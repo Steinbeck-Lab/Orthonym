@@ -103,7 +103,18 @@ class TestAM1Cyanamide:
 class TestAM5ConjoinedAmidine:
     @pytest.mark.parametrize("smiles,expected", [
         ("CC(=N)NC(C)=N", "N-ethanimidoylethanimidamide"),
-        ("CC(=N)NC(=N)c1ccccc1", "N-ethanimidoylbenzenecarboximidamide"),
+        pytest.param(
+            "CC(=N)NC(=N)c1ccccc1", "N-ethanimidoylbenzenecarboximidamide",
+            marks=pytest.mark.xfail(strict=True, reason=(
+                "TRIAGE g8 C22 (j7, re-spied): chain perception walks the conjoined "
+                "C(=N)-N-C(=N) through its nitrogens (principal_chain [=N, C, N, C, "
+                "CH3]) and parent selection prefers that chain (two amidine groups) "
+                "to the ring, so general_acyclic builds the OPSIN-unparseable "
+                "'2-phenyl-1,3-diazapentanediimidamide' (gate off; the PIN tier "
+                "abstains, best-effort ships the RT-exact '(N-ethanimidoyl"
+                "carbamimidoyl)benzene'); the rules.benzene AM-5 N-imidoyl route "
+                "never gets its turn. Needs the chain finder to keep amidine N out of "
+                "the skeleton. The expected value is OPSIN full-InChIKey exact."))),
     ])
     def test_heals(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -131,9 +142,33 @@ class TestPF2Hydrazonamido:
 
 
 @pytest.mark.unit
+class TestCyanoaminoPrefix:
+    """-NH-C#N under a senior principal group, gate ON (production).
+
+    The former fail-closed row O=C(O)CNC#N now names atom-complete. The prefix is
+    COMPOUND ('amino' substituted by 'cyano'), so it takes parentheses:
+    (the Blue Book) "Parentheses are used around compound... prefixes"; as a
+    FIRST cited prefix inside it, 'cyano' is bare, (:7272) -- cf.
+    '(methylamino)' (:21624), '(carbamoylamino)acetic acid' (:33382). The chain path
+    once shipped '[(cyano)amino]acetic acid' and the aryl path '4-cyanoaminobenzoic
+    acid' (TRIAGE g8 C21). OPSIN 2.9.0 full-InChIKey exact for all four.
+    """
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("O=C(O)CNC#N", "(cyanoamino)acetic acid"),
+        ("O=C(O)CCNC#N", "3-(cyanoamino)propanoic acid"),
+        ("OC(=O)c1ccc(NC#N)cc1", "4-(cyanoamino)benzoic acid"),
+        ("Oc1ccc(NC#N)cc1", "4-(cyanoamino)phenol"),
+    ])
+    def test_cyanoamino_is_enclosed(self, _validity_gate_on, smiles, expected):
+        assert name_compound(smiles) == expected
+
+
+@pytest.mark.unit
 class TestFailClosed:
     @pytest.mark.parametrize("smiles", [
-        "O=C(O)CNC#N",     # cyanamide + senior COOH coexistence (out of scope)
+        # NB: "O=C(O)CNC#N" (cyanamide + senior COOH) left this list: it names
+        # '(cyanoamino)acetic acid' (TestCyanoaminoPrefix above).
         # NB: "NN=C(N)CCC(=O)O" was pass-D-fail-closed; plan P1AM Task 6
         # now HEALS it to '4-amino-4-hydrazinylidenebutanoic
         # acid' (chain-terminal amidrazone amino/hydrazinylidene split) — it

@@ -107,7 +107,7 @@ class TestIUPACValueVerification:
         (6000, "hexali"), (7000, "heptali"), (8000, "octali"),
         (9000, "nonali"),
         # Thousands compositions
-        (1001, "henakili"),
+        (1001, "henkili"),  # Table 1.4: 1001 henkilia
         (1010, "decakili"),
         (1100, "hectakili"),
         (9999, "nonanonacontanonactanonali"),

@@ -81,8 +81,8 @@ def test_ring_n_targets_round_trip(smiles, expected):
         # Acyclic carbamic acids stay carbamic (N NOT a ring atom) — the reframing
         # is correct here; only a RING nitrogen is senior to it (the Blue Book).
         ("NC(=O)O", "carbamic acid"),
-        ("CNC(=O)O", "N-methylcarbamic acid"),
-        ("CN(C)C(=O)O", "N,N-dimethylcarbamic acid"),
+        ("CNC(=O)O", "methylcarbamic acid"),
+        ("CN(C)C(=O)O", "dimethylcarbamic acid"),
         # Acyclic ureas stay urea (neither N is a ring atom).
         ("NC(=O)N", "urea"),
         ("CNC(=O)NC", "N,N'-dimethylurea"),

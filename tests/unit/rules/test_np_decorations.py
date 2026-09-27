@@ -105,7 +105,10 @@ class TestNPDecorationEnumeration:
         """
         smiles = "C[C@@]12[C@H](CC[C@H]1[C@@H]1CCC=3C=C(C=CC3[C@H]1CC2)O)O"
         result = name_compound(smiles)
-        assert result == "(8R,9S,13S,14S,17S)-estra-1,3,5(10)-triene-3,17-diol", (
+        # j7: the estrane numbering map had C-11/C-12 swapped; fixed, the
+        # alpha/beta form resolves ('estra-1,3,5(10)-triene-3,17beta-diol', the
+        # preferred method, the Blue Book). OPSIN full-InChIKey exact.
+        assert result == "estra-1,3,5(10)-triene-3,17β-diol", (
             f"Got '{result}'"
         )
 
@@ -178,6 +181,13 @@ class TestNPDecorationEdgeCases:
         result = name_compound(smiles)
         assert result == "(8R,9S,10R,13S,14S)-androstan-3-one", f"Got '{result}'"
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "PIN tier abstains on the stereo-free input: a stereoparent name implies "
+        "the configuration (P-101.2.6, BlueBookV2.md:51047) and the hydro-"
+        "cyclopenta[a]phenanthrene PIN is not built; the old passing name "
+        "'1-methyl-2-(6-methylheptan-2-yl)-5-tridecylcyclopentane' named one ring "
+        "as a monocycle (OPSIN: a different molecule; bdd69a673) -- TODO in "
+        "TRIAGE.md 'Suite fix -- j1-regressions'"))
     def test_double_bond_only(self):
         """Steroid with only a double bond modification, no FG substituents."""
         # Cholest-5-ene (cholestane with one C=C, no -OH or =O)
@@ -185,6 +195,15 @@ class TestNPDecorationEdgeCases:
         smiles = "CC(C)CCCC(C)C1CCC2C3CC=C4CCCCC4(C)C3CCC12C"
         result = name_compound(smiles)
         assert "en" in result, f"Expected 'en' suffix in '{result}'"
+
+    @pytest.mark.opsin_gate
+    def test_double_bond_only_tier_contract(self):
+        """Production (gate on) for the strict-xfail row above: the PIN tier fails
+        closed or ships an RT-exact name; best-effort names it RT-exact with the
+        ring C=C as an 'ene' ending."""
+        from tests.support.rt_assert import assert_tier_contract
+        _pin, be = assert_tier_contract("CC(C)CCCC(C)C1CCC2C3CC=C4CCCCC4(C)C3CCC12C")
+        assert be.endswith("ene"), be
 
     def test_multiple_hydroxyls(self):
         """Steroid with multiple -OH groups.

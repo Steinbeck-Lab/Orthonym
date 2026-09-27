@@ -78,14 +78,22 @@ def test_p93_5_7_3_ring_assembly_stereo_no_longer_wrong():
 
 @pytest.mark.unit
 def test_p93_6_ex6_forbidden_multiplicative_fails_closed():
-    # Ex6: multiplicative name forbidden when substituents differ in
-    # stereo descriptor. Fixed in commit f5f891f4 (immediately prior to this
-    # sweep): _ring_sub_group_stereo_veto declines the merge instead of
-    # emitting a wrong stereoisomer. Verification-lock: confirms the veto
-    # still fails closed (gated == raw == "unknown organic compound"), not a
-    # new build -- the full per-substituent stereo-bracket PIN stays routed
-    # to a phase.
+    # Ex6: a multiplicative name is forbidden when the substituents differ
+    # in stereo descriptor. The witness below does NOT encode that case (TRIAGE g7
+    # C16, re-verified with rdCIPLabeler, not the engine): its two rings are the
+    # SAME cis ring, (1s,4s) each, InChI /t13-,14-,15+,16+, and the carbinol is
+    # not stereogenic (RDKit's canonical SMILES drops its tag). So the
+    # multiplicative name is right, and a SUBSTITUTED prefix takes 'bis':
+    # (a) (the Blue Book) "'bis', 'tris',... are used to indicate a
+    # multiplicity of: (a) compound or complex (i.e. substituted) prefixes"; the
+    # stereo block does not change that (it shipped 'di[' until the multiplier
+    # peeled it). OPSIN 2.9.0 cannot parse r/s: the stereo-free
+    # '1,3-bis(4-methylcyclohexyl)propan-2-ol' is full-key EXACT on the
+    # constitution (the gate's lowercase-descriptor carve-out). The genuine
+    # cis/trans case (BB Ex1, '(2R)-1-[(1r,4S)-...]-3-[(1s,4S)-...]propan-2-ol',
+    #:50474) is a separate finding (TRIAGE 'Suite fix -- j5-pin-labels-b').
     smiles = "C[C@H]1CC[C@@H](C[C@@H](O)C[C@@H]2CC[C@H](C)CC2)CC1"
+    expected = "1,3-bis[(1s,4s)-4-methylcyclohexyl]propan-2-ol"
     namer_raw = Orthonym(_disable_opsin_validity_gate=True)
-    assert namer.name(smiles) == "unknown organic compound"
-    assert namer_raw.name(smiles) == "unknown organic compound"
+    assert namer.name(smiles) == expected
+    assert namer_raw.name(smiles) == expected

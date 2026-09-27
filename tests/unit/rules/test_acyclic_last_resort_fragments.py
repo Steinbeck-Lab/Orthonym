@@ -79,8 +79,59 @@ def test_fragments_are_distinct():
     assert len(set(FRAGMENTS)) == 11
 
 
-@pytest.mark.parametrize("smiles", FRAGMENTS)
+# Three rows of the set name atom-complete now (TRIAGE g6 C15, 'Suite fix --
+# j5-pin-labels-b'); each is asserted on its spelling and its tier instead of on
+# the sentinel. The PIN spellings are OPSIN 2.9.0 full-InChIKey EXACT.
+# - N-acyl on an amine inside a sulfate/sulfonate ester: the amide is cited as
+# the '-amido' prefix, (the Blue Book) "Method (1)
+# generates preferred IUPAC names." (:32998), '2-(N-methylpropanamido)benzene-
+# 1-sulfonic acid (PIN)'. No producer builds it on the anion-ester path yet, so
+# the shipped N-acyl float stays below pin_verified (decision A part 1).
+# - the compound alkyloxy prefix inside 'methyl' takes its own marks,
+# (:7232), '(benzyloxy)carbonyl (preferred prefix)' (:18116).
+_PIN_BUILT = {
+    "CCCCCCCCCCOC[N+](C)(C)CCOC(=O)CCCCCCCCC":
+        "2-(decanoyloxy)-N-[(decyloxy)methyl]-N,N-dimethylethan-1-aminium",
+}
+_PIN_NOT_BUILT = {
+    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]": "2-tetradecanamidoethyl sulfate",
+    "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C":
+        "2-{N-[3-(decyloxy)propyl]-2-methylprop-2-enamido}ethane-1-sulfonate",
+}
+_STILL_LAST_RESORT = [s for s in FRAGMENTS
+                      if s not in _PIN_BUILT and s not in _PIN_NOT_BUILT]
+
+
+@pytest.mark.parametrize("smiles", _STILL_LAST_RESORT)
 @pytest.mark.xfail(strict=True, reason="acyclic last-resort gap, v30 phase PB")
 def test_acyclic_fragment_names_without_a_sentinel(smiles):
     name = Orthonym(general_fallback=True).name(smiles)
     assert not is_refusal_sentinel(name), name
+
+
+@pytest.mark.parametrize("smiles,expected", sorted(_PIN_BUILT.items()))
+def test_fragment_named_at_the_pin_tier(smiles, expected):
+    from tests.support.rt_assert import name_is_rt_exact
+    r = Orthonym().name_tiered(smiles)
+    assert r["name"] == expected, r
+    assert r["tier"] == "pin_verified", r
+    assert name_is_rt_exact(expected, smiles), r
+
+
+@pytest.mark.parametrize("smiles", sorted(_PIN_NOT_BUILT))
+def test_fragment_ships_below_the_pin_tier(smiles):
+    from tests.support.rt_assert import name_is_rt_exact
+    r = Orthonym().name_tiered(smiles)
+    assert not is_refusal_sentinel(r["name"]), r
+    assert r["tier"] != "pin_verified", r
+    assert name_is_rt_exact(r["name"], smiles), r
+
+
+@pytest.mark.parametrize("smiles,expected", sorted(_PIN_NOT_BUILT.items()))
+@pytest.mark.xfail(strict=True, reason=(
+    "PIN cites the N-acyl amine as an '-amido' prefix (P-66.1.1.4.3, "
+    "BlueBookV2.md:32998) on the sulfate/sulfonate ester; the anion-ester path "
+    "has no amido producer (it ships the N-acyl float below pin_verified) -- TODO "
+    "in TRIAGE.md 'Suite fix -- j5-pin-labels-b'"))
+def test_fragment_pin_spelling(smiles, expected):
+    assert Orthonym().name(smiles) == expected

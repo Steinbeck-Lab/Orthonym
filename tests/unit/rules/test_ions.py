@@ -807,5 +807,21 @@ class TestSUB01ChargeAwareNaming:
 
     def test_azide_keeps_azido_prefix(self):
         # /C2 Plan 02: azido SMARTS fixed -> the azide is no longer dropped.
+        # The azido branch is now numbered from the free valence by the
+        # polyfunctional substituent namer (Pass 1c3), '3-azidopropyl', not the
+        # string path's wrong-end '1-azidopropyl';
+        # the Blue Book "named using substitutive nomenclature and the prefix
+        # 'azido'", '(2-azidoethyl)benzene (PIN)':25995; '4-amino-4-oxobutanoic acid
+        # (PIN)':30384). OPSIN 2.9.0 full-InChIKey exact (TRIAGE g7 C14,
+        # 'Suite fix -- j5-pin-labels-b').
         name = name_compound("[N-]=[N+]=NCCCNC(=O)CCCC(=O)O")
-        assert "azido" in name
+        assert name == "5-[(3-azidopropyl)amino]-5-oxopentanoic acid"
+
+    @pytest.mark.opsin_gate
+    def test_azide_keeps_azido_prefix_tier_contract(self):
+        # Production (gate on) for the strict-xfail row above: the PIN tier fails
+        # closed or ships an RT-exact name, and the RT-exact best-effort name keeps
+        # the azide as 'azido' (what guards: it is never dropped).
+        from tests.support.rt_assert import assert_tier_contract
+        _pin, be = assert_tier_contract("[N-]=[N+]=NCCCNC(=O)CCCC(=O)O")
+        assert "azido" in be, be

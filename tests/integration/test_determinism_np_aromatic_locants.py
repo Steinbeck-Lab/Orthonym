@@ -106,10 +106,33 @@ AROMATIC_NP_FIXTURES = [
 ]
 
 
+# Fixtures whose '1,3,5(10)-trien' steroid name the engine cannot build yet.
+# The 17-ethynyl is a decoration the natural-product scaffold producer has no
+# finder for: the old outputs '(8R,9S,13S,14S,17R)-estra-1,3,5(10)-triene-3,17-
+# diol' / '...-3-methoxyestra-1,3,5(10)-trien-17-ol' DROPPED it (OPSIN 2.9.0 reads
+# them as estradiol / 3-O-methylestradiol, C18/C19 for the C20/C21 inputs: a
+# different molecule), "SUBSTITUTIVE NOMENCLATURE" (the Blue Book,
+# every substituent is cited as a prefix or a suffix). 286a491c8 made the producer
+# decline instead; they passed before only when the subprocess inherited a
+# gate-OFF environment (TRIAGE C1) or the OPSIN gate timed out and failed open.
+# Production abstains at the PIN tier (as it already did at 4e0e5c29b with the
+# gate on); best-effort names both RT-exact (von Baeyer). The xfail is strict:
+# the substring may only come back as a real, decoration-complete name.
+_NEEDS_ETHYNYL_DECORATION = {
+    "ethinyl_estradiol": "17-ethynyl estradiol",
+    "mestranol": "17-ethynyl 3-methoxyestradiol",
+}
+_ETHYNYL_XFAIL_REASON = (
+    "needs a 17-ethynyl (alkynyl) decoration finder in the NP steroid producer "
+    "(rules/natural_products.py; P-15.1 :4720): the old '1,3,5(10)-trien' name "
+    "dropped the ethynyl (286a491c8); TODO in TRIAGE.md 'Suite fix -- "
+    "j1-regressions'")
+
+
 @pytest.mark.parametrize("seed", [0, 1, 2, 3, 42])
 @pytest.mark.parametrize("fixture_id,smi,expected_substring", AROMATIC_NP_FIXTURES)
 def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
-    seed, fixture_id, smi, expected_substring,
+    seed, fixture_id, smi, expected_substring, request,
 ):
     """Per internal notes: ALL aromatic-NP-scaffold canary rows produce
     byte-identical output across PYTHONHASHSEED ∈ {0, 1, 2, 3, 42}.
@@ -120,6 +143,9 @@ def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
     substring is None, only cross-seed determinism is asserted
     (output is invariant across seeds even if specific form is uncertain).
     """
+    if fixture_id in _NEEDS_ETHYNYL_DECORATION:
+        request.applymarker(pytest.mark.xfail(strict=True,
+                                              reason=_ETHYNYL_XFAIL_REASON))
     env = os.environ.copy()
     env["PYTHONHASHSEED"] = str(seed)
     # Use the worktree src path so we test the amended code.
@@ -190,3 +216,28 @@ def test_aromatic_np_scaffold_byte_identical_across_seeds(
             f"  seed={s}: {o!r}" for s, o in sorted(outputs.items())
         )
     )
+
+
+@pytest.mark.parametrize("fixture_id", sorted(_NEEDS_ETHYNYL_DECORATION))
+def test_ethynyl_steroids_never_ship_a_decoration_dropping_name(fixture_id):
+    """0-wrong for the two strict-xfail fixtures above, in production (a fresh
+    subprocess, OPSIN gate on): whatever the default tier ships is either the
+    failure sentinel or a name that round-trips to the input's full InChIKey --
+    never the ethynyl-dropping steroid name."""
+    from orthonym.errors import is_failure_name
+    from tests.support.rt_assert import name_is_rt_exact
+    smi = next(s for f, s, _ in AROMATIC_NP_FIXTURES if f == fixture_id)
+    env = os.environ.copy()
+    cwd = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+    env["PYTHONPATH"] = os.path.join(cwd, "src")
+    for key in ("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "ORTHONYM_SELF_CONSISTENCY_GATE"):
+        env.pop(key, None)   # production gates, whatever the suite exported
+    result = subprocess.run(
+        [sys.executable, "-c",
+         f"from orthonym import name_compound; print(name_compound({smi!r}))"],
+        capture_output=True, text=True, env=env, timeout=120,
+    )
+    assert result.returncode == 0, result.stderr[:500]
+    name = result.stdout.strip()
+    assert is_failure_name(name) or name_is_rt_exact(name, smi), (
+        f"{fixture_id}: the default tier shipped {name!r}, which is not the input")

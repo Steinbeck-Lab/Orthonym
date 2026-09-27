@@ -160,15 +160,48 @@ REPAIRED = [
     # HEAD cited one bond with a locant of 1; both bonds are stereogenic, at 2 and 4
     ("C/C(=C\\C#N)/C=C/N1CCCCC1",
      "(2E,4E)-3-methyl-5-(piperidin-1-yl)penta-2,4-dienenitrile"),
-    # HEAD emitted NO descriptor at all; the chain map supplies the correct one
-    ("CN1C=C(C2=CC=CC=C21)[C@@H](CC(=O)N3CCCC3)C4=CC(=CC=C4)C(F)(F)F",
-     "N-[(3S)-3-(1-methyl-1H-indol-3-yl)-3-[3-(trifluoromethyl)phenyl]propanoyl]pyrrolidine"),
 ]
 
 
 @pytest.mark.parametrize("smiles,expected", REPAIRED)
 def test_same_rule_repairs_these(namer, smiles, expected):
     assert namer.name(smiles) == expected
+
+
+# The third repaired row of the A/B: HEAD emitted NO descriptor at all; the chain map
+# supplies '(3S)'. It is a hidden amide (acyl on a ring N), so its PIN is the
+# pseudoketone: 'Hidden' amides (the Blue Book) "now preferably named
+# as a pseudoketone" (:33127), cf. '1-(piperidin-1-yl)propan-1-one (PIN)
+# 1-propanoylpiperidine' (:29374). The old literal
+# 'N-[(3S)-...propanoyl]pyrrolidine' was never the PIN and never shipped (its
+# content holds '(' and '[', so it needs braces); what shipped was the doubled
+# 'N-({(3S)-...propanoyl})pyrrolidine':7444: one level per fragment;
+# TRIAGE g7 C10). OPSIN 2.9.0 full-InChIKey: both names below EXACT.
+HIDDEN_AMIDE = "CN1C=C(C2=CC=CC=C21)[C@@H](CC(=O)N3CCCC3)C4=CC(=CC=C4)C(F)(F)F"
+HIDDEN_AMIDE_PIN = ("(3S)-3-(1-methyl-1H-indol-3-yl)-1-(pyrrolidin-1-yl)-3-"
+                    "[3-(trifluoromethyl)phenyl]propan-1-one")
+HIDDEN_AMIDE_SHIPPED = ("N-{(3S)-3-(1-methyl-1H-indol-3-yl)-3-[3-(trifluoromethyl)"
+                        "phenyl]propanoyl}pyrrolidine")
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "PIN is the pseudoketone (P-66.1.3, BlueBookV2.md:33127): "
+    "rules/pseudoketones.name_pseudoketone names only an UNSUBSTITUTED acyl chain "
+    "('1-(pyrrolidin-1-yl)propan-1-one'); the substituted-acyl pseudoketone "
+    "producer is not built -- TODO in TRIAGE.md 'Suite fix -- j5-pin-labels-b'"))
+def test_hidden_amide_row_pin(namer):
+    assert namer.name(HIDDEN_AMIDE) == HIDDEN_AMIDE_PIN
+
+
+@pytest.mark.opsin_gate
+def test_hidden_amide_row_ships_below_the_pin_tier(namer):
+    """Production (gate on): the stereo descriptor is resolved, the N-acyl name
+    ships RT-exact with ONE level of enclosing marks, labelled below pin_verified."""
+    from tests.support.rt_assert import name_is_rt_exact
+    r = namer.name_tiered(HIDDEN_AMIDE)
+    assert r["name"] == HIDDEN_AMIDE_SHIPPED, r
+    assert r["tier"] != "pin_verified", r
+    assert name_is_rt_exact(r["name"], HIDDEN_AMIDE), r
 
 
 def test_fails_closed_rather_than_citing_an_unresolvable_locant(namer):
@@ -438,10 +471,31 @@ def test_residual_parent_block_is_not_the_substituent_block(namer):
 # The two rows a naive `principal_chain`-only guard broke. Both are RING parents
 # carrying a STALE truthy `principal_chain` (pc=(1,0) and pc=(1,)) AND
 # `chain_is_parent=True`. They must keep their descriptors.
+PENTAACETATE = "CC(=O)O[C@@H]1[C@H](C([C@H]([C@@H](C1OC(=O)C)OC(=O)C)OC(=O)C)F)OC(=O)C"
+# The pentaacetate's PIN is the polyol-ester functional-class name:
+# (the Blue Book) "All preferred IUPAC names for esters are named by
+# functional class nomenclature"; (:31819) 'propane-1,2,3-triyl
+# triacetate (PIN)' (:31827), '...-2-fluorooxane-3,4,5-triyl triacetate' (:53293).
+# Both ring directions round-trip (OPSIN 2.9.0 full InChIKey, the molecule is
+# mirror-symmetric through C3/C6); (j) (:3346) gives R the lower locant.
+# The engine emits the acyloxy-prefix name '(1R,2S,4R,5S)-1,2,4,5,6-pentakis
+# (acetyloxy)-3-fluorocyclohexane' at pin_verified (RT exact, but not the PIN, and
+# its numbering misses (g):3307, which gives the first-cited acetyloxy
+# 1,2,3,4,5). The old snapshot '(1S,2R,4S,5R)-3-fluoro-1,2,4,5,6-pentakis(acetyloxy)
+# cyclohexane' was the same non-PIN with the fluoro cited out of order
+# and the S-first numbering. What this row guards --
+# the descriptors are kept -- is asserted spelling-free below.
+PENTAACETATE_PIN = "(1R,2S,4R,5S)-6-fluorocyclohexane-1,2,3,4,5-pentayl pentaacetate"
 RING_PARENT_ROWS = [
-    ("CC(=O)O[C@@H]1[C@H](C([C@H]([C@@H](C1OC(=O)C)OC(=O)C)OC(=O)C)F)OC(=O)C",
-     "(1S,2R,4S,5R)-3-fluoro-1,2,4,5,6-pentakis(acetyloxy)cyclohexane"),
+    (PENTAACETATE, PENTAACETATE_PIN),
     ("C1CCCC(/C=C\\CC1)OC=O", "(2Z)-cyclonon-2-en-1-yl formate"),
+]
+_RING_PARENT_PARAMS = [
+    pytest.param(*RING_PARENT_ROWS[0], marks=pytest.mark.xfail(strict=True, reason=(
+        "PIN is the functional-class polyol ester (P-65.6.3.2.1 :31663); the "
+        "engine ships the acyloxy-prefix name at pin_verified -- TODO in "
+        "TRIAGE.md 'Suite fix -- j1-regressions'"))),
+    RING_PARENT_ROWS[1],
 ]
 
 
@@ -450,9 +504,18 @@ def test_ring_parent_row_set_is_non_empty():
     assert len(RING_PARENT_ROWS) == 2
 
 
-@pytest.mark.parametrize("smiles,expected", RING_PARENT_ROWS)
+@pytest.mark.parametrize("smiles,expected", _RING_PARENT_PARAMS)
 def test_ring_parent_descriptors_are_not_dropped(namer, smiles, expected):
     assert namer.name(smiles) == expected
+
+
+def test_pentaacetate_ring_parent_keeps_its_descriptors(namer):
+    """The contract of the strict-xfail row above, independent of its spelling:
+    the ring parent's four descriptors survive, i.e. the name round-trips to the
+    input's FULL InChIKey (stereo layer included; OPSIN run outside the engine)."""
+    from tests.support.rt_assert import assert_full_rt
+    name = namer.name(PENTAACETATE)
+    assert_full_rt(name, PENTAACETATE)
 
 
 def _capture_injections(namer, smiles):

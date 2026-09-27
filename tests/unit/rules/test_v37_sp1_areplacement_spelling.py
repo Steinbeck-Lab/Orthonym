@@ -11,10 +11,10 @@ This is a best-effort SPELLING/quality fix: PIN-default ABSTAINS on these inputs
 (no PIN to regress); 0-wrong is preserved by either way. Genuine chain
 skeletal-replacement PINs (``2,5,8-trioxanonane``) must stay untouched.
 """
-import os
-
-os.environ.setdefault("ORTHONYM_JVM_BUDGET", "off")
-
+# (A module-level os.environ.setdefault("ORTHONYM_JVM_BUDGET", "off") stood here. It
+# changed nothing in this process -- the engine never takes a JVM slot -- but under
+# xdist every worker imports every module at collection, so it switched the JVM
+# budget off in every child process the rest of the suite spawned. TRIAGE g8 C1.)
 import pytest
 from rdkit import Chem
 

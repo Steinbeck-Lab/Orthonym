@@ -1126,6 +1126,32 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
     # MULTI-substituted chains keep every locant deny-default).
     omit_locant_one = (n == 2 and len(substituents) == 1)
 
+    # (the Blue Book verbatim "All locants are omitted in compounds or
+    # substituent groups in which all substitutable positions are completely
+    # substituted or modified... in the same way"): every hydrogen of the
+    # parent hydride replaced by the SAME alkyl -> no locants at all
+    # ('hexamethyldisilane', not '1,1,1,2,2,2-hexamethyldisilane'). The licence
+    # is decided by the shared hydrogen-counting predicate over the parent
+    # hydride (index i = backbone locant i+1); partial or mixed substitution
+    # keeps every locant (the Blue Book counter-clause).
+    omit_all_locants = False
+    if len(by_name) == 1:
+        from orthonym.assembly.locant_omission import l5_uniform_complete
+        sym = next(iter(g14_syms))
+        # n >= 2 here: a single Group-14 atom has no degree-1 end pair above.
+        parent = Chem.MolFromSmiles(
+            f"[{sym}H3]" + f"[{sym}H2]" * (n - 2) + f"[{sym}H3]")
+        if parent is not None:
+            (only_name, only_locs), = by_name.items()
+            counts: Dict[int, int] = {}
+            for loc in only_locs:
+                counts[loc - 1] = counts.get(loc - 1, 0) + 1
+            omit_all_locants = l5_uniform_complete(
+                parent,
+                decoration_of={i: only_name for i in counts},
+                counts=counts,
+            )
+
     prefix_parts = []
     for sub_name in sorted(by_name):
         locs = by_name[sub_name]
@@ -1134,7 +1160,10 @@ def name_free_homonuclear_group14_hydride(mol) -> Optional[str]:
             m = SIMPLE_MULTIPLIERS.get(len(locs))
             if m is None:
                 return None
-            prefix_parts.append(f"{loc_str}-{m}{sub_name}")
+            if omit_all_locants:
+                prefix_parts.append(f"{m}{sub_name}")
+            else:
+                prefix_parts.append(f"{loc_str}-{m}{sub_name}")
         elif omit_locant_one and locs == [1]:
             prefix_parts.append(sub_name)
         else:

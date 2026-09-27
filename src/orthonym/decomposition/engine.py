@@ -10,6 +10,7 @@ names correctly are left alone. Only molecules with poor names (unknown,
 suspiciously short, etc.) are decomposed.
 """
 
+import contextvars
 import re
 from collections import deque
 from typing import Dict, List, Optional
@@ -560,6 +561,106 @@ def _amine_acyl_ambiguous(amine_smiles: str) -> bool:
                    and (a.GetTotalNumHs() >= 1 or a.GetIsAromatic())) >= 2
     except Exception:
         return False
+
+
+# ---------------------------------------------------------------------------
+# Decision A: the N-acyl float onto a nitrogen that is not a suffix nitrogen
+# ---------------------------------------------------------------------------
+
+#: Scope of the gate below. ``None`` (the default) = DEMOTE: a float onto a non-suffix
+#: nitrogen ships, recorded as a non-PIN fragment. A list = REFUSE: the float is withheld
+#: and appended here, so the caller that opened the scope
+#: (routing.dispatch_table._handle_peptide) can tell that its systematic attempt failed
+#: because of this gate and fall back to the demoted float. The scope changes what the
+#: naming path returns, so the nested memo keys carry ``nacyl_float_refusing``.
+_NACYL_FLOAT_REFUSALS: "contextvars.ContextVar[Optional[list]]" = contextvars.ContextVar(
+    "orthonym_nonsuffix_nacyl_float_refusals", default=None)
+
+
+def nacyl_float_refusing() -> bool:
+    """True inside a refusal scope (``_NACYL_FLOAT_REFUSALS``); a memo-key component."""
+    return _NACYL_FLOAT_REFUSALS.get() is not None
+
+
+#: Endings of an amine-fragment name whose final (suffix or retained-parent) word
+#: expresses a nitrogen -- the only names in which a bare 'N' locant designates that
+#: nitrogen. A name ending otherwise ('glycinate', '2-aminoethyl sulfate',
+#: '...-sulfonic acid') cites its nitrogen as an 'amino' prefix.
+_N_SUFFIX_NAME_ENDINGS = ("amine", "aniline", "amide", "imide", "amidine", "imine",
+                          "urea", "guanidine")
+
+
+def _nacyl_float_n_is_suffix_nitrogen(amine_smiles: str,
+                                      amine_name: Optional[str] = None) -> bool:
+    """True when the nitrogen a bare ``N-<acyl>`` float acylates is a SUFFIX nitrogen of
+    the amine parent: an atom of its principal characteristic group (the -amine of
+    'cyclohexanamine', the -amide of 'acetamide', the -sulfonamide of
+    'benzenesulfonamide'), which the italic locant 'N' designates. When the parent
+    name is given it must also end in a nitrogenous word (``_N_SUFFIX_NAME_ENDINGS``):
+    the structural principal group does not see a charged or functional-class parent
+    ('glycinate', '2-aminoethyl sulfate'), whose nitrogen the name cites as 'amino'.
+
+    False when that nitrogen is cited in the parent name as an 'amino' prefix -- the
+    alpha-amino N of 'glycine' or '(2S)-2-aminopropanoic acid', whose acid is the
+    principal characteristic group -- or is a ring atom that carries a numerical
+    locant ('pyrrolidine-2-carboxylic acid', N = 1). There the float is not the PIN:
+     "Substituents of the types -NH-CO-R and -NH-SO2-R" (the Blue Book
+    :32991) names -NH-CO-R (1) as an 'amido' prefix and (2) as an 'acylamino' prefix,
+    and "Method (1) generates preferred IUPAC names." (:32998); an N-substituted glycine
+    is printed on the acetic acid parent, "[(methanesulfinothioyl)amino]acetic acid
+    (PIN)" (:33213). User decision A (2026-09-26): retained amino-acid names stay at the
+    PIN tier only when the nitrogen is unsubstituted; the N-substituted retained name is
+    general nomenclature,:54480;:50943 identifies no PIN there).
+
+    The acylated nitrogen is the fragment's only acylatable one: the float runs only
+    after ``_amine_acyl_ambiguous`` found at most one (an H-bearing or aromatic N), and
+    the capped attachment N always bears an H. Fail-open (True, the previous behaviour)
+    when the fragment does not parse or that nitrogen is not unique.
+    """
+    try:
+        m = Chem.MolFromSmiles(amine_smiles)
+        if m is None:
+            return True
+        if amine_name and not amine_name.rstrip().endswith(_N_SUFFIX_NAME_ENDINGS):
+            return False
+        cands = [a.GetIdx() for a in m.GetAtoms()
+                 if a.GetSymbol() == 'N'
+                 and (a.GetTotalNumHs() >= 1 or a.GetIsAromatic())]
+        if len(cands) != 1:
+            return True
+        n_idx = cands[0]
+        if m.GetAtomWithIdx(n_idx).IsInRing():
+            return False
+        from ..perception.functional_groups import detect_functional_groups
+        from ..rules.seniority import get_principal_group
+        _pg, matches = get_principal_group(m, detect_functional_groups(m))
+        return any(n_idx in tuple(match) for match in (matches or ()))
+    except Exception:
+        return True
+
+
+def gate_nonsuffix_nacyl_float(amine_smiles: Optional[str],
+                               float_name: Optional[str],
+                               amine_name: Optional[str] = None) -> Optional[str]:
+    """Decision A gate for a bare ``N-<acyl>`` float (the amide branch of
+    ``_try_single_bond_decompose`` and ``fragment_assembly._assemble_amide``).
+
+    Returns ``float_name`` unchanged when the acylated N is a suffix nitrogen
+    (``_nacyl_float_n_is_suffix_nitrogen``). Otherwise, inside a refusal scope the float
+    is withheld (None) so that a systematic name can be built; outside one it ships as
+    an honest demotion: validated as before, but recorded as a non-PIN fragment, so
+    ``name_tiered`` labels any name that carries it below pin_verified.
+    """
+    if (not float_name or not amine_smiles
+            or _nacyl_float_n_is_suffix_nitrogen(amine_smiles, amine_name)):
+        return float_name
+    refusals = _NACYL_FLOAT_REFUSALS.get()
+    if refusals is not None:
+        refusals.append(float_name)
+        return None
+    from ..metrics.provenance import record_non_pin_fragment
+    record_non_pin_fragment(float_name)
+    return float_name
 
 
 def _name_quality_is_acceptable(name: str, mol) -> bool:
@@ -1456,7 +1557,10 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             if acid_frag and amine_frag:
                 if not acid_is_more_senior(acid_frag["smiles"], amine_frag["smiles"]):
                     # Amine is more senior -> substitutive naming
-                    from ..assembly.naming_utils import _wrap_n_substituent
+                    from ..assembly.naming_utils import (
+                        _wrap_n_substituent,
+                        enclose_if_compound,
+                    )
                     from .fragment_assembly import _acid_to_acyl, _join_components
                     acid_name = fragment_names.get("acid", "")
                     amine_name = fragment_names.get("amine", "")
@@ -1470,10 +1574,21 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                     # ambiguity + the no-jar fail-open hole (acylspy, PIN-tier T1).
                     if acyl and amine_name and not _amine_acyl_ambiguous(
                             amine_frag["smiles"]):
-                        wrapped_acyl = _wrap_n_substituent(acyl)
+                        # (the Blue Book): a compound acyl prefix takes
+                        # parentheses ('N-(4-hydroxyoctanoyl)...', not
+                        # 'N-4-hydroxyoctanoyl...'). _wrap_n_substituent only escalates
+                        # an existing enclosure, so add the base level first, as
+                        # fragment_assembly._assemble_amide does.
+                        wrapped_acyl = _wrap_n_substituent(enclose_if_compound(acyl))
                         sub_name = f"N-{_join_components(wrapped_acyl, amine_name)}"
                         if sub_name and _name_quality_is_acceptable(sub_name, mol):
-                            return sub_name
+                            # Decision A: refused (inside _handle_peptide's systematic
+                            # attempt) or demoted when the acylated N is not a suffix
+                            # nitrogen of the amine parent.
+                            sub_name = gate_nonsuffix_nacyl_float(
+                                amine_frag["smiles"], sub_name, amine_name)
+                            if sub_name:
+                                return sub_name
         except Exception:
             pass  # Any failure: fall through to normal assembly
 

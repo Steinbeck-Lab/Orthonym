@@ -9,17 +9,23 @@ carve-outs -- inositol / np-stereoparent / thioperoxol /... -- still ship), so
 the 1656 PIN gold gate is byte-identical. These tests run BEST-EFFORT only.
 """
 import ast
+import os
 import subprocess
 import sys
+from pathlib import Path
+
 import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
 
-sys.path.insert(0, "/home/kohulan/OpenSTOUT/Orthonym/src")
+# The checkout under test, derived from this file (TRIAGE g8 C1): the paths used to
+# be the main tree's, hard-coded, so a run from another checkout named with the
+# main tree's src in the child and tested the wrong code.
+PROJ = str(Path(__file__).resolve().parents[2])
+_SRC = os.path.join(PROJ, "src")
+sys.path.insert(0, _SRC)
 from orthonym.jvm_flags import java_cmd  # noqa: E402
 from tests.support.jars import jar_or_skip
-
-PROJ = "/home/kohulan/OpenSTOUT/Orthonym"
 
 
 def _be(smiles):
@@ -36,7 +42,10 @@ def _be(smiles):
         "eng = Orthonym(general_fallback=True, general_fallback_unverified=False, allow_aromatic_general=True)\n"
         f"print(repr(eng.name({smiles!r})))\n"
     )
-    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=PROJ)
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join(
+        x for x in (_SRC, os.environ.get("PYTHONPATH", "")) if x))
+    p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                       cwd=PROJ, env=env)
     out = p.stdout.strip().splitlines()
     return ast.literal_eval(out[-1]) if out else None
 

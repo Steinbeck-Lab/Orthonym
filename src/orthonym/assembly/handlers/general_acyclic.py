@@ -104,6 +104,7 @@ def name_general_acyclic(
         _generate_stereodescriptors,
         _generate_suffix,
         _w2_atom_coverage_declines,
+        _w2_atom_coverage_verdict,
     )
 
     # === Body: verbatim lift of composer.py:951-1055 (chain-fallback section) ===
@@ -275,8 +276,18 @@ def name_general_acyclic(
                 missing_fgs, assembled, getattr(features, 'canonical_smiles', '?'),
             )
 
-    if _w2_atom_coverage_declines(features, fragments, assembled):
+    _coverage = _w2_atom_coverage_verdict(features, fragments, assembled)
+    if _w2_atom_coverage_declines(features, fragments, assembled, verdict=_coverage):
         return None  # task-W2 Witness-B: name silently DROPPED atoms → decline
+    # A measured complete atom partition (every heavy atom bound to a fragment of
+    # this name) replaces the pool's character-count RATIO_REJECT_FLOOR, which is
+    # only a stand-in for coverage: numerical-term parent names with
+    # Table 1.4, the Blue Book) are short by design -- 'octacontane' is
+    # 11 characters for 80 carbons (ratio 0.092 < 0.10) and 'pentactane' 10 for
+    # 500 -- so the floor threw the only candidate away and the engine abstained on
+    # every unbranched alkane from C80 up (TRIAGE j3-long-alkanes, g1 C1). The
+    # OPSIN round-trip gate still verifies the emitted name.
+    _coverage_measured = _coverage is not None and _coverage.ok
 
     # a phase: route chain-naming through pool.
     # In first_applicable mode, pool.best returns the FIRST added
@@ -297,7 +308,8 @@ def name_general_acyclic(
         fragments, class_id="general_acyclic", section_cite="P-14+P-23+P-44",
         is_mononuclear_parent=is_mononuclear_parent,
     )
-    pool.add(assembled, "chain", features, tree=tree)
+    pool.add(assembled, "chain", features, tree=tree,
+             coverage_measured=_coverage_measured)
     best = pool.best()
 
     # G0 fail-closed safety (DD7): general_acyclic is the catch-all, but

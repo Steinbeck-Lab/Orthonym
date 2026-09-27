@@ -41,8 +41,12 @@ class TestPolyfunctionalSubstituentNamed:
         assert _name_frag("CCC(N)C(=O)O") == "2-amino-2-carboxyethyl"
 
     def test_serine_L_stereo(self):
-        # single stereocentre (not at attachment) -> bare (R)- descriptor
-        assert _name_frag("CC[C@@H](N)C(=O)O") == "(R)-2-amino-2-carboxyethyl"
+        # single stereocentre (not at attachment). Decision A part 2 (2026-09-27): was the
+        # bare '(R)-2-amino-2-carboxyethyl'. (the Blue Book): "In
+        # preferred IUPAC names, stereodescriptors, preceded by a locant, must be cited";
+        # '[(1R)-1-chloropropyl]benzene (PIN)' (:44668). The producer's own free-valence
+        # numbering now locates the centre (polyfunctional_substituent_located).
+        assert _name_frag("CC[C@@H](N)C(=O)O") == "(2R)-2-amino-2-carboxyethyl"
 
     def test_hydroxy_carboxy(self):
         # carboxy < hydroxy alphabetically

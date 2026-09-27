@@ -1120,7 +1120,10 @@ def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
                         anion_name = _apply_anionic_substituent_prefixes(
                             mol, sites['anions'], anion_name
                         )
-                        return anion_name
+                        # '' = a junior anionic site the prefix step cannot
+                        # express (fail closed there); None continues the
+                        # cascade, '' would end it with an empty name.
+                        return anion_name or None
                     # charged C1 stack (cysteinate class): the O-ONLY
                     # neutralization above leaves any NON-OXYGEN anion
                     # (thiolate/aminide/...) still charged, so `neutral_name`
@@ -1485,17 +1488,50 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
     if (_in and not _PEPTIDE_SUBST_ACTIVE
             and mol.GetNumHeavyAtoms() <= _PEPTIDE_SUBST_MAX_HEAVY):
         try:
+            from orthonym.decomposition.engine import _NACYL_FLOAT_REFUSALS
             from orthonym.namer import Orthonym
-            _PEPTIDE_SUBST_ACTIVE = True
-            try:
-                _subst = Orthonym(
+
+            def _sub_name():
+                return Orthonym(
                     style=style,
                     _seed_excluded_dispatch_classes=frozenset({StoutClass.PEPTIDE}),
                 ).name(_in)
+
+            def _usable(name):
+                return (name and not is_failure_name(name)
+                        and _rt_full_match(name, mol))
+
+            _PEPTIDE_SUBST_ACTIVE = True
+            try:
+                # User decision A (2026-09-26): an amino acid substituted on its
+                # nitrogen takes the systematic substitutive name at the PIN tier
+                #, the Blue Book "Method (1) generates preferred
+                # IUPAC names"; '[(methanesulfinothioyl)amino]acetic acid (PIN)'
+                #:33213). Pass 1 withholds the bare 'N-<acyl>' float onto a
+                # non-suffix nitrogen ('N-acetamidoacetylglycine'), so the composer can
+                # build '(2-acetamidoacetamido)acetic acid'.
+                _refused: list = []
+                _tok = _NACYL_FLOAT_REFUSALS.set(_refused)
+                try:
+                    _subst = _sub_name()
+                finally:
+                    _NACYL_FLOAT_REFUSALS.reset(_tok)
+                _demoted = False
+                if not _usable(_subst) and _refused:
+                    # Pass 2 (only when pass 1 failed because the gate withheld a
+                    # float): the float ships as an honest demotion -- still validated,
+                    # but not a PIN ('N-(4-hydroxyoctanoyl)glycine', a general
+                    # name,:54480).
+                    _subst = _sub_name()
+                    _demoted = True
             finally:
                 _PEPTIDE_SUBST_ACTIVE = False
-            if (_subst and not is_failure_name(_subst)
-                    and _rt_full_match(_subst, mol)):
+            if _usable(_subst):
+                if _demoted:
+                    # Name-scoped record in THIS context: the float site records its
+                    # own string, but the sub-namer may have reshaped the whole name.
+                    from orthonym.metrics.provenance import record_non_pin_fragment
+                    record_non_pin_fragment(_subst)
                 return _subst
         except Exception:
             _PEPTIDE_SUBST_ACTIVE = False

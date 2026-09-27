@@ -61,8 +61,11 @@ class TestSubgap1RouteMisses:
         # name_compound used to return 'unknown organic compound'.
         smi = "CNC[C@H](O)c1ccc(O)c(O)c1.[Cl-].[H+]"
         name = name_compound(smi, style="pin")
+        # Decision A part 2 (2026-09-27): was '4-[(R)-1-hydroxy-...'; the substituent
+        # descriptor carries its locant, the Blue Book;
+        # '[(1R)-1-chloropropyl]benzene (PIN)':44668).
         assert name == (
-            "4-[(R)-1-hydroxy-2-(methylamino)ethyl]benzene-1,2-diol "
+            "4-[(1R)-1-hydroxy-2-(methylamino)ethyl]benzene-1,2-diol "
             "hydrochloride"
         )
         assert _rt_matches(name, smi)

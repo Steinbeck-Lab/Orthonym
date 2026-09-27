@@ -23,6 +23,44 @@ Test groups (Plan 02):
 import pytest
 from orthonym import name_compound
 
+# Suite fix j6-breadth (TRIAGE g4 C4/C5): rows whose PIN the PIN tier cannot
+# build. Each keeps a strict xfail naming the missing producer; what ships
+# (best-effort RT-exact, PIN tier sentinel or RT-exact) is asserted in
+# tests/unit/rules/test_j6_breadth.py::test_pin_not_built_rows_keep_the_tier_contract.
+_J6_TODO = "TODO in TRIAGE.md 'Suite fix -- j6-breadth'"
+_XF_MACROLIDE = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs macrolide parent selection -- the 16-membered "
+    "lactone ring carries the principal characteristic groups (P-44.1.1, "
+    "BlueBookV2.md:18875) and the thiazole is a substituent; best-effort names "
+    "the thiazole as parent (non-PIN) -- " + _J6_TODO))
+_XF_FUSED = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs the fusion PIN of this ortho-fused ring system "
+    "(P-52.2.4.1, BlueBookV2.md:23710: fusion names are PINs with two rings of "
+    "five or more members; von Baeyer names are not); a von Baeyer token in the "
+    "expected value is itself non-PIN and must be corrected with the build -- "
+    + _J6_TODO))
+_XF_STEROID = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs the hydro-cyclopenta[a]phenanthrene PIN for a "
+    "steroid whose input leaves ring stereocentres undefined -- a stereoparent "
+    "name implies the configuration of all of them (P-101.2.6, BlueBookV2.md:"
+    "51047) -- " + _J6_TODO))
+_XF_POLYCYCLE = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs a PIN-tier producer for this spiro/bridged "
+    "polycycle with ylidene and lactone substituents; best-effort names it "
+    "RT-exact with non-PIN parts ('methan-1-ylidene', '2-oxaethan-1-yl') -- "
+    + _J6_TODO))
+_XF_INDOLONE = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs the indol-2-one / piperazine-2,5-dione parent "
+    "choice with the decorated 2,3-dihydro-1H-indol-2-one substituent; "
+    "'indoline' is not a PIN stem (P-54.4.3.2, BlueBookV2.md:24256), so the "
+    "expected token is 'indol' -- " + _J6_TODO))
+_XF_DIHYDRO_OXO = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs the '4-methyl-2,5-dioxo-2,5-dihydrofuran-3-yl' "
+    "prefix (oxo and hydro prefixes on a mancude heteromonocycle, P-31.1.4.2.4) "
+    "at the PIN tier; best-effort ships the non-PIN '1-oxacyclopent-3-en' form. "
+    "PIN '(2E)-3-(methoxycarbonyl)-2-[16-(4-methyl-2,5-dioxo-2,5-dihydrofuran-3-"
+    "yl)hexadecyl]pent-2-enedioic acid' (OPSIN exact) -- " + _J6_TODO))
+
 
 # ---------------------------------------------------------------------------
 # Group 1: Steroid parent selection
@@ -41,6 +79,12 @@ STEROID_PARENT_FIXES = [
         "C1(C)CC[C@H](O)C(C)(C)C1C[C@@H]3O)C(=O)O",
         "trimethylcholest",
         id="cholest-en-trione-trimethyl",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "j7 (TRIAGE g7 C12): C-10/13/17/20 are undefined in the input and the "
+            "cholestane stereoparent implies them (P-101.2.6, BlueBookV2.md:51047), so "
+            "the steroid name is declined; a stereoparent name would need 'xi' for "
+            "those centres, which OPSIN 2.9.0 cannot verify. Best-effort names the "
+            "molecule RT-exact (test_stereo_mismatch_fixes::TestSM40).")),
     ),
     pytest.param(
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)"
@@ -72,6 +116,7 @@ FUSED_HETERO_CHAIN_FIXES = [
         "C(C)(C)C(=O)[C@H](C)[C@@H](O)/C(C)=C/CC1",
         "pentamethyl",  # P86: now also finds 6-oxo, so substring can't span methyl→oxacyclo
         id="macrolide-pentamethyl-oxacyclohexadecanone",
+marks=_XF_MACROLIDE,
     ),
     pytest.param(
         "C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)"
@@ -93,8 +138,9 @@ FUSED_HETERO_CHAIN_FIXES = [
     pytest.param(
         "COC(=O)/C(CC(=O)O)=C(\\CCCCCCCCCCCCCCCCC1=C(C)"
         "C(=O)OC1=O)C(=O)O",
-        "acid",
+        "2,5-dioxo-2,5-dihydrofuran-3-yl",
         id="long-chain-dicarboxylic-acid",
+marks=_XF_DIHYDRO_OXO,
     ),
 ]
 
@@ -128,8 +174,9 @@ POLYCYCLIC_VB_FIXES = [
     pytest.param(
         "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)"
         "c3ccccc32)NC1=O",
-        "indolin",
+        "indol",
         id="indolinone-derivative",
+marks=_XF_INDOLONE,
     ),
     pytest.param(
         "CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2"
@@ -162,6 +209,7 @@ POLYCYCLIC_VB_FIXES = [
         "C=C1CCOC1=O",
         "trioxa",
         id="trioxa-tricyclic-terpene",
+marks=_XF_POLYCYCLE,
     ),
 ]
 
@@ -217,16 +265,35 @@ CHARGED_SPECIES_FIXES = [
     pytest.param(
         "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])"
         "C[N+](C)(C)C",
-        "acid",
+        # The inner salt is named as the '-ate' zwitterion and the acyl is
+        # 3-hydroxyhexadecanoyl, so the old substring was wrong for this SMILES.
+        # Expected spelling: substituent prefixes in alphanumerical order,
+        # (the Blue Book); OPSIN 2.9.0 full-InChIKey EXACT (TRIAGE g4
+        # C7). The shipped name is RT-exact and labelled below pin_verified
+        # (test_carnitine_ester_zwitterion_tier_contract).
+        "3-[(3-hydroxyhexadecanoyl)oxy]-4-(trimethylazaniumyl)butanoate",
         id="carnitine-palmitoyl-acid",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "the inner-salt name is general nomenclature (its P-74.1.3 PIN cites '(N,N-dimethylmethanaminiumyl)', which OPSIN 2.9.0 cannot verify; decision A part 2) and _route_zwitterion glues the cation prefix in front of the anion parent's own prefixes: '4-(trimethylazaniumyl)3-[(3-hydroxyhexadecanoyl)oxy]butanoate' (no hyphen, P-14.5.2 order broken; charged_router needs a structured composition) -- TODO in TRIAGE.md 'Suite fix -- j5-pin-labels-b'")),
     ),
     pytest.param(
         "CC(C)[C@@]1(C)N=C(c2nc3ccccc3cc2C(=O)[O-])"
         "NC1=O.[NH4+]",
         "quinoline",
         id="ammonium-quinoline-carboxylate",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "PIN tier abstains (as it did in production at 4e0e5c29b); the old "
+            "'ammonium quinoline-3-carboxylate' dropped the imidazolone ring "
+            "(OPSIN: a different molecule; 704facd16). Needs the "
+            "4,5-dihydro-1H-imidazol-2-yl substituent at the PIN tier -- TODO in "
+            "TRIAGE.md 'Suite fix -- j1-regressions'")),
     ),
 ]
+
+# Imazaquin ammonium: what ships in production (gate on) is asserted below --
+# the PIN tier fails closed or ships an RT-exact name, and best-effort names it
+# RT-exact with the quinoline carboxylate as the parent.
+IMAZAQUIN_NH4 = "CC(C)[C@@]1(C)N=C(c2nc3ccccc3cc2C(=O)[O-])NC1=O.[NH4+]"
 
 
 @pytest.mark.integration
@@ -236,6 +303,30 @@ def test_charged_species_naming(smiles, expected_substr):
     name = name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
+
+
+@pytest.mark.integration
+@pytest.mark.opsin_gate
+def test_carnitine_ester_zwitterion_tier_contract():
+    """The strict-xfail carnitine row above, in production (gate on): a name ships,
+    RT-exact, and below pin_verified PIN not verifiable; the composed
+    spelling is not the order yet -- TRIAGE g4 C7)."""
+    from orthonym import Orthonym
+    from tests.support.rt_assert import name_is_rt_exact
+    smi = "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C"
+    r = Orthonym().name_tiered(smi)
+    assert r["tier"] != "pin_verified", r
+    assert name_is_rt_exact(r["name"], smi), r
+
+
+@pytest.mark.integration
+@pytest.mark.opsin_gate
+def test_imazaquin_ammonium_tier_contract():
+    """The strict-xfail row above, in production: the tier contract holds and the
+    best-effort name keeps the quinoline-3-carboxylate parent."""
+    from tests.support.rt_assert import assert_tier_contract
+    _pin, be = assert_tier_contract(IMAZAQUIN_NH4)
+    assert "quinoline-3-carboxylate" in be and be.startswith("ammonium "), be
 
 
 # ---------------------------------------------------------------------------
@@ -275,16 +366,19 @@ VB_FORMAT_VERIFICATION = [
         "O=C(O)c1cc2cc3c4c(c2oc1=O)CCCN4CCC3",
         "tetracyclo",
         id="vb-aza-tetracyclic-acid",
+marks=_XF_FUSED,
     ),
     pytest.param(
         "COc1cccc2c1C(=O)c1ccc3c(c1C2=O)C(=O)C[C@@H](C)[C@H]3O",
         "tetracyclo",
         id="vb-methoxy-tetracyclic-trione",
+marks=_XF_FUSED,
     ),
     pytest.param(
         "COc1cc(O)c2c(c1O)C(=O)c1c(C(C)=O)c(O)cc(O)c1C2=O",
         "tricyclo",
         id="vb-polyhydroxy-tricyclic-dione",
+marks=_XF_FUSED,
     ),
     pytest.param(
         "COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)"
@@ -315,6 +409,7 @@ MACROCYCLIC_FIXES = [
         "C(C)(C)C(=O)[C@H](C)[C@@H](O)/C(C)=C/CC1",
         "oxacyclohexadecan",
         id="macrolide-16-ring-oxa",
+marks=_XF_MACROLIDE,
     ),
     pytest.param(
         "C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)"
@@ -348,8 +443,9 @@ SMALL_STEREO_PARENT_BASELINE = [
     ),
     pytest.param(
         "CC(=O)[C@@]1(C)C(C)=C[C@H](O)[C@H]2C[C@](C)(O)CC[C@@H]21",
-        "cyclodecan",
+        "naphthalen",
         id="ster04-decalin-ketone",
+marks=_XF_FUSED,
     ),
     pytest.param(
         "CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O",
@@ -393,13 +489,15 @@ def test_small_stereo_parent_baseline(smiles, expected_substr):
 STEROID_DECORATION_COMPLETENESS = [
     pytest.param(
         "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",
-        "stigmast",
+        "cyclopenta[a]phenanthren",
         id="stigmastane-diol-retained-name",
+marks=_XF_STEROID,
     ),
     pytest.param(
         "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",
-        "ergost",
+        "cyclopenta[a]phenanthren",
         id="ergostane-dienol-retained-name",
+marks=_XF_STEROID,
     ),
     pytest.param(
         "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1"
@@ -410,8 +508,9 @@ STEROID_DECORATION_COMPLETENESS = [
     pytest.param(
         "CC(CCCC(C)(O)COS(=O)(=O)O)[C@H]1CC[C@H]2[C@@H]3"
         "[C@H](O)C[C@@H]4C[C@H](O)CCC4(C)[C@H]3C[C@H](O)C12C",
-        "cholestan",
+        "cyclopenta[a]phenanthren",
         id="cholestane-tetraol-sulfonate",
+marks=_XF_STEROID,
     ),
 ]
 

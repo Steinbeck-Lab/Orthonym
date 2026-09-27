@@ -2083,7 +2083,29 @@ def _assemble_partially_saturated_carbocycle_name(
     from ..assembly.composition_primitives import _join_prefix_to_name
     stem = f"{formatted_prefix}{parent_name}{pcg_suffix}"
     name = _join_prefix_to_name((sub_prefix or '').rstrip('-'), stem)
+    if not pcg_suffix and _principal_group_has_suffix_form(mol):
+        # Suite fix j6: this scoped path spells only the ring -COOH / -OH
+        # suffixes. With another suffix-capable principal characteristic group
+        # (amide, nitrile, aldehyde, ketone, amine,...) it cites that group as
+        # a prefix ('2-carbamoyl-1,2,3,4-tetrahydronaphthalene', '2-cyano-...')
+        # -- valid and round-trip verified, but the PIN cites it as the suffix
+        #,; '...-2-carboxamide'). Record it non-PIN: the same
+        # name ships below pin_verified (honest demotion, no breadth change).
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
     return f"{stereo_prefix}{name}" if stereo_prefix else name
+
+
+def _principal_group_has_suffix_form(mol) -> bool:
+    """True when the molecule's principal characteristic group has a suffix
+    form (``SUFFIX_FORMS``); fails closed (True) when perception fails."""
+    try:
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import SUFFIX_FORMS, get_principal_group
+        pg, _ = get_principal_group(mol, detect_functional_groups(mol))
+    except Exception:
+        return True
+    return bool(pg) and bool(SUFFIX_FORMS.get(pg))
 
 
 def _has_offring_substituent(

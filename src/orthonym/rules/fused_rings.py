@@ -167,6 +167,128 @@ def _exocyclic_atoms_accounted(mol, core_atoms: Set[int]) -> bool:
     return accounted == exocyclic
 
 
+def _mancude_indicated_h_atoms(mol, ring_atom_set: Set[int]) -> Optional[List[int]]:
+    """Ring atoms that carry the indicated hydrogen of a mancude fused system,
+    read from the structure; ``None`` when this cannot be established.
+
+     (the Blue Book): "noncumulative double bonds are
+    introduced into the completed fused system. Hydrogen atoms not attached to
+    atoms connected by double bonds are denoted as indicated hydrogen atom(s)."
+     (:14607): "In preferred IUPAC names, all indicated hydrogen
+    atoms must be cited when the names are constructed in accordance with the
+    principles of fusion nomenclature",:3557). RDKit perceives a
+    pyrrole-type N-H of such a system as AROMATIC, which the legacy counter
+    (:func:`_compute_general_indicated_h`) skips, so 'thieno[2,3-c]pyrrole'
+    shipped without its '5H-'.
+
+    The candidate set F is every C/N ring atom with NO double bond in the
+    Kekule structure (an N-H, an N-substituted pyrrole-type N, a saturated
+    C). F is the indicated-hydrogen set only when it is the unmatched set of
+    a MAXIMUM matching of the mancude parent: the input's own
+    Kekule structure is a perfect matching of the rest, and no smaller
+    unmatched set may exist -- otherwise the extra saturation is hydro
+    ; pyrrolo[3,2-b]pyrrole (PIN):14571 has no indicated
+    hydrogen, so its N,N'-dihydro form is a hydro name) and this returns
+    ``None``. Also ``None`` for charged or other-element ring atoms and for
+    an exocyclic double bond on a ring atom (the 'added indicated hydrogen'
+    form,:3725, is not built here), so those keep the existing
+    behaviour.
+    """
+    ring = set(ring_atom_set)
+    for idx in ring:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+        if atom.GetSymbol() not in ('C', 'N', 'O', 'S', 'Se', 'Te'):
+            return None
+    try:
+        km = Chem.Mol(mol)
+        Chem.Kekulize(km, clearAromaticFlags=True)
+    except Exception:
+        return None
+    eligible: List[int] = []
+    flagged: List[int] = []
+    for idx in sorted(ring):
+        atom = km.GetAtomWithIdx(idx)
+        sym = atom.GetSymbol()
+        has_double = False
+        for bond in atom.GetBonds():
+            if bond.GetBondType() != Chem.BondType.SINGLE:
+                if bond.GetOtherAtomIdx(idx) not in ring:
+                    return None  # exocyclic =X: added hydrogen, not built here
+                if bond.GetBondType() != Chem.BondType.DOUBLE:
+                    return None
+                has_double = True
+        ring_degree = sum(1 for nb in atom.GetNeighbors() if nb.GetIdx() in ring)
+        if sym == 'C' or (sym == 'N' and ring_degree == 2):
+            eligible.append(idx)
+            if not has_double:
+                flagged.append(idx)
+        elif sym == 'N' and has_double:
+            return None  # a fusion N with a double bond is charged or odd
+    if not flagged:
+        return None
+    adj = {
+        a: [nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+            if nb.GetIdx() in eligible]
+        for a in eligible
+    }
+    minimum_sets = _saturation_indicated_h_sets(eligible, adj)
+    if frozenset(flagged) not in minimum_sets:
+        return None
+    return flagged
+
+
+def _mancude_indicated_h_locants(mol, ring_atom_set: Set[int],
+                                 atom_to_locant: Dict[int, Any],
+                                 has_substituents: bool) -> List:
+    """Locants of:func:`_mancude_indicated_h_atoms`, or ```` (no change).
+
+    The locants come from the peripheral numbering
+    (``compute_fused_numbering``), whose cascade already puts an N-H at the
+    lowest locant the ring criteria allow,:24641). A bare system
+    reads them from that engine directly -- its legacy descriptor-order map
+    (``atom_to_locant`` here) does not reproduce the fused numbering (it gives
+    the N of thieno[2,3-c]pyrrole locant 1, the engine and OPSIN give 5). A
+    substituted system already numbers from the engine, but its
+    tie-break may pick a ring automorphism; the locants are accepted only
+    when every automorphism gives the indicated hydrogen the same locants, so
+    the tie-break cannot trade an indicated-hydrogen locant (b),
+    :3246, is cited before the suffix and prefix criteria) for a substituent
+    one. Only integer locants are cited; anything
+    else keeps the existing name (````).
+    """
+    atoms = _mancude_indicated_h_atoms(mol, ring_atom_set)
+    if not atoms:
+        return []
+    from .fusion_numbering import compute_fused_numbering
+    canonical = compute_fused_numbering(mol, ring_atom_set)
+    if not canonical:
+        return []
+    try:
+        engine_map = {a: _fused_locant_to_output(canonical[a]) for a in atoms}
+    except KeyError:
+        return []
+    if has_substituents:
+        chosen = [atom_to_locant.get(a) for a in atoms]
+        if sorted(map(str, chosen)) != sorted(map(str, engine_map.values())):
+            return []
+        for perm in _ring_system_automorphisms(mol, ring_atom_set):
+            try:
+                img = sorted(str(_fused_locant_to_output(canonical[perm[a]]))
+                             for a in atoms)
+            except KeyError:
+                return []
+            if img != sorted(map(str, chosen)):
+                return []
+        locs = chosen
+    else:
+        locs = [engine_map[a] for a in atoms]
+    if not all(isinstance(loc, int) for loc in locs):
+        return []
+    return sorted(locs)
+
+
 def _fused_locant_to_output(loc):
     """compute_fused_numbering _Locant -> the int/str form the substituent
     machinery consumes: ``int`` stays int; ``(3, 'a')`` -> ``'3a'``."""
@@ -624,6 +746,22 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     name = generate_systematic_name_for_fused_pair(
         mol, list(ring1), list(ring2), shared
     )
+    # Suite fix j6 (TRIAGE g3 C08): the descriptor's OPSIN check parses the
+    # BARE name, which OPSIN reads with its own default indicated hydrogen; for
+    # an N-H system whose indicated hydrogen OPSIN puts elsewhere (6H-pyrrolo
+    # [3,4-d]pyrimidine, 6H-pyrrolo[3,4-c]pyridazine) every candidate failed
+    # and the system abstained. When the input is the mancude parent plus
+    # indicated hydrogen (_mancude_indicated_h_atoms establishes the set;
+    #, the Blue Book), retry matching the heteroatom skeleton
+    # only, and ship the result only if that indicated hydrogen is cited below
+    # (``skeleton_matched``); a hydro input (both N-H of pyrrolo[3,4-b]pyrrole)
+    # keeps declining.
+    skeleton_matched = False
+    if not name and _mancude_indicated_h_atoms(mol, ring_atom_set):
+        name = generate_systematic_name_for_fused_pair(
+            mol, list(ring1), list(ring2), shared,
+            allow_skeleton_match=True)
+        skeleton_matched = bool(name)
 
     if not name:
         return None
@@ -669,6 +807,16 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
         )
 
     indicated_h = _compute_general_indicated_h(mol, ring_atom_set, atom_to_locant)
+    if not indicated_h:
+        indicated_h = _mancude_indicated_h_locants(
+            mol, ring_atom_set, atom_to_locant, has_substituents)
+    if skeleton_matched:
+        # The descriptor was accepted on the skeleton alone: ship only with the
+        # established indicated hydrogen cited,:14607), never bare.
+        _ih = _mancude_indicated_h_locants(
+            mol, ring_atom_set, atom_to_locant, has_substituents)
+        if not _ih or list(indicated_h) != list(_ih):
+            return None
 
     #: lambda (nonstandard bonding number) tokens follow the
     # atom's fused-system locant and are cited at the beginning of the name,
@@ -3758,15 +3906,113 @@ def _assemble_fused_heterocycle_name(
         expressed = None
 
     if suffix_str:
+        #: a ketone on a saturated position of a hydro catalog core
+        # takes the core's indicated hydrogen (TRIAGE j12 finding 5).
+        _non_pin_ih = False
+        if expressed == 'one' and not substituents.get('amino_substituents'):
+            _oxo = list(substituents.get('oxo_substituents') or [])
+            _moved = _indicated_h_at_suffix(mol, core_name, atom_mapping, _oxo)
+            if _moved is not None:
+                if _moved:
+                    core_name = _moved
+                else:
+                    _non_pin_ih = True
         # Apply suffix to core name with vowel elision
         modified_core = _apply_suffix_to_core(core_name, suffix_str)
         name = _join_prefix_to_parent(prefix_str, modified_core)
         _record_if_senior_group_prefixed(mol, ring_atoms, expressed, name)
+        if _non_pin_ih:
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(f"{stereo_prefix}{name}" if stereo_prefix else name)
         return f"{stereo_prefix}{name}" if stereo_prefix else name
 
     name = _join_prefix_to_parent(prefix_str, core_name)
     _record_if_senior_group_prefixed(mol, ring_atoms, expressed, name)
     return f"{stereo_prefix}{name}" if stereo_prefix else name
+
+
+_HYDRO_CORE_RE = None
+_HYDRO_MULT = {2: 'di', 4: 'tetra', 6: 'hexa', 8: 'octa', 10: 'deca'}
+
+
+def _indicated_h_at_suffix(mol, core_name, atom_mapping, oxo_locants):
+    """The hydro catalog core respelled so that its indicated hydrogen sits at the
+    ketone, or None when there is nothing to move; '' when it should move but the
+    tautomer cannot be built (the caller then labels the name non-PIN).
+
+     (the Blue Book-24768): "the indicated hydrogen atoms are
+    placed at peripheral atoms that will accommodate these principal
+    characteristic groups... Locants for hydro prefixes are those of the
+    saturated positions" ('7H-1-benzopyran-7-one (PIN)',:24776; '3-imino-2,3-
+    dihydro-1H-isoindol-1-one (PIN)',:29609). The catalog core '2,3-dihydro-
+    1H-indole' with a ketone at C-2 is therefore '1,3-dihydro-2H-indol-2-one',
+    not '2,3-dihydro-1H-indol-2-one'.
+
+    Scope: ONE ketone, a core spelled '<locants>-<n>hydro-<h>H-<stem>', the
+    ketone at a saturated position other than h. The saturated set is read off
+    the molecule (core ring C/N in no ring double bond, the ketone carbon
+    included) and must be the core's hydro + indicated-hydrogen set. The ketone
+    position p must admit the mancude tautomer 'pH-<stem>': a Kekule arrangement
+    over every other core C and every core N with two ring bonds (chalcogens and
+    three-connected N carry no double bond)."""
+    import re as _re
+    global _HYDRO_CORE_RE
+    if len(oxo_locants) != 1:
+        return None
+    if _HYDRO_CORE_RE is None:
+        _HYDRO_CORE_RE = _re.compile(
+            r'^(?P<hl>\d+[a-z]?(?:,\d+[a-z]?)*)-(?P<mult>di|tetra|hexa|octa|deca)'
+            r'hydro-(?P<ih>\d+[a-z]?)H-(?P<stem>[A-Za-z].*)$')
+    m = _HYDRO_CORE_RE.match(core_name or '')
+    if not m:
+        return None
+    p = str(oxo_locants[0])
+    ih = m.group('ih')
+    hydro = m.group('hl').split(',')
+    if p == ih or p not in hydro:
+        return None
+    loc_of = {a: str(l) for a, l in atom_mapping.items()}
+    core = {a for a in atom_mapping if mol.GetAtomWithIdx(a).IsInRing()}
+    atom_of = {loc_of[a]: a for a in core}
+    if p not in atom_of or ih not in atom_of:
+        return ''
+    kek = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return ''
+    in_db = set()
+    for bond in kek.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in core and j in core:
+                in_db.update((i, j))
+    sat = {loc_of[a] for a in core
+           if a not in in_db and mol.GetAtomWithIdx(a).GetSymbol() in ('C', 'N')}
+    if sat != set(hydro) | {ih}:
+        return ''
+    nodes = set()
+    for a in core:
+        if a == atom_of[p]:
+            continue
+        at = mol.GetAtomWithIdx(a)
+        sym = at.GetSymbol()
+        ring_deg = sum(1 for nb in at.GetNeighbors() if nb.GetIdx() in core)
+        if sym == 'C' or (sym == 'N' and ring_deg == 2):
+            nodes.add(a)
+        elif sym in ('O', 'S', 'Se', 'Te') or (sym == 'N' and ring_deg == 3):
+            continue
+        else:
+            return ''
+    from .partial_saturation import _has_perfect_matching
+    if not _has_perfect_matching(mol, nodes):
+        return ''
+    new_hydro = sorted((sat - {p}), key=lambda l: (int(_re.match(r'\d+', l).group()),
+                                                    l))
+    mult = _HYDRO_MULT.get(len(new_hydro))
+    if not mult:
+        return ''
+    return f"{','.join(new_hydro)}-{mult}hydro-{p}H-{m.group('stem')}"
 
 
 def _record_if_senior_group_prefixed(mol, ring_atoms, expressed, name) -> None:
@@ -3941,7 +4187,11 @@ def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
         if not _is_fully_enclosed(name):
             display_name = enclose_if_compound(name)
     elif is_complex_substituent(name):
-        display_name = f'({name})'
+        # Suite fix j6: the mark escalates past the name's own marks,
+        # the Blue Book) -- '3-[2-(2,4-dimethylphenyl)-2-oxoethyl]', not
+        # '3-(2-(...)-2-oxoethyl)'; a name without marks still gets '(...)'.
+        from ..assembly.naming_utils import apply_enclosing_marks
+        display_name = apply_enclosing_marks(name, -1)
     if count == 1:
         return f"{locant_str}-{display_name}-"
     else:

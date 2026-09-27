@@ -584,6 +584,11 @@ def get_scaffold_patterns() -> dict:
 # C-19: angular methyl on C-10
 # C-20+: side chain
 
+# Every map is checked against the steroid skeleton bonds (C-9-C-11, C-11-C-12,
+# C-12-C-13,...) by tests/unit/rules/test_j7_defects_misc.py. The estrane, cholane,
+# ergostane, campestane and stigmastane maps had C-11 and C-12 swapped (the atom
+# bonded to C-9 read as 12), so a C-11/C-12 decoration got the other locant and a
+# 9(11) double bond read '9(12)' (TRIAGE g2 G2-C6, found by the j7 compound-locant fix).
 STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
     # Gonane (17 carbons, no angular methyls)
     "C1CC[C@H]2C(C1)CC[C@H]1[C@@H]3CCC[C@H]3CC[C@@H]12": {
@@ -605,7 +610,7 @@ STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
         0: 18, 1: 13, 2: 17, 3: 16, 4: 15, 5: 14,
         6: 8, 7: 7, 8: 6, 9: 5,
         10: 4, 11: 3, 12: 2, 13: 1,
-        14: 10, 15: 9, 16: 12, 17: 11,
+        14: 10, 15: 9, 16: 11, 17: 12,
     },
 
     # Pregnane (21 carbons: androstane + C-20, C-21 side chain)
@@ -622,7 +627,7 @@ STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
         0: 24, 1: 23, 2: 22, 3: 20, 4: 21, 5: 17,
         6: 16, 7: 15, 8: 14, 9: 8,
         10: 7, 11: 6, 12: 5, 13: 4, 14: 3, 15: 2, 16: 1,
-        17: 10, 18: 19, 19: 9, 20: 12, 21: 11,
+        17: 10, 18: 19, 19: 9, 20: 11, 21: 12,
         22: 13, 23: 18,
     },
 
@@ -641,7 +646,7 @@ STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
         7: 20, 8: 21, 9: 17, 10: 16, 11: 15, 12: 14,
         13: 8, 14: 7, 15: 6, 16: 5,
         17: 4, 18: 3, 19: 2, 20: 1,
-        21: 10, 22: 19, 23: 9, 24: 12, 25: 11,
+        21: 10, 22: 19, 23: 9, 24: 11, 25: 12,
         26: 13, 27: 18,
     },
 
@@ -651,7 +656,7 @@ STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
         7: 20, 8: 21, 9: 17, 10: 16, 11: 15, 12: 14,
         13: 8, 14: 7, 15: 6, 16: 5,
         17: 4, 18: 3, 19: 2, 20: 1,
-        21: 10, 22: 19, 23: 9, 24: 12, 25: 11,
+        21: 10, 22: 19, 23: 9, 24: 11, 25: 12,
         26: 13, 27: 18,
     },
 
@@ -661,7 +666,7 @@ STEROID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
         7: 17, 8: 16, 9: 15, 10: 14,
         11: 8, 12: 7, 13: 6, 14: 5,
         15: 4, 16: 3, 17: 2, 18: 1,
-        19: 10, 20: 19, 21: 9, 22: 12, 23: 11,
+        19: 10, 20: 19, 21: 9, 22: 11, 23: 12,
         24: 13, 25: 18,
         26: 25, 27: 26, 28: 27,
     },

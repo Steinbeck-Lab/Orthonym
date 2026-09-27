@@ -20,14 +20,19 @@ from orthonym.namer import Orthonym
 
 @pytest.mark.unit
 def test_cluster_e_stereo_differing_bis_fails_closed():
-    # BB Ex1: correct PIN is
+    # BB Ex1 (the Blue Book): correct PIN is
     # (2R)-1-[(1r,4S)-4-methylcyclohexyl]-3-[(1s,4S)-4-methylcyclohexyl]propan-2-ol
-    # The two 4-methylcyclohexyl substituents DIFFER in stereo, so the previously
-    # shipped '(1s,4s)-1,3-bis(4-methylcyclohexyl)propan-2-ol' is a wrong stereoisomer.
-    # Until the component-stereo-block engine exists, fail closed (both paths).
+    # for one cis and one trans ring. This SMILES does NOT encode that (TRIAGE g7
+    # C16, re-verified with rdCIPLabeler): both rings are the same cis (1s,4s)
+    # ring and the carbinol is not stereogenic, so the multiplicative name is the
+    # right one and a substituted prefix takes 'bis' (a),:7104), with
+    # the component stereo block inside the brackets. OPSIN cannot parse r/s; the
+    # stereo-free '1,3-bis(4-methylcyclohexyl)propan-2-ol' is full-key EXACT on
+    # the constitution.
     smi = "C[C@H]1CC[C@@H](C[C@@H](O)C[C@@H]2CC[C@H](C)CC2)CC1"
-    assert Orthonym().name(smi) == "unknown organic compound"
-    assert Orthonym(_disable_opsin_validity_gate=True).name(smi) == "unknown organic compound"
+    expected = "1,3-bis[(1s,4s)-4-methylcyclohexyl]propan-2-ol"
+    assert Orthonym().name(smi) == expected
+    assert Orthonym(_disable_opsin_validity_gate=True).name(smi) == expected
 
 
 @pytest.mark.unit

@@ -364,6 +364,23 @@ def name_natural_product(mol) -> Optional[str]:
         ]
         if _honesty_undef and not _honesty_defined:
             return None
+        # j7 (TRIAGE g7 C12): the tightening the note above anticipated. The parent
+        # name implies the configuration of every centre its scaffold defines
+        #, the Blue Book: "The name of a fundamental parent
+        # structure usually implies the absolute configuration of all chirality
+        # centers"): for cholestane C-8, 9, 10, 13, 14, 17 and 20. When one of
+        # those is a stereocentre the INPUT leaves undefined, the name asserts a
+        # configuration the molecule does not have -- the partially defined
+        # acid shipped with the gate off as '(3S,7S,14R,15S)-...cholest-8-ene...'
+        # (OPSIN: right skeleton, C-10/13/17/20 over-specified). Decline; the
+        # systematic pipeline names it. The implied set is read from the
+        # scaffold SMILES itself (its chiral tags), so C-5 (never implied) and a
+        # pregnane C-20 (not implied) keep the per-locant partial names above.
+        _implied_q = _scaffold_implied_query_atoms(scaffold_info.get("scaffold_smiles"))
+        _m_atoms = scaffold_info.get("matched_atoms") or []
+        _implied_t = {_m_atoms[q] for q in _implied_q if q < len(_m_atoms)}
+        if _implied_t & set(_honesty_undef):
+            return None
 
     # Step 3b: Detect NP modifications (nor-, homo-, seco-)
     # Build numbering early so it can be reused in Steps 4-6
@@ -771,7 +788,12 @@ def name_natural_product_with_substituents(
                 modification_prefix=modification_prefix, ring_ab=rab,
                 glycosyloxys=glycosyloxys,
             )
-        _record_if_acid_as_prefixes(out, hydroxyls, ketones)
+        # Only the ester/conjugate emitter still writes a terminal acid as
+        # 'hydroxy' + 'oxo'; _assemble_np_name now cites it as the '-oic acid'
+        # suffix, the Blue Book '3-oxoandrost-4-en-18-oic acid'
+        #:52554), so only the joined form is marked non-PIN.
+        if joined:
+            _record_if_acid_as_prefixes(out, hydroxyls, ketones)
         return out
 
     # tail #13: a generic glycosyloxy decoration is cited with a plain
@@ -810,6 +832,27 @@ def name_natural_product_with_substituents(
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+def _scaffold_implied_query_atoms(scaffold_smiles: Optional[str]) -> frozenset:
+    """Query-atom indices whose configuration the stereoparent name implies: the
+    atoms that carry a chiral tag in the scaffold SMILES,:51047)."""
+    return _SCAFFOLD_IMPLIED_CACHE.get(scaffold_smiles) or _scaffold_implied_compute(
+        scaffold_smiles)
+
+
+_SCAFFOLD_IMPLIED_CACHE: Dict[str, frozenset] = {}
+
+
+def _scaffold_implied_compute(scaffold_smiles: Optional[str]) -> frozenset:
+    if not scaffold_smiles:
+        return frozenset()
+    q = Chem.MolFromSmiles(scaffold_smiles)
+    out = frozenset() if q is None else frozenset(
+        a.GetIdx() for a in q.GetAtoms()
+        if a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED)
+    _SCAFFOLD_IMPLIED_CACHE[scaffold_smiles] = out
+    return out
+
 
 def _build_target_to_iupac(scaffold_info: Dict) -> Optional[Dict[int, int]]:
     """Build mapping from target molecule atom indices to IUPAC locants.
@@ -926,7 +969,9 @@ def _record_if_acid_as_prefixes(name, hydroxyls, ketones) -> None:
     -21-oxo'. The acid is the senior class and is expressed as the suffix: "Seniority
     order for classes" (the Blue Book; 7a carboxylic acids:18172, 17 alcohols);
     ('-oic acid'). The name is valid and round-trip verified, so it still ships; this marks
-    it as a non-PIN fragment (name-scoped). The name is unchanged."""
+    it as a non-PIN fragment (name-scoped). The name is unchanged. j7: only the ester /
+    conjugate emitter (``_assemble_np_ester_name``) still spells the acid this way;
+    ``_assemble_np_name`` cites it as the suffix, the Blue Book)."""
     if name and hydroxyls and ketones and set(hydroxyls) & set(ketones):
         from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(name)
@@ -1317,6 +1362,16 @@ def _find_scaffold_unsaturation(
                 if b_idx in scaffold_aromatic_atoms and e_idx in scaffold_aromatic_atoms:
                     continue  # Inherent scaffold aromaticity
             ene_locants.append(lower_loc)
+            # (1) (the Blue Book): "A compound locant is used for
+            # a double bond if the locants of the atoms at each end of the bond do
+            # not differ by a value of one. When a compound locant is required, the
+            # higher locant is cited in parentheses." -- steroid 9(11), 8(14),
+            # 1(10), 17(20). Without it '...chola-7,9-diene' reads as C9=C10 (a
+            # pentavalent C-10; OPSIN cannot parse it).
+            if (isinstance(b_loc, int) and isinstance(e_loc, int)
+                    and abs(b_loc - e_loc) != 1
+                    and lower_loc not in ene_indicated_h):
+                ene_indicated_h[lower_loc] = max(b_loc, e_loc)
         elif bond.GetBondType() == Chem.BondType.TRIPLE:
             yne_locants.append(lower_loc)
 
@@ -1654,6 +1709,20 @@ def _assemble_np_name(
     glycosyloxys = glycosyloxys or []
     ring_ab = ring_ab or {}
 
+    # A stereoparent carbon carrying both an '-OH' and an '=O' decoration is a
+    # carboxylic-acid carbon (the side-chain terminus C-21/C-24/C-26 of a steroid).
+    # The acid is the senior class, (the Blue Book; 7a carboxylic acids
+    #:18172, above ketones and alcohols), cited as the '-oic acid' suffix of the
+    # parent; the steroid form '5beta-cholan-24-oic acid',; the
+    # ketones become 'oxo' and the other -OH 'hydroxy' prefixes. It used to be
+    # written '21-hydroxy...-21-one' (TRIAGE g2 G2-C6, g7 C12).
+    acids = sorted(set(hydroxyls) & set(ketones))
+    oxos: List[int] = []
+    if acids:
+        hydroxyls = [loc for loc in hydroxyls if loc not in acids]
+        oxos = [loc for loc in ketones if loc not in acids]
+        ketones = []
+
     # a phase (-02): render a ring locant with its ring-face α/β descriptor when one
     # was cited (Latin, no hyphen between locant and greek per; else plain.
     def _greek_locant(loc):
@@ -1717,6 +1786,13 @@ def _assemble_np_name(
     # N-alkyl prefixes (e.g., "17-methyl" for N-methyl at position 17)
     for loc, alkyl_name in n_alkyls:
         prefix_entries.append((alkyl_name, f"{_greek_locant(loc)}-{alkyl_name}"))
+
+    # Oxo prefixes: ketones below a principal carboxylic acid order above).
+    if oxos:
+        locant_str = ",".join(str(loc) for loc in oxos)
+        count = len(oxos)
+        multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        prefix_entries.append(("oxo", f"{locant_str}-{multiplier}oxo"))
 
     # Sort alphabetically by name (IUPAC
     prefix_entries.sort(key=lambda x: x[0])
@@ -1790,6 +1866,7 @@ def _assemble_np_name(
     # parenthesised block (the OPSIN-unparseable anti-pattern). The side-chain R/S block
     # (stereo_prefix) stays at the very front .
     _consumed = (set(hydroxyls) | set(methyls) | set(methoxys) | set(ketones)
+                 | set(oxos) | set(acids)
                  | {loc for loc, _ in halogens} | {loc for loc, _ in n_alkyls})
     _free = sorted(loc for loc in ring_ab if loc not in _consumed)
     stem_stereo = "".join(f"{loc}{ring_ab[loc]}-" for loc in _free)
@@ -1800,6 +1877,20 @@ def _assemble_np_name(
         if stem_stereo and pre and not pre.endswith("-"):
             return f"{pre}-{stem_stereo}{body}"
         return f"{pre}{stem_stereo}{body}"
+
+    # Principal carboxylic acid (see ``acids`` above): '{prefixes}{stem}{unsat}-N-oic
+    # acid'. (a): the parent's terminal 'e' is elided before the vowel of
+    # '-oic' and kept before a multiplied '-dioic' (_np_parent_e), e.g.
+    # 'cholest-5-en-26-oic acid', 'cholan-24-oic acid'.
+    if acids:
+        acid_count = len(acids)
+        acid_mult = SIMPLE_MULTIPLIERS.get(acid_count, "") if acid_count > 1 else ""
+        acid_word = f"{acid_mult}oic acid"
+        e = _np_parent_e(acid_word)
+        acid_suffix = f"-{','.join(str(loc) for loc in acids)}-{acid_word}"
+        body = stem if unsat_suffix == "an" else effective_stem
+        return (f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, body)}"
+                f"{unsat_suffix}{e}{acid_suffix}")
 
     # --- Combine suffix for -ol (hydroxyl as suffix) when no ketone ---
     # IUPAC convention: if hydroxyl is the only principal group, use -ol suffix

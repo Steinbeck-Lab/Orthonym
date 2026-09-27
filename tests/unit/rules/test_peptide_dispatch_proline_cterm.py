@@ -179,5 +179,5 @@ class TestPinUnchanged:
     def test_alanylglycine_unchanged(self):
         assert (
             name_compound("N[C@@H](C)C(=O)NCC(=O)O", style="pin")
-            == "2-[(2S)-2-aminopropanamido]ethanoic acid"
+            == "[(2S)-2-aminopropanamido]acetic acid"
         )

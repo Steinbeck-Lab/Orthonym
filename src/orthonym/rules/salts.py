@@ -157,6 +157,14 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
         return True
     if any(ch.isdigit() for ch in name):
         return True
+    # carve-out (shared primitive): an italicized-led simple ion word
+    # ('tert-butoxide') takes the plain multiplier with a hyphen,
+    # 'magnesium di-tert-butoxide' (cf. '1,2-di-*tert*-butylbenzene (PIN)',
+    # the Blue Book; OPSIN 2.9.0 exact); _apply_stoichiometric_prefix adds
+    # the hyphen. j7, TRIAGE g7 C20.
+    from ..assembly.naming_utils import italicized_prefix_is_bare
+    if italicized_prefix_is_bare(name):
+        return False
     if '-' in name:
         return True
     # BREADTH-UNVERIFIED (Milestone C3, salt breadth program): the startswith
@@ -950,6 +958,9 @@ def _apply_stoichiometric_prefix(name: str, count: int) -> str:
         return f"{word}({name})"
 
     prefix = STOICHIOMETRIC_PREFIXES.get(count, str(count))
+    from ..assembly.naming_utils import multiplier_needs_hyphen
+    if multiplier_needs_hyphen(name):
+        return f"{prefix}-{name}"          # 'di-tert-butoxide'
     return f"{prefix}{name}"
 
 
@@ -988,7 +999,13 @@ def name_zwitterion(mol, style: str = 'pin') -> str:
     if style != 'systematic':
         canonical = Chem.MolToSmiles(mol, canonical=True)
         if canonical in RETAINED_AMINO_ACID_ZWITTERIONS:
-            return RETAINED_AMINO_ACID_ZWITTERIONS[canonical]
+            _retained = RETAINED_AMINO_ACID_ZWITTERIONS[canonical]
+            # Decision A: 'L-carnitine' / 'carnitine' have no Blue Book evidence;
+            # kept (no RT-exact systematic name at the PIN tier yet) but labelled
+            # below pin_verified (data.amino_acids.NON_PIN_AMINO_ACID_NAMES).
+            from ..data.amino_acids import record_if_non_pin_amino_acid_name
+            record_if_non_pin_amino_acid_name(_retained)
+            return _retained
 
     # GUARD 4: the route_charged chokepoint owns the anion-is-parent
     # override + the structured (…azaniumyl) cation prefix. This

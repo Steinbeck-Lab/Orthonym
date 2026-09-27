@@ -61,7 +61,8 @@ def test_unsaturated_betaine_integration(namer, smi, expected):
 @pytest.mark.parametrize("smi,expected", [
     # longer saturated betaine (regression)
     ("C[N+](C)(C)CCCC(=O)[O-]", "4-(trimethylazaniumyl)butanoate"),
-    # carnitine (regression)
+    # carnitine (regression). Name unchanged; labelled below pin_verified since
+    # decision A part 1 (test_decision_a_n_substituted_amino_acids.py).
     ("C[N+](C)(C)C[C@H](O)CC(=O)[O-]", "L-carnitine"),
 ])
 def test_betaine_regressions(namer, smi, expected):

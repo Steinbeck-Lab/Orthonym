@@ -2,10 +2,22 @@
 (formamido) from an acyl-bridge fragment whose carbon bonds the rest of the
 molecule (carbamoyl); both render MolFragmentToSmiles == 'NC=O' rooted at N."""
 import os
+# The memo reads ORTHONYM_MEMO once, at import: set it BEFORE importing orthonym,
+# and put the environment back right after. Under xdist every worker imports every
+# test module at collection, so a write that stayed in os.environ ran every child
+# process the rest of the suite spawned in memo-verify mode (the same leak class
+# as TRIAGE C1, where two modules switched the OPSIN gates off in every child).
+_ENV_BEFORE = {"ORTHONYM_MEMO": os.environ.get("ORTHONYM_MEMO")}
 os.environ["ORTHONYM_MEMO"] = "verify"
 from rdkit import Chem
 from orthonym.assembly import memo
 from orthonym import name_compound
+
+for _k, _v in _ENV_BEFORE.items():   # restore: see the note above the import
+    if _v is None:
+        os.environ.pop(_k, None)
+    else:
+        os.environ[_k] = _v
 
 
 def test_no_name_substituent_verify_mismatches_on_carbamoyl_witness():

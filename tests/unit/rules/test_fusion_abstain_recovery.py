@@ -22,4 +22,10 @@ def test_triazolopyrimidine_recovered():
 
 
 def test_triazolopyridine_recovered():
-    assert_fusion_pin("c1cnc2[nH]nnc2c1", "[1,2,3]triazolo[4,5-b]pyridine")
+    # Suite fix j4 (TRIAGE g3 C07): (the Blue Book) "In
+    # preferred IUPAC names, all indicated hydrogen atoms must be cited when
+    # the names are constructed in accordance with the principles of fusion
+    # nomenclature". The input is the 3H tautomer (N-H next to C-3a); the bare
+    # name parses to the 1H tautomer (same standard InChIKey, different
+    # canonical SMILES), so the '3H-' is what makes the name denote the input.
+    assert_fusion_pin("c1cnc2[nH]nnc2c1", "3H-[1,2,3]triazolo[4,5-b]pyridine")

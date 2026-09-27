@@ -517,12 +517,11 @@ PHASE22_PEPTIDE_ROUNDTRIP = [
     ("NCC(=O)N[C@@H](C)C(=O)O", "(2S)-2-(2-aminoacetamido)propanoic acid"),
     ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O",
      "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"),
-    ("N[C@@H](C)C(=O)NCC(=O)O", "2-[(2S)-2-aminopropanamido]ethanoic acid"),
-    # Tripeptide: the substitutive path cannot build it yet, so it falls back to
-    # the retained peptide name (unchanged, still round-trips).
+    ("N[C@@H](C)C(=O)NCC(=O)O", "[(2S)-2-aminopropanamido]acetic acid"),
+    # Tripeptide. j7 (TRIAGE g3 C05 / g5 C15): a tripeptide now takes the substitutive PIN, the nested amido prefix built from the substitutive name of its dipeptide acid fragment method (1), the Blue Book; controller ruling: peptide names are not PINs,:50943). OPSIN 2.9.0 full-InChIKey exact.
     (
         "NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O",
-        "glycylalanylleucine",
+        "(2S)-2-[(2S)-2-(2-aminoacetamido)propanamido]-4-methylpentanoic acid",
     ),
 ]
 
@@ -1127,7 +1126,8 @@ PHASE24_RT_ANALYSIS = [
     # --- Peptide naming (exact RT match) ---
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
-        "leucylserylglycine",
+        # j7 (TRIAGE g3 C05): the substitutive PIN, was 'leucylserylglycine'.
+        "{(2S)-2-[(2S)-2-amino-4-methylpentanamido]-3-hydroxypropanamido}acetic acid",
         "peptide-leu-ser-gly",
     ),
     (

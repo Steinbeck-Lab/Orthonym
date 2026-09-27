@@ -88,11 +88,14 @@ class TestSaltNaming:
     """Test salt compounds produce correct IUPAC salt names."""
 
     def test_a3_1_sodium_hydrogen_fumarate(self):
-        """A3#1: partial salt should have 'hydrogen' prefix."""
+        """A3#1: the partial salt is named by method (1) of, the PIN
+        (the Blue Book; 'potassium 6-carboxyhexanoate (PIN)':31602), with
+        the free acid as a 'carboxy' prefix; the 'hydrogen' word is method (2),
+        general nomenclature only. The (2E) descriptor is kept,
+        :46740). j7 (TRIAGE g5 C13, same producer as g3 C09's row); OPSIN
+        full-InChIKey exact."""
         result = name_compound('O=C([O-])/C=C/C(=O)O.[Na+]')
-        assert 'sodium' in result, f"Expected 'sodium', got: {result}"
-        assert 'hydrogen' in result, \
-            f"Expected 'hydrogen' prefix for partial salt, got: {result}"
+        assert result == 'sodium (2E)-3-carboxyprop-2-enoate', result
 
     def test_a3_2_guanidinium_salt(self):
         """A3#2: guanidinium should be correctly identified."""

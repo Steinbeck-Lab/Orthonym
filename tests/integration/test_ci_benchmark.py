@@ -43,7 +43,13 @@ CI_BENCHMARK = [
     (
         "C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)"
         "CC[C@]4(C)C3=CC[C@]12C",
-        "(10S,13R,14R,15S,17R,20R)-15,24-dihydroxy-4,4,14-trimethylchola-7,9-dien-3,24-dione",
+        # j7 (TRIAGE g2 G2-C6): the terminal -COOH is the '-24-oic acid' suffix, the
+        # senior class, the Blue Book); the 3-one becomes '3-oxo'; the
+        # C-9=C-11 bond takes the compound locant '9(11)' (1),:16634).
+        # The old '...chola-7,9-dien-3,24-dione' read C-9=C-10 (OPSIN: no parse).
+        # A name:50943: no PIN in Chapter, labelled best_effort;
+        # OPSIN full-InChIKey exact.
+        "(10S,13R,14R,15S,17R,20R)-15-hydroxy-4,4,14-trimethyl-3-oxochola-7,9(11)-dien-24-oic acid",
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
@@ -227,7 +233,12 @@ CI_BENCHMARK = [
     ),
     (
         "O=C([O-])[C@H](O)[C@H](O)COP(=O)([O-])[O-]",
-        "(2R,3R)-2,3-dihydroxyphosphono-4-phosphonooxybutanoate",  # P80-01 phosphonooxy prefix now generated
+        # j7 (TRIAGE g2 G2-C7): the trianion's junior -O-P(=O)(O-)2 is the anionic
+        # prefix 'phosphonatooxy' BB:41213, twin of the PIN prefix
+        # 'phosphonooxy' BB:36333); OPSIN full-InChIKey exact. The
+        # old value was not a parseable name; the engine had also shipped the
+        # charge-dropping monoanion '...-4-(phosphonooxy)butanoate' with the gate off.
+        "(2R,3R)-2,3-dihydroxy-4-(phosphonatooxy)butanoate",
     ),
     (
         "CCCCCCCC(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H]"
@@ -399,11 +410,19 @@ CI_BENCHMARK = [
     (
         "CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC"
         "[C@]12C)[C@@]1(C)CCC(=O)C(C)(C)[C@@H]1[C@@H](O)C3",
-        "(5R,6S,10S,13R,14R,17R,20R)-6,21-dihydroxy-4,4,14-trimethylcholesta-8,24-dien-3,16,21-trione",
+        # j7 (TRIAGE g2 G2-C6): the terminal -COOH is the '-21-oic acid' suffix,
+        # the Blue Book), the ketones 'oxo' prefixes; was '6,21-dihydroxy...
+        # -3,16,21-trione'. name, labelled best_effort; OPSIN full-InChIKey exact.
+        "(5R,6S,10S,13R,14R,17R,20R)-6-hydroxy-4,4,14-trimethyl-3,16-dioxocholesta-8,24-dien-21-oic acid",
     ),
     (
+        # Suite fix j6 (TRIAGE g2 G2-C8): the PIN tier abstained (a branched
+        # unsaturated substituent was declined). (the Blue Book):
+        # the parent carries the maximum number of principal characteristic
+        # groups -- benzene-1,4-diol (2 OH), not the butenol (1 OH); the old
+        # value was OPSIN-exact but not the PIN. OPSIN 2.9.0: exact.
         "CC(C)(O)/C=C/c1cc(O)ccc1O",
-        "(3E)-4-(2,5-dihydroxyphenyl)-2-methylbut-3-en-2-ol",
+        "2-[(1E)-3-hydroxy-3-methylbut-1-en-1-yl]benzene-1,4-diol",
     ),
     (
         "CC(C)=CCC(C)/C(C)=C/CO",

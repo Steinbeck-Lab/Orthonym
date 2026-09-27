@@ -337,7 +337,10 @@ DEPTH_LIMIT_COMPOUNDS = [
 _RT_BREADTH_GAPS = {
     "001_chloroquinoline_ester",
     "002_penicillin_like",
-    "003_terpene_dioxolane",
+    # "003_terpene_dioxolane" -- REMOVED 2026-09-27 (suite fix j6, TRIAGE g3
+    # C17b): the decorated 1,3-dioxolan-4-yl prefix is now built at the PIN tier
+    # (Hantzsch-Widman stem,; '(3R)-3,7-dimethyl-9-(2,2,5,5-
+    # tetramethyl-1,3-dioxolan-4-yl)nona-1,6-dien-3-ol' round-trips exact.
     "005_steroid_polyol",
     "007_galactitol_glucoside",
     # "008_allylamine_benzophenone" -- REMOVED 2026-08-21: now round-trips
@@ -388,7 +391,7 @@ _RT_PARAMS = [
     for p in DEPTH_LIMIT_COMPOUNDS
 ]
 
-assert len(_RT_BREADTH_GAPS) == 11, "the measured gap list changed size"
+assert len(_RT_BREADTH_GAPS) == 10, "the measured gap list changed size"
 assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
     "a _RT_BREADTH_GAPS id does not match any DEPTH_LIMIT_COMPOUNDS param"
 )

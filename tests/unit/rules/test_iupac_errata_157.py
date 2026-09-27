@@ -43,6 +43,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.support.local_only import local_only
+
 
 # Repo-root resolver shared by subprocess-grep tests + tracking-doc tests.
 def _repo_root() -> Path:
@@ -754,6 +756,12 @@ def _doc_path_157() -> Path:
     return _repo_root() / "docs" / "iupac_errata_applied.md"
 
 
+# docs/ is gitignored (local-only by decision), so a clean checkout has no
+# errata document: the four document tests skip there (TRIAGE g7 C02).
+_needs_errata_doc = local_only("docs/iupac_errata_applied.md")
+
+
+@_needs_errata_doc
 def test_iupac_errata_applied_doc_complete_157() -> None:
     """G6 gate: docs/iupac_errata_applied.md >= 250 LOC + 14 PIN rule entries."""
     doc = _doc_path_157()
@@ -774,6 +782,7 @@ def test_iupac_errata_applied_doc_complete_157() -> None:
         )
 
 
+@_needs_errata_doc
 def test_iupac_errata_applied_doc_section_headings_157() -> None:
     """G6 gate sub-check: 6 section headings present in expected order."""
     doc = _doc_path_157()
@@ -796,6 +805,7 @@ def test_iupac_errata_applied_doc_section_headings_157() -> None:
         last_pos = pos
 
 
+@_needs_errata_doc
 def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
     """internal notes Pitfall 5: summary table has >= 14 PIN compliance rows.
 
@@ -823,6 +833,7 @@ def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
         )
 
 
+@_needs_errata_doc
 def test_iupac_errata_applied_doc_status_consistency_157() -> None:
     """internal notes Pitfall 5: table Status drift detection vs cite-blocks.
 

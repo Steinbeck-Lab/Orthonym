@@ -37,10 +37,17 @@ from orthonym import name_compound
 # These use firm assertions (no xfail).
 EXPECTED_FIXED = [
     # --- STEROID / TERPENOID ---
-    # a phase: ring classification + retained NP names
+    # a phase: ring classification + retained NP names.
+    # This molecule carries the 16,22-epoxy O ring, so its parent is FUROSTANE, not
+    # cholestane: (b) furostan (gold row P14-NP-FUROSTAN, "was
+    # non-retained epoxy-name"); the old 'cholest' substring named a different
+    # skeleton. OPSIN 2.9.0 full-InChIKey: 'furostan' EXACT. (the Blue Book:
+    # 50943) identifies no PIN for Chapter; the stereoparent name is kept at the
+    # PIN tier by the controller ruling (TRIAGE.md 'Controller rulings'; TRIAGE g5
+    # C14).
     (
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]2[C@@H]1C",
-        "cholest",
+        "furostan",
         "Steroid: cholestane retained NP name",
     ),
     (
@@ -302,6 +309,44 @@ EXPECTED_UNFIXED = [
 ]
 
 
+# Rows whose old passing name described a DIFFERENT molecule; the default tier now
+# fails closed (as production did with the gate on at 4e0e5c29b) and the
+# best-effort tier names them RT-exact (test_parent_mismatch_tier_contract below).
+# Strict: the substring may only come back through a real, complete name.
+_BIOTINYL_AMP = (
+    "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OC(=O)CCCC[C@@H]2SC[C@@H]3NC(=O)"
+    "N[C@@H]32)[C@@H](O)[C@H]1O")
+_PIN_TIER_TARGETS = {
+    # Suite fix j6-breadth (TRIAGE g5 C11): three more rows whose PIN the PIN
+    # tier cannot build; best-effort names them RT-exact (test_j6_breadth tier
+    # contract).
+    "Cyclohexanone with chain FG - fixed by FG detection improvements": (
+        "PIN tier abstains: needs the acid-parent PIN (the carboxylic acid is "
+        "the suffix, P-44.1.1, BlueBookV2.md:18875) with a cycloalkylidene "
+        "substituent and an amide carbon in the principal chain; best-effort's "
+        "'...-2-oxocyclohexane' ring-parent name is not the PIN -- TODO in "
+        "TRIAGE.md 'Suite fix -- j6-breadth'"),
+    "FusedHet: benzothiophene salt": (
+        "PIN tier abstains: the free base 1-[1-(1-benzothiophen-2-yl)cyclohexyl]"
+        "piperidine is not named at the PIN tier (a 1-substituted cycloalkyl on "
+        "a ring N; the raw generator counts its ring carbons as a chain), and "
+        "the drawn neutral HCl adduct has no PIN (P-77.1.3; P-14.8.2 mixed "
+        "adducts); best-effort '...piperidine—hydrogen chloride (1/1)' is "
+        "RT-exact -- TODO in TRIAGE.md 'Suite fix -- j6-breadth'"),
+    "PAH: decahydronaphthalene": (
+        "PIN tier abstains: needs the hydro-naphthalene fusion PIN (P-52.2.4.1, "
+        "BlueBookV2.md:23710; P-31.1.4.2.4); the molecule has two ring C=C, so "
+        "it is a hexahydronaphthalene and the expected 'decahydro' substring is "
+        "itself wrong -- TODO in TRIAGE.md 'Suite fix -- j6-breadth'"),
+    "Nucleotide conjugate - fixed by multi-fragment assembly improvements": (
+        "the old 'adenosine (1R,5S,6S)-6-(7-hydroxy-5,7-dioxo-6,8-dioxa-7-"
+        "phosphaoctyl)-...' spliced two loose fragments (OPSIN: a 2-component "
+        "mixture; 16f45443a stopped it). 'adenosine' is a P-105.1 retained name, "
+        "not a PIN (P-100, BlueBookV2.md:50942); the systematic PIN is not built "
+        "-- TODO in TRIAGE.md 'Suite fix -- j1-regressions'"),
+}
+
+
 # Combine all compounds for the summary count test
 PARENT_MISMATCH_COMPOUNDS = EXPECTED_FIXED + [
     (smi, exp, desc) for smi, exp, desc in EXPECTED_UNFIXED
@@ -322,12 +367,15 @@ PARENT_MISMATCH_COMPOUNDS = EXPECTED_FIXED + [
         for i, (_, _, d) in enumerate(EXPECTED_FIXED)
     ],
 )
-def test_parent_mismatch_fixed(smiles, expected_parent_substring, description):
+def test_parent_mismatch_fixed(smiles, expected_parent_substring, description, request):
     """Should produce correct parent structure for these compounds.
 
     Verifies that the generated name contains the expected parent structure
     substring, indicating the correct ring system or chain was selected.
     """
+    if description in _PIN_TIER_TARGETS:
+        request.applymarker(pytest.mark.xfail(
+            strict=True, reason=_PIN_TIER_TARGETS[description]))
     name = name_compound(smiles)
     assert name, f"Should produce a name for: {description}"
     assert expected_parent_substring.lower() in name.lower(), (
@@ -336,6 +384,16 @@ def test_parent_mismatch_fixed(smiles, expected_parent_substring, description):
         f"  Generated: {name}\n"
         f"  Expected parent substring: '{expected_parent_substring}'"
     )
+
+
+@pytest.mark.integration
+@pytest.mark.opsin_gate
+def test_parent_mismatch_tier_contract():
+    """Production contract for the _PIN_TIER_TARGETS rows: the default tier ships
+    the failure sentinel or an RT-exact name, and best-effort names the molecule
+    RT-exact (breadth never drops)."""
+    from tests.support.rt_assert import assert_tier_contract
+    assert_tier_contract(_BIOTINYL_AMP)
 
 
 # ---------------------------------------------------------------------------

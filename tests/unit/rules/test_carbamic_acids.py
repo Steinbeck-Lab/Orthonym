@@ -2,7 +2,10 @@
 
 Carbamic acid (H2N-COOH) is a retained name for aminoformic acid.
 It should be detected as its own principal group, NOT as carboxylic acid.
-N-substituted forms produce names like N-methylcarbamic acid.
+N-substituted forms produce names like methylcarbamic acid:
+(the Blue Book) cites them without the italic-N locant,
+'(CH3)2N-COOH dimethylcarbamic acid (PIN)' (:30762), 'phenylcarbamic acid (PIN)'
+(:6798), '2-hydroxypropyl (2-aminoethyl)carbamate (PIN)' (:30766).
 """
 
 import pytest
@@ -62,19 +65,19 @@ class TestCarbamicAcidNaming:
 
     def test_n_methyl_carbamic_acid(self):
         """CNC(=O)O -> N-methylcarbamic acid."""
-        assert name_compound("CNC(=O)O") == "N-methylcarbamic acid"
+        assert name_compound("CNC(=O)O") == "methylcarbamic acid"
 
     def test_nn_dimethyl_carbamic_acid(self):
         """CN(C)C(=O)O -> N,N-dimethylcarbamic acid."""
-        assert name_compound("CN(C)C(=O)O") == "N,N-dimethylcarbamic acid"
+        assert name_compound("CN(C)C(=O)O") == "dimethylcarbamic acid"
 
     def test_nn_diethyl_carbamic_acid(self):
         """CCN(CC)C(=O)O -> N,N-diethylcarbamic acid."""
-        assert name_compound("CCN(CC)C(=O)O") == "N,N-diethylcarbamic acid"
+        assert name_compound("CCN(CC)C(=O)O") == "diethylcarbamic acid"
 
     def test_n_phenyl_carbamic_acid(self):
         """c1ccc(NC(=O)O)cc1 -> N-phenylcarbamic acid."""
-        assert name_compound("c1ccc(NC(=O)O)cc1") == "N-phenylcarbamic acid"
+        assert name_compound("c1ccc(NC(=O)O)cc1") == "phenylcarbamic acid"
 
 
 @pytest.mark.unit
@@ -83,4 +86,4 @@ class TestCarbamateNoRegression:
 
     def test_ethyl_n_methylcarbamate(self):
         """CCOC(=O)NC should still produce ethyl N-methylcarbamate."""
-        assert name_compound("CCOC(=O)NC") == "ethyl N-methylcarbamate"
+        assert name_compound("CCOC(=O)NC") == "ethyl methylcarbamate"

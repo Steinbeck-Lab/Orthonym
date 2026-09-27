@@ -2733,9 +2733,17 @@ def _both_ester_carbonyls_on_ring(mol, ester_matches) -> bool:
 def _acid_name_to_ate(acid_name: str) -> Optional[str]:
     """Convert an acid name to its ester anion stem:
     '...ic acid' -> '...ate' (dicarboxylic acid -> dicarboxylate; dioic ->
-    dioate). Returns None when the input is not an '-ic acid' form."""
+    dioate). Returns None when the input is not an '-ic acid' form.
+
+    The ester keeps the acid name's PIN status: a recorded non-PIN fragment in the
+    acid name (decision A's demoted 'N-<acyl>' float,...) does not survive the
+    suffix swap, so the '-ate' stem is recorded too
+    (``metrics.provenance.record_derived_non_pin_fragment``)."""
     if acid_name and acid_name.endswith("ic acid"):
-        return acid_name[: -len("ic acid")] + "ate"
+        ate = acid_name[: -len("ic acid")] + "ate"
+        from ..metrics.provenance import record_derived_non_pin_fragment
+        record_derived_non_pin_fragment(acid_name, ate)
+        return ate
     return None
 
 
@@ -3679,7 +3687,21 @@ def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
 
     # Assemble: join parts with hyphens, append parent name
     prefix_str = "-".join(parts)
-    return f"{prefix_str}{parent_name}"
+    name = f"{prefix_str}{parent_name}"
+    # A fully esterified polyol cited with its esters as 'acyloxy' prefixes on
+    # the bare hydride is not the PIN: (the Blue Book) cites
+    # an ester as a prefix only "when [...] another group is present that has
+    # priority for citation as the principal group or when all ester groups
+    # cannot be described by the methods prescribed for naming esters", and
+    # gives polyol esters such a method ('propane-1,2,3-triyl
+    # triacetate (PIN)':31827;:31836 "Method (1) generates preferred IUPAC
+    # names",:31840 'propane-1,2,3-triyl 1,2-diacetate 3-propanoate (PIN)').
+    # This is the fallback after the functional-class builder declined; the
+    # name is valid and round-trip verified, so it still ships, and the
+    # name-scoped record keeps it off pin_verified. TRIAGE g3 C10b.
+    from ..metrics.provenance import record_non_pin_fragment
+    record_non_pin_fragment(name)
+    return name
 
 
 def _find_polyol_backbone(mol, start_atoms: list, exclude: set) -> Optional[set]:

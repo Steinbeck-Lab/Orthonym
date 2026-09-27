@@ -97,13 +97,67 @@ def test_witness_converts_and_roundtrips(smiles, expected):
 
 
 def test_pin_tier_unchanged_on_witnesses():
-    """PIN tier (gfu=False) must abstain on every witness -- the fix is
-    best-effort-gated, so it can never leak into PIN."""
+    """The best-effort fall-through never leaks into the PIN tier: at the PIN
+    tier (gfu=False) a witness either abstains or is named by the PIN path
+    itself -- never the general engine -- and that name round-trips to its
+    input on the full InChIKey.
+
+    Suite fix j4 (TRIAGE g3 C10e): the premise "every witness abstains at the
+    PIN tier" went stale when the pnictogen -inate ester handler,
+    cf. the Blue Book 'methyl dimethylphosphinate (PIN)') began naming
+    witnesses 1 and 2 as functional-class esters -- a real PIN-path gain, not
+    a leak. Witness 2 then also carried a second, front-of-name '(2R)-'
+    (OPSIN-unparseable), see test_pnictogen_ester_cites_each_descriptor_once.
+    """
     pin = Orthonym()
     for smiles, _ in WITNESSES:
-        out = pin.name(smiles)
-        assert is_failure_name(out), (
-            f"PIN tier changed on {smiles!r}: emitted {out!r} (must stay abstain)")
+        res = pin.name_tiered(smiles)
+        out = res["name"]
+        if is_failure_name(out):
+            continue
+        assert res.get("source") == "pin_path", (
+            f"PIN tier named {smiles!r} as {out!r} from {res.get('source')!r}: "
+            f"the best-effort fall-through leaked into the PIN tier")
+        assert _rt_inchikey_match(out, smiles), (
+            f"PIN tier name {out!r} does not OPSIN-round-trip to {smiles!r}")
+
+
+# Suite fix j4 (TRIAGE g3 C10e). A functional-class -inate ester has no numbered
+# parent (the phosphinate is a mononuclear retained parent whose substituents take
+# no locants), so every stereodescriptor stays with the organyl group it belongs
+# to: (the Blue Book) descriptors "are placed at the front of the
+# complete name when related to the parent structure [...] When they relate to
+# substituent groups, they are cited at the front of the corresponding prefix",
+# and (:2869) scopes locants per enclosing-mark unit. The handler used to prepend a second '(2R)-'
+# read from a P-substituent's chain. All three OPSIN 2.9.0 full-InChIKey and
+# canonical-SMILES exact (independent batch); the doubled form does not parse.
+PNICTOGEN_ESTER_STEREO = [
+    ("CCOC(OCC)P(=O)(C[C@@H](O)CCl)OCC",
+     "ethyl [(2R)-3-chloro-2-hydroxypropyl](diethoxymethyl)phosphinate"),
+    ("CCOP(=O)(CC)C[C@@H](C)O",
+     "ethyl ethyl[(2R)-2-hydroxypropyl]phosphinate"),
+    # boundary: a stereocentre in the ESTER organyl group keeps its descriptor
+    ("CC[C@@H](C)OP(=O)(CC)CC", "(2R)-butan-2-yl diethylphosphinate"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", PNICTOGEN_ESTER_STEREO)
+def test_pnictogen_ester_cites_each_descriptor_once(smiles, expected):
+    res = Orthonym().name_tiered(smiles)
+    assert res["name"] == expected
+    assert res["tier"] == "pin_verified" and res["opsin"] == "verified", res
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "PIN spelling of the ethenyl prefix: P-14.3.4.4 example BlueBookV2.md:3003 "
+    "'2-chloroethen-1-yl (preferred prefix)' ('eth-1-en-1-yl': 0 BB hits; "
+    "'ethen-1-yl' :3003/:6415/:17366/:42468). The substituent namer cites the "
+    "'en' locant; the name is RT-exact but not the PIN spelling. TODO: "
+    ".planning/preexisting-triage/TRIAGE.md, 'Suite fix -- j4-pin-labels-a', "
+    "new findings."))
+def test_witness1_pin_spelling():
+    assert Orthonym().name(WITNESSES[0][0]) == (
+        "methyl bis(2,2-difluoroethen-1-yl)phosphinate")
 
 
 @pytest.mark.parametrize("smiles,expected", PIN_GOLD)

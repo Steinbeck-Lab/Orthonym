@@ -227,7 +227,9 @@ class TestRingNitrogenNotAmineProtect:
         ("CCNCC", "N-ethylethanamine"),
         ("CN(C)C", "N,N-dimethylmethanamine"),
         ("C1CCCCC1N", "cyclohexan-1-amine"),
-        ("CNC1CCCCC1", "N-methylcyclohexan-1-amine"),
+        # (c) (the Blue Book): the ring carries only the amine;
+        # '*N*-butylcyclopropanamine (PIN)' (:26292,.
+        ("CNC1CCCCC1", "N-methylcyclohexanamine"),
         ("C1COCCN1", "morpholine"),
         ("C1CCNCC1", "piperidine"),
         ("C1CCCN1", "pyrrolidine"),

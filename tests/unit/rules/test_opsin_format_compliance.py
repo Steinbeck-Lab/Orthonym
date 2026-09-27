@@ -306,23 +306,15 @@ _CANARY_DEFECT_REASONS = {
     ),
 }
 
+# Suite fix j6-breadth (2026-09-27): canary calls 135/142/323 (the prenylated-phenol trienoic
+# acid) and 171 (the tetramethyl-1,3-dioxolanyl terpene) left this table -- their raw PIN-tier
+# names are RT-exact now (strict XPASS below) and they are verified fixture rows
+# (tests/integration/test_canary_rt75.py, tags 'j6 RB-RINGBR' / 'j6 RB-HWSTEM').
 # SMILES -> (current PIN-tier name with the gate off, class, canary call numbers).
 CANARY_KNOWN_DEFECTS = {
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O": (
         "2-(acetyloxy)-4-hydroxyheptadec-16-yne-1,4-diol",
         "DK-NOTEXACT", (6,),
-    ),
-    "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](CS)C(=O)O": (
-        "lysylthreonylcysteine",
-        "DK-PEP", (7,),
-    ),
-    "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O": (
-        "leucylserylglycine",
-        "DK-PEP", (10,),
-    ),
-    "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CO)C(=O)O": (
-        "tryptophyltyrosylserine",
-        "DK-PEP", (11,),
     ),
     "CC1=CC[C@]23O[C@@]2(C)CC[C@@H]2[C@H](OC(=O)[C@H]2C)[C@@H]13": (
         "(1R,3S,6S,7S,10S,11R)-3,7,12-trimethyl-2,9-dioxatetracyclo[9.3.0.0^1,3.0^6,10]tetradec-12-en-8-one",
@@ -331,10 +323,6 @@ CANARY_KNOWN_DEFECTS = {
     "N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)N1CCC[C@@H]1C(=O)O": (
         "serylseryl-D-proline",
         "DK-PEP", (14,),
-    ),
-    "C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "serylalanyltyrosine",
-        "DK-PEP", (15,),
     ),
     "N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CCC(=O)O)C(=O)O": (
         "aspartyltryptophylglutamic acid",
@@ -364,10 +352,6 @@ CANARY_KNOWN_DEFECTS = {
         "(1S,2S,5S,8R,9R)-4,4,8-trimethyltricyclo[6.3.1.0^1,5]dodecane-2,9-diol",
         "DK-VBFUSED", (39,),
     ),
-    "CC(C)[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
-        "valyltyrosylaspartic acid",
-        "DK-PEP", (41,),
-    ),
     "NCCCC[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](CS)C(=O)O": (
         "glutaminyllysylcysteine",
         "DK-PEP", (44,),
@@ -379,10 +363,6 @@ CANARY_KNOWN_DEFECTS = {
     "NC(=O)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
         "asparaginylaspartylaspartic acid",
         "DK-PEP", (50,),
-    ),
-    "CC[C@H](C)[C@H](NC(=O)[C@@H](N)C(C)C)C(=O)N[C@H](C(=O)O)[C@@H](C)O": (
-        "valylisoleucylthreonine",
-        "DK-PEP", (62,),
     ),
     "CC(C)C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CC(N)=O)C(=O)O": (
         "leucylhistidylasparagine",
@@ -400,17 +380,9 @@ CANARY_KNOWN_DEFECTS = {
         "(3S)-6,7-dihydroxy-8-methoxy-3-methyl-3,4-dihydro-1H-2-benzopyran-4-one",
         "DK-INDH", (133,),
     ),
-    "C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO": (
-        "unknown organic compound",
-        "DK-NOTEXACT", (135, 142, 323),
-    ),
     "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3": (
         "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholesta-8,23-dien-3-yl acetate",
         "DK-ACIDPFX", (143, 317),
-    ),
-    "O=C([O-])/C=C/C(=O)O.[Na+]": (
-        "sodium 3-carboxyprop-2-enoate",
-        "DK-NOTEXACT", (145,),
     ),
     "CCN(CC)Cc1ccccc1": (
         "N-benzyl-N-ethylethan-1-amine",
@@ -421,7 +393,10 @@ CANARY_KNOWN_DEFECTS = {
         "DK-NOTEXACT", (150,),
     ),
     "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC": (
-        "propane-1,2,3-triyl 2-(11Z,14Z)-icosa-11,14-dienoate 1,3-di[(9Z,12Z)-octadeca-9,12-dienoate]",
+        # j7 (TRIAGE g5 C12): now the Blue Book method (1) spelling with the single
+        # stereo-bearing anion enclosed:31846); still DK-NOTEXACT
+        # because OPSIN 2.9.0 parses no multi-anion locant ester name.
+        "propane-1,2,3-triyl 2-[(11Z,14Z)-icosa-11,14-dienoate] 1,3-di[(9Z,12Z)-octadeca-9,12-dienoate]",
         "DK-NOTEXACT", (151, 315, 326),
     ),
     "COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\\C)CCCC1O": (
@@ -431,10 +406,6 @@ CANARY_KNOWN_DEFECTS = {
     "COC1C2=C(C)C(=O)OC2CC2CCC(O)C(C)C21C": (
         "unknown organic compound",
         "DK-NOTEXACT", (155,),
-    ),
-    "C=C[C@](C)(O)CCC=C(C)CCC1OC(C)(C)OC1(C)C": (
-        "unknown organic compound",
-        "DK-NOTEXACT", (171,),
     ),
     "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1": (
         # fix a performance pass (wp5): the ring now takes the form (was
@@ -477,57 +448,17 @@ CANARY_KNOWN_DEFECTS = {
         "unknown organic compound",
         "DK-NOTEXACT", (202, 316, 338),
     ),
-    "CC(C)C[C@H](N)C(=O)N[C@@H](CS)C(=O)O": (
-        "leucylcysteine",
-        "DK-PEP", (216,),
-    ),
-    "NCCCC[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O": (
-        "lysylserylglycine",
-        "DK-PEP", (222,),
-    ),
     "NC(=O)CC[C@H](NC(=O)CNC(=O)[C@@H](N)CO)C(=O)O": (
         "serylglycylglutamine",
         "DK-PEP", (230,),
-    ),
-    "CC(C)C[C@H](N)C(=O)N[C@@H](C)C(=O)N[C@H](C(=O)O)C(C)C": (
-        "leucylalanylvaline",
-        "DK-PEP", (231,),
-    ),
-    "CC(C)[C@H](N)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CS)C(=O)O": (
-        "valyllysylcysteine",
-        "DK-PEP", (232,),
-    ),
-    "CC(C)C[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O": (
-        "tyrosyllysylleucine",
-        "DK-PEP", (234,),
-    ),
-    "C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)NCC(=O)O": (
-        "alanyltryptophylglycine",
-        "DK-PEP", (238,),
     ),
     "N[C@@H](CC(=O)O)C(=O)NCC(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
         "aspartylglycyltryptophan",
         "DK-PEP", (239,),
     ),
-    "C[C@H](NC(=O)[C@H](Cc1ccc(O)cc1)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O": (
-        "tyrosyltyrosylalanine",
-        "DK-PEP", (240,),
-    ),
     "C[C@@H](O)[C@H](NC(=O)CN)C(=O)N[C@@H](CC(N)=O)C(=O)O": (
         "glycylthreonylasparagine",
         "DK-PEP", (242,),
-    ),
-    "C[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O": (
-        "tryptophyllysylalanine",
-        "DK-PEP", (243,),
-    ),
-    "C[C@@H](O)[C@H](NC(=O)CNC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O": (
-        "tryptophylglycylthreonine",
-        "DK-PEP", (244,),
-    ),
-    "CC(C)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
-        "lysylvalylphenylalanine",
-        "DK-PEP", (245,),
     ),
     "C[C@H](NC(=O)[C@@H](N)CS)C(=O)N[C@H](C(=O)O)[C@@H](C)O": (
         "cysteinylalanylthreonine",
@@ -537,25 +468,13 @@ CANARY_KNOWN_DEFECTS = {
         "glutamylthreonylcysteine",
         "DK-PEP", (251,),
     ),
-    "C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@H](C(=O)O)[C@@H](C)O": (
-        "alanyltryptophylthreonine",
-        "DK-PEP", (254,),
-    ),
     "CC(C)[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
         "aspartylvalylphenylalanine",
         "DK-PEP", (255,),
     ),
-    "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CO)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
-        "histidylserylaspartic acid",
-        "DK-PEP", (257,),
-    ),
     "CC(C)[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
         "glutamylvalylphenylalanine",
         "DK-PEP", (258,),
-    ),
-    "NCCCC[C@H](NC(=O)[C@H](CS)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O": (
-        "phenylalanylcysteinyllysine",
-        "DK-PEP", (262,),
     ),
     "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
         "glutaminylthreonyltryptophan",
@@ -568,22 +487,6 @@ CANARY_KNOWN_DEFECTS = {
     "CC[C@H](C)[C@H](NC(=O)[C@@H](NC(=O)[C@@H](N)CC(N)=O)[C@@H](C)O)C(=O)O": (
         "asparaginylthreonylisoleucine",
         "DK-PEP", (265,),
-    ),
-    "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CS)C(=O)N[C@@H](CS)C(=O)O": (
-        "phenylalanylcysteinylcysteine",
-        "DK-PEP", (266,),
-    ),
-    "NC(=O)C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
-        "serylasparaginylphenylalanine",
-        "DK-PEP", (267,),
-    ),
-    "NC(=O)C[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)N[C@@H](CO)C(=O)O": (
-        "phenylalanylasparaginylserine",
-        "DK-PEP", (268,),
-    ),
-    "N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CCC(=O)O)C(=O)O": (
-        "cysteinylhistidylglutamic acid",
-        "DK-PEP", (270,),
     ),
     "C[C@@H](O)[C@H](N)C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
         "threonylglutaminylaspartic acid",
@@ -605,14 +508,6 @@ CANARY_KNOWN_DEFECTS = {
         "tricyclo[3.3.1.1^3,7]decane-1,4-diol",
         "DK-ADAM", (344,),
     ),
-    "CC(C)C[C@H](NC(=O)[C@H](Cc1ccc(O)cc1)NC(=O)[C@@H](N)CS)C(=O)O": (
-        "cysteinyltyrosylleucine",
-        "DK-PEP", (345,),
-    ),
-    "CC(C)[C@H](NC(=O)CN)C(=O)N[C@@H](C)C(=O)O": (
-        "glycylvalylalanine",
-        "DK-PEP", (351,),
-    ),
     "CC1(C)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)CC[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1": (
         "unknown organic compound",
         "DK-NOTEXACT", (353,),
@@ -620,10 +515,6 @@ CANARY_KNOWN_DEFECTS = {
     "C[C@@H]1CC[C@@H]2C=C(C(=O)O)[C@H]3C[C@](C)(C(=O)O)C[C@]132": (
         "(1S,4R,7R,8R,10S)-7,10-dimethyltricyclo[6.3.0.0^4,8]undec-2-ene-2,10-dicarboxylic acid",
         "DK-VBFUSED", (356,),
-    ),
-    "N[C@@H](CO)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O": (
-        "serylhistidylcysteine",
-        "DK-PEP", (359,),
     ),
     "C[C@H](CCC1OCC1CO)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C": (
         "(3R,5S,7R,8R,9S,10S,12S,13R,14S,17R,20R)-24,27-epoxycholestane-3,7,12,26-tetrol",
@@ -633,37 +524,13 @@ CANARY_KNOWN_DEFECTS = {
         "(2S)-6-amino-2-(tyrosylaspartylamino)hexanoic acid",
         "DK-PEP", (364,),
     ),
-    "NCCCC[C@H](NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
-        "histidyllysyltryptophan",
-        "DK-PEP", (366,),
-    ),
-    "N[C@@H](CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
-        "seryltyrosyltryptophan",
-        "DK-PEP", (367,),
-    ),
     "CC(C)C[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
         "aspartylleucylaspartic acid",
         "DK-PEP", (368,),
     ),
-    "CC(C)C[C@H](NC(=O)CNC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O": (
-        "tryptophylglycylleucine",
-        "DK-PEP", (369,),
-    ),
-    "CC(C)[C@H](NC(=O)[C@H](C)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O": (
-        "histidylalanylvaline",
-        "DK-PEP", (371,),
-    ),
-    "CC(C)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CCCCN)C(=O)O": (
-        "prolylvalyllysine",
-        "DK-PEP", (374,),
-    ),
     "NC(=O)CC[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
         "glutamylglutaminylhistidine",
         "DK-PEP", (379,),
-    ),
-    "CC(C)C[C@H](NC(=O)[C@@H](N)[C@@H](C)O)C(=O)N[C@H](C(=O)O)C(C)C": (
-        "threonylleucylvaline",
-        "DK-PEP", (380,),
     ),
     "CC(C)C[C@H](NC(=O)[C@H](CC(N)=O)NC(=O)[C@@H](N)CCCCN)C(=O)O": (
         "lysylasparaginylleucine",
@@ -677,37 +544,29 @@ CANARY_KNOWN_DEFECTS = {
         "(1S,3S,4S,11R,12R,14R)-14-hydroxy-4,8,12,15,15-pentamethyltetracyclo[9.3.1.0^3,11.0^4,7]pentadec-7-en-6-one",
         "DK-VBFUSED", (385,),
     ),
-    "CC(C)[C@H](NC(=O)[C@H](CC(N)=O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O": (
-        "histidylasparaginylvaline",
-        "DK-PEP", (397,),
-    ),
     "NC(=O)CC[C@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
         "glutaminylphenylalanylglutamine",
         "DK-PEP", (400,),
     ),
-    "CC[C@H](C)[C@H](NC(=O)[C@H](Cc1cnc[nH]1)NC(=O)[C@@H](N)CCCCN)C(=O)O": (
-        "lysylhistidylisoleucine",
-        "DK-PEP", (405,),
-    ),
     "NC(=O)C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
         "glutamylasparaginylphenylalanine",
         "DK-PEP", (406,),
-    ),
-    "CC(C)[C@H](N)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O": (
-        "valylserylserine",
-        "DK-PEP", (409,),
     ),
     "C[C@@H]1CC[C@H]2C(C=O)=C[C@@H]3CC(C)(C)CC132": (
         "(1R,4S,9R)-6,6,9-trimethyltricyclo[6.3.0.0^4,8]undec-2-ene-2-carbaldehyde",
         "DK-VBFUSED", (413,),
     ),
     "C/C(=C\\CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)C(C)(C)[C@@H]1C[C@H]3O)C(=O)O": (
-        "(3R,5R,7R,10S,13R,14R,17R,20R,24E)-3,7,26-trihydroxy-4,4,14-trimethylcholesta-8,24-dien-26-one",
-        "DK-ACIDPFX", (416,),
+        # j7: the acid is the '-26-oic acid' suffix now:52548); the row keeps
+        # its whole-graph R/S block on implied centres (was DK-ACIDPFX).
+        "(3R,5R,7R,10S,13R,14R,17R,20R,24E)-3,7-dihydroxy-4,4,14-trimethylcholesta-8,24-dien-26-oic acid",
+        "DK-P101CIP", (416,),
     ),
     "C/C(=C\\[C@@H](O)C[C@@H](C)[C@H]1CC(=O)[C@@]2(C)C3=C(C(=O)C[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1C[C@@H]3O)C(=O)O": (
-        "(3S,5R,7S,10S,13R,14R,17R,20R,23S,24E)-3,7,23,26-tetrahydroxy-4,4,14-trimethylcholesta-8,24-diene-11,15,26-trione",
-        "DK-ACIDPFX", (417,),
+        # j7: the acid is the '-26-oic acid' suffix now:52548); the row keeps
+        # its whole-graph R/S block on implied centres (was DK-ACIDPFX).
+        "(3S,5R,7S,10S,13R,14R,17R,20R,23S,24E)-3,7,23-trihydroxy-4,4,14-trimethyl-11,15-dioxocholesta-8,24-dien-26-oic acid",
+        "DK-P101CIP", (417,),
     ),
     "CC[C@H](C)[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
         "glutaminylglutamylisoleucine",
@@ -716,14 +575,6 @@ CANARY_KNOWN_DEFECTS = {
     "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO": (
         "(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17,21-trihydroxy-16-methylpregna-1,4-diene-3,20-dione",
         "DK-P101CIP", (421,),
-    ),
-    "NC(=O)CC[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CS)C(=O)O": (
-        "prolylglutaminylcysteine",
-        "DK-PEP", (423,),
-    ),
-    "N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CS)C(=O)O": (
-        "tyrosyltyrosylcysteine",
-        "DK-PEP", (425,),
     ),
     "C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O": (
         "glycylaspartylalanine",
@@ -757,10 +608,6 @@ CANARY_KNOWN_DEFECTS = {
         "valylasparaginylaspartic acid",
         "DK-PEP", (443,),
     ),
-    "NC(=O)C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "serylasparaginyltyrosine",
-        "DK-PEP", (452,),
-    ),
     "NCCCC[C@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O": (
         "lysylglutamylglutamic acid",
         "DK-PEP", (454,),
@@ -773,29 +620,13 @@ CANARY_KNOWN_DEFECTS = {
         "N-[(2S)-2,5-diamino-5-oxopentanoyl](2S)-2-amino-3-methylbutanoic acid",
         "DK-NACYL", (460,),
     ),
-    "CC[C@H](C)[C@H](NC(=O)[C@H](CS)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O": (
-        "tryptophylcysteinylisoleucine",
-        "DK-PEP", (468,),
-    ),
     "C[C@@H]1C=C[C@H]2C3C1CC[C@@](C)(O)O[C@@H]3OC(=O)[C@@H]2C": (
         "(1R,4R,5S,8R,12S)-12-hydroxy-4,8,12-trimethyl-2,13-dioxatricyclo[7.4.1.0^5,14]tetradec-6-en-3-one",
         "DK-VBFUSED", (472,),
     ),
-    "NCCCC[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
-        "prolyllysylaspartic acid",
-        "DK-PEP", (474,),
-    ),
     "N[C@@H](CC(=O)O)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
         "aspartyltyrosylhistidine",
         "DK-PEP", (476,),
-    ),
-    "CC(C)[C@H](N)C(=O)NCC(=O)N[C@@H](CCCCN)C(=O)O": (
-        "valylglycyllysine",
-        "DK-PEP", (483,),
-    ),
-    "C[C@@H](O)[C@H](NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)N[C@@H](CO)C(=O)O": (
-        "histidylthreonylserine",
-        "DK-PEP", (485,),
     ),
     "CC1(C)CC23[C@@H]4CC(=O)[C@@H]2COC(=O)[C@@H]3CC[C@H]41": (
         "(2R,5S,9R,12R)-13,13-dimethyl-7-oxatetracyclo[7.5.0.0^1,5.0^2,12]tetradecane-4,8-dione",
@@ -809,14 +640,6 @@ CANARY_KNOWN_DEFECTS = {
         "serylaspartylhistidine",
         "DK-PEP", (495,),
     ),
-    "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
-        "tryptophylcysteinylhistidine",
-        "DK-PEP", (496,),
-    ),
-    "CC[C@H](C)[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CO)C(=O)O": (
-        "isoleucyltyrosylserine",
-        "DK-PEP", (499,),
-    ),
     "CC1=CCC(=O)CC(=O)[C@@]23C(=O)N[C@@H](CC(C)C)[C@@H]2[C@H](C)C(C)=C[C@@H]3C1": (
         "(1S,9S,12S,13R,14S)-7,11,12-trimethyl-14-(2-methylpropyl)-15-azatricyclo[7.7.0.0^1,13]hexadeca-6,10-diene-2,4,16-trione",
         "DK-VBFUSED", (500,),
@@ -825,29 +648,13 @@ CANARY_KNOWN_DEFECTS = {
         "glutamylcysteinylhistidine",
         "DK-PEP", (501,),
     ),
-    "NCCCC[C@H](N)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
-        "lysylphenylalanylhistidine",
-        "DK-PEP", (503,),
-    ),
     "CC(=O)OC[C@]12CC[C@H](O)C(C)(C)[C@@H]1CCC1=C2CC[C@]2(C)[C@@H]([C@H](C)[C@H](C/C=C(/C)C(=O)O)OC(C)=O)CC[C@@]12C": (
         "(3S,5R,10R,13R,14R,17R,20S,22S,24Z)-3,26-dihydroxy-4,4,14-trimethyl-26-oxocholesta-8,24-dien-19,22-diyl diacetate",
         "DK-ACIDPFX", (510,),
     ),
-    "CC(C)[C@H](N)C(=O)NCC(=O)N[C@H](C(=O)O)[C@@H](C)O": (
-        "valylglycylthreonine",
-        "DK-PEP", (513,),
-    ),
-    "CC(C)C[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CC(C)C)C(=O)O": (
-        "leucyllysylleucine",
-        "DK-PEP", (515,),
-    ),
     "CC[C@H](C)[C@H](NC(=O)[C@@H](N)CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
         "asparaginylisoleucylhistidine",
         "DK-PEP", (518,),
-    ),
-    "CC(C)C[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)NCC(=O)O": (
-        "tyrosylleucylglycine",
-        "DK-PEP", (520,),
     ),
     "C[C@H](CC[C@H](O)C(C)(C)O)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3": (
         "(3S,5R,10S,13R,14R,17R,20R,24S)-4,4,14-trimethylcholest-8-ene-3,24,25-triol",
@@ -857,22 +664,6 @@ CANARY_KNOWN_DEFECTS = {
         "glutaminylglutamylvaline",
         "DK-PEP", (524,),
     ),
-    "CC(C)[C@H](NC(=O)CN)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "glycylvalyltyrosine",
-        "DK-PEP", (526,),
-    ),
-    "CC(C(=O)O)[C@H](O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C": (
-        "(24R)-3α,12α,24,26-tetrahydroxy-5β-cholestan-26-one",
-        "DK-ACIDPFX", (527,),
-    ),
-    "CC[C@H](C)[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O": (
-        "isoleucylhistidylphenylalanine",
-        "DK-PEP", (531,),
-    ),
-    "NCCCC[C@H](N)C(=O)NCC(=O)NCC(=O)O": (
-        "lysylglycylglycine",
-        "DK-PEP", (534,),
-    ),
     "NCC(=O)N[C@@H](CCC(=O)O)C(=O)NCC(=O)O": (
         "N-glycylglutamylglycine",
         "DK-PEP", (538,),
@@ -881,33 +672,13 @@ CANARY_KNOWN_DEFECTS = {
         "(2E,9E)-3,17,18-trimethyl-15-(2-methylpropyl)-7-oxa-14-azatetracyclo[10.7.0.0^6,8.0^12,16]nonadeca-2,9,18-triene-11,13-dione",
         "DK-VBFUSED", (540,),
     ),
-    "NC(=O)C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O": (
-        "asparaginylhistidylcysteine",
-        "DK-PEP", (543,),
-    ),
     "CCC(=O)OCC(=O)[C@@]1(OC(=O)CC)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C": (
         "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11-hydroxy-16-methyl-3,20-dioxopregna-1,4-dien-17,21-diyl dipropanoate",
         "DK-P101CIP", (550,),
     ),
-    "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)NCC(=O)O": (
-        "histidylhistidylglycine",
-        "DK-PEP", (555,),
-    ),
-    "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)NCC(=O)N[C@@H](CC(=O)O)C(=O)O": (
-        "tryptophylglycylaspartic acid",
-        "DK-PEP", (558,),
-    ),
     "NC(=O)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O": (
         "histidylglutamylasparagine",
         "DK-PEP", (562,),
-    ),
-    "CC(C)[C@H](N)C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)O": (
-        "valylalanylalanine",
-        "DK-PEP", (563,),
-    ),
-    "CC[C@H](C)[C@H](N)C(=O)NCC(=O)N[C@@H](CCC(=O)O)C(=O)O": (
-        "isoleucylglycylglutamic acid",
-        "DK-PEP", (564,),
     ),
     "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
         "histidylglutamyltyrosine",
@@ -921,29 +692,13 @@ CANARY_KNOWN_DEFECTS = {
         "4-(acetyloxy)-2-hydroxyheptadec-16-yne-1,2-diol",
         "DK-NOTEXACT", (567,),
     ),
-    "N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "tyrosyltyrosyltyrosine",
-        "DK-PEP", (571,),
-    ),
     "C[C@@H](O)[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CCC(=O)O)C(=O)O": (
         "glutamyllysylthreonine",
         "DK-PEP", (572,),
     ),
-    "NC(=O)C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
-        "asparaginyltryptophylcysteinylhistidine",
-        "DK-PEP", (576,),
-    ),
     "C[C@H](O)[C@H]([NH3+])C(=O)[O-]": (
         "unknown organic compound",
         "DK-NOTEXACT", (582,),
-    ),
-    "NCC(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "glycylhistidyltyrosine",
-        "DK-PEP", (585,),
-    ),
-    "CC(C)C[C@H](NC(=O)[C@H](CO)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O": (
-        "phenylalanylserylleucine",
-        "DK-PEP", (588,),
     ),
     "CC(C)C[C@H](N)C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CC(N)=O)C(=O)O": (
         "leucylglutaminylasparagine",
@@ -969,10 +724,6 @@ CANARY_KNOWN_DEFECTS = {
         "aspartylcysteine",
         "DK-PEP", (603,),
     ),
-    "C[C@H](CCC[C@H](C)C(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C": (
-        "(25S)-26-hydroxy-5α-cholestane-3,26-dione",
-        "DK-ACIDPFX", (605,),
-    ),
     "[NH2+]=C(C[C@H](O)[C@H](O)CO)C(=O)[O-]": (
         "unknown organic compound",
         "DK-NOTEXACT", (608,),
@@ -980,10 +731,6 @@ CANARY_KNOWN_DEFECTS = {
     "CC1(C)CCC(=O)[C@@]2(C)O[C@]3(O)CC[C@@]12C[C@H]3O": (
         "(1R,3S,8R,10R)-1,10-dihydroxy-3,7,7-trimethyl-2-oxatricyclo[6.2.2.0^3,8]dodecan-4-one",
         "DK-VBFUSED", (611,),
-    ),
-    "CC[C@H](C)[C@H](N)C(=O)N[C@H](C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O)[C@@H](C)CC": (
-        "isoleucylisoleucylhistidine",
-        "DK-PEP", (614,),
     ),
     "N[C@@H](CCC(=O)O)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
         "glutamylcysteinyltryptophan",
@@ -993,21 +740,9 @@ CANARY_KNOWN_DEFECTS = {
         "aspartyltryptophylhistidine",
         "DK-PEP", (624,),
     ),
-    "CC(C)[C@H](NC(=O)[C@@H](NC(=O)[C@@H](N)CCCCN)C(C)C)C(=O)O": (
-        "lysylvalylvaline",
-        "DK-PEP", (629,),
-    ),
     "CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC": (
         "(2R)-1-(octadecanoyloxy)-2-[(9Z)-octadec-9-enoyloxy]propan-3-ol",
         "DK-GLYSUB", (633,),
-    ),
-    "C[C@H](NC(=O)[C@H](Cc1c[nH]c2ccccc12)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O": (
-        "phenylalanyltryptophylalanine",
-        "DK-PEP", (635,),
-    ),
-    "C[C@H](NC(=O)CN)C(=O)N[C@@H](CO)C(=O)O": (
-        "glycylalanylserine",
-        "DK-PEP", (644,),
     ),
     "C[C@@H](O)[C@H](NC(=O)[C@@H](NC(=O)[C@@H](N)CCCNC(=N)N)[C@@H](C)O)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
         "arginylthreonylthreonylaspartic acid",
@@ -1029,10 +764,6 @@ CANARY_KNOWN_DEFECTS = {
         "valylglutamylglutamic acid",
         "DK-PEP", (656,),
     ),
-    "C[C@@H](O)[C@H](NC(=O)CN)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
-        "glycylthreonylhistidine",
-        "DK-PEP", (657,),
-    ),
     "CC1=C[C@@H]2C(C)(C)[C@H]3CC[C@H](C)[C@@]23CC1": (
         "(1R,3R,6S,7R)-2,2,6,10-tetramethyltricyclo[5.4.0.0^3,7]undec-10-ene",
         "DK-VBNUM", (661,),
@@ -1048,10 +779,6 @@ CANARY_KNOWN_DEFECTS = {
         "trioxatricyclo[19.3.1.1^14,17]hexacosa-2,4,16-triene-15,19,23-trione",
         "DK-VBNUM", (599,),
     ),
-    "CC[C@H](C)[C@H](NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)NCC(=O)O": (
-        "tryptophylisoleucylglycine",
-        "DK-PEP", (663,),
-    ),
     "CC(C)C[C@H](NC(=O)[C@H](C)N)C(=O)N[C@H](C(=O)N[C@@H](CCC(N)=O)C(=O)O)[C@@H](C)O": (
         "alanylleucylthreonylglutamine",
         "DK-PEP", (664,),
@@ -1059,14 +786,6 @@ CANARY_KNOWN_DEFECTS = {
     "CC[C@H](C)[C@H](NC(=O)[C@@H](N)CS)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
         "cysteinylisoleucylaspartic acid",
         "DK-PEP", (666,),
-    ),
-    "CC[C@H](C)[C@H](NC(=O)CN)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "glycylisoleucyltyrosine",
-        "DK-PEP", (667,),
-    ),
-    "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O": (
-        "histidylphenylalanyltyrosine",
-        "DK-PEP", (668,),
     ),
     "NCCCC[C@H](NC(=O)[C@H](CC(N)=O)NC(=O)[C@@H](N)CC(=O)O)C(=O)O": (
         "aspartylasparaginyllysine",
@@ -1079,14 +798,6 @@ CANARY_KNOWN_DEFECTS = {
     "CCCCOc1ccc(CC(=O)NO)cc1": (
         "N-hydroxyacetamide",
         "DK-NOTEXACT", (678,),
-    ),
-    "CC[C@H](C)[C@H](NC(=O)[C@H](CCC(N)=O)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O": (
-        "tryptophylglutaminylisoleucine",
-        "DK-PEP", (679,),
-    ),
-    "CC(C)[C@H](NC(=O)[C@@H](N)[C@@H](C)O)C(=O)N[C@@H](CCCCN)C(=O)O": (
-        "threonylvalyllysine",
-        "DK-PEP", (681,),
     ),
     "CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCCCCCC": (
         "(2S)-2-hydroxy-3-(tetradecanoyloxy)propyl octadecanoate",
@@ -1104,25 +815,13 @@ CANARY_KNOWN_DEFECTS = {
         "aspartylhistidyltyrosine",
         "DK-PEP", (686,),
     ),
-    "CC[C@H](C)[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)N[C@@H](CC(C)C)C(=O)O": (
-        "phenylalanylisoleucylleucine",
-        "DK-PEP", (687,),
-    ),
     "CC1(C)C(=O)CC(O)C23C(=O)OC4OCC(=CCC12)C43": (
         "2-hydroxy-5,5-dimethyl-11,13-dioxatetracyclo[7.5.1.0^1,6.0^12,15]pentadec-8-ene-4,14-dione",
         "DK-VBFUSED", (688,),
     ),
-    "NC(=O)CC[C@H](NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O": (
-        "histidylglutaminylcysteine",
-        "DK-PEP", (690,),
-    ),
     "CC(=O)OCC(=O)[C@@]1(O)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C": (
         "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11,17-dihydroxy-16-methyl-3,20-dioxopregna-1,4-dien-21-yl acetate",
         "DK-P101CIP", (691,),
-    ),
-    "CC(CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(=O)O": (
-        "3β,26-dihydroxy-5β-cholestan-26-one",
-        "DK-ACIDPFX", (699,),
     ),
     "C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
         "glutamylalanyltryptophan",
@@ -1156,7 +855,15 @@ _NOT_RT_EXACT_SHIP_DEFECTS = {
 }
 
 _LABEL_DEFECTS = {
-    # calls 151/315/326 (a triglyceride)
+    # calls 151/315/326 (a triglyceride). FIXED in suite fix j4 (TRIAGE g3 C10b):
+    # rules.esters.name_polyol_polyester and the decomposition weave record their
+    # acyloxy-on-hydride names as non-PIN, so the row ships best_effort; the value
+    # None below turns its strict xfail into an ordinary assertion.
+    "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC": None,
+}
+
+# (the reason the row carried while it was open, kept for the record:)
+_LABEL_DEFECTS_HISTORY = {
     "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC": (
         "DEFECT (label): the gate-on PIN tier ships the RT-exact acyloxy-on-propane name "
         "'2-{[(11Z,14Z)-icosa-11,14-dienoyl]oxy}-1,3-bis{[(9Z,12Z)-octadeca-9,12-dienoyl]oxy}"
@@ -1224,6 +931,7 @@ def test_canary_not_rt_exact_raw_name_is_fixed(smiles):
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", [
     pytest.param(smi, marks=pytest.mark.xfail(strict=True, reason=reason))
+    if reason is not None else smi
     for smi, reason in _LABEL_DEFECTS.items()])
 def test_canary_known_non_pin_is_not_labelled_pin(smiles):
     from orthonym import Orthonym

@@ -57,7 +57,17 @@ def name_pnictogen_inate_ester(
 
     pool = get_current_pool()
     pool.add(name, fg_key, features)
-    final_name = _inject_stereo_if_missing(features, pool.best().name)
+    # The functional-class ester 'ethyl [(2R)-3-chloro-2-hydroxypropyl]
+    # (diethoxymethyl)phosphinate' has NO numbered parent: the phosphinate is
+    # a mononuclear retained parent whose substituents take no locants, and
+    # _name_pnictogen_inate_ester already cites every stereodescriptor inside
+    # the organyl group it belongs to ('(2R)-butan-2-yl...', '[(2R)-...]').
+    # A front-of-name block can therefore never resolve here,
+    # the Blue Book), and the undeclared scope read the stale
+    # principal_chain of a P-substituent: '(2R)-ethyl [(2R)-...]phosphinate',
+    # OPSIN-unparseable, shipped at pin_verified (TRIAGE g3 C10e). Declare it.
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, parent_scope='retained_no_locants')
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(

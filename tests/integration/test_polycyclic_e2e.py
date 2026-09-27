@@ -331,16 +331,6 @@ class TestDescriptorFormats:
 class TestEdgeCases:
     """Edge cases for polycyclic routing."""
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "DEFECT (API contract), pre-existing at 4e0e5c29b: name_compound("
-        "'invalid_smiles_xyz') returns 'unknown'. _name_impl raises "
-        "ValueError('Invalid SMILES') (namer.py), but the catch-all 'except "
-        "Exception' in Orthonym.name (added by 1a0eb0e18, v30 Phase1 B5, so a VALID "
-        "input never crashes) turns it into the descriptive fallback, against the "
-        "code's own comments ('re-raise ValueError (invalid SMILES)', 'matches name() "
-        "contract'). Fix: raise for an unparseable SMILES before the producer try, "
-        "without letting producer ValueErrors escape. .planning/TODO-2026-09-24.md, "
-        "'Open from T12 fix round 2 (wp6)'."))
     def test_invalid_smiles_raises_error(self):
         """Invalid SMILES raises ValueError."""
         # name_compound raises ValueError for invalid SMILES

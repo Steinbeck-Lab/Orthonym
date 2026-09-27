@@ -584,11 +584,14 @@ def _aminoxyl_prefix_string(prefixes: List[str]) -> str:
     'bis(chloromethyl)aminoxyl (PIN)', the Blue Book):
     alphanumerical order, ``alpha_sort_key``), 'di'/'bis' multiplying
     prefixes /: 'bis' and enclosing marks for a compound
-    prefix), a hyphen between a multiplier and an italic 'tert-'/'sec-'
-    prefix, and enclosing marks around every prefix after the first so that
-    'methyl(phenyl)' cannot be read as one prefix."""
+    prefix), a hyphen between a simple multiplier and an italicized
+    structural prefix (b), decided by the shared
+    naming_utils.multiplier_needs_hyphen), and enclosing marks around
+    every prefix after the first so that 'methyl(phenyl)' cannot be read as
+    one prefix."""
     from collections import Counter
-    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound
+    from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
+                                         multiplier_needs_hyphen)
     counts = Counter(prefixes)
     simple = {2: 'di', 3: 'tri', 4: 'tetra'}
     compound_mult = {2: 'bis', 3: 'tris', 4: 'tetrakis'}
@@ -602,7 +605,7 @@ def _aminoxyl_prefix_string(prefixes: List[str]) -> str:
             if compound:
                 out.append(f"{compound_mult[n]}({p})")
             else:
-                out.append(simple[n] + ("-" if p.startswith(("tert-", "sec-")) else "") + p)
+                out.append(simple[n] + ("-" if multiplier_needs_hyphen(p) else "") + p)
         elif compound or i:
             out.append(f"({p})")
         else:

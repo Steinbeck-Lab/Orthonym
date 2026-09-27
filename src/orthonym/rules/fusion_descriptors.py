@@ -1381,11 +1381,35 @@ def _bare_core_inchikey(mol, core_atoms: Set[int]) -> Optional[str]:
         return None
 
 
+def _heavy_atom_skeleton_smiles(m) -> Optional[str]:
+    """Canonical SMILES of ``m``'s heavy-atom graph with every bond single and
+    no hydrogen: the element-labelled skeleton, blind to bond orders and to
+    where (indicated) hydrogen sits. A fusion descriptor fixes exactly this
+    graph (which ring positions carry which heteroatom,; the
+    hydrogen/tautomer state is added by the caller's indicated-hydrogen step."""
+    from rdkit import Chem as _Chem
+    try:
+        rw = _Chem.RWMol(_Chem.RemoveHs(m, sanitize=False))
+        for a in rw.GetAtoms():
+            a.SetIsAromatic(False)
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(0)
+        for b in rw.GetBonds():
+            b.SetBondType(_Chem.BondType.SINGLE)
+            b.SetIsAromatic(False)
+        out = rw.GetMol()
+        out.UpdatePropertyCache(strict=False)
+        return _Chem.MolToSmiles(out, canonical=True)
+    except Exception:
+        return None
+
+
 def generate_systematic_name_for_fused_pair(
     mol,
     ring1: List[int],
     ring2: List[int],
-    shared_atoms: Set[int]
+    shared_atoms: Set[int],
+    allow_skeleton_match: bool = False,
 ) -> Optional[str]:
     """
     Generate systematic fusion name for a pair of fused rings.
@@ -1462,10 +1486,33 @@ def generate_systematic_name_for_fused_pair(
     target_inchikey = _bare_core_inchikey(mol, set(ring1) | set(ring2))
 
     best = None  # (citation_key, name) among candidates tried in key order
+    # Suite fix j6 (TRIAGE g3 C08): OPSIN reads a BARE name of an odd-membered
+    # mancude system (9 ring atoms: pyrrolo[3,4-d]pyrimidine) with its own
+    # default indicated hydrogen, here on a carbon (CH2), so the parse never
+    # matched an N-H input's full key and every candidate was vetoed (the
+    # descriptor came back None). The descriptor only fixes the heteroatom
+    # positions. With ``allow_skeleton_match`` (only the algorithmic caller,
+    # and only when it has established the input's indicated-hydrogen set and
+    # will cite it) and NO candidate matching the full key, the lowest-key
+    # candidate whose parse has the input core's element-labelled skeleton is
+    # used. A candidate matching the full key always wins, so every descriptor
+    # chosen before is unchanged; the default call is byte-identical.
+    best_skeleton = None
+    target_skeleton = None
     opsin_parse = None
     if target_inchikey is not None:
         from ..validation.opsin_roundtrip import opsin_parse as _opsin_parse
         opsin_parse = _opsin_parse
+    if target_inchikey is not None and allow_skeleton_match:
+        _core_bonds = [b.GetIdx() for b in mol.GetBonds()
+                       if b.GetBeginAtomIdx() in (set(ring1) | set(ring2))
+                       and b.GetEndAtomIdx() in (set(ring1) | set(ring2))]
+        try:
+            from rdkit import Chem as _ChemS
+            target_skeleton = _heavy_atom_skeleton_smiles(
+                _ChemS.PathToSubmol(mol, _core_bonds))
+        except Exception:
+            target_skeleton = None
 
     # Try every (parent, child) numbering combination. Candidates are only
     # ever REPLACED by a strictly lower citation key: lowest
@@ -1492,9 +1539,16 @@ def generate_systematic_name_for_fused_pair(
                 if parsed_mol is None:
                     continue
                 if _Chem.MolToInchiKey(parsed_mol) != target_inchikey:
+                    if (target_skeleton is not None
+                            and (best_skeleton is None or key < best_skeleton[0])
+                            and _heavy_atom_skeleton_smiles(parsed_mol)
+                            == target_skeleton):
+                        best_skeleton = (key, name)
                     continue
             best = (key, name)
 
+    if best is None and best_skeleton is not None:
+        return best_skeleton[1]
     return best[1] if best is not None else None
 
 

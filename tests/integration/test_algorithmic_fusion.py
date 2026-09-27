@@ -69,17 +69,31 @@ ALGORITHMIC_FUSION_CASES = [
     # round-trip via OPSIN.
     ('c1cc2n[nH]cc2cn1', 'pyrazolo[4,5-c]pyridine'),
 
-    # 8. pyrrolo[4,3-d]pyrimidine: pyrrole fused to pyrimidine
-    ('c1ncc2c[nH]cc2n1', 'pyrrolo[4,3-d]pyrimidine'),
+    # 8. 6H-pyrrolo[3,4-d]pyrimidine: pyrrole fused to pyrimidine
+    # Suite fix j6 (TRIAGE g3 C08): the path returned None -- OPSIN read the
+    # bare name with its own indicated hydrogen on a carbon, so every
+    # descriptor candidate failed the full-key check. Descriptor:
+    # (the Blue Book) "as low as is consistent with the numbering of the
+    # compound" -- the symmetric pyrrole c side is cited 3,4, not 4,3. Indicated
+    # hydrogen: (:14607) "all indicated hydrogen atoms must be
+    # cited". OPSIN 2.9.0: full InChIKey and canonical SMILES exact; the old
+    # 'pyrrolo[4,3-d]pyrimidine' is another molecule.
+    ('c1ncc2c[nH]cc2n1', '6H-pyrrolo[3,4-d]pyrimidine'),
 
     # 9. pyrido[3,4-d]pyrimidine: pyridine fused to pyrimidine
     ('c1cc2cncnc2cn1', 'pyrido[3,4-d]pyrimidine'),
 
-    # 10. imidazo[4,5-c]pyridine: imidazole fused to pyridine
+    # 10. 1H-imidazo[4,5-c]pyridine: imidazole fused to pyridine
     # a phase update: same.3 V18 rationale as case 7.
     # Original test expectation was pyrido[3,4-d]imidazole;.3(c)
     # picks larger ring (pyridine) as base.
-    ('c1cc2[nH]cnc2cn1', 'imidazo[4,5-c]pyridine'),
+    # Suite fix j4 (TRIAGE g3 C07): the indicated hydrogen is cited --
+    # (the Blue Book) "In preferred IUPAC names, all
+    # indicated hydrogen atoms must be cited when the names are constructed in
+    # accordance with the principles of fusion nomenclature". The bare name
+    # could not tell this 1H tautomer from 3H-imidazo[4,5-c]pyridine (OPSIN:
+    # 1H exact on canonical SMILES, 3H a different tautomer).
+    ('c1cc2[nH]cnc2cn1', '1H-imidazo[4,5-c]pyridine'),
 
     # 11. thieno[4,3-d]pyrimidine: thiophene fused to pyrimidine (alt edge)
     ('c1ncc2cscc2n1', 'thieno[4,3-d]pyrimidine'),
@@ -93,11 +107,19 @@ ALGORITHMIC_FUSION_CASES = [
     # 14. furo[2,3-b]pyrazine: furan at edge b of pyrazine
     ('c1cnc2occc2n1', 'furo[2,3-b]pyrazine'),
 
-    # 15. thieno[3,2-c]pyrrole: thiophene fused to pyrrole
-    ('c1cc2c[nH]cc2s1', 'thieno[3,2-c]pyrrole'),
+    # 15. 5H-thieno[2,3-c]pyrrole: thiophene fused to pyrrole
+    # Suite fix j4 (TRIAGE g3 C07). Descriptor: (the Blue Book)
+    # "These numbers are chosen to be as low as is consistent with the numbering
+    # of the compound and their order conforms to the direction of lettering of
+    # the parent component" -- pyrrole side c (3,4) can be lettered either way,
+    # so [2,3-c], not [3,2-c]. Indicated hydrogen: (:14607) "all
+    # indicated hydrogen atoms must be cited";:11917 "Indicated hydrogen atoms
+    # are added to the names, as required, using locants characterizing the
+    # fused system". OPSIN: 5H exact; 4H- and 6H- are other molecules.
+    ('c1cc2c[nH]cc2s1', '5H-thieno[2,3-c]pyrrole'),
 
-    # 16. furo[3,2-c]pyrrole: furan fused to pyrrole
-    ('c1cc2c[nH]cc2o1', 'furo[3,2-c]pyrrole'),
+    # 16. 5H-furo[2,3-c]pyrrole: furan fused to pyrrole (same rules as 15)
+    ('c1cc2c[nH]cc2o1', '5H-furo[2,3-c]pyrrole'),
 
     # 17. oxazolo[5,4-d]pyrimidine: oxazole fused to pyrimidine
     ('c1ncc2ncoc2n1', 'oxazolo[5,4-d]pyrimidine'),
@@ -105,11 +127,25 @@ ALGORITHMIC_FUSION_CASES = [
     # 18. thiazolo[5,4-d]pyrimidine: thiazole fused to pyrimidine
     ('c1ncc2ncsc2n1', 'thiazolo[5,4-d]pyrimidine'),
 
-    # 19. pyrrolo[4,3-b]pyrrole: pyrrole fused to pyrrole
-    ('c1cc2c[nH]cc2[nH]1', 'pyrrolo[4,3-b]pyrrole'),
+    # 19. 1,5-dihydropyrrolo[3,4-b]pyrrole: pyrrole fused to pyrrole, both N-H.
+    # Suite fix j6 (TRIAGE g3 C08): the mancude parent pyrrolo[3,4-b]pyrrole has
+    # no indicated hydrogen (8 ring atoms, 4 double bonds; cf. 'pyrrolo[3,2-b]
+    # pyrrole (PIN)', the Blue Book), so the N,N'-dihydro input takes
+    # hydro prefixes, which this 2-component path does not
+    # build; it declines (the old 'pyrrolo[4,3-b]pyrrole' is another molecule,
+    # OPSIN). Target OPSIN full-key and canonical-SMILES exact.
+    pytest.param(
+        'c1cc2c[nH]cc2[nH]1', '1,5-dihydropyrrolo[3,4-b]pyrrole',
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "needs the hydro prefix for an N,N'-dihydro mancude 2-component "
+            "fusion (P-31.1.4.2.4) in _try_algorithmic_fusion_name -- TODO in "
+            "TRIAGE.md 'Suite fix -- j6-breadth'"))),
 
-    # 20. pyrrolo[3,4-e]pyridazine: pyrrole fused to pyridazine
-    ('c1cc2c[nH]cc2nn1', 'pyrrolo[3,4-e]pyridazine'),
+    # 20. 6H-pyrrolo[3,4-c]pyridazine: pyrrole fused to pyridazine
+    # Suite fix j6 (TRIAGE g3 C08), same cause and rules as case 8. The fusion
+    # bond is pyridazine C3-C4, edge c: lowest letter), not e.
+    # OPSIN: exact; the old 'pyrrolo[3,4-e]pyridazine' is another molecule.
+    ('c1cc2c[nH]cc2nn1', '6H-pyrrolo[3,4-c]pyridazine'),
 
     # 21. thieno[2,3-e]pyridazine: thiophene fused to pyridazine
     ('c1cc2sccc2nn1', 'thieno[2,3-e]pyridazine'),

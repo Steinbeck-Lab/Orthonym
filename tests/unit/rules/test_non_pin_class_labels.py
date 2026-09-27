@@ -70,12 +70,16 @@ _DEMOTED = [
     ("NC12CC3CC(CC(C3)C1)C2", "tricyclo[3.3.1.1^3,7]decan-1-amine"),
     ("OC(=O)C12C3C4C1C5C2C3C45", "pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane-1-carboxylic acid"),
     # retained peptide names, also inside an acyl prefix (canary DK-PEP)
-    ("C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O", "prolylalanylalanine"),
+    # (Pro-Ala-Ala left this list in j7: the tripeptide substitutive PIN is built,
+    # '(2S)-2-{(2S)-2-[(2S)-pyrrolidine-2-carboxamido]propanamido}propanoic acid',
+    # pinned in tests/integration/test_stereo_benchmark.py)
     ("N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O",
      "(2S)-2-(phenylalanylglutamylamino)butanedioic acid"),
-    # stereoparent acid as hydroxy + oxo (canary DK-ACIDPFX)
-    ("C[C@H](CCC[C@H](C)C(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",
-     "(25S)-26-hydroxy-5α-cholestane-3,26-dione"),
+    # (stereoparent acid as hydroxy + oxo, canary DK-ACIDPFX: left this list in j7 --
+    # the steroid producer cites the acid as the '-26-oic acid' suffix,
+    # '(25S)-3-oxo-5α-cholestan-26-oic acid', the Blue Book), kept
+    # at the PIN tier by the controller ruling on names; pinned in
+    # tests/unit/rules/test_j7_defects_misc.py)
     # whole-graph R/S on a steroid stereoparent (canary DK-P101CIP)
     ("C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",
      "(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17,21-trihydroxy-16-methylpregna-1,4-"
@@ -83,16 +87,25 @@ _DEMOTED = [
     #: acyloxy prefixes on an alcohol (canary DK-GLYSUB)
     ("CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC",
      "(2R)-1-(octadecanoyloxy)-2-[(9Z)-octadec-9-enoyloxy]propan-3-ol"),
+    # Suite fix j4 (TRIAGE g3 C10b): polyol esters cited as acyloxy prefixes on the
+    # bare hydride -- the decomposition weave (glycerol diester ether) and the
+    # rules.esters.name_polyol_polyester fallback. (:31698);
+    # (:31836) "Method (1) generates preferred IUPAC names".
+    ("CCCCC/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)"
+     "CCCCCCCCCCCCCCCCCCCCCCC",
+     "(2R)-2-{[(9Z,12Z)-octadeca-9,12-dienoyl]oxy}-1-(octadecyloxy)-3-"
+     "(tetracosanoyloxy)propane"),
+    ("CCOCC(COC(C)=O)OC(C)=O", "1,2-bis(acetyloxy)-3-ethoxypropane"),
+    ("CC(=O)OCC(C)OC(=O)CC", "1-(acetyloxy)-2-(propanoyloxy)propane"),
     # catalog names with no Blue Book standing
     ("C1CCN2CCCCC2C1", "quinolizidine"),
     ("C1CC2CCCN2C1", "pyrrolizidine"),
     ("C1CCN2CCCC2C1", "indolizidine"),
     ("OCC1CCCN2CCCCC12", "(quinolizidin-1-yl)methanol"),
-    # a bare '(S)-' on a substituent whose name carries locants (rest-of-suite s16):
-    # (:44624) "stereodescriptors, preceded by a locant, must be cited";
-    # the PIN is '4-[(2S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid' (not built: the
-    # substituent's own numbering is not threaded to the stereo emitter here)
-    ("N[C@@H](COC(=O)CCC(=O)O)C(=O)O", "4-[(S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid"),
+    # (rest-of-suite s16, '4-[(S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid', left this
+    # list in decision A part 2, 2026-09-27: the substituent's own numbering now reaches
+    # the stereo emitter and the row ships its PIN '4-[(2S)-2-amino-2-carboxyethoxy]-4-
+    # oxobutanoic acid' at pin_verified -- pinned in tests/integration/test_stereo_benchmark.py)
 ]
 
 
@@ -127,6 +140,7 @@ _CONTROLS = [
     ("C[C@]12CC[C@H]3[C@@H](CC[C@@H]4C[C@@H](O)CC[C@@]43C)[C@@H]1CC[C@@H]2O",
      "5β-androstane-3β,17β-diol"),
     ("CC(=O)OC[C@@H](O)COC(C)=O", "2-hydroxypropane-1,3-diyl diacetate"),
+    ("CC(=O)OCC(COC(C)=O)OC(C)=O", "propane-1,2,3-triyl triacetate"),  # BB:31827
     ("CC[C@@H](Cl)c1ccccc1", "[(1R)-1-chloropropyl]benzene"),       # BB:44668
 ]
 

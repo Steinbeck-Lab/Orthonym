@@ -220,9 +220,17 @@ def test_ws1_homogeneous_two_junior_carboxylates_convert():
 def test_ws1_mixed_junior_classes_still_fail_closed():
     """Regression guard: a genuinely MIXED junior set (one junior carboxylate
     AND one junior alkoxide on the SAME pentanedioate parent) must still
-    decline (return the name unchanged) -- the widening covers ONLY a
-    homogeneous multi-junior set, never a mixed one (prefix re-ordering risk,
-    per the function's own docstring)."""
+    decline -- the widening covers ONLY a homogeneous multi-junior set,
+    never a mixed one (prefix re-ordering risk, per the function's own
+    docstring).
+
+    Declining means '' (j7, TRIAGE g2 G2-C7): the old "return the name
+    unchanged" shipped the neutral prefixes, and '3-carboxy-3-hydroxy-
+    pentanedioate' denotes the DIANION (OPSIN 2.9.0 full InChIKey differs from
+    this tetra-anion's), a different species, BB:41197: the junior
+    anionic centres "expressed as anionic substituent group(s)"). The full
+    pipeline still names the molecule '2-oxidopropane-1,2,3-tricarboxylate'
+    (RT exact) through route_charged."""
     from orthonym.rules.ions import _apply_anionic_substituent_prefixes
     from orthonym.perception.ions import get_ion_sites
 
@@ -234,7 +242,7 @@ def test_ws1_mixed_junior_classes_still_fail_closed():
 
     name_in = "3-carboxy-3-hydroxypentanedioate"
     out = _apply_anionic_substituent_prefixes(mol, anions, name_in)
-    assert out == name_in  # unchanged -> fail-closed, not a guess
+    assert out == ""  # fail-closed: never the charge-dropping neutral-prefix name
 
 
 # --------------------------------------------------------------------------

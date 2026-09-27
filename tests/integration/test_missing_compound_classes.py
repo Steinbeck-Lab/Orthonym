@@ -370,7 +370,12 @@ class TestCLS04ThiocarboxylicAcids:
 
 
 class TestCLS05CarbamicAcid:
-    """Carbamic acid naming -- parent and N-substituted forms."""
+    """Carbamic acid naming -- parent and N-substituted forms.
+
+     (the Blue Book): the substituents of the retained 'carbamic
+    acid' take no italic-N locant -- '(CH3)2N-COOH dimethylcarbamic acid (PIN)'
+    (:30762), 'phenylcarbamic acid (PIN)' (:6798).
+    """
 
     @pytest.mark.integration
     def test_carbamic_acid(self):
@@ -380,22 +385,22 @@ class TestCLS05CarbamicAcid:
     @pytest.mark.integration
     def test_n_methylcarbamic_acid(self):
         """N-monosubstituted: N-methylcarbamic acid."""
-        assert name_compound("CNC(=O)O") == "N-methylcarbamic acid"
+        assert name_compound("CNC(=O)O") == "methylcarbamic acid"
 
     @pytest.mark.integration
     def test_n_n_dimethylcarbamic_acid(self):
         """N,N-disubstituted: N,N-dimethylcarbamic acid."""
-        assert name_compound("CN(C)C(=O)O") == "N,N-dimethylcarbamic acid"
+        assert name_compound("CN(C)C(=O)O") == "dimethylcarbamic acid"
 
     @pytest.mark.integration
     def test_n_n_diethylcarbamic_acid(self):
         """N,N-disubstituted with ethyl: N,N-diethylcarbamic acid."""
-        assert name_compound("CCN(CC)C(=O)O") == "N,N-diethylcarbamic acid"
+        assert name_compound("CCN(CC)C(=O)O") == "diethylcarbamic acid"
 
     @pytest.mark.integration
     def test_n_phenylcarbamic_acid(self):
         """N-aryl substituted: N-phenylcarbamic acid."""
-        assert name_compound("c1ccc(NC(=O)O)cc1") == "N-phenylcarbamic acid"
+        assert name_compound("c1ccc(NC(=O)O)cc1") == "phenylcarbamic acid"
 
     @pytest.mark.integration
     def test_carbamic_acid_opsin_roundtrip(self):

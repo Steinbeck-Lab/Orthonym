@@ -23,14 +23,28 @@ from orthonym.assembly.fragment_naming import (
 )
 
 
+_DEPTHS = ("session_depth", "name_call_depth")
+
+
 @pytest.fixture(autouse=True)
 def _reset_state():
-    """Reset thread-local state before and after each test."""
+    """Reset thread-local state before and after each test.
+
+    The two depth counters too (TRIAGE g8 C2, 2026-09-27): since the session
+    became an explicit counter, ``test_start_creates_cache`` (a start with no
+    end) left ``session_depth`` at 1, so ``test_end_clears_cache`` -- run after
+    it in the same process -- saw a nested session and kept the cache. It
+    passed alone and failed wherever xdist put the two on one worker.
+    """
     _fragment_guard.visited = set()
     _fragment_guard.cache = None
+    for attr in _DEPTHS:
+        setattr(_fragment_guard, attr, 0)
     yield
     _fragment_guard.visited = set()
     _fragment_guard.cache = None
+    for attr in _DEPTHS:
+        setattr(_fragment_guard, attr, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -44,8 +58,15 @@ def test_start_creates_cache():
 
 
 def test_start_noop_when_nested():
-    """start_naming_session is a no-op when visited set is non-empty (nested call)."""
+    """start_naming_session allocates no cache inside an outer session (nested call).
+
+    "Nested" is an explicit counter (``start_naming_session``: "'Outermost' is an
+    EXPLICIT COUNTER, not `len(visited) == 0`"), so the outer session is set up as
+    the counter, not only as a non-empty visited set. This test used to pass only
+    on the ``session_depth`` the previous test leaked (TRIAGE g8 C2).
+    """
     _get_visited().add("PARENT_SMILES")
+    _fragment_guard.session_depth = 1  # an outer session is open
     _fragment_guard.cache = None
     start_naming_session()
     assert getattr(_fragment_guard, 'cache', None) is None

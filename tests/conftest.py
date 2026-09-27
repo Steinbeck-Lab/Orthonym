@@ -4,6 +4,8 @@ Pytest configuration and shared fixtures for Orthonym.
 
 import pytest
 import csv
+import os
+import warnings
 from pathlib import Path
 from typing import List, Dict
 
@@ -19,63 +21,16 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
 # ============================================================================
-# Public-repo fixture guard — skip tests that read local-only.planning /
-# a temp dir working directories.
+# Local-only files (docs/, a temp dir/, untracked.planning/) -- see
+# tests/support/local_only.py.
 # ============================================================================
-# The published repository does NOT ship the local `.planning/` and
-# `a temp dir/` working trees. A small set of tests reads real files from under
-# them (dev baselines, audit docs, an offline measurement instrument) and would
-# raise FileNotFoundError at run time when those files are absent.
-#
-# This single hook fixes that WITHOUT touching any test:
-# * `.planning/` present (local dev) -> no-op, every test runs unchanged.
-# * `.planning/` absent (public repo) -> every test in a fixture-dependent
-# module is SKIPPED, not errored.
-#
-# `.planning/` presence is the proxy for "this is the local working tree": when
-# it is gone, so is `a temp dir/`, so the single check also covers the
-# a temp dir reader.
-#
-# `FIXTURE_DEPENDENT` is deliberately MINIMAL — only modules that actually READ
-# a file under `.planning/` or `a temp dir/` at run time (and would therefore
-# fail if it were absent) are listed. Modules that merely MENTION such a path in
-# a comment, docstring or assert-message string read nothing and are excluded.
-# All reads below are inside test functions/methods (never at import time), so a
-# collection-time skip is sufficient — no module fails to import when the files
-# are gone.
-_PLANNING_DIR = PROJECT_ROOT / ".planning"
-
-FIXTURE_DEPENDENT = {
-    # exec's a temp dir/asm_robustness.py via importlib.spec_from_file_location
-    # (unguarded); the other tests in this module do not need the fixture, but
-    # the guard is applied at module granularity.
-    "test_v28_composer1.py",
-    # NOTE (2026-09-11): test_orgm/test_frn byte-identical canaries and
-    # test_build_ledger now carry their OWN module-level skip/skipif (retired /
-    # fixtures pruned), and test_m2_substituent_routing skips only its single
-    # fixture-reading test — so they no longer need this dir-level guard (which
-    # would over-skip m2's still-valid routing tests in the public repo).
-}
-
-
-def pytest_collection_modifyitems(config, items):
-    """Skip fixture-dependent modules when the local `.planning/` tree is absent.
-
-    No-op in local development (where `.planning/` exists and the fixtures are
-    present). In the published repo the working directories are not shipped, so
-    the run-time FileNotFoundError those modules would raise is turned into a
-    clean skip. See the `FIXTURE_DEPENDENT` note above.
-    """
-    if _PLANNING_DIR.exists():
-        return
-    skip_marker = pytest.mark.skip(
-        reason="requires local .planning/scratchpad fixtures (not published)"
-    )
-    for item in items:
-        # nodeid is "<relpath>::<test>"; take the module file's basename.
-        basename = Path(item.nodeid.split("::", 1)[0]).name
-        if basename in FIXTURE_DEPENDENT:
-            item.add_marker(skip_marker)
+# A test that reads a file the published tree does not ship carries
+# `@local_only("<repo-relative path>")`: it runs where the file exists and is
+# skipped, naming the missing path, where it does not. This replaced a
+# module-level hook that skipped whole modules when `.planning/` was absent -- a
+# proxy that stopped firing once part of `.planning/` became tracked, so the
+# readers raised FileNotFoundError in every clean checkout (TRIAGE g7 C02), and
+# that skipped the tests of a module that needed no file at all.
 
 
 # ============================================================================
@@ -349,8 +304,50 @@ def simple_heterocycles():
 # Test Markers
 # ============================================================================
 
+# ============================================================================
+# A test MODULE must not change the ORTHONYM_* environment of the run.
+# ============================================================================
+# Under xdist every worker imports every test module at collection, so a
+# module-level `os.environ[...] =...` stays in that worker's environment and is
+# inherited by EVERY child process the rest of the suite spawns there. The
+# whole-suite run of 2026-09-26 lost 11 subprocess tests and 14 more this way
+# (TRIAGE g8 C1, g7 C01): two modules set ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE=1
+# and ORTHONYM_SELF_CONSISTENCY_GATE=off at import, and the children then named
+# with both gates off ('benzene' for a quinoxaline-quinoline, labelled
+# pin_verified). Fixed at the source in 02310cf0e; this check keeps the class
+# from coming back: after collection, any ORTHONYM_* variable a module changed is
+# put back and reported as a warning. Set per test with monkeypatch.setenv, or in
+# the child's env= only.
+_ORTHONYM_ENV_BEFORE_COLLECTION: Dict[str, str] = {}
+
+
+def _orthonym_env() -> Dict[str, str]:
+    return {k: v for k, v in os.environ.items() if k.startswith("ORTHONYM_")}
+
+
+def pytest_collection_finish(session):
+    """Undo (and report) any ORTHONYM_* change made while importing test modules."""
+    before = dict(_ORTHONYM_ENV_BEFORE_COLLECTION)
+    now = _orthonym_env()
+    changed = sorted(k for k in set(before) | set(now) if before.get(k) != now.get(k))
+    if not changed:
+        return
+    for key in changed:
+        if key in before:
+            os.environ[key] = before[key]
+        else:
+            os.environ.pop(key, None)
+    warnings.warn(pytest.PytestWarning(
+        "a test module changed the environment at import and it was put back "
+        f"({', '.join(f'{k}={now.get(k)!r}' for k in changed)}): every child process "
+        "the suite spawns would have inherited it (TRIAGE g8 C1). Use "
+        "monkeypatch.setenv in the test, or pass env= to the child."))
+
+
 def pytest_configure(config):
-    """Configure custom markers."""
+    """Configure custom markers; snapshot the ORTHONYM_* environment."""
+    _ORTHONYM_ENV_BEFORE_COLLECTION.clear()
+    _ORTHONYM_ENV_BEFORE_COLLECTION.update(_orthonym_env())
     config.addinivalue_line(
         "markers", "unit: Fast unit tests (<1s each)"
     )
@@ -487,6 +484,89 @@ def pytest_runtest_call(item):
             "OPSIN jar (`orthonym --fetch-jars`) to run it."
         )
     return (yield)
+
+
+# ============================================================================
+# Process-global naming state must not outlive the test that set it.
+# ============================================================================
+# `Orthonym.name` publishes four tier ContextVars for the length of a top-level
+# call, and the fragment recursion keeps three thread-local counters. A test (or
+# an engine exit path) that leaves any of them set changes every LATER naming on
+# the same xdist worker: a default name_compound call then runs at the leaked
+# tier, and a PIN-tier test sees best-effort names. The whole-suite run of
+# 2026-09-26 had six such failures that passed alone (TRIAGE g8 C2): the
+# N-hydroxy rows (engine leak in the isotope decorator's re-entry, fixed in
+# 745d3ed6f), the hydrazinyl furan/thiophene scope guard, and
+# test_runtime_cache (a test-side session_depth leak).
+#
+# This guard names the leaker instead of letting a later, unrelated test fail:
+# after each test it checks the state, resets what leaked, and ERRORS the test
+# that left it behind. A leak from inside the engine is a defect (a name must
+# never depend on what the process named before), so it is reported, not
+# silently absorbed. Validated on two known positives: the pre-745d3ed6f engine
+# (one best-effort naming of [2H]C([2H])([2H])O leaves three ContextVars True)
+# and the pre-fix test_runtime_cache (session_depth 1).
+_NAMING_TIER_CTX = ("general_fallback_ctx", "best_effort_ctx",
+                    "allow_aromatic_general_ctx", "full_coverage_ctx")
+_NAMING_DEPTHS = ("session_depth", "name_call_depth")
+
+
+def _leaked_naming_state() -> dict:
+    """The non-default process-global naming state of the calling thread."""
+    import sys
+    leaked = {}
+    pv = sys.modules.get("orthonym.metrics.provenance")
+    if pv is not None:
+        for attr in _NAMING_TIER_CTX:
+            var = getattr(pv, attr, None)
+            if var is not None and var.get() not in (False, None):
+                leaked[attr] = var.get()
+    fn = sys.modules.get("orthonym.assembly.fragment_naming")
+    guard = getattr(fn, "_fragment_guard", None) if fn is not None else None
+    if guard is not None:
+        for attr in _NAMING_DEPTHS:
+            if getattr(guard, attr, 0):
+                leaked[attr] = getattr(guard, attr)
+        if getattr(guard, "visited", None):
+            leaked["visited"] = len(guard.visited)
+    return leaked
+
+
+def _reset_naming_state() -> None:
+    import sys
+    pv = sys.modules.get("orthonym.metrics.provenance")
+    if pv is not None:
+        for attr in _NAMING_TIER_CTX:
+            var = getattr(pv, attr, None)
+            if var is not None:
+                var.set(False)
+    fn = sys.modules.get("orthonym.assembly.fragment_naming")
+    guard = getattr(fn, "_fragment_guard", None) if fn is not None else None
+    if guard is not None:
+        for attr in _NAMING_DEPTHS:
+            setattr(guard, attr, 0)
+        guard.visited = set()
+        guard.cache = None
+
+
+@pytest.fixture(autouse=True)
+def _naming_state_isolation():
+    """Error the test that leaves naming state behind; reset it for the next.
+
+    A state already leaked before this test started (by a test outside the
+    guard's reach) is reset first, so this test does not inherit it.
+    """
+    if _leaked_naming_state():
+        _reset_naming_state()
+    yield
+    leaked = _leaked_naming_state()
+    if leaked:
+        _reset_naming_state()
+        pytest.fail(
+            f"the test left process-global naming state behind: {leaked}. Every "
+            "later naming on this worker would have run with it (TRIAGE g8 C2). "
+            "Reset it in the test (try/finally, or a fixture), or fix the engine "
+            "exit that leaked it.", pytrace=False)
 
 
 @pytest.fixture(autouse=True)

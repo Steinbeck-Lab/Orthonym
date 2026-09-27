@@ -2295,9 +2295,9 @@ def _name_carbamic_acid(features: Any) -> Optional[str]:
     SMARTS match: [NX3][CX3](=O)[OX2H1] gives (N, C, O=, OH)
 
     Unsubstituted: "carbamic acid" (H2N-COOH)
-    N-monosubstituted: "N-methylcarbamic acid" (CH3-NH-COOH)
-    N,N-disubstituted: "N,N-dimethylcarbamic acid" ((CH3)2N-COOH)
-    Mixed: "N-ethyl-N-methylcarbamic acid"
+    N-monosubstituted: "methylcarbamic acid" (CH3-NH-COOH)
+    N,N-disubstituted: "dimethylcarbamic acid" ((CH3)2N-COOH, the Blue Book PIN)
+    Mixed: "ethyl(methyl)carbamic acid"
 
     Returns:
         Retained name with N-substitution prefix, or None.
@@ -2332,9 +2332,9 @@ def _name_carbamic_acid(features: Any) -> Optional[str]:
         # Unsubstituted: "carbamic acid"
         return "carbamic acid"
 
-    # Build N-substitution prefix using _build_n_substituted_name
-    tagged_subs = [("N", s) for s in n_subs]
-    return _build_n_substituted_name(tagged_subs, "carbamic acid")
+    # (the Blue Book): no italic-N locant (see
+    # `_carbamic_n_substituted_name`).
+    return _carbamic_n_substituted_name(n_subs, "carbamic acid")
 
 
 # ============================================================================
@@ -2349,8 +2349,8 @@ def _name_carbamate(features: Any) -> Optional[str]:
     But we need the atoms at specific positions.
 
     Unsubstituted: "ethyl carbamate" (NH2 on N)
-    N-monosubstituted: "ethyl N-methylcarbamate"
-    N,N-disubstituted: "methyl N,N-dimethylcarbamate"
+    N-monosubstituted: "ethyl methylcarbamate"
+    N,N-disubstituted: "methyl dimethylcarbamate", the Blue Book)
 
     Returns:
         Functional class name, or None.
@@ -2453,7 +2453,12 @@ def _name_carbamate(features: Any) -> Optional[str]:
     # 'N-(2-methoxyethyl)carbamic acid'. Reusing it rather than re-deriving the
     # rule here keeps the two spellings from drifting again; simple substituents
     # are byte-identical (needs_brackets False).
-    n_prefix = _build_n_substituted_name([("N", s) for s in n_subs], "carbamate")
+    #
+    # (the Blue Book): the N-substituents of the retained
+    # 'carbamic acid' take no italic-N locant, '2-hydroxypropyl
+    # (2-aminoethyl)carbamate (PIN)' (:30766) -- see `_carbamic_n_substituted_name`,
+    # which keeps the enclosing marks of the shared builder.
+    n_prefix = _carbamic_n_substituted_name(n_subs, "carbamate")
     return f"{r_name} {n_prefix}"
 
 
@@ -3039,6 +3044,154 @@ def _try_name_guanidine(features: Any) -> Optional[str]:
     if not matches:
         return None
 
+    # A condensed guanidine (two amidine carbons sharing one N) is not named as a
+    # substituted guanidine: (the Blue Book) "The names biguanide,
+    # triguanide, etc., are no longer recommended. Condensed guanidines... are
+    # named systematically as the diamides of imidodicarbonimidic acid".
+    _is_condensed, _condensed = _condensed_guanidine_name(mol)
+    if _condensed:
+        return _condensed
+    if _is_condensed:
+        # Not buildable as the diamide (a substituted central N, a tautomer with
+        # the C=N on the central N, an unnameable arm): the guanidine-form name
+        # below still ships, RT-gated, but below pin_verified.
+        _name = _try_name_guanidine_core(features, matches)
+        if _name:
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(_name)
+        return _name
+    return _try_name_guanidine_core(features, matches)
+
+
+def _condensed_guanidine_name(mol) -> tuple:
+    """``(is_condensed, name)`` for H2N-C(=NH)-NH-C(=NH)-NH2 and its N-substituted
+    derivatives: the diamide of imidodicarbonimidic acid.
+
+    Locants, from the Blue Book's own row for this shape (the Blue Book,
+    'H2N-C(=NH)-NH-C(=N-CH2-CH3)-N(C6H5)2 N'1-ethyl-N1,N1-diphenyl
+    imidodicarbonimidic diamide (PIN)'): the amidine carbons are 1 and 3, the
+    central imido N is 2; the amino N of C-1 is N1, its imino N is N'1 (likewise
+    N3/N'3). Orientation: the lowest locant set, then the first-cited prefix
+    , (g)). The imino N is read off the input's double bonds, so the
+    name denotes the drawn tautomer (the standard InChIKey would not tell them
+    apart). Deny by default (``(True, None)``): a substituted central N, a C=N to
+    the central N, a charged or ring N, an arm that touches two core N or that
+    ``_name_r_group`` cannot name. ``(False, None)`` when the molecule has no such
+    core.
+    """
+    from rdkit import Chem as _Chem
+    amidine_c = []
+    for a in mol.GetAtoms():
+        if a.GetSymbol() != 'C' or a.IsInRing():
+            continue
+        ns = [n for n in a.GetNeighbors() if n.GetSymbol() == 'N']
+        if len(ns) == 3 and a.GetDegree() == 3:
+            amidine_c.append(a.GetIdx())
+    if len(amidine_c) != 2:
+        return (False, None)
+    c1, c3 = amidine_c
+    shared = ({n.GetIdx() for n in mol.GetAtomWithIdx(c1).GetNeighbors()}
+              & {n.GetIdx() for n in mol.GetAtomWithIdx(c3).GetNeighbors()})
+    if len(shared) != 1:
+        return (False, None)
+    n2 = next(iter(shared))
+    core = {c1, c3, n2}
+    ends = {}
+    for c in (c1, c3):
+        amino = imino = None
+        for n in mol.GetAtomWithIdx(c).GetNeighbors():
+            ni = n.GetIdx()
+            bt = mol.GetBondBetweenAtoms(c, ni).GetBondType()
+            if ni == n2:
+                if bt != _Chem.BondType.SINGLE:
+                    return (True, None)
+                continue
+            if bt == _Chem.BondType.DOUBLE and imino is None:
+                imino = ni
+            elif bt == _Chem.BondType.SINGLE and amino is None:
+                amino = ni
+            else:
+                return (True, None)
+        if amino is None or imino is None:
+            return (True, None)
+        ends[c] = (amino, imino)
+        core |= {amino, imino}
+    for ni in core:
+        at = mol.GetAtomWithIdx(ni)
+        if at.GetFormalCharge() != 0 or at.IsInRing() or at.GetIsAromatic():
+            return (True, None)
+    if any(n.GetIdx() not in core for n in mol.GetAtomWithIdx(n2).GetNeighbors()):
+        return (True, None)
+    if len(_Chem.GetMolFrags(mol)) != 1:
+        return (True, None)
+
+    subs_on = {}
+    seen = set()
+    for c, (amino, imino) in ends.items():
+        for n_idx in (amino, imino):
+            names = []
+            for nb in mol.GetAtomWithIdx(n_idx).GetNeighbors():
+                nb_i = nb.GetIdx()
+                if nb_i in core or nb.GetAtomicNum() <= 1:
+                    continue
+                tree, stack = set(), [nb_i]
+                while stack:
+                    x = stack.pop()
+                    if x in tree:
+                        continue
+                    tree.add(x)
+                    for y in mol.GetAtomWithIdx(x).GetNeighbors():
+                        yi = y.GetIdx()
+                        if yi in core:
+                            if yi != n_idx:
+                                return (True, None)  # an arm bridging two core N
+                            continue
+                        if y.GetAtomicNum() > 1:
+                            stack.append(yi)
+                if tree & seen:
+                    return (True, None)
+                seen |= tree
+                nm = _name_r_group(mol, nb_i, exclude_atoms=core)
+                if not nm:
+                    return (True, None)
+                names.append(nm)
+            subs_on[n_idx] = names
+    if len(seen) + len(core) != mol.GetNumHeavyAtoms():
+        return (True, None)
+    if not any(subs_on.values()):
+        return (True, None)  # the bare diamide has its own retained producer
+
+    from collections import defaultdict
+    from .naming_utils import enclose_if_compound as _enc
+    best = None
+    for first, third in ((c1, c3), (c3, c1)):
+        labels = {ends[first][0]: (1, 0), ends[first][1]: (1, 1),
+                  ends[third][0]: (3, 0), ends[third][1]: (3, 1)}
+        cited = sorted((labels[n], alpha_sort_key(nm))
+                       for n, nms in subs_on.items() for nm in nms)
+        key = (tuple(c[0] for c in cited), tuple(cited))
+        if best is None or key < best[0]:
+            best = (key, labels)
+    labels = best[1]
+
+    def _txt(lab):
+        return f"N{chr(39) * lab[1]}{lab[0]}"
+
+    groups = defaultdict(list)
+    for n_idx, nms in subs_on.items():
+        for nm in nms:
+            groups[nm].append(labels[n_idx])
+    parts = []
+    for nm in sorted(groups, key=lambda x: (alpha_sort_key(x), x)):
+        locs = ",".join(_txt(l) for l in sorted(groups[nm]))
+        parts.append(f"{locs}-{get_multiplier_prefix(len(groups[nm]), nm)}{_enc(nm)}")
+    return (True, "-".join(parts) + "imidodicarbonimidic diamide")
+
+
+def _try_name_guanidine_core(features: Any, matches) -> Optional[str]:
+    """The substituted-guanidine naming of ``_try_name_guanidine``."""
+    mol = features.mol
+
     match = matches[0]
     if len(match) < 4:
         return None
@@ -3122,6 +3275,37 @@ def _try_name_guanidine(features: Any) -> Optional[str]:
     #, independent of the italic-N locant.
     return _build_n_substituted_name(tagged_subs, "guanidine",
                                      sort_key=alpha_sort_key)
+
+
+def _carbamic_n_substituted_name(n_subs: list, base_name: str) -> str:
+    """Substituted 'carbamic acid' / 'carbamate': prefixes WITHOUT the italic-N locant.
+
+     (the Blue Book) retains 'carbamic acid' as the PIN with
+    substitution allowed; its only substitutable position is the nitrogen (an
+    O-substituent makes an ester, a separate word), so no isomer can be generated
+    by moving a prefix and the locant is omitted,:2956). The Blue
+    Book's rows: '(CH3)2N-COOH dimethylcarbamic acid (PIN)' (:30762), 'phenylcarbamic
+    acid (PIN)' (:6798), '2-hydroxypropyl (2-aminoethyl)carbamate (PIN)' (:30766),
+    'carbamoylcarbamic acid (PIN)' (:33374). Carbamimidic acid keeps its N/N'
+    locants ('*N*-ethyl-*N*-methylcarbamimidic acid (PIN)',:30764) and does not
+    come here.
+
+    Two different substituents: the second is set off by enclosing marks,
+     (:7304) "Enclosing marks are used with second and subsequent
+    simple substituents" -- 'ethyl(methyl)carbamic acid'; a compound substituent
+    takes its own marks, a repeated one its multiplier
+    ('dimethyl', 'bis(2-hydroxyethyl)',.
+    """
+    from collections import Counter
+    from .composition_primitives import retained_acetic_from_prefixes
+    from .naming_utils import apply_enclosing_marks, needs_brackets
+    counts = Counter(n_subs)
+    texts = []
+    for name in sorted(counts, key=lambda n: (alpha_sort_key(n), n)):
+        enc = apply_enclosing_marks(name, -1) if needs_brackets(name) else name
+        count = counts[name]
+        texts.append(enc if count == 1 else f"{get_multiplier_prefix(count, name)}{enc}")
+    return retained_acetic_from_prefixes(texts, parent=base_name, enclose_subsequent=True)
 
 
 def _build_n_substituted_name(
@@ -10080,7 +10264,18 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                         if _bname is None:
                             _decorated_failed = True
                         else:
-                            _branch_entries.append((_bname, True))
+                            # Decision A part 2: the marks are decided from the
+                            # NAME (the assembler's cite_organyl_in_composed_prefix,
+                            # as substituent_enumerator._name_amino_branch already
+                            # does), not forced by 'decorated'.
+                            # (the Blue Book): "the first cited substituent
+                            # never has enclosing marks unless it includes a
+                            # locant", so a SIMPLE decorated prefix is bare when
+                            # first cited -- 'carbamimidoyl(methyl)amino' (creatine),
+                            # 'carbamimidoylamino (preferred prefix)' (:34268) --
+                            # while a compound one ('chloromethyl', '2-hydroxyethyl')
+                            # is still enclosed by its name.
+                            _branch_entries.append((_bname, False))
                         continue
                     # PURE-CARBON branch. This used to be
                     # get_alkyl_name(_count_carbon_chain(...)) -- a carbon COUNT,
@@ -10622,7 +10817,7 @@ def _name_n_attached_substituent_fallback(
         # Non-phenyl ring: try recursive naming (piperidinyl, cyclohexyl, etc.)
         # Guard: only for moderately-sized substituents (<=25 atoms).
         if len(sub_atoms) <= 25:
-            from .naming_utils import needs_brackets
+            from .naming_utils import apply_enclosing_marks, needs_brackets
             from .substituent_naming import name_substituent_fragment
             sub_name = name_substituent_fragment(
                 mol, list(sub_set), attach_atom, list(chain_set)
@@ -10634,7 +10829,10 @@ def _name_n_attached_substituent_fallback(
                 sub_name = None
             if sub_name:
                 if needs_brackets(sub_name):
-                    sub_name = f"({sub_name})"
+                    # (the Blue Book): the mark follows the
+                    # name's own nesting ('[(4-fluorophenyl)methyl]'), never
+                    # '(' directly around '(' (TRIAGE g3 C10c).
+                    sub_name = apply_enclosing_marks(sub_name, -1)
                 return sub_name
         # Fallback: recursive naming via name_fragment_recursively
         # for ring-containing N-branch fragments that failed direct naming.
@@ -10653,7 +10851,7 @@ def _name_n_attached_substituent_fallback(
             carbon_side = [idx for idx in sub_atoms if idx != attach_atom]
             if len(n_branches) == 1 and carbon_side:
                 try:
-                    from .naming_utils import needs_brackets
+                    from .naming_utils import apply_enclosing_marks, needs_brackets
                     from .substituent_naming import name_substituent_fragment
                     prefix = name_substituent_fragment(
                         mol, carbon_side, n_branches[0], list(chain_set) + [attach_atom]
@@ -10666,7 +10864,11 @@ def _name_n_attached_substituent_fallback(
                     prefix = None
                 if prefix:
                     if needs_brackets(prefix):
-                        prefix = f"({prefix})"
+                        # (the Blue Book): '[(4-fluorophenyl)
+                        # methyl]amino', not '((4-fluorophenyl)methyl)amino';
+                        # the outer mark of the returned '(...amino)' is
+                        # re-chosen by format_substituent_prefix (TRIAGE g3 C10c).
+                        prefix = apply_enclosing_marks(prefix, -1)
                     return f"({prefix}amino)"
         logger.debug(
             "n_branch_ring_substituent_unnameable substituent_skip: reason=n_branch_nonphenyl_ring_still_unnameable",

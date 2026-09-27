@@ -8,6 +8,8 @@ Each test embeds one of the 14 IUPAC / prefix forms as a
 NON-PRINCIPAL substituent in a multi-substituent parent molecule and
 asserts the IUPAC-canonical prefix appears in the output name.
 """
+import pytest
+
 from orthonym import name_compound
 
 
@@ -32,15 +34,24 @@ class TestPrefixFormsViaNameCompound:
         # a phase fix target: NO duplicate hydroxymethyl
         assert "hydroxymethyl" not in n, f"hydroxymethyl present in {n!r}"
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "PIN tier abstains: needs the '4-methyl-2,5-dioxo-2,5-dihydrofuran-3-yl' "
+        "prefix (oxo and hydro prefixes on a mancude heteromonocycle, "
+        "P-31.1.4.2.4) at the PIN tier; best-effort ships the non-PIN "
+        "'1-oxacyclopent-3-en' form -- TODO in TRIAGE.md 'Suite fix -- "
+        "j6-breadth'"))
     def test_row1_regression_fixture_full(self):
-        """The Phase 160.1 canonical regression fixture per audit §3 row 1."""
+        """The a phase canonical regression fixture per the audit row 1.
+
+        Suite fix j6 (TRIAGE g5 C11): asserted as the full PIN (OPSIN full-key
+        exact); the substring checks it replaces also passed on the non-PIN
+        best-effort spelling."""
         smi = (
             "COC(=O)/C(CC(=O)O)=C(\\CCCCCCCCCCCCCCCCC1=C(C)C(=O)OC1=O)C(=O)O"
         )
         n = name_compound(smi)
-        assert "methoxycarbonyl" in n, f"got {n!r}"
-        assert "hydroxymethyl" not in n
-        assert "formatyl" not in n
+        assert n == ("(2E)-3-(methoxycarbonyl)-2-[16-(4-methyl-2,5-dioxo-2,5-"
+                     "dihydrofuran-3-yl)hexadecyl]pent-2-enedioic acid"), n
 
     def test_row3_carbamoyl_primary_amide(self):
         """Row 3: -C(=O)NH2 → carbamoyl when amide is substituent."""

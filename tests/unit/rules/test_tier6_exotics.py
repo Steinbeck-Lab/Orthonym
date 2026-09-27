@@ -291,15 +291,50 @@ def test_s_attached_mixed_bridge_now_named(_validity_gate_on):
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
     ("C1Cc2ccc(cc2)CCc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane"),
-    ("C1CCc2ccccc2CCCc2ccccc21", "1,5(1,2)-dibenzenacyclooctaphane"),
 ])
 def test_phane_production_now_named(smiles, expected):
     """ (item 2): phane skeletal PINs now produced via the hard-gated,
     formula-conservation-vetoed rules.phane composer (capability gain). No phane
     name is OPSIN-parseable, so correctness is verified by molecular-formula
-    conservation (C16H16 / C18H20 preserved), not round-trip — see
-    ITEM2-VERIFICATION.md."""
+    conservation (C16H16 preserved), not round-trip — see
+    ITEM2-VERIFICATION.md.
+
+    Suite fix j4 (TRIAGE g3 C10a / g6 C20): the ortho row
+    ('1,5(1,2)-dibenzenacyclooctaphane') moved to the tests below -- it is not a
+    cyclophane for a PIN."""
     assert name_compound(smiles) == expected
+
+
+# Suite fix j4 (TRIAGE g3 C10a / g6 C20): two benzene rings ortho-fused to a
+# 10-membered alicyclic ring. (1) (the Blue Book): a cyclophane
+# for a PIN needs a mancude ring "attached to adjacent atoms or chains at
+# nonadjacent ring positions"; (:23835-23841): "Mancude systems
+# attached to adjacent atoms of an alicyclic ring are either fused systems or
+# bridged fused systems [...] A cyclophane name is not allowed."
+_ORTHO_PHANE_LIKE = [
+    "C1CCc2ccccc2CCCc2ccccc21",
+    "C1CCCc2ccccc2CCCCc2ccccc2C1",
+]
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles", _ORTHO_PHANE_LIKE)
+def test_ortho_attached_benzenes_get_no_phane_name(smiles):
+    from orthonym.rules.phane import build_phane_pin
+    assert build_phane_pin(Chem.MolFromSmiles(smiles)) is None
+    assert "phane" not in name_compound(smiles)
+
+
+@pytest.mark.unit
+@pytest.mark.xfail(strict=True, reason=(
+    "needs the hydro fusion name for mancude rings ortho-fused to a large "
+    "alicyclic ring (P-52.2.5.2.1, BlueBookV2.md:23835-23841; class example "
+    ":23839 'dodecahydrobenzo[14]annulene (PIN)'); PIN spelling ASSUMED "
+    "(OPSIN full-InChIKey exact); TODO .planning/preexisting-triage/TRIAGE.md "
+    "'Suite fix -- j4-pin-labels-a'"))
+def test_ortho_attached_benzenes_fused_pin():
+    assert name_compound(_ORTHO_PHANE_LIKE[0]) == (
+        "5,6,7,12,13,14-hexahydrodibenzo[a,f][10]annulene")
 
 
 @pytest.mark.unit

@@ -1020,6 +1020,18 @@ def build_phane_pin(mol: Optional[Chem.Mol]) -> Optional[str]:
         return None
     shared_attach = next(iter(attach_sets))
 
+    # (1) (the Blue Book): for a PIN, a cyclophane needs "at
+    # least one ring or ring system of which must be a mancude system attached
+    # to adjacent atoms or chains at NONADJACENT ring positions";
+    # (:23835-23841): "Mancude systems attached to adjacent atoms of an
+    # alicyclic ring are either fused systems or bridged fused systems [...]
+    # A cyclophane name is not allowed." Every amplificant here shares one
+    # attachment set, so ortho (1,2) attachment on all of them means no
+    # amplificant qualifies: decline ('1,5(1,2)-dibenzenacyclooctaphane'
+    # shipped at pin_verified; TRIAGE g3 C10a / g6 C20).
+    if shared_attach[1] - shared_attach[0] == 1:
+        return None
+
     if not _phane_formula_veto(struct, mol):
         return None
 

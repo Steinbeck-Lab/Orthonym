@@ -746,6 +746,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
         return None
 
     result = None
+    acyl_float = False
 
     # Get amine prefix (simple substituent name)
     amine_prefix = _amine_to_prefix(amine_name)
@@ -766,7 +767,17 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # multiple identical N-substituents. In that case, expand the
                 # N-locant: "dimethyl" -> "N,N-dimethyl", not "N-dimethyl".
                 n_locant = _expand_n_locant_for_multiplier(amine_prefix)
-                wrapped_prefix = _wrap_n_substituent(enclose_if_compound(amine_prefix))
+                # A multiplied SIMPLE prefix ('dimethyl' -> 'N,N-'; the expander
+                # only returns several N for di/tri/... + a simple substituent)
+                # is cited bare: multiplies the simple prefix, and
+                # (the Blue Book) encloses only compound/complex
+                # prefixes -- enclose_if_compound reads 'dimethyl' as a
+                # two-prefix compound and produced the unparseable
+                # 'N,N-(dimethyl)acetamide' (TRIAGE g7 C10).
+                if n_locant != "N-":
+                    wrapped_prefix = amine_prefix
+                else:
+                    wrapped_prefix = _wrap_n_substituent(enclose_if_compound(amine_prefix))
                 result = f"{n_locant}{_join_components(wrapped_prefix, amide_name)}"
 
     if result is None:
@@ -783,6 +794,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 return None
         acyl_prefix = _acid_to_acyl(acid_name)
         if acyl_prefix and amine_name:
+            acyl_float = True
             if amine_name.startswith("N-") or amine_name.startswith("N,"):
                 # Amine already has N-prefix(es) from recursive naming.
                 # Insert the acyl as an additional N-substituent:
@@ -829,6 +841,15 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     # above, so neither can weave the placeholder into a shipped name.
     if is_refusal_sentinel(result):
         return None
+
+    if acyl_float:
+        # Decision A (user, 2026-09-26): the acyl-prefix float is refused (inside
+        # _handle_peptide's systematic attempt) or demoted when the acylated N is not a
+        # suffix nitrogen of the amine parent -- the alpha-amino N of 'glycine', a ring
+        # N. Same gate as engine.py's amide branch (engine.gate_nonsuffix_nacyl_float).
+        from .engine import gate_nonsuffix_nacyl_float
+        result = gate_nonsuffix_nacyl_float(
+            (fragment_smiles or {}).get("amine"), result, amine_name)
 
     return result
 

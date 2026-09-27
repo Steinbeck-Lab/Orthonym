@@ -98,7 +98,7 @@ class TestNoPerceptionRegression:
         ("CCCCC(=O)NN", "pentanehydrazide"),
         ("NNC(=O)c1ccccc1", "benzohydrazide"),
         ("NC(=O)O", "carbamic acid"),
-        ("CNC(=O)O", "N-methylcarbamic acid"),
+        ("CNC(=O)O", "methylcarbamic acid"),
         ("CC(=S)N", "ethanethioamide"),
         ("NC(=N)N", "guanidine"),
         ("N=C(N)NC", "N-methylguanidine"),

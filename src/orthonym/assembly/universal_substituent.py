@@ -224,6 +224,12 @@ DEFAULT_ATOM_WORK_BUDGET = 20_000
 #: fixed constant.
 _MAX_ATOMS_FOR_PERCEPTION = 2_000
 
+#: Metal-set elements that the organometallic guard in ``_build_ctx`` leaves in
+#: scope: covalent skeletal atoms spelled by the (Table 1.5) prefixes
+#: 'bora', 'sila', 'germa' (TRIAGE g6 C24). Sn/Pb stay out (OPSIN mis-valences
+#: their replacement names).
+_COVALENT_SKELETAL_METALLOIDS = frozenset({"B", "Si", "Ge"})
+
 
 class _BudgetExceeded(Exception):
     """Raised internally when the work budget is exhausted; converted to a
@@ -946,12 +952,22 @@ def _build_ctx(
     # this guard the best-effort core would build a replacement name whose OPSIN
     # re-perception mis-valences the metal and never full-round-trips -- a
     # precision leak that ships an unverifiable name. ``detect_metal_complex``
-    # flags exactly the out-of-scope complexes (organotin/ferrocene) and returns
-    # None for an IN-scope covalent Si/B/Ge heterocycle (silacyclohexane,
-    # borinane), so this abstains the former without touching the latter.
+    # flags the out-of-scope complexes (organotin/ferrocene). It ALSO flags an
+    # acyclic covalent B/Si/Ge hydride derivative (its Tier-3 sigma-bonded
+    # main-group branch: 'CCB(CC)CC', 'C[Si](C)(C)C', 'C[Ge](C)(C)C'), while it
+    # returns None for the same elements in a ring (silacyclohexane, borinane).
+    # Those three elements are IN scope as skeletal atoms either way: 'bora',
+    # 'sila' and 'germa' are (Table 1.5) replacement prefixes whose OPSIN parse
+    # keeps the drawn valence (triethylborane / tetramethylsilane are PINs of
+    # the same molecules), and the caller's full-InChIKey round trip still
+    # verifies every name. So the guard abstains only when some metal-set atom
+    # is NOT one of them (Sn, Pb, a Groups 1-12 metal,...) -- TRIAGE g6 C24.
     try:
-        from ..perception.metals import detect_metal_complex
-        if detect_metal_complex(work) is not None:
+        from ..perception.metals import detect_metal_complex, is_metal_element
+        if detect_metal_complex(work) is not None and any(
+                is_metal_element(a.GetSymbol())
+                and a.GetSymbol() not in _COVALENT_SKELETAL_METALLOIDS
+                for a in work.GetAtoms()):
             return None
     except Exception:
         pass  # detector must never break naming; fall through
@@ -1225,6 +1241,19 @@ def _name_component(
                 charged=charged_atoms,
             )
 
+        # j7 (TRIAGE g8 C4): an acyloxy branch -O-C(=O)-R attached through its
+        # ester O is the detachable prefix '<acyl>oxy' named by the
+        # shared acid engine ('acetyloxy', '(3-hydroxy-3-methylbutanoyl)oxy'),
+        # not the replacement chain '2-oxo-1-oxapropan-1-yl' (a chain ending on O,
+        # the Blue Book). Fail closed (None) off the plain
+        # acyloxy shape; the floor's whole name is still full-InChIKey verified.
+        acyloxy = _acyloxy_leaf(mol, component, attach_hint)
+        if acyloxy is not None:
+            return _ComponentResult(
+                name=acyloxy, bindings=[(acyloxy, component)], covers=component,
+                attach_locant=None, is_prefix_ready=True,
+            )
+
     # ---- parent (spine) selection -----------------------------------------
     ring_here = _ring_system_for_component(ctx, component, attach_hint, is_top)
     if ring_here is not None:
@@ -1422,6 +1451,31 @@ def _resolve_spine_charge(
             return True, text, resolved
 
     return True, None, frozenset()  # touches, but not expressible -> void
+
+
+def _acyloxy_leaf(mol, component: FrozenSet[int], attach_hint: int) -> Optional[str]:
+    """'<acyl>oxy' for a plain acyloxy branch attached through its ester O, or
+    None. Reuses composer._acyloxy_prefix_for_frag (the ' spiro-VB
+    supplier: carbamate / carbonate / thiono shapes excluded, the whole branch
+    minus the ester O must be the acyl side). A charged or stereo-bearing branch
+    is left to the generic path so the floor's stereo layer stays in charge of
+    every descriptor it emits."""
+    try:
+        if any(mol.GetAtomWithIdx(a).GetFormalCharge() for a in component):
+            return None
+        from .composer import _acyloxy_prefix_for_frag
+        tok = _acyloxy_prefix_for_frag(mol, set(component), attach_hint)
+    except Exception:  # noqa: BLE001 - a leaf shortcut must never break the floor
+        return None
+    if not tok:
+        return None
+    # a descriptor block inside the token means the acyl carried stereo, which
+    # the floor would otherwise cite itself: keep the generic path for those.
+    import re as _re
+    if _re.search(r"\((?:\d+)?[RSEZ](?:,|\))", tok):
+        return None
+    from .naming_utils import enclose_if_compound
+    return tok if tok.startswith(("(", "[", "{")) else enclose_if_compound(tok)
 
 
 def _render_as_substituent(sub: _ComponentResult, bond_order: int) -> str:

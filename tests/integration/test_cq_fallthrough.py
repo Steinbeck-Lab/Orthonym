@@ -39,8 +39,14 @@ WITNESSES = [
     ("C=C(O)N(C)[C@H](CCC)C(C)O/C=C/CF",
      "1-[(2R,5E)-7-fluoro-1,3-dimethyl-2-propyl-4-oxa-1-azahept-5-en-1-yl]"
      "eth-1-en-1-ol"),
+    # Suite fix j6: covalent Si is in the universal floor's scope since TRIAGE
+    # g6 C24, which names this witness before the CQ5 fall-through
+    # ('2-(2,2-diiodo-1-methyl-1-aza-2-silaethyl)propane' before). Both are
+    # skeletal-replacement names (the Blue Book; a chain may end on
+    # Si,:6428), neither a PIN needs four heteroatoms); OPSIN 2.9.0:
+    # both full-key and canonical-SMILES exact.
     ("CC(C)N(C)[SiH](I)I",
-     "2-(2,2-diiodo-1-methyl-1-aza-2-silaethyl)propane"),
+     "2-(1,1-diiodo-1-silamethan-1-yl)-3-methyl-2-azabutane"),
     # #3 may vary in exact spelling -> assert RT-match, not the literal string.
     ("Oc1c(N=Nc2cccc(C(F)(F)F)c2)c2cc(F)cc(F)c2n1C1CSC1", None),
 ]
@@ -157,13 +163,20 @@ def test_negative_rt_mismatch_stays_abstained():
     -based test would silently stop testing anything), and proves the exact
     mechanism this file's fall-through was built around never ships an
     RT-failing candidate."""
+    # Suite fix j6: since TRIAGE g6 C24 the universal floor (verified by the
+    # final OPSIN gate, not _rt_match) names this Si witness first; keep the
+    # organometallic guard ON for Si here so the witness reaches the CQ5
+    # fall-through this test exercises (as at the time it was written).
+    import orthonym.assembly.universal_substituent as _us
     be = _besteffort()
     smi = WITNESSES[1][0]
-    assert not is_failure_name(be.name(smi)), (
-        "sanity: this witness must normally convert (so the mock below is "
-        "the only thing causing the abstain)")
-    with patch.object(Orthonym, "_rt_match", staticmethod(lambda *a, **kw: False)):
-        out = be.name(smi)
+    with patch.object(_us, "_COVALENT_SKELETAL_METALLOIDS", frozenset()):
+        assert not is_failure_name(be.name(smi)), (
+            "sanity: this witness must normally convert (so the mock below is "
+            "the only thing causing the abstain)")
+        with patch.object(Orthonym, "_rt_match",
+                          staticmethod(lambda *a, **kw: False)):
+            out = be.name(smi)
     assert is_failure_name(out), (
         f"shipped {out!r} for {smi!r} even though _rt_match reported no "
         f"match -- invariant 9 violated")

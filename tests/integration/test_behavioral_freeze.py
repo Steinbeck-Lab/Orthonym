@@ -6,7 +6,12 @@ The fixture at tests/fixtures/chain_freeze_1_500.json was generated before
 the a phase data consolidation changes. This test ensures zero behavioral
 regression from chain prefix cleanup and extension.
 
-Marked as @pytest.mark.slow since 500 RDKit calls take ~18s.
+Marked as @pytest.mark.slow: 500 namings take ~50 s serially (~12 s with -n 8,
+measured 2026-09-27 under load ~40). Before TRIAGE 'Suite fix -- j3-long-alkanes'
+the file took hours (find_principal_chain scored every carbon path, O(n^3)), and
+every chain from C80 up abstained on the candidate pool's character-count ratio
+floor; 16 rows also carried a linking 'a' that does not have
+('henahectane' -> 'henhectane', 'cosahectane' -> 'icosahectane').
 Run with: pytest -m slow tests/integration/test_behavioral_freeze.py -v
 """
 import json

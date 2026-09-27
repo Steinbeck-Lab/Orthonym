@@ -31,7 +31,10 @@ PHASE105_CANARY = [
     # -- Ring polyfunctional --
     ("OC1CCCCC1C(=O)O", "2-hydroxycyclohexan-1-carboxylic acid"),
     # -- Multi-FG complexity --
-    ("NCC(CC(N)C(=O)O)C(=O)O", "4-amino-2-(aminomethyl)pentanedioic acid"),
+    # (g) (the Blue Book): {2,4} ties, and 'amino' is cited before
+    # 'aminomethyl':3448), so amino takes 2 (d3c164db2, plan ruling
+    # R26; the old snapshot '4-amino-2-(aminomethyl)...' numbered from the other end).
+    ("NCC(CC(N)C(=O)O)C(=O)O", "2-amino-4-(aminomethyl)pentanedioic acid"),
     # -- Ring prefix conversion (Plan 03): heterocyclic -ane ring names --
     ("O=C(O)CC1CCOCC1", "2-oxanylethanoic acid"),
     ("O=C(O)CC1CCNCC1", "2-piperidinylethanoic acid"),

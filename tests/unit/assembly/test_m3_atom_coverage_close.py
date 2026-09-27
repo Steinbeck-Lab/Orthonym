@@ -384,18 +384,30 @@ _HETEROCYCLE_CARBON_ANCHOR_GUARD = {
 
 
 def test_heterocycle_close_declines_genuine_drop_jar_absent(monkeypatch):
-    """Regression anchor: the heterocycle close (composer.py ``:5117-5140``)
-    correctly declines the historical captopril exemplar -- a ring
-    nitrogen's acyl substituent that ``get_heterocycle_substituents`` skips
-    outright (``rules/heterocycles.py`` task 9), so the close's
-    ``_cov_groups`` union is genuinely short and the whole heterocycle
-    candidate must decline (falling through to a different, complete
-    producer), jar-absent, even at the plain PIN tier."""
+    """Regression anchor: the historical captopril exemplar never ships an
+    atom-dropped name jar-absent. It used to be declined by the heterocycle close
+    (composer.py ``:5117-5140``) because ``get_heterocycle_substituents`` skipped
+    the ring nitrogen's acyl substituent outright (``rules/heterocycles.py``
+    task 9). Since decision A part 2 (2026-09-27) that collector names the acyl
+    as an acyl PREFIX when the ring carries the carboxylic-acid suffix
+    (``_ring_n_acyl_prefix_under_ring_acid``), so the heterocycle candidate is
+    complete: ``1-(2-methyl-3-sulfanylpropanoyl)pyrrolidine-2-carboxylic acid``."""
     _force_jar_absent(monkeypatch)
     name = Orthonym(style="pin").name(CAPTOPRIL_DROP_WITNESS)
-    assert name == "N-2-methyl-3-sulfanylpropanoylproline", (
+    # Was ``== "N-2-methyl-3-sulfanylpropanoylproline"``, then (decision A part 1)
+    # 'N-(2-methyl-3-sulfanylpropanoyl)proline'; since decision A part 2 the name is
+    # '1-(2-methyl-3-sulfanylpropanoyl)pyrrolidine-2-carboxylic acid' (the acyl
+    # prefix under the ring acid, the Blue Book). The spelling is not
+    # pinned here (tests/unit/rules/test_decision_a_n_substituted_amino_acids.py pins
+    # it, jar-present). What this anchor guards is completeness:
+    # the witness's sole sulfur sits in the acyl chain the historical drop lost, so a
+    # complete name carries 'sulfanyl' and the proline/pyrrolidine core
+    # (test_w2_jarabsent_coverage's drop-witness check).
+    assert not is_failure_name(name), name
+    assert "sulfanyl" in name and ("proline" in name or "pyrrolidine" in name), (
         f"expected the complete acyl-proline name, got the atom-dropped "
         f"fragment (or something else) instead: {name!r}")
+    assert name != "pyrrolidine-2-carboxylic acid"
 
 
 def test_heterocycle_carbon_anchor_overclaim_documented_gap(monkeypatch):

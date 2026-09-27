@@ -112,6 +112,14 @@ from tests.support.jars import jar_or_none
 # RB-P5141 "## Skeletal replacement ('a') nomenclature in acyclic chains",:
 # the 'a' name is the PIN only "when four or more heterounits are present in a
 # unbranched chain" (:23348); "(1) 1-methoxy-2-(2-methoxyethoxy)ethane (PIN)" (:27756).
+# 2026-09-27 (suite fix j6-breadth) change-asserted-value: two DK-NOTEXACT molecules are now
+# named RT-exact at the PIN tier and are re-baselined here (tags '# j6 RB-...; was <old>');
+# OPSIN 2.9.0 full InChIKey and canonical SMILES exact (fresh java run outside the engine).
+# RB-RINGBR (:15800) the chain substituent keeps the free valence and cites the
+# ring as a prefix; (:3477) order; (:7444) '{}'.
+# RB-HWSTEM (:8224) "Hantzsch-Widman names... are preferred IUPAC names for
+# both the unsaturated and saturated compounds"; heteroatoms lowest (1,3), then
+# the free valence (4); the -OH chain is the parent,:18875).
 # Classes (Blue Book = the Blue Book Blue Book; R<n> = plan ruling table):
 # RB-R1..R24 the plan ruling R<n> (its heading, sentence and line are in the plan table).
 # RB-Da user decision D-a: semisystematic sugar names stay at the PIN tier. No PIN is
@@ -192,7 +200,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](CS)C(=O)O",
-        "L-lysyl-L-threonyl-L-cysteine",
+        "(2R)-2-{(2S,3R)-2-[(2S)-2,6-diaminohexanamido]-3-hydroxybutanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-lysyl-L-threonyl-L-cysteine'
     ),
     (
         "SS",
@@ -204,11 +212,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
-        "L-leucyl-L-serylglycine",
+        "{(2S)-2-[(2S)-2-amino-4-methylpentanamido]-3-hydroxypropanamido}acetic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-leucyl-L-serylglycine'
     ),
     (
         "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CO)C(=O)O",
-        "L-tryptophyl-L-tyrosyl-L-serine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]-3-(4-hydroxyphenyl)propanamido}-3-hydroxypropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophyl-L-tyrosyl-L-serine'
     ),
     (
         "CC1=CC[C@]23O[C@@]2(C)CC[C@@H]2[C@H](OC(=O)[C@H]2C)[C@@H]13",
@@ -224,7 +232,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",
-        "L-seryl-L-alanyl-L-tyrosine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-hydroxypropanamido]propanamido}-3-(4-hydroxyphenyl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-seryl-L-alanyl-L-tyrosine'
     ),
     (
         "CCCCCCCCCCC(C)C(=O)O",
@@ -332,7 +340,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CC(=O)O)C(=O)O",
-        "L-valyl-L-tyrosyl-L-aspartic acid",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-methylbutanamido]-3-(4-hydroxyphenyl)propanamido}butanedioic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-valyl-L-tyrosyl-L-aspartic acid'
     ),
     (
         "C=C[C@@H](O)CCCCC",
@@ -416,7 +424,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](N)C(C)C)C(=O)N[C@H](C(=O)O)[C@@H](C)O",
-        "L-valyl-L-isoleucyl-L-threonine",
+        "(2S,3R)-2-{(2S,3S)-2-[(2S)-2-amino-3-methylbutanamido]-3-methylpentanamido}-3-hydroxybutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-valyl-L-isoleucyl-L-threonine'
     ),
     (
         "COc1cccc(C(=O)O)c1O",
@@ -523,7 +531,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CN(C)C(=O)O",
-        "N,N-dimethylcarbamic acid",
+        # (the Blue Book) 'dimethylcarbamic acid (PIN)' verbatim;
+        # no italic-N locant (suite fix j5, TRIAGE g6 C22).
+        "dimethylcarbamic acid",
     ),
     # --- a phase: Decomposition Format Fixes (/) ---
     # Alkoxy naming on benzene (: bare oxy elimination)
@@ -739,7 +749,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         r"C/C(=C\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
-        "(2Z,5E,9E)-11-hydroxy-6,10-dimethyl-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid",
+        # j6 RB-RINGBR (suite fix j6, change-asserted-value); was the malformed
+        # "...-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid"
+        "(2Z,5E,9E)-2-[2-(2,5-dihydroxyphenyl)-2-oxoethyl]-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
     ),
     (
         "O=C(O)/C=C/c1ccc(OS(=O)(=O)O)cc1",
@@ -768,7 +780,9 @@ CANARY_COMPOUNDS = [
     # a phase: Medium Molecule Completeness (2 compounds)
     (
         r"C/C(=C\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
-        "(2Z,5E,9E)-11-hydroxy-6,10-dimethyl-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid",
+        # j6 RB-RINGBR (suite fix j6, change-asserted-value); was the malformed
+        # "...-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid"
+        "(2Z,5E,9E)-2-[2-(2,5-dihydroxyphenyl)-2-oxoethyl]-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
     ),
     (
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)"
@@ -785,7 +799,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C([O-])/C=C/C(=O)O.[Na+]",
-        "sodium hydrogen (2E)-but-2-enedioate",
+        "sodium (2E)-3-carboxyprop-2-enoate",  # j7 RB-P656231 method (1):31596,:46740); was 'sodium hydrogen (2E)-but-2-enedioate'
     ),
     (
         "CCCC=CCOC(=O)c1ccccc1",
@@ -896,7 +910,9 @@ CANARY_COMPOUNDS = [
     # Failure taxonomy sentinels: substituent_loss (3 compounds)
     (
         "C=C[C@](C)(O)CCC=C(C)CCC1OC(C)(C)OC1(C)C",  # Sentinel: substituent_loss - terpene cyclopentane
-        "(3R)-9-(1,3-dioxolan-5-yl)-3,7-dimethylnona-1,6-dien-3-ol",
+        # j6 RB-HWSTEM (suite fix j6, change-asserted-value); was "(3R)-9-(1,3-dioxolan-5-yl)-
+        # 3,7-dimethylnona-1,6-dien-3-ol" (drops the four ring methyls: another molecule)
+        "(3R)-3,7-dimethyl-9-(2,2,5,5-tetramethyl-1,3-dioxolan-4-yl)nona-1,6-dien-3-ol",
     ),
     (
         "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1",  # Sentinel: substituent_loss - phenoxy maleimide
@@ -1128,7 +1144,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CS)C(=O)O",
-        "L-leucyl-L-cysteine",
+        # Decision A part 2 (2026-09-27): was "L-leucyl-L-cysteine" (canary DK-PEP, call
+        # 216). Peptides are not PINs; the PIN is the substitutive name (controller ruling,
+        # CHEBI:141425): the acyl is the method (1) amido prefix,:32995/
+        #:32998. OPSIN 2.9.0 full-InChIKey exact.
+        "(2R)-2-[(2S)-2-amino-4-methylpentanamido]-3-sulfanylpropanoic acid",
     ),
     (
         "CCCCC=CC(=O)OCC",
@@ -1152,7 +1172,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCCC[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
-        "L-lysyl-L-serylglycine",
+        "{(2S)-2-[(2S)-2,6-diaminohexanamido]-3-hydroxypropanamido}acetic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-lysyl-L-serylglycine'
     ),
     (
         "CCCCCC(C)CCCCCC(=O)O",
@@ -1188,11 +1208,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](C)C(=O)N[C@H](C(=O)O)C(C)C",
-        "L-leucyl-L-alanyl-L-valine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-4-methylpentanamido]propanamido}-3-methylbutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-leucyl-L-alanyl-L-valine'
     ),
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CS)C(=O)O",
-        "L-valyl-L-lysyl-L-cysteine",
+        "(2R)-2-{(2S)-6-amino-2-[(2S)-2-amino-3-methylbutanamido]hexanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-valyl-L-lysyl-L-cysteine'
     ),
     (
         "CCCCC/C=C/CCCOC(C)=O",
@@ -1200,7 +1220,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O",
-        "L-tyrosyl-L-lysyl-L-leucine",
+        "(2S)-2-{(2S)-6-amino-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]hexanamido}-4-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tyrosyl-L-lysyl-L-leucine'
     ),
     (
         "C/C=C(/C)CCC(C)=O",
@@ -1216,7 +1236,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)NCC(=O)O",
-        "L-alanyl-L-tryptophylglycine",
+        "{(2S)-2-[(2S)-2-aminopropanamido]-3-(1H-indol-3-yl)propanamido}acetic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-alanyl-L-tryptophylglycine'
     ),
     (
         "N[C@@H](CC(=O)O)C(=O)NCC(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",
@@ -1224,7 +1244,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)[C@H](Cc1ccc(O)cc1)NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)O",
-        "L-tyrosyl-L-tyrosyl-L-alanine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-(4-hydroxyphenyl)propanamido}propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tyrosyl-L-tyrosyl-L-alanine'
     ),
     (
         "CC(=O)OCCCC(=O)CCOC(C)=O",
@@ -1236,15 +1256,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",
-        "L-tryptophyl-L-lysyl-L-alanine",
+        "(2S)-2-{(2S)-6-amino-2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]hexanamido}propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophyl-L-lysyl-L-alanine'
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)CNC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",
-        "L-tryptophylglycyl-L-threonine",
+        "(2S,3R)-2-{2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]acetamido}-3-hydroxybutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophylglycyl-L-threonine'
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
-        "L-lysyl-L-valyl-L-phenylalanine",
+        "(2S)-2-{(2S)-2-[(2S)-2,6-diaminohexanamido]-3-methylbutanamido}-3-phenylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-lysyl-L-valyl-L-phenylalanine'
     ),
     (
         "NC(CCCO)C(=O)O",
@@ -1280,7 +1300,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@H](C(=O)O)[C@@H](C)O",
-        "L-alanyl-L-tryptophyl-L-threonine",
+        "(2S,3R)-2-{(2S)-2-[(2S)-2-aminopropanamido]-3-(1H-indol-3-yl)propanamido}-3-hydroxybutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-alanyl-L-tryptophyl-L-threonine'
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
@@ -1292,7 +1312,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CO)C(=O)N[C@@H](CC(=O)O)C(=O)O",
-        "L-histidyl-L-seryl-L-aspartic acid",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]-3-hydroxypropanamido}butanedioic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-seryl-L-aspartic acid'
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
@@ -1312,7 +1332,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCCC[C@H](NC(=O)[C@H](CS)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O",
-        "L-phenylalanyl-L-cysteinyl-L-lysine",
+        "(2S)-6-amino-2-{(2R)-2-[(2S)-2-amino-3-phenylpropanamido]-3-sulfanylpropanamido}hexanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-phenylalanyl-L-cysteinyl-L-lysine'
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",
@@ -1328,15 +1348,15 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CS)C(=O)N[C@@H](CS)C(=O)O",
-        "L-phenylalanyl-L-cysteinyl-L-cysteine",
+        "(2R)-2-{(2R)-2-[(2S)-2-amino-3-phenylpropanamido]-3-sulfanylpropanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-phenylalanyl-L-cysteinyl-L-cysteine'
     ),
     (
         "NC(=O)C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
-        "L-seryl-L-asparaginyl-L-phenylalanine",
+        "(2S)-2-{(2S)-4-amino-2-[(2S)-2-amino-3-hydroxypropanamido]-4-oxobutanamido}-3-phenylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-seryl-L-asparaginyl-L-phenylalanine'
     ),
     (
         "NC(=O)C[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)N[C@@H](CO)C(=O)O",
-        "L-phenylalanyl-L-asparaginyl-L-serine",
+        "(2S)-2-{(2S)-4-amino-2-[(2S)-2-amino-3-phenylpropanamido]-4-oxobutanamido}-3-hydroxypropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-phenylalanyl-L-asparaginyl-L-serine'
     ),
     (
         "CC(C)=CCC(C)/C(C)=C/CO",
@@ -1344,7 +1364,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CCC(=O)O)C(=O)O",
-        "L-cysteinyl-L-histidyl-L-glutamic acid",
+        "(2S)-2-{(2S)-2-[(2R)-2-amino-3-sulfanylpropanamido]-3-(1H-imidazol-5-yl)propanamido}pentanedioic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-cysteinyl-L-histidyl-L-glutamic acid'
     ),
     (
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2C3=CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C",
@@ -1570,7 +1590,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",  # aromatic,polyfunctional,medium
-        "(2Z,5E,9E)-11-hydroxy-6,10-dimethyl-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid",
+        # j6 RB-RINGBR (suite fix j6, change-asserted-value); was the malformed
+        # "...-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)undeca-2,5,9-trienoic acid"
+        "(2Z,5E,9E)-2-[2-(2,5-dihydroxyphenyl)-2-oxoethyl]-11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
     ),
     (
         "CC/C=C\\CC(O)C(O)/C=C/C(O)CCCCCCCC(=O)O",  # acyclic,medium
@@ -1658,7 +1680,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](Cc1ccc(O)cc1)NC(=O)[C@@H](N)CS)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-cysteinyl-L-tyrosyl-L-leucine",
+        "(2S)-2-{(2S)-2-[(2R)-2-amino-3-sulfanylpropanamido]-3-(4-hydroxyphenyl)propanamido}-4-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-cysteinyl-L-tyrosyl-L-leucine'
     ),
     (
         "C/C=C\\C#CC#C/C=C/C=C/CCC(=O)O",  # acyclic,medium
@@ -1682,7 +1704,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)CN)C(=O)N[C@@H](C)C(=O)O",  # acyclic,polyfunctional,medium
-        "glycyl-L-valyl-L-alanine",
+        "(2S)-2-[(2S)-2-(2-aminoacetamido)-3-methylbutanamido]propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'glycyl-L-valyl-L-alanine'
     ),
     (
         "O=C([O-])CCS",  # acyclic,charged,small
@@ -1716,7 +1738,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](CO)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-seryl-L-histidyl-L-cysteine",
+        "(2R)-2-{(2S)-2-[(2S)-2-amino-3-hydroxypropanamido]-3-(1H-imidazol-5-yl)propanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-seryl-L-histidyl-L-cysteine'
     ),
     (
         "c1ccc2c(c1)Cc1ccccc1-2",  # aromatic,fused-ring,small
@@ -1744,11 +1766,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCCC[C@H](NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "L-histidyl-L-lysyl-L-tryptophan",
+        "(2S)-2-{(2S)-6-amino-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]hexanamido}-3-(1H-indol-3-yl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-lysyl-L-tryptophan'
     ),
     (
         "N[C@@H](CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "L-seryl-L-tyrosyl-L-tryptophan",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-hydroxypropanamido]-3-(4-hydroxyphenyl)propanamido}-3-(1H-indol-3-yl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-seryl-L-tyrosyl-L-tryptophan'
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -1756,7 +1778,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)CNC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
-        "L-tryptophylglycyl-L-leucine",
+        "(2S)-2-{2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]acetamido}-4-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophylglycyl-L-leucine'
     ),
     (
         "CC1=CC[C@@H]2C[C@H]1C2(C)C",  # fused-ring,small
@@ -1769,7 +1791,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](C)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-histidyl-L-alanyl-L-valine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]propanamido}-3-methylbutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-alanyl-L-valine'
     ),
     (
         "O=CC(=O)[C@@H](O)[C@H](O)[C@@H](O)CO",  # acyclic,polyfunctional,small
@@ -1781,7 +1803,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CCCCN)C(=O)O",  # heterocycle,polyfunctional,medium
-        "L-prolyl-L-valyl-L-lysine",
+        "(2S)-6-amino-2-{(2S)-3-methyl-2-[(2S)-pyrrolidine-2-carboxamido]butanamido}hexanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-prolyl-L-valyl-L-lysine'
     ),
     (
         "NCCCC[C@H](N)C(N)=O",  # acyclic,small
@@ -1805,7 +1827,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@@H](N)[C@@H](C)O)C(=O)N[C@H](C(=O)O)C(C)C",  # acyclic,polyfunctional,medium
-        "L-threonyl-L-leucyl-L-valine",
+        "(2S)-2-{(2S)-2-[(2S,3R)-2-amino-3-hydroxybutanamido]-4-methylpentanamido}-3-methylbutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-threonyl-L-leucyl-L-valine'
     ),
     (
         "CCC(C=O)CC",  # acyclic,small
@@ -1876,7 +1898,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](CC(N)=O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-histidyl-L-asparaginyl-L-valine",
+        "(2S)-2-{(2S)-4-amino-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]-4-oxobutanamido}-3-methylbutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-asparaginyl-L-valine'
     ),
     (
         "CCCCCO",  # acyclic,small
@@ -1908,7 +1930,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@H](Cc1cnc[nH]1)NC(=O)[C@@H](N)CCCCN)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-lysyl-L-histidyl-L-isoleucine",
+        "(2S,3S)-2-{(2S)-2-[(2S)-2,6-diaminohexanamido]-3-(1H-imidazol-5-yl)propanamido}-3-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-lysyl-L-histidyl-L-isoleucine'
     ),
     (
         "NC(=O)C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",  # aromatic,polyfunctional,medium
@@ -1924,7 +1946,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-valyl-L-seryl-L-serine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-methylbutanamido]-3-hydroxypropanamido}-3-hydroxypropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-valyl-L-seryl-L-serine'
     ),
     (
         "O=[N+]([O-])c1cccc([N+](=O)[O-])c1",  # aromatic,small
@@ -1982,7 +2004,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)CC[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CS)C(=O)O",  # heterocycle,polyfunctional,medium
-        "N-[(2S)-pyrrolidine-2-carbonyl]-L-glutaminyl-L-cysteine",
+        "(2R)-2-{(2S)-5-amino-5-oxo-2-[(2S)-pyrrolidine-2-carboxamido]pentanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'N-[(2S)-pyrrolidine-2-carbonyl]-L-glutaminyl-L-cysteine'
     ),
     (
         "CC(C)[C@@H](C)[C@@H]1O[C@H]1[C@@H](C)[C@H]1CC[C@@]2(O)C3=CC(=O)[C@@H]4C[C@@H](O)[C@@H](O)C[C@]4(C)[C@H]3CC[C@]12C",  # heterocycle,fused-ring,large,steroid
@@ -1990,7 +2012,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,polyfunctional,large
-        "L-tyrosyl-L-tyrosyl-L-cysteine",
+        "(2R)-2-{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-(4-hydroxyphenyl)propanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tyrosyl-L-tyrosyl-L-cysteine'
     ),
     (
         "CC/C=C\\CC/C=C\\C/C=C\\CC/C=C\\CC/C=C\\CCC(=O)O",  # acyclic,medium
@@ -2098,7 +2120,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)C[C@H](NC(=O)[C@@H](N)CO)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-seryl-L-asparaginyl-L-tyrosine",
+        "(2S)-2-{(2S)-4-amino-2-[(2S)-2-amino-3-hydroxypropanamido]-4-oxobutanamido}-3-(4-hydroxyphenyl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-seryl-L-asparaginyl-L-tyrosine'
     ),
     (
         "CCCc1cc(O)c(CC)c(=O)o1",  # aromatic,heterocycle,small
@@ -2164,7 +2186,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@H](CS)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
-        "L-tryptophyl-L-cysteinyl-L-isoleucine",
+        "(2S,3S)-2-{(2R)-2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]-3-sulfanylpropanamido}-3-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophyl-L-cysteinyl-L-isoleucine'
     ),
     (
         "CC(O)CBr",  # acyclic,small
@@ -2188,7 +2210,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCCC[C@H](NC(=O)[C@@H]1CCCN1)C(=O)N[C@@H](CC(=O)O)C(=O)O",  # heterocycle,polyfunctional,medium
-        "L-prolyl-L-lysyl-L-aspartic acid",
+        "(2S)-2-{(2S)-6-amino-2-[(2S)-pyrrolidine-2-carboxamido]hexanamido}butanedioic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-prolyl-L-lysyl-L-aspartic acid'
     ),
     (
         "NC(=O)CC[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,polyfunctional,medium
@@ -2224,7 +2246,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](N)C(=O)NCC(=O)N[C@@H](CCCCN)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-valylglycyl-L-lysine",
+        "(2S)-6-amino-2-{2-[(2S)-2-amino-3-methylbutanamido]acetamido}hexanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-valylglycyl-L-lysine'
     ),
     (
         "NC(=O)Nc1ccccc1",  # aromatic,small
@@ -2234,7 +2256,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)N[C@@H](CO)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-histidyl-L-threonyl-L-serine",
+        "(2S)-2-{(2S,3R)-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]-3-hydroxybutanamido}-3-hydroxypropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-threonyl-L-serine'
     ),
     (
         "CC1(C)CC23[C@@H]4CC(=O)[C@@H]2COC(=O)[C@@H]3CC[C@H]41",  # heterocycle,fused-ring,medium
@@ -2278,7 +2300,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "L-tryptophyl-L-cysteinyl-L-histidine",
+        "(2S)-2-{(2R)-2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]-3-sulfanylpropanamido}-3-(1H-imidazol-5-yl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophyl-L-cysteinyl-L-histidine'
     ),
     (
         "CSCC(=O)C(C)(C)C",  # acyclic,small
@@ -2290,7 +2312,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](N)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CO)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-isoleucyl-L-tyrosyl-L-serine",
+        "(2S)-2-{(2S)-2-[(2S,3S)-2-amino-3-methylpentanamido]-3-(4-hydroxyphenyl)propanamido}-3-hydroxypropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-isoleucyl-L-tyrosyl-L-serine'
     ),
     (
         "CC1=CCC(=O)CC(=O)[C@@]23C(=O)N[C@@H](CC(C)C)[C@@H]2[C@H](C)C(C)=C[C@@H]3C1",  # heterocycle,fused-ring,medium
@@ -2306,11 +2328,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCCC[C@H](N)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,large
-        "L-lysyl-L-phenylalanyl-L-histidine",
+        "(2S)-2-{(2S)-2-[(2S)-2,6-diaminohexanamido]-3-phenylpropanamido}-3-(1H-imidazol-5-yl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-lysyl-L-phenylalanyl-L-histidine'
     ),
     (
         "C[C@H](CCC(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
-        "(3R,5R,8R,9S,10S,13R,14S,17R,20R)-3,24-dihydroxycholan-24-one",
+        "3α-hydroxy-5β-cholan-24-oic acid",  # j7 RB-P101713:52548 acid suffix on a terminal segment;:51053 alpha/beta once the cholane map's C-11/C-12 swap is fixed); was '(3R,5R,8R,9S,10S,13R,14S,17R,20R)-3,24-dihydroxycholan-24-one'
     ),
     (
         "CCC(O)CCl",  # acyclic,small
@@ -2346,7 +2368,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](N)C(=O)NCC(=O)N[C@H](C(=O)O)[C@@H](C)O",  # acyclic,polyfunctional,medium
-        "L-valylglycyl-L-threonine",
+        "(2S,3R)-2-{2-[(2S)-2-amino-3-methylbutanamido]acetamido}-3-hydroxybutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-valylglycyl-L-threonine'
     ),
     (
         "CC([NH3+])C(=O)CCCCCC(=O)[O-]",  # acyclic,small
@@ -2354,7 +2376,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CC(C)C)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-leucyl-L-lysyl-L-leucine",
+        "(2S)-2-{(2S)-6-amino-2-[(2S)-2-amino-4-methylpentanamido]hexanamido}-4-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-leucyl-L-lysyl-L-leucine'
     ),
     (
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C[C@@H]4O[C@@]45C[C@@H](O)CC[C@]5(C)[C@H]3CC[C@]12C",  # heterocycle,fused-ring,medium,steroid
@@ -2374,7 +2396,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)NCC(=O)O",  # aromatic,polyfunctional,medium
-        "L-tyrosyl-L-leucylglycine",
+        "{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-4-methylpentanamido}acetic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tyrosyl-L-leucylglycine'
     ),
     (
         "CCCC(=O)OCC(O)COC(=O)CCC",  # acyclic,medium
@@ -2398,11 +2420,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)CN)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "glycyl-L-valyl-L-tyrosine",
+        "(2S)-2-[(2S)-2-(2-aminoacetamido)-3-methylbutanamido]-3-(4-hydroxyphenyl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'glycyl-L-valyl-L-tyrosine'
     ),
     (
         "CC(C(=O)O)[C@H](O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C",  # fused-ring,large,steroid
-        "(3R,5R,8R,9S,10S,12S,13R,14S,17R,20R,24R)-3,12,24,27-tetrahydroxycholestan-27-one",
+        "(24R)-3α,12α,24-trihydroxy-5β-cholestan-26-oic acid",  # j7 RB-P101713:52548); was '(3R,5R,8R,9S,10S,12S,13R,14S,17R,20R,24R)-3,12,24,27-tetrahydroxycholestan-27-one'
     ),
     (
         "O=C(O)C=CC(=O)O",  # acyclic,small
@@ -2418,7 +2440,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-isoleucyl-L-histidyl-L-phenylalanine",
+        "(2S)-2-{(2S)-2-[(2S,3S)-2-amino-3-methylpentanamido]-3-(1H-imidazol-5-yl)propanamido}-3-phenylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-isoleucyl-L-histidyl-L-phenylalanine'
     ),
     (
         "C1=CCCCCCC1",  # small
@@ -2430,7 +2452,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCCCC[C@H](N)C(=O)NCC(=O)NCC(=O)O",  # acyclic,polyfunctional,medium
-        "L-lysylglycylglycine",
+        "{2-[(2S)-2,6-diaminohexanamido]acetamido}acetic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-lysylglycylglycine'
     ),
     (
         "CCCCC/C=C\\C(O)C(O)/C=C/CCCCCCC(=O)O",  # acyclic,medium
@@ -2466,7 +2488,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-asparaginyl-L-histidyl-L-cysteine",
+        "(2R)-2-{(2S)-2-[(2S)-2,4-diamino-4-oxobutanamido]-3-(1H-imidazol-5-yl)propanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-asparaginyl-L-histidyl-L-cysteine'
     ),
     (
         "CC(/C=C/C(=O)O)=C\\C=C\\C=C(C)\\C=C\\C(=O)O",  # acyclic,medium
@@ -2516,7 +2538,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)NCC(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-histidyl-L-histidylglycine",
+        "{(2S)-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]-3-(1H-imidazol-5-yl)propanamido}acetic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-histidylglycine'
     ),
     (
         "O=C(O)[C@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)O",  # acyclic,small
@@ -2528,7 +2550,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)NCC(=O)N[C@@H](CC(=O)O)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
-        "L-tryptophylglycyl-L-aspartic acid",
+        "(2S)-2-{2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]acetamido}butanedioic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophylglycyl-L-aspartic acid'
     ),
     (
         "NCCCC[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O",  # aromatic,polyfunctional,medium
@@ -2548,11 +2570,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-valyl-L-alanyl-L-alanine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-methylbutanamido]propanamido}propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-valyl-L-alanyl-L-alanine'
     ),
     (
         "CC[C@H](C)[C@H](N)C(=O)NCC(=O)N[C@@H](CCC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-isoleucylglycyl-L-glutamic acid",
+        "(2S)-2-{2-[(2S,3S)-2-amino-3-methylpentanamido]acetamido}pentanedioic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-isoleucylglycyl-L-glutamic acid'
     ),
     (
         "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,heterocycle,polyfunctional,large
@@ -2580,7 +2602,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,polyfunctional,large
-        "L-tyrosyl-L-tyrosyl-L-tyrosine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-(4-hydroxyphenyl)propanamido}-3-(4-hydroxyphenyl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tyrosyl-L-tyrosyl-L-tyrosine'
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CCC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2603,7 +2625,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)C[C@H](N)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "L-asparaginyl-L-tryptophyl-L-cysteinyl-L-histidine",
+        "(2S)-2-[(2R)-2-{(2S)-2-[(2S)-2,4-diamino-4-oxobutanamido]-3-(1H-indol-3-yl)propanamido}-3-sulfanylpropanamido]-3-(1H-imidazol-5-yl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-asparaginyl-L-tryptophyl-L-cysteinyl-L-histidine'
     ),
     (
         "C=CC(C)(O)CC/C=C(\\C)CCC(O)C(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCCC(C)(O)CCC=C(C)C",  # acyclic,large
@@ -2643,7 +2665,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NCC(=O)N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "glycyl-L-histidyl-L-tyrosine",
+        "(2S)-2-[(2S)-2-(2-aminoacetamido)-3-(1H-imidazol-5-yl)propanamido]-3-(4-hydroxyphenyl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'glycyl-L-histidyl-L-tyrosine'
     ),
     (
         "CCOCCCO",  # acyclic,small
@@ -2655,7 +2677,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CO)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-phenylalanyl-L-seryl-L-leucine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-phenylpropanamido]-3-hydroxypropanamido}-4-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-phenylalanyl-L-seryl-L-leucine'
     ),
     (
         "O=CC/C=C\\CCCCCCCC(=O)O",  # acyclic,polyfunctional,small
@@ -2663,7 +2685,8 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CCCCCCNC(=O)O",  # acyclic,polyfunctional,small
-        "N-hexylcarbamic acid",
+        # (the Blue Book): no italic-N locant (j5, g6 C22).
+        "hexylcarbamic acid",
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2723,7 +2746,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](CCC[C@H](C)C(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,polyfunctional,medium,steroid
-        "(5S,8R,9S,10S,13R,14S,17R,20R,25S)-27-hydroxycholestan-3,27-dione",
+        "(25S)-3-oxo-5α-cholestan-26-oic acid",  # j7 RB-P101713:52548); was '(5S,8R,9S,10S,13R,14S,17R,20R,25S)-27-hydroxycholestan-3,27-dione'
     ),
     (
         "Cc1cnc(N)c(C)n1",  # aromatic,heterocycle,small
@@ -2761,7 +2784,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](N)C(=O)N[C@H](C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O)[C@@H](C)CC",  # aromatic,heterocycle,polyfunctional,medium
-        "L-isoleucyl-L-isoleucyl-L-histidine",
+        "(2S)-2-{(2S,3S)-2-[(2S,3S)-2-amino-3-methylpentanamido]-3-methylpentanamido}-3-(1H-imidazol-5-yl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-isoleucyl-L-isoleucyl-L-histidine'
     ),
     (
         "CCCCCCC/C=C/CCCCCCCCC(=O)[O-]",  # acyclic,charged,medium
@@ -2821,7 +2844,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](NC(=O)[C@@H](N)CCCCN)C(C)C)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-lysyl-L-valyl-L-valine",
+        "(2S)-2-{(2S)-2-[(2S)-2,6-diaminohexanamido]-3-methylbutanamido}-3-methylbutanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-lysyl-L-valyl-L-valine'
     ),
     (
         "CCCCCCCCCC(=O)OC",  # acyclic,small
@@ -2845,7 +2868,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)[C@H](Cc1c[nH]c2ccccc12)NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "L-phenylalanyl-L-tryptophyl-L-alanine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-phenylpropanamido]-3-(1H-indol-3-yl)propanamido}propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-phenylalanyl-L-tryptophyl-L-alanine'
     ),
     (
         "CC(=O)[C@H]([NH3+])C(=O)[O-]",  # acyclic,small
@@ -2881,7 +2904,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](NC(=O)CN)C(=O)N[C@@H](CO)C(=O)O",  # acyclic,polyfunctional,medium
-        "glycyl-L-alanyl-L-serine",
+        "(2S)-2-[(2S)-2-(2-aminoacetamido)propanamido]-3-hydroxypropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'glycyl-L-alanyl-L-serine'
     ),
     (
         "O=C(/C=C/C=C/c1ccc(O)cc1)N1CCCCC1",  # aromatic,heterocycle,medium
@@ -2933,7 +2956,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)CN)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "glycyl-L-threonyl-L-histidine",
+        "(2S)-2-[(2S,3R)-2-(2-aminoacetamido)-3-hydroxybutanamido]-3-(1H-imidazol-5-yl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'glycyl-L-threonyl-L-histidine'
     ),
     (
         "C/C=C/C(=O)c1c(OC)cc(O)c(CC)c1O",  # aromatic,medium
@@ -2957,7 +2980,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)NCC(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium
-        "L-tryptophyl-L-isoleucylglycine",
+        "{(2S,3S)-2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]-3-methylpentanamido}acetic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophyl-L-isoleucylglycine'
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](C)N)C(=O)N[C@H](C(=O)N[C@@H](CCC(N)=O)C(=O)O)[C@@H](C)O",  # acyclic,polyfunctional,medium
@@ -2973,11 +2996,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)CN)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,polyfunctional,medium
-        "glycyl-L-isoleucyl-L-tyrosine",
+        "(2S)-2-[(2S,3S)-2-(2-aminoacetamido)-3-methylpentanamido]-3-(4-hydroxyphenyl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'glycyl-L-isoleucyl-L-tyrosine'
     ),
     (
         "N[C@@H](Cc1cnc[nH]1)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)O",  # aromatic,heterocycle,polyfunctional,large
-        "L-histidyl-L-phenylalanyl-L-tyrosine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]-3-phenylpropanamido}-3-(4-hydroxyphenyl)propanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-phenylalanyl-L-tyrosine'
     ),
     (
         "NCCCC[C@H](NC(=O)[C@H](CC(N)=O)NC(=O)[C@@H](N)CC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -3023,7 +3046,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@H](CCC(N)=O)NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large
-        "L-tryptophyl-L-glutaminyl-L-isoleucine",
+        "(2S,3S)-2-{(2S)-5-amino-2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]-5-oxopentanamido}-3-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-tryptophyl-L-glutaminyl-L-isoleucine'
     ),
     (
         "CCCCCCC/C=C\\CCCCCCCC(=O)O",  # acyclic,medium
@@ -3031,7 +3054,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)[C@@H](C)O)C(=O)N[C@@H](CCCCN)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-threonyl-L-valyl-L-lysine",
+        "(2S)-6-amino-2-{(2S)-2-[(2S,3R)-2-amino-3-hydroxybutanamido]-3-methylbutanamido}hexanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-threonyl-L-valyl-L-lysine'
     ),
     (
         "CC1=CCCC1(C)C",  # small
@@ -3055,7 +3078,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)N[C@@H](CC(C)C)C(=O)O",  # aromatic,polyfunctional,medium
-        "L-phenylalanyl-L-isoleucyl-L-leucine",
+        "(2S)-2-{(2S,3S)-2-[(2S)-2-amino-3-phenylpropanamido]-3-methylpentanamido}-4-methylpentanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-phenylalanyl-L-isoleucyl-L-leucine'
     ),
     (
         "CC1(C)C(=O)CC(O)C23C(=O)OC4OCC(=CCC12)C43",  # heterocycle,fused-ring,polyfunctional,medium
@@ -3067,7 +3090,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "NC(=O)CC[C@H](NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)N[C@@H](CS)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-histidyl-L-glutaminyl-L-cysteine",
+        "(2R)-2-{(2S)-5-amino-2-[(2S)-2-amino-3-(1H-imidazol-5-yl)propanamido]-5-oxopentanamido}-3-sulfanylpropanoic acid",  # j7 RB-PEPSUBST method (1):32995; controller ruling, peptides are not PINs); was 'L-histidyl-L-glutaminyl-L-cysteine'
     ),
     (
         "CC(=O)OCC(=O)[C@@]1(O)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C",  # fused-ring,polyfunctional,large,steroid
@@ -3104,7 +3127,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(=O)O",  # fused-ring,medium,steroid
-        "(3S,5R,8R,9S,10S,13R,14S,17R,20R)-3,27-dihydroxycholestan-27-one",
+        "3β-hydroxy-5β-cholestan-26-oic acid",  # j7 RB-P101713:52548); was '(3S,5R,8R,9S,10S,13R,14S,17R,20R)-3,27-dihydroxycholestan-27-one'
     ),
     (
         "C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium

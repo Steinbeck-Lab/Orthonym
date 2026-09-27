@@ -36,8 +36,14 @@ def _full_ik(smi):
 
 # (input SMILES, exact composed name) — each verified end-to-end at 0-wrong.
 RECLAIM_CASES = [
+    # Suite fix j6 (TRIAGE g7 C15): the salt abstained -- the ring -ium emitter
+    # crashed sorting a fused numbering with int and '9a' locants (TypeError in
+    # ions._lowest_cation_locant_renumbering). The substituent is spelled
+    # without locants: '(C6H5)2C2* diphenylmethylidene (PIN)',
+    # the Blue Book). OPSIN 2.9.0: full InChIKey and canonical SMILES
+    # exact. 'quinolizidine' is not a PIN; this is the best-effort tier.
     ("C[N@+]12CCCC[C@@H]1CCC(=C(C3=CC=CC=C3)C4=CC=CC=C4)C2.[Br-]",
-     "(5R,9aR)-3-(1,1-diphenylmethylidene)-5-methylquinolizidin-5-ium bromide"),
+     "(5R,9aR)-3-(diphenylmethylidene)-5-methylquinolizidin-5-ium bromide"),
     ("[B-](/C/1=C/C=C\\C/C=C\\C1)(C2=CC=CC=C2)(C3=CC=CC=C3)C4=CC=CC=C4",
      "(1Z,3Z,6Z)-(cycloocta-1,3,6-trien-1-yl)triphenylboranuide"),
     # D3: the plain C1 methyl is spelled 'methyl' (not 'methan-1-yl');
@@ -69,12 +75,24 @@ def test_stereo_omission_reclaimed_and_roundtrips(smiles, expected):
 @pytest.mark.roundtrip
 @pytest.mark.parametrize("smiles,expected", RECLAIM_CASES)
 def test_disabling_reclaim_abstains(monkeypatch, smiles, expected):
-    """Tripwire: with the reclaim off the row abstains -> proves the composition is
-    what emits the name (not some other path)."""
+    """Tripwire: with the reclaim off the row does not get the composed name ->
+    proves the composition is what emits it (not some other path).
+
+    Suite fix j6: two rows now have a second, RT-exact best-effort name when the
+    reclaim is off -- the universal floor names the boranuide (covalent B is in
+    its scope since TRIAGE g6 C24) and the general engine names the
+    quinolizinium salt as '(1R,6R)-3-(diphenylmethylidene)-1-methyl-1-azabicyclo
+    [4.4.0]decan-1-ium bromide' (the salt no longer crashes, TRIAGE g7 C15). So
+    the row either abstains, or ships a DIFFERENT name that round-trips to the
+    input's full InChIKey (0-wrong)."""
     monkeypatch.setattr(_namer, "_STEREO_OMISSION_RECLAIM", False)
     with jvm_slots(1, purpose="p2-stereo-reclaim-test"):
         name = _best_effort().name(smiles)
-    assert is_failure_name(name) or "unknown" in name.lower()
+        if is_failure_name(name) or "unknown" in name.lower():
+            return
+        assert name != expected, name
+        out_smi = _validity_gate_name_to_smiles(name)
+    assert out_smi is not None and _full_ik(out_smi) == _full_ik(smiles), name
 
 
 def test_retry_cascade_returns_gate_composed_not_flat(monkeypatch):

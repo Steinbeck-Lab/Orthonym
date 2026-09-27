@@ -558,6 +558,159 @@ _DECO_MULT: Dict[int, str] = {
 }
 
 
+def _decorated_biphenylyl_substituent_name(
+    mol,
+    frag_atoms,
+    attachment_atom: int,
+    allow_mancude: bool = False,
+) -> Optional[str]:
+    """A DECORATED biphenylyl substituent, named as the ring assembly:
+    ``4'-(2,5-dimethylheptyl)[1,1'-biphenyl]-4-yl``, not the phenyl-on-phenyl
+    ``4-[4-(2,5-dimethylheptyl)phenyl]phenyl``.
+
+     (the Blue Book) names two identical rings joined by a single
+    bond as a ring assembly, the PIN form; its substituent prefix keeps the
+    assembly: '(4'-cyano[1,1'-biphenyl]-4-yl)oxy... (PIN)' (:7455). The bare
+    '[1,1'-biphenyl]-4-yl' comes from ``name_ring_assembly_prefix``; a decorated
+    one fell to ``_decorated_heteroaryl_substituent_name``, which names ONE ring
+    and cites the other as a 'phenyl' decoration (TRIAGE g5 C14, shipped at
+    pin_verified).
+
+    Numbering connection locants 1,1'; then the free valence,;
+    then the decoration locants as one set, an unprimed locant lower than the
+    same primed one; then (g) alphanumerical order): the ring bearing the
+    free valence is unprimed, its connection atom is 1; the other ring is primed,
+    its connection atom is 1'. Deny by default: exactly two benzene rings in the
+    fragment, joined by one bond, every other heavy atom inside a decoration that
+    hangs off one ring atom and that the shared decoration namers name.
+    """
+    from rdkit import Chem
+    ri = mol.GetRingInfo()
+    frag_set = set(frag_atoms)
+    rings = [set(r) for r in ri.AtomRings() if set(r) <= frag_set]
+    if len(rings) != 2:
+        return None
+    for r in rings:
+        if len(r) != 6:
+            return None
+        for a in r:
+            at = mol.GetAtomWithIdx(a)
+            if (at.GetSymbol() != 'C' or not at.GetIsAromatic()
+                    or ri.NumAtomRings(a) != 1 or at.GetFormalCharge() != 0):
+                return None
+    ring_a = next((r for r in rings if attachment_atom in r), None)
+    if ring_a is None:
+        return None
+    ring_b = rings[1] if rings[0] is ring_a else rings[0]
+    if ring_a & ring_b:
+        return None
+    both = ring_a | ring_b
+    links = [(b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()
+             if (b.GetBeginAtomIdx() in ring_a and b.GetEndAtomIdx() in ring_b)
+             or (b.GetBeginAtomIdx() in ring_b and b.GetEndAtomIdx() in ring_a)]
+    if len(links) != 1:
+        return None
+    x, y = links[0]
+    a_conn, b_conn = (x, y) if x in ring_a else (y, x)
+    if mol.GetBondBetweenAtoms(a_conn, b_conn).GetBondType() != Chem.BondType.SINGLE:
+        return None
+    if attachment_atom == a_conn:
+        return None
+
+    from ..assembly.substituent_enumerator import name_substituent
+    from ..errors import is_refusal_sentinel
+    from .fused_rings import _identify_fused_substituent
+    decorations = []  # (ring atom, name)
+    accounted: Set[int] = set()
+    has_parent_bond = False
+    for ra in sorted(both):
+        for nb in mol.GetAtomWithIdx(ra).GetNeighbors():
+            ni = nb.GetIdx()
+            if ni in both or nb.GetAtomicNum() <= 1:
+                continue
+            if ni not in frag_set:
+                if ra != attachment_atom:
+                    return None
+                has_parent_bond = True
+                continue
+            deco: Set[int] = set()
+            stack = [ni]
+            while stack:
+                cur = stack.pop()
+                if cur in deco:
+                    continue
+                deco.add(cur)
+                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    nj = nn.GetIdx()
+                    if nj in both:
+                        if nj != ra:
+                            return None  # a decoration bridging two ring atoms
+                        continue
+                    if nj in frag_set and nn.GetAtomicNum() > 1:
+                        stack.append(nj)
+            info = _identify_fused_substituent(mol, ni, both)
+            nm = info.get('name') if info else None
+            if not nm:
+                nm = name_substituent(mol, sorted(deco), ni, allow_mancude=allow_mancude)
+            if not nm or is_refusal_sentinel(nm) or nm == 'substituent' or ' ' in nm:
+                return None
+            decorations.append((ra, nm))
+            accounted |= deco
+    if not has_parent_bond or not decorations:
+        return None
+    exo = {a for a in frag_set
+           if a not in both and mol.GetAtomWithIdx(a).GetAtomicNum() > 1}
+    if accounted != exo:
+        return None
+
+    def _orders(ring, start):
+        adj = {i: [n.GetIdx() for n in mol.GetAtomWithIdx(i).GetNeighbors()
+                   if n.GetIdx() in ring] for i in ring}
+        out = []
+        for first in adj[start]:
+            seq = [start, first]
+            while len(seq) < 6:
+                nxt = [n for n in adj[seq[-1]] if n != seq[-2]]
+                if not nxt:
+                    return []
+                seq.append(nxt[0])
+            out.append({atom: p + 1 for p, atom in enumerate(seq)})
+        return out
+
+    from ..assembly.naming_utils import alpha_sort_key as _alpha
+    best = None
+    for pos_a in _orders(ring_a, a_conn):
+        for pos_b in _orders(ring_b, b_conn):
+            def _loc(ra):
+                return (pos_a[ra], 0) if ra in ring_a else (pos_b[ra], 1)
+            deco_locs = tuple(sorted(_loc(ra) for ra, _ in decorations))
+            named = tuple(sorted((_loc(ra), _alpha(nm)) for ra, nm in decorations))
+            key = (pos_a[attachment_atom], deco_locs, named)
+            if best is None or key < best[0]:
+                best = (key, pos_a, pos_b)
+    if best is None:
+        return None
+    _, pos_a, pos_b = best
+
+    def _text(ra):
+        return f"{pos_a[ra]}" if ra in ring_a else f"{pos_b[ra]}'"
+
+    from collections import defaultdict as _dd
+    from ..assembly.naming_utils import enclose_if_compound as _enc
+    from ..assembly.naming_utils import get_multiplier_prefix as _mult
+    groups = _dd(list)
+    for ra, nm in decorations:
+        groups[nm].append(ra)
+    parts = []
+    for nm, ras in groups.items():
+        ras = sorted(ras, key=lambda r: ((pos_a[r], 0) if r in ring_a else (pos_b[r], 1)))
+        locs = ",".join(_text(r) for r in ras)
+        parts.append((_alpha(nm), f"{locs}-{_mult(len(ras), nm)}{_enc(nm)}"))
+    parts.sort(key=lambda p: p[0])
+    body = "-".join(p[1] for p in parts)
+    return f"{body}[1,1'-biphenyl]-{pos_a[attachment_atom]}-yl"
+
+
 def _decorated_heteroaryl_substituent_name(
     mol,
     frag_atoms,
@@ -2186,10 +2339,16 @@ def name_ring_system_substituent(
         # Fail closed (None -> enumerator fallback -> ring_fragment_declined_by_ring_engine)
         # on anything not provably correct, so this only ADDS successful emissions.
         try:
-            name = _decorated_heteroaryl_substituent_name(
-                mol, frag_atoms, tuple(frag_ring_atoms), attach_idx,
-                allow_mancude=allow_mancude,
-            )
+            # A decorated biphenylyl is a ring assembly, named as one
+            # before the single-ring producer can cite its second ring as a
+            # 'phenyl' decoration.
+            name = _decorated_biphenylyl_substituent_name(
+                mol, frag_atoms, attach_idx, allow_mancude=allow_mancude)
+            if name is None:
+                name = _decorated_heteroaryl_substituent_name(
+                    mol, frag_atoms, tuple(frag_ring_atoms), attach_idx,
+                    allow_mancude=allow_mancude,
+                )
         except Exception:
             name = None
         if name is None and allow_mancude:
@@ -3847,6 +4006,9 @@ def _ring_atom_simple_substituents(mol, ring_atom_idx: int,
     return prefixes, covered
 
 
+_HW_STEM_FROM_NUMBERING = object()  # sentinel: stem built after numbering
+
+
 def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
                                     expected_atoms: Optional[Set[int]] = None
                                     ) -> Optional[str]:
@@ -3930,7 +4092,24 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         }
         stem = _HET_STEMS.get(ring_name)
         if stem is None:
-            return None
+            # Suite fix j6 (TRIAGE g3 C17b rt75_170): a SATURATED monocycle
+            # whose heteroatoms are all chalcogens takes its Hantzsch-Widman
+            # name, the Blue Book: "Hantzsch-Widman names
+            #... are preferred IUPAC names for both the unsaturated and
+            # saturated compounds"), built below from the chosen numbering
+            # ('2,2,5,5-tetramethyl-1,3-dioxolan-4-yl'). identify_ring_system
+            # has no name for 1,3-dioxolane, so a decorated one abstained.
+            # Each chalcogen must be plain divalent (two ring bonds, no H, no
+            # exocyclic atom): a substituted ring S is lambda-4, not
+            # covered by this stem.
+            if saturated and all(
+                    mol.GetAtomWithIdx(i).GetSymbol() in ('O', 'S', 'Se', 'Te')
+                    and mol.GetAtomWithIdx(i).GetDegree() == 2
+                    and mol.GetAtomWithIdx(i).GetTotalNumHs() == 0
+                    for i in het):
+                stem = _HW_STEM_FROM_NUMBERING
+            else:
+                return None
     else:
         if aromatic and n == 6:
             stem = 'phenyl'
@@ -4168,6 +4347,18 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         )
 
     if het:
+        if stem is _HW_STEM_FROM_NUMBERING:
+            from .heterocycles import build_hw_name
+            _hw = build_hw_name(
+                [(p, mol.GetAtomWithIdx(i).GetSymbol()) for p, i in sorted(order.items())
+                 if mol.GetAtomWithIdx(i).GetSymbol() != 'C'],
+                n, True, False)
+            if not _hw or not _hw.endswith('e'):
+                return None
+            stem = _hw[:-1]
+            if stem[:1].isdigit():
+                # (a): a hyphen separates a locant from a preceding word
+                stem = '-' + stem
         return f'{_stereo_prefix}{prefix_str}{stem}-{attachment_locant}-yl'
     return f'{_stereo_prefix}{prefix_str}{stem}'
 

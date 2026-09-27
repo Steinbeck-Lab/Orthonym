@@ -184,13 +184,15 @@ class TestAmineNSubRing:
     """
 
     def test_n_cyclohexyl_amine(self):
-        """N-cyclohexylamine: cyclohexyl on nitrogen of amine."""
-        result = name_compound("CCNC1CCCCC1")
-        assert result is not None, "name_compound returned None"
-        result_lower = result.lower()
-        assert "cyclohexyl" in result_lower, (
-            f"Expected 'cyclohexyl' in '{result}'"
-        )
+        """Ethyl(cyclohexyl)amine: the RING is the parent and carries only the amine.
+
+         (the Blue Book, 'Secondary and tertiary amines'):
+        '*N*-butylcyclopropanamine (PIN)... (not *N*-cyclopropylbutan-1-amine)'
+        (:26292), so the ring is the parent (the old 'cyclohexyl' expectation had
+        the chain as parent), and (c) (:2891/:2913) omits the locant '1'
+        on the monosubstituted ring -- the N-substituent hangs off the nitrogen.
+        """
+        assert name_compound("CCNC1CCCCC1") == "N-ethylcyclohexanamine"
 
     def test_n_phenyl_amine_still_works(self):
         """N-phenylamine detection unchanged by a phase changes.

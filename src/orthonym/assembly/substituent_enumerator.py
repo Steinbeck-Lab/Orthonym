@@ -2363,7 +2363,10 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # the S-oxoacid namer; it fails closed on any S outside the neutral
     # mono/di-oxo acyl class, so plain thioethers, carbon-R sulfonyls and parent
     # sulfate/sulfamate esters are untouched.
-    if attach_idx is not None:
+    # An out-of-range attach_idx is a decline, not a crash (the range check the
+    # normalisation step and the ylidene/alkoxy intercepts of name_substituent
+    # apply; test_invalid_attach_idx_does_not_crash).
+    if attach_idx is not None and 0 <= attach_idx < mol.GetNumAtoms():
         _att = mol.GetAtomWithIdx(attach_idx)
         if (_att.GetSymbol() == 'O' and _att.GetFormalCharge() == 0
                 and _att.GetTotalNumHs() == 0 and not _att.IsInRing()):
@@ -2742,12 +2745,21 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # rings / branched / unsaturated / amides / esters / ethers / bare-acyl.
     if attach_idx is not None and attach_idx in frag_atoms_set:
         try:
-            from .substituent_naming import _name_polyfunctional_acyclic_substituent
+            from .substituent_naming import (
+                _name_polyfunctional_acyclic_substituent,
+                polyfunctional_substituent_located,
+            )
+            _poly_pos: dict = {}
             _poly = _name_polyfunctional_acyclic_substituent(
-                mol, list(frag_atoms_set), attach_idx, set()
+                mol, list(frag_atoms_set), attach_idx, set(), pos_out=_poly_pos
             )
             if _poly:
-                return _stereo_route(_poly)
+                # Decision A part 2 (lysopine): the producer's own free-valence
+                # numbering locates the descriptor, '(1R)-1-carboxyethyl'
+                #, instead of the bare '(R)-' fallback.
+                return _stereo_route(
+                    _poly, located=polyfunctional_substituent_located(
+                        mol, frag_atoms_set, _poly, _poly_pos))
         except Exception:
             pass
 
@@ -5435,6 +5447,29 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
                 return None
             if _cg is not None:
                 return _cg
+
+            # Decision A part 2 "Substituents of the types -NH-CO-R
+            # and -NH-SO2-R", the Blue Book): -NH-CO-R is named "(1)
+            # substitutively, by using a prefix formed by changing the final letter
+            # 'e' in the complete name of the amide to 'o'" (:32995), and "Method
+            # (1) generates preferred IUPAC names." (:32998). The strict builder
+            # above takes only an unbranched saturated acyl, so a DECORATED acyl
+            # on an acyclic parent (4-hydroxyoctanoyl, (6E)-4-hydroxyoct-6-enoyl,
+            # (2S)-2-acetamido-3-hydroxypropanoyl) fell to the count below, which
+            # refuses it, and the whole substituent went unnamed at the PIN tier.
+            # Name the acyl as its acid and convert (the shared primitive the ring
+            # parents already use via benzene._identify_nitrogen_group): it takes
+            # ALL branch atoms but the N as the acyl, requires a mono-acylated N
+            # and a closed fragment, and returns None (fall through) otherwise;
+            # verify_acid: the acid name must re-perceive (OPSIN, full InChIKey) as
+            # the acid fragment, since a fragment namer can return an unverified,
+            # atom-dropping name at the best-effort tier.
+            # Returned bare, like the sibling returns; the caller encloses it.
+            from .substituent_naming import acyl_amido_prefix_from_branch
+            _dec_amido = acyl_amido_prefix_from_branch(
+                mol, attach_idx, branch_start, frag_atoms, verify_acid=True)
+            if _dec_amido:
+                return _dec_amido
 
             # C4d soundness gate. What follows spells a COUNT as an unbranched
             # saturated stem, so it is faithful only when the acyl really is an

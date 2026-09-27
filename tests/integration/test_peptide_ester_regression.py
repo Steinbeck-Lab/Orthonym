@@ -105,9 +105,21 @@ class TestPeptideGuardInNaming:
         assert result == "alanine"
 
     def test_n_methylglycine_still_works(self):
-        """N-methylglycine (sarcosine) should still be named correctly."""
+        """N-methylglycine should still be named correctly -- systematically.
+
+        Was ``== "sarcosine"``, stale since: 'sarcosine' has 0 Blue Book
+        hits and is in neither retained table; "Systematic
+        substitutive names" (the Blue Book),:54251: "When not denoted by a
+        retained name, amino acids receive systematic substitutive names...". User
+        decision A (2026-09-26) states the class: an amino acid substituted on its
+        nitrogen takes the systematic substitutive name. The deny row
+        (data/iupac_2013_pin_list.json 'sarcosine') names the replacement; OPSIN 2.9.0
+        full-InChIKey round trip checked below, outside the engine.
+        """
+        from tests.support.rt_assert import assert_full_rt
         result = name_compound("CNCC(=O)O")
-        assert result == "sarcosine"
+        assert result == "(methylamino)acetic acid"
+        assert_full_rt(result, "CNCC(=O)O")
 
     def test_dipeptide_does_not_produce_wrong_carbon_count(self):
         """Ala-Gly dipeptide should NOT produce '2-aminopentanoic acid' (5C)."""

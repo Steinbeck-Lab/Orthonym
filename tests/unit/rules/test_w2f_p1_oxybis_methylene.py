@@ -164,7 +164,10 @@ class TestAsymmetricSubstitutedBenzyloxy:
         assert name_compound("COc1ccc(COCc2ccc(O)cc2)cc1") == UNKNOWN
 
     def test_benzyloxy_sibling_regression(self):
-        # HEAD-OK anchor: retained benzyloxy VALID while ring+CH2 are bare
-        #; BB 18116 '(benzyloxy)carbonyl' precedent)
+        # 'benzyloxy' is a concatenated (compound) prefix -- only the
+        # contracted forms are simple (the Blue Book) -- so inside 'methyl'
+        # it takes its own marks, (:7232); BB 18116 '(benzyloxy)
+        # carbonyl (preferred prefix)' is that nesting. Gold W2F-P1-P01 corrected
+        # in the same commit (TRIAGE g6 C15). OPSIN 2.9.0 full-key exact.
         assert name_compound("Oc1ccc(COCc2ccccc2)cc1") == \
-            "4-(benzyloxymethyl)phenol"
+            "4-[(benzyloxy)methyl]phenol"

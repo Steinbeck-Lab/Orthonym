@@ -3215,6 +3215,70 @@ def ring_principal_suffix_atoms(
     return anchors
 
 
+def _ring_n_acyl_prefix_under_ring_acid(mol, ring_n_idx: int, carbonyl_c: int,
+                                        sub_atoms, ring_set,
+                                        principal_group: Optional[str]
+                                        ) -> Optional[str]:
+    """Acyl prefix for an acyl group on a ring NITROGEN of a ring that carries the
+    carboxylic-acid suffix, or None (the caller then skips the fragment as before).
+
+    Decision A part 2 (user, 2026-09-26). An N-acyl group on a ring nitrogen is a
+    'hidden amide', named as a PSEUDOKETONE, the Blue Book), and
+    "There is no seniority order difference between ketones and pseudoketones"
+    ,:29628). A ketone in the presence of a characteristic group cited as
+    a suffix is "cited as prefixes",:29585), and "Acyl group names...
+    are used unchanged to denote substituent groups. Thus, the traditional way of
+    using acyl groups... to name ketones, pseudoketones, and heterones is
+    maintained",:31376; '2-acetylbenzoic acid (PIN)':31378). So under a
+    ring carboxylic acid the acyl is an acyl prefix on the ring N:
+    '(2S)-1-acetylpyrrolidine-2-carboxylic acid', never the '1-oxopropyl' form
+    (general nomenclature only,:30430) and never an 'N-acyl' float.
+
+    Scope (deny by default): the molecule's principal group is a carboxylic acid
+    and a ring atom of this ring system bears the neutral -C(=O)OH (the suffix the
+    ring parent takes); the ring N is neutral; the acyl is a closed carbon-rooted
+    group named by ``substituent_naming.acyl_prefix_from_branch``.
+    """
+    if principal_group != 'carboxylic_acid':
+        return None
+    n_atom = mol.GetAtomWithIdx(ring_n_idx)
+    if n_atom.GetSymbol() != 'N' or n_atom.GetFormalCharge() != 0:
+        return None
+    _acid_on_ring = False
+    for r_idx in ring_set:
+        for nb in mol.GetAtomWithIdx(r_idx).GetNeighbors():
+            if nb.GetIdx() in ring_set or nb.GetSymbol() != 'C':
+                continue
+            _dbl_o = _oh = 0
+            for b in nb.GetBonds():
+                o = b.GetOtherAtom(nb)
+                if o.GetSymbol() != 'O' or o.GetFormalCharge() != 0:
+                    continue
+                if b.GetBondTypeAsDouble() == 2.0:
+                    _dbl_o += 1
+                elif o.GetDegree() == 1 and o.GetTotalNumHs() == 1:
+                    _oh += 1
+            if _dbl_o == 1 and _oh == 1:
+                _acid_on_ring = True
+                break
+        if _acid_on_ring:
+            break
+    if not _acid_on_ring:
+        return None
+    from ..assembly.substituent_naming import acyl_prefix_from_branch
+    acyl = acyl_prefix_from_branch(mol, carbonyl_c, ring_n_idx, sub_atoms)
+    if acyl and acyl != 'acetyl' and acyl.endswith('acetyl') \
+            and not acyl.startswith(('(', '[', '{')):
+        # A SUBSTITUTED acetyl ('aminoacetyl', 'chloroacetyl') is a compound
+        # prefix and takes enclosing marks, the Blue Book;
+        # '(chloroacetyl)oxyl (PIN)':40694). The shared enclose_if_compound
+        # keys on locants and hyphens, which these names do not carry, so
+        # _format_c_substituent would cite '1-aminoacetylpyrrolidine-...' bare.
+        from ..assembly.naming_utils import apply_enclosing_marks
+        acyl = apply_enclosing_marks(acyl, -1)
+    return acyl
+
+
 def get_heterocycle_substituents(
     mol,
     ring_atoms,
@@ -3375,6 +3439,22 @@ def get_heterocycle_substituents(
                             and principal_group in (
                                 'carboxylic_acid', 'primary_amide',
                                 'secondary_amide', 'tertiary_amide')):
+                        # Decision A part 2: the acyl on a ring N of a ring that
+                        # carries the carboxylic-acid SUFFIX is an acyl PREFIX
+                        # ('(2S)-1-acetylpyrrolidine-2-carboxylic acid').
+                        _acyl_pfx = _ring_n_acyl_prefix_under_ring_acid(
+                            mol, ring_atom_idx, nbr_idx, sub_atoms, ring_set,
+                            principal_group)
+                        if _acyl_pfx is not None:
+                            substituents.setdefault(locant, []).append({
+                                'atoms': sub_atoms,
+                                'is_on_nitrogen': True,
+                                'carbon_count': 0,
+                                'connecting_atom': ring_atom_idx,
+                                'is_ring': False,
+                                'ring_name': None,
+                                'hetero_name': _acyl_pfx,
+                            })
                         continue
 
             # C4 /: an N-substituted exocyclic amine on a

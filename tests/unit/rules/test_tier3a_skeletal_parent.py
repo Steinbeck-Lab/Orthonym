@@ -102,7 +102,10 @@ class TestRingParentGuards:
         ("CC1CCC(O)CC1", "4-methylcyclohexan-1-ol"),
         ("CC1CCC(N)CC1", "4-methylcyclohexan-1-amine"),
         ("SC1CCCC1C", "2-methylcyclopentane-1-thiol"),
-        ("CNC1CCCCC1", "N-methylcyclohexan-1-amine"),
+        # N-substituents hang off the nitrogen, so the ring is monosubstituted
+        # and the locant '1' is omitted (c) the Blue Book;
+        # '*N*-butylcyclopropanamine (PIN)':26292,.
+        ("CNC1CCCCC1", "N-methylcyclohexanamine"),
     ])
     def test_ring_parent_holds(self, smiles, expected):
         assert name_compound(smiles) == expected

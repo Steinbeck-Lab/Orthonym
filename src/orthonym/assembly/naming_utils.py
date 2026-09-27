@@ -127,6 +127,8 @@ BRANCH_HANDLED_FGS: frozenset = frozenset({
     'primary_amine',      # -> "aminomethyl", "2-aminoethyl"
     'fluoro', 'chloro', 'bromo', 'iodo',  # -> "fluoromethyl" etc.
     'nitro',              # W2F-P3 -> "nitromethyl", "1,2-dinitropropyl"
+    'azido',              # -> "azidomethyl", "3-azidopropyl" (substituent_naming
+                          # Pass 1c3;, BB '(2-azidoethyl)benzene (PIN)')
 })
 # a phase (E3 Task 6) tried adding 'aldehyde' here and REVERTED it: it
 # broke `tests/unit/rules/test_bugb_guard.py::test_no_dangerous_entries`
@@ -328,6 +330,10 @@ _COMPOUND_FG_PREFIXES = (
     'nitro', 'mercapto', 'sulfanyl', 'phospho',
     # Wave-2 C2: '(isothiocyanatomethyl)benzene' BB verbatim
     'isothiocyanato', 'isocyanato',
+    #: 'azidomethyl' is azido + methyl, a compound prefix; BB
+    # '(2-azidoethyl)benzene (PIN)' (:25995). Reached once the polyfunctional
+    # substituent namer consumes the azido group (Pass 1c3, TRIAGE g7 C14).
+    'azido',
     'fluoro', 'chloro', 'bromo', 'iodo',
     'difluoro', 'trifluoro', 'dichloro', 'trichloro',
     'dibromo', 'tribromo',
@@ -1301,16 +1307,63 @@ def compute_nesting_depth(name: str) -> int:
     # enclosed in '(' again -- '(' directly around '(' -- instead of '['.
     # For names up to three levels this equals the old type test (the marks are
     # added innermost-first in the ([ { order).
-    level = 0
-    max_depth = 0
-    for ch in working:
-        if ch in '([{':
-            level += 1
-            max_depth = max(max_depth, level)
-        elif ch in ')]}':
-            level = max(0, level - 1)
+    #
+    # TRIAGE j12 finding 8: the depth is counted in MARK LEVELS, not in raw
+    # bracket levels. A group whose mark was escalated by (:7509,
+    # "consecutive enclosing marks of the same level, the next level of enclosing
+    # mark is used": '[(2S)-2-{...}propanoyl]' where '(' would stand next to
+    # '(2S)') sits one mark level above its raw depth, and everything around it
+    # must continue the order from its actual mark. Counting raw levels wrapped
+    # '(2S)-2-[(2S)-2-{2-[(2R)-...]acetamido}propanamido]-3-methylbutanamido' in
+    # '[' -- a bracket directly around a bracket -- instead of '{'. Each existing
+    # group's level is the smallest level at or above its natural one (one above
+    # its highest inner group) whose mark is the mark it actually carries.
+    levels = _mark_levels(working)
+    if levels is None:
+        level = 0
+        max_depth = 0
+        for ch in working:
+            if ch in '([{':
+                level += 1
+                max_depth = max(max_depth, level)
+            elif ch in ')]}':
+                level = max(0, level - 1)
+        return max_depth
+    return 0 if not levels else 1 + max(levels)
 
-    return max_depth
+
+def _mark_levels(text: str):
+    """The mark levels (0 = '(', 1 = '[', 2 = '{', 3 = '(' again,...)
+    of the top-level enclosed groups of ``text``, or None when the marks are
+    unbalanced."""
+    opens = {'(': 0, '[': 1, '{': 2}
+    marks = '([{'
+    closes = {')': '(', ']': '[', '}': '{'}
+    stack = []            # [open_char, max_child_level, first_content_char]
+    top: list = []
+    for i, ch in enumerate(text):
+        if ch in opens:
+            stack.append([ch, -1, text[i + 1] if i + 1 < len(text) else ''])
+        elif ch in closes:
+            if not stack or stack[-1][0] != closes[ch]:
+                return None
+            open_ch, child_max, first = stack.pop()
+            lvl = child_max + 1
+            # the one mark above the natural one is read as the
+            # escalation only when it is what that rule produces (the content
+            # starts with the natural mark); any other mismatch is an integral
+            # bracket this scan does not recognise (a von Baeyer descriptor with
+            # superscripts, say), counted at its natural level as before
+            if (opens[open_ch] != lvl % 3 and opens[open_ch] == (lvl + 1) % 3
+                    and first == marks[lvl % 3]):
+                lvl += 1
+            if stack:
+                stack[-1][1] = max(stack[-1][1], lvl)
+            else:
+                top.append(lvl)
+    if stack:
+        return None
+    return top
 
 
 def apply_enclosing_marks(name: str, depth: int = 0) -> str:
@@ -2270,6 +2323,18 @@ def is_substituted_substituent(
         return is_substituted_substituent(work[1:-1], mol=mol, atoms=atoms,
                                           attachment=attachment)
 
+    # A leading stereodescriptor block ('(1s,4s)-', '(2R)-') is not a detachable
+    # substituent: it describes the prefix it precedes, so the multiplier
+    # is decided on that prefix. Without this peel every stereo-bearing prefix
+    # read as simple and a substituted one took 'di': '1,3-di[(1s,4s)-4-methyl
+    # cyclohexyl]propan-2-ol' against (a) (the Blue Book, 'bis' for
+    # "compound or complex (i.e. substituted) prefixes"; TRIAGE g7 C16).
+    # '(2S)-butan-2-yl' stays simple ('di[(2S)-butan-2-yl]', (a)).
+    _stereo_block = re.match(r'^\((?:\d+[RSEZrsez],)*\d*[RSEZrsez]\)-', work)
+    if _stereo_block and len(work) > _stereo_block.end():
+        return is_substituted_substituent(work[_stereo_block.end():], mol=mol,
+                                          atoms=atoms, attachment=attachment)
+
     lowered = work.lower()
 
     # GRAPH-PRIMARY. When a caller supplies the fragment, (c) is a
@@ -2801,6 +2866,15 @@ def _wrap_n_substituent(name: str) -> str:
         >>> _wrap_n_substituent("(3-ethyl-1H-indolyl)")
         '(3-ethyl-1H-indolyl)'
     """
+    # Already one fully enclosed token -- '(...)', '[...]' or '{...}' -- no
+    # double-wrapping. The brace case was missing: enclose_if_compound gives a
+    # name holding '(' and '[' its outer '{...}', which the escalation below
+    # re-wrapped as '({...})' -- the same fragment enclosed twice, against
+    # (the Blue Book) one level per enclosed fragment:
+    # 'N-({(3S)-3-(1-methyl-1H-indol-3-yl)-3-[3-(trifluoromethyl)phenyl]
+    # propanoyl})pyrrolidine' (TRIAGE g7 C10).
+    if _is_fully_enclosed(name):
+        return name
     # Already has outer square brackets -- no double-wrapping
     if name.startswith('[') and name.endswith(']'):
         return name
@@ -3050,13 +3124,30 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
         # inside apply_enclosing_marks, so
         # 'furo[3,2-b]pyridin-2-yl' still takes plain parentheses.
         formatted_name = apply_enclosing_marks(name, -1)
-    elif (complex or derived_multiplier) and not name.startswith('(') \
-            and not name.startswith('['):
+    elif (complex or derived_multiplier) and not name.startswith(('(', '[', '{')):
         # Complex name (or a simple name taking a derived bis/tris/...kis
         # multiplier, without existing enclosing marks: wrap.
+        # Decision A part 2 (lysopine): a name that arrives already enclosed in
+        # braces ('{[(1R)-1-carboxyethyl]amino}', the third mark of the
+        # order, the Blue Book) is fully enclosed -- the elif above has
+        # already taken every name with an inner mark that is NOT fully enclosed
+        # -- so wrapping it again gave the extra level
+        # '2-({[(1R)-1-carboxyethyl]amino})'.
         formatted_name = f"({name})"
     else:
         formatted_name = name
+
+    # (the Blue Book, nesting order "{[({})]}"): a name its
+    # producer already wrapped in plain parentheses (the benzene amido branch
+    # returns '((2R)-2-chloropropanamido)') reached the else branch above
+    # unchanged, so '(' sat directly around the descriptor's '(' --
+    # '4-((2S,3R)-...-4-oxobutanamido)benzamido' (TRIAGE g3 C10c). The outer
+    # mark is re-chosen from the content, as for every other compound prefix;
+    # a content at depth 0 keeps its '(' (no change).
+    if formatted_name is name and name.startswith('(') and _is_fully_enclosed(name):
+        _remarked = apply_enclosing_marks(name[1:-1], -1)
+        if _remarked[0] != '(':
+            formatted_name = _remarked
 
     # Wave2 T5a: a simple multiplier joining an italicized-prefix-led name
     # keeps the hyphen boundary: '1,2-di-tert-butylbenzene' (PIN, BB

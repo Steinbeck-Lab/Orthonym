@@ -485,6 +485,10 @@ def get_amino_acid_name(
                     name = STANDARD_AMINO_ACIDS[ns]
                     is_standard = True
 
+    # Decision A: a kept trivial name without Blue Book evidence ships labelled below
+    # the PIN tier (every return below carries ``name``, so the record matches).
+    record_if_non_pin_amino_acid_name(name)
+
     if name is None or not with_descriptor:
         return name
 
@@ -694,3 +698,28 @@ if GENERAL_ONLY_AMINO_ACIDS:
         len(GENERAL_ONLY_AMINO_ACIDS),
         len(set(GENERAL_ONLY_AMINO_ACIDS.values())),
     )
+
+
+# --- Decision A: kept trivial names that are never PIN-tier names ------------
+# User decision A (2026-09-26) and the rule of 09a07205d: a trivial name is a PIN-tier
+# name only with Blue Book evidence. 'carnitine' has 0 Blue Book hits (control
+# 'glycine' 30) and is in neither retained table (Table 10.4 / 10.5,
+# the Blue Book-:54245); (heading:54247),:54251: "When not
+# denoted by a retained name, amino acids receive systematic substitutive names".
+# Unlike the pin:false rows (GENERAL_ONLY_AMINO_ACIDS), these names are KEPT: the
+# PIN tier builds no RT-exact systematic name for them yet (measured 2026-09-26: the
+# L and D zwitterions abstain, the stereo-free one gives the malformed
+# '4-(trimethylazaniumyl)3-hydroxybutanoate'), so withdrawing them would trade a
+# valid name for an abstention. They ship labelled below pin_verified instead
+# (name-scoped non-PIN record, metrics.provenance.record_non_pin_fragment).
+# Consumers: get_amino_acid_name above and rules/salts.name_zwitterion's
+# RETAINED_AMINO_ACID_ZWITTERIONS lookup ('L-carnitine', 'carnitine').
+NON_PIN_AMINO_ACID_NAMES = frozenset({"carnitine", "l-carnitine", "d-carnitine"})
+
+
+def record_if_non_pin_amino_acid_name(name: Optional[str]) -> None:
+    """Record ``name`` as a non-PIN fragment when it is a kept trivial amino-acid name
+    without Blue Book evidence (``NON_PIN_AMINO_ACID_NAMES``); no-op otherwise."""
+    if name and name.lower() in NON_PIN_AMINO_ACID_NAMES:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)

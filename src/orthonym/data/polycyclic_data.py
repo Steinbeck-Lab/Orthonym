@@ -203,15 +203,19 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         # would drop the mandatory indicated hydrogen (a non-conformant PIN).
         # AUTHORITATIVE numbering: OPSIN `1H-cyclopenta[a]naphthalene
         # -o extendedsmi` ($_AV) = C1C=CC=2C1=C1C=CC=CC1=CC2
-        # |$1;2;3;3a;9b;9a;9;8;7;6;5a;5;4$|, mapped onto this canonical SMILES
-        # (RDKit parses in written order so index i -> the i-th $_AV locant).
+        # |$1;2;3;3a;9b;9a;9;8;7;6;5a;5;4$| (written order; kept as 'smarts').
+        # j7 (TRIAGE g6 C10): 'canonical_smiles' is the RDKit canonical string
+        # like every other entry (the reverse lookup get_polycyclic_by_smiles is
+        # keyed by it, so the written-order key never matched), and
+        # iupac_numbering is re-keyed onto it by the unique substructure match
+        # (every bond maps to the same locant pair).
         # 5-ring: 1,2,3,3a,9b; 6-rings share the 3a/5a/9a/9b fusion carbons.
-        'canonical_smiles': 'C1C=CC=2C1=C1C=CC=CC1=CC2',
+        'canonical_smiles': 'C1=Cc2ccc3ccccc3c2C1',
         'smarts': 'C1C=CC=2C1=C1C=CC=CC1=CC2',
         'num_atoms': 13,
         'iupac_numbering': {
-            0: 1, 1: 2, 2: 3, 3: '3a', 4: '9b', 5: '9a',
-            6: 9, 7: 8, 8: 7, 9: 6, 10: '5a', 11: 5, 12: 4,
+            12: 1, 0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: '5a',
+            6: 6, 7: 7, 8: 8, 9: 9, 10: '9a', 11: '9b',
         },
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9],
         'num_rings': 3,

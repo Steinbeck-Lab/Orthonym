@@ -385,6 +385,18 @@ class TestOPSINSimpleGroupAminoAcids:
         none of the three is in them. The Blue Book states the precedent itself at
         :54253: norvaline and norleucine are likewise non-retained, take systematic
         names, and "The names 'norvaline' and 'norleucine' are not recommended."
+
+        User decision A (2026-09-26): 2 more rows (alanopine, strombine) left this list.
+        Both are amino acids substituted on their NITROGEN, with 0 Blue Book hits and
+        no Table 10.4/10.5 entry, so the same sentence sends them to their
+        systematic names; they moved to the companion assertion below. The PIN tier
+        names them '2-[(1-carboxyethyl)amino]propanoic acid' and
+        '2-[(carboxymethyl)amino]propanoic acid' (OPSIN 2.9.0 full-InChIKey exact).
+
+        Decision A part 2 (2026-09-27): creatine left too, on the same basis (0 Blue
+        Book hits, N-substituted), once its systematic name was built: the PIN tier
+        names it '[carbamimidoyl(methyl)amino]acetic acid' (OPSIN 2.9.0 full-InChIKey
+        exact). It is in the companion assertion below with lysopine.
         """
         from orthonym.data.amino_acids import get_amino_acid_name
         from rdkit import Chem
@@ -393,10 +405,7 @@ class TestOPSINSimpleGroupAminoAcids:
         test_cases = [
             ("CC(C)(CO)[C@@H](O)C(=O)NCCC(=O)NCCS", "pantetheine"),
             ("CC(C)(CO)[C@@H](O)C(=O)NCCCO", "pantothenol"),
-            ("CC(NC(C)C(=O)O)C(=O)O", "alanopine"),
-            ("CC(NCC(=O)O)C(=O)O", "strombine"),
             ("CCC(N)C(=O)O", "butyrine"),
-            ("CN(CC(=O)O)C(=N)N", "creatine"),
             ("CSCCCN", "methioninamine"),
         ]
 
@@ -408,10 +417,12 @@ class TestOPSINSimpleGroupAminoAcids:
             )
 
     def test_gated_simplegroup_amino_acids_are_demoted_not_deleted(self):
-        """The 3 withheld rows leave the PIN lookup but stay in the general dict.
+        """The withheld rows leave the PIN lookup but stay in the general dict.
 
         This is the demote-not-delete contract every existing deny row already
         follows; it is asserted here so a future deletion cannot pass silently.
+        alanopine and strombine: decision A (2026-09-26), see the test above;
+        creatine and lysopine: decision A part 2 (2026-09-27).
         """
         from orthonym.data.amino_acids import (
             GENERAL_ONLY_AMINO_ACIDS, get_amino_acid_name,
@@ -422,6 +433,10 @@ class TestOPSINSimpleGroupAminoAcids:
             ("CC(C)C[C@H](N)[C@@H](O)CC(=O)O", "statine"),
             ("CN[C@@H](Cc1c[nH]c2ccccc12)C(=O)O", "abrine"),
             ("NCCS(=O)(=O)O", "taurine"),
+            ("CC(NC(C)C(=O)O)C(=O)O", "alanopine"),
+            ("CC(NCC(=O)O)C(=O)O", "strombine"),
+            ("CN(CC(=O)O)C(=N)N", "creatine"),
+            ("C[C@@H](N[C@@H](CCCCN)C(=O)O)C(=O)O", "lysopine"),
         ]:
             can = Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
             assert get_amino_acid_name(can) is None, f"{name!r} still on the PIN path"
@@ -522,10 +537,18 @@ class TestExpandedAminoAcidPipeline:
         assert result == "(2S)-3-(1H-indol-3-yl)-2-(methylamino)propanoic acid"
 
     def test_name_compound_creatine(self):
-        """Creatine (non-alpha amino acid) found via SMILES lookup."""
+        """Creatine is named systematically at the PIN tier.
+
+        Decision A part 2 (2026-09-27): was ``assert "creatine" in result``.
+        'creatine' has 0 Blue Book hits and is in neither retained Table 10.4 nor
+        10.5; (the Blue Book), sentence:54251, sends it to its
+        systematic substitutive name, and decision A (user, 2026-09-26) keeps
+        retained names at the PIN tier only for amino acids whose nitrogen is
+        unsubstituted. 'carbamimidoylamino (preferred prefix)' (:34268); the second
+        N-substituent is enclosed and the first is not,:7272).
+        """
         result = name_compound("CN(CC(=O)O)C(=N)N")
-        assert result is not None
-        assert "creatine" in result.lower(), f"Expected 'creatine', got: {result}"
+        assert result == "[carbamimidoyl(methyl)amino]acetic acid", result
 
     def test_name_compound_taurine(self):
         """Taurine (sulfonic acid amino) is named systematically.

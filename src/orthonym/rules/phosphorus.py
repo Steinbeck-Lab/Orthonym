@@ -1006,14 +1006,25 @@ def _assemble_p_owner_text(owner_tokens: List[str]) -> str:
         # catches a char-free compound prefix such as 'dodecylsulfanyl' (#16
         # tris(dodecylsulfanyl) phosphite), which 'tridodecylsulfanyl' would
         # otherwise render ambiguously.
-        is_complex = (any(ch in token for ch in "()[]-, 0123456789")
-                      or is_complex_substituent(token))
+        # carve-out (shared primitive): an italicized-led simple owner
+        # ('tert-butyl') is cited bare with a hyphenated simple multiplier,
+        # 'tri-tert-butyl phosphite', as in '1,2-di-*tert*-butylbenzene (PIN)'
+        # (the Blue Book); the raw hyphen test made it
+        # 'tris(tert-butyl) phosphite' (j7, TRIAGE g7 C20).
+        from ..assembly.naming_utils import (
+            italicized_prefix_is_bare,
+            multiplier_needs_hyphen,
+        )
+        is_complex = (not italicized_prefix_is_bare(token)
+                      and (any(ch in token for ch in "()[]-, 0123456789")
+                           or is_complex_substituent(token)))
         if k == 1:
             parts.append(f"({token})" if False else token)
         elif is_complex:
             parts.append(f"{COMPLEX_MULTIPLIERS[k]}({token})")
         else:
-            parts.append(f"{SIMPLE_MULTIPLIERS[k]}{token}")
+            _sep = "-" if multiplier_needs_hyphen(token) else ""
+            parts.append(f"{SIMPLE_MULTIPLIERS[k]}{_sep}{token}")
     return " ".join(parts)
 
 

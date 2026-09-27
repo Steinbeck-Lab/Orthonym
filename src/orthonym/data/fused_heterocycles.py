@@ -1291,21 +1291,21 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 4,
         'ring_system': 'bicyclic-5-5',
         'parent_atoms': 8,
-        'iupac_locants': {0: '5', 1: '6', 2: '6a', 3: '1', 4: '2', 5: '3', 6: '3a', 7: '4'},
+        'iupac_locants': {0: 5, 1: 6, 2: '6a', 3: 1, 4: 2, 5: 3, 6: '3a', 7: 4},
     },
     'c1cc2sccc2[nH]1': {
         'name': '4H-thieno[3,2-b]pyrrole',
         'tautomer_locant': 4,
         'ring_system': 'bicyclic-5-5',
         'parent_atoms': 8,
-        'iupac_locants': {0: '5', 1: '6', 2: '6a', 3: '1', 4: '2', 5: '3', 6: '3a', 7: '4'},
+        'iupac_locants': {0: 5, 1: 6, 2: '6a', 3: 1, 4: 2, 5: 3, 6: '3a', 7: 4},
     },
     'c1cc2ccoc2[nH]1': {
         'name': '6H-furo[2,3-b]pyrrole',
         'tautomer_locant': 6,
         'ring_system': 'bicyclic-5-5',
         'parent_atoms': 8,
-        'iupac_locants': {0: '5', 1: '4', 2: '3a', 3: '3', 4: '2', 5: '1', 6: '6a', 7: '6'},
+        'iupac_locants': {0: 5, 1: 4, 2: '3a', 3: 3, 4: 2, 5: 1, 6: '6a', 7: 6},
     },
     # 1,6-dihydropyrrolo[2,3-b]pyrrole (Wave-2 completion,.
     # The two-NH compound is the DIHYDRO derivative: the bare mancude
@@ -1317,7 +1317,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bicyclic-5-5',
         'parent_atoms': 8,
-        'iupac_locants': {0: '5', 1: '4', 2: '3a', 3: '3', 4: '2', 5: '1', 6: '6a', 7: '6'},
+        'iupac_locants': {0: 5, 1: 4, 2: '3a', 3: 3, 4: 2, 5: 1, 6: '6a', 7: 6},
     },
     # 1,3-dihydro-2-benzofuran (phthalan) — the 1,3-dihydro form of 2-benzofuran
     # (parallel to the cataloged 2,3-dihydro-1-benzofuran). PIN per BB;
@@ -2608,8 +2608,50 @@ def _input_indicated_h_locants(
     return sorted(out)
 
 
+_SKELETON_SATURATED_CACHE: Dict[str, frozenset] = {}
+
+
+def _skeleton_saturated_locants(core_smiles: Optional[str], name_ih) -> frozenset:
+    """Locants the catalog entry's OWN reference structure reports as saturated
+    beyond the indicated hydrogen its name states.
+
+    ``_input_indicated_h_locants`` reads every ring atom without a double bond as
+    a saturated (indicated-H) position. Two kinds of atom are saturated by the
+    skeleton itself and carry no indicated hydrogen in any tautomer: a bridge atom
+    of a bridged fused system (the CH2 of '3,5-(epoxymethano)', locant 8) and a
+    three-connected fusion heteroatom with no H (the N at locant 6 of
+    '[1,3]oxazolo[3,2-a]pyridine'-type cores). (the Blue Book)
+    cites indicated hydrogen only where the mancude parent would otherwise have a
+    double bond, so the reference tautomer -- the one the name describes -- lists
+    them as saturated while its name does not: they are exactly its saturated set
+    minus its named set. Reading them from the entry keeps the guard free of a
+    per-entry list (TRIAGE g6 C07, g7 C17: two entries failed their own core).
+
+    Only an entry whose reference structure IS the named tautomer (every named
+    locant saturated in it) contributes; an entry whose map puts the H elsewhere
+    ('1H-imidazo[4,5-d]pyrimidine' is keyed on an NH at its locant 7) contributes
+    nothing, so the guard keeps its old behaviour there."""
+    if not core_smiles:
+        return frozenset()
+    cached = _SKELETON_SATURATED_CACHE.get(core_smiles)
+    if cached is None:
+        cached = frozenset()
+        data = FUSED_HETEROCYCLE_DATA.get(core_smiles)
+        ref = Chem.MolFromSmiles(core_smiles) if data else None
+        if ref is not None and data.get('iupac_locants'):
+            ref_ih = _input_indicated_h_locants(ref, data['iupac_locants'])
+            if ref_ih is not None:
+                cached = frozenset(ref_ih)
+        _SKELETON_SATURATED_CACHE[core_smiles] = cached
+    name_ih = frozenset(name_ih)
+    if not name_ih <= cached:
+        return frozenset()
+    return cached - name_ih
+
+
 def _correct_indicated_h_tautomer(
-    mol: Chem.Mol, name: str, atom_mapping: Dict[int, Union[int, str]]
+    mol: Chem.Mol, name: str, atom_mapping: Dict[int, Union[int, str]],
+    core_smiles: Optional[str] = None,
 ) -> Optional[str]:
     """Guard a catalog core hit against the wrong-tautomer defect .
 
@@ -2639,6 +2681,9 @@ def _correct_indicated_h_tautomer(
         return name  # letter-suffix iH (e.g. '3aH'): stay conservative, leave unchanged
     name_ih = {int(t) for t in tokens}
     input_ih = _input_indicated_h_locants(mol, atom_mapping)
+    if input_ih:
+        _skeletal = _skeleton_saturated_locants(core_smiles, name_ih)
+        input_ih = [loc for loc in input_ih if loc not in _skeletal]
     if not input_ih:
         return name  # oxo / added-hydrogen consumed the position: keep as-is
     if set(input_ih) == name_ih:
@@ -2671,7 +2716,7 @@ def match_fused_heterocycle_core(
     if not _match_covers_ring_systems(mol, result[1]):
         return None
     name, atom_mapping, key = result
-    corrected = _correct_indicated_h_tautomer(mol, name, atom_mapping)
+    corrected = _correct_indicated_h_tautomer(mol, name, atom_mapping, key)
     if corrected is None:
         return None
     if corrected != name:
@@ -3058,7 +3103,7 @@ def core_numberings(
         res = _build_core_result(rec.name, list(match), core_smiles)
         if res is None:
             continue
-        name = _correct_indicated_h_tautomer(mol, res[0], res[1])
+        name = _correct_indicated_h_tautomer(mol, res[0], res[1], core_smiles)
         if name is None:
             continue
         out.append((list(match), res[1], name))

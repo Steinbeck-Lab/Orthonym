@@ -52,6 +52,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 import subprocess
+import time
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
@@ -98,6 +99,22 @@ class ControllerEvent:
     p_section_cite: Optional[str]
 
 
+#: The one-shot OPSIN subprocess tier's patience ladder (TRIAGE g7 C01, 2026-09-27):
+#: one ``(pause_before_s, timeout_s)`` pair per attempt. The first rung is the
+#: historical single attempt (10 s). A transient failure -- a timeout (a JVM that
+#: cannot boot in 10 s on a loaded host), a fork ``OSError`` or a non-zero exit
+#: (a JVM crash) -- is retried once, after a pause, with a 60 s budget. Without the
+#: retry a loaded host turned into 'unavailable' verdicts, and a name that depends
+#: on machine load is a defect: the validity gate now fails CLOSED on
+#: 'unavailable', so an OPSIN answer that merely came late must not cost a name.
+#: Monkeypatched by the unit tests (zero pauses).
+_ONE_SHOT_LADDER: Tuple[Tuple[float, float], ...] = ((0.0, 10.0), (2.0, 60.0))
+#: After a whole ladder failed, the same oracle tries only the first rung for this
+#: long, so a genuinely dead OPSIN costs every later name one 10 s attempt (the
+#: historical cost), not the full ladder.
+_ONE_SHOT_COOLDOWN_S = 120.0
+
+
 class OpsinOracle:
     """ runtime OPSIN-RT cache (+ RESEARCH R-02 + Pitfall 5).
 
@@ -115,6 +132,9 @@ class OpsinOracle:
         # cannot poison later lookups of the same name.
         self._parse_status_cache: Dict[str, str] = {}
         self._events: list = []  # ControllerEvent diagnostic log
+        # monotonic time until which the one-shot tier skips its retry rungs (the
+        # cool-down after a whole ladder failed; see _ONE_SHOT_COOLDOWN_S)
+        self._one_shot_down_until = 0.0
 
     def rt_safe(self, pre_swap_canon: str, post_swap_subtree_str: str) -> bool:
         """internal notes T2: parse ``post_swap_subtree_str`` via OPSIN, canonicalize, compare to
@@ -145,28 +165,89 @@ class OpsinOracle:
                                           allow_radicals=True, jar_path=self._jar)
         except ImportError:  # pragma: no cover - jvm_bridge always present
             _served = False
+        if not _served:
+            # -r (--allowRadicals): add consistently with _invoke_opsin so the
+            # oracle accepts radical names; proven strictly additive over 11,668
+            # names (66 gains / 0 changes / 0 regressions; internal notes §-RADICAL).
+            _text, _ran = self._one_shot(post_swap_subtree_str)
+            if not _ran:
+                # Transient (TRIAGE g7 C01): the check could not be made, so the
+                # swap is refused (fail closed) -- but NOT cached, so a timeout on a
+                # loaded host does not pin the systematic form for this instance's
+                # lifetime (, as name_to_smiles / parse_status).
+                return False
         try:
-            if not _served:
-                result = subprocess.run(
-                    # -r (--allowRadicals): add consistently with _invoke_opsin so the
-                    # oracle accepts radical names; proven strictly additive over 11,668
-                    # names (66 gains / 0 changes / 0 regressions; internal notes §-RADICAL).
-                    ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar, "-r", "-osmi"],
-                    input=post_swap_subtree_str + "\n",
-                    capture_output=True, text=True, timeout=10,
-                )
-                _text = result.stdout
             opsin_smiles = (_text or "").strip()
             if not opsin_smiles:
                 self._cache[key] = False
                 return False
             actual_canon = Chem.CanonSmiles(opsin_smiles)
             ok = (actual_canon == pre_swap_canon)
-        except (subprocess.TimeoutExpired, OSError, ValueError) as exc:
+        except ValueError as exc:
             logger.debug("OpsinOracle T2 RT check failed for %r: %s", post_swap_subtree_str, exc)
             ok = False
         self._cache[key] = ok
         return ok
+
+    def _one_shot(self, text: str) -> Tuple[Optional[str], bool]:
+        """Run ``java -jar <opsin> -r -osmi`` on ``text``, walking _ONE_SHOT_LADDER.
+
+        Returns ``(stdout, True)`` when OPSIN ran and exited 0 (a parse, or a clean
+        rejection: empty stdout), ``(None, False)`` when no rung produced an answer.
+        A transient failure -- ``TimeoutExpired``, an ``OSError`` such as a fork
+        failure under memory pressure, or a NON-ZERO exit (OPSIN exits 0 for both a
+        parse and a clean rejection, so a non-zero exit is a JVM crash / OOM, never a
+        verdict; -01) -- moves to the next rung. ``FileNotFoundError`` (no
+        ``java`` on PATH) cannot clear by waiting, so it stops at once. After a whole
+        ladder failed, this oracle tries the first rung only for
+        ``_ONE_SHOT_COOLDOWN_S`` (a dead OPSIN costs one attempt per name, as before
+        the ladder existed).
+        """
+        rungs = _ONE_SHOT_LADDER
+        if time.monotonic() < self._one_shot_down_until:
+            rungs = rungs[:1]
+        for pause, timeout in rungs:
+            if pause:
+                time.sleep(pause)
+            try:
+                result = subprocess.run(
+                    # -r (--allowRadicals): the single source-of-truth subprocess call
+                    # used by name_to_smiles AND parse_status (via _invoke_opsin) and by
+                    # rt_safe. Adding -r lets the validity gate (namer.py, via
+                    # parse_status) ACCEPT radical names like 'pentan-3-yl' instead of
+                    # suppressing them to 'unknown organic compound'. Proven strictly
+                    # additive over 11,668 names (66 empty->parsed gains / 0 non-additive
+                    # changes / 0 regressions; internal notes §-RADICAL(a)) --
+                    # byte-identical on all non-radical names. NOT a blanket gate
+                    # bypass: OPSIN itself still validates the name (the
+                    # heptanolate-class suppression hole stays closed).
+                    ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar, "-r", "-osmi"],
+                    input=text + "\n",
+                    capture_output=True, text=True, timeout=timeout,
+                )
+            except FileNotFoundError as exc:
+                logger.debug("OpsinOracle: no java executable (%s) for %r", exc, text)
+                return None, False
+            except (subprocess.TimeoutExpired, OSError) as exc:
+                logger.debug("OpsinOracle OPSIN invocation unavailable for %r "
+                             "(timeout %ss): %s", text, timeout, exc)
+                continue
+            # A NON-ZERO exit means OPSIN itself errored (e.g. a JVM OOM / crash
+            # under full-corpus parallel load), NOT a definitive rejection -- the
+            # cause of valid heavy aminium names being suppressed to "unknown
+            # organic compound" under load (-01 close finding). Transient:
+            # try the next rung.
+            if result.returncode != 0:
+                logger.debug(
+                    "OpsinOracle OPSIN non-zero exit (%s) for %r -- treating as "
+                    "unavailable (transient), not a rejection",
+                    result.returncode, text,
+                )
+                continue
+            self._one_shot_down_until = 0.0
+            return result.stdout, True
+        self._one_shot_down_until = time.monotonic() + _ONE_SHOT_COOLDOWN_S
+        return None, False
 
     def _invoke_opsin(self, name: str) -> Tuple[Optional[str], bool]:
         """Run OPSIN ``-osmi`` on a single name. Single source of truth for the
@@ -218,43 +299,16 @@ class OpsinOracle:
             # ran is False: transient/unavailable -> fall through to the
             # definitive one-shot subprocess (never cached by callers).
 
-        try:
-            result = subprocess.run(
-                # -r (--allowRadicals): the single source-of-truth subprocess call
-                # used by name_to_smiles AND parse_status. Adding -r lets the
-                # validity gate (namer.py, via parse_status) ACCEPT radical names like
-                # 'pentan-3-yl' instead of suppressing them to 'unknown organic
-                # compound'. Proven strictly additive over 11,668 names (66 empty->
-                # parsed gains / 0 non-additive changes / 0 regressions;
-                # internal notes §-RADICAL(a)) — byte-identical on all non-radical
-                # names. NOT a blanket gate bypass: OPSIN itself still validates the
-                # name (the heptanolate-class suppression hole stays closed).
-                ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar, "-r", "-osmi"],
-                input=name + "\n",
-                capture_output=True, text=True, timeout=10,
-            )
-        except (subprocess.TimeoutExpired, OSError) as exc:
-            logger.debug("OpsinOracle OPSIN invocation unavailable for %r: %s", name, exc)
+        # The one-shot subprocess, with its patience ladder (_one_shot). A timeout,
+        # an OSError or a non-zero exit on every rung is "unavailable" (ran=False),
+        # never a rejection: OPSIN exits 0 for BOTH a parse (SMILES on stdout) AND a
+        # clean rejection (empty stdout), so only an exit-0 run is a verdict (,
+        # -01). The validity gate fails CLOSED on "unavailable"
+        # (TRIAGE g7 C01): the ladder is what keeps a late answer from costing a name.
+        text, ran = self._one_shot(name)
+        if not ran:
             return None, False
-        # A NON-ZERO exit means OPSIN itself errored (e.g. a JVM OOM / crash
-        # under full-corpus parallel load), NOT a definitive rejection. OPSIN
-        # exits 0 for BOTH a successful parse (SMILES on stdout) AND a clean
-        # rejection (empty stdout + an "unparsable" note on stderr) — so a
-        # non-zero exit is always a transient/environmental failure. Treat it as
-        # "unavailable" (ran=False) so the validity gate fails OPEN and
-        # never suppresses a valid name on a transient OPSIN crash. This
-        # completes the hardening, which previously caught only
-        # TimeoutExpired/OSError and let a non-zero exit collapse to "rejected"
-        # — the cause of valid heavy aminium names being suppressed to
-        # "unknown organic compound" under load (-01 close finding).
-        if result.returncode != 0:
-            logger.debug(
-                "OpsinOracle OPSIN non-zero exit (%s) for %r — treating as "
-                "unavailable (transient), not a rejection",
-                result.returncode, name,
-            )
-            return None, False
-        smi = result.stdout.strip()
+        smi = (text or "").strip()
         return (smi or None), True
 
     def name_to_smiles(self, name: str) -> Optional[str]:
@@ -301,10 +355,13 @@ class OpsinOracle:
           * ``"unavailable"`` — the parse could not be performed (no JAR / timeout
             / ``OSError``).
 
-        Callers MUST fail-OPEN on ``"unavailable"`` — a missing JAR or a transient
-        subprocess failure must NEVER suppress a name. This is the distinction the
-        old ``name_to_smiles is not None`` check collapsed, which let a timeout
-        turn a valid, round-trip-passing name into a descriptive fallback.
+        ``"unavailable"`` is NOT a rejection: it says nothing about the name. The
+        old ``name_to_smiles is not None`` check collapsed the two . What a
+        caller does with it is the caller's decision: the validity gate
+        treats it as "unverified" and fails CLOSED (TRIAGE g7 C01, 2026-09-27; it
+        used to fail open and ship the unverified candidate, a wrong molecule when
+        the candidate was wrong), after ``_one_shot``'s retry ladder has given a
+        slow OPSIN its chance.
 
         Only definitive outcomes are cached, so a transient failure never poisons
         a later lookup of the same name .

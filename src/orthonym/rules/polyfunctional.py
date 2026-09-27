@@ -2206,6 +2206,31 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 continue
             matches = _amine_kept
 
+        # Decision A part 2 (creatine, CN(CC(=O)O)C(=N)N): the guanidine match
+        # [N][C](=N)[N] spans the four guanidine atoms only. When the substituent
+        # branch that holds it carries MORE atoms (an N-methyl on the chain-side
+        # N), the 'carbamimidoylamino' FG prefix names four of them and drops the
+        # rest, and the substituent walk -- which the branch-subset skip in
+        # _generate_alkyl_prefixes_for_polyfunctional lets through because the
+        # branch is not a subset of the match -- names the whole branch as well:
+        # '(carbamimidoylamino)[(carbamimidoyl)(methyl)amino]acetic acid' named
+        # the guanidine twice. Mirror of the guard above: the walk owns
+        # such a branch; the FG prefix keeps the branch that IS the match
+        # (glycocyamine, '(carbamimidoylamino)acetic acid').
+        if fg_name == 'guanidine' and features.substituents:
+            _gu_kept = []
+            for _match in matches:
+                _gu_set = set(_match)
+                _owned = any(
+                    _gu_set < set(_sub_atoms)
+                    for _sub_list in features.substituents.values()
+                    for _sub_atoms in _sub_list)
+                if not _owned:
+                    _gu_kept.append(_match)
+            if not _gu_kept:
+                continue
+            matches = _gu_kept
+
         # Non-principal acyl halide on a CHAIN parent: the
         # acyl-halide carbon is a chain member, expressed as 'oxo' (=O) +
         # 'halo' (X), NOT the 'carbonochloridoyl' prefix. Blue Book worked
@@ -3244,8 +3269,18 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # with the alpha-carbon locants OMITTED — 'cyanoacetic acid' (BB 30999),
     # 'sulfanylacetic acid' (BB 4967), '(4-chlorophenoxy)acetic acid'. Same rule
     # as the general_acyclic path (_handler_shared). Guarded to a saturated
-    # 2-carbon CHAIN monoacid with substituents and no stereocentre (a C2 stereo
-    # locant cannot be omitted safely -> keep the systematic 'ethanoic' form).
+    # 2-carbon CHAIN monoacid with substituents. A stereocentre inside a
+    # substituent is cited in that prefix ('[(2S)-2-aminopropanamido]acetic acid',
+    # j7). A stereocentre ON the chain can only be the alpha carbon, the one
+    # substitutable position, so its descriptor is cited bare, without the locant
+    # the retained parent does not show, the Blue Book "preceded by
+    # a numerical or letter locant... when such locants are present"): '(S)-
+    # hydroxy(phenyl)acetic acid', as '(R)-{bis[(1R)-1-hydroxyethyl]amino}{...}
+    # acetic acid (PIN)' (:45731) and '(S)-cyclopropyl(hydroxy)acetaldehyde (PIN)'
+    # (:45259). Before (TRIAGE j12 findings 2/4/7) such a centre kept the
+    # systematic '(2S)-2-hydroxy-2-phenylethanoic acid' at pin_verified; 'ethanoic
+    # acid' is the non-preferred spelling:29725 'acetic acid (PIN)
+    # ethanoic acid').
     _acetic_context = (
         principal_group == 'carboxylic_acid'
         and chain_length == 2 and count == 1
@@ -3253,7 +3288,6 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         and all_prefixes
         and not (getattr(features, 'is_cyclic', False)
                  and not getattr(features, 'chain_is_parent', False))
-        and not features.stereocenters
         and not getattr(features, 'double_bond_stereo', None)
     )
     #: the same retained-parent + locant-omission treatment for a
@@ -3301,6 +3335,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # component. No witness for that shape was found, so it survives mutation, but
     # it is not redundant with the structural proof -- do not remove it on the
     # strength of the mutation result.
+    # the located prefixes, before any locant-free re-render below: the systematic
+    # spelling recorded for the acetic arm must keep its locants
+    _located_prefixes = list(all_prefixes)
     if (_l3_render_from is not None and len(all_prefixes) == 1
             and not suffix_locants
             and not double_locants and not triple_locants):
@@ -3312,6 +3349,26 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         _retained_acetaldehyde(mol, atom_to_locant, all_prefixes, features)
         if _aldehyde_context else None
     )
+    def _systematic_assembly(prefixes):
+        _n = format_suffix_with_locants(
+            stem, unsaturation, suffix, suffix_locants, multiplier
+        )
+        if prefixes:
+            prefix_str = _join_prefixes(prefixes)
+            # Ensure hyphen between prefix ending with letter and name starting with digit
+            if prefix_str and _n and prefix_str[-1].isalpha() and _n[0].isdigit():
+                _n = f"{prefix_str}-{_n}"
+            else:
+                _n = f"{prefix_str}{_n}"
+        return _n
+
+    # The systematic assembly is the name unless a retained arm applies. For the
+    # acetic arm the LOCATED spelling is also recorded as that name's systematic
+    # spelling (the amido converter needs the locants, see composition_primitives).
+    sys_name = _systematic_assembly(
+        _located_prefixes if _acetic_context else all_prefixes)
+
+    _record_acetic_systematic = _acetic_context
     if _acetic_context:
         #: an alpha-carbon bearing =O/=S PLUS a single-bonded chalcogen is
         # mis-classified by the FG loop as one acyl prefix (sulfanylcarbonyl /
@@ -3321,6 +3378,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         _alpha_name = _alpha_chalcogen_acetic_name(mol, principal_chain, atom_to_locant)
         if _alpha_name is not None:
             name = _alpha_name
+            # the FG loop's prefixes double-count this alpha carbon, so sys_name
+            # is not a spelling of this molecule: never record it
+            _record_acetic_systematic = False
         else:
             from ..assembly.composition_primitives import retained_acetic_from_prefixes
             #: with 2+ substituents on the single-substitutable acetic
@@ -3336,19 +3396,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         _ald_name, _ald_bare_stereo = _ald_result
         name = f"{_ald_bare_stereo}{_ald_name}"
     else:
-        # Assemble the name
-        name = format_suffix_with_locants(
-            stem, unsaturation, suffix, suffix_locants, multiplier
-        )
-
-        # Add prefixes with proper hyphenation at boundary
-        if all_prefixes:
-            prefix_str = _join_prefixes(all_prefixes)
-            # Ensure hyphen between prefix ending with letter and name starting with digit
-            if prefix_str and name and prefix_str[-1].isalpha() and name[0].isdigit():
-                name = f"{prefix_str}-{name}"
-            else:
-                name = f"{prefix_str}{name}"
+        name = sys_name
 
     # Add stereodescriptors if present (skipped when the aldehyde arm already applied
     # its bare '(S)-' — the generic path would otherwise re-prepend a '(2S)-').
@@ -3358,7 +3406,22 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         descriptors = collect_stereodescriptors(mol, atom_to_locant)
         if descriptors:
             stereo_prefix = format_stereodescriptor_string(descriptors)
-            name = f"{stereo_prefix}{name}"
+            sys_name = f"{stereo_prefix}{sys_name}"
+            if not _acetic_context:
+                name = f"{stereo_prefix}{name}"
+            elif (len(descriptors) == 1 and descriptors[0][0] == 2
+                    and descriptors[0][1] in ('R', 'S', 'r', 's')):
+                # the alpha carbon: bare descriptor, see _acetic_context)
+                name = f"({descriptors[0][1]})-{name}"
+            else:
+                # nothing else can carry a chain descriptor on this parent (the
+                # carboxy carbon is not stereogenic, E/Z is excluded above); if it
+                # ever does, keep the systematic name, which cites every locant
+                _record_acetic_systematic = False
+                name = sys_name
+    if _record_acetic_systematic:
+        from ..assembly.composition_primitives import record_retained_acetic_systematic
+        record_retained_acetic_systematic(name, sys_name)
 
     # ASSEMBLY_AUDIT: detect FGs present in molecule but missing from final name.
     # Guarded by logger level check so there is no performance impact in production.

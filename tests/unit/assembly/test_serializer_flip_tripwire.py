@@ -25,7 +25,14 @@ import os
 import pathlib
 
 # Disable the OPSIN validity gate BEFORE importing orthonym -> JVM-free
-# (the gate is a no-op for these molecules; names are unchanged).
+# (the gate is a no-op for these molecules; names are unchanged)...
+#... and put the environment back right after the import. Under xdist every
+# worker imports every test module at collection, so a module-level write that
+# stayed in os.environ switched the gates off in every child process the rest of
+# the suite spawned (TRIAGE C1: subprocess tests saw gate-off names). The namer
+# reads these variables once, at import, so restoring them changes nothing here.
+_ENV_BEFORE = {"ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE":
+               os.environ.get("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE")}
 os.environ.setdefault("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "1")
 
 import pytest
@@ -37,6 +44,12 @@ from orthonym.assembly.name_tree_to_string import (
     SERIALIZER_PRODUCTION_CLASSES,
     _assemble_explicit_fields,
 )
+
+for _k, _v in _ENV_BEFORE.items():   # restore: see the note above the import
+    if _v is None:
+        os.environ.pop(_k, None)
+    else:
+        os.environ[_k] = _v
 
 RDLogger.DisableLog("rdApp.*")
 

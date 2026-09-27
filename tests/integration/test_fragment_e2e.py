@@ -52,17 +52,19 @@ class TestPeptideE2E:
         """L-Ala-Gly dipeptide. substitutive PIN
         (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
+        assert result == "[(2S)-2-aminopropanamido]acetic acid"
 
     @pytest.mark.integration
     def test_tripeptide_gly_ala_leu(self):
-        """Gly-L-Ala-L-Leu tripeptide -> 'glycylalanylleucine'.
+        """Gly-L-Ala-L-Leu tripeptide -> its substitutive PIN (j7; was the
+        peptide name 'glycylalanylleucine',:54717).
 
          (the Blue Book): both L-descriptors omitted."""
         result = name_compound(
             "NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O"
         )
-        assert result == "glycylalanylleucine"
+        # j7 (TRIAGE g3 C05 / g5 C15): a tripeptide now takes the substitutive PIN, the
+        assert result == "(2S)-2-[(2S)-2-(2-aminoacetamido)propanamido]-4-methylpentanoic acid"
 
     @pytest.mark.integration
     def test_asparagine_not_misrouted(self):

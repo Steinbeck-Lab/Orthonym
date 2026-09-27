@@ -115,10 +115,72 @@ CFR_DISPATCH_CANARY: "OrderedDict[StoutClass, Tuple[str, str]]" = OrderedDict([
 ])
 
 
+# Rows whose frozen value is NOT the PIN and whose PIN the engine does not build
+# yet. The expected value is the PIN, under a strict xfail naming the missing
+# producer, so the row turns red (XPASS) the day the PIN ships and the frozen
+# non-PIN can never be re-accepted. Keyed by StoutClass name (per-class test) or
+# fixture id (supplementary test).
+_PIN_NOT_BUILT = {
+    # Suite fix j4 (TRIAGE g3 C10a / g6 C20). Two benzene rings ortho-fused to a
+    # 10-membered alicyclic ring: (1) (the Blue Book) needs a
+    # mancude ring attached "at nonadjacent ring positions";
+    # (:23835-23841) "Mancude systems attached to adjacent atoms of an alicyclic
+    # ring are either fused systems or bridged fused systems [...] A cyclophane
+    # name is not allowed" (BB class example:23839 '5,6,7,8,9,10,11,12,13,14,15,
+    # 16-dodecahydrobenzo[14]annulene (PIN)'). The frozen '[3.3]orthocyclophane'
+    # is a general-nomenclature phane name; the phane producer now declines, the
+    # PIN tier abstains, the best-effort tier ships the OPSIN-exact von Baeyer
+    # name. PIN spelling ASSUMED (OPSIN full-InChIKey exact).
+    "CYCLOPHANE": (
+        "5,6,7,12,13,14-hexahydrodibenzo[a,f][10]annulene",
+        "needs the hydro fusion name for mancude rings ortho-fused to a large "
+        "alicyclic ring (P-52.2.5.2.1); PIN spelling ASSUMED; TODO "
+        ".planning/preexisting-triage/TRIAGE.md 'Suite fix -- j4-pin-labels-a'"),
+    # Suite fix j4 (TRIAGE g3 C10b). A glycerol diester ether:
+    # (:31836) "Method (1) generates preferred IUPAC names" (:31840 'propane-
+    # 1,2,3-triyl 1,2-diacetate 3-propanoate (PIN)'). The engine cites both
+    # esters as acyloxy prefixes on 'propane' (OPSIN-exact, label now below the
+    # PIN tier); the frozen value is not a parseable name. The method-(1) PIN is
+    # not parseable by OPSIN 2.9.0, spelling ASSUMED.
+    "test_canary_name_stability_228": (
+        "(2R)-3-(octadecyloxy)propane-1,2-diyl 2-[(9Z,12Z)-octadeca-9,12-"
+        "dienoate] 1-tetracosanoate",
+        "needs the P-65.6.3.3.3.2 method-(1) functional-class name for polyol "
+        "esters with different acids; PIN spelling ASSUMED (not OPSIN-parseable); "
+        "TODO .planning/preexisting-triage/TRIAGE.md 'Suite fix -- "
+        "j4-pin-labels-a'"),
+    # Suite fix j7 (TRIAGE g3 C05). Asn-Glu-Leu: the frozen 'L-asparaginyl-L-
+    # glutamyl-L-leucine' and the current 'asparaginylglutamylleucine' are both the
+    # Chapter peptide name, the Blue Book: 'L' is not
+    # indicated for Table 10.4 residues), which is not a PIN:50943;
+    # controller ruling: the PIN is the substitutive name, method (1)
+    #:32995). j7 builds the nested amido prefix for tripeptides, but the Asn-Glu
+    # acid fragment itself still fails (its raw name is a different molecule), so
+    # the retained name ships best_effort. PIN spelling ASSUMED; OPSIN 2.9.0 full
+    # InChIKey exact.
+    "test_canary_rt75_595": (
+        "(2S)-2-{(2S)-4-carboxy-2-[(2S)-2,4-diamino-4-oxobutanamido]butanamido}-"
+        "4-methylpentanoic acid",
+        "needs the substitutive name of the Asn-Glu acid fragment (the glutamyl "
+        "residue's carboxy side chain); PIN spelling ASSUMED; TODO "
+        ".planning/preexisting-triage/TRIAGE.md 'Suite fix -- j7-defects-misc'"),
+}
+
+
+def _pin_not_built_param(key, node_id, *values):
+    """pytest.param for a row: the PIN under a strict xfail when ``key`` is in
+    ``_PIN_NOT_BUILT`` (the expected value is the LAST of ``values``)."""
+    if key in _PIN_NOT_BUILT:
+        pin, reason = _PIN_NOT_BUILT[key]
+        return pytest.param(*values[:-1], pin, id=node_id,
+                            marks=pytest.mark.xfail(strict=True, reason=reason))
+    return pytest.param(*values, id=node_id)
+
+
 @pytest.mark.parametrize(
     "class_id,smiles,expected_name",
-    [(c, s, n) for c, (s, n) in CFR_DISPATCH_CANARY.items()],
-    ids=[c.name for c in CFR_DISPATCH_CANARY.keys()],
+    [_pin_not_built_param(c.name, c.name, c, s, n)
+     for c, (s, n) in CFR_DISPATCH_CANARY.items()],
 )
 def test_cfr_dispatch_byte_identical(class_id, smiles, expected_name):
     """internal notes-CFR.md: name(smi) byte-identical to cascade output.
@@ -152,6 +214,42 @@ SUPPLEMENTARY_CANARY: List[Tuple[str, str, str, str]] = [
 ][:15]
 
 
+# Frozen rows whose value names a DIFFERENT molecule (OPSIN: not the input)
+# and whose current name is the verified PIN. The CSV stays the frozen record
+# (tests/integration/test_orgm_byte_identical_v18_canary.py md5-pins it against
+# the post-CFR CSV); the expected value comes from here, with its evidence.
+_SUPPLEMENTARY_REBASELINE = {
+    # Suite fix j4 (TRIAGE g3 C10c). (the Blue Book): "the
+    # nesting order is as follows: {[({})]}";: the
+    # stereodescriptor's parentheses count. OPSIN 2.9.0: full InChIKey and
+    # canonical SMILES exact; the frozen value is another molecule.
+    "test_canary_name_stability_58": (
+        "4-[4-(4-{(2S,3R)-4-amino-3-methoxy-2-[4-(4-nitrobenzamido)benzamido]-"
+        "4-oxobutanamido}benzamido)-2-hydroxy-3-[(propan-2-yl)oxy]benzamido]-"
+        "3-ethoxybenzoic acid"),
+    # Suite fix j6 (TRIAGE g3 C17b). The frozen '(3R)-9-(1,3-dioxolan-5-yl)-3,7-
+    # dimethylnona-1,6-dien-3-ol' drops the four ring methyls (OPSIN: another
+    # molecule; '1,3-dioxolan-5-yl' also misnumbers the ring). The PIN tier had
+    # abstained: a decorated saturated chalcogen heteromonocycle had no stem.
+    # Hantzsch-Widman names are PINs for saturated rings,
+    # the Blue Book); heteroatoms lowest, then the free valence;
+    # the chain carries the -OH suffix,:18875). OPSIN 2.9.0: full
+    # InChIKey and canonical SMILES exact.
+    "test_canary_rt75_170": (
+        "(3R)-3,7-dimethyl-9-(2,2,5,5-tetramethyl-1,3-dioxolan-4-yl)nona-1,6-"
+        "dien-3-ol"),
+    # Suite fix j7 (TRIAGE g3 C05). Thr-Val-Lys: the peptide name (frozen with L-,
+    # current without,:54720) is not a PIN:50943; controller
+    # ruling); the tripeptide now takes the substitutive name, the nested amido
+    # prefix built from the substitutive name of its dipeptide acid fragment
+    # method (1),:32995). OPSIN 2.9.0: full InChIKey and canonical
+    # SMILES exact; labelled pin_verified.
+    "test_canary_rt75_680": (
+        "(2S)-6-amino-2-{(2S)-2-[(2S,3R)-2-amino-3-hydroxybutanamido]-3-methyl"
+        "butanamido}hexanoic acid"),
+}
+
+
 def _supplementary_id(row: Tuple[str, str, str, str]) -> str:
     """Pytest test ID from canary row (tier_fixture-id)."""
     return f"{row[0]}_{row[1]}"
@@ -159,8 +257,8 @@ def _supplementary_id(row: Tuple[str, str, str, str]) -> str:
 
 @pytest.mark.parametrize(
     "tier,fixture_id,smiles,expected_name",
-    SUPPLEMENTARY_CANARY,
-    ids=[_supplementary_id(r) for r in SUPPLEMENTARY_CANARY],
+    [_pin_not_built_param(r[1], _supplementary_id(r), *r)
+     for r in SUPPLEMENTARY_CANARY],
 )
 def test_cfr_supplementary_byte_identical(tier, fixture_id, smiles, expected_name):
     """Supplementary fixtures sampled from PRE_CANARY_ROWS for cross-class coverage.
@@ -185,6 +283,7 @@ def test_cfr_supplementary_byte_identical(tier, fixture_id, smiles, expected_nam
             f"frozen baseline recorded exception for fixture {fixture_id!r}; "
             f"CSV-diff layer (verify_cfr_byte_identical.py --mode post) covers it."
         )
+    expected_name = _SUPPLEMENTARY_REBASELINE.get(fixture_id, expected_name)
     result = name_compound(smiles, style="pin")
     assert result == expected_name, (
         f"CFR DISPATCH REGRESSION (tier={tier}, fixture_id={fixture_id}):\n"

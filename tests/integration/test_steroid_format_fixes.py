@@ -140,7 +140,12 @@ BENCHMARK_STEROIDS = [
     pytest.param(
         "C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C",
         "stigmast",
-        "(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24-dien-3-ol",
+        # j7: the C-24=C-28 bond takes the compound locant '24(28)' (1),
+        # the Blue Book; the old '...-7,24-dien-3-ol' read C-24=C-25 and OPSIN
+        # could not parse it), and with the stigmastane map fixed (C-11/C-12 were
+        # swapped) the alpha/beta form resolves:51053).
+        # OPSIN full-InChIKey exact.
+        "(24Z)-5α-stigmasta-7,24(28)-dien-3β-ol",
         "likely_success",
         id="compound_38_stigmast_dien_ol",
     ),

@@ -365,9 +365,16 @@ INORGANIC_ANIONS = {
     '[O-]Br(=O)=O': 'bromate',           # BrO3-
     '[O-]I(=O)(=O)=O': 'periodate',      # IO4-
     '[O-]I(=O)=O': 'iodate',             # IO3-
-    # Complex fluoride anions — the dominant onium-salt counter-ions.
-    '[B-](F)(F)(F)F': 'tetrafluoroborate',      # BF4-
-    'F[P-](F)(F)(F)(F)F': 'hexafluorophosphate', # PF6-
+    # Complex fluoride anions — the dominant onium-salt counter-ions. Named by
+    # "ANIONS FORMED BY ADDITION OF HYDRIDE IONS" (the Blue Book)
+    # method (1), the 'uide' suffix: "Method (1) leads to preferred IUPAC names."
+    # (:41097); '(CH3)4B- tetramethylboranuide (PIN)' (:41104), 'F6I- hexafluoro-
+    # λ5-iodanuide (preselected name)' (:41112). The additive words
+    # 'tetrafluoroborate'/'hexafluorophosphate' (general nomenclature) pre-empted
+    # the emitter at pin_verified (TRIAGE g7 C13). OPSIN 2.9.0 full-key
+    # exact for both, alone and in the onium salts.
+    '[B-](F)(F)(F)F': 'tetrafluoroboranuide',        # BF4-
+    'F[P-](F)(F)(F)(F)F': 'hexafluoro-λ5-phosphanuide',  # PF6-
 }
 
 

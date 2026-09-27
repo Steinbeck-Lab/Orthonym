@@ -109,10 +109,19 @@ def test_9_methylguanine_end_to_end():
 
 
 @pytest.mark.opsin_gate
-def test_9_methylhypoxanthine_end_to_end():
+@pytest.mark.parametrize("smi,expected", [
+    # 9-methylhypoxanthine: H on N-1
+    ("Cn1cnc2c1nc[nH]c2=O", "9-methyl-1,9-dihydro-6H-purin-6-one"),
+    # the N-3 tautomer: its indicated hydrogen at the ketone and hydro prefixes at
+    # the saturated positions, the Blue Book), so '3,9-dihydro'.
+    # This row used to expect the N-1 name: same standard InChIKey (mobile H), but
+    # OPSIN's structure for it is the N-1 tautomer (canonical SMILES differ), not
+    # the drawn one (TRIAGE j12 finding 5)
+    ("Cn1cnc2c1[nH]cnc2=O", "9-methyl-3,9-dihydro-6H-purin-6-one"),
+])
+def test_9_methylhypoxanthine_end_to_end(smi, expected):
     from orthonym import Orthonym
-    smi = "Cn1cnc2c1[nH]cnc2=O"
-    assert Orthonym().name(smi) == "9-methyl-1,9-dihydro-6H-purin-6-one"
+    assert Orthonym().name(smi) == expected
 
 
 @pytest.mark.opsin_gate

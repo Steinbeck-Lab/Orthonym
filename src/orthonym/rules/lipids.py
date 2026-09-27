@@ -211,7 +211,15 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
         for _aname in _ordered:
             _locs = sorted(_groups[_aname])
             _loc_str = ",".join(str(x) for x in _locs)
-            _parts.append(f"{_loc_str}-{_multiplied_acylate(_aname, len(_locs))}")
+            _word = _multiplied_acylate(_aname, len(_locs))
+            if len(_locs) == 1 and _aname.startswith("("):
+                # A single anion that carries its own stereodescriptor is enclosed
+                # after its locant, the mark escalating past the descriptor's
+                # parentheses: 'propane-1,2,3-triyl 2-acetate 1-hexadecanoate
+                # 3-[(9Z)-octadec-9-enoate] (PIN)',
+                # the Blue Book). Was '3-(11Z)-octadec-11-enoate' (TRIAGE g5 C12).
+                _word = apply_enclosing_marks(_aname, -1)
+            _parts.append(f"{_loc_str}-{_word}")
         suffix = " ".join(_parts)
     else:
         suffix = _multiplied_acylate(acylates[0], n_acyl)

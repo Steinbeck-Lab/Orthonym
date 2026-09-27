@@ -12,13 +12,21 @@ whichever round-trips (0-wrong by construction). Finding:
 internal notes.
 """
 import ast
+import os
 import subprocess
 import sys
+from pathlib import Path
+
 import pytest
 from rdkit import Chem
 from rdkit.Chem import inchi
 
-sys.path.insert(0, "/home/kohulan/OpenSTOUT/Orthonym/src")
+# The checkout under test, derived from this file (TRIAGE g6 C25): the path used to
+# be the main tree's, hard-coded, so a run from another checkout (a worktree, CI)
+# named with the main tree's src in the child and tested the wrong code.
+_REPO = Path(__file__).resolve().parents[3]
+_SRC = _REPO / "src"
+sys.path.insert(0, str(_SRC))
 from orthonym.jvm_flags import java_cmd  # noqa: E402
 from tests.support.jars import jar_or_skip
 
@@ -50,8 +58,10 @@ def _best_effort_name(smiles):
         "eng = Orthonym(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)\n"
         f"print(repr(eng.name({smiles!r})))\n"
     )
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join(
+        x for x in (str(_SRC), os.environ.get("PYTHONPATH", "")) if x))
     p = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
-                       cwd="/home/kohulan/OpenSTOUT/Orthonym")
+                       cwd=str(_REPO), env=env)
     out = p.stdout.strip().splitlines()
     # the child prints repr of the name string; ast.literal_eval parses that
     # string literal safely (never eval on subprocess output).

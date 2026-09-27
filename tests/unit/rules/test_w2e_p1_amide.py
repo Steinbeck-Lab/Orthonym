@@ -77,11 +77,37 @@ class TestT5Biguanide:
         assert name_compound("NC(=N)NC(=N)N") == "imidodicarbonimidic diamide"
 
     def test_substituted_keeps_rt_valid_general_name(self):
-        # Substituted condensed guanidines await the N^n superscript
-        # subsystem (Task 12 investigation). Until then the RT-valid
-        # general name must NOT regress to unknown.
+        # The Blue Book's own row for this molecule (the Blue Book):
+        # 'H2N-C(=NH)-NH-C(=N-CH2-CH3)-N(C6H5)2 N'1-ethyl-N1,N1-diphenyl
+        # imidodicarbonimidic diamide (PIN)'; (:34298) "The names
+        # biguanide, triguanide, etc., are no longer recommended." The
+        # substituted diamide is built now (composer._condensed_guanidine_name);
+        # it used to ship the guanidine-form general name at pin_verified
+        # (TRIAGE g8 C20). OPSIN 2.9.0 full-InChIKey and canonical SMILES EXACT.
         assert name_compound("CCN=C(NC(N)=N)N(c1ccccc1)c1ccccc1") == \
-            "N-carbamimidoyl-N''-ethyl-N',N'-diphenylguanidine"
+            "N'1-ethyl-N1,N1-diphenylimidodicarbonimidic diamide"
+
+    @pytest.mark.parametrize("smiles,expected", [
+        ("CNC(=N)NC(=N)N", "N1-methylimidodicarbonimidic diamide"),
+        ("CN(C)C(=N)NC(=N)N", "N1,N1-dimethylimidodicarbonimidic diamide"),
+        ("N=C(N)NC(=N)Nc1ccc(Cl)cc1",
+         "N1-(4-chlorophenyl)imidodicarbonimidic diamide"),
+    ])
+    def test_substituted_condensed_guanidine_pin(self, smiles, expected):
+        # Same shape and locants as the BB row above (amino N of C-1 = N1).
+        assert name_compound(smiles) == expected
+
+    @pytest.mark.opsin_gate
+    def test_central_n_substituted_stays_below_pin_tier(self):
+        # A substituent on the central imido N is not built (its locant is not
+        # shown in the BB): the guanidine-form name ships RT-exact, below
+        # pin_verified,:34298).
+        from orthonym import Orthonym
+        from tests.support.rt_assert import name_is_rt_exact
+        smi = "NC(=N)N(C)C(=N)N"
+        r = Orthonym().name_tiered(smi)
+        assert r["tier"] != "pin_verified", r
+        assert name_is_rt_exact(r["name"], smi), r
 
     def test_protect_plain_guanidine(self):
         assert name_compound("NC(=N)N") == "guanidine"

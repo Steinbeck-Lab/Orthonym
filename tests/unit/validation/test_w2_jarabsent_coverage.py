@@ -132,12 +132,16 @@ def test_captopril_surviving_name_is_atom_complete_jar_absent(monkeypatch):
     ring-only atom-drop necessarily lacks it.
 
     NB (documented F1 residual -- see JAR-ABSENT-DEFAULT-TIER-FINDING.md): the
-    surviving name here is ``N-2-methyl-3-sulfanylpropanoylproline``, which is
-    atom-COMPLETE but OPSIN-UNPARSEABLE as written (its acyl substituent lacks
-    enclosing marks; the parenthesised ``N-(2-methyl-3-sulfanylpropanoyl)proline``
-    parses to the full captopril skeleton). Jar-PRESENT the OPSIN gate rejects the
-    malformed spelling and captopril abstains -- so an OPSIN round-trip cannot
-    serve as the atom-completeness oracle here; the drop-witness sulfur can.
+    surviving name here was ``N-2-methyl-3-sulfanylpropanoylproline``, atom-COMPLETE
+    but OPSIN-UNPARSEABLE as written (its acyl substituent lacked enclosing marks).
+    Since decision A part 1 (2026-09-26) the engine's N-acyl float adds them
+    , the Blue Book) and the name is
+    ``N-(2-methyl-3-sulfanylpropanoyl)proline``, which parses to the captopril
+    skeleton but reads 'proline' as L while CAPTOPRIL here is stereo-free. Since
+    decision A part 2 (2026-09-27) the heterocycle producer names the ring-N acyl
+    as an acyl prefix under the ring carboxylic acid, and the name (jar-absent and
+    jar-present alike) is ``1-(2-methyl-3-sulfanylpropanoyl)pyrrolidine-2-carboxylic
+    acid``. The spelling is not pinned here; the drop-witness sulfur still is.
     """
     _force_jar_absent(monkeypatch)
     from orthonym import Orthonym

@@ -932,8 +932,9 @@ def _validity_gate_status(name: str) -> str:
     Returns ``"parsed"`` | ``"rejected"`` | ``"unavailable"``. Delegates to
     ``OpsinOracle.parse_status`` via a module-level singleton so the parse cache
     is shared process-wide. ``"unavailable"`` (subprocess timeout / OSError /
-    no-JAR) MUST be treated as fail-OPEN by the caller — a transient OPSIN
-    failure must never suppress a valid name. Monkeypatched in tests.
+    no-JAR) is not a rejection, but it verifies nothing: the gate fails CLOSED on
+    it (TRIAGE g7 C01), after the oracle's own retry ladder. Monkeypatched in
+    tests.
     """
     global _VALIDITY_ORACLE
     if _VALIDITY_ORACLE is None:
@@ -953,6 +954,19 @@ def _validity_gate_name_to_smiles(name: str) -> Optional[str]:
         from .validation.opsin_roundtrip import _find_opsin_jar
         _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
     return _VALIDITY_ORACLE.name_to_smiles(name)
+
+
+def _same_canonical_smiles(smiles_a: str, smiles_b: str) -> bool:
+    """True iff both SMILES parse and have the same RDKit canonical isomeric SMILES
+    (the same molecular graph). False when either does not parse."""
+    try:
+        ma = Chem.MolFromSmiles(smiles_a)
+        mb = Chem.MolFromSmiles(smiles_b)
+        if ma is None or mb is None:
+            return False
+        return Chem.MolToSmiles(ma) == Chem.MolToSmiles(mb)
+    except Exception:
+        return False
 
 
 def _self_consistency_skeleton(smiles: str) -> Optional[str]:
@@ -1315,6 +1329,40 @@ def _has_no_pin_status_element(smiles: str) -> bool:
         a.GetAtomicNum() in _NO_PIN_STATUS_ELEMENTS for a in mol.GetAtoms())
 
 
+# "Ocenes" (the Blue Book): the ocene parents are named
+# substitutively and carry PINs ('2-(osmocen-1-yl)ethanol (PIN)',:40135).
+_OCENE_STEMS = ('ferrocen', 'ruthenocen', 'osmocen', 'nickelocen', 'chromocen',
+                'cobaltocen', 'vanadocen')
+
+
+def _is_p69_organometallic_without_pin(smiles: str, name: Optional[str]) -> bool:
+    """True iff the structure is an organometallic compound of a Group 1-12 metal
+    (or a lanthanide/actinide), whose names the Blue Book gives without PIN status.
+
+     INTRODUCTION (the Blue Book): "Preferred IUPAC names are indicated
+    for organometallic compounds named substitutively for the metals in Groups 14-
+    16. However, neither preferred IUPAC names or preselected names (see
+    for organometallic compounds involving the transition elements (including the
+    Group 3 elements) and Groups 1 and 2 elements, except for 'ocene' compounds,
+    are noted." (:40157) accordingly gives 'methyllithium',
+    'methylmagnesium iodide' with no '(PIN)'. "Organometallic" is structural,
+     (:39721): "at least one bond between one metal atom and one carbon
+    atom" -- ``perception.metals.has_covalent_metal_carbon_bond`` (true metals
+    only; the Group 13-16 metalloids have their own names, and a salt of an
+    organic ion has no metal-carbon bond). An ocene name keeps its PIN status.
+    Label only: the name is unchanged."""
+    if not smiles:
+        return False
+    if name and any(stem in name for stem in _OCENE_STEMS):
+        return False
+    try:
+        from .perception.metals import has_covalent_metal_carbon_bond
+        mol = Chem.MolFromSmiles(smiles)
+        return mol is not None and has_covalent_metal_carbon_bond(mol)
+    except Exception:
+        return False
+
+
 def _specified_stereo_count(mol) -> int:
     """Count of EXPLICITLY-specified stereo features (assigned chiral centres +
     directional double bonds). Used to tell a stereo CONFLICT (same count, different
@@ -1385,6 +1433,15 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     ka = _self_consistency_full_key(input_smiles)
     kb = _self_consistency_full_key(opsin_smiles)
     if ka is not None and kb is not None and ka == kb:
+        return "ok"
+    if ka is None and kb is None and _same_canonical_smiles(input_smiles, opsin_smiles):
+        # Neither side has a standard InChIKey -- RDKit generates none above ~1000
+        # heavy atoms (C1001 has one, C1024 has none) -- so both keys below are None
+        # and the verdict used to be "inconclusive", shipped unverified at the
+        # pin_verified label. Equal canonical isomeric SMILES are the same molecular
+        # graph (element, charge, isotope, H count, stereo), so this is an identity,
+        # not an approximation. Unequal SMILES stay "inconclusive" as before.
+        # (TRIAGE j3-long-alkanes: 'hectakiliane' for C1100.)
         return "ok"
     a = _self_consistency_skeleton(input_smiles)
     b = _self_consistency_skeleton(opsin_smiles)
@@ -1532,6 +1589,65 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     return _suppressed_to
 
 
+def _grammar_gap_carveout(name: str) -> Optional[str]:
+    """The carve-out slug of a construction-verified name whose CLASS OPSIN 2.9.0
+    has no grammar for at all, or None.
+
+    For these classes a healthy OPSIN call can only answer 'rejected' (each
+    docstring above records the verification: no thioperoxol suffix family, no
+    inositol or Table 10.1 stereoparent name, no 'di'-collapsed or chalcogen
+    anhydride class word, no multi-anion functional-class ester, no phane grammar,
+    no substituted halogen-uide), so the name ships on its construction alone and
+    OPSIN's answer adds nothing. The validity gate therefore consults this both
+    after a 'rejected' answer and on 'unavailable': the output of these classes does
+    not depend on whether OPSIN could be reached (TRIAGE j12 finding 1).
+
+    NOT here: the organometallic additive carve-out (OPSIN parses some '-ido'
+    ligand names, and the class has a known atom-drop hole, so a healthy run's
+     on a parsed name is a real check), the stereo-layer carve-out (its
+    licence is a parse of the stereo-stripped form) and the polyacid carve-out
+    (reached only after a parse)."""
+    if "thioperoxol" in name and not re.search(r"[A-Za-z](SO|OS)-thioperoxol", name):
+        return "thioperoxol"
+    try:
+        from .rules.inositols import INOSITOL_NAMES
+        if name in INOSITOL_NAMES:
+            return "inositol"
+    except Exception:
+        pass
+    try:
+        from .data.natural_products import NAME_EXACT_NP_PARENTS
+        if name in NAME_EXACT_NP_PARENTS:
+            return "np_stereoparent"
+    except Exception:
+        pass
+    if _DIANHYDRIDE_PIN_RE.match(name):
+        return "dianhydride"
+    if _CHALCOGEN_DIANHYDRIDE_PIN_RE.match(name):
+        return "chalcogen_dianhydride"
+    if _POLYOL_POLYESTER_PIN_RE.match(name):
+        return "polyol_polyester"
+    if _PHANE_PIN_RE.match(name):
+        return "phane"
+    if _HALOGEN_UIDE_PIN_RE.match(name):
+        return "halogen_uide"
+    return None
+
+
+def _ship_grammar_gap_carveout(name: str, slug: str) -> str:
+    """Record the carve-out outcome of ``slug`` and return ``name`` unchanged."""
+    from .metrics import provenance as _pv
+    _record_gate_outcome(_pv.carveout_outcome(slug), name)
+    if slug == "np_stereoparent":
+        # Shipped by design (controller ruling 2026-09-25, data/natural_products
+        #.get_natural_product_name), but OPSIN cannot parse it, so it is not
+        # verified, and (the Blue Book) identifies no PIN for these
+        # parents: the name must not be LABELLED pin_verified. Name-scoped record;
+        # the name itself is unchanged.
+        _pv.record_non_pin_fragment(name)
+    return name
+
+
 def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                                stats: Optional[Dict[str, int]] = None,
                                *, besteffort_unverified: bool = False,
@@ -1606,19 +1722,18 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return _suppressed_to
         _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
         return name
-    # (code review 2026-06-02): suppress ONLY on a DEFINITIVE OPSIN
-    # rejection. 'parsed' ships as-is; 'unavailable' (subprocess timeout / OSError
-    # mid-run on a loaded host) fails OPEN — a transient OPSIN failure must never
-    # turn a valid, round-trip-passing name into a descriptive fallback. The old
-    # `parse-or-None` check conflated 'rejected' with 'unavailable', breaking the
-    # phase's "0-regression by construction" guarantee.
+    # (code review 2026-06-02): 'rejected' and 'unavailable' are different
+    # facts. The old `parse-or-None` check conflated them. 'unavailable'
+    # (subprocess timeout / OSError / JVM crash mid-run on a loaded host) is no
+    # verdict at all; it used to fail OPEN and now fails CLOSED (TRIAGE g7 C01,
+    # below), after OpsinOracle._one_shot has retried it with a longer budget.
     #
     # (a phase): re-perceive the name via OPSIN. A non-None canonical
     # SMILES means OPSIN PARSED it -> run the constitutional self-consistency check
     # (suppress if the name encodes a DIFFERENT molecule). None means rejected or
-    # unavailable; only then consult parse_status to distinguish them (fail-OPEN on
-    # unavailable). Using name_to_smiles as the primary probe also avoids a second
-    # OPSIN subprocess on the common parsed path.
+    # unavailable; only then consult parse_status to distinguish them. Using
+    # name_to_smiles as the primary probe also avoids a second OPSIN subprocess on
+    # the common parsed path.
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is not None:
         # BE-STRICT full-RT (2026-08-30, user-directed): at the general-fallback
@@ -1684,19 +1799,57 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             return name
         # _self_consistency_decision records its own outcome (one per verdict).
         return _self_consistency_decision(name, smiles, opsin_smiles, stats)
-    # opsin_smiles is None -> either OPSIN was UNAVAILABLE (transient: no jar /
-    # timeout / OSError), OR OPSIN PARSED the name but emitted a SMILES that RDKit
-    # cannot canonicalise (an impossible valence — e.g. the lambda6 candidate
-    # '1,2lambda6,3-dioxathiolane' produced for a lambda6-multiring-spiro that the
-    # spiro engine fail-closes). ONLY 'unavailable' fails OPEN (a transient hiccup
-    # must never suppress a valid, round-trip-passing name —). A
+    # opsin_smiles is None -> either OPSIN was UNAVAILABLE (transient: timeout /
+    # OSError / JVM crash, the jar being present), OR OPSIN PARSED the name but
+    # emitted a SMILES that RDKit cannot canonicalise (an impossible valence — e.g.
+    # the lambda6 candidate '1,2lambda6,3-dioxathiolane' produced for a
+    # lambda6-multiring-spiro that the spiro engine fail-closes). A
     # 'parsed'-but-uncanonicalisable output is UNVERIFIABLE: we cannot confirm the
     # name describes the input structure, so it must fall through to the whitelist
     # carve-outs below and, absent a whitelist hit, suppress to the honest fallback
     # (fail-closed, accuracy #1). Conflating the two here shipped the wrong name.
+    #
+    # 'unavailable' fails CLOSED too (TRIAGE g7 C01, 2026-09-27; it used to fail
+    # OPEN,). It is not evidence against the name, but it is no evidence FOR
+    # it either, and 0-wrong is absolute: every emission verified, else abstain.
+    # Measured in a fresh process with both probes stubbed 'unavailable' (the state
+    # an OPSIN timeout on a loaded host leaves): the quinoxaline-quinoline
+    # c1ccc2nc3ccc4ncccc4c3nc2c1 shipped as 'benzene', the bromo-indolyl imidazolyl
+    # methanone lost its Br, the thiourea w18 lost its thioxo -- each a different
+    # molecule at the pin_unverified label. 's worry (a valid name lost to a
+    # hiccup) is met where it arises: OpsinOracle._one_shot retries a failed
+    # OPSIN call with a longer budget before it reports 'unavailable'. The
+    # carve-outs whose licence needs an OPSIN observation are NOT consulted: the
+    # stereo-layer carve-out needs a parse of the stripped form, and the
+    # organometallic additive one a 'rejected' (OPSIN parses some of its names,
+    # so is a real check there). The grammar-gap classes ARE consulted
+    # (TRIAGE j12 finding 1): OPSIN has no grammar for them, a healthy call can
+    # only reject them, and they ship on their construction alone, so the gate's
+    # verdict on them must not depend on whether OPSIN was reachable
+    # (_grammar_gap_carveout). The same tier rule applies as after a 'rejected'
+    # answer: at the general-fallback tiers only the exact NP stereoparents ship.
+    # A producer that assembles such a name from fragment names the gate must
+    # verify (the glyceride polyester reads 'acetic acid' / 'propanoic acid'
+    # through this gate) still cannot build it while OPSIN is unreachable: that
+    # dependence is the fragments', and they fail closed like any other name.
+    # The jar-ABSENT reduced mode (, above) is a separate, opt-in
+    # configuration and keeps its own policy.
     if _validity_gate_status(name) == "unavailable":
-        _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
-        return name  # transient -> fail-OPEN (never suppress)
+        _gap_slug = _grammar_gap_carveout(name)
+        if _gap_slug is not None and (not general_fallback_tier
+                                      or _gap_slug == "np_stereoparent"):
+            return _ship_grammar_gap_carveout(name, _gap_slug)
+        if stats is not None:
+            stats["opsin_unavailable_suppressed"] = (
+                stats.get("opsin_unavailable_suppressed", 0) + 1)
+        logger.warning("OPSIN validity gate: OPSIN unavailable, suppressed "
+                       "unverified name: %r", name[:60])
+        from .metrics.abstention import AbstentionCode, record_suppression
+        record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                           detail='opsin_unavailable', candidate=name)
+        _suppressed_to = _descriptive_fallback(smiles)
+        _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+        return _suppressed_to
     # BE-STRICT (2026-08-30, user-directed): at the general-fallback tiers
     # (best-effort / complete — ``general_fallback_tier`` True), the contract is
     # an OPSIN-ROUND-TRIP-VERIFIED name, so an OPSIN-DEFINITIVELY-REJECTED name
@@ -1754,97 +1907,46 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
             return _suppressed_to
         # else: fall through to the np_stereoparent carve-out (ships the retained PIN).
-    # DD2 / OPSIN-validity grammar carve-out (Phase D): OPSIN's generation grammar does not recognise the
+    # The grammar-gap carve-outs (TRIAGE j12 finding 1 put them in one helper, used
+    # here and on 'unavailable' above), in their historical order:
+    # - DD2 / Phase D thioperoxol: OPSIN's generation grammar does not recognise the
     # chalcogen-peroxol suffix family ('-SO-thioperoxol', '-OS-thioperoxol',
     # '-dithioperoxol'), so it REJECTS these correct PINs verbatim:
-    # `CH3-S-OH -> methane-SO-thioperoxol (PIN)`). Like the stereo-grammar carve-out
-    # below, an OPSIN coverage gap on a valid IUPAC suffix must not gate Orthonym
-    # correctness — gold is name-exact-match, not RT. guard: only un-suppress a
-    # WELL-FORMED thioperoxol name. The italic 'SO-'/'OS-' descriptor must be
-    # separator-led (hyphen/paren); a multiplied form glued straight onto the
-    # descriptor ('ethane-1,2-bisSO-thioperoxol') is a real formatting defect and
-    # stays suppressed to the honest fallback rather than shipping malformed.
-    if "thioperoxol" in name and not re.search(r"[A-Za-z](SO|OS)-thioperoxol", name):
-        _record_gate_outcome(_pv.carveout_outcome("thioperoxol"), name)
-        return name
-    # a phase follow-on: the inositol retained names
-    # (myo-/scyllo-/cis-/epi-/neo-/allo-/muco-/D-chiro-/L-chiro-inositol) are the
-    # PIN but are OPSIN-UNPARSEABLE (no generation-grammar support — verified
-    # name_to_smiles -> None for every one), exactly the thioperoxol situation
-    # above. They are produced ONLY by the hard-gated InChIKey recogniser
-    # (rules.inositols.name_inositol) — correct by construction — and validated
-    # name-exact, so OPSIN's coverage gap must not suppress them.
-    try:
-        from .rules.inositols import INOSITOL_NAMES
-        if name in INOSITOL_NAMES:
-            _record_gate_outcome(_pv.carveout_outcome("inositol"), name)
-            return name
-    except Exception:
-        pass
-    # a phase a/c): the terpene/alkaloid stereoparent
-    # retained names (abietane/kaurane/.../yohimban/sparteine/...) are the recommended
-    # semisystematic parent names but are OPSIN-UNPARSEABLE (verified name_to_smiles ->
-    # None for each), exactly the inositol/thioperoxol situation. They are produced ONLY
-    # by the exact-canonical-SMILES NATURAL_PRODUCT_DERIVATIVES lookup (correct by
-    # construction; structures ChEBI/Wikidata cross-verified), validated name-exact, so
-    # OPSIN's coverage gap must not suppress them.
-    try:
-        from .data.natural_products import NAME_EXACT_NP_PARENTS
-        if name in NAME_EXACT_NP_PARENTS:
-            _record_gate_outcome(_pv.carveout_outcome("np_stereoparent"), name)
-            # Shipped by design (controller ruling 2026-09-25, data/natural_products
-            #.get_natural_product_name), but OPSIN cannot parse it, so it is not
-            # verified, and (the Blue Book) identifies no PIN for these
-            # parents: the name must not be LABELLED pin_verified. Name-scoped record;
-            # the name itself is unchanged.
-            _pv.record_non_pin_fragment(name)
-            return name
-    except Exception:
-        pass
-    # W3-P06: di-/polyanhydride PINs ('diacetic butanedioic
-    # dianhydride') are correct-by-construction (emitted ONLY by the hard-gated
-    # rules.anhydrides._name_dianhydride) but OPSIN's anhydride word-rule cannot
-    # parse the 'di-'-COLLAPSED acid words ("Unexpected number of words in
-    # anhydride" — it accepts only the un-collapsed 'acetic butanedioic
-    # dianhydride', which round-trips to the same structure). Exactly the
-    # thioperoxol/inositol OPSIN generation-grammar gap. The regex guard keeps the
-    # carve-out tight: >=2 acid-like words followed by a multiplied '...anhydride'.
-    if _DIANHYDRIDE_PIN_RE.match(name):
-        _record_gate_outcome(_pv.carveout_outcome("dianhydride"), name)
-        return name
-    # W8-P4: chalcogen di-/poly-anhydride PIN carve-out — see
-    # _CHALCOGEN_DIANHYDRIDE_PIN_RE docstring above.
-    if _CHALCOGEN_DIANHYDRIDE_PIN_RE.match(name):
-        _record_gate_outcome(
-            _pv.carveout_outcome("chalcogen_dianhydride"), name)
-        return name
-    # W3-P07 method (1)): functional-class polyol polyester PIN
-    # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate') — correct-by-construction
-    # from _assemble_glyceride but OPSIN cannot parse the multi-anion syntax
-    # (exactly the inositol/dianhydride generation-grammar gap).
-    if _POLYOL_POLYESTER_PIN_RE.match(name):
-        _record_gate_outcome(_pv.carveout_outcome("polyol_polyester"), name)
-        return name
+    # `CH3-S-OH -> methane-SO-thioperoxol (PIN)`). guard: only a WELL-FORMED
+    # thioperoxol name; the italic 'SO-'/'OS-' descriptor must be separator-led
+    # (a multiplied form glued onto the descriptor, 'ethane-1,2-bisSO-thioperoxol',
+    # is a real formatting defect and stays suppressed).
+    # - a phase inositol retained names, OPSIN-UNPARSEABLE (verified
+    # name_to_smiles -> None for every one), produced ONLY by the hard-gated
+    # InChIKey recogniser (rules.inositols.name_inositol).
+    # - a phase a/c) terpene/alkaloid stereoparents,
+    # OPSIN-UNPARSEABLE, produced ONLY by the exact-canonical-SMILES
+    # NATURAL_PRODUCT_DERIVATIVES lookup; recorded non-PIN:50943).
+    # - W3-P06 di-/polyanhydride PINs: OPSIN's anhydride word-rule
+    # cannot parse the 'di-'-COLLAPSED acid words ("Unexpected number of words in
+    # anhydride"); emitted ONLY by the hard-gated rules.anhydrides._name_dianhydride.
+    # - W8-P4 chalcogen di-/poly-anhydride PINs (see the regex).
+    # - W3-P07 method (1)) functional-class polyol polyester PIN
+    # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate') from _assemble_glyceride;
+    # OPSIN cannot parse the multi-anion syntax.
+    # - W8-P8 Task 8.12 /.3) phane PINs from the hard-gated
+    # rules.phane.build_phane_pin (formula-conservation-vetoed); OPSIN has no phane
+    # grammar at all.
+    # - W8-P5 Task 2 / substituted halogen-uide PINs
+    # ('diphenyliodanuide') from the hard-gated rules.ions._emit_group13_uide
+    # halogen branch (atom-conservation-vetoed).
+    _gap_slug = _grammar_gap_carveout(name)
+    if _gap_slug is not None:
+        return _ship_grammar_gap_carveout(name, _gap_slug)
     # W8-P9 Task 9.1 /.4/.6): additive/coordination organometallic
-    # PIN carve-out — see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above.
+    # PIN carve-out -- see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above. Not a
+    # grammar-gap class (OPSIN parses some of its names), so it is reached only
+    # after a 'rejected' answer. It is mutually exclusive with the phane and
+    # halogen-uide patterns (different endings), so checking it after them keeps
+    # every outcome.
     if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name):
         _record_gate_outcome(
             _pv.carveout_outcome("organometallic_additive"), name)
-        return name
-    # W8-P8 Task 8.12 /.3): phane simplified-skeletal PIN carve-out —
-    # see _PHANE_PIN_RE docstring above. Emitted ONLY by the hard-gated
-    # rules.phane.build_phane_pin (formula-conservation-vetoed), so OPSIN's
-    # total lack of phane grammar must not suppress it.
-    if _PHANE_PIN_RE.match(name):
-        _record_gate_outcome(_pv.carveout_outcome("phane"), name)
-        return name
-    # W8-P5 Task 2 /: substituted halogen-uide PIN carve-out
-    # ('diphenyliodanuide') — see _HALOGEN_UIDE_PIN_RE docstring above.
-    # Emitted ONLY by the hard-gated rules.ions._emit_group13_uide halogen
-    # branch (atom-conservation-vetoed), so OPSIN's substituted-uide grammar
-    # limitation must not suppress it.
-    if _HALOGEN_UIDE_PIN_RE.match(name):
-        _record_gate_outcome(_pv.carveout_outcome("halogen_uide"), name)
         return name
     # OPSIN-validity stereo carve-out / (a phase): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
@@ -1880,21 +1982,28 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         # -FOLLOWUP: _validity_gate_status is THREE-valued, and the stripped
         # probe is a second, independent OPSIN consultation that can hiccup on its
         # own. 'unavailable' (subprocess timeout / OSError on a loaded host) means
-        # OPSIN was never consulted — it is NOT evidence against the name — so it
-        # must fail OPEN, exactly as the primary probe already does at above.
-        # Testing `== "parsed"` alone lumped it with 'rejected' and let a transient
-        # hiccup suppress the very names this carve-out exists to rescue (the
-        # verbatim BB PIN `(1s,4s)-cyclohexane-1,4-diol` -> `unknown`), contradicting
-        # the promise made three paragraphs up. Note this is NOT a blanket escape
-        # hatch: a PERSISTENTLY unavailable OPSIN (JAR genuinely missing) is already
-        # caught by the _validity_gate_jar_present probe above, which fails the
-        # whole gate open — so the two behaviours agree rather than compete.
+        # OPSIN was never consulted: no evidence against the name, and none for its
+        # CONSTITUTION either -- which is the one thing this carve-out must verify
+        # (: it was never a licence to ship an unverified constitution). So it
+        # fails CLOSED, exactly as the primary probe does (TRIAGE g7 C01,
+        # 2026-09-27; it used to ship the name here with nothing checked).
+        # OpsinOracle._one_shot's retry ladder keeps a slow OPSIN from costing the
+        # names this carve-out exists to rescue (the verbatim BB PIN
+        # `(1s,4s)-cyclohexane-1,4-diol`). A jar that is genuinely missing is the
+        # _validity_gate_jar_present reduced mode above, not this branch.
         if _stripped_status == "unavailable":
             if stats is not None:
                 stats["gate_stereo_unavailable"] = (
                     stats.get("gate_stereo_unavailable", 0) + 1)
-            _record_gate_outcome(_pv.GATE_OUTCOME_UNAVAILABLE, name)
-            return name  # transient -> fail-OPEN, with the stereo layer intact
+            logger.warning("OPSIN validity gate: OPSIN unavailable for the "
+                           "stereo-stripped probe, suppressed: %r", name[:60])
+            from .metrics.abstention import AbstentionCode, record_suppression
+            record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                               detail='opsin_unavailable_stereo_probe',
+                               candidate=name)
+            _suppressed_to = _descriptive_fallback(smiles)
+            _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+            return _suppressed_to
         # 'rejected' is unchanged: a stripped form OPSIN DEFINITIVELY rejects is a
         # genuine constitutional defect and falls through to the fallback below.
         if _stripped_status == "parsed":
@@ -1932,8 +2041,8 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             # 'parsed' but NO usable SMILES: OPSIN accepted the stripped name and
             # then emitted a structure RDKit cannot canonicalise (an impossible
             # valence) — the identical situation the non-stereo path already settled
-            # above, where only 'unavailable' fails OPEN and
-            # 'parsed'-but-uncanonicalisable is UNVERIFIABLE and suppressed. It is
+            # above, where 'parsed'-but-uncanonicalisable is UNVERIFIABLE and
+            # suppressed. It is
             # not merely an unmade measurement: it is positive evidence that the name
             # denotes a structure RDKit rejects as impossible. A stereo layer must
             # not lower the burden of proof, so fall through to the honest fallback
@@ -3415,7 +3524,20 @@ class Orthonym:
             is_top_level_naming,
             start_naming_session,
         )
+        # An unparseable SMILES raises ValueError (the documented contract,
+        # "Raises: ValueError: If SMILES is invalid"), checked BEFORE the session
+        # opens and before the producer try below. That try's catch-all exists so
+        # a VALID input never crashes (Phase1 B5); it turned _name_impl's own
+        # "Invalid SMILES" ValueError into the descriptive fallback 'unknown', and
+        # the CLI's --dump-tree then exited 0 on garbage. Top level only: a
+        # recursive fragment call keeps its fail-soft return. The empty string
+        # parses to an empty molecule and keeps its 'unknown'.
+        if smiles and is_top_level_naming() and Chem.MolFromSmiles(smiles) is None:
+            raise ValueError(f"Invalid SMILES: {smiles}")
         start_naming_session()
+        # (ContextVar, Token) pairs THIS frame publishes below; every exit resets
+        # them LIFO via _reset_published_ctx (a frame-local list, see there).
+        _ctx_tokens: list = []
         # Wave2 (cross-molecule stereo-contamination fix): the confidence /
         # candidate-pool / parent-correctness thread-locals are PER-MOLECULE, but
         # they persist across name calls (documented at the post-dispatch gate
@@ -3520,10 +3642,10 @@ class Orthonym:
             # reset in the finally below.
             try:
                 from .metrics.provenance import general_fallback_ctx
-                self._gf_ctx_token = general_fallback_ctx.set(
-                    self._general_fallback)
+                _ctx_tokens.append((general_fallback_ctx, general_fallback_ctx.set(
+                    self._general_fallback)))
             except Exception:
-                self._gf_ctx_token = None
+                pass
             #: publish the BEST-EFFORT discriminator for the same reason and
             # with the same lifetime -- read by
             # `composer._integrate_universal_prefixes` to pick the substituent
@@ -3531,10 +3653,10 @@ class Orthonym:
             # callers are tier-unaware PIN handlers.
             try:
                 from .metrics.provenance import best_effort_ctx
-                self._be_ctx_token = best_effort_ctx.set(
-                    self._general_fallback_unverified)
+                _ctx_tokens.append((best_effort_ctx, best_effort_ctx.set(
+                    self._general_fallback_unverified)))
             except Exception:
-                self._be_ctx_token = None
+                pass
             #: publish allow_aromatic_general with the same lifetime so
             # the recursive re-entry (name_compound builds a FRESH namer) gives a
             # recursively named fragment the SAME tier the top-level call ran at.
@@ -3542,79 +3664,88 @@ class Orthonym:
             # on recursion. Top-level only; reset in the finally below.
             try:
                 from .metrics.provenance import allow_aromatic_general_ctx
-                self._aag_ctx_token = allow_aromatic_general_ctx.set(
-                    self._allow_aromatic_general)
+                _ctx_tokens.append((allow_aromatic_general_ctx, allow_aromatic_general_ctx.set(
+                    self._allow_aromatic_general)))
             except Exception:
-                self._aag_ctx_token = None
+                pass
             #: publish the full-coverage opt-in with the same lifetime
             # so the recursive re-entry (name_compound builds a FRESH namer)
             # inherits it. Top-level only; reset in the finally below. Default
             # False keeps D2 unreachable and every tier byte-identical.
             try:
                 from .metrics.provenance import full_coverage_ctx
-                self._fc_ctx_token = full_coverage_ctx.set(
-                    self._full_coverage)
+                _ctx_tokens.append((full_coverage_ctx, full_coverage_ctx.set(
+                    self._full_coverage)))
             except Exception:
-                self._fc_ctx_token = None
-        # --- Wave-2 P2: isotopic substitution decorator / ---
-        # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
-        # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
-        # fail-closed decorator BEFORE _name_impl strips the label. Clean
-        # pass-through when the mol carries no isotope (has_isotopes gate) —
-        # zero cost + byte-identical on the entire unlabeled corpus.
-        if is_top_level_naming():
-            _iso_probe = Chem.MolFromSmiles(smiles)
-            if _iso_probe is not None:
-                from .rules.isotopes import decorate_isotopic_name, has_isotopes
-                if has_isotopes(_iso_probe):
-                    _iso_name = decorate_isotopic_name(smiles, self.style, self)
-                    if _iso_name is not None:
-                        # (fix wave 1): every exit of name goes
-                        # through _finish. This one lives OUTSIDE the
-                        # try/finally below, so it owns its own session
-                        # teardown -- try/finally keeps the ordering
-                        # identical to the hooked exits (proof asserted
-                        # while the session is still live, session ended
-                        # before the value is handed back).
-                        try:
+                pass
+        # Prelude guard (TRIAGE C2, 2026-09-27): an exit BEFORE the main try below --
+        # the isotope decorator's two returns, or an exception anywhere in this
+        # prelude -- tears down exactly what the main finally tears down: the four
+        # ctx tokens published above and the naming session. The isotope exits used
+        # to end only the session, so one best-effort naming of an isotope-labelled
+        # molecule left general_fallback_ctx / best_effort_ctx /
+        # allow_aromatic_general_ctx True for every LATER naming in the process, and
+        # a default PIN call then shipped a best-effort-tier name
+        # ('(2S)-2-(hydroxyamino)butane' for ON[C@@H](C)CC, which the PIN tier
+        # declines). A name must never depend on what the process named before.
+        _prelude_done = False
+        try:
+            # --- Wave-2 P2: isotopic substitution decorator / ---
+            # RDKit skeleton perception ignores GetIsotope, so an isotope-labeled
+            # mol would name as the UNLABELED skeleton (wrong PIN). Route it to the
+            # fail-closed decorator BEFORE _name_impl strips the label. Clean
+            # pass-through when the mol carries no isotope (has_isotopes gate) —
+            # zero cost + byte-identical on the entire unlabeled corpus.
+            if is_top_level_naming():
+                _iso_probe = Chem.MolFromSmiles(smiles)
+                if _iso_probe is not None:
+                    from .rules.isotopes import decorate_isotopic_name, has_isotopes
+                    if has_isotopes(_iso_probe):
+                        _iso_name = decorate_isotopic_name(smiles, self.style, self)
+                        if _iso_name is not None:
+                            # (fix wave 1): every exit of name goes
+                            # through _finish. This one lives OUTSIDE the main
+                            # try/finally below; the prelude guard's finally owns
+                            # its teardown, in the same order as the hooked exits
+                            # (proof asserted while the session is still live,
+                            # session ended before the value is handed back).
                             return self._finish(_iso_name, smiles)
-                        finally:
-                            end_naming_session()
-                    # Decorator failed closed on an isotope-labeled molecule: REFUSE.
-                    # Falling through would emit the UNLABELED skeleton name (label
-                    # silently dropped) — a wrong name the OPSIN validity gate cannot
-                    # catch (it parses to the unlabeled structure; ignores
-                    # isotopes). Accuracy-first: never emit a label-dropping name.
-                    from .metrics.abstention import AbstentionCode, record_abstention
-                    record_abstention(AbstentionCode.OTHER,
-                                      detail='isotope_decorator_failed')
-                    try:
-                        return self._finish(_descriptive_fallback(smiles),
-                                            smiles)
-                    finally:
-                        end_naming_session()
-        # --- W3-P09: normalize a charge-imbalanced acid-salt
-        # notation. A metal cation + a NEUTRAL polybasic inorganic oxoacid written
-        # without the balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1) is a
-        # valid acid salt in a malformed charge representation. Rewrite it to the
-        # balanced salt so species classification -> name_salt (method 2 PIN) ->
-        # the self-consistency gate all see the chemically-valid net-0 structure.
-        # Fail-closed (returns None) for every other shape -> smiles unchanged.
-        # Cheap gate: only a multi-fragment ('.') input carrying a cation ('+')
-        # can be this shape, so single-fragment / anion-only inputs skip the parse.
-        if is_top_level_naming() and '.' in smiles and '+' in smiles:
-            from .rules.salts import normalize_imbalanced_acid_salt
-            _bal = normalize_imbalanced_acid_salt(smiles)
-            if _bal is not None:
-                smiles = _bal
-        # M1 (Levers C1/E): open the scoped-per-call memo so name_substituent /
-        # name_pipeline_only memos live for exactly this naming call and are torn
-        # down in the finally below (bounded, determinism-safe). push_scope returns
-        # None on a nested re-entry (the inner call shares the outer cache), so only
-        # the outermost frame tears it down. See assembly/memo.py.
-        from .assembly.memo import pop_scope as _memo_pop
-        from .assembly.memo import push_scope as _memo_push
-        _memo_scope_token = _memo_push()
+                        # Decorator failed closed on an isotope-labeled molecule: REFUSE.
+                        # Falling through would emit the UNLABELED skeleton name (label
+                        # silently dropped) — a wrong name the OPSIN validity gate cannot
+                        # catch (it parses to the unlabeled structure; ignores
+                        # isotopes). Accuracy-first: never emit a label-dropping name.
+                        from .metrics.abstention import AbstentionCode, record_abstention
+                        record_abstention(AbstentionCode.OTHER,
+                                          detail='isotope_decorator_failed')
+                        return self._finish(_descriptive_fallback(smiles), smiles)
+            # --- W3-P09: normalize a charge-imbalanced acid-salt
+            # notation. A metal cation + a NEUTRAL polybasic inorganic oxoacid written
+            # without the balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1) is a
+            # valid acid salt in a malformed charge representation. Rewrite it to the
+            # balanced salt so species classification -> name_salt (method 2 PIN) ->
+            # the self-consistency gate all see the chemically-valid net-0 structure.
+            # Fail-closed (returns None) for every other shape -> smiles unchanged.
+            # Cheap gate: only a multi-fragment ('.') input carrying a cation ('+')
+            # can be this shape, so single-fragment / anion-only inputs skip the parse.
+            if is_top_level_naming() and '.' in smiles and '+' in smiles:
+                from .rules.salts import normalize_imbalanced_acid_salt
+                _bal = normalize_imbalanced_acid_salt(smiles)
+                if _bal is not None:
+                    smiles = _bal
+            # M1 (Levers C1/E): open the scoped-per-call memo so name_substituent /
+            # name_pipeline_only memos live for exactly this naming call and are torn
+            # down in the finally below (bounded, determinism-safe). push_scope returns
+            # None on a nested re-entry (the inner call shares the outer cache), so only
+            # the outermost frame tears it down. See assembly/memo.py.
+            from .assembly.memo import pop_scope as _memo_pop
+            from .assembly.memo import push_scope as _memo_push
+            _memo_scope_token = _memo_push()
+            _prelude_done = True
+        finally:
+            if not _prelude_done:
+                self._reset_published_ctx(_ctx_tokens)
+                end_naming_session()
         try:
             # + Wave-0 D1: structural scope pre-check, now UNCONDITIONAL.
             # A wildcard atom makes the input InChIKey uncomputable, so the
@@ -3935,6 +4066,14 @@ class Orthonym:
                 _ft = self._try_besteffort_clean_general_fallthrough(smiles)
                 if _ft is not None and not is_failure_name(_ft):
                     result = _ft
+            # Task 1.9: PIN fails closed; --trivial falls back to a general-only
+            # retained name when the systematic pipeline derived no PIN (and,
+            # since wp7, an OPSIN-import trivial name without PIN evidence is
+            # the DEFAULT last resort). It runs BEFORE the check below, so
+            # that check sees what the caller would receive: '[H][H]' ships
+            # 'molecular hydrogen' by default, and raise_on_limit must not raise
+            # on it (TRIAGE C24; the raise used to precede this fallback).
+            result = self._apply_trivial_fallback(result, smiles)
             #: post-failure limit (opt-in). If naming produced no real
             # name, map the failure to a named code. Keyed off an actual failure
             # so it can never fire on a successfully-named compound.
@@ -3942,67 +4081,41 @@ class Orthonym:
                 _probe = Chem.MolFromSmiles(smiles)
                 if _probe is not None:
                     raise classify_failure_limit(_probe, smiles=smiles)
-            # Task 1.9: PIN fails closed; --trivial falls back to a general-only
-            # retained name when the systematic pipeline derived no PIN.
-            #
             #: the MAIN exit. Everything that can rewrite the producer's
             # string -- stereo backstop, grammar repair, the OPSIN validity
             # gate, decomposition retry, trivial fallback -- has now run, so
             # this is the first point at which the proof can be asserted on
             # what the caller actually receives.
-            return self._finish(
-                self._apply_trivial_fallback(result, smiles), smiles)
+            return self._finish(result, smiles)
         finally:
             # M1: tear down the memo scope opened before this try (only the
             # outermost frame holds a real token; nested re-entries got None).
             _memo_pop(_memo_scope_token)
-            #: unwind the propagation ctx published above (top-level
-            # sessions only set a token; nested calls leave it None).
-            _tok = getattr(self, '_gf_ctx_token', None)
-            if _tok is not None:
-                try:
-                    from .metrics.provenance import general_fallback_ctx
-                    general_fallback_ctx.reset(_tok)
-                except Exception:
-                    pass
-                self._gf_ctx_token = None
-            #: torn down with its sibling. A leaked best-effort flag would
-            # put best-effort vocabulary on a LATER pin naming in the same
-            # process -- an H3 break that no single-molecule test would show.
-            _be_tok = getattr(self, '_be_ctx_token', None)
-            if _be_tok is not None:
-                try:
-                    from .metrics.provenance import best_effort_ctx
-                    best_effort_ctx.reset(_be_tok)
-                except Exception:
-                    pass
-                self._be_ctx_token = None
-            #: torn down with its siblings. A leaked
-            # allow_aromatic_general would put general-tier vocabulary on a LATER
-            # PIN naming in the same process -- an H3 break no single-molecule test
-            # would show (mirrors the best_effort_ctx reasoning above).
-            _aag_tok = getattr(self, '_aag_ctx_token', None)
-            if _aag_tok is not None:
-                try:
-                    from .metrics.provenance import allow_aromatic_general_ctx
-                    allow_aromatic_general_ctx.reset(_aag_tok)
-                except Exception:
-                    pass
-                self._aag_ctx_token = None
-            #: torn down with its three siblings. A leaked
-            # full_coverage flag would arm D2 on a LATER default-tier naming in
-            # the same process -- the exact isolation break SP5.4 exists to
-            # prevent (mirrors the best_effort_ctx / allow_aromatic_general_ctx
-            # reasoning above).
-            _fc_tok = getattr(self, '_fc_ctx_token', None)
-            if _fc_tok is not None:
-                try:
-                    from .metrics.provenance import full_coverage_ctx
-                    full_coverage_ctx.reset(_fc_tok)
-                except Exception:
-                    pass
-                self._fc_ctx_token = None
+            # / /: unwind the ctx vars THIS frame published.
+            self._reset_published_ctx(_ctx_tokens)
             end_naming_session()
+
+    @staticmethod
+    def _reset_published_ctx(tokens: list) -> None:
+        """Reset, last-in first-out, the provenance ctx vars one ``name`` frame
+        published (general_fallback_ctx, best_effort_ctx, allow_aromatic_general_ctx,
+        full_coverage_ctx), and empty ``tokens``. Idempotent.
+
+        The tokens live in the FRAME (a local list), not on the instance: a
+        same-instance re-entry that also runs as a top-level naming (the isotope
+        decorator names the stripped skeleton with ``namer.name(...)``) used to
+        overwrite ``self._gf_ctx_token`` & co. with its own tokens, reset those, and
+        set the attributes to None -- so the outer frame's tokens were never reset
+        and the ctx vars stayed at the outer tier for every LATER naming in the
+        process (TRIAGE C2). A leaked best-effort / allow_aromatic_general /
+        full_coverage flag puts general-tier vocabulary (or arms D2) on a later
+        default-tier naming -- an order dependence no single-molecule test shows."""
+        while tokens:
+            var, tok = tokens.pop()
+            try:
+                var.reset(tok)
+            except Exception:
+                pass
 
     def _strict_pin_twin_name(self, smiles: str) -> Optional[str]:
         """: name ``smiles`` with a STRICT sibling engine -- every construction
@@ -4213,9 +4326,9 @@ class Orthonym:
                 is_pin = False
         # wp7 (verification panel RISK 2): no oracle ran for this name. The
         # gate records UNAVAILABLE when it cannot consult OPSIN -- the opt-in
-        # reduced mode without a jar (ORTHONYM_ALLOW_REDUCED, jars.py), or a
-        # transient OPSIN failure it fails OPEN on -- and the name then ships
-        # unverified. A pin_verified label claims a verification that did not
+        # reduced mode without a jar (ORTHONYM_ALLOW_REDUCED, jars.py); a
+        # transient OPSIN failure with the jar present now suppresses (TRIAGE g7
+        # C01) -- and the name then ships unverified. A pin_verified label claims a verification that did not
         # happen ('methanaminium' for the radical cation C[NH2+] shipped so), so
         # such a name is at most pin_unverified. The PIN tier's names and the
         # breadth are unchanged; only the label is honest.
@@ -4231,6 +4344,14 @@ class Orthonym:
         # "currently do not have PIN status". 'dimethylaluminum' for C[Al]C shipped
         # pin_verified. Such a name is a verified systematic name at most.
         if tier in (PIN_VERIFIED, PIN_UNVERIFIED) and _has_no_pin_status_element(smiles):
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            is_pin = False
+        # TRIAGE j12 finding 6: likewise (the Blue Book) notes no PIN
+        # for organometallic compounds of the Group 1-12 metals, except the ocenes
+        # ('tert-butyllithium', 'methylmagnesium bromide', 'diethylzinc' shipped
+        # pin_verified). Same demotion; the name is unchanged.
+        if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
+                and _is_p69_organometallic_without_pin(smiles, name)):
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
         gates = []
@@ -8019,13 +8140,17 @@ def name_compound(smiles: str, style: str = "pin",
         from .assembly.fragment_naming import is_top_level_naming
         if not is_top_level_naming():
             from .assembly.nested_memo import cached_nested_call
+            from .decomposition.engine import nacyl_float_refusing
             from .metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
                                              full_coverage_ctx, general_fallback_ctx)
+            # nacyl_float_refusing: decision A's N-acyl float scope changes the name
+            # (routing.dispatch_table._handle_peptide opens it), so it is a key part.
             _key = (smiles, style, enable_triviality_controller, enable_group_splitting,
                     trivial_fallback, general_fallback, general_fallback_unverified,
                     allow_aromatic_general, full_coverage, raise_on_limit, binding_proof,
                     general_fallback_ctx.get(), best_effort_ctx.get(),
-                    allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+                    allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+                    nacyl_float_refusing())
             return cached_nested_call("name_compound_nested", _key, lambda: _name_compound_impl(
                 smiles, style, include_confidence,
                 enable_triviality_controller=enable_triviality_controller,
@@ -8224,8 +8349,11 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
 
     _memo_token = push_scope()
     try:
+        from .decomposition.engine import nacyl_float_refusing
+        # nacyl_float_refusing: decision A's N-acyl float scope (see name's key).
         _key = (smiles, style, general_fallback_ctx.get(), best_effort_ctx.get(),
-                allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+                allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+                nacyl_float_refusing())
         return cache_or_compute("name_pipeline_only", _key, _body)
     finally:
         pop_scope(_memo_token)

@@ -61,7 +61,12 @@ def test_carboxylate_betaine_unchanged(namer):
 
 @pytest.mark.opsin_gate
 def test_l_carnitine_unchanged(namer):
+    # The name is unchanged, but since decision A part 1 (2026-09-26) it ships
+    # labelled below pin_verified: 'carnitine' has 0 Blue Book hits and the PIN tier
+    # builds no RT-exact systematic name for it yet
+    # (tests/unit/rules/test_decision_a_n_substituted_amino_acids.py).
     assert namer.name("C[N+](C)(C)C[C@H](O)CC(=O)[O-]") == "L-carnitine"
+    assert namer.name_tiered("C[N+](C)(C)C[C@H](O)CC(=O)[O-]")["is_pin"] is False
 
 
 @pytest.mark.opsin_gate

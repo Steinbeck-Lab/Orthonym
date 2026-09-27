@@ -24,8 +24,15 @@ ACETYL_COA = "CC(=O)SCCNC(=O)CCNC(=O)C(O)C(C)(C)COP(=O)(O)OP(=O)(O)OCC1OC(n2cnc3
 
 
 def test_adenosine_names_and_round_trips():
+    # Both oxolane numberings give -3,4-diol and prefixes at {2,5}; (g)
+    # (the Blue Book, "lowest locants for the substituent cited first as a
+    # prefix in the name") gives 2 to '(6-amino-9H-purin-9-yl)', alphabetized at
+    # 'a':3477, a compound prefix begins with the first letter of its
+    # complete name), ahead of 'hydroxymethyl'. 'adenosine' is a
+    # retained name, not a PIN. The old snapshot numbered from the
+    # other end ('5-(6-amino-9H-purin-9-yl)-2-(hydroxymethyl)...').
     name = Orthonym().name(ADENOSINE)
-    assert name == "5-(6-amino-9H-purin-9-yl)-2-(hydroxymethyl)oxolane-3,4-diol", name
+    assert name == "2-(6-amino-9H-purin-9-yl)-5-(hydroxymethyl)oxolane-3,4-diol", name
     rt = opsin_roundtrip_check(ADENOSINE, name)
     assert rt["passed"], rt
 

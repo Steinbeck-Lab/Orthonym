@@ -489,3 +489,29 @@ class TestRatioRejectFloor:
             # Must not KeyError —.get('ratio') returns None → accepted
             result = pool.add(name="hybrid", handler_id="chain", features=features)
         assert result is not None
+
+    def test_below_floor_accepted_when_coverage_measured(self):
+        """TRIAGE j3-long-alkanes (g1 C1): a producer that MEASURED a complete atom
+        partition passes coverage_measured=True, and the character-count floor --
+        a stand-in for coverage -- does not reject its candidate. 'octacontane' for
+        C80 has ratio 0.092 (11 characters / 80 atoms / 1.5): numerical-term chain
+        names are short by design, Table 1.4)."""
+        pool = CandidatePool(selection_mode='first_applicable')
+        features = _make_features("C" * 80)
+        cand = CandidateName(
+            name="octacontane", handler="chain", confidence=0.4,
+            factors={'ratio': 0.092, 'atom_coverage': 0.092,
+                     'fg_recognition': 1.0, 'substituent_completeness': 1.0,
+                     'parent_correctness': 0.5},
+        )
+        with patch(
+            'orthonym.assembly.candidate_pool.compute_confidence',
+            return_value=cand,
+        ):
+            rejected = pool.add(name="octacontane", handler_id="chain",
+                                features=features)
+            accepted = pool.add(name="octacontane", handler_id="chain",
+                                features=features, coverage_measured=True)
+        assert rejected is None, "without a measured partition the floor still rejects"
+        assert accepted is not None
+        assert [c.name for c in pool._candidates] == ["octacontane"]

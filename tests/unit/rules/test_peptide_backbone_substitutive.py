@@ -102,8 +102,16 @@ class TestBackboneSubstitutiveConverts:
         )
         result = name_compound(smi)
         assert not is_failure_name(result), result
+        # j7 (TRIAGE g3 C05): the whole chain is now named substitutively (nested amido
+        # prefixes, method (1) the Blue Book); OPSIN full-InChIKey exact.
+        # j12 (findings 2/4/7/8): the N-terminal acyl is the retained 'acetamido' with
+        # its locants:29725;:7304 "Locants are required
+        #... for example acetamide"), not '...ethanamido'; and the enclosing marks
+        # continue the "{[({})]}" order:7446) from the escalated
+        # '[(2S)-2-{...}propanamido]':7509): '{' around it, not '['.
         assert result == (
-            "(2R)-2-amino-2-cyclopropylethanoylglycylalanylvalylleucine"
+            "(2S)-2-{(2S)-2-[(2S)-2-{2-[(2R)-2-amino-2-cyclopropylacetamido]acetamido}"
+            "propanamido]-3-methylbutanamido}-4-methylpentanoic acid"
         ), result
         assert _full_rt(smi, result), result
 
@@ -131,12 +139,22 @@ class TestBackboneSubstitutiveAbstainsCorrectly:
     )
 
     def test_undefined_stereo_witness_abstains(self):
+        """No longer abstains: the composer names the whole chain substitutively.
+
+        The glutamine residue's acid is the parent chain, '5-amino-5-oxopentanoic
+        acid' (cf. '4-amino-4-oxobutanoic acid (PIN)',,
+        the Blue Book); each other residue is an amido prefix,
+        (:32991) "Method (1) generates preferred IUPAC names." (:32998); one level
+        of enclosing marks per enclosed fragment, (:7444). Undefined
+        stereo in, no descriptor out. The only spelling that used to ship, with a
+        doubled '({...})' level, was fixed by the formatter change of j4
+        (TRIAGE g7 C10). OPSIN 2.9.0 full-InChIKey exact (checked here too).
+        """
         result = name_compound(self.UNDEFINED_STEREO_WITNESS)
-        assert is_failure_name(result), (
-            f"undefined-stereo backlog witness must abstain "
-            f"(P-103.3.4 stereo honesty; no addressable splice point for "
-            f"the systematic glutamine-shaped parent), got: {result}"
-        )
+        assert result == (
+            "5-amino-2-{2-[2-(2-aminopropanamido)-3-(1H-indol-3-yl)propanamido]"
+            "-3-(1H-indol-3-yl)propanamido}-5-oxopentanoic acid"), result
+        assert _full_rt(self.UNDEFINED_STEREO_WITNESS, result), result
 
     def test_side_chain_acid_trap_witness_abstains(self):
         result = name_compound(self.SIDE_CHAIN_ACID_TRAP_WITNESS)
@@ -163,8 +181,11 @@ class TestRegressionUnaffected:
         assert _full_rt(smi, result), result
 
     def test_lever_c_amide_cterm_unchanged(self):
-        """Task 2.1's own witness -- must still be handled by Lever C, not
-        accidentally short-circuited by this new, later-tried producer."""
+        """Task 2.1's own witness. Decision A part 2 (2026-09-27): was
+        'alanylglycinamide' (Lever C's retained name, labelled below the PIN tier).
+        The substitutive PIN is now built by the composer's amido prefix
+        , the Blue Book; peptides are not PINs,
+        V38-PEPTIDE-PIN-VERDICT.md), so neither Lever C nor this producer names it."""
         smi = "N[C@@H](C)C(=O)NCC(N)=O"
         result = name_compound(smi)
-        assert result == "alanylglycinamide", result
+        assert result == "2-[(2S)-2-aminopropanamido]acetamide", result

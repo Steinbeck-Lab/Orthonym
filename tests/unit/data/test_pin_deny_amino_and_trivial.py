@@ -37,7 +37,20 @@ def _pin_list():
 # Names adjudicated in Task E: absent from (or explicitly deprecated by) the
 # Blue Book AND with a measured, structurally correct systematic replacement.
 GATED_AMINO_ACIDS = ["sarcosine", "taurine", "homotaurine", "statine",
-                     "diaminopimelic acid", "abrine"]
+                     "diaminopimelic acid", "abrine",
+                     # User decision A (2026-09-26): amino acids substituted on their
+                     # NITROGEN take the systematic name at the PIN tier; each has 0
+                     # Blue Book hits, the Blue Book). Replacements (OPSIN
+                     # 2.9.0 full-InChIKey exact) in the rows' notes and in
+                     # tests/unit/rules/test_decision_a_n_substituted_amino_acids.py.
+                     "tricine", "taurocyamine", "hypotaurocyamine", "strombine",
+                     "alanopine", "beta-alanopine", "octopine", "octopinic acid",
+                     "nopaline", "tauropine",
+                     # Decision A part 2 (2026-09-27): gated once the systematic
+                     # names were built -- '[carbamimidoyl(methyl)amino]acetic acid'
+                     # and '(2S)-6-amino-2-{[(1R)-1-carboxyethyl]amino}hexanoic acid'
+                     # (both pin_verified, OPSIN 2.9.0 full-InChIKey exact).
+                     "creatine", "lysopine"]
 
 GATED_RETAINED = ["nicotinamide", "picolinic acid", "vanillin",
                   "vanillic acid", "benzhydrol", "phloroglucinol", "durene",
@@ -220,10 +233,12 @@ class TestNotOverGated:
 
     @pytest.mark.parametrize("name", [
         # measured fallback -> reason for not gating
-        "creatine",           # 'unknown organic compound'
+        # (creatine and lysopine left this list in decision A part 2: their
+        # systematic names are now built and verified, so they are gated above)
         "selenocystine",      # 'unknown organic compound'
         "tellurocystine",     # 'tellurium compound (not supported)'
-        "lysopine",           # 'unknown organic compound'
+        "carnitine",          # L/D abstain, stereo-free malformed; kept, labelled
+                              # non-PIN instead (amino_acids.NON_PIN_AMINO_ACID_NAMES)
         "saccharin",          # 'unknown organic compound'
         "triphenylmethane",   # 'unknown organic compound'
         "morphine",           # fallback uses 'morphin-7-ene', but the BB's own

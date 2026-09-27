@@ -31,7 +31,9 @@ def _skeleton(smi):
 
 @pytest.mark.parametrize("smi,expected", [
     # tripeptide with proline as the INTERNAL (amine-acceptor) residue — RT-exact
-    ("N[C@@H](C)C(=O)N1CCC[C@H]1C(=O)NCC(=O)O", "alanylprolylglycine"),
+    # j7 (TRIAGE g3 C05): the substitutive PIN method (1)), OPSIN exact
+    ("N[C@@H](C)C(=O)N1CCC[C@H]1C(=O)NCC(=O)O",
+     "{(2S)-1-[(2S)-2-aminopropanoyl]pyrrolidine-2-carboxamido}acetic acid"),
     ("N[C@@H](CCC(=O)O)C(=O)N1CCC[C@H]1C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
      "glutamylprolylphenylalanine"),
 ])
@@ -75,7 +77,9 @@ def test_proline_acceptor_0_wrong_constitution():
 @pytest.mark.parametrize("smi,expected", [
     # non-proline peptides + proline-as-acyl (N-terminal) must be UNCHANGED
     ("N[C@@H](Cc1ccccc1)C(=O)N[C@@H](C)C(=O)O", "phenylalanylalanine"),
-    ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)O", "alanylalanylalanine"),
+    # j7 (TRIAGE g3 C05): the substitutive PIN method (1)), OPSIN exact
+    ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)O",
+     "(2S)-2-{(2S)-2-[(2S)-2-aminopropanamido]propanamido}propanoic acid"),
     ("OC(=O)[C@@H](C)NC(=O)[C@@H]1CCCN1", "prolyl-D-alanine"),
 ])
 def test_non_proline_acceptor_unchanged(smi, expected):

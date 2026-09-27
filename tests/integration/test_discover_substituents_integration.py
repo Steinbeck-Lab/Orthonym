@@ -224,7 +224,11 @@ AB_CANARY_COMPOUNDS = [
     ("Cc1ccc(O)cc1C", "3,4-dimethylphenol"),  #: phenol suffix routing
     ("COc1ccc(OC)c(OC)c1", "1,2,4-trimethoxybenzene"),
     # Heterocycle
-    ("CCCc1nc(C)c(C)nc1C", "2,3,6-trimethyl-5-propylpyrazine"),
+    # (g) (the Blue Book, "lowest locants for the substituent cited
+    # first as a prefix in the name"): the locant set {2,3,5,6} ties in every
+    # numbering, so methyl, cited first, takes {2,3,5} (c10268e95; was the
+    # snapshot '2,3,6-trimethyl-5-propylpyrazine', same molecule, OPSIN exact).
+    ("CCCc1nc(C)c(C)nc1C", "2,3,5-trimethyl-6-propylpyrazine"),
     ("Oc1ccnc2ccccc12", "4-hydroxyquinoline"),
     # Ester
     ("CCCCCCCCCCCCCCCCCCCCCC(=O)OCC", "ethyl docosanoate"),

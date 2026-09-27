@@ -420,8 +420,9 @@ _TRIPWIRE_ALLOWLIST = {
     ("assembly/composer.py", "needs_parens = (any(c in r_name for c in '-,')"):
         "GUARDED — the next line ANDs in not italicized_prefix_is_bare(r_name).",
     ("assembly/composer.py",
-     "return nm.endswith('oxycarbonyl') or any(c in nm for c in '-()[]0123456789')"):
-        "GUARDED — italicized_prefix_is_bare early-returns False above it. "
+     "or any(c in nm for c in '-()[]0123456789'))"):
+        "GUARDED — italicized_prefix_is_bare early-returns False above it (j7: the "
+        "line was reflowed when 'oxycarbonimidoyl' joined 'oxycarbonyl'). "
         "UNWITNESSED: a mutation run plus a provenance probe showed the enclosing "
         "_assemble_aromatic_benzonitrile is not reached for any tert-butyl "
         "benzonitrile tried (single- or multi-substituted; another handler names "
@@ -434,6 +435,21 @@ _TRIPWIRE_ALLOWLIST = {
     ("assembly/handlers/hydroxylamine.py",
      'if any(ch.isdigit() for ch in alkyl) or "-" in alkyl or "(" in alkyl:'):
         "GUARDED — the italicized class is resolved (contraction) or refused above.",
+    # j7 (TRIAGE g7 C20): three raw tests that DID decide for an italicized-led
+    # name now call the shared primitive first (spellings OPSIN 2.9.0 exact,
+    # '1,2-di-*tert*-butylbenzene (PIN)' the Blue Book).
+    ("assembly/substituent_naming.py",
+     "if (any(ch.isdigit() for ch in tok) or '-' in tok or ' ' in tok"):
+        "GUARDED — _fg_enclose returns an italicized_prefix_is_bare token bare above it.",
+    ("rules/phosphorus.py",
+     'and (any(ch in token for ch in "()[]-, 0123456789")'):
+        "GUARDED — ANDed with not italicized_prefix_is_bare(token) on the line above; "
+        "the simple branch joins with multiplier_needs_hyphen: 'tri-tert-butyl "
+        "phosphite' (was 'tris(tert-butyl) phosphite').",
+    ("rules/salts.py", "if '-' in name:"):
+        "GUARDED — _ion_needs_enclosing_multiplier returns False for an "
+        "italicized_prefix_is_bare ion word above it, and _apply_stoichiometric_prefix "
+        "adds the hyphen: 'magnesium di-tert-butoxide' (was 'bis(tert-butoxide)').",
 
     # ---- carve-out UNREACHABLE: the producer cannot emit an italicized-led name ----
     ("rules/benzene.py",
@@ -456,6 +472,10 @@ _TRIPWIRE_ALLOWLIST = {
         "Operates on a sugar ACYL ESTER WORD, never an alkyl prefix.",
     ("data/sugar_names.py", 'if any(ch in word for ch in " -("):'):
         "Same, name_sugar_ester.",
+    ("data/sugar_names.py", 'if any(ch.isdigit() for ch in base) or "-" in base:'):
+        "Operates on a catalogued sugar BASE name (glucopyranose, 2-acetamido-2-deoxy-"
+        "...), never an alkyl prefix; a decorated base declines to the '[...]oxy' form "
+        "(j7 review).",
 
     # ---- NOT THE DECISION ----
     ("assembly/substituent_naming.py",
@@ -466,6 +486,12 @@ _TRIPWIRE_ALLOWLIST = {
     ("decomposition/engine.py", 'has_hyphens = "-" in name'):
         "NOT THE DECISION — name-DETAIL heuristic (is a big molecule's name "
         "specific enough to skip decomposition).",
+    ("rules/fusion_descriptors.py", "if '-' in inner:"):
+        "NOT THE DECISION — splits a fusion descriptor '[3,2-b]' into its child "
+        "locants and edge letter for the citation sort key (j7 review).",
+    ("rules/oligosaccharides.py", 'if "-" in base:'):
+        "NOT THE DECISION — splits a decorated sugar base into its prefix block and "
+        "stem so the configurational descriptor goes before the stem (j7 review).",
     ("rules/polycyclics.py",
      "'core_name': heterocycle_name.split('-')[-1] if '-' in heterocycle_name "
      "else heterocycle_name,"):

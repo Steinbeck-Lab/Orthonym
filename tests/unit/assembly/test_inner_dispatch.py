@@ -974,6 +974,12 @@ class TestDispatchInnerGateFailRetry:
         finally:
             restore()
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "PIN tier abstains on the D-18 fixture: needs the '4-methyl-2,5-dioxo-"
+        "2,5-dihydrofuran-3-yl' prefix (P-31.1.4.2.4) at the PIN tier; the "
+        "best-effort ester_family name is RT-exact but spells the ring '1-oxa"
+        "cyclopent-3-en' (non-PIN) -- TODO in TRIAGE.md 'Suite fix -- "
+        "j6-breadth'"))
     def test_canary_fixture_lactone_gate_fail_routes_via_ester_family(self):
         """Integration: the a phase regression-fixture SMILES from
         internal notes <specifics>. With the amendment, even when the inline
@@ -999,6 +1005,9 @@ class TestDispatchInnerGateFailRetry:
             f"D-18 regression-fixture invariance broken: 'methoxycarbonyl' "
             f"missing from {name!r}"
         )
+        # Suite fix j6 (TRIAGE g6 C23): the PIN, OPSIN full-key exact.
+        assert name == ("(2E)-3-(methoxycarbonyl)-2-[16-(4-methyl-2,5-dioxo-2,5-"
+                        "dihydrofuran-3-yl)hexadecyl]pent-2-enedioic acid"), name
 
 
 # =============================================================================

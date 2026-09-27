@@ -176,12 +176,18 @@ def test_carveout_ships_when_input_smiles_missing(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 5. `unavailable` still fails OPEN -- no-JAR / timeout must not suppress
+# 5. `unavailable` (jar PRESENT, OPSIN timed out) fails CLOSED -- TRIAGE g7 C01
+# (2026-09-27); it used to fail OPEN . No JAR at all  still
+# fails open: test_no_jar_still_fails_open below.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
-def test_transient_unavailable_still_fails_open(monkeypatch):
-    """A stereo name whose OPSIN probe merely TIMED OUT must survive: a transient
-    OPSIN failure must never turn a valid name into a fallback ."""
+def test_transient_unavailable_fails_closed(monkeypatch):
+    """A stereo name whose OPSIN probes all TIMED OUT (after the oracle's retry
+    ladder) has had nothing verified -- not its constitution, which is the one
+    thing the carve-out must check  -- so it is suppressed, even though
+    this name is the verbatim BB PIN: the gate cannot know that without OPSIN,
+    and 0-wrong is absolute. The ladder (OpsinOracle._one_shot) is what keeps a
+    slow OPSIN from costing this name; failing open shipped wrong molecules."""
     monkeypatch.setattr(nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
     monkeypatch.setattr(nm, "_SC_MODE", "on", raising=False)
     monkeypatch.setattr(nm, "_validity_gate_jar_present", lambda: True, raising=False)
@@ -189,7 +195,7 @@ def test_transient_unavailable_still_fails_open(monkeypatch):
     monkeypatch.setattr(nm, "_validity_gate_status", lambda n: "unavailable", raising=False)
     assert nm._final_opsin_validity_gate(
         "(1s,4s)-cyclohexane-1,4-diol", "O[C@H]1CC[C@@H](O)CC1", {}
-    ) == "(1s,4s)-cyclohexane-1,4-diol"
+    ) == nm._descriptive_fallback("O[C@H]1CC[C@@H](O)CC1")
 
 
 @pytest.mark.unit
@@ -270,17 +276,17 @@ def test_constitutional_defect_without_stereo_still_suppressed(monkeypatch):
 
 # ---------------------------------------------------------------------------
 # 8. -FOLLOWUP: the STRIPPED probe is three-valued too. `unavailable`
-# means OPSIN could not be consulted -- it is NOT evidence against the name,
-# so it must fail OPEN exactly as the primary probe already does
-# (namer.py:660-661,). Lumping it with `rejected` suppressed a name the
-# carve-out exists to rescue, on nothing but a subprocess hiccup.
+# means OPSIN could not be consulted -- no evidence against the name, and
+# none for its constitution either. Since TRIAGE g7 C01 (2026-09-27) it fails
+# CLOSED exactly as the primary probe does (it used to fail OPEN and ship the
+# name with nothing checked), with its own counter and abstention detail so
+# telemetry can tell it from a definitive rejection.
 #
-# WHY THE EXISTING `test_transient_unavailable_still_fails_open` DOES NOT
-# COVER THIS: it stubs `_validity_gate_status` to "unavailable" for EVERY
-# name, so the PRIMARY probe's fail-OPEN at namer.py:660 returns first and the
-# stripped probe is never reached. The stub below is asymmetric on purpose --
-# the primary name is DEFINITIVELY rejected (as real OPSIN rejects these
-# stereo forms) and only the STRIPPED probe hiccups.
+# WHY `test_transient_unavailable_fails_closed` DOES NOT COVER THIS: it stubs
+# `_validity_gate_status` to "unavailable" for EVERY name, so the PRIMARY
+# probe returns first and the stripped probe is never reached. The stub below
+# is asymmetric on purpose -- the primary name is DEFINITIVELY rejected (as
+# real OPSIN rejects these stereo forms) and only the STRIPPED probe hiccups.
 # ---------------------------------------------------------------------------
 def _stub_opsin_3valued(monkeypatch, status_map, smiles_map=None):
     """Enable the gate with ON and a HOSTILE THREE-VALUED OPSIN stub.
@@ -307,25 +313,23 @@ def _stub_opsin_3valued(monkeypatch, status_map, smiles_map=None):
 @pytest.mark.unit
 @pytest.mark.parametrize("name,smiles,stripped", [(p[0], p[1], p[2]) for p in PROTECTED],
                          ids=["cyclohexanediol", "decalin", "tropane-ester"])
-def test_stripped_probe_unavailable_ships_full_stereo_name(monkeypatch, name,
-                                                           smiles, stripped):
+def test_stripped_probe_unavailable_fails_closed(monkeypatch, name, smiles,
+                                                 stripped):
     """Primary probe DEFINITIVELY rejected + stripped probe merely UNAVAILABLE ->
-    the FULL stereo name ships unchanged.
+    the constitution was never checked -> the honest fallback (TRIAGE g7 C01).
 
-    Invariant 11 -- assert the exact string that ships, not just that the fallback
-    is absent: fail-OPEN must ship the name WITH its stereo descriptors, never the
-    stripped constitutional form (which would silently drop stereochemistry) and
-    never a fallback.
+    Invariant 11 -- assert the exact string that ships: the fallback, never the
+    unverified stereo name and never the stripped constitutional form.
     """
     _stub_opsin_3valued(monkeypatch, {name: "rejected", stripped: "unavailable"})
     stats = {}
     out = nm._final_opsin_validity_gate(name, smiles, stats)
-    assert out == name, "suppressed/altered on a comparison that could not be made"
+    assert out == nm._descriptive_fallback(smiles), (
+        "shipped a name whose constitution OPSIN never checked")
     assert out != stripped, "shipped the stereo-STRIPPED form -- stereo silently dropped"
-    assert out != nm._descriptive_fallback(smiles)
     assert stats.get("gate_stereo_unavailable") == 1
-    # It was NOT verified, so it must not be counted as a verified ship, and
-    # nothing may be recorded as suppressed.
+    # It was NOT verified, and it was not a definitive rejection either: only the
+    # unavailable counter moves.
     assert "gate_stereo_kept" not in stats
     assert "gate_stereo_unverifiable" not in stats
     assert "opsin_suppressed" not in stats

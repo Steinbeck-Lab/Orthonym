@@ -110,6 +110,12 @@ class TestAlkenylCIRegression:
         assert "hept-1-en-1-yl" in result.lower()
         assert "-heptyl-" not in result.lower()
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "PIN tier abstains: the ortho-fused carbocycle's PIN is a hydro-fusion name "
+        "the PIN tier does not build; the old passing name '(1R,2R,3S)-2-hexadecyl-"
+        "1-methyl-3-(prop-1-en-2-yl)cyclopentane' named one ring as a monocycle "
+        "(OPSIN: a different molecule; bdd69a673) -- TODO in TRIAGE.md "
+        "'Suite fix -- j1-regressions'"))
     def test_prop_1_en_2_yl_on_tricyclic(self):
         """Prop-1-en-2-yl on tricyclic terpene, not isopropyl."""
         result = name_compound(
@@ -118,6 +124,17 @@ class TestAlkenylCIRegression:
         )
         assert "prop-1-en-2-yl" in result.lower()
         assert "15-isopropyl" not in result.lower()
+
+    @pytest.mark.opsin_gate
+    def test_prop_1_en_2_yl_on_tricyclic_tier_contract(self):
+        """Production (gate on) for the strict-xfail row above: the PIN tier fails
+        closed or ships an RT-exact name; the RT-exact best-effort name cites
+        prop-1-en-2-yl, not isopropyl (what this regression guards)."""
+        from tests.support.rt_assert import assert_tier_contract
+        _pin, be = assert_tier_contract(
+            "C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)"
+            "C/C=C(\\C)CC/C=C(\\C)CC[C@H]12")
+        assert "prop-1-en-2-yl" in be and "isopropyl" not in be, be
 
 
 class TestBranchedAlkenylPrefix:

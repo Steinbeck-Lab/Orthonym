@@ -50,7 +50,7 @@ class TestDipeptidesWithStereo:
         """L-Ala-Gly PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
         Full-InChIKey round-trip verified."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
+        assert result == "[(2S)-2-aminopropanamido]acetic acid"
 
     def test_l_alanyl_l_alanine(self):
         """L-Ala-L-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
@@ -68,7 +68,8 @@ class TestTripeptides:
     def test_glycyl_l_alanyl_l_leucine(self):
         """Gly-L-Ala-L-Leu: three residues, all L -> omits L."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O")
-        assert result == "glycylalanylleucine"
+        # j7 (TRIAGE g3 C05 / g5 C15): a tripeptide now takes the substitutive PIN, the
+        assert result == "(2S)-2-[(2S)-2-(2-aminoacetamido)propanamido]-4-methylpentanoic acid"
 
 
 # ── Tetrapeptide residue ORDER (backbone walk, not atom index) ────────────
@@ -154,7 +155,12 @@ class TestTautomerRobustResidues:
 
     def test_alanylhistidylglycine(self):
         """Ala-His-Gly: histidine's imidazole tautomer must still identify."""
-        result = name_compound("C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)NCC(=O)O")
+        # j7: residue identification is the peptide producer's job; the whole-molecule
+        # name is now the substitutive PIN (TRIAGE g3 C05), so ask the producer.
+        from rdkit import Chem as _Chem
+        from orthonym.rules.peptides import name_peptide
+        result = name_peptide(_Chem.MolFromSmiles(
+            "C[C@H](N)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)NCC(=O)O"))
         assert result == "alanylhistidylglycine"
 
 
@@ -171,7 +177,7 @@ class TestProlineNTerminus:
         #: Pro-Gly PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md; the
         # sliceC target). Full-InChIKey round-trip verified.
         result = name_compound("OC(=O)CNC(=O)[C@@H]1CCCN1")
-        assert result == "2-[(2S)-pyrrolidine-2-carboxamido]ethanoic acid"
+        assert result == "[(2S)-pyrrolidine-2-carboxamido]acetic acid"
 
     def test_prolylalanine(self):
         #: Pro-Ala PIN is substitutive (V38-PEPTIDE-PIN-VERDICT.md).
@@ -281,7 +287,7 @@ class TestStereoMapping:
         (2R) and fail the round-trip gate -> fallback), and never a 'D-' prefix.
         """
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
+        assert result == "[(2S)-2-aminopropanamido]acetic acid"
         assert not result.startswith("D-")
 
     def test_glycine_no_stereo_prefix(self):
@@ -332,13 +338,17 @@ class TestCysteineStereoInversion:
         #: L-Ala-Gly emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md);
         # the S centre is preserved as (2S) and never mis-tagged 'D-'.
         result_peptide = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result_peptide == "2-[(2S)-2-aminopropanamido]ethanoic acid", \
+        assert result_peptide == "[(2S)-2-aminopropanamido]acetic acid", \
             f"got: {result_peptide}"
 
     def test_benchmark_peptide_with_l_cysteine_1(self):
         """Benchmark peptide 1: Lys-Thr-Cys, C-terminal L-cysteine (L omitted)."""
         smiles = "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](CS)C(=O)O"
-        result = name_compound(smiles)
+        # j7: the whole-molecule name is now the substitutive PIN (TRIAGE g3 C05), so
+        # the residue check asks the peptide producer itself.
+        from rdkit import Chem as _Chem
+        from orthonym.rules.peptides import name_peptide
+        result = name_peptide(_Chem.MolFromSmiles(smiles))
         assert result is not None, "Should produce a name"
         assert result.endswith("cysteine"), \
             f"Expected an L-cysteine C-terminal (L omitted, P-103.3.4), got: {result}"
@@ -406,12 +416,13 @@ class TestStereoHonestyUndefinedResidues:
         be completely unaffected by the stereo-honesty check.: names via
         the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md; RT verified)."""
         result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "2-[(2S)-2-aminopropanamido]ethanoic acid"
+        assert result == "[(2S)-2-aminopropanamido]acetic acid"
 
     def test_defined_stereo_tripeptide_unchanged(self):
         """CRITICAL guard: Gly-L-Ala-L-Leu, all-defined, unaffected."""
         result = name_compound("NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O")
-        assert result == "glycylalanylleucine"
+        # j7 (TRIAGE g3 C05 / g5 C15): a tripeptide now takes the substitutive PIN, the
+        assert result == "(2S)-2-[(2S)-2-(2-aminoacetamido)propanamido]-4-methylpentanoic acid"
 
     def test_defined_stereo_arginine_tautomer_unchanged(self):
         """CRITICAL guard: the InChIKey-skeleton-fallback residue path

@@ -30,6 +30,12 @@ Blue Book, opened with ``sed`` at write time:
 The carbamic-acid sibling never had the defect because it uses the shared
 ``_build_n_substituted_name``; the fix routes carbamate through that same
 builder instead of re-deriving the rule at a second site.
+
+Both now share ``_carbamic_n_substituted_name`` (same enclosing marks), which
+cites the N-substituents WITHOUT the italic-N locant:
+(the Blue Book) '(CH3)2N-COOH dimethylcarbamic acid (PIN)' (:30762),
+'2-hydroxypropyl (2-aminoethyl)carbamate (PIN)' (:30766). OPSIN 2.9.0 full-key
+exact for every expected name below (TRIAGE 'Suite fix -- j5-pin-labels-b').
 """
 
 import pytest
@@ -39,16 +45,16 @@ import pytest
     "smiles,expected",
     [
         # The malformed shipper, and its ethyl ester twin.
-        ("COC(=O)NCCOC", "methyl N-(2-methoxyethyl)carbamate"),
-        ("CCOC(=O)NCCOC", "ethyl N-(2-methoxyethyl)carbamate"),
+        ("COC(=O)NCCOC", "methyl (2-methoxyethyl)carbamate"),
+        ("CCOC(=O)NCCOC", "ethyl (2-methoxyethyl)carbamate"),
         # A located branched prefix is compound too via its locant).
-        ("COC(=O)NC(C)C", "methyl N-(propan-2-yl)carbamate"),
+        ("COC(=O)NC(C)C", "methyl (propan-2-yl)carbamate"),
         # SIMPLE substituents must stay bare -- byte-identical to before.
-        ("COC(=O)NC", "methyl N-methylcarbamate"),
-        ("CCOC(=O)NC", "ethyl N-methylcarbamate"),
-        ("COC(=O)N(C)C", "methyl N,N-dimethylcarbamate"),
-        ("CCOC(=O)N(C)C", "ethyl N,N-dimethylcarbamate"),
-        ("COC(=O)Nc1ccccc1", "methyl N-phenylcarbamate"),
+        ("COC(=O)NC", "methyl methylcarbamate"),
+        ("CCOC(=O)NC", "ethyl methylcarbamate"),
+        ("COC(=O)N(C)C", "methyl dimethylcarbamate"),
+        ("CCOC(=O)N(C)C", "ethyl dimethylcarbamate"),
+        ("COC(=O)Nc1ccccc1", "methyl phenylcarbamate"),
         ("COC(=O)N", "methyl carbamate"),
     ],
 )
@@ -73,4 +79,4 @@ def test_carbamic_acid_sibling_was_always_well_formed():
     from orthonym import name_compound
 
     res = name_compound("OC(=O)NCCOC")
-    assert getattr(res, "name", res) == "N-(2-methoxyethyl)carbamic acid"
+    assert getattr(res, "name", res) == "(2-methoxyethyl)carbamic acid"

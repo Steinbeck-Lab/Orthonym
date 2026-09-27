@@ -10,6 +10,7 @@ import pytest
 
 from orthonym.data.chain_names import (
     get_chain_prefix,
+    numerical_term,
     get_chain_name,
     get_alkyl_name,
     get_acid_name,
@@ -101,7 +102,7 @@ class TestCompositionalPrefixes:
     @pytest.mark.parametrize("n,expected", [
         # Hundreds + tens
         (110, "decahect"),
-        (120, "cosahect"),
+        (120, "icosahect"),  #: 'icosa' keeps its 'i' (no vowel before it)
         (130, "triacontahect"),
         (140, "tetracontahect"),
         (150, "pentacontahect"),
@@ -117,6 +118,53 @@ class TestCompositionalPrefixes:
     ])
     def test_hundreds_compositional(self, n, expected):
         assert get_chain_prefix(n) == expected
+
+
+@pytest.mark.unit
+class TestBlueBookNumericalTerms:
+    """The numerical terms the Blue Book spells out (TRIAGE j3-long-alkanes, g1 C3).
+
+     (the Blue Book), 'Derivation of basic numerical terms': "The
+    composite terms are formed by direct joining of the basic terms, without
+    hyphen(s). The letter 'i' in 'icosa' is elided after a vowel." Table 1.4 (:2794)
+    and (:2807: '1' is 'hen' and '2' is 'do' in association). There is
+    no linking 'a' ('henahecta' was the old spelling of 101) and 'icosa' keeps its
+    'i' when no vowel precedes it ('cosahecta' was the old spelling of 120).
+    """
+
+    @pytest.mark.parametrize("n,expected", [
+        # examples (:2815-2822)
+        (21, "henicosa"), (22, "docosa"), (23, "tricosa"), (24, "tetracosa"),
+        (41, "hentetraconta"), (52, "dopentaconta"), (111, "undecahecta"),
+        (363, "trihexacontatricta"), (486, "hexaoctacontatetracta"),
+        # Table 1.4 (:2794)
+        (30, "triaconta"), (100, "hecta"), (101, "henhecta"), (200, "dicta"),
+        (1000, "kilia"), (1001, "henkilia"), (2000, "dilia"),
+    ])
+    def test_numerical_term_as_spelled_in_the_blue_book(self, n, expected):
+        assert numerical_term(n) == expected
+
+    @pytest.mark.parametrize("n,expected", [
+        (101, "henhectane"), (102, "dohectane"), (103, "trihectane"),
+        (120, "icosahectane"), (201, "hendictane"), (220, "icosadictane"),
+        (503, "tripentactane"), (920, "icosanonactane"),
+        (1003, "trikiliane"), (1120, "icosahectakiliane"),
+    ])
+    def test_alkane_is_the_term_with_its_final_a_elided(self, n, expected):
+        # (:7984): numerical term + 'ane', terminal 'a' of the term elided.
+        assert get_chain_name(n) == expected
+
+    def test_no_linking_letter_anywhere(self):
+        stems = ("hect", "dict", "trict", "tetract", "pentact", "hexact", "heptact",
+                 "octact", "nonact", "kili", "dili", "trili", "tetrali", "pentali",
+                 "hexali", "heptali", "octali", "nonali")
+        for n in range(21, 10000):
+            term = numerical_term(n)
+            assert not any(u + "a" + st in term
+                           for u in ("hen", "do", "tri") for st in stems), (n, term)
+            if n % 100 == 20:
+                assert term.startswith("icosa"), (n, term)
+            assert get_chain_prefix(n) + "a" == term, n
 
 
 # ============================================================================
@@ -139,8 +187,8 @@ class TestThousandsPrefixes:
         (8000, "octali"),
         (9000, "nonali"),
         # Thousands + units (1-9)
-        (1001, "henakili"),
-        (1002, "doakili"),
+        (1001, "henkili"),  # Table 1.4: 1001 henkilia (direct joining,
+        (1002, "dokili"),
         (1005, "pentakili"),
         (1009, "nonakili"),
         # Thousands + teens (10-19)
@@ -148,7 +196,7 @@ class TestThousandsPrefixes:
         (1011, "undecakili"),
         (1015, "pentadecakili"),
         # Thousands + twenties
-        (1020, "cosakili"),
+        (1020, "icosakili"),
         (1021, "henicosakili"),
         # Thousands + hundreds
         (1100, "hectakili"),

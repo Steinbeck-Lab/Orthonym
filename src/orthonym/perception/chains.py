@@ -130,6 +130,90 @@ def find_all_carbon_chains(
     return chains
 
 
+def find_maximal_carbon_chains(
+    mol,
+    exclude_atoms: Optional[Set[int]] = None
+) -> List[List[int]]:
+    """The paths of ``find_all_carbon_chains(mol, 1, exclude_atoms)`` that cannot be
+    extended at either end, in the SAME relative order as in that list.
+
+    A path is extendable when an end atom has a carbon neighbour that is neither
+    excluded nor on the path; the extended path is then itself one of the
+    enumerated paths (the DFS below walks every simple path of non-excluded carbons
+    from every start). ``find_principal_chain`` only ever needs these: see the
+    proof at its call site.
+
+    Cost: the full enumeration stores every simple path, n^2 paths of mean length
+    n/3 for an unbranched C_n chain, and ``find_principal_chain`` scored each one in
+    O(n) -- O(n^3) per molecule (C145: 21025 paths, 25 s). This walks the same DFS
+    but records a path only when both of its ends are closed, and skips the DFS
+    from a start atom that provably closes no path (below), so an unbranched chain
+    costs O(n).
+
+    Traversal order is the same as ``find_all_carbon_chains``: start atoms in atom
+    order, neighbours in RDKit neighbour order, a path recorded when the DFS reaches
+    its last atom. Only which paths are recorded differs.
+    """
+    exclude = exclude_atoms or set()
+    atoms = list(atoms_of(mol))
+
+    def _eligible(atom) -> bool:
+        # The same test find_all_carbon_chains' dfs applies on entry.
+        return atom.GetSymbol() == 'C' and atom.GetIdx() not in exclude
+
+    adj: Dict[int, List[int]] = {}
+    for atom in atoms:
+        if _eligible(atom):
+            adj[atom.GetIdx()] = [
+                nbr.GetIdx() for nbr in atom.GetNeighbors() if _eligible(nbr)
+            ]
+
+    ring_info = mol.GetRingInfo()
+
+    def _can_start_closed(idx: int) -> bool:
+        # A path starting at s is closed at s only if every eligible neighbour of s
+        # lies on the path. With >= 2 of them the path leaves s through one and
+        # reaches another later, so s lies on a cycle and hence in a ring. An atom
+        # in no ring with >= 2 eligible neighbours therefore starts no closed path.
+        if len(adj[idx]) <= 1:
+            return True
+        try:
+            return ring_info.NumAtomRings(idx) > 0
+        except Exception:  # ring info not initialised: do not prune
+            return True
+
+    chains: List[List[int]] = []
+    for atom in atoms:
+        start = atom.GetIdx()
+        if start not in adj or not _can_start_closed(start):
+            continue
+        start_nbrs = adj[start]
+        visited: Set[int] = {start}
+        path: List[int] = [start]
+        stack = [iter(start_nbrs)]
+        if not start_nbrs:
+            chains.append(path.copy())
+        while stack:
+            nxt = None
+            for nbr in stack[-1]:
+                if nbr not in visited:
+                    nxt = nbr
+                    break
+            if nxt is None:
+                stack.pop()
+                visited.discard(path.pop())
+                continue
+            visited.add(nxt)
+            path.append(nxt)
+            nxt_nbrs = adj[nxt]
+            if (all(n in visited for n in nxt_nbrs)
+                    and all(n in visited for n in start_nbrs)):
+                chains.append(path.copy())
+            stack.append(iter(nxt_nbrs))
+
+    return chains
+
+
 def find_longest_carbon_chain(
     mol,
     exclude_atoms: Optional[Set[int]] = None
@@ -462,9 +546,19 @@ def find_principal_chain(
     combined_exclude = set(exclude_atoms) if exclude_atoms else set()
     combined_exclude |= np_terminal_carbons
 
-    chains = find_all_carbon_chains(
-        mol, min_length=1,
-        exclude_atoms=combined_exclude if combined_exclude else None
+    # Only the paths that cannot be extended at either end can win, so only those
+    # are enumerated (find_maximal_carbon_chains; the chosen chain is unchanged).
+    # Proof: extend a path P by one eligible carbon at an end to P'. P' is itself
+    # enumerated, and chain_score(P') > chain_score(P) in the tuple order: terms 0
+    # (contains_fg) and 1 (fg_count) only read set membership of chain atoms, so
+    # they cannot drop on a superset, and term 2 (length) grows by one. So an
+    # extendable path is never in `top` below, and `top` -- the chains with the best
+    # score, in enumeration order, which the tie-breaks read -- is the same list in
+    # the same order. Measured equal on the gate, breadth and chain corpora
+    # (TRIAGE 'Suite fix -- j3-long-alkanes'). The full enumeration cost O(n^3) for
+    # an unbranched C_n chain (C145: 21025 paths scored, 25 s); this costs O(n).
+    chains = find_maximal_carbon_chains(
+        mol, exclude_atoms=combined_exclude if combined_exclude else None
     )
 
     if not chains:

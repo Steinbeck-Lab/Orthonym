@@ -57,6 +57,12 @@ _SUFFIX_PRIORITY = [
     # Phase C: peroxy acid, rank 1 in SENIORITY_ORDER (directly after
     # carboxylic_acid at rank 0). the Blue Book benzenecarboperoxoic acid (PIN).
     'carboperoxoic acid',
+    # Suite fix j6 (TRIAGE g8 C23): imidic_acid is rank 11 in SENIORITY_ORDER,
+    # after the carboxylic/peroxy/chalcogen C-acids and before sulfonic_acid
+    # (rank 15), so it sits here. 'carbothioic S-acid' (rank 2) is not in this
+    # list; _assemble_benzene_with_suffix hands the suffix to a co-occurring
+    # thioic S-acid rather than let the junior imidic acid win.
+    'carboximidic acid',
     'sulfonic acid',
     # D-FOLLOWON item 5: P/Se/Te + sulfinic ring oxoacids, junior to carboxylic
     # acid and sulfonic acid acid seniority C-acids > S > Se/Te/P oxoacids) so
@@ -162,6 +168,9 @@ _SUFFIX_TO_PREFIX = {
     'carbohydrazonohydrazide': 'hydrazinecarbohydrazonoyl',  # Wave2
     'carbothiohydrazide': 'hydrazinecarbothioyl',  # Wave2
     'carboximidamide': 'carbamimidoyl',  # C2
+    # Suite fix j6: '4-(C-hydroxycarbonimidoyl)benzoic acid (PIN)',
+    # the Blue Book).
+    'carboximidic acid': 'C-hydroxycarbonimidoyl',
     'carbohydrazonamide': 'carbamohydrazonoyl',  # Wave2
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
@@ -361,6 +370,12 @@ _BENZENE_FG_SMARTS = {
     # disjoint from amide/hydrazide/amidine here. No italic chalcogen locant
     # (hydrazonic acid has a single acid oxygen).
     'hydrazonic_acid': Chem.MolFromSmarts('[CX3](=[NX2][NX3H2])[OX2H1]'),
+    # Suite fix j6 (TRIAGE g8 C23;, the Blue Book 'benzene-
+    # carboximidic acid (PIN)'): ring-attached imidic acid -C(=NH)-OH ->
+    # '-carboximidic acid'. =[NX2H1] (an UNSUBSTITUTED imino N, as perception's
+    # `imidic_acid` FG requires) keeps an N-substituted imidate/imine out; the
+    # -OH (OX2H1) keeps the imidate ester (O-alkyl) and the amidine out.
+    'imidic_acid': Chem.MolFromSmarts('[CX3](=[NX2H1])[OX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
     # F-B: N-substituted ring sulfonamide -S(=O)(=O)-NR'R''. The
     # NX3 has fewer than two H, so it is disjoint from the primary 'sulfonamide'
@@ -650,6 +665,17 @@ def _identify_suffix_fg_on_benzene(
                 return {
                     'name': 'carbohydrazonic acid',
                     'suffix_name': 'carbohydrazonic acid',
+                    'is_suffix': True, 'atoms': sub_atoms,
+                }
+
+        # Imidic acid: C(=NH)(OH) -> '-carboximidic acid'. An
+        # ACID (senior to amide/amidine); disjoint from their =O / -N SMARTS and
+        # from the hydrazonic acid above (=N-NH2, not =NH).
+        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['imidic_acid']):
+            if match[0] == start_idx:
+                return {
+                    'name': 'carboximidic acid',
+                    'suffix_name': 'carboximidic acid',
                     'is_suffix': True, 'atoms': sub_atoms,
                 }
 
@@ -2044,16 +2070,26 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     is_complex_substituent,
                 )
                 # Inner substituted prefix gets its own parens;
-                # 'chloromethyl' -> '(chloromethyl)'.
-                _inner = (f'({_bname})'
+                # 'chloromethyl' -> '(chloromethyl)'. Suite fix j6 (TRIAGE g5
+                # C11): the mark escalates past the inner name's own marks
+                #, the Blue Book) -- a stereo-prefixed
+                # '(2R)-3-oxobutan-2-yl' becomes '[(2R)-3-oxobutan-2-yl]', not
+                # '((2R)-...)' (which also failed the OPSIN grammar check).
+                _inner = (apply_enclosing_marks(_bname, -1)
                           if is_complex_substituent(_bname) else _bname)
                 _complex_prefix = f'{_inner}amino'
                 # Escalate the OUTER enclosing mark by nesting depth:
                 # '(chloromethyl)amino' -> '[(chloromethyl)amino]'. Passing the
                 # already-escalated form to format_substituent_prefix (which
                 # only wraps-if-unwrapped) yields '4-[(chloromethyl)amino]-...'.
-                _wrapped = (apply_enclosing_marks(_complex_prefix, -1)
-                            if _inner != _bname else _complex_prefix)
+                # A SIMPLE inner prefix ('cyano') still makes 'cyanoamino' a
+                # compound prefix, and (the Blue Book)
+                # "Parentheses are used around compound... prefixes" -- the
+                # formatter only wraps-if-unwrapped, so an unwrapped
+                # 'cyanoamino' shipped as '4-cyanoaminobenzoic acid' at
+                # pin_verified; '(methylamino)' (:21624), '(carbamoylamino)acetic
+                # acid' (:33382). Both shapes are enclosed here.
+                _wrapped = apply_enclosing_marks(_complex_prefix, -1)
                 return {
                     'name': _wrapped,
                     'atoms': [n_idx] + list(_branch_atoms),
@@ -4011,8 +4047,12 @@ def name_substituted_benzene(
                     prefix_str = apply_enclosing_marks(name, -1)
             elif is_complex_substituent(name):
                 # Complex substituent needs enclosing marks per IUPAC
-                # e.g., "(2-methylbut-2-en-1-yl)benzene"
-                prefix_str = f"({name})"
+                # e.g., "(2-methylbut-2-en-1-yl)benzene"; escalated by the marks
+                # already inside it, the Blue Book) --
+                # '[2-(nitromethyl)propyl]benzene', not the old hard-coded
+                # '(2-(nitromethyl)propyl)benzene'.
+                from ..assembly.naming_utils import apply_enclosing_marks
+                prefix_str = apply_enclosing_marks(name, -1)
             else:
                 prefix_str = name
         else:
@@ -4076,6 +4116,13 @@ def _assemble_benzene_with_suffix(
     if chosen_suffix is None:
         # Shouldn't happen, but fallback to first suffix
         chosen_suffix = next(iter(suffix_groups))
+    # Suite fix j6: a carbothioic S-acid (SENIORITY_ORDER rank 2) outranks an
+    # imidic acid (rank 11) but is not in _SUFFIX_PRIORITY; keep it the suffix
+    # (the imidic acid demotes to 'C-hydroxycarbonimidoyl'), as before the
+    # imidic acid had a suffix form here.
+    if (chosen_suffix == 'carboximidic acid'
+            and 'carbothioic S-acid' in suffix_groups):
+        chosen_suffix = 'carbothioic S-acid'
 
     chosen_locants = suffix_groups[chosen_suffix]
     chosen_count = len(chosen_locants)
@@ -4308,6 +4355,23 @@ def _assemble_benzene_with_suffix(
             renumbered_groups, mono_needs_locant=True
         )
         return f"{prefix_part}benzene{chosen_suffix}"
+
+    # Suite fix j6 (TRIAGE g8 C23): single imidic acid on benzene ->
+    # '-carboximidic acid'. (the Blue Book) 'benzene-
+    # carboximidic acid (PIN)' (bare, no locant); with other substituents the
+    # PIN cites '-1-' on the group: '2-(propanimidoylselanyl)benzene-1-
+    # carboximidic acid (PIN)' (:32013). Several imidic acids fall through to
+    # the general assembler ('benzene-1,4-dicarboximidic acid').
+    if chosen_suffix == 'carboximidic acid' and chosen_count == 1:
+        if not remaining_prefix_groups:
+            return "benzenecarboximidic acid"
+        renumbered_groups = _renumber_relative_to(
+            remaining_prefix_groups, chosen_locants[0]
+        )
+        prefix_part = _build_prefix_string_with_locants(
+            renumbered_groups, mono_needs_locant=True
+        )
+        return f"{prefix_part}benzene-1-carboximidic acid"
 
     # C2: single amidine on benzene -> '-carboximidamide' suffix.
     # Bare -> 'benzenecarboximidamide' (no locant). With other substituents the

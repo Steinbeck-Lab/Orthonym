@@ -580,6 +580,8 @@ def _build_from_core(mol, core_set: Set[int], acyl_carbons: Set[int]) -> Optiona
 
     prefix_on: Dict[int, List[str]] = {}
     suffix_carbons: Set[int] = set()
+    acyloxy_arm = False
+    phosphoryloxy_arm = False
 
     for c in core_order:
         ca = mol.GetAtomWithIdx(c)
@@ -595,6 +597,11 @@ def _build_from_core(mol, core_set: Set[int], acyl_carbons: Set[int]) -> Optiona
                 suffix_carbons.add(c)
             else:
                 prefix_on.setdefault(c, []).append(payload)
+                far = [o for o in n.GetNeighbors() if o.GetIdx() != c]
+                if any(o.GetIdx() in acyl_carbons for o in far):
+                    acyloxy_arm = True
+                if any(o.GetSymbol() == 'P' for o in far):
+                    phosphoryloxy_arm = True
 
     if not prefix_on:
         return None  # no linkage arm -- not this composer's job (a bare
@@ -605,7 +612,26 @@ def _build_from_core(mol, core_set: Set[int], acyl_carbons: Set[int]) -> Optiona
     if numbering is None:
         return None
 
-    return _assemble(mol, core_order, numbering, suffix_carbons, prefix_on)
+    name = _assemble(mol, core_order, numbering, suffix_carbons, prefix_on)
+    if name and acyloxy_arm and not phosphoryloxy_arm:
+        # An ester of the core polyol cited as an 'acyloxy' prefix on the bare
+        # hydride (or beside the junior '-ol' suffix) is not the PIN.
+        # (the Blue Book) ranks esters (class 9,:18182) above alcohols
+        # (17,:18190) and ethers; (:31698) cites an ester as a
+        # prefix only "when [...] another group is present that has priority for
+        # citation as the principal group or when all ester groups cannot be
+        # described by the methods prescribed for naming esters", and a polyol
+        # ester has such a method: (:31836) "Method (1) generates
+        # preferred IUPAC names" ('propane-1,2,3-triyl 1,2-diacetate
+        # 3-propanoate (PIN)',:31840). The name is valid and round-trip verified,
+        # so it still ships; the name-scoped record keeps it off pin_verified
+        # (the twin, polyfunctional._record_el02_ester_prefix_name).
+        # A phosphoryloxy arm (a phosphoric acid diester with its own acidic
+        # OH) is a different seniority question and is left as it was.
+        # TRIAGE g3 C10b.
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
 
 
 # ---------------------------------------------------------------------------

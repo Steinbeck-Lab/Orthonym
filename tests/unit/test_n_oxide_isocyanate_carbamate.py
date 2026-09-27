@@ -6,7 +6,7 @@ All use functional class nomenclature (two-word names like "methyl isocyanate").
 : N-oxides ("pyridine 1-oxide", "trimethylamine N-oxide")
 : Isocyanates ("methyl isocyanate")
 : Isothiocyanates ("phenyl isothiocyanate")
-: Carbamates ("ethyl carbamate", "ethyl N-methylcarbamate")
+: Carbamates ("ethyl carbamate", "ethyl methylcarbamate")
 """
 
 import pytest
@@ -154,7 +154,7 @@ class TestCarbamate:
     def test_carbamate_n_methyl(self):
         """N-methylcarbamate: CNC(=O)OCC -> ethyl N-methylcarbamate."""
         result = name_compound("CNC(=O)OCC")
-        assert result == "ethyl N-methylcarbamate", f"Got '{result}'"
+        assert result == "ethyl methylcarbamate", f"Got '{result}'"
 
     @pytest.mark.unit
     def test_carbamate_not_ester(self):

@@ -112,7 +112,11 @@ class TestCTerminalAmide:
         smi = "N[C@@H](C)C(=O)NCC(N)=O"
         result = name_compound(smi)
         assert not is_failure_name(result), result
-        assert result == "alanylglycinamide", result
+        # Decision A part 2 (2026-09-27): was 'alanylglycinamide' (labelled below the
+        # PIN tier). Peptides are not PINs; the PIN is the substitutive name
+        # (V38-PEPTIDE-PIN-VERDICT.md; controller ruling, CHEBI:141425): the Ala acyl
+        # is the method (1) amido prefix, the Blue Book).
+        assert result == "2-[(2S)-2-aminopropanamido]acetamide", result
         assert _full_rt(smi, result), result
 
     def test_giant_30_residue_lysinamide_cterm_and_perf(self):
@@ -167,7 +171,7 @@ class TestNMethylNTerminus:
         smi = "CN[C@@H](C)C(=O)NCC(=O)O"
         result = name_compound(smi)
         assert not is_failure_name(result), result
-        assert result == "2-[(2S)-2-(methylamino)propanamido]ethanoic acid", result
+        assert result == "[(2S)-2-(methylamino)propanamido]acetic acid", result
         assert _full_rt(smi, result), result
 
     def test_real_backlog_composed_n_methyl_and_c_amide(self):
@@ -268,7 +272,7 @@ class TestRegressionUnaffected:
     def test_alanylglycine_unchanged(self):
         #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert (name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-                == "2-[(2S)-2-aminopropanamido]ethanoic acid")
+                == "[(2S)-2-aminopropanamido]acetic acid")
 
     def test_standard_tripeptide_unchanged(self):
         """Ile-Ala-Pro, a free-COOH/free-NH2 standard tripeptide -- must be

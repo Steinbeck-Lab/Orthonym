@@ -92,6 +92,36 @@ def test_phase02_group14_locant_one_omission(smiles, expected):
 
 
 # ---------------------------------------------------------------------------
+# Suite fix j4 (TRIAGE g3 C10d) -- (the Blue Book): "All locants
+# are omitted in compounds or substituent groups in which all substitutable
+# positions are completely substituted or modified... in the same way." and
+#:3009 "In case of partial substitution or modification, all numerical prefixes
+# must be indicated." Every H of the Group-14 parent hydride replaced by the SAME
+# alkyl -> no locants; a partial or mixed set keeps every locant. All names
+# OPSIN 2.9.0 full-InChIKey exact (independent batch, suite fix j4).
+# ---------------------------------------------------------------------------
+L5_OMIT_ALL = [
+    ("C[Si]([Si](C)(C)C)(C)C", "hexamethyldisilane"),
+    ("C[Si](C)(C)[Si](C)(C)[Si](C)(C)C", "octamethyltrisilane"),
+    ("CC[Si](CC)(CC)[Si](CC)(CC)CC", "hexaethyldisilane"),
+    ("C[Ge](C)(C)[Ge](C)(C)C", "hexamethyldigermane"),
+    ("C[Sn](C)(C)[Sn](C)(C)C", "hexamethyldistannane"),
+]
+L5_KEEP = [
+    # partial: the central SiH2 is unsubstituted (:3009)
+    ("C[Si](C)(C)[SiH2][Si](C)(C)C", "1,1,1,3,3,3-hexamethyltrisilane"),
+    ("C[Si](C)(C)[SiH3]", "1,1,1-trimethyldisilane"),
+    # complete but not "in the same way" (ethyl + methyl)
+    ("C[Si](C)(C)[Si](C)(C)CC", "1-ethyl-1,1,2,2,2-pentamethyldisilane"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", L5_OMIT_ALL + L5_KEEP)
+def test_group14_complete_uniform_substitution_omits_all_locants(smiles, expected):
+    assert name_compound(smiles) == expected, "P-14.3.4.5"
+
+
+# ---------------------------------------------------------------------------
 # D1 — N-carbon hydroxylamine (R-NH-OH) named as an N-hydroxy amine
 #. Two defects:
 # (1) MANDATORY 0-wrong: a base amine name with a LEADING STEREODESCRIPTOR

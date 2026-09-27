@@ -22,11 +22,16 @@ def _ik(s):
     ("[O-]Br(=O)=O", "bromate"),
     ("[O-]I(=O)(=O)=O", "periodate"),
     ("[O-]I(=O)=O", "iodate"),
-    ("[B-](F)(F)(F)F", "tetrafluoroborate"),
-    ("F[P-](F)(F)(F)(F)F", "hexafluorophosphate"),
+    # method (1) (the Blue Book): the '-uide' names, not the
+    # additive 'tetrafluoroborate'/'hexafluorophosphate' (TRIAGE g7 C13).
+    ("[B-](F)(F)(F)F", "tetrafluoroboranuide"),
+    ("F[P-](F)(F)(F)(F)F", "hexafluoro-λ5-phosphanuide"),
 ])
 def test_anion_word_round_trips(smi, word):
-    """Each added anion word parses back to the anion (0-wrong contract)."""
+    """Each added anion word parses back to the anion (0-wrong contract), and it is
+    the word the table holds."""
+    from orthonym.data.ion_retained_names import get_anion_name
+    assert get_anion_name(smi) == word
     from orthonym.validation.opsin_roundtrip import opsin_parse
     rt = opsin_parse(word)
     assert rt and _ik(rt) == _ik(smi), f"{word} !RT {smi}"
@@ -43,8 +48,8 @@ def test_simple_perchlorate_salts_name(smi, expected):
 
 @pytest.mark.parametrize("smi", [
     "[O-]Cl(=O)(=O)=O.C[N+](C)(C)C",   # tetramethylammonium perchlorate
-    "F[P-](F)(F)(F)(F)F.C[N+](C)(C)C",  #...hexafluorophosphate
-    "[B-](F)(F)(F)F.C[N+](C)(C)C",      #...tetrafluoroborate
+    "F[P-](F)(F)(F)(F)F.C[N+](C)(C)C",  #...hexafluoro-λ5-phosphanuide
+    "[B-](F)(F)(F)F.C[N+](C)(C)C",      #...tetrafluoroboranuide
 ])
 def test_onium_inorganic_salts_round_trip(smi):
     """The onium salt now names AND round-trips to the full multi-fragment InChIKey."""

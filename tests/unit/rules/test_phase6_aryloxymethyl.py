@@ -73,15 +73,16 @@ def test_plain_aryloxymethyl_unchanged(namer, smi, expected):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    # PROTECT-ROW REGRESSION LOCK. A first fix used `enclose_if_compound`, which
-    # flags 'benzyloxy'/'cyclohexyloxy' as compound two-morpheme prefixes and
-    # over-nested these — regressing the gold PIN `4-(benzyloxymethyl)phenol`
-    # (benchmarks/the gold set, category characteristic_groups) to a wrong
-    # `4-[(benzyloxy)methyl]phenol`. A retained oxy prefix that cites NO locant
-    # of its own stays BARE (single parens, no inner nest) — the enclosure
-    # decision is keyed on `starts_with_locant`, not on compound-ness.
-    ("Oc1ccc(COCc2ccccc2)cc1", "4-(benzyloxymethyl)phenol"),
-    ("Clc1ccc(COC2CCCCC2)cc1", "1-chloro-4-(cyclohexyloxymethyl)benzene"),
+    # CORRECTED 2026-09-27 (TRIAGE g6 C15, j5). This lock used to pin the bare
+    # 'benzyloxymethyl'/'cyclohexyloxymethyl'. Only the contracted
+    # prefixes are simple ("considered as simple prefixes", the Blue Book:
+    # methoxy, ethoxy, propoxy, butoxy, phenoxy, tert-butoxy); 'benzyloxy' and
+    # 'cyclohexyloxy' are concatenations and so compound, and (:7232)
+    # encloses them inside another prefix -- '(benzyloxy)carbonyl (preferred
+    # prefix)' (:18116), '(cyclohexyloxy)benzene (PIN)' (:27768). Gold row
+    # W2F-P1-P01 corrected in the same commit. OPSIN 2.9.0 full-key exact.
+    ("Oc1ccc(COCc2ccccc2)cc1", "4-[(benzyloxy)methyl]phenol"),
+    ("Clc1ccc(COC2CCCCC2)cc1", "1-chloro-4-[(cyclohexyloxy)methyl]benzene"),
 ])
 def test_benzyloxy_and_cyclohexyloxy_stay_bare(namer, smi, expected):
     name = namer.name(smi)

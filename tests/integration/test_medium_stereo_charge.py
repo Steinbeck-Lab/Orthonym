@@ -16,6 +16,25 @@ Test groups:
 import pytest
 from orthonym import name_compound
 
+# Suite fix j6-breadth (TRIAGE g4 C5): the PIN tier cannot build these PINs yet;
+# what ships is asserted in tests/unit/rules/test_j6_breadth.py
+# (test_pin_not_built_rows_keep_the_tier_contract).
+_J6_TODO = "TODO in TRIAGE.md 'Suite fix -- j6-breadth'"
+_XF_MACROLIDE = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs macrolide parent selection (the lactone ring "
+    "carries the principal characteristic groups, P-44.1.1, BlueBookV2.md:"
+    "18875) -- " + _J6_TODO))
+_XF_INDOLONE = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs the decorated 2,3-dihydro-1H-indol-2-one "
+    "substituent / piperazine-2,5-dione parent at the PIN tier -- " + _J6_TODO))
+_XF_POLYCYCLE = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs a PIN-tier producer for the spiro/bridged trioxa "
+    "polycycle with ylidene and lactone substituents -- " + _J6_TODO))
+_XF_FUSED_VB_LOCANTS = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs the fusion PIN of this benzo-fused system "
+    "(P-52.2.4.1, BlueBookV2.md:23710); the expected '(8R,9S,15S)' encodes von "
+    "Baeyer locants (non-PIN) and must be corrected with the build -- " + _J6_TODO))
+
 
 # ---------------------------------------------------------------------------
 # Group 1: Stereo auto-unlocked compounds
@@ -28,6 +47,7 @@ STEREO_AUTOUNLOCK = [
         "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O",
         "(2R)",
         id="indolinone-2R",
+        marks=_XF_INDOLONE,
     ),
     pytest.param(
         "Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O",
@@ -45,6 +65,7 @@ STEREO_AUTOUNLOCK = [
         "C(C)(C)C(=O)[C@H](C)[C@@H](O)/C(C)=C/CC1",
         "(4S,7R,8R,9E,13Z,16S)",
         id="oxacyclohexadecanone-6stereo",
+        marks=_XF_MACROLIDE,
     ),
     pytest.param(
         "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(C)=O",
@@ -56,6 +77,7 @@ STEREO_AUTOUNLOCK = [
         "OC2(C)C)C(C)(C)[C@H]1[C@@H](O)C=C1CCOC1=O",
         "(1S,2S,5S,9Z)",
         id="tricyclic-trioxa-1S2S5S",
+        marks=_XF_POLYCYCLE,
     ),
     pytest.param(
         "O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)[C@@H]1"
@@ -68,6 +90,7 @@ STEREO_AUTOUNLOCK = [
         "[C@@H]32)C(=O)N[C@H]1Cc1ccccc1",
         "(8R,9S,15S)",
         id="tetracyclic-diaza-8R9S15S",
+        marks=_XF_FUSED_VB_LOCANTS,
     ),
     pytest.param(
         "C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)O[C@@H](C)"
@@ -118,8 +141,16 @@ CHARGE_FIXES = [
     ),
     pytest.param(
         "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
-        "palmitoyloxy",
+        # The inner salt is named as the '-ate' zwitterion and the acyl is
+        # 3-hydroxyhexadecanoyl, so the old substring was wrong for this SMILES.
+        # Expected spelling: substituent prefixes in alphanumerical order,
+        # (the Blue Book); OPSIN 2.9.0 full-InChIKey EXACT (TRIAGE g4
+        # C7). The shipped name is RT-exact and labelled below pin_verified
+        # (test_carnitine_ester_zwitterion_tier_contract).
+        "3-[(3-hydroxyhexadecanoyl)oxy]-4-(trimethylazaniumyl)butanoate",
         id="zwitterion-palmitoyloxy",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "the inner-salt name is general nomenclature (its P-74.1.3 PIN cites '(N,N-dimethylmethanaminiumyl)', which OPSIN 2.9.0 cannot verify; decision A part 2) and _route_zwitterion glues the cation prefix in front of the anion parent's own prefixes: '4-(trimethylazaniumyl)3-[(3-hydroxyhexadecanoyl)oxy]butanoate' (no hyphen, P-14.5.2 order broken; charged_router needs a structured composition) -- TODO in TRIAGE.md 'Suite fix -- j5-pin-labels-b'")),
     ),
     pytest.param(
         "CCCCCCCCCC(=O)OCC(COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCCCCCCC",
@@ -136,6 +167,12 @@ CHARGE_FIXES = [
         "CC(C)[C@@]1(C)N=C(c2nc3ccccc3cc2C(=O)[O-])NC1=O.[NH4+]",
         "ammonium",
         id="ammonium-carboxylate-salt",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "PIN tier abstains (as it did in production at 4e0e5c29b); the old "
+            "'ammonium quinoline-3-carboxylate' dropped the imidazolone ring "
+            "(OPSIN: a different molecule; 704facd16). Needs the "
+            "4,5-dihydro-1H-imidazol-2-yl substituent at the PIN tier -- TODO in "
+            "TRIAGE.md 'Suite fix -- j1-regressions'")),
     ),
 ]
 
@@ -151,15 +188,33 @@ def test_charge_naming_medium(smiles, expected):
     )
 
 
+@pytest.mark.integration
+@pytest.mark.opsin_gate
+def test_ammonium_carboxylate_salt_tier_contract():
+    """The strict-xfail 'ammonium-carboxylate-salt' row above, in production:
+    the tier contract holds and the best-effort name is an ammonium salt."""
+    from tests.support.rt_assert import assert_tier_contract
+    _pin, be = assert_tier_contract(
+        "CC(C)[C@@]1(C)N=C(c2nc3ccccc3cc2C(=O)[O-])NC1=O.[NH4+]")
+    assert be.startswith("ammonium "), be
+
+
 # ---------------------------------------------------------------------------
 # Group 3: Newly round-tripping compounds from a phase
 # These compounds gained correct names through a phase parent fixes that
 # now successfully round-trip through OPSIN -> InChI comparison.
 # ---------------------------------------------------------------------------
 NEWLY_RT_P66 = [
+    # Suite fix j6 (TRIAGE g4 C5): the old snapshot '...-2-(1-oxo1-(2,5-
+    # dihydroxyphenyl)ethyl)-...' was malformed ('oxo1-', prefixes out of
+    # order, nesting) and the PIN tier had abstained since: a ring
+    # branch on a chain substituent was declined. The substituent keeps the
+    # free valence and cites the ring as a prefix: '2-[2-(2,5-
+    # dihydroxyphenyl)-2-oxoethyl]' alphanumerical order, the Blue Book
+    #.md:3477; nesting {},:7444). OPSIN 2.9.0: exact.
     pytest.param(
         "C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO",
-        "(2Z,5E,9E)-2-(1-oxo1-(2,5-dihydroxyphenyl)ethyl)-"
+        "(2Z,5E,9E)-2-[2-(2,5-dihydroxyphenyl)-2-oxoethyl]-"
         "11-hydroxy-6,10-dimethylundeca-2,5,9-trienoic acid",
         id="ganoderenic-acid-analog-RT",
     ),

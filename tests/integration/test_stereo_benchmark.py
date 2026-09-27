@@ -116,7 +116,11 @@ SMALL_STEREO_COMPOUNDS = [
     ('C[C@@H]1Cc2cc(O)cc(O)c2CO1', '(3R)-3-methyl-3,4-dihydro-1H-2-benzopyran-6,8-diol'),  # NEWLY_RT
     ('O=P([O-])([O-])OC[C@@H](O)[C@H](O)[C@@H](O)CO', '(2R,3R,4S)-2,3,4,5-tetrahydroxypentyl phosphate'),  # P80-01 phosphonooxy prefix; P131 merges hydroxy prefixes
     ('O=C([O-])[C@@H](O)[C@H](O)[C@H](O)[C@@H](O)C(=O)[O-]', '(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioate'),  # NEWLY_RT
-    ('N[C@@H](COC(=O)CCC(=O)O)C(=O)O', '4-[(S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid'),  # MISSING_STEREO - wrong parent
+    # s16, decision A part 2 (2026-09-27): was '4-[(S)-2-amino-2-carboxyethoxy]-...'
+    # (labelled below pin_verified). (the Blue Book) 'stereodescriptors,
+    # preceded by a locant, must be cited'; the substituent producer's free-valence
+    # numbering now locates the centre. OPSIN 2.9.0 full-InChIKey exact.
+    ('N[C@@H](COC(=O)CCC(=O)O)C(=O)O', '4-[(2S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid'),
     ('C=C(C(=O)OC)N1C(=O)C[C@@H](C)C1=O', 'methyl 2-[(3R)-3-methyl-2,5-dioxopyrrolidin-1-yl]prop-2-enoate'),  # MISSING_STEREO - wrong parent; depth-independent naming v11
     ('CC(=O)[C@@H](C)Nc1ccccc1C(=O)O', None),
     # wp7 change-asserted-value (s19, s20): compares LETTERS first, locants and hyphens
@@ -129,14 +133,15 @@ SMALL_STEREO_COMPOUNDS = [
     ('CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1', 'germacrane'),  # lowercase s for pseudoasymmetric center per IUPAC
     ('COc1c(C)c(O)cc2c1C(=O)N[C@H]2C', '(3S)-5-hydroxy-7-methoxy-3,6-dimethyl-2,3-dihydro-1H-isoindol-1-one'),
     ('CC(=N)NCCCC[C@H](N)C(=O)O.Cl.Cl', None),  # alpha order fixed P80
-    # s24: a name ("Retained names are used to indicate... nitrogen...
-    # substitution", the Blue Book), kept at the PIN tier by user decision D-a; the
-    # Blue Book identifies no PIN for it:50943) and prints its own N-substituted
-    # glycines in both spellings without a PIN mark (:33382,:34278). The engine names
-    # N-acetylglycine systematically ('acetamidoacetic acid'), which D-a also admits; the
-    # two conventions are recorded in the TODO ('Open from fix a performance pass (wp7)'), not a
-    # label defect (wp7 verification panel RISK).
-    ('C/C=C/CC(O)CCC(=O)NCC(=O)O', 'N-[(6E)-4-hydroxyoct-6-enoyl]glycine'),  # alpha order fixed P80
+    # s24, decision A part 2 (user decision A, 2026-09-26): an amino acid substituted on its
+    # NITROGEN takes the systematic substitutive name at the PIN tier.
+    # (the Blue Book): -NH-CO-R is named "(1) substitutively, by using a prefix formed
+    # by changing the final letter 'e' in the complete name of the amide to 'o'" (:32995);
+    # "Method (1) generates preferred IUPAC names." (:32998); an N-substituted glycine is
+    # printed on the acetic acid parent at:33213. The N-acyl retained form ('N-[(6E)-4-
+    # hydroxyoct-6-enoyl]glycine',:54480) is general nomenclature:50943).
+    # OPSIN 2.9.0 full-InChIKey exact (outside the engine).
+    ('C/C=C/CC(O)CCC(=O)NCC(=O)O', '[(6E)-4-hydroxyoct-6-enamido]acetic acid'),  # was 'N-[(6E)-4-hydroxyoct-6-enoyl]glycine'
     ('CCC[C@@H]1OCc2c(O)cccc2[C@H]1O', '(3S,4R)-3-propyl-3,4-dihydro-1H-2-benzopyran-4,8-diol'),  # NEWLY_RT
     # a phase cleanup: stereo descriptor `(1S,4R,5R)-` rebaselined per
     # a phase spiro stereo injection + IUPAC mandatory rules
@@ -156,7 +161,10 @@ SMALL_STEREO_COMPOUNDS = [
     ('CO[C@@H]1[C@H](O)[C@@H](CO)O[C@H]1n1ccc(=O)[nH]c1=O', '1-[(2R,3R,4R,5R)-4-hydroxy-5-(hydroxymethyl)-3-methoxyoxolan-2-yl]pyrimidine-2,4(1H,3H)-dione'),
     ('CCCCC[C@@H](O)[C@@H](O)c1cc(OC)cc(=O)o1', '6-[(1R,2R)-1,2-dihydroxyheptyl]-4-methoxy-2H-pyran-2-one'),
     ('C[C@H]1C[C@H](O)[C@@H]2[C@H]1[C@@H]1[C@H](CC[C@]2(C)O)[C@@]1(C)CO', None),
-    ('C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O', 'prolylalanylalanine'),  # a phase: stereo on parent chain
+    # j7 (TRIAGE g5 C15): the tripeptide's substitutive PIN (nested amido prefix,
+    # method (1):32995; controller ruling: peptide names are not
+    # PINs); was the retained 'prolylalanylalanine'. OPSIN full-InChIKey exact.
+    ('C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O', '(2S)-2-{(2S)-2-[(2S)-pyrrolidine-2-carboxamido]propanamido}propanoic acid'),
     ('CCCCCC=CC1=C(CO)C(=O)C[C@H](O)[C@@H]1O', '(4R,5S)-3-(hept-1-en-1-yl)-4,5-dihydroxy-2-(hydroxymethyl)cyclohex-2-en-1-one'),
     ('CC(=O)[C@@]1(C)C(C)=C[C@H](O)[C@H]2C[C@](C)(O)CC[C@@H]21', None),  # MISSING_STEREO - wrong parent
     # a phase cleanup: stereo descriptor `(5S,6R,9R,10R)-` rebaselined
@@ -190,13 +198,17 @@ MEDIUM_STEREO_COMPOUNDS = [
     # (canonical estra-1,3,5-triene numbering for aromatic A-ring per
     #; per Plan 01 SUMMARY this is "unrelated to a phase"
     # incidental locant correction). Acceptable churn.
-    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-estra-1,3,5(10)-triene-3,15,16,17-tetrol'),
+    # j7: the estrane numbering map had C-11/C-12 swapped; with it fixed the
+    # alpha/beta form resolves:51053 "This method is
+    # preferred"); OPSIN full-InChIKey exact.
+    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', 'estra-1,3,5(10)-triene-3,15α,16α,17β-tetrol'),
     ('COc1cc(O)c2c(c1)C(=O)C1=C(C2=O)[C@@H](O)C[C@@](C)(O)C1', '(1S,3S)-1,3,8-trihydroxy-6-methoxy-3-methyl-1,2,3,4-tetrahydroanthracene-9,10-dione'),
     ('C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)O[C@@H](C)C/C=C\\C(=O)O1', '(4R,7Z,10S,13Z,15R,16S)-15-hydroxy-4,10,16-trimethyl-1,5,11-trioxacyclohexadeca-7,13-diene-2,6,12-trione'),
     ('CN1CCC2=C[C@H](O)[C@H]3OC(=O)c4cc5c(cc4[C@H]3[C@@H]21)OCO5', None),  # Updated P72: IUPAC citation order
     ('CCCCC[C@H](O)/C=C/[C@H]1CCC(=O)[C@@H]1C/C=C\\CCCC(=O)O', None),
     ('CCCCC[C@H](O)/C=C/[C@@H]1[C@@H](C/C=C\\CCCC(=O)O)[C@H](O)C[C@H]1O', None),
-    ('CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', 'tyrosylvalylarginine'),
+    # j7 (TRIAGE g3 C05): the substitutive PIN, was the retained 'tyrosylvalylarginine'.
+    ('CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', '(2S)-2-{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-methylbutanamido}-5-(carbamimidoylamino)pentanoic acid'),
     # wp7 change-asserted-value (m08): 'dimethyl' keys at 'methyl', before 'oxo':3448); a primed
     # locant is a locant:3442), not text that sorts before letters. OPSIN full-InChIKey exact.
     ('CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1', "(10'S,17'S)-9',13'-dimethyl-5,6'-dioxospiro[oxolane-2,14'-tetracyclo[8.7.0.0^4,9.0^13,17]heptadeca-2,4-diene]"),  # was "...-5,6'-dioxo-9',13'-dimethylspiro[...]"
@@ -281,12 +293,9 @@ _KNOWN_NON_PIN = {
         "zwitterion named by the 'amino' -> 'azaniumyl' swap, which wp3 labels below "
         "pin_verified (name-scoped record); the P-74 zwitterion PIN is not derived",
         None),
-    # s16
-    "N[C@@H](COC(=O)CCC(=O)O)C(=O)O": (
-        "bare '(S)-' on a substituent whose name carries locants; P-91.2.1.2.1 "
-        "(BlueBookV2.md:44624) 'stereodescriptors, preceded by a locant, must be "
-        "cited' (wp5 e4247b324 demotes it; the '(2S)-' emitter is not built)",
-        "4-[(2S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid"),
+    # s16 left this map in decision A part 2 (2026-09-27): the '(2S)-' emitter is built
+    # (substituent_naming.polyfunctional_substituent_located) and the row ships its PIN
+    # '4-[(2S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid' at pin_verified.
     # s21
     "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1": (
         "'germacrane', the np_stereoparent carve-out (OPSIN-unparseable; P-100 :50943, "
@@ -294,21 +303,11 @@ _KNOWN_NON_PIN = {
         "name's pseudoasymmetric '4s' is verified by the centres labeller, OPSIN "
         "2.9.0 cannot assign it",
         "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"),
-    # s40, m07, m20: retained peptide names
-    "C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O": (
-        "peptide name; controller ruling: peptides are not PINs, the PIN is the "
-        "substitutive name (not built)", None),
-    "CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O": (
-        "peptide name; controller ruling: peptides are not PINs, the PIN is the "
-        "substitutive name (not built)", None),
+    # m20: retained peptide name (s40 and m07 left this list in j7: the tripeptide
+    # substitutive PIN is built, TRIAGE g3 C05)
     "CC(C)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O": (
         "peptide name; controller ruling: peptides are not PINs, the PIN is the "
         "substitutive name (not built)", None),
-    # m01
-    "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O": (
-        "whole-graph CIP descriptors on the steroid stereoparent's implied centres "
-        "instead of the P-101.2.6 alpha/beta form (:51045, :51047); wp5 demotes it",
-        None),
     # m08 (canrenone)
     "CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1": (
         "von Baeyer descriptor for the ortho-fused steroid core inside a spiro name and "
@@ -416,25 +415,25 @@ def test_medium_stereo_baseline(smiles, expected_name):
 # wp7: tier-contract rows whose raw name misreads a 24(28)-methylidene as '24-ene'.
 # The derived spelling cites the exocyclic bond with its compound locant;
 # stereoparent names kept by the controller ruling on names) and is OPSIN 2.9.0
-# full-InChIKey exact; strict xfail until the steroid assembler emits it.
+# full-InChIKey exact. j7: the steroid unsaturation finder now emits every compound
+# locant (1), the Blue Book), so both rows pass; m17's stigmastane
+# map (C-11/C-12 swapped) is fixed too, so its name takes the preferred
+# alpha/beta form:51053) instead of the whole-graph R/S target.
 _DERIVED_TARGETS = {
     # m17 (stigmastadienol)
     "C/C=C(/CC[C@@H](C)[C@H]1CC[C@H]2C3=CC[C@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(C)C":
-        "(3S,5S,9R,10S,13R,14R,17R,20R,24Z)-stigmasta-7,24(28)-dien-3-ol",
+        "(24Z)-5α-stigmasta-7,24(28)-dien-3β-ol",
     # m18 (ergostadienol)
     "C=C(CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3)C(C)C":
         "(3S,5R,10S,13R,14R,17R,20R)-4,4,14-trimethylergosta-8,24(28)-dien-3-ol",
 }
 
 
-@pytest.mark.parametrize("smiles,target", [
-    pytest.param(smi, target, marks=pytest.mark.xfail(strict=True, reason=(
-        "DEFECT (gate-off wrong molecule, voided by the gate): the steroid assembler "
-        "writes the 24(28)-methylidene as '24-ene'; the derived PIN-tier spelling is "
-        "the target. .planning/TODO-2026-09-24.md 'Open from T12 fix round 2 (wp7)'.")))
-    for smi, target in _DERIVED_TARGETS.items()])
+@pytest.mark.parametrize("smiles,target", list(_DERIVED_TARGETS.items()))
 def test_steroid_24_28_methylidene_target(smiles, target):
+    from tests.support.rt_assert import name_is_rt_exact
     assert name_compound(smiles) == target
+    assert name_is_rt_exact(target, smiles)
 
 
 def test_every_tracked_row_is_rt_exact():

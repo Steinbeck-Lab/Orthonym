@@ -52,7 +52,42 @@ def _old_full_scan(mol):
     return (name, atom_mapping, core_smiles)
 
 
+def _locant_key(locant):
+    """'3a' -> (3, 'a'), 7 -> (7, ''): the order of catalog locants."""
+    text = str(locant)
+    digits = "".join(ch for ch in text if ch.isdigit())
+    return (int(digits) if digits else 0, text[len(digits):])
+
+
+def _automorphic_mappings(mol, core_smiles):
+    """Every atom->locant map the catalog core gives ``mol``: one per substructure
+    match, symmetry-equivalent ones included (uniquify=False)."""
+    pattern = _get_substructure_patterns()[core_smiles]
+    iul = FUSED_HETEROCYCLE_DATA[core_smiles].get('iupac_locants') or {}
+    maps = []
+    for match in mol.GetSubstructMatches(pattern, uniquify=False, maxMatches=100000):
+        maps.append({m: iul[p] for p, m in enumerate(match) if iul.get(p) is not None})
+    return maps
+
+
+def _substituent_locants(mol, mapping):
+    """Sorted locants of the mapped core atoms that carry an atom outside the core."""
+    core = set(mapping)
+    return sorted((_locant_key(loc) for idx, loc in mapping.items()
+                   if any(nb.GetIdx() not in core
+                          for nb in mol.GetAtomWithIdx(idx).GetNeighbors())))
+
+
 def _assert_equiv(smi):
+    """The bucketed matcher finds the SAME core as the full scan. Its atom->locant
+    map may differ by a symmetry of that core only: since E1/DD4 (the substituent-
+    locant minimization, ``_select_lowest_locant_match``) the matcher picks, among
+    the core's automorphic matches, the one giving the substituents the lowest
+    locants (f)/(g), the Blue Book), where the verbatim full
+    scan below keeps ``matches[0]`` ('6-methyl' vs '5-methyl' on a symmetric
+    [1,3,2]benzodioxathiole). So: same name and core, a map that is one of the
+    core's automorphic maps onto this molecule, the orientation of that placement
+    with the lowest substituent locants, and none higher than the full scan's."""
     mol = Chem.MolFromSmiles(smi)
     if mol is None:
         return
@@ -65,7 +100,20 @@ def _assert_equiv(smi):
         if r is None:
             return None
         return (r[0], dict(r[1]), r[2])
-    assert norm(new) == norm(old), f"divergence for {smi!r}:\n old={norm(old)}\n new={norm(new)}"
+    msg = f"divergence for {smi!r}:\n old={norm(old)}\n new={norm(new)}"
+    if old is None or new is None:
+        assert norm(new) == norm(old), msg
+        return
+    assert (new[0], new[2]) == (old[0], old[2]), msg
+    new_map = dict(new[1])
+    maps = _automorphic_mappings(mol, new[2])
+    assert new_map in maps, msg + "\n (not a symmetry of the core)"
+    same_placement = [d for d in maps if set(d) == set(new_map)]
+    best = min(_substituent_locants(mol, d) for d in same_placement)
+    assert _substituent_locants(mol, new_map) == best, (
+        msg + "\n (not the orientation with the lowest substituent locants)")
+    assert best <= _substituent_locants(mol, dict(old[1])), (
+        msg + "\n (substituent locants higher than the full scan's)")
 
 
 CATALOG_SMILES = list(FUSED_HETEROCYCLE_DATA.keys())

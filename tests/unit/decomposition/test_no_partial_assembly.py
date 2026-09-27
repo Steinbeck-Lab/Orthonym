@@ -106,7 +106,14 @@ GPI_FAILING_FRAGMENT = (
 # the rung names it '(3R)-3,7-dimethyl-9-(2,2,5,5-tetramethyl-1,3-dioxolan-
 # 4-yl)nona-1,6-dien-3-ol', RT-exact (measured 2026-09-25). It is the canary
 # call 171 molecule of TRIAGE.md " known cases".
-PIN_TIER_FAILING_FRAGMENT = "C=C[C@](C)(O)CCC=C(C)CCC1OC(C)(C)OC1(C)C"
+# Suite fix j6 (TRIAGE g3 C17b): that producer now exists for saturated
+# chalcogen heteromonocycles (Hantzsch-Widman stem,, so both PIN
+# rungs name the dioxolane row RT-exact and it no longer anchors anything. The
+# anchor is now the PAH_10 hexahydronaphthalene: its PIN (a hydro-naphthalene
+# fusion name, has no producer, both PIN rungs decline, and the T4
+# rung names it '2,6-dimethyl-8-(prop-1-en-2-yl)bicyclo[4.4.0]deca-1(10),2-
+# diene', RT-exact (measured 2026-09-27).
+PIN_TIER_FAILING_FRAGMENT = "C=C(C)C1CC=C2C(C)=CCCC2(C)C1"
 
 # 74-heavy-atom lipopeptide (fatty-acyl N-cap + 6 amide-linked residues,
 # non-standard/branched residues). VERIFIED (this session, monkeypatch trace):

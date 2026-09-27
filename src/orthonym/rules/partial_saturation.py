@@ -1856,7 +1856,8 @@ def _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set):
     return out
 
 
-def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None):
+def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None,
+                        alternative_indicated_h: bool = False):
     """Resolve the mancude parent(s) of a ring-ketone's ring system.
 
     Returns a list of ``(parent_name, [(locant_map, parentH_map),...], ih_locants)``
@@ -1869,6 +1870,12 @@ def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None):
     substitution of that >CH2 — which disambiguates the parent
     isomer (4H-chromen-4-one, not 2H-chromen-3-one). ``parentH_map`` is retained
     for shape compatibility (currently unused downstream).
+
+    ``alternative_indicated_h``: a fused catalog parent with ONE intrinsic
+    indicated hydrogen is also offered with that hydrogen at every other
+    peripheral carbon where the ring system stays mancude ('2H-indole' beside the
+    catalog's '1H-indole'), so a ketone there can take it,
+    :func:`_alternative_indicated_h_parents`).
     """
     from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
     from ..data.polycyclic_data import POLYCYCLIC_DATA
@@ -2033,6 +2040,92 @@ def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None):
             pairs.append((a2l, pH))
         if pairs:
             out.append((nm, pairs, frozenset(ih_locants)))
+            if alternative_indicated_h:
+                for alt_nm, alt_ih in _alternative_indicated_h_parents(
+                        nm, cmol, numbering, ih_locants):
+                    # 4th field: only for the case (see the caller)
+                    out.append((alt_nm, pairs, frozenset({alt_ih}), True))
+    return out
+
+
+def _has_perfect_matching(mol, nodes) -> bool:
+    """True iff the atoms ``nodes`` of ``mol`` can be paired off completely along
+    bonds between them (a Kekule arrangement of double bonds over them)."""
+    from functools import lru_cache
+    nbrs = {a: frozenset(nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                         if nb.GetIdx() in nodes) for a in nodes}
+
+    @lru_cache(maxsize=None)
+    def rec(avail):
+        if not avail:
+            return True
+        a = min(avail)
+        rest = avail - {a}
+        return any(rec(rest - {b}) for b in nbrs[a] if b in rest)
+
+    return rec(frozenset(nodes))
+
+
+def _alternative_indicated_h_parents(name, cmol, numbering, ih_locants):
+    """The other single-indicated-hydrogen forms of a fused catalog parent.
+
+     (the Blue Book): "When there are an equal number of
+    indicated hydrogen atoms and principal characteristic groups..., the
+    indicated hydrogen atoms are placed at peripheral atoms that will accommodate
+    these principal characteristic groups... Locants for hydro prefixes are those
+    of the saturated positions" ('2-(1,3,4,5-tetrahydro-2H-2-benzazepin-2-yl)
+    ethan-1-ol (PIN)',:24774). The catalog holds one tautomer per ring system
+    ('1H-indole'); a ketone at C-2 needs '2H-indole' -> '1,3-dihydro-2H-indol-2-
+    one'. Offered at a peripheral CARBON p (two ring bonds, a double-bond atom of
+    the catalog form) when the ring system with p as its only sp3 atom still has
+    a Kekule arrangement over every other double-bond atom, the catalog's own
+    indicated-hydrogen atom included (it must be a C or N with two ring bonds).
+    Returns ``[(name, locant)]``;  for anything else."""
+    import re as _re
+    if len(ih_locants) != 1:
+        return []
+    (h,) = tuple(ih_locants)
+    m = _re.match(rf'^{h}H-(.+)$', name)
+    if not m:
+        return []
+    stem = m.group(1)
+    n_atoms = cmol.GetNumAtoms()
+    ring = set()
+    for r in cmol.GetRingInfo().AtomRings():
+        ring.update(r)
+    kek = Chem.Mol(cmol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return []
+    db_atoms = set()
+    for bond in kek.GetBonds():
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+            if i in ring and j in ring:
+                db_atoms.update((i, j))
+
+    def _ring_degree(a):
+        return sum(1 for nb in cmol.GetAtomWithIdx(a).GetNeighbors()
+                   if nb.GetIdx() in ring)
+
+    h_atoms = [c for c, loc in numbering.items() if loc == h and c < n_atoms]
+    if len(h_atoms) != 1:
+        return []
+    h_atom = h_atoms[0]
+    if (cmol.GetAtomWithIdx(h_atom).GetSymbol() not in ('C', 'N')
+            or _ring_degree(h_atom) != 2 or h_atom in db_atoms):
+        return []
+    base = db_atoms | {h_atom}
+    out = []
+    for c, loc in numbering.items():
+        if not isinstance(loc, int) or loc == h or c >= n_atoms:
+            continue
+        if (cmol.GetAtomWithIdx(c).GetSymbol() != 'C' or c not in db_atoms
+                or _ring_degree(c) != 2):
+            continue
+        if _has_perfect_matching(cmol, base - {c}):
+            out.append((f"{loc}H-{stem}", loc))
     return out
 
 
@@ -2301,7 +2394,8 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
     # ('1-benzyl-1H-1,3-diazine-2,4-dione', '1-phenyl-2,5-dihydro-1H-pyrrole-
     # 2,5-dione'). Same test as oxo_prefix_parent_numberings.
     single_ring = any(set(r) == ring_set for r in rings)
-    candidates = _resolve_oxo_parent(mol, ring_set, monocyclic=single_ring)
+    candidates = _resolve_oxo_parent(mol, ring_set, monocyclic=single_ring,
+                                     alternative_indicated_h=True)
     if not candidates:
         return None
 
@@ -2366,8 +2460,19 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
                     _sub_names.append((_r, _alpha_sort_key(_nm)))
 
     best = None
-    for parent_name, pairs, ih_locants in candidates:
+    for _cand in candidates:
+        parent_name, pairs, ih_locants = _cand[:3]
+        # an alternative indicated-hydrogen tautomer ('2H-indole') exists only for
+        # (as many indicated hydrogens as suffixes, all at them);
+        # with fewer, (1) (:24808) keeps the parent's own lowest-
+        # locant indicated hydrogen ('3,7-dihydro-1H-purine-2,6-dione', not
+        # '2H-purine-2,6(1H,3H,7H)-dione')
+        _alt_only_at_suffixes = len(_cand) > 3 and _cand[3]
         for loc, parentH in pairs:
+            if _alt_only_at_suffixes and not (
+                    len(ih_locants) == len(carbonyls)
+                    and all(loc[c] in ih_locants for c in carbonyls)):
+                continue
             # Intrinsic-IH parent (1H-indene, 2H-/4H-chromene, the 2H-/4H-pyran
             # isomers): the ketone is the DIRECT substitution of the parent's
             # >CH2, so a carbonyl MUST sit at one of its indicated-H locants
@@ -2394,6 +2499,18 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
                                 for a in ih_atoms)):
                     continue
                 matched, unmatched = set(), set()
+            elif len(ih_locants) == len(carbonyls) and all(
+                    loc[c] in ih_locants for c in carbonyls):
+                # (the Blue Book): as many indicated hydrogen
+                # atoms as suffixes, all placed at the suffix positions -- "Locants
+                # for hydro prefixes are those of the saturated positions", whether
+                # or not they are neighbours: '1,3-dihydro-2H-indol-2-one', not an
+                # added indicated hydrogen (TRIAGE j12 finding 5). Mancude parent
+                # and molecule both pair off every other double-bond atom, so the
+                # saturated set is even; an odd one is not this case.
+                if len(sat) % 2:
+                    continue
+                matched, unmatched = set(sat), set()
             else:
                 matched, unmatched = _max_oxo_matching(adj, sat, loc)
             added_ih, hydro = unmatched, matched

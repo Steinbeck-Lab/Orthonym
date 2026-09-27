@@ -399,6 +399,45 @@ def _join_prefix_to_name(prefix_str: str, name: str) -> str:
 _ALPHA_LOCANT_RE = re.compile(r'^\d+(?:,\d+)*-')
 
 
+# TRIAGE j12 findings 2/4/7: the locant-free retained 'acetic acid' name
+# ('(S)-hydroxy(phenyl)acetic acid') cannot be turned into its amido prefix by a
+# string edit: 'acetamide' requires its locants, the Blue Book
+# "Locants are required for related compounds where additional substitutable
+# positions are available, for example acetamide"), so the prefix is built from
+# the SYSTEMATIC spelling the same producer computed ('(2S)-2-hydroxy-2-phenyl-
+# ethanoic acid' -> '(2S)-2-hydroxy-2-phenylacetamido'). The fold sites record
+# that pair here. A name denotes one structure, so the map is a pure function of
+# the name; a name absent from it (never produced by a fold in this process)
+# makes the amido converter fail closed rather than guess.
+_RETAINED_ACETIC_SYSTEMATIC: dict = {}
+_RETAINED_ACETIC_SYSTEMATIC_MAX = 50000
+
+
+def record_retained_acetic_systematic(retained: str, systematic: str) -> None:
+    """Record the systematic '...ethanoic acid' spelling of a retained substituted
+    'acetic acid' name built by a fold site (see the comment above)."""
+    if not retained or not systematic or retained == systematic:
+        return
+    if not (retained.endswith("acetic acid") and systematic.endswith("ethanoic acid")):
+        return
+    # only a LOCATED spelling is of use ('2-hydroxy-2-phenylethanoic acid', after
+    # an optional descriptor block); a locant-free one ('chloroethanoic acid',
+    # after a omission) is not recorded
+    if not re.match(r"^(?:\([^()]*\)-)?\d", systematic):
+        return
+    old = _RETAINED_ACETIC_SYSTEMATIC.get(retained)
+    if old is not None and old <= systematic:
+        return  # two producers' spellings: keep one, independent of call order
+    if len(_RETAINED_ACETIC_SYSTEMATIC) >= _RETAINED_ACETIC_SYSTEMATIC_MAX:
+        _RETAINED_ACETIC_SYSTEMATIC.clear()
+    _RETAINED_ACETIC_SYSTEMATIC[retained] = systematic
+
+
+def retained_acetic_systematic(retained: str) -> Optional[str]:
+    """The recorded systematic spelling of ``retained``, or None."""
+    return _RETAINED_ACETIC_SYSTEMATIC.get(retained)
+
+
 def retained_acetic_from_prefixes(
     prefix_texts: List[str],
     stereo: str = "",
@@ -474,15 +513,30 @@ def retained_acetic_from_prefixes(
     # marks (rule's last sentence,:7272): 'diphenyl' -> 'di(phenyl)', giving
     # 'hydroxydi(phenyl)acetic acid' (the Blue Book) -- NOT the halomethane bare-all
     # carve-out (which the BB's own di(phenyl) example contradicts here).
+    #
+    # The multiplier is read off the prefix's LOCANTS ('2,2-diphenyl': two locants,
+    # 'di'), never off its spelling: a name that merely starts with those letters
+    # is one substituent -- 'octanamido' was split into 'octa(namido)' ('(S)-
+    # hydroxyocta(namido)acetic acid', gate-rejected, TRIAGE j12), likewise
+    # 'decanoyl', 'heptanoyl', 'triazolyl', 'tetrazolyl', 'diazenyl'. A
+    # 'bis(...)'-type prefix is enclosed by its own marks already.
     if enclose_subsequent and len(unlocanted) > 1:
-        def _enclose_after_first(t: str) -> str:
-            if _is_fully_enclosed(t):
+        _count_mult = {2: 'di', 3: 'tri'}
+
+        def _locant_count(t: str) -> int:
+            m = re.match(r'^(\d+[a-z]?(?:,\d+[a-z]?)*)-', t)
+            return len(m.group(1).split(',')) if m else 1
+
+        def _enclose_after_first(t: str, n: int) -> str:
+            if _is_fully_enclosed(t) or _mult_self_enclosed(t):
                 return t
-            for _mp in _MULTIPLIER_PREFIXES:
-                if t.startswith(_mp) and len(t) > len(_mp):
-                    return f"{_mp}{apply_enclosing_marks(t[len(_mp):], -1)}"
+            _mp = _count_mult.get(n)
+            if _mp and t.startswith(_mp) and len(t) > len(_mp):
+                return f"{_mp}{apply_enclosing_marks(t[len(_mp):], -1)}"
             return apply_enclosing_marks(t, -1)
-        unlocanted = [unlocanted[0]] + [_enclose_after_first(t) for t in unlocanted[1:]]
+        unlocanted = [unlocanted[0]] + [
+            _enclose_after_first(t, _locant_count(orig))
+            for t, orig in zip(unlocanted[1:], prefix_texts[1:])]
     name = _join_prefix_to_name(_join_prefixes(unlocanted), parent)
     return f"{stereo}{name}" if stereo else name
 

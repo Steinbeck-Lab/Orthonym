@@ -1875,7 +1875,24 @@ def apply_ion_suffix_to_name(name: str, total_charge: int,
 
     Returns the ionized name, or '' if no canonical transform applies (the caller
     then falls through to the existing cascade — byte-identical contract).
+
+    The ion keeps the neutral name's PIN status: a recorded non-PIN fragment in
+    ``name`` (decision A's demoted 'N-<acyl>' float,...) does not survive the suffix
+    swap, so the ionized name is recorded too
+    (``metrics.provenance.record_derived_non_pin_fragment``).
     """
+    result = _apply_ion_suffix_to_name_form(name, total_charge, allowed_suffixes,
+                                            cation_class)
+    if result:
+        from ..metrics.provenance import record_derived_non_pin_fragment
+        record_derived_non_pin_fragment(name, result)
+    return result
+
+
+def _apply_ion_suffix_to_name_form(name: str, total_charge: int,
+                                   allowed_suffixes: Optional[frozenset] = None,
+                                   cation_class: Optional[str] = None) -> str:
+    """The string transform behind ``apply_ion_suffix_to_name``."""
     if not name:
         return ''
 
@@ -3613,6 +3630,18 @@ def _ring_iupac_locants(ring_mol):
     return (ri or {}).get('iupac_locants')
 
 
+def _ring_locant_order_key(loc):
+    """Order a ring locant: arabic numbers numerically, a fusion interior locant
+    after its number (``9 < '9a' < 10``,. ``int`` and ``str``
+    locants of one fused numbering compare without raising."""
+    if isinstance(loc, int) and not isinstance(loc, bool):
+        return (loc, "")
+    m = re.match(r"^(\d+)(.*)$", str(loc))
+    if m:
+        return (int(m.group(1)), m.group(2))
+    return (1 << 30, str(loc))
+
+
 def _lowest_cation_locant_renumbering(bare_ring_mol, locants, center, subst_atoms=()):
     """P-73.5.3.2 (heading **P-73.5.3 "Cationic characteristic groups on parent
     cations"**, ``BlueBookV2.md:42207``; rule ``:42219``): *"Where there is a
@@ -3660,7 +3689,11 @@ def _lowest_cation_locant_renumbering(bare_ring_mol, locants, center, subst_atom
     except (RuntimeError, ValueError):
         return locants
     keys = list(locants.keys())
-    target = sorted(locants.values())
+    # A fused parent's numbering mixes int and interior str locants ('9a');
+    # compare them as (number, letter) so sorting never raises (TRIAGE g7 C15:
+    # the quinolizinium bromide crashed here with TypeError and abstained).
+    lk = _ring_locant_order_key
+    target = sorted(locants.values(), key=lk)
     subst = [s for s in subst_atoms if s in locants]
     best_key, best = None, locants
     for auto in autos:
@@ -3674,10 +3707,10 @@ def _lowest_cation_locant_renumbering(bare_ring_mol, locants, center, subst_atom
             new_loc[a] = locants[b]
         # An automorphism restricted to the ring atoms must still be a bijection
         # over the same locant set; skip anything that is not (defensive).
-        if not ok or sorted(new_loc.values()) != target:
+        if not ok or sorted(new_loc.values(), key=lk) != target:
             continue
-        cation_locant = new_loc[center]
-        subst_key = tuple(sorted(new_loc[s] for s in subst))
+        cation_locant = lk(new_loc[center])
+        subst_key = tuple(sorted(lk(new_loc[s]) for s in subst))
         canon_key = tuple(canon[auto[a]] for a in keys)
         key = (cation_locant, subst_key, canon_key)
         if best_key is None or key < best_key:
@@ -5312,9 +5345,18 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
 
     # Stereodescriptor block over the numbered PARENT-chain atoms only (cp is
     # not numbered -- cites a descriptor at the locant of the parent
-    # atom it belongs to).
-    if any(mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
-           for a in path[:parent_len]):
+    # atom it belongs to). A backbone double bond's E/Z counts too,
+    # the Blue Book 'Z'/'E' are the preferred descriptors in PINs; the
+    # bond lies between two numbered parent atoms): without
+    # it the monosodium fumarate [Na+].O=C([O-])/C=C/C(=O)O shipped as the
+    # stereo-less 'sodium 3-carboxyprop-2-enoate' (TRIAGE g5 C13).
+    _backbone_ez = any(
+        mol.GetBondBetweenAtoms(path[i], path[i + 1]).GetStereo()
+        != Chem.BondStereo.STEREONONE
+        for i in range(parent_len - 1))
+    if _backbone_ez or any(
+            mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+            for a in path[:parent_len]):
         from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
         atom_to_locant = {path[i]: i + 1 for i in range(parent_len)}
         stereo_prefix = format_stereodescriptor_string(
@@ -5490,7 +5532,21 @@ def _acid_name_to_carboxylate(acid_name: str, carboxylate_count: int) -> str:
     - 'glutamic acid' -> 'glutamate' (retained)
 
     IUPAC: Replace '-ic acid' with '-ate' for full deprotonation.
+
+    The anion keeps the acid name's PIN status: when the acid name carries a recorded
+    non-PIN fragment (decision A's demoted 'N-<acyl>' float, a retained peptide name),
+    the recorded string does not survive the suffix change, so the anion name is
+    recorded too (``metrics.provenance.record_derived_non_pin_fragment``).
     """
+    result = _acid_name_to_carboxylate_form(acid_name, carboxylate_count)
+    if result:
+        from ..metrics.provenance import record_derived_non_pin_fragment
+        record_derived_non_pin_fragment(acid_name, result)
+    return result
+
+
+def _acid_name_to_carboxylate_form(acid_name: str, carboxylate_count: int) -> str:
+    """The string conversion behind ``_acid_name_to_carboxylate``."""
     if not acid_name:
         return ''
 
@@ -5537,6 +5593,91 @@ def _parent_acid_suffix_multiplicity(anion_name: str) -> int:
     return _ACID_SUFFIX_MULTIPLIER_WORDS.get(m.group(1), 1)
 
 
+def _phosphate_monoester_dianion_groups(mol, anions):
+    """The [O-] sites that form a fully deprotonated phosphoric-acid MONOESTER
+    group -O-P(=O)(O-)2, grouped by their P atom.
+
+    Returns ``(n_groups, site_indices)``. A group qualifies only when its P is
+    carbon-free, uncharged, bears exactly four O neighbours (one double-bonded,
+    one ester O bonded to another heavy atom, and exactly two of the anionic
+    sites). Any other P-bound [O-] (a diester anion, a monoanion
+    -O-P(=O)(OH)O-) is NOT a group and keeps its old 'alkoxide' count."""
+    site_idx = {a['atom_idx'] for a in anions if a.get('element') == 'O'}
+    by_p: Dict[int, List[int]] = {}
+    for i in site_idx:
+        at = mol.GetAtomWithIdx(i)
+        heavy = [n for n in at.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy) == 1 and heavy[0].GetSymbol() == 'P':
+            by_p.setdefault(heavy[0].GetIdx(), []).append(i)
+    n_groups, sites = 0, set()
+    for p_idx, o_sites in by_p.items():
+        p_at = mol.GetAtomWithIdx(p_idx)
+        nbs = list(p_at.GetNeighbors())
+        if (len(o_sites) != 2 or p_at.GetFormalCharge() != 0
+                or len(nbs) != 4 or any(n.GetSymbol() != 'O' for n in nbs)):
+            continue
+        n_double = sum(
+            1 for n in nbs
+            if mol.GetBondBetweenAtoms(p_idx, n.GetIdx()).GetBondType()
+            == Chem.BondType.DOUBLE)
+        esters = [n for n in nbs if n.GetIdx() not in o_sites
+                  and mol.GetBondBetweenAtoms(p_idx, n.GetIdx()).GetBondType()
+                  == Chem.BondType.SINGLE
+                  and any(x.GetIdx() != p_idx and x.GetAtomicNum() > 1
+                          for x in n.GetNeighbors())]
+        if n_double == 1 and len(esters) == 1:
+            n_groups += 1
+            sites.update(o_sites)
+    return n_groups, sites
+
+
+def _carbonic_parent_acid_sites(mol, anions, name: str) -> set:
+    """The [O-] sites the PARENT suffix of a carbonic / polycarbonic acid anion
+    name ('carbonate', 'dicarbonate', '1-thiodicarbonate', '2-imidodicarbonate',
+    'tricarbonate',...) already accounts for.
+
+     (the Blue Book, "Anions derived from acids"): the anion
+    formed by removing a hydron from the chalcogen atom of an acid "or
+    functional parent compound is formed by replacing the 'ic acid'... ending
+    of the acid name by 'ate'". Carbonic acid HO-CO-OH and the polynuclear
+    carbon acids HO-CO-[O-CO]n-OH "CARBONIC, CYANIC, AND DI- AND
+    POLYCARBONIC ACIDS", "a group of functional parent compounds",:30721-30736)
+    have TWO acid chalcogen atoms on their terminal carbon(s), and functional replacement
+    ,:31037, "Replacement by -OO-, -S-, =S,... -NH-, =NH") keeps
+    them, so '-ate' covers both: (:32029) '3-ethyl 1-S-methyl
+    1-thiodicarbonate (PIN)' is built on the dianion '1-thiodicarbonate'. Such a
+    site sits on a carbon with no carbon or hydrogen neighbour and a double bond
+    to a heteroatom (=O, =S, =Se, =Te, =NH, =N-NH2); its [O-] on a =S or =NH
+    carbon is classified 'alkoxide', not 'carboxylate', so without this helper
+    the '-oate'-only ``_parent_acid_suffix_multiplicity`` left it as a junior
+    'oxido' site the name cannot hold, and the whole name failed closed.
+
+    Returns the set of claimed site indices; empty unless ``name`` ends in
+    'carbonate' and there are one or two such sites (the parent has at most two
+    acid chalcogen atoms, so a third candidate means the attribution is not
+    this parent's and the caller's general junior accounting decides)."""
+    if not name.endswith('carbonate'):
+        return set()
+    sites = set()
+    for a in anions:
+        if a.get('element') != 'O':
+            continue
+        at = mol.GetAtomWithIdx(a['atom_idx'])
+        heavy = [n for n in at.GetNeighbors() if n.GetAtomicNum() > 1]
+        if len(heavy) != 1 or heavy[0].GetAtomicNum() != 6:
+            continue
+        c = heavy[0]
+        if c.GetTotalNumHs() or any(n.GetAtomicNum() in (1, 6) for n in c.GetNeighbors()):
+            continue
+        if not any(
+                b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtom(c).GetAtomicNum() in (7, 8, 16, 34, 52)
+                for b in c.GetBonds()):
+            continue
+        sites.add(a['atom_idx'])
+    return sites if len(sites) <= 2 else set()
+
+
 def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     """ (BB:41195, "ANIONIC CENTERS IN BOTH PARENT COMPOUNDS AND
     SUBSTITUENT GROUPS"): an anionic characteristic group that is NOT in the
@@ -5568,12 +5709,33 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     does not attempt.
     Examples (all verbatim BB PINs/preselected prefixes): 2-(carboxylatomethyl)benzoate
     (BB:41293), 3-oxidonaphthalene-2-carboxylate (BB:41295),
-    4-sulfonatobenzoate +, RT-verified 2026-08-17)."""
+    4-sulfonatobenzoate +, RT-verified 2026-08-17).
+
+    A phosphoric-acid monoester whose two acid O are both deprotonated,
+    -O-P(=O)(O-)2, is the junior prefix 'phosphonatooxy': the anionic twin
+    , BB:41213 "–P(O)(O–)2 phosphonato (preselected prefix)") of
+    the PIN prefix 'phosphonooxy', BB:36333 "(phosphonooxy)acetic
+    acid (PIN)"). E.g. '(2R,3R)-2,3-dihydroxy-4-(phosphonatooxy)butanoate'.
+
+    FAIL CLOSED (0-wrong): a junior anionic site this producer cannot express
+    (a mixed set of junior classes, or a neutral-prefix count that does not
+    match the anionic-site count) returns '' -- never the unconverted name,
+    whose neutral prefix denotes a DIFFERENT, less anionic molecule (it made
+    '(2R,3R)-2,3-dihydroxy-4-(phosphonooxy)butanoate', a monoanion, ship for
+    the trianion with the validity gate off)."""
     if not name:
         return name
     classes = [classify_anion(mol, a) for a in anions]
-    n_carb = sum(1 for c in classes if c == 'carboxylate')
-    n_ox = sum(1 for c in classes if c in ('phenolate', 'alkoxide'))
+    n_phosphate, phosphate_sites = _phosphate_monoester_dianion_groups(mol, anions)
+    # A carbonic / polycarbonic acid parent's '-ate' already holds its acid
+    # sites; they are never junior, whatever their class.
+    carbonic_sites = _carbonic_parent_acid_sites(mol, anions, name)
+    n_carb = sum(1 for a, c in zip(anions, classes)
+                 if c == 'carboxylate' and a['atom_idx'] not in carbonic_sites)
+    n_ox = sum(1 for a, c in zip(anions, classes)
+               if c in ('phenolate', 'alkoxide')
+               and a['atom_idx'] not in phosphate_sites
+               and a['atom_idx'] not in carbonic_sites)
     n_sulfonate = sum(1 for c in classes if c == 'sulfonate')
     n_sulfinate = sum(1 for c in classes if c == 'sulfinate')
     n_phosphonate = sum(1 for c in classes if c == 'phosphonate')
@@ -5597,13 +5759,20 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     # ('-dioate' -> 2, '-tricarboxylate' -> 3, plain '-oate'/'-carboxylate'
     # -> 1) so the JUNIOR count reflects only the sites the parent suffix did
     # NOT already claim.
-    if n_carb >= 1:
+    if carbonic_sites:
+        # The '-carbonate' parent claimed its sites above; every remaining
+        # carboxylate / olate site is junior.
+        junior_carb, junior_ox = n_carb, n_ox
+    elif n_carb >= 1:
         junior_carb = max(n_carb - _parent_acid_suffix_multiplicity(name), 0)
         junior_ox = n_ox
     elif n_ox >= 1:
         junior_carb, junior_ox = 0, n_ox - 1
     else:
-        return name
+        # No carboxylate / olate parent: every anionic site is still junior
+        # to nothing this producer knows -- keep the historical pass-through
+        # only when there is no junior site to express at all.
+        return name if not n_phosphate else ''
     # Every S/P-oxoacid anionic centre present is junior to the chosen parent
     # (carboxylate/olate) in every reachable case today. A terminal C-bonded
     # thiolate ([S-]) is likewise junior: carboxylate senior to
@@ -5620,7 +5789,7 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     junior_by_class = {
         'carb': junior_carb, 'ox': junior_ox, 'sulfonate': junior_sulfonate,
         'sulfinate': junior_sulfinate, 'phosphonate': junior_phosphonate,
-        'thiolate': junior_thiolate,
+        'thiolate': junior_thiolate, 'phosphate': n_phosphate,
     }
     total_junior = sum(junior_by_class.values())
     if total_junior == 0:
@@ -5633,45 +5802,58 @@ def _apply_anionic_substituent_prefixes(mol, anions, name: str) -> str:
     # converting two DIFFERENT substituent words risks re-ordering the
     # alphabetized prefix list, which this producer does not attempt.
     if sum(1 for v in junior_by_class.values() if v > 0) > 1:
-        return name  # mixed junior classes -> fail closed (prefix-reordering risk)
+        return ''  # mixed junior classes -> fail closed (prefix-reordering risk)
 
     out = name
     swapped = []   # (neutral token, anionic token) pairs actually swapped
     if junior_carb >= 1:
         # 'carboxy' NOT part of 'carboxyl…' (the parent 'carboxylate'/'carboxylato').
-        if len(re.findall(r'carboxy(?!l)', out)) == junior_carb:
-            out = re.sub(r'carboxy(?!l)', 'carboxylato', out, count=junior_carb)
-            swapped.append(('carboxy', 'carboxylato'))
+        if len(re.findall(r'carboxy(?!l)', out)) != junior_carb:
+            return ''
+        out = re.sub(r'carboxy(?!l)', 'carboxylato', out, count=junior_carb)
+        swapped.append(('carboxy', 'carboxylato'))
     if junior_ox >= 1:
         # Convert only when EVERY 'hydroxy' prefix is an anionic O- (so a
         # genuine neutral -OH is never turned into 'oxido').
-        if out.count('hydroxy') == junior_ox:
-            out = out.replace('hydroxy', 'oxido', junior_ox)
-            swapped.append(('hydroxy', 'oxido'))
+        if out.count('hydroxy') != junior_ox:
+            return ''
+        out = out.replace('hydroxy', 'oxido', junior_ox)
+        swapped.append(('hydroxy', 'oxido'))
     if junior_sulfonate >= 1:
         # 'sulfo' NOT part of 'sulfon…' (the neutral 'sulfonic'/'sulfonyl' or an
         # already-anionic 'sulfonato'/'sulfonate' stem elsewhere in the name).
-        if len(re.findall(r'sulfo(?!n)', out)) == junior_sulfonate:
-            out = re.sub(r'sulfo(?!n)', 'sulfonato', out, count=junior_sulfonate)
-            swapped.append(('sulfo', 'sulfonato'))
+        if len(re.findall(r'sulfo(?!n)', out)) != junior_sulfonate:
+            return ''
+        out = re.sub(r'sulfo(?!n)', 'sulfonato', out, count=junior_sulfonate)
+        swapped.append(('sulfo', 'sulfonato'))
     if junior_sulfinate >= 1:
         # 'sulfino' is a distinct token (does not overlap 'sulfinato').
-        if out.count('sulfino') == junior_sulfinate:
-            out = out.replace('sulfino', 'sulfinato', junior_sulfinate)
-            swapped.append(('sulfino', 'sulfinato'))
+        if out.count('sulfino') != junior_sulfinate:
+            return ''
+        out = out.replace('sulfino', 'sulfinato', junior_sulfinate)
+        swapped.append(('sulfino', 'sulfinato'))
     if junior_phosphonate >= 1:
         # 'phosphono' is a distinct token (does not overlap 'phosphonate').
-        if out.count('phosphono') == junior_phosphonate:
-            out = out.replace('phosphono', 'phosphonato', junior_phosphonate)
-            swapped.append(('phosphono', 'phosphonato'))
+        if out.count('phosphono') != junior_phosphonate:
+            return ''
+        out = out.replace('phosphono', 'phosphonato', junior_phosphonate)
+        swapped.append(('phosphono', 'phosphonato'))
+    if n_phosphate >= 1:
+        # One 'phosphonooxy' per -O-P(=O)(O-)2 group, and no other 'phosphono'.
+        if (out.count('phosphonooxy') != n_phosphate
+                or out.count('phosphono') != n_phosphate):
+            return ''
+        out = out.replace('phosphonooxy', 'phosphonatooxy', n_phosphate)
+        swapped.append(('phosphonooxy', 'phosphonatooxy'))
     if junior_thiolate >= 1:
         # 'sulfanyl' is the neutral -SH substituent prefix; swap the anionic
         # occurrences to 'sulfido' (mirrors the sulfinato/sulfonato/
         # phosphonato blocks above). Guarded to an EXACT count match so a
         # genuine neutral -SH elsewhere in the name is never mis-converted.
-        if out.count('sulfanyl') == junior_thiolate:
-            out = out.replace('sulfanyl', 'sulfido', junior_thiolate)
-            swapped.append(('sulfanyl', 'sulfido'))
+        if out.count('sulfanyl') != junior_thiolate:
+            return ''
+        out = out.replace('sulfanyl', 'sulfido', junior_thiolate)
+        swapped.append(('sulfanyl', 'sulfido'))
     _demote_if_swap_changes_citation_rank(out, swapped)
     return out
 

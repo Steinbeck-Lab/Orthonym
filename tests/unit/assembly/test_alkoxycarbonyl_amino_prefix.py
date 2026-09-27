@@ -190,15 +190,27 @@ class TestSecondEmitterPath:
     def test_carbamate_route_reaches_this_emitter(self):
         assert self._branch("CC(C)(C)OC(=O)NC") == "(tert-butoxycarbonyl)amino"
 
-    @pytest.mark.parametrize("smiles", [
-        "CC(C)C(=O)NC",     # isobutyryl -- a count says 4 carbons = n-butyryl
-        "C=CC(=O)NC",       # acryloyl -- a count erases the double bond
-        "CC(C)(C)C(=O)NC",  # pivaloyl -- a count says 5 carbons = n-pentanoyl
+    @pytest.mark.parametrize("smiles,amido,count_spelling", [
+        # isobutyryl -- a count says 4 carbons = n-butyryl
+        ("CC(C)C(=O)NC", "2-methylpropanamido", "butanoylamino"),
+        # acryloyl -- a count erases the double bond
+        ("C=CC(=O)NC", "prop-2-enamido", "propanoylamino"),
+        # pivaloyl -- a count says 5 carbons = n-pentanoyl
+        ("CC(C)(C)C(=O)NC", "2,2-dimethylpropanamido", "pentanoylamino"),
     ])
-    def test_count_refuses_what_it_cannot_spell(self, smiles):
-        """Must be None, not a stem. Coercing the count to 1 here is what
-        produced 'methanoylamino' for groups that contain no formyl at all."""
-        assert self._branch(smiles) is None
+    def test_count_refuses_what_it_cannot_spell(self, smiles, amido, count_spelling):
+        """Never a count stem. Coercing the count to 1 here is what produced
+        'methanoylamino' for groups that contain no formyl at all.
+
+        Decision A part 2 (2026-09-27): was ``is None``. The acid-recursive method
+        (1) amido prefix, the Blue Book, "Method (1) generates
+        preferred IUPAC names.":32998) now runs BEFORE the count and names these
+        acyls from their structure; the count still never runs on them. OPSIN 2.9.0
+        full-InChIKey exact on '(2-methylpropanamido)acetic acid',
+        '(prop-2-enamido)acetic acid', '(2,2-dimethylpropanamido)acetic acid'."""
+        got = self._branch(smiles)
+        assert got == amido
+        assert count_spelling not in got
 
     def test_faithful_linear_acyl_still_named(self):
         """The control: an unbranched saturated acyl is unaffected."""
@@ -313,7 +325,7 @@ class TestWholeName:
         ("CC(=O)NCC(=O)O", "acetamidoacetic acid"),
         ("CCC(=O)NCC(=O)O", "propanamidoacetic acid"),
         # Carbamate as the PARENT is unchanged (it was already right).
-        ("CC(C)(C)OC(=O)NCC", "tert-butyl N-ethylcarbamate"),
+        ("CC(C)(C)OC(=O)NCC", "tert-butyl ethylcarbamate"),
     ])
     def test_neighbouring_classes_unchanged(self, smiles, expected):
         assert name_compound(smiles) == expected

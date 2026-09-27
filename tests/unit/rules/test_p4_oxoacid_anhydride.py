@@ -158,19 +158,24 @@ class TestAtomDropSafetyFloor:
         load-bearing guard. (The suite default is gate-OFF, under which
         name_compound == raw and would ship the split; hence the marker.)
 
-        Only the RAW gate-OFF namer emits a mixture-split
+        The RAW gate-OFF namer used to emit a mixture-split
         ('3-hydroxypropanoic acid diphosphoric acid') for this CONNECTED input;
         OPSIN parses that name to a DISCONNECTED 2-fragment structure, so the
-        production gate's rejects it as a different molecule. Per project
-        guidance a gate-OFF wrongness is not a real deployment (production always
-        gates), so the raw split is documented, not chased. Change predates v52."""
+        production gate's SELF-01 rejected it as a different molecule. Since the
+        pre-existing-failures plan the raw namer fails closed too (TRIAGE 'Suite
+        fix -- j1-regressions'; 0-wrong: a shipped name must denote the input), so
+        the raw check now asserts that: the failure sentinel or an RT-exact name,
+        never the split. Best-effort names it RT-exact ('3-[(1,3,3-trihydroxy-
+        1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)oxy]propanoic acid')."""
+        from orthonym.errors import is_failure_name
+        from tests.support.rt_assert import name_is_rt_exact
         smi = "OC(=O)CCOP(=O)(O)OP(=O)(O)O"
         gated = name_compound(smi)
         assert gated is None or gated.startswith("unknown")   # production: fail-closed
         raw = RAW.name(smi)
         assert raw != "propanoic acid"            # never the old atom-dropped leak
-        # Raw gate-OFF emits the mixture-split the production gate rejects.
-        assert raw == "3-hydroxypropanoic acid diphosphoric acid"
+        assert raw != "3-hydroxypropanoic acid diphosphoric acid"   # nor the split
+        assert is_failure_name(raw) or name_is_rt_exact(raw, smi), raw
 
 
 @pytest.mark.unit

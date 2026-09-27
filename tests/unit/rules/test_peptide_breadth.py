@@ -126,7 +126,12 @@ class TestLeverANAcylCap:
         smi = "OC(CC(=O)NCC(=O)NCC(=O)O)CCCCCCCC(CC)C"
         result = name_compound(smi)
         assert not is_failure_name(result), result
-        assert result == "3-hydroxy-11-methyltridecanoylglycylglycine", result
+        # Decision A part 2 (2026-09-27): was the Lever-A retained name
+        # '3-hydroxy-11-methyltridecanoylglycylglycine'. The peptide PIN is the
+        # SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md, as for the dodecanoyl
+        # sibling below); the decorated acyl is now the method (1) amido prefix
+        #, the Blue Book). Full-InChIKey round trip below.
+        assert result == "[2-(3-hydroxy-11-methyltridecanamido)acetamido]acetic acid", result
         assert _full_rt(smi, result), result
 
     def test_simple_fatty_acyl_dipeptide(self):
@@ -239,7 +244,7 @@ class TestRegressionUnaffected:
     def test_alanylglycine_unchanged(self):
         #: substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         assert (name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-                == "2-[(2S)-2-aminopropanamido]ethanoic acid")
+                == "[(2S)-2-aminopropanamido]acetic acid")
 
     def test_glutathione_achiral_still_declines_or_roundtrips(self):
         """The ACHIRAL-drawn glutathione test molecule (no stereo defined

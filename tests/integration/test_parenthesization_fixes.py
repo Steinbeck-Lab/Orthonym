@@ -88,18 +88,22 @@ class TestAcyloxyParenthesization:
 class TestParenthesizationCompounds:
     """Tests for the 4 parenthesization-issue compounds from."""
 
+    # Compound #11 is uridine 2',3',5'-triacetate. (the Blue Book)
+    # identifies no PIN for the Chapter nucleoside names; the NUCLEOSIDE
+    # engine's name is kept at the PIN tier by the controller ruling (option A,
+    # TRIAGE.md 'Row 61 (carry; controller ruling, option A)', D-a). The old
+    # 'bis(acetyloxy)' substring fitted no name this molecule gets. OPSIN 2.9.0
+    # full-InChIKey EXACT (TRIAGE g5 C14).
+    COMPOUND_11 = "CC(=O)OC[C@H]1O[C@@H](n2ccc(=O)[nH]c2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O"
+
     @pytest.mark.integration
     def test_compound_11_no_hybrid_format(self):
-        """Compound #11 (HA=26): bis(acetyloxy)oxolane, not di(acetyloxy)."""
-        smiles = "CC(=O)OC[C@H]1O[C@@H](n2ccc(=O)[nH]c2=O)[C@H](OC(C)=O)[C@@H]1OC(C)=O"
-        name = name_compound(smiles)
-        assert "bis(acetyloxy)" in name, (
-            f"Expected 'bis(acetyloxy)' in '{name}'"
-        )
-        # No hybrid di(format
-        assert "di(acetyloxy)" not in name, (
-            f"Unexpected hybrid 'di(acetyloxy)' in '{name}'"
-        )
+        """Compound #11 (HA=26): the nucleoside ester name, no 'di(acetyloxy)'."""
+        from tests.support.rt_assert import name_is_rt_exact
+        name = name_compound(self.COMPOUND_11)
+        assert name == "uridine 2',3',5'-triacetate", name
+        assert "di(acetyloxy)" not in name
+        assert name_is_rt_exact(name, self.COMPOUND_11), name
 
     @pytest.mark.integration
     def test_compound_65_no_hybrid_format(self):

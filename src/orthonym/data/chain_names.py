@@ -4,27 +4,30 @@ Centralized IUPAC chain naming module.
 Provides authoritative chain prefix generation for all carbon chain lengths
 from 1 to 9999, following IUPAC 2013 Blue Book nomenclature rules.
 
-IUPAC Long Chain Naming System:
+IUPAC Long Chain Naming System, the Blue Book; numerical terms
+, Table 1.4 at:2794):
 - 1-20: Individual retained prefixes (meth, eth, prop,... icos)
-- 21+: Compositional system using units + tens + hundreds + thousands
-  - Units (1-9): hen, do, tri, tetra, penta, hexa, hepta, octa, nona
-  - Tens (20-90): cos, triacont, tetracont, pentacont, hexacont, heptacont,
-                   octacont, nonacont
-  - Hundreds (100-900): hect, dict, trict, tetract, pentact, hexact, heptact,
-                         octact, nonact
-  - Thousands (1000-9000): kili, dili, trili, tetrali, pentali, hexali,
-                            heptali, octali, nonali
-  - Assembly: units + tens + hundreds + thousands (right-to-left composition)
+- 21+: the basic numerical term of the number with its terminal 'a' elided
+  before 'ane'. The term is built from the basic terms of Table 1.4 cited in the
+  order opposite to the digits (units, tens, hundreds, thousands):
+  - Units (1-9), in association: hen, do, tri, tetra, penta, hexa, hepta,
+    octa, nona,:2807: '1' is 'hen' and '2' is 'do' in
+    association, except 'undeca', 'dicta' and 'dilia')
+  - Tens (10-90): deca, icosa, triaconta, tetraconta,... nonaconta
+  - Hundreds (100-900): hecta, dicta, tricta, tetracta,... nonacta
+  - Thousands (1000-9000): kilia, dilia, trilia, tetralia,... nonalia
 
-Special linking rules:
-- 21: hen + i + cos = "henicos" (linking 'i' before "cos" after "hen")
-- 30+: ones + tens-prefix (e.g., dotriacont, tripentacont)
-- 100+: (ones+tens) + "a" + hundreds (linking 'a' before hundreds)
-- 1000+: (sub-thousand) + "a" + thousands (linking 'a' before thousands)
+Joining,:2811): "The composite terms are formed by direct joining
+of the basic terms, without hyphen(s). The letter 'i' in 'icosa' is elided after
+a vowel." So there is no linking letter: 101 henhecta (Table 1.4), 111
+undecahecta, 363 trihexacontatricta, 486 hexaoctacontatetracta, 1001 henkilia
+(Table 1.4); and 'icosa' keeps its 'i' unless a vowel precedes it: 21 henicosa,
+22 docosa, 120 icosahecta.
 
 References:
-    IUPAC 2013 Blue Book, Table A6.1 (Numerical terms used in nomenclature)
-    IUPAC 2013 Blue Book, (Thousands digit prefixes)
+    IUPAC 2013 Blue Book,, Table 1.4 (basic numerical terms)
+    IUPAC 2013 Blue Book, (derivation of basic numerical terms)
+    IUPAC 2013 Blue Book, (unbranched acyclic hydrocarbons)
 
 Examples:
     >>> get_chain_prefix(1)
@@ -35,12 +38,16 @@ Examples:
     'dotriacont'
     >>> get_chain_prefix(100)
     'hect'
+    >>> get_chain_prefix(101)
+    'henhect'
+    >>> get_chain_prefix(120)
+    'icosahect'
     >>> get_chain_prefix(132)
     'dotriacontahect'
     >>> get_chain_prefix(1000)
     'kili'
     >>> get_chain_prefix(1001)
-    'henakili'
+    'henkili'
 """
 
 
@@ -57,36 +64,35 @@ FIRST_20 = {
 }
 
 # ============================================================================
-# Compositional components for 21+
+# Basic numerical terms (Table 1.4, the Blue Book), for 21+
 # ============================================================================
 
-# Units digit (1-9) used in compositional naming
-UNITS = {
-    0: "", 1: "hen", 2: "do", 3: "tri", 4: "tetra", 5: "penta",
+# Units digit (1-9) in association with other numerical terms
+#: 'hen' for 1 and 'do' for 2).
+UNIT_TERMS = {
+    1: "hen", 2: "do", 3: "tri", 4: "tetra", 5: "penta",
     6: "hexa", 7: "hepta", 8: "octa", 9: "nona",
 }
 
-# Tens digit (2-9) -> tens prefix
-# Note: tens=1 (10-19) is handled by FIRST_20 for n<=20,
-# and by "deca" for 110, 210, etc. (in combination with hundreds)
-# tens=2 (20-29) uses "cos" (special: "icos" for 21 with linking 'i')
-TENS = {
-    2: "cos", 3: "triacont", 4: "tetracont", 5: "pentacont",
-    6: "hexacont", 7: "heptacont", 8: "octacont", 9: "nonacont",
+# Tens digit (1-9). 11 is 'undeca', handled in _sub_hundred_term.
+TENS_TERMS = {
+    1: "deca", 2: "icosa", 3: "triaconta", 4: "tetraconta", 5: "pentaconta",
+    6: "hexaconta", 7: "heptaconta", 8: "octaconta", 9: "nonaconta",
 }
 
-# Hundreds digit (1-9) -> hundreds prefix
-HUNDREDS = {
-    1: "hect", 2: "dict", 3: "trict", 4: "tetract", 5: "pentact",
-    6: "hexact", 7: "heptact", 8: "octact", 9: "nonact",
+# Hundreds digit (1-9).
+HUNDREDS_TERMS = {
+    1: "hecta", 2: "dicta", 3: "tricta", 4: "tetracta", 5: "pentacta",
+    6: "hexacta", 7: "heptacta", 8: "octacta", 9: "nonacta",
 }
 
-# Thousands digit (1-9) -> thousands prefix
-# Source: IUPAC 2013 Blue Book Table 1.4
-THOUSANDS = {
-    1: "kili", 2: "dili", 3: "trili", 4: "tetrali", 5: "pentali",
-    6: "hexali", 7: "heptali", 8: "octali", 9: "nonali",
+# Thousands digit (1-9).
+THOUSANDS_TERMS = {
+    1: "kilia", 2: "dilia", 3: "trilia", 4: "tetralia", 5: "pentalia",
+    6: "hexalia", 7: "heptalia", 8: "octalia", 9: "nonalia",
 }
+
+_VOWELS = frozenset("aeiou")
 
 
 # ============================================================================
@@ -128,12 +134,14 @@ def get_chain_prefix(n: int) -> str:
         'tripentacont'
         >>> get_chain_prefix(100)
         'hect'
+        >>> get_chain_prefix(102)
+        'dohect'
         >>> get_chain_prefix(132)
         'dotriacontahect'
         >>> get_chain_prefix(1000)
         'kili'
         >>> get_chain_prefix(1001)
-        'henakili'
+        'henkili'
     """
     if n < 1 or n > 9999:
         raise ValueError(
@@ -144,125 +152,50 @@ def get_chain_prefix(n: int) -> str:
     if n <= 20:
         return FIRST_20[n]
 
-    # Thousands decomposition
-    thousands = n // 1000
-    remainder = n % 1000
-
-    if thousands == 0:
-        # 21-999: use compositional sub-thousand builder
-        return _build_prefix_21_to_999(n)
-
-    if remainder == 0:
-        # Pure thousands: 1000, 2000,...
-        return THOUSANDS[thousands]
-
-    # Build sub-thousand part using compositional units (not retained names)
-    # For 1-9: use UNITS (hen, do, tri,...) - same as hundreds context
-    # For 10-20: use compositional sub-hundred system
-    # For 21-999: use full compositional builder
-    if remainder <= 9:
-        sub_thousand = UNITS[remainder]
-    elif remainder <= 20:
-        tens = remainder // 10
-        ones = remainder % 10
-        sub_thousand = _build_sub_hundred(ones, tens)
-    else:
-        sub_thousand = _build_prefix_21_to_999(remainder)
-
-    thousands_prefix = THOUSANDS[thousands]
-    # Linking vowel 'a' between sub-thousand and thousands prefix
-    if sub_thousand.endswith("a"):
-        return sub_thousand + thousands_prefix
-    else:
-        return sub_thousand + "a" + thousands_prefix
+    #: the numerical term with its terminal 'a' elided before 'ane'.
+    # For n >= 21 the term always ends in the 'a' of its highest-digit term.
+    return numerical_term(n)[:-1]
 
 
-def _build_prefix_21_to_999(n: int) -> str:
-    """Build chain prefix for 21-999 using compositional rules.
+def numerical_term(n: int) -> str:
+    """The basic numerical term for ``n`` (21-9999) in association.
 
-    Decomposes the number into hundreds, tens, and ones digits,
-    then assembles the prefix using IUPAC linking rules.
+    The basic terms of Table 1.4 are cited in the order opposite to the digits
+    (units, tens, hundreds, thousands) and joined directly, without a linking
+    letter; the 'i' of 'icosa' is elided after a vowel.
 
-    Args:
-        n: Number in range 21-999.
-
-    Returns:
-        Compositional chain prefix string.
+    Examples: 21 'henicosa', 22 'docosa', 101 'henhecta', 111 'undecahecta',
+    120 'icosahecta', 363 'trihexacontatricta', 486 'hexaoctacontatetracta',
+    1001 'henkilia'.
     """
-    hundreds = n // 100
+    if n < 21 or n > 9999:
+        raise ValueError(f"numerical_term({n}): supported range is 21-9999.")
+    thousands = n // 1000
+    hundreds = (n % 1000) // 100
     tens = (n % 100) // 10
     ones = n % 10
-
-    # Build the sub-hundred part (ones + tens)
-    sub_hundred = _build_sub_hundred(ones, tens)
-
-    # Pure hundreds (100, 200, 300,...)
-    if not sub_hundred and hundreds > 0:
-        return HUNDREDS[hundreds]
-
-    # Add hundreds if present
-    if hundreds > 0:
-        hundreds_prefix = HUNDREDS[hundreds]
-        # Linking vowel 'a' between sub-hundred and hundreds
-        if sub_hundred.endswith("a"):
-            return sub_hundred + hundreds_prefix
-        else:
-            return sub_hundred + "a" + hundreds_prefix
-
-    return sub_hundred
+    return (_sub_hundred_term(ones, tens)
+            + HUNDREDS_TERMS.get(hundreds, "")
+            + THOUSANDS_TERMS.get(thousands, ""))
 
 
-def _build_sub_hundred(ones: int, tens: int) -> str:
-    """Build the sub-hundred component (ones + tens) of a chain prefix.
+def _sub_hundred_term(ones: int, tens: int) -> str:
+    """Units + tens part of a numerical term ('' for 0).
 
-    Handles special linking rules:
-    - For tens=2 (the "cos" series): "hen" becomes "henicos" (linking 'i')
-    - For tens=1 (the "dec" series in hundreds context): uses "dec"
-    - For tens=0: just the units prefix
-
-    Args:
-        ones: Units digit (0-9).
-        tens: Tens digit (0-9).
-
-    Returns:
-        Sub-hundred prefix string.
+    Direct joining: 'hen' + 'hecta' is 'henhecta', 'do' + 'triaconta'
+    'dotriaconta'. Exceptions: 11 is 'undeca', and the 'i' of
+    'icosa' is elided after a vowel ('docosa', 'tricosa'; 'henicosa', and a bare
+    'icosa' keep it).
     """
-    if tens == 0 and ones == 0:
-        return ""
+    if tens == 1 and ones == 1:
+        return "undeca"
+    unit = UNIT_TERMS.get(ones, "")
+    tens_term = TENS_TERMS.get(tens, "")
+    if tens_term.startswith("i") and unit and unit[-1] in _VOWELS:
+        tens_term = tens_term[1:]
+    return unit + tens_term
 
-    if tens == 0:
-        # Only units, no tens (e.g., 101 = hen + hect)
-        return UNITS[ones]
 
-    if tens == 1:
-        # Teens in hundreds context (e.g., 110 = dec + a + hect,
-        # 111 = hendec + a + hect, 112 = dodec + a + hect)
-        if ones == 0:
-            return "dec"
-        else:
-            # Use the standard teen names: undec, dodec, tridec, etc.
-            # These are already in FIRST_20 for 11-19
-            return FIRST_20[10 + ones]
-
-    # tens >= 2
-    tens_prefix = TENS[tens]
-
-    if ones == 0:
-        # Pure tens: 20, 30, 40,...
-        # 20 is handled by FIRST_20, so this is for 30+, or 20 in hundreds
-        return tens_prefix
-
-    unit_prefix = UNITS[ones]
-
-    # Special linking for tens=2 ("cos" series):
-    # "hen" + "icos" (linking 'i') for ones=1
-    # All others: unit + "cos" directly
-    if tens == 2 and ones == 1:
-        return "henicos"
-
-    # For tens >= 3, unit + tens directly (e.g., do + triacont = dotriacont)
-    # For tens == 2 and ones >= 2, unit + cos directly (e.g., do + cos = docos)
-    return unit_prefix + tens_prefix
 
 
 def get_chain_name(n: int) -> str:

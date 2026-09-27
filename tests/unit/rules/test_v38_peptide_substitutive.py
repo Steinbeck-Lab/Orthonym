@@ -184,14 +184,17 @@ class TestControlsUnchanged:
     best-effort tiers."""
 
     CONTROLS = [
-        ("NCC(=O)NCC(=O)NCC(=O)O", "glycylglycylglycine"),
+        # j7 (TRIAGE g3 C05): the three tripeptide controls now take the substitutive
+        # PIN (nested amido prefix, method (1) the Blue Book;
+        # controller ruling: peptide names are not PINs). OPSIN full-InChIKey exact.
+        ("NCC(=O)NCC(=O)NCC(=O)O", "[2-(2-aminoacetamido)acetamido]acetic acid"),
         (
             "CC(C)[C@H](N)C(=O)N[C@@H](Cc1ccccc1)C(=O)NCC(=O)O",
-            "valylphenylalanylglycine",
+            "{(2S)-2-[(2S)-2-amino-3-methylbutanamido]-3-phenylpropanamido}acetic acid",
         ),
         (
             "CC(C)(N)C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)O",
-            "2-amino-2-methylpropanoylalanylalanine",
+            "(2S)-2-[(2S)-2-(2-amino-2-methylpropanamido)propanamido]propanoic acid",
         ),
         ("CCO", "ethanol"),
         ("c1ccccc1", "benzene"),

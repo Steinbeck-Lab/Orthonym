@@ -82,15 +82,17 @@ def test_saccharopine_names_and_full_rt(namer):
     # amino acid (verified: sarcosine, CNCC(=O)O, already emits the
     # systematic "(methylamino)acetic acid", not "N-methylglycine"). The
     # systematic equivalent this fix produces --
-    # "(2S)-2-{[(5-amino-5-carboxypentyl]amino}pentanedioic acid" spelled
-    # with a bare "(S)" stereo descriptor on the substituent -- denotes the
+    # "(2S)-2-{[(5-amino-5-carboxypentyl]amino}pentanedioic acid" -- denotes the
     # IDENTICAL molecule (RT-verified below, full InChIKey incl. the stereo
     # layer). Before this fix the whole molecule abstained: the N-branch was
     # never enumerated at all (suppressed the atom-incomplete
-    # '(2S)-aminopentanedioic acid' candidate).
+    # '(2S)-aminopentanedioic acid' candidate). Decision A part 2 (2026-09-27):
+    # the substituent descriptor was the bare "(S)"; it now carries its locant,
+    # "(5S)", the Blue Book; '[(1R)-1-chloropropyl]benzene
+    # (PIN)':44668), from the producer's own free-valence numbering.
     smi = "N[C@@H](CCCCN[C@@H](CCC(=O)O)C(=O)O)C(=O)O"
     name = namer.name(smi)
-    assert name == "(2S)-2-{[(S)-5-amino-5-carboxypentyl]amino}pentanedioic acid", name
+    assert name == "(2S)-2-{[(5S)-5-amino-5-carboxypentyl]amino}pentanedioic acid", name
     assert _full_rt(smi, name), name
 
 
@@ -102,7 +104,7 @@ def test_saccharopine_integration_via_name_tiered(namer):
     smi = "N[C@@H](CCCCN[C@@H](CCC(=O)O)C(=O)O)C(=O)O"
     result = namer.name_tiered(smi)
     name = result.get("name")
-    assert name == "(2S)-2-{[(S)-5-amino-5-carboxypentyl]amino}pentanedioic acid", result
+    assert name == "(2S)-2-{[(5S)-5-amino-5-carboxypentyl]amino}pentanedioic acid", result
     assert _full_rt(smi, name), name
 
 

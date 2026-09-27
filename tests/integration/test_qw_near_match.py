@@ -32,24 +32,58 @@ LIPID_SATURATION_FIXES = [
     pytest.param(
         r"CCCCC/C=C\C/C=C\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\C/C=C\CCCCC)"
         r"COC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
-        "2-[(11Z,14Z)-icosa-11,14-dienoyloxy]-1,3-bis(linoleoyloxy)propane",
+        # j7 (TRIAGE g5 C12): method (1) of is the PIN (the Blue Book
+        #:31836); a single stereo-bearing anion is enclosed, '3-[(9Z)-octadec-9-
+        # enoate]' (:31846), and a multiplied one is 'di[...]', '(2R)-3-hydroxy-
+        # propane-1,2-diyl di[(3E,5E)-hepta-3,5-dienoate] (PIN)' (:47992). The old
+        # value was method (2) with trivial acyl names.
+        "propane-1,2,3-triyl 2-[(11Z,14Z)-icosa-11,14-dienoate] 1,3-di[(9Z,12Z)-"
+        "octadeca-9,12-dienoate]",
         id="lipid-C9-triglyceride-mixed",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "TRIAGE g5 C12 (j7): pinned to the P-65.6.3.3.3.2 method (1) PIN, which the "
+            "engine emits with the gate off, but OPSIN 2.9.0 parses no multi-anion "
+            "locant ester name (the Blue Book examples :31838/:31846 do not parse "
+            "either), so it cannot be round-trip verified; production ships the "
+            "RT-exact method (2) acyloxy name labelled best_effort.")),
     ),
     pytest.param(
         r"CCCCC/C=C\C/C=C\CCCCCCCC(=O)OC[C@H](COC(=O)CCCCCCCCC/C=C\CCCCCC)"
         r"OC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
-        "1,2-bis(linoleoyloxy)-3-(oleoyloxy)propane",
+        # j7 (TRIAGE g5 C12): method (1) PIN, see lipid-C9. The old value also had the
+        # wrong constitution: the 3-acyl is octadec-11-enoyl, not oleoyl (9Z).
+        "(2S)-propane-1,2,3-triyl 1,2-di[(9Z,12Z)-octadeca-9,12-dienoate] "
+        "3-[(11Z)-octadec-11-enoate]",
         id="lipid-C10-triglyceride",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "TRIAGE g5 C12 (j7): pinned to the P-65.6.3.3.3.2 method (1) PIN, which the "
+            "engine emits with the gate off, but OPSIN 2.9.0 parses no multi-anion "
+            "locant ester name (the Blue Book examples :31838/:31846 do not parse "
+            "either), so it cannot be round-trip verified; production ships the "
+            "RT-exact method (2) acyloxy name labelled best_effort.")),
     ),
     pytest.param(
         r"CCCC/C=C\CCCCCCCC(=O)O[C@H](COC(=O)CCC/C=C\C/C=C\C/C=C\CCCCCCCC)"
         r"COC(=O)CCCCCCCCC/C=C\CCCCCC",
-        "1-[(5Z,8Z,11Z)-icosa-5,8,11-trienoyloxy]-2-[(9Z)-tetradec-9-enoyloxy]-3-(oleoyloxy)propane",
+        # j7 (TRIAGE g5 C12): method (1) PIN, see lipid-C9; the old value also had the
+        # wrong constitution (octadec-11-enoyl, not oleoyl).
+        "(2S)-propane-1,2,3-triyl 1-[(5Z,8Z,11Z)-icosa-5,8,11-trienoate] "
+        "3-[(11Z)-octadec-11-enoate] 2-[(9Z)-tetradec-9-enoate]",
         id="lipid-C17-triglyceride-mixed-2",
+        marks=pytest.mark.xfail(strict=True, reason=(
+            "TRIAGE g5 C12 (j7): pinned to the P-65.6.3.3.3.2 method (1) PIN, which the "
+            "engine emits with the gate off, but OPSIN 2.9.0 parses no multi-anion "
+            "locant ester name (the Blue Book examples :31838/:31846 do not parse "
+            "either), so it cannot be round-trip verified; production ships the "
+            "RT-exact method (2) acyloxy name labelled best_effort.")),
     ),
     pytest.param(
         "O=C([O-])/C=C/C(=O)O.[Na+]",
-        "sodium hydrogen (2E)-but-2-enedioate",  # a phase: partial salt hydrogen prefix
+        # j7 (TRIAGE g5 C13): method (1) of is the PIN (the Blue Book,
+        # 'ammonium 3-carboxypropanoate (PIN)':31606); the old 'sodium hydrogen
+        # (2E)-but-2-enedioate' is method (2), general only. (2E) per
+        # (:46740); OPSIN full-InChIKey exact.
+        "sodium (2E)-3-carboxyprop-2-enoate",
         id="lipid-C14-sodium-fumarate",
     ),
 ]
@@ -62,11 +96,29 @@ LIPID_SATURATION_FIXES = [
 # names these as "methoxy", "ethoxy", etc.
 # ============================================================================
 
+# Suite fix j6-breadth (TRIAGE g5 C11): the PIN tier abstains on these two
+# ortho-fused tricycles; their PIN is a fusion name, the Blue Book:
+# 23710), so the von Baeyer snapshots below are non-PIN (and the vb-C6 one
+# names a different molecule: '12-ethyl' for a methoxymethyl). Strict xfail;
+# what ships is asserted in tests/unit/rules/test_j6_breadth.py
+# (test_pin_not_built_rows_keep_the_tier_contract).
+_XF_J6_FUSED = pytest.mark.xfail(strict=True, reason=(
+    "PIN tier abstains: needs the fusion PIN of this ortho-fused tricycle "
+    "(P-52.2.4.1); the von Baeyer expected value is non-PIN and must be "
+    "replaced with the build -- TODO in TRIAGE.md 'Suite fix -- j6-breadth'"))
+
+
 METHOXY_FIXES = [
     pytest.param(
         r"COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\C)CCCC1O",
-        "(9E)-5-hydroxy-16-isobutyl-4-methoxy-9,13,14-trimethyl-17-aza-"
-        "tricyclo[9.7.0.0(1,15)]octadeca-9,12-dien-2,18-dione",
+        # j7 (TRIAGE g5 C17), tier-aware: the von Baeyer name of this ortho-fused
+        # 5/6/11 system is not the PIN the Blue Book, fusion
+        # nomenclature applies; the cycloundeca[d]isoindole PIN is not built), so it
+        # ships labelled best_effort -- see _NON_PIN_ROWS / test_methoxy_fix. The
+        # old snapshot was the same non-PIN class plus 'isobutyl' (general only,
+        #, '0(1,15)' and 'dien-2,18-dione' (a)). OPSIN full-InChIKey exact.
+        "(9E)-5-hydroxy-4-methoxy-9,13,14-trimethyl-16-(2-methylpropyl)-17-azatricyclo"
+        "[9.7.0.0^1,15]octadeca-9,12-diene-2,18-dione",
         id="methoxy-C5-tricyclic",
     ),
     pytest.param(
@@ -74,6 +126,7 @@ METHOXY_FIXES = [
         "11-hydroxy-8-methoxy-6,9,10-trimethyl-4-oxa-"
         "tricyclo[7.4.0.0(3,7)]tridec-6-en-5-one",
         id="methoxy-C11-tricyclic",
+        marks=_XF_J6_FUSED,
     ),
 ]
 
@@ -99,6 +152,7 @@ VB_COUNTING_FIXES = [
         "(1S,2R,3S,8R,9R,12R)-12-ethyl-6-isopropyl-2,9-dimethyl-"
         "tricyclo[9.3.0.0(5,9)]tetradeca-5,10-dien-3,8,12-triol",
         id="vb-C6-tricyclo-methoxymethyl",
+        marks=_XF_J6_FUSED,
     ),
 ]
 
@@ -195,6 +249,18 @@ def test_lipid_saturation_fix(smiles, expected_name):
         f"  Expected: {expected_name}\n"
         f"  Got:      {result}"
     )
+    # Every asserted name must also round-trip (j7): the method (1) PIN rows stay
+    # strict xfails until OPSIN can verify them.
+    from tests.support.rt_assert import name_is_rt_exact
+    assert name_is_rt_exact(result, smiles), result
+
+
+# Rows whose snapshot is a known non-PIN class: the name must also ship below
+# pin_verified and round-trip exactly (tier-aware snapshot, TRIAGE g5 C17).
+_NON_PIN_ROWS = {
+    r"COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\C)CCCC1O":
+        "von Baeyer name of an ortho-fused system (P-52.2.4.1 :23710)",
+}
 
 
 @pytest.mark.parametrize("smiles,expected_name", METHOXY_FIXES)
@@ -206,6 +272,12 @@ def test_methoxy_fix(smiles, expected_name):
         f"  Expected: {expected_name}\n"
         f"  Got:      {result}"
     )
+    if smiles in _NON_PIN_ROWS:
+        from orthonym import Orthonym
+        from tests.support.rt_assert import name_is_rt_exact
+        row = Orthonym().name_tiered(smiles)
+        assert row["tier"] != "pin_verified" and not row["is_pin"], row
+        assert name_is_rt_exact(expected_name, smiles)
 
 
 @pytest.mark.parametrize("smiles,expected_name", VB_COUNTING_FIXES)

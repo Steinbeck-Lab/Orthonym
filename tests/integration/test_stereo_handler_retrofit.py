@@ -15,6 +15,10 @@ from rdkit.Chem import rdCIPLabeler
 
 from orthonym.namer import name_compound
 
+NEAR_MISS_POLYCYCLE = (
+    'CC[C@H](C)[C@@H](OC(C)=O)[C@@H](C)c1c(O)c2c(c3c1SCC(=O)N3)[C@@H](O)'
+    '[C@@H]1[C@@]3(C)CC[C@H](C(C)(C)O)O[C@@H]3CC[C@@]1(C)O2')
+
 
 # --- Helpers ---
 
@@ -85,8 +89,13 @@ class TestNearMissStereoCompounds:
         )
 
     @pytest.mark.parametrize("smiles,expected_stereo_pattern", [
-        # Compound with (3R) embedded in the name
-        ('CC(=O)[C@@H](C)Nc1ccccc1C(=O)O', r'\(3R\)'),
+        # Suite fix j6 (TRIAGE g5 C11): the stereocentre is C-2 of the
+        # substituent's own chain, '2-{[(2R)-3-oxobutan-2-yl]amino}benzoic acid'
+        #, the Blue Book: a substituent's descriptor is "preceded
+        # by a numerical or letter locant"; free valence lowest,. The old
+        # '(3R)' matched no correct numbering; the PIN tier abstained until j6.
+        # OPSIN 2.9.0: the name is full-key and canonical-SMILES exact.
+        ('CC(=O)[C@@H](C)Nc1ccccc1C(=O)O', r'\(2R\)'),
         # Glycoside-linked compound with (2S)
         (
             'CCCCCCCCCCCCCCCC(=O)OC[C@H](CO[C@@H]1O[C@H](CO)[C@H](O)[C@H](O)[C@H]1O)OC(=O)CCCCCCCCCCCCCCC',
@@ -98,10 +107,20 @@ class TestNearMissStereoCompounds:
             r'OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O',
             r'(beta|alpha|glucopyranose|\(\d+[RS])',
         ),
-        # Fused heterocycle with stereo
-        (
-            r'CC[C@H](C)[C@@H](OC(C)=O)[C@@H](C)c1c(O)c2c(c3c1SCC(=O)N3)[C@@H](O)[C@@H]1[C@@]3(C)CC[C@H](C(C)(C)O)O[C@@H]3CC[C@@]1(C)O2',
+        # Fused heterocycle with stereo. The old passing name '(3S,4R,5S,10S,11S,
+        # 12R,15R,16R,19R)-24-phenyltetracosyl acetate' (OPSIN cannot parse it)
+        # named a fragment of this 45-atom polycycle; bdd69a673 stopped it
+        #, the Blue Book). The raw generator now emits another
+        # fragment name without descriptors, which the production gate rejects;
+        # production abstained at the PIN tier at 4e0e5c29b too. What ships is
+        # asserted in test_near_miss_polycycle_tier_contract below.
+        pytest.param(
+            NEAR_MISS_POLYCYCLE,
             r'\(\d+[RS]',
+            marks=pytest.mark.xfail(strict=True, reason=(
+                "PIN tier abstains: no whole-molecule PIN producer for this fused "
+                "thiazinone polycycle; the old stereo-bearing name was a fragment "
+                "(bdd69a673) -- TODO in TRIAGE.md 'Suite fix -- j1-regressions'")),
         ),
         # Benzofuran with (7aS)
         (
@@ -115,6 +134,15 @@ class TestNearMissStereoCompounds:
         assert re.search(expected_stereo_pattern, name), (
             f"Expected stereo pattern {expected_stereo_pattern} not found in: {name}"
         )
+
+    @pytest.mark.opsin_gate
+    def test_near_miss_polycycle_tier_contract(self):
+        """Production (gate on) for the strict-xfail polycycle row: the PIN tier
+        fails closed or ships an RT-exact name; best-effort names it RT-exact --
+        the full InChIKey includes the stereo layer, so its descriptors are kept."""
+        from tests.support.rt_assert import assert_tier_contract
+        _pin, be = assert_tier_contract(NEAR_MISS_POLYCYCLE)
+        assert re.search(r'\(\d+[RS]', be), be
 
 
 # --- Handler-specific stereo tests ---
@@ -273,14 +301,21 @@ class TestStereoMismatchCompounds:
     regardless of locant mapping -- documented as unfixable by a phase.
     """
 
+    @pytest.mark.opsin_gate
     def test_sm40_stereo_present(self):
         """: Cholesterol derivative with stereo.
 
         Has multiple stereocenters in SMILES. Name should contain stereo.
-        Note: RT may still fail (OPSIN adds more stereo from steroid name).
+        j7 (TRIAGE g7 C12): the steroid name over-specified the centres the input
+        leaves undefined, the Blue Book) and is now declined; the
+        production best-effort name (gate on) is RT exact and carries the stereo.
         """
+        from orthonym.namer import Orthonym
+        from tests.support.rt_assert import name_is_rt_exact
         smi = 'CC(CC(=O)CC(C)C1C[C@H](O)[C@@]2(C)C3=C(C(=O)CC12C)C1(C)CC[C@H](O)C(C)(C)C1C[C@@H]3O)C(=O)O'
-        name = name_compound(smi)
+        name = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                        allow_aromatic_general=True).name(smi)
+        assert name_is_rt_exact(name, smi), name
         assert _has_stereo_anywhere(name), (
             f"SM-40 should have stereo descriptors: {name}"
         )

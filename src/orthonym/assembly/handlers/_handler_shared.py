@@ -415,7 +415,51 @@ _P14_3_4_RING_SUFFIX_CLASSES = frozenset({
     'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'alcohol',
     'thiol', 'selenol', 'tellurol',
     'primary_amine', 'amine',
+    'secondary_amine', 'tertiary_amine',
 })
+
+# The N-substituted amine classes: licensed only through
+# `_ring_amine_carries_only_n_substituents`, the Blue Book).
+_N_SUBSTITUTED_RING_AMINE_CLASSES = frozenset({'secondary_amine', 'tertiary_amine'})
+
+
+def _ring_amine_carries_only_n_substituents(mol, ring_set, features,
+                                            suffix_ring_atoms=None) -> bool:
+    """(c) for an N-substituted ring amine: the ring is monosubstituted.
+
+    True only when the ring (already checked: one saturated all-carbon monocycle)
+    has exactly ONE bond to the rest of the molecule, that bond goes to a neutral,
+    acyclic, singly bonded amine nitrogen, and everything else hangs off that
+    nitrogen. Then every other ring position is an unsubstituted CH2 and the
+    nitrogen's own substituents are cited with the italic `N` locant, outside the
+    ring's locant scope: '*N*-butylcyclopropanamine (PIN)' (the Blue Book,
+     Secondary and tertiary amines,:26223). Deny by default otherwise.
+    """
+    from rdkit import Chem as _Chem
+    if len(_Chem.GetMolFrags(mol)) != 1:
+        return False
+    links = [
+        (b.GetBeginAtomIdx(), b.GetEndAtomIdx()) for b in mol.GetBonds()
+        if (b.GetBeginAtomIdx() in ring_set) != (b.GetEndAtomIdx() in ring_set)
+    ]
+    if len(links) != 1:
+        return False
+    a, b = links[0]
+    ring_atom, n_idx = (a, b) if a in ring_set else (b, a)
+    n = mol.GetAtomWithIdx(n_idx)
+    if (n.GetSymbol() != 'N' or n.GetFormalCharge() != 0 or n.IsInRing()
+            or n.GetIsAromatic()):
+        return False
+    if any(bd.GetBondType() != _Chem.BondType.SINGLE for bd in n.GetBonds()):
+        return False
+    if suffix_ring_atoms and ring_atom not in set(suffix_ring_atoms):
+        return False
+    # Nothing moved out of `mol` by perception (same re-check as the bare case).
+    _canon = getattr(features, 'canonical_smiles', None)
+    _input = _Chem.MolFromSmiles(_canon) if _canon else None
+    if _input is None or _input.GetNumHeavyAtoms() != mol.GetNumHeavyAtoms():
+        return False
+    return True
 
 
 def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
@@ -557,6 +601,16 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
     # cycloalkane, which is exactly the evidence base (the Blue Book, the Blue Book,
     # (c)). Widening beyond it needs the real per-scope locant machinery
     # and belongs in tranche B, not in a looser predicate here.
+    #
+    # The one widening with verbatim evidence: an N-SUBSTITUTED ring amine. The
+    # N-substituents hang off the suffix nitrogen, not off the ring, so the ring is
+    # still monosubstituted -- (the Blue Book) '*N*-butylcyclopropanamine (PIN)
+    #... (not *N*-cyclopropylbutan-1-amine)' (the Blue Book). The `N` locant is NOT an
+    # essential locant of the ring's scope there (contrast the oxime above, class
+    # `imine`, still excluded).
+    if getattr(features, 'principal_group', None) in _N_SUBSTITUTED_RING_AMINE_CLASSES:
+        return _ring_amine_carries_only_n_substituents(
+            mol, ring_set, features, suffix_ring_atoms)
     if mol.GetNumHeavyAtoms() != len(ring) + 1:
         return False
 
@@ -2600,7 +2654,32 @@ def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     return l5_uniform_complete(parent, decoration_of=decoration_of, counts=counts)
 
 
-def _w2_atom_coverage_declines(features, fragments, assembled: str) -> bool:
+def _w2_atom_coverage_verdict(features, fragments, assembled: str):
+    """The E1 atom-coverage verdict of a general-acyclic name's fragments, or None
+    when it cannot be measured (a covered fragment did not report its atoms).
+
+    ``_w2_atom_coverage_declines`` below is ``verdict is not None and not
+    verdict.ok``. A verdict that IS ok is a measured complete atom partition: every
+    heavy atom is bound to a fragment of the name. ``name_general_acyclic`` passes
+    that to ``CandidatePool.add(coverage_measured=...)``, where it stands in for
+    the character-count RATIO_REJECT_FLOOR (TRIAGE j3-long-alkanes, g1 C1).
+    """
+    cov_frags = [
+        f for f in fragments
+        if f.fragment_type in ("parent", "suffix", "prefix")
+    ]
+    if not cov_frags or any(f.atoms is None for f in cov_frags):
+        return None
+    from ...validation.e1_certificate import verify_atom_coverage
+    return verify_atom_coverage(
+        features.mol, assembled, [f.atoms for f in cov_frags])
+
+
+_VERDICT_NOT_GIVEN = object()
+
+
+def _w2_atom_coverage_declines(features, fragments, assembled: str,
+                               verdict=_VERDICT_NOT_GIVEN) -> bool:
     """task-W2 (Witness B): does this general-acyclic name silently DROP atoms?
 
     A perceived substituent that FAILS to name — e.g. the carbon-free sulfate
@@ -2622,16 +2701,14 @@ def _w2_atom_coverage_declines(features, fragments, assembled: str) -> bool:
     incremental boundary of this fix) — the whole check is SKIPPED (return False),
     never a false void. Called UNCONDITIONALLY (pure Python/RDKit;
     redundant-but-harmless with jar-present, load-bearing jar-absent).
+
+    ``verdict``: an already computed ``_w2_atom_coverage_verdict`` for these same
+    fragments (None = not measurable); computed here when not given.
     """
-    cov_frags = [
-        f for f in fragments
-        if f.fragment_type in ("parent", "suffix", "prefix")
-    ]
-    if not cov_frags or any(f.atoms is None for f in cov_frags):
+    if verdict is _VERDICT_NOT_GIVEN:
+        verdict = _w2_atom_coverage_verdict(features, fragments, assembled)
+    if verdict is None:
         return False
-    from ...validation.e1_certificate import verify_atom_coverage
-    verdict = verify_atom_coverage(
-        features.mol, assembled, [f.atoms for f in cov_frags])
     if not verdict.ok:
         logger.debug(
             "W2 general_acyclic atom-coverage decline: name=%s reason=%s smiles=%s",
@@ -2851,20 +2928,26 @@ def _assemble_fragments(
     # — satisfied by construction here: the acid is the PCG
     # (suffix) and everything else is a prefix; a second acid would form a longer
     # diacid parent and never reach this 2-carbon monoacid branch. Bare CH3-COOH
-    # is caught upstream by the exact-SMILES retained-name lookup. The systematic
-    # 'ethanoic acid' form is kept (fall-through) only when a substituent carries
-    # a stereo locant, so the omitted-locant contraction cannot corrupt it.
+    # is caught upstream by the exact-SMILES retained-name lookup. A stereo
+    # descriptor on the 2-carbon parent can only be the alpha carbon's '(2R)-',
+    # cited bare on the locant-free parent, the Blue Book; '(R)-
+    # {...}acetic acid (PIN)':45731; TRIAGE j12 findings 2/4/7 -- it used to keep
+    # the systematic '(2R)-2-bromo-2-chloroethanoic acid' at pin_verified); any
+    # other stereo string keeps the systematic form. (:7304): the
+    # second and later simple substituents of the single-substitutable parent are
+    # enclosed, 'bromo(chloro)acetic acid (PIN)' (:7312; this path spelled it
+    # 'bromochloroacetic acid'), with a multiplier left outside the marks,
+    # 'hydroxydi(phenyl)acetic acid (PIN)' (:29852) -- the same assembly as the
+    # polyfunctional arm.
+    _acetic_stereo = re.fullmatch(r"\(2([RSrs])\)-", stereo) if stereo else None
     _is_substituted_acetic = (
         stem == "eth" and prefix_str
         and suffix_frag and suffix_frag.text == "oic acid"
         and not double_locants and not triple_locants
         and max(len(list(suffix_frag.locants) if suffix_frag.locants else []),
                 getattr(suffix_frag, 'count', 1)) == 1
-        and not any(ch.isdigit() for ch in stereo)
+        and (not stereo or _acetic_stereo is not None)
     )
-    if _is_substituted_acetic:
-        from ..composition_primitives import retained_acetic_from_prefixes
-        return retained_acetic_from_prefixes(prefix_texts, stereo)
 
     # Handle suffix attachment using PIN-style formatting
     if suffix_frag and suffix_frag.text:
@@ -2919,6 +3002,18 @@ def _assemble_fragments(
     # Add stereodescriptors at the very start
     if stereo:
         name = f"{stereo}{name}"
+
+    if _is_substituted_acetic:
+        from ..composition_primitives import (
+            record_retained_acetic_systematic,
+            retained_acetic_from_prefixes,
+        )
+        _bare = f"({_acetic_stereo.group(1)})-" if _acetic_stereo else ""
+        retained = retained_acetic_from_prefixes(
+            prefix_texts, _bare, enclose_subsequent=len(prefix_texts) > 1)
+        # the systematic spelling assembled above, for the amido converter
+        record_retained_acetic_systematic(retained, name)
+        return retained
 
     return name
 

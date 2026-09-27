@@ -33,31 +33,52 @@ SM_40_SMILES = (
 
 
 class TestSM40:
-    """: Stereocenters already correctly emitted in name."""
+    """: a partially stereo-defined steroid acid.
 
+    j7 (TRIAGE g7 C12): the input leaves C-10, 13, 17 and 20 undefined, and the
+    cholestane stereoparent implies their configuration, the Blue Book
+    :51047: "The name of a fundamental parent structure usually implies the
+    absolute configuration of all chirality centers"). The steroid producer now
+    declines such an input; the raw benchmark name below (and the raw
+    '(3S,7S,14R,15S)-3,7,15,26-tetrahydroxy-4,4,14-trimethylcholest-8-ene-11,23,
+    26-trione' it had become) over-specified those centres (OPSIN: skeleton only).
+    Production names at best-effort with an RT-exact systematic name."""
+
+    _BENCHMARK = (
+        "(3S,7S,14R,15S)-3,7,15,27-tetrahydroxy-4,4,14-trimethyl"
+        "cholest-8-en-11,23,27-trione"
+    )
+
+    @staticmethod
+    def _best_effort_name():
+        from orthonym.namer import Orthonym
+        return Orthonym(general_fallback=True, general_fallback_unverified=True,
+                        allow_aromatic_general=True).name(SM_40_SMILES)
+
+    @pytest.mark.opsin_gate
     def test_name_contains_stereodescriptor_block(self):
-        """The generated name should contain a (xR,yS,...) block."""
-        name = name_compound(SM_40_SMILES)
-        # Name should start with a stereo block like (3S,7S,14R,15S)-
+        """The best-effort production name carries a (xR,yS,...) block."""
+        name = self._best_effort_name()
         assert name.startswith("("), f"Name missing stereo block: {name}"
         assert ")-" in name, f"Name missing stereo block closing: {name}"
 
+    @pytest.mark.opsin_gate
     def test_stereo_locants_are_valid(self):
-        """Stereo locant numbers should be positive integers within parent size."""
-        name = name_compound(SM_40_SMILES)
-        # Extract stereo block
+        """The best-effort production name is RT exact and cites R/S."""
+        from tests.support.rt_assert import name_is_rt_exact
+        name = self._best_effort_name()
         stereo_block = name.split(")-")[0] + ")"
-        # Should contain R/S descriptors
         assert any(c in stereo_block for c in "RS"), f"No R/S in stereo block: {stereo_block}"
+        assert name_is_rt_exact(name, SM_40_SMILES), name
 
     def test_sm40_matches_benchmark(self):
-        """ generated name matches the benchmark name."""
+        """Gate off (the raw generator): never the over-specified benchmark-family
+        steroid name; whatever ships must denote itself."""
+        from tests.support.rt_assert import name_is_rt_exact
         name = name_compound(SM_40_SMILES)
-        benchmark = (
-            "(3S,7S,14R,15S)-3,7,15,27-tetrahydroxy-4,4,14-trimethyl"
-            "cholest-8-en-11,23,27-trione"
-        )
-        assert name == benchmark, f"SM-40 name mismatch:\n  Got:      {name}\n  Expected: {benchmark}"
+        assert name != self._BENCHMARK
+        assert "cholest" not in name, name
+        assert name == "unknown organic compound" or name_is_rt_exact(name, SM_40_SMILES), name
 
 
 # ============================================================================

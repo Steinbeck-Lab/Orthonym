@@ -796,6 +796,7 @@ class CandidatePool:
         parent_atom_indices: Optional[Set[int]] = None,
         ring_info: Optional[Dict[str, Any]] = None,
         tree: Optional["NameTreeNode"] = None,
+        coverage_measured: bool = False,
     ) -> Optional[CandidateName]:
         """Score and add a candidate. Returns the candidate, or None if
         gate-rejected (Tier B handlers only).
@@ -814,6 +815,12 @@ class CandidatePool:
             parent_atom_indices: Optional set of atom indices comprising the
                 parent structure. Used by ParentCorrectnessScorer; does NOT
                 affect compute_confidence (Risk 1).
+            coverage_measured: True when the producer MEASURED a complete atom
+                partition for ``name`` (every heavy atom bound to one of its
+                fragments; ``_w2_atom_coverage_verdict``). The RATIO_REJECT_FLOOR
+                is a character-count stand-in for coverage, so it is skipped
+                then: numerical-term chain names are short by design
+                ('octacontane', ratio 0.092). Does not affect the confidence.
 
         Returns:
             The added CandidateName on success.
@@ -834,8 +841,12 @@ class CandidatePool:
         # RATIO_REJECT_FLOOR sanity gate (a phase -a.2). Rejects
         # obvious-garbage candidates regardless of handler tier. Missing
         # 'ratio' factor treated as "not garbage" (defensive default).
+        # A MEASURED complete atom partition (coverage_measured) supersedes this
+        # length proxy (TRIAGE j3-long-alkanes, g1 C1); the OPSIN round-trip gate
+        # still verifies the emitted name.
         ratio_val = cand.factors.get('ratio')
-        if ratio_val is not None and ratio_val < RATIO_REJECT_FLOOR:
+        if (ratio_val is not None and ratio_val < RATIO_REJECT_FLOOR
+                and not coverage_measured):
             logger.debug(
                 "candidate rejected by RATIO_REJECT_FLOOR: "
                 "handler=%s name=%r ratio=%.3f < floor=%.3f",

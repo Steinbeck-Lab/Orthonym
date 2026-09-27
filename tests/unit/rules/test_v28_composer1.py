@@ -15,6 +15,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.namer import Orthonym
+from tests.support.local_only import local_only
 
 
 def _be():
@@ -404,8 +405,13 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
     assert row["name"], row
     assert "N-(3-fluorophenyl)" in row["name"], row
     assert "unknown" not in row["name"] and " substituent" not in row["name"]
+    # Decision A part 2 (2026-09-27): was '2-({4-[...]piperidin-1-yl})-...', one mark
+    # level too many. (the Blue Book) nests {}; the braced prefix
+    # is already fully enclosed, so format_substituent_prefix no longer wraps it again.
+    # OPSIN 2.9.0 full-InChIKey exact. (The prefix order -- 'methyl' cited before
+    # 'N-(3-fluorophenyl)' -- is a separate, pre-existing matter.)
     assert row["name"] == (
-        "2-({4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl})"
+        "2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}"
         "-2-methyl-N-(3-fluorophenyl)propanamide"), row
 
 
@@ -423,6 +429,7 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
 # contract of this task.
 
 
+@local_only("scratchpad/asm_robustness.py")   # gitignored instrument (TRIAGE g7 C02)
 def test_asm_robustness_instrument_smoke():
     import importlib.util
     from pathlib import Path

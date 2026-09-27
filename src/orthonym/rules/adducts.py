@@ -134,8 +134,10 @@ def _name_component(frag_smi: str, style: str, *,
     # '2-amino-1-anilinoethanamide' for NCC(=O)Nc1ccc(OCC)cc1, which OPSIN
     # cannot parse) propagate into an adduct name. Re-assert parseability
     # here so the adduct assembler is self-contained and fails closed on an
-    # unparseable component in EVERY context. Fail-OPEN on 'unavailable'
-    # (no JAR / transient OPSIN error) exactly as the production gate does.
+    # unparseable component in EVERY context. 'unavailable' (no JAR / transient
+    # OPSIN error) is not a rejection, so the component stays; the production
+    # gate then checks the whole adduct name and fails CLOSED on 'unavailable'
+    # (TRIAGE g7 C01).
     from orthonym.namer import _validity_gate_status
     if _validity_gate_status(name) == "rejected":
         # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): OPSIN

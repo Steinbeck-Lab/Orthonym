@@ -157,12 +157,18 @@ def test_carbamic_acid_builder_refuses_instead_of_dropping_the_phosphate_arm():
     """composer.py carbamic-acid N site.
 
     The defect emitted the bare retained name 'carbamic acid' -- 4 heavy atoms
-    for an 11-heavy-atom input.
+    for an 11-heavy-atom input. The builder later learnt to name the phosphate
+    arm, so it no longer refuses: it must name ALL 11 heavy atoms, never the bare
+    parent. Spelling: (the Blue Book) retains 'carbamic acid'
+    with substitution allowed and cites its N-substituents without a locant --
+    '(CH3)2N-COOH dimethylcarbamic acid (PIN)' (:30762), 'phenylcarbamic acid
+    (PIN)' (:6798). OPSIN 2.9.0 full-InChIKey exact (TRIAGE 'Suite fix --
+    j5-pin-labels-b').
     """
     features = _features_for(CARBAMIC_PHOSPHATE, "_name_carbamic_acid")
     assert features is not None, "the carbamic acid builder was never reached"
     out = _name_carbamic_acid(features)
-    assert out is None, out
+    assert out == "[2-(phosphonooxy)ethyl]carbamic acid", out
     assert _heavy(CARBAMIC_PHOSPHATE) == 11
     assert _heavy("NC(=O)O") == 4          # what 'carbamic acid' denotes
 
@@ -223,9 +229,11 @@ def test_principal_amine_refuses_instead_of_deleting_the_phosphate_arm():
         ("CNC(=S)NC", "N,N'-dimethylthiourea"),
         ("NC(=N)N", "guanidine"),
         ("CNC(=N)N", "N-methylguanidine"),
-        ("COC(=O)NC", "methyl N-methylcarbamate"),
-        ("OC(=O)NC", "N-methylcarbamic acid"),
-        ("OC(=O)NCCOC", "N-(2-methoxyethyl)carbamic acid"),
+        # (the Blue Book): no italic-N locant on
+        # a substituted carbamic acid or carbamate.
+        ("COC(=O)NC", "methyl methylcarbamate"),
+        ("OC(=O)NC", "methylcarbamic acid"),
+        ("OC(=O)NCCOC", "(2-methoxyethyl)carbamic acid"),
         ("CCCNC(=O)NCCOC", "N-(2-methoxyethyl)-N'-propylurea"),
         ("CN(C)CCO", "2-(dimethylamino)ethan-1-ol"),
         ("OC(=O)CCN(C)C", "3-(dimethylamino)propanoic acid"),

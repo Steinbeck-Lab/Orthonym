@@ -10,6 +10,8 @@ pop_pool around each assemble_name invocation. See:
 internal notes
 """
 
+import pytest
+
 from orthonym import Orthonym
 from orthonym.assembly.candidate_pool import (
     CandidatePool,
@@ -20,6 +22,14 @@ from orthonym.assembly.candidate_pool import (
     _pool_store,
 )
 from orthonym.namer import name_compound
+
+
+CHEBI_83420 = (
+    "CCCCCCCCCCCCCCCC(=O)OC[C@H]"
+    "(COP(=O)([O-])O[C@H]1[C@H](O)[C@@H](OP(=O)([O-])[O-])"
+    "[C@H](OP(=O)([O-])[O-])[C@@H](OP(=O)([O-])[O-])[C@H]1O)"
+    "OC(=O)CCCCCCCCCCCCCCC"
+)
 
 
 class TestPoolStateIsolation:
@@ -162,10 +172,16 @@ class TestPoolStateIsolationUnderRecursion:
         result = name_compound(
             "CCC(C)CCCC1CCC(CC1)C(=O)OC2=CC=C(C=C2)C3=CC=C(C=C3)CC(C)CCC(C)CC"
         )
-        # Match the v17 baseline literal:
+        # The v17 literal "4'-hydroxy-4-2,5-dimethylheptyl-1,1'-biphenyl
+        # 4-(3-methylhexyl)cyclohexanecarboxylate" did not parse and named a
+        # 3-methylhexyl. The biphenylyl ester group is the ring assembly:
+        # (the Blue Book), '(4'-cyano[1,1'-biphenyl]-4-yl)oxy... (PIN)'
+        # (:7455); the phenyl-on-phenyl '4-[4-(2,5-dimethylheptyl)phenyl]phenyl'
+        # shipped at pin_verified until the decorated biphenylyl producer (TRIAGE
+        # g5 C14). OPSIN 2.9.0 full-InChIKey EXACT.
         expected = (
-            "4'-hydroxy-4-2,5-dimethylheptyl-1,1'-biphenyl "
-            "4-(3-methylhexyl)cyclohexanecarboxylate"
+            "4'-(2,5-dimethylheptyl)[1,1'-biphenyl]-4-yl "
+            "4-(4-methylhexyl)cyclohexane-1-carboxylate"
         )
         assert result == expected, (
             f"4-deep recursion regression: got {result!r}, expected "
@@ -187,21 +203,35 @@ class TestPoolStateIsolationUnderRecursion:
             f"recursion happens."
         )
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "raw (gate-off) name is a different molecule at the base and now: "
+        "'...-cyclohexanedicarboxylate' (4e0e5c29b) / '...cyclohexane-2,6-bis(olate) "
+        "dihexadecanoate' (since f2005eb4f), both OPSIN-unparseable; production "
+        "abstains at both tiers (test_drift_stereo_chebi_83420_production). Needs a "
+        "phosphatidylinositol-trisphosphate anion producer -- TODO in TRIAGE.md "
+        "'Suite fix -- j1-regressions'"))
     def test_drift_stereo_chebi_83420(self):
         """Stereo inversion case. Recursive cyclohexane fragment naming
         used isolated atom indexing (5S,6R), pre-fix corrupted outer
         molecule's (5R,6S) baseline. Post-fix: outer indexing preserved."""
-        result = name_compound(
-            "CCCCCCCCCCCCCCCC(=O)OC[C@H]"
-            "(COP(=O)([O-])O[C@H]1[C@H](O)[C@@H](OP(=O)([O-])[O-])"
-            "[C@H](OP(=O)([O-])[O-])[C@@H](OP(=O)([O-])[O-])[C@H]1O)"
-            "OC(=O)CCCCCCCCCCCCCCC"
-        )
+        result = name_compound(CHEBI_83420)
         assert "5R,6S" in result, (
             f"Stereo prefix inverted to 5S,6R (recursive fragment's atom "
             f"indexing won the pool). Got: {result!r}. Fix must keep "
             f"outer molecule's atom-indexed stereo."
         )
+
+    @pytest.mark.opsin_gate
+    def test_drift_stereo_chebi_83420_production(self):
+        """What ships for the strict-xfail row above (gate on): the default tier
+        and best-effort each ship the failure sentinel or a name that round-trips
+        to the input's full InChIKey (both abstain today, as at 4e0e5c29b)."""
+        from orthonym.errors import is_failure_name
+        from tests.support.rt_assert import name_best_effort, name_is_rt_exact
+        pin = name_compound(CHEBI_83420)
+        assert is_failure_name(pin) or name_is_rt_exact(pin, CHEBI_83420), pin
+        be = name_best_effort(CHEBI_83420).get("name")
+        assert not be or is_failure_name(be) or name_is_rt_exact(be, CHEBI_83420), be
 
     def test_pool_stack_lifo_order(self):
         """Synthetic test: push/pop semantics are LIFO and isolate

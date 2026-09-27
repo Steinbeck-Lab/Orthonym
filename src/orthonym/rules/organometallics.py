@@ -149,6 +149,29 @@ def _ligand_name_from_atoms(mol: Any, atom_indices: Tuple[int, ...]) -> Optional
                 1 for b in atom.GetBonds()
                 if b.GetOtherAtomIdx(idx) in idx_set
             )
+        # tert-butyl: a quaternary sp3 carbon bonded to the metal and to three
+        # methyls. The retained prefix 'tert-butyl' is a preferred prefix, used
+        # unsubstituted in PINs, the Blue Book /:16286
+        # '*tert*-butyldi(methyl)phosphane (PIN)'). Fail closed on any multiple
+        # bond or other branching (TRIAGE g3 C12, ORG-T4-15 tert-butyllithium).
+        if n_atoms == 4:
+            _attach4 = [
+                idx for idx in atom_indices
+                if any(nb.GetAtomicNum() != 1 and nb.GetIdx() not in idx_set
+                       for nb in mol.GetAtomWithIdx(idx).GetNeighbors())
+            ]
+            _all_single = all(
+                b.GetBondTypeAsDouble() == 1.0
+                for idx in atom_indices
+                for b in mol.GetAtomWithIdx(idx).GetBonds()
+                if b.GetOtherAtomIdx(idx) in idx_set
+            )
+            if (_all_single and len(_attach4) == 1
+                    and internal_degrees[_attach4[0]] == 3
+                    and all(internal_degrees[i] == 1
+                            for i in atom_indices if i != _attach4[0])):
+                return 'tert-butyl'
+
         # Linear chain: exactly 2 atoms with degree 1; rest with degree 2
         deg_counts = list(internal_degrees.values())
         if deg_counts.count(1) == 2 and deg_counts.count(2) == n_atoms - 2:

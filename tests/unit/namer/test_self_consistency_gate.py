@@ -161,11 +161,14 @@ class TestGateIntegration:
         out = nm._final_opsin_validity_gate("not-a-real-name-xyz", "CCO", {})
         assert out == nm._descriptive_fallback("CCO")
 
-    def test_unavailable_fails_open(self, monkeypatch):
-        # name_to_smiles None + parse_status 'unavailable' (transient) -> ship
+    def test_unavailable_fails_closed(self, monkeypatch):
+        # name_to_smiles None + parse_status 'unavailable' (transient, jar present,
+        # the oracle's retry ladder exhausted) -> nothing verified -> suppress.
+        # TRIAGE g7 C01 (2026-09-27): this used to ship the name (fail OPEN).
         monkeypatch.setattr(nm, "_DISABLE_VALIDITY_GATE", False)
         monkeypatch.setattr(nm, "_SC_MODE", "on")
         monkeypatch.setattr(nm, "_validity_gate_jar_present", lambda: True)
         monkeypatch.setattr(nm, "_validity_gate_name_to_smiles", lambda n: None)
         monkeypatch.setattr(nm, "_validity_gate_status", lambda n: "unavailable")
-        assert nm._final_opsin_validity_gate("ethanol", "CCO", {}) == "ethanol"
+        assert nm._final_opsin_validity_gate("ethanol", "CCO", {}) == \
+            nm._descriptive_fallback("CCO")
