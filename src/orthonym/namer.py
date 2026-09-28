@@ -4437,13 +4437,16 @@ class Orthonym:
         Returns ``{name, tier, is_pin, source, opsin, gates_passed}`` where
         tier is one of:
 
-        - ``pin_verified``: the strict PIN path built the name and verified it.
-        - ``pin_unverified``: a PIN-form name that only a breadth producer
-          built; it round-trips, but its preferred status is not certified.
-        - ``systematic_verified``: a verified systematic name that is not the
-          PIN.
-        - ``best_effort``: a general-engine name, round-trip verified at the
-          full InChIKey.
+        - ``pin_verified``: the strict PIN path built the name, it is certified
+          as the PIN, and it was verified.
+        - ``pin_unverified``: a verified name from the PIN path that is not
+          certified as the PIN (only a breadth producer built it, or it carries
+          a recorded non-PIN part); also the PIN path's grammar carve-out and
+          constitution-only names, which no full round trip verified.
+        - ``systematic_verified``: a verified systematic name from the general
+          engine or a trivial/retained table that is not the PIN.
+        - ``best_effort``: the last-resort floor offer (``source`` 't4_floor'),
+          and a name whose shipped string no round trip verified.
         - ``abstain``: no name.
 
         Default construction (no flags) keeps today's PIN-or-abstain behavior
@@ -4497,6 +4500,14 @@ class Orthonym:
         # and tagging an abstention row as an ill-formed emission would corrupt
         # the very census this field exists to make possible.
         suffix_free_prefix_name = False
+        # Tier labels -- paper semantics: the tier a name earns once a round trip
+        # of THIS string has passed (set by the branches whose label depends on
+        # verification: the general engine -> systematic_verified, a PIN-path name
+        # carrying a non-PIN part -> pin_unverified). The shipped-name check below
+        # can verify a name after its label was derived; the label then follows.
+        # None where the label does not depend on a round trip (a PIN, a trivial
+        # table name, the last-resort floor).
+        _tier_if_verified = None
         if not name or is_failure_name(name):
             tier, is_pin, opsin = ABSTAIN, False, "n/a"
             source = prov["source"] or "abstain"
@@ -4527,8 +4538,11 @@ class Orthonym:
             # input structure (`_rt_match`,:2921) and publishes the verdict as
             # prov["opsin"], which is always a non-empty string — so this
             # branch never consulted jar presence and is unchanged.
+            # The inline engine lane records no engine verdict (prov["opsin"]
+            # None); the validity gate's outcome for this string then decides.
             opsin = prov["opsin"] or gate_opsin_label
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            _tier_if_verified = SYSTEMATIC_VERIFIED
             is_pin = False
             stereo_unexpressed = bool(prov.get("stereo_unexpressed"))
             suffix_free_prefix_name = bool(prov.get("suffix_free_prefix_name"))
@@ -4542,14 +4556,20 @@ class Orthonym:
             # -T1c: a composer name carrying a ring substituent prefix only
             # the GENERAL tier could build (a systematic replacement / von Baeyer
             # substituent form). Valid, but not PREFERRED -- the ring PIN may be a
-            # retained name -- so it must not ship as pin_verified/is_pin. Demoted on
-            # the same verified/unverified split the general engine uses, so the tier
-            # still means what it means everywhere else. The same demotion applies
-            # to a name that contains a recorded non-PIN fragment
+            # retained name -- so it must not ship as pin_verified/is_pin. The same
+            # demotion applies to a name that contains a recorded non-PIN fragment
             # (``record_non_pin_fragment``, e.g. a carbon-substituted
-            # '...azaniumyl' prefix).
+            # '...azaniumyl' prefix, a peptide, a von Baeyer name of an
+            # ortho-fused system).
+            # Tier labels -- paper semantics: the PIN path built the name and a
+            # round trip verified it, but it is not certified as the PIN, so it is
+            # pin_unverified (the paper: "its preferred status is not certified"),
+            # not best_effort; best_effort is the label of the best-effort rescue
+            # producers (the last-resort floor). Without a verified round trip it
+            # stays best_effort.
             opsin = gate_opsin_label
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            tier = PIN_UNVERIFIED if opsin == "verified" else BEST_EFFORT
+            _tier_if_verified = PIN_UNVERIFIED
             is_pin = False
         else:
             tier, is_pin = PIN_VERIFIED, True
@@ -4570,12 +4590,27 @@ class Orthonym:
         # belt-and-braces: a winning offer can never be a failure-name
         # sentinel (both offer-construction sites in `_finish` already
         # refuse to append one).
+        #
+        # Tier labels -- paper semantics (2026-09-28): when the PRIMARY offer won
+        # (same source as the contextvar, i.e. the snapshot the branches above
+        # read), its labels are NOT copied. The primary Offer's tier is a ranking
+        # key built in `_finish` from the general engine's own round-trip value
+        # (prov["opsin"]) alone, which the PIN path and the inline engine lane
+        # never record, so it read best_effort for every verified general-engine
+        # name of the inline lane (e.g. '12-(bicyclo[2.2.2]octan-1-yl)-6,9-
+        # dimethyltricyclo[7.4.0.0^2,6]tridecane', gate verified) and for
+        # every verified PIN-path name carrying a non-PIN part. The branches above
+        # derive the same source/is_pin from the same snapshot, and the tier from
+        # the verification of the shipped string. A DIFFERENT winner (the
+        # last-resort floor, `source` 't4_floor', tier best_effort) still
+        # supplies its own labels.
         _offer_winner = getattr(self, "_last_selected_offer", None)
         if (_offer_winner is not None and _offer_winner.name == name
-                and tier != ABSTAIN):
+                and tier != ABSTAIN and _offer_winner.source != source):
             source = _offer_winner.source
             is_pin = _offer_winner.is_pin
             tier = _offer_winner.tier
+            _tier_if_verified = None
         #: honest-PIN demotion (the β-carotene "not a verified PIN" fix).
         # A pin_verified name that the STRICT PIN path (no breadth flags) does NOT
         # itself produce is not a certified PIN -- it exists only because a breadth
@@ -4615,25 +4650,6 @@ class Orthonym:
         # breadth are unchanged; only the label is honest.
         if tier == PIN_VERIFIED and gate_outcome == _pv.GATE_OUTCOME_UNAVAILABLE:
             tier = PIN_UNVERIFIED
-            is_pin = False
-        # wp7 (verification panel NIT): the Blue Book gives no PIN for these
-        # elements' compounds. the Blue Book "Names of organic compounds based
-        # on aluminium, gallium, indium, and thallium are not followed by the
-        # parenthetical abbreviation (PIN), because the decision to choose between
-        # a name based on organic or inorganic principles has not yet been
-        # reached";:2062 names based on alumane, gallane, indigane and thallane
-        # "currently do not have PIN status". 'dimethylaluminum' for C[Al]C shipped
-        # pin_verified. Such a name is a verified systematic name at most.
-        if tier in (PIN_VERIFIED, PIN_UNVERIFIED) and _has_no_pin_status_element(smiles):
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
-            is_pin = False
-        # TRIAGE j12 finding 6: likewise (the Blue Book) notes no PIN
-        # for organometallic compounds of the Group 1-12 metals, except the ocenes
-        # ('tert-butyllithium', 'methylmagnesium bromide', 'diethylzinc' shipped
-        # pin_verified). Same demotion; the name is unchanged.
-        if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
-                and _is_p69_organometallic_without_pin(smiles, name)):
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
         # Claims conformance (2026-09-27): at the general tiers every shown name
         # has passed the round trip, apart from the exact-match list names
@@ -4676,6 +4692,36 @@ class Orthonym:
                             _mol, smiles=smiles).code
                 except Exception:
                     pass
+        # Tier labels -- paper semantics (2026-09-28): the check above verified a
+        # name whose label was derived before it ran (an offer winner the gate
+        # never judged, a general-engine name whose own check read 'unverified').
+        # A verified name keeps the tier it earns verified -- systematic_verified
+        # for the general engine, pin_unverified for a PIN-path name with a
+        # non-PIN part -- instead of the best_effort it read while unverified.
+        if (tier == BEST_EFFORT and opsin == "verified"
+                and _tier_if_verified is not None):
+            tier = _tier_if_verified
+        # (The two no-PIN-status demotions below run after the shipped-name check
+        # so that they read the final verification of the shipped string.)
+        # wp7 (verification panel NIT): the Blue Book gives no PIN for these
+        # elements' compounds. the Blue Book "Names of organic compounds based
+        # on aluminium, gallium, indium, and thallium are not followed by the
+        # parenthetical abbreviation (PIN), because the decision to choose between
+        # a name based on organic or inorganic principles has not yet been
+        # reached";:2062 names based on alumane, gallane, indigane and thallane
+        # "currently do not have PIN status". 'dimethylaluminum' for C[Al]C shipped
+        # pin_verified. Such a name is a verified systematic name at most.
+        if tier in (PIN_VERIFIED, PIN_UNVERIFIED) and _has_no_pin_status_element(smiles):
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            is_pin = False
+        # TRIAGE j12 finding 6: likewise (the Blue Book) notes no PIN
+        # for organometallic compounds of the Group 1-12 metals, except the ocenes
+        # ('tert-butyllithium', 'methylmagnesium bromide', 'diethylzinc' shipped
+        # pin_verified). Same demotion; the name is unchanged.
+        if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
+                and _is_p69_organometallic_without_pin(smiles, name)):
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            is_pin = False
         gates = []
         if source == "general_engine":
             gates.append("atom_coverage")
@@ -5906,6 +5952,10 @@ class Orthonym:
                         # regardless of how precisely tier is graded; L3/L4
                         # can sharpen this if a real second offer ever needs
                         # to out-rank it on tier.
+                        # Tier labels -- paper semantics (2026-09-28): this tier is a
+                        # ranking key only; `name_tiered` does not copy it when this
+                        # primary offer wins (it reads prov["opsin"] alone, which the
+                        # PIN path and the inline engine lane never record).
                         _offer_ger = getattr(self, "_last_ger_result", None)
                         _offer_result_obj = (
                             _offer_ger if _offer_ger is not None

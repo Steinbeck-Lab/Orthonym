@@ -107,17 +107,22 @@ def test_partial_acid_salt_ez_gate_off(smiles, expected):
 # ---------------------------------------------------------------------------
 
 STEROID_ACID_NAMES = [
-    # (smiles, name, tier at the PIN tier)
+    # (smiles, name, tier at the PIN tier). The last two carry a whole-graph R/S
+    # descriptor block (DK-P101CIP, recorded non-PIN): the PIN path built them and
+    # the gate verified them (; name_is_rt_exact below), but they are not
+    # certified as the PIN, so pin_unverified -- the paper's tier semantics (TRIAGE
+    # 'Tier labels -- paper semantics'); best_effort was the offer-label
+    # under-claim.
     ("C[C@H](CCC(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
      "3α-hydroxy-5β-cholan-24-oic acid", "pin_verified"),
     ("C[C@H](CCC[C@H](C)C(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",
      "(25S)-3-oxo-5α-cholestan-26-oic acid", "pin_verified"),
     ("C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C",
      "(10S,13R,14R,15S,17R,20R)-15-hydroxy-4,4,14-trimethyl-3-oxochola-7,9(11)-dien-24-oic acid",
-     "best_effort"),
+     "pin_unverified"),
     ("CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CCC(=O)C(C)(C)[C@@H]1[C@@H](O)C3",
      "(5R,6S,10S,13R,14R,17R,20R)-6-hydroxy-4,4,14-trimethyl-3,16-dioxocholesta-8,24-dien-21-oic acid",
-     "best_effort"),
+     "pin_unverified"),
 ]
 
 

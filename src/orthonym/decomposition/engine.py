@@ -129,7 +129,78 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
     Returns:
         IUPAC name string (best-effort tier), or None (clean abstain -- never
         a partial).
+
+    Memoised for the top-level naming call, None included (``assembly.memo``,
+    scope-bound; ``ORTHONYM_MEMO=verify`` recomputes and compares). The
+    decomposition asks for the same fragment from every cut context, and each ask
+    re-ran the whole rescue (perception, classification, engine, round trips): the
+    ChEBI lipid II-type glycopeptide made 816 rescues of 81 fragments, and the 735
+    repeats took 35 of its 91 s. Measured on those repeats (fresh process): every
+    one returned the name of the first ask, spent no unit of any naming budget and
+    left every provenance variable as it found it. So a hit returns the stored name
+    and replays nothing -- neither the cold call's budget cost nor its provenance
+    writes, which the repeats did not make either. The key carries the inputs the
+    rescue reads besides the fragment: the ambient breadth context, the N-acyl
+    float scope, the peptide re-entrancy flag and the locant/isotope scopes.
+
+    A hit charges the perf and analysis units the fresh call charged (not its work
+    units). Those two budgets are charged per ring analysis (von Baeyer ``analyze``,
+    the fused core matcher, the polycyclic path search, whose own memo replays its
+    units on a hit), so an unmemoised repeat charges them again: measured on the
+    ChEBI acetylated oligosaccharide (fresh process, no memo), 52 of 53 repeats
+    charged exactly the first ask's perf and analysis units (the 53rd is the call
+    in which the analysis budget ran out), and the budget ran out at 33.5 s, where
+    the whole-molecule rescue of the budget boundary named it; with hits
+    charging nothing it ran 409 s to the same name. The work budget is charged only
+    on a fragment-cache miss, which a warm repeat does not make: the glycopeptide's
+    first asks charged 10 work units and its 735 repeats none, and 0 perf and 0
+    analysis units either way, so it is unchanged.
     """
+    from ..assembly import fragment_naming as _fn
+    from ..assembly.memo import cache_or_compute, side_get, side_put
+    from ..assembly.locant_omission import (_ISOTOPE_PARENT_POSITIONAL,
+                                            _ISOTOPIC_NAMING_SCOPE,
+                                            forced_locant_reason)
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    from ..routing import dispatch_table as _dispatch_table
+    key = (smiles, general_fallback_ctx.get(), best_effort_ctx.get(),
+           allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+           nacyl_float_refusing(), _dispatch_table._PEPTIDE_SUBST_ACTIVE,
+           forced_locant_reason(), _ISOTOPIC_NAMING_SCOPE.get(),
+           _ISOTOPE_PARENT_POSITIONAL.get())
+    state = {"hit": True, "units": (0, 0)}
+
+    def _budgets():
+        g = _fn._fragment_guard
+        return (getattr(g, "perf_budget", None), getattr(g, "analysis_budget", None))
+
+    def _fresh():
+        state["hit"] = False
+        before = _budgets()
+        result = _name_fragment_t4_rescue_fresh(smiles)
+        state["units"] = tuple(
+            (b - a) if (a is not None and b is not None and b > a) else 0
+            for b, a in zip(before, _budgets()))
+        return result
+
+    result = cache_or_compute("t4_fragment_rescue", key, _fresh)
+    if state["hit"]:
+        units = side_get("t4_fragment_rescue", key)
+        if units:
+            # Raises PerfBudgetExceeded exactly when the repeat would have: the
+            # repeat charges these units one analysis at a time, and a spend
+            # raises once the running total reaches the remaining budget.
+            if units[0]:
+                _fn.spend_perf_work(units[0])
+            if units[1]:
+                _fn.spend_analysis_call(units[1])
+    else:
+        side_put("t4_fragment_rescue", key, state["units"])
+    return result
+
+
+def _name_fragment_t4_rescue_fresh(smiles: str) -> Optional[str]:
     from ..assembly.fragment_naming import isolated_naming_session
     from ..namer import Orthonym
 

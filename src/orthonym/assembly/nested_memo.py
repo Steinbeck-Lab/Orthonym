@@ -67,6 +67,10 @@ def _apply(replay: dict, units: tuple, replay_budgets: bool = True) -> None:
         if k in _ACCUMULATORS:
             cur = _VARS[k].get()
             _VARS[k].set(cur + tuple(x for x in (v or ()) if x not in cur))
+            # An enclosing memoised substituent-fragment naming logs the fragments
+            # this hit merges, as it logs every record_non_pin_fragment call.
+            for x in (v or ()):
+                _pv._log_non_pin(x)
         else:
             _VARS[k].set(v)
     # These direct.set writes bypass the provenance setters, so an ENCLOSING

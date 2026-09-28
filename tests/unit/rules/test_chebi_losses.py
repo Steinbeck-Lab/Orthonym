@@ -342,3 +342,324 @@ def test_nested_memo_hit_without_budget_replay():
         fn.exit_name_scope()
         memo.pop_scope(token)
         memo._MODE = old_mode
+
+
+# --------------------------------------------------------------------------
+# G ChEBI speed -- glycopeptide (TRIAGE 'ChEBI speed -- glycopeptide'). The T4
+# engine rung (t4_coverage._run_general_e1) certifies its result with
+# allow_charged=False, and E1 refuses every result for a molecule with a net
+# formal charge (G1 charge scope), so the engine run on a charged molecule was
+# always discarded. Since 9e74facde that run names every N-acyl substituent
+# through its acid, and the lipid II-type ChEBI glycopeptide (130 heavy atoms)
+# spent 139 of its 211 s in these discarded runs (NATIVE_HANG in the paper's
+# recipe). The rung now returns the same None without running the engine.
+# --------------------------------------------------------------------------
+
+def _classified_mol(smi):
+    """(mol, features) as namer._try_general_engine_recovery hands them to T4."""
+    from orthonym import Orthonym
+    nm = Orthonym()
+    mol = Chem.MolFromSmiles(smi)
+    feats = nm._perceive(mol, smi, Chem.MolToSmiles(mol))
+    nm._classify(feats)
+    return mol, feats
+
+
+def _engine_spy(monkeypatch):
+    """Record every name_general call as (caller, net charge of the molecule)."""
+    import sys
+    from orthonym.assembly import general_engine
+    calls = []
+    real = general_engine.name_general
+
+    def spy(mol, *args, **kwargs):
+        calls.append((sys._getframe(1).f_code.co_name, Chem.GetFormalCharge(mol)))
+        return real(mol, *args, **kwargs)
+    monkeypatch.setattr(general_engine, "name_general", spy)
+    return calls
+
+
+def _rung_before_the_skip(mol, features):
+    """t4_coverage._run_general_e1 as it was: run the engine, then certify."""
+    from orthonym.assembly import general_engine, t4_coverage
+    from orthonym.validation.coverage_gate import certify_general_result
+    try:
+        result = general_engine.name_general(
+            mol, features, allow_aromatic_general=True, allow_suffix_free=True)
+    except Exception:
+        return None
+    if result is None or not certify_general_result(mol, result, allow_charged=False):
+        return None
+    return t4_coverage._Candidate(name=result.name, result_obj=result)
+
+
+def test_t4_rung_never_certifies_an_engine_result_for_a_charged_molecule():
+    """The premise of the skip: the engine names azinan-1-ium, the rung's
+    certification refuses it (the complete tier's, allow_charged=True, accepts)."""
+    from orthonym.assembly.general_engine import name_general
+    from orthonym.validation.coverage_gate import certify_general_result
+    mol, feats = _classified_mol("C1CC[NH2+]CC1")
+    result = name_general(mol, feats, allow_aromatic_general=True, allow_suffix_free=True)
+    assert result is not None and result.name == "azinan-1-ium"
+    assert not certify_general_result(mol, result, allow_charged=False)
+    assert certify_general_result(mol, result, allow_charged=True)
+    assert _rung_before_the_skip(mol, feats) is None
+
+
+@pytest.mark.parametrize("smiles,charged", [
+    ("C1CC[NH2+]CC1", True),
+    ("CC(=O)N[C@@H](C)C(=O)[O-]", True),
+    ("CC(=O)N[C@H]1[C@@H](OP(=O)([O-])OP(=O)([O-])OCC=C(C)C)O[C@H](CO)[C@@H](O)[C@@H]1O",
+     True),
+    ("C[N+](C)(C)CCO", True),
+    ("CN(C)C[C@H]1CCCC[C@H]1O", False),
+    ("CCC(=O)NCC(=O)O", False),
+])
+def test_t4_rung_runs_the_engine_only_for_a_neutral_molecule(monkeypatch, smiles, charged):
+    from orthonym.assembly import t4_coverage
+    mol, feats = _classified_mol(smiles)
+    before = _rung_before_the_skip(mol, feats)
+    calls = _engine_spy(monkeypatch)
+    after = t4_coverage._run_general_e1(mol, feats)
+    assert (after and after.name) == (before and before.name)
+    if charged:
+        assert before is None and after is None
+        assert calls == []
+    else:
+        assert calls == [("_run_general_e1", 0)]
+
+
+# Charged glycopeptide pieces (not in any eval split or the a holdout split) whose
+# best-effort naming reaches the rung on a charged molecule.
+CHARGED_GLYCOPEPTIDE_PIECES = [
+    "C[C@H](NC(=O)[C@@H](C)NC(=O)CC[C@@H](NC(=O)[C@H](C)N)C(=O)[O-])C(=O)[O-]",
+    "NCCCC[C@H](NC(=O)CC[C@@H](NC(=O)[C@H](C)NC(C)=O)C(=O)[O-])C(=O)N[C@H](C)C(=O)N"
+    "[C@H](C)C(=O)[O-]",
+    "CC(=O)N[C@H]1[C@@H](OP(=O)([O-])OP(=O)([O-])OCC=C(C)C)O[C@H](CO)[C@@H](O)[C@@H]1O",
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles", CHARGED_GLYCOPEPTIDE_PIECES,
+                         ids=["ala-glu-ala-ala", "ac-ala-glu-lys-ala-ala", "glcnac-pp-prenyl"])
+def test_charged_pieces_name_as_before_without_the_discarded_engine_runs(monkeypatch, smiles):
+    """Call-count guard (fails on the code before the skip): the whole best-effort
+    naming makes no engine run from the rung on a charged molecule, and the
+    name is the one the rung before the skip gives."""
+    from orthonym.assembly import t4_coverage
+    calls = _engine_spy(monkeypatch)
+    res = _be(smiles)
+    assert [c for c in calls if c[0] == "_run_general_e1" and c[1] != 0] == []
+    assert_full_rt(res["name"], smiles)
+    with monkeypatch.context() as m:
+        m.setattr(t4_coverage, "_run_general_e1", _rung_before_the_skip)
+        old = _be(smiles)
+    assert (res["name"], res["tier"]) == (old["name"], old["tier"])
+
+
+# The decomposition asks the rescue for the same fragment from every cut
+# context; the ChEBI glycopeptide made 816 rescues of 81 fragments, and the 735
+# repeats took 35 of its 91 s. The rescue is memoised for the top-level naming
+# call (None included); a hit replays no provenance, since the measured repeats
+# left every provenance variable unchanged, and charges the perf and analysis
+# units of the fresh rescue (ChEBI speed 2, below; 0 for these pieces).
+
+def _rescue_spy(monkeypatch):
+    from orthonym.decomposition import engine as de
+    counts = {"ask": 0, "fresh": 0}
+    real_ask, real_fresh = de._name_fragment_t4_rescue, de._name_fragment_t4_rescue_fresh
+
+    def ask(smiles):
+        counts["ask"] += 1
+        return real_ask(smiles)
+
+    def fresh(smiles):
+        counts["fresh"] += 1
+        return real_fresh(smiles)
+    monkeypatch.setattr(de, "_name_fragment_t4_rescue", ask)
+    monkeypatch.setattr(de, "_name_fragment_t4_rescue_fresh", fresh)
+    return counts
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles", CHARGED_GLYCOPEPTIDE_PIECES[1:],
+                         ids=["ac-ala-glu-lys-ala-ala", "glcnac-pp-prenyl"])
+def test_t4_rescue_runs_once_per_fragment_and_context(monkeypatch, smiles):
+    """Call-count guard (fails without the memo): fewer fresh rescues than asks,
+    and the name is the one the unmemoised rescue gives."""
+    from orthonym.decomposition import engine as de
+    counts = _rescue_spy(monkeypatch)
+    res = _be(smiles)
+    assert 0 < counts["fresh"] < counts["ask"], counts
+    assert_full_rt(res["name"], smiles)
+    with monkeypatch.context() as m:
+        m.setattr(de, "_name_fragment_t4_rescue", de._name_fragment_t4_rescue_fresh)
+        old = _be(smiles)
+    assert (res["name"], res["tier"]) == (old["name"], old["tier"])
+
+
+def test_t4_rescue_memo_keeps_none_and_keys_on_the_context(monkeypatch):
+    from orthonym.assembly import memo
+    from orthonym.decomposition import engine as de
+    from orthonym.metrics.provenance import best_effort_ctx
+    calls = []
+    monkeypatch.setattr(de, "_name_fragment_t4_rescue_fresh",
+                        lambda s: calls.append(s) or (None if s == "none" else s + "!"))
+    monkeypatch.setattr(memo, "_MODE", "on")
+    token = memo.push_scope()
+    try:
+        assert de._name_fragment_t4_rescue("none") is None
+        assert de._name_fragment_t4_rescue("none") is None      # a stored None
+        assert de._name_fragment_t4_rescue("CCO") == "CCO!"
+        assert de._name_fragment_t4_rescue("CCO") == "CCO!"
+        assert calls == ["none", "CCO"]
+        ctx = best_effort_ctx.set(not best_effort_ctx.get())
+        try:
+            assert de._name_fragment_t4_rescue("CCO") == "CCO!"  # another context
+        finally:
+            best_effort_ctx.reset(ctx)
+        assert calls == ["none", "CCO", "CCO"]
+    finally:
+        memo.pop_scope(token)
+    assert de._name_fragment_t4_rescue("CCO") == "CCO!"          # no scope: recompute
+    assert calls == ["none", "CCO", "CCO", "CCO"]
+
+
+# ChEBI speed 2 (TRIAGE 'ChEBI speed -- lysine peptide'). H: the recursive
+# substituent naming re-asks name_substituent_fragment for the same fragment of the
+# same molecule object (16,898 of 26,366 calls for the ChEBI lysine-rich peptide);
+# a call whose only side effect is the name-scoped non-PIN record is memoised for
+# the top-level naming call and a hit makes the same record calls. I: a rescue
+# memo hit charges the perf and analysis units the fresh rescue charged, as the
+# unmemoised repeat did (the ChEBI acetylated oligosaccharide ran out of analysis
+# budget at 33.5 s without the memo and ran 409 s to the same name with free hits).
+
+LYSINE_PEPTIDE_PIECES = [
+    "NCCCC[C@H](NC(=O)CCCCC(=O)N[C@@H](CCCCN)C(=O)O)C(=O)N[C@@H](CCCCNC(=O)CCCCC(=O)O)C(=O)O",
+    "NCCCC[C@H](NC(=O)[C@H](CCCCN)NC(=O)CCCCC(=O)N[C@@H](CCCCN)C(=O)O)C(=O)N[C@@H](CCCCOC(=O)CCCCC(=O)O)C(=O)O",
+]
+
+
+def _fragment_namer_spy(monkeypatch):
+    from orthonym.assembly import substituent_naming as sn
+    counts = {"fresh": 0}
+    real = sn._name_substituent_fragment_uncached
+
+    def fresh(*a, **k):
+        counts["fresh"] += 1
+        return real(*a, **k)
+    monkeypatch.setattr(sn, "_name_substituent_fragment_uncached", fresh)
+    return counts
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles", LYSINE_PEPTIDE_PIECES, ids=["lys3-adipoyl", "lys4-ester"])
+def test_substituent_fragment_memo_saves_repeats_and_keeps_the_name(monkeypatch, smiles):
+    """Call-count guard (fails without the memo): fewer fresh substituent-fragment
+    namings than with the memo off, and the same name and tier."""
+    from orthonym.assembly import substituent_naming as sn
+    counts = _fragment_namer_spy(monkeypatch)
+    res = _be(smiles)
+    fresh_on = counts["fresh"]
+    assert_full_rt(res["name"], smiles)
+
+    def no_key(*a, **k):
+        raise RuntimeError("memo off")
+    with monkeypatch.context() as m:
+        m.setattr(sn, "_nsf_memo_key", no_key)
+        counts["fresh"] = 0
+        old = _be(smiles)
+        fresh_off = counts["fresh"]
+    assert 0 < fresh_on < fresh_off, (fresh_on, fresh_off)
+    assert (res["name"], res["tier"]) == (old["name"], old["tier"])
+
+
+@pytest.fixture
+def _nsf_scope(monkeypatch):
+    """A memo scope, an armed work budget and a fake fragment namer."""
+    from orthonym.assembly import fragment_naming as fn
+    from orthonym.assembly import memo
+    from orthonym.assembly import substituent_naming as sn
+    from orthonym.metrics import provenance as pv
+    monkeypatch.setattr(memo, "_MODE", "on")
+    calls = []
+    behaviour = {}
+
+    def fake(mol, sub_atoms, attach_idx, parent_chain):
+        calls.append(tuple(sub_atoms))
+        act = behaviour.get(tuple(sub_atoms))
+        if act:
+            act()
+        return None if tuple(sub_atoms) == (0,) else "x" + str(len(sub_atoms))
+    monkeypatch.setattr(sn, "_name_substituent_fragment_uncached", fake)
+    token = memo.push_scope()
+    saved = getattr(fn._fragment_guard, "work_budget", None)
+    fn._fragment_guard.work_budget = 100
+    prov_token = pv._NON_PIN_FRAGMENTS.set(())
+    try:
+        yield sn, pv, fn, calls, behaviour
+    finally:
+        pv._NON_PIN_FRAGMENTS.reset(prov_token)
+        fn._fragment_guard.work_budget = saved
+        memo.pop_scope(token)
+
+
+def test_substituent_fragment_memo_replays_the_non_pin_records(_nsf_scope):
+    sn, pv, fn, calls, behaviour = _nsf_scope
+    mol = Chem.MolFromSmiles("CCCO")
+    behaviour[(1, 2)] = lambda: (pv.record_non_pin_fragment("ethyl-x"),
+                                 pv.record_non_pin_fragment("ethyl-x"))
+    assert sn.name_substituent_fragment(mol, [1, 2], 1, [0]) == "x2"
+    assert pv._NON_PIN_FRAGMENTS.get() == ("ethyl-x",)
+    pv._NON_PIN_FRAGMENTS.set(())
+    assert sn.name_substituent_fragment(mol, [1, 2], 1, [0]) == "x2"   # a hit
+    assert calls == [(1, 2)]
+    assert pv._NON_PIN_FRAGMENTS.get() == ("ethyl-x",)                 # recorded again
+    assert sn.name_substituent_fragment(mol, [0], 0, [1]) is None
+    assert sn.name_substituent_fragment(mol, [0], 0, [1]) is None      # a stored None
+    assert calls == [(1, 2), (0,)]
+    assert sn.name_substituent_fragment(mol, [1, 2], 1, [3]) == "x2"   # another parent
+    assert sn.name_substituent_fragment(Chem.MolFromSmiles("CCCO"), [1, 2], 1, [0]) == "x2"
+    assert calls == [(1, 2), (0,), (1, 2), (1, 2)]                     # another mol object
+
+
+@pytest.mark.parametrize("effect", ["work unit", "provenance read", "other provenance"])
+def test_substituent_fragment_memo_skips_a_call_with_other_side_effects(_nsf_scope, effect):
+    sn, pv, fn, calls, behaviour = _nsf_scope
+    mol = Chem.MolFromSmiles("CCCO")
+    behaviour[(1, 2)] = {"work unit": fn.spend_fragment_work,
+                         "provenance read": pv.get_provenance,
+                         "other provenance": lambda: pv.record_source("probe")}[effect]
+    assert sn.name_substituent_fragment(mol, [1, 2], 1, [0]) == "x2"
+    assert sn.name_substituent_fragment(mol, [1, 2], 1, [0]) == "x2"
+    assert calls == [(1, 2), (1, 2)]
+
+
+def test_t4_rescue_memo_hit_charges_the_perf_and_analysis_units(monkeypatch):
+    from orthonym.assembly import fragment_naming as fn
+    from orthonym.assembly import memo
+    from orthonym.decomposition import engine as de
+
+    def fresh(s):
+        fn.spend_perf_work(5)
+        fn.spend_analysis_call(3)
+        fn.spend_fragment_work()
+        return s + "!"
+    monkeypatch.setattr(de, "_name_fragment_t4_rescue_fresh", fresh)
+    monkeypatch.setattr(memo, "_MODE", "on")
+    g = fn._fragment_guard
+    saved = {b: getattr(g, b, None) for b in ("perf_budget", "analysis_budget", "work_budget")}
+    token = memo.push_scope()
+    try:
+        g.perf_budget, g.analysis_budget, g.work_budget = 100, 100, 100
+        assert de._name_fragment_t4_rescue("CCO") == "CCO!"
+        assert (g.perf_budget, g.analysis_budget, g.work_budget) == (95, 97, 99)
+        assert de._name_fragment_t4_rescue("CCO") == "CCO!"               # a hit
+        assert (g.perf_budget, g.analysis_budget, g.work_budget) == (90, 94, 99)
+        g.analysis_budget = 3
+        with pytest.raises(fn.PerfBudgetExceeded):                         # as the repeat
+            de._name_fragment_t4_rescue("CCO")
+    finally:
+        memo.pop_scope(token)
+        for b, v in saved.items():
+            setattr(g, b, v)

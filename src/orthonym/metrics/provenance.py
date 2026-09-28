@@ -229,6 +229,42 @@ def pop_touched_log() -> set:
     return set()
 
 
+# ChEBI speed 2: a scope-bound log of the ``record_non_pin_fragment`` CALLS a
+# memoised substituent-fragment naming made (every call, also one whose fragment
+# was already recorded), so a memo hit can make the same calls again. A read of
+# the recorded fragments (``get_provenance``, ``name_carries_non_pin_part``,
+# ``record_derived_non_pin_fragment``) appends ``PROVENANCE_READ`` instead: a call
+# whose path read provenance is not memoised. A STACK of lists, like _TOUCHED.
+_NON_PIN_LOG = contextvars.ContextVar("orthonym_prov_non_pin_log", default=None)
+PROVENANCE_READ = object()
+
+
+def _log_non_pin(item) -> None:
+    stack = _NON_PIN_LOG.get()
+    if stack:
+        for log in stack:
+            log.append(item)
+
+
+def push_non_pin_log() -> list:
+    """Arm a fresh record-call log; pair with:func:`pop_non_pin_log` (LIFO)."""
+    stack = _NON_PIN_LOG.get()
+    if stack is None:
+        stack = []
+        _NON_PIN_LOG.set(stack)
+    log: list = []
+    stack.append(log)
+    return log
+
+
+def pop_non_pin_log() -> list:
+    """Disarm the innermost record-call log and return it (LIFO)."""
+    stack = _NON_PIN_LOG.get()
+    if stack:
+        return stack.pop()
+    return []
+
+
 def clear_provenance() -> None:
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
@@ -382,6 +418,7 @@ def record_non_pin_fragment(fragment: str) -> None:
     fragment."""
     if not fragment:
         return
+    _log_non_pin(fragment)
     cur = _NON_PIN_FRAGMENTS.get()
     if fragment not in cur:
         _NON_PIN_FRAGMENTS.set(cur + (fragment,))
@@ -395,6 +432,7 @@ def record_derived_non_pin_fragment(source: str, derived: str) -> None:
     survive the conversion."""
     if not source or not derived:
         return
+    _log_non_pin(PROVENANCE_READ)
     if any(f in source for f in _NON_PIN_FRAGMENTS.get()):
         record_non_pin_fragment(derived)
 
@@ -402,6 +440,7 @@ def record_derived_non_pin_fragment(source: str, derived: str) -> None:
 def name_carries_non_pin_part(prov: dict, name: Optional[str]) -> bool:
     """True when ``name`` must not be labelled a PIN: the whole-call
     ``general_ring_prefix`` flag, or a recorded non-PIN fragment it contains."""
+    _log_non_pin(PROVENANCE_READ)
     if prov.get("general_ring_prefix"):
         return True
     if not name:
@@ -410,6 +449,7 @@ def name_carries_non_pin_part(prov: dict, name: Optional[str]) -> bool:
 
 
 def get_provenance() -> dict:
+    _log_non_pin(PROVENANCE_READ)
     return {
         "source": _SOURCE.get(),
         "opsin": _OPSIN.get(),

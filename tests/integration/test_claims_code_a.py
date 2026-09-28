@@ -88,8 +88,12 @@ def test_wrong_descriptors_on_a_stereoparent_fall_back_to_its_full_key_name():
     assert row["name"] == NANDROLONE_PP_RIGHT, row
     assert _independent_full_key(row["name"]) == _key(NANDROLONE_PP)
     assert row["opsin"] == "verified" and row["verified"] == "opsin", row
-    # not what the PIN path built, so labelled below pin
-    assert row["tier"] not in ("pin_verified", "pin_unverified"), row
+    # not what the PIN path built (the gate's stereo-free repair, recorded non-PIN),
+    # so not pin_verified; a verified name from the PIN path that is not certified
+    # as the PIN is pin_unverified (paper tier semantics; TRIAGE 'Tier labels --
+    # paper semantics' -- best_effort was the offer-label under-claim this file's
+    # TRIAGE section recorded)
+    assert row["tier"] == "pin_unverified", row
     assert row["is_pin"] is False, row
 
 

@@ -142,7 +142,27 @@ def _run_general_e1(mol, features) -> Optional[_Candidate]:
 
     a phase Task 4: the SAME ``escalate=STRICT_STEREO_CHARGE_AXES`` promotion
     as ``name_t4_complete`` -- see that docstring.
+
+    A molecule with a NET formal charge returns ``None`` before the engine runs.
+    The certification below passes ``allow_charged=False``, and E1 then refuses
+    every result for such a molecule
+    (``validation.e1_certificate._verify_partition``: "net formal charge nonzero
+    (G1 charge scope)"; every other exit of that check is a refusal too), so the
+    engine's result for it was always discarded here. Running it cost the time
+    anyway: the engine names every N-acyl substituent through its acid
+    (``_name_amino_branch`` -> ``acyl_amido_prefix_from_branch``, 9e74facde),
+    and for the ChEBI lipid II-type glycopeptide (130 heavy atoms) the discarded
+    runs on its charged fragments took 139 of its 211 s (trace, fresh process:
+    612 outermost calls on charged fragments, 0 results certified).
     """
+    from rdkit import Chem
+
+    try:
+        if Chem.GetFormalCharge(mol) != 0:
+            return None
+    except Exception:  # an unreadable charge keeps the engine run (and its verdict)
+        pass
+
     from .general_engine import name_general
 
     try:

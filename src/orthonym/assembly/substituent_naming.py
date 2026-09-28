@@ -7344,7 +7344,138 @@ def _sulfonyl_sulfinyl_acyl_prefix(mol, sub_atoms, s_idx) -> Optional[str]:
     return stem
 
 
+_NSF_MEMO_NS = "substituent_fragment_name"
+# The one provenance variable a memoised call may write: the name-scoped non-PIN
+# record, whose record calls a hit makes again (metrics.provenance._NON_PIN_LOG).
+_NSF_REPLAYABLE = frozenset({"non_pin_fragments"})
+
+
+def _nsf_budget_state():
+    from .fragment_naming import _fragment_guard as _g
+    return (getattr(_g, 'perf_budget', None), getattr(_g, 'analysis_budget', None),
+            getattr(_g, 'work_budget', None))
+
+
+def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
+    """Everything:func:`_name_substituent_fragment_uncached` reads besides caches
+    whose entries never change once written: the molecule OBJECT (the hit also
+    checks identity; the entry pins it), the fragment and parent in the caller's
+    order, the stereo labels of the fragment atoms and bonds (they are assigned
+    lazily on the same object, as in ``name_substituent``'s key), the fragment
+    naming session (visited set, depth, the fragment cache object) and every
+    context variable a naming path branches on."""
+    from ..decomposition.engine import nacyl_float_refusing
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    from ..perception.molcache import atoms_of
+    from ..routing import dispatch_table as _dt
+    from .fragment_naming import _fragment_guard as _g
+    from .group_splitting import _IN_SPLIT_PROBE
+    from .locant_omission import (_ISOTOPE_PARENT_POSITIONAL, _ISOTOPIC_NAMING_SCOPE,
+                                  forced_locant_reason)
+    from .substituent_enumerator import _gate_is_reentrant
+    sub = tuple(sub_atoms)
+    sub_set = set(sub)
+    atoms = atoms_of(mol)
+    cips = []
+    for i in sub:
+        a = atoms[i]
+        cips.append(a.GetProp('_CIPCode') if a.HasProp('_CIPCode') else None)
+        for b in a.GetBonds():
+            j = b.GetOtherAtomIdx(i)
+            if j > i and j in sub_set:
+                cips.append((j, b.GetProp('_CIPCode') if b.HasProp('_CIPCode') else None))
+    if parent_chain is None:
+        parent = None
+    elif isinstance(parent_chain, (set, frozenset)):
+        parent = frozenset(parent_chain)
+    else:
+        parent = tuple(parent_chain)
+    visited = getattr(_g, 'visited', None)
+    return (id(mol), mol.GetNumAtoms(), mol.GetNumBonds(), sub, attach_idx, parent,
+            tuple(cips),
+            frozenset(visited) if visited else frozenset(),
+            getattr(_g, 'session_depth', 0), id(getattr(_g, 'cache', None)),
+            best_effort_ctx.get(), general_fallback_ctx.get(),
+            allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+            nacyl_float_refusing(), _dt._PEPTIDE_SUBST_ACTIVE, _gate_is_reentrant(),
+            getattr(_IN_SPLIT_PROBE, 'active', False), forced_locant_reason(),
+            _ISOTOPIC_NAMING_SCOPE.get(), _ISOTOPE_PARENT_POSITIONAL.get())
+
+
 def name_substituent_fragment(
+    mol,
+    sub_atoms: List[int],
+    attach_idx: int,
+    parent_chain: list,
+) -> Optional[str]:
+    """:func:`_name_substituent_fragment_uncached`, memoised for the top-level naming
+    call (``assembly.memo`` scope; ``ORTHONYM_MEMO=verify`` recomputes and compares,
+    ``off`` disables it), None included.
+
+    The recursive substituent naming asks for the same fragment of the same molecule
+    object again and again: the chain tie-break names every substituent of each
+    tied chain, and the located-FG namers, the compound-substituent namer and the
+    alkoxy prefixes then name the same branches again for each enclosing candidate.
+    Measured on the ChEBI lysine-rich peptide (136 heavy atoms, fresh process):
+    26,366 calls, 16,898 of them repeats of an earlier call with the same molecule,
+    fragment, attachment and parent, every one returning the earlier value; the
+    outermost repeats took about 26 of 84 s.
+
+    Only a call whose side effects a hit can repeat is stored: it charged no unit of
+    the perf, analysis or work budget, the only provenance variable it wrote is the
+    name-scoped non-PIN record, and it read no provenance
+    (``metrics.provenance.PROVENANCE_READ``). A hit makes the same
+    ``record_non_pin_fragment`` calls the stored call made (logged, in order, also
+    those whose fragment was already recorded) and returns the stored value. The
+    repeat of such a call returns the same value: its nested namings are hits in
+    caches whose entries never change once written (the fragment cache is consulted
+    before the cycle and depth guards, and a miss there charges a work unit), so it
+    takes the same path. It makes the same record calls or a subset (a nested memo
+    hit skips the records its computation made); either way they only re-add
+    fragments the stored call already added, because within one naming the record
+    only grows (the one exception, the NP-parent probe's ``restore_provenance``, can
+    at most leave a hit's name labelled non-PIN where the repeat would not). Any
+    other call is recomputed on every ask, as before. The key is
+    :func:`_nsf_memo_key`; an RWMol (mutable) is never memoised.
+    """
+    from . import memo as _memo
+    cache = _memo._cache_var.get()
+    if (_memo._MODE == "off" or cache is None or not sub_atoms
+            or isinstance(mol, Chem.RWMol)):
+        return _name_substituent_fragment_uncached(mol, sub_atoms, attach_idx, parent_chain)
+    try:
+        key = _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain)
+    except Exception:  # noqa: BLE001 -- no key, no memo
+        return _name_substituent_fragment_uncached(mol, sub_atoms, attach_idx, parent_chain)
+    ck = (_NSF_MEMO_NS, key)
+    from ..metrics import provenance as _pv
+    if _memo._MODE == "on":
+        hit = cache.get(ck)
+        if hit is not None and hit[0] is mol:
+            for fragment in hit[2]:
+                _pv.record_non_pin_fragment(fragment)
+            return hit[1]
+    before = _nsf_budget_state()
+    _pv.push_touched_log()
+    _pv.push_non_pin_log()
+    try:
+        value = _name_substituent_fragment_uncached(mol, sub_atoms, attach_idx, parent_chain)
+    finally:
+        records = _pv.pop_non_pin_log()
+        touched = _pv.pop_touched_log()
+    if (touched <= _NSF_REPLAYABLE and _nsf_budget_state() == before
+            and not any(r is _pv.PROVENANCE_READ for r in records)):
+        prev = cache.get(ck)
+        if (_memo._MODE == "verify" and prev is not None and prev[0] is mol
+                and prev[1] != value):
+            _memo._VERIFY_MISMATCHES.append((_NSF_MEMO_NS, key))
+            raise _memo.MemoMismatch(_NSF_MEMO_NS, key, prev[1], value)
+        cache[ck] = (mol, value, tuple(records))
+    return value
+
+
+def _name_substituent_fragment_uncached(
     mol,
     sub_atoms: List[int],
     attach_idx: int,
