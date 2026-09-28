@@ -382,3 +382,30 @@ html.dark .ot-rt-same { color: var(--ot-mark-pin); }
 html.dark .ot-reading-light { background: radial-gradient(closest-side, rgba(255, 69, 96, .34), rgba(196, 30, 58, .12) 50%, rgba(196, 30, 58, 0)); }
 .yue p code, .yue li code, .yue dd code { overflow-wrap: break-word; }
 .yue p code .pre, .yue li code .pre, .yue dd code .pre { overflow-wrap: break-word; white-space: normal; }
+
+/* ------------------------------------------------------------ logos (as on the web app) */
+.ot-brand { align-items: center; }
+.ot-brand-mark { display: block; height: 30px; width: auto; flex: none; transition: transform .25s cubic-bezier(.16, 1, .3, 1); }
+.ot-brand:hover .ot-brand-mark { transform: rotate(-6deg) scale(1.06); }
+html.dark .ot-brand-mark { filter: invert(1); }
+.ot-credit { display: inline-flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .5ch; margin: .2rem 0 .8rem !important;
+  padding: .4rem 1.1rem; border-radius: 999px; background: var(--ot-canvas); border: 1px solid var(--ot-hair); box-shadow: var(--ot-card-shadow);
+  font-size: .82rem; color: var(--ot-ink) !important; max-width: 100%; }
+.ot-credit-lead { font-family: var(--ot-f-mono); font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; color: var(--ot-muted); }
+.ot-credit-cup { width: 1.05rem; height: 1.05rem; flex: none; color: #c41e3a; }
+.ot-foot a.ot-credit-who, .ot-foot a.ot-credit-where { color: var(--ot-ink); }
+.ot-foot a.ot-credit-org { display: inline-flex; flex: none; margin-inline: .35ch; text-decoration: none; }
+.ot-credit-logo { display: block; height: 2rem; width: auto; }
+.ot-credit-logo--dark { display: none; }
+html.dark .ot-credit-logo--light { display: none; }
+html.dark .ot-credit-logo--dark { display: block; }
+.ot-credit-x { width: .8rem; height: .8rem; flex: none; color: var(--ot-muted); }
+@media (max-width: 480px) { .ot-credit { border-radius: 22px; padding: .45rem .8rem; } }
+@media (prefers-reduced-motion: reduce) { .ot-brand-mark { transition: none; } }
+@media (max-width: 480px) {
+  .ot-brand { gap: .4rem; }
+  .ot-brand-mark { height: 24px; }
+  .ot-wordmark { font-size: 1.05rem; letter-spacing: .16rem; }
+  .ot-try { padding: .4rem .65rem; letter-spacing: .05rem; font-size: .6875rem; }
+}
+@media (max-width: 360px) { .ot-wordmark { display: none; } }

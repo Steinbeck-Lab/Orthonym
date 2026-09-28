@@ -17,6 +17,8 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1a1a1a?style=flat-square)](https://www.python.org/)
 [![IUPAC 2013](https://img.shields.io/badge/IUPAC-2013%20recommendations-2f6b28?style=flat-square)](https://doi.org/10.1039/9781849733069)
 [![CI](https://github.com/Beilstein-Institut/Orthonym/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Beilstein-Institut/Orthonym/actions/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-online-1a1a1a?style=flat-square)](https://steinbeck-lab.github.io/Orthonym/)
+[![Web app: Orthonym-Web](https://img.shields.io/badge/web%20app-Orthonym--Web-1a1a1a?style=flat-square&logo=github)](https://github.com/Steinbeck-Lab/Orthonym-Web)
 
 </div>
 

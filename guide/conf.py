@@ -87,6 +87,8 @@ html_css_files = ["orthonym.css"]
 html_favicon = "_static/favicon.svg"
 html_permalinks_icon = "#"
 html_show_sourcelink = False
+# No author line on any page (the footer carries the credit line instead).
+html_show_copyright = False
 html_copy_source = False
 html_last_updated_fmt = None
 html_baseurl = os.environ.get("ORTHONYM_DOCS_BASEURL", "")

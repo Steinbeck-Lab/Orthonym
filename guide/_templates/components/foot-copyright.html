@@ -1,4 +1,15 @@
 <div class="sy-foot-copyright ot-foot">
-  <p>Orthonym {{ release }}. MIT licence. By Kohulan Rajan, Achim Zielesny and Christoph Steinbeck, at the Beilstein-Institut and the Steinbeck Lab, Friedrich Schiller University Jena.</p>
+  <p class="ot-credit">
+    <span class="ot-credit-lead">Made with</span>
+    <svg class="ot-credit-cup" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M9 2.5c-.6.8-.6 1.6 0 2.4"/><path d="M12.5 2c-.7.9-.7 1.9 0 2.9"/><path d="M16 2.5c-.6.8-.6 1.6 0 2.4"/><path d="M3.5 8h14v5.5a5 5 0 0 1-5 5h-4a5 5 0 0 1-5-5V8Z"/><path d="M17.5 9.5h1.6a2.4 2.4 0 0 1 0 4.8h-1.6"/></svg><span class="ot-sr-only">coffee</span>
+    <span class="ot-credit-lead">by</span>
+    <a class="ot-credit-who" href="https://kohulanr.com">Kohulan.R</a>
+    <span class="ot-credit-lead">at</span>
+    <a class="ot-credit-org" href="https://www.beilstein-institut.de/en/"><img class="ot-credit-logo ot-credit-logo--light" src="{{ pathto('_static/beilstein.svg', 1) }}" alt="Beilstein-Institut" width="876" height="202"><img class="ot-credit-logo ot-credit-logo--dark" src="{{ pathto('_static/beilstein-dark.svg', 1) }}" alt="Beilstein-Institut" width="876" height="202"></a>
+    <span class="ot-sr-only">and</span>
+    <svg class="ot-credit-x" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><path d="M3.5 3.5 12.5 12.5"/><path d="M12.5 3.5 3.5 12.5"/></svg>
+    <a class="ot-credit-where" href="https://cheminf.uni-jena.de">Steinbeck-Lab</a>
+  </p>
+  <p>Orthonym {{ release }}. MIT licence.</p>
   <p><a href="{{ repo_url }}">Source on GitHub</a> · <a href="{{ try_url }}">Web app</a> · <a href="{{ pathto('project/llms') }}">llms.txt</a></p>
 </div>

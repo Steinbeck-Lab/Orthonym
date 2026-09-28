@@ -197,7 +197,7 @@ A monochrome ink system with one crimson and a four-colour tier vocabulary.
 - **Dark set** (dark-canvas, dark-ground, dark-ink, dark-body, dark-muted): the canvas, the far end of the bench, headings, prose and labels in dark mode. Soft and card greys in dark mode are color-mix steps of dark-canvas toward dark-ink (94% for soft). Hairlines are white at .12 and .22 alpha.
 
 ### Named Rules
-**The Two Crimsons Rule.** Crimson appears in exactly two places: the TRY IT ONLINE pill and the reading light behind the wordmark. Links, hovers, focus rings and selection are ink. If a third crimson thing appears, it is a mistake.
+**The Two Crimsons Rule.** Crimson appears in exactly two places: the TRY IT ONLINE pill and the reading light behind the wordmark. Links, hovers, focus rings and selection are ink. If a third crimson thing appears, it is a mistake. Two exceptions are artwork, not chrome, and match the web app's footer: the coffee cup in the footer credit line, and the Beilstein-Institut logo, whose colours are the institute's own and are never recoloured (only its navy turns light on the dark footer, in beilstein-dark.svg). The header's brand mark is the web app's Orthonym.svg, black on light, inverted to white on dark.
 
 **The Colour Means Tier Rule.** Green, olive, amber and the abstain grey are used only for tier marks and tier verdicts. They never decorate.
 
