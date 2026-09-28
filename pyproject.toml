@@ -99,9 +99,9 @@ docs = [
 orthonym = "orthonym.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/Beilstein-Institut/Orthonym"
-Documentation = "https://github.com/Beilstein-Institut/Orthonym#readme"
-Repository = "https://github.com/Beilstein-Institut/Orthonym"
+Homepage = "https://github.com/Steinbeck-Lab/Orthonym"
+Documentation = "https://steinbeck-lab.github.io/Orthonym/"
+Repository = "https://github.com/Steinbeck-Lab/Orthonym"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/orthonym"]

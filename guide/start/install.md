@@ -12,7 +12,7 @@ Check the Java runtime with `java -version`. Any Java 11+ runtime works (for exa
 ## Install the package
 
 ```console
-$ pip install "git+https://github.com/Beilstein-Institut/Orthonym.git"
+$ pip install "git+https://github.com/Steinbeck-Lab/Orthonym.git"
 $ orthonym --fetch-jars
 ```
 

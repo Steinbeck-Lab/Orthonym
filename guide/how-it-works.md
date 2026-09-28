@@ -34,4 +34,4 @@ Every module has a page under [Internals](reference/internals/index.md).
 
 ## Built on
 
-RDKit, OPSIN and centres, on the IUPAC 2013 recommendations. The credits and references are in the README, under [Built on](https://github.com/Beilstein-Institut/Orthonym#built-on).
+RDKit, OPSIN and centres, on the IUPAC 2013 recommendations. The credits and references are in the README, under [Built on](https://github.com/Steinbeck-Lab/Orthonym#built-on).

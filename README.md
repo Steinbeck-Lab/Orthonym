@@ -16,7 +16,7 @@
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-1a1a1a?style=flat-square)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1a1a1a?style=flat-square)](https://www.python.org/)
 [![IUPAC 2013](https://img.shields.io/badge/IUPAC-2013%20recommendations-2f6b28?style=flat-square)](https://doi.org/10.1039/9781849733069)
-[![CI](https://github.com/Beilstein-Institut/Orthonym/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Beilstein-Institut/Orthonym/actions/workflows/ci.yml)
+[![CI](https://github.com/Steinbeck-Lab/Orthonym/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Steinbeck-Lab/Orthonym/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-online-1a1a1a?style=flat-square)](https://steinbeck-lab.github.io/Orthonym/)
 [![Web app: Orthonym-Web](https://img.shields.io/badge/web%20app-Orthonym--Web-1a1a1a?style=flat-square&logo=github)](https://github.com/Steinbeck-Lab/Orthonym-Web)
 
@@ -64,7 +64,7 @@ The same from Python:
 Needs Python 3.10+ and a Java 11+ runtime on your `PATH` (see [Installation](#installation)).
 
 ```bash
-pip install "git+https://github.com/Beilstein-Institut/Orthonym.git"
+pip install "git+https://github.com/Steinbeck-Lab/Orthonym.git"
 orthonym --fetch-jars          # one-time: downloads and checks the OPSIN and centres jars
 ```
 
@@ -148,7 +148,7 @@ When Orthonym cannot name a molecule, the plain call returns a label in place of
 - [How accuracy is measured](guide/accuracy.md): the three measures the engine is judged by.
 - [Contributing](CONTRIBUTING.md): development install, tests, source layout, how to add a compound class.
 - [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md) ·
-  [Open an issue](https://github.com/Beilstein-Institut/Orthonym/issues/new/choose)
+  [Open an issue](https://github.com/Steinbeck-Lab/Orthonym/issues/new/choose)
 
 ## How to cite
 
@@ -162,7 +162,7 @@ entry in APA and BibTeX. In BibTeX:
   title   = {{Orthonym}},
   version = {1.0.0},
   year    = {2026},
-  url     = {https://github.com/Beilstein-Institut/Orthonym}
+  url     = {https://github.com/Steinbeck-Lab/Orthonym}
 }
 ```
 

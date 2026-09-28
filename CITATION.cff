@@ -18,8 +18,8 @@ abstract: >-
   round-trip before it is returned.
 version: 1.0.0
 license: MIT
-url: "https://github.com/Beilstein-Institut/Orthonym"
-repository-code: "https://github.com/Beilstein-Institut/Orthonym"
+url: "https://github.com/Steinbeck-Lab/Orthonym"
+repository-code: "https://github.com/Steinbeck-Lab/Orthonym"
 keywords:
   - cheminformatics
   - IUPAC nomenclature

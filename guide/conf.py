@@ -110,6 +110,6 @@ html_theme_options = {
 }
 html_context = {
     "try_url": "https://orthonym.decimer.ai",
-    "repo_url": "https://github.com/Beilstein-Institut/Orthonym",
+    "repo_url": "https://github.com/Steinbeck-Lab/Orthonym",
 }
 html_sidebars = {"**": ["sidebars/localtoc.html"]}

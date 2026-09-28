@@ -24,7 +24,7 @@ layout: landing
     </div>
     <div class="ot-install">
       <p class="ot-install-label">Install. Needs Python 3.10+ and a Java 11+ runtime.</p>
-      <pre><code>pip install "git+https://github.com/Beilstein-Institut/Orthonym.git"
+      <pre><code>pip install "git+https://github.com/Steinbeck-Lab/Orthonym.git"
 orthonym --fetch-jars</code></pre>
       <p class="ot-install-note">No installing? <a href="https://orthonym.decimer.ai">Name a structure in the web app</a>.</p>
     </div>

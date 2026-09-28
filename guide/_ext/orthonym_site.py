@@ -30,7 +30,7 @@ HERE = Path(__file__).resolve().parent
 GUIDE = HERE.parent
 REPO = GUIDE.parent
 PKG = REPO / "src" / "orthonym"
-GITHUB = "https://github.com/Beilstein-Institut/Orthonym/blob/main/"
+GITHUB = "https://github.com/Steinbeck-Lab/Orthonym/blob/main/"
 
 # ------------------------------------------------------------------ tier marks
 # Engine tier id -> the lamp it lights (the web app's grouping).
@@ -323,7 +323,7 @@ def write_llms(app, exception):
              "> Orthonym turns a molecular structure (SMILES) into its IUPAC name, following the IUPAC 2013 "
              "recommendations. OPSIN reads every name back and the structures are compared by full InChIKey "
              "before a name is returned; when no name passes, the engine declines and says why.", "",
-             "Install: pip install \"git+https://github.com/Beilstein-Institut/Orthonym.git\", then "
+             "Install: pip install \"git+https://github.com/Steinbeck-Lab/Orthonym.git\", then "
              "orthonym --fetch-jars. Needs Python 3.10+ and a Java 11+ runtime. The whole text of this "
              "site is in llms-full.txt.", "", "## Pages", ""]
     for d in seq:

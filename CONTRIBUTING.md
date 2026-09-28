@@ -6,7 +6,7 @@ development environment, run the tests, and contribute a change.
 ## Development setup
 
 ```bash
-git clone https://github.com/Beilstein-Institut/Orthonym.git
+git clone https://github.com/Steinbeck-Lab/Orthonym.git
 cd Orthonym
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
@@ -50,7 +50,7 @@ Orthonym/
 To add a compound class, add a test that pins the expected name and cites the governing IUPAC
 rule. Release notes are in [`CHANGELOG.md`](CHANGELOG.md), vulnerability reports go by
 [`SECURITY.md`](SECURITY.md), and questions and bug reports go to
-[open an issue](https://github.com/Beilstein-Institut/Orthonym/issues/new/choose).
+[open an issue](https://github.com/Steinbeck-Lab/Orthonym/issues/new/choose).
 
 ## Contribution guidelines
 
