@@ -3275,20 +3275,43 @@ _ALT_PARENT_RESCUE = threading.local()
 
 
 class Orthonym:
-    """
-    IUPAC nomenclature generator.
-    
-    Implements the structure-to-name workflow:
-    1. Perception: Extract molecular features using RDKit
-    2. Classification: Apply IUPAC seniority rules
-    3. Assembly: Build name from fragments
-    
-    Example:
-        >>> namer = Orthonym
-        >>> namer.name("CCO")
-        'ethanol'
-        >>> namer.name("CC(=O)O")
-        'acetic acid'
+    """The naming engine, with every option.
+
+    Build one instance and name as many molecules with it as you like; the
+    options apply to every call.:func:`name_compound` builds a fresh instance for
+    each call.
+
+    Creating an instance checks that the OPSIN and centres jars are present and
+    stops with an error if they are not (run ``orthonym --fetch-jars``). Set
+    ``ORTHONYM_ALLOW_REDUCED=1`` to name without them, with no OPSIN check.
+
+    Parameters
+    ----------
+    style: {"pin", "general", "cas"}, default "pin"
+        Naming style, as for:func:`name_compound`.
+    enable_triviality_controller, enable_group_splitting, trivial_fallback: bool
+        As for:func:`name_compound`. All default to False.
+    general_fallback, general_fallback_unverified, allow_aromatic_general, full_coverage: bool
+        The switches behind the command line's ``--emit-tier``. All default to
+        False, which is the default tier. ``valid`` sets ``general_fallback``;
+        ``complete`` adds ``allow_aromatic_general``; ``best-effort`` adds
+        ``general_fallback_unverified``; ``full-coverage`` adds ``full_coverage``.
+    binding_proof: {"off", "audit", "enforce"}, default "off"
+        As for:func:`name_compound`.
+
+    Notes
+    -----
+    The parameters whose names start with an underscore are for the engine's own
+    use and tests; leave them at their defaults.
+
+    Examples
+    --------
+    >>> from orthonym import Orthonym
+    >>> namer = Orthonym
+    >>> namer.name("CCO")
+    'ethanol'
+    >>> namer.name("CC(=O)O")
+    'acetic acid'
     """
 
     def __init__(self, style: str = "pin", *,
@@ -3305,62 +3328,15 @@ class Orthonym:
                  _forced_parent_rank: int = 0,
                  _seed_excluded_dispatch_classes: frozenset = frozenset(),
                  binding_proof: str = "off"):
-        """
-        Initialize namer.
+        """Set up the engine; see the class description for the parameters.
 
-        Args:
-            style: Naming style
-                - "pin": Preferred IUPAC Names (IUPAC 2013)
-                - "general": General IUPAC (more flexible)
-                - "cas": CAS-style naming
-            _disable_grammar_validation: a phase escape hatch .
-                When True, the OPSIN grammar pre-validation layer is
-                disabled (`self._grammar` is None). ON by default in
-                production; OFF only for unit tests inspecting raw
-                handler output.
-            enable_triviality_controller: a phase opt-in flag.
-                Default False (Stage A SACRED byte-identical canary
-                invariant). When True, the triviality controller
-                (assembly/retained_substitution.py) swaps systematic
-                PIN-eligible parents to retained PIN forms at the
-                name-tree IR layer per IUPAC..3, and an
-                OpsinOracle is instantiated for the RT-safety
-                gate. Env override:
-                ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1/true/yes/on.
-            trivial_fallback: PIN-policy fallback flag (CLI ``--trivial``).
-                Default False (PIN fails closed). When True, a general-only
-                (PIN-denied) retained name is returned ONLY when the default
-                pipeline could not derive a PIN — a FALLBACK, never a
-                downgrade of a derivable PIN. Per the PIN-policy contract
-                (context resolution 3) this ALSO implies
-                ``enable_triviality_controller=True`` (one user intent:
-                "allow non-PIN trivial output").
-            general_fallback: opt-in. When True, a GENERAL-class
-                abstention is retried through the binding-carrying general
-                engine (assembly/general_engine.py), gated by the E1
-                certificate (validation/e1_certificate.py) and the existing
-                downstream moat (>15-HA gate, P10 vetoes,). Default
-                False — default output byte-identical for existing callers.
-            allow_aromatic_general: opt-in (plumbing only; inert
-                until P1/P2 land). When True, threaded down into
-                ``general_engine.name_general`` -> ``name_general_ring`` ->
-                ``vonbaeyer_universal.analyze_cage_universal`` as
-                ``allow_mancude``. Backs ``--emit-tier complete``. Default
-                False — default output byte-identical for existing callers.
-            binding_proof: a phase opt-in. One of:
-                - "off" (default): no proof work at all. The only cost on the
-                  default path is one string comparison, so PIN output is
-                  byte-identical BY CONSTRUCTION, not by careful matching.
-                - "audit": record the general engine's binding spine and
-                  re-assert it (validation/proof_ledger.py) against the string
-                  ``name`` actually returns. OBSERVE-ONLY — the name is never
-                  altered, findings go to ``logger.info`` and the ledger.
-                - "enforce": additionally ABSTAIN (fail closed) when the
-                  re-anchored proof fails. Implemented and unit-tested here but
-                  set by NO default path in this phase; it exists for the later
-                  phases that produce bindings for post-processed names.
-                Anything else raises ValueError: a typo must not silently
-                disable the proof.
+        Raises
+        ------
+        orthonym.jars.JarUnavailable
+            If the OPSIN or centres jar is missing and ``ORTHONYM_ALLOW_REDUCED`` is
+            not set.
+        ValueError
+            If ``binding_proof`` is not ``"off"``, ``"audit"`` or ``"enforce"``.
         """
         # Front door for the pinned OPSIN / centres jars: resolved once per process.
         # Missing -> JarUnavailable here, before any naming path can quietly fall back
@@ -3523,29 +3499,26 @@ class Orthonym:
                 self._split_oracle = None
 
     def get_dispatch_stats(self) -> Dict[Any, int]:
-        """a phase: per-instance CFR dispatch histogram.
+        """Return how often each compound-class route was taken by this instance.
 
-        Returns a defensive copy of the (StoutClass -> int) histogram
-        recorded by the CFR router on every dispatch. Per internal notes +
-         the counter lives on the Orthonym instance via the CFR
-        router; reset on demand via `reset_dispatch_stats`.
+        The engine tries compound classes in a fixed order (salts, ions,
+        carbohydrates, natural products, the general rules and more) and counts
+        which class named each molecule.
 
-        The return type is `Dict[Any, int]` (not `Dict[StoutClass, int]`)
-        to avoid eager `from.routing import StoutClass` at module-load
-        time, which would create a circular import. Callers that need
-        the StoutClass type can import it directly from `orthonym.routing`.
+        Returns
+        -------
+        dict
+            Compound class to count. The keys are members of
+            ``orthonym.routing.StoutClass``.
         """
         return self._cfr_router.get_dispatch_stats()
 
     def reset_dispatch_stats(self) -> None:
-        """a phase + a phase: explicit reset for batch-run boundaries.
+        """Set the route counters back to zero.
 
-        Resets BOTH the a phase outer-CFR (per-instance) counter AND the
-        a phase inner-dispatch (module-level) counter. The inner-dispatch
-        counter is module-level today (see assembly/inner_dispatch.py
-        :_INNER_DISPATCH_STATS) which means it is shared across Orthonym
-        instances — calling ``reset_dispatch_stats`` on one instance
-        resets the shared inner counter visible to all instances.
+        Resets this instance's class counters and the finer counters of
+        :meth:`get_inner_dispatch_stats`. The finer counters are shared by every
+        instance in the process, so this resets them for all instances.
         """
         self._cfr_router.reset_dispatch_stats()
         # a phase: also reset the inner-dispatch counter.
@@ -3553,56 +3526,47 @@ class Orthonym:
         reset_inner_dispatch_stats()
 
     def get_inner_dispatch_stats(self) -> Dict[str, int]:
-        """a phase: inner-dispatch per-handler-id counters.
+        """Return how often each handler inside the general class was used.
 
-        Returns a defensive copy of the (handler_id -> int) histogram
-        recorded by ``assembly/inner_dispatch.dispatch_inner`` on every
-        match. Inner-dispatch is the second stage of the a phase +
-        a phase dispatch pipeline: outer CFR routes to a StoutClass;
-        for the GENERAL class, inner-dispatch then routes to one of the
-        30 handlers in ``INNER_DISPATCH_TABLE``.
+        Within the general compound class, a second step picks one of several
+        handlers (acids, esters, amines and so on). These counters are shared by
+        every instance in the process;:meth:`reset_dispatch_stats` clears them.
 
-        Per internal notes: companion to ``get_dispatch_stats``; CLI
-        ``--dispatch-stats`` flag prints both together. Per -13 the
-        underlying counter is module-level (shared across instances)
-        because inner-dispatch is a pure-function call site — adding
-        per-instance threading would require touching every handler entry
-        point. The counter is reset via ``reset_dispatch_stats`` (which
-        clears BOTH outer + inner counters).
-
-        Returns:
-            Dict mapping handler_id (str) to dispatch count (int). Empty
-            dict if no inner-dispatch calls have happened yet.
+        Returns
+        -------
+        dict of str to int
+            Handler id to count; empty before the first molecule.
         """
         from .assembly.inner_dispatch import get_inner_dispatch_stats as _stats
         return _stats()
 
     def name_with_tree(self, smiles: str):
-        """a phase DECOMP-02 public API: return NamingResult(name, tree, hint).
+        """Name one molecule and return the parts of the name.
 
-        a phase ships the NameTreeNode IR substrate alongside the legacy
-        ``assemble_name`` path; first-wave handlers (Plans 02-03 ship)
-        return ``NamingResult(name=<final string>, tree=None,...)`` per
-        internal notes incremental migration. The ``tree`` field is None for
-        the 30 currently-extracted handlers; tree population is a +
-        follow-up phase. The ``name`` field is byte-identical to
-        ``Orthonym.name(smiles)``.
+        Parameters
+        ----------
+        smiles: str
+            The structure, as a SMILES string.
 
-        For tree-emitting handlers (+1 onwards), this method returns a
-        NamingResult whose ``tree`` is a NameTreeNode and where
-        ``name_tree_to_string(tree)`` round-trips to ``name`` byte-for-byte.
+        Returns
+        -------
+        NamingResult
+            ``name`` is the same string:meth:`name` returns; ``tree`` is the
+            :class:`NameTreeNode` of its parts (a single coarse node when the part of
+            the engine that built the name records no finer structure);
+            ``atom_to_locant_hint`` maps atom indices to locants where one was
+            recorded, else ``None``.
 
-        Args:
-            smiles: SMILES string to convert to IUPAC name.
+        Raises
+        ------
+        ValueError
+            If RDKit cannot read the SMILES.
 
-        Returns:
-            NamingResult NamedTuple with fields:
-              - name: str (byte-identical to Orthonym.name(smiles))
-              - tree: Optional[NameTreeNode] (None for first-wave handlers)
-              - atom_to_locant_hint: Optional[Dict[int, int]]
-
-        Raises:
-            ValueError: If SMILES is invalid.
+        Examples
+        --------
+        >>> from orthonym import Orthonym
+        >>> Orthonym.name_with_tree("OC1CCCCC1").name
+        'cyclohexanol'
         """
         # Lazy import to avoid composer.py -> name_tree -> namer.py cycle
         # at module-load time.
@@ -3679,11 +3643,17 @@ class Orthonym:
         return NamingResult(name=name, tree=tree, atom_to_locant_hint=hint)
 
     def get_validation_stats(self) -> Dict[str, int]:
-        """Return a defensive copy of the per-instance grammar counters.
+        """Return how often the OPSIN grammar pre-check passed or repaired a name.
 
-        a phase telemetry accessor. Buckets are pre-seeded in
-        `__init__`; counters are mutated in-place by the underlying
-        `OpsinGrammar` instance via the shared-by-reference dict.
+        The engine checks a candidate against OPSIN's grammar before the full round
+        trip, and can fix brackets, stereodescriptors or hyphens. The counters
+        belong to this instance and start at zero.
+
+        Returns
+        -------
+        dict of str to int
+            One counter per outcome, for example ``validate_passed`` and
+            ``repair_succeeded_bracket``.
         """
         return dict(self._grammar_stats)
 
@@ -3768,33 +3738,37 @@ class Orthonym:
 
     @_budget_scope
     def name(self, smiles: str, *, raise_on_limit: bool = False) -> str:
-        """
-        Generate IUPAC name from SMILES.
+        """Name one molecule with this instance's options.
 
-        Args:
-            smiles: SMILES string representing the molecule
-            raise_on_limit: (a phase) opt-in. When True, a provably
-                out-of-scope input raises ``OrthonymLimitError(code, message)``
-                instead of returning a plausible-but-wrong / descriptive string
-                — letting a caller distinguish "can't handle" from "got it
-                wrong". Default False preserves the always-emit behaviour
-                byte-for-byte (no limit is ever substituted into the result).
+        Parameters
+        ----------
+        smiles: str
+            The structure, as a SMILES string.
+        raise_on_limit: bool, default False
+            Raise:class:`OrthonymLimitError` for a structure the engine cannot
+            handle, instead of returning a label.
 
-                G0 (DD7 S1) note /: a top-level ring refusal carries the
-                specific ``UNSUPPORTED_RING_SYSTEM`` code. When the refusal
-                originates inside a RECURSIVE (substituent/fragment) naming call,
-                that inner frame returns its ``.message`` and the top-level
-                re-derives a generic ``UNNAMEABLE``/``UNSUPPORTED_ELEMENT`` code
-                via the post-failure classifier — i.e. the specific ring code
-                can be lost for those (rare) nested cases. The molecule still
-                fails closed; only the code precision is reduced.
+        Returns
+        -------
+        str
+            The name, or a label that says why no name was given (see
+            :func:`orthonym.errors.is_failure_name`).
 
-        Returns:
-            IUPAC systematic name
+        Raises
+        ------
+        ValueError
+            If RDKit cannot read the SMILES.
+        OrthonymLimitError
+            If ``raise_on_limit`` is true and the structure is out of scope. For a
+            ring system the engine cannot name yet the code is
+            ``UNSUPPORTED_RING_SYSTEM``; when that happens inside a part of the
+            molecule, the code reported can be the more general ``UNNAMEABLE``.
 
-        Raises:
-            ValueError: If SMILES is invalid
-            OrthonymLimitError: If raise_on_limit and the input is out of scope
+        Examples
+        --------
+        >>> from orthonym import Orthonym
+        >>> Orthonym.name("C/C=C/C")
+        '(2E)-but-2-ene'
         """
         # Start runtime fragment cache session (only at top-level depth)
         from .assembly.fragment_naming import (
@@ -4432,25 +4406,68 @@ class Orthonym:
             return None
 
     def name_tiered(self, smiles: str) -> dict:
-        """: name + honest tier/provenance labels (observation-only).
+        """Name one molecule and say how the name was made and checked.
 
-        Returns ``{name, tier, is_pin, source, opsin, gates_passed}`` where
-        tier is one of:
+        This is the row the command line prints with ``--provenance``.
 
-        - ``pin_verified``: the strict PIN path built the name, it is certified
-          as the PIN, and it was verified.
-        - ``pin_unverified``: a verified name from the PIN path that is not
-          certified as the PIN (only a breadth producer built it, or it carries
-          a recorded non-PIN part); also the PIN path's grammar carve-out and
-          constitution-only names, which no full round trip verified.
-        - ``systematic_verified``: a verified systematic name from the general
-          engine or a trivial/retained table that is not the PIN.
-        - ``best_effort``: the last-resort floor offer (``source`` 't4_floor'),
-          and a name whose shipped string no round trip verified.
-        - ``abstain``: no name.
+        Parameters
+        ----------
+        smiles: str
+            The structure, as a SMILES string.
 
-        Default construction (no flags) keeps today's PIN-or-abstain behavior
-        byte-identically.
+        Returns
+        -------
+        dict
+            ``name``
+                The name, or a label when there is none.
+            ``tier``
+                How the name was built: ``pin_verified`` (the strict path for the
+                Preferred IUPAC Name built it, certified it and OPSIN read it back),
+                ``pin_unverified`` (a name in preferred-name form that OPSIN read
+                back, but whose preferred status is not certified),
+                ``systematic_verified`` (a checked systematic name that is not the
+                preferred name, from the general engine or a table of retained
+                names), ``best_effort`` (the last-resort producers, or a name whose
+                own string no round trip confirmed) or ``abstain`` (no name).
+            ``is_pin``
+                True only for a certified Preferred IUPAC Name.
+            ``source``
+                Which part of the engine produced the name, for example
+                ``pin_path``, ``general_engine``, ``trivial_retained`` or
+                ``abstain``.
+            ``opsin``
+                What the OPSIN check found: ``verified``,
+                ``verified_constitution_only``, ``unverified`` or ``n/a``.
+            ``gates_passed``
+                The checks this name passed, for example ``self_consistency``
+                (OPSIN read the name back to your structure) and ``atom_coverage``.
+            ``gate_outcome``
+                What the final OPSIN check did for this name, for example
+                ``self_consistency_verified``, ``suppressed`` or ``not_run``, or
+                ``carveout:<class>`` for a class OPSIN cannot read.
+            ``formula``
+                The molecular formula, given when there is no name.
+            ``limit_code``
+                The reason code when there is no name, for example
+                ``UNSUPPORTED_ELEMENT``.
+            ``stereo_unexpressed``
+                True when a stereocentre of the input is not stated in the name.
+            ``suffix_free_prefix_name``
+                True when the name states the principal characteristic group as a
+                prefix with no suffix.
+            ``verified``
+                ``opsin`` (OPSIN read the whole name back to the same molecule),
+                ``opsin_constitution`` (read back with the same constitution; the
+                stereodescriptors were not confirmed by OPSIN), ``identity`` (a name
+                from an exact-match list, which OPSIN cannot read) or ``unverified``
+                (no read-back recorded).
+
+        Examples
+        --------
+        >>> from orthonym import Orthonym
+        >>> row = Orthonym.name_tiered("Cn1cnc2c1c(=O)n(C)c(=O)n2C")
+        >>> row["name"], row["tier"], row["verified"]
+        ('1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione', 'pin_verified', 'opsin')
         """
         # B2: open ONE memo scope around BOTH the primary name and the strict PIN
         # twin (_strict_pin_twin_name -> tw.name), so the twin reuses this run's
@@ -6450,19 +6467,27 @@ class Orthonym:
         return result
 
     def name_with_confidence(self, smiles: str) -> dict:
-        """Generate IUPAC name with confidence metadata.
+        """Name one molecule and return a coverage score with it.
 
-        Returns:
-            dict with keys:
-              - 'name' (str): The IUPAC name
-              - 'confidence' (float): 0.0-1.0 aggregate confidence score
-              - 'factors' (dict): Individual factor scores
-                  {'ratio': float, 'atom_coverage': float,
-                   'fg_recognition': float, 'substituent_completeness': float}
-              - 'handler' (str): Which handler produced the name
+        Returns
+        -------
+        dict
+            ``name`` (the name), ``confidence`` (a score from 0 to 1, or ``None``
+            when no measurement was taken), ``verification``, ``factors`` (the parts
+            of the score), ``handler`` (the part of the engine that built the name),
+            and further keys for the atom-to-locant map and the reason for a decline
+            (``limit``, ``abstention``).
 
-        Raises:
-            ValueError: If SMILES is invalid
+        Raises
+        ------
+        ValueError
+            If RDKit cannot read the SMILES.
+
+        Examples
+        --------
+        >>> from orthonym import Orthonym
+        >>> Orthonym.name_with_confidence("CCO")["name"]
+        'ethanol'
         """
         from .assembly.coverage_scoring import (
             clear_confidence,
@@ -8603,18 +8628,39 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
 
 
 def name_with_tree(smiles: str, style: str = "pin"):
-    """Module-level convenience wrapper for Orthonym(style).name_with_tree(smiles).
+    """Name one molecule and return the parts of the name.
 
-     part A (BLOCKER): downstream consumers expect
-    ``from orthonym import name_with_tree`` to work analogously to
-    ``name_compound``.
+    A shortcut for ``Orthonym(style=style).name_with_tree(smiles)``.
 
-    Args:
-        smiles: SMILES string to name.
-        style: 'pin' (preferred) | 'systematic' | 'cas'. Default 'pin'.
+    Parameters
+    ----------
+    smiles: str
+        The structure, as a SMILES string.
+    style: {"pin", "general", "cas"}, default "pin"
+        Naming style, as for:func:`name_compound`.
 
-    Returns:
-        NamingResult(name, tree, atom_to_locant_hint).
+    Returns
+    -------
+    NamingResult
+        The name (the same string:func:`name_compound` returns), the tree of its
+        parts as a:class:`NameTreeNode`, and a map from atom index to locant
+        where one was recorded.
+
+    Raises
+    ------
+    ValueError
+        If RDKit cannot read the SMILES.
+
+    Examples
+    --------
+    >>> from orthonym import name_with_tree
+    >>> result = name_with_tree("OC1CCCCC1")
+    >>> result.name
+    'cyclohexanol'
+    >>> result.tree.parent_stem
+    'cyclohex'
+    >>> result.tree.suffix
+    'ol'
     """
     return Orthonym(style=style).name_with_tree(smiles)
 
@@ -8631,19 +8677,92 @@ def name_compound(smiles: str, style: str = "pin",
                    full_coverage: Optional[bool] = None,
                    raise_on_limit: bool = False,
                    binding_proof: str = "off"):
-    """Public entry: generate an IUPAC name from SMILES.
+    """Name one molecule.
 
-    Thin front over:func:`_name_compound_impl`. a performance pass a lever: when this is
-    a NESTED plain-string call (an outer ``name`` is on the stack) route it
-    through the R3 replay-memo (``assembly.nested_memo.cached_nested_call``) so a
-    fragment named more than once inside one molecule re-runs the engine only
-    once; the memo replays the provenance delta and budget units the outer
-    molecule reads. TOP-LEVEL calls and ``include_confidence=True`` are NEVER
-    memoised. The key carries every result-changing kwarg (12) plus the four
-    breadth ctx-vars, so a hit can never return a name computed under different
-    flags. ``raise_on_limit=True`` raises through ``cached_nested_call`` uncached
-    (exceptions propagate) -- the existing behaviour. See the brief
-    `internal notes`.
+    Reads a structure written as SMILES and returns its IUPAC name as a string.
+    At the default settings the name is built by the strict path for the
+    Preferred IUPAC Name. Where that path cannot certify the preferred name, the
+    string can be another name of a lower tier, and where no name passes, it is a label
+    such as ``'inorganic compound (not supported)'``. Use
+    :func:`orthonym.errors.is_failure_name` to tell a label from a name, and
+    :meth:`Orthonym.name_tiered` to learn which tier a name earned.
+
+    Parameters
+    ----------
+    smiles: str
+        The structure, as a SMILES string.
+    style: {"pin", "general", "cas"}, default "pin"
+        Naming style. ``"pin"`` aims at the Preferred IUPAC Name. ``"general"``
+        allows a few general IUPAC forms where the recommendations offer one (for
+        example some adduct names and axial stereodescriptors). ``"cas"`` is
+        accepted and at present gives the same names as ``"pin"``.
+    include_confidence: bool, default False
+        Return a dictionary instead of a string. Its ``"name"`` key holds the
+        name, ``"handler"`` the part of the engine that built it, and
+        ``"confidence"`` and ``"factors"`` a coverage score and its parts.
+        ``"confidence"`` is ``None`` when no measurement was taken.
+    enable_triviality_controller: bool, default False
+        Where the recommendations prefer a retained parent name to the systematic
+        one, use the retained name. Each change is checked by an OPSIN round trip.
+        The environment setting ``ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1`` turns
+        this on as well.
+    enable_group_splitting: bool, default False
+        When an ester or thioester group inside a larger molecule has no prefix
+        form, write it as its parts (``oxo`` plus ``ethoxy``, for example) instead
+        of giving up. Each split name must pass an OPSIN round trip. The
+        environment setting ``ORTHONYM_ENABLE_GROUP_SPLITTING=1`` turns this on
+        as well.
+    trivial_fallback: bool, default False
+        When no preferred name can be built, also allow a retained trivial name
+        that is not a preferred name. A molecule whose preferred name can be built
+        keeps it. Turns on ``enable_triviality_controller``.
+    general_fallback: bool or None, default None
+        When the strict path declines, try the general naming engine (the
+        ``valid`` tier of the command line). Its names must pass an atom-coverage
+        certificate and a full-InChIKey round trip. ``None`` means "off" for a
+        call you make; the engine uses it to pass the setting on when it names
+        parts of a molecule.
+    general_fallback_unverified: bool or None, default None
+        Also switch on the last-resort producers of the ``best-effort`` tier.
+        Their names still have to pass the full-InChIKey round trip. ``None`` as
+        for ``general_fallback``.
+    allow_aromatic_general: bool or None, default None
+        Let the general engine also name aromatic and heterocyclic ring systems
+        (the ``complete`` tier). ``None`` as for ``general_fallback``.
+    full_coverage: bool or None, default None
+        Also try the coordination-name builder for metal tetrapyrrole and corrin
+        complexes (the ``full-coverage`` tier). It builds a name or declines.
+        ``None`` as for ``general_fallback``.
+    raise_on_limit: bool, default False
+        Raise:class:`OrthonymLimitError` for a structure the engine cannot
+        handle, instead of returning a label.
+    binding_proof: {"off", "audit", "enforce"}, default "off"
+        An extra check that every part of a general-engine name still maps onto
+        the atoms it names in the final string. ``"audit"`` records the result
+        and never changes the name; ``"enforce"`` also declines when the check
+        fails.
+
+    Returns
+    -------
+    str or dict
+        The name, or a label that says why no name was given. A dictionary when
+        ``include_confidence`` is true.
+
+    Raises
+    ------
+    ValueError
+        If RDKit cannot read the SMILES, or ``binding_proof`` is not one of the
+        three values.
+    OrthonymLimitError
+        If ``raise_on_limit`` is true and the structure is out of scope.
+
+    Examples
+    --------
+    >>> from orthonym import name_compound
+    >>> name_compound("CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O")
+    '(2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid'
+    >>> name_compound("O=[U](=O)=O")
+    'inorganic compound (not supported)'
     """
     if not include_confidence:
         from .assembly.fragment_naming import is_top_level_naming
@@ -8945,13 +9064,34 @@ def _descriptive_fallback(smiles: str) -> str:
 
 
 def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
-    """Diagnostic: return the OrthonymLimitError for an out-of-scope input, else None.
+    """Say whether a structure is out of scope, without raising.
 
-    Lets a caller probe "can Orthonym handle this?" without triggering an
-    exception. Returns a scope limit for structurally-refused inputs (wildcards);
-    otherwise runs the default namer and, if it fails to produce a real name,
-    returns the failure-mapped limit. Returns None for in-scope inputs and for
-    unparseable SMILES (which are a parse error, not a scope limit).
+    A wildcard atom (``*``) is refused at once. Any other structure is named with
+    the default settings; if that gives a label instead of a name, the reason is
+    returned.
+
+    Parameters
+    ----------
+    smiles: str
+        The structure, as a SMILES string.
+
+    Returns
+    -------
+    OrthonymLimitError or None
+        The reason, with its code (for example ``UNSUPPORTED_ELEMENT`` or
+        ``WILDCARD_ATOMS``) and message. ``None`` when the structure gets a name,
+        and also when RDKit cannot read the SMILES at all (that is a reading
+        error, not a scope limit).
+
+    Examples
+    --------
+    >>> from orthonym import classify_limit
+    >>> classify_limit("O=[U](=O)=O").code
+    'UNSUPPORTED_ELEMENT'
+    >>> classify_limit("CC*").code
+    'WILDCARD_ATOMS'
+    >>> classify_limit("CCO") is None
+    True
     """
     try:
         mol = Chem.MolFromSmiles(smiles)

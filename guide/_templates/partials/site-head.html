@@ -1,0 +1,32 @@
+<div class="sy-head">
+  <div class="sy-head-blur"></div>
+  <div class="sy-head-inner sy-container mx-auto">
+    <a class="sy-head-brand ot-brand" href="{{ pathto(root_doc) }}" aria-label="Orthonym documentation, home">
+      <span class="ot-reading-light" aria-hidden="true"></span>
+      <span class="ot-wordmark">Orthonym</span>
+      <span class="ot-wordmark-sub">Docs</span>
+    </a>
+    <div class="sy-head-nav" id="head-nav">
+      <nav class="sy-head-links" aria-label="Sections">
+        {%- if theme_nav_links -%}
+          {% include "components/nav-links.html" %}
+        {%- endif -%}
+      </nav>
+      <div class="sy-head-extra flex items-center print:hidden">
+        {%- include "components/searchbox.html" -%}
+        <a class="ot-head-link" href="{{ repo_url }}">GitHub</a>
+      </div>
+    </div>
+    <div class="sy-head-actions flex items-center shrink-0 print:hidden">
+      <a class="ot-try" href="{{ try_url }}">Try it online<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false"><path d="M5 11 11 5M6.5 5H11v4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      {%- include "components/theme-switch.html" -%}
+      <button class="md:hidden flex items-center js-menu" aria-label="Menu" type="button" aria-controls="head-nav" aria-expanded="false">
+        <div class="hamburger">
+          <span class="hamburger_1"></span>
+          <span class="hamburger_2"></span>
+          <span class="hamburger_3"></span>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>

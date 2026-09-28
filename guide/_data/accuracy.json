@@ -1,0 +1,12 @@
+{
+  "source": "Zenodo_Orthonym_data/run_records/RESCORE_SUMMARY.md, rows with generator orthonym (Orthonym 1.0.0, --emit-tier best-effort, scored with OPSIN 2.9.0 and its radical option)",
+  "columns": ["Set", "Molecules", "Named (round-trip exact)", "Declined", "Unreadable name", "Other layers"],
+  "rows": [
+    {"set": "Held-out ChEBI 2,000", "molecules": 2000, "named": 1991, "declined": 9, "unreadable": 0, "other_layers": 0, "wrong": 0},
+    {"set": "QM9", "molecules": 133885, "named": 133860, "declined": 25, "unreadable": 0, "other_layers": 0, "wrong": 0},
+    {"set": "ChEBI", "molecules": 111843, "named": 107686, "declined": 4118, "unreadable": 39, "other_layers": 0, "wrong": 0},
+    {"set": "PubChem 500,000", "molecules": 500000, "named": 499171, "declined": 829, "unreadable": 0, "other_layers": 0, "wrong": 0},
+    {"set": "ZINC22 500,000", "molecules": 500000, "named": 488407, "declined": 11593, "unreadable": 0, "other_layers": 0, "wrong": 0},
+    {"set": "PubChem 1,000,000", "molecules": 1000000, "named": 957523, "declined": 42468, "unreadable": 1, "other_layers": 8, "wrong": 0}
+  ]
+}

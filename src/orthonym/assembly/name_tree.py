@@ -42,50 +42,48 @@ from typing import Dict, NamedTuple, Optional, Tuple
 
 @dataclass(frozen=True)
 class NameTreeNode:
-    """a phase: 12-field frozen ordered-n-ary IR node.
+    """One part of a name, and the parts inside it.
 
-    Composition order per IUPAC::
+    A name is written in the order stereodescriptors, prefixes (in
+    alphanumerical order), parent, indicated hydrogen, unsaturation and suffix
+    (IUPAC. A node holds those pieces for one parent; each prefix is a
+    node of its own, so a substituent with its own substituents is a subtree. The
+    node cannot be changed after it is made.
 
-        [stereo] + [prefixes (alphabetized)] + [parent_stem] + [indicated_h]
-                 + [unsaturation_infix] + [suffix]
+    Attributes
+    ----------
+    parent_stem: str
+        The parent, for example ``'cyclohex'``.
+    locants: tuple of int
+        Locants of the suffix.
+    suffix: str or None
+        The suffix, for example ``'ol'``.
+    prefixes: tuple of NameTreeNode
+        The substituent prefixes, each a node.
+    stereo: str or None
+        The stereodescriptor part, for example ``'(2R)'``.
+    indicated_h: tuple of int
+        Locants of indicated hydrogen.
+    unsaturation_locants: tuple of (tuple of int, tuple of int)
+        Locants of double and of triple bonds.
+    class_id: str
+        The compound class that built the node.
+    multiplicative_prefix: str or None
+        A multiplying prefix such as ``'di'``.
+    parenthesization_hint: bool
+        True when the prefix must be written in enclosing marks.
+    iupac_section_cite: str or None
+        The section of the recommendations the node follows, for example
+        ``''``.
+    fragment_legacy: object or None
+        An older representation of the same part, kept for the engine's own use.
 
-    ``fragment_legacy`` carries the legacy ``NameFragment`` leaf rep
-    (composer.py:537) for incremental migration; handlers MAY return
-    ``tree=None`` per (DECOMP-03 byte-identical lock binds the
-    ``name`` field only).
-
-    Per internal notes: 12 fields exactly; frozen; immutable. Attempting
-    ``node.parent_stem = 'X'`` raises ``FrozenInstanceError``.
-
-    Field-coverage map (per internal notes-DECOMP.md):
-
-    +-------------------------------+--------------------------+---------------+
-    | field_name | iupac_p_section_cite | required? |
-    +===============================+==========================+===============+
-    | parent_stem | / / | REQUIRED |
-    +-------------------------------+--------------------------+---------------+
-    | locants | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | suffix | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | prefixes | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | stereo | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | indicated_h | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | unsaturation_locants | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | class_id | (audit metadata) | optional |
-    +-------------------------------+--------------------------+---------------+
-    | multiplicative_prefix | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | parenthesization_hint | / | optional |
-    +-------------------------------+--------------------------+---------------+
-    | iupac_section_cite | (audit metadata) | optional |
-    +-------------------------------+--------------------------+---------------+
-    | fragment_legacy | (migration handle) | optional |
-    +-------------------------------+--------------------------+---------------+
+    Examples
+    --------
+    >>> from orthonym import name_with_tree
+    >>> tree = name_with_tree("OC1CCCCC1").tree
+    >>> tree.parent_stem, tree.suffix
+    ('cyclohex', 'ol')
     """
     parent_stem: str
     locants: Tuple[int, ...] = ()
@@ -102,26 +100,28 @@ class NameTreeNode:
 
 
 class NamingResult(NamedTuple):
-    """a phase: handler return shape.
+    """A name together with the tree of its parts.
 
-    Per: handlers return ``NamingResult(name, tree, atom_to_locant_hint)``;
-    ``tree`` is Optional during incremental migration; ``atom_to_locant_hint``
-    is the locant map the post-handler stereo injector consumes
-    (composer.py:807, 1681-1683 today).
+    Returned by:func:`orthonym.name_with_tree` and
+    :meth:`orthonym.Orthonym.name_with_tree`. It is a named tuple of three
+    fields.
 
-    Fields:
-        name: REQUIRED — byte-identical contract per DECOMP-03. This is the
-            single source of truth at first wave; handlers SHOULD route this
-            through the existing composer.py pool.add / _inject_stereo_if_missing
-            pipeline for byte-identical preservation.
-        tree: Optional first-wave; populated incrementally per + phases.
-            ``None`` is the DEFAULT for Plan-02/03 ship (per internal notes-DECOMP.md
-            ). When non-None, the tree's serialization via
-            ``name_tree_to_string`` MUST equal the ``name`` field byte-for-byte.
-        atom_to_locant_hint: Forwarded to the post-handler stereo injector
-            (composer.py:_inject_stereo_if_missing). For ring handlers this
-            is typically ``features.heterocycle_atom_to_locant`` or
-            ``features.benzene_atom_to_locant``.
+    Attributes
+    ----------
+    name: str
+        The name, the same string:func:`orthonym.name_compound` returns.
+    tree: NameTreeNode or None
+        The parts of the name.
+    atom_to_locant_hint: dict of int to int or None
+        Atom index to locant, where the part of the engine that built the name
+        recorded it.
+
+    Examples
+    --------
+    >>> from orthonym import name_with_tree
+    >>> name, tree, hint = name_with_tree("OC1CCCCC1")
+    >>> name
+    'cyclohexanol'
     """
     name: str
     tree: Optional["NameTreeNode"] = None

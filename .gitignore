@@ -160,3 +160,6 @@ benchmarks/*/hh_10k_*.json
 
 # Third-party jars are downloaded at install, never committed
 *.jar
+
+# Documentation build output (sphinx-build guide _build/html)
+_build/

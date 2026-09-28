@@ -1,0 +1,67 @@
+name: Docs
+
+# Build the documentation site from guide/ and publish it with GitHub Pages.
+# The build imports the package for the API pages but names no molecule, so
+# it needs neither a Java runtime nor the OPSIN and centres jars.
+# Repository setting needed once: Settings > Pages > Source = GitHub Actions.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      ORTHONYM_SKIP_JAR_PREFETCH: "1"   # the build names nothing; no jar download at install
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install the package and the docs tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[docs]"
+
+      - name: Configure Pages
+        id: pages
+        uses: actions/configure-pages@v5
+
+      - name: Build (warnings are errors)
+        env:
+          ORTHONYM_DOCS_BASEURL: ${{ steps.pages.outputs.base_url }}
+        run: sphinx-build -W -b html guide _build/html
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _build/html
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

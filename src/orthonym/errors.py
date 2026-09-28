@@ -129,13 +129,33 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
 
 
 class OrthonymLimitError(Exception):
-    """Raised (opt-in) when an input is provably out of Orthonym's scope.
+    """The reason a structure is out of scope.
 
-    Carries a symbolic ``code`` (a key of ``LIMIT_CATALOG``), a human-readable
-    ``message``, the mirrored AUTONOM ``design_note_ref``, and the offending
-    ``smiles`` when available. A caller that catches this knows Orthonym
-    *cannot handle* the input — as opposed to a returned name, which is a
-    best-effort *attempt*.
+    Returned by:func:`orthonym.classify_limit`, and raised when you ask for it
+    with ``raise_on_limit=True``. It tells "cannot handle this structure" apart
+    from a name.
+
+    Attributes
+    ----------
+    code: str
+        The reason code: ``WILDCARD_ATOMS``, ``UNSUPPORTED_ELEMENT``,
+        ``ISOLATED_ATOM``, ``STRUCTURE_TOO_LARGE``, ``UNSUPPORTED_RING_SYSTEM``
+        or ``UNNAMEABLE``.
+    message: str
+        The label the plain call returns in place of a name.
+    design_note_ref: str or None
+        A reference to the design note the code follows.
+    smiles: str or None
+        The input, when known.
+
+    Examples
+    --------
+    >>> from orthonym import Orthonym, OrthonymLimitError
+    >>> try:
+    ... Orthonym.name("O=[U](=O)=O", raise_on_limit=True)
+    ... except OrthonymLimitError as err:
+    ... print(err.code, "|", err.message)
+    UNSUPPORTED_ELEMENT | inorganic compound (not supported)
     """
 
     def __init__(self, code: str, message: str,
@@ -199,11 +219,32 @@ def unsupported_element_branch(symbol: str,
 
 
 def is_failure_name(name: Optional[str]) -> bool:
-    """True if ``name`` is Orthonym's failure signal (empty or contains 'unknown').
+    """Tell a label from a name.
 
-    Mirrors the predicate ``name_compound`` already uses to decide whether to
-    fall back to a descriptive string, so the limit classifier fires on exactly
-    the inputs that today produce a descriptive fallback (never on a real name).
+    When the engine cannot name a structure, the plain call returns a label in
+    place of a name, such as ``'inorganic compound (not supported)'`` or
+    ``'unknown organic compound'``. This function is true for those labels and for
+    an empty result, and false for a real name.
+
+    Parameters
+    ----------
+    name: str or None
+        What a naming call returned.
+
+    Returns
+    -------
+    bool
+        True when ``name`` is empty or a label (it contains ``unknown`` or
+        ``(not supported)``).
+
+    Examples
+    --------
+    >>> from orthonym import name_compound
+    >>> from orthonym.errors import is_failure_name
+    >>> is_failure_name(name_compound("O=[U](=O)=O"))
+    True
+    >>> is_failure_name(name_compound("CCO"))
+    False
     """
     if not name:
         return True

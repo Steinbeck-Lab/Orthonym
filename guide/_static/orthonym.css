@@ -1,0 +1,384 @@
+/* Orthonym documentation, in the Orthonym world.
+   Tokens from the web app (Orthonym-Web frontend/src/index.css) and the
+   README pictures (docs/readme/build.py): the bench, white cards, three
+   faces, the four tier marks, crimson only on TRY IT ONLINE and the
+   reading light. Fonts are served from this site (SIL OFL). */
+
+@font-face { font-family: "Saira Condensed"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/saira-condensed-3.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Public Sans"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/public-sans-3.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Public Sans"; font-style: normal; font-weight: 600; font-display: swap;
+  src: url("fonts/public-sans-b3.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Public Sans"; font-style: italic; font-weight: 400; font-display: swap;
+  src: url("fonts/public-sans-i3.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "JetBrains Mono"; font-style: normal; font-weight: 400; font-display: swap;
+  src: url("fonts/jetbrains-mono-6.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+
+/* ------------------------------------------------------------ tokens */
+:root, html.light {
+  --ot-canvas: #ffffff;
+  --ot-soft: #f4f4f4;
+  --ot-card-grey: #ebebeb;
+  --ot-card-soft: #edeff2;
+  --ot-ground: #d5d8dc;
+  --ot-hair: #d9d9d9;
+  --ot-hair-strong: #c5c5c5;
+  --ot-ink: #000000;
+  --ot-body: #333333;
+  --ot-body-strong: #1a1a1a;
+  --ot-muted: #666666;
+  --ot-on-primary: #ffffff;
+  --ot-accent: #c41e3a;
+  --ot-accent-deep: #9d1830;
+  --ot-accent-wash: #faedef;
+  --ot-glow-wash: #fff8d6;
+  --ot-amber: #9c4109;
+  --ot-olive: #556b2f;
+  --ot-success: #2f6b28;
+  /* tier marks (deep, measured on white) and their glows (never a line on white) */
+  --ot-mark-pin: #2f6b28;      --ot-glow-pin: #3dff8f;
+  --ot-mark-fallback: #556b2f; --ot-glow-fallback: #b6f24a;
+  --ot-mark-best: #9c4109;     --ot-glow-best: #ffb02e;
+  --ot-mark-abstain: #666666;
+  /* the bench */
+  --ot-bench: linear-gradient(135deg, #f6e2e6 0%, #e6e6e9 50%, #d5d8dc 100%);
+  --ot-bench-wash: radial-gradient(75% 90% at 10% 2%, rgba(242, 196, 205, .6), rgba(242, 196, 205, 0));
+  --ot-bench-dots: radial-gradient(circle at 9px 9px, rgba(27, 28, 32, .09) 1.05px, transparent 1.6px);
+  --ot-card-shadow: 0 1px 2px rgba(17, 18, 20, .05), 0 12px 30px -14px rgba(17, 18, 20, .14);
+  --ot-r-card: 22px;
+  --ot-r-sm: 14px;
+  --ot-r-chrome: 10px;
+  --ot-f-display: "Saira Condensed", "Arial Narrow", sans-serif;
+  --ot-f-body: "Public Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  --ot-f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+
+/* Dark follows the system. Built from the web app's on-dark tokens
+   (--card-dark #1b1c20, --on-dark #f5f6f8, --muted-on-dark #a9adb4,
+   --hairline-on-dark); the lamp neons, only ever glow on white, carry
+   the marks here because on the dark card they have the contrast. */
+html.dark {
+  --ot-canvas: #1b1c20;
+  --ot-soft: color-mix(in srgb, #1b1c20 94%, #f5f6f8);
+  --ot-card-grey: color-mix(in srgb, #1b1c20 90%, #f5f6f8);
+  --ot-card-soft: color-mix(in srgb, #1b1c20 92%, #f5f6f8);
+  --ot-ground: #141518;
+  --ot-hair: rgba(255, 255, 255, .12);
+  --ot-hair-strong: rgba(255, 255, 255, .22);
+  --ot-ink: #f5f6f8;
+  --ot-body: #dcdee2;
+  --ot-body-strong: #f5f6f8;
+  --ot-muted: #a9adb4;
+  --ot-accent-wash: rgba(196, 30, 58, .16);
+  --ot-glow-wash: rgba(255, 212, 0, .12);
+  --ot-mark-pin: #3dff8f;
+  --ot-mark-fallback: #b6f24a;
+  --ot-mark-best: #ffb02e;
+  --ot-mark-abstain: #a9adb4;
+  --ot-bench: linear-gradient(135deg, #2a1d21 0%, #1d1e22 50%, #141518 100%);
+  --ot-bench-wash: radial-gradient(75% 90% at 10% 2%, rgba(196, 30, 58, .16), rgba(196, 30, 58, 0));
+  --ot-bench-dots: radial-gradient(circle at 9px 9px, rgba(245, 246, 248, .07) 1.05px, transparent 1.6px);
+  --ot-card-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 12px 30px -14px rgba(0, 0, 0, .6);
+}
+
+/* Shibuya's own variables, pointed at the tokens */
+:root, html.light, html.dark {
+  --sy-f-heading: var(--ot-f-display);
+  --sy-f-text: var(--ot-f-body);
+  --sy-f-mono: var(--ot-f-mono);
+  --sy-c-text: var(--ot-body);
+  --sy-c-light: var(--ot-muted);
+  --sy-c-bold: var(--ot-body-strong);
+  --sy-c-heading: var(--ot-ink);
+  --sy-c-link: var(--ot-ink);
+  --sy-c-link-hover: var(--ot-ink);
+  --sy-c-background: var(--ot-canvas);
+  --sy-c-surface: var(--ot-soft);
+  --sy-c-border: var(--ot-hair);
+  --sy-c-divider: var(--ot-hair);
+  --sy-c-foot-text: var(--ot-muted);
+  --sy-c-foot-background: var(--ot-canvas);
+  --sy-c-foot-divider: var(--ot-hair);
+  --sy-c-background-dropback: color-mix(in srgb, var(--ot-canvas) 84%, transparent);
+  --sy-s-navbar-height: 60px;
+  --yue-c-text: var(--ot-body);
+  --yue-c-heading: var(--ot-ink);
+  --yue-c-bold: var(--ot-body-strong);
+  --yue-c-link-1: var(--ot-ink);
+  --yue-c-link-2: var(--ot-ink);
+  --yue-c-link-border: var(--ot-hair-strong);
+  --yue-c-code-text: var(--ot-body-strong);
+  --yue-c-code-background: var(--ot-soft);
+  --yue-c-table-border: var(--ot-hair);
+  --yue-c-th-background: var(--ot-soft);
+  --yue-c-th-border: var(--ot-hair);
+  --yue-c-td-border: var(--ot-hair);
+  --yue-c-row-background: transparent;
+  --yue-c-hr: var(--ot-hair);
+  --yue-c-quote-border: var(--ot-hair-strong);
+  --yue-c-ul-marker: var(--ot-muted);
+  --yue-c-ol-marker: var(--ot-muted);
+  --yue-c-caption: var(--ot-muted);
+}
+
+/* ------------------------------------------------------------ browser surfaces */
+html { accent-color: var(--ot-ink); scrollbar-color: var(--ot-hair-strong) var(--ot-canvas); scrollbar-width: thin; }
+body { background: var(--ot-canvas); color: var(--ot-body); font-family: var(--ot-f-body);
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+::selection { background: var(--ot-ink); color: var(--ot-canvas); }
+:focus-visible { outline: 2px solid var(--ot-ink); outline-offset: 3px; border-radius: 2px; }
+code, kbd, pre, samp, table { font-variant-numeric: tabular-nums; }
+
+/* ------------------------------------------------------------ header */
+.sy-head-blur { box-shadow: 0 1px 0 var(--ot-hair); }
+.ot-brand { position: relative; display: inline-flex; align-items: baseline; gap: .6rem; text-decoration: none; isolation: isolate; }
+.ot-wordmark { font-family: var(--ot-f-display); font-size: 1.35rem; letter-spacing: .375rem; text-transform: uppercase; color: var(--ot-ink); line-height: 1; }
+.ot-wordmark-sub { font-family: var(--ot-f-mono); font-size: .6875rem; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); }
+.ot-reading-light { position: absolute; z-index: -1; left: 50%; top: 50%; width: 11rem; height: 3.2rem; margin: -1.6rem 0 0 -5.5rem;
+  background: radial-gradient(closest-side, rgba(196, 30, 58, .26), rgba(196, 30, 58, .08) 50%, rgba(196, 30, 58, 0));
+  pointer-events: none; animation: ot-read 2.4s cubic-bezier(.16, 1, .3, 1) .2s 1 both; }
+@keyframes ot-read { from { transform: translateX(-60%); opacity: 0; } 30% { opacity: 1; } to { transform: none; opacity: 1; } }
+.sy-head-links a, .sy-head-links button { font-family: var(--ot-f-mono); font-size: .75rem; letter-spacing: .125rem; text-transform: uppercase; font-weight: 400; color: var(--ot-body); }
+.sy-head-links a:hover { color: var(--ot-ink); text-decoration: underline; text-underline-offset: .35em; }
+.ot-head-link { font-family: var(--ot-f-mono); font-size: .75rem; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-body); text-decoration: none; padding: .5rem; }
+.ot-head-link:hover { color: var(--ot-ink); text-decoration: underline; text-underline-offset: .35em; }
+.searchbox input { font-family: var(--ot-f-body); border: 1px solid var(--ot-hair); border-radius: var(--ot-r-chrome); background: var(--ot-canvas); color: var(--ot-ink); }
+.searchbox input::placeholder { color: var(--ot-muted); }
+.searchbox input:focus { border-color: var(--ot-ink); outline: none; }
+/* the one primary action */
+.ot-try { display: inline-flex; align-items: center; gap: .45rem; margin-right: .75rem; padding: .5rem 1rem .5rem 1.1rem; border-radius: 9999px;
+  font-family: var(--ot-f-mono); font-size: .75rem; letter-spacing: .125rem; text-transform: uppercase; white-space: nowrap;
+  color: #ffffff; text-decoration: none; background: linear-gradient(180deg, #d63553, #9d1830);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .28), 0 1px 2px rgba(157, 24, 48, .3), 0 6px 16px -8px rgba(157, 24, 48, .55);
+  transition: background .2s cubic-bezier(.16, 1, .3, 1), box-shadow .2s cubic-bezier(.16, 1, .3, 1); }
+.ot-try:hover { background: linear-gradient(180deg, #c41e3a, #9d1830); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(157, 24, 48, .35), 0 10px 22px -10px rgba(157, 24, 48, .7); }
+.ot-try:focus-visible { outline-color: var(--ot-accent-deep); }
+@media (max-width: 767px) {
+  .ot-try { padding: .45rem .8rem; margin-right: .4rem; letter-spacing: .08rem; }
+  .ot-wordmark { letter-spacing: .25rem; font-size: 1.2rem; }
+  .ot-wordmark-sub { display: none; }
+}
+
+/* ------------------------------------------------------------ reading type */
+.yue { font-size: 1rem; line-height: 1.7; color: var(--ot-body); }
+.yue > section, .yue section > p, .yue section > ul, .yue section > ol, .yue dl { max-width: 72ch; }
+.yue h1, .yue h2, .yue h3, .yue h4 { font-family: var(--ot-f-display); font-weight: 400; text-transform: uppercase; color: var(--ot-ink); text-wrap: balance; }
+.yue h1 { font-size: clamp(2rem, 3.6vw, 3rem); line-height: 1.1; letter-spacing: .1875rem; margin-bottom: .75em; }
+.yue h2 { font-size: clamp(1.4rem, 2.2vw, 1.75rem); line-height: 1.2; letter-spacing: .125rem; margin-top: 2.4em; margin-bottom: .7em; }
+.yue h3 { font-size: 1.25rem; line-height: 1.3; letter-spacing: .09375rem; margin-top: 2em; margin-bottom: .5em; }
+.yue h1 code, .yue h2 code { text-transform: none; font-size: .8em; background: none; padding: 0; letter-spacing: 0; }
+.yue p { margin-top: .9rem; margin-bottom: 1.1rem; }
+.yue a { color: var(--ot-ink); font-weight: 400; text-decoration-color: var(--ot-hair-strong); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+.yue a:hover { text-decoration-color: var(--ot-ink); text-decoration-thickness: 2px; }
+.yue strong { font-weight: 600; color: var(--ot-body-strong); }
+.yue code { font-family: var(--ot-f-mono); font-weight: 400; font-size: .86em; color: var(--ot-body-strong); background: var(--ot-soft); border: 1px solid var(--ot-hair); border-radius: 6px; padding: .06em .32em; }
+.yue a code { color: inherit; }
+.yue a.headerlink { font-family: var(--ot-f-mono); color: var(--ot-muted); text-decoration: none; }
+.yue dl dt { font-weight: 600; color: var(--ot-ink); margin-top: 1.1rem; }
+.yue dl dt code { font-weight: 400; }
+.yue dl dd { margin-left: 1.25rem; margin-top: .2rem; }
+.yue hr { border-color: var(--ot-hair); }
+
+/* code blocks: soft card, hairline, the mono face */
+.yue div.highlight, .yue .highlight pre, .yue pre { font-family: var(--ot-f-mono); }
+.yue div.highlight { background: var(--ot-soft); border: 1px solid var(--ot-hair); border-radius: var(--ot-r-sm); }
+.yue div.highlight pre { background: transparent; font-size: .84rem; line-height: 1.65; padding: .95rem 1.1rem; }
+.yue .highlight .gp { color: var(--ot-muted); user-select: none; }
+.yue .highlight .go { color: var(--ot-body); }
+html.dark .yue div.highlight { background: var(--ot-soft); }
+
+/* tables */
+.yue table { font-size: .9rem; border-collapse: collapse; }
+.yue table th { font-family: var(--ot-f-mono); font-size: .6875rem; font-weight: 400; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); background: transparent; border-bottom: 1px solid var(--ot-hair-strong); }
+.yue table td { border-bottom: 1px solid var(--ot-hair); vertical-align: top; }
+.yue table tr:last-child td { border-bottom: 0; }
+.yue table td.text-right, .yue table th.text-right { text-align: right; }
+
+/* admonitions: a hairline card, no side bar */
+.yue .admonition { border: 1px solid var(--ot-hair); border-left: 1px solid var(--ot-hair); border-radius: var(--ot-r-sm); background: var(--ot-canvas); padding: .9rem 1.1rem; }
+.yue .admonition:before, .yue .admonition:after { display: none; }
+.yue .admonition p.admonition-title { margin: 0 0 .35rem; padding: 0; background: none; font-family: var(--ot-f-mono); font-size: .6875rem; font-weight: 400; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); }
+.yue .admonition.ot-internal { background: var(--ot-glow-wash); border-color: var(--ot-hair-strong); }
+.yue .admonition.ot-internal p.admonition-title { color: var(--ot-amber); }
+html.dark .yue .admonition.ot-internal p.admonition-title { color: var(--ot-mark-best); }
+.yue .admonition.ot-internal p:last-child { margin: 0; color: var(--ot-body-strong); }
+
+/* API entries */
+.yue dl.py > dt { font-family: var(--ot-f-mono); font-weight: 400; font-size: .9rem; background: var(--ot-soft); border: 1px solid var(--ot-hair); border-radius: var(--ot-r-sm); padding: .55rem .8rem; }
+.yue dl.py > dt .sig-name { color: var(--ot-ink); font-weight: 600; }
+.yue dl.py > dt .property, .yue dl.py > dt .sig-prename { color: var(--ot-muted); }
+.yue dl.py > dd { margin-left: .4rem; padding-left: 1rem; border-left: 1px solid var(--ot-hair); }
+.yue dl.field-list > dt { font-family: var(--ot-f-mono); font-size: .6875rem; font-weight: 400; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); }
+.yue .rubric { font-family: var(--ot-f-mono); font-size: .6875rem; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); margin-top: 1.4rem; }
+
+/* sidebars */
+.globaltoc .caption { font-family: var(--ot-f-mono); font-size: .6875rem; font-weight: 400; letter-spacing: .125rem; color: var(--ot-muted); border-top-color: var(--ot-hair); }
+.globaltoc a { color: var(--ot-body); font-size: .92rem; }
+.globaltoc a:hover { color: var(--ot-ink); }
+.globaltoc li.current > a, .globaltoc a.current { color: var(--ot-ink); font-weight: 600; background: var(--ot-soft); border-radius: 8px; }
+.localtoc h3 { font-family: var(--ot-f-mono); font-size: .6875rem; font-weight: 400; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); }
+.localtoc a { color: var(--ot-body); }
+
+/* footer */
+.sy-foot { background: var(--ot-canvas); }
+.ot-foot p { margin: .25rem 0; color: var(--ot-muted); }
+.ot-foot a { color: var(--ot-ink); text-decoration: underline; text-decoration-color: var(--ot-hair-strong); text-underline-offset: .2em; }
+
+/* ------------------------------------------------------------ tier marks */
+.ot-mark { flex: none; display: inline-block; vertical-align: -.2em; }
+.ot-mark--pin { color: var(--ot-mark-pin); }
+.ot-mark--fallback { color: var(--ot-mark-fallback); }
+.ot-mark--best-effort { color: var(--ot-mark-best); }
+.ot-mark--abstain { color: var(--ot-mark-abstain); }
+.ot-tier { display: inline-flex; align-items: center; gap: .32em; white-space: nowrap; }
+.ot-tier .ot-mark { width: 1.1em; height: 1.1em; }
+.ot-lamp-label { font-family: var(--ot-f-mono); font-size: .75rem; letter-spacing: .125rem; color: var(--ot-ink); }
+.yue dl dt .ot-tier code { font-weight: 400; }
+
+/* the rule a name wears: the confidence grammar of build.py */
+.ot-name { display: inline-block; max-width: 100%; color: var(--ot-ink); font-family: var(--ot-f-body); overflow-wrap: anywhere; padding-bottom: .3rem; }
+.ot-rule--pin { border-bottom: 6px double var(--ot-ink); }
+.ot-rule--fallback { border-bottom: 2px dashed var(--ot-ink); }
+.ot-rule--best-effort { border-bottom: 2.6px dotted var(--ot-muted); }
+.ot-rule--abstain { border-bottom: 1.6px solid var(--ot-hair-strong); }
+.ot-name--label { color: var(--ot-muted); }
+
+/* ------------------------------------------------------------ home */
+.ot-home { margin: 0 auto; }
+.yue .ot-home h1, .yue .ot-home h2, .yue .ot-home h3 { margin-top: 0; }
+.ot-hero { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.5rem; padding: clamp(1.25rem, 3.5vw, 3rem);
+  border-radius: 36px; background: var(--ot-bench-dots), var(--ot-bench-wash), var(--ot-bench); background-size: 18px 18px, auto, auto; }
+@media (min-width: 1024px) { .ot-hero { grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr); gap: 2.5rem; align-items: start; } }
+.yue .ot-home .ot-hero h1 { font-size: clamp(2.4rem, 5vw, 4rem); line-height: 1.02; letter-spacing: .2rem; margin: .4rem 0 1.1rem; }
+.ot-lede { font-size: 1.08rem; line-height: 1.65; color: var(--ot-body-strong); max-width: 36rem; margin: 0 0 1.6rem; }
+.ot-doors { display: grid; grid-template-columns: minmax(0, 1fr); gap: .9rem; }
+@media (min-width: 640px) { .ot-doors { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.yue a.ot-door { position: relative; display: flex; flex-direction: column; gap: .55rem; padding: 1.15rem 1.2rem 2.6rem; border-radius: var(--ot-r-card);
+  background: var(--ot-canvas); border: 1px solid transparent; box-shadow: var(--ot-card-shadow); color: var(--ot-body); text-decoration: none;
+  transition: border-color .25s cubic-bezier(.16, 1, .3, 1), transform .25s cubic-bezier(.16, 1, .3, 1); }
+.yue a.ot-door:hover { border-color: var(--ot-ink); transform: translateY(-2px); }
+.ot-door-title { font-family: var(--ot-f-display); font-size: 1.5rem; line-height: 1.1; letter-spacing: .09375rem; text-transform: uppercase; color: var(--ot-ink); }
+.ot-door-code { display: flex; flex-wrap: wrap; align-items: baseline; gap: .5rem; }
+.yue .ot-door-code code { font-size: .8rem; background: var(--ot-soft); }
+.ot-door-out { font-size: .95rem; color: var(--ot-ink); border-bottom: 6px double var(--ot-ink); line-height: 1.2; padding-bottom: .15rem; }
+.ot-door-note { font-size: .88rem; line-height: 1.5; color: var(--ot-muted); }
+.yue .ot-door-note code { font-size: .8rem; }
+.ot-door-arrow { position: absolute; right: 1.1rem; bottom: .95rem; color: var(--ot-ink); transition: transform .25s cubic-bezier(.16, 1, .3, 1); }
+.yue a.ot-door:hover .ot-door-arrow { transform: translateX(4px); }
+.ot-install { margin-top: 1.4rem; }
+.yue .ot-install p { margin: 0; }
+.ot-install-label { font-family: var(--ot-f-mono); font-size: .6875rem; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); }
+.yue .ot-install pre { margin: .5rem 0 .6rem; padding: .8rem 1rem; border-radius: var(--ot-r-sm); background: color-mix(in srgb, var(--ot-canvas) 78%, transparent); border: 1px solid var(--ot-hair); font-size: .8rem; line-height: 1.65; overflow-x: auto; }
+.yue .ot-install pre code { background: none; border: 0; padding: 0; font-size: inherit; }
+.ot-install-note { font-size: .92rem; }
+
+/* the ladder */
+.ot-ladder { background: var(--ot-canvas); border-radius: var(--ot-r-card); box-shadow: var(--ot-card-shadow); padding: 1.1rem clamp(1rem, 2.4vw, 1.6rem) 1rem; }
+.yue .ot-ladder-title { font-family: var(--ot-f-mono); font-size: .6875rem; letter-spacing: .125rem; color: var(--ot-muted); margin: .2rem 0 .3rem; }
+.ot-rung { padding: .95rem 0 1rem; border-top: 1px solid var(--ot-hair); }
+.ot-rung:first-of-type { border-top: 0; }
+.ot-rung-head { display: flex; align-items: center; gap: .6rem; }
+.ot-rung-tier { font-family: var(--ot-f-mono); font-size: .75rem; letter-spacing: .1875rem; text-transform: uppercase; color: var(--ot-ink); }
+.yue .ot-rung-id { margin-left: auto; font-size: .72rem; color: var(--ot-muted); background: none; border: 0; padding: 0; }
+.yue .ot-rung .ot-name { font-size: clamp(1.02rem, 1.5vw, 1.2rem); line-height: 1.35; margin: .55rem 0 .15rem; }
+.yue .ot-cmd { display: flex; flex-wrap: wrap; align-items: baseline; gap: .15rem .6rem; margin: .45rem 0 0; }
+.yue .ot-cmd code { font-size: .74rem; color: var(--ot-muted); background: none; border: 0; padding: 0; overflow-wrap: anywhere; }
+.ot-cmd-note { font-size: .78rem; color: var(--ot-muted); font-style: italic; }
+.yue .ot-rung-say { margin: .35rem 0 0; font-size: .9rem; color: var(--ot-body); }
+.yue .ot-rung-say code { font-size: .78rem; }
+.yue dl.ot-readback { display: grid; gap: .35rem; margin: .8rem 0 .2rem; padding: .7rem .85rem; border-radius: var(--ot-r-sm); background: var(--ot-soft); max-width: none; }
+.yue dl.ot-readback dt { margin: 0; font-weight: 400; font-size: .78rem; color: var(--ot-muted); }
+.yue dl.ot-readback dd { margin: 0 0 .2rem; }
+.yue dl.ot-readback code { font-size: .8rem; background: none; border: 0; padding: 0; color: var(--ot-ink); letter-spacing: .02em; }
+.yue .ot-verdict { display: flex; align-items: center; gap: .45rem; margin: .6rem 0 0; font-weight: 600; color: var(--ot-success); }
+html.dark .yue .ot-verdict { color: var(--ot-mark-pin); }
+.yue .ot-ladder-foot { margin: .4rem 0 0; padding-top: .7rem; border-top: 1px solid var(--ot-hair); font-size: .85rem; color: var(--ot-muted); }
+/* the lit PIN lamp: its glow, and three breaths once the page settles */
+.ot-lit { position: relative; overflow: visible; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--ot-glow-pin) 80%, transparent)); animation: ot-breath .66s cubic-bezier(.37, 0, .63, 1) 1.2s 3 both; }
+@keyframes ot-breath { 0%, 100% { opacity: 1; } 50% { opacity: .42; } }
+
+/* ways in */
+.ot-paths { margin-top: clamp(2.5rem, 5vw, 4rem); }
+.yue .ot-paths h2 { font-size: clamp(1.4rem, 2.2vw, 1.75rem); letter-spacing: .125rem; margin: 0 0 1.2rem; }
+.ot-paths-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11.5rem, 1fr)); gap: 1.5rem 2rem; }
+.yue .ot-path h3 { font-family: var(--ot-f-mono); font-size: .6875rem; letter-spacing: .125rem; color: var(--ot-muted); margin: 0 0 .5rem; padding-bottom: .45rem; border-bottom: 1px solid var(--ot-hair); }
+.yue .ot-path ul { list-style: none; padding: 0; margin: 0; }
+.yue .ot-path li { margin: .3rem 0; padding: 0; }
+.yue .ot-path li::before { display: none; }
+.yue .ot-path a { text-decoration: none; color: var(--ot-ink); }
+.yue .ot-path a:hover { text-decoration: underline; text-underline-offset: .25em; }
+.yue .ot-paper { margin-top: 2.2rem; padding-top: 1rem; border-top: 1px solid var(--ot-hair); color: var(--ot-muted); font-size: .92rem; max-width: none; }
+
+/* the round trip on "How every name is checked" */
+.ot-roundtrip { display: grid; gap: 0; margin: 1.4rem 0 1.8rem; border-radius: var(--ot-r-card); background: var(--ot-canvas); border: 1px solid var(--ot-hair); overflow: hidden; }
+.ot-rt-step { display: grid; grid-template-columns: minmax(0, 11rem) minmax(0, 1fr); gap: .2rem 1rem; align-items: baseline; padding: .8rem 1.1rem; border-top: 1px solid var(--ot-hair); }
+.ot-rt-step:first-child { border-top: 0; }
+.ot-rt-label { font-family: var(--ot-f-mono); font-size: .6875rem; letter-spacing: .125rem; text-transform: uppercase; color: var(--ot-muted); }
+.yue .ot-rt-step code { background: none; border: 0; padding: 0; overflow-wrap: anywhere; }
+.ot-rt-verdict { background: var(--ot-soft); }
+.ot-rt-same { grid-column: 2; display: inline-flex; align-items: center; gap: .4rem; font-weight: 600; color: var(--ot-success); }
+html.dark .ot-rt-same { color: var(--ot-mark-pin); }
+@media (max-width: 640px) { .ot-rt-step { grid-template-columns: minmax(0, 1fr); } .ot-rt-same { grid-column: 1; } }
+
+/* accuracy caption */
+#measured-results table + p { font-size: .88rem; color: var(--ot-muted); line-height: 1.6; }
+#measured-results table td:not(:first-child), #measured-results table th:not(:first-child) { text-align: right; white-space: nowrap; }
+
+.ot-files { padding-left: 1.2rem; }
+
+/* narrow screens: tables scroll inside themselves, never the page */
+.yue table { display: block; overflow-x: auto; max-width: 100%; }
+@media (min-width: 900px) { .yue table { display: table; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-reading-light, .ot-lit { animation: none !important; }
+  .yue a.ot-door, .ot-door-arrow, .ot-try { transition: none; }
+}
+
+/* ------------------------------------------------------------ round 1 fixes */
+.yue dl.py > dt { text-indent: 0; margin-left: 0; overflow-wrap: anywhere; }
+.yue h1 code, .yue h2 code { border: 0; overflow-wrap: anywhere; }
+.yue h1:has(> code) { font-size: clamp(1.4rem, 3vw, 2.2rem); letter-spacing: 0; }
+.localtoc a, .localtoc code, .sy-rside a { overflow-wrap: anywhere; }
+.sy-rside code { font-size: .8rem; }
+#measured-results table th { white-space: normal; letter-spacing: .08rem; }
+.yue .ot-home .ot-hero h1 { font-size: clamp(2.2rem, 3.9vw, 3.3rem); letter-spacing: .16rem; margin: 0 0 .9rem; }
+.ot-hero { padding-top: clamp(1.25rem, 2.6vw, 2.2rem); }
+.ot-lede { font-size: 1.02rem; margin-bottom: 1.2rem; }
+.yue a.ot-door { padding-bottom: 2.4rem; }
+.sy-content:has(.ot-home) { padding-top: 1.5rem; max-width: 76rem; }
+@media (max-width: 1279px) { .sy-rside { max-width: 16rem; overflow-x: hidden; } }
+.yue code, .yue code .pre { overflow-wrap: anywhere; word-break: normal; }
+.yue p code .pre, .yue li code .pre, .yue dd code .pre { white-space: normal; }
+.navigation a, .navigation-next, .navigation-prev { overflow-wrap: anywhere; min-width: 0; }
+
+/* ------------------------------------------------------------ finish-review fixes */
+.ot-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.ot-ladder { padding-top: .4rem; }
+@media (max-width: 640px) {
+  .ot-hero { padding: 1.25rem; border-radius: 24px; gap: 1.25rem; }
+  .yue .ot-home .ot-hero h1 { font-size: 2.25rem; letter-spacing: .1rem; margin-bottom: .6rem; }
+  .ot-lede { font-size: .95rem; line-height: 1.55; margin-bottom: 1rem; }
+  .yue a.ot-door { padding: .9rem 1rem 2.2rem; }
+}
+.yue .ot-install pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.yue #measured-results table { font-size: .84rem; }
+.yue #measured-results table th { white-space: normal; letter-spacing: .04rem; }
+.yue #measured-results table td { padding-left: .6rem; padding-right: .6rem; }
+.yue code, .yue code .pre, .localtoc code, .sy-rside code { overflow-wrap: normal; }
+.yue .ot-cmd code, .yue .ot-readback code, .yue .ot-rt-step code, .yue .ot-install code, .yue dl.py > dt { overflow-wrap: anywhere; }
+.yue table td:first-child code { white-space: nowrap; }
+.sy-lside .sy-scrollbar { overflow-x: hidden; }
+.globaltoc a { overflow-wrap: anywhere; }
+.yue .admonition.ot-internal { background: var(--ot-soft); border-color: var(--ot-hair); }
+.yue .admonition.ot-internal p.admonition-title { display: none; }
+.yue .admonition.ot-internal p { margin: 0; }
+html.dark .ot-reading-light { background: radial-gradient(closest-side, rgba(255, 69, 96, .34), rgba(196, 30, 58, .12) 50%, rgba(196, 30, 58, 0)); }
+.yue p code, .yue li code, .yue dd code { overflow-wrap: break-word; }
+.yue p code .pre, .yue li code .pre, .yue dd code .pre { overflow-wrap: break-word; white-space: normal; }

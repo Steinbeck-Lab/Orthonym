@@ -64,21 +64,26 @@ def main(args: List[str] = None) -> int:
     from orthonym.diagnostics import enable_crash_traceback
     enable_crash_traceback()
     parser = argparse.ArgumentParser(
-        description="Orthonym: Generate IUPAC names from SMILES",
+        description=("Orthonym: IUPAC names for chemical structures. Give a SMILES string "
+                     "and get its IUPAC name, checked by reading it back with OPSIN, or a "
+                     "label that says why no name was given."),
         prog="orthonym"
     )
 
     parser.add_argument(
         "smiles",
         nargs="?",
-        help="SMILES string to convert to IUPAC name"
+        help="The structure, as a SMILES string (in quotes)."
     )
 
     parser.add_argument(
         "--style",
         choices=["pin", "general", "cas"],
         default="pin",
-        help="Naming style: pin (Preferred IUPAC Name), general, or cas (default: pin)"
+        help=("Naming style: pin (aim at the Preferred IUPAC Name; the default), "
+              "general (allow a few general IUPAC forms where the recommendations "
+              "offer one), or cas (accepted; at present it gives the same names as "
+              "pin).")
     )
 
     parser.add_argument(
@@ -90,25 +95,29 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
-        help="Show detailed output including SMILES and style"
+        help=("Also print the SMILES and the style. With --batch and --output, also "
+              "say how many lines were named and how many failed.")
     )
 
     parser.add_argument(
         "--batch", "-b",
         type=str,
-        help="Process multiple SMILES from a file (one per line)"
+        help=("Name every SMILES in this file, one per line, and print one "
+              "'SMILES<tab>name' line each. --emit-tier and --provenance do not apply"
+              " to batch runs yet.")
     )
 
     parser.add_argument(
         "--output", "-o",
         type=str,
-        help="Output file for batch processing (default: stdout)"
+        help="With --batch: write the lines to this file instead of the screen."
     )
 
     parser.add_argument(
         "--confidence",
         action="store_true",
-        help="Show confidence metadata alongside the name"
+        help=("Print the name with a coverage score, the part of the engine that "
+              "built it, and the parts of the score.")
     )
 
     # a phase Plan-03 Task 4 (internal notes telemetry):
@@ -119,7 +128,8 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--validation-stats",
         action="store_true",
-        help="Print OPSIN grammar validation counters (D-17 telemetry) to stderr"
+        help=("After the name, print on the error stream how often the OPSIN grammar "
+              "pre-check passed or repaired a candidate name.")
     )
 
     # a phase Plan-03 Task 9 (internal notes telemetry):
@@ -131,7 +141,8 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--dispatch-stats",
         action="store_true",
-        help="Print CFR dispatch counters (Phase 158 D-16 telemetry) to stderr"
+        help=("After the name, print on the error stream which compound-class routes "
+              "the engine took.")
     )
 
     # a phase Plan-04 (internal notes) + a phase: --dump-tree emits the
@@ -144,30 +155,29 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--dump-tree",
         action="store_true",
-        help="Dump the NameTreeNode IR for the given SMILES (Phase 160 DECOMP-04)"
+        help="Print the parts of the name as a tree instead of the name."
     )
 
     parser.add_argument(
         "--format",
         choices=["text", "json"],
         default="text",
-        help="Output format for --dump-tree (default: text)"
+        help="Layout for --dump-tree: text (an indented tree; the default) or json."
     )
 
     # a phase Triviality Controller (/02/03 + internal notes).
-    triv_group = parser.add_argument_group("Triviality Controller (Phase 168)")
+    triv_group = parser.add_argument_group("Retained parent names")
     triv_group.add_argument(
         "--enable-triviality-controller",
         dest="enable_triviality_controller",
         action="store_true",
         default=False,
         help=(
-            "Enable the triviality controller (Phase 168). Default OFF "
-            "(Stage A SACRED canary invariant). When True, the controller "
-            "swaps systematic PIN-eligible parents (benzene/phenol/aniline/"
-            "benzoic acid/etc.) to retained PIN forms at the name-tree IR "
-            "layer per IUPAC P-15.1.8.1..3. See 168-CONTEXT.md D-08. Env "
-            "override: ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1."
+            "Use a retained parent name (benzene, phenol, aniline, benzoic acid and"
+            " others) where the IUPAC 2013 recommendations prefer it to the "
+            "systematic one (P-15.1.8). Every change is checked by an OPSIN round "
+            "trip. Off by default; ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1 turns it"
+            " on too."
         ),
     )
 
@@ -181,10 +191,12 @@ def main(args: List[str] = None) -> int:
         action="store_true",
         default=False,
         help=(
-            "Fall back to a general-only (non-PIN) retained trivial name when "
-            "the default PIN pipeline cannot derive a preferred IUPAC name. "
-            "Never downgrades a derivable PIN (e.g. glycerol SMILES still "
-            "yields propane-1,2,3-triol). Default OFF (PIN fails closed)."
+            "When no preferred name can be built, also allow a retained trivial "
+            "name that is not a preferred name. A preferred name that can be built "
+            "is never replaced (glycerol stays propane-1,2,3-triol). Without this "
+            "option a small table of retained trivial names is still used as a last"
+            " resort; --provenance labels those names systematic_verified, source "
+            "trivial_retained."
         ),
     )
 
@@ -199,15 +211,19 @@ def main(args: List[str] = None) -> int:
         choices=["pin", "valid", "complete", "best-effort", "full-coverage"],
         default="pin",
         help=(
-            "Output tier: pin (default, PIN-or-abstain), valid "
-            "(adds RT-verified general-engine names), complete (v26; adds "
-            "RT-verified aggressive general aromatic/heterocyclic "
-            "fallbacks; non-PIN allowed), best-effort (adds E1-certified "
-            "but OPSIN-unverified names), full-coverage (v37 SP5; adds the "
-            "opt-in general P-69 coordination-additive namer for "
-            "metal-tetrapyrrole/corrin macrocycles -- construct-or-decline, "
-            "labelled UNVERIFIED where no oracle exists; never surfaces "
-            "through the default plain-string API)."
+            "Which names to return. pin (the default): the name from the strict "
+            "path for the Preferred IUPAC Name; where the engine cannot certify the"
+            " preferred name it can return another name, labelled with its "
+            "tier, or a label that says why no name was given. valid: also names "
+            "from the general engine. complete: also general names for aromatic and"
+            " heterocyclic ring systems. best-effort: also the last-resort "
+            "producers. full-coverage: also the coordination-name builder for metal"
+            " tetrapyrrole and corrin complexes, which builds a name or declines. "
+            "At valid, complete and best-effort every name must pass a "
+            "full-InChIKey OPSIN round trip, except a metal-complex name from the "
+            "exact-match list, so a few classes OPSIN cannot read, which the "
+            "default tier names on their construction alone, are declined there. "
+            "--provenance shows each name's tier."
         ),
     )
     parser.add_argument(
@@ -215,17 +231,16 @@ def main(args: List[str] = None) -> int:
         action="store_true",
         default=False,
         help=(
-            "Emit the provenance row as JSON instead of the bare name "
-            "(v25 G3): {name,tier,is_pin,source,opsin,gates_passed,"
-            "gate_outcome,formula,limit_code,stereo_unexpressed}. "
-            "'opsin' is one of verified / verified_constitution_only "
-            "(v29 P7: SELF-01 judged a stereo-STRIPPED parse, so the "
-            "constitution is verified and the stereo layer is NOT) / "
-            "unverified / n/a. 'gate_outcome' (v29 P7) reports what the "
-            "OPSIN validity gate ACTUALLY DID for this name -- "
-            "self01_verified, not_run, bypassed, suppressed, "
-            "gate_disabled, unavailable, carveout:<slug>, ... -- rather "
-            "than merely whether an OPSIN jar was present."
+            "Print a JSON row instead of the bare name, with the keys name, tier, "
+            "is_pin, source, opsin, gates_passed, gate_outcome, formula, "
+            "limit_code, stereo_unexpressed, suffix_free_prefix_name and verified. "
+            "'verified' is opsin (OPSIN read the whole name back to the same "
+            "molecule), opsin_constitution (the same constitution; the "
+            "stereodescriptors were not confirmed by OPSIN), identity (a name from "
+            "an exact-match list, which OPSIN cannot read) or unverified (no "
+            "read-back recorded). 'gate_outcome' says what the final OPSIN check "
+            "did, for example self_consistency_verified, suppressed, not_run or "
+            "carveout:<class>. One SMILES at a time; not with --batch."
         ),
     )
     parser.add_argument(
@@ -234,9 +249,9 @@ def main(args: List[str] = None) -> int:
         action="store_true",
         default=False,
         help=(
-            "DIAGNOSTIC (v25): bypass the PIN path and print the general "
-            "engine's raw emission (E1-audited, NOT OPSIN-RT-gated) or its "
-            "refusal reason. Never a PIN; for inspection/comparison only."
+            "For inspection only: skip the strict path and print, as JSON, the "
+            "general engine's own name (checked for atom coverage, not by OPSIN) or"
+            " that it declined. Never a preferred name; do not use it as a name."
         ),
     )
 
@@ -244,8 +259,9 @@ def main(args: List[str] = None) -> int:
         "--fetch-jars",
         action="store_true",
         help=(
-            "Download (if needed) and verify the pinned OPSIN and centres jars, "
-            "print where they are, and exit (non-zero on failure)."
+            "Download the OPSIN and centres jars if they are missing, check each "
+            "against the SHA-256 checksum recorded in Orthonym, print where they "
+            "are, and stop (exit status 1 on failure)."
         ),
     )
     parser.add_argument(
@@ -254,11 +270,10 @@ def main(args: List[str] = None) -> int:
         choices=["off", "audit", "enforce"],
         default="off",
         help=(
-            "v29 P1 name<->graph binding proof: off (default, no proof work "
-            "at all), audit (re-assert the producer's binding spine against "
-            "the FINAL returned name and log the findings; the name is never "
-            "changed), enforce (additionally abstain when that proof fails). "
-            "Applies to the tiered emit surface."
+            "An extra check that every part of a general-engine name still maps "
+            "onto its atoms in the final name: off (the default), audit (record the"
+            " result; the name never changes), or enforce (also decline when the "
+            "check fails). Works for one SMILES and for --batch."
         ),
     )
 

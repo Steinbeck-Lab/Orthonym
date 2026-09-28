@@ -1,0 +1,697 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-28T12:30:08+00:00",
+  "title": "Design System: Orthonym documentation",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "soft": {
+        "role": "neutral",
+        "displayName": "Soft Grey",
+        "canonical": "#f4f4f4",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "hair": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "canonical": "#d9d9d9",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "hair-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "canonical": "#c5c5c5",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "body": {
+        "role": "neutral",
+        "displayName": "Body",
+        "canonical": "#333333",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "body-strong": {
+        "role": "neutral",
+        "displayName": "Body Strong",
+        "canonical": "#1a1a1a",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted",
+        "canonical": "#666666",
+        "tonalRamp": [
+          "#000000",
+          "#1a1a1a",
+          "#333333",
+          "#666666",
+          "#c5c5c5",
+          "#d9d9d9",
+          "#f4f4f4",
+          "#ffffff"
+        ]
+      },
+      "crimson": {
+        "role": "primary",
+        "displayName": "Orthonym Crimson",
+        "canonical": "#c41e3a",
+        "tonalRamp": [
+          "#3b0911",
+          "#620f1d",
+          "#891529",
+          "#ac1a33",
+          "#d66275",
+          "#e49aa6",
+          "#f0c7ce",
+          "#f9e8eb"
+        ]
+      },
+      "crimson-light": {
+        "role": "primary",
+        "displayName": "Crimson Gradient Top",
+        "canonical": "#d63553",
+        "tonalRamp": [
+          "#401019",
+          "#6b1a2a",
+          "#96253a",
+          "#bc2f49",
+          "#e27287",
+          "#eda4b2",
+          "#f5ccd4",
+          "#fbebee"
+        ]
+      },
+      "crimson-deep": {
+        "role": "primary",
+        "displayName": "Crimson Deep",
+        "canonical": "#9d1830",
+        "tonalRamp": [
+          "#2f070e",
+          "#4e0c18",
+          "#6e1122",
+          "#8a152a",
+          "#ba5d6e",
+          "#d397a2",
+          "#e6c5cb",
+          "#f5e8ea"
+        ]
+      },
+      "mark-pin": {
+        "role": "tertiary",
+        "displayName": "PIN Green",
+        "canonical": "#2f6b28",
+        "tonalRamp": [
+          "#0e200c",
+          "#183614",
+          "#214b1c",
+          "#295e23",
+          "#6d9768",
+          "#a1bc9e",
+          "#cbdac9",
+          "#eaf0ea"
+        ]
+      },
+      "mark-fallback": {
+        "role": "tertiary",
+        "displayName": "Fallback Olive",
+        "canonical": "#556b2f",
+        "tonalRamp": [
+          "#1a200e",
+          "#2a3618",
+          "#3c4b21",
+          "#4b5e29",
+          "#88976d",
+          "#b2bca1",
+          "#d4dacb",
+          "#eef0ea"
+        ]
+      },
+      "mark-best": {
+        "role": "tertiary",
+        "displayName": "Best-effort Amber",
+        "canonical": "#9c4109",
+        "tonalRamp": [
+          "#2f1403",
+          "#4e2004",
+          "#6d2e06",
+          "#893908",
+          "#ba7a53",
+          "#d2aa90",
+          "#e6d0c2",
+          "#f5ece6"
+        ]
+      },
+      "mark-abstain": {
+        "role": "tertiary",
+        "displayName": "Abstain Grey",
+        "canonical": "#666666",
+        "tonalRamp": [
+          "#1f1f1f",
+          "#333333",
+          "#474747",
+          "#5a5a5a",
+          "#949494",
+          "#bababa",
+          "#d9d9d9",
+          "#f0f0f0"
+        ]
+      },
+      "glow-pin": {
+        "role": "tertiary",
+        "displayName": "PIN Lamp Neon",
+        "canonical": "#3dff8f",
+        "tonalRamp": [
+          "#124c2b",
+          "#1e8048",
+          "#2bb264",
+          "#36e07e",
+          "#77ffb1",
+          "#a8ffcd",
+          "#ceffe3",
+          "#ecfff4"
+        ]
+      },
+      "glow-fallback": {
+        "role": "tertiary",
+        "displayName": "Fallback Lamp Neon",
+        "canonical": "#b6f24a",
+        "tonalRamp": [
+          "#374916",
+          "#5b7925",
+          "#7fa934",
+          "#a0d541",
+          "#ccf680",
+          "#def9ae",
+          "#edfcd2",
+          "#f8feed"
+        ]
+      },
+      "glow-best": {
+        "role": "tertiary",
+        "displayName": "Best-effort Lamp Neon",
+        "canonical": "#ffb02e",
+        "tonalRamp": [
+          "#4c350e",
+          "#805817",
+          "#b27b20",
+          "#e09b28",
+          "#ffc86d",
+          "#ffdba1",
+          "#ffebcb",
+          "#fff7ea"
+        ]
+      },
+      "bench-pink": {
+        "role": "neutral",
+        "displayName": "Bench Pink",
+        "canonical": "#f6e2e6",
+        "tonalRamp": [
+          "#4a4445",
+          "#7b7173",
+          "#ac9ea1",
+          "#d8c7ca",
+          "#f9ebee",
+          "#fbf2f4",
+          "#fdf8f9",
+          "#fefcfc"
+        ]
+      },
+      "bench-grey": {
+        "role": "neutral",
+        "displayName": "Bench Grey",
+        "canonical": "#e6e6e9",
+        "tonalRamp": [
+          "#454546",
+          "#737374",
+          "#a1a1a3",
+          "#cacacd",
+          "#eeeef0",
+          "#f4f4f5",
+          "#f9f9fa",
+          "#fcfcfd"
+        ]
+      },
+      "bench-cool": {
+        "role": "neutral",
+        "displayName": "Bench Cool",
+        "canonical": "#d5d8dc",
+        "tonalRamp": [
+          "#404142",
+          "#6a6c6e",
+          "#95979a",
+          "#bbbec2",
+          "#e2e4e6",
+          "#ecedef",
+          "#f4f5f6",
+          "#fbfbfc"
+        ]
+      },
+      "dark-canvas": {
+        "role": "neutral",
+        "displayName": "Dark Card",
+        "canonical": "#1b1c20",
+        "tonalRamp": [
+          "#141518",
+          "#1b1c20",
+          "color-mix(in srgb, #1b1c20 94%, #f5f6f8)",
+          "color-mix(in srgb, #1b1c20 92%, #f5f6f8)",
+          "color-mix(in srgb, #1b1c20 90%, #f5f6f8)",
+          "#a9adb4",
+          "#dcdee2",
+          "#f5f6f8"
+        ]
+      },
+      "dark-ground": {
+        "role": "neutral",
+        "displayName": "Dark Ground",
+        "canonical": "#141518",
+        "tonalRamp": [
+          "#060607",
+          "#0a0a0c",
+          "#0e0f11",
+          "#121215",
+          "#5a5b5d",
+          "#959697",
+          "#c4c4c5",
+          "#e8e8e8"
+        ]
+      },
+      "dark-ink": {
+        "role": "neutral",
+        "displayName": "On-dark Ink",
+        "canonical": "#f5f6f8",
+        "tonalRamp": [
+          "#4a4a4a",
+          "#7a7b7c",
+          "#acacae",
+          "#d8d8da",
+          "#f8f9fa",
+          "#fafbfc",
+          "#fcfdfd",
+          "#fefefe"
+        ]
+      },
+      "dark-body": {
+        "role": "neutral",
+        "displayName": "On-dark Body",
+        "canonical": "#dcdee2",
+        "tonalRamp": [
+          "#424344",
+          "#6e6f71",
+          "#9a9b9e",
+          "#c2c3c7",
+          "#e6e8eb",
+          "#eff0f2",
+          "#f6f7f8",
+          "#fcfcfc"
+        ]
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "On-dark Muted",
+        "canonical": "#a9adb4",
+        "tonalRamp": [
+          "#333436",
+          "#54565a",
+          "#76797e",
+          "#95989e",
+          "#c3c6ca",
+          "#d8dadd",
+          "#eaeaec",
+          "#f6f7f8"
+        ]
+      }
+    },
+    "darkMode": {
+      "trigger": "html.dark (follows the system)",
+      "overrides": {
+        "--ot-canvas": "#1b1c20",
+        "--ot-soft": "color-mix(in srgb, #1b1c20 94%, #f5f6f8)",
+        "--ot-ground": "#141518",
+        "--ot-hair": "rgba(255, 255, 255, .12)",
+        "--ot-hair-strong": "rgba(255, 255, 255, .22)",
+        "--ot-ink": "#f5f6f8",
+        "--ot-body": "#dcdee2",
+        "--ot-body-strong": "#f5f6f8",
+        "--ot-muted": "#a9adb4",
+        "--ot-mark-pin": "#3dff8f",
+        "--ot-mark-fallback": "#b6f24a",
+        "--ot-mark-best": "#ffb02e",
+        "--ot-mark-abstain": "#a9adb4",
+        "--ot-bench": "linear-gradient(135deg, #2a1d21 0%, #1d1e22 50%, #141518 100%)",
+        "--ot-bench-wash": "radial-gradient(75% 90% at 10% 2%, rgba(196, 30, 58, .16), rgba(196, 30, 58, 0))",
+        "--ot-bench-dots": "radial-gradient(circle at 9px 9px, rgba(245, 246, 248, .07) 1.05px, transparent 1.6px)"
+      }
+    },
+    "surfaces": [
+      {
+        "name": "bench",
+        "value": "radial-gradient(circle at 9px 9px, rgba(27, 28, 32, .09) 1.05px, transparent 1.6px) 0 0 / 18px 18px, radial-gradient(75% 90% at 10% 2%, rgba(242, 196, 205, .6), rgba(242, 196, 205, 0)), linear-gradient(135deg, #f6e2e6 0%, #e6e6e9 50%, #d5d8dc 100%)",
+        "purpose": "The landing hero only; one bench per site."
+      },
+      {
+        "name": "reading-light",
+        "value": "radial-gradient(closest-side, rgba(196, 30, 58, .26), rgba(196, 30, 58, .08) 50%, rgba(196, 30, 58, 0))",
+        "purpose": "11rem x 3.2rem glow behind the wordmark; dark: rgba(255, 69, 96, .34) core."
+      }
+    ],
+    "tierRules": [
+      {
+        "tier": "pin",
+        "value": "border-bottom: 6px double var(--ot-ink)"
+      },
+      {
+        "tier": "fallback",
+        "value": "border-bottom: 2px dashed var(--ot-ink)"
+      },
+      {
+        "tier": "best_effort",
+        "value": "border-bottom: 2.6px dotted var(--ot-muted)"
+      },
+      {
+        "tier": "abstain",
+        "value": "border-bottom: 1.6px solid var(--ot-hair-strong)"
+      }
+    ],
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The landing promise only; uppercase; 2.25rem on phones."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page h1, uppercase; code-identifier h1 drops to clamp(1.4rem, 3vw, 2.2rem), no tracking."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "h2, uppercase, 2.4em above."
+      },
+      "subtitle": {
+        "displayName": "Subtitle",
+        "purpose": "h3, uppercase; door-card titles at 1.5rem in the same voice."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Prose at 72ch; lede 1.02rem/1.65 in body-strong, 36rem."
+      },
+      "body-strong": {
+        "displayName": "Body Strong",
+        "purpose": "Bold text, sidebar current item, API names."
+      },
+      "code": {
+        "displayName": "Code",
+        "purpose": "Commands, ids, InChIKeys; blocks .84rem/1.65; tabular numerals."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase muted mono caps naming a column, group, field or step; never an eyebrow."
+      },
+      "nav": {
+        "displayName": "Nav",
+        "purpose": "Uppercase header links, GitHub, the pill, ladder tier names (.1875rem there)."
+      },
+      "wordmark": {
+        "displayName": "Wordmark",
+        "purpose": "ORTHONYM in the header; 1.2rem / .25rem on phones."
+      }
+    },
+    "shadows": [
+      {
+        "name": "card-lift",
+        "value": "0 1px 2px rgba(17, 18, 20, .05), 0 12px 30px -14px rgba(17, 18, 20, .14)",
+        "purpose": "White cards resting on the bench. Dark: 0 1px 2px rgba(0,0,0,.4), 0 12px 30px -14px rgba(0,0,0,.6)."
+      },
+      {
+        "name": "pill",
+        "value": "inset 0 1px 0 rgba(255, 255, 255, .28), 0 1px 2px rgba(157, 24, 48, .3), 0 6px 16px -8px rgba(157, 24, 48, .55)",
+        "purpose": "TRY IT ONLINE at rest."
+      },
+      {
+        "name": "pill-hover",
+        "value": "inset 0 1px 0 rgba(255, 255, 255, .2), 0 1px 2px rgba(157, 24, 48, .35), 0 10px 22px -10px rgba(157, 24, 48, .7)",
+        "purpose": "TRY IT ONLINE on hover."
+      },
+      {
+        "name": "header-seam",
+        "value": "0 1px 0 var(--ot-hair)",
+        "purpose": "Navbar underline."
+      },
+      {
+        "name": "pin-glow",
+        "value": "drop-shadow(0 0 5px color-mix(in srgb, #3dff8f 80%, transparent))",
+        "purpose": "filter on the lit PIN mark only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out-expo",
+        "value": "cubic-bezier(.16, 1, .3, 1)",
+        "purpose": "All state transitions (door lift .25s, arrow slide .25s, pill .2s) and the reading-light sweep."
+      },
+      {
+        "name": "reading-light-sweep",
+        "value": "ot-read 2.4s cubic-bezier(.16, 1, .3, 1) .2s 1 both",
+        "purpose": "Once on load: slides in from -60% and fades up."
+      },
+      {
+        "name": "pin-breath",
+        "value": "ot-breath .66s cubic-bezier(.37, 0, .63, 1) 1.2s 3 both",
+        "purpose": "Three breaths of the lit PIN mark once the page settles."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Kills both animations and the door, arrow and pill transitions."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "640px"
+      },
+      {
+        "name": "header-compact",
+        "value": "767px"
+      },
+      {
+        "name": "table-block",
+        "value": "900px"
+      },
+      {
+        "name": "hero-two-column",
+        "value": "1024px"
+      },
+      {
+        "name": "rside-cap",
+        "value": "1279px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Try It Online",
+      "kind": "button",
+      "refersTo": "button-try",
+      "description": "The one primary action; crimson pill in the header.",
+      "html": "<a class=\"ds-try\" href=\"#\">Try it online<svg viewBox=\"0 0 16 16\" width=\"14\" height=\"14\" aria-hidden=\"true\"><path d=\"M5 11 11 5M6.5 5H11v4.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a>",
+      "css": ".ds-try{display:inline-flex;align-items:center;gap:.45rem;padding:.5rem 1rem .5rem 1.1rem;border-radius:9999px;font-family:\"JetBrains Mono\",ui-monospace,monospace;font-size:.75rem;letter-spacing:.125rem;text-transform:uppercase;white-space:nowrap;color:#fff;text-decoration:none;background:linear-gradient(180deg,#d63553,#9d1830);box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(157,24,48,.3),0 6px 16px -8px rgba(157,24,48,.55);transition:background .2s cubic-bezier(.16,1,.3,1),box-shadow .2s cubic-bezier(.16,1,.3,1)}.ds-try:hover{background:linear-gradient(180deg,#c41e3a,#9d1830);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 1px 2px rgba(157,24,48,.35),0 10px 22px -10px rgba(157,24,48,.7)}.ds-try:focus-visible{outline:2px solid #9d1830;outline-offset:3px}"
+    },
+    {
+      "name": "Search",
+      "kind": "input",
+      "refersTo": "search-input",
+      "description": "Header search field.",
+      "html": "<input class=\"ds-search\" type=\"search\" placeholder=\"Search\">",
+      "css": ".ds-search{font-family:\"Public Sans\",system-ui,sans-serif;font-size:.95rem;padding:.45rem .7rem;border:1px solid var(--ot-hair,#d9d9d9);border-radius:10px;background:var(--ot-canvas,#fff);color:var(--ot-ink,#000)}.ds-search::placeholder{color:var(--ot-muted,#666)}.ds-search:focus{border-color:var(--ot-ink,#000);outline:none}"
+    },
+    {
+      "name": "Header Navigation",
+      "kind": "nav",
+      "description": "Wordmark with reading light, mono caps section links.",
+      "html": "<nav class=\"ds-head\"><a class=\"ds-brand\" href=\"#\"><span class=\"ds-light\"></span><span class=\"ds-wordmark\">Orthonym</span><span class=\"ds-sub\">Docs</span></a><a class=\"ds-link\" href=\"#\">Start</a><a class=\"ds-link\" href=\"#\">Use</a><a class=\"ds-link\" href=\"#\">Reference</a></nav>",
+      "css": ".ds-head{display:flex;align-items:baseline;gap:1.2rem;padding:1rem 1.5rem;background:var(--ot-canvas,#fff);box-shadow:0 1px 0 var(--ot-hair,#d9d9d9)}.ds-brand{position:relative;display:inline-flex;align-items:baseline;gap:.6rem;text-decoration:none;isolation:isolate}.ds-light{position:absolute;z-index:-1;left:50%;top:50%;width:11rem;height:3.2rem;margin:-1.6rem 0 0 -5.5rem;background:radial-gradient(closest-side,rgba(196,30,58,.26),rgba(196,30,58,.08) 50%,rgba(196,30,58,0));pointer-events:none}.ds-wordmark{font-family:\"Saira Condensed\",\"Arial Narrow\",sans-serif;font-size:1.35rem;letter-spacing:.375rem;text-transform:uppercase;color:var(--ot-ink,#000);line-height:1}.ds-sub{font-family:\"JetBrains Mono\",monospace;font-size:.6875rem;letter-spacing:.125rem;text-transform:uppercase;color:var(--ot-muted,#666)}.ds-link{font-family:\"JetBrains Mono\",monospace;font-size:.75rem;letter-spacing:.125rem;text-transform:uppercase;color:var(--ot-body,#333);text-decoration:none}.ds-link:hover{color:var(--ot-ink,#000);text-decoration:underline;text-underline-offset:.35em}.ds-link:focus-visible{outline:2px solid var(--ot-ink,#000);outline-offset:3px}"
+    },
+    {
+      "name": "Tier Chip",
+      "kind": "chip",
+      "description": "Inline tier reference: ring mark plus mono id, coloured by tier.",
+      "html": "<span class=\"ds-tier ds-pin\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle fill=\"none\" stroke=\"currentColor\" cx=\"9\" cy=\"9\" r=\"8\" stroke-width=\"1.25\"/><circle fill=\"none\" stroke=\"currentColor\" cx=\"9\" cy=\"9\" r=\"5.5\" stroke-width=\"1.25\"/><circle cx=\"9\" cy=\"9\" r=\"3\" fill=\"currentColor\"/></svg><code>pin_verified</code></span> <span class=\"ds-tier ds-fallback\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle fill=\"none\" stroke=\"currentColor\" cx=\"9\" cy=\"9\" r=\"7\" stroke-width=\"1.75\" stroke-dasharray=\"3.23 2.27\"/><circle cx=\"9\" cy=\"9\" r=\"3\" fill=\"currentColor\"/></svg><code>pin_unverified</code></span> <span class=\"ds-tier ds-best\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle fill=\"none\" stroke=\"currentColor\" cx=\"9\" cy=\"9\" r=\"7\" stroke-width=\"1.75\" stroke-dasharray=\"1.1 3.3\"/></svg><code>best_effort</code></span> <span class=\"ds-tier ds-abstain\"><svg viewBox=\"0 0 18 18\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle fill=\"none\" stroke=\"currentColor\" cx=\"9\" cy=\"9\" r=\"7\" stroke-width=\"1\"/></svg><code>abstain</code></span>",
+      "css": ".ds-tier{display:inline-flex;align-items:center;gap:.32em;white-space:nowrap}.ds-tier svg{width:1.1em;height:1.1em}.ds-tier code{font-family:\"JetBrains Mono\",monospace;font-size:.86em;color:var(--ot-body-strong,#1a1a1a);background:var(--ot-soft,#f4f4f4);border:1px solid var(--ot-hair,#d9d9d9);border-radius:6px;padding:.06em .32em}.ds-pin svg{color:var(--ot-mark-pin,#2f6b28)}.ds-fallback svg{color:var(--ot-mark-fallback,#556b2f)}.ds-best svg{color:var(--ot-mark-best,#9c4109)}.ds-abstain svg{color:var(--ot-mark-abstain,#666)}"
+    },
+    {
+      "name": "Door Card",
+      "kind": "card",
+      "refersTo": "card-door",
+      "description": "White card on the bench; lifts and gains an ink border on hover.",
+      "html": "<div class=\"ds-bench\"><a class=\"ds-door\" href=\"#\"><span class=\"ds-door-title\">Name a molecule</span><span class=\"ds-door-code\"><code>orthonym \"CCO\"</code><span class=\"ds-door-out\">ethanol</span></span><span class=\"ds-door-note\">The first command and what it prints.</span><svg class=\"ds-arrow\" viewBox=\"0 0 24 24\" width=\"22\" height=\"22\" aria-hidden=\"true\"><path d=\"M4 12h15M13 6l6 6-6 6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a></div>",
+      "css": ".ds-bench{padding:2rem;border-radius:36px;background:radial-gradient(circle at 9px 9px,rgba(27,28,32,.09) 1.05px,transparent 1.6px) 0 0/18px 18px,radial-gradient(75% 90% at 10% 2%,rgba(242,196,205,.6),rgba(242,196,205,0)),linear-gradient(135deg,#f6e2e6 0%,#e6e6e9 50%,#d5d8dc 100%)}.ds-door{position:relative;display:flex;flex-direction:column;gap:.55rem;max-width:18rem;padding:1.15rem 1.2rem 2.4rem;border-radius:22px;background:#fff;border:1px solid transparent;box-shadow:0 1px 2px rgba(17,18,20,.05),0 12px 30px -14px rgba(17,18,20,.14);color:#333;text-decoration:none;font-family:\"Public Sans\",system-ui,sans-serif;transition:border-color .25s cubic-bezier(.16,1,.3,1),transform .25s cubic-bezier(.16,1,.3,1)}.ds-door:hover{border-color:#000;transform:translateY(-2px)}.ds-door:focus-visible{outline:2px solid #000;outline-offset:3px}.ds-door-title{font-family:\"Saira Condensed\",\"Arial Narrow\",sans-serif;font-size:1.5rem;line-height:1.1;letter-spacing:.09375rem;text-transform:uppercase;color:#000}.ds-door-code{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5rem}.ds-door-code code{font-family:\"JetBrains Mono\",monospace;font-size:.8rem;background:#f4f4f4;border:1px solid #d9d9d9;border-radius:6px;padding:.06em .32em}.ds-door-out{font-size:.95rem;color:#000;border-bottom:6px double #000;line-height:1.2;padding-bottom:.15rem}.ds-door-note{font-size:.88rem;line-height:1.5;color:#666}.ds-arrow{position:absolute;right:1.1rem;bottom:.95rem;color:#000;transition:transform .25s cubic-bezier(.16,1,.3,1)}.ds-door:hover .ds-arrow{transform:translateX(4px)}"
+    },
+    {
+      "name": "Ladder Rung",
+      "kind": "custom",
+      "refersTo": "card-ladder",
+      "description": "Signature: a name wearing its tier mark and rule, with the read-back well and verdict.",
+      "html": "<div class=\"ds-ladder\"><div class=\"ds-rung-head\"><svg class=\"ds-mark\" viewBox=\"0 0 18 18\" width=\"26\" height=\"26\" aria-hidden=\"true\"><circle fill=\"none\" stroke=\"currentColor\" cx=\"9\" cy=\"9\" r=\"8\" stroke-width=\"1.25\"/><circle fill=\"none\" stroke=\"currentColor\" cx=\"9\" cy=\"9\" r=\"5.5\" stroke-width=\"1.25\"/><circle cx=\"9\" cy=\"9\" r=\"3\" fill=\"currentColor\"/></svg><span class=\"ds-rung-tier\">PIN</span><code class=\"ds-rung-id\">pin_verified</code></div><p class=\"ds-name\">1,3,7-trimethyl-3,7-dihydro-1<i>H</i>-purine-2,6-dione</p><dl class=\"ds-readback\"><dt>InChIKey of your structure</dt><dd><code>RYYVLZVUVIJVGH-UHFFFAOYSA-N</code></dd><dt>InChIKey of what OPSIN read back</dt><dd><code>RYYVLZVUVIJVGH-UHFFFAOYSA-N</code></dd></dl><p class=\"ds-verdict\">Same molecule: a verified Preferred IUPAC Name.</p></div>",
+      "css": ".ds-ladder{max-width:30rem;background:#fff;border-radius:22px;box-shadow:0 1px 2px rgba(17,18,20,.05),0 12px 30px -14px rgba(17,18,20,.14);padding:1.1rem 1.6rem 1rem;font-family:\"Public Sans\",system-ui,sans-serif;color:#333}.ds-rung-head{display:flex;align-items:center;gap:.6rem}.ds-mark{color:#2f6b28;filter:drop-shadow(0 0 5px color-mix(in srgb,#3dff8f 80%,transparent))}.ds-rung-tier{font-family:\"JetBrains Mono\",monospace;font-size:.75rem;letter-spacing:.1875rem;text-transform:uppercase;color:#000}.ds-rung-id{margin-left:auto;font-family:\"JetBrains Mono\",monospace;font-size:.72rem;color:#666}.ds-name{display:inline-block;color:#000;font-size:1.2rem;line-height:1.35;margin:.55rem 0 .15rem;padding-bottom:.3rem;border-bottom:6px double #000}.ds-readback{display:grid;gap:.35rem;margin:.8rem 0 .2rem;padding:.7rem .85rem;border-radius:14px;background:#f4f4f4}.ds-readback dt{margin:0;font-size:.78rem;color:#666}.ds-readback dd{margin:0 0 .2rem}.ds-readback code{font-family:\"JetBrains Mono\",monospace;font-size:.8rem;color:#000;letter-spacing:.02em}.ds-verdict{margin:.6rem 0 0;font-weight:600;color:#2f6b28}"
+    },
+    {
+      "name": "API Signature",
+      "kind": "custom",
+      "refersTo": "api-signature",
+      "description": "Soft mono strip; name in ink 600, prefix muted; body hangs from a hairline.",
+      "html": "<dl class=\"ds-api\"><dt><span class=\"ds-pre\">orthonym.</span><span class=\"ds-sig\">name_compound</span>(smiles)</dt><dd>One molecule, one name.</dd></dl>",
+      "css": ".ds-api{font-family:\"Public Sans\",system-ui,sans-serif;color:#333}.ds-api dt{font-family:\"JetBrains Mono\",monospace;font-size:.9rem;background:#f4f4f4;border:1px solid #d9d9d9;border-radius:14px;padding:.55rem .8rem;color:#333}.ds-pre{color:#666}.ds-sig{color:#000;font-weight:600}.ds-api dd{margin:.4rem 0 0 .4rem;padding-left:1rem;border-left:1px solid #d9d9d9}"
+    },
+    {
+      "name": "Admonition",
+      "kind": "card",
+      "refersTo": "admonition",
+      "description": "Hairline card, mono caps title, no side bar.",
+      "html": "<div class=\"ds-note\"><p class=\"ds-note-title\">Note</p><p>OPSIN never saw your structure.</p></div>",
+      "css": ".ds-note{border:1px solid #d9d9d9;border-radius:14px;background:#fff;padding:.9rem 1.1rem;font-family:\"Public Sans\",system-ui,sans-serif;color:#333}.ds-note p{margin:0}.ds-note-title{margin:0 0 .35rem!important;font-family:\"JetBrains Mono\",monospace;font-size:.6875rem;letter-spacing:.125rem;text-transform:uppercase;color:#666}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Name Wears Its Evidence",
+    "overview": "This is the reading room of the Orthonym world. The world is set by the README pictures and the web app: a bench of pink wash fading into cool grey under an 18 px dot grid, white cards with hairline seams, three faces with separate jobs, and four tier marks where the shape carries the tier. The docs keep all of that. What changes is the mode: this is a place for reading. The bench shows up once per page, behind the landing hero. Every other page is a white canvas with long, calm prose and hairlines. Every name shown on the site carries its mark and the rule under it, and every decline carries its reason.\n\nThe palette is ink on white with a single crimson. Crimson has two places only: the TRY IT ONLINE pill and the reading light behind the wordmark. Every other colour on the site belongs to a tier. Depth is soft and ambient and only ever lifts a card off the bench. Headings are Saira Condensed in uppercase, prose is Public Sans, and anything a person would type or compare (commands, identifiers, InChIKeys) is JetBrains Mono. Dark mode follows the system and is built from the web app's on-dark tokens. In dark mode the lamp neons that only glow on white become the tier marks themselves, because the dark card gives them the contrast.\n\nThe landing page does not use the category's hero headline over three feature cards. It uses a ladder with four real names, one per tier. The top rung is opened to show both InChIKeys and the verdict.",
+    "keyCharacteristics": [
+      "Ink on white, one crimson used twice, colour otherwise reserved for tier marks.",
+      "Three faces with fixed jobs: Saira caps for display, Public Sans for prose, JetBrains Mono for what is typed or compared.",
+      "White cards on a dotted pink-to-grey bench, lifted by an ambient two-layer shadow.",
+      "The tier grammar: ring marks (shape carries the tier) and the rule a name wears (double, dashed, dotted, thin solid).",
+      "Hairline seams (1px) separate everything. No side bars and no heavy borders.",
+      "Reading measure held at 72ch. Tables scroll inside themselves on narrow screens and never scroll the page."
+    ],
+    "rules": [
+      {
+        "name": "The Two Crimsons Rule",
+        "body": "Crimson appears in exactly two places: the TRY IT ONLINE pill and the reading light behind the wordmark. Links, hovers, focus rings and selection are ink. If a third crimson thing appears, it is a mistake.",
+        "section": "colors"
+      },
+      {
+        "name": "The Colour Means Tier Rule",
+        "body": "Green, olive, amber and the abstain grey are used only for tier marks and tier verdicts. They never decorate.",
+        "section": "colors"
+      },
+      {
+        "name": "The Neon Glows, Never Draws Rule",
+        "body": "On white, the lamp neons appear only as a glow. They are never used as a stroke, a border or text. In dark mode they become the stroke.",
+        "section": "colors"
+      },
+      {
+        "name": "The Three Jobs Rule",
+        "body": "Saira means a heading, Public Sans means prose, and JetBrains Mono means something typed or compared. A chemical name is prose, so it is set in Public Sans and never in mono.",
+        "section": "typography"
+      },
+      {
+        "name": "The Caps Are Light Rule",
+        "body": "Display caps are weight 400 and tracked. Never bold them.",
+        "section": "typography"
+      },
+      {
+        "name": "The Label Names A Thing Rule",
+        "body": "The mono caps label names a column, a group, a field or a step. It is never an eyebrow stacked over a headline.",
+        "section": "typography"
+      },
+      {
+        "name": "The Lift Needs A Bench Rule",
+        "body": "A shadow means \"a card resting on the bench\". Cards on the plain canvas (the round trip, admonitions, code) stay flat with a hairline.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep crimson to the TRY IT ONLINE pill and the reading light.",
+      "**Do** give every name on the page its tier mark and its rule (double, dashed, dotted or thin solid), and give every decline its reason code.",
+      "**Do** set commands, ids, InChIKeys and API signatures in JetBrains Mono, and set chemical names in Public Sans.",
+      "**Do** separate content with 1px hairlines (hair) and group it in soft-grey wells.",
+      "**Do** keep display and headings in Saira Condensed at weight 400, uppercase and tracked.",
+      "**Do** hold prose to 72ch and let tables scroll inside themselves below 900px.",
+      "**Do** use the card-lift shadow only for white cards resting on the bench.",
+      "**Do** switch tier marks to the lamp neons in dark mode, and turn the green verdict text to glow-pin.",
+      "**Do** stop the reading-light sweep, the PIN breaths and card transitions under prefers-reduced-motion."
+    ],
+    "donts": [
+      "**Don't** use crimson for links, hovers, focus rings, warnings or emphasis. Those are ink.",
+      "**Don't** use the tier greens, olive or amber for anything that is not a tier.",
+      "**Don't** draw a lamp neon as a line, border or text on white.",
+      "**Don't** put a coloured side bar on admonitions or callouts.",
+      "**Don't** bold Saira display caps.",
+      "**Don't** set a mono caps label above a headline as an eyebrow.",
+      "**Don't** repeat the bench on inner pages. One bench, behind the landing hero.",
+      "**Don't** replace the ring marks with icon-font glyphs or emoji. Marks and arrows are inline stroked SVG."
+    ]
+  }
+}
