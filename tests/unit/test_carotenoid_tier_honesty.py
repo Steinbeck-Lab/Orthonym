@@ -42,10 +42,13 @@ def test_carotene_all_flags_is_not_pin_verified():
 
 
 @pytest.mark.unit
+@pytest.mark.opsin_gate  # pin_verified needs the round trip (claims conformance R63)
 def test_real_pins_still_pin_verified_under_all_flags():
     # genuine strict-path PINs must be untouched: the twin produces the identical
     # name, so no demotion. Covers plain, ring, fused-ring and ring-substituted PINs.
-    be = _all_flags()
+    # The validity gate is ON here: pin_verified is earned by the round trip.
+    be = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                  allow_aromatic_general=True)
     for smi, expect in [
         ("OC(=O)c1ccccc1", "benzoic acid"),
         ("Cc1ccccc1", "toluene"),
@@ -61,10 +64,11 @@ def test_real_pins_still_pin_verified_under_all_flags():
 
 
 @pytest.mark.unit
+@pytest.mark.opsin_gate  # pin_verified needs the round trip (claims conformance R63)
 def test_default_config_byte_identical_no_twin():
     # the demotion path NEVER runs on the default/PIN engine (no breadth flag) ->
     # byte-identical, and no twin is constructed.
-    eng = Orthonym(_disable_opsin_validity_gate=True)
+    eng = Orthonym()
     r = eng.name_tiered("CCO")
     assert r.get("name") == "ethanol"
     assert r.get("tier") == "pin_verified"

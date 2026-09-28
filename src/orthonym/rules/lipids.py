@@ -15,6 +15,7 @@ polyunsaturated, branched, and hydroxy acyls uniformly.
 from __future__ import annotations
 
 import logging
+import re
 from typing import Optional
 
 from rdkit import Chem
@@ -30,14 +31,16 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------------------------------- #
 # Acyl naming — robust acid-fragment reuse
 # --------------------------------------------------------------------------- #
-def _acid_fragment_name(mol, carbonyl_idx: int, ester_o_idx: int) -> Optional[str]:
-    """Isolate the acid fragment of an ``R-C(=O)-O-`` ester and name it as a free acid.
-
-    Returns the systematic acid name (e.g. ``'(9Z)-octadec-9-enoic acid'``) or None.
-    """
+def _isolated_acid_smiles(mol, carbonyl_idx: int, ester_o_idx: int,
+                          anionic: bool = False) -> Optional[str]:
+    """SMILES of the acid fragment of an ``R-C(=O)-O-`` ester site: the ester bond is
+    cut and the site carbonyl gets a fresh ``-OH`` (``-O(-)`` when ``anionic``).
+    None when the cut fragment does not sanitize."""
     rw = Chem.RWMol(mol)
     rw.RemoveBond(carbonyl_idx, ester_o_idx)
     new_o = rw.AddAtom(Chem.Atom(8))           # the acid -OH oxygen
+    if anionic:
+        rw.GetAtomWithIdx(new_o).SetFormalCharge(-1)
     rw.AddBond(carbonyl_idx, new_o, Chem.BondType.SINGLE)
     m2 = rw.GetMol()
     try:
@@ -48,19 +51,115 @@ def _acid_fragment_name(mol, carbonyl_idx: int, ester_o_idx: int) -> Optional[st
     for frag in Chem.GetMolFrags(m2):
         if carbonyl_idx in frag:
             try:
-                acid_smiles = Chem.MolFragmentToSmiles(
+                return Chem.MolFragmentToSmiles(
                     m2, atomsToUse=list(frag), canonical=True, isomericSmiles=True)
             except Exception:
                 return None
-            from orthonym import name_compound  # lazy: re-entrant on a non-lipid fragment
-            try:
-                name = name_compound(acid_smiles)
-            except Exception:
-                return None
-            if not name or name == "unknown organic compound" or "unknown" in name:
-                return None
-            return name
     return None
+
+
+def _name_fragment(smiles: Optional[str]) -> Optional[str]:
+    """The engine's name for an isolated fragment, or None (unnamed / unknown)."""
+    if not smiles:
+        return None
+    from orthonym import name_compound  # lazy: re-entrant on a non-lipid fragment
+    try:
+        name = name_compound(smiles)
+    except Exception:
+        return None
+    if not name or name == "unknown organic compound" or "unknown" in name:
+        return None
+    return name
+
+
+def _acid_fragment_name(mol, carbonyl_idx: int, ester_o_idx: int) -> Optional[str]:
+    """Isolate the acid fragment of an ``R-C(=O)-O-`` ester and name it as a free acid.
+
+    Returns the systematic acid name (e.g. ``'(9Z)-octadec-9-enoic acid'``) or None.
+    """
+    return _name_fragment(_isolated_acid_smiles(mol, carbonyl_idx, ester_o_idx))
+
+
+# A neutral carboxy group, -C(=O)-OH.
+_CARBOXY = Chem.MolFromSmarts("[CX3](=[OX1])[OX2H1]")
+
+
+def _site_acid_is_polycarboxylic(mol, carbonyl_idx: int, ester_o_idx: int) -> bool:
+    """True when the isolated acid of this ester site carries more than one carboxy
+    group (the site's own, re-formed, plus at least one free -COOH of the acyl side).
+
+    The acid name of such a fragment cites every carboxy group it can as a suffix
+    ('butanedioic acid', 'cyclohexane-1,4-dicarboxylic acid') or puts the suffix on
+    whichever carboxy group ranks senior, which need not be the ester site ('4-
+    (carboxymethyl)benzoic acid' for either site). Its '-oyl' form then names the
+    acyl group left by removing the -OH from EACH carboxy group,
+    the Blue Book, 'butanedioyl' is divalent) or the wrong carbonyl, never
+    the monovalent acyl of this one site."""
+    smi = _isolated_acid_smiles(mol, carbonyl_idx, ester_o_idx)
+    frag = Chem.MolFromSmiles(smi) if smi else None
+    return frag is not None and len(frag.GetSubstructMatches(_CARBOXY)) > 1
+
+
+def _polycarboxylic_site_acyl(mol, carbonyl_idx: int, ester_o_idx: int) -> Optional[str]:
+    """The monovalent acyl of ONE carboxy site of a polycarboxylic acid, every other
+    carboxy group cited as a 'carboxy' prefix: HOOC-CH2-CH2-CO- is '3-carboxypropanoyl'.
+
+    Named through the site's carboxylate anion, the method (1) form
+    that carries the '-oate' suffix on the anionic carboxy group and cites the
+    free ones as 'carboxy' ('ammonium 3-carboxypropanoate (PIN)',
+    the Blue Book; 'potassium 6-carboxyhexanoate (PIN)',:31602); '-oate' /
+    '-carboxylate' then become '-oyl' / '-carbonyl':30607,
+     :30624).
+
+    The engine's anion name is checked for WHERE it puts the charge: its own
+    verification is the InChIKey, which does not locate the charge among the
+    carboxy groups (measured: it names the anion of either site of 4-(carboxy-
+    methyl)benzoic acid '4-(carboxymethyl)benzoate'). So the name is kept only
+    when its OPSIN structure is the site anion itself (charge-located canonical
+    SMILES equal); otherwise, and whenever OPSIN cannot say, None.
+
+    Fail closed (None) as well when the anion fragment is charged elsewhere, is
+    not named, is not a single '-ate' word citing a 'carboxy' prefix (a retained
+    anion name such as 'dihydrocitrate' has no '-oyl' form), or carries any
+    stereo element: the site O(-) and the in-situ ester O-R rank differently
+    under CIP, so a descriptor of the fragment (C-3 of a 3-hydroxyglutaryl, say)
+    can be the opposite of the one in the ester; the caller's own path cites
+    such stereo in situ instead.
+
+    HOOC-CO- is 'oxalo': "The prefix 'oxalo' is recommended as the preferred
+    prefix for -CO-CO-OH", the Blue Book), 'oxalooxy
+    (preferred prefix)' (:30540)."""
+    neutral = _isolated_acid_smiles(mol, carbonyl_idx, ester_o_idx)
+    neutral_mol = Chem.MolFromSmiles(neutral) if neutral else None
+    if neutral_mol is not None and Chem.MolToSmiles(neutral_mol) == "O=C(O)C(=O)O":
+        return "oxalo"
+    smi = _isolated_acid_smiles(mol, carbonyl_idx, ester_o_idx, anionic=True)
+    frag = Chem.MolFromSmiles(smi) if smi else None
+    if frag is None:
+        return None
+    if sum(abs(a.GetFormalCharge()) for a in frag.GetAtoms()) != 1:
+        return None
+    if any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in frag.GetAtoms()):
+        return None
+    if any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in frag.GetBonds()):
+        return None
+    name = _name_fragment(smi)
+    if not name or " " in name or not re.search(r"carboxy(?!l)", name):
+        return None
+    if name.endswith("carboxylate"):
+        acid = name[:-len("carboxylate")] + "carboxylic acid"
+    elif name.endswith("ate"):
+        acid = name[:-len("ate")] + "ic acid"
+    else:
+        return None
+    try:
+        from ..validation.atom_coverage import _parse_name_with_opsin, find_opsin_jar
+        parsed = _parse_name_with_opsin(name, find_opsin_jar())
+    except Exception:
+        return None
+    if not parsed or parsed != Chem.MolToSmiles(frag):
+        return None  # the '-oate' sits on another carboxy group (or no parse)
+    return _acid_to_acyl(acid)
 
 
 def _acid_to_oate(acid_name: str) -> Optional[str]:
@@ -82,6 +181,14 @@ def _acid_to_acyl(acid_name: str) -> Optional[str]:
     s = acid_name[:-5] if acid_name.endswith(" acid") else acid_name
     if s.endswith("oic"):
         return s[:-3] + "oyl"
+    # (the Blue Book): "Acyl groups derived from an acid named
+    # by means of the suffix 'carboxylic acid' are named by changing the
+    # 'carboxylic acid' suffix to the suffix 'carbonyl'", 'cyclohexanecarbonyl
+    # (preferred prefix)' (:30628), '3-[(pyridine-3-carbonyl)oxy]propanoic acid
+    # (PIN)' (:31723). The generic '-ic' -> '-yl' step below would spell
+    # 'cyclohexanecarboxylyl', which OPSIN 2.9.0 does not parse.
+    if s.endswith("carboxylic"):
+        return s[:-len("carboxylic")] + "carbonyl"
     if s.endswith("ic"):
         return s[:-2] + "yl"
     return None
@@ -93,10 +200,19 @@ def _acylate_for_site(mol, site) -> Optional[str]:
     return _acid_to_oate(acid) if acid else None
 
 
-def _acyloxy_for_site(mol, site) -> Optional[str]:
-    """site = ('acyl', carbonyl_idx, ester_o_idx) → '<acyl>oyloxy' (acyloxy prefix) or None."""
-    acid = _acid_fragment_name(mol, site[1], site[2])
-    acyl = _acid_to_acyl(acid) if acid else None
+def _acyloxy_for_site(mol, site, carboxy_prefixed_polyacid: bool = False) -> Optional[str]:
+    """site = ('acyl', carbonyl_idx, ester_o_idx) → '<acyl>oyloxy' (acyloxy prefix) or None.
+
+    ``carboxy_prefixed_polyacid`` (opt-in; the best-effort universal floor): when
+    the site's acid is polycarboxylic, name the monovalent acyl of THIS site with
+    the other carboxy groups as 'carboxy' prefixes ('(3-carboxypropanoyl)oxy')
+    or fail closed, instead of converting the polyacid's name ('butanedioyloxy',
+    a divalent acyl). Off, the historic conversion is unchanged."""
+    if carboxy_prefixed_polyacid and _site_acid_is_polycarboxylic(mol, site[1], site[2]):
+        acyl = _polycarboxylic_site_acyl(mol, site[1], site[2])
+    else:
+        acid = _acid_fragment_name(mol, site[1], site[2])
+        acyl = _acid_to_acyl(acid) if acid else None
     if not acyl:
         return None
     #: a compound acyl is cited inside its own marks with 'oxy' outside,

@@ -108,9 +108,27 @@ class TestDecision:
         assert self._decide(monkeypatch, "on", "(R)-butan-2-ol",
                             "C[C@H](O)CC", "C[C@@H](O)CC") == "(R)-butan-2-ol"
 
-    def test_on_fails_open_when_inconclusive(self, monkeypatch):
-        # OPSIN SMILES unparseable by RDKit -> inconclusive -> ship (never suppress)
-        assert self._decide(monkeypatch, "on", "weird", "CCO", "@@bad@@") == "weird"
+    def test_on_fails_closed_when_inconclusive(self, monkeypatch):
+        # OPSIN SMILES unparseable by RDKit -> inconclusive -> nothing was compared,
+        # so the name ships only after a full-key round trip (claims conformance
+        # R19, 2026-09-27; it used to fail OPEN). 'weird' has none -> withdrawn.
+        monkeypatch.setattr(nm, "_validity_gate_name_to_smiles", lambda n: None)
+        monkeypatch.setattr(nm, "_validity_gate_status", lambda n: "rejected")
+        out = self._decide(monkeypatch, "on", "weird", "CCO", "@@bad@@")
+        assert out != "weird"
+        assert out == nm._descriptive_fallback("CCO")
+
+    def test_on_inconclusive_ships_after_a_full_key_round_trip(self, monkeypatch):
+        # The same unmade comparison, but the full-key round trip of the name
+        # itself passes (OPSIN reads it back to the input) -> it ships.
+        monkeypatch.setattr(nm, "_self_consistency_verdict",
+                            lambda *a, **k: "inconclusive")
+        monkeypatch.setattr(nm, "_validity_gate_name_to_smiles", lambda n: "CCO")
+        assert self._decide(monkeypatch, "on", "ethanol", "CCO", "@@bad@@") == "ethanol"
+
+    def test_warn_still_ships_when_inconclusive(self, monkeypatch):
+        # the warn configuration keeps its documented meaning
+        assert self._decide(monkeypatch, "warn", "weird", "CCO", "@@bad@@") == "weird"
 
     def test_no_input_smiles_ships(self, monkeypatch):
         assert self._decide(monkeypatch, "on", "ethanol", None, "CCCO") == "ethanol"

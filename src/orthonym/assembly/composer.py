@@ -4404,7 +4404,7 @@ def _assemble_complex_ring_name(mol, features):
         return None
 
 
-def _acyloxy_prefix_for_frag(mol, frag_atoms, attach_idx):
+def _acyloxy_prefix_for_frag(mol, frag_atoms, attach_idx, carboxy_prefixed_polyacid=False):
     """-SP2.1': name a bare acyloxy substituent (``-O-C(=O)-R`` attached via
     its ester O, i.e. ``attach_idx`` is that O) as the detachable
     prefix ``<Racyl>oxy``, using the shared acid engine
@@ -4424,7 +4424,12 @@ def _acyloxy_prefix_for_frag(mol, frag_atoms, attach_idx):
     are owned by the carbamoyloxy path. The entire fragment minus the ester O must
     be the self-contained acyl side -- otherwise fail closed, so no atom is ever
     dropped by claiming this shape. The assembled name is round-trip gated
-    downstream (0-wrong)."""
+    downstream (0-wrong).
+
+    ``carboxy_prefixed_polyacid`` is passed through to
+    ``rules.lipids._acyloxy_for_site`` (opt-in, the best-effort universal floor):
+    an acyl side that carries its own free -COOH is '(3-carboxypropanoyl)oxy' or
+    ``None``, never the divalent 'butanedioyloxy'."""
     from rdkit import Chem
     frag = set(frag_atoms)
     if attach_idx not in frag:
@@ -4489,7 +4494,8 @@ def _acyloxy_prefix_for_frag(mol, frag_atoms, attach_idx):
         from ..rules.lipids import _acyloxy_for_site
     except Exception:
         return None
-    acyloxy = _acyloxy_for_site(mol, ("acyl", carbonyl_c, attach_idx))
+    acyloxy = _acyloxy_for_site(mol, ("acyl", carbonyl_c, attach_idx),
+                                carboxy_prefixed_polyacid=carboxy_prefixed_polyacid)
     if not acyloxy or ' ' in acyloxy:
         return None
     return acyloxy

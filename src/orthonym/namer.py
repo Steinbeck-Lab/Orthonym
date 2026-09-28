@@ -1164,21 +1164,239 @@ def _pseudo_locants_map_to_centres(reduced: str, mol, tokens, pseudo_codes) -> b
     return False
 
 
-#: Pseudoasymmetric names the general-tier gate verified but did NOT ship,
-#: keyed by the full InChIKey of the input they name (callers pass the SMILES
-#: in different spellings). A name is adopted from here only as the LAST
-#: resort, when the naming would otherwise abstain (Orthonym._finish), so an
-#: OPSIN-round-trippable alternative (e.g. 'cis-4-hydroxy-1-methylcyclohexane')
-#: always wins. One store per OUTERMOST Orthonym.name call (a contextvar set
-#: there and reset on exit): the rescues run isolated naming sessions that look
-#: "top-level", and they must add to the store, not wipe it.
-_PSEUDO_VERIFIED_CTX = contextvars.ContextVar(
-    "orthonym_pseudo_verified_candidates", default=None)
+#: One CIP descriptor of a stereodescriptor block: an optional locant (digits, an
+#: optional letter like '4a', primes) and the code. The locant is absent only
+#: where the stereogenic unit has none: "preceded by a numerical or letter
+#: locant... when such locants are present"), e.g. the sulfur of
+#: 'ethyl (R)-4-nitrobenzene-1-sulfinate'.
+_CIP_DESCRIPTOR_TOKEN_RE = re.compile(r"^(\d+[a-z]?['′]*)?([RSrsEZ])$")
 
 
-def _pseudo_candidate_store() -> dict:
-    store = _PSEUDO_VERIFIED_CTX.get()
-    return store if store is not None else {}
+def _cip_descriptor_tokens(blocks) -> Optional[list]:
+    """Every ``(locant, code)`` of the descriptor ``blocks`` that
+    ``rules.stereochemistry.strip_stereo_blocks`` removed, primes dropped from the
+    locant (``None`` for a locant-free code); ``None`` when a block holds anything
+    else (a relative-configuration word such as 'rel' / 'cis', 'R*', 'RS',...):
+    such a descriptor does not assert one configuration of one stereogenic unit,
+    so it cannot be checked."""
+    tokens = []
+    for block in blocks:
+        if not (block.startswith("(") and block.endswith(")")):
+            return None
+        for tok in block[1:-1].split(","):
+            m = _CIP_DESCRIPTOR_TOKEN_RE.match(tok.strip())
+            if not m:
+                return None
+            loc = m.group(1)
+            tokens.append((loc.replace("'", "").replace("′", "") if loc else None,
+                           m.group(2)))
+    return tokens
+
+
+def _bare_skeleton(mol):
+    """A copy of ``mol`` with the same atom and bond indices, every bond single and
+    every atom neutral, non-aromatic and hydrogen-free: the graph two tautomers,
+    two Kekulé structures or two charge forms of one constitution share."""
+    rw = Chem.RWMol(mol)
+    for a in rw.GetAtoms():
+        a.SetIsAromatic(False)
+        a.SetFormalCharge(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(0)
+        a.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
+    for b in rw.GetBonds():
+        b.SetBondType(Chem.BondType.SINGLE)
+        b.SetIsAromatic(False)
+        b.SetStereo(Chem.BondStereo.STEREONONE)
+    rw.UpdatePropertyCache(strict=False)
+    return rw
+
+
+def _stereo_descriptors_verified(name: str, smiles: Optional[str],
+                                 reduced: str) -> bool:
+    """critic-1 / R63 (claims conformance, 2026-09-27): is every stereodescriptor
+    of ``name`` right, for a name OPSIN rejects only for its stereo layer?
+
+    The stereo-layer carve-out of the validity gate ships such a name after
+    judged the stereo-STRIPPED parse (``reduced``,:func:`strip_stereo`), so the
+    constitution is OPSIN-checked and the descriptors are not. They were shipped
+    unchecked, and some were wrong: '(7R,8S)-7-chloro-1-(3,5-dihydroxyphenyl)-2-
+    methylundecyl acetate' for an input whose stereocentres are the name's C1 and C2
+    (C7 is unspecified, C8 is a CH2), and '(2S,3R)-3-oxoestr-4-en-17β-yl
+    3-phenylpropanoate', whose C2 is a CH2 and C3 the ketone carbon.
+    "NAMING OF STEREOISOMERS" (the Blue Book): "They are preceded by a
+    numerical or letter locant to describe the position of the stereogenic unit
+    when such locants are present" -- a descriptor asserts the configuration of the
+    unit at its locant, so a descriptor on a CH2 is a wrong name, not a narrower
+    OPSIN grammar.
+
+    Generalises:func:`_pseudoasymmetric_name_verified` (r/s only) to every CIP
+    descriptor. True iff, for some reading of ``reduced`` onto the input:
+
+    1. every descriptor block is a list of CIP code tokens (R, S, r, s, E, Z),
+       each with its locant where the unit has one; anything else (``rel``,
+       ``cis``, ``RS``, ``R*``) is not verifiable;
+    2. every token lands on a DISTINCT stereogenic unit of the input whose CIP
+       label (``perception.stereo.assign_stereochemistry``, the centres engine) is
+       that code -- a stereocentre for R/S/r/s, a double bond at that atom for
+       E/Z. A located token is read in OPSIN's own numbering of ``reduced`` (the
+       ``$_AV`` atom labels of ``-o extendedsmi``), so a locant on a CH2, a
+       heteroatom or out of range finds no such unit; a locant-free token may be
+       any unit with its code (step 3 still has to hold);
+    3. the input with exactly those units made unspecified has the FULL InChIKey
+       of ``reduced``'s OPSIN parse -- so every OTHER stereo unit of the input is
+       exactly what the rest of the name says (the retained parent's implied
+       configuration, a 17β,...), and none is omitted or contradicted. A token
+       that restates a unit the parent already fixes (tropane's 1R,5S) is kept
+       specified on both sides.
+
+    With (3) fixing every other unit, the code fixes each token's unit, so the name
+    denotes the input. Fails closed (False) on anything it cannot establish.
+    """
+    if not name or not smiles or not reduced:
+        return False
+    try:
+        import itertools
+        from .rules.stereochemistry import strip_stereo_blocks
+        stripped, blocks = strip_stereo_blocks(name)
+        if stripped != reduced:
+            return False
+        tokens = _cip_descriptor_tokens(blocks)
+        if not tokens:
+            return False
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return False
+        from .perception.stereo import assign_stereochemistry
+        assign_stereochemistry(mol)
+        atom_code = {a.GetIdx(): a.GetProp('_CIPCode') for a in mol.GetAtoms()
+                     if a.HasProp('_CIPCode')
+                     and a.GetProp('_CIPCode') in ('R', 'S', 'r', 's')}
+        bond_code = {b.GetIdx(): b.GetProp('_CIPCode') for b in mol.GetBonds()
+                     if b.GetBondType() == Chem.BondType.DOUBLE
+                     and b.HasProp('_CIPCode') and b.GetProp('_CIPCode') in ('E', 'Z')}
+        from .validation.opsin_roundtrip import _AV_LINE_RE, _extended_smiles
+        ext = _extended_smiles(reduced)
+        if not ext:
+            return False
+        m = _AV_LINE_RE.match(ext.strip())
+        if not m:
+            return False
+        labels = [t.strip().replace("'", "").replace('′', '')
+                  for t in m.group(2).split(';')]
+        omol = Chem.MolFromSmiles(m.group(1))
+        if (omol is None or omol.GetNumAtoms() != len(labels)
+                or omol.GetNumAtoms() != mol.GetNumAtoms()):
+            return False
+        reduced_key = _self_consistency_full_key(m.group(1))
+        if not reduced_key:
+            return False
+        n = omol.GetNumAtoms()
+        matches = [mt for mt in mol.GetSubstructMatches(
+            omol, useChirality=False, uniquify=False, maxMatches=10_000)
+            if len(mt) == n]
+        if not matches:
+            # A tautomer, Kekulé or charge-form difference between the parse and
+            # the input (the constitution itself is already verified): map the
+            # bare graphs, which keep the atom indices.
+            matches = [mt for mt in _bare_skeleton(mol).GetSubstructMatches(
+                _bare_skeleton(omol), useChirality=False, uniquify=False,
+                maxMatches=10_000) if len(mt) == n]
+        by_label: Dict[str, List[int]] = {}
+        for oi, lab in enumerate(labels):
+            by_label.setdefault(lab, []).append(oi)
+        tried: Dict[frozenset, bool] = {}
+        for mt in matches:
+            inv = {mi: oi for oi, mi in enumerate(mt)}
+            cands = []
+            for loc, code in tokens:
+                c = []
+                for oi in (by_label.get(loc, ()) if loc is not None
+                           else range(n)):
+                    mi = mt[oi]
+                    if code in ('E', 'Z'):
+                        c.extend(('b', b.GetIdx())
+                                 for b in mol.GetAtomWithIdx(mi).GetBonds()
+                                 if bond_code.get(b.GetIdx()) == code)
+                    elif atom_code.get(mi) == code:
+                        c.append(('a', mi))
+                if not c:
+                    break
+                cands.append(c)
+            else:
+                for combo in itertools.islice(itertools.product(*cands), 64):
+                    if len(set(combo)) != len(combo):
+                        continue
+                    unspecify = []
+                    for kind, idx in combo:
+                        if kind == 'a':
+                            if (omol.GetAtomWithIdx(inv[idx]).GetChiralTag()
+                                    == Chem.ChiralType.CHI_UNSPECIFIED):
+                                unspecify.append((kind, idx))
+                        else:
+                            b = mol.GetBondWithIdx(idx)
+                            ob = omol.GetBondBetweenAtoms(
+                                inv[b.GetBeginAtomIdx()], inv[b.GetEndAtomIdx()])
+                            if ob is None or ob.GetStereo() == Chem.BondStereo.STEREONONE:
+                                unspecify.append((kind, idx))
+                    key = frozenset(unspecify)
+                    if key not in tried:
+                        if len(tried) >= 128:
+                            return False
+                        rw = Chem.RWMol(mol)
+                        for kind, idx in unspecify:
+                            if kind == 'a':
+                                rw.GetAtomWithIdx(idx).SetChiralTag(
+                                    Chem.ChiralType.CHI_UNSPECIFIED)
+                            else:
+                                rw.GetBondWithIdx(idx).SetStereo(
+                                    Chem.BondStereo.STEREONONE)
+                        tried[key] = (_self_consistency_full_key(
+                            Chem.MolToSmiles(rw)) == reduced_key)
+                    if tried[key]:
+                        return True
+        return False
+    except Exception:
+        return False
+
+
+def _stereo_descriptor_repair(name: str, smiles: str, reduced: str,
+                              stats: Optional[Dict[str, int]]) -> str:
+    """critic-1 / R63: what the stereo-layer carve-out ships when a descriptor of
+    ``name`` fails:func:`_stereo_descriptors_verified`, all 0-wrong:
+
+    1. the input's stereo composed onto ``reduced`` in OPSIN's own numbering
+       (:func:`_try_compose_input_stereo`), when the composed name reads back to
+       the input's FULL InChIKey ('(1R,2S)-7-chloro-...-2-methylundecyl acetate');
+    2. else ``reduced`` itself when IT reads back to the full key (the retained
+       parent and its α/β descriptors carry all the stereo: '3-oxoestr-4-en-17β-yl
+       3-phenylpropanoate'); it is not what the PIN path built, so it is recorded
+       as a non-PIN name (labelled below pin);
+    3. else nothing: the name is withdrawn to the descriptive fallback.
+    """
+    from .metrics import provenance as _pv
+    if stats is not None:
+        stats["gate_stereo_descriptor_mismatch"] = (
+            stats.get("gate_stereo_descriptor_mismatch", 0) + 1)
+    in_key = _self_consistency_full_key(smiles)
+    if in_key is not None:
+        composed = _try_compose_input_stereo(reduced, smiles, in_key)
+        if (composed is not None
+                and _shipped_name_round_trip(composed, smiles) == "verified"):
+            _record_gate_outcome(_pv.GATE_OUTCOME_STEREO_RECOMPOSED, composed)
+            return composed
+        if _shipped_name_round_trip(reduced, smiles) == "verified":
+            _pv.record_non_pin_fragment(reduced)
+            _record_gate_outcome(_pv.GATE_OUTCOME_FULL_KEY_VERIFIED, reduced)
+            return reduced
+    logger.warning("OPSIN validity gate: a stereodescriptor does not match the "
+                   "input's CIP labels, suppressed: %r", name[:80])
+    from .metrics.abstention import AbstentionCode, record_suppression
+    record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                       detail='stereo_descriptor_unverified', candidate=name)
+    _suppressed_to = _descriptive_fallback(smiles)
+    _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+    return _suppressed_to
 
 
 def _self_consistency_net_charge(smiles: str) -> Optional[int]:
@@ -1560,6 +1778,27 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
         _record_gate_outcome(_pv.GATE_OUTCOME_SELF01_SKIPPED, name)
         return name
     verdict = _self_consistency_verdict(smiles, opsin_smiles, ignore_stereo=ignore_stereo)
+    if verdict == "inconclusive" and _SC_MODE == "on":
+        # R19 (claims conformance, 2026-09-27): "inconclusive" means a skeleton
+        # key could not be computed for one side, so nothing was compared, and
+        # this used to ship the name (fail-OPEN). The claim is a round trip for
+        # every name: run the FULL-key one (no fail-open branch) and ship only on
+        # a pass; otherwise the name is withdrawn like any unverified name.
+        # (The warn configuration keeps its documented meaning: it ships.)
+        if _shipped_name_round_trip(name, smiles) == "verified":
+            _record_gate_outcome(_pv.GATE_OUTCOME_FULL_KEY_VERIFIED, name)
+            return name
+        if stats is not None:
+            stats["self_consistency_inconclusive_suppressed"] = (
+                stats.get("self_consistency_inconclusive_suppressed", 0) + 1)
+        logger.warning("self_consistency inconclusive and no full-key round trip, "
+                       "suppressed: %r (opsin=%s)", name[:80], opsin_smiles)
+        from .metrics.abstention import AbstentionCode, record_suppression
+        record_suppression(AbstentionCode.GATE_SUPPRESSED,
+                           detail='self01_inconclusive', candidate=name)
+        _suppressed_to = _descriptive_fallback(smiles)
+        _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+        return _suppressed_to
     if verdict != "mismatch":
         # T1: "ok" is the ONE state that earns. "inconclusive"
         # ships by failing OPEN — the comparison could not be made, so nothing
@@ -1883,21 +2122,6 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             _np_exact_hit = name in _NP_EXACT
         except Exception:
             _np_exact_hit = False
-        # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): a name
-        # OPSIN rejects ONLY for its pseudoasymmetric (lowercase r/s)
-        # descriptors is verified by the stripped-form full-InChIKey round trip
-        # plus the centres labeller (_pseudoasymmetric_name_verified). It is
-        # still suppressed here, so the rescues below can find an
-        # OPSIN-round-trippable name, but it is kept as the last resort that
-        # Orthonym.name adopts instead of abstaining.
-        if (not _np_exact_hit and smiles is not None
-                and _pseudoasymmetric_name_verified(name, smiles)):
-            _key = _self_consistency_full_key(smiles)
-            _store = _PSEUDO_VERIFIED_CTX.get()
-            if _key and _store is not None and _key not in _store:
-                # keep the producer's provenance, so an adopted name is
-                # attributed to the producer that built it
-                _store[_key] = (name, _pv.get_provenance())
         if not _np_exact_hit:
             from .metrics.abstention import AbstentionCode, record_suppression
             record_suppression(
@@ -2035,6 +2259,16 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
                 # already non-verifying and is left exactly as recorded.
                 if (_pv.get_provenance()["gate_outcome"]
                         == _pv.GATE_OUTCOME_SELF01):
+                    # critic-1 / R63 (claims conformance, 2026-09-27): the
+                    # carve-out's licence is that OPSIN's stereo grammar is
+                    # narrower than the Blue Book's (lowercase r/s), never that
+                    # the descriptors need no check. Each one is checked against
+                    # the input's CIP labels at its locant; a name with a wrong
+                    # one is repaired to a full-key round-tripping name or
+                    # withdrawn (_stereo_descriptor_repair).
+                    if not _stereo_descriptors_verified(name, smiles, _stripped):
+                        return _stereo_descriptor_repair(
+                            name, smiles, _stripped, stats)
                     _record_gate_outcome(
                         _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY, name)
                 return name  # only the stereo layer is OPSIN-narrow -> ship it whole
@@ -2218,6 +2452,56 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
     if not input_smiles:
         return True  # nothing to compare against -- inconclusive, fail-OPEN
     return _full_inchikey_offer_match(input_smiles, opsin_smiles)
+
+
+def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
+    """Claims conformance (2026-09-27): the round trip of a name that is about to
+    ship at a general tier, with NO fail-open branch (unlike `_offer_rt_ok`).
+
+    Returns ``"verified"`` when OPSIN reads ``name`` and the FULL standard
+    InChIKey of what it read equals the input's (for a radical input the radical
+    graph must agree too, as the key encodes no radical electrons); equal full
+    keys mean the name denotes the whole input, so every atom is covered.
+    ``"unavailable"`` when OPSIN could not be consulted after the oracle's retry
+    ladder; ``"failed"`` otherwise (OPSIN rejected the name, a key differs, or a
+    key could not be computed). The OPSIN call is memoized, so a name the gate or
+    the offer pool already read costs no new parse.
+    """
+    if not name or not input_smiles:
+        return "failed"
+    opsin_smiles = _validity_gate_name_to_smiles(name)
+    if opsin_smiles is None:
+        return ("unavailable" if _validity_gate_status(name) == "unavailable"
+                else "failed")
+    in_key = _self_consistency_full_key(input_smiles)
+    if not in_key or _self_consistency_full_key(opsin_smiles) != in_key:
+        return "failed"
+    try:
+        from .validation.radical_identity import radical_identity_verdict
+        if radical_identity_verdict(input_smiles, opsin_smiles) == "mismatch":
+            return "failed"
+    except Exception:
+        return "failed"
+    return "verified"
+
+
+def _is_exact_match_list_name(smiles: Optional[str], name: Optional[str]) -> bool:
+    """True iff ``name`` is one of the exact-match list names the general tiers
+    may ship without an OPSIN round trip: a NAME_EXACT natural-product parent
+    ('germacrane', matched on the whole structure) or the coordination retained
+    name of exactly this input."""
+    if not name:
+        return False
+    try:
+        from .data.natural_products import NAME_EXACT_NP_PARENTS
+        if name in NAME_EXACT_NP_PARENTS:
+            return True
+    except Exception:
+        pass
+    try:
+        return bool(smiles) and _coordination_retained_name(smiles) == name
+    except Exception:
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -2920,10 +3204,6 @@ def _budget_scope(fn):
             exit_name_scope,
         )
         depth = enter_name_scope()
-        # Task 4 continuation: one pseudoasymmetric-candidate store per OUTERMOST
-        # name call (see _PSEUDO_VERIFIED_CTX), shared by every nested and
-        # isolated re-entry, reset on every exit path by the finally below.
-        _ps_tok = _PSEUDO_VERIFIED_CTX.set({}) if depth == 1 else None
         try:
             return fn(self, *args, **kwargs)
         except PerfBudgetExceeded:
@@ -2982,8 +3262,6 @@ def _budget_scope(fn):
                 self._suppress_floor_offer = False
         finally:
             exit_name_scope()
-            if _ps_tok is not None:
-                _PSEUDO_VERIFIED_CTX.reset(_ps_tok)
     return _wrapper
 
 
@@ -4255,6 +4533,9 @@ class Orthonym:
             stereo_unexpressed = bool(prov.get("stereo_unexpressed"))
             suffix_free_prefix_name = bool(prov.get("suffix_free_prefix_name"))
         elif source == "trivial_retained":
+            # R68 / critic-2: 'systematic_verified' only when a round trip passed;
+            # the honesty rule at the end of this method demotes an unverified one
+            # to best_effort (after the general tiers' own check has run).
             tier, is_pin = SYSTEMATIC_VERIFIED, False
             opsin = gate_opsin_label
         elif _pv.name_carries_non_pin_part(prov, name):
@@ -4354,6 +4635,47 @@ class Orthonym:
                 and _is_p69_organometallic_without_pin(smiles, name)):
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
+        # Claims conformance (2026-09-27): at the general tiers every shown name
+        # has passed the round trip, apart from the exact-match list names
+        # (NAME_EXACT natural-product parents, coordination retained names). The
+        # labels above come from the gate outcome recorded for THIS string, and
+        # some winners never had one: an offer that `_select_rt_passing_offer_name`
+        # picked after the gate had suppressed another string (its `_offer_rt_ok`
+        # full-key check is not recorded, so the name read 'bypassed' or
+        # 'not_run'), or a general-engine name whose own check was recorded as
+        # 'unverified' although the string round-trips. Such a name is checked
+        # here, without any fail-open branch: when OPSIN reads it back to the
+        # input's full InChIKey it is labelled verified; otherwise it is withdrawn
+        # and the row abstains with its limit code (a name OPSIN cannot read, such
+        # as one with a lowercase r/s descriptor, is never shown at these tiers).
+        # Reduced mode (no jar, ORTHONYM_ALLOW_REDUCED) and a disabled gate keep
+        # their documented labels. The default (PIN) tier is unchanged.
+        if (tier != ABSTAIN and opsin != "verified" and name
+                and self._general_fallback
+                and not self._disable_opsin_validity_gate
+                and not _DISABLE_VALIDITY_GATE
+                and _validity_gate_jar_present()
+                and not _is_exact_match_list_name(smiles, name)):
+            if _shipped_name_round_trip(name, smiles) == "verified":
+                opsin = "verified"
+                gate_outcome = _pv.GATE_OUTCOME_FULL_KEY_VERIFIED
+            else:
+                logger.info("name_tiered withdrew %r: no full-key round trip", name)
+                name = None
+                tier, is_pin, opsin = ABSTAIN, False, "n/a"
+                source = "abstain"
+                gate_outcome = _pv.GATE_OUTCOME_SUPPRESSED
+                stereo_unexpressed = False
+                suffix_free_prefix_name = False
+                try:
+                    _mol = Chem.MolFromSmiles(smiles)
+                    if _mol is not None:
+                        from rdkit.Chem import rdMolDescriptors
+                        formula = rdMolDescriptors.CalcMolFormula(_mol)
+                        limit_code = classify_failure_limit(
+                            _mol, smiles=smiles).code
+                except Exception:
+                    pass
         gates = []
         if source == "general_engine":
             gates.append("atom_coverage")
@@ -4373,12 +4695,22 @@ class Orthonym:
         #: honest verification-provenance label for the full-coverage
         # tier. Derived from what ALREADY shipped, deny-by-default "unverified":
         # "identity" -> a D1 exact-InChIKey coordination retained-name hit
-        # "opsin" -> the name round-trips through OPSIN (/ engine RT)
+        # (the input matches a curated table entry exactly; no
+        # OPSIN read-back)
+        # "opsin" -> OPSIN read the FULL name back to the input (,
+        # the engine's own RT, a full-key recomposition or the
+        # full-key round trip): opsin == "verified"
+        # "opsin_constitution" -> OPSIN read back only the stereo-STRIPPED name
+        # (opsin == "verified_constitution_only"): the constitution
+        # is confirmed by OPSIN, the descriptors by the CIP check
+        # of _stereo_descriptors_verified (R68: this used to say
+        # "opsin" although OPSIN rejects the full name)
         # "reconstructor" -> (SP5.6, if built) structurally reconstructed
-        # "unverified" -> emitted with no passing oracle (/ D2 additive),
-        # or an abstain row. Never claims a verification the
-        # emission did not earn (mirrors the allowlist
-        # discipline of ``opsin_label_for_gate_outcome``).
+        # "unverified" -> emitted with no passing oracle (/ D2 additive,
+        # a grammar carve-out), or an abstain row. Never
+        # claims a verification the emission did not earn
+        # (mirrors the allowlist discipline of
+        # ``opsin_label_for_gate_outcome``).
         verified = "unverified"
         if name and not is_failure_name(name):
             _is_d1_identity = False
@@ -4388,8 +4720,22 @@ class Orthonym:
                 _is_d1_identity = False
             if _is_d1_identity:
                 verified = "identity"
-            elif opsin in ("verified", "verified_constitution_only"):
+            elif opsin == "verified":
                 verified = "opsin"
+            elif opsin == "verified_constitution_only":
+                verified = "opsin_constitution"
+        # R63 / R68 (claims conformance, 2026-09-27): a tier whose name says
+        # 'verified' is earned only by a full round trip (verified 'opsin') or the
+        # documented identity table. The grammar carve-outs (OPSIN has no grammar
+        # for their class), the constitution-only stereo branch, and a name no
+        # check covers keep shipping where they shipped, one label down:
+        # pin_verified -> pin_unverified (not a certified PIN, as for the other
+        # pin_unverified demotions), systematic_verified -> best_effort. Labels
+        # only: the name and the gate outcome are unchanged.
+        if tier == PIN_VERIFIED and verified not in ("opsin", "identity"):
+            tier, is_pin = PIN_UNVERIFIED, False
+        elif tier == SYSTEMATIC_VERIFIED and verified not in ("opsin", "identity"):
+            tier = BEST_EFFORT
         return {"name": name, "tier": tier, "is_pin": is_pin,
                 "source": source, "opsin": opsin, "gates_passed": gates,
                 "gate_outcome": gate_outcome,
@@ -5644,28 +5990,16 @@ class Orthonym:
             # nothing fired yet, the L1 fallback if veto fired and the
             # exception came after, etc.), never a half-applied one.
             logger.info("coverage audit failed (shadow, ignored): %s", _cae)
-        # Task 4 continuation (pre-existing-failures plan): the general tiers'
-        # LAST resort before an abstention, after every rescue and offer above --
-        # a name the validity gate verified through
-        # `_pseudoasymmetric_name_verified` (OPSIN 2.9.0 parses no lowercase r/s
-        # descriptor) but held back so an OPSIN-round-trippable name could win.
-        # Nested sessions use it too, so a component of an adduct can be named.
+        # Claims conformance part 2 (2026-09-27): every name exit returns only a
+        # name whose own round trip passed (exact-match list names and the
+        # documented default-tier carve-outs excepted); see _exit_round_trip_check.
+        # After the offer selection, so an offer that won on an advisory fail-open
+        # branch of _offer_rt_ok is checked too.
         try:
-            if (is_failure_name(name) and self._general_fallback
-                    and not self._disable_opsin_validity_gate and smiles):
-                _entry = _pseudo_candidate_store().get(
-                    _self_consistency_full_key(smiles) or '')
-                if _entry and _pseudoasymmetric_name_verified(_entry[0], smiles):
-                    from .metrics import provenance as _pv_last
-                    _pv_last.restore_provenance(_entry[1])
-                    _record_gate_outcome(
-                        _pv_last.carveout_outcome("pseudoasymmetric_verified"),
-                        _entry[0])
-                    # no offer won: name_tiered must read the producer's labels
-                    self._last_selected_offer = None
-                    name = _entry[0]
-        except Exception as _pse:  # pragma: no cover - defensive
-            logger.info("pseudoasymmetric last resort failed (ignored): %s", _pse)
+            name = self._exit_round_trip_check(name, smiles)
+        except Exception as _xe:  # pragma: no cover - defensive, fails closed
+            logger.info("exit round-trip check failed (withdrawn): %s", _xe)
+            name = _descriptive_fallback(smiles)
         try:
             if self._binding_proof == "off":
                 return name
@@ -5920,6 +6254,112 @@ class Orthonym:
                 return _descriptive_fallback(smiles)
         return name
 
+    def _exit_round_trip_check(self, name: str, smiles: str) -> str:
+        """Claims conformance part 2 (2026-09-27): the check every public naming
+        entry point applies to the name it is about to return, with no fail-open
+        branch where a check is possible.
+
+        Some names reach an exit without a round trip that passed for THIS string:
+        the trivial last resort (`_apply_trivial_fallback`) returns a name after the
+        gate suppressed another string and never gates it; an offer can win on one
+        of `_offer_rt_ok`'s advisory fail-open branches (a carve-out outcome, no
+        jar, no input, an inconclusive key compare); and ships an
+        'inconclusive' compare. With OPSIN unavailable (a timeout on a loaded host,
+        the jar present) the trivial last resort returned 'benzol' for benzene at
+        the default AND best-effort tiers of ``name``, ``name_compound`` and
+        ``name_with_confidence``, with no check at all.
+
+        Top level only. Returns ``name`` when it passed, else the descriptive
+        fallback (a failure name), recording the outcome for the string returned:
+
+        * a failure name, a disabled gate (instance flag or env, the documented
+          raw-output configuration) and an exact-match list name
+          (`_is_exact_match_list_name`) pass unchanged;
+        * no jar (the opt-in reduced mode, ``ORTHONYM_ALLOW_REDUCED``): the
+          default / valid / complete tiers keep their documented behaviour (no
+          check possible, labelled unverified); best-effort fails closed, as the
+          gate does there;
+        * a general tier (``general_fallback``): the FULL-key round trip
+          (`_shipped_name_round_trip`, memoized, so a string the gate or an offer
+          already read costs no new parse) unless a full-key proof is recorded
+          for this string; pass -> labelled verified, else withdrawn;
+        * the default tier: a verified outcome recorded for this string (,
+          the documented constitution-only stereo branch, the full-key ones) or
+          one of the documented grammar carve-outs passes; a string the gate never
+          judged (``bypassed`` / ``not_run``) goes through the default-tier gate
+          now; anything else (an 'inconclusive' compare, 'unavailable' with the
+          jar present,...) is withdrawn. The ``off`` / ``warn``
+          configurations keep their documented meaning.
+        """
+        from .assembly.fragment_naming import is_top_level_naming
+        if not name or is_failure_name(name) or not is_top_level_naming():
+            return name
+        if self._disable_opsin_validity_gate or _DISABLE_VALIDITY_GATE:
+            return name
+        try:
+            if _is_exact_match_list_name(smiles, name):
+                return name
+            from .metrics import provenance as _pv
+            prov = _pv.get_provenance()
+            resolved = _pv.resolve_gate_outcome(
+                prov["gate_outcome"], prov["gate_outcome_name"], name)
+            if not _validity_gate_jar_present():
+                if not self._general_fallback_unverified:
+                    return name
+                return self._withdraw_at_exit(
+                    name, smiles, "jar_absent_besteffort_unverified")
+            if self._general_fallback:
+                if resolved in (_pv.GATE_OUTCOME_STEREO_RECOMPOSED,
+                                _pv.GATE_OUTCOME_FULL_KEY_VERIFIED):
+                    return name
+                if _shipped_name_round_trip(name, smiles) == "verified":
+                    if resolved != _pv.GATE_OUTCOME_SELF01:
+                        _record_gate_outcome(_pv.GATE_OUTCOME_FULL_KEY_VERIFIED, name)
+                    return name
+                return self._withdraw_at_exit(name, smiles, "exit_full_key_round_trip")
+
+            def _passes_default_tier(outcome: str) -> bool:
+                return (outcome in (_pv.GATE_OUTCOME_SELF01,
+                                    _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
+                                    _pv.GATE_OUTCOME_STEREO_RECOMPOSED,
+                                    _pv.GATE_OUTCOME_FULL_KEY_VERIFIED)
+                        or outcome.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX)
+                        or (outcome == _pv.GATE_OUTCOME_SELF01_SKIPPED
+                            and _SC_MODE == "off")
+                        or (outcome == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH
+                            and _SC_MODE == "warn"))
+
+            if _passes_default_tier(resolved):
+                return name
+            if resolved in (_pv.GATE_OUTCOME_BYPASSED, _pv.GATE_OUTCOME_NOT_RUN):
+                gated = _final_opsin_validity_gate(
+                    name, smiles, self._grammar_stats,
+                    besteffort_unverified=self._general_fallback_unverified,
+                    general_fallback_tier=False)
+                if is_failure_name(gated):
+                    return gated
+                prov = _pv.get_provenance()
+                if _passes_default_tier(_pv.resolve_gate_outcome(
+                        prov["gate_outcome"], prov["gate_outcome_name"], gated)):
+                    return gated
+                return self._withdraw_at_exit(gated, smiles, "exit_gate_unverified")
+            return self._withdraw_at_exit(name, smiles, "exit_" + resolved)
+        except Exception as _xe:  # pragma: no cover - defensive, fails closed
+            logger.info("exit round-trip check failed (withdrawn): %s", _xe)
+            return _descriptive_fallback(smiles)
+
+    @staticmethod
+    def _withdraw_at_exit(name: str, smiles: str, detail: str) -> str:
+        """Withdraw ``name`` at a public exit (see `_exit_round_trip_check`)."""
+        from .metrics import provenance as _pv
+        from .metrics.abstention import AbstentionCode, record_suppression
+        logger.info("exit round-trip check withdrew %r (%s)", name[:80], detail)
+        record_suppression(AbstentionCode.GATE_SUPPRESSED, detail=detail,
+                           candidate=name)
+        _suppressed_to = _descriptive_fallback(smiles)
+        _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
+        return _suppressed_to
+
     def _apply_trivial_fallback(self, result: str, smiles: str) -> str:
         """Task 1.9 (PIN-policy --trivial fallback).
 
@@ -6012,8 +6452,9 @@ class Orthonym:
                     if _scope is not None:
                         _scope.smiles = smiles
                         record_abstention(AbstentionCode.OTHER, detail=_scope.code)
-                        _fallback_name = self._apply_trivial_fallback(
-                            _scope.message, smiles)
+                        _fallback_name = self._exit_round_trip_check(
+                            self._apply_trivial_fallback(_scope.message, smiles),
+                            smiles)
                         _abst = abstention_code_for(_fallback_name)
                         _md = unmeasured_confidence(
                             name=_fallback_name, handler='fallback')
@@ -6039,8 +6480,12 @@ class Orthonym:
                     if has_isotopes(_iso_probe):
                         _iso_name = decorate_isotopic_name(smiles, self.style, self)
                         if _iso_name is not None:
+                            # Claims conformance part 2: same exit check as name.
+                            _iso_name = self._exit_round_trip_check(_iso_name, smiles)
                             _md = unmeasured_confidence(
-                                name=_iso_name, handler='isotope')
+                                name=_iso_name,
+                                handler=('fallback' if is_failure_name(_iso_name)
+                                         else 'isotope'))
                             _md['limit'] = None
                             _md['abstention'] = None
                             return _md
@@ -6075,7 +6520,9 @@ class Orthonym:
                 else:
                     record_abstention(AbstentionCode.OTHER, detail=_limit.code)
                 # Task 1.9 (C8): apply trivial fallback here, mirroring name.
-                _fallback_name = self._apply_trivial_fallback(_limit.message, smiles)
+                # Claims conformance part 2: then the same exit check as name.
+                _fallback_name = self._exit_round_trip_check(
+                    self._apply_trivial_fallback(_limit.message, smiles), smiles)
                 _abst = abstention_code_for(_fallback_name)
                 # C4: nothing scored this either, so report the shared
                 # unmeasured record rather than a fabricated 0.0 (a verdict of
@@ -6150,6 +6597,18 @@ class Orthonym:
             # _apply_trivial_fallback is a no-op when trivial_fallback=False,
             # when called recursively, or when a real PIN was derived — safe.
             metadata['name'] = self._apply_trivial_fallback(metadata['name'], smiles)
+            # Claims conformance part 2 (2026-09-27): the same exit check as name
+            # (_exit_round_trip_check): the trivial last resort above is never
+            # gated, and no name leaves without a round trip that passed.
+            _checked = self._exit_round_trip_check(metadata['name'], smiles)
+            if _checked != metadata['name']:
+                metadata = unmeasured_confidence(name=_checked, handler='fallback')
+                _lim2 = None
+                if _probe is not None:
+                    _lim2 = classify_scope_limit(_probe)
+                    if _lim2 is None and is_failure_name(_checked):
+                        _lim2 = classify_failure_limit(_probe, smiles=smiles)
+                metadata['limit'] = _lim2.as_dict() if _lim2 is not None else None
 
             # Task 0.1: typed abstention code (additive key; None for
             # a successfully named molecule).

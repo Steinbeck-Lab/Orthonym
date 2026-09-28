@@ -1127,8 +1127,34 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
             full_coverage_ctx.get())
 
 
+def _mol_graph_key(mol):
+    """A complete, atom-ORDERED description of *mol*'s graph (every atom's element,
+    charge, isotope, hydrogens, aromaticity and chiral tag; every bond's atoms,
+    order, stereo and direction), so two molecule objects share a key only when
+    atom indices mean the same atoms. Read-only: unlike ``MolToSmiles`` it sets no
+    output-order property."""
+    atoms = tuple(
+        (a.GetAtomicNum(), a.GetFormalCharge(), a.GetIsotope(), a.GetNumExplicitHs(),
+         a.GetNoImplicit(), a.GetIsAromatic(), int(a.GetChiralTag()),
+         a.GetNumRadicalElectrons())
+        for a in mol.GetAtoms())
+    bonds = tuple(
+        (b.GetBeginAtomIdx(), b.GetEndAtomIdx(), int(b.GetBondType()),
+         int(b.GetStereo()), tuple(b.GetStereoAtoms()), int(b.GetBondDir()))
+        for b in mol.GetBonds())
+    return atoms, bonds
+
+
 def name_substituent_for_ordering(mol, frag_atoms, attach_idx):
     """:func:`name_substituent` for a SORT KEY only -- it leaves no trace.
+
+    Memoised for the top-level naming call (``assembly.memo``; ``verify`` mode
+    recomputes and compares): a ring's (g) tie is re-asked for the same
+    prefix every time the ring is oriented, and each ask re-named that prefix
+    from scratch -- 3,458 sort-key namings (92 of 141 s) for a ChEBI siderophore
+    whose piperazinedione carries two long hydroxamate chains (a NATIVE_HANG row;
+    the measured code named it in 17 s). The key is the whole atom-ordered graph
+    plus the fragment and its attachment atom, i.e. everything the call reads.
 
     A numbering tie-break (g): the prefix cited first takes the lower
     locant) needs each prefix's name BEFORE the real assembly names it. A plain
@@ -1141,6 +1167,17 @@ def name_substituent_for_ordering(mol, frag_atoms, attach_idx):
     would have been without the speculative call. Returns ``None`` for the
     unnameable sentinel.
     """
+    from .memo import cache_or_compute
+    try:
+        key = (_mol_graph_key(mol), tuple(sorted(frag_atoms)), attach_idx)
+    except Exception:  # noqa: BLE001 -- no key, no memo
+        return _name_substituent_for_ordering_uncached(mol, frag_atoms, attach_idx)
+    return cache_or_compute(
+        "substituent_ordering_name", key,
+        lambda: _name_substituent_for_ordering_uncached(mol, frag_atoms, attach_idx))
+
+
+def _name_substituent_for_ordering_uncached(mol, frag_atoms, attach_idx):
     from . import substituent_naming as _sn
     from .fragment_naming import speculative_fragment_naming
     from .memo import pop_sandbox, push_sandbox

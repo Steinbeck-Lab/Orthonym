@@ -4788,10 +4788,54 @@ def sulfonamido_prefix_from_n_branch(mol, n_idx: int, sub_atoms,
     return stem[:-len('sulfonyl')] + 'sulfonamido'
 
 
+# The substitutive retry below is for an acid FRAGMENT whose recursive name is a
+# retained Chapter name ending in an amino-acid residue ('prolylalanine',
+# '(2E)-3-phenylprop-2-enoylprolyl-D-alanine'), the case it was built for (the
+# tripeptide PIN, 4f2284331). It used to fire for ANY name without an '-oic
+# acid', running a fresh whole-pipeline instance per acyl branch with no memo:
+# 55-59 calls for the ChEBI calcein-type potassium salts (their acid fragment
+# is the suffix-less '5-carboxy-...spiro[...xanthene]'; the calls spent the
+# shared analysis-call budget, so the salt went unnamed) and 8,176 calls /
+# 239 s for a 14-residue peptide (the ChEBI NATIVE_HANG rows). Gated on the
+# residue name and memoised, the same peptide makes 34 calls in 1.6 s.
+
+
+def _is_retained_peptide_name(name: Optional[str]) -> bool:
+    """True iff *name* ends in a retained amino-acid residue name (the
+    peptide / N-acyl amino acid names the substitutive retry is for)."""
+    if not name:
+        return False
+    from ..rules.stereochemistry import _peptide_stem_sets
+    _acyls, terms = _peptide_stem_sets()
+    return any(name.endswith(t) for t in terms)
+
+
 def _substitutive_peptide_acid_name(frag_smi: str) -> Optional[str]:
     """The substitutive name of an acid fragment with the PEPTIDE class excluded,
     or None. Used only when the ordinary recursive name is a retained peptide
-    name without a convertible acid suffix (TRIAGE g3 C05 / g5 C15)."""
+    name without a convertible acid suffix (TRIAGE g3 C05 / g5 C15).
+
+    Memoised for the top-level naming call (assembly.nested_memo: provenance side
+    effects replayed on a hit; ORTHONYM_MEMO=verify recomputes): the recursion
+    re-asks the same sub-peptide fragments many times (a 14-residue ChEBI peptide
+    made 8,176 calls, 239 of its 243 s). The key carries the breadth context the
+    fresh instance inherits. A hit charges no budget (replay_budgets=False; see
+    nested_memo.cached_nested_call): the unmemoised repeat ran warm, and replaying
+    each fragment's cold cost per hit spent the 500-call analysis budget on the
+    ChEBI 12-residue peptides, which then abstained."""
+    from .nested_memo import cached_nested_call
+    from ..decomposition.engine import nacyl_float_refusing
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    key = (frag_smi, general_fallback_ctx.get(), best_effort_ctx.get(),
+           allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+           nacyl_float_refusing())
+    return cached_nested_call("substitutive_peptide_acid_name", key,
+                              lambda: _substitutive_peptide_acid_name_fresh(frag_smi),
+                              replay_budgets=False)
+
+
+def _substitutive_peptide_acid_name_fresh(frag_smi: str) -> Optional[str]:
     try:
         from ..errors import is_failure_name
         from ..namer import Orthonym
@@ -4878,7 +4922,7 @@ def acyl_amido_prefix_from_branch(mol, n_idx: int, carbonyl_c: int,
         if not acid_name:
             return None
         amido = acid_name_to_amido_prefix(acid_name)
-        if not amido:
+        if not amido and _is_retained_peptide_name(acid_name):
             # A peptide acid fragment comes back as its retained Chapter name
             # ('prolylalanine'), which has no '-oic acid' to turn into '-amido', so
             # every tripeptide failed here and fell back to the non-PIN retained

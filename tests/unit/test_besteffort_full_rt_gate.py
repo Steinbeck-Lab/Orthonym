@@ -77,21 +77,20 @@ def test_opsin_unparseable_ring_stereo_abstains(smiles):
     assert _abstains(_be(smiles)), f"shipped an unverifiable name: {_be(smiles)!r}"
 
 
-# 2026-09-25 (pre-existing-failures plan, Task 4 continuation; controller
-# ruling): a name OPSIN rejects ONLY for its PSEUDOASYMMETRIC (lowercase r/s)
-# descriptor is no longer unverifiable. OPSIN 2.9.0 parses no such descriptor,
-# so '(1R,3s,5S)-tropan-3-ol' can never round-trip, but its stereo-stripped form
-# round-trips to the input's full InChIKey (with the pseudoasymmetric centre left
-# unspecified) and the centres labeller gives C-3 the same single code 's'
-# (namer._pseudoasymmetric_name_verified). Best-effort ships it only as the last
-# resort, when no OPSIN-round-trippable name exists. Chlorogenic acid's rejected
-# descriptors are true stereocentres, so it still abstains (above).
-def test_pseudoasymmetric_ring_stereo_ships_verified():
+# Claims conformance (2026-09-27): at the best-effort tier a name OPSIN rejects is
+# not emitted; the only exceptions are the exact-match list names. OPSIN 2.9.0
+# parses no lowercase pseudoasymmetric (r/s) descriptor, so the correct systematic
+# name '(1R,3s,5S)-tropan-3-ol' cannot pass the round trip (OPSIN returns no
+# structure for it) and best-effort abstains, as it did in the code the paper
+# measured. 594f8a788 had shipped it as a last resort through a
+# stripped-form check; that last resort is gone. The stripped-form verifier
+# itself still tells the right code from the wrong one.
+def test_pseudoasymmetric_ring_stereo_abstains():
     from orthonym.namer import _pseudoasymmetric_name_verified
     smiles = "CN1[C@@H]2CC[C@H]1C[C@H](O)C2"  # tropan-3-ol
     name = _be(smiles)
-    assert name == "(1R,3s,5S)-tropan-3-ol"
-    assert _pseudoasymmetric_name_verified(name, smiles)
+    assert _abstains(name), f"shipped a name OPSIN cannot read: {name!r}"
+    assert _pseudoasymmetric_name_verified("(1R,3s,5S)-tropan-3-ol", smiles)
     assert not _pseudoasymmetric_name_verified("(1R,3r,5S)-tropan-3-ol", smiles)
 
 

@@ -138,18 +138,19 @@ def _name_component(frag_smi: str, style: str, *,
     # OPSIN error) is not a rejection, so the component stays; the production
     # gate then checks the whole adduct name and fails CLOSED on 'unavailable'
     # (TRIAGE g7 C01).
-    from orthonym.namer import _validity_gate_status
-    if _validity_gate_status(name) == "rejected":
-        # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): OPSIN
-        # 2.9.0 rejects EVERY name with a pseudoasymmetric (lowercase r/s)
-        # descriptor, e.g. tropisetron's '(1R,3r,5S)-tropan-3-yl
-        # 1H-indole-3-carboxylate'. Such a component is accepted when the
-        # stripped-form full-InChIKey round trip plus the centres labeller verify
-        # it (namer._pseudoasymmetric_name_verified); refusing it dropped the
-        # whole adduct, and a later path then named the drug and lost the HCl.
-        from orthonym.namer import _pseudoasymmetric_name_verified
-        if not _pseudoasymmetric_name_verified(name, frag_smi):
-            return None
+    #
+    # Claims conformance part 2 (2026-09-27): a component OPSIN rejects is refused
+    # unless it is an exact-match list name (namer._is_exact_match_list_name), the
+    # same rule as for a whole shown name. 594f8a788 had let a component with a
+    # pseudoasymmetric (lowercase r/s) descriptor through when the stripped-form
+    # round trip plus the centres labeller agreed ('(1R,3r,5S)-tropan-3-yl
+    # 1H-indole-3-carboxylate' for tropisetron); OPSIN 2.9.0 reads no r/s, so the
+    # salt name built on it could not be read back either, and at the default
+    # tier it shipped on the stereo-stripped branch.
+    from orthonym.namer import _is_exact_match_list_name, _validity_gate_status
+    if (_validity_gate_status(name) == "rejected"
+            and not _is_exact_match_list_name(frag_smi, name)):
+        return None
     return name
 
 

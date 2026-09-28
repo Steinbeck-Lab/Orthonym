@@ -81,6 +81,7 @@ class TestNameTieredHonoursWinningOffer:
     cleanup report).
     """
 
+    @pytest.mark.opsin_gate  # pin_verified needs the round trip (R63)
     def test_normal_pin_case_unchanged(self):
         # Guard: the default single-offer/primary case must report the
         # SAME tier/is_pin/source as before this fix -- real machinery,
@@ -131,6 +132,10 @@ class TestNameTieredHonoursWinningOffer:
         def _fake_name(self, smiles):
             self._offers = []
             self._last_selected_offer = None
+            # the gate verified this string (pin_verified is earned by a
+            # recorded round trip, claims conformance R63)
+            from orthonym.metrics import provenance as pv
+            pv.record_gate_outcome(pv.GATE_OUTCOME_SELF01, "ethanol")
             return "ethanol"
 
         monkeypatch.setattr(Orthonym, "name", _fake_name)

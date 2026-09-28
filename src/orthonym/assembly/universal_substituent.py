@@ -265,6 +265,14 @@ class _Ctx:
     # (a wrong/unparseable fusion descriptor) with the always-faithful kekulized
     # von-Baeyer polyene instead. Default off; set only on the retry path.
     force_vonbaeyer_spiro: bool = False
+    # The '<acyl>oxy' leaf (``_acyloxy_leaf``, TRIAGE g8 C4) names an ester branch
+    # through the shared acid engine. When False the branch takes the generic
+    # spine path it had before that leaf existed; ``t4_coverage`` sets it False
+    # only to RETRY a leaf-bearing floor name that failed the full-InChIKey
+    # round trip, so the leaf can never cost a name the floor built without it.
+    acyloxy_leaf: bool = True
+    # Set True the first time the leaf names a branch in this call.
+    acyloxy_leaf_fired: bool = False
 
 
 @dataclass(frozen=True)
@@ -274,6 +282,9 @@ class UniversalResult:
     name: str
     bindings: Tuple[Tuple[str, FrozenSet[int]], ...]
     covers: FrozenSet[int]
+    # True when an '<acyl>oxy' leaf named a branch of this name (see
+    # ``_Ctx.acyloxy_leaf``): the caller then knows a leaf-free retry exists.
+    acyloxy_leaf_fired: bool = False
 
 
 @dataclass
@@ -367,6 +378,7 @@ class _ComponentResult:
 def name_universal_substitutive(
     mol, atom_work_budget: int = DEFAULT_ATOM_WORK_BUDGET,
     force_vonbaeyer_spiro: bool = False,
+    acyloxy_leaf: bool = True,
 ) -> Optional[UniversalResult]:
     """Name *mol* unconditionally, or return ``None`` (void -- never partial).
 
@@ -418,7 +430,8 @@ def name_universal_substitutive(
         return None
     try:
         res = _name_universal_substitutive_unsafe(
-            mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro)
+            mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
+            acyloxy_leaf=acyloxy_leaf)
         if res is not None:
             return res
         # M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide the primary
@@ -440,7 +453,8 @@ def name_universal_substitutive(
             if neutral is not None:
                 return _name_universal_substitutive_unsafe(
                     neutral, atom_work_budget,
-                    force_vonbaeyer_spiro=force_vonbaeyer_spiro)
+                    force_vonbaeyer_spiro=force_vonbaeyer_spiro,
+                    acyloxy_leaf=acyloxy_leaf)
         return None
     except Exception:
         return None
@@ -448,6 +462,7 @@ def name_universal_substitutive(
 
 def _name_universal_substitutive_unsafe(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
+    acyloxy_leaf: bool = True,
 ) -> Optional[UniversalResult]:
     """The real body -- may raise; ``name_universal_substitutive`` is the
     only caller and converts every exception to ``None``."""
@@ -465,7 +480,8 @@ def _name_universal_substitutive_unsafe(
     # passing a larger budget (that budget still legitimately raises the
     # RECURSIVE-work ceiling; it cannot raise the raw-size safety ceiling).
     built = _build_ctx(mol, atom_work_budget,
-                       force_vonbaeyer_spiro=force_vonbaeyer_spiro)
+                       force_vonbaeyer_spiro=force_vonbaeyer_spiro,
+                       acyloxy_leaf=acyloxy_leaf)
     if built is None:
         return None
     ctx, heavy = built
@@ -550,7 +566,8 @@ def _name_universal_substitutive_unsafe(
     # partition regardless of which name wins (stereo is a pure name-string
     # decoration, so the atom->token partition is identical).
     name = _resolve_floor_stereo(ctx, mol, heavy, comp, atom_work_budget)
-    return UniversalResult(name=name, bindings=tuple(comp.bindings), covers=covers)
+    return UniversalResult(name=name, bindings=tuple(comp.bindings), covers=covers,
+                           acyloxy_leaf_fired=ctx.acyloxy_leaf_fired)
 
 
 def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
@@ -920,6 +937,7 @@ def _neutralize_semipolar_chalcogenides(mol):
 
 def _build_ctx(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
+    acyloxy_leaf: bool = True,
 ) -> Optional[Tuple["_Ctx", FrozenSet[int]]]:
     """Shared whole-molecule perception + ``_Ctx`` setup for BOTH public
     entry points (``name_universal_substitutive`` on the whole graph and
@@ -1052,7 +1070,8 @@ def _build_ctx(
     ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
                budget=_Budget(atom_work_budget), canon_rank=canon_rank,
                cation_sites=cation_sites, anion_sites=anion_sites,
-               force_vonbaeyer_spiro=force_vonbaeyer_spiro)
+               force_vonbaeyer_spiro=force_vonbaeyer_spiro,
+               acyloxy_leaf=acyloxy_leaf)
     return ctx, heavy
 
 
@@ -1247,8 +1266,11 @@ def _name_component(
         # not the replacement chain '2-oxo-1-oxapropan-1-yl' (a chain ending on O,
         # the Blue Book). Fail closed (None) off the plain
         # acyloxy shape; the floor's whole name is still full-InChIKey verified.
-        acyloxy = _acyloxy_leaf(mol, component, attach_hint)
+        # Off on the leaf-free retry (``_Ctx.acyloxy_leaf``).
+        acyloxy = (_acyloxy_leaf(mol, component, attach_hint)
+                   if ctx.acyloxy_leaf else None)
         if acyloxy is not None:
+            ctx.acyloxy_leaf_fired = True
             return _ComponentResult(
                 name=acyloxy, bindings=[(acyloxy, component)], covers=component,
                 attach_locant=None, is_prefix_ready=True,
@@ -1464,7 +1486,10 @@ def _acyloxy_leaf(mol, component: FrozenSet[int], attach_hint: int) -> Optional[
         if any(mol.GetAtomWithIdx(a).GetFormalCharge() for a in component):
             return None
         from .composer import _acyloxy_prefix_for_frag
-        tok = _acyloxy_prefix_for_frag(mol, set(component), attach_hint)
+        # An acyl side with its own free -COOH is '(3-carboxypropanoyl)oxy' or
+        # None, never the divalent polyacid acyl 'butanedioyloxy'.
+        tok = _acyloxy_prefix_for_frag(mol, set(component), attach_hint,
+                                       carboxy_prefixed_polyacid=True)
     except Exception:  # noqa: BLE001 - a leaf shortcut must never break the floor
         return None
     if not tok:

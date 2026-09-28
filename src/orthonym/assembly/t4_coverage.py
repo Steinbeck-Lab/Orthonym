@@ -241,9 +241,51 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
         if uni_vb is not None and uni_vb.name \
                 and verify_or_none(uni_vb.name, smi) is not None:
             return _Candidate(name=uni_vb.name, result_obj=None)
+        # Leaf-free retry: an '<acyl>oxy' leaf named a branch of the floor name
+        # and the name failed the gate -- rebuild both forms WITHOUT that leaf,
+        # the spelling the floor gave before the leaf existed (see
+        # ``_leaf_checked_floor``).
+        if any(u is not None and u.acyloxy_leaf_fired for u in (uni, uni_vb)):
+            for force_vb in (False, True):
+                alt = name_universal_substitutive(
+                    mol, force_vonbaeyer_spiro=force_vb, acyloxy_leaf=False)
+                if alt is not None and alt.name \
+                        and verify_or_none(alt.name, smi) is not None:
+                    return _Candidate(name=alt.name, result_obj=None)
     except Exception as exc:  # fail-closed: keep the rung, never abstain
         logger.info("t4 verified-floor preference raised: %s", exc)
     return candidate
+
+
+def _leaf_checked_floor(mol, uni):
+    """The universal floor's name ``uni``, or -- when an '<acyl>oxy' leaf named one
+    of its branches and the name does NOT pass the full-InChIKey round trip --
+    the floor rebuilt without that leaf.
+
+    The leaf (``universal_substituent._acyloxy_leaf``, TRIAGE g8 C4) spells an
+    ester branch through the shared acid engine, 'acetyloxy' instead of the
+    replacement chain '2-oxo-1-oxapropan-1-yl'. Where that engine's token is
+    wrong for the branch, the whole floor name fails the round trip and, the
+    floor being the last rung, the molecule abstains -- although the floor
+    named it, round-trip exact, before the leaf existed (measured: cholesteryl
+    hydrogen succinate, 'butanedioyloxy' for -O-CO-CH2-CH2-COOH; best-effort
+    lost it in 76fb18964). So the leaf only ever REPLACES the leaf-free
+    spelling with a verified one; otherwise the leaf-free name is offered, and
+    the caller's round-trip ladder judges it exactly as before. A name with no
+    leaf is returned untouched (no extra round trip)."""
+    if not uni.acyloxy_leaf_fired:
+        return uni
+    from rdkit import Chem
+
+    from ..validation.reconstruct import verify_or_none
+    from .universal_substituent import name_universal_substitutive
+    try:
+        if verify_or_none(uni.name, Chem.MolToSmiles(mol)) is not None:
+            return uni
+    except Exception:  # an unverifiable leaf name: prefer the leaf-free one
+        pass
+    alt = name_universal_substitutive(mol, acyloxy_leaf=False)
+    return alt if alt is not None and alt.name else uni
 
 
 def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
@@ -461,6 +503,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
             from .universal_substituent import name_universal_substitutive
             _uni = name_universal_substitutive(mol)
             if _uni is not None and _uni.name:
+                _uni = _leaf_checked_floor(mol, _uni)
                 return _Candidate(name=_uni.name, result_obj=None)
     except Exception as exc:  # fail-closed: a producer bug keeps the abstention
         logger.info("t4 universal-substitutive rung raised: %s", exc)

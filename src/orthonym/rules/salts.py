@@ -554,10 +554,21 @@ def _ion_fragment_roundtrips(frag_mol, name: str) -> bool:
         return False
     try:
         from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        from ..validation.protonation_identity import protonation_site_verdict
         smiles = Chem.MolToSmiles(frag_mol)  # canonical, isomeric (stereo kept)
         if not smiles:
             return False
-        return opsin_roundtrip_check(smiles, name).get("passed") is True
+        rt = opsin_roundtrip_check(smiles, name)
+        if rt.get("passed") is not True:
+            return False
+        # The full InChIKey is protonation-blind: '1-ethyl-...-2-oxo-3,3-
+        # diphenylpyrrolidinium' (the '-ium' on the lactam N) has the key of the
+        # morpholinium cation it was offered for. That name is a different
+        # species (bfbf949fe, validation/protonation_identity.py), so it must not
+        # shadow the best-effort per-component name that puts the charge where
+        # the input has it.
+        return protonation_site_verdict(
+            smiles, rt.get("opsin_smiles") or "") != "mismatch"
     except Exception:  # fail-closed: a probe bug must never accept a wrong ion
         return False
 

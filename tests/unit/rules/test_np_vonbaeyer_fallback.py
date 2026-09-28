@@ -89,43 +89,32 @@ def test_best_effort_emits_a_round_tripping_systematic_name(retained):
             == Chem.MolToInchiKey(Chem.MolFromSmiles(smiles)))
 
 
-# 2026-09-25 (pre-existing-failures plan, Task 4 continuation; controller
-# ruling): best-effort no longer keeps `germacrane`. Its systematic name
-# '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' cannot round-trip (OPSIN
-# 2.9.0 parses no lowercase pseudoasymmetric descriptor), but it is verified by
-# the stereo-stripped full-InChIKey round trip plus the centres labeller
-# (namer._pseudoasymmetric_name_verified), and the general tiers now take it
-# over the unverifiable retained name. The PIN tier still ships `germacrane`
-# (test_default_path_still_emits_the_retained_pin above). (j)
-# (the Blue Book) gives R the lower locant, as in the BB's
-# '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane' (:51471).
-_KEEPS_SYSTEMATIC = {
-    "germacrane": "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane",
-}
-
-
+# 2026-09-25 (controller ruling): best-effort no longer keeps `germacrane`; the
+# NAME_EXACT parent gives way to its systematic name at the general tiers
+# (data.natural_products). That name, '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)
+# cyclodecane' (j), the Blue Book; the BB's '13-norgermacrane
+# (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane',:51471), cannot round-trip: OPSIN
+# 2.9.0 parses no lowercase pseudoasymmetric descriptor. Claims conformance
+# (2026-09-27): a name OPSIN rejects is not emitted at best-effort, so the row
+# abstains with its limit code -- never the unverifiable name, never a wrong one.
+# The PIN tier still ships `germacrane` (test_default_path_still_emits_the_
+# retained_pin above).
 @pytest.mark.parametrize("retained", KEEPS)
-def test_best_effort_gives_the_verified_systematic_name_when_it_does_not_rt(retained):
-    """The RT gate is still load-bearing: the systematic name does not
-    round-trip, so it ships only because the pseudoasymmetric verification
-    passes -- never the unverifiable retained name, never a wrong name."""
-    from orthonym.namer import _pseudoasymmetric_name_verified
-    smiles = _BY_NAME[retained]
-    name = _best_effort_namer().name(smiles)
-    assert name == _KEEPS_SYSTEMATIC[retained]
-    assert _pseudoasymmetric_name_verified(name, smiles)
+def test_best_effort_withholds_the_systematic_name_opsin_cannot_read(retained):
+    from orthonym.errors import is_failure_name
+    name = _best_effort_namer().name(_BY_NAME[retained])
+    assert is_failure_name(name), f"shipped a name OPSIN cannot read: {name!r}"
 
 
 @pytest.mark.parametrize("retained", KEEPS)
 def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
     """a review regression: the RT-probe runs the general-engine recovery,
     which stamps `source="general_engine"` before the RT gate can decline it. The
-    name that ships must NOT inherit that label (it would skew the cohort /
-    refusal-census attribution the project ranks levers by). Uses `name_tiered`,
-    the API that clears provenance per call and is what the cohort/census
-    machinery actually reads."""
+    row must NOT inherit that label (it would skew the cohort / refusal-census
+    attribution the project ranks levers by). Uses `name_tiered`, the API that
+    clears provenance per call and is what the cohort/census machinery reads."""
     r = _best_effort_namer().name_tiered(_BY_NAME[retained])
-    assert r["name"] == _KEEPS_SYSTEMATIC[retained]
+    assert r["name"] is None and r["tier"] == "abstain" and r["limit_code"]
     assert r["source"] != "general_engine"
 
 

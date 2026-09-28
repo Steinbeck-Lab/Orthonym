@@ -1,14 +1,17 @@
-"""Pseudoasymmetric (lowercase r/s) names: verified at the general tiers, and
-numbered by (j) (pre-existing-failures plan, Task 4 continuation;
+"""Pseudoasymmetric (lowercase r/s) names: the stripped-form verifier, the tiers, and
+numbering by (j) (pre-existing-failures plan, Task 4 continuation;
 controller ruling on germacrane, 2026-09-25).
 
 OPSIN 2.9.0 parses NO name with a lowercase pseudoasymmetric CIP descriptor, so
 such a name can never round-trip. The ruling:
 - the PIN tier keeps 'germacrane', the gold-validated np_stereoparent name it
   ships by design (gold row P14C-, "(c)");
-- the best-effort tier gives the VERIFIED systematic name
-  '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane': the stereo-stripped form
-  by OPSIN round trip (full InChIKey), the descriptors by the centres labeller.
+- the best-effort tier does not keep 'germacrane'; its systematic name
+  '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' cannot pass the OPSIN
+  round trip, so best-effort abstains (claims conformance, 2026-09-27: a name
+  OPSIN rejects is never emitted at best-effort). The stripped-form verifier
+  below (stereo-stripped OPSIN round trip plus the centres labeller) is kept for
+  the adduct components (rules/adducts._name_component).
 
 Numbering: (j) (the Blue Book): "the lower locant is assigned to
 CIP stereodescriptors Z, R, M, and r (pseudoasymmetry) that are preferred to E, S,
@@ -118,7 +121,11 @@ def test_pin_tier_keeps_the_gold_np_stereoparent_name():
     "[C@H]1(C)CC[C@@H](C(C)C)CC[C@@H](C)CCC1",
     "C[C@H]1CCC[C@@H](C)CC[C@@H](C(C)C)CC1",
 ])
-def test_best_effort_gives_the_verified_systematic_name(smiles):
+def test_best_effort_abstains_on_the_name_opsin_cannot_read(smiles):
+    # Claims conformance (2026-09-27): at best-effort a name OPSIN rejects is not
+    # emitted (exact-match list names excepted). OPSIN 2.9.0 returns no structure
+    # for GERMACRANE_SYSTEMATIC, so every spelling of the input abstains, with its
+    # limit code, as in the code the paper measured.
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert be["name"] == GERMACRANE_SYSTEMATIC
-    assert _pseudoasymmetric_name_verified(be["name"], smiles)
+    assert be["name"] is None and be["tier"] == "abstain" and be["limit_code"]
+    assert _pseudoasymmetric_name_verified(GERMACRANE_SYSTEMATIC, smiles)

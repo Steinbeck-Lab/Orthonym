@@ -1501,32 +1501,61 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
                 return (name and not is_failure_name(name)
                         and _rt_full_match(name, mol))
 
-            _PEPTIDE_SUBST_ACTIVE = True
-            try:
-                # User decision A (2026-09-26): an amino acid substituted on its
-                # nitrogen takes the systematic substitutive name at the PIN tier
-                #, the Blue Book "Method (1) generates preferred
-                # IUPAC names"; '[(methanesulfinothioyl)amino]acetic acid (PIN)'
-                #:33213). Pass 1 withholds the bare 'N-<acyl>' float onto a
-                # non-suffix nitrogen ('N-acetamidoacetylglycine'), so the composer can
-                # build '(2-acetamidoacetamido)acetic acid'.
-                _refused: list = []
-                _tok = _NACYL_FLOAT_REFUSALS.set(_refused)
+            def _attempt():
+                global _PEPTIDE_SUBST_ACTIVE
+                _PEPTIDE_SUBST_ACTIVE = True
                 try:
-                    _subst = _sub_name()
+                    # User decision A (2026-09-26): an amino acid substituted on its
+                    # nitrogen takes the systematic substitutive name at the PIN tier
+                    #, the Blue Book "Method (1) generates preferred
+                    # IUPAC names"; '[(methanesulfinothioyl)amino]acetic acid (PIN)'
+                    #:33213). Pass 1 withholds the bare 'N-<acyl>' float onto a
+                    # non-suffix nitrogen ('N-acetamidoacetylglycine'), so the composer can
+                    # build '(2-acetamidoacetamido)acetic acid'.
+                    _refused: list = []
+                    _tok = _NACYL_FLOAT_REFUSALS.set(_refused)
+                    try:
+                        _subst = _sub_name()
+                    finally:
+                        _NACYL_FLOAT_REFUSALS.reset(_tok)
+                    _demoted = False
+                    if not _usable(_subst) and _refused:
+                        # Pass 2 (only when pass 1 failed because the gate withheld a
+                        # float): the float ships as an honest demotion -- still validated,
+                        # but not a PIN ('N-(4-hydroxyoctanoyl)glycine', a general
+                        # name,:54480).
+                        _subst = _sub_name()
+                        _demoted = True
                 finally:
-                    _NACYL_FLOAT_REFUSALS.reset(_tok)
-                _demoted = False
-                if not _usable(_subst) and _refused:
-                    # Pass 2 (only when pass 1 failed because the gate withheld a
-                    # float): the float ships as an honest demotion -- still validated,
-                    # but not a PIN ('N-(4-hydroxyoctanoyl)glycine', a general
-                    # name,:54480).
-                    _subst = _sub_name()
-                    _demoted = True
-            finally:
-                _PEPTIDE_SUBST_ACTIVE = False
-            if _usable(_subst):
+                    _PEPTIDE_SUBST_ACTIVE = False
+                return (_subst if _usable(_subst) else None), _demoted
+
+            # One substitutive attempt per peptide per top-level naming call. The
+            # decomposition re-reaches this handler for the same peptide fragment
+            # from many cut contexts, and every visit ran one or two fresh
+            # whole-pipeline sub-namers: 1,096 of them (243 of 267 s) for a ChEBI
+            # siderophore that the measured code named in 17 s, 85 for the ChEBI
+            # glycopeptides (the NATIVE_HANG rows). The replay-memo is scope-bound
+            # (assembly.nested_memo: provenance side effects replayed on a hit,
+            # ORTHONYM_MEMO=verify recomputes), and its key carries every input the
+            # sub-namer reads: the molecule, the style and the breadth and
+            # N-acyl-float context the fresh instance inherits. A hit charges no
+            # budget (replay_budgets=False): the unmemoised repeat it replaces ran
+            # warm (145 analysis calls cold, then 0, 0, 0 for a ChEBI 12-residue
+            # peptide), and replaying the cold cost per hit spent the 500-call
+            # budget, so the peptide abstained instead of shipping its name.
+            from orthonym.assembly.nested_memo import cached_nested_call
+            from orthonym.decomposition.engine import nacyl_float_refusing
+            from orthonym.metrics.provenance import (
+                allow_aromatic_general_ctx, best_effort_ctx, full_coverage_ctx,
+                general_fallback_ctx)
+            _key = (_in, style, general_fallback_ctx.get(), best_effort_ctx.get(),
+                    allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+                    nacyl_float_refusing())
+            _subst, _demoted = cached_nested_call(
+                "peptide_substitutive_attempt", _key, _attempt,
+                replay_budgets=False)
+            if _subst:
                 if _demoted:
                     # Name-scoped record in THIS context: the float site records its
                     # own string, but the sub-namer may have reshaped the whole name.

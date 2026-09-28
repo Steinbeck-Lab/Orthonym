@@ -60,8 +60,9 @@ def _replay_budgets(units: Tuple[int, int, int]) -> None:
         _fn.spend_fragment_work()
 
 
-def _apply(replay: dict, units: tuple) -> None:
-    """Reproduce a fresh call's provenance + budget side effects on a memo hit."""
+def _apply(replay: dict, units: tuple, replay_budgets: bool = True) -> None:
+    """Reproduce a fresh call's provenance (+ budget, unless ``replay_budgets`` is
+    False) side effects on a memo hit."""
     for k, v in replay.items():
         if k in _ACCUMULATORS:
             cur = _VARS[k].get()
@@ -72,16 +73,30 @@ def _apply(replay: dict, units: tuple) -> None:
     # touched-log would miss them; note them explicitly so an outer memoised call
     # still records that this nested hit wrote these vars.
     _pv.note_touched(*replay.keys())
-    _replay_budgets(units)
+    if replay_budgets:
+        _replay_budgets(units)
 
 
-def cached_nested_call(namespace: str, key: tuple, fn: Callable[[], Any]) -> Any:
+def cached_nested_call(namespace: str, key: tuple, fn: Callable[[], Any], *,
+                       replay_budgets: bool = True) -> Any:
     """Return ``fn``'s result for ``(namespace, key)``; on a hit replay the EXACT
     provenance vars the call touched and its budget units. Exceptions propagate uncached.
 
     Only the RESULT is stored under ``namespace`` (so ``ORTHONYM_MEMO=verify`` compares
     names — an honest incomplete-key oracle); the context-relative replay metadata lives
-    in the scope-bound side store, which verify never compares."""
+    in the scope-bound side store, which verify never compares.
+
+    ``replay_budgets=False``: a hit replays the provenance only and charges no budget
+    unit. The recorded units are the fresh call's COLD cost; for a memo placed over a
+    whole-pipeline sub-namer (the peptide substitutive attempts) the unmemoised repeat
+    that a hit stands for runs WARM (the scope's fragment cache and plain memos already
+    hold its sub-results) and costs almost nothing, so replaying the cold cost on every
+    hit charges the budget for work that neither the memoised nor the unmemoised code
+    does. Measured (ChEBI 12-residue peptides, fresh process): the whole-molecule attempt
+    cost 145 analysis calls cold and 0, 0, 0 on its three unmemoised repeats; the replay
+    charged 4 x 145 and more against the 500-call budget, which then aborted the naming
+    (PerfBudgetExceeded -> abstain). A hit does no work, so it spends none; every fresh
+    computation still charges its own work, so the hang budgets still bound the call."""
     state = {"hit": True, "meta": None}
 
     def _fresh():
@@ -106,7 +121,7 @@ def cached_nested_call(namespace: str, key: tuple, fn: Callable[[], Any]) -> Any
         # A true hit: fn did not run — replay the metadata recorded on the fresh miss.
         meta = side_get(namespace, key)
         if meta is not None:
-            _apply(meta[0], meta[1])
+            _apply(meta[0], meta[1], replay_budgets)
     else:
         # A fresh computation (miss, or a verify-mode recompute): fn's real side
         # effects already happened; persist the metadata for a future hit.

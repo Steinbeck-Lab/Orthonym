@@ -151,20 +151,25 @@ def test_carveout_suppresses_when_constitution_differs(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# 4. `inconclusive` still fails OPEN -- never suppress on a comparison you
-# could not make.
+# 4. `inconclusive` fails CLOSED (claims conformance R19, 2026-09-27; it used to
+# fail OPEN). A comparison that could not be made verified nothing, and the
+# constitution is the one thing this carve-out must prove , so the name
+# ships only after a full-key round trip passes -- here none can: OPSIN rejects
+# the full stereo name.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
 @pytest.mark.parametrize("input_smiles,opsin_smiles,why", [
     ("O[C@H]1CC[C@@H](O)CC1", "@@not-smiles@@", "OPSIN output unparseable by RDKit"),
     ("!!! not smiles !!!", "OC1CCC(O)CC1", "input SMILES yields no skeleton"),
 ], ids=["bad-opsin-smiles", "bad-input-smiles"])
-def test_carveout_inconclusive_fails_open(monkeypatch, input_smiles, opsin_smiles, why):
+def test_carveout_inconclusive_fails_closed(monkeypatch, input_smiles, opsin_smiles, why):
     _stub_opsin(monkeypatch, {"cyclohexane-1,4-diol": opsin_smiles})
     stats = {}
     out = nm._final_opsin_validity_gate("(1s,4s)-cyclohexane-1,4-diol", input_smiles, stats)
-    assert out == "(1s,4s)-cyclohexane-1,4-diol", f"suppressed on an unmade comparison ({why})"
-    assert "self_consistency_suppressed" not in stats
+    assert out != "(1s,4s)-cyclohexane-1,4-diol", f"shipped on an unmade comparison ({why})"
+    assert nm.is_failure_name(out)
+    assert stats.get("self_consistency_inconclusive_suppressed") == 1
+    assert "gate_stereo_kept" not in stats
 
 
 @pytest.mark.unit

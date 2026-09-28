@@ -7,11 +7,23 @@ from orthonym.namer import Orthonym
 pytestmark = pytest.mark.unit
 
 
+@pytest.mark.opsin_gate
 def test_default_path_is_t1():
-    row = Orthonym(_disable_opsin_validity_gate=True).name_tiered("CCO")
+    # pin_verified is earned by the round trip (claims conformance R63,
+    # 2026-09-27), so this runs with the validity gate ON; with it disabled the
+    # same name is labelled pin_unverified (test_gate_disabled_is_not_verified).
+    row = Orthonym().name_tiered("CCO")
     assert row["name"] == "ethanol"
     assert row["tier"] == "pin_verified" and row["is_pin"] is True
     assert row["source"] == "pin_path"
+
+
+def test_gate_disabled_is_not_verified():
+    row = Orthonym(_disable_opsin_validity_gate=True).name_tiered("CCO")
+    assert row["name"] == "ethanol"
+    assert row["gate_outcome"] == "gate_disabled"
+    assert row["tier"] == "pin_unverified" and row["is_pin"] is False
+    assert row["verified"] == "unverified"
 
 
 def test_abstention_is_t5():

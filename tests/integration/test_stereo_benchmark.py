@@ -343,8 +343,9 @@ _PIN_TARGET = {
 
 def _assert_demoted(smiles, expected_name):
     """A known non-PIN class: the gate-on PIN tier ships the (RT-exact) name, but never
-    labelled pin_verified. s21 ('germacrane') cannot be OPSIN-parsed; its best-effort
-    systematic name is verified by the centres labeller instead."""
+    labelled pin_verified. s21 ('germacrane') cannot be OPSIN-parsed, nor can its
+    systematic name (a lowercase r/s descriptor), so the best-effort tier abstains
+    (claims conformance, 2026-09-27: a name OPSIN rejects is not emitted there)."""
     from orthonym import Orthonym
     r = Orthonym(style="pin").name_tiered(smiles)
     reason = _KNOWN_NON_PIN[smiles][0]
@@ -354,10 +355,9 @@ def _assert_demoted(smiles, expected_name):
     assert r["tier"] != "pin_verified" and not r["is_pin"], (
         f"a known non-PIN name is labelled pin_verified ({reason}): {r}")
     if expected_name == "germacrane":
-        from orthonym.namer import _pseudoasymmetric_name_verified
         from tests.support.rt_assert import name_best_effort
-        be = name_best_effort(smiles)["name"]
-        assert _pseudoasymmetric_name_verified(be, smiles), be
+        be = name_best_effort(smiles)
+        assert be["name"] is None and be["tier"] == "abstain", be
     else:
         from tests.support.rt_assert import assert_full_rt
         assert_full_rt(expected_name, smiles)

@@ -64,6 +64,13 @@ GATE_OUTCOME_SELF01_WARN_MISMATCH = "self_consistency_warn_mismatch"
 GATE_OUTCOME_STEREO_RECOMPOSED = "stereo_omission_full_key_recomposed"
 #: prefix for the ten by-design `return name` carve-outs: `carveout:<slug>`.
 GATE_OUTCOME_CARVEOUT_PREFIX = "carveout:"
+#: claims conformance (2026-09-27): at a general tier, ``name_tiered`` checked the
+#: shipped string itself because no verified outcome was recorded for it (an offer
+#: the pool picked after the gate had seen another string, or an outcome recorded
+#: for a different string): OPSIN read the name and the FULL InChIKey of what it
+#: read equals the input's. That is the round trip the paper claims for every
+#: shown name, and stronger than, so it claims the plain "verified" label.
+GATE_OUTCOME_FULL_KEY_VERIFIED = "full_key_round_trip_verified"
 
 #: The ONLY outcomes that may report anything other than "unverified".
 #: An allowlist, never a blocklist — an outcome string this code has never
@@ -75,6 +82,7 @@ _VERIFIED_GATE_OUTCOMES = {
     # Full-InChIKey recomposition is a stronger proof than, so it claims
     # the plain "verified" label (full stereo AND constitution match the input).
     GATE_OUTCOME_STEREO_RECOMPOSED: "verified",
+    GATE_OUTCOME_FULL_KEY_VERIFIED: "verified",
 }
 
 #: `gates_passed` token per verified outcome. `(constitution)` is
@@ -84,6 +92,7 @@ _GATE_TOKENS = {
     GATE_OUTCOME_SELF01: "self_consistency",
     GATE_OUTCOME_SELF01_CONSTITUTION_ONLY: "self_consistency_constitution_only",
     GATE_OUTCOME_STEREO_RECOMPOSED: "stereo_omission_full_key_recomposed",
+    GATE_OUTCOME_FULL_KEY_VERIFIED: "full_key_round_trip",
 }
 
 _SOURCE = contextvars.ContextVar("orthonym_prov_source", default=None)

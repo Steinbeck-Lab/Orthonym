@@ -1374,6 +1374,15 @@ def _assemble_thioester(fragment_names: Dict[str, str], style: str) -> Optional[
     return f"{s_prefix} {thioate}"
 
 
+#: the acid-fragment name of a polyphosphoric acid (preselected
+# names, the Blue Book:36901) -> the '<hydrogen> <anion>' words of its
+# monoester (one ester group; the rest of the acid hydrogens stay).
+_POLYPHOSPHORIC_MONOESTER_WORDS = {
+    "diphosphoric acid": "trihydrogen diphosphate",
+    "triphosphoric acid": "tetrahydrogen triphosphate",
+}
+
+
 def _assemble_phosphodiester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
     """Assemble phosphodiester name per IUPAC compositional nomenclature.
 
@@ -1425,6 +1434,31 @@ def _assemble_phosphodiester(fragment_names: Dict[str, str], style: str) -> Opti
     alkyl_name = fragment_names.get("alkyl")
     if not acid_name or not alkyl_name:
         return None
+
+    # "Esters of polynuclear noncarbon oxoacids" (the Blue Book
+    #:36917): "Partial (acid) esters... are named by the procedures for
+    # neutral esters and acid salts, except that the name 'hydrogen' denoting
+    # acid hydrogen atoms is indicated by the separate word 'hydrogen' (with
+    # the appropriate multiplying prefix denoting multiplicity) inserted
+    # between the name of... the organic group and the name of the anion"
+    # ('methyl hydrogen dithiohypodiphosphonite (PIN)',:36921). A monoester of
+    # diphosphoric acid (preselected name,:36901) keeps three acid hydrogens:
+    # '<R> trihydrogen diphosphate' (cf. 'xanthosine 3'-(trihydrogen
+    # diphosphate)',:55031). The old body glued '<R> diphosphoric acid' (two
+    # standalone names; Task 3 of 16f45443a declined it), which left the
+    # polyprenyl diphosphates past the general engine's reach unnamed.
+    polyphosphate = _POLYPHOSPHORIC_MONOESTER_WORDS.get(acid_name)
+    if polyphosphate is not None:
+        # An unsaturated '-en-1-ol'/'-yn-1-ol' keeps its free-valence locant,
+        # 'prop-2-en-1-yl', which the contracting
+        # _alcohol_to_alkyl drops ('prop-2-enyl').
+        unsat = _re.match(r'^(.+?(?:en|yn))-1-ol$', alkyl_name.strip())
+        group = (f"{unsat.group(1)}-1-yl" if unsat
+                 else _alcohol_to_alkyl(alkyl_name))
+        if (not group or " " in group or not group.endswith("yl")
+                or is_refusal_sentinel(group)):
+            return None
+        return f"{group} {polyphosphate}"
 
     monoester_word = " dihydrogen phosphate"
     if not acid_name.endswith(monoester_word):

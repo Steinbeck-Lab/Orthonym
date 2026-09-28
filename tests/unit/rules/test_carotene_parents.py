@@ -37,6 +37,7 @@ REP = [
 
 
 @pytest.mark.roundtrip
+@pytest.mark.opsin_gate  # pin_verified needs the round trip (claims conformance R63)
 @pytest.mark.parametrize("smiles,expected", REP)
 def test_carotene_parent_pin(smiles, expected):
     """A fundamental carotene parent names as its Greek retained PIN at pin_verified

@@ -5587,10 +5587,55 @@ def _parent_acid_suffix_multiplicity(anion_name: str) -> int:
     (''junior = n_carb - 1''), which undercounts a genuine polyacid parent
     ('-dioate'/'-trioate') and misclassifies its remaining junior sites as an
     unhandled multi-junior shape."""
+    units = _multiplicative_parent_units(anion_name)
+    if units:
+        n_units, unit_stem = units
+        return n_units * _parent_acid_suffix_multiplicity(unit_stem)
     m = re.search(r'(di|tri|tetra|penta|hexa)?(oate|carboxylate)$', anion_name)
     if not m or not m.group(1):
         return 1
     return _ACID_SUFFIX_MULTIPLIER_WORDS.get(m.group(1), 1)
+
+
+_MULTIPLIER_WORD_FOR_COUNT = {v: k for k, v in _ACID_SUFFIX_MULTIPLIER_WORDS.items()}
+# The leading locant set of a multiplicative name: one locant per multiplied
+# parent unit, each unit's locants distinguished by primes ("2,2',2'',2'''-").
+_MULTIPLICATIVE_LOCANTS_RE = re.compile(
+    r"^(?:\([^()]*\)-)?(\d+[a-z]?'*(?:,\d+[a-z]?'*)+)-")
+# A carboxylate parent unit: a retained acetate/benzoate/formate or a
+# systematic '-anoate'/'-enoate'/'-ynoate' (optionally '-dioate'...).
+_ANION_UNIT_STEM_RE = r"(?:acet|benzo|form|[a-z]*?(?:an|en|yn)(?:di|tri|tetra)?o)ate"
+
+
+def _multiplicative_parent_units(anion_name: str):
+    """``(n_units, unit_stem)`` when ``anion_name`` is a MULTIPLICATIVE
+    carboxylate name, else None.
+
+     multiplicative names multiply the whole parent, so each parent unit
+    carries its own acid suffix: '2,2',2'',2'''-(ethane-1,2-diyldinitrilo)-
+    tetraacetate' holds FOUR carboxylate sites in its parent (the Blue Book
+    :21586 '2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetic acid'), and
+    '2,2'-oxydiacetate' two. The '-oate'-only reading above counts ONE for
+    both, which made a genuine partial salt of such an acid ('trisodium
+    hydrogen...tetraacetate', look like a molecule with junior
+    carboxylate prefixes it does not have, so the anion step failed closed.
+
+    The unit count is read twice and must agree: from the leading locant set
+    (one prime level per unit) and from the multiplying prefix in front of the
+    parent-unit stem at the end of the name."""
+    m = _MULTIPLICATIVE_LOCANTS_RE.match(anion_name)
+    if not m:
+        return None
+    levels = {loc.count("'") for loc in m.group(1).split(',')}
+    n_units = len(levels)
+    word = _MULTIPLIER_WORD_FOR_COUNT.get(n_units)
+    if n_units < 2 or word is None or levels != set(range(n_units)):
+        return None
+    tail = re.search(r'[\)\]\}a-z]' + word + r'(' + _ANION_UNIT_STEM_RE + r')$',
+                     anion_name)
+    if not tail:
+        return None
+    return n_units, tail.group(1)
 
 
 def _phosphate_monoester_dianion_groups(mol, anions):

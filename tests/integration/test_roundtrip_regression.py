@@ -904,21 +904,21 @@ PHASE24_PARSE_FIXES = [
 
 
 class TestPseudoasymmetricBestEffort:
-    """germacrane at the best-effort tier: the VERIFIED systematic name
-    (controller ruling 2026-09-25). OPSIN 2.9.0 parses no lowercase
-    pseudoasymmetric descriptor, so the check is the stereo-stripped full-InChIKey
-    round trip plus the centres labeller (namer._pseudoasymmetric_name_verified)."""
+    """germacrane at the best-effort tier (controller ruling 2026-09-25: the
+    NAME_EXACT parent gives way to the systematic name there). OPSIN 2.9.0 parses
+    no lowercase pseudoasymmetric descriptor, so the systematic name
+    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' cannot round-trip, and a
+    name OPSIN rejects is not emitted at best-effort (claims conformance,
+    2026-09-27): the tier abstains with its limit code."""
 
     @pytest.mark.integration
     @pytest.mark.opsin_gate
     def test_pseudoasymmetric_best_effort(self):
         from orthonym import Orthonym
         from orthonym.cli import _emit_tier_flags
-        from orthonym.namer import _pseudoasymmetric_name_verified
         smiles = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
-        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(smiles)
-        assert be == "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
-        assert _pseudoasymmetric_name_verified(be, smiles)
+        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        assert be["name"] is None and be["tier"] == "abstain" and be["limit_code"], be
 
 
 class TestPhase24ParseFixes:

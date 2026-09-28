@@ -644,13 +644,12 @@ class TestStereoFormatTierContract:
 @pytest.mark.integration
 class TestStereoFormatGermacrane:
     """germacrane: the PIN-tier name stays OPSIN-unparseable by design (strict
-    xfail), and the best-effort tier gives the VERIFIED systematic name
-    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane': its stereo-stripped
-    form round-trips through OPSIN to the full InChIKey (the pseudoasymmetric
-    centre unspecified) and the centres labeller gives C-4 's'
-    (namer._pseudoasymmetric_name_verified). (j) (the Blue Book)
-    gives R the lower locant, as in '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-
-    dimethylcyclodecane' (:51471)."""
+    xfail). Its systematic name '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)
+    cyclodecane' (j), the Blue Book, gives R the lower locant, as in
+    '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane',:51471) cannot
+    round-trip: OPSIN 2.9.0 parses no lowercase pseudoasymmetric descriptor. Claims
+    conformance (2026-09-27): a name OPSIN rejects is not emitted at best-effort,
+    so the best-effort tier abstains on germacrane."""
 
     @pytest.mark.xfail(strict=True, reason=_GERMACRANE_XFAIL)
     def test_germacrane_pin_name_stripped_parses(self):
@@ -658,11 +657,11 @@ class TestStereoFormatGermacrane:
         assert opsin_parse(strip_stereo(name)) is not None, name
 
     @pytest.mark.opsin_gate
-    def test_germacrane_best_effort_name_is_verified(self):
+    def test_germacrane_best_effort_withholds_the_name_opsin_cannot_read(self):
         from orthonym import Orthonym
         from orthonym.cli import _emit_tier_flags
-        from orthonym.namer import _pseudoasymmetric_name_verified
+        from orthonym.errors import is_failure_name
+        systematic = "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
+        assert opsin_parse(systematic) is None  # the reason
         be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(GERMACRANE)
-        assert be == "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
-        assert _pseudoasymmetric_name_verified(be, GERMACRANE)
-        assert opsin_parse(strip_stereo(be)) is not None
+        assert is_failure_name(be), be

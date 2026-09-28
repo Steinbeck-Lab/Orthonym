@@ -100,9 +100,20 @@ def _is_true_exocyclic(mol, in_scope_idx: int, other_idx: int) -> bool:
     its C3 for the descriptor to resolve to (OPSIN: `Could not find bond that:
     <stereoChemistry locant="3" …> was referring to`). Per (the Blue Book) that
     descriptor belongs on the substituent prefix, not at parent scope.
+
+    Condition (1) is not required any more: an in-scope CHAIN atom's double
+    bond to an acyclic atom outside the scope is the '-ylidene' double bond of
+    that chain position, and (1)(a) (the Blue Book, "the
+    double bond is considered as an integral part of the parent structure; the
+    stereodescriptor is placed at the front of the substitutive name, preceded
+    by the locant indicating its point of attachment to the parent structure";
+    :48279 "Method (a) generates preferred IUPAC names") cites it with the
+    chain atom's locant, as for a ring: '(4E)-4-(chloromethylidene)heptanoic
+    acid'. Skipping it left the name stereo-incomplete: the round trip then
+    refused every candidate of the ChEBI chloromethylidene lactams (it used to
+    pass only through a misplaced-locant '(1Z)' block OPSIN happened to bind).
+    Condition (2) still keeps an endocyclic bond of another ring out.
     """
-    if not mol.GetAtomWithIdx(in_scope_idx).IsInRing():
-        return False
     if mol.GetAtomWithIdx(other_idx).IsInRing():
         return False
     return True
@@ -205,17 +216,18 @@ def collect_stereodescriptors(
 
             # Determine locant for this E/Z bond.
             # Standard case: both atoms in atom_to_locant -> use lower locant.
-            # Exocyclic case (IUPAC: one atom in a ring that is
-            # in atom_to_locant, the other outside the ring -> use the
-            # ring atom's locant. Only applies to true ring-exocyclic
-            # bonds (prevents false E/Z on chain substituent bonds).
+            # Exocyclic / '-ylidene' case (1)(a)): one atom in
+            # atom_to_locant (a ring or chain atom of this scope), the other an
+            # acyclic atom outside it -> use the in-scope atom's locant. A bond
+            # wholly inside a substituent (neither atom in scope) is skipped
+            # below, and an endocyclic bond of another ring by _is_true_exocyclic.
             if begin_idx in atom_to_locant and end_idx in atom_to_locant:
                 # Both in parent -- standard behaviour
                 locant = min(atom_to_locant[begin_idx],
                              atom_to_locant[end_idx])
             elif begin_idx in atom_to_locant and end_idx not in atom_to_locant:
-                # Only include if the in-mapping atom is in a ring
-                # (true exocyclic bond, not a chain substituent bond)
+                # Only an exocyclic / '-ylidene' bond (the other end acyclic),
+                # never an endocyclic bond of another ring (_is_true_exocyclic)
                 if not _is_true_exocyclic(mol, begin_idx, end_idx):
                     continue
                 locant = atom_to_locant[begin_idx]
@@ -581,18 +593,45 @@ def strip_stereo(name: str) -> str:
     leading descriptor (``hexane``) and substituent enclosing groups (``(2-chloroethyl)``)
     untouched.
     """
+    return strip_stereo_blocks(name)[0]
+
+
+def strip_stereo_blocks(name: str):
+    """``(strip_stereo(name), blocks)``: the stripped name and every descriptor block
+    it removed, in the order removed -- a parenthesised block WITH its parentheses
+    (``'(7R,8S)'``, ``'(1r,4r)'``) or a relative-configuration word (``'rel'``,
+    ``'rac'``, ``'cis'``, ``'trans'``, ``'(±)'``).
+
+    READ-ONLY, like:func:`strip_stereo` (which is this function's first element).
+    The validity gate's stereo-layer carve-out reads the removed blocks to check
+    every descriptor it would ship against the input's CIP labels
+    (``namer._stereo_descriptors_verified``).
+    """
     if not name:
-        return name
+        return name, []
+    blocks = []
+
+    def _nested(m):
+        # group(0) is '<mark>(<block>)-'; keep the enclosing mark.
+        blocks.append(m.group(0)[1:-1])
+        return m.group(1)
+
     s = name.strip()
     prev = None
     while prev != s:
         prev = s
-        s = _STRIP_STEREO_LEADING_RE.sub("", s).strip()
+        # The leading matcher is anchored at the start, so it removes at most one
+        # block per pass (the same as re.sub with the '^' anchor).
+        m = _STRIP_STEREO_LEADING_RE.match(s)
+        if m:
+            blocks.append(m.group(1))
+            s = s[m.end():]
+        s = s.strip()
         # W4-S2: also strip nested substituent-stereo blocks (``[(1r,4r)-…``),
         # keeping the enclosing mark. Applied in the same fixpoint so a name with
         # both a leading and a nested block converges (read-only gate probe only).
-        s = _STRIP_STEREO_NESTED_RE.sub(r"\1", s).strip()
-    return s
+        s = _STRIP_STEREO_NESTED_RE.sub(_nested, s).strip()
+    return s, blocks
 
 
 def needs_stereo_injection(mol, name: str) -> bool:
@@ -784,6 +823,48 @@ def general_engine_stereo_complete(mol, name: str) -> bool:
             == count_defined_stereo_elements(mol))
 
 
+def _inject_parent_block_beside_prefix_blocks(
+    name: str,
+    mol,
+    atom_to_locant: Optional[Dict[int, int]],
+) -> str:
+    """The parent's own block for a name whose only stereo blocks sit
+    inside substituent prefixes; else *name* unchanged.
+
+     (the Blue Book): a substituent's descriptors are cited "at
+    the front of the corresponding prefix", the parent's at the front of the
+    complete name. ``needs_stereo_injection`` treats ANY embedded block as
+    "stereo already present", so once a composed prefix carried its own block
+    ('5-{(1E,3E)-8-[...]-9-oxadeca-1,3-dien-1-yl}-...', since 5620d69f2) the
+    parent's '(21E,23Z,...)' block was never written and the name denoted the
+    stereo-incomplete molecule.
+
+    Fail-closed: only a one-word name with no leading block and no traditional
+    (D/L, alpha/beta, peptide) configuration; only the parent's descriptors
+    (``collect_stereodescriptors`` reads the locant map's atoms only); and only
+    when the new block exactly completes the count of defined stereo elements
+    (so no descriptor is ever cited twice). Every caller's round trip still
+    verifies the result."""
+    if (mol is None or not name or ' ' in name
+            or _STEREO_PREFIX_RE.match(name)
+            or not _STEREO_EMBEDDED_RE.search(name)
+            or _CARBOHYDRATE_STEREO_RE.search(name)
+            or _DL_CONFIG_RE.search(name) or _PEPTIDE_ACYL_RE.search(name)
+            or _looks_like_peptide(name)):
+        return name
+    if not atom_to_locant or not any(
+        isinstance(v, int) and v > 0 for v in atom_to_locant.values()
+    ):
+        return name
+    descriptors = collect_stereodescriptors(mol, atom_to_locant)
+    if not descriptors:
+        return name
+    if (count_expressed_stereo_descriptors(name) + len(descriptors)
+            != count_defined_stereo_elements(mol)):
+        return name
+    return f"{format_stereodescriptor_string(descriptors)}{name}"
+
+
 def inject_stereo_from_locant_map(
     name: str,
     mol,
@@ -829,7 +910,8 @@ def inject_stereo_from_locant_map(
         '(2R)-butan-2-ol'
     """
     if not needs_stereo_injection(mol, name):
-        return name
+        return _inject_parent_block_beside_prefix_blocks(
+            name, mol, atom_to_locant)
 
     #: hard precondition — no atom-index fallback.
     # fix (a phase-02, 2026-05-03): also reject all-zero / non-positive
