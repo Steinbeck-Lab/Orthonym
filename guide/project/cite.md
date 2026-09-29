@@ -11,13 +11,9 @@ GitHub's **Cite this repository** button, built from [`CITATION.cff`](https://gi
   title   = {{Orthonym}},
   version = {1.0.0},
   year    = {2026},
-  doi     = {10.5281/zenodo.23037348},
   url     = {https://github.com/Steinbeck-Lab/Orthonym}
 }
 ```
 <!-- x-release-please-end -->
-
-Every release is archived on Zenodo. The DOI [10.5281/zenodo.23037348](https://doi.org/10.5281/zenodo.23037348)
-stands for all versions and resolves to the newest one.
 
 Orthonym is built on the IUPAC 2013 recommendations, OPSIN, centres and RDKit. When you describe how a name was checked, please cite them too; the references are in the README, under [Built on](https://github.com/Steinbeck-Lab/Orthonym#built-on).

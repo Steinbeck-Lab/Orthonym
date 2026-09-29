@@ -18,7 +18,6 @@
 [![IUPAC 2013](https://img.shields.io/badge/IUPAC-2013%20recommendations-2f6b28?style=flat-square)](https://doi.org/10.1039/9781849733069)
 [![CI](https://github.com/Steinbeck-Lab/Orthonym/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Steinbeck-Lab/Orthonym/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-online-1a1a1a?style=flat-square)](https://steinbeck-lab.github.io/Orthonym/)
-[![DOI](https://zenodo.org/badge/1146154024.svg)](https://doi.org/10.5281/zenodo.23037348)
 [![Web app: Orthonym-Web](https://img.shields.io/badge/web%20app-Orthonym--Web-1a1a1a?style=flat-square&logo=github)](https://github.com/Steinbeck-Lab/Orthonym-Web)
 [![Built with: orthonym-skills](https://img.shields.io/badge/built%20with-orthonym--skills-1a1a1a?style=flat-square&logo=github)](https://github.com/Kohulan/orthonym-skills)
 
@@ -212,14 +211,10 @@ entry in APA and BibTeX. In BibTeX:
   title   = {{Orthonym}},
   version = {1.0.0},
   year    = {2026},
-  doi     = {10.5281/zenodo.23037348},
   url     = {https://github.com/Steinbeck-Lab/Orthonym}
 }
 ```
 <!-- x-release-please-end -->
-
-Every release is archived on Zenodo. The DOI [10.5281/zenodo.23037348](https://doi.org/10.5281/zenodo.23037348)
-stands for all versions and resolves to the newest one.
 
 ## Built on
 
