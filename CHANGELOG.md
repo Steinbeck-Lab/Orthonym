@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.0.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.0...v1.0.0) (2026-09-29)
 
+First public release.
+
 
 ### Features
 
@@ -32,20 +34,3 @@ project adheres to [Semantic Versioning](https://semver.org/).
 * project links in the README, the citation file, the package metadata and the documentation site ([d2f3118](https://github.com/Steinbeck-Lab/Orthonym/commit/d2f3118ef24ad9bd39dd9dc65b3b3393bbe9f7d2))
 * the documentation site shows the Orthonym mark and the web app's credit, and the README links the docs and the web app ([7fc9231](https://github.com/Steinbeck-Lab/Orthonym/commit/7fc9231a7e8cb00efd45aba2d0cefcbd62f8fc78))
 * the Orthonym documentation site, with API docstrings and command-line help in plain language ([6b3cb01](https://github.com/Steinbeck-Lab/Orthonym/commit/6b3cb017cda588e946bdd1e35289811063e772ff))
-
-## [1.0.0] — 2026-08-26
-
-First public release.
-
-### Added
-- Deterministic, rule-based SMILES → IUPAC name generation targeting Preferred IUPAC
-  Names (PINs) per the IUPAC 2013 recommendations.
-- Coverage of acyclic and cyclic compounds, functional-group derivatives, heterocycles
-  (Hantzsch–Widman), fused, bridged (von Baeyer), and spiro ring systems.
-- Stereochemistry (R/S, E/Z) via a high-accuracy CIP engine.
-- Round-trip validation against OPSIN: a name is not emitted for the wrong structure.
-- Public Python API (`name_compound`, `name_with_tree`, `Orthonym`) and a command-line
-  interface (`orthonym`, `python -m orthonym`).
-- OPSIN and CIP jars shipped in the repository and invoked as external Java processes
-  (a Java runtime is required for validation); licenses documented in NOTICE.
-- Accuracy harness and fixed evaluation splits under the project tooling.
