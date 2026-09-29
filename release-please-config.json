@@ -12,6 +12,18 @@
         {
           "type": "generic",
           "path": "src/orthonym/__init__.py"
+        },
+        {
+          "type": "generic",
+          "path": "CITATION.cff"
+        },
+        {
+          "type": "generic",
+          "path": "README.md"
+        },
+        {
+          "type": "generic",
+          "path": "guide/project/cite.md"
         }
       ]
     }
