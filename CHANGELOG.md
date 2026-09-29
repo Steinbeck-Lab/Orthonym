@@ -5,6 +5,38 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.0...v1.0.0) (2026-09-29)
+
+
+### Features
+
+* more preferred IUPAC names, fewer lost names, two wrong-name classes closed, honest labels ([e56e982](https://github.com/Steinbeck-Lab/Orthonym/commit/e56e9821bda098c3ea264aada0de7909fdac729d))
+* nomenclature coverage and correctness updates ([c2beb0b](https://github.com/Steinbeck-Lab/Orthonym/commit/c2beb0bc6df1d8e4b81f179e6eb3488adf784903))
+* nomenclature coverage and correctness updates ([d468f7b](https://github.com/Steinbeck-Lab/Orthonym/commit/d468f7b65a760f039086b1b8f7fc352537aa7e53))
+* nomenclature coverage and correctness updates ([44c2387](https://github.com/Steinbeck-Lab/Orthonym/commit/44c23872a36ebc859181dc709f59919ad52feab4))
+* radical names, safer salt names, stable numbering and Blue Book PIN spelling fixes ([f575d90](https://github.com/Steinbeck-Lab/Orthonym/commit/f575d9083cfa7402a9ddf5de217aac6be529d1cf))
+* systematic names for N-substituted amino acids, long alkanes named again, and many preferred-name fixes ([0941b15](https://github.com/Steinbeck-Lab/Orthonym/commit/0941b15ba3db53d7596e505b1b947dc5ac6c7c28))
+
+
+### Bug Fixes
+
+* every shown name passes its own round trip, N-substituted amino acids get systematic names, and ChEBI losses are restored ([5d3ad60](https://github.com/Steinbeck-Lab/Orthonym/commit/5d3ad607909f2181afcf14b10ec7121c66331bc5))
+* honest tier labels, faster naming of very large molecules, and every paper-named ChEBI structure named again ([748a603](https://github.com/Steinbeck-Lab/Orthonym/commit/748a6031fb0e32c0fdb101bdeff5cf90225f9531))
+* nomenclature correctness updates ([7c5c6c5](https://github.com/Steinbeck-Lab/Orthonym/commit/7c5c6c52e75fc8c3af0b717a1d685cf520406f4a))
+
+
+### Documentation
+
+* credits back in the README under Built on ([2e5e1c9](https://github.com/Steinbeck-Lab/Orthonym/commit/2e5e1c9830505b96b11e2876585dff4a4d3a4eca))
+* lighter README, with guide pages for how it works, declines and accuracy ([deb7cbd](https://github.com/Steinbeck-Lab/Orthonym/commit/deb7cbdaf8665f96ccb8859248c64df2eb28fbe9))
+* link orthonym-skills, the Claude Code skills Orthonym was built with ([25dd95c](https://github.com/Steinbeck-Lab/Orthonym/commit/25dd95c9c29b5597d55577c81e1aecf6fa120996))
+* plainer code comments and test names ([f5b8824](https://github.com/Steinbeck-Lab/Orthonym/commit/f5b88249fcfa28b4cc363f0f214f34c4c17adfad))
+* project links in the README, the citation file, the package metadata and the documentation site ([4d1bfb9](https://github.com/Steinbeck-Lab/Orthonym/commit/4d1bfb9d10509589199efd3729de6880b60f351e))
+* security policy and package metadata ([5e13bf9](https://github.com/Steinbeck-Lab/Orthonym/commit/5e13bf9e103e1d3b950008eee7c168d553671196))
+* the documentation site shows the Orthonym mark and the web app's credit, and the README links the docs and the web app ([87099ae](https://github.com/Steinbeck-Lab/Orthonym/commit/87099ae2f74fe35039111e956544ca9070ed8f7e))
+* the Orthonym documentation site, with API docstrings and command-line help in plain language ([b123e4a](https://github.com/Steinbeck-Lab/Orthonym/commit/b123e4ab3f7b0964f96e75510d42502114263a75))
+* the Zenodo DOI in the README, the docs and CITATION.cff ([592e99b](https://github.com/Steinbeck-Lab/Orthonym/commit/592e99baefb9b33496be7dd80f568ae8f9e98c27))
+
 ## [1.0.0](https://github.com/Steinbeck-Lab/Orthonym/releases/tag/v1.0.0) (2026-09-29)
 
 Orthonym 1.0.0 is the first public release of a deterministic, rule-based generator that turns a SMILES string into an IUPAC name, aiming at the Preferred IUPAC Name (PIN) of the IUPAC 2013 recommendations. Each name is parsed back by OPSIN and must match the input structure by full InChIKey before it is shown; otherwise Orthonym declines and gives the reason, and the few names OPSIN cannot read in full are labelled as such. The release gathers 2,787 public commits made from late January to 29 September 2026, which took the engine from chains, monocycles and the main functional groups to fused, bridged, spiro and phane ring systems, stereodescriptors, charged species, isotopes, natural products, peptides, glycans, lipids and metal compounds. On the corpora of the accompanying paper, run with the paper's recipe on the release branch, it gave no wrong names.
