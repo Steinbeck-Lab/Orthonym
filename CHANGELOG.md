@@ -5,6 +5,13 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.1](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.0...v1.0.1) (2026-09-29)
+
+
+### Documentation
+
+* the Zenodo DOI in the README, the docs and CITATION.cff ([9415508](https://github.com/Steinbeck-Lab/Orthonym/commit/94155089a8a4ed7180bd7f060c9f66a9859cb968))
+
 ## [1.0.0](https://github.com/Steinbeck-Lab/Orthonym/releases/tag/v1.0.0) (2026-09-29)
 
 Orthonym 1.0.0 is the first public release of a deterministic, rule-based generator that turns a SMILES string into an IUPAC name, aiming at the Preferred IUPAC Name (PIN) of the IUPAC 2013 recommendations. Each name is parsed back by OPSIN and must match the input structure by full InChIKey before it is shown; otherwise Orthonym declines and gives the reason, and the few names OPSIN cannot read in full are labelled as such. The release gathers 2,799 public commits made from late January to 29 September 2026, which took the engine from chains, monocycles and the main functional groups to fused, bridged, spiro and phane ring systems, stereodescriptors, charged species, isotopes, natural products, peptides, glycans, lipids and metal compounds. On the corpora of the accompanying paper, run with the paper's recipe on the release branch, it gave no wrong names.
