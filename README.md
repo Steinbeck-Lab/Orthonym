@@ -19,6 +19,9 @@
 [![CI](https://github.com/Steinbeck-Lab/Orthonym/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Steinbeck-Lab/Orthonym/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-online-1a1a1a?style=flat-square)](https://steinbeck-lab.github.io/Orthonym/)
 [![Web app: Orthonym-Web](https://img.shields.io/badge/web%20app-Orthonym--Web-1a1a1a?style=flat-square&logo=github)](https://github.com/Steinbeck-Lab/Orthonym-Web)
+[![Built with: orthonym-skills](https://img.shields.io/badge/built%20with-orthonym--skills-1a1a1a?style=flat-square&logo=github)](https://github.com/Kohulan/orthonym-skills)
+
+<sub>Part of the Orthonym project: <a href="https://github.com/Kohulan/orthonym-skills"><b>orthonym-skills</b></a>, the Claude Code skills that Orthonym was built with (<a href="#how-orthonym-was-built">how</a>).</sub>
 
 </div>
 
@@ -170,8 +173,30 @@ When Orthonym cannot name a molecule, the plain call returns a label in place of
 - [Declines](guide/declines.md): what a "no" looks like, and how to tell one from a name in code.
 - [How accuracy is measured](guide/accuracy.md): the three measures the engine is judged by.
 - [Contributing](CONTRIBUTING.md): development install, tests, source layout, how to add a compound class.
+- [orthonym-skills](https://github.com/Kohulan/orthonym-skills): the Claude Code skills, hooks and agent Orthonym was built with.
 - [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md) ·
   [Open an issue](https://github.com/Steinbeck-Lab/Orthonym/issues/new/choose)
+
+## How Orthonym was built
+
+Orthonym was built with [Claude Code](https://docs.claude.com/en/docs/claude-code), under a fixed
+set of working rules. The rules are published as
+[**orthonym-skills**](https://github.com/Kohulan/orthonym-skills), part of the Orthonym project:
+20 skills, 2 hooks and 1 agent. Each one makes a step rest on a measurement instead of a confident
+guess:
+
+- Measure on fixed, hashed test sets before and after each change
+  (`run-eval`, `cluster-failures`, `refusal-census`).
+- Prove that the code to change is on the execution path before editing it
+  (`spy-site`, `check-target`).
+- Change an expected value in a test only with a primary source, an independent check and a
+  mutation test (`change-asserted-value`, `verify-source`).
+- Run the regression gate before a merge (`run-gate`), and get a review from a second model
+  before a claim ships (`fable-review`).
+- Hand the work from one session to the next through a written note (`handoff`, `kickoff`).
+
+The skills were written for Orthonym and then made general, so that other chemistry and machine
+learning software projects can use them.
 
 ## How to cite
 
