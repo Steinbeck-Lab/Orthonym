@@ -10,7 +10,9 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Kohulan Rajan" }
+    { name = "Kohulan Rajan" },
+    { name = "Achim Zielesny" },
+    { name = "Christoph Steinbeck" },
 ]
 keywords = [
     "chemistry",
@@ -22,7 +24,7 @@ keywords = [
     "structure-to-name"
 ]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",

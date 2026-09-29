@@ -13,7 +13,7 @@ The latest released version of Orthonym receives security fixes.
 
 Please report security vulnerabilities privately rather than opening a public issue.
 
-Use GitHub's **[private vulnerability reporting](https://github.com/Kohulan/Orthonym/security/advisories/new)**
+Use GitHub's **[private vulnerability reporting](https://github.com/Steinbeck-Lab/Orthonym/security/advisories/new)**
 ("Report a vulnerability" under the repository's Security tab) to disclose the issue
 confidentially.
 
@@ -28,6 +28,10 @@ with you.
 
 ## Scope note
 
-Orthonym invokes a bundled OPSIN Java process to validate names. Vulnerabilities in OPSIN
-itself should be reported upstream at <https://github.com/dan2097/opsin>; we will update the
-bundled version as needed.
+Orthonym runs two unmodified third-party Java programs, OPSIN and centres. They are not part of
+Orthonym: it downloads them from their official releases and checks each file against a pinned
+SHA-256 before use (see [`NOTICE`](NOTICE)). A jar given by `ORTHONYM_OPSIN_JAR` or
+`ORTHONYM_CENTRES_JAR` is used without that check.
+
+Report a problem in OPSIN at <https://github.com/dan2097/opsin> and in centres at
+<https://github.com/SiMolecule/centres>. We update the pinned versions when a fixed release is out.
