@@ -7,6 +7,8 @@ project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [1.0.1](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.0...v1.0.1) (2026-09-29)
 
+The naming engine is the same as in 1.0.0: the Python code differs only in comments and docstrings. The PyPI package now lists all three authors and Development Status 5 - Production/Stable, and the documentation cites the Zenodo archive.
+
 
 ### Documentation
 
