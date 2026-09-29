@@ -22,6 +22,7 @@ abstract: >-
   tier without that full read-back and are marked in the provenance output. Every name carries a tier label that says
   whether the engine certifies it as the Preferred IUPAC Name.
 version: 1.0.0 # x-release-please-version
+doi: 10.5281/zenodo.23044199
 license: MIT
 url: "https://github.com/Steinbeck-Lab/Orthonym"
 repository-code: "https://github.com/Steinbeck-Lab/Orthonym"
