@@ -9,9 +9,12 @@ name: zenodo-release
 #   secret   ZENODO_TOKEN          a Zenodo personal access token with the scopes
 #                                  deposit:write and deposit:actions
 #   variable ZENODO_ENABLED=true   switches the job on
-#   variable ZENODO_CONCEPT_RECID  the concept record id, set after the first
+#   variable ZENODO_RECORD_ID      the record id of any published version (for
+#                                  example the first one), set after the first
 #                                  archived release; while it is unset, a release
-#                                  makes a new record
+#                                  makes a new record. Zenodo answers 410 for the
+#                                  concept record id itself, so that id cannot be
+#                                  used here.
 # Run in the release home only (RELEASE_HOME == 'true'), like release-please.
 #
 # Manual run (Actions -> zenodo-release -> Run workflow): publish=false makes a
@@ -51,7 +54,7 @@ jobs:
       - name: Archive on Zenodo
         env:
           ZENODO_TOKEN: ${{ secrets.ZENODO_TOKEN }}
-          CONCEPT_RECID: ${{ vars.ZENODO_CONCEPT_RECID }}
+          RECORD_ID: ${{ vars.ZENODO_RECORD_ID }}
           REPO: ${{ github.repository }}
           REF: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.ref }}
           RELEASE_URL: ${{ github.event.release.html_url }}
@@ -108,10 +111,11 @@ jobs:
               sys.exit(f"download of {zip_url} failed: HTTP {archive.status_code}")
           file_name = f'{repo.split("/")[1]}-{ref}.zip'
 
-          concept = os.environ.get("CONCEPT_RECID", "").strip()
-          if concept:
-              # A new version of the concept record: start from its latest version.
-              latest = check(requests.get(f"{api}/records/{concept}/versions/latest", headers=auth, timeout=60), "latest version")
+          anchor = os.environ.get("RECORD_ID", "").strip()
+          if anchor:
+              # A new version: start from the latest version of the record family
+              # (Zenodo redirects this request to it).
+              latest = check(requests.get(f"{api}/records/{anchor}/versions/latest", headers=auth, timeout=60), "latest version")
               draft = check(requests.post(f'{api}/deposit/depositions/{latest["id"]}/actions/newversion', headers=auth, timeout=60), "new version")
               draft = check(requests.get(draft["links"]["latest_draft"], headers=auth, timeout=60), "new version draft")
               for f in check(requests.get(draft["links"]["files"], headers=auth, timeout=60), "draft files"):
@@ -130,7 +134,7 @@ jobs:
               sys.exit(0)
 
           rec = check(requests.post(f"{api}/deposit/depositions/{dep}/actions/publish", headers=auth, timeout=120), "publish")
-          print(f'published: DOI {rec.get("doi")}, concept DOI {rec.get("conceptdoi")}, concept record {rec.get("conceptrecid")}')
-          if not concept:
-              print("set the repository variable ZENODO_CONCEPT_RECID to the concept record above")
+          print(f'published: DOI {rec.get("doi")}, concept DOI {rec.get("conceptdoi")}, record {rec.get("id")}')
+          if not anchor:
+              print(f'set the repository variable ZENODO_RECORD_ID to {rec.get("id")}')
           PY
