@@ -519,7 +519,7 @@ def _sigma_additive_ligands_certified(metal_complex: Any, mol: Any,
       mis-named as monodentate: benzyne ``c1ccc2c(c1)[Ti]2(Cl)Cl`` → '(phenyl)'
       (C6H4 named C6H5), metallacyclopropene ``C1=C[Ti]1(Cl)Cl`` → '(ethenyl)'.
       Abstain unless every σ-ligand touches the metal at exactly one atom.
-    abstain on all of these; these organometallics are out of
+    These organometallics are out of
     scope, so declining (→ cascade abstains) is correct, never a wrong
     constitution."""
     metal_idxs = set(metal_complex.metal_atom_indices)

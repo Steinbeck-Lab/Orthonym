@@ -12,12 +12,13 @@ substring; V18 invariants allow substring match OR defensible variation
 Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 
-import importlib
 import subprocess
 import sys
 import textwrap
 
 import pytest
+
+from tests.support.module_reload import reloaded
 
 
 @pytest.fixture(params=[
@@ -30,16 +31,18 @@ def feature_flag_mode(request, monkeypatch):
     Sets the two env vars and reloads coverage_scoring + candidate_pool
     to pick up the module-import-time env-var reads. The conftest autouse
     _phase146_clear_thread_locals fixture handles thread-local cleanup
-    after the test yields.
+    after the test yields. The modules' original namespaces are put back
+    after the test (``tests.support.module_reload.reloaded``): the reload
+    alone left the V18 weights and new classes in place for every later
+    test on the worker (TRIAGE 'Canary oxime -- test-order flake').
     """
     use_v18, sel_mode = request.param
     monkeypatch.setenv("ORTHONYM_USE_V18_WEIGHTS", use_v18)
     monkeypatch.setenv("ORTHONYM_SELECTION_MODE", sel_mode)
     # Force module reload so the env vars are re-read at import time.
     from orthonym.assembly import coverage_scoring, candidate_pool
-    importlib.reload(coverage_scoring)
-    importlib.reload(candidate_pool)
-    yield (use_v18, sel_mode)
+    with reloaded(coverage_scoring, candidate_pool):
+        yield (use_v18, sel_mode)
 
 
 def _name(smi):
@@ -272,10 +275,9 @@ class TestV17ByteIdenticalSmoke:
         monkeypatch.delenv("ORTHONYM_USE_V18_WEIGHTS", raising=False)
         monkeypatch.delenv("ORTHONYM_SELECTION_MODE", raising=False)
         from orthonym.assembly import coverage_scoring, candidate_pool
-        importlib.reload(coverage_scoring)
-        importlib.reload(candidate_pool)
         from orthonym import name_compound
-        name = name_compound(smiles)
+        with reloaded(coverage_scoring, candidate_pool):
+            name = name_compound(smiles)
         assert expected.lower() in name.lower(), (
             f"V17 default regression: {smiles} expected '{expected}', got '{name}'"
         )

@@ -5,8 +5,8 @@ internal notes): our perception
 gathers ALL senior-group occurrences molecule-wide into `principal_group_atoms` with no
 parent-membership filter, so a substituent's group (e.g. the OH of an isopropanol arm on a ring)
 is wrongly claimed as a parent suffix — double-assigning the atom and producing a wrong,
-atom-short parent (`cyclohexane-1,2-diol` for a mono-ol ring). prevent this
-by deciding suffix-vs-prefix on atom→parent membership.
+atom-short parent (`cyclohexane-1,2-diol` for a mono-ol ring). The fix decides
+suffix-vs-prefix on atom→parent membership.
 
 
 This test pins the invariant: after `_classify`, every principal-group occurrence's locant-bearing

@@ -35,12 +35,11 @@ representations produce non-empty names in both modes.
 Source: https://iupac.qmul.ac.uk/BlueBook/P3.html
 Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
-import importlib
-
 import pytest
 from rdkit import Chem
 
 from orthonym.errors import is_failure_name  # (DD7 S1) fail-closed signal
+from tests.support.module_reload import reloaded
 
 
 # 20 NP compounds per internal notes.
@@ -158,15 +157,16 @@ def feature_flag_mode(request, monkeypatch):
 
     Sets ORTHONYM_USE_V18_WEIGHTS + ORTHONYM_SELECTION_MODE and reloads
     coverage_scoring + candidate_pool so the env vars are picked up at
-    module-import time.
+    module-import time; the modules' original namespaces are put back
+    after the test (``tests.support.module_reload.reloaded``, TRIAGE
+    'Canary oxime -- test-order flake').
     """
     use_v18, sel_mode = request.param
     monkeypatch.setenv("ORTHONYM_USE_V18_WEIGHTS", use_v18)
     monkeypatch.setenv("ORTHONYM_SELECTION_MODE", sel_mode)
     from orthonym.assembly import coverage_scoring, candidate_pool
-    importlib.reload(coverage_scoring)
-    importlib.reload(candidate_pool)
-    yield (use_v18, sel_mode)
+    with reloaded(coverage_scoring, candidate_pool):
+        yield (use_v18, sel_mode)
 
 
 def _skip_if_unparseable(smiles, name_substring):

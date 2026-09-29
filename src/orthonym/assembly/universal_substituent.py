@@ -600,8 +600,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
 
     1. **full** -- rebuild the component tree with ``emit_branch_stereo=True``
        so every recursion level writes its own branch's stereodescriptors
-       (``(2R)-``/``(1E)-``) with that branch's OWN local locants (the model
-       use), then prepend the top spine's own stereo
+       (``(2R)-``/``(1E)-``) with that branch's OWN local locants, then prepend the top spine's own stereo
        block. Captures a stereocentre no matter how deep in a branch it sits.
     2. **top-only** -- prepend just the top spine's stereo block to the plain
        ``comp.name`` (the previous STEREO behaviour): recovers the parent
@@ -2826,8 +2825,9 @@ def _nitro_shortcut(mol, component: FrozenSet[int], attach_hint: int):
 # -> ``_leaf_shortcut``): a monovalent halogen renders as ``fluoro``/``chloro``/
 # ``bromo``/``iodo`` /; an element with no leaf/branch spelling
 # fails CLOSED (the whole call voids -> abstain), never a phantom-carbon name.
-# ``SKELETON_ATOMS = {"C", *REPLACEMENT}`` and # carbon-only spine -- SAME pattern, Orthonym's own (organic-only) replacement
-# table (organometallic 'a'-replacement is out of scope,. Blue Book
+# The skeleton is carbon plus the 'a'-replacement elements, with Orthonym's own
+# (organic-only) replacement table (organometallic 'a'-replacement is out of
+# scope,. Blue Book
 # / ('a'-replacement skeletal-element set).
 _SKELETAL_SPINE_ELEMENTS = frozenset({"C"}) | frozenset(REPLACEMENT_TERMS)
 

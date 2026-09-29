@@ -24,8 +24,8 @@ Corrected metric contract (binds the ship gate — see the master plan
 
 Every metric is reported under BOTH matchers (they are NOT interchangeable):
 
-* ``parity`` — the most lenient lens, mirroring the forgiving RT axis a
-  name-everything reports. Full standardization of both sides
+* ``parity`` — the most lenient lens, a forgiving round-trip comparison.
+  Full standardization of both sides
   (fragment-parent → normalize → reionize → uncharge → canonical tautomer)
   then canonical-SMILES equality. This forgives (a) charge/protonation
   state, (b) tautomers broadly — RDKit's canonical tautomer merges keto-enol

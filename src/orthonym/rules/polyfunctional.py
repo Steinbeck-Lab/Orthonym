@@ -1766,8 +1766,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 # acyl-AWARE composer namer _assemble_amide_name instead of
                 # falling through. It names the acyl chain via the general chain
                 # machinery (branch prefixes + prop-2-en/-yn unsaturation come
-                # for free, exactly the unified acid/amide suffix-swap the
-                # use) and the N-substituent via
+                # for free, the unified acid/amide suffix-swap) and the
+                # N-substituent via
                 # get_n_substituents, whose fragment already contains the junior
                 # ring-FG scoped by disjoint atom ownership (no double-count —
                 # verified). SAME coverage guards as the simple path (single

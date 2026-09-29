@@ -205,7 +205,7 @@ def test_linear_polyspiro_round_trips(core_smi, mult):
 
 
 def test_all_monocyclic_polyspiro_defers_to_numeric():
-    """two-path rule: an ALL-MONOCYCLIC dispiro takes the NUMERIC
+    """The two-path rule: an ALL-MONOCYCLIC dispiro takes the NUMERIC
     von-Baeyer ``dispiro[a.b.c.d]`` path (analyze_spiro_universal), so the
     separable namer defers (returns None) and the numeric PIN ships RT-correct."""
     from orthonym.rules.spiro import _name_linear_polyspiro_fused

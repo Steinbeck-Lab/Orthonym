@@ -13,7 +13,7 @@ molecule composer already trusts), with a fail-closed backstop.
 Note: a naive decomposition renders biphenyl-as-substituent as
 the non-preferred ``4-phenylphenyl``; the bracketed primed ``[1,1'-biphenyl]-4-yl``
 is a net PIN-correctness edge for Orthonym (connector-seeded
-prime-the-second-ring numbering, but the brackets + free-valence demotion are ours).
+prime-the-second-ring numbering, with the brackets and the free-valence demotion).
 """
 import pytest
 from rdkit import Chem

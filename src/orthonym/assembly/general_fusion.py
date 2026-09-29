@@ -2,7 +2,7 @@
 upgrade over the von-Baeyer polyene the complete-tier engine ships for mancude
 fused ring systems.
 
-Design (0-wrong-by-construction): this module NEVER trusts a
+Design (0-wrong by construction): this module NEVER trusts a
 computed fusion descriptor blindly. Every candidate fusion word is either
 (a) an EXACT structural match against a vetted catalog (canonical-SMILES keyed,
 Java-free) or (b) put through an AFFIRMATIVE OPSIN round-trip (the fusion word ->

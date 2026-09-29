@@ -345,9 +345,10 @@ def pytest_collection_finish(session):
 
 
 def pytest_configure(config):
-    """Configure custom markers; snapshot the ORTHONYM_* environment."""
+    """Configure custom markers; snapshot the ORTHONYM_* environment; record reloads."""
     _ORTHONYM_ENV_BEFORE_COLLECTION.clear()
     _ORTHONYM_ENV_BEFORE_COLLECTION.update(_orthonym_env())
+    _install_reload_recorder()
     config.addinivalue_line(
         "markers", "unit: Fast unit tests (<1s each)"
     )
@@ -567,6 +568,77 @@ def _naming_state_isolation():
             "later naming on this worker would have run with it (TRIAGE g8 C2). "
             "Reset it in the test (try/finally, or a fixture), or fix the engine "
             "exit that leaked it.", pytrace=False)
+
+
+# ============================================================================
+# A module a test reloads must be put back before the next test.
+# ============================================================================
+# `importlib.reload` re-executes a module inside the same module object, so its
+# import-time reads of the environment and its classes are replaced for the rest
+# of the process; monkeypatch restoring the environment does not undo that. Four
+# tests reloaded coverage_scoring and candidate_pool under
+# ORTHONYM_USE_V18_WEIGHTS=true and left them so: every later test on the worker
+# named with the V18 weights (the canary oxime row
+# '(3Z,6E)-2,4,4,7-tetramethylnona-6,8-dien-3-one oxime' became '...-3-oxime')
+# and saw another CandidateName class (isinstance failed). TRIAGE 'Canary oxime --
+# test-order flake'. Reload with `tests.support.module_reload.reloaded`, which
+# puts the module back. This guard records the namespace of every orthonym module
+# a test reloads (before its first reload in the test) and, after the test, puts
+# back any module that was left changed and ERRORS the test that left it.
+# Validated on the known positives: each of the four reload sites without
+# `reloaded` errors here.
+_RELOADED_MODULES: Dict[str, dict] = {}
+_ORIGINAL_RELOAD = None
+
+
+def _recording_reload(module):
+    """`importlib.reload`, recording an orthonym module's namespace first."""
+    name = getattr(module, "__name__", "") or ""
+    if (name == "orthonym" or name.startswith("orthonym.")) and name not in _RELOADED_MODULES:
+        _RELOADED_MODULES[name] = dict(vars(module))
+    return _ORIGINAL_RELOAD(module)
+
+
+def _install_reload_recorder() -> None:
+    global _ORIGINAL_RELOAD
+    import importlib
+    if _ORIGINAL_RELOAD is None:
+        _ORIGINAL_RELOAD = importlib.reload
+        importlib.reload = _recording_reload
+
+
+def pytest_unconfigure(config):
+    """Put `importlib.reload` back."""
+    global _ORIGINAL_RELOAD
+    import importlib
+    if _ORIGINAL_RELOAD is not None:
+        importlib.reload = _ORIGINAL_RELOAD
+        _ORIGINAL_RELOAD = None
+
+
+@pytest.fixture(autouse=True)
+def _module_reload_isolation():
+    """Error the test that reloads an orthonym module and leaves it changed."""
+    _RELOADED_MODULES.clear()
+    yield
+    import sys
+    left = []
+    for name, namespace in _RELOADED_MODULES.items():
+        module = sys.modules.get(name)
+        if module is None:
+            continue
+        live = vars(module)
+        if live.keys() != namespace.keys() or any(live[k] is not v for k, v in namespace.items()):
+            live.clear()
+            live.update(namespace)
+            left.append(name)
+    _RELOADED_MODULES.clear()
+    if left:
+        pytest.fail(
+            f"the test reloaded {', '.join(left)} and left the reloaded module in place "
+            "(its import-time settings and classes); every later test on this worker "
+            "would have run with it (TRIAGE 'Canary oxime -- test-order flake'). It was "
+            "put back. Reload with tests.support.module_reload.reloaded.", pytrace=False)
 
 
 @pytest.fixture(autouse=True)

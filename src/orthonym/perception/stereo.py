@@ -21,8 +21,8 @@ _CIP_ASSIGNED_PROP = '_Orthonym_CIPAssigned'
 # -03 (a phase,): centres CIP engine. Read once at import time
 # (same idiom as namer.ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER).
 #
-# (Phase H, 2026-06-21): the default is now ON. The vendored `centres`
-# scores 281/290 on the Hanson 2018 CIP Validation Suite vs
+# (Phase H, 2026-06-21): the default is now ON. The `centres`
+# CIP library scores 281/290 on the Hanson 2018 CIP Validation Suite vs
 # rdCIPLabeler's 235/290 -- a net +46 CORRECT labels with **0 per-compound
 # regressions vs RDKit** (centres remains a strict superset of RDKit on the
 # suite; the gain is exotic CIP rule cases RDKit mis-ranks). When centres is

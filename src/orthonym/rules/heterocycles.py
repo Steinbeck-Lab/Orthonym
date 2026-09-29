@@ -1509,8 +1509,8 @@ def _mancude_hydro_select(mol, ring_set: Set[int],
     (b) ``the Blue Book``, verbatim ``2H-pyran-6-carboxylic acid
     (PIN)`` ``:3252``), so numbering the stem here and the suffix independently in
     ``orient_heterocycle_with_substituents`` (which had no indicated-H tier) let
-    them disagree and abstained. read the suffix
-    locant from the SAME numbering map the indicated-H prefix uses; so do we now.
+    them disagree and abstained. The suffix
+    locant must come from the SAME numbering map the indicated-H prefix uses; it does now.
 
      'hydro' name for a partially saturated mancude heteromonocycle,
     INCLUDING the case where the mancude parent itself needs indicated hydrogen.

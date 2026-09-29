@@ -379,8 +379,8 @@ class TestSigmaAdditiveConservationCertificate:
     charged/radical σ-carbon, or a ligand bonded to the metal at two atoms all
     shipped a WRONG constitution. ``_sigma_additive_ligands_certified`` now fails
     the branch closed on each. These abstain even gate-off (the guard is in the
-    producer, not the OPSIN gate), so they need no JVM. abstain
-    on every one; these organometallics are out of scope."""
+    producer, not the OPSIN gate), so they need no JVM. These organometallics are
+    out of scope."""
 
     @pytest.mark.parametrize("smi,why", [
         ("c1ccc2c(c1)[Ti]2(Cl)Cl", "W1 benzyne: 2-point ring named (phenyl)=C6H5 vs C6H4"),

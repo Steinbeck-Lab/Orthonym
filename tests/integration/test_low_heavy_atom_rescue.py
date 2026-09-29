@@ -20,8 +20,9 @@ Tests in this module verify:
 Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
 """
 
-import importlib
 import pytest
+
+from tests.support.module_reload import reloaded
 
 
 # Three low-heavy-atom canaries per internal notes ("add 3 low-heavy-atom
@@ -42,14 +43,18 @@ LOW_HA_CANARIES = [
     ("true",  "score_based"),        # V18
 ], ids=["v17", "v18"])
 def both_modes(request, monkeypatch):
-    """Parametrized fixture: each test runs under V17 and V18."""
+    """Parametrized fixture: each test runs under V17 and V18.
+
+    The two modules are reloaded to read the env vars at import time and put
+    back after the test (``tests.support.module_reload.reloaded``, TRIAGE
+    'Canary oxime -- test-order flake').
+    """
     use_v18, sel_mode = request.param
     monkeypatch.setenv("ORTHONYM_USE_V18_WEIGHTS", use_v18)
     monkeypatch.setenv("ORTHONYM_SELECTION_MODE", sel_mode)
     from orthonym.assembly import coverage_scoring, candidate_pool
-    importlib.reload(coverage_scoring)
-    importlib.reload(candidate_pool)
-    yield (use_v18, sel_mode)
+    with reloaded(coverage_scoring, candidate_pool):
+        yield (use_v18, sel_mode)
 
 
 @pytest.mark.integration

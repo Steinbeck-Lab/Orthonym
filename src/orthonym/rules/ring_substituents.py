@@ -1899,9 +1899,8 @@ def _universal_cage_substituent_name(
         stem = parent_block[:-1] if parent_block.endswith('e') else parent_block
         # - lead 1: retained PIN stem in place of the von Baeyer
         # descriptor. Until now this function emitted `tricyclo[3.3.1.1^3,7]
-        # decan-N-yl` for a cage whose PIN stem is `adamantan-`, so the ONE thing
-        # this project claims over -- a retained name where
-        # a retained name exists -- was missing on the substituent side while the
+        # decan-N-yl` for a cage whose PIN stem is `adamantan-`, so a retained
+        # name where a retained name exists was missing on the substituent side while the
         # parent side already had it (`tricyclo.get_retained_tricyclo_name`).
         _retained = _retained_pin_cage_stem(cage, stem)
         if _retained is not None:

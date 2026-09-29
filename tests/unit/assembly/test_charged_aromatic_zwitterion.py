@@ -28,8 +28,8 @@ from orthonym.namer import _validity_gate_name_to_smiles as _n2s
 
 pytestmark = pytest.mark.roundtrip
 
-# The witnessed class (QM9 residual). names all five; each Orthonym
-# name below is a DIFFERENT but full-InChIKey-equivalent construction.
+# The witnessed class (QM9 residual). A reference name exists for all five; each
+# Orthonym name below is a DIFFERENT but full-InChIKey-equivalent construction.
 WITNESSES = [
     "NC=[NH+]C1=CN=N[N-]1",          # triazol-ide + amidinium
     "NC(=[NH2+])C1=COC(=N)[N-]1",    # oxazol-ide (2-imino) + C-amidinium

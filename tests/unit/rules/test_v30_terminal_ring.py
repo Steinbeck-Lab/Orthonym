@@ -350,7 +350,8 @@ def test_retained_pin_stem_beats_the_von_baeyer_descriptor(smiles, expected):
     Table 2.6 (``:9885``) prints *"adamantane (PIN) tricyclo[3.3.1.1^3,7]decane"*
     and *"cubane (PIN) pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane"* -- the retained
     name is the PIN and the descriptor is the ALTERNATIVE. Emitting the descriptor
-    where a retained name exists is the one thing this project claims over , and the substituent side was missing it while the parent
+    where a retained name exists misses the PIN, and the substituent side was missing the
+    retained name while the parent
     side (``tricyclo.get_retained_tricyclo_name``) already had it.
 
     MUTATION: make ``_retained_pin_cage_stem`` return None -> both cases come back

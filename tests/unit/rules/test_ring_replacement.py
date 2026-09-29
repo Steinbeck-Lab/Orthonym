@@ -74,7 +74,7 @@ pytestmark = pytest.mark.unit
 # PIN-correct: locant set lowest, and within a tied set the senior element
 # (O before N/S, per the replacement seniority order) takes the lower locant
 # (e.g. 2-oxa-6-aza, not 6-oxa-2-aza). change-asserted-value: old provably
-# non-minimal (decisive); cross-checked; mutation-verified.
+# non-minimal (decisive); mutation-verified.
 BASELINE = [
     # --- single occurrence, every element in the table ---
     ("O1CC2CCC1C2", "2-oxa"),

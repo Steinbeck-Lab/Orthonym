@@ -22,9 +22,7 @@ from orthonym.assembly.coverage_audit import CoverageVerdict
 
 pytestmark = pytest.mark.unit
 
-# The exact canary from the L0.4 gap-oracle measurement log
-# (internal notes via
-# `l0_4_measure.log`): a general-engine best-effort winner whose
+# The exact canary from a local gap measurement: a general-engine best-effort winner whose
 # `certify_general_result` (E1 + binding spine) FAILS -- `e1_spine`
 # incomplete -- even though a malformed name shipped under SHADOW.
 _TERPENOID_CANARY_SMILES = (

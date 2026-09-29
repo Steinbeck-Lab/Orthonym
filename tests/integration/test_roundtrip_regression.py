@@ -92,7 +92,7 @@ _TIER_CONTRACT = {
 
 
 # Rows whose PIN needs a producer of the paused large-polycycle plan
-# (docs/the workflow tooling/plans/2026-09-24-large_polycycles-large-polycycles.md), pre-existing-
+# pre-existing-
 # failures plan Task 5, TRIAGE rows 89, 90, 101, 102. Both skeletons contain an
 # ortho-fused pair of six-membered rings, so their PIN is a (hydro) bridged fused
 # name, not von Baeyer: (the Blue Book) "the bridged fused ring
@@ -117,7 +117,7 @@ _LARGE_POLYCYCLE_BLOCKED = {
 }
 
 
-def _assert_large_polycycles_pin_contract(smiles):
+def _assert_large_polycycle_pin_contract(smiles):
     """What large-polycycle Task 6a delivers for a blocked row: the PIN tier never
     ships the von Baeyer name as the PIN -- it names the bridged fused PIN or
     fails closed -- and whatever it ships is RT-exact."""
@@ -152,7 +152,7 @@ def _tier_params(rows):
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", sorted(_LARGE_POLYCYCLE_BLOCKED))
 def test_large_polycycle_blocked_rows_best_effort_rt_exact(smiles):
-    """Breadth never drops while a row waits on large-polycycle: best-effort names it
+    """Breadth never drops while a row waits on the large-polycycle plan: best-effort names it
     and the name round-trips to the full InChIKey."""
     from tests.support.rt_assert import assert_rt_exact
     assert_rt_exact(smiles)
@@ -411,7 +411,7 @@ class TestRoundTripRegression:
     def test_roundtrip_verified(self, smiles, expected_name):
         """Verify round-trip confirmed names never regress."""
         if smiles in _LARGE_POLYCYCLE_BLOCKED:
-            _assert_large_polycycles_pin_contract(smiles)
+            _assert_large_polycycle_pin_contract(smiles)
             return
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)
@@ -1167,7 +1167,7 @@ class TestPhase24RTImprovements:
     def test_rt_improvements(self, smiles, expected_name, test_id):
         """Verify a phase Plan 04 fixes never regress."""
         if smiles in _LARGE_POLYCYCLE_BLOCKED:
-            _assert_large_polycycles_pin_contract(smiles)
+            _assert_large_polycycle_pin_contract(smiles)
             return
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)

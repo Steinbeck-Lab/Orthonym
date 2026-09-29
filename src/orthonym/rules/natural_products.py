@@ -1957,7 +1957,8 @@ def _name_ester_acid_via_general(
     used to size the acid by counting its carbons
     (``_count_acid_fragment_carbons`` -> ``get_systematic_acylate``), which
     turns a carbamate ``-O-C(=O)-N(CH2CH2Cl)2`` (5 carbons) into
-    ``pentanoate`` -- a DIFFERENT molecule (the N and both Cl dropped). name an ester's acid RECURSIVELY as a parent, never by
+    ``pentanoate`` -- a DIFFERENT molecule (the N and both Cl dropped). An
+    ester's acid is named RECURSIVELY as a parent, never by
     carbon count.
 
     General method (no per-acid special case): extract the acid fragment as a

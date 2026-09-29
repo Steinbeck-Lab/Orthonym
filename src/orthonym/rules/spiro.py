@@ -2968,7 +2968,7 @@ def _name_general_monospiro_fused(
     Partitions the spiro system at the single spiro atom into two independent
     ring components (``_partition_rings_at_spiro`` over the spiro subsystem,
     pendant rings excluded), names EACH with the full ring-parent / von-Baeyer
-    engine (recursive pattern), then assembles
+    engine (recursively), then assembles
     ``spiro[<comp1>-x,y'-<comp2>]`` in alphanumerical component order. Every
     emission is offer-RT-gated (0-wrong). Returns the ``name_spiro_system`` shape
     or None. ``restrict_atoms`` scopes to ONE ring system of a molecule with
@@ -3348,7 +3348,7 @@ def _name_linear_polyspiro_fused(
         junction.append(s); order.append(k); prev, cur = cur, k
     if len(order) != len(core_nodes):
         return None
-    # Scope (two-path rule): the SEPARABLE named form is for a
+    # Scope (the two-path rule): the SEPARABLE named form is for a
     # chain with at least one POLYCYCLIC (fused/bridged, must-be-named)
     # component. An ALL-MONOCYCLIC dispiro/polyspiro takes the numeric
     # ``dispiro[a.b.c.d]`` von-Baeyer path instead, which

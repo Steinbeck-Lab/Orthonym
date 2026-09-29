@@ -1,165 +1,25 @@
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-
-# Virtual environments
+.eggs/
+build/
+dist/
 .venv/
 venv/
-ENV/
-
-# IDE
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
-
-# Testing
-.tox/
-.coverage
-.coverage.*
-htmlcov/
 .pytest_cache/
-.hypothesis/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
 
-# Jupyter
-.ipynb_checkpoints/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Benchmark output
-benchmark_graded_results.csv
-benchmark_graded_results.json
-
-# Local development
-*.local
-.env
-
-stereo_gap_trace_results.json
-
-# Phase 145: raw corpus caches (too large to commit)
-
-
-
-# Phase 145.1-04: byte-identical verification output dirs (ISS-006)
-tmp_byte_identical_subset/
-tmp_byte_identical_full/
-
-# OPSIN codebase (vendored at repo root for code reference per the contributor guide;
-# not part of Orthonym source. ~ 14 MB, 8 entries — keep local but untracked.)
-opsin/
-
-# Gate run artifacts ( + v22_gate.py completion sentinel)
-gate_verdict.json
-gate_run.log
-# Concurrency locks guarding those artifacts against a second gate. flock-based,
-# so they are never stale -- the kernel releases them even on SIGKILL.
-*.lock
-
-# JVM crash dumps. 19 of these had accumulated untracked in the repo root and
-# were acknowledged in NO doc or commit; they are all from the JPype in-process
-# JVM (argv `-Xmx512m -Djava.awt.headless=true --enable-native-access=ALL-UNNAMED`,
-# no `-jar`), 15 within three days. Ignoring them keeps `git status` readable --
-# it does NOT mean they are benign. The open investigation and what is and is not
-# established about their cause:  §H4.
-hs_err_pid*.log
-replay_pid*.log
-core.[0-9]*
-
-# v37 SP0 census harness output ():
-# a per-molecule JSONL over the full 111,843-unique-SMILES ChEBI corpus is a
-# measurement artifact, not source -- keep it local like  output.
-
-
-# Personal, per-machine  Code overrides. This file was TRACKED until
-# 2026-08-04, which put one developer's machine-specific permission allowlist
-# (conda paths, absolute /home paths) into the shared repo and would make any
-# second developer's local overrides collide with it. `./settings.json`
-# stays tracked -- that is the team-wide file, and it carries the agent-teams
-# flag plus the guardrails in the contributor guide. Only the `.local.` sibling is personal.
-./settings.local.json
-
-# ======================================================================
-# Public-release: internal / local-only material (kept on disk, never shipped)
-# ======================================================================
-# Internal planning, agent tooling, and dev docs. Local-only.
-
-./
-.superpowers/
-.agents/
-docs/
-
-data/pubchem_cache.json
-# Full internal engineering invariants live here locally; the tracked
-# the contributor guide is the scrubbed public contributor guide.
-.local.md
-
-# Internal reports (local-only)
-/TECHNICAL_REPORT.md
-/FAILURE_ANALYSIS.md
-/COMPREHENSIVE_PHASES.md
-/PRODUCT.md
-
-# Copyrighted reference document (local-only)
-/IUPAC_BlueBook_Organic_Naming_Guide.docx
-
-# Large regenerable data dumps (local-only; derive from ChEBI)
-/ChEBI_IUPAC.txt
-/ChEBI_SMILES.txt
-/ChEBI_IUPAC_OPSIN.txt
-/ChEBI_OPSIN_Retranslation
-/chebi_iupac_filtered.tsv
-/l
-
-# Root benchmark / debug artifacts (local-only)
-/benchmark_*.json
-/benchmark_*.csv
-/benchmark_summary.md
-/_drop23_*.json
-/pipeline_traces.json
-/gap_summary.json
-/opsin_all_classifications.json
-/opsin_discrimination.json
-/Untitled.ipynb
-/test_orthonym.ipynb
-/test_bicyclo_check.py
-/test_composer_routing_debug.py
-/test_lactone_detection.py
-/test_pentacyclic_lactone_debug.py
-/test_phase2_fused_rings.py
-
-# comparison harnesses + their outputs (local-only; they
-# import external tools not part of Orthonym and are not shipped publicly).
-
-
-benchmarks/*/rows_comparison.jsonl.gz
-benchmarks/*/hh_10k_*.json
-
-# Stray leftover test-data snippet (unreferenced)
-/test.tsv
+# Documentation build output (sphinx-build guide _build/html)
+_build/
 
 # Third-party jars are downloaded at install, never committed
 *.jar
 
-# Documentation build output (sphinx-build guide _build/html)
-_build/
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
