@@ -2395,7 +2395,10 @@ def _thiol_to_s_prefix(thiol_name: str) -> Optional[str]:
     # This handles cases where the fragment is named as an alcohol instead
     alkyl = _alcohol_to_alkyl(name)
     if alkyl and alkyl != name:
-        return f"S-{alkyl}"
+        # (the Blue Book), '*S*-(2-cyanoethyl)... (PIN)' (:31765):
+        # a compound or locant-bearing alkyl is enclosed after the element locant.
+        from ..assembly.naming_utils import enclose_if_compound
+        return f"S-{enclose_if_compound(alkyl)}"
 
     return None
 
@@ -2430,6 +2433,26 @@ def _acid_to_sulfonamide(acid_name: str) -> Optional[str]:
         return name
 
     return None
+
+
+def _is_saturated_chain_stem(base: str) -> bool:
+    """True when ``base`` (an alcohol name minus its '-1-ol') ends in a saturated
+    acyclic or monocyclic hydrocarbon stem, '<alk>an' / 'cyclo<alk>an', that is not
+    the tail of a von Baeyer or spiro descriptor ('bicyclo[2.2.1]heptan')."""
+    import re
+
+    from ..data.chain_names import get_chain_prefix
+    for n in range(60, 0, -1):
+        stem = get_chain_prefix(n) + "an"
+        if base.endswith(stem):
+            head = base[: -len(stem)]
+            if head.endswith("cyclo"):
+                head = head[: -len("cyclo")]
+            # A von Baeyer / spiro descriptor ('bicyclo[2.2.1]', 'spiro[4.5]') is
+            # a ring system; a closing enclosing mark of a PREFIX ('2-[...]ethan')
+            # is not.
+            return not re.search(r"(?:cyclo|spiro)\[[0-9.,^]+\]$", head)
+    return False
 
 
 def _alcohol_to_alkyl(alcohol_name: str) -> str:
@@ -2484,6 +2507,15 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
             # (propan-1-ol -> propyl) to stay byte-identical on chains.
             if locant is not None and locant != "1":
                 return f"{base}-{locant}-yl"
+            # (the Blue Book): the locant 1 is omitted, and 'ane'
+            # becomes 'yl', only for a SATURATED chain (and,, a saturated
+            # monocycle: 'cyclohexyl'). Every other parent keeps its free-valence
+            # locant: 'prop-2-en-1-yl (preferred prefix)' (:17216), a fixed-
+            # numbering ring such as naphthalene ('4-chloronaphthalen-1-yl', never
+            # '4-chloronaphthalenyl'), a von Baeyer or retained cage
+            # ('bicyclo[2.2.1]heptan-1-yl', 'adamantan-1-yl').
+            if locant == "1" and not _is_saturated_chain_stem(base):
+                return f"{base}-1-yl"
             # Convert "-an" ending to "-yl" (propan -> propyl)
             if base.endswith("an"):
                 return base[:-2] + "yl"

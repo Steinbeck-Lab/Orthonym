@@ -14,16 +14,17 @@ pip install -e ".[dev]"
 
 A **Java runtime (JRE 11+)** must be on your `PATH`: Orthonym validates candidate names
 by round-tripping them through OPSIN, which is a Java program. The OPSIN and centres jars are
-not part of the repository; `pip install` fetches them, and `orthonym --fetch-jars` fetches or
-re-checks them at any time (see the README, "The OPSIN and centres jars").
+not part of the repository; `pip install` tries to fetch them when it builds the package, a
+missing jar is downloaded on first use, and `orthonym --fetch-jars` fetches them or re-checks the
+ones in the jar directory at any time (see the README, "The OPSIN and centres jars").
 
 ## Running tests
 
 Run tests on targeted file sets (the OPSIN-backed tests need a Java runtime and the jars):
 
 ```bash
-python -m pytest tests/unit/assembly -q
 python -m pytest tests/unit/rules/test_multiplicative.py -q
+python -m pytest tests/unit/rules/test_d1_coordination_v36.py -q
 ```
 
 Markers (`unit`, `integration`, `roundtrip`, `slow`, `benchmark`) are defined in
@@ -31,20 +32,27 @@ Markers (`unit`, `integration`, `roundtrip`, `slow`, `benchmark`) are defined in
 
 ## How Orthonym is built
 
-The engine perceives structure (`perception/`), applies nomenclature rules (`rules/`), and
-assembles the name (`assembly/`), drawing on naming tables in `data/`; `validation/` holds the
-OPSIN round trip and the atom-coverage check. [`guide/how-it-works.md`](guide/how-it-works.md)
-describes the four parts.
+The engine perceives structure (`perception/`), dispatches by compound class (`routing/`,
+`decomposition/`), applies nomenclature rules (`rules/`), and assembles the name (`assembly/`),
+drawing on naming tables in `data/`. The orchestrator `namer.py` runs the final OPSIN check,
+using helpers in `validation/` (which also holds the atom-coverage check);
+`metrics/` records the provenance and the tier of each name.
+[`guide/how-it-works.md`](guide/how-it-works.md) describes the main stages.
 
 ```
 Orthonym/
 ├── src/orthonym/
-│   ├── perception/   # structure perception: rings, characteristic groups, CIP stereo
-│   ├── rules/        # IUPAC nomenclature rules
-│   ├── assembly/     # name assembly: locants, ordering, selection
-│   ├── validation/   # OPSIN round-trip and atom-coverage checks
-│   └── data/         # naming tables
-└── tests/            # unit and integration tests
+│   ├── namer.py        # the naming pipeline and the final OPSIN check
+│   ├── cli.py          # the command line
+│   ├── perception/     # structure perception: rings, characteristic groups, CIP stereo
+│   ├── routing/        # compound-class dispatch
+│   ├── decomposition/  # fragment-based naming of large structures
+│   ├── rules/          # IUPAC nomenclature rules
+│   ├── assembly/       # name assembly: locants, ordering, selection
+│   ├── validation/     # OPSIN round-trip and atom-coverage checks
+│   ├── metrics/        # provenance, tiers and abstention codes
+│   └── data/           # naming tables
+└── tests/              # unit and integration tests
 ```
 
 To add a compound class, add a test that pins the expected name and cites the governing IUPAC

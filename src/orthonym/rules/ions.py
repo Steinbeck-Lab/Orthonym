@@ -4652,7 +4652,7 @@ def _name_inorganic_oxoacid_anion(mol) -> str:
     ESTER (R-O-SO3-, R-O-PO3-) has carbon -> declined here (and at
     charged_router.py:382-389), so the steroid-sulfate NP-conjugate (gold -03
     'cholest-5-en-3beta-yl sulfate', '...yl hydrogen sulfate') is NEVER intercepted.
-    The mono-anion (OS(=O)(=O)[O-] -> 'hydrogensulfate') stays DISTINCT from the
+    The mono-anion (OS(=O)(=O)[O-] -> 'hydrogen sulfate') stays DISTINCT from the
     dianion ('sulfate') because the table keys on protonation state
     (the Blue Book). Returns '' if not a bare inorganic anion (caller falls
     through to the existing cascade -- byte-identical contract).

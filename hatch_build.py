@@ -7,8 +7,9 @@ redistributes them.
 
 This is best effort: a failed download does not fail the install (pip hides
 build output, and a wheel may be installed elsewhere). The guarantee is at run
-time: Orthonym refuses to name without the jars and tells the user to run
-``orthonym --fetch-jars``.
+time: a jar that is still missing is downloaded the first time Orthonym needs it,
+and Orthonym refuses to name when it can neither find nor download a jar, telling
+the user to run ``orthonym --fetch-jars``.
 """
 import importlib.util
 import os

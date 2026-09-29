@@ -177,6 +177,25 @@ _GENERAL_RING_PREFIX = contextvars.ContextVar(
 # during a naming call and resets with the rest of the provenance.
 _NON_PIN_FRAGMENTS = contextvars.ContextVar(
     "orthonym_prov_non_pin_fragments", default=())
+# Branch review fixes: the LABEL-ONLY sibling of ``_NON_PIN_FRAGMENTS`` -- name
+# fragments whose non-PIN status a structural check found (a polyacid mono-ester, a
+# lactone parent beside a senior ring ketone). They lower the label of a name that
+# contains them exactly as a non-PIN fragment does, but the PIN tier's promotion
+# re-run does not read them when it decides whether one of its names ships at all
+# (``name_carries_non_pin_part(..., label_forms=False)``): every re-run name is
+# labelled below the PIN anyway, so they would only remove a name the default tier
+# shipped before. Same lifetime and roll-back rule as the fragments.
+_NON_PIN_LABELS = contextvars.ContextVar(
+    "orthonym_prov_non_pin_labels", default=())
+# Branch review fixes (2026-09-28): the shipped name was built by the PIN tier's
+# promotion re-run (``Orthonym._name_with_pin_promotion``), i.e. with a best-effort
+# composition producer admitted under the PIN-vocabulary guard. Such a name is not
+# certified as the PIN -- the paper: "The label pin_unverified means a name in PIN
+# form that only a breadth producer built" -- so ``name_carries_non_pin_part`` reads
+# it and ``name_tiered`` labels the name pin_unverified, is_pin False. Set only by the
+# wrapper, after its re-run's name was kept; whole-call, like ``general_ring_prefix``.
+_PIN_PROMOTION_RERUN = contextvars.ContextVar(
+    "orthonym_prov_pin_promotion_rerun", default=False)
 # T1: the validity gate's per-name outcome, and the name string it was
 # recorded FOR. Defaults fail closed (NOT_RUN / no name).
 _GATE_OUTCOME = contextvars.ContextVar(
@@ -268,7 +287,7 @@ def pop_non_pin_log() -> list:
 def clear_provenance() -> None:
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
-           "non_pin_fragments")
+           "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels")
     _SOURCE.set(None)
     _OPSIN.set(None)
     _STEREO_UNEXPRESSED.set(False)
@@ -283,6 +302,8 @@ def clear_provenance() -> None:
     # molecule would tag this one's name as ill-formed when it is not.
     _SUFFIX_FREE_PREFIX_NAME.set(False)
     _NON_PIN_FRAGMENTS.set(())
+    _PIN_PROMOTION_RERUN.set(False)
+    _NON_PIN_LABELS.set(())
 
 
 def restore_provenance(snapshot: dict) -> None:
@@ -294,6 +315,19 @@ def restore_provenance(snapshot: dict) -> None:
     kept emission carries the rejected producer's label. Used by the
     Engine-3 NP→von-Baeyer downgrade, whose ``_try_general_engine_recovery``
     probe stamps ``source="general_engine"`` before the RT gate can decline it.
+
+    The name-scoped non-PIN record (``record_non_pin_fragment``) is the one
+    exception: it only grows within a naming call (``clear_provenance`` resets it
+    at a call boundary), so a restore keeps the fragments recorded since the
+    snapshot. A rejected attempt leaves cache entries behind -- the scope memo
+    (``assembly.memo.cache_or_compute``) and the fragment cache return a stored
+    string without the record its computation made -- so dropping the record let
+    a later cache hit ship a recorded non-PIN spelling as if none had been
+    recorded, and the result then depended on ``ORTHONYM_MEMO`` (branch review,
+    2026-09-28: 'C[C@@H](CN(C[C@@H]1CCC=CC1)C)O' was named at the PIN tier with the
+    memo on and abstained with it off, through the '(R)-(cyclohex-3-en-1-yl)meth'
+    record that ``rules.pin_vocabulary.promote_at_pin_tier`` rolled back). A kept
+    record only demotes a name that CONTAINS the recorded spelling.
     """
     _SOURCE.set(snapshot.get("source"))
     _OPSIN.set(snapshot.get("opsin"))
@@ -302,10 +336,16 @@ def restore_provenance(snapshot: dict) -> None:
     _GATE_OUTCOME_NAME.set(snapshot.get("gate_outcome_name"))
     _GENERAL_RING_PREFIX.set(bool(snapshot.get("general_ring_prefix")))
     _SUFFIX_FREE_PREFIX_NAME.set(bool(snapshot.get("suffix_free_prefix_name")))
-    _NON_PIN_FRAGMENTS.set(tuple(snapshot.get("non_pin_fragments") or ()))
+    _kept = tuple(snapshot.get("non_pin_fragments") or ())
+    _NON_PIN_FRAGMENTS.set(_kept + tuple(
+        f for f in _NON_PIN_FRAGMENTS.get() if f not in _kept))
+    _PIN_PROMOTION_RERUN.set(bool(snapshot.get("pin_promotion_rerun")))
+    _kept_labels = tuple(snapshot.get("non_pin_labels") or ())
+    _NON_PIN_LABELS.set(_kept_labels + tuple(
+        f for f in _NON_PIN_LABELS.get() if f not in _kept_labels))
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
-           "non_pin_fragments")
+           "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels")
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
@@ -404,6 +444,13 @@ def record_general_ring_prefix() -> None:
     _touch("general_ring_prefix")
 
 
+def record_pin_promotion_rerun() -> None:
+    """Mark the name about to ship as built by the PIN tier's promotion re-run
+    (see ``_PIN_PROMOTION_RERUN``): labelled pin_unverified, never pin_verified."""
+    _PIN_PROMOTION_RERUN.set(True)
+    _touch("pin_promotion_rerun")
+
+
 def record_non_pin_fragment(fragment: str) -> None:
     """Record a name fragment that a producer built and that is valid (the whole
     name is still round-trip verified) but is never part of a PIN -- e.g. a
@@ -425,6 +472,18 @@ def record_non_pin_fragment(fragment: str) -> None:
     _touch("non_pin_fragments")
 
 
+def record_non_pin_label(fragment: str) -> None:
+    """Record ``fragment`` as a LABEL-ONLY non-PIN part (see ``_NON_PIN_LABELS``):
+    a shipped name that contains it is labelled below the PIN; the PIN tier's
+    promotion re-run still ships it."""
+    if not fragment:
+        return
+    cur = _NON_PIN_LABELS.get()
+    if fragment not in cur:
+        _NON_PIN_LABELS.set(cur + (fragment,))
+    _touch("non_pin_labels")
+
+
 def record_derived_non_pin_fragment(source: str, derived: str) -> None:
     """Record ``derived`` as a non-PIN fragment when ``source`` contains a recorded one:
     a form built from a non-PIN name by a string conversion (an acid name turned into
@@ -437,15 +496,24 @@ def record_derived_non_pin_fragment(source: str, derived: str) -> None:
         record_non_pin_fragment(derived)
 
 
-def name_carries_non_pin_part(prov: dict, name: Optional[str]) -> bool:
+def name_carries_non_pin_part(prov: dict, name: Optional[str], *,
+                              label_forms: bool = True) -> bool:
     """True when ``name`` must not be labelled a PIN: the whole-call
-    ``general_ring_prefix`` flag, or a recorded non-PIN fragment it contains."""
+    ``general_ring_prefix`` flag, the whole-call ``pin_promotion_rerun`` flag (the
+    PIN tier's promotion re-run built the name), or a recorded non-PIN fragment it
+    contains. ``label_forms`` is passed to ``rules.pin_vocabulary.
+    non_pin_vocabulary``."""
     _log_non_pin(PROVENANCE_READ)
-    if prov.get("general_ring_prefix"):
+    if prov.get("general_ring_prefix") or prov.get("pin_promotion_rerun"):
         return True
     if not name:
         return False
-    return any(f in name for f in (prov.get("non_pin_fragments") or ()))
+    if any(f in name for f in (prov.get("non_pin_fragments") or ())):
+        return True
+    if label_forms and any(f in name for f in (prov.get("non_pin_labels") or ())):
+        return True
+    from ..rules.pin_vocabulary import non_pin_vocabulary
+    return non_pin_vocabulary(name, label_forms=label_forms) is not None
 
 
 def get_provenance() -> dict:
@@ -459,4 +527,6 @@ def get_provenance() -> dict:
         "general_ring_prefix": _GENERAL_RING_PREFIX.get(),
         "suffix_free_prefix_name": _SUFFIX_FREE_PREFIX_NAME.get(),
         "non_pin_fragments": _NON_PIN_FRAGMENTS.get(),
+        "pin_promotion_rerun": _PIN_PROMOTION_RERUN.get(),
+        "non_pin_labels": _NON_PIN_LABELS.get(),
     }

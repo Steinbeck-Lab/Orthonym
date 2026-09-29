@@ -497,7 +497,103 @@ def name_monocyclic_lactone(mol) -> Optional[str]:
         stereo_prefix = format_stereodescriptor_string(stereo_descriptors)
         name = f"{stereo_prefix}{name}"
 
+    # Branch review fixes: a ring ketone on a SENIOR ring system is the
+    # parent, not this lactone. Name it on that ring system, the lactone ring cited
+    # as an 'oxo...yl' prefix ('2-(5-oxooxolan-2-yl)-2,3-dihydro-4H-1-benzopyran-4-
+    # one'), and keep that name when OPSIN reads it back to the molecule; otherwise
+    # keep the lactone name, labelled below the PIN (label only).
+    if another_ring_ketone_system_is_senior(mol, ring_set):
+        try:
+            from .partial_saturation import name_cyclic_oxo_compound
+            senior = name_cyclic_oxo_compound(mol, pseudoketone_rings_equal=True)
+            if senior:
+                from ..validation.opsin_roundtrip import opsin_roundtrip_check
+                if opsin_roundtrip_check(Chem.MolToSmiles(mol), senior).get("passed"):
+                    return senior
+        except Exception:  # noqa: BLE001 -- keep the lactone name
+            pass
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name)
+
     return name
+
+
+# (c) and (g) element orders (the Blue Book,:19417)
+_P44_2_1_C_ORDER = ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'P', 'As', 'Sb', 'Bi',
+                    'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl')
+_P44_2_1_G_ORDER = ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P', 'As', 'Sb',
+                    'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl')
+
+
+def _ring_system_seniority_key(mol, system, rings):
+    """ (a)-(g) (the Blue Book-19417) as a key: larger is senior."""
+    syms = [mol.GetAtomWithIdx(a).GetSymbol() for a in system]
+    hetero = [x for x in syms if x != 'C']
+    c_rank = min((_P44_2_1_C_ORDER.index(x) for x in hetero if x in _P44_2_1_C_ORDER),
+                 default=len(_P44_2_1_C_ORDER))
+    g_counts = tuple(hetero.count(x) for x in _P44_2_1_G_ORDER)
+    return (bool(hetero),                                   # (a) heterocycle
+            'N' in hetero,                                  # (b) nitrogen
+            -c_rank,                                        # (c) earlier heteroatom
+            sum(1 for r in rings if r <= system),           # (d) more rings
+            len(system),                                    # (e) more skeletal atoms
+            len(hetero),                                    # (f) more heteroatoms
+            g_counts)                                       # (g) earlier heteroatoms
+
+
+def another_ring_ketone_system_is_senior(mol, lactone_ring) -> bool:
+    """True when another ring system of ``mol`` carrying a ring carbonyl (a ketone or
+    a pseudoketone: an exocyclic =O on a ring carbon) outranks the lactone's ring as
+    the parent: more such carbonyl groups, or as many and senior by.
+
+     (the Blue Book): "There is no seniority order difference between
+    ketones and pseudoketones. When necessary, the maximum number of carbonyl groups
+    or doubly bonded oxygen atoms, the seniority order between chains and rings, and
+    between rings and ring systems, are considered"; ':29648 4-(4-oxocyclohexyl)
+    oxolan-2-one (PIN) [... a heterocyclic ring is senior to a carbocyclic ring, see
+    ]'. So '5-(4-oxo-3,4-dihydro-2H-1-benzopyran-2-yl)oxolan-2-one' is not
+    the PIN: 1-benzopyran has more rings (d)) and one carbonyl, as the
+    oxolane has."""
+    try:
+        ri = mol.GetRingInfo()
+        rings = [set(r) for r in ri.AtomRings()]
+        systems = []
+        for r in rings:
+            r = set(r)
+            for other in [x for x in systems if x & r]:
+                systems.remove(other)
+                r |= other
+            systems.append(r)
+        lactone_ring = set(lactone_ring)
+
+        def _carbonyls(system):
+            n = 0
+            for a in system:
+                atom = mol.GetAtomWithIdx(a)
+                if atom.GetSymbol() != 'C':
+                    continue
+                for b in atom.GetBonds():
+                    o = b.GetOtherAtom(atom)
+                    if (b.GetBondType() == Chem.BondType.DOUBLE and o.GetSymbol() == 'O'
+                            and o.GetIdx() not in system):
+                        n += 1
+            return n
+        home = next((sy for sy in systems if lactone_ring <= sy), lactone_ring)
+        n_home = _carbonyls(home)
+        key_home = _ring_system_seniority_key(mol, home, rings)
+        for sy in systems:
+            if sy is home:
+                continue
+            n = _carbonyls(sy)
+            if not n:
+                continue
+            if n > n_home:
+                return True
+            if n == n_home and _ring_system_seniority_key(mol, sy, rings) > key_home:
+                return True
+        return False
+    except Exception:  # noqa: BLE001 -- undecidable: leave the label as it is
+        return False
 
 
 # ---------------------------------------------------------------------------

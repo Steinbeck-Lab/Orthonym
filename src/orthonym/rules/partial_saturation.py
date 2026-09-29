@@ -2129,7 +2129,36 @@ def _alternative_indicated_h_parents(name, cmol, numbering, ih_locants):
     return out
 
 
-def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
+def _ring_carbonyl_rings_atoms(mol, parent_ring_set):
+    """Atoms of the OTHER ring systems of ``mol`` that carry a ring carbonyl (an
+    exocyclic =O on a ring carbon) -- the ketone / pseudoketone rings ranks
+    with the parent's (branch review fixes)."""
+    ri = mol.GetRingInfo()
+    systems = []
+    for r in ri.AtomRings():
+        r = set(r)
+        for other in [x for x in systems if x & r]:
+            systems.remove(other)
+            r |= other
+        systems.append(r)
+    out = set()
+    for sy in systems:
+        if sy & set(parent_ring_set):
+            continue
+        for a in sy:
+            atom = mol.GetAtomWithIdx(a)
+            if atom.GetSymbol() == 'C' and any(
+                    b.GetBondType() == Chem.BondType.DOUBLE
+                    and b.GetOtherAtom(atom).GetSymbol() == 'O'
+                    and b.GetOtherAtom(atom).GetIdx() not in sy
+                    for b in atom.GetBonds()):
+                out |= sy
+                break
+    return out
+
+
+def name_cyclic_oxo_compound(mol: Chem.Mol,
+                             pseudoketone_rings_equal: bool = False) -> Optional[str]:
     """Name an UNSUBSTITUTED cyclic ketone / dione on a mancude ring system,
     emitting the preferred IUPAC name with added indicated hydrogen and/or hydro
     prefixes (IUPAC / / /.
@@ -2233,6 +2262,20 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
         return _ring_chalcogenone_carbons(mol, rs, suffix_symbol)
 
     ring_set: Set[int] = _fused_ring_system_atoms(rings, all_carbonyls)
+    if pseudoketone_rings_equal:
+        # (branch review fixes): among the ring systems that carry ring
+        # carbonyls, the parent is the one with more of them, then the senior one
+        # by (the Blue Book-19417) -- not the first one met.
+        from .lactones import _ring_system_seniority_key
+        _cands = []
+        for _c in sorted(all_carbonyls):
+            _sy = _fused_ring_system_atoms(rings, {_c})
+            if _sy and not any(_sy == _x for _x in _cands):
+                _cands.append(_sy)
+        if _cands:
+            _rs = [set(r) for r in rings]
+            ring_set = max(_cands, key=lambda _sy: (
+                len(all_carbonyls & _sy), _ring_system_seniority_key(mol, _sy, _rs)))
     if not ring_set:
         return None
 
@@ -2358,13 +2401,25 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
             return any(b.GetBondType() == Chem.BondType.DOUBLE
                        and b.GetOtherAtom(at).GetAtomicNum() not in (1, 6)
                        for b in at.GetBonds())
-        if {i for i in _pcg_idx if _is_core(i)} & substituent_atoms:
+        # Branch review fixes, the Blue Book): with
+        # ``pseudoketone_rings_equal`` (the caller has found THIS ring system the
+        # senior one) a ring carbonyl of another ring system -- a lactone, a lactam
+        # or a ring ketone -- is a pseudoketone of the same class as the -one here,
+        # cited as an 'oxo...yl' prefix: '2-(5-oxooxolan-2-yl)-2,3-dihydro-4H-1-
+        # benzopyran-4-one'. The atoms of those ring systems (and their exocyclic
+        # =O) are then not a senior rival.
+        _peer = (_ring_carbonyl_rings_atoms(mol, ring_set)
+                 if pseudoketone_rings_equal else set())
+        if _peer:
+            _peer |= {n.GetIdx() for a in _peer for n in mol.GetAtomWithIdx(a).GetNeighbors()
+                      if n.GetSymbol() == 'O' and not n.IsInRing()}
+        if ({i for i in _pcg_idx if _is_core(i)} & substituent_atoms) - _peer:
             return None
         # Belt-and-braces for an EQUAL-class rival the PCG union may not localise: a
         # substituent bearing its own acyl / imine / nitrile / thiocarbonyl carbon.
         for a in substituent_atoms:
             at = mol.GetAtomWithIdx(a)
-            if at.GetSymbol() != 'C':
+            if at.GetSymbol() != 'C' or a in _peer:
                 continue
             for b in at.GetBonds():
                 if (b.GetBondTypeAsDouble() in (2.0, 3.0)
@@ -2375,6 +2430,25 @@ def name_cyclic_oxo_compound(mol: Chem.Mol) -> Optional[str]:
 
     # Residual unsaturation required (else fully-saturated lactam/lactone/ketone).
     has_residual = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set)
+    if has_residual:
+        # Branch review fixes: RDKit's aromaticity model also flags a ring whose
+        # every double bond is EXOCYCLIC -- the 3,6-bis(ylidene) diketopiperazine
+        # 'O=c1[nH]c(=Cc2ccccc2)c(=O)[nH]c1=Cc1ccccc1' -- although no ring bond is
+        # double in its (only) Kekule structure. Such a ring is saturated: its ring
+        # ketone takes the saturated parent, 'piperazine-2,5-dione' as for the
+        # mono-ylidene (':28267 piperidin-2-one (PIN)', ':29325
+        # imidazolidine-2,4-dione (PIN)', ':29344 1,3-diazinane-2,4,6-trione (PIN)
+        # pyrimidine-2,4,6(1H,3H,5H)-trione'), never a mancude parent with hydro
+        # prefixes ('1,3,4,6-tetrahydropyrazine-2,5-dione').
+        try:
+            _kek = Chem.RWMol(mol)
+            Chem.Kekulize(_kek, clearAromaticFlags=True)
+            has_residual = any(
+                b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set
+                for b in _kek.GetBonds())
+        except Exception:  # noqa: BLE001 -- not kekulizable: keep the aromatic reading
+            has_residual = True
     if not has_residual:
         for bond in bonds_of(mol):
             if bond.GetBondType() == Chem.BondType.DOUBLE:

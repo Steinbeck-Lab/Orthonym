@@ -1669,11 +1669,34 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     # Incr-1a: thread the parent SMILES too -- the glycoside assembler
     # RT-gates the STRUCTURAL aglycone-substituent fallback against it (0-wrong).
     # Purely additive; every other assembler ignores the kwarg.
-    return assemble_fragment_name(
+    _assembled = assemble_fragment_name(
         bond["type"], fragment_names, style=style,
         fragment_smiles=fragment_smiles,
         parent_smiles=Chem.MolToSmiles(mol),
     )
+    if bond["type"] == "ester" and _assembled:
+        # Branch review fixes, the Blue Book;:18875):
+        # when another ester group shares this ester's acid parent the molecule is
+        # an ester of ONE polyacid, and 'methyl 4-amino-3-(methoxycarbonyl)pent-3-
+        # enoate' (the functional-class ester of one group, the other cited as a
+        # prefix) is not its PIN 'dimethyl 2-(1-aminoethylidene)butanedioate'. Name
+        # the polyester when its acid component can be named; otherwise keep the
+        # mono-ester name, labelled below the PIN.
+        try:
+            from ..rules.esters import (
+                ester_shares_its_acid_with_another_ester,
+                name_polyacid_polyester,
+            )
+            if ester_shares_its_acid_with_another_ester(mol, bond["acid_atom"]):
+                _poly = name_polyacid_polyester(mol)
+                if _poly:
+                    return _poly
+                from ..metrics.provenance import record_non_pin_label
+                record_non_pin_label(_assembled)
+        except Exception:  # noqa: BLE001 -- the label must never break naming
+            from ..metrics.provenance import record_non_pin_label
+            record_non_pin_label(_assembled)
+    return _assembled
 
 
 # ---------------------------------------------------------------------------

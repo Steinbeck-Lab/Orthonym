@@ -114,13 +114,17 @@ class TestNearMissStereoCompounds:
         # fragment name without descriptors, which the production gate rejects;
         # production abstained at the PIN tier at 4e0e5c29b too. What ships is
         # asserted in test_near_miss_polycycle_tier_contract below.
+        # Breadth job 1: run with the production gate on. With the suite's gate off
+        # the raw generator's fragment name changed (another wrong fragment, now with
+        # descriptors), which made this strict xfail pass for the wrong reason; the
+        # production outcome, the reason below, is unchanged (PIN tier abstains).
         pytest.param(
             NEAR_MISS_POLYCYCLE,
             r'\(\d+[RS]',
-            marks=pytest.mark.xfail(strict=True, reason=(
+            marks=[pytest.mark.opsin_gate, pytest.mark.xfail(strict=True, reason=(
                 "PIN tier abstains: no whole-molecule PIN producer for this fused "
                 "thiazinone polycycle; the old stereo-bearing name was a fragment "
-                "(bdd69a673) -- TODO in TRIAGE.md 'Suite fix -- j1-regressions'")),
+                "(bdd69a673) -- TODO in TRIAGE.md 'Suite fix -- j1-regressions'"))],
         ),
         # Benzofuran with (7aS)
         (

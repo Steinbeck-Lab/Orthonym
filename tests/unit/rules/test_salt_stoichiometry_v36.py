@@ -35,6 +35,8 @@ def test_needs_enclosing_multiplier(name, expected):
 @pytest.mark.parametrize("name,expected", [
     ("methylphosphonate", True),    # endswith 'phosphonate' branch
     ("tetrafluoroborate", True),    # startswith 'tetra' branch
+    ("trifluoroacetate", True),     # startswith 'tri' branch
+    ("dichloroacetate", True),      # startswith 'di' branch
 ])
 def test_needs_enclosing_multiplier_startswith_endswith_branches(name, expected):
     assert _ion_needs_enclosing_multiplier(name) is expected
@@ -47,10 +49,44 @@ def test_needs_enclosing_multiplier_startswith_endswith_branches(name, expected)
     ("benzenesulfonate", 2, "dibenzenesulfonate"), # simple -> di
     ("D-gluconate", 2, "bis(D-gluconate)"),        # composite -> bis, wrapped
     ("2-hydroxypropanoate", 2, "bis(2-hydroxypropanoate)"),
-    ("(2R)-2-hydroxybutanedioate", 3, "tris((2R)-2-hydroxybutanedioate)"),
+    # nesting (the Blue Book); stereodescriptor parentheses count
+    #,:7478), so the multiplied ion takes brackets
+    ("(2R)-2-hydroxybutanedioate", 3, "tris[(2R)-2-hydroxybutanedioate]"),
+    ("2-[4-(2-methylpropyl)phenyl]propanoate", 2,
+     "bis{2-[4-(2-methylpropyl)phenyl]propanoate}"),
+    # a word that begins with a multiplying prefix / is substituted (c),
+    #:7104; (c),:7035)
+    ("trifluoroacetate", 2, "bis(trifluoroacetate)"),
+    ("dichloroacetate", 2, "bis(dichloroacetate)"),
 ])
 def test_apply_stoichiometric_prefix(name, count, expected):
     assert _apply_stoichiometric_prefix(name, count) == expected
+
+
+# Texts, labels and spelling (2026-09-29): an ORGANIC cation word (from the organic
+# cation namer) with a cumulative cationic suffix (Table 7.4; (1),
+# the Blue Book; (c),:7110) or a substituted parent cation
+# (c),:7035) takes bis/tris: (:43564) 'bis(methanaminium)
+# sulfate (PIN)'. Retained name + 'ium' keeps 'di' (d)); a metal / element
+# word is not an organic cation ('disodium carbonate (PIN)',:31579).
+@pytest.mark.parametrize("name,count,organic,expected", [
+    ("methanaminium", 2, True, "bis(methanaminium)"),
+    ("ethanaminium", 3, True, "tris(ethanaminium)"),
+    ("cyclohexanaminium", 2, True, "bis(cyclohexanaminium)"),
+    ("ethaniminium", 2, True, "bis(ethaniminium)"),
+    ("acetamidium", 2, True, "bis(acetamidium)"),
+    ("acetonitrilium", 2, True, "bis(acetonitrilium)"),
+    ("methylsulfanium", 2, True, "bis(methylsulfanium)"),
+    ("trimethylsulfanium", 2, True, "bis(trimethylsulfanium)"),
+    ("diphenyliodanium", 2, True, "bis(diphenyliodanium)"),
+    ("anilinium", 2, True, "dianilinium"),
+    ("guanidinium", 2, True, "diguanidinium"),
+    ("sodium", 2, False, "disodium"),
+    ("ammonium", 2, False, "diammonium"),
+    ("methanaminium", 1, True, "methanaminium"),
+])
+def test_organic_cation_multiplier(name, count, organic, expected):
+    assert _apply_stoichiometric_prefix(name, count, organic_cation=organic) == expected
 
 
 # salt witnesses 11 & 12 (calcium bis-aldonate) + 1 verified synthetic case.

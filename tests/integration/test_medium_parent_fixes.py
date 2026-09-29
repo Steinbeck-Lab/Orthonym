@@ -463,10 +463,20 @@ marks=_XF_FUSED,
         "heptanoyl",
         id="ster04-pyrrolizinone-amide",
     ),
+    # Breadth job 1: with the suite's gate off this row passed on a wrong molecule,
+    # 'hydroxy-oxocyclopentane-1-carboxamide' (name_amide spelled the pyrrolone as a
+    # cyclopentane; it now declines a ring it cannot spell). With the production gate
+    # the PIN tier abstains, before and after; best-effort names it RT-exact
+    # ('4-hydroxy-2-oxo-3-[(2E,4E)-1-oxohexa-2,4-dien-1-yl]-5-(propan-2-ylidene)-2,5-
+    # dihydro-1H-pyrrole').
     pytest.param(
         "C/C=C/C=C/C(=O)C1=C(O)C(=C(C)C)NC1=O",
         "oxo",
         id="ster04-dienoyl-pyrrole",
+        marks=[pytest.mark.opsin_gate, pytest.mark.xfail(strict=True, reason=(
+            "PIN tier abstains: needs a PIN-tier producer for 3-acyl tetramic acids "
+            "(1,5-dihydro-2H-pyrrol-2-one with an exocyclic ylidene); best-effort "
+            "names it RT-exact"))],
     ),
 ]
 

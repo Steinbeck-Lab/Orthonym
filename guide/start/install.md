@@ -5,7 +5,7 @@ Orthonym is a Python package. It needs two things on your machine and downloads 
 | You need | Why |
 |:--|:--|
 | Python 3.10 or newer | the engine is written in Python |
-| A Java runtime, version 11 or newer, on your `PATH` | OPSIN, which reads every name back, and centres, which assigns the CIP stereodescriptors, are Java programs |
+| A Java runtime, version 11 or newer, on your `PATH` | OPSIN, which reads names back for the round-trip check, and centres, which assigns the CIP stereodescriptors, are Java programs |
 
 Check the Java runtime with `java -version`. Any Java 11+ runtime works (for example OpenJDK or Temurin).
 
@@ -32,10 +32,10 @@ Orthonym does not ship any Java program. It uses two, each pinned to one version
 
 | Jar | Version | Used for | Licence |
 |:--|:--|:--|:--|
-| OPSIN, `opsin-cli-2.9.0-jar-with-dependencies.jar` | 2.9.0 | reading every name back into a structure | MIT (the jar bundles jna-inchi, LGPL-2.1, and others) |
+| OPSIN, `opsin-cli-2.9.0-jar-with-dependencies.jar` | 2.9.0 | round-trip validation of names | MIT (the jar bundles jna-inchi, LGPL-2.1, and others) |
 | centres, `centres-cli-1.2.1.jar` | 1.2.1 | CIP stereodescriptors (*R*/*S*, *E*/*Z*) | BSD-2-Clause (the jar bundles CDK, LGPL-2.1+) |
 
-If a jar is missing, Orthonym stops with an error that says so, rather than naming with fewer checks.
+A missing jar is downloaded: when `pip` builds the package, on first use (unless `ORTHONYM_NO_DOWNLOAD=1` is set), or by `orthonym --fetch-jars`. Downloaded jars and jars in the jar directory are checked against the pinned SHA-256; a jar you point to with `ORTHONYM_OPSIN_JAR` or `ORTHONYM_CENTRES_JAR` is used as given. Orthonym stops with an error only when a jar can be neither found nor downloaded. Without a Java runtime it declines every molecule.
 
 ## Three settings for the jars
 

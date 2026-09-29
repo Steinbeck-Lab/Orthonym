@@ -3281,6 +3281,14 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # systematic '(2S)-2-hydroxy-2-phenylethanoic acid' at pin_verified; 'ethanoic
     # acid' is the non-preferred spelling:29725 'acetic acid (PIN)
     # ethanoic acid').
+    # An E/Z double bond that does not touch the chain lies inside a substituent,
+    # whose prefix already cites its descriptor ('[(2E)-but-2-enamido]acetic
+    # acid'); only a stereo bond ON the two-carbon chain (an alpha C=N) keeps the
+    # systematic spelling, which cites its locant.
+    _chain_set_db = set(principal_chain)
+    _chain_ez = any(
+        set(_db.get('atoms', ())) & _chain_set_db
+        for _db in (getattr(features, 'double_bond_stereo', None) or ()))
     _acetic_context = (
         principal_group == 'carboxylic_acid'
         and chain_length == 2 and count == 1
@@ -3288,7 +3296,20 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         and all_prefixes
         and not (getattr(features, 'is_cyclic', False)
                  and not getattr(features, 'chain_is_parent', False))
-        and not getattr(features, 'double_bond_stereo', None)
+        and not _chain_ez
+    )
+    # (the Blue Book-32693, "Only the following four retained
+    # names are preferred IUPAC names and can be substituted... acetamide (PIN)"):
+    # a substituted two-carbon monoamide is named on 'acetamide', never
+    # 'ethanamide'. Unlike acetic acid it keeps its locants, because the N and C-2
+    # are both substitutable ('N-carbamoyl-2-phenylacetamide (PIN)',:33364), so
+    # only the parent word changes.
+    _acetamide_parent = (
+        suffix == 'amide'
+        and chain_length == 2 and count == 1
+        and not double_locants and not triple_locants
+        and not (getattr(features, 'is_cyclic', False)
+                 and not getattr(features, 'chain_is_parent', False))
     )
     #: the same retained-parent + locant-omission treatment for a
     # SUBSTITUTED 2-carbon aldehyde (CH3-CHO). Its single substitutable alpha carbon
@@ -3350,9 +3371,12 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         if _aldehyde_context else None
     )
     def _systematic_assembly(prefixes):
-        _n = format_suffix_with_locants(
-            stem, unsaturation, suffix, suffix_locants, multiplier
-        )
+        if _acetamide_parent:
+            _n = 'acetamide'
+        else:
+            _n = format_suffix_with_locants(
+                stem, unsaturation, suffix, suffix_locants, multiplier
+            )
         if prefixes:
             prefix_str = _join_prefixes(prefixes)
             # Ensure hyphen between prefix ending with letter and name starting with digit

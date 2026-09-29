@@ -165,10 +165,19 @@ class TestGlycosideByteIdentityControls:
         # full-InChIKey exact.
         "CC(C)C1CCC(C)CC1O[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O":
             "5-methyl-2-(propan-2-yl)cyclohexyl β-D-glucopyranoside",
+        # Breadth job 1 change-asserted-value: were 'decahydronaphthalenyl' and
+        # 'tricyclo[3.3.1.1^3,7]decyl'. The alcohol-part prefix now keeps its free-
+        # valence locant for a parent that is not a saturated chain or monocycle:
+        # (the Blue Book, "Locants... are placed immediately before
+        # that part of the name to which they relate";:2864 'naphthalen-2-yl
+        # (preferred prefix)'), (c) (:2913, the locant '1' is omitted
+        # only in monosubstituted homogeneous MONOcyclic rings) and
+        # (:16374 '... tricyclo[3.3.1.1^3,7]decan-2-yl', the von Baeyer prefix keeps
+        # its locant). OPSIN 2.9.0 full-InChIKey exact for both.
         "OC[C@H]1O[C@@H](OC2CCCC3CCCCC23)[C@H](O)[C@@H](O)[C@@H]1O":
-            "decahydronaphthalenyl β-D-glucopyranoside",
+            "decahydronaphthalen-1-yl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](OC23CC4CC(CC(C4)C2)C3)[C@H](O)[C@@H](O)[C@@H]1O":
-            "tricyclo[3.3.1.1^3,7]decyl β-D-glucopyranoside",
+            "tricyclo[3.3.1.1^3,7]decan-1-yl β-D-glucopyranoside",
         "OC[C@H]1O[C@@H](OC2CCC3(CCCO3)CC2)[C@H](O)[C@@H](O)[C@@H]1O":
             "1-oxaspiro[4.5]decan-8-yl β-D-glucopyranoside",
         "CCO": "ethanol",

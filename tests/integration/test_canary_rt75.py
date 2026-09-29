@@ -2036,7 +2036,12 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(Cc1ccccc1)OC/C=C/c1ccccc1",  # aromatic,medium
-        "(2E)-3-phenylprop-2-enyl phenylacetate",  # phenylacetic acid retained (BB 6694)
+        # breadth job 1 change-asserted-value: was '(2E)-3-phenylprop-2-enyl
+        # phenylacetate'. (the Blue Book, "Substituents derived from
+        # unsaturated acyclic compounds"):17216 'prop-2-en-1-yl (preferred prefix)':
+        # the free-valence locant stays on an unsaturated alcohol part. OPSIN 2.9.0
+        # full-InChIKey exact.
+        "(2E)-3-phenylprop-2-en-1-yl phenylacetate",  # phenylacetic acid retained (BB 6694)
     ),
     (
         "N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CC(=O)O)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,large

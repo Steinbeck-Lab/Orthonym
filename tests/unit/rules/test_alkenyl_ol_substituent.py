@@ -90,7 +90,7 @@ def test_blocker1_stereo_completeness_never_drops_ez(smi):
     ways: an abstention (`unknown organic compound`) OR a stereo-COMPLETE name that
     round-trips with full stereo. v33 Phase 6 (E3): the FindMolChiralCenters
     shared-mol `_CIPCode`-wipe fix lets the nitrovinyl now name CORRECTLY WITH its
-    (1E) descriptor (`4-[(1E)-2-nitroeth-1-en-1-yl]phenol`, RT-full) instead of
+    (1E) descriptor (`4-[(1E)-2-nitroethen-1-yl]phenol`, RT-full) instead of
     abstaining; the enol-ether / vinyl-thioether still abstain (their substituent
     prefix isn't built). Either outcome is 0-wrong; a descriptor-less `ethenylphenol`
     or a bare `…enyl…phenol` with no E/Z is the forbidden case."""
@@ -119,7 +119,11 @@ def test_blocker1_nitrovinyl_now_names_with_stereo():
     from orthonym.validation.opsin_roundtrip import opsin_parse
     smi = "O=[N+]([O-])/C=C/c1ccc(O)cc1"
     n = _pin().name(smi)
-    assert n == "4-[(1E)-2-nitroeth-1-en-1-yl]phenol", n
+    # Breadth job 1 change-asserted-value: was '4-[(1E)-2-nitroeth-1-en-1-yl]phenol'.
+    # (d) (the Blue Book): the one double bond of a two-carbon chain
+    # takes no locant, '2-chloroethen-1-yl (preferred prefix)' (:3003). OPSIN 2.9.0
+    # full-InChIKey exact (asserted below).
+    assert n == "4-[(1E)-2-nitroethen-1-yl]phenol", n
     o = opsin_parse(n)
     assert o and inchi.MolToInchiKey(Chem.MolFromSmiles(smi)) == \
         inchi.MolToInchiKey(Chem.MolFromSmiles(o))

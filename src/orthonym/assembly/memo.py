@@ -59,6 +59,36 @@ if _MODE not in ("on", "off", "verify"):
 # is open" -> fail-open (recompute, never cache).
 _cache_var = contextvars.ContextVar("orthonym_memo_cache", default=None)
 
+#: True while the default (PIN) tier re-names a molecule it could not name, with the
+#: best-effort ring-substituent producers admitted under the PIN-vocabulary guard
+#: (``rules.pin_vocabulary.promote_at_pin_tier``; ``Orthonym.name``). Values computed
+#: in that re-run can differ from the first run's for the same key, so every cache
+#: below keys them apart: neither run is ever served the other's value, and the first
+#: run stays byte-identical to the engine without the re-run.
+pin_promotion_var = contextvars.ContextVar("orthonym_pin_promotion", default=False)
+
+
+#: Namespaces whose value is a pure function of the key -- a structure analysis or an
+#: OPSIN parse that runs no naming producer, so no site whose behaviour the promotion
+#: re-run changes (``rules.pin_vocabulary.promotion_site_probe``). The re-run reuses
+#: the first run's entries for them instead of recomputing (branch review fixes: the
+#: C-substituted sugar enumeration was 2.1 of the 2.8 s re-run of a dev2000 cardiac
+#: glycoside). ``fg_detect``, ``sugar_c_substituted`` and ``opsin_extended_smiles``
+#: are the process-wide pure namespaces (``pure_cache_or_compute``);
+#: ``polycyclic.main_ring_struct`` is the von Baeyer main-ring analysis of a ring
+#: system. ``ORTHONYM_MEMO=verify`` recomputes them in the re-run and compares.
+_PROMOTION_INDEPENDENT = frozenset({
+    "fg_detect", "sugar_c_substituted", "opsin_extended_smiles",
+    "polycyclic.main_ring_struct",
+})
+
+
+def _ck(namespace, key):
+    """The cache key for ``(namespace, key)`` in the current run (see above)."""
+    if pin_promotion_var.get() and namespace not in _PROMOTION_INDEPENDENT:
+        return (namespace, key, "pin-promotion")
+    return (namespace, key)
+
 
 class MemoMismatch(Exception):
     """Raised in ``verify`` mode when a cached result disagrees with a fresh
@@ -135,7 +165,7 @@ def side_get(namespace, key):
     if cache is None:
         return None
     side = cache.get(_SIDE_KEY)
-    return None if side is None else side.get((namespace, key))
+    return None if side is None else side.get(_ck(namespace, key))
 
 
 def side_put(namespace, key, value) -> None:
@@ -148,7 +178,7 @@ def side_put(namespace, key, value) -> None:
     if side is None:
         side = {}
         cache[_SIDE_KEY] = side
-    side[(namespace, key)] = value
+    side[_ck(namespace, key)] = value
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +229,7 @@ def pure_cache_or_compute(namespace, key, compute_fn):
     """
     if _MODE != "on" or _PROCESS_MAX <= 0:
         return cache_or_compute(namespace, key, compute_fn)
-    ck = (namespace, key)
+    ck = _ck(namespace, key)
     try:
         val = _process_cache[ck]
     except KeyError:
@@ -236,7 +266,7 @@ def cache_or_compute(namespace, key, compute_fn):
     cache = _cache_var.get()
     if cache is None:
         return compute_fn()
-    ck = (namespace, key)
+    ck = _ck(namespace, key)
     if _MODE == "verify":
         val = compute_fn()
         if ck in cache and cache[ck] != val:

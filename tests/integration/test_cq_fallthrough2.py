@@ -148,13 +148,10 @@ def test_pnictogen_ester_cites_each_descriptor_once(smiles, expected):
     assert res["tier"] == "pin_verified" and res["opsin"] == "verified", res
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "PIN spelling of the ethenyl prefix: P-14.3.4.4 example BlueBookV2.md:3003 "
-    "'2-chloroethen-1-yl (preferred prefix)' ('eth-1-en-1-yl': 0 BB hits; "
-    "'ethen-1-yl' :3003/:6415/:17366/:42468). The substituent namer cites the "
-    "'en' locant; the name is RT-exact but not the PIN spelling. TODO: "
-    ".planning/preexisting-triage/TRIAGE.md, 'Suite fix -- j4-pin-labels-a', "
-    "new findings."))
+# The PIN spelling of the ethenyl prefix, example the Blue Book
+# '2-chloroethen-1-yl (preferred prefix)' ('eth-1-en-1-yl': 0 BB hits). Was a strict
+# xfail (TODO 'Suite fix -- j4-pin-labels-a'); the substituent namer omits the 'en'
+# locant of a two-carbon chain since breadth job 1 (d),:2891).
 def test_witness1_pin_spelling():
     assert Orthonym().name(WITNESSES[0][0]) == (
         "methyl bis(2,2-difluoroethen-1-yl)phosphinate")

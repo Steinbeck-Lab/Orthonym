@@ -2886,9 +2886,9 @@ def _identify_fused_substituent(
     # NEVER reaches the carbon branch's ring delegate above -- the S branch has
     # no ring-bearing delegate and returned None. Generalise the carbon branch's
     # move: delegate ANY ring-bearing fragment, whatever its root element, to the
-    # single delegate ``name_ring_system_substituent``. Gated on
-    # ``best_effort_ctx`` so the PIN / default tier is byte-identical (no new
-    # emission there), and both name-producing flags are passed (the delegate's
+    # single delegate ``name_ring_system_substituent``. At the best-effort
+    # tier its name is used as is; at the PIN tier only through
+    # ``promote_at_pin_tier`` (below). Both name-producing flags are passed (the delegate's
     # own guards + the downstream / RT gate keep it 0-wrong: a fragment
     # it cannot number returns None, a mis-numbering abstains -- never a wrong
     # molecule). The same guards the carbon branch uses apply: modest size, only
@@ -2900,35 +2900,44 @@ def _identify_fused_substituent(
         _be_ring_sub = bool(_rbe_ctx2.get())
     except Exception:
         _be_ring_sub = False
-    if _be_ring_sub:
-        _ri = mol.GetRingInfo()
-        _COMMON_ORGANIC2 = {'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'}
-        _frag2 = _bfs_collect_all(mol, start_idx, excluded)
-        if _frag2 and len(_frag2) <= 25:
-            _fset2 = set(_frag2)
-            _straddle = any(
-                (set(_r) & _fset2) and (set(_r) & excluded)
-                for _r in _ri.AtomRings()
-            )
-            _ring_bearing = any(_ri.NumAtomRings(a) > 0 for a in _frag2)
-            _all_common = all(
-                mol.GetAtomWithIdx(idx).GetSymbol() in _COMMON_ORGANIC2
-                for idx in _frag2
-            )
-            if _ring_bearing and not _straddle and _all_common:
-                from .ring_substituents import name_ring_system_substituent
-                _tail_name = name_ring_system_substituent(
+    # Breadth Job 1 (M01): the same delegate runs at the PIN tier too, but there a
+    # name is kept only when every token is PIN vocabulary (`promote_at_pin_tier`),
+    # e.g. the pantoprazole-type '[(pyridin-2-yl)methyl]sulfinyl' on a benzimidazole.
+    _ri = mol.GetRingInfo()
+    _COMMON_ORGANIC2 = {'C', 'H', 'O', 'N', 'S', 'P', 'F', 'Cl', 'Br', 'I'}
+    _frag2 = _bfs_collect_all(mol, start_idx, excluded)
+    if _frag2 and len(_frag2) <= 25:
+        _fset2 = set(_frag2)
+        _straddle = any(
+            (set(_r) & _fset2) and (set(_r) & excluded)
+            for _r in _ri.AtomRings()
+        )
+        _ring_bearing = any(_ri.NumAtomRings(a) > 0 for a in _frag2)
+        _all_common = all(
+            mol.GetAtomWithIdx(idx).GetSymbol() in _COMMON_ORGANIC2
+            for idx in _frag2
+        )
+        if _ring_bearing and not _straddle and _all_common:
+            from .ring_substituents import name_ring_system_substituent
+
+            def _be_tail():
+                return name_ring_system_substituent(
                     mol, sorted(_frag2), start_idx,
                     allow_enumerator_fallback=True,
                     allow_mancude=True,
                 )
-                if (_tail_name and _tail_name != 'substituent'
-                        and ' ' not in _tail_name):
-                    return {
-                        'name': _tail_name,
-                        'type': 'functionalized',
-                        'atoms': sorted(_frag2),
-                    }
+            if _be_ring_sub:
+                _tail_name = _be_tail()
+            else:
+                from .pin_vocabulary import promote_at_pin_tier
+                _tail_name = promote_at_pin_tier(_be_tail)
+            if (_tail_name and _tail_name != 'substituent'
+                    and ' ' not in _tail_name):
+                return {
+                    'name': _tail_name,
+                    'type': 'functionalized',
+                    'atoms': sorted(_frag2),
+                }
 
     return None
 
@@ -3519,6 +3528,24 @@ def _renumber_core_for_suffix(mol, core_name, core_smiles, atom_mapping, substit
         if key is None or len(key) != len(current_key):
             continue
         options.append((key, match, mapping, name, subs))
+    # (b) precedes (c) (the Blue Book,:3256; '2H-pyran-6-carboxylic
+    # acid (PIN)'): the indicated hydrogen the input carries takes the lowest
+    # locant first, so only the numberings that give it that locant compete on
+    # the suffix -- '1H-benzimidazol-6-ol', not '3H-benzimidazol-5-ol'. Applied
+    # when every numbering places exactly one indicated hydrogen and they differ
+    # (the matcher's own tier, ``_select_lowest_locant_match``).
+    from ..data.fused_heterocycles import _input_indicated_h_locants
+    _cur_ih = _input_indicated_h_locants(mol, atom_mapping)
+    _ihs = [_input_indicated_h_locants(mol, opt[2]) for opt in options]
+    if (_cur_ih is not None and len(_cur_ih) == 1
+            and all(ih is not None and len(ih) == 1 for ih in _ihs)
+            and len({tuple(ih) for ih in _ihs} | {tuple(_cur_ih)}) > 1):
+        _low = min([_cur_ih] + _ihs)
+        if _cur_ih != _low:
+            # the matcher already prefers the lowest indicated hydrogen, so this
+            # is reached only by a numbering it could not see; keep it as it was
+            return core_name, atom_mapping, substituents
+        options = [opt for opt, ih in zip(options, _ihs) if ih == _low]
     if len(options) < 2:
         return core_name, atom_mapping, substituents
     best_key = options[0][0]
@@ -3948,8 +3975,11 @@ def _indicated_h_at_suffix(mol, core_name, atom_mapping, oxo_locants):
     1H-indole' with a ketone at C-2 is therefore '1,3-dihydro-2H-indol-2-one',
     not '2,3-dihydro-1H-indol-2-one'.
 
-    Scope: ONE ketone, a core spelled '<locants>-<n>hydro-<h>H-<stem>', the
-    ketone at a saturated position other than h. The saturated set is read off
+    Scope: ONE ketone, a core spelled '<locants>-<n>hydro-<h>H-<stem>' (the stem may
+    open with its own heteroatom locants, '1-benzopyran': branch review fixes, the
+    dev2000 flavanone '...-3,4-dihydro-2H-1-benzopyran-4-one' for '...-2,3-dihydro-
+    4H-1-benzopyran-4-one' passed unmoved), the ketone at a saturated position other
+    than h. The saturated set is read off
     the molecule (core ring C/N in no ring double bond, the ketone carbon
     included) and must be the core's hydro + indicated-hydrogen set. The ketone
     position p must admit the mancude tautomer 'pH-<stem>': a Kekule arrangement
@@ -3962,7 +3992,7 @@ def _indicated_h_at_suffix(mol, core_name, atom_mapping, oxo_locants):
     if _HYDRO_CORE_RE is None:
         _HYDRO_CORE_RE = _re.compile(
             r'^(?P<hl>\d+[a-z]?(?:,\d+[a-z]?)*)-(?P<mult>di|tetra|hexa|octa|deca)'
-            r'hydro-(?P<ih>\d+[a-z]?)H-(?P<stem>[A-Za-z].*)$')
+            r'hydro-(?P<ih>\d+[a-z]?)H-(?P<stem>(?:\d+(?:,\d+)*-)?[A-Za-z].*)$')
     m = _HYDRO_CORE_RE.match(core_name or '')
     if not m:
         return None

@@ -85,11 +85,15 @@ _HALO_ALKOXY_RE = re.compile(
 # Alkyl + functional group compound substituent patterns (e.g., methylamino,
 # ethylamino, propylamino). These are compound substituents per IUPAC
 # and require enclosing marks.
+# Breadth job 1 (M03): every cycloalkyl ring size, not only C5/C6 -- a compound
+# prefix takes enclosing marks, the Blue Book), so '2-cyclopropyl
+# amino-2-oxo...' is '2-(cyclopropylamino)-2-oxo...'.
 _ALKYLAMINO_RE = re.compile(
     r'^(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl|'
     r'nonyl|decyl|undecyl|dodecyl|tridecyl|tetradecyl|pentadecyl|'
     r'hexadecyl|heptadecyl|octadecyl|nonadecyl|icosyl|'
-    r'phenyl|benzyl|cyclopentyl|cyclohexyl)'
+    r'phenyl|benzyl|'
+    r'cyclo(?:prop|but|pent|hex|hept|oct|non|dec|undec|dodec)yl)'
     r'(?:amino|imino)$'
 )
 
@@ -1637,6 +1641,13 @@ def is_complex_substituent(name: str) -> bool:
     # Alkyl+amino compound substituents per IUPAC:
     # "methylamino", "ethylamino", "phenylamino" etc.
     if _ALKYLAMINO_RE.match(name):
+        return True
+    # Breadth job 1 (M03): an organyl on a diazenyl / hydrazinyl group is a compound
+    # prefix and takes enclosing marks, the Blue Book):
+    # '(phenyldiazenyl)', 'N'-[1-(tert-butyldiazenyl)cyclohexyl]' -- never
+    # '1-tert-butyldiazenylcyclohexyl'. The bare 'diazenyl' / 'hydrazinyl' stay simple.
+    if (name_lower.endswith(('yldiazenyl', 'ylhydrazinyl'))
+            and name_lower not in ('diazenyl', 'hydrazinyl')):
         return True
     # Acylamino compound substituents: "ethanoylamino", "propanoylamino" etc.
     if name.endswith('amino') and 'oyl' in name:

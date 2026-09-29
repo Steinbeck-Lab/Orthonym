@@ -3040,13 +3040,33 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
         if any(nb.GetIdx() not in core_atoms
                for nb in mol.GetAtomWithIdx(idx).GetNeighbors())
     }
+    # (b) before (c)/(f) (the Blue Book, "indicated hydrogen";
+    # '2H-pyran-6-carboxylic acid (PIN)', '1H-phenalen-4-ol (PIN)'): among the
+    # numberings a symmetric core allows, the indicated hydrogen the INPUT carries
+    # gets the lowest locant before any substituent does -- '1H-benzimidazol-6-ol',
+    # never '3H-benzimidazol-5-ol' (the matched numbering used to be chosen by the
+    # substituents alone and the tautomer label moved afterwards). Applied only
+    # when every numbering places exactly one indicated hydrogen and they differ,
+    # so a core without one, or with a hydro/oxo set, is chosen as before.
+    ih_tier = None
+    if iupac_locants:
+        _ihs = []
+        for m in matches:
+            _map = {mi: iupac_locants.get(pi) for pi, mi in enumerate(m)
+                    if iupac_locants.get(pi) is not None}
+            _ihs.append(_input_indicated_h_locants(mol, _map))
+        if (all(ih is not None and len(ih) == 1 for ih in _ihs)
+                and len({tuple(ih) for ih in _ihs}) > 1):
+            ih_tier = _ihs
+    if ih_tier is not None and not sub_atoms:
+        return matches[min(range(len(matches)), key=lambda i: ih_tier[i])]
     if not sub_atoms or not iupac_locants:
         return matches[0]
 
     from ..rules.locants import compare_numbering
 
     best, best_cand = None, None
-    for m in matches:
+    for _mi, m in enumerate(matches):
         locs = []
         scorable = True
         for pattern_idx, mol_idx in enumerate(m):
@@ -3070,6 +3090,8 @@ def _select_lowest_locant_match(mol, matches, iupac_locants):
         # 6-bromo-4-methyl).
         cand = {'substituents': locs,
                 'alpha': _match_substituent_alpha_key(mol, m, core_atoms, sub_atoms, iupac_locants)}
+        if ih_tier is not None:
+            cand['indicated_h'] = ih_tier[_mi]
         if best is None or compare_numbering(cand, best_cand) < 0:
             best, best_cand = m, cand
     # If every match was unscorable, fall back to the first (byte-identical to

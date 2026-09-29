@@ -66,7 +66,8 @@ def main(args: List[str] = None) -> int:
     parser = argparse.ArgumentParser(
         description=("Orthonym: IUPAC names for chemical structures. Give a SMILES string "
                      "and get its IUPAC name, checked by reading it back with OPSIN, or a "
-                     "label that says why no name was given."),
+                     "label that says why no name was given. The few names OPSIN cannot "
+                     "read in full are marked by --provenance."),
         prog="orthonym"
     )
 
@@ -233,11 +234,13 @@ def main(args: List[str] = None) -> int:
         help=(
             "Print a JSON row instead of the bare name, with the keys name, tier, "
             "is_pin, source, opsin, gates_passed, gate_outcome, formula, "
-            "limit_code, stereo_unexpressed, suffix_free_prefix_name and verified. "
+            "limit_code, stereo_unexpressed, suffix_free_prefix_name, "
+            "prefix_order_fallback and verified. "
             "'verified' is opsin (OPSIN read the whole name back to the same "
             "molecule), opsin_constitution (the same constitution; the "
             "stereodescriptors were not confirmed by OPSIN), identity (a name from "
-            "an exact-match list, which OPSIN cannot read) or unverified (no "
+            "the exact-match list of metal-complex names, found by the input's "
+            "exact InChIKey; OPSIN cannot read these names) or unverified (no "
             "read-back recorded). 'gate_outcome' says what the final OPSIN check "
             "did, for example self_consistency_verified, suppressed, not_run or "
             "carveout:<class>. One SMILES at a time; not with --batch."
@@ -261,7 +264,9 @@ def main(args: List[str] = None) -> int:
         help=(
             "Download the OPSIN and centres jars if they are missing, check each "
             "against the SHA-256 checksum recorded in Orthonym, print where they "
-            "are, and stop (exit status 1 on failure)."
+            "are, and stop (exit status 1 on failure). A jar given by "
+            "ORTHONYM_OPSIN_JAR or ORTHONYM_CENTRES_JAR is used as given, without "
+            "the checksum check."
         ),
     )
     parser.add_argument(

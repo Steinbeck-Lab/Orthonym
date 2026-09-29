@@ -33,12 +33,23 @@ def _name(smiles):
     ("[CH2+]", "methyliumyl"),                                # (PIN):43443
     ("CCC[OH+]", "propyloxidaniumyl"),                        # (PIN):43515
     ("CC(=O)[N-]", "acetylazanidyl"),                         # (PIN):43517
-    ("[NH-]", "azanidyl"),                                    # (preselected):43426
 ])
 def test_radical_ion(smiles, expected):
     row = _name(smiles)
     assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"]
     assert _strict_rt(expected, smiles)
+
+
+# 'azanidyl' is the preselected name (:43426), not a PIN: a carbon-free compound
+# has a preselected name at most, the Blue Book;:2062),
+# so it ships systematic_verified, is_pin False, the name unchanged (texts, labels
+# and spelling, 2026-09-29).
+@pytest.mark.opsin_gate
+def test_carbon_free_radical_ion_is_a_preselected_name():
+    row = _name("[NH-]")
+    assert row["name"] == "azanidyl" and row["tier"] == "systematic_verified"
+    assert not row["is_pin"]
+    assert _strict_rt("azanidyl", "[NH-]")
 
 
 # "Radical ions on ionic suffix groups" (the Blue Book): "When ions

@@ -497,6 +497,13 @@ def enter_name_scope():
     return d
 
 
+def name_scope_depth() -> int:
+    """The raw ``name`` call-stack depth (``enter_name_scope``): 1 inside the
+    body of the TRUE outermost ``name``, the only frame that owns the hang
+    budgets, 0 outside any ``name``."""
+    return getattr(_fragment_guard, 'name_call_depth', 0)
+
+
 def exit_name_scope():
     """Close one ``name`` scope; the outermost one disarms the budget and frees
     the whole-molecule memo cache."""

@@ -394,6 +394,10 @@ def terminal_fragment_name(
     Returns ``None`` rather than a partial name for anything out of scope. Never
     raises.
     """
+    # Breadth Job 1: never a PIN-tier producer (see ``in_pin_promotion``).
+    from .pin_vocabulary import in_pin_promotion
+    if in_pin_promotion():
+        return None
     try:
         return _terminal_fragment_name(mol, frag_atoms, attach_idx)
     except Exception:                                   # noqa: BLE001

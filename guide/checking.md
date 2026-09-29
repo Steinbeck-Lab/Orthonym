@@ -26,7 +26,7 @@ When they match, the name ships. Here is caffeine, from the engine's own output:
 
 **2. OPSIN must be able to read the name.** At the `valid`, `complete` and `best-effort` tiers, a name OPSIN cannot read is not emitted.
 
-**3. What OPSIN read must be your molecule.** At the `valid`, `complete` and `best-effort` tiers the full InChIKey must match: constitution, charge and stereochemistry. A name with a missing or wrong stereodescriptor is therefore not emitted there. At the default tier the check accepts the same full InChIKey, or the same constitution and charge with no stereodescriptor that disagrees with your structure.
+**3. What OPSIN read must be your molecule.** At the `valid`, `complete` and `best-effort` tiers the full InChIKey must match: constitution, charge and stereochemistry. A name with a missing or wrong stereodescriptor is therefore not emitted there. At the default tier the check accepts the same full InChIKey, or the same constitution, charge and protonation state with no stereodescriptor that disagrees with your structure.
 
 A candidate that fails is withdrawn, and the engine tries the next way of naming the molecule. When none passes, it declines and says why ([Declines](declines.md)).
 
@@ -41,7 +41,7 @@ Some correct names use words OPSIN does not know. Two kinds of name leave the en
 - **Names from exact-match lists.** Metal tetrapyrrole complexes (hemes, chlorophylls, cobalamins, siroheme, coenzyme F430) and a table of retained natural-product parent names are matched to your structure exactly, by InChIKey or canonical SMILES, and the listed name is given. OPSIN cannot read these names at all. A metal-complex list name shows `verified` `identity`.
 - **A few name classes at the default tier.** Some preferred-name forms (inositols, phanes, some anhydrides and natural-product stereoparents among them) are built by their rules and shipped at the default tier although OPSIN cannot read them, or reads only their constitution. The row shows `gate_outcome` `carveout:<class>` or `self_consistency_constitution_only`, and the tier is lowered accordingly. At the `valid`, `complete` and `best-effort` tiers these names are declined instead.
 
-If OPSIN itself does not answer (the Java runtime times out or stops), the name is not read back; the row shows `gate_outcome` `unavailable` and the tier is lowered.
+If OPSIN itself does not answer (the Java runtime times out or stops), the candidate is withdrawn and the row shows `gate_outcome` `suppressed`. A name ships with `gate_outcome` `unavailable` only in the opt-in reduced mode without the jars (`ORTHONYM_ALLOW_REDUCED=1`, [Install](start/install.md)).
 
 ## See it for yourself
 

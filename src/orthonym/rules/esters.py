@@ -16,6 +16,7 @@ SMARTS: "[CX3](=O)[OX2][#6]"
 """
 
 import logging
+import re
 from collections import deque
 from typing import List, Optional, Tuple
 
@@ -1055,6 +1056,24 @@ def _name_amino_acid_ester(
     return f"{r_prime} {descriptor}{ate_stem}"
 
 
+def _labels_polyacid_monoester(fn):
+    """Branch review fixes: a producer that names ONE ester group as the
+    functional-class ester (``ester_match``) labels its name below the PIN when
+    another ester group shares that ester's acid parent (the molecule is an ester of
+    one polyacid,; ``record_polyacid_monoester_non_pin``). Structural,
+    from the ester's own carbonyl carbon; the name is unchanged."""
+    import functools
+
+    @functools.wraps(fn)
+    def _wrapped(mol, ester_match, *args, **kwargs):
+        name = fn(mol, ester_match, *args, **kwargs)
+        if name:
+            record_polyacid_monoester_non_pin(mol, ester_match[0], name)
+        return name
+    return _wrapped
+
+
+@_labels_polyacid_monoester
 def name_ester(mol, ester_match: tuple) -> Optional[str]:
     """
     Generate IUPAC name for an ester.
@@ -1182,7 +1201,8 @@ def name_ester(mol, ester_match: tuple) -> Optional[str]:
     import re as _re
 
     from .stereochemistry import format_stereodescriptor_string as _fmt_stereo
-    if not _re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name):
+    if (not _re.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name)
+            and not _alkyl_name_cites_rs(alkyl_name)):
         alkyl_stereo = _collect_alkyl_fragment_stereo(mol, alkyl_atoms, ester_match)
         alkyl_stereo = [(loc, cip) for loc, cip in alkyl_stereo if cip in ('R', 'S')]
         if alkyl_stereo:
@@ -1249,6 +1269,15 @@ def _build_ester_acid_word(
             has_acid_branches = bool(non_chain_atoms)
 
             if has_acid_branches:
+                # ``get_acid_stem`` names a SATURATED chain ('propanoic'). A chain
+                # with a C=C / C#C needs its 'ene'/'yne' ending, which
+                # this branch cannot build: '...yl 3-phenylpropanoate' for a
+                # cinnamate is a different molecule. Decline, so the routes that
+                # name the unsaturated acid ('(2E)-3-phenylprop-2-enoate') run.
+                for _ci, _cj in zip(acid_principal_chain, acid_principal_chain[1:]):
+                    _cb = mol.GetBondBetweenAtoms(_ci, _cj)
+                    if _cb is not None and _cb.GetBondTypeAsDouble() != 1.0:
+                        return None
                 # Use principal chain length for the acid name (not total carbon count)
                 chain_length = len(acid_principal_chain)
                 acid_name = get_acid_stem(chain_length)
@@ -1261,6 +1290,7 @@ def _build_ester_acid_word(
                 exclude.update(set(alkyl_atoms))
 
                 # Use universal pipeline for acid-side substituents
+                _acid_prefix_texts: List[str] = []
                 try:
                     from ..assembly.composer import _integrate_universal_prefixes
                     acid_prefix_str = _integrate_universal_prefixes(
@@ -1268,10 +1298,29 @@ def _build_ester_acid_word(
                         parent_type="chain",
                         principal_chain=acid_principal_chain,
                         exclude_atoms=exclude,
+                        prefix_texts_out=_acid_prefix_texts,
                     )
                 except Exception as exc:
                     logger.debug("Ester acid-side prefix discovery failed: %s", exc)
                     acid_prefix_str = ""
+                if (chain_length == 2 and acid_prefix_str and _acid_prefix_texts
+                        and not [c for _l, c in _collect_ester_fragment_stereo(
+                            mol, acid_atoms, ester_match) if c in ('R', 'S')]):
+                    # (the Blue Book, 'acetic acid (PIN)
+                    # (substitution allowed...) ethanoic acid') with the locants
+                    # of its single substitutable carbon omitted, as for the acid
+                    # itself: 'ethyl diazoacetate (PIN)' (:25925), 'methyl
+                    # [(methylimino)silyl]acetate (PIN)' (:26578); never '...yl
+                    # 2-X-ethanoate'. Same assembly as the acid
+                    # (``retained_acetic_from_prefixes``), with the acylate word.
+                    # A stereogenic alpha carbon keeps the systematic spelling
+                    # below, which cites its locant.
+                    from ..assembly.composition_primitives import (
+                        retained_acetic_from_prefixes,
+                    )
+                    return retained_acetic_from_prefixes(
+                        _acid_prefix_texts, parent="acetate",
+                        enclose_subsequent=len(_acid_prefix_texts) > 1)
             else:
                 # No branches -- use standard acid naming
                 acid_name = get_acid_fragment_name(mol, acid_atoms)
@@ -1530,6 +1579,22 @@ def _collect_ester_fragment_stereo(mol, acid_atoms: List[int],
             queue.append((nbr_idx, next_locant))
 
     return collect_stereodescriptors(mol, atom_to_locant)
+
+
+_RS_SET = re.compile(r"\((?:\d+[a-z]?'*)?[RSrs](?:,(?:\d+[a-z]?'*)?[RSrsEZ])*\)")
+
+
+def _alkyl_name_cites_rs(alkyl_name: str) -> bool:
+    """True when the alcohol-part name already cites R/S descriptors of its own.
+
+    A compound alkyl prefix ('[(1S,3R,4S)-1,7,7-trimethyl-2-oxobicyclo[2.2.1]heptan-
+    3-yl]methyl') carries its descriptors at the front of the component they belong
+    to, the Blue Book "When they relate to substituent groups, they are
+    cited at the front of the corresponding prefix"). Prepending a second set read
+    off another numbering gave '(2R,4S,7S)-[(1S,3R,4S)-...]methyl formate', a name
+    whose outer set refers to no position and that OPSIN cannot read.
+    """
+    return bool(_RS_SET.search(alkyl_name))
 
 
 def _collect_alkyl_fragment_stereo(mol, alkyl_atoms: List[int],
@@ -2792,10 +2857,15 @@ def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
 
     if alkyl_names[0] == alkyl_names[1]:
         return f"di{alkyl_names[0]} {ate}"
-    first, second = sorted(alkyl_names)
+    # (the Blue Book): "different organyl groups are cited in
+    # alphanumerical order (see " -- 'butyl 2-ethylhexyl', never the plain
+    # string order that put the locant first ('2-ethylhexyl butyl').
+    from ..assembly.naming_utils import alpha_sort_key
+    first, second = sorted(alkyl_names, key=alpha_sort_key)
     return f"{first} {second} {ate}"
 
 
+@_labels_polyacid_monoester
 def name_polyfunctional_ester_via_acid(mol, ester_match: tuple,
                                        verified_acid: bool = False) -> Optional[str]:
     """Name a polyfunctional compound whose most-senior group is a SINGLE ester.
@@ -2862,7 +2932,8 @@ def name_polyfunctional_ester_via_acid(mol, ester_match: tuple,
     # junior functional group, e.g. -OH, alongside the ester) never called,
     # silently dropping a chiral alkyl fragment's descriptor.
     import re as _re_pf_alkyl
-    if not _re_pf_alkyl.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name):
+    if (not _re_pf_alkyl.match(r'^\(\d*[RSrsEZez](,\d*[RSrsEZez])*\)', alkyl_name)
+            and not _alkyl_name_cites_rs(alkyl_name)):
         alkyl_stereo = _collect_alkyl_fragment_stereo(mol, alkyl_atoms, ester_match)
         alkyl_stereo = [(loc, cip) for loc, cip in alkyl_stereo if cip in ('R', 'S')]
         if alkyl_stereo:
@@ -3199,6 +3270,18 @@ def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
 
     backbone_length = len(backbone)
 
+    # Branch review fixes: the '<prefix>anedioate' below names only an UNSUBSTITUTED,
+    # SATURATED backbone -- for 'COC(=O)CC(C)C(=O)OC' it gave 'dimethyl butanedioate',
+    # a different molecule the round trip then rejected, so the PIN tier abstained.
+    # A substituted or unsaturated backbone is named from its acid component instead
+    #, ``name_polyacid_polyester``); unchanged otherwise.
+    _acid = _build_diacid_from_diester(mol, ester_matches)
+    if (_acid is None or _acid.GetNumHeavyAtoms() != backbone_length + 4
+            or any(mol.GetBondBetweenAtoms(a, b).GetBondTypeAsDouble() != 1.0
+                   for a, b in zip(backbone, backbone[1:])
+                   if mol.GetBondBetweenAtoms(a, b) is not None)):
+        return name_polyacid_polyester(mol)
+
     # Get the dioate name
     dioate_name = _get_dioate_name(backbone_length)
 
@@ -3207,9 +3290,195 @@ def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
         # Same alkyl groups: use multiplier
         return f"di{alkyl_names[0]} {dioate_name}"
     else:
-        # Different alkyl groups: alphabetical order
-        sorted_names = sorted(alkyl_names)
+        # Different alkyl groups: alphanumerical order "different
+        # organyl groups are cited in alphanumerical order (see ",
+        # the Blue Book)
+        from ..assembly.naming_utils import alpha_sort_key
+        sorted_names = sorted(alkyl_names, key=alpha_sort_key)
         return f"{sorted_names[0]} {sorted_names[1]} {dioate_name}"
+
+
+# ---------------------------------------------------------------------------
+# Branch review fixes: esters of ONE polyacid,
+# ---------------------------------------------------------------------------
+
+def ester_carbonyl_atoms(mol) -> List[int]:
+    """The carbonyl carbons of the carboxylic ester groups C(=O)-O-C of ``mol``:
+    not a lactone (carbonyl carbon and ester oxygen in one ring), not an
+    anhydride (the 'alkyl' carbon is itself an acyl carbon)."""
+    out = set()
+    ri = mol.GetRingInfo()
+    for m in mol.GetSubstructMatches(_compiled_smarts("[CX3](=O)[OX2][#6]")):
+        c, o, r = m[0], m[2], m[3]
+        if any(c in ring and o in ring for ring in ri.AtomRings()):
+            continue
+        ra = mol.GetAtomWithIdx(r)
+        if ra.GetSymbol() == 'C' and any(
+                b.GetBondTypeAsDouble() == 2.0
+                and b.GetOtherAtom(ra).GetSymbol() == 'O' for b in ra.GetBonds()):
+            continue
+        out.add(c)
+    return sorted(out)
+
+
+def ester_carbonyls_share_an_acid_parent(mol, c0: int, c1: int) -> bool:
+    """True when the acid carbons ``c0`` and ``c1`` of two ester groups belong to ONE
+    acid component whose parent can carry both as suffixes, the Blue Book:
+    18875 "The senior parent structure has the maximum number of substituents
+    corresponding to the principal characteristic group (suffix)"): they are bonded
+    ('oxalate'), or joined by a path of acyclic carbon atoms (a chain through both:
+    '...dioate'), or each bonded to an atom of the same ring system ('...-1,2-
+    dicarboxylate'). A path through a heteroatom, or from a ring into a side chain,
+    gives no such parent ('4-(2-methoxy-2-oxoethyl)benzoate' stays an ester prefix,
+    ,:31698)."""
+    if mol.GetBondBetweenAtoms(c0, c1) is not None:
+        return True
+    ri = mol.GetRingInfo()
+
+    def _carbons(c):
+        return [n.GetIdx() for n in mol.GetAtomWithIdx(c).GetNeighbors()
+                if n.GetAtomicNum() == 6]
+
+    ring0 = {n for n in _carbons(c0) if ri.NumAtomRings(n)}
+    ring1 = {n for n in _carbons(c1) if ri.NumAtomRings(n)}
+    if ring0 and ring1:
+        systems: List[set] = []
+        for ring in ri.AtomRings():
+            r = set(ring)
+            for s in [s for s in systems if s & r]:
+                systems.remove(s)
+                r |= s
+            systems.append(r)
+        if any(s & ring0 and s & ring1 for s in systems):
+            return True
+    goal = {n for n in _carbons(c1) if not ri.NumAtomRings(n)}
+    stack = [n for n in _carbons(c0) if not ri.NumAtomRings(n)]
+    seen = set(stack)
+    while stack:
+        a = stack.pop()
+        if a in goal:
+            return True
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            i = nb.GetIdx()
+            if (i in seen or i in (c0, c1) or nb.GetAtomicNum() != 6
+                    or ri.NumAtomRings(i)):
+                continue
+            seen.add(i)
+            stack.append(i)
+    return False
+
+
+def ester_shares_its_acid_with_another_ester(mol, carbonyl_c: int) -> bool:
+    """True when another ester group's acid carbon shares ``carbonyl_c``'s acid
+    parent (``ester_carbonyls_share_an_acid_parent``): the molecule is then an
+    ester of one polyacid, and a name citing only ``carbonyl_c``'s ester as the
+    functional-class ester (the other as an '(alkoxycarbonyl)' prefix) is not its
+    PIN, the Blue Book "Fully esterified acids derived from a
+    single acid are systematically named by placing the name(s) of the hydroxylic
+    component... in front of the name of the acid component";:31775 'dimethyl
+    butanedioate (PIN)')."""
+    try:
+        others = [c for c in ester_carbonyl_atoms(mol) if c != carbonyl_c]
+        return any(ester_carbonyls_share_an_acid_parent(mol, carbonyl_c, c)
+                   for c in others)
+    except Exception:  # noqa: BLE001 -- undecidable: do not claim the PIN
+        return True
+
+
+def record_polyacid_monoester_non_pin(mol, carbonyl_c: int, name: Optional[str]) -> None:
+    """Label ``name`` below the PIN (``metrics.provenance.record_non_pin_label``)
+    when it names ``mol`` as a mono-ester of ``carbonyl_c``'s acid although the
+    molecule is an ester of one polyacid (``ester_shares_its_acid_with_another_
+    ester``). The name is unchanged; the round trip still judges it."""
+    if not name or carbonyl_c is None:
+        return
+    if ester_shares_its_acid_with_another_ester(mol, carbonyl_c):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name)
+
+
+def name_polyacid_polyester(mol) -> Optional[str]:
+    """ (the Blue Book): the fully esterified ester of ONE
+    polyacid, named 'dimethyl 2-methylbutanedioate' -- the organyl word, multiplied,
+    in front of the anion name of the acid component.
+
+    The acid component is built from structure (every ester alkyl stripped,
+    ``_build_diacid_from_diester``) and named by the strict pipeline, exactly as the
+    ring dicarboxylate path does (``_name_ring_dicarboxylic_diester``); its name must
+    carry EVERY acid group as a suffix ('...dioic acid', '...tricarboxylic acid'),
+    else the parent is not one polyacid parent and this declines. Scope, fail-closed:
+    every ester group of the molecule shares one acid parent, no free acid group, all
+    organyl groups identical and stereo-free (different organyl groups need the
+    alphanumerical order and, when necessary, locants,:31769), 2-4 esters.
+    """
+    try:
+        carbonyls = ester_carbonyl_atoms(mol)
+        if not 2 <= len(carbonyls) <= 4:
+            return None
+        if any(not ester_carbonyls_share_an_acid_parent(mol, carbonyls[0], c)
+               for c in carbonyls[1:]):
+            return None
+        if mol.HasSubstructMatch(_compiled_smarts("[CX3](=O)[OX2H1,OX1-]")):
+            return None  # a free acid group is senior (partial ester,
+        matches = []
+        for m in mol.GetSubstructMatches(_compiled_smarts("[CX3](=O)[OX2][#6]")):
+            if m[0] in carbonyls and all(m[0] != x[0] for x in matches):
+                matches.append(m)
+        if len(matches) != len(carbonyls):
+            return None
+        alkyl_names = set()
+        for m in matches:
+            _acid_atoms, alkyl_atoms = parse_ester_fragments(mol, m)
+            if not alkyl_atoms or any(
+                    mol.GetAtomWithIdx(a).HasProp('_CIPCode') for a in alkyl_atoms):
+                return None
+            alkyl_names.add(get_alkyl_fragment_name(mol, alkyl_atoms))
+        if len(alkyl_names) != 1:
+            return None
+        alkyl = alkyl_names.pop()
+        if not alkyl or ' ' in alkyl or not re.fullmatch(r"[a-z]+yl", alkyl):
+            return None
+        acid = _build_diacid_from_diester(mol, matches)
+        if acid is None:
+            return None
+        from ..assembly.composer import assemble_name
+        from ..namer import compute_features
+        feats = compute_features(acid, Chem.MolToSmiles(acid))
+        _diacid_namer()._classify(feats)
+        # A substituted propanedioic acid cites no locant: C-2 is its only
+        # substitutable carbon, so (the Blue Book, 'chloropropanedioic
+        # acid (PIN)') omits the locant of one substituent and (:3031, "All
+        # locants are omitted for parent compounds when all substitutable hydrogen
+        # atoms have the same locant") those of two. The acid composer cites them for
+        # most substituents ('2-phenylpropanedioic acid', '2,2-dimethylpropanedioic
+        # acid'), so no polyester of a substituted propanedioic acid is built here.
+        _chain = list(getattr(feats, "principal_chain", None) or ())
+        _acid_c = {m[0] for m in acid.GetSubstructMatches(
+            _compiled_smarts("[CX3](=O)[OX2H1]"))}
+        if (len(_chain) == 3 and _chain[0] in _acid_c and _chain[-1] in _acid_c
+                and acid.GetAtomWithIdx(_chain[1]).GetTotalNumHs() < 2):
+            return None
+        acid_name = assemble_name(feats, style="pin")
+        mult = {2: "di", 3: "tri", 4: "tetra"}[len(matches)]
+        if not acid_name or not (acid_name.endswith(f"{mult}oic acid")
+                                 or acid_name.endswith(f"{mult}carboxylic acid")):
+            return None
+        ate = _acid_name_to_ate(acid_name)
+        if ate is None:
+            return None
+        name = f"{mult}{alkyl} {ate}"
+        # The acid component is named by a gate-free intermediate namer, whose raw
+        # composer output can describe another molecule ('2-(1-aminoethyl)butane-
+        # dioic acid' for the 1-aminoethylidene acid). Ship the polyester name only
+        # when OPSIN reads it back to the input by full InChI; otherwise decline, so
+        # a caller keeps its own (labelled) name instead of losing it to a rejected
+        # one.
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        if not opsin_roundtrip_check(Chem.MolToSmiles(mol), name).get("passed"):
+            return None
+        return name
+    except Exception:  # noqa: BLE001 -- a producer bug must never crash naming
+        return None
 
 
 def _get_dioate_name(backbone_length: int) -> str:

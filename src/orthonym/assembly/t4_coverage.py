@@ -20,6 +20,7 @@ wire this namer into ``namer.py``.
 from __future__ import annotations
 
 import logging
+from contextvars import ContextVar
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
@@ -42,6 +43,67 @@ class _Candidate:
     """
     name: str
     result_obj: "Optional[GeneralEngineResult]"
+    # True when ``_prefer_verified_floor`` put the universal floor's spelling in
+    # place of a rung candidate that failed the round trip (see
+    # ``name_t4_complete_candidate``).
+    floor_substitute: bool = False
+    # True when the candidate is the final rung's universal floor itself: every
+    # engine rung above it declined.
+    final_floor: bool = False
+
+
+#: Whether the last whole-molecule ``name_t4_complete`` call returned the universal
+#: floor in place of a rung candidate that failed its round trip. Written at the END
+#: of each call (so a nested call for a fragment cannot leave its value behind for
+#: the outer one); read by the namer's recovery right after its own call.
+_LAST_FLOOR_SUBSTITUTE: ContextVar[bool] = ContextVar(
+    "t4_last_floor_substitute", default=False)
+
+
+#: Whether the last whole-molecule ``name_t4_complete`` call returned the final
+#: rung's universal floor (every engine rung declined); written like the flag above.
+_LAST_FINAL_FLOOR: ContextVar[bool] = ContextVar("t4_last_final_floor", default=False)
+
+
+def last_t4_was_final_floor() -> bool:
+    """True iff the most recent ``name_t4_complete`` call in this context returned
+    the final rung's universal floor: no engine rung (the general engine with the
+    perceived features or a feature override, the polyol rung) gave a candidate."""
+    return _LAST_FINAL_FLOOR.get()
+
+
+def last_t4_was_floor_substitute() -> bool:
+    """True iff the most recent ``name_t4_complete`` call in this context returned
+    the universal floor standing in for a rung candidate that failed the full-
+    InChIKey round trip (``_prefer_verified_floor``). Such a rung candidate is the
+    mark of a degraded naming context (the recovery inside ``name``; see
+    ``namer._try_besteffort_clean_general_fallthrough``), where a clean context can
+    still build the engine's own verified name."""
+    return _LAST_FLOOR_SUBSTITUTE.get()
+
+
+def reset_t4_floor_substitute() -> None:
+    """Clear the flags before a call whose producer may be replaced (tests stub
+    ``name_t4_complete``), so a stale value is never read."""
+    _LAST_FLOOR_SUBSTITUTE.set(False)
+    _LAST_FINAL_FLOOR.set(False)
+
+
+def name_t4_complete_candidate(mol, features) -> Optional[_Candidate]:
+    """``name_t4_complete`` returning the whole candidate (``floor_substitute``
+    included). Same gates, same name."""
+    candidate = _best_effort_candidate(mol, features)
+    if candidate is not None and candidate.result_obj is not None:
+        # a phase Part A: the shared best-effort certification gate (E1 + the
+        # binding spine). ``allow_charged=False`` preserves the T4
+        # net-charge-out-of-scope contract (see ``name_t4_complete``).
+        if not certify_general_result(mol, candidate.result_obj,
+                                      allow_charged=False):
+            candidate = None
+    _LAST_FLOOR_SUBSTITUTE.set(bool(candidate is not None
+                                    and candidate.floor_substitute))
+    _LAST_FINAL_FLOOR.set(bool(candidate is not None and candidate.final_floor))
+    return candidate
 
 
 def name_t4_complete(mol, features) -> Optional[str]:
@@ -100,20 +162,13 @@ def name_t4_complete(mol, features) -> Optional[str]:
     before/after re-measurement is BYTE-IDENTICAL emit/rt_exact -- see
     internal notes.
     """
-    candidate = _best_effort_candidate(mol, features)
-    if candidate is None:
-        return None
-    if candidate.result_obj is None:
-        return candidate.name
     # a phase Part A: the shared best-effort certification gate (E1 + the
-    # binding spine). Behaviour-identical to the former inline
-    # verify_certificate + verify_spine(escalate=STRICT_STEREO_CHARGE_AXES)
-    # pair; now the ONE place all three lanes route through so they cannot
-    # drift (validation/coverage_gate.py). ``allow_charged=False`` preserves
-    # the net-charge-out-of-scope contract.
-    if not certify_general_result(mol, candidate.result_obj, allow_charged=False):
-        return None
-    return candidate.name
+    # binding spine) runs in ``name_t4_complete_candidate``: behaviour-identical
+    # to the former inline verify_certificate + verify_spine(escalate=
+    # STRICT_STEREO_CHARGE_AXES) pair; the ONE place all three lanes route
+    # through so they cannot drift (validation/coverage_gate.py).
+    candidate = name_t4_complete_candidate(mol, features)
+    return candidate.name if candidate is not None else None
 
 
 def _run_general_e1(mol, features) -> Optional[_Candidate]:
@@ -247,11 +302,47 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
             return candidate  # rung already RT-correct: keep its nomenclature
     except Exception:
         pass  # treat an unverifiable rung as a candidate for the floor upgrade
+    floor_name = _verified_universal_floor(mol, smi)
+    if floor_name is not None:
+        return _Candidate(name=floor_name, result_obj=None, floor_substitute=True)
+    return candidate
+
+
+def _reads_back_as_constitution(mol, name: str) -> bool:
+    """True iff OPSIN parses ``name`` to the input's constitution (InChIKey
+    skeleton block; ``validate_atom_coverage``). False for an unparseable name,
+    a different molecule, or no parse at all (fail-closed: the caller then only
+    looks for a fully verified alternative)."""
+    try:
+        from ..validation.atom_coverage import validate_atom_coverage
+        cov = validate_atom_coverage(mol, name)
+        return cov.method == "parse_back" and bool(cov.constitution_match)
+    except Exception:
+        return False
+
+
+def _verified_universal_floor(mol, smi: str, first=None) -> Optional[str]:
+    """The first spelling of the universal floor that FULL-InChIKey verifies
+    (``verify_or_none``), or ``None``.
+
+    Order: the floor as built; the von Baeyer form of a fused spiro component
+    (Task C); then both forms without the '<acyl>oxy' leaf (see
+    ``_leaf_checked_floor``). ``first`` is an already-built floor result for the
+    first spelling (the final rung has one), so it is not built twice.
+
+    Shared by ``_prefer_verified_floor`` (a rung's name failed the gate) and the
+    final rung (the floor's own first spelling failed it). The final rung used to
+    ship the first spelling unverified and stop, so a fused-spiro floor name that
+    fails the round trip (e.g. a retained ring name whose locants read back as a
+    different molecule) abstained although its von Baeyer form verifies; a rung
+    candidate reaching ``_prefer_verified_floor`` got the retry, the last rung did
+    not. Fail-closed: any error returns ``None`` (the caller keeps what it had)."""
+    from ..validation.reconstruct import verify_or_none
     try:
         from .universal_substituent import name_universal_substitutive
-        uni = name_universal_substitutive(mol)
+        uni = first if first is not None else name_universal_substitutive(mol)
         if uni is not None and uni.name and verify_or_none(uni.name, smi) is not None:
-            return _Candidate(name=uni.name, result_obj=None)
+            return uni.name
         # Task C retry: the systematic fused-spiro name (a fusion descriptor the
         # numbering subsystem got wrong or OPSIN cannot parse) failed the gate.
         # Retry FORCING the von-Baeyer polyene form of the fused spiro
@@ -260,7 +351,7 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
         uni_vb = name_universal_substitutive(mol, force_vonbaeyer_spiro=True)
         if uni_vb is not None and uni_vb.name \
                 and verify_or_none(uni_vb.name, smi) is not None:
-            return _Candidate(name=uni_vb.name, result_obj=None)
+            return uni_vb.name
         # Leaf-free retry: an '<acyl>oxy' leaf named a branch of the floor name
         # and the name failed the gate -- rebuild both forms WITHOUT that leaf,
         # the spelling the floor gave before the leaf existed (see
@@ -271,10 +362,36 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
                     mol, force_vonbaeyer_spiro=force_vb, acyloxy_leaf=False)
                 if alt is not None and alt.name \
                         and verify_or_none(alt.name, smi) is not None:
-                    return _Candidate(name=alt.name, result_obj=None)
+                    return alt.name
     except Exception as exc:  # fail-closed: keep the rung, never abstain
         logger.info("t4 verified-floor preference raised: %s", exc)
-    return candidate
+    return None
+
+
+def name_prefix_order_fallback(mol) -> Optional[str]:
+    """The universal floor's name of ``mol`` with its parent's prefixes cited out
+    of the order, or ``None``.
+
+    The last resort of the best-effort tier for a molecule it would otherwise not
+    name (``namer.Orthonym._maybe_prefix_order_fallback`` is the only caller, and
+    it adds the checks that make a shipped name the input's): the round trip
+    (OPSIN's SMILES read by RDKit) can depend on the citation order of the
+    prefixes, so a floor name in the order (the Blue Book order) can fail
+    at the stereo layer although its descriptors are right -- see
+    ``universal_substituent._prefix_order_fallback``. A name is returned only when
+    that rung built it: the -ordered spelling failed at the stereo layer
+    only and this spelling reads back to the input's full InChIKey. Such a name
+    breaks on purpose and is never a PIN. Fail-closed: any error returns
+    ``None``."""
+    try:
+        from .universal_substituent import name_universal_substitutive
+        uni = name_universal_substitutive(mol, prefix_order_fallback=True)
+    except Exception as exc:  # fail-closed: the abstention stands
+        logger.info("t4 prefix-order fallback raised: %s", exc)
+        return None
+    if uni is None or not uni.prefix_order_fallback or not uni.name:
+        return None
+    return uni.name
 
 
 def _leaf_checked_floor(mol, uni):
@@ -518,13 +635,30 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
                 mol, all_heavy, radical_sites[0]['atom_idx'],
                 bond_order=radical_sites[0]['n_electrons'])
             if _prefix_name:
-                return _Candidate(name=_prefix_name, result_obj=None)
+                return _Candidate(name=_prefix_name, result_obj=None,
+                                  final_floor=True)
         else:
             from .universal_substituent import name_universal_substitutive
             _uni = name_universal_substitutive(mol)
             if _uni is not None and _uni.name:
                 _uni = _leaf_checked_floor(mol, _uni)
-                return _Candidate(name=_uni.name, result_obj=None)
+                # The retry the rungs above get through ``_prefer_verified_floor``:
+                # when the floor's first spelling does not even read back as the
+                # input's CONSTITUTION (OPSIN cannot parse it, or it parses to a
+                # different molecule), no later step can rescue it, so a verified
+                # alternative spelling (the von Baeyer form of a fused spiro
+                # component, the leaf-free form) is offered instead. A first
+                # spelling with the right constitution ships to the caller's
+                # ladder exactly as before (its stereo composition may still
+                # complete it there).
+                if not _reads_back_as_constitution(mol, _uni.name):
+                    from rdkit import Chem as _Chem
+                    _alt = _verified_universal_floor(
+                        mol, _Chem.MolToSmiles(mol), first=_uni)
+                    if _alt is not None:
+                        return _Candidate(name=_alt, result_obj=None,
+                                          final_floor=True)
+                return _Candidate(name=_uni.name, result_obj=None, final_floor=True)
     except Exception as exc:  # fail-closed: a producer bug keeps the abstention
         logger.info("t4 universal-substitutive rung raised: %s", exc)
 

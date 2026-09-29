@@ -755,7 +755,21 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 naming_system == 'metal_direct'
                 and metal_symbol in ('Zn', 'Cd', 'Hg')
                 and all(s == 'C' or is_metal_element(s) for s in _syms))
-            if a0.GetSymbol() == 'C' and (_g14_allcarbon or _g12_metalloid_ok):
+            # Breadth Job 2 (best-effort tier only): a Group-12 metal is the
+            # central atom of an additive name whatever its organyl ligand
+            # carries, the Blue Book: coordination nomenclature is
+            # the primary method for Groups 3-12;,:39735: no PIN), so a
+            # functionalised ligand ('2-oxocyclohexyl' in
+            # '(2-oxocyclohexyl)mercury chloride') is named by the same
+            # substituent composer. The Group-14 guard above is different: there
+            # a senior characteristic group outranks the parent hydride.
+            from ..metrics.provenance import best_effort_ctx
+            _g12_functional_ok = (
+                naming_system == 'metal_direct'
+                and metal_symbol in ('Zn', 'Cd', 'Hg')
+                and best_effort_ctx.get())
+            if a0.GetSymbol() == 'C' and (_g14_allcarbon or _g12_metalloid_ok
+                                          or _g12_functional_ok):
                 nm = name_substituent(mol, set(atoms), attach_idx)
                 if not nm or nm == 'substituent':
                     return None
@@ -1006,7 +1020,14 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             if ligand_class == 'alkyl_halide':
                 organic_name = organic_names[0]  # exactly one organic ligand
                 halide_word = _HALIDE_LIGAND_TO_HALIDE_WORD[halide_ligs[0].ligand_smarts_key]
-                full_name = f"{organic_name}{metal_name} {halide_word}"
+                # Enclosing marks around a compound prefix,
+                # the Blue Book: '(2-oxocyclohexyl)mercury chloride') and
+                # around a simple prefix with a locant,:7255, as in
+                # '(propan-2-yl)cyanamide (PIN)',:33535); 'ethylmagnesium
+                # bromide' and 'tert-butylmercury chloride' stay bare.
+                from ..assembly.naming_utils import enclose_if_compound
+                full_name = (f"{enclose_if_compound(organic_name)}{metal_name} "
+                             f"{halide_word}")
                 metal_name_part = metal_name
                 ligand_tree_nodes = [
                     NameTreeNode(parent_stem=organic_name,
@@ -1054,7 +1075,17 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                         return _encl(nm, 1)       # nested -> bracket upgrade
                     return f"({nm})"
                 ordered = sorted(organic_names, key=lambda nm: (_ask(nm), nm))
-                ligand_prefix = ''.join(_enclose_ligand(nm) for nm in ordered)
+                if len(_distinct) == 1:
+                    # Identical ligands take one multiplier, the enclosed prefix
+                    # after it, the Blue Book; '1,4-di(propan-
+                    # 2-yl)cyclohexane (PIN)',:25719; naming_utils.
+                    # multiplied_component): 'di(propan-2-yl)zinc',
+                    # 'bis(2-aminoethyl)zinc', never '(propan-2-yl)(propan-2-yl)zinc'.
+                    from ..assembly.naming_utils import multiplied_component
+                    ligand_prefix = multiplied_component(
+                        len(ordered), ordered[0], _enclose_ligand(ordered[0]))
+                else:
+                    ligand_prefix = ''.join(_enclose_ligand(nm) for nm in ordered)
                 full_name = f"{ligand_prefix}{metal_name}"
                 ligand_tree_nodes = [
                     NameTreeNode(parent_stem=nm, class_id='organometallic_ligand')

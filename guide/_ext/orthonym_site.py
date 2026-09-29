@@ -321,7 +321,7 @@ def write_llms(app, exception):
     titles = {d: (env.titles[d].astext() if d in env.titles else d) for d in seq}
     lines = ["# Orthonym", "",
              "> Orthonym turns a molecular structure (SMILES) into its IUPAC name, following the IUPAC 2013 "
-             "recommendations. OPSIN reads every name back and the structures are compared by full InChIKey "
+             "recommendations. OPSIN reads the names back for a round-trip check by full InChIKey "
              "before a name is returned; when no name passes, the engine declines and says why.", "",
              "Install: pip install \"git+https://github.com/Steinbeck-Lab/Orthonym.git\", then "
              "orthonym --fetch-jars. Needs Python 3.10+ and a Java 11+ runtime. The whole text of this "

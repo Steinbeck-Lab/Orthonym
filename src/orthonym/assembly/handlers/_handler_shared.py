@@ -2972,13 +2972,21 @@ def _assemble_fragments(
         # Build unsaturation infix with locants for compounds with functional groups
         unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)
 
-        name = format_suffix_with_locants(
-            stem,
-            unsaturation_infix,
-            suffix_text,
-            suffix_locants,
-            multiplier
-        )
+        if (stem == "eth" and suffix_text == "amide" and count == 1
+                and not double_locants and not triple_locants):
+            # (the Blue Book-32693): 'acetamide' is the
+            # retained PIN of the two-carbon monoamide and can be substituted
+            # ('N-phenylacetamide (PIN)',:32859); 'ethanamide' never is. Its
+            # locants stay: N and C-2 are both substitutable.
+            name = "acetamide"
+        else:
+            name = format_suffix_with_locants(
+                stem,
+                unsaturation_infix,
+                suffix_text,
+                suffix_locants,
+                multiplier
+            )
     else:
         # No suffix = hydrocarbon, build name with unsaturation.
         # -06 : a substituted cycloalkene must keep its ring ene-locant

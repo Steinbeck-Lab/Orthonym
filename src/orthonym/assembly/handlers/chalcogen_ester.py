@@ -110,7 +110,12 @@ def name_chalcogen_ester(
         return None
 
     # Compose: "{X}-{alkyl} {chain}{X-suffix}" - e.g., "Se-methyl propaneselenoate".
-    name = f"{x_prefix}-{alkyl_word} {stem_word}"
+    # A compound or locant-bearing alkyl word is enclosed after the element locant
+    #, the Blue Book; '*S*-(2-cyanoethyl) cyclohexanesulfinothioate
+    # (PIN)':31765, '*S*-(trimethylgermyl) ethanesulfonothioate (PIN)':31659), never
+    # 'S-2-cyanoethyl'; a simple one ('S-ethyl hexanethioate (PIN)',:31989) is bare.
+    from ..naming_utils import enclose_if_compound
+    name = f"{x_prefix}-{enclose_if_compound(alkyl_word)} {stem_word}"
     name = _enrich_handler_name(features, name, "chalcogen_ester")
 
     pool = get_current_pool()

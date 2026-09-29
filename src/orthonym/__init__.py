@@ -3,8 +3,12 @@
 Orthonym reads a structure written as SMILES and builds its IUPAC name from
 the rules of the IUPAC 2013 recommendations, aiming at the Preferred IUPAC
 Name. Before a name is returned, OPSIN reads it back into a structure and that
-structure is compared with yours. When no name passes, you get a label that
-says so instead of a name.
+structure is compared with yours. A few names OPSIN cannot read (retained
+natural-product and metal-complex names from exact-match lists, a few name
+forms outside OPSIN's grammar, and stereodescriptors OPSIN cannot parse) are
+returned by the default tier without that full read-back; the provenance row
+(``Orthonym.name_tiered``) marks each one. When no name passes, you get a
+label that says so instead of a name.
 
 The public names are ``name_compound`` (one molecule, one name),
 ``name_with_tree`` (the name and its parts), the ``Orthonym`` class (all

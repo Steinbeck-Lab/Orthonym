@@ -27,7 +27,7 @@ The first line is a log message on the error stream: the engine withdrew a candi
 
 | `limit_code` | Label in place of the name | When |
 |:--|:--|:--|
-| `UNSUPPORTED_ELEMENT` | `inorganic compound (not supported)`, or `<metal> compound (not supported)` | an element outside the ones the rules cover, or no carbon at all |
+| `UNSUPPORTED_ELEMENT` | `inorganic compound (not supported)`, or `<metal> compound (not supported)` | an element outside the ones the rules cover |
 | `WILDCARD_ATOMS` | `compound with wildcard atoms (not supported)` | the structure has a `*` atom |
 | `STRUCTURE_TOO_LARGE` | `unknown organic compound` | more heavy atoms than the engine's limit |
 | `ISOLATED_ATOM` | `unknown organic compound` | a single heavy atom |

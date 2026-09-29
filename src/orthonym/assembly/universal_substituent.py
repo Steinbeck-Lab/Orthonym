@@ -285,6 +285,10 @@ class UniversalResult:
     # True when an '<acyl>oxy' leaf named a branch of this name (see
     # ``_Ctx.acyloxy_leaf``): the caller then knows a leaf-free retry exists.
     acyloxy_leaf_fired: bool = False
+    # True when ``name`` cites the parent's prefixes out of the order
+    # (``_prefix_order_fallback``): never a PIN, only asked for by
+    # ``t4_coverage.name_prefix_order_fallback``.
+    prefix_order_fallback: bool = False
 
 
 @dataclass
@@ -369,6 +373,13 @@ class _ComponentResult:
     # scope stereo block, never a
     # merge across independently-
     # numbered branch spines).
+    top_prefix_atoms: Optional[Tuple[Tuple[int, ...], ...]] = None  # the
+    # parent's prefix list as the
+    # name cites it: for each
+    # prefix, the spine atoms it is
+    # attached at (top level only,
+    # None below it). Read by
+    # ``_prefix_order_fallback``.
 
 
 # ===========================================================================
@@ -379,8 +390,13 @@ def name_universal_substitutive(
     mol, atom_work_budget: int = DEFAULT_ATOM_WORK_BUDGET,
     force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True,
+    prefix_order_fallback: bool = False,
 ) -> Optional[UniversalResult]:
     """Name *mol* unconditionally, or return ``None`` (void -- never partial).
+
+    ``prefix_order_fallback`` (default False: byte-identical behaviour) arms the
+    last stereo rung ``_prefix_order_fallback`` (see there); only
+    ``t4_coverage.name_prefix_order_fallback`` sets it.
 
     ``None`` happens for exactly six reasons, all fail-closed:
       1. a scope guard (isotopes / radicals / wildcard atoms / multi-fragment
@@ -431,7 +447,7 @@ def name_universal_substitutive(
     try:
         res = _name_universal_substitutive_unsafe(
             mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
-            acyloxy_leaf=acyloxy_leaf)
+            acyloxy_leaf=acyloxy_leaf, prefix_order_fallback=prefix_order_fallback)
         if res is not None:
             return res
         # M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide the primary
@@ -454,7 +470,8 @@ def name_universal_substitutive(
                 return _name_universal_substitutive_unsafe(
                     neutral, atom_work_budget,
                     force_vonbaeyer_spiro=force_vonbaeyer_spiro,
-                    acyloxy_leaf=acyloxy_leaf)
+                    acyloxy_leaf=acyloxy_leaf,
+                    prefix_order_fallback=prefix_order_fallback)
         return None
     except Exception:
         return None
@@ -462,7 +479,7 @@ def name_universal_substitutive(
 
 def _name_universal_substitutive_unsafe(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
-    acyloxy_leaf: bool = True,
+    acyloxy_leaf: bool = True, prefix_order_fallback: bool = False,
 ) -> Optional[UniversalResult]:
     """The real body -- may raise; ``name_universal_substitutive`` is the
     only caller and converts every exception to ``None``."""
@@ -565,13 +582,17 @@ def _name_universal_substitutive_unsafe(
     # FULL-InChIKey verifies. ``comp.bindings``/``covers`` are the plain
     # partition regardless of which name wins (stereo is a pure name-string
     # decoration, so the atom->token partition is identical).
-    name = _resolve_floor_stereo(ctx, mol, heavy, comp, atom_work_budget)
+    name, reordered = _resolve_floor_stereo(
+        ctx, mol, heavy, comp, atom_work_budget,
+        prefix_order_fallback=prefix_order_fallback)
     return UniversalResult(name=name, bindings=tuple(comp.bindings), covers=covers,
-                           acyloxy_leaf_fired=ctx.acyloxy_leaf_fired)
+                           acyloxy_leaf_fired=ctx.acyloxy_leaf_fired,
+                           prefix_order_fallback=reordered)
 
 
 def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
-                          comp: "_ComponentResult", atom_work_budget: int) -> str:
+                          comp: "_ComponentResult", atom_work_budget: int,
+                          prefix_order_fallback: bool = False) -> Tuple[str, bool]:
     """ Track A: pick the most stereo-complete floor name that FULL-InChIKey
     verifies, degrading gracefully. Returns the name string to ship.
 
@@ -596,6 +617,12 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     (full; rung-1b top-ring cis-/trans-; rung-1c substituent-ring cis/trans, the
     sense cartesian product of <=2 relative rings, so <=4; top-only), returning on
     the FIRST match; ``plain`` needs none.
+
+    Returns ``(name, reordered)``: ``reordered`` is True only when the name came
+    from the last rung, ``_prefix_order_fallback`` (armed by
+    ``prefix_order_fallback``, best-effort last resort only): the parent's prefixes
+    cited out of the order because the ordered spelling's round trip fails
+    at the stereo layer only.
     """
     from ..validation.reconstruct import verify_or_none
 
@@ -612,7 +639,7 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         b.GetStereo() != Chem.BondStereo.STEREONONE for b in m.GetBonds()
     )
     if not has_stereo:
-        return plain
+        return plain, False
 
     top_block = ""
     if comp.spine_atom_to_locant:
@@ -745,8 +772,137 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         except Exception:
             verified = None  # fail-closed: never ship an unverified guess
         if verified is not None:
-            return verified
-    return plain
+            return verified, False
+    # rung 3 (last resort, armed only by ``t4_coverage.name_prefix_order_fallback``):
+    # the -ordered full candidate failed its round trip at the stereo layer
+    # only -- see ``_prefix_order_fallback``.
+    if (prefix_order_fallback and comp_full is not None and candidates
+            and candidates[0] == full_name):
+        try:
+            reordered = _prefix_order_fallback(
+                ctx, mol, heavy, comp_full, top_block, full_name, can,
+                atom_work_budget)
+        except Exception:
+            reordered = None  # fail-closed: keep the stereo-free floor name
+        if reordered is not None:
+            return reordered, True
+    return plain, False
+
+
+#: How many prefix orders ``_prefix_order_fallback`` tries after the one
+#: (each costs one rebuild of the name and one OPSIN read-back).
+_MAX_PREFIX_ORDERS = 3
+
+
+def _stereo_free_key(m) -> str:
+    """The full standard InChIKey of ``m`` with every stereo unit removed."""
+    m2 = Chem.Mol(m)
+    Chem.RemoveStereochemistry(m2)
+    return inchi.MolToInchiKey(m2) or ""
+
+
+def _fails_at_stereo_layer_only(mol, name: str) -> bool:
+    """True iff OPSIN parses ``name`` to a molecule whose full InChIKey differs
+    from ``mol``'s while the two agree once every stereo unit is removed from both
+    (constitution, charge, protonation and isotopes all equal): the name fails its
+    round trip at the stereo layer and nowhere else. Uses the memoised parse the
+    round trip already made. False when OPSIN is unavailable or cannot parse the
+    name (fail-closed)."""
+    from ..validation.atom_coverage import _parse_name_with_opsin, find_opsin_jar
+    jar = find_opsin_jar()
+    if not jar:
+        return False
+    parsed = _parse_name_with_opsin(name, jar)
+    pmol = Chem.MolFromSmiles(parsed) if parsed else None
+    if pmol is None:
+        return False
+    full_in, full_out = inchi.MolToInchiKey(mol), inchi.MolToInchiKey(pmol)
+    if not full_in or not full_out or full_in == full_out:
+        return False
+    free_in, free_out = _stereo_free_key(mol), _stereo_free_key(pmol)
+    return bool(free_in) and free_in == free_out
+
+
+def _prefix_order_fallback(ctx: "_Ctx", mol, heavy: FrozenSet[int],
+                           comp_full: "_ComponentResult", top_block: str,
+                           full_name: str, can: str,
+                           atom_work_budget: int) -> Optional[str]:
+    """Last stereo rung: the parent's prefixes cited in another order.
+
+    The round trip (OPSIN's SMILES of the name, read by RDKit, full InChIKey) can
+    depend on which substituent prefix is cited first although the name's meaning
+    does not, the Blue Book: "Alphanumerical order is used to
+    establish the order of citation of detachable substituent prefixes";:3446,
+    it does not involve stereochemical descriptors). Measured (D3, TRIAGE 'Breadth
+    -- PubChem losses' class D) on the P(III) stereocentre of
+    ``Cc1cn([C@H]2CC(O[P@]3O[C@](C)[C@@H]4CCCN43)[C@@H](CO)O2)c(=O)[nH]c1=O``:
+    OPSIN's own StdInChIKey is an InChIKey for both orders of the
+    same '(2S,4R,5S)-' name, but its SMILES carries a ring-closure digit on the
+    three-coordinate P only when the P-substituent '2-{...}' is cited first, and
+    RDKit reads a lone-pair stereocentre that carries a ring-closure digit with the
+    opposite configuration from the OpenSMILES reading (CDK, OPSIN) -- as it reads
+    the input, which carries one too. So only the P-first spelling reproduces the
+    input's (RDKit) key -STPZVPHQSA-N; the spelling, the correct PIN order,
+    never does, and the molecule had no name at all. Whether a reordered name is
+    the input's is decided by the caller's checks
+    (``namer._cip_labels_match_input_as_written``: the descriptors are those of
+    the input string as written).
+
+    Reached only when every candidate above failed its round trip AND the
+    -ordered full candidate ``full_name`` fails at the stereo layer only
+    (``_fails_at_stereo_layer_only``: its stereo-stripped parse is the input's
+    constitution, charge and isotopes) AND cites every stereo unit of the input
+    (``general_engine_stereo_complete``: a misreading, not an omission, which no
+    citation order can repair). Then each prefix of the parent's list is
+    moved in turn to the front of the list (the others keep their order),
+    the prefixes attached at a stereogenic parent atom first, at most
+    ``_MAX_PREFIX_ORDERS`` orders; the first spelling OPSIN reads back to the
+    input's FULL InChIKey (``verify_or_none``) is returned. The descriptors are
+    the candidate's, unchanged. Such a name deliberately breaks, so
+    it is never a PIN: the caller labels it best_effort. Returns ``None`` when the
+    condition does not hold or no order reads back."""
+    from ..validation.reconstruct import verify_or_none
+
+    from ..rules.stereochemistry import general_engine_stereo_complete
+
+    groups = comp_full.top_prefix_atoms or ()
+    if len(groups) < 2 or not _fails_at_stereo_layer_only(mol, full_name):
+        return None
+    # A misreading, not an omission: the spelling cites every stereo unit
+    # of the input (an omitted descriptor is not restored by any citation order).
+    if not general_engine_stereo_complete(Chem.Mol(mol), full_name):
+        return None
+    m = ctx.mol
+    stereo_atoms = {a.GetIdx() for a in m.GetAtoms()
+                    if a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED}
+    for b in m.GetBonds():
+        if b.GetStereo() != Chem.BondStereo.STEREONONE:
+            stereo_atoms.update((b.GetBeginAtomIdx(), b.GetEndAtomIdx()))
+    on_stereo = [i for i in range(1, len(groups))
+                 if any(a in stereo_atoms for a in groups[i])]
+    order = on_stereo + [i for i in range(1, len(groups)) if i not in on_stereo]
+    for front in order[:_MAX_PREFIX_ORDERS]:
+        saved_budget = ctx.budget
+        try:
+            ctx.budget = _Budget(atom_work_budget)
+            alt = _name_component(ctx, heavy, attach_hint=None, is_top=True,
+                                  emit_branch_stereo=True, top_prefix_front=front)
+        except Exception:
+            alt = None
+        finally:
+            ctx.budget = saved_budget
+        if alt is None or alt.top_prefix_atoms != (
+                (groups[front],) + groups[:front] + groups[front + 1:]):
+            continue  # not the same prefix list (fail-closed)
+        candidate = (top_block + alt.name) if top_block else alt.name
+        if candidate == full_name:
+            continue
+        try:
+            if verify_or_none(candidate, can) is not None:
+                return candidate
+        except Exception:
+            continue
+    return None
 
 
 def _ring_cistrans_is_complete(mol, a: int, b: int) -> bool:
@@ -1168,6 +1324,7 @@ def _name_component(
     ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[int], is_top: bool,
     emit_branch_stereo: bool = False,
     relative_ring_override: Optional[Dict[FrozenSet[int], str]] = None,
+    top_prefix_front: Optional[int] = None,
 ) -> Optional[_ComponentResult]:
     """Name one component -- the whole molecule (``is_top``) or one branch.
 
@@ -1195,6 +1352,11 @@ def _name_component(
     Scoped per-ring, so an independent absolute centre elsewhere is unaffected.
     Threaded unchanged into the recursion so it reaches a ring at any depth.
     ``None`` (the default) -> byte-identical prior behaviour.
+
+    ``top_prefix_front`` (top level only, NOT threaded into the recursion): the
+    index, in the -sorted prefix list of the parent, of the prefix to cite
+    first; the others keep their order. Used only by ``_prefix_order_fallback``;
+    ``None`` (the default) -> the order, byte-identical.
     """
     ctx.budget.charge(len(component))
     if not component:
@@ -1331,6 +1493,7 @@ def _name_component(
     # ``-ium`` this spine appends (their ``[O-]``
     # adds itself as an ``oxido`` leaf below).
     prefix_entries: Dict[str, List[int]] = {}
+    prefix_entry_atoms: Dict[str, List[int]] = {}
     for s_atom, root, order, branch_atoms in _discover_branches(
         mol, spine_atoms, component,
     ):
@@ -1357,11 +1520,13 @@ def _name_component(
             if rel is not None:
                 branch_stereo = f"{rel}-"
             else:
-                branch_stereo = _stereo_prefix(ctx.mol, sub.spine_atom_to_locant)
+                branch_stereo = _branch_stereo_block(
+                    ctx.mol, sub.spine_atom_to_locant, s_atom, root)
             if branch_stereo:
                 rendered = branch_stereo + rendered
         loc = spine_atom_to_locant[s_atom]
         prefix_entries.setdefault(rendered, []).append(loc)
+        prefix_entry_atoms.setdefault(rendered, []).append(s_atom)
         bindings.append((rendered, sub.covers))
         charged_accum |= sub.charged
         internal_accum |= sub.internal_atoms
@@ -1373,9 +1538,15 @@ def _name_component(
         # lexicographic; ordinary int locants sort identically under this key.
         locs = sorted(locs, key=_locant_sort_key)
         prefix_parts.append((alpha_sort_key(name),
-                              format_substituent_prefix(name, locs, len(locs))))
+                              format_substituent_prefix(name, locs, len(locs)),
+                              tuple(sorted(prefix_entry_atoms[name]))))
     prefix_parts.sort(key=lambda t: t[0])
-    joined = "-".join(p for _k, p in prefix_parts)
+    # ``_prefix_order_fallback`` only (top level): cite one prefix first, the
+    # others in their order.
+    if (is_top and top_prefix_front is not None
+            and 0 < top_prefix_front < len(prefix_parts)):
+        prefix_parts.insert(0, prefix_parts.pop(top_prefix_front))
+    joined = "-".join(p for _k, p, _a in prefix_parts)
 
     if joined:
         # hyphen glue: a joining '-' is needed only before a
@@ -1402,7 +1573,46 @@ def _name_component(
         attach_locant=attach_locant, charged=frozenset(charged_accum),
         internal_atoms=frozenset(internal_accum),
         spine_atom_to_locant=dict(spine_atom_to_locant),
+        top_prefix_atoms=(tuple(a for _k, _p, a in prefix_parts)
+                          if is_top else None),
     )
+
+
+def _branch_stereo_block(mol, branch_atom_to_locant: Dict[int, int],
+                         host_atom: int, root: int) -> str:
+    """The stereodescriptor block of one branch, cited at the front of its prefix
+    , the Blue Book: "When they relate to substituent groups, they are
+    cited at the front of the corresponding prefix").
+
+    A branch attached to its host by a double bond is a '-ylidene' prefix, and that
+    double bond is ONE stereogenic unit with one end in each scope. The host's own
+    block already cites it with the host's locant whenever the ylidene end is
+    acyclic (``collect_stereodescriptors``'s exocyclic / '-ylidene' licence, the
+    same ``_is_true_exocyclic`` test), which is method (a) of (1)
+    (the Blue Book, "the double bond is considered as an integral part of the
+    parent structure; the stereodescriptor is placed at the front of the
+    substitutive name, preceded by the locant indicating its point of attachment to
+    the parent structure";:48279 "Method (a) generates preferred IUPAC names").
+    Method (b) (:48277) cites it on the ylidene prefix instead. The two methods are
+    alternatives: citing the unit in both scopes gives one bond two descriptors,
+    e.g. '3-{(1Z)-1-[(1Z)-2-azaethan-1-ylidene]-...-3-azaprop-2-en-1-yl}', which
+    the round trip cannot read. So the branch leaves that bond to its host; when the
+    ylidene end is a ring atom the host does not cite it and the branch keeps it
+    (method (b), as before)."""
+    from ..rules.stereochemistry import (
+        _is_true_exocyclic,
+        collect_stereodescriptors,
+        format_stereodescriptor_string,
+    )
+    skip = ()
+    bond = mol.GetBondBetweenAtoms(host_atom, root)
+    if (bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE
+            and _is_true_exocyclic(mol, host_atom, root)):
+        skip = (bond.GetIdx(),)
+    if not skip:
+        return _stereo_prefix(mol, branch_atom_to_locant)
+    return format_stereodescriptor_string(
+        collect_stereodescriptors(mol, branch_atom_to_locant, skip_bonds=skip))
 
 
 def _resolve_spine_charge(

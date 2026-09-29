@@ -65,4 +65,19 @@ def test_inorganic_salt_fails_closed():
     # under any configuration (confirmed by disabling the null-out and
     # re-running: result is 'beryllium compound (not supported)', never
     # 'unknown organic compound').
-    assert _be().name_tiered("[Be+2].[O-][Si](=O)Cl.[Sr+2]").get("name") is None
+    #
+    # Breadth Job 2 (the user's decision, 2026-09-28): the best-effort tier now names
+    # this drawing as a adduct of its three ions -- a COMPLETE name, which a
+    # fresh OPSIN call reads back to exactly the drawn structure; the hazard
+    # (a partial name that drops the anion) stays closed, and the label is below PIN
+    #, the Blue Book, no PIN for a mixed adduct).
+    from tests.support.rt_assert import _independent_parse
+    smiles = "[Be+2].[O-][Si](=O)Cl.[Sr+2]"
+    row = _be().name_tiered(smiles)
+    name = row.get("name")
+    assert name == ("1-chloro-1-oxido-2-oxa-1-silaeth-1-ene\u2014beryllium(2+)"
+                    "\u2014strontium(2+) (1/1/1)"), name
+    parsed = _independent_parse(name)
+    assert parsed and Chem.MolToSmiles(Chem.MolFromSmiles(parsed)) == \
+        Chem.MolToSmiles(Chem.MolFromSmiles(smiles)), (name, parsed)
+    assert row["is_pin"] is False and row["tier"] == "systematic_verified"

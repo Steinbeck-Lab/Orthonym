@@ -17,7 +17,7 @@ Covers four trace-pinpointed fixes (`internal notes`):
    the correct name because "-ite" was missing from the suffix regex).
 3. Inorganic retained-name table fixes/additions (``data/ion_retained_names.py``):
    chlorite/chlorate swap, a malformed nitrite key, bisulfite (as
-   ``hydrogensulfite``), phosphonate dianion.
+   ``hydrogen sulfite``), phosphonate dianion.
 4. Substitutive nitramide/N-nitro producer (``rules/nitramide.py``), wired
    into dispatch as ``NITRAMIDE_SUBSTITUTED``.
 
@@ -75,7 +75,7 @@ def test_organic_unnameable_still_uses_organic_sentinel(namer):
     ("O=S([O-])[O-]", "sulfite"),
     ("[O-][Cl+][O-]", "chlorite"),          # was wrongly 'chlorate' in the table
     ("[O-]N=O", "nitrite"),                 # old table key was a malformed N+ form
-    ("O=S([O-])O", "hydrogensulfite"),      # genuine missing row
+    ("O=S([O-])O", "hydrogen sulfite"),     # genuine missing row; two words
     ("O=[PH]([O-])[O-]", "phosphonate"),    # genuine missing row
 ])
 def test_inorganic_oxoanion_names(namer, smi, expected):
@@ -159,7 +159,7 @@ def test_all_targets_round_trip_exact():
         ("O=S([O-])[O-]", "sulfite"),
         ("[O-][Cl+][O-]", "chlorite"),
         ("[O-]N=O", "nitrite"),
-        ("O=S([O-])O", "hydrogensulfite"),
+        ("O=S([O-])O", "hydrogen sulfite"),
         ("O=[PH]([O-])[O-]", "phosphonate"),
         ("C[N+](=O)[O-]", "nitromethane"),
         ("c1ccccc1[N+](=O)[O-]", "nitrobenzene"),

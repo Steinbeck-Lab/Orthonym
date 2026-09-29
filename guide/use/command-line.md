@@ -79,4 +79,4 @@ These are for looking inside the engine. None of them changes a name.
 
 ## Exit status
 
-`0` when the name (or the label for a decline) was printed; `1` for a SMILES that RDKit cannot read, or a batch with at least one such line; `2` when a jar is missing.
+`0` when the name (or the label for a decline) was printed; `1` for a SMILES that RDKit cannot read, or a batch with at least one such line; `2` when a jar can be neither found nor downloaded.

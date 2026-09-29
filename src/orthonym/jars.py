@@ -3,7 +3,7 @@
 Orthonym does not ship any jar. It uses two, pinned to one version and one
  checksum each, and downloads them from their official releases:
 
-* OPSIN 2.9.0 (name -> structure), for the round-trip check of every name.
+* OPSIN 2.9.0 (name -> structure), for the round-trip check of names.
 * centres 1.2.1, for CIP stereo descriptors.
 
 Resolution order for each jar:

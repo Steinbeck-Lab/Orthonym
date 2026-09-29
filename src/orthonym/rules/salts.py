@@ -19,7 +19,7 @@ Key naming patterns:
 
 import itertools
 from collections import Counter
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from rdkit import Chem
 
@@ -99,7 +99,7 @@ COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
 # whose SIMPLE-multiplied form ``di<W>`` is ITSELF a real OPSIN word for a
 # DIFFERENT, condensed poly species (pyro/di-nuclear). For those the ``di``/``tri``
 # multiplier collides — ``diphosphate`` = P2O7 (pyrophosphate), not 2×PO4;
-# ``disulfate`` = S2O7; ``dicarbonate`` = C2O5; ``dihydrogensulfate`` = neutral
+# ``disulfate`` = S2O7; ``dicarbonate`` = C2O5; ``dihydrogen sulfate`` = neutral
 # H2SO4 — so a count≥2 salt of W MUST take the enclosing multiplier bis(W)/tris(W).
 # Emitting ``di<W>`` names the wrong molecule (then suppresses it, so the
 # salt needlessly ABSTAINS even though ``bis(W)`` round-trips).
@@ -119,13 +119,57 @@ COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
 # move to tris(sulfate)/tris(sulfite), both RT-valid → 0 regressions.
 _DI_COLLISION_ANIONS = frozenset({
     'amidosulfate', 'borate', 'carbonate', 'chromate', 'germanate',
-    'hydrogensulfate', 'peroxydisulfate', 'phosphate', 'phosphite', 'selenate',
+    'hydrogen sulfate', 'peroxydisulfate', 'phosphate', 'phosphite', 'selenate',
     'selenide', 'selenite', 'silicate', 'sulfate', 'sulfite', 'tellurate',
     'tellurite', 'thiosulfate', 'thiosulfite',
 })
 
 
-def _ion_needs_enclosing_multiplier(name: str) -> bool:
+# (1) (the Blue Book, under Cationic centers on
+# characteristic groups): the cationic suffixes of Table 7.4 -- 'amidium',
+# 'carboxamidium', 'imidium', 'carboximidium', 'nitrilium', 'carbonitrilium',
+# 'aminium', 'iminium' -- are formed by adding 'ium' to the basic suffix, and
+# "These cationic suffixes are used with the multiplying prefixes 'bis', 'tris',
+# etc. to denote multiplicity"; (c) (:7110) 'bis', 'tris' are used
+# "before suffixes that are composed of two or more cumulative suffixes", with
+# 'bis(ylium)' and 'bis(nitrilium)'. A salt multiplies the whole cation, and the
+# Blue Book's one PIN of a multiplied organic cation keeps the derived multiplier:
+# (:43564) 'bis(methanaminium) sulfate (PIN)'. Endings of the cation
+# word as the organic cation namer derived it (each covers its 'carbo' form).
+_CUMULATIVE_CATION_SUFFIXES = ('aminium', 'iminium', 'amidium', 'imidium',
+                               'nitrilium', 'ylium')
+
+# (:41366) parent cations of the mononuclear parent hydrides ('azanium
+# (preselected name)', 'sulfanium', 'chloranium',...) and 'hydrazinium'
+# ('pentamethylhydrazinium (PIN)',:41386). A cation word that ends in one of
+# them after some prefix text is a SUBSTITUTED parent cation ('trimethylsulfanium',
+# 'diphenyliodanium', 'methylsulfanium'), and (c) (:7035) "any component
+# which is substituted automatically requires use of the multiplicative forms
+# 'bis', 'tris', etc.".
+_PARENT_CATION_WORDS = (
+    'azanium', 'phosphanium', 'arsanium', 'stibanium', 'bismuthanium',
+    'oxidanium', 'sulfanium', 'selanium', 'tellanium',
+    'fluoranium', 'chloranium', 'bromanium', 'iodanium', 'hydrazinium',
+)
+
+
+def _organic_cation_takes_derived_multiplier(name: str) -> bool:
+    """True if an ORGANIC cation word (one the organic cation namer built) takes
+    bis/tris/... when the salt multiplies it: a cation named with a cumulative
+    cationic suffix ('methanaminium' -> 'bis(methanaminium)', (1),
+     (c), or a substituted parent cation ('trimethylsulfanium'
+    -> 'bis(trimethylsulfanium)', (c)). A cation with a retained name
+    plus 'ium' ('anilinium', 'guanidinium'; (1) "Retained names... are
+    modified by adding the suffix 'ium' to the name of the neutral entity") keeps
+    'di' (d), retained names), as the monoatomic cations do ('disodium
+    carbonate (PIN)',:31579)."""
+    if name.endswith(_CUMULATIVE_CATION_SUFFIXES):
+        return True
+    return any(name.endswith(w) and len(name) > len(w)
+               for w in _PARENT_CATION_WORDS)
+
+
+def _ion_needs_enclosing_multiplier(name: str, *, organic_cation: bool = False) -> bool:
     """True if an ion name must take bis(...)/tris(...) rather than di.../tri...
 
     Applied to BOTH anion and cation words (called from
@@ -153,6 +197,8 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
     """
     if name in _DI_COLLISION_ANIONS:
         return True
+    if organic_cation and _organic_cation_takes_derived_multiplier(name):
+        return True
     if '(' in name or ')' in name or ' ' in name:
         return True
     if any(ch.isdigit() for ch in name):
@@ -167,11 +213,18 @@ def _ion_needs_enclosing_multiplier(name: str) -> bool:
         return False
     if '-' in name:
         return True
-    # BREADTH-UNVERIFIED (Milestone C3, salt breadth program): the startswith
-    # multiplier-word check above and the endswith stem-collision check below
-    # were not confirmed against an OPSIN round-trip witness at A1 time —
-    # revisit with an OPSIN-RT check when C3 reaches this area.
-    if name.startswith(('bis', 'tris', 'tetrakis', 'tetra', 'penta', 'hexa')):
+    # BREADTH-UNVERIFIED (Milestone C3, salt breadth program): the endswith
+    # stem-collision check below was not confirmed against an OPSIN round-trip
+    # witness at A1 time -- revisit with an OPSIN-RT check when C3 reaches this area.
+    # A word that begins with a multiplying prefix is enclosed (c),
+    # the Blue Book 'di(dodecyl)', 'di(tridecyl)'), and one that is substituted
+    # takes bis/tris (c),:7035): 'di' and 'tri' belong to the list as
+    # much as 'tetra' does -- 'calcium ditrifluoroacetate', 'calcium
+    # didichloroacetate' and 'ditrimethylsulfanium sulfate' shipped pin_verified;
+    # 'calcium bis(trifluoroacetate)', 'calcium bis(dichloroacetate)',
+    # 'bis(trimethylsulfanium) sulfate' (OPSIN 2.9.0 full-key exact, texts job).
+    if name.startswith(('bis', 'tris', 'tetrakis', 'di', 'tri', 'tetra', 'penta',
+                        'hexa')):
         return True
     if name.endswith(('azanide', 'phosphinate', 'phosphonate')):
         return True
@@ -301,69 +354,6 @@ def _count_protonated_acid_sites(frag_mol) -> int:
             seen.add(m[0])                           # the -OH oxygen
         count += len(seen)
     return count
-
-
-def normalize_imbalanced_acid_salt(smiles: str) -> Optional[str]:
-    """: normalize a charge-imbalanced acid-salt NOTATION to its
-    chemically-valid balanced salt.
-
-    A metal cation + a NEUTRAL polybasic INORGANIC oxoacid, written without the
-    balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1), is a valid acid salt
-    in a malformed charge representation. Deprotonate the acid by the net positive
-    charge so the whole pipeline sees the balanced salt (species-type -> 'salt',
-    name_salt -> 'sodium hydrogen carbonate', and the self-consistency gate compares
-    a balanced net-0 structure). Return the balanced-salt canonical SMILES, or None
-    (fail-closed -> caller keeps the original smiles) for any other shape.
-
-    Narrow by construction: fires only when the mol is multi-fragment with net
-    charge > 0, exactly one neutral fragment that IS a recognized inorganic oxoacid,
-    at least one cation fragment, NO anion fragment, and the acid has enough -OH
-    protons to balance the charge — so no organic acid / real salt / plain ion is
-    touched.
-    """
-    from rdkit.Chem import MolFromSmarts
-
-    from .inorganic_acids import name_inorganic_acid
-
-    mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        return None
-    if Chem.GetFormalCharge(mol) <= 0:
-        return None
-    frags = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=True)
-    if len(frags) < 2:
-        return None
-    cations = [f for f in frags if Chem.GetFormalCharge(f) > 0]
-    anions = [f for f in frags if Chem.GetFormalCharge(f) < 0]
-    neutrals = [f for f in frags if Chem.GetFormalCharge(f) == 0]
-    if anions or not cations or len(neutrals) != 1:
-        return None
-    acid = neutrals[0]
-    if name_inorganic_acid(acid) is None:
-        return None
-
-    n_protons = sum(Chem.GetFormalCharge(f) for f in cations)
-    oh_pat = MolFromSmarts('[OX2H1]')
-    if oh_pat is None:
-        return None
-    oh_matches = acid.GetSubstructMatches(oh_pat)
-    if len(oh_matches) < n_protons:
-        return None
-    rw = Chem.RWMol(acid)
-    for (o_idx,) in oh_matches[:n_protons]:
-        o = rw.GetAtomWithIdx(o_idx)
-        o.SetFormalCharge(-1)
-        o.SetNumExplicitHs(0)
-    try:
-        Chem.SanitizeMol(rw)
-    except Exception:
-        return None
-    anion_smi = Chem.MolToSmiles(rw)
-    parts = [Chem.MolToSmiles(c) for c in cations] + [anion_smi]
-    balanced = '.'.join(parts)
-    if Chem.MolFromSmiles(balanced) is None:
-        return None
-    return balanced
 
 
 def _protonate_amines_with_h_plus(mol, n_protons: int):
@@ -732,6 +722,9 @@ def name_salt(mol, style: str = 'pin', *,
 
     cation_names = []
     anion_names = []
+    # the cation words the organic cation namer built (not a metal / element word
+    # or a retained inorganic cation), for the multiplier choice below
+    organic_cation_names = set()
 
     # Process cations (excluding H+ fragments already handled above).
     #: the cation word is the element name (metal) or 'ammonium'
@@ -788,6 +781,7 @@ def name_salt(mol, style: str = 'pin', *,
                     allow_aromatic_general=allow_aromatic_general)
             if name:
                 cation_names.append(name)
+                organic_cation_names.add(name)
             # Skip unnamed cations rather than using generic 'cation'
 
     # fail-closed (0-wrong): every cation fragment IN SCOPE for this loop
@@ -924,7 +918,8 @@ def name_salt(mol, style: str = 'pin', *,
     formatted_cations = []
     for name in sorted(cation_counts.keys()):
         count = cation_counts[name]
-        formatted_cations.append(_apply_stoichiometric_prefix(name, count))
+        formatted_cations.append(_apply_stoichiometric_prefix(
+            name, count, organic_cation=name in organic_cation_names))
 
     # Format anion part with multipliers
     formatted_anions = []
@@ -942,13 +937,16 @@ def name_salt(mol, style: str = 'pin', *,
     return result + solvate_suffix
 
 
-def _apply_stoichiometric_prefix(name: str, count: int) -> str:
+def _apply_stoichiometric_prefix(name: str, count: int, *,
+                                 organic_cation: bool = False) -> str:
     """
     Apply di-, tri-, tetra- prefix for stoichiometry.
 
     Args:
         name: Base ion name
         count: Number of occurrences
+        organic_cation: the name is an organic cation word from the organic
+            cation namer (see ``_organic_cation_takes_derived_multiplier``)
 
     Returns:
         Name with stoichiometric prefix if count > 1
@@ -960,13 +958,24 @@ def _apply_stoichiometric_prefix(name: str, count: int) -> str:
         'sodium'
         >>> _apply_stoichiometric_prefix('D-gluconate', 2)
         'bis(D-gluconate)'
+        >>> _apply_stoichiometric_prefix('methanaminium', 2, organic_cation=True)
+        'bis(methanaminium)'
+        >>> _apply_stoichiometric_prefix('(2E,4E)-hexa-2,4-dienoate', 3)
+        'tris[(2E,4E)-hexa-2,4-dienoate]'
     """
     if count == 1:
         return name
 
-    if _ion_needs_enclosing_multiplier(name):
+    if _ion_needs_enclosing_multiplier(name, organic_cation=organic_cation):
         word = COMPLEX_STOICHIOMETRIC_PREFIXES.get(count, f"{count}kis")
-        return f"{word}({name})"
+        # (the Blue Book) nesting order {[({})]}: the mark
+        # around the multiplied ion is the next one after the marks the ion name
+        # already carries -.5: indicated hydrogen and fusion / ring
+        # assembly brackets ignored, stereodescriptor parentheses counted) --
+        # 'calcium bis{2-[4-(2-methylpropyl)phenyl]propanoate}', not
+        # 'bis(2-[4-(2-methylpropyl)phenyl]propanoate)'; the shared primitive.
+        from ..assembly.naming_utils import apply_enclosing_marks
+        return f"{word}{apply_enclosing_marks(name, -1)}"
 
     prefix = STOICHIOMETRIC_PREFIXES.get(count, str(count))
     from ..assembly.naming_utils import multiplier_needs_hyphen

@@ -3052,7 +3052,69 @@ def name_ring_assembly(
 def name_ring_assembly_prefix(
     mol, assembly_info: Dict, attachment_atom_idx: int
 ) -> Optional[str]:
-    """Generate ring assembly substituent prefix per IUPAC.
+    """The ring-assembly substituent prefix, numbered per whatever
+    the input atom order.
+
+    Branch review fixes: the unprimed ring was the first ring system in INPUT order,
+    so the same molecule came out '[1,1'-biphenyl]-4-yl' or '[1,1'-biphenyl]-4'-yl'
+    depending on its SMILES spelling (dev2000, both certified pin_verified by the
+    PIN tier's re-run). "Substituent prefixes derived from ring
+    assemblies" (the Blue Book): "Low locants are assigned to ring junctions,
+    then to free valences"; '[1,1'-biphenyl]-4-yl (preferred prefix)' (:16118).
+    Both directions of the assembly's ring chain are numbered and the one with the
+    lower junction locants, then the lower free-valence locant (unprimed before
+    primed), is kept."""
+    orientations = [assembly_info]
+    try:
+        n = len(assembly_info['ring_systems'])
+        adj = {i: [] for i in range(n)}
+        for _a1, _a2, s1, s2 in assembly_info['connections']:
+            adj[s1].append(s2)
+            adj[s2].append(s1)
+        ends = [i for i in range(n) if len(adj[i]) == 1]
+        if n >= 2 and len(ends) == 2 and all(len(v) <= 2 for v in adj.values()):
+            path = [ends[0]]
+            while len(path) < n:
+                nxt = [j for j in adj[path[-1]] if j not in path]
+                if len(nxt) != 1:
+                    path = None
+                    break
+                path.append(nxt[0])
+            if path is not None:
+                orientations = []
+                for order in (path, list(reversed(path))):
+                    new = {old: k for k, old in enumerate(order)}
+                    info = dict(assembly_info)
+                    info['ring_systems'] = [assembly_info['ring_systems'][o]
+                                            for o in order]
+                    info['connections'] = [(a1, a2, new[s1], new[s2]) for a1, a2, s1, s2
+                                           in assembly_info['connections']]
+                    orientations.append(info)
+    except Exception:  # noqa: BLE001 -- keep the input orientation
+        orientations = [assembly_info]
+    best = None
+    for info in orientations:
+        built = _name_ring_assembly_prefix_oriented(mol, info, attachment_atom_idx)
+        if built is None:
+            continue
+        if best is None or built[1] < best[1]:
+            best = built
+    return best[0] if best is not None else None
+
+
+def _locant_key(loc):
+    text = str(loc)
+    digits = ''.join(ch for ch in text if ch.isdigit())
+    return (int(digits) if digits else 0, text)
+
+
+def _name_ring_assembly_prefix_oriented(
+    mol, assembly_info: Dict, attachment_atom_idx: int
+):
+    """Generate ring assembly substituent prefix per IUPAC, in the ring order
+    ``assembly_info`` gives; returns ``(prefix, key)``, the key being the
+    order of this numbering (junction locants, then the free valence: its primes,
+    then its locant), or None.
 
     When a ring assembly (identical rings joined by single bonds) appears as
     a substituent on a parent chain, the prefix uses square-bracket notation
@@ -3114,9 +3176,11 @@ def name_ring_assembly_prefix(
         sorted_connections.append((a1, a2, s1, s2))
     sorted_connections.sort(key=lambda c: (c[2], c[3]))
     connection_parts = []
+    junction_key = []
     for a1, a2, s1, s2 in sorted_connections:
         loc1 = _lookup_locant(s1, a1, ring_systems[s1])
         loc2 = _lookup_locant(s2, a2, ring_systems[s2])
+        junction_key.append((_locant_key(loc1), s1, _locant_key(loc2), s2))
         # v52 P4 T2: a multi-ring fused component (e.g. naphthalene) whose
         # junction can't be resolved returns None (fail closed, see
         # `_get_connection_locant`) -- never splice that into the string as
@@ -3235,7 +3299,8 @@ def name_ring_assembly_prefix(
         assembly_base = f"{connection_str}-{multiplier}{display_name}"
 
     # Full prefix: "[1,1'-biphenyl]-4-yl" or "[1H,1'H-2,2'-biindol]-5-yl"
-    return f"[{assembly_base}]-{attach_locant}{attach_prime}-yl"
+    return (f"[{assembly_base}]-{attach_locant}{attach_prime}-yl",
+            (tuple(junction_key), attach_system_idx, _locant_key(attach_locant)))
 
 
 def name_mixed_ring_prefix(
@@ -3290,6 +3355,21 @@ def name_mixed_ring_prefix(
 
     parent_atoms = ring_systems_list[parent_idx]
     sub_atoms = ring_systems_list[sub_idx]
+
+    # Breadth Job 1 (M05): this prefix names the two ring SKELETONS only (the
+    # sub ring by its bare '-yl' name, the parent by its stem). A ring atom that
+    # carries anything else -- a chloro, a methyl, a second chain -- would be
+    # silently dropped: '1-(1-phenylpiperazin-4-yl)' for a 4-(3-chlorophenyl)
+    # piperazin-1-yl group names a different molecule. (the Blue Book):
+    # a substituent prefix names its whole structure. Decline, so the ring-by-ring
+    # producers (which name each ring with its decorations) run instead. The one
+    # bond allowed out of the fragment is the free valence at the attachment atom.
+    _frag = set(parent_atoms) | set(sub_atoms)
+    for _a in _frag:
+        _ext = [n.GetIdx() for n in mol.GetAtomWithIdx(_a).GetNeighbors()
+                if n.GetAtomicNum() > 1 and n.GetIdx() not in _frag]
+        if len(_ext) > (1 if _a == attachment_atom_idx else 0):
+            return None
 
     # Get the parent ring's system name (for stem)
     parent_ring_tuple = tuple(sorted(parent_atoms))

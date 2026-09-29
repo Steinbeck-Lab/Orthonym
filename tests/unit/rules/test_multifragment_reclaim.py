@@ -45,8 +45,15 @@ def test_1a_single_atom_methane_adduct():
 
 
 # 0-wrong tripwire: a best-effort fragment must NEVER bypass the metal sentinel and
-# emit a real organometallic name. Each of these out-of-scope metal mixtures
-# (from the frozen abstain sample) MUST still abstain to a failure/non-name.
+# emit a name that drops or misdraws part of a metal mixture (these are from the
+# frozen abstain sample). Breadth Job 2 (the user's decision, 2026-09-28) names a
+# disconnected metal drawing at the best-effort tier as a adduct of its
+# components, labelled below PIN -- "Mixed organic - inorganic adducts"
+# (the Blue Book): "preferred IUPAC names cannot be assigned to mixed adducts
+# because preferred IUPAC names have not yet been determined for inorganic
+# components". So each mixture either still abstains, or ships a name that a fresh
+# OPSIN call reads back to exactly the drawn structure (same canonical SMILES: every
+# fragment, charge and hydrogen), never a PIN label.
 @pytest.mark.parametrize("smi", [
     # bare tungsten metal + two neutral organics
     "CC(C)(C)C1=NC2=C(CCNC2)C=C1.CC(C)(C)C1=CC=CC=N1.[W]",
@@ -56,12 +63,20 @@ def test_1a_single_atom_methane_adduct():
     "C1=CC(=CC=C1NC[C]2[CH][CH][CH][CH]2)N=CC3=CC=C(O3)[N+](=O)[O-]."
     "[CH]1[CH][CH][CH][CH]1.[Fe+2]",
 ])
-def test_metal_mixture_still_abstains(smi):
+def test_metal_mixture_abstains_or_names_exactly_the_drawing(smi):
+    from rdkit import Chem
+    from tests.support.rt_assert import _independent_parse
     with jvm_slots(1, purpose="p1-task2-test"):
-        name = _best_effort().name(smi)
-    # a failure/non-name (e.g. "tungsten compound (not supported)",
-    # "unknown organic compound") — never a real emitted organometallic name.
-    assert is_failure_name(name), f"metal mixture emitted a real name: {name!r}"
+        row = _best_effort().name_tiered(smi)
+    name = row.get("name")
+    if name is None or is_failure_name(name):
+        return  # still abstains
+    parsed = _independent_parse(name)
+    canon = lambda s: Chem.MolToSmiles(Chem.MolFromSmiles(s))  # noqa: E731
+    assert parsed and canon(parsed) == canon(smi), (
+        f"metal mixture emitted {name!r}, which reads back as {parsed!r}")
+    assert row["is_pin"] is False and row["tier"] in (
+        "systematic_verified", "best_effort"), (name, row["tier"])
 
 
 # ---- lever 1b: net-0 salts with a complex organic ion (fresh-instance route) ----
@@ -130,10 +145,21 @@ def test_1d_net_charged_adduct_best_effort():
     """A net-charged multi-fragment ionic assembly composes as a em-dash
     '(1/1)' adduct of its ion components under best-effort; OPSIN preserves the net
     charge and it round-trips to the input full InChIKey."""
+    # The cation is a 1-benzothiophene, named by fusion: "Five-membered
+    # ring requirement" (the Blue Book): "Fusion nomenclature gives preferred
+    # IUPAC names only to compounds having at least two rings of at least five or
+    # more members... When fusion names are not allowed, unsaturated von Baeyer
+    # ring system names are preferred IUPAC names"; the benzo name,
+    # (:11815, '1-benzofuran (PIN)':11827); the '-ium', (:41368). The
+    # von Baeyer 'thiabicyclo[4.3.0]nona...-7-ium' asserted before is the non-fusion
+    # form of the same cation; the engine has given the fusion name since 982bce233
+    # (v52 phase 5, parent-hydride cations), before the paper code f67429619. Both
+    # read back (OPSIN 2.9.0, fresh java run) to the input's full InChIKey
+    # an InChIKey; mutation check with the old name: exit 0.
     with jvm_slots(1, purpose="p1-task2-test"):
         name = _best_effort().name("C1CC1C2=CC3=C([S+]2C(F)(F)F)C=C(C=C3)F.Cl")
-    assert name == ("8-cyclopropyl-4-fluoro-7-(trifluoromethyl)-7-thiabicyclo"
-                    "[4.3.0]nona-1(6),2,4,8-tetraen-7-ium—hydrogen chloride (1/1)")
+    assert name == ("2-cyclopropyl-6-fluoro-1-(trifluoromethyl)-1-benzothiophen-"
+                    "1-ium—hydrogen chloride (1/1)")
 
 
 def test_1d_pin_net_charged_unchanged():

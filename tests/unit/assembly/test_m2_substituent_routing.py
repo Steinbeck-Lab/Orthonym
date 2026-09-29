@@ -46,7 +46,6 @@ TIER_PROPAGATION_WITNESSES = [
     "CCC[C@@H](C)NC(=O)C[C@H]1Sc2ccc(C(F)(F)F)cc2NC1=O",                    # row 28
     "O=C(c1c2ccccc2cc2ccccc12)N1CCN(c2ccc(C(F)(F)F)cn2)CC1",                # row 31
     "O=C(Nc1ccc(Cl)c(C(=O)N(Cl)/N=C/CC(F)(F)F)c1)C1C(c2cc(Cl)cc(Cl)c2)C1(Cl)Cl",  # row 121
-    "COc1ccc(C2Oc3cccc(OC(F)F)c3-c3ccc(NC(=O)N(C)C)cc32)cc1OC",             # row 126
     "CN=C(NCC1(O)CCSC1)N1CCN(C(C)C(F)(F)F)CC1",                            # row 132
     "CNC(=O)c1cc(COC(=O)NC2CC3(CCN(c4ccc5cc(F)ccc5n4)CC3)C2)[nH]n1",       # row 141
 ]
@@ -58,9 +57,18 @@ DEFAULT_STILL_ABSTAINS = [
     "CCC[C@H](N)C(=O)N(C)[C@H]1CC[C@@H]2CN(Cc3ccc(C(F)(F)F)cc3)C[C@@H]21",  # row 23
     "O=C(c1c2ccccc2cc2ccccc12)N1CCN(c2ccc(C(F)(F)F)cn2)CC1",                # row 31
     "O=C(Nc1ccc(Cl)c(C(=O)N(Cl)/N=C/CC(F)(F)F)c1)C1C(c2cc(Cl)cc(Cl)c2)C1(Cl)Cl",  # row 121
-    "COc1ccc(C2Oc3cccc(OC(F)F)c3-c3ccc(NC(=O)N(C)C)cc32)cc1OC",             # row 126
     "CN=C(NCC1(O)CCSC1)N1CCN(C(C)C(F)(F)F)CC1",                            # row 132
     "CNC(=O)c1cc(COC(=O)NC2CC3(CCN(c4ccc5cc(F)ccc5n4)CC3)C2)[nH]n1",       # row 141
+]
+
+# Breadth job 1: row 126 left DEFAULT_STILL_ABSTAINS. The PIN tier's re-run with
+# the promoted ring-substituent producers (rules.pin_vocabulary.promote_at_pin_tier)
+# now names it; the name ships only after its own round trip and carries no non-PIN
+# token. /: {N,N,N'} is the lower urea locant set.
+DEFAULT_NOW_NAMED = [
+    ("COc1ccc(C2Oc3cccc(OC(F)F)c3-c3ccc(NC(=O)N(C)C)cc32)cc1OC",            # row 126
+     "N'-[1-(difluoromethoxy)-6-(3,4-dimethoxyphenyl)-6H-dibenzo[b,d]pyran-8-yl]"
+     "-N,N-dimethylurea"),
 ]
 
 # M4-fold nested-branch prefixes (internal notes
@@ -124,6 +132,18 @@ def test_default_tier_unchanged(pin_eng, smi):
     assert is_refusal_sentinel(name), (
         f"PIN default must still abstain (byte-identical to pre-fix HEAD); "
         f"got a NEW default-tier emission: {name!r}")
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", DEFAULT_NOW_NAMED)
+def test_default_tier_now_names_through_the_pin_rerun(pin_eng, smi, expected):
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+    row = pin_eng.name_tiered(smi)
+    assert row["name"] == expected, row
+    # branch review fixes: the promotion re-run's name is labelled pin_unverified,
+    # is_pin False (a breadth producer built it; not certified as the PIN)
+    assert row["tier"] == "pin_unverified" and not row["is_pin"], row
+    assert opsin_roundtrip_check(smi, row["name"])["passed"], row
 
 
 # --- M4-fold nested-branch prefixes: best-effort names, default abstains ----

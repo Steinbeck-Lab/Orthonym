@@ -5,13 +5,13 @@ Every name Orthonym returns carries a tier. The tier says **how the name was bui
 ## The five tiers
 
 {tier}`pin_verified`
-: The strict path for the Preferred IUPAC Name built the name, certified it as the preferred name, and OPSIN read it back to your structure. The one exception is a metal-complex name from the exact-match list, which is matched to your structure by InChIKey instead of a read-back and shows `verified` `identity` ([How every name is checked](checking.md)). `is_pin` is `true` only here.
+: The strict path for the Preferred IUPAC Name built the name, certified it as the preferred name, and OPSIN read it back to your structure. `is_pin` is `true` only here.
 
 {tier}`pin_unverified`
 : A name in preferred-name form whose preferred status the engine does not certify: a producer outside the strict path built it, or it carries a part that is not the preferred form. It is also the tier of a strict-path name that OPSIN read back only in part (its constitution) or not at all. The `verified` field tells which.
 
 {tier}`systematic_verified`
-: A checked systematic name that is not the preferred name, from the general engine or from the table of retained trivial names.
+: A checked name that is not certified as the preferred name: from the general engine, from the table of retained trivial names, from the exact-match list of metal complexes (matched by InChIKey, `verified` `identity`), or from the strict path for a class that has no preferred-name status, such as organometallic compounds and compounds without carbon (`iron(III) trichloride`, `sulfuric acid`, `ammonia`).
 
 {tier}`best_effort`
 : A name from the last-resort producers of the `best-effort` tier, or a name whose own string no round trip confirmed.
@@ -33,7 +33,7 @@ The default is `pin`. Wider tiers are opt-in:
 | `best-effort` | The last-resort producers as well. |
 | `full-coverage` | The coordination-name builder for metal tetrapyrrole and corrin complexes as well; it builds a name or declines. |
 
-The wider tiers are not simply "the default plus more". At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey round trip, except a metal-complex name from the exact-match list (`verified` `identity`), so a few name classes that the default tier ships without a full read-back are declined there ([How every name is checked](checking.md)).
+The wider tiers are not simply "the default plus more". At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey round trip, except a metal-complex name from the exact-match list ({tier}`systematic_verified`, `verified` `identity`), so a few name classes that the default tier ships without a full read-back are declined there ([How every name is checked](checking.md)).
 
 ## One molecule, three tiers
 

@@ -611,6 +611,11 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
 _VG_ENV = os.environ.get("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", "").strip().lower()
 _DISABLE_VALIDITY_GATE = _VG_ENV in ("1", "true", "yes", "on")
 
+# Breadth Job 1: set while ``Orthonym._name_with_pin_promotion`` runs its two
+# ``name`` calls, so neither re-enters the wrapper.
+_PIN_PROMOTION_WRAPPED = contextvars.ContextVar("orthonym_pin_promotion_wrapped",
+                                                default=False)
+
 # (a phase): the constitutional self-consistency gate. After the
 # parseability gate confirms OPSIN ACCEPTS a name, re-perceive it: if OPSIN parses
 # the name to a CONSTITUTIONALLY DIFFERENT molecule than the input, the name is
@@ -954,6 +959,20 @@ def _validity_gate_name_to_smiles(name: str) -> Optional[str]:
         from .validation.opsin_roundtrip import _find_opsin_jar
         _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
     return _VALIDITY_ORACLE.name_to_smiles(name)
+
+
+def _validity_gate_name_to_opsin_smiles(name: str) -> Optional[str]:
+    """OPSIN's own SMILES for ``name``, as OPSIN wrote it (not RDKit's canonical
+    form of it), via the shared singleton oracle (the same cached parse), or None
+    if OPSIN rejected it / could not be consulted. Used by
+    :func:`_lone_pair_configuration_verified`, which must read the name's
+    structure with another toolkit than RDKit."""
+    global _VALIDITY_ORACLE
+    if _VALIDITY_ORACLE is None:
+        from .assembly.retained_substitution import OpsinOracle
+        from .validation.opsin_roundtrip import _find_opsin_jar
+        _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
+    return _VALIDITY_ORACLE.name_to_opsin_smiles(name)
 
 
 def _same_canonical_smiles(smiles_a: str, smiles_b: str) -> bool:
@@ -1360,6 +1379,343 @@ def _stereo_descriptors_verified(name: str, smiles: Optional[str],
         return False
 
 
+def _cip_labels_match_input_as_written(smiles: Optional[str]) -> bool:
+    """D3 guard: are the engine's CIP labels of ``smiles`` those of the input string
+    AS WRITTEN?
+
+    The engine's labels (``perception.stereo.assign_stereochemistry``) come from
+    ``centres`` run on RDKit's canonical SMILES of RDKit's reading of the input.
+    RDKit reads a three-coordinate (lone-pair) stereocentre that carries a
+    ring-closure digit with the opposite configuration from the OpenSMILES reading
+    CDK and OPSIN use, and writes such a centre back the same way; so where the
+    input and RDKit's canonical SMILES differ in whether that centre carries a
+    ring-closure digit, the engine's label is the other stereoisomer's. Measured:
+    'C1(=CC=CC=C1)N1[P@@](N2CCC[C@H]2C1)OC(C)C' (P is R for CDK and for RDKit's
+    own labeller) gets the engine label S (canonical 'CC(C)O[P@@]1N(...)...N21').
+    Here ``centres`` labels the ORIGINAL string (its 1-based positions are the
+    string's atom order, RDKit's atom indices of the same string), and the two
+    maps of tetrahedral labels (R/S/r/s) must be equal and non-empty. E/Z labels are
+    not compared (a double bond carries no implicit neighbour). False when centres
+    is unavailable or anything fails (fail-closed)."""
+    if not smiles:
+        return False
+    try:
+        from .perception.centres_bridge import centres_label_batch
+        from .perception.stereo import assign_stereochemistry
+        batch = centres_label_batch([smiles])
+        if batch is None:
+            return False
+        tetra = ('R', 'S', 'r', 's')
+        as_written = {pos - 1: d for pos, d in (batch.get(smiles) or {}).items()
+                      if d in tetra}
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return False
+        assign_stereochemistry(mol)
+        engine = {a.GetIdx(): a.GetProp('_CIPCode') for a in mol.GetAtoms()
+                  if a.HasProp('_CIPCode') and a.GetProp('_CIPCode') in tetra}
+        return bool(engine) and engine == as_written
+    except Exception:
+        return False
+
+
+#: CIP tetrahedral labels as atom-map codes for the lone-pair check (9: a compared
+#: centre that centres leaves unlabelled).
+_LP_CIP_CODE = {'R': 1, 'S': 2, 'r': 3, 's': 4}
+_LP_UNLABELLED = 9
+_LP_TETRAHEDRAL = (Chem.ChiralType.CHI_TETRAHEDRAL_CW, Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+
+
+def _lone_pair_compared_atom(atom) -> bool:
+    """A tetrahedral stereocentre of RDKit's reading that the lone-pair check
+    compares: every one except a nitrogen outside a three-membered ring. RDKit
+    perceives such an N (a bridgehead shared by at least three rings) beyond the
+    InChI stereo rules, so no InChIKey round trip sees its configuration and OPSIN
+    writes none for it (measured: the cinchona 1-azabicyclo[2.2.2]octane N)."""
+    return (atom.GetChiralTag() in _LP_TETRAHEDRAL
+            and not (atom.GetAtomicNum() == 7 and not atom.IsInRingSize(3)))
+
+
+def _has_lone_pair_stereocentre(smiles: Optional[str]) -> bool:
+    """True iff RDKit's reading of ``smiles`` keeps a compared tetrahedral
+    stereocentre with three ligands in all (heavy atoms and H), the fourth position
+    being the lone pair: P(III), As(III), S(IV) and Se(IV) (sulfoxides, sulfinyl,
+    sulfinates, sulfonium), N in a three-membered ring."""
+    if not smiles or '@' not in smiles:
+        return False
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+    except Exception:
+        return False
+    return mol is not None and any(
+        _lone_pair_compared_atom(a) and a.GetTotalDegree() == 3 for a in mol.GetAtoms())
+
+
+def _lp_heavy_mol(smiles: str):
+    """RDKit's reading of ``smiles`` with explicit hydrogens removed, each atom
+    carrying ``_lp_pos``: its 1-based position in the string, which is the position
+    ``centres`` labels (a written [H] is an atom of the string for both)."""
+    ps = Chem.SmilesParserParams()
+    ps.removeHs = False
+    mol = Chem.MolFromSmiles(smiles, ps)
+    if mol is None:
+        return None
+    for a in mol.GetAtoms():
+        a.SetIntProp('_lp_pos', a.GetIdx() + 1)
+    return Chem.RemoveHs(mol)
+
+
+def _lp_label_code(atom, labels: Dict[int, str]) -> int:
+    if not _lone_pair_compared_atom(atom):
+        return 0
+    return _LP_CIP_CODE.get(labels.get(atom.GetIntProp('_lp_pos')), _LP_UNLABELLED)
+
+
+def _lp_annotated_smiles(mol, labels: Dict[int, str]) -> str:
+    """Canonical SMILES of ``mol`` with its stereo removed and each compared centre's
+    CIP label (from ``labels``) as its atom-map number: two such strings are equal
+    iff some isomorphism of the two graphs (elements, bonds, charges, hydrogens)
+    carries every compared centre onto a centre with the same label."""
+    rw = Chem.RWMol(mol)
+    for a in rw.GetAtoms():
+        a.SetAtomMapNum(_lp_label_code(a, labels))
+        a.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
+    for b in rw.GetBonds():
+        b.SetStereo(Chem.BondStereo.STEREONONE)
+        b.SetBondDir(Chem.BondDir.NONE)
+    return Chem.MolToSmiles(rw)
+
+
+def _lp_inchi_correspondence(mol):
+    """(standard InChI, {canonical position: atom}) from RDKit's InChI of ``mol`` and
+    its AuxInfo '/N:' layer, or None. Two readings with one InChI correspond atom by
+    atom through their canonical positions, whatever their tautomer or charge form."""
+    from rdkit.Chem import inchi as _inchi_mod
+    std, aux = _inchi_mod.MolToInchiAndAuxInfo(mol)
+    found = re.search(r'/N:([0-9,;]+)', aux or '')
+    if not std or not found:
+        return None
+    out = {}
+    for comp, part in enumerate(found.group(1).split(';')):
+        for k, tok in enumerate(part.split(',')):
+            out[(comp, k)] = mol.GetAtomWithIdx(int(tok) - 1)
+    return std, out
+
+
+def _lone_pair_configuration_verified(name: str, smiles: Optional[str]) -> bool:
+    """Lone-pair stereocentres (TRIAGE.md 'Lone-pair stereocentres -- RDKit
+    reading'): does ``name`` denote the configuration of ``smiles`` as a reader that
+    treats the lone pair as an implicit hydrogen reads the string?
+
+    Every round trip here compares RDKit InChIKeys of the input and of OPSIN's
+    SMILES of the name. RDKit does not read a lone pair the way it reads an implicit
+    hydrogen in every position of the string: it reads '[C@@H](C)(O)c1ccccc1' as
+    'C[C@H](O)c1ccccc1' (the implicit H of a first atom is the 'from' atom, the
+    Daylight rule) but '[S@@](C)(=O)c1ccccc1' as 'C[S@@](=O)c1ccccc1' -- the other
+    enantiomer -- and some ring-closure positions at P(III) and at an aziridine N
+    likewise; the RDKit Book says of missing ligands that "in SMILES they are treated
+    the same as implicit hydrogens". CDK and OPSIN's SMILES writer treat the lone
+    pair as an implicit hydrogen everywhere (measured: CDK's reading of OPSIN's SMILES
+    gives OPSIN's own StdInChIKey on every row). When RDKit misreads the input and
+    OPSIN's SMILES of the name alike, a round trip passes for a name of the other
+    stereoisomer: before this check '[S@@](C)(=O)c1ccccc1' shipped
+    '(R)-(methanesulfinyl)benzene' pin_verified at the best-effort and PIN tiers,
+    while the input, read with the lone pair as an implicit hydrogen, is the (S)
+    enantiomer, '(S)-(methanesulfinyl)benzene (PIN)', the Blue Book).
+
+    The check, for an input with a lone-pair stereocentre (``_has_lone_pair_
+    stereocentre``) only: ``centres`` (CDK) labels the input string as written and
+    OPSIN's own SMILES of the name (``_validity_gate_name_to_opsin_smiles``, not
+    RDKit's canonical form); the labels of every compared centre must agree under an
+    isomorphism of the two structures -- the annotated canonical SMILES
+    (``_lp_annotated_smiles``) are equal, or, for a name whose structure OPSIN writes
+    as another tautomer or charge form, the centres agree position by position
+    through their shared standard InChI (``_lp_inchi_correspondence``). False when
+    OPSIN or centres is unavailable or anything fails (fail-closed); True without a
+    lone-pair stereocentre (nothing to check)."""
+    if not _has_lone_pair_stereocentre(smiles):
+        return True
+    if not name:
+        return False
+    try:
+        opsin_smiles = _validity_gate_name_to_opsin_smiles(name)
+        if not opsin_smiles:
+            return False
+        from .perception.centres_bridge import centres_label_batch
+        batch = centres_label_batch([smiles, opsin_smiles])
+        if batch is None or smiles not in batch or opsin_smiles not in batch:
+            return False
+        lab_in, lab_out = batch[smiles], batch[opsin_smiles]
+        mol_in, mol_out = _lp_heavy_mol(smiles), _lp_heavy_mol(opsin_smiles)
+        if mol_in is None or mol_out is None:
+            return False
+        if _lp_annotated_smiles(mol_in, lab_in) == _lp_annotated_smiles(mol_out, lab_out):
+            return True
+        corr_in, corr_out = _lp_inchi_correspondence(mol_in), _lp_inchi_correspondence(mol_out)
+        if (corr_in is None or corr_out is None or corr_in[0] != corr_out[0]
+                or set(corr_in[1]) != set(corr_out[1])):
+            return False
+        for pos, a in corr_in[1].items():
+            b = corr_out[1][pos]
+            if _lone_pair_compared_atom(a) != _lone_pair_compared_atom(b):
+                return False
+            if _lp_label_code(a, lab_in) != _lp_label_code(b, lab_out):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _lp_labels_by_atom(labels: Dict[int, str], order: List[int]) -> Dict[int, str]:
+    """centres labels of a SMILES RDKit wrote from a mol, keyed by that mol's atom
+    indices (``order``: the ``_smilesAtomOutputOrder`` of the same write)."""
+    return {order[pos - 1]: lab for pos, lab in labels.items() if 0 < pos <= len(order)}
+
+
+#: Bound on RDKit's CIP labeller for the lone-pair reading check (about a second, the
+#: RDKit documentation's figure for 1,250,000 iterations); exceeding it keeps the input.
+_LP_CIP_MAX_ITERATIONS = 1_250_000
+
+
+def _lone_pair_standard_spelling_and_order(
+        smiles: Optional[str]) -> Tuple[Optional[str], Optional[List[int]]]:
+    """(the string to name for ``smiles``, the atom order) -- see
+    :func:`_lone_pair_standard_spelling`. The order is None when ``smiles`` is
+    returned; otherwise ``order[k]`` is the atom of RDKit's reading of ``smiles``
+    (hydrogens removed) that is atom ``k`` of the returned string."""
+    if not _has_lone_pair_stereocentre(smiles):
+        return smiles, None
+    try:
+        from rdkit.Chem import rdCIPLabeler
+
+        from .perception.centres_bridge import _smiles_output_order, centres_label_batch
+        mol = _lp_heavy_mol(smiles)
+        if mol is None:
+            return smiles, None
+        batch = centres_label_batch([smiles])
+        if batch is None or smiles not in batch:
+            return smiles, None
+        written = batch[smiles]
+        as_written = {a.GetIdx(): written[a.GetIntProp('_lp_pos')]
+                      for a in mol.GetAtoms() if a.GetIntProp('_lp_pos') in written}
+        centres = [a.GetIdx() for a in mol.GetAtoms()
+                   if _lone_pair_compared_atom(a) and a.GetTotalDegree() == 3]
+        rdkit_read = Chem.Mol(mol)
+        rdCIPLabeler.AssignCIPLabels(rdkit_read, atomsToLabel=centres, bondsToLabel=[],
+                                     maxRecursiveIterations=_LP_CIP_MAX_ITERATIONS)
+        misread = []
+        for idx in centres:
+            atom = rdkit_read.GetAtomWithIdx(idx)
+            if (idx in as_written and atom.HasProp('_CIPCode')
+                    and atom.GetProp('_CIPCode') != as_written[idx]):
+                misread.append(idx)
+        if not misread:
+            return smiles, None
+        standard = Chem.RWMol(mol)
+        for idx in misread:
+            standard.GetAtomWithIdx(idx).InvertChirality()
+        standard = standard.GetMol()
+        spelled = Chem.MolToSmiles(standard)
+        spelled_order = _smiles_output_order(standard)
+        batch = centres_label_batch([spelled])
+        if spelled_order is None or batch is None or spelled not in batch:
+            return smiles, None
+        if _lp_labels_by_atom(batch[spelled], spelled_order) != as_written:
+            return smiles, None
+        reread = Chem.MolFromSmiles(spelled)
+        if reread is None or Chem.MolToSmiles(reread) != spelled:
+            return smiles, None
+        return spelled, spelled_order
+    except Exception:
+        return smiles, None
+
+
+def _lone_pair_standard_spelling(smiles: Optional[str]) -> Optional[str]:
+    """TRIAGE.md 'Lone-pair centre written first -- naming and the gate probe': the
+    string the engine names for the caller's ``smiles``.
+
+    RDKit reads a lone-pair stereocentre written first (and at some ring-closure
+    positions) unlike an implicit hydrogen, while OpenSMILES, CDK (``centres``) and
+    OPSIN treat the lone pair like an implicit hydrogen (TRIAGE.md 'Lone-pair
+    stereocentres -- RDKit reading'). Measured: RDKit reads '[S@](=O)(C)CC' as
+    'CC[S@@](C)=O', the (R) enantiomer; CDK reads it as (S), as it reads
+    'CC[S@](C)=O', and the name of the input is '(S)-(methanesulfinyl)ethane', the
+    PIN form of (the Blue Book). The exit check
+    (:func:`_lone_pair_configuration_verified`) withdrew the (R) name, so such a
+    string was not named at all.
+
+    RDKit reads ``smiles`` unlike the standard reading at a lone-pair stereocentre
+    when RDKit's CIP label of its reading there (``rdCIPLabeler``) differs from
+    CDK's label of the string as written. With no such centre ``smiles`` is
+    returned unchanged. Otherwise those centres are inverted in RDKit's reading and
+    the result is RDKit's canonical SMILES of it, returned only when CDK's labels of
+    that string equal CDK's labels of ``smiles`` as written at every atom
+    (tetrahedral and double-bond labels alike) and RDKit writes it back unchanged.
+    The engine's CIP labels are CDK's labels of RDKit's canonical SMILES of its
+    reading (``centres_label_mol``), which for that string is the string itself, so
+    the engine then names the molecule the standard reading of ``smiles`` denotes.
+    When RDKit's canonical SMILES repeats a ring-closure misreading (the P(III) and
+    aziridine rows of test_lone_pair_configuration.py) that check fails and
+    ``smiles`` is returned: the two misreadings cancel there and those rows are
+    named right as they are. Anything that cannot be shown returns ``smiles`` (the
+    exit check then decides, as before). The exit check still compares CDK's
+    reading of the caller's string as written with OPSIN's own SMILES of the name
+    (:func:`_lone_pair_as_written`), so a name ships only when it denotes that
+    reading."""
+    return _lone_pair_standard_spelling_and_order(smiles)[0]
+
+
+#: The lone-pair input scope of this thread's outermost public naming call
+#: (``_lone_pair_input_enter``): ``open``, and ``rewrite`` = (the string named, the
+#: caller's string as written, the atom order) when the two differ, else None.
+_LP_INPUT = threading.local()
+
+
+def _lone_pair_input_enter(smiles: Optional[str]) -> Tuple[Optional[str], bool]:
+    """Open the lone-pair input scope of a public naming call: (the string to name,
+    whether this call opened the scope). Only the outermost call rewrites
+    (:func:`_lone_pair_standard_spelling`); a nested public call (``name_tiered`` ->
+    ``name``, ``name_with_tree`` -> ``name``, the strict PIN twin, a fragment's
+    own ``name``) names the string it is given. Close with
+    :func:`_lone_pair_input_exit`."""
+    if getattr(_LP_INPUT, 'open', False):
+        return smiles, False
+    spelled, order = _lone_pair_standard_spelling_and_order(smiles)
+    _LP_INPUT.open = True
+    _LP_INPUT.rewrite = (spelled, smiles, order) if spelled != smiles else None
+    return spelled, True
+
+
+def _lone_pair_input_exit(opened: bool) -> None:
+    if opened:
+        _LP_INPUT.open = False
+        _LP_INPUT.rewrite = None
+
+
+def _lone_pair_as_written(smiles: Optional[str]) -> Optional[str]:
+    """The caller's string as written when ``smiles`` is the standard spelling this
+    thread's public call named in its place (:func:`_lone_pair_input_enter`), else
+    ``smiles``."""
+    rewrite = getattr(_LP_INPUT, 'rewrite', None)
+    if rewrite is not None and smiles == rewrite[0]:
+        return rewrite[1]
+    return smiles
+
+
+def _lone_pair_caller_atoms(hint):
+    """An atom-index map of the string named, re-keyed to the atoms of the caller's
+    string (RDKit's reading, hydrogens removed) when the public call named a standard
+    spelling in its place; None when it cannot be re-keyed; unchanged otherwise."""
+    rewrite = getattr(_LP_INPUT, 'rewrite', None)
+    if rewrite is None or not hint:
+        return hint
+    order = rewrite[2]
+    try:
+        return {order[k]: v for k, v in hint.items()}
+    except Exception:
+        return None
+
+
 def _stereo_descriptor_repair(name: str, smiles: str, reduced: str,
                               stats: Optional[Dict[str, int]]) -> str:
     """critic-1 / R63: what the stereo-layer carve-out ships when a descriptor of
@@ -1412,16 +1768,6 @@ def _self_consistency_net_charge(smiles: str) -> Optional[int]:
         return sum(a.GetFormalCharge() for a in mol.GetAtoms())
     except Exception:
         return None
-
-
-def _self_consistency_has_formal_charge(smiles: str) -> bool:
-    """Does ``smiles`` carry any formally charged atom (a salt or zwitterion,
-    as opposed to a neutral molecule)? False if unparseable."""
-    try:
-        mol = Chem.MolFromSmiles(smiles)
-        return mol is not None and any(a.GetFormalCharge() for a in mol.GetAtoms())
-    except Exception:
-        return False
 
 
 #: Phase-1 reclaim (Adv1 guard): a bare RELATIVE stereo descriptor is 50/50-
@@ -1581,6 +1927,63 @@ def _is_p69_organometallic_without_pin(smiles: str, name: Optional[str]) -> bool
         return False
 
 
+def _is_metal_adduct_without_pin(smiles: str, name: Optional[str]) -> bool:
+    """True iff ``name`` is a adduct name (em-dash notation) of a
+    disconnected structure with a metal atom in it.
+
+     "Mixed organic - inorganic adducts" (the Blue Book): "preferred
+    IUPAC names cannot be assigned to mixed adducts because preferred IUPAC names
+    have not yet been determined for inorganic components"; (:39735) notes
+    no PIN for the Group 1-12 metals either. Label only: the name is unchanged."""
+    if not smiles or not name or "\u2014" not in name or "." not in smiles:
+        return False
+    try:
+        from .rules.adducts import _METAL_ELEMENT_NAMES
+        mol = Chem.MolFromSmiles(smiles)
+        return mol is not None and any(
+            a.GetSymbol() in _METAL_ELEMENT_NAMES for a in mol.GetAtoms())
+    except Exception:
+        return False
+
+
+def _is_carbon_free_compound(smiles: str) -> bool:
+    """True iff the structure has at least one atom and no carbon atom: a
+    carbon-free compound, whose names are preselected names at most, never PINs
+    ('sulfuric acid', 'ammonia', 'tetrachlorosilane', 'hexafluoro-λ5-phosphanuide',
+    'iron(III) trichloride', 'potassium hydrogen sulfate').
+
+     PREFERRED IUPAC NAMES (the Blue Book): "the label 'PIN' is added to
+    the names of compounds whose parent hydride contains at least one of the
+    following elements: B, Si, Ge, Sn, Pb, N, P, As, Sb, Bi, O, S, Se, Te, Po, F, Cl,
+    Br, I, At, and that also contain at least one carbon atom in their structure";
+    :2058 "Rules for the selection of preferred IUPAC names (PINs) for compounds
+    containing Al, Ga, In, Tl, as well as for compounds containing B, Si,... At,
+    and that do not contain carbon... will be discussed in a further publication.
+    ... the label 'preselected name' is added to appropriate names."
+    PRESELECTED NAMES (:2062): preselected names are chosen "for noncarbon-
+    containing (inorganic) parents to be used as the basis for preferred IUPAC
+    names for organic derivatives"; examples '(HO)3PO phosphoric acid (preselected
+    name)' (:2076), 'sulfuric acid (preselected name)' (:35449), 'tetrachlorosilane
+    (preselected name)' (:35758). The Blue Book labels no carbon-free structure
+    '(PIN)': of its (PIN) names, the three whose extracted structure has no carbon
+    are fragments of carbon-containing names ('... carbonazidimidoyl fluoride
+    (PIN)':31484, 'bis(methanaminium) sulfate (PIN)':43564, '...-pentaphenoxy-
+    λ5-phosphane (PIN)':46100). For the metal compounds also (:4667)
+    "preferred IUPAC names have not yet been determined for inorganic components"
+    and (:4712). A carbon-containing salt keeps its PIN status ('sodium
+    hydrogen carbonate (PIN)',:31623; 'N,N-diethylethanaminium hydrogen sulfate
+    (PIN)',:43566). Label only: the name is unchanged."""
+    if not smiles:
+        return False
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None or mol.GetNumAtoms() == 0:
+            return False
+        return not any(a.GetAtomicNum() == 6 for a in mol.GetAtoms())
+    except Exception:
+        return False
+
+
 def _specified_stereo_count(mol) -> int:
     """Count of EXPLICITLY-specified stereo features (assigned chiral centres +
     directional double bonds). Used to tell a stereo CONFLICT (same count, different
@@ -1617,7 +2020,8 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     the emitted name encode the SAME molecule as the input structure?
 
     Constitution = InChIKey skeleton block (formula + connectivity + mobile-H;
-    stereo- and charge-insensitive) PLUS net formal charge. On the stereo-strict
+    stereo- and charge-insensitive) PLUS net formal charge PLUS the protonation
+    flag of the full key (the input's charge form, for every input). On the stereo-strict
     primary path this ALSO fails a stereo CONFLICT (same amount of specified stereo,
     different RegistrationHash canonical layer). ``ignore_stereo=True`` (the OPSIN-validity
     stereo carve-out, which judges a stereo-STRIPPED OPSIN parse) compares constitution
@@ -1667,26 +2071,31 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
         return "inconclusive"
     if a != b:
         return "mismatch"
-    # Skeleton matches — guard against a name that fails to preserve a CHARGED
-    # input's net charge (the skeleton block excludes the charge layer).
+    # Skeleton matches -- the charge form must match too. The skeleton block
+    # excludes the charge (/q) and protonation (/p) layers, so a name that drops,
+    # adds or moves a charge or a hydron shares it with the input:
+    # * the hydroperoxide anion [O-]O (-1) named 'dioxidane' (OO, 0);
+    # * 'trisodium 5-hydroxybenzene-1,3-disulfonate', whose parse is three Na+
+    # and a dianion (net +1), for the trianion salt (net 0) --,
+    # the Blue Book: "Neutral salts of acids are named by citing the name
+    # of the cation(s) followed by the name of the anion";
+    # * 'methyl phosphate', whose parse is the dianion, for the neutral ester
+    # COP(=O)(O)O. That ester is 'methyl dihydrogen phosphate',
+    # the Blue Book: "Partial acid esters of polybasic acids are named by
+    # citing alkyl groups... followed by the word 'hydrogen'... and the name
+    # of the appropriate anion"; example:35940), so a name without the
+    # 'hydrogen' denotes the anion, a different species. Neutral inputs used
+    # to be exempt from this check; they are not.
+    # So the net charges must be equal, and so must the protonation flag (the last
+    # character of the full key, from the /p layer). A charge form that IS the same
+    # species (an ionic salt drug.[H+].[Cl-] read back as drug.Cl, an amino-acid
+    # zwitterion read back as the neutral acid) shares the whole full key and was
+    # accepted above.
     ca = _self_consistency_net_charge(input_smiles)
     cb = _self_consistency_net_charge(opsin_smiles)
-    # Only a genuinely CHARGED input whose charge the name drops/changes is a leak
-    # (e.g. [O-]O, -1, named 'dioxidane', 0). A NEUTRAL input is exempt: acid/ester
-    # names are protonation-ambiguous in OPSIN (e.g. 'methyl phosphate' round-trips
-    # to the -2 phosphate dianion) — that is not a wrong-molecule error.
-    if ca is not None and cb is not None and ca != 0 and ca != cb:
+    if ca is not None and cb is not None and ca != cb:
         return "mismatch"
-    # A neutral SALT is not that exemption. Its input carries formal charges that
-    # balance, the Blue Book: "Neutral salts of acids are named
-    # by citing the name of the cation(s) followed by the name of the anion"), so
-    # a name whose parse is a NET-CHARGED assembly denotes a different species:
-    # 'trisodium 5-hydroxybenzene-1,3-disulfonate' parses to three Na+ and a
-    # dianion (net +1) for a trianion salt, and the skeleton block cannot see it.
-    # Scoped to inputs with charged atoms, so 'methyl phosphate' (no formal
-    # charge) keeps its exemption.
-    if (ca == 0 and cb is not None and cb != 0
-            and _self_consistency_has_formal_charge(input_smiles)):
+    if ka is not None and kb is not None and ka[-1] != kb[-1]:
         return "mismatch"
     if ignore_stereo:
         return "ok"
@@ -3178,6 +3587,14 @@ import functools as _functools
 from .perception.molcache import atoms_of, bonds_of, inchikey_of
 from .perception.smarts_cache import compiled as _compiled_smarts
 
+#: The SMILES string given to the outermost ``name`` of this thread (set and cleared
+#: by ``_budget_scope`` at depth 1), None outside any ``name``.
+_CALLER_INPUT = threading.local()
+
+
+def _caller_input() -> Optional[str]:
+    return getattr(_CALLER_INPUT, 'smiles', None)
+
 
 def _budget_scope(fn):
     """ giant-molecule hang fix: bracket a top-level ``name`` with the
@@ -3204,7 +3621,23 @@ def _budget_scope(fn):
             exit_name_scope,
         )
         depth = enter_name_scope()
+        _lp_opened = False
         try:
+            if depth == 1:
+                # Lone-pair stereocentres: the string the caller gave, which the exit
+                # check reads as written (_exit_lone_pair_check); nested name calls
+                # name strings RDKit wrote. A lone-pair centre RDKit reads unlike the
+                # standard reading is named as the standard spelling of the caller's
+                # string (_lone_pair_standard_spelling), and the exit check still
+                # reads the caller's string as written (_lone_pair_as_written).
+                _given = args[0] if args else kwargs.get('smiles')
+                _spelled, _lp_opened = _lone_pair_input_enter(_given)
+                if _spelled != _given:
+                    if args:
+                        args = (_spelled,) + tuple(args[1:])
+                    else:
+                        kwargs['smiles'] = _spelled
+                _CALLER_INPUT.smiles = _spelled
             return fn(self, *args, **kwargs)
         except PerfBudgetExceeded:
             # M2.5: the per-top-level OPERATION budget was exhausted deep inside
@@ -3262,7 +3695,67 @@ def _budget_scope(fn):
                 self._suppress_floor_offer = False
         finally:
             exit_name_scope()
+            if depth == 1:
+                _CALLER_INPUT.smiles = None
+            _lone_pair_input_exit(_lp_opened)
     return _wrapper
+
+
+class _FailureRescues:
+    """The optional rescues the outermost ``name`` runs once its main path has
+    produced a failure it is about to ship: the late general-engine recovery, the
+    demote-senior-group rescue, the decomposition retry, the alternate-parent
+    rescue, the natural-product downgrade and the clean general fall-through.
+
+    They charge the per-molecule hang budgets the outermost ``name`` armed for
+    the whole molecule (``fragment_naming._PERF_BUDGET`` / ``_ANALYSIS_CALL_BUDGET``,
+    memo hits replaying their recorded charge). A rescue that exhausted one used to
+    raise ``PerfBudgetExceeded`` all the way to the ``_budget_scope`` boundary,
+    which abstains with the floor offer suppressed -- so a molecule whose main path
+    had FINISHED lost the round-trip-gated floor name that ``_finish`` offers every
+    other failure. Measured on the row
+    'COC(=O)c1ccc2[nH]c(=N[C@H]3C[C@@H](NC(=O)[C@H]4CCOC4)C3)sc2c1' at the best-
+    effort tier: its naming charges 410 analysis calls at 171c54d5e and 518-520
+    from 818c36360 on, where ``rules.amides.name_amide`` declines the oxolane ring
+    it used to spell as cyclopentane (a 0-wrong decline; with only that decline
+    reverted in a scratch copy the count is 412) and the rescues do more work; the
+    ceiling is 500, the trip falls inside the clean general fall-through, and the
+    molecule abstained where the floor names it round-trip exact.
+
+    ``run`` calls one rescue; when the rescue exhausts a budget it declines
+    (``fallback``) and every later rescue is skipped. ``name`` then offers the
+    bounded rescue the boundary would have offered, re-arms a fresh budget and
+    leaves through its main exit as for any other failure (floor offer included).
+    Only the frame that owns the budgets (``name_scope_depth == 1``) does this;
+    a nested ``name`` re-raises, so the signal still unwinds to that frame. A
+    trip in the main path (the hang class, e.g. the Ni-corrin of
+    ``tests/unit/rules/test_m25_workbudget.py``) reaches the boundary exactly as
+    before. Work stays bounded: one budget for the main path and its rescues, one
+    for the rescue, one for the exit; a re-explosion at the exit raises to the
+    boundary.
+    """
+
+    __slots__ = ("_owns_budget", "exhausted")
+
+    def __init__(self):
+        from .assembly.fragment_naming import name_scope_depth
+        self._owns_budget = name_scope_depth() == 1
+        self.exhausted = False
+
+    def run(self, rescue, *args, fallback=None, **kwargs):
+        if self.exhausted:
+            return fallback
+        from .assembly.fragment_naming import PerfBudgetExceeded
+        try:
+            return rescue(*args, **kwargs)
+        except PerfBudgetExceeded:
+            if not self._owns_budget:
+                raise
+            self.exhausted = True
+            logger.info("hang budget exhausted inside the failure rescue %s; "
+                        "later rescues skipped, the main exit runs on a fresh budget",
+                        getattr(rescue, "__name__", rescue))
+            return fallback
 
 
 #: cross-instance recursion guard for the parent-offer retry. The
@@ -3568,6 +4061,22 @@ class Orthonym:
         >>> Orthonym.name_with_tree("OC1CCCCC1").name
         'cyclohexanol'
         """
+        # Lone-pair centre written first: the standard spelling of the input is named
+        # when RDKit reads a lone-pair centre of it unlike the standard reading
+        # (_lone_pair_standard_spelling); the atom-to-locant hint is then re-keyed to
+        # the atoms of the caller's string. Any other input is unchanged.
+        spelled, _lp_opened = _lone_pair_input_enter(smiles)
+        try:
+            result = self._name_with_tree_impl(spelled)
+            if spelled != smiles and result.atom_to_locant_hint:
+                result = result._replace(
+                    atom_to_locant_hint=_lone_pair_caller_atoms(result.atom_to_locant_hint))
+            return result
+        finally:
+            _lone_pair_input_exit(_lp_opened)
+
+    def _name_with_tree_impl(self, smiles: str):
+        """The body of:meth:`name_with_tree`, for the string it names."""
         # Lazy import to avoid composer.py -> name_tree -> namer.py cycle
         # at module-load time.
         from .assembly.name_tree import NamingResult
@@ -3770,6 +4279,8 @@ class Orthonym:
         >>> Orthonym.name("C/C=C/C")
         '(2E)-but-2-ene'
         """
+        if not _PIN_PROMOTION_WRAPPED.get() and self._pin_promotion_eligible():
+            return self._name_with_pin_promotion(smiles, raise_on_limit=raise_on_limit)
         # Start runtime fragment cache session (only at top-level depth)
         from .assembly.fragment_naming import (
             end_naming_session,
@@ -3889,6 +4400,9 @@ class Orthonym:
             # the process-wide provenance contextvar, which still describes
             # whichever producer ran LAST (the losing primary on a floor win).
             self._last_selected_offer = None
+            # D3: the name `_maybe_prefix_order_fallback` shipped for THIS
+            # molecule, if any (read by `name_tiered`), reset for the same reason.
+            self._prefix_order_fallback_name = None
             #: publish the engine flag so fragment/component recursion
             # (name_compound builds FRESH namers) inherits it. Top-level only;
             # reset in the finally below.
@@ -3971,20 +4485,19 @@ class Orthonym:
                         record_abstention(AbstentionCode.OTHER,
                                           detail='isotope_decorator_failed')
                         return self._finish(_descriptive_fallback(smiles), smiles)
-            # --- W3-P09: normalize a charge-imbalanced acid-salt
-            # notation. A metal cation + a NEUTRAL polybasic inorganic oxoacid written
-            # without the balancing deprotonation ([Na+].OC(=O)O = NaHCO3, net +1) is a
-            # valid acid salt in a malformed charge representation. Rewrite it to the
-            # balanced salt so species classification -> name_salt (method 2 PIN) ->
-            # the self-consistency gate all see the chemically-valid net-0 structure.
-            # Fail-closed (returns None) for every other shape -> smiles unchanged.
-            # Cheap gate: only a multi-fragment ('.') input carrying a cation ('+')
-            # can be this shape, so single-fragment / anion-only inputs skip the parse.
-            if is_top_level_naming() and '.' in smiles and '+' in smiles:
-                from .rules.salts import normalize_imbalanced_acid_salt
-                _bal = normalize_imbalanced_acid_salt(smiles)
-                if _bal is not None:
-                    smiles = _bal
+            # The input is named as drawn: nothing here rewrites ``smiles`` before the
+            # producers and the gates see it, because every gate compares the name
+            # with THIS structure. A cation beside a NEUTRAL inorganic oxoacid
+            # ([Na+].OC(=O)O, net charge +1) used to be deprotonated to the balanced
+            # salt first; the salt name then verified against the rewritten
+            # structure, so 'sodium hydrogen carbonate' (NaHCO3, net 0, full
+            # InChIKey...-M) shipped as verified for an input whose key ends in -N.
+            # A different protonation state is a different species. Such an input is
+            # a mixed adduct of the cation and the acid: (the Blue Book:
+            # 4667) "names are formed by citing the names of individual compounds,
+            # connected by long (em) dashes" -> 'carbonic acid—sodium(1+) (1/1)' at
+            # the general tiers, with no PIN ("preferred IUPAC names cannot be
+            # assigned to mixed adducts",:4667), so the PIN tier abstains.
             # M1 (Levers C1/E): open the scoped-per-call memo so name_substituent /
             # name_pipeline_only memos live for exactly this naming call and are torn
             # down in the finally below (bounded, determinism-safe). push_scope returns
@@ -4194,11 +4707,21 @@ class Orthonym:
                     and result not in _DESCRIPTIVE_FALLBACK_NAMES
                     and result.strip().lower() != 'unknown'):
                 result = _descriptive_fallback(smiles)
+            # Breadth -- ZINC loss: every step from here to the main exit is an
+            # optional rescue of the failure the main path produced. A rescue
+            # that exhausts the molecule's hang budget declines instead of
+            # abstaining the whole molecule, and the main exit below still runs
+            # (see ``_FailureRescues``).
+            _rescues = _FailureRescues()
             # (opt-in): a candidate suppressed by a downstream gate
             # (/ vetoes) left only the failure sentinel; give the
             # engine its late, fully-gated shot before the failure ships.
             if is_failure_name(result):
-                _rec = self._try_general_engine_recovery(smiles)
+                _rec = _rescues.run(self._try_general_engine_recovery, smiles)
+                if _rec is not None and getattr(
+                        self, "_last_recovery_floor_substitute", False):
+                    _rec = _rescues.run(self._prefer_clean_over_floor_substitute,
+                                        smiles, _rec, fallback=_rec)
                 if _rec is not None:
                     result = _rec
             # tail #7: best-effort DEMOTE-SENIOR-GROUP rescue. A ring system
@@ -4223,7 +4746,7 @@ class Orthonym:
             if (is_top_level_naming() and is_failure_name(result)
                     and self._general_fallback
                     and not self._disable_opsin_validity_gate):
-                _dr = self._try_demote_senior_group_rescue(smiles)
+                _dr = _rescues.run(self._try_demote_senior_group_rescue, smiles)
                 if _dr is not None:
                     result = _dr
             # (-02): last-resort DECOMPOSITION before abstaining. A
@@ -4245,9 +4768,10 @@ class Orthonym:
                 _dprobe = Chem.MolFromSmiles(smiles)
                 if _dprobe is not None:
                     from .decomposition import try_decompose
-                    _dname = try_decompose(_dprobe, style=self.style)
+                    _dname = _rescues.run(try_decompose, _dprobe, style=self.style)
                     if _dname and not is_failure_name(_dname):
-                        _dgated = _final_opsin_validity_gate(
+                        _dgated = _rescues.run(
+                            _final_opsin_validity_gate,
                             _dname, smiles, self._grammar_stats,
                             besteffort_unverified=self._general_fallback_unverified,
                             general_fallback_tier=self._general_fallback)
@@ -4266,7 +4790,7 @@ class Orthonym:
             if (is_top_level_naming() and is_failure_name(result)
                     and self._general_fallback
                     and not self._disable_opsin_validity_gate):
-                _ap = self._try_alternate_parent_rescue(smiles)
+                _ap = _rescues.run(self._try_alternate_parent_rescue, smiles)
                 if _ap is not None:
                     result = _ap
             # giants Engine 3: a retained natural-product PARENT HYDRIDE
@@ -4291,7 +4815,7 @@ class Orthonym:
             if (is_top_level_naming() and self._general_fallback_unverified
                     and not self._disable_opsin_validity_gate
                     and not is_failure_name(result)):
-                _np_sys = self._try_np_systematic_downgrade(smiles, result)
+                _np_sys = _rescues.run(self._try_np_systematic_downgrade, smiles, result)
                 if _np_sys is not None:
                     result = _np_sys
             # CQ5 Task A (offer-not-return, a project rule): the committed primary
@@ -4315,9 +4839,22 @@ class Orthonym:
             if (is_top_level_naming() and is_failure_name(result)
                     and self._general_fallback_unverified
                     and not self._disable_opsin_validity_gate):
-                _ft = self._try_besteffort_clean_general_fallthrough(smiles)
+                _ft = _rescues.run(self._try_besteffort_clean_general_fallthrough, smiles)
                 if _ft is not None and not is_failure_name(_ft):
                     result = _ft
+            if _rescues.exhausted:
+                # A rescue ran out of the hang budget (``_FailureRescues``). The
+                # trip no longer reaches the ``_budget_scope`` boundary, so its last
+                # resort is offered here, in the boundary's order: the bounded T4
+                # rescue first (it arms and then disarms a budget of its own),
+                # then the main exit below on a fresh budget -- the floor offer of
+                # ``_finish`` included, as for any other failure.
+                from .assembly.fragment_naming import rearm_hang_budgets
+                if is_failure_name(result):
+                    _pb = self._try_perf_budget_t4_rescue(smiles)
+                    if _pb is not None and not is_failure_name(_pb):
+                        result = _pb
+                rearm_hang_budgets()
             # Task 1.9: PIN fails closed; --trivial falls back to a general-only
             # retained name when the systematic pipeline derived no PIN (and,
             # since wp7, an OPSIN-import trivial name without PIN evidence is
@@ -4398,12 +4935,21 @@ class Orthonym:
                 binding_proof=self._binding_proof,
             )
             self._pin_twin = tw
+        # Branch review fixes: the twin is the STRICT path, so it never runs the
+        # PIN tier's promotion re-run (``_name_with_pin_promotion``). The twin is a
+        # default-configuration instance at name-scope depth 1, so without this
+        # guard it re-ran with the promoted best-effort producers and reproduced
+        # the breadth name it exists to tell apart ('...-(2,6-dioxo-1H-pyrimidin-3-
+        # yl)propanoic acid' came out pin_verified at best-effort).
+        _wrapped = _PIN_PROMOTION_WRAPPED.set(True)
         try:
             return tw.name(smiles)
         except Exception:
             # A twin failure must never break tier reporting; treat as "strict
             # did not produce this name" (conservative -> demote), never a crash.
             return None
+        finally:
+            _PIN_PROMOTION_WRAPPED.reset(_wrapped)
 
     def name_tiered(self, smiles: str) -> dict:
         """Name one molecule and say how the name was made and checked.
@@ -4455,12 +5001,19 @@ class Orthonym:
             ``suffix_free_prefix_name``
                 True when the name states the principal characteristic group as a
                 prefix with no suffix.
+            ``prefix_order_fallback``
+                True when the name cites its substituent prefixes out of the
+                alphanumerical order because the round trip of the ordered
+                spelling fails at the stereo layer only (a stereocentre read
+                differently by the SMILES hand-off, not by the name); such a name
+                is best_effort, never a PIN.
             ``verified``
                 ``opsin`` (OPSIN read the whole name back to the same molecule),
                 ``opsin_constitution`` (read back with the same constitution; the
                 stereodescriptors were not confirmed by OPSIN), ``identity`` (a name
-                from an exact-match list, which OPSIN cannot read) or ``unverified``
-                (no read-back recorded).
+                from the exact-match list of metal-complex names, found by the
+                input's exact InChIKey; OPSIN cannot read these names) or
+                ``unverified`` (no read-back recorded).
 
         Examples
         --------
@@ -4478,11 +5031,19 @@ class Orthonym:
         # push_scope returns None inside name's own push (a nested no-op), so both
         # engines share THIS scope; only this frame tears it down.
         from .assembly.memo import pop_scope as _memo_pop, push_scope as _memo_push
-        _tier_scope = _memo_push()
+        # Lone-pair centre written first: the row names (and derives its tier and
+        # formula from) the standard spelling of the input when RDKit reads a
+        # lone-pair centre of it unlike the standard reading; see
+        # _lone_pair_standard_spelling. Any other input is unchanged.
+        smiles, _lp_opened = _lone_pair_input_enter(smiles)
         try:
-            return self._name_tiered_impl(smiles)
+            _tier_scope = _memo_push()
+            try:
+                return self._name_tiered_impl(smiles)
+            finally:
+                _memo_pop(_tier_scope)
         finally:
-            _memo_pop(_tier_scope)
+            _lone_pair_input_exit(_lp_opened)
 
     def _name_tiered_impl(self, smiles: str) -> dict:
         from .metrics import provenance as _pv
@@ -4718,7 +5279,7 @@ class Orthonym:
         if (tier == BEST_EFFORT and opsin == "verified"
                 and _tier_if_verified is not None):
             tier = _tier_if_verified
-        # (The two no-PIN-status demotions below run after the shipped-name check
+        # (The four no-PIN-status demotions below run after the shipped-name check
         # so that they read the final verification of the shipped string.)
         # wp7 (verification panel NIT): the Blue Book gives no PIN for these
         # elements' compounds. the Blue Book "Names of organic compounds based
@@ -4737,6 +5298,25 @@ class Orthonym:
         # pin_verified). Same demotion; the name is unchanged.
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
                 and _is_p69_organometallic_without_pin(smiles, name)):
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            is_pin = False
+        # Breadth Job 2: a mixed organic-inorganic adduct of a metal has no PIN
+        # either, the Blue Book). Same demotion; the name is unchanged.
+        if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
+                and _is_metal_adduct_without_pin(smiles, name)):
+            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            is_pin = False
+        # Branch review fixes: a wholly inorganic metal compound (a metal atom, no
+        # carbon atom) has no PIN either,:4667;,:4712) --
+        # 'iron(III) trichloride', 'mercury(II) dichloride', 'copper(II) sulfate
+        # dihydrate' shipped pin_verified / is_pin True at every tier. Texts,
+        # labels and spelling (user decision 2026-09-29): every carbon-free
+        # compound, metal or not -- 'sulfuric acid', 'ammonia', 'hydrogen sulfite',
+        # 'tetrachlorosilane' -- has a preselected name at most,
+        # the Blue Book;,:2062). Same demotion; the name is
+        # unchanged.
+        if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
+                and _is_carbon_free_compound(smiles)):
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
         gates = []
@@ -4787,6 +5367,23 @@ class Orthonym:
                 verified = "opsin"
             elif opsin == "verified_constitution_only":
                 verified = "opsin_constitution"
+        # P2 -- labels (2026-09-28): a name from the exact-match coordination list
+        # (D1: heme, chlorophyll, cobalamin, siroheme, coenzyme F430; checked by
+        # exact InChIKey identity, 'identity') is the ChEBI name of a coordination
+        # entity, not a Preferred IUPAC Name. The Blue Book gives coordination
+        # names no PIN status INTRODUCTION, the Blue Book: "Although
+        # coordination nomenclature is not discussed in these recommendations",
+        # PINs are chosen "within the limits of the nomenclature of organic
+        # compounds... but not between a coordination or binary name and an
+        # organic name") and notes none for organometallic compounds of the
+        # transition elements and of Groups 1 and 2 INTRODUCTION,:39735).
+        # So it is a checked name that is not the preferred name, from a table of
+        # retained names: systematic_verified, is_pin False, whatever the PIN-path
+        # branch (pin_verified) or the demotion (best_effort: it reads the
+        # OPSIN label only) derived above. Label only: name, source, 'identity'
+        # and the gate outcome are unchanged.
+        if verified == "identity":
+            tier, is_pin = SYSTEMATIC_VERIFIED, False
         # R63 / R68 (claims conformance, 2026-09-27): a tier whose name says
         # 'verified' is earned only by a full round trip (verified 'opsin') or the
         # documented identity table. The grammar carve-outs (OPSIN has no grammar
@@ -4799,12 +5396,20 @@ class Orthonym:
             tier, is_pin = PIN_UNVERIFIED, False
         elif tier == SYSTEMATIC_VERIFIED and verified not in ("opsin", "identity"):
             tier = BEST_EFFORT
+        # D3: the best-effort last resort cited the parent's prefixes out of the
+        # order (``_maybe_prefix_order_fallback``): never a PIN, best_effort.
+        prefix_order_fallback = bool(
+            name and not is_failure_name(name)
+            and getattr(self, "_prefix_order_fallback_name", None) == name)
+        if prefix_order_fallback:
+            tier, is_pin = BEST_EFFORT, False
         return {"name": name, "tier": tier, "is_pin": is_pin,
                 "source": source, "opsin": opsin, "gates_passed": gates,
                 "gate_outcome": gate_outcome,
                 "formula": formula, "limit_code": limit_code,
                 "stereo_unexpressed": stereo_unexpressed,
                 "suffix_free_prefix_name": suffix_free_prefix_name,
+                "prefix_order_fallback": prefix_order_fallback,
                 "verified": verified}
 
     def _retained_structural_preference(self, mol) -> Optional[str]:
@@ -5069,6 +5674,136 @@ class Orthonym:
             return False
 
     def _try_general_engine_recovery(self, smiles: str) -> Optional[str]:
+        """The late engine recovery (``_try_general_engine_recovery_impl``).
+
+        Also records, in ``self._last_recovery_floor_substitute``, whether the
+        name it returns is the universal floor standing in for a rung candidate
+        that failed its round trip (``t4_coverage.last_t4_was_floor_substitute``),
+        so the caller can let a clean-context recovery offer the engine's own name
+        first (``_prefer_clean_over_floor_substitute``)."""
+        origin: dict = {}
+        rec = self._try_general_engine_recovery_impl(smiles, origin)
+        self._last_recovery_floor_substitute = bool(
+            rec is not None and origin.get("floor_substitute"))
+        # P1: the name is the final rung's universal floor (every engine rung
+        # declined), see ``_prefer_clean_over_floor_substitute``.
+        self._last_recovery_final_floor = bool(
+            rec is not None and origin.get("final_floor"))
+        return rec
+
+    def _prefer_clean_over_floor_substitute(self, smiles: str,
+                                            floor_name: str) -> str:
+        """``floor_name`` came from the in-``name`` recovery, where the rung
+        candidate failed its round trip and the universal floor's verified
+        spelling stood in for it. That failing rung is the degraded-context
+        symptom ``_try_besteffort_clean_general_fallthrough`` exists for (the
+        engine inside ``name`` builds a worse candidate than at depth 0 with a
+        fresh memo), and the clean fall-through only runs when nothing shipped --
+        so a verified floor spelling used to pre-empt the engine's own verified
+        name, e.g. a 1,3-thiazole spelled '3-thia-1-azacyclopenta-1,4-diene' and
+        its carboxylic acid as '12-hydroxy-...-13-oxa-...-12-en'. Offer-not-return
+        (a project rule): run the clean recovery now and keep its name when it is
+        not itself a floor stand-in; otherwise keep ``floor_name`` (and the
+        provenance of the run that built it). Every candidate here passed the
+        recovery's own full round trip. Best-effort, top level, gate on only --
+        the same conditions as the clean fall-through.
+
+        Only for a molecule with a ring. There the parent is a ring
+        (1), the Blue Book, "Within the same class, a ring or ring system
+        has seniority over a chain"), which the engine's rungs choose by ring
+        seniority and spell by their Hantzsch-Widman / retained names, while the
+        floor may pick a junior ring (benzene over pyridine) and spells every
+        ring by replacement ('2-azacyclohexa-2,4,6-trien-1-yl'). In an acyclic
+        molecule the floor's principal chain is the one (the Blue Book:
+        20922, "(a) contains the greater number of heteroatoms of any kind; (b)
+        has the greater number of skeletal atoms"), while the engine's ring-first
+        rung, with no ring to choose, falls back to a short chain ('1-oxoethane'
+        for CC(=O)NCN(C)N=O against the floor's '3-methyl-6-oxo-1-oxa-2,3,5-
+        triazahept-1-ene'), so the floor spelling stays.
+
+        Only in the outermost ``name`` (``name_scope_depth == 1``). The
+        fragment-recursion depth that ``is_top_level_naming`` reads is 0 while
+        any ``name`` dispatches its whole molecule (and ``isolated_naming_session``
+        resets it to 0), so a nested best-effort ``name`` -- the ``name_compound``
+        instances that name the acid of an acyloxy prefix or a glycoside cap,
+        which inherit the best-effort tier from the context -- whose own recovery
+        produced a floor stand-in ran this offer for its sub-structure (ChEBI
+        PEG-glycopeptide, 209 heavy atoms: 12 nested offers, 43.9 s, each ending
+        in the same floor string). A nested name is round-trip gated again by the
+        frame that uses it, and the names this offer contributes come from the
+        outermost frame: on the 13 dev-set rows whose stand-in it replaces, all 13
+        at ``name_scope_depth == 1``, each from a clean engine rung."""
+        from .assembly.fragment_naming import is_top_level_naming, name_scope_depth
+        if not (name_scope_depth() == 1 and is_top_level_naming()
+                and self._general_fallback_unverified
+                and not self._disable_opsin_validity_gate):
+            return floor_name
+        _m = Chem.MolFromSmiles(smiles)
+        if _m is None or _m.GetRingInfo().NumRings() == 0:
+            return floor_name
+        from .metrics.provenance import get_provenance, restore_provenance
+        _snap = get_provenance()
+        # Two clean contexts, the cheap one first. The in-``name`` recovery is
+        # degraded three ways (``_try_besteffort_clean_general_fallthrough``): the
+        # best-effort context variables, the elevated session depth and the
+        # molecule's fragment memo. The first clean run is a probe: it resets the
+        # first two and READS the memos (fragment memo and scope memo) without
+        # writing them (``speculative_fragment_naming`` + ``push_sandbox``: its
+        # writes and its budget spend are dropped on exit), so every fragment the
+        # main path already named costs nothing. The memo holds names the main
+        # path built in the best-effort context, so an engine rung built on them
+        # is not the clean-context name (dev2000 'O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3cc
+        # ccc3)cc2)c1': '...-3-(2-hydroxy-1,3-dioxa-2-thiapropa-1,2-dienyl)benzene'
+        # from the probe, '...-3-(1,1-dioxo-2-oxa-1λ6-thiaethyl)benzene' fresh), and
+        # the probe never ships one. It ships only the final rung's universal
+        # floor, reached when every engine rung declined even with the molecule's
+        # fragment names at hand; otherwise the recovery runs on a fresh memo
+        # exactly as before (the probe left no trace in any memo or budget). On the
+        # 36 outermost offers of the a dev split / milestone1500 / dev2000 best-effort
+        # evals, the 11 probes that ended in the final rung gave the fresh run's
+        # name and the fresh run ended there too. A fresh memo re-derives every
+        # fragment of the molecule: for two ChEBI peptides (119 and 209 heavy
+        # atoms) 12.3 s and 43.8 s against the recipe's 90 s stall, where the
+        # probe took 0.14 s and 2.5 s and gave the same string.
+        from .assembly.fragment_naming import (
+            PerfBudgetExceeded,
+            speculative_fragment_naming,
+        )
+        from .assembly.memo import pop_sandbox, push_sandbox
+        # Branch review fixes: the fresh-memo run names the CANONICAL spelling of the
+        # molecule (RDKit's canonical isomeric SMILES, the same string for every
+        # atom order), so its name no longer depends on how the input was written
+        # (dev2000 'O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3ccccc3)cc2)c1' came out three ways
+        # over five spellings, each replacing the same floor string). It is the same
+        # molecule, so its round trip is the input's; the probe keeps the input
+        # spelling because it reads the molecule's memos.
+        _canonical_smiles = Chem.MolToSmiles(_m) or smiles
+        for _fresh_memo in (False, True):
+            self._last_recovery_final_floor = False
+            if _fresh_memo:
+                clean = self._try_besteffort_clean_general_fallthrough(
+                    _canonical_smiles)
+            else:
+                _sandbox = push_sandbox()
+                try:
+                    with speculative_fragment_naming():
+                        clean = self._try_besteffort_clean_general_fallthrough(
+                            smiles, reset_cache=False)
+                except PerfBudgetExceeded:
+                    clean = None  # not charged (speculative); the fresh run decides
+                finally:
+                    pop_sandbox(_sandbox)
+            if (clean is not None and not is_failure_name(clean)
+                    and not getattr(self, "_last_recovery_floor_substitute", False)
+                    and (_fresh_memo
+                         or getattr(self, "_last_recovery_final_floor", False))):
+                return clean
+            restore_provenance(_snap)
+        self._last_recovery_floor_substitute = True
+        return floor_name
+
+    def _try_general_engine_recovery_impl(self, smiles: str,
+                                          origin: dict) -> Optional[str]:
         """ (opt-in): late engine recovery for abstentions.
 
         Covers the two flows the in-``_name_impl`` wiring cannot see:
@@ -5213,10 +5948,18 @@ class Orthonym:
                     # to an abstention (measured root cause). Run it in an isolated
                     # depth-0 session so it gets the full recursion budget a
                     # standalone call gets.
+                    from .assembly.t4_coverage import (
+                        last_t4_was_final_floor,
+                        last_t4_was_floor_substitute,
+                        reset_t4_floor_substitute,
+                    )
+                    reset_t4_floor_substitute()
                     with isolated_naming_session():
                         cand = name_t4_complete(mol, feats)
                     if cand is None:
                         return None
+                    origin["floor_substitute"] = last_t4_was_floor_substitute()
+                    origin["final_floor"] = last_t4_was_final_floor()
                     # FINAL-REVIEW FIX 1: this name must POSITIVELY
                     # round-trip or the path ABSTAINS. The shared ladder below
                     # ships a `general_fallback_unverified` emission even when
@@ -5428,7 +6171,7 @@ class Orthonym:
         return None
 
     def _try_besteffort_clean_general_fallthrough(
-            self, smiles: str) -> Optional[str]:
+            self, smiles: str, *, reset_cache: bool = True) -> Optional[str]:
         """CQ5 Task A: the RT-failure fall-through (best-effort tier only).
 
         Re-invoke the RT-gated ``_try_general_engine_recovery`` in a CLEAN naming
@@ -5469,6 +6212,12 @@ class Orthonym:
         Gated by the caller on ``_general_fallback_unverified`` + the
         ship-a-failure path, so PIN/complete output is byte-identical and no
         currently-shipping name can change (offer-not-return; a project rule).
+
+        ``reset_cache=False`` keeps the fragment memo the caller has installed
+        (context variables and session depth are still reset): the memo-reading
+        first attempt of ``_prefer_clean_over_floor_substitute``, which runs it
+        inside ``speculative_fragment_naming`` so that memo is a throwaway copy.
+        The fall-through itself always runs on a fresh memo.
         """
         if not self._general_fallback_unverified:
             return None
@@ -5487,7 +6236,7 @@ class Orthonym:
                 allow_aromatic_general_ctx.set(False),
                 full_coverage_ctx.set(False),
             )
-            with isolated_naming_session(reset_cache=True):
+            with isolated_naming_session(reset_cache=reset_cache):
                 return self._try_general_engine_recovery(smiles)
         except Exception as e:  # fail-closed: keep the abstention
             logger.info(
@@ -5527,9 +6276,11 @@ class Orthonym:
           (0-wrong; inv 9 -- verify what SHIPS, not just that the bad path stopped).
 
         Best-effort tier only (``_general_fallback_unverified``) and reached only on
-        a molecule that ALREADY abstains at this boundary, so no currently-shipping
-        name can change and PIN/complete output is byte-identical (offer-not-return,
-        inv 18). Never raises.
+        a molecule that ALREADY abstains at this boundary -- or, since the ZINC-loss
+        fix, from ``name`` itself when one of its failure rescues exhausted the
+        budget and the molecule is about to ship a failure (``_FailureRescues``) --
+        so no currently-shipping name can change and PIN/complete output is
+        byte-identical (offer-not-return, inv 18). Never raises.
         """
         if not self._general_fallback_unverified:
             return None
@@ -6067,6 +6818,14 @@ class Orthonym:
         except Exception as _xe:  # pragma: no cover - defensive, fails closed
             logger.info("exit round-trip check failed (withdrawn): %s", _xe)
             name = _descriptive_fallback(smiles)
+        # D3 (user decision 2026-09-28): the best-effort tier's last resort for a
+        # molecule it is about to leave unnamed -- after every other path and the
+        # exit check, so it can only turn an abstention into a name, never change
+        # a name that ships. See _maybe_prefix_order_fallback.
+        try:
+            name = self._maybe_prefix_order_fallback(name, smiles)
+        except Exception as _pe:  # pragma: no cover - defensive, keeps the abstention
+            logger.info("prefix-order fallback failed (abstention kept): %s", _pe)
         try:
             if self._binding_proof == "off":
                 return name
@@ -6236,6 +6995,99 @@ class Orthonym:
                 "t4 floor offer computation failed (kept existing offers): %s",
                 _fe)
 
+    def _maybe_prefix_order_fallback(self, name: str, smiles: str) -> str:
+        """D3 (user decision 2026-09-28): the best-effort tier's last resort for a
+        molecule whose round trip depends on the citation order of its prefixes.
+
+        The round trip (OPSIN's SMILES of the name, read by RDKit, full InChIKey)
+        can depend on the prefix order although the name's meaning does not
+        , the Blue Book, "Alphanumerical order is used to establish the
+        order of citation of detachable substituent prefixes";:3446, the order
+        does not involve stereochemical descriptors). Measured on the P(III) centre
+        of PubChem-500k row
+        ``Cc1cn([C@H]2CC(O[P@]3O[C@](C)[C@@H]4CCCN43)[C@@H](CO)O2)c(=O)[nH]c1=O``:
+        OPSIN's own StdInChIKey is the same for both orders, but its SMILES carries
+        a ring-closure digit on the three-coordinate P in one order and not in the
+        other, and RDKit reads a lone-pair stereocentre that carries a ring-closure
+        digit with the opposite configuration from the OpenSMILES reading that CDK
+        (the ``centres`` labeller) and OPSIN use -- as it reads the input, which
+        carries one too. So the -ordered name never round-trips and the
+        molecule had no name. ``t4_coverage.name_prefix_order_fallback`` builds the
+        universal floor's name with the parent's prefixes in another order when the
+         spelling fails its round trip at the stereo layer only.
+
+        Runs only when ``name`` is a failure name at the end of the outermost
+        best-effort ``name`` (after the exit check), so no name that ships
+        changes and the PIN, valid and complete tiers never reach it. The name
+        ships only when it passes every check a shipped best-effort name passes --
+        the coverage audit, the full-InChIKey round trip of this string
+        (``_shipped_name_round_trip``), the stereodescriptor check
+        (``_stereo_descriptors_verified``: every descriptor is the engine's CIP
+        label at its unit) and the exit check -- AND
+        ``_cip_labels_match_input_as_written``: the engine's CIP labels equal an
+        independent OpenSMILES-conformant reading of the input string (CDK). A
+        round trip that passes through the RDKit reading on one side only (an
+        input without a ring-closure digit at the centre, read as written, and a
+        reordered name whose SMILES has one) would otherwise ship the other
+        stereoisomer's descriptors. It breaks on purpose, so it is never a
+        PIN: the winning offer is the last-resort floor's (source ``t4_floor``,
+        tier best_effort, ``is_pin`` False), and ``name_tiered`` reports
+        ``prefix_order_fallback`` True for it. Otherwise returns ``name``
+        unchanged. Never raises out of the caller's guard."""
+        if name and not is_failure_name(name):
+            return name
+        if (not self._general_fallback_unverified
+                or getattr(self, '_suppress_floor_offer', False)
+                or self._disable_opsin_validity_gate or _DISABLE_VALIDITY_GATE
+                or not smiles or not _validity_gate_jar_present()):
+            return name
+        from .assembly.fragment_naming import (
+            is_top_level_naming, isolated_naming_session, name_scope_depth)
+        if not (name_scope_depth() == 1 and is_top_level_naming()):
+            return name
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None or not (
+                any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+                    for a in mol.GetAtoms())
+                or any(b.GetStereo() != Chem.BondStereo.STEREONONE
+                       for b in mol.GetBonds())):
+            return name  # no stereo unit: the fallback cannot apply
+        from .assembly.fragment_naming import PerfBudgetExceeded
+        from .assembly.t4_coverage import name_prefix_order_fallback
+        try:
+            with isolated_naming_session():
+                reordered = name_prefix_order_fallback(mol)
+        except PerfBudgetExceeded:
+            # the molecule's hang budget ran out inside the floor (a BaseException,
+            # so the floor's own guard does not catch it): the abstention stands.
+            return name
+        if not reordered or is_failure_name(reordered):
+            return name
+        if _shipped_name_round_trip(reordered, smiles) != "verified":
+            return name
+        from .rules.stereochemistry import strip_stereo_blocks
+        if not _stereo_descriptors_verified(
+                reordered, smiles, strip_stereo_blocks(reordered)[0]):
+            return name
+        if not _cip_labels_match_input_as_written(smiles):
+            return name
+        from .assembly.coverage_audit import audit_coverage
+        _self01, _skip_reanchor, _skip_detail = _self01_lookup(reordered)
+        verdict = audit_coverage(
+            mol, reordered, None, self01_complete=_self01,
+            skip_reanchor=_skip_reanchor, skip_detail=_skip_detail)
+        if not verdict.complete:
+            return name
+        if self._exit_round_trip_check(reordered, smiles) != reordered:
+            return name
+        from .assembly.offer_pool import Offer
+        self._last_selected_offer = Offer(
+            name=reordered, result_obj=None, is_pin=False, tier=BEST_EFFORT,
+            source="t4_floor", complete=True)
+        self._prefix_order_fallback_name = reordered
+        logger.info("prefix-order fallback named %r", reordered[:80])
+        return reordered
+
     def _record_binding_proof(self, mol, eng, stage: str) -> None:
         """: record a certified general-engine spine on the ledger.
 
@@ -6321,7 +7173,212 @@ class Orthonym:
                 return _descriptive_fallback(smiles)
         return name
 
+    def _pin_promotion_eligible(self) -> bool:
+        """The default (PIN) tier in its production configuration, at top level:
+        no breadth flag, the round-trip gate on with its jar, the PIN style, and
+        this ``name`` is the outermost one (``name_scope_depth == 1``: its own
+        ``_budget_scope`` has entered, no enclosing ``name`` runs).
+
+        ``is_top_level_naming`` alone is not "the caller's molecule": it reads
+        the fragment-recursion depth, which is 0 while ANY ``name`` dispatches
+        its whole molecule and which ``isolated_naming_session`` resets to 0 for
+        the recovery lane, the rescues and the clean fall-through. So a helper
+        instance in the default configuration, created by a producer of an outer
+        call at any tier, read as top level and named what its first run could
+        not name a second time with the promoted producers: the peptide handler's
+        substitutive sub-namer (``dispatch_table._handle_peptide``) and the
+        default-tier ``name_compound`` instances of the glycoside aglycone namer
+        and of the clean fall-through. Measured on a 119-heavy-atom ChEBI
+        glycopeptide at the best-effort tier: 52 wrapper calls in nested
+        ``name`` frames (32 from the peptide sub-namer, 1 from the peptide-acid
+        namer of an amido prefix, 19 from the aglycone namer); the nine ChEBI
+        peptides the paper recipe lost to its 90 s stall took 102-152 s alone
+        against 60-79 s before the re-run existed. At the PIN tier those helpers
+        never re-ran (``_PIN_PROMOTION_WRAPPED`` is set for the whole outer
+        call), so the PIN tier is unchanged: the re-run is the PIN tier's policy
+        for the caller's call, not for a helper of another tier. (Letting a helper
+        that names the whole molecule keep it -- the peptide sub-namer -- gave one
+        dev-set row its PIN at best-effort, but put 3-11 s back on the ChEBI
+        peptides, 116-209 heavy atoms, in the recipe; not done.)"""
+        if (self._general_fallback or self._general_fallback_unverified
+                or self._allow_aromatic_general or self._full_coverage
+                or self.style != "pin" or self._principal_group_override is not None
+                or self._disable_opsin_validity_gate or _DISABLE_VALIDITY_GATE):
+            return False
+        from .assembly.fragment_naming import is_top_level_naming, name_scope_depth
+        return (name_scope_depth() == 1 and is_top_level_naming()
+                and _validity_gate_jar_present())
+
+    def _name_with_pin_promotion(self, smiles: str, *, raise_on_limit: bool) -> str:
+        """Breadth Job 1 (M01): the PIN tier names the molecule as before; only when
+        that run returns no name does it name it again with the best-effort ring-
+        substituent producers admitted, each name kept only when its vocabulary is
+        all PIN vocabulary (``rules.pin_vocabulary.promote_at_pin_tier``) -- e.g.
+        '[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine',
+        the Blue Book), '(4-methylcyclohex-3-en-1-yl)' (e),:3288).
+
+        A molecule the first run names keeps that name byte for byte, so a route
+        that becomes reachable only through a promoted prefix can never pre-empt
+        the route that names it today. The second run goes through every gate the
+        first does (the round trip included) and its memo entries are keyed apart
+        (``assembly.memo.pin_promotion_var``). When it also returns no name, the
+        first run's result and provenance are what the caller sees.
+
+        A kept second-run name is labelled pin_unverified with ``is_pin`` False by
+        ``name_tiered`` (``metrics.provenance.record_pin_promotion_rerun``): a
+        breadth producer built it, so it is not certified as the PIN.
+        """
+        from .assembly.memo import pin_promotion_var
+        from .metrics import provenance as _pv
+        wrapped = _PIN_PROMOTION_WRAPPED.set(True)
+        try:
+            from .assembly.fragment_naming import PerfBudgetExceeded
+            from .rules.pin_vocabulary import promotion_could_change, promotion_site_probe
+            limit_error = None
+            with promotion_site_probe() as _sites:
+                try:
+                    first = self.name(smiles, raise_on_limit=raise_on_limit)
+                except OrthonymLimitError as _le:
+                    # raise_on_limit: the first run found no name. The re-run gets
+                    # its chance; the limit is raised only when it finds none either.
+                    first, limit_error = None, _le
+            if first and not is_failure_name(first):
+                return first
+            if not promotion_could_change(_sites):
+                # Branch review fixes (perf): the re-run would repeat the first run
+                # and find no name either (``rules.pin_vocabulary.
+                # promotion_could_change``): the first run reached no site whose
+                # behaviour the re-run changes -- e.g. a structural decline
+                # (UNSUPPORTED_ELEMENT, WILDCARD_ATOMS, STRUCTURE_TOO_LARGE) before
+                # any producer ran -- or only promotion calls whose promoted
+                # producers, previewed in the context each call ran in, keep no name.
+                if limit_error is not None:
+                    raise limit_error
+                return first
+            snap = _pv.get_provenance()
+            promoted = pin_promotion_var.set(True)
+            second = None
+            try:
+                _pv.clear_provenance()
+                second = self.name(smiles)
+            except PerfBudgetExceeded:
+                # Branch review fixes: the re-run shares the hang budgets the first
+                # run armed (this wrapper runs in the outermost name, the frame
+                # that owns them), so it can exhaust what the first run left. That
+                # is "no second name": the first run's result, provenance and limit
+                # stand, so ``raise_on_limit=True`` still raises OrthonymLimitError
+                # (the trip used to unwind to the outermost boundary, which returned
+                # the failure label instead).
+                logger.info("PIN promotion re-run exhausted the hang budget; first "
+                            "result kept")
+                second = None
+            except Exception as _pe:  # noqa: BLE001 - the re-run must never break naming
+                logger.info("PIN promotion re-run failed (first result kept): %s", _pe)
+                second = None
+            finally:
+                pin_promotion_var.reset(promoted)
+            if second and not is_failure_name(second):
+                # Kept only in PIN form: a round trip passed for THIS string, and the
+                # name carries no fragment or token that labels it below the PIN
+                # (``name_carries_non_pin_part``: 'ethanamide', '1-oxacyclopentan-
+                # 2-yl',...), and the molecule is no multiplicative candidate. A
+                # re-run name that fails any of these is dropped and the molecule
+                # stays as the first run left it.
+                _prov = _pv.get_provenance()
+                _outcome = _pv.resolve_gate_outcome(
+                    _prov["gate_outcome"], _prov["gate_outcome_name"], second)
+                from .rules.pin_vocabulary import multiplicative_candidate
+                _mol_mc = Chem.MolFromSmiles(smiles)
+                if (_pv.opsin_label_for_gate_outcome(_outcome) == "verified"
+                        and (_prov["source"] or "pin_path") == "pin_path"
+                        and not _pv.name_carries_non_pin_part(
+                            _prov, second, label_forms=False)
+                        and _mol_mc is not None
+                        and not multiplicative_candidate(_mol_mc)):
+                    # Branch review fixes: a kept re-run name is NOT certified as the
+                    # PIN. The promoted producers are the best-effort composition
+                    # branches (``allow_mancude``), and the vocabulary guard is a
+                    # closed list, so a re-run name can be a right-molecule name that
+                    # the Blue Book does not prefer: 'methyl...-3-(methoxycarbonyl)
+                    # pent-3-enoate' for 'dimethyl...butanedioate',
+                    # the Blue Book), an oxolan-2-one parent beside a senior
+                    # 1-benzopyran-4-one,:29628), '(1-sulfanylideneethyl)'
+                    # for 'ethanethioyl',:30246). The paper's definition
+                    # (tier labels): "pin_unverified means a name in PIN form that
+                    # only a breadth producer built". So the name ships labelled
+                    # pin_unverified, is_pin False (``name_carries_non_pin_part``).
+                    _pv.record_pin_promotion_rerun()
+                    return second
+                logger.info("PIN promotion re-run name %r is not a verified PIN form; "
+                            "first result kept", second)
+            _pv.restore_provenance(snap)
+            if limit_error is not None:
+                raise limit_error
+            return first
+        finally:
+            _PIN_PROMOTION_WRAPPED.reset(wrapped)
+
     def _exit_round_trip_check(self, name: str, smiles: str) -> str:
+        """The check every public naming entry point applies to the name it is about
+        to return: the round trip (:meth:`_exit_round_trip_check_rt`), then, for an
+        input with a lone-pair stereocentre, the configuration check that does not go
+        through RDKit's reading (:meth:`_exit_lone_pair_check`)."""
+        return self._exit_lone_pair_check(
+            self._exit_round_trip_check_rt(name, smiles), smiles)
+
+    def _exit_lone_pair_check(self, name: str, smiles: str) -> str:
+        """Lone-pair stereocentres (TRIAGE.md 'Lone-pair stereocentres -- RDKit
+        reading'): withdraw a name that passed its round trip but names the other
+        configuration at a lone-pair stereocentre than the input as written
+        (:func:`_lone_pair_configuration_verified`). The round trip compares RDKit's
+        readings of the input and of OPSIN's SMILES, so an RDKit misreading shared by
+        both sides passes it; this check reads both strings with CDK instead.
+
+        Top level only, on a name the round trip kept, at every tier. Passes
+        unchanged: a failure name, an input without a lone-pair stereocentre, a
+        disabled gate (the documented raw-output configuration), an exact-match list
+        name (identity by the input's InChIKey; OPSIN cannot read it) and the
+        no-jar reduced mode (no OPSIN to read the name; such names are labelled
+        unverified). Anything else that fails or cannot be checked is withdrawn."""
+        from .assembly.fragment_naming import is_top_level_naming
+        if not name or is_failure_name(name) or not is_top_level_naming():
+            return name
+        # Only the string the caller gave (``_caller_input``; outside any name a
+        # public entry point's own argument). A nested name of another string --
+        # the acid of an ester, a salt's component -- names a SMILES RDKit wrote from
+        # its own reading, so its configuration is RDKit's by construction; the whole
+        # name is checked against the caller's string. Measured: naming
+        # 'CCCCCCC#CCO[S@](=O)c1ccc(C)cc1' runs a nested name of
+        # 'Cc1ccc([S@@](=O)O)cc1' whose name '(S)-4-methylbenzene-1-sulfinic acid'
+        # OPSIN does not read; a check there withdrew it, and with it the ester's
+        # right name 'non-2-yn-1-yl (S)-4-methylbenzene-1-sulfinate' (pin_verified,
+        # the same configuration for CDK as the input).
+        _caller = _caller_input()
+        if _caller is not None and smiles != _caller:
+            return name
+        # The caller's string as written: when a lone-pair centre of it is read by
+        # RDKit unlike the standard reading, the public call named its standard
+        # spelling instead (_lone_pair_standard_spelling), and the name is checked
+        # against the string the caller gave (TRIAGE.md 'Lone-pair centre written
+        # first -- naming and the gate probe').
+        _written = _lone_pair_as_written(smiles)
+        if not _has_lone_pair_stereocentre(_written):
+            return name
+        if self._disable_opsin_validity_gate or _DISABLE_VALIDITY_GATE:
+            return name
+        try:
+            if _is_exact_match_list_name(smiles, name):
+                return name
+            if not _validity_gate_jar_present():
+                return name
+            if _lone_pair_configuration_verified(name, _written):
+                return name
+            return self._withdraw_at_exit(name, smiles, "exit_lone_pair_configuration")
+        except Exception as _le:  # pragma: no cover - defensive, fails closed
+            logger.info("lone-pair configuration check failed (withdrawn): %s", _le)
+            return _descriptive_fallback(smiles)
+
+    def _exit_round_trip_check_rt(self, name: str, smiles: str) -> str:
         """Claims conformance part 2 (2026-09-27): the check every public naming
         entry point applies to the name it is about to return, with no fail-open
         branch where a check is possible.
@@ -6489,6 +7546,21 @@ class Orthonym:
         >>> Orthonym.name_with_confidence("CCO")["name"]
         'ethanol'
         """
+        # Lone-pair centre written first: the standard spelling of the input is named
+        # when RDKit reads a lone-pair centre of it unlike the standard reading
+        # (_lone_pair_standard_spelling); the atom-to-locant map is then re-keyed to
+        # the atoms of the caller's string. Any other input is unchanged.
+        spelled, _lp_opened = _lone_pair_input_enter(smiles)
+        try:
+            metadata = self._name_with_confidence_impl(spelled)
+            if spelled != smiles and isinstance(metadata, dict) and metadata.get('atom_to_locant'):
+                metadata['atom_to_locant'] = _lone_pair_caller_atoms(metadata['atom_to_locant'])
+            return metadata
+        finally:
+            _lone_pair_input_exit(_lp_opened)
+
+    def _name_with_confidence_impl(self, smiles: str) -> dict:
+        """The body of:meth:`name_with_confidence`, for the string it names."""
         from .assembly.coverage_scoring import (
             clear_confidence,
             retrieve_confidence,

@@ -565,6 +565,20 @@ def _cascade_models_every_earlier_tier(mol, ring_list: List[int], heteroatoms) -
         ring_bonds.append(bond)
     if all(b.GetBondType() == Chem.BondType.SINGLE for b in ring_bonds):
         return True
+    # Branch review fixes: a ring RDKit perceives aromatic although every double
+    # bond on it is exocyclic (the 3,6-bis(ylidene) diketopiperazine) is saturated in
+    # its Kekule structure, the only one it has -- read the bond orders there, so
+    # (g) decides its numbering as for any saturated ring ('(3Z,6Z)-3-benzylidene-6-
+    # [(4-methoxyphenyl)methylidene]piperazine-2,5-dione', (g):3307).
+    if any(b.GetIsAromatic() for b in ring_bonds):
+        try:
+            _kek = Chem.RWMol(mol)
+            Chem.Kekulize(_kek, clearAromaticFlags=True)
+            if all(_kek.GetBondBetweenAtoms(a, ring_list[(k + 1) % n]).GetBondType()
+                   == Chem.BondType.SINGLE for k, a in enumerate(ring_list)):
+                return True
+        except Exception:  # noqa: BLE001 -- not kekulizable: the aromatic reading
+            pass
     if not all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring_list):
         return False
     for a in ring_list:
@@ -798,6 +812,32 @@ def _ring_smiles_with_indicated_h_restored(mol, ring_atoms) -> Optional[str]:
     if ring_mol is None:
         return None
     return Chem.MolToSmiles(ring_mol, canonical=True)
+
+
+def _saturated_ring_retained_name(mol, ring_atoms) -> Optional[str]:
+    """The retained name (``get_retained_name``) of the SATURATED monocycle on
+    ``ring_atoms``: the ring's atoms (element only, neutral) joined by single bonds.
+    Used only for a ring whose Kekule structure has no ring double bond although
+    RDKit perceived it aromatic (every double bond exocyclic)."""
+    try:
+        ring = list(ring_atoms)
+        ri = mol.GetRingInfo()
+        if any(ri.NumAtomRings(a) != 1 for a in ring):
+            return None  # a fused / spiro ring is no monocycle (no retained name)
+        rw = Chem.RWMol()
+        index = {}
+        for a in ring:
+            index[a] = rw.AddAtom(Chem.Atom(mol.GetAtomWithIdx(a).GetAtomicNum()))
+        ring_set = set(ring)
+        for b in mol.GetBonds():
+            i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if i in ring_set and j in ring_set:
+                rw.AddBond(index[i], index[j], Chem.BondType.SINGLE)
+        sat = rw.GetMol()
+        Chem.SanitizeMol(sat)
+        return get_retained_name(Chem.MolToSmiles(sat))
+    except Exception:  # noqa: BLE001 -- no retained name: the HW stem stands
+        return None
 
 
 def get_ring_canonical_smiles(mol, ring_atoms) -> str:
@@ -2513,6 +2553,16 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
             # Corrected on ``info`` itself so that the indicated-hydrogen step
             # below reads the same verdict the stem does.
             info = {**info, 'is_saturated': True, 'is_aromatic': False}
+            # Branch review fixes: the same sentence allows the
+            # retained saturated names of Table 2.3, and the retained lookup at the
+            # top of this function missed them for the same reason (its key is the
+            # aromatic fragment): the 3,6-bis(ylidene) diketopiperazine ring came
+            # out '1,4-diazinane' where its mono-ylidene analogue, and the Blue
+            # Book, have 'piperazine' ('piperazine-2,5-dione'). Look the ring up
+            # again as the saturated ring it is.
+            _sat_retained = _saturated_ring_retained_name(mol, oriented)
+            if _sat_retained:
+                return _sat_retained
         elif 1 <= _d < _max_match:
             # A hydro form that:func:`name_partially_saturated_monocyclic_heterocycle`
             # declined to name. It must NOT fall through to the mancude stem:
@@ -4496,6 +4546,22 @@ def name_substituted_heterocycle(
                         # heteroatom-dropping alkyl name (sugar-ring-oxygen-drop).
                         # Fail-closed per accuracy-first.
                         return None
+                    if carbon_count > 1:
+                        # Breadth Job 1 (M05): the carbon-count alkyl name is right
+                        # only for a straight chain attached at its end; for a ring
+                        # or a branched all-carbon fragment the fragment namer
+                        # declined it names a different molecule ('hexyl' for
+                        # phenyl). (the Blue Book): a substituent prefix
+                        # names its own structure. Decline the candidate instead.
+                        from ..assembly.substituent_naming import (
+                            _attach_is_chain_terminus,
+                            _is_linear_alkyl,
+                        )
+                        _heavy = [a for a in sub_atoms
+                                  if mol.GetAtomWithIdx(a).GetAtomicNum() > 1]
+                        if not (_is_linear_alkyl(mol, _heavy)
+                                and _attach_is_chain_terminus(mol, _heavy, _heavy[0])):
+                            return None
                     try:
                         sub_name = get_alkyl_name(carbon_count)
                     except ValueError:

@@ -300,26 +300,26 @@ Q 338.7 171.5, 341.3 171.5
   <text class="body" x="56" y="1432" font-size="27" fill="#666666">InChIKey of what OPSIN read</text>
   <text class="mono" x="56" y="1476" font-size="30" fill="#000000">RYYVLZVUVIJVGH-UHFFFAOYSA-N</text>
   <g transform="translate(58.0,1520.0) scale(2.222)"><g class=""><defs><radialGradient id="gpinnv"><stop offset="0" stop-color="#3dff8f" stop-opacity=".88"/><stop offset=".3" stop-color="#3dff8f" stop-opacity=".4"/><stop offset=".64" stop-color="#3dff8f" stop-opacity="0"/></radialGradient></defs><circle class="breath" cx="9" cy="9" r="16" fill="url(#gpinnv)" opacity="1.0"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="8" stroke-width="1.25"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="5.5" stroke-width="1.25"/><circle cx="9" cy="9" r="3" fill="#2f6b28"/></g></g>
-  <text class="bold" x="116" y="1551" font-size="32" fill="#2f6b28">Same molecule: a verified PIN</text>
+  <text class="bold" x="116" y="1551" font-size="32" fill="#2f6b28">Same molecule: verified</text>
   <line x1="56" y1="1604" x2="744" y2="1604" stroke="#d9d9d9" stroke-width="1.6"/>
 </g>
 <g class="rise" style="animation-delay:2.3s">
   <g transform="translate(56.0,1652.0) scale(2.222)"><g class=""><defs><radialGradient id="gpinn"><stop offset="0" stop-color="#3dff8f" stop-opacity=".88"/><stop offset=".3" stop-color="#3dff8f" stop-opacity=".4"/><stop offset=".64" stop-color="#3dff8f" stop-opacity="0"/></radialGradient></defs><circle class="breath" cx="9" cy="9" r="16" fill="url(#gpinn)" opacity="1.0"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="8" stroke-width="1.25"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="5.5" stroke-width="1.25"/><circle cx="9" cy="9" r="3" fill="#2f6b28"/></g></g>
   <text class="mono" x="116" y="1682" font-size="30" letter-spacing="3" fill="#000000">PIN</text>
   <line x1="116" y1="1706.5" x2="476.0" y2="1706.5" stroke="#000000" stroke-width="2"/><line x1="116" y1="1713.5" x2="476.0" y2="1713.5" stroke="#000000" stroke-width="2"/>
-  <text class="body" x="116" y="1760.0" font-size="28" fill="#1a1a1a" text-anchor="start">Verified, and the preferred name.</text>
+  <text class="body" x="116" y="1760.0" font-size="28" fill="#1a1a1a" text-anchor="start">Verified, and certified as the PIN.</text>
   <text class="mono" x="116" y="1802.0" font-size="22" fill="#666666" text-anchor="start">pin_verified</text>
 </g><g class="rise" style="animation-delay:2.4s">
   <g transform="translate(56.0,1836.0) scale(2.222)"><g class=""><circle fill="none" stroke="#556b2f" cx="9" cy="9" r="7" stroke-width="1.75" stroke-dasharray="3.23 2.27"/><circle cx="9" cy="9" r="3" fill="#556b2f"/></g></g>
   <text class="mono" x="116" y="1866" font-size="30" letter-spacing="3" fill="#666666">FALLBACK</text>
   <line x1="116" y1="1894" x2="476.0" y2="1894" stroke="#000000" stroke-width="2" stroke-dasharray="13 9"/>
-  <text class="body" x="116" y="1944.0" font-size="28" fill="#666666" text-anchor="start">Verified, but not certified as the PIN.</text>
+  <text class="body" x="116" y="1944.0" font-size="28" fill="#666666" text-anchor="start">Not certified as the PIN. See the verified field.</text>
   <text class="mono" x="116" y="1986.0" font-size="22" fill="#666666" text-anchor="start">pin_unverified · systematic_verified</text>
 </g><g class="rise" style="animation-delay:2.5s">
   <g transform="translate(56.0,2020.0) scale(2.222)"><g class=""><circle fill="none" stroke="#9c4109" cx="9" cy="9" r="7" stroke-width="1.75" stroke-dasharray="1.1 3.3"/></g></g>
   <text class="mono" x="116" y="2050" font-size="30" letter-spacing="3" fill="#666666">BEST EFFORT</text>
   <line x1="116" y1="2078" x2="476.0" y2="2078" stroke="#666666" stroke-width="2.6" stroke-dasharray="2.5 8" stroke-linecap="round"/>
-  <text class="body" x="116" y="2128.0" font-size="28" fill="#666666" text-anchor="start">The general engine built all or part of it.</text>
+  <text class="body" x="116" y="2128.0" font-size="28" fill="#666666" text-anchor="start">Last resort, or not confirmed by a round trip.</text>
   <text class="mono" x="116" y="2170.0" font-size="22" fill="#666666" text-anchor="start">best_effort</text>
 </g><g class="rise" style="animation-delay:2.6s">
   <g transform="translate(56.0,2204.0) scale(2.222)"><g class=""><circle fill="none" stroke="#666666" cx="9" cy="9" r="7" stroke-width="1"/></g></g>

@@ -13,7 +13,9 @@ Blue Book basis per group:
 - N-substituted cycloalkanamines omit the ring locant: (c) (:2913),
   '*N*-butylcyclopropanamine (PIN)' (:26292).
 - carbamic acid substituents take no N locant: (:30758,:30762).
-- BF4-/PF6-: method (1) (:41097).
+- BF4-/PF6-: method (1) (:41097); the sodium salt is a wholly inorganic metal
+  compound, labelled systematic_verified (branch review fixes;:2062), and the
+  carbon-free anion itself too (texts, labels and spelling;:2056/:2058).
 """
 import pytest
 
@@ -57,9 +59,8 @@ PIN_NAMES = [
     ("OC(=O)N(C)CC", "ethyl(methyl)carbamic acid"),
     ("OC(=O)N(CCO)CCO", "bis(2-hydroxyethyl)carbamic acid"),
     ("COC(=O)N(C)C", "methyl dimethylcarbamate"),
-    # anions
-    ("F[P-](F)(F)(F)(F)F", "hexafluoro-λ5-phosphanuide"),
-    ("[Na+].[B-](F)(F)(F)F", "sodium tetrafluoroboranuide"),
+    # anions: 'hexafluoro-λ5-phosphanuide' is carbon-free, so it is
+    # systematic_verified (test_the_p72_3_anion_itself_is_not_labelled_a_pin below)
 ]
 
 
@@ -69,3 +70,33 @@ def test_pin_name(smiles, expected):
     assert r["name"] == expected, r
     assert r["tier"] == "pin_verified", r
     assert name_is_rt_exact(expected, smiles), expected
+
+
+def test_the_sodium_salt_of_a_p72_3_anion_is_not_labelled_a_pin():
+    # Branch review fixes: a wholly inorganic metal compound (a metal atom, no carbon)
+    # is systematic_verified, is_pin False; the name is unchanged. PRESELECTED
+    # NAMES (the Blue Book): "Preselected names are names for structures or
+    # structural components chosen among two or more names for noncarboncontaining
+    # (inorganic) parents to be used as the basis for preferred IUPAC names for
+    # organic derivatives"; (:4667) "preferred IUPAC names have not yet been
+    # determined for inorganic components". (The PIN examples of carry
+    # carbon: 'sodium trimethylboranuide (PIN)',:41116.)
+    smiles = "[Na+].[B-](F)(F)(F)F"
+    r = Orthonym().name_tiered(smiles)
+    assert r["name"] == "sodium tetrafluoroboranuide", r
+    assert r["tier"] == "systematic_verified" and r["is_pin"] is False, r
+    assert name_is_rt_exact(r["name"], smiles), r
+
+
+def test_the_p72_3_anion_itself_is_not_labelled_a_pin():
+    # Texts, labels and spelling (2026-09-29): a carbon-free compound has a
+    # preselected name at most, never a PIN. PREFERRED IUPAC NAMES
+    # (the Blue Book) adds the label 'PIN' to compounds "that also contain at
+    # least one carbon atom in their structure";:2058 the PIN rules for compounds
+    # "that do not contain carbon... will be discussed in a further publication";
+    # 'F6I- hexafluoro-λ5-iodanuide (preselected name)' (:41112). Name unchanged.
+    smiles = "F[P-](F)(F)(F)(F)F"
+    r = Orthonym().name_tiered(smiles)
+    assert r["name"] == "hexafluoro-λ5-phosphanuide", r
+    assert r["tier"] == "systematic_verified" and r["is_pin"] is False, r
+    assert name_is_rt_exact(r["name"], smiles), r

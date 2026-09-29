@@ -22,7 +22,7 @@ atom indices as those are NOT valid IUPAC locants.
 
 import logging
 import re
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 
 from rdkit import Chem
 
@@ -122,7 +122,9 @@ def _is_true_exocyclic(mol, in_scope_idx: int, other_idx: int) -> bool:
 def collect_stereodescriptors(
     mol,
     atom_to_locant: Dict[int, int],
-    include_near_parent_ez: bool = False
+    include_near_parent_ez: bool = False,
+    *,
+    skip_bonds: Iterable[int] = (),
 ) -> List[Tuple[int, str]]:
     """
     Collect all stereodescriptors from a molecule using IUPAC locants.
@@ -143,6 +145,13 @@ def collect_stereodescriptors(
                        prefix", so a bond lying wholly inside a substituent has
                        no locant in the PARENT's numbering and is now skipped.
                        See the fail-closed branch below for the full derivation.
+        skip_bonds: indices of E/Z bonds this scope must NOT cite because
+                       another scope of the same name cites them. The one
+                       caller is a '-ylidene' substituent whose attachment
+                       double bond its host already cites with the host's
+                       locant (1)(a), the Blue Book):
+                       citing it in both scopes is one stereogenic unit cited
+                       twice. Default empty (every other caller unchanged).
 
     Returns:
         List of (locant, cip_code) tuples, sorted by locant ascending.
@@ -196,8 +205,11 @@ def collect_stereodescriptors(
     # future letter RDKit adds is excluded by construction rather than by enumeration.
     #
     # The axis itself is NOT lost — `detect_axial_chirality` remains its single source.
+    _skip_bond_ids = frozenset(skip_bonds) if skip_bonds else frozenset()
     for bond in bonds_of(mol):
         if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z'):
+            if bond.GetIdx() in _skip_bond_ids:
+                continue  # cited by another scope of the name (see ``skip_bonds``)
             # Skip ring-constrained double bonds in small rings: double bonds
             # in rings of size 7 or fewer have geometry fixed by ring strain.
             # Macrocyclic rings (8+ members) CAN have meaningful E/Z geometry

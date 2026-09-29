@@ -695,7 +695,102 @@ def get_amide_parent_name(
     return f"{stem}ane{suffix_form}"
 
 
-def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> str:
+class RingAmideParts:
+    """The structural parts of a ring carboxamide name (branch review fixes).
+
+    ``ring_hydride`` ('cyclohexane') and ``suffix`` ('carboxamide', 'carbothioamide')
+    for a saturated cycloalkane, or the retained ``benzamide``; ``n_substituents``
+    as ``get_n_substituents`` returns them (empty for a primary amide). A composer
+    assembles the name from these parts -- never by cutting an emitted name apart.
+    """
+
+    __slots__ = ("ring_hydride", "suffix", "retained", "n_substituents")
+
+    def __init__(self, ring_hydride, suffix, retained, n_substituents):
+        self.ring_hydride = ring_hydride
+        self.suffix = suffix
+        self.retained = retained
+        self.n_substituents = tuple(n_substituents or ())
+
+    def parent_word(self, suffix_locant: bool = False) -> str:
+        """The parent word. ``suffix_locant``: a ring prefix is cited as well, so the
+        suffix keeps its locant, the Blue Book "... then all locants
+        must be cited"): 'cyclohexane-1-carboxamide'; alone it is omitted
+         (c),:2891): 'cyclohexanecarboxamide'. The retained 'benzamide'
+        numbers its carbonyl-bearing carbon 1 and cites no suffix locant."""
+        if self.retained:
+            return self.retained
+        if suffix_locant:
+            return f"{self.ring_hydride}-1-{self.suffix}"
+        return f"{self.ring_hydride}{self.suffix}"
+
+
+def ring_amide_parts(mol, amide_atoms: tuple,
+                     suffix_form: str = "amide") -> Optional[RingAmideParts]:
+    """``RingAmideParts`` for a ring-attached amide ``name_amide`` can spell, else
+    None (see ``name_amide``)."""
+    if not is_ring_attached_amide(mol, amide_atoms):
+        return None
+    carbonyl_carbon_idx = None
+    for idx in amide_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() == 'C':
+            for neighbor in atom.GetNeighbors():
+                if neighbor.GetSymbol() == 'O':
+                    bond = mol.GetBondBetweenAtoms(idx, neighbor.GetIdx())
+                    if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
+                        carbonyl_carbon_idx = idx
+                        break
+
+    ring_size = 6  # Default
+    is_aromatic_benzene = False
+    # The two parents this branch can spell are benzamide and
+    # cyclo<alk>anecarboxamide: an ISOLATED all-carbon ring, aromatic benzene
+    # or fully saturated. Anything else -- a heteroring (pyridine), a ring with
+    # a double bond, a ring fused or spiro-joined to another -- would be spelled
+    # as that saturated carbocycle, a different molecule (pyridine-4-carbox-
+    # amide was named 'cyclohexanecarboxamide').
+    # (the Blue Book,:32680 'thiophene-2-carboxamide (PIN)'): the
+    # suffix 'carboxamide' goes on the ring's own name. Decline (None) so a
+    # producer that names the ring runs instead.
+    spellable = False
+    if carbonyl_carbon_idx is not None:
+        carbonyl = mol.GetAtomWithIdx(carbonyl_carbon_idx)
+        for neighbor in carbonyl.GetNeighbors():
+            if neighbor.IsInRing():
+                ring_info = mol.GetRingInfo()
+                for ring in ring_info.AtomRings():
+                    if neighbor.GetIdx() in ring:
+                        ring_size = len(ring)
+                        ring_atoms = [mol.GetAtomWithIdx(i) for i in ring]
+                        _all_c = all(a.GetSymbol() == 'C' for a in ring_atoms)
+                        _isolated = all(ring_info.NumAtomRings(i) == 1 for i in ring)
+                        _saturated = all(
+                            not a.GetIsAromatic() for a in ring_atoms) and all(
+                            mol.GetBondBetweenAtoms(ring[k], ring[(k + 1) % len(ring)])
+                            .GetBondType() == Chem.BondType.SINGLE
+                            for k in range(len(ring)))
+                        if ring_size == 6:
+                            if (all(a.GetIsAromatic() for a in ring_atoms)
+                                    and _all_c):
+                                is_aromatic_benzene = True
+                        spellable = _all_c and _isolated and (
+                            is_aromatic_benzene or _saturated)
+                        break
+                break
+    if not spellable:
+        return None
+    n_subs = ()
+    if get_amide_type(mol, amide_atoms) in ("secondary", "tertiary"):
+        n_subs = get_n_substituents(mol, amide_atoms)
+    if is_aromatic_benzene:
+        return RingAmideParts(None, None, "benzamide", n_subs)
+    stem = _get_chain_prefix(ring_size)
+    suffix = "carboxamide" if suffix_form == "amide" else f"carbo{suffix_form}"
+    return RingAmideParts(f"cyclo{stem}ane", suffix, None, n_subs)
+
+
+def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> Optional[str]:
     """
     Generate IUPAC name for an amide compound.
 
@@ -720,51 +815,14 @@ def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> str:
     is_ring = is_ring_attached_amide(mol, amide_atoms)
 
     if is_ring:
-        # Find the ring and get its size
-        carbonyl_carbon_idx = None
-        for idx in amide_atoms:
-            atom = mol.GetAtomWithIdx(idx)
-            if atom.GetSymbol() == 'C':
-                for neighbor in atom.GetNeighbors():
-                    if neighbor.GetSymbol() == 'O':
-                        bond = mol.GetBondBetweenAtoms(idx, neighbor.GetIdx())
-                        if bond and bond.GetBondType() == Chem.BondType.DOUBLE:
-                            carbonyl_carbon_idx = idx
-                            break
-
-        ring_size = 6  # Default
-        is_aromatic_benzene = False
-        if carbonyl_carbon_idx is not None:
-            carbonyl = mol.GetAtomWithIdx(carbonyl_carbon_idx)
-            for neighbor in carbonyl.GetNeighbors():
-                if neighbor.IsInRing():
-                    ring_info = mol.GetRingInfo()
-                    for ring in ring_info.AtomRings():
-                        if neighbor.GetIdx() in ring:
-                            ring_size = len(ring)
-                            if ring_size == 6:
-                                ring_atoms = [mol.GetAtomWithIdx(i) for i in ring]
-                                if (all(a.GetIsAromatic() for a in ring_atoms)
-                                        and all(a.GetSymbol() == 'C' for a in ring_atoms)):
-                                    is_aromatic_benzene = True
-                            break
-                    break
-
-        if is_aromatic_benzene:
-            parent_name = "benzamide"
-        else:
-            parent_name = get_amide_parent_name(
-                ring_size, is_ring=True, suffix_form=suffix_form,
-            )
-
-        # Check for N-substitution
-        amide_type = get_amide_type(mol, amide_atoms)
-        if amide_type in ("secondary", "tertiary"):
-            n_subs = get_n_substituents(mol, amide_atoms)
-            n_prefix = format_n_substitution(n_subs)
+        parts = ring_amide_parts(mol, amide_atoms, suffix_form=suffix_form)
+        if parts is None:
+            return None
+        parent_name = parts.parent_word()
+        if parts.n_substituents:
+            n_prefix = format_n_substitution(list(parts.n_substituents))
             if n_prefix:
                 return f"{n_prefix}{parent_name}"
-
         return parent_name
 
     # Chain amide

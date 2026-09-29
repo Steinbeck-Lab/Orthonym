@@ -148,6 +148,7 @@ def _integrate_universal_prefixes(
     ring_atom_to_locant=None,
     exclude_atoms=None,
     allow_mancude=None,
+    prefix_texts_out=None,
 ):
     """Discover and format all substituents on a parent structure.
 
@@ -251,6 +252,15 @@ def _integrate_universal_prefixes(
 
     if not prefix_groups:
         return ""
+
+    if prefix_texts_out is not None:
+        # The same per-group texts ``_format_prefix_groups`` joins, for a caller
+        # that assembles them itself (the retained 'acetate' of an ester's acid
+        # part, whose locants are omitted, ``retained_acetic_from_prefixes``).
+        for _pname in sorted(prefix_groups.keys(), key=alpha_sort_key):
+            _plocs = sorted(prefix_groups[_pname])
+            prefix_texts_out.append(
+                format_substituent_prefix(_pname, _plocs, len(_plocs)))
 
     # Format with locants, multipliers, and alphabetical sorting
     return _format_prefix_groups(prefix_groups)
@@ -6628,6 +6638,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         get_n_substituents,
         is_ring_attached_amide,
         name_amide,
+        ring_amide_parts,
     )
 
     # a phase chalcogen amides funnel into this pipeline; map the
@@ -6713,12 +6724,54 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     # N-substituted amide already starts with `N-`/`N,N-` and is left
                     # alone: `N` is itself an essential locant, and reshaping that string
                     # is out of scope for this rule (fail toward the existing spelling).
-                    if base_name[:1] != "N":
-                        _tail = "carboxamide"
-                        if base_name.endswith(_tail):
-                            _stem = base_name[: -len(_tail)]
-                            if _stem.startswith("cyclo") and _stem.endswith("e"):
-                                base_name = f"{_stem}-1-{_tail}"
+                    # Branch review fixes: assembled from the amide's STRUCTURAL
+                    # parts (``rules.amides.ring_amide_parts``: the ring hydride,
+                    # the suffix, the N-substituents), never by cutting name_amide's
+                    # emitted string apart and splicing a locant into it.
+                    _parts = ring_amide_parts(mol, amide_atoms,
+                                              suffix_form=amide_suffix_form)
+                    if _parts is not None and _parts.n_substituents:
+                        # Breadth job 1 (M03): an N-substituted ring amide. Its N-
+                        # and ring prefixes are ONE alphanumerical series,
+                        # the Blue Book "Prefixes... are arranged
+                        # alphanumerically"; '3-chloro-N-(2-chlorophenyl)naphthalene-
+                        # 2-sulfonamide (PIN)',:32881), and the ring suffix keeps its
+                        # locant once a ring prefix is present,:2869):
+                        # 'N-cyclopentyl-4,4-difluorocyclohexane-1-carboxamide', never
+                        # '4,4-difluoro-N-cyclopentylcyclohexanecarboxamide'. Only
+                        # when no N-substituent shares a name with a ring prefix
+                        # (those merge into one multiplied prefix, 'N,4-dimethyl',
+                        # which is not built here); otherwise the spelling below is
+                        # kept and labelled below the PIN by the vocabulary guard.
+                        _merged = None
+                        try:
+                            _nsubs = list(_parts.n_substituents)
+                            _groups = {}
+                            for _s in _nsubs:
+                                _groups.setdefault(_s["name"], []).append(_s)
+                            _ring_keys = {str(alpha_sort_key(_t)) for _t in prefix_parts}
+                            if not any(str(alpha_sort_key(_nm)) in _ring_keys
+                                       for _nm in _groups):
+                                _nparts = [format_n_substitution(_g)
+                                           for _g in _groups.values()]
+                                if all(_nparts):
+                                    _all = sorted(prefix_parts + _nparts,
+                                                  key=alpha_sort_key)
+                                    _merged = "-".join(_all) + _parts.parent_word(
+                                        suffix_locant=True)
+                        except Exception:  # noqa: BLE001 - keep the prior spelling
+                            _merged = None
+                        if _merged:
+                            return _inject_stereo_if_missing(features, _merged)
+                        _nprefix = format_n_substitution(_nsubs)
+                        if _nprefix:
+                            return _inject_stereo_if_missing(
+                                features,
+                                f"{prefix_str}-{_nprefix}{_parts.parent_word()}")
+                    if _parts is not None and not _parts.n_substituents:
+                        return _inject_stereo_if_missing(
+                            features,
+                            f"{prefix_str}{_parts.parent_word(suffix_locant=True)}")
                     # Insert hyphen before N-locant prefix (base_name may
                     # start with "N-" or "N,N-" from name_amide)
                     sep = "-" if base_name[:1] == "N" else ""
@@ -8804,6 +8857,16 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                     )
                     if _rc_name:
                         _pv_general_ring_prefix()
+                elif not _rc_name:
+                    # Breadth Job 1 (M01): in the PIN tier's re-run the same
+                    # decorated-ring producers run, and a name is kept only when
+                    # every token is PIN vocabulary ('2,6,6-trimethyl-3-oxocyclohex-
+                    # 1-en-1-yl',, the Blue Book).
+                    from ..rules.pin_vocabulary import promote_at_pin_tier
+                    _rc_name = promote_at_pin_tier(lambda: _rc_nrss(
+                        features.mol, sorted(_rc_frag), _ring_attach_atom,
+                        allow_mancude=True,
+                    ))
                 if (_rc_name and ' ' not in _rc_name
                         and any(_ch.isdigit() for _ch in _rc_name)):
                     # nesting ORDER (BB 7444; escalation, BB 7509) under the marks requirement (BB 7232): a decorated ring name that

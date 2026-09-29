@@ -75,17 +75,18 @@ def test_same_instance_reentry_keeps_the_outer_tokens():
     assert _ctx_values() == CLEAN
 
 
-def test_an_exception_in_the_prelude_restores_context_and_session(monkeypatch):
-    """An exception before the main try (here: the acid-salt normalizer, which
-    runs only for a multi-fragment input with a cation) still resets the four
-    ctx vars and ends the naming session."""
-    import orthonym.rules.salts as salts
+def test_an_exception_in_the_prelude_restores_context_and_session():
+    """An exception before the main try (here: the isotope probe, which runs for
+    every top-level input RDKit can read) still resets the four ctx vars and ends
+    the naming session."""
+    import orthonym.rules.isotopes as isotopes
 
-    def _boom(smiles):
+    def _boom(mol):
         raise RuntimeError("injected")
-    monkeypatch.setattr(salts, "normalize_imbalanced_acid_salt", _boom)
-    with pytest.raises(RuntimeError, match="injected"):
-        _best_effort_engine().name("[Na+].OC(=O)O")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(isotopes, "has_isotopes", _boom)
+        with pytest.raises(RuntimeError, match="injected"):
+            _best_effort_engine().name("CCCO")
     assert _ctx_values() == CLEAN
     assert fragment_naming.is_top_level_naming()       # session depth back to 0
     assert name_compound("CCO") == "ethanol"

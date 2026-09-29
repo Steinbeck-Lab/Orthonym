@@ -7,7 +7,7 @@ Four stages do the work. The orchestrator, `namer.py`, runs them and holds the f
 | Stage | What it does |
 |:--|:--|
 | **Perception** | RDKit reads the structure; Orthonym finds rings, characteristic groups and stereocentres. The CIP descriptors come from the centres labeller; RDKit's CIP labeller fills the few double bonds centres leaves unlabelled and takes over for a molecule centres cannot label. |
-| **Rules** | Seniority, the parent hydride, locants, alphanumerical order and spelling, built as nomenclature classes from the IUPAC 2013 recommendations. Names the recommendations list one by one (retained and natural-product names), and a last-resort table of trivial names, are looked up by exact structure. |
+| **Rules** | Seniority, the parent hydride, locants, alphanumerical order and spelling, built as nomenclature classes from the IUPAC 2013 recommendations. Names the recommendations list one by one (retained and natural-product names), the names of metal tetrapyrrole complexes (ChEBI names, matched by exact InChIKey) and a last-resort table of trivial names are looked up by exact structure. |
 | **Assembly** | Chains, rings, Hantzsch–Widman heterocycles, fused, bridged (von Baeyer) and spiro systems, and the characteristic-group families: acids, esters, amides, amines, nitriles and more. |
 | **Validation** | The OPSIN round trip that decides whether a name leaves the engine, with named exceptions for classes OPSIN cannot read, and, for names from the general engine, an atom-coverage certificate. |
 

@@ -302,18 +302,21 @@ INORGANIC_ANIONS = {
     # legacy 'O=[SH](=O)[O-]' key above was a -1 [SH] form that never matched the
     # real fully-deprotonated dianion '[O-]S(=O)(=O)[O-]' (canonical O=S(=O)([O-])[O-]).
     'O=S(=O)([O-])[O-]': 'sulfate',
-    # HSO4- mono-anion / the Blue Book); MUST stay distinct from
-    # 'sulfate' (different protonation state). OPSIN round-trips 'hydrogensulfate'
-    # -> S(=O)(=O)(O)[O-] (the correct mono-anion).
-    'O=S(=O)([O-])O': 'hydrogensulfate',
+    # HSO4- mono-anion; MUST stay distinct from 'sulfate' (different protonation
+    # state). Branch review fixes: two words, as the phosphate and carbonate rows
+    # below -- (the Blue Book) names acid salts of polybasic
+    # oxoacids by method (2), 'sodium hydrogen carbonate (PIN)' (:31623), with the
+    # Note that only inorganic nomenclature writes 'hydrogen' directly in front of
+    # the anion; (:43566) '*N*,*N*-diethylethanaminium hydrogen sulfate
+    # (PIN)';:7150 "hydrogensulfate is an inorganic name for HSO4-". OPSIN reads
+    # 'hydrogen sulfate' back to S(=O)(=O)(O)[O-].
+    'O=S(=O)([O-])O': 'hydrogen sulfate',
     'O=S([O-])[O-]': 'sulfite',
-    # B3 (e): genuine missing row -- the real bisulfite/hydrogensulfite
-    # mono-anion (HSO3-, the O-protonated tautomer of sulfurous acid's
-    # conjugate base). Verified RT: opsin_roundtrip_check('O=S([O-])O',
-    # 'hydrogensulfite') passes (OPSIN parses to the same InChIKey). Named
-    # 'hydrogensulfite' to match the existing 'hydrogensulfate' row's style
-    # rather than the informal 'bisulfite'.
-    'O=S([O-])O': 'hydrogensulfite',
+    # B3 (e): genuine missing row -- the real bisulfite mono-anion (HSO3-, the
+    # O-protonated tautomer of sulfurous acid's conjugate base), named like the
+    # hydrogen sulfate row above, two words) rather than the informal
+    # 'bisulfite'. OPSIN reads 'hydrogen sulfite' back to S(=O)(O)[O-].
+    'O=S([O-])O': 'hydrogen sulfite',
     'O=P([O-])([O-])[O-]': 'phosphate',
     'O=P([O-])([O-])O': 'hydrogen phosphate',
     'O=P([O-])(O)O': 'dihydrogen phosphate',

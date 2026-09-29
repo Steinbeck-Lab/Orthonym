@@ -46,7 +46,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : Whether the name was read back, in one word:
   `opsin` (OPSIN read the name back to the same molecule),
   `opsin_constitution` (OPSIN read it back with the same constitution; the stereodescriptors were not confirmed by OPSIN),
-  `identity` (a name from an exact-match list, such as a metal tetrapyrrole complex, which OPSIN cannot read),
+  `identity` (a metal-complex name from the exact-match list, matched to your structure by InChIKey; OPSIN cannot read these names),
   or `unverified` (no read-back recorded).
 
 ## Read `tier` and `verified` together

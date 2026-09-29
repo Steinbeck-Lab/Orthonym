@@ -126,6 +126,9 @@ class OpsinOracle:
         self._jar = opsin_jar
         self._cache: Dict[Tuple[str, str], bool] = {}
         self._name_cache: Dict[str, Optional[str]] = {}
+        # OPSIN's own SMILES of a name, exactly as OPSIN wrote it (the definitive
+        # outcomes of ``_invoke_opsin`` only; see ``name_to_opsin_smiles``).
+        self._raw_cache: Dict[str, Optional[str]] = {}
         # validity-gate parse-outcome cache (/, code review
         # 2026-06-02). Only DEFINITIVE outcomes ('parsed'/'rejected') are stored
         # here — a transient 'unavailable' is never cached, so a one-off timeout
@@ -327,6 +330,7 @@ class OpsinOracle:
         raw, ran = self._invoke_opsin(name)
         if not ran:
             return None  # transient — do NOT cache
+        self._raw_cache[name] = raw
         try:
             # OPSIN can emit a SMILES that RDKit cannot parse (e.g. an impossible
             # valence from a lambda-convention candidate such as
@@ -345,6 +349,26 @@ class OpsinOracle:
             canon = None
         self._name_cache[name] = canon
         return canon
+
+    def name_to_opsin_smiles(self, name: str) -> Optional[str]:
+        """OPSIN's own SMILES of ``name``, byte for byte as OPSIN wrote it (``-r
+        -osmi``), or None when OPSIN rejected the name or could not be consulted.
+
+        ``name_to_smiles`` returns RDKit's canonical SMILES of this string, which is
+        RDKit's reading written back by RDKit; a check that must read the name's
+        structure as OPSIN built it with another toolkit (``namer.
+        _lone_pair_configuration_verified``) needs the string itself. Shares the
+        parse with ``name_to_smiles`` (cached on the same definitive outcomes; a
+        transient failure is not cached)."""
+        if self._jar is None or not name:
+            return None
+        if name in self._raw_cache:
+            return self._raw_cache[name]
+        raw, ran = self._invoke_opsin(name)
+        if not ran:
+            return None
+        self._raw_cache[name] = raw
+        return raw
 
     def parse_status(self, name: str) -> str:
         """Three-valued OPSIN parse outcome for the validity gate .
@@ -376,6 +400,7 @@ class OpsinOracle:
         raw, ran = self._invoke_opsin(name)
         if not ran:
             return "unavailable"  # transient — NOT cached
+        self._raw_cache[name] = raw
         status = "parsed" if raw else "rejected"
         self._parse_status_cache[name] = status
         return status

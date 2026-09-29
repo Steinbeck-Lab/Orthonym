@@ -102,8 +102,9 @@ def test_r3_thiourea_unit_is_not_spelled_twice(namer):
 
 
 @pytest.mark.opsin_gate
-def test_r3_abstains_rather_than_emitting_a_wrong_constitution():
-    """R3 must produce NO name in production rather than a wrong molecule.
+def test_r3_ships_its_verified_pin_never_a_wrong_constitution():
+    """R3 must never produce a wrong molecule in production (it abstained until
+    breadth job 1; it now ships its verified PIN).
 
     Its verified PIN is
 
@@ -125,11 +126,20 @@ def test_r3_abstains_rather_than_emitting_a_wrong_constitution():
     import orthonym.namer as _n
     assert _n._DISABLE_VALIDITY_GATE is False
     row = _OS(style="pin").name_tiered(R3_SMILES)
-    # PIN tier spells an abstention as the sentinel + gate_outcome='suppressed';
-    # what must never happen is a real name describing a different molecule.
-    assert row.get("gate_outcome") == "suppressed", row
-    assert row.get("name") in (None, "", "unknown organic compound"), row.get("name")
-    assert row.get("is_pin") is False, row
+    # Breadth job 1: the gap closed. The PIN tier's re-run names the 1,1-
+    # disubstituted cyclohexyl through the promoted ring-substituent producers, and
+    # 'tert-butyldiazenyl' is a compound prefix, so it is enclosed,
+    # the Blue Book). The name is the verified PIN quoted above and ships only
+    # after its own round trip; what must never happen is a real name describing a
+    # different molecule.
+    assert row.get("name") == "N-tert-butyl-N'-[1-(tert-butyldiazenyl)cyclohexyl]thiourea", row
+    # Branch review fixes: a name only the promotion re-run builds (breadth
+    # producers) is labelled pin_unverified, is_pin False -- the paper's tier
+    # definition, "pin_unverified means a name in PIN form that only a breadth
+    # producer built" -- the name is unchanged.
+    assert row.get("tier") == "pin_unverified" and row.get("is_pin") is False, row
+    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+    assert opsin_roundtrip_check(R3_SMILES, row["name"])["passed"], row
     assert _formula(R3_SMILES) == "C15H30N4S"
 
 

@@ -18,6 +18,13 @@ fully nameable and every single-heavy-atom fragment is a recognized
 inorganic component. Scope: ALL-NEUTRAL fragment sets only — charged
 multi-fragment input is owned by the salt/ion routing (dispatch priority
 < 800) and never reaches this module.
+
+Breadth Job 2 (best-effort tier only): a disconnected drawing with a metal in it
+('CC(N)C(=O)O.CC(N)C(=O)O.[Ni]', six '[C-]#N' with '[Fe+2]') is named as a
+mixed organic - inorganic adduct of its components -- a metal atom by its element
+name, a metal cation with its charge number, a metal halide or oxide by an additive
+name -- and ships only when OPSIN reads the name back to exactly the drawn structure.
+Such a name is never a PIN (the Blue Book).
 """
 
 from typing import Dict, List, Optional, Tuple
@@ -40,8 +47,9 @@ EM_DASH = "—"
 # refusal defect that abstained instead of naming the adduct.
 #
 # STILL excluded (fail-closed): bare metals (organometallic routing owns them,
-# never swallowed here) and bare N/ammonia (a bare nitrogen fragment is more
-# often a perception artefact than a genuine ammoniate; the exclusion is
+# never swallowed here -- except at the best-effort tier, see
+# ``_METAL_ELEMENT_NAMES`` below) and bare N/ammonia (a bare nitrogen fragment is
+# more often a perception artefact than a genuine ammoniate; the exclusion is
 # deliberate and left in place until a corpus-grounded reason to add it).
 SINGLE_ATOM_COMPONENT_NAMES: Dict[str, str] = {
     "O": "water",
@@ -53,6 +61,159 @@ SINGLE_ATOM_COMPONENT_NAMES: Dict[str, str] = {
     "S": "hydrogen sulfide",  # -1a: H2S
     "P": "phosphane",         # -1a: PH3 (phosphane is the PIN, not phosphine)
 }
+
+
+# Breadth Job 2 (best-effort tier only): the monoatomic metal components of a
+# disconnected depiction -- 'CC(N)C(=O)O.CC(N)C(=O)O.[Ni]', six '[C-]#N' with
+# '[Fe+2]'. "Mixed organic - inorganic adducts" (the Blue Book):
+# "organic components in order as described in, inorganic components in
+# order as described in Ref 12"; and (:4667) "preferred IUPAC names cannot be
+# assigned to mixed adducts because preferred IUPAC names have not yet been
+# determined for inorganic components". (:39735) notes no PIN for the
+# Group 1-12 metals either. Such a name is therefore never a PIN: it is built only
+# at the best-effort tier, labelled below PIN (namer._is_metal_adduct_without_pin)
+# and shipped only when OPSIN reads it back to exactly the drawn structure
+# (``_parse_reproduces_depiction`` below, then the full-key round trip).
+#
+# A metal atom takes its element name; a metal cation adds its charge number in
+# parentheses, the notation of 'pentaammine(ethanido)osmium(1+) chloride'
+#,:39793). The element set is perception.metals.METAL_ELEMENT_SYMBOLS;
+# every spelling below was read back by OPSIN 2.9.0 to the bare atom and to its
+# 1+ and 2+ ions (all 94).
+_METAL_ELEMENT_NAMES: Dict[str, str] = {
+    'Ac': 'actinium', 'Ag': 'silver', 'Al': 'aluminium', 'Am': 'americium',
+    'As': 'arsenic', 'Au': 'gold', 'B': 'boron', 'Ba': 'barium',
+    'Be': 'beryllium', 'Bh': 'bohrium', 'Bi': 'bismuth', 'Bk': 'berkelium',
+    'Ca': 'calcium', 'Cd': 'cadmium', 'Ce': 'cerium', 'Cf': 'californium',
+    'Cm': 'curium', 'Cn': 'copernicium', 'Co': 'cobalt', 'Cr': 'chromium',
+    'Cs': 'caesium', 'Cu': 'copper', 'Db': 'dubnium', 'Ds': 'darmstadtium',
+    'Dy': 'dysprosium', 'Er': 'erbium', 'Es': 'einsteinium', 'Eu': 'europium',
+    'Fe': 'iron', 'Fm': 'fermium', 'Fr': 'francium', 'Ga': 'gallium',
+    'Gd': 'gadolinium', 'Ge': 'germanium', 'Hf': 'hafnium', 'Hg': 'mercury',
+    'Ho': 'holmium', 'Hs': 'hassium', 'In': 'indium', 'Ir': 'iridium',
+    'K': 'potassium', 'La': 'lanthanum', 'Li': 'lithium', 'Lr': 'lawrencium',
+    'Lu': 'lutetium', 'Md': 'mendelevium', 'Mg': 'magnesium', 'Mn': 'manganese',
+    'Mo': 'molybdenum', 'Mt': 'meitnerium', 'Na': 'sodium', 'Nb': 'niobium',
+    'Nd': 'neodymium', 'Ni': 'nickel', 'No': 'nobelium', 'Np': 'neptunium',
+    'Os': 'osmium', 'Pa': 'protactinium', 'Pb': 'lead', 'Pd': 'palladium',
+    'Pm': 'promethium', 'Po': 'polonium', 'Pr': 'praseodymium', 'Pt': 'platinum',
+    'Pu': 'plutonium', 'Ra': 'radium', 'Rb': 'rubidium', 'Re': 'rhenium',
+    'Rf': 'rutherfordium', 'Rg': 'roentgenium', 'Rh': 'rhodium', 'Ru': 'ruthenium',
+    'Sb': 'antimony', 'Sc': 'scandium', 'Sg': 'seaborgium', 'Si': 'silicon',
+    'Sm': 'samarium', 'Sn': 'tin', 'Sr': 'strontium', 'Ta': 'tantalum',
+    'Tb': 'terbium', 'Tc': 'technetium', 'Te': 'tellurium', 'Th': 'thorium',
+    'Ti': 'titanium', 'Tl': 'thallium', 'Tm': 'thulium', 'U': 'uranium',
+    'V': 'vanadium', 'W': 'tungsten', 'Y': 'yttrium', 'Yb': 'ytterbium',
+    'Zn': 'zinc', 'Zr': 'zirconium',
+}
+
+
+def _metal_atom_component_name(frag_mol) -> Optional[str]:
+    """The name of a one-atom metal component, or None.
+
+    'nickel' for [Ni], 'iron(2+)' for [Fe+2], '(99Tc)technetium' for [99Tc]
+    (the nuclide descriptor of in front of the element name). None for
+    a non-metal, a metal carrying hydrogen ([NaH] is a hydride, not a metal atom)
+    or a negative metal ion (an '-ide' of a metal is not built here).
+    """
+    if frag_mol.GetNumAtoms() != 1:
+        return None
+    atom = frag_mol.GetAtomWithIdx(0)
+    name = _METAL_ELEMENT_NAMES.get(atom.GetSymbol())
+    if name is None or atom.GetTotalNumHs() != 0:
+        return None
+    charge = atom.GetFormalCharge()
+    if charge < 0:
+        return None
+    if charge > 0:
+        name = f"{name}({charge}+)"
+    if atom.GetIsotope():
+        name = f"({atom.GetIsotope()}{atom.GetSymbol()}){name}"
+    return name
+
+
+# Terminal ligands of a mononuclear metal halide / oxide component, keyed by
+# (atomic number, bond order to the metal) -> ligand prefix. The prefixes are the
+# ones OPSIN 2.9.0 reads in an additive name ('dichloropalladium' ->
+# Cl[Pd]Cl, 'trichlorooxovanadium' -> O=[V](Cl)(Cl)Cl); the 2005 ligand spellings
+# of the Blue Book ('chlorido', 'iodido') are not read by it, so a name
+# built with them could never pass the round trip.
+_METAL_HALIDE_OXIDE_LIGANDS: Dict[Tuple[int, float], str] = {
+    (9, 1.0): 'fluoro', (17, 1.0): 'chloro', (35, 1.0): 'bromo',
+    (53, 1.0): 'iodo', (8, 2.0): 'oxo',
+}
+
+_LIGAND_MULTIPLIERS = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+
+
+def _metal_halide_oxide_component_name(frag_mol) -> Optional[str]:
+    """Additive name of a neutral mononuclear metal halide / oxide component, or None.
+
+    'dichloropalladium' for Cl[Pd]Cl (the inorganic component of
+    'cycloocta-1,5-diene--dichloropalladium (1/1)'), 'oxovanadium' for O=[V],
+    'iodocopper' for [Cu]I: the ligand prefixes in alphanumerical order, each with
+    its multiplier, then the element name. Only for a true metal (the Groups 1-12
+    metals and the f-block, perception.metals._TRUE_METAL_SYMBOLS_FOR_VETO: a
+    Group 13-16 element has a parent hydride and is named substitutively,
+    with no charge and no hydrogen, whose every other atom is an uncharged,
+    hydrogen-free terminal halogen (single bond) or oxygen (double bond) on it.
+    """
+    from ..perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
+    metals = [a for a in frag_mol.GetAtoms() if a.GetSymbol() in _METAL_ELEMENT_NAMES]
+    if len(metals) != 1 or frag_mol.GetNumAtoms() < 2:
+        return None
+    metal = metals[0]
+    if (metal.GetSymbol() not in _TRUE_METAL_SYMBOLS_FOR_VETO
+            or metal.GetFormalCharge() != 0 or metal.GetTotalNumHs() != 0
+            or metal.GetIsotope()):
+        return None
+    counts: Dict[str, int] = {}
+    for atom in frag_mol.GetAtoms():
+        if atom.GetIdx() == metal.GetIdx():
+            continue
+        if (atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0
+                or atom.GetIsotope() or atom.GetDegree() != 1
+                or atom.GetNumRadicalElectrons() != 0):
+            return None
+        bond = frag_mol.GetBondBetweenAtoms(atom.GetIdx(), metal.GetIdx())
+        if bond is None:
+            return None
+        prefix = _METAL_HALIDE_OXIDE_LIGANDS.get(
+            (atom.GetAtomicNum(), bond.GetBondTypeAsDouble()))
+        if prefix is None:
+            return None
+        counts[prefix] = counts.get(prefix, 0) + 1
+    if any(n not in _LIGAND_MULTIPLIERS for n in counts.values()):
+        return None
+    ligands = "".join(_LIGAND_MULTIPLIERS[counts[p]] + p for p in sorted(counts))
+    return ligands + _METAL_ELEMENT_NAMES[metal.GetSymbol()]
+
+
+def _is_metal_atom_fragment(frag_mol) -> bool:
+    """True iff the fragment is one metal atom (any charge, any hydrogen count)."""
+    return (frag_mol.GetNumHeavyAtoms() == 1
+            and any(a.GetSymbol() in _METAL_ELEMENT_NAMES
+                    for a in frag_mol.GetAtoms()))
+
+
+def _parse_reproduces_depiction(name: str, mol) -> bool:
+    """True iff OPSIN reads ``name`` back to exactly the drawn structure.
+
+    Equal canonical isomeric SMILES: the same fragments with the same atoms,
+    bonds, formal charges, hydrogen counts, isotopes and stereo. This is stricter
+    than an equal standard InChIKey, which does not see where a charge or a
+    mobile hydrogen sits (a zwitterion and its neutral form share one key), and it
+    is what a name for a disconnected ionic depiction has to prove: OPSIN balances
+    the charges of an adduct's components itself ('triethylphosphanium--copper
+    monoiodide (1/1)' reads back as [Cu+]I). A name OPSIN cannot read, or an
+    unavailable OPSIN, fails closed.
+    """
+    from orthonym.namer import _same_canonical_smiles, _validity_gate_name_to_smiles
+    try:
+        parsed = _validity_gate_name_to_smiles(name)
+        return bool(parsed) and _same_canonical_smiles(parsed, Chem.MolToSmiles(mol))
+    except Exception:
+        return False
 
 
 def split_components(mol) -> Optional[List[Tuple[str, int]]]:
@@ -84,7 +245,8 @@ def _name_component(frag_smi: str, style: str, *,
                     general_fallback: bool = False,
                     allow_aromatic_general: bool = False,
                     general_fallback_unverified: bool = False,
-                    charged_ok: bool = False) -> Optional[str]:
+                    charged_ok: bool = False,
+                    ions_ok: bool = False) -> Optional[str]:
     """Name ONE component fragment, or None (fail-closed).
 
     Single-heavy-atom fragments come ONLY from the table above.
@@ -110,10 +272,22 @@ def _name_component(frag_smi: str, style: str, *,
     # ion word (…-ium / …-ide) by the fresh best-effort instance below, exactly as
     # a neutral multi-atom fragment. A single charged atom (a bare ion) stays out
     # of the single-atom table and refuses.
+    #
+    # Breadth Job 2 (``ions_ok``, best-effort tier only): a one-atom metal
+    # component takes its element name ('nickel', 'iron(2+)'), and a one-atom
+    # charged non-metal ('[NH2-]' -> 'azanide') is named by the fresh instance
+    # below like any other ion.
     if frag_mol.GetNumHeavyAtoms() == 1:
-        return None if is_charged else SINGLE_ATOM_COMPONENT_NAMES.get(
-            Chem.MolToSmiles(frag_mol, canonical=True))
+        if ions_ok and _is_metal_atom_fragment(frag_mol):
+            return _metal_atom_component_name(frag_mol)
+        if not (ions_ok and is_charged):
+            return None if is_charged else SINGLE_ATOM_COMPONENT_NAMES.get(
+                Chem.MolToSmiles(frag_mol, canonical=True))
     from orthonym.namer import Orthonym  # lazy: avoid import cycle
+    if ions_ok and _metal_halide_oxide_component_name(frag_mol) is not None:
+        # Breadth Job 2: a metal halide / oxide the single-component pipeline
+        # has no name for (it abstains on Cl[Pd]Cl, O=[V], [Cu]I).
+        return _metal_halide_oxide_component_name(frag_mol)
     try:
         name = Orthonym(
             style=style, general_fallback=general_fallback,
@@ -274,8 +448,19 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     frag_mols = {smi: Chem.MolFromSmiles(smi) for smi, _ in components}
     if any(fm is None for fm in frag_mols.values()):
         return None
-    if not any(fm.GetNumHeavyAtoms() >= 2 for fm in frag_mols.values()):
+    # Breadth Job 2: the metal-adduct widening runs at the best-effort tier only
+    #, the Blue Book: no PIN for a mixed organic-inorganic adduct),
+    # and only for an assembly with a metal atom in it; a metal-free assembly is
+    # named exactly as before.
+    _ions_ok = bool(general_fallback_unverified) and any(
+        a.GetSymbol() in _METAL_ELEMENT_NAMES for a in mol.GetAtoms())
+    _has_metal_atom = _ions_ok and any(
+        _is_metal_atom_fragment(fm) for fm in frag_mols.values())
+    if not _has_metal_atom and not any(
+            fm.GetNumHeavyAtoms() >= 2 for fm in frag_mols.values()):
         return None
+    if all(_is_metal_atom_fragment(fm) for fm in frag_mols.values()):
+        return None  # metal atoms only: not a mixed adduct
     # -1d: under best-effort, a net-charged multi-fragment assembly composes
     # as a -notation adduct of its (charged) ion components -- 'cation—anion
     # (1/1)' (measured 65% RT_FULL, 0 wrong). OPSIN preserves the net charge when a
@@ -288,13 +473,25 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     _best_effort = (general_fallback or general_fallback_unverified
                     or allow_aromatic_general)
     from ..perception.metals import assembly_has_out_of_scope_metal
-    _charged_ok = _best_effort and not assembly_has_out_of_scope_metal(mol)
+    _out_of_scope_metal = assembly_has_out_of_scope_metal(mol)
+    # Breadth Job 2: at the best-effort tier the charged components of a metal
+    # assembly are named too; the name then has to reproduce the drawn charges
+    # exactly (``_parse_reproduces_depiction`` below).
+    _charged_ok = _best_effort and (_ions_ok or not _out_of_scope_metal)
+    _widened = False
     for smi, fm in frag_mols.items():
-        if Chem.GetFormalCharge(fm) != 0 and not _charged_ok:
+        _charged = Chem.GetFormalCharge(fm) != 0
+        if _charged and not _charged_ok:
             return None
+        if _charged and _out_of_scope_metal:
+            _widened = True
         if (fm.GetNumHeavyAtoms() == 1
                 and smi not in SINGLE_ATOM_COMPONENT_NAMES):
-            return None
+            if not (_ions_ok and (_charged or _is_metal_atom_fragment(fm))):
+                return None
+            _widened = True
+        if _ions_ok and _metal_halide_oxide_component_name(fm) is not None:
+            _widened = True
     ordered = sorted(components, key=lambda t: component_sort_key(t[0]))
     named: List[Tuple[str, int]] = []
     for smi, count in ordered:
@@ -302,10 +499,13 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
             smi, style, general_fallback=general_fallback,
             allow_aromatic_general=allow_aromatic_general,
             general_fallback_unverified=general_fallback_unverified,
-            charged_ok=_charged_ok)
+            charged_ok=_charged_ok, ions_ok=_ions_ok)
         if component_name is None:
             return None  # fail-closed: never drop or placeholder a component
         named.append((component_name, count))
+    if _widened:
+        _name = _assemble_adduct_name(named)
+        return _name if _parse_reproduces_depiction(_name, mol) else None
     if style == "general":
         water_indices = [i for i, (smi, _c) in enumerate(ordered)
                          if smi == "O"]

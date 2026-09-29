@@ -56,15 +56,47 @@ class TestVerdict:
             "OC1=CC=C(C=C1)P([O-])([O-])=O.[Na+].[Na+].[Na+]",
         ) == "mismatch"
 
-    def test_neutral_input_keeps_the_protonation_exemption(self):
-        # 'methyl phosphate' round-trips to the dianion; the input has no formal
-        # charge, so this is protonation ambiguity, not a wrong molecule.
+    def test_neutral_input_with_a_charged_parse_is_a_mismatch(self):
+        # P0 charge-form names: a neutral input has no protonation exemption.
+        # OPSIN 2.9.0 reads 'methyl phosphate' as the dianion (full InChIKey
+        # an InChIKey); the neutral ester COP(=O)(O)O is -N and is
+        # 'methyl dihydrogen phosphate' "Esters of mononuclear
+        # noncarbon oxoacids", the Blue Book "Partial acid esters of
+        # polybasic acids are named by citing alkyl groups... followed by the word
+        # 'hydrogen'... and the name of the appropriate anion";:35940
+        # "P(O)(O-CH3)(OH)2 methyl dihydrogen phosphate (PIN)"). A different
+        # protonation state is a different species.
         assert nm._self_consistency_verdict(
-            "COP(=O)(O)O", "COP(=O)([O-])[O-]") == "ok"
-        # a correct salt / zwitterion / hydrochloride name still passes
+            "COP(=O)(O)O", "COP(=O)([O-])[O-]") == "mismatch"
+        assert nm._self_consistency_verdict("CC(=O)O", "CC(=O)[O-]") == "mismatch"
+
+    def test_protonation_flag_difference_is_a_mismatch(self):
+        # The input rewrite this case came from ([Na+].OC(=O)O, net +1, full key
+        # an InChIKey) against OPSIN's parse of 'sodium hydrogen
+        # carbonate' (net 0, an InChIKey): same skeleton block,
+        # different charge form.
+        assert nm._self_consistency_verdict(
+            "[Na+].OC(=O)O", "C(O)([O-])=O.[Na+]") == "mismatch"
+
+    def test_protonation_flag_alone_decides_when_net_charges_agree(self, monkeypatch):
+        # The flag compare is its own rule, not a side effect of the net-charge
+        # one: with the net-charge helper made to agree, the differing last key
+        # character (-N vs -M) still rejects the parse.
+        monkeypatch.setattr(nm, "_self_consistency_net_charge", lambda s: 0)
+        assert nm._self_consistency_verdict(
+            "[Na+].OC(=O)O", "C(O)([O-])=O.[Na+]") == "mismatch"
+        assert nm._self_consistency_verdict(
+            "COP(=O)(O)O", "COP(=O)([O-])[O-]") == "mismatch"
+
+    def test_charge_forms_of_one_species_still_pass(self):
+        # A correct salt / hydrochloride / zwitterion name shares the input's
+        # whole full InChIKey and passes.
         assert nm._self_consistency_verdict(
             "CC(=O)[O-].[Na+]", "CC(=O)[O-].[Na+]") == "ok"
         assert nm._self_consistency_verdict("CC[NH3+].[Cl-]", "CCN.Cl") == "ok"
+        assert nm._self_consistency_verdict("[NH3+]CC(=O)[O-]", "NCC(=O)O") == "ok"
+        assert nm._self_consistency_verdict(
+            "COP(=O)(O)O", "COP(=O)(O)O") == "ok"
 
     def test_skeleton_stereo_insensitive(self):
         # the skeleton block is identical regardless of stereo descriptors

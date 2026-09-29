@@ -2,7 +2,7 @@
 
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-banner-narrow.svg">
-  <img src="assets/readme-banner.svg" alt="Orthonym engine. Preferred IUPAC Names for chemical structures. Deterministic, rule-based, following the IUPAC 2013 recommendations." width="100%">
+  <img src="assets/readme-banner.svg" alt="Orthonym engine. Checked IUPAC Names for Chemical Structures. Deterministic, rule-based, following the IUPAC 2013 recommendations." width="100%">
 </picture>
 
 <br>
@@ -11,7 +11,7 @@
 
 <br>
 
-**A SMILES string goes in. Its Preferred IUPAC Name comes out, or a clear "no". Never a guess.**
+**A SMILES string goes in. A verified IUPAC name comes out, or a clear "no". Never a guess.**
 
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-1a1a1a?style=flat-square)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-1a1a1a?style=flat-square)](https://www.python.org/)
@@ -22,29 +22,36 @@
 
 </div>
 
-## How every name is checked
+## How names are checked
 
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-roundtrip-narrow.svg">
-  <img src="assets/readme-roundtrip.svg" alt="The round trip for caffeine. Orthonym writes the name 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione. OPSIN reads that name back into a structure. The InChIKey of your structure and the InChIKey of what OPSIN read are both RYYVLZVUVIJVGH-UHFFFAOYSA-N, so the name is a verified Preferred IUPAC Name. Below, the four tiers a name can land on: PIN, fallback, best effort and no name, with the engine's tier ids." width="100%">
+  <img src="assets/readme-roundtrip.svg" alt="The round trip for caffeine. Orthonym writes the name 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione. OPSIN reads that name back into a structure. The InChIKey of your structure and the InChIKey of what OPSIN read are both RYYVLZVUVIJVGH-UHFFFAOYSA-N, so OPSIN confirms that the name describes your structure; the strict PIN path built and certified it, so it is labelled pin_verified. Below, the four tiers a name can land on: PIN, fallback, best effort and no name, with the engine's tier ids." width="100%">
 </picture>
 
-**Deterministic.** Orthonym builds every name from the nomenclature rules of the IUPAC 2013
-recommendations, the "Blue Book". There is no neural network and no sampling: the same structure
-always gets the same name.
+**Deterministic.** Orthonym builds its names from the nomenclature rules of the IUPAC 2013
+recommendations, the "Blue Book". Where those rules do not yet reach a molecule, it can give a
+general systematic name or a retained name from a table instead, labelled as not the preferred
+name. There is no neural network and no sampling: the same input always gives the same output.
 
-**Checked.** In the default tier, every name is handed to [OPSIN](https://github.com/dan2097/opsin),
-which never saw your structure, and parsed back. The two structures are compared by full InChIKey,
-and an atom-coverage check confirms that every atom is named.
+**Checked.** A name is handed to [OPSIN](https://github.com/dan2097/opsin), which never saw your
+structure, and parsed back. The structure OPSIN reads must match yours in constitution, charge and
+stereo, so a name that leaves out or adds an atom cannot pass. The default tier makes a few
+exceptions for names OPSIN cannot read in full: names from exact-match lists (metal-complex and
+natural-product parent names), a few name forms that OPSIN's grammar lacks or misreads, and names
+whose stereodescriptors OPSIN cannot parse (OPSIN confirms their constitution, and each descriptor is
+checked against its CIP label). `--provenance` marks each of them. The wider tiers ship none of
+them, except the metal-complex list names.
 
-**Honest.** When no name passes, Orthonym says so instead of guessing. `--provenance` reports the
-tier each name landed on and, in its own field, whether OPSIN read it back.
+**Honest.** A candidate that fails a check is withdrawn, and when no name is left Orthonym says so
+instead of guessing. `--provenance` reports the tier each name landed on and, in its `verified`
+field, how it was checked.
 
 ## See it working
 
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-specimen-narrow.svg">
-  <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints sphingosine, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, best_effort. Uranium trioxide prints inorganic compound (not supported), abstain." width="100%">
+  <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, pin_unverified. Uranium trioxide prints inorganic compound (not supported), abstain." width="100%">
 </picture>
 
 <sub>Real output. The command line prints the plain line; the mark under it and the tier at its right
@@ -100,17 +107,20 @@ see [`CONTRIBUTING.md`](CONTRIBUTING.md).
 ### The OPSIN and centres jars
 
 Orthonym does **not** ship any Java jars. It uses two, and downloads them from their official
-releases, checking each against a pinned SHA-256 checksum:
+releases, checking each download against a pinned SHA-256 checksum:
 
 | Jar | Version | Used for | Licence |
 |:--|:--|:--|:--|
-| [OPSIN](https://github.com/dan2097/opsin) `opsin-cli-2.9.0-jar-with-dependencies.jar` | 2.9.0 | round-trip validation of every name | MIT (the jar bundles jna-inchi, LGPL-2.1, and others) |
+| [OPSIN](https://github.com/dan2097/opsin) `opsin-cli-2.9.0-jar-with-dependencies.jar` | 2.9.0 | round-trip validation of names | MIT (the jar bundles jna-inchi, LGPL-2.1, and others) |
 | [centres](https://github.com/SiMolecule/centres) `centres.jar` | 1.2.1 | CIP stereo descriptors (R/S, E/Z) | BSD-2-Clause (the jar bundles CDK, LGPL-2.1+) |
 
-`pip install` tries to fetch them for you. To fetch or re-check them at any time, run
-`orthonym --fetch-jars`. If a jar is missing, Orthonym **stops with a clear error** rather than
-quietly naming with less validation. For offline machines, point Orthonym at jars you copied
-yourself:
+`pip install` tries to fetch them for you, and a jar that is still missing is downloaded and
+checked the first time Orthonym needs it. To fetch them, or re-check the ones in the jar directory,
+run `orthonym --fetch-jars`. If a jar cannot be found or downloaded (or `ORTHONYM_NO_DOWNLOAD=1`
+forbids the download), Orthonym **stops with a clear error** rather than quietly naming with less
+validation; without a working Java runtime it declines every molecule rather than naming it
+unchecked. For offline machines, point Orthonym at jars you copied yourself (a jar given this way
+is used as given, without the checksum check):
 
 | Setting | Effect |
 |:--|:--|
@@ -122,20 +132,33 @@ Licences and sources of the third-party components are listed in [`NOTICE`](NOTI
 
 ## Output tiers
 
-The default is strict. Wider tiers are opt-in with `--emit-tier`:
+The default returns the name from the strict path for the Preferred IUPAC Name. Where the engine
+cannot certify the preferred name, it can return another checked name, labelled with a lower tier,
+or it declines. Wider tiers are opt-in with `--emit-tier`:
 
 | `--emit-tier` | Returns |
 |:--|:--|
-| `pin` *(default)* | the Preferred IUPAC Name, or nothing |
-| `valid` | adds round-trip-verified general names |
-| `complete` | adds round-trip-verified names from the wider general fallbacks (non-PIN allowed) |
-| `best-effort` | adds names that pass the atom-coverage check but are not verified by OPSIN |
+| `pin` *(default)* | the strict path's name for the Preferred IUPAC Name, a labelled non-PIN name where the engine cannot certify the PIN, or nothing |
+| `valid` | also general names that OPSIN reads back to your structure |
+| `complete` | also general names for aromatic and heterocyclic ring systems |
+| `best-effort` | also the names of the last-resort producers |
 
-Whatever the tier, `--provenance` says what each name is: `pin_verified` (the strict PIN path built
-and verified it), `pin_unverified` (a PIN-form name whose preferred status is not certified),
-`systematic_verified` (verified, not the PIN), `best_effort` (the general engine built all or part
-of it) or `abstain` (no name). The tier says how a name was built. The `verified` field says
-whether OPSIN read it back to the same molecule.
+At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey OPSIN round trip (a
+metal-complex name from the exact-match list excepted), so the few default-tier names OPSIN cannot
+read in full are not shipped there, and a wider tier can, rarely, decline a molecule that a
+narrower tier names.
+
+Whatever the tier, `--provenance` (one SMILES at a time) says what each name is: `pin_verified`
+(the strict PIN path built it, certified it as the PIN, and OPSIN read it back), `pin_unverified`
+(built on the PIN path, but not certified as the PIN), `systematic_verified` (a checked name that
+is not certified as the PIN, for example from the general engine, from a table of retained names,
+or of a class for which the Blue Book gives no PIN), `best_effort` (a last-resort producer's name,
+or one that no round trip confirmed) or `abstain` (no name). The tier says how a name was built.
+The `verified` field says how it was checked: `opsin` (OPSIN read the whole name back to your
+structure), `opsin_constitution` (OPSIN read it back without its stereodescriptors, and each
+descriptor was checked against its CIP label), `identity` (a metal-complex name from the
+exact-match list, found by your structure's exact InChIKey; OPSIN cannot read these names) or
+`unverified`.
 
 When Orthonym cannot name a molecule, the plain call returns a label in place of a name, such as
 `inorganic compound (not supported)`, and `--provenance` marks the row `abstain` with a reason code.
@@ -170,8 +193,8 @@ entry in APA and BibTeX. In BibTeX:
 
 Orthonym stands on the IUPAC 2013 recommendations and on open cheminformatics software:
 [RDKit](https://www.rdkit.org/) reads the structure, [OPSIN 2.9.0](https://github.com/dan2097/opsin)
-reads every name back, and [centres 1.2.1](https://github.com/SiMolecule/centres) assigns the CIP
-descriptors. Without them there would be no Orthonym.
+reads the names back to check them, and [centres 1.2.1](https://github.com/SiMolecule/centres)
+assigns the CIP descriptors. Without them there would be no Orthonym.
 
 > Favre, H. A.; Powell, W. H. *Nomenclature of Organic Chemistry: IUPAC Recommendations and
 > Preferred Names 2013*. Royal Society of Chemistry, **2013**.

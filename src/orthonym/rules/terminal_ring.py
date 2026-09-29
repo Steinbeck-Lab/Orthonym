@@ -573,6 +573,10 @@ def terminal_ring_name(
     """
     if mol is None or not ring_atoms:
         return None
+    # Breadth Job 1: never a PIN-tier producer (see ``in_pin_promotion``).
+    from .pin_vocabulary import in_pin_promotion
+    if in_pin_promotion():
+        return None
     ring = set(ring_atoms)
     if len(ring) > MAX_CAGE_ATOMS:
         logger.info("terminal_ring: %d atoms > MAX_CAGE_ATOMS; refuse",

@@ -1168,8 +1168,27 @@ def name_substituent_for_ordering(mol, frag_atoms, attach_idx):
     unnameable sentinel.
     """
     from .memo import cache_or_compute
+    # Branch review fixes: the value is ``name_substituent``'s name in the CURRENT
+    # naming context, and that name depends on the four propagation flags the
+    # best-effort tier sets and the clean fall-through resets
+    # (``namer._try_besteffort_clean_general_fallthrough``), so they are part of the
+    # key, as in ``_substituent_memo_key``. Without them a sort key named in the
+    # best-effort context was served to the clean context of the same molecule (and
+    # back), ORTHONYM_MEMO=verify raised MemoMismatch here, and the (g) tie of
+    # a 1,4-disubstituted piperazine followed whichever context filled the entry
+    # first: milestone1500 'C1C[C@@H](OC1)CNC(=S)N2CCN(CC2)S(=O)(=O)C3=CC=CC=C3' was
+    # '4-{...}-1-(phenylsulfonyl)piperazine' for four spellings and '1-{...}-4-
+    # (phenylsulfonyl)piperazine' for the fifth. The fragment session depth is in the
+    # key too: a deep prefix is named against the depth budget left at that depth (a
+    # recursion-depth fallback deeper down), so the same prefix asked at two depths
+    # can get two names (verify-mode mismatches on two dev rows). Finer key => only
+    # more misses.
+    from .fragment_naming import _session_depth
     try:
-        key = (_mol_graph_key(mol), tuple(sorted(frag_atoms)), attach_idx)
+        key = (_mol_graph_key(mol), tuple(sorted(frag_atoms)), attach_idx,
+               best_effort_ctx.get(), general_fallback_ctx.get(),
+               allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+               _session_depth())
     except Exception:  # noqa: BLE001 -- no key, no memo
         return _name_substituent_for_ordering_uncached(mol, frag_atoms, attach_idx)
     return cache_or_compute(
@@ -1690,9 +1709,26 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
     except Exception:  # noqa: BLE001 -- a key-construction error is a cache skip
         _memo_key = None
     if _memo_key is None:
-        return _body()
-    from .memo import cache_or_compute
-    return cache_or_compute("name_substituent", _memo_key, _body)
+        _token = _body()
+    else:
+        from .memo import cache_or_compute
+        _token = cache_or_compute("name_substituent", _memo_key, _body)
+    # Breadth Job 1 (M01): at the PIN tier a fragment the strict cascade declines
+    # is offered to the SAME cascade with its ring-substituent composition switch
+    # (``allow_mancude``) on -- the producers that switch opens build names such
+    # as '(4-methoxyphenyl)methyl' or '2,6,6-trimethylcyclohex-1-en-1-yl' that
+    # are PIN forms, the Blue Book;,:16619). Only a
+    # name made of PIN vocabulary is kept (`promote_at_pin_tier`): the universal
+    # replacement fallback stays best-effort-only (it reads ``best_effort_ctx``
+    # itself), and a von Baeyer / replacement / radical-style form is declined.
+    # A fragment the strict cascade names is untouched.
+    if not allow_mancude and (_token is None or _token == "substituent"):
+        from ..rules.pin_vocabulary import promote_at_pin_tier
+        _promoted = promote_at_pin_tier(lambda: name_substituent(
+            mol, frag_atoms, attach_idx, allow_mancude=True))
+        if _promoted is not None:
+            return _promoted
+    return _token
 
 
 def name_ylidene_substituent(mol, frag_atoms, attach_idx):
@@ -3621,7 +3657,22 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
     if len(ih) > 1:
         return None  # ambiguous indicated hydrogen -> do not guess
     ih_atom = ih[0] if ih else None
-    deco_set = set(deco_carriers)
+    # (e) (the Blue Book-3290): after the free valence, low locants go
+    # to the 'ene'/'yne' endings -- first to the multiple bonds as a set, then to
+    # the double bonds -- and only then (f) to the detachable prefixes:
+    # 'cyclohex-3-en-1-yl (preferred prefix)' (:3268), '4-(4-methylcyclohex-3-en-
+    # 1-yl)' (:25725), never '4-methylcyclohex-4-en-1-yl'. Only a carbocyclic,
+    # non-mancude core names its unsaturation with 'ene'/'yne' endings; a
+    # heterocycle's is expressed by hydro prefixes and indicated hydrogen, which
+    # this key does not model, so it is left as before.
+    ring_multi = []
+    if not het and not aromatic:
+        for i in core:
+            for j in adj[i]:
+                if i < j:
+                    _o = mol.GetBondBetweenAtoms(i, j).GetBondTypeAsDouble()
+                    if _o >= 2.0:
+                        ring_multi.append((i, j, _o))
     best_key = None
     best = None
     for start in range(n):
@@ -3633,8 +3684,24 @@ def _monocycle_position_map(mol, core, attach_idx, deco_carriers, ring_info):
                     mol.GetAtomWithIdx(a).GetSymbol(), 99), a2p[a])))
             ih_loc = a2p[ih_atom] if ih_atom is not None else 0
             fv_loc = a2p[attach_idx]
-            deco_locs = tuple(sorted(a2p[c] for c in deco_set))
-            key = (het_locs, sen_locs, ih_loc, fv_loc, deco_locs)
+
+            def _mb_loc(i, j):
+                pi, pj = a2p[i], a2p[j]
+                lo, hi = min(pi, pj), max(pi, pj)
+                return hi if (lo == 1 and hi == n) else lo
+            multi_locs = tuple(sorted(_mb_loc(i, j) for i, j, _ in ring_multi))
+            double_locs = tuple(sorted(_mb_loc(i, j) for i, j, o in ring_multi
+                                       if o == 2.0))
+            # (f) (the Blue Book, "detachable alphabetized prefixes,
+            # all considered together in a series of increasing numerical order"): the locant set
+            # counts every prefix, so a carrier with two decorations (gem-
+            # dimethyl) contributes its locant twice -- '4-hydroxy-2,2-dimethyl-
+            # 6-methylidenecyclohexyl' {2,2,4,6}, not '4-hydroxy-6,6-dimethyl-2-
+            # methylidenecyclohexyl' {2,4,6,6}. ``deco_carriers`` holds one entry
+            # per decoration; a set of carriers dropped the repeat.
+            deco_locs = tuple(sorted(a2p[c] for c in deco_carriers))
+            key = (het_locs, sen_locs, ih_loc, fv_loc, multi_locs, double_locs,
+                   deco_locs)
             if best_key is None or key < best_key:
                 best_key = key
                 best = a2p
@@ -3665,6 +3732,101 @@ def _borrow_heteroarene_stem(mol, core, attach_idx):
     if not m:
         return None
     return m.group('stem')
+
+
+_AZINE_STEMS = {'pyridine': 'pyridin', 'pyrimidine': 'pyrimidin',
+                'pyrazine': 'pyrazin', 'pyridazine': 'pyridazin'}
+
+
+def _azine_added_hydrogen_core(mol, core, attach_idx, deco_carriers):
+    """``(pos, tail)`` for a six-membered azine ring core (pyridine, pyrimidine,
+    pyrazine, pyridazine) of which some ring atoms are not in a ring double bond --
+    a ring ketone ('oxo'), an N-H, an sp3 ring atom, or the free-valence atom
+    itself -- else None (branch review fixes).
+
+    Mancude azines need no indicated hydrogen, the Blue Book), so
+    those positions are named by hydro prefixes and, for a free valence on such a
+    position, by ADDED hydrogen,:24695 'pyridin-1(2H)-yl (preferred
+    prefix)'): '2,4-dioxo-3,4-dihydropyrimidin-1(2H)-yl' (uracil-1-yl, BB:53935
+    style), never '2,6-dioxo-1H-pyrimidin-3-yl'. Numbering /:
+    heteroatoms low, then the free valence, the added hydrogen, the hydro prefixes
+    , 'Locants for hydro prefixes are those of the saturated
+    positions'), then the ring's substituent prefixes all together, then the
+    canonical ranks (input-order independent). Hydro prefixes are cited next to the
+    parent, after the alphabetized prefixes ('2,4-dioxo-3,4-dihydro...').
+    """
+    from rdkit import Chem as _Chem
+
+    from ..rules.ring_substituents import identify_ring_system
+    ring = list(core)
+    if len(ring) != 6:
+        return None
+    if any(mol.GetAtomWithIdx(a).GetSymbol() not in ('C', 'N')
+           or mol.GetAtomWithIdx(a).GetFormalCharge() != 0
+           or mol.GetRingInfo().NumAtomRings(a) != 1 for a in ring):
+        return None
+    stem = _AZINE_STEMS.get(identify_ring_system(mol, tuple(sorted(ring))) or '')
+    if stem is None:
+        return None
+    ring_set = set(ring)
+    try:
+        kek = _Chem.RWMol(mol)
+        _Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:  # noqa: BLE001
+        return None
+    in_db = set()
+    for b in kek.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if (i in ring_set and j in ring_set
+                and b.GetBondType() == _Chem.BondType.DOUBLE):
+            in_db.update((i, j))
+        elif b.GetBondType() != _Chem.BondType.SINGLE and (i in ring_set) != (j in ring_set):
+            continue  # an exocyclic =O / =C on a ring atom leaves it out of in_db
+        elif (i in ring_set and j in ring_set
+              and b.GetBondType() not in (_Chem.BondType.SINGLE,
+                                          _Chem.BondType.DOUBLE)):
+            return None
+    saturated = [a for a in ring if a not in in_db]
+    if not saturated or len(saturated) % 2:
+        return None
+    # ring order
+    order = [ring[0]]
+    while len(order) < 6:
+        nxt = [n.GetIdx() for n in mol.GetAtomWithIdx(order[-1]).GetNeighbors()
+               if n.GetIdx() in ring_set and n.GetIdx() not in order]
+        if not nxt:
+            return None
+        order.append(nxt[0] if len(order) == 1 else nxt[0])
+    if mol.GetBondBetweenAtoms(order[0], order[-1]) is None:
+        return None
+    ranks = list(_Chem.CanonicalRankAtoms(mol, breakTies=False))
+    best = None
+    for start in range(6):
+        for step in (1, -1):
+            seq = [order[(start + step * k) % 6] for k in range(6)]
+            pos = {a: k + 1 for k, a in enumerate(seq)}
+            het = sorted(pos[a] for a in ring if mol.GetAtomWithIdx(a).GetSymbol() == 'N')
+            fv = pos[attach_idx]
+            rest = sorted(pos[a] for a in saturated if a != attach_idx)
+            if attach_idx in saturated:
+                added = rest[0]
+                hydro = rest[1:]
+            else:
+                added = None
+                hydro = rest
+            decos = sorted(pos[a] for a in deco_carriers if a in pos)
+            key = (het, fv, added or 0, hydro, decos, [ranks[a] for a in seq])
+            if best is None or key < best[0]:
+                best = (key, pos, fv, added, hydro)
+    _key, pos, fv, added, hydro = best
+    mult = {2: 'di', 4: 'tetra', 6: 'hexa'}
+    head = ''
+    if hydro:
+        if len(hydro) not in mult:
+            return None
+        head = f"{','.join(str(h) for h in hydro)}-{mult[len(hydro)]}hydro"
+    fv_part = f"{fv}({added}H)" if added is not None else f"{fv}"
+    return pos, f"{head}{stem}-{fv_part}-yl"
 
 
 def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
@@ -3843,9 +4005,15 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
 
     # ---- Step 3: number the core -------------------------------------------
     deco_carriers = [ra for ra, _, _ in decorations]
-    pos = _monocycle_position_map(
+    _azine = _azine_added_hydrogen_core(mol, core, attach_idx, deco_carriers)
+    pos = None if _azine is not None else _monocycle_position_map(
         mol, core, attach_idx, deco_carriers, ring_info)
-    if pos is not None:
+    if _azine is not None:
+        # Branch review fixes: a six-membered azine with ring ketones / N-H / a
+        # saturated free-valence atom takes hydro prefixes and added hydrogen
+        #, numbered as that form is (``_azine_added_hydrogen_core``).
+        pos, core_tail = _azine
+    elif pos is not None:
         core_tail = _monocycle_core_tail(mol, core, attach_idx, pos, ring_info)
         if not core_tail or ' ' in core_tail:
             # -T1b: the PIN stem tables declined -- a mixed-saturation
@@ -4021,6 +4189,53 @@ def _longest_carbon_path_from(mol, frag_set, start):
     return best
 
 
+def _senior_longest_carbon_path_from(mol, frag_set, start):
+    """The longest acyclic-carbon path from ``start`` (``_longest_carbon_path_from``),
+    chosen among ALL equally long ones by the chain criteria instead of by the
+    input's atom order (branch review fixes: a dev2000 flavanone's prenyl-type
+    prefix came out '(2E)-3-(hydroxymethyl)but-2-en-1-yl' or '(2E)-4-hydroxy-3-
+    methylbut-2-en-1-yl' by its SMILES spelling):
+
+    * the greater number of multiple bonds, the Blue Book);
+    * the greater number of substituents cited as prefixes,:21604 "the
+      maximum number of substituents cited as prefixes") -- one per branch, so
+      '4-hydroxy-3-methyl' (two) before '3-(hydroxymethyl)' (one);
+    * the lower locants of those substituents,:21698);
+    * then the atoms' canonical ranks, which do not depend on the input order (a
+      tie left there is a symmetric choice: both chains give the same name)."""
+    carbons = {i for i in frag_set
+               if mol.GetAtomWithIdx(i).GetAtomicNum() == 6
+               and not mol.GetAtomWithIdx(i).IsInRing()}
+    if start not in carbons:
+        return None
+    try:
+        from .substituent_naming import _longest_carbon_chains_from
+        chains = _longest_carbon_chains_from(mol, carbons, start)
+    except Exception:  # noqa: BLE001
+        chains = None
+    if not chains:
+        return _longest_carbon_path_from(mol, frag_set, start)
+    if len(chains) == 1:
+        return chains[0]
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+
+    def _key(chain):
+        chain_set = set(chain)
+        multiple = sum(
+            1 for a, b in zip(chain, chain[1:])
+            if mol.GetBondBetweenAtoms(a, b) is not None
+            and mol.GetBondBetweenAtoms(a, b).GetBondTypeAsDouble() > 1.0)
+        branch_locants = []
+        for k, a in enumerate(chain, start=1):
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                j = nb.GetIdx()
+                if j in frag_set and j not in chain_set and nb.GetAtomicNum() > 1:
+                    branch_locants.append(k)
+        return (-multiple, -len(branch_locants), sorted(branch_locants),
+                [ranks[a] for a in chain])
+    return min(chains, key=_key)
+
+
 def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
                                                allow_mancude: bool = False):
     """Acyclic sibling of:func:`_recursive_fragment_substituent_name`: name a
@@ -4064,9 +4279,27 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     if a.GetAtomicNum() != 6 or a.IsInRing():
         return None  # ring / heteroatom attach -> not this composer's job
 
-    chain = _longest_carbon_path_from(mol, frag_set, attach_idx)
+    chain = _senior_longest_carbon_path_from(mol, frag_set, attach_idx)
     if chain is None or len(chain) < 2:
         return None
+    # Breadth Job 1 (M03): this composer always ends its chain at the free
+    # valence (locant 1). A substituent prefix is named on the longest chain
+    # THROUGH the free-valence atom, the Blue Book 'propan-2-yl
+    # (preferred prefix) 1-methylethyl';:22744 '1-hydroxypropan-2-yl... [not
+    # 1-(hydroxymethyl)ethyl]'), so when two carbon arms make a longer chain
+    # ('1-benzylethyl' for 1-phenylpropan-2-yl) its name is not the PIN prefix.
+    # In the PIN tier's promotion re-run it declines; every other run is
+    # unchanged.
+    from ..rules.pin_vocabulary import in_pin_promotion
+    if in_pin_promotion():
+        _rest = frag_set - {attach_idx}
+        _arms = sorted(
+            (len(_longest_carbon_path_from(mol, _rest, nb.GetIdx()) or ())
+             for nb in a.GetNeighbors() if nb.GetIdx() in _rest
+             and nb.GetAtomicNum() == 6 and not nb.IsInRing()),
+            reverse=True)
+        if 1 + sum(_arms[:2]) > len(chain):
+            return None
     pos = {atom: i + 1 for i, atom in enumerate(chain)}
     chain_set = set(chain)
 
@@ -4103,6 +4336,10 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     _base, _hydride = _stem
     if _hydride == _base + "ane":
         core_tail = get_alkyl_name(len(chain))  # 'pentyl' (fv=1, elided)
+    elif _hydride == "eth-1-ene":
+        # (d) (the Blue Book): the one double bond of a two-carbon
+        # chain takes no locant, '2-chloroethen-1-yl (preferred prefix)' (:3003).
+        core_tail = "ethen-1-yl"
     elif _hydride.endswith("e"):
         core_tail = _hydride[:-1] + "-1-yl"      # 'pent-2-ene' -> 'pent-2-en-1-yl'
     else:
@@ -4116,6 +4353,18 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     from collections import defaultdict
 
     from .naming_utils import alpha_sort_key, enclose_if_compound, get_multiplier_prefix
+    if in_pin_promotion():
+        # Breadth Job 1: the ring-branch guard of the strict producers (suite fix
+        # j6, ``substituent_naming._ring_branch_may_need_other_parent``) holds in
+        # the PIN tier's re-run too: a decoration whose ring system repeats the
+        # parent's, or that carries the principal characteristic group, makes the
+        # molecule a multiplicative candidate, the Blue Book:
+        # Ph-CCl2-Ph is '1,1'-(dichloromethylene)dibenzene'), so a substitutive
+        # '(1-chloro-2-phenylethyl)benzene' is not its PIN.
+        from .substituent_naming import _ring_branch_may_need_other_parent
+        for _ca, _ni, _branch in decorations:
+            if _ring_branch_may_need_other_parent(mol, frag_set, attach_idx, _branch):
+                return None
     groups = defaultdict(list)
     for ca, ni, branch in decorations:
         if not len(branch) < len(frag_set):

@@ -167,10 +167,12 @@ def test_trometamol_cation_is_opsin_valid(namer):
 # site(s) (one [H+] per site) and re-enter the salt namer.
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
-    # 2 ethylamine bases + malonate dianion + 2 [H+]
-    ("CCN.CCN.O=C([O-])CC(=O)[O-].[H+].[H+]", "diethanaminium propanedioate"),
+    # 2 ethylamine bases + malonate dianion + 2 [H+]; a cation with the cumulative
+    # suffix 'aminium' is multiplied by 'bis', the Blue Book,
+    # 'bis(methanaminium) sulfate (PIN)'; (1),:41431), not 'di'
+    ("CCN.CCN.O=C([O-])CC(=O)[O-].[H+].[H+]", "bis(ethanaminium) propanedioate"),
     # 2 ethylamine bases + oxalate dianion + 2 [H+]
-    ("CCN.CCN.[O-]C(=O)C(=O)[O-].[H+].[H+]", "diethanaminium oxalate"),
+    ("CCN.CCN.[O-]C(=O)C(=O)[O-].[H+].[H+]", "bis(ethanaminium) oxalate"),
     # ethylenediamine (a diamine) + malonate dianion + 2 [H+] -> bis(aminium)
     ("NCCN.O=C([O-])CC(=O)[O-].[H+].[H+]",
      "ethane-1,2-bis(aminium) propanedioate"),

@@ -130,10 +130,15 @@ _WITNESSES = [
     "(O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C",
 ]
 
-# A no-stereo molecule (haloperidol) that ALSO routes through the T4-handoff and
-# abstains at COMPLETE today — used for the negative control so the stereo gate
-# can never be the reason for an abstain (isolates the RT gate).
-_NOSTEREO_T4 = "O=C(CCCN1CCC(O)(c2ccc(Cl)cc2)CC1)c1ccc(F)cc1"
+# A no-stereo molecule that ALSO routes through the T4-handoff and abstains at
+# COMPLETE without it — used for the negative control so the stereo gate can never
+# be the reason for an abstain (isolates the RT gate). Breadth job 1: was
+# haloperidol, which the main pipeline now names itself (RT-exact, PIN tier
+# '4-[4-(4-chlorophenyl)-4-hydroxypiperidin-1-yl]-1-(4-fluorophenyl)butan-1-one'),
+# so the handoff is no longer reached for it; this a dev split row (a chloro
+# fentanyl analogue) still needs it (measured: PIN tier abstains, COMPLETE names it,
+# COMPLETE abstains with name_t4_complete sabotaged and the rescues switched off).
+_NOSTEREO_T4 = "CCC(=O)N(c1ccc(Cl)cc1)C1CCN(CCc2ccccc2)CC1"
 
 
 class TestWitnessesPromotedToComplete:
@@ -173,6 +178,13 @@ class TestUnverifiedRescueStillAbstains:
         monkeypatch.setattr(
             Orthonym, "_try_alternate_parent_rescue",
             lambda self, s: None)
+        # Breadth job 1 added a third sibling: the PIN tier's re-run with the
+        # promoted ring-substituent producers (Orthonym._name_with_pin_promotion),
+        # which names haloperidol correctly (RT-exact) and so would mask what this
+        # test isolates. Switched off here for the same reason.
+        monkeypatch.setattr(
+            Orthonym, "_pin_promotion_eligible",
+            lambda self: False)
         name = _complete(_NOSTEREO_T4)
         assert errors.is_failure_name(name), (
             f"COMPLETE tier SHIPPED an RT-failing T4 candidate: {name!r}")

@@ -31,11 +31,13 @@ _VARS = {
     "gate_outcome": _pv._GATE_OUTCOME, "gate_outcome_name": _pv._GATE_OUTCOME_NAME,
     "general_ring_prefix": _pv._GENERAL_RING_PREFIX, "suffix_free_prefix_name": _pv._SUFFIX_FREE_PREFIX_NAME,
     "non_pin_fragments": _pv._NON_PIN_FRAGMENTS,
+    "pin_promotion_rerun": _pv._PIN_PROMOTION_RERUN,
+    "non_pin_labels": _pv._NON_PIN_LABELS,
 }
 # Accumulators: a hit MERGES the fresh call's recorded entries into the current
 # value instead of overwriting it -- an overwrite would drop entries recorded
 # after the fresh call (in this ambient context) that the snapshot never saw.
-_ACCUMULATORS = frozenset({"non_pin_fragments"})
+_ACCUMULATORS = frozenset({"non_pin_fragments", "non_pin_labels"})
 _BUDGETS = ("perf_budget", "analysis_budget", "work_budget")
 
 
@@ -68,9 +70,12 @@ def _apply(replay: dict, units: tuple, replay_budgets: bool = True) -> None:
             cur = _VARS[k].get()
             _VARS[k].set(cur + tuple(x for x in (v or ()) if x not in cur))
             # An enclosing memoised substituent-fragment naming logs the fragments
-            # this hit merges, as it logs every record_non_pin_fragment call.
-            for x in (v or ()):
-                _pv._log_non_pin(x)
+            # this hit merges, as it logs every record_non_pin_fragment call (the
+            # label-only records are not logged: a call that makes them is never
+            # stored by that memo, see ``_NSF_REPLAYABLE``).
+            if k == "non_pin_fragments":
+                for x in (v or ()):
+                    _pv._log_non_pin(x)
         else:
             _VARS[k].set(v)
     # These direct.set writes bypass the provenance setters, so an ENCLOSING
