@@ -31,6 +31,26 @@ from ..perception.smarts_cache import compiled as _compiled_smarts
 logger = logging.getLogger(__name__)
 
 
+def _multiplied_organyl(count: int, organyl: str) -> str:
+    """The multiplied organyl word of an ester (``di-tert-butyl``, ``di(propan-2-yl)``,
+    ``dimethyl``), formed by the shared primitive.
+
+    The organyl groups of a symmetric ester are one component multiplied by the
+    numerical prefix, so the multiplier and its punctuation follow the rules for
+    any multiplied component: (b) (the Blue Book, "simple substituent
+    prefixes", example ``di-tert-butyl``:7070) with the (d) hyphen
+    (:6958, "to separate italic letters from Roman letters", ``di-*tert*-butyl``
+    :6964); (a) (:7085, parentheses for "simple substituent prefixes
+    having locants", ``di(propan-2-yl)``); (a) (:7104, ``bis`` for
+    "compound or complex (i.e. substituted) prefixes"). The BB's own esters:
+    'di(propan-2-yl) disulfite' (:36921). A bare ``f"di{organyl}"`` gave
+    'ditert-butyl oxalate' and 'dipropan-2-yl oxalate'. The same helper already
+    forms the terminal organyls of the functional-class polyester builder below.
+    """
+    from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+    return multiplied_component(count, organyl, enclose_if_compound(organyl))
+
+
 def parse_ester_fragments(mol, ester_match: tuple) -> Tuple[List[int], List[int]]:
     """
     Split ester into acid and alkyl fragments.
@@ -2478,10 +2498,8 @@ def _name_ring_principal_independent_esters(
     ring_locant = best_order[start_atom]  # always 1 by construction
     final_acylate = _insert_ring_ester_locant(acylate_name, ring_locant)
 
-    if prefix_str[-1].isalpha() and final_acylate[:1].isdigit():
-        ring_part = f"{prefix_str}-{final_acylate}"
-    else:
-        ring_part = f"{prefix_str}{final_acylate}"
+    from ..assembly.composition_primitives import _join_prefix_to_name
+    ring_part = _join_prefix_to_name(prefix_str, final_acylate)
 
     return f"{alkyl_name} {ring_part}"
 
@@ -2594,8 +2612,8 @@ def name_independent_esters(mol, ester_matches: list) -> Optional[str]:
         if count == 1:
             prefix_parts.append(f"({prefix})")
         else:
-            multiplier = get_multiplier_prefix(count, prefix)
-            prefix_parts.append(f"{multiplier}({prefix})")
+            from ..assembly.naming_utils import multiplied_component as _mc
+            prefix_parts.append(_mc(count, prefix, f"({prefix})"))
 
     prefix_str = "-".join(prefix_parts)
 
@@ -2856,7 +2874,7 @@ def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
         return None
 
     if alkyl_names[0] == alkyl_names[1]:
-        return f"di{alkyl_names[0]} {ate}"
+        return f"{_multiplied_organyl(2, alkyl_names[0])} {ate}"
     # (the Blue Book): "different organyl groups are cited in
     # alphanumerical order (see " -- 'butyl 2-ethylhexyl', never the plain
     # string order that put the locant first ('2-ethylhexyl butyl').
@@ -3288,7 +3306,7 @@ def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
     # Assemble the name
     if alkyl_names[0] == alkyl_names[1]:
         # Same alkyl groups: use multiplier
-        return f"di{alkyl_names[0]} {dioate_name}"
+        return f"{_multiplied_organyl(2, alkyl_names[0])} {dioate_name}"
     else:
         # Different alkyl groups: alphanumerical order "different
         # organyl groups are cited in alphanumerical order (see ",
@@ -3466,7 +3484,7 @@ def name_polyacid_polyester(mol) -> Optional[str]:
         ate = _acid_name_to_ate(acid_name)
         if ate is None:
             return None
-        name = f"{mult}{alkyl} {ate}"
+        name = f"{_multiplied_organyl(len(matches), alkyl)} {ate}"
         # The acid component is named by a gate-free intermediate namer, whose raw
         # composer output can describe another molecule ('2-(1-aminoethyl)butane-
         # dioic acid' for the 1-aminoethylidene acid). Ship the polyester name only

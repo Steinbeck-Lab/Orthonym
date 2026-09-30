@@ -10,6 +10,49 @@ engine's suffix-form name when it OPSIN-round-trips to the input (0-wrong).
 import pytest
 from rdkit import Chem
 from orthonym import Orthonym
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "O=C(O)C12CC3CC(CC(C3)C1)C2",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -30,5 +73,5 @@ def test_spiro_principal_group_is_suffix_not_prefix(opsin_gate, smiles, expected
     ("OC(=O)C1CC2CCC1C2",              "bicyclo[2.2.1]heptane-2-carboxylic acid"),
 ])
 def test_scope_unchanged(opsin_gate, smiles, expected):
-    out = Orthonym(style="pin").name(Chem.CanonSmiles(smiles))
+    out = _dt_name(Chem.CanonSmiles(smiles))
     assert out == expected, f"scope regression: expected {expected!r}, got {out!r}"

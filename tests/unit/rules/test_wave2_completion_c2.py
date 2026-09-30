@@ -30,17 +30,25 @@ def _validity_gate_on(monkeypatch):
 
 @pytest.mark.unit
 class TestSilaneLigands:
+    # (the Blue Book, "For mononuclear parent hydrides with two
+    # or more substituents the first cited substituent never has enclosing marks
+    # unless it includes a locant. The second and further substituents are each
+    # enclosed with parentheses even for simple substituents. When the simple
+    # substituent groups are accompanied by multiplicative prefixes such as 'di'
+    # and 'tri', the multiplicative prefixes are not included in the parentheses."):
+    # 'trichloro(iodomethyl)silane (PIN)':25870, '[2-(1,3-dioxolan-2-yl)ethyl]
+    # tri(methyl)silane (PIN)':35326, 'tert-butyldi(methyl)phosphane (PIN)':16286.
     @pytest.mark.parametrize("smiles,expected", [
         ("CC(C)(C)[Si](C)(C)OCC1CO1",
-         "(tert-butyl)di(methyl)(oxiranylmethoxy)silane"),
-        ("[Si](C)(C)(C)OCC1CO1", "tri(methyl)(oxiranylmethoxy)silane"),
-        ("CO[Si](C)(C)C", "methoxytrimethylsilane"),
+         "tert-butyldi(methyl)(oxiranylmethoxy)silane"),
+        ("[Si](C)(C)(C)OCC1CO1", "trimethyl(oxiranylmethoxy)silane"),
+        ("CO[Si](C)(C)C", "methoxytri(methyl)silane"),
     ])
     def test_heals(self, smiles, expected):
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("CC[Si](C)(C)C", "ethyltrimethylsilane"),
+        ("CC[Si](C)(C)C", "ethyltri(methyl)silane"),   #:7272
         ("C[Si](C)(C)C", "tetramethylsilane"),
         ("C[Si](C)(C)O", "trimethylsilanol"),   # G2 suffix diversion
         ("CC[Sn](CC)(CC)CC", "tetraethylstannane"),

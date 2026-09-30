@@ -28,6 +28,61 @@ from rdkit import Chem
 from rdkit.Chem import inchi
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 @pytest.fixture(scope="module")
@@ -46,7 +101,7 @@ def _rt(smiles: str, name: str) -> bool:
 @pytest.mark.opsin_gate
 def test_ring_locant_present(namer):
     smi = "COC(=O)C1CCCCC1C"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "methyl 2-methylcyclohexane-1-carboxylate", name
     assert _rt(smi, name), name
 
@@ -56,7 +111,7 @@ def test_lowest_locant_and_deterministic(namer):
     want = "methyl 2-methylcyclopentane-1-carboxylate"
     smi = "COC(=O)C1CCCC1C"
     for s in {smi, Chem.MolToSmiles(Chem.MolFromSmiles(smi))}:
-        n = namer.name(s)
+        n = _dt_obj_name(namer, s)
         assert n == want, (s, n)
         assert _rt(s, n), n
 
@@ -77,7 +132,7 @@ def test_order_invariance_extended(namer, smi):
     # doRandom=True), beyond the two the brief mandates -- the determinism
     # lock should hold for ALL of them, not just the canonical form.
     want = "methyl 2-methylcyclopentane-1-carboxylate"
-    n = namer.name(smi)
+    n = _dt_obj_name(namer, smi)
     assert n == want, (smi, n)
     assert _rt(smi, n), (smi, n)
 
@@ -85,7 +140,7 @@ def test_order_invariance_extended(namer, smi):
 @pytest.mark.opsin_gate
 def test_regression_aromatic_retained_stem_unchanged(namer):
     smi = "COC(=O)c1ccc(C)cc1"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "methyl 4-methylbenzoate", name
     assert _rt(smi, name), name
 
@@ -95,7 +150,7 @@ def test_regression_unsubstituted_ring_acid_no_locant(namer):
     # No ring substituent -> the licensed omission still applies;
     # this must NOT gain a '-1-' it doesn't need.
     smi = "COC(=O)C1CCCCC1"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "methyl cyclohexanecarboxylate", name
     assert _rt(smi, name), name
 
@@ -103,7 +158,7 @@ def test_regression_unsubstituted_ring_acid_no_locant(namer):
 @pytest.mark.opsin_gate
 def test_regression_wave2_acyloxymethyl_ring_unchanged(namer):
     smi = "COC(=O)C1CCCCC1COC(C)=O"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "methyl 2-[(acetyloxy)methyl]cyclohexane-1-carboxylate", name
     assert _rt(smi, name), name
 
@@ -111,7 +166,7 @@ def test_regression_wave2_acyloxymethyl_ring_unchanged(namer):
 @pytest.mark.opsin_gate
 def test_regression_acyloxy_on_ring_unchanged(namer):
     smi = "COC(=O)c1ccc(OC(C)=O)cc1"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "methyl 4-(acetyloxy)benzoate", name
     assert _rt(smi, name), name
 
@@ -119,7 +174,7 @@ def test_regression_acyloxy_on_ring_unchanged(namer):
 @pytest.mark.opsin_gate
 def test_regression_diacylglycerol_unchanged(namer):
     smi = "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == (
         "(2S)-1-hydroxy-3-[(9Z)-pentadec-9-enoyloxy]propan-2-yl "
         "(9Z)-octadec-9-enoate"

@@ -408,11 +408,12 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
     # Decision A part 2 (2026-09-27): was '2-({4-[...]piperidin-1-yl})-...', one mark
     # level too many. (the Blue Book) nests {}; the braced prefix
     # is already fully enclosed, so format_substituent_prefix no longer wraps it again.
-    # OPSIN 2.9.0 full-InChIKey exact. (The prefix order -- 'methyl' cited before
-    # 'N-(3-fluorophenyl)' -- is a separate, pre-existing matter.)
+    # OPSIN 2.9.0 full-InChIKey exact. a performance pass: the N-prefix is cited in the one
+    # alphanumerical series, the Blue Book;,:3477), so
+    # 'N-(3-fluorophenyl)' before '2-methyl'.
     assert row["name"] == (
         "2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}"
-        "-2-methyl-N-(3-fluorophenyl)propanamide"), row
+        "-N-(3-fluorophenyl)-2-methylpropanamide"), row
 
 
 # ============================================================================

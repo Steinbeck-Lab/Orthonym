@@ -12,11 +12,38 @@ larger name around such a component ('xanthosine 5'-(...)') still may, and the s
 name is labelled non-PIN.
 """
 import pytest
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1",
+    "O=c1[nH]c(=O)c2ncn([C@@H]3O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]3O)c2[nH]1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1",
+})
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 pytestmark = pytest.mark.unit
 
 
 def _tiered(smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     from orthonym import Orthonym
     return Orthonym(style="pin").name_tiered(smiles)
 

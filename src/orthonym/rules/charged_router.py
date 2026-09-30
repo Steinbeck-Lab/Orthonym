@@ -568,6 +568,58 @@ def _atom_coverage_ok_for_polyacid_zwitterion(mol, cation_idx: int,
     return not any(idx in cation_side for idx in anion_idxs)
 
 
+def _is_primary_protonated_amine(atom) -> bool:
+    """True for a PRIMARY protonated amine ``-NH3+``: N, charge +1, three H and
+    exactly one heavy neighbour (the scope of the azaniumyl builder
+    ``_name_primary_amine_azaniumyl_zwitterion``, which names it from the
+    neutral amine name)."""
+    if (atom.GetSymbol() != 'N' or atom.GetFormalCharge() != 1
+            or atom.GetTotalNumHs() != 3):
+        return False
+    return sum(1 for nb in atom.GetNeighbors() if nb.GetSymbol() != 'H') == 1
+
+
+def _dicarboxylate_parent_chain(mol, anion_idxs):
+    """The acyclic parent chain of a DI-carboxylate anion: the atoms of the
+    shortest path between the two carboxyl carbons (both ends included), or
+    None when the anions are not exactly two carboxylates on two distinct
+    acyclic carbons joined by an acyclic path.
+
+    For an acyclic dicarboxylic acid the principal chain is this path
+    : the chain carries both suffix groups; ``-dioic acid``
+    counts the two carboxyl carbons as chain atoms), so an atom off this path
+    is an atom of a SUBSTITUENT of the parent chain, not a parent atom.
+    """
+    from rdkit.Chem import rdmolops
+    carbons = []
+    for idx in anion_idxs:
+        heavy = [n for n in mol.GetAtomWithIdx(idx).GetNeighbors()
+                 if n.GetSymbol() != 'H']
+        if len(heavy) != 1 or heavy[0].GetSymbol() != 'C':
+            return None
+        carbons.append(heavy[0].GetIdx())
+    if len(set(carbons)) != 2:
+        return None
+    path = rdmolops.GetShortestPath(mol, carbons[0], carbons[1])
+    if not path or any(mol.GetAtomWithIdx(a).IsInRing() for a in path):
+        return None
+    return frozenset(path)
+
+
+def _severed_side(mol, keep_idx: int, cut_idx: int):
+    """Atom indices on the ``cut_idx`` side of the bond ``keep_idx``-``cut_idx``
+    (the fragment holding ``cut_idx`` once that bond is removed), or None when
+    the bond is absent or the cut leaves the graph connected (ring bond)."""
+    rw = Chem.RWMol(mol)
+    if rw.GetBondBetweenAtoms(keep_idx, cut_idx) is None:
+        return None
+    rw.RemoveBond(keep_idx, cut_idx)
+    for fr in Chem.GetMolFrags(rw.GetMol(), asMols=False, sanitizeFrags=False):
+        if cut_idx in fr:
+            return None if keep_idx in fr else frozenset(fr)
+    return None
+
+
 def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> str:
     """ generalized to a MULTI-carboxylate anion parent (a phase).
 
@@ -622,19 +674,90 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
     if len(path) < 2:
         return ''
     parent_attach_idx = path[1]  # the cation neighbour leading into the parent
-
     anion_atom_idxs = [a['atom_idx'] for a in anions]
+
+    # The composition below, ``{locant}-{prefix}{parent anion name}``, is right
+    # only when the prefix substitutes the PARENT CHAIN and the parent carries
+    # no other prefix. For an acyclic dicarboxylate both are structural facts:
+    # the parent chain is the path between the two carboxyl carbons
+    # (``_dicarboxylate_parent_chain``). When the cation's neighbour is OFF that
+    # chain, the cation rides on a substituent ARM ([NH3+]CH2- on C2 of
+    # butanedioate): severing only the cation would leave the arm's carbons in
+    # the parent ('methylbutanedioic acid') and the composition would read
+    # '3-azaniumylmethylbutanedioate' -- a compound prefix without its
+    # enclosing marks and with the locant of the wrong atom. The arm is then
+    # severed as a whole at the chain atom and named as one compound prefix
+    # /: '[(trimethylazaniumyl)methyl]'). A PRIMARY -NH3+ on
+    # an arm is left to the builder below
+    # (``_name_primary_amine_azaniumyl_zwitterion``), which names it from the
+    # neutral amine name ('2-(aminomethyl)butanedioic acid' ->
+    # '2-(azaniumylmethyl)butanedioate', the 'azaniumylmethyl' spelling).
+    # The arm is named by the substituent namer. A carbon-substituted N+ is
+    # labelled below the PIN there (``record_amine_cation_prefix``: its PIN form
+    # is the '-aminiumyl' one,:42296/:42299), which also covers the
+    # amidinium arm, whose onium composer writes the compound N-substituent
+    # without marks ('diaminomethylideneazaniumyl';:7283
+    # "(chloromethyl)(methyl)silane (PIN)"), recorded in TRIAGE.
+    chain = _dicarboxylate_parent_chain(mol, anion_atom_idxs)
+    sever_from, sever_at = cation_idx, parent_attach_idx
+    cat_prefix = ''
+    if chain is not None and parent_attach_idx not in chain:
+        if _is_primary_protonated_amine(cation_atom):
+            return ''
+        on_chain = [k for k, a in enumerate(path) if a in chain]
+        if not on_chain or on_chain[0] < 2:
+            return ''
+        sever_at = path[on_chain[0]]          # the chain atom carrying the arm
+        sever_from = path[on_chain[0] - 1]    # the arm's root atom
+        arm = _severed_side(mol, sever_at, sever_from)
+        if arm is None or cation_idx not in arm:
+            return ''
+        from ..assembly.substituent_enumerator import name_substituent
+        try:
+            arm_token = name_substituent(mol, arm, sever_from)
+        except Exception:  # noqa: BLE001 - a producer bug must degrade, not crash
+            return ''
+        if not isinstance(arm_token, str) or not arm_token or arm_token == 'substituent':
+            return ''
+        cat_prefix = arm_token
     if not _atom_coverage_ok_for_polyacid_zwitterion(
-            mol, cation_idx, parent_attach_idx, anion_atom_idxs):
+            mol, sever_from, sever_at, anion_atom_idxs):
         return ''  # Finding A: an anion is stranded on the cation side of the
                    # severed bond -> would be silently dropped -- fail closed
+    if chain is not None:
+        # The parent must be the BARE chain: every heavy atom of the component
+        # that stays on the parent side is a chain atom or an oxygen of one of
+        # the two carboxyl carbons. Otherwise the parent name carries a prefix
+        # of its own and the cation prefix cannot simply be put in front of it
+        # alphanumerical order, locants).
+        cation_side = _severed_side(mol, sever_at, sever_from)
+        if cation_side is None:
+            return ''
+        ends = {nb.GetIdx() for idx in anion_atom_idxs
+                for nb in mol.GetAtomWithIdx(idx).GetNeighbors()
+                if nb.GetSymbol() == 'C'}
+        component = next(fr for fr in Chem.GetMolFrags(mol, asMols=False,
+                                                        sanitizeFrags=False)
+                         if sever_at in fr)
+        for i in component:
+            atom = mol.GetAtomWithIdx(i)
+            if i in cation_side or i in chain or atom.GetAtomicNum() == 1:
+                continue
+            if atom.GetSymbol() == 'O' and any(
+                    nb.GetIdx() in ends for nb in atom.GetNeighbors()):
+                continue
+            return ''
+        locant_atom = sever_at
+    else:
+        locant_atom = parent_attach_idx
 
-    from ..assembly.substituent_naming import cation_to_prefix
-    cat_prefix = cation_to_prefix(mol, cation_idx, parent_attach_idx)
+    if not cat_prefix:
+        from ..assembly.substituent_naming import cation_to_prefix
+        cat_prefix = cation_to_prefix(mol, cation_idx, parent_attach_idx)
     if not cat_prefix:
         return ''  # ylide / non-N onium / unnameable -> honest-fail
 
-    parent_smi = _sever_cation_build_anion_parent(mol, cation_idx, parent_attach_idx)
+    parent_smi = _sever_cation_build_anion_parent(mol, sever_from, sever_at)
     if not parent_smi:
         return ''
     try:
@@ -654,7 +777,7 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
     # break the tie -- lowest locants picks the smaller end).
     locant_prefix = ''
     attach_locant = _attachment_locant_on_polyacid_parent(
-        mol, anion_atom_idxs, parent_attach_idx)
+        mol, anion_atom_idxs, locant_atom)
     if attach_locant is not None and attach_locant >= 2:
         if _parent_has_chain_locants(parent_anion_name):
             locant_prefix = f'{attach_locant}-'
@@ -754,7 +877,7 @@ def _full_inchikey_rt_ok(mol, name: str) -> bool:
     from ..validation.radical_identity import radical_identity_verdict
     in_smi = Chem.MolToSmiles(mol)
     return (radical_identity_verdict(in_smi, smi) != "mismatch"
-            and protonation_site_verdict(in_smi, smi) != "mismatch")
+            and protonation_site_verdict(in_smi, smi, name) != "mismatch")
 
 
 def _iminide_omit_locants(name: str, mol) -> str:
@@ -853,8 +976,13 @@ def _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style) -> str
       * EVERY nitrogen in the molecule is one of those cations (so the neutral
         name has exactly one grouped ``amino`` prefix and no stray N token);
       * every anion is a carboxylate (the ``name_carboxylate_anion`` transform);
-      * the cation/anion counts avoid the ``_name_polyacid_zwitterion`` region it
-        already owns: EITHER exactly 1 cation + exactly 1 anion, OR >= 2 cations.
+      * any cation/anion counts. ``_route_zwitterion`` tries
+        ``_name_polyacid_zwitterion`` first, so the 1-cation/>=2-anion region
+        reaches this builder only when that sever path declined -- e.g. the
+        -NH3+ rides on a substituent ARM of the dicarboxylate chain
+        ([NH3+]CH2- on butanedioate), which the sever path hands over because
+        this builder spells the arm from the neutral amine name
+        ('2-(aminomethyl)butanedioic acid' -> '2-(azaniumylmethyl)butanedioate').
 
     All four RT-verified targets are carboxylate; a sulfinate/sulfonate amino
     acid is out of scope here (declines -> abstain) and is left for a later
@@ -862,18 +990,10 @@ def _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style) -> str
     """
     if not cations or not anions:
         return ''
-    # Partition: the 1-cation/>=2-anion region is _name_polyacid_zwitterion's.
-    if not ((len(cations) == 1 and len(anions) == 1) or len(cations) >= 2):
-        return ''
     # Every cation a primary protonated ammonium -NH3+.
-    for c in cations:
-        a = mol.GetAtomWithIdx(c['atom_idx'])
-        if (a.GetSymbol() != 'N' or a.GetFormalCharge() != 1
-                or a.GetTotalNumHs() != 3):
-            return ''
-        heavy = [nb for nb in a.GetNeighbors() if nb.GetSymbol() != 'H']
-        if len(heavy) != 1:
-            return ''
+    if not all(_is_primary_protonated_amine(mol.GetAtomWithIdx(c['atom_idx']))
+               for c in cations):
+        return ''
     # No OTHER nitrogen -> the neutral name's only detachable N prefix is the
     # grouped ``amino`` cluster (guards the re-expression against a stray amino).
     n_nitrogen = sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'N')
@@ -1349,6 +1469,16 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
         return ''
     if not parent_smi:
         return ''
+    # The suffix decides chain choice and numbering, and a cation
+    # outranks every neutral class, the Blue Book), so the parent's
+    # own characteristic groups are prefixes: '2,4-dioxopentane-3-diazonium
+    # (PIN)'. Appending 'diazonium' to the NEUTRAL parent's name cannot do that
+    # ('pentane-2,4-dionediazonium'; 'prop-1-ene' numbered away from the
+    # suffix). Name it with the group as the forced suffix first, kept only when
+    # its full key round-trips; the append path below stays for the rest.
+    forced = _name_diazonium_as_forced_suffix(mol, proximal_n, terminal_n, style)
+    if forced and _full_inchikey_rt_ok(mol, forced):
+        return forced
     try:
         neutral = _reenter(parent_smi, style)
     except (RecursionError, ValueError, RuntimeError):
@@ -1356,6 +1486,66 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
     if not neutral or _is_malformed_parent(neutral):
         return ''
     return apply_ion_suffix_to_name(neutral, 1, cation_class='diazonium') or ''
+
+
+# A monovalent -XH suffix group standing in for -N2+ while the neutral parent is
+# named: the element must be absent from the molecule, so its suffix is the only
+# one of its kind in the name. All three suffixes start with a consonant, as
+# 'diazonium' does, so the parent keeps its final 'e' in both and
+# 'benzene-1,4-bis(diazonium)'): the stem transfers unchanged.
+_DIAZONIUM_STAND_INS = (('S', 16, 'thiol'), ('Se', 34, 'selenol'),
+                        ('Te', 52, 'tellurol'))
+_STAND_IN_SUFFIX_RE = {
+    sfx: _re.compile(r'^(?P<stem>.+?)(?P<loc>-\d+-)?' + sfx + r'$')
+    for _el, _z, sfx in _DIAZONIUM_STAND_INS
+}
+
+
+def _name_diazonium_as_forced_suffix(mol, proximal_n: int, terminal_n: int,
+                                     style: str) -> str:
+    """ (the Blue Book-41615): "Cations containing an -N2+ group
+    attached to a parent hydride are... named... by using the suffix
+    'diazonium'", and a cation outranks every neutral characteristic group
+    , so the parent's own groups become prefixes: '2,4-dioxopentane-3-
+    diazonium (PIN)' (:41615).
+
+    The -N2+ is replaced by a one-atom -XH suffix group (a chalcogen the molecule
+    does not contain), the neutral is named with that group FORCED as the
+    principal characteristic group -- the same forced re-entry the anion path
+    uses (``_reenter_forced``) -- and its suffix is exchanged for 'diazonium'.
+    Chain choice and numbering therefore follow the suffix, as they must. A
+    re-entry that does not end in the stand-in suffix (the override was not
+    honoured) declines; whatever ships still faces the full-key round trip."""
+    present = {a.GetAtomicNum() for a in mol.GetAtoms()}
+    stand_in = next(((z, sfx) for _el, z, sfx in _DIAZONIUM_STAND_INS
+                     if z not in present), None)
+    if stand_in is None:
+        return ''
+    z, sfx = stand_in
+    rw = Chem.RWMol(mol)
+    px = rw.GetAtomWithIdx(proximal_n)
+    px.SetAtomicNum(z)
+    px.SetFormalCharge(0)
+    px.SetNoImplicit(True)
+    px.SetNumExplicitHs(1)
+    px.SetNumRadicalElectrons(0)
+    rw.RemoveAtom(terminal_n)
+    try:
+        neutral_mol = rw.GetMol()
+        Chem.SanitizeMol(neutral_mol)
+        neutral_smi = Chem.MolToSmiles(neutral_mol)
+    except Exception:
+        return ''
+    try:
+        forced = _reenter_forced(neutral_smi, style, sfx)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not forced or _is_malformed_parent(forced):
+        return ''
+    m = _STAND_IN_SUFFIX_RE[sfx].match(forced)
+    if m is None or sfx in m.group('stem'):
+        return ''
+    return m.group('stem') + (m.group('loc') or '') + 'diazonium'
 
 
 def _bare_parent_ion_unit(mol, ion_idx: int, kind: str):
@@ -1914,7 +2104,7 @@ def _cation_name_rt_ok(name: str, mol) -> bool:
         # is mobile): '2-(dimethylamino)ethan-1-aminium' parses to the primary
         # aminium for the protonated tertiary amine C[NH+](C)CCN.
         from ..validation.protonation_identity import protonation_site_verdict
-        return protonation_site_verdict(Chem.MolToSmiles(mol), parsed) != "mismatch"
+        return protonation_site_verdict(Chem.MolToSmiles(mol), parsed, name) != "mismatch"
     except Exception:
         return False
 

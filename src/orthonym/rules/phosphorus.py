@@ -992,39 +992,26 @@ def _assemble_p_owner_text(owner_tokens: List[str]) -> str:
     from collections import Counter
 
     from ..assembly.naming_utils import (
-        COMPLEX_MULTIPLIERS,
-        SIMPLE_MULTIPLIERS,
         alpha_sort_key,
-        is_complex_substituent,
+        enclose_if_compound,
+        multiplied_component,
     )
     counts = Counter(owner_tokens)
     parts = []
     for token in sorted(counts, key=alpha_sort_key):
         k = counts[token]
-        # A compound owner takes bis/tris with marks. The char scan catches
-        # locanted/parenthesised owners; is_complex_substituent additionally
-        # catches a char-free compound prefix such as 'dodecylsulfanyl' (#16
-        # tris(dodecylsulfanyl) phosphite), which 'tridodecylsulfanyl' would
-        # otherwise render ambiguously.
-        # carve-out (shared primitive): an italicized-led simple owner
-        # ('tert-butyl') is cited bare with a hyphenated simple multiplier,
-        # 'tri-tert-butyl phosphite', as in '1,2-di-*tert*-butylbenzene (PIN)'
-        # (the Blue Book); the raw hyphen test made it
-        # 'tris(tert-butyl) phosphite' (j7, TRIAGE g7 C20).
-        from ..assembly.naming_utils import (
-            italicized_prefix_is_bare,
-            multiplier_needs_hyphen,
-        )
-        is_complex = (not italicized_prefix_is_bare(token)
-                      and (any(ch in token for ch in "()[]-, 0123456789")
-                           or is_complex_substituent(token)))
         if k == 1:
-            parts.append(f"({token})" if False else token)
-        elif is_complex:
-            parts.append(f"{COMPLEX_MULTIPLIERS[k]}({token})")
+            parts.append(token)
         else:
-            _sep = "-" if multiplier_needs_hyphen(token) else ""
-            parts.append(f"{SIMPLE_MULTIPLIERS[k]}{_sep}{token}")
+            # The multiplier is the one (the shared primitive): 'bis' for a
+            # substituted owner ('bis(2-chloroethyl)', 'tris(dodecylsulfanyl)'),
+            # the basic one with marks for a simple owner with locants, (a)
+            # (the Blue Book, 'di(propan-2-yl) disulfite (PIN)':36921), or
+            # beginning with a multiplying syllable, (c)/(d) (:7104,
+            # 'di(dodecyl)'), and 'tri-tert-butyl' (d),:6958). A
+            # character test (any hyphen or digit -> 'bis') wrote
+            # 'bis(propan-2-yl) hydrogen phosphate'.
+            parts.append(multiplied_component(k, token, enclose_if_compound(token)))
     return " ".join(parts)
 
 
@@ -1890,8 +1877,8 @@ def name_phosphoxane_oxy_substituent(
         if not locants:
             return None
         locs = ','.join(str(x) for x in sorted(locants))
-        mult = get_multiplier_prefix(len(locants), word)
-        return f"{locs}-{mult}{word}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        return f"{locs}-{_mc(len(locants), word, word)}"
 
     # detachable prefixes in alphanumerical order: esters ({R}oxy) and
     # hydroxy interleave by name; oxo comes after hydroxy ('h' < 'o').

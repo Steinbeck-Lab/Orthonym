@@ -48,6 +48,49 @@ from orthonym import Orthonym
 from orthonym.assembly import fragment_naming as fn
 from orthonym.assembly import memo
 from tests.support.rt_assert import assert_full_rt, name_best_effort
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "NCc1csc(-c2cccs2)n1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -126,13 +169,16 @@ def test_the_pin_tier_still_promotes_the_caller_s_molecule(monkeypatch):
     name and nowhere else."""
     smiles = "NCc1csc(-c2cccs2)n1"
     depths = _spy_promotion(monkeypatch, smiles)
-    row = Orthonym().name_tiered(smiles)
+    row = _dt_row(smiles)
     assert row["name"] == "[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine"
     # branch review fixes: a re-run name is labelled below the PIN (a breadth
     # producer built it), never pin_verified
     assert row["tier"] == "pin_unverified" and not row["is_pin"]
     assert_full_rt(row["name"], smiles)
-    assert depths == [(1, True)]
+    # every default-tier naming of the caller's molecule (the declined call and the
+    # strict path's, tests/support/default_tier.py) re-runs in the outermost name
+    # only
+    assert depths and set(depths) == {(1, True)}, depths
 
 
 # ChEBI rows whose best-effort naming made the helper re-runs (trace at 6a78ea183,

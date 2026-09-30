@@ -4040,6 +4040,35 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
                 return None  # unnameable N-branch -> decline (fail-closed)
             return {'suffix_name': 'carboxamide', 'n_substituents': n_subs}
 
+    # (the Blue Book): an amidine -C(=NH)-NH2 on a ring is the
+    # '-carboximidamide' suffix ('cyclohexanecarboximidamide (PIN)',:34206), its
+    # amino nitrogen locant N and the imino nitrogen N' (:34175). Ranked below the
+    # amides and above the nitrile. Substituents on the amino nitrogen are
+    # N-prefixes ('6-chloro-N-methylpyridine-3-carboximidamide'), as for a ring
+    # carboxamide; a substituted imino nitrogen (N') is not expressed by this
+    # path and declines to the general path, as does a guanidine carbon.
+    amidine_pat = _compiled_smarts('[CX3](=[NX2;H1;+0])[NX3;+0]')
+    if amidine_pat:
+        for match in mol.GetSubstructMatches(amidine_pat):
+            if match[0] != start_idx:
+                continue
+            if any(nb.GetSymbol() == 'N' and nb.GetIdx() not in match[1:]
+                   for nb in start_atom.GetNeighbors()):
+                return None                  # a guanidine carbon
+            from .benzene import _detect_amidine_n_substituents
+            entries = _detect_amidine_n_substituents(mol, start_idx, set(ring_set))
+            if entries is None or any(loc != 'N' for loc, _nm in entries):
+                return None                  # unnameable or N' -> decline
+            _amino = mol.GetAtomWithIdx(match[2])
+            _expected = sum(1 for nb in _amino.GetNeighbors()
+                            if nb.GetAtomicNum() > 1 and nb.GetIdx() != start_idx)
+            if len(entries) != _expected:
+                return None                  # a branch it cannot name -> decline
+            if not entries:
+                return {'suffix_name': 'carboximidamide'}
+            return {'suffix_name': 'carboximidamide',
+                    'n_substituents': sorted(nm for _loc, nm in entries)}
+
     # Check for nitrile: C#N
     nitrile_pat = _compiled_smarts('[CX2]#[NX1]')
     if nitrile_pat:
@@ -4660,6 +4689,44 @@ def name_substituted_heterocycle(
             c_groups.setdefault(_n_name, []).extend(_n_locants)
             del n_groups[_n_name]
 
+    # (b) (the Blue Book) / (a) (:7104): identical prefixes
+    # are ONE multiplied group whatever atom carries them -- '*N*,4-dimethyl-*N*-(3-
+    # methylphenyl)benzamide (PIN)' (:32879), '*N*,*N*,2-trimethyl-...propanamide
+    # (PIN)' (:21624), '*N*1,*N*3-dimethylpropanediamide (PIN)' (:2889), locants in
+    # the order (:3195, italic letters before numerals). The N-substituents
+    # of the ring suffix (amine / carboxamide nitrogen, the N-hydroxy of a
+    # hydroxamic acid) and the italic-N ring substituents were cited as separate
+    # 'N-...' prefixes next to the same ring prefix ('N-methyl-...-1-methyl-1H-
+    # pyrrole-5-carboxamide', 'N2-cyclopropyl-N4-cyclopropylpyrimidine-2,4-
+    # diamine'). A name that also occurs as a ring prefix, or on several suffix
+    # nitrogens, now joins that group and is cited with the ring prefixes in the
+    # order; an N-substituent with no identical partner keeps its place.
+    _chosen_suffix_early = (_choose_ring_suffix(principal_group, suffix_fg)[0]
+                            if suffix_fg else None)
+    _suffix_n_entries = _suffix_nitrogen_prefix_entries(
+        _chosen_suffix_early, suffix_fg, suffix_n_substituents, amine_n_by_locant,
+        suffix_n_hydroxy)
+    _merged_n_names = _identical_prefix_names_to_merge(
+        _suffix_n_entries, c_groups, n_groups)
+    for _nm, _loc in _suffix_n_entries:
+        if _nm in _merged_n_names:
+            c_groups.setdefault(_nm, []).append(_loc)
+    from ..assembly.composition_primitives import identical_prefixes_grouped
+    for _nm in (list(n_groups) if identical_prefixes_grouped() else ()):
+        if _nm in _merged_n_names or _nm in c_groups:
+            c_groups.setdefault(_nm, []).extend(["N"] * len(n_groups[_nm]))
+            del n_groups[_nm]
+
+    # The suffix-nitrogen substituents that joined no group are cited in the SAME
+    # alphanumerical series as the ring prefixes, (the Blue Book,
+    # "Simple prefixes... are arranged alphabetically") and (:3477, "The
+    # name of a prefix for a substituent is considered to begin with the first
+    # letter of its complete name"): 'N,4-dicyclohexyl-N-methyl-...', not 'N-methyl-
+    # N,4-dicyclohexyl-...'. They used to be prepended to the finished name.
+    _suffix_n_tokens = _suffix_nitrogen_prefix_tokens(
+        [(_nm, _loc) for _nm, _loc in _suffix_n_entries
+         if _nm not in _merged_n_names])
+
     # Build prefix parts
     prefix_parts = []
 
@@ -4749,11 +4816,16 @@ def name_substituted_heterocycle(
             )
 
     # Format C-substituent prefixes
+    from ..assembly.composition_primitives import prefix_locant_order_key
     for name, locants in c_groups.items():
         count = len(locants)
+        # fusion locants ('4a') mix with ints here; prefix_locant_order_key
+        # places a numeral-plus-letter locant after its numeral
         prefix = _format_c_substituent(
-            name, sorted(locants), count, omit_locants=_l3_omit_prefix_locant)
+            name, sorted(locants, key=prefix_locant_order_key), count,
+            omit_locants=_l3_omit_prefix_locant)
         prefix_parts.append((prefix, name))
+    prefix_parts.extend(_suffix_n_tokens)
 
     # Sort in alphanumerical order by the base substituent name.
     # ⚠ Must be `prefix_citation_sort_key`, NOT raw `alpha_sort_key`: the latter
@@ -4798,30 +4870,10 @@ def name_substituted_heterocycle(
 
     # Add suffix-type functional groups
     if suffix_fg:
-        from .seniority import get_suffix as _get_ring_suffix
         # / ring-suffix fix: the PRINCIPAL group's ring suffix wins (it is, by
         # seniority, senior to any co-present carb* suffix). Otherwise fall back
-        # to the fixed carb* priority list.
-        pg_ring_suffix = _get_ring_suffix(principal_group, is_ring=True) if principal_group else None
-        _SUFFIX_PRIORITY = [
-            'carboxylic acid', 'carboxamide', 'carbohydrazide',
-            'carbonitrile', 'carbaldehyde',
-            'carbothioamide', 'carboselenoamide', 'carbotelluroamide',
-        ]
-        chosen_suffix = None
-        chosen_locants = []
-        if pg_ring_suffix and pg_ring_suffix in suffix_fg:
-            chosen_suffix = pg_ring_suffix
-            chosen_locants = sorted(suffix_fg[pg_ring_suffix])
-        if not chosen_suffix:
-            for suf in _SUFFIX_PRIORITY:
-                if suf in suffix_fg:
-                    chosen_suffix = suf
-                    chosen_locants = sorted(suffix_fg[suf])
-                    break
-        if not chosen_suffix:
-            chosen_suffix = next(iter(suffix_fg))
-            chosen_locants = sorted(suffix_fg[chosen_suffix])
+        # to the fixed carb* priority list (``_choose_ring_suffix``).
+        chosen_suffix, chosen_locants = _choose_ring_suffix(principal_group, suffix_fg)
 
         count = len(chosen_locants)
         multiplier = get_suffix_multiplier_prefix(count, chosen_suffix) if count > 1 else ""
@@ -4884,17 +4936,22 @@ def name_substituted_heterocycle(
         # have locant-free parent names, so this is the conservative side of a
         # boundary the Blue Book does not settle.
         # * no retained-heteroatom locant prefix, injected above)
-        # * no N-substituent / N-hydroxy prefix -- those carry ESSENTIAL italic-N
-        # locants and are prepended AFTER this join, so they must be consulted
-        # here or the scope would be emptied of a locant it still needs.
+        # * no N-locanted substituent of a multiplied ring amine; the italic-N
+        # prefixes of a single suffix nitrogen do not locate the ring and leave
+        # the omission as it is: '*N*-methylbenzenecarboximidamide' (the Blue Book
+        #:34388), '*N*-hydroxycyclohexanecarboxamide' (:30150), as
+        # 'pyrazinecarboxylic acid (PIN)' (:2949) -> 'N-methylpyrazine
+        # carboximidamide' (a performance pass, RF3-7)
         # * no stereodescriptors
         _l3_omit_suffix_locant = False
-        if (not prefix_str and len(suffix_fg) == 1 and len(chosen_locants) == 1
+        # the suffix-nitrogen tokens are cited in the prefix series (a performance pass) but
+        # are not ring prefixes
+        _ring_prefix_count = len(prefix_parts) - len(_suffix_n_tokens)
+        if (_ring_prefix_count == 0 and len(suffix_fg) == 1 and len(chosen_locants) == 1
                 and not multiplier
                 and parent_name and parent_name.isalpha()
                 and not _het_loc_prefix
-                and not suffix_n_substituents and not amine_n_by_locant
-                and not suffix_n_hydroxy
+                and not (amine_n_by_locant and len(suffix_fg.get('amine', [])) > 1)
                 and not stereo_descriptors):
             from ..assembly.locant_omission import (
                 l3_locant_omitted_for_parent_atoms,
@@ -4916,6 +4973,24 @@ def name_substituted_heterocycle(
         # (N-methyl / N-phenyl / N,N-dimethyl) to the ring-amine suffix name.
         # Wave2: same mechanism serves the N-substituted
         # ring carboxamide (N,N-diethylfuran-2-carboxamide).
+        # Only the N-substituents with no identical partner are still prepended
+        # here; the others joined their group above (``_merged_n_names``).
+        amine_n_by_locant = {
+            _loc: [_s for _s in _subs if _s not in _merged_n_names]
+            for _loc, _subs in amine_n_by_locant.items()}
+        amine_n_by_locant = {_loc: _subs for _loc, _subs in amine_n_by_locant.items()
+                             if _subs}
+        suffix_n_substituents = {
+            _k: [_s for _s in _v if _s not in _merged_n_names]
+            for _k, _v in suffix_n_substituents.items()}
+        suffix_n_substituents = {_k: _v for _k, _v in suffix_n_substituents.items()
+                                 if _v}
+        if 'hydroxy' in _merged_n_names:
+            suffix_n_hydroxy = set()
+        if _suffix_n_tokens:
+            # already cited in the prefix series (``_suffix_n_tokens``)
+            amine_n_by_locant, suffix_n_substituents = {}, {}
+            suffix_n_hydroxy = set()
         if chosen_suffix == 'amine' and len(suffix_fg.get('amine', [])) > 1 \
                 and amine_n_by_locant:
             # companion: MULTI-amine ring -> each amine nitrogen's
@@ -4927,28 +5002,28 @@ def name_substituted_heterocycle(
             for _loc in sorted(amine_n_by_locant):
                 _subs = amine_n_by_locant[_loc]
                 if len(_subs) == 2 and _subs[0] == _subs[1]:
-                    _mp = get_multiplier_prefix(2, _subs[0])
+                    from ..assembly.naming_utils import multiplied_component as _mc
                     _parts.append(
-                        f"N{_loc},N{_loc}-{_mp}{enclose_if_compound(_subs[0])}")
+                        f"N{_loc},N{_loc}-{_mc(2, _subs[0], enclose_if_compound(_subs[0]))}")
                 else:
                     for _s in _subs:
                         _parts.append(f"N{_loc}-{enclose_if_compound(_s)}")
             _n_prefix = "-".join(_parts)
             if _n_prefix:
-                if combined and combined[0].isdigit():
+                if combined and (combined[0].isdigit()
+                                 or _starts_with_locant(combined)):
                     combined = f"{_n_prefix}-{combined}"
                 else:
                     combined = f"{_n_prefix}{combined}"
-        elif chosen_suffix in ('amine', 'carboxamide', 'carbothioamide',
-                               'carboselenoamide', 'carbotelluroamide') \
+        elif chosen_suffix in _N_SUBSTITUTED_RING_SUFFIXES \
                 and chosen_suffix in suffix_n_substituents:
             _n_subs = suffix_n_substituents[chosen_suffix]
             _n_prefix = ""
             if len(_n_subs) == 1:
                 _n_prefix = f"N-{enclose_if_compound(_n_subs[0])}"
             elif len(_n_subs) == 2 and _n_subs[0] == _n_subs[1]:
-                _mp = get_multiplier_prefix(2, _n_subs[0])
-                _n_prefix = f"N,N-{_mp}{enclose_if_compound(_n_subs[0])}"
+                from ..assembly.naming_utils import multiplied_component as _mc
+                _n_prefix = f"N,N-{_mc(2, _n_subs[0], enclose_if_compound(_n_subs[0]))}"
             else:
                 _n_prefix = "-".join(
                     f"N-{enclose_if_compound(_n)}" for _n in _n_subs
@@ -4957,7 +5032,8 @@ def name_substituted_heterocycle(
                 # A hyphen is needed when the existing name already begins with a
                 # ring-locant prefix (e.g. '4-fluoropyridin...'); otherwise the
                 # N-prefix attaches directly (N-methylpyridin-4-amine).
-                if combined and combined[0].isdigit():
+                if combined and (combined[0].isdigit()
+                                 or _starts_with_locant(combined)):
                     combined = f"{_n_prefix}-{combined}"
                 else:
                     combined = f"{_n_prefix}{combined}"
@@ -4965,7 +5041,8 @@ def name_substituted_heterocycle(
         # Hydroxamic acid suffix: prepend N-hydroxy to the assembled name
         #: N-hydroxy is an N-substituent on the amide parent).
         if chosen_suffix == 'carboxamide' and chosen_suffix in suffix_n_hydroxy:
-            combined = f"N-hydroxy{combined}"
+            combined = ("N-hydroxy-" if _starts_with_locant(combined)
+                        else "N-hydroxy") + combined
 
         # Remaining suffix FGs become prefixes (carboxy, formyl, etc.)
         _SUFFIX_TO_PREFIX = {
@@ -4974,6 +5051,7 @@ def name_substituted_heterocycle(
             'carboxamide': 'carbamoyl',
             'carbohydrazide': 'hydrazinecarbonyl',  # C1
             'carbonitrile': 'cyano',
+            'carboximidamide': 'carbamimidoyl',  #
             'carbothioamide': 'carbamothioyl',
             'carboselenoamide': 'carbamoselenoyl',
             'carbotelluroamide': 'carbamotelluroyl',
@@ -5017,6 +5095,116 @@ def _fully_enclosed(n: str) -> bool:
     return False
 
 
+def _starts_with_locant(text: str) -> bool:
+    """Does ``text`` open with a locant set (``4-``, ``N-``, ``N,1-``, ``N2,N4-``)?
+     (a) (the Blue Book): a hyphen separates locants from the
+    preceding word, so a prefix joined in front of it takes one -- an italic
+    element locant is a locant as much as a numeral (``naming_utils.
+    starts_with_locant``)."""
+    from ..assembly.naming_utils import starts_with_locant
+    return starts_with_locant(text)
+
+
+_RING_SUFFIX_PRIORITY = (
+    'carboxylic acid', 'carboxamide', 'carbohydrazide', 'carboximidamide',
+    'carbonitrile', 'carbaldehyde',
+    'carbothioamide', 'carboselenoamide', 'carbotelluroamide',
+)
+
+#: The ring suffixes whose nitrogen carries the ``N``-locanted substituents
+#: collected by the ring collector (``amine_n_substituents``).
+_N_SUBSTITUTED_RING_SUFFIXES = ('amine', 'carboxamide', 'carboximidamide',
+                                'carbothioamide',
+                                'carboselenoamide', 'carbotelluroamide')
+
+
+def _choose_ring_suffix(principal_group, suffix_fg):
+    """``(suffix, sorted locants)`` of the ring suffix this name cites: the
+    principal group's ring suffix when present (by seniority it is senior to any
+    co-present carb* suffix), else the fixed carb* priority, else the first."""
+    from .seniority import get_suffix as _get_ring_suffix
+    pg_ring_suffix = (_get_ring_suffix(principal_group, is_ring=True)
+                      if principal_group else None)
+    if pg_ring_suffix and pg_ring_suffix in suffix_fg:
+        return pg_ring_suffix, sorted(suffix_fg[pg_ring_suffix])
+    for suf in _RING_SUFFIX_PRIORITY:
+        if suf in suffix_fg:
+            return suf, sorted(suffix_fg[suf])
+    first = next(iter(suffix_fg))
+    return first, sorted(suffix_fg[first])
+
+
+def _suffix_nitrogen_prefix_entries(chosen_suffix, suffix_fg,
+                                    suffix_n_substituents, amine_n_by_locant,
+                                    suffix_n_hydroxy):
+    """``[(prefix name, locant),...]`` for the substituents on the nitrogen(s) of
+    the cited ring suffix, with the locant each is cited by: ``N`` for the one
+    nitrogen of a single amine / carboxamide suffix,,
+    ``N<ring locant>`` for each nitrogen of a multiplied ring amine,
+    the Blue Book), and the ``N``-hydroxy of a hydroxamic acid.
+    The same subs the suffix block below prepends, in its order."""
+    out = []
+    if not chosen_suffix:
+        return out
+    if (chosen_suffix == 'amine' and len(suffix_fg.get('amine', [])) > 1
+            and amine_n_by_locant):
+        for loc in sorted(amine_n_by_locant):
+            for sub in amine_n_by_locant[loc]:
+                out.append((sub, f"N{loc}"))
+    elif (chosen_suffix in _N_SUBSTITUTED_RING_SUFFIXES
+          and chosen_suffix in suffix_n_substituents):
+        for sub in suffix_n_substituents[chosen_suffix]:
+            out.append((sub, "N"))
+    if chosen_suffix == 'carboxamide' and chosen_suffix in suffix_n_hydroxy:
+        out.append(("hydroxy", "N"))
+    return out
+
+
+def _suffix_nitrogen_prefix_tokens(entries):
+    """``[(formatted prefix, prefix name),...]`` for suffix-nitrogen substituents
+    ``[(name, locant),...]`` (``_suffix_nitrogen_prefix_entries``): one token per
+    name, its italic locants in order ('N-methyl', 'N,N-dimethyl', 'N2-cyclopropyl',
+    'N-hydroxy'), the multiplier from the shared primitive and the marks of
+    a compound prefix."""
+    from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+    order, locs = [], {}
+    for name, loc in entries:
+        if name not in locs:
+            order.append(name)
+            locs[name] = []
+        locs[name].append(loc)
+    out = []
+    for name in order:
+        marked = enclose_if_compound(name)
+        n = len(locs[name])
+        text = marked if n == 1 else multiplied_component(n, name, marked)
+        out.append((f"{','.join(locs[name])}-{text}", name))
+    return out
+
+
+def _identical_prefix_names_to_merge(n_entries, c_groups, n_groups):
+    """The suffix-nitrogen prefix names that are cited ELSEWHERE in the name too --
+    as a ring prefix (``c_groups``), as an italic-N ring substituent
+    (``n_groups``), or on another suffix nitrogen -- and so join one multiplied
+    group (b), ``combine_identical_prefix_groups``). None inside
+    ``identical_prefixes_cited_apart``."""
+    from ..assembly.composition_primitives import identical_prefixes_grouped
+    if not identical_prefixes_grouped():
+        return set()
+    seen = {}
+    for name, loc in n_entries:
+        seen.setdefault(name, set()).add(loc)
+    names = set()
+    for name, locs in seen.items():
+        occurrences = sum(1 for nm, _ in n_entries if nm == name)
+        if name in c_groups or name in n_groups:
+            names.add(name)
+        elif len(locs) > 1 and occurrences > 1:
+            # the same prefix on two different suffix nitrogens ('N2', 'N4')
+            names.add(name)
+    return names
+
+
 def _format_n_substituent(name: str, count: int, locants=None) -> str:
     """
     Format an N-substituent prefix.
@@ -5056,7 +5244,9 @@ def _format_n_substituent(name: str, count: int, locants=None) -> str:
             # '[[...]]' when name already contained a '['. Fusion/spiro/von-
             # Baeyer brackets (e.g. '[2,3-b]') are excluded from the escalation
             # count by apply_enclosing_marks itself.
-            display = apply_enclosing_marks(name, -1)
+            # (a name already enclosed once keeps its one mark,:7232)
+            from ..assembly.naming_utils import _is_fully_enclosed
+            display = name if _is_fully_enclosed(name) else apply_enclosing_marks(name, -1)
         locant_str = ",".join(str(loc) for loc in sorted(locants))
         if count == 1:
             return f"{locant_str}-{display}"
@@ -5137,7 +5327,9 @@ def _format_c_substituent(name: str, locants: List[int], count: int,
         # from the escalation count by apply_enclosing_marks itself
         #, so a fusion-descriptor substituent still gets
         # plain parentheses.
-        display_name = apply_enclosing_marks(name, -1)
+        from ..assembly.naming_utils import _is_fully_enclosed
+        display_name = (name if _is_fully_enclosed(name)
+                        else apply_enclosing_marks(name, -1))
     if count == 1:
         return display_name if omit_locants else f"{locant_str}-{display_name}"
     # (a) (the Blue Book): 'bis'/'tris'/'tetrakis' indicate a multiplicity of

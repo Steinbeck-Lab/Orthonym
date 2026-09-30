@@ -411,11 +411,11 @@ def _name_azoxy(mol) -> Optional[str]:
         return None
     if ra != rb:
         return None                          # unsymmetric -> NNO/ONN machinery
-    from ..assembly.naming_utils import enclose_if_compound, multiplier_needs_hyphen
-    enclosed = enclose_if_compound(ra)
-    if enclosed == ra and multiplier_needs_hyphen(ra):
-        return f"di-{enclosed}diazene oxide"      # (b)/(d) di-tert-butyl...
-    return f"di{enclosed}diazene oxide"
+    from ..assembly.naming_utils import enclose_if_compound
+    from ..assembly.naming_utils import multiplied_component
+    # the shared primitive: 'di-tert-butyl' (b)/ (d)),
+    # 'di(propan-2-yl)', 'bis(...)'
+    return f"{multiplied_component(2, ra, enclose_if_compound(ra))}diazene oxide"
 
 
 def _formazan_terminal_n(mol, inner_n, central_c, bond_type):

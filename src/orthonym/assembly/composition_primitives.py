@@ -386,7 +386,16 @@ def _join_prefix_to_name(prefix_str: str, name: str) -> str:
     if not prefix_str or not name:
         return prefix_str + name
 
-    if (prefix_str[-1].isalpha() or prefix_str[-1] in (')', ']')) and name[0].isdigit():
+    # (a)/(b) (the Blue Book,:6944): a hyphen before a locant,
+    # after a letter or after any closing enclosing mark makes ')', ']'
+    # and '}' one device,:7446).
+    if (prefix_str[-1].isalpha() or prefix_str[-1] in (')', ']', '}')) and name[0].isdigit():
+        return f"{prefix_str}-{name}"
+
+    # (d) (the Blue Book): italic letters of the parent
+    # ('s-indacene') are separated from Roman letters by a hyphen.
+    from .naming_utils import begins_with_italic_designator
+    if prefix_str[-1].isalpha() and begins_with_italic_designator(name):
         return f"{prefix_str}-{name}"
 
     return f"{prefix_str}{name}"
@@ -679,7 +688,114 @@ def is_ring_parent_name(parent_text: str) -> bool:
     )
 
 
+# ---------------------------------------------------------------------------
+# / -- one multiplied group per identical prefix, whatever atom
+# kind (a ring or chain carbon, an amide or amine N, an ester O) carries it.
+# ---------------------------------------------------------------------------
+
+_LOCANT_HEAD_RE = re.compile(r"^(\d+)([a-z]*)(.*)$")
+
+
+def prefix_locant_order_key(locant) -> tuple:
+    """Order one locant within a multiplied prefix's locant set.
+
+     (the Blue Book): "Italic capital and lower-case letter locants
+    are lower than Greek letter locants, which, in turn, are lower than numerals";
+    :3193: "Primed locants are placed immediately after the corresponding unprimed
+    locants in a set arranged in ascending order; locants consisting of a number
+    and a lower-case letter... are placed immediately after the corresponding
+    numeric locant". So the italic element locants ``N``, ``N'``, ``N2``, ``O``,
+    ``S`` lead (in their own order: letter, then prime or superscript), then the
+    numerals by value, a letter-suffixed numeral (``3a``) and a primed one (``4'``)
+    right after their numeral. The Blue Book's mixed sets:
+    '*N*,*N*,2-trimethyl...propanamide (PIN)' (:21624), '*N*,1,4-triphenyl-1*H*-
+    1,2,4-triazol-4-ium-3-aminide (PIN)' (:42460).
+    """
+    if isinstance(locant, bool):
+        raise TypeError(f"bad locant {locant!r}")
+    if isinstance(locant, int):
+        return (1, locant, "", 0, "")
+    text = str(locant)
+    m = _LOCANT_HEAD_RE.match(text)
+    if m:
+        return (1, int(m.group(1)), m.group(2), m.group(3).count("'")
+                + m.group(3).count("\u2032"), m.group(3))
+    head = text.rstrip("0123456789'\u2032")
+    tail = text[len(head):]
+    digits = "".join(ch for ch in tail if ch.isdigit())
+    return (0, 0, head, int(digits) if digits else 0,
+            tail.count("'") + tail.count("\u2032"))
+
+
+def identical_prefixes_grouped() -> bool:
+    """False while:func:`identical_prefixes_cited_apart` is active: the producers
+    then cite each source's prefix groups on their own ('N,N-diphenyl-6-phenyl')
+    instead of one group per identical prefix ('N,N,6-triphenyl')."""
+    from .memo import prefixes_apart_var
+    return not prefixes_apart_var.get()
+
+
+class identical_prefixes_cited_apart:
+    """Context: name with identical prefixes of different atoms cited apart.
+
+     'Different isotopic modifications on otherwise identical
+    substituents' (the Blue Book): "When two substituent groups are
+    isotopically modified in different ways so that they cannot be combined
+    together using multiplicative terms such as 'di-', 'bis-', etc., they are cited
+    separately" (:43758). The isotope decorator names the isotope-STRIPPED skeleton,
+    where the groups look identical and are multiplied ('N,N,6-triphenyl'); when a
+    label sits on one member only, no descriptor can be placed on that name, and the
+    skeleton is named again inside this context so the members stand apart."""
+
+    def __enter__(self):
+        from .memo import prefixes_apart_var
+        self._token = prefixes_apart_var.set(True)
+        return self
+
+    def __exit__(self, *exc):
+        from .memo import prefixes_apart_var
+        prefixes_apart_var.reset(self._token)
+        return False
+
+
+def combine_identical_prefix_groups(entries):
+    """Merge the prefix groups of one substitutive name that carry the SAME prefix.
+
+    ``entries`` is an iterable of ``(name, locants)`` in citation order, where a
+    ``name`` may occur more than once because different producers collected it --
+    the ring or chain carbons in one list, the nitrogens of an amide or amine suffix
+    in another. Returns ``[(name, locants),...]`` with every identical ``name``
+    combined into ONE group at its first position, the locants ordered by
+    :func:`prefix_locant_order_key`.
+
+     (the Blue Book) (b) (:7067): the basic multiplying prefixes
+    "indicate a multiplicity of:... simple substituent prefixes", and (a)
+    (:7104) 'bis', etc., of substituted ones -- a multiplicity of the PREFIX, not
+    of the atom kind it sits on. The Blue Book's PINs cite one group across italic
+    and numeric locants: '*N*,2-dimethylpropanamide' and '*N*,*N*,2-trimethyl-3-
+    {...}propanamide (PIN)' (:21624), '*N*,4-dimethyl-*N*-(3-methylphenyl)benzamide
+    (PIN)' (:32879), '*N*,1-bis(4-chlorophenyl)methanimine (PIN)' (:26524),
+    '*N*,1,4-triphenyl-1*H*-1,2,4-triazol-4-ium-3-aminide (PIN)' (:42460), and
+    across differently numbered nitrogens '*N*1,*N*3-dimethylpropanediamide (PIN)'
+    (:2889). This is the grouping only; each producer
+    keeps its own formatter (marks, multiplier) and its own citation order.
+    """
+    order: List[str] = []
+    merged = {}
+    for name, locants in entries:
+        if name not in merged:
+            merged[name] = []
+            order.append(name)
+        merged[name].extend(locants)
+    return [(name, sorted(merged[name], key=prefix_locant_order_key))
+            for name in order]
+
+
 __all__ = [
+    "prefix_locant_order_key",
+    "combine_identical_prefix_groups",
+    "identical_prefixes_grouped",
+    "identical_prefixes_cited_apart",
     "_estimate_parent_size_from_name",
     "_build_unsaturation_infix",
     "_build_hydrocarbon_name",

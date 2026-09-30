@@ -50,6 +50,51 @@ from rdkit import Chem
 import orthonym
 from orthonym.validation import opsin_roundtrip
 from tests.support.jars import jar_or_skip
+from tests.support.default_tier import (  # noqa: E402
+    assert_default_tier_declines,
+    declined_pin_row,
+    default_tier_rule_applies,
+    strict_path_name,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C=C1C2CC3CC1CC(C2)C3",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 # One representative per ring family. Every one is a ring carbon carrying an
@@ -117,6 +162,14 @@ def _name_under(mode, smiles, monkeypatch):
     if mode == "no_jvm":
         monkeypatch.setattr(
             opsin_roundtrip, "_find_opsin_jar", lambda *a, **k: None)
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        if mode == "jar_present":
+            return _declined_pin_row(smiles)["name"]
+        # The reduced mode without a jar is under the same emission rule (namer.py
+        # ``_default_tier_policy_applies``): the default tier declines there too, and
+        # the strict path's name, built with the rule off, stays under test.
+        assert_default_tier_declines(smiles)
+        return strict_path_name(smiles)
     try:
         return orthonym.name_compound(smiles, style="pin")
     except Exception:  # noqa: BLE001 - an exception is an abstention, not a wrong name

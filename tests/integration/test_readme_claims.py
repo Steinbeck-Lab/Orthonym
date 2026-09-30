@@ -106,7 +106,9 @@ def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers()
     assert diol["tier"] != "pin_verified", diol
     assert _independent_parse(diol["name"]) is None
     heme = _row(HEME_B["smiles"])             # a metal-complex list name
-    assert heme["verified"] == "identity" and heme["tier"] == "systematic_verified", heme
+    # the label of its naming path, as in the paper's measured run (user decision
+    # 2026-09-30, replacing the 2026-09-28 label systematic_verified)
+    assert heme["verified"] == "identity" and heme["tier"] == "pin_verified", heme
     for tier in ("valid", "best-effort"):
         wide = {s: _row(s, tier) for s in ("CSO", "O[C@H]1CC[C@@H](O)CC1")}
         for s, row in wide.items():

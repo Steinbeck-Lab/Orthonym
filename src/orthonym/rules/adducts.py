@@ -417,6 +417,205 @@ def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
     return f"{names} ({proportions})"
 
 
+def _mixture_smiles(components: List[Tuple[str, int]]) -> str:
+    """The SMILES of ``components`` [(canonical SMILES, count),...] as one mixture."""
+    return ".".join(smi for smi, count in components for _ in range(count))
+
+
+def _full_key(smiles: Optional[str]) -> Optional[str]:
+    """The full standard InChIKey of ``smiles``, or None."""
+    if not smiles:
+        return None
+    try:
+        m = Chem.MolFromSmiles(smiles)
+        return Chem.MolToInchiKey(m) if m is not None else None
+    except Exception:
+        return None
+
+
+def _reads_back_as(name: str, expected_smiles: str) -> bool:
+    """True iff OPSIN reads ``name`` to exactly ``expected_smiles`` (equal RDKit
+    canonical isomeric SMILES). Fail-closed on no parse or no OPSIN."""
+    from orthonym.namer import _same_canonical_smiles, _validity_gate_name_to_smiles
+    try:
+        parsed = _validity_gate_name_to_smiles(name)
+        return bool(parsed) and _same_canonical_smiles(parsed, expected_smiles)
+    except Exception:
+        return False
+
+
+def _component_spellings(frag_smi: str, primary: str, style: str, flags: dict):
+    """The other spellings of one adduct component, best first, as (rank, name):
+    1 -- the engine's late general-engine recovery name
+    (``Orthonym._engine_recovery_spelling``), 2 -- the universal floor's verified
+    spelling (``t4_coverage._verified_universal_floor``). Each reads back by
+    itself to the component's full InChIKey (``verify_or_none``) and differs from
+    ``primary`` and from the other. A one-atom component has no other spelling.
+    Best-effort tier only (the caller gates). Never raises an ``Exception``."""
+    frag = Chem.MolFromSmiles(frag_smi)
+    if frag is None or frag.GetNumHeavyAtoms() < 2:
+        return []
+    from orthonym.namer import Orthonym
+    from orthonym.validation.reconstruct import verify_or_none
+    out: List[Tuple[int, str]] = []
+    seen = {primary}
+    try:
+        eng = Orthonym(style=style, **flags)._engine_recovery_spelling(frag_smi)
+    except Exception:
+        eng = None
+    try:
+        if eng and eng not in seen and verify_or_none(eng, frag_smi) is not None:
+            seen.add(eng)
+            out.append((1, eng))
+    except Exception:
+        pass
+    try:
+        from orthonym.assembly.t4_coverage import _verified_universal_floor
+        floor = _verified_universal_floor(frag, Chem.MolToSmiles(frag))
+    except Exception:
+        floor = None
+    if floor and floor not in seen:
+        out.append((2, floor))
+    return out
+
+
+#: At most this many OPSIN read-backs of trial adduct names per adduct in
+#: ``_readable_spellings`` (the PubChem-1M mixtures it names needed at most 18);
+#: past it the adduct is left as the engine built it and the caller's gates decide.
+_READBACK_TRIALS = 64
+#: At most this many components re-spelled together to repair one join.
+_MAX_RESPELLED = 3
+
+
+def _readable_spellings(ordered: List[Tuple[str, int]],
+                        named: List[Tuple[str, int]], style: str,
+                        flags: dict) -> List[Tuple[str, int]]:
+    """Component spellings whose adduct name OPSIN reads back.
+
+     (the Blue Book, "Names are formed by citing the names of
+    individual compounds in the order of the formula connected by long (em)
+    dashes"). OPSIN reads the em dash as a hyphen and parses greedily across it,
+    so two correct component names can fuse into one word it cannot build and the
+    adduct fails its read-back although every component reads back alone:
+    'benzene—2-aminopyridine' ('benzene-2-amin...'), 'triphenylene—benzene'
+    ('tri(phenylene)benzene'), '...tetraazacyclododecane—formic acid',
+    '...cyclohepta-1,3-diene—methanol' (the conjunctive '...dienemethanol'); with
+    three two-word components ('ethyl...propanoate', 'tert-butyl...carbamate',
+    'carbon dioxide') in eight it also splits the words wrongly.
+
+    ``named`` is returned unchanged when its adduct name already reads back to the
+    input's full InChIKey, so no name that ships today changes (the caller's
+    full-key gates refuse every other reading; OPSIN can read fused words as a
+    different set of components). Otherwise the components are added left to right
+    in the same citation order; where the adduct up to component k does not read
+    back to exactly those components, other spellings (``_component_spellings``:
+    rank 1 the engine's recovery name, rank 2 the universal floor's) are tried for
+    components 0..k: the engine recovery spellings before any floor spelling, then
+    one re-spelled component before two (at most ``_MAX_RESPELLED``), then the
+    largest component first (the most heavy atoms; then the one nearest the
+    failing join). A small compound thus keeps its name ('carbon dioxide', 'formic
+    acid', 'methanol', whose other spellings are the floor's '1,3-dioxapropa-1,2-
+    diene', '1,3-dioxaprop-1-ene', '1-oxaethane') whenever re-spelling a large
+    neighbour repairs the join. The proportions and the order never change. When nothing reads back
+    within ``_READBACK_TRIALS`` OPSIN reads, ``named`` is returned and the caller's
+    gates decide as before. Each component's spellings are built with its own hang
+    budgets (``fragment_naming.own_hang_budgets``), like its first name."""
+    counts = [c for _s, c in ordered]
+    whole = _assemble_adduct_name(named)
+    try:
+        from orthonym.namer import _validity_gate_name_to_smiles
+        parsed = _validity_gate_name_to_smiles(whole)
+    except Exception:
+        parsed = None
+    expected = _mixture_smiles(ordered)
+    if parsed is not None and _full_key(parsed) == _full_key(expected):
+        return named  # reads back already: unchanged
+    from itertools import combinations, product
+
+    from orthonym.assembly.fragment_naming import own_hang_budgets
+    pools: Dict[int, List[Tuple[int, str]]] = {}
+
+    def pool(i: int) -> List[Tuple[int, str]]:
+        """[(rank, spelling)] of component i, its first name (rank 0) first."""
+        if i not in pools:
+            with own_hang_budgets():
+                pools[i] = [(0, named[i][0])] + _component_spellings(
+                    ordered[i][0], named[i][0], style, flags)
+        return pools[i]
+
+    heavy = [Chem.MolFromSmiles(smi).GetNumHeavyAtoms() for smi, _c in ordered]
+    memo: Dict[Tuple[str, ...], bool] = {}
+    reads = [0]
+
+    def reads_back(names: List[str]) -> Optional[bool]:
+        """Whether the adduct of ``names`` (components 0..len-1) reads back to
+        exactly those components; None once the read-back budget is spent."""
+        key = tuple(names)
+        if key not in memo:
+            if reads[0] >= _READBACK_TRIALS:
+                return None
+            reads[0] += 1
+            k = len(names)
+            memo[key] = _reads_back_as(
+                _assemble_adduct_name(list(zip(names, counts[:k]))),
+                _mixture_smiles(ordered[:k]))
+        return memo[key]
+
+    def repair(chosen: List[str], k: int) -> Optional[List[str]]:
+        """``chosen[:k+1]`` with 1..``_MAX_RESPELLED`` of its components re-spelled
+        so that every prefix from the first re-spelled one up to k reads back."""
+        # the largest components first, then the ones nearest the join
+        order = sorted(range(k + 1), key=lambda i: (-heavy[i], k - i))
+        for max_rank in (1, 2):
+            for n in range(1, min(_MAX_RESPELLED, k + 1) + 1):
+                for positions in combinations(order, n):
+                    options = []
+                    for i in positions:
+                        alts = [sp for r, sp in pool(i)
+                                if 1 <= r <= max_rank and sp != chosen[i]]
+                        if not alts:
+                            break
+                        options.append(alts)
+                    else:
+                        for picks in product(*options):
+                            trial = list(chosen[:k + 1])
+                            for i, sp in zip(positions, picks):
+                                trial[i] = sp
+                            ok = True
+                            for j in range(max(min(positions), 1), k + 1):
+                                r = reads_back(trial[:j + 1])
+                                if r is None:
+                                    return None
+                                if not r:
+                                    ok = False
+                                    break
+                            if ok:
+                                return trial
+        return None
+
+    chosen = [n for n, _c in named]
+    for k in range(1, len(ordered)):
+        r = reads_back(chosen[:k + 1])
+        if r is None:
+            return named
+        if r:
+            continue
+        fixed = repair(chosen, k)
+        if fixed is None:
+            return named
+        chosen = fixed + chosen[k + 1:]
+    # Labels: a spelling from the engine recovery or the floor is a general-engine
+    # name, never a PIN (``name_tiered`` labels the adduct systematic_verified,
+    # as for any general-engine name, and a PIN-path adduct carrying it below PIN).
+    _alt = [n for i, n in enumerate(chosen) if n != named[i][0]]
+    if _alt:
+        from orthonym.metrics.provenance import record_non_pin_fragment, record_source
+        record_source("general_engine")
+        for n in _alt:
+            record_non_pin_fragment(n)
+    return list(zip(chosen, counts))
+
+
 def name_adduct(mol, canonical_smiles: Optional[str] = None,
                 style: str = "pin", *,
                 general_fallback: bool = False,
@@ -494,15 +693,27 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
             _widened = True
     ordered = sorted(components, key=lambda t: component_sort_key(t[0]))
     named: List[Tuple[str, int]] = []
+    # Each component is a compound of its own and is named with the hang
+    # budgets of one compound (``own_hang_budgets``), not with what is left of the
+    # whole assembly's.
+    from orthonym.assembly.fragment_naming import own_hang_budgets
     for smi, count in ordered:
-        component_name = _name_component(
-            smi, style, general_fallback=general_fallback,
-            allow_aromatic_general=allow_aromatic_general,
-            general_fallback_unverified=general_fallback_unverified,
-            charged_ok=_charged_ok, ions_ok=_ions_ok)
+        with own_hang_budgets():
+            component_name = _name_component(
+                smi, style, general_fallback=general_fallback,
+                allow_aromatic_general=allow_aromatic_general,
+                general_fallback_unverified=general_fallback_unverified,
+                charged_ok=_charged_ok, ions_ok=_ions_ok)
         if component_name is None:
             return None  # fail-closed: never drop or placeholder a component
         named.append((component_name, count))
+    if general_fallback_unverified:
+        # Best-effort tier: spellings whose adduct name OPSIN can read back
+        # (``_readable_spellings``); unchanged when the name already reads back.
+        named = _readable_spellings(ordered, named, style, dict(
+            general_fallback=general_fallback,
+            allow_aromatic_general=allow_aromatic_general,
+            general_fallback_unverified=general_fallback_unverified))
     if _widened:
         _name = _assemble_adduct_name(named)
         return _name if _parse_reproduces_depiction(_name, mol) else None

@@ -4129,7 +4129,8 @@ def _assemble_substituent_prefix(
         multiplier = get_multiplier_prefix(count, name)
 
         locant_str = ','.join(str(loc) for loc in locants)
-        parts.append(f"{locant_str}-{multiplier}{enclose_if_compound(name)}")
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(f"{locant_str}-{_mc(count, name, enclose_if_compound(name))}")
 
     return '-'.join(parts) + '-' if parts else ""
 

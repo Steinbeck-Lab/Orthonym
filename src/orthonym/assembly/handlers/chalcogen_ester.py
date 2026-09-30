@@ -115,6 +115,42 @@ def name_chalcogen_ester(
     # (PIN)':31765, '*S*-(trimethylgermyl) ethanesulfonothioate (PIN)':31659), never
     # 'S-2-cyanoethyl'; a simple one ('S-ethyl hexanethioate (PIN)',:31989) is bare.
     from ..naming_utils import enclose_if_compound
+    # Stereodescriptors stand "immediately at the front of the part of the name to
+    # which they relate"; for a substituent group "at the front of the
+    # corresponding prefix" "NAMING OF STEREOISOMERS", the Blue Book).
+    # An ester names its acid and its organyl group as separate words, each with
+    # its own descriptors: '(2S)-butan-2-yl (4S)-4-chlorohexanoate (PIN)' (:46715),
+    # 'ethyl (R)-4-nitrobenzene-1-sulfinate (PIN)' (:46268). So the acyl chain's
+    # descriptors go in front of the acid word ('S-ethyl (2E)-but-2-enethioate'),
+    # and the organyl word carries its own (name_substituent cites them:
+    # 'S-[(3S)-3-hydroxybutyl]'); nothing goes in front of the whole name
+    # ('(2E)-S-[(3S)-3-hydroxybutyl] but-2-enethioate' and '(2R)-S-[butan-2-yl]
+    # ethanethioate' were built so). When the organyl word cites fewer
+    # descriptors than it has stereo elements, the front block of the whole name
+    # is kept (as before).
+    acid_side = set(_collect_subgraph(mol, c_carbonyl_idx,
+                                      {o_idx, x_idx, c_alkyl_idx}))
+    acid_centres = [sc for sc in (features.stereocenters or [])
+                    if sc['idx'] in acid_side]
+    acid_bonds = [db for db in (getattr(features, 'double_bond_stereo', None) or [])
+                  if set(db.get('atoms') or ()) <= acid_side]
+    organyl_elements = (
+        len(features.stereocenters or []) - len(acid_centres)
+        + len(getattr(features, 'double_bond_stereo', None) or []) - len(acid_bonds))
+    import re as _re
+    organyl_cited = organyl_elements <= sum(
+        len(block.split(',')) for block in _re.findall(
+            r"\((\d*[RSrsEZ](?:,\d*[RSrsEZ])*)\)-", alkyl_word))
+    acid_stereo_placed = bool(acid_centres or acid_bonds or organyl_elements) and organyl_cited
+    if acid_stereo_placed and (acid_centres or acid_bonds):
+        from types import SimpleNamespace
+        acid_features = SimpleNamespace(
+            mol=mol, stereocenters=acid_centres, double_bond_stereo=acid_bonds)
+        stem_word = _inject_stereo_if_missing(
+            acid_features, stem_word,
+            atom_to_locant={a: i + 1 for i, a in enumerate(
+                _find_longest_carbon_chain(mol, c_carbonyl_idx, acid_side))},
+            parent_scope='chain')
     name = f"{x_prefix}-{enclose_if_compound(alkyl_word)} {stem_word}"
     name = _enrich_handler_name(features, name, "chalcogen_ester")
 
@@ -123,7 +159,7 @@ def name_chalcogen_ester(
     if cand is None:
         return None
 
-    final_name = _inject_stereo_if_missing(
+    final_name = cand.name if acid_stereo_placed else _inject_stereo_if_missing(
         features, cand.name, atom_to_locant=None,
     )
     return NamingResult(
@@ -195,9 +231,28 @@ def _name_chalcogen_chain(
     except (ValueError, KeyError, ImportError):
         return None
 
-    # IUPAC: 'e' of '{prefix}ane' preserved because '-selenoate' /
-    # '-telluroate' start with consonants ('s' / 't').
-    base = f"{chain_prefix}ane{x_suffix}"
+    # Chain multiple bonds are part of the parent name: the
+    # 'dodeca-2,8-diene' of an unsaturated acyl chain. It was always written
+    # '-ane' ('7,11-dihydroxydodecanethioate' for a dodeca-2,8-dienethioate,
+    # a different molecule the round trip refused). C1 is the ester carbon.
+    from rdkit import Chem
+    double_locants, triple_locants = [], []
+    for pos in range(chain_len - 1):
+        bond = mol.GetBondBetweenAtoms(principal_chain[pos], principal_chain[pos + 1])
+        if bond is None:
+            return None
+        if bond.GetBondType() == Chem.BondType.DOUBLE:
+            double_locants.append(pos + 1)
+        elif bond.GetBondType() == Chem.BondType.TRIPLE:
+            triple_locants.append(pos + 1)
+        elif bond.GetBondType() != Chem.BondType.SINGLE:
+            return None  # aromatic / other: not an acyclic chain
+    from ..composition_primitives import _build_unsaturation_infix
+    infix = _build_unsaturation_infix(double_locants, triple_locants)
+
+    # IUPAC: 'e' of '{prefix}ane' / '-ene' / '-yne' preserved because
+    # '-thioate' / '-selenoate' / '-telluroate' start with consonants.
+    base = f"{chain_prefix}{infix}e{x_suffix}"
 
     chain_set = set(principal_chain)
     has_branches = any(

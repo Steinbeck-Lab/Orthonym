@@ -113,9 +113,10 @@ P14_4_NEGATIVES = [
     #: -ol outranks -thiol, so the SH stays a sulfanyl prefix. The numbering
     # hint must agree with that (it did not before: the tier anchored the THIOL).
     ("Oc1ccccc1S", "2-sulfanylphenol"),
-    #: thiol outranks amine.
-    ("Nc1ccccc1S", "2-aminobenzenethiol"),
-    ("Sc1ccc(Cl)cc1", "4-chlorobenzenethiol"),
+    #: thiol outranks amine. The suffix locant is cited beside a prefix
+    #, the Blue Book; 'sodium 4-methylbenzene-1-thiolate (PIN)', the Blue Book).
+    ("Nc1ccccc1S", "2-aminobenzene-1-thiol"),
+    ("Sc1ccc(Cl)cc1", "4-chlorobenzene-1-thiol"),
     # A suffix SENIOR to -ol is present, so the OH stays a hydroxy prefix.
     ("Oc1ccc(C(=O)O)cc1", "4-hydroxybenzoic acid"),
     ("Oc1ccc(N)cc1", "4-aminophenol"),
@@ -195,9 +196,9 @@ P41_REANCHOR_NAMES = [
     # 1 and (g) then orders the two prefixes (chloro before sulfanyl).
     ("Oc1cc(S)cc(Cl)c1", "3-chloro-5-sulfanylphenol"),
     ("Oc1c(S)cccc1Cl", "2-chloro-6-sulfanylphenol"),
-    # thiol outranks amine, so here the SH takes the suffix.
-    ("Nc1ccccc1S", "2-aminobenzenethiol"),
-    ("Nc1ccc(S)cc1", "4-aminobenzenethiol"),
+    # thiol outranks amine, so here the SH takes the suffix (locant cited, the Blue Book).
+    ("Nc1ccccc1S", "2-aminobenzene-1-thiol"),
+    ("Nc1ccc(S)cc1", "4-aminobenzene-1-thiol"),
 ]
 
 

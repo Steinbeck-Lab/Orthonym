@@ -47,9 +47,12 @@ from orthonym import Orthonym
 def namer():
     # Gate OFF on purpose: with the gate on, merely REFUSES the wrong
     # name ('unknown organic compound'). That hides the generator defect and
-    # turns a wrong molecule into a coverage loss. Judge the generator.
-    _namer._DISABLE_VALIDITY_GATE = True
-    return Orthonym(style="pin")
+    # turns a wrong molecule into a coverage loss. Judge the generator. The flag
+    # is put back when the module ends, so a later module is not named with the
+    # gate off.
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_namer, "_DISABLE_VALIDITY_GATE", True)
+        yield Orthonym(style="pin")
 
 
 def _name(namer, smiles):

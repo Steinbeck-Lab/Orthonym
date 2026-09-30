@@ -12,7 +12,9 @@ honest-fail-on-data. They are NOT @pytest.mark.xfail-masked — VERIFICATION.md
  documents each disposition.
 
 Audit amendments applied at Plan-04 (documented in VERIFICATION.md):
-- T4-13: PIN updated to 'trimethylphenylsilane' (IUPAC alphabetic)
+- T4-13: PIN updated to 'trimethylphenylsilane' (IUPAC alphabetic); the
+  second cited prefix enclosed, 'trimethyl(phenyl)silane',
+  the Blue Book; 'trichloro(iodomethyl)silane (PIN)':25870)
 - T4-14: PIN/SYS updated to 'butyllithium' (SMILES is n-butyl, not sec-butyl)
 """
 import csv

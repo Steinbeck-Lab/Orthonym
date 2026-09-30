@@ -443,6 +443,79 @@ def _cip_orientation_key(mol, oriented: List[int],
         return ()
 
 
+def _pg_anchor_multiplicity(mol, pg_set, substituent_positions):
+    """How many principal-group suffixes each ring anchor atom carries.
+
+     gives the lowest locants to the suffixes as a SET WITH
+    MULTIPLICITY, so the geminal pair of OC1(O)CCC(O)CC1 counts twice:
+    {1,1,4} beats {1,4,4} ('cyclohexane-1,1,4-triol'). A suffix that can sit
+    twice on one ring carbon is a monovalent -XH group (-ol, -thiol, -amine,
+    ...), cited as a one-atom heteroatom-rooted substituent list at the anchor.
+    Its element is the one every anchor carries; an extra such list of that
+    element at an anchor is a second suffix. When the anchors share no single
+    element the multiplicity stays 1 per anchor (the set rule it replaces).
+
+    The same element fixes the anchor SET too. Every -OH on the ring is an
+    '-ol' suffix once the alcohols are the principal class (the
+    class union of seniority.get_principal_group), but the caller's anchor set
+    can hold one alcohol subtype only (the tertiary C of CC1(O)CCC(O)CC1, or a
+    geminal diol's carbon, is left out), which numbered those suffixes as
+    prefixes ('4-methylcyclohexane-1,4-diol' for 1-methylcyclohexane-1,4-diol).
+    A ring atom outside ``pg_set`` that carries such a -XH of that element is
+    added as an anchor with its own count.
+
+    Returns ``(mult, z)``: anchor -> suffix count, and the suffix element
+    (None when it could not be read, in which case ``mult`` is the plain set).
+    """
+    mult = {a: 1 for a in pg_set}
+    if mol is None or not substituent_positions:
+        return mult, None
+
+    def _xh_elements(a):
+        els = []
+        for sub in substituent_positions.get(a, ()):
+            if len(sub) != 1:
+                continue
+            at = mol.GetAtomWithIdx(sub[0])
+            bond = mol.GetBondBetweenAtoms(a, sub[0])
+            if (at.GetAtomicNum() not in (6, 1) and at.GetTotalNumHs() > 0
+                    and bond is not None
+                    and bond.GetBondType() == Chem.BondType.SINGLE):
+                els.append(at.GetAtomicNum())
+        return els
+
+    per_anchor = {a: _xh_elements(a) for a in pg_set}
+    common = None
+    for els in per_anchor.values():
+        common = set(els) if common is None else common & set(els)
+    if not common or len(common) != 1:
+        return mult, None
+    z = next(iter(common))
+    for a, els in per_anchor.items():
+        mult[a] = max(1, els.count(z))
+    for a in substituent_positions:
+        if a not in mult:
+            _n = _xh_elements(a).count(z)
+            if _n:
+                mult[a] = _n
+    return mult, z
+
+
+def _is_suffix_list(mol, anchor, sub_atoms, z) -> bool:
+    """Whether a substituent list at a suffix anchor IS a suffix: a one-atom
+    single-bonded -XH of the suffix element ``z``. With ``z`` unknown every
+    heteroatom-rooted list there counts as the suffix (the older reading)."""
+    if not sub_atoms:
+        return False
+    root = mol.GetAtomWithIdx(sub_atoms[0])
+    if z is None:
+        return root.GetSymbol() != 'C'
+    bond = mol.GetBondBetweenAtoms(anchor, sub_atoms[0])
+    return (len(sub_atoms) == 1 and root.GetAtomicNum() == z
+            and root.GetTotalNumHs() > 0 and bond is not None
+            and bond.GetBondType() == Chem.BondType.SINGLE)
+
+
 def _orient_cycloalkane_with_pg(
     mol,
     ring_list: List[int],
@@ -462,13 +535,15 @@ def _orient_cycloalkane_with_pg(
     """
     n = len(ring_list)
     candidates = []
+    _pg_mult, _pg_z = _pg_anchor_multiplicity(mol, pg_set, substituent_positions)
 
     for start_pos in range(n):
         for direction in (1, -1):
             oriented = _build_oriented_ring(ring_list, start_pos, direction)
 
-            # (c) suffix-anchor locants
-            pg_locants = sorted(oriented.index(a) + 1 for a in pg_set)
+            # (c) suffix-anchor locants, one per suffix (geminal counts twice)
+            pg_locants = sorted(oriented.index(a) + 1
+                                for a in _pg_mult for _ in range(_pg_mult[a]))
 
             # (f) prefix-only entries: at a PG position, the heteroatom-rooted
             # list IS the suffix (C-OH / C=O / C-NH2) and does not count;
@@ -476,8 +551,10 @@ def _orient_cycloalkane_with_pg(
             prefix_entries = []  # (locant, sub_atoms)
             for i, atom_idx in enumerate(oriented):
                 for sub_atoms in substituent_positions.get(atom_idx, ()):
-                    if (atom_idx in pg_set and sub_atoms
-                            and mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol() != 'C'):
+                    # A chloro or amino prefix on an anchor carbon is still a
+                    # prefix: only the suffix's own -XH list is excluded.
+                    if (atom_idx in _pg_mult
+                            and _is_suffix_list(mol, atom_idx, sub_atoms, _pg_z)):
                         continue
                     prefix_entries.append((i + 1, sub_atoms))
             prefix_locants = sorted(loc for loc, _ in prefix_entries)
@@ -633,16 +710,18 @@ def orient_cycloalkene(
     # --- Path A: Principal group on ring -> PG gets lowest locant ---
     if principal_group_atoms:
         candidates = []
+        _pg_in_ring = {a for a in principal_group_atoms if a in ring_list}
+        _pg_mult, _ = _pg_anchor_multiplicity(mol, _pg_in_ring, substituent_positions)
 
         for start_idx in range(n):
             for direction in [1, -1]:
                 oriented = _build_oriented_ring(ring_list, start_idx, direction)
 
-                # Calculate principal group locants
+                # Calculate principal group locants (one per suffix,
                 pg_locants = sorted(
                     oriented.index(atom) + 1
-                    for atom in principal_group_atoms
-                    if atom in oriented
+                    for atom in _pg_mult
+                    for _ in range(_pg_mult[atom])
                 )
 
                 # Calculate double bond locants (wrap-aware: the closure

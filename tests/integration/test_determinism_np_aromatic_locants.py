@@ -129,6 +129,54 @@ _ETHYNYL_XFAIL_REASON = (
     "j1-regressions'")
 
 
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): these fixtures' names carry
+# a whole-graph R/S block on the steroid stereoparent, which the code records as not
+# the PIN, the Blue Book), so the default tier declines them
+# (NO_VERIFIED_PIN). The subprocess then also prints the strict path's name (the
+# emission rule switched off) and the best-effort name: the strict path's name carries
+# the substring and is the best-effort name, and it is the output compared across seeds.
+_DEFAULT_TIER_DECLINES = {"alpha_estradiol", "deoxyestradiol", "2_methoxyestradiol",
+                          "4_hydroxyestradiol"}
+
+
+def _named_in_subprocess(smi, env, timeout=60):
+    """(returncode, stderr, default-tier name, its limit code, the strict path's name,
+    the best-effort name) from a fresh interpreter with ``env``."""
+    import json
+    code = (
+        "import json\n"
+        "import orthonym.namer as nm\n"
+        "from orthonym import Orthonym, name_compound\n"
+        "from orthonym.cli import _emit_tier_flags\n"
+        f"smi = {smi!r}\n"
+        "row = Orthonym().name_tiered(smi)\n"
+        "tok = nm._DEFAULT_TIER_POLICY_OFF.set(True)\n"
+        "strict = Orthonym().name(smi)\n"
+        "nm._DEFAULT_TIER_POLICY_OFF.reset(tok)\n"
+        "be = Orthonym(**_emit_tier_flags('best-effort')).name_tiered(smi)['name']\n"
+        "print(json.dumps([name_compound(smi), row['limit_code'], strict, be]))\n"
+    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                            text=True, env=env, timeout=timeout)
+    if result.returncode != 0:
+        return result.returncode, result.stderr, None, None, None, None
+    name, limit, strict, be = json.loads(result.stdout.strip().splitlines()[-1])
+    return 0, result.stderr, name, limit, strict, be
+
+
+def _shipped_or_strict(fixture_id, name, limit, strict, be):
+    """The default-tier name, or for a fixture the default tier declines, the strict
+    path's name after the decline and the best-effort name are checked."""
+    if fixture_id in _DEFAULT_TIER_DECLINES:
+        from orthonym.errors import is_failure_name
+        assert is_failure_name(name) and limit == "NO_VERIFIED_PIN", (fixture_id, name, limit)
+        assert be == strict, (fixture_id, strict, be)
+        return strict
+    return name
+
+
 @pytest.mark.parametrize("seed", [0, 1, 2, 3, 42])
 @pytest.mark.parametrize("fixture_id,smi,expected_substring", AROMATIC_NP_FIXTURES)
 def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
@@ -152,19 +200,13 @@ def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
     cwd = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
     env["PYTHONPATH"] = os.path.join(cwd, "src")
 
-    cmd = [
-        sys.executable, "-c",
-        f"from orthonym import name_compound; print(name_compound({smi!r}))",
-    ]
-    result = subprocess.run(
-        cmd, capture_output=True, text=True, env=env, timeout=60,
-    )
-    assert result.returncode == 0, (
+    rc, stderr, name, limit, strict, be = _named_in_subprocess(smi, env, timeout=120)
+    assert rc == 0, (
         f"name_compound subprocess failed for {fixture_id} at "
         f"PYTHONHASHSEED={seed}:\n"
-        f"  stderr: {result.stderr[:500]}"
+        f"  stderr: {stderr[:500]}"
     )
-    name = result.stdout.strip()
+    name = _shipped_or_strict(fixture_id, name, limit, strict, be)
 
     if expected_substring is not None:
         assert expected_substring in name, (
@@ -195,17 +237,11 @@ def test_aromatic_np_scaffold_byte_identical_across_seeds(
         env = os.environ.copy()
         env["PYTHONHASHSEED"] = str(seed)
         env["PYTHONPATH"] = os.path.join(cwd, "src")
-        cmd = [
-            sys.executable, "-c",
-            f"from orthonym import name_compound; print(name_compound({smi!r}))",
-        ]
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, env=env, timeout=60,
-        )
-        assert result.returncode == 0, (
+        rc, _stderr, name, limit, strict, be = _named_in_subprocess(smi, env, timeout=120)
+        assert rc == 0, (
             f"name_compound subprocess failed for {fixture_id} at seed {seed}"
         )
-        outputs[seed] = result.stdout.strip()
+        outputs[seed] = _shipped_or_strict(fixture_id, name, limit, strict, be)
 
     # All 5 outputs MUST be byte-identical
     distinct = set(outputs.values())

@@ -1076,13 +1076,24 @@ def needs_brackets(name: str) -> bool:
     # Examples: hydroxymethyl, carboxymethyl, aminoethyl, oxoethyl, formylmethyl
     # But NOT: methoxy, ethoxy (these are simple ether prefixes, single concept)
     # Uses module-level _COMPOUND_FG_PREFIXES and _ALKYL_ROOTS_FULL (C1-C20).
+    # The FG prefix may carry a basic multiplying prefix: 'dihydroxymethyl' is
+    # two hydroxy on methyl, as compound a prefix as 'hydroxymethyl'
+    # "Parentheses are used around compound (see and complex...
+    # prefixes", the Blue Book; '(chloromethyl)silane (PIN)':7236). Left
+    # bare, '2-dihydroxymethylphenol' was shipped for 2-(dihydroxymethyl)phenol.
+    # A multiplied ALKYL ('dimethyl') is no FG prefix and stays simple.
+    _fg_heads = [name_lower]
+    for _mult in ('di', 'tri', 'tetra'):
+        if name_lower.startswith(_mult):
+            _fg_heads.append(name_lower[len(_mult):])
     for fg in _COMPOUND_FG_PREFIXES:
-        if name_lower.startswith(fg):
-            remainder = name_lower[len(fg):]
-            # Check if the remainder is an alkyl root
-            for alkyl in _ALKYL_ROOTS_FULL:
-                if remainder == alkyl:
-                    return True
+        for _head in _fg_heads:
+            if _head.startswith(fg):
+                remainder = _head[len(fg):]
+                # Check if the remainder is an alkyl root
+                for alkyl in _ALKYL_ROOTS_FULL:
+                    if remainder == alkyl:
+                        return True
 
     # Compound sulfur/selenium/tellurium prefixes: alkyl + sulfinyl/sulfonyl/sulfanyl
     # Per IUPAC, "methylsulfinyl" = methyl + sulfinyl = compound substituent
@@ -2435,8 +2446,36 @@ def is_substituted_substituent(
             return True
         if _is_single_simple_unit(body):
             return False
+        # The detached prefix after the locant set may itself begin with an
+        # italicized structural prefix, alone or multiplied: '4-tert-butylphenyl',
+        # '2,4-di-tert-butylphenyl', 'N-tert-butylcarbamoyl'. Its italic letters are
+        # part of that simple prefix ('tert-butyl', (a), the Blue Book)
+        # and are set aside here as they are at the front of a name above; what
+        # follows decides ('butylphenyl' is two units, so the whole prefix is
+        # substituted and takes 'bis', (c):7035, (a):7104,
+        # 'bis({3,5-di-tert-butyl-2-...phenyl}methylidene)':37980).
+        unitalic, had_italic = _set_aside_italicized_prefix(body)
+        if had_italic:
+            return is_substituted_substituent(unitalic)
 
     return _splits_into_two_units(body)
+
+
+def _set_aside_italicized_prefix(body: str) -> Tuple[str, bool]:
+    """``body`` without a leading italicized structural prefix that may follow a
+    multiplying syllable: 'tert-butylphenyl' -> ('butylphenyl', True),
+    'di-tert-butylphenyl' and 'ditert-butylphenyl' -> ('dibutylphenyl', True),
+    'methylphenyl' -> ('methylphenyl', False)."""
+    for mult in ('',) + _LEADING_MULTIPLIER_SYLLABLES:
+        if mult and not body.startswith(mult):
+            continue
+        rest = body[len(mult):]
+        if mult and rest.startswith('-'):
+            rest = rest[1:]
+        remainder, had = strip_italicized_structural_prefix(rest)
+        if had and remainder:
+            return mult + remainder, True
+    return body, False
 
 
 def _is_recognised_prefix_component(token: str) -> bool:
@@ -2464,7 +2503,37 @@ def _is_recognised_prefix_component(token: str) -> bool:
     # (`:33087`).
     if len(token) > 5 and token.endswith('amido'):
         return True
-    return False
+    return _is_replacement_named_hydride_yl(token)
+
+
+# Skeletal replacement ('a') prefixes, each optionally multiplied and
+# optionally followed by the locant set of the next one: 'oxa', 'dioxa',
+# 'oxa-2-sila', 'dioxa-2,4-diphospha'.
+_A_PREFIX_RUN_RE = re.compile(
+    r'^(?:(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?'
+    r'(?:fluora|chlora|broma|ioda|oxa|thia|selena|tellura|aza|phospha|arsa|'
+    r'stiba|bisma|sila|germa|stanna|plumba|bora|alumina|galla|inda|thalla)'
+    r'(?:-\d+(?:,\d+)*-)?)+')
+
+
+def _is_replacement_named_hydride_yl(token: str) -> bool:
+    """Is ``token`` ONE parent-hydride prefix named by skeletal replacement,
+    such as 'oxabutyl', 'dioxahexyl' or 'oxa-2-silabutyl'?
+
+    "Nondetachable prefixes describe structural modifications to the parent
+    structure creating new parent structures, for example, replacement prefixes,
+    which can be either skeletal replacement ('a') prefixes (see or..."
+    , the Blue Book). The 'a' prefixes are part of the parent
+    hydride, so the whole token is one component. As the tail of a split this
+    makes '2-ethyl-1-oxabutyl' two units ('ethyl' + '1-oxabutyl'), a substituted
+    prefix that takes 'bis' (a), the Blue Book); '1-oxabutyl'
+    alone stays a single unit."""
+    m = _A_PREFIX_RUN_RE.match(token)
+    if not m or m.end() >= len(token):
+        return False
+    core = token[m.end():]
+    return (core in _SIMPLE_PREFIX_VOCABULARY
+            or _is_bare_hydride_yl(core, require_known_stem=True))
 
 
 def _splits_at_a_unit_boundary(body: str, allow_multiplier: bool = True,
@@ -2505,6 +2574,12 @@ def _splits_at_a_unit_boundary(body: str, allow_multiplier: bool = True,
             if not tail:
                 continue
             if _is_recognised_prefix_component(tail):
+                return True
+            # A located prefix after the unit that opens with an enclosed
+            # substituent is a second unit too: 'hydroxy-3-[(2-methylprop-2-
+            # enoyl)oxy]propoxy' is 'hydroxy' + '[(...)oxy]propoxy', a substituted
+            # prefix that takes 'tris' (a), the Blue Book).
+            if m and _enclosed_leader_is_a_substituent(tail):
                 return True
             if _splits_at_a_unit_boundary(tail, allow_multiplier, _depth + 1):
                 return True
@@ -2656,6 +2731,56 @@ CATENATION_AMBIGUOUS_PREFIXES = frozenset({
 })
 
 
+# (c): the skeletal replacement ('a') prefixes at the front of a
+# substituent prefix, in full ('oxa', 'dioxa', 'thia', 'aza', 'sila': '1-oxaethyl',
+# '1,2-oxazol-3-yl', 'oxan-2-yl', '2-azabicyclo[...]') or with the final 'a' elided
+# before a Hantzsch-Widman stem ('oxolan-2-yl', 'oxiran-2-yl', 'azetidin-1-yl',
+# '1,2,4-triazol-1-yl'). The halogen 'a' prefixes are left out (their spellings
+# begin retained names, 'fluoranthenyl'), and the Group 13 stems out of the elided
+# form ('indolyl').
+_REPLACEMENT_FRONT_RE = re.compile(
+    r"^(?!(?:thi|ox|selen|tellur)anthren|(?:phosph|ars|stib|bism)in(?:ol|dol)"
+    r"|(?:di|tri|tetra)?(?:az|phosph|ars|stib|bism|sil|germ|stann|plumb|bor)ane$)"
+    r"(?:(?:di|tri|tetra|penta|hexa)?"
+    r"(?:oxa|thia|selena|tellura|aza|phospha|arsa|stiba|"
+    r"bisma|sila|germa|stanna|plumba|bora)"
+    r"|(?:di|tri|tetr|tetra)?(?:ox|thi|selen|tellur|az|phosph|ars|stib|bism|sil|germ|"
+    r"stann|plumb|bor)(?=ir|et|ol|in|an|ep|oc|on|ec))")
+# (The retained fusion names 'thianthrene', 'oxanthrene', 'selenanthrene',
+# 'phosphinoline', 'arsinoline', 'phosphindole',... open with an 'a' stem but are
+# not replacement names, 'thianthrene (PIN)':11757; 'indazole' is retained too.
+# A mononuclear or catenated hydride parent ('silane', 'disilane', 'phosphane') is
+# not a replacement name either; its own multiplier rule is (a).)
+
+#: The endings of a parent hydride name that a multiplicative name multiplies
+#: ('azetidine', 'azepane', '1,3-dioxolane', 'silane'): (c) applies to the
+#: parent join of multiplicative nomenclature as to a substituent prefix
+#: ('bis(azacyclododecane) (PIN)', the Blue Book).
+_PARENT_HYDRIDE_ENDINGS = ("ane", "ene", "ine", "ole", "ane)", "ine)")
+
+
+def opens_with_replacement_prefix(name: Optional[str]) -> bool:
+    """ (c) (the Blue Book,:7174-7178): does this substituent prefix open,
+    after its locants and indicated hydrogen, with a skeletal replacement ('a')
+    prefix, so that 'di' in front of it could be read as part of the replacement
+    count ('di(1,2-oxazol-3-yl)' as a 'dioxazole')? Substituent prefixes (ending
+    in 'yl', 'ylidene', 'ylidyne') and the parent hydrides a multiplicative name
+    multiplies ('azetidine' in "1,1'-carbonylbis(azetidine)", not the
+    'diazetidine' ring) are considered; the acyl prefixes of oxalic and oxamic
+    acid and the oxoacid prefixes ('phosphono') are not replacement names."""
+    if not name:
+        return False
+    core = name.strip()
+    while _is_fully_enclosed(core):
+        core = core[1:-1]
+    core = re.sub(r"^(?:[0-9,]+[a-z]?H?-|\d*H-|[0-9,']+-)+", "", core)
+    if not core.endswith(("yl", "ylidene", "ylidyne") + _PARENT_HYDRIDE_ENDINGS):
+        return False
+    if core.startswith(("oxal", "oxam")):
+        return False
+    return bool(_REPLACEMENT_FRONT_RE.match(core))
+
+
 def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     """Get the appropriate multiplier prefix for a count of substituents.
 
@@ -2752,8 +2877,14 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     # The second leg is (d) (a simple component that would be AMBIGUOUS
     # if multiplied by 'di' -- `disulfanyl` is -S-SH, so two -SH must be
     # `bis(sulfanyl)`), and it is preserved exactly as it was.
+    # The third leg is (c): a component that opens with a skeletal
+    # replacement ('a') prefix, of an 'a' chain or a Hantzsch-Widman ring, takes
+    # the derived multiplier "to describe clearly the number of replacement atoms"
+    # ('bis(1,2-oxazol-3-yl)... whereas di(1,2-oxazol-3-yl) might be interpreted as
+    # a dioxazole ring system', the Blue Book; 'bis(azacyclododecane)':7176).
     if is_substituted_substituent(substituent_name) \
-            or substituent_name in CATENATION_AMBIGUOUS_PREFIXES:
+            or substituent_name in CATENATION_AMBIGUOUS_PREFIXES \
+            or opens_with_replacement_prefix(substituent_name):
         if count in COMPLEX_MULTIPLIERS:
             return COMPLEX_MULTIPLIERS[count]
         # For counts > 20, build compositional multiplier using chain_names
@@ -2812,11 +2943,32 @@ def multiplied_component(count: int, name: str, marked: str) -> str:
         'di(propan-2-yl)'
         >>> multiplied_component(2, 'cyclohexylmethyl', '(cyclohexylmethyl)')
         'bis(cyclohexylmethyl)'
+        >>> multiplied_component(2, 'dodecyl', 'dodecyl')
+        'di(dodecyl)'
     """
+    if count > 1 and marked == name and enclose_if_compound(name) != name:
+        # (a) (the Blue Book-7087, "simple substituent prefixes
+        # having locants", 'di(propan-2-yl)') and (:7232, compound and
+        # complex prefixes): a multiplied component a caller passes bare takes the
+        # marks its name needs, so no producer can write 'dipropan-2-yl'.
+        marked = enclose_if_compound(name)
+    elif count > 1 and marked == name and needs_p1634_marks(name):
+        # (the Blue Book, "Parentheses... are used to enclose
+        # multiplied components that are:") (c) "simple substituent prefixes...
+        # beginning with a multiplicative prefix" ('di(dodecyl)') and (d) those
+        # "beginning with 'dec'" ('di(decyl)', 'tri(decyl)') (:7104); the
+        # multiplier stays the basic one. 'di(dodecyl)silane (PIN)' (:38222).
+        marked = f"({name})"
     mult = get_multiplier_prefix(count, name)
     if mult.endswith('-') and marked != name:
         #: the component is enclosed, so the hyphen goes.
         mult = mult[:-1]
+    if ((mult in COMPLEX_MULTIPLIERS.values() or mult.endswith('kis'))
+            and not _is_fully_enclosed(marked)):
+        # (the Blue Book): "Parentheses are used to enclose
+        # terms modified by the numerical prefixes 'bis', 'tris', 'tetrakis',
+        # etc." -- 'bis(sulfanyl)', never 'bissulfanyl'.
+        marked = apply_enclosing_marks(marked, -1)
     return f"{mult}{marked}"
 
 
@@ -2954,6 +3106,21 @@ def _is_locant_token(token: str) -> bool:
     return bool(head) and head in _ITALIC_LOCANT_LETTERS
 
 
+#: The italic designators that begin a retained ring parent name: 's-indacene
+#: (PIN)', 'as-indacene (PIN)', the Blue Book).
+_ITALIC_PARENT_DESIGNATOR_RE = re.compile(r"^(?:as|s)-(?=[a-z])")
+
+
+def begins_with_italic_designator(name: str) -> bool:
+    """True iff ``name`` opens with the italic designator of a retained parent
+    ('s-indacene', 'as-indacen-1-yl'). A preceding prefix that ends in a Roman
+    letter is then joined with a hyphen: (the Blue Book, "Hyphens
+    are used in substitutive names:") (d) "to separate italic letters from Roman
+    letters" (:6960), example '*as*-indacene' (:6966); '...cyclopenta[*cd*]-*s*-
+    indacene (PIN)' (:14505). So '3-methyl-s-indacene', not '3-methyls-indacene'."""
+    return bool(name) and bool(_ITALIC_PARENT_DESIGNATOR_RE.match(name))
+
+
 def starts_with_locant(prefix: str) -> bool:
     """True iff a formatted substituent prefix opens with a locant set.
 
@@ -2974,6 +3141,9 @@ def starts_with_locant(prefix: str) -> bool:
     if not sep or not head:
         return False
     return all(_is_locant_token(tok) for tok in head.split(","))
+
+
+_FUSION_LOCANT_RE = re.compile(r"(\d+)([a-z]+)")
 
 
 def locant_sort_key(locant) -> Tuple[int, int, str]:
@@ -3012,6 +3182,14 @@ def locant_sort_key(locant) -> Tuple[int, int, str]:
     text = str(locant)
     if text.isdigit():
         return (1, int(text), "")
+    # A fusion locant is a numeral plus a lower-case letter ('4a', '8a'), and
+    # (the Blue Book) places it "immediately after the
+    # corresponding numeric locant" ('4, 4a, 5'), not in the italic-letter class.
+    # Sorting a fused ring's '4a' against an int raised TypeError in
+    # name_substituted_heterocycle (breadth job 3, M35).
+    _fusion = _FUSION_LOCANT_RE.fullmatch(text)
+    if _fusion:
+        return (1, int(_fusion.group(1)), _fusion.group(2))
     return (0, 0, text)
 
 

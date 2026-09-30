@@ -18,8 +18,11 @@ Key naming patterns:
 """
 
 import itertools
+import re
 from collections import Counter
 from typing import Any, Dict, List
+
+import re
 
 from rdkit import Chem
 
@@ -228,6 +231,17 @@ def _ion_needs_enclosing_multiplier(name: str, *, organic_cation: bool = False) 
         return True
     if name.endswith(('azanide', 'phosphinate', 'phosphonate')):
         return True
+    # The anion of a mononuclear parent hydride ('azanetriide', 'phosphanetriide',
+    # 'sulfanediide';, the Blue Book-40902): 'di' before it reads
+    # as the anion of the dinuclear hydride ('diphosphanetriide', of diphosphane),
+    # a component "ambiguous if multiplied by... 'di', 'tri'" (d),
+    #:7037), so it takes 'bis': 'trimagnesium bis(phosphanetriide)'.
+    from .ions import _MONONUCLEAR_ANION_PARENT
+    for parent, _bonding in _MONONUCLEAR_ANION_PARENT.values():
+        stem = parent[:-1]
+        if name.startswith(stem) and name[len(stem):] in (
+                'ide', 'ediide', 'etriide', 'etetraide'):
+            return True
     return False
 
 
@@ -354,6 +368,187 @@ def _count_protonated_acid_sites(frag_mol) -> int:
             seen.add(m[0])                           # the -OH oxygen
         count += len(seen)
     return count
+
+
+def _acid_oxygen_sites(frag_mol):
+    """The anionic atoms of ``frag_mol`` when every one is an acid oxygen (an [O-]
+    on an atom that also carries =O: carboxylate, sulfonate, phosphate...), as
+    (O index, centre index) pairs; None otherwise or for a carbon-free anion."""
+    if frag_mol is None or not any(a.GetAtomicNum() == 6 for a in frag_mol.GetAtoms()):
+        return None
+    sites = []
+    for a in frag_mol.GetAtoms():
+        q = a.GetFormalCharge()
+        if q == 0:
+            continue
+        if q != -1 or a.GetAtomicNum() != 8 or a.GetDegree() != 1:
+            return None
+        owner = a.GetNeighbors()[0]
+        if not any(b.GetBondType() == Chem.BondType.DOUBLE
+                   and b.GetOtherAtom(owner).GetAtomicNum() == 8
+                   for b in owner.GetBonds()):
+            return None
+        sites.append((a.GetIdx(), owner.GetIdx()))
+    return sites
+
+
+def _is_polybasic_oxoacid_anion(frag_mol, n_hydrons: int) -> bool:
+    """True iff ``frag_mol`` is an organic polycarboxylate: every anionic atom is
+    a carboxylate oxygen, with more such sites than ``n_hydrons``, so that the
+    hydrons leave at least one site ionized method (2): "the
+    remaining acid hydrogen atom(s)"), and no ester group. An anion of a
+    noncarbon oxoacid (a phosphate ester) is named by
+    ``_bare_hydrons_on_one_oxoacid_centre``."""
+    sites = _acid_oxygen_sites(frag_mol)
+    if sites is None:
+        return False
+    if any(frag_mol.GetAtomWithIdx(c).GetAtomicNum() != 6 for _, c in sites):
+        return False
+    # A partial ESTER cites its hydrocarbyl groups before 'hydrogen'
+    #, the Blue Book); this branch cites none, so it declines.
+    ester = Chem.MolFromSmarts('[CX3](=O)[OX2][#6]')
+    if ester is not None and frag_mol.HasSubstructMatch(ester):
+        return False
+    return len(sites) > n_hydrons >= 1
+
+
+def _bare_hydrons_on_one_oxoacid_centre(mol, anion_frag_atoms, n_hydrons: int):
+    """``mol`` with its bare [H+] placed on the anionic oxygens of the ONE
+    noncarbon oxoacid centre that carries every anionic site of the anion
+    (``[O-]P(=O)([O-])OC`` + H+ -> ``O=P(O)([O-])OC``), those oxygens being
+    equivalent, so the placement is forced; None for any other anion. The salt is
+    then named like any drawn acid salt: method (2) as it applies to
+    esters "Partial esters of polybasic acids and their salts",
+    the Blue Book;:31938 "the components present are cited in the order,
+    cation, hydrocarbyl group, hydrogen, anion";:35944 "sodium methyl hydrogen
+    phosphate (PIN)") and (:31619, "potassium hydrogen
+    methylphosphonate (PIN)", drawn with a bare H+:31625)."""
+    anionic = [i for i in anion_frag_atoms if mol.GetAtomWithIdx(i).GetFormalCharge() < 0]
+    if not anionic:
+        return None
+    centres = set()
+    for i in anionic:
+        a = mol.GetAtomWithIdx(i)
+        if a.GetFormalCharge() != -1 or a.GetAtomicNum() != 8 or a.GetDegree() != 1:
+            return None
+        owner = a.GetNeighbors()[0]
+        if owner.GetAtomicNum() in (1, 6) or not any(
+                b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtom(owner).GetAtomicNum() == 8 for b in owner.GetBonds()):
+            return None
+        centres.add(owner.GetIdx())
+    if len(centres) != 1 or not (len(anionic) > n_hydrons >= 1):
+        return None
+    rank = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    rw = Chem.RWMol(mol)
+    for i in sorted(anionic, key=lambda k: rank[k])[:n_hydrons]:
+        a = rw.GetAtomWithIdx(i)
+        a.SetFormalCharge(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(1)
+    for h in sorted((a.GetIdx() for a in mol.GetAtoms()
+                     if a.GetAtomicNum() == 1 and a.GetDegree() == 0
+                     and a.GetFormalCharge() == 1), reverse=True)[:n_hydrons]:
+        rw.RemoveAtom(h)
+    out = rw.GetMol()
+    try:
+        Chem.SanitizeMol(out)
+    except Exception:
+        return None
+    return out
+
+
+def _fragment_atom_indices(mol, frag_mol):
+    """The atom indices of ``mol``'s fragment that is ``frag_mol`` (by canonical
+    SMILES), or None."""
+    target = Chem.MolToSmiles(frag_mol)
+    for idxs, frag in zip(Chem.GetMolFrags(mol, asMols=False, sanitizeFrags=False),
+                          Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=False)):
+        if Chem.MolToSmiles(frag) == target:
+            return list(idxs)
+    return None
+
+
+#: A free-acid prefix ('carboxy', not 'carboxylato' / 'carboxylate') or an
+#: embedded 'hydrogen' in an anion word: the word already expresses acid hydrons.
+_ACID_H_IN_WORD_RE = re.compile(r"carboxy(?!l)|hydrogen")
+
+
+def _anion_word_expresses_acid_hydrons(word: str) -> bool:
+    """True iff the anion word cites acid hydrons itself: a 'carboxy' prefix
+    (method (1), 'potassium 6-carboxyhexanoate') or an embedded 'hydrogen'
+    ('hydrogen carbonate', 'dihydrogen phosphate'). 'propane-1,2,3-tricarboxylate'
+    does not: its 'carboxy' is part of the '-carboxylate' suffix."""
+    return bool(word) and bool(_ACID_H_IN_WORD_RE.search(word))
+
+
+def _fully_ionized(frag_mol):
+    """``frag_mol`` with every acid -OH that ``_count_protonated_acid_sites``
+    counts (-COOH, and -OH on a P/S/Se centre carrying =O) ionized; None when it
+    has none or does not sanitize."""
+    if frag_mol is None or _count_protonated_acid_sites(frag_mol) == 0:
+        return None
+    from rdkit.Chem import MolFromSmarts
+    rw = Chem.RWMol(frag_mol)
+    seen = set()
+    for sma in ('[CX3](=O)[OX2H1]', '[#15,#16,#34](=O)[OX2H1]'):
+        for m in frag_mol.GetSubstructMatches(MolFromSmarts(sma)):
+            o = m[2]
+            if o in seen:
+                continue
+            seen.add(o)
+            a = rw.GetAtomWithIdx(o)
+            a.SetFormalCharge(-1)
+            a.SetNoImplicit(True)
+            a.SetNumExplicitHs(0)
+    ion = rw.GetMol()
+    try:
+        Chem.SanitizeMol(ion)
+    except Exception:
+        return None
+    return ion
+
+
+def _method_2_anion_word_reads_back(frag_mol, word: str) -> bool:
+    """True iff ``word`` is the anion word of a method (2) acid salt of
+    ``frag_mol``: it cites no acid hydrons itself, and ``'<n>hydrogen <word>'`` --
+    what name_salt will write -- reads back to the fragment with its hydrons on the
+    same atoms, or on other acid oxygens of equivalent noncarbon oxoacid centres
+    (the licence of validation/protonation_identity rule 2 (c);,
+    the Blue Book;,:36903)."""
+    n_h = _count_protonated_acid_sites(frag_mol) if frag_mol is not None else 0
+    if not word or n_h == 0 or _anion_word_expresses_acid_hydrons(word):
+        return False
+    text = f"{_HYDROGEN_PREFIXES.get(n_h, 'hydrogen')} {word}"
+    try:
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        from ..validation.protonation_identity import (
+            _same_oxoacid_hydrons_among_equivalent_centres, protonation_site_verdict)
+        smiles = Chem.MolToSmiles(frag_mol)
+        rt = opsin_roundtrip_check(smiles, text)
+        parsed = rt.get("opsin_smiles") or ""
+        if rt.get("passed") is not True or not parsed:
+            return False
+        if protonation_site_verdict(smiles, parsed) != "mismatch":
+            return True
+        pm = Chem.MolFromSmiles(parsed)
+        return pm is not None and _same_oxoacid_hydrons_among_equivalent_centres(frag_mol, pm)
+    except Exception:
+        return False
+
+
+def _fully_ionized_anion_word(frag_mol, style: str) -> str:
+    """The method (2) anion word for ``frag_mol``: the ordinary name of its fully
+    ionized form, when OPSIN reads it back to that form; '' otherwise."""
+    ion = _fully_ionized(frag_mol)
+    if ion is None:
+        return ''
+    from .charged_router import route_charged
+    try:
+        word = route_charged(ion, style) or name_anion(ion, style)
+    except Exception:
+        return ''
+    return word if word and _ion_fragment_roundtrips(ion, word) else ''
 
 
 def _protonate_amines_with_h_plus(mol, n_protons: int):
@@ -558,7 +753,7 @@ def _ion_fragment_roundtrips(frag_mol, name: str) -> bool:
         # shadow the best-effort per-component name that puts the charge where
         # the input has it.
         return protonation_site_verdict(
-            smiles, rt.get("opsin_smiles") or "") != "mismatch"
+            smiles, rt.get("opsin_smiles") or "", name) != "mismatch"
     except Exception:  # fail-closed: a probe bug must never accept a wrong ion
         return False
 
@@ -717,7 +912,33 @@ def name_salt(mol, style: str = 'pin', *,
     # anion-only name (e.g. 'chloride'/'chloride monohydrate') -- a WRONG species
     # (net charge -1). Fail closed. Also closes the pre-existing [H+].[Cl-]->'chloride'
     # default-path 0-wrong bug.
-    if h_plus_frags:
+    # method (2) (the Blue Book): an acid salt drawn with its
+    # acid hydron(s) as bare [H+] beside the cation(s) of a polybasic oxoacid anion
+    # leaves the hydron's site open -- "Method (1) generates preferred IUPAC
+    # names, except when the structure of the acid salt is unknown" (:31596) --
+    # and is named like the neutral salt with the word 'hydrogen' between the
+    # cation(s) and the anion: 'sodium hydrogen 2-(carboxylatomethyl)benzoate
+    # (PIN)' (:31610), 'potassium sodium hydrogen propane-1,2,3-tricarboxylate
+    # (PIN)' (:31612). The hydrons are kept (``bare_acid_hydrons``) and cited below.
+    # The anion of a noncarbon oxoacid (a phosphate ester, a phosphonate) whose
+    # anionic sites all sit on one centre takes the hydron(s) on that centre --
+    # its oxygens are equivalent, so the site is forced -- and is named as the
+    # drawn acid salt ('sodium methyl hydrogen phosphate').
+    bare_acid_hydrons = 0
+    if (h_plus_frags and other_cation_frags and not neutrals
+            and len(frags['anions']) == 1):
+        anion_atoms = _fragment_atom_indices(mol, frags['anions'][0]['mol'])
+        placed = (_bare_hydrons_on_one_oxoacid_centre(mol, anion_atoms, len(h_plus_frags))
+                  if anion_atoms is not None else None)
+        if placed is not None:
+            return name_salt(placed, style, general_fallback=general_fallback,
+                             general_fallback_unverified=general_fallback_unverified,
+                             allow_aromatic_general=allow_aromatic_general)
+        if _is_polybasic_oxoacid_anion(frags['anions'][0]['mol'], len(h_plus_frags)):
+            bare_acid_hydrons = len(h_plus_frags)
+        else:
+            return ''
+    elif h_plus_frags:
         return ''
 
     cation_names = []
@@ -793,6 +1014,7 @@ def name_salt(mol, style: str = 'pin', *,
     if len(cation_names) != len(cation_list):
         return ''
 
+    systematic_anion_words = {}
     # Process anions. /: name the ORGANIC anion via the
     # route_charged chokepoint (it owns the parent decision: -oate / -olate /
     # -sulfonate / -ide), falling back to name_anion and the INORGANIC_ANIONS
@@ -805,6 +1027,15 @@ def name_salt(mol, style: str = 'pin', *,
 
         if smiles in INORGANIC_ANIONS:
             anion_names.append(INORGANIC_ANIONS[smiles])
+            # The table word of a one-atom anion of a mononuclear parent hydride
+            # ('nitride', 'phosphide', 'carbide') has the systematic '-ide' name as
+            # its alternative, the Blue Book-40902: 'azanetriide',
+            # 'phosphanetriide', ``ions._name_mononuclear_hydride_anion``); used
+            # below when OPSIN reads the table-word salt name back as nothing.
+            from .ions import _name_mononuclear_hydride_anion
+            _sys_word = _name_mononuclear_hydride_anion(frag_mol)
+            if _sys_word:
+                systematic_anion_words[INORGANIC_ANIONS[smiles]] = _sys_word
             continue
         # W3-P10: di-/polynuclear oxoacid anion word ('diphosphate')
         # BEFORE the generic name_anion, which would otherwise emit the neutral acid
@@ -825,11 +1056,24 @@ def name_salt(mol, style: str = 'pin', *,
         # THIS fragment; replace with the (RT-verified) best-effort name only
         # when that yields a verified alternative, so a correct ordinary name is
         # never discarded (PIN tier + canary salts stay byte-identical).
-        if _be and name and not _ion_fragment_roundtrips(frag_mol, name):
-            alt = _name_organic_ion_best_effort(
-                smiles, general_fallback=general_fallback,
-                general_fallback_unverified=general_fallback_unverified,
-                allow_aromatic_general=allow_aromatic_general)
+        # The anion word of a method (2) acid salt names the FULLY ionized
+        # fragment; it is right only where the salt's 'hydrogen' word will cite
+        # the hydrons: one anion fragment whose name carries no free-acid prefix.
+        _method_2_word_ok = len(frags['anions']) == 1
+        if _be and name and not (_ion_fragment_roundtrips(frag_mol, name)
+                                 or (_method_2_word_ok
+                                     and _method_2_anion_word_reads_back(frag_mol, name))):
+            # The anion word of the method (2) acid salt (the salt's 'hydrogen'
+            # word cites the hydrons) before the per-component fallback, so the
+            # salt keeps a salt name ('disodium dihydrogen methylenebis(phosphonate)').
+            word = _fully_ionized_anion_word(frag_mol, style) if _method_2_word_ok else ''
+            if word and not _method_2_anion_word_reads_back(frag_mol, word):
+                word = ''
+            alt = (word
+                   or _name_organic_ion_best_effort(
+                       smiles, general_fallback=general_fallback,
+                       general_fallback_unverified=general_fallback_unverified,
+                       allow_aromatic_general=allow_aromatic_general))
             if alt:
                 name = alt
         if not name:
@@ -903,12 +1147,28 @@ def name_salt(mol, style: str = 'pin', *,
         # 'dihydrogen phosphate',. Only a fully-systematic organic
         # '-oate/-dioate' anion takes the separate 'hydrogen' (method 2 general
         # form, e.g. 'sodium hydrogen but-2-enedioate').
-        acid_h_expressed = any(('carboxy' in a) or ('hydrogen' in a)
-                               for a in anion_names)
+        acid_h_expressed = any(_anion_word_expresses_acid_hydrons(a) for a in anion_names)
+        # A name that reads back to the anion fragment AS DRAWN already carries
+        # its acid hydrons (a 'hydroxy' prefix of a general-tier anion name:
+        # '2,4-dihydroxy-2,4-dioxido-1,5-dioxa-2,4-diphosphapenta-1,4-diene');
+        # a 'hydrogen' word would count them twice.
+        if (protonated_acids > 0 and not acid_h_expressed and len(anion_names) == 1
+                and (general_fallback or general_fallback_unverified
+                     or allow_aromatic_general)
+                and _ion_fragment_roundtrips(anion_frag['mol'], anion_names[0])):
+            acid_h_expressed = True
         if protonated_acids > 0 and not acid_h_expressed:
             hydrogen_prefix = _HYDROGEN_PREFIXES.get(
                 protonated_acids, 'hydrogen'
             )
+        # The bare acid hydrons of a method (2) acid salt (above): the anion is
+        # named with every acid site ionized, so its name cannot express them.
+        if bare_acid_hydrons:
+            if protonated_acids:
+                return ''
+            hydrogen_prefix = _HYDROGEN_PREFIXES.get(bare_acid_hydrons, '')
+            if not hydrogen_prefix:
+                return ''
 
     # Handle stoichiometry - count duplicates
     cation_counts = Counter(cation_names)
@@ -934,7 +1194,103 @@ def name_salt(mol, style: str = 'pin', *,
         result_parts = formatted_cations + formatted_anions
 
     result = ' '.join(result_parts)
+    if systematic_anion_words and not hydrogen_prefix:
+        result = _binary_salt_name_read_back(
+            mol, result, formatted_cations, anion_counts, systematic_anion_words)
+    if not hydrogen_prefix:
+        result = _charge_fixed_ratio_name(mol, result, cation_counts, anion_counts)
     return result + solvate_suffix
+
+
+#: A cation word that states its charge: an oxidation number '(III)' or a charge
+#: number '(3+)' at the end of the word.
+_STATED_CHARGE_RE = re.compile(r'\((?:[IVX]+|\d+\+)\)$')
+
+
+def _charge_fixed_ratio_name(mol, result: str, cation_counts, anion_counts) -> str:
+    """The binary name without stoichiometric prefixes, when the cation word states
+    its charge and OPSIN reads that name back to the input's full InChIKey; else
+    ``result``.
+
+    With one cation and one anion, and the cation's charge stated by its oxidation
+    or charge number, the ratio of the two ions is fixed by electroneutrality, so
+    the prefixes add nothing: 'iron(III) oxide', not 'bis[iron(III)] trioxide',
+    whose enclosing marks the stoichiometric prefix needed only because the charge
+    number is itself in parentheses. Binary names cite "the name of the cation
+    followed by that of the anion", the Blue Book). A name OPSIN
+    2.9.0 reads as another ratio or another species ('copper(I) oxide' reads as
+    [Cu-]=O) is not read back and keeps ``result``."""
+    if len(cation_counts) != 1 or len(anion_counts) != 1:
+        return result
+    (cation, n_cat), = cation_counts.items()
+    (anion, n_an), = anion_counts.items()
+    if (n_cat == 1 and n_an == 1) or not _STATED_CHARGE_RE.search(cation):
+        return result
+    plain = f"{cation} {anion}"
+    if plain == result:
+        return result
+    try:
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        if opsin_roundtrip_check(Chem.MolToSmiles(mol), plain).get("passed") is True:
+            return plain
+    except Exception:  # noqa: BLE001 - keep today's name
+        return result
+    return result
+
+
+def _binary_salt_name_read_back(mol, result: str, formatted_cations, anion_counts,
+                                systematic_anion_words) -> str:
+    """``result`` when OPSIN reads it back to the input's full InChIKey; else the
+    same binary name with each one-atom anion cited by its systematic '-ide' name.
+
+     (the Blue Book): salts take "binary names formed by citing the
+    name of the cation followed by that of the anion"; the anion of a mononuclear
+    parent hydride is named with the suffix '-ide',:40900-40902).
+    OPSIN 2.9.0 reads no structure from 'aluminium nitride', 'trimagnesium
+    diphosphide' or 'gallium arsenide', and does read 'aluminium azanetriide',
+    'trimagnesium bis(phosphanetriide)'. A multiplied hydride anion takes 'bis' and
+    parentheses: 'diphosphanetriide' reads as an anion of diphosphane (d),
+    :7037, a component "ambiguous if multiplied by... 'di', 'tri'"). Tried with the
+    stoichiometric prefixes first, then without them (the charges fix the ratio):
+    'magnesium phosphanetriide'. The first form OPSIN reads back exactly is used;
+    when none is, ``result`` is returned unchanged."""
+    try:
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        smiles = Chem.MolToSmiles(mol)
+        if opsin_roundtrip_check(smiles, result).get("passed") is True:
+            return result
+        from ..assembly.naming_utils import COMPLEX_MULTIPLIERS
+        sys_anions = []
+        for name in sorted(anion_counts):
+            word = systematic_anion_words.get(name, name)
+            count = anion_counts[name]
+            if count > 1 and name in systematic_anion_words:
+                sys_anions.append(f"{COMPLEX_MULTIPLIERS[count]}({word})")
+            else:
+                sys_anions.append(_apply_stoichiometric_prefix(word, count))
+        plain_c = sorted({_strip_stoichiometry(c) for c in formatted_cations})
+        candidates = [
+            # the table words without the stoichiometric prefixes ('lithium nitride')
+            ' '.join(plain_c + sorted(anion_counts)),
+            # the systematic anion names, with the prefixes, then without
+            ' '.join(formatted_cations + sys_anions),
+            ' '.join(plain_c + sorted(systematic_anion_words.get(n, n)
+                                      for n in anion_counts)),
+        ]
+        for cand in candidates:
+            if cand != result and opsin_roundtrip_check(smiles, cand).get("passed") is True:
+                return cand
+    except Exception:  # noqa: BLE001 - keep today's name
+        return result
+    return result
+
+
+def _strip_stoichiometry(word: str) -> str:
+    """'trimagnesium' -> 'magnesium' (a basic stoichiometric prefix only)."""
+    for prefix in sorted(STOICHIOMETRIC_PREFIXES.values(), key=len, reverse=True):
+        if prefix and word.startswith(prefix) and len(word) > len(prefix) + 2:
+            return word[len(prefix):]
+    return word
 
 
 def _apply_stoichiometric_prefix(name: str, count: int, *,

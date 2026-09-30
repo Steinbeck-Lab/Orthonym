@@ -483,9 +483,17 @@ BB_SUBSTITUTED_TWO_UNIT = [
 # an enclosed substituent, so `[1,2,4]triazolo[1,5-a]pyrimidin-2-yl` and
 # `[4-2H]benzoyl` were called substituted against the verbatim (f).
 # ---------------------------------------------------------------------------
-BB_SIMPLE_BARE_RING_YL = [
+# a performance pass: the Hantzsch-Widman ring-yls that open with an 'a' prefix are simple
+# but take the derived multiplier by (c) (the Blue Book,
+# "before skeletal replacement ('a') prefixes, such as 'aza', 'oxa', etc. that are
+# used in the construction of Hantzsch-Widman names";:7178 'bis(1,2-oxazol-3-yl)
+#... whereas di(1,2-oxazol-3-yl) might be interpreted as a 'dioxazole' ring
+# system'): 'bis(oxolan-2-yl)methanol', read back exact by OPSIN.
+BB_REPLACEMENT_FRONT_RING_YL = [
     "oxolan-2-yl", "oxan-4-yl", "oxocan-2-yl", "oxonan-2-yl",
     "1,3-dioxolan-2-yl", "1,3-dioxan-2-yl",
+]
+BB_SIMPLE_BARE_RING_YL = [
     "triphenylen-2-yl", "pyridin-2-yl", "thiophen-2-yl",
     "1H-imidazol-1-yl", "piperidin-1-yl", "pyrrolidin-1-yl",
     "cyclohexen-1-yl", "isoxazol-3-yl",
@@ -510,6 +518,13 @@ def test_p3final_simple_class_takes_the_basic_multiplier(name):
     )
     assert get_multiplier_prefix(2, name).rstrip("-") == "di"
     assert get_multiplier_prefix(3, name).rstrip("-") == "tri"
+
+
+@pytest.mark.parametrize("name", BB_REPLACEMENT_FRONT_RING_YL)
+def test_replacement_front_ring_yl_is_simple_but_takes_bis(name):
+    assert is_substituted_substituent(name) is False, name
+    assert get_multiplier_prefix(2, name) == "bis"
+    assert get_multiplier_prefix(3, name) == "tris"
 
 
 @pytest.mark.parametrize("name", BB_SUBSTITUTED_CONCATENATED_OXY
@@ -571,6 +586,13 @@ def test_a_ring_stem_is_never_peeled_as_a_characteristic_group_prefix():
     `bis(oxolan-2-yl)methanol` where BB 29677's `di(furan-2-yl)` class requires
     `di(oxolan-2-yl)methanol`. The negative-control list it relied on covered
     only the 20 acyclic alkyl roots, so no ring name could ever be protected.
+
+    (a performance pass: the multiplier of a Hantzsch-Widman prefix is 'bis' all the same, by
+     (c), the Blue Book, "before skeletal replacement ('a')
+    prefixes... used in the construction of Hantzsch-Widman names", 'bis(1,2-
+    oxazol-3-yl)... whereas di(1,2-oxazol-3-yl) might be interpreted as a
+    'dioxazole' ring system'; furan is a retained name, not a Hantzsch-Widman
+    one. This test asserts the predicate only, which is unchanged.)
     """
     for nm in ("oxolan-2-yl", "oxocan-2-yl", "oxonan-2-yl",
                "1,3-dioxolan-2-yl", "triphenylen-2-yl"):

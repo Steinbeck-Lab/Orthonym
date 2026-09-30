@@ -31,13 +31,19 @@ import pytest
 from orthonym.namer import name_compound
 
 
+# a performance pass: the N-substituent is cited in the one alphanumerical series with the
+# acyl prefixes, (the Blue Book, "Simple prefixes (i.e., those
+# describing atoms and unsubstituted substituents) are arranged alphabetically")
+# and (:3477, "The name of a prefix for a substituent is considered to
+# begin with the first letter of its complete name"): 'N-(4-hydroxyphenyl)-2-
+# methylpropanamide'.
 @pytest.mark.parametrize("smiles,expected", [
     # --- the stated targets: paracetamol's isobutyryl / acryloyl cousins ---
-    ("CC(C)C(=O)Nc1ccc(O)cc1", "2-methyl-N-(4-hydroxyphenyl)propanamide"),
+    ("CC(C)C(=O)Nc1ccc(O)cc1", "N-(4-hydroxyphenyl)-2-methylpropanamide"),
     ("C=CC(=O)Nc1ccc(O)cc1",   "N-(4-hydroxyphenyl)prop-2-enamide"),
     # branched saturated, other acyls
-    ("CC(C)(C)C(=O)Nc1ccc(O)cc1", "2,2-dimethyl-N-(4-hydroxyphenyl)propanamide"),
-    ("CC(C)CC(=O)Nc1ccc(O)cc1",   "3-methyl-N-(4-hydroxyphenyl)butanamide"),
+    ("CC(C)(C)C(=O)Nc1ccc(O)cc1", "N-(4-hydroxyphenyl)-2,2-dimethylpropanamide"),
+    ("CC(C)CC(=O)Nc1ccc(O)cc1",   "N-(4-hydroxyphenyl)-3-methylbutanamide"),
     ("CCC(CC)C(=O)Nc1ccc(O)cc1",  "2-ethyl-N-(4-hydroxyphenyl)butanamide"),
     # unsaturated acyls
     ("C#CC(=O)Nc1ccc(O)cc1",   "N-(4-hydroxyphenyl)prop-2-ynamide"),
@@ -46,12 +52,12 @@ from orthonym.namer import name_compound
     ("CC(C)=CC(=O)Nc1ccc(O)cc1", "N-(4-hydroxyphenyl)-3-methylbut-2-enamide"),
     ("C=C(C)C(=O)Nc1ccc(O)cc1",  "N-(4-hydroxyphenyl)-2-methylprop-2-enamide"),
     # carbocyclic substituent on the acyl (phenylacetyl / cyclohexylacetyl)
-    ("c1ccccc1CC(=O)Nc1ccc(O)cc1",  "2-phenyl-N-(4-hydroxyphenyl)acetamide"),
+    ("c1ccccc1CC(=O)Nc1ccc(O)cc1",  "N-(4-hydroxyphenyl)-2-phenylacetamide"),
     # junior FG = amine (also junior to amide,, and other ring positions
-    ("CC(C)C(=O)Nc1ccc(N)cc1",  "2-methyl-N-(4-aminophenyl)propanamide"),
-    ("CC(C)C(=O)Nc1ccccc1O",    "2-methyl-N-(2-hydroxyphenyl)propanamide"),
+    ("CC(C)C(=O)Nc1ccc(N)cc1",  "N-(4-aminophenyl)-2-methylpropanamide"),
+    ("CC(C)C(=O)Nc1ccccc1O",    "N-(2-hydroxyphenyl)-2-methylpropanamide"),
     # N-alkyl carrying the junior FG (hydroxyethyl)
-    ("CC(C)C(=O)NCCO",  "2-methyl-N-(2-hydroxyethyl)propanamide"),
+    ("CC(C)C(=O)NCCO",  "N-(2-hydroxyethyl)-2-methylpropanamide"),
 ])
 def test_polyfunctional_branched_or_unsaturated_amide_now_names(smiles, expected):
     assert name_compound(smiles) == expected
@@ -61,7 +67,7 @@ def test_polyfunctional_branched_or_unsaturated_amide_now_names(smiles, expected
     # _enrich_ring_n_substituent no longer double-counts an aromatic ring-FG.
     # (branched acyl -> new route; acetyl -> pre-existing name_amide route: BOTH
     # used to double-count the hydroxy and abstain.)
-    ("CC(C)C(=O)NCc1ccc(O)cc1", "2-methyl-N-[(4-hydroxyphenyl)methyl]propanamide"),
+    ("CC(C)C(=O)NCc1ccc(O)cc1", "N-[(4-hydroxyphenyl)methyl]-2-methylpropanamide"),
     ("CC(=O)NCc1ccc(O)cc1",     "N-[(4-hydroxyphenyl)methyl]acetamide"),
 ])
 def test_aromatic_n_substituent_ring_fg_not_double_counted(smiles, expected):

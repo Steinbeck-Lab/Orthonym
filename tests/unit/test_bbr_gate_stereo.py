@@ -30,6 +30,51 @@ Gold row: O[C@H]1CC[C@@H](O)CC1 -> (1s,4s)-cyclohexane-1,4-diol /
 import pytest
 
 from orthonym import Orthonym
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "O[C@H]1CC[C@@H](O)CC1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "O[C@H]1CC[C@@H](O)CC1",
+})
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 def _simulated_opsin_status(name: str) -> str:
@@ -70,7 +115,15 @@ def test_cyclohexanediol_not_gate_suppressed(gate_enabled_real_policy):
     #: the raw name is already correct; with the gate ENABLED and OPSIN
     # rejecting the stereo block but PARSING the stereo-stripped form, Plan 04's
     # where-it-fails logic ships the full name. FIXED — permanent green tripwire.
-    assert Orthonym().name("O[C@H]1CC[C@@H](O)CC1") == "(1s,4s)-cyclohexane-1,4-diol"
+    # The gate's output is the strict path's name; with switched off by this
+    # fixture no constitution-only verdict is recorded, so the default tier's emission
+    # rule declines the name here (NO_VERIFIED_PIN). With the real gate it records
+    # 'self_consistency_constitution_only' and the default tier emits the name (one
+    # of its exceptions; tests/integration/test_readme_claims.py).
+    from tests.support.default_tier import strict_path_name
+    assert strict_path_name("O[C@H]1CC[C@@H](O)CC1") == "(1s,4s)-cyclohexane-1,4-diol"
+    assert (Orthonym().name_tiered("O[C@H]1CC[C@@H](O)CC1")["limit_code"]
+            == "NO_VERIFIED_PIN")
 
 
 @pytest.mark.unit

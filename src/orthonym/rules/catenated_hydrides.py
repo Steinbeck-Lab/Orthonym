@@ -134,7 +134,12 @@ def name_catenated_hydride(mol) -> Optional[str]:
     # not silthiane; siloxane keeps no linker — vowel-initial).
     link = '' if suffix[0] in _VOWELS else 'a'
     base = f"{stem}{link}{suffix}"
-    multiplier = get_multiplier_prefix(len(hub_atoms), base)
+    # The prefix counts the hub atoms of the chain, 'disiloxane',
+    # 'diphosphaselenane'): a basic numerical term, never the 'bis' of a
+    # multiplied component (c) concerns multiplied components).
+    from ..assembly.naming_utils import simple_multiplier_word
+    multiplier = simple_multiplier_word(len(hub_atoms)) or get_multiplier_prefix(
+        len(hub_atoms), base)
     return f"{multiplier}{base}"
 
 
@@ -382,10 +387,8 @@ def _try_aba_parent(mol, order, chal_set) -> Optional[str]:
         marked = enclose_if_compound(nm)
         if len(uniq) >= 2 and i > 0 and marked == nm:
             marked = apply_enclosing_marks(nm, -1)
-        if m and marked == nm and multiplier_needs_hyphen(nm):
-            token = f"{m}-{marked}"              # (b)/(d) di-tert-butyl
-        else:
-            token = f"{m}{marked}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        token = _mc(counts[nm], nm, marked)     # (b)/(d) di-tert-butyl
         parts.append(token)
     return f"{''.join(parts)}{parent}"
 

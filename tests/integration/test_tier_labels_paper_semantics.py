@@ -3,10 +3,13 @@
 The paper's tiers (Methods, "Tiers"; the brief of this job):
 
 - pin_verified: built by the strict PIN path, certified as the PIN, and verified.
-- pin_unverified: a verified name from the PIN path that is not certified as the PIN.
+- pin_unverified: a verified name in PIN form from the PIN path that is not certified
+  as the PIN ("a name in PIN form that only a breadth producer built").
 - systematic_verified: a verified systematic name from the general engine or a
   trivial/retained table that is not the PIN ("for example, a von Baeyer name for a
-  fused ring system").
+  fused ring system"), and a verified PIN-path name that contains a part the code
+  records as not the PIN (user decision 2026-09-30: "a correct systematic name that
+  is not the PIN").
 - best_effort: the best-effort rescue producers (the last-resort floor offer), and a
   name no round trip of the shipped string verified.
 
@@ -103,13 +106,13 @@ def test_inline_lane_primary_offer_verified_by_the_gate_is_systematic_verified(
     assert row["verified"] == "opsin", row
 
 
-def test_pin_path_name_with_a_non_pin_part_verified_is_pin_unverified(monkeypatch):
+def test_pin_path_name_with_a_non_pin_part_verified_is_systematic_verified(monkeypatch):
     name = "(trimethylazaniumyl)acetate"
     monkeypatch.setattr(Orthonym, "name", _fake_name_with_primary_offer(
         "pin_path", name, "best_effort", gate_outcome=pv.GATE_OUTCOME_SELF01,
         non_pin_fragment="trimethylazaniumyl"))
     row = Orthonym().name_tiered("C[N+](C)(C)CC(=O)[O-]")
-    assert row["tier"] == "pin_unverified", row
+    assert row["tier"] == "systematic_verified", row
     assert row["is_pin"] is False and row["source"] == "pin_path", row
     assert row["verified"] == "opsin", row
 
@@ -150,7 +153,7 @@ def test_name_verified_by_the_shipped_name_check_takes_its_verified_tier(monkeyp
 
 
 @pytest.mark.opsin_gate
-def test_pin_path_non_pin_name_verified_by_the_shipped_name_check_is_pin_unverified(
+def test_pin_path_non_pin_name_verified_by_the_shipped_name_check_is_systematic(
         monkeypatch):
     jar_or_skip()
     name = "(trimethylazaniumyl)acetate"
@@ -160,7 +163,7 @@ def test_pin_path_non_pin_name_verified_by_the_shipped_name_check_is_pin_unverif
         "C[N+](C)(C)CC(=O)[O-]")
     assert row["name"] == name, row
     assert row["gate_outcome"] == pv.GATE_OUTCOME_FULL_KEY_VERIFIED, row
-    assert row["tier"] == "pin_unverified" and row["is_pin"] is False, row
+    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
 
 
 @pytest.mark.opsin_gate

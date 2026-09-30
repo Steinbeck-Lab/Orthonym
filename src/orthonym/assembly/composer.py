@@ -3019,14 +3019,16 @@ def _try_name_cyanamide(features: Any) -> Optional[str]:
     _counts = Counter(sub_names)
     if len(_counts) == 1:
         nm = next(iter(_counts))
-        return f"{get_multiplier_prefix(len(sub_names), nm)}{_wrap(nm) if needs_brackets(nm) else nm}cyanamide"
+        from .naming_utils import multiplied_component as _mc
+        return f"{_mc(len(sub_names), nm, _wrap(nm) if needs_brackets(nm) else nm)}cyanamide"
     # 2+ distinct substituents -> alphanumeric order, wrap compounds
     _parts = []
     for nm in sorted(_counts, key=alpha_sort_key):
         _c = _counts[nm]
         piece = _wrap(nm)
         if _c > 1:
-            piece = f"{get_multiplier_prefix(_c, nm)}{piece}"
+            from .naming_utils import multiplied_component as _mc
+            piece = _mc(_c, nm, piece)
         _parts.append(piece)
     return f"{''.join(_parts)}cyanamide"
 
@@ -3194,7 +3196,8 @@ def _condensed_guanidine_name(mol) -> tuple:
     parts = []
     for nm in sorted(groups, key=lambda x: (alpha_sort_key(x), x)):
         locs = ",".join(_txt(l) for l in sorted(groups[nm]))
-        parts.append(f"{locs}-{get_multiplier_prefix(len(groups[nm]), nm)}{_enc(nm)}")
+        from .naming_utils import multiplied_component as _mc
+        parts.append(f"{locs}-{_mc(len(groups[nm]), nm, _enc(nm))}")
     return (True, "-".join(parts) + "imidodicarbonimidic diamide")
 
 
@@ -3314,7 +3317,8 @@ def _carbamic_n_substituted_name(n_subs: list, base_name: str) -> str:
     for name in sorted(counts, key=lambda n: (alpha_sort_key(n), n)):
         enc = apply_enclosing_marks(name, -1) if needs_brackets(name) else name
         count = counts[name]
-        texts.append(enc if count == 1 else f"{get_multiplier_prefix(count, name)}{enc}")
+        from .naming_utils import multiplied_component as _mc
+        texts.append(enc if count == 1 else _mc(count, name, enc))
     return retained_acetic_from_prefixes(texts, parent=base_name, enclose_subsequent=True)
 
 
@@ -3405,8 +3409,8 @@ def _build_n_substituted_name(
             # substituent, so `count == 1` here.
             prefix_parts.append(enc if _omit_n_locant else f"{locant_str}-{enc}")
         else:
-            mult = get_multiplier_prefix(count, name)
-            prefix_parts.append(f"{locant_str}-{mult}{enc}")
+            from .naming_utils import multiplied_component as _mc
+            prefix_parts.append(f"{locant_str}-{_mc(count, name, enc)}")
 
     prefix = "-".join(prefix_parts)
     return _join_prefix_to_name(prefix, base_name)  # L2
@@ -4751,10 +4755,10 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
             prefix_parts.append(f"{_render_primed_locant(locants[0])}-{enclose_if_compound(name)}")
         else:
             locant_str = ",".join(_render_primed_locant(loc) for loc in locants)
-            multiplier = get_multiplier_prefix(count, name)
+            from .naming_utils import multiplied_component as _mc
             #: a compound/complex substituent takes enclosing marks; the
             # multiplicative prefix (bis/tris) is cited outside them.
-            prefix_parts.append(f"{locant_str}-{multiplier}{enclose_if_compound(name)}")
+            prefix_parts.append(f"{locant_str}-{_mc(count, name, enclose_if_compound(name))}")
 
     # Alphabetize prefixes per IUPAC
     prefix_parts.sort(key=lambda x: alpha_sort_key(x))
@@ -5004,14 +5008,14 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
                 ring_atom_to_locant.get(a, 1) for a in attach_atoms_list
             )
             locant_str = ",".join(str(loc) for loc in locants)
-            multiplier = get_multiplier_prefix(count, prefix_name)
+            from .naming_utils import multiplied_component as _mc
             if is_acyloxy:
                 prefix_parts.append(
-                    f"{locant_str}-{multiplier}({prefix_name})"
+                    f"{locant_str}-{_mc(count, prefix_name, f'({prefix_name})')}"
                 )
             else:
                 prefix_parts.append(
-                    f"{locant_str}-{multiplier}{enclose_if_compound(prefix_name)}"
+                    f"{locant_str}-{_mc(count, prefix_name, enclose_if_compound(prefix_name))}"
                 )
 
     # Sort alphabetically per IUPAC
@@ -6104,8 +6108,8 @@ def _format_hydrazide_nn_prefix(inner_subs, term_subs):
         if len(locs) == 1:
             parts.append((alpha_sort_key(nm), f"{loc_str}-{wrapped}"))
         else:
-            mp = get_multiplier_prefix(len(locs), nm)
-            parts.append((alpha_sort_key(nm), f"{loc_str}-{mp}{wrapped}"))
+            from .naming_utils import multiplied_component as _mc
+            parts.append((alpha_sort_key(nm), f"{loc_str}-{_mc(len(locs), nm, wrapped)}"))
     parts.sort(key=lambda p: p[0])
     # No trailing hyphen: the last N-substituent prepends directly to the base
     # ('N-ethyl-N'-methylacetohydrazide', 'N'-methylethanehydrazide').
@@ -6586,8 +6590,8 @@ def _assemble_geminal_dicarboximidamide_name(features: Any, style: str):
         loc_str = ",".join(tok for _p, tok in toks_sorted)
         count = len(toks_sorted)
         if count > 1:
-            mp = get_multiplier_prefix(count, sub_name)
-            rendered = f"{loc_str}-{mp}{_wrap_n_substituent(sub_name)}"
+            from .naming_utils import multiplied_component as _mc
+            rendered = f"{loc_str}-{_mc(count, sub_name, _wrap_n_substituent(sub_name))}"
         else:
             rendered = f"{loc_str}-{_wrap_n_substituent(sub_name)}"
         segments.append((alpha_sort_key(sub_name), rendered))
@@ -6597,6 +6601,123 @@ def _assemble_geminal_dicarboximidamide_name(features: Any, style: str):
     if not n_prefix:
         return None
     return f"{n_prefix}{base_name}"
+
+
+def _rendered_prefix_is(name: str, rendered: str, locants) -> bool:
+    """Is the formatted prefix ``rendered`` (cited at ``locants``) the prefix
+    ``name``, once per locant? Decided by rendering ``name`` with the shared
+    formatter and comparing -- the fragment's text is never taken apart."""
+    locs = list(locants or ())
+    if not locs:
+        return False
+    try:
+        return format_substituent_prefix(name, locs, len(locs)) == rendered
+    except Exception:  # noqa: BLE001 - an unrenderable name is not this prefix
+        return False
+
+
+def _amide_with_identical_prefixes_merged(c_items, n_subs, parent_word):
+    """One substitutive amide name whose identical prefixes form one group.
+
+    ``c_items`` are the acyl-side (C-locanted) prefixes as ``(rendered, name,
+    locants)`` -- ``name`` None when only the rendered text is known -- and
+    ``n_subs`` the amide nitrogen's substituents (``get_n_substituents``).
+     (b) (the Blue Book) / (a) (:7104): the multiplying
+    prefix counts a PREFIX, whatever atom bears it, so an N-substituent and an acyl
+    prefix of the same name are one group, its locants in the order
+    (:3195, italic letters first) -- '*N*,2-dimethylpropanamide' and '*N*,*N*,2-
+    trimethyl-3-{...}propanamide (PIN)' (:21624), '*N*,4-dimethyl-*N*-(3-methyl-
+    phenyl)benzamide (PIN)' (:32879) -- and two acyl prefixes of the same name are
+    one group too ('2,2,2-trifluoro', never '2-fluoro-2-fluoro-2-fluoro'). The
+    groups are then cited in one alphanumerical series,:3375).
+    '2-phenyl-N-phenylacetamide' becomes 'N,2-diphenylacetamide'.
+
+    The N-substituents are cited in the same series as the acyl prefixes also when
+    no name is shared,:3448, "Simple prefixes... are arranged
+    alphabetically";,:3477): 'N-benzyl-2-methylpentanamide', not
+    '2-methyl-N-benzylpentanamide' (as the ring carboxamides, a performance pass). Inside
+    ``identical_prefixes_cited_apart`` nothing is merged, and the order still holds.
+
+    Returns None when there is nothing to merge or reorder (no N-substituent next
+    to an acyl prefix; the caller keeps its own spelling, byte for byte) or when a
+    part cannot be rendered.
+    """
+    from ..rules.amides import format_n_substitution
+    from .composition_primitives import identical_prefixes_grouped, prefix_locant_order_key
+    grouped = identical_prefixes_grouped()
+    n_by_name: Dict[str, List[Dict]] = {}
+    for sub in n_subs or ():
+        n_by_name.setdefault(sub["name"], []).append(sub)
+    # 1. name every acyl item: known, or recognised as one of the N names
+    items = []
+    for rendered, name, locs in c_items:
+        locs = list(locs or ())
+        if name is None:
+            name = next((nm for nm in n_by_name
+                         if _rendered_prefix_is(nm, rendered, locs)), None)
+        items.append((rendered, name, locs))
+    # 2. the names cited more than once (acyl + N, or several acyl items)
+    count_items: Dict[str, int] = {}
+    for _r, name, locs in items:
+        if name is not None and locs:
+            count_items[name] = count_items.get(name, 0) + 1
+    merged = ([nm for nm, k in count_items.items() if k > 1 or nm in n_by_name]
+              if grouped else [])
+    if not merged and not (n_by_name and items):
+        return None
+    # 3. one token per group, each sorted by its prefix NAME: a
+    # multiplied or locanted token alphabetizes on the name it cites, never on
+    # its locants -- 'N,2-dimethyl' files under 'methyl', not 'n')
+    tokens: List[Tuple[Any, str]] = []
+    group_locs: Dict[str, List] = {nm: [] for nm in merged}
+    # The second key is the first locant, italic letters before numerals
+    #,:3195), for two tokens of one name cited apart.
+    for rendered, name, locs in items:
+        if name in merged and locs:
+            group_locs[name].extend(locs)
+        else:
+            tokens.append(((alpha_sort_key(name if name is not None else rendered),
+                            prefix_locant_order_key(locs[0]) if locs else ()),
+                           rendered))
+    for nm in merged:
+        locs = group_locs[nm] + ["N"] * len(n_by_name.get(nm, ()))
+        locs.sort(key=prefix_locant_order_key)
+        tokens.append(((alpha_sort_key(nm), prefix_locant_order_key(locs[0])),
+                       format_substituent_prefix(nm, locs, len(locs))))
+    for nm, subs in n_by_name.items():
+        if nm in merged:
+            continue
+        part = format_n_substitution(subs)
+        if not part:
+            return None
+        tokens.append(((alpha_sort_key(nm), prefix_locant_order_key("N")), part))
+    tokens.sort(key=lambda t: t[0])
+    return _join_prefix_to_name(_join_prefixes([t for _k, t in tokens]), parent_word)
+
+
+def _chain_amide_identical_prefixes(mol, amide_atoms, suffix_form, base_name,
+                                    c_items):
+    """``_amide_with_identical_prefixes_merged`` for a CHAIN amide whose
+    ``base_name`` (``rules.amides.name_amide``) is the N-prefix + the acyl parent.
+    Returns None -- the caller keeps its spelling -- unless ``base_name`` is
+    exactly that concatenation (so the merged name names the same parts) and some
+    prefix is cited twice."""
+    from ..rules.amides import (
+        format_n_substitution,
+        get_amide_chain_length,
+        get_amide_parent_name,
+        get_n_substituents,
+    )
+    try:
+        parent_word = get_amide_parent_name(
+            get_amide_chain_length(mol, amide_atoms), suffix_form=suffix_form)
+        n_subs = get_n_substituents(mol, amide_atoms)
+        n_prefix = format_n_substitution(n_subs) if n_subs else ""
+        if n_prefix is None or base_name != f"{n_prefix}{parent_word}":
+            return None
+        return _amide_with_identical_prefixes_merged(c_items, n_subs, parent_word)
+    except Exception:  # noqa: BLE001 - keep the caller's spelling
+        return None
 
 
 def _assemble_amide_name(features: Any, style: str) -> str:
@@ -6691,6 +6812,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             prefixes = _generate_prefixes(features)
             if prefixes:
                 prefix_parts = []
+                _ring_prefix_locants = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
                     # (a phase assembly/parenthesisation fix,): render the prefix LOCANT.
                     # _generate_prefixes is inconsistent — alkyl prefixes embed the
@@ -6703,6 +6825,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                         prefix_parts.append(f"{_loc}-{p.text}")
                     else:
                         prefix_parts.append(p.text)
+                    _ring_prefix_locants.append((prefix_parts[-1], list(p.locants or ())))
                 if prefix_parts:
                     prefix_str = "-".join(prefix_parts)
                     # (the Blue Book): a ring substituent prefix carries an ESSENTIAL
@@ -6744,6 +6867,20 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                         # which is not built here); otherwise the spelling below is
                         # kept and labelled below the PIN by the vocabulary guard.
                         _merged = None
+                        # An N-substituent that shares its name with a ring prefix
+                        # joins it in ONE multiplied group, (b) /:
+                        # 'N,4-dimethylcyclohexane-1-carboxamide', '*N*,4-dimethyl-
+                        # *N*-(3-methylphenyl)benzamide (PIN)' (the Blue Book)
+                        # (``_amide_with_identical_prefixes_merged``).
+                        try:
+                            _merged = _amide_with_identical_prefixes_merged(
+                                [(t, None, _l) for t, _l in _ring_prefix_locants],
+                                list(_parts.n_substituents),
+                                _parts.parent_word(suffix_locant=True))
+                        except Exception:  # noqa: BLE001 - keep the prior spelling
+                            _merged = None
+                        if _merged:
+                            return _inject_stereo_if_missing(features, _merged)
                         try:
                             _nsubs = list(_parts.n_substituents)
                             _groups = {}
@@ -6943,6 +7080,14 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     if _acyl_prefixes:
                         _acyl_prefixes.sort(
                             key=lambda t: (alpha_sort_key(t[1]), t[0]))
+                        _merged_amide = _chain_amide_identical_prefixes(
+                            mol, amide_atoms, amide_suffix_form, base_name,
+                            [(r, _n, [_l]) for _l, _n, r in _acyl_prefixes])
+                        if _merged_amide:
+                            return _inject_stereo_if_missing(
+                                features, _merged_amide,
+                                atom_to_locant=_acyl_locants,
+                            )
                         _pfx = "-".join(r for _l, _n, r in _acyl_prefixes)
                         _sep = "-" if base_name[:1] == "N" else ""
                         base_name = f"{_pfx}{_sep}{base_name}"
@@ -6957,6 +7102,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
             prefixes = _generate_prefixes(features)
             if prefixes:
                 prefix_parts = []
+                _prefix_part_locants = []
                 for p in sorted(prefixes, key=lambda x: alpha_sort_key(x.text)):
                     # (a phase assembly/parenthesisation fix,): render the prefix LOCANT.
                     # _generate_prefixes is inconsistent — alkyl prefixes embed the
@@ -6969,7 +7115,16 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                         prefix_parts.append(f"{_loc}-{p.text}")
                     else:
                         prefix_parts.append(p.text)
+                    _prefix_part_locants.append((prefix_parts[-1], list(p.locants or ())))
                 if prefix_parts:
+                    _merged_amide = _chain_amide_identical_prefixes(
+                        mol, amide_atoms, amide_suffix_form, base_name,
+                        [(t, None, _loc) for t, _loc in _prefix_part_locants])
+                    if _merged_amide:
+                        return _inject_stereo_if_missing(
+                            features, _merged_amide,
+                            atom_to_locant=_acyl_locants,
+                        )
                     prefix_str = "-".join(prefix_parts)
                     # Insert hyphen before N-locant prefix (base_name may
                     # start with "N-" or "N,N-" from name_amide)
@@ -7469,9 +7624,12 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         if count == 1:
             n_prefix_items.append((alpha_sort_key(name), f"N-{wrapped}"))
         else:
-            mult = get_multiplier_prefix(count, name)
+            # The shared primitive joins the multiplier (and the
+            # (c)/(d) marks of 'N,N-di(decyl)', the Blue Book).
+            from .naming_utils import multiplied_component
             n_locants = ",".join(["N"] * count)
-            n_prefix_items.append((alpha_sort_key(name), f"{n_locants}-{mult}{wrapped}"))
+            n_prefix_items.append((alpha_sort_key(name),
+                                   f"{n_locants}-{multiplied_component(count, name, wrapped)}"))
 
     # Get base amine name from the general assembly
     # Build name using standard fragments. a phase.1: the parent + suffix
@@ -7512,6 +7670,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     # own alphabetized block, mirroring the amide handler's prefix rendering.
     other_prefixes = _generate_prefixes(features)
     c_prefix_items = []
+    _c_prefix_locants = []
     for p in sorted(other_prefixes, key=lambda x: alpha_sort_key(x.text)):
         # (a phase assembly/parenthesisation fix,): _generate_prefixes is inconsistent —
         # alkyl prefixes embed the locant in.text ('3-methyl') while FG prefixes
@@ -7522,6 +7681,29 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
             c_prefix_items.append((alpha_sort_key(p.text), f"{_loc}-{p.text}"))
         else:
             c_prefix_items.append((alpha_sort_key(p.text), p.text))
+        _c_prefix_locants.append(list(p.locants or ()))
+
+    # (b) (the Blue Book) / (a) (:7104): an N-substituent
+    # and a C-prefix of the same name are ONE multiplied group, its locants in the
+    # order (:3195): '*N*,2-dimethylpropanamide', '*N*,4-dimethyl-*N*-(3-
+    # methylphenyl)benzamide (PIN)' (:32879) -- '3-phenyl-N-phenylprop-2-en-1-
+    # amine' is 'N,3-diphenylprop-2-en-1-amine'. Recognised by rendering the
+    # N-substituent's name at the C-prefix's locants with the shared formatter.
+    from .composition_primitives import identical_prefixes_grouped, prefix_locant_order_key
+    for name in (sorted(sub_counts.keys(), key=lambda n: (alpha_sort_key(n), n))
+                 if identical_prefixes_grouped() else ()):
+        for j, (_key, text) in enumerate(c_prefix_items):
+            locs = _c_prefix_locants[j]
+            if _rendered_prefix_is(name, text, locs):
+                all_locs = sorted(locs + ["N"] * sub_counts[name],
+                                  key=prefix_locant_order_key)
+                c_prefix_items[j] = (_key, format_substituent_prefix(
+                    name, all_locs, len(all_locs)))
+                _c_prefix_locants[j] = all_locs
+                n_prefix_items = [it for it in n_prefix_items
+                                  if it[0] != alpha_sort_key(name)
+                                  or not it[1].startswith("N")]
+                break
 
     # Merge the C- and N-prefixes into ONE alphanumerical order,
     # the Blue Book; the N-substituent sorts among the C-prefixes in
@@ -7697,11 +7879,11 @@ def _assemble_polyamine_name(
             # principal N is demoted or fails closed with `return None` above),
             # so this branch does not fire for any molecule today and is NOT the
             # mechanism that yields the bare-primed mononuclear-parent names.
-            # (The mononuclear exception, the Blue Book, actually plays
-            # out elsewhere: methanediamine reaches this loop with loc=1 and
-            # then abstains via the geminal suffix dedup, and
-            # N,N'-dinitromethanediamine is built by a DIFFERENT handler, not
-            # here.) The guard is kept only so a future inf-locant caller cannot
+            # (The mononuclear parent is handled in the else-branch below:
+            # methanediamine reaches this loop with loc=1 -- since breadth job 3
+            # the geminal suffix no longer collapses to one amine -- and takes
+            # bare primes there; N,N'-dinitromethanediamine is built by a
+            # DIFFERENT handler.) The guard is kept only so a future inf-locant caller cannot
             # emit a malformed 'Ninf' tag; the bare prime is a safe fallback.
             n_tag_by_idx[n_idx] = "N" + ("'" * bare_count)
             bare_count += 1
@@ -7717,7 +7899,13 @@ def _assemble_polyamine_name(
             # locant (both amines on one carbon), disambiguate the 2nd+ with a
             # prime -> N3, N'3 (N3-ethyl-N'3-methylhexane-3,3-diamine).
             k = geminal_count.get(loc, 0)
-            n_tag_by_idx[n_idx] = "N" + ("'" * k) + str(loc)
+            # A mononuclear parent (methanediamine) has one skeletal position,
+            # so its nitrogens are told apart by primes alone: 'N,N'-diethyl-
+            # methanediamine', the Blue Book; the multiplicative
+            # alternative is the PIN there) -- 'N1,N'1-' cites a superscript that
+            # carries no information.
+            _sup = "" if len(chain_set) == 1 else str(loc)
+            n_tag_by_idx[n_idx] = "N" + ("'" * k) + _sup
             geminal_count[loc] = k + 1
 
     if not n_tag_by_idx:
@@ -7752,15 +7940,20 @@ def _assemble_polyamine_name(
         # its own locant/hyphen ('2-aminoethyl') or the simple 'aminomethyl'
         # is enclosed in parentheses so it alphabetises on and cites as its
         # complete name. Simple alkyls ('methyl') stay bare.
-        _wrapped = _wrap_n_substituent(name)
+        # A simple prefix with locants is enclosed too ('*N*1-(propan-2-yl)
+        # dicarbonic diamide (PIN)', the Blue Book; (a):7085
+        # 'di(propan-2-yl)'), as on the single-amine path: enclose_if_compound
+        # decides the first mark, _wrap_n_substituent escalates an inner one, and
+        # the shared primitive joins the multiplier.
+        _wrapped = _wrap_n_substituent(enclose_if_compound(name))
         if demoted_n and _wrapped == name and (
                 any(ch.isdigit() for ch in name) or 'amino' in name):
             _wrapped = f"({name})"
         if count == 1:
             rendered = f"{loc_str}-{_wrapped}"
         else:
-            mult = get_multiplier_prefix(count, name)
-            rendered = f"{loc_str}-{mult}{_wrapped}"
+            from .naming_utils import multiplied_component
+            rendered = f"{loc_str}-{multiplied_component(count, name, _wrapped)}"
         n_prefix_entries.append((alpha_sort_key(name), rendered))
 
     # Base name: parent + '-diamine' suffix (+ stereo). Built from the SUFFIX
@@ -8367,8 +8560,8 @@ def _detect_fused_het_inner_subs(
         if count == 1:
             prefix_parts.append(f'{loc_str}-{enclose_if_compound(name)}')
         else:
-            mult = get_multiplier_prefix(count, name)
-            prefix_parts.append(f'{loc_str}-{mult}{enclose_if_compound(name)}')
+            from .naming_utils import multiplied_component as _mc
+            prefix_parts.append(f'{loc_str}-{_mc(count, name, enclose_if_compound(name))}')
 
     return '-'.join(prefix_parts) + '-' if prefix_parts else ""
 
@@ -10100,15 +10293,17 @@ def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True) -> Op
         mult = composed_prefix_multiplier(bname, k)
         if not mult:
             return None
+        # The multiplier and its marks come from the shared primitive:
+        # 'di-tert-butyl' (d), the Blue Book), 'di(dodecyl)'
+        # (c),:7104), 'bis(chloromethyl)' (a)); a simple
+        # branch after the first is enclosed,:7272).
+        from .naming_utils import multiplied_component
         if compound:
-            cited.append(f"{mult}{marked}")
+            cited.append(multiplied_component(k, bname, marked))
         elif i == 0:
-            # (d) (the Blue Book): a hyphen separates the italic
-            # letters from the multiplier -- 'di-tert-butyl', never 'ditert-butyl'.
-            from .naming_utils import multiplier_needs_hyphen
-            cited.append(f"{mult}{'-' if multiplier_needs_hyphen(bname) else ''}{bname}")
+            cited.append(multiplied_component(k, bname, bname))
         else:
-            cited.append(f"{mult}({bname})")
+            cited.append(multiplied_component(k, bname, f"({bname})"))
     core = "".join(cited) + "amino"
     return apply_enclosing_marks(core, -1) if enclose else core
 
@@ -11727,8 +11922,12 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
             # passing the BARE name (it does correct ->->{} nesting +
             # leading-stereo escalation; passing the bare name avoids the
             # double-enclose hazard).
-            from ..assembly.naming_utils import _has_stereo_prefix, apply_enclosing_marks
-            if is_complex_substituent(name) or _has_stereo_prefix(name):
+            from ..assembly.naming_utils import (_has_stereo_prefix, _is_fully_enclosed,
+                                                 apply_enclosing_marks)
+            if _is_fully_enclosed(name):
+                # already enclosed once, the Blue Book)
+                formatted = name
+            elif is_complex_substituent(name) or _has_stereo_prefix(name):
                 formatted = apply_enclosing_marks(name, depth=-1)
             else:
                 formatted = name

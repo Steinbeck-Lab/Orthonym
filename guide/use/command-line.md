@@ -19,12 +19,12 @@ benzene
 : Where the IUPAC 2013 recommendations prefer a retained parent name (benzene, phenol, aniline, benzoic acid and others) to the systematic one, use it (P-15.1.8). Every change is checked by an OPSIN round trip. `ORTHONYM_ENABLE_TRIVIALITY_CONTROLLER=1` turns it on too.
 
 `--trivial`
-: When no preferred name can be built, also allow a retained trivial name that is not a preferred name. A preferred name that can be built is never replaced: glycerol stays `propane-1,2,3-triol`. Without this option a small table of retained trivial names is still used as a last resort; the provenance row labels those names {tier}`systematic_verified` with source `trivial_retained`.
+: When no preferred name can be built, also allow a retained trivial name that is not a preferred name. A preferred name that can be built is never replaced: glycerol stays `propane-1,2,3-triol`. Without this option a small table of retained trivial names is still used as a last resort at the wider tiers (the default tier declines those names); the provenance row labels them {tier}`systematic_verified` with source `trivial_retained`.
 
 ## Tiers
 
 `--emit-tier {pin,valid,complete,best-effort,full-coverage}`
-: Which names to return. The default, `pin`, returns the name from the strict path for the Preferred IUPAC Name; where the engine cannot certify the preferred name it can return another name, labelled with its tier. `valid` adds names from the general engine, `complete` adds general names for aromatic and heterocyclic ring systems, `best-effort` adds the last-resort producers, and `full-coverage` adds the coordination-name builder for metal tetrapyrrole and corrin complexes. See [Output tiers](../tiers.md).
+: Which names to return. The default, `pin`, returns a name only when the pipeline can build the preferred IUPAC name (PIN), that is when the strict PIN path built the name and verified it ({tier}`pin_verified`). The only exceptions are names from the natural-product and metal-complex lists, the name formats absent from OPSIN's grammar (for example inositols, phanes and thioperoxols), and PINs whose stereodescriptors OPSIN cannot read, for which the default tier compares the constitution. Otherwise it declines, with the reason code `NO_VERIFIED_PIN` when it built a name that is not a verified PIN. `valid` adds names from the general engine, `complete` adds general names for aromatic and heterocyclic ring systems, `best-effort` adds the last-resort producers, and `full-coverage` adds the coordination-name builder for metal tetrapyrrole and corrin complexes. The wider tiers also return the names the default tier declines, each labelled with its tier. See [Output tiers](../tiers.md).
 
 ## Output
 

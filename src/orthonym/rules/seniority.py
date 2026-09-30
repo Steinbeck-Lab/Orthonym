@@ -475,6 +475,14 @@ _SENIORITY_PARENT = {
     "tertiary_alcohol": "alcohol",
     "phenol": "alcohol",
     "enol": "alcohol",
+    # The generic 'alcohol' key is where perception files every -OH
+    # that fits no subtype, a geminal diol's two OH among them (C(O)O is
+    # neither primary nor secondary). It belongs to its own equal-seniority
+    # class: without this row the class union below left it out, so in
+    # OC(O)CO the principal 'primary_alcohol' suffix counted one OH and the
+    # prefix loop skipped the other two as same-class ('ethan-1-ol', a
+    # different molecule) instead of 'ethane-1,1,2-triol'.
+    "alcohol": "alcohol",
     "primary_amine": "amine",
     "secondary_amine": "amine",
     "tertiary_amine": "amine",
@@ -1013,11 +1021,16 @@ PREFIX_FORMS = {
     "phosphite_triester": None,  # IUPAC: functional class naming
     "phosphonate_diester": None,  # IUPAC: functional class naming
     # v50 B2: sulfuric-acid esters. Functional-class named as a whole molecule;
-    # a demoted sulfate ester on a senior parent is a 'sulfooxy'-type oxy prefix
-    # emitted by the dedicated rules/sulfur_oxoacid.py path, NOT a naive per-FG
-    # string here (which cannot carry the ester organyl / attachment). Kept None.
+    # a demoted DIESTER on a senior parent needs its second organyl in the prefix
+    # ('[(methoxysulfonyl)oxy]'), which a per-FG string cannot carry: kept None.
+    # A demoted MONOESTER has no second organyl -- the parent is its only one --
+    # so it is the fixed preselected prefix 'sulfooxy', as the phosphate
+    # monoester is 'phosphonooxy' below: (the Blue Book)
+    # "3-(sulfooxy)propanoic acid (PIN)" (:36488); 'HO-SO2-O- sulfooxy
+    # (preselected prefix)' (:31342). The PIN-vocabulary guard keeps it off the
+    # PIN label under a junior parent (pin_vocabulary._oxoacid_ester_prefix_re).
     "sulfate_diester": None,      # IUPAC functional class naming
-    "sulfate_monoester": None,    # IUPAC functional class naming
+    "sulfate_monoester": "sulfooxy",  # IUPAC
     # a review: functional-class ester (no prefix form)
     "phosphinate_ester": None,   # IUPAC functional class naming
     "arsinate_ester": None,      # IUPAC functional class naming

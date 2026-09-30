@@ -32,12 +32,13 @@ def test_per_deuterated_glycine_systematic_parent():
     name = _name(PER_D_GLYCINE)
     assert name and name not in ("unknown organic compound", None), "abstained"
     assert opsin_roundtrip_check(PER_D_GLYCINE, name)["passed"], name
-    #: retained 'glycine' has no numbered positions for the label
-    # -> systematic parent. The default systematic-STYLE skeleton itself
-    # still keeps the retained "acetic acid" stem (measured 2026-08-23), so
-    # this also asserts the fallback actually fired.
-    assert "glycine" not in name.lower()
-    assert "acetic" not in name.lower()
+    # a performance pass: every hydrogen is labelled, so the compound is "completely
+    # isotopically substituted" and cites no locant, the Blue Book
+    #:44196, heading ' Omission of locants'; '(2H6)benzene (PIN)'
+    #:44200). No labelled position has to be identified, so the
+    # systematic-parent switch (:44251) does not apply and the retained PIN
+    # parent stays.
+    assert name == "(2H5)glycine", name
 
 
 # ---------------------------------------------------------------------------

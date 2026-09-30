@@ -102,8 +102,36 @@ rt_ok = False
 if emits:
     parsed = opsin_parse(name)
     rt_ok = bool(parsed) and (ik(parsed) == ik(smi))
-print(json.dumps({"name": name, "emits": emits, "rt_ok": rt_ok}))
+# the default tier's decline code, the strict path's name (the emission rule off) and
+# the best-effort name, each with its round trip
+import orthonym.namer as nm
+from orthonym import Orthonym
+from orthonym.cli import _emit_tier_flags
+limit = strict = be = None
+try:
+    limit = Orthonym().name_tiered(smi)["limit_code"]
+    tok = nm._DEFAULT_TIER_POLICY_OFF.set(True)
+    try:
+        strict = Orthonym().name(smi)
+    finally:
+        nm._DEFAULT_TIER_POLICY_OFF.reset(tok)
+    be = Orthonym(**_emit_tier_flags("best-effort")).name_tiered(smi)["name"]
+except Exception:   # an input RDKit cannot read (the hypervalent Cl canary)
+    pass
+def rt(n):
+    p = opsin_parse(n) if n and not errors.is_failure_name(n) else None
+    return bool(p) and ik(p) == ik(smi)
+print(json.dumps({"name": name, "emits": emits, "rt_ok": rt_ok, "limit": limit,
+                  "strict": strict, "strict_rt": rt(strict), "be": be, "be_rt": rt(be)}))
 """
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): this row's name carries a
+# part the code records as not the PIN, so the default tier declines it
+# (NO_VERIFIED_PIN); the strict path's name and the best-effort name carry the
+# 'iodanyl' spelling and round-trip.
+DEFAULT_TIER_DECLINES = frozenset({"CI(C)N1CCCC(C1)OC(=O)NC2=CC=CC=C2C3=CC=CC=C3"})
 
 
 def _name_fresh(smi):
@@ -120,6 +148,10 @@ def _name_fresh(smi):
 @pytest.mark.parametrize("smi", RECLAIM_SMILES)
 def test_a1_neutral_iodane_substituent_reclaims_and_roundtrips(smi):
     r = _name_fresh(smi)
+    if smi in DEFAULT_TIER_DECLINES:
+        assert not r["emits"] and r["limit"] == "NO_VERIFIED_PIN", r
+        assert "iodanyl" in r["be"] and r["be_rt"], r
+        r = dict(r, name=r["strict"], emits=True, rt_ok=r["strict_rt"])
     assert r["emits"], f"expected an emission, got abstain: {r}"
     assert "iodanyl" in r["name"], f"expected 'iodanyl' spelling, got {r['name']!r}"
     assert "iodyl" not in r["name"].replace("iodanyl", ""), \

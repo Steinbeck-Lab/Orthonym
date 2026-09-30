@@ -28,6 +28,12 @@ HYDROXYACYL_COA = (
     "CCCCCCCCCCCCCC[C@@H](O)C(=O)SCCNC(=O)CCNC(=O)[C@H](O)C(C)(C)COP(=O)(O)"
     "OP(=O)(O)OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O"
 )
+# The same skeleton with the thioester C=O reduced to CH2 (a sulfide): no ester, so
+# the pantetheine chain is still reached as the deep -O-<chain> (butoxy) substituent.
+HYDROXYALKYL_SULFIDE_COA = (
+    "CCCCCCCCCCCCCC[C@@H](O)CSCCNC(=O)CCNC(=O)[C@H](O)C(C)(C)COP(=O)(O)"
+    "OP(=O)(O)OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O"
+)
 # acetyl-CoA (no stereo) - must keep round-tripping (no regression).
 ACETYL_COA = (
     "CC(=O)SCCNC(=O)CCNC(=O)C(O)C(C)(C)COP(=O)(O)OP(=O)(O)OCC1OC"
@@ -47,9 +53,32 @@ def test_full_stereo_acyl_coa_round_trips_full_inchikey():
 
 
 def test_pantetheine_3_hydroxy_descriptor_is_emitted():
-    # the previously-dropped on-chain stereocentre now carries its locant+CIP
+    # The thioester is named by its chalcogen-ester handler since breadth job 3
+    # (review finding 8): each word carries its own stereodescriptors, "at the front of
+    # the corresponding prefix" "NAMING OF STEREOISOMERS", the Blue Book),
+    # so the pantetheine centre is C-2 of its acyl prefix, '[(2R)-3-{...}-2-hydroxy-3-
+    # methyl-1-oxobutyl]', and the acid's own is '(2R)-2-hydroxyhexadecanethioate'.
+    # It was '(3R)-3-hydroxy-...-4-oxobutoxy' under the purine amine. Both read back to
+    # the input's full InChIKey (independent OPSIN 2.9.0 call); best-effort label
+    # pin_unverified.
     name = _be_name(HYDROXYACYL_COA)
-    assert "(3R)" in name, name
+    assert name == (
+        "S-{2-[(3-{[(2R)-3-{[(3-{[(2R,3S,4R,5R)-5-(6-amino-9H-purin-9-yl)-4-hydroxy-"
+        "3-(phosphonooxy)oxolan-2-yl]methoxy}-1,3-dihydroxy-1,3-dioxo-1λ5,3λ5-"
+        "diphosphoxan-1-yl)oxy]methyl}-2-hydroxy-3-methyl-1-oxobutyl]amino}-1-"
+        "oxopropyl)amino]ethyl} (2R)-2-hydroxyhexadecanethioate"), name
+
+
+def test_pantetheine_3_hydroxy_descriptor_is_emitted_on_the_butoxy_chain():
+    # the on-chain stereocentre of the deep -O-<chain> (butoxy) substituent carries its
+    # locant + CIP descriptor ('(3R)-3-hydroxy-...-4-oxobutoxy')
+    name = _be_name(HYDROXYALKYL_SULFIDE_COA)
+    assert name == (
+        "9-[(2R,3R,4S,5R)-5-{[(1,3-dihydroxy-3-[(3R)-3-hydroxy-4-({3-[(2-{[(2R)-2-"
+        "hydroxyhexadecyl]sulfanyl}ethyl)amino]-3-oxopropyl}amino)-2,2-dimethyl-4-"
+        "oxobutoxy]-1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)oxy]methyl}-3-hydroxy-"
+        "4-(phosphonooxy)oxolan-2-yl]-9H-purin-6-amine"), name
+    assert opsin_roundtrip_check(HYDROXYALKYL_SULFIDE_COA, name)["passed"], name
 
 
 def test_acetyl_coa_no_stereo_still_round_trips():

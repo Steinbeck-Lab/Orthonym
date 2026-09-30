@@ -30,6 +30,70 @@ RT-gated (`@pytest.mark.opsin_gate`); the top-level /OPSIN gate
 """
 import pytest
 from orthonym import Orthonym
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    # the zwitterion arms of the acid-salt branch (merged after the rule): the
+    # 'azaniumyl' of a carbon-substituted N+ is recorded as not the PIN,
+    # the Blue Book '(N,N-dimethylmethanaminiumyl)acetate (PIN)')
+    "C[N+](C)(C)CC(CC(=O)[O-])C(=O)[O-]",
+    "C[NH+](C)CC(CC(=O)[O-])C(=O)[O-]",
+    "NC(N)=[NH+]CC(CC(=O)[O-])C(=O)[O-]",
+    "C[N+](C)(C)C(CC(=O)[O-])C(=O)[O-]",
+    "C[N+](C)(C)CCC(=O)[O-]",
+    "C[N+](C)(C)CCOS(=O)(=O)[O-]",
+    "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 @pytest.fixture(scope="module")
@@ -48,7 +112,7 @@ def namer():
     ("[NH3+]C(CC(=O)[O-])C(=O)[O-]", "2-azaniumylbutanedioate"),
 ])
 def test_aminium_polyacid_zwitterion(namer, smi, expected):
-    assert namer.name(smi) == expected
+    assert _dt_obj_name(namer, smi) == expected
 
 
 # --- regressions: untouched paths ----------------------------------------
@@ -56,7 +120,7 @@ def test_aminium_polyacid_zwitterion(namer, smi, expected):
 def test_carboxylate_betaine_unchanged(namer):
     # Single-anion GUARD-4 betaine path is a completely separate
     # branch (len(anions) == 1) -- must stay byte-identical.
-    assert namer.name("C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
+    assert _dt_obj_name(namer, "C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
 
 
 @pytest.mark.opsin_gate
@@ -65,8 +129,8 @@ def test_l_carnitine_unchanged(namer):
     # labelled below pin_verified: 'carnitine' has 0 Blue Book hits and the PIN tier
     # builds no RT-exact systematic name for it yet
     # (tests/unit/rules/test_decision_a_n_substituted_amino_acids.py).
-    assert namer.name("C[N+](C)(C)C[C@H](O)CC(=O)[O-]") == "L-carnitine"
-    assert namer.name_tiered("C[N+](C)(C)C[C@H](O)CC(=O)[O-]")["is_pin"] is False
+    assert _dt_obj_name(namer, "C[N+](C)(C)C[C@H](O)CC(=O)[O-]") == "L-carnitine"
+    assert _dt_obj_row(namer, "C[N+](C)(C)C[C@H](O)CC(=O)[O-]")["is_pin"] is False
 
 
 @pytest.mark.opsin_gate
@@ -74,7 +138,7 @@ def test_l_serine_zwitterion_unchanged(namer):
     # Single-anion protonated-amine zwitterion -- the established
     # retained/neutral-form amino-acid path (defer), unaffected by the
     # new multi-anion branch (len(anions) == 1 here).
-    assert namer.name("[NH3+][C@@H](CO)C(=O)[O-]") == "L-serine"
+    assert _dt_obj_name(namer, "[NH3+][C@@H](CO)C(=O)[O-]") == "L-serine"
 
 
 @pytest.mark.opsin_gate
@@ -82,12 +146,12 @@ def test_dicarboxylate_dianion_no_cation_unchanged(namer):
     # Pure poly-anion (no cation at all): route_charged never calls
     # _route_zwitterion when there is no cation site -- a completely
     # separate dispatch path, must stay byte-identical.
-    assert namer.name("[O-]C(=O)CCC(=O)[O-]") == "butanedioate"
+    assert _dt_obj_name(namer, "[O-]C(=O)CCC(=O)[O-]") == "butanedioate"
 
 
 @pytest.mark.opsin_gate
 def test_phase3_choline_sulfate_unchanged(namer):
-    assert namer.name("C[N+](C)(C)CCOS(=O)(=O)[O-]") == "2-(trimethylazaniumyl)ethyl sulfate"
+    assert _dt_obj_name(namer, "C[N+](C)(C)CCOS(=O)(=O)[O-]") == "2-(trimethylazaniumyl)ethyl sulfate"
 
 
 @pytest.mark.opsin_gate
@@ -95,13 +159,13 @@ def test_phase3_bis_quaternary_ammonium_unchanged(namer):
     # /: the substitutive '-bis(aminium)' name is the PIN
     # (the Blue Book,:42160-42162,:42366); the multiplicative
     # 'hexane-1,6-diylbis(trimethylazanium)' is its general-tier fallback.
-    assert namer.name("C[N+](C)(C)CCCCCC[N+](C)(C)C") == \
+    assert _dt_obj_name(namer, "C[N+](C)(C)CCCCCC[N+](C)(C)C") == \
         "N1,N1,N1,N6,N6,N6-hexamethylhexane-1,6-bis(aminium)"
 
 
 @pytest.mark.opsin_gate
 def test_phase3_sulfonatobenzoate_unchanged(namer):
-    assert namer.name("[O-]C(=O)c1ccc(cc1)S(=O)(=O)[O-]") == "4-sulfonatobenzoate"
+    assert _dt_obj_name(namer, "[O-]C(=O)c1ccc(cc1)S(=O)(=O)[O-]") == "4-sulfonatobenzoate"
 
 
 # --- fail-closed: out-of-scope shapes must never emit a wrong name --------
@@ -112,7 +176,7 @@ def test_mixed_carboxylate_sulfonate_zwitterion_failclosed(namer):
     # fires when EVERY anion classifies 'carboxylate'). Abstain (or some
     # non-fabricated fallback) is acceptable; a WRONG name is not.
     from orthonym.errors import is_failure_name
-    out = namer.name("[NH3+]C(CS(=O)(=O)[O-])C(=O)[O-]")
+    out = _dt_obj_name(namer, "[NH3+]C(CS(=O)(=O)[O-])C(=O)[O-]")
     assert out is not None
     assert is_failure_name(out), f"expected an honest abstain, got: {out!r}"
 
@@ -131,7 +195,7 @@ def test_two_cations_build_bis_azaniumyl(namer):
     from rdkit import Chem
     from orthonym.validation.opsin_roundtrip import opsin_parse
     smi = "[NH3+]C(CC(=O)[O-])C([NH3+])C(=O)[O-]"
-    out = namer.name(smi)
+    out = _dt_obj_name(namer, smi)
     assert out == "2,3-bis(azaniumyl)pentanedioate"
     assert "dioic acid" not in out  # not the non-PIN neutral form
     g = opsin_parse(out)
@@ -158,7 +222,7 @@ def test_ring_cation_declines_the_new_branch_directly():
 
 # --- a phase review follow-up (Findings A/B/C) -----------------------
 @pytest.mark.opsin_gate
-def test_tricarboxylate_parent_failclosed(namer):
+def test_tricarboxylate_parent_cites_the_locant(namer):
     # Finding B: a 3-carboxylate parent (`propane-1,2,3-tricarboxylic acid`
     # -- is named `...tricarboxylate` by `name_carboxylate_anion`,
     # which `_parent_has_chain_locants` does NOT recognize (only
@@ -167,14 +231,24 @@ def test_tricarboxylate_parent_failclosed(namer):
     # silently cite the wrong ring/chain position. RT-verified 2026-08-17
     # (`.venv/bin/python -m orthonym`): before the Finding-B tightening this
     # emitted the unlocanted 'azaniumylpropane-1,2,3-tricarboxylate', which
-    # OPSIN parses as a DIFFERENT molecule (NH3+ defaults onto C1) and the
-    # outer gate suppressed -> abstain. `_name_polyacid_zwitterion`
-    # now declines this shape itself (proactive fail-closed, not just an
-    # accidental gate catch).
-    from orthonym.errors import is_failure_name
-    out = namer.name("[NH3+]C(CC(=O)[O-])(CC(=O)[O-])C(=O)[O-]")
-    assert out is not None
-    assert is_failure_name(out), f"expected an honest abstain, got: {out!r}"
+    # OPSIN parses as a DIFFERENT molecule (NH3+ defaults onto C1).
+    # `_name_polyacid_zwitterion` declines this shape itself (the unit test
+    # below). The builder `_name_primary_amine_azaniumyl_zwitterion`
+    # then takes it: it names the neutral acid, whose locants are its own
+    # (the citric-acid pattern, the Blue Book "2-hydroxypropane-1,2,3-
+    # tricarboxylic acid (PIN)"), and re-expresses 'amino' as 'azaniumyl'
+    #,:1779 (e): the anion is the parent, the cation a prefix).
+    from rdkit import Chem
+    from rdkit.Chem import inchi
+    from tests.support.jars import jar_or_skip
+    from tests.support.rt_assert import _independent_parse
+    jar_or_skip()
+    smi = "[NH3+]C(CC(=O)[O-])(CC(=O)[O-])C(=O)[O-]"
+    out = namer.name(smi)
+    assert out == "2-azaniumylpropane-1,2,3-tricarboxylate"
+    parsed = _independent_parse(out)
+    fixed_h = lambda s: inchi.MolToInchi(Chem.MolFromSmiles(s), options="/FixedH /SNon")
+    assert parsed and fixed_h(parsed) == fixed_h(smi)
 
 
 def test_tricarboxylate_parent_declines_the_new_branch_directly():
@@ -200,7 +274,7 @@ def test_compound_cation_prefix_polyacid_branch(namer):
     # trimethylazaniumyl, not the bare 'azaniumyl' of the goal molecules --
     # on the poly-acid branch, pinning `enclose_if_compound`'s parens arm
     # here (RT-verified 2026-08-17).
-    assert namer.name("C[N+](C)(C)C(CC(=O)[O-])C(=O)[O-]") == \
+    assert _dt_obj_name(namer, "C[N+](C)(C)C(CC(=O)[O-])C(=O)[O-]") == \
         "2-(trimethylazaniumyl)butanedioate"
 
 
@@ -226,3 +300,73 @@ def test_multi_branch_onium_atom_drop_declines_directly():
     result = _name_polyacid_zwitterion(
         mol, sites['cations'], sites['anions'], 'pin')
     assert result == ''
+
+
+# --- a cation on a substituent ARM of the dicarboxylate chain ------------------
+# The sever path's composition '{locant}-{prefix}{parent}' is right only for a
+# prefix on the parent chain and a parent without prefixes of its own: severing
+# only the N of [NH3+]CH2- on butanedioate left 'methylbutanedioic acid' and gave
+# '3-azaniumylmethylbutanedioate' (a compound prefix without its enclosing marks,
+#, and the locant of the arm's carbon). BB::42366 "3-(azaniumylmethyl)-
+# pentane-1,5-bis(aminium) (PIN)";:42360 "[6-(trimethylazaniumyl)hexyl]";:16280
+# "2-[(4-bromophenyl)methyl]pyridine (PIN)".
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smi,expected", [
+    ("[NH3+]CC(CC(=O)[O-])C(=O)[O-]", "2-(azaniumylmethyl)butanedioate"),
+    ("[NH3+]CC(CC(=O)[O-])C(=O)[O-].[Na+]", "sodium 2-(azaniumylmethyl)butanedioate"),
+    ("[NH3+]CCC(CC(=O)[O-])C(=O)[O-]", "2-(2-azaniumylethyl)butanedioate"),
+    ("[NH3+]CC(CC(=O)[O-])CC(=O)[O-]", "3-(azaniumylmethyl)pentanedioate"),
+    ("C[N+](C)(C)CC(CC(=O)[O-])C(=O)[O-]", "2-[(trimethylazaniumyl)methyl]butanedioate"),
+    ("C[NH+](C)CC(CC(=O)[O-])C(=O)[O-]", "2-[(dimethylazaniumyl)methyl]butanedioate"),
+    # a parent with a prefix of its own: the neutral name carries both
+    ("[NH3+]C(C)(CCC(=O)[O-])C(=O)[O-]", "2-azaniumyl-2-methylpentanedioate"),
+])
+def test_cation_on_an_arm_is_one_compound_prefix(namer, smi, expected):
+    from rdkit import Chem
+    from rdkit.Chem import inchi
+    from tests.support.jars import jar_or_skip
+    from tests.support.rt_assert import _independent_parse
+    jar_or_skip()
+    out = _dt_obj_name(namer, smi)
+    assert out == expected
+    parsed = _independent_parse(out)
+    fixed_h = lambda s: inchi.MolToInchi(Chem.MolFromSmiles(s), options="/FixedH /SNon")
+    assert parsed and fixed_h(parsed) == fixed_h(smi)
+
+
+@pytest.mark.parametrize("smi", [
+    "[NH3+]CC(CC(=O)[O-])C(=O)[O-]",      # primary -NH3+ on an arm: the builder's
+    "[NH3+]C(C)(CCC(=O)[O-])C(=O)[O-]",   # the parent keeps a methyl prefix
+])
+def test_sever_path_declines_an_arm_or_a_prefixed_parent(smi):
+    from rdkit import Chem
+    from orthonym.perception.ions import get_ion_sites
+    from orthonym.rules.charged_router import _name_polyacid_zwitterion
+    mol = Chem.MolFromSmiles(smi)
+    sites = get_ion_sites(mol)
+    assert _name_polyacid_zwitterion(mol, sites['cations'], sites['anions'], 'pin') == ''
+
+
+@pytest.mark.opsin_gate
+def test_amidinium_arm_is_named_below_the_pin():
+    """An amidinium N+ on an arm: the onium composer writes the compound
+    N-substituent without marks ('diaminomethylideneazaniumyl';,
+    the Blue Book "(chloromethyl)(methyl)silane (PIN)"), so the name ships
+    labelled below the PIN, with the arm enclosed and the chain atom's locant
+    (base: '3-diaminomethylideneazaniumylmethylbutanedioate')."""
+    from rdkit import Chem
+    from rdkit.Chem import inchi
+    from orthonym import Orthonym
+    from tests.support.jars import jar_or_skip
+    from tests.support.rt_assert import _independent_parse
+    jar_or_skip()
+    smi = "NC(N)=[NH+]CC(CC(=O)[O-])C(=O)[O-]"
+    # the default tier declines it (NO_VERIFIED_PIN); the strict path's name is the
+    # best-effort name, labelled systematic_verified: a name the code records as not
+    # the PIN (the paper, Methods, "Tiers", L73; user decision 2026-09-30)
+    r = _dt_row(smi)
+    assert r["name"] == "2-[(diaminomethylideneazaniumyl)methyl]butanedioate", r
+    assert r["tier"] == "systematic_verified", r
+    parsed = _independent_parse(r["name"])
+    fixed_h = lambda s: inchi.MolToInchi(Chem.MolFromSmiles(s), options="/FixedH /SNon")
+    assert parsed and fixed_h(parsed) == fixed_h(smi)

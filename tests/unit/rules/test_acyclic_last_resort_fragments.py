@@ -26,6 +26,52 @@ import pytest
 
 from orthonym.errors import is_refusal_sentinel
 from orthonym.namer import Orthonym
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
+    "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
+})
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # REQUIRED, and it is what makes the assertion below mean anything.
 # `tests/conftest.py:302-317` disables the OPSIN validity gate suite-wide and
@@ -112,7 +158,7 @@ def test_acyclic_fragment_names_without_a_sentinel(smiles):
 @pytest.mark.parametrize("smiles,expected", sorted(_PIN_BUILT.items()))
 def test_fragment_named_at_the_pin_tier(smiles, expected):
     from tests.support.rt_assert import name_is_rt_exact
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert r["name"] == expected, r
     assert r["tier"] == "pin_verified", r
     assert name_is_rt_exact(expected, smiles), r
@@ -121,7 +167,7 @@ def test_fragment_named_at_the_pin_tier(smiles, expected):
 @pytest.mark.parametrize("smiles", sorted(_PIN_NOT_BUILT))
 def test_fragment_ships_below_the_pin_tier(smiles):
     from tests.support.rt_assert import name_is_rt_exact
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert not is_refusal_sentinel(r["name"]), r
     assert r["tier"] != "pin_verified", r
     assert name_is_rt_exact(r["name"], smiles), r
@@ -134,4 +180,4 @@ def test_fragment_ships_below_the_pin_tier(smiles):
     "has no amido producer (it ships the N-acyl float below pin_verified) -- TODO "
     "in TRIAGE.md 'Suite fix -- j5-pin-labels-b'"))
 def test_fragment_pin_spelling(smiles, expected):
-    assert Orthonym().name(smiles) == expected
+    assert _dt_name(smiles) == expected

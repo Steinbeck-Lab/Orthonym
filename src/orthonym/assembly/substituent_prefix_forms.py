@@ -1191,8 +1191,8 @@ def get_phosphoryl_prefix(
     if count == 1:
         core = f"{name}phosphoryl"
     else:
-        mult = get_multiplier_prefix(count, name)
-        core = f"{mult}{apply_enclosing_marks(name, -1)}phosphoryl"
+        from .naming_utils import multiplied_component as _mc
+        core = f"{_mc(count, name, apply_enclosing_marks(name, -1))}phosphoryl"
     return core
 
 
@@ -1475,7 +1475,8 @@ def get_n_n_dialkyl_carbamoyl_prefix(
     # alkenyl prefix is not. (b) (:7104) supplies the parentheses, and
     # BB:38230 carries the PIN '1,1-dimethyl-3,4-di(prop-1-en-2-yl)germolane'.
     if alkyl1 == alkyl2:
-        return f"di{enclose_if_compound(alkyl1)}carbamoyl"
+        from .naming_utils import multiplied_component
+        return f"{multiplied_component(2, alkyl1, enclose_if_compound(alkyl1))}carbamoyl"
 
     # Mixed pair, alphabetized ascending -> '{lower}({higher})carbamoyl'.
     #: the first cited N-substituent has no enclosing marks unless
@@ -1600,7 +1601,8 @@ def _carbamoyl_with_distal_substituents(
     parts = []
     for base in sorted(counts, key=alpha_sort_key):
         c = counts[base]
-        parts.append(base if c == 1 else f"{get_multiplier_prefix(c, base)}{base}")
+        from .naming_utils import multiplied_component as _mc
+        parts.append(base if c == 1 else _mc(c, base, base))
     return "".join(parts) + stem
 
 
@@ -1773,7 +1775,8 @@ def _compute_branch_b_carbamoyloxy_name(
         # N-locants omitted; mixed pair sets off the second
         # substituent; enclose the whole unit then append 'oxy'.
         if alkyl1 == alkyl2:
-            inner = f"di{enclose_if_compound(alkyl1)}carbamoyl"
+            from .naming_utils import multiplied_component
+            inner = f"{multiplied_component(2, alkyl1, enclose_if_compound(alkyl1))}carbamoyl"
             return f"{apply_enclosing_marks(inner, -1)}oxy"
         if alpha_sort_key(alkyl1) < alpha_sort_key(alkyl2):
             first, second = alkyl1, alkyl2
@@ -2004,6 +2007,20 @@ def get_substituent_prefix_form(
             if _a.GetSymbol() == 'N':
                 if _a.GetDegree() == 2 and _a.GetTotalNumHs() == 1:
                     return "hydroxyamino"
+                # -N(OH)2: the amino group substituted by two hydroxy, the
+                # doubled form of the preselected 'hydroxyamino',
+                # the Blue Book; substituted amino prefixes,
+                # 'dimethylamino'). Each OH is its own hydroxylamine match on
+                # the one N, so both return this word for one prefix; it was
+                # dropped ('pentanoic acid' for 2-(dihydroxyamino)pentanoic acid).
+                _nbrs = list(_a.GetNeighbors())
+                _oh = [n for n in _nbrs if n.GetSymbol() == 'O'
+                       and n.GetDegree() == 1 and n.GetTotalNumHs() == 1]
+                _c = [n for n in _nbrs if n.GetSymbol() == 'C']
+                if (_a.GetDegree() == 3 and _a.GetTotalNumHs() == 0
+                        and _a.GetFormalCharge() == 0
+                        and len(_oh) == 2 and len(_c) == 1):
+                    return "dihydroxyamino"
                 return None
         return None
 

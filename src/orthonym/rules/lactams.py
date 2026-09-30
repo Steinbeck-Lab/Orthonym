@@ -490,8 +490,8 @@ def _format_n_prefix(name: str, count: int) -> str:
     if count == 1:
         return f"N-{wrapped}"
     n_locants = ",".join(["N"] * count)
-    multiplier = get_multiplier_prefix(count, name)
-    return f"{n_locants}-{multiplier}{wrapped}"
+    from ..assembly.naming_utils import multiplied_component as _mc
+    return f"{n_locants}-{_mc(count, name, wrapped)}"
 
 
 def _detect_lactam_substituents(mol, ordered_ring, atom_to_locant, excluded):

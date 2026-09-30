@@ -108,7 +108,7 @@ def name_is_rt_exact(name: str, smiles: str) -> bool:
     if not (opsin_smi and key and _full_inchikey(opsin_smi) == key):
         return False
     return (radical_identity_verdict(smiles, opsin_smi) != "mismatch"
-            and protonation_site_verdict(smiles, opsin_smi) != "mismatch")
+            and protonation_site_verdict(smiles, opsin_smi, name) != "mismatch")
 
 
 def assert_full_rt(name: str, smiles: str, what: str = "") -> str:

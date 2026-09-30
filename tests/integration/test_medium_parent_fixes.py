@@ -22,6 +22,49 @@ Test groups (Plan 02):
 
 import pytest
 from orthonym import name_compound
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # Suite fix j6-breadth (TRIAGE g4 C4/C5): rows whose PIN the PIN tier cannot
 # build. Each keeps a strict xfail naming the missing producer; what ships
@@ -100,7 +143,7 @@ STEROID_PARENT_FIXES = [
 @pytest.mark.parametrize("smiles,expected_substr", STEROID_PARENT_FIXES)
 def test_steroid_parent_selection(smiles, expected_substr):
     """Steroid NP scaffolds must include explicit methyl group decoration."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -149,7 +192,7 @@ marks=_XF_DIHYDRO_OXO,
 @pytest.mark.parametrize("smiles,expected_substr", FUSED_HETERO_CHAIN_FIXES)
 def test_fused_heterocycle_chain_parent(smiles, expected_substr):
     """Fused heterocycles with chains must select ring as parent."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -218,7 +261,7 @@ marks=_XF_POLYCYCLE,
 @pytest.mark.parametrize("smiles,expected_substr", POLYCYCLIC_VB_FIXES)
 def test_polycyclic_vb_naming(smiles, expected_substr):
     """Polycyclic compounds must get VB or retained ring names, not fragments."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -240,7 +283,7 @@ POLYCYCLIC_AROMATIC_FIXES = [
 @pytest.mark.parametrize("smiles,expected_substr", POLYCYCLIC_AROMATIC_FIXES)
 def test_polycyclic_aromatic_routing(smiles, expected_substr):
     """Polycyclic aromatic compounds must route to correct naming path."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -300,7 +343,7 @@ IMAZAQUIN_NH4 = "CC(C)[C@@]1(C)N=C(c2nc3ccccc3cc2C(=O)[O-])NC1=O.[NH4+]"
 @pytest.mark.parametrize("smiles,expected_substr", CHARGED_SPECIES_FIXES)
 def test_charged_species_naming(smiles, expected_substr):
     """Charged species must produce structural names, not generic salts."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -314,7 +357,7 @@ def test_carnitine_ester_zwitterion_tier_contract():
     from orthonym import Orthonym
     from tests.support.rt_assert import name_is_rt_exact
     smi = "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C"
-    r = Orthonym().name_tiered(smi)
+    r = _dt_row(smi)
     assert r["tier"] != "pin_verified", r
     assert name_is_rt_exact(r["name"], smi), r
 
@@ -346,7 +389,7 @@ ALKALOID_FIXES = [
 @pytest.mark.parametrize("smiles,expected_substr", ALKALOID_FIXES)
 def test_alkaloid_parent_selection(smiles, expected_substr):
     """Alkaloid compounds must identify correct scaffold parent."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -393,7 +436,7 @@ marks=_XF_FUSED,
 @pytest.mark.parametrize("smiles,expected_substr", VB_FORMAT_VERIFICATION)
 def test_vb_format_completeness(smiles, expected_substr):
     """VB-named compounds must produce names containing VB ring descriptors."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -424,7 +467,7 @@ marks=_XF_MACROLIDE,
 @pytest.mark.parametrize("smiles,expected_substr", MACROCYCLIC_FIXES)
 def test_macrocyclic_naming(smiles, expected_substr):
     """Macrocyclic compounds must include correct ring-size prefix."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -485,7 +528,7 @@ marks=_XF_FUSED,
 @pytest.mark.parametrize("smiles,expected_substr", SMALL_STEREO_PARENT_BASELINE)
 def test_small_stereo_parent_baseline(smiles, expected_substr):
     """ small stereo compounds must produce non-None names with structural content."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
 
@@ -529,6 +572,6 @@ marks=_XF_STEROID,
 @pytest.mark.parametrize("smiles,expected_substr", STEROID_DECORATION_COMPLETENESS)
 def test_steroid_decoration_completeness(smiles, expected_substr):
     """Steroid NP names must include correct scaffold stem."""
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"

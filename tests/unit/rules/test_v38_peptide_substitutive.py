@@ -47,6 +47,59 @@ from rdkit.Chem import inchi
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C(OC)([C@@H](NC(=O)[C@H](CC(C)C)N)CC(C)C)=O",
+    "CCCC[C@H](NC(=O)[C@H](C)N)C(=O)O",
+    "COC(=O)[C@@H](C)NC(=O)[C@H](C)N",
+    "COC(=O)[C@H](CC(C)C)NC(=O)[C@@H](N)CC(C)C",
+    "N([C@@H](CC(C)C)C(OC)=O)C([C@H](CC(C)C)N)=O",
+    "N[C@H](C(=O)N[C@H](C(=O)OC)CC(C)C)CC(C)C",
+    "N[C@H](C(N[C@H](C(=O)O)CCCC)=O)C",
+    "OC(=O)[C@@H](NC(=O)[C@H](C)N)CCCC",
+    "[C@H](C(O)=O)(NC(=O)[C@@H](N)C)CCCC",
+    "[C@H](C)(C(N[C@@H](CCCC)C(=O)O)=O)N",
+    "[C@H](CC(C)C)(C(OC)=O)NC(=O)[C@H](CC(C)C)N",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # GATE ON (production default): this module tests exactly what `name_compound`
 # emits for a real caller. Mirrors test_peptide_capped_termini.py's rationale.
@@ -93,7 +146,7 @@ class TestSiteB_EsterCTerminus:
     an ester C-terminus, so `name_peptide` was never reached."""
 
     def test_leu_leu_methyl_ester_byte_and_rt(self):
-        result = name_compound(LEU_LEU_OME)
+        result = _dt_name_compound(LEU_LEU_OME)
         assert not is_failure_name(result), result
         assert result == LEU_LEU_OME_NAME, result
         assert _full_rt(LEU_LEU_OME, result), result
@@ -103,7 +156,7 @@ class TestSiteB_EsterCTerminus:
         molecule via the CIP-locanted splice (byte value pinned; both centres
         defined) and round-trips."""
         smi = "COC(=O)[C@@H](C)NC(=O)[C@H](C)N"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == "methyl (2R)-2-[(2S)-2-aminopropanamido]propanoate", result
         assert _full_rt(smi, result), result
@@ -116,7 +169,7 @@ class TestSiteA_CIPLocantedSplice:
     '(2S)-2-amino' the residue splices into."""
 
     def test_ala_norleucine_byte_and_rt(self):
-        result = name_compound(ALA_NORLEUCINE)
+        result = _dt_name_compound(ALA_NORLEUCINE)
         assert not is_failure_name(result), result
         assert result == ALA_NORLEUCINE_NAME, result
         assert _full_rt(ALA_NORLEUCINE, result), result
@@ -141,7 +194,7 @@ class TestNonStandardLinearPeptides:
 
     @pytest.mark.parametrize("smi", CASES)
     def test_names_right_molecule_or_abstains(self, smi):
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         if is_failure_name(result):
             return  # clean abstention is acceptable
         # If a name is emitted, it MUST describe the input molecule.
@@ -171,7 +224,7 @@ class TestDeterminism:
             variants.add(
                 Chem.MolToSmiles(Chem.RenumberAtoms(mol, order), canonical=False)
             )
-        names = {v: name_compound(v) for v in variants}
+        names = {v: _dt_name_compound(v) for v in variants}
         assert len(set(names.values())) == 1, names
         assert next(iter(names.values())) == expected, names
 
@@ -205,7 +258,7 @@ class TestControlsUnchanged:
 
     @pytest.mark.parametrize("smi,expected", CONTROLS)
     def test_default_tier(self, smi, expected):
-        assert name_compound(smi) == expected, (smi, name_compound(smi))
+        assert _dt_name_compound(smi) == expected, (smi, _dt_name_compound(smi))
 
     @pytest.mark.parametrize("smi,expected", CONTROLS)
     def test_best_effort_tier(self, smi, expected):

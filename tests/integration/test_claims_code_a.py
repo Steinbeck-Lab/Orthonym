@@ -33,6 +33,35 @@ from orthonym import Orthonym
 from orthonym import namer
 from orthonym.metrics import provenance as pv
 from tests.support.rt_assert import _independent_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C[C@@H]1C[C@@]2(O[C@H]2C)C(=O)O[C@@H]2CC[N+]3([O-])CC=C(COC(=O)[C@]1(C)O)[C@H]23",
+    "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@H]43)[C@@H]1CC[C@@H]2OC(=O)CCc1ccccc1",
+    "N=C=O",
+    "N=C=S",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@H]43)[C@@H]1CC[C@@H]2OC(=O)CCc1ccccc1",
+    "N=C=O",
+    "N=C=S",
+})
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
@@ -48,6 +77,8 @@ def _independent_full_key(name):
 
 
 def _pin_row(smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     return Orthonym().name_tiered(smiles)
 
 
@@ -89,11 +120,10 @@ def test_wrong_descriptors_on_a_stereoparent_fall_back_to_its_full_key_name():
     assert _independent_full_key(row["name"]) == _key(NANDROLONE_PP)
     assert row["opsin"] == "verified" and row["verified"] == "opsin", row
     # not what the PIN path built (the gate's stereo-free repair, recorded non-PIN),
-    # so not pin_verified; a verified name from the PIN path that is not certified
-    # as the PIN is pin_unverified (paper tier semantics; TRIAGE 'Tier labels --
-    # paper semantics' -- best_effort was the offer-label under-claim this file's
-    # TRIAGE section recorded)
-    assert row["tier"] == "pin_unverified", row
+    # so not pin_verified; a verified name that the code records as not the PIN is
+    # systematic_verified (user decision 2026-09-30; Methods, "Tiers": "a correct
+    # systematic name that is not the PIN")
+    assert row["tier"] == "systematic_verified", row
     assert row["is_pin"] is False, row
 
 
@@ -174,7 +204,10 @@ def test_inconclusive_self01_ships_only_after_a_full_key_round_trip(monkeypatch)
 
 @pytest.mark.parametrize("smiles,name", [
     ("N=C=S", "isothiocyanic acid"),
-    ("[SH-]", "bisulfide"),
+    # [SH-] was the second example ('bisulfide'); breadth job 3 names it by the
+    # parent-hydride rule ('sulfanide', the Blue Book-40902), which
+    # is not a trivial name, so another trivial one stands in for it
+    ("N=C=O", "isocyanic acid"),
 ])
 def test_trivial_name_is_round_tripped_and_labelled_verified(smiles, name):
     row = _pin_row(smiles)
@@ -211,17 +244,18 @@ def test_round_tripping_pin_keeps_pin_verified():
     assert _independent_full_key(row["name"]) == _key("CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O")
 
 
-def test_identity_table_name_is_systematic_verified():
-    # P2 -- labels (2026-09-28): the exact-match coordination list name keeps its
-    # name and its 'identity' check, a verified tier, but it is not a PIN: the Blue
-    # Book gives coordination names no PIN status, the Blue Book;
-    #,:39735), so it is systematic_verified, not pin_verified
-    # (tests/integration/test_p2_labels_public_claims.py covers the whole list).
+def test_identity_table_name_keeps_the_label_of_its_naming_path():
+    # Paper conformance (user decision 2026-09-30, replacing the 2026-09-28 label
+    # systematic_verified): the exact-match coordination list name keeps its name,
+    # its 'identity' check and the label of the path that returned it, as in the
+    # paper's measured run (35 pin_verified, 3 best_effort on ChEBI); heme b at the
+    # default tier is pin_verified (tests/integration/test_p2_labels_public_claims.py
+    # covers the whole list).
     from tests.unit.rules.test_d1_coordination_v36 import FIXTURES
     heme = next(r["smiles"] for r in FIXTURES
                 if r["name"] == "(protoporphyrinato)iron(II)")
     row = _pin_row(heme)
     assert row["name"] == "(protoporphyrinato)iron(II)", row
     assert row["verified"] == "identity", row
-    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
+    assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
     assert _independent_full_key(row["name"]) == ""  # OPSIN cannot read it

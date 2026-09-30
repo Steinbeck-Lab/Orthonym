@@ -24,6 +24,49 @@ import pytest
 from orthonym.namer import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "OC[C@H]1O[C@@H](OC23CC4CC(CC(C4)C2)C3)[C@H](O)[C@@H](O)[C@@H]1O",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # whole-branch review (minor 2): every test here asserts an OPSIN round-trip,
 # so mark the whole module opsin_gate — a Java-free run SKIPS these rather than
@@ -72,7 +115,7 @@ class TestComplexAglyconeGlycosideNames:
     """A sugar on a retained/complex aglycone now NAMES + RT-verifies (was abstain)."""
 
     def test_bornyl_glucoside_names_and_roundtrips(self):
-        name = name_compound(BORNYL_GLUCOSIDE)
+        name = _dt_name_compound(BORNYL_GLUCOSIDE)
         assert not is_failure_name(name), f"still abstains: {name!r}"
         # 0-wrong: the emitted name must describe the input structure.
         assert opsin_roundtrip_check(BORNYL_GLUCOSIDE, name)["passed"], name
@@ -88,7 +131,7 @@ class TestComplexAglyconeGlycosideNames:
 
         NEVER a wrong molecule: an emitted name must round-trip to the input.
         """
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         if is_failure_name(name):
             pytest.skip(f"abstains (acceptable, not wrong): {name!r}")
         assert opsin_roundtrip_check(smiles, name)["passed"], (smiles, name)
@@ -134,7 +177,7 @@ class TestComplexAglyconeGlycosideDeterminism:
     def test_glucoside_deterministic_across_atom_orders(self, smiles, expected):
         variants = self._reordered_smiles(smiles)
         assert len(variants) >= 5  # canonical + 4 deterministic reorderings
-        names = [name_compound(v) for v in variants]
+        names = [_dt_name_compound(v) for v in variants]
         # Every atom ordering yields the identical name (a project rule).
         assert len(set(names)) == 1, dict(zip(variants, names))
         assert not is_failure_name(names[0]), names[0]
@@ -186,7 +229,7 @@ class TestGlycosideByteIdentityControls:
 
     @pytest.mark.parametrize("smiles,expected", list(CONTROLS.items()))
     def test_control_default_tier_unchanged(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", list(CONTROLS.items()))
     def test_control_best_effort_tier_unchanged(self, smiles, expected):

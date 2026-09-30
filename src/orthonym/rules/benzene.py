@@ -2676,6 +2676,24 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                     # -O-S(=O)-: sulfinyloxy
                     return {'name': 'sulfinyloxy', 'atoms': sub_atoms}
                 elif s_double_o >= 2:
+                    # -O-SO2-OH is the preselected prefix 'sulfooxy'
+                    #, the Blue Book;:31342 "HO-SO2-O- sulfooxy
+                    # (preselected prefix)"); 'sulfonyloxy' is -O-SO2- with a
+                    # free valence on S, a different molecule, so an aryl
+                    # hydrogen sulfate beside an -OH was refused
+                    # ('4-nitro-2-(sulfonyloxy)phenol').
+                    s_oh = [
+                        nb for nb in s_atom.GetNeighbors()
+                        if nb.GetIdx() != o_idx and nb.GetSymbol() == 'O'
+                        and nb.GetDegree() == 1 and nb.GetTotalNumHs() == 1
+                        and nb.GetFormalCharge() == 0
+                        and mol.GetBondBetweenAtoms(
+                            s_atom.GetIdx(), nb.GetIdx()).GetBondType()
+                        == Chem.BondType.SINGLE
+                    ]
+                    if (len(s_oh) == 1 and s_atom.GetDegree() == 4
+                            and s_atom.GetFormalCharge() == 0):
+                        return {'name': 'sulfooxy', 'atoms': sub_atoms}
                     # -O-S(=O)(=O)-: sulfonyloxy
                     return {'name': 'sulfonyloxy', 'atoms': sub_atoms}
 
@@ -4430,6 +4448,14 @@ def _assemble_benzene_with_suffix(
     # Assemble: {prefix}benzene-{locants}-{multiplier}{suffix}
     if chosen_count > 1:
         return f"{prefix_part}benzene-{locant_str}-{multiplier}{chosen_suffix}"
+    elif prefix_part:
+        # A single systematic suffix beside a prefix cites its locant:
+        # (the Blue Book) omits the '1' only where no locant is needed, and
+        # the PINs print it -- 'sodium 4-methylbenzene-1-thiolate (PIN)' (:43599),
+        # '3-[(4-sulfanylphenyl)disulfanyl]benzene-1-thiol (PIN)' (:27593), as the
+        # sulfonic-acid branch above does ('4-aminobenzene-1-sulfonic acid').
+        # '4-methylbenzenethiol' was shipped for the first.
+        return f"{prefix_part}benzene-{locant_str}-{chosen_suffix}"
     else:
         # Monosubstituted: benzene{suffix} (no locant, no hyphen)
         return f"{prefix_part}benzene{chosen_suffix}"
@@ -4544,8 +4570,12 @@ def _name_substituted_aniline(
     n_prefix_entries: List[Tuple[str, str]] = []  # (alpha_key, rendered)
     if n_substituents:
         if len(n_substituents) == 2 and n_substituents[0] == n_substituents[1]:
-            mp = get_multiplier_prefix(2, n_substituents[0])
-            rendered = f"N,N-{mp}{_wrap_n_substituent(enclose_if_compound(n_substituents[0]))}"
+            # The shared primitive joins the multiplier ('N,N-di(dodecyl)',
+            # (c), the Blue Book).
+            from ..assembly.naming_utils import multiplied_component
+            _nm = n_substituents[0]
+            rendered = (f"N,N-"
+                        f"{multiplied_component(2, _nm, _wrap_n_substituent(enclose_if_compound(_nm)))}")
             n_prefix_entries.append((alpha_sort_key(n_substituents[0]), rendered))
         else:
             for name in n_substituents:
@@ -4680,8 +4710,8 @@ def _name_substituted_benzenediamine(
         locs = sorted(locs)
         tags = ",".join(f"N{loc}" for loc in locs)
         body = _wrap_n_substituent(enclose_if_compound(nm))
-        mp = get_multiplier_prefix(len(locs), nm) if len(locs) > 1 else ""
-        n_prefix_entries.append((alpha_sort_key(nm), f"{tags}-{mp}{body}"))
+        from ..assembly.naming_utils import multiplied_component as _mc
+        n_prefix_entries.append((alpha_sort_key(nm), f"{tags}-{_mc(len(locs), nm, body)}"))
 
     # --- Ring-substituent prefix entries ---
     ring_prefix_entries: List[Tuple[str, str]] = []
@@ -4860,8 +4890,8 @@ def _build_amidine_n_prefix(n_substituents) -> str:
         loc_str = ",".join(nlocs_sorted)
         count = len(nlocs_sorted)
         if count > 1:
-            mp = get_multiplier_prefix(count, name)
-            rendered = f"{loc_str}-{mp}{_wrap_n_substituent(name)}"
+            from ..assembly.naming_utils import multiplied_component as _mc
+            rendered = f"{loc_str}-{_mc(count, name, _wrap_n_substituent(name))}"
         else:
             rendered = f"{loc_str}-{_wrap_n_substituent(name)}"
         segments.append((alpha_sort_key(name), _loc_sort(nlocs_sorted[0]), rendered))
@@ -5004,7 +5034,8 @@ def _build_n_substituted_sulfamoyl_prefix(
         return None  # distinct N-substituents: nested form not built
     base = names[0]
     if len(names) == 2:
-        base = f"{get_multiplier_prefix(2, base)}{base}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        base = _mc(2, base, base)
     # A substituted substituent -> enclosed per ('(methylsulfamoyl)',
     # '(dimethylsulfamoyl)'). Pre-enclose here; the downstream formatter leaves an
     # already-bracketed name alone, so there is no double-enclosing.

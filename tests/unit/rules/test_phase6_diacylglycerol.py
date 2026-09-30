@@ -20,6 +20,51 @@ from rdkit.Chem import inchi
 
 from orthonym import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C(CCCCCCC/C=C\\CCCCC)(=O)OC[C@@H](OC(CCCCCCC/C=C\\CCCCCCCC)=O)CO",
+    "CC(=O)OCC(O)COC(=O)CCCCC",
+    "CCCCC/C=C\\CCCCCCCC(=O)OC[C@H](CO)OC(=O)CCCCCCC/C=C\\CCCCCCCC",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -55,7 +100,7 @@ def test_diacylglycerol_unsaturated_asymmetric_names_by_senior_ester():
     -- the junior hydroxy class promoted to principal, inverting."""
     assert inchi.MolToInchiKey(Chem.MolFromSmiles(WITNESS)) == WITNESS_INCHIKEY
 
-    name = Orthonym().name(WITNESS)
+    name = _dt_name(WITNESS)
     assert name == WITNESS_NAME, name
     assert _rt_matches(WITNESS, name), name
 
@@ -71,7 +116,7 @@ def test_diacylglycerol_order_invariant():
     )
     assert inchi.MolToInchiKey(Chem.MolFromSmiles(alt_smiles)) == WITNESS_INCHIKEY
 
-    name = Orthonym().name(alt_smiles)
+    name = _dt_name(alt_smiles)
     assert name == WITNESS_NAME, name
 
 
@@ -85,7 +130,7 @@ def test_1_3_diacylglycerol_different_acyls_names_by_senior_ester():
     'propan-2-yl') branch -- 's own worked example
     ('2-(acetyloxy)ethyl methyl butanedioate (PIN)') is exactly this shape."""
     smi = "CC(=O)OCC(O)COC(=O)CCCCC"
-    name = Orthonym().name(smi)
+    name = _dt_name(smi)
     assert name == "3-(acetyloxy)-2-hydroxypropyl hexanoate", name
     assert _rt_matches(smi, name), name
 
@@ -100,7 +145,7 @@ def test_1_3_diacylglycerol_identical_acyls_stays_multiplicative_diyl_form():
     name did not change as a side effect of wiring the new path into
     `name_polyfunctional`."""
     smi = "CCCCCC(=O)OCC(O)COC(=O)CCCCC"
-    name = Orthonym().name(smi)
+    name = _dt_name(smi)
     assert name == "2-hydroxypropane-1,3-diyl dihexanoate", name
     assert _rt_matches(smi, name), name
 

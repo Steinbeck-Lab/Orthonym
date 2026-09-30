@@ -94,6 +94,61 @@ from rdkit.Chem import inchi
 from orthonym import Orthonym
 from orthonym.assembly.substituent_naming import name_substituent_fragment
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CNS(=O)(=O)Cc1ccc2[nH]cc(CCN(C)C)c2c1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 @pytest.fixture(scope="module")
@@ -137,7 +192,7 @@ def test_task7_fragment_level_attach_locant():
 @pytest.mark.opsin_gate
 def test_task7_name_integration_and_rt(namer):
     smi = "COC(OC)C(C)c1ccccc1"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "(1,1-dimethoxypropan-2-yl)benzene", name
     assert _full_rt(smi, name), name
 
@@ -179,7 +234,7 @@ def test_task8_name_integration_and_rt(namer):
     used, see the test below)."""
     smi = "OC(=O)c1ccc(CCC(=O)NCCS)cc1"
     assert _key14(smi) == "CTUBSZMLRVDFKF"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: a prefix "is considered to begin with the first letter of its complete name" (the Blue Book): 'oxo' (o) is cited before
     # '[(2-sulfanylethyl)amino]' (s), and (g) (:3307) then gives oxo the lower
     # locant -- here both sit on C3. OPSIN RT exact.
@@ -200,7 +255,7 @@ def test_pantetheine_still_abstains_safely(namer):
     before any of this batch's edits). FALL THROUGH here is correct per this
     batch's explicit licence: 0-wrong (safe abstention) over breadth."""
     smi = "CC(C)(CO)[C@@H](O)C(=O)NCCC(=O)NCCS"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     # Never a WRONG molecule: either it safely abstains, or (if some future
     # fix to the separate composer bug changes this) it must RT-match.
     assert name == "unknown organic compound" or _full_rt(smi, name), name
@@ -229,7 +284,7 @@ def test_task9_fragment_level_no_carbamoyl():
 @pytest.mark.opsin_gate
 def test_task9_name_integration_no_carbamoyl_and_rt(namer):
     smi = "CNS(=O)(=O)Cc1ccc2[nH]cc(CCN(C)C)c2c1"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert "carbamoyl" not in name, name
     assert _full_rt(smi, name), name
 
@@ -260,7 +315,7 @@ def test_task10_name_integration_and_rt(namer):
     ownership end-to-end via `.name`."""
     smi = "OC(=O)CCSc1ccc(O)cc1O"
     assert _key14(smi) == "RWVORULKTLJCIE"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "3-[(2,4-dihydroxyphenyl)sulfanyl]propanoic acid", name
     assert _full_rt(smi, name), name
 
@@ -304,7 +359,7 @@ def test_task11_ornithine_still_abstains_safely(namer):
     (`OC(=O)CCCCNC(=N)N(C)C` -> also abstains at HEAD, unrelated to nitroso).
     FALL THROUGH here is correct per this batch's explicit licence."""
     smi = "N=C(NCCC[C@H](N)C(=O)O)NN=O"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "unknown organic compound" or _full_rt(smi, name), name
 
 
@@ -324,7 +379,7 @@ def test_task11_e4_fail_closed_fallthrough():
 @pytest.mark.opsin_gate
 def test_task11_e4_whole_molecule_no_wrong_emission(namer):
     smi = "OC(=O)CCCCNC(=N)N(C)C"
-    name = namer.name(smi)
+    name = _dt_obj_name(namer, smi)
     assert name == "unknown organic compound" or _full_rt(smi, name), name
 
 

@@ -10,8 +10,12 @@ A. Carbon-free compounds carry a preselected name at most, never a PIN.
    appropriate names"; PRESELECTED NAMES (:2062); '(HO)3PO phosphoric acid
    (preselected name)' (:2076), 'sulfuric acid (preselected name)' (:35449),
    'tetrachlorosilane (preselected name)' (:35758). The Blue Book labels no
-   carbon-free structure '(PIN)'. Label only: systematic_verified, is_pin False,
-   the name unchanged. A carbon-containing compound keeps its label.
+   carbon-free structure '(PIN)'. The tier label, however, follows the paper's
+   measured run (user decision 2026-09-30, replacing the 2026-09-29 label
+   systematic_verified): the label of the naming path, 'sodium chloride'
+   pin_verified -- the paper, Methods, "Tiers": "The tier labels describe how the
+   engine built a name". The name is unchanged. A carbon-containing compound keeps
+   its label.
 
 B. A multiplied organic cation in a salt takes 'bis', 'tris',... when it carries a
    cumulative cationic suffix or is a substituted parent cation, and every
@@ -35,18 +39,42 @@ import pytest
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from tests.support.rt_assert import assert_full_rt
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C/C=C/C=C/C(=O)[O-].C/C=C/C=C/C(=O)[O-].C/C=C/C=C/C(=O)[O-].[Al+3]",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
 
 def _row(smiles, tier):
+    if tier == "pin" and smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     if tier == "pin":
         return Orthonym(style="pin").name_tiered(smiles)
     return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
 # ---------------------------------------------------------------------------
-# A. Carbon-free compounds: preselected names, not PINs
+# A. Carbon-free compounds: preselected names; the label of the naming path
 # ---------------------------------------------------------------------------
 
 CARBON_FREE = [
@@ -63,10 +91,11 @@ CARBON_FREE = [
 
 @pytest.mark.parametrize("smiles,expected", CARBON_FREE)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
-def test_a_carbon_free_compound_is_not_labelled_a_pin(smiles, expected, tier):
+def test_a_carbon_free_compound_keeps_the_label_of_its_naming_path(smiles, expected,
+                                                                   tier):
     row = _row(smiles, tier)
     assert row["name"] == expected, row
-    assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
+    assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
     assert row["verified"] == "opsin", row
     assert_full_rt(expected, smiles)
 

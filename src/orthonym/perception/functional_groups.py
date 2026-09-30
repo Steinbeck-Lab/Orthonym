@@ -1246,6 +1246,8 @@ def get_chain_excluded_atoms(mol) -> Set[int]:
 # the group; the [#6] anchor(2) must not suppress an unrelated FG on that carbon.
 _SUPPRESS_ATOM_SLICE = {
     'hydroxylamine': slice(0, 2),
+    'secondary_alcohol': slice(0, 2),
+    'tertiary_alcohol': slice(0, 2),
 }
 
 

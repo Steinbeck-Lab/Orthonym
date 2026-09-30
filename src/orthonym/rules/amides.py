@@ -308,8 +308,8 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
             prefix_parts.append(f"{locants[0]}-{name}")
         else:
             locant_str = ",".join(str(loc) for loc in locants)
-            multiplier = get_multiplier_prefix(count, name)
-            prefix_parts.append(f"{locant_str}-{multiplier}{name}")
+            from ..assembly.naming_utils import multiplied_component as _mc
+            prefix_parts.append(f"{locant_str}-{_mc(count, name, name)}")
 
     prefix_parts.sort(key=lambda x: alpha_sort_key(x))
 
@@ -487,10 +487,11 @@ def format_n_substitution(substituents: List[Dict]) -> Optional[str]:
         if count == 1:
             parts.append(f"N-{display_name}")
         else:
-            # Multiple of same: N,N-di...
-            multiplier = get_multiplier_prefix(count, name)
+            # Multiple of same: N,N-di... The shared primitive joins the
+            # multiplier (and the (c)/(d) marks of 'di(dodecyl)').
+            from ..assembly.naming_utils import multiplied_component
             n_locants = ",".join(["N"] * count)
-            parts.append(f"{n_locants}-{multiplier}{display_name}")
+            parts.append(f"{n_locants}-{multiplied_component(count, name, display_name)}")
 
     # Join parts with hyphen
     return "-".join(parts)
@@ -955,8 +956,9 @@ def name_chain_diamide(
         if len(locants) == 1:
             prefix = f"{n_locant_str}-{display_name}"
         else:
-            multiplier = get_multiplier_prefix(len(locants), name)
-            prefix = f"{n_locant_str}-{multiplier}{display_name}"
+            from ..assembly.naming_utils import multiplied_component
+            prefix = (f"{n_locant_str}-"
+                      f"{multiplied_component(len(locants), name, display_name)}")
         parts.append((alpha_sort_key(name), prefix))
 
     parts.sort(key=lambda p: p[0])

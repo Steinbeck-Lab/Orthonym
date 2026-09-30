@@ -990,7 +990,8 @@ def _identify_pah_nitrogen_group(mol, n_idx: int, core_atoms: Set[int]) -> Optio
                 get_multiplier_prefix as _gmp,
             )
             _names, _atoms = _detected
-            _parts = [f"{_gmp(_ct, _nm)}{_enc(_nm)}"
+            from ..assembly.naming_utils import multiplied_component as _mc
+            _parts = [_mc(_ct, _nm, _enc(_nm))
                       for _nm, _ct in sorted(_Counter(_names).items())]
             return {'name': f"{''.join(_parts)}amino",
                     'atoms': [n_idx] + _atoms}
@@ -1458,14 +1459,35 @@ def name_substituted_polycyclic(
                 stereo_text="",
             )
 
-    # Build prefix strings, sorted alphabetically by substituent name
-    prefixes = []
+    # (b) (the Blue Book) / (a) (:7104): an N-substituent of
+    # the promoted amine that shares its name with a ring prefix is ONE multiplied
+    # group with it, locants in the order (:3195, italic N first):
+    # '*N*,1,4-triphenyl-1*H*-1,2,4-triazol-4-ium-3-aminide (PIN)' (:42460) --
+    # 'N-phenyl-9,9-diphenyl-9H-fluoren-3-amine' is 'N,9,9-triphenyl-9H-fluoren-3-
+    # amine'. (The L3 licence above never fires with an N-substituent present.)
+    _merged_n_counts = {}
+    from ..assembly.composition_primitives import identical_prefixes_grouped
+    if (amine_n_substituents and suffix_groups.get('amine')
+            and identical_prefixes_grouped()):
+        from collections import Counter as _MCounter
+        for _nm, _ct in _MCounter(amine_n_substituents).items():
+            if _nm in prefix_substituent_groups:
+                _merged_n_counts[_nm] = _ct
+    from ..assembly.composition_primitives import prefix_locant_order_key
+
+    # Build prefix strings, sorted alphabetically by substituent name. Each entry
+    # keeps its sort key so the italic-N prefixes below join the SAME series.
+    _keyed_prefixes = []
     for name in sorted(prefix_substituent_groups.keys(), key=alpha_sort_key):
         locants = prefix_substituent_groups[name]
+        if name in _merged_n_counts:
+            locants = sorted(list(locants) + ["N"] * _merged_n_counts[name],
+                             key=prefix_locant_order_key)
         count = len(locants)
         prefix_str = format_substituent_prefix(
             name, [] if _l3_omit_prefix_locant else locants, count)
-        prefixes.append(prefix_str)
+        _keyed_prefixes.append(((alpha_sort_key(name), 1), prefix_str))
+    prefixes = [p for _k, p in _keyed_prefixes]
 
     # The italic-N prefixes of a promoted N-substituted amine. Cited only when
     # the amine actually became the suffix -- `suffix_groups.get('amine')` is the
@@ -1488,9 +1510,20 @@ def name_substituted_polycyclic(
         _n_parts = []
         for _nm, _ct in sorted(_Counter(amine_n_substituents).items(),
                                key=lambda kv: alpha_sort_key(kv[0])):
-            _n_parts.append(f"{','.join(['N'] * _ct)}-"
-                            f"{_gmp(_ct, _nm)}{_wrap_n(_nm)}")
-        prefixes = _n_parts + prefixes
+            if _nm in _merged_n_counts:
+                continue
+            from ..assembly.naming_utils import multiplied_component as _mc
+            from ..assembly.naming_utils import enclose_if_compound as _enc_n
+            _n_parts.append(((alpha_sort_key(_nm), 0),
+                             f"{','.join(['N'] * _ct)}-"
+                             f"{_mc(_ct, _nm, _wrap_n(_enc_n(_nm)))}"))
+        # (the Blue Book, "Simple prefixes... are arranged
+        # alphabetically") and (:3477): the italic-N prefixes are cited in
+        # the one alphanumerical series with the ring prefixes, not in front of it;
+        # for one name the italic N comes first,:3195, "Italic capital
+        #... letter locants are lower than... numerals").
+        prefixes = [p for _k, p in sorted(_n_parts + _keyed_prefixes,
+                                          key=lambda kp: kp[0])]
 
     # Join prefixes with proper hyphenation
     prefix_part = _join_pah_prefixes(prefixes)
@@ -1617,17 +1650,20 @@ def _join_pah_prefixes(prefixes: List[str]) -> str:
     if len(prefixes) == 1:
         return prefixes[0]
 
+    from ..assembly.naming_utils import starts_with_locant
+
     result = prefixes[0]
     for i in range(1, len(prefixes)):
         current = prefixes[i]
 
-        # Check if we need a hyphen
-        if result and current:
-            last_char = result[-1]
-            first_char = current[0]
-
-            if last_char.isalpha() and first_char.isdigit():
-                result += "-"
+        # (a)/(b) (the Blue Book,:6944): a hyphen separates a
+        # locant from the preceding prefix, whether that prefix ends in a letter
+        # or in an enclosing mark, and whether the locant is a numeral or an
+        # italic letter ('...-2-yl)-9-phenyl', '...-1-yl)-N-phenyl').
+        if result and current and result[-1] != "-" and (
+                starts_with_locant(current)
+                or (result[-1].isalpha() and current[0].isdigit())):
+            result += "-"
 
         result += current
 

@@ -84,13 +84,14 @@ def _centres_jar_version_key(path: Path):
     return tuple(int(p) for p in m.group(1).split("."))
 
 
-@lru_cache(maxsize=8)
 def _find_centres_jar(version: Optional[str] = None) -> Optional[str]:
-    """Find the pinned centres CLI jar via ``orthonym.jars`` (cached per process).
+    """Find the pinned centres CLI jar via ``orthonym.jars``.
 
-    Perf lever A5 (2026-09-13): this ran a ``PROJECT_ROOT.glob`` on EVERY centres call
-    (1,960 directory scans per 300 molecules, ~1 % of naming time). The set of vendored
-    jars does not change while a process runs, so the lookup is cached per argument.
+    Perf lever A5 (2026-09-13) cached this with ``lru_cache`` when it ran a
+    ``PROJECT_ROOT.glob`` on every centres call. ``orthonym.jars.find_jar`` now keeps
+    the outcome itself (once per process, a dict read), and ``jars.fetch_all``
+    forgets it; a second cache here kept the old answer after that (None from a
+    reduced-mode start, so RDKit's CIP labels for the rest of the process).
 
     Parallel to ``opsin_roundtrip._find_opsin_jar``.
 

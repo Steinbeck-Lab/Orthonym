@@ -310,6 +310,11 @@ _CANARY_DEFECT_REASONS = {
 # acid) and 171 (the tetramethyl-1,3-dioxolanyl terpene) left this table -- their raw PIN-tier
 # names are RT-exact now (strict XPASS below) and they are verified fixture rows
 # (tests/integration/test_canary_rt75.py, tags 'j6 RB-RINGBR' / 'j6 RB-HWSTEM').
+# Breadth job 3 review fixes (2026-09-29): canary calls 155 (DK-NOTEXACT, the fused
+# ring ketone that raised TypeError on the '4a'/7 locant sort, fixed by 2c79719e3) and
+# 684 (DK-SFXNUM, fixed by 7c39f2243: every ring -OH of the alcohol class is a suffix)
+# left this table: both raw PIN-tier names are RT-exact now and are verified fixture
+# rows (tests/integration/test_canary_rt75.py, tags 'b3 RB-...').
 # SMILES -> (current PIN-tier name with the gate off, class, canary call numbers).
 CANARY_KNOWN_DEFECTS = {
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O": (
@@ -388,10 +393,6 @@ CANARY_KNOWN_DEFECTS = {
         "N-benzyl-N-ethylethan-1-amine",
         "DK-ETHANAMINE", (149,),
     ),
-    "NC(N)=[NH2+].O=C([O-])C(=O)O": (
-        "guanidinium 1-carboxymethanoate",
-        "DK-NOTEXACT", (150,),
-    ),
     "CCCCC/C=C\\C/C=C\\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC)COC(=O)CCCCCCC/C=C\\C/C=C\\CCCCC": (
         # j7 (TRIAGE g5 C12): now the Blue Book method (1) spelling with the single
         # stereo-bearing anion enclosed:31846); still DK-NOTEXACT
@@ -402,10 +403,6 @@ CANARY_KNOWN_DEFECTS = {
     "COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\\C)CCCC1O": (
         "(9E)-5-hydroxy-4-methoxy-9,13,14-trimethyl-16-(2-methylpropyl)-17-azatricyclo[9.7.0.0^1,15]octadeca-9,12-diene-2,18-dione",
         "DK-VBFUSED", (154, 320, 333),
-    ),
-    "COC1C2=C(C)C(=O)OC2CC2CCC(O)C(C)C21C": (
-        "unknown organic compound",
-        "DK-NOTEXACT", (155,),
     ),
     "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1": (
         # fix a performance pass (wp5): the ring now takes the form (was
@@ -802,10 +799,6 @@ CANARY_KNOWN_DEFECTS = {
     "CCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCCCCCC": (
         "(2S)-2-hydroxy-3-(tetradecanoyloxy)propyl octadecanoate",
         "DK-GLYM2", (683,),
-    ),
-    "C/C1=C\\[C@H](O)C[C@](C)(O)/C=C/[C@H](C(C)C)CC/C(C)=C/CC1": (
-        "(1R,2E,6E,10S,11E,13S)-3,7,13-trimethyl-10-(propan-2-yl)cyclotetradeca-2,6,11-triene-1,13-diol",
-        "DK-SFXNUM", (684,),
     ),
     "CC(C)[C@H](NC(=O)[C@H](CCC(N)=O)NC(=O)[C@@H](N)[C@@H](C)O)C(=O)O": (
         "threonylglutaminylvaline",

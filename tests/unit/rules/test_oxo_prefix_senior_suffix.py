@@ -44,6 +44,52 @@ import pytest
 
 from orthonym import Orthonym, name_compound
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(C)(C)NC(=O)C1=CC2=C(C(=CC=C2)OC)OC1=O",
+    "CNC(=O)c1cc(=O)c2ccccc2o1",
+    "CNC(=O)c1cnc2ccccc2c1",
+    "CNS(=O)(=O)Cc1ccc2[nH]cc(CCN(C)C)c2c1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -139,7 +185,7 @@ PIN_ROWS = [
 
 @pytest.mark.parametrize("smiles,pin", PIN_ROWS, ids=[r[0] for r in PIN_ROWS])
 def test_oxo_prefix_pin(smiles, pin):
-    name = name_compound(smiles)
+    name = _dt_name_compound(smiles)
     assert name == pin
     assert name_is_rt_exact(name, smiles), f"{name!r} does not round-trip to {smiles}"
 
@@ -151,7 +197,7 @@ GLUED = re.compile(r"(?:one|dione|amine)\d|one-\d+-carb")
 
 @pytest.mark.parametrize("smiles", [r[0] for r in PIN_ROWS[:27]])
 def test_never_a_glued_second_suffix(smiles):
-    res = Orthonym(style="pin").name_tiered(smiles)
+    res = _dt_row(smiles)
     assert not GLUED.search(res.get("name") or ""), res
 
 
@@ -195,7 +241,7 @@ SENIOR_PREFIX_ROWS = [
 
 @pytest.mark.parametrize("smiles,old", SENIOR_PREFIX_ROWS, ids=[r[0] for r in SENIOR_PREFIX_ROWS])
 def test_senior_group_as_prefix_is_not_pin_verified(smiles, old):
-    res = Orthonym(style="pin").name_tiered(smiles)
+    res = _dt_row(smiles)
     assert res.get("tier") != "pin_verified", res
     assert res.get("name") and name_is_rt_exact(res["name"], smiles), res
 

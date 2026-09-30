@@ -136,10 +136,13 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
     re-ran the whole rescue (perception, classification, engine, round trips): the
     ChEBI lipid II-type glycopeptide made 816 rescues of 81 fragments, and the 735
     repeats took 35 of its 91 s. Measured on those repeats (fresh process): every
-    one returned the name of the first ask, spent no unit of any naming budget and
-    left every provenance variable as it found it. So a hit returns the stored name
-    and replays nothing -- neither the cold call's budget cost nor its provenance
-    writes, which the repeats did not make either. The key carries the inputs the
+    one returned the name of the first ask and spent no unit of any naming budget.
+    A hit replays the provenance variables the cold call wrote (its ``source``
+    record above all): a caller that restored its provenance between two asks
+    (the isotope decorator names its skeleton twice) otherwise shipped the
+    general-engine skeleton under the PIN path's label with the memo on and
+    systematic_verified with it off ('2-methylpropan-2-yl 2-{6-[2-(4-{2-[(2H5)
+    cyclohexa-1,3,5-trien-1-yl]-1-oxo-2-azaethyl}-...)ethanoate'). The key carries the inputs the
     rescue reads besides the fragment: the ambient breadth context, the N-acyl
     float scope, the peptide re-entrancy flag and the locant/isotope scopes.
 
@@ -169,7 +172,9 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
            nacyl_float_refusing(), _dispatch_table._PEPTIDE_SUBST_ACTIVE,
            forced_locant_reason(), _ISOTOPIC_NAMING_SCOPE.get(),
            _ISOTOPE_PARENT_POSITIONAL.get())
-    state = {"hit": True, "units": (0, 0)}
+    from ..assembly.nested_memo import _apply as _replay_provenance
+    from ..metrics import provenance as _pv
+    state = {"hit": True, "units": (0, 0), "replay": {}}
 
     def _budgets():
         g = _fn._fragment_guard
@@ -178,7 +183,13 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
     def _fresh():
         state["hit"] = False
         before = _budgets()
-        result = _name_fragment_t4_rescue_fresh(smiles)
+        _pv.push_touched_log()
+        try:
+            result = _name_fragment_t4_rescue_fresh(smiles)
+        finally:
+            touched = _pv.pop_touched_log()
+        after_prov = _pv.get_provenance()
+        state["replay"] = {k: after_prov[k] for k in touched if k in after_prov}
         state["units"] = tuple(
             (b - a) if (a is not None and b is not None and b > a) else 0
             for b, a in zip(before, _budgets()))
@@ -186,8 +197,9 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
 
     result = cache_or_compute("t4_fragment_rescue", key, _fresh)
     if state["hit"]:
-        units = side_get("t4_fragment_rescue", key)
-        if units:
+        meta = side_get("t4_fragment_rescue", key)
+        if meta:
+            units, replay = meta
             # Raises PerfBudgetExceeded exactly when the repeat would have: the
             # repeat charges these units one analysis at a time, and a spend
             # raises once the running total reaches the remaining budget.
@@ -195,8 +207,10 @@ def _name_fragment_t4_rescue(smiles: str) -> Optional[str]:
                 _fn.spend_perf_work(units[0])
             if units[1]:
                 _fn.spend_analysis_call(units[1])
+            if replay:
+                _replay_provenance(replay, (0, 0, 0), replay_budgets=False)
     else:
-        side_put("t4_fragment_rescue", key, state["units"])
+        side_put("t4_fragment_rescue", key, (state["units"], state["replay"]))
     return result
 
 

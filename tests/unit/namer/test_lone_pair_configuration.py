@@ -25,6 +25,49 @@ from orthonym import Orthonym, namer
 from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from tests.support.rt_assert import _independent_parse, assert_full_rt
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C[S@@](=O)c1ccc(CNC(=NCCc2cccc3c2OCCO3)NC2CC2)cc1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -128,7 +171,7 @@ def test_canonical_sulfoxide_keeps_its_name(tier):
 
 
 def test_p_ring_row_misread_on_both_sides_keeps_its_name():
-    res = Orthonym(style="pin").name_tiered(P_RING_ROW)
+    res = _dt_row(P_RING_ROW)
     assert res.get("name") == P_RING_NAME
     assert_full_rt(res.get("name"), P_RING_ROW)
     # RDKit misreads the input (its key is not OPSIN's own key of the right name)...
@@ -139,7 +182,7 @@ def test_p_ring_row_misread_on_both_sides_keeps_its_name():
 
 
 def test_tautomer_name_pairs_through_the_standard_inchi():
-    res = Orthonym(style="pin").name_tiered(TAUTOMER_ROW)
+    res = _dt_row(TAUTOMER_ROW)
     assert res.get("name") == TAUTOMER_NAME
     assert_full_rt(res.get("name"), TAUTOMER_ROW)
     assert namer._lone_pair_configuration_verified(TAUTOMER_NAME, TAUTOMER_ROW) is True
@@ -160,7 +203,7 @@ def test_aziridine_nitrogen():
 
 
 def test_sulfinate_ester_is_checked_on_the_callers_string_only():
-    res = Orthonym(style="pin").name_tiered(SULFINATE_ROW)
+    res = _dt_row(SULFINATE_ROW)
     assert res.get("name") == SULFINATE_NAME
     assert res.get("tier") == "pin_verified"
     assert_full_rt(res.get("name"), SULFINATE_ROW)

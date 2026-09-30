@@ -766,6 +766,39 @@ def _sulfur_oxoacid_ring_suffix_locant_is_trivial(
     return True
 
 
+def _distinct_group_locants(chain, pg_matches, atom_to_locant, mol) -> List[int]:
+    """Chain locants of the principal characteristic groups, one per group.
+
+    ``pg_matches`` are SMARTS match tuples. Matches that share a non-carbon
+    atom describe the same group and give one locant; matches with disjoint
+    characteristic atoms are distinct groups and each gives its locant, so a
+    geminal pair keeps both (``[1, 1]``). Without a mol there is no way to
+    tell the atoms apart, so the old one-locant-per-position rule applies.
+    """
+    if mol is None:
+        return sorted(set(get_functional_group_locants(
+            chain, pg_matches, atom_to_locant, mol=mol)))
+    groups: List[set] = []
+    locants: List[int] = []
+    for match in pg_matches:
+        het = {a for a in match if mol.GetAtomWithIdx(a).GetAtomicNum() != 6}
+        loc = get_functional_group_locants(chain, [match], atom_to_locant, mol=mol)
+        if not loc:
+            continue
+        if not het:
+            # A carbon-only match cannot be told apart from another one at
+            # the same position; keep one locant per position for it.
+            if loc[0] not in locants:
+                groups.append(set())
+                locants.append(loc[0])
+            continue
+        if any(het & g for g in groups):
+            continue
+        groups.append(het)
+        locants.append(loc[0])
+    return sorted(locants)
+
+
 def _generate_suffix(features: Any) -> Optional["NameFragment"]:
     """Generate suffix fragment for principal group.
 
@@ -826,15 +859,22 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         fg_count = max_capacity
 
     if features.principal_chain and features.atom_to_locant and features.principal_group_atoms:
-        fg_locants = get_functional_group_locants(
+        # One locant per DISTINCT characteristic group, kept as a multiset.
+        # cites a locant once for each suffix it locates, so a
+        # geminal pair on one chain carbon is 'ethane-1,1-diamine' /
+        # 'butane-1,1-diol' (the hydroxy-compound suffix rule; the
+        # appended ring suffixes below already keep the multiset,). A
+        # locant set here merged the two groups into ONE suffix
+        # ('ethanamine'), a different molecule. Two SMARTS matches are the
+        # SAME group only when they share a characteristic (non-carbon) atom:
+        # the ketone pattern '[#6][CX3](=O)[#6]' matches one C=O twice with
+        # its neighbours swapped, and those still collapse to one locant.
+        fg_locants = _distinct_group_locants(
             features.principal_chain,
             features.principal_group_atoms,
             features.atom_to_locant,
-            mol=features.mol
+            features.mol,
         )
-
-        # Deduplicate locants (overlapping SMARTS can produce duplicates)
-        fg_locants = sorted(set(fg_locants))
 
         # Further validate: count should match unique locants when locants exist
         if fg_locants:
@@ -1021,7 +1061,11 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         # Map FG atoms to ring locants
         fg_locants = []
         mol = features.mol
+        # (characteristic atoms, locant) per match -- see the multiset note
+        # after the loop.
+        _match_het_locant = []
         for match in features.principal_group_atoms:
+            _n_before = len(fg_locants)
             found = False
             match_set = set(match)
             ring_set_local = set(ring_idx_to_locant.keys())
@@ -1068,8 +1112,25 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
                             break
                     if found:
                         break
+            if len(fg_locants) > _n_before:
+                _match_het_locant.append((
+                    {a for a in match if mol.GetAtomWithIdx(a).GetAtomicNum() != 6},
+                    fg_locants[-1]))
 
-        fg_locants = sorted(set(fg_locants))
+        # One locant per DISTINCT group, as a multiset (the chain branch's
+        # _distinct_group_locants rule): geminal ring suffixes are
+        # 'cyclohexane-1,1-diol' cites a locant for each suffix).
+        # Matches sharing a characteristic atom are one group matched twice.
+        _groups: List[set] = []
+        _multiset: List[int] = []
+        for _het, _loc in _match_het_locant:
+            if _het and any(_het & _g for _g in _groups):
+                continue
+            if not _het and _loc in _multiset:
+                continue
+            _groups.append(_het)
+            _multiset.append(_loc)
+        fg_locants = sorted(_multiset)
         if fg_locants:
             fg_count = len(fg_locants)
             locants = tuple(fg_locants)
@@ -1507,6 +1568,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                 )
 
         prefix_text = get_prefix(fg_name)
+        _raw_prefix = prefix_text
         #: a COMPOUND FG prefix (e.g. the oxime =N-OH prefix
         # 'hydroxyimino') takes enclosing marks. Simple FG prefixes
         # (hydroxy/oxo/amino/chloro/...) are returned bare by enclose_if_compound,
@@ -1527,8 +1589,9 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
 
             if count > 1:
                 # Add multiplier
-                multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-                prefix_text = f"{multiplier}{prefix_text}"
+                # the shared primitive ('bis(hydroxyimino)', 'dihydroxy')
+                from ..naming_utils import multiplied_component as _mc
+                prefix_text = _mc(count, _raw_prefix, prefix_text)
 
             #: defer the locant-1 omission decision to the post-loop block,
             # which knows the molecule-wide substituent count.

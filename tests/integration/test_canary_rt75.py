@@ -120,6 +120,17 @@ from tests.support.jars import jar_or_none
 # RB-HWSTEM (:8224) "Hantzsch-Widman names... are preferred IUPAC names for
 # both the unsaturated and saturated compounds"; heteroatoms lowest (1,3), then
 # the free valence (4); the -OH chain is the parent,:18875).
+# 2026-09-29 (breadth job 3 review fixes) change-asserted-value: two known-defect molecules
+# (canary calls 155 and 684) are now named RT-exact at the PIN tier and are re-baselined here
+# (tags '# b3 RB-...; was <old>'); OPSIN 2.9.0 full InChIKey exact (fresh java run outside the
+# engine).
+# RB-P14C "### **** NUMBERING" (c) "principal characteristic groups and free valences
+# (suffixes)" (:3256): both ring -OH are the suffix, -1,3-diol ({1,3} before the
+# enes {4,8,13}; the other {1,3} numbering gives enes {4,9,13}); 'propan-2-yl'
+# (RB-P29 below).
+# RB-FUSEDKETONE the fused ring ketone keeps its hydro prefixes and added hydrogen as
+# '3,4-dihydronaphthalen-1(2H)-one (PIN)' (:3276); (:3193) sorts a
+# numeral-plus-letter locant immediately after its numeral ('4a' after 4).
 # Classes (Blue Book = the Blue Book Blue Book; R<n> = plan ruling table):
 # RB-R1..R24 the plan ruling R<n> (its heading, sentence and line are in the plan table).
 # RB-Da user decision D-a: semisystematic sugar names stay at the PIN tier. No PIN is
@@ -818,8 +829,12 @@ CANARY_COMPOUNDS = [
         "N-benzyl-N-ethylethanamine",
     ),
     (
+        # (2) (the Blue Book): the remaining acid hydrogen is the
+        # word 'hydrogen'; the retained 'oxalic acid (PIN)' (:29723) gives 'oxalate'
+        # (the acid-salt method (2) of the protonation branch; re-baselined from
+        # 'guanidinium hydrogen ethanedioate')
         "NC(N)=[NH2+].O=C([O-])C(=O)O",
-        "guanidinium hydrogen ethanedioate",
+        "guanidinium hydrogen oxalate",
     ),
     (
         r"CCCCC/C=C\C/C=C\CCCCCCCCCC(=O)OC(COC(=O)CCCCCCC/C=C\C/C=C\CCCCC)COC(=O)CCCCCCC/C=C\C/C=C\CCCCC",
@@ -839,7 +854,10 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COC1C2=C(C)C(=O)OC2CC2CCC(O)C(C)C21C",
-        "11-hydroxy-8-methoxy-6,9,10-trimethyl-4-oxa-tricyclo[7.4.0.0(3,7)]tridec-6-en-5-one",
+        # b3 RB-FUSEDKETONE (breadth job 3 review fixes, change-asserted-value); was the
+        # von Baeyer "11-hydroxy-8-methoxy-6,9,10-trimethyl-4-oxa-tricyclo[7.4.0.0(3,7)]
+        # tridec-6-en-5-one" (the engine abstained on it since: TypeError)
+        "6-hydroxy-4-methoxy-3,4a,5-trimethyl-4a,5,6,7,8,8a,9,9a-octahydronaphtho[2,3-b]furan-2(4H)-one",
     ),
     (
         "CC(C)(C)[NH3+]",
@@ -3071,7 +3089,9 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C/C1=C\\[C@H](O)C[C@](C)(O)/C=C/[C@H](C(C)C)CC/C(C)=C/CC1",  # medium
-        "(1R,2E,6E,10S,11E,13S)-13-hydroxy-10-isopropyl-3,7,13-trimethylcyclotetradeca-2,6,11-trien-1-ol",
+        # b3 RB-P14C (breadth job 3 review fixes, change-asserted-value); was "(1R,2E,6E,10S,
+        # 11E,13S)-13-hydroxy-10-isopropyl-3,7,13-trimethylcyclotetradeca-2,6,11-trien-1-ol"
+        "(1S,3R,4E,8E,12S,13E)-1,5,9-trimethyl-12-(propan-2-yl)cyclotetradeca-4,8,13-triene-1,3-diol",
     ),
     (
         "CC(C)[C@H](NC(=O)[C@H](CCC(N)=O)NC(=O)[C@@H](N)[C@@H](C)O)C(=O)O",  # acyclic,polyfunctional,medium

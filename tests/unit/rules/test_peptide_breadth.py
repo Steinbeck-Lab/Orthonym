@@ -25,6 +25,50 @@ from rdkit.Chem import inchi
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "NC(CCC(=O)NC1(C(=O)O)CC1)C(=O)O",
+    "N[C@@H](CCC(=O)N[C@@H](CS)C(=O)NCC(=O)O)C(=O)O",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # GATE ON (production default): tests/conftest.py's autouse fixture disables
 # the final OPSIN validity gate for every test UNLESS this marker is set, so
@@ -69,7 +113,7 @@ class TestLeverBGammaLink:
         '1-(4-amino-4-carboxybutanamido)cyclopropane-1-carboxylic acid'.
         """
         smi = "NC(CCC(=O)NC1(C(=O)O)CC1)C(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == (
             "1-(4-amino-4-carboxybutanamido)cyclopropane-1-carboxylic acid"
@@ -85,7 +129,7 @@ class TestLeverBGammaLink:
         before this change (the general/composer engine does not reach a
         3-residue conjugate of this shape)."""
         smi = "N[C@@H](CCC(=O)N[C@@H](CS)C(=O)NCC(=O)O)C(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == "(4S)-4-amino-4-carboxybutanoylcysteinylglycine", result
         assert _full_rt(smi, result), result
@@ -100,7 +144,7 @@ class TestLeverBGammaLink:
         names for this structure; this test only asserts the NEW output
         still round-trips (0-wrong), not that it is the ONLY valid name."""
         smi = "N[C@@H](CCC(=O)NCC(=O)O)C(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert _full_rt(smi, result), result
 
@@ -124,7 +168,7 @@ class TestLeverANAcylCap:
         to get the input SMILES (name -> SMILES -> name round-trip):
         '3-hydroxy-11-methyltridecanoylglycylglycine'."""
         smi = "OC(CC(=O)NCC(=O)NCC(=O)O)CCCCCCCC(CC)C"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         # Decision A part 2 (2026-09-27): was the Lever-A retained name
         # '3-hydroxy-11-methyltridecanoylglycylglycine'. The peptide PIN is the
@@ -141,7 +185,7 @@ class TestLeverANAcylCap:
         'dodecanoylglycylglycine' to '(2-dodecanamidoacetamido)acetic acid'.
         Full-InChIKey round-trip verified."""
         smi = "CCCCCCCCCCCC(=O)NCC(=O)NCC(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == "(2-dodecanamidoacetamido)acetic acid", result
         assert _full_rt(smi, result), result
@@ -177,7 +221,7 @@ class TestFailClosedMidChainNonStandard:
     )
 
     def test_chebi371_abstains(self):
-        result = name_compound(self.CHEBI_371)
+        result = _dt_name_compound(self.CHEBI_371)
         assert is_failure_name(result), (
             f"chebi 371 must abstain (mid-chain non-standard residue is not "
             f"solvable via the peptide-chain convention -- SPY §2), got: {result}"
@@ -187,7 +231,7 @@ class TestFailClosedMidChainNonStandard:
         """Even if some future change makes this molecule emit a name, it
         must never describe a SMALLER molecule (an atom-drop) -- if a name
         is emitted at all, it must round-trip and keep every heavy atom."""
-        result = name_compound(self.CHEBI_371)
+        result = _dt_name_compound(self.CHEBI_371)
         if is_failure_name(result):
             return
         o = opsin_parse(result)
@@ -217,7 +261,7 @@ class TestNoAtomDropInvariant:
 
     def test_every_emitted_name_preserves_heavy_atom_count(self):
         for smi in self.CASES:
-            result = name_compound(smi)
+            result = _dt_name_compound(smi)
             assert not is_failure_name(result), (smi, result)
             o = opsin_parse(result)
             assert o is not None, (smi, result)
@@ -256,7 +300,7 @@ class TestRegressionUnaffected:
         OPSIN cannot know is unspecified here) -- assert whichever holds
         (decline, or a round-tripping name) but never the wrong string."""
         smi = "NC(CCC(=O)NC(CS)C(=O)NCC(=O)O)C(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert result != "glutamylcysteinylglycine"
         if not is_failure_name(result):
             assert _full_rt(smi, result), result

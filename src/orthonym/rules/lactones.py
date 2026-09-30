@@ -780,8 +780,8 @@ def name_cyclic_polyester(mol) -> Optional[str]:
         parts = []
         for nm in sorted(groups, key=alpha_sort_key):
             locs = sorted(groups[nm])
-            m = get_multiplier_prefix(len(locs), nm) if len(locs) > 1 else ""
-            parts.append(f"{','.join(str(x) for x in locs)}-{m}{nm}")
+            from ..assembly.naming_utils import multiplied_component as _mc
+            parts.append(f"{','.join(str(x) for x in locs)}-{_mc(len(locs), nm, nm)}")
         prefix = "-".join(parts)
 
     if prefix:

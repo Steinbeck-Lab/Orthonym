@@ -229,6 +229,12 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
         locs = ",".join([locant] * count)
         if count > 1:
             mult = SIMPLE_MULTIPLIERS.get(count, "")
+            # (d) (the Blue Book, 'di-*tert*-butyl':6964): a
+            # hyphen after the multiplier before a bare italicized prefix, none
+            # before an enclosed one,:6968) -- the shared primitive.
+            from ..naming_utils import multiplier_needs_hyphen
+            if mult and multiplier_needs_hyphen(enclosed):
+                mult += "-"
             term = f"{locs}-{mult}{enclosed}"
         else:
             term = f"{locant}-{enclosed}"

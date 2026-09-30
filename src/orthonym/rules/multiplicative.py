@@ -1335,6 +1335,115 @@ def _try_azanediyl_methylene_phosphonic(mol) -> Optional[str]:
     return None
 
 
+#: A neutral phosphonic acid group -P(=O)(OH)2 on a carbon.
+_PHOSPHONIC_ACID_SMARTS = Chem.MolFromSmarts('[#6][PX4;+0](=[OX1])([OX2H1])[OX2H1]')
+_LINKED_PHOSPHONIC_CACHE: Dict[str, Optional[str]] = {}
+#: The surrogate's sulfonic-acid suffix: '<parent>[-<locants>]-<n>sulfonic acid'.
+_SULFONIC_SUFFIX_RE = __import__('re').compile(
+    r'^(?P<head>.+?)(?:-(?P<locs>\d+(?:,\d+)+))?-?(?P<mult>di|tri|tetra)sulfonic acid$')
+
+
+def _try_linked_phosphonic_acids(mol) -> Optional[str]:
+    """ "Substitution of mononuclear noncarbon oxoacids with hydrogen
+    atoms attached to the central atom" (the Blue Book): an organyl group
+    substitutes the phosphonic acid; the acid is not a suffix (:35457 Note, the
+    suffix method 'has been rejected';:35461 "ethylphosphonic acid (PIN) (not
+    ethanephosphonic acid)"). Two or more phosphonic acid groups on one carbon
+    linking group are identical parent structures joined by a di- or polyvalent
+    group: multiplicative nomenclature, (:23178) -- ':5854
+    [azanediylbis(methylene)]bis(phosphonic acid) (PIN)', ':35472
+    (naphthalene-2,6-diyl)bis(phosphonous acid) (PIN)',:7148 'bis(phosphonic
+    acid)... describes two phosphonic acids... diphosphonic acid describes the
+    acid (HO)(O)PH-O-PH(O)(OH)'. The linking group is named as a substituent
+    group with free valences ('-CH2- methylene (preferred prefix) (not
+    methanediyl)':5188; 'benzene-1,2-diyl' not recommended:16282, the
+    phenylene prefix instead).
+
+    The linking group and its numbering come from a surrogate in which every
+    phosphonic acid group is a sulfonic acid group, a SUFFIX, so the free
+    valences take the suffix locants ('ethane-1,2-disulfonic acid' ->
+    'ethane-1,2-diyl'); a surrogate whose name does not have that form (a senior
+    group elsewhere) declines. The name is returned only when OPSIN reads it back
+    to ``mol`` (full InChIKey; ``_linked_name_rt_ok``); None otherwise."""
+    if mol is None or _PHOSPHONIC_ACID_SMARTS is None:
+        return None
+    matches = mol.GetSubstructMatches(_PHOSPHONIC_ACID_SMARTS)
+    if len(matches) < 2 or sum(1 for a in mol.GetAtoms() if a.GetSymbol() == 'P') != len(matches):
+        return None
+    if any(a.GetFormalCharge() for a in mol.GetAtoms()):
+        return None
+    key = Chem.MolToSmiles(mol)
+    if key in _LINKED_PHOSPHONIC_CACHE:
+        result = _LINKED_PHOSPHONIC_CACHE[key]
+    else:
+        _LINKED_PHOSPHONIC_CACHE[key] = None
+        result = _linked_phosphonic_acids_name(mol, matches)
+        _LINKED_PHOSPHONIC_CACHE[key] = result
+    if result is None:
+        # No verified multiplicative name: a name another producer builds with
+        # the rejected suffix style ('methanediphosphonic acid', and its anion
+        # word) is not a PIN and is labelled below it.
+        from ..metrics.provenance import record_non_pin_fragment
+        word = {2: 'di', 3: 'tri', 4: 'tetra'}.get(len(matches))
+        if word:
+            record_non_pin_fragment(f"{word}phosphonic acid")
+            record_non_pin_fragment(f"{word}phosphonate")
+    return result
+
+
+def _linked_phosphonic_acids_name(mol, matches) -> Optional[str]:
+    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS
+    rw = RWMol(mol)
+    for m in matches:
+        rw.GetAtomWithIdx(m[1]).SetAtomicNum(16)
+        # S(=O)(=O)O: the second hydroxy oxygen becomes the second oxo
+        rw.GetBondBetweenAtoms(m[1], m[4]).SetBondType(Chem.BondType.DOUBLE)
+        o = rw.GetAtomWithIdx(m[4])
+        o.SetNoImplicit(True)
+        o.SetNumExplicitHs(0)
+    surrogate = rw.GetMol()
+    try:
+        Chem.SanitizeMol(surrogate)
+        from ..namer import Orthonym
+        acid = Orthonym(style='pin', _disable_opsin_validity_gate=True).name(
+            Chem.MolToSmiles(surrogate))
+    except Exception:
+        return None
+    mm = _SULFONIC_SUFFIX_RE.match(acid or '')
+    if not mm:
+        return None
+    n = {'di': 2, 'tri': 3, 'tetra': 4}[mm.group('mult')]
+    if n != len(matches):
+        return None
+    head, locs = mm.group('head'), mm.group('locs')
+    if locs is None and head.endswith('methane'):
+        linker, enclose = head[:-len('methane')] + 'methylene', head != 'methane'
+    elif locs and head.endswith('benzene'):
+        linker, enclose = f"{head[:-len('benzene')]}{locs}-phenylene", True
+    elif locs:
+        linker, enclose = f"{head}-{locs}-{mm.group('mult')}yl", True
+    else:
+        return None
+    mult = COMPLEX_MULTIPLIERS.get(n)
+    if not mult:
+        return None
+    name = f"({linker}){mult}(phosphonic acid)" if enclose else f"{linker}{mult}(phosphonic acid)"
+    return name if _linked_name_rt_ok(name, mol) else None
+
+
+def _linked_name_rt_ok(name: str, mol) -> bool:
+    """OPSIN reads ``name`` back to ``mol``'s full InChIKey; False when it cannot
+    be checked."""
+    try:
+        from ..validation.opsin_roundtrip import opsin_parse
+        from ..perception.molcache import inchikey_of
+        parsed = opsin_parse(name)
+        pm = Chem.MolFromSmiles(parsed) if parsed else None
+        return pm is not None and Chem.MolToInchiKey(pm) == inchikey_of(mol)
+    except Exception:
+        return False
+
+
 def _try_phosphanetriyl_methylene_oxoacid(mol) -> Optional[str]:
     """ / (the Blue Book, verbatim (PIN)):
     P(CH2-P(=O)(OH)2)3 -> [phosphanetriyltris(methylene)]tris(phosphonic acid);
@@ -3214,6 +3323,13 @@ def name_multiplicative(mol) -> Optional[str]:
     if result is not None:
         return result
 
+    # Two or more phosphonic acid groups on one carbon linking group
+    # /: methylenebis(phosphonic acid),
+    # (ethane-1,2-diyl)bis(phosphonic acid), (1,4-phenylene)bis(phosphonic acid).
+    result = _try_linked_phosphonic_acids(mol)
+    if result is not None:
+        return result
+
     # v52 a phase /: a composite -CH2CH2-[XH2]-CH2CH2-
     # central bridge over two identical mononuclear Group-14 hydride parents ->
     # [silanediyldi(ethane-2,1-diyl)]bis(silane). Runs before the plain
@@ -4774,6 +4890,15 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
     if re.match(r"^(?:\d|N[-,'0-9])", parent_name):
         return COMPLEX_MULTIPLIERS.get(unit_count)
 
+    # (c) (the Blue Book): 'bis', 'tris' "before skeletal
+    # replacement ('a') prefixes... used in the construction of Hantzsch-Widman
+    # names": "1,1'-carbonylbis(azetidine)", not '...carbonyldiazetidine' (a ring
+    # with two nitrogen atoms; 'bis(azacyclododecane) (PIN)',:7176). Retained
+    # parents keep 'di' ("1,1'-carbonyldipiperidine").
+    from ..assembly.naming_utils import opens_with_replacement_prefix
+    if opens_with_replacement_prefix(parent_name):
+        return COMPLEX_MULTIPLIERS.get(unit_count)
+
     # (a) (a phase): a mononuclear Group-14 hydride parent
     # ('silane'/'trimethylsilane'/...) takes bis/tris to avoid the catenated
     # 'disilane'/'trisilane' ambiguity — the count still derives from the
@@ -5001,7 +5126,11 @@ def _assemble_multiplicative_name(
     # unaffected (no parentheses). Whether the multiplier is di/tri
     # or bis/tris substituted units) is decided by
     # _select_multiplier on the leading-locant test.
-    if any(ch.isdigit() for ch in parent_name) or parent_lower.startswith("dec"):
+    # A derived multiplier ('bis', 'tris') always takes the parentheses
+    #, the Blue Book; "1,1'-carbonylbis(azetidine)").
+    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS as _CM
+    if (any(ch.isdigit() for ch in parent_name) or parent_lower.startswith("dec")
+            or multiplier in _CM.values()):
         return f"{locant_prefix}{bridge_token}{multiplier}({parent_name})"
 
     # Handle names with spaces (e.g., "benzoic acid" -> "tribenzoic acid")

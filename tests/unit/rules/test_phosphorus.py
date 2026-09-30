@@ -297,10 +297,15 @@ class TestPhosphateEsterNaming:
         mol, p = self._pidx("CCOP(=O)(C)OCC")
         assert name_phosphate_ester(mol, p) == "diethyl methylphosphonate"
 
-    def test_bis_isopropyl_methylphosphonate(self):
-        """CC(C)OP(=O)(C)OC(C)C -> complex owner takes bis(...)."""
+    def test_di_isopropyl_methylphosphonate(self):
+        """CC(C)OP(=O)(C)OC(C)C -> a simple owner with locants keeps the basic
+        multiplier and takes parentheses: "Parentheses (round brackets)
+        ... are used to enclose multiplied components that are: (a) simple
+        substituent prefixes having locants; di(propan-2-yl)" (the Blue Book-
+        7087), 'di(propan-2-yl) disulfite (PIN)' (:36921). OPSIN 2.9.0 reads the
+        name back to the input's full InChIKey."""
         mol, p = self._pidx("CC(C)OP(=O)(C)OC(C)C")
-        assert name_phosphate_ester(mol, p) == "bis(propan-2-yl) methylphosphonate"
+        assert name_phosphate_ester(mol, p) == "di(propan-2-yl) methylphosphonate"
 
     def test_triethyl_phosphite(self):
         """CCOP(OCC)OCC -> triethyl phosphite (trivalent P, no P=O)."""

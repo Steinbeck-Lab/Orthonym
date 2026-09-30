@@ -486,6 +486,58 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
 }
 
 
+# "Polyhelicenes" (the Blue Book): "A hydrocarbon parent component
+# of six or more rings that consists of a benzene ring ortho-fused to the
+# 3,4-position of phenanthrene and further benzene rings fused in a similar way is
+# named by citing a numerical prefix ('hexa', 'hepta', etc.) denoting the total
+# number of benzene rings... followed by the term 'helicene'"; 'hexahelicene (PIN)'
+# (:11483) with the orientation and numbering. The series is one
+# pattern, so it is generated rather than tabulated: the n rings run 1-4 and 4a,
+# then (2k-1, 2k, 2ka) for each further ring k = 3..n, the far terminal ring's four
+# CH positions 2n+1..2n+4, then the n-1 interior atoms (2n+4)a, (2n+4)b,... in the
+# order of the SMILES below. hexahelicene keeps its hand-verified entry above; the
+# generator reproduces it atom for atom, and every member 7-12 reproduces OPSIN
+# 2.9.0's own locant labels for its name (checked when this was written).
+_HELICENE_PREFIX = {7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca',
+                    11: 'undeca', 12: 'dodeca'}
+
+
+def _helicene_entry(n: int) -> Tuple[str, Dict[str, Any]]:
+    from rdkit import Chem
+
+    def _rb(k: int) -> str:
+        return str(k) if k < 10 else f'%{k}'
+
+    smiles = ('c1cccc2' + ''.join(f'ccc{_rb(k)}' for k in range(3, n + 1))
+              + f'ccccc{_rb(n)}'
+              + ''.join(f'c{_rb(k)}' for k in range(n - 1, 2, -1)) + 'c12')
+    locants: List[Any] = [1, 2, 3, 4, '4a']
+    for k in range(3, n + 1):
+        locants += [2 * k - 1, 2 * k, f'{2 * k}a']
+    locants += [2 * n + 1, 2 * n + 2, 2 * n + 3, 2 * n + 4]
+    locants += [f'{2 * n + 4}{chr(97 + i)}' for i in range(n - 1)]
+    mol = Chem.MolFromSmiles(smiles)
+    canonical = Chem.MolToSmiles(mol)
+    order = [int(x) for x in
+             mol.GetProp('_smilesAtomOutputOrder').strip('[],').split(',')]
+    numbering = {can_idx: locants[atom_idx]
+                 for can_idx, atom_idx in enumerate(order)}
+    return f'{_HELICENE_PREFIX[n]}helicene', {
+        'canonical_smiles': canonical,
+        'smarts': canonical,
+        'num_atoms': mol.GetNumAtoms(),
+        'iupac_numbering': numbering,
+        'substituent_positions': list(range(1, 2 * n + 5)),
+        'num_rings': n,
+    }
+
+
+for _n in _HELICENE_PREFIX:
+    _hname, _hdata = _helicene_entry(_n)
+    POLYCYCLIC_DATA.setdefault(_hname, _hdata)
+del _n, _hname, _hdata
+
+
 # Reverse lookup: canonical SMILES -> PAH name
 _SMILES_TO_NAME: Dict[str, str] = {
     data['canonical_smiles']: name

@@ -1419,6 +1419,14 @@ def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
             mult = SIMPLE_MULTIPLIERS.get(cnt)
             if mult is None:
                 return None
+            # (d) (the Blue Book, "to separate italic letters from
+            # Roman letters", example 'di-*tert*-butyl':6964): the multiplier keeps
+            # a hyphen before a bare italicized prefix -- 'N,N-di-tert-butyl', not
+            # 'N,N-ditert-butyl' -- and none before an enclosed one,
+            #:6968). The shared primitive decides it.
+            from .naming_utils import multiplier_needs_hyphen
+            if multiplier_needs_hyphen(disp):
+                mult += "-"
             token = f"{','.join(['N'] * cnt)}-{mult}{disp}"
         entries.append((_alpha_key(nm), token))
     return n_sub_atoms, entries, bindings

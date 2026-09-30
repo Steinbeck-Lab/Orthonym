@@ -1474,7 +1474,8 @@ def _assemble_phosphodiester(fragment_names: Dict[str, str], style: str) -> Opti
         return None
     if first == second:
         enclosed = enclose_if_compound(first)
-        groups = f"di{first}" if enclosed == first else f"bis{enclosed}"
+        from ..assembly.naming_utils import multiplied_component
+        groups = multiplied_component(2, first, enclosed)
     else:
         groups = " ".join(sorted((first, second), key=alpha_sort_key))
     return f"{groups} hydrogen phosphate"

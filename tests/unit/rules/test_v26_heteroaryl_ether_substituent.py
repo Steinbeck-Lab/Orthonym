@@ -28,8 +28,11 @@ def test_heteroaryl_ether_substituent(smi, pin):
 def test_triazine_flagship():
     # flagship: ring poly-amine N-locants + methylsulfanyl ring prefix.
     # (N2/N4 assignment follows the ring numbering; RT-verified either way.)
+    # The N-prefixes are cited in one alphanumerical series with the ring prefixes,
+    # (the Blue Book): 'tert-butyl' files under 'b' ('4-butyl-4-tert-
+    # butylcyclohexan-1-ol (PIN)',:3465), before 'cyclopropyl'.
     assert name_compound("CSc1nc(NC2CC2)nc(NC(C)(C)C)n1") == \
-        "N2-cyclopropyl-N4-tert-butyl-6-(methylsulfanyl)-1,3,5-triazine-2,4-diamine"
+        "N4-tert-butyl-N2-cyclopropyl-6-(methylsulfanyl)-1,3,5-triazine-2,4-diamine"
 
 
 @pytest.mark.parametrize("smi,pin", [

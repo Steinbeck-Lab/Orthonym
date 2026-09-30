@@ -798,75 +798,50 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             # the boundary is unambiguous ('tert-butyl(dimethyl)[(oxiran-2-
             # yl)methoxy]silane' BB-style); simple methyl/ethyl stay bare
             # unless multiplied next to a compound neighbour.
-            def _ligand_token(count, name):
+            def _ligand_token(count, name, first):
+                """One multiplied ligand prefix of the hydride parent.
+
+                The multiplier, its hyphen and the / marks come
+                from the shared primitive (``naming_utils.multiplied_component``):
+                'di-tert-butyl' (d), the Blue Book), 'di(dodecyl)'
+                 (c),:7104; 'di(dodecyl)silane (PIN)':38222),
+                'bis(4-tert-butylphenyl)' (a),:7104). A compound ligand
+                (a structural hyphen, an inner mark, a compound R-oxy) takes its
+                own marks. (:7272): "For mononuclear
+                parent hydrides with two or more substituents the first cited
+                substituent never has enclosing marks unless it includes a locant.
+                The second and further substituents are each enclosed with
+                parentheses even for simple substituents. When the simple
+                substituent groups are accompanied by multiplicative prefixes such
+                as 'di' and 'tri', the multiplicative prefixes are not included in
+                the parentheses" -- 'ethyldi(methyl)phosphane (PIN)',
+                'ethyldi(propan-2-yl)silane (PIN)', '*tert*-butyldi(methyl)
+                phosphane (PIN)' (:16286)."""
                 from ..assembly.naming_utils import (
+                    apply_enclosing_marks,
+                    enclose_if_compound,
                     has_structural_hyphen,
-                    multiplier_needs_hyphen,
-                    needs_p1634_marks,
+                    multiplied_component,
                 )
-                mult = _multiplicative_prefix(count)
-                #, SECOND leg of the same rule: a simple multiplier
-                # joined to an italicized-prefix-led name keeps the hyphen
-                # boundary — 'di-tert-butyl', never the malformed 'ditert-butyl'
-                # this site shipped ('ditert-butylmethylsilane' for
-                # CC(C)(C)[SiH](C)C(C)(C)C). naming_utils.format_substituent_prefix
-                # already had this leg; fixing only the marks leg here in
-                # left the two producers disagreeing, so both now call the one
-                # primitive (multiplier_needs_hyphen).
-                if mult and multiplier_needs_hyphen(name):
-                    mult = f'{mult}-'
-                # W3-P03-7 (c)/(d), BB 38222): a multiplied alkyl ligand
-                # whose NAME begins with a numeric-multiplier syllable (decyl /
-                # dodecyl..nonadecyl) takes enclosing marks so the multiplier is
-                # not folded into the stem -- 'di(dodecyl)silane' (PIN) -- while
-                # KEEPING the basic di/tri multiplier (the alkyl is not otherwise
-                # complex, so it is NOT switched to bis). Gated on count > 1.
-                if count > 1 and needs_p1634_marks(name):
-                    return f'{mult}({name})'
-                # /: the hyphen test is the SHARED
-                # has_structural_hyphen, not a raw `'-' in name`. A leading
-                # italicized 'tert-'/'sec-' is part of a SIMPLE retained prefix and
-                # takes NO marks -- BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN)
-                # cites tert-butyl bare, as does BB 3465
-                # `4-butyl-4-*tert*-butylcyclohexan-1-ol` (PIN) directly after a
-                # locant. (An earlier comment here attributed an 'N-tert-butyl'
-                # example to; that string does not occur in the Blue Book
-                # and is the parentheses rule.) The raw hyphen test made this site the FOURTH
-                # divergent copy of the compound predicate and emitted the non-PIN
-                # '(tert-butyl)di(methyl)(oxiranylmethoxy)silane' -- the very form
-                # the comment above quotes the Blue Book as writing bare.
-                # 'tert-butyl-dimethylsilyl' still has a structural hyphen and is
-                # still complex.
+
                 def _compound_ligand(nm):
                     return (has_structural_hyphen(nm) or '(' in nm
                             or _is_complex_ligand_oxy(nm))
 
-                if _compound_ligand(name):
-                    inner = f'({name})' if '(' not in name else f'[{name}]'
-                    return f'{mult}{inner}' if not mult else f'{mult}{inner}'
-                if mult and any(_compound_ligand(n) for _c, n in sorted_groups):
-                    return f'{mult}({name})'
-                return f'{mult}{name}'
+                marked = enclose_if_compound(name)
+                if marked == name and _compound_ligand(name):
+                    marked = apply_enclosing_marks(name, -1)
+                if not first and marked == name:
+                    marked = apply_enclosing_marks(name, -1)
+                return multiplied_component(count, name, marked) if count > 1 else marked
 
             _ligand_tokens = [
-                (count, name, _ligand_token(count, name))
-                for count, name in sorted_groups
+                (count, name, _ligand_token(count, name, k == 0))
+                for k, (count, name) in enumerate(sorted_groups)
             ]
-            #: on a mononuclear parent hydride with 2+ DIFFERENT simple
-            # ligands, the first cited is bare and each subsequent one is enclosed --
-            # 'methyl(propyl)silanol', mirroring 'ethyl(methyl)(propyl)phosphane (PIN)'
-            # (:7282). Only when every ligand is a single (count 1), non-compound
-            # group that _ligand_token already left bare (tok == name); compound or
-            # multiplied ligands are enclosed inside _ligand_token above and fall to
-            # the plain join (keeps di(methyl)/tetramethyl/... canaries byte-identical).
-            if (len(_ligand_tokens) >= 2
-                    and all(c == 1 and tok == n for c, n, tok in _ligand_tokens)):
-                from ..assembly.naming_utils import apply_enclosing_marks
-                ligand_prefix = _ligand_tokens[0][2] + ''.join(
-                    apply_enclosing_marks(tok, -1) for _c, _n, tok in _ligand_tokens[1:]
-                )
-            else:
-                ligand_prefix = ''.join(tok for _c, _n, tok in _ligand_tokens)
+            # (the second and further ligands enclosed) is applied in
+            # _ligand_token, so the tokens are joined as they are.
+            ligand_prefix = ''.join(tok for _c, _n, tok in _ligand_tokens)
             ligand_tree_nodes = [
                 NameTreeNode(
                     parent_stem=name,
@@ -910,8 +885,8 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 # ligand is at locant '1'.
                 if suffix == 'amine' and len(pg_ligs) == 1 and sorted_groups:
                     locanted = '-'.join(
-                        f"{','.join(['1'] * count)}-{_ligand_token(count, name)}"
-                        for count, name in sorted_groups
+                        f"{','.join(['1'] * count)}-{_ligand_token(count, name, k == 0)}"
+                        for k, (count, name) in enumerate(sorted_groups)
                     )
                     full_name = f"{locanted}{parent_with_suffix}"
                 else:
@@ -1097,18 +1072,19 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
             grouped = _group_ligand_counts(organic_names)
             sorted_groups = _alphabetize_simple_ligands(grouped)
             # second leg, the THIRD multiplier-join site in this file:
-            # 'di-tert-butylzinc', never the malformed 'ditert-butylzinc'. All three
-            # call the one primitive (multiplier_needs_hyphen) so they cannot
-            # disagree — fixing only _ligand_token would have left this path
-            # emitting the malformed form for exactly the inputs the sibling fix
-            # newly routed here.
-            from ..assembly.naming_utils import multiplier_needs_hyphen as _mnh
+            # 'di-tert-butylzinc', never the malformed 'ditert-butylzinc'. It calls
+            # the shared primitive as _ligand_token does, so they cannot disagree.
 
             def _join_mult(count: int, name: str) -> str:
-                mult = _multiplicative_prefix(count)
-                if mult and _mnh(name):
-                    return f'{mult}-{name}'
-                return f'{mult}{name}'
+                # the shared primitive: 'di-tert-butyl', 'di(dodecyl)',
+                # 'bis(4-tert-butylphenyl)'
+                from ..assembly.naming_utils import (
+                    enclose_if_compound as _eic,
+                    multiplied_component as _mc,
+                )
+                if count == 1:
+                    return name
+                return _mc(count, name, _eic(name))
 
             ligand_prefix = ''.join(
                 _join_mult(count, name) for count, name in sorted_groups

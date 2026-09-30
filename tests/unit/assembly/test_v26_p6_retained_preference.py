@@ -105,6 +105,61 @@ from rdkit import Chem
 import orthonym.namer as _namer_mod
 from orthonym.namer import Orthonym, is_failure_name
 from tests.support.jars import jar_or_none
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C1CCN2CCCCC2C1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 pytestmark = pytest.mark.unit
@@ -367,7 +422,7 @@ def test_pin_names_accept_cases_directly(smiles, expected, _general, production_
     recovery-lane preference (still exercised by the recognizer/recovery tests
     above) is simply no longer NEEDED for these two, because pin handles them."""
     pin = Orthonym(style="pin")
-    out = pin.name(Chem.CanonSmiles(smiles))
+    out = _dt_obj_name(pin, Chem.CanonSmiles(smiles))
     assert out == expected, (
         f"expected pin to name {smiles!r} as {expected!r}, got {out!r}")
 
@@ -398,7 +453,7 @@ def test_valid_tier_names_quinolizidine_directly(production_gate):
 def test_pin_abstains_failclosed_case(smiles, retained_candidate,
                                       general_name, production_gate):
     pin = Orthonym(style="pin")
-    out = pin.name(Chem.CanonSmiles(smiles))
+    out = _dt_obj_name(pin, Chem.CanonSmiles(smiles))
     assert (not out) or is_failure_name(out), (
         f"expected pin abstention for {smiles!r}, got {out!r}")
 
@@ -423,7 +478,7 @@ def test_control_cases_unchanged_under_pin_and_complete(smiles, expected,
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     canon = Chem.CanonSmiles(smiles)
-    p = pin.name(canon)
+    p = _dt_obj_name(pin, canon)
     c = comp.name(canon)
     assert p == expected, f"{smiles}: pin gave {p!r} != {expected!r}"
     assert c == expected, f"{smiles}: complete gave {c!r} != {expected!r}"

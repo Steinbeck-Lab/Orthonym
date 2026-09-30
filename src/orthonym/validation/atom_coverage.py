@@ -89,6 +89,7 @@ class CoverageResult:
             fix stereo, isotopes or charge (module docstring, DECLARED SCOPE).
         input_inchikey: Full InChIKey of the input molecule ('' if unavailable).
         parsed_inchikey: Full InChIKey of the parse-back ('' if unavailable).
+        parsed_smiles: OPSIN's SMILES of the parse-back ('' if unavailable).
     """
 
     total_heavy_atoms: int
@@ -104,6 +105,7 @@ class CoverageResult:
     constitution_match: bool = False
     input_inchikey: str = ""
     parsed_inchikey: str = ""
+    parsed_smiles: str = ""
 
 
 def find_opsin_jar() -> Optional[str]:
@@ -383,6 +385,7 @@ def validate_atom_coverage(
                     constitution_match=same_constitution,
                     input_inchikey=in_key,
                     parsed_inchikey=out_key,
+                    parsed_smiles=parsed_smiles,
                 )
 
     # Fallback: OPSIN unavailable or parse failed

@@ -131,7 +131,8 @@ def name_ketene(mol) -> Optional[str]:
             return None
         if covered != {a.GetIdx() for a in atoms_of(mol)}:
             return None
-        return f"di{names[0]}ethenone"
+        from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+        return f"{multiplied_component(2, names[0], enclose_if_compound(names[0]))}ethenone"
 
     # The terminal carbon may carry only H and/or single-bonded halogens.
     halo_counts: dict = {}

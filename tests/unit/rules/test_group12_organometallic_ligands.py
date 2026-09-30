@@ -25,6 +25,31 @@ from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from tests.support.rt_assert import _independent_parse, name_is_rt_exact
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(C)(C)[Hg]Cl",
+    "CC(C)[Hg]Cl",
+    "CC(C)[Zn]C(C)C",
+    "CC[Mg]Br",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 pytestmark = [pytest.mark.opsin_gate]
 
@@ -35,6 +60,8 @@ def _best_effort_row(smiles):
 
 
 def _pin_row(smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     with jvm_slots(1, purpose="breadth-job2-test"):
         return Orthonym().name_tiered(smiles)
 

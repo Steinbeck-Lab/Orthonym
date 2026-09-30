@@ -60,6 +60,49 @@ from rdkit.Chem import inchi
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC[C@H](C)[C@H](N)C(=O)N[C@@H](C)C(=O)N1CCC[C@@H]1C(=O)O",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # GATE ON (production default) -- matches test_peptide_capped_termini.py's
 # rationale: this module tests exactly what `name_compound` emits.
@@ -100,7 +143,7 @@ class TestBackboneSubstitutiveConverts:
             "N[C@H](C1CC1)C(=O)NCC(=O)N[C@@H](C)C(=O)"
             "N[C@@H](C(C)C)C(=O)N[C@@H](CC(C)C)C(=O)O"
         )
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         # j7 (TRIAGE g3 C05): the whole chain is now named substitutively (nested amido
         # prefixes, method (1) the Blue Book); OPSIN full-InChIKey exact.
@@ -150,14 +193,14 @@ class TestBackboneSubstitutiveAbstainsCorrectly:
         doubled '({...})' level, was fixed by the formatter change of j4
         (TRIAGE g7 C10). OPSIN 2.9.0 full-InChIKey exact (checked here too).
         """
-        result = name_compound(self.UNDEFINED_STEREO_WITNESS)
+        result = _dt_name_compound(self.UNDEFINED_STEREO_WITNESS)
         assert result == (
             "5-amino-2-{2-[2-(2-aminopropanamido)-3-(1H-indol-3-yl)propanamido]"
             "-3-(1H-indol-3-yl)propanamido}-5-oxopentanoic acid"), result
         assert _full_rt(self.UNDEFINED_STEREO_WITNESS, result), result
 
     def test_side_chain_acid_trap_witness_abstains(self):
-        result = name_compound(self.SIDE_CHAIN_ACID_TRAP_WITNESS)
+        result = _dt_name_compound(self.SIDE_CHAIN_ACID_TRAP_WITNESS)
         assert is_failure_name(result), (
             f"side-chain-acid-trap backlog witness must abstain (a free "
             f"Glu side-chain acid on a non-parent residue must never be "
@@ -176,7 +219,7 @@ class TestRegressionUnaffected:
 
     def test_standard_tripeptide_unchanged(self):
         smi = "CC[C@H](C)[C@H](N)C(=O)N[C@@H](C)C(=O)N1CCC[C@@H]1C(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert _full_rt(smi, result), result
 
@@ -187,5 +230,5 @@ class TestRegressionUnaffected:
         , the Blue Book; peptides are not PINs,
         V38-PEPTIDE-PIN-VERDICT.md), so neither Lever C nor this producer names it."""
         smi = "N[C@@H](C)C(=O)NCC(N)=O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert result == "2-[(2S)-2-aminopropanamido]acetamide", result

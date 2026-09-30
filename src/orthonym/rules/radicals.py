@@ -602,10 +602,8 @@ def _aminoxyl_prefix_string(prefixes: List[str]) -> str:
         if n > 1:
             if n not in simple:
                 return ''
-            if compound:
-                out.append(f"{compound_mult[n]}({p})")
-            else:
-                out.append(simple[n] + ("-" if multiplier_needs_hyphen(p) else "") + p)
+            from ..assembly.naming_utils import multiplied_component as _mc
+            out.append(_mc(n, p, enclose_if_compound(p)))
         elif compound or i:
             out.append(f"({p})")
         else:

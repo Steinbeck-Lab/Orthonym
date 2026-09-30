@@ -462,11 +462,22 @@ class TestFixACountSubscriptOmission:
         # (2H2)2-amino (the same defect fixed for 5-(81Br)bromo). Both forms round-trip
         # to the identical per-D glycine (verified: same InChIKey); this is the
         # BB-conformant spelling.
+        #
+        # a performance pass: every hydrogen of per-D glycine is labelled, so the compound is
+        # "completely isotopically substituted" and cites no locant,
+        # (the Blue Book, heading ' Omission of locants'; '(2H6)
+        # benzene (PIN)':44200): '(2H5)glycine'. No position has to be identified,
+        # so the switch to a systematic parent (:44251) does not apply.
+        # The multi-position fallback is exercised by the glycine with one amino
+        # hydrogen left; its forced '(2H1)' is below the PIN,:43720).
         from orthonym.namer import Orthonym
         n = Orthonym(style="pin", general_fallback=True,
                       general_fallback_unverified=True, allow_aromatic_general=True)
         got = n.name_tiered("[2H]OC(=O)C([2H])([2H])N([2H])[2H]").get("name")
-        assert got == "2-(2H2)amino(2,2-2H2)ethan(2H1)oic acid", f"got {got!r}"
+        assert got == "(2H5)glycine", f"got {got!r}"
+        res = n.name_tiered("[2H]OC(=O)C([2H])([2H])N[2H]")
+        assert res.get("name") == "2-(2H1)amino(2,2-2H2)ethan(2H1)oic acid", res
+        assert res.get("tier") != "pin_verified" and not res.get("is_pin"), res
 
 
 class TestIsotopeDescriptorPlacementAndNestedBracket:

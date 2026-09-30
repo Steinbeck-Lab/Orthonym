@@ -418,7 +418,8 @@ def name_silicate_ester(mol) -> Optional[str]:
     for nm in sorted(counts, key=alpha_sort_key):
         c = counts[nm]
         enclosed = f"({nm})" if is_complex_substituent(nm) else nm
-        parts.append(enclosed if c == 1 else f"{get_multiplier_prefix(c, nm)}{enclosed}")
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(enclosed if c == 1 else _mc(c, nm, enclosed))
     return " ".join(parts) + " silicate"
 
 

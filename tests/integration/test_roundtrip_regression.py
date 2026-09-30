@@ -29,6 +29,50 @@ from rdkit import Chem
 from orthonym import name_compound
 from tests.support.jars import jar_or_none
 from tests.support.rt_assert import assert_tier_contract
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
+    "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 # Rows whose PIN the PIN tier cannot build (pre-existing-failures plan, Task 4).
@@ -123,7 +167,7 @@ def _assert_large_polycycle_pin_contract(smiles):
     fails closed -- and whatever it ships is RT-exact."""
     from orthonym.errors import is_failure_name
     from tests.support.rt_assert import name_is_rt_exact
-    pin = name_compound(smiles)
+    pin = _dt_name_compound(smiles)
     assert is_failure_name(pin) or (
         "cyclo[" not in pin and name_is_rt_exact(pin, smiles)), (
         f"PIN tier ships a von Baeyer name for {smiles}: {pin!r}")
@@ -416,7 +460,7 @@ class TestRoundTripRegression:
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)
             return
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name == expected_name, (
             f"REGRESSION: {smiles}\n"
             f"  Expected: {expected_name}\n"
@@ -437,7 +481,7 @@ class TestCoreNamingRegression:
                              ids=[f"core-{i}" for i in range(len(CORE_NAMING))])
     def test_core_naming(self, smiles, expected_name):
         """Verify core naming foundations never regress."""
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name == expected_name, (
             f"REGRESSION: {smiles}\n"
             f"  Expected: {expected_name}\n"
@@ -472,7 +516,7 @@ class TestNamingNeverCrashes:
     def test_no_crash(self, smiles):
         """Verify naming never crashes (may return fallback name)."""
         try:
-            name = name_compound(smiles)
+            name = _dt_name_compound(smiles)
             assert isinstance(name, str), f"Expected string, got {type(name)}"
             assert len(name) > 0, f"Empty name for {smiles}"
         except RecursionError:
@@ -565,7 +609,7 @@ class TestPhase22PeptideRoundTrip:
     )
     def test_peptide_exact_roundtrip(self, smiles, expected_name):
         """Peptide name -> OPSIN -> canonical SMILES must match original."""
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name == expected_name, (
             f"Name mismatch: expected '{expected_name}', got '{name}'"
         )
@@ -599,7 +643,7 @@ class TestPhase22MultiplicativeRoundTrip:
     )
     def test_multiplicative_exact_roundtrip(self, smiles, expected_name):
         """Multiplicative name -> OPSIN -> canonical SMILES must match."""
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name == expected_name, (
             f"Name mismatch: expected '{expected_name}', got '{name}'"
         )
@@ -640,7 +684,7 @@ class TestPhase22NPEsterRoundTrip:
     )
     def test_np_ester_opsin_parses(self, smiles, expected_name):
         """NP ester functional class name must be parseable by OPSIN."""
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name == expected_name, (
             f"Name mismatch: expected '{expected_name}', got '{name}'"
         )
@@ -668,7 +712,7 @@ class TestPhase22NPEsterRoundTrip:
     )
     def test_np_ester_exact_roundtrip(self, smiles, expected_name):
         """NP ester exact canonical match (may fail due to stereo differences)."""
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         opsin_smiles = _opsin_parse(name)
         assert opsin_smiles, f"OPSIN parse failed for '{name}'"
 
@@ -770,7 +814,7 @@ class TestPhase24Wave2Fixes:
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)
             return
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert isinstance(name, str), (
             f"Expected string for {test_id}, got {type(name)}"
         )
@@ -904,12 +948,16 @@ PHASE24_PARSE_FIXES = [
 
 
 class TestPseudoasymmetricBestEffort:
-    """germacrane at the best-effort tier (controller ruling 2026-09-25: the
-    NAME_EXACT parent gives way to the systematic name there). OPSIN 2.9.0 parses
-    no lowercase pseudoasymmetric descriptor, so the systematic name
-    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' cannot round-trip, and a
-    name OPSIN rejects is not emitted at best-effort (claims conformance,
-    2026-09-27): the tier abstains with its limit code."""
+    """germacrane at the best-effort tier. OPSIN 2.9.0 parses no lowercase
+    pseudoasymmetric descriptor, so the systematic name
+    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' cannot round-trip (since
+    594f8a788, 2026-09-25, the general tiers abstained). 'germacrane' is a name of
+    the natural-product list, matched by the exact structure, Table 10.1
+    (c) terpenes, the Blue Book); the paper's run emitted it
+    at best-effort, labelled pin_verified. User decision 2026-09-30: the list names
+    OPSIN cannot read are emitted at the wider tiers again, labelled pin_verified
+    (verified 'identity'), with the deviation from (:50943) recorded in
+    TRIAGE."""
 
     @pytest.mark.integration
     @pytest.mark.opsin_gate
@@ -918,7 +966,8 @@ class TestPseudoasymmetricBestEffort:
         from orthonym.cli import _emit_tier_flags
         smiles = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
         be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-        assert be["name"] is None and be["tier"] == "abstain" and be["limit_code"], be
+        assert be["name"] == "germacrane", be
+        assert be["tier"] == "pin_verified" and be["verified"] == "identity", be
 
 
 class TestPhase24ParseFixes:
@@ -941,7 +990,7 @@ class TestPhase24ParseFixes:
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)
             return
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert isinstance(name, str), (
             f"Expected string for {test_id}, got {type(name)}"
         )
@@ -1022,7 +1071,7 @@ class TestPhase24ParseFixesRoundTrip:
     )
     def test_parse_fix_opsin_parses(self, smiles, expected_name, test_id):
         """Fixed names must be parseable by OPSIN."""
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name == expected_name, (
             f"Name mismatch for {test_id}: expected '{expected_name}', got '{name}'"
         )
@@ -1172,7 +1221,7 @@ class TestPhase24RTImprovements:
         if smiles in _TIER_CONTRACT:
             assert_tier_contract(smiles)
             return
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert isinstance(name, str), (
             f"Expected string for {test_id}, got {type(name)}"
         )
@@ -1203,7 +1252,7 @@ class TestPhase24RTAnalysis:
     )
     def test_rt_analysis(self, smiles, expected_name, test_id):
         """Verify a phase RT analysis-derived naming never regresses."""
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert isinstance(name, str), (
             f"Expected string for {test_id}, got {type(name)}"
         )

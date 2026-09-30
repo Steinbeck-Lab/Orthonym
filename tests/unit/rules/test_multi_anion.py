@@ -40,7 +40,7 @@ def namer():
     ("[O-]C(=O)CS(=O)(=O)[O-]", "sulfonatoacetate"),
 ])
 def test_integration_mixed_dianion_names(namer, smi, expected):
-    assert namer.name(smi) == expected
+    assert _dt_obj_name(namer, smi) == expected
 
 
 @pytest.mark.opsin_gate
@@ -58,7 +58,7 @@ def test_integration_mixed_dianion_names(namer, smi, expected):
     ("CS(=O)(=O)[O-]", "methanesulfonate"),
 ])
 def test_integration_regressions_unchanged(namer, smi, expected):
-    assert namer.name(smi) == expected
+    assert _dt_obj_name(namer, smi) == expected
 
 
 @pytest.mark.opsin_gate
@@ -66,7 +66,7 @@ def test_integration_failclosed_never_wrong(namer):
     # A shape the new machinery cannot yet name correctly must abstain to the
     # honest sentinel, never emit the neutral-prefix ('...sulfo...' /
     # '...phosphono...') form that denotes a different (mono-anion) molecule.
-    out = namer.name("O=P([O-])([O-])c1ccc(C(=O)[O-])cc1")  # triple mixed anion
+    out = _dt_obj_name(namer, "O=P([O-])([O-])c1ccc(C(=O)[O-])cc1")  # triple mixed anion
     assert "sulfo" not in out
     assert "phosphono" not in out
 
@@ -93,6 +93,66 @@ def test_integration_failclosed_never_wrong(namer):
 # (independent batch call; TRIAGE.md ' fix a performance pass -- wp1-zero-wrong').
 # ---------------------------------------------------------------------------
 from tests.support.rt_assert import name_is_rt_exact  # noqa: E402
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC([O-])CC(C)CC([O-])=O.[Na+].[Na+]",
+    "C[N+](C)(C)CCC(=O)[O-]",
+    "Cc1ccc([O-])c(C([O-])=O)c1.[Na+].[Na+]",
+    "[O-]CC(C)C([O-])=O.[Na+].[Na+]",
+    "[O-]CCP(=O)([O-])[O-].[Na+].[Na+].[Na+]",
+    "[O-]c1cc(C)cc(C([O-])=O)c1.[Na+].[Na+]",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 _JUNIOR_CHALCOGEN_PINS = [
     # previously WRONG molecule at pin_verified
@@ -121,7 +181,7 @@ _JUNIOR_CHALCOGEN_PINS = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", _JUNIOR_CHALCOGEN_PINS)
 def test_junior_anionic_chalcogen_is_oxido_or_sulfido(namer, smi, expected):
-    res = namer.name_tiered(smi)
+    res = _dt_obj_row(namer, smi)
     assert res["name"] == expected
     assert res["tier"] == "pin_verified"
     assert name_is_rt_exact(expected, smi)
@@ -148,7 +208,7 @@ def test_p72_7a_boundary_is_not_pin_verified(namer):
     # parent ('trisodium 3-sulfonatopropane-1,2-bis(olate)'); both that name and
     # 'trisodium 2,3-dioxidopropane-1-sulfonate' round-trip, so only the rule can
     # choose. The oxoacid-parent producer must decline (never pin_verified).
-    res = namer.name_tiered("[O-]CC([O-])CS(=O)(=O)[O-].[Na+].[Na+].[Na+]")
+    res = _dt_obj_row(namer, "[O-]CC([O-])CS(=O)(=O)[O-].[Na+].[Na+].[Na+]")
     assert res["tier"] != "pin_verified"
     assert "dioxidopropane" not in (res["name"] or "")
 
@@ -160,7 +220,7 @@ def test_chain_phosphonate_suffix_form_is_demoted(namer):
     # the Blue Book "ethylphosphonic acid (PIN) (not ethanephosphonic
     # acid)" -> '(2-oxidoethyl)phosphonate'. Not pin_verified.
     smi = "[O-]CCP(=O)([O-])[O-].[Na+].[Na+].[Na+]"
-    res = namer.name_tiered(smi)
+    res = _dt_obj_row(namer, smi)
     assert name_is_rt_exact(res["name"], smi)
     assert res["tier"] != "pin_verified"
     assert res["is_pin"] is False
@@ -182,7 +242,7 @@ def test_chain_phosphonate_suffix_form_is_demoted(namer):
     "[O-]CC(C)C([O-])=O.[Na+].[Na+]",
 ])
 def test_rank_changing_oxido_swap_is_not_pin_verified(namer, smi):
-    res = namer.name_tiered(smi)
+    res = _dt_obj_row(namer, smi)
     assert name_is_rt_exact(res["name"], smi)
     assert res["tier"] != "pin_verified"
     assert res["is_pin"] is False
@@ -197,7 +257,7 @@ def test_rank_changing_oxido_swap_is_not_pin_verified(namer, smi):
     ("[O-]c1ccccc1C([O-])=O.[Na+].[Na+]", "disodium 2-oxidobenzoate"),
 ])
 def test_rank_preserving_oxido_swap_stays_pin_verified(namer, smi, expected):
-    res = namer.name_tiered(smi)
+    res = _dt_obj_row(namer, smi)
     assert res["name"] == expected
     assert res["tier"] == "pin_verified"
 

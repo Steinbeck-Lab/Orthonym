@@ -72,9 +72,11 @@ def test_pin_name(smiles, expected):
     assert name_is_rt_exact(expected, smiles), expected
 
 
-def test_the_sodium_salt_of_a_p72_3_anion_is_not_labelled_a_pin():
-    # Branch review fixes: a wholly inorganic metal compound (a metal atom, no carbon)
-    # is systematic_verified, is_pin False; the name is unchanged. PRESELECTED
+def test_the_sodium_salt_of_a_p72_3_anion_keeps_the_label_of_its_naming_path():
+    # Paper conformance (user decision 2026-09-30, replacing the 2026-09-28/29 label
+    # systematic_verified): a carbon-free compound takes the label of the paper's
+    # measured run, the label of its naming path ('sodium chloride' pin_verified);
+    # the name is unchanged. For its PIN status see PRESELECTED
     # NAMES (the Blue Book): "Preselected names are names for structures or
     # structural components chosen among two or more names for noncarboncontaining
     # (inorganic) parents to be used as the basis for preferred IUPAC names for
@@ -84,13 +86,14 @@ def test_the_sodium_salt_of_a_p72_3_anion_is_not_labelled_a_pin():
     smiles = "[Na+].[B-](F)(F)(F)F"
     r = Orthonym().name_tiered(smiles)
     assert r["name"] == "sodium tetrafluoroboranuide", r
-    assert r["tier"] == "systematic_verified" and r["is_pin"] is False, r
+    assert r["tier"] == "pin_verified" and r["is_pin"] is True, r
     assert name_is_rt_exact(r["name"], smiles), r
 
 
-def test_the_p72_3_anion_itself_is_not_labelled_a_pin():
+def test_the_p72_3_anion_itself_keeps_the_label_of_its_naming_path():
     # Texts, labels and spelling (2026-09-29): a carbon-free compound has a
-    # preselected name at most, never a PIN. PREFERRED IUPAC NAMES
+    # preselected name at most; its tier label follows the paper's measured run (user
+    # decision 2026-09-30): the label of its naming path. PREFERRED IUPAC NAMES
     # (the Blue Book) adds the label 'PIN' to compounds "that also contain at
     # least one carbon atom in their structure";:2058 the PIN rules for compounds
     # "that do not contain carbon... will be discussed in a further publication";
@@ -98,5 +101,5 @@ def test_the_p72_3_anion_itself_is_not_labelled_a_pin():
     smiles = "F[P-](F)(F)(F)(F)F"
     r = Orthonym().name_tiered(smiles)
     assert r["name"] == "hexafluoro-λ5-phosphanuide", r
-    assert r["tier"] == "systematic_verified" and r["is_pin"] is False, r
+    assert r["tier"] == "pin_verified" and r["is_pin"] is True, r
     assert name_is_rt_exact(r["name"], smiles), r

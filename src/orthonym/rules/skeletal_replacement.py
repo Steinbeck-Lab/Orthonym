@@ -380,8 +380,8 @@ def _format_substituent_prefix(placed: List[Tuple[int, str]]) -> str:
     parts = []
     for name in sorted(by_name):
         locs = sorted(by_name[name])
-        mult = SIMPLE_MULTIPLIERS.get(len(locs), '') if len(locs) > 1 else ''
-        parts.append(f"{','.join(str(l) for l in locs)}-{mult}{name}")
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(f"{','.join(str(l) for l in locs)}-{_mc(len(locs), name, name)}")
     return '-'.join(parts)
 
 

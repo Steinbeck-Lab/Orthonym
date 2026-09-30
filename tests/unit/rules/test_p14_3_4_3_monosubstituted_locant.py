@@ -332,19 +332,22 @@ def test_class_generalises(namer, smiles, expected, why):
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        # ★ MUTATION-DERIVED WITNESSES. Deleting the N-substituent guard at the ring
-        # -suffix join survived the first test round — these are the rows that kill it.
-        # The italic-N locant is ESSENTIAL, and it is prepended AFTER the suffix join,
-        # so the guard has to be consulted at the join or (:2869) is violated:
-        # one essential locant in the scope restores EVERY locant in it. Without the
-        # guard these become 'N-methylpyrazinamine' / 'N,N-dimethylpyrazinamine' /
-        # 'N-methylpyrazinecarboxamide'.
-        ("CNc1cnccn1", "N-methylpyrazin-2-amine"),
-        ("CN(C)c1cnccn1", "N,N-dimethylpyrazin-2-amine"),
-        ("CNC(=O)c1cnccn1", "N-methylpyrazine-2-carboxamide"),
+        # a performance pass (RF3-7): the italic-N locant of the suffix nitrogen does not locate
+        # the ring and does not restore the ring-suffix locant the licence omits.
+        # The Blue Book's own PINs with an N-locant on a one-position ring keep the
+        # ring locant omitted: '*N*'-ethyl-*N*-methylbenzenecarboximidamide (PIN)'
+        # (the Blue Book), '*N*-hydroxycyclohexanecarboxamide (PIN)' (:30150,
+        #:32827), '*N*-methylbenzamide (PIN)' (:32792); with 'pyrazinecarboxylic
+        # acid (PIN)':2939,:2949) the N-substituted pyrazine names
+        # follow ('pyrazinecarboxamide' -> 'N-methylpyrazinecarboxamide').
+        # (:2869) restores the locants of the unit whose locant is essential; the
+        # N-locant is cited for the amide nitrogen, not for a ring position.
+        ("CNc1cnccn1", "N-methylpyrazinamine"),
+        ("CN(C)c1cnccn1", "N,N-dimethylpyrazinamine"),
+        ("CNC(=O)c1cnccn1", "N-methylpyrazinecarboxamide"),
     ],
 )
-def test_an_essential_N_locant_restores_the_ring_suffix_locant(namer, smiles, expected):
+def test_an_n_locant_keeps_the_ring_suffix_locant_omitted(namer, smiles, expected):
     assert namer.name(smiles) == expected
 
 

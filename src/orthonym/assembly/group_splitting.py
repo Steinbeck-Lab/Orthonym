@@ -64,20 +64,28 @@ _PROBE_NAME_CACHE: dict = {}
 # resolution mirrors namer.py; a missing jar leaves OpsinOracle(_jar=None)
 # whose rt_safe is False -> every split is rejected (FAIL-CLOSED,).
 _DEFAULT_ORACLE = None
+_DEFAULT_ORACLE_BUILT = None  # the oracle _get_default_oracle built last
 _DEFAULT_ORACLE_LOCK = threading.Lock()
 
 
 def _get_default_oracle():
-    """Singleton OpsinOracle for default-ON per-split RT gating (fail-closed)."""
-    global _DEFAULT_ORACLE
-    if _DEFAULT_ORACLE is None:
+    """Singleton OpsinOracle for default-ON per-split RT gating (fail-closed), for the
+    jar ``_find_opsin_jar`` names now: built again when the jar resolution has
+    changed since it was built (as ``namer._validity_oracle``), so an oracle built
+    without a jar does not reject every split for the rest of the process. An oracle
+    put in ``_DEFAULT_ORACLE`` from outside is used as it is."""
+    global _DEFAULT_ORACLE, _DEFAULT_ORACLE_BUILT
+    from ..validation.opsin_roundtrip import _find_opsin_jar  # absolute, cwd-independent (R1)
+    jar = _find_opsin_jar()
+    oracle = _DEFAULT_ORACLE
+    if oracle is None or (oracle is _DEFAULT_ORACLE_BUILT and oracle._jar != jar):
         with _DEFAULT_ORACLE_LOCK:
-            if _DEFAULT_ORACLE is None:
+            oracle = _DEFAULT_ORACLE
+            if oracle is None or (oracle is _DEFAULT_ORACLE_BUILT and oracle._jar != jar):
                 from .retained_substitution import OpsinOracle  # Pattern-S3
-                from ..validation.opsin_roundtrip import _find_opsin_jar  # absolute, cwd-independent (R1)
-                jar = _find_opsin_jar()
-                _DEFAULT_ORACLE = OpsinOracle(opsin_jar=jar)
-    return _DEFAULT_ORACLE
+                oracle = OpsinOracle(opsin_jar=jar)
+                _DEFAULT_ORACLE = _DEFAULT_ORACLE_BUILT = oracle
+    return oracle
 
 
 @dataclass(frozen=True)

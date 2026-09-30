@@ -32,6 +32,7 @@ from .errors import (
     classify_scope_limit,
     is_failure_name,
     is_refusal_sentinel,
+    no_verified_pin,
 )
 
 logger = logging.getLogger(__name__)
@@ -616,6 +617,12 @@ _DISABLE_VALIDITY_GATE = _VG_ENV in ("1", "true", "yes", "on")
 _PIN_PROMOTION_WRAPPED = contextvars.ContextVar("orthonym_pin_promotion_wrapped",
                                                 default=False)
 
+# Set by ``Orthonym._strict_pin_twin_name`` while the strict twin names: the twin
+# reports the strict path's own name to ``name_tiered``, so the default tier's
+# emission rule (``Orthonym._default_tier_decision``) is not applied to it.
+_DEFAULT_TIER_POLICY_OFF = contextvars.ContextVar("orthonym_default_tier_policy_off",
+                                                  default=False)
+
 # (a phase): the constitutional self-consistency gate. After the
 # parseability gate confirms OPSIN ACCEPTS a name, re-perceive it: if OPSIN parses
 # the name to a CONSTITUTIONALLY DIFFERENT molecule than the input, the name is
@@ -732,8 +739,33 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
 
 
 # Module-level singleton so the OPSIN parse cache is shared across all name
-# calls in a process (lazy-init on first use).
+# calls in a process (lazy-init on first use; see _validity_oracle).
 _VALIDITY_ORACLE = None
+# The oracle _validity_oracle built last (an oracle put in _VALIDITY_ORACLE from
+# outside, e.g. a test's stub, is not it and is used as it is).
+_VALIDITY_ORACLE_BUILT = None
+
+
+def _validity_oracle():
+    """The shared validity-gate OpsinOracle, for the jar ``_find_opsin_jar`` names now.
+
+    Built at first use, and built again when the jar resolution has changed since
+    (``orthonym.jars.fetch_all`` in a process that started in reduced mode, or a
+    test that simulates a missing jar). An oracle built without a jar answers
+    'unavailable' to every parse, and the gate fails closed on that, so keeping it
+    would withhold every later name of the process ('unknown organic compound';
+    TRIAGE 'Unit suite -- the unknown-organic-compound order leak').
+    """
+    global _VALIDITY_ORACLE, _VALIDITY_ORACLE_BUILT
+    from .validation.opsin_roundtrip import _find_opsin_jar
+    jar = _find_opsin_jar()
+    oracle = _VALIDITY_ORACLE
+    if oracle is None or (oracle is _VALIDITY_ORACLE_BUILT and oracle._jar != jar):
+        from .assembly.retained_substitution import OpsinOracle
+        oracle = OpsinOracle(opsin_jar=jar)
+        _VALIDITY_ORACLE = _VALIDITY_ORACLE_BUILT = oracle
+    return oracle
+
 
 # W3-P06: dianhydride/polyanhydride PIN word-form — >=2 acid-like
 # words then a NUMERICALLY-multiplied '...anhydride' ('diacetic butanedioic
@@ -941,24 +973,14 @@ def _validity_gate_status(name: str) -> str:
     it (TRIAGE g7 C01), after the oracle's own retry ladder. Monkeypatched in
     tests.
     """
-    global _VALIDITY_ORACLE
-    if _VALIDITY_ORACLE is None:
-        from .assembly.retained_substitution import OpsinOracle
-        from .validation.opsin_roundtrip import _find_opsin_jar
-        _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
-    return _VALIDITY_ORACLE.parse_status(name)
+    return _validity_oracle().parse_status(name)
 
 
 def _validity_gate_name_to_smiles(name: str) -> Optional[str]:
     """OPSIN canonical SMILES for ``name`` via the shared singleton oracle (cached),
     or None if OPSIN rejected it / could not be consulted. Used by the
     constitutional self-consistency gate to re-perceive the emitted name."""
-    global _VALIDITY_ORACLE
-    if _VALIDITY_ORACLE is None:
-        from .assembly.retained_substitution import OpsinOracle
-        from .validation.opsin_roundtrip import _find_opsin_jar
-        _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
-    return _VALIDITY_ORACLE.name_to_smiles(name)
+    return _validity_oracle().name_to_smiles(name)
 
 
 def _validity_gate_name_to_opsin_smiles(name: str) -> Optional[str]:
@@ -967,12 +989,7 @@ def _validity_gate_name_to_opsin_smiles(name: str) -> Optional[str]:
     if OPSIN rejected it / could not be consulted. Used by
     :func:`_lone_pair_configuration_verified`, which must read the name's
     structure with another toolkit than RDKit."""
-    global _VALIDITY_ORACLE
-    if _VALIDITY_ORACLE is None:
-        from .assembly.retained_substitution import OpsinOracle
-        from .validation.opsin_roundtrip import _find_opsin_jar
-        _VALIDITY_ORACLE = OpsinOracle(opsin_jar=_find_opsin_jar())
-    return _VALIDITY_ORACLE.name_to_opsin_smiles(name)
+    return _validity_oracle().name_to_opsin_smiles(name)
 
 
 def _same_canonical_smiles(smiles_a: str, smiles_b: str) -> bool:
@@ -1830,6 +1847,14 @@ def _try_compose_input_stereo(
         if composed_smiles is None:
             return None
         if _self_consistency_full_key(composed_smiles) == in_key:
+            # the key does not place a hydron (validation/protonation_identity.py)
+            from .validation.protonation_identity import protonation_site_verdict
+            if protonation_site_verdict(smiles, composed_smiles, composed) == "mismatch":
+                return None
+            # nor the radical graph (validation/radical_identity.py)
+            from .validation.radical_identity import radical_identity_verdict
+            if radical_identity_verdict(smiles, composed_smiles) == "mismatch":
+                return None
             return composed  # stereo composed AND full-key-verified == input
     except Exception as _exc:
         # Fail-closed (0-wrong): any OPSIN/RDKit unavailability -> the caller
@@ -1946,6 +1971,35 @@ def _is_metal_adduct_without_pin(smiles: str, name: Optional[str]) -> bool:
         return False
 
 
+def _is_one_atom_ion_salt(smiles: str) -> bool:
+    """True iff the input is two or more components and every component is a
+    one-heavy-atom ion ('[Li+].[Li+].[Li+].[N-3]', '[Fr+].[NH2-]'): a salt of
+    element ions. A salt is named by "citing the name of the cation(s) followed by
+    the name of the anion... as a separate word", the Blue Book;
+     :43590 "binary names formed by citing the name of the cation followed
+    by that of the anion"); the em-dash notation of (:3765) is the one of
+    adducts, "formed by direct combination of separate molecular entities"
+    (:3761)."""
+    mol = Chem.MolFromSmiles(smiles) if smiles else None
+    if mol is None:
+        return False
+    frags = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=False)
+    return len(frags) >= 2 and all(
+        f.GetNumHeavyAtoms() == 1 and Chem.GetFormalCharge(f) != 0 for f in frags)
+
+
+def _has_metal_atom(smiles: str) -> bool:
+    """True iff the structure holds an atom of a metal element (the element set of
+    ``rules.adducts._METAL_ELEMENT_NAMES``)."""
+    try:
+        from .rules.adducts import _METAL_ELEMENT_NAMES
+        mol = Chem.MolFromSmiles(smiles) if smiles else None
+        return mol is not None and any(
+            a.GetSymbol() in _METAL_ELEMENT_NAMES for a in mol.GetAtoms())
+    except Exception:
+        return False
+
+
 def _is_carbon_free_compound(smiles: str) -> bool:
     """True iff the structure has at least one atom and no carbon atom: a
     carbon-free compound, whose names are preselected names at most, never PINs
@@ -2015,7 +2069,8 @@ def _name_omits_input_stereo(input_smiles: str, opsin_smiles: str) -> bool:
 
 
 def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
-                              ignore_stereo: bool = False) -> str:
+                              ignore_stereo: bool = False,
+                              name: Optional[str] = None) -> str:
     """``"ok"`` | ``"mismatch"`` | ``"inconclusive"`` — does the OPSIN re-perception of
     the emitted name encode the SAME molecule as the input structure?
 
@@ -2050,7 +2105,7 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     # C[NH2+]CCC(=O)NC) shares the input's full key
     # (validation/protonation_identity.py).
     from .validation.protonation_identity import protonation_site_verdict
-    if protonation_site_verdict(input_smiles, opsin_smiles) == "mismatch":
+    if protonation_site_verdict(input_smiles, opsin_smiles, name) == "mismatch":
         return "mismatch"
     ka = _self_consistency_full_key(input_smiles)
     kb = _self_consistency_full_key(opsin_smiles)
@@ -2186,7 +2241,8 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     if _SC_MODE == "off" or not smiles:
         _record_gate_outcome(_pv.GATE_OUTCOME_SELF01_SKIPPED, name)
         return name
-    verdict = _self_consistency_verdict(smiles, opsin_smiles, ignore_stereo=ignore_stereo)
+    verdict = _self_consistency_verdict(smiles, opsin_smiles, ignore_stereo=ignore_stereo,
+                                        name=name)
     if verdict == "inconclusive" and _SC_MODE == "on":
         # R19 (claims conformance, 2026-09-27): "inconclusive" means a skeleton
         # key could not be computed for one side, so nothing was compared, and
@@ -2442,6 +2498,13 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         # RE-PARSES to the wrong constitution (locant-assignment bug). Ship it —
         # the BB is the sole PIN authority and OPSIN's bug must not gate us.
         if _POLYACID_PREFIX_DERIVATIVE_PIN_RE.match(name):
+            # Review fixes: the carve-out exists for OPSIN's wrong re-parse only; a
+            # round trip that verifies the name ('2-thiodisulfuric acid') is recorded
+            # as such, not pre-empted by the carve-out.
+            if (_SC_MODE == "on" and smiles is not None
+                    and _self_consistency_verdict(smiles, opsin_smiles, name=name) == "ok"):
+                _record_gate_outcome(_pv.GATE_OUTCOME_SELF01, name)
+                return name
             _record_gate_outcome(
                 _pv.carveout_outcome("polyacid_prefix_derivative"), name)
             return name
@@ -2716,7 +2779,8 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     return _suppressed_to
 
 
-def _full_inchikey_offer_match(input_smiles: str, opsin_smiles: str) -> bool:
+def _full_inchikey_offer_match(input_smiles: str, opsin_smiles: str,
+                               name: Optional[str] = None) -> bool:
     """ a phase L3-1: True iff ``input_smiles`` and ``opsin_smiles`` share
     the SAME FULL (all-layer) InChIKey -- constitution AND stereo AND
     protonation/mobile-H-tautomer state all identical.
@@ -2745,7 +2809,11 @@ def _full_inchikey_offer_match(input_smiles: str, opsin_smiles: str) -> bool:
         ik_out = inchi.MolToInchiKey(mo)
         if not ik_in or not ik_out:
             return True
-        return ik_in == ik_out
+        if ik_in != ik_out:
+            return False
+        # An equal key does not place a hydron (validation/protonation_identity.py).
+        from .validation.protonation_identity import protonation_site_verdict
+        return protonation_site_verdict(input_smiles, opsin_smiles, name) != "mismatch"
     except Exception:
         return True
 
@@ -2860,7 +2928,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
                 and _validity_gate_status(name) == "unavailable")
     if not input_smiles:
         return True  # nothing to compare against -- inconclusive, fail-OPEN
-    return _full_inchikey_offer_match(input_smiles, opsin_smiles)
+    return _full_inchikey_offer_match(input_smiles, opsin_smiles, name)
 
 
 def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
@@ -2889,9 +2957,51 @@ def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
         from .validation.radical_identity import radical_identity_verdict
         if radical_identity_verdict(input_smiles, opsin_smiles) == "mismatch":
             return "failed"
+        # Nor does the key place a hydron: the partial salts of one polybasic
+        # acid, and the cations of one base protonated on different atoms, share
+        # it (validation/protonation_identity.py).
+        from .validation.protonation_identity import protonation_site_verdict
+        if protonation_site_verdict(input_smiles, opsin_smiles, name) == "mismatch":
+            return "failed"
     except Exception:
         return "failed"
     return "verified"
+
+
+def _np_exact_list_name(smiles: Optional[str]) -> Optional[str]:
+    """The exact-match natural-product parent name of exactly this input
+    (``data.natural_products.NAME_EXACT_NP_PARENTS``, looked up by the input's
+    canonical SMILES in ``NATURAL_PRODUCT_DERIVATIVES``), or None. Unlike
+    ``get_natural_product_name`` it does not give way at the general tiers."""
+    if not smiles:
+        return None
+    try:
+        from .data.natural_products import (
+            GENERAL_ONLY_NATURAL_PRODUCTS,
+            NAME_EXACT_NP_PARENTS,
+            NATURAL_PRODUCT_DERIVATIVES,
+        )
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        canonical = Chem.MolToSmiles(mol, canonical=True)
+        if canonical in GENERAL_ONLY_NATURAL_PRODUCTS:
+            return None
+        name = NATURAL_PRODUCT_DERIVATIVES.get(canonical)
+        return name if name in NAME_EXACT_NP_PARENTS else None
+    except Exception:
+        return None
+
+
+def _coordination_list_name(smiles: Optional[str], name: Optional[str]) -> bool:
+    """True iff ``name`` is the exact-match coordination list name of exactly this
+    input (D1 table, matched by the input's exact InChIKey)."""
+    if not smiles or not name:
+        return False
+    try:
+        return _coordination_retained_name(smiles) == name
+    except Exception:
+        return False
 
 
 def _is_exact_match_list_name(smiles: Optional[str], name: Optional[str]) -> bool:
@@ -2911,6 +3021,78 @@ def _is_exact_match_list_name(smiles: Optional[str], name: Optional[str]) -> boo
         return bool(smiles) and _coordination_retained_name(smiles) == name
     except Exception:
         return False
+
+
+def _default_tier_emits(row: dict, pin_form: bool, smiles: Optional[str],
+                        trivial_fallback: bool = False) -> bool:
+    """Whether the default tier emits the name of ``row`` (paper conformance, user
+    decision 2026-09-30; the submitted text, Methods). True for:
+
+    * a pin_verified name ("the strict PIN path built the name and verified it");
+    * an exact-match list name, natural-product parent or metal complex ("The only
+      deliberate exceptions are names derived from the natural-product and
+      metal-complex lists... emitted based solely on their exact structural
+      match");
+    * a name of the formats OPSIN has no grammar for, shipped on their construction
+      (gate outcome ``carveout:<class>``; "At the default tier, ten further name
+      formats absent from OPSIN's grammar... are emitted without parse-back
+      validation because their construction rules are exact");
+    * a strict-path PIN whose stereodescriptors OPSIN cannot read, verified by the
+      constitution and the descriptor check (``self_consistency_constitution_only``
+      with ``pin_form``; "At the default tier, it compares only the constitutional
+      part of the key");
+    * with ``trivial_fallback`` (``--trivial``), a name from the table of retained
+      trivial names, which that option asks for.
+
+    Every other name -- one the engine records as not the PIN, a name only a
+    breadth producer built, a general-engine or retained-table name, a name of a
+    class without PIN status -- is declined (NO_VERIFIED_PIN)."""
+    from .metrics import provenance as _pv
+    name = row.get("name")
+    if not name or is_failure_name(name) or row.get("tier") == ABSTAIN:
+        return True
+    if row.get("tier") == PIN_VERIFIED:
+        return True
+    if _is_exact_match_list_name(smiles, name):
+        return True
+    gate = row.get("gate_outcome") or ""
+    if gate.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX):
+        return True
+    if gate == _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY and pin_form:
+        return True
+    # the opt-in reduced mode (no OPSIN jar): a strict-path name in PIN form ships
+    # unverified, as the reduced mode documents; any other name is declined
+    if gate == _pv.GATE_OUTCOME_UNAVAILABLE and pin_form:
+        return True
+    if trivial_fallback and row.get("source") == "trivial_retained":
+        return True
+    return False
+
+
+def _default_tier_declined_row(smiles: str):
+    """(label, row) of a default-tier decline (NO_VERIFIED_PIN): the label the plain
+    call returns and the ``name_tiered`` row.
+
+    The label is the NO_VERIFIED_PIN catalog text, 'unknown organic compound', never the
+    UNSUPPORTED_ELEMENT text '<metal> compound (not supported)': the engine built a
+    name for the structure (its elements are supported), only not a verified PIN
+    ('ethenylsodium' is declined as 'unknown organic compound', NO_VERIFIED_PIN)."""
+    from .errors import LIMIT_CATALOG
+    from .metrics import provenance as _pv
+    label, formula = LIMIT_CATALOG["NO_VERIFIED_PIN"]["message"], None
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is not None:
+            from rdkit.Chem import rdMolDescriptors
+            formula = rdMolDescriptors.CalcMolFormula(mol)
+    except Exception:
+        pass
+    return label, {"name": label, "tier": ABSTAIN, "is_pin": False,
+                   "source": "abstain", "opsin": "n/a", "gates_passed": [],
+                   "gate_outcome": _pv.GATE_OUTCOME_SUPPRESSED,
+                   "formula": formula, "limit_code": "NO_VERIFIED_PIN",
+                   "stereo_unexpressed": False, "suffix_free_prefix_name": False,
+                   "prefix_order_fallback": False, "verified": "unverified"}
 
 
 # ---------------------------------------------------------------------------
@@ -3622,6 +3804,7 @@ def _budget_scope(fn):
         )
         depth = enter_name_scope()
         _lp_opened = False
+        _policy = False
         try:
             if depth == 1:
                 # Lone-pair stereocentres: the string the caller gave, which the exit
@@ -3638,7 +3821,19 @@ def _budget_scope(fn):
                     else:
                         kwargs['smiles'] = _spelled
                 _CALLER_INPUT.smiles = _spelled
-            return fn(self, *args, **kwargs)
+                # The default tier's emission rule applies to the caller's call
+                # only; the provenance it reads is this call's own.
+                _policy = self._default_tier_policy_applies()
+                if _policy:
+                    self._default_tier_row = None
+                    from .metrics.provenance import clear_provenance
+                    clear_provenance()
+            _result = fn(self, *args, **kwargs)
+            if _policy:
+                _result = self._default_tier_decision(
+                    _result, args[0] if args else kwargs.get('smiles'),
+                    kwargs.get('raise_on_limit', False))
+            return _result
         except PerfBudgetExceeded:
             # M2.5: the per-top-level OPERATION budget was exhausted deep inside
             # a combinatorial ring analysis (a genuinely explosive symmetric
@@ -3670,7 +3865,10 @@ def _budget_scope(fn):
             # PIN/complete output is byte-identical (offer-not-return, inv 18).
             _rescued = self._try_perf_budget_t4_rescue(smiles)
             if _rescued is not None and not is_failure_name(_rescued):
-                return self._finish(_rescued, smiles)
+                _result = self._finish(_rescued, smiles)
+                if _policy:
+                    _result = self._default_tier_decision(_result, smiles, False)
+                return _result
             logger.warning(
                 "PERF BUDGET exhausted: abstaining on smiles=%s (macrocycle-hang guard)",
                 (smiles or '')[:60])
@@ -3690,9 +3888,12 @@ def _budget_scope(fn):
             # coordination-retained name is the correct abstain.
             self._suppress_floor_offer = True
             try:
-                return self._finish(_descriptive_fallback(smiles), smiles)
+                _result = self._finish(_descriptive_fallback(smiles), smiles)
             finally:
                 self._suppress_floor_offer = False
+            if _policy:
+                _result = self._default_tier_decision(_result, smiles, False)
+            return _result
         finally:
             exit_name_scope()
             if depth == 1:
@@ -3766,6 +3967,11 @@ class _FailureRescues:
 # offer. One flag per thread; set for the whole duration of an outer offer.
 _ALT_PARENT_RESCUE = threading.local()
 
+
+
+#: The fewest naming passes the clean-first offer (``_prefer_clean_over_floor_substitute``)
+#: may make, whatever the main path made: one clean recovery of a small molecule.
+_OFFER_MIN_PASSES = 64
 
 class Orthonym:
     """The naming engine, with every option.
@@ -4713,6 +4919,28 @@ class Orthonym:
             # abstaining the whole molecule, and the main exit below still runs
             # (see ``_FailureRescues``).
             _rescues = _FailureRescues()
+            # Breadth job 3 review fixes: a salt of element ions that the default
+            # tier names by its whole-compound name ('lithium nitride': its
+            # stoichiometric name 'trilithium nitride' is suppressed, and the
+            # default last resort below supplies the name) keeps that name at the
+            # best-effort tier. The best-effort rescues would otherwise join the
+            # ions in the adduct notation of ('lithium(1+)--azanetriide
+            # (3/1)'), which is the format of adducts, not of a salt,
+            # ``_is_one_atom_ion_salt``). Only a name that reads back to the
+            # input's full key is taken; otherwise the rescues run as before.
+            if (is_failure_name(result) and self._general_fallback_unverified
+                    and not self._disable_opsin_validity_gate
+                    and is_top_level_naming() and _is_one_atom_ion_salt(smiles)):
+                from .data import get_general_retained_name, get_unverified_retained_name
+                _canon_salt = Chem.MolToSmiles(Chem.MolFromSmiles(smiles), canonical=True)
+                _salt_word = ((get_general_retained_name(_canon_salt)
+                               if self._trivial_fallback else None)
+                              or get_unverified_retained_name(_canon_salt))
+                if (_salt_word
+                        and _shipped_name_round_trip(_salt_word, smiles) == "verified"):
+                    from .metrics.provenance import record_source
+                    record_source("trivial_retained")
+                    result = _salt_word
             # (opt-in): a candidate suppressed by a downstream gate
             # (/ vetoes) left only the failure sentinel; give the
             # engine its late, fully-gated shot before the failure ships.
@@ -4942,6 +5170,7 @@ class Orthonym:
         # the breadth name it exists to tell apart ('...-(2,6-dioxo-1H-pyrimidin-3-
         # yl)propanoic acid' came out pin_verified at best-effort).
         _wrapped = _PIN_PROMOTION_WRAPPED.set(True)
+        _policy_off = _DEFAULT_TIER_POLICY_OFF.set(True)
         try:
             return tw.name(smiles)
         except Exception:
@@ -4949,6 +5178,7 @@ class Orthonym:
             # did not produce this name" (conservative -> demote), never a crash.
             return None
         finally:
+            _DEFAULT_TIER_POLICY_OFF.reset(_policy_off)
             _PIN_PROMOTION_WRAPPED.reset(_wrapped)
 
     def name_tiered(self, smiles: str) -> dict:
@@ -4970,11 +5200,14 @@ class Orthonym:
                 How the name was built: ``pin_verified`` (the strict path for the
                 Preferred IUPAC Name built it, certified it and OPSIN read it back),
                 ``pin_unverified`` (a name in preferred-name form that OPSIN read
-                back, but whose preferred status is not certified),
+                back, but whose preferred status is not certified: a producer outside
+                the strict path built it or a part of it),
                 ``systematic_verified`` (a checked systematic name that is not the
-                preferred name, from the general engine or a table of retained
-                names), ``best_effort`` (the last-resort producers, or a name whose
-                own string no round trip confirmed) or ``abstain`` (no name).
+                preferred name, from the general engine, a table of retained names,
+                or the strict path when the name contains a part the engine records
+                as not the preferred form), ``best_effort`` (the last-resort
+                producers, or a name whose own string no round trip confirmed) or
+                ``abstain`` (no name).
             ``is_pin``
                 True only for a certified Preferred IUPAC Name.
             ``source``
@@ -4995,7 +5228,9 @@ class Orthonym:
                 The molecular formula, given when there is no name.
             ``limit_code``
                 The reason code when there is no name, for example
-                ``UNSUPPORTED_ELEMENT``.
+                ``UNSUPPORTED_ELEMENT``, or ``NO_VERIFIED_PIN`` when the default
+                tier built a name that is not a verified PIN (a wider tier returns
+                it).
             ``stereo_unexpressed``
                 True when a stereocentre of the input is not stated in the name.
             ``suffix_free_prefix_name``
@@ -5011,9 +5246,10 @@ class Orthonym:
                 ``opsin`` (OPSIN read the whole name back to the same molecule),
                 ``opsin_constitution`` (read back with the same constitution; the
                 stereodescriptors were not confirmed by OPSIN), ``identity`` (a name
-                from the exact-match list of metal-complex names, found by the
-                input's exact InChIKey; OPSIN cannot read these names) or
-                ``unverified`` (no read-back recorded).
+                from an exact-match list: a metal-complex name found by the input's
+                exact InChIKey, or a natural-product parent name found by its exact
+                structure; OPSIN cannot read these names) or ``unverified`` (no
+                read-back recorded).
 
         Examples
         --------
@@ -5046,11 +5282,25 @@ class Orthonym:
             _lone_pair_input_exit(_lp_opened)
 
     def _name_tiered_impl(self, smiles: str) -> dict:
-        from .metrics import provenance as _pv
         from .metrics.provenance import clear_provenance, get_provenance
         clear_provenance()
+        self._default_tier_row = None
         name = self.name(smiles)
-        prov = get_provenance()
+        # The default tier's emission rule already derived this call's row (the
+        # emitted name's, or the decline's): the same row, not a second derivation.
+        stash = getattr(self, "_default_tier_row", None)
+        self._default_tier_row = None
+        if stash is not None and stash[0] == name:
+            return dict(stash[1])
+        return self._tier_row_and_pin_form(smiles, name, get_provenance())[0]
+
+    def _tier_row_and_pin_form(self, smiles: str, name, prov: dict):
+        """The provenance row of ``name`` (see:meth:`name_tiered`), and whether the
+        name is in strict-path PIN form: its tier is ``pin_verified`` before the
+        label is lowered for a missing full OPSIN read-back (a grammar carve-out,
+        the constitution-only stereo branch). The default tier's emission rule
+        reads the second value (:func:`_default_tier_emits`)."""
+        from .metrics import provenance as _pv
         source = prov["source"] or "pin_path"
         # T1: what the gate DID for THIS name, not whether a jar exists.
         # The old `gate_active = (not disabled and jar_present)` stamped
@@ -5086,6 +5336,26 @@ class Orthonym:
         # None where the label does not depend on a round trip (a PIN, a trivial
         # table name, the last-resort floor).
         _tier_if_verified = None
+        # A name of the exact-match metal-complex list (D1 table, the input's
+        # exact InChIKey) is a ChEBI name taken verbatim: labelled by the path that
+        # returned it, as in the paper's measured run (user decision 2026-09-30),
+        # so the name-scoped non-PIN records, which read the spelling of names the
+        # engine builds, are not read for it ('kappa4' is no non-PIN token); the
+        # whole-call records are.
+        _is_coord_list = bool(name) and not is_failure_name(name) and \
+            _coordination_list_name(smiles, name)
+        _non_pin_scope = None if _is_coord_list else name
+        # A name of the exact-match natural-product parent list (NAME_EXACT_NP_PARENTS,
+        # the input's exact canonical SMILES; 'germacrane') likewise: the paper's
+        # measured run labelled it pin_verified (user decision 2026-09-30, (c) covers
+        # both list classes). No non-PIN record applies to a verbatim list name, the
+        # whole-call ones neither (they describe the candidates of the call, e.g. the
+        # systematic name the general tiers tried first).
+        _is_np_list = bool(name) and not is_failure_name(name) and \
+            _np_exact_list_name(smiles) == name
+        if _is_np_list:
+            _non_pin_scope = None
+            prov = dict(prov, general_ring_prefix=False, pin_promotion_rerun=False)
         if not name or is_failure_name(name):
             tier, is_pin, opsin = ABSTAIN, False, "n/a"
             source = prov["source"] or "abstain"
@@ -5130,7 +5400,7 @@ class Orthonym:
             # to best_effort (after the general tiers' own check has run).
             tier, is_pin = SYSTEMATIC_VERIFIED, False
             opsin = gate_opsin_label
-        elif _pv.name_carries_non_pin_part(prov, name):
+        elif _pv.name_carries_non_pin_part(prov, _non_pin_scope):
             # -T1c: a composer name carrying a ring substituent prefix only
             # the GENERAL tier could build (a systematic replacement / von Baeyer
             # substituent form). Valid, but not PREFERRED -- the ring PIN may be a
@@ -5139,15 +5409,23 @@ class Orthonym:
             # (``record_non_pin_fragment``, e.g. a carbon-substituted
             # '...azaniumyl' prefix, a peptide, a von Baeyer name of an
             # ortho-fused system).
-            # Tier labels -- paper semantics: the PIN path built the name and a
-            # round trip verified it, but it is not certified as the PIN, so it is
-            # pin_unverified (the paper: "its preferred status is not certified"),
-            # not best_effort; best_effort is the label of the best-effort rescue
-            # producers (the last-resort floor). Without a verified round trip it
-            # stays best_effort.
+            # Tier labels -- paper semantics (Methods, "Tiers"; user decision
+            # 2026-09-30): a name that contains a name-scoped non-PIN record (a
+            # recorded non-PIN fragment or label, or non-PIN vocabulary) is one the
+            # code knows is not the PIN, so a verified one is "a correct systematic
+            # name that is not the PIN": systematic_verified. A name that carries
+            # only a whole-call record -- a ring substituent prefix only the general
+            # tier could build (``general_ring_prefix``) or the PIN tier's promotion
+            # re-run (``pin_promotion_rerun``) -- is "a name in PIN form that only a
+            # breadth producer built, so its preferred status is not certified":
+            # pin_unverified. Without a verified round trip either is best_effort.
             opsin = gate_opsin_label
-            tier = PIN_UNVERIFIED if opsin == "verified" else BEST_EFFORT
-            _tier_if_verified = PIN_UNVERIFIED
+            _known_non_pin = _pv.name_carries_non_pin_part(
+                dict(prov, pin_promotion_rerun=False, general_ring_prefix=False),
+                _non_pin_scope)
+            _tier_if_verified = (SYSTEMATIC_VERIFIED if _known_non_pin
+                                 else PIN_UNVERIFIED)
+            tier = _tier_if_verified if opsin == "verified" else BEST_EFFORT
             is_pin = False
         else:
             tier, is_pin = PIN_VERIFIED, True
@@ -5226,9 +5504,11 @@ class Orthonym:
         # happen ('methanaminium' for the radical cation C[NH2+] shipped so), so
         # such a name is at most pin_unverified. The PIN tier's names and the
         # breadth are unchanged; only the label is honest.
+        _unavailable_demoted = False
         if tier == PIN_VERIFIED and gate_outcome == _pv.GATE_OUTCOME_UNAVAILABLE:
             tier = PIN_UNVERIFIED
             is_pin = False
+            _unavailable_demoted = True
         # Claims conformance (2026-09-27): at the general tiers every shown name
         # has passed the round trip, apart from the exact-match list names
         # (NAME_EXACT natural-product parents, coordination retained names). The
@@ -5296,8 +5576,12 @@ class Orthonym:
         # for organometallic compounds of the Group 1-12 metals, except the ocenes
         # ('tert-butyllithium', 'methylmagnesium bromide', 'diethylzinc' shipped
         # pin_verified). Same demotion; the name is unchanged.
+        # Not for a name of the exact-match metal-complex list (heme, chlorophyll,
+        # cobalamin, siroheme, coenzyme F430): its label is the one the naming
+        # path gives it (user decision 2026-09-30, the paper's measured labels).
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
-                and _is_p69_organometallic_without_pin(smiles, name)):
+                and _is_p69_organometallic_without_pin(smiles, name)
+                and not _is_coord_list):
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
         # Breadth Job 2: a mixed organic-inorganic adduct of a metal has no PIN
@@ -5306,17 +5590,19 @@ class Orthonym:
                 and _is_metal_adduct_without_pin(smiles, name)):
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
-        # Branch review fixes: a wholly inorganic metal compound (a metal atom, no
-        # carbon atom) has no PIN either,:4667;,:4712) --
-        # 'iron(III) trichloride', 'mercury(II) dichloride', 'copper(II) sulfate
-        # dihydrate' shipped pin_verified / is_pin True at every tier. Texts,
-        # labels and spelling (user decision 2026-09-29): every carbon-free
-        # compound, metal or not -- 'sulfuric acid', 'ammonia', 'hydrogen sulfite',
-        # 'tetrachlorosilane' -- has a preselected name at most,
-        # the Blue Book;,:2062). Same demotion; the name is
-        # unchanged.
+        # A carbon-free compound ('sodium chloride', 'sulfuric acid', 'ammonia')
+        # keeps the label its naming path gives it (user decision 2026-09-30: the
+        # labels of the paper's measured run, 'sodium chloride' pin_verified); the
+        # elements above keep their own demotion.
+        # Review fixes (a performance pass): a salt of element ions with a metal cation and a
+        # carbon anion ('dimagnesium methanetetraide', a metal carbide):
+        # (the Blue Book) "preferred IUPAC names have not yet been
+        # determined for inorganic components"; (:39735) gives no PIN for
+        # the compounds of the Group 1-12 metals. Same demotion; the name is
+        # unchanged. A carbon-free salt of element ions keeps its label as above.
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
-                and _is_carbon_free_compound(smiles)):
+                and _is_one_atom_ion_salt(smiles) and _has_metal_atom(smiles)
+                and not _is_carbon_free_compound(smiles)):
             tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
             is_pin = False
         gates = []
@@ -5356,34 +5642,20 @@ class Orthonym:
         # ``opsin_label_for_gate_outcome``).
         verified = "unverified"
         if name and not is_failure_name(name):
-            _is_d1_identity = False
-            try:
-                _is_d1_identity = _coordination_retained_name(smiles) == name
-            except Exception:
-                _is_d1_identity = False
-            if _is_d1_identity:
+            if _is_coord_list or _is_np_list:
                 verified = "identity"
             elif opsin == "verified":
                 verified = "opsin"
             elif opsin == "verified_constitution_only":
                 verified = "opsin_constitution"
-        # P2 -- labels (2026-09-28): a name from the exact-match coordination list
-        # (D1: heme, chlorophyll, cobalamin, siroheme, coenzyme F430; checked by
-        # exact InChIKey identity, 'identity') is the ChEBI name of a coordination
-        # entity, not a Preferred IUPAC Name. The Blue Book gives coordination
-        # names no PIN status INTRODUCTION, the Blue Book: "Although
-        # coordination nomenclature is not discussed in these recommendations",
-        # PINs are chosen "within the limits of the nomenclature of organic
-        # compounds... but not between a coordination or binary name and an
-        # organic name") and notes none for organometallic compounds of the
-        # transition elements and of Groups 1 and 2 INTRODUCTION,:39735).
-        # So it is a checked name that is not the preferred name, from a table of
-        # retained names: systematic_verified, is_pin False, whatever the PIN-path
-        # branch (pin_verified) or the demotion (best_effort: it reads the
-        # OPSIN label only) derived above. Label only: name, source, 'identity'
-        # and the gate outcome are unchanged.
-        if verified == "identity":
-            tier, is_pin = SYSTEMATIC_VERIFIED, False
+        # A name from the exact-match coordination list (D1: heme, chlorophyll,
+        # cobalamin, siroheme, coenzyme F430; checked by exact InChIKey identity,
+        # 'identity') keeps the label its naming path gives it (user decision
+        # 2026-09-30, the paper's measured labels: 35 pin_verified and 3
+        # best_effort on ChEBI).
+        # (a strict-path name lowered only because OPSIN could not be consulted, the
+        # opt-in reduced mode, is still in PIN form)
+        _pin_form = tier == PIN_VERIFIED or (tier == PIN_UNVERIFIED and _unavailable_demoted)
         # R63 / R68 (claims conformance, 2026-09-27): a tier whose name says
         # 'verified' is earned only by a full round trip (verified 'opsin') or the
         # documented identity table. The grammar carve-outs (OPSIN has no grammar
@@ -5403,14 +5675,15 @@ class Orthonym:
             and getattr(self, "_prefix_order_fallback_name", None) == name)
         if prefix_order_fallback:
             tier, is_pin = BEST_EFFORT, False
-        return {"name": name, "tier": tier, "is_pin": is_pin,
-                "source": source, "opsin": opsin, "gates_passed": gates,
-                "gate_outcome": gate_outcome,
-                "formula": formula, "limit_code": limit_code,
-                "stereo_unexpressed": stereo_unexpressed,
-                "suffix_free_prefix_name": suffix_free_prefix_name,
-                "prefix_order_fallback": prefix_order_fallback,
-                "verified": verified}
+            _pin_form = False
+        return ({"name": name, "tier": tier, "is_pin": is_pin,
+                 "source": source, "opsin": opsin, "gates_passed": gates,
+                 "gate_outcome": gate_outcome,
+                 "formula": formula, "limit_code": limit_code,
+                 "stereo_unexpressed": stereo_unexpressed,
+                 "suffix_free_prefix_name": suffix_free_prefix_name,
+                 "prefix_order_fallback": prefix_order_fallback,
+                 "verified": verified}, _pin_form)
 
     def _retained_structural_preference(self, mol) -> Optional[str]:
         """ (AutoNom A3): retained/fusion structural-recognizer
@@ -5691,6 +5964,39 @@ class Orthonym:
             rec is not None and origin.get("final_floor"))
         return rec
 
+    def _engine_recovery_spelling(self, smiles: str) -> Optional[str]:
+        """A second spelling of ``smiles`` for a caller whose use of the first one
+        failed: the name the late general-engine recovery gives it
+        (``_try_general_engine_recovery``), run in an isolated depth-0 naming
+        session inside the caller's own naming (the tier context and the fragment
+        memo are the caller's), without the main path's handlers.
+
+        This is the spelling the engine ships when its main path declines the
+        molecule, so it is the one an adduct component had before a main-path
+        producer could name it ('...-7-carboxamide' where the main path now builds
+        the demoted N-acyl float '...-7-carbonyl)-3-chloro-4-fluoroaniline'). The
+        recovery round-trip gates its own name; the caller checks again what it
+        builds from it. Best-effort tier only (None otherwise). The provenance the
+        recovery records is dropped: the caller's own gates decide what ships.
+        Never raises an ``Exception`` (a hang budget trip still unwinds to the
+        frame that owns the budget)."""
+        if not self._general_fallback_unverified:
+            return None
+        from .assembly.fragment_naming import isolated_naming_session
+        from .metrics.provenance import get_provenance, restore_provenance
+        snap = get_provenance()
+        try:
+            with isolated_naming_session():
+                rec = self._try_general_engine_recovery(smiles)
+        except Exception as exc:  # noqa: BLE001 - a second spelling is optional
+            logger.info("engine recovery spelling failed for %s: %s", smiles, exc)
+            rec = None
+        finally:
+            restore_provenance(snap)
+        if rec is None or is_failure_name(rec):
+            return None
+        return rec
+
     def _prefer_clean_over_floor_substitute(self, smiles: str,
                                             floor_name: str) -> str:
         """``floor_name`` came from the in-``name`` recovery, where the rung
@@ -5778,26 +6084,54 @@ class Orthonym:
         # molecule, so its round trip is the input's; the probe keeps the input
         # spelling because it reads the molecule's memos.
         _canonical_smiles = Chem.MolToSmiles(_m) or smiles
-        for _fresh_memo in (False, True):
-            self._last_recovery_final_floor = False
-            if _fresh_memo:
-                clean = self._try_besteffort_clean_general_fallthrough(
-                    _canonical_smiles)
-            else:
-                _sandbox = push_sandbox()
-                try:
-                    with speculative_fragment_naming():
+        # PubChem 1M -- branch losses: the offer re-names a molecule whose verified
+        # stand-in ships either way, so it is an optional improvement, bounded by
+        # what the main path cost: at most as many naming passes
+        # (``Orthonym._name_impl`` calls, ``fragment_naming.naming_passes``) as the
+        # main path made before it, and never fewer than ``_OFFER_MIN_PASSES`` (one
+        # clean recovery of a small molecule already takes several: 52 for a dev2000
+        # row whose main path made 5). A clean context misses every memo entry the
+        # best-effort main path made (the fragment and sort-key memos are keyed by
+        # the naming context), so for a big peptide the offer re-derived the whole
+        # molecule: PubChem-1M rows at 82 s (1,519 passes against the main path's
+        # 5), 64 s (964 against 143) and more than 600 s (the fragment work budget
+        # exhausted), each ending with the stand-in's own string. The 39 outermost
+        # offers of the a dev split / milestone1500 / dev2000 best-effort rows made at
+        # most 52 passes (census at d6d6187ac), so none of them meets the cap. The
+        # count depends on the molecule alone, so the outcome is the same in every
+        # process. An offer that reaches the cap keeps the stand-in (the name the
+        # engine shipped before the offer existed).
+        from .assembly.fragment_naming import (
+            OptionalNamingCapExceeded,
+            naming_pass_cap,
+            naming_passes,
+        )
+        try:
+            with naming_pass_cap(max(naming_passes(), _OFFER_MIN_PASSES)):
+                for _fresh_memo in (False, True):
+                    self._last_recovery_final_floor = False
+                    if _fresh_memo:
                         clean = self._try_besteffort_clean_general_fallthrough(
-                            smiles, reset_cache=False)
-                except PerfBudgetExceeded:
-                    clean = None  # not charged (speculative); the fresh run decides
-                finally:
-                    pop_sandbox(_sandbox)
-            if (clean is not None and not is_failure_name(clean)
-                    and not getattr(self, "_last_recovery_floor_substitute", False)
-                    and (_fresh_memo
-                         or getattr(self, "_last_recovery_final_floor", False))):
-                return clean
+                            _canonical_smiles)
+                    else:
+                        _sandbox = push_sandbox()
+                        try:
+                            with speculative_fragment_naming():
+                                clean = self._try_besteffort_clean_general_fallthrough(
+                                    smiles, reset_cache=False)
+                        except PerfBudgetExceeded:
+                            clean = None  # not charged (speculative); the fresh run decides
+                        finally:
+                            pop_sandbox(_sandbox)
+                    if (clean is not None and not is_failure_name(clean)
+                            and not getattr(self, "_last_recovery_floor_substitute", False)
+                            and (_fresh_memo
+                                 or getattr(self, "_last_recovery_final_floor", False))):
+                        return clean
+                    restore_provenance(_snap)
+        except OptionalNamingCapExceeded:
+            logger.info("clean-first offer stopped at its naming-pass cap; "
+                        "the stand-in is kept")
             restore_provenance(_snap)
         self._last_recovery_floor_substitute = True
         return floor_name
@@ -6826,6 +7160,27 @@ class Orthonym:
             name = self._maybe_prefix_order_fallback(name, smiles)
         except Exception as _pe:  # pragma: no cover - defensive, keeps the abstention
             logger.info("prefix-order fallback failed (abstention kept): %s", _pe)
+        # Review fixes (the paper, L74: "At the best-effort tier, a name that OPSIN
+        # rejects is not emitted; the only exceptions are the exact-match list names
+        # described below"): at the general tiers the natural-product lookup gives
+        # way to the systematic name, which the gate verifies; when no
+        # verified name was found, the exact-match natural-product parent name of the
+        # whole input ('germacrane') is the last resort before a decline, as the
+        # metal-complex list name is (above). Only an abstention turns into a name.
+        try:
+            from .assembly.fragment_naming import is_top_level_naming as _np_top
+            from .assembly.fragment_naming import name_scope_depth as _np_depth
+            if (self._general_fallback and is_failure_name(name) and _np_top()
+                    and _np_depth() == 1):
+                _np_name = _np_exact_list_name(smiles)
+                if _np_name is not None:
+                    from .metrics import provenance as _np_pv
+                    _np_pv.record_source("pin_path")
+                    _record_gate_outcome(
+                        _np_pv.carveout_outcome("np_stereoparent"), _np_name)
+                    name = _np_name
+        except Exception as _npe:  # pragma: no cover - defensive, keeps the abstention
+            logger.info("natural-product list fallback failed (abstention kept): %s", _npe)
         try:
             if self._binding_proof == "off":
                 return name
@@ -7173,6 +7528,54 @@ class Orthonym:
                 return _descriptive_fallback(smiles)
         return name
 
+    def _default_tier_policy_applies(self) -> bool:
+        """The default tier's emission rule applies to this call: no breadth flag
+        (``--emit-tier pin``), the round-trip gate on with its jar, not the strict
+        twin of a wider tier, and the caller's own call (read by ``_budget_scope``
+        at name-scope depth 1; a nested ``name`` names a part of a molecule)."""
+        # Review fixes: the paper's default configuration is the PIN style
+        # ('--style general' keeps its general forms), and the rule does not depend on
+        # the OPSIN jar (in the opt-in reduced mode a strict-path name in PIN form is
+        # emitted unverified, every other name declined). Only the raw-output
+        # switches that turn the validity gate off (the private constructor flag and
+        # ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE) leave it off.
+        if (self.style != "pin"
+                or self._general_fallback or self._general_fallback_unverified
+                or self._allow_aromatic_general or self._full_coverage
+                or self._disable_opsin_validity_gate or _DISABLE_VALIDITY_GATE
+                or _DEFAULT_TIER_POLICY_OFF.get()):
+            return False
+        from .assembly.fragment_naming import is_top_level_naming
+        return is_top_level_naming()
+
+    def _default_tier_decision(self, name, smiles: Optional[str],
+                               raise_on_limit: bool = False):
+        """Paper conformance (user decision 2026-09-30): the default tier emits a
+        name only when it is pin_verified -- "The label pin_verified means the
+        strict PIN path built the name and verified it" -- or one of the default
+        tier's exceptions (:func:`_default_tier_emits`); "The default configuration
+        emits a name only when the pipeline can build the preferred IUPAC name
+        (PIN); otherwise, it declines" (the submitted text, Methods, "Tiers"). Any
+        other name is declined: the call returns the structure's decline label
+        (raises ``OrthonymLimitError`` NO_VERIFIED_PIN with ``raise_on_limit``),
+        and ``name_tiered`` reports tier ``abstain`` with limit code
+        NO_VERIFIED_PIN. The wider tiers keep every name. The row derived here is
+        kept for ``name_tiered`` (``_default_tier_row``)."""
+        if not name or is_failure_name(name) or not smiles:
+            return name
+        from .metrics.provenance import get_provenance
+        row, pin_form = self._tier_row_and_pin_form(smiles, name, get_provenance())
+        if _default_tier_emits(row, pin_form, smiles, self._trivial_fallback):
+            self._default_tier_row = (name, row)
+            return name
+        label, declined = _default_tier_declined_row(smiles)
+        self._default_tier_row = (label, declined)
+        logger.info("default tier declined %r (tier %s): not a verified PIN",
+                    name, row.get("tier"))
+        if raise_on_limit:
+            raise no_verified_pin(label, smiles=smiles)
+        return label
+
     def _pin_promotion_eligible(self) -> bool:
         """The default (PIN) tier in its production configuration, at top level:
         no breadth flag, the round-trip gate on with its jar, the PIN style, and
@@ -7248,10 +7651,10 @@ class Orthonym:
                 # Branch review fixes (perf): the re-run would repeat the first run
                 # and find no name either (``rules.pin_vocabulary.
                 # promotion_could_change``): the first run reached no site whose
-                # behaviour the re-run changes -- e.g. a structural decline
-                # (UNSUPPORTED_ELEMENT, WILDCARD_ATOMS, STRUCTURE_TOO_LARGE) before
-                # any producer ran -- or only promotion calls whose promoted
-                # producers, previewed in the context each call ran in, keep no name.
+                # behaviour the re-run changes -- e.g. an input with a wildcard atom,
+                # which is declined before any producer runs -- or only promotion
+                # calls whose promoted producers, previewed in the context each call
+                # ran in, keep no name.
                 if limit_error is not None:
                     raise limit_error
                 return first
@@ -7551,13 +7954,48 @@ class Orthonym:
         # (_lone_pair_standard_spelling); the atom-to-locant map is then re-keyed to
         # the atoms of the caller's string. Any other input is unchanged.
         spelled, _lp_opened = _lone_pair_input_enter(smiles)
+        # The default tier's emission rule (see ``_default_tier_decision``) is
+        # applied once, to the name this call returns: this path is no ``name``
+        # scope, so the rule is switched off for the names it builds on the way.
+        from .assembly.fragment_naming import name_scope_depth
+        _policy = name_scope_depth() == 0 and self._default_tier_policy_applies()
+        if _policy:
+            from .metrics.provenance import clear_provenance
+            clear_provenance()
+        _policy_off = _DEFAULT_TIER_POLICY_OFF.set(True) if _policy else None
         try:
-            metadata = self._name_with_confidence_impl(spelled)
+            try:
+                metadata = self._name_with_confidence_impl(spelled)
+            finally:
+                if _policy_off is not None:
+                    _DEFAULT_TIER_POLICY_OFF.reset(_policy_off)
+            if _policy and isinstance(metadata, dict):
+                metadata = self._default_tier_confidence(metadata, spelled)
             if spelled != smiles and isinstance(metadata, dict) and metadata.get('atom_to_locant'):
                 metadata['atom_to_locant'] = _lone_pair_caller_atoms(metadata['atom_to_locant'])
             return metadata
         finally:
             _lone_pair_input_exit(_lp_opened)
+
+    def _default_tier_confidence(self, metadata: dict, smiles: str) -> dict:
+        """``name_with_confidence`` at the default tier: the emission rule of
+        ``_default_tier_decision`` for the name it returns; a declined name gives the
+        record of a decline with ``limit`` NO_VERIFIED_PIN."""
+        name = metadata.get('name')
+        if not name or is_failure_name(name):
+            return metadata
+        from .metrics.provenance import get_provenance
+        row, pin_form = self._tier_row_and_pin_form(smiles, name, get_provenance())
+        if _default_tier_emits(row, pin_form, smiles, self._trivial_fallback):
+            return metadata
+        from .assembly.coverage_scoring import unmeasured_confidence
+        from .metrics.abstention import abstention_code_for
+        label, _ = _default_tier_declined_row(smiles)
+        md = unmeasured_confidence(name=label, handler='fallback')
+        md['limit'] = no_verified_pin(label, smiles=smiles).as_dict()
+        _abst = abstention_code_for(label)
+        md['abstention'] = _abst.value if _abst else None
+        return md
 
     def _name_with_confidence_impl(self, smiles: str) -> dict:
         """The body of:meth:`name_with_confidence`, for the string it names."""
@@ -7881,6 +8319,10 @@ class Orthonym:
         # factory + handler shim can read it from kwargs forwarded by
         # `dispatch`.
         self._skip_decomposition = _skip_decomposition
+        # One naming pass of the outermost name (the unit that bounds the
+        # clean-first offer, ``_prefer_clean_over_floor_substitute``).
+        from .assembly.fragment_naming import count_naming_pass
+        count_naming_pass()
 
         # Parse SMILES
         mol = Chem.MolFromSmiles(smiles)
@@ -9161,6 +9603,15 @@ class Orthonym:
                     if features.principal_group:
                         from .rules.seniority import get_prefix as _pg_get_prefix
                         _pg_prefix = _pg_get_prefix(features.principal_group)
+                        from .rules.seniority import SUFFIX_FORMS as _PG_SUFFIX_FORMS
+                        # the ring suffix of the principal group is an N-substituted
+                        # amide suffix ('-carboxamide'): the heterocycle assembler
+                        # cites it. An ester or anhydride class is named by
+                        # functional class nomenclature (a lactone ring by 'oxo'),
+                        # so it cites no ring suffix to number first.
+                        _pg_ring_suffix = (_PG_SUFFIX_FORMS.get(features.principal_group)
+                                           or ("", ""))[1]
+                        _pg_has_suffix_form = _pg_ring_suffix.endswith("carboxamide")
                         # The principal characteristic group is a CLASS, not a
                         # single FG label. A ring bearing an exocyclic primary
                         # alcohol (-CH2OH) plus secondary ring alcohols (ring -OH)
@@ -9173,7 +9624,19 @@ class Orthonym:
                         # without this the suffix-locant tie is broken by SMILES
                         # atom order -> non-deterministic numbering .
                         for _fg, _matches in features.functional_groups.items():
-                            if _pg_prefix is None or _pg_get_prefix(_fg) != _pg_prefix:
+                            # A principal group with no prefix form but an amide ring
+                            # suffix (an N-substituted amide: 'secondary_amide',
+                            # 'tertiary_amide') still anchors its own matches: its suffix
+                            # ('-carboxamide') takes the lowest locant before the
+                            # prefixes, (c) (the Blue Book) --
+                            # 'N,N,6-trimethylpyridine-3-carboxamide', not 'N,N,2-
+                            # trimethylpyridine-5-carboxamide' ('2-chloropyridine-3-
+                            # carboxamide (PIN)',:32895).
+                            if (_fg != features.principal_group
+                                    or _pg_prefix is not None
+                                    or not _pg_has_suffix_form) and (
+                                    _pg_prefix is None
+                                    or _pg_get_prefix(_fg) != _pg_prefix):
                                 continue
                             for match in _matches:
                                 match_set = set(match)
@@ -9310,10 +9773,28 @@ class Orthonym:
                     # bonded DIRECTLY to a ring carbon (not via an exocyclic C).
                     pg_ring_atoms = set()
                     if features.principal_group and features.principal_group in features.functional_groups:
+                        from .rules.parent_selection import (
+                            SKELETAL_SUFFIX_PGS as _SKEL_SFX_RING)
                         ring_set = set(features.principal_ring)
-                        for match in features.functional_groups[features.principal_group]:
+                        # Breadth job 3 review fixes: the principal characteristic
+                        # group is the WHOLE equal-seniority class the suffix cites
+                        # (DD5,, as on the chain path below -- the
+                        # principal SUBTYPE's matches alone left a secondary or
+                        # tertiary ring -OH out of the anchor set when a primary
+                        # -CH2OH decided the subtype. And an -ol/-amine/-thiol/-one
+                        # decorates a skeletal atom: it has no exocyclic-carbon
+                        # suffix form (SKELETAL_SUFFIX_PGS), so a wholly exocyclic
+                        # match (the -CH2OH of 'hydroxymethyl') is a substituent and
+                        # anchors nothing. (c) (the Blue Book) numbers
+                        # the suffixes first: '4-(hydroxymethyl)cyclohexan-1-ol',
+                        # not '1-(hydroxymethyl)cyclohexan-4-ol'.
+                        _pg_ring_matches = (features.principal_group_atoms
+                                            or features.functional_groups[features.principal_group])
+                        for match in _pg_ring_matches:
                             match_set = set(match)
                             if not (match_set & ring_set):
+                                if features.principal_group in _SKEL_SFX_RING:
+                                    continue
                                 #.1 S4: wholly-exocyclic match = an
                                 # APPENDED suffix (-carbaldehyde, -carboxylic
                                 # acid, -carbonitrile). Its expressed-suffix
@@ -9752,10 +10233,13 @@ def name_compound(smiles: str, style: str = "pin",
     """Name one molecule.
 
     Reads a structure written as SMILES and returns its IUPAC name as a string.
-    At the default settings the name is built by the strict path for the
-    Preferred IUPAC Name. Where that path cannot certify the preferred name, the
-    string can be another name of a lower tier, and where no name passes, it is a label
-    such as ``'inorganic compound (not supported)'``. Use
+    At the default settings a name is returned only when the strict path for the
+    Preferred IUPAC Name built it and verified it, or when it is one of the default
+    tier's exceptions (the exact-match list names, the few name formats OPSIN cannot
+    read, a PIN whose stereodescriptors OPSIN cannot read); otherwise, and where no
+    name passes, it is a label such as ``'unknown organic compound'`` or
+    ``'inorganic compound (not supported)'``. The wider tiers (``general_fallback``
+    and the options below) also return names that are not the preferred name. Use
     :func:`orthonym.errors.is_failure_name` to tell a label from a name, and
     :meth:`Orthonym.name_tiered` to learn which tier a name earned.
 
@@ -9990,6 +10474,13 @@ def _name_compound_impl(smiles: str, style: str = "pin",
         if result:
             # Check if result contains 'unknown' as a component (partial failure)
             if 'unknown' in result.lower():
+                # A default-tier decline (NO_VERIFIED_PIN) keeps its own label: the
+                # structure's elements are supported, so the UNSUPPORTED_ELEMENT
+                # text of the descriptive fallback would misstate the reason.
+                _stash = getattr(namer, "_default_tier_row", None)
+                if (_stash is not None and _stash[0] == result
+                        and _stash[1].get("limit_code") == "NO_VERIFIED_PIN"):
+                    return result
                 return _descriptive_fallback(smiles)
             return result
         # If name returned empty/None, generate descriptive fallback
@@ -10150,10 +10641,11 @@ def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
     Returns
     -------
     OrthonymLimitError or None
-        The reason, with its code (for example ``UNSUPPORTED_ELEMENT`` or
-        ``WILDCARD_ATOMS``) and message. ``None`` when the structure gets a name,
-        and also when RDKit cannot read the SMILES at all (that is a reading
-        error, not a scope limit).
+        The reason, with its code (for example ``UNSUPPORTED_ELEMENT``,
+        ``WILDCARD_ATOMS``, or ``NO_VERIFIED_PIN`` when the default settings built
+        a name that is not a verified preferred IUPAC name) and message. ``None``
+        when the structure gets a name, and also when RDKit cannot read the SMILES
+        at all (that is a reading error, not a scope limit).
 
     Examples
     --------
@@ -10175,10 +10667,16 @@ def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
     if scope is not None:
         scope.smiles = smiles
         return scope
+    namer = Orthonym()
     try:
-        produced = Orthonym().name(smiles)
+        produced = namer.name(smiles)
     except Exception:
         produced = None
     if is_failure_name(produced):
+        # The default tier built a name but declined it (not a verified PIN).
+        stash = getattr(namer, "_default_tier_row", None)
+        if (stash is not None and stash[0] == produced
+                and stash[1].get("limit_code") == "NO_VERIFIED_PIN"):
+            return no_verified_pin(produced, smiles=smiles)
         return classify_failure_limit(mol, smiles=smiles)
     return None

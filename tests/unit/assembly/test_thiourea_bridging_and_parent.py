@@ -61,6 +61,51 @@ from rdkit import Chem
 
 import orthonym.namer as _namer
 from orthonym import Orthonym
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C",
+})
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 R3_SMILES = "CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C"
@@ -70,8 +115,11 @@ R3_SMILES = "CC(C)(C)NC(=S)NC1(CCCCC1)N=NC(C)(C)C"
 def namer():
     # Judge the GENERATOR, not the gate: with the validity gate on,
     # merely suppresses the wrong name instead of preventing its construction.
-    _namer._DISABLE_VALIDITY_GATE = True
-    return Orthonym(style="pin")
+    # The flag is put back when the module ends, so a later module is not named
+    # with the gate off.
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_namer, "_DISABLE_VALIDITY_GATE", True)
+        yield Orthonym(style="pin")
 
 
 def _name(nm, smiles):
@@ -125,7 +173,8 @@ def test_r3_ships_its_verified_pin_never_a_wrong_constitution():
     # wp6-tests; TRIAGE.md ' outcome').
     import orthonym.namer as _n
     assert _n._DISABLE_VALIDITY_GATE is False
-    row = _OS(style="pin").name_tiered(R3_SMILES)
+    row = (_declined_pin_row(R3_SMILES) if default_tier_rule_applies()
+           else _OS(style="pin").name_tiered(R3_SMILES))
     # Breadth job 1: the gap closed. The PIN tier's re-run names the 1,1-
     # disubstituted cyclohexyl through the promoted ring-substituent producers, and
     # 'tert-butyldiazenyl' is a compound prefix, so it is enclosed,

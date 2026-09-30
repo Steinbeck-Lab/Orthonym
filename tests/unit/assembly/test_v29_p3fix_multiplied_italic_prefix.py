@@ -111,7 +111,10 @@ def namer():
      '(di-tert-butylmethylsilyl)acetic acid'),
     #...and its SIBLING producer on the same fragment: these two disagreeing was
     # the defect, so they are asserted together.
-    ('CC(C)(C)[Si](C(C)(C)C)(C)C', 'di-tert-butyldimethylsilane'),
+    # (the Blue Book): the second cited prefix of a mononuclear
+    # parent hydride is enclosed, its multiplier outside ('ethyldi(methyl)
+    # phosphane (PIN)', 'tert-butyldi(methyl)phosphane (PIN)':16286).
+    ('CC(C)(C)[Si](C(C)(C)C)(C)C', 'di-tert-butyldi(methyl)silane'),
     # count 3 (BB 37495's `tri-tert-butyl` shape)
     ('CC(C)(C)[Si](C(C)(C)C)(C(C)(C)C)CC(=O)O',
      '(tri-tert-butylsilyl)acetic acid'),

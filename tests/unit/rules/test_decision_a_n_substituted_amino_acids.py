@@ -60,6 +60,69 @@ import pytest
 
 from orthonym import Orthonym
 from tests.support.rt_assert import assert_full_rt
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CCCCC/C=C\\C[C@@H](/C=C/C=C\\C/C=C\\CCCC(=O)NCCS(=O)(=O)[O-])OO",
+    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
+    "CCCCC[C@@H](/C=C/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCC(=O)[O-])OO",
+    "C[N+](C)(C)CC(O)CC(=O)[O-]",
+    "C[N+](C)(C)C[C@@H](O)CC(=O)[O-]",
+    "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]",
+    "CCCCC[C@@H](/C=C/C=C\\C/C=C\\C/C=C\\CCCC(=O)NCC(=O)[O-])OO",
+})
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 DENIED = ["tricine", "taurocyamine", "hypotaurocyamine", "strombine", "alanopine",
           "beta-alanopine", "octopine", "octopinic acid", "nopaline", "tauropine"]
@@ -105,7 +168,7 @@ def test_deny_row_withdraws_the_table_name(name):
     ("N=C(N)NCCS(=O)(=O)O", "2-(carbamimidoylamino)ethane-1-sulfonic acid"),
 ])
 def test_systematic_name_at_the_pin_tier(namer, smiles, expected):
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["name"] == expected
     assert res["tier"] == "pin_verified" and res["is_pin"] is True
     assert_full_rt(res["name"], smiles)
@@ -124,7 +187,7 @@ def test_systematic_name_at_the_pin_tier(namer, smiles, expected):
      "(2S)-2-[(2S)-2-acetamidopropanamido]propanoic acid"),
 ])
 def test_float_refused_systematic_name_built(namer, smiles, expected):
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["name"] == expected
     assert res["tier"] == "pin_verified" and res["is_pin"] is True
     assert_full_rt(res["name"], smiles)
@@ -143,7 +206,7 @@ def test_float_refused_systematic_name_built(namer, smiles, expected):
 def test_float_the_engine_cannot_replace_yet_is_demoted(namer, smiles):
     """Breadth never drops and the PIN tier never labels a non-PIN pin_verified: the
     name still ships (RT-exact) but below the PIN tier."""
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["is_pin"] is False and res["tier"] != "pin_verified", res
     assert_full_rt(res["name"], smiles)
 
@@ -213,7 +276,7 @@ def test_carnitine_is_labelled_below_the_pin_tier(namer, smiles, expected):
     zwitterion abstains without the retained name, the stereo-free one gives the
     malformed '4-(trimethylazaniumyl)3-hydroxybutanoate'), so the name is kept and
     labelled non-PIN rather than withdrawn."""
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["name"] == expected
     assert res["is_pin"] is False and res["tier"] != "pin_verified"
     assert_full_rt(res["name"], smiles)
@@ -222,7 +285,7 @@ def test_carnitine_is_labelled_below_the_pin_tier(namer, smiles, expected):
 @pytest.mark.opsin_gate
 def test_d_carnitine_from_the_amino_acid_table_is_labelled_below_the_pin_tier(namer):
     smiles = "C[N+](C)(C)C[C@@H](O)CC(=O)[O-]"
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["is_pin"] is False and res["tier"] != "pin_verified", res
     assert_full_rt(res["name"], smiles)
 
@@ -273,7 +336,7 @@ def test_d_carnitine_from_the_amino_acid_table_is_labelled_below_the_pin_tier(na
      "(2S)-6-amino-2-{[(1R)-1-carboxyethyl]amino}hexanoic acid"),
 ])
 def test_part2_systematic_name_at_the_pin_tier(namer, smiles, expected):
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["name"] == expected, res
     assert res["tier"] == "pin_verified" and res["is_pin"] is True, res
     assert_full_rt(res["name"], smiles)
@@ -292,7 +355,7 @@ def test_amido_prefix_of_a_substituted_acetic_acid_is_the_acetamido_pin(namer):
     covered in test_j12_verify_fixes.py."""
     smiles = ("CCOC(=O)C1=C(SC=C1C2=CC=CC=C2)NC(=O)[C@H](C3=CC=CC=C3)"
               "SC4=NN=NN4C5=C(C=C(C=C5)C)C")
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["name"] == (
         "ethyl 2-[(2S)-2-{[1-(2,4-dimethylphenyl)-1H-tetrazol-5-yl]sulfanyl}-2-"
         "phenylacetamido]-4-phenylthiophene-3-carboxylate"), res
@@ -395,7 +458,7 @@ def test_ring_n_acyl_prefix_scope(smiles, principal_group, expected):
     ("CN(CCO)CC(=O)O", "[(2-hydroxyethyl)(methyl)amino]acetic acid"),
 ])
 def test_n_n_disubstituted_amino_prefix(namer, smiles, expected):
-    res = namer.name_tiered(smiles)
+    res = _dt_obj_row(namer, smiles)
     assert res["name"] == expected, res
     assert res["tier"] == "pin_verified" and res["is_pin"] is True, res
     assert_full_rt(res["name"], smiles)

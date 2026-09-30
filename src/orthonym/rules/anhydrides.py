@@ -1295,8 +1295,8 @@ def _name_saturated_oxa_dione(mol, c1: int, c2: int, bridge_o: int, ring) -> Opt
     parts = []
     for nm in sorted(groups, key=alpha_sort_key):
         locs = sorted(groups[nm])
-        mult = get_multiplier_prefix(len(locs), nm) if len(locs) > 1 else ""
-        parts.append(f"{','.join(str(x) for x in locs)}-{mult}{nm}")
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(f"{','.join(str(x) for x in locs)}-{_mc(len(locs), nm, nm)}")
     # The substituent prefix attaches DIRECTLY to the parent stem (no separating
     # hyphen): '3-methyloxolane-2,5-dione', not '3-methyl-oxolane-2,5-dione'.
     prefix = "-".join(parts)

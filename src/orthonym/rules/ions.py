@@ -28,6 +28,7 @@ from ..data.ion_retained_names import (
     get_cation_name,
 )
 from ..errors import UnnameableSubstituentError  # a voided candidate (Task 3)
+from ..errors import is_failure_name
 from ..perception.ions import get_ion_sites
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.molcache import inchikey_of
@@ -1021,6 +1022,61 @@ def _name_acyl_azanide(mol, anion_idx: int) -> str:
 
 # === MAIN NAMING FUNCTIONS ===
 
+# (the Blue Book-7933) mononuclear parent hydrides of
+# the Group 13-16 elements with their standard bonding numbers. Halogen hydrides
+# are left out: their anions keep 'fluoride'/'chloride'/... Aluminium and the
+# Group-13 metals are left to the metal paths.
+_MONONUCLEAR_ANION_PARENT = {
+    'B': ('borane', 3), 'C': ('methane', 4), 'Si': ('silane', 4),
+    'Ge': ('germane', 4), 'Sn': ('stannane', 4), 'Pb': ('plumbane', 4),
+    'N': ('azane', 3), 'P': ('phosphane', 3), 'As': ('arsane', 3),
+    'Sb': ('stibane', 3), 'Bi': ('bismuthane', 3),
+    'O': ('oxidane', 2), 'S': ('sulfane', 2), 'Se': ('selane', 2),
+    'Te': ('tellane', 2),
+}
+_ANION_MULT = {2: 'di', 3: 'tri', 4: 'tetra'}
+
+
+def _name_mononuclear_hydride_anion(mol) -> str:
+    """Name a bare one-atom anion formed from a mononuclear parent hydride.
+
+     "Anions derived from parent hydrides and their derivatives"
+    (the Blue Book-40902): "An anion derived formally by the removal of
+    one or more hydrons from any position of a neutral parent hydride is
+    preferably named by using the suffix '-ide', with elision of the final
+    letter 'e' of the parent hydride, if any. Numerical prefixes 'di', 'tri',
+    etc. are used to denote multiplicity" -- 'diphenylmethanediide (PIN)',
+    'ethynediide (PIN)' (:40910,:40918); (:40945) names 'azanide'
+    and 'azanediide' this way. So [S-2] (sulfane less two hydrons) is
+    'sulfanediide', [SH-] 'sulfanide', [N-3] 'azanetriide'.
+
+    Scope: one atom, no radical electrons, charge -k with hydrogens h and
+    h + k equal to the standard bonding number (a hypervalent or electron-
+    deficient centre is not a hydron-less parent hydride). HO- is excluded: its
+    preselected name is the retained 'hydroxide',:41015).
+    Returns '' when out of scope.
+    """
+    if mol is None or mol.GetNumAtoms() != 1:
+        return ''
+    atom = mol.GetAtomWithIdx(0)
+    k = -atom.GetFormalCharge()
+    if k < 1 or atom.GetNumRadicalElectrons() or atom.GetIsotope():
+        return ''
+    entry = _MONONUCLEAR_ANION_PARENT.get(atom.GetSymbol())
+    if entry is None:
+        return ''
+    parent, bonding = entry
+    h = atom.GetTotalNumHs()
+    if h + k != bonding:
+        return ''
+    if atom.GetSymbol() == 'O' and h == 1:
+        return ''  # HO- -> 'hydroxide' (preselected, retained table)
+    if k == 1:
+        return parent[:-1] + 'ide'
+    mult = _ANION_MULT.get(k)
+    return parent + mult + 'ide' if mult else ''
+
+
 def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = False) -> str:
     """
     Generate IUPAC name for an anionic molecule.
@@ -1061,6 +1117,15 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
 
     if mol is None:
         return '' if not retained_only else None
+
+    #: a bare anion of a mononuclear parent hydride ('sulfanediide').
+    # Ahead of the retained table on purpose: its words for these ions
+    # ('sulfide', 'oxide', 'selenide', 'nitride', 'carbide') name the salts
+    # ('disodium sulfide', salts.py reads the table directly) but none of
+    # them is a name of the bare ion (OPSIN reads no structure from them).
+    _hydride_anion = _name_mononuclear_hydride_anion(mol)
+    if _hydride_anion:
+        return _hydride_anion
 
     # Guard against infinite recursion
     if _depth > 2:
@@ -1277,12 +1342,26 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             1 for a in anions if classify_anion(mol, a) == 'carboxylate'
         )
         if carboxylate_count > 0:
+            refused_conversion = False
             anion_name = _acid_name_to_carboxylate(neutral_name, carboxylate_count)
             if anion_name:
                 #: cite any JUNIOR anionic group (not in the parent) by its
                 # anionic prefix (carboxylato/oxido) instead of the neutral carboxy/hydroxy.
                 anion_name = _apply_anionic_substituent_prefixes(mol, anions, anion_name)
-                return _validate_anion_name(mol, anion_name)
+                validated = _validate_anion_name(mol, anion_name)
+                if validated:
+                    return validated
+                # The retained word converted but its anion is refused (a
+                # carbohydrate acid: 'D-mannaric acid' -> 'D-mannarate', which the
+                # PIN tier no longer accepts). That is no reason to abstain: the
+                # SYSTEMATIC acid of the same skeleton is the PIN parent,
+                # '-oic acid' -> '-oate'; '(2S,3S,4S,5S)-2,3,4,5-tetrahydroxy-
+                # hexanedioate'), so fall through to the namer below that leaves
+                # the carbohydrate catalog out. The FIX 3b systematic namer is not
+                # tried again after a refusal: it names the same skeleton by the
+                # same catalog ('D-mannaric acid'), and on the large anions of the
+                # dev sets it was one more whole naming per call of name_anion.
+                refused_conversion = True
             # FIX 3b (charged C1, cysteinate multi-anion stack): the
             # retained neutral name (e.g. an amino-acid word like
             # 'L-cysteine') has no convertible '-oic acid'/'-ic acid'
@@ -1293,8 +1372,20 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
             # acid suffix -- e.g. cysteine -> the retained word fails,
             # '(2R)-2-amino-3-sulfanylpropanoic acid' converts to
             # '...propanoate' and then to '...sulfidopropanoate'.
-            sys_neutral_name = _try_neutralize_and_name_systematic(mol)
-            if sys_neutral_name:
+            # Then the name of the same skeleton with the carbohydrate catalog
+            # left out: a carbohydrate acid name ('D-mannaric acid') is a
+            # natural-product name, and "Preferred IUPAC names (PINs) for the
+            # natural products in Chapter are not identified"
+            # (the Blue Book); its systematic acid is the parent whose
+            # '-oic acid' becomes '-oate',:40955).
+            for _sys_namer in (
+                    (_try_neutralize_and_name_without_carbohydrate,)
+                    if refused_conversion else
+                    (_try_neutralize_and_name_systematic,
+                     _try_neutralize_and_name_without_carbohydrate)):
+                sys_neutral_name = _sys_namer(mol)
+                if not sys_neutral_name:
+                    continue
                 sys_anion_name = _acid_name_to_carboxylate(
                     sys_neutral_name, carboxylate_count)
                 if sys_anion_name:
@@ -1720,6 +1811,74 @@ def _try_neutralize_and_name(mol) -> str:
     return ''
 
 
+def _try_neutralize_and_name_without_carbohydrate(mol) -> str:
+    """Name the fully neutralized skeleton with the carbohydrate catalog left
+    out of the dispatch (the natural-product names of are not PINs,
+    the Blue Book), so an aldaric/aldonic acid gets its systematic
+    polyhydroxy acid name. Same neutralization as ``_try_neutralize_and_name``;
+    '' on any failure. The caller RT-gates whatever anion it builds from it."""
+    if mol is None or _has_metal(mol):
+        return ''
+    try:
+        rw = Chem.RWMol(mol)
+        for atom in rw.GetAtoms():
+            charge = atom.GetFormalCharge()
+            if charge > 0:
+                atom.SetFormalCharge(0)
+                atom.SetNumExplicitHs(max(0, atom.GetNumExplicitHs() - charge))
+            elif charge < 0:
+                atom.SetFormalCharge(0)
+                atom.SetNumExplicitHs(atom.GetNumExplicitHs() - charge)
+        Chem.SanitizeMol(rw)
+        neutral_smiles = Chem.MolToSmiles(rw, canonical=True)
+    except Exception:
+        return ''
+    if not neutral_smiles:
+        return ''
+    # The multi-anion branch reaches this for every call of name_anion on the
+    # molecule (17-26 per row on the large lipid and conjugate anions of the dev
+    # sets, each a whole naming of the neutral skeleton). Bounded twice: leaving
+    # the carbohydrate catalog out changes the name only of a skeleton that
+    # catalog would name (its dispatch predicate), so any other skeleton returns
+    # at once; and the naming is memoised per molecule (the scope-bound replay
+    # memo of nested namings, keyed like its other users by the skeleton and the
+    # breadth context the nested naming reads).
+    from ..assembly.nested_memo import cached_nested_call
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    _key = (neutral_smiles, general_fallback_ctx.get(), best_effort_ctx.get(),
+            allow_aromatic_general_ctx.get(), full_coverage_ctx.get())
+    return cached_nested_call(
+        "anion_neutral_without_carbohydrate", _key,
+        lambda: _name_neutral_without_carbohydrate(neutral_smiles))
+
+
+def _name_neutral_without_carbohydrate(neutral_smiles: str) -> str:
+    """The body of ``_try_neutralize_and_name_without_carbohydrate``: '' unless
+    the carbohydrate catalog would name the neutral skeleton, else its name with
+    that catalog left out of the dispatch."""
+    from ..routing.dispatch_table import StoutClass, _is_carbohydrate_lookup
+    nmol = Chem.MolFromSmiles(neutral_smiles)
+    if nmol is None:
+        return ''
+    try:
+        if not _is_carbohydrate_lookup(nmol, neutral_smiles, neutral_smiles):
+            return ''
+    except Exception:
+        return ''
+    from ..namer import Orthonym
+    try:
+        name = Orthonym(style='pin', _disable_opsin_validity_gate=True,
+                        _seed_excluded_dispatch_classes=frozenset(
+                            {StoutClass.CARBOHYDRATE_LOOKUP})).name(neutral_smiles)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    from ..errors import is_failure_name
+    if not name or is_failure_name(name):
+        return ''
+    return name
+
+
 def _try_neutralize_and_name_systematic(mol) -> str:
     """Sibling of ``_try_neutralize_and_name`` that requests the SYSTEMATIC
     (non-retained) name for the fully-neutralized skeleton.
@@ -1788,6 +1947,10 @@ _OXOACID_NEUTRAL_SUFFIXES = frozenset({
     'sulfonic acid', 'sulfinic acid',
     'phosphonic acid', 'phosphinic acid', 'phosphoric acid',
 })
+
+#: '<linking group>bis(<oxoacid>)': a multiplicative name of identical oxoacid units.
+_MULTIPLIED_OXOACID_UNIT_RE = re.compile(
+    r'^(?P<head>.+?(?:bis|tris|tetrakis))\((?P<unit>phosphonic acid)\)$')
 
 
 # =============================================================================
@@ -1989,7 +2152,12 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     # parent hydride (phosphane/silane/...) and add the -anide ending.
     # Each branch fail-closes ('' -> legacy), preserving the no-crash contract.
     if center.IsInRing():
-        return _emit_ring_cumulative_suffix(mol, center_idx, suffix)
+        ring_name = _emit_ring_cumulative_suffix(mol, center_idx, suffix)
+        if suffix == 'ium' and center.GetAtomicNum() != 6:
+            if center.GetTotalNumHs() == 0:
+                return _ring_cation_hydron_site_name(mol, center_idx, ring_name)
+            return _ring_cation_in_place_name(mol, center_idx, ring_name)
+        return ring_name
     if center.GetSymbol() != 'C':
         return _emit_heteroatom_cumulative_suffix(mol, center_idx, suffix)
 
@@ -2104,10 +2272,11 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
         mult = get_multiplier_prefix(count, sub_name)
         loc_str = ','.join(str(l) for l in locants_sorted)
         from ..assembly.naming_utils import is_complex_substituent
+        from ..assembly.naming_utils import multiplied_component as _mc
         if is_complex_substituent(sub_name) and count > 1:
-            body = f"{mult}({sub_name})"
+            body = _mc(count, sub_name, f"({sub_name})")
         else:
-            body = f"{mult}{sub_name}"
+            body = _mc(count, sub_name, sub_name)
         #: a single-atom parent (methane) has only ONE substitutable
         # position, so its substituent locants are OMITTED (`tricyanomethanide`,
         # not `1,1,1-tricyanomethanide`). Every other chain keeps first-class
@@ -2298,9 +2467,9 @@ def emit_mono_ionized_polyfunctional(mol, ion_idx: int, kind: str) -> str:
     # Sibling prefixes (all share sib_prefix): grouped, multiplied (di/tri), sorted.
     locants = sorted(loc_map[sib_carbon[s]] for s in siblings)
     count = len(locants)
-    mult = get_multiplier_prefix(count, sib_prefix) or ''
+    from ..assembly.naming_utils import multiplied_component as _mc
     loc_str = ','.join(str(l) for l in locants)
-    prefix_str = f"{loc_str}-{mult}{sib_prefix}"
+    prefix_str = f"{loc_str}-{_mc(count, sib_prefix, sib_prefix)}"
     return f"{prefix_str}{core}"
 
 
@@ -2456,7 +2625,8 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
         # ``enclose_if_compound`` primitive (idempotent, escalates (-> [ -> {), so a
         # SIMPLE prefix (methyl/cyclohexyl) stays bare and a multiplied complex
         # prefix keeps its di/bis + marks unchanged.
-        body = f"{mult}{enclose_if_compound(sub_name)}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        body = _mc(count, sub_name, enclose_if_compound(sub_name))
         prefix_parts.append((alpha_sort_key(sub_name), locants_sorted[0],
                              f"{loc_str}-{body}"))
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
@@ -2921,7 +3091,8 @@ def _emit_mononuclear_heteroatom_ide_direct(mol, center_idx: int) -> str:
     parts = []
     for sub_name, count in name_to_count.items():
         mult = get_multiplier_prefix(count, sub_name)
-        body = f"{mult}{enclose_if_compound(sub_name)}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        body = _mc(count, sub_name, enclose_if_compound(sub_name))
         parts.append((alpha_sort_key(sub_name), body))
     parts.sort(key=lambda t: t[0])
     name = f"{''.join(p[1] for p in parts)}{_elide_terminal_e(stem)}ide"
@@ -3007,7 +3178,8 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
         # `trifluoro[3-(methylsulfanyl)phenyl]boranuide`.
         # `enclose_if_compound` also escalates (-> [ so the mark nests correctly
         # around a ligand that already carries parentheses.
-        body = f"{mult}{enclose_if_compound(sub_name)}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        body = _mc(count, sub_name, enclose_if_compound(sub_name))
         parts.append((alpha_sort_key(sub_name), body))
     parts.sort(key=lambda t: t[0])
     return f"{''.join(p[1] for p in parts)}{suffix}"
@@ -3309,10 +3481,8 @@ def emit_onium_hydride_parent(mol, center_idx: int) -> str:
         # 'benzoyldimethylsulfanium'. Same rule as catenated_hydrides._try_aba_parent.
         if len(uniq) >= 2 and i > 0 and marked == nm:
             marked = apply_enclosing_marks(nm, -1)
-        if mult and marked == nm and multiplier_needs_hyphen(nm):
-            token = f"{mult}-{marked}"          # (b) di-tert-butyl
-        else:
-            token = f"{mult}{marked}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        token = _mc(counts[nm], nm, marked)     # (b) di-tert-butyl
         parts.append(token)
     return f"{''.join(parts)}{suffix}"
 
@@ -3452,10 +3622,8 @@ def _assemble_unlocanted_ium(subs: List[str], parent: str) -> str:
         marked = enclose_if_compound(nm)
         if len(uniq) >= 2 and i > 0 and marked == nm:
             marked = apply_enclosing_marks(nm, -1)
-        if mult and marked == nm and multiplier_needs_hyphen(nm):
-            token = f"{mult}-{marked}"
-        else:
-            token = f"{mult}{marked}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        token = _mc(counts[nm], nm, marked)
         parts.append(token)
     return f"{''.join(parts)}{suffix}"
 
@@ -3590,8 +3758,8 @@ def emit_catenated_hydride_cation(mol, center_idx: int) -> str:
             and all(mol.GetAtomWithIdx(i).GetTotalNumHs() == 0 for i in chain)):
         nm, locs = next(iter(name_to_locants.items()))
         if not is_complex_substituent(nm):
-            mult = get_multiplier_prefix(len(locs), nm)
-            return f"{mult}{nm}{stem}ium"
+            from ..assembly.naming_utils import multiplied_component as _mc
+            return f"{_mc(len(locs), nm, nm)}{stem}ium"
 
     prefix_parts = []                             # (alpha_key, min_locant, text)
     for nm, locs in name_to_locants.items():
@@ -3607,7 +3775,8 @@ def emit_catenated_hydride_cation(mol, center_idx: int) -> str:
         # (methyl/ethyl) stays bare and the multiplied ``di(propan-2-yl)`` form is
         # kept. The old ``and len(locs_sorted) > 1`` guard dropped the marks on a
         # count-1 complex prefix (…-1-propan-2-yldisulfan-1-ium).
-        body = f"{mult}{enclose_if_compound(nm)}"
+        from ..assembly.naming_utils import multiplied_component as _mc
+        body = _mc(len(locs_sorted), nm, enclose_if_compound(nm))
         prefix_parts.append((alpha_sort_key(nm), locs_sorted[0],
                              f"{loc_str}-{body}"))
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
@@ -4028,7 +4197,8 @@ def _emit_conjugated_carbocycle_radical_ion(mol, center_idx: int, ring_system,
     return f"cyclo{stem}{ending}-1-{suffix}"
 
 
-def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
+def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
+                                 ium_site: Optional[int] = None) -> str:
     """F- (DD3): name a RING centre bearing a cumulative -ide (ring carbanion,
      or -ium (ring cation, suffix, with 'e' elision and a
     first-class ring locant read from the neutral-ring numbering.
@@ -4317,6 +4487,13 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
     if not locants or center_idx not in locants:
         return ''
     center_locant = locants[center_idx]
+    # ``ium_site``: the ring atom that carries the cation's added hydron when it is
+    # not the drawn centre (_ring_cation_hydron_site_name); the '-ium' is cited at
+    # its locant in this same numbering.
+    if ium_site is not None:
+        if ium_site not in locants:
+            return ''
+        center_locant = locants[ium_site]
     prefix = _p74_ring_substituent_prefix(mol, ring_system, locants, set())
     if prefix is None:
         return ''
@@ -4357,6 +4534,155 @@ def _ring_has_off_ring_substituent(mol, ring_system):
             if nb.GetIdx() not in rs and nb.GetSymbol() != 'H':
                 return True
     return False
+
+
+def _ring_cation_hydron_site(mol, ring_system, center_idx):
+    """The ring atom that carries the added hydron of a ring cation whose positive
+    charge is DRAWN on a substituted, hydrogen-free atom: a resonance structure of
+    ``mol`` puts the charge on another ring heteroatom that bears hydrogen, with the
+    drawn centre neutral (``C[N+]1=CNc2ccccc21``: the charge of N-1 sits on the NH of
+    N-3 in the other drawing, so the cation is 1-methylbenzimidazole plus a hydron
+    at N-3). Returns ``(resonance_mol, atom_idx)`` -- the lowest canonical rank
+    first, so the choice does not depend on the input's atom order -- or None."""
+    try:
+        sup = Chem.ResonanceMolSupplier(mol, 0, 64)
+        structs = [sup[i] for i in range(len(sup))]
+    except Exception:
+        return None
+    rank = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    found = {}
+    for r in structs:
+        if r is None or r.GetAtomWithIdx(center_idx).GetFormalCharge() != 0:
+            continue
+        for idx in ring_system:
+            a = r.GetAtomWithIdx(idx)
+            if (idx != center_idx and a.GetAtomicNum() not in (1, 6)
+                    and a.GetFormalCharge() == 1 and a.GetTotalNumHs() >= 1):
+                found.setdefault(idx, r)
+    if not found:
+        return None
+    site = min(found, key=lambda i: rank[i])
+    res = Chem.Mol(found[site])
+    try:
+        Chem.SanitizeMol(res)
+    except Exception:
+        return None
+    return res, site
+
+
+def _neutral_parent_ium_names(res, x: int, ring_system) -> List[str]:
+    """'<neutral parent>-<k>-ium' for every ring locant k, where the neutral
+    parent is ``res`` with the hydron at ring atom ``x`` removed. The parent's own
+    name fixes the numbering, and in it a ring nitrogen that carries a substituent
+    is the indicated-hydrogen position ('1-methyl-1H-imidazole'), so the '-ium'
+    of the added hydron takes the other locant.  when the parent carries a
+    suffix group or cannot be named."""
+    work = Chem.RWMol(res)
+    try:
+        a = work.GetAtomWithIdx(x)
+        a.SetFormalCharge(0)
+        a.SetNoImplicit(True)
+        a.SetNumExplicitHs(a.GetTotalNumHs() - 1)
+        neutral = work.GetMol()
+        Chem.SanitizeMol(neutral)
+    except (RuntimeError, ValueError):
+        return []
+    if _ring_bears_principal_group(neutral):
+        return []
+    try:
+        from ..namer import Orthonym
+        parent = Orthonym(style='pin', _disable_opsin_validity_gate=True
+                          ).name(Chem.MolToSmiles(neutral))
+    except (RecursionError, ValueError, RuntimeError):
+        return []
+    if not parent or is_failure_name(parent):
+        return []
+    stem = _elide_terminal_e(parent)
+    return [f"{stem}-{k}-ium" for k in range(1, len(ring_system) + 1)]
+
+
+def _ring_system_of(mol, center_idx: int):
+    from ..perception.rings import get_ring_systems
+    try:
+        for rs in get_ring_systems(mol, include_spiro=True):
+            if center_idx in rs:
+                return rs
+    except (RuntimeError, ValueError):
+        return None
+    return None
+
+
+def _ring_cation_hydron_site_name(mol, center_idx: int, demoted: str) -> str:
+    """ (the Blue Book, "A cation derived formally by adding one or more
+    hydrons to any position of a neutral parent hydride... is named by replacing
+    the final letter 'e' of the parent hydride name... by the suffix 'ium'";
+    '1H-imidazol-3-ium (PIN)':41396): the '-ium' locant is the position of the
+    ADDED hydron. A ring cation drawn with its charge on a substituted atom that
+    carries no hydrogen (``C[N+]1=CNc2ccccc21``) is the neutral N-substituted
+    parent (1-methyl-1H-benzimidazole) plus a hydron at the ring NH (N-3):
+    '1-methyl-1H-benzimidazol-3-ium'. The DEMOTE branch cites the '-ium' at the
+    drawn centre ('1-methyl-1H-benzimidazol-1-ium'), which puts the hydron on the
+    substituted N-1 -- a different cation, whose standard InChIKey is the same.
+
+    Numbering, (the Blue Book): with the indicated hydrogen (b,:3246) and the
+    '-ium' suffix (c,:3256) at locants 1 and 3 either way, (f) (:3301,
+    "detachable alphabetized prefixes, all considered together") puts the
+    N-substituent at 1: '1-methyl-1H-imidazol-3-ium', not '3-methyl-1H-
+    imidazol-3-ium'; (:42219) on cation locants: "This is consistent
+    with the choice of lowest locants for corresponding neutral compounds (see
+    ." That is the numbering of the neutral parent, whose substituted ring
+    N is the indicated-hydrogen position.
+
+    When a ring atom other than the drawn centre carries the added hydron, the
+    candidates are, in order: the neutral parent with the '-ium' at each ring
+    locant (``_neutral_parent_ium_names``), the in-place composition at the
+    hydron's atom, the DEMOTE composition with the '-ium' at that atom's locant
+    (it keeps the substituent prefixes of a ring whose other groups are not
+    suffixes), and ``demoted`` itself; the first that reads back to ``mol`` with
+    the hydrons on the same atoms (``_cation_name_rt_ok``, fixed-H layer) is
+    returned, '' (decline) when none does. Without such an atom ``demoted`` is
+    returned unchanged."""
+    ring_system = _ring_system_of(mol, center_idx)
+    if ring_system is None:
+        return demoted
+    site = _ring_cation_hydron_site(mol, ring_system, center_idx)
+    if site is None:
+        return demoted
+    from .charged_router import _cation_name_rt_ok
+    res, x = site
+    candidates = list(_neutral_parent_ium_names(res, x, ring_system))
+    in_place = _emit_ring_cumulative_suffix(res, x, 'ium')
+    if in_place:
+        candidates.append(in_place)
+    at_site = _emit_ring_cumulative_suffix(mol, center_idx, 'ium', ium_site=x)
+    if at_site:
+        candidates.append(at_site)
+    if demoted:
+        candidates.append(demoted)
+    for cand in candidates:
+        if _cation_name_rt_ok(cand, mol):
+            return cand
+    return ''
+
+
+def _ring_cation_in_place_name(mol, center_idx: int, in_place: str) -> str:
+    """The same numbering rule for a ring cation drawn with the charge on the
+    atom that carries the added hydron (``Cn1cc[nH+]c1``): on a ring with an
+    exocyclic substituent the in-place composition reads the '-ium' locant from
+    another numbering than the parent name's ('1-methyl-1H-imidazol-1-ium'); when
+    it does not read back to ``mol`` exactly, the neutral parent with the '-ium'
+    at each ring locant is tried ('1-methyl-1H-imidazol-3-ium'). ``in_place`` is
+    returned unchanged when it reads back exactly or no candidate does."""
+    ring_system = _ring_system_of(mol, center_idx)
+    if ring_system is None or not _ring_has_off_ring_substituent(mol, ring_system):
+        return in_place
+    from .charged_router import _cation_name_rt_ok
+    if in_place and _cation_name_rt_ok(in_place, mol):
+        return in_place
+    for cand in _neutral_parent_ium_names(mol, center_idx, ring_system):
+        if _cation_name_rt_ok(cand, mol):
+            return cand
+    return in_place
 
 
 def _ring_bears_principal_group(ring_mol):
@@ -4722,6 +5048,16 @@ def _name_oxoacid_anion(mol, style: str) -> str:
         if (_DEGENERATE_OXOACID_PARENT_RE.match(low)
                 or 'unknown' in low or 'not supported' in low):
             return ''
+        # A multiplicative name of identical oxoacid units:
+        # 'methylenebis(phosphonic acid)', rules/multiplicative
+        # _try_linked_phosphonic_acids) ionizes its unit: the anion of each
+        # identical parent, 'methylenebis(phosphonate)' (cf. the Blue Book
+        # 'P,P'-(ethane-1,2-diyl)bis(phosphonothioate) (PIN)').
+        multiplied = _MULTIPLIED_OXOACID_UNIT_RE.match(neutral_name)
+        if multiplied:
+            unit = _ionize_acid_name(multiplied.group('unit'), total_charge=-1,
+                                     allowed_suffixes=_OXOACID_NEUTRAL_SUFFIXES)
+            return f"{multiplied.group('head')}({unit})" if unit else ''
         #: restrict the suffix match to genuine oxoacid suffixes — this
         # path only ever sees a re-entered S/P oxoacid parent, so the bare
         # "ol"/"amine"/"thiol" entries must not be eligible to mis-fire.
@@ -5247,7 +5583,12 @@ def _name_partial_acid_salt_anion(mol, anion_site: Dict) -> str:
     if len(path) != n_carbons:
         return ''
     parent_len = len(path) - 1
-    if parent_len < 1:
+    # A one- or two-carbon parent is the retained formate / acetate, which does
+    # not take the carboxy prefix ('2-carboxyethanoate', '1-carboxymethanoate'
+    # are no names; see _anion_chain_parent_length): the method (2) acid salt
+    # ('sodium hydrogen propanedioate', 'sodium hydrogen oxalate') is built by
+    # the caller instead.
+    if parent_len <= 2:
         return ''
     parent_carbon_set = set(path[:parent_len])   # the numbered parent chain; excludes cp
 
@@ -5399,8 +5740,28 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     acid_name = _neutralize_carboxylate_to_acid(mol, anion_site)
     if acid_name:
         oate_name = _acid_to_oate(acid_name)
-        if oate_name:
+        # With a second, un-ionized carboxy group the neutral acid's principal
+        # carboxy group need not be the ionized one: the name must keep the charge
+        # where the input has it (_anion_on_its_own_parent).
+        if oate_name and (not _has_free_carboxy_group(mol)
+                          or _anion_name_keeps_hydron_sites(mol, oate_name)):
             return oate_name
+        if oate_name:
+            own_parent = (_anion_on_its_own_parent(mol, anion_site, acid_name)
+                          or _anion_as_principal_suffix(mol, anion_site))
+            if own_parent:
+                return own_parent
+            # method (2): when every carboxy group of the neutral acid
+            # is a suffix, its '-oate' is the name of the FULLY ionized anion and
+            # name_salt cites the remaining acid hydron(s) as 'hydrogen'. That name
+            # does not place the hydron; it ships only when OPSIN's reading of the
+            # whole salt name has the input's hydrons (the gates' fixed-H check),
+            # and it is not the PIN for a drawn site (method (1) is,:31596), so it
+            # is labelled below the PIN.
+            if not _FREE_CARBOXY_PREFIX_RE.search(acid_name):
+                from ..metrics.provenance import record_non_pin_fragment
+                record_non_pin_fragment(oate_name)
+                return oate_name
 
     # a phase (F4): the carboxylate of an amino acid whose neutral form has
     # a retained name (glycine) — the acid path returns '' (no '-oic acid'), and
@@ -5443,6 +5804,200 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
             return f"{prefix}a-{loc_str}-{mult}enoate"
     else:
         return prefix + "anoate"
+
+
+def _has_free_carboxy_group(mol) -> bool:
+    """True iff ``mol`` (an anion) still carries an un-ionized -COOH."""
+    from rdkit.Chem import MolFromSmarts
+    pat = MolFromSmarts('[CX3](=O)[OX2H1]')
+    return pat is not None and mol.HasSubstructMatch(pat)
+
+
+def _anion_name_keeps_hydron_sites(mol, name: str) -> bool:
+    """True iff OPSIN reads ``name`` back to ``mol``'s full InChIKey with the
+    hydrons on the same atoms (charged_router._full_inchikey_rt_ok, which compares
+    the fixed-H layer); False when it cannot be checked."""
+    from .charged_router import _full_inchikey_rt_ok
+    try:
+        return bool(name) and _full_inchikey_rt_ok(mol, name)
+    except Exception:
+        return False
+
+
+def _anion_on_its_own_parent(mol, anion_site: Dict, rank0_acid: str) -> str:
+    """ method (1) with for a partially ionized polycarboxylic
+    acid whose ionized carboxy group is NOT the neutral acid's principal one.
+
+     "Acid salts" (the Blue Book,:31593): "(1) by substitutive
+    nomenclature in which the free acid is cited as a prefix to the name of the
+    anion";:31596 "Method (1) generates preferred IUPAC names, except when the
+    structure of the acid salt is unknown." An anion is senior to an acid, '4 Anions' before '7 Acids',:18167), and (:41261) chooses
+    the anionic parent first by "(a) parent with the maximum number of anionic
+    centers" (:41265), then by (:41289 "(e)... the general seniority order of classes
+    (see and parent structures (see "). So for O=C([O-])Cc1ccccc1C(=O)O
+    the parent is the acetate that carries the anionic centre, with the free acid
+    as a prefix: '(2-carboxyphenyl)acetate' -- not '2-(carboxymethyl)benzoate', in
+    which the ring carboxy group is the anion (a different species with the same
+    standard InChIKey).
+
+    The neutral acid's parent pool is walked in its own order
+    (``_forced_parent_rank`` 1, 2,...; rank 0 is ``rank0_acid``): the first
+    parent whose '-oate' reads back to ``mol`` with the hydrons on the same atoms
+    is the senior parent that carries the anionic centre. Returns '' when none
+    does."""
+    try:
+        rw = Chem.RWMol(mol)
+        o_atom = rw.GetAtomWithIdx(anion_site['atom_idx'])
+        o_atom.SetFormalCharge(0)
+        o_atom.SetNumExplicitHs(o_atom.GetNumExplicitHs() + 1)
+        Chem.SanitizeMol(rw)
+        neutral_smiles = Chem.MolToSmiles(rw, canonical=True)
+    except Exception:
+        return ''
+    from ..metrics.provenance import best_effort_ctx
+    from ..namer import Orthonym
+    be = dict(general_fallback=True, general_fallback_unverified=True,
+              allow_aromatic_general=True) if best_effort_ctx.get() else {}
+    rank = 1
+    while rank < 8:
+        inner = Orthonym(style='pin', _disable_opsin_validity_gate=True,
+                         _forced_parent_rank=rank, **be)
+        try:
+            acid = inner.name(neutral_smiles)
+        except (RecursionError, ValueError, RuntimeError):
+            return ''
+        pool_size = getattr(inner, '_top_parent_pool_size', 1)
+        if acid and acid != rank0_acid and 'ic acid' in acid:
+            oate = _acid_to_oate(acid)
+            if oate and _anion_name_keeps_hydron_sites(mol, oate):
+                return oate
+        rank += 1
+        if rank >= pool_size:
+            break
+    return ''
+
+
+#: The 'carboxy' prefix of a free -COOH in a name (not 'carboxylato', '-carboxylic acid').
+_FREE_CARBOXY_PREFIX_RE = re.compile(r"carboxy(?!l)")
+
+
+def _anion_chain_parent_length(mol, anion_site: Dict) -> int:
+    """The number of carbons of the longest chain that starts at the ionized
+    carboxy carbon and runs through acyclic carbons that are not the carbon of a
+    free -COOH (those are 'carboxy' prefixes): the length of the chain parent a
+    method (1) name would take. 1 or 2 is the formate / acetate parent, whose
+    retained names do not take the suffix group as a prefix,
+    the Blue Book;:4969 "A suffix explicitly or implicitly
+    present cannot be expressed as a prefix",:4973 "propanedioic acid (PIN)
+    malonic acid (not 2-carboxyacetic acid)")."""
+    from rdkit.Chem import MolFromSmarts
+    free = {m[0] for m in mol.GetSubstructMatches(MolFromSmarts('[CX3](=O)[OX2H1]'))}
+    start = None
+    for nb in mol.GetAtomWithIdx(anion_site['atom_idx']).GetNeighbors():
+        if nb.GetAtomicNum() == 6:
+            start = nb.GetIdx()
+    if start is None:
+        return 0
+
+    def longest(idx, seen):
+        best = 0
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            j = nb.GetIdx()
+            if (j in seen or nb.GetAtomicNum() != 6 or nb.IsInRing() or j in free):
+                continue
+            best = max(best, 1 + longest(j, seen | {j}))
+        return best
+
+    return 1 + longest(start, {start})
+
+
+def _ionized_carboxyl_ring_anchor(mol, anion_site: Dict):
+    """The ring atom that carries the ionized carboxy group of ``anion_site``
+    (a ring carboxylate, named with the '-carboxylate' suffix), or None when the
+    carboxy carbon is bonded to no ring atom (a chain carboxylate)."""
+    for nb in mol.GetAtomWithIdx(anion_site['atom_idx']).GetNeighbors():
+        if nb.GetAtomicNum() != 6:
+            continue
+        for r in nb.GetNeighbors():
+            if r.IsInRing():
+                return r.GetIdx()
+    return None
+
+
+def _is_isolated_benzene_atom(mol, idx: int) -> bool:
+    """True iff atom ``idx`` belongs to a ring system that is one benzene ring:
+    six aromatic carbons, fused to nothing."""
+    rs = _ring_system_of(mol, idx)
+    return (rs is not None and len(rs) == 6
+            and all(mol.GetAtomWithIdx(i).GetAtomicNum() == 6
+                    and mol.GetAtomWithIdx(i).GetIsAromatic() for i in rs))
+
+
+def _anion_as_principal_suffix(mol, anion_site: Dict) -> str:
+    """ method (1) (the Blue Book) for a partially ionized
+    polycarboxylic acid: the anion is the principal characteristic group, '4 Anions':18167 before '7 Acids':18170; (a):41265), so
+    the parent is chosen with the ionized group as its suffix and every free
+    -COOH is a 'carboxy' prefix: '4-carboxypentanoate' for
+    OC(=O)C(C)CCC(=O)[O-], '4-carboxy-2-methylbutanoate' for
+    OC(=O)CCC(C)C(=O)[O-], '4-carboxycyclohexane-1-carboxylate' for
+    OC(=O)C1CCC(CC1)C(=O)[O-].
+
+    The neutral acid cannot express that choice: all its carboxy groups are one
+    class, and the parent takes the most of them ('2-methylpentanedioic acid',
+    'cyclohexane-1,4-dicarboxylic acid'). The ionized group is therefore named
+    as the one group of its own class -- a peroxy acid, -C(=O)OOH, forced
+    principal (``_principal_group_override``) -- which sits in the same position
+    and leaves the free -COOH groups to the non-principal 'carboxy' prefix:
+    '4-carboxypentaneperoxoic acid', '4-carboxycyclohexane-1-carboperoxoic
+    acid'. Its suffix becomes the anion's: a chain '...eperoxoic acid' ->
+    '...oate' (the parent hydride 'pentane' elides its 'e' before '-oate'), a
+    ring '...carboperoxoic acid' -> '...carboxylate', the
+    '-carboxylic acid' suffix of a ring). Declines: a chain parent of one or two
+    carbons (``_anion_chain_parent_length``: the retained formate / acetate), and
+    a carboxylate on a benzene ring, whose parent is the retained benzoate
+    ,:29717 "Only the following five carboxylic acids retained names
+    and are also preferred IUPAC names",:29727 "C6H5-COOH benzoic acid (PIN)
+    benzenecarboxylic acid"), which the surrogate cannot name. The anion name is
+    returned only when OPSIN reads it back to ``mol`` with the hydrons on the
+    same atoms; '' otherwise."""
+    ring_anchor = _ionized_carboxyl_ring_anchor(mol, anion_site)
+    if ring_anchor is None:
+        if _anion_chain_parent_length(mol, anion_site) <= 2:
+            return ''
+        suffix, anion_suffix = 'eperoxoic acid', 'oate'
+    else:
+        if _is_isolated_benzene_atom(mol, ring_anchor):
+            return ''
+        suffix, anion_suffix = 'carboperoxoic acid', 'carboxylate'
+    try:
+        rw = Chem.RWMol(mol)
+        o_idx = anion_site['atom_idx']
+        o_atom = rw.GetAtomWithIdx(o_idx)
+        o_atom.SetFormalCharge(0)
+        o_atom.SetNoImplicit(True)
+        o_atom.SetNumExplicitHs(0)
+        hydroxy = rw.AddAtom(Chem.Atom(8))
+        rw.AddBond(o_idx, hydroxy, Chem.BondType.SINGLE)
+        surrogate = rw.GetMol()
+        Chem.SanitizeMol(surrogate)
+        surrogate_smiles = Chem.MolToSmiles(surrogate)
+    except Exception:
+        return ''
+    from ..metrics.provenance import best_effort_ctx
+    from ..namer import Orthonym
+    be = dict(general_fallback=True, general_fallback_unverified=True,
+              allow_aromatic_general=True) if best_effort_ctx.get() else {}
+    try:
+        name = Orthonym(style='pin', _disable_opsin_validity_gate=True,
+                        _principal_group_override='peroxy_acid', **be).name(surrogate_smiles)
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not name or not name.endswith(suffix) or name.count('peroxoic') != 1:
+        return ''
+    if ring_anchor is None and name.endswith('carboperoxoic acid'):
+        return ''
+    anion = name[:-len(suffix)] + anion_suffix
+    return anion if _anion_name_keeps_hydron_sites(mol, anion) else ''
 
 
 def _neutralize_carboxylate_to_acid(mol, anion_site: Dict) -> str:
@@ -6257,8 +6812,8 @@ def _name_arylamine_quaternary_aminium(mol, cation_site: Dict) -> str:
         if count == 1:
             prefix_parts.append(f"N-{wrapped}")
         else:
-            mult = get_multiplier_prefix(count, name)
-            prefix_parts.append(",".join(["N"] * count) + f"-{mult}{wrapped}")
+            from ..assembly.naming_utils import multiplied_component as _mc
+            prefix_parts.append(",".join(["N"] * count) + f"-{_mc(count, name, wrapped)}")
     n_prefix = "-".join(prefix_parts)
     # Neutral primary-amine PROXY: sever every N-substituent bond, neutralise N, give
     # it 2 H, keep the ring-system fragment, and name it via the neutral assembly.
@@ -6397,8 +6952,8 @@ def emit_uronium(mol, sites) -> str:
         locs = sorted(groups[s], key=lambda l: _LOCRANK[l])
         count = len(locs)
         wrapped = enclose_if_compound(s)
-        mult = get_multiplier_prefix(count, s) if count > 1 else ''
-        parts.append(",".join(locs) + '-' + mult + wrapped)
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(",".join(locs) + '-' + _mc(count, s, wrapped))
     prefix = "-".join(parts)
     parent = 'uronium' if chalcogen.GetSymbol() == 'O' else 'thiouronium'
     return prefix + parent
@@ -6818,12 +7373,13 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
         count = len(locants_sorted)
         mult = get_multiplier_prefix(count, nm)
         loc_str = ','.join(str(x) for x in locants_sorted)
+        from ..assembly.naming_utils import multiplied_component as _mc
         if is_complex_substituent(nm) and count > 1:
-            body = f"{mult}({nm})"
+            body = _mc(count, nm, f"({nm})")
         elif is_complex_substituent(nm):
             body = f"({nm})"
         else:
-            body = f"{mult}{nm}"
+            body = _mc(count, nm, nm)
         prefix_parts.append((alpha_sort_key(nm), locants_sorted[0], f"{loc_str}-{body}"))
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
     # Detachable prefix blocks are separated from one another by a hyphen

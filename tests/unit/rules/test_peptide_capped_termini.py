@@ -45,6 +45,53 @@ from rdkit.Chem import inchi
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC[C@H](C)[C@H](N)C(=O)N[C@@H](C)C(=O)N1CCC[C@@H]1C(=O)O",
+    "CC[C@H](C)[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](C)C(=O)N[C@H](C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](C)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@H](C(=O)N[C@@H](Cc1ccccc1)C(N)=O)C(C)C)[C@@H](C)CC",
+    "CC[C@H](C)[C@H](N)C(=O)N[C@@H](CC(N)=O)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](C)C(=O)N[C@H](C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)N[C@@H](Cc1ccccc1)C(=O)N[C@@H](C)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(N)=O)[C@@H](C)CC",
+    "CC[C@H](C)[C@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CCCNC(=N)N)NC(=O)[C@@H](NC(=O)[C@H](C)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CCC(=O)O)NC(=O)[C@H](CCSC)NC(=O)[C@H](CCC(N)=O)NC(=O)[C@H](CCCCN)NC(=O)[C@H](CO)NC(=O)[C@H](CC(C)C)NC(=O)[C@H](CC(=O)O)NC(=O)[C@H](CO)NC(=O)[C@@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@@H](NC(=O)CNC(=O)[C@H](CCC(=O)O)NC(=O)CNC(=O)[C@@H](N)Cc1c[nH]cn1)[C@@H](C)O)[C@@H](C)O)C(C)C)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CC(N)=O)C(=O)NCC(=O)NCC(=O)N1CCC[C@H]1C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)NCC(=O)N[C@@H](C)C(=O)N1CCC[C@H]1C(=O)N1CCC[C@H]1C(=O)N[C@@H](CO)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(=O)N[C@@H](CCCCN)C(N)=O",
+    "CC[C@H](C)[C@H](NC)C(=O)N[C@@H](CO)C(=O)N1CCC[C@H]1C(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](CC(C)C)C(=O)N[C@@H](C)C(=O)N[C@@H](CO)C(=O)N[C@@H](CC(C)C)C(=O)N[C@H](C(N)=O)C(C)C",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # GATE ON (production default) -- see test_peptide_breadth.py's identical
 # rationale: this module tests exactly what `name_compound` emits for a
@@ -95,13 +142,13 @@ class TestCTerminalAmide:
     )
 
     def test_phenylalaninamide_cterm(self):
-        result = name_compound(self.ILE_TO_PHE_NH2)
+        result = _dt_name_compound(self.ILE_TO_PHE_NH2)
         assert not is_failure_name(result), result
         assert result.endswith("phenylalaninamide"), result
         assert _full_rt(self.ILE_TO_PHE_NH2, result), result
 
     def test_leucinamide_cterm(self):
-        result = name_compound(self.ILE_TO_LEU_NH2)
+        result = _dt_name_compound(self.ILE_TO_LEU_NH2)
         assert not is_failure_name(result), result
         assert result.endswith("leucinamide"), result
         assert _full_rt(self.ILE_TO_LEU_NH2, result), result
@@ -110,7 +157,7 @@ class TestCTerminalAmide:
         """Minimal synthetic witness (Ala-Gly-NH2) for a fast, easy-to-read
         positive control alongside the two large real witnesses above."""
         smi = "N[C@@H](C)C(=O)NCC(N)=O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         # Decision A part 2 (2026-09-27): was 'alanylglycinamide' (labelled below the
         # PIN tier). Peptides are not PINs; the PIN is the substitutive name
@@ -148,7 +195,7 @@ class TestCTerminalAmide:
         )
         import time
         t0 = time.time()
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         elapsed = time.time() - t0
         assert not is_failure_name(result), result
         assert result.endswith("lysinamide"), result
@@ -169,7 +216,7 @@ class TestNMethylNTerminus:
         #: N-methyl-Ala-Gly PIN is the substitutive form
         # (V38-PEPTIDE-PIN-VERDICT.md; peptide names are non-PIN). RT verified.
         smi = "CN[C@@H](C)C(=O)NCC(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == "[(2S)-2-(methylamino)propanamido]acetic acid", result
         assert _full_rt(smi, result), result
@@ -194,7 +241,7 @@ class TestNMethylNTerminus:
         # RT-verified name that carries a leading (2S) descriptor, so it no
         # longer literally STARTS with 'N-methyl' (it contains it). Exact
         # emission asserted below; full-InChIKey round-trip verified.
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert result == (
             "(2S)-N-methylisoleucylserylprolylalanylleucylleucylalanyl"
@@ -232,7 +279,7 @@ class TestSideChainTrapAbstains:
             "C(=O)N[C@@H](CCC(N)=O)C(=O)N[C@@H](CCC(N)=O)C(N)=O)[C@@H](C)CC)"
             "[C@@H](C)CC)[C@@H](C)O)[C@@H](C)O)C(C)C)C(C)C"
         )
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert is_failure_name(result), (
             f"glutamine C-terminal double-amide must abstain (ambiguous "
             f"side-chain vs alpha amide), got: {result}"
@@ -250,7 +297,7 @@ class TestSideChainTrapAbstains:
             "NC(Cc1ccccc1)C(=O)N1CCCC1C(=O)NC(CC(N)=O)C(=O)N1CCCC1C(=O)"
             "NC(Cc1ccc(C)cc1)C(=O)NC(C(=O)NC(C=O)CC(C)C)C(C)O"
         )
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert is_failure_name(result), (
             f"C-terminal aldehyde cap must abstain (out of this lever's "
             f"scope), got: {result}"
@@ -278,7 +325,7 @@ class TestRegressionUnaffected:
         """Ile-Ala-Pro, a free-COOH/free-NH2 standard tripeptide -- must be
         completely unaffected by Lever C (neither cap is present)."""
         smi = "CC[C@H](C)[C@H](N)C(=O)N[C@@H](C)C(=O)N1CCC[C@@H]1C(=O)O"
-        result = name_compound(smi)
+        result = _dt_name_compound(smi)
         assert not is_failure_name(result), result
         assert "N-methyl" not in result, result
         assert not result.endswith("amide"), result

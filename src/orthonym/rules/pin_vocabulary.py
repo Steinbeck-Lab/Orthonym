@@ -33,6 +33,22 @@ _SMALL_RING_REPLACEMENT = re.compile(
     r"cyclo(?:prop|but|pent|hex|hept|oct|non|dec)"
     r"(?=a|-)(?!adec|acos|atriacont|atetracont)(?!a?\[)(?![^\s()\[\]{}]*yn)")
 
+# (2) (the Blue Book, "The suffixes 'yl', 'ylidene', and 'ylidyne'
+# are added to the name of the parent hydride... The locants for the atoms of
+# free valences are as low as..."): a ring substituent prefix cites the locant of
+# its free valence ('naphthalen-2-yl (preferred prefix) 2-naphthyl (contracted
+# name)',:2865; '(furan-2-yl)... (2-furyl)',:7268). The contracted or
+# locant-free spellings of the legacy ring table ('aziridinyl', 'pyridyl',
+# 'furyl', 'naphthyl',...) occur in no PIN of the Blue Book. 'oxiranyl' is left
+# out: oxirane has one kind of substitutable hydrogen, so its locant may be
+# omitted,:2939), as in '*tert*-butyldi(methyl)(oxiranylmethoxy)
+# silane (PIN)' (:18929).
+_UNLOCANTED_RING_YL = re.compile(
+    r"(?<![a-z])(?:pyridyl|furyl|thienyl|naphthyl|pyrrolyl|imidazolyl|pyrimidinyl|"
+    r"pyrazinyl|pyridazinyl|oxanyl|piperidinyl|morpholinyl|piperazinyl|oxolanyl|"
+    r"pyrrolidinyl|oxetanyl|azetidinyl|aziridinyl|indolyl|quinolinyl|"
+    r"isoquinolinyl|benzofuranyl|benzothienyl|benzimidazolyl|purinyl|carbazolyl)")
+
 # (the Blue Book, 'benzene (PIN) (not [6]annulene)') and
 # ('phenyl'): the mancude six-membered carbocycle is benzene; 'cyclohexa-1,3,5-triene'
 # is never the PIN spelling of it or of its substituent prefix.
@@ -122,7 +138,7 @@ _JUNIOR_TO_ESTER_END = re.compile(
 # named by functional class nomenclature,:35916-35918, 'methyl hydrogen
 # sulfate (PIN)':35968; '(2S)-2,3-dihydroxypropyl dihydrogen phosphate':55148),
 # and acids and esters are senior to amides, ketones, hydroxy compounds and amines
-#,:18176-18190). Read with the same junior-suffix end as above.
+#,:18170-18192). Read with the same junior-suffix end as above.
 # Branch review fixes: indicated hydrogen on a six-membered azine parent.
 # / (the Blue Book): indicated hydrogen is cited only "consistent with
 # the maximum number of noncumulative double bonds", and mancude pyridine, pyrimidine,
@@ -133,8 +149,87 @@ _JUNIOR_TO_ESTER_END = re.compile(
 # [2,3-b]carbazole (PIN)') is not matched. Label-only, as the form below.
 _AZINE_INDICATED_H = re.compile(
     r"(?<![A-Za-z0-9])\d+H-(?:pyridin|pyrimidin|pyrazin|pyridazin)(?=-|e(?![a-z]))")
-_OXOACID_ESTER_PREFIX = re.compile(
-    r"sulfooxy|phosphonooxy|(?:\(hydroxy\)|hydroxy)phosphoryl[)\]}]*oxy")
+# The ester prefixes of EVERY mononuclear noncarbon oxoacid, derived from one
+# source: the acyl prefix the engine gives each noncarbon oxoacid group
+# (``seniority.PREFIX_FORMS``: 'sulfo', 'sulfino', 'phosphono', 'arsono', 'stibono',
+# 'borono', 'selenono',... and the acyl groups 'nitro' / 'nitroso' of nitric and
+# nitrous acid) joined to 'oxy' or to a chalcogen analogue.
+# (the Blue Book): substituent groups derived from the esters of nitric and
+# nitrous acid "are named by concatenation by adding the acyl groups 'nitro' for
+# -NO2 and 'nitroso' for -NO to the prefix 'oxy' or by substituting these acyl
+# groups into substituent groups such as 'sulfanyl', 'selanyl', or 'tellanyl'"
+# ('nitrooxy (preselected prefix)':36405); (:36327) for the B, N, P,
+# As and Sb groups; 'pentyl nitrite (PIN)',:35922). The word list it
+# replaces ('sulfooxy', 'phosphonooxy') left 'nitrooxy' at the PIN label under every
+# junior class ('2-(nitrooxy)ethan-1-ol', PIN '2-hydroxyethyl nitrate').
+_OXOACID_ESTER_PREFIX_RE: Optional["re.Pattern"] = None
+
+
+def _oxoacid_ester_prefix_re() -> "re.Pattern":
+    global _OXOACID_ESTER_PREFIX_RE
+    if _OXOACID_ESTER_PREFIX_RE is None:
+        from .seniority import PREFIX_FORMS
+        # an acid group's acyl prefix is one lower-case word ending in 'o'
+        # ('carboxy', 'carbamoyloxy', 'N-hydroxyamido' of the carbon acids are not)
+        acyl = {v for k, v in PREFIX_FORMS.items()
+                if k.endswith("_acid") and v and v.isalpha() and v.islower()
+                and v.endswith("o")}
+        acyl |= {PREFIX_FORMS["nitro"], PREFIX_FORMS["nitroso"]}
+        alt = "|".join(sorted((re.escape(a) for a in acyl), key=len, reverse=True))
+        _OXOACID_ESTER_PREFIX_RE = re.compile(
+            rf"(?<![a-z])(?:{alt})(?:oxy|sulfanyl|selanyl|tellanyl)"
+            r"|(?:\(hydroxy\)|hydroxy)phosphoryl[)\]}]*oxy")
+    return _OXOACID_ESTER_PREFIX_RE
+
+# Breadth job 3 review fixes: the class of the parent that carries an ester prefix,
+# read from the END of the whole name as the complement of the classes senior to
+# esters. (the Blue Book-18194) ranks radicals, radical ions,
+# anions, zwitterions, cations (classes 1-6,:18164-18169), acids (7,:18170), and
+# anhydrides (8) above esters (9,:18182); acid halides (10) and everything below
+# them -- amides, hydrazides, imides, nitriles, aldehydes, ketones, hydroxy compounds,
+# hydroperoxides, amines, imines (11-20) and the heterane classes 21-43 -- are
+# junior. The _JUNIOR_TO_ESTER_END word list above names only some junior suffixes
+# and missed retained names and functional modifiers ('4-(sulfooxy)benzaldehyde',
+# '4-(sulfooxy)aniline', '3-(sulfooxy)propanehydrazide', '(sulfooxy)acetaldehyde
+# oxime'); this reader recognises the senior heads instead, so a junior head it does
+# not know is still junior. A name is headed by a class senior to esters when it
+# ends in 'acid' (7) or '-anhydride' (8, 'dianhydride', 'thioanhydride'), in an anion or ester word '-ate', '-ite' or
+# anionic '-ide' (4, 9: 'propanoate', 'ethyl... propanoate', 'methanide',
+# 'boranuide'), or carries a cation word '-ium' (6, a salt or a cationic parent:
+# 'N,N,N-trimethylethan-1-aminium'). '-amide', '-imide', '-hydrazide' and the
+# functional-class words ('oxide', 'chloride', 'azide', 'cyanide',...) are not
+# anions. A substituent-prefix string ('4-(sulfooxy)phenyl', '[(...)oxy]') has no
+# head of its own and is not read.
+_NAME_WORD_SPLIT = re.compile(r"[\s—]+")
+_STOICHIOMETRY_WORD = re.compile(r"\(\d+(?:/\d+)+\)")
+_PREFIX_STRING_END = re.compile(r"(?:yl|ylidene|ylidyne|ylene|y|o)$")
+_NON_ANION_IDE_END = re.compile(
+    r"(?:amide|imide|hydrazide|oxide|sulfide|selenide|telluride|fluoride|chloride"
+    r"|bromide|iodide|azide|cyanide|hydride|nitride|carbide)$")
+
+
+def _head_senior_to_esters(name: str) -> Optional[bool]:
+    """True when ``name`` is headed by a class senior to esters (classes 1-9),
+    False when by a junior class (10-43), None for a substituent-prefix string."""
+    raw = [w for w in _NAME_WORD_SPLIT.split(name.strip()) if w]
+    while raw and _STOICHIOMETRY_WORD.fullmatch(raw[-1]):
+        raw.pop()
+    words = [w.rstrip(")]}") for w in raw]
+    words = [w for w in words if w]
+    if not words:
+        return None
+    last = words[-1]
+    if last == "acid" or last.endswith("anhydride"):
+        return True
+    if any(w.endswith("ium") for w in words):
+        return True
+    if last.endswith(("ate", "ite")) and not last.endswith("hydrate"):
+        return True
+    if last.endswith("ide") and not _NON_ANION_IDE_END.search(last):
+        return True
+    if len(words) == 1 and _PREFIX_STRING_END.search(last):
+        return None
+    return False
 
 # (the Blue Book 'propan-1-yl propyl (preferred prefix)'): a
 # saturated acyclic (or monocyclic, prefix with its free valence at
@@ -317,6 +412,22 @@ _ADAMANTANE_VB = re.compile(r"tricyclo\[3\.3\.1\.1\^?\{?3,7\}?\]dec")
 # leads to preferred IUPAC names";:40426, 'dioxidanyl' is the systematic name of
 # the HOO radical, whose PIN is 'hydroperoxyl'): 'dioxidanyl' is never PIN vocabulary.
 _DIOXIDANYL = re.compile(r"dioxidanyl")
+# (the Blue Book): "N,N'-methylenediethanamine (PIN)
+# N,N'-diethylmethanediamine" -- two amines on ONE carbon, each nitrogen carrying
+# the same substituent, are identical N-substituted parents on a symmetric linker,
+# and (:23180) prefers the multiplicative name for "multiple occurrences
+# of identical parent structures, other than alkanes". The substitutive geminal
+# form ('N,N'-diethylmethanediamine', 'N1,N'1-diethylethane-1,1-diamine': one
+# multiplied prefix over N<k> and N'<k> at the same position k of a CARBON
+# chain's geminal diamine) is its non-preferred alternative. Scoped to carbon
+# parents: the Blue Book keeps the substitutive name for the Group-13/14 hydrides
+# ('1-methyl-N,N'-disilylsilanediamine (PIN)':38182, 'N,N'-bis(butylboranyl)
+# boranediamine (PIN)':37425) and for ureas, guanidines and amides. Label-only:
+# the name stays (it round-trips), it is not certified as the PIN.
+_GEMINAL_N_N_PRIME_MULTIPLIED = re.compile(
+    r"(?<![A-Za-z])N(\d*)(?:,N\1)*,N'\1(?:,N'\1)*-"
+    r"(?:di|tri|tetra|bis|tris|tetrakis)\S*"
+    r"(?:methanediamine|[a-z]ane-(\d+),\2-diamine)$")
 
 # / (the Blue Book "Acyl prefixes formed from acyclic parent
 # hydrocarbons and prefixes such as 'oxo'... for example, '1-oxopropyl' are not
@@ -493,7 +604,8 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
     for rx in (_SMALL_RING_REPLACEMENT, _BENZENE_AS_TRIENE, _OXOMETHYL,
                _UNRETAINED_C1C2_ACID, _ACYLAMINO, _ALKAN_1_YL, _MISSING_HYPHEN,
                _UNCONTRACTED_OXY, _METHYL_ON_ETHYL, _ADAMANTANE_VB, _DIOXIDANYL,
-               _OXO_ALKYL_ACYL, _UNENCLOSED_COMPOUND, _UNENCLOSED_ELEMENT_LOCANT):
+               _OXO_ALKYL_ACYL, _UNENCLOSED_COMPOUND, _UNENCLOSED_ELEMENT_LOCANT,
+               _GEMINAL_N_N_PRIME_MULTIPLIED, _UNLOCANTED_RING_YL):
         m = rx.search(name)
         if m:
             return m.group(0)
@@ -508,9 +620,16 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
         m = _ACYLOXY.search(name)
         if m:
             return m.group(0)
-    if " " not in name and _JUNIOR_TO_ESTER_END.search(name):
-        m = _ACYL_ESTER_PREFIX.search(name) or (
-            _OXOACID_ESTER_PREFIX.search(name) if label_forms else None)
+    if label_forms:
+        # the label reads the head class from (``_head_senior_to_esters``)
+        if _head_senior_to_esters(name) is False:
+            m = (_ACYL_ESTER_PREFIX.search(name)
+                 or _oxoacid_ester_prefix_re().search(name))
+            if m:
+                return m.group(0)
+    elif " " not in name and _JUNIOR_TO_ESTER_END.search(name):
+        # the promotion re-run's keep-or-drop decision keeps its own form
+        m = _ACYL_ESTER_PREFIX.search(name)
         if m:
             return m.group(0)
     if label_forms:

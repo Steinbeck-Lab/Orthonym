@@ -43,7 +43,7 @@ TIER_LAMP = {
 }
 LAMP_LABEL = {"pin": "PIN", "fallback": "FALLBACK", "best_effort": "BEST EFFORT", "abstain": "NO NAME"}
 LAMP_TITLE = {
-    "pin": "Preferred IUPAC Name, built by the strict path and read back by OPSIN",
+    "pin": "Preferred IUPAC Name: the strict PIN path built it and verified it",
     "fallback": "A checked name whose preferred status is not certified",
     "best_effort": "A name from the last-resort producers, shown with its own read-back verdict",
     "abstain": "No name: the engine declined",

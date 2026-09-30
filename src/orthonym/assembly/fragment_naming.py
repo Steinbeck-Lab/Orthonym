@@ -20,6 +20,7 @@ Usage:
         ...
 """
 
+import contextlib
 import logging
 import threading as _threading
 from typing import Dict, Optional
@@ -494,7 +495,55 @@ def enter_name_scope():
         # Allocate a fresh one here so a leaked cache from a prior molecule can
         # never carry over (start_naming_session then keeps this live cache).
         _fragment_guard.cache = {}
+        # The molecule's naming passes (``count_naming_pass``) start from 0.
+        _fragment_guard.naming_passes = 0
+        _fragment_guard.naming_pass_cap = None
     return d
+
+
+class OptionalNamingCapExceeded(BaseException):
+    """Raised by ``count_naming_pass`` when an optional re-naming of the molecule
+    (``naming_pass_cap``) has run all the naming passes it was allowed. A
+    ``BaseException`` like ``PerfBudgetExceeded``, so the ``except Exception``
+    fallbacks inside the producers do not absorb it and it unwinds to the frame
+    that armed the cap, which keeps the name it already has."""
+
+
+def count_naming_pass() -> None:
+    """Count one naming pass (one ``Orthonym._name_impl`` call) of the current
+    outermost ``name`` (``enter_name_scope`` resets the count). Raises
+    ``OptionalNamingCapExceeded`` when a cap armed by ``naming_pass_cap`` is
+    passed. A no-op count outside any ``name`` scope."""
+    if getattr(_fragment_guard, 'name_call_depth', 0) <= 0:
+        return
+    n = getattr(_fragment_guard, 'naming_passes', 0) + 1
+    _fragment_guard.naming_passes = n
+    cap = getattr(_fragment_guard, 'naming_pass_cap', None)
+    if cap is not None and n > cap:
+        raise OptionalNamingCapExceeded()
+
+
+def naming_passes() -> int:
+    """The naming passes (``count_naming_pass``) the current outermost ``name``
+    has made so far; 0 outside any ``name`` scope."""
+    return getattr(_fragment_guard, 'naming_passes', 0)
+
+
+@contextlib.contextmanager
+def naming_pass_cap(allowed: int):
+    """Allow the body at most ``allowed`` more naming passes: the next pass past
+    that raises ``OptionalNamingCapExceeded`` (caught by the caller). The count is
+    deterministic -- the passes a naming makes depend on the molecule alone (the
+    fragment memo starts empty for every outermost ``name``) -- so a capped
+    body gives the same outcome in every process. Nested caps keep the tighter
+    one; the previous cap is restored on exit."""
+    prev = getattr(_fragment_guard, 'naming_pass_cap', None)
+    cap = naming_passes() + max(0, int(allowed))
+    _fragment_guard.naming_pass_cap = cap if prev is None else min(prev, cap)
+    try:
+        yield
+    finally:
+        _fragment_guard.naming_pass_cap = prev
 
 
 def name_scope_depth() -> int:
@@ -514,6 +563,7 @@ def exit_name_scope():
         _fragment_guard.perf_budget = None
         _fragment_guard.analysis_budget = None
         _fragment_guard.cache = None
+        _fragment_guard.naming_pass_cap = None
     else:
         _fragment_guard.name_call_depth = d
 
@@ -536,6 +586,42 @@ def spend_fragment_work() -> bool:
 
 
 import contextlib as _contextlib
+
+_OWNED_BUDGETS = ('perf_budget', 'analysis_budget', 'work_budget')
+
+
+@_contextlib.contextmanager
+def own_hang_budgets():
+    """Run the body with hang budgets of its own: every budget that is armed
+    (``perf_budget``, ``analysis_budget``, ``work_budget``) starts the body at its
+    full ceiling, and the enclosing values are put back on exit, so the body
+    neither spends nor sees the enclosing molecule's budgets. A disarmed budget
+    stays disarmed; a no-op outside any ``name`` scope.
+
+    For the components of a adduct: each is a compound of its own
+    , the Blue Book, "Names are formed by citing the names of
+    individual compounds"), named by a nested ``name`` that otherwise shares the
+    whole assembly's budgets, so a mixture of four drug-size macrocycles ran out
+    of the 500 analysis calls one compound gets (PubChem 1M: 296, 102, 65 and a
+    fourth component that tripped the budget, abstaining the whole drawing). Still
+    bounded -- each component by the ceilings of one compound -- and a trip inside
+    the body raises ``PerfBudgetExceeded`` to the outermost ``name`` as before."""
+    if getattr(_fragment_guard, 'name_call_depth', 0) <= 0:
+        yield
+        return
+    saved = {attr: getattr(_fragment_guard, attr, None) for attr in _OWNED_BUDGETS}
+    fresh = {'perf_budget': _PERF_BUDGET if _PERF_BUDGET > 0 else None,
+             'analysis_budget': (_ANALYSIS_CALL_BUDGET
+                                 if _ANALYSIS_CALL_BUDGET > 0 else None),
+             'work_budget': _WORK_BUDGET}
+    for attr, value in saved.items():
+        if value is not None:
+            setattr(_fragment_guard, attr, fresh[attr])
+    try:
+        yield
+    finally:
+        for attr, value in saved.items():
+            setattr(_fragment_guard, attr, value)
 
 
 @_contextlib.contextmanager

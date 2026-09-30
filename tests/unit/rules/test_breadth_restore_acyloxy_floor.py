@@ -122,6 +122,13 @@ def _site(smiles):
     ("c1ccccc1[O:1][C:2](=O)C(=O)O", "oxalooxy"),
     # 'cyclohexanecarbonyl (preferred prefix)' (:30628)
     ("c1ccccc1[O:1][C:2](=O)C1CCCCC1", "(cyclohexanecarbonyl)oxy"),
+    # these two declined while the engine named the anion of the site with the charge
+    # on another carboxy group ('4-(carboxymethyl)benzoate') or by a retained anion
+    # name ('dihydrocitrate'); the protonation branch names the anion of the mapped
+    # site itself, so the acyl of that site is derived, acyl groups from
+    # the acid of the site; the ester reads back below)
+    ("c1ccccc1[O:1][C:2](=O)Cc1ccc(C(=O)O)cc1", "[(4-carboxyphenyl)acetyl]oxy"),
+    ("c1ccccc1[O:1][C:2](=O)CC(O)(CC(=O)O)C(=O)O", "(3,4-dicarboxy-3-hydroxybutanoyl)oxy"),
 ])
 def test_acyloxy_token_is_the_monovalent_site_acyl(mapped, token):
     from orthonym.rules.lipids import _acyloxy_for_site
@@ -134,13 +141,8 @@ def test_acyloxy_token_is_the_monovalent_site_acyl(mapped, token):
 
 
 @pytest.mark.parametrize("mapped", [
-    # the engine names the anion of THIS site '4-(carboxymethyl)benzoate', with
-    # the charge on the other carboxy group: declined, never the benzoyl acyl
-    "c1ccccc1[O:1][C:2](=O)Cc1ccc(C(=O)O)cc1",
     # a stereocentre that exists only in the ester (CIP of O(-) vs O-R)
     "c1ccccc1[O:1][C:2](=O)C[C@@H](O)CC(=O)O",
-    # retained anion name ('dihydrocitrate') has no '-oyl' form
-    "c1ccccc1[O:1][C:2](=O)CC(O)(CC(=O)O)C(=O)O",
 ])
 def test_acyloxy_token_declines_when_the_site_acyl_is_not_proven(mapped):
     from orthonym.rules.lipids import _acyloxy_for_site

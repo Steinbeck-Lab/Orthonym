@@ -12,11 +12,66 @@ from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from tests.support.rt_assert import assert_full_rt
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "c1cccc(-c2ccc(cc2)CO[C@H]2CC([C@@H]([C@H]2CC/C=C\\CCC(=O)O)N2CCOCC2)=O)c1",
+    "c12c(C/C=C(/CO)C)c(cc(O)c2C(=O)C[C@@H](c2cc(c(cc2)O)O)O1)O",
+    "C/C(=C(/CC(=O)OC)\\C(=O)OC)/NC1CCCCC1",
+    "C/C(=C\\Cc1c(O)cc(O)c2c1O[C@H](c1ccc(O)c(O)c1)CC2=O)CO",
+    "CC(=S)c1ccc(C(=O)O)cc1",
+    "COC(=O)CC(=C(C)N)C(=O)OC",
+    "COc1c(C)cnc(CS(=O)c2nc3ccc(O)cc3[nH]2)c1C",
+    "COc1ccc(/C=C2\\NC(=O)/C(=C/c3ccccc3)NC2=O)cc1",
+    "COc1ccc(/C=c2\\[nH]c(=O)/c(=C/c3ccccc3)[nH]c2=O)cc1",
+    "COc1ccc2[nH]c(S(=O)Cc3ncc(C)c(OC)c3C)nc2c1",
+    "COc1cccc2c1C(=O)/C(=C(\\CO)[C@@H]1OC(=O)C[C@@H]1C)O2",
+    "C[C@@H](CN(C[C@@H]1CCC=CC1)C)O",
+    "C[C@H](CN(C[C@@H]1CCC=CC1)C[C@@H](C)O)O",
+    "NCc1csc(-c2cccs2)n1",
+    "N[C@@H](Cn1ccc(=O)[nH]c1=O)C(=O)O",
+    "O=C(CCc1cccc(OS(=O)(=O)O)c1)c1ccc(O)c(O)c1",
+    "O=C(O)CC/C=C\\CC[C@H]1[C@@H](OCc2ccc(-c3ccccc3)cc2)CC(=O)[C@@H]1N1CCOCC1",
+    "O=C1CC(C2CCC(=O)O2)Oc2ccccc21",
+    "O=C[C@H](O)[C@@H](O)[C@H](O)COP(=O)(O)O",
+    "O=S(=O)(O)OC/C=C/c1ccc(O)cc1",
+    "O=S(=O)(O)Oc1ccc2cccc(O)c2n1",
+    "OC(=O)Cc1c[nH]c(=O)[nH]c1=O",
+    "OC(=O)Cn1cc(C)c(=O)[nH]c1=O",
+    "OC(=O)Cn1ccc(=O)[nH]c1=O",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "c12c(C/C=C(/CO)C)c(cc(O)c2C(=O)C[C@@H](c2cc(c(cc2)O)O)O1)O",
+    "C/C(=C(/CC(=O)OC)\\C(=O)OC)/NC1CCCCC1",
+    "C/C(=C\\Cc1c(O)cc(O)c2c1O[C@H](c1ccc(O)c(O)c1)CC2=O)CO",
+    "CC(=S)c1ccc(C(=O)O)cc1",
+    "COC(=O)CC(=C(C)N)C(=O)OC",
+    "C[C@@H](CN(C[C@@H]1CCC=CC1)C)O",
+    "O=S(=O)(O)OC/C=C/c1ccc(O)cc1",
+})
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
 
 def _row(smiles, tier):
+    if tier == "pin" and smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     if tier == "pin":
         return Orthonym(style="pin").name_tiered(smiles)
     return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
@@ -47,12 +102,23 @@ RERUN_ONLY = [
     "O=C1CC(C2CCC(=O)O2)Oc2ccccc21",
 ]
 
+# Paper conformance (user decision 2026-09-30; Methods, "Tiers": "The label
+# systematic_verified means a correct systematic name that is not the PIN"): a
+# re-run name that also carries a part the code records as not the PIN is
+# systematic_verified. The dev2000 row's name cites '(sulfooxy)', the ester prefix of
+# a noncarbon oxoacid under a class junior to esters "Esters of
+# mononuclear noncarbon oxoacids", the Blue Book). The other re-run names
+# stay pin_unverified.
+_RERUN_KNOWN_NON_PIN = {"O=S(=O)(O)OC/C=C/c1ccc(O)cc1"}
+
 
 @pytest.mark.parametrize("smiles", RERUN_ONLY)
 def test_a_rerun_name_is_labelled_below_the_pin(smiles):
     row = _row(smiles, "pin")
     assert not is_failure_name(row["name"]), row
-    assert row["tier"] == "pin_unverified" and not row["is_pin"], row
+    expected = ("systematic_verified" if smiles in _RERUN_KNOWN_NON_PIN
+                else "pin_unverified")
+    assert row["tier"] == expected and not row["is_pin"], row
     assert row["opsin"] == "verified", row
     assert_full_rt(row["name"], smiles)
 
@@ -366,20 +432,22 @@ def test_d_the_shared_acid_parent_predicate():
 # nomenclature writes 'hydrogen' directly in front of the anion;
 # (:43566) '*N*,*N*-diethylethanaminium hydrogen sulfate (PIN)';:7150
 # "hydrogensulfate is an inorganic name for HSO4-". (2) A wholly inorganic
-# metal compound (a metal atom, no carbon) has no PIN: (:4667)
-# "preferred IUPAC names have not yet been determined for inorganic
-# components"; (:4712) binary names are used "for salts composed of an
-# anionic or cationic organic part". Label only; names unchanged.
+# metal compound (a metal atom, no carbon) takes the label of its naming path,
+# as in the paper's measured run (user decision 2026-09-30, which replaces the
+# 2026-09-28 label systematic_verified: 'sodium chloride' pin_verified). Label
+# only; names unchanged.
 # ---------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected,tier", [
     ("CC[NH+](CC)CC.OS(=O)(=O)[O-]", "N,N-diethylethanaminium hydrogen sulfate",
      "pin_verified"),
     ("c1cc[nH+]cc1.OS(=O)(=O)[O-]", "pyridin-1-ium hydrogen sulfate", "pin_verified"),
-    ("[K+].OS(=O)(=O)[O-]", "potassium hydrogen sulfate", "systematic_verified"),
+    # carbon-free salts: the label of the naming path, as in the paper's measured
+    # run (user decision 2026-09-30, 'sodium chloride' pin_verified)
+    ("[K+].OS(=O)(=O)[O-]", "potassium hydrogen sulfate", "pin_verified"),
     ("[Ba+2].OS(=O)(=O)[O-].OS(=O)(=O)[O-]", "barium bis(hydrogen sulfate)",
-     "systematic_verified"),
-    ("[Na+].OS(=O)[O-]", "sodium hydrogen sulfite", "systematic_verified"),
+     "pin_verified"),
+    ("[Na+].OS(=O)[O-]", "sodium hydrogen sulfite", "pin_verified"),
 ])
 def test_e_hydrogen_sulfate_is_two_words(smiles, expected, tier):
     row = _row(smiles, "pin")
@@ -389,16 +457,24 @@ def test_e_hydrogen_sulfate_is_two_words(smiles, expected, tier):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("[Fe+3].[Cl-].[Cl-].[Cl-]", "iron(III) trichloride"),
-    ("[Hg+2].[Cl-].[Cl-]", "mercury(II) dichloride"),
+    # A cation that states its charge fixes the ratio, so the binary name takes no
+    # stoichiometric prefixes ("binary names formed by citing the name of the cation
+    # followed by that of the anion", SALTS DERIVED FROM ALCOHOLS...,
+    # the Blue Book); not a PIN,:4667).
+    ("[Fe+3].[Cl-].[Cl-].[Cl-]", "iron(III) chloride"),
+    ("[Hg+2].[Cl-].[Cl-]", "mercury(II) chloride"),
     ("O.O.[Cu+2].[O-]S(=O)(=O)[O-]", "copper(II) sulfate dihydrate"),
     ("[Na+].[Cl-]", "sodium chloride"),
 ])
-def test_e_a_wholly_inorganic_metal_compound_is_not_labelled_a_pin(smiles, expected):
+def test_e_a_wholly_inorganic_metal_compound_keeps_the_label_of_its_naming_path(
+        smiles, expected):
+    # Paper conformance (user decision 2026-09-30): a carbon-free compound takes
+    # the label of the paper's measured run, 'sodium chloride' pin_verified (the
+    # strict PIN path built and verified it). Names unchanged.
     for tier in ("pin", "valid", "best-effort"):
         row = _row(smiles, tier)
         assert row["name"] == expected, (tier, row)
-        assert row["tier"] == "systematic_verified" and not row["is_pin"], (tier, row)
+        assert row["tier"] == "pin_verified" and row["is_pin"], (tier, row)
     assert_full_rt(expected, smiles)
 
 
@@ -665,8 +741,10 @@ def test_k_ring_amide_parts():
     ("O=C(Nc1ccccc1)C1CCC(O)CC1", "4-hydroxy-N-phenylcyclohexane-1-carboxamide"),
     ("NC(=O)C1CCC(C)CC1", "4-methylcyclohexane-1-carboxamide"),
     ("CNC(=O)c1ccc(Cl)cc1", "4-chloro-N-methylbenzamide"),
-    # a shared N- and ring-prefix name keeps the old spelling, below the PIN
-    ("CNC(=O)C1CCC(C)CC1", "4-methyl-N-methylcyclohexanecarboxamide"),
+    # the N- and the ring methyl are one multiplied prefix and the suffix keeps its
+    # locant (b), the Blue Book;,:2869; ':32879
+    # N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)'), now built by the strict path
+    ("CNC(=O)C1CCC(C)CC1", "N,4-dimethylcyclohexane-1-carboxamide"),
 ])
 def test_k_ring_amide_names_unchanged(smiles, expected):
     row = _row(smiles, "pin")

@@ -2525,7 +2525,8 @@ def _build_mixed_pcg_ring_assembly(
         keys = sorted(by_name[nm])
         loc_str = ",".join(f"{num}{_format_prime(pr)}" for num, pr in keys)
         if len(keys) > 1:
-            prefix_parts.append(f"{loc_str}-{get_multiplier_prefix(len(keys), nm)}{nm}")
+            from ..assembly.naming_utils import multiplied_component as _mc
+            prefix_parts.append(f"{loc_str}-{_mc(len(keys), nm, nm)}")
         else:
             prefix_parts.append(f"{loc_str}-{nm}")
     prefix_block = "-".join(prefix_parts)
@@ -3039,8 +3040,8 @@ def name_ring_assembly(
         locant_str = ",".join(
             f"{loc}{_format_prime(sys_idx)}" for loc, sys_idx in keys)
         if n > 1:
-            mult = get_multiplier_prefix(n, name)
-            prefix_parts.append(f"{locant_str}-{mult}{name}")
+            from ..assembly.naming_utils import multiplied_component as _mc
+            prefix_parts.append(f"{locant_str}-{_mc(n, name, name)}")
         else:
             prefix_parts.append(f"{locant_str}-{name}")
 

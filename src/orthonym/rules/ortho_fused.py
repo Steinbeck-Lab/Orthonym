@@ -514,13 +514,12 @@ def format_substituent_prefix(substituents: List[Tuple[int, str]]) -> str:
     for locant, name in substituents:
         grouped[name].append(locant)
 
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 
     parts = []
     for name, locants in sorted(grouped.items()):
         locants_str = ",".join(str(l) for l in sorted(locants))
-        mult = SIMPLE_MULTIPLIERS.get(len(locants), "")
-        parts.append(f"{locants_str}-{mult}{name}")
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(f"{locants_str}-{_mc(len(locants), name, name)}")
 
     return "-".join(parts) + "-" if parts else ""
 

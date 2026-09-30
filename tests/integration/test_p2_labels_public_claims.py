@@ -1,4 +1,4 @@
-"""P2 -- labels and public claims (2026-09-28): the exact-match coordination list.
+"""P2 -- labels and public claims: the exact-match coordination list.
 
 The D1 table (``data/coordination_retained.py``: heme, chlorophyll, cobalamin,
 siroheme, coenzyme F430) maps the exact standard InChIKey of a ChEBI structure to its
@@ -15,13 +15,13 @@ not Preferred IUPAC Names:
   elements (including the Group 3 elements) and Groups 1 and 2 elements, except for
   'ocene' compounds, are noted."
 
-So at every tier such a name is a checked name that is not the preferred name, from a
-table of retained names: ``systematic_verified``, ``is_pin`` False (the paper's tiers:
-"pin_verified, built by the strict PIN path and verified"; "systematic_verified, a
-verified systematic name that is not the PIN"). Before this change heme b and
-chlorophyll a read ``pin_verified`` / ``is_pin`` True, and the cobalamins with a
-cobalt-carbon bond read ``best_effort`` (the demotion looked at the OPSIN label
-only). The name, the source, 'identity' and the gate outcome are unchanged.
+Paper conformance (user decision 2026-09-30, which replaces the 2026-09-28 label
+``systematic_verified``): such a name takes the label of the path that returned it, as
+in the paper's measured run (35 ``pin_verified`` and 3 ``best_effort`` on ChEBI at the
+best-effort tier; Supplementary Table 3). At the default tier every listed complex is
+``pin_verified``; the demotion of organometallic compounds and the name-scoped
+non-PIN records are not read for a list name. The name, the source, 'identity' and the
+gate outcome are unchanged.
 
 Every row is also checked independently of the engine: the input's InChIKey is the
 table key of that exact name, and a FRESH OPSIN call (``tests.support.rt_assert.
@@ -63,22 +63,22 @@ def _assert_identity_label(fx, row):
     assert row["name"] == fx["name"], row                  # name unchanged
     assert COORDINATION_RETAINED.get(_key(fx["smiles"])) == fx["name"]  # identity holds
     assert row["verified"] == "identity", row
-    assert row["tier"] == "systematic_verified", row
-    assert row["is_pin"] is False, row
+    assert row["tier"] == "pin_verified", row
+    assert row["is_pin"] is True, row
     assert _independent_parse(row["name"]) is None, row["name"]  # OPSIN reads nothing
 
 
 @pytest.mark.parametrize("tier", TIERS)
 @pytest.mark.parametrize("fx", [HEME_B, CHLOROPHYLL_A, CYANOCOBALAMIN],
                          ids=["heme_b", "chlorophyll_a", "cyanocobalamin"])
-def test_coordination_list_name_is_systematic_verified_at_every_tier(fx, tier):
-    # heme b / chlorophyll a were pin_verified (is_pin True); cyanocobalamin, with a
-    # Co-C bond, was best_effort through the demotion.
+def test_coordination_list_name_keeps_the_label_of_its_naming_path(fx, tier):
+    # heme b, chlorophyll a and cyanocobalamin (a Co-C bond, not read by the
+    # demotion for a list name) are pin_verified at every tier, as in the paper run.
     _assert_identity_label(fx, _row(fx["smiles"], tier))
 
 
 @pytest.mark.parametrize("fx", FIXTURES, ids=[f["chebi"] for f in FIXTURES])
-def test_every_listed_complex_is_labelled_systematic_verified(fx):
+def test_every_listed_complex_is_labelled_pin_verified_at_the_default_tier(fx):
     _assert_identity_label(fx, _row(fx["smiles"], "pin"))
 
 
@@ -91,12 +91,16 @@ def test_a_certified_pin_keeps_pin_verified():
     assert _key(_independent_parse(row["name"])) == _key(caffeine)
 
 
-def test_a_pin_verified_label_always_means_an_opsin_read_back():
-    # With the identity names moved to systematic_verified, every pin_verified row
-    # carries verified 'opsin' (the claims-code-a rule allowed 'identity' too).
+def test_a_pin_verified_label_means_an_opsin_read_back_or_the_list_identity():
+    # The claims-code-a rule: a pin_verified row carries verified 'opsin' (checked
+    # here by a fresh OPSIN call) or 'identity' (the input's key is the table key of
+    # exactly that name).
     for smiles in ("CCO", "CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O", HEME_B["smiles"],
                    CHLOROPHYLL_A["smiles"]):
         row = _row(smiles, "pin")
         if row["tier"] == "pin_verified":
-            assert row["verified"] == "opsin", row
-            assert _key(_independent_parse(row["name"])) == _key(smiles), row
+            assert row["verified"] in ("opsin", "identity"), row
+            if row["verified"] == "opsin":
+                assert _key(_independent_parse(row["name"])) == _key(smiles), row
+            else:
+                assert COORDINATION_RETAINED.get(_key(smiles)) == row["name"], row

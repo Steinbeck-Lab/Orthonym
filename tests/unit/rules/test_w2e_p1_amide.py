@@ -7,6 +7,49 @@ canonical-matched against the evidence SMILES during planning.
 import pytest
 
 from orthonym.namer import name_compound
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "NC(=N)N(C)C(=N)N",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 @pytest.fixture()
@@ -29,7 +72,7 @@ class TestT2CarbonicFamilyParents:
         ("NC(=N)NN", "hydrazinecarboximidamide"),      # was unknown
     ])
     def test_pins(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     def test_protect_carbonohydrazonic_diamide_unchanged(self):
         # existing exact row in the same dict must keep working
@@ -45,7 +88,7 @@ class TestT3AromaticCarboximidamideProtect:
         ("C(=N)(Nc1ccccc1)c1ccccc1", "N-phenylbenzenecarboximidamide"),
     ])
     def test_protect(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
 
 @pytest.mark.unit
@@ -58,14 +101,14 @@ class TestT4SulfonimidamideRingAndSe:
         ("C[Se](=N)(=O)N", "methaneselenonimidamide"),
     ])
     def test_heals(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
         ("CS(=N)(=O)N", "methanesulfonimidamide"),
         ("CS(=N)N", "methanesulfinimidamide"),
     ])
     def test_protect_chain_s_forms(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
 
 @pytest.mark.unit
@@ -95,7 +138,7 @@ class TestT5Biguanide:
     ])
     def test_substituted_condensed_guanidine_pin(self, smiles, expected):
         # Same shape and locants as the BB row above (amino N of C-1 = N1).
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     @pytest.mark.opsin_gate
     def test_central_n_substituted_stays_below_pin_tier(self):
@@ -105,7 +148,7 @@ class TestT5Biguanide:
         from orthonym import Orthonym
         from tests.support.rt_assert import name_is_rt_exact
         smi = "NC(=N)N(C)C(=N)N"
-        r = Orthonym().name_tiered(smi)
+        r = _dt_row(smi)
         assert r["tier"] != "pin_verified", r
         assert name_is_rt_exact(r["name"], smi), r
 
@@ -129,7 +172,7 @@ class TestT6AmidrazonePrefixes:
         ("NNC(=N)c1cccc(C(=O)O)c1", "3-(hydrazinecarboximidoyl)benzoic acid"),
     ])
     def test_heals(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
         # pass-D pins share the hydrazonamide FG machinery — protect:
@@ -141,7 +184,7 @@ class TestT6AmidrazonePrefixes:
          "methyl 4-(dimethylamino)-4-(ethylimino)butanoate"),
     ])
     def test_protect_shared_machinery(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
 
 @pytest.mark.unit
@@ -155,7 +198,7 @@ class TestT7ImidohydrazideFamily:
         ("CC(=N)NN", "ethanimidohydrazide"),
     ])
     def test_heals(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
         # family reps already healed elsewhere — protect:
@@ -164,7 +207,7 @@ class TestT7ImidohydrazideFamily:
         ("CC(=NN)NN", "ethanehydrazonohydrazide"),
     ])
     def test_protect_family_reps(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
 
 @pytest.mark.unit
@@ -181,7 +224,7 @@ class TestT8SulfinoSulfonoHydrazonamido:
          "4-(benzenesulfonohydrazonamido)benzoic acid"),
     ])
     def test_heals(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     def test_protect_parent_direction(self):
         assert name_compound("NNS(=NN)c1ccccc1") == \
@@ -202,7 +245,7 @@ class TestT9ComplexPolyamines:
         ("NCCNCCN", "N1-(2-aminoethyl)ethane-1,2-diamine"),
     ])
     def test_heals(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
         # existing 2-N path must stay byte-identical (primed style):
@@ -210,7 +253,7 @@ class TestT9ComplexPolyamines:
         ("CNCCN", "N-methylethane-1,2-diamine"),
     ])
     def test_protect_simple_diamines(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
 
 @pytest.mark.unit
@@ -228,7 +271,7 @@ class TestT10Am2AcylChainSubstituents:
         ("CCCC(NC(C)=O)CC", "N-(hexan-3-yl)acetamide"),
     ])
     def test_protect_plain_off_chain(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
 
 @pytest.mark.unit
@@ -246,7 +289,7 @@ class TestT11Am2PoolDiscard:
         ("CC(=O)NC", "N-methylacetamide"),
     ])
     def test_protect_amide_pool(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected
 
 
 @pytest.mark.unit
@@ -280,11 +323,11 @@ class TestT12GeminalDicarboximidamide:
     def test_out_of_class_fails_closed(self, _validity_gate_on, smiles):
         # Mixed carboxamide+carboximidamide is not the built (di)imidamide
         # class; must not emit the N-superscript dicarboximidamide name.
-        assert name_compound(smiles) != \
+        assert _dt_name_compound(smiles) != \
             "N''1-ethyl-N1,N1-dimethylcyclohexane-1,1-dicarboximidamide"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("NC(=N)C1CCCCC1", "cyclohexanecarboximidamide"),  # mono form OK at HEAD
     ])
     def test_protect_mono(self, smiles, expected):
-        assert name_compound(smiles) == expected
+        assert _dt_name_compound(smiles) == expected

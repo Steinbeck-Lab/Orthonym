@@ -237,6 +237,16 @@ def verify_or_none(name, input_smiles, name_facts: Optional["NameFacts"] = None)
             # OPSIN parsed the name. Verify on the FULL InChIKey (both non-empty).
             if cov.input_inchikey and cov.parsed_inchikey \
                     and cov.input_inchikey == cov.parsed_inchikey:
+                # The full key does not place a hydron: the partial salts of one
+                # polybasic acid share it (validation/protonation_identity.py).
+                from .protonation_identity import protonation_site_verdict
+                if protonation_site_verdict(input_smiles, cov.parsed_smiles, name) == "mismatch":
+                    return None
+                # Nor the radical graph: the key encodes neither radical electrons
+                # nor bond order ('ethene' and [CH2][CH2]; radical_identity.py).
+                from .radical_identity import radical_identity_verdict
+                if radical_identity_verdict(input_smiles, cov.parsed_smiles) == "mismatch":
+                    return None
                 return name
             return None   # parsed to a DIFFERENT (or stereo/charge-different) molecule
     except Exception:

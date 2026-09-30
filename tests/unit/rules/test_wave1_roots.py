@@ -168,9 +168,13 @@ def test_c5_branched_alkoxy_substitutive():
       CC(C)OCC -> 2-ethoxypropane (isopropyl side < 3C still GENERAL)
       CCC(C)OC -> 2-methoxybutane (sec-butyl side < 3C still GENERAL)
       C(C)(C)(C)OC -> 2-methoxy-2-methylpropane (t-butyl side < 3C still GENERAL)
-      CC(C)OC(C)C -> 2-(propan-2-yloxy)propane (both sides branched 3C — NEW FIX)
-      CC(C)OCCC -> 1-(propan-2-yloxy)propane (isopropyl vs propyl — NEW FIX)
-      CCCCOC(C)C -> 1-(propan-2-yloxy)butane (butyl vs isopropyl — NEW FIX)
+      CC(C)OC(C)C -> 2-[(propan-2-yl)oxy]propane (both sides branched 3C — NEW FIX)
+      CC(C)OCCC -> 1-[(propan-2-yl)oxy]propane (isopropyl vs propyl — NEW FIX)
+      CCCCOC(C)C -> 1-[(propan-2-yl)oxy]butane (butyl vs isopropyl — NEW FIX)
+
+    The alkyl prefix is enclosed inside the compound oxy prefix: "(CH3)2CH-O-
+    ... (propan-2-yl)oxy (preferred prefix)", the Blue Book;
+    ,:7232).
 
     Linear controls (must stay correct — these pass through GENERAL path already):
       CCCOCCC -> 1-propoxypropane
@@ -183,9 +187,9 @@ def test_c5_branched_alkoxy_substitutive():
     assert name_compound("C(C)(C)(C)OC", style="pin") == "2-methoxy-2-methylpropane"
 
     # C5 NEW FIXES — both sides >= 3 heavy atoms, one/both branched:
-    assert name_compound("CC(C)OC(C)C", style="pin") == "2-(propan-2-yloxy)propane"
-    assert name_compound("CC(C)OCCC", style="pin") == "1-(propan-2-yloxy)propane"
-    assert name_compound("CCCCOC(C)C", style="pin") == "1-(propan-2-yloxy)butane"
+    assert name_compound("CC(C)OC(C)C", style="pin") == "2-[(propan-2-yl)oxy]propane"
+    assert name_compound("CC(C)OCCC", style="pin") == "1-[(propan-2-yl)oxy]propane"
+    assert name_compound("CCCCOC(C)C", style="pin") == "1-[(propan-2-yl)oxy]butane"
 
     # LINEAR CONTROLS — must still pass:
     assert name_compound("CCCOCCC", style="pin") == "1-propoxypropane"

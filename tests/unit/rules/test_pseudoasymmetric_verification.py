@@ -121,11 +121,17 @@ def test_pin_tier_keeps_the_gold_np_stereoparent_name():
     "[C@H]1(C)CC[C@@H](C(C)C)CC[C@@H](C)CCC1",
     "C[C@H]1CCC[C@@H](C)CC[C@@H](C(C)C)CC1",
 ])
-def test_best_effort_abstains_on_the_name_opsin_cannot_read(smiles):
-    # Claims conformance (2026-09-27): at best-effort a name OPSIN rejects is not
-    # emitted (exact-match list names excepted). OPSIN 2.9.0 returns no structure
-    # for GERMACRANE_SYSTEMATIC, so every spelling of the input abstains, with its
-    # limit code, as in the code the paper measured.
+def test_best_effort_emits_the_list_name_for_every_spelling(smiles):
+    # OPSIN 2.9.0 returns no structure for GERMACRANE_SYSTEMATIC (no lowercase
+    # pseudoasymmetric descriptor) and none for 'germacrane'. 'germacrane' is a name of
+    # the natural-product list, matched by the exact structure, Table 10.1
+    # (c) terpenes, the Blue Book); the paper's run emitted it
+    # at best-effort, labelled pin_verified. User decision 2026-09-30: the list names
+    # OPSIN cannot read are emitted at the wider tiers again, labelled pin_verified
+    # (verified 'identity'), with the deviation from (:50943) recorded in
+    # TRIAGE. Every spelling of the input is the same structure, so every spelling
+    # gets the list name.
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert be["name"] is None and be["tier"] == "abstain" and be["limit_code"]
+    assert be["name"] == "germacrane", be
+    assert be["tier"] == "pin_verified" and be["verified"] == "identity", be
     assert _pseudoasymmetric_name_verified(GERMACRANE_SYSTEMATIC, smiles)

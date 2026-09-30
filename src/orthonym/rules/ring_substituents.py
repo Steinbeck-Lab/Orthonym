@@ -558,6 +558,30 @@ _DECO_MULT: Dict[int, str] = {
 }
 
 
+
+# Prefix forms of the groups a ring expresses by an appended SUFFIX when it is the
+# parent. The ring-decoration identifier (fused_rings._identify_fused_substituent)
+# files -COOH and -CHO under those suffix words ('carboxylic acid', 'carbaldehyde')
+# with type 'suffix'; a ring that is itself a SUBSTITUENT cites every decoration as
+# a prefix, so '3-carbaldehydephenyl' is '3-formylphenyl':
+# (the Blue Book) "The prefix 'formyl' is used in preferred IUPAC names";
+# 'HCO- formyl (preferred prefix)',:30444); 'carboxy',
+#:29908).
+_SUFFIX_DECORATION_PREFIX = {
+    'carboxylic acid': 'carboxy',
+    'carbaldehyde': 'formyl',
+    'carboxamide': 'carbamoyl',
+    'carbonitrile': 'cyano',
+}
+
+
+def _decoration_prefix_name(info) -> Optional[str]:
+    """The PREFIX name of an identified ring decoration (see the table above)."""
+    nm = info.get('name')
+    if info.get('type') == 'suffix':
+        return _SUFFIX_DECORATION_PREFIX.get(info.get('suffix_name'), nm)
+    return nm
+
 def _decorated_biphenylyl_substituent_name(
     mol,
     frag_atoms,
@@ -649,7 +673,7 @@ def _decorated_biphenylyl_substituent_name(
                     if nj in frag_set and nn.GetAtomicNum() > 1:
                         stack.append(nj)
             info = _identify_fused_substituent(mol, ni, both)
-            nm = info.get('name') if info else None
+            nm = _decoration_prefix_name(info) if info else None
             if not nm:
                 nm = name_substituent(mol, sorted(deco), ni, allow_mancude=allow_mancude)
             if not nm or is_refusal_sentinel(nm) or nm == 'substituent' or ' ' in nm:
@@ -859,7 +883,7 @@ def _decorated_heteroaryl_substituent_name(
                     a for a in _deco
                     if mol.GetAtomWithIdx(a).GetAtomicNum() > 1)
                 continue
-            nm = info.get('name')
+            nm = _decoration_prefix_name(info)
             if not nm or ' ' in nm:
                 return None
             decorations.append((ra, nm))
@@ -892,6 +916,7 @@ def _decorated_heteroaryl_substituent_name(
     )
     from ..assembly.naming_utils import (
         enclose_if_compound as _enclose_if_compound,
+        multiplied_component as _multiplied_component,
     )
     deco_atoms = [ra for ra, _ in decorations]
     best_key = None
@@ -972,8 +997,14 @@ def _decorated_heteroaryl_substituent_name(
         # primitive for this — it unions needs_brackets with
         # is_complex_substituent (neither is complete alone), escalates
         # (-> [ -> { for an already-bracketed inner name, leaves simple
-        # prefixes bare, and is idempotent.
-        text = f"{','.join(str(l) for l in locs)}-{mult}{_enclose_if_compound(nm)}"
+        # prefixes bare, and is idempotent. The multiplier and its hyphen come
+        # from the shared primitive (``multiplied_component``): 'di-tert-
+        # butyl' (d), the Blue Book, 'di-*tert*-butyl':6964),
+        # 'bis' for a substituted prefix (a),:7104). A private
+        # 'di'/'tri' table wrote '3,5-ditert-butylphenyl' and could never write
+        # 'bis'.
+        text = (f"{','.join(str(l) for l in locs)}-"
+                f"{_multiplied_component(len(locs), nm, _enclose_if_compound(nm))}")
         prefix_parts.append((_alpha(nm), text))
     prefix_parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in prefix_parts)
@@ -1034,6 +1065,7 @@ def _decorated_fused_substituent_name(
     )
     from ..assembly.naming_utils import (
         enclose_if_compound as _enclose_if_compound,
+        multiplied_component as _multiplied_component,
     )
     from .fused_rings import (
         _fused_locant_num,
@@ -1091,7 +1123,7 @@ def _decorated_fused_substituent_name(
             info = _identify_fused_substituent(mol, ni, ring_set)
             if info is None:
                 return None
-            nm = info.get('name')
+            nm = _decoration_prefix_name(info)
             if not nm or ' ' in nm:
                 return None
             decorations.append((ra, nm))
@@ -1149,7 +1181,9 @@ def _decorated_fused_substituent_name(
         mult = _DECO_MULT.get(len(locs))
         if mult is None:
             return None
-        text = f"{','.join(str(l) for l in locs)}-{mult}{_enclose_if_compound(nm)}"
+        # The multiplier as on the monocyclic path (``multiplied_component``).
+        text = (f"{','.join(str(l) for l in locs)}-"
+                f"{_multiplied_component(len(locs), nm, _enclose_if_compound(nm))}")
         prefix_parts.append((_alpha(nm), text))
     prefix_parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in prefix_parts)
@@ -1161,7 +1195,10 @@ def _decorated_fused_substituent_name(
     # hyphens separate locants from words: '3-hydroxy-2,2-dimethyl-3,4-dihydro-2H-1-
     # benzopyran-6-yl', never '...dimethyl3,4-dihydro...'). The free-valence
     # locant then follows with a hyphen.
-    sep = '-' if stem[:1].isdigit() else ''
+    # An italic designator of the stem ('s-indacen') is set off by a hyphen too,
+    # (d) (:6960): '3-methyl-s-indacen-1-yl'.
+    from ..assembly.naming_utils import begins_with_italic_designator
+    sep = '-' if (stem[:1].isdigit() or begins_with_italic_designator(stem)) else ''
     return f"{body}{sep}{stem}-{attach_locant}-yl"
 
 
@@ -4429,8 +4466,8 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         for name in sorted(groups):  # alphabetical citation order
             locs = sorted(groups[name])
             loc_str = ','.join(str(loc) for loc in locs)
-            mult = get_multiplier_prefix(len(locs), name) if len(locs) > 1 else ''
-            parts.append(f'{loc_str}-{mult}{name}')
+            from ..assembly.naming_utils import multiplied_component as _mc
+            parts.append(f'{loc_str}-{_mc(len(locs), name, name)}')
         prefix_str = '-'.join(parts)
     else:
         #: a complex (branched/stereo) prefix is enclosed; ordering is
@@ -4451,9 +4488,9 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         for name in sorted(groups, key=_sort_key):
             locs = sorted(groups[name])
             loc_str = ','.join(str(loc) for loc in locs)
-            mult = get_multiplier_prefix(len(locs), name) if len(locs) > 1 else ''
+            from ..assembly.naming_utils import multiplied_component as _mc
             rendered = apply_enclosing_marks(name, -1) if _is_complex_prefix(name) else name
-            parts.append(f'{loc_str}-{mult}{rendered}')
+            parts.append(f'{loc_str}-{_mc(len(locs), name, rendered)}')
         prefix_str = '-'.join(parts)
 
     # W4-S2 / BB 48117): emit the ring substituent's OWN internal

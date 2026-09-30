@@ -3132,6 +3132,73 @@ def core_numberings(
     return out
 
 
+def numbering_held_by_drawn_alternation(mol, core_smiles: str,
+                                        atom_mapping: Dict[int, Union[int, str]]) -> bool:
+    """True iff the drawn Kekule alternation keeps a matched core's substituted atoms
+    from the lowest locants the core's numbering gives them.
+
+    A catalog core written as a localized alternation (pentalene, heptalene,
+    s-indacene: RDKit perceives no aromatic sextet over the whole system) matches
+    only the numberings whose double bonds sit where the input draws them, so for
+    one of the two bond-shift drawings the substituent gets a higher locant:
+    '5-methylheptalene' where the other drawing is '1-methylheptalene'. The two
+    drawings are distinct compounds (``rules.isotopes._kekule_forms_of_one_compound``,
+    a 4n circuit), which the Blue Book tells apart by a Delta descriptor:
+     "Localized double bonds" (the Blue Book), "If it is necessary
+    to identify isomers that differ only by virtue of the location of localized
+    double bonds, this differentiation is indicated by the use of the Greek letter
+    Delta" (:14597), '1,6-dimethyl-Delta1(10a)-heptalene (PIN)' (:14601). A name
+    that carries the higher locant and no Delta is then not the PIN of that drawing
+     (f),:3301, lowest locants to the detachable prefixes). Decided by
+    matching the core with its bonds made generic: the substituted core atoms' locant
+    set under the drawn match against the lowest one under any match of the
+    skeleton. False for an aromatic core, a core with a saturated position, or when
+    the drawn alternation excludes no numbering."""
+    _build_pattern_index()
+    rec = _REC_BY_SMILES.get(core_smiles)
+    iul = (FUSED_HETEROCYCLE_DATA.get(core_smiles) or {}).get('iupac_locants') or {}
+    if rec is None or not atom_mapping or not iul:
+        return False
+    pat = rec.pattern
+    double = Chem.BondType.DOUBLE
+    if not any(b.GetBondType() == double and not b.GetIsAromatic()
+               for b in pat.GetBonds()):
+        return False
+    if not all(a.GetIsAromatic() or any(b.GetBondType() == double for b in a.GetBonds())
+               for a in pat.GetAtoms()):
+        return False
+    core_atoms = set(atom_mapping)
+    sub_atoms = {idx for idx in core_atoms
+                 if any(nb.GetIdx() not in core_atoms
+                        for nb in mol.GetAtomWithIdx(idx).GetNeighbors())}
+    if not sub_atoms:
+        return False
+    try:
+        params = Chem.AdjustQueryParameters.NoAdjustments()
+        params.makeBondsGeneric = True
+        generic = Chem.AdjustQueryProperties(pat, params)
+        matches = [list(m) for m in mol.GetSubstructMatches(
+            generic, uniquify=False, maxMatches=64) if set(m) == core_atoms]
+    except Exception:
+        return False
+    from ..rules.locants import compare_locant_sets
+
+    def _locs(mapping_of_mol_idx):
+        vals = [_coerce_locant_for_compare(mapping_of_mol_idx.get(i)) for i in sub_atoms]
+        if any(v is None for v in vals):
+            return None
+        return sorted(vals, key=lambda v: (v, '') if isinstance(v, int) else v)
+
+    drawn = _locs(atom_mapping)
+    if drawn is None:
+        return False
+    for m in matches:
+        cand = _locs({mi: iul.get(pi) for pi, mi in enumerate(m)})
+        if cand is not None and compare_locant_sets(cand, drawn) < 0:
+            return True
+    return False
+
+
 def select_lowest_locant_match(mol, matches, core_smiles: str):
     """Public entry to ``_select_lowest_locant_match`` for one catalog core."""
     iul = FUSED_HETEROCYCLE_DATA[core_smiles].get('iupac_locants') or {}

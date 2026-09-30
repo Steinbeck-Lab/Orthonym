@@ -223,8 +223,8 @@ def _name_carbamimidate(mol: Any, match: "tuple[int, ...]") -> Optional[str]:
         if len(locs) == 1:
             prefix_parts.append(f"{loc_str}-{disp}")
         else:
-            mult = get_multiplier_prefix(len(locs), nm)
-            prefix_parts.append(f"{loc_str}-{mult}{disp}")
+            from ..naming_utils import multiplied_component as _mc
+            prefix_parts.append(f"{loc_str}-{_mc(len(locs), nm, disp)}")
     n_prefix = '-'.join(prefix_parts)
 
     if n_prefix:

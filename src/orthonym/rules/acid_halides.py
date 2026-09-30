@@ -1052,8 +1052,8 @@ def _get_chain_substituent_prefix(mol, features, chain, consumed_atoms) -> str:
         locants = prefix_groups[prefix_name]
         locant_str = ",".join(str(l) for l in sorted(locants))
         if len(locants) > 1:
-            multiplier = get_multiplier_prefix(len(locants), prefix_name)
-            parts.append(f"{locant_str}-{multiplier}{prefix_name}")
+            from ..assembly.naming_utils import multiplied_component as _mc
+            parts.append(f"{locant_str}-{_mc(len(locants), prefix_name, prefix_name)}")
         else:
             parts.append(f"{locant_str}-{prefix_name}")
 

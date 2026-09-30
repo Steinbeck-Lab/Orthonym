@@ -647,9 +647,13 @@ class TestStereoFormatGermacrane:
     xfail). Its systematic name '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)
     cyclodecane' (j), the Blue Book, gives R the lower locant, as in
     '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane',:51471) cannot
-    round-trip: OPSIN 2.9.0 parses no lowercase pseudoasymmetric descriptor. Claims
-    conformance (2026-09-27): a name OPSIN rejects is not emitted at best-effort,
-    so the best-effort tier abstains on germacrane."""
+    round-trip: OPSIN 2.9.0 parses no lowercase pseudoasymmetric descriptor.
+    'germacrane' is a name of the natural-product list, matched by the exact
+    structure, Table 10.1 (c) terpenes, the Blue Book); the
+    paper's run emitted it at best-effort, labelled pin_verified. User
+    decision 2026-09-30: the list names OPSIN cannot read are emitted at the wider
+    tiers again, labelled pin_verified (verified 'identity'), with the deviation from
+     (:50943) recorded in TRIAGE."""
 
     @pytest.mark.xfail(strict=True, reason=_GERMACRANE_XFAIL)
     def test_germacrane_pin_name_stripped_parses(self):
@@ -657,11 +661,13 @@ class TestStereoFormatGermacrane:
         assert opsin_parse(strip_stereo(name)) is not None, name
 
     @pytest.mark.opsin_gate
-    def test_germacrane_best_effort_withholds_the_name_opsin_cannot_read(self):
+    def test_germacrane_best_effort_emits_the_list_name_opsin_cannot_read(self):
         from orthonym import Orthonym
         from orthonym.cli import _emit_tier_flags
-        from orthonym.errors import is_failure_name
         systematic = "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
-        assert opsin_parse(systematic) is None  # the reason
-        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(GERMACRANE)
-        assert is_failure_name(be), be
+        assert opsin_parse(systematic) is None  # the systematic name is no way out
+        assert opsin_parse("germacrane") is None  # nor is the list name read back
+        be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
+            GERMACRANE)
+        assert be["name"] == "germacrane", be
+        assert be["tier"] == "pin_verified" and be["verified"] == "identity", be

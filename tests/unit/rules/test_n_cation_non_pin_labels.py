@@ -26,6 +26,40 @@ import pytest
 from orthonym import Orthonym
 from orthonym.jvm_budget import jvm_slots
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(C)(C)[N+](C)(C)CC(=O)[O-]",
+    "CCCCCCCCCCCCCC/C=C\\OC[C@H](COP(=O)(O)OCC[N+](C)(C)C)O",
+    "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP([O-])(=O)OCC[N+](C)(C)C)OC(=O)CCCCCCCCCCCCCCC",
+    "CCC[N+](C)(C)CC(=O)[O-]",
+    "CC[N+](C)(C)CC(=O)[O-]",
+    "CC[N+](CC)(CC)CC(=O)[O-]",
+    "C[N+](C)(C)CC(=O)[O-]",
+    "C[N+](C)(C)CCCC(=O)[O-]",
+    "C[N+](C)(C)CCOS(=O)(=O)[O-]",
+    "C[N+](C)(C)[C-](C)C",
+    "C[NH+](C)CCC(=O)O",
+    "C[NH2+]CCC(=O)O",
+    "[NH3+]CCC(=O)O",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -34,6 +68,8 @@ _PC = "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP([O-])(=O)OCC[N+](C)(C)C)OC(=O)CCCCCCCCCCC
 
 
 def _row(smiles, namer=None):
+    if namer is None and smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     with jvm_slots(1, purpose="test-n-cation-labels"):
         return (namer or Orthonym(style="pin")).name_tiered(smiles)
 

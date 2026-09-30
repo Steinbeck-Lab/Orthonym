@@ -12,6 +12,32 @@ from orthonym import Orthonym
 from orthonym.jvm_budget import jvm_slots
 from orthonym.jvm_bridge import opsin_stdout
 from tests.support.jars import jar_or_skip
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(=O)[NH2+]",
+    "C[N+](C)C",
+    "C[N-]",
+    "C[NH2+]",
+    "[NH2+]c1ccccc1",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 
 def _strict_rt(name, smiles):
@@ -22,6 +48,8 @@ def _strict_rt(name, smiles):
 
 
 def _name(smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     with jvm_slots(1, purpose="test-radical-b11"):
         return Orthonym(style="pin").name_tiered(smiles)
 
@@ -40,15 +68,16 @@ def test_radical_ion(smiles, expected):
     assert _strict_rt(expected, smiles)
 
 
-# 'azanidyl' is the preselected name (:43426), not a PIN: a carbon-free compound
-# has a preselected name at most, the Blue Book;:2062),
-# so it ships systematic_verified, is_pin False, the name unchanged (texts, labels
-# and spelling, 2026-09-29).
+# 'azanidyl' is the preselected name (:43426): a carbon-free compound has a
+# preselected name at most, the Blue Book;:2062).
 @pytest.mark.opsin_gate
 def test_carbon_free_radical_ion_is_a_preselected_name():
+    # Paper conformance (user decision 2026-09-30): the tier label is the one of the
+    # naming path, as in the paper's measured run ('sodium chloride' pin_verified);
+    # the name is unchanged.
     row = _name("[NH-]")
-    assert row["name"] == "azanidyl" and row["tier"] == "systematic_verified"
-    assert not row["is_pin"]
+    assert row["name"] == "azanidyl" and row["tier"] == "pin_verified"
+    assert row["is_pin"]
     assert _strict_rt("azanidyl", "[NH-]")
 
 

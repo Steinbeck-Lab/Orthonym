@@ -59,16 +59,36 @@ def _isolated_acid_smiles(mol, carbonyl_idx: int, ester_o_idx: int,
 
 
 def _name_fragment(smiles: Optional[str]) -> Optional[str]:
-    """The engine's name for an isolated fragment, or None (unnamed / unknown)."""
+    """The engine's name for an isolated fragment, or None (unnamed / unknown).
+
+    The fragment is named for a part of a larger name (an acyl or an '-oate'),
+    often speculatively: a classifier asks for an acyloxy prefix that the ester
+    route then does not use. The producer that named the fragment is therefore
+    not the producer of the outer name, so its record (``source``/``opsin``) is
+    not left on the outer call: 'bis[4-(butan-2-yl)phenyl] oxalate' read
+    systematic_verified at the best-effort tier, where a discarded acyloxy probe
+    had reached the general engine, and pin_verified at the PIN tier. A fragment
+    name the general engine built is recorded instead as a non-PIN fragment, which
+    labels below the PIN only a name that carries it (and its acyl / '-oate' forms,
+    ``_acid_to_acyl`` / ``_acid_to_oate``)."""
     if not smiles:
         return None
     from orthonym import name_compound  # lazy: re-entrant on a non-lipid fragment
+    from ..metrics.provenance import (get_provenance, record_non_pin_fragment,
+                                      restore_provenance)
+    before = get_provenance()
     try:
         name = name_compound(smiles)
     except Exception:
-        return None
+        name = None
+    after = get_provenance()
+    nested_source = after.get("source")
+    after["source"], after["opsin"] = before.get("source"), before.get("opsin")
+    restore_provenance(after)
     if not name or name == "unknown organic compound" or "unknown" in name:
         return None
+    if nested_source == "general_engine":
+        record_non_pin_fragment(name)
     return name
 
 
@@ -163,6 +183,15 @@ def _polycarboxylic_site_acyl(mol, carbonyl_idx: int, ester_o_idx: int) -> Optio
 
 
 def _acid_to_oate(acid_name: str) -> Optional[str]:
+    out = _acid_to_oate_form(acid_name)
+    if out:
+        # The '-oate' keeps the acid name's non-PIN record (_name_fragment).
+        from ..metrics.provenance import record_derived_non_pin_fragment
+        record_derived_non_pin_fragment(acid_name, out)
+    return out
+
+
+def _acid_to_oate_form(acid_name: str) -> Optional[str]:
     s = acid_name[:-5] if acid_name.endswith(" acid") else acid_name
     if s.endswith("oic"):
         return s[:-3] + "oate"
@@ -172,6 +201,15 @@ def _acid_to_oate(acid_name: str) -> Optional[str]:
 
 
 def _acid_to_acyl(acid_name: str) -> Optional[str]:
+    out = _acid_to_acyl_form(acid_name)
+    if out:
+        # The acyl keeps the acid name's non-PIN record (_name_fragment).
+        from ..metrics.provenance import record_derived_non_pin_fragment
+        record_derived_non_pin_fragment(acid_name, out)
+    return out
+
+
+def _acid_to_acyl_form(acid_name: str) -> Optional[str]:
     # '-amic' / '-imidic' acids take '-oyl' ('carbamoyl (preferred prefix)',
     # the Blue Book); the table and its rules live with the shared converter.
     from ..decomposition.fragment_assembly import ACID_ENDINGS_TO_OYL_ACYL

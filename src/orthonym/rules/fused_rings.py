@@ -2243,6 +2243,15 @@ def name_fused_heterocycle(mol):
     name = _assemble_fused_heterocycle_name(mol, core_name, substituents, atom_mapping)
     if name is None:
         return None
+    # A core drawn in the bond-shift alternation that numbers its substituents
+    # away from the lowest locants ('5-methylheptalene' for the drawing whose
+    # partner is '1-methylheptalene') has a Delta-descriptor PIN,
+    # the Blue Book-14601) that is not written here: the name is labelled
+    # below the PIN (name-scoped non-PIN record), the name itself is unchanged.
+    from ..data.fused_heterocycles import numbering_held_by_drawn_alternation
+    if numbering_held_by_drawn_alternation(mol, _core_smiles, atom_mapping):
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
     return (name, ring_atoms, atom_mapping, True)
 
 
@@ -3829,31 +3838,61 @@ def _assemble_fused_heterocycle_name(
 
     prefix_parts = []
 
-    # Handle N-substituents
-    for name, count in substituents['n_substituents'].items():
-        prefix = _format_n_prefix(name, count)
-        prefix_parts.append((prefix, name))
-
-    # Handle C-substituents
-    for name, locants in substituents['c_substituents'].items():
-        count = len(locants)
-        prefix = _format_c_prefix(name, locants, count)
-        prefix_parts.append((prefix, name))
-
-    # Handle other substituents (halogens, etc.)
+    # Each source's groups, in the order they were cited: the N-substituents of
+    # the amine suffix ('N' per substituent), the ring C-substituents and the
+    # other (halogen etc.) ring substituents.
     other_groups = defaultdict(list)
     for sub in substituents['other']:
-        name = sub['name']
-        locant = sub['locant']
-        other_groups[name].append(locant)
-
+        other_groups[sub['name']].append(sub['locant'])
+    _sources = []
+    for name, count in substituents['n_substituents'].items():
+        _sources.append(('n', name, ["N"] * count))
+    for name, locants in substituents['c_substituents'].items():
+        _sources.append(('c', name, list(locants)))
     for name, locants in other_groups.items():
         # Ensure all locants are strings for consistent sorting
         # (some may be int, others str like '3a')
         locants = [str(l) for l in locants]
         locants.sort(key=lambda x: (len(x), x))
-        count = len(locants)
-        prefix = _format_c_prefix(name, locants, count)
+        _sources.append(('o', name, locants))
+
+    # (b) (the Blue Book) / (a) (:7104): identical prefixes
+    # are one multiplied group whatever atom carries them, with the locants in the
+    # order (:3195, italic letters before numerals) -- '*N*,4-dimethyl-*N*-
+    # (3-methylphenyl)benzamide (PIN)' (:32879), '*N*,1,4-triphenyl-1*H*-1,2,4-
+    # triazol-4-ium-3-aminide (PIN)' (:42460). The N-substituent of the amine
+    # suffix and a ring substituent of the same name were two prefixes ('3-chloro-
+    # N-methyl-2-methyl-N-phenyl-2H-indazol-6-amine'); they are now one group
+    # ('3-chloro-N,2-dimethyl-N-phenyl-2H-indazol-6-amine'). A name cited by one
+    # source only keeps its formatting byte for byte.
+    from ..assembly.composition_primitives import (
+        combine_identical_prefix_groups,
+        identical_prefixes_grouped,
+    )
+    _kinds = defaultdict(set)
+    for kind, name, _locs in _sources:
+        _kinds[name].add(kind)
+    _single = {name: (kind, locs) for kind, name, locs in _sources
+               if len(_kinds[name]) == 1}
+    if not identical_prefixes_grouped():
+        # (``identical_prefixes_cited_apart``): each source's groups on
+        # their own.
+        for kind, name, locs in _sources:
+            if kind == 'n':
+                prefix_parts.append((_format_n_prefix(name, len(locs)), name))
+            else:
+                prefix_parts.append((_format_c_prefix(name, locs, len(locs)), name))
+    for name, locants in (combine_identical_prefix_groups(
+            (name, locs) for _kind, name, locs in _sources)
+            if identical_prefixes_grouped() else ()):
+        if name in _single:
+            kind, locs = _single[name]
+            if kind == 'n':
+                prefix = _format_n_prefix(name, len(locs))
+            else:
+                prefix = _format_c_prefix(name, locs, len(locs))
+        else:
+            prefix = _format_c_prefix(name, [str(l) for l in locants], len(locants))
         prefix_parts.append((prefix, name))
 
     # Sort alphabetically by base name
@@ -4081,6 +4120,13 @@ def _join_prefix_to_parent(prefix_str: str, parent_name: str) -> str:
     if not prefix_str:
         return parent_name
 
+    # (d) (the Blue Book): an italic designator of the parent
+    # ('s-indacene') is separated from the prefix's Roman letters by a hyphen,
+    # '3-methyl-s-indacene' (``begins_with_italic_designator``).
+    from ..assembly.naming_utils import begins_with_italic_designator
+    if begins_with_italic_designator(parent_name):
+        return prefix_str.rstrip('-') + '-' + parent_name
+
     # If parent starts with a letter, remove trailing hyphen from prefix
     # e.g., "2-methyl-" + "quinoline" -> "2-methylquinoline"
     if parent_name and parent_name[0].isalpha():
@@ -4187,8 +4233,8 @@ def _format_n_prefix(name: str, count: int) -> str:
         return f"N-{wrapped}-"
     else:
         n_locants = ",".join(["N"] * count)
-        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"{n_locants}-{multiplier}{wrapped}-"
+        from ..assembly.naming_utils import multiplied_component
+        return f"{n_locants}-{multiplied_component(count, name, wrapped)}-"
 
 
 def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
@@ -4221,13 +4267,18 @@ def _format_c_prefix(name: str, locants: List[int], count: int) -> str:
         # Suite fix j6: the mark escalates past the name's own marks,
         # the Blue Book) -- '3-[2-(2,4-dimethylphenyl)-2-oxoethyl]', not
         # '3-(2-(...)-2-oxoethyl)'; a name without marks still gets '(...)'.
-        from ..assembly.naming_utils import apply_enclosing_marks
-        display_name = apply_enclosing_marks(name, -1)
+        from ..assembly.naming_utils import _is_fully_enclosed, apply_enclosing_marks
+        display_name = (name if _is_fully_enclosed(name)
+                        else apply_enclosing_marks(name, -1))
     if count == 1:
         return f"{locant_str}-{display_name}-"
     else:
-        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
-        return f"{locant_str}-{multiplier}{display_name}-"
+        # The shared primitive: 'di-tert-butyl' (d),
+        # the Blue Book), 'bis' for a substituted prefix (a),
+        #:7104: '2,6-bis(4-chlorophenyl)-9H-carbazole'), 'di(dodecyl)'
+        # (c)). A basic-multiplier table here never wrote 'bis'.
+        from ..assembly.naming_utils import multiplied_component
+        return f"{locant_str}-{multiplied_component(count, name, display_name)}-"
 
 
 def _join_fused_prefixes(prefixes: List[str]) -> str:

@@ -89,21 +89,26 @@ def test_best_effort_emits_a_round_tripping_systematic_name(retained):
             == Chem.MolToInchiKey(Chem.MolFromSmiles(smiles)))
 
 
-# 2026-09-25 (controller ruling): best-effort no longer keeps `germacrane`; the
-# NAME_EXACT parent gives way to its systematic name at the general tiers
-# (data.natural_products). That name, '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)
-# cyclodecane' (j), the Blue Book; the BB's '13-norgermacrane
-# (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane',:51471), cannot round-trip: OPSIN
-# 2.9.0 parses no lowercase pseudoasymmetric descriptor. Claims conformance
-# (2026-09-27): a name OPSIN rejects is not emitted at best-effort, so the row
-# abstains with its limit code -- never the unverifiable name, never a wrong one.
-# The PIN tier still ships `germacrane` (test_default_path_still_emits_the_
-# retained_pin above).
+# `germacrane` is a name of the natural-product list (NAME_EXACT_NP_PARENTS), matched
+# by the exact structure: (the Blue Book) "Semisystematic names of
+# recommended parent structures are listed in Table 10.1", Table 10.1 (c) terpenes
+# (:51413) lists 'germacrane'. Its systematic form, '(1R,4s,7S)-1,7-dimethyl-4-
+# (propan-2-yl)cyclodecane' (the BB's '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-
+# dimethylcyclodecane',:51471), cannot round-trip: OPSIN 2.9.0 reads no lowercase
+# pseudoasymmetric descriptor, and it reads 'germacrane' neither. The paper's run
+# (f67429619, before 594f8a788 withheld it at the general tiers on 2026-09-25)
+# emitted `germacrane` at best-effort, labelled pin_verified (the paper, Methods,
+# "Tiers": the list names are the exception to the full round trip). User decision
+# 2026-09-30: the list names OPSIN cannot read are labelled pin_verified (verified
+# 'identity', the exact structure match) and emitted at the wider tiers again; the
+# known deviation from ("Preferred IUPAC names (PINs) are not identified for
+# the compounds in this Chapter",:50943) is recorded in TRIAGE. Read-back of the
+# structure: OPSIN reads '(1R,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' (the
+# systematic name without the pseudoasymmetric descriptor) to the input's
+# constitution with the same two R/S centres.
 @pytest.mark.parametrize("retained", KEEPS)
-def test_best_effort_withholds_the_systematic_name_opsin_cannot_read(retained):
-    from orthonym.errors import is_failure_name
-    name = _best_effort_namer().name(_BY_NAME[retained])
-    assert is_failure_name(name), f"shipped a name OPSIN cannot read: {name!r}"
+def test_best_effort_emits_the_list_name_opsin_cannot_read(retained):
+    assert _best_effort_namer().name(_BY_NAME[retained]) == retained
 
 
 @pytest.mark.parametrize("retained", KEEPS)
@@ -114,7 +119,9 @@ def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
     attribution the project ranks levers by). Uses `name_tiered`, the API that
     clears provenance per call and is what the cohort/census machinery reads."""
     r = _best_effort_namer().name_tiered(_BY_NAME[retained])
-    assert r["name"] is None and r["tier"] == "abstain" and r["limit_code"]
+    assert r["name"] == retained, r
+    assert r["tier"] == "pin_verified" and r["verified"] == "identity", r
+    assert r["gate_outcome"] == "carveout:np_stereoparent", r
     assert r["source"] != "general_engine"
 
 

@@ -32,9 +32,12 @@ from orthonym import Orthonym
 @pytest.fixture(scope="module")
 def namer():
     # The defect lives with the validity gate OFF: with it on, merely
-    # suppresses the wrong name. Judge the generator, not the gate.
-    _namer._DISABLE_VALIDITY_GATE = True
-    return Orthonym(style="pin")
+    # suppresses the wrong name. Judge the generator, not the gate. The flag is
+    # put back when the module ends, so a later module is not named with the gate
+    # off.
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_namer, "_DISABLE_VALIDITY_GATE", True)
+        yield Orthonym(style="pin")
 
 
 def _name(namer, smiles):

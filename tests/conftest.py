@@ -641,6 +641,94 @@ def _module_reload_isolation():
             "put back. Reload with tests.support.module_reload.reloaded.", pytrace=False)
 
 
+# ============================================================================
+# An OPSIN oracle built for a jar a test simulated must not outlive the test.
+# ============================================================================
+# The validity gate keeps ONE OpsinOracle for the process (`namer._VALIDITY_ORACLE`;
+# the split gate keeps `group_splitting._DEFAULT_ORACLE` the same way). It is built
+# at its first use from the jar `_find_opsin_jar` names at that moment and is never
+# built again. A test that forces the jar absent (monkeypatch `_find_opsin_jar` ->
+# None, the `_force_jar_absent` pattern) and is the first test on its worker to reach
+# that oracle builds it with jar=None (an N-acyl ring amino acid such as captopril
+# reaches it through `fragment_acid_name_verified`, which asks OPSIN without checking
+# for the jar first). monkeypatch puts the resolver back, but the oracle keeps
+# jar=None. For the rest of the worker the gate runs again, every OPSIN answer is
+# 'unavailable', the gate fails closed on that, and simple molecules come out as
+# 'unknown organic compound' (438 failures in one worker's order; TRIAGE 'Unit suite
+# -- the unknown-organic-compound order leak'). The engine does the same outside the
+# tests after `orthonym.jars.fetch_all` in a process that started in reduced mode;
+# the engine fix (the oracle follows the jar resolution) is in namer.py and waits for
+# the lane merge (strict xfail in tests/unit/test_simulated_jar_isolation.py). Until
+# then this guard runs after each test's teardown (monkeypatch has been undone by
+# then). An orthonym module global that holds an OpsinOracle which the test replaced
+# with one built for another jar than the real one is put back: the object from
+# before the test if its jar is the real one, otherwise None (the next use builds it
+# again). The test is not failed: simulating a missing jar is what it is for, and the
+# resolver it patched was put back. Validated on the known positives in that section.
+_ORACLES_BEFORE_TEST: Dict[tuple, object] = {}
+
+
+def _module_oracles() -> Dict[tuple, object]:
+    """(module, attribute) -> value, for each orthonym module global that holds an OpsinOracle."""
+    import sys
+    found = {}
+    for name, module in list(sys.modules.items()):
+        if module is None or not (name == "orthonym" or name.startswith("orthonym.")):
+            continue
+        for attr, value in list(vars(module).items()):
+            # By class name, so an instance made before a reload of its module still counts.
+            if type(value).__name__ == "OpsinOracle" and hasattr(value, "_jar"):
+                found[(name, attr)] = value
+    return found
+
+
+def _real_opsin_jar():
+    """The jar this test process really has (None in reduced mode or without a jar)."""
+    try:
+        from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+        return _find_opsin_jar()
+    except Exception:  # incl. orthonym.jars.JarUnavailable
+        return None
+
+
+def _put_back_simulated_jar_oracles() -> list:
+    """Put back each module-global OpsinOracle the test replaced with one built for
+    another jar than the real one; return the (module, attribute) pairs put back."""
+    import sys
+    changed = {key: value for key, value in _module_oracles().items()
+               if _ORACLES_BEFORE_TEST.get(key) is not value}
+    if not changed:
+        return []
+    real = _real_opsin_jar()
+    put_back = []
+    for (name, attr), oracle in changed.items():
+        if oracle._jar == real:
+            continue
+        before = _ORACLES_BEFORE_TEST.get((name, attr))
+        keep = before if before is not None and getattr(before, "_jar", None) == real else None
+        setattr(sys.modules[name], attr, keep)
+        put_back.append((name, attr))
+    return put_back
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_setup(item):
+    """Record the module-global OpsinOracles before any fixture of the test runs."""
+    global _ORACLES_BEFORE_TEST
+    _ORACLES_BEFORE_TEST = _module_oracles()
+    return (yield)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_teardown(item, nextitem):
+    """After every finalizer of the test (monkeypatch undone), put back the oracles
+    built for a simulated jar."""
+    try:
+        return (yield)
+    finally:
+        _put_back_simulated_jar_oracles()
+
+
 @pytest.fixture(autouse=True)
 def _phase146_clear_thread_locals():
     """Auto-clear the three thread-local stores after each test.

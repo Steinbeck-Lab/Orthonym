@@ -384,12 +384,12 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
             locs = sorted(by_name[nm])
             complex_ = is_complex_substituent(nm)
             disp = f"({nm})" if complex_ and not (nm.startswith("(") and nm.endswith(")")) else nm
-            mult = get_multiplier_prefix(len(locs), complex_)
+            from ..assembly.naming_utils import multiplied_component as _mc
             if omit_locants:
-                parts.append(f"{mult}{disp}")
+                parts.append(_mc(len(locs), nm, disp))
             else:
                 locstr = ",".join(str(x) for x in locs)
-                parts.append(f"{locstr}-{mult}{disp}")
+                parts.append(f"{locstr}-{_mc(len(locs), nm, disp)}")
         #: hyphen-join the ordered prefix fragments.
         prefix_str = "-".join(parts) if len(parts) > 1 else parts[0]
         # the parent stem starts with a letter, so no hyphen needed after prefix_str.

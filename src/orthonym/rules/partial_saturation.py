@@ -2663,8 +2663,8 @@ def name_cyclic_oxo_compound(mol: Chem.Mol,
         parts = []
         for nm in sorted(by_name, key=alpha_sort_key):
             nlocs = sorted(by_name[nm], key=lambda s: _locant_key(s[1:]))
-            parts.append(','.join(nlocs) + '-'
-                         + get_multiplier_prefix(len(nlocs), nm) + nm)
+            from ..assembly.naming_utils import multiplied_component as _mc
+            parts.append(','.join(nlocs) + '-' + _mc(len(nlocs), nm, nm))
         # (a) (the Blue Book): a hyphen separates the prefix from a
         # DIGIT-initial parent ('N-methyl' + '1H-inden-1-imine' ->
         # 'N-methyl-1H-inden-1-imine'); no hyphen before a letter-initial parent

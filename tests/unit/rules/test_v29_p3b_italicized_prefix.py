@@ -181,8 +181,11 @@ def test_mononuclear_multiplied_italicized_prefix_is_not_malformed(ungated_namer
     straight onto 'tert-' with no boundary at all. (b)/(d) requires the hyphen:
     'di-tert-butyl'. OPSIN-exact (C(C)(C)(C)[SiH](C)C(C)(C)C).
     """
+    # And the second cited prefix of the mononuclear parent is enclosed
+    #, the Blue Book, 'tert-butyldi(methyl)phosphane (PIN)'
+    #:16286).
     assert (ungated_namer.name("CC(C)(C)[SiH](C)C(C)(C)C")
-            == "di-tert-butylmethylsilane")
+            == "di-tert-butyl(methyl)silane")
 
 
 def test_the_multiplied_simple_prefix_carve_out_still_holds(ungated_namer):
@@ -441,11 +444,6 @@ _TRIPWIRE_ALLOWLIST = {
     ("assembly/substituent_naming.py",
      "if (any(ch.isdigit() for ch in tok) or '-' in tok or ' ' in tok"):
         "GUARDED — _fg_enclose returns an italicized_prefix_is_bare token bare above it.",
-    ("rules/phosphorus.py",
-     'and (any(ch in token for ch in "()[]-, 0123456789")'):
-        "GUARDED — ANDed with not italicized_prefix_is_bare(token) on the line above; "
-        "the simple branch joins with multiplier_needs_hyphen: 'tri-tert-butyl "
-        "phosphite' (was 'tris(tert-butyl) phosphite').",
     ("rules/salts.py", "if '-' in name:"):
         "GUARDED — _ion_needs_enclosing_multiplier returns False for an "
         "italicized_prefix_is_bare ion word above it, and _apply_stoichiometric_prefix "

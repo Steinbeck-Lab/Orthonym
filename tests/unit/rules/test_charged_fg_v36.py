@@ -28,6 +28,62 @@ import pytest
 
 from orthonym import Orthonym
 from orthonym.errors import is_failure_name
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "O=[N+]([O-])NCN[N+](=O)[O-]",
+    "OCC(O[N+](=O)[O-])CO[N+](=O)[O-]",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 @pytest.fixture(scope="module")
@@ -45,12 +101,15 @@ def namer():
 # gate does to an OPSIN-unparseable-standing-alone retained word, not about
 # the retained lookup itself.
 @pytest.mark.parametrize("smi", [
-    "[S-2]",             # sulfide -- OPSIN cannot parse a bare chalcogenide alone
+    # "[S-2]" left this list in breadth job 3: the bare ion is 'sulfanediide' by the
+    # parent-hydride rule (the Blue Book-40902), asserted in
+    # tests/unit/rules/test_breadth3_m15_small_ions.py; the salt word 'sulfide'
+    # still names no bare ion
     "[H+]",              # bare proton
     "O=[SH][O-]",        # HO2S- -- no retained-table row (not the same species as bisulfite)
 ])
 def test_carbon_free_ion_honest_abstain(namer, smi):
-    out = namer.name(smi)
+    out = _dt_obj_name(namer, smi)
     assert out != "unknown organic compound", (
         f"{smi} should abstain honestly, not the organic sentinel: {out!r}")
     assert "not supported" in out
@@ -61,7 +120,7 @@ def test_carbon_free_ion_honest_abstain(namer, smi):
 def test_organic_unnameable_still_uses_organic_sentinel(namer):
     # A carbon-BEARING molecule that fails to name must still use the
     # pre-existing organic sentinel -- Task 1 must not over-broaden.
-    out = namer.name("CCCCCCCCCCCCOP(=S)([O-])[O-]")
+    out = _dt_obj_name(namer, "CCCCCCCCCCCCOP(=S)([O-])[O-]")
     assert out == "unknown organic compound"
 
 
@@ -79,7 +138,7 @@ def test_organic_unnameable_still_uses_organic_sentinel(namer):
     ("O=[PH]([O-])[O-]", "phosphonate"),    # genuine missing row
 ])
 def test_inorganic_oxoanion_names(namer, smi, expected):
-    assert namer.name(smi) == expected
+    assert _dt_obj_name(namer, smi) == expected
 
 
 @pytest.mark.opsin_gate
@@ -92,7 +151,7 @@ def test_inorganic_oxoanion_names(namer, smi, expected):
 def test_organic_nitro_regression(namer, smi, expected):
     # Task 2's carbon-free guard + SMARTS narrowing must NEVER touch a real
     # organic nitro compound or a nitrate-ester substituent.
-    assert namer.name(smi) == expected
+    assert _dt_obj_name(namer, smi) == expected
 
 
 @pytest.mark.unit
@@ -121,14 +180,14 @@ def test_looks_like_ionic_name_recognises_ite_suffix():
     ("O=[N+]([O-])NCN[N+](=O)[O-]", "N,N'-dinitromethanediamine"),
 ])
 def test_substituted_nitramide_names(namer, smi, expected):
-    assert namer.name(smi) == expected
+    assert _dt_obj_name(namer, smi) == expected
 
 
 @pytest.mark.unit
 def test_plain_nitramide_unchanged(namer):
     # The exact-whole-molecule retained-table hit must still win (the new
     # producer declines on 0 substituents).
-    assert namer.name("O=[N+]([O-])N") == "nitramide"
+    assert _dt_obj_name(namer, "O=[N+]([O-])N") == "nitramide"
 
 
 @pytest.mark.unit

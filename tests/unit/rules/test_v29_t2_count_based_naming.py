@@ -284,8 +284,11 @@ def test_s2_does_not_fabricate_a_c43_chain(ungated_namer):
 @pytest.mark.parametrize("smiles,expected", [
     ("OC(=O)CCNC(=O)NCCC", "3-[(propylcarbamoyl)amino]propanoic acid"),
     ("OC(=O)CCNC(=O)NC", "3-[(methylcarbamoyl)amino]propanoic acid"),
-    ("OC(=O)CCCC(=O)N(CCC)CCC",
-     "5-(dipropylamino)-5-(dipropylcarbamoyl)pentanoic acid"),  #: N omitted
+    # was '5-(dipropylamino)-5-(dipropylcarbamoyl)pentanoic acid', which cites the
+    # amide twice (OPSIN: a different molecule, QGSHOJKPRHEBFA). The chain-end
+    # -CO-NR2 is 'oxo' + the amino side, the Blue Book;
+    # 'anilino(oxo)acetic acid (PIN)':30398); breadth job 3.
+    ("OC(=O)CCCC(=O)N(CCC)CCC", "5-(dipropylamino)-5-oxopentanoic acid"),
     ("OC(=O)CCSCCC", "3-(propylsulfanyl)propanoic acid"),
     ("OC(=O)CCSCC(C)C", "3-[(2-methylpropyl)sulfanyl]propanoic acid"),
     # (the Blue Book): the PIN for a chalcogen analogue of an ether

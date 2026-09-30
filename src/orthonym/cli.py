@@ -196,8 +196,8 @@ def main(args: List[str] = None) -> int:
             "name that is not a preferred name. A preferred name that can be built "
             "is never replaced (glycerol stays propane-1,2,3-triol). Without this "
             "option a small table of retained trivial names is still used as a last"
-            " resort; --provenance labels those names systematic_verified, source "
-            "trivial_retained."
+            " resort at the wider tiers (the default tier declines those names); "
+            "--provenance labels them systematic_verified, source trivial_retained."
         ),
     )
 
@@ -212,19 +212,25 @@ def main(args: List[str] = None) -> int:
         choices=["pin", "valid", "complete", "best-effort", "full-coverage"],
         default="pin",
         help=(
-            "Which names to return. pin (the default): the name from the strict "
-            "path for the Preferred IUPAC Name; where the engine cannot certify the"
-            " preferred name it can return another name, labelled with its "
-            "tier, or a label that says why no name was given. valid: also names "
-            "from the general engine. complete: also general names for aromatic and"
-            " heterocyclic ring systems. best-effort: also the last-resort "
-            "producers. full-coverage: also the coordination-name builder for metal"
-            " tetrapyrrole and corrin complexes, which builds a name or declines. "
-            "At valid, complete and best-effort every name must pass a "
-            "full-InChIKey OPSIN round trip, except a metal-complex name from the "
-            "exact-match list, so a few classes OPSIN cannot read, which the "
-            "default tier names on their construction alone, are declined there. "
-            "--provenance shows each name's tier."
+            "Which names to return. pin (the default): a name only when the "
+            "pipeline can build the preferred IUPAC name (PIN), that is when the "
+            "strict PIN path built the name and verified it (tier pin_verified). "
+            "The only exceptions are names from the natural-product and "
+            "metal-complex lists, the name formats absent from OPSIN's grammar "
+            "(for example inositols, phanes and thioperoxols), and PINs whose "
+            "stereodescriptors OPSIN cannot read, for which the default tier "
+            "compares the constitution. Otherwise it declines, with the reason "
+            "code NO_VERIFIED_PIN when it built a name that is not a verified PIN. "
+            "valid: also names from the general engine. complete: also general "
+            "names for aromatic and heterocyclic ring systems. best-effort: also "
+            "the last-resort producers. full-coverage: also the coordination-name "
+            "builder for metal tetrapyrrole and corrin complexes, which builds a "
+            "name or declines. The wider tiers also return the names the default "
+            "tier declines, each labelled with its tier; there every name must "
+            "pass a full-InChIKey OPSIN round trip, except a name from the "
+            "natural-product and metal-complex lists, so the name formats absent "
+            "from OPSIN's grammar are declined there. --provenance shows each "
+            "name's tier."
         ),
     )
     parser.add_argument(
@@ -239,8 +245,9 @@ def main(args: List[str] = None) -> int:
             "'verified' is opsin (OPSIN read the whole name back to the same "
             "molecule), opsin_constitution (the same constitution; the "
             "stereodescriptors were not confirmed by OPSIN), identity (a name from "
-            "the exact-match list of metal-complex names, found by the input's "
-            "exact InChIKey; OPSIN cannot read these names) or unverified (no "
+            "an exact-match list: a metal-complex name found by the input's exact "
+            "InChIKey, or a natural-product parent name found by its exact "
+            "structure; OPSIN cannot read these names) or unverified (no "
             "read-back recorded). 'gate_outcome' says what the final OPSIN check "
             "did, for example self_consistency_verified, suppressed, not_run or "
             "carveout:<class>. One SMILES at a time; not with --batch."

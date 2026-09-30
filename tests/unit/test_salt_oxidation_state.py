@@ -24,7 +24,10 @@ def namer():
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
     ("[Au+].[Cl-]", "gold(I) chloride"),               # variable-valence: Stock recovered
-    ("[Fe+2].[Cl-].[Cl-]", "iron(II) dichloride"),     # variable-valence
+    # variable-valence; the stated charge fixes the ratio, so no stoichiometric
+    # prefix: binary names cite "the name of the cation followed by that of the
+    # anion", the Blue Book; a performance pass,)
+    ("[Fe+2].[Cl-].[Cl-]", "iron(II) chloride"),
 ])
 def test_variable_valence_metal_carries_stock(namer, smiles, expected):
     assert namer.name(smiles) == expected

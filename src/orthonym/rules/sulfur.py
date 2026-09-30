@@ -100,7 +100,8 @@ def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
 
     # Check for symmetry
     if sub_names[0] == sub_names[1]:
-        return f"di{sub_names[0]} sulfide"
+        from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+        return f"{multiplied_component(2, sub_names[0], enclose_if_compound(sub_names[0]))} sulfide"
     else:
         return f"{sub_names[0]} {sub_names[1]} sulfide"
 
@@ -155,7 +156,8 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
 
     # Check for symmetry
     if sub_names[0] == sub_names[1]:
-        return f"di{sub_names[0]} {class_word}"
+        from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+        return f"{multiplied_component(2, sub_names[0], enclose_if_compound(sub_names[0]))} {class_word}"
     else:
         return f"{sub_names[0]} {sub_names[1]} {class_word}"
 
@@ -209,7 +211,8 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
 
     # Check for symmetry
     if sub_names[0] == sub_names[1]:
-        return f"di{sub_names[0]} {class_word}"
+        from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+        return f"{multiplied_component(2, sub_names[0], enclose_if_compound(sub_names[0]))} {class_word}"
     else:
         return f"{sub_names[0]} {sub_names[1]} {class_word}"
 

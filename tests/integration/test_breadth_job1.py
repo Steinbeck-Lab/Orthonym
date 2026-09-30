@@ -28,7 +28,14 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
+from tests.support.default_tier import declined_at_default
 from tests.support.rt_assert import assert_full_rt
+
+# Default tier (paper, Methods, "Tiers", L73: "The default configuration emits a name
+# only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines"; user decision 2026-09-30): a name the code records as not the PIN is
+# declined there with NO_VERIFIED_PIN, and each such asserted name is checked as the
+# strict path's name and at the best-effort tier (tests/support/default_tier.py).
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
@@ -71,13 +78,25 @@ RERUN_BUILT = frozenset({
 })
 
 
+# A re-run name whose best-effort name is another one (the re-run is the PIN tier's).
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "O=C(O)CCCCCC[C@H]1C(=O)C[C@@H](O)[C@@H]1/C=C/[C@@H](O)CCCCCO",
+})
+
+
 def _assert_pin(smiles, expected):
+    if smiles in RERUN_BUILT:
+        # declined at the default tier (NO_VERIFIED_PIN); the strict path's re-run
+        # still builds the name, and the best-effort tier names the molecule below
+        # the PIN label
+        be = declined_at_default(
+            smiles, expected,
+            best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+        assert be["tier"] != "pin_verified" and not be["is_pin"], be
+        return be
     row = _pin(smiles)
     assert row["name"] == expected, row
-    if smiles in RERUN_BUILT:
-        assert row["tier"] == "pin_unverified" and not row["is_pin"], row
-    else:
-        assert row["tier"] == "pin_verified" and row["is_pin"], row
+    assert row["tier"] == "pin_verified" and row["is_pin"], row
     assert row["opsin"] == "verified", row
     assert_full_rt(row["name"], smiles)
     return row
@@ -120,14 +139,16 @@ def test_m01_a_non_pin_rerun_name_is_not_shipped_at_the_pin_tier():
     # the only name the re-run can build carries '1-oxacyclopropan-2-yl'
     #, the Blue Book: Hantzsch-Widman 'oxiran-2-yl' for a ring of
     # <= 10 members), so the PIN tier stays as it was; best-effort still names it,
-    # labelled below the PIN. Tier labels -- paper semantics (TRIAGE.md): the PIN
-    # path built the name, a round trip verified it, and it carries a recorded
-    # non-PIN part, so it is pin_unverified (not certified as the PIN), is_pin False.
+    # labelled below the PIN. Tier labels -- paper semantics (user decision
+    # 2026-09-30; Methods, "Tiers": "The label systematic_verified means a correct
+    # systematic name that is not the PIN"): the PIN path built the name, a round
+    # trip verified it, and it carries a part the code records as not the PIN, so
+    # it is systematic_verified, is_pin False.
     smi = "CC/C=C\\CC(O)/C=C/C=C\\C=C\\C=C\\C1OC1CCCCCC(=O)O"
     assert is_failure_name(_pin(smi)["name"])
     be = _be(smi)
     assert "oxacyclopropan" in be["name"], be
-    assert be["tier"] == "pin_unverified" and not be["is_pin"], be
+    assert be["tier"] == "systematic_verified" and not be["is_pin"], be
     assert be["opsin"] == "verified", be
     assert_full_rt(be["name"], smi)
 
@@ -210,10 +231,8 @@ def test_m03_a_stereogenic_alpha_carbon_keeps_the_located_spelling():
     # the locant-free acetate is used only without an alpha stereocentre; the
     # systematic form cites the locant and is labelled below the PIN
     smi = "COC(=O)[C@H](Cl)Br"
-    row = _pin(smi)
-    assert row["name"] == "methyl (2R)-2-bromo-2-chloroethanoate", row
+    row = declined_at_default(smi, "methyl (2R)-2-bromo-2-chloroethanoate")
     assert not row["is_pin"], row
-    assert_full_rt(row["name"], smi)
 
 
 def test_m03_alcohol_to_alkyl_keeps_the_free_valence_locant_where_it_is_needed():
@@ -311,11 +330,21 @@ GUARDED = [
     # '[3,3'-bi-1H-indole]' PIN
     "N#Cc1ccccc1Cc1ccccc1C#N",
     "Oc1cc2[nH]cc(-c3c[nH]c4cc(O)c(O)cc34)c2cc1O",
-    # '4-methyl-N-methylcyclohexanecarboxamide': the N- and C-methyl are one
-    # multiplied prefix and the suffix keeps its locant ('N,4-dimethylcyclohexane-1-
-    # carboxamide',:2869), which this producer does not build
-    "CNC(=O)C1CCC(C)CC1",
+    # ('CNC(=O)C1CCC(C)CC1' left this list: the strict path now builds its PIN
+    # 'N,4-dimethylcyclohexane-1-carboxamide', test_the_guarded_amide_is_now_the_pin)
 ]
+
+
+def test_the_guarded_amide_is_now_the_pin():
+    # the N- and C-methyl are one multiplied prefix and the suffix keeps its locant
+    # (b), the Blue Book;,:2869; ':32879
+    # N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)'); the strict path's first run
+    # builds it, so no re-run is involved
+    smi = "CNC(=O)C1CCC(C)CC1"
+    row = _pin(smi)
+    assert row["name"] == "N,4-dimethylcyclohexane-1-carboxamide", row
+    assert row["tier"] == "pin_verified" and row["is_pin"], row
+    assert_full_rt(row["name"], smi)
 
 
 @pytest.mark.parametrize("smiles", GUARDED)

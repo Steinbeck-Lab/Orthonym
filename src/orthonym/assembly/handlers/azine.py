@@ -149,7 +149,8 @@ def name_azine(
         # Symmetric azine: 'di(<X>ylidene)hydrazine'. The BB
         # PIN uses the simple multiplier 'di' even for a locant-bearing ylidene
         # (BB 38592 'di(propan-2-ylidene)hydrazine', not 'bis(...)').
-        name = f"di{_enclose(name1)}hydrazine"
+        from ..naming_utils import multiplied_component
+        name = f"{multiplied_component(2, name1, _enclose(name1))}hydrazine"
     else:
         # Unsymmetric azine: alphanumeric citation, each
         # ylidene enclosed, no position locants (BB '(butan-2-ylidene)'

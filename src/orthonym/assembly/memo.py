@@ -83,9 +83,22 @@ _PROMOTION_INDEPENDENT = frozenset({
 })
 
 
+#: True while an isotope-labelled molecule's skeleton is named with its identical
+#: N- and C-prefixes cited apart (``composition_primitives.
+#: identical_prefixes_cited_apart``). Its values differ from the grouped run's for
+#: the same key, so the caches below key them apart, as for the promotion re-run.
+prefixes_apart_var = contextvars.ContextVar("orthonym_prefixes_apart", default=False)
+
+
 def _ck(namespace, key):
     """The cache key for ``(namespace, key)`` in the current run (see above)."""
-    if pin_promotion_var.get() and namespace not in _PROMOTION_INDEPENDENT:
+    if namespace in _PROMOTION_INDEPENDENT:
+        return (namespace, key)
+    if prefixes_apart_var.get():
+        if pin_promotion_var.get():
+            return (namespace, key, "pin-promotion", "prefixes-apart")
+        return (namespace, key, "prefixes-apart")
+    if pin_promotion_var.get():
         return (namespace, key, "pin-promotion")
     return (namespace, key)
 

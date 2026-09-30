@@ -136,33 +136,36 @@ Licences and sources of the third-party components are listed in [`NOTICE`](NOTI
 
 ## Output tiers
 
-The default returns the name from the strict path for the Preferred IUPAC Name. Where the engine
-cannot certify the preferred name, it can return another checked name, labelled with a lower tier,
-or it declines. Wider tiers are opt-in with `--emit-tier`:
+The default returns a name only when the strict PIN path built it and verified it, or when the name
+is one of the few exceptions: a name from the exact-match lists, a name format absent from OPSIN's
+grammar, or a PIN whose stereodescriptors OPSIN cannot read. Otherwise it declines. Wider tiers are
+opt-in with `--emit-tier`:
 
 | `--emit-tier` | Returns |
 |:--|:--|
-| `pin` *(default)* | the strict path's name for the Preferred IUPAC Name, a labelled non-PIN name where the engine cannot certify the PIN, or nothing |
+| `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar or a PIN whose stereodescriptors OPSIN cannot read; otherwise nothing (`NO_VERIFIED_PIN`) |
 | `valid` | also general names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
 | `best-effort` | also the names of the last-resort producers |
 
 At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey OPSIN round trip (a
-metal-complex name from the exact-match list excepted), so the few default-tier names OPSIN cannot
-read in full are not shipped there, and a wider tier can, rarely, decline a molecule that a
-narrower tier names.
+name from the natural-product and metal-complex lists excepted), so the name formats absent from
+OPSIN's grammar, which the default tier ships without a full read-back, are not shipped there, and
+a wider tier can, rarely, decline a molecule that a narrower tier names.
 
 Whatever the tier, `--provenance` (one SMILES at a time) says what each name is: `pin_verified`
-(the strict PIN path built it, certified it as the PIN, and OPSIN read it back), `pin_unverified`
-(built on the PIN path, but not certified as the PIN), `systematic_verified` (a checked name that
-is not certified as the PIN, for example from the general engine, from a table of retained names,
-or of a class for which the Blue Book gives no PIN), `best_effort` (a last-resort producer's name,
-or one that no round trip confirmed) or `abstain` (no name). The tier says how a name was built.
+(the strict PIN path built it and verified it), `pin_unverified` (a name in PIN form whose
+preferred status is not certified), `systematic_verified` (a correct systematic name that is not
+the PIN, for example from the general engine, from a table of retained names, a strict-path name
+with a part the engine records as not the preferred form, or of a class for which the Blue Book
+gives no PIN, such as Group 1-12 organometallic compounds), `best_effort` (a last-resort producer's
+name, or one that no round trip confirmed) or `abstain` (no name). The tier says how a name was
+built.
 The `verified` field says how it was checked: `opsin` (OPSIN read the whole name back to your
 structure), `opsin_constitution` (OPSIN read it back without its stereodescriptors, and each
-descriptor was checked against its CIP label), `identity` (a metal-complex name from the
-exact-match list, found by your structure's exact InChIKey; OPSIN cannot read these names) or
-`unverified`.
+descriptor was checked against its CIP label), `identity` (a name from an exact-match list: a
+metal-complex name found by your structure's exact InChIKey, or a natural-product parent name found
+by its exact structure; OPSIN cannot read these names) or `unverified`.
 
 When Orthonym cannot name a molecule, the plain call returns a label in place of a name, such as
 `inorganic compound (not supported)`, and `--provenance` marks the row `abstain` with a reason code.

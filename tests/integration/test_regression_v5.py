@@ -9,6 +9,49 @@ comparison, fatty acid identification).
 import pytest
 from orthonym import name_compound
 from tests.support.rt_assert import assert_full_rt, assert_tier_contract
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)OC[C@H](COC(=O)CCCCCCCCCCCCCCCCCCCCCC)OC(=O)CCCCCCCC/C=C\\C/C=C\\C/C=C\\CC",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 class TestCoverageGateWhitelist:
@@ -27,7 +70,7 @@ class TestCoverageGateWhitelist:
             "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OC(=O)CCCC"
             "[C@@H]2SC[C@@H]3NC(=O)N[C@@H]32)[C@@H](O)[C@H]1O"
         )
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name != "unknown"
         # a phase-03: 'adenine' (7 chars) for 38-HA molecule = ratio 0.18
         # Below 0.25 threshold -> decomposition attempted
@@ -91,7 +134,7 @@ class TestCoverageGateWhitelist:
             "CN1C(=O)[C@]23SSS[C@@]1(CO)C(=O)N2[C@H]1Nc2ccccc2"
             "[C@@]1(c1c[nH]c2ccccc12)[C@@H]3O"
         )
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name != "1H-indole", (
             f"Dense polycyclic should not be named '1H-indole' -- "
             f"coverage gate should reject this oversimplification"
@@ -108,7 +151,7 @@ class TestCoverageGateWhitelist:
         ribose phosphate and the water; OPSIN full InChIKey: wrong).
         """
         smiles = "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O"
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         # 2026-09-26 (pre-existing-failures plan, Task 11 carry, TRIAGE row 61)
         # change-asserted-value. Controller ruling, option A (-09-24 'From T10'):
         # the retained nucleotide name stays at the PIN tier, the same as the D-a ruling
@@ -144,7 +187,7 @@ class TestBracketHyphenation:
         locant sorting (mixed int/str), not just bracket hyphenation.
         """
         smiles = "COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2"
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         # The name should not contain "]2" (missing hyphen)
         assert "]2" not in name and "]3" not in name and "]4" not in name, (
             f"Missing hyphen after bracket in: '{name}'"
@@ -160,7 +203,7 @@ class TestBracketHyphenation:
         not 'hydroxy3-methylbut-2-en-1-yl'.
         """
         smiles = "CC(C)=C[C@H](O)C1=CC(=O)[C@@H](O)[C@H](O)[C@H]1O"
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         # Should NOT contain "hydroxy3-" (missing hyphen)
         assert "hydroxy3" not in name, (
             f"Missing hyphen in substituent: '{name}'"
@@ -254,7 +297,7 @@ class TestDecompositionQuality:
             "[C@H](O)[C@H]1O)C(CCCCCCCCCCCCCCC)"
             "/C=C/CCCCCCCCCCCCC"
         )
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         # Should not contain garbled 'acidyl' token
         assert "acidyl" not in name.lower(), (
             f"Garbled 'acidyl' token in: '{name}'"
@@ -278,7 +321,7 @@ class TestDecompositionQuality:
             "(CO[C@H]1OC(CO)[C@@H](O)[C@H](O)[C@H]1O)"
             "NC(=O)CCCCCCCCCCCCCCCCCCCCCC"
         )
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name is not None and name != "unknown"
         # Brackets should be balanced
         assert name.count("(") == name.count(")"), (
@@ -358,7 +401,7 @@ class TestFattyAcidIdentification:
             r"CC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)OCC"
             r"(COP(=O)(O)OCCNC)OC(=O)CCCCCCCCC/C=C\C/C=C\CCCCC"
         )
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         from tests.support.jars import jar_or_skip
         jar_or_skip()
         assert_full_rt(name, smiles, "phospholipid: ")
@@ -375,7 +418,7 @@ class TestFattyAcidIdentification:
             r"CC/C=C\C/C=C\C/C=C\CCCCCCCC(=O)OCC"
             r"(COP(=O)(O)OCCNC)OC(=O)CCCCCCCCC/C=C\C/C=C\CCCCC"
         )
-        name = name_compound(smiles)
+        name = _dt_name_compound(smiles)
         assert name is not None and name != "unknown"
         # Should NOT use wrong saturated trivial names
         assert "arachidoyloxy" not in name, (
@@ -428,6 +471,8 @@ class TestFattyAcidIdentification:
             r"OC(=O)CCCCCCCC/C=C\C/C=C\C/C=C\CC"
         )
         name, _be = assert_tier_contract(smiles)
+        if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+            name = _declined_pin_row(smiles)["name"]
         # C23:0 should use systematic name tricosanoyloxy
         assert "tricosanoyloxy" in name, (
             f"Expected 'tricosanoyloxy' for C23:0 chain: '{name}'"

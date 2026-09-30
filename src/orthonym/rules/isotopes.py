@@ -18,6 +18,7 @@ positions; then to higher atomic number; then to higher mass number.
 from __future__ import annotations
 
 import contextlib
+import contextvars
 import re
 from typing import Dict, List, Optional, Tuple
 
@@ -216,6 +217,242 @@ def _opsin_parse(candidate_name: str) -> Optional[str]:
         return None
 
 
+def _same_fixed_h_inchi(a: Chem.Mol, b: Chem.Mol) -> bool:
+    """True iff ``a`` and ``b`` have the same fixed-H InChI (isotopic layers
+    included); False when either has none.
+
+    The isomeric canonical SMILES compare in ``_isotope_round_trips`` depends on
+    the Kekule form of a conjugated ring RDKit does not perceive as aromatic: the
+    14-atom periphery of '10b,10c-dihydropyren-1-yl' comes back from OPSIN with its
+    double bonds in the other alternation than the input's, the same compound (one
+    standard InChI) spelt as two SMILES, so a correctly placed descriptor failed
+    its round trip (PubChem 1M: a (2H5)phenyl on such a skeleton). InChI does not
+    depend on the Kekule form, and its fixed-H layer, unlike the standard key,
+    still fixes the position of a nuclide on an exchangeable hydrogen
+    ('[2H]OC(=O)CN' and 'OC(=O)CN[2H]' share the standard key, not the fixed-H
+    InChI), which is what the SMILES compare guards. The caller still requires
+    the full standard InChIKey to match as well."""
+    try:
+        from rdkit.Chem import inchi as _inchi
+        ia = _inchi.MolToInchi(a, options="/FixedH")
+        ib = _inchi.MolToInchi(b, options="/FixedH")
+    except Exception:
+        return False
+    return bool(ia) and ia == ib
+
+
+#: Set when ``_isotope_round_trips`` refuses a candidate whose parse is a
+#: bond-shift isomer of the input (same constitution, a 4n alternating circuit).
+_BOND_SHIFT_PARSE_REFUSED = contextvars.ContextVar(
+    "orthonym_isotope_bond_shift_refused", default=False)
+
+
+#: How many atom mappings ``_kekule_forms_of_one_compound`` tries before it
+#: answers False (fail closed: the parse is then judged by its SMILES alone).
+_KEKULE_MAPPING_CAP = 1000
+
+
+def _single_bond_graph(mol: Chem.Mol) -> Chem.Mol:
+    """``mol`` with every bond single and every atom's hydrogen count fixed as
+    drawn (isotopes, charges and stereo tags kept): its constitution without its
+    bond orders."""
+    m = Chem.RWMol(mol)
+    for atom in m.GetAtoms():
+        atom.SetNumExplicitHs(atom.GetTotalNumHs())
+        atom.SetNoImplicit(True)
+        atom.SetIsAromatic(False)
+    for bond in m.GetBonds():
+        bond.SetBondType(Chem.BondType.SINGLE)
+        bond.SetIsAromatic(False)
+    m.UpdatePropertyCache(strict=False)
+    return m.GetMol()
+
+
+def _alternating_parts(diff: Dict[frozenset, Tuple[bool, bool]]
+                       ) -> Optional[Tuple[List[int], List[Tuple[int, int, int]]]]:
+    """The parts that ``diff`` -- the bonds that are double in exactly one of two
+    drawings, ``{atom pair: (double in the first, double in the second)}`` --
+    consists of: ``(circuit sizes, paths)``, each path ``(end, end, bond count)``;
+    or None when it is not a set of disjoint circuits and paths whose bonds
+    alternate between the two drawings."""
+    adj: Dict[int, List[Tuple[int, bool]]] = {}
+    for pair, (in_first, _in_second) in diff.items():
+        x, y = tuple(pair)
+        adj.setdefault(x, []).append((y, in_first))
+        adj.setdefault(y, []).append((x, in_first))
+    if any(len(v) > 2 or (len(v) == 2 and v[0][1] == v[1][1]) for v in adj.values()):
+        return None
+    sizes: List[int] = []
+    paths: List[Tuple[int, int, int]] = []
+    seen: set = set()
+    # Paths first: each starts at an atom with one differing bond.
+    for start in [x for x, v in adj.items() if len(v) == 1]:
+        if start in seen:
+            continue
+        bonds, prev, cur = 0, None, start
+        while True:
+            seen.add(cur)
+            nxt = [y for y, _ in adj[cur] if y != prev]
+            if not nxt:
+                break
+            prev, cur = cur, nxt[0]
+            bonds += 1
+        paths.append((start, cur, bonds))
+    for start in adj:
+        if start in seen:
+            continue
+        size, prev, cur = 0, None, start
+        while True:
+            seen.add(cur)
+            size += 1
+            nxt = [y for y, _ in adj[cur] if y != prev]
+            if not nxt:
+                return None
+            prev, cur = cur, nxt[0]
+            if cur == start:
+                break
+        sizes.append(size)
+    return sizes, paths
+
+
+def _charge_free(mol: Chem.Mol) -> Chem.Mol:
+    """``mol`` with every formal charge set to 0: the graph the atom mapping of
+    ``_kekule_forms_of_one_compound`` is searched on (RDKit matches a query atom's
+    charge exactly, so two drawings that place a delocalized charge on different
+    atoms would have no complete mapping, and an exhaustive search for one)."""
+    m = Chem.RWMol(mol)
+    for atom in m.GetAtoms():
+        atom.SetFormalCharge(0)
+    m.UpdatePropertyCache(strict=False)
+    return m.GetMol()
+
+
+def _kekule_forms_of_one_compound(a: Chem.Mol, b: Chem.Mol) -> bool:
+    """True iff ``a`` and ``b`` are ONE compound drawn as two of its resonance
+    structures -- two Kekule alternations of a ring system, or one charge placed on
+    different atoms of a delocalized group -- and not two bond-shift (valence)
+    isomers.
+
+    The fixed-H InChI compare (``_same_fixed_h_inchi``) accepts a parse whose
+    double bonds sit elsewhere than the input's, because InChI records no bond
+    orders. That is right for the 14-atom periphery of '10b,10c-dihydropyren-1-yl'
+    (a 4n+2 circuit: two Kekule structures of one aromatic ring system, which OPSIN
+    writes in the other alternation), and wrong for a ring whose alternations are
+    distinct compounds: a 4n circuit -- cycloocta-1,3,5,7-tetraene (8 atoms), the
+    [4n]annulenes, the pentalene and heptalene peripheries (8, 12) -- has two
+    bond-shift isomers, which a name cites by its ene locants: 'cycloocta-1,3,5,7-
+    tetraene (PIN)', the Blue Book, "In monocyclic homogeneous
+    unsaturated compounds, one double or triple bond is always allocated the locant
+    '1'";:16554), 'cyclododeca-1,3,5,7,9,11-hexaene (PIN)' for [12]annulene
+    ,:8081). There '1-methyl(2-2H)cycloocta-1,3,5,7-tetraene' (D on the
+    carbon double-bonded to C1) is not the input '1-methyl(8-2H)...' (D on the
+    carbon single-bonded to C1), although the fixed-H InChIs are equal.
+
+    A delocalized charge is one species whatever atom a drawing puts it on:
+    DELOCALIZED RADICALS AND IONS (:43540), "Delocalization in names involving one
+    radical or ionic center in an otherwise conjugated double bonds structure is
+    denoted by the appropriate suffix without locants" (:43542). So the 18O of
+    '[18O-][N+](=O)c1ccccc1' and of '[18O]=[N+]([O-])c1ccccc1' is one label of
+    one nitrobenzene, and a D-tropylium with the charge drawn at another carbon is
+    the same cation. The two drawings then differ by an alternating PATH of an even
+    number of bonds whose two end atoms exchange the charge.
+
+    Decided on the atoms: the two drawings' single-bond graphs, charges set aside,
+    are matched atom for atom (element, isotope and hydrogen count equal); for some
+    matching, the bonds whose order differs must form disjoint alternating circuits
+    of 4n+2 atoms each and alternating paths of an even number of bonds whose two
+    ends, and only those atoms, carry opposite changes of formal charge. Up to
+    ``_KEKULE_MAPPING_CAP`` matchings are tried; False when none qualifies (fail
+    closed). The graphs are compared by canonical SMILES before the search, so the
+    search only runs on two isomorphic graphs, where every matching it counts is
+    complete and the cap bounds the work."""
+    try:
+        ka, kb = Chem.Mol(a), Chem.Mol(b)
+        Chem.Kekulize(ka, clearAromaticFlags=True)
+        Chem.Kekulize(kb, clearAromaticFlags=True)
+        ga, gb = _single_bond_graph(ka), _single_bond_graph(kb)
+        qa, qb = _charge_free(ga), _charge_free(gb)
+    except Exception:
+        return False
+    if (ga.GetNumAtoms() != gb.GetNumAtoms()
+            or ga.GetNumBonds() != gb.GetNumBonds()):
+        return False
+    try:
+        if Chem.MolToSmiles(qa) != Chem.MolToSmiles(qb):
+            return False
+    except Exception:
+        return False
+    double = Chem.BondType.DOUBLE
+    try:
+        matches = qa.GetSubstructMatches(
+            qb, uniquify=False, useChirality=False,
+            maxMatches=_KEKULE_MAPPING_CAP)
+    except Exception:
+        return False
+    for match in matches:
+        if any(ka.GetAtomWithIdx(j).GetAtomicNum() != kb.GetAtomWithIdx(i).GetAtomicNum()
+               or ka.GetAtomWithIdx(j).GetIsotope() != kb.GetAtomWithIdx(i).GetIsotope()
+               or ga.GetAtomWithIdx(j).GetTotalNumHs() != gb.GetAtomWithIdx(i).GetTotalNumHs()
+               for i, j in enumerate(match)):
+            continue
+        charge_change = {}
+        for i, j in enumerate(match):
+            dq = (ka.GetAtomWithIdx(j).GetFormalCharge()
+                  - kb.GetAtomWithIdx(i).GetFormalCharge())
+            if dq:
+                charge_change[j] = dq
+        diff: Dict[frozenset, Tuple[bool, bool]] = {}
+        orders_agree = True
+        for bond_b in kb.GetBonds():
+            i, j = match[bond_b.GetBeginAtomIdx()], match[bond_b.GetEndAtomIdx()]
+            bond_a = ka.GetBondBetweenAtoms(i, j)
+            if bond_a is None:
+                orders_agree = False
+                break
+            ta, tb = bond_a.GetBondType(), bond_b.GetBondType()
+            if ta == tb:
+                continue
+            if {ta, tb} != {double, Chem.BondType.SINGLE}:
+                orders_agree = False
+                break
+            diff[frozenset((i, j))] = (ta == double, tb == double)
+        if not orders_agree:
+            continue
+        parts = _alternating_parts(diff)
+        if parts is None:
+            continue
+        sizes, paths = parts
+        if not all(n % 4 == 2 for n in sizes):
+            continue
+        ends = set()
+        paths_ok = True
+        for x, y, n_bonds in paths:
+            dx, dy = charge_change.get(x, 0), charge_change.get(y, 0)
+            if n_bonds % 2 or not dx or dx != -dy:
+                paths_ok = False
+                break
+            ends.update((x, y))
+        if paths_ok and ends == set(charge_change):
+            return True
+    return False
+
+
+def _bond_order_free_key(mol: Chem.Mol) -> Optional[str]:
+    """A canonical SMILES of ``mol`` with every bond made single and every atom's
+    hydrogen count fixed as drawn (isotopes and stereo tags kept), or None.
+
+    It names WHICH atom carries a label without depending on the Kekule form of
+    a conjugated ring RDKit does not perceive as aromatic (``_same_fixed_h_inchi``):
+    ``_decorate_distinct_multi_locant`` maps each probe locant to the atom it
+    labels by this key when the plain canonical SMILES of OPSIN's parse and of the
+    input disagree only in that alternation. Only a search key: every candidate
+    it leads to is still judged by ``_isotope_round_trips``."""
+    try:
+        return Chem.MolToSmiles(_single_bond_graph(mol))
+    except Exception:
+        return None
+
+
 def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
                          stereo_blind: bool = False) -> bool:
     """True iff OPSIN parses ``candidate_name`` to a structure that is rdkit-
@@ -240,9 +477,22 @@ def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
             a, b = Chem.Mol(parsed), Chem.Mol(original_mol)
             Chem.RemoveStereochemistry(a)
             Chem.RemoveStereochemistry(b)
-            return Chem.MolToSmiles(a) == Chem.MolToSmiles(b)
+            return (Chem.MolToSmiles(a) == Chem.MolToSmiles(b)
+                    or (_same_fixed_h_inchi(a, b)
+                        and _kekule_forms_of_one_compound(a, b)))
+        # A parse whose SMILES differs from the input's is accepted only as the
+        # other Kekule alternation of the same compound: equal fixed-H InChI and
+        # every alternating circuit 4n+2 (``_kekule_forms_of_one_compound``), so
+        # a bond-shift isomer ('1-methyl(2-2H)cycloocta-1,3,5,7-tetraene' for the
+        # input's '(8-2H)') is refused. The refusal of a bond-shift isomer is
+        # recorded (``_BOND_SHIFT_PARSE_REFUSED``): the name accepted after it
+        # carries a higher locant than the one of the same constitution.
         if Chem.MolToSmiles(parsed) != Chem.MolToSmiles(original_mol):
-            return False
+            if not _same_fixed_h_inchi(parsed, original_mol):
+                return False
+            if not _kekule_forms_of_one_compound(parsed, original_mol):
+                _BOND_SHIFT_PARSE_REFUSED.set(True)
+                return False
         # (a review P4 related note): RDKit CanonSmiles can call a charged /
         # aromatic multi-component pair equal while InChI distinguishes them (the
         # same weakness fixed in ``namer._rt_match`` — measured on a cyanine dye).
@@ -287,6 +537,20 @@ _BRACKET_INDICATED_H_RE = re.compile(r"[(\[{]\d+H-")
 #: gated by the caller, so any surplus offset can only be discarded, never shipped.
 _INTERIOR_LOCANT_STEM_RE = re.compile(r"-(?=[\d,]+-[a-z])")
 
+#: The opening bracket of a ring-assembly name inside a name, e.g. the ``[`` of
+#: ``([1,1'-biphenyl]-4-yl)`` or ``[2,2'-bipyridin]-3-yl``.
+#: (the Blue Book, "They also enclose ring assembly names when these are
+#: followed by a principal group suffix or a cumulative suffix") puts the whole
+#: ring-assembly stem in brackets when a suffix follows, so the slot "before the
+#: part of the compound that is isotopically substituted" is the
+#: bracket itself: ``[(2',3',4',5',6'-2H5)[1,1'-biphenyl]-4-yl]``,
+#::7469: those brackets are ignored in the nesting order of the enclosing marks).
+#: The stem begins with a locant set, not a letter, and the
+#: bracket follows ``(`` or ``-``, so none of the rules above offered it and a
+#: labelled ring of a biphenyl-yl prefix failed closed (PubChem 1M: five
+#: deuterated OLED hosts the paper named). Every candidate stays OPSIN-RT gated.
+_RING_ASSEMBLY_STEM_RE = re.compile(r"\[(?=\d+'*(?:[,:]\d+'*)+-[a-z])")
+
 #: A SUFFIX that names a labelled HETEROATOM whose nuclide is placed immediately
 #: BEFORE the suffix it modifies (``propane-1-(34S)thiol``), rather than floated to
 #: the front of the parent -- "position not normally denoted by a locant"
@@ -324,6 +588,95 @@ _HETEROATOM_SUFFIX_STEM_RE = re.compile(
 _CARBO_AFFIX_SUFFIX_RE = re.compile(
     r"(?:carboxylic|carbonitrile|carbaldehyde)(?![a-z])"
 )
+
+
+#: A locant set as it opens a name part: numerals with an optional letter / primes
+#: (``2``, ``3a``, ``4'``) or an italic element locant (``N``, ``N1``), comma-joined,
+#: closed by the hyphen that introduces what it locates.
+_LEADING_LOCANT_SET_RE = re.compile(
+    r"(?:\d+[a-z]?'*|[A-Z][a-z]?\d*'*)(?:,(?:\d+[a-z]?'*|[A-Z][a-z]?\d*'*))*-")
+
+#: A basic or derived multiplying prefix that can open a multiplied substituent
+#: (``2,4-dimethyl``, ``3,5-bis(...)``, ``2,6-di-tert-butyl``).
+_OPENING_MULTIPLIER_RE = re.compile(
+    r"(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|bis|tris|tetrakis)"
+    r"(?=[a-z(\[{]|-(?:tert|sec)-)")
+
+
+def _slot_precedes_substituent_locant(skel: str, off: int) -> bool:
+    """Does an insertion at ``off`` sit in front of the attachment locant of a
+    DETACHABLE substituent prefix (the slot before ``-2-phenyl`` in
+    ``...-2-phenyl-1-benzofuran``, or the front of ``3-phenylpropanoic acid``)?
+
+     (the Blue Book): the nuclide symbols, "preceded by any necessary
+    locant(s)", go "before the part of the compound that is isotopically
+    substituted". A substituent prefix's attachment locant belongs to the parent it
+    locates, not to the prefix, so a descriptor for the prefix's own atoms follows
+    that locant: '4-(2-14C)ethylbenzoic acid (PIN)' (:43818), '2-(13C)methyl-3-
+    methylpyridine (PIN)' (:43764), '1-(13C)methyl(2-13C)benzene (PIN)' (:43736);
+    and a descriptor for the parent's atoms goes before the parent stem, after the
+    prefixes: '1-phenyl(1,2-13C2)ethan-1-one (PIN)' (:43732). The slot before a
+    locant is right only when that locant belongs to the labelled part itself -- an
+    indicated hydrogen ('(15N)-1H-indole (PIN)',:43790), the heteroatom locants of
+    a replacement or Hantzsch-Widman parent ('...(2H2)-1,4-dioxane', the
+    ``_INTERIOR_LOCANT_STEM_RE`` slot).
+
+    OPSIN reads the descriptor in front of a substituent locant leniently as
+    labelling that substituent, so the round trip accepts
+    '(2,3,4,5,6-2H5)-2-phenyl-1-benzofuran' as well as the Blue Book's
+    '2-(2,3,4,5,6-2H5)phenyl-1-benzofuran'; the oracle cannot choose, the grammar
+    must. True when what follows the locant set opens a substituent prefix: an
+    enclosing mark, a multiplier, an italicized structural prefix, or a prefix
+    component the shared prefix vocabulary recognises (``_is_recognised_prefix_
+    component``) that ends at a hyphen / mark or, as an ``...yl`` prefix, runs
+    straight into the parent ('phenylpropanoic acid'). A replacement or ring stem
+    ('azatricyclo', 'dioxane', 'triazin', 'benzofuran') is not a prefix component,
+    and a component that only BEGINS a stem ('oxo' in 'oxolane') is not accepted,
+    so the legitimate sub-parent slots keep their rank.
+    """
+    if off < 0 or off >= len(skel):
+        return False
+    if off == 0:
+        text = skel
+    elif skel[off] == "-":
+        text = skel[off + 1:]
+    elif skel[off].isupper() and skel[off - 1] in "-([{":
+        # the slot right before an italic element locant ('-N-phenyl')
+        text = skel[off:]
+    else:
+        return False
+    m = _LEADING_LOCANT_SET_RE.match(text)
+    if not m:
+        return False
+    after = text[m.end():]
+    if not after:
+        return False
+    if after[0] in "({":
+        return True
+    if after[0] == "[" and not after[1:2].isdigit():
+        return True
+    mm = _OPENING_MULTIPLIER_RE.match(after)
+    if mm:
+        rest = after[mm.end():]
+        if rest[:1] in "([{-":
+            return True
+        after = rest
+    from ..assembly.naming_utils import (
+        _is_recognised_prefix_component,
+        strip_italicized_structural_prefix,
+    )
+    if strip_italicized_structural_prefix(after)[1]:
+        return True
+    for k in range(len(after), 2, -1):
+        head = after[:k]
+        if not head.isalpha() or not _is_recognised_prefix_component(head):
+            continue
+        nxt = after[k:k + 1]
+        if not nxt or nxt in "-([{":
+            return True
+        if nxt.isalpha() and head.endswith(("yl", "ylidene", "ylidyne")):
+            return True
+    return False
 
 
 def _insertion_offsets(skel: str) -> List[int]:
@@ -370,6 +723,14 @@ def _insertion_offsets(skel: str) -> List[int]:
     # the introducing hyphen so a nuclide on that ring can place its descriptor
     # (e.g. '3,6-dimethyl' + '(2H2)' + '-1,4-dioxane-2,5-dione'). RT-gated.
     offsets.extend(m.start() for m in _INTERIOR_LOCANT_STEM_RE.finditer(skel))
+    # A bracketed ring-assembly stem ('[1,1'-biphenyl]-4-yl'): the slot is its
+    # opening bracket (``_RING_ASSEMBLY_STEM_RE``). RT-gated.
+    offsets.extend(m.start() for m in _RING_ASSEMBLY_STEM_RE.finditer(skel))
+    # A bracketed substituent ring opening with skeletal-replacement locants
+    # ('[9,24-dioxahexacyclo...'): the slot right after the mark
+    # (``_BRACKET_SKELETAL_LOCANT_RE``). RT-gated.
+    offsets.extend(m.start() + 1
+                   for m in _BRACKET_SKELETAL_LOCANT_RE.finditer(skel))
     return sorted(set(offsets))
 
 
@@ -431,6 +792,26 @@ def _is_heteroatom_suffix_slot(skel: str, off: int) -> bool:
     return False
 
 
+#: A name part opening with a skeletal replacement ('a') prefix or a
+#: Hantzsch-Widman stem (the (c) set of ``naming_utils``).
+from ..assembly.naming_utils import _REPLACEMENT_FRONT_RE as _REPLACEMENT_PART_RE  # noqa: E402
+
+
+#: A stereodescriptor block closing the text before a slot: '(2R,4S)', '(1r,4r)',
+#: '(E)', '(2Z,4E)'.
+_STEREO_BLOCK_END_RE = re.compile(
+    r"\((?:\d*[a-z']*[RSEZrs](?:\*)?|rel|cis|trans)"
+    r"(?:,(?:\d*[a-z']*[RSEZrs](?:\*)?))*\)$")
+
+
+def _replacement_locant_follows(rest: str) -> bool:
+    """Does ``rest`` open with a numeral locant set (after an optional hyphen)
+    that introduces a replacement prefix or Hantzsch-Widman stem ('-1,4-dioxane',
+    '2-azatricyclo')?"""
+    m = re.match(r"-?((?:\d+[a-z]?'*)(?:,\d+[a-z]?'*)*)-", rest)
+    return bool(m) and bool(_REPLACEMENT_PART_RE.match(rest[m.end():]))
+
+
 def _placement_quality(skel: str, off: int, locant_free: bool = False) -> int:
     """ placement rank for an isotope descriptor spliced at ``off``:
     ``-1`` when the descriptor is a locant-free label sitting directly before the
@@ -463,6 +844,28 @@ def _placement_quality(skel: str, off: int, locant_free: bool = False) -> int:
     if locant_free and _is_heteroatom_suffix_slot(skel, off):
         return -1
     rest = skel[off:]
+    # A replacement ('a') prefix or Hantzsch-Widman stem carries its heteroatom
+    # locants as part of its own name ('2-azatricyclo[...]', '1,4-dioxane',
+    # '1-oxaethan-1-yl'): the descriptor goes before that locant set, hyphen-joined
+    #, the Blue Book, "when the name, or a part of a name, includes
+    # a preceding locant, a hyphen is inserted"; the slot of '(15N)-1H-indole
+    # (PIN)',:43790). Splicing it between the locants and the prefix
+    # ('2-(2H8)azatricyclo') detaches the locants from what they locate.
+    # (Not at the hyphen after a stereodescriptor block, which stays:
+    # '(2R,4S)-(2-2H)-3-oxatricyclo[...]'.)
+    if _replacement_locant_follows(rest) and not (
+            rest.startswith("-") and _STEREO_BLOCK_END_RE.search(skel[:off])):
+        return 0
+    if off > 0 and _REPLACEMENT_PART_RE.match(rest) and re.search(
+            r"(?:^|[-(\[{])(?:\d+[a-z]?'*)(?:,\d+[a-z]?'*)*-$", skel[:off]):
+        return 2
+    rest = skel[off:]
+    if rest[:1].isupper() and _LEADING_LOCANT_SET_RE.match(rest):
+        # An italic element locant ('N-methyl', 'N,N-dimethyl', 'S-methyl') is a
+        # locant, not the affix: the descriptor follows it,
+        # (the Blue Book, nuclide symbols "preceded by any necessary
+        # locant(s)"): 'N-(2H3)methylbenzamide', not '(2H3)N-methylbenzamide'.
+        return 1
     if rest[:1].isalpha():
         return 0
     if _INDICATED_H_PREFIX_RE.match(rest):
@@ -849,6 +1252,19 @@ _LEADING_SKELETAL_LOCANT_RE = re.compile(
     r"^\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"
     r"(?:" + _A_PREFIX_ALT + r")")
 
+#: The same skeletal-replacement locant opening a SUBSTITUENT's ring name inside
+#: its enclosing marks, e.g. the ``9,24-`` of ``[9,24-dioxahexacyclo[...]...-yl]``.
+#: The part isotopically substituted is that ring, and its name begins with the
+#: locant set, so the descriptor goes right after the opening mark, hyphen-joined
+#: to the locant as at the front of a parent (``_LEADING_SKELETAL_LOCANT_RE``):
+#: ``[(3,4,...-2H11)-9,24-dioxahexacyclo[...]...-yl]``. No other rule offered that
+#: slot, so a labelled heteroatom von Baeyer substituent failed closed (PubChem 1M:
+#: a deuterated dibenzofuran-fused OLED host). Used by ``_insertion_offsets``
+#: (the slot is the index after the mark); every candidate stays OPSIN-RT gated.
+_BRACKET_SKELETAL_LOCANT_RE = re.compile(
+    r"[(\[{](?=\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"
+    r"(?:" + _A_PREFIX_ALT + r"))")
+
 
 def _front_hyphen_candidate(skel: str, desc: str) -> Optional[Tuple[int, str]]:
     """``(insertion_point, candidate)`` placing ``desc`` at the front of the
@@ -904,8 +1320,34 @@ def _distinct_hydroxyl_o_classes(original: Chem.Mol) -> int:
     return len(classes)
 
 
+#: A parent that cites SEVERAL nitrogens of its own suffix groups: a multiplied
+#: amine / imine / amide-type suffix ('propane-1,2-diamine', 'benzene-1,3-
+#: dicarboxamide'), or a name that already carries a numbered nitrogen locant
+#: ('N1-methylpropane-1,2-diamine'). (the Blue Book): "Superscript
+#: arabic numbers, which are the locants of the parent structure, are used to
+#: differentiate the nitrogen atoms of di- and polyamines, di- and polyimines, di-
+#: and polyamides, except for geminal amines, imines, and amides."
+_PARENT_NUMBERS_ITS_NITROGENS_RE = re.compile(
+    r"(?:di|tri|tetra|tetr|penta|hexa|hepta|octa|bis\(|tris\()"
+    r"(?:amine|imine|amide|carboxamide|sulfonamide|sulfinamide|carbothioamide"
+    r"|carboximidamide|imidamide|amidine|hydrazonamide|amidrazone)"
+    r"|(?<![A-Za-z])N\d")
+
+
+def _parent_numbers_its_nitrogens(skeleton: Optional[str]) -> bool:
+    """: does the skeleton's parent cite more than one nitrogen of its own
+    characteristic groups (so each needs its numbered ``N1`` / ``N2`` locant)?
+
+    ``None`` (no skeleton known) keeps the old answer, True, for a caller that
+    has not passed one."""
+    if skeleton is None:
+        return True
+    return _PARENT_NUMBERS_ITS_NITROGENS_RE.search(skeleton) is not None
+
+
 def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
-                              n_pos: int) -> List[str]:
+                              n_pos: int,
+                              skeleton: Optional[str] = None) -> List[str]:
     """Letter locants the placement search should offer in addition to the integer
     locants -- the amide/amine nitrogen ``N`` and the carboxyl-oxygen
     ``O``.
@@ -956,16 +1398,32 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
     form round-trips there, so ``N`` still wins. Every candidate stays OPSIN-RT
     gated (defence in depth); correctness of the numeral-vs-bare choice comes from
     the atom count, and of the numeral value from the RT-distinguishable molecules.
+
+    Two corrections (PIN spelling, PubChem 1M job): the numbered forms were offered
+    whenever the MOLECULE had several nitrogens, so a ring nitrogen of a
+    substituent made the lone amide nitrogen of an acetamide '(N1,2,2-2H3)
+    acetamide'. (the Blue Book, "In a name consisting of one word,
+    the isotopic descriptor is placed before the name, with an appropriate
+    locant") writes that nitrogen '(N-2H1)acetamide (PIN)' (:43828), and
+    (:7739) numbers the nitrogens of di- and polyamines, -imines and -amides only.
+    So the numbered forms are offered only when the SKELETON's parent cites several
+    nitrogens of its own groups (``_parent_numbers_its_nitrogens``); otherwise the
+    bare ``N`` alone. And a RING nitrogen is a skeletal atom of the ring, located
+    by its ring numeral, never by an italic letter: the D on N-3 of an
+    imidazolidine is '(3-2H)imidazolidine', not '(N3-2H)imidazolidine', so no
+    letter locant is offered for it (the integer sweep places it).
     """
     n_count = sum(1 for a in original.GetAtoms() if a.GetSymbol() == "N")
+    numbered = n_count > 1 and _parent_numbers_its_nitrogens(skeleton)
     out: List[str] = []
     for idx in label_map:
         atom = original.GetAtomWithIdx(idx)
         if atom.GetSymbol() != "H":
             continue
         nbrs = atom.GetNeighbors()
-        if nbrs and nbrs[0].GetSymbol() == "N" and not nbrs[0].GetIsAromatic():
-            if n_count <= 1:
+        if (nbrs and nbrs[0].GetSymbol() == "N" and not nbrs[0].GetIsAromatic()
+                and not nbrs[0].IsInRing()):
+            if not numbered:
                 #: a single nitrogen keeps the bare italic ``N``.
                 if "N" not in out:
                     out.append("N")
@@ -1133,11 +1591,306 @@ def _promote_isotope_to_parent_chain(
             candidate = skel[:parent_off] + desc + skel[parent_off:]
             if _isotope_round_trips(candidate, original, stereo_blind=stereo_blind):
                 #: only OMIT the locant when the position is genuinely
-                # unambiguous; otherwise fall through to the explicit-locant form.
-                if locant is None and not _placement_unambiguous(original, True):
+                # unambiguous (or the unit is completely labelled,;
+                # otherwise fall through to the explicit-locant form.
+                if (locant is None and not _placement_unambiguous(original, True)
+                        and not _unit_completely_labelled(
+                            skel, parent_off, keys, original)):
                     continue
+                if desc != desc_pref:
+                    # The always-show subscript is the parse fallback, not the
+                    # preferred spelling (see _find_best_placement).
+                    from ..metrics.provenance import record_non_pin_fragment
+                    record_non_pin_fragment(candidate)
+                    record_non_pin_fragment(_descriptor_fragment(candidate, desc))
                 return candidate
     return None
+
+
+def _nitrogen_hydrogen_needs_locant(original: Chem.Mol, skel: str, off: int) -> bool:
+    """ (the Blue Book, "Locants are not omitted when there is a
+    possibility of isomers") for a hydrogen nuclide on a NITROGEN of the parent: a
+    locant-free descriptor at the parent level (enclosing-mark depth 0) is ambiguous
+    when the parent unit of that nitrogen -- its ring system for a ring nitrogen,
+    the nitrogen and the carbon chain or ring it is bonded to for an amine or amide
+    nitrogen -- has another hydrogen-bearing position. '(N-2H1)acetamide (PIN)'
+    ,:43828), '(N-2H2)aniline (PIN)' (:43830); the ring nitrogen takes its
+    ring numeral ('(1-2H)piperidine'). OPSIN puts a locant-free D on an N-H by
+    default, so the round trip cannot see the ambiguity.
+
+    True only when every label is a hydrogen isotope on one nitrogen carrier and
+    the slot does not open a substituent prefix: a descriptor before 'amino'
+    ('4-(2H2)aminobenzoic acid') labels that prefix, whose one position needs no
+    locant."""
+    if _bracket_depth(skel, off) != 0:
+        return False
+    from ..assembly.naming_utils import _is_recognised_prefix_component
+    run = re.match(r"[a-z]+", skel[off:])
+    if run and any(_is_recognised_prefix_component(run.group(0)[:k])
+                   for k in range(3, len(run.group(0)))):
+        return False
+    carriers = set()
+    for atom in original.GetAtoms():
+        if atom.GetIsotope():
+            if atom.GetSymbol() != "H":
+                return False
+            carriers.add(_isotope_carrier(atom))
+    if len(carriers) != 1:
+        return False
+    (carrier,) = tuple(carriers)
+    try:
+        base = Chem.Mol(original)
+        for atom in base.GetAtoms():
+            atom.SetIsotope(0)
+        base_h = Chem.AddHs(base)
+        ranks = list(Chem.CanonicalRankAtoms(base_h, breakTies=False))
+    except Exception:
+        return False
+    x = base_h.GetAtomWithIdx(carrier)
+    if x.GetSymbol() != "N":
+        return False
+    ri = base_h.GetRingInfo()
+    unit = set()
+    if x.IsInRing():
+        rings = [set(r) for r in ri.AtomRings()]
+        system = set()
+        frontier = [r for r in rings if carrier in r]
+        while frontier:
+            r = frontier.pop()
+            if r <= system:
+                continue
+            system |= r
+            frontier.extend(q for q in rings if len(q & system) >= 2 and not q <= system)
+        unit = system
+    else:
+        unit = {carrier}
+        for nb in x.GetNeighbors():
+            if nb.GetSymbol() == "C":
+                unit |= _element_scope(base_h, nb.GetIdx(), "C")
+    hosts = {i for i in unit
+             if any(nb.GetSymbol() == "H" for nb in base_h.GetAtomWithIdx(i).GetNeighbors())}
+    return any(ranks[i] != ranks[carrier] for i in hosts)
+
+
+def _locant_names_the_labelled_position(skel: str, off: int, locant, keys,
+                                        original: Chem.Mol) -> bool:
+    """Does the shared locant of a hydrogen-isotope descriptor with count >= 2
+    ('(1,1,1-2H3)') name the position that carries the labels?
+
+    A descriptor cites one locant per nuclide at that position,
+    the Blue Book, "all locants are placed before the nuclide that is
+    multiplied"), so the position must hold that many hydrogens. OPSIN 2.9.0 reads
+    '(1,1,1-2H3)ethylbenzene' leniently as the CD3 compound although C1 of ethyl,
+    the atom with the free valence (1),:15813), bears two hydrogens only;
+    the PIN is '(2,2,2-2H3)ethylbenzene'. Checked by reading the same slot with ONE
+    nuclide at that locant: it must label an atom equivalent to the input's
+    labelled carrier. True when the check does not apply or cannot be made."""
+    if locant is None or len(keys) != 1:
+        return True
+    (mass, el), count, maxpos = keys[0]
+    if el != "H" or count < 2:
+        return True
+    one = format_isotope_descriptor([(locant, mass, el, 1, maxpos)])
+    smi = _opsin_parse(skel[:off] + one + skel[off:])
+    if not smi:
+        return True
+    parsed = Chem.MolFromSmiles(smi)
+    if parsed is None:
+        return True
+    try:
+        ref = Chem.RWMol(Chem.AddHs(original))
+        kept = False
+        for atom in ref.GetAtoms():
+            if atom.GetIsotope() == mass and atom.GetSymbol() == el:
+                if kept:
+                    atom.SetIsotope(0)
+                kept = True
+        want = Chem.MolToSmiles(Chem.RemoveHs(ref.GetMol()))
+        got = Chem.MolToSmiles(parsed)
+    except Exception:
+        return True
+    return want == got
+
+
+def _whole_compound_labelled(keys, original: Chem.Mol) -> bool:
+    """Is every position of each nuclide's element in the compound labelled with
+    that nuclide: every hydrogen atom for a hydrogen nuclide, every atom of the
+    element for a heavier one?"""
+    try:
+        mol = Chem.AddHs(original)
+    except Exception:
+        return False
+    for (mass, el), _count, _maxpos in keys:
+        atoms = [a for a in mol.GetAtoms() if a.GetSymbol() == el]
+        if not atoms or any(a.GetIsotope() != mass for a in atoms):
+            return False
+    return True
+
+
+def _slot_opens_substituent_prefix(skel: str, off: int) -> bool:
+    """Does a descriptor spliced at ``off`` label a substituent group: inside a
+    substituent's enclosing marks, or in front of a substituent prefix that the
+    shared prefix vocabulary recognises and that is followed by more name
+    ('(2H5)ethylbenzene', '2-(2H5)phenyl-1-benzofuran', '(2H5)ethyl acetate')?
+    A component that only begins a stem ('oxo' in 'oxolane') is not a prefix, as
+    in:func:`_slot_precedes_substituent_locant`."""
+    if off < 0 or off >= len(skel):
+        return False
+    if _bracket_depth(skel, off) > 0:
+        return True
+    from ..assembly.naming_utils import _is_recognised_prefix_component
+    text = skel[off:]
+    for k in range(len(text), 2, -1):
+        head = text[:k]
+        if not head.isalpha() or not _is_recognised_prefix_component(head):
+            continue
+        nxt = text[k:k + 1]
+        if nxt and nxt in "-([{ ":
+            return True
+        # an 'yl' prefix, or an 'oxy' prefix, running straight into the parent
+        # ('(2H5)ethylbenzene', '(2H5)ethoxybenzene')
+        if nxt.isalpha() and head.endswith(("yl", "ylidene", "ylidyne", "oxy")):
+            return True
+    return False
+
+
+def _scope_completely_labelled(original: Chem.Mol, keys) -> bool:
+    """Every hydrogen position of the element-connected unit that carries the
+    labels (:func:`_element_scope`) is labelled, for a hydrogen nuclide; every
+    atom of the unit, for a heavier one."""
+    if len(keys) != 1:
+        return False
+    (mass, el), _count, _maxpos = keys[0]
+    try:
+        mol = Chem.AddHs(original)
+    except Exception:
+        return False
+    labelled = [a for a in mol.GetAtoms() if a.GetIsotope() == mass and a.GetSymbol() == el]
+    if not labelled:
+        return False
+    carriers = {_isotope_carrier(a) for a in labelled}
+    scope = set()
+    for c in carriers:
+        scope |= _element_scope(mol, c, mol.GetAtomWithIdx(c).GetSymbol())
+    if el == "H":
+        hs = [nb for i in scope for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+              if nb.GetSymbol() == "H"]
+        return bool(hs) and all(h.GetIsotope() == mass for h in hs)
+    return all(mol.GetAtomWithIdx(i).GetIsotope() == mass for i in scope)
+
+
+def _label_keys(original: Chem.Mol):
+    """``[((mass, element), count, max_at_pos)]`` of every label of ``original``."""
+    by_key: Dict[Tuple[int, str], int] = {}
+    maxpos: Dict[Tuple[int, str], int] = {}
+    for atom in original.GetAtoms():
+        if atom.GetIsotope():
+            k = (atom.GetIsotope(), atom.GetSymbol())
+            by_key[k] = by_key.get(k, 0) + 1
+            maxpos[k] = max(maxpos.get(k, 0), _max_atoms_at_position(atom))
+    return sorted(((k, by_key[k], maxpos[k]) for k in by_key),
+                  key=lambda kv: (kv[0][1], kv[0][0]))
+
+
+def _complete_unit_spelling_unreadable(skel: str, off: int, keys,
+                                        original: Chem.Mol) -> bool:
+    """The locant-free spelling gives a completely labelled substituent
+    group at ``off`` is not read by OPSIN 2.9.0 as the input's constitution
+    ('(2H7)propylbenzene' reads as the propan-2-yl isomer), so the locanted
+    spelling that ships is not the PIN spelling. Graph check of the unit
+    (:func:`_scope_completely_labelled`), then the parse of the locant-free form."""
+    if not _slot_opens_substituent_prefix(skel, off):
+        return False
+    if not _scope_completely_labelled(original, keys):
+        return False
+    try:
+        want = Chem.MolToInchiKey(original).split('-')[0]
+    except Exception:
+        return False
+    groups = [(None, mass, el, count, maxpos) for (mass, el), count, maxpos in keys]
+    smi = _opsin_parse(skel[:off] + format_isotope_descriptor(groups) + skel[off:])
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return True
+    try:
+        return Chem.MolToInchiKey(mol).split('-')[0] != want
+    except Exception:
+        return True
+
+
+def _unit_completely_labelled(skel: str, off: int, keys,
+                              original: Chem.Mol) -> bool:
+    """: does the unit that a locant-free descriptor spliced at
+    ``off`` modifies hold no further position for any of its nuclides?
+
+    "Locants are omitted in compounds or substituent groups in which all
+    positions are completely isotopically substituted or modified in the same
+    way.", the Blue Book; '(2H6)benzene (PIN)',:44200.)
+    :func:`_placement_unambiguous` reads symmetry classes of the graph, so a
+    unit whose positions fall in SEVERAL classes and are all labelled
+    ('(2H5)ethyl': CH2 and CH3) fails it although nothing is left to place.
+
+    The unit is the one OPSIN reads the descriptor onto, so OPSIN is asked: the
+    same slot with ONE more nuclide of a kind ('(2H6)' where the candidate has
+    '(2H5)') must not describe the input's constitution. When it does, the unit
+    had a free position, the candidate fills it only partly, and a possibility
+    of isomers remains ("Locants are not omitted when there is a possibility of
+    isomers",,:44202): the caller then cites the locants.
+    '(2H5)ethylbenzene' passes (ethyl has five hydrogen atoms); a phenyl-d5 of
+    '1,1'-biphenyl' or of 'benzyl' does not (ten and seven). A hydrogen on a
+    chalcogen atom counts as a position, as in '(2-2H1)acetic acid (PIN)'
+    (:43804), so a fully labelled ethyl of ethanol keeps its locants.
+
+    The rule names two kinds of unit, "compounds or substituent groups": the
+    whole compound, when every position of the nuclide's element in it is
+    labelled ('(2H8)propane', '(2H5)glycine'), or a substituent group, when the
+    descriptor opens a substituent prefix (:func:`_slot_opens_substituent_prefix`).
+    The parent of a substituted compound is neither: a fully labelled acetamide
+    parent keeps its locants, '2-(pyridin-4-yl)-N-phenyl(N,2,2-2H3)acetamide',
+    as the unmodified analogue cites 'N,2,2-trichloro' "as in
+    unmodified names";,:3007, omits locants only in compounds or
+    substituent groups that are completely substituted).
+
+    A control parse of the candidate's own count, with its subscript shown,
+    must succeed, so an OPSIN refusal of the spelling itself is never read as
+    a full unit. This only licenses omission for a candidate that already
+    reads back to the input (the caller's round trip).
+    """
+    if not keys:
+        return False
+    if not (_slot_opens_substituent_prefix(skel, off)
+            or _whole_compound_labelled(keys, original)):
+        return False
+    try:
+        want = Chem.MolToInchiKey(original).split('-')[0]
+    except Exception:
+        return False
+    if not want:
+        return False
+
+    def _constitution(name: str) -> Optional[str]:
+        smi = _opsin_parse(name)
+        mol = Chem.MolFromSmiles(smi) if smi else None
+        if mol is None:
+            return None
+        try:
+            return Chem.MolToInchiKey(mol).split('-')[0] or None
+        except Exception:
+            return None
+
+    control = [(None, mass, el, count, maxpos)
+               for (mass, el), count, maxpos in keys]
+    if _constitution(skel[:off] + format_isotope_descriptor(control, force_show=True)
+                     + skel[off:]) != want:
+        return False
+    for i in range(len(keys)):
+        bumped = [(None, mass, el, count + (1 if j == i else 0), maxpos)
+                  for j, ((mass, el), count, maxpos) in enumerate(keys)]
+        name = (skel[:off] + format_isotope_descriptor(bumped, force_show=True)
+                + skel[off:])
+        if _constitution(name) == want:
+            return False            # room for one more -> isomers possible
+    return True
 
 
 def _find_best_placement(
@@ -1180,7 +1933,29 @@ def _find_best_placement(
     # letter locants (e.g. amide ``N``) are tried after the locant-free
     # form and before the integer locants -- an amide/amine D belongs on ``N``,
     # which no integer locant can express. RT-gated like every other candidate.
-    for locant in [None] + list(extra_locants or []) + list(range(1, n_pos + 1)):
+    #
+    # A locant here is ONE position shared by every labelled atom of a nuclide
+    # (``format_isotope_descriptor``: '(2,2,2-2H3)', three D at position 2). A
+    # nuclide with more labelled atoms than one position can bear (count >
+    # max_at_pos: four D on four aromatic CH, two 13C) has no such position, so
+    # every locanted candidate fails its round trip; only the locant-free form is
+    # tried then, and the other decorators (distinct positions, several parts)
+    # place those labels. The outcome is the one the full sweep reached; the
+    # sweep itself cost up to (positions x offsets x 2) OPSIN parses (PubChem 1M:
+    # a D4 mixture spent 58,000 of them, 60 s, on candidates that cannot parse
+    # to the drawn structure).
+    _shared_position_possible = all(
+        count <= maxpos for (_mass, _el), count, maxpos in keys)
+    _locants = [None] + ((list(extra_locants or []) + list(range(1, n_pos + 1)))
+                         if _shared_position_possible else [])
+    # Locant-free candidates for a D on a parent nitrogen with other hydrogen-
+    # bearing positions (``_nitrogen_hydrogen_needs_locant``) and locanted ones
+    # whose locant does not name the labelled position
+    # (``_locant_names_the_labelled_position``): kept aside and used only when no
+    # other candidate round-trips (then labelled below the PIN), so no name is
+    # lost.
+    held = []
+    for locant in _locants:
         groups_desc = [(locant, mass, el, count, maxpos)
                        for (mass, el), count, maxpos in keys]
         p4542 = _p4542_p4543_key(groups_desc)
@@ -1217,7 +1992,21 @@ def _find_best_placement(
                     # shipped the ambiguous nested form -- a review review 2026-09-08.)
                     if (locant is None
                             and not _placement_unambiguous(
-                                original, complete_sub_omission)):
+                                original, complete_sub_omission)
+                            and not _unit_completely_labelled(
+                                skel, off, keys, original)):
+                        continue
+                    if (locant is None
+                            and _nitrogen_hydrogen_needs_locant(original, skel, off)):
+                        held.append((p4542, loc_rank, sub_rank,
+                                     _placement_quality(skel, off, locant_free=True),
+                                     off, desc, candidate))
+                        continue
+                    if not _locant_names_the_labelled_position(
+                            skel, off, locant, keys, original):
+                        held.append((p4542, loc_rank, sub_rank,
+                                     _placement_quality(skel, off, locant_free=False),
+                                     off, desc, candidate))
                         continue
                     won.append((p4542, loc_rank, sub_rank,
                                 _placement_quality(skel, off,
@@ -1239,6 +2028,9 @@ def _find_best_placement(
             #: the first locant-form that yields ANY round-tripper is
             # the lowest-locant form; do not consider higher-locant forms.
             break
+    below_pin = False
+    if not won and held:
+        won, below_pin = held, True
     if not won:
         return None, None, None, None
     # Tie-break order: /.3 (w[0]) -> locant (w[1]) -> subscript form
@@ -1264,12 +2056,60 @@ def _find_best_placement(
     # hyphenated when the descriptor is the plain front splice (off==0) and the
     # next char is a digit, RT-gated so a non-parsing hyphenation falls back to
     # the bare form (the front-hyphen candidates above already carry their '-').
-    if (off == 0 and desc and candidate.startswith(desc)
-            and candidate[len(desc):len(desc) + 1].isdigit()):
-        hyphenated = candidate[:len(desc)] + "-" + candidate[len(desc):]
+    # The same holds inside a name: a descriptor spliced in front of a
+    # substituent or parent part that opens with a locant ('[(2H11)-9,24-
+    # dioxahexacyclo[...]...-6-yl]'), (:43718, "when the name, or a
+    # part of a name, includes a preceding locant, a hyphen is inserted").
+    _end = off + len(desc) if desc else -1
+    if (desc and candidate[off:_end] == desc
+            and candidate[_end:_end + 1].isdigit()):
+        hyphenated = candidate[:_end] + "-" + candidate[_end:]
         if _isotope_round_trips(hyphenated, original, stereo_blind=stereo_blind):
             candidate = hyphenated
+    # Below the PIN: a locant-free form kept for want of a locanted one that OPSIN
+    # reads, and a letter locant repeated for one heteroatom ('(N,N-2H2)aniline'),
+    # where the Blue Book cites the letter once ('(N-2H2)aniline (PIN)',
+    # the Blue Book), a form OPSIN 2.9.0 cannot parse.
+    # And a count subscript the preferred form omits ('ethan-1-(2H1)ol' where the
+    # Blue Book writes 'ethan(2H)ol (PIN)',, the Blue Book, and
+    # '(1-2H1)ethan-1-(2H)ol (PIN)' when a locant is required,:44214): the
+    # always-show form is only the fallback for an omitted spelling OPSIN 2.9.0
+    # cannot parse, so the name it builds is labelled below the PIN.
+    # And a descriptor in front of a D/L configurational affix: "Stereochemical
+    # affixes (for example D and L) are added according to the rules of special
+    # classes" and precede the descriptor, 'L-(4-13C,35S)methionine',
+    # the Blue Book-44128), a spelling OPSIN 2.9.0 does not read; the
+    # readable '(3-13C)L-alanine' is kept below the PIN.
+    # And a completely labelled substituent group whose locant-free spelling
+    #,:44196) OPSIN 2.9.0 misreads keeps its locants, below the PIN
+    # ('(1,1,2,2,3,3,3-2H7)propylbenzene').
+    if (below_pin or _sub_rank == 1
+            or re.match(r"(?:D|L|DL)-", candidate[off + len(desc):] if desc else "")
+            or (isinstance(loc_rank, int) and loc_rank >= 1
+                and _complete_unit_spelling_unreadable(skel, off, keys, original))
+            or (isinstance(loc_rank, str) and desc
+                and f"{loc_rank},{loc_rank}-" in desc)):
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(candidate)
+        record_non_pin_fragment(_descriptor_fragment(candidate, desc))
     return candidate, off, desc, loc_rank
+
+
+def _descriptor_fragment(name: str, desc: str) -> str:
+    """The descriptor ``desc`` in ``name`` together with the name part it modifies
+    (up to the end of that part's first alphabetic run): '(2H1)ol' in
+    'ethan-1-(2H1)ol'. A below-PIN mark recorded on this fragment still finds the
+    name when other descriptors are spliced in around it (the multi-position
+    decorator combines per-group candidates into one name)."""
+    start = name.find(desc) if desc else -1
+    if start < 0:
+        return ""
+    j = start + len(desc)
+    while j < len(name) and not name[j].isalpha():
+        j += 1
+    while j < len(name) and name[j].isalpha():
+        j += 1
+    return name[start:j]
 
 
 def _mask_isotopes(mol: Chem.Mol, keep_indices) -> Chem.Mol:
@@ -1458,6 +2298,7 @@ def _forced_locant_skeleton(namer, stripped_smiles: Optional[str],
 def _decorate_multi_position(
     skeleton: str, groups: List[Dict[int, int]], original: Chem.Mol, n_pos: int,
     namer=None, stripped_smiles: Optional[str] = None,
+    merge_collisions: bool = False,
 ) -> Optional[str]:
     """Place ONE descriptor per attachment GROUP, each at its own insertion
     offset + /.2/.3 -- different labelled parts of a
@@ -1517,7 +2358,8 @@ def _decorate_multi_position(
             # letter locants ITS atoms justify; still OPSIN-RT gated (0-wrong).
             # ``complete_sub_omission`` stays False here (see ``_placement_unambiguous``:
             # a multi-descriptor name must cite all locants once any is required).
-            group_letter_locants = _letter_locant_candidates(original, group, n_pos)
+            group_letter_locants = _letter_locant_candidates(
+                original, group, n_pos, skeleton=skel)
             _cand, off, desc, loc_rank = _find_best_placement(
                 skel, group_keys, masked, n_pos,
                 extra_locants=group_letter_locants)
@@ -1525,33 +2367,102 @@ def _decorate_multi_position(
                 return None, False
             if isinstance(loc_rank, int) and loc_rank >= 1:
                 any_positional = True
-            placements.append((off, desc))
+            placements.append((off, desc, loc_rank, group_keys))
         return placements, any_positional
 
-    def _assemble(skel: str, placements: List[Tuple[int, str]]) -> Optional[str]:
-        # Colliding offsets have no principled merge order here -> fail closed
-        # rather than guess (this has not been observed on any verified witness).
-        offsets_seen = [p[0] for p in placements]
-        if len(set(offsets_seen)) != len(offsets_seen):
+    def _merged(placements) -> Optional[List[Tuple[int, str]]]:
+        """One descriptor per insertion offset. Groups whose descriptors land at the
+        SAME offset label the same part of the name. (the Blue Book)
+        places the nuclide symbols, "preceded by any necessary locant(s), letters,
+        and/or numerals, before the part of the compound that is isotopically
+        substituted", and "When two or more nuclide symbols appear at the same place
+        in the name they are cited first in alphabetical order and then by their
+        mass number" -- one descriptor for that place, citing every labelled
+        position of the part: the D of a CD2 (locant 2) and of the amide NH (locant
+        N) of one acetamide give '(N,2,2-2H3)acetamide',:43824, with its
+        PIN '(N-2H1)acetamide',:43828; locant order,:3195, "Italic
+        capital and lower-case letter locants are lower than Greek letter locants,
+        which, in turn, are lower than numerals"). The labels of one nuclide pool
+        their locants (a scalar locant once per atom at it); different nuclides stay
+        separate groups in that order (``format_isotope_descriptor``). Collisions are
+        merged only on the last-resort call (``merge_collisions``, made after every
+        other placement strategy declined, so no name that ships without it
+        changes); otherwise, and when a colliding group is placed without a locant
+        (it cannot share a descriptor that cites locants), a collision fails closed
+        (None) as before."""
+        by_off: Dict[int, list] = {}
+        for off, desc, loc_rank, group_keys in placements:
+            by_off.setdefault(off, []).append((desc, loc_rank, group_keys))
+        out: List[Tuple[int, str]] = []
+        for off, items in by_off.items():
+            if len(items) == 1:
+                out.append((off, items[0][0]))
+                continue
+            if not merge_collisions or any(
+                    loc_rank == -1 for _d, loc_rank, _k in items):
+                return None
+            pooled: Dict[Tuple[int, str], Tuple[List, int]] = {}
+            for _d, loc_rank, group_keys in items:
+                for (mass, el), count, maxpos in group_keys:
+                    locs, mp = pooled.get((mass, el), ([], 0))
+                    pooled[(mass, el)] = (locs + [str(loc_rank)] * count,
+                                          max(mp, maxpos))
+            groups_desc = [
+                (tuple(sorted(locs, key=_locant_sort_key)), mass, el, len(locs), mp)
+                for (mass, el), (locs, mp) in pooled.items()]
+            out.append((off, format_isotope_descriptor(groups_desc)))
+        return out
+
+    def _assemble(skel: str, placements) -> Optional[str]:
+        # Descriptors that land at one offset are merged into one (``_merged``);
+        # a collision it cannot merge fails closed.
+        placements = _merged(placements)
+        if placements is None:
             return None
-        # Splice from the HIGHEST offset down so an earlier offset is never
-        # shifted by a later insertion.
-        placements = sorted(placements, key=lambda p: -p[0])
-        out = skel
-        for off, desc in placements:
-            out = out[:off] + desc + out[off:]
-        #: step up the enclosing marks of any substituent that just
-        # received a descriptor INSIDE its own marks (``(1-bromopropyl)`` +
-        # ``(81Br)`` -> ``[1-(81Br)bromopropyl]``). The final start index of each
-        # descriptor in ``out`` is its own offset plus the total length of every
-        # descriptor spliced at a LOWER offset (each rewrite below preserves length,
-        # so these indices stay valid through the cascade).
-        shift = 0
-        for off, desc in sorted(placements):
-            out = _escalate_marks_for_descriptor(out, off + shift)
-            shift += len(desc)
-        if _isotope_round_trips(out, original):
-            return out
+        # (the Blue Book): "Immediately after the parentheses there
+        # is neither space nor hyphen, except that when the name, or a part of a
+        # name, includes a preceding locant, a hyphen is inserted" -- on the merging
+        # call (``merge_collisions``, the last resort) a descriptor spliced right
+        # before a locant digit is hyphen-joined to it ('(15N)-1H-indole'), as the
+        # single-descriptor and distinct-position paths do; the bare splice stays
+        # the fallback when OPSIN does not read the hyphenated one. The first call
+        # keeps its bare splice, so no name it already builds changes.
+        variants = []
+        for hyphenate in ((True, False) if merge_collisions else (False,)):
+            inserts = [(off, desc + ("-" if hyphenate and skel[off:off + 1].isdigit()
+                                     else "")) for off, desc in placements]
+            if inserts not in variants:
+                variants.append(inserts)
+        for inserts in variants:
+            # Splice from the HIGHEST offset down so an earlier offset is never
+            # shifted by a later insertion.
+            out = skel
+            for off, ins in sorted(inserts, key=lambda p: -p[0]):
+                out = out[:off] + ins + out[off:]
+            #: step up the enclosing marks of any substituent that just
+            # received a descriptor INSIDE its own marks (``(1-bromopropyl)`` +
+            # ``(81Br)`` -> ``[1-(81Br)bromopropyl]``). The final start index of each
+            # descriptor in ``out`` is its own offset plus the total length of every
+            # insert spliced at a LOWER offset (each rewrite below preserves length,
+            # so these indices stay valid through the cascade).
+            shift = 0
+            for off, ins in sorted(inserts):
+                out = _escalate_marks_for_descriptor(out, off + shift)
+                shift += len(ins)
+            if _isotope_round_trips(out, original):
+                # One merged descriptor for a completely labelled substituent group
+                # whose locant-free spelling, the Blue Book) OPSIN
+                # 2.9.0 misreads: the locanted name ships below the PIN
+                # ('(1,1,2,2,3,3,3-2H7)propylbenzene').
+                if len(placements) == 1:
+                    _all_keys = _label_keys(original)
+                    if (_all_keys and _complete_unit_spelling_unreadable(
+                            skel, placements[0][0], _all_keys, original)):
+                        from ..metrics.provenance import record_non_pin_fragment
+                        record_non_pin_fragment(out)
+                        record_non_pin_fragment(
+                            _descriptor_fragment(out, placements[0][1]))
+                return out
         return None
 
     placements, any_positional = _place(skeleton)
@@ -1649,11 +2560,19 @@ def _decorate_distinct_multi_locant(
     # Single-label canonical reference (isotopes kept) for each labelled atom,
     # grouped: {reference_smiles: how many atoms carry it}. Symmetric atoms share
     # one reference and must be filled from the SAME locant class.
+    #
+    # Two keys name the labelled atom: the canonical SMILES (as before), and, when
+    # that leaves a reference class unfilled, the bond-order-free key
+    # (``_bond_order_free_key``): OPSIN can write a conjugated ring RDKit does not
+    # perceive as aromatic in the other Kekule alternation than the input, so no
+    # probe's SMILES equals any reference although each probe labels a real atom.
     try:
-        ref_count: Dict[str, int] = {}
+        ref_counts: Tuple[Dict[str, int], Dict[str, int]] = ({}, {})
         for idx in my_atoms:
-            r = Chem.MolToSmiles(_mask_isotopes(original, [idx]))
-            ref_count[r] = ref_count.get(r, 0) + 1
+            masked = _mask_isotopes(original, [idx])
+            for kind, r in enumerate((Chem.MolToSmiles(masked),
+                                      _bond_order_free_key(masked))):
+                ref_counts[kind][r] = ref_counts[kind].get(r, 0) + 1
     except Exception:
         return None
     sym = nuclide_symbol(mass, el)
@@ -1676,9 +2595,17 @@ def _decorate_distinct_multi_locant(
     seen: set = set()
     offs = [o for o in ([0] + _insertion_offsets(skeleton))
             if not (o in seen or seen.add(o))]
+    #: a slot in front of a substituent prefix's attachment locant is not
+    # a place the Blue Book puts a descriptor (``_slot_precedes_substituent_
+    # locant``), but OPSIN reads it back, and the first offset that round-trips
+    # wins below. Try those slots last (stable), so the Blue Book slot -- after
+    # the locant, before the prefix or the parent stem it labels -- is found first
+    # ('2-(2,3,4,5,6-2H5)phenyl-1-benzofuran', not '(2,3,4,5,6-2H5)-2-phenyl-1-
+    # benzofuran'); a molecule whose only round-tripper is such a slot still names.
+    offs.sort(key=lambda o: _slot_precedes_substituent_locant(skeleton, o))
     for off in offs:
         # locant token -> single-label isotopomer at this offset
-        loc_canon: Dict[str, str] = {}
+        loc_canons: Tuple[Dict[str, str], Dict[str, str]] = ({}, {})
         for tok in loc_tokens:
             probe = f"({tok}-{sym}1)"
             s = _opsin_parse(skeleton[:off] + probe + skeleton[off:])
@@ -1686,16 +2613,21 @@ def _decorate_distinct_multi_locant(
                 continue
             pm = Chem.MolFromSmiles(s)
             if pm is not None:
-                loc_canon[tok] = Chem.MolToSmiles(pm)
-        if not loc_canon:
+                loc_canons[0][tok] = Chem.MolToSmiles(pm)
+                loc_canons[1][tok] = _bond_order_free_key(pm)
+        if not loc_canons[0]:
             continue
-        # invert: reference_smiles -> locant tokens that reproduce it (lowest-first)
-        by_ref: Dict[str, List[str]] = {}
-        for tok in sorted(loc_canon, key=_locant_sort_key):
-            by_ref.setdefault(loc_canon[tok], []).append(tok)
-        # each reference class must be fillable from its own locant class
-        if any(ref not in by_ref or len(by_ref[ref]) < need
-               for ref, need in ref_count.items()):
+        # invert: reference key -> locant tokens that reproduce it (lowest-first);
+        # each reference class must be fillable from its own locant class, under the
+        # SMILES key or else under the bond-order-free key.
+        for loc_canon, ref_count in zip(loc_canons, ref_counts):
+            by_ref: Dict[str, List[str]] = {}
+            for tok in sorted(loc_canon, key=_locant_sort_key):
+                by_ref.setdefault(loc_canon[tok], []).append(tok)
+            if not any(ref is None or ref not in by_ref or len(by_ref[ref]) < need
+                       for ref, need in ref_count.items()):
+                break
+        else:
             continue
         # count candidate locant-set combinations; fail closed if unbounded
         combos = 1
@@ -1732,7 +2664,17 @@ def _decorate_distinct_multi_locant(
                 for join in joins:
                     cand = skeleton[:off] + desc + join + skeleton[off:]
                     if _isotope_round_trips(cand, original):
-                        return _escalate_marks_for_descriptor(cand, off)
+                        cand = _escalate_marks_for_descriptor(cand, off)
+                        # A completely labelled substituent group cites no locants
+                        #, the Blue Book); when OPSIN 2.9.0 misreads
+                        # that spelling ('(2H7)propylbenzene' as the propan-2-yl
+                        # isomer) the locanted name ships below the PIN.
+                        if _complete_unit_spelling_unreadable(skeleton, off, keys,
+                                                              original):
+                            from ..metrics.provenance import record_non_pin_fragment
+                            record_non_pin_fragment(cand)
+                            record_non_pin_fragment(_descriptor_fragment(cand, desc))
+                        return cand
     return None
 
 
@@ -2098,7 +3040,11 @@ def _decorate_letter_multiplier(skeleton, keys, original, stripped,
             # spelling -- e.g. ``(N-11C1)`` -- not the one this function is
             # built to produce).
             desc = format_isotope_descriptor([(None, mass, el, 1, maxpos)])
-            candidate = f"{prefix}{bare_seg}{letter}-{desc}{base}{tail}"
+            # (the Blue Book): the labelled copy is cited before
+            # the unlabelled ones ("The isotopically modified substituent is
+            # preferred alphabetically to the unmodified substituent").
+            candidate = (f"{prefix}{letter}-{desc}{base}"
+                         f"{('-' + bare_seg[:-1]) if bare_seg else ''}{tail}")
             # ``stereo_blind`` caller): compare CONSTITUTION only so the
             # stereodescriptor-less split reproduces the connectivity; the caller
             # re-gates the stereodescriptor-prefixed candidate full-InChIKey. The
@@ -2211,16 +3157,20 @@ def _decorate_demultiplied(skeleton, keys, original, stripped,
             loc_to_label = dict(zip(chosen, perm))
             for k in valid_ks:
                 base, parent = tail[:k], tail[k:]
-                segs = []
+                # (the Blue Book): "The isotopically modified
+                # substituent is preferred alphabetically to the unmodified
+                # substituent": the labelled copies are cited first ('N-[7-(131I)
+                # iodo-6-iodo-9H-fluoren-2-yl]acetamide (PIN)',:43762).
+                lab_segs, bare_segs = [], []
                 for L in locs:
                     if L in loc_to_label:
                         mass, el = loc_to_label[L]
                         desc = format_isotope_descriptor(
                             [(None, mass, el, 1, maxpos_of[(mass, el)])])
-                        segs.append(f"{L}-{desc}{base}")
+                        lab_segs.append(f"{L}-{desc}{base}")
                     else:
-                        segs.append(f"{L}-{base}")
-                cand = "-".join(segs) + parent
+                        bare_segs.append(f"{L}-{base}")
+                cand = "-".join(lab_segs + bare_segs) + parent
                 # ``stereo_blind`` caller): compare CONSTITUTION only so a
                 # de-multiplied constitution that lacks the stereodescriptor still
                 # passes; the caller re-gates the stereo-prefixed candidate on the
@@ -2266,11 +3216,10 @@ def _decorate_reduced_multiplier(skeleton, keys, original, stripped,
     (``:44149``, "Numbering... is not changed from that of... the unmodified
     compound") is honoured automatically.
 
-    Citation order — (``:3446``: "the principles of alphanumerical order do
-    not include... isotopic... descriptors") makes both segments alphabetise to
-    the IDENTICAL substituent word, so the tie is broken by (``:3442``:
-    when the Roman letters are identical, compare the initial locants, lowest
-    first): the segment whose lowest locant is smaller is cited first.
+    Citation order — (``:43758``): "The isotopically modified
+    substituent is preferred alphabetically to the unmodified substituent", so the
+    labelled segment is cited first whatever its locant ('N-[7-(131I)iodo-6-iodo-
+    9H-fluoren-2-yl]acetamide (PIN)', ``:43762``).
 
     Scope (bounded, PIN-safe, isotope-path only): ONE labelled copy of ONE nuclide
     with TWO OR MORE bare copies. Every candidate is OPSIN-RT gated (0-wrong);
@@ -2326,12 +3275,12 @@ def _decorate_reduced_multiplier(skeleton, keys, original, stripped,
     def _assemble(lab_loc: int, k: int) -> str:
         base, parent = tail[:k], tail[k:]
         bare_locs = [L for L in locs if L != lab_loc]
-        lab_seg = (lab_loc, f"{lab_loc}-{desc}{base}")
-        bare_seg = (min(bare_locs),
-                    f"{','.join(str(L) for L in bare_locs)}-{_RED[len(bare_locs)]}{base}")
-        #: identical substituent word -> lower initial locant cited first.
-        first, second = sorted((lab_seg, bare_seg), key=lambda s: s[0])
-        return f"{first[1]}-{second[1]}{parent}"
+        lab_seg = f"{lab_loc}-{desc}{base}"
+        bare_seg = f"{','.join(str(L) for L in bare_locs)}-{_RED[len(bare_locs)]}{base}"
+        # (the Blue Book): "The isotopically modified substituent
+        # is preferred alphabetically to the unmodified substituent", whatever the
+        # locants ('N-[7-(131I)iodo-6-iodo-9H-fluoren-2-yl]acetamide (PIN)',:43762).
+        return f"{lab_seg}-{bare_seg}{parent}"
 
     # Enumerate the labelled copy over the parent's fixed locant set; RT-gate each;
     # keeps the lowest labelled locant. The trailing candidate string makes
@@ -2346,6 +3295,95 @@ def _decorate_reduced_multiplier(skeleton, keys, original, stripped,
         return None
     winners.sort(key=lambda w: (w[0], w[1], w[2]))
     return winners[0][2]
+
+
+#: One locant token of a multiplied prefix group: a numeral with an optional
+#: letter and primes ('2', '4a', "4'") or an italic element locant with an
+#: optional superscript numeral and primes ('N', 'N2', "N'", 'O').
+_GROUP_LOCANT = r"(?:\d+[a-z]?'*|[A-Z][a-z]?\d*'*)"
+#: A multiplied simple prefix group anywhere in a name: its locant set, a basic
+#: multiplying prefix and the prefix word ('2,7-diphenyl', 'N2,N4-dimethyl',
+#: "N,N'-dimethyl", 'N,N-dimethyl', '6,7-diiodo' inside a substituent).
+_MULT_GROUP_RE = re.compile(
+    rf"(?:^|(?<=[-(\[{{]))(?P<locs>{_GROUP_LOCANT}(?:,{_GROUP_LOCANT})+)-"
+    r"(?P<mult>di|tri|tetra|penta|hexa)(?P<word>[a-z]+)")
+
+
+def _group_locant_key(tok: str) -> tuple:
+    """ (the Blue Book) order of the locants of one group: "Italic
+    capital and lower-case letter locants are lower than... numerals"; primes
+    follow the unprimed locant."""
+    primes = tok.count("'")
+    core = tok.replace("'", "")
+    if core[:1].isdigit():
+        num = int(re.match(r"\d+", core).group())
+        return (1, "", num, core[len(str(num)):], primes)
+    m = re.match(r"([A-Z][a-z]?)(\d*)", core)
+    return (0, m.group(1), int(m.group(2) or 0), "", primes)
+
+
+def _decorate_one_labelled_copy(skeleton, keys, original, stripped,
+                                stereo_blind: bool = False) -> Optional[str]:
+    """: a multiplied prefix group ONE of whose copies carries every
+    label is cited as two groups, the labelled copy first.
+
+    "When two substituent groups are isotopically modified in different ways so
+    that they cannot be combined together using multiplicative terms such as
+    'di-', 'bis-', etc., they are cited separately. The isotopically modified
+    substituent is preferred alphabetically to the unmodified substituent."
+    , the Blue Book; '2-(13C)methyl-3-methylpyridine (PIN)',
+    :43764; 'N-[7-(131I)iodo-6-iodo-9H-fluoren-2-yl]acetamide (PIN)',:43762.)
+
+    The splitters above take a group at the front of the name with numeral
+    locants and one nuclide atom per copy. This one takes the group anywhere
+    (inside a substituent's marks too), with numeral or italic locants
+    ('N2,N4-dimethyl', "N,N'-dimethyl", 'N,N-dimethyl') and any number of labels
+    on the one copy ('(2H5)phenyl', '(2H3)methyl'). The copy's descriptor carries
+    no locant, which is licensed only when the copy is completely labelled
+    ,:func:`_unit_completely_labelled`); otherwise it declines. The
+    other copies keep a reduced multiplier. Among the numberings OPSIN reads back,
+    the labelled copy takes the lowest locant,:44172). Every candidate
+    is OPSIN-RT gated against the input (0-wrong); nothing that does not read back
+    is returned."""
+    from ..assembly.naming_utils import _SIMPLE_PREFIX_VOCABULARY
+    desc_groups = [(None, mass, el, count, maxpos)
+                   for (mass, el), count, maxpos in keys]
+    desc = format_isotope_descriptor(desc_groups)
+    winners = []
+    for m in _MULT_GROUP_RE.finditer(skeleton):
+        locs = m.group("locs").split(",")
+        n = _MULT_TO_COUNT[m.group("mult")]
+        if len(locs) != n:
+            continue
+        word = m.group("word")
+        bases = [word[:k] for k in range(len(word), 0, -1)
+                 if word[:k] in _SIMPLE_PREFIX_VOCABULARY]
+        if not bases:
+            continue
+        base = bases[0]
+        pre, rest = skeleton[:m.start()], skeleton[m.start("word") + len(base):]
+        if not _isotope_round_trips(
+                pre + "-".join(f"{L}-{base}" for L in locs) + rest, stripped):
+            continue                     # the word boundary is not 'base'
+        for i, lab in enumerate(locs):
+            others = locs[:i] + locs[i + 1:]
+            bare = (f"{others[0]}-{base}" if len(others) == 1 else
+                    f"{','.join(others)}-{_COUNT_TO_MULT[len(others)]}{base}")
+            head = pre + f"{lab}-"
+            off = len(head)
+            plain = head + f"{base}-{bare}{rest}"
+            if not _unit_completely_labelled(plain, off, keys, original):
+                continue
+            cand = _escalate_marks_for_descriptor(
+                head + f"{desc}{base}-{bare}{rest}", off)
+            if _isotope_round_trips(cand, original, stereo_blind=stereo_blind):
+                winners.append((_group_locant_key(lab), cand))
+        if winners:
+            break
+    if not winners:
+        return None
+    winners.sort()
+    return winners[0][1]
 
 
 def _decorate_uniform_multiplier(skeleton, keys, original, stripped,
@@ -2563,6 +3601,12 @@ def _decorate_mixed_locant(skeleton: str, keys, original: Chem.Mol,
                              off, _escalate_marks_for_descriptor(cand, off)))
         if winners:
             winners.sort(key=lambda w: (w[0], w[1], w[2], w[3]))
+            if winners[0][0] == 1:
+                # The always-show subscript is the parse fallback, not the
+                # preferred spelling (see _find_best_placement).
+                from ..metrics.provenance import record_non_pin_fragment
+                record_non_pin_fragment(winners[0][3])
+                record_non_pin_fragment(_descriptor_fragment(winners[0][3], desc_force))
             return winners[0][3]
     return None
 
@@ -2732,9 +3776,106 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     # known to be REQUIRED): the weaker flag must not gag the omissions that stay
     # correct under, i.e. ``(13C1)benzenehexol`` and ``(2H6)benzene``.
     from ..assembly.locant_omission import isotopic_naming_scope
-    with isotopic_naming_scope("isotope"):
-        return _decorate_isotopic_name_inner(
-            smiles, style, namer, original, stripped, label_map)
+    _shift_token = _BOND_SHIFT_PARSE_REFUSED.set(False)
+    try:
+        with isotopic_naming_scope("isotope"):
+            result = _decorate_isotopic_name_inner(
+                smiles, style, namer, original, stripped, label_map)
+            if result is None:
+                result = _decorate_with_identical_prefixes_apart(
+                    smiles, style, namer, original, stripped, label_map)
+        if (result and _BOND_SHIFT_PARSE_REFUSED.get()
+                and _has_fused_localized_alternation(original)):
+            # A fused mancude parent names no ene locants, so for the drawing
+            # whose lower-locant name reads back as its bond-shift isomer the
+            # name has a higher locant ('(3-2H)pentalene' against '(1-2H)'), and
+            # the PIN of that drawing carries a Delta descriptor,
+            # "Localized double bonds" (the Blue Book,:14597 "this
+            # differentiation is indicated by the use of the Greek letter Delta";
+            # '1,6-dimethyl-Delta1(10a)-heptalene (PIN)':14601), which OPSIN 2.9.0
+            # cannot read. The name is kept and labelled below the PIN.
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(result)
+        return result
+    finally:
+        _BOND_SHIFT_PARSE_REFUSED.reset(_shift_token)
+
+
+def _has_fused_localized_alternation(mol: Chem.Mol) -> bool:
+    """True iff ``mol`` has a fused ring system (two or more rings sharing a bond)
+    whose ring atoms are all unsaturated (aromatic, or in a ring double bond) and
+    that carries a ring double bond RDKit does not perceive as aromatic: a mancude
+    fused parent named by fusion nomenclature, which cites no ene locants
+    (pentalene, heptalene, s-indacene). A monocycle cites its ene locants
+    ('cycloocta-1,3,5,7-tetraene', and is not such a system."""
+    try:
+        ri = mol.GetRingInfo()
+        rings = [set(r) for r in ri.BondRings()]
+    except Exception:
+        return False
+    if len(rings) < 2:
+        return False
+    # fused systems: rings that share a bond
+    systems: List[set] = []
+    for r in rings:
+        merged = [sys_ for sys_ in systems if sys_ & r]
+        new = set(r)
+        for m in merged:
+            new |= m
+            systems.remove(m)
+        systems.append(new)
+    double = Chem.BondType.DOUBLE
+    for bonds in systems:
+        n_rings = sum(1 for r in rings if r <= bonds)
+        if n_rings < 2:
+            continue
+        bs = [mol.GetBondWithIdx(i) for i in bonds]
+        if not any(b.GetBondType() == double and not b.GetIsAromatic() for b in bs):
+            continue
+        atoms = {a for b in bs for a in (b.GetBeginAtomIdx(), b.GetEndAtomIdx())}
+        if all(mol.GetAtomWithIdx(a).GetIsAromatic()
+               or any(b.GetBondType() == double and b.IsInRing()
+                      for b in mol.GetAtomWithIdx(a).GetBonds())
+               for a in atoms):
+            return True
+    return False
+
+
+def _decorate_with_identical_prefixes_apart(smiles, style, namer, original, stripped,
+                                            label_map) -> Optional[str]:
+    """The decoration of a skeleton named with its identical prefixes of different
+    atoms cited apart, when the grouped skeleton could not carry the labels.
+
+     'Different isotopic modifications on otherwise identical
+    substituents' (the Blue Book): "When two substituent groups are
+    isotopically modified in different ways so that they cannot be combined
+    together using multiplicative terms such as 'di-', 'bis-', etc., they are cited
+    separately" (:43758). The skeleton is named without its labels, so an
+    N-substituent and a ring prefix of one name form one group ('N,N,6-triphenyl-
+    ...-9H-carbazol-3-amine'), and a label on one member ('6-(2H5)phenyl') has no
+    place in it. Inside ``identical_prefixes_cited_apart`` the producers cite each
+    source's groups on their own ('N,N-diphenyl-6-phenyl-...'), and the same
+    enumeration and round trip run on that skeleton. Only when that skeleton is
+    spelled differently. The name also separates groups whose members carry the
+    same labels, so it is recorded non-PIN (labelled below the PIN)."""
+    from ..assembly.composition_primitives import identical_prefixes_cited_apart
+    stripped_smiles = Chem.MolToSmiles(stripped)
+    try:
+        grouped = (namer.name(stripped_smiles),
+                   _flagged_systematic_namer(namer).name(stripped_smiles))
+        with identical_prefixes_cited_apart():
+            apart = (namer.name(stripped_smiles),
+                     _flagged_systematic_namer(namer).name(stripped_smiles))
+            if apart == grouped:
+                return None
+            result = _decorate_isotopic_name_inner(
+                smiles, style, namer, original, stripped, label_map)
+    except Exception:  # noqa: BLE001 - an optional second spelling
+        return None
+    if result:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(result)
+    return result
 
 
 def _flagged_systematic_namer(namer):
@@ -2802,10 +3943,24 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # ``methoxybenzene`` wins). ``systematic_name`` is named at the caller's tier
     # (p4-trace) so a best-effort skeleton stays reachable. Every candidate below
     # is ``_isotope_round_trips``-gated, so a wrong skeleton choice fails closed.
+    # Each skeleton naming records its own provenance (the producer that named
+    # it); the shipped name then carries the provenance of the skeleton it was
+    # built on. Without the snapshots the systematic skeleton's producer (the
+    # general engine at the best-effort tier) stayed recorded when the name was
+    # built on the PIN skeleton: '(1-2H)pentalene' read systematic_verified at the
+    # best-effort tier and pin_verified at the PIN tier.
+    from ..metrics.provenance import get_provenance, restore_provenance
+    _prov_before = get_provenance()
     systematic_name = (namer.name(stripped_smiles) if style == "systematic"
                        else _flagged_systematic_namer(namer).name(stripped_smiles))
-    pin_name = (systematic_name if style == "systematic"
-                else namer.name(stripped_smiles))
+    _prov_systematic = get_provenance()
+    if style == "systematic":
+        pin_name = systematic_name
+        _prov_pin = _prov_systematic
+    else:
+        restore_provenance(_prov_before)
+        pin_name = namer.name(stripped_smiles)
+        _prov_pin = get_provenance()
 
     def _usable(s: Optional[str]) -> bool:
         return bool(s) and "unknown" not in s.lower() and not is_failure_name(s)
@@ -2893,7 +4048,6 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # ``_find_best_placement`` so the multi-attachment path below can reuse it
     # unchanged; this closure is a thin adapter preserving the existing
     # ``(candidate, loc_rank)`` contract used by the rest of this function.)
-    letter_locants = _letter_locant_candidates(original, label_map, n_pos)
 
     def _enumerate(skel):
         """Best (candidate, loc_rank) for one skeleton spelling, or (None, None).
@@ -2901,9 +4055,13 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         ``loc_rank`` is -1 when the winning descriptor needs NO locant, else the
         locant. That value is the trigger: see below.
         """
+        # The letter locants depend on the skeleton spelled: numbered
+        # N locants only for a parent citing several nitrogens of its own groups).
         candidate, _off, _desc, loc_rank = _find_best_placement(
             skel, keys, original, n_pos, allow_front_hyphen=True,
-            extra_locants=letter_locants, complete_sub_omission=True)
+            extra_locants=_letter_locant_candidates(
+                original, label_map, n_pos, skeleton=skel),
+            complete_sub_omission=True)
         return candidate, loc_rank
 
     def _place_on_skeleton(skeleton: str, is_pin_pass: bool) -> Optional[str]:
@@ -2961,7 +4119,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
 
         best, loc_rank = _enumerate(skeleton)
         if best is None:
-            return None
+            return _decorate_one_labelled_copy(skeleton, keys, original, stripped)
 
         # ── criterion (k) (the Blue Book), the senior-chain isotope
         # tie-break ──────────────────────────────────────────────────────────────────
@@ -3002,8 +4160,13 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         # (which handles integer positions on the parent chain/ring) does not apply --
         # skip it for non-int ranks.
         if isinstance(loc_rank, int) and loc_rank >= 1:
+            # The re-render records its own producer; the name built on it carries
+            # that record, a name kept on ``skeleton`` does not.
+            _prov_skeleton = get_provenance()
             with _isotope_locant_scopes(original):
                 skel2 = _flagged_systematic_namer(namer).name(stripped_smiles)
+            _prov_skel2 = get_provenance()
+            restore_provenance(_prov_skeleton)
             # (converse): on the retained/PIN pass the systematic
             # re-render can be a DIFFERENT parent word (``ethanoic acid`` for
             # ``acetic acid``); the converse keeps the retained PIN, so accept the
@@ -3017,6 +4180,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
                 # Fail toward the locanted spelling only if it still round-trips; never
                 # trade a verified name for an unverified one.
                 if best2 is not None:
+                    restore_provenance(_prov_skel2)
                     return best2
         return best
 
@@ -3059,6 +4223,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # Retained/PIN skeleton first, systematic second converse). Every
     # candidate is OPSIN-RT-gated inside ``_place_on_skeleton`` (0-wrong).
     for _skel, _is_pin_pass in specs:
+        restore_provenance(_prov_pin if _skel == pin_name else _prov_systematic)
         placed = _place_on_skeleton(_skel, _is_pin_pass)
         if placed is not None:
             return placed
@@ -3068,6 +4233,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # candidate above. ``skeleton`` is the systematic spelling (or the sole usable
     # one), i.e. the same parent the pre-loop code fell back to.
     skeleton = specs[-1][0]
+    restore_provenance(_prov_pin if skeleton == pin_name else _prov_systematic)
     # A3 Task 1 + multi-position placement): the single
     # combined descriptor above shares ONE locant across every labelled
     # atom of a nuclide, which cannot express labels sitting at more than
@@ -3136,10 +4302,24 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # driven, full-InChIKey gated). Tried last so a plain (non-stereo) row is
     # never charged its cost.
     stereo = _decorate_isotope_stereo(
-        skeleton, keys, original, stripped, n_pos, letter_locants)
+        skeleton, keys, original, stripped, n_pos,
+        _letter_locant_candidates(original, label_map, n_pos, skeleton=skeleton))
     if stereo is not None:
         return stereo
+    # Last resort: one descriptor per attachment group as in (a), with the groups
+    # that land at the same insertion slot merged into one descriptor for that
+    # part: nuclide symbols "at the same place in the name" are cited
+    # together) -- a CD2 and the amide ND of one acetamide, '(N,2,2-2H3)acetamide'
+    # (PubChem 1M). Tried after every other strategy so no name they build
+    # changes; RT-gated like every candidate.
+    if len(groups) > 1:
+        merged = _decorate_multi_position(
+            skeleton, groups, original, n_pos,
+            namer=namer, stripped_smiles=stripped_smiles, merge_collisions=True)
+        if merged is not None:
+            return merged
     # De-multiplication (single AND mixed nuclides) was already attempted
     # ahead of this enumeration by _decorate_demultiplied; nothing else to
     # try -> fail closed (never a wrong labeled name).
     return None
+

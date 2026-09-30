@@ -302,7 +302,8 @@ def _assemble(mol, parent, numbering, suffix_carbons, prefix_on) -> Optional[str
         if mult is None:
             return None
         loc_str = ','.join(str(x) for x in locs)
-        parts.append(f"{loc_str}-{mult}{tok}")
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(f"{loc_str}-{_mc(len(locs), tok, tok)}")
     prefix_str = '-'.join(parts)
 
     # --- -ol suffix with lowest locants. ---

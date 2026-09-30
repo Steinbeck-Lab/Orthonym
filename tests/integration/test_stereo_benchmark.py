@@ -38,6 +38,53 @@ import pytest
 
 from orthonym import name_compound
 from tests.support.rt_assert import assert_tier_contract
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3",
+    "CC(C)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O",
+    "CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1",
+    "COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43",
+    "C[C@@H]([NH3+])P(=O)([O-])[O-]",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 # Baselines that described a DIFFERENT molecule (pre-existing-failures plan,
 # Task 4 continuation, 2026-09-25). With the gate off, the PIN tier shipped the
@@ -88,6 +135,9 @@ from tests.support.rt_assert import assert_tier_contract
 # XPASSes once a PIN producer lands (or if the label regresses).
 # * _PIN_TARGET: a pin_verified name that is not the PIN, with a Blue-Book-derived
 # target; the row is a strict xfail on the target string.
+# * _LIST_NAME_NOT_THE_PIN: a natural-product list name, labelled pin_verified by its
+# list identity at every tier (user decision 2026-09-30); a strict xfail on the
+# systematic PIN string in test_stereo_pin_not_built_yet.
 _TIER_CONTRACT = {
     "CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC"
     "(=O)C(C)(C)[C@@H]4CC[C@]23C)O1",
@@ -296,13 +346,7 @@ _KNOWN_NON_PIN = {
     # s16 left this map in decision A part 2 (2026-09-27): the '(2S)-' emitter is built
     # (substituent_naming.polyfunctional_substituent_located) and the row ships its PIN
     # '4-[(2S)-2-amino-2-carboxyethoxy]-4-oxobutanoic acid' at pin_verified.
-    # s21
-    "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1": (
-        "'germacrane', the np_stereoparent carve-out (OPSIN-unparseable; P-100 :50943, "
-        "no PINs for natural products; wp5 demotes it). The systematic best-effort "
-        "name's pseudoasymmetric '4s' is verified by the centres labeller, OPSIN "
-        "2.9.0 cannot assign it",
-        "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"),
+    # s21 ('germacrane') left this map: _LIST_NAME_NOT_THE_PIN below.
     # m20: retained peptide name (s40 and m07 left this list in j7: the tripeptide
     # substitutive PIN is built, TRIAGE g3 C05)
     "CC(C)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O": (
@@ -325,6 +369,28 @@ _KNOWN_NON_PIN = {
         "wp5 demotes it", None),
 }
 
+# SMILES -> (why the name is not the PIN, the systematic PIN string) for a name of the
+# natural-product list (NAME_EXACT_NP_PARENTS, matched by the exact structure). User
+# decision 2026-09-30: as in the paper's run, the list names are labelled
+# pin_verified with verified 'identity' (the exact structure match, not an OPSIN
+# verdict) at every tier, and trivial and semisystematic natural-product names get real
+# systematic PINs later (the PIN class program, Task 32); the deviation from
+# ("Preferred IUPAC names (PINs) are not identified for the compounds in this
+# Chapter", the Blue Book) is recorded in TRIAGE.
+_LIST_NAME_NOT_THE_PIN = {
+    # s21: 'germacrane':51375, Table 10.1 (c) terpenes:51413). OPSIN 2.9.0
+    # reads neither it nor its systematic name (no lowercase pseudoasymmetric
+    # descriptor; '13-norgermacrane (1R,4s,7S)-4-ethyl-1,7-dimethylcyclodecane',
+    #:51471); '(1R,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane', the systematic name
+    # without the '4s', reads back to the input's constitution and R/S centres.
+    "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1": (
+        "'germacrane', the np_stereoparent list name (P-100 :50943, no PINs for natural "
+        "products; labelled pin_verified by its list identity, user decision "
+        "2026-09-30). The systematic name's pseudoasymmetric '4s' is verified by the "
+        "centres labeller, OPSIN 2.9.0 cannot assign it",
+        "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"),
+}
+
 # SMILES -> (Blue-Book-derived PIN, reason) for pin_verified names that are not the PIN.
 _PIN_TARGET = {
     # s28 (canary row 133, DK-INDH)
@@ -343,30 +409,36 @@ _PIN_TARGET = {
 
 def _assert_demoted(smiles, expected_name):
     """A known non-PIN class: the gate-on PIN tier ships the (RT-exact) name, but never
-    labelled pin_verified. s21 ('germacrane') cannot be OPSIN-parsed, nor can its
-    systematic name (a lowercase r/s descriptor), so the best-effort tier abstains
-    (claims conformance, 2026-09-27: a name OPSIN rejects is not emitted there)."""
-    from orthonym import Orthonym
-    r = Orthonym(style="pin").name_tiered(smiles)
+    labelled pin_verified."""
+    r = _dt_row(smiles)
     reason = _KNOWN_NON_PIN[smiles][0]
     assert r["name"] == expected_name, (
         f"KNOWN-NON-PIN ROW CHANGED: {smiles}: expected {expected_name!r}, got "
         f"{r['name']!r} -- re-verify (OPSIN full InChIKey + the Blue Book)")
     assert r["tier"] != "pin_verified" and not r["is_pin"], (
         f"a known non-PIN name is labelled pin_verified ({reason}): {r}")
-    if expected_name == "germacrane":
-        from tests.support.rt_assert import name_best_effort
-        be = name_best_effort(smiles)
-        assert be["name"] is None and be["tier"] == "abstain", be
-    else:
-        from tests.support.rt_assert import assert_full_rt
-        assert_full_rt(expected_name, smiles)
+    from tests.support.rt_assert import assert_full_rt
+    assert_full_rt(expected_name, smiles)
+
+
+def _assert_list_identity(smiles, expected_name):
+    """A natural-product list name (_LIST_NAME_NOT_THE_PIN): the default and the
+    best-effort tier ship it, labelled pin_verified by its list identity (verified
+    'identity', gate outcome carveout:np_stereoparent). OPSIN cannot read it, so there
+    is no round trip to assert."""
+    from tests.support.rt_assert import name_best_effort
+    for r in (_dt_row(smiles), name_best_effort(smiles)):
+        assert r["name"] == expected_name, (
+            f"LIST-NAME ROW CHANGED: {smiles}: expected {expected_name!r}, got "
+            f"{r['name']!r} -- re-verify (the list entry + the Blue Book)")
+        assert r["tier"] == "pin_verified" and r["verified"] == "identity", r
+        assert r["gate_outcome"] == "carveout:np_stereoparent", r
 
 
 def _params(rows):
     out = []
     for smi, exp in rows:
-        if smi in _TIER_CONTRACT or smi in _KNOWN_NON_PIN:
+        if smi in _TIER_CONTRACT or smi in _KNOWN_NON_PIN or smi in _LIST_NAME_NOT_THE_PIN:
             out.append(pytest.param(smi, exp, marks=pytest.mark.opsin_gate))
         elif smi in _PIN_TARGET:
             out.append(pytest.param(smi, _PIN_TARGET[smi][0], marks=pytest.mark.xfail(
@@ -383,7 +455,10 @@ def _check(smiles, expected_name):
     if smiles in _KNOWN_NON_PIN:
         _assert_demoted(smiles, expected_name)
         return
-    result = name_compound(smiles)
+    if smiles in _LIST_NAME_NOT_THE_PIN:
+        _assert_list_identity(smiles, expected_name)
+        return
+    result = _dt_name_compound(smiles)
     assert result == expected_name, (
         f"STEREO BASELINE CHANGED: {smiles}\n"
         f"  Expected: {expected_name}\n"
@@ -432,7 +507,7 @@ _DERIVED_TARGETS = {
 @pytest.mark.parametrize("smiles,target", list(_DERIVED_TARGETS.items()))
 def test_steroid_24_28_methylidene_target(smiles, target):
     from tests.support.rt_assert import name_is_rt_exact
-    assert name_compound(smiles) == target
+    assert _dt_name_compound(smiles) == target
     assert name_is_rt_exact(target, smiles)
 
 
@@ -444,7 +519,8 @@ def test_every_tracked_row_is_rt_exact():
     from tests.support.rt_assert import name_is_rt_exact
     bad = [(smi, exp) for smi, exp in SMALL_STEREO_COMPOUNDS + MEDIUM_STEREO_COMPOUNDS
            if exp is not None and smi not in _TIER_CONTRACT and smi not in _KNOWN_NON_PIN
-           and smi not in _PIN_TARGET and not name_is_rt_exact(exp, smi)]
+           and smi not in _LIST_NAME_NOT_THE_PIN and smi not in _PIN_TARGET
+           and not name_is_rt_exact(exp, smi)]
     assert not bad, bad
 
 
@@ -462,14 +538,15 @@ def test_steroid_rows_are_listed_once():
     pytest.param(smi, marks=pytest.mark.xfail(strict=True, reason=(
         "PIN not built: " + reason + ". .planning/TODO-2026-09-24.md 'Open from T12 "
         "fix round 2 (wp5)' / '(wp6)'")))
-    for smi, (reason, _target) in _KNOWN_NON_PIN.items()])
+    for smi, (reason, _target) in list(_KNOWN_NON_PIN.items())
+    + list(_LIST_NAME_NOT_THE_PIN.items())])
 def test_stereo_pin_not_built_yet(smiles):
     """The PIN tier ships a PIN for a known non-PIN row (the derived string where there
     is one). Strict xfail: it XPASSes when a PIN producer lands -- or if the demoted
     label regresses to pin_verified -- and forces the row to be re-verified."""
     from orthonym import Orthonym
-    r = Orthonym(style="pin").name_tiered(smiles)
-    target = _KNOWN_NON_PIN[smiles][1]
+    r = _dt_row(smiles)
+    target = {**_KNOWN_NON_PIN, **_LIST_NAME_NOT_THE_PIN}[smiles][1]
     assert r["tier"] == "pin_verified", r
     if target is not None:
         assert r["name"] == target, r
@@ -492,7 +569,7 @@ def test_cip_audit_no_wrong_labels():
     ]
 
     for smiles, expected_name in stereo_compounds[:20]:  # Check first 20
-        result = name_compound(smiles)
+        result = _dt_name_compound(smiles)
         # Parse stereo from name
         stereo_in_name = re.findall(r'(\d+)([RSEZ])', result)
 

@@ -71,7 +71,10 @@ M16 = [
     ("CCCCCCCCCCCCCCCCOP(=O)([O-])OCCCCCCCCCCCCCCCC."
      "CCCCCCCCCCCCCCCCOP(=O)([O-])OCCCCCCCCCCCCCCCC."
      "CCCCCCCCCCCCCCCCOP(=O)([O-])OCCCCCCCCCCCCCCCC.[Al+3]",
-     "dihexadecyl phosphate—aluminium(3+) (3/1)"),
+     # (c) (the Blue Book): a simple prefix "beginning with a
+     # multiplicative prefix" takes parentheses when multiplied, 'di(dodecyl)
+     # (preferred prefix)'; 'hexadecyl' begins with 'hexa'.
+     "di(hexadecyl) phosphate—aluminium(3+) (3/1)"),
     ("C(C(=O)[O-])S.[Ca+2]", "sulfanylacetate—calcium(2+) (1/1)"),
 ]
 # M17b: a metal halide component (the Hg row: test_group12_organometallic_ligands.py).

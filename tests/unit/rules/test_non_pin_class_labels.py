@@ -46,9 +46,48 @@ from orthonym.rules.polycyclic import (
     retained_von_baeyer_parent,
 )
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C1CC2CCCN2C1",
+    "C1CCN2CCCC2C1",
+    "C1CCN2CCCCC2C1",
+    "CC(=O)OCC(C)OC(=O)CC",
+    "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
+    "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
+    "CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1",
+    "CCCCC/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCCCCCCCC",
+    "CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC",
+    "CCOCC(COC(C)=O)OC(C)=O",
+    "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",
+    "NC12CC3CC(CC(C3)C1)C2",
+    "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O",
+    "OC(=O)C12C3C4C1C5C2C3C45",
+    "OC1C2CC3CC1CC(O)(C3)C2",
+    "OCC1CCCN2CCCCC12",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
 
 
 def _row(smiles):
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
     with jvm_slots(1, purpose="test-non-pin-class-labels"):
         return Orthonym(style="pin").name_tiered(smiles)
 
@@ -119,12 +158,17 @@ def test_known_non_pin_class_ships_demoted(smiles, expected):
 
 
 @pytest.mark.opsin_gate
-def test_carveout_stereoparent_is_not_labelled_verified():
+def test_carveout_stereoparent_is_labelled_by_its_list_identity():
     # 'germacrane' ships through the np_stereoparent carve-out: OPSIN cannot parse it.
+    # It is a name of the natural-product list, matched by the exact structure
+    #, Table 10.1 (c) terpenes, the Blue Book). The paper's run
+    # labelled it pin_verified; user decision 2026-09-30: the list names are
+    # labelled pin_verified with verified 'identity' (the exact structure match), not
+    # an OPSIN verdict, and the deviation from (:50943) is recorded in TRIAGE.
     row = _row("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1")
     assert row["name"] == "germacrane"
     assert row["opsin"] == "unverified"
-    assert row["tier"] != "pin_verified" and not row["is_pin"]
+    assert row["tier"] == "pin_verified" and row["verified"] == "identity", row
 
 
 _CONTROLS = [

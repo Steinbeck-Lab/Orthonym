@@ -503,10 +503,17 @@ def oxo_ene_valence_illegal(name: str) -> bool:
     (:func:`_scope_substrings`) and test each independently; the caffeine-class
     parent-scope collision still fires, and every recovered name stays
     OPSIN-round-trip gated downstream so 0-wrong is unchanged.
+
+    The components of a adduct are separate compounds, each with its own
+    numbering, the Blue Book, "Names are formed by citing the names
+    of individual compounds in the order of the formula connected by long (em)
+    dashes"), so the em dash separates scopes exactly as the space between salt
+    words does: the '6-en' of one component and the '3-oxo' of the next are not
+    one carbon (PubChem-1M row: five ketone / enamine components, each valid).
     """
     if not name or 'ene' not in name or ('oxo' not in name and 'one' not in name):
         return False
-    for word in name.split():
+    for word in name.replace('\u2014', ' ').split():
         for scope in _scope_substrings(word):
             if _ene_termini(scope) & _oxo_locants(scope):
                 return True

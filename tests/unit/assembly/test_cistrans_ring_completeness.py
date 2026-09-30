@@ -133,8 +133,13 @@ RECLAIM = [  # symmetric substituent ring -> reclaim as a verified cis/trans nam
 BOTH_KINDS = "C[C@H](Cc1cccc(Cl)c1)C(=O)N[C@H]1C[C@H](NC(=O)[C@@H]2CCCC[C@H]2O)C1"  # head-1
 TRUE_PAIR_ONLY = "CNC(=O)N[C@H]1CCCC[C@@H]1O"
 PIN_ISOLATION = [
-    ("CNC(=O)[C@@H]1C[C@@H](O)CN1", "(2S,4R)-N-methyl-4-hydroxypyrrolidine-2-carboxamide"),
-    ("CNC(=O)[C@H]1O[C@H]1C", "(2S,3S)-N-methyl-2-methyloxirane-3-carboxamide"),
+    # (the Blue Book): prefixes in one alphanumerical series,
+    # 'hydroxy' before 'methyl', the italic N locant not counted (:3442).
+    ("CNC(=O)[C@@H]1C[C@@H](O)CN1", "(2S,4R)-4-hydroxy-N-methylpyrrolidine-2-carboxamide"),
+    # the suffix gets the lowest locant, the principal characteristic
+    # group) and the identical methyl prefixes are one multiplied prefix (b),
+    # the Blue Book; ':32879 N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)')
+    ("CNC(=O)[C@H]1O[C@H]1C", "(2S,3S)-N,3-dimethyloxirane-2-carboxamide"),
 ]
 
 

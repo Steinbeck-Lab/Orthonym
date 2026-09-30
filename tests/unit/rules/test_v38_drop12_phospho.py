@@ -31,6 +31,49 @@ from orthonym import name_compound
 from orthonym.assembly.substituent_enumerator import name_substituent
 from orthonym.rules.phosphorus import carbon_free_phospho_prefix
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "OCCOP(=O)(O)O",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -83,7 +126,7 @@ MEDRONIC = "OP(=O)(O)CP(=O)(O)O"
 
 @pytest.mark.roundtrip
 def test_pyridinium_nucleotide_abstain_to_emit():
-    out = name_compound(PYRIDINIUM_NT)
+    out = _dt_name_compound(PYRIDINIUM_NT)
     assert out not in (None, UNK), f"pyridinium nucleotide still abstains: {out!r}"
     assert _rt_ok(PYRIDINIUM_NT, out), f"emitted name is not RT-valid: {out!r}"
 
@@ -91,7 +134,7 @@ def test_pyridinium_nucleotide_abstain_to_emit():
 @pytest.mark.roundtrip
 def test_pyridinium_nucleotide_pinned_name():
     assert _rt_ok(PYRIDINIUM_NT, PYRIDINIUM_NT_NAME)
-    assert name_compound(PYRIDINIUM_NT) == PYRIDINIUM_NT_NAME
+    assert _dt_name_compound(PYRIDINIUM_NT) == PYRIDINIUM_NT_NAME
 
 
 # ---------------------------------------------------------------------------
@@ -142,7 +185,7 @@ def test_carbon_free_phospho_prefix_fail_closed(smiles):
     "OP(=O)(O)CCCP(=O)(O)O",
 ])
 def test_never_wrong(smiles):
-    out = name_compound(smiles)
+    out = _dt_name_compound(smiles)
     if out in (None, UNK):
         return  # clean abstain preserves 0-wrong
     assert _rt_ok(smiles, out), f"0-wrong violated: {out!r} for {smiles}"
@@ -173,7 +216,7 @@ def test_target_pins_are_rt_valid():
 @pytest.mark.parametrize("smiles", [PYRIDINIUM_NT, MEDRONIC])
 def test_determinism(smiles):
     canon = Chem.MolToSmiles(Chem.MolFromSmiles(smiles))
-    names = {name_compound(smiles), name_compound(canon)}
+    names = {_dt_name_compound(smiles), _dt_name_compound(canon)}
     assert len(names) == 1, f"non-deterministic across orders: {names}"
 
 
@@ -194,4 +237,4 @@ def test_determinism(smiles):
     ("c1ccccc1", "benzene"),
 ])
 def test_byte_identity_controls(smiles, expected):
-    assert name_compound(smiles) == expected
+    assert _dt_name_compound(smiles) == expected

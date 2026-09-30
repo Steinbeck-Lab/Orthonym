@@ -277,10 +277,10 @@ def _assemble_prefixes(tokens) -> str:
     Multiplier table selection is (b)/(a) (the Blue Book):
     a compound/complex branch token -- already wrapped in marks by
     the caller (``enclose_if_compound``), so it opens with '(', '[' or '{' --
-    is multiplied with the DERIVED table (``bis``/``tris``/...), never the
-    basic ``di``/``tri`` table reserved for simple prefixes. Reusing
-    ``get_bracket_depth`` here keeps the compound test the SAME decision
-    ``enclose_if_compound`` already made, rather than re-deriving it.
+    is multiplied through the shared primitive
+    (``naming_utils.multiplied_component``): ``bis``/``tris`` for a substituted
+    prefix, the basic ``di``/``tri`` for a simple one with locants
+    ('di(propan-2-yl)', (a)).
 
     NO trailing hyphen. Hyphens separate one prefix from the NEXT prefix, never a
     prefix from the stem it qualifies: the substituent group CC(C)C- is
@@ -289,8 +289,6 @@ def _assemble_prefixes(tokens) -> str:
     hyphen. An earlier draft appended '-' here and produced the malformed form on
     all four branched cases.
     """
-    from ..assembly.naming_utils import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS, get_bracket_depth
-
     grouped: Dict[str, List[int]] = {}
     keys: Dict[str, str] = {}
     for key, locant, tok in tokens:
@@ -299,12 +297,8 @@ def _assemble_prefixes(tokens) -> str:
     parts = []
     for tok in sorted(grouped, key=lambda t: keys[t]):
         locs = sorted(grouped[tok])
-        if len(locs) > 1:
-            table = COMPLEX_MULTIPLIERS if get_bracket_depth(tok) > 0 else SIMPLE_MULTIPLIERS
-            mult = table.get(len(locs), str(len(locs)))
-        else:
-            mult = ""
-        parts.append(f"{','.join(str(x) for x in locs)}-{mult}{tok}")
+        from ..assembly.naming_utils import multiplied_component as _mc
+        parts.append(f"{','.join(str(x) for x in locs)}-{_mc(len(locs), tok, tok)}")
     return "-".join(parts)
 
 

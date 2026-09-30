@@ -185,14 +185,11 @@ class TestKnownAdjacentDefects:
         defect was that two of them did not."""
         assert namer.name(smiles) == expected, why
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "N-SUBSTITUTED ring amides are deliberately OUT OF SCOPE of the P-14.3.3 fix and "
-        "have a SECOND, independent defect. We emit "
-        "`4-methyl-N-methylcyclohexanecarboxamide`: the ring locant is still missing, AND "
-        "the prefix order violates P-14.5.2 alphanumerical ordering -- the same class as "
-        "the known `1-phenyl-N-methyl(2R)-propan-2-amine` defect. `N` is itself an "
-        "essential locant, so reshaping that string needs the P-14.5.2 work, not this "
-        "rule. Recorded rather than half-fixed."))
+    # The N-substituted ring amide: formerly a strict xfail ('4-methyl-N-methyl
+    # cyclohexanecarboxamide', the ring locant missing and the N- and ring methyl cited
+    # apart); fixed by the integration round's suffix-first numbering and grouping of
+    # identical prefixes (b), the Blue Book;,:2869; ':32879
+    # N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)').
     def test_n_substituted_ring_amide(self, namer):
         assert namer.name("CNC(=O)C1CCC(C)CC1") == \
             "N,4-dimethylcyclohexane-1-carboxamide"

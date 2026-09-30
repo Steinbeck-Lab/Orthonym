@@ -41,6 +41,61 @@ from orthonym.rules.ions import (
 )
 from orthonym.namer import Orthonym
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "C[N+](C)(C)CCCC(=O)[O-]",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 def _full_rt(smiles: str, name: str) -> bool:
@@ -74,7 +129,7 @@ def test_one_carbon_ylidene_owner_anion_round_trips():
 
 @pytest.mark.opsin_gate
 def test_one_carbon_ylidene_owner_anion_integration(namer):
-    assert namer.name("SC=NOS(=O)(=O)[O-]") == "sulfanylmethylideneamino sulfate"
+    assert _dt_obj_name(namer, "SC=NOS(=O)(=O)[O-]") == "sulfanylmethylideneamino sulfate"
 
 
 def test_validate_anion_name_accepts_one_carbon_ylidene_owner():
@@ -90,7 +145,7 @@ def test_validate_anion_name_accepts_one_carbon_ylidene_owner():
 
 @pytest.mark.opsin_gate
 def test_two_carbon_ylidene_owner_unchanged(namer):
-    assert namer.name("CC(S)=NOS(=O)(=O)[O-]") == "[(1-sulfanylethylidene)amino] sulfate"
+    assert _dt_obj_name(namer, "CC(S)=NOS(=O)(=O)[O-]") == "[(1-sulfanylethylidene)amino] sulfate"
 
 
 # ---------------------------------------------------------------------------
@@ -153,4 +208,4 @@ def test_bare_substituted_methylidene_leak_rejected():
     ("[O-]C(=O)CCC(=O)[O-]", "butanedioate"),
 ])
 def test_seven_regressions_unchanged(namer, smi, expected):
-    assert namer.name(smi) == expected
+    assert _dt_obj_name(namer, smi) == expected

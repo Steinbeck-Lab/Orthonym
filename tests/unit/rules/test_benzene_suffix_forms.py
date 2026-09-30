@@ -76,7 +76,8 @@ class TestSeniorityGuard:
         ("Sc1ccc(O)cc1", "4-sulfanylphenol", "same, para"),
         ("OC(=O)c1ccc(S)cc1", "4-sulfanylbenzoic acid",
          "carboxylic acid (0) outranks both"),
-        ("Nc1ccc(S)cc1", "4-aminobenzenethiol", "-thiol (94) outranks -amine (102+)"),
+        # locant cited beside the prefix, the Blue Book; the Blue Book)
+        ("Nc1ccc(S)cc1", "4-aminobenzene-1-thiol", "-thiol (94) outranks -amine (102+)"),
     ])
     def test_senior_group_claims_the_suffix(self, namer, smiles, expected, why):
         assert namer.name(smiles) == expected, why
@@ -132,11 +133,8 @@ class TestUnchangedControls:
 
 
 class TestKnownAdjacentDefect:
-    @pytest.mark.xfail(strict=True, reason=(
-        "Pre-existing P-14.3.3 UNDER-citation, the same class as "
-        "`4-methylcyclohexanecarbonitrile` (see test_p14_3_4_peroxy_acid_locant.py). The "
-        "essential 4-methyl locant should restore the suffix locant. The BB contrast is "
-        "BB:31167 `4-methylbenzene-1,3-disulfonic acid (PIN)`, a substituted benzene "
-        "oxoacid citing its locants. Recorded, not silently accepted."))
+    # Was a strict xfail under-citation, the Blue Book; the Blue Book
+    # '4-methylbenzene-1,3-disulfonic acid (PIN)'); fixed in breadth job 3 --
+    # 'sodium 4-methylbenzene-1-thiolate (PIN)' (the Blue Book).
     def test_substituted_benzenethiol_cites_its_locant(self, namer):
         assert namer.name("Sc1ccc(C)cc1") == "4-methylbenzene-1-thiol"

@@ -27,7 +27,10 @@ from typing import Dict, Optional
 
 from rdkit import Chem
 
-# AUTONOM total-atoms hard limit (code 212): 125 atoms / structure.
+# The heavy-atom count above which an input the engine has not named gets the code
+# STRUCTURE_TOO_LARGE instead of UNNAMEABLE (classify_failure_limit). The code is a
+# label given after the attempt: the engine sets no size limit and attempts every
+# input, whatever its size.
 ATOM_LIMIT = 125
 
 # Elements Orthonym names as organic skeletons / substituents. Single source
@@ -105,8 +108,10 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
         'message': 'isolated atom or substructure too small to name',
         'design_note_ref': 'ERR-263/266',
     },
+    # Given after the attempt, to an unnamed input with more than ATOM_LIMIT heavy
+    # atoms; no input is refused for its size.
     'STRUCTURE_TOO_LARGE': {
-        'message': f'structure exceeds the {ATOM_LIMIT}-atom limit',
+        'message': f'no name for this structure of more than {ATOM_LIMIT} heavy atoms',
         'design_note_ref': 'ERR-212',
     },
     'UNNAMEABLE': {
@@ -125,6 +130,18 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
         'message': 'unknown organic compound',
         'design_note_ref': 'ERR-274',
     },
+    # The default tier (``--emit-tier pin``) emits a name only when the strict PIN
+    # path built it and verified it (tier pin_verified), or when it is one of the
+    # default tier's exceptions (the exact-match list names, the name formats OPSIN
+    # has no grammar for, a strict-path PIN whose stereodescriptors OPSIN cannot
+    # read). Any other name it built is declined with this code; the wider tiers
+    # return that name with its tier. The label the plain call returns is this
+    # message, never an UNSUPPORTED_ELEMENT text: the structure's elements are
+    # supported, the engine built a name for it.
+    'NO_VERIFIED_PIN': {
+        'message': 'unknown organic compound',
+        'design_note_ref': 'default tier',
+    },
 }
 
 
@@ -139,8 +156,9 @@ class OrthonymLimitError(Exception):
     ----------
     code: str
         The reason code: ``WILDCARD_ATOMS``, ``UNSUPPORTED_ELEMENT``,
-        ``ISOLATED_ATOM``, ``STRUCTURE_TOO_LARGE``, ``UNSUPPORTED_RING_SYSTEM``
-        or ``UNNAMEABLE``.
+        ``ISOLATED_ATOM``, ``STRUCTURE_TOO_LARGE``, ``UNSUPPORTED_RING_SYSTEM``,
+        ``UNNAMEABLE`` or ``NO_VERIFIED_PIN`` (the default tier built a name but
+        not a verified preferred IUPAC name; a wider tier returns it).
     message: str
         The label the plain call returns in place of a name.
     design_note_ref: str or None
@@ -193,6 +211,13 @@ def unsupported_ring_system(smiles: Optional[str] = None) -> OrthonymLimitError:
     (default path returns ``.message`` = 'unknown organic compound';
     ``raise_on_limit=True`` re-raises this error)."""
     return _make('UNSUPPORTED_RING_SYSTEM', smiles=smiles)
+
+
+def no_verified_pin(message: str, smiles: Optional[str] = None) -> OrthonymLimitError:
+    """The default tier's decline of a name that is not a verified PIN and not one
+    of its exceptions (``Orthonym.name`` with ``raise_on_limit=True``). ``message``
+    is the label the plain call returns for the structure."""
+    return _make('NO_VERIFIED_PIN', message=message, smiles=smiles)
 
 
 def unsupported_element_branch(symbol: str,
@@ -407,7 +432,8 @@ def classify_failure_limit(mol: Chem.Mol,
         )
 
     # Organic but unnameable. Message stays the legacy "unknown organic compound"
-    # for byte-identity; the CODE distinguishes oversize / isolated / generic.
+    # for byte-identity; the CODE distinguishes more than ATOM_LIMIT heavy atoms /
+    # isolated / generic. Every input was attempted before this label is given.
     heavy = sum(1 for atom in mol.GetAtoms() if atom.GetAtomicNum() > 1)
     if heavy > ATOM_LIMIT:
         code = 'STRUCTURE_TOO_LARGE'

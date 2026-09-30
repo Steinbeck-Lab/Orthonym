@@ -156,9 +156,8 @@ def test_unchanged_shapes(smiles, expected):
 # strict=True so this self-clears loudly the moment that site is fixed, rather
 # than silently asserting a defect.
 # --------------------------------------------------------------------------
-@pytest.mark.xfail(strict=True,
-                   reason="chain-amide site composer.py::_assemble_amide_name "
-                          "still bakes the N-prefix into base_name; emits "
-                          "'2-methyl-N-methylpropanamide'")
+# The chain-amide site merges an N-substituent with an acyl prefix of the same
+# name (composer._amide_with_identical_prefixes_merged, the class-2 grouping) and,
+# since a performance pass, cites every N-substituent in the one alphanumerical series.
 def test_chain_amide_merges_too():
     assert name_compound("CC(C)C(=O)NC") == "N,2-dimethylpropanamide"

@@ -174,19 +174,9 @@ def test_benzene_fg_not_dropped(smiles, desc):
     # The true PIN also cites the suffix locant, because the 4-methyl locant is
     # essential and (the Blue Book) then restores every locant in the scope --
     # cf. the Blue Book `4-methylbenzene-1,3-disulfonic acid (PIN)`. We now emit
-    # `4-methylbenzenethiol`, which fixes the suffix but still under-cites, so the row
-    # keeps the TRUE PIN and is marked xfail rather than being re-frozen on the
-    # intermediate form. Tracked by
-    # test_benzene_suffix_forms.py::TestKnownAdjacentDefect.
-    pytest.param(
-        "Sc1ccc(cc1)C", "4-methylbenzene-1-thiol",
-        marks=pytest.mark.xfail(
-            strict=True,
-            reason="P-14.3.3 under-citation: emits `4-methylbenzenethiol`. The `-thiol` "
-                   "suffix itself is now correct (was `1-methyl-4-sulfanylbenzene`); the "
-                   "remaining gap is the essential-locant restoration.",
-        ),
-    ),
+    # `4-methylbenzene-1-thiol` since breadth job 3 (the single benzene suffix beside a
+    # prefix cites its locant; 'sodium 4-methylbenzene-1-thiolate (PIN)', the Blue Book).
+    ("Sc1ccc(cc1)C", "4-methylbenzene-1-thiol"),
     # Fluoro + trifluoromethyl
     ("Fc1ccc(cc1)C(F)(F)F", "1-fluoro-4-(trifluoromethyl)benzene"),
 ])

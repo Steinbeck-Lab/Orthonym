@@ -654,8 +654,8 @@ def _nitrogen_ylidene_prefix(mol, frag_atoms, attach_idx, free_valence):
             grouped[t] += 1
         parts = []
         for t, count in grouped.items():
-            mult = get_multiplier_prefix(count, t)
-            parts.append((alpha_sort_key(t), f"{mult}{enclose_if_compound(t)}"))
+            from .naming_utils import multiplied_component as _mc
+            parts.append((alpha_sort_key(t), _mc(count, t, enclose_if_compound(t))))
         block = "".join(p for _, p in sorted(parts))
         return f"{block}hydrazinylidene"
 
@@ -4070,8 +4070,8 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     for dname, locs in groups.items():
         locs = sorted(locs)
         token = enclose_if_compound(dname)
-        mult = get_multiplier_prefix(len(locs), dname)
-        text = f"{','.join(str(l) for l in locs)}-{mult}{token}"
+        from .naming_utils import multiplied_component as _mc
+        text = f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
         parts.append((alpha_sort_key(dname), text))
     parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in parts)
@@ -4381,8 +4381,8 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     for dname, locs in groups.items():
         locs = sorted(locs)
         token = enclose_if_compound(dname)
-        mult = get_multiplier_prefix(len(locs), dname)
-        text = f"{','.join(str(l) for l in locs)}-{mult}{token}"
+        from .naming_utils import multiplied_component as _mc
+        text = f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
         parts.append((alpha_sort_key(dname), text))
     parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in parts)
@@ -5418,11 +5418,22 @@ def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
         alkyl_name = name_substituent_fragment(
             mol, alkyl_sub_atoms, alkyl_start, list(parent_atoms) + [attach_idx]
         )
+        if alkyl_name == "tert-butyl":
+            # "(CH3)3C-O- tert-butoxy (preferred prefix) (no substitution)"
+            #, the Blue Book).
+            return "tert-butoxy"
         if alkyl_name and alkyl_name.endswith("yl"):
-            #: the oxy suffix is appended to the alkyl name, then the
-            # whole compound substituent name is wrapped in enclosing marks.
-            # Correct: (propan-2-yloxy), NOT (propan-2-yl)oxy.
-            return f"({alkyl_name[:-2]}yloxy)"
+            # The alkyl prefix is enclosed inside the compound 'oxy' prefix, and the
+            # compound prefix in its own marks,:7232): "(CH3)2CH-O-
+            #... (propan-2-yl)oxy (preferred prefix)",:27683),
+            # "(butan-2-yl)oxy (preferred prefix)" (:27687); '2-[(propan-2-yl)oxy]
+            # propane', as the aryl and sulfanyl ethers already are.
+            # The compound prefix is returned without its own outer marks: every
+            # join site encloses a compound prefix once,:7232), so an
+            # outer mark here was added a second time at a locant-free parent
+            # ('{[(propan-2-yl)oxy]}cyclohexane').
+            from .naming_utils import enclose_if_compound
+            return f"{enclose_if_compound(alkyl_name)}oxy"
         # name_substituent_fragment failed — fall through to ALKOXY_NAMES approximation
 
     # TODO: _check_for_alkoxy (composer.py) and get_alkoxy_prefix

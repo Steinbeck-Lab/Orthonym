@@ -1279,13 +1279,16 @@ def _name_saturated_substituted_chain(
         return f"{_l5}{stem}yl"
 
     _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+    # Past 'hexa' the multiplier is composed, the Blue Book-2813;
+    # 21 'henicosa':2820) by simple_multiplier_word; the old digit fallback wrote
+    # '21fluoro' for twenty-one fluoro prefixes (here and in the four tables below).
     # Alphabetical order of the (base) halogen prefixes: the di/tri
     # multiplier on a simple substituent is ignored for ordering).
     part_strings = []
     for prefix in sorted(groups.keys()):
         locs = sorted(groups[prefix])
         loc_str = ",".join(str(loc) for loc in locs)
-        mult = _MULT.get(len(locs), f"{len(locs)}")
+        mult = _MULT[len(locs)] if len(locs) in _MULT else (simple_multiplier_word(len(locs)) or "")
         part_strings.append(f"{loc_str}-{mult}{prefix}")
 
     return f"{'-'.join(part_strings)}{stem}yl"
@@ -1567,7 +1570,7 @@ def _assemble_branched_substituent_on_chain(mol, backbone_set, chain, prefix_on)
     parts = []
     for prefix in sorted(groups.keys(), key=alpha_sort_key):
         locs = sorted(groups[prefix])
-        mult = _MULT.get(len(locs), SIMPLE_MULTIPLIERS.get(len(locs), ""))
+        mult = _MULT[len(locs)] if len(locs) in _MULT else (simple_multiplier_word(len(locs)) or "")
         loc_str = ",".join(str(loc) for loc in locs)
         parts.append(f"{loc_str}-{mult}{prefix}")
     stem = get_chain_prefix(len(chain))
@@ -1711,7 +1714,7 @@ def _name_internal_polyfunctional_substituent(
         parts = []
         for prefix in names_sorted:
             locs = sorted(groups[prefix])
-            mult = _MULT.get(len(locs), SIMPLE_MULTIPLIERS.get(len(locs), ""))
+            mult = _MULT[len(locs)] if len(locs) in _MULT else (simple_multiplier_word(len(locs)) or "")
             parts.append(f"{','.join(str(x) for x in locs)}-{mult}{prefix}")
         name = (f"{''.join(_joined_prefix_parts(parts))}"
                 f"{get_chain_prefix(len(order))}an-{pos[attach_idx]}-yl")
@@ -1837,7 +1840,7 @@ def _name_branched_unsaturated_substituent(
         parts = []
         for prefix in sorted(groups.keys(), key=alpha_sort_key):
             locs = sorted(groups[prefix])
-            mult = _MULT.get(len(locs), SIMPLE_MULTIPLIERS.get(len(locs), ""))
+            mult = _MULT[len(locs)] if len(locs) in _MULT else (simple_multiplier_word(len(locs)) or "")
             parts.append(f"{','.join(str(loc) for loc in locs)}-{mult}{prefix}")
         joined = ''.join(_joined_prefix_parts(parts))
         name = _unsaturated_substituent_name(
@@ -3135,7 +3138,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
     parts = []
     for prefix in sorted(groups.keys(), key=alpha_sort_key):
         locs = sorted(groups[prefix])
-        mult = _MULT.get(len(locs), SIMPLE_MULTIPLIERS.get(len(locs), ""))
+        mult = _MULT[len(locs)] if len(locs) in _MULT else (simple_multiplier_word(len(locs)) or "")
         if single_position:
             parts.append(f"{mult}{prefix}")           # methyl: locant elided
         else:
@@ -6021,7 +6024,11 @@ def _name_aryl_methyl_ether(mol, central_c_idx: int, oxygen_idx: int) -> Optiona
         ring_name = _substituted_aryl_ring_name(mol, aryl_idx, central_c_idx)
         if ring_name is None:
             return None
-        return f"({ring_name})methoxy"
+        # (the Blue Book, the nesting order "{[({})]}"): the
+        # mark around the aryl prefix escalates past the marks it already carries,
+        # '[4-(hydroxymethyl)phenyl]methoxy', never '(4-(hydroxymethyl)phenyl)methoxy'.
+        from .naming_utils import apply_enclosing_marks
+        return f"{apply_enclosing_marks(ring_name, -1)}methoxy"
     return "benzyloxy"
 
 
@@ -7308,8 +7315,8 @@ def _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx):
     if not alkyl_names:
         core = f"(oxo-{LAMBDA}5-azanyl)"
     elif len(alkyl_names) == 2 and alkyl_names[0] == alkyl_names[1]:
-        mp = get_multiplier_prefix(2, alkyl_names[0])
-        core = f"[{mp}{alkyl_names[0]}(oxo)-{LAMBDA}5-azanyl]"
+        from .naming_utils import multiplied_component as _mc
+        core = f"[{_mc(2, alkyl_names[0], alkyl_names[0])}(oxo)-{LAMBDA}5-azanyl]"
     elif len(alkyl_names) == 1:
         core = f"[{alkyl_names[0]}(oxo)-{LAMBDA}5-azanyl]"
     else:
@@ -8810,8 +8817,9 @@ def _compose_group14_prefixes(prefixes: List[str]) -> str:
     for name in sorted(counts.keys(), key=prefix_citation_sort_key):
         count = counts[name]
         mult = get_multiplier_prefix(count, name)
+        from .naming_utils import multiplied_component as _mc
         if is_complex_substituent(name) and count > 1:
-            parts.append(f"{mult}({name})")
+            parts.append(_mc(count, name, f"({name})"))
         else:
             # -FIX Item 4: a SIMPLE multiplier joined to a name that leads
             # with an ITALICIZED structural prefix keeps the hyphen boundary.
@@ -8831,7 +8839,7 @@ def _compose_group14_prefixes(prefixes: List[str]) -> str:
             # `multiplier_needs_hyphen` is the shared primitive the six other
             # composers in this class already use; this was the site that
             # open-coded around it.
-            parts.append(f"{mult}{enclose_if_compound(name)}")
+            parts.append(_mc(count, name, enclose_if_compound(name)))
     return ''.join(parts)
 
 
@@ -8866,8 +8874,9 @@ def _compose_n_substituent_prefix(sub_prefixes: List[str]) -> str:
         # A compound name (locant, hyphen) is enclosed wherever it stands
         #; e.g. '(propan-2-yl)azaniumyl'); every name after the first
         # is enclosed too, with the multiplier outside.
+        from .naming_utils import multiplied_component as _mc
         if i > 0 or is_complex_substituent(name):
-            parts.append(f"{mult}{apply_enclosing_marks(name, -1)}")
+            parts.append(_mc(counts[name], name, apply_enclosing_marks(name, -1)))
         else:
-            parts.append(f"{mult}{name}")
+            parts.append(_mc(counts[name], name, name))
     return ''.join(parts)

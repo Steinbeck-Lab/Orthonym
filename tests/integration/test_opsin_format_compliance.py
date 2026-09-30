@@ -420,15 +420,16 @@ class TestFormatEdgeFixes:
 
     def test_no_missing_separator_before_n_prefix(self):
         """Prefix + N-prefix must have hyphen separator, not direct concatenation."""
-        # 2-methyl-N-methylbutanamide (not 2-methylN-methylbutanamide)
+        # the two methyl prefixes are one multiplied prefix with the locant set 'N,2'
+        # (b), the Blue Book; ':21624 N,N,2-trimethyl-...propanamide
+        # (PIN)'), so there is no second prefix to separate: the check is that no
+        # N-locant is glued to a preceding word (never '...methylN-...')
         smiles = "CC(CC)C(=O)NC"
         name = name_compound(smiles)
         assert "methylN" not in name, (
             f"Missing separator between prefix and N-locant: {name}"
         )
-        assert "-N-" in name or name.startswith("N-"), (
-            f"Expected hyphen before N-locant prefix: {name}"
-        )
+        assert name == "N,2-dimethylbutanamide", name
 
     def test_nn_format_correct_hyphen(self):
         """N,N-locant must use N,N- (hyphen after last N), not N,N, (comma)."""

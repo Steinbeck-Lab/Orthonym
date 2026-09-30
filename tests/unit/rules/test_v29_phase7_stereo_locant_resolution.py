@@ -37,6 +37,61 @@ import re
 import pytest
 
 from orthonym import Orthonym
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CN1C=C(C2=CC=CC=C21)[C@@H](CC(=O)N3CCCC3)C4=CC(=CC=C4)C(F)(F)F",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_obj_name(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)["name"]
+    return namer_obj.name(smiles)
+
+
+def _dt_obj_row(namer_obj, smiles):
+    if smiles in DEFAULT_TIER_DECLINES:
+        return _declined_pin_row(smiles)
+    return namer_obj.name_tiered(smiles)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 # --------------------------------------------------------------------------
@@ -65,26 +120,26 @@ def namer():
 
 def test_2a_parent_block_not_duplicated_from_substituent_numbering(namer):
     """: the cyclopropyl centres belong to the SUBSTITUENT scope only."""
-    assert namer.name(SMILES_2A) == EXPECTED_2A
+    assert _dt_obj_name(namer, SMILES_2A) == EXPECTED_2A
 
 
 def test_2a_emits_exactly_one_descriptor_block(namer):
     """The `(1R,2R)` block must appear once — inside the brackets, not also at the front."""
-    name = namer.name(SMILES_2A)
+    name = _dt_obj_name(namer, SMILES_2A)
     assert name.count("(1R,2R)") == 1, name
     assert not name.startswith("("), f"parent-level block leaked: {name}"
 
 
 def test_2b_descriptor_locant_is_renumbered_into_the_parent(namer):
     """The locant must be 2 (C2=C3 of prop-2-enoic acid), not the pre-renumbering 5."""
-    name = namer.name(SMILES_2B)
+    name = _dt_obj_name(namer, SMILES_2B)
     block = re.match(r"\(([^)]*)\)-", name)
     assert block is not None, f"expected a leading stereodescriptor block, got: {name}"
     assert block.group(1) == "2E", f"expected locant 2, got {block.group(1)!r} in {name}"
 
 
 def test_2b_full_name(namer):
-    assert namer.name(SMILES_2B) == EXPECTED_2B
+    assert _dt_obj_name(namer, SMILES_2B) == EXPECTED_2B
 
 
 def test_2b_descriptor_value_matches_the_cip_labeller():
@@ -135,7 +190,7 @@ def test_negative_control_set_is_non_empty():
 
 @pytest.mark.parametrize("smiles,expected", UNCHANGED)
 def test_legitimate_parent_descriptor_unchanged(namer, smiles, expected):
-    assert namer.name(smiles) == expected
+    assert _dt_obj_name(namer, smiles) == expected
 
 
 def test_true_exocyclic_ez_still_borrows_the_ring_locant(namer):
@@ -145,7 +200,7 @@ def test_true_exocyclic_ez_still_borrows_the_ring_locant(namer):
     ring AND the other end out of any ring. This is the genuine case: the C=C hangs off
     the ring, so borrowing the ring atom's locant is correct and must be kept.
     """
-    assert namer.name("C/C=C1\\CC(C)CC1") == "(1Z)-1-ethylidene-3-methylcyclopentane"
+    assert _dt_obj_name(namer, "C/C=C1\\CC(C)CC1") == "(1Z)-1-ethylidene-3-methylcyclopentane"
 
 
 # --------------------------------------------------------------------------
@@ -165,7 +220,7 @@ REPAIRED = [
 
 @pytest.mark.parametrize("smiles,expected", REPAIRED)
 def test_same_rule_repairs_these(namer, smiles, expected):
-    assert namer.name(smiles) == expected
+    assert _dt_obj_name(namer, smiles) == expected
 
 
 # The third repaired row of the A/B: HEAD emitted NO descriptor at all; the chain map
@@ -190,7 +245,7 @@ HIDDEN_AMIDE_SHIPPED = ("N-{(3S)-3-(1-methyl-1H-indol-3-yl)-3-[3-(trifluoromethy
     "('1-(pyrrolidin-1-yl)propan-1-one'); the substituted-acyl pseudoketone "
     "producer is not built -- TODO in TRIAGE.md 'Suite fix -- j5-pin-labels-b'"))
 def test_hidden_amide_row_pin(namer):
-    assert namer.name(HIDDEN_AMIDE) == HIDDEN_AMIDE_PIN
+    assert _dt_obj_name(namer, HIDDEN_AMIDE) == HIDDEN_AMIDE_PIN
 
 
 @pytest.mark.opsin_gate
@@ -198,7 +253,7 @@ def test_hidden_amide_row_ships_below_the_pin_tier(namer):
     """Production (gate on): the stereo descriptor is resolved, the N-acyl name
     ships RT-exact with ONE level of enclosing marks, labelled below pin_verified."""
     from tests.support.rt_assert import name_is_rt_exact
-    r = namer.name_tiered(HIDDEN_AMIDE)
+    r = _dt_obj_row(namer, HIDDEN_AMIDE)
     assert r["name"] == HIDDEN_AMIDE_SHIPPED, r
     assert r["tier"] != "pin_verified", r
     assert name_is_rt_exact(r["name"], HIDDEN_AMIDE), r
@@ -215,7 +270,7 @@ def test_fails_closed_rather_than_citing_an_unresolvable_locant(namer):
     a fabricated descriptor.
     """
     smiles = "C1CCC/C=C(\\CCCC1)/CC(C(=O)[O-])(/C/2=C/CCCCCCCC2)/C/3=C/CCCCCCCC3"
-    name = namer.name(smiles)
+    name = _dt_obj_name(namer, smiles)
     assert name == "2,2,3-tri(cyclodec-1-en-1-yl)propanoate"
     assert not name.startswith("("), f"a parent-scope block was fabricated: {name}"
 
@@ -286,13 +341,13 @@ def test_counterexample_set_is_non_empty():
 @pytest.mark.parametrize("smiles,expected", COUNTEREXAMPLES)
 def test_amide_caller_inherits_the_parent_scope_rule(namer, smiles, expected):
     """`composer.py:5564` never passed an override — the shared chain must decide."""
-    assert namer.name(smiles) == expected
+    assert _dt_obj_name(namer, smiles) == expected
 
 
 @pytest.mark.parametrize("smiles,expected", COUNTEREXAMPLES)
 def test_counterexample_block_cites_a_locant_the_parent_actually_has(namer, smiles, expected):
     """`prop-2-enamide` has C1..C3, so a leading `1`/`2` must denote the parent's own bond."""
-    name = namer.name(smiles)
+    name = _dt_obj_name(namer, smiles)
     block = re.search(r"\((\d+)([EZRS])\)-", name)
     assert block is not None, f"expected a parent-scope block, got: {name}"
     assert block.group(1) == "2", f"locant {block.group(1)!r} is not the parent's: {name}"
@@ -458,12 +513,12 @@ def test_residual_acid_halide_cites_the_parents_own_numbering(namer):
     """HEAD emitted `(1R,2R)-3-[(1R,2R)-2-methylcyclopropyl]propanoyl chloride`:
     the cyclopropyl SUBSTITUENT's numbering, duplicated at parent scope, on a
     parent stem that had also lost its double bond."""
-    assert namer.name(SMILES_C1R) == EXPECTED_C1R
+    assert _dt_obj_name(namer, SMILES_C1R) == EXPECTED_C1R
 
 
 def test_residual_parent_block_is_not_the_substituent_block(namer):
     """The `(1R,2R)` belongs inside the brackets and nowhere else."""
-    name = namer.name(SMILES_C1R)
+    name = _dt_obj_name(namer, SMILES_C1R)
     assert name.startswith("(2E)-"), name
     assert name.count("(1R,2R)") == 1, f"substituent block duplicated: {name}"
 
@@ -506,7 +561,7 @@ def test_ring_parent_row_set_is_non_empty():
 
 @pytest.mark.parametrize("smiles,expected", _RING_PARENT_PARAMS)
 def test_ring_parent_descriptors_are_not_dropped(namer, smiles, expected):
-    assert namer.name(smiles) == expected
+    assert _dt_obj_name(namer, smiles) == expected
 
 
 def test_pentaacetate_ring_parent_keeps_its_descriptors(namer):
@@ -514,7 +569,7 @@ def test_pentaacetate_ring_parent_keeps_its_descriptors(namer):
     the ring parent's four descriptors survive, i.e. the name round-trips to the
     input's FULL InChIKey (stereo layer included; OPSIN run outside the engine)."""
     from tests.support.rt_assert import assert_full_rt
-    name = namer.name(PENTAACETATE)
+    name = _dt_obj_name(namer, PENTAACETATE)
     assert_full_rt(name, PENTAACETATE)
 
 
@@ -541,7 +596,7 @@ def _capture_injections(namer, smiles):
 
     composer._inject_stereo_if_missing = _spy
     try:
-        final = namer.name(smiles)
+        final = _dt_obj_name(namer, smiles)
     finally:
         composer._inject_stereo_if_missing = orig
     return final, seen
@@ -674,7 +729,7 @@ def test_acyl_unsaturation_row_set_is_non_empty():
 
 @pytest.mark.parametrize("smiles,expected", ACYL_UNSATURATION_ROWS)
 def test_acyl_halide_spells_its_own_unsaturation(namer, smiles, expected):
-    assert namer.name(smiles) == expected
+    assert _dt_obj_name(namer, smiles) == expected
 
 
 @pytest.mark.opsin_gate

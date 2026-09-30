@@ -8,6 +8,53 @@ from rdkit import Chem
 
 from orthonym.namer import Orthonym
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.default_tier import (  # noqa: E402
+    declined_pin_row,
+    default_tier_rule_applies,
+)
+
+# Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
+# name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it
+# declines." User decision 2026-09-30 ("Ship it in 1.0.2"): a name the code records
+# as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
+# molecules below the test asserts that decline, the strict path's name and label,
+# and the same name at the best-effort tier (tests/support/default_tier.py).
+DEFAULT_TIER_DECLINES = frozenset({
+    "CC(C)(C)[Li]",
+    "CC(C)(C)[Mg]Cl",
+    "CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CCC(=O)C(C)(C)[C@@H]1[C@@H](O)C3",
+    "C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C",
+    "[Li]C(C)(C)C",
+})
+#... whose best-effort name is another one (it reads back exactly)
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+
+
+def _declined_pin_row(smiles):
+    return declined_pin_row(
+        smiles, best_effort_same=smiles not in BEST_EFFORT_NAMES_IT_OTHERWISE)
+
+
+def _dt_name_compound(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return name_compound(smiles)
+
+
+def _dt_name(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)["name"]
+    return Orthonym(style="pin").name(smiles)
+
+
+def _dt_row(smiles):
+    from orthonym import Orthonym, name_compound  # noqa: F811
+    if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
+        return _declined_pin_row(smiles)
+    return Orthonym(style="pin").name_tiered(smiles)
+
 
 
 # ---------------------------------------------------------------------------
@@ -30,7 +77,7 @@ PHOSPHONATOOXY_NAMES = [
 @pytest.mark.parametrize("smiles,expected", PHOSPHONATOOXY_NAMES,
                          ids=[e for _, e in PHOSPHONATOOXY_NAMES])
 def test_phosphonatooxy_junior_anion(smiles, expected):
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert r["name"] == expected
     assert r["tier"] == "pin_verified"
     assert name_is_rt_exact(expected, smiles)
@@ -46,7 +93,7 @@ def test_phosphonatooxy_junior_anion(smiles, expected):
 def test_gate_off_never_ships_the_charge_dropping_name(smiles):
     """Gate off (the suite default): whatever ships must still be the input
     species; the old '(phosphonooxy)...ate' denoted a less anionic molecule."""
-    name = Orthonym().name(smiles)
+    name = _dt_name(smiles)
     assert "phosphonooxy" not in name
     if name and name != "unknown organic compound":
         assert name_is_rt_exact(name, smiles), name
@@ -81,7 +128,7 @@ PARTIAL_ACID_SALT_EZ = [
 @pytest.mark.parametrize("smiles,expected", PARTIAL_ACID_SALT_EZ,
                          ids=[e for _, e in PARTIAL_ACID_SALT_EZ])
 def test_partial_acid_salt_keeps_backbone_ez(smiles, expected):
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert r["name"] == expected
     assert r["tier"] == "pin_verified"
     assert name_is_rt_exact(expected, smiles)
@@ -89,7 +136,7 @@ def test_partial_acid_salt_keeps_backbone_ez(smiles, expected):
 
 @pytest.mark.parametrize("smiles,expected", PARTIAL_ACID_SALT_EZ[:2])
 def test_partial_acid_salt_ez_gate_off(smiles, expected):
-    assert Orthonym().name(smiles) == expected
+    assert _dt_name(smiles) == expected
 
 
 # ---------------------------------------------------------------------------
@@ -109,20 +156,19 @@ def test_partial_acid_salt_ez_gate_off(smiles, expected):
 STEROID_ACID_NAMES = [
     # (smiles, name, tier at the PIN tier). The last two carry a whole-graph R/S
     # descriptor block (DK-P101CIP, recorded non-PIN): the PIN path built them and
-    # the gate verified them (; name_is_rt_exact below), but they are not
-    # certified as the PIN, so pin_unverified -- the paper's tier semantics (TRIAGE
-    # 'Tier labels -- paper semantics'); best_effort was the offer-label
-    # under-claim.
+    # the gate verified them (; name_is_rt_exact below), and the code records
+    # them as not the PIN, so systematic_verified -- "a correct systematic name that
+    # is not the PIN" (user decision 2026-09-30; Methods, "Tiers").
     ("C[C@H](CCC(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
      "3α-hydroxy-5β-cholan-24-oic acid", "pin_verified"),
     ("C[C@H](CCC[C@H](C)C(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",
      "(25S)-3-oxo-5α-cholestan-26-oic acid", "pin_verified"),
     ("C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C",
      "(10S,13R,14R,15S,17R,20R)-15-hydroxy-4,4,14-trimethyl-3-oxochola-7,9(11)-dien-24-oic acid",
-     "pin_unverified"),
+     "systematic_verified"),
     ("CC(C)=CCC[C@@H](C(=O)O)[C@H]1C(=O)C[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CCC(=O)C(C)(C)[C@@H]1[C@@H](O)C3",
      "(5R,6S,10S,13R,14R,17R,20R)-6-hydroxy-4,4,14-trimethyl-3,16-dioxocholesta-8,24-dien-21-oic acid",
-     "pin_unverified"),
+     "systematic_verified"),
 ]
 
 
@@ -130,7 +176,7 @@ STEROID_ACID_NAMES = [
 @pytest.mark.parametrize("smiles,expected,tier", STEROID_ACID_NAMES,
                          ids=[e for _, e, _ in STEROID_ACID_NAMES])
 def test_steroid_terminal_acid_is_the_suffix(smiles, expected, tier):
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert r["name"] == expected
     assert r["tier"] == tier
     assert name_is_rt_exact(expected, smiles)
@@ -158,7 +204,7 @@ def test_steroid_numbering_maps_follow_the_skeleton():
      "estra-1,3,5(10)-triene-3,15α,16α,17β-tetrol"),
 ])
 def test_steroid_compound_locant_and_alpha_beta(smiles, expected):
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert r["name"] == expected
     assert name_is_rt_exact(expected, smiles)
 
@@ -171,7 +217,7 @@ def test_steroid_compound_locant_and_alpha_beta(smiles, expected):
 ])
 def test_undefined_implied_centre_declines_the_stereoparent(smiles):
     """Gate off: the raw producer never over-specifies an implied centre."""
-    name = Orthonym().name(smiles)
+    name = _dt_name(smiles)
     assert not any(stem in name for stem in ("cholest", "androst"))
     if name != "unknown organic compound":
         assert name_is_rt_exact(name, smiles), name
@@ -222,7 +268,7 @@ def test_skeleton_saturated_set_needs_a_consistent_entry():
     ("CC(C)(C)[Mg]Cl", "tert-butylmagnesium chloride"),
 ])
 def test_tert_butyl_sigma_ligand(smiles, expected):
-    name = Orthonym().name(smiles)
+    name = _dt_name(smiles)
     assert name == expected
     assert name_is_rt_exact(name, smiles)
 
@@ -251,7 +297,7 @@ def test_other_branched_ligand_still_fails_closed():
     ("[Ca+2].CC(=O)[O-].CC(=O)[O-]", "calcium diacetate"),
 ])
 def test_italicized_prefix_multiplier(smiles, expected):
-    name = Orthonym().name(smiles)
+    name = _dt_name(smiles)
     assert name == expected
     assert name_is_rt_exact(name, smiles)
 
@@ -280,7 +326,7 @@ PEPTIDE_PINS = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected", PEPTIDE_PINS, ids=[e[:40] for _, e in PEPTIDE_PINS])
 def test_peptide_substitutive_pin(smiles, expected):
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert r["name"] == expected
     assert r["tier"] == "pin_verified"
     assert name_is_rt_exact(expected, smiles)
@@ -296,7 +342,7 @@ def test_chain_stereocentre_keeps_the_retained_acid():
     '(S)-cyclopropyl(hydroxy)acetaldehyde (PIN)' (:45259). Was '(2S)-2-hydroxy-2-
     phenylethanoic acid' at pin_verified."""
     smiles = "O[C@@H](c1ccccc1)C(=O)O"
-    r = Orthonym().name_tiered(smiles)
+    r = _dt_row(smiles)
     assert r["name"] == "(S)-hydroxy(phenyl)acetic acid", r
     assert r["tier"] == "pin_verified", r
     assert name_is_rt_exact(r["name"], smiles)

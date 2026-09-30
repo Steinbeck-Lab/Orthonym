@@ -482,11 +482,10 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
             # it encodes is real and the no-locant path could reach it the moment a
             # mononuclear parent takes a derived multiplier; a dead branch that
             # bypasses the shared sink is the trap, not the branch itself.
-            if _is_derived(multiplier):
-                return f"{multiplier}{_enclose(prefix_form)}"
-            if _compound_nl:
-                return f"{multiplier}{_enclose(prefix_form)}"
-            return f"{multiplier}{prefix_form}"
+            from ..assembly.naming_utils import multiplied_component as _mc
+            if _is_derived(multiplier) or _compound_nl:
+                return _mc(count, prefix_form, _enclose(prefix_form))
+            return _mc(count, prefix_form, prefix_form)
         if _compound_nl:
             return _enclose(prefix_form)
         return prefix_form
@@ -523,9 +522,10 @@ def format_fg_prefix(prefix_form: str, locants: List[int], count: int) -> str:
     # Get multiplier if multiple instances
     if count > 1:
         multiplier = get_multiplier_prefix(count, prefix_form)
+        from ..assembly.naming_utils import multiplied_component as _mc
         if compound or _is_derived(multiplier):
-            return f"{locant_str}-{multiplier}{_enclose(prefix_form)}"
-        return f"{locant_str}-{multiplier}{prefix_form}"
+            return f"{locant_str}-{_mc(count, prefix_form, _enclose(prefix_form))}"
+        return f"{locant_str}-{_mc(count, prefix_form, prefix_form)}"
 
     if compound:
         return f"{locant_str}-{_enclose(prefix_form)}"
@@ -586,6 +586,7 @@ def _name_amidine_chain_side(
 
     _counts = _C(_names)
     _parts = []
+    from ..assembly.naming_utils import multiplied_component as _mc_pf
     for _nm in sorted(_counts):
         _c = _counts[_nm]
         #: a COMPOUND N-substituent takes its own enclosing marks,
@@ -595,7 +596,7 @@ def _name_amidine_chain_side(
         # `ethylimino` are byte-identical to before.
         _enc = apply_enclosing_marks(_nm, -1) if needs_brackets(_nm) else _nm
         _parts.append(
-            _enc if _c == 1 else f"{get_multiplier_prefix(_c, _enc)}{_enc}"
+            _enc if _c == 1 else _mc_pf(_c, _nm, _enc)
         )
     # BARE: `format_fg_prefix` owns the outer marks and their type. See the
     # docstring — returning them from here is what produced `(` inside `(`.
@@ -1152,10 +1153,8 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
 
     if all_prefixes:
         prefix_str = _join_prefixes(all_prefixes)
-        if prefix_str and formatted_suffix and prefix_str[-1].isalpha() and formatted_suffix[0].isdigit():
-            name = f"{prefix_str}-{formatted_suffix}"
-        else:
-            name = f"{prefix_str}{formatted_suffix}"
+        from ..assembly.composition_primitives import _join_prefix_to_name
+        name = _join_prefix_to_name(prefix_str, formatted_suffix)
     else:
         name = formatted_suffix
 
@@ -1985,14 +1984,14 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             enc = _enc(acyloxy_name, -1)
             if count > 1 and valid_locants:
                 locant_str = ",".join(str(loc) for loc in valid_locants)
-                multiplier = get_multiplier_prefix(count, acyloxy_name)
-                all_prefixes.append(f"{locant_str}-{multiplier}{enc}")
+                from ..assembly.naming_utils import multiplied_component as _mc
+                all_prefixes.append(f"{locant_str}-{_mc(count, acyloxy_name, enc)}")
             elif valid_locants:
                 all_prefixes.append(f"{valid_locants[0]}-{enc}")
             else:
                 if count > 1:
-                    multiplier = get_multiplier_prefix(count, acyloxy_name)
-                    all_prefixes.append(f"{multiplier}{enc}")
+                    from ..assembly.naming_utils import multiplied_component as _mc
+                    all_prefixes.append(_mc(count, acyloxy_name, enc))
                 else:
                     all_prefixes.append(enc)
 
@@ -2406,6 +2405,68 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     for _sac, (_amino_prefix, _branch) in _sa_units.items():
                         _amidine_excluded_n.update(_branch)
                     continue
+
+        # The TERTIARY sibling of the block above: -CO-NR2 terminating the chain
+        # parent is 'oxo' + the N-side prefix at that carbon's locant, the N side
+        # named whole as the substituent it is ('dimethylamino').
+        # (the Blue Book) "The combination of the prefixes 'anilino' and 'oxo'
+        # is used for describing -CO-NH-C6H5 at the end of an acyclic chain",
+        # 'anilino(oxo)acetic acid (PIN)' (:30398) -- the same rule for any amino
+        # side. The generic path cited the amide twice ('(dimethylamino)(dimethyl-
+        # carbamoyl)acetic acid', a different molecule). SMARTS
+        # [CX3](=O)[NX3]([#6])[#6]: match[0]=C, match[2]=N. Fail closed unless every
+        # match's amide C is a chain member and its N side names as a substituent.
+        if fg_name == 'tertiary_amide' and chain_set:
+            # (local aliases only: a bare 'name_substituent' import here would make
+            # that name local to the whole function and unbind its other uses)
+            from ..assembly.substituent_enumerator import (
+                name_substituent as _ta_name_substituent,
+            )
+            from ..errors import is_refusal_sentinel as _ta_is_refusal
+            from ..assembly.naming_utils import (
+                apply_enclosing_marks as _ta_enc_marks,
+                needs_brackets as _ta_needs_br,
+            )
+            _ta_prefixes = []
+            _ta_branches = []
+            for _m in matches:
+                _tac, _tan = _m[0], _m[2]
+                _loc = atom_to_locant.get(_tac) if _tac in chain_set else None
+                if _loc is None or mol.GetAtomWithIdx(_tan).GetTotalNumHs():
+                    # an N-H amide also matches this SMARTS; it is the
+                    # secondary block's (or no) business
+                    _ta_prefixes = []
+                    break
+                _seen = {_tac}
+                _stack = [_tan]
+                _branch = []
+                while _stack:
+                    _a = _stack.pop()
+                    if _a in _seen:
+                        continue
+                    _seen.add(_a)
+                    _branch.append(_a)
+                    for _nb in mol.GetAtomWithIdx(_a).GetNeighbors():
+                        if _nb.GetIdx() not in _seen and _nb.GetAtomicNum() > 1:
+                            _stack.append(_nb.GetIdx())
+                if set(_branch) & chain_set:
+                    _ta_prefixes = []  # the N side reaches back into the parent
+                    break
+                _n_name = _ta_name_substituent(mol, sorted(_branch), _tan)
+                if (not _n_name or _n_name == 'substituent' or ' ' in _n_name
+                        or _ta_is_refusal(_n_name)):
+                    _ta_prefixes = []
+                    break
+                if _ta_needs_br(_n_name):
+                    _n_name = _ta_enc_marks(_n_name, -1)
+                _ta_prefixes.append(format_fg_prefix('oxo', [_loc], 1))
+                _ta_prefixes.append(format_fg_prefix(_n_name, [_loc], 1))
+                _ta_branches.append(_branch)
+            if _ta_prefixes:
+                all_prefixes.extend(_ta_prefixes)
+                for _branch in _ta_branches:
+                    _amidine_excluded_n.update(_branch)
+                continue
 
         #: a sulfonamide bonded to the chain via its N
         # (R-SO2-NH-chain) is expressed by _check_for_acylamino as the
@@ -2857,6 +2918,17 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 )
             continue
 
+        # The two OH of one -N(OH)2 are two hydroxylamine matches on the same N,
+        # and 'dihydroxyamino' already names both: one group, one locant (it was
+        # counted twice, '2,2-bis(dihydroxyamino)', a different molecule).
+        if prefix_form == 'dihydroxyamino':
+            _by_n = {}
+            for _m in matches:
+                _n_at = next((a for a in _m
+                              if mol.GetAtomWithIdx(a).GetSymbol() == 'N'), None)
+                _by_n.setdefault(_n_at, _m)
+            matches = list(_by_n.values())
+
         # Get locants for this FG
         locants = get_non_principal_fg_locants(
             mol, matches, principal_chain, atom_to_locant, fg_name
@@ -2989,9 +3061,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 if _rc == 1:
                     all_prefixes.append(f"N-{_wrap_n_substituent(_rn)}")
                 else:
-                    _rmult = get_multiplier_prefix(_rc, _rn)
+                    from ..assembly.naming_utils import multiplied_component as _mc
                     all_prefixes.append(
-                        f"N,N-{_rmult}{_wrap_n_substituent(_rn)}"
+                        f"N,N-{_mc(_rc, _rn, _wrap_n_substituent(_rn))}"
                     )
 
     # --- a phase (E3 Task 5): N-substituent prefix for a PRINCIPAL AMIDE
@@ -3084,9 +3156,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                             all_prefixes.append(
                                 f"N-{_wrap_n_substituent(_arn)}")
                         else:
-                            _armult = get_multiplier_prefix(_arc, _arn)
+                            from ..assembly.naming_utils import multiplied_component as _mc
                             all_prefixes.append(
-                                f"N,N-{_armult}{_wrap_n_substituent(_arn)}"
+                                f"N,N-{_mc(_arc, _arn, _wrap_n_substituent(_arn))}"
                             )
 
     # --- Merge duplicate bare prefix names ---
@@ -3123,10 +3195,8 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             return None
         _parent = f"{_stem}ane"
         _pfx = _join_prefixes(all_prefixes)
-        if _pfx and _pfx[-1].isalpha() and _parent[0].isdigit():
-            _name = f"{_pfx}-{_parent}"
-        else:
-            _name = f"{_pfx}{_parent}"
+        from ..assembly.composition_primitives import _join_prefix_to_name
+        _name = _join_prefix_to_name(_pfx, _parent)
         if features.stereocenters or getattr(features, 'double_bond_stereo', None):
             from .stereochemistry import (
                 collect_stereodescriptors,
@@ -3379,11 +3449,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             )
         if prefixes:
             prefix_str = _join_prefixes(prefixes)
-            # Ensure hyphen between prefix ending with letter and name starting with digit
-            if prefix_str and _n and prefix_str[-1].isalpha() and _n[0].isdigit():
-                _n = f"{prefix_str}-{_n}"
-            else:
-                _n = f"{prefix_str}{_n}"
+            # A hyphen between the prefixes and a name that opens with a locant.
+            from ..assembly.composition_primitives import _join_prefix_to_name
+            _n = _join_prefix_to_name(prefix_str, _n)
         return _n
 
     # The systematic assembly is the name unless a retained arm applies. For the
@@ -4105,10 +4173,21 @@ def _merge_bare_duplicate_prefixes(prefixes: List[str]) -> List[str]:
 
         for merge_group in merge_sets:
             all_locants: List[int] = []
+            _seen_locant_lists = set()
             for idx, locs in merge_group:
-                all_locants.extend(locs)
                 merged_indices.add(idx)
-            all_locants = sorted(set(all_locants))
+                # The same string twice is one group emitted twice (the cyano
+                # of CCNC(=O)N/C=C(\C#N)/C(=O)OCC reaches this list twice), so
+                # it counts once, as the set below always did.
+                if tuple(locs) in _seen_locant_lists:
+                    continue
+                _seen_locant_lists.add(tuple(locs))
+                all_locants.extend(locs)
+            # Across DIFFERENT strings the locants are a multiset: '5-hydroxy' +
+            # '8,8-dihydroxy' is '5,8,8-trihydroxy' (three OH). A set here
+            # dropped the geminal pair to one ('5,8-dihydroxy', a different
+            # molecule); cites a locant once per substituent.
+            all_locants = sorted(all_locants)
             total_count = len(all_locants) if all_locants else len(merge_group)
 
             # Rebuild using format_fg_prefix (peer function in this module)
