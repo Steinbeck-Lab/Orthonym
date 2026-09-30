@@ -5,6 +5,13 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.2](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.1...v1.0.2) (2026-09-30)
+
+
+### Bug Fixes
+
+* engine fixes and optimizations, tier updates ([6cab387](https://github.com/Steinbeck-Lab/Orthonym/commit/6cab38789a73993310344acf4d15dfd882391fde))
+
 ## [1.0.1](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.0...v1.0.1) (2026-09-29)
 
 The naming engine is the same as in 1.0.0: the Python code differs only in comments and docstrings. The PyPI package now lists all three authors and Development Status 5 - Production/Stable, and the documentation cites the Zenodo archive.
