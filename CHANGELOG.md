@@ -5,6 +5,13 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.3](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.2...v1.0.3) (2026-10-01)
+
+
+### Bug Fixes
+
+* bridged fused PINs on naphthalene and anthracene parents, larger ring systems at the best-effort tier, more PIN classes and exact spellings ([7bdb0d2](https://github.com/Steinbeck-Lab/Orthonym/commit/7bdb0d2e6c2f6817610f5d9a4607a2202e6e716e))
+
 ## [1.0.2](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.1...v1.0.2) (2026-09-30)
 
 
