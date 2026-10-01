@@ -9,7 +9,7 @@ GitHub's **Cite this repository** button, built from [`CITATION.cff`](https://gi
 @software{orthonym,
   author  = {Rajan, Kohulan and Zielesny, Achim and Steinbeck, Christoph},
   title   = {{Orthonym}},
-  version = {1.0.2},
+  version = {1.0.3},
   year    = {2026},
   doi     = {10.5281/zenodo.23044199},
   url     = {https://github.com/Steinbeck-Lab/Orthonym}
