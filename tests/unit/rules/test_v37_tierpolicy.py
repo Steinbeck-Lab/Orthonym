@@ -36,8 +36,8 @@ systematic von-Baeyer form, which would REGRESS the PIN at the complete tier
 Run ONLY this file (the whole suite deadlocks on an OPSIN pipe):
     .venv/bin/python -m pytest tests/unit/rules/test_v37_tierpolicy.py -q
 """
-import signal
 import pytest
+from orthonym.wallclock import wall_clock_limit
 from rdkit import Chem
 from rdkit.Chem import inchi
 
@@ -64,43 +64,27 @@ def _oracle():
     return OpsinOracle(opsin_jar=jar_or_skip())
 
 
-def _alarm(seconds=120):
-    def _raise(sig, frm):
-        raise TimeoutError()
-    signal.signal(signal.SIGALRM, _raise)
-    signal.alarm(seconds)
-
-
 def _complete(smi):
     """The verified COMPLETE tier: RT-verified engine/rescue names, NO T4
     unverified ship (gf=T, gfu=F, aag=T). The 0-wrong shipping tier."""
-    _alarm()
-    try:
+    with wall_clock_limit(120):
         return Orthonym(
             style="pin", general_fallback=True,
             general_fallback_unverified=False, allow_aromatic_general=True,
         ).name(smi)
-    finally:
-        signal.alarm(0)
 
 
 def _best_effort(smi):
-    _alarm()
-    try:
+    with wall_clock_limit(120):
         return Orthonym(
             style="pin", general_fallback=True,
             general_fallback_unverified=True, allow_aromatic_general=True,
         ).name(smi)
-    finally:
-        signal.alarm(0)
 
 
 def _pin(smi):
-    _alarm()
-    try:
+    with wall_clock_limit(120):
         return Orthonym(style="pin").name(smi)
-    finally:
-        signal.alarm(0)
 
 
 def _ik(smi):
@@ -185,6 +169,15 @@ class TestUnverifiedRescueStillAbstains:
         monkeypatch.setattr(
             Orthonym, "_pin_promotion_eligible",
             lambda self: False)
+        # The general chain engine cites amide N-substituents with the locant N,
+        # so its inline attempt now names the molecule correctly (RT-exact
+        # 'N-(4-chlorophenyl)-N-[1-(2-phenylethyl)piperidin-4-yl]propanamide')
+        # before the handoff is reached. It is turned off here too, so the
+        # handoff -- the path under test -- is the one that runs.
+        from orthonym.assembly import general_engine
+        monkeypatch.setattr(
+            general_engine, "name_general",
+            lambda mol, feats, *a, **k: None)
         name = _complete(_NOSTEREO_T4)
         assert errors.is_failure_name(name), (
             f"COMPLETE tier SHIPPED an RT-failing T4 candidate: {name!r}")

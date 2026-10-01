@@ -17,7 +17,7 @@ Each result lands on one of five states. The mark carries the state by its shape
 : A checked name whose preferred status is not certified. The engine's tiers {tier}`pin_unverified` and {tier}`systematic_verified`. Most of these names were read back by OPSIN to your structure; at the default tier a name that OPSIN read back with its constitution only, or could not read, lands here too. The app's own read-back verdict under the name says which.
 
 {lamp}`best_effort`
-: A name from the general engine or a last-resort producer, not from the strict rules. The engine's tier {tier}`best_effort`. The app prints its own read-back verdict under the name.
+: A name from a last-resort producer, not from the strict rules or the general engine. The engine's tier {tier}`best_effort`. The app prints its own read-back verdict under the name.
 
 {lamp}`abstain`
 : The engine declined rather than guess, so no name was made. The engine's tier {tier}`abstain`.

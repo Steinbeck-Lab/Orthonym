@@ -9,8 +9,8 @@ Task 3: the spiro-von-Baeyer constitutional defects (RT-gated; abstain if unfixa
 Run ONLY this file (whole-suite deadlocks on an OPSIN pipe):
     .venv/bin/python -m pytest tests/unit/rules/test_c_waveE_v36.py -q
 """
-import signal
 import pytest
+from orthonym.wallclock import wall_clock_limit
 
 from orthonym.jvm_budget import jvm_slots
 
@@ -29,33 +29,16 @@ def _jvm_slot():
         yield
 
 
-class _Timeout(Exception):
-    pass
-
-
-def _alarm(seconds=60):
-    def _raise(sig, frm):
-        raise _Timeout()
-    signal.signal(signal.SIGALRM, _raise)
-    signal.alarm(seconds)
-
-
 def _name(smiles):
     from orthonym import name_compound
-    _alarm(60)
-    try:
+    with wall_clock_limit(60):
         return name_compound(smiles)
-    finally:
-        signal.alarm(0)
 
 
 def _rt(smiles, name):
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
-    _alarm(60)
-    try:
+    with wall_clock_limit(60):
         return opsin_roundtrip_check(smiles, name)["passed"]
-    finally:
-        signal.alarm(0)
 
 
 def _constitution_rt(smiles, name):
@@ -66,11 +49,8 @@ def _constitution_rt(smiles, name):
     from orthonym.validation.opsin_roundtrip import opsin_parse
     from rdkit import Chem
     from rdkit.Chem.inchi import MolToInchiKey
-    _alarm(60)
-    try:
+    with wall_clock_limit(60):
         osmi = opsin_parse(name)
-    finally:
-        signal.alarm(0)
     if not osmi:
         return False
     mi = Chem.MolFromSmiles(smiles)

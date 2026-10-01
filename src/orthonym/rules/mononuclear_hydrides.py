@@ -194,10 +194,14 @@ def _find_senior_phosphane_silyl_hub(mol):
         return None
     # No hub-eligible atom more senior than P may be present (N-P etc. handled
     # elsewhere); a Si is allowed only as a bare-silyl substituent (checked in
-    # _classify_phosphane_subs). Any Ge/Sn/Pb/other-metal hub -> fail closed.
+    # _classify_phosphane_subs). S, Se and Te are junior to P,
+    # the Blue Book, "N > P >... > O > S > Se > Te > C") and are allowed
+    # inside an organyl ('di(methyl)[2-(methylsulfanyl)ethyl]phosphane'; the
+    # organyl check is _ether_organyl_prefix_name). Any Ge/Sn/Pb/other-metal hub
+    # -> fail closed.
     for a in atoms_of(mol):
         sym = a.GetSymbol()
-        if sym in ('H', 'C', 'P', 'Si'):
+        if sym in ('H', 'C', 'P', 'Si', 'S', 'Se', 'Te'):
             continue
         return None
     return p
@@ -605,15 +609,26 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
         if subs is not None and 'silyl' in subs:
             prefix_block = _build_substituent_string(subs)
             return _assemble(prefix_block, lam, stem)
-        # degrade floor (best-effort ONLY): a pure-organyl phosphane whose
-        # substituent is a RING (tricyclododecylphosphane) is never reached by
-        # name_phosphine -- the ring routing bypasses it -- and would otherwise
-        # abstain (measured DEGRADE row). _classify_phosphane_subs already names the
-        # ring organyls, so emit the substitutive phosphane. Gated on best_effort_ctx
-        # so the PIN path stays byte-identical (name_phosphine still owns acyclic
-        # phosphanes on the PIN cascade; a phosphane-with-ring-substituent PIN
-        # spelling is a separate refinement). 0-wrong: backstops the emission.
-        if subs is not None and best_effort_ctx.get():
+        # "Substitution of phosphanes, arsanes, and stibanes by
+        # organyl groups" (the Blue Book): "Alkyl, aryl, etc. groups... are
+        # always denoted by prefixes" (:39153) -- the phosphane is the parent at
+        # EVERY tier: 'cyclohexylphosphane (PIN)' (:39165), 'ethyl(methyl)(phenyl)
+        # phosphane (PIN)' (:39171), 'tert-butyldi(methyl)phosphane (PIN)' (:16286,
+        # not a propane chain with a dimethylphosphanyl prefix), 'triphenyl-
+        # λ5-phosphane (PIN)' (:2768). _classify_phosphane_subs names every
+        # organyl (ring organyls included) or returns None, so this branch is the
+        # arsane organyl regime above for phosphorus. It used to run at the
+        # best-effort tier only, so the PIN tier shipped the chain name or nothing.
+        # Every Blue Book example bonds each organyl to P by a single bond. A
+        # multiply bonded one is kept at the best-effort tier: R3P=CR2 is an ylide,
+        # and "'Ylides'" (:42499) says "Method (1) is applicable to all
+        # 'ylides' and leads to preferred IUPAC names" (:42509) -- the zwitterionic
+        # '2-(trimethylphosphaniumyl)propan-2-ide (PIN)', not the λ-convention
+        # 'trimethyl(propan-2-ylidene)-λ5-phosphane' (:42530).
+        # 0-wrong: backstops the emission.
+        if subs is not None and (best_effort_ctx.get() or all(
+                b.GetBondType() == Chem.BondType.SINGLE for b in hub.GetBonds()
+                if b.GetOtherAtom(hub).GetAtomicNum() > 1)):
             return _assemble(_build_substituent_string(subs), lam, stem)
 
     # --- /: a hypervalent-iodine DIESTER (PhI(OAc)2 ->
@@ -810,9 +825,73 @@ def _classify_phosphane_subs(mol, hub) -> Optional[List[str]]:
             continue
         name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
         if name is None:
+            name = _ether_organyl_prefix_name(mol, nbr, hub_idx)
+        if name is None:
             return None
         names.append(name)
     return names or None
+
+
+def _ether_organyl_prefix_name(mol, nbr, hub_idx: int) -> Optional[str]:
+    """The prefix of a carbon-attached organyl whose only heteroatoms are halogen
+    atoms and divalent O, S, Se, Te bonded to two carbons (ethers and sulfides,
+    open-chain or in a ring: '2-methoxyethyl', '4-methoxyphenyl',
+    '2-(methylsulfanyl)ethyl', 'thiophen-2-yl'), named by the shared substituent
+    namer; None for anything else (a chalcogen chain such as a disulfanyl group
+    is left to the other producers).
+
+     (the Blue Book): "Alkyl, aryl, etc. groups and groups
+    derived from parent hydrides containing O, S, Se, and Te atoms are always
+    denoted by prefixes" (:39153). Such groups are prefix-only (no suffix form,
+    , so the phosphane stays the parent -- unless the molecule has a principal
+    characteristic group other than the phosphane itself (then that group's parent
+    is senior, '2-(dimethylphosphanyl)ethan-1-ol'), which declines here."""
+    try:
+        if nbr.GetSymbol() != 'C':
+            return None
+        bond = mol.GetBondBetweenAtoms(nbr.GetIdx(), hub_idx)
+        if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+            return None
+        frag, stack = set(), [nbr.GetIdx()]
+        while stack:
+            x = stack.pop()
+            if x in frag:
+                continue
+            frag.add(x)
+            for n in mol.GetAtomWithIdx(x).GetNeighbors():
+                ni = n.GetIdx()
+                if ni == hub_idx:
+                    if x != nbr.GetIdx():
+                        return None          # a ring through the hub
+                    continue
+                if ni not in frag:
+                    stack.append(ni)
+        for idx in frag:
+            a = mol.GetAtomWithIdx(idx)
+            if a.GetFormalCharge() or a.GetNumRadicalElectrons():
+                return None
+            sym = a.GetSymbol()
+            if sym == 'C' or (sym in _HALOGENS and a.GetDegree() == 1):
+                continue
+            if (sym in ('O', 'S', 'Se', 'Te') and a.GetDegree() == 2
+                    and a.GetTotalNumHs() == 0
+                    and all(n.GetSymbol() == 'C' for n in a.GetNeighbors())
+                    and all(b.GetBondType() in (Chem.BondType.SINGLE, Chem.BondType.AROMATIC)
+                            for b in a.GetBonds())):
+                continue
+            return None
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        pg, _m = get_principal_group(mol, detect_functional_groups(mol))
+        if pg and 'phosphine' not in str(pg):
+            return None
+        from ..assembly.substituent_naming import name_substituent_fragment
+        name = name_substituent_fragment(mol, sorted(frag), nbr.GetIdx(), [hub_idx])
+        if not name or name == 'substituent' or ' ' in name:
+            return None
+        return name
+    except Exception:  # noqa: BLE001 -- a producer bug must never crash naming
+        return None
 
 
 # Parent-hydride stems for the mononuclear heterone hubs. The characteristic-group

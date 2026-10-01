@@ -32,11 +32,16 @@ class TestP351Multiplier:
         # groups are bis(disulfanyl) (the Blue Book, the Blue Book), because 'didisulfanyl'
         # would read as a catenation ('di' + 'disulfanyl' = -SSSS-);
         # the tri- forms (-S-S-S-H) collide the same way.
+        # (e) (the Blue Book) adds the other prefixes that begin with
+        # a multiplicative 'di': 'bis(diazenyl) (not didiazenyl)' (:7194).
         assert CATENATION_AMBIGUOUS_PREFIXES == frozenset({
             "sulfanyl", "selanyl", "tellanyl", "phosphanyl",
             "arsanyl", "stibanyl", "azanyl", "oxidanyl",
             "disulfanyl", "diselanyl", "ditellanyl",
             "trisulfanyl", "triselanyl", "tritellanyl",
+            "diazenyl", "diazanyl", "disilanyl", "digermanyl", "distannanyl",
+            "diplumbanyl", "diboranyl", "diphosphanyl", "diarsanyl", "distibanyl",
+            "dibismuthanyl", "dioxidanyl",
         })
 
     def test_unambiguous_simple_prefix_keeps_di(self):

@@ -160,3 +160,44 @@ class TestComponentTables:
         from orthonym.rules.adducts import _name_component
         assert _name_component("[Fe]", "pin") is None
         assert _name_component("[Fe+2]", "pin", charged_ok=True) is None
+
+
+# A one-atom ion ('[Cl-]', '[I-]', '[Br-]', '[OH-]') is an inorganic component too:
+# "Mixed organic - inorganic adducts" (the Blue Book;:4665 "organic
+# components in order as described in, inorganic components in order as
+# described in Ref 12";:4667 no PIN). A metal-free depiction with such an ion is
+# named at the best-effort tier the same way as one with a metal atom, and only when
+# the name reproduces the drawn charges.
+ONE_ATOM_ION = [
+    ("CCO.C[N+](C)(C)C.[Cl-]", "ethanol—N,N,N-trimethylmethanaminium—chloride (1/1/1)"),
+    ("CC(=O)O.C[n+]1ccccc1.[I-]", "acetic acid—1-methylpyridin-1-ium—iodide (1/1/1)"),
+    ("c1ccccc1.CCCC[N+](CCCC)(CCCC)CCCC.[Br-]",
+     "N,N,N-tributylbutan-1-aminium—benzene—bromide (1/1/1)"),
+    ("CC(=O)OCC.C[N+](C)(C)C.[Cl-].[Cl-]",
+     "ethyl acetate—N,N,N-trimethylmethanaminium—chloride (1/1/2)"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", ONE_ATOM_ION)
+def test_best_effort_names_a_one_atom_ion_without_a_metal(smiles, expected):
+    row = _best_effort_row(smiles)
+    name = row.get("name")
+    assert name == expected, f"{smiles}: best-effort name {name!r}"
+    _assert_reads_back_exactly(name, smiles)
+    assert row["tier"] in ("systematic_verified", "best_effort"), (name, row["tier"])
+    assert row["is_pin"] is False
+
+
+@pytest.mark.parametrize("smiles", [s for s, _ in ONE_ATOM_ION])
+def test_pin_tier_still_abstains_on_a_one_atom_ion_adduct(smiles):
+    row = _pin_row(smiles)
+    assert row["tier"] == "abstain" and is_failure_name(row.get("name") or "unknown"), (
+        f"{smiles}: PIN tier shipped {row.get('name')!r} ({row['tier']})")
+
+
+def test_one_atom_ion_component_stays_out_of_the_default_scope():
+    """Without the best-effort switch a one-atom ion is still no adduct component."""
+    from orthonym.rules.adducts import name_adduct
+    mol = Chem.MolFromSmiles("CCO.C[N+](C)(C)C.[Cl-]")
+    assert name_adduct(mol, style="pin", general_fallback=True,
+                       allow_aromatic_general=True) is None

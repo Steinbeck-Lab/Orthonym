@@ -191,6 +191,15 @@ def name_general_acyclic(
     # stem-string (`parent_frag.text == "meth"`) + no-suffix gate, which was a
     # molecule-class band-aid.
     is_mononuclear_parent = (_get_parent_atom_count(features) == 1)
+    # (the Blue Book) with (the Blue Book): a parent compound whose
+    # substitutable hydrogens all sit on one atom cites no prefix locant, and its
+    # second and subsequent simple prefixes are enclosed exactly as on a mononuclear
+    # parent -- 'bromo(chloro)acetic acid (PIN)' (the Blue Book). Applied by
+    # rebuilding the prefix fragments, like the licences around it.
+    from ._handler_shared import _l6_prefix_locants_omitted
+    if _l6_prefix_locants_omitted(features, fragments):
+        fragments = _prefix_fragments_without_locants(fragments)
+        is_mononuclear_parent = True
     # (the Blue Book) is decided HERE for the same reason as the mononuclear
     # rule above: the licence needs the STRUCTURE (the parent compound's
     # substitutable-hydrogen orbits), and `_assemble_fragments` receives only name

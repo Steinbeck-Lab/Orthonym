@@ -60,8 +60,11 @@ def test_r8c_ring_benzene_hydroxamic():
     OPSIN-verified: O=C(NO)c1ccccc1 round-trips correctly.
     """
     assert name_compound("O=C(NO)c1ccccc1", style="pin") == "N-hydroxybenzamide"
-    # Substituted benzene hydroxamic: 2-hydroxy on ring
-    assert name_compound("O=C(NO)c1ccccc1O", style="pin") == "N-hydroxy-2-hydroxybenzamide"
+    # Substituted benzene hydroxamic: 2-hydroxy on ring. Identical simple prefixes
+    # on N and on the ring are multiplied together: (the Blue Book,
+    # (b):7067, "simple substituent prefixes"); 'N,4-dimethyl-N-(3-methylphenyl)
+    # benzamide (PIN)' (:32879), 'N,N,2-trimethyl-...propanamide (PIN)' (:21624)
+    assert name_compound("O=C(NO)c1ccccc1O", style="pin") == "N,2-dihydroxybenzamide"
 
 
 def test_r8c_ring_pyridine_hydroxamic():

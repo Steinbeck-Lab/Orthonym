@@ -7,7 +7,11 @@ whole `enumerator_last_resort` terminal class on the 500-row best-effort census
 (seed 42, `benchmarks/pubchem_2000.csv`) -- measured at, matching the
 census figure of 11 recorded in internal notes.
 
-These tests are RED ON PURPOSE. They pin the oracle for the follow-up build and
+2026-09-30: nine of the eleven name atom-complete now (see _PIN_BUILT,
+_PIN_NOT_BUILT and _STILL_LAST_RESORT below); the organometallic two stay strict
+xfails.
+
+These tests were RED ON PURPOSE. They pin the oracle for the follow-up build and
 deliberately contain no fix: the RING sibling of this gap turned out to already
 exist and merely be unreachable (-T1), so the build must a trace the site
 before assuming a namer is missing.
@@ -138,21 +142,45 @@ def test_fragments_are_distinct():
 _PIN_BUILT = {
     "CCCCCCCCCCOC[N+](C)(C)CCOC(=O)CCCCCCCCC":
         "2-(decanoyloxy)-N-[(decyloxy)methyl]-N,N-dimethylethan-1-aminium",
+    # 2026-09-30 (pre-existing 26): the acrylamido sulfonate is named at the PIN
+    # tier, the amide as the '-amido' prefix,:32998, "Method (1)
+    # generates preferred IUPAC names"); OPSIN 2.9.0 full InChIKey and FixedH exact.
+    "CC(C(C)S(=O)(=O)[O-])NC(=O)C=C": "3-(prop-2-enamido)butane-2-sulfonate",
 }
 _PIN_NOT_BUILT = {
     "CCCCCCCCCCCCCC(=O)NCCOS(=O)(=O)[O-]": "2-tetradecanamidoethyl sulfate",
     "CCCCCCCCCCOCCCN(CCS(=O)(=O)[O-])C(=O)C(=C)C":
         "2-{N-[3-(decyloxy)propyl]-2-methylprop-2-enamido}ethane-1-sulfonate",
 }
-_STILL_LAST_RESORT = [s for s in FRAGMENTS
-                      if s not in _PIN_BUILT and s not in _PIN_NOT_BUILT]
+# The rows that named atom-complete before the rest (g6 C15).
+_NAMED_EARLIER = {"CCCCCCCCCCOC[N+](C)(C)CCOC(=O)CCCCCCCCC"} | set(_PIN_NOT_BUILT)
+_LAST_RESORT_ROWS = [s for s in FRAGMENTS if s not in _NAMED_EARLIER]
+# 2026-09-30 (pre-existing 26): six of the eight remaining rows name atom-complete
+# now. With the gate on, `Orthonym(general_fallback=True)` names each one, and the
+# name reads back by a fresh OPSIN call to the input's full InChIKey; the
+# best-effort tier names each one RT-exact too, and the PIN tier declines or ships
+# an RT-exact name (assert_tier_contract). Their strict xfails had turned into
+# XPASS. The organometallic two keep the strict xfail: the engine declines them
+# ('molybdenum compound (not supported)', 'aluminium compound (not supported)').
+_STILL_LAST_RESORT = frozenset({
+    "CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-]."
+    "CCN(CC)C(=S)[S-].CCN(CC)C(=S)[S-].[Mo]",
+    "CCC(C)CC[Al+2]",
+})
 
 
-@pytest.mark.parametrize("smiles", _STILL_LAST_RESORT)
-@pytest.mark.xfail(strict=True, reason="acyclic last-resort gap, v30 phase PB")
+@pytest.mark.parametrize("smiles", [
+    pytest.param(s, marks=pytest.mark.xfail(
+        strict=True, reason="acyclic last-resort gap, v30 phase PB: an "
+        "organometallic fragment, the engine declines it"))
+    if s in _STILL_LAST_RESORT else s
+    for s in _LAST_RESORT_ROWS])
 def test_acyclic_fragment_names_without_a_sentinel(smiles):
+    from tests.support.rt_assert import assert_tier_contract, name_is_rt_exact
     name = Orthonym(general_fallback=True).name(smiles)
     assert not is_refusal_sentinel(name), name
+    assert name_is_rt_exact(name, smiles), name
+    assert_tier_contract(smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", sorted(_PIN_BUILT.items()))

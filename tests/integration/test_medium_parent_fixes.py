@@ -175,7 +175,12 @@ marks=_XF_MACROLIDE,
     pytest.param(
         "CC(C)=CCC/C(C)=C/COC[C@H]1O[C@@H]"
         "(N2CCC(=O)NC2=O)[C@H](O)[C@@H]1O",
-        "oxolane",
+        # the ring that carries the principal characteristic group is the parent
+        #, the Blue Book); the cyclic amide is a pseudoketone
+        #,:29314, "Cyclic anhydrides, esters and amides are named as
+        # pseudoketones"; '1,3-diazinane-2,4,6-trione (PIN)':29344), so the
+        # oxolane is a substituent
+        "oxolan-2-yl]-1,3-diazinane-2,4-dione",
         id="geranyl-nucleoside-thf-parent",
     ),
     pytest.param(
@@ -205,13 +210,17 @@ def test_fused_heterocycle_chain_parent(smiles, expected_substr):
 POLYCYCLIC_VB_FIXES = [
     pytest.param(
         "Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O",
-        "hydroxychromane",
+        # 'chromane' is not a PIN: (the Blue Book), "Names
+        # listed in Table 3.1 are retained names that are not used as preferred
+        # IUPAC names"; 'chromane 3,4-dihydro-2H-1-benzopyran (PIN)' (:17004)
+        "3,4-dihydro-2H-1-benzopyran-3,4,7-triol",
         id="catechin-trihydroxychromane",
     ),
     pytest.param(
         "O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)"
         "[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O",
-        "chroman",
+        # (:16980,:17004), as above
+        "2,3-dihydro-4H-1-benzopyran-4-one",
         id="xylopyranoside-trihydroxychromanone",
     ),
     pytest.param(
@@ -297,7 +306,10 @@ CHARGED_SPECIES_FIXES = [
     pytest.param(
         "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])"
         "OCC[N+](C)(C)C)OC(C)=O",
-        "palmitate",
+        # 'palmitic acid' is retained for general nomenclature only:
+        # (the Blue Book, "The following names are retained for general
+        # nomenclature"), 'palmitic acid hexadecanoic acid (PIN)' (:29787)
+        "hexadecanoyloxy",
         id="phospholipid-palmitate-ester",
     ),
     pytest.param(
@@ -457,7 +469,13 @@ marks=_XF_MACROLIDE,
     pytest.param(
         "C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)"
         "O[C@@H](C)C/C=C\\C(=O)O1",
-        "oxacyclohexadecan",
+        # the ring has two C=C, so its name is not the saturated
+        # '...oxacyclohexadecane': (the Blue Book), "In rings
+        # modified by skeletal replacement ('a') nomenclature, low locants are
+        # assigned first to heteroatoms and then to unsaturated sites"
+        # ('1,4,7,10-tetraoxacyclododec-2-ene (PIN)':16562; the 'a' before
+        # 'diene' as in 'cycloocta-1,3,5,7-tetraene (PIN)':16554)
+        "1,5,11-trioxacyclohexadeca-7,13-diene-2,6,12-trione",
         id="macrolide-trilactone-16ring",
     ),
 ]

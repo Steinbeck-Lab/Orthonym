@@ -31,8 +31,12 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CC(=S)c1ccc(C(=O)O)cc1",
     "COC(=O)CC(=C(C)N)C(=O)OC",
     "COc1c(C)cnc(CS(=O)c2nc3ccc(O)cc3[nH]2)c1C",
-    "COc1ccc(/C=C2\\NC(=O)/C(=C/c3ccccc3)NC2=O)cc1",
-    "COc1ccc(/C=c2\\[nH]c(=O)/c(=C/c3ccccc3)[nH]c2=O)cc1",
+    # PIN class program Task 2: the two spellings of '(3Z,6Z)-3-benzylidene-6-[(4-
+    # methoxyphenyl)methylidene]piperazine-2,5-dione' are built by the strict path's
+    # first run now (the decorated ring-yl fold at every tier) and ship pin_verified:
+    # (the Blue Book) lactams as heterocyclic pseudoketones
+    # "Method (1) generates preferred IUPAC names"; 'benzylidene' unsubstituted is a
+    # preferred prefix,:16304).
     "COc1ccc2[nH]c(S(=O)Cc3ncc(C)c(OC)c3C)nc2c1",
     "COc1cccc2c1C(=O)/C(=C(\\CO)[C@@H]1OC(=O)C[C@@H]1C)O2",
     "C[C@@H](CN(C[C@@H]1CCC=CC1)C)O",
@@ -296,7 +300,7 @@ def test_c_a_rerun_that_can_win_still_runs(monkeypatch):
     smiles = "NCc1csc(-c2cccs2)n1"
     reruns = _count_reruns(monkeypatch)
     row = _row(smiles, "pin")
-    assert row["name"] == "[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine", row
+    assert row["name"] == "1-[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine", row
     assert len(reruns) >= 1
     assert_full_rt(row["name"], smiles)
 

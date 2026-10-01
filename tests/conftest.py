@@ -509,6 +509,12 @@ def pytest_runtest_call(item):
 # and the pre-fix test_runtime_cache (session_depth 1).
 _NAMING_TIER_CTX = ("general_fallback_ctx", "best_effort_ctx",
                     "allow_aromatic_general_ctx", "full_coverage_ctx")
+# The request tier (``provenance.best_effort_request_ctx``) is None outside a
+# request; a value left behind, False included, would set the tier of every later
+# call on the worker that reads it outside a request: the ring ceilings
+# (``vonbaeyer_universal.cage_caps``) and ``name_with_confidence``, which sets it
+# only when it is None.
+_NAMING_REQUEST_CTX = ("best_effort_request_ctx",)
 _NAMING_DEPTHS = ("session_depth", "name_call_depth")
 
 
@@ -521,6 +527,10 @@ def _leaked_naming_state() -> dict:
         for attr in _NAMING_TIER_CTX:
             var = getattr(pv, attr, None)
             if var is not None and var.get() not in (False, None):
+                leaked[attr] = var.get()
+        for attr in _NAMING_REQUEST_CTX:
+            var = getattr(pv, attr, None)
+            if var is not None and var.get() is not None:
                 leaked[attr] = var.get()
     fn = sys.modules.get("orthonym.assembly.fragment_naming")
     guard = getattr(fn, "_fragment_guard", None) if fn is not None else None
@@ -541,6 +551,10 @@ def _reset_naming_state() -> None:
             var = getattr(pv, attr, None)
             if var is not None:
                 var.set(False)
+        for attr in _NAMING_REQUEST_CTX:
+            var = getattr(pv, attr, None)
+            if var is not None:
+                var.set(None)
     fn = sys.modules.get("orthonym.assembly.fragment_naming")
     guard = getattr(fn, "_fragment_guard", None) if fn is not None else None
     if guard is not None:

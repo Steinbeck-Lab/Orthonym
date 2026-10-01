@@ -647,12 +647,19 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     frag_mols = {smi: Chem.MolFromSmiles(smi) for smi, _ in components}
     if any(fm is None for fm in frag_mols.values()):
         return None
-    # Breadth Job 2: the metal-adduct widening runs at the best-effort tier only
-    #, the Blue Book: no PIN for a mixed organic-inorganic adduct),
-    # and only for an assembly with a metal atom in it; a metal-free assembly is
-    # named exactly as before.
-    _ions_ok = bool(general_fallback_unverified) and any(
-        a.GetSymbol() in _METAL_ELEMENT_NAMES for a in mol.GetAtoms())
+    # Breadth Job 2: the mixed organic-inorganic widening runs at the best-effort
+    # tier only, the Blue Book: no PIN for a mixed organic-inorganic
+    # adduct), and only for an assembly with an inorganic component: a metal atom,
+    # or a charged component with one heavy atom (e.g. '[Cl-]', '[OH-]', '[NH4+]',
+    # '[S-2]'), which the single-component pipeline names ('chloride',
+    # 'hydroxide', 'azanium') like any other ion. The
+    # whole name must then reproduce the drawn charges
+    # (``_parse_reproduces_depiction`` below). Any other assembly is named exactly
+    # as before.
+    _ions_ok = bool(general_fallback_unverified) and (
+        any(a.GetSymbol() in _METAL_ELEMENT_NAMES for a in mol.GetAtoms())
+        or any(fm.GetNumHeavyAtoms() == 1 and Chem.GetFormalCharge(fm) != 0
+               for fm in frag_mols.values()))
     _has_metal_atom = _ions_ok and any(
         _is_metal_atom_fragment(fm) for fm in frag_mols.values())
     if not _has_metal_atom and not any(

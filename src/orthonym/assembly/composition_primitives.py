@@ -262,6 +262,20 @@ def _build_hydrocarbon_name(
         is_monosubstituted=_ring_mono,
     )
 
+    # (the Blue Book) "Cyclic cumulenes are composed entirely of
+    # atoms... linked by double bonds. For homocyclic cumulenes omission of all
+    # locants is recommended for preferred IUPAC names (see ":
+    # 'cycloundecaundecaene (PIN)' (:16592). A monocycle of n atoms has n bonds and
+    # its stem is 'cyclo' + the n-carbon chain stem, so n double bonds on that stem
+    # means every ring bond is double. Unsubstituted rings only (the callers' own
+    # ``ring_bond_locant_omittable``; a cumulated ring carbon has no hydrogen anyway).
+    from ..data.chain_names import get_chain_prefix
+    _cumulated_ring = (
+        is_cyclic and num_triple == 0 and num_double >= 3
+        and ring_bond_locant_omittable is True
+        and stem == f"cyclo{get_chain_prefix(num_double)}"
+    )
+
     # Determine if the 'a' euphonic connector is needed (IUPAC:
     # used when multiple bonds have multiplied locants (diene, diyne, etc.)
     needs_a = (num_double > 1) or (num_triple > 1 and num_double == 0)
@@ -280,7 +294,7 @@ def _build_hydrocarbon_name(
         else:
             loc_str = ",".join(str(loc) for loc in double_locants)
             mult = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
-            segments.append((loc_str, mult, "en"))
+            segments.append((None if _cumulated_ring else loc_str, mult, "en"))
 
     if num_triple > 0:
         if num_triple == 1:
@@ -484,6 +498,22 @@ def retained_acetic_from_prefixes(
     for gating the whole assembly to the substituted-2-carbon-mono-FG context; this
     function only performs the retained-name assembly.
     """
+    name = _join_prefix_to_name(
+        unlocanted_prefix_block(prefix_texts, enclose_subsequent=enclose_subsequent),
+        parent)
+    return f"{stereo}{name}" if stereo else name
+
+
+def unlocanted_prefix_block(prefix_texts: List[str],
+                            enclose_subsequent: bool = False) -> str:
+    """The prefix block of a parent whose substitutable hydrogens all sit at one
+    locant, the Blue Book: "All locants are omitted for parent
+    compounds when all substitutable hydrogen atoms have the same locant"): each
+    formatted prefix loses its leading locant set, a complex prefix is enclosed,
+    and with ``enclose_subsequent`` every prefix after the first is set off by
+    enclosing marks /.3.2, 'bromo(chloro)acetic acid':7312). The
+    body of ``retained_acetic_from_prefixes``, shared with the chain prefixes of
+    ``composer._integrate_universal_prefixes``."""
     unlocanted = [_ALPHA_LOCANT_RE.sub('', t) for t in prefix_texts]
     #: stripping the alpha locant can leave a COMPLEX substituent
     # whose own enclosure no longer wraps the whole prefix -- e.g.
@@ -546,8 +576,7 @@ def retained_acetic_from_prefixes(
         unlocanted = [unlocanted[0]] + [
             _enclose_after_first(t, _locant_count(orig))
             for t, orig in zip(unlocanted[1:], prefix_texts[1:])]
-    name = _join_prefix_to_name(_join_prefixes(unlocanted), parent)
-    return f"{stereo}{name}" if stereo else name
+    return _join_prefixes(unlocanted)
 
 
 # ---------------------------------------------------------------------------

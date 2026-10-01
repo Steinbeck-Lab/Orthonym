@@ -23,8 +23,8 @@ a full-stereo non-regression guard.
 Run ONLY this file (whole-suite deadlocks on an OPSIN pipe):
     .venv/bin/python -m pytest tests/unit/rules/test_v37_stereo_completion.py -q
 """
-import signal
 import pytest
+from orthonym.wallclock import wall_clock_limit
 from rdkit import Chem
 
 from orthonym import Orthonym, errors, name_compound
@@ -46,24 +46,14 @@ def _jvm_slot():
         yield
 
 
-def _alarm(seconds=90):
-    def _raise(sig, frm):
-        raise TimeoutError()
-    signal.signal(signal.SIGALRM, _raise)
-    signal.alarm(seconds)
-
-
 def _be():
     return Orthonym(general_fallback=True, general_fallback_unverified=True,
                      allow_aromatic_general=True)
 
 
 def _be_name(smi):
-    _alarm()
-    try:
+    with wall_clock_limit(90):
         return _be().name(smi)
-    finally:
-        signal.alarm(0)
 
 
 def _rt(smi, name):
@@ -142,11 +132,8 @@ class TestST1NeverWrongAndPinPreserved:
     def test_pseudoasym_named_blocker_pin_tier_still_abstains(self):
         # gold V36-VB-PSEUDOASYM-01: PIN tier must NOT ship a non-RT (1r,5s);
         # default tier abstains (suppresses the flat form at PIN).
-        _alarm()
-        try:
+        with wall_clock_limit(90):
             name = name_compound("C1C[C@H]2C[C@H](C2)O1")
-        finally:
-            signal.alarm(0)
         assert errors.is_failure_name(name)
 
 

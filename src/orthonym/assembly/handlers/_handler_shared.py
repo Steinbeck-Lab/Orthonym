@@ -1621,6 +1621,10 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
     existing_sub_positions = sum(len(p.locants) if p.locants else 1 for p in prefixes)
     fg_sub_positions = sum(len(locs) if locs else 1 for _txt, locs, _atoms in fg_prefix_specs)
     total_substituents = existing_sub_positions + fg_sub_positions
+    # (the Blue Book): a one-atom chain parent whose principal group still
+    # holds a substitutable hydrogen cites the '1' ('1-hydrazinylmethanamine (PIN)',
+    # the Blue Book); see locant_omission.mononuclear_parent_locant_required.
+    _mononuclear_locant_required = mononuclear_locant_required_here(features)
     for prefix_text, fg_locants, fg_atoms in fg_prefix_specs:
         # NOTE: do NOT add an outer `and total_substituents == 1` guard. The
         # is_monosubstituted arg already encodes the single-substituent condition,
@@ -1654,7 +1658,7 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
             is_ring=_sym_carbo_ring,
             is_monosubstituted=(total_substituents == 1 and fg_locants == [1]
                                 and features.principal_group is None),
-        )
+        ) and not _mononuclear_locant_required
         prefixes.append(NameFragment(
             text=prefix_text,
             locants=tuple(sorted(fg_locants)) if (fg_locants and not omit_locants) else (),
@@ -1814,11 +1818,16 @@ def _generate_stereodescriptors(features: Any, atom_to_locant_override: Optional
     # is omitted per (a unique position carries no locant) -> bare "(R)-".
     # Example: [C@H](Br)(Cl)F has parent methane {C_idx: 1}; the descriptor
     # (1,'R') must format as "(R)-", not the spurious "(1R)-".
+    # Not when the parent's own locant is cited / through
+    # ``mononuclear_locant_required_here``): (the Blue Book) then cites every
+    # locant, the descriptor's too -- '(1E)-1-[...]-N-[...]methanimine (PIN)'
+    # (the Blue Book).
     if (
         len(atom_to_locant) == 1
         and len(descriptors) == 1
         and isinstance(descriptors[0][0], int)
         and descriptors[0][0] == next(iter(atom_to_locant.values()))
+        and not mononuclear_locant_required_here(features)
     ):
         # Strip the locant: emit the bare descriptor "(R)-".
         cip = descriptors[0][1]
@@ -2019,6 +2028,20 @@ def locant_scope_is_a_name_component() -> bool:
         return bool(_naming_call_produces_a_name_component())
     except Exception:                          # noqa: BLE001 -- deny-by-default
         return True
+
+
+def mononuclear_locant_required_here(features: Any) -> bool:
+    """``locant_omission.mononuclear_parent_locant_required``, the Blue Book;
+    , the Blue Book; '1-hydrazinylmethanamine (PIN)', the Blue Book) for THIS naming
+    call: False when the
+    call names a fragment that is spliced into a larger name (the fragment-boundary
+    observation above), whose nitrogen hydrogens may be caps where the rest of the
+    molecule attaches ('N-hydroxyphenylmethanimine' names the capped imine). Shared
+    by the four producers that omit the locant of a one-atom chain parent."""
+    if locant_scope_is_a_name_component():
+        return False
+    from ..locant_omission import mononuclear_parent_locant_required
+    return mononuclear_parent_locant_required(features)
 
 
 def _prefix_fragments_without_locants(
@@ -2338,6 +2361,61 @@ def _naming_call_produces_a_name_component() -> bool:
         return bool(_get_visited())
     except Exception:                          # noqa: BLE001 -- deny-by-default
         return True
+
+
+def _l6_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:
+    """ (the Blue Book) at PARENT scope: "All locants are omitted for parent
+    compounds when all substitutable hydrogen atoms have the same locant." With
+     (the Blue Book): "Simple substituents of a parent where only one possible
+    position can be substituted do not require locants. Enclosing marks are used with
+    second and subsequent simple substituents" -- 'bromo(chloro)acetic acid (PIN)'
+    (the Blue Book), 'amino(oxo)ethaneperoxoic acid (PIN)' (the Blue Book). 'acetamide' is the
+    boundary: its N-H are substitutable too, so '2-chloroacetamide' keeps the locant.
+
+    The parent compound is the principal chain plus the principal-group atoms; the
+    decision is ``locant_omission.l6_chain_parent_one_substitutable_atom``. Deny-by-
+    default, with the same three scope checks as the sibling licence below
+    (forced locants and isotopic modification inside the leaf; the fragment-boundary
+    observation here), and False when anything else in the scope cites a locant (a
+    stereodescriptor, a stem that is not purely alphabetic, an unsaturation or a
+    suffix locant)."""
+    if _naming_call_produces_a_name_component():
+        return False
+    if features is None or not fragments:
+        return False
+    mol = getattr(features, "mol", None)
+    chain = list(getattr(features, "principal_chain", None) or [])
+    if mol is None or not chain:
+        return False
+    if (getattr(features, "is_cyclic", False)
+            and not getattr(features, "chain_is_parent", False)):
+        return False
+    prefixes = [f for f in fragments if f.fragment_type == "prefix"]
+    suffixes = [f for f in fragments if f.fragment_type == "suffix"]
+    parents = [f for f in fragments if f.fragment_type == "parent"]
+    stereos = [f for f in fragments if f.fragment_type == "stereo"]
+    if not prefixes or len(parents) != 1 or len(suffixes) > 1:
+        return False
+    if stereos and str(stereos[0].text or "").strip():
+        return False
+    if not (parents[0].text or "").isalpha():
+        return False
+    for bond_locants in (parents[0].locants or ()):
+        if bond_locants:
+            return False
+    if suffixes and any(str(l).isdigit() for l in (suffixes[0].locants or [])):
+        return False
+    # The substituted acetic acid has its own arm in `_assemble_fragments` (the
+    # retained parent, the same omission, and the located spelling it records for
+    # the amido converter), which needs the fragments' locants.
+    if (parents[0].text == "eth" and suffixes
+            and suffixes[0].text == "oic acid"):
+        return False
+    groups = set()
+    for match in (getattr(features, "principal_group_atoms", None) or ()):
+        groups.update(int(i) for i in match)
+    from ..locant_omission import l6_chain_parent_one_substitutable_atom
+    return l6_chain_parent_one_substitutable_atom(mol, chain, groups)
 
 
 def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:

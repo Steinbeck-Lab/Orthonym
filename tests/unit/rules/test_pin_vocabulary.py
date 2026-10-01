@@ -35,6 +35,8 @@ NON_PIN = [
     ("14-oxatetradecyl", "14-oxatetradec"),
     ("3-hydroxy-9-oxanon-1-en-1-yl", "9-oxanon"),
     ("1-methyl-3-oxapropyl", "3-oxaprop"),
+    # (:32928): method (1) 'amino' + 'oxo' for a -CO-NH2 on a chain
+    ("5-(carbamoylmethyl)furan-2-carboxylic acid", "carbamoylmethyl"),
     # 'formyl (preferred prefix)... oxomethyl'
     ("{[(2,3-dichlorophenyl)amino]-oxomethyl}amino", "oxomethyl"),
     # / retained acetic acid, acetamide

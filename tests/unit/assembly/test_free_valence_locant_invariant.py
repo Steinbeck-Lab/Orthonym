@@ -169,7 +169,10 @@ def test_located_branches_fail_closed_without_a_proven_attach_locant(parent, n):
     ("cyclohexane", 6, "cyclohexyl"),
     # gain: a one-position stem drops the locant it could never
     # justify. These were '1-carbamoylmethyl' / '1-cyanomethyl' / '1-oxomethyl'.
-    ("acetamide", 2, "carbamoylmethyl"),
+    # (the Blue Book) method (1) for chains: '5-(2-amino-2-
+    # oxoethyl)furan-2-carboxylic acid (PIN)' (:32940); the free valence of the
+    # two-carbon fragment can only be at C-1, so the locant '2' is forced.
+    ("acetamide", 2, "2-amino-2-oxoethyl"),
     ("acetonitrile", 2, "cyanomethyl"),
     ("methanal", 1, "oxomethyl"),
 ])

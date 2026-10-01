@@ -2540,8 +2540,9 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
             pass
 
     # ---- Tier 1.7 (DD2 Fix B, Phase D): peroxy / disulfanyl substituent ----
-    # A -O-O-R (peroxy) / -S-S-R (disulfanyl) substituent: the attach atom is a
-    # divalent chalcogen bonded to a second like chalcogen inside the fragment.
+    # A -O-O-R (peroxy) / -S-S-R (disulfanyl; likewise -Se-Se-R diselanyl and
+    # -Te-Te-R ditellanyl) substituent: the attach atom is a divalent chalcogen
+    # bonded to a second like chalcogen inside the fragment.
     # Named (R)peroxy / (R)disulfanyl per (1). Placed before the cache /
     # recursive tiers, which otherwise mangle the -O-O-/-S-S- into a bogus
     # 'peroxyl'/'dithioperoxyl' fragment. Reachable from EVERY caller (the chain
@@ -2550,7 +2551,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     if attach_idx is not None and attach_idx in frag_atoms_set:
         _attach_atom = mol.GetAtomWithIdx(attach_idx)
         _sym = _attach_atom.GetSymbol()
-        if _sym in ('O', 'S') and any(
+        if _sym in ('O', 'S', 'Se', 'Te') and any(
             n.GetSymbol() == _sym and n.GetIdx() in frag_atoms_set
             for n in _attach_atom.GetNeighbors()
         ):
@@ -3915,6 +3916,10 @@ def _terminal_monocycle_core_tail(mol, core, attach_idx, pos):
         audit_monocycle_replacement_name,
         build_monocycle_replacement_name,
     )
+    from ..rules.vonbaeyer_universal import (
+        beyond_pin_caps,
+        record_beyond_pin_caps,
+    )
     core_set = set(core)
     if attach_idx not in core_set or set(pos) != core_set:
         return None
@@ -3936,6 +3941,10 @@ def _terminal_monocycle_core_tail(mol, core, attach_idx, pos):
         logger.info("terminal monocycle tail %r failed the reconstruction "
                     "audit; refuse", name)
         return None
+    # A ring beyond the PIN ceilings is named at the best-effort tier only; the
+    # name is recorded as not a PIN, as ``terminal_ring_name`` records its own.
+    if beyond_pin_caps(len(core_set)):
+        record_beyond_pin_caps(name)
     return name
 
 
@@ -6155,6 +6164,9 @@ _CHALCOGEN_CHAIN_SUB_MULT = {
 }
 
 
+_CHALCOGEN_CHAIN_STEM = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}
+
+
 def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
     """§**** (BB:39325/:39327) / (1) /: name a
     homogeneous contiguous S-chain substituent, MAXIMISING the chain.
@@ -6177,7 +6189,12 @@ def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
     """
     frag_set = set(frag_atoms)
     s1 = mol.GetAtomWithIdx(attach_idx)
-    if s1.GetSymbol() != 'S' or not _is_divalent_chalcogen_atom(s1):
+    # speaks of "identical chalcogen atoms": a Se or Te chain is named the
+    # same way on its own stem ('methyltriselanyl', '1-(methyltriselanyl)propan-1-one
+    # (PIN)', the Blue Book).
+    elem = s1.GetSymbol()
+    stem_word = _CHALCOGEN_CHAIN_STEM.get(elem)
+    if stem_word is None or not _is_divalent_chalcogen_atom(s1):
         return None
     # Walk the maximal contiguous linear chain of divalent S atoms, moving AWAY
     # from the parent (the parent-side neighbour is not in frag_set). Every atom
@@ -6194,7 +6211,7 @@ def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
             ni = n.GetIdx()
             if ni == prev or ni not in frag_set or n.GetSymbol() == 'H':
                 continue
-            if n.GetSymbol() == 'S' and _is_divalent_chalcogen_atom(n):
+            if n.GetSymbol() == elem and _is_divalent_chalcogen_atom(n):
                 onward_s.append(ni)
             else:
                 other_heavy.append(ni)
@@ -6209,7 +6226,7 @@ def _name_disulfanyl_branch(mol, frag_atoms, attach_idx, parent_atoms):
     mult = _CHALCOGEN_CHAIN_SUB_MULT.get(k)
     if mult is None:
         return None                            # k<2 (unreachable via Tier 1.7) or >8
-    stem = f"{mult}sulfanyl"
+    stem = f"{mult}{stem_word}"
     # R on the terminal chain atom (at most one non-S heavy neighbour); none -> a
     # terminal -S…S-H, the bare <mult>sulfanyl.
     last = mol.GetAtomWithIdx(chain[-1])

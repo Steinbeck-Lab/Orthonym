@@ -118,8 +118,10 @@ def namer():
     # count 3 (BB 37495's `tri-tert-butyl` shape)
     ('CC(C)(C)[Si](C(C)(C)C)(C(C)(C)C)CC(=O)O',
      '(tri-tert-butylsilyl)acetic acid'),
-    # the third site, an amide N -- was `N,N-ditert-butylformamide`
-    ('CC(C)(C)N(C(C)(C)C)C=O', 'N,N-di-tert-butylformamide'),
+    # the third site, an amide N -- was `N,N-ditert-butylformamide`; both N-H of
+    # formamide carry the same group, so no locant is cited,
+    # the Blue Book, 'dimethylformamide (PIN)':32782;:3007)
+    ('CC(C)(C)N(C(C)(C)C)C=O', 'di-tert-butylformamide'),
     # a mononuclear pnictogen hub
     ('CC(C)(C)[As](C(C)(C)C)C', 'di-tert-butyl(methyl)arsane'),
     # the -oxy form, where the italic prefix is interior to the token

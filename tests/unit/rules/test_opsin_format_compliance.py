@@ -260,11 +260,6 @@ _CANARY_DEFECT_REASONS = {
         "connectivity-only, or the engine declines); routed in TRIAGE.md 'Canary calls "
         "routed per call' and 'T4 outcome'"
     ),
-    "DK-OXIME": (
-        "needs a ruling: 'N-hydroxyphenylmethanimine' vs 'N-hydroxy-1-phenylmethanimine' "
-        "(BB :47666 omits the C locant with two C-substituents in parentheses, :26524 "
-        "cites 'N,1-'; single unparenthesised phenyl reads as 'hydroxyphenyl')"
-    ),
     "DK-P101CIP": (
         "CIP descriptors on the stereoparent's implied centres instead of the P-101 "
         "alpha/beta form (P-101.2.6 :51047 'the name of a fundamental parent structure "
@@ -315,6 +310,11 @@ _CANARY_DEFECT_REASONS = {
 # 684 (DK-SFXNUM, fixed by 7c39f2243: every ring -OH of the alcohol class is a suffix)
 # left this table: both raw PIN-tier names are RT-exact now and are verified fixture
 # rows (tests/integration/test_canary_rt75.py, tags 'b3 RB-...').
+# Bridged fused S0 follow-up (2026-10-01): canary call 175 (DK-NOTEXACT, the 'cyclohexa[b]pyridine'
+# acid with no hydro prefixes) left this table: the hydro prefixes now go on the mancude parent
+#, the Blue Book), its raw PIN-tier name '4,7,8-trihydroxy-7,8-dihydroquinoline-
+# 2-carboxylic acid' is RT-exact (OPSIN 2.9.0 full key and FixedH InChI) and is a verified fixture
+# row (tests/integration/test_canary_rt75.py, tag 'bf RB-HYDRO').
 # SMILES -> (current PIN-tier name with the gate off, class, canary call numbers).
 CANARY_KNOWN_DEFECTS = {
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O": (
@@ -377,10 +377,6 @@ CANARY_KNOWN_DEFECTS = {
         "unknown organic compound",
         "DK-NOTEXACT", (68,),
     ),
-    "C(=N\\O)c1ccccc1": (
-        "N-hydroxyphenylmethanimine",
-        "DK-OXIME", (91,),
-    ),
     "COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O": (
         "(3S)-6,7-dihydroxy-8-methoxy-3-methyl-3,4-dihydro-1H-2-benzopyran-4-one",
         "DK-INDH", (133,),
@@ -420,10 +416,6 @@ CANARY_KNOWN_DEFECTS = {
     "CC1C/C(=C\\CC(CC(N)=O)CC(=O)O)C(=O)C(C)C1": (
         "unknown organic compound",
         "DK-NOTEXACT", (174,),
-    ),
-    "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2": (
-        "4,7,8-trihydroxycyclohexa[b]pyridine-2-carboxylic acid",
-        "DK-NOTEXACT", (175,),
     ),
     "CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12": (
         "N-heptanoyl(7aS)-3-amino-5,6,7,7a-tetrahydropyrrolizin-1(3aH)-one",

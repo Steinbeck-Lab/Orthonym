@@ -24,7 +24,11 @@ Three coupled root-cause fixes / /:
 
 3. Locant hygiene: a mononuclear (1-atom) chain parent takes no substituent
    locants (phenylmethanol, NOT 1-phenylmethanol; Rule 1 through
-   format_substituent_prefix); a SUBSTITUTED 2-carbon parent CITES the suffix
+   format_substituent_prefix) -- unless the principal group still holds a
+   substitutable hydrogen, the Blue Book, "Locants are required
+   for related compounds where additional substitutable positions are available";
+   '1-hydrazinylmethanamine (PIN)',:38535), so the amine and the imine cite '1-'
+   ('1-phenylmethanamine'; PIN class program Task 11); a SUBSTITUTED 2-carbon parent CITES the suffix
    locant on the generic path ('1-cyclohexylethan-1-imine',
    '2-chloroethane-1-selenol' — parallel to the dedicated -ol handler's
    '2-chloroethan-1-ol'), while bare ethanimine/ethaneselenol still elide
@@ -48,13 +52,13 @@ class TestSkeletalSuffixChainParent:
 
     @pytest.mark.parametrize("smiles,expected", [
         ("OCC1CCCCC1", "cyclohexylmethanol"),
-        ("NCC1CCCCC1", "cyclohexylmethanamine"),
+        ("NCC1CCCCC1", "1-cyclohexylmethanamine"),
         ("SCC1CCCCC1", "cyclohexylmethanethiol"),
         ("[SeH]CC1CCCCC1", "cyclohexylmethaneselenol"),
         ("[TeH]CC1CCCCC1", "cyclohexylmethanetellurol"),
-        ("N=CC1CCCCC1", "cyclohexylmethanimine"),
+        ("N=CC1CCCCC1", "1-cyclohexylmethanimine"),
         ("OCc1ccccc1", "phenylmethanol"),
-        ("NCc1ccccc1", "phenylmethanamine"),
+        ("NCc1ccccc1", "1-phenylmethanamine"),
         ("OCC1CCC(C)CC1", "(4-methylcyclohexyl)methanol"),
     ])
     def test_chain_parent_heals(self, smiles, expected):

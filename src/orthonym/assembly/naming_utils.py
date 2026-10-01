@@ -2728,6 +2728,13 @@ CATENATION_AMBIGUOUS_PREFIXES = frozenset({
     "trisulfanyl", # -SSSH -> bis(trisulfanyl)
     "triselanyl",  # -SeSeSeH
     "tritellanyl", # -TeTeTeH
+    # (e) (the Blue Book) 'bis', 'tris'... "before names beginning
+    # with a multiplicative prefix 'di'": 'bis(diazenyl) (preselected prefix...)
+    # (not didiazenyl)' (:7194). The other catenated dinuclear hydride prefixes.
+    "diazenyl",    # HN=N- -> bis(diazenyl) (:7194)
+    "diazanyl",    # H2N-NH- -> bis(diazanyl)
+    "disilanyl", "digermanyl", "distannanyl", "diplumbanyl", "diboranyl",
+    "diphosphanyl", "diarsanyl", "distibanyl", "dibismuthanyl", "dioxidanyl",
 })
 
 

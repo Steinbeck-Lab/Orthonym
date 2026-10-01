@@ -286,8 +286,10 @@ CANARY_COMPOUNDS = [
         "(2E)-2,5-dichloro-4-oxohex-2-enedioic acid",
     ),
     (
+        # formamide completely N-substituted in the same way cites no locant:
+        # 'dimethylformamide (PIN)', the Blue Book;
         "CCCN(C=O)CCC",
-        "N,N-dipropylformamide",
+        "dipropylformamide",
     ),
     (
         "CCCCCCCC/C=C/CCCCCCCC=O",
@@ -574,8 +576,11 @@ CANARY_COMPOUNDS = [
         "(2E)-3-phenylprop-2-enoic acid",
     ),
     (
+        # oximes are named as N-hydroxy imines, the Blue Book, 'N-hydroxypropan-1-imine
+        # (PIN)',:23168); the hydroxy could stand on C1, so
+        # (:2957) cites '1-'
         r"C(=N\O)c1ccccc1",
-        "benzaldehyde oxime",
+        "N-hydroxy-1-phenylmethanimine",
     ),
     (
         "CC(C)=CC=O",
@@ -957,8 +962,12 @@ CANARY_COMPOUNDS = [
         "3-(2-aminoethyl)-5-(3,5-dimethyl-2-oxocyclohexyl)pentanoic acid",
     ),
     (
-        "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2",  # Sentinel: parent_mismatch - hydroxypyridine carboxylic
-        "4-hydroxypyridine-6-carboxylic acid",  # Fixed: was "2,3-dibutyl-..." (fabricated from ring boundary leak)
+        "O=C(O)c1cc(O)c2c(n1)C(O)C(O)C=C2",
+        # bf RB-HYDRO (bridged fused S0 follow-up, change-asserted-value): hydro prefixes on the
+        # mancude parent quinoline, the Blue Book; quinoline retained,:1996);
+        # OPSIN 2.9.0 full key and FixedH exact. Was "4-hydroxypyridine-6-carboxylic acid" (a
+        # different molecule; the row was a known defect, call 175).
+        "4,7,8-trihydroxy-7,8-dihydroquinoline-2-carboxylic acid",
     ),
     (
         # Phase G0 (DD7 S1): this prenyl-chromanone fuses a benzene ring into

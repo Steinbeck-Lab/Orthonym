@@ -371,7 +371,10 @@ def test_witness_still_ships_wrong_name_documented_gap(monkeypatch):
 CAPTOPRIL_DROP_WITNESS = "CC(CS)C(=O)N1CCCC1C(=O)O"  # historical exemplar
 
 HETEROCYCLE_CARBON_ANCHOR_OVERCLAIM_WITNESS = "NC(=NCl)NC(=O)c1cccs1"
-HETEROCYCLE_CARBON_ANCHOR_OVERCLAIM_WRONG = "2-(carbamoylmethyl)thiophene"
+# The spelling of the wrong carbamoyl-on-chain prefix follows method
+# (1) (the Blue Book) since the PIN class program Task 2; the molecule it
+# names (the documented gap) is unchanged.
+HETEROCYCLE_CARBON_ANCHOR_OVERCLAIM_WRONG = "2-(2-amino-2-oxoethyl)thiophene"
 
 # Ordinary carbon-anchored heteroatom-bearing heterocycle substituents that
 # MUST keep emitting jar-absent -- the exact population the reverted

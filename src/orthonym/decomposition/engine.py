@@ -1489,6 +1489,99 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
 # Single-bond decomposition helper
 # ---------------------------------------------------------------------------
 
+#: (the Blue Book '7 Acids',:18182 '9 Esters',:18184 '11 Amides'):
+#: the class a split's functional-class or amide assembly expresses as the principal
+#: characteristic group of the whole name, as its most senior member in
+#: ``rules.seniority.SENIORITY_ORDER``.
+_SPLIT_EXPRESSED_CLASS = {
+    "amide": "primary_amide",
+    "sulfonamide": "primary_amide",
+    "ester": "ester",
+    "thioester": "ester",
+    "carbamate": "ester",
+}
+
+
+def _molecule_principal_group(mol, exclude_atoms=frozenset()) -> Optional[str]:
+    """The principal characteristic group of ``mol``, leaving out acid derivatives whose
+    linkage lies in a ring: class 9 "lactones and other cyclic esters are named as
+    heterocycles" (the Blue Book), class 11 likewise for cyclic amides (:18184), so a
+    lactone or a lactam is never the senior class that rules out a split. Groups holding
+    an atom of ``exclude_atoms`` (the carbonyl carbon of the group a split cuts) are left
+    out too: the cut group is the split's own, not a class elsewhere in the molecule."""
+    if mol is None:
+        return None
+    try:
+        from ..perception.functional_groups import detect_functional_groups
+        from ..rules.seniority import SENIORITY_ORDER, get_principal_group
+        lo, hi = SENIORITY_ORDER.index("anhydride"), SENIORITY_ORDER.index("stibinate_ester")
+        derivative = set(SENIORITY_ORDER[lo:hi + 1])
+
+        def cyclic(match):
+            atoms = list(match)
+            return any(mol.GetBondBetweenAtoms(a, b) is not None
+                       and mol.GetBondBetweenAtoms(a, b).IsInRing()
+                       for i, a in enumerate(atoms) for b in atoms[i + 1:])
+
+        groups = {}
+        for name, matches in detect_functional_groups(mol).items():
+            matches = [m for m in matches if not (set(m) & set(exclude_atoms))]
+            if name in derivative:
+                matches = [m for m in matches if not cyclic(m)]
+            if matches:
+                groups[name] = matches
+        pg, _ = get_principal_group(mol, groups)
+        return pg
+    except Exception:  # noqa: BLE001 -- unknown: the split is not judged
+        return None
+
+
+def _split_parent_is_junior(mol, expressed: Optional[str], exclude_atoms=frozenset()) -> bool:
+    """True when the molecule's principal characteristic group is senior to the
+    class ``expressed`` that a split would cite as the parent's principal group: the name
+    would then carry the senior group as a prefix ('...carboxamide' with a
+    'carboxymethyl' prefix), which is not the PIN. The split declines; another split or
+    the substitutive pipeline names the molecule."""
+    if not expressed:
+        return False
+    # classes 1-6 (radicals, ions, zwitterions;:18158-:18168) are senior to every
+    # suffix class, and the group perception does not rank them: a charged molecule
+    # is not judged here.
+    if any(a.GetFormalCharge() or a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
+        return False
+    pg = _molecule_principal_group(mol, exclude_atoms)
+    rank_pg, rank_expressed = _p41_rank(pg), _p41_rank(expressed)
+    if rank_pg is None or rank_expressed is None:
+        return False
+    return rank_pg < rank_expressed
+
+
+#: subtypes of one class ranked together class 11 "Amides [in the order of the
+#: corresponding acids...]",:18184; the alcohols and the amines are one class each)
+_P41_SAME_CLASS = (
+    ("primary_amide", "secondary_amide", "tertiary_amide"),
+    ("primary_sulfonamide", "secondary_sulfonamide", "tertiary_sulfonamide"),
+    ("primary_sulfinamide", "secondary_sulfinamide", "tertiary_sulfinamide"),
+)
+
+
+def _p41_rank(name: Optional[str]) -> Optional[int]:
+    """The SENIORITY_ORDER position of the class of ``name``: the first position of any
+    member of its class (primary / secondary / tertiary alcohol, amine or amide rank
+    alike)."""
+    from ..rules.seniority import _SENIORITY_PARENT, SENIORITY_ORDER
+    if name not in SENIORITY_ORDER:
+        return None
+    members = [name]
+    parent = _SENIORITY_PARENT.get(name)
+    if parent is not None:
+        members = [m for m, c in _SENIORITY_PARENT.items() if c == parent]
+    for group in _P41_SAME_CLASS:
+        if name in group:
+            members = list(group)
+    return min(SENIORITY_ORDER.index(m) for m in members if m in SENIORITY_ORDER)
+
+
 def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[str]:
     """Attempt decomposition using a single bond.
 
@@ -1640,7 +1733,11 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
             acid_frag = next((f for f in fragments if f["side"] == "acid"), None)
             amine_frag = next((f for f in fragments if f["side"] == "amine"), None)
             if acid_frag and amine_frag:
-                if not acid_is_more_senior(acid_frag["smiles"], amine_frag["smiles"]):
+                if (not acid_is_more_senior(acid_frag["smiles"], amine_frag["smiles"])
+                        and not _split_parent_is_junior(
+                            mol, _molecule_principal_group(
+                                Chem.MolFromSmiles(amine_frag["smiles"])),
+                            {bond.get("acid_atom")})):
                     # Amine is more senior -> substitutive naming
                     from ..assembly.naming_utils import (
                         _wrap_n_substituent,
@@ -1676,6 +1773,21 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                                 return sub_name
         except Exception:
             pass  # Any failure: fall through to normal assembly
+
+    #: a functional-class / amide assembly cites the bond's class as the
+    # principal group of the whole name; decline it when the molecule holds a senior
+    # class elsewhere (an acid beside an amide or an ester). The amide assembler cites
+    # the amide only for a simple amine ('N-methyl...amide'); otherwise it floats the
+    # acyl onto the amine fragment, whose own principal group is then the parent's.
+    _expressed = _SPLIT_EXPRESSED_CLASS.get(bond["type"])
+    if bond["type"] == "amide":
+        from .fragment_assembly import _amine_to_prefix
+        if not _amine_to_prefix(fragment_names.get("amine") or ""):
+            _amine_frag = next((f for f in fragments if f["side"] == "amine"), None)
+            _expressed = (_molecule_principal_group(Chem.MolFromSmiles(_amine_frag["smiles"]))
+                          if _amine_frag else None)
+    if _split_parent_is_junior(mol, _expressed, {bond.get("acid_atom")}):
+        return None
 
     # Assemble (delegate to fragment_assembly module)
     # a phase /: thread fragment_smiles additively; only the glycoside
@@ -1832,6 +1944,12 @@ def _try_multi_bond_decompose(
     #: require at least 2 named fragments for assembly
     if len(named_fragments) < 2:
         return None  # Not enough fragments to assemble
+
+    #: the same class check as the single-bond split, for the functional-class
+    # polyester (the polyamide assembler names an amine core with N-acyl prefixes)
+    if bond_type == "ester" and _split_parent_is_junior(
+            mol, "ester", {b.get("acid_atom") for b in bonds}):
+        return None
 
     # Dispatch to bond-type-specific multi-fragment assembler
     if bond_type == "ester":

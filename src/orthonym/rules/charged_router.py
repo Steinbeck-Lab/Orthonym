@@ -69,24 +69,17 @@ from .ions import (
 )
 
 # =============================================================================
-# Anti-hang complexity bound (169.6 follow-on). route_charged sends charged
-# species through the FULL select_parent/assembly pipeline, whose candidate
-# enumeration cost grows combinatorially with molecular size. On a pathological
-# large / highly-symmetric charged molecule that pipeline blows up (RDKit valence
-# churn) — the 169.5 carbon-counting stub used to absorb these instantly but
-# WRONGLY; deleting the stub (Plan 03) exposed the blowup and hung the full-corpus
-# benchmark for 14.5h with NO escape (the spin is signal-resistant, so the
-# per-compound timeout cannot interrupt it). Bound it: above this heavy-atom count
-# the router degrades GRACEFULLY (returns '' -> legacy fallback / honest
-# descriptive) — it does NOT hang and does NOT emit a wrong name.
-#
-# Regression-safe threshold: the LARGEST charged compound that round-trips in the
-# 169.5 baseline is 46 HA (p99=40); 50 leaves a margin above every RT-er while
-# catching the 27 charged giants >= 80 HA (up to 209) that never round-trip.
-# Independently corroborates AUTONOM's documented 44-atom hard limit. Raise it if
-# the router is later shown to name larger charged molecules in bounded time.
+# The charged route sets no size limit. Its re-entry of the full naming pipeline
+# (``_reenter*`` -> ``Orthonym.name(neutral_smi)``) is a nested ``name``
+# call, so it spends the budgets armed once at the outermost ``name``
+# (``assembly.fragment_naming.enter_name_scope``): the fragment-attempt budget
+# ``_WORK_BUDGET`` (once spent, every further fragment attempt abstains), and the
+# inner-operation budget ``_PERF_BUDGET`` and analysis-call budget
+# ``_ANALYSIS_CALL_BUDGET``, whose exhaustion raises ``PerfBudgetExceeded``; that
+# unwinds to the outermost boundary and becomes a clean abstention. Recursion
+# through the route is bounded by ``_MAX_ROUTE_DEPTH`` below. The work, not the
+# heavy-atom count, is bounded.
 # =============================================================================
-_MAX_CHARGED_ROUTE_HEAVY_ATOMS = 50
 
 # charged-species fix, 169.6 caveats (a phase): canonical SMILES of retained charged species
 # that LACK a valid systematic PIN — their neutralize->re-name chokepoint path yields
@@ -2408,13 +2401,6 @@ def route_charged(mol, style: str = 'pin') -> str:
 
     # --- Step 2: multi-fragment (dot-disconnected salt / arbitrary) -> Plan 04.
     if len(Chem.GetMolFrags(mol)) > 1:
-        return ''
-
-    # --- Anti-hang complexity bound (169.6 follow-on; see
-    # _MAX_CHARGED_ROUTE_HEAVY_ATOMS). The full-pipeline re-entry below can blow up
-    # combinatorially on a pathological large charged molecule. Degrade GRACEFULLY
-    # rather than hang. Regression-safe: largest RT-ing charged baseline cpd = 46 HA.
-    if mol.GetNumHeavyAtoms() > _MAX_CHARGED_ROUTE_HEAVY_ATOMS:
         return ''
 
     # --- Step 2b (charged-species fix, 169.6 caveats, a phase): retained-name-first ONLY for

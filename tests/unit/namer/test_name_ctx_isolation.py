@@ -23,7 +23,8 @@ import orthonym.namer as _namer
 from orthonym import Orthonym, name_compound
 from orthonym.assembly import fragment_naming
 from orthonym.metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
-                                         full_coverage_ctx, general_fallback_ctx)
+                                         best_effort_request_ctx, full_coverage_ctx,
+                                         general_fallback_ctx)
 
 _CTX = (general_fallback_ctx, best_effort_ctx, allow_aromatic_general_ctx, full_coverage_ctx)
 N_HYDROXY = "ON[C@@H](C)CC"
@@ -99,3 +100,72 @@ def test_reset_helper_is_lifo_and_idempotent():
     assert toks == [] and general_fallback_ctx.get() is False
     _namer.Orthonym._reset_published_ctx(toks)          # no-op
     assert general_fallback_ctx.get() is False
+
+
+def test_the_request_tier_is_set_for_the_call_and_unset_after_every_exit():
+    """``best_effort_request_ctx`` holds the tier of the outermost request for the
+    length of the call -- in every nested naming and at every read of the von Baeyer
+    ceilings -- and is None again after it, on the normal exit, after the isotope
+    re-entry of the same engine and on an exception in the prelude."""
+    import orthonym.rules.isotopes as isotopes
+    from orthonym.rules import terminal_ring
+    from orthonym.rules import vonbaeyer_universal as vbu
+    calix6 = ("Oc1c2cccc1Cc1cccc(c1O)Cc1cccc(c1O)Cc1cccc(c1O)Cc1cccc(c1O)"
+              "Cc1cccc(c1O)C2")                          # a 42-atom ring system
+    impl_seen, caps_seen = [], []
+    real_caps, real_impl = vbu.cage_caps, _namer.Orthonym._name_impl
+
+    def _caps():
+        caps_seen.append(best_effort_request_ctx.get())
+        return real_caps()
+
+    def _impl(self, *args, **kwargs):
+        impl_seen.append(best_effort_request_ctx.get())
+        return real_impl(self, *args, **kwargs)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(vbu, "cage_caps", _caps)
+        mp.setattr(terminal_ring, "cage_caps", _caps)
+        mp.setattr(_namer.Orthonym, "_name_impl", _impl)
+        name = _best_effort_engine().name(calix6)
+        assert name.startswith("heptacyclo[31.3.1.1^3,7."), name
+        assert caps_seen and set(caps_seen) == {True}, caps_seen
+        assert impl_seen and set(impl_seen) == {True}, impl_seen
+        assert best_effort_request_ctx.get() is None
+        impl_seen.clear()
+        assert Orthonym().name("CC(=O)OCC1CCCCC1") == "cyclohexylmethyl acetate"
+        assert impl_seen and set(impl_seen) == {False}, impl_seen
+        assert best_effort_request_ctx.get() is None
+    _best_effort_engine().name("[2H]C([2H])([2H])O")
+    assert best_effort_request_ctx.get() is None
+
+    def _boom(mol):
+        raise RuntimeError("injected")
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(isotopes, "has_isotopes", _boom)
+        with pytest.raises(RuntimeError, match="injected"):
+            _best_effort_engine().name("CCCO")
+    assert best_effort_request_ctx.get() is None
+
+
+def test_the_last_resort_t4_rescue_runs_in_the_request_tier():
+    """The last-resort rescue runs after the body of the outermost ``name`` has
+    hit the hang budget and reset the breadth contexts; the request tier still
+    holds there, so a best-effort request keeps its ceilings for it."""
+    from orthonym.assembly.fragment_naming import PerfBudgetExceeded
+    seen = []
+
+    def _exhausted(self, *args, **kwargs):
+        raise PerfBudgetExceeded("injected")
+
+    def _rescue(self, smiles):
+        seen.append((best_effort_request_ctx.get(), best_effort_ctx.get()))
+        return None
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_namer.Orthonym, "_name_impl", _exhausted)
+        mp.setattr(_namer.Orthonym, "_try_perf_budget_t4_rescue", _rescue)
+        _best_effort_engine().name("CCCO")
+        assert seen == [(True, False)], seen
+        seen.clear()
+        Orthonym().name("CCCO")
+        assert seen == [(False, False)], seen
+    assert best_effort_request_ctx.get() is None

@@ -252,8 +252,16 @@ def _substitutive_oxime_name(features: Any) -> Optional[str]:
     except Exception:
         return None
     from ...namer import name_compound as _name_compound
+    from ..locant_omission import suffix_nitrogen_hydrogens_are_caps
     try:
-        sub = _name_compound(imine_smiles)
+        # The imine's N-H is the cap of the oxime's N-OH: the oxime nitrogen holds
+        # no hydrogen, and the hydroxy could stand on the carbon instead,
+        # the Blue Book), so a one-carbon parent with a C-H cites '1-'
+        # ('N-hydroxy-1-phenylmethanimine'); with no C-H nothing can move and the
+        # locant is omitted ('(Z)-N-hydroxy(4-chlorophenyl)(phenyl)methanimine
+        # (PIN)', the Blue Book).
+        with suffix_nitrogen_hydrogens_are_caps(movable=(True,)):
+            sub = _name_compound(imine_smiles)
     except Exception:
         return None
     if not sub:

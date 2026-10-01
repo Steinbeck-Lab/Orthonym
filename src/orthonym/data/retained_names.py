@@ -438,7 +438,12 @@ RETAINED_NAMES = {
     "CCOC(C)=O": "ethyl acetate",
     "COC(C)=O": "methyl acetate",
     "CC#N": "acetonitrile",
-    "CN(C)C=O": "N,N-dimethylformamide",
+    # (the Blue Book): 'dimethylformamide (PIN)' (:32782) --
+    # formamide's substitutable hydrogens are its two N-H (a C-substituted formamide
+    # is named on another parent: 'carbonochloridic amide (PIN) (not
+    # 1-chloroformamide)',:32707), so complete substitution in the same way omits
+    # the N locants,:3007).
+    "CN(C)C=O": "dimethylformamide",
 
     # === SULFUR COMPOUNDS (a phase) ===
     # Disulfane (S-S bond, no carbon)

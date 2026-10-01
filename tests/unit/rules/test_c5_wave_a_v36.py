@@ -49,31 +49,26 @@ ADAMANTANE = "C1C2CC3CC1CC(C2)C3"
 
 def _run_bounded(smiles: str, inner_alarm_s: int = 20, hard_kill_s: int = 35) -> dict:
     """Name ``smiles`` in a fresh subprocess. The subprocess self-bounds with
-    ``signal.alarm(inner_alarm_s)``; the PARENT additionally hard-kills the child at
+    ``orthonym.wallclock.wall_clock_limit(inner_alarm_s)`` (a SIGALRM whose
+    WallClockTimeout no ``except Exception`` on the naming path can absorb, so a
+    naming past the limit prints TIMEOUT and never a half-made name); the PARENT
+    additionally hard-kills the child at
     ``hard_kill_s`` via ``subprocess.run(timeout=...)`` (an OS-level SIGKILL from
     outside the process), so the wall-clock bound holds even if a busy RDKit C loop
     does not yield to the in-process signal handler. Returns
     ``{"hung": bool, "result": str|None, "stderr": str}``.
     """
     script = textwrap.dedent(f"""
-        import signal
+        from orthonym.wallclock import WallClockTimeout, wall_clock_limit
 
-        class _T(Exception):
-            pass
-
-        def _h(signum, frame):
-            raise _T()
-
-        signal.signal(signal.SIGALRM, _h)
-        signal.alarm({inner_alarm_s})
         try:
-            from orthonym.jvm_budget import jvm_slots
-            with jvm_slots(1, purpose="v36-c5-wave-a-fullerene-bound"):
-                from orthonym.namer import name_compound
-                out = name_compound({smiles!r})
-            signal.alarm(0)
+            with wall_clock_limit({inner_alarm_s}):
+                from orthonym.jvm_budget import jvm_slots
+                with jvm_slots(1, purpose="v36-c5-wave-a-fullerene-bound"):
+                    from orthonym.namer import name_compound
+                    out = name_compound({smiles!r})
             print("RESULT:" + repr(out))
-        except _T:
+        except WallClockTimeout:
             print("RESULT:TIMEOUT")
         """)
     try:

@@ -344,7 +344,10 @@ def get_fusion_prefix(ring_name: str) -> str:
     # 1) Curated contracted retained forms: benzo, furo, thieno,
     # pyrido, pyrano,...
     if core in FUSION_PREFIXES:
-        return FUSION_PREFIXES[core]
+        prefix = FUSION_PREFIXES[core]
+        if prefix == 'cyclohexa':
+            _record_cyclohexa_component()
+        return prefix
 
     # 2) The authoritative monocyclic registry is the source of truth for the
     # attached-component prefix (pyran -> pyrano). This function historically
@@ -375,6 +378,21 @@ def get_fusion_prefix(ring_name: str) -> str:
     if name.endswith('e'):
         return name[:-1] + 'o'
     return name + 'o'
+
+
+def _record_cyclohexa_component() -> None:
+    """ (the Blue Book): "Monocyclic hydrocarbon prefixes for
+    attached components other than 'benzo' are formed by dropping 'ne' from the
+    name of the appropriate saturated monocyclic hydrocarbon" -- the six-membered
+    carbocyclic attached component is 'benzo', so a fusion name with a 'cyclohexa'
+    component (built from a saturated six-membered ring) is valid for OPSIN but
+    never a PIN. Recorded name-scoped: only a shipped name that carries
+    'cyclohexa[' is labelled below PIN."""
+    try:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment('cyclohexa[')
+    except Exception:  # a label record must never break naming
+        pass
 
 
 def build_systematic_fusion_name(
@@ -1547,9 +1565,26 @@ def generate_systematic_name_for_fused_pair(
                     continue
             best = (key, name)
 
-    if best is None and best_skeleton is not None:
-        return best_skeleton[1]
-    return best[1] if best is not None else None
+    chosen = best[1] if best is not None else (
+        best_skeleton[1] if best_skeleton is not None else None)
+    # (the Blue Book): a benzene ring ortho-fused to a
+    # heteromonocycle of five or more members is named as a benzoheterocycle
+    # ('2-benzofuran (PIN)... benzo[c]furan'); the fusion-descriptor name built here
+    # ('benzo[c]thiophene', 'benzo[d]isothiazole') is valid but never the PIN.
+    # Recorded without a final 'e' so that the parent with a suffix
+    # ('...benzo[c]thiophen-1-ol') is covered too.
+    if (chosen is not None and child_name == 'benzene'
+            and len(parent_ring) >= 5 and is_heterocyclic(mol, list(parent_ring))):
+        _record_benzo_descriptor_name(chosen[:-1] if chosen.endswith('e') else chosen)
+    return chosen
+
+
+def _record_benzo_descriptor_name(fragment: str) -> None:
+    try:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(fragment)
+    except Exception:  # a label record must never break naming
+        pass
 
 
 def generate_multi_fusion_name(

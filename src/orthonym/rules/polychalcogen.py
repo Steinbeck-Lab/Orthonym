@@ -673,7 +673,17 @@ def name_polysulfoxide_sulfone(mol) -> Optional[str]:
     sub_block = _cite_locanted_prefixes(by_name)
 
     core = f"{lam_block}-{base}{oxo_suffix}"
-    return f"{sub_block}-{core}" if sub_block else core
+    name = f"{sub_block}-{core}" if sub_block else core
+    # A Blue Book conflict, left for a ruling (review a performance pass, F-06): cites
+    # the substituent locants of '1,2-dimethyl-1λ4,2λ4-disulfane-1,2-dione (PIN)' and
+    # '1-ethyl-2-methyl-1λ6,2λ6-disulfane-1,1,2,2-tetrone (PIN)' (the Blue Book-:39560) but
+    # omits them on 'diethyl-1λ6,2λ4-diselane-1,1,2-trione (PIN)' (:39562). The shape
+    # the book prints without them -- one substituent on chalcogens of different
+    # bonding numbers -- keeps this name, labelled pin_unverified.
+    if len(by_name) == 1 and len(set(lam_by_pos.values())) > 1:
+        from ..metrics.provenance import record_uncertified_pin_name
+        record_uncertified_pin_name(name)
+    return name
 
 
 __all__ = ["name_chalcogen_chain", "name_polysulfoxide_sulfone"]

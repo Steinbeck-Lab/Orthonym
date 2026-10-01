@@ -35,8 +35,8 @@ file ships NO new handler; it CODIFIES the finding as regression guards:
 Run ONLY this file (the whole suite deadlocks on an OPSIN pipe):
     .venv/bin/python -m pytest tests/unit/rules/test_v37_corestereo.py -q
 """
-import signal
 import pytest
+from orthonym.wallclock import wall_clock_limit
 from rdkit import Chem
 from rdkit.Chem import inchi
 
@@ -62,33 +62,20 @@ def _oracle():
     return OpsinOracle(opsin_jar=jar_or_skip())
 
 
-def _alarm(seconds=90):
-    def _raise(sig, frm):
-        raise TimeoutError()
-    signal.signal(signal.SIGALRM, _raise)
-    signal.alarm(seconds)
-
-
 def _complete(smi):
     """The verified best-effort ('complete') tier: RT-verified engine names,
     NO unverified opt-in (gf=T, gfu=F, aag=T). This is the 0-wrong shipping
     tier for systematic ring names."""
-    _alarm()
-    try:
+    with wall_clock_limit(90):
         return Orthonym(
             style="pin", general_fallback=True,
             general_fallback_unverified=False, allow_aromatic_general=True,
         ).name(smi)
-    finally:
-        signal.alarm(0)
 
 
 def _pin(smi):
-    _alarm()
-    try:
+    with wall_clock_limit(90):
         return Orthonym(style="pin").name(smi)
-    finally:
-        signal.alarm(0)
 
 
 def _ik(smi):

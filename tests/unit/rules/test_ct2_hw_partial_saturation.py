@@ -23,8 +23,8 @@ constitution. 0-wrong is absolute.
 Run ONLY this file (whole-suite deadlocks on an OPSIN pipe):
     .venv/bin/python -m pytest tests/unit/rules/test_ct2_hw_partial_saturation.py -q
 """
-import signal
 import pytest
+from orthonym.wallclock import wall_clock_limit
 
 from orthonym.jvm_budget import jvm_slots
 
@@ -37,33 +37,16 @@ def _jvm_slot():
         yield
 
 
-class _Timeout(Exception):
-    pass
-
-
-def _alarm(seconds=60):
-    def _raise(sig, frm):
-        raise _Timeout()
-    signal.signal(signal.SIGALRM, _raise)
-    signal.alarm(seconds)
-
-
 def _name(smiles):
     from orthonym import name_compound
-    _alarm(60)
-    try:
+    with wall_clock_limit(60):
         return name_compound(smiles)
-    finally:
-        signal.alarm(0)
 
 
 def _rt(smiles, name):
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
-    _alarm(60)
-    try:
+    with wall_clock_limit(60):
         return opsin_roundtrip_check(smiles, name)["passed"]
-    finally:
-        signal.alarm(0)
 
 
 # The priority signature-2 witness: 2-(methylsulfanyl)-thiazoline spiro-fused to a

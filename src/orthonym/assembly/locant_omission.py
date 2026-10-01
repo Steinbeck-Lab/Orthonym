@@ -59,6 +59,10 @@ __all__ = [
     "l3_monosubstituted_locant_omitted",
     "l3_locant_omitted_for_parent_atoms",
     "l6_all_substitutable_h_share_one_locant",
+    "l6_chain_parent_one_substitutable_atom",
+    "l6_ring_parent_one_substitutable_atom",
+    "mononuclear_parent_locant_required",
+    "suffix_nitrogen_hydrogens_are_caps",
     "scope_forces_locants",
     "forced_locant_scope",
     "locants_are_forced",
@@ -67,6 +71,8 @@ __all__ = [
     "scope_has_isotopic_modification",
     "isotope_parent_positional_scope",
     "parent_scope_has_positional_isotope",
+    "isotope_labelled_original_scope",
+    "isotope_label_on_atoms",
 ]
 
 #: ``:3007`` -- "Except for hydrogen atoms attached to chalcogen atoms, such as in
@@ -553,6 +559,217 @@ def l6_all_substitutable_h_share_one_locant(
     return len(locants) == 1
 
 
+def l6_chain_parent_one_substitutable_atom(
+    mol, chain_atoms: Iterable[int], group_atoms: Iterable[int] = ()
+) -> bool:
+    """```` (``:3031``) for an ACYCLIC parent compound named by a producer
+    from its chain and the atoms of the characteristic groups its name expresses
+    (the acid / acyl halide / thioacid / peroxoic acid group, the anhydride or ester
+    oxygen): "All locants are omitted for parent compounds when all substitutable
+    hydrogen atoms have the same locant." -- 'cyanoacetyl chloride (PIN)' (:5112),
+    'amino(oxo)ethaneperoxoic acid (PIN)' (:30182), '*S*-methyl (ethylsulfanyl)
+    (sulfanylidene)ethanethioate (PIN)' (:32019); 'acetamide' keeps '2-' because its
+    N-H are substitutable too ('*N*-carbamoyl-2-phenylacetamide (PIN)',:33364).
+
+    The UNSUBSTITUTED parent compound is rebuilt on the graph: an atom of the chain,
+    or a group atom bonded to the chain, has as many substitutable hydrogens as it
+    carries now plus the bonds it has to atoms outside the chain and the groups (its
+    substituents); hydrogens on chalcogens and on an aldehyde formyl carbon are not
+    substitutable (``:3007``). True only when exactly one atom has any.
+
+    Deny-by-default, ``:2869``): False under:func:`locants_are_forced`, in
+    an isotopically modified scope, with an isotope or a stereodescriptor on the
+    chain, for a ring atom on the chain, or on any error.
+    """
+    try:
+        if mol is None or locants_are_forced() or scope_has_isotopic_modification():
+            return False
+        chain = {int(a) for a in chain_atoms}
+        groups = {int(a) for a in group_atoms} - chain
+        if not chain:
+            return False
+        known = chain | groups
+        shell = set(chain)
+        for g in groups:
+            if any(n.GetIdx() in chain for n in mol.GetAtomWithIdx(g).GetNeighbors()):
+                shell.add(g)
+        for a in chain:
+            atom = mol.GetAtomWithIdx(a)
+            if atom.IsInRing() or atom.GetIsotope():
+                return False
+            if atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+                return False
+            for b in atom.GetBonds():
+                if b.GetStereo() != Chem.BondStereo.STEREONONE:
+                    return False
+        holders = 0
+        for a in shell:
+            atom = mol.GetAtomWithIdx(a)
+            if atom.GetSymbol() in CHALCOGENS:
+                continue
+            # The formyl exception is for an aldehyde group OF THE PARENT (its =O is
+            # one of the group atoms); an oxo substituent on a chain carbon leaves
+            # that carbon's hydrogens substitutable ('3-oxopropanoic acid').
+            if _is_aldehyde_formyl_carbon(atom) and any(
+                    b.GetBondType() == Chem.BondType.DOUBLE
+                    and b.GetOtherAtom(atom).GetIdx() in groups
+                    for b in atom.GetBonds()):
+                continue
+            outside = sum(1 for n in atom.GetNeighbors() if n.GetIdx() not in known)
+            if atom.GetTotalNumHs() + outside > 0:
+                holders += 1
+        return holders == 1
+    except Exception:  # noqa: BLE001 -- deny by default
+        return False
+
+
+# A producer that deletes a substituent from the suffix nitrogen and names the rest
+# (the oxime 'N-hydroxy' builder names the imine C=NH, then adds 'N-hydroxy') hands
+# the namer an N-H that is a cap, not a hydrogen of the compound. It declares the
+# caps here -- one entry per capped hydrogen, True when the substituent it stands
+# for could sit on the parent carbon without changing the parent (see
+# ``_movable_to_parent_carbon``) -- so the licence below reads the compound's
+# nitrogen, not the cap.
+_SUFFIX_NITROGEN_CAPS: "contextvars.ContextVar[tuple]" = (
+    contextvars.ContextVar("orthonym_suffix_nitrogen_caps", default=()))
+
+
+@contextlib.contextmanager
+def suffix_nitrogen_hydrogens_are_caps(movable=(True,)):
+    """Declare that hydrogens of the suffix nitrogen in this naming are caps for
+    substituents the caller adds back; ``movable`` holds one flag per cap (see the
+    comment above)."""
+    token = _SUFFIX_NITROGEN_CAPS.set(tuple(bool(m) for m in movable))
+    try:
+        yield
+    finally:
+        _SUFFIX_NITROGEN_CAPS.reset(token)
+
+
+def _movable_to_parent_carbon(mol, n_idx: int, sub_idx: int) -> bool:
+    """Could the N-substituent rooted at ``sub_idx`` stand on the one-carbon parent
+    instead, the parent staying the same? A substituent attached through an acyclic
+    carbon would lengthen the chain -- methyl on C1 of methanamine makes ethanamine --
+    so it changes the parent and generates no isomer of it: 'cyano-N,N-dimethyl-
+    methanamine N-oxide (PIN)' (the Blue Book) cites no C locant. A ring atom or
+    a heteroatom can ('N,1-bis(4-chlorophenyl)methanimine (PIN)',:26524). A charged
+    atom (an N-oxide oxygen) is not a substituent prefix: False."""
+    atom = mol.GetAtomWithIdx(sub_idx)
+    if atom.GetFormalCharge() != 0 or atom.GetAtomicNum() == 1:
+        return False
+    if atom.GetAtomicNum() == 6 and not atom.IsInRing():
+        return False
+    return True
+
+
+def mononuclear_parent_locant_required(features) -> bool:
+    """True when a substituent on a ONE-ATOM chain parent must cite its locant '1'.
+
+     (a) (the Blue Book) omits the locant '1' "in substituted
+    mononuclear parent hydrides" ('chloromethane (PIN)') -- parent hydrides only;
+    a parent with a suffix ('methanamine', a functionalized parent hydride,
+     :4770) is decided by (:2957): "Locants are omitted when
+    no isomer can be generated by moving suffixes and/or prefixes (if any) from
+    their position to another or by interchanging them between two different
+    positions"; (:7304) "Locants are required for related compounds
+    where additional substitutable positions are available, for example acetamide".
+    The positions of the parent compound are the carbon and the suffix nitrogen(s):
+
+    * a C-prefix could move to a suffix N that holds a hydrogen --
+      '1-hydrazinylmethanamine (PIN)' (:38535);
+    * an N-prefix could move to the carbon when the carbon holds a hydrogen and the
+      prefix keeps the parent (``_movable_to_parent_carbon``) --
+      '(1E)-1-[...]-N-[...]methanimine (PIN)' (:50452), 'N,1-bis(4-chlorophenyl)-
+      methanimine (PIN)' (:26524); an acyclic-carbon N-substituent would change the
+      parent, so 'cyano-N,N-dimethylmethanamine N-oxide (PIN)' (:36580) omits;
+    * with every position substituted nothing can move, and (:3007)
+      omits ('(Z)-N-hydroxy(4-chlorophenyl)(phenyl)methanimine (PIN)',:47666).
+
+    Hydrogens on a chalcogen are not substitutable, so 'chloromethanol'
+    keeps its omission. Hydrogens are read with their graph neighbours, so an explicit
+    [H] that carries a double-bond descriptor counts. Carbon atoms of a group match
+    are the substituents' attachment atoms (a ketone match spans both flanking
+    carbons), not positions of the parent; ring atoms belong to a ring substituent.
+    (The carbon test is defensive and mutation-surviving today: every flanking carbon
+    found on a one-carbon parent was a ring atom, which the ring test already skips --
+    'cyclohexyl(phenyl)methanone' is the witness for the pair.) Deny-by-default:
+    anything not established returns False, which keeps the existing omission."""
+    caps = _SUFFIX_NITROGEN_CAPS.get()
+    try:
+        mol = getattr(features, "mol", None)
+        chain = list(getattr(features, "principal_chain", None) or ())
+        if mol is None or len(chain) != 1:
+            return False
+        if (getattr(features, "is_cyclic", False)
+                and not getattr(features, "chain_is_parent", False)):
+            return False
+        parent = int(chain[0])
+        groups = set()
+        for match in (getattr(features, "principal_group_atoms", None) or ()):
+            groups.update(int(i) for i in match)
+        groups.discard(parent)
+        c_atom = mol.GetAtomWithIdx(parent)
+        c_subs = [nb.GetIdx() for nb in c_atom.GetNeighbors()
+                  if nb.GetAtomicNum() > 1 and nb.GetIdx() not in groups]
+        if not c_subs:
+            return False
+        c_h = c_atom.GetTotalNumHs(includeNeighbors=True)
+        suffix_ns = []
+        for idx in groups:
+            atom = mol.GetAtomWithIdx(idx)
+            if (atom.GetSymbol() in CHALCOGENS or atom.GetAtomicNum() in (1, 6)
+                    or atom.IsInRing()):
+                continue
+            if mol.GetBondBetweenAtoms(parent, idx) is None:
+                continue
+            suffix_ns.append(atom)
+        for n_atom in suffix_ns:
+            n_h = n_atom.GetTotalNumHs(includeNeighbors=True)
+            movable = [_movable_to_parent_carbon(mol, n_atom.GetIdx(), nb.GetIdx())
+                       for nb in n_atom.GetNeighbors()
+                       if nb.GetIdx() != parent and nb.GetAtomicNum() > 1]
+            if caps:
+                n_h -= len(caps)
+                movable.extend(caps)
+            if n_h > 0:
+                return True                  # a C-prefix could move to the N
+            if c_h > 0 and any(movable):
+                return True                  # an N-prefix could move to the C
+    except Exception:  # noqa: BLE001 -- deny by default
+        return False
+    return False
+
+
+def l6_ring_parent_one_substitutable_atom(mol, ring_atoms: Iterable[int]) -> bool:
+    """```` (``:3031``) for a RING parent hydride named with its substituent
+    prefixes only (no suffix): the unsubstituted ring's substitutable hydrogens all sit
+    on one ring atom -- 'chlorotrioxetane (PIN) (not 4-chloro-1,2,3-trioxetane)'
+    (``:3187``), 'dichlorotrioxetane (PIN)' (``:3029``). A ring atom's substitutable
+    hydrogens are its hydrogens plus its bonds to atoms outside the ring; hydrogens on
+    chalcogens are not substitutable (``:3007``). Deny-by-default: forced locants, an
+    isotopic scope, an isotope or a stereo mark on the ring, a charge, or any error."""
+    try:
+        if mol is None or locants_are_forced() or scope_has_isotopic_modification():
+            return False
+        ring = {int(a) for a in ring_atoms}
+        if not ring:
+            return False
+        holders = 0
+        for a in ring:
+            atom = mol.GetAtomWithIdx(a)
+            if (atom.GetIsotope() or atom.GetFormalCharge()
+                    or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED):
+                return False
+            if atom.GetSymbol() in CHALCOGENS:
+                continue
+            outside = sum(1 for n in atom.GetNeighbors() if n.GetIdx() not in ring)
+            if atom.GetTotalNumHs() + outside > 0:
+                holders += 1
+        return holders == 1
+    except Exception:  # noqa: BLE001 -- deny by default
+        return False
+
+
 def _has_letter_locant(locants: Iterable) -> bool:
     """A non-plain-numeric locant (``N``, ``N1``, ``1'``, ``O``) is always essential.
 
@@ -748,6 +965,59 @@ def isotope_parent_positional_scope(reason: str = "isotope"):
 def parent_scope_has_positional_isotope() -> bool:
     """True when an enclosing:func:`isotope_parent_positional_scope` is active."""
     return _ISOTOPE_PARENT_POSITIONAL.get() is not None
+
+
+# The labelled molecule itself, declared by ``rules/isotopes.py`` around the same
+# forced re-render. ``_parent_carries_positional_isotope`` above is a structural proxy
+# (any ring atom or labelled heteroatom counts as "parent"), so a deuterium on a
+# substituent ring sets the parent-positional flag too. A producer that knows its
+# parent atoms can ask the exact question instead: does a label sit on THESE atoms?
+_ISOTOPE_LABELLED_ORIGINAL: "contextvars.ContextVar[Optional[Chem.Mol]]" = (
+    contextvars.ContextVar("orthonym_isotope_labelled_original", default=None))
+
+
+@contextlib.contextmanager
+def isotope_labelled_original_scope(original):
+    """Declare the labelled molecule whose isotope-stripped skeleton is being named
+    (entered by ``rules/isotopes.py`` with:func:`isotope_parent_positional_scope`)."""
+    token = _ISOTOPE_LABELLED_ORIGINAL.set(original)
+    try:
+        yield
+    finally:
+        _ISOTOPE_LABELLED_ORIGINAL.reset(token)
+
+
+def isotope_label_on_atoms(mol, atoms) -> bool:
+    """True when a label of the declared labelled molecule sits on one of ``atoms``
+    of ``mol`` (the isotope-stripped molecule being named): a labelled atom, or a
+    labelled hydrogen bonded to it. ``mol`` is mapped onto the labelled molecule by
+    substructure match (every match, so a symmetric parent is read the same either
+    way). False when no labelled molecule is declared or ``mol`` does not map."""
+    original = _ISOTOPE_LABELLED_ORIGINAL.get()
+    if original is None or mol is None or not atoms:
+        return False
+    try:
+        tagged = Chem.RWMol(original)
+        for atom in tagged.GetAtoms():
+            if atom.GetAtomicNum() == 1:
+                continue
+            if atom.GetIsotope() or any(
+                    nb.GetAtomicNum() == 1 and nb.GetIsotope()
+                    for nb in atom.GetNeighbors()):
+                atom.SetIntProp("_orthonym_labelled", 1)
+        for atom in tagged.GetAtoms():
+            atom.SetIsotope(0)
+        params = Chem.RemoveHsParameters()
+        params.removeIsotopes = True
+        heavy = Chem.RemoveHs(tagged.GetMol(), params)
+        wanted = [int(a) for a in atoms]
+        for match in heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64):
+            if any(heavy.GetAtomWithIdx(match[i]).HasProp("_orthonym_labelled")
+                   for i in wanted if i < len(match)):
+                return True
+    except Exception:  # noqa: BLE001 -- no answer is "not labelled"
+        return False
+    return False
 
 
 def scope_forces_locants(

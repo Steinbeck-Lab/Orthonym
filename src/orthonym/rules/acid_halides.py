@@ -204,12 +204,28 @@ def _name_carbamoyl_acyl(mol, match, class_word) -> Optional[str]:
         accounted = {acyl_c, carbonyl_o, n_amide} | class_atoms
         if accounted != heavy:
             return None
-        return f"carbamoyl {class_word}"
+        name = f"carbamoyl {class_word}"
+        _label_carbamoyl_halide(name, class_word)
+        return name
     acyl = _n_substituted_carbamoyl(mol, acyl_c, n_amide,
                                     heavy - ({acyl_c, carbonyl_o, n_amide} | class_atoms))
     if acyl is None:
         return None
     return f"{acyl} {class_word}"
+
+
+def _label_carbamoyl_halide(name: str, class_word: str) -> None:
+    """A Blue Book conflict, left for a ruling (review a performance pass, F-06):
+    prints 'Cl-CO-NH2 carbonochloridic amide (PIN) (not 1-chloroformamide)'
+    (the Blue Book), while (:31474) forms the acyl halides of carbamic
+    acid on 'carbamoyl' and ranks acid halides (10) above amides (11). The
+    'carbamoyl <halide>' name of H2N-CO-X is kept and labelled pin_unverified; the
+    pseudohalides keep their (PIN) ('carbamoyl isocyanate',:31488; 'carbamoyl
+    cyanide',:34858), and the N-substituted halides, for which the book prints no
+    name, keep theirs ('dimethylcarbamoyl chloride')."""
+    if class_word in ("fluoride", "chloride", "bromide", "iodide"):
+        from ..metrics.provenance import record_uncertified_pin_name
+        record_uncertified_pin_name(name)
 
 
 def _n_substituted_carbamoyl(mol, acyl_c, n_amide, rest) -> Optional[str]:

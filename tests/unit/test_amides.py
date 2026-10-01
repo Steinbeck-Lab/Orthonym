@@ -209,11 +209,11 @@ class TestNameAmide:
         assert name_amide(mol, matches[0]) == "N-methylacetamide"
 
     def test_name_n_n_dimethylformamide(self):
-        """CN(C)C=O -> N,N-dimethylformamide"""
+        """CN(C)C=O -> dimethylformamide (the Blue Book), 'dimethylformamide (PIN)' (:32782); (:3007))"""
         mol = Chem.MolFromSmiles("CN(C)C=O")
         pattern = Chem.MolFromSmarts("[CX3](=O)[NX3]")
         matches = mol.GetSubstructMatches(pattern)
-        assert name_amide(mol, matches[0]) == "N,N-dimethylformamide"
+        assert name_amide(mol, matches[0]) == "dimethylformamide"
 
     def test_name_n_ethyl_n_methylacetamide(self):
         """CCN(C)C(C)=O -> N-ethyl-N-methylacetamide"""
@@ -291,10 +291,11 @@ class TestTertiaryAmidesIntegration:
     """Integration tests for N,N-disubstituted amides."""
 
     def test_n_n_dimethylformamide(self):
-        """CN(C)C=O should be named N,N-dimethylformamide."""
+        """CN(C)C=O should be named dimethylformamide:
+        (the Blue Book), 'dimethylformamide (PIN)' (:32782); (:3007)."""
         from orthonym import name_compound
         result = name_compound("CN(C)C=O")
-        assert result == "N,N-dimethylformamide"
+        assert result == "dimethylformamide"
 
     def test_n_n_dimethylacetamide(self):
         """CN(C)C(C)=O should be named N,N-dimethylacetamide."""

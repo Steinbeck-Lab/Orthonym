@@ -24,7 +24,7 @@ benzene
 ## Tiers
 
 `--emit-tier {pin,valid,complete,best-effort,full-coverage}`
-: Which names to return. The default, `pin`, returns a name only when the pipeline can build the preferred IUPAC name (PIN), that is when the strict PIN path built the name and verified it ({tier}`pin_verified`). The only exceptions are names from the natural-product and metal-complex lists, the name formats absent from OPSIN's grammar (for example inositols, phanes and thioperoxols), and PINs whose stereodescriptors OPSIN cannot read, for which the default tier compares the constitution. Otherwise it declines, with the reason code `NO_VERIFIED_PIN` when it built a name that is not a verified PIN. `valid` adds names from the general engine, `complete` adds general names for aromatic and heterocyclic ring systems, `best-effort` adds the last-resort producers, and `full-coverage` adds the coordination-name builder for metal tetrapyrrole and corrin complexes. The wider tiers also return the names the default tier declines, each labelled with its tier. See [Output tiers](../tiers.md).
+: Which names to return. The default, `pin`, returns a name only when the pipeline can build the preferred IUPAC name (PIN), that is when the strict PIN path built the name and verified it ({tier}`pin_verified`). The only exceptions are names from the natural-product and metal-complex lists, the name formats absent from OPSIN's grammar (for example inositols, phanes and thioperoxols), and PINs whose stereodescriptors OPSIN cannot read, for which the default tier compares the constitution. Otherwise it declines, with the reason code `NO_VERIFIED_PIN` when it built a name that is not a verified PIN. `valid` adds names from the general engine, `complete` adds general names for aromatic and heterocyclic ring systems, `best-effort` adds the last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build these names for ring systems of up to 40 skeletal atoms and 8 rings), and adducts with a one-atom ion such as chloride, and `full-coverage` adds the coordination-name builder for metal tetrapyrrole and corrin complexes. The wider tiers also return the names the default tier declines, each labelled with its tier. See [Output tiers](../tiers.md).
 
 ## Output
 
@@ -57,7 +57,7 @@ NameTree: cyclohexanol  (class_id=general_acyclic, cite=P-14+P-23+P-44)
 
 ## Diagnostics
 
-These are for looking inside the engine. None of them changes a name.
+These are for looking inside the engine. None of them changes a name, except `--binding-proof enforce`, which can decline one.
 
 `--fetch-jars`
 : Download the OPSIN and centres jars if they are missing, check them, print where they are, and stop. See [Install](../start/install.md).
@@ -75,7 +75,7 @@ These are for looking inside the engine. None of them changes a name.
 : An extra check that every part of a general-engine name still maps onto its atoms in the final name. `audit` records the result and never changes the name; `enforce` also declines when the check fails.
 
 `--version`, `-V`
-: Print the version (`orthonym 1.0.0`).
+: Print the installed version, in the form `orthonym 1.0.2`.
 
 ## Exit status
 

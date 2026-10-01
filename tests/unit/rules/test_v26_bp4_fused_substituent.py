@@ -195,13 +195,23 @@ class TestBP4Phase3PartialSaturation:
     def test_substituted_partial_saturation(self, smiles, expected):
         assert _try_algorithmic_fusion_name(Chem.MolFromSmiles(smiles)) == expected
 
+    def test_suffix_on_the_unsaturated_part_takes_the_hydro_name(self):
+        """A suffix on an atom of the unsaturated part needs no added hydrogen: the
+        hydro prefixes go on the mancude parent, the Blue Book) with
+        its indicated hydrogen (b):3246; '2H-pyran-6-carboxylic acid (PIN)'
+        :3252). Was '4H,5H,6H-furo[2,3-b]pyran-2-carboxylic acid' (the legacy path's
+        indicated hydrogen on every saturated position); OPSIN 2.9.0 reads the new name
+        to the full InChIKey and the same FixedH InChI."""
+        assert _try_algorithmic_fusion_name(Chem.MolFromSmiles("O1CCCc2cc(C(=O)O)oc21")) \
+            == "5,6-dihydro-4H-furo[2,3-b]pyran-2-carboxylic acid"
+
     @pytest.mark.parametrize("smiles", [
         "O=C1CCc2ccoc21",          # oxo suffix
-        "O1CCCc2cc(C(=O)O)oc21",   # carboxylic-acid suffix
     ])
     def test_suffix_group_fails_closed(self, smiles):
-        """A suffix-forming group needs added indicated H (out of scope):
-        _try_partial_saturation_name declines (the legacy path then owns it)."""
+        """A suffix on a saturated position (the ring C=O) needs added
+        indicated H (out of scope): _try_partial_saturation_name declines (the legacy
+        path then owns it)."""
         from orthonym.rules.fused_rings import (
             _try_partial_saturation_name, get_shared_atoms,
         )

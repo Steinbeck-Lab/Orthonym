@@ -459,13 +459,14 @@ class TestNewScaffoldRecognition:
         assert result is not None, "Aconitane scaffold should be detected"
         assert "aconit" in result.lower(), f"Expected aconitane name, got: {result}"
 
-    def test_berberine_scaffold(self):
-        """Bare berberine scaffold should be recognized."""
+    def test_berbine_scaffold(self):
+        """Bare berbine scaffold is named 'berbine' (a),
+        the Blue Book; OPSIN 2.9.0 reads it to this structure's full InChIKey,
+        while 'berberine' names a different, unsaturated alkaloid)."""
         smiles = "c1ccc2c(c1)CC1c3ccccc3CCN1C2"
         mol = _mol(smiles)
         result = name_natural_product(mol)
-        assert result is not None, "Berberine scaffold should be detected"
-        assert "berber" in result.lower(), f"Expected berberine name, got: {result}"
+        assert result == "berbine", f"Expected berbine, got: {result}"
 
     def test_menthane_derivative(self):
         """Menthane as exact derivative should be recognized."""

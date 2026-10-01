@@ -199,31 +199,38 @@ class TestFailSafe:
 
 
 @pytest.mark.unit
-class TestComplexityGuard:
-    """Anti-hang complexity bound (169.6 follow-on). route_charged degrades
-    GRACEFULLY (returns '') above _MAX_CHARGED_ROUTE_HEAVY_ATOMS rather than
-    blowing up the full-pipeline re-entry on a pathological large charged molecule
-    (the deleted carbon-counting stub used to absorb these instantly-but-wrongly;
-    its removal exposed a 14.5h full-corpus benchmark hang). Regression-safe: the
-    largest charged compound that round-trips in the 169.5 baseline is 46 HA."""
+class TestNoSizeCap:
+    """route_charged sets no heavy-atom limit: a charged molecule of any size is
+    routed, and the work of its full-pipeline re-entry is bounded by the budgets
+    of the outermost name (fragment attempts, inner operations, analysis calls)
+    plus _MAX_ROUTE_DEPTH. The 14.5 h hang once attributed to size was the [99Tc]
+    radical recursion (see TestMetalRadicalHangGuard).
 
-    def test_threshold_is_regression_safe(self):
-        from orthonym.rules.charged_router import _MAX_CHARGED_ROUTE_HEAVY_ATOMS
-        # Must sit ABOVE the largest RT-ing charged baseline compound (46 HA) so
-        # no currently-round-tripping charged molecule is ever refused.
-        assert _MAX_CHARGED_ROUTE_HEAVY_ATOMS >= 47
+     'Anions derived from hydroxy compounds' (the Blue Book;
+    sentence:41013): an anion from a hydroxy group "is preferably named by using
+    suffixes 'olate',..."; (:41429) "Cationic suffixes derived from
+    names of... amines... are formed by adding the suffix 'ium'", example
+    '*N*,*N*,*N*-trimethylmethanaminium (PIN)'."""
 
-    def test_large_charged_bails_fast(self):
-        # A C54 carboxylate anion = 56 heavy atoms (> 50): the guard fires and
-        # returns '' (caller falls through). Without the guard this enters the
-        # full select_parent/assembly pipeline and hangs.
+    def test_large_alkoxide_is_routed(self):
+        big = "C" * 55 + "[O-]"
+        assert Chem.MolFromSmiles(big).GetNumHeavyAtoms() == 56
+        assert _rc(big) == "pentapentacontan-1-olate"
+
+    def test_large_quaternary_ammonium_is_routed(self):
+        big = "C" * 52 + "[N+](C)(C)C"
+        assert Chem.MolFromSmiles(big).GetNumHeavyAtoms() == 56
+        assert _rc(big) == "N,N,N-trimethyldopentacontan-1-aminium"
+
+    def test_large_carboxylate_left_to_the_anion_path(self):
+        # A carboxylate is not built by the route at any size (its -ate is formed
+        # on the anion path of name); the route returns '' for it.
         big = "C" * 54 + "(=O)[O-]"
         assert Chem.MolFromSmiles(big).GetNumHeavyAtoms() > 50
         assert _rc(big) == ""
 
     def test_small_charged_below_bound_still_routes(self):
-        # A small alkoxide (6 HA, well under the bound) is a deleted-stub class
-        # the router owns -> unaffected by the guard.
+        # A small alkoxide (6 HA) the router owns.
         assert _rc("CCCCCC[O-]") != ""
 
 

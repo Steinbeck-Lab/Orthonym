@@ -145,7 +145,11 @@ def test_inorganic_oxoanion_names(namer, smi, expected):
 @pytest.mark.parametrize("smi,expected", [
     ("C[N+](=O)[O-]", "nitromethane"),
     ("c1ccccc1[N+](=O)[O-]", "nitrobenzene"),
-    ("CCO[N+](=O)[O-]", "nitrooxyethane"),   # alkyl nitrate ester -- must not regress
+    # alkyl nitrate ester: (the Blue Book-35918, 'Esters of
+    # mononuclear noncarbon oxoacids'), "Alkyl groups, aryl groups, etc. are cited
+    # as separate words... followed by the name of the appropriate anion";
+    # sibling 'pentyl nitrite (PIN)' (:35922)
+    ("CCO[N+](=O)[O-]", "ethyl nitrate"),
     ("OCC(O[N+](=O)[O-])CO[N+](=O)[O-]", "2,3-bis(nitrooxy)propan-1-ol"),
 ])
 def test_organic_nitro_regression(namer, smi, expected):

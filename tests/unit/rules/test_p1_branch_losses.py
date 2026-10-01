@@ -170,7 +170,7 @@ def test_the_pin_tier_still_promotes_the_caller_s_molecule(monkeypatch):
     smiles = "NCc1csc(-c2cccs2)n1"
     depths = _spy_promotion(monkeypatch, smiles)
     row = _dt_row(smiles)
-    assert row["name"] == "[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine"
+    assert row["name"] == "1-[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine"
     # branch review fixes: a re-run name is labelled below the PIN (a breadth
     # producer built it), never pin_verified
     assert row["tier"] == "pin_unverified" and not row["is_pin"]

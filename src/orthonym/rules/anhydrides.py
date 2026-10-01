@@ -50,6 +50,10 @@ _HALIDE_WORD = {"F": "fluoride", "Cl": "chloride", "Br": "bromide", "I": "iodide
 _MIXED_INORGANIC_ANHYDRIDE_SMARTS = {
     "cyanic": "[CX3](=O)[OX2][CX2]#[NX1]",
     "thiocyanic": "[CX3](=O)[SX2][CX2]#[NX1]",
+    # nitric acid HO-NO2, the charge-separated drawing,:32272; OPSIN
+    # 2.9.0 reads 'acetic nitric anhydride' to CC(=O)O[N+](=O)[O-])
+    # (the acyl carbon bears carbon or hydrogen only, as in the perception fold)
+    "nitric": "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2][NX3+](=[OX1])[OX1-]",
 }
 
 
@@ -640,6 +644,25 @@ def _name_acyl_acid_component(mol, acyl_c: int, acyl_x: int, bridge: int):
         mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6, 8, 16, 34)
         for a in keep if a != acyl_x
     )
+    # A substituted two-carbon thio-/seleno-acid component is the parent compound
+    # 'ethanethioic acid' whose substitutable hydrogens all sit on C-2:
+    # (the Blue Book) omits the locants, as for the =O component
+    # ('chloroacetic chloroethanethioic anhydride'). The recursive namer cannot see
+    # that its fragment is a whole word of this name, so the component is built
+    # here on its own chain, with the same prefix machinery as the =O component.
+    _frag = _collect_acyl_fragment_atoms(mol, acyl_c, bridge)
+    _chain = _find_longest_chain(mol, acyl_c, _frag)
+    if len(_chain) == 2:
+        from ..assembly.locant_omission import l6_chain_parent_one_substitutable_atom
+        _exclude = (set(range(mol.GetNumAtoms())) - _frag) | {acyl_x}
+        if l6_chain_parent_one_substitutable_atom(mol, _chain, _exclude):
+            from ..assembly.composer import _integrate_universal_prefixes
+            _prefix = _integrate_universal_prefixes(
+                mol, set(_chain), parent_type="chain", principal_chain=_chain,
+                atom_to_locant={idx: pos + 1 for pos, idx in enumerate(_chain)},
+                exclude_atoms=_exclude)
+            if _prefix:
+                return f"{_prefix}ethane{affix}", True
     smi = _extract_fragment_smiles(mol, set(keep), acyl_c, cap_element=8)
     if not smi:
         return None, False
@@ -1121,6 +1144,13 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     # 32571 'bis(chloroacetic) anhydride'). Guard: only for SIMPLE substituents
     # (no '(' complex substituent, whose own internal locants must not be
     # stripped) — a complex-substituted C2 acid keeps the systematic 'ethanoic'.
+    if prefix_str and len(principal_chain) == 2:
+        # (the Blue Book): when the licence holds,
+        # _integrate_universal_prefixes has already cited the prefixes without
+        # locants (a complex one enclosed): '(4-chlorophenoxy)acetic'.
+        from ..assembly.locant_omission import l6_chain_parent_one_substitutable_atom
+        if l6_chain_parent_one_substitutable_atom(mol, principal_chain, exclude):
+            return f"{prefix_str}acetic", True
     if prefix_str and len(principal_chain) == 2 and "(" not in prefix_str:
         unlocanted = re.sub(r"\d+(?:,\d+)*-", "", prefix_str)
         return f"{unlocanted}acetic", True

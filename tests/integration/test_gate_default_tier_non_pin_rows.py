@@ -1,7 +1,7 @@
 """The PIN-conformance gate and the default-tier rule (user decision 2026-09-30).
 
 The paper, Methods, "Tiers" (L73): "The default configuration emits a name only when the
-pipeline can build the preferred IUPAC name (PIN); otherwise, it declines." 23 gold
+pipeline can build the preferred IUPAC name (PIN); otherwise, it declines." 25 gold
 rows expect a name the code records as not the PIN, so the default tier declines them
 with NO_VERIFIED_PIN. The gold rows are not edited: ``scripts/pin_conformance_eval.py``
 evaluates the rows of ``benchmarks/the gold set/default_tier_non_pin_rows.json`` at the
@@ -36,7 +36,12 @@ def _gold_rows():
 
 def test_every_listed_row_is_an_unchanged_gold_row_with_its_reason():
     rows = _rows()
-    assert len(rows) == 23
+    # 23 rows of the default-tier rule, DD7-bridged-3 ('1,4-dihydro-1,4-epithionaphthalene':
+    # a general-nomenclature bridge prefix,, the Blue Book; the PIN
+    # '1,4-dihydro-1,4-sulfanonaphthalene',:28063, is unreadable by OPSIN 2.9.0), and
+    # W2E-P0BL-05 ('1H-1λ4-benzo[b]thiophene': a fusion-descriptor benzo name,
+    #:11813; the PIN '1H-1λ4-1-benzothiophene' is read back exactly by OPSIN 2.9.0).
+    assert len(rows) == 25
     gold = _gold_rows()
     for r in rows:
         g = gold.get((r["pack"], r["def_id"], r["smiles"]))

@@ -170,8 +170,14 @@ def test_the_two_predicates_provably_disagree():
     """
     assert is_complex_substituent("propan-2-yl") is True    # -> parentheses
     assert is_substituted_substituent("propan-2-yl") is False  # -> `di`
-    #... and the reverse disagreement, on a name with no digit to key off.
-    assert is_complex_substituent("hydroxymethyl") is False
+    # 'hydroxymethyl' is a compound prefix, the Blue Book, "A
+    # compound substituent group consists of a simple substituent group... to
+    # which is attached one or more simple substituent groups"), so it is both
+    # enclosed and multiplied with 'bis': (:7232), "Parentheses are
+    # used around compound (see and complex (see prefixes";
+    # '2-(hydroxymethyl)benzene-1,4-diol (PIN)' (:6802). The enclosure predicate
+    # says so since 3b1aef050; here the two questions agree.
+    assert is_complex_substituent("hydroxymethyl") is True
     assert is_substituted_substituent("hydroxymethyl") is True
 
 
@@ -358,7 +364,10 @@ BB_SIMPLE_CHARACTERISTIC_GROUP = [
     "carbamoyl", "sulfamoyl", "hydroperoxy", "hydrazinyl",
     "sulfo", "sulfino", "isocyano", "isocyanato", "guanidino",
     "carbamimidoyl", "sulfanylidene", "selanylidene", "thioxo",
-    "diazenyl", "hydrazinylidene", "phosphono", "phosphino", "borono",
+    "hydrazinylidene", "phosphono", "phosphino", "borono",
+    # 'diazenyl' is no longer here: (e) (the Blue Book) "before names
+    # beginning with a multiplicative prefix 'di'" -- 'bis(diazenyl) (preselected
+    # prefix...) (not didiazenyl)' (:7194); it is in CATENATION_AMBIGUOUS_PREFIXES.
 ]
 
 # ---------------------------------------------------------------------------

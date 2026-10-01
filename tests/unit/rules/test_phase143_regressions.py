@@ -111,24 +111,29 @@ class TestOPSINParseRegressions:
     IUPAC but OPSIN 2.9.0 cannot parse them. None of these had RT=1 in baseline.
     """
 
-    def test_ajmaline_retained_name(self):
-        """Ajmaline is correctly resolved as retained NP name (was VB hexacyclo...).
+    # The two rows below used to assert the gate-off names 'ajmaline' and 'berberine'.
+    # Both came from the natural-product producer returning the BARE scaffold name
+    # for a decorated input (the scaffold has no numbering map): the two OH groups
+    # of ajmaline and the four OMe groups of tetrahydropalmatine were dropped, and
+    # 'berberine' is a different compound. (the Blue Book): every
+    # substituent is cited; (a) (:51382 'ajmalan',:51391
+    # 'berbine') names the parents. OPSIN 2.9.0 reads neither 'ajmaline' nor
+    # 'berberine'. The producer now declines, and the best-effort tier names each
+    # molecule with a name OPSIN reads back to its full InChIKey.
 
-        a phase cleanup: removed stale @pytest.mark.xfail. a phase
-        OPSIN XML retained-name expansion (914 entries; commit)
-        brought ajmaline into the registry; the test passes cleanly.
-        """
-        name = name_compound(
-            "CC[C@H]1[C@@H]2CC3[C@@H]4N(C)c5ccccc5[C@]45C[C@@H](C2C5O)N3[C@@H]1O"
-        )
-        assert name == "ajmaline"
+    @pytest.mark.opsin_gate
+    @pytest.mark.parametrize("smiles", [
+        "CC[C@H]1[C@@H]2CC3[C@@H]4N(C)c5ccccc5[C@]45C[C@@H](C2C5O)N3[C@@H]1O",
+        "COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2",
+    ], ids=["ajmaline", "tetrahydropalmatine"])
+    def test_decorated_scaffold_without_numbering_is_not_named_by_its_bare_scaffold(self, smiles):
+        from rdkit import Chem
+        from orthonym import Orthonym
+        from orthonym.cli import _emit_tier_flags
+        from orthonym.rules.natural_products import name_natural_product
+        from tests.support.rt_assert import name_is_rt_exact
 
-    def test_berberine_retained_name(self):
-        """Berberine is correctly resolved as retained NP name (was VB tetracyclo...).
-
-        a phase cleanup: removed stale @pytest.mark.xfail. a phase
-        OPSIN XML retained-name expansion brought berberine into the
-        registry; the test passes cleanly.
-        """
-        name = name_compound("COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2")
-        assert name == "berberine"
+        assert name_natural_product(Chem.MolFromSmiles(smiles)) is None
+        row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+        assert row["tier"] != "abstain", row
+        assert name_is_rt_exact(row["name"], smiles), row["name"]

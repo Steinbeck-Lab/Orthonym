@@ -262,6 +262,22 @@ def _integrate_universal_prefixes(
             prefix_texts_out.append(
                 format_substituent_prefix(_pname, _plocs, len(_plocs)))
 
+    # (the Blue Book): a chain parent compound whose substitutable
+    # hydrogens all sit on one atom cites no substituent locant -- 'cyanoacetyl
+    # chloride (PIN)' (:5112), 'amino(oxo)ethaneperoxoic acid (PIN)' (:30182) --
+    # and every prefix after the first is enclosed,:7312). The
+    # licence is computed on the graph (``l6_chain_parent_one_substitutable_atom``).
+    if parent_type == "chain":
+        from .locant_omission import l6_chain_parent_one_substitutable_atom
+        if l6_chain_parent_one_substitutable_atom(
+                mol, principal_chain or parent_set, exclude_atoms or ()):
+            from .composition_primitives import unlocanted_prefix_block
+            _texts = []
+            for _pname in sorted(prefix_groups.keys(), key=alpha_sort_key):
+                _plocs = sorted(prefix_groups[_pname])
+                _texts.append(format_substituent_prefix(_pname, _plocs, len(_plocs)))
+            return unlocanted_prefix_block(_texts, enclose_subsequent=True)
+
     # Format with locants, multipliers, and alphabetical sorting
     return _format_prefix_groups(prefix_groups)
 
@@ -2725,8 +2741,15 @@ def _urea_substituent_has_heteroatom_h(mol, n_indices, urea_core) -> bool:
 
     The urea core atoms are excluded, so the substituted N's own H is never
     counted -- only atoms belonging to the substituent are inspected.
+
+    Only an N-H counts: "Except for hydrogen atoms attached to chalcogen atoms,
+    such as in acids, alcohols,... all hydrogen atoms are considered
+    substitutable", the Blue Book), so a hydroxy or sulfanyl group adds no
+    kind of substitutable hydrogen ('(2-hydroxyethyl)urea'). (O-H and S-H used to
+    count; no urea with an O-H or S-H reached this builder until urea was ranked
+    above the hydroxy compounds, PIN class program Task 13.)
     """
-    _HETERO_WITH_H = {'N', 'O', 'S'}
+    _HETERO_WITH_H = {'N'}
     seen = set(urea_core)
     stack = []
     for n_idx in n_indices:
@@ -2835,6 +2858,17 @@ def _try_name_urea(features: Any) -> Optional[str]:
     if not n1_subs and not n2_subs:
         return "urea"
 
+    # (the Blue Book): "All locants are omitted in compounds... in
+    # which all substitutable positions are completely substituted or modified... in
+    # the same way" -- 'tetrafluorourea (PIN)' (:3025): the four N-H of urea replaced
+    # by one substituent cite no N locants ('tetramethylurea', not
+    # "N,N,N',N'-tetramethylurea").
+    if (len(n1_subs) == 2 and len(n2_subs) == 2
+            and len(set(n1_subs + n2_subs)) == 1):
+        _same = n1_subs[0]
+        from .naming_utils import multiplied_component
+        return f"{multiplied_component(4, _same, enclose_if_compound(_same))}urea"
+
     # Build N-substitution prefix with N/N' locants
     # When only one N is substituted, it always gets unprimed "N"
     # When both Ns are substituted, they get "N" and "N'"
@@ -2855,8 +2889,11 @@ def _try_name_urea(features: Any) -> Optional[str]:
         # by the alphabetically-first substituent set). This ALSO removes the
         # SMILES-atom-order dependence (the SMARTS [N]C(=O)[N] match order was
         # the old, nondeterministic basis) -- a determinism fix as well as a PIN fix.
-        key1 = (-len(n1_subs), sorted(n1_subs))
-        key2 = (-len(n2_subs), sorted(n2_subs))
+        # The alphanumerical key is 's (alpha_sort_key), as in the thiourea and
+        # guanidine siblings: a raw string sort put '1-[...]propyl' before 'butyl'
+        # and 'methyl' before 'tert-butyl'.
+        key1 = (-len(n1_subs), sorted(alpha_sort_key(s) for s in n1_subs))
+        key2 = (-len(n2_subs), sorted(alpha_sort_key(s) for s in n2_subs))
         if key1 <= key2:
             first_subs, second_subs = n1_subs, n2_subs
         else:
@@ -2876,8 +2913,11 @@ def _try_name_urea(features: Any) -> Optional[str]:
         mol, (n1_idx, n2_idx), urea_core
     )
 
+    # alphanumerical citation order (the Blue Book), as the thiourea
+    # and guanidine siblings already pass.
     return _build_n_substituted_name(
-        tagged_subs, "urea", sub_has_heteroatom_h=sub_has_heteroatom_h
+        tagged_subs, "urea", sort_key=alpha_sort_key,
+        sub_has_heteroatom_h=sub_has_heteroatom_h
     )
 
 
@@ -4394,6 +4434,15 @@ def _assemble_complex_ring_name(mol, features):
 
             # Try ortho-fused bicyclic (carbocyclic fallback)
             result = name_ortho_fused_bicyclic(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+
+            # (d) (the Blue Book): a bridge across a bond common to two
+            # rings (4a,8a-ethanonaphthalene) is classified 'ortho-fused' here, and no
+            # fused namer names it; the bridged fused PIN builder does.
+            from ..rules.bridged_fused import name_bridged_fused_pin
+            result = name_bridged_fused_pin(mol)
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
@@ -6734,7 +6783,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     Handles:
     - Primary amides: acetamide, propanamide, (9Z)-octadec-9-enamide
     - Secondary amides: N-methylacetamide, N-methyl(9Z)-octadec-9-enamide
-    - Tertiary amides: N,N-dimethylformamide
+    - Tertiary amides: N,N-dimethylacetamide; dimethylformamide (a formamide with the same group on both N-H cites no N locants)
     - Ring-attached amides: cyclohexanecarboxamide
 
     Args:
@@ -7524,16 +7573,53 @@ def _assemble_imine_name(features: Any, style: str) -> Optional[str]:
         return None
 
     other_prefixes = _generate_prefixes(features)
-    c_prefix_parts = []
-    for p in sorted(other_prefixes, key=lambda x: alpha_sort_key(x.text)):
-        if p.locants and not str(p.text)[:1].isdigit():
-            _loc = ",".join(str(_l) for _l in p.locants)
-            c_prefix_parts.append(f"{_loc}-{p.text}")
+    # (the Blue Book) arranges ALL detachable prefixes alphanumerically,
+    # the N-locanted one among the C-prefixes: 'N-cyclohexyl-1-phenylmethanimine',
+    # not '1-phenyl-N-cyclohexyl...' ('(1E)-1-[...]-N-[...]methanimine (PIN)',
+    #:50452 orders b < p). The same substituent on N and on C1 is one multiplied
+    # prefix with the locant set 'N,1': 'N,1-bis(4-chlorophenyl)methanimine (PIN)'
+    # (:26524).
+    n_name = n_subs[0]
+    entries = []                          # (sort key, text, starts with a locant)
+    merged = False
+    for p in other_prefixes:
+        _text = str(p.text)
+        _locs = list(p.locants or ())
+        # a producer that bakes the locant into the text also carries the bare name
+        _bare = (getattr(p, 'text_without_locants', None)
+                 if _text[:1].isdigit() else None) or _text
+        if (not merged and _bare == n_name and len(_locs) == 1
+                and getattr(p, 'count', 1) == 1):
+            from .naming_utils import multiplied_component
+            entries.append((alpha_sort_key(n_name),
+                            f"N,{_locs[0]}-" + multiplied_component(
+                                2, n_name, enclose_if_compound(n_name)), True))
+            merged = True
+            continue
+        if _locs and not _text[:1].isdigit():
+            entries.append((alpha_sort_key(_text),
+                            f"{','.join(str(_l) for _l in _locs)}-{_text}", True))
         else:
-            c_prefix_parts.append(p.text)
-    if c_prefix_parts:
-        return f"{'-'.join(c_prefix_parts)}-{n_prefix}{base_name}"
-    return f"{n_prefix}{base_name}"
+            entries.append((alpha_sort_key(_text), _text, _text[:1].isdigit()))
+    if not merged:
+        entries.append((alpha_sort_key(n_name), n_prefix, True))
+    entries.sort(key=lambda e: e[0])
+    # (:7272) on a one-atom parent: the second and later prefixes that
+    # cite no locant are enclosed -- '(Z)-N-hydroxy(4-chlorophenyl)(phenyl)methanimine
+    # (PIN)' (:47666).
+    _mononuclear = len(features.principal_chain or ()) == 1
+    out = ""
+    for i, (_k, text, located) in enumerate(entries):
+        if i and _mononuclear and not located and not text.startswith(("(", "[", "{")):
+            text = f"({text})"
+        if not out:
+            out = text
+        elif text.startswith(("(", "[", "{")) and not located:
+            out += text
+        else:
+            out += f"-{text}"
+    joiner = "-" if base_name[:1].isdigit() else ""
+    return f"{out}{joiner}{base_name}"
 
 
 def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
@@ -9153,10 +9239,13 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     # single trivially-1 position, so ring-substituent locants are never cited
     # (phenylmethanol / diphenylmethanone, NOT 1-phenylmethanol). Route the
     # decision through the shared chokepoint rather than an inline test.
+    #... unless the parent's principal group still holds a substitutable hydrogen
+    #, the Blue Book; '1-hydrazinylmethanamine (PIN)', the Blue Book).
+    from .handlers._handler_shared import mononuclear_locant_required_here
     _omit_ring_sub_locants = should_omit_locant_one(
         context="prefix",
         chain_length=len(features.principal_chain or ()),
-    )
+    ) and not mononuclear_locant_required_here(features)
     for name, locants in ring_sub_groups.items():
         count = len(locants)
         sorted_locants = sorted(locants)
@@ -10012,12 +10101,17 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
         # sulfanyl)methane; bis(methylsulfanyl)methane). Bracket wrapping for
         # complex substituents is preserved in the omit branch below.
         _prefix_chain_len = len(getattr(features, 'principal_chain', []))
+        # (not when the one-atom parent's principal group still holds a substitutable
+        # hydrogen:, the Blue Book; '1-hydrazinylmethanamine (PIN)', the Blue Book)
+        from .handlers._handler_shared import mononuclear_locant_required_here
         if should_omit_locant_one(
             context="prefix",
             chain_length=_prefix_chain_len,
             is_monosubstituted=(is_simple_hydrocarbon and total_substituents == 1
                                 and sorted_locants == [1]),
-        ) and (total_substituents == 1 or _prefix_chain_len == 1):
+        ) and (total_substituents == 1 or _prefix_chain_len == 1) and not (
+                _prefix_chain_len == 1
+                and mononuclear_locant_required_here(features)):
             # A complex/compound substituent still needs enclosing marks even when
             # its locant is elided, BB 7232: "*Parentheses are used
             # around compound... and complex... prefixes*"). -FINAL m3:

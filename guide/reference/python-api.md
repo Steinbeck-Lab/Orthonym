@@ -55,4 +55,4 @@ Every example below is the engine's own output.
 
 ## Version
 
-`orthonym.__version__` is the installed version, for example `'1.0.0'`.
+`orthonym.__version__` is the installed version, a string such as `'1.0.2'`.

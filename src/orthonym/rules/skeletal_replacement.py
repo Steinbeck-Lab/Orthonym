@@ -1013,6 +1013,39 @@ def _skeletal_atoms_all_expressible(mol: Chem.Mol, atoms: List[int]) -> bool:
     return True
 
 
+def _cyclic_skeleton_spellable(mol: Chem.Mol, ring_atoms: List[int]) -> bool:
+    """Can the cyclic 'a' builder spell this ring without changing the molecule?
+
+    ``_try_cyclic_replacement_name`` writes each ring atom as its 'a' prefix (or
+    as a carbon of the cycloalkane stem), a heteroatom with a nonstandard bonding
+    number with its λ symbol, '1-oxa-4λ4-thiacyclotetradecane (PIN)',
+    the Blue Book), and each ring bond as single or double ('ene'). It has no
+    'yne' form, so a ring with a triple bond came out as another molecule:
+
+        ``C1#CCCCCOCCCCC1`` -> '1-oxacyclododecane' (the triple bond dropped)
+
+     (a triple bond changes 'ane' to 'yne'). Such a ring declines here, as
+    does a radical or a carbon whose bonding number is not 4 (no form for either).
+    A CHARGED ring atom is not checked: the ring-ion emitters pass the ion itself
+    and append the charge suffix to the parent name built here
+    (``C1CCCCC[NH2+]CCOCCCC1`` -> '1-oxa-4-azacyclotetradecane' -> '...-4-ium')."""
+    for idx in ring_atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetFormalCharge() != 0:
+            continue
+        if atom.GetNumRadicalElectrons():
+            return False
+        if atom.GetSymbol() == 'C':
+            if atom.GetTotalValence() != 4:
+                return False
+    ring = set(ring_atoms)
+    for bond in mol.GetBonds():
+        if (bond.GetBeginAtomIdx() in ring and bond.GetEndAtomIdx() in ring
+                and bond.GetBondType() == Chem.BondType.TRIPLE):
+            return False
+    return True
+
+
 def _find_replacement_chain(
     mol: Chem.Mol, exclude_atoms: Optional[set] = None,
 ) -> Optional[List[int]]:
@@ -1549,6 +1582,10 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     # while ``ring_size`` still counted it into the cycloalkane stem.
     if not _skeletal_atoms_all_expressible(mol, ring_atoms):
         return None
+    # No λ and no 'yne' form in this builder: such a ring declines rather than
+    # being spelled as another molecule (see _cyclic_skeleton_spellable).
+    if not _cyclic_skeleton_spellable(mol, ring_atoms):
+        return None
     heteroatoms = []
     for i, atom_idx in enumerate(ring_atoms):
         atom = mol.GetAtomWithIdx(atom_idx)
@@ -1604,6 +1641,9 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
                     positions.append((i + 1, symbol))
 
             hetero_locant_set = sorted(pos[0] for pos in positions)
+            # with /: when there is a choice, low
+            # locants go to the λ heteroatoms, the higher bonding number first.
+            lambda_key = _lambda_orientation_key(ordered, mol)
 
             # Per-element locant lists, in 'a'-prefix seniority order, compared
             # lexicographically — the "then, if necessary, according to the
@@ -1654,7 +1694,7 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
             # heteroatoms and then to unsaturated sites").
             comparison_key = (
                 senior_first_locant, hetero_locant_set, seniority_key,
-                db_locants,
+                lambda_key, db_locants,
             )
 
             if best_key is None or comparison_key < best_key:
@@ -1707,12 +1747,20 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     omit_all_locants = (
         all_single and len(sorted_groups) == 1 and total_hetero == ring_size
     )
-    omit_locants = elide_single or omit_all_locants
+    # The λ symbol "is cited immediately after the locant denoting the heteroatom"
+    #, the Blue Book), so a ring with a λ heteroatom cites its
+    # heteroatom locants ('1λ3-iodinane (PIN)').
+    lambda_by_locant = {
+        i + 1: lam for i, idx in enumerate(best_ordered)
+        if (lam := nonstandard_bonding_number(mol, idx)) is not None
+    }
+    omit_locants = (elide_single or omit_all_locants) and not lambda_by_locant
 
     parts = []
     for symbol, locants in sorted_groups:
         term = REPLACEMENT_TERMS[symbol]
-        locant_str = '' if omit_locants else ','.join(str(loc) for loc in locants)
+        locant_str = '' if omit_locants else ','.join(
+            format_lambda_token(loc, lambda_by_locant.get(loc)) for loc in locants)
         count = len(locants)
 
         if count == 1:
@@ -1744,6 +1792,14 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     if not db_locants:
         # No double bonds found despite all_single being False (shouldn't happen)
         return f'{replacement_prefix}cyclo{chain_prefix}ane'
+
+    # (the Blue Book) "Cyclic cumulenes are composed entirely of
+    # atoms, identical or different, linked by double bonds": when every ring bond is
+    # double the ene locants say nothing and are omitted, the heteroatom
+    # locants stay -- '1λ4,2λ4-dithiacycloundecaundecaene (PIN)' (:16596).
+    if len(db_locants) == ring_size and ring_size in SIMPLE_MULTIPLIERS:
+        return (f'{replacement_prefix}cyclo{chain_prefix}a'
+                f'{SIMPLE_MULTIPLIERS[ring_size]}ene')
 
     return _build_unsaturated_cyclic_name(
         replacement_prefix, chain_prefix, db_locants

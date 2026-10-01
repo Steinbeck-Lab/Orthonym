@@ -1,13 +1,15 @@
-""" degrade-floor slice 1 — ring-substituted phosphane parent.
+"""Ring-substituted phosphane parent (slice 1; PIN class program Task 2).
 
 The phosphane parent namer handles simple alkyl phosphanes (triethylphosphane, PIN) but
 ring-substituted phosphanes (tricyclododecylphosphane) fell through: `name_phosphine` is never
-reached for a ring-bearing molecule (ring routing bypasses it) and `name_mononuclear_hydride`
-deferred pure-organyl phosphanes to it (`'silyl' in subs` gate). `_classify_phosphane_subs`
-already yields the ring substituents, so best-effort (T4) emits the substitutive phosphane.
+reached for a ring-bearing molecule (ring routing bypasses it). `_classify_phosphane_subs`
+yields the ring substituents, so `name_mononuclear_hydride` emits the substitutive phosphane.
 
-T4-SCOPED: guarded by `best_effort_ctx`, so the PIN path is byte-identical (unit test below drives
-the contextvar directly, independent of the OPSIN gate which behaves differently under pytest).
+This branch ran at the best-effort tier only. "Substitution of phosphanes,
+arsanes, and stibanes by organyl groups" (the Blue Book): "Alkyl, aryl, etc. groups...
+are always denoted by prefixes" (:39153), 'cyclohexylphosphane (PIN)' (:39165): the organyl
+phosphane is the PIN, so the branch now runs at every tier (the unit test below drives the
+contextvar directly, independent of the OPSIN gate which behaves differently under pytest).
 0-wrong: RT identity below + in production.
 """
 from rdkit import Chem
@@ -36,21 +38,15 @@ RING_PHOSPHANES = [
 
 
 @pytest.mark.parametrize("smi,expected", RING_PHOSPHANES)
-def test_ring_phosphane_t4_only(smi, expected):
+def test_ring_phosphane_named_at_every_tier(smi, expected):
     mol = Chem.MolFromSmiles(smi)
-    # PIN path (contextvar False) -> must abstain (None): byte-identical, no regression.
-    tok = best_effort_ctx.set(False)
-    try:
-        assert name_mononuclear_hydride(mol) is None, "PIN path must not emit (T4-scoping broken)"
-    finally:
-        best_effort_ctx.reset(tok)
-    # best-effort (contextvar True) -> emits the substitutive phosphane, RT-correct.
-    tok = best_effort_ctx.set(True)
-    try:
-        out = name_mononuclear_hydride(mol)
-    finally:
-        best_effort_ctx.reset(tok)
-    assert out == expected, out
+    for tier_flag in (False, True):   # the PIN path and the best-effort path
+        tok = best_effort_ctx.set(tier_flag)
+        try:
+            out = name_mononuclear_hydride(mol)
+        finally:
+            best_effort_ctx.reset(tok)
+        assert out == expected, (tier_flag, out)
     assert out.endswith("phosphane")
     assert _rt(smi, out), f"wrong molecule: {out!r}"
 

@@ -23,10 +23,11 @@ Patterns (trace, VERIFIED):
 """
 from __future__ import annotations
 
-import signal
 from collections import namedtuple
 
 import pytest
+
+from orthonym.wallclock import WallClockTimeout, wall_clock_limit
 
 # --- witness sets (trace V36-a trace-C1C2C6.md; bare ring cores) --------------------
 
@@ -162,8 +163,9 @@ CANARY_NAMES = {
 RT = namedtuple("RT", ["name", "passed", "error"])
 
 
-class _Timeout(Exception):
-    pass
+# A naming past its limit raises WallClockTimeout, a BaseException no `except
+# Exception` on the naming path can absorb; the tests skip on it.
+_Timeout = WallClockTimeout
 
 
 def _ring_rt(smiles: str, timeout_s: int = 60) -> RT:
@@ -174,18 +176,10 @@ def _ring_rt(smiles: str, timeout_s: int = 60) -> RT:
     from orthonym.namer import Orthonym
     from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
 
-    def _handler(signum, frame):
-        raise _Timeout()
-
-    old = signal.signal(signal.SIGALRM, _handler)
-    signal.alarm(timeout_s)
-    try:
+    with wall_clock_limit(timeout_s):
         nm = Orthonym(style="pin", general_fallback=True,
                        allow_aromatic_general=True)
         name = nm.name(smiles)
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old)
     if not name:
         return RT(name, False, "no_name")
     res = opsin_roundtrip_check(smiles, name)

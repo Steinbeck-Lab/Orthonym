@@ -788,19 +788,32 @@ def name_general_chain(
     if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in chain):
         return _refuse("hetero parent chain (replacement nomenclature)")
 
-    part = _partition(mol, features, chain)
+    part = _partition(mol, features, chain, allow_mancude=allow_mancude)
     if part is None:
         return None
     return _assemble(mol, features, chain, part, allow_charged=allow_charged,
                      allow_mancude=allow_mancude)
 
 
-def _partition(mol, features, chain) -> Optional[dict]:
+def _partition(mol, features, chain, allow_mancude: bool = False
+               ) -> Optional[dict]:
     """Split heavy atoms into chain / suffix / substituent fragments.
 
     Suffix atoms (PG-match atoms off the chain) are folded into the
     blocked set BEFORE substituent discovery so a suffix oxygen is never
     double-expressed as a 'hydroxy'/'oxo' prefix.
+
+    Only the HETEROATOMS of a match are suffix atoms. A principal-group SMARTS
+    also matches context carbons that belong to no characteristic group: the
+    N-substituent carbon(s) of a secondary / tertiary amide
+    (``[CX3](=O)[NX3H1][#6]``) and the flanking carbons of a ketone
+    (``[#6][CX3](=O)[#6]``). The characteristic carbon of a chain suffix is a
+    chain atom, so an off-chain carbon of the match is always such a context
+    atom. Folding it into the suffix left everything beyond it unreachable by
+    substituent discovery, and the partition was refused. A context carbon
+    bonded to a chain atom is an ordinary substituent; one bonded to the amide
+    nitrogen is an N-substituent, cited with the locant *N*,
+    see ``_amide_n_substituents``).
     """
     from ..rules.seniority import get_suffix
     from .substituent_enumerator import discover_substituents
@@ -842,14 +855,36 @@ def _partition(mol, features, chain) -> Optional[dict]:
                         "inline suffix characteristic atom off parent chain")
             else:
                 loc = min(atom_to_locant[i] for i in on_chain)
-            suffix_atoms.update(i for i in match
-                                if i not in chain_set
-                                and mol.GetAtomWithIdx(i).GetAtomicNum() > 1)
+            hetero = [i for i in match
+                      if i not in chain_set
+                      and mol.GetAtomWithIdx(i).GetAtomicNum() not in (1, 6)]
+            # The suffix heteroatoms sit on the characteristic carbon, which is a
+            # chain atom; a match reaching the chain only through a context carbon
+            # (its characteristic carbon off the chain) is not a suffix of it.
+            if any(not any(n.GetIdx() in chain_set
+                           for n in mol.GetAtomWithIdx(i).GetNeighbors())
+                   for i in hetero):
+                return _refuse("suffix characteristic atom off parent chain")
+            suffix_atoms.update(hetero)
             pg_chain_locants.append(loc)
+
+    # N-substituents of a chain amide (R-CO-NHR', R-CO-NR'R''), cited with the
+    # italic N locant. Held out of substituent discovery, whose walk from the
+    # chain cannot pass the suffix nitrogen. Fail closed (never drop an atom)
+    # when any N-substituent is unnameable or the shape is out of scope.
+    n_sub_atoms: set = set()
+    n_sub_counts: Dict[str, int] = {}
+    n_sub_bindings: List[TokenBinding] = []
+    if suffix_core == 'amide':
+        n_res = _amide_n_substituents(mol, pg_matches, allow_mancude,
+                                      parent_atoms=chain_set | suffix_atoms)
+        if n_res is None:
+            return _refuse("amide N-substituent unnameable or out of scope")
+        n_sub_atoms, n_sub_counts, n_sub_bindings = n_res
 
     try:
         subs = discover_substituents(
-            mol, chain_set | suffix_atoms, parent_type='chain',
+            mol, chain_set | suffix_atoms | n_sub_atoms, parent_type='chain',
             principal_chain=chain, atom_to_locant=atom_to_locant,
             general_fallback=True)
     except AssertionError as e:
@@ -866,6 +901,8 @@ def _partition(mol, features, chain) -> Optional[dict]:
         'pg_locants': sorted(pg_chain_locants),
         'substituents': subs,
         'atom_to_locant': atom_to_locant,
+        'n_sub_counts': n_sub_counts,
+        'n_sub_bindings': n_sub_bindings,
     }
 
 
@@ -1120,16 +1157,23 @@ def _assemble(mol, features, chain, part,
         frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
                                           'prefix'))
 
+    # An amide N-substituent is one more detachable prefix in the same
+    # alphanumerical order; its locant is the italic N, cited before
+    # the numeric locants of an identical chain prefix ('N,N,2-trimethyl...
+    # propanamide (PIN)', the Blue Book).
+    n_counts = part.get('n_sub_counts') or {}
     prefix_parts = []
-    for prefix in sorted(groups, key=_alpha_key):
-        locs = sorted(groups[prefix])
+    names = list(groups) + [nm for nm in n_counts if nm not in groups]
+    for prefix in sorted(names, key=_alpha_key):
+        locs = ['N'] * n_counts.get(prefix, 0) + [
+            str(loc) for loc in sorted(groups.get(prefix, ()))]
         text = _mult_prefix(len(locs), prefix)
         if text is None:
             return _refuse("multiplicity beyond table")
-        prefix_parts.append(','.join(map(str, locs)) + '-' + text)
+        prefix_parts.append(','.join(locs) + '-' + text)
 
     # --- suffix ---
-    bindings = frag_bindings
+    bindings = frag_bindings + list(part.get('n_sub_bindings') or ())
     suffix_text = ''
     if part['suffix_core']:
         style = _SUPPORTED_SUFFIX_STYLES[part['suffix_core']]
@@ -1330,31 +1374,33 @@ def _extract_ring_ester(mol, pg_matches, ring_set, allow_mancude):
     return r_word, r_frag, core, ring_attach
 
 
-def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
-    """ /: collect and format N-substituents on a
-    ring carboxamide / sulfonamide.
+def _amide_n_substituents(mol, pg_matches, allow_mancude, parent_atoms=None):
+    """The N-substituents of carboxamide / sulfonamide principal-group instances.
 
     The amide/sulfonamide nitrogen's non-H neighbours (other than the C=O / S
-    anchor) are N-substituents -- named by ``name_substituent`` and cited with
-    the italic ``N``/``N,N`` locant. Returns
-    ``(n_sub_atoms, prefix_entries, bindings)`` where ``n_sub_atoms`` is the set
-    of N-substituent fragment atoms to hold out of the ring-substituent set and
-    the appended-suffix atoms, and ``prefix_entries`` is a list of
-    ``(alpha_key, formatted_token)`` merged into the ring-substituent ordering by
-    the caller. Returns ``None`` (fail closed) if any N-substituent is
+    anchor) are N-substituents, each named by ``name_substituent``. Returns
+    ``(n_sub_atoms, name_counts, bindings)``: the union of the N-substituent
+    fragment atoms, the count of each substituent name, and one ``prefix``
+    binding per fragment. ``None`` (fail closed) if an N-substituent is
     unnameable -- never drop it (that would ship a different constitution).
+
+    ``parent_atoms`` (the chain path passes the chain and suffix atoms) adds the
+    scope checks of (the Blue Book, "... citing the
+    substituents R' and R'' as prefixes preceded by the locant *N* when one amide
+    group is present. In di- and polyamides... *N* locants with superscripted
+    arabic numbers... are used"): a molecule with more than one amide group
+    that carries an N-substituent needs the superscript locants, which are not
+    built, so it fails closed; so does an amide nitrogen in a ring (the ring is
+    then not an N-substituent) and any N-substituent fragment that reaches a
+    parent atom or another N-substituent.
     """
-    from .naming_utils import (
-        SIMPLE_MULTIPLIERS,
-        _wrap_n_substituent,
-        is_complex_substituent,
-    )
     from .substituent_enumerator import name_substituent
 
     n_sub_atoms: set = set()
     name_counts: Dict[str, int] = {}
     bindings: List[TokenBinding] = []
     seen: set = set()
+    amide_ns: set = set()
     for match in pg_matches:
         key = tuple(sorted(match))
         if key in seen:
@@ -1368,6 +1414,7 @@ def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
             # bare-suffix path (no N-subs) still applies if there are none.
             continue
         n_idx = n_idxs[0]
+        amide_ns.add(n_idx)
         # The FG anchor is the sulfonamide S or the carbonyl C (=O) bonded to N
         # -- NOT just any C neighbour (an N-alkyl carbon is also a C neighbour).
         anchor = None
@@ -1390,6 +1437,10 @@ def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
             j = nb.GetIdx()
             if j in exclude or nb.GetAtomicNum() <= 1:
                 continue
+            if parent_atoms is not None and (
+                    j in parent_atoms or j in n_sub_atoms
+                    or mol.GetAtomWithIdx(n_idx).IsInRing()):
+                return None
             frag: set = set()
             stack = [j]
             while stack:
@@ -1400,12 +1451,42 @@ def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
                 for n2 in mol.GetAtomWithIdx(x).GetNeighbors():
                     if n2.GetIdx() not in frag and n2.GetIdx() not in exclude:
                         stack.append(n2.GetIdx())
+            if parent_atoms is not None and (frag & (set(parent_atoms) | n_sub_atoms)):
+                return None
             nm = name_substituent(mol, frag, j, allow_mancude=allow_mancude)
             if is_refusal_sentinel(nm):
                 return None  # unnameable N-substituent -> fail closed
             n_sub_atoms |= frag
             name_counts[nm] = name_counts.get(nm, 0) + 1
             bindings.append(TokenBinding(tuple(sorted(frag)), nm, 'prefix'))
+    if parent_atoms is not None and n_sub_atoms and len(amide_ns) > 1:
+        return None  # N-substituted polyamide: superscript N locants not built
+    return n_sub_atoms, name_counts, bindings
+
+
+def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
+    """ /: collect and format N-substituents on a
+    ring carboxamide / sulfonamide.
+
+    The N-substituents come from ``_amide_n_substituents``; each is cited with
+    the italic ``N``/``N,N`` locant. Returns
+    ``(n_sub_atoms, prefix_entries, bindings)`` where ``n_sub_atoms`` is the set
+    of N-substituent fragment atoms to hold out of the ring-substituent set and
+    the appended-suffix atoms, and ``prefix_entries`` is a list of
+    ``(alpha_key, formatted_token)`` merged into the ring-substituent ordering by
+    the caller. Returns ``None`` (fail closed) if any N-substituent is
+    unnameable -- never drop it (that would ship a different constitution).
+    """
+    from .naming_utils import (
+        SIMPLE_MULTIPLIERS,
+        _wrap_n_substituent,
+        is_complex_substituent,
+    )
+
+    found = _amide_n_substituents(mol, pg_matches, allow_mancude)
+    if found is None:
+        return None
+    n_sub_atoms, name_counts, bindings = found
 
     entries: List = []
     for nm, cnt in name_counts.items():

@@ -48,8 +48,9 @@ class TestUreaRetainedName:
         assert name_compound("NC(=O)Nc1ccccc1") == "phenylurea"
 
     def test_urea_tetrasubstituted(self):
-        """Fully substituted urea -> 'N,N,N',N'-tetramethylurea'."""
-        assert name_compound("CN(C)C(=O)N(C)C") == "N,N,N',N'-tetramethylurea"
+        """Fully substituted urea -> 'tetramethylurea': all four N-H substituted in
+        the same way, (the Blue Book; 'tetrafluorourea (PIN)',:3025)."""
+        assert name_compound("CN(C)C(=O)N(C)C") == "tetramethylurea"
 
     def test_urea_mixed_substitution(self):
         """Mixed substitution -> 'N-ethyl-N'-methylurea'."""
@@ -141,7 +142,7 @@ class TestFGCollisionAvoidance:
     ("CNC(=O)NC", "N,N'-dimethylurea"),
     ("CN(C)C(=O)N", "N,N-dimethylurea"),
     ("NC(=O)Nc1ccccc1", "phenylurea"),
-    ("CN(C)C(=O)N(C)C", "N,N,N',N'-tetramethylurea"),
+    ("CN(C)C(=O)N(C)C", "tetramethylurea"),            #:3007,:3025
     ("CCNC(=O)NC", "N-ethyl-N'-methylurea"),
     ("NC(=N)N", "guanidine"),
     ("CNC(=N)N", "N-methylguanidine"),

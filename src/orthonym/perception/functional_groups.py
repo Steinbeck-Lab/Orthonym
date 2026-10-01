@@ -797,6 +797,15 @@ _ANHYDRIDE_BRIDGE_SMARTS = {
     # the molecule perceives as ester+cyanate/thiocyanate and mis-names.
     "cyanic_anhydride": "[CX3](=O)[OX2][CX2]#[NX1]",
     "thiocyanic_anhydride": "[CX3](=O)[SX2][CX2]#[NX1]",
+    # mixed anhydride of a carboxylic acid and nitric acid R-CO-O-NO2,
+    # the Blue Book, "Mixed anhydrides with carbonic acid, cyanic acid, and
+    # inorganic acids are named as anhydrides"): 'acetic nitric anhydride'. Without
+    # the fold the acyl-O-NO2 reads as the 'nitrooxy' prefix on a chain. The acyl
+    # carbon bears carbon or hydrogen only (a carboxylic or formic acid partner);
+    # a carbamic or carbonic partner needs its own acid name and keeps the
+    # substitutive read.
+    "nitric_anhydride":
+        "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2][NX3+](=[OX1])[OX1-]",
     # D /.2/.3, /.3): thio/seleno-ACYL anhydrides
     # R-C(=X1)-Y-C(=X2)-R' where an acyl chalcogen X1/X2 is S or Se (a
     # '...thioic'/'...selenoic' acid component, BB 32451/32455/32467), with an
@@ -944,7 +953,10 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     # (like chalcogen_anhydride, its substitutive read is owned by a senior
     # co-group when one is present). The O-bridge thioacyl variant folds
     # unconditionally, matching the base O-bridge (fail-closed, never wrong).
-    _SUBSTITUTIVE_BRIDGE = {"chalcogen_anhydride", "thioacyl_chalcogen_anhydride"}
+    # The nitric mixed anhydride joins it too: under a senior group its
+    # substitutive read ('3-(nitrooxy)-3-oxopropanoic acid') is the one built.
+    _SUBSTITUTIVE_BRIDGE = {"chalcogen_anhydride", "thioacyl_chalcogen_anhydride",
+                            "nitric_anhydride"}
     # D: dedup the BROAD acyl folds by atom-set against everything already
     # in the 'anhydride' bucket (base O-bridge FG + the earlier bridge keys), so
     # a (=O,=O) match is not double-added -- only the new thio/seleno-acyl motifs.
@@ -1388,7 +1400,8 @@ def _resolve_fg_collisions(results):
         # 'thiocyanate' (-O-C#N/-S-C#N) on the SAME atoms; suppress those too so
         # 'acetic cyanic anhydride' is not mis-perceived as an ester.
         ('anhydride', ['aldehyde', 'thioester', 'selenoester', 'telluroester',
-                       'ketone', 'peroxide', 'ester', 'cyanate', 'thiocyanate']),
+                       'ketone', 'peroxide', 'ester', 'cyanate', 'thiocyanate',
+                       'nitrooxy']),
         ('acid_chloride', ['aldehyde']),
         ('acid_bromide', ['aldehyde']),
         ('acid_fluoride', ['aldehyde']),

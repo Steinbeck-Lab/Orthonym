@@ -3,7 +3,7 @@
 Tests the complete SMILES -> name pipeline for natural products:
 - Steroid scaffolds (androstane, estrane, pregnane, cholestane, etc.)
 - Steroid derivatives (cholesterol)
-- Alkaloid scaffolds (morphinan, tropane, cinchonane, aporphine, ergoline)
+- Alkaloid scaffolds (morphinan, tropane, cinchonan, aporphine, ergoline)
 - Alkaloid derivatives (morphine, codeine, diamorphine, hydrocodone, etc.)
 - Terpenoid derivatives (camphor, limonene, pinenes, terpineols)
 - Carotenoids (beta-carotene, lycopene)
@@ -160,9 +160,11 @@ class TestAlkaloidE2E:
         assert name_compound(smiles) == "tropane"
 
     @pytest.mark.integration
-    def test_cinchonane(self):
+    def test_cinchonan(self):
+        # (a) spells the parent 'cinchonan' (the Blue Book);
+        # OPSIN 2.9.0 reads it to this structure's full InChIKey.
         smiles = canonical("C=C[C@H]1C[N@@]2CC[C@H]1C[C@@H]2Cc1ccnc2ccccc12")
-        assert name_compound(smiles) == "cinchonane"
+        assert name_compound(smiles) == "cinchonan"
 
     @pytest.mark.integration
     def test_aporphine(self):
@@ -210,7 +212,7 @@ class TestAlkaloidE2E:
         alkaloids = {
             "morphinan": "c1ccc2c(c1)C[C@H]1NCC[C@@]23CCCC[C@@H]13",
             "tropane": "CN1[C@@H]2CCC[C@H]1CC2",
-            "cinchonane": "C=C[C@H]1C[N@@]2CC[C@H]1C[C@@H]2Cc1ccnc2ccccc12",
+            "cinchonan": "C=C[C@H]1C[N@@]2CC[C@H]1C[C@@H]2Cc1ccnc2ccccc12",
             "aporphine": "CN1CCc2cccc3c2C1Cc1ccccc1-3",
             "ergoline": "c1cc2c3c(c[nH]c3c1)C[C@H]1NCCC[C@H]21",
         }
@@ -521,12 +523,12 @@ class TestParametrizedDerivatives:
         # Alkaloid scaffolds
         ("c1ccc2c(c1)C[C@H]1NCC[C@@]23CCCC[C@@H]13", "morphinan"),
         ("CN1[C@@H]2CCC[C@H]1CC2", "tropane"),
-        ("C=C[C@H]1C[N@@]2CC[C@H]1C[C@@H]2Cc1ccnc2ccccc12", "cinchonane"),
+        ("C=C[C@H]1C[N@@]2CC[C@H]1C[C@@H]2Cc1ccnc2ccccc12", "cinchonan"),
         ("CN1CCc2cccc3c2C1Cc1ccccc1-3", "aporphine"),
         ("c1cc2c3c(c[nH]c3c1)C[C@H]1NCCC[C@H]21", "ergoline"),
     ], ids=[
         "androstane", "estrane", "pregnane", "cholestane", "cholane", "gonane",
-        "morphinan", "tropane", "cinchonane", "aporphine", "ergoline",
+        "morphinan", "tropane", "cinchonan", "aporphine", "ergoline",
     ])
     def test_scaffold_naming(self, smiles, expected):
         """Parametrized test: bare scaffold SMILES should return parent name."""

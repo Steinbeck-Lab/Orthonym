@@ -118,7 +118,6 @@ class TestFailClosedDecline:
         ("ClCl", "Cl2 diatomic: no degree>=2 hub"),
         ("ClI", "ICl interhalogen: no degree>=2 hub"),
         ("FS(F)(F)(F)(F)S(F)(F)(F)(F)F", "S2F10: two hubs (di-nuclear)"),
-        ("CP(C)C", "trimethylphosphane: organyl P -> name_phosphine owns it"),
         ("CSC", "dimethyl sulfide: organyl chalcogen is not in the organyl regime"),
         ("c1cc[as]c1", "arsole: As is a ring member, not a parent hydride"),
     ])
@@ -128,6 +127,14 @@ class TestFailClosedDecline:
         if mol is None:
             pytest.skip(f"RDKit rejects SMILES ({why})")
         assert name_mononuclear_hydride(mol) is None, why
+
+    def test_organyl_phosphane_is_named_on_the_phosphane_parent(self):
+        """ "Substitution of phosphanes, arsanes, and stibanes by organyl
+        groups" (the Blue Book): "Alkyl, aryl, etc. groups... are always denoted
+        by prefixes" (:39153); '(C6H5)3P triphenylphosphane (PIN)' (:39157). The organyl
+        phosphane branch runs at every tier (it was a decline row while name_phosphine
+        alone named acyclic phosphanes at the PIN tier)."""
+        assert name_mononuclear_hydride(Chem.MolFromSmiles("CP(C)C")) == "trimethylphosphane"
 
     @pytest.mark.parametrize("smiles,expected,fabricated", [
         ("CC(C)[As](C(C)C)C(C)C",            "tri(propan-2-yl)arsane",

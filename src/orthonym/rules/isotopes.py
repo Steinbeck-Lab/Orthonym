@@ -1899,6 +1899,7 @@ def _find_best_placement(
     extra_locants: Optional[List] = None,
     stereo_blind: bool = False,
     complete_sub_omission: bool = False,
+    multi_descriptor: bool = False,
 ) -> Tuple[Optional[str], Optional[int], Optional[str], Optional[int]]:
     """Best ``(candidate, offset, descriptor, loc_rank)`` for ONE skeleton
     spelling and ONE ``(mass, element) -> count`` key list, OPSIN-RT gated
@@ -1921,6 +1922,13 @@ def _find_best_placement(
     opens with a skeletal-replacement locant. It is OFF for the multi-attachment
     caller, whose ``(off, desc)`` pair is re-spliced verbatim and cannot express
     the added hyphen.
+
+    ``multi_descriptor`` is True for the multi-attachment caller. There
+    ``original`` is a masked copy carrying one group's labels only, so the
+     unit licence (:func:`_unit_completely_labelled`) cannot see the
+    other descriptors of the name, and a name with several descriptors cites
+    every locant once any is required, the Blue Book); the
+    licence is not consulted then.
     """
     offs_raw = [0] + _insertion_offsets(skel)
     seen: set = set()
@@ -1993,8 +2001,9 @@ def _find_best_placement(
                     if (locant is None
                             and not _placement_unambiguous(
                                 original, complete_sub_omission)
-                            and not _unit_completely_labelled(
-                                skel, off, keys, original)):
+                            and (multi_descriptor
+                                 or not _unit_completely_labelled(
+                                     skel, off, keys, original))):
                         continue
                     if (locant is None
                             and _nitrogen_hydrogen_needs_locant(original, skel, off)):
@@ -2263,10 +2272,12 @@ def _isotope_locant_scopes(original: Chem.Mol):
     skeleton itself carries a positional isotope, ALSO
     ``isotope_parent_positional_scope``, the parent-own-locant licences)."""
     from ..assembly.locant_omission import (
-        forced_locant_scope, isotope_parent_positional_scope)
+        forced_locant_scope, isotope_labelled_original_scope,
+        isotope_parent_positional_scope)
     with forced_locant_scope("isotope"):
         if _parent_carries_positional_isotope(original):
-            with isotope_parent_positional_scope("isotope"):
+            with isotope_parent_positional_scope("isotope"), \
+                    isotope_labelled_original_scope(original):
                 yield
         else:
             yield
@@ -2357,12 +2368,17 @@ def _decorate_multi_position(
             # per group (masked to that group's indices) so each group offers only the
             # letter locants ITS atoms justify; still OPSIN-RT gated (0-wrong).
             # ``complete_sub_omission`` stays False here (see ``_placement_unambiguous``:
-            # a multi-descriptor name must cite all locants once any is required).
+            # a multi-descriptor name must cite all locants once any is required), and
+            # ``multi_descriptor`` keeps the unit licence off, since it
+            # would read only this group's masked copy (a propanoyl whose CH3 and CH2
+            # are two groups: OPSIN reads the bumped '(3H4)propanoylamino' of the
+            # CH3 group as another constitution, the licence then placed that group
+            # locant-free, and the two groups could not be joined at their slot).
             group_letter_locants = _letter_locant_candidates(
                 original, group, n_pos, skeleton=skel)
             _cand, off, desc, loc_rank = _find_best_placement(
                 skel, group_keys, masked, n_pos,
-                extra_locants=group_letter_locants)
+                extra_locants=group_letter_locants, multi_descriptor=True)
             if off is None:
                 return None, False
             if isinstance(loc_rank, int) and loc_rank >= 1:

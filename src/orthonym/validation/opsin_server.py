@@ -112,18 +112,26 @@ class PersistentOpsin:
             if not self._alive() and not self._start():
                 return None, False
             try:
-                self._proc.stdin.write(name + "\n")
-                self._proc.stdin.flush()
-            except (BrokenPipeError, OSError) as exc:
-                logger.debug("PersistentOpsin write failed (%s); restarting", exc)
+                try:
+                    self._proc.stdin.write(name + "\n")
+                    self._proc.stdin.flush()
+                except (BrokenPipeError, OSError) as exc:
+                    logger.debug("PersistentOpsin write failed (%s); restarting", exc)
+                    self._kill()
+                    return None, False
+                try:
+                    line = self._q.get(timeout=self._read_timeout)
+                except queue.Empty:
+                    logger.debug("PersistentOpsin read timeout for %r; restarting", name)
+                    self._kill()
+                    return None, False
+            except BaseException:
+                # Interrupted between the write and its answer (a KeyboardInterrupt,
+                # a measurement tool's wall-clock limit): the answer is still on its
+                # way, and the next call would read it as its own. Drop the process;
+                # the next call starts a fresh one.
                 self._kill()
-                return None, False
-            try:
-                line = self._q.get(timeout=self._read_timeout)
-            except queue.Empty:
-                logger.debug("PersistentOpsin read timeout for %r; restarting", name)
-                self._kill()
-                return None, False
+                raise
             if line is _EOF:
                 self._kill()
                 return None, False

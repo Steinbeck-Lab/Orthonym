@@ -2531,6 +2531,21 @@ def name_ring_system_substituent(
     return None
 
 
+def _carries_stereo(mol, atoms) -> bool:
+    """True when an atom of ``atoms`` has a specified tetrahedral configuration
+    or a bond between two of them (or from one of them) has a specified E/Z."""
+    from rdkit import Chem
+    atoms = set(atoms)
+    for a in atoms:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+            return True
+        for b in atom.GetBonds():
+            if b.GetStereo() != Chem.BondStereo.STEREONONE:
+                return True
+    return False
+
+
 def _fold_nonring_decorations(mol, frag_set, frag_ring_atoms, attach_idx):
     """ sub-lever A / Composer #2: fold every non-carrier decoration subgraph
     of a chain-rooted ring branch into the ring-yl atom set.
@@ -2652,17 +2667,31 @@ def _compound_ring_on_chain_substituent(
                 continue
             ring_substituent_atoms.add(ni)
     frag_ring_atoms = set(frag_ring_atoms) | ring_substituent_atoms
-    if allow_mancude:
-        # sub-lever A / Composer #2: also fold MULTI-ATOM ring decorations
-        # (methoxy, isopropyl,...) into the ring-yl, so '(4-methoxyphenyl)methyl'
-        # and the decorated-aryl/-cycloalkyl-on-a-simple-carrier class names via
-        # the name_ring_system_substituent recursion below. Best-effort only; the
-        # PIN default keeps the degree-1-only folding above, byte-identical.
-        _widened = _fold_nonring_decorations(
-            mol, frag_set, frag_ring_atoms, attach_idx)
-        if _widened is None:
-            return None
-        frag_ring_atoms = _widened
+    # sub-lever A / Composer #2: also fold MULTI-ATOM ring decorations
+    # (methoxy, cyano, isopropyl,...) into the ring-yl, so
+    # '(4-methoxyphenyl)methyl' and the decorated-aryl/-cycloalkyl-on-a-simple-
+    # carrier class names via the name_ring_system_substituent recursion below.
+    # At every tier: (the Blue Book) names a substituted
+    # benzyl group as the ring-yl on its carrier ('carboxy(4-carboxyphenyl)
+    # methylidene (preferred prefix)',:16330), and the PIN
+    # '4-chloro-2-[(3-cyanophenyl)methyl]benzonitrile',:6235)
+    # carries the cyano on the ring-yl. The fold only decides which atoms
+    # form the ring-yl: the ring-yl is still named by the ring producers at
+    # the caller's tier (``allow_mancude`` is passed on unchanged), so the PIN
+    # tier composes only a ring-yl its strict producers build. It used to run
+    # at the best-effort tier only (a degree-1-only fold at the PIN tier).
+    _widened = _fold_nonring_decorations(
+        mol, frag_set, frag_ring_atoms, attach_idx)
+    if _widened is None:
+        return None
+    # The strict ring producers do not cite a stereodescriptor that sits inside
+    # a folded multi-atom decoration ('{4-[(R)-methanesulfinyl]phenyl}methyl'):
+    # the outer emitter would cite it in front of the whole prefix instead
+    # ('{(R)-[4-(methanesulfinyl)phenyl]methyl}'). At the PIN tier such a
+    # decoration is not folded, as before.
+    if not allow_mancude and _carries_stereo(mol, _widened - set(frag_ring_atoms)):
+        _widened = set(frag_ring_atoms)
+    frag_ring_atoms = _widened
     raw_carrier = frag_set - frag_ring_atoms
     # w2f p1, BB 16322 'bromo(4-methylphenyl)methyl (preferred
     # prefix)'): an α-HALOGEN on the carrier is a carrier DECORATION cited

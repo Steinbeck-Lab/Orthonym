@@ -1507,6 +1507,42 @@ def _alpha_chalcogen_acetic_name(mol, principal_chain, atom_to_locant) -> Option
     return f"{''.join(parts)}acetic acid"
 
 
+def _single_substitutable_atom_parent(mol, features, principal_chain, all_prefixes,
+                                      double_locants, triple_locants, chain_ez) -> bool:
+    """True when the chain parent compound (the principal chain and the principal
+    characteristic group atoms) has all its substitutable hydrogens on one atom
+    (``assembly.locant_omission.l6_chain_parent_one_substitutable_atom``), so the
+    substituent prefixes cite no locant, the Blue Book).
+
+    Deny-by-default, as the sibling licence of this module: a chain
+    parent only, no unsaturation, no stereodescriptor, and a scope that is the
+    whole molecule (``locant_scope_is_a_name_component``: a fragment named as a
+    free molecule and spliced into a larger name keeps its locants)."""
+    try:
+        if not all_prefixes or not principal_chain:
+            return False
+        if double_locants or triple_locants or chain_ez:
+            return False
+        if getattr(features, 'stereocenters', None) or getattr(
+                features, 'double_bond_stereo', None):
+            return False
+        if (getattr(features, 'is_cyclic', False)
+                and not getattr(features, 'chain_is_parent', False)):
+            return False
+        from ..assembly.handlers._handler_shared import (
+            locant_scope_is_a_name_component,
+        )
+        if locant_scope_is_a_name_component():
+            return False
+        groups = set()
+        for _m in (getattr(features, 'principal_group_atoms', None) or ()):
+            groups.update(int(i) for i in _m)
+        from ..assembly.locant_omission import l6_chain_parent_one_substitutable_atom
+        return l6_chain_parent_one_substitutable_atom(mol, principal_chain, groups)
+    except Exception:  # noqa: BLE001 -- deny by default
+        return False
+
+
 def _retained_acetaldehyde(mol, atom_to_locant, all_prefixes, features):
     """ substituted-acetaldehyde PIN for an alpha-substituted 2-carbon
     aldehyde (CH3-CHO).
@@ -2012,9 +2048,15 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         and not (getattr(features, 'is_cyclic', False)
                  and not getattr(features, 'chain_is_parent', True))
     )
+    #... except where the parent's principal group still holds a substitutable
+    # hydrogen: (the Blue Book) "Locants are required for related compounds
+    # where additional substitutable positions are available" -- '1-hydrazinyl-
+    # methanamine (PIN)' (the Blue Book).
+    from ..assembly.handlers._handler_shared import mononuclear_locant_required_here
     _omit_mononuclear_locants = (
         _mononuclear_chain_parent
         and _should_omit_l1(context="prefix", chain_length=len(principal_chain))
+        and not mononuclear_locant_required_here(features)
     )
 
     # ------------------------------------------------------------------------- #
@@ -3487,6 +3529,25 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # alpha stereodescriptor (skip the generic stereo block below).
         _ald_name, _ald_bare_stereo = _ald_result
         name = f"{_ald_bare_stereo}{_ald_name}"
+    elif (not (suffix == 'nitrile' and chain_length == 2)
+          and _single_substitutable_atom_parent(mol, features, principal_chain,
+                                                all_prefixes, double_locants,
+                                                triple_locants, _chain_ez)):
+        # (the C2 nitrile is left out: its PIN is the retained 'acetonitrile' "with
+        # unlimited substitution",, the Blue Book, and this assembly spells
+        # it 'ethanenitrile', so the omission waits for the retained stem)
+        # (the Blue Book) "All locants are omitted for parent
+        # compounds when all substitutable hydrogen atoms have the same locant":
+        # 'amino(oxo)ethaneperoxoic acid (PIN)' (:30182); the first prefix bare,
+        # each subsequent one enclosed, 'bromo(chloro)acetic acid',
+        #:7312).
+        from ..assembly.composition_primitives import (
+            _join_prefix_to_name as _jpn,
+            unlocanted_prefix_block,
+        )
+        name = _jpn(unlocanted_prefix_block(
+            all_prefixes, enclose_subsequent=len(all_prefixes) > 1),
+            _systematic_assembly([]))
     else:
         name = sys_name
 

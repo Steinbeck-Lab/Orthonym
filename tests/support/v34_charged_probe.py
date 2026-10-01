@@ -58,7 +58,6 @@ from __future__ import annotations
 
 import csv
 import json
-import signal
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -75,12 +74,9 @@ BE_KWARGS = dict(general_fallback=True, general_fallback_unverified=True,
                   allow_aromatic_general=True)
 
 
-class _TimeOut(Exception):
-    pass
-
-
-def _alarm(sig, frm):
-    raise _TimeOut()
+# A naming past PER_MOL_TIMEOUT raises orthonym.wallclock.WallClockTimeout, a
+# BaseException no `except Exception` on the naming path can absorb, so the row is
+# an abstain and never a name finished from a half-made choice.
 
 
 def _inchikey(smiles: Optional[str]) -> Optional[str]:
@@ -105,23 +101,22 @@ def probe(smiles_list: List[str]) -> Dict[str, dict]:
     from orthonym.validation.opsin_roundtrip import opsin_parse
     from orthonym.errors import is_failure_name
     from orthonym.jvm_budget import jvm_slots
+    from orthonym.wallclock import WallClockTimeout, clear_leaked_naming_state, wall_clock_limit
 
-    signal.signal(signal.SIGALRM, _alarm)
     namer = Orthonym(**BE_KWARGS)
     out: Dict[str, dict] = {}
     with jvm_slots(1, purpose="v34-probe"):
         for smi in smiles_list:
             want = _inchikey(smi)
             name = None
-            signal.alarm(PER_MOL_TIMEOUT)
             try:
-                name = namer.name(smi)
-            except _TimeOut:
+                with wall_clock_limit(PER_MOL_TIMEOUT):
+                    name = namer.name(smi)
+            except WallClockTimeout:
+                clear_leaked_naming_state()  # the next SMILES is named clean
                 name = None
             except Exception:
                 name = None
-            finally:
-                signal.alarm(0)
 
             if not name or is_failure_name(name):
                 out[smi] = {"name": None, "rt": "abstain"}

@@ -132,14 +132,17 @@ def test_group14_complete_uniform_substitution_omits_all_locants(smiles, expecte
 # (2) order (the Blue Book): 'N-hydroxy' and a leading simple C-prefix are
 # cited in alphanumerical order (chloro/fluoro/cyclopropyl < hydroxy).
 # ---------------------------------------------------------------------------
+# The N keeps one N-H, so the C-prefix of the one-carbon parent cites '1'
+#, the Blue Book; '1-hydrazinylmethanamine (PIN)', the Blue Book; PIN class
+# program Task 11).
 D1_REORDER = [
-    ("ONCCl", "chloro-N-hydroxymethanamine"),
-    ("ONCF", "fluoro-N-hydroxymethanamine"),
-    ("ONCC1CC1", "cyclopropyl-N-hydroxymethanamine"),
-    ("ONC(Cl)Cl", "dichloro-N-hydroxymethanamine"),
-    ("ONC(Cl)(Cl)Cl", "trichloro-N-hydroxymethanamine"),
-    # hydroxy sorts before phenyl -> N-hydroxy stays leading, no spurious hyphen.
-    ("ONCc1ccccc1", "N-hydroxyphenylmethanamine"),
+    ("ONCCl", "1-chloro-N-hydroxymethanamine"),
+    ("ONCF", "1-fluoro-N-hydroxymethanamine"),
+    ("ONCC1CC1", "1-cyclopropyl-N-hydroxymethanamine"),
+    ("ONC(Cl)Cl", "1,1-dichloro-N-hydroxymethanamine"),
+    ("ONC(Cl)(Cl)Cl", "1,1,1-trichloro-N-hydroxymethanamine"),
+    # hydroxy sorts before phenyl -> N-hydroxy stays leading.
+    ("ONCc1ccccc1", "N-hydroxy-1-phenylmethanamine"),
 ]
 D1_UNCHANGED = [
     ("CNO", "N-hydroxymethanamine"),

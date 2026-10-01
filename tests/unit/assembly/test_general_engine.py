@@ -157,3 +157,52 @@ class TestEngineStereo:
         assert res is not None
         assert res.name.startswith("(") and "bicyclo" in res.name
         assert verify_certificate(mol, res).ok
+
+
+class TestChainAmideNSubstituents:
+    """The chain partition keeps only the heteroatoms of a principal-group match as
+    suffix atoms; the N-substituents of a chain amide are cited with the locant N.
+
+     (heading ' *N*-Substitution', the Blue Book;
+    sentence:32774): "Substituted primary amides, with general structures such as
+    R-CO-NHR' and R-CO-NR'R'',... are named by citing the substituents R' and R''
+    as prefixes preceded by the locant *N* when one amide group is present. In di-
+    and polyamides... *N* locants with superscripted arabic numbers... are used";
+    example 'N,N-dimethylpropanamide (PIN)' (:32788). The N locant comes before the
+    numeric locants of an identical prefix: 'N,N,2-trimethyl-3-{...}propanamide
+    (PIN)' (:21624,."""
+
+    def test_n_methyl(self):
+        assert _name("CCC(=O)NC").name == "N-methylpropanamide"
+
+    def test_n_n_dimethyl_bb_example(self):
+        assert _name("CCC(=O)N(C)C").name == "N,N-dimethylpropanamide"
+
+    def test_n_locant_merged_before_numeric_locant(self):
+        assert _name("CC(C)C(=O)NC").name == "N,2-dimethylpropanamide"
+
+    def test_n_substituent_with_its_own_substituents(self):
+        assert (_name("CCCCCC(=O)NC(CO)C(O)CCC").name
+                == "N-(1,3-dihydroxyhexan-2-yl)hexanamide")
+
+    def test_n_substituent_bindings_cover_all_heavy_atoms(self):
+        mol = Chem.MolFromSmiles("CCCC(=O)N(C)c1ccccc1")
+        res = _name("CCCC(=O)N(C)c1ccccc1")
+        assert res.name == "N-methyl-N-phenylbutanamide"
+        bound = sorted(i for b in res.bindings for i in b.atom_ids)
+        assert bound == list(range(mol.GetNumHeavyAtoms()))
+
+    def test_ketone_flanking_carbon_is_a_substituent(self):
+        # (the Blue Book), '1-phenylpropan-1-one (PIN)' (:28342): the
+        # ketone match's off-chain flanking carbon is the phenyl substituent, not a
+        # suffix atom.
+        assert _name("CCC(=O)c1ccccc1").name == "1-phenylpropan-1-one"
+
+    @pytest.mark.parametrize("smi", [
+        "O=C(CCC(=O)NC)NC",   # N1,N4-dimethylbutanediamide: superscript N locants not built
+        "CC(=O)N1CCCC1",      # amide N in a ring: the ring is not an N-substituent
+        "CC(=O)NCCCC",        # principal chain through the N-substituent, not the acyl carbon
+    ])
+    def test_out_of_scope_amide_fails_closed(self, smi):
+        mol, feats = _features(smi)
+        assert name_general_chain(mol, feats) is None

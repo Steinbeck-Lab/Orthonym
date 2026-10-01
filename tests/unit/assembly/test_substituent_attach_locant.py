@@ -165,7 +165,7 @@ class TestUnaffectedFormsUnchanged:
         ("propane", 3, "propyl"),
         ("pyridine", 0, "pyridinyl"),
         ("methanal", 1, "oxomethyl"),               #, one position
-        ("acetamide", 2, "carbamoylmethyl"),
+        ("acetamide", 2, "2-amino-2-oxoethyl"),  # method (1),:32940
     ])
     def test_genuinely_unlocated_forms_still_emit(self, parent, n, expected):
         assert parent_to_prefix(

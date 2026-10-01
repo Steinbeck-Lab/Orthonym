@@ -57,6 +57,25 @@ HETEROATOM_BRIDGE_PREFIXES: Dict[str, str] = {
     'N': 'epimino',
 }
 
+#: (the Blue Book-14110): these bridge prefixes are general nomenclature;
+#: the preselected (PIN) prefixes are 'sulfano', 'disulfano', 'selano', 'tellano' and 'azano',
+#: which OPSIN 2.9.0 cannot read, so a name that uses one of these is never certified a PIN.
+GENERAL_ONLY_BRIDGE_PREFIXES = frozenset({'epithio', 'epidithio', 'episeleno', 'epitelluro', 'epimino'})
+
+
+def _record_general_bridge(prefix: str) -> None:
+    """Record a general-nomenclature bridge prefix as a part that is never a PIN.
+
+    The record is name-scoped (``metrics.provenance.record_non_pin_fragment``): it
+    lowers the label of every shipped name that carries the prefix -- the bare
+    bridged parent and any larger name built on it -- and of no other name."""
+    if prefix in GENERAL_ONLY_BRIDGE_PREFIXES:
+        try:
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(prefix)
+        except Exception:  # a label record must never break naming
+            pass
+
 # Known fused ring parent names for lookup
 # Minimal set - extend as needed
 FUSED_PARENT_NAMES: Dict[str, str] = {
@@ -592,6 +611,10 @@ def get_bridge_prefix(bridge_info: Dict[str, Any]) -> str:
         key = (length, het)
         if key in BRIDGE_PREFIXES:
             return BRIDGE_PREFIXES[key]
+        # A heteroatom bridge without a tabulated prefix (-SiH2-, -Se-, -PH-,...)
+        # has no name here; the carbon table below would name it 'methano', a
+        # different molecule, so return no prefix and let the caller decline.
+        return ''
 
     # Carbon bridge by length
     key = (length, 'C')
@@ -677,6 +700,8 @@ def name_bridged_fused_system(mol):
     bridge_groups = defaultdict(list)
     for bridge in bridges:
         prefix = get_bridge_prefix(bridge)
+        if not prefix:
+            return None
         bridge_groups[prefix].append(bridge)
 
     # Build name parts
@@ -718,6 +743,8 @@ def name_bridged_fused_system(mol):
     else:
         name = parent_name
 
+    for prefix in bridge_groups:
+        _record_general_bridge(prefix)
     return (name, ring_atoms, core_numbering, False)
 
 
@@ -794,12 +821,12 @@ def name_bridged_fused_pin(mol):
         return None
     all_ring_atoms: Set[int] = set().union(*rings)
 
-    # Bare ring systems only: a substituent would be dropped (a wrong name), so
-    # fail closed if any heavy atom is outside the ring system. (Substituted
-    # bridged-fused is a documented G1 follow-on.)
+    # The bare-system paths below name bare ring systems only (a substituent would be
+    # dropped); a substituted system goes to the bridged fused PIN builder, which
+    # spells every substituent, suffix and stereodescriptor on its own numbering.
     heavy = {a.GetIdx() for a in mol.GetAtoms()}
     if heavy != all_ring_atoms:
-        return None
+        return _package_pin(mol)
 
     aromatic = {i for i in all_ring_atoms if mol.GetAtomWithIdx(i).GetIsAromatic()}
     if not aromatic:
@@ -809,7 +836,7 @@ def name_bridged_fused_pin(mol):
         # validates its OWN aromatic residual, so route straight to it; the
         # dihydro enumeration below needs an RDKit-aromatic residual and would
         # find nothing here.
-        return _try_mancude_bridged(mol, all_ring_atoms)
+        return _try_mancude_bridged(mol, all_ring_atoms) or _package_pin(mol)
 
     # Enumerate ALL candidate bridge excisions: connected subsets of NON-aromatic
     # ring atoms whose excision leaves a clean naphthalene residual ("clean" = the
@@ -837,7 +864,8 @@ def name_bridged_fused_pin(mol):
     if len(distinct) == 1:
         return results[0]
     if results:
-        return None  # ambiguous (>1 distinct) name — fail closed
+        # >1 distinct name (ethano vs etheno): (a)-(j) rank the excisions
+        return _package_pin(mol)
 
     # Wave-2 completion: the MANCUDE bridged classes — the
     # residual keeps its full aromatic system and the bridgeheads stay sp2
@@ -846,7 +874,15 @@ def name_bridged_fused_pin(mol):
     # 1,4-ethano-5,8-methanoanthracene (all BB verbatim). The dihydro path
     # above cannot see these (its bridge candidates are non-aromatic atoms
     # with sp3 bridgeheads); this path fires only when it found nothing.
-    return _try_mancude_bridged(mol, all_ring_atoms)
+    return _try_mancude_bridged(mol, all_ring_atoms) or _package_pin(mol)
+
+
+def _package_pin(mol):
+    """The bridged fused PIN builder (``rules/bridged_fused_pin``) for what the bare-system
+    paths above do not name: substituted systems, any hydrogenation state, bridges on a
+    fusion bond, and the excision ties ranks. None when it declines."""
+    from .bridged_fused_pin import build
+    return build(mol)
 
 
 def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring_atoms: Set[int]):
@@ -1015,6 +1051,7 @@ def _name_bridged_fused_excision(mol, bridge_atoms: Set[int], residual, all_ring
     name = '-'.join(parts) + base_name
     if base_name == 'acridine':
         name = f"9H-{name}"
+    _record_general_bridge(bridge_prefix)
 
     # atom_to_locant is a ring-MEMBERSHIP map only (not real IUPAC locants); harmless
     # because substituents_included=True makes the caller skip substituent enrichment.
@@ -1274,6 +1311,11 @@ def _validate_and_name_mancude(mol, components: List[Set[int]],
         prefix, locants = entries[0]
         name = f"{_format_locants(locants)}-{prefix}{base_name}"
 
+    # Defensive: the composition guard above admits a single -O- bridge only
+    # ('epoxy', preselected), so this path cannot spell a general-only prefix today;
+    # the record keeps the label right if that guard is widened.
+    for prefix, _locants in entries:
+        _record_general_bridge(prefix)
     atom_to_locant = {i: i + 1 for i in sorted(all_ring_atoms)}
     return (name, set(all_ring_atoms), atom_to_locant, True)
 
@@ -1295,7 +1337,9 @@ def has_aromatic_mancude_bridge(mol) -> bool:
     all_ring_atoms: Set[int] = set().union(*rings)
     heavy = {a.GetIdx() for a in mol.GetAtoms()}
     if heavy != all_ring_atoms:
-        return False  # bare ring systems only (substituted -> other paths)
+        # a substituted system: exempt it only when the bridged fused PIN builder
+        # names it (6-methyl-1,4-ethenonaphthalene)
+        return _package_pin(mol) is not None
     return _try_mancude_bridged(mol, all_ring_atoms) is not None
 
 
@@ -1639,7 +1683,7 @@ def _assemble_anthracene_two_bridge(entries: List[Tuple[str, List[int]]]):
         pair_lo = list(lo[:2])
         pair_hi = list(lo[2:])
         return (f"{_format_locants(pair_lo)}:{_format_locants(pair_hi)}"
-                f"-di{pa}")
+                f"-di{pa}anthracene")
 
     # cite alphanumerically, heteroatom bridge senior.
     senior_pfx = _order_two_bridges(entries)[0][0]

@@ -50,7 +50,7 @@ SIMPLE_N_SUBSTITUENT_CASES = [
     ("CC(=O)NCC", "N-ethylacetamide"),
     ("CC(=O)Nc1ccccc1", "N-phenylacetamide"),
     ("CC(=O)NCc1ccccc1", "N-benzylacetamide"),
-    ("CN(C)C=O", "N,N-dimethylformamide"),
+    ("CN(C)C=O", "dimethylformamide"),   # (the Blue Book), 'dimethylformamide (PIN)' (:32782); (:3007)
 ]
 
 

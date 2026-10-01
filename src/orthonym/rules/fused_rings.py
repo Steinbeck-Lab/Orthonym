@@ -17,6 +17,7 @@ IUPAC 2013 Rules for fused systems:
 Reference: IUPAC 2013 Blue Book, Section (Fused Ring Systems)
 """
 
+import re
 from collections import defaultdict, deque
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -474,6 +475,202 @@ def _saturation_indicated_h_sets(sat_atoms, adj):
     return []
 
 
+def _perfect_matching_pairs(nodes: frozenset, adj) -> Optional[List[Tuple[int, int]]]:
+    """One perfect matching of the induced subgraph on ``nodes`` as a list of
+    pairs (deterministic: lowest atom first), or ``None`` when there is none."""
+    if not nodes:
+        return []
+    v = min(nodes)
+    for w in sorted(adj[v]):
+        if w in nodes:
+            rest = _perfect_matching_pairs(nodes - {v, w}, adj)
+            if rest is not None:
+                return [(v, w)] + rest
+    return None
+
+
+def _catalogued_mancude_parent(mol, ring_atom_set: Set[int], hydro_atoms,
+                               adj) -> Optional[Tuple[str, Dict[int, Any]]]:
+    """ (the Blue Book): the hydro prefixes of a partially
+    saturated fused system express the hydrogenation of its MANCUDE parent ring
+    system, so the parent is named as the mancude system itself is named.
+
+    Builds the mancude twin of the ring system -- the input's ring skeleton with
+    one double bond put back on each pair of a perfect matching of the hydro atoms
+    (every other ring atom, its hydrogen and its charge kept) -- and names it with
+    the fused ring catalogue (retained names,, and the benzo names of
+    : quinoline, 1H-indole, 2-benzofuran, 1,8-naphthyridine,...).
+
+    Returns ``(parent name, {input atom -> locant})`` or ``None`` (no perfect
+    matching, a ring atom with an exocyclic double bond, the twin does not
+    sanitize, or the catalogue has no entry for it)."""
+    pairs = _perfect_matching_pairs(frozenset(hydro_atoms), adj)
+    if not pairs:
+        return None
+    ring_atom_set = set(ring_atom_set)
+    try:
+        kek = Chem.Mol(mol)
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+        bonds = [b.GetIdx() for b in kek.GetBonds()
+                 if b.GetBeginAtomIdx() in ring_atom_set
+                 and b.GetEndAtomIdx() in ring_atom_set]
+        amap: Dict[int, int] = {}
+        twin = Chem.RWMol(Chem.PathToSubmol(kek, bonds, atomMap=amap))
+        if set(amap) != ring_atom_set:
+            return None
+        for orig, idx in amap.items():
+            src = kek.GetAtomWithIdx(orig)
+            exo = 0
+            for b in src.GetBonds():
+                if b.GetOtherAtomIdx(orig) in ring_atom_set:
+                    continue
+                if b.GetBondType() != Chem.BondType.SINGLE:
+                    return None            # exocyclic =X: added-hydrogen territory
+                exo += 1
+            at = twin.GetAtomWithIdx(idx)
+            at.SetNoImplicit(True)
+            at.SetNumExplicitHs(int(src.GetTotalNumHs()) + exo)
+        for a, b in pairs:
+            twin.GetBondBetweenAtoms(amap[a], amap[b]).SetBondType(Chem.BondType.DOUBLE)
+            for x in (a, b):
+                at = twin.GetAtomWithIdx(amap[x])
+                if at.GetNumExplicitHs() < 1:
+                    return None
+                at.SetNumExplicitHs(at.GetNumExplicitHs() - 1)
+        twin_mol = twin.GetMol()
+        Chem.SanitizeMol(twin_mol)
+    except Exception:
+        return None
+    core = match_fused_heterocycle_core(twin_mol)
+    if core is None:
+        return None
+    name, twin_locants, _key = core
+    inv = {idx: orig for orig, idx in amap.items()}
+    numbering = {inv[i]: loc for i, loc in twin_locants.items() if i in inv}
+    if set(numbering) != ring_atom_set:
+        return None
+    return name, numbering
+
+
+_LEADING_IH = re.compile(r"^((?:\d+[a-z]?H)(?:,\d+[a-z]?H)*)-")
+
+
+def _leading_indicated_h(name: str) -> Set[str]:
+    """The indicated-hydrogen locants a catalogue name starts with
+    ('1H-benzimidazole' -> {'1'}; 'quinoline' -> set)."""
+    m = _LEADING_IH.match(name)
+    if not m:
+        return set()
+    return {part[:-1] for part in m.group(1).split(',')}
+
+
+def _unsaturated_part_indicated_h(mol, ring_atom_set: Set[int], sat: Set[int]):
+    """The ring atoms outside the saturated region that hold indicated hydrogen of
+    the mancude parent: no double bond in a Kekule structure of the input (a
+    pyrrole-type N, with H or a substituent). A divalent ring chalcogen (the O of
+    furan) is no indicated-hydrogen position. ``None`` when the input cannot be
+    kekulized (fail closed)."""
+    try:
+        kek = Chem.Mol(mol)
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return None
+    out = set()
+    for a in ring_atom_set:
+        if a in sat:
+            continue
+        at = kek.GetAtomWithIdx(a)
+        if any(b.GetBondType() == Chem.BondType.DOUBLE for b in at.GetBonds()):
+            continue
+        ring_deg = sum(1 for b in at.GetBonds() if b.GetOtherAtomIdx(a) in ring_atom_set)
+        if at.GetSymbol() in ('O', 'S', 'Se', 'Te') and ring_deg == 2:
+            continue
+        if at.GetSymbol() == 'N' and ring_deg == 3:
+            continue           # a fusion N (indolizine) holds no hydrogen
+        out.add(a)
+    return frozenset(out)
+
+
+def _mancude_indicated_h_count(mol, ring_atom_set: Set[int]) -> int:
+    """How many indicated hydrogen atoms the mancude form of this ring skeleton
+    takes: the ring atoms that can carry a ring double bond (C, and N, P, As, B with
+    two ring bonds), minus twice a maximum matching of them. Pyrrole 1, furan 0,
+    cyclopenta[c]pyridine 1, indolizine 0."""
+    ring_atom_set = set(ring_atom_set)
+
+    def _eligible(idx):
+        at = mol.GetAtomWithIdx(idx)
+        deg = sum(1 for b in at.GetBonds() if b.GetOtherAtomIdx(idx) in ring_atom_set)
+        sym = at.GetSymbol()
+        if sym == 'C':
+            return deg <= 3
+        return sym in ('N', 'P', 'As', 'B') and deg == 2
+
+    nodes = frozenset(a for a in ring_atom_set if _eligible(a))
+    adj = {a: {n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors()
+               if n.GetIdx() in nodes} for a in nodes}
+    memo: Dict[frozenset, int] = {}
+
+    def _max_matching(rest: frozenset) -> int:
+        if len(rest) < 2:
+            return 0
+        if rest in memo:
+            return memo[rest]
+        v = min(rest)
+        best = _max_matching(rest - {v})          # v unmatched
+        for w in adj[v]:
+            if w in rest:
+                best = max(best, 1 + _max_matching(rest - {v, w}))
+        memo[rest] = best
+        return best
+
+    return len(nodes) - 2 * _max_matching(nodes)
+
+
+def _record_non_pin_spelling(fragment: str) -> None:
+    """Record a name part this module built that is valid but never a PIN
+    (name-scoped: only a shipped name that carries it is labelled below PIN)."""
+    try:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(fragment)
+    except Exception:  # a label record must never break naming
+        pass
+
+
+def _first_cited_prefix_key(subs) -> tuple:
+    """ (g) (the Blue Book): the locants of the detachable prefixes taken
+    in alphanumerical citation order, so the prefix cited first gets the lowest."""
+    if not subs:
+        return ()
+    by_name: Dict[str, List[Any]] = defaultdict(list)
+    for name, locs in (subs.get('c_substituents') or {}).items():
+        by_name[name].extend(locs)
+    for other in subs.get('other') or ():
+        if 'locant' in other:
+            by_name[str(other.get('name', ''))].append(other['locant'])
+    return tuple(tuple(sorted(_fused_locant_num(l) for l in by_name[n]))
+                 for n in sorted(by_name, key=lambda n: n.lower()))
+
+
+def _substituent_placement(subs) -> tuple:
+    """A comparable record of which substituent sits on which locant (None -> )."""
+    if not subs:
+        return ()
+    out = []
+    for kind in ('c_substituents', 'suffix_groups'):
+        for name, locs in sorted((subs.get(kind) or {}).items()):
+            out.append((kind, name, tuple(sorted(str(l) for l in locs))))
+    for kind in ('oxo_substituents', 'amino_substituents'):
+        out.append((kind, tuple(sorted(str(l) for l in (subs.get(kind) or ())))))
+    for other in subs.get('other') or ():
+        out.append(('other', tuple(sorted((str(k), str(v)) for k, v in other.items()))))
+    for kind in sorted(k for k in subs if k not in (
+            'c_substituents', 'suffix_groups', 'oxo_substituents',
+            'amino_substituents', 'other')):
+        out.append((kind, repr(subs[kind])))
+    return tuple(sorted(out, key=repr))
+
+
 def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: str):
     """ a phase (full): name a partially-saturated 2-component ortho-fused
     mancude system as ``<hydro>-<indicatedH>-<mancude parent>`` /
@@ -571,13 +768,39 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
     if not ih_sets:
         return None
 
-    from .fusion_numbering import compute_fused_numbering
-    canonical = compute_fused_numbering(mol, ring_atom_set)
-    if not canonical:
+    # (the Blue Book): "In preferred IUPAC names, all indicated
+    # hydrogen atoms must be cited". The unsaturated part can hold the mancude
+    # parent's indicated hydrogen itself (the pyrrole-type N-H of
+    # '4,5,6,7-tetrahydro-1H-imidazo[4,5-c]pyridine'); it is cited with the name.
+    arom_ih = _unsaturated_part_indicated_h(mol, ring_atom_set, set(sat))
+    if arom_ih is None:
         return None
 
-    # --- 3. Substituents (case c). Suffix-forming groups need added
-    # indicated-H -> out of scope. Prefix-only proceeds. ---
+    # (:17026): the hydro prefixes go on the name of the MANCUDE parent.
+    # For each way of placing the indicated hydrogen in the saturated region
+    # (``ih_sets``), the mancude parent is the twin with one double bond restored on
+    # each hydro pair; its catalogue name ('quinoline', '1H-indole',
+    # '1H-benzimidazole') replaces a fusion name built from the saturated ring
+    # ('cyclohexa[b]pyridine',: the six-membered carbocyclic attached
+    # component is 'benzo'; 'benzo[d]imidazole',, with the catalogue's
+    # numbering and the indicated hydrogen its name carries. A twin the descriptor
+    # already names keeps the descriptor and its numbering.
+    from .fusion_numbering import compute_fused_numbering
+    options = []   # (parent name, numbering, the ih sets it may take, catalogue?)
+    for S in ih_sets:
+        _parent = _catalogued_mancude_parent(mol, ring_atom_set, set(sat) - set(S), adj)
+        if _parent is not None and _parent[0] != mancude_parent:
+            options.append((_parent[0], _parent[1], [S], True))
+    if not options:
+        canonical = compute_fused_numbering(mol, ring_atom_set)
+        if not canonical:
+            return None
+        options = [(mancude_parent, canonical, ih_sets, False)]
+
+    # --- 3. Substituents (case c). A suffix on a saturated position needs
+    # added hydrogen -> out of scope; a suffix on an atom of the unsaturated
+    # part takes the ring as it is examples: hydro prefixes with
+    # the suffix of the mancude parent). ---
     has_sub = any(at.GetIdx() not in ring_atom_set and at.GetAtomicNum() != 1
                   for at in mol.GetAtoms())
     if has_sub and not _exocyclic_atoms_accounted(mol, ring_atom_set):
@@ -588,48 +811,80 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
     canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
     atoms_by_rank = sorted(ring_atom_set, key=lambda a: canon_rank[a])
 
-    best = None  # (key, sig, cand, ih_set, substituents)
-    for perm in perms:
-        try:
-            cand = {a: _fused_locant_to_output(canonical[perm[a]])
-                    for a in ring_atom_set}
-        except KeyError:
-            continue
-        # sat carbons must map to plain-integer (non-fusion) locants
-        if any(_fused_locant_num(cand[a])[1] != 0 for a in sat):
-            continue
-        # choose the ih-set giving lowest (ih_locants, hydro_locants) here
-        best_ih = None
-        for S in ih_sets:
-            ihl = tuple(sorted(_fused_locant_num(cand[a]) for a in S))
-            hyl = tuple(sorted(_fused_locant_num(cand[a]) for a in sat if a not in S))
-            if best_ih is None or (ihl, hyl) < (best_ih[0], best_ih[1]):
-                best_ih = (ihl, hyl, S)
-        if best_ih is None:
-            continue
-        if has_sub:
-            subs = get_fused_heterocycle_substituents(mol, cand)
-            if (subs['suffix_groups'] or subs['oxo_substituents']
-                    or subs['amino_substituents']):
-                return None                     # territory -> fail closed
-            prefix_key = _fused_substituent_citation_key(subs)[1]
-        else:
-            subs, prefix_key = None, ()
-        key = (best_ih[0], best_ih[1], prefix_key)
-        sig = tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank)
-        if best is None or (key, sig) < (best[0], best[1]):
-            best = (key, sig, cand, best_ih[2], subs)
+    best = None  # (key, sig, cand, ih_set, substituents, parent name, catalogue?)
+    for parent_name, canonical, sets, from_catalogue in options:
+        named_ih = _leading_indicated_h(parent_name) if from_catalogue else None
+        for perm in perms:
+            try:
+                cand = {a: _fused_locant_to_output(canonical[perm[a]])
+                        for a in ring_atom_set}
+            except KeyError:
+                continue
+            # sat carbons must map to plain-integer (non-fusion) locants
+            if any(_fused_locant_num(cand[a])[1] != 0 for a in sat):
+                continue
+            # choose the ih-set giving lowest (ih_locants, hydro_locants) here
+            best_ih = None
+            for S in sets:
+                ih_atoms = set(S) | arom_ih
+                if from_catalogue and named_ih != {str(cand[a]) for a in ih_atoms}:
+                    continue   # the catalogue name's indicated hydrogen is not this one
+                ihl = tuple(sorted(_fused_locant_num(cand[a]) for a in ih_atoms))
+                hyl = tuple(sorted(_fused_locant_num(cand[a]) for a in sat if a not in S))
+                if best_ih is None or (ihl, hyl) < (best_ih[0], best_ih[1]):
+                    best_ih = (ihl, hyl, S)
+            if best_ih is None:
+                continue
+            if has_sub:
+                subs = get_fused_heterocycle_substituents(mol, cand)
+                sat_locs = {str(cand[a]) for a in sat}
+                suffix_locs = {str(loc) for locs in subs['suffix_groups'].values()
+                               for loc in locs}
+                suffix_locs |= {str(loc) for loc in subs['amino_substituents']}
+                if subs['oxo_substituents'] or suffix_locs & sat_locs:
+                    return None                 # territory -> fail closed
+                suffix_key, prefix_key = _fused_substituent_citation_key(subs)
+            else:
+                subs, suffix_key, prefix_key = None, (), ()
+            # (the Blue Book): (b) indicated hydrogen (:3246), (c) suffixes
+            # (:3256), (e) hydro prefixes (:3288-:3289), (f) detachable prefixes (:3301),
+            # in this order ('5,6,7,8-tetrahydroquinoxaline-2-carboxylic acid', not -3-).
+            # then (g) (:3307): lowest locants for the prefix cited first in the name.
+            key = (best_ih[0], suffix_key, best_ih[1], prefix_key,
+                   _first_cited_prefix_key(subs))
+            sig = tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank)
+            placement = _substituent_placement(subs)
+            if best is None or key < best[0]:
+                best = (key, sig, cand, best_ih[2], subs, parent_name, from_catalogue)
+                tied_placements = {placement}
+            elif key == best[0]:
+                tied_placements.add(placement)
+                if sig < best[1]:
+                    best = (key, sig, cand, best_ih[2], subs, parent_name, from_catalogue)
     if best is None:
+        return None
+    # A tie that (b)-(g) leave between numberings that place the substituents
+    # differently fails closed; the best-effort tiers keep their own name for the
+    # molecule.
+    if len(tied_placements) > 1:
         return None
 
     # --- 5. Assemble '<hydro>-<indicatedH>-<mancude parent>' ---
-    _key, _sig, cand, ih_set, subs = best
-    # Task C fail-closed: a saturated N admitted above may only be a HYDRO atom.
-    # If the chosen partition would cite a nitrogen as INDICATED hydrogen, the
-    # pyrrole-vs-pyridine ambiguity the old defer guarded against is live for
-    # THIS system -- defer to the legacy path rather than risk a wrong
-    # constitution. (Carbon indicated-H, the common ``5H`` case, is unaffected.)
-    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in ih_set):
+    _key, _sig, cand, ih_set, subs, mancude_parent, from_catalogue = best
+    # Task C fail-closed: a saturated N admitted above may only be a HYDRO atom,
+    # unless the catalogue name of the mancude twin carries that indicated hydrogen
+    # itself (1H-benzimidazole). Otherwise, if the chosen partition would cite a
+    # nitrogen as INDICATED hydrogen, the pyrrole-vs-pyridine ambiguity the old
+    # defer guarded against is live for THIS system -- defer to the legacy path
+    # rather than risk a wrong constitution. (Carbon indicated-H, the common ``5H``
+    # case, is unaffected.)
+    if not from_catalogue and any(
+            mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in ih_set):
+        return None
+    # An indicated hydrogen of the unsaturated part and one of the saturated region
+    # together are more than the descriptor-named parent takes; the catalogue checks
+    # its own name above.
+    if not from_catalogue and ih_set and arom_ih:
         return None
     hydro_atoms = [a for a in sat if a not in ih_set]
     if not hydro_atoms:
@@ -639,10 +894,11 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
         return None                             # >10 hydro -> defer
     hydro_locs = sorted((cand[a] for a in hydro_atoms), key=_fused_locant_num)
     hydro_prefix = f"{','.join(str(l) for l in hydro_locs)}-{mult}hydro"
-    if ih_set:
+    cited_ih = set() if from_catalogue else (set(ih_set) | arom_ih)
+    if cited_ih:
         ih_prefix = ','.join(
             f"{cand[a]}H"
-            for a in sorted(ih_set, key=lambda a: _fused_locant_num(cand[a]))
+            for a in sorted(cited_ih, key=lambda a: _fused_locant_num(cand[a]))
         )
         parent = f"{hydro_prefix}-{ih_prefix}-{mancude_parent}"
     elif mancude_parent[0].isalpha():
@@ -846,6 +1102,14 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if indicated_h:
         h_parts = ','.join(str(loc) + 'H' for loc in indicated_h)
         name = f"{h_parts}-{lam_prefix}{name}"
+        # (the Blue Book): indicated hydrogen tells apart the
+        # isomers of the MANCUDE parent; (:17026): the degree of
+        # hydrogenation is given by 'hydro' prefixes ('6,7-dihydro-5H-benzo[7]annulene
+        # (PIN)',:17032). More indicated hydrogen than the mancude parent takes
+        # ('5H,6H,7H,8H,9H-cyclohepta[b]pyridine', '1H,2H,3H-benzo[d]imidazole') is
+        # a saturated region spelled as indicated hydrogen: valid, never the PIN.
+        if len(indicated_h) > _mancude_indicated_h_count(mol, ring_atom_set):
+            _record_non_pin_spelling(name[:-1] if name.endswith('e') else name)
     elif lam_prefix:
         name = f"{lam_prefix}{name}"
 

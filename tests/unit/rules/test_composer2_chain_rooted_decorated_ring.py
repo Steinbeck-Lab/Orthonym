@@ -41,12 +41,14 @@ def test_best_effort_names_decorated_ring_on_chain(smi, expected):
     assert name_substituent(m, frag, fv, allow_mancude=True) == expected
 
 
-@pytest.mark.parametrize("smi,_expected", BEST_EFFORT_CASES)
-def test_pin_default_unchanged_byte_identical(smi, _expected):
-    # PIN default must NOT gain these (best-effort-only scope -> 0 gold risk):
-    # a multi-atom ring decoration keeps the historical sentinel refusal.
+@pytest.mark.parametrize("smi,expected", BEST_EFFORT_CASES)
+def test_pin_default_names_decorated_ring_on_chain(smi, expected):
+    # The multi-atom ring decoration folds at the PIN tier too (PIN class program
+    # Task 2): (the Blue Book) names a substituted benzyl group as
+    # the ring-yl on its carrier, 'carboxy(4-carboxyphenyl)methylidene (preferred
+    # prefix)' (:16330). The ring-yl is still built by the strict ring producers.
     m, frag, fv = _frag(smi)
-    assert name_substituent(m, frag, fv, allow_mancude=False) == "substituent"
+    assert name_substituent(m, frag, fv, allow_mancude=False) == expected
 
 
 # regressions that must keep working (degree-1 decoration folds at BOTH tiers;

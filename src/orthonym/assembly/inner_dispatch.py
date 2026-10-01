@@ -411,6 +411,20 @@ def dispatch_inner(
         # mutates its own dict.
         _stats = _get_stats_dict()
         _stats[entry.handler_id] = _stats.get(entry.handler_id, 0) + 1
+        # (the Blue Book) with (:18158): when urea is
+        # senior to the perceived principal group, the PIN is a urea name. Any other
+        # handler's name for such a molecule (the urea handler declined, or never
+        # ran) is correct but not the PIN: it is labelled below the PIN, the name is
+        # kept -- '3-[(methylcarbamoyl)amino]propanenitrile' for the urea
+        # "N-(2-cyanoethyl)-N'-methylurea".
+        if (entry.handler_id != "urea"
+                and getattr(features, "principal_group", None) is not None):
+            from .handlers.urea import urea_parent_expected
+            if urea_parent_expected(features):
+                _junior = getattr(result, "name", None)
+                if _junior:
+                    from ..metrics.provenance import record_non_pin_label
+                    record_non_pin_label(_junior)
         return InnerDispatchResult(
             handler_id=entry.handler_id,
             handler=entry.handler,
@@ -1154,6 +1168,25 @@ _register_inner(
     handler=name_nitrite_ester,
     iupac_section="P-67",
     description="Nitrite ester (<alkyl> nitrite) functional-class handler (WSD-05)",
+    side_effect_inventory=(),  # predicate purity invariant
+)
+
+# --- nitrate_ester functional-class '<organyl> nitrate').
+# Priority 2962 in the specialty-intercept tier, beside nitrite_ester.
+# Fires only for one nitric-acid ester group and no principal group, so a
+# molecule with a senior group keeps the 'nitrooxy' prefix.
+from .handlers.nitrate_ester import (  # noqa: E402
+    _is_nitrate_ester,
+    name_nitrate_ester,
+)
+
+_register_inner(
+    handler_id="nitrate_ester",
+    priority=2962,
+    predicate=_is_nitrate_ester,
+    handler=name_nitrate_ester,
+    iupac_section="P-67.1.3.2",
+    description="Nitrate ester (<alkyl> nitrate) functional-class handler",
     side_effect_inventory=(),  # predicate purity invariant
 )
 

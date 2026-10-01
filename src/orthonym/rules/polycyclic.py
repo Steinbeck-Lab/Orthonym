@@ -114,7 +114,13 @@ def fusion_nomenclature_applies(mol, ring_atoms) -> bool:
     A cluster is grown along rings that share exactly one bond (ortho-fusion); every
     ring in it must meet every other ring in at most one atom or exactly one bond, as
     in a fused ring system. Smallest rings come from RDKit's symmetrized SSSR. A miss
-    only leaves a label as it was; it never changes a name."""
+    only leaves a label as it was; it never changes a name.
+
+    A cluster that holds every ring atom while the system has more rings than the
+    cluster closes those rings by bonds only. (:14025): "An atom or group of
+    atoms is named as a bridge", so such a cluster gives no bridged fused name (a decalin
+    with a cyclobutane closed across it, tricyclo[4.4.0.0^5,10]decane); the search goes on
+    for a cluster that leaves a bridge atom or is the whole system."""
     ring_atoms = frozenset(ring_atoms)
 
     def _fresh():
@@ -124,6 +130,28 @@ def fusion_nomenclature_applies(mol, ring_atoms) -> bool:
             if fr <= ring_atoms and fr not in rings:
                 rings.append(fr)
         n = len(rings)
+        # the number of rings of the system (bonds - atoms + components)
+        n_bonds = sum(1 for b in mol.GetBonds()
+                      if b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms)
+        n_comp, seen = 0, set()
+        for start in ring_atoms:
+            if start in seen:
+                continue
+            n_comp += 1
+            todo = [start]
+            seen.add(start)
+            while todo:
+                cur = todo.pop()
+                for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    k = nb.GetIdx()
+                    if k in ring_atoms and k not in seen:
+                        seen.add(k)
+                        todo.append(k)
+        cycle_rank = n_bonds - len(ring_atoms) + n_comp
+
+        def _leaves_a_bridge_atom_or_is_whole(cluster):
+            covered = frozenset().union(*(rings[k] for k in cluster))
+            return covered != ring_atoms or len(cluster) >= cycle_rank
 
         def _one_bond(i, j):
             s = rings[i] & rings[j]
@@ -147,7 +175,7 @@ def fusion_nomenclature_applies(mol, ring_atoms) -> bool:
                         continue
                     if not all(_compatible(j, k) for k in path):
                         continue
-                    if len(rings[j]) >= 5:
+                    if len(rings[j]) >= 5 and _leaves_a_bridge_atom_or_is_whole(path + (j,)):
                         return True
                     if len(path) < 8:
                         stack.append((j, path + (j,)))

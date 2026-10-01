@@ -448,7 +448,9 @@ def test_chalcogen_urea_retained_parents(namer, smiles, expected):
     ("CNC(=O)N", "methylurea"),
     ("CC(C)(C)NC(=O)N", "tert-butylurea"),
     ("CNC(=O)NC", "N,N'-dimethylurea"),
-    ("CC(C)(C)NC(=O)NC1CCCCC1", "N-cyclohexyl-N'-tert-butylurea"),
+    # alphanumerical order (the Blue Book) files 'tert-butyl' under
+    # 'b': '4-butyl-4-tert-butylcyclohexan-1-ol (PIN)' (:3463).
+    ("CC(C)(C)NC(=O)NC1CCCCC1", "N-tert-butyl-N'-cyclohexylurea"),
     ("NC(=O)NCCC(=O)O", "3-(carbamoylamino)propanoic acid"),
     ("CNC(=O)NCCC(=O)O", "3-[(methylcarbamoyl)amino]propanoic acid"),
     ("CN(C)C(=O)NCCC(=O)O", "3-[(dimethylcarbamoyl)amino]propanoic acid"),

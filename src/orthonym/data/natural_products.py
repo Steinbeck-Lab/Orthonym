@@ -48,6 +48,9 @@ NATURAL_PRODUCT_SCAFFOLDS = {
     },
 
     # ---- Alkaloids (8 scaffolds) ----
+    # Names as (a) spells them (the Blue Book-:51404):
+    # 'morphinan', 'cinchonan', 'ajmalan', 'berbine', 'aporphine', 'ergoline',
+    # 'aconitane', 'tropane'.
     "c1ccc2c(c1)C[C@H]1NCC[C@@]23CCCC[C@@H]13": {
         "name": "morphinan", "stem": "morphin", "class": "alkaloid",
     },
@@ -55,7 +58,7 @@ NATURAL_PRODUCT_SCAFFOLDS = {
         "name": "tropane", "stem": "trop", "class": "alkaloid",
     },
     "C=C[C@H]1C[N@@]2CC[C@H]1C[C@@H]2Cc1ccnc2ccccc12": {
-        "name": "cinchonane", "stem": "cinchon", "class": "alkaloid",
+        "name": "cinchonan", "stem": "cinchon", "class": "alkaloid",
     },
     "CN1CCc2cccc3c2C1Cc1ccccc1-3": {
         "name": "aporphine", "stem": "aporphin", "class": "alkaloid",
@@ -67,13 +70,13 @@ NATURAL_PRODUCT_SCAFFOLDS = {
     "C1C[C@H]2CN[C@@H]3[C@@H]4C[C@H]2[C@@]3(C1)[C@@H]1C[C@@H]2CC[C@H]4[C@H]1C2": {
         "name": "aconitane", "stem": "aconit", "class": "alkaloid",
     },
-    # Berberine scaffold (a phase -- OPSIN entry)
+    # Berbine scaffold (a phase -- OPSIN entry)
     "c1ccc2c(c1)CC1c3ccccc3CCN1C2": {
-        "name": "berberine", "stem": "berbin", "class": "alkaloid",
+        "name": "berbine", "stem": "berbin", "class": "alkaloid",
     },
-    # Ajmaline scaffold (a phase -- OPSIN entry)
+    # Ajmalan scaffold (a phase -- OPSIN entry)
     "CC[C@@H]1CN2[C@H]3C[C@]45C[C@H]3[C@H]1C[C@H]2[C@@H]4N(C)c1ccccc15": {
-        "name": "ajmaline", "stem": "ajmal", "class": "alkaloid",
+        "name": "ajmalan", "stem": "ajmal", "class": "alkaloid",
     },
 
     # ---- Terpene scaffolds ----
@@ -169,7 +172,7 @@ NATURAL_PRODUCT_DERIVATIVES = {
     "CC[C@]12CCCN3CCc4c(n(c5ccccc45)CC1)[C@@H]32": "vincane",
     "C/C=C1/CN2[C@H]3C[C@@H]1[C@@H](C)[C@@H]2Cc1c3[nH]c2ccccc12": "sarpagan",
     "C1=C2CN3CC[C@]45c6ccccc6N6CC[C@H](OC1)[C@@H]([C@H]64)[C@H]2C[C@H]35": "strychnidine",
-    "C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6": "hetisane",
+    "C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6": "hetisan",
     # W8-P7a.2b clean saturated CHN alkaloid parent hydrides (Table 10.1a) —
     # two-source verified (PubChem + NCI CACTUS, full InChIKey); OPSIN-unparseable
     # -> name-exact. Analogs of the yohimban/aspidospermidine class above. Several
@@ -411,7 +414,7 @@ NAME_EXACT_NP_PARENTS = frozenset({
     "abietane", "kaurane", "taxane", "lupane", "oleanane", "ursane", "lanostane", "hopane",
     "gammacerane", "eudesmane", "cadinane", "guaiane", "germacrane", "pimarane", "gibbane",
     "beyerane", "atisane", "labdane", "dammarane", "cucurbitane", "yohimban", "sparteine",
-    "ibogamine", "aspidospermidine", "vincane", "sarpagan", "strychnidine", "hetisane",
+    "ibogamine", "aspidospermidine", "vincane", "sarpagan", "strychnidine", "hetisan",
     # Wave-8 P7a.2: complex diterpene/triterpene parents (Table 10.1c) — two-source verified.
     "podocarpane", "protostane", "grayanotoxane", "rosane",
     # Wave-8 P7a.2b: clean CHN alkaloid parent hydrides (Table 10.1a) — two-source verified.

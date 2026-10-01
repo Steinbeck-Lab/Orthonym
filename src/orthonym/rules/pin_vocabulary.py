@@ -308,7 +308,11 @@ def _ortho_fused_von_baeyer(m) -> bool:
 # has a bridged fused name, which is the PIN -- 'tricyclo[5.2.1.0^2,6]
 # decane' (a 4,7-methanoindene). Systems with non-zero secondary bridges are not
 # read (not flagged); a system with no such fused pair ('bicyclo[2.2.1]heptane',
-# 'tricyclo[2.2.1.0^2,6]heptane') keeps its von Baeyer name.
+# 'tricyclo[2.2.1.0^2,6]heptane') keeps its von Baeyer name. A fused pair that holds
+# every atom of a system with more rings closes the other rings by bonds only, and
+# (:14025) "An atom or group of atoms is named as a bridge": no bridged
+# fused name from that pair ('tricyclo[4.4.0.0^5,10]decane', a decalin with a
+# cyclobutane closed across it, keeps its von Baeyer name).
 
 
 def _bridged_fused_von_baeyer(m) -> bool:
@@ -346,6 +350,7 @@ def _bridged_fused_von_baeyer(m) -> bool:
         rings = [set(r) for r in Chem.GetSymmSSSR(mol)]
     except Exception:  # noqa: BLE001 - an unparsable descriptor is not flagged
         return False
+    n_rings = mol.GetNumBonds() - mol.GetNumAtoms() + 1
     for i in range(len(rings)):
         for j in range(i + 1, len(rings)):
             if len(rings[i]) < 5 or len(rings[j]) < 5:
@@ -354,8 +359,71 @@ def _bridged_fused_von_baeyer(m) -> bool:
             if len(shared) == 2:
                 x, y = shared
                 if mol.GetBondBetweenAtoms(x, y) is not None:
+                    if len(rings[i] | rings[j]) == mol.GetNumAtoms() and n_rings > 2:
+                        # the other rings are closed by bonds only: no bridged fused
+                        # name from this pair, so the von Baeyer name can be the PIN,
+                        # but only in the form of its descriptor
+                        if not _vb_superscripts_lowest(m):
+                            return True
+                        continue
                     return True
     return False
+
+
+def _vb_superscripts_lowest(m) -> bool:
+    """ (the Blue Book): "The superscript locants for the secondary
+    bridges must be as low as possible when considered as a set in ascending numerical
+    order". True when the descriptor's zero-atom secondary bridges carry the lowest
+    superscript set over every numbering of its own bicyclic system [a.b.c] (main ring
+    and main bridge numbered as numbers them); False when a lower set exists or
+    the descriptor has a secondary bridge with atoms (not judged here)."""
+    a, b, c = int(m.group(1)), int(m.group(2)), int(m.group(3))
+    secondary = [(int(n), int(x), int(y))
+                 for n, x, y in _VB_SECONDARY.findall(m.group(4) or "")]
+    if not secondary or any(n != 0 for n, _, _ in secondary):
+        return False
+    try:
+        from rdkit import Chem
+        main = a + b + 2
+        rw = Chem.RWMol()
+        for _ in range(main + c):
+            atom = Chem.Atom(6)
+            atom.SetNoImplicit(True)
+            rw.AddAtom(atom)
+        for i in range(main):
+            rw.AddBond(i, (i + 1) % main, Chem.BondType.SINGLE)
+        prev = 0
+        for k in range(c):
+            rw.AddBond(prev, main + k, Chem.BondType.SINGLE)
+            prev = main + k
+        if rw.GetBondBetweenAtoms(prev, a + 1) is None:
+            rw.AddBond(prev, a + 1, Chem.BondType.SINGLE)
+        bicyclic = rw.GetMol()
+        bicyclic.UpdatePropertyCache(strict=False)
+        Chem.FastFindRings(bicyclic)
+        for _, x, y in secondary:
+            if not (1 <= x <= main + c and 1 <= y <= main + c):
+                return False
+            if rw.GetBondBetweenAtoms(x - 1, y - 1) is None:
+                rw.AddBond(x - 1, y - 1, Chem.BondType.SINGLE)
+        system = rw.GetMol()
+        system.UpdatePropertyCache(strict=False)
+        Chem.FastFindRings(system)
+        main_bonds = {frozenset((bd.GetBeginAtomIdx(), bd.GetEndAtomIdx()))
+                      for bd in bicyclic.GetBonds()}
+        own = sorted(v for _, x, y in secondary for v in (x, y))
+        for emb in system.GetSubstructMatches(bicyclic, uniquify=False, useChirality=False,
+                                              maxMatches=10000):
+            locant = {s: q + 1 for q, s in enumerate(emb)}
+            sup = sorted(locant[e] for bd in system.GetBonds()
+                         for e in (bd.GetBeginAtomIdx(), bd.GetEndAtomIdx())
+                         if frozenset((locant[bd.GetBeginAtomIdx()] - 1,
+                                       locant[bd.GetEndAtomIdx()] - 1)) not in main_bonds)
+            if sup < own:
+                return False
+        return True
+    except Exception:  # noqa: BLE001 - an unparsable descriptor is not judged
+        return False
 
 # (a) (the Blue Book): hyphens separate locants from words. A letter
 # (or a closing bracket) followed directly by a digit ('2,2-dimethyl3,4-dihydro',
@@ -472,6 +540,14 @@ def _di_compound(name: str) -> Optional[str]:
 # '2,2'-azanediyldiacetic acid' -- so an acetic acid (acetate) parent carrying a
 # 'carboxymethyl' (another acetic acid unit) is not the PIN spelling.
 _CARBOXYMETHYL_ON_ACETIC = re.compile(r"carboxymethyl.*acet(?:ic acid|ate)$")
+
+# (the Blue Book, a -CO-NH2 group that is not the suffix):
+# "For generation of IUPAC preferred names, method (1) is preferred for chains"
+# (:32928) -- 'amino' and 'oxo' on the terminal atom of the carbon chain: '5-(2-
+# amino-2-oxoethyl)furan-2-carboxylic acid (PIN)' (:32940), not '(2) 5-(carbamoyl
+# methyl)furan-2-carboxylic acid' (:32941). A (substituted) carbamoyl cited on a
+# 'methyl' carrier is that carbon chain written by method (2).
+_CARBAMOYL_ON_METHYL = re.compile(r"carbamoyl[)\]}]*methyl")
 
 # (the Blue Book, "if any locants are essential for defining the
 # structure of the parent structure... then all locants must be cited") with
@@ -605,7 +681,7 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
                _UNRETAINED_C1C2_ACID, _ACYLAMINO, _ALKAN_1_YL, _MISSING_HYPHEN,
                _UNCONTRACTED_OXY, _METHYL_ON_ETHYL, _ADAMANTANE_VB, _DIOXIDANYL,
                _OXO_ALKYL_ACYL, _UNENCLOSED_COMPOUND, _UNENCLOSED_ELEMENT_LOCANT,
-               _GEMINAL_N_N_PRIME_MULTIPLIED, _UNLOCANTED_RING_YL):
+               _GEMINAL_N_N_PRIME_MULTIPLIED, _UNLOCANTED_RING_YL, _CARBAMOYL_ON_METHYL):
         m = rx.search(name)
         if m:
             return m.group(0)
@@ -645,6 +721,111 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
     return _duplicated_stereo_locant(name)
 
 
+def identical_parent_units(mol, sys_a, sys_b) -> bool:
+    """False only when two ring systems of the same skeleton are shown NOT to be
+    identical parent units of a multiplicative name; True otherwise (identical, or
+    undecidable here: the caller keeps treating them as a multiplicative candidate).
+
+     "Preferred IUPAC multiplicative names" (the Blue Book): a
+    multiplicative PIN needs "(2) the multiplicative groups, other than the central
+    multiplicative group, are symmetrically substituted; and (3) the locants of all
+    substituent groups on the identical parent structures, including suffix groups,
+    are identical" (:23183-23184); "all substituent groups, including the principal
+    characteristic groups must be identical and have the same locant" (:23186). When
+    they are not, "preferred IUPAC names are generated by substitutive nomenclature"
+    ,:6231): '4-chloro-2-[(3-cyanophenyl)methyl]benzonitrile (PIN)'
+    (:6235), '1-bromo-3-[(3-chlorophenyl)methyl]benzene (PIN)' (:6279); units that
+    differ only in configuration are not identical either (:22587).
+
+    A unit is its ring system with every atom still connected to it once the atoms
+    of the shortest path to the other system (the linker) are removed; the linker
+    atom next to the unit is written as a dummy atom, so the attachment position is
+    part of the comparison. Units whose canonical isomeric SMILES differ are not
+    identical. Undecidable (True): the systems are bonded directly (a ring
+    assembly), the two units share an atom (a second path joins them), or any
+    error."""
+    return _unit_identity(mol, sys_a, sys_b) is not False
+
+
+def _unit_identity(mol, sys_a, sys_b, out=None):
+    """True / False when the two decorated units are / are not identical (see
+    ``identical_parent_units``); None when undecidable here (a ring assembly, units
+    joined by a second path, no path, an error). ``out`` (a dict), when given,
+    receives ``linker`` (the atoms of the shortest path between the two systems,
+    outside them) and ``units`` once they are known."""
+    try:
+        from rdkit import Chem
+
+        sys_a, sys_b = set(sys_a), set(sys_b)
+        if sys_a & sys_b:
+            return None
+        # breadth-first from every atom of A to the first atom of B
+        prev = {a: None for a in sys_a}
+        frontier = list(sys_a)
+        hit = None
+        while frontier and hit is None:
+            nxt = []
+            for cur in frontier:
+                for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    ni = nb.GetIdx()
+                    if ni in prev:
+                        continue
+                    prev[ni] = cur
+                    if ni in sys_b:
+                        hit = ni
+                        break
+                    nxt.append(ni)
+                if hit is not None:
+                    break
+            frontier = nxt
+        if hit is None:
+            return None
+        path = [hit]
+        while prev[path[-1]] is not None:
+            path.append(prev[path[-1]])
+        path.reverse()                     # A-atom, linker..., B-atom
+        linker = [i for i in path if i not in sys_a and i not in sys_b]
+        if not linker:
+            return None                    # directly bonded: a ring assembly
+        if out is not None:
+            out["linker"] = list(linker)
+        cut = set(linker)
+
+        def unit(seed_sys):
+            seen, stack = set(seed_sys), list(seed_sys)
+            while stack:
+                cur = stack.pop()
+                for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    ni = nb.GetIdx()
+                    if ni not in seen and ni not in cut:
+                        seen.add(ni)
+                        stack.append(ni)
+            return seen
+
+        unit_a, unit_b = unit(sys_a), unit(sys_b)
+        if out is not None:
+            out["units"] = (unit_a, unit_b)
+        if unit_a & unit_b:
+            return None
+
+        def key(unit_atoms, dummy_idx):
+            rw = Chem.RWMol(mol)
+            d = rw.GetAtomWithIdx(dummy_idx)
+            d.SetAtomicNum(0)
+            d.SetFormalCharge(0)
+            d.SetIsotope(0)
+            d.SetNoImplicit(True)
+            d.SetNumExplicitHs(0)
+            d.SetIsAromatic(False)
+            rw.UpdatePropertyCache(strict=False)
+            return Chem.MolFragmentToSmiles(rw, atomsToUse=sorted(unit_atoms | {dummy_idx}),
+                                            canonical=True, isomericSmiles=True)
+
+        return key(unit_a, linker[0]) == key(unit_b, linker[-1])
+    except Exception:  # noqa: BLE001 - unknown
+        return None
+
+
 def multiplicative_candidate(mol) -> bool:
     """True when the molecule may take a multiplicative PIN, so a
     substitutive name built by the PIN tier's re-run is not known to be its PIN.
@@ -661,7 +842,9 @@ def multiplicative_candidate(mol) -> bool:
       '(1-chloro-2-phenylethyl)benzene'.
     A skeleton that is only a substituent of a senior parent ('2,5-bis[(4-methoxy
     phenyl)methyl]-4-methylpyrimidine') or a principal group on the linking chain
-    ('bis(4-chlorophenyl)methanol') does not count. Fails closed (True) on error.
+    ('bis(4-chlorophenyl)methanol') does not count, nor do exactly two ring systems
+    that ``identical_parent_units`` shows are not identically substituted units
+     conditions (2) and (3)). Fails closed (True) on error.
     """
     try:
         from rdkit import Chem
@@ -713,6 +896,12 @@ def multiplicative_candidate(mol) -> bool:
             for members in repeated.values():
                 idx = {i for i, sy in enumerate(systems) if any(sy is x for x in members)}
                 if len(idx & set(owner)) >= 2:
+                    # (2)/(3): two units that are not identically
+                    # substituted give no multiplicative PIN
+                    # ('4-chloro-2-[(3-cyanophenyl)methyl]benzonitrile',:6235)
+                    if (len(members) == 2
+                            and not identical_parent_units(mol, members[0], members[1])):
+                        continue
                     return True
             return False
 
@@ -721,10 +910,147 @@ def multiplicative_candidate(mol) -> bool:
             n_rings = sum(1 for r in rings if r <= sy)
             return ('N' in syms, bool(syms - {'C'}), n_rings, len(sy))
         top = max(seniority(sy) for sy in systems)
-        return any(seniority(v[0]) == top for v in repeated.values())
+        return any(seniority(v[0]) == top
+                   and not (len(v) == 2 and not identical_parent_units(mol, v[0], v[1]))
+                   for v in repeated.values())
     except Exception:  # noqa: BLE001 - unknown: do not claim the PIN
         return True
 
+
+
+def _carbamate_ester_pattern():
+    from rdkit import Chem
+    return Chem.MolFromSmarts("[#7;!R]-[CX3;!R](=O)-[OX2;!R]-[#6]")
+
+
+_CARBAMATE_ESTER = _carbamate_ester_pattern()
+
+
+def _linker_sequence(mol, linker, start_system) -> tuple:
+    """The linker read from one unit: (element, aromatic, bond order from the
+    previous atom) for each atom, the first bond being the one to the unit."""
+    seq = []
+    prev = None
+    for a in linker:
+        atom = mol.GetAtomWithIdx(a)
+        if prev is None:
+            bond = next((mol.GetBondBetweenAtoms(a, x) for x in start_system
+                         if mol.GetBondBetweenAtoms(a, x) is not None), None)
+        else:
+            bond = mol.GetBondBetweenAtoms(prev, a)
+        seq.append((atom.GetSymbol(), atom.GetIsAromatic(),
+                    bond.GetBondTypeAsDouble() if bond is not None else None))
+        prev = a
+    return tuple(seq)
+
+
+def multiplicative_pin_expected(mol) -> bool:
+    """True when the molecule's PIN is a multiplicative name, so no other name built
+    for it is its PIN.
+
+     "Preferred IUPAC multiplicative names" (the Blue Book):
+    "Multiplicative nomenclature is preferred to substitutive nomenclature for
+    generating preferred IUPAC names to express multiple occurrences of identical
+    parent structures, other than alkanes when (1) the linking bonds... are
+    identical and (2) the multiplicative groups... are symmetrically substituted;
+    and (3) the locants of all substituent groups on the identical parent structures,
+    including suffix groups, are identical" (:23180-23184); '1,1'-oxybis(4-bromo
+    benzene) (PIN)',:6186); esters of such parents follow it
+    ,:31790, 'dimethyl butanedioylbis(oxy-2,1-phenylene)
+    dibutanedioate (PIN)',:31806).
+
+    Narrower than ``multiplicative_candidate`` (which also answers True when it
+    cannot decide): the molecule has a principal characteristic group (or, which the
+    perception does not report, an N-substituted carbamic acid ester); two ring
+    systems of one skeleton each own an instance of it (the group lies in the
+    unit's ring system or is bonded to it and to no other ring system); their
+    decorated units are identical (``_unit_identity``); the linker between them is
+    symmetrical; and the two units hold more instances of the group than the rest
+    of the molecule. A ring assembly, a principal group on the linker, no principal
+    group, or anything undecidable gives False."""
+    try:
+        if not multiplicative_candidate(mol):
+            return False
+        from itertools import combinations
+
+        from rdkit import Chem
+
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        ri = mol.GetRingInfo()
+        rings = [set(r) for r in ri.AtomRings()]
+        systems = []
+        for r in rings:
+            merged = [x for x in systems if x & r]
+            for x in merged:
+                systems.remove(x)
+                r = r | x
+            systems.append(r)
+
+        def skel(atoms):
+            return Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(atoms),
+                                            canonical=True, isomericSmiles=False,
+                                            kekuleSmiles=False)
+        groups = {}
+        for i, sy in enumerate(systems):
+            groups.setdefault(skel(sy), []).append(i)
+        fgs = detect_functional_groups(mol)
+        pg, pg_matches = get_principal_group(mol, fgs)
+        if not pg:
+            # An ester of an N-substituted carbamic acid is not reported by the
+            # principal-group perception; esters rank above the classes it does
+            # report for these skeletons, and a multiplied acid component
+            # is named multiplicatively,:31790).
+            pg_matches = tuple(mol.GetSubstructMatches(_CARBAMATE_ESTER))
+            pg = "carbamate_ester" if pg_matches else None
+        if not pg:
+            # No claim without a principal characteristic group: the skeleton's
+            # parent then depends on classes this check does not see (a ring
+            # assembly, a ketene, a sulfoxide or sulfanediimine hub, an
+            # unsymmetrical ether linker).
+            return False
+        near = []
+        for sy in systems:
+            zone = set(sy)
+            for a in sy:
+                zone.update(n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors())
+            near.append(zone)
+        owners = set()
+        for m in (pg_matches or ()):
+            touched = [i for i, z in enumerate(near) if set(m) & z]
+            if len(touched) == 1:
+                owners.add(touched[0])
+        for members in groups.values():
+            if len(members) < 2:
+                continue
+            for i, j in combinations(members, 2):
+                if not (i in owners and j in owners):
+                    continue
+                info = {}
+                if _unit_identity(mol, systems[i], systems[j], info) is not True:
+                    continue
+                # (1)/(2): the central multiplicative group links the
+                # units by identical bonds and is itself symmetrical -- the linker
+                # read from either unit is the same sequence ('methylene',
+                # 'ethane-1,2-diyl', '1,3-phenylenebis(methylene)'); an '-O-CH2-'
+                # linker is not ('(phenoxymethyl)benzene' stays substitutive).
+                linker = info.get("linker") or []
+                if _linker_sequence(mol, linker, systems[i]) != _linker_sequence(
+                        mol, list(reversed(linker)), systems[j]):
+                    continue
+                # (:18875): the senior parent has the maximum number of
+                # principal characteristic groups; a multiplicative parent counts
+                # those of all its identical units (:18907-18909). Claimed only when
+                # the two units hold more instances than the rest of the molecule,
+                # so no other structure can be the senior parent.
+                both = set().union(*info.get("units", (set(), set())))
+                inside = sum(1 for m in pg_matches if set(m) <= both)
+                if inside <= len(pg_matches) - inside:
+                    continue
+                return True
+        return False
+    except Exception:  # noqa: BLE001 - unknown: no claim
+        return False
 
 # Branch review fixes (perf): set by ``Orthonym._name_with_pin_promotion`` around
 # its FIRST run. The re-run differs from the first run only at the sites that read the

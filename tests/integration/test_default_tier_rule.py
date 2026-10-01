@@ -77,7 +77,7 @@ def test_a_name_only_a_breadth_producer_built_is_declined():
     smi = "NCc1csc(-c2cccs2)n1"
     assert_default_tier_declines(smi)
     assert strict_path_row(smi)["tier"] == "pin_unverified"
-    assert_best_effort_gives(smi, "[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine")
+    assert_best_effort_gives(smi, "1-[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine")
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -155,7 +155,10 @@ EMIT_TIER_HELP = (
     "constitution. Otherwise it declines, with the reason code NO_VERIFIED_PIN when "
     "it built a name that is not a verified PIN. valid: also names from the general "
     "engine. complete: also general names for aromatic and heterocyclic ring systems. "
-    "best-effort: also the last-resort producers. full-coverage: also the "
+    "best-effort: also the last-resort producers, von Baeyer and spiro names for "
+    "ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build "
+    "them up to 40 atoms and 8 rings), and adducts with a one-atom ion. full-coverage: "
+    "also the "
     "coordination-name builder for metal tetrapyrrole and corrin complexes, which "
     "builds a name or declines. The wider tiers also return the names the default "
     "tier declines, each labelled with its tier; there every name must pass a "

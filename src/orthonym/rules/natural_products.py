@@ -521,8 +521,9 @@ def name_natural_product_with_substituents(
     decorations, assembles a systematic name like "3-hydroxycholest-4-en-17-one"
     or functional class format "3-oxoandrost-4-en-17-yl acetate" for esters.
 
-    For non-steroid scaffolds or when numbering is unavailable, falls back
-    to returning just the scaffold name.
+    Returns None (the systematic pipeline names the molecule) when a decoration
+    cannot be cited: no numbering map for the scaffold, or a decoration kind the
+    chosen assembler does not take.
 
     Args:
         mol: RDKit Mol object.
@@ -539,7 +540,6 @@ def name_natural_product_with_substituents(
     Returns:
         Name string for the natural product.
     """
-    scaffold_class = scaffold_info["scaffold_class"]
     scaffold_stem = scaffold_info["scaffold_stem"]
     scaffold_name = scaffold_info["scaffold_name"]
 
@@ -547,16 +547,13 @@ def name_natural_product_with_substituents(
     # Works for any scaffold class (steroid, alkaloid) that has a numbering map
     numbering = _build_target_to_iupac(scaffold_info)
     if numbering is None:
-        # No numbering map -> coverage gate, then bare scaffold name
-        total_heavy = mol.GetNumHeavyAtoms()
-        if total_heavy > 10:
-            scaffold_coverage = len(scaffold_info["matched_atoms"]) / total_heavy
-            threshold = 0.40 if scaffold_class == "steroid" else 0.50
-            if scaffold_coverage < threshold:
-                return None  # Fall through to systematic naming
-        if modification_prefix:
-            return modification_prefix + scaffold_name
-        return scaffold_name
+        # No numbering map: no decoration can be given a locant, and this function
+        # is reached only when heavy atoms lie outside the scaffold (the bare and
+        # hydrogen-only cases return earlier). The bare scaffold name would drop
+        # them -- 'aporphine' for the 1,2-diol, 'berbine' for tetrahydropalmatine,
+        # a different molecule -- so decline, the Blue Book: every
+        # substituent is cited); the systematic pipeline names the molecule.
+        return None
 
     matched_set = set(scaffold_info["matched_atoms"])
 
@@ -804,6 +801,16 @@ def name_natural_product_with_substituents(
     # without the α/β interleaving -- and require it to OPSIN-round-trip (0-wrong
     # net); honest-fail if it does not (never ship a name that drops or
     # mis-locates the sugar). Fail-OPEN when OPSIN is absent.
+    # The ester/conjugate assembler cites hydroxy, oxo, methyl and halogen
+    # decorations only. A candidate without the input's epoxy bridge, N-alkyl,
+    # methoxy or glycosyloxy groups, or without its skeletal modification, names a
+    # different molecule ('morphinan-6-yl acetate' for a 4,5-epoxy-3-methoxy-17-
+    # methylmorphinan-6-yl acetate), so the producer declines,
+    # the Blue Book).
+    if (esters or conjugates) and (epoxy_bridges or n_alkyls or methoxys
+                                   or glycosyloxys or modification_prefix):
+        return None
+
     if glycosyloxys:
         name_rs = _assemble_steroid(_whole_graph_rs_prefix(mol, numbering, scaffold_info), {})
         return name_rs if _alpha_beta_rt_ok(mol, name_rs) else None
@@ -1655,6 +1662,22 @@ def _np_parent_e(next_word: str) -> str:
     return "" if next_word[0] in _ELISION_VOWELS else "e"
 
 
+def _saturated_parent_e(stem: str, scaffold_name: str, next_word: str) -> str:
+    """The terminal 'e' of a fully saturated stereoparent name before ``next_word``
+    (``_np_parent_e``), or none at all for a retained name that ends in 'an'.
+
+     (the Blue Book): "Existing names of parent structures in
+    which endings are different from those indicated above, for example morphinan
+    and ibogamine, are exceptions and treated as retained names." The retained
+    name keeps its own ending: '4,5alpha-epoxymorphinan' (:52332),
+    '...-17-methyl-7,8-didehydromorphinan-3,6alpha-diol' (:2680), never
+    'morphinane' or 'morphinane-3,6-diol'. ``scaffold_name`` is the retained name
+    of the parent table; a name that is the stem plus 'an' has no 'e'."""
+    if scaffold_name == f"{stem}an":
+        return ""
+    return _np_parent_e(next_word)
+
+
 def _assemble_np_name(
     stem: str,
     scaffold_name: str,
@@ -1776,16 +1799,24 @@ def _assemble_np_name(
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
         prefix_entries.append(("hydroxy", f"{locant_str}-{multiplier}hydroxy"))
 
-    # Methyl prefix (C-methyl on scaffold carbons)
-    if methyls:
-        locant_str = ",".join(_greek_locant(loc) for loc in methyls)
-        count = len(methyls)
+    # Alkyl prefixes: C-methyl on scaffold carbons and N-alkyl on scaffold
+    # nitrogens (e.g. "17-methyl" for N-methyl at position 17). (b)
+    # (the Blue Book): a multiplying prefix counts identical PREFIXES,
+    # whatever atom kind carries them, so a C-methyl and an N-methyl are one
+    # group: '4,5-epoxy-17-methyl-7,8-didehydromorphinan-3,6-diol' has one
+    # methyl; two are '7,17-dimethyl', not '7-methyl-17-methyl'.
+    from ..assembly.composition_primitives import (
+        combine_identical_prefix_groups, identical_prefixes_grouped,
+    )
+    alkyl_groups = [("methyl", list(methyls))] if methyls else []
+    alkyl_groups += [(alkyl_name, [loc]) for loc, alkyl_name in n_alkyls]
+    if identical_prefixes_grouped():
+        alkyl_groups = combine_identical_prefix_groups(alkyl_groups)
+    for alkyl_name, locs in alkyl_groups:
+        locant_str = ",".join(_greek_locant(loc) for loc in locs)
+        count = len(locs)
         multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
-        prefix_entries.append(("methyl", f"{locant_str}-{multiplier}methyl"))
-
-    # N-alkyl prefixes (e.g., "17-methyl" for N-methyl at position 17)
-    for loc, alkyl_name in n_alkyls:
-        prefix_entries.append((alkyl_name, f"{_greek_locant(loc)}-{alkyl_name}"))
+        prefix_entries.append((alkyl_name, f"{locant_str}-{multiplier}{alkyl_name}"))
 
     # Oxo prefixes: ketones below a principal carboxylic acid order above).
     if oxos:
@@ -1886,7 +1917,8 @@ def _assemble_np_name(
         acid_count = len(acids)
         acid_mult = SIMPLE_MULTIPLIERS.get(acid_count, "") if acid_count > 1 else ""
         acid_word = f"{acid_mult}oic acid"
-        e = _np_parent_e(acid_word)
+        e = (_saturated_parent_e(stem, scaffold_name, acid_word)
+             if unsat_suffix == "an" else _np_parent_e(acid_word))
         acid_suffix = f"-{','.join(str(loc) for loc in acids)}-{acid_word}"
         body = stem if unsat_suffix == "an" else effective_stem
         return (f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, body)}"
@@ -1920,7 +1952,8 @@ def _assemble_np_name(
         # (a): the parent-hydride terminal 'e' is elided before the vowel-initial
         # single '-ol' but RETAINED before a consonant-initial multiplied '-diol'/'-triol'
         # (estradiol -> 'triene-3,17-diol'; 5alpha-androstane-3,17-diol).
-        e = _np_parent_e(ol_word)
+        e = (_saturated_parent_e(stem, scaffold_name, ol_word)
+             if unsat_suffix == "an" else _np_parent_e(ol_word))
         # non-OH prefix + modification_prefix + [stem-stereo] + effective_stem + unsaturation + -ol
         # e.g., "4-methylcholest-5-en-3-ol" or "5alpha-cholestan-3beta-ol"
         return f"{stereo_prefix}{_stemjoin(non_oh_prefix + modification_prefix, effective_stem)}{unsat_suffix}{e}{ol_suffix}"
@@ -1933,10 +1966,11 @@ def _assemble_np_name(
         # '-one' but RETAINED before a consonant-initial multiplied '-dione'/'-trione'
         # (androstane-3,17-dione), and kept when no suffix follows (bare name).
         if ketone_suffix:
-            e = _np_parent_e(ketone_word)
+            e = _saturated_parent_e(stem, scaffold_name, ketone_word)
             return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}{e}{ketone_suffix}"
         else:
-            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}e"
+            e = _saturated_parent_e(stem, scaffold_name, "")
+            return f"{stereo_prefix}{_stemjoin(prefix + modification_prefix, stem)}{unsat_suffix}{e}"
     else:
         # Unsaturated: prefix + modification_prefix + effective_stem + unsaturation + ketone
         # as above: retain 'e' before '-dione' (androst-4-ene-3,17-dione),
@@ -2500,7 +2534,9 @@ def _assemble_np_ester_name(
         # Combine: all prefixes + acyloxy + [stem-stereo] + stem + unsaturation + "e"
         all_prefix = "-".join(p for p in [prefix, acyloxy_prefix] if p)
         ester_consumed = set(ester_locants)
-        return f"{stereo_prefix}{_ester_stemjoin(all_prefix, effective_stem, ester_consumed)}{unsat_suffix}e"
+        e = (_saturated_parent_e(stem, scaffold_name, "")
+             if unsat_suffix == "an" else "e")
+        return f"{stereo_prefix}{_ester_stemjoin(all_prefix, effective_stem, ester_consumed)}{unsat_suffix}{e}"
 
     # --- Assemble: stereo_prefix + prefix + [stem-stereo] + stem + unsaturation + yl + space + acylate ---
     # IUPAC: terminal 'e' of "-ane" elided before vowel suffix (-yl starts with 'y')

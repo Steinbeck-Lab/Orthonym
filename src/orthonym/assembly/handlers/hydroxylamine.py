@@ -481,12 +481,24 @@ def _name_n_carbon_hydroxylamine_as_amine(features: Any):
         _PARENT = "methanamine"
         if base != _PARENT and base.endswith(_PARENT):
             cprefix = base[:-len(_PARENT)]
+            # The amine piece keeps its N-H, so its C-prefix may cite the locant '1'
+            #, the Blue Book; '1-hydrazinylmethanamine (PIN)', the Blue Book):
+            # '1,1,1-trichloromethanamine'. The locant set of a one-carbon parent is
+            # all '1's; it stays with its prefix ('1,1,1-trichloro-N-hydroxy...').
+            cloc = ""
+            _head, _sep, _tail = cprefix.partition("-")
+            if _sep and _head and set(_head.split(",")) == {"1"}:
+                cloc, cprefix = f"{_head}-", _tail
             if (not cprefix[:1].isalpha()) or any(
                     ch in "([{0123456789" for ch in cprefix):
-                return None  # locanted / compound C-prefix -- ordering deferred
+                return None  # compound C-prefix -- ordering deferred
             if alpha_sort_key(cprefix) < alpha_sort_key("hydroxy"):
                 # C-prefix cited first; the following 'N-' locant takes a hyphen.
-                name = f"{cprefix}-N-hydroxy{_PARENT}"
+                name = f"{cloc}{cprefix}-N-hydroxy{_PARENT}"
+            elif cloc:
+                # 'N-hydroxy' cited first, then the locanted C-prefix
+                # ('N-hydroxy-1-phenylmethanamine').
+                name = f"N-hydroxy-{cloc}{cprefix}{_PARENT}"
             else:
                 # 'N-hydroxy' cited first; the C-prefix starts with a letter and
                 # juxtaposes with no hyphen (N-hydroxyphenylmethanamine).

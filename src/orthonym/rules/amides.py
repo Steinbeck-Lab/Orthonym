@@ -798,7 +798,7 @@ def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> Optional[
     Handles:
     - Primary amides: acetamide
     - Secondary amides: N-methylacetamide
-    - Tertiary amides: N,N-dimethylformamide
+    - Tertiary amides: N,N-dimethylacetamide; dimethylformamide (a formamide with the same group on both N-H cites no N locants)
     - Ring-attached amides: cyclohexanecarboxamide
     - a phase chalcogen amides (suffix_form="thioamide"/"selenoamide"/"telluroamide"):
       ethanethioamide, N-methylpropaneselenoamide, etc.
@@ -834,11 +834,52 @@ def name_amide(mol, amide_atoms: tuple, suffix_form: str = "amide") -> Optional[
     amide_type = get_amide_type(mol, amide_atoms)
     if amide_type in ("secondary", "tertiary"):
         n_subs = get_n_substituents(mol, amide_atoms)
+        _complete = _formamide_completely_substituted(parent_name, amide_type, n_subs)
+        if _complete:
+            return f"{_complete}{parent_name}"
         n_prefix = format_n_substitution(n_subs)
         if n_prefix:
             return f"{n_prefix}{parent_name}"
 
     return parent_name
+
+
+def _formamide_completely_substituted(parent_name, amide_type, n_subs) -> Optional[str]:
+    """The N-prefix of a formamide whose two N-H are both replaced by the same
+    substituent, cited without locants; None otherwise.
+
+     (the Blue Book): "All locants are omitted in compounds... in
+    which all substitutable positions are completely substituted... in the same
+    way"; formamide's substitutable hydrogens are the two N-H -- a C-substituted
+    formamide takes another parent ('carbonochloridic amide (PIN) (not
+    1-chloroformamide)',:32707) -- so prints 'dimethylformamide
+    (PIN)' (:32782), while a single N-substituent keeps its locant ('N-phenyl
+    formamide (PIN)',:32855). Deny-by-default: two different substituents, a
+    stereo-bearing or isotopic scope, a scope that is part of a larger name."""
+    try:
+        if parent_name != "formamide" or amide_type != "tertiary":
+            return None
+        if not n_subs or len(n_subs) != 2:
+            return None
+        names = {sub.get("name") for sub in n_subs}
+        if len(names) != 1:
+            return None
+        name = next(iter(names))
+        if not name or is_refusal_sentinel(name):
+            return None
+        from ..assembly.locant_omission import (
+            locants_are_forced,
+            scope_has_isotopic_modification,
+        )
+        if locants_are_forced() or scope_has_isotopic_modification():
+            return None
+        from ..assembly.handlers._handler_shared import locant_scope_is_a_name_component
+        if locant_scope_is_a_name_component():
+            return None
+        from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+        return multiplied_component(2, name, enclose_if_compound(name))
+    except Exception:  # noqa: BLE001 -- deny by default
+        return None
 
 
 def name_chain_diamide(

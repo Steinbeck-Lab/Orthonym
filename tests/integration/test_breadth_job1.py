@@ -59,7 +59,11 @@ def _be(smiles):
 # other row is named by the first (strict) run and stays pin_verified.
 RERUN_BUILT = frozenset({
     "NCc1csc(-c2cccs2)n1",
-    "COc1ccc(Cc2ncc(Cc3ccc(OC)cc3)c(C)n2)cc1",
+    # (PIN class program Task 2) '2,5-bis[(4-methoxyphenyl)methyl]-4-methylpyrimidine'
+    # is built by the strict first run now (the decorated ring-yl fold at every tier):
+    # (b) (the Blue Book) the pyrimidine is the senior ring, the two
+    # benzene units are its substituents, '7,7-bis[(2-butoxyethoxy)methyl]-...-dioic
+    # acid (PIN)' (:18899) for 'bis[...]' on a senior parent; pin_verified.
     "C=C1CC1C(C)=O",
     "O=C(O)C(=O)C[C@H]1C=C[C@H](O)CC1",
     "CC1=C(CC/C(C)=C/C=C/C(C)=C/CO)C(C)(C)CCC1",
@@ -108,7 +112,7 @@ def _assert_pin(smiles, expected):
 
 M01 = [
     # (the Blue Book) ring-on-chain, '(thiophen-2-yl)methyl' (:16442)
-    ("NCc1csc(-c2cccs2)n1", "[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine"),
+    ("NCc1csc(-c2cccs2)n1", "1-[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine"),  #
     #:16280 '2-[(4-bromophenyl)methyl]pyridine (PIN)': the decorated ring folds in
     ("COc1ccc(Cc2ncc(Cc3ccc(OC)cc3)c(C)n2)cc1",
      "2,5-bis[(4-methoxyphenyl)methyl]-4-methylpyrimidine"),
@@ -130,7 +134,7 @@ def test_m01_best_effort_label_stays_below_the_pin_when_only_the_rerun_builds_it
     # promotion re-run, so a name only the re-run builds is not confirmed by it and
     # the best-effort label stays pin_unverified (as before the re-run existed)
     row = _be("NCc1csc(-c2cccs2)n1")
-    assert row["name"] == "[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine", row
+    assert row["name"] == "1-[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine", row
     assert row["tier"] == "pin_unverified" and not row["is_pin"], row
     assert_full_rt(row["name"], "NCc1csc(-c2cccs2)n1")
 

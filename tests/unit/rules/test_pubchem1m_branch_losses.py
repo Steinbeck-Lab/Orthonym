@@ -267,6 +267,91 @@ def test_dihydropyrene_row_names_rt_exact():
 
 
 # --------------------------------------------------------------------------
+# I4 the unit licence stays off the multi-descriptor composition
+# --------------------------------------------------------------------------
+# A propanoyl labelled on its CH3 and CH2 (five 3H or 2H) inside a peptide is
+# placed by the multi-descriptor composition: one group per labelled carbon,
+# each placed against a copy of the molecule that carries that group's labels
+# only. The licence ("Locants are omitted in compounds or
+# substituent groups in which all positions are completely isotopically
+# substituted or modified in the same way", the Blue Book, heading
+# ' Omission of locants') asked OPSIN about one more nuclide on that
+# masked copy; OPSIN read '(3H4)propanoylamino' as another constitution, so the
+# CH3 group was placed without locants and could not be joined to the CH2
+# group's '(2,2-3H2)' at the same slot: the row declined. A name with several
+# isotope descriptors cites every locant once any is required,
+#:44180, "if isotopic modification requires a locant to specify its position,
+# then all locants must be specified and none are omitted"), and here the
+# locants are required ("Locants are not omitted when there is a possibility
+# of isomers",,:44202; '(3H5)propanoylamino' reads back to a
+# different molecule). PubChem 1M row 168012462 and three rows of its class.
+
+MULTI_DESCRIPTOR_ROWS = {
+    "pc1m_168012462": (
+        "[3H]C([3H])([3H])C([3H])([3H])C(=O)NC(CC1=CC=C(C=C1)OS(=O)(=O)O)C(=O)NC(CCCC)"
+        "NC(=O)CC(=O)NC(CC2=CNC3=CC=CC=C32)C(=O)N(C)C(CCCC)C(=O)NC(CC(=O)O)C(=O)NC("
+        "CC4=CC=CC=C4)C(=O)N"),
+    "peptide_2h5": (
+        "[2H]C([2H])([2H])C([2H])([2H])C(=O)NC(CC1=CC=C(C=C1)OS(=O)(=O)O)C(=O)NC(CCCC)"
+        "NC(=O)CC(=O)NC(CC2=CNC3=CC=CC=C32)C(=O)N(C)C(CCCC)C(=O)NC(CC(=O)O)C(=O)NC("
+        "CC4=CC=CC=C4)C(=O)N"),
+    "sulfooxy_malonamide_3h5": (
+        "[3H]C([3H])([3H])C([3H])([3H])C(=O)NC(CC1=CC=C(C=C1)OS(=O)(=O)O)C(=O)NC(CCCC)"
+        "NC(=O)CC(=O)O"),
+    "indole_malonamide_3h5": (
+        "[3H]C([3H])([3H])C([3H])([3H])C(=O)NC(CCCC)NC(=O)CC(=O)NC(CC2=CNC3=CC=CC=C32)"
+        "C(=O)O"),
+}
+
+
+def _fixed_h_inchi(smiles):
+    from rdkit.Chem import inchi
+    mol = Chem.MolFromSmiles(smiles) if smiles else None
+    return inchi.MolToInchi(mol, options="/FixedH") if mol is not None else None
+
+
+@pytest.mark.parametrize("smiles", list(MULTI_DESCRIPTOR_ROWS.values()),
+                         ids=list(MULTI_DESCRIPTOR_ROWS))
+def test_multi_descriptor_propanoyl_rows_name_rt_exact(smiles):
+    res = name_best_effort(smiles)
+    name = assert_full_rt(res.get("name"), smiles)
+    back = _independent_parse(name)
+    assert _fixed_h_inchi(back) == _fixed_h_inchi(smiles), (name, back)
+
+
+def test_multi_descriptor_composition_never_consults_the_unit_licence(monkeypatch):
+    """The licence reads the masked copy of one group, which cannot see the other
+    descriptors of the name; the composition keeps every locant."""
+    import orthonym.rules.isotopes as iso
+    calls = []
+    real = iso._unit_completely_labelled
+
+    def spy(*a, **k):
+        import traceback
+        calls.append([f.name for f in traceback.extract_stack()])
+        return real(*a, **k)
+
+    monkeypatch.setattr(iso, "_unit_completely_labelled", spy)
+    # the small analogue: its multi-descriptor composition runs (two labelled
+    # carbons) and the single-descriptor name wins
+    smiles = "[3H]C([3H])([3H])C([3H])([3H])C(=O)NC(C)C(=O)O"
+    res = name_best_effort(smiles)
+    assert_full_rt(res.get("name"), smiles)
+    assert calls, "the spy saw no licence call at all: the probe did not run"
+    assert not [c for c in calls if "_decorate_multi_position" in c], calls
+
+
+def test_single_descriptor_stereo_placement_keeps_the_unit_licence():
+    """The isotope-induced stereo placement is one descriptor on the whole
+    molecule, so a completely labelled ethyl substituent cites no locants
+    ,:44196)."""
+    smiles = "CC[C@H](C([2H])([2H])C([2H])([2H])[2H])C(=O)O"
+    res = name_best_effort(smiles)
+    name = assert_full_rt(res.get("name"), smiles)
+    assert name == "(2R)-2-(2H5)ethylbutanoic acid", name
+
+
+# --------------------------------------------------------------------------
 # Review fix: the isotope round trip never accepts a bond-shift isomer
 # --------------------------------------------------------------------------
 # The fixed-H InChI compare of I2 records no bond orders, so it also accepted

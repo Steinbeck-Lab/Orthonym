@@ -102,11 +102,13 @@ class TestAmideRegressionGuards:
         assert result == "N-methylacetamide", f"Got: {result}"
 
     def test_nn_dimethylformamide_unchanged(self):
-        """N,N-disubstituted retained: CN(C)C=O -> N,N-dimethylformamide"""
+        """N,N-disubstituted retained: CN(C)C=O -> dimethylformamide (the Blue Book), 'dimethylformamide (PIN)' (:32782); (:3007):
+        both N-H, formamide's only substitutable positions, carry the same group)"""
         result = name_compound("CN(C)C=O")
-        assert result == "N,N-dimethylformamide", f"Got: {result}"
+        assert result == "dimethylformamide", f"Got: {result}"
 
     def test_nn_dipropylformamide_unchanged(self):
-        """Tertiary formamide: CCCN(C=O)CCC -> N,N-dipropylformamide"""
+        """Tertiary formamide: CCCN(C=O)CCC -> dipropylformamide (as 'dimethylformamide
+        (PIN)', (the Blue Book), 'dimethylformamide (PIN)' (:32782); (:3007))"""
         result = name_compound("CCCN(C=O)CCC")
-        assert result == "N,N-dipropylformamide", f"Got: {result}"
+        assert result == "dipropylformamide", f"Got: {result}"

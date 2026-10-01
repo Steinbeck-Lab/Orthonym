@@ -26,11 +26,12 @@ Every assertion is round-trip gated (name -> OPSIN -> InChIKey == input): a wron
 construction cannot pass, it can only abstain. Canaries lock the pre-existing spiro
 / spiro-VB / spiro-ketal outputs byte-for-byte so the shared dispatch is unmoved.
 """
-import signal
 
 import pytest
 from rdkit import Chem
 from rdkit import RDLogger
+
+from orthonym.wallclock import wall_clock_limit
 
 RDLogger.DisableLog("rdApp.*")
 
@@ -38,17 +39,9 @@ RDLogger.DisableLog("rdApp.*")
 def _name(smiles: str) -> str:
     from orthonym import name_compound
 
-    def _to(signum, frame):
-        raise TimeoutError()
-
-    old = signal.signal(signal.SIGALRM, _to)
-    signal.alarm(60)
-    try:
+    with wall_clock_limit(60):
         res = name_compound(smiles)
-        return res.name if hasattr(res, "name") else str(res)
-    finally:
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, old)
+    return res.name if hasattr(res, "name") else str(res)
 
 
 def _rt_ok(smiles: str, name: str) -> bool:

@@ -90,8 +90,14 @@ def test_no_spurious_bare_amino_prefix(namer, smiles):
         ("NCC(=O)N", "2-aminoacetamide"),      # glycinamide: real -NH2
         ("CC(=O)N", "acetamide"),
         ("CCC(=O)N", "propanamide"),
-        ("OCC(=O)N", "2-hydroxyethanamide"),
-        ("CSCC(=O)N", "2-(methylsulfanyl)ethanamide"),
+        # 'acetamide' is a retained PIN that can be substituted,
+        # the Blue Book, "Only the following four retained names are
+        # preferred IUPAC names and can be substituted", 'acetamide (PIN)':32693),
+        # and it keeps the '2-' locant,:7304, "Locants are required
+        # for related compounds where additional substitutable positions are
+        # available, for example acetamide")
+        ("OCC(=O)N", "2-hydroxyacetamide"),
+        ("CSCC(=O)N", "2-(methylsulfanyl)acetamide"),
     ],
 )
 def test_primary_amine_and_plain_amides_unchanged(namer, smiles, expected):

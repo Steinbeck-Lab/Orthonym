@@ -934,4 +934,17 @@ def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
             if bond is not None and bond.HasProp('_CIPCode'):
                 items.append((min(atom_to_locant[i], atom_to_locant[j]),
                               bond.GetProp('_CIPCode')))
+    # A stereogenic double bond from a chain atom to a substituent (an '-ylidene'
+    # prefix) is cited at that chain atom's locant ('(2Z,3E)-2,3-diethylidene
+    # butanedioic acid'), so (j) (:3346) ranks it with the chain's own.
+    from rdkit import Chem as _Chem
+    for bond in mol.GetBonds():
+        if (bond.GetBondType() != _Chem.BondType.DOUBLE
+                or not bond.HasProp('_CIPCode')):
+            continue
+        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if (i in chain_set) != (j in chain_set):
+            c = i if i in chain_set else j
+            if c in atom_to_locant:
+                items.append((atom_to_locant[c], bond.GetProp('_CIPCode')))
     return cip_locant_rank_key(items)

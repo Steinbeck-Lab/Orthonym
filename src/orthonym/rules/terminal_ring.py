@@ -39,11 +39,14 @@ Scope (stated explicitly, per the task contract)
   which is a CLOSED list, so an off-table skeletal element (Zn/Cd/Hg/Fe/…) has no
   morpheme and MUST refuse -- see the ``ring_replacement`` module docstring.
 * **Cycle rank** -- 1 (this module's monocycle branch) and 2..8 (delegated to the
-  universal analyzers; 8 is ``vonbaeyer_universal.MAX_CAGE_RINGS``, deliberately
-  NOT raised here: its own comment at ``vonbaeyer_universal.py:48`` requires the
-   main-bridge selection to be fixed first).
-* **Size** -- at most 40 skeletal atoms (``MAX_CAGE_ATOMS``; the monocycle branch
-  is additionally bounded by ``data.chain_names.get_chain_prefix``).
+  universal analyzers; 8 is ``vonbaeyer_universal.MAX_CAGE_RINGS``, kept at the
+  PIN tier: its own comment in ``vonbaeyer_universal.py`` requires the
+  main-bridge selection to be fixed first); the best-effort tier takes
+  ``BEST_EFFORT_MAX_CAGE_RINGS`` (``vonbaeyer_universal.cage_caps``).
+* **Size** -- at most 40 skeletal atoms (``MAX_CAGE_ATOMS``) at the PIN tier,
+  ``BEST_EFFORT_MAX_CAGE_ATOMS`` at the best-effort tier; the monocycle branch is
+  additionally bounded by ``data.chain_names.get_chain_prefix``. A name built on a
+  ring system beyond the PIN ceilings is recorded as not a PIN.
 * **Charge** -- a charged skeletal ring atom REFUSES. A ring cation/anion is
    (``cation_words`` / ``ion_retained_names``), not replacement
   nomenclature; ``[n+]`` in a ring is a different naming class and inventing a
@@ -77,7 +80,15 @@ logger = logging.getLogger(__name__)
 #: Shared with the von Baeyer sibling so the two halves of the terminal namer
 #: cannot drift into two different ceilings.
 from .lambda_convention import LAMBDA  # noqa: E402
-from .vonbaeyer_universal import MAX_CAGE_ATOMS, MAX_CAGE_RINGS  # noqa: E402
+from . import vonbaeyer_universal as _vbu  # noqa: E402
+# The PIN-tier ceilings, re-exported by value (read by tests and measurement tools);
+# every size check below reads the tier's pair through ``cage_caps`` at call time.
+from .vonbaeyer_universal import MAX_CAGE_ATOMS, MAX_CAGE_RINGS  # noqa: E402,F401
+from .vonbaeyer_universal import (  # noqa: E402
+    beyond_pin_caps,
+    cage_caps,
+    record_beyond_pin_caps,
+)
 
 __all__ = [
     "TerminalRingName",
@@ -125,16 +136,22 @@ def _multiplier_to_count() -> Dict[str, int]:
     return {word: n for n, word in SIMPLE_MULTIPLIERS.items()}
 
 
+_STEM_SIZES: Dict[str, int] = {}
+
+
 def _size_from_stem(stem: str) -> Optional[int]:
-    """Invert ``get_chain_prefix`` over the sizes this module can emit."""
-    from ..data.chain_names import get_chain_prefix
-    for n in range(3, MAX_CAGE_ATOMS + 1):
-        try:
-            if get_chain_prefix(n) == stem:
-                return n
-        except (ValueError, KeyError):
-            continue
-    return None
+    """Invert ``get_chain_prefix`` over the sizes this module can emit at any tier
+    (up to ``BEST_EFFORT_MAX_CAGE_ATOMS``; the size check of each producer decides
+    what is emitted at the tier running)."""
+    if not _STEM_SIZES:
+        from ..data.chain_names import get_chain_prefix
+        for n in range(3, max(_vbu.BEST_EFFORT_MAX_CAGE_ATOMS,
+                              _vbu.MAX_CAGE_ATOMS) + 1):
+            try:
+                _STEM_SIZES.setdefault(get_chain_prefix(n), n)
+            except (ValueError, KeyError):
+                continue
+    return _STEM_SIZES.get(stem)
 
 
 # --------------------------------------------------------------------------
@@ -270,7 +287,7 @@ def build_monocycle_replacement_name(
 
     ring_set = set(ring_atoms)
     n = len(ring_set)
-    if n < 3 or n > MAX_CAGE_ATOMS:
+    if n < 3 or n > cage_caps()[0]:
         return None
     try:
         stem = get_chain_prefix(n)
@@ -578,7 +595,8 @@ def terminal_ring_name(
     if in_pin_promotion():
         return None
     ring = set(ring_atoms)
-    if len(ring) > MAX_CAGE_ATOMS:
+    max_atoms, max_rings = cage_caps()
+    if len(ring) > max_atoms:
         logger.info("terminal_ring: %d atoms > MAX_CAGE_ATOMS; refuse",
                     len(ring))
         return None
@@ -621,12 +639,15 @@ def terminal_ring_name(
             logger.info("terminal_ring: monocycle name %r failed the "
                         "reconstruction audit; refuse", name)
             return None
+        if beyond_pin_caps(len(ring)):
+            record_beyond_pin_caps(name)
         return TerminalRingName(name=name, numbering=dict(numbering),
                                 basis='monocycle')
 
-    if rank > MAX_CAGE_RINGS:
-        # Deliberately NOT raised here: vonbaeyer_universal.py:48 requires the
-        # main-bridge selection to be fixed first.
+    if rank > max_rings:
+        # The PIN tier keeps vonbaeyer_universal.MAX_CAGE_RINGS: the
+        # main-bridge selection must be fixed first (vonbaeyer_universal.py); the
+        # best-effort tier takes its measured ceiling (``cage_caps``).
         logger.info("terminal_ring: ring count %d > MAX_CAGE_RINGS; refuse",
                     rank)
         return None

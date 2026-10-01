@@ -58,8 +58,10 @@ def _named(smiles):
 
 MULTIPLIER_JOIN_ROWS = [
     ("CCCCCCCCCCCCN(CCCCCCCCCCCC)C(N)=O", "N,N-di(dodecyl)urea"),
+    # all four N-H substituted in the same way: no N locants:3007,
+    # 'tetrafluorourea (PIN)':3025)
     ("CCCCCCCCCCCCN(CCCCCCCCCCCC)C(=O)N(CCCCCCCCCCCC)CCCCCCCCCCCC",
-     "N,N,N',N'-tetra(dodecyl)urea"),
+     "tetra(dodecyl)urea"),
     ("CCCCCCCCCCCCN(CCCCCCCCCCCC)NC(=O)c1ccccc1",
      "N',N'-di(dodecyl)benzohydrazide"),
     ("CC(C)N(C(C)C)NC(=O)c1ccccc1", "N',N'-di(propan-2-yl)benzohydrazide"),

@@ -299,10 +299,13 @@ class TestMononuclearPolyfunctionalNaming:
     @pytest.mark.parametrize("smiles", ["COCNC", "CNCOC"])
     def test_methoxy_n_methyl_methanamine(self, smiles):
         # CH3-O-CH2-NH-CH3: amine principal (suffix), methoxy substituent, both
-        # on the single carbon -> 'methoxy-N-methylmethanamine' (not
-        # '1-methoxy-N-methylmethan-1-amine'). Also a determinism pair.
+        # on the single carbon -> '1-methoxy-N-methylmethanamine' (not
+        # '1-methoxy-N-methylmethan-1-amine'): the amine N-H is a further
+        # substitutable position, so the C-prefix cites '1', the Blue Book;
+        # '1-hydrazinylmethanamine (PIN)', the Blue Book; PIN class program Task 11).
+        # Also a determinism pair.
         from orthonym import name_compound
-        assert name_compound(smiles, style="pin") == "methoxy-N-methylmethanamine"
+        assert name_compound(smiles, style="pin") == "1-methoxy-N-methylmethanamine"
 
     def test_aminomethanol(self):
         # HO-CH2-NH2: alcohol principal (senior to amine) + amino prefix on the

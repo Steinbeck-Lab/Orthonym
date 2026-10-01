@@ -145,7 +145,8 @@ def _collect_substituents(mol, chain: List[int]
 
 
 def _format_n2_substituents(subs: List[Tuple[int, str]],
-                            is_diazene: bool = False) -> Optional[str]:
+                            is_diazene: bool = False,
+                            labelled_parent: bool = False) -> Optional[str]:
     """Cite substituents on a 2-N parent (hydrazine or diazene).
 
     A SINGLE substituent omits the locant — its position on the
@@ -174,6 +175,9 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
       compound or, being simple, is not cited first and must be set off
       from the prefix before it.
 
+    ``labelled_parent``: an isotope label sits on one of the two nitrogens (read on
+    the labelled molecule by the caller); the diazene then cites every locant.
+
     Returns None (fail-closed) if a required multiplier is unavailable."""
     from ..assembly.naming_utils import (
         enclose_if_compound,
@@ -190,10 +194,15 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
         # scope that ``rules/isotopes.py`` enters ONLY when a labelled atom sits on the
         # PARENT (here the hydrazine N). The detachable prefix is numbered first, so it
         # takes locant 1 (the label then falls on N2). Off the isotope path the flag is
-        # unset and the licensed omission stands (``phenylhydrazine``). Diazene's single
-        # substituent keeps its omission (each N is =N-, one substitutable valence).
+        # unset and the licensed omission stands (``phenylhydrazine``). The same holds
+        # for diazene, the Blue Book, "if isotopic modification
+        # requires a locant to specify its position, then all locants must be specified
+        # and none are omitted"): ``1-phenyl(2-15N)diazene``. The diazene asks the
+        # exact question (a label on its own nitrogens) instead of the ring-or-
+        # heteroatom proxy, so a label on the phenyl ring leaves '(2-2H)phenyldiazene'.
         from ..assembly.locant_omission import parent_scope_has_positional_isotope
-        if not is_diazene and parent_scope_has_positional_isotope():
+        if (labelled_parent if is_diazene
+                else parent_scope_has_positional_isotope()):
             return f"1-{enclose_if_compound(subs[0][1])}"
         return enclose_if_compound(subs[0][1])
 
@@ -204,6 +213,20 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
         counts: Dict[str, int] = {}
         for _, name in subs:
             counts[name] = counts.get(name, 0) + 1
+        # (the Blue Book): a positional label on a diazene nitrogen
+        # needs its locant, so every locant is cited -- '1-(naphthalen-2-yl)-2-phenyl
+        # (1-15N)diazene (PIN)',:44267;:44381 with the label on N2). The
+        # substituent cited first in alphanumerical order takes locant 1,
+        # whichever nitrogen carries the label (:44267 and:44381 both put the
+        # naphthalenyl at 1). ``labelled_parent`` is read only inside the re-render
+        # that rules/isotopes.py makes when a descriptor cites a locant.
+        if labelled_parent:
+            if len(counts) == 1:
+                name = next(iter(counts))
+                return f"1,2-{multiplied_component(2, name, enclose_if_compound(name))}"
+            first, second = sorted(counts, key=prefix_citation_sort_key)
+            return (f"1-{enclose_if_compound(first)}"
+                    f"-2-{enclose_if_compound(second)}")
         if len(counts) == 1:                       # symmetric: dimethyldiazene
             name, count = next(iter(counts.items()))
             if count not in _SUB_MULTIPLIER:
@@ -778,7 +801,15 @@ def name_polyazane(mol) -> Optional[str]:
     # _format_n2_substituents). ``saturated`` is False iff a chain double bond
     # was found, which on a 2-N chain is exactly the diazene case.
     elif n == 2:
-        formatted = _format_n2_substituents(subs, is_diazene=not saturated)
+        from ..assembly.locant_omission import (
+            isotope_label_on_atoms,
+            parent_scope_has_positional_isotope,
+        )
+        _labelled_parent = (not saturated
+                            and parent_scope_has_positional_isotope()
+                            and isotope_label_on_atoms(mol, chain))
+        formatted = _format_n2_substituents(subs, is_diazene=not saturated,
+                                            labelled_parent=_labelled_parent)
         if formatted is None:
             return None
         constitution = f"{formatted}{parent}"

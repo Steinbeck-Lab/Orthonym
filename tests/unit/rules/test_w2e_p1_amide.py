@@ -250,7 +250,11 @@ class TestT9ComplexPolyamines:
     @pytest.mark.parametrize("smiles,expected", [
         # existing 2-N path must stay byte-identical (primed style):
         ("NCCN", "ethane-1,2-diamine"),
-        ("CNCCN", "N-methylethane-1,2-diamine"),
+        # a diamine's nitrogen atoms take numbered 'N' locants:
+        # (the Blue Book), "... and 'N' locants for substitution on the
+        # nitrogen atom"; one substituted N of ethane-1,2-diamine is 'N1-'
+        # ('N1-(aminomethyl)ethane-1,2-diamine (PIN)',,:26381)
+        ("CNCCN", "N1-methylethane-1,2-diamine"),
     ])
     def test_protect_simple_diamines(self, smiles, expected):
         assert _dt_name_compound(smiles) == expected

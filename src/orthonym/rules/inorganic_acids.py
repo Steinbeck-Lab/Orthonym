@@ -1850,6 +1850,15 @@ def name_carbonic_frn_family(mol):
                 return None
         return reps
 
+    # (the Blue Book): the acid of urea H2N-CO-NH-COOH is
+    # 'carbamoylcarbamic acid (PIN)' (:33374), named systematically on carbamic acid,
+    # not as an imido/amido-replaced dicarbonic acid. The carbamic-acid assembly names
+    # it once this builder declines ('carbamoyl(methyl)carbamic acid' already).
+    # Longer chains (H2N-CO-NH-CO-NH-COOH) need a nested carbamoyl prefix that is not
+    # built, so they keep this name.
+    if (n == 2 and bridges == ["imido"]
+            and any(k == "amido" for tl in terminals.values() for (k, _) in tl)):
+        return None
     fwd = _positions(order, bridges)
     rev = _positions(order[::-1], bridges[::-1])
     if fwd is None and rev is None:
@@ -1886,6 +1895,283 @@ def name_carbonic_frn_family(mol):
             frags.append(f"{','.join(str(x) for x in locs)}-{mult}{infix}")
     prefix = "-".join(frags)
     return f"{prefix}{_CARB_MULT[n]}carbonic acid"
+
+
+# --- PIN class program Task 13: carbonic- and cyanic-acid functional classes ---
+# Three families the substitutive engine cannot spell (it names them on a
+# 'methane' / 'propanedinitrile' / anhydride parent instead):
+# * (the Blue Book) acyl halides and pseudohalides of cyanic acid,
+# "Method (1) generates preferred IUPAC names": 'carbononitridic chloride (PIN)',
+# 'carbononitridic azide (PIN)' (:31513,:31515);
+# * (:34844) "Nitriles corresponding to carbonic acid and di- and
+# polycarbonic acids are named by functional class nomenclature": 'carbonyl
+# dicyanide (PIN)', 'carbonimidoyl dicyanide (PIN)', 'carbonohydrazonoyl
+# dicyanide (PIN)', 'carbamoyl cyanide (PIN)' (:34848-:34858);
+# * (:33539) amides of di- and polycarbonic acids, "formed by adding the
+# functional class name 'amide' to that of the corresponding acid, preceded by
+# the numerical prefix 'di'", with N1/N3 and numerical locants: 'dicarbonic
+# diamide (PIN)', 'N1-(propan-2-yl)dicarbonic diamide (PIN)', 'N1-methyl-2-thio-
+# tricarbonic diamide (PIN)' (:33543-:33549), and the condensed ureas of
+# (:33505), 'N1-methyl-2-imidodicarbonic diamide (PIN)' (:33514).
+# Each recogniser accounts for every heavy atom and fails closed (None) otherwise.
+
+_CYANIC_EXCLUDED_CLASS = {"cyanide"}          # N#C-C#N is 'oxalonitrile' (retained)
+_CARBONIC_ACYL_WORD = {"O": "carbonyl", "S": "carbonothioyl", "Se": "carbonoselenoyl",
+                       "Te": "carbonotelluroyl", "imido": "carbonimidoyl",
+                       "hydrazono": "carbonohydrazonoyl"}
+_CARBAMOYL_ACYL_WORD = {"O": "carbamoyl", "S": "carbamothioyl"}
+
+
+def _heavy_set(mol):
+    return {a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1}
+
+
+def _branch_atoms(mol, start, banned):
+    """Heavy atoms reachable from ``start`` without entering ``banned``."""
+    seen, stack = set(), [start]
+    while stack:
+        i = stack.pop()
+        if i in seen or i in banned:
+            continue
+        seen.add(i)
+        stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(i).GetNeighbors()
+                     if nb.GetAtomicNum() > 1)
+    return seen
+
+
+def _cyano_carbon(mol, c_idx, centre_idx):
+    """The atoms {C, N} of a -C#N group whose carbon ``c_idx`` hangs off the centre."""
+    c = mol.GetAtomWithIdx(c_idx)
+    if c.GetSymbol() != "C" or c.GetFormalCharge() != 0 or c.IsInRing():
+        return None
+    others = [nb for nb in c.GetNeighbors() if nb.GetIdx() != centre_idx]
+    if len(others) != 1 or c.GetDegree() != 2:
+        return None
+    n = others[0]
+    bond = mol.GetBondBetweenAtoms(c_idx, n.GetIdx())
+    if (n.GetSymbol() != "N" or n.GetDegree() != 1 or n.GetFormalCharge() != 0
+            or bond.GetBondType() != Chem.BondType.TRIPLE):
+        return None
+    return {c_idx, n.GetIdx()}
+
+
+def _name_cyanic_acyl_halide(mol) -> Optional[str]:
+    """N#C-Y with Y a halogen or pseudohalide -> 'carbononitridic <Y>'."""
+    heavy = _heavy_set(mol)
+    for a in atoms_of(mol):
+        if a.GetSymbol() != "C" or a.GetDegree() != 2 or a.GetFormalCharge() != 0:
+            continue
+        nbs = list(a.GetNeighbors())
+        nitrile = [nb for nb in nbs if nb.GetSymbol() == "N" and nb.GetDegree() == 1
+                   and mol.GetBondBetweenAtoms(a.GetIdx(), nb.GetIdx()).GetBondType()
+                   == Chem.BondType.TRIPLE]
+        if len(nitrile) != 1:
+            continue
+        y = next(nb for nb in nbs if nb.GetIdx() != nitrile[0].GetIdx())
+        word = _halide_pseudohalide_class_word(mol, y, a.GetIdx())
+        if word is None or word in _CYANIC_EXCLUDED_CLASS:
+            return None
+        group = _branch_atoms(mol, y.GetIdx(), {a.GetIdx()})
+        if group | {a.GetIdx(), nitrile[0].GetIdx()} != heavy:
+            return None
+        return f"carbononitridic {word}"
+    return None
+
+
+def _name_carbonic_nitrile(mol) -> Optional[str]:
+    """X=C(CN)2 -> '<acyl> dicyanide'; H2N-C(=O/S)-CN -> 'carbamoyl cyanide' /
+    'carbamothioyl cyanide'."""
+    heavy = _heavy_set(mol)
+    for a in atoms_of(mol):
+        if (a.GetSymbol() != "C" or a.GetDegree() != 3 or a.GetFormalCharge() != 0
+                or a.IsInRing()):
+            continue
+        acyl = _carb_acyl(mol, a)
+        if acyl is None:
+            continue
+        kind, acyl_atoms = acyl
+        singles = [b.GetOtherAtom(a) for b in a.GetBonds()
+                   if b.GetBondType() == Chem.BondType.SINGLE]
+        if len(singles) != 2:
+            continue
+        cyanos = [_cyano_carbon(mol, nb.GetIdx(), a.GetIdx()) for nb in singles]
+        if all(cyanos):
+            accounted = {a.GetIdx()} | acyl_atoms | cyanos[0] | cyanos[1]
+            if accounted == heavy and kind in _CARBONIC_ACYL_WORD:
+                return f"{_CARBONIC_ACYL_WORD[kind]} dicyanide"
+            return None
+        if sum(1 for c in cyanos if c) == 1 and kind in _CARBAMOYL_ACYL_WORD:
+            cy = next(c for c in cyanos if c)
+            other = next(nb for nb, c in zip(singles, cyanos) if not c)
+            if {a.GetIdx(), other.GetIdx()} | acyl_atoms | cy != heavy:
+                return None
+            if (other.GetSymbol() == "N" and other.GetDegree() == 1
+                    and other.GetTotalNumHs() == 2 and other.GetFormalCharge() == 0):
+                return f"{_CARBAMOYL_ACYL_WORD[kind]} cyanide"
+            # (:31482) 'NC-CO-Cl carbonocyanidoyl chloride (PIN)'
+            if (kind == "O" and other.GetSymbol() in _HALIDE_CLASS_WORD
+                    and other.GetDegree() == 1):
+                return f"carbonocyanidoyl {_HALIDE_CLASS_WORD[other.GetSymbol()]}"
+        return None
+    return None
+
+
+def _name_polycarbonic_diamide(mol) -> Optional[str]:
+    """H2N-C(=X)-[Y-C(=X)]k-NH2 (k = 1..3; X = O/S/Se/Te; Y = O/S/Se, -NH-, -O-O-),
+    the amide nitrogens bearing carbon-only substituents, -> '[N1-...]<replacement
+    prefixes><di|tri|tetra>carbonic diamide',."""
+    if len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    if any(a.GetFormalCharge() for a in atoms_of(mol)):
+        return None
+    acid_cs = {}
+    for a in atoms_of(mol):
+        if a.GetSymbol() != "C" or a.IsInRing() or a.GetDegree() != 3:
+            continue
+        acyl = _carb_acyl(mol, a)
+        if acyl is None or acyl[0] not in _CARB_CHALC_PREFIX and acyl[0] != "O":
+            continue
+        acid_cs[a.GetIdx()] = acyl
+    n = len(acid_cs)
+    if not 2 <= n <= 4:
+        return None
+    acid_set = set(acid_cs)
+    accounted = set(acid_set)
+    for _, atoms in acid_cs.values():
+        accounted |= atoms
+    adj = {c: [] for c in acid_set}
+    amide_n = {}
+    for cidx in acid_set:
+        c = mol.GetAtomWithIdx(cidx)
+        for b in c.GetBonds():
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                continue
+            nb = b.GetOtherAtom(c)
+            br = _carb_bridge(mol, c, nb, acid_set)
+            if br is not None:
+                other, kind, atoms = br
+                adj[cidx].append((other, kind))
+                accounted |= atoms
+                continue
+            if (nb.GetSymbol() == "N" and not nb.IsInRing() and not nb.GetIsAromatic()
+                    and cidx not in amide_n):
+                amide_n[cidx] = nb.GetIdx()
+                continue
+            return None
+    deg = {c: len(adj[c]) for c in acid_set}
+    if sorted(deg.values()) != [1, 1] + [2] * (n - 2):
+        return None
+    ends = [c for c in acid_set if deg[c] == 1]
+    if set(amide_n) != set(ends):
+        return None                     # exactly the two end carbons carry an amide N
+    # walk the chain
+    order, bridges, prev, cur = [ends[0]], [], None, ends[0]
+    while len(order) < n:
+        nxts = [(o, k) for (o, k) in adj[cur] if o != prev]
+        if len(nxts) != 1:
+            return None
+        bridges.append(nxts[0][1])
+        order.append(nxts[0][0])
+        prev, cur = cur, nxts[0][0]
+    # N-substituents: carbon-only branches, named by the universal substituent namer
+    from ..assembly.substituent_naming import name_substituent_fragment
+    subs_at = {}                        # carbon idx -> [substituent names]
+    for cidx, nidx in amide_n.items():
+        n_atom = mol.GetAtomWithIdx(nidx)
+        branches = [nb.GetIdx() for nb in n_atom.GetNeighbors() if nb.GetIdx() != cidx]
+        if n_atom.GetTotalNumHs() != 2 - len(branches) or len(branches) > 2:
+            return None
+        accounted.add(nidx)
+        names = []
+        for b in branches:
+            atoms = _branch_atoms(mol, b, {nidx})
+            if any(mol.GetAtomWithIdx(i).GetAtomicNum() != 6 for i in atoms):
+                return None
+            if atoms & accounted:
+                return None
+            accounted |= atoms
+            name = name_substituent_fragment(mol, sorted(atoms), b, [nidx])
+            if not name or "unknown" in name:
+                return None
+            names.append(name)
+        subs_at[cidx] = names
+    if accounted != _heavy_set(mol):
+        return None
+
+    def _reps(carbon_order, bridge_kinds):
+        reps = {}
+        for i, cidx in enumerate(carbon_order):
+            kind = acid_cs[cidx][0]
+            if kind in _CARB_CHALC_PREFIX:
+                reps.setdefault(_CARB_CHALC_PREFIX[kind], []).append(2 * i + 1)
+        for j, kind in enumerate(bridge_kinds):
+            if kind == "O":
+                continue
+            infix = {"S": "thio", "Se": "seleno", "imido": "imido",
+                     "peroxy": "peroxy"}.get(kind)
+            if infix is None:
+                return None
+            reps.setdefault(infix, []).append(2 * j + 2)
+        return reps
+
+    def _n_locants(carbon_order):
+        return {carbon_order[0]: 1, carbon_order[-1]: 2 * n - 1}
+
+    cands = []
+    for co, bk in ((order, bridges), (order[::-1], bridges[::-1])):
+        reps = _reps(co, bk)
+        if reps is None:
+            return None
+        nloc = _n_locants(co)
+        sub_locs = sorted(nloc[c] for c, names in subs_at.items() for _ in names)
+        key = (sorted(p for ps in reps.values() for p in ps), sub_locs)
+        cands.append((key, reps, nloc))
+    _, reps, nloc = min(cands, key=lambda t: t[0])
+
+    frags = []
+    for infix in sorted(reps):
+        locs = sorted(reps[infix])
+        mult = _CARB_MULT.get(len(locs))
+        if mult is None:
+            return None
+        frags.append(f"{','.join(str(x) for x in locs)}-{mult}{infix}")
+    parent = f"{'-'.join(frags)}{_CARB_MULT[n]}carbonic diamide"
+
+    by_name = {}
+    for cidx, names in subs_at.items():
+        for nm in names:
+            by_name.setdefault(nm, []).append(nloc[cidx])
+    if not by_name:
+        return parent
+    from ..assembly.naming_utils import (
+        alpha_sort_key, enclose_if_compound, multiplied_component)
+    parts = []
+    for nm in sorted(by_name, key=alpha_sort_key):
+        locs = sorted(by_name[nm])
+        if len(locs) not in _CARB_MULT or len(locs) > 4:
+            return None
+        loc_str = ",".join(f"N{x}" for x in locs)
+        parts.append(f"{loc_str}-"
+                     f"{multiplied_component(len(locs), nm, enclose_if_compound(nm))}")
+    prefix = "-".join(parts)
+    joiner = "-" if parent[:1].isdigit() else ""
+    return f"{prefix}{joiner}{parent}"
+
+
+def name_carbonic_class_derivative(mol) -> Optional[str]:
+    """The Task 13 functional classes of carbonic and cyanic acid (see the block
+    comment above), else None."""
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for builder in (_name_cyanic_acyl_halide, _name_carbonic_nitrile,
+                    _name_polycarbonic_diamide):
+        try:
+            name = builder(mol)
+        except Exception:  # noqa: BLE001 -- a recogniser that cannot decide declines
+            name = None
+        if name is not None:
+            return name
+    return None
 
 
 # --- Substituted / multiplicative hydrazinecarboxamide (semicarbazide) family ---
@@ -2140,6 +2426,12 @@ def name_inorganic_acid(mol) -> Optional[str]:
     tabled = _ALL_INORGANIC.get(canonical)
     if tabled is not None:
         return tabled
+    # PIN class program Task 13: cyanic-acid acyl halides, carbonic-acid nitriles and
+    # the amides of di- and polycarbonic acids (functional classes; see the block
+    # comment above name_carbonic_class_derivative).
+    carb_class = name_carbonic_class_derivative(mol)
+    if carb_class is not None:
+        return carb_class
     # Substituted / multiplicative hydrazinecarboxamide (semicarbazide family):
     # the exact base is tabled above; the substituted and bis forms are
     # named here (fail-closed graph matcher, zero false positives by full atom

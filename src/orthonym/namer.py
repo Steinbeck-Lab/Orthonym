@@ -3802,11 +3802,18 @@ def _budget_scope(fn):
             enter_name_scope,
             exit_name_scope,
         )
+        from .metrics.provenance import best_effort_request_ctx
         depth = enter_name_scope()
         _lp_opened = False
         _policy = False
+        _request_token = None
         try:
             if depth == 1:
+                # The tier of the request (``provenance.best_effort_request_ctx``)
+                # for the whole outermost call, the last-resort rescue below
+                # included; reset in the finally below.
+                _request_token = best_effort_request_ctx.set(
+                    bool(getattr(self, '_general_fallback_unverified', False)))
                 # Lone-pair stereocentres: the string the caller gave, which the exit
                 # check reads as written (_exit_lone_pair_check); nested name calls
                 # name strings RDKit wrote. A lone-pair centre RDKit reads unlike the
@@ -3898,6 +3905,8 @@ def _budget_scope(fn):
             exit_name_scope()
             if depth == 1:
                 _CALLER_INPUT.smiles = None
+            if _request_token is not None:
+                best_effort_request_ctx.reset(_request_token)
             _lone_pair_input_exit(_lp_opened)
     return _wrapper
 
@@ -5421,7 +5430,8 @@ class Orthonym:
             # pin_unverified. Without a verified round trip either is best_effort.
             opsin = gate_opsin_label
             _known_non_pin = _pv.name_carries_non_pin_part(
-                dict(prov, pin_promotion_rerun=False, general_ring_prefix=False),
+                dict(prov, pin_promotion_rerun=False, general_ring_prefix=False,
+                     uncertified_pin_names=()),
                 _non_pin_scope)
             _tier_if_verified = (SYSTEMATIC_VERIFIED if _known_non_pin
                                  else PIN_UNVERIFIED)
@@ -5496,6 +5506,28 @@ class Orthonym:
             if _strict_name != name:
                 tier = PIN_UNVERIFIED
                 is_pin = False
+        # "Preferred IUPAC multiplicative names" (the Blue Book):
+        # identical parent structures, identically substituted at identical locants,
+        # take the multiplicative name as the PIN (:23180-23184); '4,4′-methylene
+        # diphenol (PIN) (1) 4-[(4-hydroxyphenyl)methyl]phenol' (:26874). When
+        # ``multiplicative_pin_expected`` holds and the name did not come from the
+        # multiplicative producer (dispatch class MULTIPLICATIVE), the name is a
+        # correct systematic name that is not the PIN, on every route that built it
+        # (the first run included): systematic_verified, is_pin False. The default
+        # tier then declines it; the wider tiers keep it.
+        # The routes (carbohydrates, natural products, peptides, lipids) name
+        # by their own nomenclature, not by parent selection; their labels are
+        # the natural-product decision's (plan Task 32), so they are not read here.
+        if tier == PIN_VERIFIED and name and not is_failure_name(name):
+            _mult_cls = getattr(self, "_last_dispatch_class", None)
+            if getattr(_mult_cls, "name", None) not in (
+                    "MULTIPLICATIVE", "CARBOHYDRATE_LOOKUP", "NATURAL_PRODUCT",
+                    "PEPTIDE", "LIPID"):
+                from .rules.pin_vocabulary import multiplicative_pin_expected
+                _mol_mult = Chem.MolFromSmiles(smiles)
+                if _mol_mult is not None and multiplicative_pin_expected(_mol_mult):
+                    tier = SYSTEMATIC_VERIFIED
+                    is_pin = False
         # wp7 (verification panel RISK 2): no oracle ran for this name. The
         # gate records UNAVAILABLE when it cannot consult OPSIN -- the opt-in
         # reduced mode without a jar (ORTHONYM_ALLOW_REDUCED, jars.py); a
@@ -8015,11 +8047,20 @@ class Orthonym:
             clear_abstention,
             record_abstention,
         )
+        from .metrics.provenance import best_effort_request_ctx
         start_naming_session()
         clear_confidence()
         # Task 0.1: reset the typed-abstention slot (twin of name).
         if is_top_level_naming():
             clear_abstention()
+        # The tier of the request (``provenance.best_effort_request_ctx``), as
+        # ``_budget_scope`` sets it for ``name``: this entry point calls
+        # ``_name_impl`` without that scope. Set only outside a request, so a call
+        # made inside a ``name`` keeps that request's tier; reset below.
+        _request_token = None
+        if best_effort_request_ctx.get() is None:
+            _request_token = best_effort_request_ctx.set(
+                bool(getattr(self, '_general_fallback_unverified', False)))
         try:
             # Wave-0 D1: same wildcard pre-check as name. name_with_confidence
             # returns a metadata dict, so mirror the limit handler's fallback dict
@@ -8202,6 +8243,8 @@ class Orthonym:
 
             return metadata
         finally:
+            if _request_token is not None:
+                best_effort_request_ctx.reset(_request_token)
             end_naming_session()
             clear_confidence()
 
@@ -10279,8 +10322,10 @@ def name_compound(smiles: str, style: str = "pin",
         call you make; the engine uses it to pass the setting on when it names
         parts of a molecule.
     general_fallback_unverified: bool or None, default None
-        Also switch on the last-resort producers of the ``best-effort`` tier.
-        Their names still have to pass the full-InChIKey round trip. ``None`` as
+        Also switch on the ``best-effort`` tier: the last-resort producers, von
+        Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11
+        rings (the other tiers build these names for ring systems of up to 40
+        skeletal atoms and 8 rings), and adducts with a one-atom ion. Their names still have to pass the full-InChIKey round trip. ``None`` as
         for ``general_fallback``.
     allow_aromatic_general: bool or None, default None
         Let the general engine also name aromatic and heterocyclic ring systems

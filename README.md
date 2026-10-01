@@ -45,7 +45,7 @@ exceptions for names OPSIN cannot read in full: names from exact-match lists (me
 natural-product parent names), a few name forms that OPSIN's grammar lacks or misreads, and names
 whose stereodescriptors OPSIN cannot parse (OPSIN confirms their constitution, and each descriptor is
 checked against its CIP label). `--provenance` marks each of them. The wider tiers ship none of
-them, except the metal-complex list names.
+them, except the names from the exact-match lists (metal-complex and natural-product parent names).
 
 **Honest.** A candidate that fails a check is withdrawn, and when no name is left Orthonym says so
 instead of guessing. `--provenance` reports the tier each name landed on and, in its `verified`
@@ -116,7 +116,7 @@ releases, checking each download against a pinned SHA-256 checksum:
 | Jar | Version | Used for | Licence |
 |:--|:--|:--|:--|
 | [OPSIN](https://github.com/dan2097/opsin) `opsin-cli-2.9.0-jar-with-dependencies.jar` | 2.9.0 | round-trip validation of names | MIT (the jar bundles jna-inchi, LGPL-2.1, and others) |
-| [centres](https://github.com/SiMolecule/centres) `centres.jar` | 1.2.1 | CIP stereo descriptors (R/S, E/Z) | BSD-2-Clause (the jar bundles CDK, LGPL-2.1+) |
+| [centres](https://github.com/SiMolecule/centres) `centres-cli-1.2.1.jar` (published as `centres.jar`) | 1.2.1 | CIP stereo descriptors (R/S, E/Z) | BSD-2-Clause (the jar bundles CDK, LGPL-2.1+) |
 
 `pip install` tries to fetch them for you, and a jar that is still missing is downloaded and
 checked the first time Orthonym needs it. To fetch them, or re-check the ones in the jar directory,
@@ -146,7 +146,7 @@ opt-in with `--emit-tier`:
 | `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar or a PIN whose stereodescriptors OPSIN cannot read; otherwise nothing (`NO_VERIFIED_PIN`) |
 | `valid` | also general names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
-| `best-effort` | also the names of the last-resort producers |
+| `best-effort` | also the names of the last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build these names for ring systems of up to 40 skeletal atoms and 8 rings), and adducts with a one-atom ion such as chloride |
 
 At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey OPSIN round trip (a
 name from the natural-product and metal-complex lists excepted), so the name formats absent from

@@ -168,6 +168,22 @@ allow_aromatic_general_ctx = contextvars.ContextVar(
 # pin/valid/complete/best-effort output.
 full_coverage_ctx = contextvars.ContextVar(
     "orthonym_full_coverage", default=False)
+# The tier of the OUTERMOST naming request: True for a best-effort request
+# (``general_fallback_unverified``), False for any other, None outside a request.
+# Set by the outermost ``name`` (``namer._budget_scope`` at name-scope depth 1,
+# which no nested or isolated naming re-enters), with the value ``name``
+# publishes as ``best_effort_ctx``, for the whole call -- the last-resort rescue
+# that runs after the body has hit the hang budget included -- and reset on
+# return. It differs from ``best_effort_ctx`` on three paths, all measured on the
+# large-molecule census (TRIAGE 'Large molecules -- part 3'): the best-effort
+# clean fall-through resets ``best_effort_ctx`` to False so that substituent
+# recursion takes the PIN vocabulary; the last-resort rescue runs after the
+# body has reset it; and the fragment rescue builds a fresh best-effort engine
+# inside a request of ANY tier, the PIN tier included. Read only by the von Baeyer
+# ring-size ceilings (``vonbaeyer_universal.cage_caps``), which take their
+# best-effort values in a best-effort request and nowhere else.
+best_effort_request_ctx = contextvars.ContextVar(
+    "orthonym_best_effort_request", default=None)
 # -T1c: a composer (``pin_path``) name whose ring substituent prefix could
 # only be produced by the GENERAL tier -- see ``record_general_ring_prefix``.
 _GENERAL_RING_PREFIX = contextvars.ContextVar(
@@ -187,6 +203,13 @@ _NON_PIN_FRAGMENTS = contextvars.ContextVar(
 # shipped before. Same lifetime and roll-back rule as the fragments.
 _NON_PIN_LABELS = contextvars.ContextVar(
     "orthonym_prov_non_pin_labels", default=())
+# Review a performance pass (F-06): names in PIN form whose preferred status the Blue Book itself
+# leaves open -- the book prints a different (PIN) for the same structure. A shipped
+# name that contains one is labelled pin_unverified (not systematic_verified: the code
+# does not know it is not the PIN). Name-scoped, with the same lifetime and roll-back
+# rule as the labels above.
+_UNCERTIFIED_PIN_NAMES = contextvars.ContextVar(
+    "orthonym_prov_uncertified_pin_names", default=())
 # Branch review fixes (2026-09-28): the shipped name was built by the PIN tier's
 # promotion re-run (``Orthonym._name_with_pin_promotion``), i.e. with a best-effort
 # composition producer admitted under the PIN-vocabulary guard. Such a name is not
@@ -287,7 +310,8 @@ def pop_non_pin_log() -> list:
 def clear_provenance() -> None:
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
-           "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels")
+           "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels",
+           "uncertified_pin_names")
     _SOURCE.set(None)
     _OPSIN.set(None)
     _STEREO_UNEXPRESSED.set(False)
@@ -304,6 +328,7 @@ def clear_provenance() -> None:
     _NON_PIN_FRAGMENTS.set(())
     _PIN_PROMOTION_RERUN.set(False)
     _NON_PIN_LABELS.set(())
+    _UNCERTIFIED_PIN_NAMES.set(())
 
 
 def restore_provenance(snapshot: dict) -> None:
@@ -343,9 +368,13 @@ def restore_provenance(snapshot: dict) -> None:
     _kept_labels = tuple(snapshot.get("non_pin_labels") or ())
     _NON_PIN_LABELS.set(_kept_labels + tuple(
         f for f in _NON_PIN_LABELS.get() if f not in _kept_labels))
+    _kept_unc = tuple(snapshot.get("uncertified_pin_names") or ())
+    _UNCERTIFIED_PIN_NAMES.set(_kept_unc + tuple(
+        f for f in _UNCERTIFIED_PIN_NAMES.get() if f not in _kept_unc))
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
-           "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels")
+           "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels",
+           "uncertified_pin_names")
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
@@ -484,6 +513,18 @@ def record_non_pin_label(fragment: str) -> None:
     _touch("non_pin_labels")
 
 
+def record_uncertified_pin_name(name: str) -> None:
+    """Record ``name`` as a PIN-form name whose preferred status the Blue Book leaves
+    open (see ``_UNCERTIFIED_PIN_NAMES``): a shipped name that contains it is labelled
+    pin_unverified, is_pin False."""
+    if not name:
+        return
+    cur = _UNCERTIFIED_PIN_NAMES.get()
+    if name not in cur:
+        _UNCERTIFIED_PIN_NAMES.set(cur + (name,))
+    _touch("uncertified_pin_names")
+
+
 def record_derived_non_pin_fragment(source: str, derived: str) -> None:
     """Record ``derived`` as a non-PIN fragment when ``source`` contains a recorded one:
     a form built from a non-PIN name by a string conversion (an acid name turned into
@@ -508,6 +549,8 @@ def name_carries_non_pin_part(prov: dict, name: Optional[str], *,
         return True
     if not name:
         return False
+    if any(f in name for f in (prov.get("uncertified_pin_names") or ())):
+        return True
     if any(f in name for f in (prov.get("non_pin_fragments") or ())):
         return True
     if label_forms and any(f in name for f in (prov.get("non_pin_labels") or ())):
@@ -529,4 +572,5 @@ def get_provenance() -> dict:
         "non_pin_fragments": _NON_PIN_FRAGMENTS.get(),
         "pin_promotion_rerun": _PIN_PROMOTION_RERUN.get(),
         "non_pin_labels": _NON_PIN_LABELS.get(),
+        "uncertified_pin_names": _UNCERTIFIED_PIN_NAMES.get(),
     }

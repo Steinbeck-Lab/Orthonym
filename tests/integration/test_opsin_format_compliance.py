@@ -280,10 +280,13 @@ class TestNBracketWrapping:
         assert "N-[" not in name, f"Simple N-methyl must not be bracketed: {name}"
 
     def test_nn_dimethylformamide_no_brackets(self):
-        """N,N-dimethylformamide must NOT get unnecessary brackets."""
-        name = name_compound("CN(C)C=O")
+        """N,N-dimethylacetamide must NOT get unnecessary brackets. (The formamide of
+        this test is 'dimethylformamide (PIN)' without locants,,
+        the Blue Book; acetamide's C-2 is substitutable, so its N locants stay.)"""
+        name = name_compound("CN(C)C(C)=O")
         assert "N,N-dimethyl" in name, f"Expected N,N-dimethyl: {name}"
         assert "[" not in name, f"Simple N,N-dimethyl must not be bracketed: {name}"
+        assert name_compound("CN(C)C=O") == "dimethylformamide"
 
     def test_n_ethylpropanamide_no_brackets(self):
         """N-ethylpropanamide must NOT get unnecessary brackets."""
@@ -294,27 +297,42 @@ class TestNBracketWrapping:
     # ---- Integration tests for bracket-fixable compounds ----
 
     def test_pentanoylamino_propanoyl_gets_brackets(self):
-        """N-[(2S)-2-(pentanoylamino)propanoyl]-... gets square brackets."""
+        """A stereo-bearing acylamino substituent is enclosed in the next mark.
+
+        The SMILES is Pro-Ala-Ala. Its -NH-CO-R groups are named by the
+        '-amido' / '-carboxamido' prefixes: (the Blue Book,
+        'Substituents of the types -NH-CO-R and -NH-SO2-R'),:32998 "Method (1)
+        generates preferred IUPAC names", not an 'N-[...acyl]' form. Each
+        stereo-bearing prefix is enclosed: '[(2S)-pyrrolidine-2-carboxamido]'
+        inside '{(2S)-2-[...]propanamido}',:7232, "Parentheses are
+        used around compound... and complex... prefixes").
+        """
         smiles = "C[C@H](NC(=O)[C@H](C)NC(=O)[C@@H]1CCCN1)C(=O)O"
         name = name_compound(smiles)
-        assert "N-[" in name, (
-            f"Expected N-[...] bracket wrapping for stereo N-substituent: {name}"
-        )
+        assert name == ("(2S)-2-{(2S)-2-[(2S)-pyrrolidine-2-carboxamido]"
+                        "propanamido}propanoic acid"), name
         # Must not have bare N-(2S) pattern
         assert "N-(2S)" not in name, (
             f"Should not have bare N-(2S) without brackets: {name}"
         )
 
+    # opsin_gate: with the suite's default gate-off state the generator's
+    # atom-dropping string 'N-[(1Z)-2-(1H-indol-3-yl)eth-1-en-1-yl](2S)-3-
+    # phenylpropanamide' (the Ac-Leu-N(Me) part is lost; OPSIN 2.9.0 cannot parse
+    # it) satisfied the substring test and the strict xfail XPASSed. With the gate
+    # on, as shipped, the default tier declines it; the best-effort name
+    # 'N-[(1Z)-2-(1H-indol-3-yl)eth-1-en-1-yl](2S)-2-{[(2S)-2-acetylamino-4-
+    # methyl-1-oxopentyl](methyl)amino}-3-phenylpropanamide' reads back exact.
+    @pytest.mark.opsin_gate
     @pytest.mark.xfail(
         strict=True,
-        reason="Phase 149 / IM-x.x: Phase 148 P-44.1(a) cascade unblock + "
-               "decomposition fragment-naming bug changed name from "
-               "`N-[(2S)-2-(hexanoylamino)-3-phenylpropanoyl]-3-(2-aminoethyl)-1H-indole` "
-               "to `N-acetyl(2S)-1-(amino(4Z)-2-(1H-indol-3-yl)eth-1-en-1-yl)-...-propanamide` "
-               "— the N-substituent is now `acetyl` (no brackets needed) but "
-               "the bracket-wrapping format rule for stereo N-substituents "
-               "should still apply once decomposition is fixed. Per "
-               "148-01-SUMMARY Risks §2 (Plan-01 carry-forward).",
+        reason="the default tier builds no name for this N-methyl peptide amide: "
+               "the generator's only candidate, 'N-[(1Z)-2-(1H-indol-3-yl)eth-1-"
+               "en-1-yl](2S)-3-phenylpropanamide', drops the Ac-Leu-N(Me) part "
+               "(a different molecule, which OPSIN 2.9.0 cannot parse) and the "
+               "validity gate removes it; needs a producer that keeps the "
+               "N-acyl-N-methyl amino branch. The best-effort name reads back "
+               "exact.",
     )
     def test_hexanoylamino_phenylpropanoyl_gets_brackets(self):
         """N-[(2S)-2-(hexanoylamino)-3-phenylpropanoyl]-... gets square brackets."""
@@ -433,8 +451,9 @@ class TestFormatEdgeFixes:
 
     def test_nn_format_correct_hyphen(self):
         """N,N-locant must use N,N- (hyphen after last N), not N,N, (comma)."""
-        # N,N-dimethylformamide: verify correct N,N- format
-        smiles = "CN(C)C=O"
+        # N,N-dimethylacetamide: verify correct N,N- format (formamide itself is
+        # 'dimethylformamide (PIN)', the Blue Book)
+        smiles = "CN(C)C(C)=O"
         name = name_compound(smiles)
         assert "N,N-" in name, f"Expected N,N- format: {name}"
         assert "N,N," not in name, f"Extra comma in N,N format: {name}"
@@ -467,14 +486,18 @@ class TestFormatEdgeFixes:
             )
 
     def test_benzene_as_parent_unchanged(self):
-        """benzene as parent ring should keep 'benzene', not become 'phenyl'."""
-        # hydroxymethylbenzene: benzene is the parent, methanol is substituent
+        """The ring of benzyl alcohol is a substituent: the parent carries the -OH.
+
+         (the Blue Book, under ' SENIORITY ORDER FOR PARENT
+        STRUCTURES'): "The senior parent structure has the maximum number of
+        substituents corresponding to the principal characteristic group
+        (suffix)". The -OH sits on the CH2, so methanol is the parent and the
+        ring is 'phenyl', as in 'cyclopropyl(phenyl)methanol (PIN)' (:7302).
+        'hydroxymethylbenzene' denotes the same molecule but is not the PIN.
+        """
         smiles = "OCc1ccccc1"
         name = name_compound(smiles)
-        # benzene as parent is correct (not changed to phenyl)
-        assert "benzene" in name, (
-            f"benzene as parent should stay 'benzene': {name}"
-        )
+        assert name == "phenylmethanol", name
 
     def test_phenyl_in_chain_context(self):
         """Benzene ring as substituent on chain should use 'phenyl'."""

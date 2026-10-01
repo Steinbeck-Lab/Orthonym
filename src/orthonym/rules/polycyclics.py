@@ -2250,8 +2250,11 @@ def _partial_sat_substituent_prefix(
     if not found_any:
         return None
     parts = []
+    from .partial_saturation import _locant_key
     for name in sorted(grouped.keys(), key=alpha_sort_key):
-        locs = sorted(grouped[name], key=lambda x: (isinstance(x, str), x))
+        # (the Blue Book): a letter locant follows its bare number
+        # (4 < 4a < 5), so '4a,5,8a-trimethyl', never '5,4a,8a-'.
+        locs = sorted(grouped[name], key=_locant_key)
         parts.append(format_substituent_prefix(name, locs, len(locs)))
     if not parts:
         return None

@@ -54,6 +54,51 @@ class _Malformed(Exception):
 MAX_CAGE_ATOMS = 40
 MAX_CAGE_RINGS = 8
 
+#: The best-effort tier's ceilings. A best-effort name need not be the PIN, only a
+#: verified systematic name, so the main-bridge concern above does not
+#: apply there; the work of each analysis is bounded by the per-name budgets
+#: (``fragment_naming._PERF_BUDGET`` / ``_ANALYSIS_CALL_BUDGET``). The values are
+#: measured (TRIAGE 'Large molecules -- part 3'): with no ceiling at all, every
+#: ring system named in the large-molecule census, the large-polycycle ladder and
+#: its two corpora has at most 82 skeletal atoms and 11 rings; above 11 rings no
+#: system was named and the main-ring search of each one ran its perf budget out
+#: (census rows up to 210 s slower, the ladder's 15- to 21-ring rows 30-44 s).
+#: The PIN tier keeps the two ceilings above.
+BEST_EFFORT_MAX_CAGE_ATOMS = 100
+BEST_EFFORT_MAX_CAGE_RINGS = 11
+
+
+def cage_caps() -> Tuple[int, int]:
+    """``(atoms, rings)`` ceilings for the tier of the running request: the
+    best-effort values in a best-effort request
+    (``provenance.best_effort_request_ctx``), else ``MAX_CAGE_ATOMS`` /
+    ``MAX_CAGE_RINGS`` -- in a PIN or complete request, on every path, the
+    best-effort recoveries such a request runs included, and outside a request."""
+    try:
+        from ..metrics.provenance import best_effort_request_ctx
+        if best_effort_request_ctx.get() is True:
+            return BEST_EFFORT_MAX_CAGE_ATOMS, BEST_EFFORT_MAX_CAGE_RINGS
+    except Exception:  # a tier read must never widen the scope
+        pass
+    return MAX_CAGE_ATOMS, MAX_CAGE_RINGS
+
+
+def beyond_pin_caps(n_atoms: int, n_rings: Optional[int] = None) -> bool:
+    """True iff a ring system of this size is analysed only under the best-effort
+    ceilings. A name built on such a system is not labelled a PIN."""
+    return n_atoms > MAX_CAGE_ATOMS or (n_rings is not None and n_rings > MAX_CAGE_RINGS)
+
+
+def record_beyond_pin_caps(fragment: str) -> None:
+    """Record ``fragment`` (the ring descriptor or ring name a producer built on a
+    ring system beyond the PIN ceilings) as a part that is never a PIN, so a name
+    carrying it is labelled below the PIN (``provenance.record_non_pin_fragment``)."""
+    try:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(fragment)
+    except Exception:
+        pass
+
 
 @dataclass(frozen=True)
 class RingAnalysis:
@@ -477,7 +522,8 @@ def analyze_cage_universal(
     else:
         cage_canon = _get_largest_connected_ring_component(kek, ring_atoms)
 
-    if len(cage_canon) > MAX_CAGE_ATOMS:
+    max_atoms, max_rings = cage_caps()
+    if len(cage_canon) > max_atoms:
         return None
     # a phase T3b: count rings the way defines them (minimum
     # scissions to reach an acyclic skeleton = circuit rank), NOT the count of
@@ -485,8 +531,9 @@ def analyze_cage_universal(
     # cages (adamantane 4 vs 3, cubane 6 vs 5), so this cap used to refuse
     # heptacyclo cages as "> 8 rings". See von_baeyer_ring_count.
     n_rings = von_baeyer_ring_count(kek, cage_canon)
-    if n_rings is None or n_rings < 2 or n_rings > MAX_CAGE_RINGS:
+    if n_rings is None or n_rings < 2 or n_rings > max_rings:
         return None
+    _beyond_pin = beyond_pin_caps(len(cage_canon), n_rings)
 
     analyzer = VonBaeyerAnalyzer()
     if len(analyzer._find_all_bridgeheads(kek, cage_canon)) < 2:
@@ -583,6 +630,8 @@ def analyze_cage_universal(
         logger.info("vonbaeyer_universal: mancude/aromatic cage -> refuse (default path)")
         return None
 
+    if _beyond_pin:
+        record_beyond_pin_caps(desc.descriptor_string)
     return UniversalCage(
         descriptor=desc.descriptor_string,
         total_atoms=desc.total_atoms,
@@ -772,7 +821,8 @@ def analyze_spiro_universal(
     cage_set = set(cage_atoms) if cage_atoms is not None else set(ring_atoms_mol)
     if not cage_set <= ring_atoms_mol:
         return None
-    if len(cage_set) > MAX_CAGE_ATOMS:
+    max_atoms, max_rings = cage_caps()
+    if len(cage_set) > max_atoms:
         return None
 
     # cage-only submol (reuses the spiro.py blocks unchanged, isolated from any
@@ -792,8 +842,9 @@ def analyze_spiro_universal(
     # no symmetry-degenerate smallest rings), so this only stops a bridged
     # candidate from being rejected for the wrong reason before that check runs.
     vb_rings = von_baeyer_ring_count(sub, set(range(sub.GetNumAtoms())))
-    if vb_rings is None or vb_rings < 2 or vb_rings > MAX_CAGE_RINGS:
+    if vb_rings is None or vb_rings < 2 or vb_rings > max_rings:
         return None
+    _beyond_pin = beyond_pin_caps(len(cage_set), vb_rings)
     spiro_sub = get_spiro_atoms(sub)
     if not spiro_sub:
         return None
@@ -905,6 +956,8 @@ def analyze_spiro_universal(
     cage_orig = tuple(sorted(cage_set))
     atom_to_locant = {sub_to_mol[k]: loc for k, loc in numbering.items()}
 
+    if _beyond_pin:
+        record_beyond_pin_caps(descriptor)
     return SpiroSystem(
         descriptor=descriptor,
         total_atoms=total_atoms,

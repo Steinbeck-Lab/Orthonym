@@ -1614,6 +1614,12 @@ def _ring_branch_may_need_other_parent(mol, sub_set, attach_idx, branch):
     - the molecule has no suffix group and the branch's ring system is the
       same as the ring system the substituent is attached to (Ph-CCl2-Ph is
       the multiplicative '1,1'-(dichloromethylene)dibenzene',.
+
+    Neither holds when the two ring systems are not identically substituted
+    units (``_branch_and_parent_are_distinct_units``, conditions (2)
+    and (3)): then no multiplicative name is the PIN, and the substitutive name
+    this producer builds is ('4-chloro-2-[(3-cyanophenyl)methyl]benzonitrile
+    (PIN)', the Blue Book).
     """
     try:
         from ..perception.functional_groups import detect_functional_groups
@@ -1625,6 +1631,9 @@ def _ring_branch_may_need_other_parent(mol, sub_set, attach_idx, branch):
     if pg:
         for match in pg_matches or ():
             if set(match) & set(branch):
+                if _branch_and_parent_are_distinct_units(
+                        mol, sub_set, attach_idx, branch, pg_matches):
+                    continue
                 return True
         return False
     parent_nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
@@ -1653,10 +1662,134 @@ def _ring_branch_may_need_other_parent(mol, sub_set, attach_idx, branch):
             key = lambda atoms: Chem.MolFragmentToSmiles(
                 mol, atomsToUse=sorted(atoms), canonical=True)
             if key(parent_sys) == key(branch_sys):
+                if _branch_and_parent_are_distinct_units(
+                        mol, sub_set, attach_idx, branch, None):
+                    continue
                 return True
         except Exception:
             return True
     return False
+
+
+def _is_chain_carboxamide(mol, sub_atoms, attach_idx) -> bool:
+    """True for a substituent that is an acyclic carbon chain of two or more
+    carbons, attached at a carbon, ending in a carboxamide -C(=O)-N< whose N
+    carries only hydrogen or saturated carbon: "Carbamoyl and
+    amino groups may be substituted in the normal way", the Blue Book).
+    The fragment holds no other heteroatom, no ring atom, no charge and no
+    radical, so the chain's name is the method (1) 'amino' + 'oxo' form and
+    nothing else in it is decided here."""
+    try:
+        sub_set = set(sub_atoms)
+        if attach_idx not in sub_set or mol.GetAtomWithIdx(attach_idx).GetSymbol() != 'C':
+            return False
+        ring_info = mol.GetRingInfo()
+        o_atoms, n_atoms = [], []
+        for idx in sub_set:
+            a = mol.GetAtomWithIdx(idx)
+            if (ring_info.NumAtomRings(idx) or a.GetFormalCharge()
+                    or a.GetNumRadicalElectrons()):
+                return False
+            sym = a.GetSymbol()
+            if sym == 'O':
+                o_atoms.append(a)
+            elif sym == 'N':
+                n_atoms.append(a)
+            elif sym != 'C':
+                return False
+        if len(o_atoms) != 1 or len(n_atoms) != 1:
+            return False
+        o, n = o_atoms[0], n_atoms[0]
+        if o.GetDegree() != 1:
+            return False
+        cc = o.GetNeighbors()[0]
+        if (mol.GetBondBetweenAtoms(o.GetIdx(), cc.GetIdx()).GetBondType()
+                != Chem.BondType.DOUBLE or cc.GetSymbol() != 'C'
+                or mol.GetBondBetweenAtoms(n.GetIdx(), cc.GetIdx()) is None):
+            return False
+        chain_nbrs = [x for x in cc.GetNeighbors()
+                      if x.GetIdx() in sub_set and x.GetSymbol() == 'C']
+        if len(chain_nbrs) != 1 or cc.GetIdx() == attach_idx:
+            return False          # the amide carbon ends a chain of >= 2 carbons
+        # The amide carbon is reached from the attachment through carbon atoms
+        # only: an N between them is the reversed amide -NH-CO-R (an acylamino
+        # group,, not a carboxamide at the chain end.
+        seen, stack = {attach_idx}, [attach_idx]
+        while stack:
+            cur = stack.pop()
+            for x in mol.GetAtomWithIdx(cur).GetNeighbors():
+                xi = x.GetIdx()
+                if xi in sub_set and xi not in seen and x.GetSymbol() == 'C':
+                    seen.add(xi)
+                    stack.append(xi)
+        if cc.GetIdx() not in seen:
+            return False
+        for x in n.GetNeighbors():
+            if x.GetIdx() == cc.GetIdx():
+                continue
+            if x.GetSymbol() != 'C' or x.GetIdx() not in sub_set or x.GetIsAromatic():
+                return False
+            if any(b.GetBondType() != Chem.BondType.SINGLE for b in x.GetBonds()):
+                return False
+        return True
+    except Exception:
+        return False
+
+
+def _branch_and_parent_are_distinct_units(mol, sub_set, attach_idx, branch, pg_matches):
+    """True when the ring branch and the parent ring system are two ring systems of
+    one skeleton that are NOT identically substituted units, so no multiplicative
+    name is the PIN "Preferred IUPAC multiplicative names",
+    the Blue Book, conditions (2) and (3) at:23183-23184: "the locants of
+    all substituent groups on the identical parent structures, including suffix
+    groups, are identical";,:6231: otherwise "preferred IUPAC names
+    are generated by substitutive nomenclature").
+
+    Only the plain two-unit case is decided: the substituent is attached to a ring
+    atom of the parent, the branch holds exactly one ring system of that ring
+    system's skeleton, the molecule holds exactly two ring systems of it, and --
+    with a principal characteristic group (``pg_matches``) -- each of the two
+    carries one in or next to it (else the branch's group needs another parent,
+    which is not this producer's choice). ``identical_parent_units`` then compares
+    the two decorated units. Anything else, or any error: False (the caller's
+    decline stands)."""
+    try:
+        from ..rules.pin_vocabulary import identical_parent_units
+        ring_info = mol.GetRingInfo()
+        systems = []
+        for ring in ring_info.AtomRings():
+            r = set(ring)
+            merged = [sy for sy in systems if sy & r]
+            for sy in merged:
+                systems.remove(sy)
+                r |= sy
+            systems.append(r)
+        parent_ring_nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+                            if n.GetIdx() not in sub_set and ring_info.NumAtomRings(n.GetIdx())]
+        if len(parent_ring_nbrs) != 1:
+            return False
+        parent_sys = next(sy for sy in systems if parent_ring_nbrs[0] in sy)
+
+        def skel(atoms):
+            return Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(atoms), canonical=True,
+                                            isomericSmiles=False)
+        pkey = skel(parent_sys)
+        in_branch = [sy for sy in systems if sy <= set(branch) and skel(sy) == pkey]
+        if len(in_branch) != 1 or sum(1 for sy in systems if skel(sy) == pkey) != 2:
+            return False
+        branch_sys = in_branch[0]
+        if pg_matches is not None:
+            def zone(sy):
+                z = set(sy)
+                for a in sy:
+                    z.update(n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors())
+                return z
+            for sy in (parent_sys, branch_sys):
+                if not any(set(m) & zone(sy) for m in pg_matches):
+                    return False
+        return not identical_parent_units(mol, parent_sys, branch_sys)
+    except Exception:
+        return False
 
 
 def _name_internal_polyfunctional_substituent(
@@ -3434,7 +3567,15 @@ def _ether_chain_locants_omitted(mol, sub_atoms, backbone, groups,
     # skeleton, so no structural test below can see the label).
     if locants_are_forced():
         return False
-    if scope_has_isotopic_modification():
+    # The weaker isotopic declaration vetoes only a backbone with more than one
+    # position. (the Blue Book): "locants are omitted if no locants
+    # are necessary in unmodified names. However, if isotopic modification requires
+    # a locant to specify its position, then all locants must be specified" -- on a
+    # one-atom backbone ('methyl') every position is locant 1, so no label in this
+    # scope can need one: '{[(2H1)methoxy(2H2)methyl]sulfanyl}methaneperoxol (PIN)'
+    # (:44188), not '[1-(2H1)methoxy(2H2)methyl]'. A label that does need a locant
+    # anywhere enters the forced scope above, which still vetoes.
+    if scope_has_isotopic_modification() and len(backbone or ()) != 1:
         return False
 
     if mol is None or not backbone or not groups or not sub_atoms:
@@ -5721,12 +5862,16 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
         return None
 
     # ---- Amide: general -amide suffix ---- (IUPAC
-    # e.g., "propanamide" -> "2-carbamoylethyl", "acetamide" -> "carbamoylmethyl"
+    # "acetamide" -> "2-amino-2-oxoethyl": (the Blue Book)
+    # "For generation of IUPAC preferred names, method (1) is preferred for
+    # chains" (:32928) -- 'amino' + 'oxo' on the terminal atom of the carbon chain,
+    # '5-(2-amino-2-oxoethyl)furan-2-carboxylic acid (PIN)' (:32940), not the
+    # method (2) '(carbamoylmethyl)' (:32941).
     m_amide = re.search(r'(?:an)?amide$', name)
     if m_amide:
         shortened = chain_length - 1
         if shortened == 1:
-            return "carbamoylmethyl"        #: one position, no locant
+            return "2-amino-2-oxoethyl"
         if shortened >= 2:
             return _decline_unjustifiable(
                 "carbamoyl", "count-derived locant on a multi-position stem")
@@ -6276,6 +6421,15 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
                 for b in atom.GetBonds())
             if cc_unsat:
                 return None
+            # A nitrile carbon (C#N) is not a chain carbon: the group is the
+            # 'cyano' prefix, the Blue Book), named as a branch.
+            # Counting it into the chain wrote the -C#N as a chain end bearing
+            # 'amino' -- '1-amino-...butan-2-yl' for -CH(C#N)CH2CH2SCH3, a
+            # different molecule (the read-back caught it).
+            if any(b.GetBondType() == Chem.BondType.TRIPLE
+                   and b.GetOtherAtom(atom).GetSymbol() != 'C'
+                   for b in atom.GetBonds()):
+                continue
             carbon_set.add(idx)
         if attach_idx not in carbon_set:
             return None
@@ -6761,6 +6915,17 @@ def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
         return None
     sym = a.GetSymbol()
     heavy = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() in sub_set]
+    # The bare prefixes 'hydroxy', 'sulfanyl' and 'amino' are -OH, -SH and -NH2: a
+    # hetero atom on one single bond with the hydrogens that bond leaves. A bare
+    # nitrile N (0 H, a triple bond) or an =NH named 'amino' is another molecule
+    # (review a performance pass, F-07: '1-amino-...' for -C#N). (The R forms keep their
+    # previous behaviour; a wrong one there is voided by the round trip.)
+    if not heavy and sym in ('O', 'S', 'N'):
+        _bonds = [b for b in a.GetBonds() if b.GetOtherAtom(a).GetAtomicNum() > 1]
+        _want_h = {'O': 1, 'S': 1, 'N': 2}[sym]
+        if (len(_bonds) != 1 or _bonds[0].GetBondType() != Chem.BondType.SINGLE
+                or a.GetTotalNumHs(includeNeighbors=True) != _want_h):
+            return None
 
     def _name_r(r_root, block=attach_idx):
         return name_substituent_fragment(
@@ -8314,7 +8479,15 @@ def _name_substituent_fragment_uncached(
         _fg_best_effort = bool(best_effort_ctx.get())
     except Exception:
         _fg_best_effort = False
-    if _fg_best_effort and attach_idx is not None and attach_idx in set(sub_atoms):
+    # At the PIN tier the same namer runs for one class the Blue Book fixes by
+    # rule, a carboxamide at the end of a carbon chain (``_is_chain_carboxamide``):
+    # (the Blue Book) "method (1) is preferred for chains"
+    # (:32928), 'amino' and 'oxo' on the terminal atom -- '5-(2-amino-2-oxoethyl)
+    # furan-2-carboxylic acid (PIN)' (:32940); the recursive path below writes the
+    # method (2) form '(carbamoylmethyl)' (:32941).
+    _fg_pin = (not _fg_best_effort and attach_idx is not None
+               and _is_chain_carboxamide(mol, sub_atoms, attach_idx))
+    if (_fg_best_effort or _fg_pin) and attach_idx is not None and attach_idx in set(sub_atoms):
         _fg_name = None
         _fg_located = None
         try:
@@ -8345,6 +8518,10 @@ def _name_substituent_fragment_uncached(
             logger.debug("Tier FG located namer failed: %s", _exc)
             _fg_name = None
             _fg_located = None
+        if _fg_name is not None and _fg_pin:
+            from ..rules.pin_vocabulary import non_pin_vocabulary
+            if non_pin_vocabulary(_fg_name) is not None:
+                _fg_name = None
         if _fg_name is not None:
             return _add_substituent_stereo(
                 mol, sub_atoms, _fg_name, attach_idx=attach_idx,

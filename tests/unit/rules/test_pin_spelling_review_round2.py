@@ -508,7 +508,7 @@ ISOTOPE_DESCRIPTOR_ROWS = [
     ("[2H]N1CCNC1", "(1-2H)imidazolidine", "pin_verified"),
     ("[2H]N1CCC(C)CC1", "4-methyl(1-2H)piperidine", "pin_verified"),
     ("[2H]NC", "(N-2H1)methanamine", "pin_verified"),
-    ("[2H]NCc1ccccc1", "phenyl(N-2H1)methanamine", "pin_verified"),
+    ("[2H]NCc1ccccc1", "1-phenyl(N-2H1)methanamine", "pin_verified"),  # (Task 11)
     # the Blue Book cites 'N' once ('(N-2H2)aniline (PIN)',:43830), which OPSIN
     # 2.9.0 cannot read: the readable spelling ships below the PIN, a correct
     # systematic name that is not the PIN (user decision 2026-09-30)
@@ -606,7 +606,10 @@ def test_identical_prefix_names_to_merge_direct():
 
 @pytest.mark.parametrize("smiles,expected,tier", [
     ("OCCO[N+](=O)[O-]", "2-(nitrooxy)ethan-1-ol", "systematic_verified"),
-    ("CCO[N+](=O)[O-]", "(nitrooxy)ethane", "systematic_verified"),
+    # the ester is the only characteristic group: its functional-class name is
+    # built,:35918, "Alkyl groups, aryl groups, etc. are cited as
+    # separate words... followed by the name of the appropriate anion")
+    ("CCO[N+](=O)[O-]", "ethyl nitrate", "pin_verified"),
     ("NC(=O)CCO[N+](=O)[O-]", "3-(nitrooxy)propanamide", "systematic_verified"),
     ("Oc1ccc(O[N+](=O)[O-])cc1", "4-(nitrooxy)phenol", "systematic_verified"),
     ("CC(=O)CCO[N+](=O)[O-]", "4-(nitrooxy)butan-2-one", "systematic_verified"),

@@ -28,7 +28,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : The checks this name passed, for example `self_consistency` (OPSIN read the name back to your structure), `atom_coverage` (every atom is named) or `full_key_round_trip`.
 
 `gate_outcome`
-: What the final OPSIN check did for this name: `self_consistency_verified`, `full_key_round_trip_verified`, `self_consistency_constitution_only`, `suppressed` (a candidate failed and was withdrawn), `not_run`, `unavailable` (OPSIN did not answer), or `carveout:<class>` for a name class that OPSIN cannot read.
+: What the final OPSIN check did for this name: `self_consistency_verified`, `full_key_round_trip_verified`, `self_consistency_constitution_only`, `suppressed` (a candidate failed and was withdrawn), `not_run`, `unavailable` (no OPSIN check ran: the opt-in reduced mode without the jars), or `carveout:<class>` for a name class that OPSIN cannot read.
 
 `formula`
 : The molecular formula, given when there is no name, so a decline still tells you what came in.

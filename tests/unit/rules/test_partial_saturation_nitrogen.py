@@ -28,9 +28,17 @@ def _const(smi):
 
 # (smiles, expected tetrahydro prefix substring)
 SATURATED_N = [
-    ("c1nc2c([nH]1)CCNC2", "tetrahydroimidazo"),          # imidazo[4,5-c]pyridine
-    ("c1cc2c([nH]1)CCNC2", "tetrahydropyrrolo"),          # pyrrolo[3,2-c]pyridine
-    ("c1n[nH]c2c1CCNC2", "tetrahydropyrazolo"),           # pyrazolo
+    # imidazo[4,5-c]pyridine and pyrazolo[3,4-c]pyridine: the mancude parent's indicated
+    # hydrogen on the aromatic N-H is cited, the Blue Book); OPSIN's
+    # read-back has the input's FixedH InChI (1H, not 3H / 2H).
+    ("c1nc2c([nH]1)CCNC2", "tetrahydro-1H-imidazo"),
+    # pyrrolo[3,2-c]pyridine: the hydro prefixes go on the mancude parent with its
+    # indicated hydrogen, '4,5,6,7-tetrahydro-1H-pyrrolo[3,2-c]pyridine',
+    # the Blue Book "In preferred IUPAC names, all indicated hydrogen atoms must
+    # be cited";:24256 "based on the retained mancude names... 1H-indole
+    #... modified by 'hydro' prefixes").
+    ("c1cc2c([nH]1)CCNC2", "tetrahydro-1H-pyrrolo"),
+    ("c1n[nH]c2c1CCNC2", "tetrahydro-1H-pyrazolo"),
     ("C1Cc2cncnc2CN1", "tetrahydropyrido"),               # pyrido[3,4-d]pyrimidine
 ]
 

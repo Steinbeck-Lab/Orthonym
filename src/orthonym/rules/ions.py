@@ -4507,7 +4507,16 @@ def _collect_substituent_atoms(mol, center_idx, start_idx, ring_system):
     """BFS the connected substituent component hanging off ``start_idx`` (a
     neighbour of the ring centre), excluding the centre and ring atoms. Returns
     the atom-index set, or None if it loops back into the ring (fused/bridged
-    attachment — out of scope)."""
+    attachment — out of scope) or back to the centre itself.
+
+    A walk that reaches the centre again through an atom other than
+    ``start_idx`` is a ring THROUGH the centre, not a branch of it: each of the
+    centre's ring neighbours would walk the same ring, so the mononuclear-centre
+    emitters (``_emit_group13_uide``, ``emit_halogen_onium``,...) named one ring
+    as two chain ligands and passed their atom-coverage veto -- ``C[B-]1(C)CCCCC1``
+    -> 'dimethyldipentylboranuide', ``C1CC[I+]CC1`` -> 'dipentyliodanium', both
+    a different molecule. Such a centre is a ring atom and belongs to a ring
+    parent, so the walk declines it."""
     seen = {center_idx}
     stack = [start_idx]
     sub = set()
@@ -4519,6 +4528,8 @@ def _collect_substituent_atoms(mol, center_idx, start_idx, ring_system):
         sub.add(x)
         for nb in mol.GetAtomWithIdx(x).GetNeighbors():
             nbi = nb.GetIdx()
+            if nbi == center_idx and x != start_idx:
+                return None  # the "substituent" is a ring through the centre
             if nbi in ring_system and nbi != center_idx:
                 return None  # substituent re-enters the ring system
             if nbi not in seen:

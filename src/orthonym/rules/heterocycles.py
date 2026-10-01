@@ -899,9 +899,14 @@ def build_hw_name(
     is_saturated: bool,
     is_aromatic: bool,
     lambda_by_locant: Optional[Dict[int, int]] = None,
+    cite_locants: bool = True,
 ) -> Optional[str]:
     """
     Build Hantzsch-Widman systematic name for a heterocycle.
+
+    ``cite_locants=False`` leaves out the heteroatom locant set, for a caller that
+    has established a licence for the whole name (a lambda locant is
+    always cited,.
 
     Returns ``None`` -- fail closed -- when any heteroatom has no Table 2.4
     prefix. ``""`` still means "no heteroatoms supplied" and stays distinct.
@@ -991,7 +996,8 @@ def build_hw_name(
     #: a lambda-bearing ring ALWAYS cites its heteroatom locants,
     # even for a single heteroatom (1lambda3-iodinane, not 'lambda3-iodinane'),
     # with the lambda token immediately after its locant (1,3lambda5-oxaphosphole).
-    if (total_het > 1 or lambda_by_locant) and not _one_element_all_positions:
+    if ((total_het > 1 or lambda_by_locant) and not _one_element_all_positions
+            and (cite_locants or lambda_by_locant)):
         from .lambda_convention import format_lambda_token
         locant_prefix = ','.join(
             format_lambda_token(loc, lambda_by_locant.get(loc))
@@ -4815,6 +4821,30 @@ def name_substituted_heterocycle(
                 stereo_text="",
             )
 
+    # (the Blue Book) "All locants are omitted for parent compounds
+    # when all substitutable hydrogen atoms have the same locant": 'chlorotrioxetane
+    # (PIN) (not 4-chloro-1,2,3-trioxetane)' (:3187), 'dichlorotrioxetane (PIN)'
+    # (:3029) -- the parent's heteroatom locants go too; (:7304) encloses
+    # the second and subsequent simple prefixes. The ring parent is rebuilt from the
+    # structure without its locant set, and used only when the same builder, asked
+    # for the locants, gives exactly ``parent_name``.
+    _l6_parent = _l6_ring_parent_without_locants(
+        mol, ring_atoms, parent_name, atom_to_locant, suffix_fg, _has_n_substituent,
+        n_groups, _suffix_n_tokens, stereo_descriptors)
+    if _l6_parent and c_groups:
+        from ..assembly.composition_primitives import (
+            _join_prefix_to_name,
+            unlocanted_prefix_block,
+        )
+        from ..assembly.naming_utils import format_substituent_prefix
+        _texts = sorted(
+            ((name, format_substituent_prefix(name, sorted(locs), len(locs)))
+             for name, locs in c_groups.items()),
+            key=lambda t: prefix_citation_sort_key(t[0]))
+        return _join_prefix_to_name(
+            unlocanted_prefix_block([t[1] for t in _texts], enclose_subsequent=True),
+            _l6_parent)
+
     # Format C-substituent prefixes
     from ..assembly.composition_primitives import prefix_locant_order_key
     for name, locants in c_groups.items():
@@ -4867,6 +4897,16 @@ def name_substituted_heterocycle(
             combined = f"{prefix_str}{parent_name}"
     else:
         combined = f"{prefix_str}{parent_name}"
+    if _l3_omit_prefix_locant and all(
+            mol.GetAtomWithIdx(int(_ra)).GetIsAromatic() for _ra in ring_atoms):
+        # A Blue Book conflict, left for a ruling (review a performance pass, F-06):
+        # (the Blue Book, with 'pyrazinecarboxylic acid (PIN)':2949) omits the locant here,
+        # while prints '2-[(pyridin-3-yl)oxy]pyrazine (PIN)' (:27772) for a
+        # prefix on the same ring. The name is kept and labelled pin_unverified. Only
+        # the mancude (aromatic) ring: the book prints the saturated one-orbit ring
+        # without the locant as the PIN ('phenyloxirane (PIN)', the Blue Book).
+        from ..metrics.provenance import record_uncertified_pin_name
+        record_uncertified_pin_name(combined)
 
     # Add suffix-type functional groups
     if suffix_fg:
@@ -5072,6 +5112,53 @@ def name_substituted_heterocycle(
         return f"{stereo_prefix}{combined}"
 
     return combined
+
+
+def _l6_ring_parent_without_locants(mol, ring_atoms, parent_name, atom_to_locant,
+                                    suffix_fg, has_n_substituent, n_groups,
+                                    suffix_n_tokens, stereo_descriptors) -> Optional[str]:
+    """The Hantzsch-Widman parent name without its heteroatom locants when the
+     licence holds for a substituted ring with no suffix (see the caller);
+    None otherwise. Deny-by-default: a suffix, an N-substituent, a stereodescriptor,
+    a scope that is part of a larger name, a lambda atom, or a rebuilt name that does
+    not reproduce ``parent_name`` exactly."""
+    try:
+        if suffix_fg or has_n_substituent or n_groups or suffix_n_tokens:
+            return None
+        if stereo_descriptors or not parent_name or parent_name.isalpha():
+            return None
+        from ..assembly.handlers._handler_shared import locant_scope_is_a_name_component
+        if locant_scope_is_a_name_component():
+            return None
+        from ..assembly.locant_omission import l6_ring_parent_one_substitutable_atom
+        ring = list(ring_atoms)
+        if not l6_ring_parent_one_substitutable_atom(mol, ring):
+            return None
+        from .lambda_convention import nonstandard_bonding_number
+        hetero = []
+        for a in ring:
+            atom = mol.GetAtomWithIdx(a)
+            if atom.GetSymbol() == 'C':
+                continue
+            if nonstandard_bonding_number(mol, a) is not None:
+                return None
+            loc = atom_to_locant.get(a)
+            if not isinstance(loc, int):
+                return None
+            hetero.append((loc, atom.GetSymbol()))
+        hetero.sort()
+        ring_set = set(ring)
+        bonds = [mol.GetBondBetweenAtoms(i, j) for i in ring for j in ring
+                 if i < j and mol.GetBondBetweenAtoms(i, j) is not None]
+        is_aromatic = all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring_set)
+        is_saturated = all(b.GetBondType() == Chem.BondType.SINGLE for b in bonds)
+        with_locants = build_hw_name(hetero, len(ring), is_saturated, is_aromatic)
+        if with_locants != parent_name:
+            return None
+        return build_hw_name(hetero, len(ring), is_saturated, is_aromatic,
+                             cite_locants=False) or None
+    except Exception:  # noqa: BLE001 -- deny by default
+        return None
 
 
 def _fully_enclosed(n: str) -> bool:

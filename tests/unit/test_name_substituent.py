@@ -287,11 +287,11 @@ class TestParentToPrefixAmide:
             "propanamide", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     def test_acetamide(self):
-        """acetamide -> carbamoyl prefix form."""
+        """acetamide -> the method (1) prefix of (the Blue Book,
+        "method (1) is preferred for chains"): '5-(2-amino-2-oxoethyl)furan-2-carboxylic
+        acid (PIN)' (:32940), not '(carbamoylmethyl)' (:32941)."""
         result = parent_to_prefix("acetamide", 2, attach_locant=ATTACH_LOCANT_UNKNOWN)
-        assert result is not None
-        assert isinstance(result, str)
-        assert "carbamoyl" in result.lower()
+        assert result == "2-amino-2-oxoethyl"
 
     def test_carboxamide(self):
         """benzcarboxamide -> carbamoyl prefix form."""
