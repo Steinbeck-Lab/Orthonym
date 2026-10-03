@@ -218,7 +218,7 @@ entry in APA and BibTeX. In BibTeX:
 @software{orthonym,
   author  = {Rajan, Kohulan and Zielesny, Achim and Steinbeck, Christoph},
   title   = {{Orthonym}},
-  version = {1.0.3},
+  version = {1.0.4},
   year    = {2026},
   doi     = {10.5281/zenodo.23044199},
   url     = {https://github.com/Steinbeck-Lab/Orthonym}

@@ -5,6 +5,13 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.4](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.3...v1.0.4) (2026-10-03)
+
+
+### Bug Fixes
+
+* bridged fused PINs on every printed fused parent, the morphine class, ketones and imides on bridged parents, more PIN classes and exact spellings ([85759e7](https://github.com/Steinbeck-Lab/Orthonym/commit/85759e7bca1481c7c0cf5a5f9ce48554fb39711f))
+
 ## [1.0.3](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.2...v1.0.3) (2026-10-01)
 
 
