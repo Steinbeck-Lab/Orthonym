@@ -315,12 +315,36 @@ def test_bluebook_cited_pin_strings(smiles, expected, cite):
     assert _name(smiles) == expected, f"PIN per {cite}"
 
 
+def _identical_units_across_the_bridge(smiles) -> bool:
+    """True when the molecule's S-S bond joins two identical units: cutting that
+    bond leaves two fragments with the same canonical SMILES
+    (HO-CH2-CH2-SS-CH2-CH2-OH)."""
+    mol = Chem.MolFromSmiles(smiles)
+    ss = [b.GetIdx() for b in mol.GetBonds()
+          if b.GetBeginAtom().GetSymbol() == "S" and b.GetEndAtom().GetSymbol() == "S"]
+    if len(ss) != 1:
+        return False
+    halves = Chem.GetMolFrags(Chem.FragmentOnBonds(mol, ss, addDummies=False),
+                              asMols=True)
+    return len(halves) == 2 and len({Chem.MolToSmiles(h) for h in halves}) == 1
+
+
 def test_disulfanediyl_is_never_emitted_for_a_monovalent_branch():
     """'disulfanediyl' is method (3): the MULTIPLICATIVE divalent bridge
     -SS-. It is not a monovalent substituent prefix, so no branch disulfide may
-    cite it. Verified across the whole family rather than on one molecule."""
+    cite it. Verified across the whole family rather than on one molecule.
+
+    The one family member whose two halves are identical units, HO-CH2-CH2-SS-
+    CH2-CH2-OH, takes the multiplicative name: (the Blue Book)
+    "methods (3), (4), or (5) generate preferred IUPAC names when the conditions
+    for their use are satisfied", '4,4'-disulfanediyldiphenol (PIN)' (:27892),
+    '2,2'-sulfanediyldi(ethan-1-ol) (PIN)',:5813). There the bridge
+    joins the two units and is no branch prefix; that row is asserted exactly in
+    ``test_identical_units_take_the_multiplicative_pin``."""
     offenders = []
     for smiles, _canonical, _heavy in _family():
+        if _identical_units_across_the_bridge(smiles):
+            continue
         name = _name(smiles)
         if not _is_abstention(name) and "disulfanediyl" in name:
             offenders.append((smiles, name))
@@ -328,6 +352,15 @@ def test_disulfanediyl_is_never_emitted_for_a_monovalent_branch():
         "divalent 'disulfanediyl' cited for a monovalent branch:\n"
         + "\n".join(f"  {s}: {n!r}" for s, n in offenders)
     )
+
+
+def test_identical_units_take_the_multiplicative_pin():
+    """The family's identical-unit disulfide (see the test above): the -SS- bridge
+    multiplies the two ethan-1-ol units, method (3) (:27860,:27866),
+     (:23180) -- '2,2'-sulfanediyldi(ethan-1-ol) (PIN)' (:5813)."""
+    identical = [s for s, _c, _h in _family() if _identical_units_across_the_bridge(s)]
+    assert identical == ["OCCSSCCO"], identical
+    assert _name("OCCSSCCO") == "2,2'-disulfanediyldi(ethan-1-ol)"
 
 
 def test_tert_butoxy_is_never_spelled_tert_butyloxy():

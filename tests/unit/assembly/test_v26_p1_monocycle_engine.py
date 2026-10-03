@@ -13,9 +13,10 @@ demonstrated NEWCOV win is benzene aryl-ethers (``-OCF3`` / ``-OCH2CF3`` /...),
 which the ``benzene.py`` vocab drops but the recursion + name faithfully.
 
 Reproduce-first (confirmed 2026-07-20, production OPSIN gate on): under the
-DEFAULT pin path every NEWCOV SMILES below returns ``is_failure_name``
+DEFAULT pin path every NEWCOV SMILES below returned ``is_failure_name``
 (``unknown organic compound``); under ``complete`` they emit an
-OPSIN-round-tripping name.
+OPSIN-round-tripping name. Since the PIN class program Task 8 the default pin
+path names them too, with the same strings (test_newcov_pin_tier_emits).
 
 Every emission is fail-closed: E1 atom partition + OPSIN round-trip.
 The engine returns None on anything outside scope (charged / fused-cage parent /
@@ -36,7 +37,7 @@ import pytest
 from rdkit import Chem
 
 import orthonym.namer as _namer_mod
-from orthonym.namer import Orthonym, is_failure_name
+from orthonym.namer import Orthonym
 from orthonym.assembly.general_engine import name_general_monocycle
 from orthonym.validation.e1_certificate import verify_certificate
 from tests.support.jars import jar_or_none
@@ -46,7 +47,8 @@ from tests.support.rt_assert import assert_full_rt
 pytestmark = pytest.mark.unit
 
 
-# (SMILES, expected complete-tier name) — pin ABSTAINS, complete EMITS, RT-OK.
+# (SMILES, expected complete-tier name) — complete EMITS, RT-OK; the default pin
+# path emits the same names since the PIN class program Task 8.
 # All are benzene aryl-ethers: the concrete P1 coverage win (benzene vocab miss).
 NEWCOV_CASES = [
     # change-asserted-value: a fluoro-substituted alkoxy is a
@@ -208,18 +210,28 @@ def test_names_opsin_roundtrip(smiles, expected, opsin_roundtrip):
 
 
 # --------------------------------------------------------------------------
-# Reproduce-first: the NEWCOV cases ABSTAIN under the default pin path.
+# The default pin path names the NEWCOV cases with the same strings.
+# PIN class program Task 8, change-asserted-value (was test_newcov_pin_abstains,
+# which asserted the default-pin abstention of 2026-07-20): the benzene substituent
+# collector now names an R-O- whose R carries a halogen with the shared substituent
+# namer, so the default pin path builds the PIN. "Retained names"
+# (the Blue Book): the alkoxy prefixes "are fully substitutable (with the
+# exception of tert-butoxy)" (:27667); '1-(chloromethoxy)-4-nitrobenzene (PIN; no
+# substitution on anisole for PINs)' (:27711). (:7232): "Parentheses are
+# used around compound (see and complex (see prefixes". Every
+# name reads back to the input (test_names_opsin_roundtrip); the old accepted value,
+# a failure name, was mutation-checked against this assertion.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,_expected", NEWCOV_CASES)
-def test_newcov_pin_abstains(smiles, _expected, production_gate):
+@pytest.mark.parametrize("smiles,expected", NEWCOV_CASES)
+def test_newcov_pin_tier_emits(smiles, expected, production_gate):
     pin = Orthonym(style="pin")
     out = pin.name(Chem.CanonSmiles(smiles))
-    assert (not out) or is_failure_name(out), (
-        f"expected default-pin abstention, got {out!r}")
+    assert out == expected, f"{smiles}: default pin gave {out!r} != {expected!r}"
 
 
 # --------------------------------------------------------------------------
-# complete-tier full namer emits the NEWCOV names (PIN abstained first).
+# complete-tier full namer emits the NEWCOV names (the default pin path gives
+# the same names).
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", NEWCOV_CASES)
 def test_complete_tier_emits(smiles, expected, production_gate):
@@ -304,7 +316,8 @@ def test_flag_off_full_namer_rt_exact(smiles, _expected, production_gate):
     # user decision D-b (plan 'User decisions (answered 2026-09-24)'): "D-b -> the
     # policy wins: where a wider-tier name round-trips EXACTLY, change the test to
     # assert an exact round-trip." So the assertion is the full-InChIKey round
-    # trip, not a spelling (the PIN tier still abstains on these). The old
+    # trip, not a spelling (the PIN tier names them since the PIN class program
+    # Task 8, test_newcov_pin_tier_emits). The old
     # accepted value (a failure name) was mutation-checked.
     nm = Orthonym(style="pin", general_fallback=True)
     canon = Chem.CanonSmiles(smiles)

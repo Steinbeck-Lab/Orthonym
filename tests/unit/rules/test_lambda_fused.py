@@ -1,7 +1,9 @@
 """: lambda tokens cited at the beginning of fused-ring names.
 
-1H-1lambda4-benzo[b]thiophene OPSIN-verified 2026-07-09 (parses to the same
-RDKit canonical SMILES as the input, C1=Cc2ccccc2[SH2]1).
+1H-1lambda4-1-benzothiophene: the benzo name of (the Blue Book, '1-benzofuran
+(PIN)':11827) with the lambda token and the one indicated hydrogen of the mancude system
+('1H-1λ4-thiophene (PIN)',,:9167). OPSIN 2.9.0 reads it back to the input's full
+InChIKey (it used to be the descriptor name '1H-1lambda4-benzo[b]thiophene', not the PIN).
 """
 import pytest
 from orthonym.namer import name_compound
@@ -11,7 +13,7 @@ from orthonym.namer import name_compound
 def test_lambda4_benzothiophene_pin():
     # BB mechanism + indicated-H, on the
     # algorithmic 2-component fusion path (benzo + thiophene).
-    assert name_compound("[SH2]1C=CC2=C1C=CC=C2") == "1H-1λ4-benzo[b]thiophene"
+    assert name_compound("[SH2]1C=CC2=C1C=CC=C2") == "1H-1λ4-1-benzothiophene"
 
 
 @pytest.mark.unit

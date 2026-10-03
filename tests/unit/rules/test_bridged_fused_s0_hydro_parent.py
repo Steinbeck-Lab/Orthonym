@@ -21,17 +21,19 @@ CLASS_ROWS = [
     ("Cn1ccc2CCCCc21", "1-methyl-4,5,6,7-tetrahydro-1H-indole"),
     ("C1CC=Cc2ncccc21", "5,6-dihydroquinoline"),
     ("C1CNc2ncccc2C1", "1,2,3,4-tetrahydro-1,8-naphthyridine"),
+    # the catalogue holds 2-benzothiophene and 1,2-benzothiazole now,
+    # the Blue Book; 'hexahydro-2-benzothiophene-1,3-dione (PIN)',:32546)
+    ("C1CCc2cscc2C1", "4,5,6,7-tetrahydro-2-benzothiophene"),
+    ("C1CCc2sncc2C1", "4,5,6,7-tetrahydro-1,2-benzothiazole"),
 ]
 CONTROL_ROWS = [
     ("C1CNc2ccccc2C1", "1,2,3,4-tetrahydroquinoline"),
     ("C1Cc2ccccc2CN1", "1,2,3,4-tetrahydroisoquinoline"),
 ]
-# The mancude parent is not in the fused ring catalogue (2-benzothiophene, 1,2-benzothiazole), or the
-# name comes from the indicated-hydrogen path (5,8-dihydro, a suffix on the saturated ring): the
-# 'cyclohexa' name is kept, labelled below PIN.
+# The name comes from the indicated-hydrogen path (5,8-dihydro, a suffix on the saturated ring):
+# the 'cyclohexa' name is kept, labelled below PIN. (The 2-benzothiophene and 1,2-benzothiazole
+# twins moved to CLASS_ROWS when the catalogue got those parents.)
 CYCLOHEXA_NON_PIN_ROWS = [
-    ("C1CCc2cscc2C1", "4,5,6,7-tetrahydrocyclohexa[c]thiophene"),
-    ("C1CCc2sncc2C1", "4,5,6,7-tetrahydrocyclohexa[d]isothiazole"),
     ("C1=CCc2ncccc2C1", "5H,8H-cyclohexa[b]pyridine"),
     ("OC(=O)C1CCc2ncccc2C1", "5H,7H,8H-cyclohexa[b]pyridine-6-carboxylic acid"),
 ]

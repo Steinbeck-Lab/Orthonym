@@ -498,12 +498,12 @@ class TestCentralAreneMultiplicative:
             # the multiplicative alcohol-arm PIN "(benzene-1,3,5-triyl)tri-
             # methanol" is now claimed; the gold's
             # documented Tier-5a intent).
-            ("COC(=O)Cc1ccc(CC(=O)OC)cc1", "methyl-ester arms (not free -COOH)"),
+            # PIN class program Task 10: the methyl-ester arms, the branched arm and
+            # the pyridine central ring are named by the general detector
+            # (test_general_detector_names_them below).
             ("[O-]C(=O)Cc1ccc(CC(=O)[O-])cc1", "carboxylate (anion, not -COOH)"),
             ("Cc1cc(CC(=O)O)cc(CC(=O)O)c1", "extra methyl substituent on ring"),
             ("OC(=O)Cc1cc(CCC(=O)O)cc(CC(=O)O)c1", "non-identical arm lengths"),
-            ("OC(=O)CC(C)c1ccc(C(C)CC(=O)O)cc1", "branched arm"),
-            ("OC(=O)Cc1ccc(CC(=O)O)nc1", "pyridine central (not benzene)"),
             ("OC(=O)Cc1ccc2cc(CC(=O)O)ccc2c1", "naphthalene central (>6 ring atoms)"),
             ("OC(=O)CCCC(=O)O", "acyclic diacid (no ring)"),
         ],
@@ -517,6 +517,26 @@ class TestCentralAreneMultiplicative:
         assert name_multiplicative(mol) is None, (
             f"expected fail-closed None for {smiles} ({why})"
         )
+
+    @pytest.mark.parametrize(
+        "smiles,expected",
+        [
+            # (the Blue Book): the organyl groups in front of
+            # the multiplied acid component ('dimethyl 3,3'-oxydibenzoate (PIN)',
+            #:31801); '2,2'-(naphthalene-2,3-diyl)diacetic acid (PIN)' (:23514)
+            ("COC(=O)Cc1ccc(CC(=O)OC)cc1", "dimethyl 2,2'-(1,4-phenylene)diacetate"),
+            # (:23178): identical butanoic acid units, attachment locant 3
+            ("OC(=O)CC(C)c1ccc(C(C)CC(=O)O)cc1", "3,3'-(1,4-phenylene)dibutanoic acid"),
+            # '10,10'-(pyridine-2,3-diyl)di(decanoic acid) (PIN)' (:6761)
+            ("OC(=O)Cc1ccc(CC(=O)O)nc1", "2,2'-(pyridine-2,5-diyl)diacetic acid"),
+        ],
+    )
+    def test_general_detector_names_them(self, smiles, expected):
+        from rdkit import Chem
+
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        assert name_multiplicative(Chem.MolFromSmiles(smiles)) == expected
 
     def test_central_arene_is_order_independent(self):
         """Symmetric multiplicative molecules are a determinism trap: the name
@@ -687,10 +707,9 @@ class TestGroup14HydrideMultiplicative:
         "Cl[SiH2]CC[SiH3]",              # the Blue Book trap: asymmetric, chlorosilane
         "[SiH3]CC[Si](C)(C)C",          # differing units (silyl vs trimethylsilyl)
         "[SiH3]CC",                      # only one unit
-        "[SiH3]C[SiH3]",                 # both units on one carbon (methanediyl)
-        "CC[Si](CC)(CC)CC[Si](CC)(CC)CC",  # ethyl (non-methyl) substituent
-        "[SiH3][SiH2]CC[SiH2][SiH3]",   # catenated disilane units
         "Cc1cc([SiH3])cc([SiH3])c1",    # extra ring substituent -> coverage fail
+        # (methylene, triethylsilane and disilane units: named by the general
+        # detector, test_general_detector_hydride_units below)
     ])
     def test_fail_closed_traps(self, smiles):
         # Multiplicative must fail closed here (asymmetric / out-of-scope) so the
@@ -699,6 +718,21 @@ class TestGroup14HydrideMultiplicative:
         from orthonym.rules.multiplicative import name_multiplicative
 
         assert name_multiplicative(Chem.MolFromSmiles(smiles)) is None
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # (the Blue Book, Si senior to C) and (:23178);
+        # '1,1'-methylenebis(disilane) (PIN)',:5807), the locant 1
+        # omitted for a mononuclear parent hydride,:5776)
+        ("[SiH3]C[SiH3]", "methylenebis(silane)"),
+        ("CC[Si](CC)(CC)CC[Si](CC)(CC)CC", "(ethane-1,2-diyl)bis(triethylsilane)"),
+        ("[SiH3][SiH2]CC[SiH2][SiH3]", "1,1'-(ethane-1,2-diyl)bis(disilane)"),
+    ])
+    def test_general_detector_hydride_units(self, smiles, expected):
+        from rdkit import Chem
+
+        from orthonym.rules.multiplicative import name_multiplicative
+
+        assert name_multiplicative(Chem.MolFromSmiles(smiles)) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
         ("CC(C[Si](C)(C)C)[Si](C)(C)C", "(propane-1,2-diyl)bis(trimethylsilane)"),

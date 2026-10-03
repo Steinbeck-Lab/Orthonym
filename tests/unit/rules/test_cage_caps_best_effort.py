@@ -122,7 +122,9 @@ def test_best_effort_names_the_calixarene_and_the_pin_tier_refuses():
 def test_a_pin_path_name_on_a_raised_cage_is_not_labelled_a_pin():
     row = _row(CYCLIC_PEPTIDE, "best-effort")
     name = row.get("name")
-    assert name and "tetracyclo[38.2.1.1^23,26.1^33,36]pentatetraconta" in name, name
+    # superscripts as low as possible, the Blue Book; quick-wins F-Q1),
+    # was '...1^23,26.1^33,36...'
+    assert name and "tetracyclo[38.2.1.1^5,8.1^15,18]pentatetraconta" in name, name
     assert name_is_rt_exact(name, CYCLIC_PEPTIDE)
     assert row["tier"] != "pin_verified" and row["is_pin"] is False, row["tier"]
     pin = _row(CYCLIC_PEPTIDE, "pin")

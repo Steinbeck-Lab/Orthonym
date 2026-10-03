@@ -198,7 +198,7 @@ def _ring_frag_attach(mol):
     # 5-yl"acetic acid and the -12-yl form give the same InChIKey,
     # an InChIKey -- a real molecular symmetry, not a bug),
     # so this is a PIN correction, not a behavior regression.
-    ("C1CCC12CCC1(CCC1)CC2CC(=O)O", "dispiro[3.2.3.2]dodecan-5-yl"),
+    ("C1CCC12CCC1(CCC1)CC2CC(=O)O", "dispiro[3.2.3^7.2^4]dodecan-5-yl"),
 ])
 def test_universal_spiro_substituent(smi, expected):
     """Java-free unit test of the P3 spiro `-yl` producer (the fragment namer),

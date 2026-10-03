@@ -54,7 +54,7 @@ def namer():
     # Monospiro junction: the N+ IS the spiro atom (all 4 bonds in rings).
     ("C1CCCC[N+]12CCCCC2", "6-azaspiro[5.5]undecan-6-ium"),
     # Dispiro junction: the N+ is one of two adjacent spiro atoms.
-    ("C1CCCCC12[N+]1(CCCCC1)CCC2", "6-azadispiro[5.0.5.3]pentadecan-6-ium"),
+    ("C1CCCCC12[N+]1(CCCCC1)CCC2", "6-azadispiro[5.0.5^7.3^6]pentadecan-6-ium"),
     # A phosphonium at a spiro junction -- the same class, one heteroatom over
     # (classified 'onium', so the onium single-cation branch reaches the fix).
     ("C1CCCC[P+]12CCCCC2", "6-phosphaspiro[5.5]undecan-6-ium"),
@@ -74,7 +74,7 @@ def test_charged_spiro_junction_names(namer, smiles, expected):
     ("[Cl-].C1CCCC[N+]12CCCCC2",
      "6-azaspiro[5.5]undecan-6-ium chloride"),
     ("[Br-].C1CCCCC12[N+]1(CCCCC1)CCC2",
-     "6-azadispiro[5.0.5.3]pentadecan-6-ium bromide"),
+     "6-azadispiro[5.0.5^7.3^6]pentadecan-6-ium bromide"),
 ])
 @pytest.mark.unit
 def test_charged_spiro_junction_salts(namer, smiles, expected):
@@ -104,7 +104,7 @@ class TestNameChargedSpiroSystem:
     def test_dispiro_junction(self):
         mol = Chem.MolFromSmiles("C1CCCCC12[N+]1(CCCCC1)CCC2")
         assert (name_charged_spiro_system(mol, self._cation_idx(mol))
-                == "6-azadispiro[5.0.5.3]pentadecan-6-ium")
+                == "6-azadispiro[5.0.5^7.3^6]pentadecan-6-ium")
 
     @pytest.mark.unit
     def test_declines_non_spiro_ring_cation(self):

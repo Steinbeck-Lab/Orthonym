@@ -164,8 +164,8 @@ def test_tier5a_regression_controls(smiles, expected):
         # EDTA (the composite diyldinitrilo bridge) is no longer deferred: it is
         # built by _try_diamine_dinitrilo_bridge and covered with an OPSIN
         # round-trip in tests/unit/rules/test_edta.py.
-        ("OCCOCCOCCOCCO",
-         "tetraethylene glycol: arm carries a second ether O — deferred"),
+        # (tetraethylene glycol is no longer deferred: the general detector names
+        # it, test_tetraethylene_glycol_concatenated_bridge below)
     ],
 )
 def test_tier5a_fail_closed(smiles, why):
@@ -174,6 +174,14 @@ def test_tier5a_fail_closed(smiles, why):
     assert name_multiplicative(mol) is None, (
         f"expected fail-closed None for {smiles} ({why})"
     )
+
+
+def test_tetraethylene_glycol_concatenated_bridge():
+    # (the Blue Book): '2,2'-[oxybis(ethane-2,1-diyloxy)]diacetic acid
+    # (PIN, a multiplicative name)' (:23210); three heterounits, below the four of
+    # (:23348). PIN class program Task 10.
+    mol = Chem.MolFromSmiles("OCCOCCOCCOCCO")
+    assert name_multiplicative(mol) == "2,2'-[oxybis(ethane-2,1-diyloxy)]di(ethan-1-ol)"
 
 
 # ---------------------------------------------------------------------------

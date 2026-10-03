@@ -196,6 +196,20 @@ def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optiona
     return None
 
 
+def _ring_system_within(mol, ring_atoms: set, allowed: set) -> set:
+    """The atoms of ``allowed`` joined to ``ring_atoms`` through ring bonds: the ring
+    system (rings that share atoms) that holds ``ring_atoms``."""
+    out, stack = set(ring_atoms), list(ring_atoms)
+    while stack:
+        cur = stack.pop()
+        for bond in mol.GetAtomWithIdx(cur).GetBonds():
+            j = bond.GetOtherAtomIdx(cur)
+            if bond.IsInRing() and j in allowed and j not in out:
+                out.add(j)
+                stack.append(j)
+    return out
+
+
 def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str:
     """Enrich a ring-based N-substituent name with sub-substituent prefixes.
 
@@ -230,6 +244,15 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
 
     if not frag_ring_atoms:
         return base_name  # No ring in fragment
+
+    # A ring that is one ring of a polycyclic ring system (fused, bridged fused, von
+    # Baeyer, spiro) is not the whole ring stem: name_substituent names such a system
+    # whole ('bicyclo[2.2.1]heptan-2-yl', '1,2,3,4-tetrahydro-1,4-ethanonaphthalen-2-yl'),
+    # and the system's other ring atoms are not sub-substituents of this one ring
+    # (reading them as such built '4-ethan-2-ylbicyclo[2.2.1]heptan-2-yl' and
+    # '2-phenyl1,2,3,4-tetrahydro-1,4-ethanonaphthalen-2-yl', different molecules).
+    if _ring_system_within(mol, frag_ring_atoms, sub_set) != frag_ring_atoms:
+        return base_name
 
     # name_substituent already FULLY decorates an AROMATIC ring substituent
     # (e.g. '(4-hydroxyphenyl)methyl', '(4-methylphenyl)methyl'), so
@@ -934,7 +957,9 @@ def name_chain_diamide(
 
     # Extract N-substituents at each end: (locant, [names]).
     per_end = []  # list of (locant, [sub_name,...])
+    covered = set(chain)
     for locant, match in positioned:
+        covered.update(match)
         subs = get_n_substituents(mol, match)
         names = []
         for sub in subs:
@@ -942,7 +967,23 @@ def name_chain_diamide(
             if not name:
                 return None  # un-nameable N-substituent -> fail-closed
             names.append(name)
+            covered.update(sub.get("atoms") or ())
         per_end.append((locant, names))
+
+    # This body cites the N-substituents of a saturated chain only. A
+    # substituent on a chain carbon ('2-methylpropanediamide (PIN)',,
+    # the Blue Book) or a chain double or triple bond ('but-2-enediamide')
+    # is left to the general path, which cites it; naming the bare saturated
+    # parent here dropped it.
+    if any(atom.GetAtomicNum() > 1 and atom.GetIdx() not in covered
+           for atom in mol.GetAtoms()):
+        return None
+    _chain_set = set(chain)
+    for _bond in mol.GetBonds():
+        if (_bond.GetBeginAtomIdx() in _chain_set
+                and _bond.GetEndAtomIdx() in _chain_set
+                and _bond.GetBondTypeAsDouble() != 1.0):
+            return None
 
     # Orientation: choose forward vs reversed numbering so the
     # N-substituents get the lowest locant set. The chain carries two

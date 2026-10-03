@@ -29,6 +29,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
     bonds_of,
 )
 from ..perception.molcache import atoms_of, canon_smiles
+from .multiplicative_general import name_general_multiplicative
 
 # ---------------------------------------------------------------------------
 # Saturation/modification prefixes that must not be preceded by "di"
@@ -3377,10 +3378,11 @@ def name_multiplicative(mol) -> Optional[str]:
     if result is not None:
         return result
 
-    # Quick reject: need at least 2 ring systems
+    # The ring-system bridge handlers below need at least 2 rings; the general
+    # detector also covers chain and hydride parent units.
     ring_info = mol.GetRingInfo()
     if ring_info.NumRings() < 2:
-        return None
+        return name_general_multiplicative(mol)
 
     # a phase.B: topology guard for ring-assembly mutual exclusion.
     # If every inter-fragment connection is a single bond between two ring
@@ -3470,7 +3472,11 @@ def name_multiplicative(mol) -> Optional[str]:
     if result is not None:
         return result
 
-    return None
+    # --- General detector,,: identical parent
+    # units found on the graph, conditions (1)-(3) checked there, the linker
+    # named as a simple or concatenated multiplying group. Runs after the
+    # narrow shapes above. ---
+    return name_general_multiplicative(mol)
 
 
 def _bridge_units_config_mismatch(mol, bridge_idx: int, conn_atoms: List[int]) -> bool:
@@ -3599,6 +3605,32 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
                     mol, idx, extra_remove=extra_remove)):
             continue
 
+        # (the Blue Book) "Seniority order of classes (see
+        # is used when a choice has to be made between a parent structure
+        # and a component of a multiplicative group": a C=O / C=S bridge is a
+        # ketone (thione) of its own (a pseudoketone when it is linked to a ring
+        # heteroatom,:1878) and is the parent when the units carry no principal
+        # characteristic group of its class or above. 'di(1H-imidazol-1-yl)-
+        # methanethione (PIN)',:29544); 'bis(phenyldiazenyl)methanone
+        # (PIN)' (:23313). Units with an acid or a ketone keep the multiplicative
+        # name: '4,4'-carbonyldibenzoic acid (PIN)' (:29473), '1,1'-carbonothioyl-
+        # di(pyridin-2(1H)-one) (PIN)' (:29581).
+        ketone_parent_unbuilt = False
+        if bridge_type in ('carbonyl', 'carbonothioyl') and _bridge_holds_principal_group(
+                canon_a, bridge_type):
+            rev = _bridge_ketone_parent_name(mol, idx, nbr_indices, bridge_type)
+            if rev is not None:
+                return rev
+            if all(mol.GetAtomWithIdx(c).GetAtomicNum() == 6 for c in nbr_indices):
+                # carbon-attached units: the substitutive ketone path names it
+                # ('bis(4-hydroxyphenyl)methanone')
+                continue
+            # The ketone (thione) parent is the PIN here but its prefix could
+            # not be named ('1,1'-carbonylbis(1H-indole)' for
+            # 'di(1H-indol-1-yl)methanone'): the multiplicative name assembled
+            # below is kept, labelled below the PIN.
+            ketone_parent_unbuilt = True
+
         # Pnictogen-oxoacid / -ester-bridge PIN guard (mirrors the NH / carbonyl
         # guards above;, the Blue Bookff). A mononuclear P/As/Sb bridge
         # bearing a =E chalcogen AND a free -OH/-SH is an arsinic/phosphinic/
@@ -3631,11 +3663,110 @@ def _try_single_atom_bridges(mol, ring_atoms: set) -> Optional[str]:
             canon_a,
         )
         if result is not None:
+            if ketone_parent_unbuilt:
+                from ..metrics.provenance import record_non_pin_fragment
+                record_non_pin_fragment(result)
             return result
         # Decline / saturation-prefix parent: let the loop & caller fall through
         continue
 
     return None
+
+
+def _bridge_holds_principal_group(canon_unit: str, bridge_type: str) -> bool:
+    """True when the units carry no principal characteristic group of the
+    bridge's class (ketone for C=O, thioketone for C=S) or a senior one."""
+    from ..perception.functional_groups import detect_functional_groups
+    from .seniority import compare_seniority, get_principal_group
+    frag = Chem.MolFromSmiles(canon_unit)
+    if frag is None:
+        return False
+    unit_pg = get_principal_group(frag, detect_functional_groups(frag))[0]
+    if unit_pg is None:
+        return True
+    bridge_class = 'ketone' if bridge_type == 'carbonyl' else 'thioketone'
+    return compare_seniority(unit_pg, bridge_class) == 1
+
+
+def _bridge_ketone_parent_name(mol, bridge_idx: int, ring_conns: List[int],
+                               bridge_type: str) -> Optional[str]:
+    """'di(1H-imidazol-1-yl)methanethione': the C=O / C=S bridge between two
+    identical rings attached through a ring nitrogen named as the ketone (thione)
+    parent with the two rings as prefixes, the Blue Book). The
+    ring may be saturated: (b) (:28263) counts an acyclic carbonyl
+    bonded "to a heteroatom of a ring or ring system" as a pseudoketone ('hidden
+    amide'; '1-(piperidin-1-yl)ethan-1-one (PIN)',:28271), and (:29370)
+    names it "substitutively by using the suffix 'one'", so
+    'di(pyrrolidin-1-yl)methanone', not '1,1'-carbonyldipyrrolidine'. The
+    multiplier follows the prefix name (a),:7085, 'di(naphthalen-2-
+    yl)ethanedione (PIN)',:28380, for an unsubstituted ring system; (a),
+    'bis' for a substituted prefix; 'bis' for a prefix with hydro prefixes,
+    'bis(4,5-dihydrothiophen-2-yl)di(methyl)germane (PIN)',:38232, which the
+    shared ``get_multiplier_prefix`` decides: 'bis(2,3-dihydro-1H-indol-1-yl)-
+    methanone').
+    A carbon-attached ring is named by the substitutive ketone path
+    ('di(pyridin-2-yl)methanone'); anything else returns None."""
+    from ..assembly.naming_utils import (
+        COMPLEX_MULTIPLIERS,
+        apply_enclosing_marks,
+        enclose_if_compound,
+        multiplied_component,
+    )
+    from ..assembly.substituent_naming import name_substituent_fragment
+    from ..errors import is_failure_name
+    names = set()
+    bare = True
+    atom_rings = [set(r) for r in mol.GetRingInfo().AtomRings()]
+    for conn in ring_conns:
+        atom = mol.GetAtomWithIdx(conn)
+        if atom.GetAtomicNum() != 7:
+            return None
+        side = set()
+        stack = [conn]
+        while stack:
+            x = stack.pop()
+            if x in side or x == bridge_idx:
+                continue
+            side.add(x)
+            stack.extend(n.GetIdx() for n in mol.GetAtomWithIdx(x).GetNeighbors())
+        ring = None
+        for r in mol.GetRingInfo().AtomRings():
+            if conn in r:
+                if ring is not None:
+                    return None
+                ring = set(r)
+        if ring is None:
+            return None
+        # The ring system of that ring (rings sharing atoms with it: fused,
+        # bridged, spiro); a unit atom outside it is a substituent, so the prefix
+        # is substituted and takes 'bis' (a), the Blue Book).
+        system = set(ring)
+        grown = True
+        while grown:
+            grown = False
+            for r in atom_rings:
+                if r & system and not r <= system:
+                    system |= r
+                    grown = True
+        if side - system:
+            bare = False
+        try:
+            nm = name_substituent_fragment(mol, sorted(side), conn, [bridge_idx])
+        except Exception:  # noqa: BLE001 - no prefix name, no reverse name
+            return None
+        if not nm or is_failure_name(nm):
+            return None
+        names.add(nm)
+    if len(names) != 1:
+        return None
+    prefix = names.pop()
+    if bare:
+        token = multiplied_component(2, prefix, enclose_if_compound(prefix))
+    else:
+        # (a): a substituted (compound) prefix takes 'bis'
+        token = COMPLEX_MULTIPLIERS[2] + apply_enclosing_marks(prefix, -1)
+    parent = 'methanone' if bridge_type == 'carbonyl' else 'methanethione'
+    return f"{token}{parent}"
 
 
 def _unit_name_is_substituted(parent_name: str) -> bool:
@@ -3862,6 +3993,20 @@ def _resolve_unit_and_assemble(
         numbering via the fragment cascade (P-16.5.1.1).
 
     Returns the assembled name or None (decline — caller continues)."""
+    # (the Blue Book): the esters of a multiplied acid
+    # component cite their organyl groups in front of the multiplied anion
+    # ('dimethyl 3,3'-oxydibenzoate (PIN)',:31801). A unit whose principal
+    # characteristic group is an ester is left to the general detector, which
+    # builds that form; multiplying the whole ester name gave '3,3'-oxydimethyl
+    # benzoate'.
+    _unit_mol = Chem.MolFromSmiles(canon_unit)
+    unit_pg = None
+    if _unit_mol is not None:
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        unit_pg = get_principal_group(_unit_mol, detect_functional_groups(_unit_mol))[0]
+        if unit_pg in ("ester", "thioester", "selenoester", "telluroester", "iminoester"):
+            return None
     parent_name = _name_parent(canon_unit)
     if parent_name is None:
         return None
@@ -3880,7 +4025,12 @@ def _resolve_unit_and_assemble(
                 return n.GetIdx()
         return bridge_idxs[0]
 
-    if has_sub and not _fragment_has_anchor_pg(frag):
+    # A unit with substituents but no principal characteristic group (nitro,
+    # methoxy,...) has no suffix to anchor its numbering: the attachment-anchored
+    # unit, '1,1'-oxybis(4-bromobenzene) (PIN)') or a decline; the
+    # PG-anchored path read the nitro N as a suffix group ('4,4'-sulfanediyl-
+    # dinitrobenzene', another spelling than '1,1'-sulfanediylbis(4-nitrobenzene)').
+    if has_sub and (unit_pg is None or not _fragment_has_anchor_pg(frag)):
         anchored = [_attachment_anchored_benzene_unit(mol, _bridge_for(c), c)
                     for c in ring_conns]
         if anchored[0] is None or any(a != anchored[0] for a in anchored[1:]):
@@ -4892,9 +5042,9 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
 
     # (c) (the Blue Book): 'bis', 'tris' "before skeletal
     # replacement ('a') prefixes... used in the construction of Hantzsch-Widman
-    # names": "1,1'-carbonylbis(azetidine)", not '...carbonyldiazetidine' (a ring
+    # names": "1,1'-methylenebis(azepane)", not '...methylenediazepane' (a ring
     # with two nitrogen atoms; 'bis(azacyclododecane) (PIN)',:7176). Retained
-    # parents keep 'di' ("1,1'-carbonyldipiperidine").
+    # parents keep 'di' ("1,1'-methylenedipyrrolidine").
     from ..assembly.naming_utils import opens_with_replacement_prefix
     if opens_with_replacement_prefix(parent_name):
         return COMPLEX_MULTIPLIERS.get(unit_count)
@@ -4928,10 +5078,34 @@ _P1634_PARENS_SUFFIXES = (
 )
 
 
+# The same rule for the suffixes whose locant the free fragment name omits on a
+# ring with all positions alike ('cyclopentanethiol', 'cyclohexanol'): inside a
+# multiplicative name the attachment is a second substituted position of the
+# unit, so the suffix locant is cited: '2,2'-sulfanediyldi(cyclopentane-1-thiol)
+# (PIN)', the Blue Book), '3,4'-disulfanediyldi(benzene-1-thiol)'
+# (:27593), 'di(cyclohexane-1-carboxylic acid)' (e),:7085). Longest
+# suffix first ('thiol' before 'ol'); only a cycloalkane or benzene stem, so the
+# retained 'phenol' and 'aniline' never match.
+_P1634_LOCANT_OMITTED_SUFFIXES = ('selenol', 'tellurol', 'thiol', 'amine', 'ol')
+_SYMMETRIC_RING_STEM = r"^(?:cyclo[a-z]+?an|benzen)e?$"
+
+
+def _locant_omitted_suffix(parent_name: str) -> Optional[Tuple[str, str]]:
+    import re
+    for suffix in _P1634_LOCANT_OMITTED_SUFFIXES:
+        if parent_name.endswith(suffix):
+            stem = parent_name[: -len(suffix)]
+            if re.match(_SYMMETRIC_RING_STEM, stem):
+                return stem, suffix
+            return None
+    return None
+
+
 def _needs_p1634_parens(parent_name: str) -> bool:
     """True iff the parent is a functionalized parent hydride whose systematic
     characteristic-group suffix takes a ring locant (e))."""
-    return any(parent_name.endswith(s) for s in _P1634_PARENS_SUFFIXES)
+    return (any(parent_name.endswith(s) for s in _P1634_PARENS_SUFFIXES)
+            or _locant_omitted_suffix(parent_name) is not None)
 
 
 def _bridge_token(bridge_name: str) -> str:
@@ -4975,6 +5149,10 @@ def _insert_ring_pg_locant(parent_name: str, locant: int = 1) -> Optional[str]:
             if stem.endswith('-'):
                 return parent_name
             return f"{stem}-{locant}-{suffix}"
+    split = _locant_omitted_suffix(parent_name)
+    if split is not None:
+        stem, suffix = split
+        return f"{stem}-{locant}-{suffix}"
     return None
 
 
@@ -5127,7 +5305,7 @@ def _assemble_multiplicative_name(
     # or bis/tris substituted units) is decided by
     # _select_multiplier on the leading-locant test.
     # A derived multiplier ('bis', 'tris') always takes the parentheses
-    #, the Blue Book; "1,1'-carbonylbis(azetidine)").
+    #, the Blue Book; "1,1'-methylenebis(azepane)").
     from ..assembly.naming_utils import COMPLEX_MULTIPLIERS as _CM
     if (any(ch.isdigit() for ch in parent_name) or parent_lower.startswith("dec")
             or multiplier in _CM.values()):

@@ -19,6 +19,10 @@ D ``_name_ether_substituted_chain`` hand-rolled private licence
 E same ``bis(methoxy)`` -> ``dimethoxy``
 ====== ========================================= ==================================
 
+(User ruling D1, 2026-10-02: defect B's pyrazine rows now cite the locant again -- a
+prefix on a mancude heteromonocycle, '2-[(pyridin-3-yl)oxy]pyrazine (PIN)' the Blue Book;
+the licence keeps the saturated one-orbit ring, 'phenyloxirane (PIN)' the Blue Book.)
+
 ★ WHY THE GUARD ROWS ARE THE REAL TEST. For defect A the licence at HEAD refused at a
 "prefix text begins with a digit" guard, so ``2-methylpentanedioic acid`` was right by
 ACCIDENT -- the guard refused every alkyl prefix, correct and incorrect alike. After
@@ -159,14 +163,18 @@ def test_defect_a_guards_keep_their_locant(namer, smiles, expected):
 # --------------------------------------------------------------------------- #
 # 3. DEFECT B -- C-substituent prefixes on a heterocycle #
 # --------------------------------------------------------------------------- #
+# User ruling D1 (2026-10-02): a prefix on a MANCUDE heteromonocycle cites its locant
+# even with one kind of substitutable hydrogen -- (the Blue Book) prints
+# '(1) 2-[(pyridin-3-yl)oxy]pyrazine (PIN)' (the Blue Book). The licence still fires for the
+# saturated one-orbit ring (the oxirane pair below) and for the pyrazine SUFFIX.
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        ("Clc1cnccn1", "chloropyrazine"),
-        ("Cc1cnccn1", "methylpyrazine"),
+        ("Clc1cnccn1", "2-chloropyrazine"),
+        ("Cc1cnccn1", "2-methylpyrazine"),
     ],
 )
-def test_defect_b_ring_prefix_locant_omitted(namer, smiles, expected):
+def test_defect_b_mancude_heteroring_prefix_cites_its_locant(namer, smiles, expected):
     assert namer.name(smiles) == expected
 
 
@@ -266,12 +274,13 @@ def test_defect_c_guards(namer, smiles, expected):
         # E, the other side of the boundary: the UNCONTRACTED `methylsulfanyl` is a
         # substituted prefix and keeps `bis(...)` per:35344 / (a). At HEAD
         # this emitted `bis((methylsulfanyl))methylbenzene` -- double-enclosed, and
-        # rejected by the OPSIN grammar check. ⚠ The MISSING OUTER MARKS
-        # (`[bis(methylsulfanyl)methyl]benzene` would be right) are a separate,
-        # pre-existing `rules/benzene.py` defect, outside this task's files; this
-        # row is asserted as-emitted so a later fix there shows up as a diff rather
-        # than passing silently.
-        ("CSC(SC)c1ccccc1", "bis(methylsulfanyl)methylbenzene"),
+        # rejected by the OPSIN grammar check. The outer marks were then missing
+        # (`bis(methylsulfanyl)methylbenzene`, a `rules/benzene.py` defect this row
+        # was asserted as-emitted to expose): the monosubstituted benzene branch now
+        # encloses a compound prefix by enclose_if_compound (bridged fused S3, fix
+        # a performance pass), (the Blue Book) with the next mark of
+        # (:7446), as in 'bis[bis(trimethylsilyl)methyl]stannanol (PIN)' (:38204).
+        ("CSC(SC)c1ccccc1", "[bis(methylsulfanyl)methyl]benzene"),
     ],
 )
 def test_defect_e_multiplier_and_enclosure(namer, smiles, expected):
@@ -396,8 +405,9 @@ def test_fragment_boundary_observation_reads_the_visited_set():
         # general_acyclic (defect A + the pre-existing chloro rows)
         ("OC(=O)C(C)C(=O)O", "methylpropanedioic acid", "2-methylpropanedioic acid"),
         ("OC(=O)C(Cl)C(=O)O", "chloropropanedioic acid", "2-chloropropanedioic acid"),
-        # heterocycle (defect B)
-        ("Clc1cnccn1", "chloropyrazine", "2-chloropyrazine"),
+        # heterocycle (defect B; the saturated one-orbit ring, the Blue Book -- a prefix on
+        # mancude pyrazine cites its locant, user ruling D1)
+        ("ClC1CO1", "chlorooxirane", "2-chlorooxirane"),
         # polyfunctional (defect C)
         ("OC(=O)C(O)C(=O)O", "hydroxypropanedioic acid", "2-hydroxypropanedioic acid"),
     ],

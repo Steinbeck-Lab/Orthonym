@@ -48,14 +48,20 @@ def analyze_polycyclic(mol):
     return VonBaeyerAnalyzer().analyze(mol, ring_atoms)
 
 # The user-supplied molecule: tetracyclic von Baeyer cage, CHO, COOH, two ring
-# methyls and ONE exocyclic =CH2 at ring locant 13.
+# methyls and ONE exocyclic =CH2 (von Baeyer ring locant 13).
 ACCEPTANCE_SMILES = (
     "C(=O)[C@@H]1[C@@]23[C@H]([C@@]4(CCC[C@]([C@@H]14)(C(=O)O)C)C)"
     "CC[C@@H](C(C2)=C)C3"
 )
+# The bridged fused PIN on the benzo[a]azulene parent since bridged fused S2b,
+# the name tests/unit/rules/test_bf_s2b_targets.py pins for the same molecule: a bridged
+# fused system is senior to a von Baeyer system (the Blue Book), with 'hydro'
+# prefixes,:24221). The exocyclic =CH2 is still named (8-methylidene). Was
+# '(1R,2S,3S,4R,8S,9S,12R)-2-formyl-4,8-dimethyl-13-methylidenetetracyclo
+# [10.2.1.0^1,9.0^3,8]pentadecane-4-carboxylic acid'.
 ACCEPTANCE_TARGET = (
-    "(1R,2S,3S,4R,8S,9S,12R)-2-formyl-4,8-dimethyl-13-methylidene"
-    "tetracyclo[10.2.1.0^1,9.0^3,8]pentadecane-4-carboxylic acid"
+    "(1R,4aS,4bS,7R,9aR,10S,10aS)-10-formyl-1,4a-dimethyl-8-methylidene"
+    "dodecahydro-1H-7,9a-methanobenzo[a]azulene-1-carboxylic acid"
 )
 
 

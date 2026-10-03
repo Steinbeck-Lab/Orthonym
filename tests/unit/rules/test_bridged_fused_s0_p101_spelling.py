@@ -5,7 +5,14 @@
 N-methyl are one prefix group ('7,17-dimethyl', not '7-methyl-17-methyl'). (:51007):
 "morphinan and ibogamine, are exceptions and treated as retained names"; the Blue Book writes
 '4,5alpha-epoxymorphinan' (:52332) and '...-17-methyl-7,8-didehydromorphinan-3,6alpha-diol'
-(:2680), never 'morphinane'. The names keep the pin_verified label (user decision).
+(:2680), never 'morphinane'. Slice S4: a morphinan without the 4,5-epoxy bridge has a bridged
+fused PIN that needs the 'azanoethano' bridge prefix,:14155 "-NH-CH2-CH2-
+(azanoethano) (preferred prefix)"); OPSIN 2.9.0 reads the general-nomenclature 'epiminoethano'
+but not the preferred 'azanoethano', so no PIN is built; its
+name is labelled below the PIN,:50943; the user's decision on natural-product names,
+"the default tier declines a natural-product name only where no systematic PIN is built"): the
+best-effort tier keeps it (systematic_verified), the default tier declines it. The tropane name
+(no bridged fused reading) keeps the pin_verified label.
 """
 import pytest
 
@@ -14,9 +21,14 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from tests.support.rt_assert import name_is_rt_exact
 
-ROWS = [
+#: a 4,5-epoxymorphinan: the strict path builds its bridged fused PIN (slice S4;
+#: the Blue Book), which replaces the name
+#: '(5R,6S,7R,9R,13S,14R)-4,5-epoxy-3,6-dimethoxy-7,17-dimethylmorphinan'
+PIN_ROWS = [
     ("COc1ccc2c3c1O[C@H]1[C@@H](OC)[C@H](C)C[C@H]4[C@@H](C2)N(C)CC[C@@]341",
-     "(5R,6S,7R,9R,13S,14R)-4,5-epoxy-3,6-dimethoxy-7,17-dimethylmorphinan"),
+     "(4R,4aR,6R,7S,7aR,12bS)-7,9-dimethoxy-3,6-dimethyl-2,3,4,4a,5,6,7,7a-octahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline"),
+]
+ROWS = [
     ("Cc1ccc2c(c1)[C@@]13CCCC[C@@H]3[C@@H](C2)N(C)CC1",
      "(9R,13S,14S)-3,17-dimethylmorphinan"),
     ("Cc1ccc2c(c1)[C@@]13CC[C@H](C)C[C@@H]3[C@@H](C2)N(C)CC1",
@@ -43,13 +55,21 @@ def _row(smiles, tier):
         return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
+#: the morphinans without the 4,5-epoxy bridge (no PIN is built): below the PIN
+BELOW_PIN = ROWS + CONTROL_ROWS[:3]
+
+
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,name", ROWS + CONTROL_ROWS)
+@pytest.mark.parametrize("smiles,name", ROWS + CONTROL_ROWS + PIN_ROWS)
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 def test_p101_stereoparent_spelling(smiles, name, tier):
     row = _row(smiles, tier)
+    below = (smiles, name) in BELOW_PIN
+    if below and tier == "pin":
+        assert (row["tier"], row.get("limit_code")) == ("abstain", "NO_VERIFIED_PIN"), row
+        return
     assert row.get("name") == name, row.get("name")
-    assert row["tier"] == "pin_verified", row["tier"]
+    assert row["tier"] == ("systematic_verified" if below else "pin_verified"), row["tier"]
     assert name_is_rt_exact(name, smiles)
 
 

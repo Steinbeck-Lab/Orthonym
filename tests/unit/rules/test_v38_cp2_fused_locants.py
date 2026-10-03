@@ -96,11 +96,16 @@ def _rt_ok(smiles: str, name: str) -> bool:
 
 # --- the two minimal reproducers, OPSIN-verified PIN targets ----------------
 
+# (the Blue Book): the decalin component is cited as its mancude
+# parent (naphthalene) with its indicated hydrogen and hydro prefixes in front of
+# the spiro name ('4'a,5',6',7',8',8'a-hexahydro-1'H-spiro[imidazolidine-4,2'-
+# quinoxaline] (PIN)',:17050). Were "4a-methylspiro[decahydronaphthalene-2,2'-
+# oxirane]" and "8a-methylspiro[decahydronaphthalene-2,2'-oxirane]".
 REPRO1_SMILES = "CC12CCC3(OC3)CC2CCCC1"
-REPRO1_TARGET = "4a-methylspiro[decahydronaphthalene-2,2'-oxirane]"
+REPRO1_TARGET = "4a-methyl-3,4,4a,5,6,7,8,8a-octahydro-1H-spiro[naphthalene-2,2'-oxirane]"
 
 REPRO2_SMILES = "CC12CCCCC2CCC2(OC2)C1"
-REPRO2_TARGET = "8a-methylspiro[decahydronaphthalene-2,2'-oxirane]"
+REPRO2_TARGET = "8a-methyl-3,4,4a,5,6,7,8,8a-octahydro-1H-spiro[naphthalene-2,2'-oxirane]"
 
 
 @pytest.mark.opsin_gate
@@ -147,7 +152,8 @@ def test_reproducers_deterministic_across_atom_orders(smiles, target):
 # fused-locant path but carries no decoration, so it must stay byte-identical.
 
 PIN_CONTROLS = {
-    "C1C2(CO2)CCC3CCCCC13": "spiro[decahydronaphthalene-2,2'-oxirane]",
+    # was "spiro[decahydronaphthalene-2,2'-oxirane]", the Blue Book)
+    "C1C2(CO2)CCC3CCCCC13": "3,4,4a,5,6,7,8,8a-octahydro-1H-spiro[naphthalene-2,2'-oxirane]",
     "C1CCC2(CC1)CCCC2": "spiro[4.5]decane",
     "C1CCC2CCCCC2C1": "decahydronaphthalene",
     "C1CC2CCC1CC2": "bicyclo[2.2.2]octane",

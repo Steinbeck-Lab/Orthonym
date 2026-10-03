@@ -88,3 +88,40 @@ def test_the_cut_group_is_not_a_class_elsewhere():
     assert mol.GetAtomWithIdx(carbonyl).GetSymbol() == "C"
     assert _molecule_principal_group(mol) == "secondary_amide"
     assert _molecule_principal_group(mol, {carbonyl}) != "secondary_amide"
+
+
+# --- The three paths the class check did not judge (quick-wins Q6) -------------------
+# Each produced only names that a read-back stopped; they no longer produce them.
+
+def test_a_roles_swapped_ester_split_does_not_glue_the_acyloxy_prefix():
+    # '(acetyloxy)(2R,3R)-2-(3,4-dihydroxyphenyl)-3,5,7-trihydroxy-...': the glued
+    # acyloxy prefix had no locant and the esterified O stayed a hydroxy (a different
+    # molecule). The glue is gone; the split still names the bond with the original
+    # atom roles (the assembly the glue used to fall through to), so the names the
+    # read-back accepted from that assembly are kept (a vinca dimer bromide of the
+    # class sample keeps its RT-exact best-effort name).
+    from rdkit import Chem
+    from orthonym.decomposition import engine as E
+    from orthonym.decomposition.bond_cleavage import find_cleavable_bonds
+    m = Chem.MolFromSmiles("CC(=O)O[C@H]1C(=O)c2c(O)cc(O)cc2O[C@@H]1c1ccc(O)c(O)c1")
+    swapped = [b for b in find_cleavable_bonds(m) if b.get("roles_swapped")]
+    assert swapped, "witness lost its roles-swapped ester bond"
+    for b in swapped:
+        name = E._try_single_bond_decompose(m, b)
+        assert name is None or "(acetyloxy)" not in name, name
+
+
+def test_the_polyamide_assembler_cites_only_what_it_can_place():
+    from orthonym.decomposition.fragment_assembly import _assemble_multi_amide
+    acid = ({"smiles": "CC(=O)O", "side": "acid"}, "acetic acid")
+    # a diamine core needs N/N' locants: decline
+    assert _assemble_multi_amide(
+        [({"smiles": "NCCN", "side": "middle"}, "ethane-1,2-diamine"), acid, acid]) is None
+    # a fragment that is not an acyl group would be dropped: decline
+    assert _assemble_multi_amide(
+        [({"smiles": "NC1CCCCC1", "side": "middle"}, "cyclohexanamine"), acid,
+         ({"smiles": "NCC", "side": "amine"}, "ethanamine")]) is None
+    # one N, acyl groups only: built
+    assert _assemble_multi_amide(
+        [({"smiles": "NC1CCCCC1", "side": "middle"}, "cyclohexanamine"), acid, acid]) \
+        == "N,N-diacetylcyclohexanamine"

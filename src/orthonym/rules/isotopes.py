@@ -557,25 +557,82 @@ _RING_ASSEMBLY_STEM_RE = re.compile(r"\[(?=\d+'*(?:[,:]\d+'*)+-[a-z])")
 #: / ``the Blue Book Blue Book`` ("Specific positions of nuclides
 #: must be indicated... preceding the nuclide symbol"). Matched narrowly at a token
 #: boundary: a hyphen must introduce the suffix (``skel[off-1] == "-"``, so
-#: ``methan|ol`` / ``phen|ol`` / ``hexan|oic acid`` are NOT slots) and a non-letter
-#: must follow the stem (so the ``ol`` inside ``indole`` is not a slot).
+#: ``hexan|oic acid`` is NOT a slot; the locant-free ``-XH`` suffixes that follow a
+#: stem directly are ``_STEM_ADJACENT_CHALCOGEN_OL_RE``) and a non-letter must
+#: follow the stem (so the ``ol`` inside ``indole`` is not a slot).
 #:
-#: ⚠ ``-ol`` (alcohol O) and ``-amine`` (amine N) are DELIBERATELY EXCLUDED. The
-#: gold protect pin ``CC[18OH]`` -> ``(18O)ethan-1-ol`` (W2F-P5-P4, "parent-front
-#: descriptor") keeps a locant-free O nuclide at the FRONT of the parent, and a
-#: co-labelled amine N must COMBINE with a positional carbon nuclide into one
-#: front descriptor -- ``C[13CH2][15NH2]`` -> ``(1-13C,15N)ethan-1-amine``
-#:, ``:44202``; gold V47-/03), which the suffix-adjacent split
-#: ``(1-13C)ethan-1-(15N)amine`` broke. Placing the ``ol``/``amine`` nuclide at a
-#: distinct suffix slot let ``_decorate_multi_position`` emit that split instead of
-#: falling through to the combined ``_decorate_mixed_locant`` form. Only the
-#: chalcogen analogues of the alcohol suffix -- ``-thiol`` (S), ``-selenol`` (Se),
-#: ``-tellurol`` (Te) -- take the suffix-adjacent slot (``propane-1-(34S)thiol``,
-#: ``propane-1-(77Se)selenol``, ``propane-1-(125Te)tellurol``; all OPSIN-round-trip).
+#: ``-ol`` (alcohol O) takes the suffix-adjacent slot like its chalcogen analogues
+#: ``-thiol`` (S), ``-selenol`` (Se) and ``-tellurol`` (Te): (the Blue Book:
+#: 43718, the nuclide symbols go "before the part of the compound that is
+#: isotopically substituted"; '1-(aminomethyl)cyclopentan-1-(18O)ol (PIN)',:43744),
+#: ('(1-2H1)ethan-1-(2H)ol (PIN)',:44214). (``propane-1-(34S)thiol``,
+#: ``propane-1-(77Se)selenol``, ``propane-1-(125Te)tellurol``; all OPSIN-round-trip.)
+#:
+#: ⚠ ``-amine`` (amine N) is DELIBERATELY EXCLUDED: a co-labelled amine N must
+#: COMBINE with a positional carbon nuclide into one front descriptor --
+#: ``C[13CH2][15NH2]`` -> ``(1-13C,15N)ethan-1-amine``, ``:44202``; gold
+#: V47-/03), which the suffix-adjacent split ``(1-13C)ethan-1-(15N)amine``
+#: broke. Placing the ``amine`` nuclide at a distinct suffix slot let
+#: ``_decorate_multi_position`` emit that split instead of falling through to the
+#: combined ``_decorate_mixed_locant`` form.
 _HETEROATOM_SUFFIX_STEM_RE = re.compile(
     r"(?:carboxylic|carbonitrile|carbaldehyde|nitrile|thiol|selenol"
-    r"|tellurol|one|oic|al)(?![a-z])"
+    r"|tellurol|one|oic|al|ol)(?![a-z])"
 )
+
+#: The ``-XH`` chalcogen suffixes (``ol``, ``thiol``, ``selenol``, ``tellurol``) of a
+#: name whose unlabelled spelling cites no locant: they follow the parent-hydride
+#: stem directly, with the final 'e' elided before ``ol`` (a)) and kept
+#: before a consonant -- ``ethan|ol``, ``methan|ol``, ``silan|ol``,
+#: ``cyclohexan|ol``, ``methane|thiol``. (the Blue Book) keeps
+#: that locant-free spelling when the label needs no locant, and the nuclide
+#: still goes before the suffix: 'ethan(2H)ol (PIN) (as in ethanol)' (:44184),
+#: 'methan(2H,18O)ol (PIN)' (:43840).
+#:
+#: A RETAINED one-word name that ends in '-ol' is not a parent-hydride stem plus a
+#: suffix, so it offers no slot before its 'ol': 'phen|ol' is not 'ethen|ol'.
+#: (the Blue Book): "In a name consisting of one word, the isotopic
+#: descriptor is placed before the name, with an appropriate locant. This method is
+#: preferred to that of placing the descriptor before the implied name of the
+#: characteristic group." ('(N-2H2)aniline (PIN)',:43830); the descriptor stands
+#: immediately before the retained name, after any substituent prefix
+#: ('2-methoxy(3,4,5,6-3H4)phenol (PIN)',:44168), and the one oxygen takes no
+#: locant,:44190): '(18O)phenol', '4-methyl(18O)phenol'. The names are
+#: the one-word names of the engine's retained-name tables whose 'ol' follows an
+#: 'an' / 'en' / 'yn' stem that is not itself a parent-hydride name of those
+#: tables ('methan|ol', 'ethan|ol', 'cetan|ol' keep the slot); 'phenol' is the one
+#: retained for PINs,:26764).
+_RETAINED_ONE_WORD_OL_NAMES = frozenset({
+    "phenol", "eugenol", "isoeugenol", "androstenol", "campestanol",
+    "estratetraenol", "pantothenol", "piaselenol",
+})
+_STEM_ADJACENT_CHALCOGEN_OL_RE = re.compile(
+    r"(?<=an|en|yn)"
+    + "".join(f"(?<!{re.escape(n[:-2])})"
+              for n in sorted(_RETAINED_ONE_WORD_OL_NAMES))
+    + r"ol(?![a-z])"
+    r"|(?<=ane|ene|yne)(?:thiol|selenol|tellurol)(?![a-z])"
+)
+
+#: A MULTIPLIED ``-XH`` chalcogen suffix ('ethane-1,2-diol', 'propane-1,2,3-triol',
+#: 'benzenehexol', 'benzene-1,2-dithiol'). A nuclide on one of its chalcogens is
+#: not cited before the multiplied suffix in a PIN: copies modified in different
+#: ways are split, the labelled one staying the suffix and the others becoming
+#: prefixes, the Blue Book, "the isotopically modified
+#: characteristic group with the greater number of modifications is chosen as the
+#: principal characteristic group to be cited as a suffix; the other characteristic
+#: is then cited as a prefix"), and copies modified in the same way carry the
+#: descriptor inside the multiplied suffix ('cyclohexane-1,1-di[(14C)carboxylic
+#: acid] (PIN)',:43774). Neither form is built here.
+_MULTIPLIED_XH_SUFFIX_RE = re.compile(
+    r"(?:di|tri|tetra?|penta?|hexa?|hepta?|octa?|nona?|deca?)"
+    r"(?:ol|thiol|selenol|tellurol)(?![a-z])"
+)
+
+#: The substituent prefixes that name an ``-XH`` group: a descriptor in front of
+#: one of them modifies that prefix ('3-(18O)hydroxypropanoic acid';
+#: '(2R)-2-(2H)hydroxy-3-hydroxy(1-2H)propanal (PIN)', the Blue Book).
+_XH_PREFIX_RE = re.compile(r"(?:hydroxy|sulfanyl|selanyl|tellanyl)")
 
 #: The "carbo-affix" suffixes -- ``carboxylic`` / ``carbonitrile`` /
 #: ``carbaldehyde`` -- name the functional heteroatom (the carboxyl O, the
@@ -782,13 +839,21 @@ def _is_heteroatom_suffix_slot(skel: str, off: int) -> bool:
     descriptor, and a locant-free heteroatom is reached only when its position is
     unambiguous, i.e. exactly one such suffix group -- never a multiplied
     ``...dicarbaldehyde`` (whose single-atom label would require a locant), so
-    the ``di``/``tri`` prefix cannot be mis-split."""
+    the ``di``/``tri`` prefix cannot be mis-split.
+
+    The locant-free ``-XH`` chalcogen suffix of a name that cites no locant
+    (``ethan|ol``, ``methane|thiol``) also follows a letter: it is recognised by
+    ``_STEM_ADJACENT_CHALCOGEN_OL_RE`` ('ethan(2H)ol (PIN)', the Blue Book;
+    'methan(2H,18O)ol (PIN)',:43840). A retained one-word name (``phenol``)
+    offers no such slot: its descriptor goes before the name,:43824;
+    ``_RETAINED_ONE_WORD_OL_NAMES``)."""
     if off <= 0:
         return False
     if skel[off - 1] == "-":
         return _HETEROATOM_SUFFIX_STEM_RE.match(skel[off:]) is not None
     if skel[off - 1].isalpha():
-        return _CARBO_AFFIX_SUFFIX_RE.match(skel[off:]) is not None
+        return (_CARBO_AFFIX_SUFFIX_RE.match(skel[off:]) is not None
+                or _STEM_ADJACENT_CHALCOGEN_OL_RE.match(skel, off) is not None)
     return False
 
 
@@ -2092,7 +2157,23 @@ def _find_best_placement(
     # And a completely labelled substituent group whose locant-free spelling
     #,:44196) OPSIN 2.9.0 misreads keeps its locants, below the PIN
     # ('(1,1,2,2,3,3,3-2H7)propylbenzene').
+    # And a nuclide on a chalcogen of a multiplied '-XH' suffix cited anywhere but
+    # in front of that suffix's own part: the PIN splits the copies or cites the
+    # descriptor inside the multiplied suffix, the Blue Book;
+    # 'cyclohexane-1,1-di[(14C)carboxylic acid] (PIN)',:43774), neither of which
+    # is built ('(18O)ethane-1,2-diol', PIN '2-hydroxyethan-1-(18O)ol').
+    # And one letter locant cited both for a hydrogen nuclide and for a nuclide
+    # of the element the letter names ('(O-2H,O-18O)phenol'): the Blue Book
+    # gives that heteroatom nuclide no locant, '(O-2H,18O)acetic acid (PIN)'
+    #, the Blue Book) and '(18O-2H,18O)acetic acid (PIN)'
+    # (:43810), a mixed form this search does not build (it shares one locant
+    # across the descriptor).
     if (below_pin or _sub_rank == 1
+            or (isinstance(loc_rank, str) and desc
+                and _letter_locant_on_its_own_element(loc_rank, keys))
+            or (desc and _MULTIPLIED_XH_SUFFIX_RE.search(skel)
+                and not _XH_PREFIX_RE.match(skel, off)
+                and _labels_an_xh_chalcogen(original))
             or re.match(r"(?:D|L|DL)-", candidate[off + len(desc):] if desc else "")
             or (isinstance(loc_rank, int) and loc_rank >= 1
                 and _complete_unit_spelling_unreadable(skel, off, keys, original))
@@ -2102,6 +2183,14 @@ def _find_best_placement(
         record_non_pin_fragment(candidate)
         record_non_pin_fragment(_descriptor_fragment(candidate, desc))
     return candidate, off, desc, loc_rank
+
+
+def _letter_locant_on_its_own_element(letter: str, keys) -> bool:
+    """True when the letter locant ``letter`` ('O') shared by every nuclide of the
+    descriptor is cited for a hydrogen nuclide and for a nuclide of the element
+    the letter names: '(O-2H,O-18O)'."""
+    elements = {el for (_mass, el), _count, _maxpos in keys}
+    return letter in elements and "H" in elements
 
 
 def _descriptor_fragment(name: str, desc: str) -> str:
@@ -3919,6 +4008,40 @@ def _flagged_systematic_namer(namer):
     )
 
 
+def _is_xh_chalcogen(original: Chem.Mol, idx: int) -> bool:
+    """Is atom ``idx`` the chalcogen of an ``-XH`` group (an ``-OH`` / ``-SH`` /
+    ``-SeH`` / ``-TeH`` singly bonded to one carbon or silicon), the atom a
+    ``-ol`` / ``-thiol`` / ``-selenol`` / ``-tellurol`` suffix or a ``hydroxy`` /
+    ``sulfanyl`` / ``selanyl`` / ``tellanyl`` prefix names?"""
+    atom = original.GetAtomWithIdx(idx)
+    if atom.GetSymbol() not in ("O", "S", "Se", "Te") or atom.GetFormalCharge():
+        return False
+    heavy = [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
+    if len(heavy) != 1 or heavy[0].GetSymbol() not in ("C", "Si"):
+        return False
+    bond = original.GetBondBetweenAtoms(idx, heavy[0].GetIdx())
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return False
+    return atom.GetTotalNumHs(includeNeighbors=True) >= 1
+
+
+def _labels_only_on_xh_chalcogens(original: Chem.Mol, label_map) -> bool:
+    """True when every labelled atom is the chalcogen of an ``-XH`` group
+    (:func:`_is_xh_chalcogen`). Such a nuclide needs no locant when the unlabelled
+    name cites none (one such group,, the Blue Book "Locants are
+    omitted when there is only one atom of a given element"), so
+    (:44180) keeps the locant-free spelling: 'ethan(2H)ol (PIN) (as in ethanol)'
+    (:44184)."""
+    return bool(label_map) and all(
+        _is_xh_chalcogen(original, idx) for idx in label_map)
+
+
+def _labels_an_xh_chalcogen(original: Chem.Mol) -> bool:
+    """Does ``original`` carry a nuclide on the chalcogen of an ``-XH`` group?"""
+    return any(a.GetIsotope() and _is_xh_chalcogen(original, a.GetIdx())
+               for a in original.GetAtoms())
+
+
 def _is_same_parent_locanted(retained_skel: str, systematic_skel: str) -> bool:
     """True iff ``systematic_skel`` is the SAME parent as ``retained_skel``,
     differing ONLY by locants (``ethanol`` / ``ethan-1-ol``), not a different
@@ -3938,6 +4061,28 @@ def _is_same_parent_locanted(retained_skel: str, systematic_skel: str) -> bool:
     def _strip(s: str) -> str:
         return re.sub(r"[\d,]", "", s).replace("-", "")
     return _strip(retained_skel) == _strip(systematic_skel)
+
+
+def _carry_skeleton_status(skeleton: str, decorated: str) -> None:
+    """Pass the uncertified-PIN record of ``skeleton`` to ``decorated``, a name built on it
+    by a descriptor that needs NO locant.
+
+     (the Blue Book, under ' Omission of locants':44178): "In
+    preferred IUPAC names, locants are omitted if no locants are necessary in unmodified
+    names. However, if isotopic modification requires a locant to specify its position,
+    then all locants must be specified and none are omitted." So when the descriptor
+    needs no locant, the locants of the PIN are those of the unmodified PIN
+    ('{[(2H1)methoxy(2H2)methyl]sulfanyl}methaneperoxol (PIN)',:44188), and the
+    decorated name is the PIN only if ``skeleton`` is. A skeleton recorded by
+    ``record_uncertified_pin_name`` (a dichalcogane with one kind of substituent on
+    unequal bonding numbers cited with its locants, named here under the isotopic scope)
+    keeps that status: '1,2-di[(13C)methyl]-1λ6,2λ4-disulfane-1,1,2-trione' no longer
+    contains the recorded '1,2-dimethyl-1λ6,2λ4-disulfane-1,1,2-trione', so without this
+    it was labelled pin_verified. A descriptor that needs a locant does not pass the
+    record on: every locant is then cited ('1-(13C)methyl-2-methyl-...', two different
+    substituents,:43758), the form the record was about."""
+    from ..metrics.provenance import record_derived_uncertified_pin_name
+    record_derived_uncertified_pin_name(skeleton, decorated)
 
 
 def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
@@ -4004,15 +4149,23 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # retained/PIN spelling is the SAME PARENT as the systematic one and differs from
     # it ONLY by an elided locant (``ethanol`` vs ``ethan-1-ol``), an isotopic
     # modification withdraws that omission licence -- the locanted spelling is
-    # required. Do NOT offer the unlocanted retained pass in that case, so the label
-    # lands on the locanted parent (``CC[18OH]`` -> ``(18O)ethan-1-ol``, gold protect
-    # W2F-P5-P4) rather than the unlocanted ``(18O)ethanol``. A genuinely different
+    # required. Do NOT offer the unlocanted retained pass in that case, so a carbon
+    # label lands on the locanted parent (``[13CH3]CO`` -> ``(2-13C)ethan-1-ol``)
+    # rather than the unlocanted ``(2-13C)ethanol``. A genuinely different
     # retained parent word (``acetic acid`` vs ``ethanoic acid``) is unaffected and
     # keeps its PIN pass. Every candidate stays OPSIN-RT gated (0-wrong).
+    # The converse holds when the label needs NO locant: a nuclide on the chalcogen
+    # of the one ``-XH`` group a locant-free suffix names ('ethan(2H)ol (PIN) (as in
+    # ethanol)', the Blue Book; 'methan(2H,18O)ol (PIN)',:43840) keeps the
+    # unlocanted spelling,:44180, "locants are omitted if no locants are
+    # necessary in unmodified names"): ``CC[18OH]`` -> ``ethan(18O)ol``. A label that
+    # does need a locant on that spelling is re-rendered on the locanted parent by
+    # ``_place_on_skeleton`` below (``loc_rank >= 1``).
     specs: List[Tuple[str, bool]] = []
     if (not drop_retained and _usable(pin_name) and _usable(systematic_name)
             and pin_name != systematic_name
-            and not _is_same_parent_locanted(pin_name, systematic_name)):
+            and (not _is_same_parent_locanted(pin_name, systematic_name)
+                 or _labels_only_on_xh_chalcogens(original, label_map))):
         specs.append((pin_name, True))
     if _usable(systematic_name):
         specs.append((systematic_name, False))
@@ -4111,6 +4264,8 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         # otherwise.
         uniform = _decorate_uniform_multiplier(skeleton, keys, original, stripped)
         if uniform is not None:
+            # One locant-free descriptor on every copy.
+            _carry_skeleton_status(skeleton, uniform)
             return uniform
 
         # A3 Task 3, letter-locant class): a repeated IDENTICAL
@@ -4198,6 +4353,9 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
                 if best2 is not None:
                     restore_provenance(_prov_skel2)
                     return best2
+        if isinstance(loc_rank, int) and loc_rank == -1:
+            # The descriptor needs no locant.
+            _carry_skeleton_status(skeleton, best)
         return best
 
     # ── (the Blue Book) systematic ring-carbon parent, PRE-emptive ─────────

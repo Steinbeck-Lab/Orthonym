@@ -197,9 +197,11 @@ class TestParentToPrefix:
         assert parent_to_prefix("ethane", chain_length=2, attach_locant=ATTACH_LOCANT_UNKNOWN) == "ethyl"
 
     def test_methylpropane_to_yl(self):
-        """2-methylpropane -> 2-methylpropyl."""
+        """2-methylpropane -> declined: the '2-' belongs to the capped molecule's
+        numbering, right for -CH2-CH(CH3)2 and wrong for -C(CH3)3 /
+        ; the located chain namer numbers the fragment from its free valence."""
         result = parent_to_prefix("2-methylpropane", chain_length=3, attach_locant=ATTACH_LOCANT_UNKNOWN)
-        assert result == "2-methylpropyl"
+        assert result is None
 
     def test_ethanol_to_hydroxyethyl(self):
         """ethanol -> 2-hydroxyethyl (ethanol has -ol at implicit C-2)."""

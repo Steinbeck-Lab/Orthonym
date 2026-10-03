@@ -210,8 +210,9 @@ class TestPipelineIntegration:
         assert result == "cholesterol"
 
     def test_morphine_via_name_compound(self):
+        # (the Blue Book) identifies no PIN for a natural product; the strict path builds its bridged fused PIN:23816,:23843) on the rule-derived parent '[1]benzofuro[3,2-e]isoquinoline' (slice S4)
         result = name_compound(MORPHINE_SMILES)
-        assert result == "morphine"
+        assert result == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     def test_camphor_via_name_compound(self):
         """: was ``== "camphor"``. The PIN path now emits the Blue Book's
@@ -379,24 +380,28 @@ class TestExpandedAlkaloidDerivatives:
         assert result == "dihydrolysergic acid"
 
     def test_dihydromorphine(self):
+        # the bridged fused PIN (slice S4; the Blue Book)
         smiles = "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)CC[C@H]3[C@H]1C5"
         result = name_compound(smiles)
-        assert result == "dihydromorphine"
+        assert result == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,5,6,7,7a-octahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     def test_morphinone(self):
         smiles = "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2C(=O)C=C[C@H]3[C@H]1C5"
         result = name_compound(smiles)
-        assert result == "morphinone"
+        # the bridged fused PIN (slice S3: added hydrogen at the 7-one, the Blue Book;:50943)
+        assert result == "(4R,4aR,7aR,12bS)-9-hydroxy-3-methyl-2,3,4,4a-tetrahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"
 
     def test_codeinone(self):
         smiles = "COc1ccc2c3c1O[C@H]1C(=O)C=C[C@H]4[C@@H](C2)N(C)CC[C@]314"
         result = name_compound(smiles)
-        assert result == "codeinone"
+        # the bridged fused PIN (slice S3: added hydrogen at the 7-one, the Blue Book;:50943)
+        assert result == "(4R,4aR,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a-tetrahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"
 
     def test_dihydrocodeine(self):
+        # the bridged fused PIN (slice S4; the Blue Book)
         smiles = "COc1ccc2c3c1O[C@H]1[C@@H](O)CC[C@H]4[C@@H](C2)N(C)CC[C@@]341"
         result = name_compound(smiles)
-        assert result == "dihydrocodeine"
+        assert result == "(4R,4aR,7S,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,5,6,7,7a-octahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7-ol"
 
     def test_lysergamide(self):
         smiles = "CN1C[C@H](C(N)=O)C=C2c3cccc4[nH]cc(c34)C[C@H]21"
@@ -488,16 +493,18 @@ class TestNoRegressionExistingNP:
         assert name_compound(CHOLESTEROL_SMILES) == "cholesterol"
 
     def test_morphine(self):
-        assert name_compound(MORPHINE_SMILES) == "morphine"
+        # the bridged fused PIN (slice S4; the Blue Book)
+        assert name_compound(MORPHINE_SMILES) == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     def test_codeine(self):
-        assert name_compound(CODEINE_SMILES) == "codeine"
+        assert name_compound(CODEINE_SMILES) == "(4R,4aR,7S,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7-ol"
 
     def test_diamorphine(self):
         assert name_compound(DIAMORPHINE_SMILES) == "diamorphine"
 
     def test_hydrocodone(self):
-        assert name_compound(HYDROCODONE_SMILES) == "hydrocodone"
+        # the bridged fused PIN (slice S3: added hydrogen at the 7-one, the Blue Book;:50943)
+        assert name_compound(HYDROCODONE_SMILES) == "(4R,4aR,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"
 
     def test_camphor(self):
         """: camphor is the ONE of these 26 rows that is deliberately no

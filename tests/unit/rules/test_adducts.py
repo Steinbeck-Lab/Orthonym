@@ -231,8 +231,13 @@ class TestAdductDispatch:
 
     def test_identical_fragments_keep_frozen_space_join(self):
         # Plan-01 byte-identical representative
-        # (tests/unit/routing/test_dispatcher.py:61)
-        assert self._nc("CCO.OCC") == "ethanol ethanol"
+        # (tests/unit/routing/test_dispatcher.py:61). The space-join is a correct
+        # systematic name, not a PIN (no Blue Book construction repeats a name;
+        #, the Blue Book, adducts of SEPARATE molecular entities): the
+        # default (PIN) tier declines it, best-effort keeps it.
+        assert self._nc("CCO.OCC") == "unknown organic compound"
+        from tests.support.pin_tiers import name_breadth
+        assert name_breadth("CCO.OCC")["name"] == "ethanol ethanol"
 
     def test_unnameable_distinct_set_fails_closed(self):
         # was a structure-dropping hazard: the legacy handler skipped

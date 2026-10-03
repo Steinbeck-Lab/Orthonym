@@ -99,8 +99,14 @@ class TestIsothiocyanatoMethyl:
 @pytest.mark.unit
 class TestNestedAlkoxy:
     @pytest.mark.parametrize("smiles,expected", [
-        ("COCOCC", "methoxymethoxyethane"),
-        ("CCCC(CCC)OCOC", "4-methoxymethoxyheptane"),
+        # Slice S3, Task S3.1b: a substituted contracted alkoxy is a compound prefix and takes
+        # parentheses the Blue Book,:15762,:7232;
+        # '1-(chloromethoxy)-4-nitrobenzene (PIN)':27711), as the depth-two name below and
+        # the gold '[(methoxymethoxy)methyl]benzene' already enclose it.
+        ("COCOCC", "(methoxymethoxy)ethane"),
+        # (the Blue Book): the compound prefix is enclosed
+        # ('5-(methoxymethyl)oxolan-2-yl',:54971)
+        ("CCCC(CCC)OCOC", "4-(methoxymethoxy)heptane"),
         ("CCCCCCCCC(OC)CCCCCCCC", "9-methoxyheptadecane"),
     ])
     def test_one_level_heals(self, smiles, expected):

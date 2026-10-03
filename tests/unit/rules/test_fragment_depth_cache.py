@@ -424,9 +424,14 @@ assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
 # the glue decline on purpose (archive bisect over the src commits). The base pass
 # was a pass on a wrong name and is not restored; best-effort (systematic_verified)
 # is RT-exact. Stereo row m22 of test_stereo_benchmark.py is the same SMILES.
+# 011_macrolide_lactone (quick-wins Q6): with the gate off it passed on the
+# roles-swapped split's '(3-methylbutanoyloxy)(1R,2R,...)-2,4-dihydroxy-...' glue,
+# which cites the esterified O again as a hydroxy (a different molecule; the round
+# trip stopped it, the PIN tier abstained at the base too). The glue is gone;
+# best-effort is RT-exact ('...-2-[(3-methylbutanoyl)oxy]-...').
 _TIER_CONTRACT_IDS = {"018_steroid_furanone", "002_penicillin_like",
                       "003_terpene_dioxolane", "005_steroid_polyol", "012_biaryl_ether",
-                      "021_udp_sugar"}
+                      "021_udp_sugar", "011_macrolide_lactone"}
 _TIER_CONTRACT_SMILES = {p.values[0] for p in DEPTH_LIMIT_COMPOUNDS
                          if p.id in _TIER_CONTRACT_IDS}
 assert len(_TIER_CONTRACT_SMILES) == len(_TIER_CONTRACT_IDS)

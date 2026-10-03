@@ -22,7 +22,7 @@ Provides:
 """
 
 import logging
-from collections import deque
+from collections import OrderedDict, deque
 from typing import Dict, List, Optional, Set
 
 from rdkit import Chem
@@ -117,6 +117,39 @@ def _bfs_substituent(mol, start_idx: int, exclude_set: set) -> list:
 # Main detection functions
 # ---------------------------------------------------------------------------
 
+#: Results by exact graph (see:func:`_graph_signature`), across Mol objects: the PIN
+#: tier's promotion re-run (``namer._name_with_pin_promotion``) parses the same SMILES
+#: into a new Mol, and the per-Mol memo below misses there; the C70 fullerene spent
+#: 8 of its 15 s in two detections. Bounded, least recently used first out.
+_NP_GRAPH_MEMO: "OrderedDict[tuple, Optional[Dict]]" = OrderedDict()
+_NP_GRAPH_MEMO_MAX = 256
+
+
+def _graph_signature(mol) -> tuple:
+    """Every atom (element, charge, isotope, aromatic flag, hydrogen count, chiral
+    tag) and every bond (ends, order, stereo), by index: two Mols with one signature
+    are the same molecule with the same atom numbering, so the detection, whose
+    ``matched_atoms`` are atom indices, gives both the same result."""
+    atoms = tuple((a.GetAtomicNum(), a.GetFormalCharge(), a.GetIsotope(),
+                   a.GetIsAromatic(), a.GetTotalNumHs(), int(a.GetChiralTag()))
+                  for a in mol.GetAtoms())
+    bonds = tuple((b.GetBeginAtomIdx(), b.GetEndAtomIdx(), int(b.GetBondType()),
+                   int(b.GetStereo())) for b in mol.GetBonds())
+    return atoms, bonds
+
+
+def _detect_by_graph(mol) -> Optional[Dict]:
+    key = _graph_signature(mol)
+    if key in _NP_GRAPH_MEMO:
+        _NP_GRAPH_MEMO.move_to_end(key)
+        return _NP_GRAPH_MEMO[key]
+    result = _detect_natural_product_impl(mol)
+    _NP_GRAPH_MEMO[key] = result
+    if len(_NP_GRAPH_MEMO) > _NP_GRAPH_MEMO_MAX:
+        _NP_GRAPH_MEMO.popitem(last=False)
+    return result
+
+
 def detect_natural_product(mol) -> Optional[Dict]:
     """Memoising front of:func:`_detect_natural_product_impl` (perf lever A7, 2026-09-13).
 
@@ -134,7 +167,7 @@ def detect_natural_product(mol) -> Optional[Dict]:
         sig = tuple((a.GetAtomicNum(), a.GetFormalCharge()) for a in atoms_of(mol))
     except Exception:
         return _detect_natural_product_impl(mol)
-    hit = cached_by_key(mol, "natural_product", sig, lambda: _detect_natural_product_impl(mol))
+    hit = cached_by_key(mol, "natural_product", sig, lambda: _detect_by_graph(mol))
     if hit is None:
         return None
     return {**hit, "non_scaffold_atoms": set(hit["non_scaffold_atoms"])}

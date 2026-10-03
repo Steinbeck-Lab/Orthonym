@@ -101,6 +101,21 @@ _MAX_EXPANSION_ITERATIONS = 16
 
 _PLACEHOLDER_RE = re.compile(r"%([A-Za-z]+)%")
 
+#: a comma-separated locant list followed directly by a lowercase letter
+# ('2,4dichloro'). A fusion carbon locant is a number with one Roman letter
+#, the Blue Book: "Each fusion carbon atom is given the same
+# number as the immediately preceding nonfusion skeletal atom, modified by a Roman
+# letter 'a', 'b', 'c', 'd', etc."), so a locant is a number with at most one
+# letter, and the word after a locant list starts with at least two letters (every
+# prefix and parent does). The lettered locants inside a list are not a missing
+# hyphen: '1,2,3,4,4a,9,9a,10-octahydro-9,10-ethanoanthracene (PIN)' (:19964).
+_HY3_MISSING_HYPHEN_RE = re.compile(
+    r"(?P<digits>\d+[a-z]?(?:,\d+[a-z]?)+)(?P<letter>[a-z]{2})")
+# The repair splits only after a list whose last locant is a bare number: '2,4dichloro'
+# -> '2,4-dichloro' (a final letter could be either the locant's or the word's).
+_HY3_REPAIR_RE = re.compile(
+    r"(?P<digits>\d+[a-z]?(?:,\d+[a-z]?)*,\d+)(?P<letter>[a-z]{2})")
+
 # The regexTokens.xml resource inside the OPSIN jar is byte-identical to the
 # submodule copy. Reading it from the bundled jar removes the dependency on the
 # OPSIN source tree, so a source install without the submodule still works.
@@ -535,7 +550,7 @@ class OpsinGrammar:
         # follow-on letter so we don't false-positive on
         # already-correct `2,4-dichloro`.
         #: internal notes C.fix BEFORE-pattern.
-        if re.search(r"\d+,\d+[a-z]", name):
+        if _HY3_MISSING_HYPHEN_RE.search(name):
             return False, "missing_hyphen_between_locant_list_and_substituent"
 
         #.fix: `1H,...,N H-,M H-...` shape — trailing hyphens
@@ -680,8 +695,7 @@ class OpsinGrammar:
         #: internal notes C.fix (insert hyphen between
         # comma-separated locant list and a follow-on lowercase
         # letter).
-        hy3 = re.sub(
-            r"(?P<digits>\d+,\d+)(?P<letter>[a-z])",
+        hy3 = _HY3_REPAIR_RE.sub(
             r"\g<digits>-\g<letter>",
             name,
         )

@@ -95,8 +95,10 @@ def test_c4_guard_iminodibenzoic_acid_stays_multiplicative():
 def test_c4_guard_amine_prefix_when_senior_group_present():
     """anilino / (N-alkylamino) must stay a PREFIX when a senior group (COOH)
     is on the ring — the amine is only promoted to the aniline suffix when it
-    is the molecule-level principal group. OPSIN-verified fallback PIN."""
-    assert _pin("CNc1ccc(C(=O)O)cc1") == "4-(N-methylamino)benzoic acid"
+    is the molecule-level principal group. OPSIN-verified fallback PIN. The amino
+    prefix cites its substituent without 'N-':, '4,4-bis(methylamino)
+    butanoic acid (PIN)' (the Blue Book)."""
+    assert _pin("CNc1ccc(C(=O)O)cc1") == "4-(methylamino)benzoic acid"
 
 
 # ---------------------------------------------------------------------------

@@ -451,13 +451,15 @@ class TestDispiroNaming:
 
     @pytest.mark.unit
     def test_dispiro_descriptor_format(self):
-        """Dispiro descriptor has format dispiro[a.b.c.d]."""
+        """Dispiro descriptor has format dispiro[a.b.c^m.d^n]: the superscript
+        locants of the spiro atoms reached a second time,
+        the Blue Book; 'dispiro[3.2.3^7.2^4]dodecane (PIN)':9981)."""
         mol = Chem.MolFromSmiles('C1CC12CC1(CC1)C2')
         name = name_spiro_system(mol)
         assert name is not None
         import re
-        assert re.search(r'dispiro\[\d+\.\d+\.\d+\.\d+\]', name), \
-            f"Expected dispiro[a.b.c.d] format, got: {name}"
+        assert re.search(r'dispiro\[\d+\.\d+\.\d+\^\d+\.\d+\^\d+\]', name), \
+            f"Expected dispiro[a.b.c^m.d^n] format, got: {name}"
 
 
 class TestHeterospiroNaming:

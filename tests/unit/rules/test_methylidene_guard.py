@@ -129,7 +129,9 @@ def test_one_carbon_ylidene_owner_anion_round_trips():
 
 @pytest.mark.opsin_gate
 def test_one_carbon_ylidene_owner_anion_integration(namer):
-    assert _dt_obj_name(namer, "SC=NOS(=O)(=O)[O-]") == "sulfanylmethylideneamino sulfate"
+    # A compound prefix is enclosed, the Blue Book), as the two-carbon
+    # sibling below already is.
+    assert _dt_obj_name(namer, "SC=NOS(=O)(=O)[O-]") == "[(sulfanylmethylidene)amino] sulfate"
 
 
 def test_validate_anion_name_accepts_one_carbon_ylidene_owner():

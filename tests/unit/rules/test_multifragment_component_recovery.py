@@ -69,9 +69,17 @@ class TestCageCationSaltRecovery:
         # the wrong 'tropan-1-ium'. Now RT-replaced with the true cage name.
         smi = "C[NH+]1C2CCC1C3CC4=CC=CC=C4CC3C2.[Cl-]"
         name = be.name(smi)
+        # the bridged fused name on the two-component carbocyclic parent
+        # cyclohepta[b]naphthalene (bridged fused S2b, c29608b8f): a bridged fused
+        # system is senior to a von Baeyer system (the Blue Book) and its
+        # saturated positions take 'hydro' prefixes,:24221;:24233
+        # 'decahydronaphthalene (PIN) bicyclo[4.4.0]decane'); best-effort tier
+        # (systematic_verified). Was '16-methyl-16-azatetracyclo[11.2.1.0^3,12.0^5,10]
+        # hexadeca-5,7,9-trien-16-ium chloride' (with the quick-wins superscripts
+        # '[11.2.1.0^2,11.0^4,9]hexadeca-4,6,8-trien').
         assert name == (
-            "16-methyl-16-azatetracyclo[11.2.1.0^3,12.0^5,10]"
-            "hexadeca-5,7,9-trien-16-ium chloride"
+            "12-methyl-5a,6,7,8,9,10,10a,11-octahydro-5H-6,9-"
+            "epiminocyclohepta[b]naphthalen-12-ium chloride"
         )
         assert _full_rt_matches(name, smi)
 
@@ -79,9 +87,12 @@ class TestCageCationSaltRecovery:
         # A fused triaza-tetracyclo (fused-heteroaromatic) cage cation + chloride.
         smi = "C1C2=CC=CC=C2C3=NC(=O)C4=C([NH+]31)N=CC=C4.[Cl-]"
         name = be.name(smi)
+        # the fixed von Baeyer numbering first, the Blue Book), with the
+        # lowest superscripts,:9685; quick-wins F-Q1), then the heteroatoms;
+        # was '3-oxo-2,8,10-triazatetracyclo[8.7.0.0^4,9.0^12,17]...-10-ium chloride'
         assert name == (
-            "3-oxo-2,8,10-triazatetracyclo[8.7.0.0^4,9.0^12,17]"
-            "heptadeca-1,4,6,8,12,14,16-heptaen-10-ium chloride"
+            "8-oxo-1,3,9-triazatetracyclo[8.7.0.0^2,7.0^11,16]"
+            "heptadeca-2,4,6,9,11,13,15-heptaen-1-ium chloride"
         )
         assert _full_rt_matches(name, smi)
 

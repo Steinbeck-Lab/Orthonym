@@ -400,32 +400,17 @@ class TestSeniorityBoundariesAreNotPromoted:
         )
         assert "benzene-1,4-diamine" in name
 
-    def test_multiplicative_pin_is_still_not_reached(self):
+    def test_multiplicative_pin_is_now_reached(self):
         """the Blue Book verbatim, under '### Multiplicative nomenclature':
         '4,4'-azanediyldibenzonitrile (PIN) 4-[(4-cyanophenyl)amino]benzonitrile
         4-(4-cyanoanilino)benzonitrile'.
 
-        Both substitutive forms are listed UNMARKED, i.e. legitimate general IUPAC
-        names (tier 2, the Blue Book); neither carries a 'not'. P4-a therefore moves this
-        emission WITHIN tier 2 to the form built from the preferred component, while
-        the true PIN — which needs multiplicative nomenclature /
-        — remains unreached. This test exists so that gap stays visible: it fails if
-        the emission drifts to a spelling the Blue Book does not list at all, and it
-        refuses to let the anilino spelling be mistaken for the PIN."""
+        The general multiplicative detector (PIN class program, Task 10;
+        , the Blue Book) builds the PIN, so neither substitutive
+        form (tier 2, the Blue Book) is emitted any more and the anilino spelling is
+        never mistaken for the PIN."""
         name = _name("N#Cc1ccc(Nc2ccc(C#N)cc2)cc1")
-        bb_listed = {
-            "4-(4-cyanoanilino)benzonitrile",            # the Blue Book, general (tier 2)
-            "4-[(4-cyanophenyl)amino]benzonitrile",      # the Blue Book, general (tier 2)
-        }
-        assert name in bb_listed, (
-            f"{name!r} is not one of the substitutive forms the Blue Book lists at "
-            f"BB:26419: {sorted(bb_listed)}"
-        )
-        assert name != "4,4'-azanediyldibenzonitrile", (
-            "the multiplicative PIN is NOT built by P4-a; if this now passes, "
-            "P-45.1.1/P-62.2.5.1 landed elsewhere and the p62_anilino tripwire row "
-            "must be re-categorised to 'target'"
-        )
+        assert name == "4,4'-azanediyldibenzonitrile", name
 
 
 # --------------------------------------------------------------------------- #

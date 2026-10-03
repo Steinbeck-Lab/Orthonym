@@ -536,7 +536,8 @@ class TestVonBaeyerReplacementPrefixNoStrayHyphen:
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,pin", [
         ("CC12CC3CC(C1)CC(C2)C3", "1-methyltricyclo[3.3.1.1^3,7]decane"),
-        ("CC1C2CC3C1C1C2C31", "2-methyltetracyclo[3.3.0.0^3,7.0^4,6]octane"),
+        # (the Blue Book): superscripts {2,3,4,7} before {3,4,6,7}
+        ("CC1C2CC3C1C1C2C31", "6-methyltetracyclo[3.3.0.0^2,4.0^3,7]octane"),
     ])
     def test_carbocyclic_substituted_vb_no_stray_hyphen(self, smiles, pin):
         # Same stray-hyphen class as S1, on the SUBSTITUENT-prefix path: for a

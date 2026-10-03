@@ -21,17 +21,18 @@ from orthonym.namer import name_compound
 # Each entry validated against IUPAC 2013 retained names and OPSIN round-trip
 # =============================================================================
 HETEROCYCLE_ACCURACY_CASES = [
-    # --- Nucleobase retained names (key benchmark failures) ---
-    ("O=c1[nH]c(=O)c2[nH]cnc2[nH]1", "xanthine"),
-    ("Nc1ncnc2[nH]cnc12", "adenine"),
-    ("O=c1[nH]cnc2[nH]cnc12", "hypoxanthine"),
+    # --- Purine bases: 'xanthine', 'adenine', 'hypoxanthine', 'guanine' do not occur in
+    # the Blue Book (0 hits); "the PIN is 7H-purine" (the Blue Book) ---
+    ("O=c1[nH]c(=O)c2[nH]cnc2[nH]1", "3,7-dihydro-1H-purine-2,6-dione"),
+    ("Nc1ncnc2[nH]cnc12", "9H-purin-6-amine"),
+    ("O=c1[nH]cnc2[nH]cnc12", "1,9-dihydro-6H-purin-6-one"),
     #: uracil is NOT a BB retained name (0 grep hits) -> the PIN is the
     # systematic pyrimidinedione; the retained 'uracil' is served only via --trivial.
     ("O=c1cc[nH]c(=O)[nH]1", "pyrimidine-2,4(1H,3H)-dione"),
 
-    # --- Guanine (both tautomeric input forms) ---
-    ("Nc1nc2[nH]cnc2c(=O)[nH]1", "guanine"),
-    ("Nc1nc(=O)c2[nH]cnc2[nH]1", "guanine"),
+    # --- Guanine (both tautomeric input forms; each name keeps its tautomer) ---
+    ("Nc1nc2[nH]cnc2c(=O)[nH]1", "2-amino-1,9-dihydro-6H-purin-6-one"),
+    ("Nc1nc(=O)c2[nH]cnc2[nH]1", "2-amino-3,7-dihydro-6H-purin-6-one"),
 
     # --- Purine (IUPAC retained name with indicated H) ---
     ("c1ncnc2[nH]cnc12", "9H-purine"),
@@ -99,15 +100,13 @@ def test_heterocycle_accuracy(smiles, expected):
 
 
 class TestXanthineRetainedNamePriority:
-    """Xanthine (unsubstituted) must return retained name, not systematic."""
+    """Xanthine (unsubstituted) is named on purine: 'xanthine' does not occur in the
+    Blue Book (0 hits); "the PIN is 7H-purine" (the Blue Book)."""
 
     def test_xanthine_not_systematic(self):
-        """Xanthine must return 'xanthine', not '3,7-dihydro-1H-purine-2,6-dione'."""
+        """The bare dione gets the purine PIN (no retained 'xanthine')."""
         result = name_compound("O=c1[nH]c(=O)c2[nH]cnc2[nH]1")
-        assert result == "xanthine", f"Expected 'xanthine', got '{result}'"
-        assert "purine" not in result, (
-            f"Systematic name leaked through: '{result}'"
-        )
+        assert result == "3,7-dihydro-1H-purine-2,6-dione", f"got '{result}'"
 
     def test_caffeine_systematic(self):
         """Caffeine returns systematic name (not a retained IUPAC name)."""
@@ -117,17 +116,18 @@ class TestXanthineRetainedNamePriority:
 
 
 class TestGuanineTautomers:
-    """Both guanine tautomer inputs must return 'guanine'."""
+    """Each guanine tautomer input gets the purine name of that tautomer ('guanine' does
+    not occur in the Blue Book, 0 hits; "the PIN is 7H-purine", the Blue Book)."""
 
     def test_guanine_tautomer_1(self):
-        """Guanine tautomer from retained_names.py entry."""
+        """N1-H, N9-H tautomer."""
         result = name_compound("Nc1nc2[nH]cnc2c(=O)[nH]1")
-        assert result == "guanine", f"Expected 'guanine', got '{result}'"
+        assert result == "2-amino-1,9-dihydro-6H-purin-6-one", f"got '{result}'"
 
     def test_guanine_tautomer_2(self):
-        """Guanine alternate tautomer (common input form)."""
+        """N3-H, N7-H tautomer."""
         result = name_compound("Nc1nc(=O)c2[nH]cnc2[nH]1")
-        assert result == "guanine", f"Expected 'guanine', got '{result}'"
+        assert result == "2-amino-3,7-dihydro-6H-purin-6-one", f"got '{result}'"
 
 
 class TestFusedHeterocycleIdentification:

@@ -78,14 +78,27 @@ def _roundtrips_to(name, smiles):
     return Chem.MolToInchiKey(m) == _inchikey(smiles)
 
 
+def _declined_strict_name(smiles):
+    """The name the strict path builds for ``smiles`` (the name the default tier
+    used to return). The isoindolone rows cite their lactam C=O as
+    an 'oxo' prefix on the spiro parent; that is not the PIN (the principal characteristic
+    group is a suffix,; 'spiro[4.5]decane-1,7-dione (PIN)', the Blue Book),
+    so the default (PIN) tier declines it with NO_VERIFIED_PIN and the best-effort
+    tier names it, read back exactly (``tests/support/default_tier.py``)."""
+    from tests.support.default_tier import declined_pin_row
+    return declined_pin_row(smiles, best_effort_same=False)["name"]
+
+
 def _name_in_fresh_subprocess(smiles):
-    """Name ``smiles`` in a brand-new interpreter (no warm engine / cache), so a
-    numbering that depended on atom order or a warm cache would show up as a
-    disagreement across runs. Returns the emitted name string."""
+    """The strict path's name for ``smiles`` (the default tier's emission rule
+    switched off, ``tests/support/default_tier.strict_path_name``) in a brand-new
+    interpreter (no warm engine / cache), so a numbering that depended on atom order
+    or a warm cache would show up as a disagreement across runs. Returns the
+    emitted name string."""
     code = (
         "import sys;"
-        "from orthonym import name_compound;"
-        "sys.stdout.write(repr(name_compound(sys.argv[1])))"
+        "from tests.support.default_tier import strict_path_name;"
+        "sys.stdout.write(repr(strict_path_name(sys.argv[1])))"
     )
     proc = subprocess.run(
         [sys.executable, "-c", code, smiles],
@@ -115,7 +128,7 @@ RECLAIM_ROWS = [
 
 @pytest.mark.parametrize("cid,smiles", RECLAIM_ROWS, ids=[r[0] for r in RECLAIM_ROWS])
 def test_isoindole_spiro_reclaims_and_full_roundtrips(cid, smiles):
-    name = name_compound(smiles)
+    name = _declined_strict_name(smiles)
     assert not is_failure_name(name), f"CID {cid} still abstains: {name!r}"
     assert _roundtrips_to(name, smiles), (
         f"CID {cid} name {name!r} does not round-trip to the input structure "
@@ -125,11 +138,16 @@ def test_isoindole_spiro_reclaims_and_full_roundtrips(cid, smiles):
 
 # The directly-grounded numbering case: CID 143635820's core with its
 # adamantan-2-yl N-substituent replaced by methyl (which removes the independent
-# second defect). Byte-identity locks the corrected fixed numbering: the Cl lands
-# at 4 and the gem-dimethyl at 1 (Option A: spiro at 3), NOT the pre-fix
-# mirror-wrong "4-chloro-3,3-dimethyl...-1,4'-piperidine" (a different molecule).
+# second defect). Byte-identity locks the fixed isoindole numbering (C1 bonds
+# C7a, C3 bonds C3a) with the spiro atom at the low locant 1: the gem-dimethyl
+# lands at 3 and the Cl at 7. The isoindoline component is cited as its mancude
+# parent with the hydro prefixes in front, the Blue Book;
+# '4'a,5',6',7',8',8'a-hexahydro-1'H-spiro[imidazolidine-4,2'-quinoxaline] (PIN)',
+#:17050); low locants go first to the spiro junction,:16761; the
+# set '2,9'' before '3,9'',,:10280). Was
+# '4-chloro-1,1,2-trimethylspiro[2,3-dihydro-1H-isoindole-3,4'-piperidine]'.
 GROUNDED_SMILES = "CC1(C2=C(C(=CC=C2)Cl)C3(N1C)CCNCC3)C"
-GROUNDED_NAME = "4-chloro-1,1,2-trimethylspiro[2,3-dihydro-1H-isoindole-3,4'-piperidine]"
+GROUNDED_NAME = "7-chloro-2,3,3-trimethyl-2,3-dihydrospiro[isoindole-1,4'-piperidine]"
 
 
 def test_grounded_numbering_byte_identity():

@@ -1123,7 +1123,17 @@ def _suffix_block(style: str, core: str, locants: List[int]) -> Optional[str]:
     mult = '' if n == 1 else _MULT_SIMPLE.get(n)
     if n > 1 and mult is None:
         return None
-    return '-' + ','.join(map(str, sorted(locants))) + '-' + (mult or '') + core
+    return '-' + ','.join(map(str, sorted(locants))) + '-' + _multiplied_core(mult, core)
+
+
+def _multiplied_core(mult: Optional[str], core: str) -> str:
+    """The multiplier joined to the suffix with the (c) elision (the Blue Book
+    :7619, "the terminal letter 'a' in the names of numerical multiplicative prefixes when
+    followed by a suffix beginning with 'a' or 'o'";:7625 'benzenehexol (PIN, (not
+    benzenehexaol)'): 'tetrol', 'pentol', 'tetramine', 'tetrone', through the shared
+    naming_utils._join_multiplied_suffix."""
+    from .naming_utils import _join_multiplied_suffix
+    return _join_multiplied_suffix(mult or '', core)
 
 
 def _assemble(mol, features, chain, part,
@@ -1957,7 +1967,7 @@ def _ring_suffix_text(core: str, locants: List[int]) -> Optional[str]:
     mult = '' if n == 1 else _MULT_SIMPLE.get(n)
     if n > 1 and mult is None:
         return None
-    return '-' + ','.join(map(str, sorted(locants))) + '-' + (mult or '') + core
+    return '-' + ','.join(map(str, sorted(locants))) + '-' + _multiplied_core(mult, core)
 
 
 def _bond_ring_locant(la: int, lb: int, n: int) -> int:

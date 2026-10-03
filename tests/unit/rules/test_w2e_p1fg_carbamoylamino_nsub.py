@@ -21,8 +21,9 @@ class TestCarbamoylaminoNSub:
             == "N-[3-(carbamoylamino)propyl]formamide"
 
     def test_acid_leg_protect(self):
+        # retained 'acetic acid (PIN)' (the Blue Book), no locant (:3037)
         assert name_compound("NC(=O)NCC(=O)O", style="pin") \
-            == "2-(carbamoylamino)ethanoic acid"
+            == "(carbamoylamino)acetic acid"
 
     def test_urea_parent_protect(self):
         # Urea parent still names as a urea (not hijacked by the carbamoylamino

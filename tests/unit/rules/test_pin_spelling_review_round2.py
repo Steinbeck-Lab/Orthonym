@@ -605,15 +605,21 @@ def test_identical_prefix_names_to_merge_direct():
 # --------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles,expected,tier", [
-    ("OCCO[N+](=O)[O-]", "2-(nitrooxy)ethan-1-ol", "systematic_verified"),
+    # quick-wins Q4e: the nitrate ester outranks the junior group,:18182) and names
+    # the molecule; was '2-(nitrooxy)ethan-1-ol' (systematic_verified)
+    ("OCCO[N+](=O)[O-]", "2-hydroxyethyl nitrate", "pin_verified"),
     # the ester is the only characteristic group: its functional-class name is
     # built,:35918, "Alkyl groups, aryl groups, etc. are cited as
     # separate words... followed by the name of the appropriate anion")
     ("CCO[N+](=O)[O-]", "ethyl nitrate", "pin_verified"),
-    ("NC(=O)CCO[N+](=O)[O-]", "3-(nitrooxy)propanamide", "systematic_verified"),
-    ("Oc1ccc(O[N+](=O)[O-])cc1", "4-(nitrooxy)phenol", "systematic_verified"),
-    ("CC(=O)CCO[N+](=O)[O-]", "4-(nitrooxy)butan-2-one", "systematic_verified"),
-    ("NCCO[N+](=O)[O-]", "2-(nitrooxy)ethan-1-amine", "systematic_verified"),
+    # quick-wins Q4e (as the first row): the amide's prefix is '3-amino-3-oxopropyl', as
+    # '5-(2-amino-2-oxoethyl)furan-2-carboxylic acid (PIN)' (:32940); the old names were
+    # '3-(nitrooxy)propanamide', '4-(nitrooxy)phenol', '4-(nitrooxy)butan-2-one' and
+    # '2-(nitrooxy)ethan-1-amine' (systematic_verified)
+    ("NC(=O)CCO[N+](=O)[O-]", "3-amino-3-oxopropyl nitrate", "pin_verified"),
+    ("Oc1ccc(O[N+](=O)[O-])cc1", "4-hydroxyphenyl nitrate", "pin_verified"),
+    ("CC(=O)CCO[N+](=O)[O-]", "3-oxobutyl nitrate", "pin_verified"),
+    ("NCCO[N+](=O)[O-]", "2-aminoethyl nitrate", "pin_verified"),
     ("OCC(O[N+](=O)[O-])CO[N+](=O)[O-]", "2,3-bis(nitrooxy)propan-1-ol", "systematic_verified"),
     ("NC(=O)CCOS(=O)(=O)O", "3-(sulfooxy)propanamide", "systematic_verified"),
     # a senior head keeps the prefix PIN ('2-(tert-butylimino)-3-methyl-3-

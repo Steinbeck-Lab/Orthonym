@@ -62,11 +62,21 @@ def _best_effort_namer():
                      allow_aromatic_general=True)
 
 
-@pytest.mark.parametrize("retained", CONVERTS + KEEPS)
+#: parents whose bridged fused PIN the strict path builds (slice S4;
+#: the Blue Book,:23843): the default path emits that PIN
+BRIDGED_FUSED_PINS = {"gibbane": "(7S,9aR,10aS)-dodecahydro-1H-7,9a-methanobenzo[a]azulene"}
+
+
+@pytest.mark.parametrize("retained", [n for n in CONVERTS + KEEPS if n not in BRIDGED_FUSED_PINS])
 def test_default_path_still_emits_the_retained_pin(retained):
     """The PIN/default path is byte-identical -- Engine 3 is best-effort-only."""
     smiles = _BY_NAME[retained]
     assert _pin_namer().name(smiles) == retained
+
+
+@pytest.mark.parametrize("retained", sorted(BRIDGED_FUSED_PINS))
+def test_default_path_emits_the_bridged_fused_pin(retained):
+    assert _pin_namer().name(_BY_NAME[retained]) == BRIDGED_FUSED_PINS[retained]
 
 
 @pytest.mark.parametrize("retained", CONVERTS)

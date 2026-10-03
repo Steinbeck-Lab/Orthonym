@@ -105,31 +105,35 @@ def test_unsubstituted_cage_descriptors_unchanged(namer, smiles, expected):
 
 
 # --------------------------------------------------------------------------
-# The orientation pass is descriptor-preserving BY CONSTRUCTION.
+# The orientation pass keeps the ring analysis and takes the lowest superscripts.
 #
-# It ranks alternative numberings, and a candidate whose descriptor differs is a
-# different RING ANALYSIS -- that was settled by -, not by
-# / -- so it is rejected rather than ranked. Measured: with the
-# rejection removed, 185 of 398 cage descriptors in the corpus MOVE (mostly
-# steroid tetracycles, e.g. tetracyclo[8.7.0.0^4,9.0^13,17] ->
-# tetracyclo[8.7.0.0^2,7.0^11,15]). Whether those alternatives are themselves
-# preferable under is a separate, pre-existing question about main
-# ring selection; this locant pass must not decide it silently.
+# It ranks alternative numberings of the same ring analysis: a candidate with
+# other bridge lengths or another ring-count word, -.3) is
+# rejected. Among the rest the superscripts decide first --
+# (the Blue Book) "The superscript locants for the secondary bridges must be
+# as low as possible when considered as a set in ascending numerical order", then
+# (:9699) -- and only then / (quick-wins F-Q1; it
+# used to keep the incumbent's superscripts, which came from the atom order).
+# The steroid tetracycles below move from tetracyclo[8.7.0.0^4,9.0^13,17] to
+# tetracyclo[8.7.0.0^2,7.0^11,15] ({2,7,11,15} is lower than {4,9,13,17}).
 # --------------------------------------------------------------------------
 
 DESCRIPTOR_STABLE = [
-    "CC1CC2C3CCC4=CC(=O)C=CC4(C3(C(CC2(C1(C(=O)COP(=O)(O)O)O)C)O)F)C",
-    "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@@]4([C@]3([C@H](C[C@@]2("
-    "[C@]1(C(=O)COC(=O)C)OC(=O)C(C)C)C)O)F)C",
-    "C[C@H](CCCC(C)C)[C@H]1CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CC[C@@H]4[C@@]3"
-    "(C(CC4=O)C(=O)OC)C)C",
-    "CC12CCC3C(C1CCC2O)CCC4=CC(=NN(C)C)CCC34C",
+    ("CC1CC2C3CCC4=CC(=O)C=CC4(C3(C(CC2(C1(C(=O)COP(=O)(O)O)O)C)O)F)C",
+     "tetracyclo[8.7.0.0^2,7.0^11,15]"),
+    ("C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@@]4([C@]3([C@H](C[C@@]2("
+     "[C@]1(C(=O)COC(=O)C)OC(=O)C(C)C)C)O)F)C",
+     "tetracyclo[8.7.0.0^2,7.0^11,15]"),
+    ("C[C@H](CCCC(C)C)[C@H]1CC[C@@H]2[C@@]1(CC[C@H]3[C@H]2CC[C@@H]4[C@@]3"
+     "(C(CC4=O)C(=O)OC)C)C",
+     "tetracyclo[7.7.0.0^2,6.0^10,14]"),
+    ("CC12CCC3C(C1CCC2O)CCC4=CC(=NN(C)C)CCC34C", None),
 ]
 
 
-@pytest.mark.parametrize("smiles", DESCRIPTOR_STABLE)
-def test_orientation_pass_never_changes_the_descriptor(smiles):
-    from orthonym.rules.polycyclic import VonBaeyerAnalyzer
+@pytest.mark.parametrize("smiles,lowest", DESCRIPTOR_STABLE)
+def test_orientation_pass_never_changes_the_descriptor(smiles, lowest):
+    from orthonym.rules.polycyclic import VonBaeyerAnalyzer, _superscript_shape_and_rank
 
     mol = Chem.MolFromSmiles(smiles)
     ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
@@ -138,10 +142,15 @@ def test_orientation_pass_never_changes_the_descriptor(smiles):
     incumbent = analyzer._analyze_impl(mol, ring_atoms)
     chosen = analyzer.analyze(mol, ring_atoms)
 
-    assert chosen.descriptor_string == incumbent.descriptor_string, (
-        f"the locant pass moved the descriptor: "
+    inc_shape, inc_rank = _superscript_shape_and_rank(incumbent.descriptor_string)
+    shape, rank = _superscript_shape_and_rank(chosen.descriptor_string)
+    assert shape == inc_shape, (
+        f"the locant pass changed the ring analysis: "
         f"{incumbent.descriptor_string} -> {chosen.descriptor_string}"
     )
+    assert rank <= inc_rank
+    if lowest is not None:
+        assert chosen.descriptor_string == lowest
     # And it must still be a complete, one-locant-per-atom numbering.
     locants = [chosen.numbering.get(i) for i in ring_atoms]
     assert all(l is not None for l in locants)

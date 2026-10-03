@@ -5,8 +5,9 @@ conversion of a methylene, >CH2, group into a >C=O group, the suffix 'one' with 
 locants can be added to the name of parent hydrides having such groups." A carbon of a
 saturated bridge (methano, ethano) is such a >CH2 group, so no added hydrogen is needed
 ('1,2,3,4-tetrahydro-1,4-methanonaphthalen-9-one'). A ketone at a ring position of the
-fused parent needs added hydrogen (:28388,:24693): slice S3, declined here.
-Every expected name was read back by OPSIN 2.9.0 to the input's full InChIKey (S1.8b)."""
+fused parent needs indicated or added hydrogen (:28388,:24693): slice S3,
+``test_bf_s3_ring_ketones.py``, where the four rows this file declined before S3 are named.
+Every expected name was read back by OPSIN 2.9.0 to the input's full InChIKey (S1.8b, S3)."""
 import pytest
 from rdkit import Chem
 
@@ -30,23 +31,12 @@ BRIDGE_KETONES = [
     ("CC(=O)c1ccc2c(c1)C1CCC2C1=O", "6-acetyl-1,2,3,4-tetrahydro-1,4-methanonaphthalen-9-one"),
     ("C[C@@]12CC[C@@H](C1=O)c1ccccc21", "(1S,4R)-1-methyl-1,2,3,4-tetrahydro-1,4-methanonaphthalen-9-one"),
 ]
-RING_KETONES = [   # added hydrogen needed at the ketone position: slice S3, declined
-    "O=C1CC2CC1c1ccccc12",           # the ring C2 of 1,2,3,4-tetrahydro-1,4-methanonaphthalene
-    "O=C1CC2CCC1c1ccccc12",          # two ethano readings; (c) puts the ketone in the ring (2)
-    "O=C1C(=O)C2CCC1c1ccccc12",      # the same for the dione
-    "O=C1C=CC(=O)C2C3CCC(C3)C12",    # ketones on the fused parent's ring
-]
 
 
 @pytest.mark.parametrize("smiles,name", BRIDGE_KETONES)
 def test_bridge_ketone_name(smiles, name):
     res = build(Chem.MolFromSmiles(smiles))
     assert res is not None and res[0] == name, res
-
-
-@pytest.mark.parametrize("smiles", RING_KETONES)
-def test_ring_ketone_is_declined(smiles):
-    assert build(Chem.MolFromSmiles(smiles)) is None
 
 
 def _row(smiles, tier):
@@ -66,9 +56,12 @@ def test_bridge_ketone_is_the_verified_pin(smiles, name, tier):
 
 
 @pytest.mark.opsin_gate
-def test_a_ring_ketone_keeps_its_von_baeyer_name_at_best_effort():
-    smiles = "O=C1CC2CCC1c1ccccc12"
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    be = _row(smiles, "best-effort")
-    assert be["tier"] == "systematic_verified" and "cyclo[" in be["name"], be
-    assert name_is_rt_exact(be["name"], smiles)
+@pytest.mark.parametrize("tier", ["pin", "best-effort"])
+def test_a_ring_ketone_is_the_verified_pin(tier):
+    # slice S3: (c) (:3256) puts the ketone in the ring (2 before the bridge's 9) and
+    # (:24695) adds the hydrogen at C1 ('3,4-dihydronaphthalen-1(2H)-one (PIN)',
+    #:3276)
+    smiles, name = "O=C1CC2CCC1c1ccccc12", "3,4-dihydro-1,4-ethanonaphthalen-2(1H)-one"
+    row = _row(smiles, tier)
+    assert (row.get("name"), row["tier"]) == (name, "pin_verified"), row
+    assert name_is_rt_exact(name, smiles)

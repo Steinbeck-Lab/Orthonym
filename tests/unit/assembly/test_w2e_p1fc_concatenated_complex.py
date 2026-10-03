@@ -17,6 +17,8 @@ class TestP2952ConcatenatedComplex:
             "4-[(benzylsulfanyl)methyl]benzoic acid"
 
     def test_oxy_analog_unchanged(self):
-        # The pre-existing oxy concatenation must stay byte-identical.
+        # The oxy concatenation encloses each compound prefix:
+        # (the Blue Book) parentheses around compound prefixes, nested by
+        # (:7446); '(benzyloxy)carbonyl (preferred prefix)' (:18116).
         assert name_compound("OC(=O)c1ccc(COCc2ccccc2)cc1") == \
-            "4-(benzyloxymethyl)benzoic acid"
+            "4-[(benzyloxy)methyl]benzoic acid"

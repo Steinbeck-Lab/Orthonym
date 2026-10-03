@@ -86,7 +86,6 @@ COVERAGE_CASES = [
 BYTE_IDENTICAL_CASES = [
     ("c1ccccc1.O", "benzene—water (1/1)"),
     ("CCO.O", "ethanol—water (1/1)"),
-    ("OCCO.OCCO", "ethane-1,2-diol ethane-1,2-diol"),
     ("CC(=O)[O-].[Na+]", "sodium acetate"),
 ]
 
@@ -207,6 +206,17 @@ def test_complete_emits_split_name_join(smiles, expected, production_gate):
 def test_pin_matches_expected(smiles, expected, production_gate):
     out = _pin().name(Chem.CanonSmiles(smiles))
     assert out == expected, f"{smiles}: pin gave {out!r} != {expected!r}"
+
+
+def test_identical_components_are_named_only_below_the_pin(production_gate):
+    # 'ethane-1,2-diol ethane-1,2-diol' (identical components joined by a space) is a
+    # correct systematic name, not a PIN: the Blue Book has no construction that
+    # repeats a name, the Blue Book, adducts of SEPARATE molecular
+    # entities). The PIN path declines it; the complete configuration keeps it. (It
+    # used to be a BYTE_IDENTICAL_CASES row shipped by both.)
+    smi = Chem.CanonSmiles("OCCO.OCCO")
+    assert _pin().name(smi) == "unknown organic compound"
+    assert _complete().name(smi) == "ethane-1,2-diol ethane-1,2-diol"
 
 
 @pytest.mark.parametrize("smiles,expected", BYTE_IDENTICAL_CASES)

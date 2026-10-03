@@ -261,14 +261,18 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O', '(2S)-2-{(2S)-2-[(2S)-2-amino-3-(4-hydroxyphenyl)propanamido]-3-methylbutanamido}-5-(carbamimidoylamino)pentanoic acid'),
     # wp7 change-asserted-value (m08): 'dimethyl' keys at 'methyl', before 'oxo':3448); a primed
     # locant is a locant:3442), not text that sorts before letters. OPSIN full-InChIKey exact.
-    ('CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1', "(10'S,17'S)-9',13'-dimethyl-5,6'-dioxospiro[oxolane-2,14'-tetracyclo[8.7.0.0^4,9.0^13,17]heptadeca-2,4-diene]"),  # was "...-5,6'-dioxo-9',13'-dimethylspiro[...]"
+    # quick-wins F-Q1: von Baeyer superscripts as low as possible, the Blue Book);
+    # was "(10'S,17'S)-9',13'-dimethyl-5,6'-dioxospiro[oxolane-2,14'-tetracyclo[8.7.0.0^4,9.0^13,17]heptadeca-2,4-diene]"
+    ('CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1', "(1'S,11'S)-2',15'-dimethyl-5,5'-dioxospiro[oxolane-2,14'-tetracyclo[8.7.0.0^2,7.0^11,15]heptadeca-6,8-diene]"),
     ('C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12', None),
     ('C/C(=C\\CC/C(C)=C/C/C=C(/CC(=O)c1cc(O)ccc1O)C(=O)O)CO', None),  # NEWLY_RT
     # _TIER_CONTRACT (was '...-4,4,8,10,14-pentamethylgonan-3-one', side chain dropped)
     ('CC(C)(O)[C@@H]1CC[C@@](C)([C@H]2CC[C@]3(C)[C@@H]2CC[C@@H]2[C@@]4(C)CCC(=O)C(C)(C)[C@@H]4CC[C@]23C)O1', None),
     ('C/C1=C/C[C@H](O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)/C(C)=C/[C@H]2OC(=O)[C@H](C)[C@@H]2CC1', None),
     ('CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C[C@@]23CC[C@]4(O)CO)O1', None),  # Updated P72: IUPAC citation order
-    ('COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43', 'methyl (8R,17R,21S)-15-methyl-5,15-diazahexacyclo[14.2.2.1^1,5.0^8,16.0^9,14.0^8,21]henicosa-9,11,13-triene-17-carboxylate'),  # Updated P72: IUPAC citation order
+    # quick-wins F-Q1: superscripts {1,3,8,9,9,12,16,21} before {1,5,8,8,9,14,16,21},:9685);
+    # was 'methyl (8R,17R,21S)-15-methyl-5,15-diazahexacyclo[14.2.2.1^1,5.0^8,16.0^9,14.0^8,21]henicosa-9,11,13-triene-17-carboxylate'
+    ('COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43', 'methyl (9R,18R,21S)-2-methyl-2,12-diazahexacyclo[14.2.2.1^9,12.0^1,9.0^3,8.0^16,21]henicosa-3,5,7-triene-18-carboxylate'),
     ('COc1cc2c(cc1OC)[C@H]1Cc3ccc(OC)c(OC)c3CN1CC2', None),  # wp7: was 'berberine' (a different compound, the unsaturated alkaloid; tetrahydropalmatine is the input)
     # _TIER_CONTRACT (was '...-3,7,15-trihydroxycholan-24-one', the ester O-methyl dropped)
     ('COC(=O)CC[C@@H](C)[C@H]1C[C@@H](O)[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@@]21C', None),

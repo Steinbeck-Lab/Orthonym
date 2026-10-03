@@ -630,6 +630,130 @@ def _exocyclic_component(mol, start: int, ring_set: set) -> set:
     return visited
 
 
+def _chain_hydrazone_prefixes(mol, matches, chain_set):
+    """``{hydrazone C: ('(R-hydrazinylidene)' body, nitrogen-branch atoms)}`` for
+    the chain hydrazones C=N-N(R) of ``matches`` whose far nitrogen carries a heavy
+    substituent; ``False`` when such a branch cannot be named (the caller fails
+    closed); ``{}`` when there is none. An unsubstituted =N-NH2 is left to the
+    plain 'hydrazinylidene' prefix.
+
+    The body comes from the substituent walk's ylidene constructor
+    (``substituent_enumerator._nitrogen_ylidene_prefix``): the free valence is N1
+    and every substituent sits on N2, so no locant is cited inside the unit
+    ('(propan-2-ylidene)hydrazinylidene', 'phenylhydrazinylidene').
+    """
+    out = {}
+    if not matches or not chain_set:
+        return out
+    from ..assembly.substituent_enumerator import _nitrogen_ylidene_prefix
+    for match in matches:
+        if len(match) < 3:
+            continue
+        c_idx, n1, n2 = match[0], match[1], match[2]
+        if c_idx not in chain_set:
+            continue
+        if not any(nb.GetIdx() != n1 and nb.GetAtomicNum() > 1
+                   for nb in mol.GetAtomWithIdx(n2).GetNeighbors()):
+            continue
+        branch = {n1}
+        stack = [n1]
+        while stack:
+            cur = stack.pop()
+            for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                ni = nb.GetIdx()
+                if ni != c_idx and ni not in branch and nb.GetAtomicNum() > 1:
+                    branch.add(ni)
+                    stack.append(ni)
+        if branch & chain_set:
+            return False
+        body = _nitrogen_ylidene_prefix(mol, branch, n1, 2)
+        if not body:
+            return False
+        # a compound prefix is enclosed, '(acetylhydrazinylidene)'
+        from ..assembly.naming_utils import enclose_if_compound
+        out[c_idx] = (enclose_if_compound(body), branch)
+    return out
+
+
+def _is_attachment_carbon(mol, idx: int, match) -> bool:
+    """True for a carbon of an FG match that the group's heteroatoms reach only by
+    single bonds (the substituted carbon of -NH2, -SH, -O-NH2, -NH-OH,...), as
+    opposed to a carbon that is part of the group itself (the C of -C#N, -COOH,
+    -C(=O)NH2, which a multiple bond joins to a heteroatom of the match)."""
+    from rdkit import Chem  # module has no top-level Chem import
+    atom = mol.GetAtomWithIdx(idx)
+    if atom.GetAtomicNum() != 6:
+        return False
+    in_match = set(match)
+    hetero_bonds = [b for b in atom.GetBonds()
+                    if b.GetOtherAtomIdx(idx) in in_match
+                    and b.GetOtherAtom(atom).GetAtomicNum() != 6]
+    return bool(hetero_bonds) and all(
+        b.GetBondType() == Chem.BondType.SINGLE for b in hetero_bonds)
+
+
+def _fg_located_atoms(mol, match) -> tuple:
+    """The atoms of an FG match that the group occupies: its heteroatoms and the
+    carbons bonded to them. A carbon of the match bonded to none of the match's
+    heteroatoms is SMARTS context (the two neighbours in
+    ``[OX2H][CX4H1]([#6])[#6]``), not a position of the group, so whether the group
+    sits on a substituent branch is read from the other atoms."""
+    in_match = set(match)
+    located = []
+    for a in match:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetAtomicNum() != 6 or any(
+                nb.GetIdx() in in_match and nb.GetAtomicNum() != 6
+                for nb in atom.GetNeighbors()):
+            located.append(a)
+    return tuple(located) or tuple(match)
+
+
+def _ring_branches_named_whole(mol, non_principal, ring_set) -> set:
+    """Atoms of the exocyclic branches a ring parent hands to the substituent
+    walk instead of citing a group of them as a ring-locant prefix.
+
+    - A non-principal group none of whose atoms is in the ring or bonded to it
+      (it sits deeper in a branch): the whole branch. The skeleton-decoration
+      groups keep their own exocyclic table (``_name_exocyclic_decoration``).
+      A carbon the match holds only as the group's point of attachment (bonded
+      to the group's heteroatoms by single bonds only: the C of -CH2-NH2 for
+      'amino', of -CH2-SH for 'sulfanyl') is not part of the prefix, so it
+      anchors the group only when it is a ring atom itself; bonded to the ring
+      from outside it is a branch carbon, and the prefix is the whole branch:
+      '1-(aminomethyl)...', as '3-(2-iminopropyl)cyclohexane-1-carboxylic acid
+      (PIN)', the Blue Book) cites its imino group inside the
+      branch.
+    - A ring imine C=N-R or ring hydrazone C=N-N(R) whose nitrogen side carries
+      a heavy substituent: the nitrogen branch (one '(R-imino)' /
+      '(R-hydrazinylidene)' prefix, the walk's ylidene constructor).
+    """
+    handover: set = set()
+    for fg_name, matches in (non_principal or {}).items():
+        if fg_name in _SKELETON_DECORATION_FGS:
+            continue
+        for match in matches or ():
+            if not match:
+                continue
+            anchored = any(
+                a in ring_set or (
+                    not _is_attachment_carbon(mol, a, match)
+                    and any(nb.GetIdx() in ring_set
+                            for nb in mol.GetAtomWithIdx(a).GetNeighbors()))
+                for a in match)
+            if not anchored:
+                handover |= _exocyclic_component(mol, match[0], ring_set)
+                continue
+            if fg_name in ('imine', 'hydrazone') and match[0] in ring_set:
+                n_first = match[1]
+                n_far = match[2] if fg_name == 'hydrazone' else match[1]
+                before = match[1] if fg_name == 'hydrazone' else match[0]
+                if any(nb.GetIdx() != before and nb.GetAtomicNum() > 1
+                       for nb in mol.GetAtomWithIdx(n_far).GetNeighbors()):
+                    handover |= _exocyclic_component(mol, n_first, ring_set)
+    return handover
+
+
 def _name_exocyclic_decoration(
     mol, center: int, ring_set: set, atom_to_locant: dict, fg_name: str
 ):
@@ -977,8 +1101,39 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
     # pipeline names them instead of them silently vanishing).
     _extra_consumed: set = set()
     _do_not_consume: set = set()
+    # Branches the universal pipeline (Step 6) names whole, as one substituent:
+    # a group that sits deeper in an exocyclic branch than the ring atom's own
+    # neighbour cannot be a ring-locant prefix ('3-(2-iminopropyl)cyclohexane-1-
+    # carboxylic acid (PIN)',, the Blue Book), and a ring =N-
+    # whose nitrogen side carries a substituent is one '(R-imino)' /
+    # '(R-hydrazinylidene)' prefix ('4-[(propan-2-ylidene)hydrazinylidene]
+    # cyclohexane-1-carboxylic acid (PIN)',:38613). Any other group inside such a
+    # branch goes with it.
+    _handover = _ring_branches_named_whole(mol, non_principal, ring_set)
+    _do_not_consume |= _handover
     for fg_name, matches in non_principal.items():
         if not matches:
+            continue
+        if _handover:
+            matches = [m for m in matches
+                       if not (set(m) - ring_set) or not (set(m) - ring_set) <= _handover]
+            if not matches:
+                continue
+        # (1) (the Blue Book): a -C(=NH)-OH bonded to the ring
+        # is the compound prefix 'C-hydroxycarbonimidoyl',
+        # '2-(C-hydroxycarbonimidoyl)cyclopentane-1-carboxylic acid (PIN)' (:30029).
+        if fg_name == 'imidic_acid':
+            _ia_locs = []
+            for match in matches:
+                _ia_c = match[0]
+                _ia_ring = [nb.GetIdx() for nb in mol.GetAtomWithIdx(_ia_c).GetNeighbors()
+                            if nb.GetIdx() in ring_set and nb.GetIdx() in atom_to_locant]
+                if _ia_c in ring_set or len(_ia_ring) != 1:
+                    return None
+                _ia_locs.append(atom_to_locant[_ia_ring[0]])
+            _ia_locs.sort()
+            all_prefixes.append(format_fg_prefix(
+                'C-hydroxycarbonimidoyl', _ia_locs, len(_ia_locs)))
             continue
         if fg_name in NO_SENIORITY_GROUPS and fg_name not in ('alkene', 'alkyne'):
             # Named as prefix if it has a prefix form
@@ -2001,6 +2156,29 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 _m for _m in non_principal['primary_amide']
                 if not any(a in _oxamoyl_amide_c for a in _m)]
 
+    # (the Blue Book) "In the presence of functions having
+    # seniority the prefix 'hydrazinylidene' is used substitutively";
+    # (:38652) "The compound prefix 'carbamoylhydrazinylidene' is used in the
+    # presence of a characteristic group that is preferred for citation as a
+    # suffix": '4-[(dimethylcarbamoyl)hydrazinylidene]heptanoic acid (PIN)'
+    # (:38678). A chain hydrazone C=N-N(R) whose far nitrogen carries a
+    # substituent is ONE '(R-hydrazinylidene)' prefix built over its whole
+    # nitrogen branch; any other group perceived inside that branch (the 'urea'
+    # of a semicarbazone) belongs to it. Pre-pass, so the FG loop's order does not
+    # matter.
+    _hz_named = _chain_hydrazone_prefixes(mol, non_principal.get('hydrazone'),
+                                          set(principal_chain))
+    if _hz_named is False:
+        return None   # a substituted =N-N we cannot name: never a bare 'hydrazinylidene'
+    if _hz_named:
+        _hz_all_atoms = set()
+        for _hz_prefix, _hz_branch in _hz_named.values():
+            _hz_all_atoms |= _hz_branch
+        non_principal = {
+            _k: ([_m for _m in _v if not set(_m) <= _hz_all_atoms]
+                 if _k != 'hydrazone' else _v)
+            for _k, _v in non_principal.items()}
+
     # Add ester acyloxy prefixes if esters were demoted
     if ester_acyloxy_prefixes:
         # Group identical acyloxy prefixes for multipliers
@@ -2158,7 +2336,15 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         if _branch_atoms and fg_name in BRANCH_HANDLED_FGS:
             filtered_matches = []
             for match in matches:
-                if not all(a in _branch_atoms for a in match):
+                # The group's own atoms decide where it sits: a secondary-alcohol
+                # match also holds the carbinol carbon's two neighbours, one of
+                # which is the chain atom the branch hangs from, so testing every
+                # atom kept the branch's OH and cited it a second time on the
+                # chain ('3-bromo-2-(2-bromo-1-hydroxyethyl)-2,4-dihydroxybutanoic
+                # acid' for the PIN '3-bromo-2-(2-bromo-1-hydroxyethyl)-4-hydroxy-
+                # butanoic acid (PIN)',, the Blue Book).
+                _located = _fg_located_atoms(mol, match)
+                if not all(a in _branch_atoms for a in _located):
                     filtered_matches.append(match)
                     continue
                 # Check if this FG is on a small branch with carbons
@@ -2167,7 +2353,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 for _pos, sub_list in features.substituents.items():
                     for sub_atoms in sub_list:
                         sub_set = set(sub_atoms)
-                        if all(a in sub_set for a in match):
+                        if all(a in sub_set for a in _located):
                             # This branch contains the entire FG match
                             c_count = sum(1 for a in sub_atoms
                                           if mol.GetAtomWithIdx(a).GetSymbol() == 'C')
@@ -2358,6 +2544,28 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                 all_prefixes.append(
                     format_fg_prefix('hydroperoxy', _px_locs, _n))
                 _amidine_excluded_n.update(_px_os)
+                continue
+
+        # (2),,: an imidic acid, an
+        # unsubstituted hydrazide or a chalcogen acid whose carbon ENDS the chain
+        # parent (a senior group present) is cited by two simple prefixes at that
+        # carbon's locant -- '4-hydroxy-4-iminobutanoic acid (PIN)',
+        # '3-hydrazinyl-3-oxopropanoic acid (PIN)', '4-oxo-4-sulfanylbutanoic
+        # acid (PIN)' -- never the acyl prefix ('C-hydroxycarbonimidoyl',
+        # 'hydrazinecarbonyl', 'sulfanylcarbonyl'), which would cite the chain
+        # carbon a second time. Fail closed (fall through) unless every match
+        # qualifies.
+        if fg_name in _CHAIN_END_ACID_DERIVATIVE_FGS and chain_set:
+            _ce = _chain_end_acid_derivative_prefixes(
+                mol, fg_name, matches, chain_set, atom_to_locant,
+                principal_group)
+            if _ce is not None:
+                _ce_groups, _ce_atoms = _ce
+                for _pf, _locs in _ce_groups.items():
+                    _locs = sorted(_locs)
+                    all_prefixes.append(
+                        format_fg_prefix(_pf, _locs, len(_locs)))
+                _amidine_excluded_n.update(_ce_atoms)
                 continue
 
         # W3-P03-6, BB 30396): a non-principal SECONDARY amide
@@ -2569,6 +2777,18 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         _amidine_excluded_n.add(_tan)
                     continue
 
+        # The substituted chain hydrazones of the pre-pass above.
+        if fg_name == 'hydrazone' and _hz_named:
+            for _m in matches:
+                if _m[0] in _hz_named:
+                    _hz_prefix, _hz_branch = _hz_named[_m[0]]
+                    all_prefixes.append(format_fg_prefix(
+                        _hz_prefix, [atom_to_locant[_m[0]]], 1))
+                    _amidine_excluded_n.update(_hz_branch)
+            matches = [_m for _m in matches if _m[0] not in _hz_named]
+            if not matches:
+                continue
+
         # (BB 33071/55479, W2E-P1FG Task 10): a chain imine C
         # whose =N bears the exact H2N-CO-CO- branch is cited as the preferred
         # composite prefix '(oxamoylimino)' at the imine C's locant. A =N
@@ -2593,11 +2813,23 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     break
                 _oxa = oxamoyl_branch_name(mol, _imn, _heavy[0])
                 _loc = atom_to_locant.get(_imc)
-                if _oxa is None or _loc is None:
-                    _im_ok = False   # substituted =N we cannot name -> fail closed
+                if _loc is None:
+                    _im_ok = False
                     break
-                _im_prefixes.append(
-                    format_fg_prefix(f"({_oxa}imino)", [_loc], 1))
+                if _oxa is not None:
+                    _im_prefixes.append(
+                        format_fg_prefix(f"({_oxa}imino)", [_loc], 1))
+                else:
+                    # (BB 26540): with a senior group present the
+                    # imine is the prefix 'imino'; a carbon group on its N is
+                    # cited on it, '(R-imino)': '2-(tert-butylimino)-3-methyl-
+                    # 3-(nitrooxy)butanoic acid (PIN)' (BB 25963),
+                    # '3-(methylimino)butan-2-ylidene (PIN)' (BB 43352).
+                    _rim = _carbon_imino_prefix(mol, _imn, _imc, _heavy[0])
+                    if _rim is None:
+                        _im_ok = False   # substituted =N we cannot name -> fail closed
+                        break
+                    _im_prefixes.append(format_fg_prefix(_rim, [_loc], 1))
                 _amidine_excluded_n.add(_imn)
                 _im_handled = True
             if not _im_ok:
@@ -2892,6 +3124,22 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             if not _bridge_kept:
                 continue
             matches = _bridge_kept
+
+        # /: the ester of a noncarbon oxoacid on a
+        # carbon of a substituent BRANCH ('-CH2-O-PO3H2') is part of that
+        # branch's prefix, '[(phosphonooxy)methyl]', which the substituent walk
+        # builds whole. Citing the FG prefix as well put it on the chain atom the
+        # branch hangs from ('2-(phosphonooxy)-2-[(phosphonooxy)methyl]...', a
+        # different molecule). Hand such a match to the walk; a branch it cannot
+        # name fails the handler closed there (FAILCLOSED-POLY-SUB).
+        if fg_name in _OXOACID_ESTER_FGS and features.substituents:
+            _ester_kept = [
+                _m for _m in matches
+                if not _match_inside_walked_branch(_m, chain_set, features)
+            ]
+            if not _ester_kept:
+                continue
+            matches = _ester_kept
 
         # Get prefix form for this FG
         prefix_form = get_fg_prefix_form(
@@ -3637,6 +3885,97 @@ def _record_el02_ester_prefix_name(name: str) -> None:
 _CHALCOGEN_BRIDGE_FGS = frozenset({'peroxide', 'disulfide'})
 
 
+# (BB 30219): "When the position of chalcogen atoms is known,
+# combinations of prefixes such as 'hydroxy- and sulfanylidene-' or 'sulfanyl-
+# and oxo-' are used in acyclic compounds." The doubly bonded chalcogen gives
+# the '-ylidene' (or 'oxo') prefix, the -XH chalcogen the '-yl' (or 'hydroxy')
+# prefix. Every chalcogen-acid SMARTS matches (C, =X, -XH).
+_CHALCOGEN_YLIDENE_PREFIX = {
+    'O': 'oxo', 'S': 'sulfanylidene', 'Se': 'selanylidene', 'Te': 'tellanylidene',
+}
+_CHALCOGEN_YL_PREFIX = {
+    'O': 'hydroxy', 'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl',
+}
+_CHAIN_END_CHALCOGEN_ACID_FGS = frozenset({
+    'thioic_S_acid', 'thioic_O_acid', 'dithioic_acid',
+    'selenoic_Se_acid', 'selenoic_O_acid', 'diselenoic_acid',
+    'telluroic_Te_acid', 'telluroic_O_acid', 'ditelluroic_acid',
+})
+_CHAIN_END_ACID_DERIVATIVE_FGS = (
+    frozenset({'imidic_acid', 'hydrazide'}) | _CHAIN_END_CHALCOGEN_ACID_FGS)
+
+
+def _chain_end_acid_derivative_prefixes(mol, fg_name, matches, chain_set,
+                                        atom_to_locant, principal_group=None):
+    """The simple-prefix pair of a junior acid-derivative group ending the chain.
+
+    For each match whose carbon is a member of the chain parent:
+
+    - ``imidic_acid`` (C, =NH, OH): 'hydroxy' + 'imino', (2)
+      (BB 30021) "a combination of the simple prefixes 'hydroxy' and 'imino' at
+      the end of a carbon chain is used in preferred IUPAC names";
+    - ``hydrazide`` (C, =O, N, N) with an unsubstituted -NH-NH2: 'hydrazinyl' +
+      'oxo', (BB 34014);
+    - a chalcogen acid (C, =X, -XH): the '=X' and '-XH' prefixes of
+      ``_CHALCOGEN_YLIDENE_PREFIX`` / ``_CHALCOGEN_YL_PREFIX``,.
+
+    Returns ``({prefix: [locants]}, consumed heteroatoms)``, or None when any
+    match falls outside the class (an off-chain carbon, a substituted
+    hydrazide, a charged atom).
+
+    Also None for a chalcogen acid under a DIFFERENT chalcogen acid as the
+    principal group: (BB 18489-18525, Table 4.3) ranks these by "(a)
+    maximum number of oxygen atoms, then S, Se, and Te atoms... (c) oxygen
+    atoms, then S, Se, and Te atoms, in -(O)OH and -OH groups" ('-CS-OH
+    carbothioic O-acid' above '-CO-SH carbothioic S-acid'), and
+    ``SENIORITY_ORDER`` does not follow that order inside this block, so the
+    parent chosen there may not be the senior acid.
+    """
+    if (fg_name in _CHAIN_END_CHALCOGEN_ACID_FGS
+            and principal_group in _CHAIN_END_CHALCOGEN_ACID_FGS
+            and principal_group != fg_name):
+        return None
+    groups: Dict[str, List[int]] = defaultdict(list)
+    consumed: Set[int] = set()
+    for _m in matches:
+        if len(_m) < 3:
+            return None
+        _c = _m[0]
+        _loc = atom_to_locant.get(_c) if _c in chain_set else None
+        if _loc is None:
+            return None
+        _atoms = [mol.GetAtomWithIdx(_a) for _a in _m]
+        if any(_at.GetFormalCharge() for _at in _atoms):
+            return None
+        if fg_name == 'imidic_acid':
+            _pair = ('hydroxy', 'imino')
+            _used = (_m[1], _m[2])
+        elif fg_name == 'hydrazide':
+            if len(_m) < 4:
+                return None
+            _n1, _n2 = _atoms[2], _atoms[3]
+            # -C(=O)-NH-NH2 only: N1 bonded to the carbonyl C and N2 alone,
+            # N2 a terminal NH2.
+            if (_n1.GetDegree() != 2 or _n1.GetTotalNumHs() != 1
+                    or _n2.GetDegree() != 1 or _n2.GetTotalNumHs() != 2):
+                return None
+            _pair = ('hydrazinyl', 'oxo')
+            _used = (_m[1], _m[2], _m[3])
+        else:
+            _ylidene = _CHALCOGEN_YLIDENE_PREFIX.get(_atoms[1].GetSymbol())
+            _yl = _CHALCOGEN_YL_PREFIX.get(_atoms[2].GetSymbol())
+            if _ylidene is None or _yl is None:
+                return None
+            _pair = (_yl, _ylidene)
+            _used = (_m[1], _m[2])
+        for _pf in _pair:
+            groups[_pf].append(_loc)
+        consumed.update(_used)
+    if not groups:
+        return None
+    return dict(groups), consumed
+
+
 def _bridge_far_side_is_walked_branch(mol, match, chain_set, features) -> bool:
     """True when a bridge ``match`` (C, X, X, C) has exactly one carbon
     on the parent chain and its ENTIRE far side -- both chalcogens and the far
@@ -3665,6 +4004,27 @@ def _bridge_far_side_is_walked_branch(mol, match, chain_set, features) -> bool:
             if far_side <= set(_sub_atoms):
                 return True
     return False
+
+
+#: The ester groups of noncarbon oxoacids whose FG prefix is '<acyl>oxy'
+#: ('sulfooxy', 'phosphonooxy', 'nitrooxy';,,
+#:.
+_OXOACID_ESTER_FGS = frozenset({
+    'sulfate_monoester', 'phosphate_monoester', 'nitrooxy',
+})
+
+
+def _match_inside_walked_branch(match, chain_set, features) -> bool:
+    """True when no atom of ``match`` is on the principal chain and the whole
+    match lies inside ONE walked substituent branch (the walk names it)."""
+    if not match or not features.substituents:
+        return False
+    match_set = set(match)
+    if match_set & chain_set:
+        return False
+    return any(match_set <= set(_sub_atoms)
+               for _sub_list in features.substituents.values()
+               for _sub_atoms in _sub_list)
 
 
 def _is_linear_terminal_pure_c_branch(mol, sub_atoms, chain_set) -> bool:
@@ -3717,6 +4077,61 @@ def _enumerate_pure_c_branch_name(mol, sub_atoms, features, position):
     if name and needs_brackets(name):
         name = f"({name})"
     return name
+
+
+def _carbon_imino_prefix(mol, imn: int, imc: int, r_idx: int) -> Optional[str]:
+    """'{R}imino' for a chain imine C=N-R whose N carries one carbon group R
+    , the Blue Book; '(tert-butylimino)':25963), or ``None``.
+
+    R is named by the shared nitrogen-ylidene builder
+    (``substituent_enumerator._nitrogen_ylidene_prefix``); R must hang from the
+    imine N alone (no atom of R bonds back into the parent)."""
+    from rdkit import Chem
+    if mol.GetAtomWithIdx(r_idx).GetAtomicNum() != 6:
+        return None
+    b_cn = mol.GetBondBetweenAtoms(imc, imn)
+    b_nr = mol.GetBondBetweenAtoms(imn, r_idx)
+    if (b_cn is None or b_cn.GetBondType() != Chem.BondType.DOUBLE
+            or b_nr is None or b_nr.GetBondType() != Chem.BondType.SINGLE):
+        return None
+    frag = {imn, r_idx}
+    stack = [r_idx]
+    while stack:
+        cur = stack.pop()
+        for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+            j = nb.GetIdx()
+            if j != imn and j not in frag:
+                frag.add(j)
+                stack.append(j)
+    if imc in frag:
+        return None
+    from ..assembly.substituent_enumerator import _nitrogen_ylidene_prefix
+    token = _nitrogen_ylidene_prefix(mol, frag, imn, 2)
+    if not token or token == 'imino' or ' ' in token:
+        return None
+    return token
+
+
+def _acid_linked_poly_branch(mol, sub_atoms, features, check_fg_link: bool,
+                             acyl_carbon: bool = True) -> Optional[str]:
+    """The acyl-oxy / acyl-amino prefix of a principal-chain branch, or ``None``
+    (``assembly.substituent_enumerator.name_acid_linked_branch`` holds the rules).
+
+    ``check_fg_link``: decline when the linking OXYGEN belongs to a perceived
+    functional group (that group's FG prefix names the branch: 'sulfooxy',
+    'phosphonooxy', 'nitrooxy')."""
+    from ..assembly.substituent_enumerator import name_acid_linked_branch
+    chain_set = set(features.principal_chain or ())
+    links = [i for i in sub_atoms
+             if any(n.GetIdx() in chain_set
+                    for n in mol.GetAtomWithIdx(i).GetNeighbors())]
+    if len(links) != 1:
+        return None
+    return name_acid_linked_branch(
+        mol, set(sub_atoms), links[0], getattr(features, 'principal_group', None),
+        functional_groups=((getattr(features, 'functional_groups', None) or {})
+                           if check_fg_link else None),
+        acyl_carbon=acyl_carbon)
 
 
 def _generate_alkyl_prefixes_for_polyfunctional(
@@ -3869,6 +4284,12 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 # Wave-2 completion: thiourea -NH-C(=S)-NH2 -> carbamothioylamino
                 # FG prefix (whole branch), same double-count guard as urea.
                 'thiourea',
+                # (the Blue Book): 'cyanato' for -O-CN and
+                # 'thiocyanato' for -S-CN are the preferred prefixes; the FG
+                # prefix names the whole branch ('3-(thiocyanato)propanoic acid
+                # (PIN)',:31013). The walk re-read it as 'cyanosulfanyl' on the
+                # same locant ('3-(cyanosulfanyl)-3-(thiocyanato)...').
+                'cyanate', 'thiocyanate',
             }
             _sub_set = set(sub_atoms)
             _skip_fg_branch = False
@@ -3940,6 +4361,52 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         substituent_groups[_ph].append(position)
                         continue
 
+            # /: a CARBON-FREE acid branch joined through
+            # an O or an -NH- ('sulfamoyloxy', '(chlorosulfonyl)oxy', the P-O-P
+            # chain). No FG prefix names it: its linking O belongs to no
+            # functional group (checked), and a sulfonamide whose S is off the
+            # chain is handed to this walk by the FG loop. It is one acyl-oxy /
+            # acyl-amino prefix.
+            if carbon_count == 0:
+                _acid = _acid_linked_poly_branch(
+                    mol, sub_atoms, features, check_fg_link=True)
+                if _acid:
+                    substituent_groups[_acid].append(position)
+                    continue
+
+            # (1) / (the Blue Book,:29496): the =O of an
+            # acyclic pseudoketone carbonyl on the chain is the prefix 'oxo' under
+            # a principal group senior to ketones; its carbon-free Si/Ge partner is
+            # 'silyl' / 'germyl' (the shared group-14 namer of the composer walk):
+            # '3-hydroxy-5-oxo-5-silylpentanoic acid'.
+            if carbon_count == 0:
+                from ..assembly.composer import is_pseudoketone_oxo
+                _pk_chain = set(features.principal_chain or ())
+                _pk_attach = next(
+                    (nb.GetIdx() for si in sub_atoms
+                     for nb in mol.GetAtomWithIdx(si).GetNeighbors()
+                     if nb.GetIdx() in _pk_chain), None)
+                if _pk_attach is not None and is_pseudoketone_oxo(
+                        mol, sub_atoms, _pk_attach, _pk_chain, features):
+                    substituent_groups['oxo'].append(position)
+                    continue
+                _g14_attach = next(
+                    (si for si in sub_atoms
+                     if any(nb.GetIdx() in _pk_chain
+                            for nb in mol.GetAtomWithIdx(si).GetNeighbors())),
+                    None)
+                if (_g14_attach is not None
+                        and mol.GetAtomWithIdx(_g14_attach).GetSymbol()
+                        in ('Si', 'Ge')):
+                    from ..assembly.substituent_naming import (
+                        _name_group14_substituent,
+                    )
+                    _g14 = _name_group14_substituent(
+                        mol, list(sub_atoms), _g14_attach)
+                    if _g14:
+                        substituent_groups[_g14].append(position)
+                        continue
+
             # Skip non-alkyl substituents
             if carbon_count == 0:
                 continue
@@ -3961,6 +4428,14 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                 het_name = _check_for_acylamino(mol, sub_atoms, features.principal_chain)
                 if not het_name and not skip_acyloxy:
                     het_name = _check_for_acyloxy(mol, sub_atoms, features.principal_chain)
+                if not het_name:
+                    # /: an acid branch joined through
+                    # an O or an -NH- is ONE prefix, '[(methoxysulfonyl)amino]',
+                    # '[(pyridine-3-carbonyl)oxy]' -- before the generic namer,
+                    # which named the -NH- of -NH-SO2-OCH3 alone ('amino').
+                    het_name = _acid_linked_poly_branch(
+                        mol, sub_atoms, features, check_fg_link=False,
+                        acyl_carbon=not skip_acyloxy)
                 if not het_name:
                     het_name = _name_heteroatom_substituent(mol, sub_atoms, features.principal_chain)
                 if not het_name:

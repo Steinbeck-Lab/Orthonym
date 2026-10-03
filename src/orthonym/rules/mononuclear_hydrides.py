@@ -879,6 +879,13 @@ def _ether_organyl_prefix_name(mol, nbr, hub_idx: int) -> Optional[str]:
                     and all(b.GetBondType() in (Chem.BondType.SINGLE, Chem.BondType.AROMATIC)
                             for b in a.GetBonds())):
                 continue
+            # one disulfide link -S-S- between two carbons (an open-chain
+            # 'methyldisulfanyl' group, also prefix-only,:39153)
+            if (sym == 'S' and a.GetDegree() == 2 and a.GetTotalNumHs() == 0
+                    and not a.IsInRing()
+                    and sorted(n.GetSymbol() for n in a.GetNeighbors()) == ['C', 'S']
+                    and all(b.GetBondType() == Chem.BondType.SINGLE for b in a.GetBonds())):
+                continue
             return None
         from ..perception.functional_groups import detect_functional_groups
         from .seniority import get_principal_group

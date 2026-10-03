@@ -276,6 +276,35 @@ class TestValidateHyphenPlacement:
         assert ok is False
         assert "hyphen" in msg
 
+    @pytest.mark.parametrize("name", [
+        # (the Blue Book): a fusion carbon locant is a number
+        # with one Roman letter; the Blue Book's own PINs carry them mid-list.
+        "1,2,3,4,4a,9,9a,10-octahydro-9,10-ethanoanthracene",   #:19964 (PIN)
+        "3a,4,5,6,7,7a-hexahydro-1H-4,7-methanoindene",
+        "1,2,3,4,4a,5,8,8a-octahydronaphthalene",
+        "5,6,6a,7-tetrahydro-4H-dibenzo[de,g]quinoline",
+    ])
+    def test_HY_3_lettered_fusion_locants_valid(self, name):
+        g = OpsinGrammar()
+        ok, msg = g._validate_detailed(name)
+        assert ok is True, msg
+
+    @pytest.mark.parametrize("name", [
+        "9,10ethanoanthracene",            # bridge prefix without its hyphen
+        "1,2,3,4,4a,9,9a,10octahydroanthracene",
+        "4a,8adihydronaphthalene",
+    ])
+    def test_HY_3_missing_hyphen_after_lettered_list_invalid(self, name):
+        g = OpsinGrammar()
+        ok, msg = g._validate_detailed(name)
+        assert ok is False
+        assert "hyphen" in msg
+
+    def test_HY_3_repair_keeps_lettered_locants(self):
+        g = OpsinGrammar()
+        assert (g._suggest_hyphen_normalization("1,2,3,4,4a,9,9a,10octahydroanthracene")
+                == "1,2,3,4,4a,9,9a,10-octahydroanthracene")
+
     def test_HY_3_missing_hyphen_2_2dimethyl_invalid(self):
         # internal notes C.b shape (variant of).
         g = OpsinGrammar()

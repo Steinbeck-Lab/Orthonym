@@ -155,7 +155,8 @@ def _name_oxamoyl_halide(mol, acid_halide_matches, halide_word) -> Optional[str]
 
 def _name_carbamoyl_acyl(mol, match, class_word) -> Optional[str]:
     """ (retained acyl 'carbamoyl'): H2N-CO-Y -> 'carbamoyl <class>'
-    (BB 31488 'H2N-CO-NCO carbamoyl isocyanate (PIN)').
+    (BB 31488 'H2N-CO-NCO carbamoyl isocyanate (PIN)'); for a halogen Y the amide of
+    the carbonic acid, 'carbonochloridic amide' (``_CARBONOHALIDIC_AMIDE``).
 
     'carbamoyl' is the retained acyl group of carbamic acid (H2N-COOH); its -OH
     is replaced by a halide or pseudohalide (Y). ``match`` is the acyl-halide /
@@ -204,9 +205,8 @@ def _name_carbamoyl_acyl(mol, match, class_word) -> Optional[str]:
         accounted = {acyl_c, carbonyl_o, n_amide} | class_atoms
         if accounted != heavy:
             return None
-        name = f"carbamoyl {class_word}"
-        _label_carbamoyl_halide(name, class_word)
-        return name
+        amide = _CARBONOHALIDIC_AMIDE.get(class_word)
+        return amide if amide is not None else f"carbamoyl {class_word}"
     acyl = _n_substituted_carbamoyl(mol, acyl_c, n_amide,
                                     heavy - ({acyl_c, carbonyl_o, n_amide} | class_atoms))
     if acyl is None:
@@ -214,18 +214,21 @@ def _name_carbamoyl_acyl(mol, match, class_word) -> Optional[str]:
     return f"{acyl} {class_word}"
 
 
-def _label_carbamoyl_halide(name: str, class_word: str) -> None:
-    """A Blue Book conflict, left for a ruling (review a performance pass, F-06):
-    prints 'Cl-CO-NH2 carbonochloridic amide (PIN) (not 1-chloroformamide)'
-    (the Blue Book), while (:31474) forms the acyl halides of carbamic
-    acid on 'carbamoyl' and ranks acid halides (10) above amides (11). The
-    'carbamoyl <halide>' name of H2N-CO-X is kept and labelled pin_unverified; the
-    pseudohalides keep their (PIN) ('carbamoyl isocyanate',:31488; 'carbamoyl
-    cyanide',:34858), and the N-substituted halides, for which the book prints no
-    name, keep theirs ('dimethylcarbamoyl chloride')."""
-    if class_word in ("fluoride", "chloride", "bromide", "iodide"):
-        from ..metrics.provenance import record_uncertified_pin_name
-        record_uncertified_pin_name(name)
+# H2N-CO-X, X a halogen: the amide of a carbonic acid. (the Blue Book:
+# 32699) "Substitution of the aldehydic hydrogen is subject to limitations (see
+# " -- 'Cl-CO-NH2 carbonochloridic amide (PIN) (not 1-chloroformamide)'
+# (:32705-:32707); (:30670) lists -F, -Cl, -Br and -I (:30672), whose names
+# "are derived from carbonic acid by functional replacement nomenclature" (:30674).
+# User ruling D1 (2026-10-02): the printed PIN is followed, against the 'carbamoyl'
+# acyl halides of (:31474). The pseudohalides keep their printed PINs
+# ('carbamoyl isocyanate',:31488; 'carbamoyl cyanide',:34858), and the N-substituted
+# halides keep theirs ('dimethylcarbamoyl chloride').
+_CARBONOHALIDIC_AMIDE = {
+    "fluoride": "carbonofluoridic amide",
+    "chloride": "carbonochloridic amide",
+    "bromide": "carbonobromidic amide",
+    "iodide": "carbonoiodidic amide",
+}
 
 
 def _n_substituted_carbamoyl(mol, acyl_c, n_amide, rest) -> Optional[str]:

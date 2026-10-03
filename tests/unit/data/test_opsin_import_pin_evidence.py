@@ -24,12 +24,12 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1",
+    "CC/C(=C(/CC)c1ccc(O)cc1)c1ccc(O)cc1",
     "O=c1[nH]c(=O)c2ncn([C@@H]3O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]3O)c2[nH]1",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
-    "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1",
+    "CC/C(=C(/CC)c1ccc(O)cc1)c1ccc(O)cc1",
 })
 
 
@@ -54,6 +54,11 @@ def _tiered(smiles):
     ("CN1CCCC1c1cccnc1", "3-(1-methylpyrrolidin-2-yl)pyridine"),      # was 'nicotine'
     ("Cc1ncc(CO)c(CO)c1O", "4,5-bis(hydroxymethyl)-2-methylpyridin-3-ol"),  # 'pyridoxine'
     ("CC(C)CCCC(C)CCCC(C)CCCC(C)C", "2,6,10,14-tetramethylpentadecane"),     # 'pristane'
+    # was 'bisphenol a', the trivial last resort, until the multiplicative names of
+    # PIN class program batch 2 (Task 10): two identical phenol parents on identical
+    # locants, linked by one group, take the multiplicative PIN,
+    # the Blue Book), as '4,4′-methylenediphenol (PIN)' (:26874)
+    ("CC(C)(c1ccc(O)cc1)c1ccc(O)cc1", "4,4'-(propane-2,2-diyl)diphenol"),
 ])
 def test_systematic_pin_replaces_the_trivial_name(smiles, pin):
     from tests.support.rt_assert import name_is_rt_exact
@@ -64,7 +69,9 @@ def test_systematic_pin_replaces_the_trivial_name(smiles, pin):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,trivial", [
-    ("CC(C)(c1ccc(O)cc1)c1ccc(O)cc1", "bisphenol a"),
+    # 'diethylstilbestrol' has no Blue Book hit and the systematic pipeline builds no
+    # PIN for it; 'bisphenol a' was this row until batch 2 named it (above)
+    ("CC/C(=C(/CC)c1ccc(O)cc1)c1ccc(O)cc1", "diethylstilbestrol"),
 ])
 def test_trivial_name_is_the_last_resort_labelled_non_pin(smiles, trivial):
     r = _tiered(smiles)

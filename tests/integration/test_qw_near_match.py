@@ -138,14 +138,13 @@ METHOXY_FIXES = [
 # desc.total_atoms (sum(bridge_lengths) + 2).
 # ============================================================================
 
+# vb-C8-pentacyclo (quick-wins F-R8) left this list for test_vb_c8_tier_contract below: its
+# frozen name 'icosan-5,10-diol' with five methyl groups dropped the hydroxymethyl oxygen (a
+# different molecule) and used the old '1(2,6)' typography.
+VB_C8_SMILES = ("CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C"
+                "[C@@]23CC[C@]4(O)CO)O1")
+
 VB_COUNTING_FIXES = [
-    pytest.param(
-        "CC1(C)OC[C@]2(C)[C@@H](CC[C@@]3(C)[C@H]2[C@@H](O)C[C@H]2C[C@@H]4C"
-        "[C@@]23CC[C@]4(O)CO)O1",
-        "(1S,2S,5R,6R,8R,10S,11R,12R,17R)-1,5,12,15,15-pentamethyl-14,16-dioxa-"
-        "pentacyclo[9.8.0.1(2,6).0(2,8).0(12,17)]icosan-5,10-diol",  # Updated P72: IUPAC citation order
-        id="vb-C8-pentacyclo",
-    ),
     pytest.param(
         r"COC[C@@]1(O)CC[C@@H]2C1=C[C@]1(C)C(=C(C(C)C)C[C@H]1O)C[C@H](O)"
         r"[C@@H]2C",
@@ -278,6 +277,18 @@ def test_methoxy_fix(smiles, expected_name):
         row = Orthonym().name_tiered(smiles)
         assert row["tier"] != "pin_verified" and not row["is_pin"], row
         assert name_is_rt_exact(expected_name, smiles)
+
+
+@pytest.mark.opsin_gate
+def test_vb_c8_tier_contract():
+    """The best-effort tier names the pentacycle RT-exact, every framework atom counted
+    : the stem is the bracket sum + 2, icosane = 20) and the superscripts as
+    low as possible, the Blue Book); the PIN tier ships nothing that is
+    not RT-exact (the von Baeyer name of a fusion-nameable system is never the PIN)."""
+    from tests.support.rt_assert import assert_tier_contract
+    _pin, be = assert_tier_contract(VB_C8_SMILES)
+    assert be == ("(1S,2S,5R,10R,11R,12S,14R,16R,17R)-12,17-dihydroxy-17-(hydroxymethyl)-"
+                  "2,7,7,10-tetramethyl-6,8-dioxapentacyclo[14.3.1.0^1,14.0^2,11.0^5,10]icosane")
 
 
 @pytest.mark.parametrize("smiles,expected_name", VB_COUNTING_FIXES)

@@ -257,9 +257,11 @@ class TestDemoteRegressionGuards:
         assert name_compound("O=Cc1ccco1", style="pin") == "furfural"
 
     def test_purine_indicated_h_unchanged(self):
-        """Purine catalog must not be re-keyed (9H->7H was the 1.5 regression)."""
-        assert name_compound("c1ncc2[nH]cnc2n1", style="pin") == \
-            "1H-imidazo[4,5-d]pyrimidine"
+        """Purine catalog must not be re-keyed (9H->7H was the 1.5 regression). The
+        7H tautomer is '7H-purine': "the PIN is 7H-purine" (the Blue Book); its
+        entry used to carry the fusion name '1H-imidazo[4,5-d]pyrimidine'."""
+        assert name_compound("c1ncc2[nH]cnc2n1", style="pin") == "7H-purine"
+        assert name_compound("c1ncc2nc[nH]c2n1", style="pin") == "9H-purine"
 
 
 @pytest.mark.unit

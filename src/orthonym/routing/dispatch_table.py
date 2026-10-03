@@ -1217,7 +1217,19 @@ def _handle_multi_component_neutral(mol, smiles, canonical_smiles, features=None
     # did not parse; the a review review refuted that -- 'ethanol ethanol' RTs FULL --
     # and the em-dash form wrongly asserts an adduct relation excludes for
     # identical entities and shipped labelled PIN, so it was reverted.)
-    return ' '.join([frag_name] * len(frags))
+    joined = ' '.join([frag_name] * len(frags))
+    # The Blue Book has no construction that repeats a name for identical
+    # components, the Blue Book, defines adducts of SEPARATE
+    # molecular entities), so the space-join is a correct systematic name that is
+    # not a PIN: recorded as not the PIN, the default tier declines it and
+    # best-effort ships it labelled systematic_verified (the paper's label
+    # semantics, Methods 'Tiers').
+    try:
+        from orthonym.metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(joined)
+    except Exception:  # a label record must never break naming
+        pass
+    return joined
 
 
 def _handle_multiplicative(mol, smiles, canonical_smiles, features=None, *,
@@ -1413,9 +1425,72 @@ def _handle_carbohydrate_lookup(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_natural_product(mol, smiles, canonical_smiles, features=None, *,
                             style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:1071-1073."""
+    """Mirrors namer.py:1071-1073, with the systematic PIN offered first.
+
+     (the Blue Book): "When the full structure is known, a 'systematic name'
+    may be generated in accordance with Rules described in Chapters through...
+    Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter."
+    So where the strict path builds the to name of a molecule this route would
+    name ('morphine', '(5R,6S,9R,13S,14R)-4,5-epoxy-17-ethylmorphin-7-ene-3,6-diol'),
+    that name is the PIN and is returned instead of the trivial or semisystematic name
+    (``_systematic_pin_before_natural_product``).
+
+    Where the molecule's PIN is a bridged fused name that the builder does not complete
+    (an ester such as diamorphine's, a stereocentre outside the ring system, the
+    'azanoethano' bridge of the morphinans that OPSIN 2.9.0 cannot read), the
+    natural-product name is still returned for breadth but recorded as not the PIN
+    (``record_non_pin_fragment``, name-scoped, as the retained peptide names): the wider
+    tiers keep it labelled below the PIN and the default tier declines it (the user's
+    decision on natural-product names, PIN class program Task 32: "the default tier
+    declines a natural-product name only where no systematic PIN is built"). A parent of
+    the exact-match list (``NAME_EXACT_NP_PARENTS``, 'hasubanan') keeps the label the namer
+    gives list names (the paper's measured labels, ``namer._np_exact_list_name``): a policy
+    carve-out, the paper's deliberate exception for list names (``namer._default_tier_emits``),
+    not a Blue Book reading names no PIN for it). Every other natural-product name is
+    returned as before."""
     from orthonym.rules.natural_products import name_natural_product
-    return name_natural_product(mol)
+    systematic = _systematic_pin_before_natural_product(mol)
+    if systematic is not None:
+        return systematic
+    name = name_natural_product(mol)
+    if name:
+        from orthonym.data.natural_products import NAME_EXACT_NP_PARENTS
+        from orthonym.rules.bridged_fused_pin import has_bridged_fused_reading
+        if name not in NAME_EXACT_NP_PARENTS and has_bridged_fused_reading(mol):
+            from orthonym.data.natural_products import get_natural_product_name
+            from orthonym.metrics.provenance import record_non_pin_fragment, record_source
+            record_non_pin_fragment(name)
+            if get_natural_product_name(canonical_smiles or Chem.MolToSmiles(mol)) == name:
+                # a trivial name of the exact-match table ('oxycodone') is a retained
+                # trivial name: labelled systematic_verified, source trivial_retained,
+                # emitted at the default tier only with '--trivial' (the user's decision:
+                # "trivial names as retained trivial names")
+                record_source("trivial_retained")
+    return name
+
+
+def _systematic_pin_before_natural_product(mol) -> Optional[str]:
+    """The bridged fused PIN of a molecule the natural-product route names, or
+    None. (the Blue Book) "A bridged fused system (see Section
+    is used to generate names for structures that cannot be named by normal fusion
+    nomenclature"; (:23843) "fused ring systems > bridged fused systems >
+    non-fused bridged systems". The 4,5-epoxymorphinans (morphine, codeine, thebaine,
+    nalbuphine,...) and the bridged terpenoid skeletons the natural-product tables
+    name are such systems; the builder (``rules.bridged_fused_pin``) names them on a
+    certified parent or declines.
+
+    The name is taken only when OPSIN reads it back to the input's full InChIKey
+    (``_rt_full_match``), so a name the exit gate would reject never replaces the
+    natural-product name (the molecule keeps that name instead of abstaining). An internal
+    error of the builder is a decline (``name_bridged_fused_pin`` runs it under
+    ``bridged_fused.builder_declining_on_error``), and one of the caller's class check
+    ``has_bridged_fused_reading`` answers False under the same guard: either way the route
+    returns its natural-product name, never an exception."""
+    from orthonym.rules.bridged_fused import name_bridged_fused_pin
+    got = name_bridged_fused_pin(mol)
+    if not got or not got[0]:
+        return None
+    return got[0] if _rt_full_match(got[0], mol) else None
 
 
 # Re-entrancy flag for _handle_peptide's substitutive sub-namer (see its body).
@@ -1439,7 +1514,9 @@ def _rt_full_match(name: str, mol) -> bool:
     """True iff ``name`` OPSIN-parses to the SAME full InChIKey as ``mol``.
     Fail-closed: any parse/RDKit error returns False. Used by _handle_peptide to
     reject a substitutive sub-name that silently dropped a backbone atom before
-    trusting it over the retained peptide name (0-wrong)."""
+    trusting it over the retained peptide name (0-wrong), and by
+    _systematic_pin_before_natural_product before a bridged fused name replaces a
+    natural-product name."""
     try:
         from rdkit import Chem
 

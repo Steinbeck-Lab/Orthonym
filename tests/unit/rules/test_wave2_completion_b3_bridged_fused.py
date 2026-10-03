@@ -1,8 +1,9 @@
 """Wave-2 completion batch B3 — mancude bridged-fused constructor.
 
-The new `_try_mancude_bridged` path names bridged-fused systems whose residual
-keeps its full aromatic system and whose bridgeheads stay sp2 (0 H) — so no
-hydro prefix: 1,4-epoxynaphthalene / 1,4-ethanonaphthalene /
+Bridged-fused systems whose residual keeps its full aromatic system and whose
+bridgeheads stay sp2 (0 H) — so no hydro prefix (named by the bridged fused PIN
+builder behind `name_bridged_fused_pin` since slice S2; the earlier
+`_try_mancude_bridged` path was removed): 1,4-epoxynaphthalene / 1,4-ethanonaphthalene /
 9,10-ethanoanthracene / 1,4-ethano-5,8-methanoanthracene (all BB verbatim,
 all OPSIN-RT verified).
 

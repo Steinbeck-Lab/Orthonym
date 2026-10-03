@@ -314,6 +314,19 @@ def _is_monocyclic_ring_system(mol: Any, ring_atoms: Any) -> bool:
     return internal_bonds // 2 == len(ring_set)
 
 
+def _carbocycle_triple_bonds_spellable(ring_size: int, n_double: int, n_triple: int) -> bool:
+    """May a carbocycle with ``n_triple`` (>= 1) triple bonds be named by its endings?
+
+    No for a six-membered ring: (the Blue Book) names the hydro
+    derivatives of benzene 'cyclohexene' and 'cyclohexadiene', and
+    (:17173) names its didehydro derivative '1,2-didehydrobenzene (PIN)'
+    (:17175, "cyclohexa-1,3-dien-5-yne (formerly called 'benzyne')"); the Blue
+    Book has no 'yne' PIN in that family. No either when the endings have no
+    settled spelling (``multiple_bond_endings_spellable``)."""
+    from ..composition_primitives import multiple_bond_endings_spellable
+    return ring_size != 6 and multiple_bond_endings_spellable(n_double, n_triple)
+
+
 def _generate_ring_parent(features: Any) -> "NameFragment":
     """
     Generate parent name for cyclic compounds.
@@ -382,12 +395,18 @@ def _generate_ring_parent(features: Any) -> "NameFragment":
         )
 
     elif ring_type == 'cycloalkene':
-        # Get double bond locants from features
+        # Get double and triple bond locants from features:
+        # (the Blue Book) "The presence of one or more double or triple
+        # bonds... is denoted by changing the ending 'ane'... to 'ene' or 'yne'".
         ring_double_bond_locants = getattr(features, 'ring_double_bond_locants', [])
+        ring_triple_bond_locants = getattr(features, 'ring_triple_bond_locants', [])
+        if ring_triple_bond_locants and not _carbocycle_triple_bonds_spellable(
+                ring_size, len(ring_double_bond_locants), len(ring_triple_bond_locants)):
+            return NameFragment(text="", fragment_type="parent")
 
         return NameFragment(
             text=f"cyclo{stem}",
-            locants=(tuple(ring_double_bond_locants), ()),  # (double_bond_locants, triple_bond_locants)
+            locants=(tuple(ring_double_bond_locants), tuple(ring_triple_bond_locants)),
             fragment_type="parent",
             atoms=frozenset(principal_ring),
         )
@@ -1042,6 +1061,7 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
             # or heterocyclic paths, which take other branches entirely.
             ring_has_essential_locant = bool(
                 getattr(features, 'ring_double_bond_locants', None)
+                or getattr(features, 'ring_triple_bond_locants', None)
             )
             if fg_count > 1 or other_subs_exist or ring_has_essential_locant:
                 locants = tuple(anchored_locants)
@@ -1289,7 +1309,17 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
     # Also collect ring substituent branch atoms -- the enumerator now names
     # compound substituents (trifluoromethyl, etc.) on rings, so their FG atoms
     # should not be double-counted as standalone FG prefixes.
-    ring_substituents = getattr(features, 'ring_substituents', None)
+    # When the CHAIN is the parent, ``features.ring_substituents`` is the
+    # ring-as-parent view, in which the principal chain itself is a branch of the
+    # ring ({ring atom: [[chain atoms + their branches]]}), so every filter below
+    # that reads it took the chain's own groups for groups already cited inside a
+    # ring substituent and dropped them: '3-cyclohexylpropanoic acid' for
+    # O=C(O)CC(Br)C1CCCCC1, where the PIN is '3,3-dibromo-3-cyclohexylpropanoic acid
+    # (PIN)', the Blue Book) for the dibromo homologue. The ring's own
+    # substituents are excluded on that path by ``ring_atom_set`` above, as the
+    # ring-alkyl prefixes are (a phase).
+    ring_substituents = (None if getattr(features, 'chain_is_parent', False)
+                         else getattr(features, 'ring_substituents', None))
     if ring_substituents:
         for _ring_idx, sub_list in ring_substituents.items():
             for sub_atoms in sub_list:
@@ -1418,6 +1448,18 @@ def _generate_prefixes(features: Any) -> List["NameFragment"]:
                               for sa in _sl]
             matches = [m for m in matches
                        if not any(all(a in s for a in m) for s in _ring_sub_sets)]
+            # A ring imine C=N-R / hydrazone C=N-N(R) whose nitrogen side carries
+            # a substituent: the ring walk names that whole branch as one prefix
+            # ('4-(phenylhydrazinylidene)cyclohexane-1-carboxylic acid (PIN)',
+            # the Blue Book; '(methylimino)'), so the bare 'imino' /
+            # 'hydrazinylidene' FG prefix would cite the same =N a second time.
+            if (fg_name in ('imine', 'hydrazone') and oriented_ring
+                    and not getattr(features, 'chain_is_parent', False)):
+                _ih_ring = set(oriented_ring)
+                matches = [
+                    m for m in matches
+                    if not (m and m[0] in _ih_ring
+                            and any((set(m) - _ih_ring) < s for s in _ring_sub_sets))]
 
         # a phase (E3 Task 6): an ALDEHYDE fully contained in a chain
         # substituent branch, cited a second time as an unlocated "oxo" on the

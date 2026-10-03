@@ -4897,16 +4897,6 @@ def name_substituted_heterocycle(
             combined = f"{prefix_str}{parent_name}"
     else:
         combined = f"{prefix_str}{parent_name}"
-    if _l3_omit_prefix_locant and all(
-            mol.GetAtomWithIdx(int(_ra)).GetIsAromatic() for _ra in ring_atoms):
-        # A Blue Book conflict, left for a ruling (review a performance pass, F-06):
-        # (the Blue Book, with 'pyrazinecarboxylic acid (PIN)':2949) omits the locant here,
-        # while prints '2-[(pyridin-3-yl)oxy]pyrazine (PIN)' (:27772) for a
-        # prefix on the same ring. The name is kept and labelled pin_unverified. Only
-        # the mancude (aromatic) ring: the book prints the saturated one-orbit ring
-        # without the locant as the PIN ('phenyloxirane (PIN)', the Blue Book).
-        from ..metrics.provenance import record_uncertified_pin_name
-        record_uncertified_pin_name(combined)
 
     # Add suffix-type functional groups
     if suffix_fg:

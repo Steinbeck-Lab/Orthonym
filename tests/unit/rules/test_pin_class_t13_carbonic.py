@@ -143,10 +143,6 @@ def test_urea_with_a_nitrile_branch_best_effort():
 # the superscript letter locants, so it cannot be certified. (The plan's
 # '[(thiocarboxy)oxy]methanethioic O-acid' is the PIN for a structure whose sulfur
 # location is unknown on one carbon,,:31093.)
-# * H2N-CO-Cl: prints 'carbonochloridic amide (PIN) (not
-# 1-chloroformamide)' (:32707), while names the acyl halides of carbamic
-# acid on 'carbamoyl' ('carbamoyl isocyanate (PIN)',:31488) and acid halides rank
-# above amides. The engine keeps 'carbamoyl chloride'; a ruling is needed.
 # * The urea + nitrile row at the PIN tier: the PIN-tier substituent namer does not
 # name -CH(C#N)CH2CH2SCH3 ('1-cyano-3-(methylsulfanyl)propyl'), so the urea handler
 # declines; the nitrile-parent name the polyfunctional handler builds is then
@@ -154,7 +150,6 @@ def test_urea_with_a_nitrile_branch_best_effort():
 # tier declines and the best-effort tier ships the urea name, pin_unverified.
 XFAIL_ROWS = [
     ("OC(=S)OC(O)=S", "1,3-dithiodicarbonic O1,O3-acid"),
-    ("NC(=O)Cl", "carbonochloridic amide"),
     ("CNC(=O)NC(C#N)CCSC", "N-[1-cyano-3-(methylsulfanyl)propyl]-N'-methylurea"),
 ]
 
@@ -163,6 +158,15 @@ XFAIL_ROWS = [
 @pytest.mark.parametrize("smiles,pin", XFAIL_ROWS)
 def test_carbonic_family_open_rows(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
+
+
+def test_carbonochloridic_amide():
+    # H2N-CO-Cl: prints 'carbonochloridic amide (PIN) (not
+    # 1-chloroformamide)' (:32707), while names the acyl halides of carbamic
+    # acid on 'carbamoyl' ('carbamoyl isocyanate (PIN)',:31488) and acid halides rank
+    # above amides. The user ruled (2026-10-02, D1) that the printed PIN is
+    # followed for H2N-CO-X; tests/unit/rules/test_user_rulings_d1_d3.py has the class.
+    assert_pin_at_both_tiers("NC(=O)Cl", "carbonochloridic amide")
 
 
 
@@ -247,18 +251,18 @@ def test_completely_substituted_urea_not_pin():
     assert_not_pin_labelled("CN(C)C(=O)N(C)C", "N,N,N',N'-tetramethylurea")
 
 
-# Review a performance pass, F-06: 'carbonochloridic amide (PIN)' (:32707) against the 'carbamoyl'
-# acyl halides of (:31474) and: the carbamoyl halide names are kept and
-# labelled pin_unverified until a ruling; the pseudohalides keep their (PIN).
+# Review a performance pass, F-06, then the user ruling D1 (2026-10-02): 'carbonochloridic amide
+# (PIN)' (:32707) is followed for H2N-CO-X, so the 'carbamoyl' halide names of
+# (:31474) are not the PIN of the unsubstituted amide; the pseudohalides keep their (PIN).
 @pytest.mark.parametrize("smiles,name", [
     ("NC(=O)Cl", "carbamoyl chloride"),
     ("NC(=O)F", "carbamoyl fluoride"),
 ])
-def test_carbamoyl_halides_are_pin_unverified(smiles, name):
+def test_carbamoyl_halides_are_not_pin(smiles, name):
     from tests.support.pin_tiers import name_breadth, name_default
-    b = name_breadth(smiles)
-    assert (b.get("name"), b.get("tier")) == (name, "pin_unverified"), b
-    assert name_default(smiles).get("tier") != "pin_verified"
+    for res in (name_default(smiles), name_breadth(smiles)):
+        assert res.get("name") != name, res
+    assert_not_pin_labelled(smiles, name)
 
 
 @pytest.mark.parametrize("smiles,pin", [

@@ -247,14 +247,12 @@ class TestUnchangedControls:
         assert namer.name(smiles) == expected
 
 
-class TestKnownAdjacentDefect:
-    @pytest.mark.xfail(strict=True, reason=(
-        "The `-ol` promotion shipped here covers the POLYCYCLIC path "
-        "(rules/polycyclics.py). The fused-heterocycle path has the same defect and is "
-        "not yet fixed: a ring hydroxy stays a prefix. Recorded rather than left "
-        "unlogged; needs the same promotion where the fused_heterocycles parent is "
-        "assembled."))
-    def test_dihydroindenol_should_use_the_ol_suffix(self, namer):
+class TestDihydroindenolSuffix:
+    # (the Blue Book,:26829): hydroxy compounds are named substitutively with
+    # the suffix 'ol'; parent '2,3-dihydro-1H-indene (PIN)' (:16988), prefix analogue
+    # '2,3-dihydro-1H-inden-2-yl (preferred prefix)' (:17374). The fused path got the
+    # '-ol' promotion the polycyclic path had (it was a strict xfail here before).
+    def test_dihydroindenol_uses_the_ol_suffix(self, namer):
         assert namer.name("OC1Cc2ccccc2C1") == "2,3-dihydro-1H-inden-2-ol"
 
 

@@ -145,9 +145,11 @@ class TestCandidateSelection:
             f"Expected quinoline-based name, got: {result}"
 
     def test_adenine_retained_wins(self):
-        """Adenine retained name should win (core retained name boost)."""
+        """The 6-aminopurine is named on the retained purine parent: 'adenine' does
+        not occur in the Blue Book (0 hits); "the PIN is 7H-purine"
+        (the Blue Book)."""
         result = name_compound("Nc1ncnc2nc[nH]c12")
-        assert result == "adenine"
+        assert result == "7H-purin-6-amine"
 
 
 # ---------------------------------------------------------------------------

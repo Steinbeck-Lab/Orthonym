@@ -130,13 +130,14 @@ class TestDispiro:
 
     @pytest.mark.unit
     def test_dispiro_atom_count_invariant(self):
-        """Total atom count for dispiro[a.b.c.d]: a+b+c+d+2 = total ring atoms."""
+        """Total atom count for dispiro[a.b.c^m.d^n]: a+b+c+d+2 = total ring atoms
+        (the superscripts are spiro-atom locants,, not linking atoms)."""
         mol = Chem.MolFromSmiles("C1CCC2(CC1)CC1(CCC2)CCCCCC1")
         result = name_spiro_system(mol)
         assert result is not None
         name = result[0]
         bracket = name[name.index("[") + 1: name.index("]")]
-        segments = [int(s) for s in bracket.split(".")]
+        segments = [int(s.split("^")[0]) for s in bracket.split(".")]
         ri = mol.GetRingInfo()
         ring_atoms = set()
         for r in ri.AtomRings():

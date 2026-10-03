@@ -276,11 +276,12 @@ def test_gap_b_handler_does_not_enrich_a_complete_name():
 
     corrupted = _enrich_handler_name(
         features, "N-cyclohexylthiourea", "thiourea")
-    # Enrichment STILL corrupts (re-spells the handler's own core as a prefix);
-    # the core is now emitted in its fully systematic form rather than the
-    # `carbamothioyl` contraction, but the point -- the skip is load-bearing --
-    # is unchanged.
-    assert corrupted.startswith("1-{[amino(sulfanylidene)methyl]amino}"), corrupted
+    # Enrichment STILL corrupts (re-spells the handler's own core as a prefix).
+    # The core is spelled with the preferred prefix 'carbamothioyl',
+    # the Blue Book; 'H2N-CS-NH- carbamothioylamino (preferred prefix)',
+    #:33489), as the docstring above describes; the point -- the skip is
+    # load-bearing -- is unchanged.
+    assert corrupted.startswith("1-(carbamothioylamino)"), corrupted
 
 
 def test_gap_b_urea_sibling_enrichment_is_unchanged():

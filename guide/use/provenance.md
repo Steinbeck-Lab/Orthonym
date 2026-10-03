@@ -19,7 +19,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : `true` only for a certified Preferred IUPAC Name.
 
 `source`
-: Which part of the engine produced the name: `pin_path` (the strict path), `general_engine`, `trivial_retained` (the table of retained trivial names), `t4_floor` (a last-resort producer) or `abstain`.
+: Which part of the engine produced the name: `pin_path` (the strict path), `general_engine`, `trivial_retained` (a retained trivial name: from the last-resort table, or a trivial natural-product name such as `diamorphine`), `t4_floor` (a last-resort producer) or `abstain`.
 
 `opsin`
 : What the OPSIN check found: `verified`, `verified_constitution_only` (the constitution matched; the stereodescriptors were not compared), `unverified`, or `n/a` when there is no name.

@@ -733,7 +733,15 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 nm = name_substituent(mol, set(inner), c_start[0])
                 if not nm or nm == 'substituent' or not nm.endswith('yl'):
                     return None
-                return nm[:-2] + 'oxy'
+                # (the Blue Book): only methoxy, ethoxy, propoxy,
+                # butoxy, phenoxy and tert-butoxy contract; every other R-O- keeps
+                # the whole organyl name, enclosed when it is compound:
+                # '(propan-2-yl)oxy (preferred prefix)' (:27683), '(benzyloxy)
+                # carbonyl' (:18116), '(cyclohexyloxy)benzene (PIN)' (:27768). The
+                # bare 'yl' -> 'oxy' swap made 'propan-2-oxy' and 'benzoxy'. The
+                # shared converter spells every alkoxy prefix.
+                from ..assembly.substituent_enumerator import alkoxy_prefix_from_substituent
+                return alkoxy_prefix_from_substituent(nm)
             # (b) a carbon-attached ligand the simple table rejects -> the general
             # substituent composer. TWO distinct scopes, deliberately asymmetric:
             # - Group-14 hydride-parent (Si/Ge/Sn/Pb): require the WHOLE ligand to
@@ -1490,9 +1498,16 @@ def _alphabetize_simple_ligands(
     # MISSED 'sec-' (sec-butyl sorted at 's'), so it shares the one primitive.
     from ..assembly.naming_utils import strip_italicized_structural_prefix
 
+    # (the Blue Book): "The name of a prefix for a substituent is considered
+    # to begin with the first letter of its complete name" -- enclosing marks and
+    # locants ignored, as the shared key does ('(propan-2-yl)oxy' at 'p',
+    # '2-methylpropoxy' at 'm'); the remainder alone sorted '(' and digits ahead of
+    # every letter.
+    from ..assembly.naming_utils import alpha_sort_key
+
     def _alpha_key(entry):
         remainder, _ = strip_italicized_structural_prefix(entry[1])
-        return remainder
+        return alpha_sort_key(remainder)
 
     return sorted(grouped, key=_alpha_key)
 

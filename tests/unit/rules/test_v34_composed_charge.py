@@ -793,20 +793,20 @@ def test_ws_noabstain_ethylphosphinate_leaf_full_rt():
 def test_ws_noabstain_triple_charged_leaf_phosphinate_polyanion_block1():
     """NOABSTAIN class 3, the brief's own witness (chebi500): a net-3
     polyanion -- two independent carboxylates plus the phosphinate leaf above,
-    all on one short unsaturated backbone. Converts abstain -> block1 (a
-    genuine E/Z geometric-descriptor omission on the central C=C, verified
-    via direct InChIKey compare below; never a wrong molecule)."""
+    all on one short unsaturated backbone. The floor now writes the E/Z of the
+    central C=C with the chain locant ('(3Z)-'), method (a)
+    (the Blue Book,:48276,:48279), so the name round-trips to the full InChIKey and
+    ``verify_or_none`` returns it (it used to omit the descriptor: block1)."""
     smi = "O=C([O-])C/C(=C/[PH](=O)[O-])C(=O)[O-]"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("2,5-dioxido-3-{1-[oxido(oxo)phosphanyl]methan-1-ylidene}"
+    assert name == ("(3Z)-2,5-dioxido-3-{1-[oxido(oxo)phosphanyl]methan-1-ylidene}"
                      "-1,6-dioxahexa-1,5-diene")
-    assert verified is None  # block1: safe E/Z omission, never shipped wrong
+    assert verified == name  # full-InChIKey CONFIRMED
     got = opsin_parse(name)
     assert got, f"OPSIN could not parse {name!r}"
     have = Chem.MolToInchiKey(Chem.MolFromSmiles(got))
     want = Chem.MolToInchiKey(Chem.MolFromSmiles(smi))
-    assert have[:14] == want[:14]  # constitution matches (block1)
-    assert have != want            # E/Z genuinely omitted, not wrong
+    assert have == want  # constitution, charge and E/Z
 
 
 def test_ws_noabstain_phosphinate_leaf_excluded_from_chain_continuation():

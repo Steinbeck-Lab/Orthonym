@@ -83,6 +83,28 @@ def _spiro_principal_suffix_preference(features: Any, current_name: str) -> Opti
     return None
 
 
+def _complex_parent_is_spiro(mol: Any, complex_result: Any,
+                             principal_group_atoms: Any = None) -> bool:
+    """True when the complex-ring parent holds a spiro atom (a spiro union,,
+    its assembly left the substituents to the prefix enricher, and a principal
+    characteristic group has an atom outside the ring skeleton (the =O of a
+    ketone, the -OH of an alcohol): that group is then cited as a prefix. A
+    match lying wholly in the ring (a ring P-H or N-H) is part of the parent
+    hydride, not a characteristic group of it."""
+    if getattr(complex_result, 'substituents_included', True):
+        return False
+    try:
+        from ...perception.rings import get_spiro_atoms
+        ring_atoms = set(getattr(complex_result, 'ring_atoms', ()) or ())
+        if not set(get_spiro_atoms(mol)) & ring_atoms:
+            return False
+        return any(
+            any(a not in ring_atoms for a in match)
+            for match in (principal_group_atoms or ()))
+    except Exception:
+        return False
+
+
 def _is_tier_a_ring(features: Any) -> bool:
     """Predicate: matches if features.is_cyclic AND not chain_is_parent.
 
@@ -379,6 +401,18 @@ def name_tier_a_ring(
                         features, complex_name)
                     if _alt is not None:
                         complex_name = _alt
+                    elif _complex_parent_is_spiro(
+                            features.mol, complex_result,
+                            getattr(features, 'principal_group_atoms', None)):
+                        # /: the principal characteristic group
+                        # is cited as the suffix of the parent hydride, e.g.
+                        # 'spiro[4.5]decane-1,7-dione (PIN)',
+                        # the Blue Book). The spiro assembly above cites
+                        # every group as a prefix, so with no suffix form this
+                        # name ('3',4,4'-trihydroxy-...-spiro[...]') is not the
+                        # PIN: it is labelled below it.
+                        from ...metrics.provenance import record_non_pin_fragment
+                        record_non_pin_fragment(complex_name)
                 _complex_result_for_injection = complex_result
                 _complex_cand = _tier_a_pool.add(
                     complex_name, 'complex_ring', features,

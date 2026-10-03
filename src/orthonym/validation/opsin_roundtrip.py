@@ -152,13 +152,35 @@ def _parse_av_token(tok: str) -> Optional[Locant]:
     return (n, primes, letter)
 
 
+class OpsinUnavailable(Exception):
+    """OPSIN could not answer a call: the in-process path could not serve it and the
+    subprocess timed out, could not start, or exited non-zero (the JVM did not start or
+    crashed; OPSIN exits 0 on a name it rejects). That is a state of this process at this
+    moment, not a property of the name, so no memo keeps it (the memo's contract is that
+    the key determines the value, ``assembly.memo.pure_cache_or_compute``)."""
+
+
 def _extended_smiles(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     """OPSIN ``-o extendedsmi`` output line for *name* (in-process fast path;
     subprocess fallback only when the in-process path cannot serve the call), or
     None if OPSIN rejected the name / was unavailable. Memoised per name inside the
     naming scope (Lever A, 2026-09-12): the stereo re-anchor asks for the same name
     several times per molecule, and a definitive rejection used to start a fresh
-    3.5 s Java process that printed the same empty line."""
+    3.5 s Java process that printed the same empty line. A call OPSIN could not
+    answer (``OpsinUnavailable``) also gives None but is not memoised, so the next
+    call for the name asks OPSIN again."""
+    try:
+        return extended_smiles_or_unavailable(name, jar_version)
+    except OpsinUnavailable:
+        return None
+
+
+def extended_smiles_or_unavailable(name: str, jar_version: str = "2.9.0") -> Optional[str]:
+    """``_extended_smiles``, except that a call OPSIN could not answer raises
+    ``OpsinUnavailable`` instead of returning None: for a caller that keeps its own memo
+    of what it builds from the answer (``rules.bridged_fused_pin.fusion_names``), which
+    must not remember a transient failure either. The answers (a line, or None for a
+    rejected name or an absent jar) are memoised as in ``_extended_smiles``."""
     # Perf lever A8: a pure function of (name, jar_version) -> process-wide.
     from ..assembly.memo import pure_cache_or_compute
     return pure_cache_or_compute("opsin_extended_smiles", (name, jar_version),
@@ -177,8 +199,13 @@ def _extended_smiles_uncached(name: str, jar_version: str = "2.9.0") -> Optional
             ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path, "-o", "extendedsmi"],
             input=name, capture_output=True, text=True, timeout=15,
         )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
-        return None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
+        # raised, not returned: the memo stores nothing when its compute function raises
+        raise OpsinUnavailable(f"OPSIN subprocess failed for {name!r}: {type(exc).__name__}") from exc
+    if result.returncode != 0:
+        # the JVM did not start or crashed (e.g. out of memory under load): no answer, not a
+        # rejection, which OPSIN reports with exit status 0 and an empty line
+        raise OpsinUnavailable(f"OPSIN subprocess exited {result.returncode} for {name!r}")
     lines = (result.stdout or "").strip().split("\n")
     out = lines[-1].strip() if lines else ""
     if not out or "could not be interpreted" in out.lower():

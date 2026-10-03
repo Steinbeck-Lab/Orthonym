@@ -285,12 +285,14 @@ def test_recognizer_agrees_with_pin_path_on_controls(smiles, expected):
 
 def test_recognizer_ordering_avoids_the_bad_retained_names_entry():
     """DATA-QUALITY side finding (reproduce-first): get_retained_name on
-    benzo[f]quinoline's canonical SMILES returns the WRONG (non-isomeric)
-    'benzo[h]quinoline'. The recognizer must try get_fused_heterocycle_name
-    FIRST so this bad entry is never even consulted."""
+    benzo[f]quinoline's canonical SMILES used to return the WRONG (non-isomeric)
+    'benzo[h]quinoline' (the two keys of data/retained_names.py were swapped; now
+    corrected: OPSIN 2.9.0 reads 'benzo[f]quinoline' to this key,,
+    the Blue Book). The recognizer still tries get_fused_heterocycle_name
+    FIRST, and both tables now agree."""
     from orthonym.data.retained_names import get_retained_name
     canon = Chem.CanonSmiles("c1ccc2c(c1)ccc1ncccc12")
-    assert get_retained_name(canon) == "benzo[h]quinoline"  # documents the bug
+    assert get_retained_name(canon) == "benzo[f]quinoline"
     nm = Orthonym(style="pin")
     mol = Chem.MolFromSmiles(canon)
     assert nm._retained_structural_preference(mol) == "benzo[f]quinoline"

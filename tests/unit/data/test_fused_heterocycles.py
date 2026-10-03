@@ -200,12 +200,15 @@ class TestSubstructureMatching:
 
     @pytest.mark.unit
     def test_substituted_purine_matches_purine_core(self):
-        """6-methylpurine should match purine core."""
+        """6-methylpurine should match purine core. The input carries H on N7, so the
+        core is '7H-purine' ("the PIN is 7H-purine", the Blue Book); the entry
+        used to be named '1H-imidazo[4,5-d]pyrimidine', and '9H-purine' is the other
+        tautomer."""
         mol = Chem.MolFromSmiles('Cc1ncnc2nc[nH]c12')
         result = match_fused_heterocycle_core(mol)
         assert result is not None
         name, mapping, core_smiles = result
-        assert name == '9H-purine'
+        assert name == '7H-purine'
         assert len(mapping) == 9
 
     @pytest.mark.unit
@@ -866,10 +869,12 @@ class TestPhase101FixedEntries:
 
     @pytest.mark.unit
     def test_phenanthridine_fusion_locants(self):
-        """Phenanthridine should have junction locants 4a, 4b, 8a, 10a."""
+        """Phenanthridine has junction locants 4a, 6a, 10a, 10b:
+        (the Blue Book), the fusion carbon after N5 and C6 is 6a; phenanthrene's
+        traditional 4b/8a/10a:12493) does not carry over."""
         data = FUSED_HETEROCYCLE_DATA['c1ccc2c(c1)cnc1ccccc12']
         locant_values = set(data['iupac_locants'].values())
-        for junction in ['4a', '4b', '8a', '10a']:
+        for junction in ['4a', '6a', '10a', '10b']:
             assert junction in locant_values, f"Missing junction locant {junction}"
 
     @pytest.mark.unit
@@ -1126,10 +1131,13 @@ class TestPhase101NewEntries:
 
     @pytest.mark.unit
     def test_pyrrolizine_has_bridgehead_junctions(self):
-        """Pyrrolizine should have junction locants 3a and 7a."""
+        """Pyrrolizine's fusion N is numbered 4 and its fusion carbon is 7a:
+         (the Blue Book) numbers fusion heteroatoms ("including fusion
+        heteroatoms but not fusion carbon atoms"). The map used to letter the N '3a'."""
         data = FUSED_HETEROCYCLE_DATA['C1=Cn2cccc2C1']
         locant_values = set(data['iupac_locants'].values())
-        assert '3a' in locant_values, "Missing junction locant 3a"
+        assert '3a' not in locant_values
+        assert 4 in locant_values, "the fusion nitrogen is N4"
         assert '7a' in locant_values, "Missing junction locant 7a"
 
 

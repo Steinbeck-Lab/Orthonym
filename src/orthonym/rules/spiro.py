@@ -25,6 +25,7 @@ Examples:
     dispiro[2.1.2.1]octane - three rings sharing two spiro centers
 """
 
+import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
@@ -219,7 +220,20 @@ def _generate_polyspiro_descriptor(mol, spiro_atoms: Set[int]) -> Optional[str]:
     else:
         prefix = f'{n_spiro}spiro'
 
-    seg_str = '.'.join(str(s) for s in segments)
+    # (the Blue Book): "Each time a spiro atom is reached for the
+    # second time its locant, which has already been assigned, is cited as a
+    # superscript number to the number of the preceding linking atoms";
+    # 'dispiro[3.2.3^7.2^4]dodecane (PIN)' (:9981), and:9991 recommends the
+    # superscripts for every polyspiro PIN. The walk [t1. b. t2. d] numbers
+    # the first spiro atom t1 + 1 and the second t1 + b + 2 (the order of
+    # ``_dispiro_numbering_candidates``), and the walk returns to each of them
+    # after the terminal ring t2 and the return arc d. Written '^n', the
+    # superscript convention of the branched walk (``_branched_spiro_walk``).
+    if n_spiro == 2 and len(segments) == 4:
+        t1, b, t2, d = segments
+        seg_str = f"{t1}.{b}.{t2}^{t1 + b + 2}.{d}^{t1 + 1}"
+    else:
+        seg_str = '.'.join(str(s) for s in segments)
     return f"{prefix}[{seg_str}]"
 
 
@@ -852,6 +866,8 @@ def _dispiro_numbering_candidates(
 
 def _get_polyspiro_numbering(
     mol, spiro_atoms: Set[int], suffix_ring_atoms: Optional[Set[int]] = None,
+    prefix_ring_atoms: Optional[List[int]] = None,
+    rank_full_molecule: bool = False,
 ) -> Optional[Dict[int, int]]:
     """Generate IUPAC numbering for a polyspiro system.
 
@@ -859,7 +875,11 @@ def _get_polyspiro_numbering(
     the monospiro sibling): the free valence of a spiro SUBSTITUENT,
     -- ranked after heteroatoms in the lowest-locant tiebreak below, so a
     polyspiro substituent's attachment point gets the lowest locant available
-    once the heteroatom placement (if any) is settled."""
+    once the heteroatom placement (if any) is settled.
+
+    ``prefix_ring_atoms`` and ``rank_full_molecule``: as in
+    ``get_spiro_numbering`` (f), then (g) and (j) for a numbering of
+    the whole molecule)."""
     ri = mol.GetRingInfo()
     all_rings = [list(r) for r in ri.AtomRings()]
 
@@ -893,6 +913,7 @@ def _get_polyspiro_numbering(
 
     canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
     suffix_set = set(suffix_ring_atoms or ())
+    prefix_list = list(prefix_ring_atoms or ())
 
     def _key(mapping: Dict[int, int]):
         heteros = [(a, loc) for a, loc in mapping.items()
@@ -905,11 +926,108 @@ def _get_polyspiro_numbering(
         # atoms, ranked after heteroatoms (same order as get_spiro_numbering).
         suffix_locs = sorted(loc for a, loc in mapping.items()
                               if a in suffix_set)
-        seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
-        canon_seq = tuple(canon[a] for a in seq)
-        return (het_locs, het_by_seniority, suffix_locs, canon_seq)
+        # (f) (the Blue Book), as in get_spiro_numbering: empty
+        # when the caller passes no prefix atoms, so the ordering is unchanged.
+        prefix_locs = sorted(mapping[a] for a in prefix_list if a in mapping)
+        return (het_locs, het_by_seniority, suffix_locs, prefix_locs)
 
-    return min(candidates, key=_key)
+    def _canon_key(mapping: Dict[int, int]):
+        seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
+        return tuple(canon[a] for a in seq)
+
+    ring_set = set().union(*(set(r) for r in ring_chain))
+    return _select_spiro_numbering(
+        mol, candidates, _key, _canon_key, ring_set, prefix_list, suffix_set,
+        rank_full_molecule)
+
+
+def _spiro_exocyclic_prefix_atoms(mol, ring_atoms: Set[int]) -> List[int]:
+    """The (f) input read from the molecule itself: each ring atom of the
+    spiro system once for every exocyclic heavy neighbour (a gem-dimethyl carbon
+    twice), as ``general_engine._prefix_ring_atoms`` gives the general engine.
+    For the substituent-prefix names of ``name_spiro_system``'s callers, which
+    cite every exocyclic group as a prefix."""
+    out: List[int] = []
+    for a in sorted(ring_atoms):
+        for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+            if nb.GetIdx() not in ring_atoms and nb.GetAtomicNum() > 1:
+                out.append(a)
+    return out
+
+
+def _spiro_cip_locant_key(mol, mapping: Dict[int, int]) -> tuple:
+    """ (j) key (``naming_utils.cip_locant_rank_key``) of one spiro
+    numbering: each numbered ring atom's R/S/r/s and each ring double bond's
+    Z/E, at its locant (the lower locant of the bond)."""
+    if not (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+                for a in mol.GetAtoms())
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE
+                   for b in mol.GetBonds())):
+        return ()
+    try:
+        from ..assembly.naming_utils import cip_locant_rank_key
+        from ..perception.stereo import assign_stereochemistry
+        assign_stereochemistry(mol)
+        items = []
+        for a, loc in mapping.items():
+            atom = mol.GetAtomWithIdx(a)
+            if atom.HasProp('_CIPCode'):
+                items.append((loc, atom.GetProp('_CIPCode')))
+        for b in mol.GetBonds():
+            i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+            if (i in mapping and j in mapping
+                    and b.GetBondType() == Chem.BondType.DOUBLE
+                    and b.HasProp('_CIPCode')):
+                items.append((min(mapping[i], mapping[j]), b.GetProp('_CIPCode')))
+        return cip_locant_rank_key(items)
+    except Exception:
+        return ()
+
+
+def _select_spiro_numbering(
+    mol, candidates, key, canon_key, ring_set: Set[int], prefix_atoms,
+    suffix_set: Set[int], rank_full_molecule: bool,
+) -> Dict[int, int]:
+    """The numbering with the lowest ``key``; a tie goes to (g), then (j),
+    when the numbering is one of the whole molecule, then to the canonical ranks.
+
+     NUMBERING (the Blue Book): "(g) lowest locants for the
+    substituent cited first as a prefix in the name" (:3307), then "(j) When
+    there is a choice for lower locants related to the presence of stereogenic
+    centers or stereoisomers, the lower locant is assigned to CIP
+    stereodescriptors Z, R, M, and r... that are preferred to E, S, P, and s"
+    (:3346); '(5R,7S)-1,8-dioxadispiro[4.1.4^7.2^5]tridecane (PIN)' and
+    '(1S,5R,7S)-1,7-dimethylspiro[4.5]decane (PIN)',:49166,
+    :49172). The prefix names come from ``heterocycles._ring_prefix_names`` (the
+    same (g) source as the heterocycle numbering); when one cannot be named, (g)
+    and (j) are both skipped, so a tie (g) would break never goes to (j). (j) is
+    skipped for an isotopically modified molecule, because (i) (:3336) comes
+    first and this key does not model it. Only for ``rank_full_molecule``: the
+    callers that number a ring-only submolecule would read prefix names and CIP
+    labels of a different molecule. Without it the result equals the old
+    ``min(candidates, key=(key, canon_key))``."""
+    best = min(key(m) for m in candidates)
+    tied = [m for m in candidates if key(m) == best]
+    if len(tied) > 1 and rank_full_molecule:
+        try:
+            from .heterocycles import _ring_prefix_names
+            names = _ring_prefix_names(
+                mol, set(ring_set), set(prefix_atoms), set(suffix_set))
+        except Exception:
+            names = None
+        if names is not None:
+            isotopic = any(a.GetIsotope() for a in mol.GetAtoms())
+
+            def _g_j(mapping: Dict[int, int]):
+                g_key = tuple(sorted(
+                    (name, mapping[idx])
+                    for idx, lst in names.items() if idx in mapping
+                    for name in lst))
+                j_key = () if isotopic else _spiro_cip_locant_key(mol, mapping)
+                return (g_key, j_key)
+
+            return min(tied, key=lambda m: (_g_j(m), canon_key(m)))
+    return min(tied, key=canon_key)
 
 
 def _spiro_ring_traversals(
@@ -954,6 +1072,7 @@ def _spiro_ring_traversals(
 def get_spiro_numbering(
     mol, spiro_center: int, suffix_ring_atoms: Optional[Set[int]] = None,
     prefix_ring_atoms: Optional[List[int]] = None,
+    rank_full_molecule: bool = False,
 ) -> Dict[int, int]:
     """
     Generate IUPAC numbering for a monospiro system.
@@ -1071,13 +1190,18 @@ def get_spiro_numbering(
         # lists each prefix-bearing ring atom once per prefix (empty when the
         # caller has none, so the ordering is unchanged there).
         prefix_locs = sorted(mapping[a] for a in prefix_list if a in mapping)
+        return (het_locs, het_by_seniority, lam_locs, suffix_locs, unsat_all,
+                unsat_dbl, prefix_locs)
+
+    def _canon_key(mapping: Dict[int, int]):
         # (4) deterministic, spelling-independent tiebreak for symmetric rings
         seq = [a for a, _loc in sorted(mapping.items(), key=lambda kv: kv[1])]
-        canon_seq = tuple(canon[a] for a in seq)
-        return (het_locs, het_by_seniority, lam_locs, suffix_locs, unsat_all,
-                unsat_dbl, prefix_locs, canon_seq)
+        return tuple(canon[a] for a in seq)
 
-    return min(candidates, key=_key)
+    # (5) (g) and (j) for a numbering of the whole molecule.
+    return _select_spiro_numbering(
+        mol, candidates, _key, _canon_key, ring_atom_set, prefix_list,
+        suffix_set, rank_full_molecule)
 
 
 def _get_ring_adjacent_to_spiro(
@@ -1198,6 +1322,22 @@ def _unsaturated_spiro_parent(
     return _build_hydrocarbon_name(stem, double_locants, triple_locants)
 
 
+def _spiro_system_numbering(
+    mol, spiro_atoms_set: Set[int], ring_atoms: Set[int],
+) -> Optional[Dict[int, int]]:
+    """The numbering of a pure spiro system inside the whole molecule ``mol``:
+    the numbering with (f) over the exocyclic groups, then (g) and
+    (j) (``_select_spiro_numbering``)."""
+    prefix_atoms = _spiro_exocyclic_prefix_atoms(mol, set(ring_atoms))
+    if len(spiro_atoms_set) == 1:
+        return get_spiro_numbering(
+            mol, next(iter(spiro_atoms_set)), prefix_ring_atoms=prefix_atoms,
+            rank_full_molecule=True)
+    return _get_polyspiro_numbering(
+        mol, spiro_atoms_set, prefix_ring_atoms=prefix_atoms,
+        rank_full_molecule=True)
+
+
 def name_spiro_system(mol):
     """
     Generate the complete IUPAC name for a spiro compound.
@@ -1251,14 +1391,14 @@ def name_spiro_system(mol):
         if ring_set & spiro_atoms_set:
             ring_atoms_to_check |= ring_set
 
-    # Compute IUPAC numbering for the spiro system
-    if n_spiro == 1:
-        spiro_center = list(spiro_atoms_set)[0]
-        atom_to_locant = get_spiro_numbering(mol, spiro_center)
-    else:
-        atom_to_locant = _get_polyspiro_numbering(mol, spiro_atoms_set)
-        if atom_to_locant is None:
-            atom_to_locant = {}
+    # Compute IUPAC numbering for the spiro system. The callers cite every
+    # exocyclic group as a substituent prefix on this numbering, so (f)
+    # "detachable alphabetized prefixes, all considered together in a series of
+    # increasing numerical order" (the Blue Book) ranks them, then (g) and
+    # (j): '(1S,5R,7S)-1,7-dimethylspiro[4.5]decane (PIN)' (:49172), not
+    # '4,9-dimethyl'. The direction round each ring is free.
+    atom_to_locant = _spiro_system_numbering(
+        mol, spiro_atoms_set, ring_atoms_to_check) or {}
 
     # --- Wave2 T6a: ring unsaturation splice / ---
     # Map each ring multiple bond onto the fixed spiro numbering and emit the
@@ -1759,10 +1899,10 @@ def get_spiro_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
     ring_atoms: Set[int] = set()
     for r in ri.AtomRings():
         ring_atoms.update(r)
-    if len(spiro_atoms) == 1:
-        numbering = get_spiro_numbering(mol, list(spiro_atoms)[0])
-    else:
-        numbering = _get_polyspiro_numbering(mol, set(spiro_atoms))
+    # The same numbering as name_spiro_system (f), (g), (j) over the
+    # molecule's exocyclic groups), so every consumer of these locants agrees
+    # with the spiro parent name.
+    numbering = _spiro_system_numbering(mol, set(spiro_atoms), ring_atoms)
     if not numbering:
         return None
     if not (set(numbering.keys()) >= ring_atoms):
@@ -2629,6 +2769,34 @@ def _component_alpha_key(name: str) -> str:
     return s
 
 
+def _bracket_component_locants(name: str) -> str:
+    """Enclose the locants that belong to a spiro ring-component name in square
+    brackets: ``1-benzothiophene`` -> ``[1]benzothiophene``, ``1,3-oxazole`` ->
+    ``[1,3]oxazole``.
+
+     Note (the Blue Book): "The double set of brackets in this name
+    occurs because the spiro name requires them and brackets are used to enclose
+    locants belonging to component names (see ", in
+    '3H,3'H-2,2'-spirobi[[1]benzothiophene] (PIN)' (:10160). (:10295):
+    "All locants present in bicyclic fused benzo ring component or
+    Hantzsch-Widman named component are placed in brackets (without primes for
+    the second component...)".
+
+    Only the heteroatom locants that open a one-word mancude or Hantzsch-Widman
+    component name are moved; a name without leading locants (``quinoline``,
+    ``thieno[2,3-b]furan``, ``oxolane``) and a name carrying hydro prefixes or a
+    lambda descriptor are returned unchanged.
+    """
+    import re
+    m = re.match(r'^(\d+(?:,\d+)*)-([a-z][a-z\[\],\d-]*)$', name)
+    if m is None:
+        return name
+    rest = m.group(2)
+    if '-' in rest.split('[', 1)[0] or 'hydro' in rest:
+        return name
+    return f"[{m.group(1)}]{rest}"
+
+
 def _strip_consumed_indicated_h(component_name: str, spiro_locant) -> str:
     """Drop a leading indicated-hydrogen descriptor (``1H-``) from a spiro
     ring-component name when the spiro atom sits at that locant.
@@ -2821,6 +2989,36 @@ def name_mixed_spiro_fused(
         return None
     side_name, side_atom_to_locant = side_named
 
+    core_ring_atoms_pin: Set[int] = set()
+    for r in fused_rings:
+        core_ring_atoms_pin.update(r)
+    side_atoms_pin = set(side_rings[0])
+    core_ring_atoms_pin |= side_atoms_pin
+    if not allow_vb and restrict_atoms is None:
+        # (the Blue Book): each component by its own preferred
+        # (mancude) name, in alphanumerical order, with the indicated hydrogen
+        # and hydro prefixes of the complete structure cited in front
+        # ('2'H-spiro[cyclopentane-1,1'-isoquinoline] (PIN)',:19607).
+        fused_atoms_pin = core_ring_atoms_pin - (side_atoms_pin - {spiro_center})
+        st_fused = _monospiro_component_state(
+            mol, fused_atoms_pin, spiro_center, fused_name,
+            fused_atom_to_locant, is_cage=False)
+        st_side = _monospiro_component_state(
+            mol, side_atoms_pin, spiro_center, side_name,
+            side_atom_to_locant, is_cage=False)
+        asm = (_assemble_hoisted_monospiro(spiro_center, st_fused, st_side)
+               if st_fused is not None and st_side is not None else None)
+        if asm is not None:
+            front, core, combined_pin, _first, _second = asm
+            if set(combined_pin) >= core_ring_atoms_pin:
+                return (_attach_hoisted_front(front, core), core_ring_atoms_pin,
+                        combined_pin, False)
+        _label_old_form = True
+    else:
+        # The von Baeyer floor and the per-ring-system path build only this
+        # spliced form; it is decided below from the component names.
+        _label_old_form = None
+
     # Step 4: locate the spiro centre in each part's locant map.
     f_loc = fused_atom_to_locant.get(spiro_center)
     s_loc = side_atom_to_locant.get(spiro_center)
@@ -2899,7 +3097,33 @@ def name_mixed_spiro_fused(
     if not (set(combined_locants.keys()) >= core_ring_atoms):
         return None  # Pitfall 7: partial coverage of the spiro CORE -> None
 
+    if _label_old_form is None:
+        # (the Blue Book) / (:10260): the indicated
+        # hydrogen and hydro prefixes of the complete structure are cited in
+        # front of the spiro name; a component that keeps its own inside the
+        # brackets ('spiro[2,3-dihydro-1H-indene-1,1'-cyclohexane]') is not the
+        # PIN. A component without them ('bicyclo[2.2.1]heptane') leaves the
+        # spliced form as it is.
+        _label_old_form = any(_component_cites_added_hydrogen(n)
+                              for n in (first_name, second_name))
+    if _label_old_form:
+        # The preferred form above could not be built: this name keeps a
+        # component's own hydro prefixes / indicated hydrogen inside the
+        # brackets, so it is not the PIN, the Blue Book).
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
     return (name, core_ring_atoms, combined_locants, False)
+
+
+_ADDED_HYDROGEN_RE = re.compile(
+    r"(?:^|[-\[(,])\d+[a-z]?'*H-"
+    r"|\d+[a-z]?'*(?:,\d+[a-z]?'*)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?hydro")
+
+
+def _component_cites_added_hydrogen(component_name: str) -> bool:
+    """Does a spiro component name carry indicated hydrogen ('1H-indene') or hydro
+    prefixes ('2,3-dihydro-1H-indene') of its own?"""
+    return bool(component_name) and _ADDED_HYDROGEN_RE.search(component_name) is not None
 
 
 def _partition_rings_at_spiro(
@@ -3619,6 +3843,23 @@ def _reanchor_locmap_to_canonical_spiro(
 _MANCUDE_MATCH_ATOM_CAP = 32
 
 
+def _ring_skeleton_smiles(frag, carbon_skeleton: bool = False) -> str:
+    """Canonical SMILES of a ring component's SKELETON: every bond single, no
+    aromaticity, no hydrogen, no charge. With ``carbon_skeleton`` every atom is
+    also carbon -- the 'saturated bi- or polycyclic alicyclic hydrocarbon' of
+     (the Blue Book) that skeletal replacement ('a') nomenclature
+    starts from."""
+    rw = Chem.RWMol()
+    for atom in frag.GetAtoms():
+        new = Chem.Atom(6 if carbon_skeleton else atom.GetAtomicNum())
+        new.SetNoImplicit(True)
+        rw.AddAtom(new)
+    for bond in frag.GetBonds():
+        rw.AddBond(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx(),
+                   Chem.BondType.SINGLE)
+    return Chem.MolToSmiles(rw.GetMol(), canonical=True)
+
+
 def _spirobi_locant_key(loc, primes: int = 0) -> Tuple[int, str, int]:
     """ sort key for a locant of an assembled spiro system.
 
@@ -4029,6 +4270,584 @@ def _spirobi_saturation_prefix(mol, spiro_center: int, components):
     return front, component_name
 
 
+def _kekule_ring_unsaturated(mol, comp_atoms: Set[int]) -> Optional[Set[int]]:
+    """Atoms of a spiro component that carry a ring DOUBLE (or triple) bond of
+    the component in a Kekule form of the molecule. A pyrrole-type ring N-H, an
+    sp3 ring atom and a ring atom bearing only an exocyclic =O are not in the
+    set: none of them takes a double bond of the mancude ring. Returns None when
+    the molecule cannot be kekulized or a component atom is charged (the valence
+    bookkeeping of a charged skeleton is not derived here)."""
+    if any(mol.GetAtomWithIdx(a).GetFormalCharge() for a in comp_atoms):
+        return None
+    try:
+        kek = Chem.Mol(mol)
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:
+        return None
+    out: Set[int] = set()
+    for bond in kek.GetBonds():
+        x, y = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if x in comp_atoms and y in comp_atoms and bond.GetBondType() in (
+                Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
+            out.update((x, y))
+    return out
+
+
+def _constrained_mancude_matching(adj, nodes, key_of, may_be_unmatched):
+    """Maximum matching over ``nodes`` in which every UNMATCHED node lies in
+    ``may_be_unmatched``; among those, the one with the lowest sorted tuple of
+    unmatched locant keys. Returns ``(pairs, unmatched)`` or None when no
+    matching leaves only allowed nodes unmatched.
+
+    The unmatched nodes are the indicated-hydrogen positions of the mancude
+    parent. They must be atoms that really carry that hydrogen, so a node that
+    is unsaturated in the molecule must be matched: the lowest-locant choice is
+    made among the descriptions of THIS structure (b), the Blue Book
+    :3246), e.g. 5'H, not 3'H, for the oxazole of
+    '(1R)-5'H-spiro[indene-1,2'-[1,3]oxazole] (PIN)' (:49162)."""
+    from functools import lru_cache
+
+    node_set = frozenset(nodes)
+    allowed = frozenset(may_be_unmatched)
+
+    @lru_cache(maxsize=None)
+    def rec(avail):
+        if not avail:
+            return (0, (), ())
+        first = min(avail)
+        rest = avail - {first}
+        best = None
+        if first in allowed:
+            sub = rec(rest)
+            if sub is not None:
+                best = (sub[0], tuple(sorted(sub[1] + (key_of[first],))), sub[2])
+        for other in adj[first]:
+            if other not in rest:
+                continue
+            sub = rec(rest - {other})
+            if sub is None:
+                continue
+            cand = (sub[0] + 1, sub[1], sub[2] + ((first, other),))
+            if best is None or cand[0] > best[0] or (
+                    cand[0] == best[0] and cand[1] < best[1]):
+                best = cand
+        return best
+
+    res = rec(node_set)
+    if res is None:
+        return None
+    pairs = list(res[2])
+    matched = {atom for pair in pairs for atom in pair}
+    return pairs, set(node_set) - matched
+
+
+def _hoisted_saturation(mol, comp_atoms: Set[int], spiro_center: int,
+                        numbering, unsaturated: Set[int]):
+    """ / saturation of ONE component under ``numbering``,
+    described on its mancude parent: ``(hydro_locants, indicated_h_locants)``
+    as raw locants, or None.
+
+    The spiro atom (four single ring bonds) is left out of the mancude
+    assignment. The indicated-hydrogen positions are the unmatched atoms of a
+    MAXIMUM matching that leaves only atoms saturated in the molecule unmatched
+    (``_constrained_mancude_matching``); the other saturated atoms that could
+    take a ring double bond are the 'hydro' positions."""
+    others = set(comp_atoms) - {spiro_center}
+    if any(a not in numbering for a in others):
+        return None
+    if len(others) > _MANCUDE_MATCH_ATOM_CAP:
+        return None
+    eligible, adj = _component_eligible_adjacency(mol, others, comp_atoms)
+    if any(a in unsaturated for a in others if a not in set(eligible)):
+        return None  # a double bond on an atom with no spare valence
+    key_of = {a: _spirobi_locant_key(numbering[a]) for a in eligible}
+    full_pairs, _u = _mancude_max_matching(adj, eligible, key_of)
+    saturated = {a for a in eligible if a not in unsaturated}
+    res = _constrained_mancude_matching(adj, eligible, key_of, saturated)
+    if res is None:
+        return None
+    pairs, unmatched = res
+    if len(pairs) != len(full_pairs):
+        return None  # the structure is not its mancude parent plus hydro
+    hydro = saturated - unmatched
+    if len(hydro) % 2:
+        return None
+    return ({numbering[a] for a in hydro}, {numbering[a] for a in unmatched})
+
+
+def _hoisted_state_rank(mol, numbering, spiro_center, hydro, indicated,
+                        prefix_atoms):
+    """Choice among the numberings of one component, the Blue Book
+    :3219): the spiro atom first,:10168), then (b) indicated
+    hydrogen, (e) hydro prefixes, (f) the detachable prefixes."""
+    return (_spirobi_locant_key(numbering[spiro_center]),
+            tuple(sorted(_spirobi_locant_key(x) for x in indicated)),
+            tuple(sorted(_spirobi_locant_key(x) for x in hydro)),
+            tuple(sorted(_spirobi_locant_key(numbering[a])
+                         for a in prefix_atoms if a in numbering)))
+
+
+def _skeleton_copy(frag):
+    """The fragment with every bond single and no aromaticity, atom indices
+    unchanged: its automorphisms are the symmetries of the RING SYSTEM, which
+    fix its equally established numberings, whatever the
+    saturation of the real fragment."""
+    rw = Chem.RWMol(frag)
+    for bond in rw.GetBonds():
+        bond.SetBondType(Chem.BondType.SINGLE)
+        bond.SetIsAromatic(False)
+    for atom in rw.GetAtoms():
+        atom.SetIsAromatic(False)
+        atom.SetNoImplicit(True)
+        atom.SetNumExplicitHs(0)
+    skel = rw.GetMol()
+    skel.UpdatePropertyCache(strict=False)
+    return skel
+
+
+def _hoisted_fused_state(mol, comp_atoms: Set[int], spiro_center: int,
+                         unsaturated: Set[int], prefix_atoms,
+                         base_numbering=None):
+    """A polycyclic spiro component named by its mancude fusion or retained
+    name, with its saturation hoisted (``_hoisted_saturation``). The numbering
+    is the catalog's, else ``base_numbering`` (the numbering under which the
+    component's own name was built); every symmetry-equivalent numbering of the
+    ring system is considered. Returns ``{'name', 'map', 'loc', 'hydro', 'ih'}``
+    or None."""
+    resolved = _component_raw_catalog_locants(mol, comp_atoms)
+    if resolved is not None:
+        frag, orig_to_frag, raw_locants = resolved
+    else:
+        extracted = _extract_subfragment(mol, comp_atoms)
+        if extracted is None:
+            return None
+        frag, orig_to_frag = extracted
+        raw_locants = {a: base_numbering[a] for a in comp_atoms
+                       if base_numbering and a in base_numbering}
+        if set(raw_locants) != set(comp_atoms) or len(
+                set(map(str, raw_locants.values()))) != len(raw_locants):
+            # the numbering of the mancude parent itself, from its namer
+            raw_locants = _mancude_parent_numbering(mol, comp_atoms, frag,
+                                                    orig_to_frag)
+            if raw_locants is None:
+                return None
+    try:
+        numberings = _component_numberings(_skeleton_copy(frag), orig_to_frag,
+                                           raw_locants)
+    except Exception:
+        return None
+    best = None
+    for numbering in numberings:
+        if not isinstance(numbering.get(spiro_center), int):
+            continue
+        sat = _hoisted_saturation(mol, comp_atoms, spiro_center, numbering,
+                                  unsaturated)
+        if sat is None:
+            continue
+        hydro, indicated = sat
+        rank = _hoisted_state_rank(mol, numbering, spiro_center, hydro,
+                                   indicated, prefix_atoms)
+        if best is None or rank < best[0]:
+            best = (rank, numbering, hydro, indicated)
+    if best is None:
+        return None
+    _rank, numbering, hydro, indicated = best
+    mancude = _checked_mancude_component_name(mol, comp_atoms, numbering)
+    if not mancude:
+        return None
+    return {'name': _bracket_component_locants(mancude), 'map': dict(numbering),
+            'loc': numbering[spiro_center], 'hydro': hydro, 'ih': indicated}
+
+
+def _checked_mancude_component_name(mol, comp_atoms: Set[int], numbering):
+    """The name of the MANCUDE ring system of a spiro component (its own
+    indicated hydrogen removed), provided the numbering of that named ring
+    system is ``numbering`` or one of its symmetry-equivalent forms -- so the
+    hoisted hydro and indicated-hydrogen locants are locants of the parent the
+    name cites. The mancude form is built from the skeleton (every ring bond
+    single, then a maximum set of noncumulative double bonds) and named by the
+    fused-ring catalog, or for a carbocycle by the polycyclic hydrocarbon
+    namer. Returns None when the name or its numbering cannot be confirmed."""
+    extracted = _extract_subfragment(mol, comp_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    if frag.GetNumAtoms() > _MANCUDE_MATCH_ATOM_CAP:
+        return None
+    eligible = sorted(
+        f for orig, f in orig_to_frag.items()
+        if _can_bear_ring_double_bond(mol, orig, comp_atoms))
+    elig = set(eligible)
+    if not eligible:
+        return None
+    adj = {f: sorted(n.GetIdx() for n in frag.GetAtomWithIdx(f).GetNeighbors()
+                     if n.GetIdx() in elig) for f in eligible}
+    key_of = {f: _spirobi_locant_key(numbering[orig])
+              for orig, f in orig_to_frag.items() if f in elig}
+    full_pairs, _unmatched = _mancude_max_matching(adj, eligible, key_of)
+    # The ring system is the same whichever atom keeps the indicated hydrogen of
+    # the free parent ('1H-' or '4H-quinolizine'); the namer is asked for each
+    # placement, lowest locant first, until it names the system.
+    if len(eligible) == 2 * len(full_pairs):
+        placements = [full_pairs]
+    else:
+        placements = []
+        for f in sorted(eligible, key=lambda x: key_of[x]):
+            res = _constrained_mancude_matching(adj, eligible, key_of, {f})
+            if res is not None and len(res[0]) == len(full_pairs):
+                placements.append(res[0])
+    frag_to_orig = {f: o for o, f in orig_to_frag.items()}
+    wanted = {a: str(numbering[a]) for a in comp_atoms}
+    skeleton = _skeleton_copy(frag)
+    for pairs in placements:
+        bare = _name_mancude_placement(frag, pairs)
+        if bare is None:
+            continue
+        name, authority = bare
+        auth_orig = {frag_to_orig[f]: loc for f, loc in authority.items()
+                     if f in frag_to_orig}
+        if set(auth_orig) != set(comp_atoms):
+            continue
+        variants = _component_numberings(skeleton, orig_to_frag, auth_orig)
+        if not any({a: str(v[a]) for a in comp_atoms} == wanted
+                   for v in variants if set(v) == set(comp_atoms)):
+            continue
+        _ih, bare_name = _extract_leading_indicated_h(name)
+        return bare_name
+    return None
+
+
+def _mancude_parent_numbering(mol, comp_atoms: Set[int], frag, orig_to_frag):
+    """``{orig_atom: locant}`` of the mancude ring system with this skeleton, as
+    its namer numbers it (the fused-ring catalog, or the polycyclic hydrocarbon
+    namer for a carbocycle), or None."""
+    eligible = sorted(
+        f for orig, f in orig_to_frag.items()
+        if _can_bear_ring_double_bond(mol, orig, comp_atoms))
+    if not eligible or len(eligible) > _MANCUDE_MATCH_ATOM_CAP:
+        return None
+    elig = set(eligible)
+    adj = {f: sorted(n.GetIdx() for n in frag.GetAtomWithIdx(f).GetNeighbors()
+                     if n.GetIdx() in elig) for f in eligible}
+    key_of = {f: (f, '', 0) for f in eligible}
+    full_pairs, _u = _mancude_max_matching(adj, eligible, key_of)
+    if len(eligible) == 2 * len(full_pairs):
+        placements = [full_pairs]
+    else:
+        placements = []
+        for f in eligible:
+            res = _constrained_mancude_matching(adj, eligible, key_of, {f})
+            if res is not None and len(res[0]) == len(full_pairs):
+                placements.append(res[0])
+    frag_to_orig = {f: o for o, f in orig_to_frag.items()}
+    for pairs in placements:
+        named = _name_mancude_placement(frag, pairs)
+        if named is None:
+            continue
+        out = {frag_to_orig[f]: loc for f, loc in named[1].items()
+               if f in frag_to_orig}
+        if set(out) == set(comp_atoms) and len(
+                set(map(str, out.values()))) == len(out):
+            return out
+    return None
+
+
+def _name_mancude_placement(frag, pairs):
+    """Name the fragment with exactly the double bonds ``pairs`` (every other
+    ring bond single): ``(name, {frag_idx: locant})`` from the fused-ring
+    catalog, or for a carbocycle from the polycyclic hydrocarbon namer; None
+    when neither names it."""
+    rw = Chem.RWMol(frag)
+    for bond in rw.GetBonds():
+        bond.SetBondType(Chem.BondType.SINGLE)
+        bond.SetIsAromatic(False)
+    for atom in rw.GetAtoms():
+        atom.SetIsAromatic(False)
+        atom.SetNoImplicit(False)
+        atom.SetNumExplicitHs(0)
+    for first, second in pairs:
+        rw.GetBondBetweenAtoms(first, second).SetBondType(Chem.BondType.DOUBLE)
+    mancude = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mancude)
+    except Exception:
+        return None
+    rings = [list(r) for r in mancude.GetRingInfo().AtomRings()]
+    named = _name_fused_component(mancude, rings)
+    if named is not None and named[0] and named[1]:
+        return named
+    if not all(a.GetAtomicNum() == 6 for a in mancude.GetAtoms()):
+        return None
+    try:
+        from .polycyclics import get_polycyclic_iupac_locants, identify_polycyclic
+        name = identify_polycyclic(mancude)
+        authority = get_polycyclic_iupac_locants(mancude, name) if name else None
+    except Exception:
+        return None
+    if not name or not authority:
+        return None
+    return name, {k: (f"{v[0]}{v[1]}" if isinstance(v, tuple) else v)
+                  for k, v in authority.items()}
+
+
+def _mancude_monocycle_name(mol, comp_atoms: Set[int]) -> Optional[str]:
+    """The name of the MANCUDE heteromonocycle with this skeleton, its own
+    indicated hydrogen removed: the retained name where one is the PIN
+    ('furan', 'pyridine', 'thiophene', 'pyran'), else the Hantzsch-Widman name
+    ('1,3-oxazole'), from the ring namer ``heterocycles.name_heterocycle``. The
+    mancude form is built from the skeleton (every bond single, then a maximum
+    set of noncumulative double bonds), not edited from another name."""
+    extracted = _extract_subfragment(mol, comp_atoms)
+    if extracted is None:
+        return None
+    frag, orig_to_frag = extracted
+    eligible = sorted(
+        f for orig, f in orig_to_frag.items()
+        if _can_bear_ring_double_bond(mol, orig, comp_atoms))
+    elig = set(eligible)
+    adj = {f: sorted(n.GetIdx() for n in frag.GetAtomWithIdx(f).GetNeighbors()
+                     if n.GetIdx() in elig) for f in eligible}
+    pairs, _unmatched = _mancude_max_matching(
+        adj, eligible, {f: (f, '', 0) for f in eligible})
+    rw = Chem.RWMol(frag)
+    for bond in rw.GetBonds():
+        bond.SetBondType(Chem.BondType.SINGLE)
+        bond.SetIsAromatic(False)
+    for atom in rw.GetAtoms():
+        atom.SetIsAromatic(False)
+        atom.SetNoImplicit(False)
+        atom.SetNumExplicitHs(0)
+    for first, second in pairs:
+        rw.GetBondBetweenAtoms(first, second).SetBondType(Chem.BondType.DOUBLE)
+    mancude = rw.GetMol()
+    try:
+        Chem.SanitizeMol(mancude)
+        from .heterocycles import name_heterocycle
+        named = name_heterocycle(mancude, list(range(mancude.GetNumAtoms())))
+    except Exception:
+        return None
+    if not named or ' ' in named:
+        return None
+    _ih, bare = _extract_leading_indicated_h(named)
+    return bare
+
+
+def _hoisted_hw_monocycle_state(mol, comp_atoms: Set[int], spiro_center: int,
+                                unsaturated: Set[int], prefix_atoms):
+    """An unsaturated heteromonocyclic spiro component named by its mancude
+    Hantzsch-Widman name ('[1,3]oxazole'), numbered by the heteroatoms first
+     and then as in ``_hoisted_state_rank``, with its saturation
+    hoisted. Returns the state dict or None."""
+    name = _mancude_monocycle_name(mol, comp_atoms)
+    if not name:
+        return None
+    ring = [a for a in comp_atoms]
+    adj = {a: [n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors()
+               if n.GetIdx() in comp_atoms] for a in ring}
+    if any(len(v) != 2 for v in adj.values()):
+        return None
+    from ..data.hw_heteroatoms import HETEROATOM_PRIORITY as _HP
+    hetero = [a for a in ring if mol.GetAtomWithIdx(a).GetAtomicNum() != 6]
+    walks = []
+    for start in sorted(ring):
+        for first in sorted(adj[start]):
+            path = [start, first]
+            while len(path) < len(ring):
+                nxt = [n for n in adj[path[-1]] if n != path[-2]]
+                if len(nxt) != 1:
+                    break
+                path.append(nxt[0])
+            if len(path) == len(ring):
+                walks.append({a: i + 1 for i, a in enumerate(path)})
+    if not walks:
+        return None
+
+    def het_key(num):
+        return (sorted(num[a] for a in hetero),
+                [p for _l, p in sorted(
+                    (num[a], _HP.get(mol.GetAtomWithIdx(a).GetSymbol(), 999))
+                    for a in hetero)])
+    top = min(het_key(w) for w in walks)
+    best = None
+    for numbering in walks:
+        if het_key(numbering) != top:
+            continue
+        sat = _hoisted_saturation(mol, comp_atoms, spiro_center, numbering,
+                                  unsaturated)
+        if sat is None:
+            continue
+        hydro, indicated = sat
+        rank = _hoisted_state_rank(mol, numbering, spiro_center, hydro,
+                                   indicated, prefix_atoms)
+        if best is None or rank < best[0]:
+            best = (rank, numbering, hydro, indicated)
+    if best is None:
+        return None
+    _rank, numbering, hydro, indicated = best
+    return {'name': _bracket_component_locants(name), 'map': dict(numbering),
+            'loc': numbering[spiro_center], 'hydro': hydro, 'ih': indicated}
+
+
+def _component_needs_hoist(mol, comp_atoms: Set[int], spiro_center: int,
+                           unsaturated: Set[int]) -> bool:
+    """True when an atom of the component other than the spiro atom could take
+    a ring double bond but carries none: its saturation must be cited in front
+    of the spiro name."""
+    return any(
+        a != spiro_center and a not in unsaturated
+        and _can_bear_ring_double_bond(mol, a, comp_atoms)
+        for a in comp_atoms)
+
+
+def _pin_component_alpha_key(name: str) -> Tuple[str, str]:
+    """ / alphanumerical order of two ring-component names
+    (the Blue Book): the Roman letters first ('cyclopentane' before
+    'isoquinoline', 'indene' before '[1,3]oxazole'); when they are equal, the
+    fusion locants and letters, heteroatom locants and von Baeyer numbers
+    ('thieno[2,3-b]furan' before 'thieno[3,2-b]furan',:10310)."""
+    import re
+    s = name.strip().lower()
+    letters = re.sub(r'[^a-z]', '', re.sub(r'\[[^\]]*\]', '', s))
+    return (letters, s)
+
+
+def _assemble_hoisted_monospiro(spiro_center: int, state_a, state_b):
+    """ (the Blue Book) two-component spiro name from two
+    component states: the component names in alphanumerical order, the second
+    primed, and the hydro prefixes and indicated hydrogen of the complete
+    structure in front ('4'a,5',6',7',8',8'a-hexahydro-1'H-spiro[imidazolidine-
+    4,2'-quinoxaline] (PIN)',:17050). Returns ``(front, core, combined_map,
+    unprimed_state, primed_state)`` or None."""
+    from .partial_saturation import get_saturation_prefix
+    if _pin_component_alpha_key(state_a['name']) <= _pin_component_alpha_key(
+            state_b['name']):
+        first, second = state_a, state_b
+    else:
+        first, second = state_b, state_a
+    hydro_tokens = []
+    indicated_tokens = []
+    for state, primes in ((first, 0), (second, 1)):
+        for loc in state['hydro']:
+            hydro_tokens.append((_spirobi_locant_key(loc, primes),
+                                 _spirobi_locant_display(loc, primes)))
+        for loc in state['ih']:
+            indicated_tokens.append((_spirobi_locant_key(loc, primes),
+                                     _spirobi_locant_display(loc, primes)))
+    hydro_part = ""
+    if hydro_tokens:
+        multiplier = get_saturation_prefix(len(hydro_tokens))
+        if not multiplier:
+            return None
+        hydro_part = (f"{','.join(t for _k, t in sorted(hydro_tokens))}-"
+                      f"{multiplier}")
+    ih_part = ",".join(f"{t}H" for _k, t in sorted(indicated_tokens))
+    front = (hydro_part, ih_part)
+    core = (f"spiro[{first['name']}-{first['loc']},"
+            f"{second['loc']}'-{second['name']}]")
+    combined: Dict[int, _Locant] = {}
+    for atom_idx, locant in first['map'].items():
+        combined[atom_idx] = locant
+    for atom_idx, locant in second['map'].items():
+        if atom_idx == spiro_center:
+            continue
+        combined[atom_idx] = (locant, "'")
+    return front, core, combined, first, second
+
+
+def _attach_hoisted_front(front, rest: str) -> str:
+    """Cite the hoisted hydro prefix and indicated hydrogen in front of the spiro
+    name: hydro prefix, then indicated hydrogen, then the name
+    ('4'a,5',6',7',8',8'a-hexahydro-1'H-spiro[...]', the Blue Book;
+    '1,2-dihydrospiro[...]'). A hyphen separates a term from a following
+    locant (a), the Blue Book, "to separate locants from words
+    or word fragments"); 'hydro' joins a following letter directly."""
+    hydro_part, ih_part = front
+    out = rest
+    if ih_part:
+        out = f"{ih_part}-{out}"
+    if hydro_part:
+        out = f"{hydro_part}-{out}" if out[:1].isdigit() else f"{hydro_part}{out}"
+    return out
+
+
+def _plain_component_state(name: str, numbering, spiro_center: int):
+    """State of a component whose name needs no hoisting: a saturated
+    monocycle, a von Baeyer cage without double bonds, or a fused system whose
+    only sp3 ring atom is the spiro atom. The component's own indicated
+    hydrogen at the spiro atom is dropped."""
+    loc = numbering.get(spiro_center)
+    if not isinstance(loc, int):
+        return None
+    shown = _bracket_component_locants(_strip_consumed_indicated_h(name, loc))
+    if _extract_leading_indicated_h(shown)[0]:
+        return None  # indicated hydrogen left inside the bracket
+    return {'name': shown, 'map': dict(numbering), 'loc': loc,
+            'hydro': set(), 'ih': set()}
+
+
+def _ortho_fused_five_plus(mol, comp_atoms: Set[int]) -> bool:
+    """True when the component is an ortho-fused ring system (rings sharing one
+    bond, no atom in three rings) of rings of five or more members: such a
+    system with a double bond is named by fusion nomenclature, as hydro
+    derivatives of its mancude parent, not by von Baeyer names
+    : fusion nomenclature for systems with at least two rings of five or
+    more members)."""
+    rings = [set(r) for r in mol.GetRingInfo().AtomRings()
+             if set(r) <= set(comp_atoms)]
+    if len(rings) < 2 or any(len(r) < 5 for r in rings):
+        return False
+    for i in range(len(rings)):
+        for j in range(i + 1, len(rings)):
+            if len(rings[i] & rings[j]) > 2:
+                return False
+    for a in comp_atoms:
+        if sum(1 for r in rings if a in r) > 2:
+            return False
+    return True
+
+
+def _monospiro_component_state(mol, comp_atoms: Set[int], spiro_center: int,
+                               name: str, numbering, is_cage: bool):
+    """The state of one component of a two-component spiro system, or
+    None when its preferred form cannot be built here (the caller then keeps
+    its older name and labels it below the PIN)."""
+    unsaturated = _kekule_ring_unsaturated(mol, comp_atoms)
+    if unsaturated is None:
+        return None
+    others = set(comp_atoms) - {spiro_center}
+    prefix_atoms = _spiro_exocyclic_prefix_atoms(mol, set(comp_atoms))
+    ring_count = len([r for r in mol.GetRingInfo().AtomRings()
+                      if set(r) <= set(comp_atoms)])
+    has_unsat = bool(unsaturated & others)
+    if (is_cage or ('cyclo[' in name and ring_count > 1)) and not (
+            has_unsat and _ortho_fused_five_plus(mol, comp_atoms)):
+        # (the Blue Book): a double bond of a von Baeyer
+        # component is an 'ene' ending after the last bracket of the spiro
+        # name, a form this builder does not write.
+        return None if has_unsat else _plain_component_state(
+            name, numbering, spiro_center)
+    if ring_count == 1:
+        if not has_unsat:
+            return _plain_component_state(name, numbering, spiro_center)
+        if all(mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in comp_atoms):
+            # an unsaturated carbocycle: 'ene' after the bracket,
+            # '...spiro[[1]benzofuran-2,1'-cyclohexan]-2'-ene (PIN)',:17052).
+            return None
+        return _hoisted_hw_monocycle_state(mol, comp_atoms, spiro_center,
+                                           unsaturated, prefix_atoms)
+    # a von Baeyer numbering is not the numbering of the fused parent
+    base = None if (is_cage or 'cyclo[' in name) else numbering
+    hoisted = _hoisted_fused_state(mol, comp_atoms, spiro_center, unsaturated,
+                                   prefix_atoms, base_numbering=base)
+    if hoisted is not None:
+        return hoisted
+    if not _component_needs_hoist(mol, comp_atoms, spiro_center, unsaturated):
+        # a fused system outside the catalog lookup (a carbocyclic template
+        # such as fluorene) whose only sp3 ring atom is the spiro atom
+        return _plain_component_state(name, numbering, spiro_center)
+    return None
+
+
 def is_spirobi(mol) -> bool:
     """: monospiro ring system with two IDENTICAL (polycyclic)
     components joined at one spiro atom (e.g. 1,1'-spirobi[indene]).
@@ -4083,14 +4902,19 @@ def _name_spirobi_core(mol):
     for r in rings_b:
         atoms_b.update(r)
 
-    # Components must be graph-isomorphic (canonical SMILES of the capped
-    # fragments equal). If not, it is a DIFFERENT-component spiro, not
-    # spirobi — decline here.
+    # Components must be IDENTICAL RING COMPONENTS: the same atoms
+    # joined the same way. (the Blue Book): "the maximum number of
+    # noncumulative double bonds is added (i.e., the system is made mancude) after
+    # construction of the complete skeleton", so the comparison is made on the
+    # skeleton (bond orders, aromaticity and hydrogen ignored): the two halves of
+    # '2,4'-spirobi[[1]benzopyran] (PIN)' (:10182) carry their double bonds in
+    # different places. A different skeleton is a DIFFERENT-component spiro
+    #, not spirobi -- decline here.
     ext_a = _extract_subfragment(mol, atoms_a)
     ext_b = _extract_subfragment(mol, atoms_b)
     if ext_a is None or ext_b is None:
         return None
-    if Chem.MolToSmiles(ext_a[0]) != Chem.MolToSmiles(ext_b[0]):
+    if _ring_skeleton_smiles(ext_a[0]) != _ring_skeleton_smiles(ext_b[0]):
         return None
 
     named_a = _name_fused_component(mol, rings_a)
@@ -4099,8 +4923,6 @@ def _name_spirobi_core(mol):
         return None
     name_a, loc_map_a = named_a
     name_b, loc_map_b = named_b
-    if name_a != name_b:
-        return None  # isomorphic skeleton but the namers disagree -> decline
     # lowest locant at the spiro atom, computed DETERMINISTICALLY: a
     # symmetric component (e.g. indane positions 1 and 3 are mirror-equivalent)
     # lets the catalog substructure-match place the spiro atom at either of two
@@ -4147,11 +4969,20 @@ def _name_spirobi_core(mol):
         if hoisted is None:
             return None  # fail closed: saturation we cannot spell is not named
         front, component_name = hoisted
+        component_name = _bracket_component_locants(component_name)
         name = f"{front}{lo_tok},{hi}'-spirobi[{component_name}]"
     else:
         # /: indicated hydrogen of the individual component is
-        # not cited when the spiro atom occupies that locant.
-        component_name = _strip_consumed_indicated_h(name_a, lo)
+        # not cited when the spiro atom occupies that locant. Each half is named
+        # with its own indicated hydrogen ('2H-1-benzopyran', '4H-1-benzopyran'
+        # for the halves of '2,4'-spirobi[[1]benzopyran]'); both must reduce to
+        # one component name, else the namers disagree -> decline.
+        unprimed_name = name_a if unprimed_map is loc_map_a else name_b
+        primed_name = name_b if unprimed_map is loc_map_a else name_a
+        component_name = _strip_consumed_indicated_h(unprimed_name, lo)
+        if _strip_consumed_indicated_h(primed_name, hi) != component_name:
+            return None
+        component_name = _bracket_component_locants(component_name)
         name = f"{lo_tok},{hi}'-spirobi[{component_name}]"
 
     combined_locants: Dict[int, _Locant] = {}
@@ -6047,14 +6878,39 @@ def _name_spiro_vonbaeyer_core(mol):
         return None
     ene_a, ene_b = _ene_sides
     _spirobi_trailing = ''
+    _pin_front = None
+    _non_pin_form = False
 
-    identical = (
-        name_a == name_b
-        and Chem.MolToSmiles(ext_a[0]) == Chem.MolToSmiles(ext_b[0])
-    )
+    # (the Blue Book): "When ring components of 'spirobi'
+    # compounds are named by von Baeyer nomenclature, heteroatoms are indicated by
+    # skeletal replacement ('a') nomenclature. The spirobi ring system is named as
+    # the saturated bi- or polycyclic alicyclic hydrocarbon". Two von Baeyer cages
+    # are therefore identical components when their CARBON skeletons are, whatever
+    # their heteroatoms ('6-sila-2,2'-spirobi[bicyclo[2.2.1]heptane] (PIN)',
+    #:10201) and double bonds ('2,2'-spirobi[bicyclo[2.2.1]heptan]-5-ene (PIN)',
+    #:16771); any other component must match atom for atom, as before.
+    _both_cages = a_vb and b_vb
+    identical = name_a == name_b and (
+        _ring_skeleton_smiles(ext_a[0], carbon_skeleton=True)
+        == _ring_skeleton_smiles(ext_b[0], carbon_skeleton=True)
+        if _both_cages
+        else Chem.MolToSmiles(ext_a[0]) == Chem.MolToSmiles(ext_b[0]))
     if identical:
         # spirobi multiplicative form for two identical components.
-        if loc_a <= loc_b:
+        # (:10168): "the lower number at the spiro atom is unprimed".
+        # With equal spiro locants, (:10186): "low locants are given to
+        # the spiro atom, then to the heteroatoms", and (:16761):
+        # "low locants are assigned, in order, to spiro junction(s), heteroatoms
+        # and double bonds".
+        if loc_a == loc_b and _both_cages:
+            a_first = _spirobi_cage_order_key(
+                mol, atoms_a, atoms_b, spiro_center, locmap_a, locmap_b,
+                ene_a, ene_b) <= _spirobi_cage_order_key(
+                mol, atoms_b, atoms_a, spiro_center, locmap_b, locmap_a,
+                ene_b, ene_a)
+        else:
+            a_first = loc_a <= loc_b
+        if a_first:
             lo, hi = loc_a, loc_b
             unprimed_map, primed_map = locmap_a, locmap_b
             ene_unp, ene_pri = ene_a, ene_b
@@ -6062,19 +6918,28 @@ def _name_spiro_vonbaeyer_core(mol):
             lo, hi = loc_b, loc_a
             unprimed_map, primed_map = locmap_b, locmap_a
             ene_unp, ene_pri = ene_b, ene_a
-        component = _strip_consumed_indicated_h(name_a, lo)
-        name = f"{lo},{hi}'-spirobi[{component}]"
+        component = _bracket_component_locants(
+            _strip_consumed_indicated_h(name_a, lo))
         # spirobi: unsaturation of the two IDENTICAL cages is cited as a
         # multiplicative suffix AFTER the closing bracket (`...nonane]-6,6'-diene`,
         # a Blue-Book PIN form) -- NOT spliced inside (that is the component-name
         # rule, handled in the else branch below). ``_spirobi_trailing``
-        # is appended at the end (after any 'a'-prefix).
+        # is appended at the end (after any 'a'-prefix). (:16761):
+        # "The final letter 'e' of the saturated hydrocarbon name is elided if
+        # followed by a vowel" ('...heptan]-5-ene', '...nonane]-6,6'-diene'), and
+        # the locants follow (:3193), primed after the same unprimed
+        # number ('...nonane]-6',7-diene',:16779).
         if ene_unp or ene_pri:
-            _tok = [str(n) for n in ene_unp] + [f"{n}'" for n in ene_pri]
+            _tok = sorted(
+                [(_spirobi_locant_key(n, 0), str(n)) for n in ene_unp]
+                + [(_spirobi_locant_key(n, 1), f"{n}'") for n in ene_pri])
             from ..assembly.naming_utils import get_suffix_multiplier_prefix
+            _mult = get_suffix_multiplier_prefix(len(_tok), 'ene')
             _spirobi_trailing = (
-                f"-{','.join(_tok)}-"
-                f"{get_suffix_multiplier_prefix(len(_tok), 'ene')}ene")
+                f"-{','.join(t for _k, t in _tok)}-{_mult}ene")
+            if not _mult and component.endswith('e'):
+                component = component[:-1]
+        name = f"{lo},{hi}'-spirobi[{component}]"
     else:
         # component-name spiro: cite components in ALPHANUMERICAL order
         # of the component name (NOT ring seniority); first cited is unprimed.
@@ -6107,13 +6972,29 @@ def _name_spiro_vonbaeyer_core(mol):
             name = (f"{front_prefix}spiro[{first_bare}-{first_loc},"
                     f"{second_loc}'-{second_bare}]")
         else:
-            first_name = _strip_consumed_indicated_h(first_name, first_loc)
-            second_name = _strip_consumed_indicated_h(second_name, second_loc)
-            first_name = _splice_cage_ene(first_name, first_ene, '')
-            second_name = _splice_cage_ene(second_name, second_ene, "'")
-            if first_name is None or second_name is None:
-                return None
-            name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
+            # (the Blue Book): each component by its own preferred
+            # (mancude) name, in alphanumerical order, with the indicated
+            # hydrogen and hydro prefixes of the complete structure cited in
+            # front ('2'H,5H-spiro[thieno[2,3-b]furan-4,3'-thieno[3,2-b]furan]
+            # (PIN)',:10310).
+            st_a = _monospiro_component_state(
+                mol, atoms_a, spiro_center, name_a, locmap_a, is_cage=a_vb)
+            st_b = _monospiro_component_state(
+                mol, atoms_b, spiro_center, name_b, locmap_b, is_cage=b_vb)
+            asm = (_assemble_hoisted_monospiro(spiro_center, st_a, st_b)
+                   if st_a is not None and st_b is not None else None)
+            if asm is not None:
+                _pin_front, name, _comb, _first, _second = asm
+                unprimed_map, primed_map = _first['map'], _second['map']
+            else:
+                _non_pin_form = True
+                first_name = _strip_consumed_indicated_h(first_name, first_loc)
+                second_name = _strip_consumed_indicated_h(second_name, second_loc)
+                first_name = _splice_cage_ene(first_name, first_ene, '')
+                second_name = _splice_cage_ene(second_name, second_ene, "'")
+                if first_name is None or second_name is None:
+                    return None
+                name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
 
     combined_locants: Dict[int, _Locant] = {}
     for atom_idx, locant in unprimed_map.items():
@@ -6181,7 +7062,47 @@ def _name_spiro_vonbaeyer_core(mol):
     # the bracket (a Blue-Book PIN form); that suffix is appended here.
     if _spirobi_trailing:
         name = name + _spirobi_trailing
+    if _pin_front:
+        name = _attach_hoisted_front(_pin_front, name)
+    if _non_pin_form:
+        # The preferred form could not be built: this name keeps a component's
+        # own hydro prefixes / indicated hydrogen inside the brackets or a
+        # component double bond spliced into it, so it is not the PIN,
+        # the Blue Book;,:16761).
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
     return name, all_ring_atoms, combined_locants
+
+
+def _spirobi_cage_order_key(mol, first_atoms: Set[int], second_atoms: Set[int],
+                            spiro_center: int, first_map, second_map,
+                            first_ene, second_ene):
+    """Locant key of a 'spirobi' von Baeyer system when ``first_atoms`` is the
+    unprimed cage: the heteroatom locants as one set, then per heteroatom in the
+    order of (O > S > Se > Te > N >...), then the double-bond
+    locants, each compared in the order of (5 < 5' < 6 < 6').
+    '5,6'-dioxa-2,2'-spirobi[bicyclo[2.2.2]octane]-7,7'-diene (PIN)'
+    (the Blue Book), '6-oxa-6'-thia-2,2'-spirobi[bicyclo[2.2.1]heptane]
+    (PIN)' (:10203)."""
+    hetero: Dict[str, List[Tuple]] = {}
+    all_keys: List[Tuple] = []
+    for atoms, amap, primes in ((first_atoms, first_map, 0),
+                                (second_atoms, second_map, 1)):
+        for a in atoms:
+            if a == spiro_center:
+                continue
+            sym = mol.GetAtomWithIdx(a).GetSymbol()
+            if sym in ('C', 'H') or a not in amap:
+                continue
+            key = _spirobi_locant_key(amap[a], primes)
+            all_keys.append(key)
+            hetero.setdefault(sym, []).append(key)
+    per_element = tuple(
+        tuple(sorted(hetero[el]))
+        for el in sort_heteroatoms_by_priority(list(hetero)))
+    enes = tuple(sorted([_spirobi_locant_key(n, 0) for n in first_ene]
+                        + [_spirobi_locant_key(n, 1) for n in second_ene]))
+    return (tuple(sorted(all_keys)), per_element, enes)
 
 
 def _spiro_vb_a_prefix(
@@ -6226,14 +7147,17 @@ def _spiro_vb_a_prefix(
         sym = mol.GetAtomWithIdx(a).GetSymbol()
         if sym not in HETEROATOM_PREFIXES:
             return None  # off Table 1.5: no morpheme exists -> refuse
+        # (the Blue Book): "Primed locants are placed immediately
+        # after the corresponding unprimed locants in a set arranged in
+        # ascending order" ('5,6'-dioxa':16775, '2'',7-dioxa':16787).
         if a in unprimed_map:
             loc = unprimed_map[a]
             token = str(loc)
-            key = (0, loc)
+            key = _spirobi_locant_key(loc, 0)
         elif a in primed_map:
             loc = primed_map[a]
             token = f"{loc}'"
-            key = (1, loc)
+            key = _spirobi_locant_key(loc, 1)
         else:
             return None
         by_element.setdefault(sym, []).append((token, key))

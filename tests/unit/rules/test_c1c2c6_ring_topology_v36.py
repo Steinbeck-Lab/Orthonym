@@ -127,21 +127,23 @@ C_COVERED_BY_FLOOR = [
     "c1ccc2nc3ncncc3nc2c1",    # -> benzo[g]pteridine (retained, RT-ok)
 ]
 
-# Pattern D: bridged-fused whole molecule. DEFERRED (V36-C1C2C6-TASK45-BCD-FINDING.md):
-# measurement REFUTES the trace's "pure routing bypass" premise -- detect_bridged_fused
-# returns False and name_bridged_fused_system returns None for this macrocyclic-bridge
-# topology, so it is a detector+construction gap, not a routing patch. Abstains (0-wrong).
+# Pattern D: a macrocycle over two six-membered rings that each carry one C=N. Neither
+# ring is mancude, so (1) (the Blue Book, "at least one ring or ring
+# system of which must be a mancude system") does not apply and (:23831)
+# makes the von Baeyer name the PIN. It is named now
+# ('2,15-dioxa-12,25-diazatricyclo[22.2.2.2^11,14]triaconta-12,25-diene') and
+# round-trips: ``test_d_witness_names_and_rt``.
 D_WITNESSES = [
     "C1=NC2CCCCCCCCOC3C=NC(CCCCCCCCOC1CC2)CC3",
 ]
 
-# A2/B/C/D remain a documented abstain until their pattern's task lands. A1 is
-# promoted into ``test_a1_witness_names_and_rt`` (Task 2, VERIFIED fix shipped).
+# A2/B/C remain a documented abstain until their pattern's task lands. A1 is
+# promoted into ``test_a1_witness_names_and_rt`` (Task 2, VERIFIED fix shipped), D
+# into ``test_d_witness_names_and_rt``.
 ABSTAIN_TODAY_WITNESSES = (
     [("A2", s) for s in A2_WITNESSES]
     + [("B", s) for s in B_WITNESSES]
     + [("C", s) for s in C_WITNESSES]
-    + [("D", s) for s in D_WITNESSES]
 )
 
 # Canary: ring names that ALREADY work must stay byte-identical + RT-valid. The
@@ -215,6 +217,17 @@ def test_a1_witness_names_and_rt(smiles):
     except _Timeout:
         pytest.skip("naming exceeded timeout (out-of-scope size)")
     assert r.passed, f"A1 witness did not round-trip: name={r.name!r} err={r.error}"
+
+
+@pytest.mark.parametrize("smiles", D_WITNESSES)
+def test_d_witness_names_and_rt(smiles):
+    """Pattern D: the witness that abstained when this file was written is named now;
+    the name must OPSIN-round-trip to the input's full InChIKey (0-wrong)."""
+    try:
+        r = _ring_rt(smiles)
+    except _Timeout:
+        pytest.skip("naming exceeded timeout (out-of-scope size)")
+    assert r.passed, f"D witness did not round-trip: name={r.name!r} err={r.error}"
 
 
 @pytest.mark.parametrize("smiles", A2_STEREO_CLOSEABLE)

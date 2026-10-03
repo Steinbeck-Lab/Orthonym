@@ -116,7 +116,9 @@ class TestKetonePGLocationProtect:
         ("CC(=O)c1ccccc1", "1-phenylethan-1-one"),  # Wave2 T1d: acetophenone de-headlined to the PIN
         ("CC(=O)C1CCCCC1", "1-cyclohexylethan-1-one"),
         ("O=C(CC)c1ccccc1", "1-phenylpropan-1-one"),
-        ("O=C1CCCCC1", "cyclohexan-1-one"),
+        # (c) (the Blue Book): no locant '1' in a monosubstituted
+        # homogeneous monocycle; 'cyclohexanethiol (PIN)' (:2917).
+        ("O=C1CCCCC1", "cyclohexanone"),
         ("CC(=O)CC1CCCCC1", "1-cyclohexylpropan-2-one"),
         ("CC(=O)Cc1ccccc1", "1-phenylpropan-2-one"),
         ("O=Cc1ccccc1", "benzaldehyde"),
@@ -226,7 +228,7 @@ class TestRingNitrogenNotAmineProtect:
         ("CCN(CC)CC", "N,N-diethylethanamine"),
         ("CCNCC", "N-ethylethanamine"),
         ("CN(C)C", "N,N-dimethylmethanamine"),
-        ("C1CCCCC1N", "cyclohexan-1-amine"),
+        ("C1CCCCC1N", "cyclohexanamine"),  # (c), the Blue Book
         # (c) (the Blue Book): the ring carries only the amine;
         # '*N*-butylcyclopropanamine (PIN)' (:26292,.
         ("CNC1CCCCC1", "N-methylcyclohexanamine"),

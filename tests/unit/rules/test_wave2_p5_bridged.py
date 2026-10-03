@@ -21,8 +21,11 @@ class TestP25UnsaturatedAcyclicBridges:
         assert name_compound("C12=CC=C(C3=CC=CC=C13)C=C2") == "1,4-ethenonaphthalene"
 
     def test_butadieno_naphthalene(self):
-        # OPSIN: 1,4-buta[1,3]dienonaphthalene -> C12=CC=C(C3=CC=CC=C13)C=CC=C2
-        assert name_compound("C12=CC=C(C3=CC=CC=C13)C=CC=C2") == "1,4-buta[1,3]dienonaphthalene"
+        # (b) (the Blue Book) "include the maximum number of skeletal
+        # atoms" (ex.:14277: a 17-atom parent, not '4,5-buta[1,3]dieno...' on 16): the
+        # benzo[8]annulene parent (12 atoms) with an etheno bridge, not naphthalene (10)
+        # with buta[1,3]dieno. OPSIN reads both spellings to the same InChIKey.
+        assert name_compound("C12=CC=C(C3=CC=CC=C13)C=CC=C2") == "5,10-ethenobenzo[8]annulene"
 
     def test_dibenzobarrelene_protect(self):
         # anchor already-correct — lock against regression
@@ -179,10 +182,16 @@ class TestP23SecondaryBridgesFailClosed:
     constructor MUST decline them (return None) so it never emits a wrong
     partial name; the von Baeyer engine owns them downstream."""
 
-    def test_secondary_bridge_fused_declines_in_constructor(self):
+    def test_a_fused_parent_with_one_bridge_is_not_a_secondary_bridge(self):
+        # tricyclo[3.3.1.0^3,7]nonane has a secondary von Baeyer bridge, but it is also
+        # pentalene, the Blue Book 'pentalene (PIN)') with one methano
+        # bridge: (:23843) "fused ring systems > bridged fused systems >
+        # non-fused bridged systems", and the pentalene parent has two five-membered rings
+        #,:23710). OPSIN 2.9.0 reads the name to the input's full InChIKey.
         from orthonym.rules.bridged_fused import name_bridged_fused_pin
         m = Chem.MolFromSmiles("C12CC3CC(C1)C(C2)C3c1ccccc1")
-        assert name_bridged_fused_pin(m) is None
+        got = name_bridged_fused_pin(m)
+        assert got is not None and got[0] == "1-phenyloctahydro-2,5-methanopentalene"
 
     def test_simple_single_bridge_still_named(self):
         # protect the simple dihydro-methano bridge (not a secondary bridge)

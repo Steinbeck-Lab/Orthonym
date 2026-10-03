@@ -22,12 +22,17 @@ trip held it back. The fix is at the producer, so the candidate is never built.
     needs the 'yne' ending, (:16489): "The presence of one or more double or
     triple bonds in an otherwise saturated parent hydride... is denoted by changing the
     ending 'ane' of the name of a saturated parent hydride to 'ene' or 'yne'." The builder
-    has no 'yne' form, so it declines such a ring. It now writes the λ form (PIN class
+    had no 'yne' form, so it declined such a ring. It now writes the λ form (PIN class
     program Task 11,:9158 "The symbol λn, where n is the bonding number, is
     cited immediately after the locant denoting the heteroatom with the nonstandard bonding
-    number"), so the λ rings are named: '1-oxa-4λ4-thiacyclotetradecane (PIN)' (:9486). A
-    CHARGED ring atom stays in scope: the ring-ion emitters pass the ion and append the
-    charge suffix to the parent name the builder returns ('1-oxa-4-azacyclotetradecan-4-ium').
+    number"), so the λ rings are named: '1-oxa-4λ4-thiacyclotetradecane (PIN)' (:9486); and
+    the 'yne' ending (PIN class program Task 4,:16558 "low locants are assigned
+    first to heteroatoms and then to unsaturated sites"), so the triple-bond rings are named:
+    '1,11-disilacycloicosa-5,7-dien-3-yne (PIN)' (:16570), '1,10-disilacycloicosa-12,14,16-
+    trien-18-yne (PIN)' (:16576). It still declines what it has no form for: a ring radical,
+    and one 'ene' with a multiplied 'yne' (no Blue Book spelling). A CHARGED ring atom stays
+    in scope: the ring-ion emitters pass the ion and append the charge suffix to the parent
+    name the builder returns ('1-oxa-4-azacyclotetradecan-4-ium').
 
 At both tiers the rows never ship the wrong names; the best-effort tier keeps its RT-exact
 general-engine name.
@@ -73,9 +78,14 @@ UIDE_NAMED = [("[B-](C)(C)(C)C", "tetramethylboranuide"), ("C[P-](C)(C)C", "tetr
               ("F[B-](F)(F)c1ccccc1", "trifluorophenylboranuide")]
 HALONIUM_DECLINED = ["C1CC[I+]CC1", "c1ccc2c(c1)[I+]c1ccccc1-2"]
 HALONIUM_NAMED = [("c1ccc(cc1)[I+]c1ccccc1", "diphenyliodanium")]
-RING_DECLINED = ["C1#CC[SiH2]CCCCCCCCC[SiH2]CCC=CC=C1",
-                 "C1#CC[SiH2]CCCCCCCC[SiH2]CC=CC=CC=C1", "C1#CCCCCOCCCCC1"]
+# A ring radical; one 'ene' with a multiplied 'yne' (a):7595,:16497).
+RING_DECLINED = ["C1CCCCC[Si]CCOCCCC1", "C1#CC#CC=CCCCCCO1"]
 RING_NAMED = [("C1CCCCCSCCOCCCC1", "1-oxa-4-thiacyclotetradecane"),
+              # the 'yne' form (Task 4; OPSIN 2.9.0 read-back FULL)
+              ("C1#CC[SiH2]CCCCCCCCC[SiH2]CCC=CC=C1", "1,11-disilacycloicosa-5,7-dien-3-yne"),  #:16570
+              ("C1#CC[SiH2]CCCCCCCC[SiH2]CC=CC=CC=C1",
+               "1,10-disilacycloicosa-12,14,16-trien-18-yne"),                                  #:16576
+              ("C1#CCCCCOCCCCC1", "1-oxacyclododec-6-yne"),
               # the λ form (Task 11; OPSIN 2.9.0 read-back FULL)
               ("C1CCCCC[SH2]CCOCCCC1", "1-oxa-4λ4-thiacyclotetradecane"),          #:9486
               ("C1CC[SH2]CCCSCCOC1", "1-oxa-4,8λ4-dithiacyclododecane"),
@@ -124,7 +134,7 @@ def test_ligand_walk_declines_a_ring_through_the_centre():
 
 
 @pytest.mark.parametrize("smiles", RING_DECLINED)
-def test_cyclic_replacement_declines_triple_bonds(smiles):
+def test_cyclic_replacement_declines_what_it_cannot_spell(smiles):
     mol = Chem.MolFromSmiles(smiles)
     assert _try_cyclic_replacement_name(mol, mol.GetRingInfo()) is None
 

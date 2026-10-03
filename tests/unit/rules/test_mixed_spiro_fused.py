@@ -643,7 +643,11 @@ class TestCT3PendantRingOfferNotReturn:
             "core parent (invariant 18 offer-not-return)."
         )
         name, ring_atoms, _atom_to_locant, _subs = result
-        assert name and name.startswith("spiro["), name
+        # (the Blue Book): "Indicated hydrogen... is cited in front
+        # of the name if needed in the complete structure"; the benzofuran is its
+        # mancude component with bracketed locants,:10295). Was a name
+        # starting 'spiro[2,3-dihydro-1-benzofuran-...'.
+        assert name == "3H-spiro[[1]benzofuran-2,2'-piperazine]", name
         # The pendant phenyl ring atoms must NOT be in the core ring set.
         total_ring_atoms = len({a for r in mol.GetRingInfo().AtomRings()
                                 for a in r})

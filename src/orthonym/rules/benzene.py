@@ -1242,6 +1242,59 @@ def _nitrile_oxide_prefix(mol, start_idx: int,
     return {'name': None}
 
 
+_CHALCOGEN_LINK_SYMBOLS = frozenset(('O', 'S', 'Se', 'Te'))
+
+
+def _chalcogen_linked_carbon_substituent(
+    mol, e_idx: int, ring_atoms: Set[int]
+) -> Optional[Dict]:
+    """R-E- on the ring, E a neutral divalent chalcogen (O, S, Se, Te) joined by
+    single bonds to the ring and to one carbon atom of R.
+
+     (the Blue Book), method (1) (:27808): "by prefixing the names of
+    the substituent groups R'-S-, R'-Se-, or R'-Te-, i.e., R'-sulfanyl, R'-selanyl,
+    and R'-tellanyl, respectively, to that of the parent hydride, RH"; "Method (1),
+    substitutive nomenclature, gives preferred IUPAC names" (:27817).
+    '(cyclopentylselanyl)benzene (PIN)' (:27834), '1-chloro-4-[(chloromethyl)
+    selanyl]benzene (PIN)' (:27850); for R-O-, '1-(chloromethoxy)-4-nitrobenzene
+    (PIN)',:27711). The prefix is R's substituent name with the
+    chalcogen's linker, built by the shared substituent namer from the whole
+    R-E- fragment, and it is enclosed by the rule (:7232) "Parentheses
+    are used around compound... and complex... prefixes".
+
+    The dedicated O and S branches build the plain-alkyl R (and the other R-O-
+    shapes they recognise) first; this covers the R they decline and every R-Se- /
+    R-Te-. Declines (None) when R holds an aromatic atom: a second benzene ring in R
+    raises the multiplicative choice (1,1'-sulfanediyldibenzene (PIN),
+    :27826), which the multiplicative producer decides, not this collector.
+    """
+    e_atom = mol.GetAtomWithIdx(e_idx)
+    if (e_atom.GetSymbol() not in _CHALCOGEN_LINK_SYMBOLS
+            or e_atom.GetFormalCharge() != 0
+            or e_atom.GetDegree() != 2
+            or e_atom.GetTotalNumHs() != 0
+            or e_atom.GetNumRadicalElectrons() != 0):
+        return None
+    if any(b.GetBondType() != Chem.BondType.SINGLE for b in e_atom.GetBonds()):
+        return None
+    others = [n for n in e_atom.GetNeighbors() if n.GetIdx() not in ring_atoms]
+    if len(others) != 1 or others[0].GetSymbol() != 'C':
+        return None
+    sub_atoms = _bfs_substituent_atoms(mol, e_idx, ring_atoms)
+    if any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in sub_atoms):
+        return None
+    from ..assembly.naming_utils import enclose_if_compound
+    from ..assembly.substituent_naming import name_substituent_fragment
+    try:
+        name = name_substituent_fragment(mol, sub_atoms, e_idx, list(ring_atoms))
+    except Exception:
+        return None
+    if not name or name == 'substituent' or ' ' in name:
+        return None
+    enclosed = enclose_if_compound(name)
+    return {'name': enclosed, 'atoms': sub_atoms, 'is_complex': enclosed != name}
+
+
 def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
     """
     Identify a substituent starting from an atom attached to the ring.
@@ -1332,6 +1385,11 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
     # Sulfur-based groups (non-suffix fallback)
     if symbol == 'S':
         return _identify_sulfur_group(mol, start_idx, ring_atoms)
+
+    # Selanyl / tellanyl ethers R-Se- / R-Te- method (1)); the oxoacid
+    # suffixes on Se/Te were recognised above.
+    if symbol in ('Se', 'Te'):
+        return _chalcogen_linked_carbon_substituent(mol, start_idx, ring_atoms)
 
     # Boron-based groups: the borono prefix -B(OH)2 preselected
     # substituent prefix). HEAD dropped the whole boron unit on ring parents
@@ -2019,8 +2077,14 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                             'suffix_name': 'amine', 'n_substituents': ['phenyl'],
                         },
                     }
+                # Amino prefixes cite the N-substituent without 'N-';
+                # '4,4-bis(methylamino)butanoic acid (PIN)', the Blue Book;
+                # '6-[(methylamino)sulfinyl]naphthalene-2-carboxylic acid (PIN)',:32989);
+                # a compound alkyl prefix is enclosed ('2-[di(butan-2-yl)amino]butan-2-ol
+                # (PIN)',:28170).
+                from ..assembly.naming_utils import enclose_if_compound
                 return {
-                    'name': f'(N-{alkyl_name}amino)',
+                    'name': f'({enclose_if_compound(alkyl_name)}amino)',
                     'atoms': [n_idx] + alkyl_atoms,
                     'is_complex': True,
                     # C4: -NHR promotes to 'N-<alkyl>aniline' when principal.
@@ -2260,7 +2324,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
             if _mixed:
                 _sub_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
                 return {
-                    'name': f'(N-{_mixed}amino)',
+                    'name': f'({_mixed}amino)',   # no 'N-' in an amino prefix (:26318)
                     'atoms': _sub_atoms,
                     'is_complex': True,
                     # Promote to 'N-<prefix>aniline' when the amine is principal.
@@ -2599,6 +2663,13 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                             }
                         break
 
+            # An R that carries other atoms (a halogen,...) is named whole by
+            # the shared substituent namer: '1-(chloromethoxy)-4-nitrobenzene
+            # (PIN)', the Blue Book).
+            _linked = _chalcogen_linked_carbon_substituent(mol, o_idx, ring_atoms)
+            if _linked is not None:
+                return _linked
+
             # Case 4: O-C that's not pure alkyl but not ring/aromatic
             # Try to count total carbons and make a best-effort alkoxy name
             all_sub = _bfs_substituent_atoms(mol, nbr.GetIdx(), ring_atoms | {o_idx})
@@ -2801,6 +2872,12 @@ def _identify_sulfur_group(mol, s_idx: int, ring_atoms: Set[int]) -> Optional[Di
         other_s = neighbors[0]
         if other_s.GetTotalNumHs() >= 1:
             return {'name': 'disulfanyl', 'atoms': [s_idx, other_s.GetIdx()]}
+
+    # R-S- whose R carries other atoms ('[(chloromethyl)sulfanyl]',
+    # method (1), the Blue Book): R is named whole by the shared namer.
+    _linked = _chalcogen_linked_carbon_substituent(mol, s_idx, ring_atoms)
+    if _linked is not None:
+        return _linked
 
     # Generic fallback for other S-based substituents
     sub_atoms = _bfs_substituent_atoms(mol, s_idx, ring_atoms)
@@ -4048,31 +4125,19 @@ def name_substituted_benzene(
             # keeping the multiplier, so 'methyl' x6 -> 'hexamethyl'.
             prefix_str = format_substituent_prefix(name, [], count)
         elif _omit:
-            # Monosubstituted: just "chloro", "methyl", etc. - no locant
-            if name.startswith('(') or name.startswith('['):
-                # A name with a leading bracket may be either FULLY enclosed
-                # ("(oxan-2-yl)oxy" is NOT — trailing 'oxy'; "(2-methylpropyl)"
-                # IS). When it is NOT fully enclosed the whole substituent still
-                # needs an OUTER enclosing mark, escalated per
-                # ("(methoxymethoxy)methyl" -> "[(methoxymethoxy)methyl]").
-                from ..assembly.naming_utils import (
-                    _is_fully_enclosed,
-                    apply_enclosing_marks,
-                )
-                if _is_fully_enclosed(name):
-                    prefix_str = name
-                else:
-                    prefix_str = apply_enclosing_marks(name, -1)
-            elif is_complex_substituent(name):
-                # Complex substituent needs enclosing marks per IUPAC
-                # e.g., "(2-methylbut-2-en-1-yl)benzene"; escalated by the marks
-                # already inside it, the Blue Book) --
-                # '[2-(nitromethyl)propyl]benzene', not the old hard-coded
-                # '(2-(nitromethyl)propyl)benzene'.
-                from ..assembly.naming_utils import apply_enclosing_marks
-                prefix_str = apply_enclosing_marks(name, -1)
-            else:
-                prefix_str = name
+            # Monosubstituted: no locant. A compound or complex prefix takes
+            # enclosing marks, the Blue Book) by the same rule as
+            # the polysubstituted branch below (format_substituent_prefix):
+            # enclose_if_compound, the union of needs_brackets,
+            # is_complex_substituent and an inner enclosing mark, escalated by the
+            # marks already inside it,:7444; '(2-methylbut-2-en-1-yl)
+            # benzene', '[2-(nitromethyl)propyl]benzene', '[(methoxymethoxy)methyl]
+            # benzene'); a fully enclosed name ('(2-methylpropyl)') is unchanged.
+            # is_complex_substituent alone cited a chalcogen prefix on a ring
+            # substituent bare ('cyclohexylsulfanylbenzene'), against
+            # '(cyclopentylselanyl)benzene (PIN)',:27834).
+            from ..assembly.naming_utils import enclose_if_compound
+            prefix_str = enclose_if_compound(name)
         else:
             # Polysubstituted: include locants
             prefix_str = format_substituent_prefix(name, locants, count)

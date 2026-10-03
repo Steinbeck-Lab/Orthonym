@@ -40,7 +40,7 @@ def test_heterone_and_nucleobase_pins(namer_pin, smiles, expected):
     ("NC1CCC(=O)CC1", "4-aminocyclohexan-1-one"),   # carbocyclic ketone > amine (already correct)
     ("O=C1CCCCN1", "piperidin-2-one"),               # saturated lactam
     ("O=C1CCCO1", "oxolan-2-one"),                   # saturated lactone
-    ("O=C1CCCCC1", "cyclohexan-1-one"),              # saturated ketone
+    ("O=C1CCCCC1", "cyclohexanone"),                 # saturated ketone; (c), the Blue Book
     ("O=c1ccc2ccccc2o1", "2H-1-benzopyran-2-one"),   # coumarin (heterone already handled)
     ("O=c1ccoc2ccccc12", "4H-1-benzopyran-4-one"),   # chromone
     ("O=c1ccc2ccccc2[nH]1", "quinolin-2(1H)-one"),   # quinolinone
@@ -63,6 +63,7 @@ def test_nucleobase_denies_present():
     from orthonym.data import _PIN_DENY
     for n in ("uracil", "thymine", "cytosine", "fluorouracil"):
         assert n in _PIN_DENY, n
-    # The purine-base bicyclics are DEFERRED (still emit their retained names).
+    # The purine bases are denied too (quick-wins): 0 Blue Book hits each; "the PIN
+    # is 7H-purine" (the Blue Book).
     for n in ("adenine", "guanine", "xanthine", "hypoxanthine"):
-        assert n not in _PIN_DENY, n
+        assert n in _PIN_DENY, n

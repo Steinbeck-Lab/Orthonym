@@ -397,8 +397,10 @@ class TestRetainedNameExpansion:
         """Test allyl alcohol naming."""
         smiles = "C=CCO"
         result = name_molecule(smiles)
-        assert result is not None
-        assert "allyl" in result.lower() or "propen" in result.lower()
+        # 'allyl' is general nomenclature only, the Blue Book); the
+        # suffix takes the lowest locant before the 'ene' ending (c)
+        #:3256, (e)(i):3289).
+        assert result == "prop-2-en-1-ol"
 
 
 class TestFusedHeterocycleExpansion:

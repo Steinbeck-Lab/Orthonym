@@ -51,7 +51,7 @@ def test_spiro_unsaturation_splice(smiles, expected):
 @pytest.mark.parametrize("smiles,expected", [
     ("C1CCC2(CC1)CCCC2", "spiro[4.5]decane"),
     ("O1CCCC12CCCCC2", "1-oxaspiro[4.5]decane"),
-    ("C1CC2(C1)CCC3(CC2)CCC3", "dispiro[3.2.3.2]dodecane"),
+    ("C1CC2(C1)CCC3(CC2)CCC3", "dispiro[3.2.3^7.2^4]dodecane"),
 ])
 def test_saturated_spiro_protected(smiles, expected):
     """The splice pass must not disturb saturated spiro/dispiro naming."""

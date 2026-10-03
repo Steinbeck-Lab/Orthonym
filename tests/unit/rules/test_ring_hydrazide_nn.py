@@ -130,7 +130,8 @@ def test_chain_hydrazide_merged_nn_multiplier(smiles, expected):
         # amide neighbours (decomposition amide cleavage NOT affected)
         ("CNC(=O)c1ccccc1", "N-methylbenzamide"),
         ("O=C(Nc1ccccc1)c1ccccc1", "N-phenylbenzamide"),
-        ("O=C(NCC(=O)O)c1ccccc1", "2-benzamidoethanoic acid"),
+        # retained 'acetic acid (PIN)' (the Blue Book), no locant (:3037)
+        ("O=C(NCC(=O)O)c1ccccc1", "benzamidoacetic acid"),
         # semicarbazide / urea family (urea C(=O)-NH2 side still cleavable)
         # (BB 38623): hydrazinecarboxamide is the PIN;
         # semicarbazide is general nomenclature only (plan P1AM Task 2).

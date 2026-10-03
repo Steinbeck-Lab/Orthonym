@@ -572,7 +572,8 @@ def l6_chain_parent_one_substitutable_atom(
     N-H are substitutable too ('*N*-carbamoyl-2-phenylacetamide (PIN)',:33364).
 
     The UNSUBSTITUTED parent compound is rebuilt on the graph: an atom of the chain,
-    or a group atom bonded to the chain, has as many substitutable hydrogens as it
+    a group atom bonded to the chain, or a non-carbon group atom joined to it through
+    the group (the sulfonamide nitrogen), has as many substitutable hydrogens as it
     carries now plus the bonds it has to atoms outside the chain and the groups (its
     substituents); hydrogens on chalcogens and on an aldehyde formyl carbon are not
     substitutable (``:3007``). True only when exactly one atom has any.
@@ -592,6 +593,13 @@ def l6_chain_parent_one_substitutable_atom(
         shell = set(chain)
         for g in groups:
             if any(n.GetIdx() in chain for n in mol.GetAtomWithIdx(g).GetNeighbors()):
+                shell.add(g)
+        # A group atom joined to the chain through the group (the nitrogen of
+        # '-sulfonamide' on its sulfur) is a position of the parent compound too
+        # (user ruling D3, 2026-10-02; see mononuclear_parent_locant_required).
+        for g in _group_atoms_reached_from(mol, chain, groups):
+            atom = mol.GetAtomWithIdx(g)
+            if atom.GetAtomicNum() not in (1, 6) and atom.GetSymbol() not in CHALCOGENS:
                 shell.add(g)
         for a in chain:
             atom = mol.GetAtomWithIdx(a)
@@ -662,6 +670,32 @@ def _movable_to_parent_carbon(mol, n_idx: int, sub_idx: int) -> bool:
     return True
 
 
+def _group_atoms_reached_from(mol, start_atoms, groups) -> set:
+    """The atoms of the principal group joined to ``start_atoms`` (the parent chain)
+    through non-carbon group atoms: the nitrogen of '-sulfonamide' sits on the sulfur,
+    not on the carbon, yet it is a position of the parent compound
+    ('N-hydroxymethanesulfonamide (PIN)', the Blue Book). The walk never passes
+    through a carbon or a ring atom, so the far side of an anhydride or ester oxygen
+    and a ring stay out."""
+    start = {int(a) for a in start_atoms}
+    seen: set = set()
+    stack = [nb.GetIdx() for a in start for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+             if nb.GetIdx() in groups and nb.GetIdx() not in start]
+    while stack:
+        idx = stack.pop()
+        if idx in seen:
+            continue
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.IsInRing():
+            continue
+        seen.add(idx)
+        if atom.GetAtomicNum() == 6:
+            continue
+        stack.extend(nb.GetIdx() for nb in atom.GetNeighbors()
+                     if nb.GetIdx() in groups and nb.GetIdx() not in start)
+    return seen
+
+
 def mononuclear_parent_locant_required(features) -> bool:
     """True when a substituent on a ONE-ATOM chain parent must cite its locant '1'.
 
@@ -673,7 +707,11 @@ def mononuclear_parent_locant_required(features) -> bool:
     their position to another or by interchanging them between two different
     positions"; (:7304) "Locants are required for related compounds
     where additional substitutable positions are available, for example acetamide".
-    The positions of the parent compound are the carbon and the suffix nitrogen(s):
+    The positions of the parent compound are the carbon and the suffix nitrogen(s) --
+    those on the carbon and those the principal group joins to it, as the nitrogen of
+    '-sulfonamide' on its sulfur (user ruling D3, 2026-10-02: '1-chloromethane-
+    sulfonamide';:32991, "Method (1) generates preferred IUPAC names"
+    :32998, prints '(1) (1-cyclohexylmethanesulfonamido)acetic acid':33024):
 
     * a C-prefix could move to a suffix N that holds a hydrogen --
       '1-hydrazinylmethanamine (PIN)' (:38535);
@@ -714,20 +752,23 @@ def mononuclear_parent_locant_required(features) -> bool:
         if not c_subs:
             return False
         c_h = c_atom.GetTotalNumHs(includeNeighbors=True)
+        reached = _group_atoms_reached_from(mol, (parent,), groups)
         suffix_ns = []
         for idx in groups:
             atom = mol.GetAtomWithIdx(idx)
             if (atom.GetSymbol() in CHALCOGENS or atom.GetAtomicNum() in (1, 6)
                     or atom.IsInRing()):
                 continue
-            if mol.GetBondBetweenAtoms(parent, idx) is None:
+            direct = mol.GetBondBetweenAtoms(parent, idx) is not None
+            if not direct and idx not in reached:
                 continue
-            suffix_ns.append(atom)
-        for n_atom in suffix_ns:
+            suffix_ns.append((atom, direct))
+        for n_atom, direct in suffix_ns:
             n_h = n_atom.GetTotalNumHs(includeNeighbors=True)
             movable = [_movable_to_parent_carbon(mol, n_atom.GetIdx(), nb.GetIdx())
                        for nb in n_atom.GetNeighbors()
-                       if nb.GetIdx() != parent and nb.GetAtomicNum() > 1]
+                       if nb.GetIdx() != parent and nb.GetAtomicNum() > 1
+                       and (direct or nb.GetIdx() not in groups)]
             if caps:
                 n_h -= len(caps)
                 movable.extend(caps)
@@ -1184,7 +1225,34 @@ def l3_monosubstituted_locant_omitted(
     ):
         return False
 
+    if prefix_locants and _is_mancude_heteromonocycle(parent):
+        return False
+
     return l3_one_kind_of_substitutable_h(parent)
+
+
+def _is_mancude_heteromonocycle(parent) -> bool:
+    """True when ``parent`` is exactly one mancude ring holding a heteroatom.
+
+    A PREFIX on such a ring cites its locant even when the ring has one kind of
+    substitutable hydrogen: (``:27764``) "Method (1), (3), or (5) leads to
+    preferred IUPAC names" prints '(1) 2-[(pyridin-3-yl)oxy]pyrazine (PIN)'
+    (``:27772``). The ``:2939`` licence keeps the rows it prints: a suffix on the same
+    ring, 'pyrazinecarboxylic acid (PIN)' (``:2949``), and a prefix on a carbocycle,
+    'chlorocoronene (PIN)' (``:2947``); a saturated ring is not mancude, 'phenyloxirane
+    (PIN)' (``:2035``). User ruling D1 (2026-10-02): the printed PINs are followed.
+    Mancude is read as every ring atom aromatic. Any failure answers True, which
+    keeps the locant (deny-by-default)."""
+    try:
+        n = parent.GetNumAtoms()
+        rings = parent.GetRingInfo().AtomRings()
+        if len(rings) != 1 or len(rings[0]) != n:
+            return False
+        atoms = list(parent.GetAtoms())
+        return (all(a.GetIsAromatic() for a in atoms)
+                and any(a.GetAtomicNum() != 6 for a in atoms))
+    except Exception:  # noqa: BLE001 -- deny-by-default: keep the locant
+        return True
 
 
 def _one_substituent_removed(mol, parent_atoms: FrozenSet[int]) -> bool:

@@ -245,8 +245,10 @@ class TestRetainedDiacylAndCarbonicHalides:
         assert name_compound("NC(=O)N=C=O") == "carbamoyl isocyanate"
 
     def test_carbamoyl_chloride(self):
-        #: carbamoyl (retained acyl of carbamic acid) + halide class word.
-        assert name_compound("NC(=O)Cl") == "carbamoyl chloride"
+        # (the Blue Book) 'Cl-CO-NH2 carbonochloridic amide (PIN) (not
+        # 1-chloroformamide)'; the user ruled (2026-10-02, D1) that the printed PIN is
+        # followed for the unsubstituted H2N-CO-X.
+        assert name_compound("NC(=O)Cl") == "carbonochloridic amide"
 
     def test_n_substituted_carbamoyl_fails_closed(self):
         # An N-substituted amide is NOT bare carbamoyl -> stays systematic (no

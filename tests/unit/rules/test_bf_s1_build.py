@@ -95,13 +95,9 @@ def test_descriptors_decided_by_sequence_rules_4_and_5_are_declined(smiles):
 
 
 @pytest.mark.parametrize("smiles", [
-    "O=C1CC2CC1c1ccccc12",               # ketone: needs added hydrogen (slice S3)
-    "O=CC1CC2CC1c1ccccc12",              # aldehyde suffix: not spelled in S1
     "COC(=O)C1CC2CC1c1ccccc12",          # ester: functional class name
     "OCC(O)C1CC2CC1c1ccccc12",           # two -OH on the chain: the chain is the parent
     "C[C@H](Cl)C1=CC2CC1c1ccccc12",      # a stereocentre outside the ring system
-    "C12C=CC(C1)c1ccc3ccccc3c12",        # a phenanthrene residual (slice S2)
-    "C12=CC=C(C3=C4C=5C6=CC=C(C5C(=C13)C4)C6)C2",   # three bridges (outside S1)
 ])
 def test_declined(smiles):
     assert _name(smiles) is None

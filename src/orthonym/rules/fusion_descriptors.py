@@ -52,6 +52,10 @@ FUSION_PREFIXES: Dict[str, str] = {
     'cyclopentene': 'cyclopenta',
     'cycloheptadiene': 'cyclohepta',
     'cycloheptene': 'cyclohepta',
+    # an eight-membered carbocyclic attached component: 'cycloocta';
+    # the Blue Book 'dibenzo[4,5:6,7]cycloocta[1,2-c]furan (PIN)')
+    'cyclooctatetraene': 'cycloocta',
+    'cyclooctene': 'cycloocta',
     'cyclohexene': 'cyclohexa',
 
     # 5-membered heterocycles
@@ -597,6 +601,8 @@ def _identify_ring_name(mol, ring_atoms: List[int]) -> str:
             return 'benzene' if is_aromatic else 'cyclohexene'
         if ring_size == 7:
             return 'cycloheptadiene' if is_aromatic else 'cycloheptene'
+        if ring_size == 8:
+            return 'cyclooctatetraene' if is_aromatic else 'cyclooctene'
         return ''
 
     # Heterocyclic rings: use registry with gap disambiguation
@@ -1464,7 +1470,8 @@ def generate_systematic_name_for_fused_pair(
     # For carbocyclic child (all positions equivalent), omit child locants
     # benzene -> [b], cyclopentadiene -> [b], cycloheptadiene -> [b]
     CARBOCYCLIC_CHILDREN = {'benzene', 'cyclopentadiene', 'cyclopentene',
-                            'cycloheptadiene', 'cycloheptene', 'cyclohexene'}
+                            'cycloheptadiene', 'cycloheptene', 'cyclohexene',
+                            'cyclooctatetraene', 'cyclooctene'}
     child_is_carbo = child_name in CARBOCYCLIC_CHILDREN
 
     # Enumerate the co-optimal PARENT numberings too -- see
@@ -1572,11 +1579,54 @@ def generate_systematic_name_for_fused_pair(
     # ('2-benzofuran (PIN)... benzo[c]furan'); the fusion-descriptor name built here
     # ('benzo[c]thiophene', 'benzo[d]isothiazole') is valid but never the PIN.
     # Recorded without a final 'e' so that the parent with a suffix
-    # ('...benzo[c]thiophen-1-ol') is covered too.
+    # ('...benzo[c]thiophen-1-ol') is covered too. (The algorithmic caller replaces
+    # it by the catalogue benzo name when one exists: catalogue_benzo_name.)
     if (chosen is not None and child_name == 'benzene'
             and len(parent_ring) >= 5 and is_heterocyclic(mol, list(parent_ring))):
         _record_benzo_descriptor_name(chosen[:-1] if chosen.endswith('e') else chosen)
     return chosen
+
+
+# A benzo name with heteroatom locants ('1-benzothiophene', '1,3-benzoxazole'); the
+# 'benzis-' spellings ('1,2-benzisoxazole') are not PIN components,
+# the Blue Book: the Hantzsch-Widman names '1,2-oxazole',... must be used).
+_BENZO_NAME_RE = re.compile(r"^\d+(?:,\d+)*-benzo?(?!is)[a-z]")
+
+
+def _catalogue_benzo_skeletons() -> Dict[str, str]:
+    """Element-labelled skeleton -> benzo name, for every catalogue entry whose name is
+    a benzo name with heteroatom locants and no indicated hydrogen."""
+    global _BENZO_SKELETONS
+    if _BENZO_SKELETONS is None:
+        from rdkit import Chem as _Chem
+        from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+        table: Dict[str, str] = {}
+        for key, entry in FUSED_HETEROCYCLE_DATA.items():
+            name = entry.get('name') or ''
+            if entry.get('tautomer_locant') is not None or not _BENZO_NAME_RE.match(name):
+                continue
+            m = _Chem.MolFromSmiles(key)
+            sk = _heavy_atom_skeleton_smiles(m) if m is not None else None
+            if sk:
+                table.setdefault(sk, name)
+        _BENZO_SKELETONS = table
+    return _BENZO_SKELETONS
+
+
+_BENZO_SKELETONS: Optional[Dict[str, str]] = None
+
+
+def catalogue_benzo_name(mol, core_atoms: Set[int]) -> Optional[str]:
+    """The catalogue benzo name of the two-ring core's element-labelled
+    skeleton, or None."""
+    from rdkit import Chem as _Chem
+    bonds = [b.GetIdx() for b in mol.GetBonds()
+             if b.GetBeginAtomIdx() in core_atoms and b.GetEndAtomIdx() in core_atoms]
+    try:
+        sk = _heavy_atom_skeleton_smiles(_Chem.PathToSubmol(mol, bonds))
+    except Exception:
+        return None
+    return _catalogue_benzo_skeletons().get(sk) if sk else None
 
 
 def _record_benzo_descriptor_name(fragment: str) -> None:
@@ -1585,68 +1635,3 @@ def _record_benzo_descriptor_name(fragment: str) -> None:
         record_non_pin_fragment(fragment)
     except Exception:  # a label record must never break naming
         pass
-
-
-def generate_multi_fusion_name(
-    mol,
-    parent_ring: List[int],
-    parent_name: str,
-    fused_rings: List[Tuple[List[int], Set[int]]]
-) -> Optional[str]:
-    """
-    Generate systematic name for multiple rings fused to a parent.
-
-    Handles complex fusion scenarios like dibenzo[a,c]anthracene where
-    multiple rings of the same type are fused at different edges.
-
-    Args:
-        mol: RDKit Mol object
-        parent_ring: List of atom indices in the parent ring
-        parent_name: Name of the parent ring (e.g., 'anthracene')
-        fused_rings: List of (child_ring_atoms, shared_atoms) for each fusion
-
-    Returns:
-        Complete systematic fusion name, or None if cannot be generated
-
-    Examples:
-        >>> # For dibenzo[a,c]anthracene
-        >>> generate_multi_fusion_name(mol, anthracene_atoms, 'anthracene',
-        ... [(benzene1_atoms, {0,1}), (benzene2_atoms, {4,5})])
-        'dibenzo[a,c]anthracene'
-    """
-    if not fused_rings:
-        return None
-
-    # Group fused rings by type
-    from collections import defaultdict
-    rings_by_type: Dict[str, List[Tuple[List[int], Set[int]]]] = defaultdict(list)
-
-    for child_ring, shared in fused_rings:
-        child_name = _identify_ring_name(mol, child_ring)
-        if child_name:
-            rings_by_type[child_name].append((child_ring, shared))
-
-    # For now, handle single child type (e.g., all benzene)
-    if len(rings_by_type) == 1:
-        child_name = list(rings_by_type.keys())[0]
-        fusions = rings_by_type[child_name]
-
-        if len(fusions) == 1:
-            # Single fusion - use standard naming
-            child_ring, shared = fusions[0]
-            return generate_systematic_name_for_fused_pair(
-                mol, parent_ring, child_ring, shared
-            )
-        else:
-            # Multi-component fusion
-            components = []
-            for child_ring, shared in fusions:
-                components.append((child_name, parent_ring, shared))
-
-            descriptor = generate_multi_fusion_descriptor(parent_name, components)
-            if descriptor:
-                return build_multi_component_name(
-                    parent_name, child_name, len(fusions), descriptor
-                )
-
-    return None

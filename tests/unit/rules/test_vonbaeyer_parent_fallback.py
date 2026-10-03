@@ -253,9 +253,12 @@ ASSEMBLY_POSITIVES = [
     ("C[C@@]12CCC[C@@]3(C)[C@@H](C1)[C@@](O)(CO)CC[C@@]23C",
      "(1R,3R,4R,7S,8S)-4-(hydroxymethyl)-1,7,8-trimethyltricyclo"
      "[5.4.0.0^3,8]undecan-4-ol"),
+    # quick-wins F-Q1: '0^2,6' before '0^5,9', the Blue Book), the
+    # oxygen follows the fixed numbering,:9765); was
+    # '(5S,6R,9S,10S)-2,6,11-trimethyl-7,13-dioxo-8-oxatricyclo[8.3.0.0^5,9]trideca-1,11-diene'
     ("CC1=CC(=O)C2=C(C)CC[C@@H]3[C@H](OC(=O)[C@@H]3C)[C@@H]12",
-     "(5S,6R,9S,10S)-2,6,11-trimethyl-7,13-dioxo-8-oxatricyclo"
-     "[8.3.0.0^5,9]trideca-1,11-diene"),
+     "(1S,2S,5R,6S)-5,9,13-trimethyl-4,11-dioxo-3-oxatricyclo"
+     "[8.3.0.0^2,6]trideca-9,12-diene"),
     ("O=C1NC2=Nc3ccc(Cl)c(Cl)c3CN2C1O",
      "10,11-dichloro-6-hydroxy-5-oxo-2,4,7-triazatricyclo[7.4.0.0^3,7]"
      "trideca-1(9),2,10,12-tetraene"),
@@ -285,9 +288,11 @@ ASSEMBLY_POSITIVES = [
     ("CCC(C)CC(C)/C=C\\[C@@H]1O[C@H]2[C@H](C(=O)O[C@H]2C)[C@H](O)[C@H]1O",
      "(1S,3S,4R,5S,6R,9S)-3-[(1Z)-3,5-dimethylhept-1-en-1-yl]-4,5-"
      "dihydroxy-9-methyl-7-oxo-2,8-dioxabicyclo[4.3.0]nonane"),
+    # quick-wins F-Q1: '0^4,9' before '0^10,15',:9685); was '(7R)-7-benzyl-
+    # 5-ethyl-3,6,9,17-tetraoxo-8-oxa-2,5,16-triazatricyclo[16.4.0.0^10,15]docosa-...'
     ("CCN1CC(=O)Nc2ccccc2C(=O)Nc2ccccc2C(=O)O[C@H](Cc2ccccc2)C1=O",
-     "(7R)-7-benzyl-5-ethyl-3,6,9,17-tetraoxo-8-oxa-2,5,16-triazatricyclo"
-     "[16.4.0.0^10,15]docosa-1(22),10,12,14,18,20-hexaene"),
+     "(15R)-15-benzyl-13-ethyl-3,11,14,17-tetraoxo-16-oxa-2,10,13-triazatricyclo"
+     "[16.4.0.0^4,9]docosa-1(22),4,6,8,18,20-hexaene"),
 ]
 
 

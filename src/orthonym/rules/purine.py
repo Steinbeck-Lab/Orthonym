@@ -4,9 +4,10 @@ purine numbering; indicated H derived from the graph; / amine suffix).
 Names a SUBSTITUTED purine ring system -- the adenine/hypoxanthine/purine
 skeleton carrying ring-N substituents and/or exocyclic characteristic groups --
 as a whole-molecule parent (`9-methyl-9H-purin-6-amine`) and (Task 3) as a
-`-yl` substituent (`6-amino-9H-purin-9-yl`). Declines the bare retained bases
-(adenine/guanine/hypoxanthine) for their standard tautomers, which keep their
-retained names via another path.
+`-yl` substituent (`6-amino-9H-purin-9-yl`). The bare bases are named here too
+('9H-purin-6-amine'): 'adenine', 'guanine' and 'hypoxanthine' do not occur in
+the Blue Book (0 hits) and are not retained heterocycle names; the ring
+system is purine ("the PIN is 7H-purine", the Blue Book).
 
 Modelled on rules/purine_oxo.py: an atom-mapped skeleton SMARTS whose map
 numbers ARE the fixed IUPAC purine locants, per-structure indicated H derived
@@ -113,19 +114,15 @@ def name_substituted_purine(mol) -> Optional[str]:
                       # xanthine family) defer to purine_oxo.py. Prevents the
                       # amino+oxo silent-oxo-drop wrong-molecule name.
 
-        # Fire ONLY for a genuinely substituted purine. A bare purine base whose
-        # only exocyclic group is the retained-defining C6 amino/oxo (adenine /
-        # hypoxanthine) keeps its retained name -> decline here. "Substituted"
-        # means at least one ring-position substituent beyond that: a C/N-alkyl
-        # or aryl prefix, a halogen, a suffix group, an N-substituent, or an
-        # amino pattern beyond the bare-adenine defining C6-amino (di-/poly-amino,
-        # or a lone amino NOT at C6 -- e.g. 2,6-diaminopurine).
+        # Every purine with at least one exocyclic group is named here, the bare
+        # 6-amine included ('7H-purin-6-amine', '9H-purin-6-amine'): 'adenine' is
+        # not a Blue Book name (0 hits) and the ring system is purine,
+        # "the PIN is 7H-purine", the Blue Book). The unsubstituted parent
+        # has no exocyclic group and stays with the catalogue entry '7H-purine'.
         amino = subs.get('amino_substituents') or []
         substituted = bool(
             subs.get('c_substituents') or subs.get('n_substituents')
-            or subs.get('other') or subs.get('suffix_groups')
-            or len(amino) > 1            # di-/poly-amino (e.g. 2,6-diaminopurine)
-            or (amino and amino != [6])  # a lone amino NOT at C6
+            or subs.get('other') or subs.get('suffix_groups') or amino
         )
         if not substituted:
             continue
@@ -412,16 +409,36 @@ _OXO_CORE_SMARTS = (
 _OXO_CORE = Chem.MolFromSmarts(_OXO_CORE_SMARTS)
 _OXO_MAP_NUMS = [a.GetAtomMapNum() for a in _OXO_CORE.GetAtoms()]
 
-# The added/indicated-H form is 1,{sat}-dihydro-6H, where {sat} (7 or 9) is the
-# locant of the SATURATED five-membered-ring nitrogen -- derived per structure
-# by `_purine_indicated_h`, exactly as in `purine_oxo.py`. A C2-amino
+# The added/indicated-H form is {six},{sat}-dihydro-6H, where {sat} (7 or 9) is
+# the locant of the SATURATED five-membered-ring nitrogen -- derived per
+# structure by `_purine_indicated_h`, exactly as in `purine_oxo.py` -- and {six}
+# (1 or 3) that of the saturated six-membered-ring nitrogen
+# (`_saturated_six_ring_locant`): the N3-H tautomer is
+# '2-amino-3,7-dihydro-6H-purin-6-one', not the 1,7-dihydro tautomer. A C2-amino
 # substituent (guanine family), when present, is placed as an ordinary
 # `2-amino` PREFIX (never passed through `amino_substituents`): the shared
 # `_build_fused_suffix` treats amino as the SUFFIX and DROPS the oxo whenever
 # both are present -- a wrong-molecule defect for exactly this family, which
 # is why this engine builds the name from a constructive template instead of
 # reusing that suffix logic.
-_OXO_PARENT_TEMPLATE = "1,{sat}-dihydro-6H-purin-6-one"
+_OXO_PARENT_TEMPLATE = "{six},{sat}-dihydro-6H-purin-6-one"
+
+
+def _saturated_six_ring_locant(mol, loc_to_idx, core_atoms) -> Optional[int]:
+    """Return 1 or 3 -- the locant of the saturated (H- or substituent-bearing)
+    six-membered-ring nitrogen next to the C6=O. Exactly one of N1/N3 must
+    qualify; otherwise None, so the match declines (the name would denote
+    another tautomer)."""
+    qualifying = []
+    for loc in (1, 3):
+        idx = loc_to_idx.get(loc)
+        if idx is None:
+            return None
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetTotalNumHs() >= 1 or any(
+                nb.GetIdx() not in core_atoms for nb in atom.GetNeighbors()):
+            qualifying.append(loc)
+    return qualifying[0] if len(qualifying) == 1 else None
 
 # Only plain hydrocarbon, halogen and bare (-NH2) amino substituents are named
 # here; every other substituent type declines (fail-closed) so an unverifiable
@@ -503,10 +520,12 @@ def name_oxo_purine(mol) -> Optional[str]:
     """Systematic PIN for a substituted mono-6-oxo purine -- the hypoxanthine
     or guanine family -- else None.
 
+    The bare parents are named too ('1,7-dihydro-6H-purin-6-one',
+    '2-amino-1,9-dihydro-6H-purin-6-one'): 'hypoxanthine' and 'guanine' do not
+    occur in the Blue Book (0 hits) and are not retained heterocycle
+    names ("the PIN is 7H-purine", the Blue Book).
+
     Declines (fail-closed):
-      - the bare parent (unsubstituted hypoxanthine, or guanine whose only
-        exocyclic feature is the defining C2-amino) -> keeps its retained
-        name via another path;
       - a 2,6-dione (purine_oxo.py's job) or any extra ring oxo (8-oxo /
         trione) -- the pinned single C6=O in the SMARTS means a second ring
         =O is picked up as an unaccepted 'oxo' substituent by the shared
@@ -546,6 +565,9 @@ def name_oxo_purine(mol) -> Optional[str]:
         sat = _purine_indicated_h(mol, loc_to_idx, core_atoms)
         if sat is None:
             continue
+        six = _saturated_six_ring_locant(mol, loc_to_idx, core_atoms)
+        if six is None:
+            continue
 
         subs = _collect_oxo_purine_substituents(
             mol, atom_mapping, core_atoms,
@@ -554,19 +576,7 @@ def name_oxo_purine(mol) -> Optional[str]:
         if subs is None:
             continue  # an out-of-scope / unidentifiable substituent
 
-        c_subs = subs["c_substituents"]
-        other = subs["other"]
-        total = sum(len(locs) for locs in c_subs.values()) + len(other)
-
-        if total == 0:
-            continue  # bare hypoxanthine -> defer to the retained-name path
-        if (
-            total == 1 and not c_subs and len(other) == 1
-            and other[0]["name"] == "amino" and other[0]["locant"] == 2
-        ):
-            continue  # bare guanine (only the defining C2-amino) -> defer
-
-        parent = _OXO_PARENT_TEMPLATE.format(sat=sat)
+        parent = _OXO_PARENT_TEMPLATE.format(six=six, sat=sat)
         return _assemble_fused_heterocycle_name(mol, parent, subs, atom_mapping)
 
     return None

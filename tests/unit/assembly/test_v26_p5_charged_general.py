@@ -17,7 +17,9 @@ the backstop but fails OPEN without Java, hence the structural fail-closed rules
 Reproduce-first (confirmed 2026-07-21, production OPSIN gate on; pin-emit
 split 2026-08-21):
   - PIN_EMIT_CASES: the three silyl/germyl heteroarene-ammonium rows ARE PINs
-     + and EMIT at the default pin tier.
+     + and EMIT at the default pin tier; so does the
+    1,4-dimethylpyrazine-1,4-diium dication, PIN class program
+    Task 7).
   - PIN_ABSTAIN_CASES: pin (default) ABSTAINS; ``complete`` emits an
     OPSIN-round-tripping charged name.
   - FAIL-CLOSED cases: the engine abstains (never a wrong / charge-dropped
@@ -77,17 +79,21 @@ PIN_EMIT_CASES = [
     # ``2-silylisoquinolin-2-ium`` /, worked example:42203),
     # via the ions.py onium router recursing on the neutral bare ring.
     ("[SiH3][n+]1ccc2ccccc2c1", "2-silylisoquinolin-2-ium"),
+    # Multi-charge dication (PIN class program Task 7): two hydron-addition centres
+    # of one ring parent, (the Blue Book) "... preceded by
+    # multiplying prefixes 'di', 'tri', etc. to denote the multiplicity of identical
+    # cationic centers" (:41368), '1,4-dioxane-1,4-diium (PIN)' (:41409),
+    # '1-methylpyridin-1-ium (PIN)' (:41394); the parent is 'pyrazine (PIN)'
+    #,:8145), not the Hantzsch-Widman '1,4-diazine'. The terminal 'e' of
+    # the parent stays before 'di' (a),:7595). The engine-direct table
+    # below keeps the general engine's own '1,4-diazine' spelling.
+    ("C[n+]1cc[n+](C)cc1", "1,4-dimethylpyrazine-1,4-diium"),
 ]
 
 # Full-namer cases that abstain at pin and emit only at the ``complete`` tier.
 PIN_ABSTAIN_CASES = [
     ("[SiH3]C[CH-]C", "1-silylpropan-2-ide"),
     ("FC(F)(F)[CH-]C", "1,1,1-trifluoropropan-2-ide"),
-    # Multi-charge dication: the multiplied suffix ("-1,4-diium") begins with
-    # the consonant 'd' (di-), NOT a vowel -- (a) requires the parent's
-    # terminal 'e' be RETAINED ("...diazine-1,4-diium", not "diazin-1,4-diium").
-    # Regression case for the elision-conditional fix in _append_charge_suffix.
-    ("C[n+]1cc[n+](C)cc1", "1,4-dimethyl-1,4-diazine-1,4-diium"),
 ]
 
 # What the full namer ships across both tiers (pin-emit + complete-only).
@@ -95,7 +101,9 @@ FULL_NAMER_CASES = PIN_EMIT_CASES + PIN_ABSTAIN_CASES
 
 # Engine-direct (``name_general``) emissions: identical to FULL_NAMER_CASES
 # except the fused-ring cation, which is the von-Baeyer / skeletal-replacement
-# form (engine-isolation-only, never shipped in production -- see the header).
+# form (engine-isolation-only, never shipped in production -- see the header),
+# and the dication, which the engine spells on the Hantzsch-Widman parent
+# '1,4-diazine' (the full namer ships the PIN on 'pyrazine' first).
 ENGINE_DIRECT_CASES = [
     ("[SiH3][n+]1ccccc1", "1-silylpyridin-1-ium"),
     ("[GeH3][n+]1ccccc1", "1-germylpyridin-1-ium"),

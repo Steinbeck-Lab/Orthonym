@@ -198,8 +198,10 @@ def test_task3_spiro_vb_defect_zero_wrong(smiles):
     ("CC12CCC(CC1)C2", "1-methylbicyclo[2.2.1]heptane"),
     # stereo tricyclo+ PINs that round-trip (polycyclic.py path —
     # name_polycyclic_complete): the reroute must stay byte-identical here too.
-    ("C[C@H]1CC2CC3CC1CC(C2)(C3)", "(2S)-2-methyltricyclo[4.3.1.1^4,8]undecane"),
-    ("O[C@H]1CC2CC3CC1CC(C2)C3", "(2S)-tricyclo[4.3.1.1^4,8]undecan-2-ol"),
+    # quick-wins F-Q1: superscripts as low as possible, (the Blue Book),
+    # '1^3,8' before '1^4,8' (were '(2S)-2-methyl...[4.3.1.1^4,8]' and '...undecan-2-ol')
+    ("C[C@H]1CC2CC3CC1CC(C2)(C3)", "(4S)-4-methyltricyclo[4.3.1.1^3,8]undecane"),
+    ("O[C@H]1CC2CC3CC1CC(C2)C3", "(4S)-tricyclo[4.3.1.1^3,8]undecan-4-ol"),
     ("C1C2CC3CC1CC(C2)C3", "adamantane"),
 ])
 def test_task1_canary_byte_identical(smiles, expected):

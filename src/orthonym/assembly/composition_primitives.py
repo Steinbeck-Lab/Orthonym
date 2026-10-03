@@ -166,6 +166,19 @@ def _build_unsaturation_infix(
     return result
 
 
+def multiple_bond_endings_spellable(n_double: int, n_triple: int) -> bool:
+    """Do the 'ene'/'yne' endings for these bond counts have a settled spelling?
+
+    No for one or more double bonds together with two or more triple bonds.
+     (a) (the Blue Book) elides the 'e' of 'ene' only before an ending
+    beginning with a vowel, and a multiplied 'yne' begins with its multiplier
+    ('-1-ene-3,5-diyne'); (:16497) "when the endings 'ene' and 'yne' are
+    preceded by a multiplying prefix and a locant the letter 'a' is inserted" does
+    not say where that 'a' goes before a multiplied 'yne' that follows an 'ene', and
+    the Blue Book has no such example. A producer of a PIN declines those."""
+    return not (n_double >= 1 and n_triple >= 2)
+
+
 def _build_hydrocarbon_name(
     stem: str,
     double_locants: List[int],
@@ -250,8 +263,12 @@ def _build_hydrocarbon_name(
         _chain_len = 3
     else:
         _chain_len = 0
+    # (the Blue Book): "one double or triple bond is always
+    # allocated the locant '1'. When alone, the locant '1' is omitted in names" --
+    # alone: the ring's only multiple bond ('cycloicosyne (PIN)',:21070; with a
+    # second one it stays, 'cyclopentadec-1-en-4-yne (PIN)',:7601).
     _ring_mono = (
-        ring_bond_locant_omittable
+        (ring_bond_locant_omittable and num_double + num_triple == 1)
         if (is_cyclic and ring_bond_locant_omittable is not None)
         else (num_double == 1 and num_triple == 0)
     )
@@ -828,6 +845,7 @@ __all__ = [
     "_estimate_parent_size_from_name",
     "_build_unsaturation_infix",
     "_build_hydrocarbon_name",
+    "multiple_bond_endings_spellable",
     "_join_prefixes",
     "_join_prefix_to_name",
     "apply_mononuclear_enclosing",

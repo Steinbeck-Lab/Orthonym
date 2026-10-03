@@ -152,11 +152,16 @@ class TestAtomDropSafetyFloor:
         assert rt["passed"], f"round-trip failed (atom-drop guard): {rt}"
 
     @pytest.mark.opsin_gate
-    def test_carboxypropyl_diphosphate_gated_abstains(self):
+    def test_carboxypropyl_diphosphate_gated_names_the_pin(self):
         """B2 (was a fail-closed floor row, raw+gated): under the PRODUCTION
-        gate (opsin_gate) the namer correctly ABSTAINS -- 0-wrong holds, the
+        gate (opsin_gate) the namer used to ABSTAIN -- 0-wrong held, the
         load-bearing guard. (The suite default is gate-OFF, under which
         name_compound == raw and would ship the split; hence the marker.)
+        Since the PIN class program (Task 5) the default tier names it with the
+        Blue Book PIN, P-67.2.6 "Substituent groups derived from polyacids"
+        (BlueBookV2.md:36937): '(2) 3-[(1,3,3-trihydroxy-1,3-dioxo-1λ5,3λ5-
+        diphosphoxan-1-yl)oxy]propanoic acid (PIN)' (:36949); it reads back to
+        the input's full InChIKey.
 
         The RAW gate-OFF namer used to emit a mixture-split
         ('3-hydroxypropanoic acid diphosphoric acid') for this CONNECTED input;
@@ -171,7 +176,9 @@ class TestAtomDropSafetyFloor:
         from tests.support.rt_assert import name_is_rt_exact
         smi = "OC(=O)CCOP(=O)(O)OP(=O)(O)O"
         gated = name_compound(smi)
-        assert gated is None or gated.startswith("unknown")   # production: fail-closed
+        assert gated == ("3-[(1,3,3-trihydroxy-1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)"
+                         "oxy]propanoic acid")                 # production: the PIN
+        assert name_is_rt_exact(gated, smi), gated
         raw = RAW.name(smi)
         assert raw != "propanoic acid"            # never the old atom-dropped leak
         assert raw != "3-hydroxypropanoic acid diphosphoric acid"   # nor the split

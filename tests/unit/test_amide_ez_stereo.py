@@ -37,15 +37,23 @@ class TestAmideEZWithNSubstitution:
     """: E/Z preserved through N-substitution prefix."""
 
     def test_n_methyl_oleamide(self):
-        """N-methyl oleamide has N-prefix, Z descriptor, and enamide suffix."""
+        """N-methyl oleamide has N-prefix, Z descriptor, and enamide suffix.
+
+        The stereo block stands at the front of the complete name, before the
+        N-prefix: (the Blue Book) "Stereodescriptors placed at the
+        front of the complete name or name fragment to which they apply";
+        '(*Z*)-*N*-hydroxy(4-chlorophenyl)(phenyl)methanimine (PIN)',
+        :47666), '(*R*)-*N*-benzyl-*N*-methyl-*N*-(prop-2-en-1-yl)anilinium bromide
+        (PIN)',:45986)."""
         result = name_compound("CCCCCCCC/C=C\\CCCCCCCC(=O)NC")
         assert "N-methyl" in result, f"Missing N-methyl in: {result}"
         assert "(9Z)" in result, f"Missing (9Z) in: {result}"
         assert "enamide" in result, f"Missing enamide in: {result}"
-        # Verify correct ordering: N-prefix before stereo block
+        # Verify correct ordering: stereo block before the N-prefix
         n_pos = result.index("N-methyl")
         z_pos = result.index("(9Z)")
-        assert n_pos < z_pos, f"N-prefix should come before stereo: {result}"
+        assert z_pos < n_pos, f"stereo should come before the N-prefix: {result}"
+        assert result == "(9Z)-N-methyloctadec-9-enamide", result
 
 
 class TestAmideMultipleEZ:

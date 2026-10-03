@@ -67,5 +67,7 @@ def test_unsaturated_spiro_monocycle_component():
 def test_saturated_spiro_unchanged():
     n = Orthonym()
     assert n.name_tiered("C1CCC2(CC1)CCCCC2").get("name") == "spiro[5.5]undecane"
+    # (f) (the Blue Book): the two rings of spiro[5.5]undecane are the
+    # same size, so either may be numbered first and the prefix takes 3.
     assert n.name_tiered("ClC1CCC2(CCCCC2)CC1").get("name") == \
-        "9-chlorospiro[5.5]undecane"
+        "3-chlorospiro[5.5]undecane"

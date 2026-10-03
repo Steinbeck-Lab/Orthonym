@@ -20,7 +20,11 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem as _Chem
 
-from ..assembly.naming_utils import _wrap_n_substituent, enclose_if_compound
+from ..assembly.naming_utils import (
+    _SIMPLE_PREFIX_VOCABULARY,
+    _wrap_n_substituent,
+    enclose_if_compound,
+)
 from ..data.sugar_names import (
     lookup_sugar,
     recognize_sugar_skeleton,
@@ -672,6 +676,183 @@ def _is_poly_acid_name(acid_name: str) -> bool:
     return any(m in low for m in _POLY_ACID_NAME_MARKERS)
 
 
+# ----------------------------------------------------------------------------
+# The citation order of an N-prefix put in front of a fragment name (label only)
+# ----------------------------------------------------------------------------
+# The amide and sulfonamide assemblers below write 'N-<prefix>' in front of the name of
+# the other fragment ('N-methyl' + 'acetamide'). That keeps the citation order of the
+# Blue Book only when the fragment name has no stereodescriptor block at its front and no
+# alphanumerically ordered prefix that sorts before the N-prefix:
+# (the Blue Book) "Stereodescriptors placed at the front of the complete name";
+# (:3448) "Simple prefixes... are arranged alphabetically; multiplicative
+# prefixes, if necessary, are then inserted"; (:3477) "The name of a prefix for
+# a substituent is considered to begin with the first letter of its complete name";
+# (:3440) the order does not include "the detachable saturation prefixes, hydro and
+# dehydro", which follow the alphanumerically ordered prefixes. The ordinary
+# substitutive path orders every prefix ('(1S,2S,5R)-5-hydroxy-2-phenyl-N-(prop-2-en-1-
+# yl)cyclohexane-1-carboxamide'); the concatenation gives 'N-(prop-2-en-1-yl)(4R,...)-9-
+# (benzyloxy)-...-6-carboxamide' and 'N-cyclohexyl-3-acetamido-9-azabicyclo[3.3.1]-
+# nonane-9-carboxamide', which name the right molecule but are not the PIN form. Such a
+# name is recorded as not the PIN (``record_non_pin_label``, label only: the name still
+# ships at the wider tiers); it is never rewritten.
+
+#:: a stereodescriptor block at the front of a name ('(4R,4aS,12bS)-',
+#: '(2E)-', '(R)-', "(N'E)-", 'rel-(1R,2S)-')
+_FRONT_STEREO_RE = _re.compile(
+    r"^(?:rel-|rac-)?\((?:(?:[0-9]+[a-z]*'*|N'*)?(?:[RSEZrsMP]\*?|RS|SR))"
+    r"(?:,(?:(?:[0-9]+[a-z]*'*|N'*)?(?:[RSEZrsMP]\*?|RS|SR)))*\)-")
+#: one locant set at the front of a name: '3', '4a,7', "2'", 'N', "N,N'"
+_LOCANT_SET_RE = _re.compile(r"^(?:[0-9]+[a-z]?'*|N'*)(?:,(?:[0-9]+[a-z]?'*|N'*))*$")
+#: a first token that is not an alphanumerically ordered prefix, so none precedes it:
+#: hydro prefixes,:3440), bridge prefixes, nondetachable), skeletal
+#: replacement 'a' prefixes, nondetachable), and parent names that begin with heteroatom
+#: locants (Hantzsch-Widman names, benzo names, ring assemblies: '1,3-thiazole',
+#: '1,3-dioxolane', '1-benzofuran', "2,2'-bipyridine")
+_NOT_ORDERED_FIRST_RE = _re.compile(
+    r"^\(?(?:"
+    r"(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|undeca|dodeca|trideca|tetradeca"
+    r"|pentadeca|hexadeca|heptadeca|octadeca|nonadeca|icosa)?(?:de)?hydro(?!xy|peroxy)"
+    r"|ep(?:oxy|ithio|imino|idioxy|idithio|iseleno|itelluro)"
+    r"|(?:meth|eth|prop|but|pent|hex)(?:ano|eno)(?!yl|ate|ic)"
+    r"|(?:benzeno|naphthaleno|anthraceno|azano|disulfano|sulfano|selano|tellano)"
+    r"|(?:di|tri|tetra|penta|hexa)?(?:oxa|thia|selena|tellura|aza|phospha|arsa|stiba"
+    r"|bisma|sila|germa|stanna|plumba|bora)(?!n)"
+    r"|(?:benzo?)?(?:(?:di|tri|tetra?|penta?)?(?:ox|thi|az|selen|tellur|phosph|ars|stib"
+    r"|bism|sil|germ|stann|plumb|bor)a?)+(?:ir|et|ol|in|an|ep|oc|ec)"
+    r"|benzo(?:furan|thiophen|pyran|thiopyran|selenophen|tellurophen)"
+    r"|(?:bi|ter|quater)(?!s\(|cyclo|s[a-z])"
+    r")")
+#: a first token that begins with an enclosed prefix, multiplied or not:
+#: '(cyclopropylmethyl)', '[2-(3-methylphenoxy)propanamido]benzamide',
+#: 'bis(2-chloroethyl)acetamide'
+_ENCLOSED_FIRST_RE = _re.compile(
+    r"^(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca"
+    r"|bis|tris|tetrakis|pentakis|hexakis|heptakis|octakis|nonakis|decakis)?(?=[(\[{])")
+#: the italic structural prefixes an unenclosed simple prefix carries with a hyphen
+#: ('4-tert-butyl'); (:3495) considers italic letters only "When... Roman letters
+#: do not permit a decision", so 'tert-butyl' is ordered as 'butyl' ('1-(butan-2-yl)-3-
+#: tert-butylbenzene (PIN)',:3507)
+_ITALIC_FIRST = frozenset({"tert", "sec"})
+#: (:15935): the substituent suffixes 'yl', 'ylidene', 'ylidyne'; a simple
+#: prefix of the vocabulary that ends in 'yl' can go on as '-ylidene' or '-ylidyne'
+#: ('propylidene')
+_YL_EXTENSIONS = ("idene", "idyne")
+#: the engine's simple-prefix vocabulary (``naming_utils._SIMPLE_PREFIX_VOCABULARY``), the
+#: words of letters only, longest first
+_SIMPLE_UNITS: Tuple[str, ...] = tuple(sorted(
+    (u for u in _SIMPLE_PREFIX_VOCABULARY if u.isalpha()), key=lambda u: (-len(u), u)))
+
+
+def _enclosed_content(token: str, start: int) -> Optional[str]:
+    """The text inside the enclosing marks that open at ``token[start]``, or None when
+    they do not close."""
+    depth = 0
+    for j in range(start, len(token)):
+        ch = token[j]
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+            if depth == 0:
+                return token[start + 1:j]
+    return None
+
+
+def _first_ordered_prefix(first: str) -> Optional[str]:
+    """The first alphanumerically ordered prefix of a fragment name, read from its first
+    top-level token ``first``, or None when the token does not show where it ends.
+
+    An enclosed prefix is the text inside its marks, a multiplying prefix in front left out
+    ,:3448: multiplicative prefixes "do not alter the alphabetical order already
+    established"). An unenclosed token is a simple prefix, joined to the parent name or not
+    ('methylpentanamide', 'methylidenebutanamide'): the longest word of the simple-prefix
+    vocabulary its letters begin with, extended by '-idene' or '-idyne' after 'yl'. Where
+    the prefix ends decides the order of two prefixes one of which begins with the other:
+    the shorter sorts first,:3477, the first letter of the complete name; ex.
+    :21663 '4-methyl-3-methylidenehexanoic acid (PIN)')."""
+    from ..assembly.naming_utils import prefix_citation_sort_key
+    m = _ENCLOSED_FIRST_RE.match(first)
+    if m:
+        return _enclosed_content(first, m.end())
+    letters = prefix_citation_sort_key(first)[0]
+    for unit in _SIMPLE_UNITS:
+        if letters.startswith(unit):
+            rest = letters[len(unit):]
+            if unit.endswith("yl"):
+                for ending in _YL_EXTENSIONS:
+                    if rest.startswith(ending):
+                        return unit + ending
+            return unit
+    return None
+
+
+def _top_level_tokens(name: str) -> List[str]:
+    """``name`` split at the hyphens outside every enclosing mark."""
+    out, cur, depth = [], [], 0
+    for ch in name:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if ch == "-" and depth == 0:
+            out.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    out.append("".join(cur))
+    return out
+
+
+def n_prefix_breaks_citation_order(n_prefixes: List[str], name: str) -> bool:
+    """True when ``'N-<n_prefixes>' + name`` is not in the Blue Book's citation order
+    (see the comment above): ``name`` begins with a stereodescriptor block, or its first
+    alphanumerically ordered prefix (``_first_ordered_prefix`` of the token after its first
+    locant set) sorts before an N-prefix or equals it. Equal means the same Roman letters,
+    the same own locants,:3517, decides identical letters by "the lowest
+    locant(s) at the first point of difference": '4-(2-methylbutyl)-N-(3-methylbutyl)-
+    aniline (PIN)',:3523) and the same configuration symbols: identical prefixes are
+    cited once with a multiplicative prefix: 'N,2-dimethyl...'), and a tie the
+    book does not break cannot be ordered by the concatenation either way. Where the token
+    does not show where its prefix ends (no vocabulary word begins it), the whole token is
+    compared, and a token that begins with the N-prefix's letters counts as the same prefix.
+    The keys are the engine's own keys (``prefix_citation_sort_key``)."""
+    from ..assembly.naming_utils import prefix_citation_sort_key
+    if not name or not n_prefixes:
+        return False
+    if _FRONT_STEREO_RE.match(name):
+        return True
+    tokens = _top_level_tokens(name)
+    if len(tokens) < 2 or not _LOCANT_SET_RE.match(tokens[0]):
+        return False
+    first = tokens[1]
+    if first in _ITALIC_FIRST and len(tokens) > 2:
+        # 'tert-butyl...': an italic prefix and its simple prefix (never the ring-assembly
+        # 'ter' of 'terphenyl', which the next test reads)
+        first = f"{first}-{tokens[2]}"
+    elif not first or _NOT_ORDERED_FIRST_RE.match(first):
+        return False
+    prefix_q = _first_ordered_prefix(first)
+    q_key = prefix_citation_sort_key(prefix_q)[:3] if prefix_q is not None else None
+    token_key = prefix_citation_sort_key(first)[0]
+    for prefix in n_prefixes:
+        n_key = prefix_citation_sort_key(prefix)
+        if q_key is not None:
+            if q_key <= n_key[:3]:
+                return True
+        elif token_key <= n_key[0] or token_key.startswith(n_key[0]):
+            return True
+    return False
+
+
+def _record_if_out_of_citation_order(result: Optional[str], n_prefixes: List[str],
+                                     name: str) -> None:
+    """Label ``result`` below the PIN when its N-prefix breaks the citation order
+    (``n_prefix_breaks_citation_order``); never changes the name."""
+    if result and n_prefix_breaks_citation_order(n_prefixes, name):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(result)
+
+
 def _expand_n_locant_for_multiplier(prefix: str) -> str:
     """Expand N-locant based on multiplier prefix on an N-substituent name.
 
@@ -747,6 +928,8 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
 
     result = None
     acyl_float = False
+    # (N-prefix, the name it is put in front of), for the citation-order label below
+    order_parts = None
 
     # Get amine prefix (simple substituent name)
     amine_prefix = _amine_to_prefix(amine_name)
@@ -762,6 +945,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # Do NOT prepend another "N-" -- the N is already in the prefix.
                 # Result: "N-methylcyclohexylacetamide" (correct).
                 result = _join_components(amine_prefix, amide_name)
+                order_parts = (_re.sub(r"^N(?:,N)*-", "", amine_prefix), amide_name)
             else:
                 # Check if prefix has a multiplier (di, tri, tetra) indicating
                 # multiple identical N-substituents. In that case, expand the
@@ -779,6 +963,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 else:
                     wrapped_prefix = _wrap_n_substituent(enclose_if_compound(amine_prefix))
                 result = f"{n_locant}{_join_components(wrapped_prefix, amide_name)}"
+                order_parts = (amine_prefix, amide_name)
 
     if result is None:
         # Complex amine: use acyl prefix pattern
@@ -804,6 +989,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # This keeps each N-substituent as a separate "N-X" segment
                 # so _group_n_substituents can properly merge identical ones.
                 result = f"N-{_wrap_n_substituent(enclose_if_compound(acyl_prefix))}-{amine_name}"
+                order_parts = (acyl_prefix, amine_name)
             else:
                 #: a parent-hydride-derived acyl prefix (furan-2-carbonyl,
                 # cyclohexanecarbonyl) must be parenthesised so two parent hydrides
@@ -814,6 +1000,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # mirroring the already-fixed amine_prefix sibling branch above.
                 wrapped = _wrap_n_substituent(enclose_if_compound(acyl_prefix))
                 result = f"N-{_join_components(wrapped, amine_name)}"
+                order_parts = (acyl_prefix, amine_name)
 
     if result is None:
         return None
@@ -851,6 +1038,8 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
         result = gate_nonsuffix_nacyl_float(
             (fragment_smiles or {}).get("amine"), result, amine_name)
 
+    if order_parts is not None:
+        _record_if_out_of_citation_order(result, [order_parts[0]], order_parts[1])
     return result
 
 
@@ -1517,7 +1706,9 @@ def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optiona
     amine_prefix = _amine_to_prefix(amine_name)
     if amine_prefix:
         wrapped = _wrap_n_substituent(amine_prefix)
-        return f"N-{_join_components(wrapped, sulfonamide_parent)}"
+        result = f"N-{_join_components(wrapped, sulfonamide_parent)}"
+        _record_if_out_of_citation_order(result, [amine_prefix], sulfonamide_parent)
+        return result
 
     return sulfonamide_parent
 
@@ -1810,6 +2001,12 @@ def _assemble_multi_amide(
 
     if not core_name:
         return None
+    # Every acyl group is cited with the locant 'N', so the core must hold exactly
+    # one nitrogen (a diamine core needs N/N' locants: 'N,N-dicarbonylmethanediamine'
+    # for a bis-urea was a different molecule).
+    _core_mol = _Chem.MolFromSmiles(core_frag.get("smiles") or "")
+    if _core_mol is None or sum(1 for a in _core_mol.GetAtoms() if a.GetSymbol() == "N") != 1:
+        return None
 
     # Collect acyl prefixes from non-core fragments
     acyl_names: List[str] = []
@@ -1817,8 +2014,12 @@ def _assemble_multi_amide(
         if frag is core_frag:
             continue
         acyl = _acid_to_acyl(name)
-        if acyl:  # Per: None from _acid_to_acyl is skipped
-            acyl_names.append(acyl)
+        if not acyl:
+            # A fragment that is not an acyl group would be dropped from the name
+            # (a second amine core: 'N-acetyl-N,N-dibutanedioylethane-1,2-diamine'
+            # for a two-diamine input) -> decline.
+            return None
+        acyl_names.append(acyl)
 
     if not acyl_names:
         return None
@@ -1845,6 +2046,7 @@ def _assemble_multi_amide(
     if result.count("N-") >= 2:
         result = _group_n_substituents(result)
 
+    _record_if_out_of_citation_order(result, list(acyl_counts), core_name)
     return result
 
 

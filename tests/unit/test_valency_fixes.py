@@ -18,6 +18,7 @@ These tests target the fixes in Plan 17-04:
 import re
 import pytest
 from orthonym import name_compound
+from tests.support.rt_assert import assert_full_rt
 
 
 # ---------------------------------------------------------------------------
@@ -228,21 +229,22 @@ class TestOPSINParseability:
     These compounds previously produced 'unphysical valency' OPSIN errors.
     """
 
+    # (the Blue Book) "The locant '1' is omitted:"... (c) "in
+    # monosubstituted homogeneous monocyclic rings;" (:2913); 'cyclohexanethiol
+    # (PIN)' (:2917). OPSIN reads the locant-free names back to the input's full
+    # InChIKey, so the PIN is also the parseable form.
+
     def test_suffix_locant_present_for_ring_ketone(self):
-        """Ring ketone suffix must have explicit locant for OPSIN compatibility."""
+        """A monosubstituted ring ketone is the locant-free PIN and round-trips."""
         name = name_compound("O=C1CCCCC1")
-        assert name
-        # Should contain locanted suffix like cyclohexan-N-one
-        # Not bare "cyclohexanone" (which OPSIN defaults to position 1)
-        assert re.search(r'-\d+-one', name), \
-            f"Expected locanted ketone suffix, got: {name}"
+        assert name == "cyclohexanone"
+        assert_full_rt(name, "O=C1CCCCC1")
 
     def test_suffix_locant_present_for_ring_alcohol(self):
-        """Ring alcohol suffix must have explicit locant."""
+        """A monosubstituted ring alcohol is the locant-free PIN and round-trips."""
         name = name_compound("OC1CCCCC1")
-        assert name
-        assert re.search(r'-\d+-ol', name), \
-            f"Expected locanted alcohol suffix, got: {name}"
+        assert name == "cyclohexanol"
+        assert_full_rt(name, "OC1CCCCC1")
 
     def test_prefix_and_suffix_at_different_positions(self):
         """Substituted ring with FG: prefix and suffix at different atoms."""

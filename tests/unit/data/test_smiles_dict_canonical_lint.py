@@ -118,11 +118,8 @@ _KEEP_NAME_STRUCTURE_MISMATCH = frozenset({
     # fixed), these five are the ONLY remaining name<->structure mismatches.
     # The earlier KEEP-deferred block (the 43 isomer mislabels) and the
     # heptalene KEEP-aromaticity entry are now FIXED and removed (ratchet
-    # shrinks). ---
-    "Nc1ncnc2[nH]cnc12",            # adenine
-    "Nc1nc(=O)c2[nH]cnc2[nH]1",     # guanine (tautomer)
-    "Nc1nc2[nH]cnc2c(=O)[nH]1",     # guanine (tautomer)
-    "O=c1[nH]cnc2[nH]cnc12",        # hypoxanthine
+    # shrinks). The adenine, guanine and hypoxanthine entries left the
+    # catalogue (quick-wins: not Blue Book names; purine names them). ---
     "O=c1[nH]c(=O)c2nc[nH]c2[nH]1", # xanthine
 })
 

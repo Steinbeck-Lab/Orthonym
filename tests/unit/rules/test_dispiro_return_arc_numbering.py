@@ -82,11 +82,12 @@ def test_class_b_dispiro_cage_roundtrips(smi):
 def test_bare_dispiro_descriptor_consistent_locant():
     """The bare (no exocyclic group) witness pins the exact defect: the O must
     take the descriptor-consistent locant 8, not the old 9 (a different
-    molecule). ``[2.0.3.2]`` is the Blue Book descriptor (smaller terminal ring
-    first,; low spiro locants,."""
+    molecule). ``[2.0.3^4.2^3]`` is the Blue Book descriptor (smaller terminal ring
+    first,; low spiro locants,; the superscript locants of the
+    spiro atoms reached a second time,, the Blue Book)."""
     smi = "C1CC11COC11CCC1"
     name = _besteffort(smi)
-    assert name == "8-oxadispiro[2.0.3.2]nonane", name
+    assert name == "8-oxadispiro[2.0.3^4.2^3]nonane", name
     assert _inchikey(n2s(name)) == _inchikey(smi)
 
 
@@ -97,12 +98,12 @@ def test_pin_dispiro_return_arc_symmetric_unchanged():
     automorphism for them (no heteroatom breaks the symmetry), so they must not
     move. These hit the SAME ``_get_polyspiro_numbering`` this fix touches."""
     cases = {
-        "C1CC12CC1(CC1)C2": "dispiro[2.1.2.1]octane",
-        "C1CCCC12CCC1(CCCC1)CC2": "dispiro[4.2.4.2]tetradecane",
-        "C1CC12C1(CC1)C2": "dispiro[2.0.2.1]heptane",
+        "C1CC12CC1(CC1)C2": "dispiro[2.1.2^5.1^3]octane",
+        "C1CCCC12CCC1(CCCC1)CC2": "dispiro[4.2.4^8.2^5]tetradecane",
+        "C1CC12C1(CC1)C2": "dispiro[2.0.2^4.1^3]heptane",
         # CQ5 hetero witnesses (a performance pass first-arc fix) must stay put too.
-        "C1C2(CCC2)C11CCO1": "1-oxadispiro[3.0.3.1]nonane",
-        "C1CC11CCC11CO1": "1-oxadispiro[2.0.2.2]octane",
+        "C1C2(CCC2)C11CCO1": "1-oxadispiro[3.0.3^5.1^4]nonane",
+        "C1CC11CCC11CO1": "1-oxadispiro[2.0.2^4.2^3]octane",
     }
     for smi, expected in cases.items():
         got = name_spiro_system(Chem.MolFromSmiles(smi))[0]

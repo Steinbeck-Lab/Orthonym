@@ -47,6 +47,8 @@ $ orthonym "C[N+](C)(C)CC(=O)[O-]" --emit-tier valid
 (trimethylazaniumyl)acetate
 ```
 
+Natural-product names are a second case. Where a molecule's preferred name is a bridged fused name that the engine does not build yet, its natural-product name (`diamorphine`, `(9R,13S,14S)-3-methoxy-17-methylmorphinan`) is not the PIN. The default tier declines it with `NO_VERIFIED_PIN`, and a wider tier returns it labelled {tier}`systematic_verified`. `--trivial` also returns the trivial ones, such as `diamorphine`, at the default tier.
+
 At a tier other than `pin`, the plain command line prints `(no name — CODE)` instead of the label:
 
 ```console

@@ -871,8 +871,11 @@ RETAINED_NAMES = {
     # data bug (suppressed it to unknown). Bipyridines are named
     # systematically by rules/ring_assemblies.py; no retained row.
     "Oc1cc(O)cc(O)c1": "phloroglucinol",              # benzene-1,3,5-triol
-    "c1ccc2c(c1)ccc1cccnc12": "benzo[f]quinoline",
-    "c1ccc2c(c1)ccc1ncccc12": "benzo[h]quinoline",
+    # Keys checked against OPSIN 2.9.0's reading of each name: the
+    # fusion name denotes the structure): benzo[f] fuses the benzo ring to the
+    # quinoline 5,6-bond, benzo[h] to the 7,8-bond next to N1.
+    "c1ccc2c(c1)ccc1ncccc12": "benzo[f]quinoline",
+    "c1ccc2c(c1)ccc1cccnc12": "benzo[h]quinoline",
     "Oc1ccc2c(c1)OCO2": "sesamol",                    # 3,4-methylenedioxyphenol
     "O=Cc1ccc2c(c1)OCO2": "piperonal",                # 3,4-methylenedioxybenzaldehyde
     "C=CCc1ccc2c(c1)OCO2": "safrole",

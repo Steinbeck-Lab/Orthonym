@@ -35,8 +35,9 @@ class TestCLIParserAcceptsComplete:
         # argparse renders the --emit-tier choices as a brace list with NO
         # spaces; assert the exact rendering so `complete` is present as a real
         # tier choice (not merely a substring of some other help text) and the
-        # full ladder is offered.
-        assert "{pin,valid,complete,best-effort}" in out
+        # full ladder is offered. The fifth choice, full-coverage, is the
+        # --emit-tier choice that c8cd7fd0d added (cli.py, ``choices=``).
+        assert "{pin,valid,complete,best-effort,full-coverage}" in out
 
     def test_emit_tier_complete_runs_benzene(self, capsys):
         rc = cli_main(["c1ccccc1", "--emit-tier", "complete"])

@@ -533,8 +533,9 @@ class TestOxoAminoFusedHeterocycles:
         mol = Chem.MolFromSmiles('O=c1[nH]cnc2nc[nH]c12')
         name = name_fused_heterocycle(mol)
         assert name is not None
-        # IUPAC 2013: retained name "hypoxanthine" is preferred
-        assert name == "hypoxanthine" or ('purin' in name.lower() and 'one' in name.lower())
+        # 'hypoxanthine' does not occur in the Blue Book (0 hits); "the PIN is 7H-purine"
+        # (the Blue Book)
+        assert name == "1,7-dihydro-6H-purin-6-one"
 
     @pytest.mark.unit
     def test_oxo_detection(self):

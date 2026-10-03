@@ -211,6 +211,25 @@ def name_ester_family(
     """
     from ..candidate_pool import get_current_pool
 
+    # An ester of nitric or nitrous acid outranks a junior principal group,
+    # the Blue Book, esters class 9): the molecule is named in the functional-
+    # class form, '2-hydroxyethyl nitrate',:35918; '3-oxobutyl bromate
+    # (PIN)',:35974), which the polyfunctional sub-path below cannot build (it made
+    # '2-(nitrooxy)ethan-1-ol', the alcohol as the parent). The ester handlers try
+    # first; when they cannot name the alcohol component, the sub-paths below keep
+    # their name for the molecule.
+    _fg = getattr(features, 'functional_groups', None) or {}
+    if getattr(features, 'principal_group', None) is not None and (
+            _fg.get('nitrooxy') or _fg.get('nitrite')):
+        from .nitrate_ester import _is_nitrate_ester, name_nitrate_ester
+        from .nitrite_ester import _is_nitrite_ester, name_nitrite_ester
+        for _pred, _namer in ((_is_nitrate_ester, name_nitrate_ester),
+                              (_is_nitrite_ester, name_nitrite_ester)):
+            if _pred(features):
+                _res = _namer(features, mol, style=style)
+                if _res is not None:
+                    return _res
+
     # ============================================================
     # Sub-path 1: polyfunctional (composer.py:859-877 verbatim lift)
     # ============================================================

@@ -450,7 +450,9 @@ def test_unlocanted_ring_prefix_vocabulary():
 # block stays.
 @pytest.mark.parametrize("smiles,expected", [
     ('[2H]C1=C(C(=C2C(=C1[2H])C3=C(C(=C(C(=C3N2C4=CC(=CC(=C4)C5=CC(=CC=C5)[Si]6(C7=C(C8=C6C=CC=N8)N=CC=C7)C9=CC=CC=C9)C1=CC=CC=C1)[2H])[2H])[2H])[2H])[2H])[2H]',
-     '2-(3-{5-[(2H8)-2-azatricyclo[7.4.0.0^3,8]trideca-1(13),3,5,7,9,11-hexaen-2-yl]-3-phenylphenyl}phenyl)-2-phenyl-7,10-diaza-2-silatricyclo[7.4.0.0^3,8]trideca-1(13),3,5,7,9,11-hexaene'),
+     # quick-wins F-Q1: '0^2,7' before '0^3,8', the Blue Book); the heteroatoms
+     # follow the fixed numbering,:9765). Was '2-(3-{5-[(2H8)-2-azatricyclo[7.4.0.0^3,8]...'
+     '8-(3-{5-[(2H8)-8-azatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaen-8-yl]-3-phenylphenyl}phenyl)-8-phenyl-3,13-diaza-8-silatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaene'),
     ("[2H][C@@]12[C@@H](O1)CCC3=CC=CC=C23",
      "(2R,4S)-(2-2H)-3-oxatricyclo[5.4.0.0^2,4]undeca-1(11),7,9-triene"),
 ])

@@ -115,11 +115,13 @@ from .naming_utils import (
     _join_multiplied_suffix,
     _wrap_n_substituent,
     alpha_sort_key,
+    cip_descriptor_rank_key,
     enclose_if_compound,
     format_substituent_prefix,
     get_alkyl_name,
     get_multiplier_prefix,
     is_complex_substituent,
+    multiplied_component,
     should_omit_locant_one,
 )
 from .substituent_enumerator import (
@@ -6769,6 +6771,115 @@ def _chain_amide_identical_prefixes(mol, amide_atoms, suffix_form, base_name,
         return None
 
 
+def _unsaturated_amide_in_one_series(fragments, n_subs, n_prefix, base_name, style):
+    """The N-substituted name of the fragment branch of ``_assemble_amide_name``
+    (an amide whose molecule has a double or triple bond).
+
+    That branch assembles the acyl name from its fragments (parent, suffix,
+    prefixes, stereodescriptors) and used to put the N-substituent prefix in front
+    of it: 'N-ethyl-2-bromopent-4-ynamide', 'N-methyl-2-methylprop-2-enamide',
+    'N-propyl(2E)-4-chlorobut-2-enamide',
+    'N-[2-(cyclohex-1-en-1-yl)ethyl]-2,2,2-trichloroacetamide'.
+
+     (the Blue Book): "Simple prefixes (i.e., those describing atoms
+    and unsubstituted substituents) are arranged alphabetically";
+    (:3477): "The name of a prefix for a substituent is considered to begin with
+    the first letter of its complete name." An N-substituent is one of these
+    prefixes: '2-hydroxy-N-methylpropanamide (PIN)' (:32730), '3-chloro-N-
+    (2-chlorophenyl)naphthalene-2-sulfonamide (PIN)' (:32881); one named like an
+    acyl prefix joins it in one multiplied group, 'N,N,2-trimethyl-3-{...}
+    propanamide (PIN)' (:21624). (:4826): "Stereodescriptors placed at
+    the front of the complete name or name fragment to which they apply". The
+    series is built by ``_amide_with_identical_prefixes_merged``, as for the
+    saturated chain amides.
+
+    Returns None (the caller keeps its spelling) unless the acyl parts
+    (stereodescriptors, prefixes, parent word) give back exactly ``base_name``,
+    so the new name cites the same parts, or when a part cannot be rendered.
+    """
+    stereo = next((f for f in fragments if f.fragment_type == "stereo"), None)
+    prefixes = [f for f in fragments if f.fragment_type == "prefix"]
+    core = [f for f in fragments if f.fragment_type in ("parent", "suffix")]
+    try:
+        parent_word = _assemble_fragments(core, style)
+        stereo_text = stereo.text if stereo is not None and stereo.text else ""
+        c_items = []
+        for p in sorted(prefixes, key=lambda x: (alpha_sort_key(x.text),
+                                                  cip_descriptor_rank_key(x.text))):
+            if p.locants and not str(p.text)[:1].isdigit():
+                rendered = f"{','.join(str(_l) for _l in p.locants)}-{p.text}"
+            else:
+                rendered = p.text
+            c_items.append((rendered, None, list(p.locants or ())))
+        acyl = (_join_prefix_to_name(_join_prefixes([r for r, _n, _l in c_items]),
+                                     parent_word)
+                if c_items else parent_word)
+        if not parent_word or f"{stereo_text}{acyl}" != base_name:
+            return None
+        if c_items:
+            merged = _amide_with_identical_prefixes_merged(
+                c_items, list(n_subs), parent_word)
+        else:
+            merged = _join_prefix_to_name(n_prefix, parent_word)
+        if not merged:
+            return None
+        return f"{stereo_text}{merged}"
+    except Exception as exc:  # noqa: BLE001 - the caller labels its own spelling
+        logger.warning(
+            "amide_one_series_render_failed base_name=%r error=%r", base_name, exc)
+        return None
+
+
+def _n_prefix_first_is_series_order(fragments, n_subs) -> bool:
+    """Is the N-prefix in front of the acyl name ('N-methylprop-2-enamide') already
+    the order? Only when the acyl part has no stereodescriptor (they go in
+    front of the complete name,, the Blue Book) and every
+    N-substituent sorts before every acyl prefix,:3448;,
+    :3477), with none of the same name (one multiplied group, (b),
+    :7067)."""
+    if any(f.fragment_type == "stereo" and f.text for f in fragments):
+        return False
+    acyl = [f.text for f in fragments if f.fragment_type == "prefix"]
+    if not acyl:
+        return True
+    names = [sub.get("name") for sub in n_subs or ()]
+    if not names or not all(names):
+        return False
+    return all(alpha_sort_key(n) < alpha_sort_key(a) for n in names for a in acyl)
+
+
+def _n_substituted_fragment_amide_name(fragments, n_subs, n_prefix, base_name, style):
+    """The name of an N-substituted amide of the fragment branch of
+    ``_assemble_amide_name``: the one-series name
+    (``_unsaturated_amide_in_one_series``), else the N-prefix in front of
+    ``base_name``, labelled below the PIN unless that is the series order
+    (``_n_prefix_first_is_series_order``)."""
+    one_series = _unsaturated_amide_in_one_series(
+        fragments, n_subs, n_prefix, base_name, style)
+    if one_series:
+        return one_series
+    # A locant must be separated from the preceding N-substituent prefix
+    # by a hyphen rendering). A BRANCHED or otherwise-substituted
+    # unsaturated acyl parent begins with a chain locant
+    # ('3-methylbut-2-enamide'), so a bare concatenation glues
+    # 'N-(4-hydroxyphenyl)3-methylbut-2-enamide' — the documented
+    # italic/numeral-glue defect that OPSIN accepts, so a round trip
+    # cannot see it (lever-A honesty sweep). starts_with_locant
+    # leaves a plain stem ('prop-2-enamide') and a leading stereo
+    # descriptor ('(2E)-...') unhyphenated.
+    from .naming_utils import starts_with_locant as _starts_with_locant
+    _sep = "-" if _starts_with_locant(base_name) else ""
+    name = f"{n_prefix}{_sep}{base_name}"
+    if not _n_prefix_first_is_series_order(fragments, n_subs):
+        # The one-series name was not built (a part did not render, or the parts did
+        # not give back ``base_name``) and the N-prefix in front of the acyl
+        # prefixes or the stereodescriptors is not the / order
+        # ('N-propyl(2E)-4-chlorobut-2-enamide'): the name is kept below the PIN.
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
+
+
 def _assemble_amide_name(features: Any, style: str) -> str:
     """
     Assemble name for amide compounds with N-substitution handling.
@@ -7243,18 +7354,8 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         n_subs = get_n_substituents(mol, amide_atoms)
         n_prefix = format_n_substitution(n_subs)
         if n_prefix:
-            # A locant must be separated from the preceding N-substituent prefix
-            # by a hyphen rendering). A BRANCHED or otherwise-substituted
-            # unsaturated acyl parent begins with a chain locant
-            # ('3-methylbut-2-enamide'), so a bare concatenation glues
-            # 'N-(4-hydroxyphenyl)3-methylbut-2-enamide' — the documented
-            # italic/numeral-glue defect that OPSIN accepts, so a round trip
-            # cannot see it (lever-A honesty sweep). starts_with_locant
-            # leaves a plain stem ('prop-2-enamide') and a leading stereo
-            # descriptor ('(2E)-...') unhyphenated.
-            from .naming_utils import starts_with_locant as _starts_with_locant
-            _sep = "-" if _starts_with_locant(base_name) else ""
-            final_name = f"{n_prefix}{_sep}{base_name}"
+            final_name = _n_substituted_fragment_amide_name(
+                fragments, n_subs, n_prefix, base_name, style)
 
     # a phase SCORE-01 (Pitfall 2): stash a STRUCTURED tree from the chain
     # fragment list, with fragment_legacy overridden to the FINAL (post-N-prefix)
@@ -8477,14 +8578,23 @@ def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment
         if total_count <= 0:
             total_count = len(group)  # Fallback: one per fragment
 
-        # Rebuild the formatted prefix
+        # Rebuild the formatted prefix. The multiplier and the enclosing marks come
+        # from the shared ``multiplied_component``, so a merged prefix is
+        # multiplied as the same prefix is everywhere else: 'bis' for a prefix with
+        # hydro prefixes, 'bis(4,5-dihydrothiophen-2-yl)di(methyl)germane (PIN)'
+        #, the Blue Book), and for a substituted one
+        # (a),:7104).
         if total_count > 1:
-            multiplier = SIMPLE_MULTIPLIERS.get(total_count, str(total_count))
+            try:
+                multiplied = multiplied_component(total_count, base_name, base_name)
+            except ValueError:
+                multiplied = (SIMPLE_MULTIPLIERS.get(total_count, str(total_count))
+                              + base_name)
             if all_locants:
                 locant_str = ",".join(str(l) for l in all_locants)
-                text = f"{locant_str}-{multiplier}{base_name}"
+                text = f"{locant_str}-{multiplied}"
             else:
-                text = f"{multiplier}{base_name}"
+                text = multiplied
         else:
             if all_locants:
                 locant_str = ",".join(str(l) for l in all_locants)
@@ -9410,9 +9520,20 @@ def _build_substituted_ring_name(
         needs_brackets,
     )
     prefix_parts = []
+    # (the Blue Book): every substitutable position of the aromatic
+    # ring other than the free valence carries the same substituent -> no locants
+    # ('pentafluorophenyl'; '1-chloro-2-(pentafluoroethyl)benzene (PIN)',:3023).
+    _complete = (len(sub_groups) == 1
+                 and all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring_atoms)
+                 and sorted(next(iter(sub_groups.values())))
+                 == list(range(2, len(ring_atoms) + 1)))
     for name in sorted(sub_groups.keys(), key=alpha_sort_key):
         locs = sorted(sub_groups[name])
         count = len(locs)
+        if _complete:
+            from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+            prefix_parts.append(multiplied_component(count, name, enclose_if_compound(name)))
+            continue
         loc_str = ','.join(str(l) for l in locs)
         # Wave2 T3a: compound FG-on-alkyl prefixes (hydroxymethyl) take
         # enclosing marks with a simple multiplier — the a phase
@@ -9764,6 +9885,92 @@ def _render_prefix_without_locants(name: str, count: int) -> str:
     return _mult + name
 
 
+def _acid_linked_parent_branch(mol, sub_info, parent_atoms, features,
+                               acyl_carbon: bool = True) -> Optional[str]:
+    """The acyl-oxy / acyl-amino prefix of a branch on the parent chain or ring,
+    or ``None`` (``substituent_enumerator.name_acid_linked_branch`` holds the
+    rules; a linking O that belongs to a perceived functional group declines)."""
+    from .substituent_enumerator import name_acid_linked_branch
+    frag = set(sub_info.frag_atoms)
+    links = [i for i in frag
+             if mol.GetBondBetweenAtoms(sub_info.attach_mol_idx, i) is not None]
+    if len(links) != 1 or sub_info.attach_mol_idx not in parent_atoms:
+        return None
+    return name_acid_linked_branch(
+        mol, frag, links[0], getattr(features, 'principal_group', None),
+        functional_groups=getattr(features, 'functional_groups', None) or {},
+        acyl_carbon=acyl_carbon)
+
+
+#: Heteroatoms whose acyclic carbonyl is a pseudoketone (b)) with no
+#: ester or anhydride class of its own: '1-silylethan-1-one (PIN)',
+#: '1-phosphanylpropan-1-one (PIN)' (:28273,:28275).
+_PSEUDOKETONE_HETERO = frozenset({
+    'B', 'Si', 'Ge', 'Sn', 'Pb', 'P', 'As', 'Sb', 'Bi',
+})
+
+
+def is_pseudoketone_oxo(mol, frag_atoms, attach_idx, parent_atoms,
+                        features) -> bool:
+    """True for the =O of an acyclic pseudoketone carbonyl on the parent chain
+    when the principal characteristic group is senior to ketones.
+
+     (b) (the Blue Book): pseudoketones are "compounds in which
+    an acyclic carbonyl group is bonded to one or two acyclic skeletal
+    heteroatoms, except nitrogen, halogen, or pseudohalogen atoms, or to a
+    heteroatom of a ring or ring system". (:29450): "(1) the prefix 'oxo'
+    when the doubly bonded oxygen atom (ketone, pseudoketone or heterone group)
+    is not in position 1 of a side chain"; (:29496) "Acyclic
+    pseudoketones are named in the same way", '4-oxo-4-silylbutanoic acid (PIN)'
+    (:29500).
+
+    The branch ``frag_atoms`` is the single =O atom on the non-ring parent
+    carbon ``attach_idx``, which carries no H; no perceived functional group
+    holds the =O (an acyl halide, amide, ester or anhydride match holds it and
+    names the carbonyl itself). The heteroatom is an element of
+    ``_PSEUDOKETONE_HETERO`` or the first atom of a chain of S/Se/Te atoms
+    ('1-(methoxydisulfanyl)ethan-1-one (PIN)',:28277); an O, or a chalcogen
+    bonded to O, makes an ester or anhydride class and is not taken here.
+    """
+    from ..rules.seniority import compare_seniority
+    frag = set(frag_atoms)
+    c_idx = attach_idx
+    if len(frag) != 1 or c_idx not in parent_atoms:
+        return False
+    o_idx = next(iter(frag))
+    o_atom = mol.GetAtomWithIdx(o_idx)
+    c_atom = mol.GetAtomWithIdx(c_idx)
+    bond = mol.GetBondBetweenAtoms(c_idx, o_idx)
+    if (o_atom.GetSymbol() != 'O' or o_atom.GetFormalCharge()
+            or bond is None or bond.GetBondTypeAsDouble() != 2.0
+            or c_atom.GetSymbol() != 'C' or c_atom.IsInRing()
+            or c_atom.GetTotalNumHs()):
+        return False
+    pg = getattr(features, 'principal_group', None)
+    if not pg or compare_seniority(pg, 'ketone') >= 0:
+        return False
+    hetero = [nb for nb in c_atom.GetNeighbors()
+              if nb.GetIdx() != o_idx and nb.GetIdx() not in parent_atoms]
+    if not hetero:
+        return False
+    for nb in hetero:
+        if nb.GetSymbol() in _PSEUDOKETONE_HETERO:
+            continue
+        # a chalcogen chain ('methoxydisulfanyl'); -S-O-R is the ester of a
+        # thioperoxoic acid ('SO-methyl benzene(carbothioperoxoate) (PIN)',:32001)
+        if nb.GetSymbol() in ('S', 'Se', 'Te'):
+            others = [nn for nn in nb.GetNeighbors() if nn.GetIdx() != c_idx]
+            if others and all(nn.GetSymbol() in ('S', 'Se', 'Te')
+                              for nn in others):
+                continue
+        return False
+    for matches in (getattr(features, 'functional_groups', None) or {}).values():
+        for match in matches:
+            if o_idx in match:
+                return False
+    return True
+
+
 def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for all substituents on chain parents.
@@ -9957,6 +10164,25 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     substituent_groups[_ph].append(sub_info.locant)
                     substituent_group_atoms[_ph].update(sub_info.frag_atoms)
                     continue
+        # /: a CARBON-FREE acid branch joined through an O
+        # or an -NH- ('(chlorosulfonyl)oxy', '(aminosulfinyl)oxy', the P-O-P
+        # chain) whose linking O belongs to no functional group: no FG prefix
+        # names it; it is one prefix (substituent_enumerator.name_acid_linked_branch).
+        if not has_carbon:
+            _acid_link = _acid_linked_parent_branch(mol, sub_info, chain_set, features)
+            if _acid_link:
+                substituent_groups[_acid_link].append(sub_info.locant)
+                substituent_group_atoms[_acid_link].update(sub_info.frag_atoms)
+                continue
+        # (1) /: the =O of an acyclic pseudoketone carbonyl on
+        # the chain (no functional group holds it) is the prefix 'oxo' under a
+        # principal group senior to ketones -- '4-oxo-4-silylbutanoic acid (PIN)'.
+        if not has_carbon and is_pseudoketone_oxo(
+                mol, sub_info.frag_atoms, sub_info.attach_mol_idx, chain_set,
+                features):
+            substituent_groups['oxo'].append(sub_info.locant)
+            substituent_group_atoms['oxo'].update(sub_info.frag_atoms)
+            continue
         if not has_carbon:
             logger.debug(
                 "substituent_is_bare_functional_group substituent_skip: reason=fg_only locant=%d (by-design: FG prefix loop handles these)",
@@ -10011,8 +10237,17 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                 is_exocyclic_double = True
                 break
 
-        # Name via the universal classify-and-name pipeline
-        name = classify_and_name_fragment(mol, sub_info, chain_set, features)
+        #: a noncarbon acid branch joined through an O or an -NH-
+        # that carries carbon ('(methoxysulfinyl)oxy') is one prefix as well. It
+        # is decided before the generic namer, which reads the ester O of
+        # -O-S(=O)-OCH2CH3 as an ether ('1-(1,3-dioxa-2λ4-thiaprop-2-en-1-
+        # yl)ethoxy', a different molecule). R-CO-O- stays with the generic
+        # namer's acyloxy step (classify_and_name_fragment).
+        name = _acid_linked_parent_branch(mol, sub_info, chain_set, features,
+                                         acyl_carbon=False)
+        if name is None:
+            # Name via the universal classify-and-name pipeline
+            name = classify_and_name_fragment(mol, sub_info, chain_set, features)
         if name is None:
             # Fallback: simple carbon-count alkyl naming -- but ONLY when that name
             # is honest for this fragment. Counting carbons and spelling an alkyl
@@ -10323,13 +10558,18 @@ def _composed_amino_branch_name(mol, branch_atoms, branch_start) -> Optional[str
     return composed_prefix_organyl_name(mol, branch_atoms, branch_start)
 
 
-def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True) -> Optional[str]:
+def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True,
+                                     head: str = "amino") -> Optional[str]:
     """Assemble the amino prefix from named N-branches — the ONE assembler.
 
     ``enclose=False`` returns the CORE ('methyl(propanoyl)amino') without the
     outer mark pair, for the one caller whose own caller applies
     those marks. Every ordering and per-branch marking decision is unchanged, so
     the default path stays byte-identical.
+
+    ``head`` is the N-bearing unit the branches are cited on: 'amino' by default,
+    'carbamothioyl' for R-NH-CS- ('methylcarbamothioyl', the analogue of
+    'methylcarbamoyl',.
 
     ``branch_entries``: list of ``(raw_branch_name, decorated: bool)``. The
     ``decorated`` flag is now vestigial for GRAMMAR: whether a branch needs
@@ -10398,7 +10638,7 @@ def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True) -> Op
             cited.append(multiplied_component(k, bname, bname))
         else:
             cited.append(multiplied_component(k, bname, f"({bname})"))
-    core = "".join(cited) + "amino"
+    core = "".join(cited) + head
     return apply_enclosing_marks(core, -1) if enclose else core
 
 
@@ -11867,6 +12107,14 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
             for idx in sub_info.frag_atoms
         )
         if not has_carbon:
+            # /: a carbon-free acid branch joined through
+            # an O or an -NH- is one acyl-oxy / acyl-amino prefix (as on a chain
+            # parent, _generate_alkyl_prefixes).
+            _acid_link = _acid_linked_parent_branch(mol, sub_info, ring_set, features)
+            if _acid_link:
+                substituent_groups[_acid_link].append(sub_info.locant)
+                handled_ring_fg_atoms.update(sub_info.frag_atoms)
+                continue
             fg_prefix = _detect_fg_only_prefix(
                 mol, sub_info.frag_atoms, sub_info.attach_mol_idx
             )
@@ -11918,8 +12166,14 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
                 is_exocyclic_double = True
                 break
 
-        # Classify and name via the unified pipeline
-        name = classify_and_name_fragment(mol, sub_info, ring_set, features)
+        #: a noncarbon acid branch that carries carbon
+        # ('(methoxysulfinyl)oxy') is decided before the generic namer, as on a
+        # chain parent (_generate_alkyl_prefixes).
+        name = _acid_linked_parent_branch(mol, sub_info, ring_set, features,
+                                          acyl_carbon=False)
+        if name is None:
+            # Classify and name via the unified pipeline
+            name = classify_and_name_fragment(mol, sub_info, ring_set, features)
         if name is None:
             # Fallback: try simple carbon-count alkyl naming
             carbon_count = sum(
@@ -12009,22 +12263,16 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
 
         if _omit_locant:
             # Monosubstituted carbocyclic ring: omit locant (it's always 1).
-            # /: complex OR stereo-prefixed substituents need
-            # enclosing marks. The old guard skipped enclosing for a
-            # leading-stereo name ((R)-3-methylpentyl starts with '(') -> the
-            # broken (R)-3-methylpentylbenzene. Route through apply_enclosing_marks
-            # passing the BARE name (it does correct ->->{} nesting +
-            # leading-stereo escalation; passing the bare name avoids the
-            # double-enclose hazard).
-            from ..assembly.naming_utils import (_has_stereo_prefix, _is_fully_enclosed,
-                                                 apply_enclosing_marks)
-            if _is_fully_enclosed(name):
-                # already enclosed once, the Blue Book)
-                formatted = name
-            elif is_complex_substituent(name) or _has_stereo_prefix(name):
-                formatted = apply_enclosing_marks(name, depth=-1)
-            else:
-                formatted = name
+            # A compound or complex prefix takes enclosing marks,
+            # the Blue Book) by the same rule as the polysubstituted branch
+            # below (format_substituent_prefix): enclose_if_compound, the union of
+            # needs_brackets, is_complex_substituent and an inner enclosing mark.
+            # is_complex_substituent alone cited '(trifluoromethyl)sulfanyl' and
+            # '(methylsulfanyl)methyl' bare ('[(penta-1,4-dien-3-yl)sulfanyl]
+            # cyclobutane (PIN)',:27836). A stereo-prefixed name ('(R)-3-methyl
+            # pentyl') carries an inner mark and is escalated as before (/
+            #); an already enclosed name is returned unchanged.
+            formatted = enclose_if_compound(name)
             # Use empty locants so _assemble_fragments won't re-add "1-"
             emit_locants = ()
         else:

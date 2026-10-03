@@ -492,8 +492,15 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         # Real-corpus impact of the redirect itself was measured as zero at the
         # time (0 router diffs over pubchem_2000 + chebi_5000) -- inherited,
         # not re-run here.
+        # A Hantzsch-Widman parent takes no 'yne' ending,
+        # the Blue Book "[except for parents with Hantzsch-Widman names]"),
+        # so a ring of ten or fewer atoms with a ring triple bond is named by
+        # replacement whatever its size: '1,2,5,6-tetrasilacyclooct-3-en-7-yne
+        # (PIN)' and '1,2,5,6-tetrasilacycloocta-3,7-diyne (PIN)',
+        #:21091).
         if len(ring_info.AtomRings()) == 1:
-            if len(ring_info.AtomRings()[0]) <= 10:
+            if (len(ring_info.AtomRings()[0]) <= 10
+                    and not _ring_triple_bonds(mol, ring_info.AtomRings()[0])):
                 return None
         # For large heterocyclic rings (>= 11, or unsaturated/multi-heteroatom
         # 7-10-rings), try cyclic replacement naming per IUPAC.
@@ -1013,22 +1020,28 @@ def _skeletal_atoms_all_expressible(mol: Chem.Mol, atoms: List[int]) -> bool:
     return True
 
 
+def _ring_triple_bonds(mol: Chem.Mol, ring_atoms) -> List[Tuple[int, int]]:
+    """The triple bonds between two atoms of ``ring_atoms``."""
+    ring = set(ring_atoms)
+    return [(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()) for bond in mol.GetBonds()
+            if bond.GetBondType() == Chem.BondType.TRIPLE
+            and bond.GetBeginAtomIdx() in ring and bond.GetEndAtomIdx() in ring]
+
+
 def _cyclic_skeleton_spellable(mol: Chem.Mol, ring_atoms: List[int]) -> bool:
     """Can the cyclic 'a' builder spell this ring without changing the molecule?
 
     ``_try_cyclic_replacement_name`` writes each ring atom as its 'a' prefix (or
     as a carbon of the cycloalkane stem), a heteroatom with a nonstandard bonding
     number with its λ symbol, '1-oxa-4λ4-thiacyclotetradecane (PIN)',
-    the Blue Book), and each ring bond as single or double ('ene'). It has no
-    'yne' form, so a ring with a triple bond came out as another molecule:
-
-        ``C1#CCCCCOCCCCC1`` -> '1-oxacyclododecane' (the triple bond dropped)
-
-     (a triple bond changes 'ane' to 'yne'). Such a ring declines here, as
-    does a radical or a carbon whose bonding number is not 4 (no form for either).
-    A CHARGED ring atom is not checked: the ring-ion emitters pass the ion itself
-    and append the charge suffix to the parent name built here
+    the Blue Book), and each ring bond as single, double ('ene') or triple
+    ('yne',:16489). A radical or a carbon whose bonding number is not 4
+    has no form, so such a ring declines here; so does a ring whose 'ene'/'yne'
+    endings have no settled spelling (``multiple_bond_endings_spellable``). A
+    CHARGED ring atom is not checked: the ring-ion emitters pass the ion itself and
+    append the charge suffix to the parent name built here
     (``C1CCCCC[NH2+]CCOCCCC1`` -> '1-oxa-4-azacyclotetradecane' -> '...-4-ium')."""
+    from ..assembly.composition_primitives import multiple_bond_endings_spellable
     for idx in ring_atoms:
         atom = mol.GetAtomWithIdx(idx)
         if atom.GetFormalCharge() != 0:
@@ -1039,11 +1052,10 @@ def _cyclic_skeleton_spellable(mol: Chem.Mol, ring_atoms: List[int]) -> bool:
             if atom.GetTotalValence() != 4:
                 return False
     ring = set(ring_atoms)
-    for bond in mol.GetBonds():
-        if (bond.GetBeginAtomIdx() in ring and bond.GetEndAtomIdx() in ring
-                and bond.GetBondType() == Chem.BondType.TRIPLE):
-            return False
-    return True
+    n_double = sum(1 for bond in mol.GetBonds()
+                   if bond.GetBondType() == Chem.BondType.DOUBLE
+                   and bond.GetBeginAtomIdx() in ring and bond.GetEndAtomIdx() in ring)
+    return multiple_bond_endings_spellable(n_double, len(_ring_triple_bonds(mol, ring)))
 
 
 def _find_replacement_chain(
@@ -1675,26 +1687,21 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
             )
             senior_first_locant = min(by_element[senior_element])
 
-            # Compute double bond locants for tiebreaker
-            db_locants = []
-            if not all_single:
-                for i in range(ring_size):
-                    a1 = ordered[i]
-                    a2 = ordered[(i + 1) % ring_size]
-                    bond = mol.GetBondBetweenAtoms(a1, a2)
-                    if bond and bond.GetBondTypeAsDouble() == 2.0:
-                        # Locant of double bond = lower-numbered atom (1-based)
-                        db_locants.append(i + 1)
-                db_locants.sort()
+            # Compute double and triple bond locants for tiebreaker
+            db_locants, tb_locants = _ring_bond_locants(mol, ordered, all_single)
 
             # numbering order: (1) locant '1' to the senior
             # heteroatom; (2) low locants to the heteroatoms as a set; (3)
             # seniority of the 'a' prefixes; then (4) low locants to the
             # unsaturated sites ("Low locants are assigned first to the
-            # heteroatoms and then to unsaturated sites").
+            # heteroatoms and then to unsaturated sites"): first to the double
+            # and triple bonds as a set, then to the double bonds,
+            # the Blue Book;:16558, '1,11-disilacycloicosa-
+            # 5,7-dien-3-yne (PIN)':16570, "not 1,11-disilacycloicosa-4,6-dien-
+            # 8-yne; the locant set '3,5,7' is lower than '4,6,8'").
             comparison_key = (
                 senior_first_locant, hetero_locant_set, seniority_key,
-                lambda_key, db_locants,
+                lambda_key, sorted(db_locants + tb_locants), db_locants,
             )
 
             if best_key is None or comparison_key < best_key:
@@ -1778,19 +1785,12 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
     if all_single:
         return f'{replacement_prefix}cyclo{chain_prefix}ane'
 
-    # Unsaturated large heterocyclic rings: build name with -ene/-adiene/-atriene
-    # Compute double bond locants from the best orientation
-    db_locants = []
-    for i in range(ring_size):
-        a1 = best_ordered[i]
-        a2 = best_ordered[(i + 1) % ring_size]
-        bond = mol.GetBondBetweenAtoms(a1, a2)
-        if bond and bond.GetBondTypeAsDouble() == 2.0:
-            db_locants.append(i + 1)
-    db_locants.sort()
+    # Unsaturated large heterocyclic rings: build name with -ene/-yne endings
+    # Compute double and triple bond locants from the best orientation
+    db_locants, tb_locants = _ring_bond_locants(mol, best_ordered, all_single)
 
-    if not db_locants:
-        # No double bonds found despite all_single being False (shouldn't happen)
+    if not db_locants and not tb_locants:
+        # No multiple bonds found despite all_single being False (shouldn't happen)
         return f'{replacement_prefix}cyclo{chain_prefix}ane'
 
     # (the Blue Book) "Cyclic cumulenes are composed entirely of
@@ -1802,64 +1802,60 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
                 f'{SIMPLE_MULTIPLIERS[ring_size]}ene')
 
     return _build_unsaturated_cyclic_name(
-        replacement_prefix, chain_prefix, db_locants
+        replacement_prefix, chain_prefix, db_locants, tb_locants
     )
+
+
+def _ring_bond_locants(mol: Chem.Mol, ordered: List[int],
+                       all_single: bool) -> Tuple[List[int], List[int]]:
+    """Sorted (double, triple) bond locants of the ring numbered as ``ordered``.
+
+    A ring bond from position i to i+1 takes the locant i (1-based); the closing
+    bond from the last position to the first takes the last locant."""
+    db_locants: List[int] = []
+    tb_locants: List[int] = []
+    if not all_single:
+        ring_size = len(ordered)
+        for i in range(ring_size):
+            bond = mol.GetBondBetweenAtoms(ordered[i], ordered[(i + 1) % ring_size])
+            if bond is None:
+                continue
+            order = bond.GetBondTypeAsDouble()
+            if order == 2.0:
+                db_locants.append(i + 1)
+            elif order == 3.0:
+                tb_locants.append(i + 1)
+    return sorted(db_locants), sorted(tb_locants)
 
 
 def _build_unsaturated_cyclic_name(
     replacement_prefix: str,
     chain_prefix: str,
     double_bond_locants: List[int],
+    triple_bond_locants: Optional[List[int]] = None,
 ) -> str:
-    """Build cyclic replacement name with unsaturation suffix.
+    """Build cyclic replacement name with unsaturation endings.
 
-    Constructs names like '1-oxacyclohept-4,5-diene' from the replacement
-    prefix, chain size prefix, and double bond locant positions.
-
-    Handles vowel elision: when chain_prefix ends in 'a' and the suffix
-    starts with a vowel, the trailing 'a' is dropped (e.g., 'octa' + 'ene'
-    becomes 'octene', not 'octaene'). Since get_chain_prefix returns
-    stems without trailing 'a' (e.g., 'oct', 'dec'), and we build the
-    suffix directly, no special elision is needed for most cases.
-
-    For single double bond: '-{locant}-ene'
-    For 2 double bonds: '-{loc1},{loc2}-diene' (with linking 'a')
-    For 3 double bonds: '-{loc1},{loc2},{loc3}-triene' (with linking 'a')
+    The 'a' prefixes go in front of the name of the unsaturated cycloalkane
+    , the Blue Book), whose 'ene'/'yne' endings are spelled by the
+    shared hydrocarbon primitive ``_build_hydrocarbon_name``: the linking 'a'
+    before a multiplied first ending,:16497; 'cyclohepta-2,4-diene'),
+    'ene' before 'yne' with its 'e' elided (a),:7595). The heteroatom
+    fixes the numbering, so every locant is cited ('1-oxacyclododec-2-ene',
+    '1,11-disilacycloicosa-5,7-dien-3-yne (PIN)',:16570).
 
     Args:
         replacement_prefix: Heteroatom prefix (e.g., '1-oxa').
         chain_prefix: Ring size prefix from get_chain_prefix (e.g., 'hept').
         double_bond_locants: Sorted list of 1-based locant positions for
             double bonds.
+        triple_bond_locants: Sorted list of 1-based locant positions for
+            triple bonds.
 
     Returns:
         Complete unsaturated cyclic replacement name string.
     """
-    count = len(double_bond_locants)
-    locant_str = ','.join(str(loc) for loc in double_bond_locants)
-
-    if count == 1:
-        suffix = 'ene'
-    else:
-        # For multiple double bonds: multiplier + 'ene'
-        # 2 DB = "diene", 3 DB = "triene", 4 DB = "tetraene", etc.
-        if count in SIMPLE_MULTIPLIERS:
-            multiplier = SIMPLE_MULTIPLIERS[count]
-        else:
-            multiplier = str(count)
-        suffix = f'{multiplier}ene'
-
-    # Build stem: cyclo + chain_prefix
-    # get_chain_prefix returns e.g., 'hept', 'oct', 'dec' (no trailing 'a')
-    # IUPAC convention for unsaturation:
-    # - Single ene: stem without linking vowel -> cyclohept-2-ene
-    # - Multiple ene: stem with linking 'a' -> cyclohepta-2,4-diene
-    # The linking 'a' goes on the stem when the suffix starts with a
-    # consonant (d in diene, t in triene).
-    stem = chain_prefix
-    if count > 1:
-        # Add linking vowel 'a' to chain prefix for multi-ene
-        # "hept" -> "hepta", "oct" -> "octa", "dec" -> "deca"
-        stem = chain_prefix + 'a'
-
-    return f'{replacement_prefix}cyclo{stem}-{locant_str}-{suffix}'
+    from ..assembly.composition_primitives import _build_hydrocarbon_name
+    return replacement_prefix + _build_hydrocarbon_name(
+        f'cyclo{chain_prefix}', list(double_bond_locants),
+        list(triple_bond_locants or ()), ring_bond_locant_omittable=False)

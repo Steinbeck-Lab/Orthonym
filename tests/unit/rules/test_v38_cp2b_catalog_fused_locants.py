@@ -46,7 +46,6 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CC12CCCCN1CCCC2",
-    "O1CC11CCC2CCCCN2C1",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -99,11 +98,17 @@ def _rt_ok(smiles: str, name: str) -> bool:
 
 # --- the verified witness: catalog fused heterocycle spiro component, methyl on
 # the ring-fusion carbon (9a) -----------------------------------------------
-# oxirane sorts alphabetically before quinolizidine, so quinolizidine is the
-# PRIMED (second-cited) component and its fusion locant is carried as a primed
-# tuple ('9a', "'"); the undecorated core names spiro[oxirane-2,3'-quinolizidine].
+# oxirane sorts alphabetically before quinolizine, so quinolizine is the PRIMED
+# (second-cited) component and its fusion locant is carried as a primed tuple
+# ('9a', "'"). The saturated component is cited as its mancude parent
+# (4H-quinolizine, the retained PIN, the Blue Book; 'quinolizidine' is not a
+# Blue Book name) with its indicated hydrogen and hydro prefixes in front of the spiro
+# name, (:10260), as in '4′a,5′,6′,7′,8′,8′a-hexahydro-1′H-spiro[imidazolidine-
+# 4,2′-quinoxaline] (PIN)' (:17050). Was "9a'-methylspiro[oxirane-2,3'-quinolizidine]":
+# the merge of PIN class program batch 2 (Task 9, the mancude component spelling) with
+# quick wins e2cee144c (the catalogue numbering maps, 4H-quinolizine among them).
 WITNESS_SMILES = "CC12CCCCN2CC2(CC1)OC2"
-WITNESS_TARGET = "9a'-methylspiro[oxirane-2,3'-quinolizidine]"
+WITNESS_TARGET = "9a'-methyl-1',6',7',8',9',9'a-hexahydro-2'H,4'H-spiro[oxirane-2,3'-quinolizine]"
 
 
 @pytest.mark.opsin_gate
@@ -155,16 +160,21 @@ def test_zero_wrong_sweep_rt_or_abstain(smiles):
 
 # --- PIN / no-regression controls: byte-identical to HEAD -------------------
 # Captured on HEAD 5b0562dd before the fix (a temp dir probe_cp2b_head.py). The
-# undecorated catalog core spiro[oxirane-2,3'-quinolizidine] is the load-bearing
-# control -- it exercises the SAME catalog branch but carries no decoration on a
-# fusion atom, so it must stay byte-identical.
+# undecorated catalog spiro core is the load-bearing control -- it exercises the
+# SAME catalog branch but carries no decoration on a fusion atom, so it must stay
+# byte-identical.
 PIN_CONTROLS = {
     # systematic-branch sibling (CP2) -- must stay working:
-    "CC12CCCCC2CCC2(N1)OC2": "8a-methylspiro[decahydroquinoline-2,2'-oxirane]",
+    # was "8a-methylspiro[decahydroquinoline-2,2'-oxirane]": the quinoline component
+    # is its mancude parent with its saturation in front, cited after 'oxirane'
+    # (alphanumerical order), (the Blue Book)
+    "CC12CCCCC2CCC2(N1)OC2": "8a'-methyl-3',4',4'a,5',6',7',8',8'a-octahydro-1'H-spiro[oxirane-2,2'-quinoline]",
     # catalog fused heterocycle, plain substituent (not on a fusion atom):
     "CC12CCCCN1CCCC2": "9a-methylquinolizidine",
     # undecorated catalog-branch spiro core (SAME code path, no fusion decoration):
-    "O1CC11CCC2CCCCN2C1": "spiro[oxirane-2,3'-quinolizidine]",
+    # was "spiro[oxirane-2,3'-quinolizidine]", re-spelled as the witness above
+    #, the Blue Book); now the default tier's PIN as well
+    "O1CC11CCC2CCCCN2C1": "1',6',7',8',9',9'a-hexahydro-2'H,4'H-spiro[oxirane-2,3'-quinolizine]",
 }
 
 

@@ -50,12 +50,19 @@ def _is_refused(smiles: str) -> bool:
 # vonbaeyer_cage_has_aromaticity returns True on the naming path, and the default
 # path refuses with UNSUPPORTED_RING_SYSTEM): triptycene (PIN
 # '9,10-dihydro-9,10-[1,2]benzenoanthracene', a bridged fused name, not
-# built) and the benzo-fused bicyclo[2.2.2]octadiene. Best-effort names both
-# RT-exact (von Baeyer), so breadth holds.
+# built). Best-effort names it RT-exact (von Baeyer), so breadth holds.
+#
+# The benzo-fused bicyclo[2.2.2]octadiene left the family with the bridged fused
+# builder: it is named '1,4-dihydro-1,4-ethanonaphthalene' (pin_verified, OPSIN
+# 2.9.0 full-InChIKey exact), the pattern of (j) (the Blue Book,
+# '1,4-dihydro-1,4-ethanoanthracene (PIN) (not 1,2,3,4-tetrahydro-1,4-
+# ethenoanthracene)',:14399), asserted below.
 AROMATIC_IN_CAGE = [
     "c1ccc2c(c1)C1c3ccccc3C2c2ccccc21",  # triptycene
-    "C1=CC2CCC1c1ccccc12",               # benzo-fused bicyclo[2.2.2]octa-2,5-diene
 ]
+
+BENZO_BICYCLOOCTADIENE = "C1=CC2CCC1c1ccccc12"
+BENZO_BICYCLOOCTADIENE_NAME = "1,4-dihydro-1,4-ethanonaphthalene"
 
 SPIROBI_INDANE = "C1Cc2ccccc2C13Cc1ccccc1C3"   # DD7-spiro-1
 SPIROBI_INDANE_NAME = "1',2,3,3'-tetrahydro-1,2'-spirobi[indene]"
@@ -104,6 +111,23 @@ def test_spirobi_indane_is_named_exactly_and_deterministically():
     assert names == {SPIROBI_INDANE_NAME}, names
     jar_or_skip()
     assert_full_rt(SPIROBI_INDANE_NAME, SPIROBI_INDANE)
+
+
+def test_benzo_bicyclooctadiene_is_named_exactly_and_deterministically():
+    """The benzo-fused bicyclo[2.2.2]octadiene left the fail-closed family: every
+    spelling gives one name, the (j) bridged fused PIN (more
+    noncumulative double bonds in the fused parent, the Blue Book,:14399), and
+    that name round-trips to the input's full InChIKey. This replaces the three
+    refusal assertions it had (test_aromatic_in_cage_*[C1=CC2CCC1c1ccccc12])."""
+    from tests.support.jars import jar_or_skip
+    from tests.support.rt_assert import assert_full_rt
+    namer = Orthonym().name
+    mol = Chem.MolFromSmiles(BENZO_BICYCLOOCTADIENE)
+    names = {namer(Chem.MolToSmiles(mol, doRandom=True)) for _ in range(4)}
+    names.add(namer(Chem.MolToSmiles(mol)))
+    assert names == {BENZO_BICYCLOOCTADIENE_NAME}, names
+    jar_or_skip()
+    assert_full_rt(BENZO_BICYCLOOCTADIENE_NAME, BENZO_BICYCLOOCTADIENE)
 
 
 # --------------------------------------------------------------------------- #

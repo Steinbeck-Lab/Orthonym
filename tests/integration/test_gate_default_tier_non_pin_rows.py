@@ -36,11 +36,13 @@ def _gold_rows():
 
 def test_every_listed_row_is_an_unchanged_gold_row_with_its_reason():
     rows = _rows()
-    # 23 rows of the default-tier rule, DD7-bridged-3 ('1,4-dihydro-1,4-epithionaphthalene':
+    # 23 rows of the default-tier rule and DD7-bridged-3 ('1,4-dihydro-1,4-epithionaphthalene':
     # a general-nomenclature bridge prefix,, the Blue Book; the PIN
-    # '1,4-dihydro-1,4-sulfanonaphthalene',:28063, is unreadable by OPSIN 2.9.0), and
-    # W2E-P0BL-05 ('1H-1λ4-benzo[b]thiophene': a fusion-descriptor benzo name,
-    #:11813; the PIN '1H-1λ4-1-benzothiophene' is read back exactly by OPSIN 2.9.0).
+    # '1,4-dihydro-1,4-sulfanonaphthalene',:28063, is unreadable by OPSIN 2.9.0).
+    # W2E-P0BL-05 left the list: its gold row now expects the PIN '1H-1λ4-1-benzothiophene'
+    #,:11815), which the default tier ships. W2E-P0A-P2 ('ethanol ethanol',
+    # protect) joined it: identical components joined by a space are not a PIN,
+    #:3759, adducts of separate molecular entities; quick-wins Q7a).
     assert len(rows) == 25
     gold = _gold_rows()
     for r in rows:

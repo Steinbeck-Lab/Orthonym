@@ -286,9 +286,16 @@ def _central_carbon(mol, core_atoms):
     return core_atoms[1]  # fallback (SMARTS middle)
 
 
-def _glyceride_numbering(mol, match):
+def _glyceride_numbering(mol, match, acylate_of=None):
     """Return {atom_idx: iupac_locant} numbering propane so the ester (PCG) sites get
-    the lowest locants; central carbon is always 2."""
+    the lowest locants; central carbon is always 2.
+
+    ``acylate_of`` (acyl atom -> anion name), given when the anions differ: with the
+    ester locant set tied, the anion cited first in the name (alphanumerical order,
+     method (1), the Blue Book) takes the lowest locants, as a
+    prefix cited first does (g),:3307): 'propane-1,2,3-triyl 1,2-diacetate
+    3-propanoate (PIN)' (:31840), '... 2-acetate 1-hexadecanoate 3-[(9Z)-octadec-9-
+    enoate] (PIN)' (:31846)."""
     core = match.core_atoms
     central = _central_carbon(mol, core)
     terminals = [c for c in core if c != central]
@@ -302,7 +309,13 @@ def _glyceride_numbering(mol, match):
     candidates = [{t1: 1, central: 2, t2: 3}, {t2: 1, central: 2, t1: 3}]
 
     def key(numbering):
-        return sorted(numbering[a] for a in acyl_atoms) or [99]
+        primary = sorted(numbering[a] for a in acyl_atoms) or [99]
+        if not acylate_of:
+            return (primary,)
+        groups = {}
+        for a in acyl_atoms:
+            groups.setdefault(acylate_of[a], []).append(numbering[a])
+        return (primary, [sorted(groups[g]) for g in sorted(groups, key=_alpha_key)])
 
     best = min(candidates, key=key)
     return best, central, atom_site
@@ -313,6 +326,9 @@ def _glyceride_numbering(mol, match):
 # --------------------------------------------------------------------------- #
 def _assemble_glyceride(mol, match, style) -> Optional[str]:
     num, central, atom_site = _glyceride_numbering(mol, match)
+    _acylate_of = {a: _acylate_for_site(mol, s) for a, s in atom_site.items() if s[0] == "acyl"}
+    if None not in _acylate_of.values() and len(set(_acylate_of.values())) > 1:
+        num, central, atom_site = _glyceride_numbering(mol, match, _acylate_of)
 
     acyl_atoms = sorted((a for a, s in atom_site.items() if s[0] == "acyl"),
                         key=lambda a: num[a])

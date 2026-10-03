@@ -178,13 +178,15 @@ class TestAlkaloidE2E:
 
     @pytest.mark.integration
     def test_morphine(self):
+        # (the Blue Book) identifies no PIN for a natural product; the strict path builds its bridged fused PIN:23816,:23843) on the rule-derived parent '[1]benzofuro[3,2-e]isoquinoline' (slice S4)
         smiles = canonical("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5")
-        assert name_compound(smiles) == "morphine"
+        assert name_compound(smiles) == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     @pytest.mark.integration
     def test_codeine(self):
+        # the bridged fused PIN, as for morphine (slice S4)
         smiles = canonical("COc1ccc2c3c1O[C@H]1[C@@H](O)C=C[C@H]4[C@@H](C2)N(C)CC[C@@]341")
-        assert name_compound(smiles) == "codeine"
+        assert name_compound(smiles) == "(4R,4aR,7S,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7-ol"
 
     @pytest.mark.integration
     def test_diamorphine(self):
@@ -194,17 +196,20 @@ class TestAlkaloidE2E:
     @pytest.mark.integration
     def test_hydrocodone(self):
         smiles = canonical("COc1ccc2c3c1O[C@H]1C(=O)CC[C@H]4[C@@H](C2)N(C)CC[C@]314")
-        assert name_compound(smiles) == "hydrocodone"
+        # the bridged fused PIN (slice S3: added hydrogen at the 7-one, the Blue Book;:50943)
+        assert name_compound(smiles) == "(4R,4aR,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"
 
     @pytest.mark.integration
     def test_oxycodone(self):
         smiles = canonical("COc1ccc2c3c1O[C@H]1C(=O)CC[C@@]4(O)[C@@H](C2)N(C)CC[C@]314")
-        assert name_compound(smiles) == "oxycodone"
+        # the bridged fused PIN (slice S3: added hydrogen at the 7-one, the Blue Book;:50943)
+        assert name_compound(smiles) == "(4R,4aS,7aR,12bS)-4a-hydroxy-9-methoxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"
 
     @pytest.mark.integration
     def test_hydromorphone(self):
         smiles = canonical("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2C(=O)CC[C@H]3[C@H]1C5")
-        assert name_compound(smiles) == "hydromorphone"
+        # the bridged fused PIN (slice S3: added hydrogen at the 7-one, the Blue Book;:50943)
+        assert name_compound(smiles) == "(4R,4aR,7aR,12bS)-9-hydroxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"
 
     @pytest.mark.integration
     def test_alkaloid_count(self):
@@ -433,9 +438,10 @@ class TestSuccessCriteria:
 
     @pytest.mark.integration
     def test_sc3_morphine_recognition(self):
-        """SC3: name_compound(morphine_smiles) -> 'morphine'."""
+        """SC3: name_compound(morphine_smiles) -> its bridged fused PIN (slice S4;,
+        the Blue Book: the natural-product name 'morphine' is not a PIN)."""
         smiles = "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
-        assert name_compound(smiles) == "morphine"
+        assert name_compound(smiles) == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     @pytest.mark.integration
     def test_sc3b_beta_carotene_recognition(self):
@@ -482,12 +488,20 @@ class TestParametrizedDerivatives:
         # Steroid derivatives
         ("CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C", "cholesterol"),
         # Opioid derivatives
-        ("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5", "morphine"),
-        ("COc1ccc2c3c1O[C@H]1[C@@H](O)C=C[C@H]4[C@@H](C2)N(C)CC[C@@]341", "codeine"),
+        # morphine and codeine: their bridged fused PINs (slice S4; the Blue Book)
+        ("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5",
+         "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"),
+        ("COc1ccc2c3c1O[C@H]1[C@@H](O)C=C[C@H]4[C@@H](C2)N(C)CC[C@@]341",
+         "(4R,4aR,7S,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7-ol"),
         ("CC(=O)Oc1ccc2c3c1O[C@H]1[C@@H](OC(C)=O)C=C[C@H]4[C@@H](C2)N(C)CC[C@@]341", "diamorphine"),
-        ("COc1ccc2c3c1O[C@H]1C(=O)CC[C@H]4[C@@H](C2)N(C)CC[C@]314", "hydrocodone"),
-        ("COc1ccc2c3c1O[C@H]1C(=O)CC[C@@]4(O)[C@@H](C2)N(C)CC[C@]314", "oxycodone"),
-        ("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2C(=O)CC[C@H]3[C@H]1C5", "hydromorphone"),
+        # hydrocodone, oxycodone, hydromorphone: their bridged fused PINs (slice S3;
+        # the Blue Book,:50943)
+        ("COc1ccc2c3c1O[C@H]1C(=O)CC[C@H]4[C@@H](C2)N(C)CC[C@]314",
+         "(4R,4aR,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"),
+        ("COc1ccc2c3c1O[C@H]1C(=O)CC[C@@]4(O)[C@@H](C2)N(C)CC[C@]314",
+         "(4R,4aS,7aR,12bS)-4a-hydroxy-9-methoxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"),
+        ("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2C(=O)CC[C@H]3[C@H]1C5",
+         "(4R,4aR,7aR,12bS)-9-hydroxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"),
         # Terpenoid derivatives
         ("CC12CCC(CC1=O)C2(C)C", "camphor"),
         ("C=C(C)C1CC=C(C)CC1", "limonene"),
@@ -564,11 +578,12 @@ class TestPhase141CompoundClassRouting:
 
     @pytest.mark.integration
     def test_alkaloid_routing_morphine(self):
-        """Morphine routes through alkaloid class and returns retained name."""
+        """Morphine routes through the natural-product class, which offers its bridged fused
+        PIN first (slice S4; the Blue Book)."""
         result = name_compound(
             "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
         )
-        assert result == "morphine"
+        assert result == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     @pytest.mark.integration
     def test_amino_acid_routing_glycine(self):

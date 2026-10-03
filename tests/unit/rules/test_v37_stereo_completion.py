@@ -280,5 +280,8 @@ class TestST1KnownFollowOn:
         name = _be_name(smi)
         assert not errors.is_failure_name(name)          # ST.3: no longer abstains
         assert _rt(smi, name)                            # FULL stereo, round-trips
-        assert name == ("(1R,3R,8R,9S,10R,12R)-10-(acetyloxy)-5,8,9-trimethylspiro"
-                        "[2-oxatricyclo[7.2.1.0^3,8]dodec-4-ene-12,2'-oxirane]")
+        # quick-wins F-Q1: '0^2,7' before '0^3,8', the Blue Book), the
+        # oxygen then follows the fixed numbering,:9765); was
+        # '(1R,3R,8R,9S,10R,12R)-10-(acetyloxy)-5,8,9-trimethylspiro[2-oxatricyclo[7.2.1.0^3,8]...'
+        assert name == ("(1S,2R,7R,9R,11R,12R)-11-(acetyloxy)-1,2,5-trimethylspiro"
+                        "[8-oxatricyclo[7.2.1.0^2,7]dodec-5-ene-12,2'-oxirane]")

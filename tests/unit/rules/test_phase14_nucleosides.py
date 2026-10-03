@@ -151,7 +151,9 @@ def test_5_methylcytidine_deterministic():
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected", [
     ("CC(C)[C@H]1CC[C@H]2[C@@H](CC[C@H]3C(C)(C)CCC[C@]23C)C1", "abietane"),
-    ("C[C@@H]1C[C@]23CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]2CC[C@H]1C3", "kaurane"),
+    # kaurane: the strict path builds its bridged fused PIN (slice S4; the Blue Book)
+    ("C[C@@H]1C[C@]23CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]2CC[C@H]1C3",
+     "(4aS,6aS,8R,9S,11aS,11bS)-4,4,8,11b-tetramethyltetradecahydro-6a,9-methanocyclohepta[a]naphthalene"),
     ("CC(C)[C@@H]1CC[C@]2(C)CC[C@]3(C)[C@H](CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@]43C)[C@@H]12", "lupane"),
     ("CC1(C)CC[C@]2(C)CC[C@]3(C)[C@H](CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1", "oleanane"),
     ("CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@@H]3CC[C@H]4C(C)(C)CCC[C@]4(C)[C@H]3CC[C@]12C", "lanostane"),

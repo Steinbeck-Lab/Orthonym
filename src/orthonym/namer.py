@@ -100,6 +100,19 @@ from .rules.seniority import get_principal_group
 # ---------------------------------------------------------------------------
 
 
+def _is_sulfoxide_type_centre(atom) -> bool:
+    """A chalcogen stereocentre of a sulfoxide-type group R-X(=O)-R' (X = S, Se, Te;
+    also the charge-separated R-X+(O-)-R'): three neighbours, one a terminal oxygen,
+    two carbons. Such an atom is never a parent hydride atom of a substitutive name;
+    it sits in a 'methanesulfinyl'-type prefix."""
+    if atom.GetSymbol() not in ('S', 'Se', 'Te'):
+        return False
+    nbrs = list(atom.GetNeighbors())
+    oxo = [n for n in nbrs if n.GetSymbol() == 'O' and n.GetDegree() == 1]
+    carbons = [n for n in nbrs if n.GetSymbol() == 'C']
+    return len(nbrs) == 3 and len(oxo) == 1 and len(carbons) == 2
+
+
 def _final_stereo_check(
     mol,
     name: str,
@@ -192,7 +205,21 @@ def _final_stereo_check(
     ):
         _cip = _rs_atoms[0].GetProp('_CIPCode')
         if _cip in ('R', 'S', 'r', 's'):
-            return f"({_cip})-{name}"
+            _fronted = f"({_cip})-{name}"
+            if _is_sulfoxide_type_centre(_rs_atoms[0]) and re.search(r"\d", name):
+                # (the Blue Book): "When they relate to substituent
+                # groups, they are cited at the front of the corresponding prefix.
+                # They are preceded by a numerical or letter locant... when such
+                # locants are present" -- '1-methyl-4-[(R)-phenyl(18O1)methanesulfonyl]
+                # benzene (PIN)' (:46030). A sulfoxide-type centre is never the parent
+                # (it is always in a 'sulfinyl' prefix), so the name's front is the
+                # prefix's front only when no locant is cited ('(S)-(methanesulfinyl)
+                # benzene (PIN)',:46266). With locants the fronted descriptor is a
+                # valid name, never the PIN: labelled below it (the best-effort tier
+                # keeps the name; the PIN tier declines).
+                from .metrics.provenance import record_non_pin_fragment
+                record_non_pin_fragment(_fronted)
+            return _fronted
 
     # Predicate said True but no authoritative injection happened -> log gap.
     n_atom_stereo = sum(1 for a in atoms_of(mol) if a.HasProp('_CIPCode'))
@@ -937,7 +964,8 @@ def _p4_oxoacid_anhydride_leak_motif(mol) -> bool:
             and mol.HasSubstructMatch(_P4_NAKED_CARBONATE_PAT)):
         return True
     from .rules.inorganic_acids import _find_polyacid_backbone, name_inorganic_acid
-    if _find_polyacid_backbone(mol) is not None and name_inorganic_acid(mol) is None:
+    _backbone = _find_polyacid_backbone(mol)
+    if _backbone is not None and name_inorganic_acid(mol) is None:
         from .rules.anhydrides import (
             _name_chalcogen_anhydride,
             _name_peroxy_anhydride,
@@ -945,8 +973,49 @@ def _p4_oxoacid_anhydride_leak_motif(mol) -> bool:
         )
         if (_name_sulfonic_anhydride(mol) is None
                 and _name_chalcogen_anhydride(mol) is None
-                and _name_peroxy_anhydride(mol) is None):
+                and _name_peroxy_anhydride(mol) is None
+                and not _polyacid_backbone_is_acid_linked_prefix(mol, _backbone[1])):
             return True
+    return False
+
+
+def _polyacid_backbone_is_acid_linked_prefix(mol, centres) -> bool:
+    """True when the two-centre backbone hangs from the rest of the molecule by
+    one oxygen and the prefix builder names that branch whole: the
+    'substituent-prefix on a senior acid' item of the floor above, built by
+    ``substituent_enumerator.name_acid_linked_branch`` ('3-[(1,3,3-trihydroxy-
+    1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)oxy]propanoic acid (PIN)',
+    the Blue Book). The builder declines unless the principal
+    characteristic group is senior to esters and the branch is pendant, and it
+    names every atom of the branch, so no atom can be dropped through it."""
+    from .assembly.substituent_enumerator import name_acid_linked_branch
+    from .perception.functional_groups import detect_functional_groups
+    from .rules.seniority import get_principal_group
+    centre_set = set(centres)
+    for c in centres:
+        for o in mol.GetAtomWithIdx(c).GetNeighbors():
+            if o.GetSymbol() != 'O' or o.GetDegree() != 2:
+                continue
+            outer = [x.GetIdx() for x in o.GetNeighbors()
+                     if x.GetIdx() != c and x.GetIdx() not in centre_set]
+            if len(outer) != 1 or mol.GetAtomWithIdx(outer[0]).GetSymbol() != 'C':
+                continue
+            branch = {o.GetIdx()}
+            stack = [c]
+            while stack:
+                cur = stack.pop()
+                if cur in branch:
+                    continue
+                branch.add(cur)
+                for nb in mol.GetAtomWithIdx(cur).GetNeighbors():
+                    j = nb.GetIdx()
+                    if j != o.GetIdx() and j not in branch:
+                        stack.append(j)
+            if outer[0] in branch or not centre_set <= branch:
+                continue
+            pg, _ = get_principal_group(mol, detect_functional_groups(mol))
+            if name_acid_linked_branch(mol, branch, o.GetIdx(), pg):
+                return True
     return False
 
 
@@ -3288,6 +3357,8 @@ class MolecularFeatures:
     ring_substituents: Dict[int, List[List[int]]] = field(default_factory=dict)  # Substituents on ring
     ring_double_bonds: List[tuple] = field(default_factory=list)  # Double bonds in ring
     ring_double_bond_locants: List[int] = field(default_factory=list)  # Locants for ring double bonds
+    ring_triple_bonds: List[tuple] = field(default_factory=list)  # Triple bonds in ring
+    ring_triple_bond_locants: List[int] = field(default_factory=list)  # Locants for ring triple bonds
 
     # Ring assembly information (biphenyl, bipyridine, etc.)
     ring_assembly_info: Optional[Dict] = None
@@ -5207,14 +5278,16 @@ class Orthonym:
                 The name, or a label when there is none.
             ``tier``
                 How the name was built: ``pin_verified`` (the strict path for the
-                Preferred IUPAC Name built it, certified it and OPSIN read it back),
+                Preferred IUPAC Name built it, certified it and OPSIN read it back;
+                or a name from an exact-match list, matched to the input's exact
+                structure, with ``verified`` ``identity``),
                 ``pin_unverified`` (a name in preferred-name form that OPSIN read
                 back, but whose preferred status is not certified: a producer outside
                 the strict path built it or a part of it),
                 ``systematic_verified`` (a checked systematic name that is not the
-                preferred name, from the general engine, a table of retained names,
-                or the strict path when the name contains a part the engine records
-                as not the preferred form), ``best_effort`` (the last-resort
+                preferred name, for example from the general engine, a table of
+                retained names, or the strict path when the name contains a part
+                the engine records as not the preferred form), ``best_effort`` (the last-resort
                 producers, or a name whose own string no round trip confirmed) or
                 ``abstain`` (no name).
             ``is_pin``
@@ -5743,11 +5816,9 @@ class Orthonym:
         audit found >=2 canonical-SMILES keys shared between the two tables
         where ``get_retained_name`` carries a WRONG (non-isomeric) name for
         a fused ring system that ``FUSED_HETEROCYCLE_DATA`` already has
-        correct -- e.g. benzo[f]quinoline's canonical SMILES also keys
-        ``ALL_RETAINED_NAMES`` to ``benzo[h]quinoline`` (a different
-        connectivity; OPSIN-verified NOT to round-trip), and quinolizidine's
-        key resolves to ``decahydroisoquinoline`` (also a different
-        connectivity). Checking (1) first means the caller's gate
+        correct -- e.g. quinolizidine's key resolves to
+        ``decahydroisoquinoline`` (a different connectivity; the benzo[f]/[h]
+        quinoline keys of that audit have since been corrected). Checking (1) first means the caller's gate
         never even has to catch these -- and it still would, since this
         method never itself verifies its answer.
 
@@ -9552,9 +9623,23 @@ class Orthonym:
                 # demote it to its chain, which the ring-substituent enumerator
                 # then names as an oxo-alkyl prefix (2-oxobutyl). Fail-closed:
                 # leaves principal_group_atoms unchanged on any ambiguity.
+                # "Ring" here is the parent ring SYSTEM, not the one ring that
+                # principal_ring names: rings joined by a spiro atom are one
+                # parent hydride, the Blue Book, "the naming of
+                # parent hydrides containing free spiro unions"), and both of its
+                # ketones are suffixes, 'spiro[4.5]decane-1,7-dione (PIN)'
+                #,:28404). Measured against the single ring, the
+                # ketone on the second spiro ring was 'off-ring' and the 1:1 tie
+                # demoted it to 'oxo' ('1-oxospiro[4.5]decan-7-one').
                 if not getattr(features, 'chain_is_parent', False):
+                    _pr_set = set(features.principal_ring or ())
+                    _parent_system = next(
+                        (s for s in get_ring_systems(
+                            features.mol, include_spiro=True)
+                         if _pr_set and _pr_set <= s),
+                        _pr_set)
                     _demote_offring_principal_group_matches(
-                        features, features.principal_ring
+                        features, _parent_system
                     )
 
                 # (b) /: a mancude monocyclic hydrocarbon
@@ -9794,6 +9879,7 @@ class Orthonym:
                     from .rules.cycloalkanes import (
                         get_ring_double_bonds,
                         get_ring_substituents,
+                        get_ring_triple_bonds,
                         orient_cycloalkane,
                         orient_cycloalkene,
                     )
@@ -9803,8 +9889,13 @@ class Orthonym:
                         features.mol, features.principal_ring
                     )
 
-                    # Get ring double bonds
+                    # Get ring double bonds, and the triple bonds:
+                    # (the Blue Book) numbers both, as one set first
+                    # (e)(ii),:3290).
                     features.ring_double_bonds = get_ring_double_bonds(
+                        features.mol, features.principal_ring
+                    )
+                    features.ring_triple_bonds = get_ring_triple_bonds(
                         features.mol, features.principal_ring
                     )
 
@@ -9905,22 +9996,29 @@ class Orthonym:
                             features.principal_ring,
                             features.ring_double_bonds,
                             features.ring_substituents,
-                            principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None
+                            principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None,
+                            triple_bond_atoms=features.ring_triple_bonds,
                         )
-                        # Calculate ring double bond locants (wrap-aware:
-                        # the closure bond positions (0, n-1) is locant n)
-                        if features.oriented_ring and features.ring_double_bonds:
+                        # Calculate ring double and triple bond locants
+                        # (wrap-aware: the closure bond positions (0, n-1) is
+                        # locant n)
+                        if features.oriented_ring:
                             from .rules.cycloalkanes import ring_double_bond_locant
                             oriented = features.oriented_ring
                             n_ring = len(oriented)
-                            locants = []
-                            for a1, a2 in features.ring_double_bonds:
-                                pos1 = oriented.index(a1)
-                                pos2 = oriented.index(a2)
-                                locants.append(
-                                    ring_double_bond_locant(pos1, pos2, n_ring)
-                                )
-                            features.ring_double_bond_locants = sorted(locants)
+                            for _bonds, _field in (
+                                    (features.ring_double_bonds, 'ring_double_bond_locants'),
+                                    (features.ring_triple_bonds, 'ring_triple_bond_locants')):
+                                if not _bonds:
+                                    continue
+                                locants = []
+                                for a1, a2 in _bonds:
+                                    pos1 = oriented.index(a1)
+                                    pos2 = oriented.index(a2)
+                                    locants.append(
+                                        ring_double_bond_locant(pos1, pos2, n_ring)
+                                    )
+                                setattr(features, _field, sorted(locants))
 
         # Find principal chain (for acyclic molecules or chain-is-parent cyclic molecules)
         # Skip if chain was already set by parent selection (chain_is_parent = True)
@@ -10292,9 +10390,14 @@ def name_compound(smiles: str, style: str = "pin",
         The structure, as a SMILES string.
     style: {"pin", "general", "cas"}, default "pin"
         Naming style. ``"pin"`` aims at the Preferred IUPAC Name. ``"general"``
-        allows a few general IUPAC forms where the recommendations offer one (for
-        example some adduct names and axial stereodescriptors). ``"cas"`` is
-        accepted and at present gives the same names as ``"pin"``.
+        allows general IUPAC forms where the recommendations offer one (for
+        example functional class names such as 'dimethyl sulfoxide', hydrate
+        names such as 'oxalic acid dihydrate' and the axial descriptors Ra and
+        Sa). The default tier's PIN-only rule applies to ``"pin"`` only, so with
+        ``"general"`` or ``"cas"`` a name that ``"pin"`` declines with
+        NO_VERIFIED_PIN is returned. ``"cas"`` is accepted and at present gives
+        the names of ``"general"``, except that hydrate names and axial
+        descriptors keep their ``"pin"`` form.
     include_confidence: bool, default False
         Return a dictionary instead of a string. Its ``"name"`` key holds the
         name, ``"handler"`` the part of the engine that built it, and
@@ -10413,11 +10516,8 @@ def _name_compound_impl(smiles: str, style: str = "pin",
 
     Args:
         smiles: SMILES string
-        style: Naming style
-            - "pin": Preferred IUPAC Names (default, uses retained names when available)
-            - "systematic": Always generate systematic name (bypass retained names)
-            - "general": General IUPAC (more flexible)
-            - "cas": CAS-style naming
+        style: Naming style, "pin" (the default), "general" or "cas"; see
+            :func:`name_compound`.
         include_confidence: If True, return dict with confidence metadata
             instead of plain str
         binding_proof: proof mode forwarded to ``Orthonym`` -- see

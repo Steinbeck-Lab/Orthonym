@@ -3004,7 +3004,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1=C[C@@H]2C(C)(C)[C@H]3CC[C@H](C)[C@@]23CC1",  # fused-ring,small
-        "(1R,3R,6S,7R)-2,2,6,10-tetramethyl-tricyclo[5.4.0.0(3,7)]undec-10-ene",
+        "(1R,2S,5R,7R)-2,6,6,9-tetramethyltricyclo[5.4.0.0^1,5]undec-8-ene",  # quick-wins F-Q1: DK-VBNUM 661 fixed, superscripts {1,5} < {3,7}:9685); was '(1R,3R,6S,7R)-2,2,6,10-tetramethyl-tricyclo[5.4.0.0(3,7)]undec-10-ene'
     ),
     (
         "CC/C=C\\CC",  # acyclic,small

@@ -63,14 +63,11 @@ class TestP6461ThioneKetoneParent:
     def test_diphenylmethanone(self):
         assert name_compound("O=C(c1ccccc1)c1ccccc1") == "diphenylmethanone"
 
-    @pytest.mark.xfail(
-        reason="v50 A4 BLOCKED: guard broadening to bare heteroarenes is "
-        "correct (P-64.6.1) but the substitutive methanethione builder cannot "
-        "place an N-attached azolyl (perceives an N-C(=S)-N thiourea) and "
-        "abstains. Multiplicative name retained until the producer gap closes.",
-        strict=True,
-    )
-    def test_di_imidazol_1_yl_methanethione_blocked(self):
+    def test_di_imidazol_1_yl_methanethione(self):
+        # (the Blue Book) 'di(1H-imidazol-1-yl)methanethione (PIN)';
+        # (:23309): the thione bridge is the parent. Built by
+        # rules/multiplicative.py:_bridge_ketone_parent_name (PIN class program,
+        # Task 10).
         smi = "S=C(n1ccnc1)n1ccnc1"
         assert name_compound(smi) == "di(1H-imidazol-1-yl)methanethione"
 

@@ -980,12 +980,32 @@ def _decorated_heteroaryl_substituent_name(
     groups = _dd(list)
     for ra, nm in decorations:
         groups[nm].append(best_pos[ra])
+    # (the Blue Book): "All locants are omitted in compounds or
+    # substituent groups in which all substitutable positions are completely
+    # substituted or modified... in the same way" ('1-chloro-2-(pentafluoroethyl)
+    # benzene (PIN)',:3023): every ring atom other than the free-valence atom that
+    # carries a hydrogen in the parent ring (carbon, or a hetero ring atom bearing
+    # a decoration or H) holds the same decoration -> 'pentafluorophenyl'.
+    _substitutable = {
+        i for i in ring_list if i != attachment_atom
+        and (mol.GetAtomWithIdx(i).GetSymbol() == 'C' or i in deco_atoms
+             or mol.GetAtomWithIdx(i).GetTotalNumHs() > 0)}
+    # Several identical substituents and no indicated hydrogen: a single
+    # substituent on an indicated-hydrogen atom keeps its locant
+    # ('1-(2,4-dimethylphenyl)-1H-tetrazol-5-yl').
+    _complete = (len(groups) == 1 and len(deco_atoms) >= 2
+                 and len(deco_atoms) == len(set(deco_atoms))
+                 and indicated_h_atom is None and set(deco_atoms) == _substitutable)
     prefix_parts = []  # (alpha_key, text)
     for nm, locs in groups.items():
         locs = sorted(locs)
         mult = _DECO_MULT.get(len(locs))
         if mult is None:
             return None
+        if _complete:
+            prefix_parts.append(
+                (_alpha(nm), _multiplied_component(len(locs), nm, _enclose_if_compound(nm))))
+            continue
         # Enclosing marks. "Parentheses (round brackets)... are used
         # to enclose multiplied components that are:... (c) simple substituent
         # prefixes and functionalized parent hydrides beginning with a
@@ -1575,6 +1595,18 @@ def _extract_ring_submol(mol, ring_atoms, attachment_atom):
     return sub, attach_sub
 
 
+def _bridged_fused_substituent_name(sub, attach_sub) -> Optional[str]:
+    """A bridged fused ring system as a '-yl' prefix parent, free valence):
+    ``bridged_fused_pin.build_substituent``. Tried before the von Baeyer namer: a ring
+    system with a bridged fused name is never named by von Baeyer nomenclature
+    , the Blue Book, "fused ring systems > bridged fused systems >
+    non-fused bridged systems"). An internal error of the builder declines and is logged
+    (``bridged_fused.builder_declining_on_error``); the caller then tries the next namer."""
+    from .bridged_fused import builder_declining_on_error
+    from .bridged_fused_pin import build_substituent
+    return builder_declining_on_error(build_substituent, sub, attach_sub)
+
+
 def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
     """``bicyclo[2.2.1]heptan-2-yl`` etc. for a detached carbocyclic von-Baeyer
     ring system, reusing the bicyclo parent namer with the free valence
@@ -2012,7 +2044,8 @@ def _polycyclic_substituent_name(
     sub, attach_sub = _extract_ring_submol(mol, ring_atoms, attachment_atom)
     if sub is None:
         return None
-    for namer in (_vonbaeyer_substituent_name,
+    for namer in (_bridged_fused_substituent_name,
+                  _vonbaeyer_substituent_name,
                   _spiro_substituent_name,
                   _fused_hydro_substituent_name):
         try:
@@ -4489,7 +4522,23 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
                 return True
         return any(c in nm for c in '-()[]0123456789')
 
-    if not any(_is_complex_prefix(nm) for nm in groups):
+    # (the Blue Book): every substitutable position of the aromatic
+    # ring other than the free valence carries the same substituent -> no locants
+    # ('pentachlorophenoxy'; '1-chloro-2-(pentafluoroethyl)benzene (PIN)',:3023).
+    _substitutable = sorted(
+        p for p, i in order.items() if i != attachment_atom
+        and (mol.GetAtomWithIdx(i).GetSymbol() == 'C' or atom_prefixes[i]
+             or mol.GetAtomWithIdx(i).GetTotalNumHs() > 0))
+    _complete = (len(groups) == 1 and len(_substitutable) >= 2
+                 and all(mol.GetAtomWithIdx(i).GetIsAromatic()
+                         and mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in order.values())
+                 and sorted(next(iter(groups.values()))) == _substitutable)
+    if _complete:
+        from ..assembly.naming_utils import enclose_if_compound as _eic
+        from ..assembly.naming_utils import multiplied_component as _mc
+        (name, locs), = groups.items()
+        prefix_str = _mc(len(locs), name, _eic(name))
+    elif not any(_is_complex_prefix(nm) for nm in groups):
         # byte-identical legacy path — simple-prefix rings are unchanged.
         parts = []
         for name in sorted(groups):  # alphabetical citation order

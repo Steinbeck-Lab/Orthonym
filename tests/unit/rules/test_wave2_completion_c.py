@@ -122,21 +122,24 @@ class TestAdditives:
         assert name_compound("O=C(C#N)C#N") == "carbonyl dicyanide"
 
     def test_ethyl_diazoacetate(self):
-        # Engine acetate-policy form of BB 'ethyl diazoacetate' (RT-verified).
+        # DIAZO COMPOUNDS (the Blue Book): 'N2CH-CO-O-C2H5 ethyl
+        # diazoacetate (PIN)' (:25925), the retained acetic acid (:17646).
         assert (name_compound("[N-]=[N+]=CC(=O)OCC")
-                == "ethyl 2-diazoethanoate")
+                == "ethyl diazoacetate")
 
     def test_diazomethane(self):
         assert name_compound("C=[N+]=[N-]") == "diazomethane"
 
     def test_sulfanylidene_prefix(self):
-        # Engine paren form (pre-existing enclosure trait shared with =O twin).
+        # (the Blue Book) nesting order "{[({})]}" (:7446): a
+        # compound prefix inside a parenthesised prefix takes square brackets.
         assert (name_compound("CCC(=S)CC1CCCC(CC(=O)CC)C1")
-                == "1-(3-(2-sulfanylidenebutyl)cyclohexyl)butan-2-one")
+                == "1-[3-(2-sulfanylidenebutyl)cyclohexyl]butan-2-one")
 
     def test_oxo_twin_unchanged(self):
+        # nesting order (the Blue Book).
         assert (name_compound("CCC(=O)CC1CCCC(CC(=O)CC)C1")
-                == "1-(3-(2-oxobutyl)cyclohexyl)butan-2-one")
+                == "1-[3-(2-oxobutyl)cyclohexyl]butan-2-one")
 
     def test_thioketone_parent_unchanged(self):
         assert name_compound("CCC(=S)C") == "butane-2-thione"

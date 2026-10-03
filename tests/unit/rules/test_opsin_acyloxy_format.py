@@ -36,14 +36,17 @@ class TestAcyloxyBracketFormat:
         )
 
     def test_acyloxy_brackets_on_chain(self):
-        """Acyloxy prefix on acyclic chain is bracketed: 2-(acetyloxy)ethanoic acid.
+        """Acyloxy prefix on acyclic chain is bracketed: (acetyloxy)acetic acid.
 
         Wave-3: acetyl is the PIN acyl group, so the bracketed prefix is
-        '(acetyloxy)' (ethanoyloxy is general-only).
+        '(acetyloxy)' (ethanoyloxy is general-only). The parent is the retained
+        'acetic acid (PIN) (substitution allowed; see '
+        (the Blue Book), without a locant ('difluoroacetic acid (PIN)
+        (not 2,2-difluoroacetic acid)',:3037).
         """
         name = name_compound("CC(=O)OCC(=O)O")
-        assert name == "2-(acetyloxy)ethanoic acid", (
-            f"Expected '2-(acetyloxy)ethanoic acid', got '{name}'"
+        assert name == "(acetyloxy)acetic acid", (
+            f"Expected '(acetyloxy)acetic acid', got '{name}'"
         )
         assert re.search(r"\(\w+yloxy\)", name), (
             f"Expected bracketed acyloxy prefix in '{name}'"

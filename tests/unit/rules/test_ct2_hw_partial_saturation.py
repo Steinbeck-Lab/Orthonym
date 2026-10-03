@@ -58,9 +58,15 @@ THIAZOLINE = "CON1C(=O)C2(CN=C(SC)S2)c2ccccc21"
 
 def test_thiazoline_partial_saturation_names_rt_exact():
     """Signature 2 (the fix target): the thiazoline spiro-oxindole must NAME
-    (not abstain) and round-trip exactly. Preserving ``C=N`` and citing the
-    spiro locant consistently with the ``4,5-dihydro-1,3-thiazole`` stem."""
-    n = _name(THIAZOLINE)
+    (not abstain) and round-trip exactly, preserving ``C=N``. Its lactam C=O is an
+    'oxo' prefix on the spiro parent, which is not the PIN (the principal
+    characteristic group is a suffix,; 'spiro[4.5]decane-1,7-dione (PIN)',
+    the Blue Book): the default (PIN) tier declines it with NO_VERIFIED_PIN,
+    the strict path still builds the name and the best-effort tier gives the same
+    name, read back exactly (``tests/support/default_tier.py``)."""
+    from tests.support.default_tier import declined_pin_row
+    with wall_clock_limit(120):
+        n = declined_pin_row(THIAZOLINE)["name"]
     assert not n.startswith("unknown"), (
         f"still abstaining on the thiazoline partial-saturation component: {n!r}")
     assert _rt(THIAZOLINE, n), f"named but does not round-trip: {n!r}"

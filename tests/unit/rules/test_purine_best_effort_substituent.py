@@ -135,7 +135,8 @@ def test_pin_default_engine_output_unchanged_end_to_end():
     eng = Orthonym()
     assert eng.name("CCO") == "ethanol"
     assert eng.name("CC(=O)Oc1ccccc1C(=O)O") == "2-(acetyloxy)benzoic acid"  # aspirin
-    assert eng.name("Nc1ncnc2nc[nH]c12") == "adenine"
+    # 'adenine' is not a Blue Book name (0 hits); "the PIN is 7H-purine" (the Blue Book)
+    assert eng.name("Nc1ncnc2nc[nH]c12") == "7H-purin-6-amine"
     assert eng.name("Cn1cnc2c(N)ncnc21") == "9-methyl-9H-purin-6-amine"
 
 

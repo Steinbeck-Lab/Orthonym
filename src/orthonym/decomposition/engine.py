@@ -1482,7 +1482,73 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
             if scored[0][0] != scored[-1][0]:  # strict seniority difference only
                 return scored[-1][1]  # cleave the LEAST senior acid's bond
 
+    # (the Blue Book): "Esters that do not qualify for
+    # multiplicative names as described above are named as monoesters and other
+    # ester components are expressed as prefixes by substitutive nomenclature";
+    # 'methyl 2-chloro-5-[3-(ethoxycarbonyl)phenoxy]benzoate (PIN) (not ethyl
+    # 3-[4-chloro-3-(methoxycarbonyl)phenoxy]benzoate; the parent structure of the
+    # PIN has more substituents)' (:31813), the rule of. Among ester bonds
+    # whose acid components sit on ring systems of one skeleton (no choice),
+    # the cleaved ester is the one whose ring carries more substituents; the
+    # balance order above decides only what this leaves tied.
+    if best.get("type") == "ester":
+        peers = _ester_peers_by_parent_substituents(mol, bonds, best)
+        if peers:
+            best = min(peers, key=_balance_score)
+
     return best
+
+
+def _ester_acyl_ring(mol, acyl_c: int):
+    """(ring-system atoms, skeleton key) of the ring the ester acyl carbon is bonded
+    to, or None for an acyl carbon on a chain."""
+    ri = mol.GetRingInfo()
+    nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(acyl_c).GetNeighbors() if n.IsInRing()]
+    if len(nbrs) != 1:
+        return None
+    system = set()
+    rings = [set(r) for r in ri.AtomRings()]
+    frontier = [r for r in rings if nbrs[0] in r]
+    while frontier:
+        r = frontier.pop()
+        if r <= system:
+            continue
+        system |= r
+        frontier.extend(x for x in rings if x & system and not x <= system)
+    key = Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(system), canonical=True,
+                                   isomericSmiles=False)
+    return system, key
+
+
+def _ester_peers_by_parent_substituents(mol, bonds, best):
+    """The ester bonds whose acid ring has the most substituents,
+    among those on a ring of the same skeleton as ``best``'s;  when ``best``
+    already has the most or no such comparison applies."""
+    try:
+        ref = _ester_acyl_ring(mol, best["acid_atom"])
+        if ref is None:
+            return []
+        counted = []
+        for b in bonds:
+            if b.get("type") != "ester":
+                continue
+            ring = _ester_acyl_ring(mol, b["acid_atom"])
+            if ring is None or ring[1] != ref[1]:
+                continue
+            system = ring[0]
+            n_subs = sum(1 for a in system for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                         if nb.GetIdx() not in system and nb.GetIdx() != b["acid_atom"]
+                         and nb.GetAtomicNum() > 1)
+            counted.append((n_subs, b))
+        if len(counted) < 2:
+            return []
+        top = max(n for n, _ in counted)
+        best_n = next((n for n, b in counted if b is best), None)
+        if best_n is None or best_n == top:
+            return []
+        return [b for n, b in counted if n == top]
+    except Exception:  # noqa: BLE001 - keep the balance choice
+        return []
 
 
 # ---------------------------------------------------------------------------
@@ -1546,7 +1612,10 @@ def _split_parent_is_junior(mol, expressed: Optional[str], exclude_atoms=frozens
         return False
     # classes 1-6 (radicals, ions, zwitterions;:18158-:18168) are senior to every
     # suffix class, and the group perception does not rank them: a charged molecule
-    # is not judged here.
+    # is not judged here. (Judged, quick-wins Q6: a split of a charged molecule can be
+    # right -- the amide split of an N-acyl glycinate names the anion parent,
+    # '...glycinate', tests/unit/decomposition/test_split_parent_class_p41.py -- so it
+    # is not declined; the read-back judges each such name.)
     if any(a.GetFormalCharge() or a.GetNumRadicalElectrons() for a in mol.GetAtoms()):
         return False
     pg = _molecule_principal_group(mol, exclude_atoms)
@@ -1655,38 +1724,13 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     # naming: acid fragment becomes a prefix on the larger parent fragment.
     # The acid_atom/alkyl_atom in the bond dict are NOT swapped -- only the
     # flag is set. We swap the naming roles here at assembly time.
-    if bond.get("roles_swapped"):
-        try:
-            from .fragment_assembly import _acid_to_acyl, _join_components
-            acid_name = fragment_names.get("acid", "")
-            other_name = (fragment_names.get("alkyl")
-                          or fragment_names.get("amine", ""))
-
-            if bond["type"] == "ester":
-                # Acyloxy prefix: "acetic acid" -> "(acetyloxy)" prefix on parent
-                acyl = _acid_to_acyl(acid_name)
-                if acyl and other_name:
-                    sub_name = _join_components(f"({acyl}oxy)", other_name)
-                    if sub_name and _name_quality_is_acceptable(sub_name, mol):
-                        return sub_name
-
-            elif bond["type"] == "thioester":
-                # Acylthio prefix: "acetic acid" -> "(acetylthio)" prefix on parent
-                acyl = _acid_to_acyl(acid_name)
-                if acyl and other_name:
-                    sub_name = _join_components(f"({acyl}thio)", other_name)
-                    if sub_name and _name_quality_is_acceptable(sub_name, mol):
-                        return sub_name
-
-            elif bond["type"] in ("phosphodiester", "sulfonamide", "carbamate"):
-                # For uncommon bond types, fall through to normal assembly.
-                # The roles_swapped flag is informational; the existing assembler
-                # will attempt naming with the original (un-swapped) atom indices.
-                pass
-
-            # Fallback: if substitutive naming failed, fall through to normal assembly
-        except Exception:
-            pass  # Any failure: fall through to normal assembly
+    # The roles-swapped ester / thioester (the alcohol side is the parent, the acid
+    # side its acyloxy / acylthio prefix) is not glued here: gluing '(acyloxy)' in
+    # front of the parent's name cannot place the prefix's locant, and the parent was
+    # named with the esterified O still on it (the '(acetyloxy)-...-6-ol' shape: no
+    # locant, the O cited twice) -- names only the read-back stopped (quick-wins Q6).
+    # The roles_swapped flag stays informational: the assembly below names the
+    # bond with the original atom roles, as it did when the glue failed.
 
     # Substitutive naming preference: when the acid fragment already has a
     # principal group (sulfonic acid, phosphonic acid), prefer substitutive
@@ -1822,7 +1866,65 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         except Exception:  # noqa: BLE001 -- the label must never break naming
             from ..metrics.provenance import record_non_pin_label
             record_non_pin_label(_assembled)
+    if bond["type"] in ("sulfonamide", "amide") and _assembled:
+        # User ruling D3 (2026-10-02): a C-substituent of a one-carbon sulfonamide
+        # cites '1-' when it could stand on the nitrogen, or an N-substituent on the
+        # carbon, the Blue Book; '(1-cyclohexylmethanesulfonamido)acetic
+        # acid',:33024). A sulfonamide parent is assembled here from a fragment name
+        # (its acid's, or the amine fragment an N-acyl group floats onto), which cannot
+        # carry that locant, so the name is labelled below the PIN.
+        try:
+            if _one_carbon_sulfonamide_cites_parent_locant(
+                    mol, _sulfonamide_parent_match(mol, bond, fragment_names)):
+                from ..metrics.provenance import record_non_pin_label
+                record_non_pin_label(_assembled)
+        except Exception:  # noqa: BLE001 -- the label must never break naming
+            from ..metrics.provenance import record_non_pin_label
+            record_non_pin_label(_assembled)
     return _assembled
+
+
+_SULFONAMIDE_UNIT = Chem.MolFromSmarts("[SX4](=[OX1])(=[OX1])[NX3]")
+
+
+def _sulfonamide_parent_match(mol, bond, fragment_names):
+    """The (S, O, O, N) atoms of the sulfonamide whose name is the parent of the
+    assembled name, else None: the cleaved sulfonamide itself, or -- for an amide
+    whose acyl floats onto the amine fragment (no simple amine prefix, the branch
+    ``_assemble_amide`` takes) -- the sulfonamide holding the amide nitrogen."""
+    if bond["type"] == "sulfonamide":
+        return bond.get("match")
+    from .fragment_assembly import _amine_to_prefix
+    if _amine_to_prefix(fragment_names.get("amine") or ""):
+        return None
+    n_idx = bond.get("amine_atom")
+    for match in mol.GetSubstructMatches(_SULFONAMIDE_UNIT):
+        if match[3] == n_idx:
+            return match
+    return None
+
+
+def _one_carbon_sulfonamide_cites_parent_locant(mol, match) -> bool:
+    """True when the sulfonamide ``match`` (S, O, O, N) sits on a one-carbon acyclic
+    parent whose substituent must cite the locant '1' -- the licence of the one-carbon
+    parents, ``locant_omission.mononuclear_parent_locant_required``, read on the whole
+    molecule. False for any other shape (a longer chain, a ring carbon, no match)."""
+    if not match or len(match) < 4:
+        return False
+    s_atom = mol.GetAtomWithIdx(int(match[0]))
+    carbons = [nb for nb in s_atom.GetNeighbors() if nb.GetAtomicNum() == 6]
+    if len(carbons) != 1 or carbons[0].IsInRing():
+        return False
+    c_atom = carbons[0]
+    if any(nb.GetAtomicNum() == 6 and not nb.IsInRing() for nb in c_atom.GetNeighbors()):
+        return False
+    from types import SimpleNamespace
+
+    from ..assembly.locant_omission import mononuclear_parent_locant_required
+    return mononuclear_parent_locant_required(SimpleNamespace(
+        mol=mol, principal_chain=[c_atom.GetIdx()],
+        principal_group_atoms=[tuple(int(i) for i in match[:4])],
+        is_cyclic=False, chain_is_parent=True))
 
 
 # ---------------------------------------------------------------------------

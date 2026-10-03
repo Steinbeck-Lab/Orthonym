@@ -25,7 +25,7 @@ class TestP24BranchedPolyspiro:
 
     def test_dispiro_unchanged(self):
         # 2-spiro-atom path must NOT regress.
-        assert name_compound("C1CC2(CC1)CC1(CC2)CCCC1") == "dispiro[4.1.4.2]tridecane"
+        assert name_compound("C1CC2(CC1)CC1(CC2)CCCC1") == "dispiro[4.1.4^7.2^5]tridecane"
 
 
 @pytest.mark.unit

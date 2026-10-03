@@ -219,10 +219,12 @@ def test_p82_6_3_2_ring_carbon_parent(smiles, expected):
 # Phase-07 NR1 LOCK — three PIN rows the Phase-07 fix-wave (Tasks 3 + 5)
 # regressed and the fast pre-gate caught. All are 0-wrong (OPSIN-RT valid) but
 # were spelled wrong vs the protected/gold baseline:
-# * CC[18OH]: 7c721bb0d's PIN-first skeleton flipped the parent to the
-# locant-elided ``ethanol``; (the Blue Book ``(2-13C)ethan-1-ol
-# [not (2-13C)ethanol]``) requires the locanted parent under isotopic
-# modification -> gold protect W2F-P5-P4 ``(18O)ethan-1-ol`` (FRONT).
+# * CC[18OH]: the 18O on the oxygen of the ``-ol`` suffix needs no locant, so
+# (the Blue Book) keeps the locant-free ``ethanol`` spelling
+# and the nuclide goes before the suffix: 'ethan(2H)ol (PIN) (as in ethanol)'
+# (:44184), '1-(aminomethyl)cyclopentan-1-(18O)ol (PIN)' (:43744) -> gold
+# W2F-P5-P4 ``ethan(18O)ol``. (A carbon label still needs its locant:
+# ``(2-13C)ethan-1-ol [not (2-13C)ethanol]``,:44186.)
 # * C[13CH2][15NH2] / [13CH3]C[15NH2]: 5ed0197a9's ``-amine`` suffix-adjacent
 # slot let ``_decorate_multi_position`` SPLIT the combinable descriptor into
 # ``(1-13C)ethan-1-(15N)amine``; (the Blue Book) + gold V47-/03
@@ -230,7 +232,7 @@ def test_p82_6_3_2_ring_carbon_parent(smiles, expected):
 # Pinned in BOTH the default (name_compound) and inline best-effort styles.
 # --------------------------------------------------------------------------- #
 NR1_RESTORED = [
-    ("CC[18OH]", "(18O)ethan-1-ol"),
+    ("CC[18OH]", "ethan(18O)ol"),
     ("C[13CH2][15NH2]", "(1-13C,15N)ethan-1-amine"),
     ("[13CH3]C[15NH2]", "(2-13C,15N)ethan-1-amine"),
 ]

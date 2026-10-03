@@ -34,9 +34,10 @@ CASES = [
     # indane spiro imidazolidine
     ("C[C@H](NC(=O)CN1C(=O)N[C@@]2(CCc3ccccc32)C1=O)c1ccc2c(c1)CCCC2",
      "imidazolidine"),
-    # tetrahydroquinoline spiro 1,3-diazinane
+    # tetrahydroquinoline spiro 1,3-diazinane: the Hantzsch-Widman component's
+    # locants are bracketed inside the spiro name, the Blue Book)
     ("Cc1ccc2c(c1)C[C@@]1(CN2C)C(=O)NC(=O)N(CCc2ccc(F)cc2)C1=O",
-     "1,3-diazinane"),
+     "[1,3]diazinane"),
 ]
 
 
@@ -71,7 +72,11 @@ def test_side_ring_numbering_is_deterministic():
     n1 = name_mixed_spiro_fused(Chem.MolFromSmiles(smi))[0]
     canon = Chem.MolToSmiles(Chem.MolFromSmiles(smi))
     n2 = name_mixed_spiro_fused(Chem.MolFromSmiles(canon))[0]
-    assert n1 == n2 == "spiro[2,3-dihydro-1H-indole-3,3'-pyrrolidine]"
+    # (the Blue Book): the indole component is cited as its mancude
+    # parent with the hydro prefixes in front ('4'a,5',6',7',8',8'a-hexahydro-1'H-
+    # spiro[imidazolidine-4,2'-quinoxaline] (PIN)',:17050). Was
+    # "spiro[2,3-dihydro-1H-indole-3,3'-pyrrolidine]".
+    assert n1 == n2 == "1,2-dihydrospiro[indole-3,3'-pyrrolidine]"
 
 
 def test_sulfone_side_ring_is_lambda2_skeleton_not_lambda4():

@@ -456,15 +456,12 @@ def test_urea_locant_kept_when_substituent_has_heteroatom_h(namer, smiles, expec
 
 
 # --------------------------------------------------------------------------- #
-# 6. THE MANDATORY NEGATIVE THAT IS NOT NAMEABLE — asserted as strict xfail #
+# 6. THE MANDATORY NEGATIVE, now nameable: the locant survives #
 # --------------------------------------------------------------------------- #
-@pytest.mark.xfail(
-    strict=True,
-    reason="coverage gap measured 2026-07-29 AND re-measured after this change: "
-           "'NC(=O)C(C)C(=O)N' emits 'unknown organic compound' (OPSIN-UNPARSEABLE). "
-           "The live guard for this row is test_l3_orbit_predicate, which asserts the "
-           "predicate is False. When this XPASSes, confirm the locant SURVIVED — an "
-           "L3 wiring that over-strips would emit 'methylpropanediamide' here.",
-)
+# Was a strict xfail ('unknown organic compound': the chain-diamide handler named
+# the bare 'propanediamide' and the round trip refused it). The handler now leaves
+# a carbon-substituted diamide to the general path, and the locant SURVIVES:
+# '2-methylpropanediamide (PIN)', the Blue Book). An L3 wiring
+# that over-strips would emit 'methylpropanediamide' here.
 def test_2_methylpropanediamide_keeps_its_locant_when_it_becomes_nameable(namer):
     assert namer.name("NC(=O)C(C)C(=O)N") == "2-methylpropanediamide"

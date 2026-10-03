@@ -49,6 +49,16 @@ def get_ring_double_bonds(mol, ring_atoms: Tuple[int, ...]) -> List[Tuple[int, i
     return double_bonds
 
 
+def get_ring_triple_bonds(mol, ring_atoms: Tuple[int, ...]) -> List[Tuple[int, int]]:
+    """All triple bonds within a ring, as (atom_idx1, atom_idx2) tuples."""
+    ring_set = set(ring_atoms)
+    return [
+        (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()) for bond in mol.GetBonds()
+        if bond.GetBondType() == Chem.BondType.TRIPLE
+        and bond.GetBeginAtomIdx() in ring_set and bond.GetEndAtomIdx() in ring_set
+    ]
+
+
 def is_mancude_monocyclic_hydrocarbon(mol, ring_atoms: Tuple[int, ...]) -> bool:
     """(b) / detection: a mancude monocyclic hydrocarbon
     that RDKit marks aromatic but which is NOT benzene is named as the
@@ -671,23 +681,41 @@ def _prefix_name_for_sort(mol, sub_atoms: List[int], ring_list: List[int]) -> Op
     return name
 
 
+def _ring_bond_locant_list(oriented: List[int], bonds, n: int) -> List[int]:
+    """Sorted wrap-aware locants of the ring ``bonds`` on ``oriented``."""
+    locants = []
+    for a1, a2 in bonds:
+        if a1 in oriented and a2 in oriented:
+            locants.append(ring_double_bond_locant(oriented.index(a1), oriented.index(a2), n))
+    locants.sort()
+    return locants
+
+
 def orient_cycloalkene(
     mol,
     ring_atoms: Tuple[int, ...],
     double_bond_atoms: List[Tuple[int, int]],
     substituent_positions: Optional[Dict[int, List[List[int]]]] = None,
-    principal_group_atoms: Optional[Set[int]] = None
+    principal_group_atoms: Optional[Set[int]] = None,
+    triple_bond_atoms: Optional[List[Tuple[int, int]]] = None,
 ) -> List[int]:
     """
-    Orient a cycloalkene ring for IUPAC naming.
+    Orient an unsaturated carbocycle (double and/or triple ring bonds) for IUPAC naming.
 
     IUPAC 2013 rules:
-    - When a principal characteristic group is on the ring, it receives
-      the lowest possible locant (ideally 1).
-    - Double bond locant is secondary to principal group locant.
-    - When no principal group is on the ring, double bond is at C1-C2.
-    - Direction is chosen to give lowest locants to other substituents.
-    - For mono-cycloalkenes, the locant is omitted in the name.
+    - (c) (the Blue Book): a principal characteristic group on the
+      ring receives the lowest possible locant (ideally 1).
+    - (e)(ii) (:3290): "low locants are given first to multiple bonds as a
+      set and then to double bonds"; (:21366) "lower locants are
+      assigned first to the endings as a set without regard to type and then to
+      'ene' endings" ('cycloicosa-1,3-dien-5-yne (PIN)',:21372).
+    - When no principal group is on the ring, one double or triple bond takes
+      the locant 1,:16548).
+    - Direction is then chosen to give lowest locants to other substituents.
+    - For a ring with a single multiple bond, the locant is omitted in the name.
+
+    With no triple bond the multiple-bond set IS the double-bond set, so the
+    criteria reduce to the double-bond ones.
 
     Args:
         mol: RDKit Mol object
@@ -696,15 +724,17 @@ def orient_cycloalkene(
         substituent_positions: Optional dict mapping ring atom index to substituent lists
         principal_group_atoms: Optional set of ring atom indices bearing the principal
             characteristic group (e.g., C bearing =O for ketone)
+        triple_bond_atoms: Optional list of (atom1, atom2) tuples for triple bonds
 
     Returns:
         List of ring atom indices reordered for IUPAC naming
     """
     ring_list = list(ring_atoms)
     n = len(ring_list)
+    triple_bond_atoms = list(triple_bond_atoms or ())
 
-    if not double_bond_atoms:
-        # No double bonds - just return as-is (shouldn't happen for cycloalkene)
+    if not double_bond_atoms and not triple_bond_atoms:
+        # No multiple bonds - just return as-is (shouldn't happen for this ring type)
         return ring_list
 
     # --- Path A: Principal group on ring -> PG gets lowest locant ---
@@ -724,15 +754,11 @@ def orient_cycloalkene(
                     for _ in range(_pg_mult[atom])
                 )
 
-                # Calculate double bond locants (wrap-aware: the closure
+                # Double and triple bond locants (wrap-aware: the closure
                 # bond positions (0, n-1) is locant n, not 1)
-                db_locants = []
-                for a1, a2 in double_bond_atoms:
-                    if a1 in oriented and a2 in oriented:
-                        pos1 = oriented.index(a1)
-                        pos2 = oriented.index(a2)
-                        db_locants.append(ring_double_bond_locant(pos1, pos2, n))
-                db_locants.sort()
+                db_locants = _ring_bond_locant_list(oriented, double_bond_atoms, n)
+                tb_locants = _ring_bond_locant_list(oriented, triple_bond_atoms, n)
+                mb_locants = sorted(db_locants + tb_locants)
 
                 # Calculate substituent locants: one per substituent (f)
                 # "all considered together", with multiplicity, as in the
@@ -740,17 +766,19 @@ def orient_cycloalkene(
                 sub_locants = _substituent_locant_multiset(
                     oriented, substituent_positions)
 
-                candidates.append((oriented, pg_locants, db_locants, sub_locants))
+                candidates.append((oriented, pg_locants, mb_locants, db_locants,
+                                   sub_locants))
 
-        # Sort: lowest PG locants (c), then lowest DB locants (e), then lowest
-        # prefix locants (f), then the first-cited prefix (g), then (j)
-        # (the Blue Book). Without (g)/(j) a tie went to candidate order,
-        # i.e. to the SMILES atom order.
+        # Sort: lowest PG locants (c), then lowest multiple-bond locants as a
+        # set and then lowest DB locants (e), then lowest prefix locants (f),
+        # then the first-cited prefix (g), then (j) (the Blue Book).
+        # Without (g)/(j) a tie went to candidate order, i.e. to the SMILES
+        # atom order.
         canon = _canonical_ranks(mol)
 
         def sort_key(item):
-            oriented, pg, db, sub = item
-            return (pg, db, sub,
+            oriented, pg, mb, db, sub = item
+            return (pg, mb, db, sub,
                     _alpha_citation_key(mol, oriented, substituent_positions or {},
                                         ring_list),
                     _cip_orientation_key(mol, oriented, double_bond_atoms),
@@ -760,20 +788,14 @@ def orient_cycloalkene(
         candidates.sort(key=sort_key)
         return candidates[0][0]
 
-    # --- Path B: No principal group on ring -> double bond at C1-C2 ---
-    # Get positions of double bond atoms in the ring
-    db_atoms_set = set()
-    for a1, a2 in double_bond_atoms:
-        db_atoms_set.add(a1)
-        db_atoms_set.add(a2)
-
-    # Try all orientations where a double bond starts at position 1
+    # --- Path B: No principal group on ring -> a multiple bond at C1-C2 ---
+    # Try all orientations where a double or triple bond starts at position 1
     candidates = []
 
-    for db_a1, db_a2 in double_bond_atoms:
-        # For each double bond, try starting with either atom as position 1
+    for db_a1, db_a2 in list(double_bond_atoms) + triple_bond_atoms:
+        # For each multiple bond, try starting with either atom as position 1
         for start_atom in [db_a1, db_a2]:
-            # The other atom of the double bond should be position 2
+            # The other atom of the bond should be position 2
             other_atom = db_a2 if start_atom == db_a1 else db_a1
 
             start_pos = ring_list.index(start_atom)
@@ -791,30 +813,33 @@ def orient_cycloalkene(
                 sub_locants = _substituent_locant_multiset(
                     oriented, substituent_positions)
 
-                # Calculate locants for all double bonds (wrap-aware)
-                db_locants = []
-                for a1, a2 in double_bond_atoms:
-                    pos1 = oriented.index(a1)
-                    pos2 = oriented.index(a2)
-                    db_locants.append(ring_double_bond_locant(pos1, pos2, n))
+                # Locants for all double and triple bonds (wrap-aware)
+                db_locants = _ring_bond_locant_list(oriented, double_bond_atoms, n)
+                tb_locants = _ring_bond_locant_list(oriented, triple_bond_atoms, n)
+                mb_locants = sorted(db_locants + tb_locants)
 
-                db_locants.sort()
-
-                candidates.append((oriented, db_locants, sub_locants))
+                candidates.append((oriented, mb_locants, db_locants, sub_locants))
 
     if not candidates:
         # Fallback - shouldn't happen
         return ring_list
 
-    # First criterion: lowest double bond locants
+    # First criterion: lowest locants to the multiple bonds as a set, then to
+    # the double bonds (e)(ii),
+    best_mb_locants = None
+    for _, mb_locants, _, _ in candidates:
+        if best_mb_locants is None or _compare_locant_sets(mb_locants, best_mb_locants) < 0:
+            best_mb_locants = mb_locants
+    candidates = [c for c in candidates if c[1] == best_mb_locants]
+
     best_db_locants = None
-    for _, db_locants, _ in candidates:
+    for _, _, db_locants, _ in candidates:
         if best_db_locants is None or _compare_locant_sets(db_locants, best_db_locants) < 0:
             best_db_locants = db_locants
 
     # Filter by best double bond locants
     filtered = [
-        (oriented, sub_locants) for oriented, db_locants, sub_locants in candidates
+        (oriented, sub_locants) for oriented, _, db_locants, sub_locants in candidates
         if db_locants == best_db_locants
     ]
 

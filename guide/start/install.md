@@ -56,7 +56,7 @@ A missing jar is downloaded: when `pip` builds the package, on first use (unless
    $ export ORTHONYM_NO_DOWNLOAD=1
    ```
 
-   `ORTHONYM_NO_DOWNLOAD=1` stops Orthonym from trying to download anything.
+   `ORTHONYM_NO_DOWNLOAD=1` stops Orthonym from downloading a missing jar when it names a structure. `orthonym --fetch-jars` is an explicit request and still downloads.
 
 ## Naming without the jars
 

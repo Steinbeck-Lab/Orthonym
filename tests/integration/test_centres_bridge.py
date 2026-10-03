@@ -145,6 +145,9 @@ def test_apply_labels_diene_targets_specific_bond():
 def test_batch_returns_none_when_jar_absent(monkeypatch):
     """jar-absent -> centres_label_batch returns None (caller falls back)."""
     import orthonym.perception.centres_bridge as cb
+    # an empty process-level label cache: a worker that already labelled this SMILES
+    # would serve it from the cache before the jar is looked for
+    monkeypatch.setattr(cb, "_CENTRES_LABEL_CACHE", {})
     monkeypatch.setattr(cb, "_find_centres_jar", lambda *a, **k: None)
     assert cb.centres_label_batch(["C[C@H](O)CC"]) is None
 
@@ -153,6 +156,9 @@ def test_batch_returns_none_when_jar_absent(monkeypatch):
 def test_mol_label_returns_false_when_jar_absent(monkeypatch):
     """jar-absent -> centres_label_mol returns False (caller falls back to RDKit)."""
     import orthonym.perception.centres_bridge as cb
+    # an empty label cache, as above (under xdist a worker that had labelled
+    # '(S)-butan-2-ol' returned True here)
+    monkeypatch.setattr(cb, "_CENTRES_LABEL_CACHE", {})
     monkeypatch.setattr(cb, "_find_centres_jar", lambda *a, **k: None)
     mol = Chem.MolFromSmiles("C[C@H](O)CC")
     assert cb.centres_label_mol(mol) is False
@@ -173,6 +179,7 @@ def test_batch_returns_none_when_no_jvm_at_all(monkeypatch):
     import orthonym.jvm_bridge as jb
     import orthonym.perception.centres_bridge as cb
     smi = "CC[C@@H](O)CC[C@H](C)Cl"          # distinctive; not cached by other tests
+    monkeypatch.setattr(cb, "_CENTRES_LABEL_CACHE", {})  # and an empty cache, as above
     assert smi not in cb._CENTRES_LABEL_CACHE, "precondition: SMILES not cached"
     monkeypatch.setattr(cb, "_java_available", lambda *a, **k: False)
     monkeypatch.setattr(jb, "centres_available", lambda *a, **k: False)

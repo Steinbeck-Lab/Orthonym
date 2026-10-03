@@ -11,10 +11,13 @@ Keys are canonical SMILES (verified with RDKit), values contain:
 - ring_system: Classification (benzo-5-membered, benzo-6-membered, tricyclic, etc.)
 - parent_atoms: Number of heavy atoms in parent ring system
 - iupac_locants: Mapping from canonical atom index to IUPAC peripheral locant
+- pin (optional): False for a name the Blue Book does not hold; a name built on that
+  core is recorded as not the PIN (``match_fused_heterocycle_core``)
 """
 
 import re
 from collections import Counter
+from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from rdkit import Chem
@@ -363,7 +366,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 4, 6: 10, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 5},
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 4, 6: 5, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 10},
     },
     # indolizine
     'c1ccn2cccc2c1': {
@@ -472,60 +475,6 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'ring_system': 'pteridine',
         'parent_atoms': 10,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: 4, 8: '4a', 9: 5},
-    },
-    # adenine
-    'Nc1ncnc2nc[nH]c12': {
-        'name': 'adenine',
-        'tautomer_locant': None,
-        'ring_system': 'purine',
-        'parent_atoms': 10,
-        'iupac_locants': {0: 'N6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 4, 6: 7, 7: 8, 8: 9, 9: 5},
-        'is_retained_name': True,
-    },
-    # adenine
-    'Nc1ncnc2[nH]cnc12': {
-        'name': 'adenine',
-        'tautomer_locant': None,
-        'ring_system': 'purine',
-        'parent_atoms': 10,
-        'iupac_locants': {0: 'N6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 9, 6: 8, 7: 7, 8: 5, 9: 4},
-        'is_retained_name': True,
-    },
-    # hypoxanthine
-    'O=c1[nH]cnc2nc[nH]c12': {
-        'name': 'hypoxanthine',
-        'tautomer_locant': None,
-        'ring_system': 'purine',
-        'parent_atoms': 10,
-        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 4, 6: 7, 7: 8, 8: 9, 9: 5},
-        'is_retained_name': True,
-    },
-    # hypoxanthine
-    'O=c1[nH]cnc2[nH]cnc12': {
-        'name': 'hypoxanthine',
-        'tautomer_locant': None,
-        'ring_system': 'purine',
-        'parent_atoms': 10,
-        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 3, 5: 9, 6: 8, 7: 7, 8: 5, 9: 4},
-        'is_retained_name': True,
-    },
-    # guanine
-    'Nc1nc2[nH]cnc2c(=O)[nH]1': {
-        'name': 'guanine',
-        'tautomer_locant': None,
-        'ring_system': 'purine',
-        'parent_atoms': 11,
-        'iupac_locants': {0: 'N2', 1: 2, 2: 3, 3: 9, 4: 8, 5: 7, 6: 5, 7: 6, 8: 'O6', 9: 1, 10: 4},
-        'is_retained_name': True,
-    },
-    # guanine
-    'Nc1nc(=O)c2[nH]cnc2[nH]1': {
-        'name': 'guanine',
-        'tautomer_locant': None,
-        'ring_system': 'purine',
-        'parent_atoms': 11,
-        'iupac_locants': {0: 'N2', 1: 2, 2: 6, 3: 'O6', 4: 5, 5: 9, 6: 8, 7: 7, 8: 4, 9: 3, 10: 1},
-        'is_retained_name': True,
     },
     # pyrazolo[1,5-a]pyrimidine
     'c1cnc2ccnn2c1': {
@@ -919,10 +868,13 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: 4, 8: 5},
     },
-    # 1H-imidazo[4,5-d]pyrimidine
+    # 7H-purine. (16) "purine (special numbering, 7H-isomer
+    # shown; the PIN is 7H-purine)" (the Blue Book); the map is purine's
+    # special numbering (N7-H). It was named with the fusion name
+    # '1H-imidazo[4,5-d]pyrimidine', which is not the PIN and does not fit this map.
     'c1ncc2[nH]cnc2n1': {
-        'name': '1H-imidazo[4,5-d]pyrimidine',
-        'tautomer_locant': 1,
+        'name': '7H-purine',
+        'tautomer_locant': 7,
         'ring_system': 'purine-related',
         'parent_atoms': 9,
         'iupac_locants': {0: 2, 1: 1, 2: 6, 3: 5, 4: 7, 5: 8, 6: 9, 7: 4, 8: 3},
@@ -1047,13 +999,17 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {0: 6, 1: 7, 2: 8, 3: '8a', 4: 1, 5: 2, 6: 3, 7: 4, 8: 5},
     },
-    # phenanthridine
+    # phenanthridine. Not one of the traditional numberings of (the Blue Book),
+    # so it is numbered by (:12501) "around the system... Each fusion carbon
+    # atom is given the same number as the immediately preceding nonfusion skeletal atom":
+    # 4, 4a, N5, 6, 6a, 7... 10, 10a, 10b (OPSIN 2.9.0's $_AV locants agree). The map had
+    # phenanthrene's fusion letters 4b/8a/10a, which no peripheral order gives with N5.
     'c1ccc2c(c1)cnc1ccccc12': {
         'name': 'phenanthridine',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 8, 1: 9, 2: 10, 3: '8a', 4: '4b', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4, 10: 3, 11: 2, 12: 1, 13: '10a'},
+        'iupac_locants': {0: 8, 1: 9, 2: 10, 3: '10a', 4: '6a', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4, 10: 3, 11: 2, 12: 1, 13: '10b'},
     },
     # 9H-beta-carboline
     'c1ccc2c(c1)[nH]c1cnccc12': {
@@ -1139,13 +1095,16 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: '4b', 9: 5, 10: 6, 11: 7, 12: 8, 13: '8a'},
         'is_retained_name': True,
     },
-    # phenanthridin-6(5H)-one
+    # phenanthridin-6(5H)-one: the phenanthridine numbering,:12501), C6a next
+    # to the carbonyl carbon C6 and C7 next to C6a; OPSIN 2.9.0's $_AV locants agree. The map
+    # had the second benzo ring numbered from the wrong end (7 next to C10a) and the fusion
+    # letters 4b/10a/10b of no peripheral order.
     'O=c1[nH]c2ccccc2c2ccccc12': {
         'name': 'phenanthridin-6(5H)-one',
         'tautomer_locant': 5,
         'ring_system': 'tricyclic',
         'parent_atoms': 15,
-        'iupac_locants': {0: '=O', 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '10a', 9: '4b', 10: 7, 11: 8, 12: 9, 13: 10, 14: '10b'},
+        'iupac_locants': {0: '=O', 1: 6, 2: 5, 3: '4a', 4: 4, 5: 3, 6: 2, 7: 1, 8: '10b', 9: '10a', 10: 10, 11: 9, 12: 8, 13: 7, 14: '6a'},
         'is_retained_name': True,
     },
     # 4H-quinolizine
@@ -1154,7 +1113,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': 4,
         'ring_system': 'bridgehead',
         'parent_atoms': 10,
-        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: '4a', 4: 6, 5: 7, 6: 8, 7: 9, 8: '9a', 9: 1},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: 8, 7: 9, 8: '9a', 9: 1},
     },
     # quinolizidine
     'C1CCN2CCCCC2C1': {
@@ -1171,7 +1130,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 8,
-        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 5, 4: 6, 5: 7, 6: '7a', 7: 1},
+        'iupac_locants': {0: 2, 1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: '7a', 7: 1},
     },
     # xanthone
     'O=c1c2ccccc2oc2ccccc12': {
@@ -1197,13 +1156,14 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'iupac_locants': {0: '=O', 1: 9, 2: '9a', 3: 1, 4: 2, 5: 3, 6: 4, 7: '4a', 8: 10, 9: '10a', 10: 5, 11: 6, 12: 7, 13: 8, 14: '8a'},
         'is_retained_name': True,
     },
-    # 1,10-phenanthroline
+    # 1,10-phenanthroline: as phenanthridine above,:12501), the fusion carbon
+    # atoms are 4a, 6a, 10a, 10b (OPSIN 2.9.0's $_AV locants agree), not 4a, 4b, 8a, 10a.
     'c1cnc2c(c1)ccc1cccnc12': {
         'name': '1,10-phenanthroline',
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 8, 1: 9, 2: 10, 3: '8a', 4: '4b', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4, 10: 3, 11: 2, 12: 1, 13: '10a'},
+        'iupac_locants': {0: 8, 1: 9, 2: 10, 3: '10a', 4: '6a', 5: 7, 6: 6, 7: 5, 8: '4a', 9: 4, 10: 3, 11: 2, 12: 1, 13: '10b'},
     },
     # 1H-perimidine
     'C1=Nc2cccc3cccc(c23)N1': {
@@ -1226,6 +1186,54 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # cf. its dione = phthalic anhydride = 2-benzofuran-1,3-dione, the Blue Book)
     'c1ccc2cocc2c1': {
         'name': '2-benzofuran',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # 2-benzothiophene (PIN). (the Blue Book): a benzene ring ortho-fused to a
+    # heteromonocycle is named as a benzoheterocycle with the heteroatom locants cited
+    # ("for preferred IUPAC names locants must be cited"); 'hexahydro-2-benzothiophene-1,3-dione (PIN)' (:32546).
+    # Numbering from OPSIN 2.9.0 (-oextendedsmi), checked by
+    # tests/unit/data/test_catalogue_numbering_opsin.py.
+    'c1ccc2cscc2c1': {
+        'name': '2-benzothiophene',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # 1,2-benzothiazole (PIN). (the Blue Book): a benzene ring ortho-fused to a
+    # heteromonocycle is named as a benzoheterocycle with the heteroatom locants cited
+    # ("for preferred IUPAC names locants must be cited"); the Hantzsch-Widman component,:11982).
+    # Numbering from OPSIN 2.9.0 (-oextendedsmi), checked by
+    # tests/unit/data/test_catalogue_numbering_opsin.py.
+    'c1ccc2sncc2c1': {
+        'name': '1,2-benzothiazole',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # 1-benzoselenophene (PIN). (the Blue Book): a benzene ring ortho-fused to a
+    # heteromonocycle is named as a benzoheterocycle with the heteroatom locants cited
+    # ("for preferred IUPAC names locants must be cited"); as '1-benzofuran (PIN)' (:11827).
+    # Numbering from OPSIN 2.9.0 (-oextendedsmi), checked by
+    # tests/unit/data/test_catalogue_numbering_opsin.py.
+    'c1ccc2[se]ccc2c1': {
+        'name': '1-benzoselenophene',
+        'tautomer_locant': None,
+        'ring_system': 'benzo-5-membered',
+        'parent_atoms': 9,
+        'iupac_locants': {0: 5, 1: 6, 2: 7, 3: '7a', 4: 1, 5: 2, 6: 3, 7: '3a', 8: 4},
+    },
+    # 2-benzoselenophene (PIN). (the Blue Book): a benzene ring ortho-fused to a
+    # heteromonocycle is named as a benzoheterocycle with the heteroatom locants cited
+    # ("for preferred IUPAC names locants must be cited"); as '2-benzofuran (PIN)' (:11829).
+    # Numbering from OPSIN 2.9.0 (-oextendedsmi), checked by
+    # tests/unit/data/test_catalogue_numbering_opsin.py.
+    'c1ccc2c[se]cc2c1': {
+        'name': '2-benzoselenophene',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-membered',
         'parent_atoms': 9,
@@ -1774,7 +1782,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 8,
-        'iupac_locants': {0: 6, 1: 5, 2: '5a', 3: 3, 4: 2, 5: 1, 6: '3a', 7: 7},
+        'iupac_locants': {0: 6, 1: 5, 2: 4, 3: 3, 4: 2, 5: 1, 6: '7a', 7: 7},
     },
     # pyrrolo[1,2-c]pyrimidine
     'c1cc2ccncn2c1': {
@@ -1820,7 +1828,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'tricyclic',
         'parent_atoms': 14,
-        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 4, 6: 10, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 5},
+        'iupac_locants': {0: 3, 1: 2, 2: 1, 3: '10a', 4: '4a', 5: 4, 6: 5, 7: '5a', 8: 6, 9: 7, 10: 8, 11: 9, 12: '9a', 13: 10},
     },
     # [1]benzofuro[3,2-b]pyridine. (the Blue Book): "Locants
     # that describe structural features of components, such as positions of
@@ -1855,8 +1863,9 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'purine',
         'parent_atoms': 11,
-        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 'O2', 5: 5, 6: 7, 7: 8, 8: 9, 9: 4, 10: 3},
+        'iupac_locants': {0: 'O2', 1: 2, 2: 1, 3: 6, 4: 'O6', 5: 5, 6: 7, 7: 8, 8: 9, 9: 4, 10: 3},
         'is_retained_name': True,
+        'pin': False,
     },
     # xanthine
     'O=c1[nH]c(=O)c2[nH]cnc2[nH]1': {
@@ -1864,8 +1873,9 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'tautomer_locant': None,
         'ring_system': 'purine',
         'parent_atoms': 11,
-        'iupac_locants': {0: 'O6', 1: 6, 2: 1, 3: 2, 4: 'O2', 5: 3, 6: 9, 7: 8, 8: 7, 9: 5, 10: 4},
+        'iupac_locants': {0: 'O2', 1: 2, 2: 1, 3: 6, 4: 'O6', 5: 5, 6: 7, 7: 8, 8: 9, 9: 4, 10: 3},
         'is_retained_name': True,
+        'pin': False,
     },
     # benzo[g]pteridine-2,4(1H,3H)-dione
     'O=c1[nH]c(=O)c2nc3ccccc3nc2[nH]1': {
@@ -2532,6 +2542,40 @@ def _match_covers_ring_systems(mol, atom_mapping) -> bool:
     return True
 
 
+@lru_cache(maxsize=None)
+def _key_ring_bond_count(key: str) -> Optional[int]:
+    """Number of ring bonds of a catalogue entry's SMILES key (None if unparseable)."""
+    pat = Chem.MolFromSmiles(key) if key else None
+    if pat is None:
+        return None
+    return sum(1 for b in pat.GetBonds() if b.IsInRing())
+
+
+def _match_adds_no_ring_bond(mol, atom_mapping, key) -> bool:
+    """Does the matched ring system carry exactly the ring bonds of the pattern?
+
+    A substructure match may map every atom of a ring system (so
+    ``_match_covers_ring_systems`` holds) and still leave out a ring bond of the
+    input: mancude cyclopenta[a]indene (12 atoms, 14 bonds) holds the 12-atom
+    perimeter of benzo[8]annulene (13 bonds) plus one transannular bond. A catalogue
+    name denotes its whole ring system, so such a match names a different
+    molecule. Counts the ring bonds of every ring system the core touches.
+    """
+    core_atoms = {k for k in (atom_mapping or {}) if isinstance(k, int)}
+    want = _key_ring_bond_count(key)
+    if not core_atoms or want is None:
+        return True
+    from ..perception.rings import get_ring_systems
+    have = 0
+    for rs in get_ring_systems(mol):
+        rs = set(rs)
+        if core_atoms & rs:
+            have += sum(1 for b in mol.GetBonds()
+                        if b.IsInRing() and b.GetBeginAtomIdx() in rs
+                        and b.GetEndAtomIdx() in rs)
+    return have == want
+
+
 #: elements that can carry an indicated hydrogen (a mancude saturated
 # position). Mirrors ``rules.ring_assemblies._INDICATED_H_ATOM_ELEMENTS`` (kept
 # local to avoid a data->rules import): B, C, N, Si, P, Ge, As, Sn, Sb, Bi. The
@@ -2715,7 +2759,17 @@ def match_fused_heterocycle_core(
         return None
     if not _match_covers_ring_systems(mol, result[1]):
         return None
+    if not _match_adds_no_ring_bond(mol, result[1], result[2]):
+        return None
     name, atom_mapping, key = result
+    if FUSED_HETEROCYCLE_DATA.get(key, {}).get('pin') is False:
+        # A catalogue name the Blue Book does not hold ('xanthine', 0 hits): a name
+        # built on this core is correct but never the PIN.
+        try:
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(name)
+        except Exception:  # a label record must never break naming
+            pass
     corrected = _correct_indicated_h_tautomer(mol, name, atom_mapping, key)
     if corrected is None:
         return None

@@ -73,8 +73,10 @@ def test_senior_parent_keeps_the_nitrooxy_prefix(smiles, expected):
     assert row["name"] == expected and row["tier"] == "pin_verified", row
 
 
+# A polyol ester with another group (a free OH) is not claimed. The clean polyol
+# ester '[O-][N+](=O)OCCO[N+](=O)[O-]' is: 'ethane-1,2-diyl dinitrate'
+#, the Blue Book; tests/unit/rules/test_polyol_identical_anions.py).
 @pytest.mark.parametrize("smiles", [
-    "[O-][N+](=O)OCCO[N+](=O)[O-]",
     "OCC(O[N+](=O)[O-])CO[N+](=O)[O-]",
 ])
 def test_polyol_ester_is_not_claimed(smiles):
@@ -89,16 +91,20 @@ def test_polyol_ester_is_not_claimed(smiles):
 # The alcohol part of a carboxylic ester is named as a fragment and turned into
 # a substituent prefix; it keeps the substitutive 'nitrooxy' form there, so the
 # carboxylic ester (the senior ester, class 9 in the order of the acids)
-# still names the parent.
+# still names the parent. Two different anions on one alcohol component make it
+# method (2) of (the Blue Book: "Method (1) generates
+# preferred IUPAC names"), so the name ships at best-effort, below the PIN, and
+# the prefix carries its locant ('2-(nitrooxy)ethyl',.
 @pytest.mark.parametrize("smiles,acid_word", [
     ("CC(=O)OCCO[N+](=O)[O-]", "acetate"),
     ("C1=CC=C(C(=C1)CC(=O)OCCO[N+](=O)[O-])NC2=C(C=CC=C2Cl)Cl", "acetate"),
 ])
 def test_alcohol_part_of_a_carboxylic_ester_keeps_the_prefix(smiles, acid_word):
-    row = Orthonym(style="pin").name_tiered(smiles)
+    row = name_best_effort(smiles)
     name = assert_full_rt(row["name"], smiles)
-    assert "nitrooxy" in name and name.endswith(acid_word), name
-    assert row["tier"] == "pin_verified", row
+    assert name.startswith("2-(nitrooxy)ethyl ") and name.endswith(acid_word), name
+    assert row["tier"] == "systematic_verified", row
+    assert Orthonym(style="pin").name_tiered(smiles)["tier"] == "abstain"
 
 
 # An acyl group on the nitrate oxygen makes a mixed anhydride of nitric acid, not
@@ -154,7 +160,9 @@ def test_predicate():
     assert _is_nitrate_ester(_F({"nitrooxy": one}))
     assert not _is_nitrate_ester(_F({"nitrooxy": one}, pg="ester"))
     assert not _is_nitrate_ester(_F({"nitrooxy": one, "nitrite": [(5, 6, 7, 8)]}))
-    assert not _is_nitrate_ester(_F({"nitrooxy": one + [(5, 6, 7, 8, 9)]}))
+    # several nitrate groups reach the producer, which names only a clean polyol
+    # ester ('ethane-1,2-diyl dinitrate',, the Blue Book)
+    assert _is_nitrate_ester(_F({"nitrooxy": one + [(5, 6, 7, 8, 9)]}))
     assert not _is_nitrate_ester(_F({}))
 
 

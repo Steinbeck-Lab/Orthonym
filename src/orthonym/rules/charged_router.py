@@ -2225,6 +2225,36 @@ def _reentry_guarded(fn):
     return _wrapped
 
 
+def _declined_route_keeps_producer_record(fn):
+    """A declined route (``''``, or an exception) leaves the producer record
+    (``source``/``opsin``) as it found it.
+
+    The route re-enters the whole pipeline on the neutral form (``_reenter``,
+    ``_reenter_forced``, ``_reenter_gated``), and at the best-effort tier that naming
+    can reach the general engine, which records itself as the producer of the call.
+    When the route then returns no name, the caller names the species another way
+    (``rules.radicals.name_radical`` after ``_handle_radical``), and the record of the
+    discarded re-entry would label that name: '1-[(propan-2-yl)diselanyl]propane'
+    , the Blue Book) read systematic_verified, source general_engine,
+    at the best-effort tier, and pin_verified at the PIN tier, where the re-entry of
+    'CC(C)[Se][SeH]' records nothing. A route that returns a name keeps the record its
+    re-entries made (the name is built on the neutral name). The name-scoped records
+    (non-PIN fragments and labels) only label a name that carries them, so they are
+    kept either way."""
+    def _wrapped(mol, style: str = 'pin') -> str:
+        from ..metrics.provenance import producer_record, restore_producer_record
+        record = producer_record()
+        try:
+            result = fn(mol, style)
+        except BaseException:
+            restore_producer_record(record)
+            raise
+        if not result:
+            restore_producer_record(record)
+        return result
+    return _wrapped
+
+
 # A neutral oxoacid OH (carboxylic, sulfur or phosphorus oxoacid).
 _OXOACID_OH = Chem.MolFromSmarts(
     "[OX2H1]-[$([CX3]=O),$([SX4](=O)=O),$([SX3]=O),$([PX4]=O)]")
@@ -2375,6 +2405,7 @@ def _uronium_rt_ok(name: str, mol) -> bool:
 
 
 @_reentry_guarded
+@_declined_route_keeps_producer_record
 def route_charged(mol, style: str = 'pin') -> str:
     """THE single mandatory parent-selection chokepoint (CHOKE-01 / CHOKE-02).
 
@@ -2670,6 +2701,18 @@ def route_charged(mol, style: str = 'pin') -> str:
         # then names the neutral form (suppressed by the SELF gate) rather than
         # shipping a wrong charged name.
         if len(sites['cations']) >= 2:
+            # (the Blue Book): two or more hydron-addition
+            # centres that are skeletal atoms of ONE ring parent hydride -> the
+            # ring parent + locants + 'diium'/'triium' ('1,4-dioxane-1,4-diium
+            # (PIN)',:41409). Strict round trip with the hydrons on the same
+            # atoms. First, because the constructions below name centres that are
+            # not ring atoms (an -amine suffix, a linker of bare onium units); on
+            # a decline they run unchanged.
+            from .ions import emit_ring_poly_cation_ium
+            ring_poly = emit_ring_poly_cation_ium(
+                mol, [c['atom_idx'] for c in sites['cations']])
+            if ring_poly and _cation_name_rt_ok(ring_poly, mol):
+                return ring_poly
             if ccls == 'aminium':
                 from .ions import _poly_to_bis_cation_suffix
                 _neutral = _neutralize_fragment(mol)
@@ -2924,7 +2967,10 @@ def route_charged(mol, style: str = 'pin') -> str:
             # The emitter now dispatches a RING carbanion through its ring branch
             # ([CH-]1CCCCC1 -> cyclohexan-1-ide), so ring carbanions are named
             # here too instead of dropping their charge (DD3 Defect C).
-            carbanion_name = emit_parent_hydride_cumulative_suffix(mol, center_idx, 'ide')
+            # A chain carbon's =O is an 'oxo' prefix of the '-ide' parent:
+            # 'acetyl anion 1-oxoethan-1-ide (PIN)', the Blue Book).
+            carbanion_name = emit_parent_hydride_cumulative_suffix(
+                mol, center_idx, 'ide', oxo_prefixes=True)
             # 0-wrong RT gate: the carbanion emitter names substituents on the
             # index-preserving parent, and a mis-named substituent would ship a
             # WRONG molecule (`N#C[C-](C#N)C#N` -> `1,1,1-trimethylmethanide`
@@ -2984,6 +3030,18 @@ def route_charged(mol, style: str = 'pin') -> str:
         # substituted-'-uide'-parent emitter (cannot neutralize: the hypervalent
         # neutral hydride is invalid). W4-I2: generalized beyond Group 13.
         if _acls == {'uide_anion'} and len(sites['anions']) == 1:
+            # (the Blue Book,:41129): a RING '-uide' centre is the
+            # neutral ring parent hydride with the 'uide' suffix at the centre
+            # locant, its ligands as ring prefixes ('1,1-dimethylborinan-1-uide
+            # (PIN)',:41120). Strict round trip; a declined or unverified ring
+            # name abstains (the mononuclear emitter below declines ring centres).
+            _uide_idx = sites['anions'][0]['atom_idx']
+            if mol.GetAtomWithIdx(_uide_idx).IsInRing():
+                from .ions import emit_parent_hydride_cumulative_suffix
+                ring_uide = emit_parent_hydride_cumulative_suffix(mol, _uide_idx, 'uide')
+                if ring_uide and _full_inchikey_rt_ok(mol, ring_uide):
+                    return ring_uide
+                return ''
             from .ions import _emit_group13_uide
             uide = _emit_group13_uide(mol, sites['anions'][0]['atom_idx'])
             if uide:

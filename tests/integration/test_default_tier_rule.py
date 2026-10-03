@@ -115,10 +115,13 @@ def test_a_strict_path_pin_verified_by_its_constitution_is_emitted():
 
 
 def test_a_retained_trivial_name_is_emitted_only_with_trivial_fallback():
-    smi = "CC(C)(c1ccc(O)cc1)c1ccc(O)cc1"
+    # 'diethylstilbestrol': no Blue Book hit, and the strict path builds no PIN for it.
+    # This was 'bisphenol a' until PIN class program batch 2 (Task 10) named that one
+    # '4,4'-(propane-2,2-diyl)diphenol' at the default tier, the Blue Book).
+    smi = "CC/C(=C(/CC)c1ccc(O)cc1)c1ccc(O)cc1"
     assert_default_tier_declines(smi)
     row = Orthonym(trivial_fallback=True).name_tiered(smi)
-    assert row["name"] == "bisphenol a" and row["source"] == "trivial_retained", row
+    assert row["name"] == "diethylstilbestrol" and row["source"] == "trivial_retained", row
     assert_full_rt(row["name"], smi)
 
 
@@ -148,12 +151,14 @@ def test_the_cli_default_tier_prints_the_decline():
 EMIT_TIER_HELP = (
     "Which names to return. pin (the default): a name only when the pipeline can "
     "build the preferred IUPAC name (PIN), that is when the strict PIN path built the "
-    "name and verified it (tier pin_verified). The only exceptions are names from the "
+    "name and verified it (tier pin_verified). The exceptions are names from the "
     "natural-product and metal-complex lists, the name formats absent from OPSIN's "
-    "grammar (for example inositols, phanes and thioperoxols), and PINs whose "
+    "grammar (for example inositols, phanes and thioperoxols), PINs whose "
     "stereodescriptors OPSIN cannot read, for which the default tier compares the "
-    "constitution. Otherwise it declines, with the reason code NO_VERIFIED_PIN when "
-    "it built a name that is not a verified PIN. valid: also names from the general "
+    "constitution, and, with --trivial, a retained trivial name. Otherwise it "
+    "declines, with the reason code NO_VERIFIED_PIN when it built a name that is not "
+    "a verified PIN. The rule applies to the default --style pin. valid: also names "
+    "from the general "
     "engine. complete: also general names for aromatic and heterocyclic ring systems. "
     "best-effort: also the last-resort producers, von Baeyer and spiro names for "
     "ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build "
@@ -168,10 +173,14 @@ EMIT_TIER_HELP = (
 TRIVIAL_HELP = (
     "When no preferred name can be built, also allow a retained trivial name that is "
     "not a preferred name. A preferred name that can be built is never replaced "
-    "(glycerol stays propane-1,2,3-triol). Without this option a small table of "
-    "retained trivial names is still used as a last resort at the wider tiers (the "
-    "default tier declines those names); --provenance labels them "
-    "systematic_verified, source trivial_retained.")
+    "(glycerol stays propane-1,2,3-triol). Without this option, two kinds of retained "
+    "trivial name are still used at the wider tiers, and the default tier declines "
+    "them: names from a small last-resort table, and the trivial natural-product names "
+    "of molecules whose preferred bridged fused name the engine does not build yet "
+    "(diamorphine). --provenance labels both systematic_verified, source "
+    "trivial_retained. A natural-product name built on a parent, such as "
+    "'(9R,13S,14S)-3-methoxy-17-methylmorphinan', is not a trivial name, and "
+    "--trivial does not return it at the default tier.")
 
 
 def test_the_help_text_says_what_the_default_tier_does(capsys, monkeypatch):

@@ -54,6 +54,10 @@ _MIXED_INORGANIC_ANHYDRIDE_SMARTS = {
     # 2.9.0 reads 'acetic nitric anhydride' to CC(=O)O[N+](=O)[O-])
     # (the acyl carbon bears carbon or hydrogen only, as in the perception fold)
     "nitric": "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2][NX3+](=[OX1])[OX1-]",
+    # nitrous acid HO-N=O ('acetic nitrous anhydride'; an '-ous' inorganic acid as
+    # in 'benzoic phosphinous anhydride (PIN)',:32280); OPSIN 2.9.0 reads it to
+    # CC(=O)ON=O
+    "nitrous": "[CX3;$([CX3]([#6])(=O)O),$([CH1](=O)O)](=O)[OX2][NX2]=[OX1]",
 }
 
 
@@ -220,7 +224,10 @@ def name_anhydride(features) -> Optional[str]:
         return f"{acid1_name} anhydride"
     else:
         # Mixed/asymmetric anhydride: alphabetical order /.
-        acids = sorted([acid1_name, acid2_name])
+        from ..assembly.naming_utils import alpha_sort_key
+        #: alphabetical order of the acid names, locants not counted
+        # ('chloroacetic 4-nitrobenzene-1-sulfonic anhydride (PIN)', the Blue Book)
+        acids = sorted([acid1_name, acid2_name], key=alpha_sort_key)
         return f"{acids[0]} {acids[1]} anhydride"
 
 
@@ -291,7 +298,8 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
         if sub1:
             return f"bis({a1}) anhydride"
         return f"{a1} anhydride"
-    acids = sorted([a1, a2])
+    from ..assembly.naming_utils import alpha_sort_key
+    acids = sorted([a1, a2], key=alpha_sort_key)   #,:32270
     return f"{acids[0]} {acids[1]} anhydride"
 
 
@@ -530,8 +538,14 @@ def _name_mixed_inorganic_anhydride(mol) -> Optional[str]:
         c1, o1, bridge = m[0], m[1], m[2]
         acid1, _sub1 = _name_acyl_acid(mol, c1, bridge, o1)
         if acid1 is None:
+            # An acid the acyl namer cannot build ('pyridine-4-carboxylic'): the
+            # acid component is named as the free acid R-CO-OH by the acid producer
+            # cites the names of the two acids,:32255).
+            acid1 = _free_acid_component_name(mol, c1, bridge)
+        if acid1 is None:
             return None
-        acids = sorted([acid1, inorganic_word])
+        from ..assembly.naming_utils import alpha_sort_key
+        acids = sorted([acid1, inorganic_word], key=alpha_sort_key)   #,:32270
         return f"{acids[0]} {acids[1]} anhydride"
     return None
 
@@ -584,7 +598,8 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
         if sub1:
             return f"bis({acid1}) {class_term}"
         return f"{acid1} {class_term}"
-    acids = sorted([acid1, acid2])
+    from ..assembly.naming_utils import alpha_sort_key
+    acids = sorted([acid1, acid2], key=alpha_sort_key)   #,:32270
     return f"{acids[0]} {acids[1]} {class_term}"
 
 
@@ -1018,10 +1033,26 @@ def _collect_acyl_fragment_atoms(mol, carbonyl_c: int, bridge_o: int) -> set:
     return visited
 
 
+def _free_acid_component_name(mol, acyl_c: int, bridge: int) -> Optional[str]:
+    """The acid component's name without the word 'acid', from the free acid R-CO-OH
+    capped at the bridge and named by the recursive fragment namer; None if the name
+    is not a carboxylic acid name."""
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from .esters import _extract_fragment_smiles
+    keep = _bfs_side_atoms(mol, acyl_c, {bridge})
+    smi = _extract_fragment_smiles(mol, set(keep), acyl_c, cap_element=8)
+    nm = name_fragment_recursively(smi) if smi else None
+    if not nm or not nm.endswith(" acid") or " " in nm[:-len(" acid")]:
+        return None
+    return nm[:-len(" acid")]
+
+
 def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
     """Find the longest carbon chain starting from ``start`` within frag_atoms.
 
-    Uses DFS to find the longest simple path of carbon atoms.
+    Uses DFS to find the longest simple path of carbon atoms. A nitrile carbon
+    (C#N) is not a chain atom: under the acid suffix the group is the prefix
+    'cyano'; 'cyanoacetic', not 'propanoic' with the N dropped).
 
     Args:
         mol: RDKit Mol object.
@@ -1031,7 +1062,10 @@ def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
     Returns:
         Ordered list of atom indices [start,..., end].
     """
-    carbon_set = {i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C'}
+    carbon_set = {i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+                  and not any(b.GetBondTypeAsDouble() == 3.0
+                              and b.GetOtherAtom(mol.GetAtomWithIdx(i)).GetSymbol() == 'N'
+                              for b in mol.GetAtomWithIdx(i).GetBonds())}
 
     best_path = [start]
 
@@ -1106,6 +1140,19 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
     # acids still need the substituent-prefix path below.
     from .esters import acid_is_ring_acid, get_acid_fragment_name
     frag_list = list(frag_atoms)
+    if acid_is_ring_acid(mol, frag_list):
+        # A ring acid with anything beyond its ring and the carbonyl group
+        # ('4-nitrobenzoic'): the ring namer below gives the bare ring acid
+        # ('benzoic'), a different acid, so the free acid R-CO-OH is named by the
+        # acid producer instead cites the substituted acid names,
+        # 'chloroacetic 4-nitrobenzene-1-sulfonic anhydride (PIN)',:32270).
+        ring_atoms = set()
+        for ring in mol.GetRingInfo().AtomRings():
+            if set(ring) <= frag_atoms:
+                ring_atoms |= set(ring)
+        if frag_atoms - ring_atoms - {carbonyl_c, carbonyl_o}:
+            acid = _free_acid_component_name(mol, carbonyl_c, bridge_o)
+            return (acid, True) if acid else (None, False)
     if acid_is_ring_acid(mol, frag_list) or (
         not is_branched and not non_c_non_carbonyl_o
     ):
@@ -1156,7 +1203,19 @@ def _name_acyl_acid(mol, carbonyl_c: int, bridge_o: int, carbonyl_o: int):
         return f"{unlocanted}acetic", True
     base_acid = _build_acid_name(len(principal_chain))
     if prefix_str:
-        return f"{prefix_str}{base_acid}", True
+        acid = f"{prefix_str}{base_acid}"
+        if len(principal_chain) == 1:
+            # A substituted formic acid. (the Blue Book): -Cl, -CN,
+            # -NH2 and the other listed groups on formic acid are named from carbonic
+            # acid ('carbonochloridic acid (PIN)'; 'NC-CO-OH carbonocyanidic acid (PIN)',
+            #:30832); (:30692) keeps the retained stem for the rest
+            # ('nitroformic acid (PIN)',:30696). 'cyanomethanoic' and the like read
+            # back to the right molecule but are never the PIN: labelled below it (the
+            # best-effort tier keeps the name, the PIN tier declines). A nitrile carbon
+            # is no chain atom, so NC-CO- is such a one-carbon acid.
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(acid)
+        return acid, True
     return base_acid, False
 
 

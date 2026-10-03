@@ -549,18 +549,24 @@ class TestIsotopeEndToEnd:
     @pytest.mark.parametrize("smiles,expected", [
         # ★ The regression this guard exists for: locants_are_forced is False here.
         # 13C count subscript omitted per /FIX-A (a carbon position holds
-        # one carbon); the locant behaviour under test is unchanged.
+        # one carbon). (the Blue Book) "Locants are not omitted
+        # when there is a possibility of isomers": the 13C can sit on C1 or C2.
+        # (:7478): the isotope parentheses count in the nesting
+        # order, so the prefix takes square brackets ('1,2-di[(13C)methyl]benzene
+        # (PIN',:7492).
         ("FC(F)(F)[13C](F)(F)C1CCCCC1",
-         "(1,1,2,2,2-pentafluoro(13C)ethyl)cyclohexane"),
+         "[1,1,2,2,2-pentafluoro(1-13C)ethyl]cyclohexane"),
         ("FC(F)(F)[13C](F)(F)c1ccccc1",
-         "(1,1,2,2,2-pentafluoro(13C)ethyl)benzene"),
+         "[1,1,2,2,2-pentafluoro(1-13C)ethyl]benzene"),
         # forced scope IS active here (the descriptor needed locant 2).
         ("Clc1ccccc1C(F)(F)[13C](F)(F)F",
-         "1-chloro-2-(1,1,2,2,2-pentafluoro(2-13C)ethyl)benzene"),
+         "1-chloro-2-[1,1,2,2,2-pentafluoro(2-13C)ethyl]benzene"),
         # partial substitution: denied on its own merits, label or no label. The
         # D keeps (2H1): its omitted (2H) spelling is not OPSIN-parseable in this
         # nested substituent slot, so the placement search falls back (FIX-A).
-        ("FC(F)(F)C(F)([2H])C1CCCCC1", "(1,2,2,2-tetrafluoro(2H1)ethyl)cyclohexane"),
+        # Square brackets by (:7478), as '{[(2H1)methoxy(2H2)methyl]
+        # sulfanyl}methaneperoxol (PIN)' (:44188).
+        ("FC(F)(F)C(F)([2H])C1CCCCC1", "[1,2,2,2-tetrafluoro(2H1)ethyl]cyclohexane"),
         # omissions that must SURVIVE -- the weaker isotopic flag is
         # deliberately not consulted by rules/benzene.py.
         ("Cc1c(C)c(C)c(C)c(C)[13c]1C", "hexamethyl(13C)benzene"),

@@ -637,12 +637,12 @@ class TestKnownLimitations:
         """Dispiro systems are named (the old 'not supported' marker was stale).
 
         Task 12 fix a performance pass (wp6-tests): the non-strict xfail XPASSed. The engine
-        names the system 'dispiro[2.1.3.2]decane' (pin_verified), which OPSIN
+        names the system 'dispiro[2.1.3^5.2^3]decane' (pin_verified), which OPSIN
         2.9.0 parses to the input's full InChIKey, so this asserts the round
         trip. The Blue Book spelling carries the superscripts:
         (the Blue Book) "Each time a spiro atom is reached for the second
         time its locant... is cited as a superscript number", e.g.
-        'dispiro[3.2.3^7.2^4]dodecane (PIN)' (:9981); see the strict xfail below.
+        'dispiro[3.2.3^7.2^4]dodecane (PIN)' (:9981); the next test asserts it.
         The test id is kept."""
         from tests.support.jars import jar_or_skip
         from tests.support.rt_assert import assert_full_rt
@@ -652,15 +652,11 @@ class TestKnownLimitations:
         assert_full_rt(result, "C1CC2(C1)CC3(CC2)CC3")
 
     @pytest.mark.integration
-    @pytest.mark.xfail(strict=True, reason=(
-        "DEFECT (PIN spelling, class): polyspiro descriptors omit the superscript "
-        "locants of spiro atoms reached a second time (P-24.2.2, BlueBookV2.md:9977; "
-        "'dispiro[3.2.3^7.2^4]dodecane (PIN)' :9981). rules/spiro.py builds "
-        "'dispiro[a.b.c.d]' and passing tests lock that form "
-        "(tests/unit/rules/test_spiro.py, test_vonbaeyer_spiro.py, "
-        "test_dispiro_return_arc_numbering.py). .planning/TODO-2026-09-24.md "
-        "'Open from T12 fix round 2 (wp6)'."))
     def test_dispiro_descriptor_carries_superscripts(self):
+        """ (the Blue Book): "Each time a spiro atom is reached for
+        the second time its locant, which has already been assigned, is cited as
+        a superscript number to the number of the preceding linking atoms";
+        'dispiro[3.2.3^7.2^4]dodecane (PIN)' (:9981)."""
         assert name_compound("C1CC2(C1)CC3(CC2)CC3") == "dispiro[2.1.3^5.2^3]decane"
 
     @pytest.mark.integration

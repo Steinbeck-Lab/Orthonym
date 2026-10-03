@@ -33,15 +33,20 @@ def _const(smi):
 # ring nitrogen (OPSIN-fatal) and now round-trip
 HETERO_FIXED = [
     ("COc1cccc(F)c1C(=O)N1CCCC2(CCc3cnc(N(C)C)nc32)C1", "cyclopenta[d]pyrimidine"),
-    ("COc1ccc(C)cc1NC(=O)N1CCC2(CC1)NC(=O)c1cccc(Cl)c1N2", "benzo[d]pyrimidine"),
+    # the retained name: '(9) quinazoline (PIN)', the Blue Book), not
+    # 'benzo[d]pyrimidine'
+    ("COc1ccc(C)cc1NC(=O)N1CCC2(CC1)NC(=O)c1cccc(Cl)c1N2", "quinazoline"),
     ("O=C1OC2(CCC(O)(C(=O)Nc3ccn(-c4ccccc4)n3)CC2)c2ncccc21", "furo"),
 ]
 
-# all-carbon fused components must keep their name-consistent numbering
+# all-carbon fused components must keep their name-consistent numbering; the
+# component is cited as its mancude parent (naphthalene) with its saturation in
+# front of the spiro name, the Blue Book)
 CARBON_UNCHANGED = [
     ("COC(=O)N(C)[C@H]1CCC2(CCN(CCC(C)(C)C)CC2)C2=C1CCC=C2",
-     "hexahydronaphthalene"),
-    ("CC1(C)CCC[C@]2(C)CC3(CC[C@@H]12)OCOO3", "decahydronaphthalene"),
+     "-spiro[naphthalene-1,4'-piperidine]"),
+    ("CC1(C)CCC[C@]2(C)CC3(CC[C@@H]12)OCOO3",
+     "-spiro[naphthalene-2,3'-[1,2,4]trioxolane]"),
 ]
 
 
@@ -76,6 +81,9 @@ def test_hexahydronaphthalene_keeps_low_carbon_locant():
         "COC(=O)N(C)[C@H]1CCC2(CCN(CCC(C)(C)C)CC2)C2=C1CCC=C2")
     res = name_mixed_spiro_fused(m)
     assert res is not None
+    # (the Blue Book) with (b) then (e) (:3246): indicated
+    # hydrogen at 2, then the hydro prefixes. Was
+    # "spiro[1,2,3,4,5,6-hexahydronaphthalene-1,4'-piperidine]".
     assert res[0] == (
-        "spiro[1,2,3,4,5,6-hexahydronaphthalene-1,4'-piperidine]"
+        "3,4,5,6-tetrahydro-2H-spiro[naphthalene-1,4'-piperidine]"
     ), res[0]

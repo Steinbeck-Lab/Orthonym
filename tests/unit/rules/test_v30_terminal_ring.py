@@ -300,6 +300,7 @@ def test_pin_default_is_untouched(smiles):
         mol, tuple(ring), attach, allow_mancude=False) == expected[smiles]
 
 
+@pytest.mark.opsin_gate
 def test_general_ring_prefix_emission_is_not_labelled_a_pin():
     """-T1c: the composer stamps every emission ``source='pin_path'`` ->
     ``T1``, ``is_pin=True`` (``namer.py:2728``). A ring substituent prefix only
@@ -307,9 +308,10 @@ def test_general_ring_prefix_emission_is_not_labelled_a_pin():
     here is the retained name *adamantane*, not ``tricyclo[3.3.1.1^3,7]decane`` --
     so it must be demoted rather than shipped as a PIN.
 
-    MUTATION: delete the ``elif prov.get("general_ring_prefix")`` branch in
-    ``namer.py`` -> the demoted molecule comes back ``T1`` / ``is_pin=True`` and
-    the first two assertions fail.
+    MUTATION: the label of this molecule now comes from the strict-twin demotion in
+    ``namer.py`` (a pin_verified name the strict PIN path does not build itself is
+    pin_unverified, ``if _strict_name != name``); disable it -> the demoted molecule
+    comes back ``pin_verified`` / ``is_pin=True`` and the first assertions fail.
 
     The assertion is on the DEMOTION, not on the shape of the name: this test
     originally required ``tricyclo[3.3.1.1^3,7]`` in the name, and the
@@ -318,6 +320,9 @@ def test_general_ring_prefix_emission_is_not_labelled_a_pin():
     testing the wrong thing -- the flag records *which tier produced the prefix*,
     not what the prefix looks like. The contrast against a PIN-route molecule is
     what makes it meaningful.
+
+    The OPSIN validity gate is on (``opsin_gate``): with it off no name is verified,
+    so the contrast row is 'pin_unverified' too and the contrast proves nothing.
     """
     from orthonym import Orthonym
     namer = Orthonym(general_fallback=True, general_fallback_unverified=True,
@@ -325,7 +330,9 @@ def test_general_ring_prefix_emission_is_not_labelled_a_pin():
     demoted = namer.name_tiered('OC(=O)CC12CC3CC(O)(CC(C3)C1)C2')
     assert demoted['name'], demoted
     assert demoted['is_pin'] is False, demoted
-    assert demoted['tier'] in ('systematic_verified', 'best_effort'), demoted
+    # Tier labels, paper semantics (namer.py "Tier labels" block): a name in PIN form
+    # that only a breadth producer built is 'pin_unverified' -- never 'pin_verified'.
+    assert demoted['tier'] in ('pin_unverified', 'systematic_verified', 'best_effort'), demoted
     # CONTRAST: a composer emission whose ring prefix the PIN route produced is
     # untouched -- still pin_verified / is_pin. Without this the test would also
     # pass if the demotion fired for every composer emission.

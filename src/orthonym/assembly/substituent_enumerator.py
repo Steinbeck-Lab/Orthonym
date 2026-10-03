@@ -2302,6 +2302,85 @@ def is_dichalcogen_bridge_attach(mol, attach_idx, frag_atoms_set,
     )
 
 
+def name_acid_linked_branch(mol, frag_atoms, attach_idx, principal_group,
+                            functional_groups=None, acyl_carbon: bool = True):
+    """The ONE prefix of a branch joined to its parent through the oxygen (or the
+    -NH-) of an acid's acyl group, or ``None``.
+
+    The acid group keeps its own acyl prefix and the linking atom adds 'oxy' or
+    'amino' (concatenation); the branch is never split into a prefix for the
+    linking atom and a lost acyl part:
+
+    - (the Blue Book): a sulfur group "attached by oxygen
+      (chalcogen) or nitrogen" is "named by an appropriate prefix formed by
+      concatenation": '3-[(chlorosulfonyl)oxy]propanoic acid (PIN)' (:36492),
+      '3-(sulfamoyloxy)propanoic acid (PIN)' (:36494), '3-[(methoxysulfonyl)
+      amino]propanoic acid (PIN)' (:36502);
+    - (:36937) method (2) for a P-O-P chain: '3-[(1,3,3-trihydroxy-
+      1,3-dioxo-1λ5,3λ5-diphosphoxan-1-yl)oxy]propanoic acid (PIN)' (:36949);
+    - (:31696), R-CO-O- as 'acyloxy': '3-[(pyridine-3-carbonyl)
+      oxy]propanoic acid (PIN)' (:31723).
+
+    All three apply when "another group is present that has priority for
+    citation as the principal group": the branch is an ester (or
+    an amide of an ester), so ``principal_group`` must be senior to esters
+    : the acids and the anhydrides). Under a junior class the ester is
+    named by functional class nomenclature,:35916), not here.
+
+    ``attach_idx`` is the linking atom inside ``frag_atoms``; the branch must hang
+    from the parent by that one bond (no other branch atom bonds outside it).
+    With ``functional_groups`` given, a linking OXYGEN that belongs to a perceived
+    functional group is left to that group's prefix ('sulfooxy', 'phosphonooxy',
+    'nitrooxy': declines). A linking -NH- is held only by a sulfonamide match,
+    whose S then lies off the parent, and the FG prefix loop hands such a
+    sulfonamide to the branch walk (``polyfunctional`` '(...sulfonamido)' skip),
+    so it is not checked. With ``acyl_carbon=False`` the R-CO-O- shape declines
+    (the caller names esters elsewhere). Each producer names every atom of the
+    branch or declines.
+    """
+    from ..rules.seniority import compare_seniority
+    if not principal_group or compare_seniority(principal_group, "ester") >= 0:
+        return None
+    frag = set(frag_atoms)
+    if attach_idx is None or attach_idx not in frag:
+        return None
+    a = mol.GetAtomWithIdx(attach_idx)
+    if (a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() or a.GetIsotope()
+            or a.IsInRing()):
+        return None
+    outer = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() not in frag]
+    inner = [n.GetIdx() for n in a.GetNeighbors() if n.GetIdx() in frag]
+    if len(outer) != 1 or len(inner) != 1:
+        return None
+    for i in frag:
+        if i != attach_idx and any(
+                n.GetIdx() not in frag
+                for n in mol.GetAtomWithIdx(i).GetNeighbors()):
+            return None
+    sym = a.GetSymbol()
+    centre = mol.GetAtomWithIdx(inner[0]).GetSymbol()
+    if sym == 'O' and functional_groups and any(
+            attach_idx in m
+            for matches in functional_groups.values() for m in (matches or ())):
+        return None
+    if sym == 'O' and a.GetTotalNumHs() == 0:
+        if centre == 'S':
+            from ..rules.sulfur_oxoacid import name_sulfur_oxoacid_oxy_substituent
+            return name_sulfur_oxoacid_oxy_substituent(mol, attach_idx, outer[0])
+        if centre == 'P':
+            from ..rules.phosphorus import name_phosphoxane_oxy_substituent
+            return name_phosphoxane_oxy_substituent(mol, attach_idx, outer[0])
+        if centre == 'C' and acyl_carbon:
+            from .composer import _acyloxy_prefix_for_frag
+            token = _acyloxy_prefix_for_frag(mol, frag, attach_idx)
+            return token if token and ' ' not in token else None
+        return None
+    if sym == 'N' and centre == 'S':
+        from ..rules.sulfur_oxoacid import name_sulfur_oxoacid_amino_substituent
+        return name_sulfur_oxoacid_amino_substituent(mol, attach_idx, outer[0])
+    return None
+
+
 def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                               allow_mancude: bool = False):
     """Name any substituent fragment.
@@ -5125,6 +5204,22 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
         attach_idx = frag_atoms[0]
 
     frag_set_for_chalcogen = set(frag_atoms)
+
+    #: a nitrogen joined to the parent by a DOUBLE bond is an ylidene free
+    # valence, '{R}imino' for =N-R and '{R}hydrazinylidene' for =N-N< (the same
+    # constructor the name_substituent gate uses): '4-[(propan-2-ylidene)
+    # hydrazinylidene]cyclohexane-1-carboxylic acid (PIN)',
+    # the Blue Book), '4-(phenylhydrazinylidene)cyclohexane-1-carboxylic acid
+    # (PIN)' (:38579). The amino-branch reading below assumes a single bond and
+    # named =N-N=C(CH3)2 '(propan-2-iminyl)amino', a different molecule.
+    if attach_idx is not None:
+        _root = mol.GetAtomWithIdx(attach_idx)
+        if _root.GetSymbol() == 'N' and any(
+                b.GetBondType() == Chem.BondType.DOUBLE
+                and b.GetOtherAtomIdx(attach_idx) in parent_atoms
+                for b in _root.GetBonds()):
+            return _nitrogen_ylidene_prefix(
+                mol, frag_set_for_chalcogen, attach_idx, 2)
 
     # (generalizes SP2.1'): a PLAIN acyloxy ester '-O-C(=O)-R' with a SYSTEMATIC
     # acyl must be caught HERE, before the alkoxy branch below mis-reads the ester O

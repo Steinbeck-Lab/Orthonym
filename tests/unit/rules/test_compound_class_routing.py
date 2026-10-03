@@ -218,12 +218,14 @@ class TestExistingNPPreserved:
         assert result == "cholesterol"
 
     def test_morphine_still_returns_morphine(self):
+        # (the Blue Book) identifies no PIN for a natural product; the strict path builds its bridged fused PIN:23816,:23843) on the rule-derived parent '[1]benzofuro[3,2-e]isoquinoline' (slice S4)
         result = name_compound(MORPHINE_SMILES)
-        assert result == "morphine"
+        assert result == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     def test_codeine_still_returns_codeine(self):
+        # the bridged fused PIN, as for morphine (slice S4)
         result = name_compound(CODEINE_SMILES)
-        assert result == "codeine"
+        assert result == "(4R,4aR,7S,7aR,12bS)-9-methoxy-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7-ol"
 
     def test_ethanol_still_returns_ethanol(self):
         result = name_compound(ETHANOL_SMILES)

@@ -68,17 +68,23 @@ POST_148_2_BASELINE_NAMES = {
     # exact); the catalog still says 'quinolizidine', now labelled below pin_verified. Strict
     # xfail below until the PIN is built.
     'C1CCN2CCCCC2C1': 'octahydro-2H-quinolizine',
-    'Nc1nc(=O)c2[nH]cnc2[nH]1': 'guanine',
-    'Nc1nc2[nH]cnc2c(=O)[nH]1': 'guanine',
-    'Nc1ncnc2[nH]cnc12': 'adenine',
-    'Nc1ncnc2nc[nH]c12': 'adenine',
+    # quick-wins, change-asserted-value: the four purine-base rows below were 'guanine',
+    # 'adenine', 'xanthine' and 'hypoxanthine'. None of those names occurs in the Blue Book
+    # (0 hits); purine is the retained name, "the PIN is 7H-purine"
+    # (the Blue Book). The six nucleobase catalogue entries are removed (see
+    # _REMOVED_NUCLEOBASE_KEYS); the bases get their purine names, OPSIN 2.9.0 full-InChIKey
+    # and fixed-H exact.
+    'Nc1nc(=O)c2[nH]cnc2[nH]1': '2-amino-3,7-dihydro-6H-purin-6-one',
+    'Nc1nc2[nH]cnc2c(=O)[nH]1': '2-amino-1,9-dihydro-6H-purin-6-one',
+    'Nc1ncnc2[nH]cnc12': '9H-purin-6-amine',
+    'Nc1ncnc2nc[nH]c12': '7H-purin-6-amine',
     'O=C1c2ccccc2-c2ccccc21': '9H-fluoren-9-one',
-    'O=c1[nH]c(=O)c2[nH]cnc2[nH]1': 'xanthine',
+    'O=c1[nH]c(=O)c2[nH]cnc2[nH]1': '3,7-dihydro-1H-purine-2,6-dione',
     'O=c1[nH]c(=O)c2nc3ccccc3nc2[nH]1': 'benzo[g]pteridine-2,4(1H,3H)-dione',
-    'O=c1[nH]c(=O)c2nc[nH]c2[nH]1': 'xanthine',
+    'O=c1[nH]c(=O)c2nc[nH]c2[nH]1': '3,9-dihydro-1H-purine-2,6-dione',
     'O=c1[nH]c2ccccc2c2ccccc12': 'phenanthridin-6(5H)-one',
-    'O=c1[nH]cnc2[nH]cnc12': 'hypoxanthine',
-    'O=c1[nH]cnc2nc[nH]c12': 'hypoxanthine',
+    'O=c1[nH]cnc2[nH]cnc12': '1,9-dihydro-6H-purin-6-one',
+    'O=c1[nH]cnc2nc[nH]c12': '1,7-dihydro-6H-purin-6-one',
     'O=c1c2ccccc2[nH]c2ccccc12': 'acridin-9(10H)-one',
     'O=c1c2ccccc2oc2ccccc12': '9H-xanthen-9-one',
     'O=c1c2ccccc2sc2ccccc12': '9H-thioxanthen-9-one',
@@ -135,7 +141,11 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2c(c1)c1ccccc1c1ccccc21': 'triphenylene',
     'c1ccc2c(c1)ccc1[nH]ccc12': '3H-benzo[e]indole',
     'c1ccc2c(c1)ccc1c3ccccc3ccc21': 'chrysene',
-    'c1ccc2c(c1)ccc1ncccc12': 'benzo[h]quinoline',
+    # quick-wins, change-asserted-value (was 'benzo[h]quinoline', a different molecule:
+    # the retained table's benzo[f]/[h] keys were swapped): fusion names
+    # (the Blue Book); OPSIN 2.9.0 reads 'benzo[f]quinoline' to this key, full
+    # InChIKey exact.
+    'c1ccc2c(c1)ccc1ncccc12': 'benzo[f]quinoline',
     'c1ccc2c(c1)ccc1occc12': 'naphtho[2,1-b]furan',
     'c1ccc2c(c1)ccc1sccc12': 'naphtho[2,1-b]thiophene',
     'c1ccc2c(c1)cnc1ccccc12': 'phenanthridine',
@@ -211,7 +221,9 @@ POST_148_2_BASELINE_NAMES = {
     'c1cnn2cccc2c1': 'pyrrolo[1,2-b]pyridazine',
     'c1cnn2ccnc2c1': 'imidazo[1,2-b]pyridazine',
     'c1ncc2[nH]ccc2n1': '5H-pyrrolo[3,2-d]pyrimidine',
-    'c1ncc2[nH]cnc2n1': '1H-imidazo[4,5-d]pyrimidine',
+    # quick-wins, change-asserted-value (was '1H-imidazo[4,5-d]pyrimidine', a fusion name
+    # for a ring system with a retained name): "the PIN is 7H-purine" (the Blue Book).
+    'c1ncc2[nH]cnc2n1': '7H-purine',
     'c1ncc2nc[nH]c2n1': '9H-purine',
     'c1ncc2ncncc2n1': 'pyrimido[5,4-d]pyrimidine',
 }
@@ -263,5 +275,17 @@ def test_baseline_table_size():
     table is a snapshot of the entries that existed then; what it can check is that
     none of them has left the catalog. The newer entries are covered by the catalog
     round-trip tests (tests/unit/data/test_fused_het_data_integrity.py)."""
-    missing = sorted(set(POST_148_2_BASELINE_NAMES) - set(FUSED_HETEROCYCLE_DATA))
+    missing = sorted(set(POST_148_2_BASELINE_NAMES) - set(FUSED_HETEROCYCLE_DATA)
+                     - _REMOVED_NUCLEOBASE_KEYS)
     assert not missing, f"frozen baseline keys no longer in FUSED_HETEROCYCLE_DATA: {missing}"
+    assert not (_REMOVED_NUCLEOBASE_KEYS & set(FUSED_HETEROCYCLE_DATA))
+
+
+# quick-wins: the six nucleobase entries ('adenine', 'guanine', 'hypoxanthine', two tautomer
+# keys each) left the catalogue on purpose. The names do not occur in the Blue Book (0 hits),
+# purine is the retained name ("the PIN is 7H-purine", the Blue Book) and the
+# entries carried scrambled numbering maps; rules/purine.py names these molecules on purine.
+_REMOVED_NUCLEOBASE_KEYS = frozenset({
+    'Nc1nc(=O)c2[nH]cnc2[nH]1', 'Nc1nc2[nH]cnc2c(=O)[nH]1', 'Nc1ncnc2[nH]cnc12',
+    'Nc1ncnc2nc[nH]c12', 'O=c1[nH]cnc2[nH]cnc12', 'O=c1[nH]cnc2nc[nH]c12',
+})

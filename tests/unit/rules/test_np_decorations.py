@@ -221,10 +221,13 @@ class TestNPDecorationEdgeCases:
         )
 
     def test_decoration_does_not_break_exact_match(self):
-        """Molecules with exact derivative entries still use exact match."""
-        # Morphine should still be "morphine"
+        """Molecules with exact derivative entries still use exact match in the producer
+        (the engine names morphine by its bridged fused PIN, slice S4)."""
+        from rdkit import Chem
+
+        from orthonym.rules.natural_products import name_natural_product
         smiles = "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
-        assert name_compound(smiles) == "morphine"
+        assert name_natural_product(Chem.MolFromSmiles(smiles)) == "morphine"
 
     def test_name_natural_product_none_input(self):
         """name_natural_product(None) should return None."""

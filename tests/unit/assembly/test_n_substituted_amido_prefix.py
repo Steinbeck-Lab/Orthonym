@@ -170,13 +170,33 @@ def test_helper_misnamed_R_witnesses_now_named_correctly():
                            == Chem.MolToInchiKey(capped))
 
 
-def test_helper_sentinel_R_fails_closed():
+def test_helper_sentinel_R_fails_closed(monkeypatch):
     # a review RISK 2: name_substituent may return the `substituent` placeholder ->
     # never splice `N-substituentacetamido` (a project rule). is_refusal_sentinel + the
-    # re-anchor both catch it.
-    m = _frag("OC(=O)CCN(N=O)C(C)=O")  # R' = -N=O (recursion/depth fallback)
+    # re-anchor both catch it. The R' namer now names -N=O ('nitroso'), so the
+    # placeholder is injected where the helper imports the R' namer at call time.
+    import orthonym.rules.amides as amides
+    monkeypatch.setattr(amides, "_name_n_substituent",
+                        lambda mol, atoms, n: "substituent")
+    m = _frag("OC(=O)CCN(N=O)C(C)=O")
     assert n_substituted_acyl_amido_prefix(m, 5, set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4},
                                            {0, 1, 2, 3, 4}) is None
+
+
+def test_helper_nitroso_R_is_named():
+    # The former sentinel witness, R' = -N=O, is named by the helper:
+    # 'N-nitrosoacetamido', the prefix form of 'N-acetylacetamido (preferred prefix)'
+    #, the Blue Book). Independent OPSIN parse of the amide against
+    # the N-capped fragment.
+    from tests.support.rt_assert import _independent_parse
+    m = _frag("OC(=O)CCN(N=O)C(C)=O")
+    sub = set(range(m.GetNumAtoms())) - {0, 1, 2, 3, 4}
+    got = n_substituted_acyl_amido_prefix(m, 5, sub, {0, 1, 2, 3, 4})
+    assert got == "N-nitrosoacetamido"
+    capped = Chem.MolFromSmiles(Chem.MolFragmentToSmiles(m, atomsToUse=sorted(sub)))
+    parsed = _independent_parse(got[:-1] + "e")
+    assert parsed and (Chem.MolToInchiKey(Chem.MolFromSmiles(parsed))
+                       == Chem.MolToInchiKey(capped))
 
 
 def test_helper_isotope_fails_closed():

@@ -18,9 +18,10 @@ The generic path names this tail by skeletal ("a") replacement
 
 The S-oxoacid acyl group is ``{X}sulfonyl`` (n S=O double bonds = 2) or
 ``{X}sulfinyl`` (n = 1), where X is the single S ligand that is neither the
-linking O/N nor an oxo. Two Blue Book contractions apply / the
-substituent-prefix tables at:56857,:56859): ``hydroxysulfonyl`` -> ``sulfo``
-and ``aminosulfonyl`` -> ``sulfamoyl``. ``aminosulfinyl`` is NOT contracted
+linking O/N nor an oxo. Three Blue Book contractions apply / the
+substituent-prefix tables at:56857,:56859;:17971):
+``hydroxysulfonyl`` -> ``sulfo``, ``hydroxysulfinyl`` -> ``sulfino`` and
+``aminosulfonyl`` -> ``sulfamoyl``. ``aminosulfinyl`` is NOT contracted
 (explicitly ``[not …sulfinamoyloxy…]`` at:36500).
 
 Every function fails closed (returns ``None``) on any S outside the neutral
@@ -122,9 +123,16 @@ def _sulfur_oxoacid_acyl(mol, s_idx: int, link_idx: int) -> Optional[str]:
     if xp is None:
         return None
     acyl = xp + ("sulfonyl" if n_oxo == 2 else "sulfinyl")
-    # contractions (the -sulfinyl forms are NOT contracted::36500).
+    # The acyl prefix of an acid named by a suffix is that acid's own prefix:
+    # '-SO2-OH sulfo' and '-SO-OH sulfino (preselected prefix)',
+    # the Blue Book,:17971; 'HO-SO2-O- sulfooxy (preselected prefix)'
+    #:31342); 'sulfamoyl (preselected prefix) aminosulfonyl' is retained
+    #,:31330). The amide of the sulfinic acid has no retained
+    # name: 'aminosulfinyl' stays ('[not...sulfinamidoyloxy...]',:36500).
     if acyl == "hydroxysulfonyl":
         return "sulfo"
+    if acyl == "hydroxysulfinyl":
+        return "sulfino"
     if acyl == "aminosulfonyl":
         return "sulfamoyl"
     return acyl
@@ -151,9 +159,43 @@ def name_sulfur_oxoacid_oxy_substituent(
     acyl = _sulfur_oxoacid_acyl(mol, s_nbrs[0], o_idx)
     if acyl is None:
         return None
-    if acyl in ("sulfo", "sulfamoyl"):
-        return acyl + "oxy"          # sulfooxy / sulfamoyloxy
+    if acyl in ("sulfo", "sulfino", "sulfamoyl"):
+        return acyl + "oxy"          # sulfooxy / sulfinooxy / sulfamoyloxy
     return f"({acyl})oxy"            # (chlorosulfonyl)oxy, …
+
+
+def name_sulfur_oxoacid_amino_substituent(
+        mol, n_idx: int, from_idx: int) -> Optional[str]:
+    """N-linked ``-NH-S(oxoacid)`` as an amino substituent prefix.
+
+    ``n_idx`` is the linking nitrogen (the fragment attach atom), ``from_idx``
+    its parent-side neighbour. The nitrogen must be a neutral acyclic -NH-
+    bonded to the parent and to the sulfur only. Returns ``sulfoamino`` /
+    ``sulfinoamino`` / ``sulfamoylamino`` (single compound tokens, as
+    'sulfooxy') or ``(methoxysulfonyl)amino`` / ``(chlorosulfonyl)amino`` (as
+    '3-[(methoxysulfonyl)amino]propanoic acid (PIN)', the Blue Book), or
+    ``None`` (fail closed).
+    """
+    n = mol.GetAtomWithIdx(n_idx)
+    if (n.GetSymbol() != "N" or n.GetFormalCharge() != 0
+            or n.GetNumRadicalElectrons() or n.GetIsotope()
+            or n.GetTotalNumHs() != 1 or n.IsInRing() or n.GetDegree() != 2):
+        return None
+    if mol.GetBondBetweenAtoms(n_idx, from_idx) is None:
+        return None
+    s_nbrs = [x.GetIdx() for x in n.GetNeighbors()
+              if x.GetIdx() != from_idx and x.GetSymbol() == "S"]
+    if len(s_nbrs) != 1:
+        return None
+    if (mol.GetBondBetweenAtoms(n_idx, s_nbrs[0]).GetBondType()
+            != Chem.BondType.SINGLE):
+        return None
+    acyl = _sulfur_oxoacid_acyl(mol, s_nbrs[0], n_idx)
+    if acyl is None:
+        return None
+    if acyl in ("sulfo", "sulfino", "sulfamoyl"):
+        return acyl + "amino"
+    return f"({acyl})amino"
 
 
 def name_sulfate_ester(mol, sulfur_idx: int) -> Optional[str]:

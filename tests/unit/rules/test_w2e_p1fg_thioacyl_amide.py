@@ -52,4 +52,5 @@ class TestThioacylThioamide:
         assert name_compound("CC(=S)NC", style="pin") == "N-methylethanethioamide"
 
     def test_o_acyl_protect(self):
-        assert name_compound("CCC(=O)NC=O", style="pin") == "N-propanoylformamide"
+        # (the Blue Book,:33111) with (b) (:20923).
+        assert name_compound("CCC(=O)NC=O", style="pin") == "N-formylpropanamide"

@@ -283,8 +283,10 @@ class TestSubstructureMatching:
         result = match_fused_heterocycle_core(mol)
         assert result is not None
         name, _, _ = result
-        # Should match adenine (10 atoms) over purine (9 atoms)
-        assert name == 'adenine'
+        # The purine core wins over any single ring. (It used to be a separate
+        # 'adenine' catalogue entry; that name is not a Blue Book name and the entry
+        # is gone: "the PIN is 7H-purine", the Blue Book.)
+        assert name == '7H-purine'
 
 
 # =========================================================================

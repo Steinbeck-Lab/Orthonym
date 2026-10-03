@@ -82,6 +82,98 @@ _HALO_ALKOXY_RE = re.compile(
     r'oxy$'
 )
 
+# (the Blue Book): the retained contracted R-O- prefixes 'methoxy',
+# 'ethoxy', 'propoxy', 'butoxy' and 'phenoxy' "are fully substitutable (with the exception
+# of tert-butoxy) and are considered as simple prefixes" (:17958 'methoxy' is a simple
+# prefix). One of them carrying a substituent prefix is a compound prefix,
+#:15762, "a simple substituent group... to which is attached one or more simple
+# substituent groups"), which takes parentheses,:7232): '1-(chloromethoxy)-4-
+# nitrobenzene (PIN)' (:27711), '[2-(carboxymethoxy)ethoxy]acetic acid' (:23112),
+# '1-methoxy-2-(2-methoxyethoxy)ethane (PIN)' (:27756). Without a locant the digit test
+# cannot see it ('methoxymethoxy', 'chloromethoxy', 'phenylmethoxy'). Every stem that
+# ends the name is tried, and a split whose root is a substituent prefix decides
+# ('methoxymethoxy' = 'methoxy' + 'methoxy'; 'methoxym' + 'ethoxy' has no prefix root).
+# 'isopropoxy' (general nomenclature only, no substitution), the italic
+# 'tert-'/'sec-' forms (removed before this test) and a bare multiplier ('dimethoxy') stay
+# simple. The substituent prefix in front of the stem may itself be enclosed: the prefix
+# producers pass '(methylsulfanyl)methoxy' and '(trifluoromethyl)methoxy', a root that
+# ends in a closing mark, and the compound prefix takes the next mark around it
+# ('[(4-methylphenyl)methoxy]benzene',,:21618).
+#
+# ONE rule. "Substituted" is the question is_substituted_substituent answers (c),
+#:7035, "any component which is substituted automatically requires use of the
+# multiplicative forms 'bis', 'tris', etc."), and the same answer decides the enclosing marks
+# here (needs_brackets, is_complex_substituent) and in enclose_if_compound /
+# format_substituent_prefix. So is_substituted_contracted_alkoxy is that predicate
+# restricted to the tokens that end in a contracted stem, and the root reading below is
+# one arm OF that predicate: its vocabulary split does not know every substituent prefix
+# ('acetylmethoxy', 'ethenylmethoxy', 'bis(trifluoromethyl)methoxy',
+# 'carboxy(phenyl)methoxy'), and the root reading does not know every root the split
+# knows ('methylidenemethoxy'); the enclosure and the multiplier now agree on all of them.
+_CONTRACTED_ALKOXY_STEMS = ("methoxy", "ethoxy", "propoxy", "butoxy", "phenoxy")
+_NOT_A_PREFIX_ROOT = frozenset(("iso", "cyclo", "mono"))
+_SUBSTITUENT_ROOT_ENDINGS = ("o", "oxy", "yl", ")", "]", "}")
+
+
+def is_substituted_contracted_alkoxy(name_lower: str) -> bool:
+    """True for a retained contracted alkoxy prefix that carries a substituent prefix
+    ('methoxymethoxy', 'chloromethoxy', 'hydroxyethoxy', 'chlorophenoxy', and with an
+    enclosed substituent prefix '(methylsulfanyl)methoxy'): a compound prefix
+    that takes enclosing marks. False for the simple prefixes themselves and
+    for a multiplied simple prefix ('dimethoxy').
+
+    Decided by is_substituted_substituent (the one 'is this prefix substituted' rule),
+    restricted to the tokens that end in a contracted stem; that predicate reads the root
+    in front of the stem with _contracted_alkoxy_root_is_a_prefix."""
+    return (name_lower.endswith(_CONTRACTED_ALKOXY_STEMS)
+            and is_substituted_substituent(name_lower))
+
+
+def _contracted_alkoxy_root_is_a_prefix(name_lower: str) -> bool:
+    """The root reading of a contracted alkoxy token: a stem that ends the token, preceded by
+    a root that ends like a substituent prefix ('chloro', 'hydroxy', 'phenyl', an enclosed
+    '(methylsulfanyl)'), and is not 'iso', 'cyclo' or 'mono'. An arm of
+    is_substituted_substituent (see the comment above _CONTRACTED_ALKOXY_STEMS).
+
+    A root that ends in an enclosed DESCRIPTOR is not a substituent prefix: an isotope
+    descriptor modifies the simple prefix it precedes, which keeps 'di'
+    ('1,2-di[(13C)methyl]benzene (PIN. ', the Blue Book), so '(2H3)methoxy'
+    is simple. The descriptor test is the one _enclosed_leader_is_a_substituent uses."""
+    for stem in _CONTRACTED_ALKOXY_STEMS:
+        if name_lower.endswith(stem):
+            root = name_lower[: -len(stem)]
+            if (root and root not in _NOT_A_PREFIX_ROOT
+                    and root.endswith(_SUBSTITUENT_ROOT_ENDINGS)
+                    and not _ends_in_an_enclosed_descriptor(root)):
+                return True
+    return False
+
+
+def _ends_in_an_enclosed_descriptor(root: str) -> bool:
+    """Does ``root`` end in an enclosed group that names nothing ('(2h3)', '(13c)', '[1,2]')?
+    False for a root that does not end in a closing mark."""
+    pairs = {')': '(', ']': '[', '}': '{'}
+    closer = root[-1:]
+    if closer not in pairs:
+        return False
+    opener, depth = pairs[closer], 0
+    for i in range(len(root) - 1, -1, -1):
+        if root[i] == closer:
+            depth += 1
+        elif root[i] == opener:
+            depth -= 1
+            if depth == 0:
+                return not _enclosure_names_a_group(root[i + 1:-1])
+    return False
+
+
+def _enclosure_names_a_group(inner: str) -> bool:
+    """An enclosed group with a real name in it (two letters in a row: '4-methylphenyl'), as
+    opposed to a descriptor of only digits, commas, dots, primes, hyphens and a bare element
+    or italic letter ('1,2,4', '3.2.1', '1,5-a', '4-2H', '2H3', '13C')."""
+    return any(ch.isalpha() and inner[j + 1:j + 2].isalpha() for j, ch in enumerate(inner))
+
+
 # Alkyl + functional group compound substituent patterns (e.g., methylamino,
 # ethylamino, propylamino). These are compound substituents per IUPAC
 # and require enclosing marks.
@@ -109,6 +201,11 @@ _RINGYL_ALKYL_RE = re.compile(
 
 _COMPOUND_OXY_PREFIXES = frozenset((
     'sulfooxy', 'sulfonyloxy', 'phosphonooxy', 'phosphonatoxy', 'carbonyloxy',
+    # (the Blue Book): an acid's own acyl prefix joined to
+    # 'oxy' or 'amino' by concatenation is a compound prefix, enclosed as
+    # '3-(sulfooxy)propanoic acid (PIN)' (:36488) and '3-(sulfamoyloxy)propanoic
+    # acid (PIN)' (:36494); 'sulfino' is the prefix of -SO-OH,:17971).
+    'sulfinooxy', 'sulfoamino', 'sulfinoamino',
 ))
 
 # BUG-B guard: FG types that substituent naming demonstrably handles on 1-3C branches.
@@ -1071,6 +1168,10 @@ def needs_brackets(name: str) -> bool:
     # simple; only the halo-alkoxy compound is caught here.
     if _HALO_ALKOXY_RE.match(name_lower):
         return True
+    # Any other substituent prefix on a retained contracted alkoxy is compound too
+    #:27667,,: '(methoxymethoxy)', '(phenylmethoxy)'.
+    if is_substituted_contracted_alkoxy(name_lower):
+        return True
 
     # Functional group prefixes fused with alkyl names are compound substituents.
     # Examples: hydroxymethyl, carboxymethyl, aminoethyl, oxoethyl, formylmethyl
@@ -1251,8 +1352,12 @@ def get_bracket_depth(name: str) -> int:
 #: Indicated hydrogen -- (1H), (3H), (9aH) etc.
 _INDICATED_H_RE = re.compile(r'\(\d+[a-z]?H\)')
 #: Fusion/spiro/ring-assembly/von Baeyer brackets -- [2,3-b],
-# [4.5], [2.2.1], [1,1'-biphenyl] (ring-assembly enclosures carry primes)
-_FUSION_BRACKET_RE = re.compile(r"\[[0-9a-z,.'\-]+\]")
+# [4.5], [2.2.1], [1,1'-biphenyl] (ring-assembly enclosures carry primes).
+# (the Blue Book) "the square brackets of ring fusion, spiro
+# fusion, ring assembly, or the extended von Baeyer names are ignored": that
+# includes descriptors with superscript locants, written '^n' ('[3.2.3^7.2^4]',
+# '[3.2.1.0^2,4]'); 'tris(tetracyclo[3.2.0.0^2,7.0^4,6]heptane)' (:10824).
+_FUSION_BRACKET_RE = re.compile(r"\[[0-9a-z,.'^\-]+\]")
 # (the Blue Book) "the square brackets of... ring assembly
 #... names are ignored", with (heading:7444) "the presence of square
 # brackets and/or parentheses that are an integral part of the name of a parent
@@ -1367,8 +1472,8 @@ def _mark_levels(text: str):
             # the one mark above the natural one is read as the
             # escalation only when it is what that rule produces (the content
             # starts with the natural mark); any other mismatch is an integral
-            # bracket this scan does not recognise (a von Baeyer descriptor with
-            # superscripts, say), counted at its natural level as before
+            # bracket this scan does not recognise, counted at its natural level
+            # as before
             if (opens[open_ch] != lvl % 3 and opens[open_ch] == (lvl + 1) % 3
                     and first == marks[lvl % 3]):
                 lvl += 1
@@ -1539,6 +1644,16 @@ def enclose_if_compound(name: str) -> str:
     if (needs_brackets(name) or is_complex_substituent(name)
             or any(mark in name for mark in '([{')):
         return apply_enclosing_marks(name, -1)
+    # A compound prefix without a locant -- a substituent prefix in front of its
+    # parent prefix, as is_substituted_substituent reads it ('silylamino',
+    # 'cyanoamino', 'chlorophenyl', 'methylcarbamoyl', 'nitrosooxy') -- is enclosed
+    # too: (the Blue Book) "Parentheses are used around compound
+    #... and complex... prefixes"; '(silylamino)silyl' (:26322),
+    # '4-(disilylamino)cyclohexane-1-carbonitrile (PIN)' (:38198). The contracted
+    # amide prefixes ('acetamido', 'benzamido') are cited bare ('2-acetamido...',
+    # '4-benzamido...' in the Blue Book) although they take 'bis'.
+    if not name.lower().endswith('amido') and is_substituted_substituent(name):
+        return apply_enclosing_marks(name, -1)
     return name
 
 
@@ -1649,6 +1764,13 @@ def is_complex_substituent(name: str) -> bool:
     for _fg in _COMPOUND_FG_PREFIXES:
         if name_lower.startswith(_fg) and name_lower[len(_fg):] in _ALKYL_ROOTS_FULL:
             return True
+    # A substituent prefix on a retained contracted alkoxy, the Blue Book)
+    # is a compound prefix and takes enclosing marks,:7232):
+    # '1-(chloromethoxy)-4-nitrobenzene (PIN)' (:27711). Without this the bridged fused
+    # and partially hydrogenated fused names and the cyclohexane prefixes cited
+    # 'methoxymethoxy' and 'chloromethoxy' bare. The same test as needs_brackets.
+    if is_substituted_contracted_alkoxy(name_lower):
+        return True
     # Alkyl+amino compound substituents per IUPAC:
     # "methylamino", "ethylamino", "phenylamino" etc.
     if _ALKYLAMINO_RE.match(name):
@@ -1680,6 +1802,31 @@ def is_complex_substituent(name: str) -> bool:
     # parent-hydride-yl form ('arsanyl', 'stibanyl') stays simple.
     for _pnictyl in ('arsanyl', 'stibanyl', 'bismuthanyl'):
         if name.endswith(_pnictyl) and name != _pnictyl:
+            return True
+    # The same for phosphanyl, the Blue Book):
+    # '3-(hydroxyphosphanyl)propanoic acid (PIN)' (:27272),
+    # '4-[ethyl(methyl)phosphanyl]-1H-imidazole'. The bare 'phosphanyl' and the
+    # catenated parent-hydride prefixes 'diphosphanyl' / 'triphosphanyl' stay
+    # simple.
+    if name_lower.endswith('phosphanyl'):
+        _p_head = name_lower[:-len('phosphanyl')]
+        if _p_head and _p_head not in ('di', 'tri', 'tetra', 'penta', 'hexa'):
+            return True
+    # A nitrogen-ylidene prefix carrying its own prefix is a compound prefix too:
+    # '4-(phenylhydrazinylidene)cyclohexane-1-carboxylic acid (PIN)'
+    # (the Blue Book), '4-[(dimethylcarbamoyl)hydrazinylidene]heptanoic acid
+    # (PIN)' (:38678), 'methyl [(methylimino)silyl]acetate (PIN)' (:26578). The
+    # bare 'imino' / 'hydrazinylidene' (and their multiplied 'diimino', (b)
+    #:7072) stay simple.
+    for _n_ylidene in ('imino', 'hydrazinylidene'):
+        if name_lower.endswith(_n_ylidene):
+            _ny_head = name_lower[:-len(_n_ylidene)]
+            if _ny_head and _ny_head not in ('di', 'tri', 'tetra', 'penta', 'hexa'):
+                return True
+    # An N-substituted carbamoyl / carbamothioyl is a compound prefix:
+    # '2-[(methylcarbamoyl)amino]naphthalene-1-carboxylic acid (PIN)' (:33354).
+    for _carbamoyl in ('carbamoyl', 'carbamothioyl'):
+        if name_lower.endswith(_carbamoyl) and name_lower != _carbamoyl:
             return True
     # (R-oxy)alkyl compound substituents per IUPAC / (
     # C- / V-3): an alkoxy/aryloxy unit ('<R>oxy') fused to a terminal alkyl-yl
@@ -2277,12 +2424,7 @@ def _enclosed_leader_is_a_substituent(work: str) -> bool:
                 # primes, hyphens and a bare element/italic letter (`1,2,4`,
                 # `3.2.1`, `1,5-a`, `4-2H`). Anything with a real name in it
                 # (`4-methylphenyl`) is a detached prefix.
-                if not any(
-                    ch2.isalpha() and inner[j + 1:j + 2].isalpha()
-                    for j, ch2 in enumerate(inner)
-                ):
-                    return False
-                return True
+                return _enclosure_names_a_group(inner)
     return False
 
 
@@ -2458,7 +2600,13 @@ def is_substituted_substituent(
         if had_italic:
             return is_substituted_substituent(unitalic)
 
-    return _splits_into_two_units(body)
+    # A retained contracted alkoxy prefix, the Blue Book) with a
+    # substituent prefix in front of its stem, read from the root's ending where the
+    # vocabulary split does not know the root ('acetylmethoxy', 'ethenylmethoxy',
+    # 'bis(trifluoromethyl)methoxy'): substituted, so 'bis' (c),:7035) and
+    # enclosing marks,:7232). The enclosure predicates ask this same
+    # predicate through is_substituted_contracted_alkoxy.
+    return _splits_into_two_units(body) or _contracted_alkoxy_root_is_a_prefix(body)
 
 
 def _set_aside_italicized_prefix(body: str) -> Tuple[str, bool]:
@@ -2772,8 +2920,8 @@ def opens_with_replacement_prefix(name: Optional[str]) -> bool:
     prefix, so that 'di' in front of it could be read as part of the replacement
     count ('di(1,2-oxazol-3-yl)' as a 'dioxazole')? Substituent prefixes (ending
     in 'yl', 'ylidene', 'ylidyne') and the parent hydrides a multiplicative name
-    multiplies ('azetidine' in "1,1'-carbonylbis(azetidine)", not the
-    'diazetidine' ring) are considered; the acyl prefixes of oxalic and oxamic
+    multiplies ('azepane' in "1,1'-methylenebis(azepane)", not the
+    'diazepane' ring) are considered; the acyl prefixes of oxalic and oxamic
     acid and the oxoacid prefixes ('phosphono') are not replacement names."""
     if not name:
         return False
@@ -2786,6 +2934,28 @@ def opens_with_replacement_prefix(name: Optional[str]) -> bool:
     if core.startswith(("oxal", "oxam")):
         return False
     return bool(_REPLACEMENT_FRONT_RE.match(core))
+
+
+#: A 'hydro' prefix as it stands in a name: its locant set, the hyphen, a basic
+#: multiplying prefix and 'hydro' ('2,3-dihydro', '1,2,3,4-tetrahydro',
+#: '4a,8a-dihydro'), not the 'hydroxy' / 'hydroperoxy' / 'hydroseleno' /
+#: 'hydrotelluro' / 'hydrosulf...' prefixes or 'hydrogen'. A hydro prefix on a
+#: selenophene or tellurophene ring ('4,5-dihydroselenophen-2-yl',
+#: '2,3-dihydroselenopheno[2,3-b]pyridine') still counts; '4-hydroselenophenyl'
+#: (a 'hydroseleno' prefix on 'phenyl') does not. Indicated hydrogen ('1H-') is
+#: not a hydro prefix.
+_HYDRO_PREFIX_RE = re.compile(
+    r"(?<![a-z])\d+[a-z]?'*(?:,\d+[a-z]?'*)*-"
+    r"(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca|undeca|dodeca|tetradeca"
+    r"|hexadeca|octadeca|icosa)?hydro"
+    r"(?!xy|peroxy|gen|sulf|(?:selen|tellur)(?!ophen(?:e|o|-)))")
+
+
+def carries_hydro_prefix(name: Optional[str]) -> bool:
+    """Does this substituent prefix carry 'hydro' prefixes of its own
+    ('2,3-dihydro-1H-indol-1-yl', '4,5-dihydrothiophen-2-yl')? Indicated hydrogen
+    alone ('1H-imidazol-1-yl') does not count."""
+    return bool(name) and _HYDRO_PREFIX_RE.search(name) is not None
 
 
 def get_multiplier_prefix(count: int, substituent_name: str) -> str:
@@ -2889,9 +3059,19 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
     # the derived multiplier "to describe clearly the number of replacement atoms"
     # ('bis(1,2-oxazol-3-yl)... whereas di(1,2-oxazol-3-yl) might be interpreted as
     # a dioxazole ring system', the Blue Book; 'bis(azacyclododecane)':7176).
+    # The fourth leg is a prefix that carries 'hydro' prefixes of its own. Hydro
+    # prefixes are detachable prefixes that are "not included in the category of
+    # alphabetized detachable prefixes which describe substitution" (the summary
+    # of changes, item 5, the Blue Book), so the rule text of /
+    # (a) (:7085,:7104) does not settle the multiplier; the Blue Book's
+    # one multiplied hydro-prefixed prefix takes 'bis':
+    # 'bis(4,5-dihydrothiophen-2-yl)di(methyl)germane (PIN)',
+    #:38232), and it has no 'di(' before such a prefix. Indicated hydrogen alone
+    # keeps 'di': 'di(1H-imidazol-1-yl)methanethione (PIN)',:29544).
     if is_substituted_substituent(substituent_name) \
             or substituent_name in CATENATION_AMBIGUOUS_PREFIXES \
-            or opens_with_replacement_prefix(substituent_name):
+            or opens_with_replacement_prefix(substituent_name) \
+            or carries_hydro_prefix(substituent_name):
         if count in COMPLEX_MULTIPLIERS:
             return COMPLEX_MULTIPLIERS[count]
         # For counts > 20, build compositional multiplier using chain_names
@@ -3289,6 +3469,13 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
     # (b)/(d)) but equally on 'tert-butylsulfanyl' (wrong — a compound chalcogen
     # prefix takes marks under, exactly as '(methylsulfanyl)' does).
     if needs_brackets(name):
+        complex = True
+    # A compound prefix without a locant ('silylamino', 'cyanoamino',
+    # 'methylcarbamoyl', 'nitrosooxy'): the same arm as enclose_if_compound
+    #, the Blue Book; '4-(disilylamino)cyclohexane-1-carbonitrile
+    # (PIN)',:38198). The contracted amide prefixes stay bare ('4-benzamido...').
+    if (not complex and not name.lower().endswith('amido')
+            and is_substituted_substituent(name)):
         complex = True
     # W3-P03-7 (c)/(d)): a multiplied alkyl name beginning with a numeric-
     # multiplier syllable (decyl / dodecyl..nonadecyl) takes enclosing marks —

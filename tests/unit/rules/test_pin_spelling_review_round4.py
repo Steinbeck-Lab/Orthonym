@@ -8,7 +8,7 @@ each name test rejects (``scripts/mutation_check.py``).
   RF3-3 a compound prefix is enclosed once, the Blue Book), also
          at a locant-free parent: '[(propan-2-yl)oxy]cyclohexane'.
   RF3-2 (c) (:7170, 'bis(azacyclododecane) (PIN)':7176) at the parent
-         join of multiplicative nomenclature: "1,1'-carbonylbis(azetidine)".
+         join of multiplicative nomenclature: "1,1'-methylenebis(azepane)".
   RF3-4 a completely labelled 'oxy' group before its parent cites no locants
          ,:44196): '(2H5)ethoxybenzene'.
   RF3-6 a locant-free spelling OPSIN 2.9.0 misreads keeps its locants and is
@@ -47,14 +47,16 @@ def test_compound_prefix_is_enclosed_once(smiles, expected):
 
 
 MULTIPLICATIVE_PARENT_ROWS = [
-    ("O=C(N1CCC1)N1CCC1", "1,1'-carbonylbis(azetidine)"),
-    ("O=C(N1CC1)N1CC1", "1,1'-carbonylbis(aziridine)"),
-    ("O=C(N1CCCCCC1)N1CCCCCC1", "1,1'-carbonylbis(azepane)"),
     ("C(N1CCCCCC1)N1CCCCCC1", "1,1'-methylenebis(azepane)"),
     # retained parents keep 'di'
-    ("O=C(N1CCCCC1)N1CCCCC1", "1,1'-carbonyldipiperidine"),
-    ("O=C(N1CCOCC1)N1CCOCC1", "4,4'-carbonyldimorpholine"),
     ("C(N1CCCC1)N1CCCC1", "1,1'-methylenedipyrrolidine"),
+    # A C=O bridge between two ring nitrogens is the pseudoketone parent, the rings its
+    # prefixes (b), the Blue Book;,:29370; PIN class program
+    # batch 2 fix a performance pass); the multiplier rule is the same: 'bis' for the
+    # Hantzsch-Widman prefix (c),:7176), 'di' for the retained ones.
+    ("O=C(N1CCCCCC1)N1CCCCCC1", "bis(azepan-1-yl)methanone"),
+    ("O=C(N1CCCCC1)N1CCCCC1", "di(piperidin-1-yl)methanone"),
+    ("O=C(N1CCOCC1)N1CCOCC1", "di(morpholin-4-yl)methanone"),
 ]
 
 

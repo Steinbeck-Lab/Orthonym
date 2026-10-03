@@ -398,6 +398,27 @@ def _oxoacid_fragments_identical(mol) -> bool:
     return len(frags) >= 2 and len(set(frags)) == 1
 
 
+def tautomer_verdict(input_smiles: str, parsed_smiles: str) -> str:
+    """``"n/a"``, ``"ok"`` or ``"mismatch"`` for two neutral structures that may differ only
+    in where an N-H / N= ring pair carries its hydrogen (the bridged fused PIN builder's
+    indicated-hydrogen check, its design spec section 8): the standard InChI puts that
+    hydron in one mobile-H layer, so '4,5,6,7-tetrahydro-2H-4,7-methanoindazole' and the
+    1H name share one InChIKey. ``"mismatch"`` when the standard InChIs (stereo off) are
+    equal and the fixed-H InChIs differ, ``"ok"`` when both are equal, ``"n/a"`` when a
+    structure cannot be read or the standard InChIs already differ."""
+    mi = Chem.MolFromSmiles(input_smiles) if input_smiles else None
+    mo = Chem.MolFromSmiles(parsed_smiles) if parsed_smiles else None
+    if mi is None or mo is None:
+        return "n/a"
+    si, so = _standard_inchi(mi), _standard_inchi(mo)
+    if not si or si != so:
+        return "n/a"
+    fi, fo = _fixed_h_inchi(mi), _fixed_h_inchi(mo)
+    if not fi or not fo:
+        return "n/a"
+    return "ok" if fi == fo else "mismatch"
+
+
 def protonation_site_verdict(input_smiles: str, parsed_smiles: str,
                              name: str = None) -> str:
     """``"n/a"``, ``"ok"`` or ``"mismatch"``.

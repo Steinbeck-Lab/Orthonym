@@ -19,10 +19,12 @@ def test_6_chloropurine_no_amine():
     assert name_substituted_purine(_mol("Clc1ncnc2[nH]cnc12")) == "6-chloro-9H-purine"
 
 
-def test_bare_adenine_declines():
-    # bare adenine keeps its retained name via another path -> this producer declines
-    assert name_substituted_purine(_mol("Nc1ncnc2[nH]cnc12")) is None
-    assert name_substituted_purine(_mol("Nc1ncnc2nc[nH]c12")) is None
+def test_bare_adenine_is_named_on_purine():
+    # 'adenine' does not occur in the Blue Book (0 hits); "the PIN is 7H-purine"
+    # (the Blue Book): the producer names the bare base too (it used to decline
+    # and defer to the retained name). Both tautomers keep their indicated hydrogen.
+    assert name_substituted_purine(_mol("Nc1ncnc2[nH]cnc12")) == "9H-purin-6-amine"
+    assert name_substituted_purine(_mol("Nc1ncnc2nc[nH]c12")) == "7H-purin-6-amine"
 
 
 def test_26_diaminopurine():
@@ -81,8 +83,9 @@ def test_9_methyladenine_end_to_end():
 
 def test_bare_adenine_unchanged_end_to_end():
     from orthonym import Orthonym
-    # bare adenine still gets its retained name (standard tautomer)
-    assert Orthonym().name("Nc1ncnc2nc[nH]c12") == "adenine"
+    # the bare base is named on purine ('adenine': 0 Blue Book hits; "the PIN is
+    # 7H-purine", the Blue Book)
+    assert Orthonym().name("Nc1ncnc2nc[nH]c12") == "7H-purin-6-amine"
 
 
 def test_26_diaminopurine_end_to_end():

@@ -28,5 +28,8 @@ class TestAM2PolyfunctionalAmide:
             == "N,N-dimethylacetamide"
 
     def test_n_sub_amide_protect(self):
+        # (the Blue Book): (R-CO)2NH is named as the N-acyl
+        # derivative of the senior primary amide ('N-acetylbenzamide (PIN)',
+        #:33111); propanamide is senior to formamide by (b) (:20923).
         assert name_compound("CCC(=O)NC=O", style="pin") \
-            == "N-propanoylformamide"
+            == "N-formylpropanamide"

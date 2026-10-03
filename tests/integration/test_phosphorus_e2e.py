@@ -196,11 +196,19 @@ class TestBisPhosphanyl:
     """E2E tests for bis/tris multiplied phosphanyl groups ."""
 
     def test_bis_diphenylphosphanyl_benzene(self):
-        """Two identical PPh2 groups on benzene use bis multiplier ."""
+        """Two identical PPh2 groups on benzene use the bis multiplier .
+
+        The two phosphanes are the parent: P is senior to C,
+        the Blue Book), and identical
+        parents linked by a substituent group take a multiplicative name, as printed
+        for '(ethane-1,2-diyl)bis(dimethylphosphane) (PIN)' (the Blue Book),
+        '(dibenzo[b,d]furan-3,7-diyl)bis(phosphane) (PIN)' (:39196) and
+        '(1,2-phenylene)bis(arsane) (PIN)' (:39198). Was the substitutive
+        '1,2-bis(diphenylphosphanyl)benzene' (PIN class program batch 2, Task 10)."""
         result = name_compound(
             "c1ccc(P(c2ccccc2)c3ccccc3)c(P(c4ccccc4)c5ccccc5)c1"
         )
-        assert "bis(diphenylphosphanyl)" in result
+        assert result == "(1,2-phenylene)bis(diphenylphosphane)"
 
 
 class TestPhosphorusOnComplexSubstrate:

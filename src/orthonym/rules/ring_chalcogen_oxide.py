@@ -299,15 +299,38 @@ def name_ring_chalcogen_oxide(mol) -> Optional[str]:
         else:
             return None
     else:
-        loc = iupac[base_site]
-        if isinstance(loc, tuple):
-            loc = loc[0]
-        if not isinstance(loc, int):
+        loc = _lowest_equivalent_locant(base, base_site, iupac)
+        if loc is None:
             return None
 
     if len(oxide_oxygens) == 1:
         return f"{base_name} {loc}-oxide"
     return f"{base_name} {loc},{loc}-dioxide"
+
+
+def _locant_int(loc) -> Optional[int]:
+    if isinstance(loc, tuple):
+        loc = loc[0]
+    return loc if isinstance(loc, int) else None
+
+
+def _lowest_equivalent_locant(base, site: int, iupac) -> Optional[int]:
+    """The chalcogen's locant, lowest over the automorphisms of the base ring system.
+
+    An automorphism of the base renumbers it as validly as the map itself, so the
+    chalcogen may take the locant of any atom it maps to; the lowest one is cited
+    , low locants within the fixed numbering): 'thianthrene 5-oxide', not
+    '10-oxide' (both sulfur atoms are equivalent).
+    """
+    loc = _locant_int(iupac.get(site))
+    if loc is None:
+        return None
+    for match in base.GetSubstructMatches(base, uniquify=False, useChirality=False,
+                                          maxMatches=1000):
+        other = _locant_int(iupac.get(match[site]))
+        if other is not None and other < loc:
+            loc = other
+    return loc
 
 
 __all__ = ["name_ring_chalcogen_oxide"]

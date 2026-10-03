@@ -2174,6 +2174,30 @@ def _offring_substituent_atoms(
     return out
 
 
+def _nitro_group_atoms(mol, n_idx: int, ring_idx: int) -> Optional[Set[int]]:
+    """{N, O, O} when atom ``n_idx`` is an –NO2 group on ring atom ``ring_idx`` (drawn
+    charge-separated, N+(=O)O-, or as N(=O)=O), else None.
+
+    Both oxygens are terminal and carry no hydrogen and no radical, so with the net charge
+    0 the group is one N=O and one N–O(-) (or two N=O); -N(OH)2 and -N(O*)2, which have
+    the same atoms, are not read as nitro. A labelled atom is not read either: 'nitro'
+    carries no isotope descriptor. Those groups go on to the fragment namer."""
+    n = mol.GetAtomWithIdx(n_idx)
+    if (n.GetSymbol() != 'N' or n.GetDegree() != 3 or n.GetTotalNumHs() != 0
+            or n.GetNumRadicalElectrons() != 0 or n.GetIsotope() != 0):
+        return None
+    oxygens = [nb for nb in n.GetNeighbors() if nb.GetIdx() != ring_idx]
+    if len(oxygens) != 2 or any(
+            o.GetSymbol() != 'O' or o.GetDegree() != 1 or o.GetTotalNumHs() != 0
+            or o.GetNumRadicalElectrons() != 0 or o.GetIsotope() != 0
+            for o in oxygens):
+        return None
+    charge = n.GetFormalCharge() + sum(o.GetFormalCharge() for o in oxygens)
+    if charge != 0 or n.GetFormalCharge() not in (0, 1):
+        return None
+    return {n_idx} | {o.GetIdx() for o in oxygens}
+
+
 def _partial_sat_substituent_prefix(
     mol, atom_to_locant: Dict[int, Any],
     exclude_atoms: Optional[Set[int]] = None,
@@ -2227,6 +2251,14 @@ def _partial_sat_substituent_prefix(
             if n.GetSymbol() in _HALO and n.GetDegree() == 1:
                 grouped[_HALO[n.GetSymbol()]].append(atom_to_locant[idx])
                 spelled.add(n.GetIdx())
+                continue
+            # (the Blue Book): "Compounds containing the –NO2 or –NO group
+            # are named by means of the prefixes 'nitro' and 'nitroso'". The substituent
+            # fragment namer cannot name the charge-separated –N+(=O)O– group.
+            _nitro = _nitro_group_atoms(mol, n.GetIdx(), idx)
+            if _nitro is not None:
+                grouped['nitro'].append(atom_to_locant[idx])
+                spelled.update(_nitro)
                 continue
             sub_atoms: List[int] = []
             seen = set(ring_set) | exclude

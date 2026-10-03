@@ -50,9 +50,13 @@ class TestShadowAuditDoesNotChangeName:
         # otherwise the legacy PIN pipeline ships an un-suppressed WRONG
         # candidate for this molecule and general_fallback never engages,
         # which is a test-harness artifact, not the production path.
+        # The general-engine winner: '(6S,10S)-6,10-dimethylbicyclo[4.4.0]decan-3-ol'
+        # (e1_spine). 'CN(C)CC1CCCCC1O' served here until the PIN path named it
+        # ('2-[(dimethylamino)methyl]cyclohexan-1-ol', PIN class program Task 8),
+        # after which its verdict comes from and no longer tests the leak.
         nm = Orthonym(general_fallback=True, general_fallback_unverified=True,
                         allow_aromatic_general=True)
-        nm.name("CN(C)CC1CCCCC1O")  # a GENERAL-engine winner (e1_spine)
+        nm.name("C[C@H]1CCC[C@@]2(C)CCC(O)CC12")  # a GENERAL-engine winner (e1_spine)
         v1 = nm._last_coverage_verdict
         nm.name("CCO")  # a plain retained-name (bare-str) winner
         v2 = nm._last_coverage_verdict

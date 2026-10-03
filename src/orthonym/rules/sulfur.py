@@ -138,6 +138,16 @@ def name_sulfoxide(mol, sulfoxide_atoms: Tuple[int, ...]) -> Optional[str]:
     class_word = {'S': 'sulfoxide', 'Se': 'selenoxide',
                   'Te': 'telluroxide'}[sulfur.GetSymbol()]
 
+    # A RING chalcogen is a skeletal heteroatom of the ring system, never the
+    # central atom of an acyclic functional-class name ('R R' sulfoxide'), exactly as
+    # in name_sulfide above: characterising its two ring branches as organyl groups
+    # dropped the ring bonds ('diphenyl sulfoxide' for a thianthrene or phenoxathiine
+    # oxide, a different molecule, stopped only by the read-back). Decline; the
+    # ring producers name it, the Blue Book).
+    if sulfur.IsInRing():
+        return None
+
+
     # Get carbon neighbors (exclude oxygen)
     neighbors = [n for n in sulfur.GetNeighbors() if n.GetSymbol() == 'C']
     if len(neighbors) != 2:
@@ -192,6 +202,16 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
     sulfur = mol.GetAtomWithIdx(sulfur_idx)
     class_word = {'S': 'sulfone', 'Se': 'selenone',
                   'Te': 'tellurone'}[sulfur.GetSymbol()]
+
+    # A RING chalcogen is a skeletal heteroatom of the ring system, never the
+    # central atom of an acyclic functional-class name ('R R' sulfone'), exactly as
+    # in name_sulfide above: characterising its two ring branches as organyl groups
+    # dropped the ring bonds ('diphenyl sulfone' for a thianthrene or phenoxathiine
+    # oxide, a different molecule, stopped only by the read-back). Decline; the
+    # ring producers name it, the Blue Book).
+    if sulfur.IsInRing():
+        return None
+
 
     # Get carbon neighbors (exclude oxygens)
     neighbors = [n for n in sulfur.GetNeighbors() if n.GetSymbol() == 'C']

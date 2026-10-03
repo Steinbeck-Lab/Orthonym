@@ -34,7 +34,7 @@ among them DETERMINISTICALLY via 's lowest-heteroatom-locant rule
 (then lowest free-valence locant for a substituent, then a
 canonical-rank tiebreak), mirroring ``get_spiro_numbering``'s monospiro
 sibling. Both witnesses now emit the single lowest-locant PIN
-(``1-oxadispiro[3.0.3.1]nonane`` / ``1-oxadispiro[2.0.2.2]octane``)
+(``1-oxadispiro[3.0.3^5.1^4]nonane`` / ``1-oxadispiro[2.0.2^4.2^3]octane``)
 deterministically, at both PIN and best-effort tiers.
 """
 import pytest
@@ -57,7 +57,7 @@ class TestAdjacentSpiroDescriptorFix:
         result = name_spiro_system(mol)
         assert result is not None, "must not abstain (0-wrong via None is the fallback, not the goal)"
         name = result[0]
-        assert name == '1-oxadispiro[3.0.3.1]nonane', name
+        assert name == '1-oxadispiro[3.0.3^5.1^4]nonane', name
         rt = opsin_roundtrip_check(smi, name)
         assert rt['passed'], f"{name} must OPSIN round-trip to the input: {rt}"
 
@@ -68,7 +68,7 @@ class TestAdjacentSpiroDescriptorFix:
         result = name_spiro_system(mol)
         assert result is not None
         name = result[0]
-        assert name == '1-oxadispiro[2.0.2.2]octane', name
+        assert name == '1-oxadispiro[2.0.2^4.2^3]octane', name
         rt = opsin_roundtrip_check(smi, name)
         assert rt['passed'], f"{name} must OPSIN round-trip to the input: {rt}"
 
@@ -85,7 +85,7 @@ class TestAdjacentSpiroDescriptorFix:
         assert analysis is not None
         stem = _get_alkane_name(analysis.total_atoms)
         name = analysis.hetero_prefix + analysis.descriptor + stem
-        assert name == '1-oxadispiro[3.0.3.1]nonane', name
+        assert name == '1-oxadispiro[3.0.3^5.1^4]nonane', name
         rt = opsin_roundtrip_check(smi, name)
         assert rt['passed'], f"{name} must OPSIN round-trip to the input: {rt}"
 
@@ -97,7 +97,7 @@ class TestAdjacentSpiroDescriptorFix:
         assert analysis is not None
         stem = _get_alkane_name(analysis.total_atoms)
         name = analysis.hetero_prefix + analysis.descriptor + stem
-        assert name == '1-oxadispiro[2.0.2.2]octane', name
+        assert name == '1-oxadispiro[2.0.2^4.2^3]octane', name
         rt = opsin_roundtrip_check(smi, name)
         assert rt['passed'], f"{name} must OPSIN round-trip to the input: {rt}"
 
@@ -113,13 +113,13 @@ class TestExistingSpiroFixturesUnchanged:
     def test_dispiro_2_1_2_1_octane_unchanged(self):
         mol = Chem.MolFromSmiles('C1CC12CC1(CC1)C2')
         name = name_spiro_system(mol)[0]
-        assert name == 'dispiro[2.1.2.1]octane'
+        assert name == 'dispiro[2.1.2^5.1^3]octane'
 
     @pytest.mark.unit
     def test_dispiro_4_2_4_2_tetradecane_unchanged(self):
         mol = Chem.MolFromSmiles('C1CCCC12CCC1(CCCC1)CC2')
         name = name_spiro_system(mol)[0]
-        assert name == 'dispiro[4.2.4.2]tetradecane'
+        assert name == 'dispiro[4.2.4^8.2^5]tetradecane'
 
     @pytest.mark.unit
     def test_dispiro_2_0_2_1_heptane_unchanged_and_now_verified_roundtrip(self):
@@ -131,7 +131,7 @@ class TestExistingSpiroFixturesUnchanged:
         smi = 'C1CC12C1(CC1)C2'
         mol = Chem.MolFromSmiles(smi)
         name = name_spiro_system(mol)[0]
-        assert name == 'dispiro[2.0.2.1]heptane'
+        assert name == 'dispiro[2.0.2^4.1^3]heptane'
         rt = opsin_roundtrip_check(smi, name)
         assert rt['passed'], rt
 
@@ -141,7 +141,7 @@ class TestExistingSpiroFixturesUnchanged:
          through ``_get_polyspiro_numbering`` -- previously only
         the monospiro ``get_spiro_numbering`` had it. Locked in via the
         ``tests/unit/rules/test_v27_p3_spiro_engine.py`` PIN correction
-        (dispiro[3.2.3.2]dodecan-5-yl, not the old arbitrary -12-yl -- both
+        (dispiro[3.2.3^7.2^4]dodecan-5-yl, not the old arbitrary -12-yl -- both
         denote the identical molecule, an InChIKey,
         confirmed via OPSIN); re-asserted here as the module-level regression
         guard for this file's scope."""
@@ -156,7 +156,7 @@ class TestExistingSpiroFixturesUnchanged:
             if not nb.IsInRing() and nb.GetSymbol() == 'C')
         sub, attach_sub = _extract_ring_submol(mol, ring_atoms, attach)
         got = _universal_spiro_substituent_name(sub, attach_sub, allow_mancude=True)
-        assert got == 'dispiro[3.2.3.2]dodecan-5-yl', got
+        assert got == 'dispiro[3.2.3^7.2^4]dodecan-5-yl', got
 
 
 class TestDeterminism:
@@ -183,7 +183,7 @@ class TestDeterminism:
             result = name_spiro_system(mol_r)
             assert result is not None, smi_r
             names.add(result[0])
-        assert names == {'1-oxadispiro[3.0.3.1]nonane'}, names
+        assert names == {'1-oxadispiro[3.0.3^5.1^4]nonane'}, names
 
     @pytest.mark.unit
     def test_witness2_name_identical_under_every_atom_order(self):
@@ -197,4 +197,4 @@ class TestDeterminism:
             result = name_spiro_system(mol_r)
             assert result is not None, smi_r
             names.add(result[0])
-        assert names == {'1-oxadispiro[2.0.2.2]octane'}, names
+        assert names == {'1-oxadispiro[2.0.2^4.2^3]octane'}, names

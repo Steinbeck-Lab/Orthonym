@@ -108,12 +108,11 @@ STILL_REFUSED = [
     "c1ccc2cc3c(cc2c1)C3",         # cyclopropa[b]naphthalene
     "c1ccc2cc3c(cc2c1)CC3",        # cyclobuta[b]naphthalene
     "c1ccc2cc3c(cc2c1)CCC3",       # cyclopenta[b]naphthalene
-    # CRITICAL-2 (code review): a composite / multi-heteroatom bridge would DROP atoms
-    # via the length-blind heteroatom prefix (epidioxy -> 'epoxy' loses an O). Must
-    # fail closed until the composite-bridge grammar is built.
-    "C1=CC2OOC1c1ccccc12",         # -O-O- (epidioxy bridge)
-    "C1=CC2COCC1c1ccccc12",        # -CH2-O-CH2- (composite bridge)
-    "C1=CC2CSCC1c1ccccc12",        # -CH2-S-CH2- (composite bridge)
+    # (the -O-O- row moved to tests/unit/rules/test_bf_s2_prefixes.py: slice S2 names it
+    # 1,4-dihydro-1,4-epidioxynaphthalene,:14101)
+    # (the -CH2-O-CH2- and -CH2-S-CH2- rows moved to tests/unit/rules/test_bf_s2_selection.py:
+    # by (b) slice S2 names them on the 3-benzoxepine and 3-benzothiepine
+    # parents with an etheno bridge)
 ]
 
 

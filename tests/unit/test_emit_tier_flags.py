@@ -84,9 +84,11 @@ _ABSTAINING_SMILES = (
 )
 # The engine's verified best-effort name for the molecule above (round-trips to
 # the input InChIKey -- see the change-asserted-value note).
+# nesting (the Blue Book) and alphabetical order of the
+# prefixes (:3448): 'fluorophenyl' before 'methyl'.
 _BEST_EFFORT_NAME = (
-    "2-({4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl})"
-    "-2-methyl-N-(3-fluorophenyl)propanamide"
+    "2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}"
+    "-N-(3-fluorophenyl)-2-methylpropanamide"
 )
 
 

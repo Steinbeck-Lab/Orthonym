@@ -358,6 +358,36 @@ def _candidate_starts(
     return [(a, clockwise_dir) for a in sorted(candidates)]
 
 
+def _two_ring_starts(
+    periphery: List[int],
+    fusion_atoms: Set[int],
+) -> List[Tuple[int, int]]:
+    """(start_atom, direction) candidates for TWO ortho-fused rings of any size.
+
+     (the Blue Book) orients the system before numbering it:
+    two ortho-fused rings always lie in one horizontal row, so every permitted
+    orientation puts one of the two rings on the right and is drawn either way
+    up. Numbering starts at the non-fusion atom of the right-hand ring that
+    follows a fusion atom and proceeds away from it -- so the candidates are the
+    four non-fusion atoms next to a fusion atom, each walking away from that
+    fusion atom. No lattice embedding is needed, which is why rings of seven or
+    more members (the embedding cannot place them) are numbered here; the
+     cascade in:func:`compute_fused_numbering` then chooses
+    ('6,7,8,9-tetrahydro-5H-cyclohepta[b]pyridine', N1... C9a;
+    'azulene' 1, 2, 3, 3a... 8a). The candidate set depends only on the graph,
+    never on the input atom order.
+    """
+    n = len(periphery)
+    out = []
+    for i, a in enumerate(periphery):
+        if a in fusion_atoms:
+            continue
+        for step in (1, -1):
+            if periphery[(i - step) % n] in fusion_atoms:
+                out.append((a, step))
+    return sorted(out)
+
+
 def _assign_from_start(
     mol: Chem.Mol,
     periphery: List[int],
@@ -506,7 +536,19 @@ def compute_fused_numbering(
     fusion_atoms = _fusion_atoms(graph)  # type: ignore[arg-type]
 
     orientations = best_orientations(mol, ring_atoms)
-    if not orientations:
+    if orientations:
+        starts = []
+        for coords in orientations:
+            start_ring = _start_ring_key(graph, coords)  # type: ignore[arg-type]
+            start_ring_atoms = set(graph[start_ring]['atoms'])  # type: ignore[index]
+            starts.extend(_candidate_starts(
+                mol, coords, periphery, start_ring_atoms, fusion_atoms,
+            ))
+    elif len(graph) == 2:
+        # Two rings that the lattice embedding cannot place (a ring of seven or
+        # more members): every orientation is a horizontal row of two rings.
+        starts = _two_ring_starts(periphery, fusion_atoms)
+    else:
         return None
 
     # Canonical atom ranks (SMILES-order-INDEPENDENT) for the final symmetry
@@ -534,47 +576,42 @@ def compute_fused_numbering(
     best_fus: Optional[List[_Locant]] = None
     best_ih: Optional[List[_Locant]] = None
     best_sig: Optional[Tuple] = None
-    for coords in orientations:
-        start_ring = _start_ring_key(graph, coords)  # type: ignore[arg-type]
-        start_ring_atoms = set(graph[start_ring]['atoms'])  # type: ignore[index]
-        for start_atom, direction in _candidate_starts(
-            mol, coords, periphery, start_ring_atoms, fusion_atoms,
-        ):
-            cand = _assign_from_start(
-                mol, periphery, start_atom, direction, fusion_atoms,
-            )
-            if not cand:
-                continue
-            # Cascade comparison terms:
-            # (a)/(b): heteroatom set then element seniority;
-            # (c): low locants to fusion carbons;
-            # (b): low locants to indicated hydrogen (1H-indole etc.).
-            het = _heteroatom_pairs(mol, cand)
-            fus = _fusion_letters(cand)
-            ih = _indicated_h_locants(mol, cand)
-            if best_map is None:
-                best_map, best_het, best_fus, best_ih = cand, het, fus, ih
-                best_sig = _canon_signature(cand)
-                continue
-            # Tier (a)+(b): heteroatoms (via the shared comparator).
-            cmp = compare_numbering(
-                {'heteroatoms': het}, {'heteroatoms': best_het},
-            )
-            if cmp == 0:
-                # Tier (c): low locants to fusion carbons (the (int,'a') set).
-                cmp = compare_locant_sets(fus, best_fus)
-            if cmp == 0:
-                # Tier (b,: low locants to indicated hydrogen.
-                cmp = compare_locant_sets(ih, best_ih)
-            if cmp == 0:
-                # Genuine symmetry tie -> canonical-rank representative.
-                sig = _canon_signature(cand)
-                if sig < best_sig:  # type: ignore[operator]
-                    best_map, best_het, best_fus, best_ih, best_sig = (
-                        cand, het, fus, ih, sig)
-                continue
-            if cmp < 0:
-                best_map, best_het, best_fus, best_ih = cand, het, fus, ih
-                best_sig = _canon_signature(cand)
+    for start_atom, direction in starts:
+        cand = _assign_from_start(
+            mol, periphery, start_atom, direction, fusion_atoms,
+        )
+        if not cand:
+            continue
+        # Cascade comparison terms:
+        # (a)/(b): heteroatom set then element seniority;
+        # (c): low locants to fusion carbons;
+        # (b): low locants to indicated hydrogen (1H-indole etc.).
+        het = _heteroatom_pairs(mol, cand)
+        fus = _fusion_letters(cand)
+        ih = _indicated_h_locants(mol, cand)
+        if best_map is None:
+            best_map, best_het, best_fus, best_ih = cand, het, fus, ih
+            best_sig = _canon_signature(cand)
+            continue
+        # Tier (a)+(b): heteroatoms (via the shared comparator).
+        cmp = compare_numbering(
+            {'heteroatoms': het}, {'heteroatoms': best_het},
+        )
+        if cmp == 0:
+            # Tier (c): low locants to fusion carbons (the (int,'a') set).
+            cmp = compare_locant_sets(fus, best_fus)
+        if cmp == 0:
+            # Tier (b,: low locants to indicated hydrogen.
+            cmp = compare_locant_sets(ih, best_ih)
+        if cmp == 0:
+            # Genuine symmetry tie -> canonical-rank representative.
+            sig = _canon_signature(cand)
+            if sig < best_sig:  # type: ignore[operator]
+                best_map, best_het, best_fus, best_ih, best_sig = (
+                    cand, het, fus, ih, sig)
+            continue
+        if cmp < 0:
+            best_map, best_het, best_fus, best_ih = cand, het, fus, ih
+            best_sig = _canon_signature(cand)
 
     return best_map

@@ -101,8 +101,10 @@ def test_homolog_skeleton_namer_emits_no_steroid_retained_name():
     # protostane — pentacyclic triterpane (lanostane/dammarane class).
     ("CC(C)CCC[C@@H](C)[C@H]1CC[C@@]2(C)[C@H]1CC[C@H]1[C@@]3(C)CCCC(C)(C)[C@@H]3CC[C@@]12C",
      "protostane"),
-    # grayanotoxane — tetracyclic diterpane (kaurane/atisane class).
-    ("C[C@@H]1[C@@H]2CCC(C)(C)[C@H]2CC[C@@]23C[C@@H](CC[C@@H]12)[C@@H](C)C3", "grayanotoxane"),
+    # grayanotoxane — tetracyclic diterpane (kaurane/atisane class): the strict path builds
+    # its bridged fused PIN (slice S4; the Blue Book,:23843).
+    ("C[C@@H]1[C@@H]2CCC(C)(C)[C@H]2CC[C@@]23C[C@@H](CC[C@@H]12)[C@@H](C)C3",
+     "(3aS,4R,4aS,7R,8S,9aR,11aS)-1,1,4,8-tetramethyltetradecahydro-7,9a-methanocyclopenta[b]heptalene"),
     # rosane — tricyclic diterpane (abietane class); was mis-named (substituent drop).
     ("CC[C@]1(C)CC[C@]2(C)[C@H](CC[C@@H]3[C@H]2CCCC3(C)C)C1", "rosane"),
 ])
@@ -150,7 +152,9 @@ def test_name_exact_alkaloid_parents(smi, expected):
     ("CC1CC[C@H]2C(C)CCCC(C)(C)[C@H]2C1", "himachalane"),
     ("CC(C)CCC[C@H](C)[C@H]1CC[C@]2(C)C[C@H]3[C@H](CC[C@@H]3C)[C@@H](C)CC[C@@H]12", "ophiobolane"),
     ("C[C@@H]1CCC[C@]2(C)[C@H]3CC[C@H](C)[C@@H]4CCO[C@H](C[C@@H]12)[C@]34C", "picrasane"),
-    ("CC1CC[C@@]2(C)[C@@H](C1)O[C@@H]1CC[C@@]2(C)[C@@H]1C", "trichothecane"),
+    # trichothecane: the bridged fused PIN on '1-benzoxepine' (slice S4;:50943)
+    ("CC1CC[C@@]2(C)[C@@H](C1)O[C@@H]1CC[C@@]2(C)[C@@H]1C",
+     "(2R,5S,5aR,9aR,10S)-5,5a,8,10-tetramethyldecahydro-2,5-methano-1-benzoxepine"),
 ])
 def test_name_exact_sesqui_di_terpene_parents(smi, expected):
     can = Chem.MolToSmiles(Chem.MolFromSmiles(smi))

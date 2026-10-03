@@ -595,7 +595,14 @@ def _mancude_indicated_h_count(mol, ring_atom_set: Set[int]) -> int:
     """How many indicated hydrogen atoms the mancude form of this ring skeleton
     takes: the ring atoms that can carry a ring double bond (C, and N, P, As, B with
     two ring bonds), minus twice a maximum matching of them. Pyrrole 1, furan 0,
-    cyclopenta[c]pyridine 1, indolizine 0."""
+    cyclopenta[c]pyridine 1, indolizine 0.
+
+    A ring atom with a nonstandard bonding number, two ring bonds and no exocyclic
+    multiple bond can carry a ring double bond too: '1H-1λ4-thiophene (PIN)' and
+    '3H-1λ4-thiophene (PIN)', the Blue Book,:9167,:9171) and
+    '2H-5λ4-dibenzo[b,d]thiophene (PIN)',:14531,:14555) each take one
+    indicated hydrogen."""
+    from .lambda_convention import nonstandard_bonding_number
     ring_atom_set = set(ring_atom_set)
 
     def _eligible(idx):
@@ -604,7 +611,12 @@ def _mancude_indicated_h_count(mol, ring_atom_set: Set[int]) -> int:
         sym = at.GetSymbol()
         if sym == 'C':
             return deg <= 3
-        return sym in ('N', 'P', 'As', 'B') and deg == 2
+        if sym in ('N', 'P', 'As', 'B') and deg == 2:
+            return True
+        return (deg == 2 and nonstandard_bonding_number(mol, idx) is not None
+                and not any(b.GetBondTypeAsDouble() >= 2.0
+                            and b.GetOtherAtomIdx(idx) not in ring_atom_set
+                            for b in at.GetBonds()))
 
     nodes = frozenset(a for a in ring_atom_set if _eligible(a))
     adj = {a: {n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors()
@@ -625,6 +637,30 @@ def _mancude_indicated_h_count(mol, ring_atom_set: Set[int]) -> int:
         return best
 
     return len(nodes) - 2 * _max_matching(nodes)
+
+
+_AZOLE_COMPONENT_RE = re.compile(r"(?:isoxazol|isothiazol|isoselenazol|oxazol|thiazol|selenazol)(?:o\[|e\b)")
+
+
+def _unbracketed_azole_component(name: str) -> bool:
+    """True when a fusion name spells an oxazole, thiazole or selenazole component
+    without its Hantzsch-Widman locants: (the Blue Book) "The names
+    'isothiazole', 'isoxazole', 'thiazole', and 'oxazole', although permitted in general
+    nomenclature, are not recommended for the names of components in preferred IUPAC
+    fusion names. The Hantzsch-Widman names 1,2-thiazole, 1,2-oxazole, 1,3- thiazole,
+    and 1,3-oxazole, respectively, must be used; the locants are enclosed in square
+    brackets in the completed fusion name" ('[1,3]selenazolo[5,4-d][1,3]thiazole (PIN)',
+    :12311). A component starts the name or follows a hyphen or a fusion bracket; one
+    inside a benzo name ('1,3-benzothiazole') follows a letter and is not a component
+    of this kind, and one after its locant bracket ('[1,3]thiazolo') is the PIN form."""
+    for m in _AZOLE_COMPONENT_RE.finditer(name or ""):
+        before = name[:m.start()]
+        if before and before[-1].isalpha():
+            continue                  # inside a benzo name or another word
+        if re.search(r"\[\d+,\d+\]$", before):
+            continue                  # '[1,3]thiazolo', '[1,2]oxazole'
+        return True
+    return False
 
 
 def _record_non_pin_spelling(fragment: str) -> None:
@@ -1022,6 +1058,13 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if not name:
         return None
 
+    # (the Blue Book): this namer spells an azole component without
+    # its bracketed Hantzsch-Widman locants ('isoxazolo[4,5-c]pyridine',
+    # 'cyclohepta[d]thiazole'): a valid name, never the PIN. Every name built on it
+    # (hydro prefixes, substituents) carries it and is labelled below the PIN.
+    if _unbracketed_azole_component(name):
+        _record_non_pin_spelling(name)
+
     # a phase: a partially-saturated fused pair is named as
     # '<locants>-<multiplier>hydro-<mancude parent>'. `name` here is the mancude
     # descriptor (generate_systematic_name_for_fused_pair is aromaticity-
@@ -1034,6 +1077,18 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
             Chem.MolToSmiles(mol), hydro_name,
         )
         return hydro_name
+
+    # (the Blue Book): a benzene ring fused to a heteromonocycle is
+    # named as a benzoheterocycle with its heteroatom locants. The catalogue match
+    # misses such a system when a ring atom has a nonstandard bonding number ([SH2]),
+    # so the descriptor name ('benzo[b]thiophene', never the PIN) was built above;
+    # the catalogue benzo name of the same skeleton is the parent instead
+    # ('1H-1λ4-1-benzothiophene'). The fusion numbering, so every locant added
+    # below, is the same for both names.
+    from .fusion_descriptors import catalogue_benzo_name
+    _benzo = catalogue_benzo_name(mol, ring_atom_set)
+    if _benzo is not None:
+        name = _benzo
 
     # Compute indicated hydrogen for the algorithmic fused system
     parent_name, child_name, parent_ring, child_ring = identify_parent_and_child(
@@ -1154,6 +1209,7 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
 _PCF_CARBOCYCLIC = {
     'benzene', 'cyclopentadiene', 'cyclopentene',
     'cycloheptadiene', 'cycloheptene', 'cyclohexene',
+    'cyclooctatetraene', 'cyclooctene',
 }
 _PCF_MULTIPLIERS = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
 # Heteroatom seniority for the base's isolated IUPAC numbering (senior -> low

@@ -671,19 +671,61 @@ def name_polysulfoxide_sulfone(mol) -> Optional[str]:
     if any(_SUB_MULTIPLIER.get(len(locs)) is None for locs in by_name.values()):
         return None                       # more substituents than the table covers
     sub_block = _cite_locanted_prefixes(by_name)
+    _unlocanted = _dichalcogane_identical_substituents_unequal_lambda(
+        mol, chain, lam_by_pos, sub_by_pos, by_name)
+    if _unlocanted:
+        sub_block = _cite_unlocanted_prefixes(
+            [(pos, nm) for pos, names in sub_by_pos.items() for nm in names]) or sub_block
 
     core = f"{lam_block}-{base}{oxo_suffix}"
     name = f"{sub_block}-{core}" if sub_block else core
-    # A Blue Book conflict, left for a ruling (review a performance pass, F-06): cites
-    # the substituent locants of '1,2-dimethyl-1λ4,2λ4-disulfane-1,2-dione (PIN)' and
-    # '1-ethyl-2-methyl-1λ6,2λ6-disulfane-1,1,2,2-tetrone (PIN)' (the Blue Book-:39560) but
-    # omits them on 'diethyl-1λ6,2λ4-diselane-1,1,2-trione (PIN)' (:39562). The shape
-    # the book prints without them -- one substituent on chalcogens of different
-    # bonding numbers -- keeps this name, labelled pin_unverified.
-    if len(by_name) == 1 and len(set(lam_by_pos.values())) > 1:
+    # One kind of substituent on atoms of different bonding numbers, cited with its
+    # locants: a longer chain (the Blue Book prints only dichalcoganes, the Blue Book-:39562)
+    # or a dichalcogane the helper above declines (a stereo mark, an isotope, forced
+    # locants, a fragment scope). Either way the name is kept and labelled
+    # pin_unverified (review a performance pass, F-06).
+    if (not _unlocanted and len(by_name) == 1
+            and len(set(lam_by_pos.values())) > 1):
         from ..metrics.provenance import record_uncertified_pin_name
         record_uncertified_pin_name(name)
     return name
+
+
+def _dichalcogane_identical_substituents_unequal_lambda(
+        mol, chain, lam_by_pos, sub_by_pos, by_name) -> bool:
+    """ (the Blue Book), "Method (1) generates preferred IUPAC names"
+    (:39552): a two-atom chain whose atoms carry one identical substituent each and have
+    different bonding numbers cites no substituent locants --
+    'diethyl-1λ6,2λ4-diselane-1,1,2-trione (PIN)' (:39562); equal bonding numbers cite
+    them ('1,2-dimethyl-1λ4,2λ4-disulfane-1,2-dione (PIN)',:39554), and so do two
+    different substituents ('1-ethyl-2-methyl-1λ6,2λ6-disulfane-1,1,2,2-tetrone (PIN)',
+    :39556). User ruling D1 (2026-10-02): the printed PINs are followed. Each atom then
+    holds its one substituent in the only free position, so no isomer arises by moving
+    them,:2953). Deny-by-default: forced locants, an isotopic or
+    fragment scope, a stereo mark on the chain, or any failure keeps the locants."""
+    try:
+        if len(chain) != 2 or len(by_name) != 1:
+            return False
+        if any(len(sub_by_pos.get(pos) or ()) != 1 for pos in (0, 1)):
+            return False
+        if lam_by_pos.get(0) == lam_by_pos.get(1):
+            return False
+        if any(mol.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+               for i in chain):
+            return False
+        if any(a.GetIsotope() for a in mol.GetAtoms()):
+            return False
+        from ..assembly.handlers._handler_shared import locant_scope_is_a_name_component
+        from ..assembly.locant_omission import (
+            locants_are_forced,
+            scope_has_isotopic_modification,
+        )
+        if (locants_are_forced() or scope_has_isotopic_modification()
+                or locant_scope_is_a_name_component()):
+            return False
+        return True
+    except Exception:                          # noqa: BLE001 -- deny-by-default
+        return False
 
 
 __all__ = ["name_chalcogen_chain", "name_polysulfoxide_sulfone"]

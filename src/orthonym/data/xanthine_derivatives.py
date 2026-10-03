@@ -27,8 +27,7 @@ XANTHINE_DERIVATIVES: Dict[str, Dict[str, Any]] = {
     # =========================================================================
     'O=c1[nH]c(=O)c2[nH]cnc2[nH]1': {
         'systematic_name': '3,7-dihydro-1H-purine-2,6-dione',
-        'common_name': 'xanthine',
-        'retained_name': 'xanthine',  # IUPAC retained name
+        'common_name': 'xanthine',  # not a Blue Book name (0 hits); no retained_name
         'n_positions': [],
         'n_substituents': [],
         'indicated_h': '1H',

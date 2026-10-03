@@ -590,6 +590,17 @@ def name_hydroxylamine(
     terms = _format_locant_block(o_subs, "O") + _format_locant_block(n_subs, "N")
     terms.sort(key=lambda t: t[0].lstrip("([{").lower())
     name = "-".join(t[1] for t in terms) + "hydroxylamine"
+    if n_subs:
+        # (the Blue Book): "Substituted hydroxylamines of the
+        # type R-NH-OH or RR'N-OH are named as N-derivatives of the senior amine"
+        # ('N-hydroxymethanamine (PIN) N-methylhydroxylamine',:38314). The amine
+        # form above declines for this molecule (a base amine with a locant), so
+        # the functional-class name it falls back to is correct but not the PIN.
+        try:
+            from ...metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(name)
+        except Exception:  # a label record must never break naming
+            pass
 
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug(

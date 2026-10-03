@@ -96,14 +96,16 @@ _DEMOTED = [
     # von Baeyer names of fusion-nameable systems (canary DK-VBFUSED; TRIAGE rows 89/90)
     ("CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
      "5,5,9,14-tetramethyl-15-oxapentacyclo[11.3.1.0^1,10.0^4,9.0^14,16]heptadecane-6,7-diol"),
+    # quick-wins F-Q1, the Blue Book): '0^1,6' before '0^4,9'
     ("CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
-     "(1R,4S,9S,12R)-4,8,8-trimethyl-2,3-dioxatricyclo[7.3.1.0^4,9]tridec-5-en-12-ol"),
+     "(1S,6S,9R,10R)-2,2,6-trimethyl-7,8-dioxatricyclo[7.3.1.0^1,6]tridec-4-en-10-ol"),
     # wp7 change-asserted-value: (:3448) 'dimethyl' keys at 'methyl', before 'oxo';
     # the primed locants are locants (:3442). Was "...-5,6'-dioxo-9',13'-dimethylspiro[...]".
     # OPSIN 2.9.0 full-InChIKey exact.
+    # quick-wins F-Q1,:9685): '0^2,7.0^11,15' before '0^4,9.0^13,17'
     ("CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1",
-     "(10'S,17'S)-9',13'-dimethyl-5,6'-dioxospiro[oxolane-2,14'-tetracyclo[8.7.0.0^4,9."
-     "0^13,17]heptadeca-2,4-diene]"),
+     "(1'S,11'S)-2',15'-dimethyl-5,5'-dioxospiro[oxolane-2,14'-tetracyclo[8.7.0.0^2,7."
+     "0^11,15]heptadeca-6,8-diene]"),
     # von Baeyer names of adamantane / cubane (canary DK-ADAM)
     ("OC1C2CC3CC1CC(O)(C3)C2", "tricyclo[3.3.1.1^3,7]decane-1,4-diol"),
     ("NC12CC3CC(CC(C3)C1)C2", "tricyclo[3.3.1.1^3,7]decan-1-amine"),

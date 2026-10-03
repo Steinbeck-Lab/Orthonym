@@ -20,30 +20,24 @@ from orthonym import name_compound
 class TestEsterSenioritySwap:
     """Test ester bonds with seniority-based role swapping."""
 
+    @pytest.mark.opsin_gate
     def test_steroid_acetate_names_ring_system(self):
         """Steroid acetate: acid=acetate(3 HA), other=steroid(20 HA).
 
         CC(=O)OC1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C
-        With roles_swapped=True, the name should reference the steroid
-        ring system as the parent, not just produce "steroid acetate" style.
-        The name must not be None/unknown and should contain ring-related terms.
+        The roles-swapped split used to glue '(acetyloxy)' in front of the steroid
+        named with the esterified O still on it: '(acetyloxy)-14-hydroxy-9,13-
+        dimethyltetracyclo[...]heptadec-4-en-6-one' (no locant for the prefix and
+        one O cited twice -- a different molecule, which only the round trip
+        stopped; this test passed on it with the validity gate off). The glue is
+        gone (quick-wins Q6), so what is asserted is what ships: the tier
+        contract -- the best-effort tier names the ester RT-exact, and the PIN tier
+        ships nothing that is not RT-exact (it abstained before the change too).
         """
+        from tests.support.rt_assert import assert_tier_contract
         smiles = "CC(=O)OC1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C"
-        name = name_compound(smiles)
-        assert name is not None and name.lower() != "unknown"
-        assert name.lower() != "unknown organic compound", (
-            f"Steroid acetate should produce a valid name, got: {name}"
-        )
-        # The name should reference the large ring system
-        name_lower = name.lower()
-        # Should have some structural reference to the ring system
-        has_ring_ref = any(
-            tok in name_lower
-            for tok in ["cyclo", "tetra", "tri", "deca", "one", "ol", "an", "en"]
-        )
-        assert has_ring_ref or len(name) > 15, (
-            f"Expected ring system reference in steroid acetate name: {name}"
-        )
+        _pin, be = assert_tier_contract(smiles)
+        assert "acetate" in be, be
 
     def test_simple_ester_ethyl_acetate_unchanged(self):
         """CCOC(=O)C (ethyl acetate): simple ester, should NOT swap."""

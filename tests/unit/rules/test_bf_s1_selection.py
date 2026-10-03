@@ -46,7 +46,6 @@ def test_a_metheno_reading_loses_to_the_divalent_methano_bridge():
     "C1Cc2cccc3cccc1c23",            # acenaphthene: the whole system is fused:14241)
     "C1c2cc3ccccc3cc21",             # 1H-cyclopropa[b]naphthalene: fused, not bridged
     "c1ccc2ccccc2c1",                # naphthalene
-    "C1=CC2C3C=CC(C3)C2C1",          # dicyclopentadiene: the parent is indene (slice S2)
     "C1CC2CCC1C2",                   # norbornane: no fused parent
     "C1C2CC3CC1CC(C2)C3",            # adamantane
     "C1CC2CC1C2c1ccccc1",            # a phenyl substituent is another ring system

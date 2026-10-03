@@ -328,7 +328,10 @@ SMILES_CE1 = "C[C@@H]1C[C@H]1/C=C/C(N)=O"
 EXPECTED_CE1 = "(2E)-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enamide"
 
 SMILES_CE2 = "C[C@@H]1C[C@H]1/C=C/C(=O)NC"
-EXPECTED_CE2 = "N-methyl(2E)-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enamide"
+# The parent block stands at the front of the complete name, the N-substituent in the
+# prefix series: (the Blue Book) "Stereodescriptors placed at the front of
+# the complete name or name fragment to which they apply"; (:3477).
+EXPECTED_CE2 = "(2E)-N-methyl-3-[(1R,2R)-2-methylcyclopropyl]prop-2-enamide"
 
 COUNTEREXAMPLES = [(SMILES_CE1, EXPECTED_CE1), (SMILES_CE2, EXPECTED_CE2)]
 

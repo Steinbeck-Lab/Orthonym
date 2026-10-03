@@ -21,7 +21,8 @@ is a hydrocarbyl (alkyl/aryl, as typed 'alkyl' by the shared identifier) or a
 halogen on a bare purine-2,6-dione ring system whose imidazole has exactly one
 saturated N. Functional/heteroatom substituents, a C8=O (purine-2,6,8-trione,
 i.e. the uric-acid family), extra fused rings, and the unsubstituted parent all
-decline here (the unsubstituted parent keeps its retained name via another path).
+decline here. The unsubstituted parent gets the bare parent name (no retained
+'xanthine' at the PIN tier; --trivial keeps it).
 
 This module owns the purine-2,6-DIONE (xanthine/caffeine family) only. The
 -oxo case (hypoxanthine/guanine) lives in ``rules/purine.py::name_oxo_purine``.
@@ -100,10 +101,12 @@ def name_purine_26_dione(mol) -> Optional[str]:
         )
         if subs is None:
             continue  # an out-of-scope / unidentifiable substituent
-        if not subs["c_substituents"] and not subs["other"]:
-            continue  # unsubstituted parent -> defer to the retained-name path
-
         parent = _PARENT_TEMPLATE.format(sat=sat)
+        if not subs["c_substituents"] and not subs["other"]:
+            # The unsubstituted parent is named here too: 'xanthine' does not occur
+            # in the Blue Book (0 hits) and is not a retained heterocycle;
+            # the ring system is purine ("the PIN is 7H-purine", the Blue Book).
+            return parent
         return _assemble_fused_heterocycle_name(mol, parent, subs, atom_mapping)
 
     return None

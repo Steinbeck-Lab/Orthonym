@@ -245,7 +245,11 @@ class TestNewEntries:
         # F-T9/DD6: 'putrescine' (NCCCCN) is general-only — denied from the
         # gated headline path (PIN butane-1,4-diamine), so get_retained_name -> None.
         # (It stays in the RAW retained_names.RETAINED_NAMES alias; see test_new_entry_exists.)
-        ("Nc1ncnc2[nH]cnc12", "adenine"),
+        # quick-wins: 'adenine' is general-only (0 Blue Book hits; "the PIN is
+        # 7H-purine", the Blue Book) -- denied from the gated path like the
+        # monocyclic nucleobases, so get_retained_name -> None (GENERAL_RETAINED_NAMES
+        # keeps it for --trivial).
+        ("Nc1ncnc2[nH]cnc12", None),
         ("c1ccc(Cc2ccccc2)cc1", "diphenylmethane"),
     ])
     def test_get_retained_name_function(self, smiles, expected_name):

@@ -160,8 +160,17 @@ class TestAmideDecomposition:
         )
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_macrolide_ester_produces_complete_name(self):
-        """Large macrolide with malonate ester: was 'propanoic acid'."""
+        """Large macrolide with malonate ester: was 'propanoic acid'.
+
+        With the validity gate off this test passed on the roles-swapped split's
+        '(propanedioyloxy)(...)-undecahydroxy-...' glue (no locant, the esterified
+        O cited again as a hydroxy: a different molecule, stopped only by the
+        round trip). The glue is gone (quick-wins Q6), so the test asserts
+        what ships, with the gate on: the tier contract (best-effort RT-exact, the
+        PIN tier never a name that is not RT-exact) and no fragment name."""
+        from tests.support.rt_assert import assert_tier_contract
         smi = (
             "CN=C(N)NCCC/C=C/CCC[C@H](C)[C@H]1OC(=O)/C(C)=C\\C=C/"
             "[C@H](C)[C@H](O)C[C@H](O)[C@H](C)[C@@H](O)CC[C@@H](C)"
@@ -169,8 +178,8 @@ class TestAmideDecomposition:
             "C[C@@H](O)C[C@H](O)/C(C)=C\\C=C/[C@H]1C)C[C@@H](O)"
             "[C@@H]2O"
         )
-        name = name_compound(smi)
-        assert name != "unknown"
+        pin, name = assert_tier_contract(smi)
+        assert pin != "propanoic acid", "Should not be just 'propanoic acid' (fragment loss)"
         assert name != "propanoic acid", "Should not be just 'propanoic acid' (fragment loss)"
         assert len(name) > 20, f"Macrolide name too short: {name}"
 

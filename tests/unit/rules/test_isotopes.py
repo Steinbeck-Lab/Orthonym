@@ -240,14 +240,12 @@ class TestDeMultiplicationP4542:
         ("[2H]C([2H])([2H])Oc1ccccc1", "(2H3)methoxybenzene"),
         ("[12CH](Cl)(Cl)Cl",        "trichloro(12C)methane"),  # 'tri' but NO leading locant -> inert
         ("[13CH3]OC(C)=O",          "(13C)methyl acetate"),    # front descriptor path
-        # A locant-free O nuclide on the ``-ol`` suffix stays at the FRONT of the
-        # parent restores the parent locant under isotopic modification:
-        # ``(2-13C)ethan-1-ol [not (2-13C)ethanol]``, the Blue Book). Gold protect pin
-        # W2F-P5-P4 ("parent-front descriptor", OPSIN-RT verified) requires the front
-        # form; the Phase-07 suffix-adjacent spelling ``ethan-1-(18O)ol`` regressed it
-        # and is reverted (only the ``-thiol``/``-selenol``/``-tellurol`` chalcogen
-        # suffixes keep the adjacent slot). Both round-trip to CC[18OH] (0-wrong).
-        ("CC[18OH]",                "(18O)ethan-1-ol"),        # gold W2F-P5-P4, front
+        # A locant-free O nuclide on the ``-ol`` suffix goes immediately before the
+        # suffix, and the unlabelled name's locant-free spelling stays when the label
+        # needs no locant: (the Blue Book) 'ethan(2H)ol (PIN) (as in
+        # ethanol)' (:44184); (:43718) '1-(aminomethyl)cyclopentan-1-(18O)ol
+        # (PIN)' (:43744). Gold W2F-P5-P4 follows. OPSIN 2.9.0 reads it back to CC[18OH].
+        ("CC[18OH]",                "ethan(18O)ol"),           # gold W2F-P5-P4
     ])
     def test_existing_isotope_placements_unaffected(self, smiles, expected):
         from orthonym.namer import name_compound

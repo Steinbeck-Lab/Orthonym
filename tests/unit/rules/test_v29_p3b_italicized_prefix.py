@@ -466,6 +466,11 @@ _TRIPWIRE_ALLOWLIST = {
      "if '-' in sub_yl_name and not sub_yl_name.startswith('('):"):
         "get_ring_substituent_name yields a RING-yl name ('pyridin-2-yl'); a ring "
         "prefix is never spelled with a leading tert-/sec-.",
+    ("rules/spiro.py", "if '-' in rest.split('[', 1)[0] or 'hydro' in rest:"):
+        "_bracket_component_locants reads a spiro RING-COMPONENT name "
+        "('1-benzothiophene', '2,3-dihydro-1-benzofuran'); the hyphen finds a second "
+        "locant block (hydro prefixes, a lambda descriptor) so such a name is left "
+        "unbracketed. A ring-component name is never spelled with a leading tert-/sec-.",
     ("data/sugar_names.py", 'if n > 1 and any(ch in word for ch in "- ("):'):
         "Operates on a sugar ACYL ESTER WORD, never an alkyl prefix.",
     ("data/sugar_names.py", 'if any(ch in word for ch in " -("):'):

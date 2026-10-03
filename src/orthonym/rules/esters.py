@@ -674,7 +674,12 @@ def _alkyl_name_via_substituent_primitive(mol, alkyl_set: set) -> Optional[str]:
     # (`(1S,2S)-2-hydroxycycloheptyl`). Fail-closed: this only runs after the old
     # primitive already declined, so it can convert a currently-abstaining ester
     # or stay declined -- it can never regress a name the old path emitted.
-    if any(mol.GetAtomWithIdx(i).IsInRing() for i in alkyl_set):
+    # The same holds for an alcohol component that carries a heteroatom group the
+    # primitive declines ('2-(nitrooxy)ethyl': the capped name '(nitrooxy)ethane'
+    # has no locant to carry over,: the recursive namer numbers it from
+    # the free valence.
+    if any(mol.GetAtomWithIdx(i).IsInRing()
+           or mol.GetAtomWithIdx(i).GetSymbol() not in ('C', 'H') for i in alkyl_set):
         try:
             from ..assembly.substituent_enumerator import name_substituent
             ring_word = name_substituent(mol, sorted(alkyl_set), attach)
@@ -1089,8 +1094,72 @@ def _labels_polyacid_monoester(fn):
         name = fn(mol, ester_match, *args, **kwargs)
         if name:
             record_polyacid_monoester_non_pin(mol, ester_match[0], name)
+            if len(ester_match) >= 4:
+                record_polyol_mixed_anion_non_pin(mol, ester_match[3], ester_match[2], name)
         return name
     return _wrapped
+
+
+def _alcohol_part_has_another_ester(mol, alkyl_c: int, ester_o: int) -> bool:
+    """Does the alcohol component (the subgraph at ``alkyl_c`` not crossing
+    ``ester_o``) carry another ester oxygen -- an O between one of its carbons and an
+    acyl carbon (C=O / C=S) or an inorganic acid centre (N=O, N+(=O)O-, S(=O)(=O),
+    P=O)? Then the molecule is a polyester of one 'alcoholic' component."""
+    seen, stack = {ester_o}, [alkyl_c]
+    comp = set()
+    while stack:
+        x = stack.pop()
+        if x in seen:
+            continue
+        seen.add(x)
+        comp.add(x)
+        stack.extend(n.GetIdx() for n in mol.GetAtomWithIdx(x).GetNeighbors())
+    for idx in comp:
+        o = mol.GetAtomWithIdx(idx)
+        if o.GetSymbol() != 'O' or o.GetDegree() != 2 or o.GetFormalCharge():
+            continue
+        nbrs = list(o.GetNeighbors())
+        if not any(n.GetSymbol() == 'C' and not _is_acid_centre(mol, n) for n in nbrs):
+            continue
+        if any(_is_acid_centre(mol, n) for n in nbrs):
+            return True
+    return False
+
+
+def _is_acid_centre(mol, atom) -> bool:
+    sym = atom.GetSymbol()
+    dbl = [b.GetOtherAtom(atom).GetSymbol() for b in atom.GetBonds()
+           if b.GetBondTypeAsDouble() == 2.0]
+    if sym == 'C':
+        return any(s in ('O', 'S') for s in dbl)
+    if sym == 'N':
+        return 'O' in dbl
+    if sym == 'S':
+        return dbl.count('O') >= 2
+    if sym == 'P':
+        return 'O' in dbl
+    return False
+
+
+def record_polyol_mixed_anion_non_pin(mol, alkyl_c: int, ester_o: int,
+                                      name: Optional[str]) -> None:
+    """Label ``name`` below the PIN when it is method (2) of
+    (the Blue Book): an ester whose alcohol component carries another ester
+    of a different anion, the other ester cited as a prefix ('(acetyloxy)methyl
+    formate', '2-(nitrosooxy)ethyl acetate'). "Method (1) generates preferred IUPAC
+    names but names formed by using method (2) are acceptable in general
+    nomenclature" (:31836; '(1) methylene acetate formate (PIN) (2) (formyloxy)methyl
+    acetate',:31840); esters of noncarbon acids are named "in the same way"
+    ,:35918). The method (1) names are not read by OPSIN 2.9.0, so they
+    are not built; the method (2) name ships below the PIN, unchanged."""
+    if not name or alkyl_c is None or ester_o is None:
+        return
+    try:
+        if _alcohol_part_has_another_ester(mol, alkyl_c, ester_o):
+            from ..metrics.provenance import record_non_pin_label
+            record_non_pin_label(name)
+    except Exception:  # a label record must never break naming
+        pass
 
 
 @_labels_polyacid_monoester
@@ -1323,6 +1392,13 @@ def _build_ester_acid_word(
                 except Exception as exc:
                     logger.debug("Ester acid-side prefix discovery failed: %s", exc)
                     acid_prefix_str = ""
+                if not acid_prefix_str and any(
+                        mol.GetAtomWithIdx(a).GetAtomicNum() > 1 for a in non_chain_atoms):
+                    # The acid chain carries heavy-atom branches the prefix pipeline
+                    # could not name: the bare chain acid would drop them
+                    # ('heptan-2-yl ethanoate' for an aryloxyacetate, a different
+                    # molecule stopped only by the read-back). Decline.
+                    return None
                 if (chain_length == 2 and acid_prefix_str and _acid_prefix_texts
                         and not [c for _l, c in _collect_ester_fragment_stereo(
                             mol, acid_atoms, ester_match) if c in ('R', 'S')]):
@@ -3556,17 +3632,19 @@ def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str
         carbonyl_carbons.add(match[0])
     exclude = ester_oxygens | carbonyl_carbons
 
-    # (1) identical acyl groups (as '-oate' anion names)
+    # (1) identical acyl groups (as '-oate' anion names). The acid is named with
+    # its substituents (anhydrides._name_acyl_acid, the producer of the anhydride
+    # acid words): the bare carbon count of get_acid_fragment_name read
+    # ClCH2-CO- as 'acetic', a different acid.
+    from .anhydrides import _name_acyl_acid
     anions = []
+    substituted = False
     for c_c, c_o, e_o, alk_c in ester_matches:
-        acid_atoms = _bfs_fragment(mol, c_c, exclude_atom=e_o)
-        acid_name = get_acid_fragment_name(mol, acid_atoms)
+        acid_name, sub = _name_acyl_acid(mol, c_c, e_o, c_o)
         if not acid_name:
             return None
-        # get_acid_fragment_name returns e.g. 'acetic' (no ' acid' tail);
-        # _acid_name_to_ate needs the '...ic acid' form.
-        acid_full = acid_name if acid_name.endswith("acid") else acid_name + " acid"
-        anion = _acid_name_to_ate(acid_full)
+        substituted = substituted or sub
+        anion = _acid_name_to_ate(acid_name + " acid")
         if anion is None:
             return None
         anions.append(anion)
@@ -3574,48 +3652,85 @@ def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str
         return None
 
     # (2) name the diol residue as a divalent -diyl group with attachment locants.
-    backbone_start_atoms = [m[3] for m in ester_matches]
-    backbone = _find_polyol_backbone(mol, backbone_start_atoms, exclude)
+    diyl = _polyol_organyl_name(mol, [m[3] for m in ester_matches], ester_oxygens,
+                                exclude)
+    if diyl is None:
+        return None
+
+    # (3) multiplied acid anion: 'di' + 'acetate' -> 'diacetate',
+    # 'di' before a consonant, no elision); a substituted anion takes 'bis'
+    #, the Blue Book; 'propane-1,3-diyl
+    # bis(chloroacetate) (PIN)',:31825).
+    if substituted:
+        return f"{diyl} bis({anions[0]})"
+    return f"{diyl} di{anions[0]}"
+
+
+_POLYOL_VALENCE = {2: "diyl", 3: "triyl", 4: "tetrayl"}
+_POLYOL_MULTIPLIER = {2: "di", 3: "tri", 4: "tetra"}
+
+
+def _polyol_organyl_name(mol, attach_atoms: list, ester_oxygens: set,
+                         exclude: set) -> Optional[str]:
+    """'<alkane>-<locants>-<n>yl' for a clean acyclic polyol residue: an unbranched
+    saturated carbon chain whose only heavy neighbours are its own atoms and the
+    ester oxygens (two on one carbon for an acylal:, 'ethane-1,1-diyl
+    dibutanoate (PIN)', the Blue Book); the attachment locants as low as
+    possible. None for any other residue."""
+    if len(attach_atoms) not in _POLYOL_VALENCE:
+        return None
+    backbone = _find_polyol_backbone(mol, list(attach_atoms), exclude)
     if backbone is None or len(backbone) < 2:
         return None
     ordered = _order_backbone_chain(mol, backbone, exclude)
     if ordered is None:
         return None
-
-    # Fail closed if any backbone carbon carries a heavy substituent outside
-    # the backbone / the two ester oxygens (keep it a clean unsubstituted diol).
-    backbone_set = set(ordered)
-    allowed = backbone_set | ester_oxygens
+    # Fail closed if any backbone carbon carries a heavy substituent outside the
+    # backbone / the ester oxygens (keep it a clean unsubstituted polyol).
+    allowed = set(ordered) | ester_oxygens
     for idx in ordered:
         atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() != 'C':
+        if atom.GetSymbol() != 'C' or atom.GetIsAromatic():
             return None
-        for nbr in atom.GetNeighbors():
+        for bond in atom.GetBonds():
+            nbr = bond.GetOtherAtom(atom)
             if nbr.GetAtomicNum() <= 1:
                 continue
-            if nbr.GetIdx() not in allowed:
+            if nbr.GetIdx() not in allowed or bond.GetBondTypeAsDouble() != 1.0:
                 return None
-
     n = len(ordered)
     parent_prefix = get_chain_prefix(n)
     if not parent_prefix:
         return None
-
-    # Attachment locants = positions of the two ester-bearing carbons, numbered
-    # for lowest locant set (first-point-of-difference over both directions).
     fwd = {idx: i + 1 for i, idx in enumerate(ordered)}
     rev = {idx: n - i for i, idx in enumerate(ordered)}
-    attach_atoms = [m[3] for m in ester_matches]
     fwd_locs = sorted(fwd[a] for a in attach_atoms)
     rev_locs = sorted(rev[a] for a in attach_atoms)
     locs = fwd_locs if fwd_locs <= rev_locs else rev_locs
+    return (f"{parent_prefix}ane-{','.join(str(x) for x in locs)}-"
+            f"{_POLYOL_VALENCE[len(attach_atoms)]}")
 
-    loc_str = ",".join(str(x) for x in locs)
-    diyl = f"{parent_prefix}ane-{loc_str}-diyl"
 
-    # (3) multiplied acid anion: 'di' + 'acetate' -> 'diacetate',
-    # 'di' before a consonant, no elision).
-    return f"{diyl} di{anions[0]}"
+def name_polyol_identical_inorganic_ester(mol, attach_atoms: list, ester_oxygens: set,
+                                          group_atoms: set, anion: str) -> Optional[str]:
+    """ (the Blue Book): "When anions are identical functional
+    class multiplicative nomenclature is used" ('ethane-1,2-diyl diacetate (PIN)',
+    :31823; 'propane-1,2,3-triyl triacetate (PIN)',:31827); esters of noncarbon
+    acids "are named in the same way as esters of organic acids",
+    :35918): 'ethane-1,2-diyl dinitrite', 'propane-1,2,3-triyl trinitrate'.
+
+    ``attach_atoms`` are the polyol carbons bearing the ester oxygens, and
+    ``group_atoms`` every atom of the inorganic anion groups (ester oxygens
+    included). The molecule must be the polyol residue plus those groups and
+    nothing else; otherwise None."""
+    exclude = set(group_atoms)
+    organyl = _polyol_organyl_name(mol, list(attach_atoms), set(ester_oxygens), exclude)
+    if organyl is None:
+        return None
+    backbone = _find_polyol_backbone(mol, list(attach_atoms), exclude)
+    if set(range(mol.GetNumAtoms())) != (backbone | set(group_atoms)):
+        return None
+    return f"{organyl} {_POLYOL_MULTIPLIER[len(attach_atoms)]}{anion}"
 
 
 def _ester_cut_components(mol, ester_matches: list):
@@ -3910,6 +4025,13 @@ def name_polyol_polyester(mol, ester_matches: list) -> Optional[str]:
         acid_atoms = _bfs_fragment(mol, carbonyl_c, exclude_atom=ester_o)
         acid_name = get_acid_fragment_name(mol, acid_atoms)
         if not acid_name:
+            return None
+        # The carbon-count name of get_acid_fragment_name drops the acid's own
+        # substituents ('acetic' for ClCH2-CO-, a different molecule): decline
+        # unless the acid named with its substituents is that same bare acid.
+        from .anhydrides import _name_acyl_acid
+        _full, _sub = _name_acyl_acid(mol, carbonyl_c, ester_o, match[1])
+        if _sub or _full != acid_name:
             return None
         acyloxy = get_acyloxy_prefix(acid_name)
 

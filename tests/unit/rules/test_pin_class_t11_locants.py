@@ -369,16 +369,18 @@ def test_oxime_hydroxy_could_stand_on_the_carbon():
     assert Orthonym().name("ON=Cc1ccccc1") == "N-hydroxy-1-phenylmethanimine"
 
 
-# (I) Blue Book conflicts, left for a ruling (the engine follows the general rule):
+# (I) Forms the Blue Book prints differently from its general rule; the user ruled
+# (2026-10-02, D1) that the engine follows the printed PINs:
 # * (:2939) "The locant is omitted in monosubstituted symmetrical parent
 # hydrides or parent compounds where there is only one kind of substitutable
-# hydrogen" with 'pyrazinecarboxylic acid (PIN)' (:2949), against (:27764)
-# '2-[(pyridin-3-yl)oxy]pyrazine (PIN)' (:27772). Pyrazine has one kind of
-# substitutable hydrogen, so the engine omits the locant.
+# hydrogen" with 'pyrazinecarboxylic acid (PIN)' (:2949), while (:27764)
+# prints '2-[(pyridin-3-yl)oxy]pyrazine (PIN)' (:27772): a prefix on a mancude
+# heteromonocycle cites its locant, a suffix does not.
 # * (:39545): '1,2-dimethyl-1λ4,2λ4-disulfane-1,2-dione (PIN)' and
 # '1-phenyl-2-(quinolin-7-yl)-1λ6,2λ6-diselane-1,1,2,2-tetrone (PIN)' cite the
 # substituent locants, 'diethyl-1λ6,2λ4-diselane-1,1,2-trione (PIN)' (:39562) does
-# not. The engine cites them, as the first two rows do.
+# not: identical substituents on chalcogen atoms of unequal bonding numbers.
+# More rows: tests/unit/rules/test_user_rulings_d1_d3.py.
 BB_CONFLICT_ROWS = [
     ("c1cncc(Oc2cnccn2)c1", "2-[(pyridin-3-yl)oxy]pyrazine"),
     ("CC(C)COc1cnccn1", "2-(2-methylpropoxy)pyrazine"),
@@ -386,7 +388,6 @@ BB_CONFLICT_ROWS = [
 ]
 
 
-@pytest.mark.xfail(strict=True, reason="Blue Book conflict, see the comment above (ruling)")
 @pytest.mark.parametrize("smiles,pin", BB_CONFLICT_ROWS)
 def test_bb_conflict_rows(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
@@ -422,11 +423,11 @@ def test_one_carbon_imine_not_pin(smiles, non_pin):
     assert_not_pin_labelled(smiles, non_pin)
 
 
-# Review a performance pass, F-06: the forms the Blue Book prints differently for the same
-# structure are kept and labelled pin_unverified until a ruling (the default tier
-# declines them): the monosubstituted pyrazine with a prefix:2939/:2949
-# against:27772), the one-substituent λ dichalcogane with unequal bonding
-# numbers:39556-:39562). Controls: the forms the book prints as ours.
+# Review a performance pass, F-06, then the user ruling D1 (2026-10-02): the general-rule forms of
+# the structures the Blue Book prints differently are not the PIN -- the unlocanted
+# prefix on pyrazine, '2-[(pyridin-3-yl)oxy]pyrazine (PIN)':27772) and the
+# cited substituent locants of the λ dichalcogane with unequal bonding numbers
+#, 'diethyl-1λ6,2λ4-diselane-1,1,2-trione (PIN)':39562).
 UNCERTIFIED_ROWS = [
     ("c1cncc(Oc2cnccn2)c1", "[(pyridin-3-yl)oxy]pyrazine"),
     ("CC(C)COc1cnccn1", "(2-methylpropoxy)pyrazine"),
@@ -436,11 +437,11 @@ UNCERTIFIED_ROWS = [
 
 
 @pytest.mark.parametrize("smiles,name", UNCERTIFIED_ROWS)
-def test_disputed_forms_are_pin_unverified(smiles, name):
+def test_disputed_forms_are_not_pin(smiles, name):
     from tests.support.pin_tiers import name_breadth, name_default
-    b = name_breadth(smiles)
-    assert (b.get("name"), b.get("tier")) == (name, "pin_unverified"), b
-    assert name_default(smiles).get("tier") != "pin_verified"
+    for res in (name_default(smiles), name_breadth(smiles)):
+        assert res.get("name") != name, res
+    assert_not_pin_labelled(smiles, name)
 
 
 @pytest.mark.parametrize("smiles,pin", [

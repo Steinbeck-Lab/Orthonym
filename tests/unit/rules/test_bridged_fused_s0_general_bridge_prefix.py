@@ -87,12 +87,12 @@ def test_preselected_epoxy_bridge_keeps_its_pin():
         assert row.get("name") == name and row["tier"] == "pin_verified", (tier, row.get("name"), row["tier"])
 
 
-UNTABULATED_HETERO_BRIDGE_ROWS = [  # -SiH2-, -Se-, -PH-, -Te-, -BH-, -GeH2- across naphthalene 1,4
-    "C12[SiH2]C(C=C1)c1ccccc12",
+UNTABULATED_HETERO_BRIDGE_ROWS = [  # -Se-, -PH-, -Te-, -GeH2- across naphthalene 1,4
+    # (-SiH2- 'silano' and -BH- 'borano' are tabulated,:14108 /:14118: slice S2
+    # names them, tests/unit/rules/test_bf_s2_prefixes.py)
     "C12[Se]C(C=C1)c1ccccc12",
     "C12[PH]C(C=C1)c1ccccc12",
     "C12[Te]C(C=C1)c1ccccc12",
-    "C12[BH]C(C=C1)c1ccccc12",
     "C12[GeH2]C(C=C1)c1ccccc12",
 ]
 

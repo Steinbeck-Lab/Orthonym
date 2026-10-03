@@ -189,9 +189,6 @@ def test_chain_carboxamide_class(smiles, opens):
 # built on any other route for such a skeleton is never labelled pin_verified
 # (rules/pin_vocabulary.py:multiplicative_pin_expected); the best-effort tier keeps it.
 MULT_SKELETON_NOT_PIN_ROWS = [
-    ("N#Cc1ccc(Cc2ccc(C#N)cc2)cc1", "4-[(4-cyanophenyl)methyl]benzonitrile"),
-    ("N#Cc1cccc(Cc2cccc(C#N)c2)c1", "3-[(3-cyanophenyl)methyl]benzonitrile"),
-    ("N#Cc1ccc(CCc2ccc(C#N)cc2)cc1", "4-[2-(4-cyanophenyl)ethyl]benzonitrile"),
     ("COC(=O)Nc1ccc(Cc2ccc(NC(=O)OC)c(Cc3ccc(NC(=O)OC)cc3)c2)cc1",
      "methyl (4-{[4-[(methoxycarbonyl)amino]-3-({4-[(methoxycarbonyl)amino]phenyl}methyl)"
      "phenyl]methyl}phenyl)carbamate"),
@@ -201,6 +198,11 @@ MULT_SKELETON_PIN_ROWS = [
     ("c1ccc(Oc2ccccc2)cc1", "1,1'-oxydibenzene"),                    #:27776
     ("c1ccccc1Cc1ccccc1", "1,1'-methylenedibenzene"),                #:19360
     ("Brc1ccc(Oc2ccc(Br)cc2)cc1", "1,1'-oxybis(4-bromobenzene)"),    #:6185
+    # built by the general multiplicative detector (PIN class program Task 10);
+    # '2,2'-methylenedibenzonitrile (PIN)',:2648)
+    ("N#Cc1ccc(Cc2ccc(C#N)cc2)cc1", "4,4'-methylenedibenzonitrile"),
+    ("N#Cc1cccc(Cc2cccc(C#N)c2)c1", "3,3'-methylenedibenzonitrile"),
+    ("N#Cc1ccc(CCc2ccc(C#N)cc2)cc1", "4,4'-(ethane-1,2-diyl)dibenzonitrile"),
 ]
 
 

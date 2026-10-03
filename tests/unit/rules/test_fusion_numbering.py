@@ -175,16 +175,26 @@ class TestFailClosed:
         assert compute_fused_numbering(m, _ring_atoms(m)) is None
 
     def test_azulene_not_all_six_returns_none(self):
+        # quick-wins F-Q3a: two rings lie in one row whatever their sizes, so the
+        # numbering needs no lattice, the Blue Book). Azulene:
+        # 1, 2, 3, 3a, 4... 8, 8a (fusion carbons as low as possible,.
         m = Chem.MolFromSmiles("c1ccc2cccc-2cc1")
-        assert compute_fused_numbering(m, _ring_atoms(m)) is None
+        num = compute_fused_numbering(m, _ring_atoms(m))
+        assert num is not None
+        fusion = [a.GetIdx() for a in m.GetAtoms() if a.GetDegree() == 3]
+        assert sorted(num[i] for i in fusion) == [(3, 'a'), (8, 'a')]
 
     def test_seven_membered_ring_returns_none(self):
-        # 13B(a) S2b admits 5/6-membered mixed rings (indole etc.), but a
-        # system containing a 7- (or 8-) membered ring still fails closed
-        # (mixed >6-ring geometry = S2b.3).
+        # quick-wins F-Q3a: a system of two rings with a 7- (or 8-) membered ring is
+        # numbered too (heptalene 1-5, 5a, 6-10, 10a); three rings with a large ring
+        # still fail closed (the lattice cannot place them).
         m = Chem.MolFromSmiles("C1=CC=CC2=CC=CC=CC2=C1")  # heptalene (7,7)
         assert m is not None
-        assert compute_fused_numbering(m, _ring_atoms(m)) is None
+        num = compute_fused_numbering(m, _ring_atoms(m))
+        fusion = [a.GetIdx() for a in m.GetAtoms() if a.GetDegree() == 3]
+        assert sorted(num[i] for i in fusion) == [(5, 'a'), (10, 'a')]
+        m3 = Chem.MolFromSmiles("c1ccc2c(c1)CCCCc1ccccc1-2")  # 5H-dibenzo[a,c][7]annulene skeleton
+        assert compute_fused_numbering(m3, _ring_atoms(m3)) is None
 
     def test_benzene_single_ring_returns_none(self):
         m = Chem.MolFromSmiles("c1ccccc1")

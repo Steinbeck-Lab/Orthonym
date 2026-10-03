@@ -385,6 +385,28 @@ def record_source(source: str, opsin: Optional[str] = None) -> None:
         _touch("opsin")
 
 
+def producer_record() -> tuple:
+    """The producer record of the call so far: ``(source, opsin)`` as
+    :func:`record_source` left them. Pair with:func:`restore_producer_record` around
+    an attempt whose name may be discarded. The value read is only written back to
+    the record, never used to build a name, so the read is not logged as a
+    provenance read (``PROVENANCE_READ``)."""
+    return (_SOURCE.get(), _OPSIN.get())
+
+
+def restore_producer_record(record: tuple) -> None:
+    """Re-set ``source`` and ``opsin`` to ``record`` (a:func:`producer_record`
+    value). A variable that already holds its value is not written, so a call that
+    left the record unchanged touches nothing."""
+    source, opsin = record
+    if _SOURCE.get() != source:
+        _SOURCE.set(source)
+        _touch("source")
+    if _OPSIN.get() != opsin:
+        _OPSIN.set(opsin)
+        _touch("opsin")
+
+
 def record_stereo_unexpressed(flag: bool) -> None:
     """ T6.4: mark the current emission as constitution-only (stereo
     defined on the input but not expressed in the name). Set at the flagged
@@ -523,6 +545,18 @@ def record_uncertified_pin_name(name: str) -> None:
     if name not in cur:
         _UNCERTIFIED_PIN_NAMES.set(cur + (name,))
     _touch("uncertified_pin_names")
+
+
+def record_derived_uncertified_pin_name(source: str, derived: str) -> None:
+    """Record ``derived`` as an uncertified PIN-form name when ``source`` contains a
+    recorded one: a name built from ``source`` by a splice that leaves every locant of
+    ``source`` as it is (an isotopic descriptor that needs no locant) keeps the status of
+    ``source``, since the recorded string does not survive the splice."""
+    if not source or not derived:
+        return
+    _log_non_pin(PROVENANCE_READ)
+    if any(n in source for n in _UNCERTIFIED_PIN_NAMES.get()):
+        record_uncertified_pin_name(derived)
 
 
 def record_derived_non_pin_fragment(source: str, derived: str) -> None:

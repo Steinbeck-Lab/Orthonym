@@ -34,9 +34,11 @@
 </picture>
 
 **Deterministic.** Orthonym builds its names from the nomenclature rules of the IUPAC 2013
-recommendations, the "Blue Book". Where those rules do not yet reach a molecule, it can give a
-general systematic name or a retained name from a table instead, labelled as not the preferred
-name. There is no neural network and no sampling: the same input always gives the same output.
+recommendations, the "Blue Book". Where those rules do not yet reach a molecule, a wider tier
+(`--emit-tier`) can give a general systematic name, a retained name from a table or a
+natural-product name instead, labelled as not the preferred name. The default tier declines these
+names; [Output tiers](#output-tiers) lists its exceptions. There is no neural network and no
+sampling: the same input always gives the same output.
 
 **Checked.** A name is handed to [OPSIN](https://github.com/dan2097/opsin), which never saw your
 structure, and parsed back. The structure OPSIN reads must match yours in constitution, charge and
@@ -45,7 +47,8 @@ exceptions for names OPSIN cannot read in full: names from exact-match lists (me
 natural-product parent names), a few name forms that OPSIN's grammar lacks or misreads, and names
 whose stereodescriptors OPSIN cannot parse (OPSIN confirms their constitution, and each descriptor is
 checked against its CIP label). `--provenance` marks each of them. The wider tiers ship none of
-them, except the names from the exact-match lists (metal-complex and natural-product parent names).
+them, except the names from the exact-match lists: a metal-complex name, and a natural-product
+parent name when no verified systematic name is found.
 
 **Honest.** A candidate that fails a check is withdrawn, and when no name is left Orthonym says so
 instead of guessing. `--provenance` reports the tier each name landed on and, in its `verified`
@@ -138,12 +141,13 @@ Licences and sources of the third-party components are listed in [`NOTICE`](NOTI
 
 The default returns a name only when the strict PIN path built it and verified it, or when the name
 is one of the few exceptions: a name from the exact-match lists, a name format absent from OPSIN's
-grammar, or a PIN whose stereodescriptors OPSIN cannot read. Otherwise it declines. Wider tiers are
-opt-in with `--emit-tier`:
+grammar, or a PIN whose stereodescriptors OPSIN cannot read. With `--trivial` it also returns a
+retained trivial name, labelled `systematic_verified`. Otherwise it declines. This rule applies to
+the default `--style pin`. Wider tiers are opt-in with `--emit-tier`:
 
 | `--emit-tier` | Returns |
 |:--|:--|
-| `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar or a PIN whose stereodescriptors OPSIN cannot read; otherwise nothing (`NO_VERIFIED_PIN`) |
+| `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar or a PIN whose stereodescriptors OPSIN cannot read (with `--trivial`, also a retained trivial name); otherwise nothing (`NO_VERIFIED_PIN`) |
 | `valid` | also general names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
 | `best-effort` | also the names of the last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build these names for ring systems of up to 40 skeletal atoms and 8 rings), and adducts with a one-atom ion such as chloride |
@@ -157,7 +161,8 @@ Whatever the tier, `--provenance` (one SMILES at a time) says what each name is:
 (the strict PIN path built it and verified it), `pin_unverified` (a name in PIN form whose
 preferred status is not certified), `systematic_verified` (a correct systematic name that is not
 the PIN, for example from the general engine, from a table of retained names, a strict-path name
-with a part the engine records as not the preferred form, or of a class for which the Blue Book
+with a part the engine records as not the preferred form, a natural-product name of a molecule
+whose bridged fused PIN the engine does not build yet, or of a class for which the Blue Book
 gives no PIN, such as Group 1-12 organometallic compounds), `best_effort` (a last-resort producer's
 name, or one that no round trip confirmed) or `abstain` (no name). The tier says how a name was
 built.

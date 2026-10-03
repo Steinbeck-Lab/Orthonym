@@ -22,13 +22,16 @@ Scope, fail-closed (None) outside it:
   * the oxygen carries an alcohol component: an acyl, thioacyl or imidoyl carbon
     there makes a mixed anhydride,:32272), named by the anhydride
     producer ('acetic nitric anhydride');
-  * exactly one nitric-acid ester group. Several nitrate groups on one alcohol
-    component are an ester of a polyol, named with a multivalent organyl
-    group, 'Polyesters formed from a single 'alcoholic'
-    component',:31815; 'ethane-1,2-diyl diacetate (PIN)':31823), which this
-    producer does not build; the prefix name stays below the PIN.
-  * no principal characteristic group (``principal_group`` None) and no nitrite
-    ester, so any group that could compete with the ester for the parent defers;
+  * one nitric-acid ester group, or several on one clean acyclic polyol, named
+    with a multivalent organyl group, 'Polyesters formed from a
+    single 'alcoholic' component',:31815;,:31819, 'ethane-1,2-
+    diyl diacetate (PIN)':31823): 'propane-1,2,3-triyl trinitrate'. Any other
+    shape with several nitrate groups keeps its prefix name below the PIN.
+  * no principal characteristic group, or one of a class junior to the esters
+    ,:18182; ``nitrite_ester.principal_group_is_junior_to_esters``), which
+    the alcohol component then cites as a prefix ('2-hydroxyethyl nitrate',
+    '2-acetamidoethyl nitrate'); and no nitrite ester, so any group that could
+    compete with the ester for the parent defers;
   * the molecule is neutral apart from the N+/O- pair of the nitrate group, and
     the alcohol component plus the four atoms of the group are the whole
     molecule.
@@ -44,11 +47,12 @@ def _is_nitrate_ester(features: Any) -> bool:
     """Predicate (pure): one nitric-acid ester group is the only
     characteristic group that could name the parent. NO mol/features mutation;
     NO module state."""
+    from .nitrite_ester import principal_group_is_junior_to_esters
     fg = getattr(features, 'functional_groups', None) or {}
     matches = fg.get('nitrooxy') or []
-    if len(matches) != 1 or fg.get('nitrite'):
+    if not matches or fg.get('nitrite'):
         return False
-    return getattr(features, 'principal_group', None) is None
+    return principal_group_is_junior_to_esters(getattr(features, 'principal_group', None))
 
 
 def name_nitrate_ester(
@@ -76,11 +80,20 @@ def name_nitrate_ester(
     if not is_top_level_naming():
         return None
     matches = (getattr(features, 'functional_groups', None) or {}).get('nitrooxy', [])
-    if len(matches) != 1:
-        return None
     if mol is None:
         mol = getattr(features, 'mol', None)
     if mol is None:
+        return None
+    if len(matches) >= 2:
+        # Identical nitrate anions on one polyol: functional class multiplicative
+        # ('propane-1,2,3-triyl trinitrate'); see esters.name_polyol_identical_
+        # inorganic_ester, the Blue Book;,:35918).
+        from ...rules.esters import name_polyol_identical_inorganic_ester
+        group = {a for m in matches for a in m[:4]}
+        name = name_polyol_identical_inorganic_ester(
+            mol, [m[4] for m in matches], {m[3] for m in matches}, group, "nitrate")
+        return _emit(features, name) if name else None
+    if len(matches) != 1:
         return None
     match = matches[0]
     if len(match) < 5:
@@ -115,15 +128,38 @@ def name_nitrate_ester(
         r_word = name_substituent(mol, set(r_atoms), r_carbon)
     except Exception:
         r_word = None
-    if not r_word:
-        return None
+    from ...errors import is_refusal_sentinel
+    if not r_word or is_refusal_sentinel(r_word):
+        return None             # 'substituent nitrate' is no name: decline
 
     name = f"{r_word} nitrate"
+    # A second, different ester on the same alcohol component makes this method (2)
+    # of ('2-(acetyloxy)ethyl nitrate'): correct, not the PIN.
+    from ...rules.esters import record_polyol_mixed_anion_non_pin
+    record_polyol_mixed_anion_non_pin(mol, r_carbon, ester_o, name)
     pool = get_current_pool()
     cand = pool.add(name, "nitrate_ester", features)
     if cand is None:
         return None
 
+    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    return NamingResult(
+        name=final_name,
+        tree=NameTreeNode(
+            parent_stem=final_name, class_id="nitrate_ester",
+            iupac_section_cite="P-67.1.3.2", fragment_legacy=final_name,
+        ),
+        atom_to_locant_hint=None,
+    )
+
+
+def _emit(features: Any, name: str) -> Optional[NamingResult]:
+    """Pool the name and return it as the handler result (stereo injected)."""
+    from ..candidate_pool import get_current_pool
+    from ..composer import _inject_stereo_if_missing
+    cand = get_current_pool().add(name, "nitrate_ester", features)
+    if cand is None:
+        return None
     final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
     return NamingResult(
         name=final_name,

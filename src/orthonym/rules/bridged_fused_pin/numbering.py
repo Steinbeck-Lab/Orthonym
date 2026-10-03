@@ -16,9 +16,6 @@ on the same bridgeheads "in accordance with their order of citation".
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from rdkit import Chem
-
-from ...perception.automorphisms import skeleton_automorphisms
 from .selection import Split
 
 
@@ -26,6 +23,8 @@ def loc_key(loc: Any) -> Tuple[int, str]:
     """Order of locants: 4 < 4a < 5, the Blue Book)."""
     if isinstance(loc, int):
         return (loc, "")
+    if isinstance(loc, tuple):
+        return (int(loc[0]), str(loc[1]))
     text = str(loc)
     digits = "".join(c for c in text if c.isdigit())
     return (int(digits), text[len(digits):])
@@ -46,54 +45,39 @@ class Numbering:
 
 
 def _parent_numberings(mol, split: Split) -> List[Dict[int, Any]]:
-    """Every IUPAC numbering of the residual: its fixed numbering (a)) read off
-    one match of the parent, composed with each automorphism of the residual skeleton."""
-    from ...data.polycyclic_data import POLYCYCLIC_DATA
-    entry = POLYCYCLIC_DATA[split.parent]
-    fixed = entry["iupac_numbering"]
-    cmol = Chem.MolFromSmiles(entry["canonical_smiles"])
-    params = Chem.AdjustQueryParameters.NoAdjustments()
-    params.makeBondsGeneric = True
-    params.aromatizeIfPossible = False
-    query = Chem.AdjustQueryProperties(cmol, params)
-    residual = set(split.residual)
-    base = None
-    for match in mol.GetSubstructMatches(query, uniquify=False, useChirality=False):
-        if set(match) == residual:
-            base = {match[c]: loc for c, loc in fixed.items()}
-            break
-    if base is None or set(base) != residual:
-        return []
-    auts, exhaustive = skeleton_automorphisms(mol, residual, element_blind=False, cap=64)
-    if not exhaustive:
-        return []
-    out, seen = [], set()
-    for sigma in auts:
-        numb = {a: base[sigma[a]] for a in residual}
-        sig = tuple(sorted(numb.items(), key=lambda kv: kv[0]))
-        if sig not in seen:
-            seen.add(sig)
-            out.append(numb)
-    return out
+    """Every IUPAC numbering of the residual: its fixed numbering (a)) composed
+    with each element-aware automorphism of the residual skeleton (``parents.fused_parent``)."""
+    from .parents import fused_parent
+    got = fused_parent(mol, set(split.residual))
+    return [dict(n) for n in got.numberings] if got is not None else []
 
 
-def _citation(prefixes: Sequence[str], heads: Sequence[Tuple[Any, Any]]):
-    """ (:14173) citation order: alphabetical by bridge prefix;
-    (:14181) each locant pair in numerical order. Returns [(prefix, (lo, hi)),...]."""
-    pairs = [(p, tuple(sorted(h, key=loc_key))) for p, h in zip(prefixes, heads)]
-    return sorted(pairs, key=lambda e: (e[0], [loc_key(x) for x in e[1]]))
+def _citation(prefixes: Sequence[str], heads: Sequence[Tuple[Any, Any]],
+              ordered: Sequence[bool]):
+    """ (:14173) citation order: alphabetical by bridge prefix (parentheses
+    ignored); (:14181) the locant pair of a symmetric bridge in numerical
+    order, (:14201) that of an unsymmetric or composite bridge "in the order
+    expressed or implied by the name of the bridge". Returns [(prefix, (first, second))]."""
+    pairs = [(p, tuple(h) if o else tuple(sorted(h, key=loc_key)))
+             for p, h, o in zip(prefixes, heads, ordered)]
+    return sorted(pairs, key=lambda e: (e[0].strip("()"), [loc_key(x) for x in e[1]]))
 
 
-def numberings(mol, split: Split, prefixes: Sequence[str]) -> List[Numbering]:
-    """Every candidate numbering of the bridged system, bridge atoms included."""
+def numberings(mol, split: Split, prefixes: Sequence[str],
+               first: Optional[Sequence[Optional[int]]] = None) -> List[Numbering]:
+    """Every candidate numbering of the bridged system, bridge atoms included. ``first[i]``
+    is the bridgehead of bridge i whose locant is cited first (None: numerical order)."""
+    first = list(first) if first is not None else [None] * len(split.bridges)
     out = []
     for ring_loc in _parent_numberings(mol, split):
-        heads = [(ring_loc[a], ring_loc[b]) for a, b in split.bridgeheads]
+        heads = []
+        for (a, b), f in zip(split.bridgeheads, first):
+            heads.append((ring_loc[b], ring_loc[a]) if f == b else (ring_loc[a], ring_loc[b]))
         nxt = max(loc_key(v)[0] for v in ring_loc.values()) + 1
         # /: the bridge on the higher bridgeheads first; the
         # same bridgeheads in citation order.
         # (a stable sort keeps the citation order among equal bridgeheads)
-        order = sorted(range(len(split.bridges)), key=lambda i: prefixes[i])
+        order = sorted(range(len(split.bridges)), key=lambda i: prefixes[i].strip("()"))
         order = sorted(order, reverse=True,
                        key=lambda i: sorted((loc_key(v) for v in heads[i]), reverse=True))
         full = dict(ring_loc)
@@ -106,7 +90,7 @@ def numberings(mol, split: Split, prefixes: Sequence[str]) -> List[Numbering]:
             for a in chain:
                 full[a] = nxt
                 nxt += 1
-        cited = _citation(prefixes, heads)
+        cited = _citation(prefixes, heads, [f is not None for f in first])
         out.append(Numbering(
             atom_to_locant=full,
             attachment_set=locant_tuple(x for h in heads for x in h),

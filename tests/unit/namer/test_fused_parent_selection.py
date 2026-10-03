@@ -98,7 +98,7 @@ def test_p52_2_8_equal_tiebreak_ring_wins():
 
 @pytest.mark.unit
 def test_p31_1_3_4_np_override_preserved():
-    """ NP backbone always ring-parent: morphine stays 'morphine'.
+    """ NP backbone always ring-parent: morphine is named on its ring system.
 
     Morphine is a recognized natural-product backbone (morphinan scaffold);
     detect_natural_product classifies it. The NP override at
@@ -112,9 +112,10 @@ def test_p31_1_3_4_np_override_preserved():
     morphine_smiles = 'CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5'
     name = name_compound(morphine_smiles)
     assert name, f'name_compound returned empty/None: {name!r}'
-    lower = name.lower()
-    assert 'morphin' in lower, (
-        f"Expected 'morphin' (P-31.1.3.4 NP override); got {name!r}"
+    # slice S4: the ring parent is the bridged fused system the Blue Book; the
+    # PIN is '...-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol')
+    assert name == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol", (
+        f"Expected the ring-parent PIN (P-31.1.3.4 NP override); got {name!r}"
     )
 
 

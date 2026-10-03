@@ -374,6 +374,30 @@ class BridgeInfo:
     locant_high: Optional[int] = None  # Higher VB locant of endpoint (for secondary)
 
 
+def _superscript_shape_and_rank(descriptor_string):
+    """``(shape, rank)`` of a von Baeyer descriptor such as 'tricyclo[2.2.1.0^3,5]'.
+
+    ``shape`` is the ring-count word with the bridge lengths in citation order
+    (superscripts dropped): two descriptors of one shape differ only in their
+    superscripts. ``rank`` orders the superscripts by
+    (the Blue Book, as a set in ascending order) and then
+    (:9699, in order of citation); lower is preferred. ``(None, )`` when the
+    string has no bracket."""
+    m = re.fullmatch(r"([^\[]*)\[([^\]]*)\](.*)", descriptor_string or "")
+    if not m:
+        return None, ()
+    lengths, sups = [], []
+    for part in m.group(2).split("."):
+        length, _, loc = part.partition("^")
+        lengths.append(length)
+        if loc:
+            try:
+                sups.extend(int(x) for x in loc.split(","))
+            except ValueError:
+                return None, ()
+    return (m.group(1), tuple(lengths), m.group(3)), (tuple(sorted(sups)), tuple(sups))
+
+
 @dataclass
 class PolycyclicDescriptor:
     """Complete von Baeyer descriptor for a polycyclic system."""
@@ -1825,9 +1849,22 @@ class VonBaeyerAnalyzer:
         and (:3219) then govern that choice; before this pass it was made
         by an arbitrary canonical-rank backstop.
 
-        Only candidates whose ``descriptor_string`` is IDENTICAL to the
-        incumbent's are considered, so the ring analysis is provably untouched
-        and the change is confined to locants.
+        Candidates keep the incumbent's ring analysis: the same ring-count word
+        and the same bridge lengths in the same citation positions, so
+        and -.3 are untouched. Among them the secondary-bridge
+        superscripts decide first -- (the Blue Book) "The
+        superscript locants for the secondary bridges must be as low as possible
+        when considered as a set in ascending numerical order", then
+        (:9699) "... as low as possible when considered in the sequence of their
+        order of citation in the name" -- because the von Baeyer numbering is the
+        fixed numbering of the ring system, which heteroatoms, suffixes and
+        prefixes follow:9765 "Numbering is determined first by the
+        fixed numbering of the hydrocarbon system";:16623). Only then
+        the / criteria of:meth:`_locant_criteria_key`. A
+        candidate whose descriptor differs from the incumbent's must pass the
+        legality audit itself; the pure-cage path reaches the same superscripts
+        through ``_select_pin_orientation``
+        ('tricyclo[2.2.1.0^2,6]heptane', not '0^3,5').
         """
         try:
             _, _, candidates = self._find_main_ring(
@@ -1853,8 +1890,10 @@ class VonBaeyerAnalyzer:
         if len(expanded) > self._MAX_LOCANT_CANDIDATES:
             return incumbent
 
+        inc_shape, inc_rank = _superscript_shape_and_rank(incumbent.descriptor_string)
         best = incumbent
-        best_key = self._locant_criteria_key(mol, ring_atoms, incumbent, spiro_atom)
+        best_key = (inc_rank,
+                    self._locant_criteria_key(mol, ring_atoms, incumbent, spiro_atom))
         for cand in expanded:
             try:
                 desc = self._analyze_impl(mol, ring_atoms, forced=cand)
@@ -1862,19 +1901,24 @@ class VonBaeyerAnalyzer:
                 continue
             if desc is None or not desc.numbering:
                 continue
-            # The descriptor is settled by -- a candidate that changes it
-            # is a different ring analysis, not a renumbering. Reject it.
-            if desc.descriptor_string != incumbent.descriptor_string:
+            # The bridge lengths are settled by -- a candidate that changes
+            # them is a different ring analysis, not a renumbering. Reject it.
+            shape, rank = _superscript_shape_and_rank(desc.descriptor_string)
+            if inc_shape is None or shape != inc_shape:
                 continue
             # Every skeletal atom must receive exactly one locant: a candidate
             # that drops or doubles an atom is malformed, not merely worse.
             locs = [desc.numbering.get(i) for i in ring_atoms]
             if any(l is None for l in locs) or len(set(locs)) != len(ring_atoms):
                 continue
-            key = self._locant_criteria_key(mol, ring_atoms, desc, spiro_atom)
-            if key < best_key:
-                best_key = key
-                best = desc
+            key = (rank, self._locant_criteria_key(mol, ring_atoms, desc, spiro_atom))
+            if key >= best_key:
+                continue
+            if (desc.descriptor_string != incumbent.descriptor_string
+                    and not self._legality_verified(mol, ring_atoms, desc)):
+                continue
+            best_key = key
+            best = desc
         return best
 
     def _orientation_variants(self, main_ring, bh_pair):

@@ -243,6 +243,17 @@ def count_ring_double_bonds(mol, ring_atoms) -> int:
     return count
 
 
+def count_ring_triple_bonds(mol, ring_atoms) -> int:
+    """Count the triple bonds between two atoms of ``ring_atoms``."""
+    ring_set = set(ring_atoms)
+    return sum(
+        1 for bond in bonds_of(mol)
+        if bond.GetBondType() == Chem.BondType.TRIPLE
+        and bond.GetBeginAtomIdx() in ring_set
+        and bond.GetEndAtomIdx() in ring_set
+    )
+
+
 def get_ring_double_bond_atoms(mol, ring_atoms) -> List[Tuple[int, int]]:
     """
     Get all double bonds within a ring as atom pairs.
@@ -419,8 +430,12 @@ def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
     1. Heterocyclic aromatic - contains non-carbon atoms AND all atoms aromatic
     2. Heterocyclic saturated - contains non-carbon atoms AND not all aromatic
     3. Aromatic - all atoms are aromatic (RDKit detection), carbocyclic
-    4. Cycloalkane - saturated, all carbon, no double bonds
-    5. Cycloalkene - unsaturated, all carbon, has double bonds but not aromatic
+    4. Cycloalkane - saturated, all carbon, no double or triple bonds
+    5. Cycloalkene - unsaturated, all carbon, has double or triple bonds but not
+       aromatic. (the Blue Book): a double or a triple bond turns
+       the 'ane' ending into 'ene' or 'yne', so a ring with only triple bonds
+       ('cycloicosyne (PIN)',:21070) is unsaturated too; it used to be called
+       saturated and named 'cycloicosane', another molecule.
 
     All heterocyclic return values start with 'heterocyclic' so callers can use
     ``ring_type.startswith('heterocyclic')`` for backward-compatible matching.
@@ -457,8 +472,8 @@ def classify_ring(mol, ring_atoms: Tuple[int, ...]) -> str:
     if is_aromatic_ring(mol, ring_atoms):
         return 'aromatic'
 
-    # Check saturated (cycloalkane)
-    if is_saturated_ring(mol, ring_atoms):
+    # Check saturated (cycloalkane): no double and no triple ring bond
+    if is_saturated_ring(mol, ring_atoms) and not count_ring_triple_bonds(mol, ring_atoms):
         return 'cycloalkane'
 
     # Must be cycloalkene (unsaturated carbocyclic, non-aromatic)

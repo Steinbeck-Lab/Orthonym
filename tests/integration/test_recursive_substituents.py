@@ -298,7 +298,11 @@ class TestParentToPrefix:
 
     @pytest.mark.integration
     def test_branched_alkane_to_yl(self):
-        assert parent_to_prefix("2-methylpropane", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) == "2-methylpropyl"
+        # The capped name's '2-' is the CAPPED molecule's locant: right for
+        # -CH2-CH(CH3)2, wrong for -C(CH3)3 /: the prefix is
+        # numbered from the free valence). The string converter cannot tell the two
+        # apart and declines; the located chain namer names the fragment.
+        assert parent_to_prefix("2-methylpropane", 3, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
     @pytest.mark.integration
     def test_alcohol_to_hydroxy(self):

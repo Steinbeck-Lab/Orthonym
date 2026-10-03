@@ -58,7 +58,6 @@ def test_named_purine_diones(smiles, expected):
 
 
 @pytest.mark.parametrize("label,smiles", [
-    ("bare xanthine (0 substituents -> defer to retained)", BARE_XANTHINE),
     ("benzene (no purine)", "c1ccccc1"),
     ("pyridine (no purine)", "c1ccncc1"),
     ("adenine (6-amino, not a dione)", "Nc1ncnc2nc[nH]c12"),
@@ -78,6 +77,14 @@ def test_fail_closed_returns_none(label, smiles):
     mol = Chem.MolFromSmiles(smiles)
     assert mol is not None
     assert name_purine_26_dione(mol) is None, label
+
+
+def test_bare_parent_is_named_on_purine():
+    # 'xanthine' does not occur in the Blue Book (0 hits); "the PIN is 7H-purine"
+    # (the Blue Book), so the bare dione gets the parent name (it used to
+    # decline and defer to the retained 'xanthine').
+    assert name_purine_26_dione(Chem.MolFromSmiles(BARE_XANTHINE)) == \
+        "3,7-dihydro-1H-purine-2,6-dione"
 
 
 def test_none_input():

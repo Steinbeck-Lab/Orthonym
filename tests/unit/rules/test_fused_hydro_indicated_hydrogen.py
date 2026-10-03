@@ -27,15 +27,17 @@ PIN_ROWS = [
     ("C1Nc2ccccc2N1C", "1-methyl-2,3-dihydro-1H-benzimidazole"),
     ("CC1CCc2c(C=O)cncc21", "7-methyl-6,7-dihydro-5H-cyclopenta[c]pyridine-4-carbaldehyde"),
     ("c1cc2c([nH]1)CCNC2", "4,5,6,7-tetrahydro-1H-pyrrolo[3,2-c]pyridine"),
+    # benzo names, in the catalogue now (they were declined descriptor names)
+    ("c1ccc2cscc2c1", "2-benzothiophene"),
+    ("c1ccc2sncc2c1", "1,2-benzothiazole"),
+    ("c1ccc2[se]ccc2c1", "1-benzoselenophene"),
+    # a seven-membered ring: two rings in a row are numbered without the lattice (quick-wins
+    # F-Q3a); was the non-PIN '5H,6H,7H,8H,9H-cyclohepta[b]pyridine' below
+    ("C1CCCc2ncccc2C1", "6,7,8,9-tetrahydro-5H-cyclohepta[b]pyridine"),
 ]
-# Valid names the producers cannot yet spell as the PIN (the benzo names of outside the
-# catalogue; a seven-membered ring the fused numbering declines; hydro pairs that are not adjacent;
-# a ketone on the saturated ring): the default tier declines them, best-effort keeps each name.
+# Valid names the producers cannot yet spell as the PIN (hydro pairs that are not adjacent; a
+# ketone on the saturated ring): the default tier declines them, best-effort keeps each name.
 NON_PIN_ROWS = [
-    ("c1ccc2cscc2c1", "benzo[c]thiophene"),              # PIN 2-benzothiophene
-    ("c1ccc2sncc2c1", "benzo[d]isothiazole"),            # PIN 1,2-benzothiazole
-    ("c1ccc2[se]ccc2c1", "benzo[b]selenophene"),         # PIN 1-benzoselenophene
-    ("C1CCCc2ncccc2C1", "5H,6H,7H,8H,9H-cyclohepta[b]pyridine"),
     ("C1Cc2cc[nH]c2C1", "4H,5H,6H-cyclopenta[b]pyrrole"),
     ("C=CCc1cncc2c1C(=O)CC2", "4-(prop-2-en-1-yl)-6H,7H-cyclopenta[c]pyridin-5-one"),
 ]

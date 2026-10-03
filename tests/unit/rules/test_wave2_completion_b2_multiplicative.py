@@ -61,10 +61,13 @@ class TestAttachmentAnchoredUnits:
         # canonical-equal but the anchored units differ -> decline.
         assert _mult("Brc1ccc(Oc2cccc(Br)c2)cc1") is None
 
-    def test_unsupported_substituent_fails_closed(self):
-        # CF3 unit substituent is outside the anchored table -> decline,
+    def test_substituent_outside_the_anchored_table(self):
+        # CF3 is outside the anchored table; the general detector names the
+        # unit from its structure (PIN class program Task 10;,
+        # the Blue Book, '1,1'-oxybis(4-bromobenzene) (PIN)':6185) --
         # never a locant-dropping name.
-        assert _mult("FC(F)(F)c1ccc(Oc2ccc(C(F)(F)F)cc2)cc1") is None
+        assert (_mult("FC(F)(F)c1ccc(Oc2ccc(C(F)(F)F)cc2)cc1")
+                == "1,1'-oxybis[4-(trifluoromethyl)benzene]")
 
 
 @pytest.mark.unit

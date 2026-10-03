@@ -328,15 +328,21 @@ GUARDED = [
     # chain at the free valence, and the longest chain through it is butan-2-yl, so
     # it declines in the re-run
     "CCC(Cc1ccccc1)NCCO",
-    # multiplicative candidates: the re-run's substitutive
-    # '2-[(2-cyanophenyl)methyl]benzonitrile' is not '2,2'-methylenedibenzonitrile
-    # (PIN)'; a ring assembly '3-(...-1H-indol-3-yl)-1H-indole-...' is not the
+    # a ring assembly '3-(...-1H-indol-3-yl)-1H-indole-...' is not the
     # '[3,3'-bi-1H-indole]' PIN
-    "N#Cc1ccccc1Cc1ccccc1C#N",
+    # ('N#Cc1ccccc1Cc1ccccc1C#N' left this list: the strict path now builds its PIN
+    # '2,2'-methylenedibenzonitrile', the Blue Book),
+    # test_the_guarded_multiplicative_is_now_the_pin)
     "Oc1cc2[nH]cc(-c3c[nH]c4cc(O)c(O)cc34)c2cc1O",
     # ('CNC(=O)C1CCC(C)CC1' left this list: the strict path now builds its PIN
     # 'N,4-dimethylcyclohexane-1-carboxamide', test_the_guarded_amide_is_now_the_pin)
 ]
+
+
+def test_the_guarded_multiplicative_is_now_the_pin():
+    # (the Blue Book); '2,2'-methylenedibenzonitrile (PIN)' (:2648),
+    # built by the general multiplicative detector (PIN class program, Task 10)
+    _assert_pin("N#Cc1ccccc1Cc1ccccc1C#N", "2,2'-methylenedibenzonitrile")
 
 
 def test_the_guarded_amide_is_now_the_pin():

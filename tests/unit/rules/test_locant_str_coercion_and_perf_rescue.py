@@ -77,10 +77,14 @@ _GIANT = ("C1[C@@H](C2=C(N1C(=O)C3=CC4=C(N3)C=CC(=C4)NC(=O)C5=CC6=CC=CC=C6N5)"
 @pytest.mark.slow
 @pytest.mark.integration
 @pytest.mark.roundtrip
+@pytest.mark.opsin_gate
 def test_perf_budget_giant_recovers_at_best_effort_and_round_trips():
     """The giant must (a) emit at the best-effort tier instead of abstaining, and
     (b) the emitted name must OPSIN-round-trip to the input's FULL InChIKey (0-wrong).
-    Requires a JVM (OPSIN); skipped otherwise since the rescue is RT-gated."""
+    Runs with the OPSIN validity gate on (the shipped default; the suite's autouse
+    fixture turns it off otherwise): with the gate on the general engine names the
+    giant; with it off a different, unparseable candidate is returned.
+    Requires a JVM (OPSIN); skipped otherwise."""
     from orthonym.validation.opsin_roundtrip import _java_available
     if not _java_available():
         pytest.skip("OPSIN/JVM required: the perf-budget rescue is OPSIN-RT-gated")

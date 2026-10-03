@@ -63,11 +63,14 @@ LANOSTERYL_HMG = (
 SPIRO_H_SUCCINATE = (
     "O=C(O)CCC(=O)O[C@@H]1CCO[C@]2(C1)CC[C@@H](OC(C)=O)C1=CC(=O)CCC12")
 
+# The tetracyclo locants follow the lowest secondary-bridge superscripts,
+# 'tetracyclo[8.7.0.0^2,7.0^11,15]', the Blue Book), so the
+# ester oxygen of the steroid 3-position is locant 5.
 CARBOXY_ACYL_WITNESSES = [
-    (CHOLESTERYL_H_SUCCINATE, "6-[(3-carboxypropanoyl)oxy]"),
-    (CHOLESTANYL_H_GLUTARATE, "6-[(4-carboxybutanoyl)oxy]"),
-    (LANOSTERYL_H_SUCCINATE, "6-[(3-carboxypropanoyl)oxy]"),
-    (CHOLENIC_ACID_H_SUCCINATE, "6-[(3-carboxypropanoyl)oxy]"),
+    (CHOLESTERYL_H_SUCCINATE, "5-[(3-carboxypropanoyl)oxy]"),
+    (CHOLESTANYL_H_GLUTARATE, "5-[(4-carboxybutanoyl)oxy]"),
+    (LANOSTERYL_H_SUCCINATE, "5-[(3-carboxypropanoyl)oxy]"),
+    (CHOLENIC_ACID_H_SUCCINATE, "5-[(3-carboxypropanoyl)oxy]"),
     (SPIRO_H_SUCCINATE, "4'-[(3-carboxypropanoyl)oxy]"),
 ]
 

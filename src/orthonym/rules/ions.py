@@ -2109,17 +2109,44 @@ _CUMULATIVE_SUFFIX_H_DELTA = {
     'ylidyne': +3,    #: trivalent radical; parent re-adds 3 H
     'ium': -1,        #: cation is protonated; parent removes 1 H
     'ylium': +1,      #: carbenium lost H- (hydride); parent re-adds 1 H
+    # method (1) (the Blue Book): the anion is the parent hydride plus a
+    # hydride ion, so the parent removes 1 H. Ring centres only (the acyclic
+    # '-uide' centres are _emit_group13_uide's).
+    'uide': -1,
 }
 
 
-def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> str:
+def _is_chain_oxo(mol, sub_atoms, chain_idx: int) -> bool:
+    """True when the substituent ``sub_atoms`` of chain atom ``chain_idx`` is one
+    neutral oxygen atom double-bonded to it: (the Blue Book) "the
+    prefix 'oxo' is used when a characteristic group having seniority is present"
+    (:28234); '=O oxo (preselected prefix)',:17965)."""
+    if len(sub_atoms) != 1:
+        return False
+    o = mol.GetAtomWithIdx(next(iter(sub_atoms)))
+    if o.GetSymbol() != 'O' or o.GetFormalCharge() or o.GetDegree() != 1:
+        return False
+    bond = mol.GetBondBetweenAtoms(chain_idx, o.GetIdx())
+    return bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE
+
+
+def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str,
+                                          oxo_prefixes: bool = False) -> str:
     """Name a parent hydride with a cumulative anionic / radical / cationic suffix
     on a single carbon centre, with a FIRST-CLASS locant.
 
-    suffix in {'ide', 'ium', 'yl', 'ylidene', 'ylidyne'}.
+    suffix in {'ide', 'ium', 'yl', 'ylidene', 'ylidyne', 'uide'}.
       'ide' -> / Table 3.4 (anion, loss of H+)
       'yl'/'ylidene'/'ylidyne' -> / Table 3.4 (radical, loss of H.)
       'ium' -> (cation; reserved for later reuse)
+      'uide' -> (anion, addition of H-); a RING centre only
+
+    ``oxo_prefixes`` (an acyclic carbon '-ide' centre only): a chain carbon's =O is
+    cited as an 'oxo' prefix of the '-ide' parent hydride, (heading
+    the Blue Book) "Systematic names (see are preferred IUPAC
+    names." (:40872), 'acetyl anion 1-oxoethan-1-ide (PIN)' (:40878). Off by
+    default: the ylide composer (``_sever_and_name_carbanion``) splices its own
+    prefix in front of the returned name without re-sorting the prefixes.
 
     center_idx is the atom index OF THE CHARGED/RADICAL CARBON ON ``mol`` (the
     index-preserving mol passed in — NOT a freshly canonicalized copy; canonical
@@ -2151,6 +2178,14 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     # (b) ACYCLIC non-carbon heteroatom centre (P/As/Sb/Si/Ge -ide): name the
     # parent hydride (phosphane/silane/...) and add the -anide ending.
     # Each branch fail-closes ('' -> legacy), preserving the no-crash contract.
+    if suffix == 'uide':
+        #: a hydride-addition centre is one bond above its standard bonding
+        # number with charge -1 (classify_anion's 'uide_anion'); only a RING centre
+        # is named here (an acyclic one is _emit_group13_uide's).
+        std = _UIDE_STD_VALENCE.get(center.GetSymbol())
+        if (std is None or not center.IsInRing() or center.GetFormalCharge() != -1
+                or _occupied_valence(center) != std + 1):
+            return ''
     if center.IsInRing():
         ring_name = _emit_ring_cumulative_suffix(mol, center_idx, suffix)
         if suffix == 'ium' and center.GetAtomicNum() != 6:
@@ -2259,6 +2294,10 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     for position, sub_lists in subs_by_position.items():
         chain_idx = chain[position - 1]
         for sub_atoms in sub_lists:
+            if (oxo_prefixes and suffix == 'ide'
+                    and _is_chain_oxo(work_mol, sub_atoms, chain_idx)):
+                name_to_locants.setdefault('oxo', []).append(loc_map[chain_idx])
+                continue
             info = classify_substituent(work_mol, sub_atoms, parent_atoms)
             sub_name = info.get('name')
             if not sub_name:
@@ -2287,8 +2326,13 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str) -> 
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
     #: detachable prefixes join one another and the parent stem directly
     # (the locant-hyphen is INTERNAL to each prefix block); '3-methyl' + 'butan-2-ide'
-    # -> '3-methylbutan-2-ide', NEVER '3-methyl-butan-2-ide'.
-    prefix_str = ''.join(p[2] for p in prefix_parts)
+    # -> '3-methylbutan-2-ide', NEVER '3-methyl-butan-2-ide'. Between two prefix
+    # blocks the next block's locant takes a hyphen, (a) "to separate
+    # locants from words or word fragments" (the Blue Book): '2-methyl' +
+    # '1-oxo' -> '2-methyl-1-oxopropan-1-ide', not '2-methyl1-oxo...'.
+    prefix_str = ''
+    for part in (p[2] for p in prefix_parts):
+        prefix_str += f"-{part}" if prefix_str and part[:1].isdigit() else part
 
     # 5b. Unsaturation endings (en/yn) come BEFORE the cumulative -ide/-yl ending
     # (Table 3.4 cumulative-ending order; RESEARCH (d): but-3-en-2-ide, not
@@ -3812,11 +3856,11 @@ def _ring_locant_order_key(loc):
 
 
 def _lowest_cation_locant_renumbering(bare_ring_mol, locants, center, subst_atoms=()):
-    """P-73.5.3.2 (heading **P-73.5.3 "Cationic characteristic groups on parent
-    cations"**, ``BlueBookV2.md:42207``; rule ``:42219``): *"Where there is a
+    """ (heading ** "Cationic characteristic groups on parent
+    cations"**, ``the Blue Book``; rule ``:42219``): *"Where there is a
     choice, low locants for skeletal cationic centers are determined before
     considering locants for cationic suffixes. This is consistent with the choice
-    of lowest locants for corresponding neutral compounds (see P-14.4)."*  The
+    of lowest locants for corresponding neutral compounds (see."* The
     book's worked example (``:42288``) is a SYMMETRIC di-hetero ring —
     ``N,N,N,2-tetramethyl-2,6-naphthyridin-2-ium-5-aminium`` (PIN), *not* the
     ``…-6-ium-…`` form — the cationic ring N taking the LOWER of the symmetric
@@ -3825,26 +3869,32 @@ def _lowest_cation_locant_renumbering(bare_ring_mol, locants, center, subst_atom
     ``_ring_iupac_locants`` numbers the NEUTRAL parent ring and is blind to which
     ring atom carries the charge, so on a symmetric parent (norbornane-type
     ``1,4-diazabicyclo[2.2.1]heptane``: both bridgehead N equivalent) it may hand
-    the cationic centre the HIGH locant (``…heptan-4-ium``).  Given that base
+    the cationic centre the HIGH locant (``…heptan-4-ium``). Given that base
     numbering and the ring index ``center`` of the skeletal cationic centre, this
     returns the numbering — chosen among all graph-automorphism-equivalent
     numberings of the bare parent — that gives the cationic centre the lowest
     locant, breaking any residual tie by the substituent-atom locant set
-    (``subst_atoms``, ranked AFTER the cation per P-14.4) then a deterministic
+    (``subst_atoms``, ranked AFTER the cation per then a deterministic
     canonical-rank key.
 
     A graph automorphism of the bare parent maps like-atom to like-atom, so every
     candidate numbering assigns the heteroatoms the IDENTICAL locant set — the
-    P-31.1.4.3.2/.3 heteroatom-set / senior-heteroatom minimisation the base
+    /.3 heteroatom-set / senior-heteroatom minimisation the base
     numbering already fixed is never disturbed (verified: the two N stay ``{1,4}``,
-    only the cation moves 4->1).  This is why the criterion is applied as a
+    only the cation moves 4->1). This is why the criterion is applied as a
     post-pass over automorphisms rather than by re-ranking the neutral numbering.
 
     ``locants`` / ``center`` / ``subst_atoms`` are all keyed to ``bare_ring_mol``'s
-    atom indices.  Returns a possibly-relabelled dict with the SAME keys, or
+    atom indices. Returns a possibly-relabelled dict with the SAME keys, or
     ``locants`` unchanged when no equivalent numbering lowers the cation locant
-    (the common asymmetric case — automorphism group is trivial)."""
-    if center not in locants:
+    (the common asymmetric case — automorphism group is trivial).
+
+    ``center`` may also be a collection of ring indices (several cationic centres,
+    '1,4-diazabicyclo[2.2.2]octane-1,4-diium'): their locants are then compared
+    as a set, lowest first "Lowest set of locants", the Blue Book,
+    :3191)."""
+    centers = (center,) if isinstance(center, int) else tuple(center)
+    if not centers or any(c not in locants for c in centers):
         return locants
     try:
         autos = bare_ring_mol.GetSubstructMatches(
@@ -3878,7 +3928,7 @@ def _lowest_cation_locant_renumbering(bare_ring_mol, locants, center, subst_atom
         # over the same locant set; skip anything that is not (defensive).
         if not ok or sorted(new_loc.values(), key=lk) != target:
             continue
-        cation_locant = lk(new_loc[center])
+        cation_locant = tuple(sorted(lk(new_loc[c]) for c in centers))
         subst_key = tuple(sorted(lk(new_loc[s]) for s in subst))
         canon_key = tuple(canon[auto[a]] for a in keys)
         key = (cation_locant, subst_key, canon_key)
@@ -3931,7 +3981,8 @@ def _order_ring_cycle(mol, ring_system):
     return order if len(order) == len(ring) else None
 
 
-def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None):
+def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None,
+                          subst_atoms=None):
     """Full single-ring IUPAC numbering for a charged ring centre, choosing the
     orientation that gives lowest locants in / order:
       (a) all heteroatoms as a set;
@@ -3964,9 +4015,17 @@ def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None):
     as ``mol`` (index-preserving), or ``(None, None)`` for a fused/multi ring
     (caller falls back to the general ``_ring_iupac_locants`` supplier). Subsumes
     the carbocyclic-monocycle fallback (an all-carbon symmetric ring gives the
-    centre locant 1 via criterion (d))."""
+    centre locant 1 via criterion (d)).
+
+    ``center_idx`` may also be a collection of ring indices (several charged
+    centres, '1,4-dioxane-1,4-diium'); criterion (d) then compares their locants
+    as a set "Lowest set of locants", the Blue Book,:3191).
+    ``subst_atoms``, when given, names the ring atoms that carry substituents for
+    criterion (e) (a caller that numbers a bare parent whose substituents were
+    replaced by hydrogen); by default they are read off ``mol``."""
+    centers = (center_idx,) if isinstance(center_idx, int) else tuple(center_idx)
     cyclic = _order_ring_cycle(mol, ring_system)
-    if cyclic is None or center_idx not in cyclic:
+    if cyclic is None or not centers or any(c not in cyclic for c in centers):
         return None, None
     from ..data.hw_heteroatoms import get_heteroatom_priority
     ring = set(ring_system)
@@ -3994,7 +4053,10 @@ def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None):
                    for nb in a.GetNeighbors())
 
     indicated_atoms = [i for i in cyclic if _is_indicated_h(i)]
-    subst_atoms = [i for i in cyclic if _has_subst(i)]
+    if subst_atoms is None:
+        subst_atoms = [i for i in cyclic if _has_subst(i)]
+    else:
+        subst_atoms = [i for i in cyclic if i in set(subst_atoms)]
     best = None
     for start in range(n):
         for direction in (1, -1):
@@ -4010,7 +4072,8 @@ def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None):
             canonkey = tuple(canon[i] for i in order)
             anion_key = ((loc[anion_attach_idx],)
                          if anion_attach_idx is not None else ())
-            key = (het_set, senior, indh, loc[center_idx], anion_key,
+            centre_key = tuple(sorted(loc[c] for c in centers))
+            key = (het_set, senior, indh, centre_key, anion_key,
                    subst, canonkey)
             if best is None or key < best[0]:
                 best = (key, loc, indh[0] if indh else None)
@@ -4061,6 +4124,33 @@ def _ring_locants_lowest_to_set(mol, ring_system, suffix_atoms):
             if best is None or key < best[0]:
                 best = (key, loc)
     return best[1]
+
+
+def _uide_parent_cites_hydrogen(mol, ring_system, center_idx, parent: str) -> bool:
+    """A ring '-uide' centre keeps the hydrogen of its neutral parent hydride (a
+    hydride is ADDED): '1-methoxy-1,3-dimethyl-1H-1-benzoborol-1-uide (PIN)'
+    , the Blue Book). When the centre has no ring double bond but
+    another atom of its ring system has one, the parent is a mancude ring whose
+    centre carries indicated hydrogen, the Blue Book), so the
+    parent name must cite it ('1H-' or a 'hydro' prefix). False when it does not
+    (the neutral namer's 'phosphindole' for 1H-phosphindole): the caller declines
+    rather than compose a name without it. True for a saturated ring."""
+    ring = set(ring_system)
+    try:
+        kek = Chem.Mol(mol)
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except (RuntimeError, ValueError):
+        return False
+
+    def _ring_double(i):
+        return any(b.GetBondType() == Chem.BondType.DOUBLE
+                   and b.GetOtherAtomIdx(i) in ring
+                   for b in kek.GetAtomWithIdx(i).GetBonds())
+
+    if _ring_double(center_idx) or not any(_ring_double(i) for i in ring
+                                           if i != center_idx):
+        return True
+    return bool(re.search(r'\d+H\b|hydro', parent))
 
 
 def _is_saturated_carbocycle(mol, ring_system) -> bool:
@@ -4233,8 +4323,17 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
     `furan-2-ylium`). The DEMOTE branch (0-H, un-neutralizable) never applies to
     -ylium, whose target-H is always >= 1.
 
+     (heading the Blue Book): a ring '-uide' centre (hydride
+    addition) takes both modes like '-ium': "(1) by forming the name of the neutral
+    compound according to skeletal replacement ('a') nomenclature and using the
+    suffixes 'ide' and 'uide' to describe the anionic centers" (:41126), "Method
+    (1) results in preferred IUPAC names." (:41129). IN-PLACE when the centre
+    carries H (`C1C[PH-]2CCC1CC2` -> 1-phosphabicyclo[2.2.2]octan-1-uide (PIN),
+    :41149), DEMOTE when it does not (`C[B-]1(C)CCCCC1` -> 1,1-dimethylborinan-1-
+    uide (PIN),:41120; 2,2-dimethyl-2-boraspiro[4.5]decan-2-uide (PIN),:41143).
+
     Returns '' for any other suffix or on any decline (legacy fall-through)."""
-    if suffix not in ('ide', 'ium', 'yl', 'ylidene', 'ylidyne', 'ylium'):
+    if suffix not in ('ide', 'ium', 'yl', 'ylidene', 'ylidyne', 'ylium', 'uide'):
         return ''
     from ..perception.rings import get_ring_systems
     ring_system = None
@@ -4294,7 +4393,7 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
         # well-formed for a BARE ring parent (stem + detachable PREFIXES); an FG
         # suffix corrupts it (`pyridin-3-ol-1-ium`). Those are /
         # territory -> legacy (on HEAD they are 'unknown' too, so no regression).
-        if _ring_bears_principal_group(ring_mol):
+        if _ring_bears_principal_group(ring_mol, set(ring_system)):
             return ''
         try:
             from ..namer import Orthonym
@@ -4372,10 +4471,16 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
         # '1H-pyrrol-1-ide'. Strip the leading indicated-H token off the parent name
         # (a re-anchored rewrite, not blind: it fires ONLY when the token's own
         # locant equals the centre's, i.e. the removed H is precisely that H).
-        if (indicated_h is not None and indicated_h == center_locant
+        # A '-uide' centre ADDS a hydride, so its parent's indicated hydrogen stays:
+        # '1-methoxy-1,3-dimethyl-1H-1-benzoborol-1-uide (PIN)' (the Blue Book).
+        if (suffix != 'uide' and indicated_h is not None
+                and indicated_h == center_locant
                 and re.match(rf'^{indicated_h}[Hh]-', parent)):
             parent = re.sub(r'^\d+[Hh]-', '', parent)
             indicated_h = None
+        if suffix == 'uide' and not _uide_parent_cites_hydrogen(
+                mol, ring_system, center_idx, parent):
+            return ''
         prefix = _indicated_hydrogen_prefix(indicated_h, parent, ring_system, mol)
         # RC-D (, (c) the Blue Book 'monosubstituted homogeneous
         # monocyclic rings' / the Blue Book): the locant is OMITTED on a
@@ -4395,8 +4500,8 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
             return f"{prefix}{_elide_terminal_e(parent)}{suffix}"
         return f"{prefix}{_elide_terminal_e(parent)}-{center_locant}-{suffix}"
 
-    # --- DEMOTE (0-H ring cation: N-substituted aromatic) ------------------
-    if suffix != 'ium':
+    # --- DEMOTE (0-H ring cation: N-substituted aromatic; 0-H ring '-uide') --
+    if suffix not in ('ium', 'uide'):
         return ''
     exo = [n.GetIdx() for n in center.GetNeighbors()
            if n.GetIdx() not in ring_system]
@@ -4499,6 +4604,9 @@ def _emit_ring_cumulative_suffix(mol, center_idx: int, suffix: str,
         return ''
     stem = _p74_bare_ring_stem(mol, ring_system, center_idx)
     if not stem:
+        return ''
+    if suffix == 'uide' and not _uide_parent_cites_hydrogen(
+            mol, ring_system, center_idx, stem):
         return ''
     return f"{_join_prefix_stem(prefix, _elide_terminal_e(stem))}-{center_locant}-{suffix}"
 
@@ -4696,7 +4804,113 @@ def _ring_cation_in_place_name(mol, center_idx: int, in_place: str) -> str:
     return in_place
 
 
-def _ring_bears_principal_group(ring_mol):
+def emit_ring_poly_cation_ium(mol, centers) -> str:
+    """Several cationic centres of one ring parent hydride, each formed by adding a
+    hydron: (heading the Blue Book) "A cation derived formally by
+    adding one or more hydrons to any position of a neutral parent hydride... is
+    named by replacing the final letter 'e' of the parent hydride name, if any, by
+    the suffix 'ium', preceded by multiplying prefixes 'di', 'tri', etc. to denote
+    the multiplicity of identical cationic centers." (:41368); '1,4-dioxane-1,4-
+    diium (PIN)' (:41409). The final 'e' stays before 'di'/'tri': it is elided only
+    before a vowel (a),:7595), as in 'tetramethyldiazene-1,2-diium
+    (PIN)' (:41407).
+
+    Scope: two or more centres in ONE ring system, each a ring heteroatom with
+    charge +1; no other charged atom; every exocyclic group joined by a single
+    bond. The neutral parent hydride is the bare ring: every exocyclic group
+    replaced by hydrogen and one hydrogen (the added hydron) taken off each centre,
+    so a centre keeps its bonding number (a quaternary ring N+ is the parent's NH
+    plus a hydron, then substituted, as in '1,1-dimethylpiperidin-1-ium').
+    Numbering, heading:3219): the ring's own heteroatom numbering, then
+    the centres as a set ((c) suffixes,:3256), then the substituted positions
+    ((f),:3301); the exocyclic groups are cited as prefixes in that one
+    numbering. A parent whose name carries indicated hydrogen or hydro prefixes is
+    out of scope (criteria (b),:3246, and (e),:3288, are not modelled here).
+    Returns '' on any decline; the caller verifies the name by a strict round
+    trip."""
+    centers = sorted(set(centers))
+    if mol is None or len(centers) < 2:
+        return ''
+    ring_system = _ring_system_of(mol, centers[0])
+    if ring_system is None or any(c not in ring_system for c in centers):
+        return ''
+    rs = set(ring_system)
+    for a in mol.GetAtoms():
+        if a.GetNumRadicalElectrons():
+            return ''
+        if a.GetIdx() in centers:
+            if a.GetFormalCharge() != 1 or a.GetAtomicNum() in (1, 6):
+                return ''
+        elif a.GetFormalCharge():
+            return ''
+    exo = {i: 0 for i in ring_system}
+    for i in ring_system:
+        for b in mol.GetAtomWithIdx(i).GetBonds():
+            if b.GetOtherAtomIdx(i) in rs:
+                continue
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                return ''
+            exo[i] += 1
+    ring_sorted = sorted(ring_system)
+    to_bare = {o: k for k, o in enumerate(ring_sorted)}
+    bare_w = Chem.RWMol(mol)
+    try:
+        for i in ring_sorted:
+            h = (mol.GetAtomWithIdx(i).GetTotalNumHs() + exo[i]
+                 - (1 if i in centers else 0))
+            if h < 0:
+                return ''
+            ra = bare_w.GetAtomWithIdx(i)
+            ra.SetFormalCharge(0)
+            ra.SetNoImplicit(True)
+            ra.SetNumExplicitHs(h)
+        for idx in sorted((a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in rs),
+                          reverse=True):
+            bare_w.RemoveAtom(idx)
+        bare = bare_w.GetMol()
+        Chem.SanitizeMol(bare)
+    except (RuntimeError, ValueError):
+        return ''
+    try:
+        from ..namer import Orthonym
+        stem = Orthonym(style='pin', _disable_opsin_validity_gate=True
+                        ).name(Chem.MolToSmiles(bare))
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not stem or is_failure_name(stem) or re.search(r'\d+H\b|hydro', stem):
+        return ''
+    bare_rs = list(range(len(ring_sorted)))
+    bare_centers = tuple(to_bare[c] for c in centers)
+    bare_subst = {to_bare[i] for i in ring_system if exo[i]}
+    base, _ind = _charged_ring_locants(bare, bare_rs, bare_centers,
+                                       subst_atoms=bare_subst)
+    if base is None:
+        # Fused / bridged / spiro: the namer's own numbering of the bare parent,
+        # then, among its automorphisms, the one giving the centres the lowest set.
+        base = _ring_iupac_locants(bare)
+        if not base or any(k not in base for k in bare_rs):
+            return ''
+        base = _lowest_cation_locant_renumbering(bare, base, bare_centers, bare_subst)
+    locants = {ring_sorted[k]: v for k, v in base.items() if k < len(ring_sorted)}
+    if any(i not in locants for i in ring_system):
+        return ''
+    prefix = _p74_ring_substituent_prefix(mol, ring_system, locants, set())
+    if prefix is None:
+        return ''
+    try:
+        mult = get_suffix_multiplier_prefix(len(centers), 'ium')
+    except ValueError:
+        return ''
+    locs = ','.join(str(locants[c]) for c in sorted(
+        centers, key=lambda c: _ring_locant_order_key(locants[c])))
+    return f"{_join_prefix_stem(prefix, stem)}-{locs}-{mult}ium"
+
+
+_PHOSPHINE_GROUPS = frozenset({'primary_phosphine', 'secondary_phosphine',
+                               'tertiary_phosphine'})
+
+
+def _ring_bears_principal_group(ring_mol, ring_system=None):
     """True if the neutral ring carries a principal characteristic group (a
     suffix-taking FG: -ol / -al / -one / -oic acid / -amine / -nitrile / …).
     Code-review: the ring -ium/-ide append `<ring-stem>-<locant>-<suffix>`
@@ -4705,12 +4919,22 @@ def _ring_bears_principal_group(ring_mol):
     (`pyridin-3-ol-1-ium`). Used to fail-closed so the legacy / /
     path handles those. On perception failure return False (don't block a clean
     ring — a residual malformed FG-ring name is caught by the OPSIN gate anyway,
-    so the safe-against-regression default is to proceed)."""
+    so the safe-against-regression default is to proceed).
+
+    With ``ring_system`` given, a 'phosphine' match whose phosphorus atoms are all
+    skeletal atoms of that ring system is the ring's own heteroatom, not a
+    characteristic group: '1-phosphabicyclo[2.2.2]octan-1-uide (PIN)'
+    (the Blue Book) is the parent hydride 1-phosphabicyclo[2.2.2]octane
+    plus a hydride ion. The phosphines rank last in the seniority order and have
+    no suffix form, so nothing senior hides behind them."""
     try:
         from ..perception.functional_groups import detect_functional_groups
         from .seniority import get_principal_group
         fgs = detect_functional_groups(ring_mol)
-        pg_name, _ = get_principal_group(ring_mol, fgs)
+        pg_name, pg_atoms = get_principal_group(ring_mol, fgs)
+        if (pg_name in _PHOSPHINE_GROUPS and ring_system is not None and pg_atoms
+                and all(match and match[0] in ring_system for match in pg_atoms)):
+            return False
         return pg_name is not None
     except (RuntimeError, ValueError, KeyError, IndexError, TypeError):
         return False

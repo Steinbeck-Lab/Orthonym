@@ -131,14 +131,17 @@ EXPECTED_FIXED = [
 
     # --- FUSED HETEROCYCLE ---
     # a phase: ring_system_score prefers heterocyclic over carbocyclic
+    # quick-wins F-R8: (the Blue Book) keeps 'chromane' and 'isochromane'
+    # out of PINs; the parent is the benzopyran, '3,4-dihydro-2H-1-benzopyran' and
+    # '3,4-dihydro-1H-2-benzopyran',:11815). Was 'chroman' / 'isochroman'.
     (
         "Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O",
-        "chroman",
+        "1-benzopyran",
         "FusedHet: trihydroxychromane",
     ),
     (
         "COc1c(O)c(O)cc2c1CO[C@@H](C)C2=O",
-        "isochroman",
+        "2-benzopyran",
         "FusedHet: dihydroxy-methoxy isochromanone",
     ),
     (
@@ -164,9 +167,12 @@ EXPECTED_FIXED = [
 
     # --- BRIDGED POLYCYCLIC ---
     # a phase: ring_system_score selects correct polycyclic parent
+    # quick-wins F-R8: the bridged fused name is the PIN, the Blue Book;
+    #:19532, fused > bridged fused > von Baeyer), built by bridged fused S2:
+    # '...decahydro-3a,7-methanocyclopenta[8]annulene-3,6-diol'. Was 'tricyclo'.
     (
         "CC1(C)C[C@H](O)[C@]23CC[C@@H](O)[C@](C)(CC[C@@H]12)C3",
-        "tricyclo",
+        "methanocyclopenta[8]annulene",
         "Bridged: tricyclic diol (canary)",
     ),
     (

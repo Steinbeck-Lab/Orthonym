@@ -171,11 +171,12 @@ class TestSteroidStereoRegression:
         )
 
     def test_morphine_retained_name(self):
-        """Morphine (exact derivative match) should still return 'morphine'."""
+        """Morphine: its bridged fused PIN with CIP descriptors (slice S4;
+        the Blue Book)."""
         name = name_compound(
             "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
         )
-        assert name == "morphine"
+        assert name == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
 
     def test_non_stereo_testosterone_no_stereo_prefix(self):
         """Testosterone from non-stereo SMILES should NOT get stereo prefix."""
