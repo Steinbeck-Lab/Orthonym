@@ -92,6 +92,8 @@ name_compound("C/C=C/C")                      # '(2E)-but-2-ene'
 name_compound("C[C@H](O)CC")                  # '(2S)-butan-2-ol'
 ```
 
+`name_compound` and the other naming functions also take an RDKit `Chem.Mol` in place of the SMILES string, for example a molecule read from an SDF file. The Mol is named through RDKit's SMILES of it (`Chem.MolToSmiles(mol)`), after a check that this SMILES holds the same molecule and stereo; when it does not, the call raises `ValueError`. Your Mol is not changed.
+
 From the command line:
 
 ```bash

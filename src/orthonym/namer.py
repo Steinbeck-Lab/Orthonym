@@ -15,10 +15,11 @@ import os
 import re
 import threading
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from rdkit import Chem
 
+from . import input_mol as _input_mol
 from .data import (
     RETAINED_NAMES,  # noqa: F401 re-exported: imported FROM this module by tests/unit/data/test_opsin_merge_layer.py
 )
@@ -3867,6 +3868,13 @@ def _budget_scope(fn):
     """
     @_functools.wraps(fn)
     def _wrapper(self, *args, **kwargs):
+        # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
+        _arg = args[0] if args else kwargs.get('smiles', '')
+        if not isinstance(_arg, str) and _input_mol.handles(_arg):
+            if args:
+                args = (_input_mol.smiles_for(_arg),) + tuple(args[1:])
+            else:
+                kwargs = {**kwargs, 'smiles': _input_mol.smiles_for(_arg)}
         from .assembly.fragment_naming import (
             PerfBudgetExceeded,
             disarm_hang_budgets,
@@ -4319,13 +4327,15 @@ class Orthonym:
         from .assembly.inner_dispatch import get_inner_dispatch_stats as _stats
         return _stats()
 
-    def name_with_tree(self, smiles: str):
+    def name_with_tree(self, smiles: Union[str, Chem.Mol]):
         """Name one molecule and return the parts of the name.
 
         Parameters
         ----------
-        smiles: str
-            The structure, as a SMILES string.
+        smiles: str or rdkit.Chem.Mol
+            The structure, as a SMILES string or an RDKit ``Chem.Mol``. A Mol is
+            named through RDKit's SMILES of it, after a check that this SMILES
+            holds the same molecule and stereo (see:ref:`python-input`).
 
         Returns
         -------
@@ -4339,7 +4349,11 @@ class Orthonym:
         Raises
         ------
         ValueError
-            If RDKit cannot read the SMILES.
+            If RDKit cannot read the SMILES, ``smiles`` is ``None``, or a Mol fails
+            the check (RDKit cannot sanitize it, or its SMILES does not hold the
+            same molecule and stereo).
+        TypeError
+            If ``smiles`` is neither a string nor a ``Chem.Mol``.
 
         Examples
         --------
@@ -4347,6 +4361,9 @@ class Orthonym:
         >>> Orthonym.name_with_tree("OC1CCCCC1").name
         'cyclohexanol'
         """
+        if not isinstance(smiles, str) and _input_mol.handles(smiles):
+            # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
+            smiles = _input_mol.smiles_for(smiles)
         # Lone-pair centre written first: the standard spelling of the input is named
         # when RDKit reads a lone-pair centre of it unlike the standard reading
         # (_lone_pair_standard_spelling); the atom-to-locant hint is then re-keyed to
@@ -4532,13 +4549,15 @@ class Orthonym:
         return gated
 
     @_budget_scope
-    def name(self, smiles: str, *, raise_on_limit: bool = False) -> str:
+    def name(self, smiles: Union[str, Chem.Mol], *, raise_on_limit: bool = False) -> str:
         """Name one molecule with this instance's options.
 
         Parameters
         ----------
-        smiles: str
-            The structure, as a SMILES string.
+        smiles: str or rdkit.Chem.Mol
+            The structure, as a SMILES string or an RDKit ``Chem.Mol``. A Mol is
+            named through RDKit's SMILES of it, after a check that this SMILES
+            holds the same molecule and stereo (see:ref:`python-input`).
         raise_on_limit: bool, default False
             Raise:class:`OrthonymLimitError` for a structure the engine cannot
             handle, instead of returning a label.
@@ -4552,7 +4571,11 @@ class Orthonym:
         Raises
         ------
         ValueError
-            If RDKit cannot read the SMILES.
+            If RDKit cannot read the SMILES, ``smiles`` is ``None``, or a Mol fails
+            the check (RDKit cannot sanitize it, or its SMILES does not hold the
+            same molecule and stereo).
+        TypeError
+            If ``smiles`` is neither a string nor a ``Chem.Mol``.
         OrthonymLimitError
             If ``raise_on_limit`` is true and the structure is out of scope. For a
             ring system the engine cannot name yet the code is
@@ -5261,15 +5284,17 @@ class Orthonym:
             _DEFAULT_TIER_POLICY_OFF.reset(_policy_off)
             _PIN_PROMOTION_WRAPPED.reset(_wrapped)
 
-    def name_tiered(self, smiles: str) -> dict:
+    def name_tiered(self, smiles: Union[str, Chem.Mol]) -> dict:
         """Name one molecule and say how the name was made and checked.
 
         This is the row the command line prints with ``--provenance``.
 
         Parameters
         ----------
-        smiles: str
-            The structure, as a SMILES string.
+        smiles: str or rdkit.Chem.Mol
+            The structure, as a SMILES string or an RDKit ``Chem.Mol``. A Mol is
+            named through RDKit's SMILES of it, after a check that this SMILES
+            holds the same molecule and stereo (see:ref:`python-input`).
 
         Returns
         -------
@@ -5333,6 +5358,15 @@ class Orthonym:
                 structure; OPSIN cannot read these names) or ``unverified`` (no
                 read-back recorded).
 
+        Raises
+        ------
+        ValueError
+            If RDKit cannot read the SMILES, ``smiles`` is ``None``, or a Mol fails
+            the check (RDKit cannot sanitize it, or its SMILES does not hold the
+            same molecule and stereo).
+        TypeError
+            If ``smiles`` is neither a string nor a ``Chem.Mol``.
+
         Examples
         --------
         >>> from orthonym import Orthonym
@@ -5340,6 +5374,9 @@ class Orthonym:
         >>> row["name"], row["tier"], row["verified"]
         ('1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione', 'pin_verified', 'opsin')
         """
+        if not isinstance(smiles, str) and _input_mol.handles(smiles):
+            # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
+            smiles = _input_mol.smiles_for(smiles)
         # B2: open ONE memo scope around BOTH the primary name and the strict PIN
         # twin (_strict_pin_twin_name -> tw.name), so the twin reuses this run's
         # breadth-INDEPENDENT memo entries instead of recomputing them. The two
@@ -8029,8 +8066,15 @@ class Orthonym:
             return trivial
         return result
 
-    def name_with_confidence(self, smiles: str) -> dict:
+    def name_with_confidence(self, smiles: Union[str, Chem.Mol]) -> dict:
         """Name one molecule and return a coverage score with it.
+
+        Parameters
+        ----------
+        smiles: str or rdkit.Chem.Mol
+            The structure, as a SMILES string or an RDKit ``Chem.Mol``. A Mol is
+            named through RDKit's SMILES of it, after a check that this SMILES
+            holds the same molecule and stereo (see:ref:`python-input`).
 
         Returns
         -------
@@ -8044,7 +8088,11 @@ class Orthonym:
         Raises
         ------
         ValueError
-            If RDKit cannot read the SMILES.
+            If RDKit cannot read the SMILES, ``smiles`` is ``None``, or a Mol fails
+            the check (RDKit cannot sanitize it, or its SMILES does not hold the
+            same molecule and stereo).
+        TypeError
+            If ``smiles`` is neither a string nor a ``Chem.Mol``.
 
         Examples
         --------
@@ -8052,6 +8100,9 @@ class Orthonym:
         >>> Orthonym.name_with_confidence("CCO")["name"]
         'ethanol'
         """
+        if not isinstance(smiles, str) and _input_mol.handles(smiles):
+            # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
+            smiles = _input_mol.smiles_for(smiles)
         # Lone-pair centre written first: the standard spelling of the input is named
         # when RDKit reads a lone-pair centre of it unlike the standard reading
         # (_lone_pair_standard_spelling); the atom-to-locant map is then re-keyed to
@@ -10321,15 +10372,17 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
 
 
 
-def name_with_tree(smiles: str, style: str = "pin"):
+def name_with_tree(smiles: Union[str, Chem.Mol], style: str = "pin"):
     """Name one molecule and return the parts of the name.
 
     A shortcut for ``Orthonym(style=style).name_with_tree(smiles)``.
 
     Parameters
     ----------
-    smiles: str
-        The structure, as a SMILES string.
+    smiles: str or rdkit.Chem.Mol
+        The structure, as a SMILES string or an RDKit ``Chem.Mol``. A Mol is named
+        through RDKit's SMILES of it, after a check that this SMILES holds the same
+        molecule and stereo (see:ref:`python-input`).
     style: {"pin", "general", "cas"}, default "pin"
         Naming style, as for:func:`name_compound`.
 
@@ -10343,7 +10396,11 @@ def name_with_tree(smiles: str, style: str = "pin"):
     Raises
     ------
     ValueError
-        If RDKit cannot read the SMILES.
+        If RDKit cannot read the SMILES, ``smiles`` is ``None``, or a Mol fails the
+        check (RDKit cannot sanitize it, or its SMILES does not hold the same
+        molecule and stereo).
+    TypeError
+        If ``smiles`` is neither a string nor a ``Chem.Mol``.
 
     Examples
     --------
@@ -10359,7 +10416,7 @@ def name_with_tree(smiles: str, style: str = "pin"):
     return Orthonym(style=style).name_with_tree(smiles)
 
 
-def name_compound(smiles: str, style: str = "pin",
+def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
                    include_confidence: bool = False,
                    *,
                    enable_triviality_controller: bool = False,
@@ -10373,7 +10430,8 @@ def name_compound(smiles: str, style: str = "pin",
                    binding_proof: str = "off"):
     """Name one molecule.
 
-    Reads a structure written as SMILES and returns its IUPAC name as a string.
+    Reads a structure, written as SMILES or given as an RDKit molecule, and returns
+    its IUPAC name as a string.
     At the default settings a name is returned only when the strict path for the
     Preferred IUPAC Name built it and verified it, or when it is one of the default
     tier's exceptions (the exact-match list names, the few name formats OPSIN cannot
@@ -10386,8 +10444,10 @@ def name_compound(smiles: str, style: str = "pin",
 
     Parameters
     ----------
-    smiles: str
-        The structure, as a SMILES string.
+    smiles: str or rdkit.Chem.Mol
+        The structure, as a SMILES string or an RDKit ``Chem.Mol``. A Mol is named
+        through RDKit's SMILES of it, after a check that this SMILES holds the same
+        molecule and stereo (see:ref:`python-input`).
     style: {"pin", "general", "cas"}, default "pin"
         Naming style. ``"pin"`` aims at the Preferred IUPAC Name. ``"general"``
         allows general IUPAC forms where the recommendations offer one (for
@@ -10455,8 +10515,11 @@ def name_compound(smiles: str, style: str = "pin",
     Raises
     ------
     ValueError
-        If RDKit cannot read the SMILES, or ``binding_proof`` is not one of the
-        three values.
+        If RDKit cannot read the SMILES, ``smiles`` is ``None``, a Mol fails the
+        check (RDKit cannot sanitize it, or its SMILES does not hold the same
+        molecule and stereo), or ``binding_proof`` is not one of the three values.
+    TypeError
+        If ``smiles`` is neither a string nor a ``Chem.Mol``.
     OrthonymLimitError
         If ``raise_on_limit`` is true and the structure is out of scope.
 
@@ -10468,6 +10531,9 @@ def name_compound(smiles: str, style: str = "pin",
     >>> name_compound("O=[U](=O)=O")
     'inorganic compound (not supported)'
     """
+    if not isinstance(smiles, str) and _input_mol.handles(smiles):
+        # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
+        smiles = _input_mol.smiles_for(smiles)
     if not include_confidence:
         from .assembly.fragment_naming import is_top_level_naming
         if not is_top_level_naming():
@@ -10771,7 +10837,7 @@ def _descriptive_fallback(smiles: str) -> str:
     return classify_failure_limit(mol, smiles=smiles).message
 
 
-def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
+def classify_limit(smiles: Union[str, Chem.Mol]) -> Optional[OrthonymLimitError]:
     """Say whether a structure is out of scope, without raising.
 
     A wildcard atom (``*``) is refused at once. Any other structure is named with
@@ -10780,8 +10846,10 @@ def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
 
     Parameters
     ----------
-    smiles: str
-        The structure, as a SMILES string.
+    smiles: str or rdkit.Chem.Mol
+        The structure, as a SMILES string or an RDKit ``Chem.Mol``. A Mol is named
+        through RDKit's SMILES of it, after a check that this SMILES holds the same
+        molecule and stereo (see:ref:`python-input`).
 
     Returns
     -------
@@ -10790,7 +10858,13 @@ def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
         ``WILDCARD_ATOMS``, or ``NO_VERIFIED_PIN`` when the default settings built
         a name that is not a verified preferred IUPAC name) and message. ``None``
         when the structure gets a name, and also when RDKit cannot read the SMILES
-        at all (that is a reading error, not a scope limit).
+        at all, ``smiles`` is ``None``, or a Mol fails the check described under
+        :func:`name_compound` (that is a reading error, not a scope limit).
+
+    Raises
+    ------
+    TypeError
+        If ``smiles`` is neither a string, a ``Chem.Mol`` nor ``None``.
 
     Examples
     --------
@@ -10802,6 +10876,14 @@ def classify_limit(smiles: str) -> Optional[OrthonymLimitError]:
     >>> classify_limit("CCO") is None
     True
     """
+    if not isinstance(smiles, str) and _input_mol.handles(smiles):
+        # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
+        if smiles is None:
+            return None   # as for a SMILES RDKit cannot read
+        try:
+            smiles = _input_mol.smiles_for(smiles)
+        except _input_mol.InvalidInputError:
+            return None   # a reading error, not a scope limit
     try:
         mol = Chem.MolFromSmiles(smiles)
     except Exception:
