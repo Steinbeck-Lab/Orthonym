@@ -5,6 +5,15 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.5](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.4...v1.0.5) (2026-10-07)
+
+
+### Bug Fixes
+
+* name quality -- book forms at every tier, stricter PIN labels ([597858a](https://github.com/Steinbeck-Lab/Orthonym/commit/597858ac14e51e1a550c10b1a8044ab471384b64))
+* name_compound and the other public naming functions accept an RDKit molecule as well as a SMILES string ([324bf1d](https://github.com/Steinbeck-Lab/Orthonym/commit/324bf1dac3e218a6abea8870d278c1af011bc323))
+* name_compound and the other public naming functions accept an RDKit molecule as well as a SMILES string ([0d3ad47](https://github.com/Steinbeck-Lab/Orthonym/commit/0d3ad4707aa9f259b43764bc6554dc0e44ed60f4))
+
 ## [1.0.4](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.3...v1.0.4) (2026-10-03)
 
 
