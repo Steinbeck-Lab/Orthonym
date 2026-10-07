@@ -1856,6 +1856,31 @@ def _monocyclic_intrinsic_ih_oxo_parents(mol, ring_set):
     return out
 
 
+@lru_cache(maxsize=None)
+def _catalog_entry_is_mancude(smiles: str) -> bool:
+    """True when the catalog structure ``smiles`` is a mancude ring system: it has the
+    maximum number of noncumulative ring double bonds its ring atoms allow,
+    the Blue Book), at least one. Only a mancude parent can take a ketone by
+    substitution of its indicated hydrogen or by added hydrogen,:28410); a
+    saturated entry ('quinolizidine') made 'quinolizidin-4-one' for 4H-quinolizin-4-one,
+    and a ketone entry ('acridone', 'xanthine') has a ring atom with no ring double bond
+    where its parent has one. The test is the engine's own mancude predicate
+    (``perception.mancude.is_mancude_ring_system``) over the entry's ring atoms; an entry it
+    cannot decide (no Kekule structure, a ring triple bond) is not taken as a parent. The
+    answer depends on ``smiles`` only, so it is computed once per entry; ``_resolve_oxo_parent``
+    asks it only for an entry whose skeleton matches the ring system (a cold call costs about
+    0.4 ms, and the catalogue holds about 200 entries)."""
+    from ..perception.mancude import is_mancude_ring_system
+    cmol = Chem.MolFromSmiles(smiles)
+    if cmol is None:
+        return False
+    ring = {a.GetIdx() for a in cmol.GetAtoms() if a.IsInRing()}
+    has_double = any(b.GetIsAromatic() or b.GetBondType() == Chem.BondType.DOUBLE
+                     for b in cmol.GetBonds()
+                     if b.GetBeginAtomIdx() in ring and b.GetEndAtomIdx() in ring)
+    return has_double and is_mancude_ring_system(cmol, ring) is True
+
+
 def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None,
                         alternative_indicated_h: bool = False):
     """Resolve the mancude parent(s) of a ring-ketone's ring system.
@@ -1944,7 +1969,16 @@ def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None,
                 nums.append({a: idx + 1 for idx, a in enumerate(seq)})
 
         def _hk(loc):
-            return (tuple(sorted(loc[a] for a in het)),
+            # (the Blue Book): "The locant '1' is given to a
+            # heteroatom that occurs first in the seniority sequence... The
+            # numbering is then chosen to give lowest locants to heteroatoms
+            # considered as a set" -- the senior heteroatom at 1 outranks the
+            # lowest set ('1,3,4-oxadiazol-2(3H)-one', not a numbering with a
+            # nitrogen at 1 written after the parent name '1,3,4-oxadiazole'),
+            # as heterocycles._monocycle_numberings ranks the parent's own name.
+            at_one = next(a for a in ring_set if loc[a] == 1)
+            return (get_heteroatom_priority(mol.GetAtomWithIdx(at_one).GetSymbol()),
+                    tuple(sorted(loc[a] for a in het)),
                     tuple(sorted((get_heteroatom_priority(mol.GetAtomWithIdx(a).GetSymbol()), loc[a]) for a in het)))
         if het:
             best_h = min(_hk(l) for l in nums)
@@ -1975,15 +2009,16 @@ def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None,
     cands = []
     for nm, e in POLYCYCLIC_DATA.items():
         if e.get('iupac_numbering') and e.get('canonical_smiles'):
-            cands.append((nm, e['canonical_smiles'], e['iupac_numbering']))
+            cands.append((nm, e['canonical_smiles'], e['iupac_numbering'], False))
     for cs, e in FUSED_HETEROCYCLE_DATA.items():
         if not e.get('iupac_locants'):
             continue
         if 'hydro' in e['name'].lower() or 'saturated' in e.get('ring_system', '').lower():
             continue  # saturated/partially-hydro entry — not a mancude oxo-parent
-        cands.append((e['name'], cs, e['iupac_locants']))
+        # The mancude test of the entry runs below, only once its skeleton matches.
+        cands.append((e['name'], cs, e['iupac_locants'], True))
     out = []
-    for nm, cs, numbering in cands:
+    for nm, cs, numbering, heterocycle_entry in cands:
         cmol = Chem.MolFromSmiles(cs)
         if cmol is None or cmol.GetNumAtoms() != n:
             continue
@@ -2038,6 +2073,8 @@ def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None,
                 continue
             pH = {match[c]: cmol.GetAtomWithIdx(c).GetTotalNumHs() for c in numbering if c < len(match)}
             pairs.append((a2l, pH))
+        if pairs and heterocycle_entry and not _catalog_entry_is_mancude(cs):
+            continue  # 'quinolizidine', 'acridone', 'xanthine': not mancude, not named by the text test
         if pairs:
             out.append((nm, pairs, frozenset(ih_locants)))
             if alternative_indicated_h:
@@ -2155,6 +2192,24 @@ def _ring_carbonyl_rings_atoms(mol, parent_ring_set):
                 out |= sy
                 break
     return out
+
+
+def _carries_ring_hydrogen(mol, idx: int, ring_set) -> bool:
+    """True when ring atom ``idx`` can be a hydro, indicated or added hydrogen position: it
+    keeps a free valence after its bonds to the ring system. (the Blue Book)
+    gives indicated hydrogen to a ring atom "with a bonding number of three or higher
+    connected to adjacent ring atoms by single bonds only, and carrying one or more hydrogen
+    atoms", and (:24693) added hydrogen to "a ring atom that is attached to adjacent
+    ring atoms by single bonds only". A neutral ring nitrogen with three ring bonds (the
+    bridgehead of indolizine or quinolizine) carries no hydrogen in either form
+    ('indolizin-3(2H)-one', not '...-3(2H,4H)-one'); a boron, silicon or phosphorus atom with
+    two ring bonds does ('borinin-2(1H)-one'). A charged ring atom keeps the earlier test
+    (carbon or nitrogen)."""
+    at = mol.GetAtomWithIdx(idx)
+    if at.GetFormalCharge() != 0 or at.GetNumRadicalElectrons() != 0:
+        return at.GetSymbol() in ('C', 'N')
+    n_ring = sum(1 for nb in at.GetNeighbors() if nb.GetIdx() in ring_set)
+    return Chem.GetPeriodicTable().GetDefaultValence(at.GetAtomicNum()) - n_ring >= 1
 
 
 def name_cyclic_oxo_compound(mol: Chem.Mol,
@@ -2493,7 +2548,7 @@ def name_cyclic_oxo_compound(mol: Chem.Mol,
                 mol_ring_db.add(j)
     sat = {i for i in ring_set
            if i not in carbonyls and i not in mol_ring_db
-           and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N')}
+           and _carries_ring_hydrogen(mol, i, ring_set)}
     adj = {i: set() for i in sat}
     for bond in bonds_of(mol):
         i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()

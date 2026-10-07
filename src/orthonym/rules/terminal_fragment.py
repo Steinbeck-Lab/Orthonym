@@ -38,6 +38,13 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Set
 
 from rdkit import Chem
 
+from ..assembly.book_prefixes import (
+    CHALCOGEN_HEAD,
+    HETERO_ROOT_VALENCE,
+    MONONUCLEAR_HEAD,
+    a_chain_licensed,
+    hetero_roots_composable,
+)
 from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_alkyl_name
 from .ring_replacement import build_replacement_prefix
 
@@ -88,7 +95,8 @@ def _canonical_ranks(mol) -> Sequence[int]:
 
 
 def _backbone_from(mol, atoms: Set[int], start: int,
-                   ranks: Sequence[int], stop_at_ring: bool = False) -> List[int]:
+                   ranks: Sequence[int], stop_at_ring: bool = False,
+                   carbon_only: bool = False) -> List[int]:
     """The deepest simple path from ``start`` inside ``atoms``.
 
     ``atoms`` is acyclic here, so the induced subgraph rooted at ``start`` is a
@@ -113,7 +121,9 @@ def _backbone_from(mol, atoms: Set[int], start: int,
                     # miscount -- see _HALOGEN_ATOMIC_NUMS).
                     and nb.GetAtomicNum() not in _HALOGEN_ATOMIC_NUMS
                     and not (stop_at_ring
-                             and mol.GetAtomWithIdx(nb.GetIdx()).IsInRing())]
+                             and mol.GetAtomWithIdx(nb.GetIdx()).IsInRing())
+                    # roadmap N5c: a substitutive backbone walks carbon atoms only
+                    and not (carbon_only and nb.GetAtomicNum() != 6)]
         if not children:
             key = (len(path), tuple(ranks[i] for i in path))
             if key > best_key:
@@ -295,8 +305,9 @@ def _assemble_prefixes(tokens) -> str:
         grouped.setdefault(tok, []).append(locant)
         keys[tok] = key
     parts = []
+    from .fused_forms import locant_key
     for tok in sorted(grouped, key=lambda t: keys[t]):
-        locs = sorted(grouped[tok])
+        locs = sorted(grouped[tok], key=locant_key)
         from ..assembly.naming_utils import multiplied_component as _mc
         parts.append(f"{','.join(str(x) for x in locs)}-{_mc(len(locs), tok, tok)}")
     return "-".join(parts)
@@ -362,6 +373,35 @@ def _chain_stem_with_unsaturation(n: int, ene: List[int],
     return stem + ("a" if needs_a else "") + ene_part[1] + yne_part[1] + "-1-yl"
 
 
+def _book_chain_name(mol, backbone: Sequence[int], replacement_prefix: str,
+                     stem: str, raw_names: Sequence[str],
+                     unit_cites_locant: bool) -> Optional[str]:
+    """The book's spelling of a decorated carbon backbone, or ``None`` to keep the
+    locant-for-every-prefix assembly (roadmap N5f).
+
+    * a one-carbon backbone is a methyl group: no locants (a),
+      the Blue Book), the second and further prefixes enclosed,
+      :7272): 'trifluoromethyl', '(cyclopropylamino)methyl';
+    * every substitutable position of the backbone carries the same prefix: no
+      locants,:3007): 'pentafluoroethyl'.
+
+    ``unit_cites_locant`` is the caller's fact that ``stem`` itself cites a locant
+    (an ene/yne locant), passed through to:func:`positions_alike_prefix`."""
+    from ..assembly.book_prefixes import (
+        book_forms_enabled, methyl_group_name, positions_alike_prefix)
+    if not book_forms_enabled() or replacement_prefix or not raw_names:
+        return None
+    if any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in backbone):
+        return None
+    if len(backbone) == 1:
+        return methyl_group_name(raw_names, 1)
+    alike = positions_alike_prefix(mol, backbone, raw_names,
+                                   unit_cites_locant=unit_cites_locant)
+    if alike is None:
+        return None
+    return _join_prefix_block(alike, stem)
+
+
 def _join_prefix_block(block: str, stem: str) -> str:
     """Concatenate a substituent-prefix block onto the stem it qualifies.
 
@@ -393,12 +433,39 @@ def terminal_fragment_name(
     if in_pin_promotion():
         return None
     try:
-        return _terminal_fragment_name(mol, frag_atoms, attach_idx)
+        return _same_reach_name(mol, frag_atoms, attach_idx)
     except Exception:                                   # noqa: BLE001
         # 17 call sites: degrade, never crash. Logged so a bug is visible in the
         # census instead of looking like an honest decline.
         logger.exception("terminal_fragment: unexpected error; refusing")
         return None
+
+
+def _same_reach_name(mol, frag_atoms, attach_idx: int) -> Optional[TerminalFragmentName]:
+    """Roadmap N5, same reach: the book spellings re-spell a fragment this writer names
+    with its mechanical spellings; they never make it name a fragment it declines.
+
+    ``name_substituent`` calls this writer after the ring composer and before the chain
+    composer (``_recursive_chain_fragment_substituent_name``), which names a decorated
+    chain with the recursive prefixes ('propan-2-yl', '1H-1,2,4-triazol-...' numbered by
+    . A ring this writer used to decline in its replacement spelling (an aromatic
+    triazole) but now names by its Hantzsch-Widman name would let it take a fragment
+    the chain composer names better: measured on 'Cc1nnc(C(C)C)n1C1CC2CCC(C1)N2CC[C@H]
+    (NC(=O)C1CCC(F)(F)CC1)c1ccc(O)cc1' at the best-effort tier, '5-methyl-3-(1-methyl
+    ethyl)-4H-1,2,4-triazol-4-yl' (g), the Blue Book, wants methyl at 3)
+    in place of the chain composer's '3-methyl-5-(propan-2-yl)-4H-1,2,4-triazol-4-yl'.
+    So the fragment is named mechanically first (one more run of this writer, not one
+    per level: the nested calls run inside it); when that declines, this writer
+    declines as before."""
+    from ..assembly.book_prefixes import book_forms_enabled, mechanical_forms
+    if not book_forms_enabled():
+        return _terminal_fragment_name(mol, frag_atoms, attach_idx)
+    with mechanical_forms():
+        mech = _terminal_fragment_name(mol, frag_atoms, attach_idx)
+    if mech is None:
+        return None
+    book = _terminal_fragment_name(mol, frag_atoms, attach_idx)
+    return book if book is not None else mech
 
 
 def _ring_system_of(mol, frag: Set[int], seed: int) -> Set[int]:
@@ -458,6 +525,7 @@ def _composite_fragment_name(
 
     accounted = set(core)
     prefix_tokens: List[tuple] = []
+    raw_names: List[str] = []
     branch_comps: List[Set[int]] = []
     # The RING's own numbering is authoritative -- it skips 4 -> 4a -> 5, so a
     # position-derived locant would disagree with the name it was spelled from.
@@ -469,6 +537,7 @@ def _composite_fragment_name(
             accounted |= set(comp)
             prefix_tokens.append((alpha_sort_key(_het), locant,
                                   enclose_if_compound(_het)))
+            raw_names.append(_het)
             continue
         # 0-WRONG guard (mirrors the chain loop): a ring decoration joined by a
         # NON-single bond (exocyclic =CH2 / =C<, an ylidene) recurses to a `-yl`
@@ -489,6 +558,7 @@ def _composite_fragment_name(
         accounted |= set(sub.atoms)
         token = enclose_if_compound(sub.name)
         prefix_tokens.append((alpha_sort_key(sub.name), locant, token))
+        raw_names.append(sub.name)
 
     # --- ring-system stereo -> one leading (nR,nZ,...) block (§A) ----------
     # Cite the RING SYSTEM's own atom R/S + ring-bond E/Z with the RING numbering
@@ -532,12 +602,23 @@ def _composite_fragment_name(
             else:
                 return None  # ring-to-branch / unplaceable geometry -> refuse
         if _bits:
-            _bits.sort()
+            # a fusion numbering has lettered locants ('4a'): number, then letters
+            # (``fused_forms.locant_key``; the same order for plain int locants)
+            from .fused_forms import locant_key
+            _bits.sort(key=lambda bit: (locant_key(bit[0]), bit[1]))
             descriptor = "(" + ",".join(f"{lc}{c}" for lc, c in _bits) + ")-"
 
     name = tr.name
     if prefix_tokens:
-        name = _join_prefix_block(_assemble_prefixes(prefix_tokens), name)
+        # (the Blue Book): every substitutable ring position carries
+        # the same prefix -> no locants ('pentafluorophenyl')
+        alike = None
+        if tr.basis in ('monocycle_book', 'fused_book'):
+            from ..assembly.book_prefixes import positions_alike_prefix
+            alike = positions_alike_prefix(mol, sorted(core), raw_names,
+                                           unit_cites_locant=tr.cites_locant)
+        name = _join_prefix_block(
+            alike if alike is not None else _assemble_prefixes(prefix_tokens), name)
     if descriptor:
         name = descriptor + name
 
@@ -551,8 +632,185 @@ def _composite_fragment_name(
         atoms=frozenset(accounted))
 
 
+def _book_hetero_fragment(mol, frag: Set[int], attach_idx: int
+                          ) -> Optional[TerminalFragmentName]:
+    """A fragment attached through a heteroatom, composed from its parts (roadmap N5c):
+
+    * -O-R 'R-oxy' with the retained contractions the Blue Book,
+       :27667: 'methoxy', '2-chloroethoxy', 'phenoxy', '(propan-2-yl)oxy');
+      -O-CO-R the acyloxy prefix:31698);
+    * -S-R '(R)sulfanyl', -Se-R '(R)selanyl', -Te-R '(R)tellanyl':27649);
+    * -N< 'amino' with its substituents, the second enclosed,;
+      'methylamino', 'methyl(phenyl)amino', 'acetylamino').
+
+    The parts are named by this module's own recursion (an acyl part by
+    ``book_prefixes.acyl_group_prefix``). ``None`` for any other shape."""
+    from rdkit import Chem as _Chem
+
+    from ..assembly.book_prefixes import acyl_group_prefix
+    from ..assembly.substituent_enumerator import (
+        alkoxy_prefix_from_substituent, cite_organyl_in_composed_prefix)
+    root = mol.GetAtomWithIdx(attach_idx)
+    sym = root.GetSymbol()
+    if (sym not in HETERO_ROOT_VALENCE or root.IsInRing()
+            or root.GetFormalCharge() or root.GetIsotope()):
+        return None
+    if any(b.GetBondType() != _Chem.BondType.SINGLE for b in root.GetBonds()):
+        return None
+    if root.GetTotalValence() != HETERO_ROOT_VALENCE[sym]:
+        return None
+    parents = [nb.GetIdx() for nb in root.GetNeighbors() if nb.GetIdx() not in frag]
+    if len(parents) != 1:
+        return None
+    parts = []
+    claimed = {attach_idx}
+    for nb in root.GetNeighbors():
+        j = nb.GetIdx()
+        if j not in frag or j in claimed:
+            continue
+        comp, stack = set(), [j]
+        while stack:
+            cur = stack.pop()
+            if cur in comp or cur == attach_idx:
+                continue
+            comp.add(cur)
+            for nb2 in mol.GetAtomWithIdx(cur).GetNeighbors():
+                k = nb2.GetIdx()
+                if k in frag and k not in comp and k != attach_idx:
+                    stack.append(k)
+        claimed |= comp
+        parts.append((j, comp))
+    if not parts or (sym in CHALCOGEN_HEAD and len(parts) != 1):
+        return None
+    if claimed != frag:
+        return None
+
+    def name_of(p_attach, p_atoms):
+        if len(p_atoms) == 1:
+            lone = _single_heteroatom_branch_prefix(mol, p_atoms)
+            if lone is not None:
+                return lone, False
+        acyl = acyl_group_prefix(
+            mol, p_attach, attach_idx, p_atoms,
+            lambda atoms, r: (lambda t: t.name if t is not None else None)(
+                _terminal_fragment_name(mol, set(atoms), r)))
+        if acyl is not None:
+            return acyl, True
+        sub = _terminal_fragment_name(mol, set(p_atoms), p_attach)
+        return (sub.name, False) if sub is not None else (None, False)
+
+    names = []
+    for p_attach, p_atoms in parts:
+        nm, is_acyl = name_of(p_attach, p_atoms)
+        if not nm:
+            return None
+        names.append((nm, is_acyl))
+    if sym in MONONUCLEAR_HEAD:
+        # a mononuclear parent hydride: its prefixes without locants, the second and
+        # further enclosed:7272): 'trimethylsilyl',
+        # '*tert*-butyldi(methyl)silyl', 'dimethylphosphanyl'
+        from ..assembly.composer import _assemble_decorated_amino_prefix
+        token = _assemble_decorated_amino_prefix(
+            [(n, False) for n, _ in names], enclose=False, head=MONONUCLEAR_HEAD[sym])
+    elif sym == "N":
+        token = None
+        if len(names) == 1 and names[0][1] and root.GetTotalNumHs() == 1:
+            # -NH-CO-R: the amido prefix, method (1) (the Blue Book
+            # "Method (1) generates preferred IUPAC names"), from the verified acid
+            from ..assembly.substituent_naming import acyl_amido_prefix_from_branch
+            try:
+                token = acyl_amido_prefix_from_branch(
+                    mol, attach_idx, parts[0][0], frag, verify_acid=True)
+            except Exception:  # noqa: BLE001 - a producer that raises is a decline
+                token = None
+        if not token:
+            from ..assembly.composer import _assemble_decorated_amino_prefix
+            token = _assemble_decorated_amino_prefix(
+                [(n, False) for n, _ in names], enclose=False, head="amino")
+    else:
+        nm, is_acyl = names[0]
+        if sym == "O" and not is_acyl:
+            token = alkoxy_prefix_from_substituent(nm)
+        else:
+            cited = cite_organyl_in_composed_prefix(nm)
+            token = f"{cited}{CHALCOGEN_HEAD[sym]}" if cited else None
+            if token and is_acyl:
+                # Lane L2: an acyl-oxy / acyl-sulfanyl prefix is compound,
+                # the Blue Book; '2-(acetyloxy)ethane-1-sulfonic acid (PIN)':31713)
+                from ..assembly.prefix_derivation import built
+                token = built(token, substituted=True, enclosed=True)
+    if not token:
+        return None
+    from ..assembly.book_prefixes import note_book_form
+    note_book_form()
+    return TerminalFragmentName(name=token, numbering={attach_idx: 1}, basis="hetero",
+                                atoms=frozenset(frag))
+
+
+def _book_acyl_fragment(mol, frag: Set[int], attach_idx: int
+                        ) -> Optional[TerminalFragmentName]:
+    """The acyl-group name of a fragment attached through a carbonyl carbon
+    (``assembly.book_prefixes.acyl_group_prefix``), its parts named by this module's
+    own recursion; ``None`` when the fragment is not such a group."""
+    from ..assembly.book_prefixes import acyl_group_prefix, book_forms_enabled
+    if not book_forms_enabled():
+        return None
+    atom = mol.GetAtomWithIdx(attach_idx)
+    if atom.GetSymbol() != "C" or atom.IsInRing():
+        return None
+    parents = [nb.GetIdx() for nb in atom.GetNeighbors() if nb.GetIdx() not in frag]
+    if len(parents) != 1:
+        return None
+
+    def part(atoms, root):
+        sub = _terminal_fragment_name(mol, set(atoms), root)
+        return sub.name if sub is not None else None
+
+    token = acyl_group_prefix(mol, attach_idx, parents[0], frag, part)
+    if token is None:
+        return None
+    return TerminalFragmentName(name=token, numbering={attach_idx: 1}, basis="acyl",
+                                atoms=frozenset(frag))
+
+
+def _book_retained_fragment(mol, frag: Set[int], attach_idx: int
+                            ) -> Optional[TerminalFragmentName]:
+    """'benzyl' or 'tert-butyl' for an unsubstituted group on a single bond,
+    the Blue Book-:24414), decided from the atoms by
+    ``book_prefixes.retained_group_prefix``; ``None`` for any other fragment. This writer
+    spells single-bond prefixes only."""
+    from ..assembly.book_prefixes import note_book_form, retained_group_prefix
+    parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+               if nb.GetIdx() not in frag and nb.GetAtomicNum() > 1]
+    if len(parents) != 1:
+        return None
+    if mol.GetBondBetweenAtoms(attach_idx, parents[0]).GetBondType() != Chem.BondType.SINGLE:
+        return None
+    token = retained_group_prefix(mol, frag, attach_idx, 1)
+    if token is None:
+        return None
+    note_book_form()
+    return TerminalFragmentName(name=token, numbering={attach_idx: 1}, basis="chain",
+                                atoms=frozenset(frag))
+
+
 def _terminal_fragment_name(
     mol, frag_atoms, attach_idx: int,
+) -> Optional[TerminalFragmentName]:
+    """The book's spelling first (roadmap N5c: a carbon backbone, heteroatom-rooted
+    branches composed as 'R-oxy', '(R)sulfanyl', '(R)amino'), then -- when that
+    declines, e.g. on an imine C=N the carbon walk cannot place -- the earlier
+    replacement-chain spelling."""
+    from ..assembly.book_prefixes import book_forms_enabled
+    if book_forms_enabled():
+        res = _terminal_fragment_name_impl(mol, frag_atoms, attach_idx, book=True)
+        if res is not None:
+            return res
+    return _terminal_fragment_name_impl(mol, frag_atoms, attach_idx, book=False)
+
+
+def _terminal_fragment_name_impl(
+    mol, frag_atoms, attach_idx: int, book: bool,
 ) -> Optional[TerminalFragmentName]:
     if mol is None or not frag_atoms:
         return None
@@ -598,10 +856,36 @@ def _terminal_fragment_name(
     # and -CH2CH2-cyclohexyl emits `2-(cyclohexan-1-yl)ethyl` (a project rule's T4
     # clause; retained ring names are a follow-on). The pure-acyclic case (no
     # ring) is stop_at_ring=False -> byte-identical.
+    # Roadmap N5e: an acyl group attached through its carbonyl carbon takes its acyl
+    # name ('carbamoyl', '(R)carbamoyl', 'azetidine-1-carbonyl', 'methoxycarbonyl',
+    # 'benzoyl'; (2) the Blue Book), never an 'a' chain that writes the
+    # carbonyl oxygen as a chain end ('2-oxaeth-1-en-1-yl', '1-oxo-2-azaethyl').
+    acyl = _book_acyl_fragment(mol, frag, attach_idx)
+    if acyl is not None:
+        return acyl
+    if book:
+        hetero = _book_hetero_fragment(mol, frag, attach_idx)
+        if hetero is not None:
+            return hetero
+        retained = _book_retained_fragment(mol, frag, attach_idx)
+        if retained is not None:
+            return retained
+
     _frag_has_ring = not _is_acyclic(mol, frag)
     ranks = _canonical_ranks(mol)
     backbone = _backbone_from(mol, frag, attach_idx, ranks,
                               stop_at_ring=_frag_has_ring)
+    if (book and mol.GetAtomWithIdx(attach_idx).GetAtomicNum() == 6
+            and not a_chain_licensed(mol, backbone)
+            and hetero_roots_composable(mol, backbone)):
+        # Roadmap N5c: (the Blue Book) and (:23348) allow an
+        # 'a' chain only with C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga, In, Tl)
+        # ends, at least one carbon atom and four or more heterounits; otherwise the
+        # backbone is the carbon chain and every heteroatom roots a substituent prefix.
+        backbone = _backbone_from(mol, frag, attach_idx, ranks,
+                                  stop_at_ring=_frag_has_ring, carbon_only=True)
+        from ..assembly.book_prefixes import note_book_form
+        note_book_form()
     numbering_for_branches = {a: i + 1 for i, a in enumerate(backbone)}
     branches = _branches_off(mol, frag, backbone, numbering_for_branches)
 
@@ -701,11 +985,24 @@ def _terminal_fragment_name(
             "multiplier; refuse rather than emit an unparseable name",
             len(ene), len(yne))
         return None
+    if book and not rp.prefix and len(backbone) == 2 and ene == [1] and not yne:
+        # (the Blue Book): one place for the double bond, so no
+        # ene locant; the free-valence locant only with a branch prefix
+        # ('ethenyl':24547, '2-chloroethen-1-yl':3003)
+        stem = "ethen-1-yl" if branches else "ethenyl"
     name = f"{rp.prefix}{stem}" if rp.prefix else stem
+    if rp.prefix and not a_chain_licensed(mol, backbone):
+        # (the Blue Book), (:23348): an 'a' chain the book does
+        # not allow is valid but never part of a PIN; the block and the stem root are in
+        # every name built on this chain
+        from ..data.chain_names import get_chain_prefix
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(f"{rp.prefix}{get_chain_prefix(len(backbone))}")
 
     accounted = set(backbone)
     _backbone_set = set(backbone)
     prefix_tokens: List[tuple] = []          # (alpha_key, locant, token)
+    raw_names: List[str] = []                # the bare prefix name of each branch
     for locant, battach, comp in branches:
         # A lone heteroatom branch takes its STANDARD prefix. Recursing on it
         # yields `1-oxamethyl` for `=O`, which OPSIN reads as `-OH` -- a wrong
@@ -717,6 +1014,7 @@ def _terminal_fragment_name(
             accounted |= set(comp)
             prefix_tokens.append((alpha_sort_key(_het), locant,
                                   enclose_if_compound(_het)))
+            raw_names.append(_het)
             continue
         # 0-WRONG guard: a branch joined to the backbone by a NON-single bond is a
         # =/# -attached substituent (methylidene, cyclohexylidene,...). Recursing
@@ -750,9 +1048,13 @@ def _terminal_fragment_name(
         # strips enclosing marks itself, so this is not an approximation.
         token = enclose_if_compound(sub.name)
         prefix_tokens.append((alpha_sort_key(sub.name), locant, token))
+        raw_names.append(sub.name)
 
     if prefix_tokens:
-        name = _join_prefix_block(_assemble_prefixes(prefix_tokens), name)
+        book = _book_chain_name(mol, backbone, rp.prefix, name, raw_names,
+                                unit_cites_locant=bool(ene or yne))
+        name = book if book is not None else _join_prefix_block(
+            _assemble_prefixes(prefix_tokens), name)
 
     result = TerminalFragmentName(name=descriptor + name, numbering=numbering,
                                   basis="chain", atoms=frozenset(accounted))

@@ -1641,9 +1641,21 @@ def enclose_if_compound(name: str) -> str:
     """
     if not name or _is_fully_enclosed(name):
         return name
+    # Lane L2: the writer's record decides the marks when it has decided them
+    # (``assembly.prefix_derivation``;, the Blue Book)
+    from .prefix_derivation import carried, derivation_of
+    _rec = derivation_of(name)
+    if _rec is not None and _rec.enclosed is not None:
+        return carried(apply_enclosing_marks(name, -1), like=name) if _rec.enclosed else name
     if (needs_brackets(name) or is_complex_substituent(name)
             or any(mark in name for mark in '([{')):
-        return apply_enclosing_marks(name, -1)
+        # Review F1 (properfix a performance pass): ``apply_enclosing_marks`` always
+        # returns a plain ``str``, which used to drop the record of a
+        # recorded ``name`` right here -- the single most-called enclosure
+        # site in the engine (~150 callers). ``carried`` keeps it (the
+        # mark itself carries no new fact; (c) is
+        # about the CORE prefix, enclosed or not).
+        return carried(apply_enclosing_marks(name, -1), like=name)
     # A compound prefix without a locant -- a substituent prefix in front of its
     # parent prefix, as is_substituted_substituent reads it ('silylamino',
     # 'cyanoamino', 'chlorophenyl', 'methylcarbamoyl', 'nitrosooxy') -- is enclosed
@@ -1653,7 +1665,7 @@ def enclose_if_compound(name: str) -> str:
     # amide prefixes ('acetamido', 'benzamido') are cited bare ('2-acetamido...',
     # '4-benzamido...' in the Blue Book) although they take 'bis'.
     if not name.lower().endswith('amido') and is_substituted_substituent(name):
-        return apply_enclosing_marks(name, -1)
+        return carried(apply_enclosing_marks(name, -1), like=name)
     return name
 
 
@@ -2466,6 +2478,13 @@ def is_substituted_substituent(
     """
     if not name:
         return False
+    # Lane L2 (R2): the writer that built the prefix recorded whether it attached a
+    # substituent prefix (``assembly.prefix_derivation``), (c)
+    # (the Blue Book); that record decides. A name without one is read below.
+    from .prefix_derivation import derivation_of
+    _rec = derivation_of(name)
+    if _rec is not None:
+        return _rec.substituted
 
     # (a) names `tert-butyl` among the UNSUBSTITUTED prefixes, and
     # `sec-` behaves identically. Decide on the remainder, via THE shared
@@ -3156,7 +3175,11 @@ def multiplied_component(count: int, name: str, marked: str) -> str:
         # terms modified by the numerical prefixes 'bis', 'tris', 'tetrakis',
         # etc." -- 'bis(sulfanyl)', never 'bissulfanyl'.
         marked = apply_enclosing_marks(marked, -1)
-    return f"{mult}{marked}"
+    # Review F1 (properfix a performance pass): keep ``name``'s record on the finished,
+    # multiplied token -- a caller that merges THIS output again (nested
+    # multiplication, or a second dedup pass) must still be able to read it.
+    from .prefix_derivation import carried
+    return carried(f"{mult}{marked}", like=name)
 
 
 # ============================================================================
@@ -3553,9 +3576,23 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
 
     # Assemble: locants-multiplier+name. An empty locant list (elided per
     #, e.g. a mononuclear parent: phenylmethanol) takes no hyphen.
+    #
+    # Lane L2 proper-fix a performance pass (review finding F1): every return above this
+    # point is a plain ``str`` (f-string / ``apply_enclosing_marks``), which
+    # drops the writer's ``assembly.prefix_derivation`` record even when
+    # ``name`` carried one on entry (c)
+    # substitution). A caller that groups several occurrences of the SAME
+    # substituent AFTER this function has formatted each one individually
+    # (``composer._merge_duplicate_prefixes``) then re-derives the multiplier
+    # from the finished text with no record left to read -- the mechanism
+    # ``carried`` exists for exactly this ("a writer step that adds marks or
+    # a descriptor to a recorded name keeps the record",
+    # ``assembly/prefix_derivation.py``). Thread the INPUT's record onto the
+    # fully-formatted output so it survives past this writer.
+    from .prefix_derivation import carried
     if not locant_str:
-        return f"{multiplier}{formatted_name}"
-    return f"{locant_str}-{multiplier}{formatted_name}"
+        return carried(f"{multiplier}{formatted_name}", like=name)
+    return carried(f"{locant_str}-{multiplier}{formatted_name}", like=name)
 
 
 # ============================================================================

@@ -45,8 +45,12 @@ WITNESSES = [
     # skeletal-replacement names (the Blue Book; a chain may end on
     # Si,:6428), neither a PIN needs four heteroatoms); OPSIN 2.9.0:
     # both full-key and canonical-SMILES exact.
+    # Roadmap N5c (name-quality lane L2): an 'a' chain that ends on N is not a book
+    # form, the Blue Book); the nitrogen roots '(R)amino' with its
+    # substituents,:7272). Was '2-(1,1-diiodo-1-silamethan-1-yl)-3-
+    # methyl-2-azabutane'.
     ("CC(C)N(C)[SiH](I)I",
-     "2-(1,1-diiodo-1-silamethan-1-yl)-3-methyl-2-azabutane"),
+     "2-[(diiodosilyl)(methyl)amino]propane"),
     # #3 may vary in exact spelling -> assert RT-match, not the literal string.
     ("Oc1c(N=Nc2cccc(C(F)(F)F)c2)c2cc(F)cc(F)c2n1C1CSC1", None),
 ]
@@ -163,17 +167,33 @@ def test_negative_rt_mismatch_stays_abstained():
     -based test would silently stop testing anything), and proves the exact
     mechanism this file's fall-through was built around never ships an
     RT-failing candidate."""
-    # Suite fix j6: since TRIAGE g6 C24 the universal floor (verified by the
-    # final OPSIN gate, not _rt_match) names this Si witness first; keep the
-    # organometallic guard ON for Si here so the witness reaches the CQ5
-    # fall-through this test exercises (as at the time it was written).
+    # Suite fix j6 / lane L2 properfix: this Si witness is now named by the PIN
+    # path itself ('2-[(diiodosilyl)(methyl)amino]propane', the verdict of the
+    # full-InChIKey check in namer._final_opsin_validity_gate), and when that
+    # primary is voided the floor offer ships it, so neither reaches the CQ5
+    # fall-through this test guards. Put the witness back on that path: the
+    # primary producer builds a non-failure, RT-INVALID name (the root cause of
+    # the file's docstring; the gate voids it) and the floor offer is not
+    # made, so the only route left is the RT-gated fall-through, which consults
+    # ``_rt_match``.
     import orthonym.assembly.universal_substituent as _us
     be = _besteffort()
     smi = WITNESSES[1][0]
-    with patch.object(_us, "_COVALENT_SKELETAL_METALLOIDS", frozenset()):
-        assert not is_failure_name(be.name(smi)), (
-            "sanity: this witness must normally convert (so the mock below is "
-            "the only thing causing the abstain)")
+    wrong_primary = "2-[(diiodosilyl)(ethyl)amino]propane"   # a different molecule
+    orig_impl = Orthonym._name_impl
+
+    def _wrong_primary(self, smiles, *a, **kw):
+        return wrong_primary if smiles == smi else orig_impl(self, smiles, *a, **kw)
+
+    with patch.object(_us, "_COVALENT_SKELETAL_METALLOIDS", frozenset()), \
+            patch.object(Orthonym, "_name_impl", _wrong_primary), \
+            patch.object(Orthonym, "_maybe_append_t4_floor_offer",
+                         lambda *a, **kw: None):
+        sane = be.name(smi)
+        assert not is_failure_name(sane) and sane != wrong_primary, (
+            "sanity: the fall-through must normally convert this witness (so "
+            f"the mock below is the only thing causing the abstain), got {sane!r}")
+        assert _rt_inchikey_match(sane, smi)
         with patch.object(Orthonym, "_rt_match",
                           staticmethod(lambda *a, **kw: False)):
             out = be.name(smi)

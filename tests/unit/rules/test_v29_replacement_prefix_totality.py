@@ -807,6 +807,13 @@ def test_the_table_1_5_replacement_source_lives_in_exactly_one_place():
         # organometallic metallacycles -- a different nomenclature
         # system entirely, and the legitimate home of Hg/Zn/Cd.
         'data/organometallics.py',
+        # The reader of the spelling checks (validation/spelling/units.py, REPL_ELEMENT):
+        # it maps a printed 'a' prefix back to its element and builds no name. It keeps
+        # its own copy so a check cannot inherit a defect of the writer's tables, and a
+        # test holds the copy equal to Table 1.5 and Table 2.4 together
+        # (test_spelling_readers.py::
+        # test_the_replacement_prefixes_the_reader_knows_are_those_of_tables_1_5_and_2_4).
+        'validation/spelling/units.py',
     }
     unexpected = [o for o in offenders
                   if not any(o.startswith(a + ':') for a in allowed)]

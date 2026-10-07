@@ -23,9 +23,13 @@ def _best_effort():
 def test_1c_neutral_composer_under_best_effort():
     """A neutral 2-fragment mixture whose one hard component names only under the
     general engine now composes (lever 1c).."""
+    # S2c-1 fixture update (was the silabicyclic ring c1ccc2c(c1)[SiH2]cc2, now named
+    # '1H-1-benzosilole' at PIN by the benzo name, the Blue Book): the
+    # lambda-convention benzodioxathiole is the hard component (PIN abstains; the general
+    # engine names it). OPSIN 2.9.0 full-InChIKey exact.
     with jvm_slots(1, purpose="p1-task2-test"):
-        name = _best_effort().name("CCO.c1ccc2c(c1)[SiH2]cc2")
-    assert name == "ethanol—7-silabicyclo[4.3.0]nona-1,3,5,8-tetraene (1/1)"
+        name = _best_effort().name("CCO.c1ccc2c(c1)O[SH2]O2")
+    assert name == "ethanol—7,9-dioxa-8λ4-thiabicyclo[4.3.0]nona-1,3,5-triene (1/1)"
 
 
 def test_pin_tier_adduct_unchanged():
@@ -106,13 +110,17 @@ def test_1b_pin_salt_unchanged():
 
 def test_1e_hard_identical_pair_reclaims_under_best_effort():
     """The 1e reclaim comes from threading the best-effort flags into the identical-
-    path fresh instance: a HARD identical fragment (a silabicyclic ring the PIN
+    path fresh instance: a HARD identical fragment (a lambda-convention ring the PIN
     namer abstains on) now names, and the space-join round-trips to the input full
     InChIKey. PIN abstains on the same input (test below), so this is the reclaim."""
+    # S2c-1 fixture update (was the silabicyclic ring c1ccc2c(c1)[SiH2]cc2, now named
+    # '1H-1-benzosilole' at PIN by the benzo name, the Blue Book): the
+    # lambda-convention benzodioxathiole is the hard component (PIN abstains; the general
+    # engine names it). OPSIN 2.9.0 full-InChIKey exact.
     with jvm_slots(1, purpose="p1-task2-test"):
-        name = _best_effort().name("c1ccc2c(c1)[SiH2]cc2.c1ccc2c(c1)[SiH2]cc2")
-    assert name == ("7-silabicyclo[4.3.0]nona-1,3,5,8-tetraene "
-                    "7-silabicyclo[4.3.0]nona-1,3,5,8-tetraene")
+        name = _best_effort().name("c1ccc2c(c1)O[SH2]O2.c1ccc2c(c1)O[SH2]O2")
+    assert name == ("7,9-dioxa-8λ4-thiabicyclo[4.3.0]nona-1,3,5-triene "
+                    "7,9-dioxa-8λ4-thiabicyclo[4.3.0]nona-1,3,5-triene")
 
 
 def test_1e_flag_threading_changes_hard_identical():
@@ -121,11 +129,15 @@ def test_1e_flag_threading_changes_hard_identical():
     best-effort differs from PIN. (The unit conftest disables the OPSIN gate, so the
     PIN producer here emits a gross-mismatch name that production would suppress;
     asserting best-effort != PIN captures the reclaim without depending on that.)"""
+    # S2c-1 fixture update (was the silabicyclic ring c1ccc2c(c1)[SiH2]cc2, now named
+    # '1H-1-benzosilole' at PIN by the benzo name, the Blue Book): the
+    # lambda-convention benzodioxathiole is the hard component (PIN abstains; the general
+    # engine names it). OPSIN 2.9.0 full-InChIKey exact.
     with jvm_slots(1, purpose="p1-task2-test"):
-        pin = Orthonym(style="pin").name("c1ccc2c(c1)[SiH2]cc2.c1ccc2c(c1)[SiH2]cc2")
-        be = _best_effort().name("c1ccc2c(c1)[SiH2]cc2.c1ccc2c(c1)[SiH2]cc2")
-    assert be == ("7-silabicyclo[4.3.0]nona-1,3,5,8-tetraene "
-                  "7-silabicyclo[4.3.0]nona-1,3,5,8-tetraene")
+        pin = Orthonym(style="pin").name("c1ccc2c(c1)O[SH2]O2.c1ccc2c(c1)O[SH2]O2")
+        be = _best_effort().name("c1ccc2c(c1)O[SH2]O2.c1ccc2c(c1)O[SH2]O2")
+    assert be == ("7,9-dioxa-8λ4-thiabicyclo[4.3.0]nona-1,3,5-triene "
+                  "7,9-dioxa-8λ4-thiabicyclo[4.3.0]nona-1,3,5-triene")
     assert be != pin
 
 

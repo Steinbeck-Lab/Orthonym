@@ -253,6 +253,11 @@ def _acyloxy_for_site(mol, site, carboxy_prefixed_polyacid: bool = False) -> Opt
         acyl = _acid_to_acyl(acid) if acid else None
     if not acyl:
         return None
+    # Lane L2: the acyl group's multiplier and marks, from its atoms
+    from ..assembly.book_prefixes import acyl_derivation, acyl_side_atoms
+    from ..assembly.prefix_derivation import built, with_derivation
+    acyl = with_derivation(acyl, acyl_derivation(
+        mol, site[1], acyl_side_atoms(mol, site[1], site[2])))
     #: a compound acyl is cited inside its own marks with 'oxy' outside,
     # '4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl...' (the Blue Book),
     # '3-[(pyridine-3-carbonyl)oxy]propanoic acid (PIN)' (:31723); a simple acyl
@@ -260,7 +265,9 @@ def _acyloxy_for_site(mol, site, carboxy_prefixed_polyacid: bool = False) -> Opt
     # '(4-hydroxybenzoyl)oxy', never '4-hydroxybenzoyloxy'.
     from ..assembly.substituent_enumerator import cite_organyl_in_composed_prefix
     cited = cite_organyl_in_composed_prefix(acyl)
-    return f"{cited}oxy" if cited else None
+    # (the Blue Book): an acyl-oxy prefix is compound,
+    # '2-(acetyloxy)ethane-1-sulfonic acid (PIN)' (:31713), 'bis(acetyloxy)' (:32382)
+    return built(f"{cited}oxy", substituted=True, enclosed=True) if cited else None
 
 
 def _multiplied_acylate(acylate: str, count: int) -> str:

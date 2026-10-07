@@ -255,7 +255,7 @@ def main(args: List[str] = None) -> int:
             "Print a JSON row instead of the bare name, with the keys name, tier, "
             "is_pin, source, opsin, gates_passed, gate_outcome, formula, "
             "limit_code, stereo_unexpressed, suffix_free_prefix_name, "
-            "prefix_order_fallback and verified. "
+            "prefix_order_fallback, verified and spelling_failures. "
             "'verified' is opsin (OPSIN read the whole name back to the same "
             "molecule), opsin_constitution (the same constitution; the "
             "stereodescriptors were not confirmed by OPSIN), identity (a name from "
@@ -264,7 +264,11 @@ def main(args: List[str] = None) -> int:
             "structure; OPSIN cannot read these names) or unverified (no "
             "read-back recorded). 'gate_outcome' says what the final OPSIN check "
             "did, for example self_consistency_verified, suppressed, not_run or "
-            "carveout:<class>. One SMILES at a time; not with --batch."
+            "carveout:<class>. 'spelling_failures' lists the spelling rules of the "
+            "PIN (rule id and detail) that a name in PIN form breaks, and the rule "
+            "of a recorded non-PIN part that lowered the name; such a name is "
+            "not labelled pin_verified, and pin declines it. One SMILES at a time; "
+            "not with --batch."
         ),
     )
     parser.add_argument(

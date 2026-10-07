@@ -103,15 +103,15 @@ POST_148_2_BASELINE_NAMES = {
     'c1cc2nccnc2cn1': 'pyrido[3,4-b]pyrazine',
     'c1cc2nccnc2nn1': 'pyrazino[2,3-c]pyridazine',
     'c1cc2ncncc2cn1': 'pyrido[4,3-d]pyrimidine',
-    'c1cc2ncoc2cn1': 'oxazolo[5,4-c]pyridine',
-    'c1cc2ncsc2cn1': 'thiazolo[5,4-c]pyridine',
+    'c1cc2ncoc2cn1': '[1,3]oxazolo[5,4-c]pyridine',
+    'c1cc2ncsc2cn1': '[1,3]thiazolo[5,4-c]pyridine',
     'c1cc2occc2cn1': 'furo[3,2-c]pyridine',
     'c1cc2sccc2cn1': 'thieno[3,2-c]pyridine',
     'c1cc2sccc2s1': 'thieno[3,2-b]thiophene',
     'c1ccc2[nH]ccc2c1': '1H-indole',
-    'c1ccc2[nH]cnc2c1': '1H-benzimidazole',
+    'c1ccc2[nH]cnc2c1': '1H-1,3-benzimidazole',
     'c1ccc2[nH]ncc2c1': '1H-indazole',
-    'c1ccc2[nH]nnc2c1': '1H-benzotriazole',
+    'c1ccc2[nH]nnc2c1': '1H-1,2,3-benzotriazole',
     'c1ccc2[se]cnc2c1': '1,3-benzoselenazole',
     'c1ccc2c(c1)-c1ccccc1-2': 'biphenylene',
     # Phase C: (the Blue Book) names the retained forms 'indane' /
@@ -174,13 +174,13 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccc2nccnc2c1': 'quinoxaline',
     'c1ccc2ncncc2c1': 'quinazoline',
     'c1ccc2nnccc2c1': 'cinnoline',
-    'c1ccc2nocc2c1': '2,1-benzisoxazole',
+    'c1ccc2nocc2c1': '2,1-benzoxazole',
     'c1ccc2nonc2c1': '2,1,3-benzoxadiazole',
     'c1ccc2nscc2c1': '2,1-benzothiazole',
     'c1ccc2nsnc2c1': '2,1,3-benzothiadiazole',
     'c1ccc2occc2c1': '1-benzofuran',  #: PIN locant, the Blue Book)
     'c1ccc2ocnc2c1': '1,3-benzoxazole',
-    'c1ccc2oncc2c1': '1,2-benzisoxazole',
+    'c1ccc2oncc2c1': '1,2-benzoxazole',
     'c1ccc2sccc2c1': '1-benzothiophene',  #: PIN locant, the Blue Book)
     'c1ccc2scnc2c1': '1,3-benzothiazole',
     'c1ccn2cccc2c1': 'indolizine',
@@ -188,7 +188,7 @@ POST_148_2_BASELINE_NAMES = {
     'c1ccn2cncc2c1': 'imidazo[1,5-a]pyridine',
     'c1ccn2ncnc2c1': '[1,2,4]triazolo[1,5-a]pyridine',
     'c1ccn2nnnc2c1': '[1,2,3,4]tetrazolo[1,5-a]pyridine',
-    'c1cn2ccsc2n1': 'imidazo[2,1-b]thiazole',
+    'c1cn2ccsc2n1': 'imidazo[2,1-b][1,3]thiazole',
     'c1cnc2[nH]ccc2c1': '1H-pyrrolo[2,3-b]pyridine',
     'c1cnc2[nH]cnc2c1': '3H-imidazo[4,5-b]pyridine',
     'c1cnc2[nH]ncc2c1': '1H-pyrazolo[3,4-b]pyridine',
@@ -208,16 +208,16 @@ POST_148_2_BASELINE_NAMES = {
     'c1cnc2nccnc2n1': 'pyrazino[2,3-b]pyrazine',
     'c1cnc2ncncc2c1': 'pyrido[2,3-d]pyrimidine',
     'c1cnc2ncncc2n1': 'pteridine',
-    'c1cnc2ncoc2c1': 'oxazolo[4,5-b]pyridine',
-    'c1cnc2ncsc2c1': 'thiazolo[4,5-b]pyridine',
+    'c1cnc2ncoc2c1': '[1,3]oxazolo[4,5-b]pyridine',
+    'c1cnc2ncsc2c1': '[1,3]thiazolo[4,5-b]pyridine',
     'c1cnc2nncn2c1': '[1,2,4]triazolo[4,3-a]pyrimidine',
-    'c1cnc2nocc2c1': 'isoxazolo[3,4-b]pyridine',
+    'c1cnc2nocc2c1': '[1,2]oxazolo[3,4-b]pyridine',
     'c1cnc2occc2c1': 'furo[2,3-b]pyridine',
-    'c1cnc2ocnc2c1': 'oxazolo[5,4-b]pyridine',
-    'c1cnc2oncc2c1': 'isoxazolo[5,4-b]pyridine',
+    'c1cnc2ocnc2c1': '[1,3]oxazolo[5,4-b]pyridine',
+    'c1cnc2oncc2c1': '[1,2]oxazolo[5,4-b]pyridine',
     'c1cnc2sccc2c1': 'thieno[2,3-b]pyridine',
-    'c1cnc2scnc2c1': 'thiazolo[5,4-b]pyridine',
-    'c1cnc2scnc2n1': 'thiazolo[4,5-b]pyrazine',
+    'c1cnc2scnc2c1': '[1,3]thiazolo[5,4-b]pyridine',
+    'c1cnc2scnc2n1': '[1,3]thiazolo[4,5-b]pyrazine',
     'c1cnn2cccc2c1': 'pyrrolo[1,2-b]pyridazine',
     'c1cnn2ccnc2c1': 'imidazo[1,2-b]pyridazine',
     'c1ncc2[nH]ccc2n1': '5H-pyrrolo[3,2-d]pyrimidine',
@@ -239,10 +239,6 @@ _PIN_NOT_BUILT = {
     'C1CCN2CCCC2C1': "needs the hydro indolizine parent (octahydroindolizine); the "
                      "catalog name 'indolizidine' is not a Blue Book name and ships "
                      "labelled below pin_verified",
-    'C1=Cn2cccc2C1': "DEFECT (non-PIN at pin_verified): the catalog spells the mancude "
-                     "system 'pyrrolizine' without its indicated hydrogen; BB Table 2.8 "
-                     "(21) 'the PIN is 1H-pyrrolizine' (:11628). .planning/"
-                     "TODO-2026-09-24.md 'Open from T12 fix round 2 (wp6)'",
 }
 
 

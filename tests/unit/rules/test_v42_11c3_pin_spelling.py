@@ -116,8 +116,10 @@ def test_saturated_phosphinane_ring_unchanged():
     """Regression: the SATURATED ring keeps its distinct replacement name; my
     aromatic-phosphinine registration must not touch it. (Emits only under the
     general_fallback best-effort tier, like bb_conformance.)"""
+    # roadmap N5d (name-quality lane L2): the Hantzsch-Widman name of the saturated
+    # ring, the Blue Book); was '1-phosphacyclohexan-1-yl benzoate'
     assert _name_general_fallback("O=C(OP1CCCCC1)c1ccccc1") == \
-        "1-phosphacyclohexan-1-yl benzoate"
+        "phosphinan-1-yl benzoate"
 
 
 # ---------------------------------------------------------------------------

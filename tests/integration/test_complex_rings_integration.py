@@ -166,7 +166,7 @@ class TestCOMPLEX03:
         # Isoquinoline
         ("c1ccc2cnccc2c1", "isoquinoline"),
         # Benzimidazole
-        ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
+        ("c1ccc2[nH]cnc2c1", "1H-1,3-benzimidazole"),
         # Benzofuran (no indicated H needed)
         #: 1-benzofuran is the PIN, the Blue Book)
         ("c1ccc2occc2c1", "1-benzofuran"),

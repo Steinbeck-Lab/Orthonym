@@ -75,7 +75,7 @@ class TestExactSMILESMatching:
         mol = Chem.MolFromSmiles('c1ccc2[nH]cnc2c1')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == '1H-benzimidazole'
+        assert result[0] == '1H-1,3-benzimidazole'
         assert result[1] == 1
 
     @pytest.mark.unit
@@ -195,7 +195,7 @@ class TestSubstructureMatching:
         result = match_fused_heterocycle_core(mol)
         assert result is not None
         name, mapping, core_smiles = result
-        assert name == '1H-benzimidazole'
+        assert name == '1H-1,3-benzimidazole'
         assert len(mapping) == 9
 
     @pytest.mark.unit
@@ -471,7 +471,7 @@ class TestBenzoFusedOxazolesAndThiazoles:
         mol = Chem.MolFromSmiles('c1ccc2nocc2c1')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == '2,1-benzisoxazole'
+        assert result[0] == '2,1-benzoxazole'
 
     @pytest.mark.unit
     def test_benzisothiazole(self):
@@ -1101,12 +1101,13 @@ class TestPhase101NewEntries:
 
     @pytest.mark.unit
     def test_pyrrolizine_exact_match(self):
-        """Pyrrolizine should return correct name."""
+        """Pyrrolizine is named with its indicated hydrogen: BB Table 2.8 (21) "pyrrolizine
+        (1H-isomer shown; the PIN is 1H-pyrrolizine)" (the Blue Book)."""
         mol = Chem.MolFromSmiles('C1=Cn2cccc2C1')
         result = get_fused_heterocycle_name(mol)
         assert result is not None
-        assert result[0] == 'pyrrolizine'
-        assert result[1] is None
+        assert result[0] == '1H-pyrrolizine'
+        assert result[1] == 1
 
     @pytest.mark.unit
     def test_pyrrolizine_canonical_smiles_in_dict(self):
@@ -1198,10 +1199,10 @@ class TestPhase101EndToEndNaming:
 
     @pytest.mark.unit
     def test_pyrrolizine_e2e(self):
-        """Pyrrolizine SMILES should produce 'pyrrolizine'."""
+        """Pyrrolizine SMILES should produce '1H-pyrrolizine' (the Blue Book)."""
         from orthonym import name_compound
         result = name_compound('C1=Cn2cccc2C1')
-        assert result == 'pyrrolizine'
+        assert result == '1H-pyrrolizine'
 
     @pytest.mark.unit
     def test_6_methylphenanthridine_e2e(self):

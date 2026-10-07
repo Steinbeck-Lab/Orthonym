@@ -51,9 +51,12 @@ RECLAIM_CASES = [
     # ), and 'methyl' vs 'methan' flips the alphanumerical order
     # so '6-methyl' now precedes the methyl-bearing complex prefix.
     # RT-verified identical InChIKey (checked below by _validity_gate_name_to_smiles).
+    # roadmap N5c/N5d (name-quality lane L2): the amino N roots '[methyl(...)amino]'
+    #, the Blue Book) and the ring is 'piperidin-4-yl',
+    #:8482). The oxime keeps '(2-oxa-1-azaethan-1-ylidene)' (the plan's residual R5).
     ("CC1=NC(=C(C=C1)/C(=N/O)/N(C)C2CCN(CC2)C)OC3=CC=CC(=C3)C(C)C",
-     "(1Z)-6-methyl-3-[2-(4-methyl-4-azacyclohexan-1-yl)-1-(2-oxa-1-azaethan-1-ylidene)"
-     "-2-azapropan-1-yl]-2-[3-(propan-2-yl)phenoxy]pyridine"),
+     "(1Z)-6-methyl-3-{[methyl(1-methylpiperidin-4-yl)amino](2-oxa-1-azaethan-1-ylidene)"
+     "methyl}-2-[3-(propan-2-yl)phenoxy]pyridine"),
 ]
 
 

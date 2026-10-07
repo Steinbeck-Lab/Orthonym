@@ -42,7 +42,6 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-    "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -151,13 +150,6 @@ _LARGE_POLYCYCLE_BLOCKED = {
     "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31":
         "needs large-polycycle Task 6a: hydro bridged-fused PIN "
         "(P-52.2.5.2; the von Baeyer name is not the PIN)",
-    # Also mis-numbered as a von Baeyer name: (:9685) "The
-    # superscript locants for the secondary bridges must be as low as possible
-    # when considered as a set" -- 0^1,6 beats the shipped 0^4,9 (large-polycycle
-    # Task 10, descriptor selection across tied decompositions).
-    "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O":
-        "needs large-polycycle Task 6a: hydro bridged-fused PIN (P-52.2.5.2); "
-        "Task 10: P-23.2.6.2.4 von Baeyer superscript locants",
 }
 
 
@@ -305,7 +297,7 @@ ROUNDTRIP_VERIFIED = [
     # Polycyclic (von Baeyer)
     (
         "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
-        "(1S,4R,5R,8S)-1,9,9-trimethyl-2,3-dioxa-tricyclo[6.4.0.1(4,8)]tridec-11-en-5-ol",
+        "(3R,4R,6aS,10aS)-7,7,10a-trimethyl-3,4,5,6,8,10a-hexahydro-7H-3,6a-methano-1,2-benzodioxocin-4-ol",
     ),
     (
         "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
@@ -1127,7 +1119,7 @@ PHASE24_RT_IMPROVEMENTS = [
     # VB tricyclo format with dioxa + stereo
     (
         "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
-        "(1S,4R,5R,8S)-1,9,9-trimethyl-2,3-dioxa-tricyclo[6.4.0.1(4,8)]tridec-11-en-5-ol",
+        "(3R,4R,6aS,10aS)-7,7,10a-trimethyl-3,4,5,6,8,10a-hexahydro-7H-3,6a-methano-1,2-benzodioxocin-4-ol",
         "vb-tricyclo-dioxa-stereo",
     ),
 ]

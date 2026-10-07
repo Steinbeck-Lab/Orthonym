@@ -131,17 +131,15 @@ def test_chain_composer_requires_carbon_acyclic_attach():
         mol, frag, 0, allow_mancude=False) is None
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "TRIAGE g7 C09 (j7): rules.terminal_fragment spells the C(=O)NH2 terminus as a "
-    "chain O, '(4S)-4,5-diamino-2-methyl-6-oxahex-5-en-1-yl' (a replacement chain "
-    "ending on O, P-15.4.3.1 BlueBookV2.md:6465); refusing it there alone reroutes "
-    "whole names through the universal floor (measured, TRIAGE.md j7 section)."))
 def test_composed_prefix_has_no_stray_hyphen_before_stem(opsin_proof):
     # spelling: the alkyl stem elides ('...5-oxopentyl', not '...5-oxo-pentyl').
     mol = Chem.MolFromSmiles("CC(C)C[C@H](N)C(N)=O")
     prefix = name_substituent(mol, set(range(mol.GetNumAtoms())), 0,
                               allow_mancude=True)
     assert prefix and "-pentyl" not in prefix and prefix.endswith("pentyl"), prefix
+    # the carboxamide carbon ends the chain as 'amino' + 'oxo',
+    # the Blue Book; the '2-anilino-2-oxoethyl (preferred prefix)' pattern,:24603)
+    assert prefix == "(4S)-4,5-diamino-2-methyl-5-oxopentyl", prefix
 
 
 def test_pin_default_unaffected_simple_substituent():

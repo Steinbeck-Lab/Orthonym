@@ -172,6 +172,13 @@ from ..rules.vonbaeyer_universal import (
 # Task B2b: reuse general_engine's own charge-suffix primitives so this
 # module spells charge the SAME way as the rest of the codebase (never
 # reinvented) -- see the module docstring's charge-scope paragraph.
+from .book_prefixes import (
+    CHALCOGEN_HEAD,
+    HETERO_ROOT_VALENCE,
+    MONONUCLEAR_HEAD,
+    a_chain_licensed,
+    hetero_roots_composable,
+)
 from .general_engine import (
     _MULT_SIMPLE,
     _charge_suffix_text,
@@ -273,6 +280,19 @@ class _Ctx:
     acyloxy_leaf: bool = True
     # Set True the first time the leaf names a branch in this call.
     acyloxy_leaf_fired: bool = False
+    # Roadmap N5: spell each spine and branch in the book's form (``book_prefixes``,
+    # ``rules.monocycle_forms``) instead of the mechanical one. ``t4_coverage`` sets
+    # it False only to RETRY a floor name that failed the full-InChIKey round trip,
+    # so a book spelling can never cost a name the floor built without it.
+    book_forms: bool = True
+    # Set True the first time a book spelling replaces a mechanical one in this call.
+    book_forms_fired: bool = False
+    # An aromaticity-perceived view of ``mol`` (same atom indices) for the ring
+    # names of ``rules.monocycle_forms``; built on first use, False if unbuildable.
+    aromatic_mol: object = None
+    # Roadmap N5c: while True, a chain spine walks carbon atoms only
+    # (``_tree_neighbors``); set by ``_name_chain_spine`` for one spine choice.
+    carbon_walk: bool = False
 
 
 @dataclass(frozen=True)
@@ -289,6 +309,9 @@ class UniversalResult:
     # (``_prefix_order_fallback``): never a PIN, only asked for by
     # ``t4_coverage.name_prefix_order_fallback``.
     prefix_order_fallback: bool = False
+    # True when a book spelling (``_Ctx.book_forms``) is part of ``name``: the
+    # caller then knows a mechanical-spelling retry exists.
+    book_forms_fired: bool = False
 
 
 @dataclass
@@ -373,6 +396,15 @@ class _ComponentResult:
     # scope stereo block, never a
     # merge across independently-
     # numbered branch spines).
+    yl_names: Optional[Dict[int, str]] = None     # roadmap N5: the book's
+    # substituent spelling of this
+    # component by attachment bond
+    # order ('trifluoromethyl',
+    # '2-chloroethyl', 'phenyl'),
+    # used by
+    # ``_render_as_substituent`` in
+    # place of the mechanical
+    # ``-{locant}-yl`` rewrite.
     top_prefix_atoms: Optional[Tuple[Tuple[int, ...], ...]] = None  # the
     # parent's prefix list as the
     # name cites it: for each
@@ -391,8 +423,13 @@ def name_universal_substitutive(
     force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True,
     prefix_order_fallback: bool = False,
+    book_forms: bool = True,
 ) -> Optional[UniversalResult]:
     """Name *mol* unconditionally, or return ``None`` (void -- never partial).
+
+    ``book_forms`` (default True) spells spines and branches in the Blue Book's form
+    (``_Ctx.book_forms``); False gives the mechanical spelling, the retry
+    ``t4_coverage`` runs when a book-form name fails the round trip.
 
     ``prefix_order_fallback`` (default False: byte-identical behaviour) arms the
     last stereo rung ``_prefix_order_fallback`` (see there); only
@@ -447,7 +484,8 @@ def name_universal_substitutive(
     try:
         res = _name_universal_substitutive_unsafe(
             mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
-            acyloxy_leaf=acyloxy_leaf, prefix_order_fallback=prefix_order_fallback)
+            acyloxy_leaf=acyloxy_leaf, prefix_order_fallback=prefix_order_fallback,
+            book_forms=book_forms)
         if res is not None:
             return res
         # M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide the primary
@@ -471,7 +509,8 @@ def name_universal_substitutive(
                     neutral, atom_work_budget,
                     force_vonbaeyer_spiro=force_vonbaeyer_spiro,
                     acyloxy_leaf=acyloxy_leaf,
-                    prefix_order_fallback=prefix_order_fallback)
+                    prefix_order_fallback=prefix_order_fallback,
+                    book_forms=book_forms)
         return None
     except Exception:
         return None
@@ -480,6 +519,7 @@ def name_universal_substitutive(
 def _name_universal_substitutive_unsafe(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True, prefix_order_fallback: bool = False,
+    book_forms: bool = True,
 ) -> Optional[UniversalResult]:
     """The real body -- may raise; ``name_universal_substitutive`` is the
     only caller and converts every exception to ``None``."""
@@ -498,7 +538,7 @@ def _name_universal_substitutive_unsafe(
     # RECURSIVE-work ceiling; it cannot raise the raw-size safety ceiling).
     built = _build_ctx(mol, atom_work_budget,
                        force_vonbaeyer_spiro=force_vonbaeyer_spiro,
-                       acyloxy_leaf=acyloxy_leaf)
+                       acyloxy_leaf=acyloxy_leaf, book_forms=book_forms)
     if built is None:
         return None
     ctx, heavy = built
@@ -585,9 +625,13 @@ def _name_universal_substitutive_unsafe(
     name, reordered = _resolve_floor_stereo(
         ctx, mol, heavy, comp, atom_work_budget,
         prefix_order_fallback=prefix_order_fallback)
+    if ctx.book_forms_fired:
+        from .book_prefixes import note_book_form
+        note_book_form()
     return UniversalResult(name=name, bindings=tuple(comp.bindings), covers=covers,
                            acyloxy_leaf_fired=ctx.acyloxy_leaf_fired,
-                           prefix_order_fallback=reordered)
+                           prefix_order_fallback=reordered,
+                           book_forms_fired=ctx.book_forms_fired)
 
 
 def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
@@ -1092,7 +1136,7 @@ def _neutralize_semipolar_chalcogenides(mol):
 
 def _build_ctx(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
-    acyloxy_leaf: bool = True,
+    acyloxy_leaf: bool = True, book_forms: bool = True,
 ) -> Optional[Tuple["_Ctx", FrozenSet[int]]]:
     """Shared whole-molecule perception + ``_Ctx`` setup for BOTH public
     entry points (``name_universal_substitutive`` on the whole graph and
@@ -1222,11 +1266,13 @@ def _build_ctx(
     cation_sites = list(ion_sites.get('cations') or [])
     anion_sites = list(ion_sites.get('anions') or [])
 
+    from .book_prefixes import book_forms_enabled
     ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
                budget=_Budget(atom_work_budget), canon_rank=canon_rank,
                cation_sites=cation_sites, anion_sites=anion_sites,
                force_vonbaeyer_spiro=force_vonbaeyer_spiro,
-               acyloxy_leaf=acyloxy_leaf)
+               acyloxy_leaf=acyloxy_leaf,
+               book_forms=book_forms and book_forms_enabled())
     return ctx, heavy
 
 
@@ -1312,6 +1358,9 @@ def _name_universal_substituent_prefix_unsafe(
         if ctx.mol.GetAtomWithIdx(idx).GetFormalCharge() != 0 and idx not in charge_ok:
             return None
 
+    if ctx.book_forms_fired:
+        from .book_prefixes import note_book_form
+        note_book_form()
     return _render_as_substituent(comp, bond_order)
 
 
@@ -1437,15 +1486,56 @@ def _name_component(
                 attach_locant=None, is_prefix_ready=True,
             )
 
+        # Roadmap N5c: a branch attached through O, S, Se, Te or N is 'R-oxy' /
+        # 'methoxy', '(R)sulfanyl', '(R)amino' the Blue Book-27679,
+        #, not an 'a' chain ending on that heteroatom:6465).
+        hetero = (_hetero_root_leaf(ctx, component, attach_hint, emit_branch_stereo,
+                                    relative_ring_override)
+                  if ctx.book_forms else None)
+        if hetero is not None:
+            token, h_charged, h_internal = hetero
+            ctx.book_forms_fired = True
+            return _ComponentResult(
+                name=token, bindings=[(token, component)], covers=component,
+                attach_locant=None, is_prefix_ready=True,
+                charged=h_charged, internal_atoms=h_internal,
+            )
+
+        # Roadmap N5e: a branch attached through a carbonyl carbon is an acyl group
+        # ('carbamoyl', '(R)carbamoyl', 'azetidine-1-carbonyl', 'methoxycarbonyl',
+        # 'benzoyl'; (2) the Blue Book), not the replacement chain
+        # '1-oxo-2-azaethyl' / '2-oxaeth-1-en-1-yl'.
+        acyl = _acyl_leaf(ctx, component, attach_hint) if ctx.book_forms else None
+        if acyl is not None:
+            ctx.book_forms_fired = True
+            return _ComponentResult(
+                name=acyl, bindings=[(acyl, component)], covers=component,
+                attach_locant=None, is_prefix_ready=True,
+            )
+
+        retained = (_retained_group_leaf(ctx, component, attach_hint)
+                    if ctx.book_forms else None)
+        if retained is not None:
+            ctx.book_forms_fired = True
+            return _ComponentResult(
+                name=retained, bindings=[(retained, component)], covers=component,
+                attach_locant=None, is_prefix_ready=True,
+            )
+
     # ---- parent (spine) selection -----------------------------------------
     ring_here = _ring_system_for_component(ctx, component, attach_hint, is_top)
+    ring_form = None
     if ring_here is not None:
         spine_result = _name_ring_spine(ctx, component, ring_here, attach_hint)
     else:
         spine_result = _name_chain_spine(ctx, component, attach_hint)
     if spine_result is None:
         return None
-    spine_atoms, spine_core, spine_atom_to_locant, attach_locant = spine_result
+    if len(spine_result) == 5:
+        # roadmap N5d: a single ring spelled by its book name (``_book_ring_spine``)
+        spine_atoms, spine_core, spine_atom_to_locant, attach_locant, ring_form = spine_result
+    else:
+        spine_atoms, spine_core, spine_atom_to_locant, attach_locant = spine_result
 
     # ---- charge (Task B2b): does THIS level's own spine carry a genuine
     # ionic centre? Checked BEFORE branch discovery so an unresolvable
@@ -1482,8 +1572,16 @@ def _name_component(
     # ``...2-azapropan-2-ium`` -- but that elision is tolerated on the
     # TOKEN-IN-NAME axis ALONE, inside ``_verify_partition`` (accepts the stem
     # ``token[:-1]``), NOT by pre-stemming the stored token here.
+    # A spine of exactly one plain (non-isotope) carbon atom has, at the bond-order-0
+    # level, exactly one possible parent-hydride name -- 'methane' (no unsaturation is
+    # possible on a single atom, no replacement element is present) -- a fact of the
+    # atom itself, not of whatever the general chain builder computed for it.
+    _lone_methane = (
+        len(spine_atoms) == 1
+        and ctx.mol.GetAtomWithIdx(next(iter(spine_atoms))).GetAtomicNum() == 6
+        and not ctx.mol.GetAtomWithIdx(next(iter(spine_atoms))).GetIsotope())
     bindings: List[Tuple[str, FrozenSet[int]]] = [
-        (spine_core, frozenset(spine_atoms)),
+        ("methane" if _lone_methane else spine_core, frozenset(spine_atoms)),
     ]
     charged_accum: set = set(charge_ids)
     internal_accum: set = set(oxide_ids)  # Task B2b fix a performance pass + M2: rendered
@@ -1522,7 +1620,9 @@ def _name_component(
                 branch_stereo = _branch_stereo_block(
                     ctx.mol, sub.spine_atom_to_locant, s_atom, root)
             if branch_stereo:
-                rendered = branch_stereo + rendered
+                # Lane L2 (R2): the descriptor block keeps the writer's record
+                from .prefix_derivation import carried
+                rendered = carried(branch_stereo + rendered, like=rendered)
         loc = spine_atom_to_locant[s_atom]
         prefix_entries.setdefault(rendered, []).append(loc)
         prefix_entry_atoms.setdefault(rendered, []).append(s_atom)
@@ -1547,13 +1647,29 @@ def _name_component(
         prefix_parts.insert(0, prefix_parts.pop(top_prefix_front))
     joined = "-".join(p for _k, p, _a in prefix_parts)
 
-    if joined:
+    ionic_suffix = charge_suffix_text if needs_charge else oxide_suffix_text
+    # Roadmap N5: the book's spelling of this level -- a one-carbon spine as a methyl
+    # group, locants dropped where no isomer needs them, the alkyl and ring prefixes
+    # of (1) /. ``None`` keeps the mechanical spelling below.
+    book = None
+    if (ctx.book_forms and ionic_suffix is None and top_prefix_front is None
+            and spine_core is not None):
+        book = _book_spelling(ctx, spine_atoms, spine_core, attach_locant,
+                              prefix_entries, joined, ring_form,
+                              spine_atom_to_locant=spine_atom_to_locant)
+
+    if book is not None:
+        full_name, yl_names = book
+        ctx.book_forms_fired = True
+    elif joined:
         # hyphen glue: a joining '-' is needed only before a
         # locant-initial core (mirrors general_engine._emit_ring_from_analysis).
         glue = "-" if spine_core[:1].isdigit() else ""
         full_name = joined + glue + spine_core
+        yl_names = None
     else:
         full_name = spine_core
+        yl_names = None
 
     # A genuine skeletal charge and an internal semipolar-oxide ``-ium`` are
     # mutually exclusive on one spine (the compound case voided above), so at most
@@ -1562,7 +1678,6 @@ def _name_component(
     # (``_append_charge_suffix`` is called on the substituent-decorated name), so
     # (a)/ elision targets the parent hydride's own trailing 'e',
     # never truncates a substituent prefix.
-    ionic_suffix = charge_suffix_text if needs_charge else oxide_suffix_text
     if ionic_suffix is not None:
         full_name = _elide_before_ionic_suffix(full_name, ionic_suffix)
 
@@ -1574,7 +1689,157 @@ def _name_component(
         spine_atom_to_locant=dict(spine_atom_to_locant),
         top_prefix_atoms=(tuple(a for _k, _p, a in prefix_parts)
                           if is_top else None),
+        yl_names=yl_names,
     )
+
+
+def _book_spelling(ctx: _Ctx, spine_atoms, spine_core: str, attach_locant,
+                   prefix_entries: Dict[str, List[int]], joined: str, ring_form=None,
+                   spine_atom_to_locant: Optional[Dict[int, int]] = None):
+    """``(parent name, {bond order: substituent name})`` in the book's form, or
+    ``None`` when the mechanical spelling is already the book's.
+
+    * one carbon spine: a methyl group, its prefixes without locants and the second
+      and further enclosed (a) the Blue Book,:7272):
+      'trifluoromethyl', '(4-chlorophenyl)methyl', 'chlorodi(fluoro)methane';
+    * every substitutable position carrying the same prefix: no locants
+       :3007): 'pentafluoroethyl';
+    * an unbranched saturated carbon chain with the free valence at its end: the
+      alkyl prefix of (1) (:15813), '2-chloroethyl', not '2-chloroethan-1-yl';
+    * a ring spine spelled by ``rules.monocycle_forms`` (``ring_form``): 'phenyl',
+      'cyclopropyl', 'pyridin-2-yl':16290, (1) and (2)).
+
+    ``spine_atom_to_locant`` is the chain spine's own locant order (``atom -> 1-indexed
+    position along the chain``), for the bond-adjacency facts below; ``spine_atoms`` alone
+    is a ``frozenset`` and carries no order.
+
+    properfix a performance pass (review finding I4): the (b) (the Blue Book) and
+     (:2953) locant-omission legs below used to skip a charged component,
+    citing as the reason a charge's locant "must" stay -- (:41195-:41262,
+    anionic-centre prefix FORMATION, read in full) states no locant rule, and
+     (b) itself is unconditional: its own worked example is 'hydrazinyl
+    (preselected prefix) (not hydrazin-1-yl)' (:2911, an UNCHARGED branch) -- there is
+    no carve-out in the rule's text for a charged one either. OPSIN reads the
+    locant-free forms correctly ('CC[Se-]' -> 'selenidoethane', 'CC[PH](=O)[O-]' ->
+    '[oxido(oxo)phosphanyl]ethane'); the three `test_v34_composed_charge.py` literals
+    that kept the locant were stale (BUILD-MODE artifacts in this round's fix report).
+    Properfix a performance pass (review-2 M10): the guard this removed tested a
+    ``has_charged_atom`` flag the caller computed from ``_name_component``'s
+    ``charged_accum``; now that the branches below are unconditional, that flag is
+    never read here, so the parameter (and the caller's ``bool(charged_accum)``) are
+    gone rather than kept dead.
+    """
+    from ..rules.fused_forms import locant_key
+    from .book_prefixes import METHYL_HEADS, methyl_group_name, positions_alike_prefix
+
+    mol = ctx.mol
+    flat = [name for name, locs in prefix_entries.items() for _ in locs]
+    # A fused-ring spine's locants mix plain ints with lettered fusion locants ('7a'),
+    # which plain ``<`` cannot compare; ``locant_key`` is the one total order over both
+    # already used to sort locants elsewhere in this package.
+    spine = (sorted(spine_atoms, key=lambda a: locant_key(spine_atom_to_locant[a]))
+             if spine_atom_to_locant is not None else list(spine_atoms))
+    carbon_spine = all(mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in spine)
+    plain = lambda a: not mol.GetAtomWithIdx(a).GetIsotope()
+    if len(spine) == 1 and carbon_spine and plain(spine[0]):
+        if not flat:
+            # 'methylidene', 'methylidyne', never 'methan-1-ylidene' (1))
+            return "methane", {b: METHYL_HEADS[b] for b in (1, 2, 3)}
+        parent = methyl_group_name(flat, 0)
+        yl = {b: methyl_group_name(flat, b) for b in (1, 2, 3)}
+        if parent is None or any(v is None for v in yl.values()):
+            return None
+        spine_atom = mol.GetAtomWithIdx(spine[0])
+        heavy = [nb for nb in spine_atom.GetNeighbors() if nb.GetAtomicNum() > 1]
+        if len(heavy) >= 3 and any(
+                nb.GetAtomicNum() == 8 and nb.GetDegree() == 1
+                and mol.GetBondBetweenAtoms(spine[0], nb.GetIdx()).GetBondType()
+                == Chem.BondType.DOUBLE for nb in heavy):
+            # (the Blue Book) / (:30628): an acyl group
+            # spelled 'R(oxo)methyl' is a general name, never part of a PIN
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(yl[1])
+        return parent, yl
+
+    applied = False
+    block = joined
+    unit_cites_locant = (ring_form.cites_locant(attach_locant) if ring_form is not None
+                        else _chain_cites_locant(mol, spine))
+    alike = positions_alike_prefix(
+        mol, spine, flat, unit_cites_locant=unit_cites_locant) if (
+        flat and (carbon_spine or ring_form is not None)) else None
+    if alike is not None:
+        block = alike
+        applied = True
+    elif (ring_form is not None and attach_locant is None and len(flat) == 1
+            and ring_form.kind in ("benzene", "cycloalkane")):
+        # (c) (the Blue Book): the locant '1' is omitted in a
+        # monosubstituted homogeneous monocycle ('bromobenzene (PIN)')
+        from .naming_utils import enclose_if_compound
+        block = enclose_if_compound(flat[0])
+        applied = True
+    elif (ring_form is None and carbon_spine and len(spine) == 2 and len(flat) == 1
+            and attach_locant is None
+            and mol.GetBondBetweenAtoms(spine[0], spine[1]).GetBondType()
+            == Chem.BondType.SINGLE):
+        # (b) (the Blue Book): "The locant '1' is omitted:... in
+        # monosubstituted homogeneous chains consisting of only two identical
+        # atoms" ('methoxyethane (PIN)',:27745). Unconditional (review I4):
+        # (b)'s own 'hydrazinyl (not hydrazin-1-yl)' (:2911) omits the
+        # locant with a charge-bearing branch too; a charged component is not an
+        # exception this licence carves out has no locant rule at all).
+        from .naming_utils import enclose_if_compound
+        block = enclose_if_compound(flat[0])
+        applied = True
+    glue = "-" if block and spine_core[:1].isdigit() else ""
+    parent = block + glue + spine_core
+    yl: Dict[int, str] = {}
+    if ring_form is not None:
+        for order in (1, 2):
+            core_yl = ring_form.prefix_at_locant(attach_locant, order)
+            if core_yl is not None:
+                yl[order] = block + ("-" if block and core_yl[:1].isdigit() else "") + core_yl
+        applied = applied or bool(yl)
+        if ring_form.kind != "heteromonocycle":
+            return parent, (yl or None)
+    elif (ring_form is None and carbon_spine and attach_locant == 1 and len(spine) == 2
+            and mol.GetBondBetweenAtoms(spine[0], spine[1]).GetBondType()
+            == Chem.BondType.DOUBLE):
+        # (the Blue Book): one place for the double bond, so no
+        # ene locant; the free-valence locant only with a prefix ('ethenyl'
+        #:24547, '2-chloroethen-1-yl':3003, '2-bromoethen-1-ylidene':45805).
+        # Unconditional (review I4): no charge exception, same as the (b) leg above.
+        yl[1] = block + ("ethen-1-yl" if block else "ethenyl")
+        yl[2] = block + ("ethen-1-ylidene" if block else "ethenylidene")
+        applied = True
+    elif (carbon_spine and attach_locant == 1 and len(spine) > 1
+            and all(plain(a) for a in spine)
+            and not any(mol.GetAtomWithIdx(a).IsInRing() for a in spine)
+            and all(mol.GetBondBetweenAtoms(spine[i], spine[i + 1]).GetBondType()
+                    == Chem.BondType.SINGLE for i in range(len(spine) - 1))):
+        yl[1] = block + get_alkyl_name(len(spine))
+        yl[2] = block + get_alkyl_name(len(spine)) + "idene"
+        applied = True
+    if not applied:
+        return None
+    return parent, (yl or None)
+
+
+def _chain_cites_locant(mol, spine) -> bool:
+    """The chain parent cites a locant: a skeletal heteroatom ('2-oxapropane') or a
+    multiple bond ('prop-1-ene'), the Blue Book).
+
+    A spine atom already in a ring means this is a ring spine without a
+    ``MonocycleForm``/``FusedForm`` override (one of those declined, or the ring is
+    polycyclic): such a parent is spelled by 'a' replacement or a von Baeyer / spiro
+    bracket descriptor, which always cites a locant,, and its spine
+    is not in general a bonded path (a bridgehead skips the ``spine[i]``-``spine[i+1]``
+    adjacency this function otherwise assumes for an acyclic chain)."""
+    if any(mol.GetAtomWithIdx(a).IsInRing() for a in spine):
+        return True
+    return (any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in spine)
+            or any(mol.GetBondBetweenAtoms(spine[i], spine[i + 1]).GetBondType()
+                   != Chem.BondType.SINGLE for i in range(len(spine) - 1)))
 
 
 def _branch_stereo_block(mol, branch_atom_to_locant: Dict[int, int],
@@ -1712,6 +1977,198 @@ def _acyloxy_leaf(mol, component: FrozenSet[int], attach_hint: int) -> Optional[
     return tok if tok.startswith(("(", "[", "{")) else enclose_if_compound(tok)
 
 
+def _hetero_root_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
+                      emit_branch_stereo: bool = False, relative_ring_override=None):
+    """``(token, charged, internal)`` for a branch attached through a heteroatom, composed
+    from its parts, or ``None``:
+
+    * -O-R 'R-oxy' with the retained contractions the Blue Book,
+       :27667: 'methoxy', '2-chloroethoxy', 'phenoxy', '(propan-2-yl)oxy');
+      -O-CO-R the acyloxy prefix:31698);
+    * -S-R '(R)sulfanyl', -Se-R '(R)selanyl', -Te-R '(R)tellanyl':27649);
+    * -N< 'amino' with its substituents, the second enclosed:7272).
+
+    The parts are named by this floor's own recursion (their stereo blocks and charges
+    carried as in the branch loop of ``_name_component``); an acyl part by
+    ``book_prefixes.acyl_group_prefix``. A lone heteroatom is the leaf shortcuts'."""
+    mol = ctx.mol
+    root = mol.GetAtomWithIdx(attach_hint)
+    sym = root.GetSymbol()
+    if (sym not in HETERO_ROOT_VALENCE or root.IsInRing() or root.GetIsotope()
+            or ctx.ring_system_of.get(attach_hint) is not None):
+        return None
+    # an ammonium nitrogen (four single bonds, +1): 'azaniumyl' with its prefixes
+    #; every other root is neutral at its standard bonding number
+    ammonium = (sym == "N" and root.GetFormalCharge() == 1
+                and root.GetTotalValence() == 4
+                and any(s["atom_idx"] == attach_hint for s in ctx.cation_sites))
+    if root.GetFormalCharge() and not ammonium:
+        return None
+    if not ammonium and root.GetTotalValence() != HETERO_ROOT_VALENCE[sym]:
+        return None
+    # an imine nitrogen joined to its one part by a double bond: '(R-ylidene)amino'
+    double = [b for b in root.GetBonds() if b.GetBondType() != Chem.BondType.SINGLE]
+    ylidene_part = None
+    if double:
+        if (sym != "N" or ammonium or len(double) != 1
+                or double[0].GetBondType() != Chem.BondType.DOUBLE
+                or double[0].GetStereo() != Chem.BondStereo.STEREONONE):
+            return None
+        ylidene_part = double[0].GetOtherAtomIdx(attach_hint)
+        if ylidene_part not in component or mol.GetAtomWithIdx(ylidene_part).GetSymbol() != "C":
+            return None
+    if len([nb for nb in root.GetNeighbors() if nb.GetIdx() not in component]) != 1:
+        return None
+    parts = []
+    claimed = {attach_hint}
+    for nb in root.GetNeighbors():
+        j = nb.GetIdx()
+        if j not in component or j in claimed:
+            continue
+        comp, stack = set(), [j]
+        while stack:
+            cur = stack.pop()
+            if cur in comp or cur == attach_hint:
+                continue
+            comp.add(cur)
+            for nb2 in mol.GetAtomWithIdx(cur).GetNeighbors():
+                k = nb2.GetIdx()
+                if k in component and k not in comp and k != attach_hint:
+                    stack.append(k)
+        claimed |= comp
+        parts.append((j, frozenset(comp)))
+    if not parts or (sym in CHALCOGEN_HEAD and len(parts) != 1) \
+            or claimed != set(component):
+        return None
+    if ylidene_part is not None and len(parts) != 1:
+        return None
+
+    from .book_prefixes import acyl_group_prefix
+    from .substituent_enumerator import (
+        alkoxy_prefix_from_substituent, cite_organyl_in_composed_prefix)
+    names, charged, internal = [], set(), set()
+    for p_attach, p_atoms in parts:
+        plain = (not any(mol.GetAtomWithIdx(a).GetFormalCharge() for a in p_atoms)
+                 and not any(mol.GetAtomWithIdx(a).GetChiralTag()
+                             != Chem.ChiralType.CHI_UNSPECIFIED for a in p_atoms))
+        acyl = None
+        if plain and ylidene_part is None:
+            acyl = acyl_group_prefix(
+                mol, p_attach, attach_hint, p_atoms,
+                lambda atoms, r: (lambda sub: _render_as_substituent(sub, 1)
+                                  if sub is not None else None)(
+                    _name_component(ctx, frozenset(atoms), attach_hint=r, is_top=False)))
+        if acyl:
+            names.append((acyl, True))
+            continue
+        sub = _name_component(ctx, p_atoms, attach_hint=p_attach, is_top=False,
+                              emit_branch_stereo=emit_branch_stereo,
+                              relative_ring_override=relative_ring_override)
+        if sub is None:
+            return None
+        rendered = _render_as_substituent(sub, 2 if p_attach == ylidene_part else 1)
+        if emit_branch_stereo and sub.spine_atom_to_locant:
+            rel = (relative_ring_override.get(frozenset(sub.spine_atom_to_locant))
+                   if relative_ring_override else None)
+            block = (f"{rel}-" if rel is not None else
+                     _branch_stereo_block(mol, sub.spine_atom_to_locant, attach_hint,
+                                          p_attach))
+            if block:
+                rendered = block + rendered
+        names.append((rendered, False))
+        charged |= sub.charged
+        internal |= sub.internal_atoms
+    if ammonium:
+        from .composer import _assemble_decorated_amino_prefix
+        token = _assemble_decorated_amino_prefix(
+            [(n, False) for n, _ in names], enclose=False, head="azaniumyl")
+        charged = charged | {attach_hint}
+    elif ylidene_part is not None:
+        cited = cite_organyl_in_composed_prefix(names[0][0])
+        token = f"{cited}amino" if cited else None
+    elif sym in MONONUCLEAR_HEAD:
+        # a mononuclear parent hydride: its prefixes without locants, the second and
+        # further enclosed:7272): 'trimethylsilyl', 'dimethylphosphanyl'
+        from .composer import _assemble_decorated_amino_prefix
+        token = _assemble_decorated_amino_prefix(
+            [(n, False) for n, _ in names], enclose=False, head=MONONUCLEAR_HEAD[sym])
+    elif sym == "N":
+        token = None
+        if len(names) == 1 and names[0][1] and root.GetTotalNumHs() == 1:
+            # -NH-CO-R: the amido prefix, method (1) (the Blue Book
+            # "Method (1) generates preferred IUPAC names"), from the verified acid
+            from .substituent_naming import acyl_amido_prefix_from_branch
+            try:
+                token = acyl_amido_prefix_from_branch(
+                    mol, attach_hint, parts[0][0], set(component), verify_acid=True)
+            except Exception:  # noqa: BLE001 - a producer that raises is a decline
+                token = None
+        if not token:
+            from .composer import _assemble_decorated_amino_prefix
+            token = _assemble_decorated_amino_prefix(
+                [(n, False) for n, _ in names], enclose=False, head="amino")
+    else:
+        nm, is_acyl = names[0]
+        if sym == "O" and not is_acyl:
+            token = alkoxy_prefix_from_substituent(nm)
+        else:
+            cited = cite_organyl_in_composed_prefix(nm)
+            token = f"{cited}{CHALCOGEN_HEAD[sym]}" if cited else None
+    if not token:
+        return None
+    return token, frozenset(charged), frozenset(internal)
+
+
+def _retained_group_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int
+                         ) -> Optional[str]:
+    """Lane L2 (R1): 'benzyl' / 'benzylidene' / 'benzylidyne' / 'tert-butyl' for an
+    unsubstituted group, with the bond order of its attachment,
+    the Blue Book-:24418; ``book_prefixes.retained_group_prefix``)."""
+    from .book_prefixes import retained_group_prefix
+    mol = ctx.mol
+    parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_hint).GetNeighbors()
+               if nb.GetIdx() not in component and nb.GetAtomicNum() > 1]
+    if len(parents) != 1:
+        return None
+    order = {Chem.BondType.SINGLE: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}.get(
+        mol.GetBondBetweenAtoms(attach_hint, parents[0]).GetBondType())
+    return retained_group_prefix(mol, component, attach_hint, order) if order else None
+
+
+def _acyl_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int) -> Optional[str]:
+    """The acyl-group prefix of a branch attached through its carbonyl carbon
+    (``book_prefixes.acyl_group_prefix``), its parts named by this floor's own
+    recursion, or ``None``. A charged or stereo-bearing branch is left to the generic
+    path, so the floor's charge and stereo layers stay in charge of those."""
+    mol = ctx.mol
+    atom = mol.GetAtomWithIdx(attach_hint)
+    if atom.GetSymbol() != "C" or atom.IsInRing():
+        return None
+    if any(mol.GetAtomWithIdx(a).GetFormalCharge() for a in component):
+        return None
+    if any(mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+           for a in component) or any(
+            b.GetStereo() != Chem.BondStereo.STEREONONE
+            and b.GetBeginAtomIdx() in component and b.GetEndAtomIdx() in component
+            for b in mol.GetBonds()):
+        return None
+    parents = [nb.GetIdx() for nb in atom.GetNeighbors() if nb.GetIdx() not in component]
+    if len(parents) != 1:
+        return None
+
+    def part(atoms, root):
+        sub = _name_component(ctx, frozenset(atoms), attach_hint=root, is_top=False)
+        return _render_as_substituent(sub, 1) if sub is not None else None
+
+    from .book_prefixes import acyl_group_prefix
+    try:
+        return acyl_group_prefix(mol, attach_hint, parents[0], component, part)
+    except _BudgetExceeded:
+        raise
+    except Exception:  # noqa: BLE001 - a leaf shortcut must never break the floor
+        return None
+
+
 def _render_as_substituent(sub: _ComponentResult, bond_order: int) -> str:
     """Rewrite a component's parent name as a ``-yl``/``-ylidene``/``-ylidyne``
     substituent prefix, cited at ITS OWN attachment locant.
@@ -1729,6 +2186,8 @@ def _render_as_substituent(sub: _ComponentResult, bond_order: int) -> str:
     """
     if sub.is_prefix_ready:
         return sub.name
+    if sub.yl_names and bond_order in sub.yl_names:
+        return sub.yl_names[bond_order]
     name = sub.name
     # "Retained substituent prefix names" /: an UNBRANCHED
     # saturated all-carbon chain whose free valence is at position 1 and which
@@ -1843,6 +2302,8 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             continue
         if ctx.ring_system_of.get(j) is not None:
             continue
+        if ctx.carbon_walk and nb.GetAtomicNum() != 6:
+            continue  # roadmap N5c: a substitutive spine is a carbon chain
         if not _is_skeletal_spine_element(ctx.mol, j):
             continue  # ALLOW-LIST (M1): only carbon + a REPLACEMENT_TERMS-
             # spellable heteroatom MAY thread the chain spine. Every
@@ -2115,6 +2576,11 @@ def _name_ring_spine(
         mixed = _mixed_spiro_fused_leaf(ctx, ring_atoms, attach_hint)
         if mixed is not None:
             return mixed
+        # Roadmap N5b: a fusable system by its fusion name before the von Baeyer
+        # polyene the Blue Book,:24221).
+        fused = _book_fused_spine(ctx, component, ring_atoms, attach_hint)
+        if fused is not None:
+            return fused
         cage = analyze_cage_universal(mol, cage_atoms=set(ring_atoms),
                                       allow_mancude=True)
         if cage is None:
@@ -2149,6 +2615,9 @@ def _name_ring_spine(
     # Monocyclic: build our own minimal cyclo/'a'-replacement name.
     if len(sssr_here) != 1:
         return None  # defensive: a ring system with 0 SSSR rings inside it
+    book = _book_ring_spine(ctx, component, ring_atoms, attach_hint)
+    if book is not None:
+        return book
     ring_tuple = next((r for r in ri.AtomRings() if set(r) == ring_atoms), None)
     if ring_tuple is None:
         return None
@@ -2258,11 +2727,92 @@ def _name_ring_spine(
 # Chain spine construction (acyclic; own tree-diameter / rooted walk)
 # ===========================================================================
 
+def _book_fused_spine(ctx: _Ctx, component: FrozenSet[int], ring_atoms: FrozenSet[int],
+                      attach_hint: Optional[int]):
+    """Roadmap N5b: a fusable ring system of the floor spelled by its fusion name
+    (``rules.fused_forms.fused_system_form``: '1,2,3,4-tetrahydronaphthalene',
+    '1H-indole', '4H-1-benzopyran' with an 'oxo' prefix; the Blue Book,
+     :24221), numbered for this component's branches. Returns the spine
+    5-tuple ``(atoms, parent, atom->locant, attach locant, form)`` -- the shape of
+    ``_book_ring_spine``, so ``_book_spelling`` renders the prefix -- or ``None``
+    (the von Baeyer spelling below stays the floor's answer). The fusion atoms keep
+    their lettered locants, which ``_locant_sort_key`` orders."""
+    if not ctx.book_forms:
+        return None
+    from ..rules.fused_forms import fused_system_form
+    from ..rules.monocycle_forms import aromatic_view, branch_carriers
+    if ctx.aromatic_mol is None:
+        ctx.aromatic_mol = aromatic_view(ctx.mol) or False
+    view = ctx.aromatic_mol
+    if view is False:
+        return None
+    ring = sorted(ring_atoms)
+    try:
+        form = fused_system_form(view, ring, attach_hint,
+                                 branch_carriers(view, ring, attach_hint, within=component))
+    except Exception:  # noqa: BLE001 - a producer that raises is a decline
+        return None
+    if form is None:
+        return None
+    attach_locant = form.numbering.get(attach_hint) if attach_hint is not None else None
+    ctx.book_forms_fired = True
+    return frozenset(ring_atoms), form.parent, dict(form.numbering), attach_locant, form
+
+
+def _book_ring_spine(ctx: _Ctx, component: FrozenSet[int], ring_atoms: FrozenSet[int],
+                     attach_hint: Optional[int]):
+    """Roadmap N5d: a single ring of the floor spelled by its book name -- 'benzene' /
+    'phenyl' the Blue Book,:16290), a cycloalkane, or a
+    retained / Hantzsch-Widman heteromonocycle:8482,:23682) --
+    numbered by ``rules.monocycle_forms`` for this component's branches. Returns the
+    spine 5-tuple ``(atoms, parent, atom->locant, attach locant, form)`` or ``None``
+    (the 'a'-replacement spelling below stays the floor's answer)."""
+    if not ctx.book_forms:
+        return None
+    from ..rules.monocycle_forms import aromatic_view, branch_carriers, monocycle_form
+    if ctx.aromatic_mol is None:
+        ctx.aromatic_mol = aromatic_view(ctx.mol) or False
+    view = ctx.aromatic_mol
+    if view is False:
+        return None
+    ring = sorted(ring_atoms)
+    form = monocycle_form(view, ring, attach_hint,
+                          branch_carriers(view, ring, attach_hint, within=component))
+    if form is None:
+        return None
+    attach_locant = form.numbering.get(attach_hint) if attach_hint is not None else None
+    ctx.book_forms_fired = True
+    return frozenset(ring_atoms), form.parent, dict(form.numbering), attach_locant, form
+
+
 def _name_chain_spine(
     ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[int],
 ) -> Optional[Tuple[FrozenSet[int], str, Dict[int, int], Optional[int]]]:
     mol = ctx.mol
+    path = _pick_chain_path(ctx, component, attach_hint)
+    # Roadmap N5c: (:6465) / (:23348) -- an 'a' chain only when
+    # the book allows it; otherwise the spine is the carbon chain and each heteroatom
+    # roots a substituent prefix (``_hetero_root_leaf``: 'methoxy', '(R)amino',...).
+    if (ctx.book_forms and path and not a_chain_licensed(mol, path)
+            and hetero_roots_composable(mol, path)
+            and (attach_hint is None or mol.GetAtomWithIdx(attach_hint).GetAtomicNum() == 6)
+            and any(mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in component)):
+        ctx.carbon_walk = True
+        try:
+            carbon_path = _pick_chain_path(ctx, component, attach_hint)
+        finally:
+            ctx.carbon_walk = False
+        if carbon_path and all(mol.GetAtomWithIdx(a).GetAtomicNum() == 6
+                               for a in carbon_path):
+            path = carbon_path
+            ctx.book_forms_fired = True
+    return _chain_spine_from_path(ctx, component, attach_hint, path)
 
+
+def _pick_chain_path(ctx: _Ctx, component: FrozenSet[int],
+                     attach_hint: Optional[int]) -> Optional[List[int]]:
+    """The chain spine's atom path (the walk ``_tree_neighbors`` allows)."""
+    mol = ctx.mol
     if attach_hint is not None:
         path = _farthest_path_from(ctx, attach_hint, component)
     else:
@@ -2304,7 +2854,12 @@ def _name_chain_spine(
         rev = list(reversed(path))
         if _chain_score(ctx, rev, component) < _chain_score(ctx, path, component):
             path = rev
+    return path
 
+
+def _chain_spine_from_path(ctx: _Ctx, component: FrozenSet[int],
+                           attach_hint: Optional[int], path):
+    mol = ctx.mol
     if not path:
         return None
     # ALLOW-LIST (M1), builder side: a chain spine may be built ONLY from
@@ -2341,6 +2896,12 @@ def _name_chain_spine(
     hetero_prefix = _build_hetero_prefix(mol, path, atom_to_locant)
     parent_block = _build_parent_with_unsaturation(n, unsaturation, fg_suffix=None)
     core = hetero_prefix + parent_block
+    if hetero_prefix and not a_chain_licensed(mol, path):
+        # (the Blue Book), (:23348): an 'a' chain the book does
+        # not allow is valid but never part of a PIN (see terminal_fragment)
+        from ..data.chain_names import get_chain_prefix
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(f"{hetero_prefix}{get_chain_prefix(n)}")
 
     attach_locant = atom_to_locant.get(attach_hint) if attach_hint is not None else None
     return frozenset(path), core, atom_to_locant, attach_locant

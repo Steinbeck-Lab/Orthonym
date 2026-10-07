@@ -3979,6 +3979,24 @@ def _monocycle_core_tail(mol, core, attach_idx, pos, ring_info):
     return f'{ih_prefix}{stem}-{pos[attach_idx]}-yl'
 
 
+def _book_monocycle_core_tail(mol, core, attach_idx, deco_carriers):
+    """``(numbering, tail)`` for a monocyclic core spelled by its book name
+    ('2H-pyran-3-yl', '1,3-oxazol-4-yl', 'cyclopropyl'; the Blue Book,
+    , or ``None``. ``deco_carriers`` lists the core atom of each decoration
+     (f) lowest locants)."""
+    from .book_prefixes import book_forms_enabled
+    if not book_forms_enabled():
+        return None
+    from ..rules.monocycle_forms import monocycle_form
+    form = monocycle_form(mol, sorted(core), attach_idx, list(deco_carriers))
+    if form is None:
+        return None
+    tail = form.prefix(attach_idx, 1)
+    if tail is None:
+        return None
+    return dict(form.numbering), tail
+
+
 def _terminal_monocycle_core_tail(mol, core, attach_idx, pos):
     """-T1b: the AUDITED replacement tail for a monocyclic core
     the PIN stem tables declined, on the caller's OWN ``pos`` numbering.
@@ -4111,7 +4129,15 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
             # replacement name instead, on THIS SAME ``pos`` numbering, so the
             # decoration locants read off ``pos`` below stay consistent with the
             # core tail by construction rather than by two numberings agreeing.
-            core_tail = _terminal_monocycle_core_tail(mol, core, attach_idx, pos)
+            #
+            # Roadmap N5d: first the book's name of the ring with ITS numbering
+            # (``rules.monocycle_forms``; the decoration locants below read off the
+            # same ``pos``), then the replacement spelling for what it declines.
+            _book = _book_monocycle_core_tail(mol, core, attach_idx, deco_carriers)
+            if _book is not None:
+                pos, core_tail = _book
+            else:
+                core_tail = _terminal_monocycle_core_tail(mol, core, attach_idx, pos)
             if not core_tail or ' ' in core_tail:
                 return None
     else:

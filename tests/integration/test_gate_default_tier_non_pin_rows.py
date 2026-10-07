@@ -42,8 +42,11 @@ def test_every_listed_row_is_an_unchanged_gold_row_with_its_reason():
     # W2E-P0BL-05 left the list: its gold row now expects the PIN '1H-1λ4-1-benzothiophene'
     #,:11815), which the default tier ships. W2E-P0A-P2 ('ethanol ethanol',
     # protect) joined it: identical components joined by a space are not a PIN,
-    #:3759, adducts of separate molecular entities; quick-wins Q7a).
-    assert len(rows) == 25
+    #:3759, adducts of separate molecular entities; quick-wins Q7a). W2E-P2IP-P2 (the
+    # seven-ring assembly '...-septiphenyl', protect) joined it: (:24088) "Phane
+    # names are preferred IUPAC names rather than ring assembly names when seven or more
+    # rings or ring systems are present", and OPSIN 2.9.0 reads no phane name.
+    assert len(rows) == 26
     gold = _gold_rows()
     for r in rows:
         g = gold.get((r["pack"], r["def_id"], r["smiles"]))

@@ -4699,16 +4699,22 @@ def _component_needs_hoist(mol, comp_atoms: Set[int], spiro_center: int,
         for a in comp_atoms)
 
 
-def _pin_component_alpha_key(name: str) -> Tuple[str, str]:
+def _pin_component_alpha_key(name: str) -> Tuple[str, Tuple[int, ...], str]:
     """ / alphanumerical order of two ring-component names
     (the Blue Book): the Roman letters first ('cyclopentane' before
     'isoquinoline', 'indene' before '[1,3]oxazole'); when they are equal, the
-    fusion locants and letters, heteroatom locants and von Baeyer numbers
-    ('thieno[2,3-b]furan' before 'thieno[3,2-b]furan',:10310)."""
+    heteroatom locants that open a benzo or Hantzsch-Widman component name, compared
+    as a set,:3191: "compared term by term with other locant sets, each cited
+    in order of increasing value"): '3,1-benzoxazine before 2,3-benzoxazine' (:10318),
+    '1,2-benzo... before 1,3-benzo...' (:10312); then the fusion locants and letters
+    and von Baeyer numbers as written ('thieno[2,3-b]furan' before
+    'thieno[3,2-b]furan',:10310; 'benzo[g]... before benzo[h]...',:10301)."""
     import re
     s = name.strip().lower()
     letters = re.sub(r'[^a-z]', '', re.sub(r'\[[^\]]*\]', '', s))
-    return (letters, s)
+    lead = re.match(r'^\[(\d+(?:,\d+)*)\]', s) or re.match(r'^(\d+(?:,\d+)*)-', s)
+    hetero = tuple(sorted(int(x) for x in lead.group(1).split(','))) if lead else ()
+    return (letters, hetero, s)
 
 
 def _assemble_hoisted_monospiro(spiro_center: int, state_a, state_b):
@@ -4981,6 +4987,15 @@ def _name_spirobi_core(mol):
         primed_name = name_b if unprimed_map is loc_map_a else name_a
         component_name = _strip_consumed_indicated_h(unprimed_name, lo)
         if _strip_consumed_indicated_h(primed_name, hi) != component_name:
+            return None
+        # (the Blue Book): "Indicated hydrogen of individual
+        # components is not cited... If indicated hydrogen is needed, it is cited in front
+        # of the spiro atom locants" ('2'H,4H-2,4'-spirobi[[1,3]dioxolo[4,5-c]pyran] (PIN)',
+        #:10172). A component name that still carries indicated hydrogen here (a parent
+        # with two indicated hydrogen positions, '2H,4H-[1,3]dioxolo[4,5-c]pyran', of which
+        # the spiro atom takes one) would cite it inside the bracket; this branch has no
+        # front citation for it, so it declines.
+        if _extract_leading_indicated_h(component_name)[0]:
             return None
         component_name = _bracket_component_locants(component_name)
         name = f"{lo_tok},{hi}'-spirobi[{component_name}]"
@@ -6920,6 +6935,13 @@ def _name_spiro_vonbaeyer_core(mol):
             ene_unp, ene_pri = ene_b, ene_a
         component = _bracket_component_locants(
             _strip_consumed_indicated_h(name_a, lo))
+        # (the Blue Book): "Indicated hydrogen of individual
+        # components is not cited"; it stands in front of the spiro locants
+        # ('2'H,4H-2,4'-spirobi[[1,3]dioxolo[4,5-c]pyran] (PIN)',:10172). A component that
+        # keeps its own inside the bracket ('2H,4H-[1,3]dioxolo[4,5-c]pyran' joined at C2
+        # and C4') gives a valid name that is not the PIN.
+        if _extract_leading_indicated_h(component)[0]:
+            _non_pin_form = True
         # spirobi: unsaturation of the two IDENTICAL cages is cited as a
         # multiplicative suffix AFTER the closing bracket (`...nonane]-6,6'-diene`,
         # a Blue-Book PIN form) -- NOT spliced inside (that is the component-name

@@ -28,12 +28,13 @@ def _whole(smiles, attach=0):
 # --------------------------------------------------------------- ring systems
 
 @pytest.mark.parametrize("smiles,attach,expected", [
-    # derived from terminal_ring_name directly, 2026-08-04
-    ("C1CCCCC1", 0, "cyclohexan-1-yl"),
-    ("C1CCOCC1", 0, "1-oxacyclohexan-4-yl"),
-    # mancude ring: the SYSTEMATIC form, not the retained 'phenyl' -- correct for
-    # this best-effort tier, where a complete name beats a preferred-or-absent one
-    ("c1ccccc1", 0, "cyclohexa-1,3,5-trien-1-yl"),
+    # roadmap N5d (name-quality lane L2): the book's names of the rings -- 'cyclohexyl'
+    # (1), the Blue Book), 'oxan-4-yl',:8482), 'phenyl'
+    #,:16290). Were 'cyclohexan-1-yl', '1-oxacyclohexan-4-yl' and
+    # 'cyclohexa-1,3,5-trien-1-yl' (derived from terminal_ring_name, 2026-08-04).
+    ("C1CCCCC1", 0, "cyclohexyl"),
+    ("C1CCOCC1", 0, "oxan-4-yl"),
+    ("c1ccccc1", 0, "phenyl"),
 ])
 def test_bare_ring_system_delegates_to_terminal_ring(smiles, attach, expected):
     mol, frag, att = _whole(smiles, attach)

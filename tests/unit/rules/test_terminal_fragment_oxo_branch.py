@@ -65,13 +65,16 @@ def test_mid_chain_ketone_branch_is_oxo_not_oxamethyl():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # These have the oxygen in the BACKBONE, are already RT-EXACT, and must not move.
-    ("c1ccccc1CC=O", "3-oxaprop-2-en-1-yl"),
-    ("c1ccccc1CC(C)=O", "2-methyl-3-oxaprop-2-en-1-yl"),
-    ("c1ccccc1CC(O)C", "2-methyl-3-oxapropyl"),
+    # Roadmap N5c: the chain ends on carbon, the Blue Book "The chain must
+    # be terminated by a C atom or..."), the oxygen is a prefix: 'acetonyl = 2-oxopropyl*'
+    # (Appendix 2,:55429); the 'amino-oxo' pattern of '2-anilino-2-oxoethyl (preferred
+    # prefix)' (:24603)
+    ("c1ccccc1CC=O", "2-oxoethyl"),
+    ("c1ccccc1CC(C)=O", "2-oxopropyl"),
+    ("c1ccccc1CC(O)C", "2-hydroxypropyl"),
 ])
 def test_backbone_oxygen_forms_do_not_regress(smiles, expected):
-    """Regression pins. A branch fix must not perturb the backbone decomposition."""
+    """Regression pins: a carbonyl or hydroxy oxygen is a prefix on the carbon chain."""
     assert _name(smiles) == expected
 
 

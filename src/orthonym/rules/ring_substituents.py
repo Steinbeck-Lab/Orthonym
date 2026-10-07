@@ -1665,12 +1665,16 @@ def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
             infix = _build_ene_yne_infix(base, ene, [])
             if infix is None:
                 return None
-            return f'{desc}{infix}-{loc}-yl'  # bicyclo[2.2.2]oct-5-en-2-yl
+            # Lane L2 (R2): a von Baeyer ring is a simple component, its brackets
+            # a descriptor (f), the Blue Book)
+            from ..assembly.prefix_derivation import built
+            return built(f'{desc}{infix}-{loc}-yl', substituted=False)  # bicyclo[2.2.2]oct-5-en-2-yl
 
         parent = desc + stem  # 'bicyclo[2.2.1]heptane'
         if parent.endswith('e'):
             parent = parent[:-1]
-        return f'{parent}-{loc}-yl'
+        from ..assembly.prefix_derivation import built
+        return built(f'{parent}-{loc}-yl', substituted=False)
     except Exception:
         return None
 
@@ -1702,7 +1706,9 @@ def _spiro_substituent_name(sub, attach_sub) -> Optional[str]:
         parent = desc + stem
         if parent.endswith('e'):
             parent = parent[:-1]
-        return f'{parent}-{loc}-yl'
+        # Lane L2 (R2): (f) (the Blue Book) 'oxydi(spiro[4.5]decane)'
+        from ..assembly.prefix_derivation import built
+        return built(f'{parent}-{loc}-yl', substituted=False)
     except Exception:
         return None
 
@@ -2308,6 +2314,29 @@ def _fused_heterocycle_core_numbering(mol, ring_atoms, attach, deco_carriers):
     return best_pos, tail
 
 
+def _fused_form_core_numbering(mol, ring_atoms, attach, deco_carriers):
+    """Roadmap N5b: ``(pos, tail)`` for a fusable ring core named by its fusion name
+    (``rules.fused_forms.fused_system_form``: the catalogue's mancude parent with the
+    hydro prefixes and indicated hydrogen of this structure,
+    the Blue Book), or ``None``. ``pos`` holds the numbered (not lettered) ring
+    locants, as the two catalogue helpers above return it; the free valence and every
+    decoration carrier take a numbered locant or the core declines."""
+    from .fused_forms import fused_system_form
+    try:
+        form = fused_system_form(mol, list(ring_atoms), attach, list(deco_carriers))
+    except Exception:  # noqa: BLE001 - a producer that raises is a decline
+        return None
+    if form is None:
+        return None
+    tail = form.prefix(attach, 1)
+    if tail is None or ' ' in tail:
+        return None
+    pos = {a: loc for a, loc in form.numbering.items() if isinstance(loc, int)}
+    if any(a not in pos for a in [attach, *deco_carriers]):
+        return None
+    return pos, tail
+
+
 def polycyclic_core_numbering(
     mol, ring_atoms: Tuple[int, ...], attachment_atom: int,
     deco_carriers, allow_mancude: bool = False,
@@ -2352,6 +2381,14 @@ def polycyclic_core_numbering(
         # polyenes. The retained name is the preferred emission. Gated on
         # allow_mancude so the PIN-default path stays byte-identical.
         res = _fused_heterocycle_core_numbering(
+            mol, ring_atoms, attachment_atom, deco_carriers)
+        if res is not None:
+            return res
+        # Roadmap N5b: a fusable system the two catalogue lookups above do not hold
+        # as a bare mancude entry (a hydro form, an indicated-hydrogen tautomer, an
+        # 'oxo' decoration) by its fusion name on the catalogue numbering, before
+        # the von Baeyer polyene the Blue Book,:24221).
+        res = _fused_form_core_numbering(
             mol, ring_atoms, attachment_atom, deco_carriers)
         if res is not None:
             return res
@@ -3007,7 +3044,8 @@ def _compound_ring_on_chain_substituent(
         # layer (naming_utils.format_substituent_prefix, Task 6) escalates
         # the outer mark to brackets. Mononuclear carrier
         # cites no locant.
-        return f"{''.join(_parts)}{alkyl}"
+        from ..assembly.prefix_derivation import built
+        return built(f"{''.join(_parts)}{alkyl}", substituted=True)
     #: enclose the ring-yl in marks only when it is itself complex
     # (carries locants/parens, e.g. '(naphthalen-2-yl)methyl'); a simple ring-yl
     # is concatenated bare ('cyclohexylmethyl', 'phenylmethyl' is retained
@@ -3029,13 +3067,17 @@ def _compound_ring_on_chain_substituent(
         # correctly stays the systematic (4-chlorophenyl)methyl per.
         # The single -CH2- carrier is already guaranteed by len(path)==1 plus
         # the saturated/undecorated carrier guards above.
+        # Lane L2 (R2): 'benzyl' is a retained name, a simple component (a),
+        # the Blue Book); a ring on the carrier makes a compound prefix (:7035)
+        from ..assembly.prefix_derivation import built
         if ring_name == 'phenyl':
-            return 'benzyl'
-        return f'{inner}methyl'
+            return built('benzyl', substituted=False)
+        return built(f'{inner}methyl', substituted=True)
     if pos_out is not None:
         # The SAME `enumerate(path, start=1)` numbering `loc` above came from.
         pos_out.update({_a: _i for _i, _a in enumerate(path, start=1)})
-    return f'{loc}-{inner}{alkyl}'
+    from ..assembly.prefix_derivation import built
+    return built(f'{loc}-{inner}{alkyl}', substituted=True)
 
 
 def _contained_rings(mol, ring_atoms: Tuple[int, ...]):
@@ -3136,8 +3178,13 @@ def _ring_assembly_substituent_prefix(
     info = detect_ring_assembly(mol, frag_systems)
     if info is None:
         return None  # non-identical / branched / atom-bridged — not
+    from ..assembly.prefix_derivation import built
     try:
-        return name_ring_assembly_prefix(mol, info, attachment_point)
+        # Lane L2 (R2): a ring assembly is a simple component; its brackets are
+        # ignored for nesting, the Blue Book; '3,5-di([1,1'-biphenyl]-
+        # 3-yl)pyridine (PIN)',:23913)
+        return built(name_ring_assembly_prefix(mol, info, attachment_point),
+                     substituted=False)
     except Exception:  # noqa: BLE001 — a builder error is a decline, not a crash
         return None
 

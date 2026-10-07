@@ -210,10 +210,18 @@ RETAINED_NAMES = {
     # the ALL_RETAINED_NAMES merge (: hand-curated wins) and fix the spelling.
     # The indolizine/quinolizine analogues have no OPSIN whole-molecule name, so
     # the engine otherwise emits a von Baeyer name -- these add the retained PIN.
-    "C1=Cc2ccccc2[AsH]1": "arsindole",         # the Blue Book
-    "C1=c2ccccc2=C[AsH]1": "isoarsindole",      # the Blue Book
-    "c1ccc2[pH]ccc2c1": "phosphindole",         # the Blue Book
-    "c1ccc2c[pH]cc2c1": "isophosphindole",      # the Blue Book
+    # The indole and isoindole analogues carry indicated hydrogen like their N parents:
+    # Table 2.9 prints 'indole (PIN)' (the Blue Book) in the same column where entry
+    # (19) says "the PIN is 1H-indole" (the Blue Book); (the Blue Book) "in a preferred
+    # IUPAC name a locant and the symbol 'H' must be cited"; (the Blue Book) "all
+    # indicated hydrogen atoms must be cited". The table spelling is a listing spelling,
+    # by analogy with the note of the seniority lists Note 1, the Blue Book
+    # "Indicated hydrogen atoms are not shown in this kind of listing"). The As/P atom
+    # keeps the locant of the indole N (1) or isoindole N (2).
+    "C1=Cc2ccccc2[AsH]1": "1H-arsindole",       # the Blue Book
+    "C1=c2ccccc2=C[AsH]1": "2H-isoarsindole",   # the Blue Book
+    "c1ccc2[pH]ccc2c1": "1H-phosphindole",      # the Blue Book
+    "c1ccc2c[pH]cc2c1": "2H-isophosphindole",   # the Blue Book
     "C1=CC2=CC=C[As]2C=C1": "arsindolizine",    # the Blue Book (5+6 indolizine-type, fully mancude: NO indicated H)
     "c1ccp2cccc2c1": "phosphindolizine",        # the Blue Book (5+6 indolizine-type, fully mancude: NO indicated H)
     # phosphinolizine is the 6+6 QUINOLIZINE analogue (Table 2.9 row 15), so it
@@ -223,7 +231,7 @@ RETAINED_NAMES = {
     # shorthand (as "quinolizine (PIN)" is). OPSIN parses 4H-phosphinolizine to the
     # identical structure (RT-verified). a review.
     "C1=CCP2C=CC=CC2=C1": "4H-phosphinolizine",  # the Blue Book / the Blue Book (6+6 quinolizine analogue)
-    "c1ccc2[nH]cnc2c1": "1H-benzimidazole",  # 1H-benzimidazole is IUPAC 2013 PIN
+    "c1ccc2[nH]cnc2c1": "1H-1,3-benzimidazole",  # (the Blue Book): "for preferred IUPAC names locants must be cited";:37665
     # (the Blue Book) "for preferred IUPAC names locants must be
     # cited": the (PIN) example prints "1-benzofuran (PIN) benzofuran" -- the bare
     # stem is a retained general name, the PIN carries the O locant. The FUSED
@@ -255,17 +263,21 @@ RETAINED_NAMES = {
     # catalog value is fixed in lockstep for the substituted/fused path.
     "c1ccc2c(c1)Oc1ccccc1S2": "phenoxathiine",         # the Blue Book phenoxathiine (PIN)
     "c1ccc2c(c1)Oc1ccccc1[Se]2": "phenoxaselenine",    # the Blue Book phenoxaselenine (PIN)
-    # The 4 X-H (P/As/Sb) tricyclics carry a saturated X-H at ring position 10, but the
-    # BB prints these as "<name> (PIN, 10H-isomer shown)" (the Blue Book) —
-    # "10H-isomer shown" says which drawn isomer the PIN denotes, it is NOT part of the
-    # PIN string. Contrast the isostructural N-cases, which spell it out explicitly as
-    # "the PIN is 10H-phenoxazine" / "the PIN is 10H-phenothiazine" (the Blue Book) — a
-    # different phrasing for a different fact. So the P/As/Sb PINs are the bare parent
-    # names, no 10H- prefix. (phenoxaselenine/phenoxathiine have divalent Se/S = no H.)
-    "c1ccc2c(c1)Oc1ccccc1P2": "phenoxaphosphinine",    # the Blue Book phenoxaphosphinine (PIN, 10H-isomer shown)
-    "c1ccc2c(c1)Oc1ccccc1[AsH]2": "phenoxarsinine",    # the Blue Book phenoxarsinine (PIN, 10H-isomer shown)
-    "c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2": "phenoxastibinine",  # the Blue Book phenoxastibinine (PIN, 10H-isomer shown)
-    "c1ccc2c(c1)Sc1ccccc1[AsH]2": "phenothiarsinine",  # the Blue Book phenothiarsinine (PIN, 10H-isomer shown)
+    # The 4 X-H (P/As/Sb) tricyclics carry a saturated X-H at ring position 10: the
+    # mancude parent needs one indicated hydrogen there, the Blue Book).
+    # The BB lists them as "<name> (PIN, 10H-isomer shown)" (the Blue Book)
+    # beside "the PIN is 10H-phenoxazine" for the N analogue (the Blue Book). The PIN cites
+    # it: (the Blue Book) "in a preferred IUPAC name a locant and the symbol 'H' must
+    # be cited"; (the Blue Book) "all indicated hydrogen atoms must be cited";
+    # (the Blue Book) "in preferred IUPAC names indicated hydrogen must always be
+    # cited when present in the corresponding structure". The bare spelling is a listing
+    # spelling, by analogy with the note of the seniority lists Note 1,
+    # the Blue Book "Indicated hydrogen atoms are not shown in this kind of listing").
+    # (phenoxaselenine/phenoxathiine have divalent Se/S = no H.)
+    "c1ccc2c(c1)Oc1ccccc1P2": "10H-phenoxaphosphinine",    # the Blue Book
+    "c1ccc2c(c1)Oc1ccccc1[AsH]2": "10H-phenoxarsinine",    # the Blue Book
+    "c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2": "10H-phenoxastibinine",  # the Blue Book
+    "c1ccc2c(c1)Sc1ccccc1[AsH]2": "10H-phenothiarsinine",  # the Blue Book
 
     # === UNSATURATED 6-MEMBERED O-HETEROCYCLES (pyrans) ===
     # IUPAC 2013 prefers "2H-pyran" / "4H-pyran" over HW systematic "oxine"

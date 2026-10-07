@@ -221,7 +221,7 @@ def test_italic_n_fallback_is_untouched():
     ("Clc1ccc(Cl)cc1",       "1,4-dichlorobenzene"),
     ("CC(C)c1ccc(C(C)C)cc1", "1,4-di(propan-2-yl)benzene"),
     # fused producer (rules/fused_rings.py) -- already collapses ring-N + ring-C
-    ("Cn1c(C)nc2ccccc21",    "1,2-dimethyl-1H-benzimidazole"),
+    ("Cn1c(C)nc2ccccc21",    "1,2-dimethyl-1H-1,3-benzimidazole"),
     ("Cn1cc(C)c2ccccc21",    "1,3-dimethyl-1H-indole"),
 ])
 def test_other_producers_are_byte_identical(smiles, expected):

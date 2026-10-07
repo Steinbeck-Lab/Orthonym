@@ -203,6 +203,13 @@ _NON_PIN_FRAGMENTS = contextvars.ContextVar(
 # shipped before. Same lifetime and roll-back rule as the fragments.
 _NON_PIN_LABELS = contextvars.ContextVar(
     "orthonym_prov_non_pin_labels", default=())
+# The Blue Book rule of a label-only record that names one
+# (``record_non_pin_label(fragment, rule=..., detail=...)``): ``(fragment, rule,
+# detail)`` triples, read by ``non_pin_label_rule_failures``. A name lowered by such
+# a record carries the rule in its row (``spelling_failures``), as a name lowered by
+# a spelling check does. Same lifetime and roll-back rule as the labels.
+_NON_PIN_LABEL_RULES = contextvars.ContextVar(
+    "orthonym_prov_non_pin_label_rules", default=())
 # Review a performance pass (F-06): names in PIN form whose preferred status the Blue Book itself
 # leaves open -- the book prints a different (PIN) for the same structure. A shipped
 # name that contains one is labelled pin_unverified (not systematic_verified: the code
@@ -311,7 +318,7 @@ def clear_provenance() -> None:
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
            "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels",
-           "uncertified_pin_names")
+           "non_pin_label_rules", "uncertified_pin_names")
     _SOURCE.set(None)
     _OPSIN.set(None)
     _STEREO_UNEXPRESSED.set(False)
@@ -328,6 +335,7 @@ def clear_provenance() -> None:
     _NON_PIN_FRAGMENTS.set(())
     _PIN_PROMOTION_RERUN.set(False)
     _NON_PIN_LABELS.set(())
+    _NON_PIN_LABEL_RULES.set(())
     _UNCERTIFIED_PIN_NAMES.set(())
 
 
@@ -368,13 +376,16 @@ def restore_provenance(snapshot: dict) -> None:
     _kept_labels = tuple(snapshot.get("non_pin_labels") or ())
     _NON_PIN_LABELS.set(_kept_labels + tuple(
         f for f in _NON_PIN_LABELS.get() if f not in _kept_labels))
+    _kept_rules = tuple(snapshot.get("non_pin_label_rules") or ())
+    _NON_PIN_LABEL_RULES.set(_kept_rules + tuple(
+        r for r in _NON_PIN_LABEL_RULES.get() if r not in _kept_rules))
     _kept_unc = tuple(snapshot.get("uncertified_pin_names") or ())
     _UNCERTIFIED_PIN_NAMES.set(_kept_unc + tuple(
         f for f in _UNCERTIFIED_PIN_NAMES.get() if f not in _kept_unc))
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
            "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels",
-           "uncertified_pin_names")
+           "non_pin_label_rules", "uncertified_pin_names")
 
 
 def record_source(source: str, opsin: Optional[str] = None) -> None:
@@ -523,16 +534,27 @@ def record_non_pin_fragment(fragment: str) -> None:
     _touch("non_pin_fragments")
 
 
-def record_non_pin_label(fragment: str) -> None:
+def record_non_pin_label(fragment: str, rule: Optional[str] = None,
+                         detail: str = "") -> None:
     """Record ``fragment`` as a LABEL-ONLY non-PIN part (see ``_NON_PIN_LABELS``):
     a shipped name that contains it is labelled below the PIN; the PIN tier's
-    promotion re-run still ships it."""
+    promotion re-run still ships it.
+
+    ``rule`` (a Blue Book rule id, with ``detail`` saying how) is the reason the
+    fragment is not the PIN form: the row of a name the record lowers lists it in
+    ``spelling_failures`` (see ``non_pin_label_rule_failures``)."""
     if not fragment:
         return
     cur = _NON_PIN_LABELS.get()
     if fragment not in cur:
         _NON_PIN_LABELS.set(cur + (fragment,))
     _touch("non_pin_labels")
+    if rule:
+        entry = (fragment, rule, detail)
+        cur_rules = _NON_PIN_LABEL_RULES.get()
+        if entry not in cur_rules:
+            _NON_PIN_LABEL_RULES.set(cur_rules + (entry,))
+        _touch("non_pin_label_rules")
 
 
 def record_uncertified_pin_name(name: str) -> None:
@@ -593,6 +615,21 @@ def name_carries_non_pin_part(prov: dict, name: Optional[str], *,
     return non_pin_vocabulary(name, label_forms=label_forms) is not None
 
 
+def non_pin_label_rule_failures(prov: dict, name: Optional[str]) -> list:
+    """The reasons of the label-only records that ``name`` contains and that name a
+    rule (``record_non_pin_label(..., rule=...)``), as ``spelling_failures`` entries
+    ``{"rule":..., "detail":...}`` in record order, one per rule and detail."""
+    _log_non_pin(PROVENANCE_READ)
+    if not name:
+        return []
+    out = []
+    for fragment, rule, detail in (prov.get("non_pin_label_rules") or ()):
+        entry = {"rule": rule, "detail": detail}
+        if fragment in name and entry not in out:
+            out.append(entry)
+    return out
+
+
 def get_provenance() -> dict:
     _log_non_pin(PROVENANCE_READ)
     return {
@@ -606,5 +643,6 @@ def get_provenance() -> dict:
         "non_pin_fragments": _NON_PIN_FRAGMENTS.get(),
         "pin_promotion_rerun": _PIN_PROMOTION_RERUN.get(),
         "non_pin_labels": _NON_PIN_LABELS.get(),
+        "non_pin_label_rules": _NON_PIN_LABEL_RULES.get(),
         "uncertified_pin_names": _UNCERTIFIED_PIN_NAMES.get(),
     }

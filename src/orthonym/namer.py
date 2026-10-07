@@ -645,11 +645,28 @@ _DISABLE_VALIDITY_GATE = _VG_ENV in ("1", "true", "yes", "on")
 _PIN_PROMOTION_WRAPPED = contextvars.ContextVar("orthonym_pin_promotion_wrapped",
                                                 default=False)
 
+# Roadmap N5: set while ``Orthonym._name_with_book_retry`` or
+# ``Orthonym._name_tiered_with_book_retry`` runs its calls, so a ``name`` /
+# ``name_tiered`` call inside them never starts a second retry.
+_BOOK_RETRY_OWNED = contextvars.ContextVar("orthonym_book_retry_owned", default=False)
+#: label order for the retry: a mechanical-spelling row replaces the book-spelling row
+#: only when its label is strictly higher
+_LABEL_RANK = {"pin_verified": 4, "pin_unverified": 3, "systematic_verified": 2,
+               "best_effort": 1}
+
 # Set by ``Orthonym._strict_pin_twin_name`` while the strict twin names: the twin
 # reports the strict path's own name to ``name_tiered``, so the default tier's
 # emission rule (``Orthonym._default_tier_decision``) is not applied to it.
 _DEFAULT_TIER_POLICY_OFF = contextvars.ContextVar("orthonym_default_tier_policy_off",
                                                   default=False)
+
+#: dispatch classes whose names follow Chapter nomenclature (carbohydrates, natural
+#: products and stereoparents, lipids, amino acids): "Preferred IUPAC names (PINs) are
+#: not identified for the compounds in this Chapter" (the Blue Book), and their
+#: labels are the natural-product decision's (pin-class plan Task 32), so the spelling
+#: checks of the PIN do not read them (``Orthonym._tier_row_and_pin_form``). The PEPTIDE
+#: route is read: the names it emits for these inputs are substitutive names.
+_SPELLING_CHECK_SKIPPED_CLASSES = ("CARBOHYDRATE_LOOKUP", "NATURAL_PRODUCT", "LIPID", "AMINO_ACID")
 
 # (a phase): the constitutional self-consistency gate. After the
 # parseability gate confirms OPSIN ACCEPTS a name, re-perceive it: if OPSIN parses
@@ -3114,9 +3131,11 @@ def _default_tier_emits(row: dict, pin_form: bool, smiles: Optional[str],
     * with ``trivial_fallback`` (``--trivial``), a name from the table of retained
       trivial names, which that option asks for.
 
-    Every other name -- one the engine records as not the PIN, a name only a
-    breadth producer built, a general-engine or retained-table name, a name of a
-    class without PIN status -- is declined (NO_VERIFIED_PIN)."""
+    Every other name -- one the engine records as not the PIN, a name that breaks a
+    spelling rule of the PIN (``row["spelling_failures"]``, also for the grammar
+    carve-outs), a name only a breadth producer built, a general-engine or
+    retained-table name, a name of a class without PIN status -- is declined
+    (NO_VERIFIED_PIN)."""
     from .metrics import provenance as _pv
     name = row.get("name")
     if not name or is_failure_name(name) or row.get("tier") == ABSTAIN:
@@ -3125,6 +3144,10 @@ def _default_tier_emits(row: dict, pin_form: bool, smiles: Optional[str],
         return True
     if _is_exact_match_list_name(smiles, name):
         return True
+    # a name that breaks a spelling rule of the PIN (``spelling_failures``,
+    # validation/pin_spelling.py) is not the PIN, whatever its OPSIN grammar class
+    if row.get("spelling_failures"):
+        return False
     gate = row.get("gate_outcome") or ""
     if gate.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX):
         return True
@@ -3139,9 +3162,11 @@ def _default_tier_emits(row: dict, pin_form: bool, smiles: Optional[str],
     return False
 
 
-def _default_tier_declined_row(smiles: str):
+def _default_tier_declined_row(smiles: str, spelling_failures=()):
     """(label, row) of a default-tier decline (NO_VERIFIED_PIN): the label the plain
-    call returns and the ``name_tiered`` row.
+    call returns and the ``name_tiered`` row. ``spelling_failures`` (the declined
+    name's, see:meth:`Orthonym._tier_row_and_pin_form`) is the reason when a spelling
+    rule declined it.
 
     The label is the NO_VERIFIED_PIN catalog text, 'unknown organic compound', never the
     UNSUPPORTED_ELEMENT text '<metal> compound (not supported)': the engine built a
@@ -3162,7 +3187,8 @@ def _default_tier_declined_row(smiles: str):
                    "gate_outcome": _pv.GATE_OUTCOME_SUPPRESSED,
                    "formula": formula, "limit_code": "NO_VERIFIED_PIN",
                    "stereo_unexpressed": False, "suffix_free_prefix_name": False,
-                   "prefix_order_fallback": False, "verified": "unverified"}
+                   "prefix_order_fallback": False, "verified": "unverified",
+                   "spelling_failures": list(spelling_failures)}
 
 
 # ---------------------------------------------------------------------------
@@ -3848,6 +3874,27 @@ _CALLER_INPUT = threading.local()
 
 def _caller_input() -> Optional[str]:
     return getattr(_CALLER_INPUT, 'smiles', None)
+
+
+def _book_retry_scope(fn):
+    """Roadmap N5 safety net around the public ``name``, outside ``_budget_scope``.
+
+    The writers spell the book's forms (``assembly.book_prefixes``: 'phenyl', 'methoxy',
+    'carbamoyl', fusion names, no redundant locants). When a book spelling was used and
+    the caller's molecule is left without a name, ``Orthonym._name_with_book_retry``
+    names it again with ``mechanical_forms`` (the spellings before roadmap N5). Each
+    run is an outermost ``name`` call of its own: its body runs at ``name_scope_depth
+    == 1`` (the PIN tier's promotion re-run requires it) with hang budgets of its own,
+    and the function that runs is ``name`` itself (a test that finds the outermost frame
+    by its name still finds it). A nested ``name`` call (a fragment, the strict twin, a
+    promotion re-run) and a call inside a retry run ``fn`` directly."""
+    @_functools.wraps(fn)
+    def _wrapper(self, *args, **kwargs):
+        from .assembly.fragment_naming import name_scope_depth
+        if _BOOK_RETRY_OWNED.get() or name_scope_depth() > 0:
+            return fn(self, *args, **kwargs)
+        return self._name_with_book_retry(lambda: fn(self, *args, **kwargs))
+    return _wrapper
 
 
 def _budget_scope(fn):
@@ -4548,6 +4595,7 @@ class Orthonym:
                 return _gated_cand
         return gated
 
+    @_book_retry_scope
     @_budget_scope
     def name(self, smiles: Union[str, Chem.Mol], *, raise_on_limit: bool = False) -> str:
         """Name one molecule with this instance's options.
@@ -5357,6 +5405,16 @@ class Orthonym:
                 exact InChIKey, or a natural-product parent name found by its exact
                 structure; OPSIN cannot read these names) or ``unverified`` (no
                 read-back recorded).
+            ``spelling_failures``
+                The spelling rules of the PIN a name in PIN form breaks, as
+                ``{"rule": "", "detail":...}`` entries
+                (``validation.pin_spelling``; a round trip cannot see them), and
+                the rule of a recorded non-PIN part that lowered the name
+                (``metrics.provenance.record_non_pin_label`` with a rule, e.g.
+                 for a ring assembly of three or more components with
+                primed locants). Such a name is systematic_verified at most; the
+                default tier declines it with NO_VERIFIED_PIN and keeps the entries
+                as the reason. Empty otherwise.
 
         Raises
         ------
@@ -5377,28 +5435,61 @@ class Orthonym:
         if not isinstance(smiles, str) and _input_mol.handles(smiles):
             # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
             smiles = _input_mol.smiles_for(smiles)
-        # B2: open ONE memo scope around BOTH the primary name and the strict PIN
-        # twin (_strict_pin_twin_name -> tw.name), so the twin reuses this run's
-        # breadth-INDEPENDENT memo entries instead of recomputing them. The two
-        # breadth-SENSITIVE namespaces (fused_core, name_substituent) carry the four
-        # breadth flags in their keys (a lever), so the twin's flags-OFF lookups miss
-        # the primary's flags-ON entries and recompute at the correct configuration.
-        # push_scope returns None inside name's own push (a nested no-op), so both
-        # engines share THIS scope; only this frame tears it down.
-        from .assembly.memo import pop_scope as _memo_pop, push_scope as _memo_push
         # Lone-pair centre written first: the row names (and derives its tier and
         # formula from) the standard spelling of the input when RDKit reads a
         # lone-pair centre of it unlike the standard reading; see
         # _lone_pair_standard_spelling. Any other input is unchanged.
         smiles, _lp_opened = _lone_pair_input_enter(smiles)
         try:
-            _tier_scope = _memo_push()
-            try:
-                return self._name_tiered_impl(smiles)
-            finally:
-                _memo_pop(_tier_scope)
+            if _BOOK_RETRY_OWNED.get():
+                return self._name_tiered_scoped(smiles)
+            return self._name_tiered_with_book_retry(smiles)
         finally:
             _lone_pair_input_exit(_lp_opened)
+
+    def _name_tiered_scoped(self, smiles: str) -> dict:
+        """``_name_tiered_impl`` inside its own memo scope.
+
+        B2: ONE memo scope around BOTH the primary name and the strict PIN twin
+        (_strict_pin_twin_name -> tw.name), so the twin reuses this run's
+        breadth-INDEPENDENT memo entries instead of recomputing them. The two
+        breadth-SENSITIVE namespaces (fused_core, name_substituent) carry the four
+        breadth flags in their keys (a lever), so the twin's flags-OFF lookups miss
+        the primary's flags-ON entries and recompute at the correct configuration.
+        push_scope returns None inside name's own push (a nested no-op), so both
+        engines share THIS scope; only this frame tears it down. Roadmap N5: the
+        mechanical-spelling retry of ``_name_tiered_with_book_retry`` runs in a scope
+        of its own, so no memo entry of the book-spelling run reaches it."""
+        from .assembly.memo import pop_scope as _memo_pop, push_scope as _memo_push
+        _tier_scope = _memo_push()
+        try:
+            return self._name_tiered_impl(smiles)
+        finally:
+            _memo_pop(_tier_scope)
+
+    def _name_tiered_with_book_retry(self, smiles: str) -> dict:
+        """Roadmap N5 safety net for the row (see ``_name_with_book_retry``): when a book
+        spelling was used and the row is ``abstain`` or ``best_effort`` (no name, or a
+        name no round trip confirmed), the molecule is named again with
+        ``mechanical_forms`` in a fresh memo scope, and that row is returned when its
+        label is strictly higher. The wider tiers only, and not after a hang guard
+        fired, as in ``name`` (``_book_retry_applies``)."""
+        from .assembly.book_prefixes import mechanical_forms, watch_book_forms
+        from .assembly.fragment_naming import hang_budget_trips
+        owned = _BOOK_RETRY_OWNED.set(True)
+        try:
+            trips = hang_budget_trips()
+            with watch_book_forms() as fired:
+                row = self._name_tiered_scoped(smiles)
+            if (fired[0] and hang_budget_trips() == trips and self._book_retry_applies()
+                    and row.get("tier") in ("abstain", "best_effort")):
+                with mechanical_forms():
+                    alt = self._name_tiered_scoped(smiles)
+                if _LABEL_RANK.get(alt.get("tier"), 0) > _LABEL_RANK.get(row.get("tier"), 0):
+                    return alt
+            return row
+        finally:
+            _BOOK_RETRY_OWNED.reset(owned)
 
     def _name_tiered_impl(self, smiles: str) -> dict:
         from .metrics.provenance import clear_provenance, get_provenance
@@ -5455,6 +5546,13 @@ class Orthonym:
         # None where the label does not depend on a round trip (a PIN, a trivial
         # table name, the last-resort floor).
         _tier_if_verified = None
+        # The rules of the label-only non-PIN records that lowered the name
+        # (``record_non_pin_label(..., rule=...)``, e.g. for a ring
+        # assembly of three or more components with primed locants): the row lists
+        # them in ``spelling_failures``, the field a spelling check fills, so a
+        # decline by such a record carries its reason. Set by the branch below that
+        # reads the records; a different offer winner supplies its own labels.
+        _label_rule_failures = []
         # A name of the exact-match metal-complex list (D1 table, the input's
         # exact InChIKey) is a ChEBI name taken verbatim: labelled by the path that
         # returned it, as in the paper's measured run (user decision 2026-09-30),
@@ -5547,6 +5645,7 @@ class Orthonym:
                                  else PIN_UNVERIFIED)
             tier = _tier_if_verified if opsin == "verified" else BEST_EFFORT
             is_pin = False
+            _label_rule_failures = _pv.non_pin_label_rule_failures(prov, _non_pin_scope)
         else:
             tier, is_pin = PIN_VERIFIED, True
             opsin = gate_opsin_label
@@ -5587,6 +5686,7 @@ class Orthonym:
             is_pin = _offer_winner.is_pin
             tier = _offer_winner.tier
             _tier_if_verified = None
+            _label_rule_failures = []
         #: honest-PIN demotion (the β-carotene "not a verified PIN" fix).
         # A pin_verified name that the STRICT PIN path (no breadth flags) does NOT
         # itself produce is not a certified PIN -- it exists only because a breadth
@@ -5790,6 +5890,35 @@ class Orthonym:
                 verified = "opsin"
             elif opsin == "verified_constitution_only":
                 verified = "opsin_constitution"
+        # Spelling checks that do not rely on the round trip (validation/pin_spelling.py):
+        # a round trip proves the molecule, never the spelling ('pyrido[1,2-b]pyridazin-
+        # 6-one' reads back to the input as well as the PIN '6H-pyrido[1,2-b]pyridazin-
+        # 6-one'). A name in PIN form that breaks a spelling rule indicated
+        # hydrogen, alphanumerical order, enclosing marks, locants,
+        # numbering, / / parent choice) is a correct name
+        # that is not the PIN: the label is lowered as for the name-scoped non-PIN records
+        # above (systematic_verified, best_effort without a verified round trip, is_pin
+        # False); the name is unchanged, and the row records the failures. The exact-match
+        # list names keep the label of their path (user decision 2026-09-30) and are not
+        # read; nor are the names of the routes (``_SPELLING_CHECK_SKIPPED_CLASSES``),
+        # whose labels are the natural-product decision's. A name lowered by a
+        # label-only record that names its rule starts with that rule
+        # (``_label_rule_failures``); the checks below never read such a name.
+        spelling_failures = list(_label_rule_failures) if tier != ABSTAIN else []
+        if ((tier == PIN_VERIFIED or (tier == PIN_UNVERIFIED and _unavailable_demoted))
+                and name and not is_failure_name(name)
+                and not _is_np_list and not _is_coord_list
+                and getattr(getattr(self, "_last_dispatch_class", None), "name", None)
+                not in _SPELLING_CHECK_SKIPPED_CLASSES):
+            from .validation.pin_spelling import check_pin_spelling
+            _checked = [
+                {"rule": f.rule, "detail": f.detail}
+                for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name)]
+            if _checked:
+                tier, is_pin = SYSTEMATIC_VERIFIED, False
+                logger.info("name_tiered lowered %r: %s", name,
+                            "; ".join(f"{f['rule']} {f['detail']}" for f in _checked))
+            spelling_failures += _checked
         # A name from the exact-match coordination list (D1: heme, chlorophyll,
         # cobalamin, siroheme, coenzyme F430; checked by exact InChIKey identity,
         # 'identity') keeps the label its naming path gives it (user decision
@@ -5825,7 +5954,8 @@ class Orthonym:
                  "stereo_unexpressed": stereo_unexpressed,
                  "suffix_free_prefix_name": suffix_free_prefix_name,
                  "prefix_order_fallback": prefix_order_fallback,
-                 "verified": verified}, _pin_form)
+                 "verified": verified,
+                 "spelling_failures": spelling_failures}, _pin_form)
 
     def _retained_structural_preference(self, mol) -> Optional[str]:
         """ (AutoNom A3): retained/fusion structural-recognizer
@@ -7708,7 +7838,8 @@ class Orthonym:
         if _default_tier_emits(row, pin_form, smiles, self._trivial_fallback):
             self._default_tier_row = (name, row)
             return name
-        label, declined = _default_tier_declined_row(smiles)
+        label, declined = _default_tier_declined_row(
+            smiles, row.get("spelling_failures") or ())
         self._default_tier_row = (label, declined)
         logger.info("default tier declined %r (tier %s): not a verified PIN",
                     name, row.get("tier"))
@@ -7751,6 +7882,61 @@ class Orthonym:
         from .assembly.fragment_naming import is_top_level_naming, name_scope_depth
         return (name_scope_depth() == 1 and is_top_level_naming()
                 and _validity_gate_jar_present())
+
+    def _name_with_book_retry(self, run) -> str:
+        """The retry of ``_book_retry_scope``: ``run`` is one outermost ``name`` call.
+        When a book spelling was used and the run left the molecule without a name (a
+        label in place of a name, or a limit error), ``run`` is called again inside
+        ``mechanical_forms`` and its result is used when it is a name. Both runs go
+        through every gate.
+
+        The wider tiers only (``_book_retry_applies``). No second run when the first one
+        hit a hang guard (``fragment_naming.hang_budget_trips``: the molecule ran out of a
+        work budget, which a second run would spend again).
+
+        The trigger differs from ``_name_tiered_with_book_retry`` by design: a string
+        carries no label, so this retry runs only when the first run left no name. The
+        row API also retries a row labelled ``best_effort`` (a name no round trip
+        confirmed) and returns the mechanical row when its label is higher; for such a
+        row ``name`` returns the book-spelled best-effort name where ``name_tiered``
+        can return the mechanical, verified one. Deriving the label of every first run
+        here would cost each molecule the row computation of ``name_tiered``."""
+        from .assembly.book_prefixes import mechanical_forms, watch_book_forms
+        from .assembly.fragment_naming import hang_budget_trips
+        owned = _BOOK_RETRY_OWNED.set(True)
+        try:
+            trips = hang_budget_trips()
+            with watch_book_forms() as fired:
+                try:
+                    out, limit_error = run(), None
+                except OrthonymLimitError as e:
+                    out, limit_error = None, e
+            if (fired[0] and hang_budget_trips() == trips and self._book_retry_applies()
+                    and (limit_error is not None or is_failure_name(out))):
+                with mechanical_forms():
+                    try:
+                        alt = run()
+                    except OrthonymLimitError:
+                        alt = None
+                if alt is not None and not is_failure_name(alt):
+                    return alt
+            if limit_error is not None:
+                raise limit_error
+            return out
+        finally:
+            _BOOK_RETRY_OWNED.reset(owned)
+
+    def _book_retry_applies(self) -> bool:
+        """The mechanical-spelling retry runs at the wider tiers only, where the default
+        tier's emission rule does not apply (``_default_tier_policy_applies``). The
+        default tier emits only a pin_verified name of the strict path: the floor,
+        which runs there for every hard molecule, has its own mechanical retry
+        (``t4_coverage._verified_universal_floor``) and never gives that label, so a
+        whole second run would only double the work of the molecules the tier declines
+        (measured on a lipid dianion: 8 neutral namings in place of 4,
+        ``test_breadth3_m15_small_ions.py``). A pin_verified name a book spelling costs
+        is a lost row of Procedure E's PIN-tier comparison."""
+        return not self._default_tier_policy_applies()
 
     def _name_with_pin_promotion(self, smiles: str, *, raise_on_limit: bool) -> str:
         """Breadth Job 1 (M01): the PIN tier names the molecule as before; only when
@@ -8083,7 +8269,8 @@ class Orthonym:
             when no measurement was taken), ``verification``, ``factors`` (the parts
             of the score), ``handler`` (the part of the engine that built the name),
             and further keys for the atom-to-locant map and the reason for a decline
-            (``limit``, ``abstention``).
+            (``limit``, ``abstention``, and ``spelling_failures``: the spelling rules of
+            the PIN that the declined name breaks).
 
         Raises
         ------
@@ -8134,7 +8321,8 @@ class Orthonym:
     def _default_tier_confidence(self, metadata: dict, smiles: str) -> dict:
         """``name_with_confidence`` at the default tier: the emission rule of
         ``_default_tier_decision`` for the name it returns; a declined name gives the
-        record of a decline with ``limit`` NO_VERIFIED_PIN."""
+        record of a decline with ``limit`` NO_VERIFIED_PIN and ``spelling_failures``
+        (the spelling rules the declined name breaks, empty for another reason)."""
         name = metadata.get('name')
         if not name or is_failure_name(name):
             return metadata
@@ -8144,11 +8332,14 @@ class Orthonym:
             return metadata
         from .assembly.coverage_scoring import unmeasured_confidence
         from .metrics.abstention import abstention_code_for
-        label, _ = _default_tier_declined_row(smiles)
+        label, declined = _default_tier_declined_row(
+            smiles, row.get("spelling_failures") or ())
         md = unmeasured_confidence(name=label, handler='fallback')
         md['limit'] = no_verified_pin(label, smiles=smiles).as_dict()
         _abst = abstention_code_for(label)
         md['abstention'] = _abst.value if _abst else None
+        # the reason a spelling rule gave, as on the name_tiered decline row
+        md['spelling_failures'] = declined['spelling_failures']
         return md
 
     def _name_with_confidence_impl(self, smiles: str) -> dict:
@@ -9911,7 +10102,8 @@ class Orthonym:
                     # other substituents for lowest locants order).
                     oriented, atom_to_locant = orient_heterocycle_with_substituents(
                         features.mol, features.principal_ring, sub_positions,
-                        principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None
+                        principal_group_atoms=pg_ring_atoms if pg_ring_atoms else None,
+                        mancude_hydrogen=True,
                     )
                     features.oriented_heterocycle = oriented
                     features.heterocycle_atom_to_locant = atom_to_locant

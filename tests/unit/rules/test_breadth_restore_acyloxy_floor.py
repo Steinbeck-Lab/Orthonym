@@ -99,9 +99,19 @@ def test_stereo_bearing_acyl_keeps_the_floor_spelling(smiles):
     """A carboxy acyl with a stereocentre is not named from its isolated anion
     (the site O(-) and the ester O-R rank differently under CIP): the leaf
     declines and the floor's generic, stereo-complete spelling ships."""
-    name = _shipped(smiles)
+    # roadmap N5c (name-quality lane L2): the subject is the leaf's decline, so the floor's
+    # spelling is pinned in the mechanical spellings; with the book spellings the chain
+    # carries the ester oxygen as a prefix ('-oxy', the Blue Book) in
+    # place of the hetero-ended 'a' chain (:6465) does not allow (residual R4:
+    # the acyl name of a stereo-bearing carboxy acyl is not built).
+    from orthonym.assembly.book_prefixes import mechanical_forms
+    with mechanical_forms():
+        name = _shipped(smiles)
     assert "(4S)-4,6-dihydroxy-4-methyl-2-oxo-1,7-dioxahept-6-en-1-yl" in name, name
     assert "pentanedioyl" not in name, name
+    name = _shipped(smiles)
+    assert "{[(3S)-3,5-dihydroxy-3-methyl-1,5-dioxopentyl]oxy}" in name, name
+    assert "pentanedioyl" not in name and "dioxahept" not in name, name
 
 
 # --- the shared acyloxy helper, opt-in used by the floor --------------------

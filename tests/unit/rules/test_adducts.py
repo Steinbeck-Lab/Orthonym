@@ -58,9 +58,12 @@ class TestNameComponent:
         # the old NCC(=O)Nc1ccc(OCC)cc1 now names as the engine improved; this
         # silabicyclic ring still abstains at PIN. Do NOT re-pin to the old name --
         # its emitted spelling 'ethanamide' is itself a spelling-layer defect,
-        # should be 'acetamide' per BB.)
+        # should be 'acetamide' per BB.) Fixture updated again (S2c-1): the
+        # silole is named '1H-1-benzosilole' by the benzo name (the Blue Book:
+        # 11815); the lambda-convention benzodioxathiole,:12452, a later
+        # slice) still abstains at PIN.
         from orthonym.rules.adducts import _name_component
-        assert _name_component("c1ccc2c(c1)[SiH2]cc2", "pin") is None
+        assert _name_component("c1ccc2c(c1)O[SH2]O2", "pin") is None
 
 
 class TestComponentOrdering:
@@ -142,7 +145,7 @@ class TestNameAdduct:
     def test_any_unnameable_fragment_fails_closed(self):
         # a fragment the PIN namer cannot build -> whole adduct fails closed
         # (fixture updated 2026-09-03; see test_unnameable_fragment_fails_closed)
-        assert self._name("O.c1ccc2c(c1)[SiH2]cc2") is None
+        assert self._name("O.c1ccc2c(c1)O[SH2]O2") is None
 
     def test_all_identical_fragments_decline(self):
         # >=2 DISTINCT components required (adducts are combinations of

@@ -54,14 +54,16 @@ def test_difluoromethyl_on_ring_roundtrips():
     (2 carbons, 1 F). The bug rendered ``1-fluoroethan-1-yl``."""
     r, verified = _name_and_verify("c1ccccc1C(F)F")
     assert verified == r.name, f"{r.name!r} did not round-trip"
-    assert "difluoromethan" in r.name, f"CHF2 mis-rendered: {r.name!r}"
+    # roadmap N5f: a methyl group is 'difluoromethyl', never 'difluoromethan-1-yl'
+    # (a), the Blue Book; (1),:15813)
+    assert "difluoromethyl" in r.name, f"CHF2 mis-rendered: {r.name!r}"
     assert "fluoroethan" not in r.name, f"phantom carbon leaked: {r.name!r}"
 
 
 def test_trifluoromethyl_on_ring_roundtrips():
     r, verified = _name_and_verify("c1ccccc1C(F)(F)F")
     assert verified == r.name, f"{r.name!r} did not round-trip"
-    assert "trifluoromethan" in r.name, f"CF3 mis-rendered: {r.name!r}"
+    assert "trifluoromethyl" in r.name, f"CF3 mis-rendered: {r.name!r}"
     assert "fluoroethan" not in r.name, f"phantom carbon leaked: {r.name!r}"
 
 

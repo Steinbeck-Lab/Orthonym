@@ -15,6 +15,14 @@ from orthonym.rules.terminal_fragment import (
     TerminalFragmentName,
     terminal_fragment_name,
 )
+from orthonym.assembly.naming_utils import apply_enclosing_marks
+from tests.support.rt_assert import name_is_rt_exact
+
+
+def _reads_back_on_benzene(prefix, smiles_on_benzene):
+    """OPSIN reads '<prefix>benzene' (the prefix in its enclosing marks) back to the
+    fragment carrying a phenyl at its attachment atom (full standard InChIKey)."""
+    return name_is_rt_exact(apply_enclosing_marks(prefix, -1) + "benzene", smiles_on_benzene)
 
 
 def _frag(smiles, attach_smarts_idx=0):
@@ -29,18 +37,19 @@ def _frag(smiles, attach_smarts_idx=0):
     ("CC",      "ethyl"),
     ("CCCC",    "butyl"),
     ("C",       "methyl"),
-    # one heteroatom: locant 1 is the attachment atom, numbering runs away
-    ("COCC",    "2-oxabutyl"),
-    ("CSCC",    "2-thiabutyl"),
-    ("CNCC",    "2-azabutyl"),
-    ("CCOCC",   "3-oxapentyl"),
-    # two of a kind -> multiplier
-    ("COCOC",   "2,4-dioxapentyl"),
-    # two kinds -> cited in seniority order, each with its locant
-    ("CSCOCC",  "4-oxa-2-thiahexyl"),
-    ("COCNC",   "2-oxa-4-azapentyl"),
-    # group 14 heteroatoms are in the admitted table
-    ("C[SiH2]CC", "2-silabutyl"),
+    # Roadmap N5c: fewer than four heterounits, so no 'a' chain,
+    # the Blue Book); each heteroatom roots a prefix on the carbon chain:
+    # 'ethoxy (preferred prefix)',:27671), '(2-ethoxyethyl)' (:41777),
+    # '[(ethylsulfanyl)methyl]' (:23106), '[(ethylsilyl)methyl]' (:22680),
+    # '{[(methoxymethyl)sulfanyl]methyl}' (:22694)
+    ("COCC",    "ethoxymethyl"),
+    ("CSCC",    "(ethylsulfanyl)methyl"),
+    ("CNCC",    "(ethylamino)methyl"),
+    ("CCOCC",   "2-ethoxyethyl"),
+    ("COCOC",   "(methoxymethoxy)methyl"),
+    ("CSCOCC",  "[(ethoxymethyl)sulfanyl]methyl"),
+    ("COCNC",   "[(methylamino)methoxy]methyl"),
+    ("C[SiH2]CC", "(ethylsilyl)methyl"),
 ])
 def test_straight_saturated_chain(smiles, expected):
     mol, frag, attach = _frag(smiles)
@@ -87,7 +96,9 @@ def test_ring_fragments_now_name_via_the_composite_branch():
     tests/unit/rules/test_terminal_fragment_composite.py."""
     mol = Chem.MolFromSmiles("C1CCCCC1")
     got = terminal_fragment_name(mol, set(range(mol.GetNumAtoms())), 0)
-    assert got is not None and got.name == "cyclohexan-1-yl"
+    # (c) (the Blue Book) "in monosubstituted homogeneous monocyclic rings";
+    # 'C6H11- cyclohexyl (preferred prefix)',:15832)
+    assert got is not None and got.name == "cyclohexyl"
 
 
 def test_never_raises_on_degenerate_input():
@@ -123,7 +134,6 @@ def test_never_raises_on_degenerate_input():
     ("CC(C)C",      "2-methylpropyl"),
     ("CC(C)CC",     "2-methylbutyl"),
     # branch on a heteroatom-bearing backbone
-    ("COC(C)C",     "3-methyl-2-oxabutyl"),
     # two identical branches -> multiplier
     ("CC(C)(C)C",   "2,2-dimethylpropyl"),
 ])
@@ -132,6 +142,26 @@ def test_branched_saturated_chain(smiles, expected):
     got = terminal_fragment_name(mol, frag, attach)
     assert got is not None, f"{smiles} refused"
     assert got.name == expected
+
+
+def test_branched_ether_fragment_is_a_methyl_group_with_an_alkoxy_prefix():
+    # one heterounit: no 'a' chain, the Blue Book); the O roots an
+    # 'R-oxy' prefix,:27633). The writer's contract, not a spelling pin.
+    mol, frag, attach = _frag("COC(C)C")
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None and got.atoms == frozenset(frag)
+    assert "oxa" not in got.name
+    assert _reads_back_on_benzene(got.name, "CC(C)OCc1ccccc1")
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "P-63.2.2.2 (BlueBookV2.md:27683) '(CH3)2CH-O- ... (propan-2-yl)oxy (preferred "
+    "prefix)': the chain writer names the branch '1-methylethyl'; the P-29.2 "
+    "'propan-2-yl' branch is not built by terminal_fragment (residual R-a of the L2 "
+    "proper-fix plan)"))
+def test_branched_ether_fragment_takes_the_book_prefix():
+    mol, frag, attach = _frag("COC(C)C")
+    assert terminal_fragment_name(mol, frag, attach).name == "[(propan-2-yl)oxy]methyl"
 
 
 @pytest.mark.parametrize("smiles", ["CC(C)C", "CC(C)(C)C", "COC(C)C"])
@@ -198,7 +228,7 @@ def test_embedded_straight_chain_fragment_bonded_to_an_outside_ring():
 
     got = terminal_fragment_name(mol, frag, attach)
     assert got is not None
-    assert got.name == "1-oxapropyl"
+    assert got.name == "ethoxy"          # 'ethoxy (preferred prefix)', the Blue Book
     assert got.atoms == frozenset(frag)
 
 
@@ -243,14 +273,21 @@ def test_embedded_branched_fragment_bonded_to_an_outside_ring():
     ("CCCCC(C(C)C)CCCC",   "5-(1-methylethyl)nonyl"),
     # one compound branch that is itself a longer compound (isobutyl-shaped)
     ("CCCCC(CC(C)C)CCCC",  "5-(2-methylpropyl)nonyl"),
-    # a tert-butyl-shaped branch
-    ("CCCCC(C(C)(C)C)CCCC", "5-(1,1-dimethylethyl)nonyl"),
 ])
 def test_compound_branch_gets_enclosing_marks(smiles, expected):
     mol, frag, attach = _frag(smiles)
     got = terminal_fragment_name(mol, frag, attach)
     assert got is not None, f"{smiles} refused"
     assert got.name == expected
+    assert got.atoms == frozenset(frag)
+
+
+def test_a_tert_butyl_branch_takes_the_retained_prefix():
+    # (the Blue Book) 'tert-butyl (preferred prefix) 1,1-dimethylethyl';
+    # a simple prefix, cited bare
+    mol, frag, attach = _frag("CCCCC(C(C)(C)C)CCCC")
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None and got.name == "5-tert-butylnonyl"
     assert got.atoms == frozenset(frag)
 
 
@@ -318,8 +355,6 @@ def test_simple_branch_still_bare_with_basic_multiplier(smiles, expected):
     ("C=CCC",   "but-1-en-1-yl"),
     ("CC=CC",   "but-2-en-1-yl"),
     ("C#CCC",   "but-1-yn-1-yl"),
-    # replacement + unsaturation together
-    ("COC=C",   "2-oxabut-3-en-1-yl"),
 ])
 def test_unsaturated_backbone(smiles, expected):
     mol, frag, attach = _frag(smiles)
@@ -327,6 +362,21 @@ def test_unsaturated_backbone(smiles, expected):
     assert got is not None, f"{smiles} refused"
     assert got.name == expected
     assert got.atoms == frozenset(frag)
+
+
+def test_vinyl_ether_fragment_is_a_methyl_group_with_an_alkoxy_prefix():
+    mol, frag, attach = _frag("COC=C")
+    got = terminal_fragment_name(mol, frag, attach)
+    assert got is not None and got.atoms == frozenset(frag)
+    assert "oxa" not in got.name
+    assert _reads_back_on_benzene(got.name, "C=COCc1ccccc1")
+
+
+def test_vinyl_ether_fragment_takes_the_book_prefix():
+    """the Blue Book 'vinyl (ethenyl), for CH2=CH-' (ethenyl the preferred
+    prefix); the ethene locants are omitted,:2953): '(ethenyloxy)methyl'."""
+    mol, frag, attach = _frag("COC=C")
+    assert terminal_fragment_name(mol, frag, attach).name == "(ethenyloxy)methyl"
 
 
 def test_a_saturated_backbone_is_unaffected_by_the_unsaturation_code():
@@ -403,17 +453,12 @@ def test_single_of_each_type_is_byte_identical_to_before_the_fix():
     assert got.atoms == frozenset(frag)
 
 
-def test_replacement_prefix_with_multiplied_ene():
-    """A replacement prefix composes normally with a MULTIPLIED ene: the
-    heteroatom's own locant ('2-oxa') is unaffected by the linking 'a' the
-    multiplied suffix adds to the hydrocarbon stem it's fused onto.
-
-    Fragment: C(attach)-O-CH=C=CH2 -- a cumulated diene (locants 3,4) past an
-    oxa replacement at backbone position 2. OPSIN-verified: parses inside
-    '(2-oxapenta-3,4-dien-1-yl)benzene' -> C=C=COCc1ccccc1.
-    """
+def test_an_allenyl_ether_fragment_roots_an_alkoxy_prefix():
+    """C(attach)-O-CH=C=CH2: one heterounit, so no 'a' chain,
+    the Blue Book); the O roots 'R-oxy' on the methyl group,:27633)
+    and the allene keeps its locants as its parent does ('propa-1,2-diene (PIN)',:16517)."""
     mol, frag, attach = _frag("COC=C=C")
     got = terminal_fragment_name(mol, frag, attach)
     assert got is not None
-    assert got.name == "2-oxapenta-3,4-dien-1-yl"
+    assert got.name == "[(propa-1,2-dien-1-yl)oxy]methyl"
     assert got.atoms == frozenset(frag)

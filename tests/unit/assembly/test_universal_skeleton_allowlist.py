@@ -32,6 +32,7 @@ Targeted-file run only (avoid the OPSIN-pipe deadlock of a full pytest run):
 """
 from __future__ import annotations
 
+import pytest
 from rdkit import Chem
 
 from orthonym.assembly.universal_substituent import (
@@ -107,25 +108,59 @@ def _names_and_roundtrips(smiles):
     return r
 
 
-def test_ether_chain_threads_oxa():
-    r = _names_and_roundtrips("CCOCCOCC")  # 3,6-dioxaoctane
-    assert "oxa" in r.name
+# Roadmap N5c: a chain with fewer than four heterounits is not an 'a' chain,
+# the Blue Book); the floor names the carbon parent and each heteroatom as a prefix
+# root. The contract below (full coverage, full-key round trip, no 'a' prefix) is what the
+# floor guarantees; the PIN of each molecule needs a parent choice the floor does not make,
+# pinned under strict xfail with its rule.
 
-def test_thioether_threads_thia():
-    r = _names_and_roundtrips("CSC")       # 2-thiapropane
-    assert "thia" in r.name
+def test_ether_chain_is_a_carbon_parent_with_alkoxy_prefixes():
+    assert "oxa" not in _names_and_roundtrips("CCOCCOCC").name
 
-def test_aza_chain_threads_aza():
-    r = _names_and_roundtrips("CCNCC")     # 3-azapentane
-    assert "aza" in r.name
 
-def test_silane_threads_sila():
-    r = _names_and_roundtrips("C[Si](C)(C)C")  # 2-silapropane skeleton
-    assert "sila" in r.name
+@pytest.mark.xfail(strict=True, reason=(
+    "P-63.2.4.1 (BlueBookV2.md:27754) '1,2-dimethoxyethane (PIN)': the floor does not "
+    "choose the symmetric ether parent (residual R-b of the L2 proper-fix plan)"))
+def test_ether_chain_takes_the_pin():
+    assert _names_and_roundtrips("CCOCCOCC").name == "1,2-diethoxyethane"
 
-def test_borane_threads_bora():
-    r = _names_and_roundtrips("CCB(CC)CC")     # 3-borapentane skeleton
-    assert "bora" in r.name
+
+def test_thioether_is_the_pin():
+    # (the Blue Book) 'CH3-S-CH3 (1) (methylsulfanyl)methane (PIN)'
+    assert _names_and_roundtrips("CSC").name == "(methylsulfanyl)methane"
+
+
+def test_amine_chain_is_a_carbon_parent_with_an_amino_prefix():
+    assert "aza" not in _names_and_roundtrips("CCNCC").name
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "BlueBookV2.md:23543 'CH3-NH-CH3 N-methylmethanamine (PIN)': the floor writes no "
+    "suffix (residual R-b of the L2 proper-fix plan)"))
+def test_amine_chain_takes_the_pin():
+    assert _names_and_roundtrips("CCNCC").name == "N-ethylethanamine"
+
+
+def test_silane_is_a_parent_with_a_silyl_prefix():
+    assert "sila" not in _names_and_roundtrips("C[Si](C)(C)C").name
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "P-44.1.2.1 (BlueBookV2.md:18925) 'Si(CH3)4 tetramethylsilane (PIN) (Si is senior to "
+    "C)': the floor's parent choice does not apply the heteroatom seniority (residual R-b)"))
+def test_silane_takes_the_pin():
+    assert _names_and_roundtrips("C[Si](C)(C)C").name == "tetramethylsilane"
+
+
+def test_borane_is_a_parent_with_a_boranyl_prefix():
+    assert "bora" not in _names_and_roundtrips("CCB(CC)CC").name.replace("boranyl", "")
+
+
+@pytest.mark.xfail(strict=True, reason=(
+    "BlueBookV2.md:37419 'B(CH3)3 trimethylborane (PIN)': the floor's parent choice "
+    "(residual R-b of the L2 proper-fix plan)"))
+def test_borane_takes_the_pin():
+    assert _names_and_roundtrips("CCB(CC)CC").name == "triethylborane"
 
 def test_stannane_threads_stanna():
     r = _names_and_roundtrips("C[Sn](C)(C)C")
@@ -194,12 +229,13 @@ def test_ylidene_halogen_fails_closed_not_phantom_carbon():
 # so a non-skeletal RING atom must fail closed too (symmetric to the chain).
 # ---------------------------------------------------------------------------
 
-def test_skeletal_hetero_rings_still_build():
-    """Legitimate monocyclic heterocycles (skeletal ring heteroatoms) must
-    still be named and round-trip -- the ring guard must not drop them."""
-    for smi, tok in (("O1CCCCC1", "oxa"), ("S1CCCCC1", "thia"), ("N1CCCCC1", "aza")):
-        r = _names_and_roundtrips(smi)
-        assert tok in r.name, f"{smi} expected {tok}: {r.name!r}"
+def test_skeletal_hetero_rings_take_their_hantzsch_widman_or_retained_names():
+    """ (the Blue Book): rings of ten or fewer members are named by the
+    Hantzsch-Widman system or a retained name, not by 'a' replacement; 'oxane (PIN)'
+    (:16956), 'piperidine (PIN)' (:8210)."""
+    for smi, name in (("O1CCCCC1", "oxane"), ("S1CCCCC1", "thiane"),
+                      ("N1CCCCC1", "piperidine")):
+        assert _names_and_roundtrips(smi).name == name
 
 
 def test_iodinane_ring_fails_closed_not_phantom_carbocycle():

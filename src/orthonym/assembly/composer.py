@@ -3445,6 +3445,13 @@ def _build_n_substituted_name(
         # names (methyl, phenyl) are byte-identical (needs_brackets False). Sort
         # + multiplier stay on the RAW name -> ordering unchanged.
         enc = apply_enclosing_marks(name, -1) if needs_brackets(name) else name
+        if enc == name:
+            # (the Blue Book): a compound prefix is enclosed; its writer
+            # recorded that ('(carbamoylamino)methyl', 'hydroxy(phenyl)methyl')
+            from .prefix_derivation import derivation_of
+            _rec = derivation_of(name)
+            if _rec is not None and _rec.enclosed:
+                enc = apply_enclosing_marks(name, -1)
         if count == 1:
             #: the monosubstituted-urea licence omits the italic-N locant
             # (methylurea). `_omit_n_locant` is only ever True when this is the single
@@ -5682,6 +5689,81 @@ def _heteromonocycle_oxo_prefix_ring(features: Any) -> Optional[Set[int]]:
     return ring if unsaturated else None
 
 
+#: (the Blue Book): the class of a ring carbon's exocyclic =X group,
+#: as the engine's seniority key -- class 16 ketones and pseudoketones (:18189) with their
+#: chalcogen analogues,:29502), in the suffix order C=O > C=S > C=Se > C=Te
+#:,:29561); class 20 imines R=NH, R=N-R' (:18193).
+_RING_EQX_CLASS = {8: 'ketone', 16: 'thioketone', 34: 'selenoketone', 52: 'telluroketone',
+                   7: 'imine'}
+_KETONIC_SUFFIX_ORDER = ('ketone', 'thioketone', 'selenoketone', 'telluroketone')
+
+
+def _suffix_junior_to(principal_group: Optional[str], group_class: str) -> bool:
+    """True when ``principal_group`` (the engine's seniority key of the suffix the name cites)
+    is a class junior to ``group_class`` in: for a class-16 group, a ketonic
+    suffix later in the order of or a class after 16 (hydroxy compounds 17:18190,
+    hydroperoxides 18, amines 19:18192, imines 20); for an imine, nothing the name cites as a
+    suffix is junior. An unknown key is not judged (False)."""
+    from ..rules.seniority import SENIORITY_ORDER
+    if group_class == 'imine' or principal_group not in SENIORITY_ORDER:
+        return False
+    if principal_group in _KETONIC_SUFFIX_ORDER:
+        return (_KETONIC_SUFFIX_ORDER.index(principal_group)
+                > _KETONIC_SUFFIX_ORDER.index(group_class))
+    # the aldehyde chalcogen analogues sit after 'ketone' in SENIORITY_ORDER but are class 15
+    # (:18188, "Aldehydes and chalcogen analogues"), senior to class 16: compare from the
+    # last ketonic key, so only classes 17-20 and the prefix-only classes count as junior
+    return SENIORITY_ORDER.index(principal_group) > SENIORITY_ORDER.index('telluroketone')
+
+
+def _ring_group_cited_below_its_class(features: Any, substituents, atom_to_locant) -> bool:
+    """True when the heterocycle assembly cites a ring carbon's exocyclic =X group (=O, =S,
+    =Se, =Te; =NH or =N-C) as a PREFIX ('sulfanylidene', 'selanylidene', 'imino') while the
+    name cites no suffix, or only a suffix of a class junior to the group's.
+
+     SENIORITY ORDER FOR CLASSES (the Blue Book) "The order of seniority of classes
+    is given in Table 4.1" (:18160): the principal characteristic group is the senior class
+    present, and it is cited as the suffix. A ketone, pseudoketone or heterone (class 16,
+    :18189), and its chalcogen analogue:29502;:29506 "=S '-thione' and
+    'sulfanylidene'"), ranks before hydroxy compounds (17), amines (19)
+    and imines (20); a ring =S beside an amine suffix or with no suffix is therefore not the
+    PIN ('2-sulfanylidene-2H-1,3-dioxole' for the PIN '2H-1,3-dioxole-2-thione',
+    '5-fluoro-2-sulfanylidene-2,3-dihydropyrimidin-4-amine' for '6-amino-5-fluoropyrimidine-
+    2(1H)-thione'). A group junior to the cited suffix stays a prefix of the PIN
+    ('4-sulfanylidene-4H-pyran-2-carbonitrile', '2-imino-2H-pyran-5-amine';
+    '2-sulfanylidene-1,3-thiazolidin-4-one (PIN)',:29569). The name stays valid (it is read
+    back to the input), so the caller records it below the PIN rather than refusing it."""
+    from rdkit import Chem
+    mol = features.mol
+    ring = set(features.principal_ring or ())
+    if not ring or not atom_to_locant:
+        return False
+    suffix_locants = {str(loc) for loc, entries in (substituents or {}).items()
+                      if any(e.get('is_suffix') for e in entries)}
+    principal_group = getattr(features, 'principal_group', None)
+    for a in ring:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetAtomicNum() != 6:
+            continue  # =X on a ring heteroatom (lambda heterones) is not judged here
+        for bond in atom.GetBonds():
+            if bond.GetBondType() != Chem.BondType.DOUBLE:
+                continue
+            x = bond.GetOtherAtom(atom)
+            group_class = _RING_EQX_CLASS.get(x.GetAtomicNum())
+            if group_class is None or x.GetIdx() in ring or x.GetFormalCharge():
+                continue
+            if group_class == 'imine':
+                if any(nb.GetIdx() != a and nb.GetAtomicNum() != 6 for nb in x.GetNeighbors()):
+                    continue  # =N-O, =N-N: oxime and hydrazone classes, not judged here
+            elif x.GetDegree() != 1:
+                continue
+            if str(atom_to_locant.get(a)) in suffix_locants:
+                continue  # the group is the suffix
+            if not suffix_locants or _suffix_junior_to(principal_group, group_class):
+                return True
+    return False
+
+
 def _assemble_heterocycle_name(features: Any, style: str) -> str:
     """
     Assemble name for heterocyclic compounds.
@@ -5700,7 +5782,31 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     Returns:
         Complete IUPAC name for the heterocycle
     """
-    from ..rules.heterocycles import name_heterocycle, name_substituted_heterocycle
+    from ..rules.heterocycles import (
+        heteromonocycle_parent_with_hydrogen,
+        heteromonocycle_ring_hydrogen,
+        name_heterocycle,
+        name_substituted_heterocycle,
+    )
+
+    # Check for substituents
+    substituents = getattr(features, 'heterocycle_substituents', None)
+    atom_to_locant = getattr(features, 'heterocycle_atom_to_locant', None)
+
+    # A ring atom with an exocyclic double bond (ketone, thione or imine suffix; ylidene,
+    # imino or sulfanylidene prefix): the parent's hydrogen is that of its mancude form
+    # with the groups accommodated,; ``ring_hydrogen``), not the
+    # hydrogen of the substituted ring ('1,3-dioxol-2-one' for the PIN '2H-1,3-dioxol-2-
+    # one'; '2H-oxepin-3-one' for 'oxepin-3(2H)-one', Note the Blue Book).
+    parent_name = None
+    added_hydrogen = ''
+    _hydrogen = heteromonocycle_ring_hydrogen(
+        features.mol, features.principal_ring, substituents, atom_to_locant)
+    if _hydrogen is not None:
+        parent_name = heteromonocycle_parent_with_hydrogen(
+            features.mol, features.principal_ring, _hydrogen[0], atom_to_locant)
+        if parent_name is not None:
+            added_hydrogen = _hydrogen[1]
 
     # Get the heterocycle parent name. Pass the principal-group atoms so a
     # PARTIALLY-SATURATED ring numbers its hydro/indicated-H prefix consistently
@@ -5712,18 +5818,15 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
         a for tup in (getattr(features, "principal_group_atoms", None) or [])
         for a in (tup if isinstance(tup, (list, tuple)) else (tup,))
     }
-    parent_name = name_heterocycle(
-        features.mol, features.principal_ring,
-        principal_group_atoms=_pcg_flat or None)
+    if parent_name is None:
+        parent_name = name_heterocycle(
+            features.mol, features.principal_ring,
+            principal_group_atoms=_pcg_flat or None)
     if parent_name is None:
         # A ring heteroatom has no replacement prefix in the governing table, so
         # the parent cannot be spelled. Refuse before decorating it with
         # substituents (which would concatenate onto a missing parent).
         return None
-
-    # Check for substituents
-    substituents = getattr(features, 'heterocycle_substituents', None)
-    atom_to_locant = getattr(features, 'heterocycle_atom_to_locant', None)
 
     #: Atom coverage audit for heterocycle naming path
     if logger.isEnabledFor(logging.DEBUG):
@@ -5775,7 +5878,8 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
             parent_name,
             substituents,
             atom_to_locant,
-            principal_group=getattr(features, 'principal_group', None)
+            principal_group=getattr(features, 'principal_group', None),
+            added_hydrogen=added_hydrogen,
         )
     else:
         # No substituents - return parent name directly
@@ -5784,6 +5888,12 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     if result is None:
         return None
     if oxo_prefix_ring:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(result)
+    # A ring =X group cited as a prefix beside no suffix or a junior one,
+    # the Blue Book): valid, never the PIN; the default tier declines, best-effort
+    # keeps the name.
+    if _ring_group_cited_below_its_class(features, substituents, atom_to_locant):
         from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(result)
 
@@ -8529,7 +8639,18 @@ def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment
     # Examples: "2-hydroxy" -> "hydroxy", "3,4-dihydroxy" -> "hydroxy",
     # "methyl" -> "methyl", "2,2-dimethyl" -> "methyl"
     def _extract_base_name(text: str) -> str:
-        """Strip locants and multipliers to get the base substituent name."""
+        """Strip locants and multipliers to get the base substituent name.
+
+        Review F1 (properfix a performance pass): ``text`` can be a recorded
+        ``PrefixName`` (``assembly.prefix_derivation``) -- a prior single
+        occurrence this same round's writers formatted. Every operation below
+        (``re.sub``, slicing) returns a plain ``str``, so the extracted base
+        is wrapped with ``carried`` before it returns: the group this base
+        name represents is rebuilt (``multiplied_component`` below) from the
+        SAME substituent, so its (c) record still
+        applies to the merged form.
+        """
+        from .prefix_derivation import carried
         # Strip leading locants (digits, commas, hyphens at start)
         stripped = re.sub(r'^[\d,]+-', '', text)
         # Strip multiplicative prefix
@@ -8537,16 +8658,16 @@ def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment
             if stripped.startswith(mult):
                 remainder = stripped[len(mult):]
                 if remainder:
-                    return remainder
+                    return carried(remainder, like=text)
         for mult in sorted(COMPLEX_MULTIPLIERS.values(), key=len, reverse=True):
             if stripped.startswith(mult):
                 remainder = stripped[len(mult):]
                 # Complex multipliers have parenthesized names: tetrakis(methyl) -> methyl
                 if remainder.startswith('(') and ')' in remainder:
-                    return remainder[1:remainder.index(')')]
+                    return carried(remainder[1:remainder.index(')')], like=text)
                 if remainder:
-                    return remainder
-        return stripped
+                    return carried(remainder, like=text)
+        return carried(stripped, like=text)
 
     # Group by base name
     groups: Dict[str, List[NameFragment]] = defaultdict(list)
@@ -9097,7 +9218,20 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 # Ring assembly prefixes contain square brackets and locants,
                 # so they need parentheses wrapping per IUPAC:
                 # 4-([1,1'-biphenyl]-4-yl)butanoic acid
-                ring_sub_groups[f'({prefix})'].append(attach_chain_locant)
+                #
+                # Review F1 (properfix a performance pass): a ring assembly is a SIMPLE
+                # component despite its brackets --
+                # (the Blue Book), '3,5-di([1,1'-biphenyl]-3-yl)pyridine
+                # (PIN)' (:23913), the same fact ``_ring_assembly_substituent_
+                # prefix`` records for its own (single-fragment) call path.
+                # The f-string dict key used to drop that fact for every
+                # multiplied occurrence this loop collects, so a later merge
+                # (``_merge_duplicate_prefixes``) fell through to the
+                # name-string heuristic and multiplied a bracket-bearing
+                # simple prefix as 'bis'. Record it at the writer instead.
+                from .prefix_derivation import built
+                ring_sub_groups[built(f'({prefix})', substituted=False)].append(
+                    attach_chain_locant)
                 # Mark all rings in this fragment as consumed
                 for rg in fragment:
                     consumed_ring_sets.add(tuple(sorted(rg)))
@@ -10639,7 +10773,11 @@ def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True,
         else:
             cited.append(multiplied_component(k, bname, f"({bname})"))
     core = "".join(cited) + head
-    return apply_enclosing_marks(core, -1) if enclose else core
+    from .prefix_derivation import built
+    # Lane L2 (R2): a head with branches is a substituted prefix (c),:7035),
+    # a compound prefix cited in marks,:7232)
+    return built(apply_enclosing_marks(core, -1) if enclose else core,
+                 substituted=bool(branch_entries), enclosed=bool(branch_entries) or None)
 
 
 def _anilino_prefix_from_n_branch(mol, n_idx: int, sub_atoms) -> Optional[str]:

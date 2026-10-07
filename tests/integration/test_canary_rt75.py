@@ -976,10 +976,13 @@ CANARY_COMPOUNDS = [
         # WRONG — it DROPS the benzo aromaticity (1 `-ene` for a 4-double-bond
         # molecule), re-parsing to a different over-saturated structure. G0
         # correctly fails closed (von Baeyer cannot represent aromaticity); the
-        # correct fused-aromatic PIN is a Phase-G1 build. This canary now guards
-        # the fail-closed refusal, not the old wrong cage.
+        # correct fused-aromatic PIN is a Phase-G1 build. This canary guarded the
+        # fail-closed refusal; since S2c-1 the bridged fused PIN on the benzo-name parent
+        # 2-benzoxocine is built, the Blue Book;:23883 "the
+        # bridged fused ring name is preferred to the von Baeyer name"), OPSIN 2.9.0
+        # full-InChIKey exact.
         r"CC(C)=CCc1ccc(O)c2c1C=C[C@H]1O[C@@H]2O[C@H]1C",  # Sentinel: G0 fail-closed (was wrong von-Baeyer)
-        "unknown organic compound",
+        "(1S,3S,4R)-3-methyl-7-(3-methylbut-2-en-1-yl)-3,4-dihydro-1H-1,4-epoxy-2-benzoxocin-10-ol",
     ),
     # Failure taxonomy sentinels: fragment_loss (3 compounds)
     (

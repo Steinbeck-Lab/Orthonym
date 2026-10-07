@@ -298,8 +298,13 @@ def test_ws7_net_anion_dithiocarbamate_carboxylate_names_and_full_rt():
     name, verified = _floor_name_and_verify(smi)
     # D3: plain C1 methyl -> retained 'methyl', not 'methan-1-yl'
     # (RT-identical InChIKey; pure spelling).
-    assert name == ("7-methyl-2-oxido-6-sulfanylidene-"
-                    "1-oxa-5-thia-7-azaoct-1-ene")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("3-{[(dimethylamino)(sulfanylidene)methyl]sulfanyl}-1-oxido-"
+                    "1-oxopropane")
     assert verified == name
 
 
@@ -311,7 +316,13 @@ def test_ws7_diglycine_zwitterion_skeletal_ium_plus_oxido_leaves_full_rt():
     blocks a per-spine cation). ``verify_or_none`` CONFIRMs FULL."""
     smi = "O=C([O-])CNCC[NH2+]CC(=O)[O-]"
     name, verified = _floor_name_and_verify(smi)
-    assert name == "2,9-dioxido-1,10-dioxa-4,7-diazadeca-1,9-dien-7-ium"
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("1-oxido-2-({2-[(2-oxido-2-oxoethyl)azaniumyl]ethyl}amino)-1-"
+                    "oxoethane")
     assert verified == name
 
 
@@ -321,8 +332,13 @@ def test_ws7_net_dianion_triacetate_amine_names_and_full_rt():
     branch arm. ``verify_or_none`` CONFIRMs FULL."""
     smi = "O=C([O-])CNCC[NH+](CC(=O)[O-])CC(=O)[O-]"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("2,9-dioxido-4-(2-oxido-3-oxaprop-2-en-1-yl)-"
-                    "1,10-dioxa-4,7-diazadeca-1,9-dien-4-ium")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("2-({2-[di(2-oxido-2-oxoethyl)azaniumyl]ethyl}amino)-1-oxido-"
+                    "1-oxoethane")
     assert verified == name
 
 
@@ -340,13 +356,27 @@ def test_ws7_stereo_carboxylate_now_ships_full_stereo_ws_stereo_win():
     generator): reverting the STEREO splice (``_stereo_prefix`` forced to
     ``''``) reproduces the exact former value (name without the ``(...)-``
     block, ``verified is None``) -- see task-STEREO-report.md's mutation
-    check. Do NOT revert this value without re-deriving it the same way."""
+    check. Do NOT revert this value without re-deriving it the same way.
+
+    Lane L2 proper-fix round, Task 11 (2026-10-06): the vinyl branch's own locant is
+    stale against this round's fix (the Blue Book, 'ethenyl':24547,
+    'ethenylbenzene (PIN)':2002) -- a bare -CH=CH2 substituent with no prefix of its
+    own cites no free-valence locant, same as the bare top-level case. Re-verified
+    independently: ``verify_or_none`` on the new name FULL-RT-matches (unchanged from
+    before); this test's own OPSIN parse-back + InChIKey compare below also re-checks
+    it; a code-level mutation (disabling the ``_book_spelling`` branch in a
+    scratch copy) reproduces the exact former value with 'eth-1-en-1-yl'."""
     smi = ("C=C[C@]1(C)CC[C@@H]2C(=CC[C@@H]3[C@]2(C)CCC[C@]3(C)"
            "C(=O)[O-])C1")
     name, verified = _floor_name_and_verify(smi)
     # D3: plain C1 methyls -> retained 'trimethyl', not 'tri(methan-1-yl)'.
-    assert name == ("(1R,2R,5R,10R,11S)-5-(eth-1-en-1-yl)-1,5,11-trimethyl-"
-                     "11-(1-oxido-2-oxaeth-1-en-1-yl)tricyclo[8.4.0.0^2,7]tetradec-7-ene")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("(1R,2R,5R,10R,11S)-5-ethenyl-1,5,11-trimethyl-11-"
+                    "[oxido(oxo)methyl]tricyclo[8.4.0.0^2,7]tetradec-7-ene")
     assert verified == name  # full-InChIKey CONFIRMED (constitution+stereo+charge)
     got = opsin_parse(name)
     assert got, f"OPSIN could not parse {name!r}"
@@ -387,8 +417,14 @@ def test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong():
     # 0-wrong intent (never ship a PARTIAL descriptor) is met by a complete one:
     # OPSIN 2.9.0 (fresh call, outside the engine) gives the input's full InChIKey.
     # A producer-level best-effort name, not a PIN claim. The test id is kept.
+    # Roadmap N5f: the alkyl prefix of (1) (the Blue Book: "The atom
+    # with the free valence terminates a chain and always has the locant '1', which is
+    # omitted from the name"), '1-methylpropyl', not '1-methylpropan-1-yl'. Roadmap
+    # N5e: a carbonyl group in position 1 of a side chain takes its acyl group name
+    # (2),:29451), 'acetyl' (:30442 'acetyl (preferred prefix) ethanoyl
+    # 1-oxoethyl'), not '1-oxoethyl'.
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(5S)-5-[(1S)-1-methylpropan-1-yl]-2,4-dioxo-3-(1-oxoethan-1-yl)-"
+    assert name == ("(5S)-3-acetyl-5-[(1S)-1-methylpropyl]-2,4-dioxo-"
                      "1-azacyclopentan-3-ide")
     assert verified == name               # verified, with every stereocentre cited
     jar_or_skip()
@@ -480,17 +516,21 @@ def test_ws7_offers_lane_healthy_verified_floor_offer_still_ships():
 
 def test_ws7_selenido_leaf_roundtrips():
     """MEDIUM: the Se-anion leaf spelling is `selenido` (NOT the OPSIN-rejected
-    `selanido`). The floor names `[Se-]CC` -> `1-selenidoethane` and
-    `verify_or_none` CONFIRMs FULL, so the docstring's OPSIN-RT claim is true."""
+    `selanido`). The floor names `[Se-]CC` -> `selenidoethane` (properfix a performance pass,
+    review I4: (b), the Blue Book, omits the locant of a
+    monosubstituted two-atom homogeneous chain unconditionally -- its own example
+    'hydrazinyl (not hydrazin-1-yl)' (:2911) keeps no locant for a charge-adjacent
+    branch either) and `verify_or_none` CONFIRMs FULL, so the docstring's OPSIN-RT
+    claim is true."""
     name, verified = _floor_name_and_verify("CC[Se-]")
-    assert name == "1-selenidoethane"
+    assert name == "selenidoethane"
     assert verified == name
 
 
 def test_ws7_sulfido_leaf_roundtrips():
     """LOW: lock the S-anion leaf path so it is not silently uncovered."""
     name, verified = _floor_name_and_verify("CC[S-]")
-    assert name == "1-sulfidoethane"
+    assert name == "sulfidoethane"
     assert verified == name
 
 
@@ -533,8 +573,14 @@ def test_ws_stereo_bicyclic_carnitine_ester_converts_block1_to_full():
     # D3: plain C1 methyls -> 'dimethyl'/'trimethyl'; with the inner
     # parens gone the outer enclosure de-escalates  -> .
     # RT-verified identical InChIKey.
-    assert name == ("(1R,2S,4R)-2-(4,4-dimethyl-6-oxo-1,7-dioxa-4-azaundecan-"
-                     "4-ium-1-yl)-1,7,7-trimethylbicyclo[2.2.1]heptane")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("(1R,2S,4R)-2-{2-[(2-butoxy-2-"
+                    "oxoethyl)di(methyl)azaniumyl]ethoxy}-1,7,7-"
+                    "trimethylbicyclo[2.2.1]heptane")
     assert verified == name
 
 
@@ -546,8 +592,13 @@ def test_ws_stereo_cyclohexene_ammonium_ester_converts_block1_to_full():
     name, verified = _floor_name_and_verify(smi)
     # D3: plain C1 ethyl/methyls -> 'ethyl'/'methyl'/'trimethyl'; the
     # outer enclosure de-escalates  -> . RT-verified identical.
-    assert name == ("(3S,4S,5R)-4-(5-ethyl-5-methyl-3-oxo-2-oxa-5-"
-                     "azaheptan-5-ium-1-yl)-1,3,5-trimethylcyclohex-1-ene")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("(3S,4S,5R)-4-({2-[diethyl(methyl)azaniumyl]-1-"
+                    "oxoethoxy}methyl)-1,3,5-trimethylcyclohex-1-ene")
     assert verified == name
 
 
@@ -563,9 +614,14 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
     name, verified = _floor_name_and_verify(smi)
     # D3: plain C1 methyls -> 'dimethyl'; outer enclosure de-escalates
     #  -> . RT-verified identical InChIKey.
-    assert name == ("(19R,25Z,28Z,31Z,34Z)-19-(3-hydroxy-7,7-dimethyl-3-oxo-"
-                     "2,4-dioxa-7-aza-3-phosphaoctan-7-ium-1-yl)-21-oxo-17-oxa-"
-                     "20-thiatetraconta-25,28,31,34-tetraene")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("(5Z,8Z,11Z,14Z)-1-{[(1R)-2-(hexadecyloxy)-1-(3-hydroxy-7,7-"
+                    "dimethyl-3-oxo-2,4-dioxa-7-aza-3-phosphaoctan-7-ium-1-"
+                    "yl)ethyl]sulfanyl}-1-oxoicosa-5,8,11,14-tetraene")
     assert verified == name
 
 
@@ -617,9 +673,21 @@ def test_ws_noabstain_flavonoid_phenolate_mancude_cage_names_full_rt():
     post-fix: emits a von-Baeyer polyene floor name that FULL-RT-verifies."""
     smi = "COc1cc(-c2cc(=O)c3c(O)cc([O-])cc3o2)ccc1O"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("7-hydroxy-3-[4-hydroxy-3-(1-oxaethan-1-yl)cyclohexa-1,3,5-"
-                     "trien-1-yl]-9-oxido-5-oxo-2-oxabicyclo[4.4.0]deca-"
-                     "1(10),3,6,8-tetraene")
+    # roadmap N5d: the benzene ring is 'phenyl', the Blue Book "The
+    # retained prefixes 'methylene', 'phenyl',... have been used as fully
+    # substitutable substituent groups"), never 'cyclohexa-1,3,5-trien-1-yl'
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    # Roadmap N5b: a fusable ring system takes its fusion name, not a von Baeyer name
+    #, the Blue Book "Fusion nomenclature gives preferred IUPAC names
+    # only to compounds having at least two rings of at least five or more members";
+    #:24221 hydro prefixes;:24864 a ring C=O cited as 'oxo').
+    # OPSIN 2.9.0 reads this name back to the input's full InChIKey.
+    assert name == ("5-hydroxy-2-(4-hydroxy-3-methoxyphenyl)-7-oxido-4-oxo-4H-1-"
+                    "benzopyran")
     assert verified == name  # full-InChIKey CONFIRMED
 
 
@@ -631,9 +699,18 @@ def test_ws_noabstain_isoflavone_phenolate_mancude_cage_names_full_rt():
     # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value: a prefix "is considered to begin with the first letter of its complete name" (the Blue Book): '(1-oxaethan-1-yl)' keys at 'oxaethanyl'
     # and '[4-(1-oxaethan-1-yl)-7,9-dioxabicyclo...-3-yl]' at 'oxaethanyldioxa...'
     # (it keyed at its inner locant '4', before every letter). OPSIN RT exact.
-    assert name == ("8-(1-oxaethan-1-yl)-4-[4-(1-oxaethan-1-yl)-7,9-dioxabicyclo"
-                     "[4.3.0]nona-1,3,5-trien-3-yl]-9-oxido-5-oxo-2-oxabicyclo"
-                     "[4.4.0]deca-1(10),3,6,8-tetraene")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    # Roadmap N5b: a fusable ring system takes its fusion name, not a von Baeyer name
+    #, the Blue Book "Fusion nomenclature gives preferred IUPAC names
+    # only to compounds having at least two rings of at least five or more members";
+    #:24221 hydro prefixes;:24864 a ring C=O cited as 'oxo').
+    # OPSIN 2.9.0 reads this name back to the input's full InChIKey.
+    assert name == ("6-methoxy-3-(4-methoxy-7,9-dioxabicyclo[4.3.0]nona-1,3,5-"
+                    "trien-3-yl)-7-oxido-4-oxo-4H-1-benzopyran")
     assert verified == name  # full-InChIKey CONFIRMED
 
 
@@ -655,9 +732,21 @@ def test_ws_noabstain_protonated_purine_mancude_cage_block1_safe_omission():
     # outside the engine) gives the input's full InChIKey (an InChIKey).
     # A producer-level best-effort name, not a PIN claim. The test id is kept.
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("5-{1-[(1R,4S)-4-methyl-3-(1-oxoprop-2-en-1-yl)-3-"
-                     "azacyclohexan-1-yl]-1-azamethan-1-yl}-2,4,9-"
-                     "triazabicyclo[4.3.0]nona-1,3,5,7-tetraen-4-ium")
+    # roadmap N5d: a heteromonocycle of ten or fewer members takes its retained or
+    # Hantzsch-Widman name with its own numbering, the Blue Book
+    # "Mancude and saturated heteromonocyclic compounds with up to and including ten
+    # ring members are named by the extended Hantzsch-Widman system";
+    #:23682): 'piperidin-3-yl', never '3-azacyclohexan-1-yl'
+    # Roadmap N5e: the acyl group by its acyl name (2), the Blue Book
+    # "carbonyl groups in position 1 of a side chain, i.e., -CO-R, are described by
+    # the appropriate acyl group name"): 'prop-2-enoyl', not '1-oxoprop-2-en-1-yl'
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("5-{[(3R,6S)-6-methyl-1-(prop-2-enoyl)piperidin-3-yl]amino}-"
+                    "2,4,9-triazabicyclo[4.3.0]nona-1,3,5,7-tetraen-4-ium")
     assert verified == name
     jar_or_skip()
     assert_full_rt(name, smi)
@@ -673,7 +762,12 @@ def test_ws_noabstain_naphthalene_mancude_cage_no_longer_voids():
         name_universal_substitutive)
     r = name_universal_substitutive(Chem.MolFromSmiles("c1ccc2ccccc2c1"))
     assert r is not None
-    assert r.name == "bicyclo[4.4.0]deca-1,3,5,7,9-pentaene"
+    # Roadmap N5b: a fusable ring system takes its fusion name, not a von Baeyer name
+    #, the Blue Book "Fusion nomenclature gives preferred IUPAC names
+    # only to compounds having at least two rings of at least five or more members";
+    #:24221 hydro prefixes;:24864 a ring C=O cited as 'oxo').
+    # OPSIN 2.9.0 reads this name back to the input's full InChIKey.
+    assert r.name == "naphthalene"
 
 
 def test_ws_noabstain_achiral_saturated_bicycle_self_check_unchanged():
@@ -716,10 +810,17 @@ def test_ws_noabstain_ring_phosphate_bromopurine_nucleotide_full_rt():
     smi = ("Nc1nc2c(nc(Br)n2[C@@H]2O[C@@H]3COP(=O)([O-])O[C@H]3[C@H]2O)"
            "c(=O)[nH]1")
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(1S,6R,8R,9R)-8-[3-amino-8-bromo-5-oxo-2,4,7,9-"
-                     "tetraazabicyclo[4.3.0]nona-1(6),2,7-trien-9-yl]-9-"
-                     "hydroxy-3-oxido-3-oxo-2,4,7-trioxa-3-phosphabicyclo"
-                     "[4.3.0]nonane")
+    # Roadmap N5b: the purine ring takes its fusion name, the Blue Book);
+    # (:24768) "When there are an equal number of indicated hydrogen atoms and
+    #... free valences to be accommodated, the indicated hydrogen atoms are placed at
+    # peripheral atoms that will accommodate these... free valences": N9 takes the
+    # indicated hydrogen, the hydro prefixes come after Example 5,:25477,
+    # '1,3-dioxo-1,3-dihydro-2H-isoindol-2-yl'): '6-oxo-1,6-dihydro-9H-purin-9-yl'. The
+    # sugar-phosphate bicycle has no catalogue parent and keeps its von Baeyer name. OPSIN
+    # 2.9.0 reads this name back to the input's full InChIKey.
+    assert name == ("(1S,6R,8R,9R)-8-(2-amino-8-bromo-6-oxo-1,6-dihydro-9H-purin-"
+                    "9-yl)-9-hydroxy-3-oxido-3-oxo-2,4,7-trioxa-3-"
+                    "phosphabicyclo[4.3.0]nonane")
     assert verified == name  # full-InChIKey CONFIRMED
 
 
@@ -778,7 +879,8 @@ def test_ws_noabstain_methylphosphinate_leaf_full_rt():
     charge). Confirms the shortcut alone, independent of the composite
     3-charged-leaf witness below."""
     name, verified = _floor_name_and_verify("C[PH](=O)[O-]")
-    assert name == "1-[oxido(oxo)phosphanyl]methane"
+    # roadmap N5f: (a) (the Blue Book), no locant on methane
+    assert name == "[oxido(oxo)phosphanyl]methane"
     assert verified == name  # full-InChIKey CONFIRMED
 
 
@@ -786,7 +888,8 @@ def test_ws_noabstain_ethylphosphinate_leaf_full_rt():
     """Unit witness: same shortcut, one carbon longer -- generalization
     proof (not a single hard-coded molecule)."""
     name, verified = _floor_name_and_verify("CC[PH](=O)[O-]")
-    assert name == "1-[oxido(oxo)phosphanyl]ethane"
+    # properfix a performance pass (review I4): (b) omits the locant unconditionally
+    assert name == "[oxido(oxo)phosphanyl]ethane"
     assert verified == name  # full-InChIKey CONFIRMED
 
 
@@ -799,8 +902,15 @@ def test_ws_noabstain_triple_charged_leaf_phosphinate_polyanion_block1():
     ``verify_or_none`` returns it (it used to omit the descriptor: block1)."""
     smi = "O=C([O-])C/C(=C/[PH](=O)[O-])C(=O)[O-]"
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(3Z)-2,5-dioxido-3-{1-[oxido(oxo)phosphanyl]methan-1-ylidene}"
-                     "-1,6-dioxahexa-1,5-diene")
+    # roadmap N5f: 'methylidene' (1), the Blue Book;:15876
+    # 'methylidene (preferred prefix)'), no locant on its prefix (a))
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert name == ("(1Z)-4-oxido-2-[oxido(oxo)methyl]-1-[oxido(oxo)phosphanyl]-"
+                    "4-oxobut-1-ene")
     assert verified == name  # full-InChIKey CONFIRMED
     got = opsin_parse(name)
     assert got, f"OPSIN could not parse {name!r}"
@@ -859,9 +969,18 @@ def test_ws_noabstain_reverse_prenyl_indole_zwitterion_block1_safe_omission():
     # the engine) gives the input's full InChIKey (an InChIKey). A
     # producer-level best-effort name, not a PIN claim. The test id is kept.
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("9-[(2S)-2-azaniumyl-3-oxido-4-oxabut-3-en-1-yl]-5-"
-                     "(3-methylbut-2-en-1-yl)-7-azabicyclo[4.3.0]"
-                     "nona-1,3,5,8-tetraene")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    # Roadmap N5b: a fusable ring system takes its fusion name, not a von Baeyer name
+    #, the Blue Book "Fusion nomenclature gives preferred IUPAC names
+    # only to compounds having at least two rings of at least five or more members";
+    #:24221 hydro prefixes;:24864 a ring C=O cited as 'oxo').
+    # OPSIN 2.9.0 reads this name back to the input's full InChIKey.
+    assert name == ("3-[(2S)-2-azaniumyl-3-oxido-3-oxopropyl]-7-(3-methylbut-2-"
+                    "en-1-yl)-1H-indole")
     assert "pentyl" not in name  # NOT the brief-feared saturated mis-spelling
     assert verified == name
     jar_or_skip()
@@ -967,6 +1086,10 @@ def test_ws_noabstain_p74_end_to_end_still_ships_full_via_floor():
     r = name_universal_substitutive(Chem.MolFromSmiles(smi))
     assert r is not None
     # D3: plain C1 methyl -> retained 'methyl'.
-    assert r.name == ("(2S)-1-methyl-2-(1-oxido-2-oxaeth-1-en-1-yl)"
-                       "-1-azacyclopentan-1-ium")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert r.name == "(2S)-1-methyl-2-[oxido(oxo)methyl]-1-azacyclopentan-1-ium"
     assert verify_or_none(r.name, smi) == r.name  # full-InChIKey CONFIRMED

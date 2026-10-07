@@ -63,7 +63,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     "C1CCN2CCCCC2C1",
     "CC(=O)OCC(C)OC(=O)CC",
     "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-    "CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
     "CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1",
     "CCCCC/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCCCCCCCC",
     "CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC",
@@ -96,9 +95,6 @@ _DEMOTED = [
     # von Baeyer names of fusion-nameable systems (canary DK-VBFUSED; TRIAGE rows 89/90)
     ("CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
      "5,5,9,14-tetramethyl-15-oxapentacyclo[11.3.1.0^1,10.0^4,9.0^14,16]heptadecane-6,7-diol"),
-    # quick-wins F-Q1, the Blue Book): '0^1,6' before '0^4,9'
-    ("CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
-     "(1S,6S,9R,10R)-2,2,6-trimethyl-7,8-dioxatricyclo[7.3.1.0^1,6]tridec-4-en-10-ol"),
     # wp7 change-asserted-value: (:3448) 'dimethyl' keys at 'methyl', before 'oxo';
     # the primed locants are locants (:3442). Was "...-5,6'-dioxo-9',13'-dimethylspiro[...]".
     # OPSIN 2.9.0 full-InChIKey exact.
@@ -188,6 +184,10 @@ _CONTROLS = [
     ("CC(=O)OC[C@@H](O)COC(C)=O", "2-hydroxypropane-1,3-diyl diacetate"),
     ("CC(=O)OCC(COC(C)=O)OC(C)=O", "propane-1,2,3-triyl triacetate"),  # BB:31827
     ("CC[C@@H](Cl)c1ccccc1", "[(1R)-1-chloropropyl]benzene"),       # BB:44668
+    # the bridged fused PIN:23883 "the bridged fused ring name is preferred to
+    # the von Baeyer name"), since S2c-1 named on the benzo-name parent 1,2-benzodioxocine
+    ("CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
+     "(3R,4R,6aS,10aS)-7,7,10a-trimethyl-3,4,5,6,8,10a-hexahydro-7H-3,6a-methano-1,2-benzodioxocin-4-ol"),
 ]
 
 

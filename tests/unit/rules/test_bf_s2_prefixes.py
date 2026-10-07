@@ -25,6 +25,9 @@ def _name(smiles):
     ("C1=CC2N=NC1c1ccccc12", "1,4-dihydro-1,4-diazenonaphthalene"),       #:14112
     ("C1=CC23C=CC=CC2(C=C1)CCCCC3",
      "6,7,8,9-tetrahydro-5H-4a,9a-buta[1,3]dienobenzo[7]annulene"),
+    # -O-O-O-: the benzotrioxepine reading has more atoms (b)); its parent, the
+    # benzo name '2,3,4-benzotrioxepine', comes from the S2c-1 producer
+    ("C1=CC2OOOC1c1ccccc12", "1,5-dihydro-1,5-etheno-2,3,4-benzotrioxepine"),
 ])
 def test_bridge_prefixes(smiles, name):
     assert _name(smiles) == name
@@ -52,8 +55,6 @@ def test_composite_bridges_are_cited_alphabetically_without_parentheses():
 
 
 @pytest.mark.parametrize("smiles", [
-    "C1=CC2OOOC1c1ccccc12",   # -O-O-O-: the 1,2,3-benzotrioxepine reading has more atoms
-                              # (b)) and no parent name in the tables
     "C1=CC2PC1c1ccccc12",     # -PH-: no prefix is spelled (and the phosphane is read as a
                               # principal characteristic group)
     "O=S1(=O)C2C=CC1c1ccccc12",  # -SO2-: a nonstandard bonding number:2744)

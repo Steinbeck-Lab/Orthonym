@@ -267,7 +267,7 @@ class TestCOMPLEX05_FusedHeterocycles:
         # Isoquinoline
         ("c1ccc2cnccc2c1", "isoquinoline"),
         # Benzimidazole
-        ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
+        ("c1ccc2[nH]cnc2c1", "1H-1,3-benzimidazole"),
         # Benzofuran
         #: PIN carries the O locant, the Blue Book
         # "1-benzofuran (PIN) benzofuran")
@@ -302,7 +302,7 @@ class TestCOMPLEX05_TautomerLocants:
     def test_benzimidazole_has_indicated_hydrogen(self):
         """Benzimidazole requires 1H- prefix."""
         result = name_compound("c1ccc2[nH]cnc2c1")
-        assert result == "1H-benzimidazole"
+        assert result == "1H-1,3-benzimidazole"
         assert result.startswith("1H-")
 
 

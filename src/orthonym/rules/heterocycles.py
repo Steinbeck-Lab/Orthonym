@@ -311,11 +311,19 @@ def orient_heterocycle_with_substituents(
     mol,
     ring_atoms,
     substituent_positions: Optional[Set[int]] = None,
-    principal_group_atoms: Optional[Set[int]] = None
+    principal_group_atoms: Optional[Set[int]] = None,
+    mancude_hydrogen: bool = False,
 ) -> Tuple[List[int], Dict[int, int]]:
     """
     Orient heterocycle considering heteroatoms, the principal characteristic
     group, AND other substituent positions.
+
+    ``mancude_hydrogen``: a ring whose atoms carry an exocyclic double bond, or
+    whose mancude parent has two or more indicated hydrogen atoms, is numbered by
+    :func:`_ring_hydrogen_numbering` (the hydrogen of its mancude parent,
+     (c)-(f)) -- for the heterocycle assembly, whose writer
+    spells that hydrogen (``heteromonocycle_ring_hydrogen``). Other callers keep
+    the cascade below.
 
     IUPAC Rule low-locant order, applied to a ring whose senior
     heteroatom is fixed at position 1 per: after fixing the
@@ -379,6 +387,8 @@ def orient_heterocycle_with_substituents(
         # acid, the verbatim BB row at:3252): the hydro namer declines it
         # (d == max_match), but the suffix still had no indicated-H tier.
         _man = _mancude_parent_suffix_numbering(mol, ring_set, principal_group_atoms)
+    if _man is None and mancude_hydrogen:
+        _man = _ring_hydrogen_numbering(mol, ring_set, principal_group_atoms)
     if _man is not None:
         oriented_r = sorted(_man, key=lambda a: _man[a])
         return oriented_r, dict(_man)
@@ -900,6 +910,7 @@ def build_hw_name(
     is_aromatic: bool,
     lambda_by_locant: Optional[Dict[int, int]] = None,
     cite_locants: bool = True,
+    describe_structure: bool = False,
 ) -> Optional[str]:
     """
     Build Hantzsch-Widman systematic name for a heterocycle.
@@ -907,6 +918,13 @@ def build_hw_name(
     ``cite_locants=False`` leaves out the heteroatom locant set, for a caller that
     has established a licence for the whole name (a lambda locant is
     always cited,.
+
+    ``describe_structure=True`` is for a caller that is not naming this ring as a
+    standalone parent, but citing its heteroatom positions to "describe structural
+    features of [a fusion] component", the Blue Book): it keeps
+    the heteroatom locants even for a ring would otherwise call
+    unambiguous on its own ('[1,2,3,4]tetrazolo[1,5-a]pyridine', not
+    'tetrazolo[1,5-a]pyridine', although bare '1H-tetrazole' (:2989) cites none).
 
     Returns ``None`` -- fail closed -- when any heteroatom has no Table 2.4
     prefix. ``""`` still means "no heteroatoms supplied" and stays distinct.
@@ -983,20 +1001,23 @@ def build_hw_name(
     ]
     total_het = len(cited_locants)
     locant_prefix = ""
-    #: a ring in which ONE heteroatom element occupies EVERY skeletal
-    # position needs no heteroatom locants — the numbering is unambiguous
-    # (hexasilinane, not '1,2,3,4,5,6-hexasilinane'; hexathiane). This holds only
-    # when a single distinct element fills all ring positions AND no lambda is
-    # present (a lambda always cites its locant,. A same-element ring
-    # NOT spanning all positions (1,2-disilinane) still needs its locants.
-    _one_element_all_positions = (
-        len(element_locants) == 1 and total_het == ring_size
+    # (the Blue Book): "All locants are omitted for parent
+    # Hantzsch-Widman names if there is only one heteroatom or if there is no
+    # ambiguity if locants are omitted." One element filling every skeletal
+    # position, or every position but one, has a single arrangement: hexasilinane
+    # (not '1,2,3,4,5,6-hexasilinane'), '1H-tetrazole (PIN) (not
+    # 1H-1,2,3,4-tetrazole)' (:2989), dioxirane, diazirine. A lambda locant is
+    # always cited. A same-element ring that fills neither all
+    # positions nor all but one (1,2-disilinane) still needs its locants.
+    _no_isomer = (
+        len(element_locants) == 1 and total_het >= ring_size - 1
         and not lambda_by_locant
+        and not describe_structure
     )
     #: a lambda-bearing ring ALWAYS cites its heteroatom locants,
     # even for a single heteroatom (1lambda3-iodinane, not 'lambda3-iodinane'),
     # with the lambda token immediately after its locant (1,3lambda5-oxaphosphole).
-    if ((total_het > 1 or lambda_by_locant) and not _one_element_all_positions
+    if ((total_het > 1 or lambda_by_locant) and not _no_isomer
             and (cite_locants or lambda_by_locant)):
         from .lambda_convention import format_lambda_token
         locant_prefix = ','.join(
@@ -1951,6 +1972,109 @@ def _mancude_parent_suffix_numbering(mol, ring_set: Set[int],
     return {ordered[p]: best_loc[p] for p in range(n)}
 
 
+def _ring_hydrogen_numbering(mol, ring_set: Set[int],
+                             principal_group_atoms=None) -> Optional[Dict[int, int]]:
+    """Atom-index -> locant map for a heteromonocycle whose ring atoms carry an exocyclic
+    double bond (a ketone, thione or imine suffix; an oxo, imino or ylidene prefix), or
+    whose mancude parent has two or more indicated hydrogen atoms ('6-methyl-2H,4H-1,3-
+    dioxine'), numbered by the hydrogen of its MANCUDE parent with the groups accommodated
+    (``ring_hydrogen``, the rule:func:`heteromonocycle_ring_hydrogen` writes the name with).
+
+     (the Blue Book-25044): "the starting point and direction of numbering of
+    a compound are chosen so as to give lowest locants to the structural features (if
+    present) considered successively in the order given": (b) heteroatoms (the cascade of
+    :func:`_monocycle_numberings`), (c) indicated hydrogen, (d) principal group named as
+    suffix, (e) 'added indicated hydrogen', (f) 'hydro' prefixes, (g) substituents named as
+    prefixes. The heteroatom cascade of ``orient_heterocycle_with_substituents`` ranks a
+    hydrogen-bearing ring heteroatom and the suffix, but neither the parent's indicated
+    hydrogen nor the added hydrogen, so a ketone on a parent without indicated hydrogen was
+    numbered by atom order ('azet-3(4H)-one' against 'azet-3(2H)-one') and the hydro
+    prefixes outranked the suffix ('1,2-dihydro...-6-amine' against '2,3-dihydro...-4-amine');
+    on a parent with two indicated hydrogen atoms the substituent prefixes (g) outranked the
+    indicated hydrogen (c) ('4-methyl-2H,6H-1,3-dioxine' against '6-methyl-2H,4H-1,3-dioxine').
+    Item (c) reads "indicated hydrogen [for unsubstituted compounds; a higher locant may be
+    needed at another position to provide for a substituent suffix in accordance with
+    structural feature (d)]" (:25040): a =X suffix takes the indicated hydrogen at its own
+    position first,:24768), which ``ring_hydrogen`` places before the
+    numberings are compared; a suffix that needs no hydrogen and a prefix never move it
+    ('2H-pyran-6-carboxylic acid (PIN)',:3252).
+    A tie in (b)-(g) goes to the alphanumerical order of the prefixes and the CIP
+    descriptors, as in the cascade, then to the canonical ranks (determinism only).
+
+    ``principal_group_atoms``: the ring atoms that bear the principal characteristic group,
+    or an exocyclic atom of it. A ring atom with an exocyclic double bond among them is a
+    =X suffix ('-one'); every other such atom is a prefix,:24864), an ordinary
+    saturated position of the mancude parent. None outside this scope (no such atom and at
+    most one indicated hydrogen -- that one the parent hydride's own writer places,
+    :func:`_monocycle_indicated_h_prefix` -- no heteroatom, a ring of more than ten members
+    or a saturated one, a ring of a fused or bridged system -- its hydrogen is that of the
+    whole ring system, written by the fusion producers -- a structure the rule declines in
+    any numbering): the caller keeps its cascade."""
+    n = len(ring_set)
+    if n < 3 or n > 10:
+        return None
+    if any(len(ring_set.intersection(r)) >= 2 and set(r) != ring_set
+           for r in mol.GetRingInfo().AtomRings()):
+        return None  # not a monocycle (caffeine's pyrimidine ring): the cascade stands
+    from . import ring_hydrogen
+    if not any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_set):
+        return None
+    exo = ring_hydrogen.exocyclic_double_atoms(mol, ring_set)
+    if not exo and (all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_set)
+                    or not any(b.GetBondType() == Chem.BondType.DOUBLE
+                               for b in mol.GetBonds()
+                               if b.GetBeginAtomIdx() in ring_set
+                               and b.GetEndAtomIdx() in ring_set)):
+        return None  # aromatic: at most one indicated hydrogen; saturated: none is cited
+    ordered = _macrocycle_ordered_ring(mol, ring_set)
+    if ordered is None or len(ordered) != n:
+        return None
+    pcg_atoms = set(principal_group_atoms or ())
+    exo_pcg = pcg_atoms - ring_set
+    pcg_ring = {a for a in ordered
+                if a in pcg_atoms or any(nb.GetIdx() in exo_pcg
+                                         for nb in mol.GetAtomWithIdx(a).GetNeighbors())}
+    suffix_eqx = {a for a in exo if a in pcg_atoms}
+    sub_ring = {a for a in ordered
+                if any(nb.GetIdx() not in ring_set and nb.GetAtomicNum() > 1
+                       for nb in mol.GetAtomWithIdx(a).GetNeighbors())} - pcg_ring
+    cands = []
+    for het_key, loc in _monocycle_numberings(mol, ordered):
+        a2l = {ordered[p]: loc[p] for p in range(n)}
+        rh = ring_hydrogen.ring_hydrogen(mol, ring_set, suffix_eqx, a2l)
+        if rh is None or rh.state.n_double == 0:
+            return None
+        if not exo and len(rh.indicated) < 2:
+            return None  # the count of indicated hydrogen atoms is the parent's, any numbering
+        ih_key, _eqx_key, added_key, hydro_key = ring_hydrogen.numbering_key(
+            rh, a2l, suffix_eqx)
+        key = (het_key, ih_key, tuple(sorted(a2l[a] for a in pcg_ring)), added_key,
+               hydro_key, tuple(sorted(a2l[a] for a in sub_ring)))
+        cands.append((key, a2l))
+    best = min(key for key, _ in cands)
+    tied = []
+    for key, a2l in cands:
+        if key == best and a2l not in tied:
+            tied.append(a2l)
+    canon = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+
+    def _oriented(a2l):
+        return sorted(a2l, key=lambda a: a2l[a])
+
+    prefix_names = (_ring_prefix_names(mol, ring_set, sub_ring, pcg_ring)
+                    if len(tied) > 1 else None)
+    if prefix_names is not None:
+        def _tie_key(a2l):
+            g_key = tuple(sorted((name, a2l[idx]) for idx, names in prefix_names.items()
+                                 for name in names))
+            return (g_key, _ring_cip_locant_key(mol, _oriented(a2l)),
+                    [canon[a] for a in _oriented(a2l)])
+        tied.sort(key=_tie_key)
+    else:
+        tied.sort(key=lambda a2l: [canon[a] for a in _oriented(a2l)])
+    return dict(tied[0])
+
+
 def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
                              principal_group_atoms=None) -> Optional[str]:
     """Hydro name via the RDKit-AROMATIZABLE mancude parent (1,2-dihydropyridine,
@@ -2613,6 +2737,30 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
     return hw_name
 
 
+def _heteroatom_locant_map(mol, order: List[int]) -> Tuple[Tuple[int, str], ...]:
+    """``((locant, element),...)`` of the ring heteroatoms when ring order ``order`` is
+    numbered 1, 2,... ``len(order)``."""
+    return tuple((pos + 1, mol.GetAtomWithIdx(a).GetSymbol())
+                 for pos, a in enumerate(order)
+                 if mol.GetAtomWithIdx(a).GetSymbol() != 'C')
+
+
+def _orders_keeping_heteroatom_map(mol, ring_order: List[int], heteroatom_map=None):
+    """Every numbering of a monocycle (each start atom of ``ring_order``, both directions,
+    in that order) that gives its heteroatoms the locants ``heteroatom_map`` (default: the
+    map of ``ring_order`` itself), as a ring order. The heteroatom locants are fixed first
+    ; (b), the Blue Book-25044) and the callers choose among
+    these numberings by the features that follow (indicated hydrogen, suffix,...)."""
+    n = len(ring_order)
+    want = (_heteroatom_locant_map(mol, ring_order) if heteroatom_map is None
+            else tuple(heteroatom_map))
+    for start in range(n):
+        for step in (1, -1):
+            order = [ring_order[(start + step * k) % n] for k in range(n)]
+            if _heteroatom_locant_map(mol, order) == want:
+                yield order
+
+
 def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
     """Indicated-hydrogen prefix ('2H-') for a mancude monocyclic HW parent.
 
@@ -2650,24 +2798,9 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
         if len(pyrrole_atoms) != 1:
             return ""
         target = pyrrole_atoms[0]
-
-        def _het_map_arom(order):
-            return tuple(
-                (pos + 1, mol.GetAtomWithIdx(a).GetSymbol())
-                for pos, a in enumerate(order)
-                if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
-            )
-
-        base_map = _het_map_arom(oriented)
-        best_loc: Optional[int] = None
-        for start in range(n):
-            for step in (1, -1):
-                order = [oriented[(start + step * k) % n] for k in range(n)]
-                if _het_map_arom(order) != base_map:
-                    continue
-                loc = order.index(target) + 1
-                if best_loc is None or loc < best_loc:
-                    best_loc = loc
+        best_loc = min((order.index(target) + 1
+                        for order in _orders_keeping_heteroatom_map(mol, oriented)),
+                       default=None)
         if best_loc is None:
             return ""
         return f"{best_loc}H-"
@@ -2730,6 +2863,19 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
             idx for pos, idx in enumerate(oriented)
             if idx not in db_atoms and eligible[pos]
         ]
+    if len(sp3h) > 1 and mol.GetNumHeavyAtoms() == n:
+        # More than one indicated hydrogen, the Blue Book: every such
+        # atom "is designated by indicated hydrogen";:3721 each is cited), on the
+        # bare parent hydride: the lowest locant set among the numberings that keep the
+        # heteroatom locants:24641;:8320 "If there is a choice, such ring atoms
+        # are assigned low locants"): '2H,4H-1,3-dioxine', not '2H,6H-'. A substituted ring
+        # takes its numbering from the heterocycle assembly (heteromonocycle_ring_hydrogen).
+        best_set = min((tuple(sorted(order.index(a) + 1 for a in sp3h))
+                        for order in _orders_keeping_heteroatom_map(mol, oriented)),
+                       default=None)
+        if best_set is None:
+            return ""
+        return ",".join(f"{loc}H" for loc in best_set) + "-"
     if len(sp3h) != 1:
         return ""
     target = sp3h[0]
@@ -2739,26 +2885,186 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
     # heteroatoms fixed first, then low locants to indicated hydrogen). This
     # settles the direction tie the single-heteroatom numbering leaves open
     # (2H-azirine, not 3H-azirine).
-    def _het_map(order):
-        return tuple(
-            (pos + 1, mol.GetAtomWithIdx(a).GetSymbol())
-            for pos, a in enumerate(order)
-            if mol.GetAtomWithIdx(a).GetSymbol() != 'C'
-        )
-
-    base_map = _het_map(oriented)
-    best_loc: Optional[int] = None
-    for start in range(n):
-        for step in (1, -1):
-            order = [oriented[(start + step * k) % n] for k in range(n)]
-            if _het_map(order) != base_map:
-                continue
-            loc = order.index(target) + 1
-            if best_loc is None or loc < best_loc:
-                best_loc = loc
+    best_loc = min((order.index(target) + 1
+                    for order in _orders_keeping_heteroatom_map(mol, oriented)),
+                   default=None)
     if best_loc is None:
         return ""
     return f"{best_loc}H-"
+
+
+#: suffix names of a =X group on a ring atom ketone, chalcogen
+#: analogue, imine): the ring atom loses two hydrogen atoms
+_RING_HYDROGEN_SUFFIXES = frozenset({'one', 'thione', 'selone', 'tellone', 'imine'})
+
+
+def heteromonocycle_ring_hydrogen(mol, ring_atoms, substituents, atom_to_locant):
+    """``(front, added)`` for a Hantzsch-Widman or retained heteromonocycle whose ring atoms
+    carry an exocyclic double bond (a ketone, thione or imine suffix; a sulfanylidene, imino,
+    oxo or ylidene prefix beside any suffix), or whose mancude parent has two or more
+    indicated hydrogen atoms ('5-methyl-2H,4H-1,3-dioxine'), under the numbering
+    ``atom_to_locant``: the text in front of the
+    stem ('2H-', '2H,4H-', '2,3-dihydro-4H-', '') and the added indicated hydrogen of the
+    suffix ('2H' for 'oxepin-3(2H)-one'), by the shared rule ``ring_hydrogen``
+     the Blue Book-24768,:24689; '4H-pyran-4-one (PIN) pyran-4-one'
+    :28414). None when the rule does not apply: neither case, a saturated or larger-than-10
+    ring (saturated Hantzsch-Widman and replacement names carry no hydrogen), a =X suffix
+    with a suffix of another kind beside it, a ring the rule declines, or a numbering that is not the lowest
+    for (:25036-25044) (c) indicated hydrogen, (d) suffix (every
+    principal characteristic group the name cites as a suffix, not only a =X one), (e) added
+    hydrogen, (f) hydro prefixes among the numberings that keep the heteroatom locants
+    ('2H,4H-1,3-dioxin-4-one', not '...-6-one'; '2,3-dihydro...-4-amine', not
+    '1,2-dihydro...-6-amine'). The caller then keeps its own spelling."""
+    from . import ring_hydrogen
+    ring = list(ring_atoms or ())
+    ring_set = set(ring)
+    if not ring or not substituents or not atom_to_locant or len(ring) > 10:
+        return None
+    if any(a not in atom_to_locant for a in ring):
+        return None
+    exo = ring_hydrogen.exocyclic_double_atoms(mol, ring_set)
+    by_locant = {str(atom_to_locant[a]): a for a in ring}
+    suffix_names = set()
+    suffix_atoms = set()
+    suffix_ring = set()                   # every ring atom a suffix sits on, for (d)
+    for loc, entries in substituents.items():
+        for e in entries:
+            if not e.get('is_suffix'):
+                continue
+            suffix_names.add(e.get('suffix_name'))
+            atom = by_locant.get(str(loc))
+            if atom is not None:
+                suffix_ring.add(atom)
+            if atom in exo and e.get('suffix_name') in _RING_HYDROGEN_SUFFIXES:
+                suffix_atoms.add(atom)
+    if (suffix_names & _RING_HYDROGEN_SUFFIXES) and (len(suffix_names) > 1 or not suffix_atoms):
+        return None
+    rh = ring_hydrogen.ring_hydrogen(mol, ring_set, suffix_atoms, atom_to_locant)
+    if rh is None or rh.state.n_double == 0:
+        return None
+    if not exo and len(rh.indicated) < 2:
+        # no =X group and at most one indicated hydrogen: the parent hydride's own
+        # indicated hydrogen (_monocycle_indicated_h_prefix) stands
+        return None
+    order = _macrocycle_ordered_ring(mol, ring_set)
+    if order is None:
+        return None
+
+    chosen_het = tuple(sorted((atom_to_locant[a], mol.GetAtomWithIdx(a).GetSymbol())
+                              for a in ring if mol.GetAtomWithIdx(a).GetSymbol() != 'C'))
+    chosen_key = ring_hydrogen.numbering_key(rh, atom_to_locant, suffix_ring)
+    for numbered in _orders_keeping_heteroatom_map(mol, order, chosen_het):
+        a2l = {a: k + 1 for k, a in enumerate(numbered)}
+        other = ring_hydrogen.ring_hydrogen(mol, ring_set, suffix_atoms, a2l)
+        if other is None:
+            return None
+        if ring_hydrogen.numbering_key(other, a2l, suffix_ring) < chosen_key:
+            return None
+    front = ring_hydrogen.parent_prefix(rh, atom_to_locant)
+    if front is None:
+        return None
+    return front, ring_hydrogen.added_text(rh, atom_to_locant)
+
+
+_TABLE_INDICATED_H = re.compile(r'^\d+H-(?=[a-z\d])')
+
+
+def _mancude_retained_stem(mol, ring_atoms) -> Optional[str]:
+    """The retained name of a heteromonocycle's MANCUDE parent without the indicated
+    hydrogen the table spells for one of its tautomers: 'imidazole' (the table's
+    '1H-imidazole'), 'pyran' ('2H-pyran'), 'pyridine', '1,3-oxazole'. The parent is the
+    ring skeleton with the maximum number of noncumulative double bonds,
+    the Blue Book); every placement of its indicated hydrogen is looked up, the
+    first table name in SMILES order wins (each is the same retained stem,: "pyrrole (1H-isomer shown; the PIN is 1H-pyrrole)",:8163). None when the table
+    holds no tautomer or the table name is not a plain stem (a hydro or lambda name)."""
+    from itertools import combinations
+    ring = sorted(ring_atoms)
+    ring_set = set(ring)
+    pt = Chem.GetPeriodicTable()
+    idx = {a: i for i, a in enumerate(ring)}
+    bonds = [(idx[b.GetBeginAtomIdx()], idx[b.GetEndAtomIdx()]) for b in mol.GetBonds()
+             if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set]
+    els = [mol.GetAtomWithIdx(a).GetAtomicNum() for a in ring]
+    deg = [sum(1 for b in bonds if i in b) for i in range(len(ring))]
+    elig = [i for i in range(len(ring)) if pt.GetDefaultValence(els[i]) - deg[i] >= 1]
+    adj = {i: {j for b in bonds for j in b if i in b and j != i and j in elig} for i in elig}
+
+    def _perfect(nodes):
+        if not nodes:
+            return []
+        v = min(nodes)
+        for w in sorted(adj[v] & nodes):
+            rest = _perfect(nodes - {v, w})
+            if rest is not None:
+                return [(v, w)] + rest
+        return None
+
+    best = None
+    for k in range(0, 4):
+        mancude = False                   # k is the parent's indicated-hydrogen count
+        for ih in combinations(elig, k):
+            m = _perfect(frozenset(elig) - set(ih))
+            if m is None:
+                continue
+            mancude = True
+            rw = Chem.RWMol()
+            for z in els:
+                rw.AddAtom(Chem.Atom(z))
+            dbl = {frozenset(p) for p in m}
+            for i, j in bonds:
+                rw.AddBond(i, j, Chem.BondType.DOUBLE if frozenset((i, j)) in dbl
+                           else Chem.BondType.SINGLE)
+            try:
+                raw = Chem.MolToSmiles(rw.GetMol())
+            except RuntimeError:          # an RDKit invariant on the unsanitized placement
+                continue
+            parsed = Chem.MolFromSmiles(raw)
+            if parsed is None:            # the placement does not sanitize: no such tautomer
+                continue
+            smi = Chem.MolToSmiles(parsed)
+            name = get_retained_name(smi)
+            if name and (best is None or smi < best[0]):
+                best = (smi, name)
+        if mancude:
+            break
+    if best is None:
+        return None
+    stem = _TABLE_INDICATED_H.sub('', best[1], count=1)
+    if 'hydro' in stem or 'λ' in stem or 'lambda' in stem or _TABLE_INDICATED_H.match(stem):
+        return None
+    return stem
+
+
+def heteromonocycle_parent_with_hydrogen(mol, ring_atoms, front: str,
+                                         atom_to_locant) -> Optional[str]:
+    """The parent name of a heteromonocycle written with the hydrogen ``front`` of
+    :func:`heteromonocycle_ring_hydrogen` in front of its mancude stem ('2H-1,3-dioxole',
+    '2,3-dihydro-4H-pyran', 'oxepine' + added hydrogen at the suffix). The stem is the
+    retained name when the table holds the ring as a bare mancude name ('pyrrole'), else
+    the Hantzsch-Widman name with the retained stems of (:func:`_apply_retained_stem`).
+    None (the caller keeps its own spelling) for a retained name the table spells with its
+    own hydrogen or locants, a lambda ring atom, a ring heteroatom without a prefix, or a
+    numbering whose heteroatom locants differ from the stem's."""
+    from .lambda_convention import nonstandard_bonding_number as _nsbn
+    ring = list(ring_atoms)
+    oriented, _ = orient_heterocycle(mol, ring)
+    if not oriented or any(_nsbn(mol, i) is not None for i in oriented):
+        return None
+    het = get_heteroatom_locants(oriented, mol)
+    mine = sorted((atom_to_locant[a], mol.GetAtomWithIdx(a).GetSymbol()) for a in ring
+                  if mol.GetAtomWithIdx(a).GetSymbol() != 'C')
+    if sorted((loc, el) for loc, el in het) != mine:
+        return None
+    stem = _mancude_retained_stem(mol, ring)
+    if stem is None:
+        info = classify_heterocycle(mol, ring)
+        stem = build_hw_name(het, info['ring_size'], False, info['is_aromatic'])
+        if not stem:
+            return None
+        stem = _apply_retained_stem(stem)
+    if not front or front.endswith('-'):
+        return f"{front}{stem}"
+    return f"{front}-{stem}" if stem[:1].isdigit() else f"{front}{stem}"
 
 
 def _macrocycle_ordered_ring(mol, ring_set: Set[int]) -> Optional[List[int]]:
@@ -4389,10 +4695,15 @@ def name_substituted_heterocycle(
     parent_name: str,
     substituents: Dict[int, List[Dict]],
     atom_to_locant: Dict[int, int],
-    principal_group: Optional[str] = None
+    principal_group: Optional[str] = None,
+    added_hydrogen: str = '',
 ) -> Optional[str]:
     """
     Assemble complete name for a substituted heterocycle.
+
+    ``added_hydrogen`` ('2H'): the 'added indicated hydrogen' a ketone, thione or imine
+    suffix needs (:func:`heteromonocycle_ring_hydrogen`), cited in parentheses after the
+    suffix locants, the Blue Book; 'pyridin-2(1H)-one (PIN)':21316).
 
     Returns None (the heterocycle candidate declines) when an exocyclic
     substituent cannot be named correctly and completely — naming it partially
@@ -4994,7 +5305,9 @@ def name_substituted_heterocycle(
                 stereo_text="",
             )
 
-        if _l3_omit_suffix_locant:
+        if added_hydrogen and chosen_suffix in _RING_HYDROGEN_SUFFIXES:
+            combined = f"{combined}-{locant_str}({added_hydrogen})-{suffix_token}"
+        elif _l3_omit_suffix_locant:
             combined = f"{combined}{suffix_token}"
         else:
             combined = f"{combined}-{locant_str}-{suffix_token}"
@@ -5115,7 +5428,7 @@ def _l6_ring_parent_without_locants(mol, ring_atoms, parent_name, atom_to_locant
     try:
         if suffix_fg or has_n_substituent or n_groups or suffix_n_tokens:
             return None
-        if stereo_descriptors or not parent_name or parent_name.isalpha():
+        if stereo_descriptors or not parent_name:
             return None
         from ..assembly.handlers._handler_shared import locant_scope_is_a_name_component
         if locant_scope_is_a_name_component():
@@ -5143,10 +5456,29 @@ def _l6_ring_parent_without_locants(mol, ring_atoms, parent_name, atom_to_locant
         is_aromatic = all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring_set)
         is_saturated = all(b.GetBondType() == Chem.BondType.SINGLE for b in bonds)
         with_locants = build_hw_name(hetero, len(ring), is_saturated, is_aromatic)
-        if with_locants != parent_name:
+        without_locants = build_hw_name(hetero, len(ring), is_saturated, is_aromatic,
+                                        cite_locants=False)
+        # properfix a performance pass, finding C1: ``parent_name`` can already BE the
+        # locant-free form. (the Blue Book) "All locants are
+        # omitted for parent Hantzsch-Widman names if there is only one
+        # heteroatom or if there is no ambiguity if locants are omitted" makes
+        # ``build_hw_name`` itself drop the heteroatom locants whenever one
+        # element fills every ring position or all but one ('trioxetane',
+        # '1H-tetrazole') -- independently of any licence, and before
+        # this function is ever asked to strip anything. The caller passes
+        # exactly that default (``cite_locants=True``) build as ``parent_name``,
+        # so for those rings ``with_locants == without_locants == parent_name``
+        # already: there is no heteroatom locant left to strip, but the
+        # SUBSTITUENT-locant omission this function licenses
+        # (``l6_ring_parent_one_substitutable_atom``, already checked above)
+        # must still fire so 'dichlorotrioxetane (PIN)' (:3029) keeps dropping
+        # its substituent locants too. Accept ``parent_name`` against EITHER
+        # rebuilt form -- never ``isalpha``, a name-text proxy that cannot
+        # tell "no locants because nothing to strip" apart from "no locants
+        # because already removed them".
+        if parent_name not in (with_locants, without_locants):
             return None
-        return build_hw_name(hetero, len(ring), is_saturated, is_aromatic,
-                             cite_locants=False) or None
+        return without_locants or None
     except Exception:  # noqa: BLE001 -- deny by default
         return None
 

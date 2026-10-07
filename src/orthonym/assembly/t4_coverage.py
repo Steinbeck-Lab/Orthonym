@@ -336,22 +336,42 @@ def _verified_universal_floor(mol, smi: str, first=None) -> Optional[str]:
     fails the round trip (e.g. a retained ring name whose locants read back as a
     different molecule) abstained although its von Baeyer form verifies; a rung
     candidate reaching ``_prefer_verified_floor`` got the retry, the last rung did
-    not. Fail-closed: any error returns ``None`` (the caller keeps what it had)."""
+    not. Fail-closed: any error returns ``None`` (the caller keeps what it had).
+
+    Roadmap N5: the ladder runs first with the book spellings
+    (``universal_substituent._Ctx.book_forms``); when none of its names verifies and
+    a book spelling was part of one, it runs again with the mechanical spellings the
+    floor gave before, so a book spelling never costs a name."""
+    name, fired = _verified_floor_ladder(mol, smi, first, book_forms=True)
+    if name is not None or not fired:
+        return name
+    name, _fired = _verified_floor_ladder(mol, smi, None, book_forms=False)
+    return name
+
+
+def _verified_floor_ladder(mol, smi: str, first, book_forms: bool):
+    """``(name, book_forms_fired)``: the ladder of ``_verified_universal_floor`` at one
+    spelling setting."""
     from ..validation.reconstruct import verify_or_none
+    fired = False
     try:
         from .universal_substituent import name_universal_substitutive
-        uni = first if first is not None else name_universal_substitutive(mol)
+        uni = first if first is not None else name_universal_substitutive(
+            mol, book_forms=book_forms)
+        fired = bool(uni is not None and uni.book_forms_fired)
         if uni is not None and uni.name and verify_or_none(uni.name, smi) is not None:
-            return uni.name
+            return uni.name, fired
         # Task C retry: the systematic fused-spiro name (a fusion descriptor the
         # numbering subsystem got wrong or OPSIN cannot parse) failed the gate.
         # Retry FORCING the von-Baeyer polyene form of the fused spiro
         # component -- always constitution-faithful, so it recovers breadth at
         # 0-wrong with an uglier (non-PIN, floor-only) covering name.
-        uni_vb = name_universal_substitutive(mol, force_vonbaeyer_spiro=True)
+        uni_vb = name_universal_substitutive(mol, force_vonbaeyer_spiro=True,
+                                             book_forms=book_forms)
+        fired = fired or bool(uni_vb is not None and uni_vb.book_forms_fired)
         if uni_vb is not None and uni_vb.name \
                 and verify_or_none(uni_vb.name, smi) is not None:
-            return uni_vb.name
+            return uni_vb.name, fired
         # Leaf-free retry: an '<acyl>oxy' leaf named a branch of the floor name
         # and the name failed the gate -- rebuild both forms WITHOUT that leaf,
         # the spelling the floor gave before the leaf existed (see
@@ -359,13 +379,15 @@ def _verified_universal_floor(mol, smi: str, first=None) -> Optional[str]:
         if any(u is not None and u.acyloxy_leaf_fired for u in (uni, uni_vb)):
             for force_vb in (False, True):
                 alt = name_universal_substitutive(
-                    mol, force_vonbaeyer_spiro=force_vb, acyloxy_leaf=False)
+                    mol, force_vonbaeyer_spiro=force_vb, acyloxy_leaf=False,
+                    book_forms=book_forms)
+                fired = fired or bool(alt is not None and alt.book_forms_fired)
                 if alt is not None and alt.name \
                         and verify_or_none(alt.name, smi) is not None:
-                    return alt.name
+                    return alt.name, fired
     except Exception as exc:  # fail-closed: keep the rung, never abstain
         logger.info("t4 verified-floor preference raised: %s", exc)
-    return None
+    return None, fired
 
 
 def name_prefix_order_fallback(mol) -> Optional[str]:
@@ -386,12 +408,40 @@ def name_prefix_order_fallback(mol) -> Optional[str]:
     try:
         from .universal_substituent import name_universal_substitutive
         uni = name_universal_substitutive(mol, prefix_order_fallback=True)
+        if (uni is None or not uni.prefix_order_fallback) and uni is not None \
+                and uni.book_forms_fired:
+            # roadmap N5: the mechanical spellings, as before the book forms
+            uni = name_universal_substitutive(mol, prefix_order_fallback=True,
+                                              book_forms=False)
     except Exception as exc:  # fail-closed: the abstention stands
         logger.info("t4 prefix-order fallback raised: %s", exc)
         return None
     if uni is None or not uni.prefix_order_fallback or not uni.name:
         return None
     return uni.name
+
+
+def _book_checked_floor(mol, uni):
+    """The universal floor's name ``uni``, or -- when a book spelling (roadmap N5,
+    ``universal_substituent._Ctx.book_forms``) is part of it and the name does NOT
+    pass the full-InChIKey round trip -- the floor rebuilt with the mechanical
+    spellings it gave before. So a book spelling only ever replaces the mechanical
+    one with a verified name; otherwise the mechanical name is offered and the
+    caller's round-trip ladder judges it exactly as before. A name with no book
+    spelling is returned untouched (no extra round trip)."""
+    if not uni.book_forms_fired:
+        return uni
+    from rdkit import Chem
+
+    from ..validation.reconstruct import verify_or_none
+    from .universal_substituent import name_universal_substitutive
+    try:
+        if verify_or_none(uni.name, Chem.MolToSmiles(mol)) is not None:
+            return uni
+    except Exception:  # an unverifiable book name: prefer the mechanical one
+        pass
+    alt = name_universal_substitutive(mol, book_forms=False)
+    return alt if alt is not None and alt.name else uni
 
 
 def _leaf_checked_floor(mol, uni):
@@ -421,7 +471,8 @@ def _leaf_checked_floor(mol, uni):
             return uni
     except Exception:  # an unverifiable leaf name: prefer the leaf-free one
         pass
-    alt = name_universal_substitutive(mol, acyloxy_leaf=False)
+    alt = name_universal_substitutive(mol, acyloxy_leaf=False,
+                                      book_forms=uni.book_forms_fired)
     return alt if alt is not None and alt.name else uni
 
 
@@ -641,6 +692,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
             from .universal_substituent import name_universal_substitutive
             _uni = name_universal_substitutive(mol)
             if _uni is not None and _uni.name:
+                _uni = _book_checked_floor(mol, _uni)
                 _uni = _leaf_checked_floor(mol, _uni)
                 # The retry the rungs above get through ``_prefer_verified_floor``:
                 # when the floor's first spelling does not even read back as the

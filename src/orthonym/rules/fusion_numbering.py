@@ -48,6 +48,7 @@ from rdkit import Chem
 from .fusion_orientation import (
     best_orientations,
     classify_ring_system,
+    grid_orientations,
 )
 from .locants import _Locant, compare_locant_sets, compare_numbering
 
@@ -107,6 +108,14 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
         ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
          '9', '9a'),
     ),
+    # (the Blue Book) "xanthene and its chalcogen analogues" keep the
+    # traditional numbering; Table 2.8:11646 '9H-telluroxanthene' (OPSIN $_AV)
+    (
+        '9H-telluroxanthene',
+        'C1=CC=CC=2[Te]C3=CC=CC=C3CC12',
+        ('1', '2', '3', '4', '4a', '10', '10a', '5', '6', '7', '8', '8a',
+         '9', '9a'),
+    ),
     # ----- (5,6)/(5,6,6) heterocycles with retained "special numbering" -----
     # Blue Book Table 2.8: purine (entry 16, "special numbering" — also listed
     # with anthracene/phenanthrene at (a) as fixed) and carbazole (entry
@@ -129,6 +138,15 @@ _FIXED_NUMBERING_SYSTEMS: Tuple[Tuple[str, str, Tuple[str, ...]], ...] = (
         '9H-beta-carboline',
         'C1=NC=CC=2C3=CC=CC=C3NC12',
         ('1', '2', '3', '4', '4a', '4b', '5', '6', '7', '8', '8a', '9', '9a'),
+    ),
+    # (the Blue Book) lists cyclopenta[a]phenanthrene among the
+    # traditional numberings (the steroid numbering, fusion carbons 5, 8, 9, 10, 13,
+    # 14 without letters); OPSIN 2.9.0 '17H-cyclopenta[a]phenanthrene' $_AV
+    (
+        '17H-cyclopenta[a]phenanthrene',
+        'C1=CC=CC2=CC=C3C=4C=CCC4C=CC3=C12',
+        ('1', '2', '3', '4', '5', '6', '7', '8', '14', '15', '16', '17', '13',
+         '12', '11', '9', '10'),
     ),
     # 9H-fluorene — the carbocyclic carbazole-shape (CH2 at 9, no heteroatom to
     # drive the lowest-locant cascade) is a retained PAH with the SAME special
@@ -535,11 +553,24 @@ def compute_fused_numbering(
 
     fusion_atoms = _fusion_atoms(graph)  # type: ignore[arg-type]
 
-    orientations = best_orientations(mol, ring_atoms)
-    if orientations:
+    # All-six systems keep the integer hexagon path; any other ring size is drawn on
+    # the same grid with the permitted ring shapes (``grid_orientations``), and the
+    # start ring is the uppermost cell, then the one furthest to the right
+    #, the Blue Book), read off the cell centres.
+    if info['all_six']:
+        orientations = best_orientations(mol, ring_atoms)
+        layouts = [(None, coords) for coords in orientations] if orientations else []
+    else:
+        got = grid_orientations(mol, ring_atoms)
+        layouts = got[1] if got else []
+    if layouts:
         starts = []
-        for coords in orientations:
-            start_ring = _start_ring_key(graph, coords)  # type: ignore[arg-type]
+        for centres, coords in layouts:
+            if centres is None:
+                start_ring = _start_ring_key(graph, coords)  # type: ignore[arg-type]
+            else:
+                top = max(centres.values(), key=lambda c: (c[1], c[0]))
+                start_ring = min(nd for nd, c in centres.items() if c == top)
             start_ring_atoms = set(graph[start_ring]['atoms'])  # type: ignore[index]
             starts.extend(_candidate_starts(
                 mol, coords, periphery, start_ring_atoms, fusion_atoms,

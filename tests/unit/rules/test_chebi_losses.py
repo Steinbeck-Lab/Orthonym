@@ -171,7 +171,11 @@ def _count_retries(monkeypatch):
 def test_potassium_salt_names_without_peptide_retries(monkeypatch):
     calls = _count_retries(monkeypatch)
     res = _be(CALCEIN_K5)
-    assert res["name"].startswith("pentapotassium 2',7'-dichloro-3',6'-dioxido-")
+    # roadmap N5c (name-quality lane L2): the amide chain is cut at its N,
+    # the Blue Book), so the 5-substituent now sorts before 'dioxido'
+    assert res["name"].startswith(
+        "pentapotassium 2',7'-dichloro-5-[({4-[di(2-oxido-2-oxoethyl)amino]-3-"
+        "(2-oxido-2-oxoethoxy)phenyl}amino)(oxo)methyl]-3',6'-dioxido-")
     assert_full_rt(res["name"], CALCEIN_K5)
     assert calls == []
 

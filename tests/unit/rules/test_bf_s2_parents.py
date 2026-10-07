@@ -75,13 +75,16 @@ def test_a_lettered_fusion_heteroatom_map_is_discarded():
     assert {n[nitrogen] for n in fp.numberings} == {5}
 
 
-@pytest.mark.parametrize("smiles", [
-    "c1ccc2c(c1)[nH]c1cnccc12",      # catalogue name '9H-beta-carboline' is not a PIN
-    "c1cn2ccsc2n1",                  # 'imidazo[2,1-b]thiazole' is not a PIN
+@pytest.mark.parametrize("smiles,name", [
+    # the catalogue's '9H-beta-carboline' is not a PIN (no Blue Book line) and its
+    # 'imidazo[2,1-b]thiazole' spelled the thiazole without its locants:11982);
+    # since S2c-1 the two-component producer names both skeletons, numbered by OPSIN
+    ("c1ccc2c(c1)[nH]c1cnccc12", "pyrido[3,4-b]indole"),
+    ("c1cn2ccsc2n1", "imidazo[2,1-b][1,3]thiazole"),
 ])
-def test_parents_the_tables_cannot_certify_are_declined(smiles):
+def test_parents_the_tables_cannot_certify_get_the_producers_name(smiles, name):
     _, fp = _parent(smiles)
-    assert fp is None, fp
+    assert fp is not None and fp.name == name and fp.source == "hetero_fusion_name+opsin", fp
 
 
 def test_benzo_names_need_heteroatom_locants():

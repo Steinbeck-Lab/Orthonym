@@ -140,10 +140,13 @@ def test_m01_best_effort_label_stays_below_the_pin_when_only_the_rerun_builds_it
 
 
 def test_m01_a_non_pin_rerun_name_is_not_shipped_at_the_pin_tier():
-    # the only name the re-run can build carries '1-oxacyclopropan-2-yl'
-    #, the Blue Book: Hantzsch-Widman 'oxiran-2-yl' for a ring of
-    # <= 10 members), so the PIN tier stays as it was; best-effort still names it,
-    # labelled below the PIN. Tier labels -- paper semantics (user decision
+    # the only name the re-run can build comes from a best-effort ring writer (the
+    # terminal ring namer is never a PIN-tier producer); it carried
+    # '1-oxacyclopropan-2-yl' and, since roadmap N5d, the Hantzsch-Widman 'oxiran-2-yl'
+    #, the Blue Book). The PIN tier stays as it was; best-effort
+    # still names it, labelled below the PIN: pin_unverified now that its spelling
+    # carries no part the code records as not the PIN, never is_pin (the label of a
+    # name a breadth producer built, ``metrics.provenance``). Tier labels -- paper semantics (user decision
     # 2026-09-30; Methods, "Tiers": "The label systematic_verified means a correct
     # systematic name that is not the PIN"): the PIN path built the name, a round
     # trip verified it, and it carries a part the code records as not the PIN, so
@@ -151,8 +154,8 @@ def test_m01_a_non_pin_rerun_name_is_not_shipped_at_the_pin_tier():
     smi = "CC/C=C\\CC(O)/C=C/C=C\\C=C\\C=C\\C1OC1CCCCCC(=O)O"
     assert is_failure_name(_pin(smi)["name"])
     be = _be(smi)
-    assert "oxacyclopropan" in be["name"], be
-    assert be["tier"] == "systematic_verified" and not be["is_pin"], be
+    assert "oxiran-2-yl" in be["name"], be
+    assert be["tier"] == "pin_unverified" and not be["is_pin"], be
     assert be["opsin"] == "verified", be
     assert_full_rt(be["name"], smi)
 
@@ -196,11 +199,11 @@ M03 = [
     # (e) (:3288-3290): 'ene' before the prefixes
     ("CC1=CCC(CC1)C(=C)CCO", "3-(4-methylcyclohex-3-en-1-yl)but-3-en-1-ol"),
     # (b) before (c) (:3246): the indicated hydrogen first
-    ("Oc1ccc2nc[nH]c2c1", "1H-benzimidazol-6-ol"),
-    ("Cc1nc2ccc(C(=O)O)cc2[nH]1", "2-methyl-1H-benzimidazole-6-carboxylic acid"),
-    ("Clc1ccc2nc[nH]c2c1", "6-chloro-1H-benzimidazole"),
+    ("Oc1ccc2nc[nH]c2c1", "1H-1,3-benzimidazol-6-ol"),
+    ("Cc1nc2ccc(C(=O)O)cc2[nH]1", "2-methyl-1H-1,3-benzimidazole-6-carboxylic acid"),
+    ("Clc1ccc2nc[nH]c2c1", "6-chloro-1H-1,3-benzimidazole"),
     ("COc1c(C)cnc(CS(=O)c2nc3ccc(O)cc3[nH]2)c1C",
-     "2-{[(4-methoxy-3,5-dimethylpyridin-2-yl)methyl]sulfinyl}-1H-benzimidazol-6-ol"),
+     "2-{[(4-methoxy-3,5-dimethylpyridin-2-yl)methyl]sulfinyl}-1H-1,3-benzimidazol-6-ol"),
     # (a) (:6938): a hyphen separates a locant from a word
     ("COc1ccc(C2=C(Cc3ccc4c(c3)CC(O)C(C)(C)O4)[C@H](OC)OC2=O)cc1",
      "(5R)-4-[(3-hydroxy-2,2-dimethyl-3,4-dihydro-2H-1-benzopyran-6-yl)methyl]-5-methoxy-"

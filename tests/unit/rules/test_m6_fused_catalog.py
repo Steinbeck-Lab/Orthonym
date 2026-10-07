@@ -18,7 +18,7 @@ exact bare core, never a hand-guessed name) before being added:
   * 9H-fluorene (tricyclic PAH)
   * 3,4-dihydro-2H-1,4-benzoxazine (benzomorpholine)
   * pyrazolo[1,5-a]pyrazine (bridgehead-N 5-6)
-  * 5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole (5-5 heteroaromatic)
+  * 5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole (5-5 heteroaromatic)
 
 Both the bare parents and small substituted derivatives are pinned, plus two
 of the real corpus witnesses that measurably converted from
@@ -53,12 +53,12 @@ from orthonym.data.fused_heterocycles import match_fused_heterocycle_core
         # to substituent placement, not just the unsubstituted lookup).
         ("c1cn2nccc2cn1", "pyrazolo[1,5-a]pyrazine"),
         ("Cc1cn2nccc2cn1", "6-methylpyrazolo[1,5-a]pyrazine"),
-        # 5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole: bare parent
+        # 5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole: bare parent
         # and a 6-phenyl derivative.
-        ("c1nnc2n1NCS2", "5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole"),
+        ("c1nnc2n1NCS2", "5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole"),
         (
             "c1nnc2n1NC(c3ccccc3)S2",
-            "6-phenyl-5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole",
+            "6-phenyl-5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole",
         ),
     ],
 )
@@ -103,7 +103,7 @@ def test_m6_kindc_catalog_covers_the_four_new_cores():
         ("C1c2ccccc2-c2ccccc21", "9H-fluorene"),
         ("C1COc2ccccc2N1", "3,4-dihydro-2H-1,4-benzoxazine"),
         ("c1cn2nccc2cn1", "pyrazolo[1,5-a]pyrazine"),
-        ("c1nnc2n1NCS2", "5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole"),
+        ("c1nnc2n1NCS2", "5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole"),
     ]
     for smiles, expected_name in cases:
         mol = Chem.MolFromSmiles(smiles)
@@ -146,14 +146,14 @@ def test_m6_kindc_real_witnesses_reach_the_catalog():
             "Cn1ccc(-c2cn3nccc3c(-c3cnn(C4CC5(CC(C#N)C5)C4)c3)n2)n1",
             "pyrazolo[1,5-a]pyrazine",
         ),
-        # 5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole core --
+        # 5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole core --
         # reached, though the overall molecule still abstains for an
         # unrelated reason (a nitro-group tautomer/charge form the
         # self-consistency gate does not equate with the neutral form OPSIN
         # emits; not this catalog -- see the report).
         (
             "[O-][NH+](O)c1ccc([C@@H]2Nn3c(nnc3-c3cccnc3)S2)cc1",
-            "5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole",
+            "5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole",
         ),
     ]
     for smiles, expected_name in cases:

@@ -55,16 +55,17 @@ HETEROCYCLE_ACCURACY_CASES = [
     ("C1=c2ccccc2=[As]c2ccccc21", "acridarsine"),         # the Blue Book (PIN)
     ("c1ccc2pc3ccccc3cc2c1", "acridophosphine"),          # the Blue Book (PIN)
     ("c1ccc2c(c1)Oc1ccccc1[Se]2", "phenoxaselenine"),     # the Blue Book (PIN)
-    # The 4 X-H members drop the indicated hydrogen: the Blue Book
-    # print "<name> (PIN, 10H-isomer shown)" where "10H-isomer shown" identifies
-    # the DRAWN isomer and is NOT part of the PIN string; v52 Phase-1
-    # SP3, commit dfa8ed41f). Contrast the isostructural N-cases (the Blue Book)
-    # phenoxazine/phenothiazine, whose entries say "the PIN is 10H-phenoxazine" —
-    # there 10H- IS part of the PIN, so those keep it (still emit 10H-, verified).
-    ("c1ccc2c(c1)Oc1ccccc1P2", "phenoxaphosphinine"),   # the Blue Book (PIN)
-    ("c1ccc2c(c1)Oc1ccccc1[AsH]2", "phenoxarsinine"),   # the Blue Book (PIN)
-    ("c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2", "phenoxastibinine"),  # the Blue Book (PIN)
-    ("c1ccc2c(c1)Sc1ccccc1[AsH]2", "phenothiarsinine"),  # the Blue Book (PIN)
+    # The 4 X-H members cite the indicated hydrogen of their X-H at 10,
+    # the Blue Book): the Blue Book list them as "<name> (PIN, 10H-isomer
+    # shown)" beside "the PIN is 10H-phenoxazine" (the Blue Book) for the N analogue; the
+    # PIN cites it the Blue Book, the Blue Book, the Blue Book). The
+    # bare spelling is a listing spelling, by analogy with Note 1 (the Blue Book, the
+    # note of the seniority lists: "Indicated hydrogen atoms are not shown in
+    # this kind of listing").
+    ("c1ccc2c(c1)Oc1ccccc1P2", "10H-phenoxaphosphinine"),   # the Blue Book
+    ("c1ccc2c(c1)Oc1ccccc1[AsH]2", "10H-phenoxarsinine"),   # the Blue Book
+    ("c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2", "10H-phenoxastibinine"),  # the Blue Book
+    ("c1ccc2c(c1)Sc1ccccc1[AsH]2", "10H-phenothiarsinine"),  # the Blue Book
     # phenoxathiine — the S member of the same family (was mis-spelled
     # 'phenoxathiin'); PIN keeps the terminal 'e', the Blue Book).
     ("c1ccc2c(c1)Oc1ccccc1S2", "phenoxathiine"),
@@ -82,7 +83,7 @@ HETEROCYCLE_ACCURACY_CASES = [
     ("c1ccc2ncccc2c1", "quinoline"),
     ("c1ccc2cnccc2c1", "isoquinoline"),
     ("c1ccc2[nH]ccc2c1", "1H-indole"),
-    ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
+    ("c1ccc2[nH]cnc2c1", "1H-1,3-benzimidazole"),
     ("c1ccc2occc2c1", "1-benzofuran"),      #: PIN locant, the Blue Book)
     ("c1ccc2sccc2c1", "1-benzothiophene"),  #: PIN locant, the Blue Book)
     ("c1ccc2ncncc2c1", "quinazoline"),

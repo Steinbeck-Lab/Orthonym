@@ -199,9 +199,9 @@ class TestNameFusedHeterocycle:
 
     @pytest.mark.unit
     def test_benzimidazole_name(self):
-        """Benzimidazole should be named '1H-benzimidazole'."""
+        """Benzimidazole should be named '1H-1,3-benzimidazole', the benzo name with its locants)."""
         mol = Chem.MolFromSmiles('c1ccc2[nH]cnc2c1')
-        assert name_fused_heterocycle(mol) == '1H-benzimidazole'
+        assert name_fused_heterocycle(mol) == '1H-1,3-benzimidazole'
 
     @pytest.mark.unit
     def test_purine_name(self):

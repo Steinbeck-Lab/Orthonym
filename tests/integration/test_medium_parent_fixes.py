@@ -438,7 +438,7 @@ marks=_XF_FUSED,
     pytest.param(
         "COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)"
         "C15CC2)[C@@H]3[C@@H]4O",
-        "hexacyclo",
+        "-2,12b:5a,7a-diethanoazepino[4,3-c]carbazole-",
         id="vb-hexacyclic-diaza-alkaloid",
     ),
 ]

@@ -64,8 +64,40 @@ ORDERED_NAME = (
 EZ_FLOOR_ROW = "C/C=C(\\CC(=C\\C)/C(C)=C/Nc1ccc(-c2csc(C(=O)N(C)C)c2)cn1)OC"
 
 
-def test_witness_ships_the_paper_spelling_at_best_effort():
+# Roadmap N5 (name-quality lane L2): with the book spellings the strict path names the
+# row by a substitutive name whose order round-trips, and the general engine names
+# it at the complete tier; the fallback is not reached for it (both read back by OPSIN
+# 2.9.0 to the full InChIKey). The fallback rule itself is pinned on this witness with the
+# book spellings switched off (``book_prefixes.mechanical_forms``), which gives the
+# writers' spellings of the paper's run.
+BOOK_NAME = (
+    "1-[(2R,5R)-5-(hydroxymethyl)-4-{[(2S,4R,5S)-4-methyl-4-phenyl-3-oxa-1-aza-"
+    "2-phosphabicyclo[3.3.0]octan-2-yl]oxy}oxolan-2-yl]-5-methylpyrimidine-"
+    "2,4(1H,3H)-dione")
+COMPLETE_BOOK_NAME = (
+    "(2S,4R,5S)-2-{[(2R,5R)-2-(hydroxymethyl)-5-(5-methyl-2,4-dioxo-1,3-diazacyclohex-"
+    "5-en-1-yl)oxolan-3-yl]oxy}-4-methyl-4-phenyl-3-oxa-1-aza-2-phosphabicyclo[3.3.0]"
+    "octane")
+
+
+def test_the_book_spellings_name_the_witness_without_the_fallback(monkeypatch):
+    import orthonym.assembly.t4_coverage as t4
+    calls = []
+    real = t4.name_prefix_order_fallback
+    monkeypatch.setattr(t4, "name_prefix_order_fallback",
+                        lambda mol: calls.append(1) or real(mol))
     res = name_best_effort(P_ROW)
+    assert res.get("name") == BOOK_NAME
+    assert_full_rt(res.get("name"), P_ROW)
+    assert res.get("tier") == "systematic_verified"
+    assert res.get("prefix_order_fallback") is False
+    assert calls == []
+
+
+def test_witness_ships_the_paper_spelling_at_best_effort():
+    from orthonym.assembly.book_prefixes import mechanical_forms
+    with mechanical_forms():
+        res = name_best_effort(P_ROW)
     assert res.get("name") == PAPER_NAME
     assert_full_rt(res.get("name"), P_ROW)
     assert res.get("tier") == "best_effort"
@@ -101,7 +133,14 @@ def test_pin_and_complete_tiers_are_unchanged(tier, monkeypatch):
     namer = (Orthonym(style="pin") if tier == "pin"
              else Orthonym(style="pin", **_emit_tier_flags(tier)))
     res = namer.name_tiered(P_ROW)
-    assert res.get("tier") == "abstain"
+    if tier == "pin":
+        assert res.get("tier") == "abstain"
+    else:
+        # roadmap N5 (name-quality lane L2): the general engine names the row with
+        # the book spellings (it abstained before); never through the fallback
+        assert res.get("name") == COMPLETE_BOOK_NAME
+        assert res.get("tier") == "systematic_verified"
+        assert_full_rt(res.get("name"), P_ROW)
     assert res.get("prefix_order_fallback") is False
     assert calls == []
 
@@ -133,11 +172,15 @@ def test_floor_keeps_the_p145_order_when_it_round_trips():
 
 
 def test_floor_fallback_builds_the_paper_spelling():
+    # roadmap N5 (name-quality lane L2): the fallback rule is pinned on the paper's
+    # spelling with the book spellings switched off (the spellings it was built on).
+    from orthonym.assembly.book_prefixes import mechanical_forms
     from orthonym.assembly.t4_coverage import name_prefix_order_fallback
     from orthonym.assembly.universal_substituent import name_universal_substitutive
     mol = Chem.MolFromSmiles(P_ROW)
-    assert name_universal_substitutive(mol).prefix_order_fallback is False
-    assert name_prefix_order_fallback(mol) == PAPER_NAME
+    with mechanical_forms():
+        assert name_universal_substitutive(mol).prefix_order_fallback is False
+        assert name_prefix_order_fallback(mol) == PAPER_NAME
 
 
 def test_stereo_layer_only_gate():
@@ -174,6 +217,9 @@ def test_an_omitted_descriptor_is_not_reordered(monkeypatch):
 
 def test_orders_tried_are_capped(monkeypatch):
     import orthonym.assembly.universal_substituent as us
+    # roadmap N5 (name-quality lane L2): the fallback rule is pinned on the paper's
+    # spelling with the book spellings switched off (the spellings it was built on).
+    from orthonym.assembly.book_prefixes import mechanical_forms
     from orthonym.assembly.t4_coverage import name_prefix_order_fallback
     rebuilds = []
     real = us._name_component
@@ -183,7 +229,8 @@ def test_orders_tried_are_capped(monkeypatch):
             rebuilds.append(kwargs["top_prefix_front"])
         return real(*args, **kwargs)
     monkeypatch.setattr(us, "_name_component", spy)
-    assert name_prefix_order_fallback(Chem.MolFromSmiles(P_ROW)) == PAPER_NAME
+    with mechanical_forms():
+        assert name_prefix_order_fallback(Chem.MolFromSmiles(P_ROW)) == PAPER_NAME
     # the P-substituent (index 2, on the P stereocentre) is reached after the
     # 4-methyl prefix (index 1, on the C-4 stereocentre); both on stereo atoms
     assert rebuilds == [1, 2]
@@ -237,9 +284,21 @@ def test_corpus_p_row_labels_are_those_as_written_and_it_ships():
     from orthonym.namer import _cip_labels_match_input_as_written
     assert _cip_labels_match_input_as_written(CORPUS_P_ROW) is True
     assert _cip_labels_match_input_as_written(P_ROW) is True
-    res = name_best_effort(CORPUS_P_ROW)
+    # the fallback rule, with the book spellings switched off (the spellings it was
+    # built on)
+    from orthonym.assembly.book_prefixes import mechanical_forms
+    with mechanical_forms():
+        res = name_best_effort(CORPUS_P_ROW)
     assert res.get("name") == (
         "(2R,5S)-2-(2-methyl-1-oxapropan-1-yl)-3-(cyclohexa-1,3,5-trien-1-yl)"
         "-1,3-diaza-2-phosphabicyclo[3.3.0]octane")
     assert_full_rt(res.get("name"), CORPUS_P_ROW)
     assert res.get("prefix_order_fallback") is True
+    # roadmap N5 (name-quality lane L2): with the book spellings ('1-methylethoxy',
+    # the Blue Book; 'phenyl',:16290) the order
+    # round-trips and the general engine names the row without the fallback
+    res = name_best_effort(CORPUS_P_ROW)
+    assert res.get("name") == (
+        "(2R,5S)-2-(1-methylethoxy)-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane")
+    assert_full_rt(res.get("name"), CORPUS_P_ROW)
+    assert res.get("prefix_order_fallback") is False

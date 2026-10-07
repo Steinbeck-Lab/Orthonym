@@ -265,9 +265,16 @@ LABEL_ON_ONE_MEMBER_ROWS = [
      "1-{2-[6-(2-tert-butoxy-2-oxoethyl)-2,2-dimethyl-1,3-dioxan-4-yl]ethyl}-2-"
      "(4-fluorophenyl)-N-(2H5)phenyl-3-phenyl-5-(propan-2-yl)-1H-"
      "pyrrole-4-carboxamide", "pin_unverified"),
+    # roadmap N5b/N5d (name-quality lane L2): the carbazole takes its fusion name and
+    # the phenyl group its prefix ('9-(2H5)phenyl-N,N-diphenyl-9-(9-phenyl-9H-carbazol-
+    # 2-yl)-9H-fluoren-3-amine'), so the name keeps no part the label guard records as
+    # not the PIN: pin_unverified, is_pin False (a label, not a derivation of the PIN).
+    # It was '...-9-[8-(cyclohexa-1,3,5-trien-1-yl)-8-azatricyclo[7.4.0.0^2,7]trideca-
+    # 1(13),2,4,6,9,11-hexaen-5-yl]-...', systematic_verified.
     ("[2H]C1=C(C(=C(C(=C1[2H])[2H])C2(C3=C(C=C(C=C3)N(C4=CC=CC=C4)C5=CC=CC=C5)"
-     "C6=CC=CC=C62)C7=CC8=C(C=C7)C9=CC=CC=C9N8C1=CC=CC=C1)[2H])[2H]", None,
-     "systematic_verified"),
+     "C6=CC=CC=C62)C7=CC8=C(C=C7)C9=CC=CC=C9N8C1=CC=CC=C1)[2H])[2H]",
+     "9-(2H5)phenyl-N,N-diphenyl-9-(9-phenyl-9H-carbazol-2-yl)-9H-fluoren-3-amine",
+     "pin_unverified"),
     ("[2H]C1=C(C(=C(C(=C1[2H])[2H])C2(C3=C(C=C(C=C3)N(C4=CC=CC=C4)C5=CC=CC6=CC=CC=C65)"
      "C7=CC=CC=C72)C8=CC9=C(C=C8)SC1=CC=CC=C19)[2H])[2H]", None, "pin_unverified"),
 ]

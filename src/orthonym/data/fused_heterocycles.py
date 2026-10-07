@@ -97,7 +97,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # 1H-benzimidazole
     'c1ccc2[nH]cnc2c1': {
-        'name': '1H-benzimidazole',
+        'name': '1H-1,3-benzimidazole',
         'tautomer_locant': 1,
         'ring_system': 'benzo-5-membered',
         'parent_atoms': 9,
@@ -105,7 +105,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # 1H-benzotriazole
     'c1ccc2[nH]nnc2c1': {
-        'name': '1H-benzotriazole',
+        'name': '1H-1,2,3-benzotriazole',
         'tautomer_locant': 1,
         'ring_system': 'benzo-5-membered',
         'parent_atoms': 9,
@@ -137,7 +137,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # 2,1-benzisoxazole
     'c1ccc2nocc2c1': {
-        'name': '2,1-benzisoxazole',
+        'name': '2,1-benzoxazole',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-membered',
         'parent_atoms': 9,
@@ -889,7 +889,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # thiazolo[4,5-b]pyridine
     'c1cnc2ncsc2c1': {
-        'name': 'thiazolo[4,5-b]pyridine',
+        'name': '[1,3]thiazolo[4,5-b]pyridine',
         'tautomer_locant': None,
         'ring_system': 'thienopyrimidine',
         'parent_atoms': 9,
@@ -985,7 +985,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # oxazolo[5,4-b]pyridine
     'c1cnc2ocnc2c1': {
-        'name': 'oxazolo[5,4-b]pyridine',
+        'name': '[1,3]oxazolo[5,4-b]pyridine',
         'tautomer_locant': None,
         'ring_system': 'oxazolopyridine',
         'parent_atoms': 9,
@@ -1124,13 +1124,26 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 10,
         'iupac_locants': {0: 2, 1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: 8, 7: 9, 8: '9a', 9: 1},
     },
-    # pyrrolizine
+    # 1H-pyrrolizine: entry (21) (the Blue Book) "pyrrolizine (1H-isomer
+    # shown; the PIN is 1H-pyrrolizine)"; (:14607) "In preferred IUPAC names, all
+    # indicated hydrogen atoms must be cited". Locant 1 is the CH2 of this structure.
     'C1=Cn2cccc2C1': {
-        'name': 'pyrrolizine',
-        'tautomer_locant': None,
+        'name': '1H-pyrrolizine',
+        'tautomer_locant': 1,
         'ring_system': 'bridgehead',
         'parent_atoms': 8,
         'iupac_locants': {0: 2, 1: 3, 2: 4, 3: 5, 4: 6, 5: 7, 6: '7a', 7: 1},
+    },
+    # 3H-pyrrolizine: the retained name of every tautomer is 'pyrrolizine' (Table 2.8,
+    # the Blue Book "the PIN is 1H-pyrrolizine";:11903 no fusion name for a
+    # system with a retained name, so not '3H-pyrrolo[1,2-a]pyrrole'); map: OPSIN 2.9.0
+    # '3H-pyrrolizine' $_AV (C1, C2, C3, N4, C5, C6, C7, C7a)
+    'C1=Cc2cccn2C1': {
+        'name': '3H-pyrrolizine',
+        'tautomer_locant': 3,
+        'ring_system': 'bridgehead',
+        'parent_atoms': 8,
+        'iupac_locants': {0: 2, 1: 1, 2: '7a', 3: 7, 4: 6, 5: 5, 6: 4, 7: 3},
     },
     # xanthone
     'O=c1c2ccccc2oc2ccccc12': {
@@ -1340,7 +1353,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # 1,2-benzisoxazole
     'c1ccc2oncc2c1': {
-        'name': '1,2-benzisoxazole',
+        'name': '1,2-benzoxazole',
         'tautomer_locant': None,
         'ring_system': 'benzo-5-membered',
         'parent_atoms': 9,
@@ -1658,7 +1671,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # oxazolo[4,5-b]pyridine
     'c1cnc2ncoc2c1': {
-        'name': 'oxazolo[4,5-b]pyridine',
+        'name': '[1,3]oxazolo[4,5-b]pyridine',
         'tautomer_locant': None,
         'ring_system': 'oxazolopyridine',
         'parent_atoms': 9,
@@ -1666,7 +1679,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # thiazolo[5,4-b]pyridine
     'c1cnc2scnc2c1': {
-        'name': 'thiazolo[5,4-b]pyridine',
+        'name': '[1,3]thiazolo[5,4-b]pyridine',
         'tautomer_locant': None,
         'ring_system': 'thiazolopyridine',
         'parent_atoms': 9,
@@ -1674,7 +1687,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # isoxazolo[5,4-b]pyridine
     'c1cnc2oncc2c1': {
-        'name': 'isoxazolo[5,4-b]pyridine',
+        'name': '[1,2]oxazolo[5,4-b]pyridine',
         'tautomer_locant': None,
         'ring_system': 'isoxazolopyridine',
         'parent_atoms': 9,
@@ -1682,7 +1695,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # thiazolo[4,5-b]pyrazine
     'c1cnc2scnc2n1': {
-        'name': 'thiazolo[4,5-b]pyrazine',
+        'name': '[1,3]thiazolo[4,5-b]pyrazine',
         'tautomer_locant': None,
         'ring_system': 'thienopyrimidine',
         'parent_atoms': 9,
@@ -1778,7 +1791,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # imidazo[2,1-b]thiazole
     'c1cn2ccsc2n1': {
-        'name': 'imidazo[2,1-b]thiazole',
+        'name': 'imidazo[2,1-b][1,3]thiazole',
         'tautomer_locant': None,
         'ring_system': 'bridgehead',
         'parent_atoms': 8,
@@ -2011,7 +2024,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # oxazolo[5,4-c]pyridine
     'c1cc2ncoc2cn1': {
-        'name': 'oxazolo[5,4-c]pyridine',
+        'name': '[1,3]oxazolo[5,4-c]pyridine',
         'tautomer_locant': None,
         'ring_system': 'oxazolopyridine',
         'parent_atoms': 9,
@@ -2019,7 +2032,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # thiazolo[5,4-c]pyridine
     'c1cc2ncsc2cn1': {
-        'name': 'thiazolo[5,4-c]pyridine',
+        'name': '[1,3]thiazolo[5,4-c]pyridine',
         'tautomer_locant': None,
         'ring_system': 'thiazolopyridine',
         'parent_atoms': 9,
@@ -2027,7 +2040,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     },
     # isoxazolo[3,4-b]pyridine
     'c1cnc2nocc2c1': {
-        'name': 'isoxazolo[3,4-b]pyridine',
+        'name': '[1,2]oxazolo[3,4-b]pyridine',
         'tautomer_locant': None,
         'ring_system': 'isoxazolopyridine',
         'parent_atoms': 9,
@@ -2162,7 +2175,7 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 9,
         'iupac_locants': {3: 1, 4: 2, 5: 3, 6: '3a', 2: 8, 1: 7, 0: 6, 8: 5, 7: 4},
     },
-    # 5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole (partially
+    # 5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole (partially
     # saturated 5-5 heteroaromatic fusion; witness ring system from
     # [O-][NH+](O)c1ccc([C@@H]2Nn3c(nnc3-c3cccnc3)S2)cc1, a common
     # 6-aryl-5,6-dihydrotriazolothiadiazole scaffold). OPSIN rejects the
@@ -2170,7 +2183,10 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
     # and the [3,2-b] fusion-locant variant names a DIFFERENT structure
     # (verified non-match) -- only the [3,4-b] form round-trips to this core.
     'c1nnc2n1NCS2': {
-        'name': '5,6-dihydro-[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole',
+        # no hyphen between 'dihydro' and the component's bracketed locants,
+        # the Blue Book; 'octahydro[1,4]dioxocino[2,3-c][1,6]dioxecine-2,5,9,12-tetrone
+        # (PIN)':32191)
+        'name': '5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole',
         'tautomer_locant': None,
         'ring_system': 'triazolothiadiazole',
         'parent_atoms': 8,

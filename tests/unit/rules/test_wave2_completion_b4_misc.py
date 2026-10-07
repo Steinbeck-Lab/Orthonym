@@ -114,8 +114,13 @@ class TestFusedRingRows:
         assert (name_compound("c1nc2[se]cnc2s1")
                 == "[1,3]selenazolo[5,4-d][1,3]thiazole")
 
-    def test_thiazolothiazole_unchanged(self):
-        assert name_compound("c1nc2scnc2s1") == "thiazolo[5,4-d]thiazole"
+    def test_thiazolothiazole(self):
+        # S2c-1 (change-asserted-value, was 'thiazolo[5,4-d]thiazole'):
+        # 'Heteromonocycles' (the Blue Book), the Hantzsch-Widman name 1,3-thiazole
+        # with its locants in square brackets, as the sibling above
+        # ('[1,3]selenazolo[5,4-d][1,3]thiazole (PIN)',:12311). OPSIN 2.9.0 full-InChIKey
+        # exact.
+        assert name_compound("c1nc2scnc2s1") == "[1,3]thiazolo[5,4-d][1,3]thiazole"
 
     def test_dihydropyrrolopyrrole(self):
         # LEDGER-STALE override: the bare mancude 'pyrrolo[2,3-b]pyrrole' is a

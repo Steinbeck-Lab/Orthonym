@@ -187,11 +187,19 @@ PROMOTION_HELPER_ROWS = [
     # ChEBI 45958
     ("NCCCC[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](Cc1ccccc1)C(=O)O",
      "glutaminyllysylphenylalanine"),
-    # ChEBI 105164
+    # ChEBI 105164. properfix a performance pass (review I4/): the mononuclear-N amino
+    # assembler (``substituent_naming._located_fg_hetero_root``) now encloses the
+    # SECOND and further branch even when it is simple,
+    # the Blue Book, "the second and further substituents are each enclosed
+    # with parentheses even for simple substituents" -- 'methyl(phenyl)amino'
+    #:26308), so the bare 'methylamino' after a compound acyl branch -- which
+    # OPSIN's own grammar could misparse at the same boundary a bare 'formyl-
+    # methylamino' does -- becomes '(methyl)amino'. RT-VERIFIED unchanged
+    # (assert_full_rt below).
     ("CCCC[C@@H](C)C[C@@H](C)C(=O)N(C)[C@@H](CC(C)C)C(=O)N[C@H](C(=O)N(C)[C@H]"
      "(C(=O)N1C[C@@H](O)C[C@H]1C(=O)O)C(C)C)[C@@H](C)OC(C)=O",
      "(2S,4S)-1-[(2S)-2-{[(2S,3R)-3-(acetyloxy)-2-{[(2S)-2-{[(2R,4R)-2,4-dimethyl-"
-     "1-oxooctyl]methylamino}-4-methyl-1-oxopentyl]amino}-1-oxobutyl]methylamino}-"
+     "1-oxooctyl](methyl)amino}-4-methyl-1-oxopentyl]amino}-1-oxobutyl](methyl)amino}-"
      "3-methyl-1-oxobutyl]-4-hydroxypyrrolidine-2-carboxylic acid"),
 ]
 
@@ -255,13 +263,15 @@ def test_nested_frame_keeps_the_stand_in_without_a_clean_run(monkeypatch):
 
 
 # ChEBI 105698: its best-effort naming ran the offer in a nested name (trace at
-# 6a78ea183: 1 nested run); name unchanged by the fix.
+# 6a78ea183: 1 nested run); name unchanged by the fix. Roadmap N5 (name-quality lane
+# L2): 'hexyl', 'methylidene', 'methylethyl' (1), the Blue Book) and
+# 'methoxy',:27667); was '...-8-[(1R,3S)-1,3-dimethylhexan-1-yl]-12-
+# (methan-1-ylidene)-5-(1-methylethan-1-yl)-9-(1-oxaethan-1-yl)-...'.
 NESTED_OFFER_ROW = (
     "C=C1C=CC(=O)NCC(=O)N[C@@H](C(C)C)C(=O)O[C@@H]([C@H](C)C[C@@H](C)CCC)"
     "[C@H](OC)C(=O)N1",
-    "(5S,8S,9S)-8-[(1R,3S)-1,3-dimethylhexan-1-yl]-12-(methan-1-ylidene)-5-"
-    "(1-methylethan-1-yl)-9-(1-oxaethan-1-yl)-3,6,10,15-tetraoxo-7-oxa-1,4,11-"
-    "triazacyclopentadec-13-ene")
+    "(5S,8S,9S)-8-[(1R,3S)-1,3-dimethylhexyl]-9-methoxy-5-(1-methylethyl)-"
+    "12-methylidene-3,6,10,15-tetraoxo-7-oxa-1,4,11-triazacyclopentadec-13-ene")
 
 
 def test_no_clean_run_in_a_nested_frame(monkeypatch):
@@ -363,30 +373,30 @@ def test_memo_reading_run_leaves_no_trace(monkeypatch):
 # 1,2-dienyl)benzene'), which must not ship.
 CLEAN_OFFER_ROWS = [
     # a dev split / milestone1500
-    ("O=C(NCc1ccccn1)c1ccc(Oc2ccccc2)cc1",
-     "2-(3-{4-[1-(cyclohexa-1,3,5-trien-1-yl)-1-oxamethyl]cyclohexa-1,3,5-trien-1-yl}"
-     "-4-oxa-2-azabut-3-en-1-yl)pyridine",
-     [(1, False), (1, True)]),
-    # a dev split / milestone1500
     ("CO/C=C(C(=O)OC)\\C(C)=C/C=C/c1ccc(OCC=C(C)C)c(O)c1",
      "2-hydroxy-4-[(1E,3Z,5E)-6-methoxy-5-(methoxycarbonyl)-4-methylhexa-1,3,5-trien-"
      "1-yl]-1-[(3-methylbut-2-en-1-yl)oxy]benzene",
      [(1, False), (1, True)]),
     # dev2000
+    # roadmap N5c (name-quality lane L2): the chain no longer ends on the S that roots
+    # 'sulfanyl', the Blue Book); the hexavalent S keeps the
+    # chain spelling (plan decision 5)
     ("C=CCC(=NOS(=O)(=O)O)S[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O",
-     "(2R,3S,4S,5R,6S)-6-[5,5-dioxo-2-(prop-2-en-1-yl)-4,6-dioxa-1,5λ6-dithia-3-"
-     "azahex-2-en-1-yl]-3,4,5-trihydroxy-2-(hydroxymethyl)oxane",
+     "(2R,3S,4S,5R,6S)-6-{[4,4-dioxo-1-(prop-2-en-1-yl)-3,5-dioxa-4λ6-thia-2-"
+     "azapent-1-en-1-yl]sulfanyl}-3,4,5-trihydroxy-2-(hydroxymethyl)oxane",
      [(1, False), (1, True)]),
     # dev2000
+    # roadmap N5c/N5d (name-quality lane L2): 'phenyl', '(phenylamino)'
+    # the Blue Book;:6465)
     ("O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3ccccc3)cc2)c1",
-     "1-(2-{4-[1-(cyclohexa-1,3,5-trien-1-yl)-1-azamethyl]cyclohexa-1,3,5-trien-1-yl}-"
-     "1,2-diazaeth-1-en-1-yl)-3-(1,1-dioxo-2-oxa-1λ6-thiaethyl)benzene",
+     "3-(1,1-dioxo-2-oxa-1λ6-thiaethyl)-1-{2-[4-(phenylamino)phenyl]-1,2-diazaeth-"
+     "1-en-1-yl}benzene",
      [(1, False), (1, True)]),
 ]
 
 
 @pytest.mark.parametrize("smiles,expected,offer_runs", CLEAN_OFFER_ROWS,
-                         ids=["pyridine", "hexatrienyl", "glucosinolate", "sulfonyl"])
+                         ids=["hexatrienyl", "glucosinolate", "sulfonyl"])
 def test_clean_offer_names_are_kept(monkeypatch, smiles, expected, offer_runs):
     runs = _spy_clean_offer(monkeypatch)
     row = name_best_effort(smiles)
@@ -394,6 +404,35 @@ def test_clean_offer_names_are_kept(monkeypatch, smiles, expected, offer_runs):
     assert row["tier"] == "systematic_verified"
     assert_full_rt(row["name"], smiles)
     assert runs == offer_runs
+
+
+# a dev split / milestone1500. Roadmap N5 (name-quality lane L2): with the book spellings
+# ('phenoxy', 'benzoyl', '(...)amino'; the Blue Book,
+#:30446,:6465) the main path names the row and the offer never runs; the
+# offer is pinned on it with the book spellings switched off.
+PYRIDINE_ROW = "O=C(NCc1ccccn1)c1ccc(Oc2ccccc2)cc1"
+
+
+def test_clean_offer_name_is_kept_mechanical_spelling(monkeypatch):
+    from orthonym.assembly.book_prefixes import mechanical_forms
+    runs = _spy_clean_offer(monkeypatch)
+    with mechanical_forms():
+        row = name_best_effort(PYRIDINE_ROW)
+    assert row["name"] == (
+        "2-(3-{4-[1-(cyclohexa-1,3,5-trien-1-yl)-1-oxamethyl]cyclohexa-1,3,5-trien-1-yl}"
+        "-4-oxa-2-azabut-3-en-1-yl)pyridine")
+    assert row["tier"] == "systematic_verified"
+    assert_full_rt(row["name"], PYRIDINE_ROW)
+    assert runs == [(1, False), (1, True)]
+
+
+def test_the_book_spellings_name_the_row_without_the_offer(monkeypatch):
+    runs = _spy_clean_offer(monkeypatch)
+    row = name_best_effort(PYRIDINE_ROW)
+    assert row["name"] == "2-{[(4-phenoxybenzoyl)amino]methyl}pyridine"
+    assert row["tier"] == "systematic_verified"
+    assert_full_rt(row["name"], PYRIDINE_ROW)
+    assert runs == []
 
 
 # The ChEBI row the recipe lost first (ChEBI 18872, 119 heavy atoms): named
@@ -404,15 +443,20 @@ CHEBI_18872 = (
     "[C@@H](CC[C@H](CN)O[C@@H]2O[C@H](CO)[C@H](O)[C@H](O)[C@H]2O)C(=O)NCC(=O)N"
     "[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(N)=O)C(=O)NCC(=O)N2CCC[C@H]2C(=O)N"
     "[C@@H](CCCCN)C(=O)NCC(=O)N[C@@H](CCC(=O)O)C(=O)N[C@H](C(=O)O)[C@@H](C)O)c1")
+# Roadmap N5 (name-quality lane L2): the carbon chains carry the heteroatoms as prefixes
+#, the Blue Book), the rings take their book names:8482,
+#:16290), '(aminoacetyl)amino' with its enclosing marks:7232).
+# Was '3-{(2S,5S,11S,14S)-18-{(2S)-2-[(3S,9S,12S,13R)-3-(5-azapentan-1-yl)-...-19-oxa-
+# 4,7,10,13,16-pentaazanonadec-18-en-1-yl}-1-methylcyclohexa-1,3,5-triene'.
 CHEBI_18872_NAME = (
-    "3-{(2S,5S,11S,14S)-18-{(2S)-2-[(3S,9S,12S,13R)-3-(5-azapentan-1-yl)-12-carboxy-"
-    "13-hydroxy-9-(3-hydroxy-4-oxabut-3-en-1-yl)-1,4,7,10-tetraoxo-2,5,8,11-"
-    "tetraazatetradecan-1-yl]-1-azacyclopentan-1-yl}-2-[(6S,9S)-9-(cyclohexan-1-yl)-"
-    "6-methyl-2,5,8,11-tetraoxo-1,4,7,10,13-pentaazatridecan-1-yl]-11-(3-hydroxy-4-"
-    "oxabut-3-en-1-yl)-3,6,9,12,15-pentaoxo-14-(3-oxo-4-azabutan-1-yl)-5-[(3R)-3-"
-    "{1-[(1R,3R,4R,5S,6R)-4,5,6-trihydroxy-3-(2-oxaethan-1-yl)-2-oxacyclohexan-1-yl]"
-    "-1-oxamethan-1-yl}-5-azapentan-1-yl]-19-oxa-4,7,10,13,16-pentaazanonadec-18-en-"
-    "1-yl}-1-methylcyclohexa-1,3,5-triene")
+    "3-[(2S)-2-[(2-{[(2S)-2-({(2S)-2-[(aminoacetyl)amino]-2-cyclohexyl-1-oxoethyl}"
+    "amino)-1-oxopropyl]amino}-1-oxoethyl)amino]-3-{[(1S,4R)-5-amino-1-{[(2-{[(1S)-1-"
+    "({[(1S)-4-amino-1-{[(2-{(2S)-2-[(3S,9S,12S,13R)-3-(4-aminobutyl)-12-carboxy-13-"
+    "hydroxy-9-(3-hydroxy-3-oxopropyl)-1,4,7,10-tetraoxo-2,5,8,11-tetraazatetradecan-"
+    "1-yl]pyrrolidin-1-yl}-2-oxoethyl)amino](oxo)methyl}-4-oxobutyl]amino}(oxo)methyl)"
+    "-4-hydroxy-4-oxobutyl]amino}-2-oxoethyl)amino](oxo)methyl}-4-{[(2R,3R,4S,5R,6R)-"
+    "3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxy}pentyl]amino}-3-oxopropyl]-1-"
+    "methylbenzene")
 
 
 def test_chebi_18872_names_without_the_repeated_work(monkeypatch):

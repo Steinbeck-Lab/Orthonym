@@ -90,17 +90,27 @@ _PROMOTION_INDEPENDENT = frozenset({
 prefixes_apart_var = contextvars.ContextVar("orthonym_prefixes_apart", default=False)
 
 
+#: Roadmap N5: True (the default) while the writers spell the Blue Book's forms
+#: (``assembly.book_prefixes.book_forms_enabled``); ``book_prefixes.mechanical_forms``
+#: sets it False for a run that wants the spellings before N5. Some of those runs share
+#: one memo scope with the book spellings (the terminal-fragment writer's mechanical
+#: pre-pass, the assembly tier's von Baeyer gate), and their values differ for the same
+#: key, so the caches below key them apart, as for the promotion re-run.
+book_forms_var = contextvars.ContextVar("orthonym_book_forms", default=True)
+
+
 def _ck(namespace, key):
     """The cache key for ``(namespace, key)`` in the current run (see above)."""
     if namespace in _PROMOTION_INDEPENDENT:
         return (namespace, key)
+    tag = () if book_forms_var.get() else ("mechanical-forms",)
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
-            return (namespace, key, "pin-promotion", "prefixes-apart")
-        return (namespace, key, "prefixes-apart")
+            return (namespace, key, "pin-promotion", "prefixes-apart") + tag
+        return (namespace, key, "prefixes-apart") + tag
     if pin_promotion_var.get():
-        return (namespace, key, "pin-promotion")
-    return (namespace, key)
+        return (namespace, key, "pin-promotion") + tag
+    return (namespace, key) + tag
 
 
 class MemoMismatch(Exception):

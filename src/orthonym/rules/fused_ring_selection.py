@@ -232,12 +232,68 @@ def _horizontal_row_count(mol, rings_in_component):
     return best
 
 
+#: (the Blue Book) citation order of the 'a' prefixes
+_HW_CITATION = ('F', 'Cl', 'Br', 'I', 'O', 'S', 'Se', 'Te', 'N', 'P', 'As', 'Sb',
+                'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B', 'Al', 'Ga', 'In', 'Tl')
+
+
+def _monocycle_numbering(mol, ring):
+    """The component's own numbering of a heteromonocycle (h)/(i) read it:
+    the Blue Book "locants '1,2' of pyridazine preferred to locants '1,4' of
+    pyrazine"): (:8284) "The locant '1' is given to a heteroatom that occurs
+    first in the seniority sequence... The numbering is then chosen to give lowest locants
+    to heteroatoms considered as a set", then the lowest locants in that sequence. None
+    for a carbocycle or a ring that is not a simple cycle. The rule fixes the locant sets,
+    so the input atom order never matters."""
+    ring = list(ring)
+    ring_set = set(ring)
+    cyc = [ring[0]]
+    prev = None
+    while True:
+        cur = cyc[-1]
+        nbs = sorted(nb.GetIdx() for nb in mol.GetAtomWithIdx(cur).GetNeighbors()
+                     if nb.GetIdx() in ring_set and nb.GetIdx() != prev)
+        if not nbs:
+            return None
+        nxt = nbs[0]
+        if nxt == cyc[0]:
+            break
+        if nxt in cyc:
+            return None
+        prev = cur
+        cyc.append(nxt)
+    if len(cyc) != len(ring_set):
+        return None
+    het = {a: mol.GetAtomWithIdx(a).GetSymbol() for a in cyc
+           if mol.GetAtomWithIdx(a).GetAtomicNum() != 6}
+    if not het:
+        return None
+    senior = min(het.values(), key=lambda e: _HW_CITATION.index(e) if e in _HW_CITATION else 99)
+    n = len(cyc)
+    best = None
+    for s in range(n):
+        if het.get(cyc[s]) != senior:
+            continue
+        for d in (1, -1):
+            num = {cyc[(s + d * k) % n]: k + 1 for k in range(n)}
+            key = (tuple(sorted(num[a] for a in het)),
+                   tuple(tuple(sorted(num[a] for a in het if het[a] == e)) for e in _HW_CITATION))
+            if best is None or key < best[0]:
+                best = (key, num)
+    return best[1] if best else None
+
+
 def _component_numbering(mol, atoms, rings_in_component):
-    """Spelling-invariant per-component locant map: number the component by a
-    heteroatom-priority canonical walk (locant 1 -> most senior heteroatom or,
-    for carbocycles, the RDKit-canonical-rank-lowest atom). Returns
-    {atom_idx: locant}. Kept local + deterministic (uses canonical ranks, not
-    input order) so (h)-(j) tuples do not depend on the SMILES spelling."""
+    """Spelling-invariant per-component locant map: a heteromonocycle takes its own
+    Hantzsch-Widman numbering (``_monocycle_numbering``); any other component is numbered
+    by a heteroatom-priority canonical walk (locant 1 -> most senior heteroatom or, for
+    carbocycles, the RDKit-canonical-rank-lowest atom). Returns {atom_idx: locant}. Kept
+    local + deterministic (uses canonical ranks, not input order) so (h)-(j) tuples do not
+    depend on the SMILES spelling."""
+    if len(rings_in_component) == 1 and set(rings_in_component[0]) == set(atoms):
+        own = _monocycle_numbering(mol, rings_in_component[0])
+        if own is not None:
+            return own
     ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
     ordered = sorted(atoms, key=lambda a: (
         -_HETEROATOM_SENIORITY.get(mol.GetAtomWithIdx(a).GetSymbol(), 0),
@@ -254,13 +310,17 @@ def _component_heteroatom_locants(mol, atoms, rings_in_component):
 
 
 def _component_het_type_locants(mol, atoms, rings_in_component):
-    """(i) locants grouped by heteroatom seniority order (senior element's
-    locants first, ascending within each element)."""
+    """(i) locants grouped by element in the order of (i) (the Blue Book)
+    "F > Cl > Br > I > O > S > Se > Te > N > P >..." (``_FR23_ALT_ORDER``, not the (a)
+    order, which puts N first), ascending within each element::12416
+    '[1,3,2]oxathiazolo[4,5-d][1,2,3]oxathiazole (PIN) (locants '1,2,3' are lower than
+    '1,3,2')' -- O1 S2 N3 against O1 N2 S3."""
     numb = _component_numbering(mol, atoms, rings_in_component)
     out = []
+    order = {e: i for i, e in enumerate(_FR23_ALT_ORDER)}
     for elem in sorted({mol.GetAtomWithIdx(a).GetSymbol() for a in atoms
                         if mol.GetAtomWithIdx(a).GetAtomicNum() != 6},
-                       key=lambda e: -_HETEROATOM_SENIORITY.get(e, 0)):
+                       key=lambda e: order.get(e, len(order))):
         out.extend(sorted(numb[a] for a in atoms
                           if mol.GetAtomWithIdx(a).GetSymbol() == elem))
     return out
@@ -325,5 +385,9 @@ def select_base_component(
     if len(fused_components) < 2:
         raise ValueError("Need >=2 components for fusion naming")
 
-    ranked = sorted(fused_components, key=lambda c: _rank(mol, c))
+    # A full tie (identical components in different places) is broken by the canonical
+    # atom ranks, never by the input order (two spellings of one molecule must give one name)
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
+    ranked = sorted(fused_components,
+                    key=lambda c: (_rank(mol, c), tuple(sorted(ranks[a] for a in c))))
     return ranked[0], ranked[1:]

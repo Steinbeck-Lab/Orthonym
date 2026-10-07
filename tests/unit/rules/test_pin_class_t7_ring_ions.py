@@ -39,8 +39,10 @@ Declined at the PIN tier (best-effort keeps its RT-exact name):
    criteria (b) and (e),:3246,:3288, are not modelled by that construction);
 - a carbanion with a chloro prefix (the chain-substituent classifier does not name it);
 - a ring '-uide' whose mancude parent the neutral namer spells without its indicated
-  hydrogen ('1-methylphosphole', 'phosphindole'): a '-uide' adds a hydride, so the
-  parent's indicated hydrogen stays in the name ('1H-1-benzoborol-1-uide',:41122).
+  hydrogen ('1-methylphosphole'): a '-uide' adds a hydride, so the parent's indicated
+  hydrogen stays in the name ('1H-1-benzoborol-1-uide',:41122). The phosphindole
+  centre is named since the neutral parent is '1H-phosphindole' (the name-quality
+  program, lane L1a): '1H-phosphindol-1-uide', as '1H-phosphol-1-uide'.
 """
 import pytest
 from rdkit import Chem
@@ -79,6 +81,8 @@ CLASS_ROWS = [
     ("C[BH-]1C=CC=C1", "1-methyl-1H-borol-1-uide"),
     ("[PH2-]1C=CC=C1", "1H-phosphol-1-uide"),
     ("C[P-]1(C)C=CC=C1", "1,1-dimethyl-1H-phosphol-1-uide"),
+    ("[PH2-]1C=Cc2ccccc21", "1H-phosphindol-1-uide"),
+    ("C[P-]1(C)C=Cc2ccccc21", "1,1-dimethyl-1H-phosphindol-1-uide"),
     # / carbanions with 'oxo' prefixes
     ("CC[C-]=O", "1-oxopropan-1-ide"),
     ("CC(=O)[CH2-]", "2-oxopropan-1-ide"),
@@ -130,7 +134,6 @@ CONTROL_ROWS = [
     ("C1CCCCC[NH2+]CCOCCCC1", "1-oxa-4-azacyclotetradecan-4-ium"),
     ("C[Si-]1CCCC1", "1-methylsilolan-1-ide"),
     ("C1CC[NH2+]CC1", "piperidin-1-ium"),
-    ("[CH2-]C", "ethan-1-ide"),
     ("C1CCCC[N+]12CCCC2", "5-azaspiro[4.5]decan-5-ium"),
     ("CCC(C)[CH-]C(C)C", "2,4-dimethylhexan-3-ide"),
 ]
@@ -138,11 +141,14 @@ CONTROL_ROWS = [
 DECLINED_ROWS = [
     "CO[B-]1(C)C=C(C)c2ccccc21",   # methoxy ligand (see the module docstring)
     "C[PH-]1C=CC=C1",              # the parent name lacks its indicated hydrogen
-    "[PH2-]1C=Cc2ccccc21",         # (the same: 'phosphindole' for 1H-phosphindole)
-    "C[P-]1(C)C=Cc2ccccc21",       # (the same, on the substituted centre)
     "C1=C[NH2+]C=C[NH2+]1",        # a dication on a hydro-prefixed parent
     "C1C[OH+]CC[NH2+]1",           # two cation classes
     "ClCC[C-]=O",                  # chloro prefix on the carbanion chain
+    # 'ethan-1-ide' is not the PIN: (b) omits the locant '1' on a two-atom chain
+    # with one feature ('ethanol (PIN)':2907), and the book writes "'ethanide' not 'ethyl
+    # anion' for CH3-CH2" (:40382); the spelling check of the label site lowers it, and the
+    # best-effort tier keeps 'ethan-1-ide' (systematic_verified, full read-back)
+    "[CH2-]C",
 ]
 
 

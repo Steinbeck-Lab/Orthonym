@@ -413,9 +413,13 @@ def _select_substituent_numbering(mol, ring_atom_set: Set[int]):
     canonical = compute_fused_numbering(mol, ring_atom_set)
     if not canonical:
         return None  # engine declined -> cannot trust locants -> fail closed
-    perms = _ring_system_automorphisms(mol, ring_atom_set)
     canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
     atoms_by_rank = sorted(ring_atom_set, key=lambda a: canon_rank[a])
+    with_hydrogen = _select_numbering_with_ring_hydrogen(
+        mol, ring_atom_set, canonical, atoms_by_rank)
+    if with_hydrogen is not None:
+        return with_hydrogen
+    perms = _ring_system_automorphisms(mol, ring_atom_set)
 
     best = None  # (citation_key, signature, cand_map, substituents)
     for perm in perms:
@@ -434,6 +438,137 @@ def _select_substituent_numbering(mol, ring_atom_set: Set[int]):
     if best is None:
         return None
     return best[2], best[3]
+
+
+def _ring_hydrogen_suffix_atoms(subs, atom_to_locant, exo) -> Optional[Set[int]]:
+    """The =X ring atoms the name expresses as its suffix ('-one'), or None when the
+    ring system's groups are not written by this module's suffix assembly: a senior suffix
+    group makes the ring C=O an 'oxo' prefix of another parent spelling
+    (``_assemble_oxo_prefix_name``), and an amine beside a ring C=O declines."""
+    if subs.get('suffix_groups'):
+        return None
+    oxo = {str(l) for l in subs.get('oxo_substituents') or ()}
+    if oxo and subs.get('amino_substituents'):
+        return None
+    return {a for a in exo if str(atom_to_locant[a]) in oxo}
+
+
+def _placed_ring_hydrogen(mol, ring_atom_set: Set[int], atom_to_locant, subs):
+    """The ring system's indicated / added / hydro positions by the shared rule
+    (``ring_hydrogen.ring_hydrogen``) when a ring atom carries an exocyclic double bond,
+    else None (the system keeps the hydrogen this module computes for it)."""
+    from . import ring_hydrogen
+    exo = ring_hydrogen.exocyclic_double_atoms(mol, ring_atom_set)
+    if not exo:
+        return None
+    suffix = _ring_hydrogen_suffix_atoms(subs, atom_to_locant, exo)
+    if suffix is None:
+        return None
+    return ring_hydrogen.ring_hydrogen(mol, ring_atom_set, suffix, atom_to_locant)
+
+
+def _select_numbering_with_ring_hydrogen(mol, ring_atom_set, canonical, atoms_by_rank):
+    """The numbering of a substituted system whose ring atoms carry an exocyclic double
+    bond (a ketone suffix; an ylidene, imino or oxo prefix), chosen over every numbering of
+    the MANCUDE skeleton (``ignore_bond_order``: the hydrogen of the name belongs to the
+    parent, so a numbering is a property of the skeleton) by
+    (the Blue Book-25044): (c) indicated hydrogen, (d) the principal group as suffix,
+    (e) added indicated hydrogen, (f) hydro prefixes, (g) detachable prefixes -- the key the
+    bridged fused builder uses ('4H,5H-pyrano[2,3-b]pyran-4-one', not '...-5-one').
+    ``(atom_to_locant, substituents)``, or None when the system has no such atom or the
+    shared rule declines any numbering (the caller then keeps its own choice)."""
+    from . import ring_hydrogen
+    exo = ring_hydrogen.exocyclic_double_atoms(mol, ring_atom_set)
+    if not exo:
+        return None
+    best = None
+    # Every early ``return None`` below abandons the whole selection, not one permutation
+    # (the sibling loop of ``_select_substituent_numbering`` skips a bad one): the lowest
+    # locants of are a minimum over ALL numberings of the skeleton, so a numbering
+    # the rule cannot evaluate leaves the minimum undecided and the caller keeps its own
+    # choice (fail closed). The three conditions read the topology (the locant map of an
+    # automorphism, which substituent kinds are present, which hydro state the structure
+    # has), so they agree across the automorphisms of one skeleton.
+    for perm in _ring_system_automorphisms(mol, ring_atom_set, ignore_bond_order=True):
+        try:
+            cand = {a: _fused_locant_to_output(canonical[perm[a]]) for a in ring_atom_set}
+        except KeyError:
+            return None
+        subs = get_fused_heterocycle_substituents(mol, cand)
+        suffix = _ring_hydrogen_suffix_atoms(subs, cand, exo)
+        if suffix is None:
+            return None
+        rh = ring_hydrogen.ring_hydrogen(mol, ring_atom_set, suffix, cand)
+        if rh is None:
+            return None
+        ih_key, _suffix_key, added_key, hydro_key = ring_hydrogen.numbering_key(rh, cand, suffix)
+        suffix_key, prefix_key = _fused_substituent_citation_key(subs)
+        key = (ih_key, suffix_key, added_key, hydro_key, prefix_key)
+        sig = tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank)
+        if best is None or (key, sig) < (best[0], best[1]):
+            best = (key, sig, cand, subs)
+    if best is None:
+        return None
+    return best[2], best[3]
+
+
+def _hydrogen_marked_substituents(subs, rh, atom_to_locant):
+    """``subs`` with the added indicated hydrogen the suffix cites ('-4(3H)-one') and the
+    mark that the shared rule placed the hydrogen (``_assemble_fused_heterocycle_name`` then
+    does not move it again)."""
+    from .bridged_fused_pin.numbering import loc_key
+    out = dict(subs)
+    out['added_hydrogen'] = sorted((atom_to_locant[a] for a in rh.added), key=loc_key)
+    out['ring_hydrogen'] = True
+    return out
+
+
+_RETAINED_SKELETONS: Optional[Dict[str, str]] = None
+
+
+def _retained_name_of_skeleton(mol, ring_atom_set: Set[int], descriptor: str) -> Optional[str]:
+    """The retained name the catalogue gives this ring skeleton when it is not
+    ``descriptor``, else None. (the Blue Book) "pyrrolizine (1H-isomer shown;
+    the PIN is 1H-pyrrolizine)": a fusion descriptor for such a skeleton
+    ('pyrrolo[1,2-a]pyrrole') is not the PIN. Retained = a catalogue name whose stem
+    (without indicated hydrogen) is a printed PIN parent of
+    ``bridged_fused_pin.parents.PIN_PARENT_NAMES``. The fusion producers reach such a
+    skeleton when the catalogue producers decline it (a tautomer the catalogue does not
+    hold, '3H-pyrrolizine'; a =X group, '1H-pyrrolizin-2(3H)-one'); the name is kept and
+    labelled below the PIN."""
+    global _RETAINED_SKELETONS
+    from ..data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
+    from .bridged_fused_pin.parents import PIN_PARENT_NAMES
+    from .fusion_descriptors import _heavy_atom_skeleton_smiles
+    if _RETAINED_SKELETONS is None:
+        table: Dict[str, str] = {}
+        for key, entry in FUSED_HETEROCYCLE_DATA.items():
+            stem = re.sub(r'^(?:\d+[a-z]?H,)*\d+[a-z]?H-', '', entry.get('name') or '')
+            if stem not in PIN_PARENT_NAMES:
+                continue
+            m = Chem.MolFromSmiles(key)
+            sk = _heavy_atom_skeleton_smiles(m) if m is not None else None
+            if sk:
+                table.setdefault(sk, stem)
+        _RETAINED_SKELETONS = table
+    bonds = [b.GetIdx() for b in mol.GetBonds()
+             if b.GetBeginAtomIdx() in ring_atom_set and b.GetEndAtomIdx() in ring_atom_set]
+    try:
+        sk = _heavy_atom_skeleton_smiles(Chem.PathToSubmol(mol, bonds))
+    except Exception:
+        return None
+    stem = _RETAINED_SKELETONS.get(sk) if sk else None
+    return stem if stem and stem != descriptor else None
+
+
+def _join_hydrogen_prefix(prefix: str, stem: str) -> str:
+    """'7,8-dihydro-2H,5H-' + 'pyrano[4,3-b]pyran'; '3,4-dihydro' + 'quinoline',
+    the Blue Book: hydro prefixes stand "immediately at the front of the name of the
+    parent hydride"); a hydro prefix before a locant keeps its hyphen, before a letter or a
+    fusion bracket it does not ('3,4-dihydro[1,3]dioxolo',:32498 class)."""
+    if not prefix or prefix.endswith('-'):
+        return f"{prefix}{stem}"
+    return f"{prefix}-{stem}" if stem[:1].isdigit() else f"{prefix}{stem}"
 
 
 def _ring_double_bond(atom, ring_set) -> bool:
@@ -937,7 +1072,10 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
             for a in sorted(cited_ih, key=lambda a: _fused_locant_num(cand[a]))
         )
         parent = f"{hydro_prefix}-{ih_prefix}-{mancude_parent}"
-    elif mancude_parent[0].isalpha():
+    elif mancude_parent[0].isalpha() or mancude_parent.startswith('['):
+        # no hyphen before a letter, nor before a component's bracketed heteroatom
+        # locants,:6936-6966; '3,4-dihydro[1,3]dioxolo...':52586,
+        # 'octahydro[1,4]dioxocino[2,3-c][1,6]dioxecine-2,5,9,12-tetrone (PIN)':32191)
         parent = f"{hydro_prefix}{mancude_parent}"     # BYTE-IDENTICAL to the slice
     else:
         parent = f"{hydro_prefix}-{mancude_parent}"
@@ -947,7 +1085,272 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
     return parent
 
 
-def _try_algorithmic_fusion_name(mol) -> Optional[str]:
+# ---------------------------------------------------------------------------
+# Slice S2c-1 in the plain fused path: a two-ring system named on its certified parent
+# ---------------------------------------------------------------------------
+
+#: (the Blue Book): the ring atoms that can carry a ring double bond
+#: in a mancude parent -- standard bonding number four with up to three ring bonds, or three
+#: with two ring bonds. O, S, Se and Te (bonding number two) and a ring atom of bonding
+#: number three with three ring bonds carry none.
+_RING_DOUBLE_BOND_FOUR = frozenset({'C', 'Si', 'Ge', 'Sn', 'Pb'})
+_RING_DOUBLE_BOND_THREE = frozenset({'N', 'P', 'As', 'Sb', 'Bi', 'B', 'Al', 'Ga', 'In', 'Tl'})
+_RING_DOUBLE_BOND_NONE = frozenset({'O', 'S', 'Se', 'Te'})
+
+
+def _certified_two_ring_parent(mol, ring_atom_set: Set[int]):
+    """The certified parent of a two-ring fused system, or None.
+
+     (the Blue Book): a mancude ortho-fused system with no retained or
+    systematic name is named "by prefixing to the name of a component ring or ring
+    system (the parent component) designations of the other component(s)". The bridged
+    fused builder's parent source (``bridged_fused_pin.parents.fused_parent``) holds
+    those names: the parent tables, the names the book prints as PINs, and the
+    two-component fusion and benzo names its producers build by the rules
+    (``fusion_names``, ``hetero_fusion``), each numbered by OPSIN's reading of the name
+    and cross-checked by the fusion numbering. Returns its ``FusedParent`` (``name``
+    without indicated hydrogen, ``numberings`` = every numbering of the ring atoms).
+    """
+    from .bridged_fused_pin.parents import fused_parent
+    return fused_parent(mol, set(ring_atom_set))
+
+
+def _certified_parent_hydrogen(mol, ring_atom_set: Set[int]):
+    """The indicated hydrogen of a ring system that is its mancude parent, read from the
+    structure: ``(indicated, accommodating, count)``, or None.
+
+     (the Blue Book): "noncumulative double bonds are introduced into the
+    completed fused system. Hydrogen atoms not attached to atoms connected by double bonds
+    are denoted as indicated hydrogen atom(s)"; (:8320): "After the maximum
+    number of noncumulative double bonds has been assigned to the ring structure, any ring
+    atom with a bonding number of three or higher connected to adjacent ring atoms by single
+    bonds only, and carrying one or more hydrogen atoms, is designated by indicated
+    hydrogen". The ring system is its mancude parent when its ring double bonds are a
+    MAXIMUM matching of the ring atoms that can carry one (``_RING_DOUBLE_BOND_*``); the
+    atoms they leave out are the ``count`` indicated hydrogen positions the parent takes.
+    ``accommodating``: those of them with an exocyclic double bond (a ketone suffix, an
+    ylidene or oxo prefix), where (:24768) places the indicated hydrogen;
+    ``indicated``: the others.
+
+    None, so the caller keeps its older path, for fewer ring double bonds than the maximum
+    (hydro prefixes,:16880, or added hydrogen,:3725), a charged or
+    radical ring atom, an atom with a nonstandard bonding number (the lambda-convention of
+    ,:12452, cited at the front of the fused name), an element outside Table
+    1.3, a cumulated or non-single ring bond other than a double bond, or an exocyclic
+    double bond on a ring atom that cannot carry indicated hydrogen.
+    """
+    from .lambda_convention import nonstandard_bonding_number
+    ring = set(ring_atom_set)
+    try:
+        km = Chem.Mol(mol)
+        Chem.Kekulize(km, clearAromaticFlags=True)
+    except Exception:
+        return None
+    capable: Set[int] = set()
+    for idx in ring:
+        atom = km.GetAtomWithIdx(idx)
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+        if nonstandard_bonding_number(mol, idx) is not None:
+            return None
+        sym = atom.GetSymbol()
+        degree = sum(1 for nb in atom.GetNeighbors() if nb.GetIdx() in ring)
+        if sym in _RING_DOUBLE_BOND_FOUR:
+            if degree <= 3:
+                capable.add(idx)
+        elif sym in _RING_DOUBLE_BOND_THREE:
+            if degree == 2:
+                capable.add(idx)
+        elif sym not in _RING_DOUBLE_BOND_NONE:
+            return None
+    matched: Set[int] = set()
+    exocyclic: Set[int] = set()
+    for idx in ring:
+        ring_doubles = 0
+        for bond in km.GetAtomWithIdx(idx).GetBonds():
+            kind = bond.GetBondType()
+            if bond.GetOtherAtomIdx(idx) in ring:
+                if kind == Chem.BondType.DOUBLE:
+                    ring_doubles += 1
+                elif kind != Chem.BondType.SINGLE:
+                    return None
+            elif kind == Chem.BondType.DOUBLE:
+                exocyclic.add(idx)
+            elif kind != Chem.BondType.SINGLE:
+                return None
+        if ring_doubles > 1 or (ring_doubles and idx not in capable):
+            return None
+        if ring_doubles:
+            matched.add(idx)
+    unmatched = capable - matched
+    if exocyclic - unmatched:
+        return None
+    adj = {a: frozenset(n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors()
+                        if n.GetIdx() in capable) for a in capable}
+    memo: Dict[frozenset, int] = {}
+
+    def _maximum_matching(rest: frozenset) -> int:
+        if len(rest) < 2:
+            return 0
+        if rest in memo:
+            return memo[rest]
+        v = min(rest)
+        best = _maximum_matching(rest - {v})
+        for w in adj[v]:
+            if w in rest:
+                best = max(best, 1 + _maximum_matching(rest - {v, w}))
+        memo[rest] = best
+        return best
+
+    if len(matched) != 2 * _maximum_matching(frozenset(capable)):
+        return None
+    return (frozenset(unmatched - exocyclic), frozenset(unmatched & exocyclic),
+            len(unmatched))
+
+
+def _acyl_group_on_ring(mol, ring_atom_set: Set[int]) -> bool:
+    """True when an atom bonded to the ring system is a carbon with a double bond to O, S,
+    Se, Te or N and the fused substituent reader does not cite its group as a suffix
+    (carboxylic acid, carboxamide, carbaldehyde, carbonitrile on the ring). Such a group --
+    an ester, an N-substituted amide, a ketone (Table 4.1, the Blue Book, classes 9,
+    11 and 16) -- is the principal characteristic group, cited as a suffix or by functional
+    class names; the reader would write it as a prefix ('(dimethylamino)oxomethyl'), so the
+    certified route leaves such a compound to the older path."""
+    ring = set(ring_atom_set)
+    for idx in ring:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            j = nb.GetIdx()
+            if j in ring or nb.GetSymbol() != 'C':
+                continue
+            acyl = any(b.GetBondType() == Chem.BondType.DOUBLE
+                       and b.GetOtherAtom(nb).GetSymbol() in ('O', 'S', 'Se', 'Te', 'N')
+                       and b.GetOtherAtomIdx(j) not in ring
+                       for b in nb.GetBonds())
+            if not acyl:
+                continue
+            info = _identify_fused_substituent(mol, j, ring)
+            if info is None or info.get('type') != 'suffix':
+                return True
+    return False
+
+
+def _certified_name_with_ring_hydrogen(mol, ring_atom_set: Set[int], certified,
+                                       atoms_by_rank) -> Optional[str]:
+    """The name on a certified parent of a system whose ring atoms carry an exocyclic double
+    bond, with the hydrogen the shared rule places (``ring_hydrogen.ring_hydrogen``), or
+    None.
+
+     (the Blue Book): "When there are an equal number of indicated
+    hydrogen atoms and principal characteristic groups... the indicated hydrogen atoms are
+    placed at peripheral atoms that will accommodate these principal characteristic groups"
+    ('7H-1-benzopyran-7-one (PIN)':24776); (:24689) added hydrogen for the others.
+    The numbering is chosen over every numbering of the certified parent by
+    (:25040-25044): (c) indicated hydrogen, (d) the suffix, (e) added hydrogen, (f) hydro
+    prefixes (``ring_hydrogen.numbering_key``), (g) the prefixes, then a canonical-rank
+    signature. None when the rule declines a numbering (the caller then keeps its older
+    path).
+    """
+    from . import ring_hydrogen
+    ring = set(ring_atom_set)
+    exo = ring_hydrogen.exocyclic_double_atoms(mol, ring)
+    best = None
+    for numbering in certified.numberings:
+        cand = dict(numbering)
+        if set(cand) != ring:
+            continue
+        subs = get_fused_heterocycle_substituents(mol, cand)
+        suffix = _ring_hydrogen_suffix_atoms(subs, cand, exo)
+        if suffix is None:
+            return None
+        rh = ring_hydrogen.ring_hydrogen(mol, ring, suffix, cand)
+        if rh is None:
+            return None
+        ih_key, suffix_key, added_key, hydro_key = ring_hydrogen.numbering_key(rh, cand, suffix)
+        _suffix_locants, prefix_key = _fused_substituent_citation_key(subs)
+        key = (ih_key, suffix_key, added_key, hydro_key, prefix_key,
+               tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank))
+        if best is None or key < best[0]:
+            best = (key, cand, subs, rh)
+    if best is None:
+        return None
+    _key, atom_to_locant, subs, rh = best
+    prefix = ring_hydrogen.parent_prefix(rh, atom_to_locant)
+    if prefix is None:
+        return None
+    name = _join_hydrogen_prefix(prefix, certified.name)
+    return _assemble_fused_heterocycle_name(
+        mol, name, _hydrogen_marked_substituents(subs, rh, atom_to_locant), atom_to_locant) or None
+
+
+def _certified_fusion_name(mol, ring_atom_set: Set[int],
+                           has_substituents: bool) -> Optional[str]:
+    """The name of a two-ring fused system on its certified parent, or None.
+
+    The parent comes from ``_certified_two_ring_parent``, the Blue Book;
+    ,:23710: the fusion name is the PIN once two rings have five or more
+    members); its own numberings (OPSIN's reading of the name) number the system. Among
+    them the indicated hydrogen gets the lowest locants first, then the suffix groups,
+    then the prefixes, (c), (d), (g),:25040-25044; (f)
+    :12612), then a canonical-rank signature, so the atom order of the input never
+    decides. All indicated hydrogen atoms are cited in front of the parent,
+    :14607;,:12478). A position whose indicated hydrogen accommodates an
+    exocyclic double bond,:24768: '7H-1-benzopyran-7-one (PIN)':24776) is
+    cited by the shared hydrogen rule (``_certified_name_with_ring_hydrogen``). None (the
+    caller keeps its older path) when the source has no parent, the ring hydrogen is not
+    that of the mancude parent (``_certified_parent_hydrogen``), a substituent is not read
+    in full, a ring acyl group would be a prefix (``_acyl_group_on_ring``), or the shared
+    hydrogen rule does not write the system's ring =X groups.
+    """
+    hydrogen = _certified_parent_hydrogen(mol, ring_atom_set)
+    if hydrogen is None:
+        return None
+    if has_substituents and (not _exocyclic_atoms_accounted(mol, ring_atom_set)
+                             or _acyl_group_on_ring(mol, ring_atom_set)):
+        return None
+    certified = _certified_two_ring_parent(mol, ring_atom_set)
+    if certified is None:
+        return None
+    indicated, accommodating, _count = hydrogen
+    canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    atoms_by_rank = sorted(ring_atom_set, key=lambda a: canon_rank[a])
+    if accommodating:
+        # (the Blue Book): the indicated hydrogen of a position that
+        # carries a ring =X group is placed by the shared hydrogen rule, which also orders
+        # the numberings (c)-(g)). A system the rule does not write -- a senior
+        # suffix group beside a ring C=O, which the older path cites as an 'oxo' prefix
+        # after the indicated hydrogen of its position,:24864: "After the
+        # introduction of indicated and 'added indicated hydrogen' atoms, all substituent
+        # groups not expressed as suffixes are cited as prefixes";
+        # '4-oxo-4H-1-benzopyran-2-carboxylic acid') -- keeps the older path.
+        return _certified_name_with_ring_hydrogen(mol, ring_atom_set, certified, atoms_by_rank)
+    best = None
+    for numbering in certified.numberings:
+        cand = dict(numbering)
+        if set(cand) != set(ring_atom_set):
+            continue
+        subs = get_fused_heterocycle_substituents(mol, cand) if has_substituents else None
+        key = (
+            sorted(_fused_locant_num(cand[a]) for a in indicated),
+            _fused_substituent_citation_key(subs) if subs is not None else ((), ()),
+            tuple(_fused_locant_num(cand[a]) for a in atoms_by_rank),
+        )
+        if best is None or key < best[0]:
+            best = (key, cand, subs)
+    if best is None:
+        return None
+    _key, atom_to_locant, subs = best
+    name = certified.name
+    cited = sorted((atom_to_locant[a] for a in indicated), key=_fused_locant_num)
+    if cited:
+        name = ','.join(f"{loc}H" for loc in cited) + '-' + name
+    if has_substituents:
+        name = _assemble_fused_heterocycle_name(mol, name, subs, atom_to_locant)
+        if not name:
+            return None
+    return name
+
+
+def _try_algorithmic_fusion_name(mol, require_certified: bool = False) -> Optional[str]:
     """
     Attempt systematic fusion naming for 2-component ortho-fused systems.
 
@@ -960,6 +1363,8 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
 
     Args:
         mol: RDKit Mol object
+        require_certified: only a name on the certified parent (slice S2c-1); None
+            otherwise
 
     Returns:
         Systematic fusion name, or None if cannot be generated
@@ -1008,6 +1413,18 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     ring2_hetero = is_heterocyclic(mol, list(ring2))
     if not ring1_hetero and not ring2_hetero:
         return None
+
+    # Slice S2c-1: the certified parent source of the bridged fused builder names the
+    # system first when the system is its mancude parent with indicated hydrogen
+    # (``_certified_fusion_name``; RDKit aromaticity is not asked: '2H,5H-pyrano[2,3-b]pyran
+    # (PIN)', the Blue Book, has no aromatic ring). Every other case keeps the path
+    # below unchanged.
+    _system = set(ring1) | set(ring2)
+    _certified = _certified_fusion_name(
+        mol, _system,
+        any(a.GetIdx() not in _system and a.GetAtomicNum() != 1 for a in mol.GetAtoms()))
+    if _certified is not None or require_certified:
+        return _certified
 
     # Gate: at least one ring must have aromatic atoms
     # Non-aromatic fused heterocycles (e.g., pyrazolidine bridged systems)
@@ -1058,12 +1475,14 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
     if not name:
         return None
 
-    # (the Blue Book): this namer spells an azole component without
-    # its bracketed Hantzsch-Widman locants ('isoxazolo[4,5-c]pyridine',
-    # 'cyclohepta[d]thiazole'): a valid name, never the PIN. Every name built on it
-    # (hydro prefixes, substituents) carries it and is labelled below the PIN.
-    if _unbracketed_azole_component(name):
-        _record_non_pin_spelling(name)
+    # (the Blue Book) "pyrrolizine (1H-isomer shown; the PIN is
+    # 1H-pyrrolizine)": a descriptor of a skeleton that has a retained name is valid but
+    # never the PIN, whatever the hydrogen, the groups or the hydro prefixes of the name
+    # built on it ('3H-pyrrolo[1,2-a]pyrrole' for '3H-pyrrolizine', '1H-pyrrolo[1,2-a]
+    # pyrrol-2(3H)-one' for '1H-pyrrolizin-2(3H)-one'). Every name this producer ships on
+    # it, below as well as on the hydro path, is labelled below the PIN; best-effort keeps it.
+    if _retained_name_of_skeleton(mol, ring_atom_set, name):
+        _record_non_pin_spelling(name[:-1] if name.endswith('e') else name)
 
     # a phase: a partially-saturated fused pair is named as
     # '<locants>-<multiplier>hydro-<mancude parent>'. `name` here is the mancude
@@ -1076,7 +1495,20 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
             "Partial-saturation fusion name for %s: %s",
             Chem.MolToSmiles(mol), hydro_name,
         )
+        # the hydro name takes its mancude parent from the catalogue when the catalogue
+        # holds it ('2,3-dihydro[1,3]oxazolo[4,5-b]pyridine'), so the label below reads the
+        # name that ships: the descriptor's unbracketed 'oxazolo[4,5-b]pyridine' is a
+        # substring of the bracketed PIN spelling and must not label it
+        if _unbracketed_azole_component(hydro_name):
+            _record_non_pin_spelling(hydro_name)
         return hydro_name
+
+    # (the Blue Book): this namer spells an azole component without
+    # its bracketed Hantzsch-Widman locants ('isoxazolo[4,5-c]pyridine',
+    # 'cyclohepta[d]thiazole'): a valid name, never the PIN. Every name built on it
+    # (substituents below, the hydro name above) carries it and is labelled below the PIN.
+    if _unbracketed_azole_component(name):
+        _record_non_pin_spelling(name)
 
     # (the Blue Book): a benzene ring fused to a heteromonocycle is
     # named as a benzoheterocycle with its heteroatom locants. The catalogue match
@@ -1117,10 +1549,29 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
             mol, parent_ring, child_ring, shared, parent_name, child_name
         )
 
-    indicated_h = _compute_general_indicated_h(mol, ring_atom_set, atom_to_locant)
-    if not indicated_h:
-        indicated_h = _mancude_indicated_h_locants(
-            mol, ring_atom_set, atom_to_locant, has_substituents)
+    # A ring atom with an exocyclic double bond (ketone suffix; ylidene, imino or oxo
+    # prefix): the hydrogen of the name is the mancude parent's, with the groups
+    # accommodated by / (``ring_hydrogen``); the counters below read
+    # the substituted ring instead and drop it ('pyrido[1,2-b]pyridazin-6-one' for the PIN
+    # '6H-pyrido[1,2-b]pyridazin-6-one', the Blue Book).
+    ring_h = None
+    hydro_txt = ''
+    if has_substituents:
+        ring_h = _placed_ring_hydrogen(mol, ring_atom_set, atom_to_locant, substituents)
+        if ring_h is not None:
+            from . import ring_hydrogen as _rh
+            hydro_txt = _rh.hydro_text(ring_h, atom_to_locant)
+            if hydro_txt is None:
+                ring_h, hydro_txt = None, ''
+    if ring_h is not None:
+        from .bridged_fused_pin.numbering import loc_key as _loc_key
+        indicated_h = sorted((atom_to_locant[a] for a in ring_h.indicated), key=_loc_key)
+        substituents = _hydrogen_marked_substituents(substituents, ring_h, atom_to_locant)
+    else:
+        indicated_h = _compute_general_indicated_h(mol, ring_atom_set, atom_to_locant)
+        if not indicated_h:
+            indicated_h = _mancude_indicated_h_locants(
+                mol, ring_atom_set, atom_to_locant, has_substituents)
     if skeleton_matched:
         # The descriptor was accepted on the skeleton alone: ship only with the
         # established indicated hydrogen cited,:14607), never bare.
@@ -1167,6 +1618,8 @@ def _try_algorithmic_fusion_name(mol) -> Optional[str]:
             _record_non_pin_spelling(name[:-1] if name.endswith('e') else name)
     elif lam_prefix:
         name = f"{lam_prefix}{name}"
+    if hydro_txt:
+        name = _join_hydrogen_prefix(hydro_txt, name)
 
     # a phase: attach the substituents discovered above against the
     # canonical numbering, reusing the exact assembler the catalog path uses.
@@ -1497,9 +1950,34 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
         nm = _pcf_name_with_base(mol, comps, names, bidx)
         if nm:
             produced.add(nm)
+    below_pin = False
+    if not produced:
+        # (h) and (i) (the Blue Book,:12407) can leave one senior component
+        # that no star-shaped name takes as its base: 'furo[3',4':5,6]pyrazino[2,3-c]pyridazine
+        # (PIN)' (:13994) takes pyridazine by (h) and needs a second-order attached component
+        # (slice S2c-2). The star-shaped name on a component that ties with it on (a)-(g)
+        # ('furo[3,4-b]pyridazino[3,4-e]pyrazine') still names the molecule: it is kept and
+        # labelled below the PIN, so the name path stays (demote the label, keep the name).
+        def _a_to_g(r):
+            return (r.senior_het_neg, r.ring_count_neg, r.ring_sizes_neg, r.het_count_neg,
+                    r.het_variety_neg, r.alt_het_tuple, r.orient_stub)
+        top = min(_a_to_g(r) for r in ranks)
+        for bidx, r in enumerate(ranks):
+            if bidx in base_candidates or _a_to_g(r) != top:
+                continue
+            nm = _pcf_name_with_base(mol, comps, names, bidx)
+            if nm:
+                produced.add(nm)
+        below_pin = True
     if len(produced) != 1:
         return None
     bare_name = next(iter(produced))
+    if below_pin:
+        _record_non_pin_spelling(bare_name[:-1] if bare_name.endswith('e') else bare_name)
+    # (the Blue Book), as in the two-component producer: a descriptor of a
+    # skeleton that has a retained name ('dibenzo[b,e]pyridine' for acridine) is not the PIN.
+    if _retained_name_of_skeleton(mol, ring_atom_set, bare_name):
+        _record_non_pin_spelling(bare_name[:-1] if bare_name.endswith('e') else bare_name)
     if not has_substituents:
         return bare_name
 
@@ -1515,6 +1993,22 @@ def _try_polycomponent_fusion_name(mol) -> Optional[str]:
     if selected is None:
         return None
     atom_to_locant, substituents = selected
+    # The descriptor carries no hydrogen: a ring atom with an exocyclic double bond takes
+    # the mancude parent's hydrogen by the shared rule,, as in the
+    # two-component producer.
+    ring_h = _placed_ring_hydrogen(mol, ring_atom_set, atom_to_locant, substituents)
+    if ring_h is not None:
+        from . import ring_hydrogen as _rh
+        pre = _rh.parent_prefix(ring_h, atom_to_locant)
+        if pre is not None:
+            return _assemble_fused_heterocycle_name(
+                mol, _join_hydrogen_prefix(pre, bare_name),
+                _hydrogen_marked_substituents(substituents, ring_h, atom_to_locant),
+                atom_to_locant)
+        # A hydro count with no multiplying prefix (``parent_prefix`` None; the shared
+        # rule's hydro positions come in pairs, so not met in practice): keep the spelling
+        # of this producer without the rule, as the two-component producer does when
+        # ``hydro_text`` is None; the name is still read back to the input before it ships.
     return _assemble_fused_heterocycle_name(
         mol, bare_name, substituents, atom_to_locant
     )
@@ -2441,6 +2935,15 @@ def name_fused_heterocycle(mol):
         )
         if ri.NumRings() >= 2 and has_ring_heteroatom:
             canonical_smi = Chem.MolToSmiles(mol, canonical=True)
+            from ..data import has_retained_name as _has_pin_evidenced_retained_name
+            if not _has_pin_evidenced_retained_name(canonical_smi):
+                # Slice S2c-1: a trivial name of the imported list has no Blue Book PIN
+                # evidence ('selenochromene'; ``data.get_retained_name`` records it as not
+                # the PIN). (the Blue Book) and (:11903) give
+                # the PIN, so the name on the certified two-ring parent is asked first.
+                certified_name = _try_algorithmic_fusion_name(mol, require_certified=True)
+                if certified_name:
+                    return (certified_name, ring_atoms, {}, True)
             global_retained = _get_global_retained_name(canonical_smi)
             if global_retained:
                 return (global_retained, ring_atoms, {}, True)
@@ -4296,7 +4799,8 @@ def _assemble_fused_heterocycle_name(
         #: a ketone on a saturated position of a hydro catalog core
         # takes the core's indicated hydrogen (TRIAGE j12 finding 5).
         _non_pin_ih = False
-        if expressed == 'one' and not substituents.get('amino_substituents'):
+        if (expressed == 'one' and not substituents.get('amino_substituents')
+                and not substituents.get('ring_hydrogen')):
             _oxo = list(substituents.get('oxo_substituents') or [])
             _moved = _indicated_h_at_suffix(mol, core_name, atom_mapping, _oxo)
             if _moved is not None:
@@ -4452,6 +4956,17 @@ def _join_prefix_to_parent(prefix_str: str, parent_name: str) -> str:
     if parent_name and parent_name[0].isalpha():
         return prefix_str.rstrip('-') + parent_name
 
+    # A parent that starts with the bracketed heteroatom locants of a component
+    # ('[1,3]thiazolo[5,4-b]pyridine',:11982) follows the prefix
+    # without a hyphen: (the Blue Book-6966) puts hyphens between
+    # locants and words, after a closing parenthesis before a locant, between
+    # locants and an opening enclosing mark and before an italic letter, never
+    # between a word and an opening bracket; '...octahydro[1,4]dioxocino[2,3-c]
+    # [1,6]dioxecine-2,5,9,12-tetrone (PIN)' (:32191), '1,7-ethano[4,1,2]
+    # benzoxadiazine (PIN)' (:14327). So '6-methyl[1,3]thiazolo[5,4-b]pyridine'.
+    if parent_name.startswith('['):
+        return prefix_str.rstrip('-') + parent_name
+
     # If parent starts with a digit, keep the hyphen
     # e.g., "7-nitro-" + "1H-indazole" -> "7-nitro-1H-indazole"
     return prefix_str + parent_name
@@ -4484,23 +4999,30 @@ def _build_fused_suffix(substituents: Dict, core_name: str) -> str:
     if amino_locants:
         return _format_suffix('amine', amino_locants)
     if oxo_locants:
-        return _format_suffix('one', oxo_locants)
+        return _format_suffix('one', oxo_locants,
+                              substituents.get('added_hydrogen') or ())
     return ''
 
 
-def _format_suffix(suffix_base: str, locants: List) -> str:
+def _format_suffix(suffix_base: str, locants: List, added_hydrogen=()) -> str:
     """
     Format a suffix with locants and multiplier.
 
     Args:
         suffix_base: Base suffix ('amine', 'one')
         locants: List of locants
+        added_hydrogen: locants of the 'added indicated hydrogen' the suffix needs, cited
+            in parentheses after the suffix locants, the Blue Book:
+            "cited in parentheses after the locant of the structural feature to which it
+            refers"; 'pyrimidine-4,6(1H,5H)-dione (PIN)':24709)
 
     Returns:
-        Formatted suffix like '-6-amine' or '-2,6-dione'
+        Formatted suffix like '-6-amine' or '-2,6-dione' or '-4(3H)-one'
     """
     count = len(locants)
     locant_str = ','.join(str(loc) for loc in locants)
+    if added_hydrogen:
+        locant_str += '(' + ','.join(f"{loc}H" for loc in added_hydrogen) + ')'
 
     if count == 1:
         return f"-{locant_str}-{suffix_base}"

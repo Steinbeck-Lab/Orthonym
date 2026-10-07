@@ -225,8 +225,8 @@ def test_fused_five_ring_never_acquires_a_monocycle_retained_name(smiles):
     ("Cn1ccc2ccccc21", "1-methyl-1H-indole"),
     ("c1ccc2occc2c1", "1-benzofuran"),  #: PIN locant, the Blue Book)
     ("c1ccc2[nH]c3ccccc3c2c1", "9H-carbazole"),
-    ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
-    ("Cn1cnc2ccccc21", "1-methyl-1H-benzimidazole"),
+    ("c1ccc2[nH]cnc2c1", "1H-1,3-benzimidazole"),
+    ("Cn1cnc2ccccc21", "1-methyl-1H-1,3-benzimidazole"),
     ("c1ccc2ncccc2c1", "quinoline"),
 ])
 def test_fused_names_unchanged(smiles, expected):

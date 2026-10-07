@@ -52,6 +52,12 @@ DEFAULT_TIER_DECLINES = frozenset({
     "OC(=O)Cc1c[nH]c(=O)[nH]c1=O",
     "OC(=O)Cn1cc(C)c(=O)[nH]c1=O",
     "OC(=O)Cn1ccc(=O)[nH]c1=O",
+    # '([1,1':4',1''-terphenyl]-4-yl)methanol': an assembly of three rings numbered
+    # with primed locants is not the PIN. (the Blue Book) "The
+    # preferred numbering for ring assemblies composed of three or more identical
+    # cyclic systems uses composite locants rather than primed locants (see ".
+    "OCc1ccc(-c2ccc(-c3ccccc3)cc2)cc1",
+    "c1ccc(-c2ccc(-c3ccc(CO)cc3)cc2)cc1",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
@@ -834,7 +840,7 @@ def test_m_best_effort_name_does_not_depend_on_the_atom_order(smiles):
 
 def test_m_the_ordering_sort_key_memo_is_keyed_by_the_naming_context(monkeypatch):
     # milestone1500. The (g) tie of the 1,4-disubstituted piperazine is
-    # decided by the prefixes' names (the one cited first, 'oxacyclopentanyl...'
+    # decided by the prefixes' names (the one cited first, '...oxolan-2-yl...'
     # before 'phenylsulfonyl', takes locant 1; (g) the Blue Book,
     #:3477). The sort-key names were memoised without the naming context, so the
     # clean fall-through read the best-effort context's entries: four of five
@@ -842,7 +848,11 @@ def test_m_the_ordering_sort_key_memo_is_keyed_by_the_naming_context(monkeypatch
     # ORTHONYM_MEMO=verify raised MemoMismatch (the floor name shipped instead).
     from orthonym.assembly import memo
     smiles = "C1C[C@@H](OC1)CNC(=S)N2CCN(CC2)S(=O)(=O)C3=CC=CC=C3"
-    expected = ("1-{3-[(2R)-1-oxacyclopentan-2-yl]-1-sulfanylidene-2-azapropyl}-"
+    # roadmap N5c/N5d (name-quality lane L2): the carbon chain carries the amino
+    # prefix, the Blue Book) and the ring takes its Hantzsch-Widman
+    # name,:8482); was '1-{3-[(2R)-1-oxacyclopentan-2-yl]-1-sulfanylidene-
+    # 2-azapropyl}-4-(phenylsulfonyl)piperazine'
+    expected = ("1-[({[(2R)-oxolan-2-yl]methyl}amino)(sulfanylidene)methyl]-"
                 "4-(phenylsulfonyl)piperazine")
     seen = set()
     for mode in ("on", "verify", "off"):

@@ -114,12 +114,24 @@ BELOW_PIN = [
     ("COC1=C2C3=C(CC4C56C3(CCN4CC7CC7)C(O2)C(CC5)(C(O6)C(=O)NC8=CC=CC=C8)O)C=C1",
      "N-phenyl-3-(cyclopropylmethyl)-7-hydroxy-9-methoxy-1,2,3,4,5,6,7,7a-octahydro-4a,7-"
      f"(epoxymethano)-{_P}-14-carboxamide"),
+    # roadmap N5e (name-quality lane L2): the acyl group is cited by its acyl name and
+    # the best-effort tier names the row in citation order ('chloro' before the complete
+    # name of the N-prefix, the Blue Book). The name has no part the label
+    # guard records as not the PIN, so it is labelled pin_unverified (``BEST_EFFORT_TIER``),
+    # is_pin False. It is not in PIN form: amides rank "in the order of the corresponding
+    # acids" class 11,:18184;:33559), carboxylic before sulfonic
+    #:18304,:18307), so the PIN is named on the ring carboxamide, a parent choice
+    # this producer does not make. The default tier still declines it. Was
+    # 'N-[(4R,4aS,7aR,12bS)-...-6-carbonyl]-2-chlorobenzene-1-sulfonamide—methane (1/1)'.
     ("C.C1CC1CN2CC[C@]34[C@@H]5C(=C(C[C@]3([C@H]2CC6=C4C(=C(C=C6)O)O5)O)C(=O)NS(=O)(=O)C7=CC=CC=C7Cl)O",
-     "N-[(4R,4aS,7aR,12bS)-3-(cyclopropylmethyl)-4a,7,9-trihydroxy-2,3,4,4a,5,7a-hexahydro-1H-"
-     f"{_P}-6-carbonyl]-2-chlorobenzene-1-sulfonamide—methane (1/1)"),
+     "2-chloro-N-[(4R,4aS,7aR,12bS)-3-(cyclopropylmethyl)-4a,7,9-trihydroxy-2,3,4,4a,5,7a-"
+     f"hexahydro-1H-{_P}-6-carbonyl]benzene-1-sulfonamide—methane (1/1)"),
     ("CN1CCC23c4c5cccc4OC2C(C(=O)NCCC)CCC3C1C5",
      f"N-propyl-3-methyl-2,3,4,4a,5,6,7,7a-octahydro-1H-{_P}-7-carboxamide"),
 ]
+#: the best-effort label of a row whose name is in citation order (systematic_verified for
+#: the others)
+BEST_EFFORT_TIER = {BELOW_PIN[3][0]: "pin_unverified"}
 #: shipped pin_verified at the base (milestone1500); best-effort names it otherwise
 BASE_ROW = "CC(=O)NC1CC2CCCC(C1)N2C(=O)NC3CCCCC3"
 #: assembled names in citation order keep the PIN label (the second: 'cyclopropyl' before
@@ -150,7 +162,9 @@ def test_the_default_tier_declines_an_assembled_name_out_of_citation_order(smile
 @pytest.mark.parametrize("smiles,name", BELOW_PIN)
 def test_best_effort_keeps_the_assembled_name_below_the_pin(smiles, name):
     row = _row(smiles, "best-effort")
-    assert (row.get("name"), row["tier"]) == (name, "systematic_verified"), row
+    assert (row.get("name"), row["tier"]) == (
+        name, BEST_EFFORT_TIER.get(smiles, "systematic_verified")), row
+    assert row["is_pin"] is False, row
     assert name_is_rt_exact(name, smiles)
 
 

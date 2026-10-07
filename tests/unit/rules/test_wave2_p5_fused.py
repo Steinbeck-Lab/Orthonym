@@ -56,7 +56,7 @@ class TestWave2P5FusedVerify:
         ("c1ccc2ccccc2c1", "naphthalene"),                 # (g)
         ("c1ccc2ncccc2c1", "quinoline"),                   # (h)
         ("c1ccc2[nH]ccc2c1", "1H-indole"),                 # (i)
-        ("c1ccc2nc[nH]c2c1", "1H-benzimidazole"),          # (j)
+        ("c1ccc2nc[nH]c2c1", "1H-1,3-benzimidazole"),          # (j)
     ])
     def test_already_correct(self, smiles, expected):
         assert _dt_name_compound(smiles) == expected
@@ -127,7 +127,7 @@ class TestP25ParentSelectionTiebreakGtoJ:
         ("c1ccc2ccccc2c1", "naphthalene"),
         ("c1ccc2ncccc2c1", "quinoline"),
         ("c1ccc2[nH]ccc2c1", "1H-indole"),
-        ("c1ccc2nc[nH]c2c1", "1H-benzimidazole"),
+        ("c1ccc2nc[nH]c2c1", "1H-1,3-benzimidazole"),
     ])
     def test_af_decided_unchanged(self, smiles, expected):
         assert _dt_name_compound(smiles) == expected

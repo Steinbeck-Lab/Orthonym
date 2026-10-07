@@ -202,8 +202,10 @@ class TestChebi2364RoundTrips:
         )
         name = namer.name_tiered(CHEBI_2364)["name"]
         assert name, "CHEBI:2364 must emit a best-effort name"
-        # The carrier descriptor is the whole point of the fix.
-        assert "{(1S)-1-[(2S)-5-methyl-6-oxo-1-oxacyclohex-4-en-2-yl]ethyl}" \
+        # The carrier descriptor is the whole point of the fix. The ring takes its
+        # Hantzsch-Widman / retained name, the Blue Book; '2H-pyran (PIN)',
+        #:2164; '3,4-dihydro-2H-pyran-3-yl (preferred prefix)',:17317).
+        assert "{(1S)-1-[(2S)-5-methyl-6-oxo-3,6-dihydro-2H-pyran-2-yl]ethyl}" \
             in name, name
 
         raw = opsin_stdout(name, False)

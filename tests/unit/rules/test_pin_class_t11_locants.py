@@ -158,6 +158,12 @@ PIN_ROWS_B = [
     ("CC1(C)OO1", "dimethyldioxirane"),
     ("ClC1SSS1", "chlorotrithietane"),
     ("Clc1nnns1", "chlorothiatriazole"),
+    # properfix a performance pass (review-2 M9): the a performance pass review named these as the
+    # rest of the class; added as a test only now. All OPSIN-RT EXACT.
+    ("ClC1(Cl)SSS1", "dichlorotrithietane"),
+    ("CC1(C)SS1", "dimethyldithiirane"),
+    ("FC1(F)OOOO1", "difluorotetroxolane"),
+    ("CCC1(Cl)OOO1", "chloro(ethyl)trioxetane"),
 ]
 NOT_PIN_ROWS_B = [("ClC1OOO1", "4-chloro-1,2,3-trioxetane"),          #:3187 'not'
                   ("ClC1(Cl)OOO1", "4,4-dichloro-1,2,3-trioxetane")]

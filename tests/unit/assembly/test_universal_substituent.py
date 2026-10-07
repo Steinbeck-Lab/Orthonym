@@ -112,7 +112,12 @@ def test_hetero_backbone_polyether():
     """The module docstring's own worked example for skeletal replacement:
     COCCOCCOC -> 2,5,8-trioxanonane."""
     result, verified = _name_and_verify("COCCOCCOC")
-    assert result.name == "2,5,8-trioxanonane"
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert result.name == "1-methoxy-2-(2-methoxyethoxy)ethane"
     assert verified == result.name
 
 
@@ -130,7 +135,10 @@ def test_monocyclic_ring():
 def test_hetero_monocyclic_ring():
     result, verified = _name_and_verify("C1CCOCC1")
     assert verified == result.name
-    assert "oxa" in result.name and "cyclo" in result.name
+    # roadmap N5d: a heteromonocycle of ten or fewer members takes its
+    # Hantzsch-Widman name, the Blue Book;:23682),
+    # never '1-oxacyclohexane'
+    assert result.name == "oxane"
 
 
 def test_aromatic_ring_kekulizes():
@@ -157,7 +165,9 @@ def test_two_separate_ring_systems_linked_by_a_chain():
     system is discovered as a nested branch, recursively, off the linker."""
     smi = "C1CCCCC1CCC1CCCC1"  # cyclohexane-CH2CH2CH2-cyclopentane
     result, verified = _name_and_verify(smi)
-    assert "cyclopentan" in result.name and "cyclohexane" in result.name
+    # roadmap N5d: 'cyclopentyl', never 'cyclopentan-1-yl' (1),
+    # the Blue Book; (c):2913)
+    assert result.name == "(2-cyclopentylethyl)cyclohexane"
     assert verified == result.name
 
 
@@ -187,7 +197,11 @@ def test_hard_branch_witness_perindopril_fragment():
     achiral constitution completely."""
     result, verified = _name_and_verify("CCCC(NC(C)C=O)C(=O)OCC")
     assert verified == result.name
-    assert "aza" in result.name and "oxa" in result.name
+    # Roadmap N5c: three heteroatoms make no 'a' chain, the Blue Book,
+    # "four or more heterounits";:6465, the chain ends on C): the spine is
+    # the carbon chain, the N roots '(R)amino' and the ester O 'ethoxy'
+    #:27667). The name covers every atom and reads back to the input.
+    assert result.name == "1-ethoxy-2-[(1-formylethyl)amino]-1-oxopentane"
 
 
 # ===========================================================================
@@ -230,8 +244,12 @@ def test_stereo_bearing_perindopril_now_full_ws_stereo_win():
     # short prefix -- 'methyl'/'propyl', not the mechanical 'methan-1-yl'/
     # 'propan-1-yl' (OPSIN parses both identically, so the RT assertion below
     # is unaffected; this is a pure spelling correction).
-    assert result.name == ("(3R,5S)-3-methyl-6-oxo-5-propyl-"
-                            "1,7-dioxa-4-azanon-1-ene")
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert result.name == "(2S)-1-ethoxy-2-{[(1R)-1-formylethyl]amino}-1-oxopentane"
     cov = validate_atom_coverage(mol, result.name)
     assert cov.constitution_match is True
     assert verify_or_none(result.name, smi) == result.name  # full: stereo now expressed
@@ -433,10 +451,12 @@ def test_m2_polynitro_now_named_not_voided():
     degenerate spine -- now composes cleanly (the carbon parent + N nitro leaves),
     full-InChIKey RT-verified. Each nitro group is internal, so 0-wrong holds
     (a shredded/unspellable nitro still voids on the raw-charge guard)."""
+    # roadmap N5f: no locant on a substituted mononuclear parent (a),
+    # the Blue Book, 'CH3Cl chloromethane (PIN)':2897)
     cases = {
-        "C([N+](=O)[O-])[N+](=O)[O-]": "1,1-dinitromethane",
+        "C([N+](=O)[O-])[N+](=O)[O-]": "dinitromethane",
         "[O-][N+](=O)CC[N+](=O)[O-]": "1,2-dinitroethane",
-        "[O-][N+](=O)C([N+](=O)[O-])[N+](=O)[O-]": "1,1,1-trinitromethane",
+        "[O-][N+](=O)C([N+](=O)[O-])[N+](=O)[O-]": "trinitromethane",
     }
     for smi, expected in cases.items():
         result, verified = _name_and_verify(smi)
@@ -474,7 +494,12 @@ def test_carboxylate_anion_names_via_charged_leaf():
     mechanism that closes that gap. The expected string is re-derived, not
     hand-edited (verified to OPSIN-round-trip WITH its -1 charge)."""
     result, verified = _name_and_verify("CC(=O)[O-]")
-    assert result.name == "2-oxido-1-oxaprop-1-ene"
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert result.name == "1-oxido-1-oxoethane"
     assert verified == result.name  # full-InChIKey RT (constitution + charge)
 
 
@@ -492,7 +517,12 @@ def test_zwitterion_amino_acid_names_via_charged_leaves():
     OPSIN-round-trip-verified, not hand-edited. (The FULL namer still prefers the
     retained name ``glycine`` for this input; this is the isolated floor test.)"""
     result, verified = _name_and_verify("C(C(=O)[O-])[NH3+]")
-    assert result.name == "3-azaniumyl-2-oxido-1-oxaprop-1-ene"
+    # Roadmap N5c: an acyclic 'a' chain is a book form only with four or more
+    # heteroatoms, a carbon atom and C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga,
+    # In, Tl) ends, the Blue Book;:23348); otherwise the
+    # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
+    # '(R)amino', 'azaniumyl';:27633,:27667).
+    assert result.name == "2-azaniumyl-1-oxido-1-oxoethane"
     assert verified == result.name
 
 
@@ -955,10 +985,13 @@ def test_determinism_across_equivalent_smiles_permutations():
             names.add(result.name if result is not None else None)
         assert len(names) == 1, f"{smi} produced {names} across permutations"
 
-    # The specific lowest-locant regression named in the finding:
+    # The specific lowest-locant regression named in the finding. Roadmap N5d:
+    # (the Blue Book, "The locant '1' is omitted:") (c) "in
+    # monosubstituted homogeneous monocyclic rings" (:2913) -- never '5-...' and
+    # never '1-chlorocyclohexane'.
     mol = Chem.MolFromSmiles("ClC1CCCCC1")
     result = name_universal_substitutive(mol)
-    assert result.name == "1-chlorocyclohexane"
+    assert result.name == "chlorocyclohexane"
 
 
 def test_single_heavy_atom_top_level_input_no_raise():

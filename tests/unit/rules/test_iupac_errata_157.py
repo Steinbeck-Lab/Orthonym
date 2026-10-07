@@ -718,11 +718,17 @@ def test_compound_locants_not_applicable_grep_157() -> None:
     # Per internal notes S5.2: hits must be in validation/opsin_grammar.py
     # (a phase token-name string), composer.py:3966 (comment), or
     # naming_utils.py:417 (doc-string). NEVER in rules/ generation paths.
+    # validation/spelling/lexer.py READS names for the spelling checks: it types the
+    # parentheses of a compound locant for the nesting order of
+    # (the Blue Book) and builds no locant; a unit with a compound locant has no
+    # numbering model, so no locant comparison reads it
+    # (test_spelling_readers.py::test_a_compound_locant_is_never_compared).
     for hit in hits:
         allowed = (
             "validation/opsin_grammar.py" in hit
             or "assembly/composer.py" in hit
             or "assembly/naming_utils.py" in hit
+            or "validation/spelling/lexer.py" in hit
         )
         assert allowed, (
             f"P-31.1.4.3 NA re-verification: compound-locant hit in "

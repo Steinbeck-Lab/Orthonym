@@ -61,8 +61,10 @@ import pytest
 from orthonym import Orthonym
 from tests.support.rt_assert import assert_full_rt
 from tests.support.default_tier import (  # noqa: E402
+    declined_at_default,
     declined_pin_row,
     default_tier_rule_applies,
+    strict_path_row,
 )
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
@@ -343,24 +345,34 @@ def test_part2_systematic_name_at_the_pin_tier(namer, smiles, expected):
 
 
 @pytest.mark.opsin_gate
-def test_amido_prefix_of_a_substituted_acetic_acid_is_the_acetamido_pin(namer):
+def test_amido_prefix_of_a_substituted_acetic_acid_is_the_acetamido_name():
     """The acid producer used to spell this substituted acetic acid '...-2-phenyl
     ethanoic acid' (the general-nomenclature alternative, the Blue Book:
-    29725), so the name carried '...ethanamido' and was labelled below the PIN
-    tier. The acid now takes the retained parent with its alpha descriptor cited
-    bare (TRIAGE j12 findings 2/4/7), and the amido prefix is built on the
-    retained 'acetamide', which keeps its locants:32995;
-    :7304 "Locants are required... for example acetamide"): the PIN ships
-    pin_verified. The label rule for a prefix from a non-PIN acid spelling is
-    covered in test_j12_verify_fixes.py."""
+    29725), so the name carried '...ethanamido'. The acid now takes the retained parent
+    with its alpha descriptor cited bare (TRIAGE j12 findings 2/4/7), and the amido
+    prefix is built on the retained 'acetamide', which keeps its locants
+    :32995;:7304 "Locants are required... for example acetamide"). The
+    label rule for a prefix from a non-PIN acid spelling is covered in
+    test_j12_verify_fixes.py.
+
+    The name is not the PIN: four ring systems (benzene, thiophene, tetrazole,
+    dimethylbenzene) sit on one unbranched chain of eight nodes with ring systems at
+    both ends (2),:23829), and the phane parent cites the principal
+    characteristic group, the ester on the thiophene, as often as any other parent
+     :18875; a tie goes to the phane,:23901 "even though the
+    compounds could also be named by substitutive or multiplicative nomenclature"). The
+    junior amide on the chain is cited as 'oxo' + 'aza'. OPSIN 2.9.0 reads no phane
+    name, so the spelling check lowers the label: the default tier declines,
+    the strict path's name is systematic_verified, and the best-effort tier gives the
+    same name, read back exactly."""
     smiles = ("CCOC(=O)C1=C(SC=C1C2=CC=CC=C2)NC(=O)[C@H](C3=CC=CC=C3)"
               "SC4=NN=NN4C5=C(C=C(C=C5)C)C")
-    res = _dt_obj_row(namer, smiles)
-    assert res["name"] == (
-        "ethyl 2-[(2S)-2-{[1-(2,4-dimethylphenyl)-1H-tetrazol-5-yl]sulfanyl}-2-"
-        "phenylacetamido]-4-phenylthiophene-3-carboxylate"), res
-    assert res["is_pin"] is True and res["tier"] == "pin_verified", res
-    assert_full_rt(res["name"], smiles)
+    name = ("ethyl 2-[(2S)-2-{[1-(2,4-dimethylphenyl)-1H-tetrazol-5-yl]sulfanyl}-2-"
+            "phenylacetamido]-4-phenylthiophene-3-carboxylate")
+    declined_at_default(smiles, name)
+    row = strict_path_row(smiles)
+    assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), row
+    assert "P-52.2.5.1" in [f["rule"] for f in row.get("spelling_failures") or []], row
 
 
 @pytest.mark.unit

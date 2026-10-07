@@ -236,6 +236,48 @@ def _enclose_component(name: str) -> str:
     return f"({name})" if _needs_von_baeyer_parens(name) else name
 
 
+def _cite_after_multiplier(multiplier: str, component: str) -> str:
+    """Join a ring-assembly multiplying prefix ('bi', 'ter',...) to the text of
+    its component name, as written after any parentheses.
+
+     (a) (the Blue Book): a hyphen separates locants from words or
+    word fragments, so a component name that begins with a locant is set off from
+    the prefix by a hyphen: '2,2'-bi-3,1,5-benzoxadiarsepine (PIN)',
+    :20912), '2,2'-bi-1-naphthol' (:27224). Every other component abuts the prefix:
+    '2,2'-bipyridine (PIN)' (:15577) and, after the parentheses (:15564),
+    '1,1'-bi(cyclopropane) (PIN)' (:15573).
+    """
+    if component[:1].isdigit():
+        return f"{multiplier}-{component}"
+    return f"{multiplier}{component}"
+
+
+def _multiplied_assembly(connection_str: str, multiplier: str, component: str,
+                         count: int) -> str:
+    """The assembly text '<junction locants>-<prefix><component>' of a ring assembly of
+    ``count`` identical cyclic systems ('2,2'-bipyridine', '2,5':2',2''-terthiophene').
+
+     (the Blue Book): "The preferred numbering for ring assemblies
+    composed of three or more identical cyclic systems uses composite locants rather
+    than primed locants (see "; (:15655) leaves the serially primed
+    locants to general nomenclature. This writer numbers every assembly with primed
+    locants, so for three or more components the text is recorded as a label-only
+    non-PIN part (``record_non_pin_label``): a shipped name that contains it is
+    labelled below the PIN and keeps its spelling at every tier, and its row records
+    the rule (``spelling_failures``) as the reason. Two components keep
+    the primed PIN numbering of ('1,1'-biphenyl (PIN)',:15575).
+    """
+    text = f"{connection_str}-{_cite_after_multiplier(multiplier, component)}"
+    if count >= 3 and "'" in connection_str:
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(
+            text, rule="P-52.2.7.2",
+            detail=(f"ring assembly '{text}' of {count} identical cyclic systems "
+                    f"numbered with primed locants; the PIN numbering uses composite "
+                    f"locants"))
+    return text
+
+
 def _to_ylidene(name: str) -> Optional[str]:
     """Convert a saturated carbocycle parent-hydride name to its ylidene
     substituent-group name for a double-bond junction
@@ -2512,7 +2554,7 @@ def _build_mixed_pcg_ring_assembly(
     # left untouched. Route through the shared elision primitive rather than the
     # raw f-string so ``[1,1'-biphenyl]-2,4,4',6-tetrol`` (PIN) is emitted.
     from ..assembly.naming_utils import _join_multiplied_suffix
-    core = (f"[{connection_str}-{multiplier}{ring_name}]"
+    core = (f"[{_multiplied_assembly(connection_str, multiplier, ring_name, count)}]"
             f"-{suffix_loc_str}-{_join_multiplied_suffix(smult, senior)}")
 
     # Prefix block (alphanumerical, grouped multipliers). Directly abuts '[' with
@@ -2767,7 +2809,8 @@ def name_ring_assembly(
             return None
         ylidene = _to_ylidene(ring_name)
         if ylidene is not None:
-            return f"{connection_str}-{multiplier}{_enclose_component(ylidene)}"
+            return _multiplied_assembly(connection_str, multiplier,
+                                        _enclose_component(ylidene), count)
         # Mancude heterocyclic ylidene: stem is the MANCUDE parent
         # (furan, not the 2,3-dihydrofuran ring_name), with per-ring indicated
         # hydrogen recomputed at each component's saturated position. Both stems
@@ -2785,8 +2828,8 @@ def name_ring_assembly(
         ih_prefix = (",".join(f"{loc}{_format_prime(sys_idx)}H"
                               for loc, sys_idx in ih_tokens) + "-"
                      ) if ih_tokens else ""
-        return (f"{ih_prefix}{connection_str}-{multiplier}"
-                f"{stems[0]}ylidene")
+        return ih_prefix + _multiplied_assembly(connection_str, multiplier,
+                                                stems[0] + 'ylidene', count)
 
     # (the Blue Book) /: a SINGLE-bond assembly of the SAME mancude
     # parent in two indicated-hydrogen states (aromatic pyridine + its
@@ -2812,7 +2855,8 @@ def name_ring_assembly(
             ih_prefix = (",".join(f"{loc}{_format_prime(sys_idx)}H"
                                   for loc, sys_idx in ih_tokens) + "-"
                          ) if ih_tokens else ""
-            return f"{ih_prefix}{connection_str}-{multiplier}{stems[0]}"
+            return ih_prefix + _multiplied_assembly(connection_str, multiplier,
+                                                    stems[0], count)
 
     # a phase.B: indicated-H placement subset for ring assemblies.
     # If ring_name carries an indicated-H prefix like "1H-indole", emit the
@@ -2839,9 +2883,8 @@ def name_ring_assembly(
         # ("1H,1'H-2,2'-biindole",. Distinguish by whether the stem
         # itself carries a locant set (a comma-locant '<d>,<d>-' prefix).
         if re.match(r"^\d[\d,]*-", ring_stem):
-            base_name = (
-                f"{connection_str}-{multiplier}({ring_name})"
-            )
+            base_name = _multiplied_assembly(connection_str, multiplier,
+                                             f"({ring_name})", count)
         elif all(locs is not None for locs in per_ring_ih_locants):
             # IUPAC (the Blue Book) "Indicated hydrogen... in a ring
             # assembly is added... to each component ring as required": recompute
@@ -2868,21 +2911,20 @@ def name_ring_assembly(
                 ) + "-"
             else:
                 ih_prefix = ""
-            base_name = (
-                f"{ih_prefix}{connection_str}-{multiplier}{ring_stem}"
-            )
+            base_name = ih_prefix + _multiplied_assembly(
+                connection_str, multiplier, ring_stem, count)
         else:
             indicated_h_replicated = ",".join(
                 f"{locant_int}{_format_prime(i)}H" for i in range(count)
             ) + "-"
-            base_name = (
-                f"{indicated_h_replicated}{connection_str}-{multiplier}{ring_stem}"
-            )
+            base_name = indicated_h_replicated + _multiplied_assembly(
+                connection_str, multiplier, ring_stem, count)
     else:
         # IUPAC: enclose the component in parentheses when needed to
         # avoid confusion with von Baeyer names (cycloalkanes / spiro / bicyclo);
         # mancude rings (phenyl/pyridine/furan/...) stay bare.
-        base_name = f"{connection_str}-{multiplier}{_enclose_component(ring_name)}"
+        base_name = _multiplied_assembly(connection_str, multiplier,
+                                         _enclose_component(ring_name), count)
 
     if not substituent_list:
         return base_name
@@ -2947,7 +2989,7 @@ def name_ring_assembly(
         # '-carboxylic acid'/'-carbaldehyde'/'-carbonitrile' and 'di'/'tri'
         # untouched. Route through the shared elision primitive, not a raw f-string.
         from ..assembly.naming_utils import _join_multiplied_suffix
-        return (f"[{connection_str}-{multiplier}{ring_name}]"
+        return (f"[{_multiplied_assembly(connection_str, multiplier, ring_name, count)}]"
                 f"-{locant_str}-{_join_multiplied_suffix(mult, _suffix_stem)}")
 
     # +: MIXED prefix+suffix assembly (a suffix-expressible PCG
@@ -3274,9 +3316,8 @@ def _name_ring_assembly_prefix_oriented(
         # Vowel elision for the -yl form: "indole" -> "indol".
         display_stem = ring_stem[:-1] if ring_stem.endswith('e') else ring_stem
         # Assembly base: "1H,1'H-2,2'-biindol"
-        assembly_base = (
-            f"{indicated_h_replicated}{connection_str}-{multiplier}{display_stem}"
-        )
+        assembly_base = indicated_h_replicated + _multiplied_assembly(
+            connection_str, multiplier, display_stem, count)
     else:
         # For heterocyclic rings, apply vowel elision: "pyridine" -> "pyridin" before -yl
         # (IUPAC: terminal 'e' dropped before '-yl')
@@ -3297,7 +3338,8 @@ def _name_ring_assembly_prefix_oriented(
             display_name = f"({display_name})"
 
         # Assembly base: "1,1'-biphenyl", "2,2'-bipyridin", "1,1'-bi(cyclohexan)"
-        assembly_base = f"{connection_str}-{multiplier}{display_name}"
+        assembly_base = _multiplied_assembly(connection_str, multiplier,
+                                             display_name, count)
 
     # Full prefix: "[1,1'-biphenyl]-4-yl" or "[1H,1'H-2,2'-biindol]-5-yl"
     return (f"[{assembly_base}]-{attach_locant}{attach_prime}-yl",

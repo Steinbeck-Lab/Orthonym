@@ -131,7 +131,14 @@ print(json.dumps({"name": name, "emits": emits, "rt_ok": rt_ok, "limit": limit,
 # part the code records as not the PIN, so the default tier declines it
 # (NO_VERIFIED_PIN); the strict path's name and the best-effort name carry the
 # 'iodanyl' spelling and round-trip.
-DEFAULT_TIER_DECLINES = frozenset({"CI(C)N1CCCC(C1)OC(=O)NC2=CC=CC=C2C3=CC=CC=C3"})
+# The spelling checks of the label site (validation/pin_spelling.py) lower two more rows:
+# 'di(methylidene-λ3-iodanyl)' multiplies a substituted prefix, which takes 'bis' (a),
+# the Blue Book), and 'N-[(oxan-4-yl)methyl]-4-diphosphanyl-3-(methylidene-λ3-iodanyl)'
+# cites 'oxanylmethyl' before 'diphosphanyl' and 'methylideneiodanyl',:3477). Both
+# names are correct and keep their best-effort tier with a full read-back.
+DEFAULT_TIER_DECLINES = frozenset({"CI(C)N1CCCC(C1)OC(=O)NC2=CC=CC=C2C3=CC=CC=C3",
+                                   "C=IC(OC1=CN=C(N=C1)OC2=CCNC(N=C2)N)I=C",
+                                   "C=IC1=C(C2(CCNCC2)CN1C(=O)NCC3CCOCC3)PP"})
 
 
 def _name_fresh(smi):

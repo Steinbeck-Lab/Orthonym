@@ -184,7 +184,7 @@ class TestLocantResolution:
             break
         prefix = get_fused_heterocycle_prefix(core_smiles, ring_attach_idx, atom_mapping)
         assert prefix is not None
-        assert prefix == "1H-benzimidazol-2-yl"
+        assert prefix == "1H-1,3-benzimidazol-2-yl"
 
     def test_benzothiazole_c2_prefix(self):
         """1,3-Benzothiazole attached at C-2 → '1,3-benzothiazol-2-yl'."""
@@ -209,8 +209,8 @@ class TestTautomerLocants:
     @pytest.mark.parametrize("name_substr,smiles", [
         ("1H-indol", "c1ccc2[nH]ccc2c1"),
         ("1H-indazol", "c1ccc2[nH]ncc2c1"),
-        ("1H-benzimidazol", "c1ccc2[nH]cnc2c1"),
-        ("1H-benzotriazol", "c1ccc2[nH]nnc2c1"),
+        ("1H-1,3-benzimidazol", "c1ccc2[nH]cnc2c1"),
+        ("1H-1,2,3-benzotriazol", "c1ccc2[nH]nnc2c1"),
         ("9H-carbazol", "c1ccc2c(c1)[nH]c1ccccc12"),
         ("9H-purin", "c1ncc2nc[nH]c2n1"),
     ])

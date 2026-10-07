@@ -151,7 +151,7 @@ class TestRisk5IndicatedHydrogenTautomerGuard:
         # The guard must NOT over-fire on any correct-tautomer catalog hit:
         ("c1ccc2[nH]ccc2c1", "1H-indole"),
         ("Cn1ccc2ccccc21", "1-methyl-1H-indole"),        # N-substituted-at-iH
-        ("c1ccc2[nH]cnc2c1", "1H-benzimidazole"),
+        ("c1ccc2[nH]cnc2c1", "1H-1,3-benzimidazole"),
         ("c1ccc2c(c1)Nc1ccccc1O2", "10H-phenoxazine"),
         ("c1ccc2c(c1)Cc1ccccc1O2", "9H-xanthene"),       # sp3 CH2 indicated H
         ("O=C1c2ccccc2-c2ccccc21", "9H-fluoren-9-one"),  # oxo-consumed iH: no misfire

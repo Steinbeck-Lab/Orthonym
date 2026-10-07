@@ -48,8 +48,12 @@ pytestmark = pytest.mark.unit
 # mancude FUSED cage OUTSIDE the retained/fusion PIN catalog: the default pin
 # path ABSTAINS, complete emits a VB polyene that OPSIN round-trips.
 AROMATIC_FUSED_CASES = [
-    ("C1=CC=CC2=CC=CC=CC=C12",          # heptalene
-     "bicyclo[6.4.0]dodeca-1,3,5,7,9,11-hexaene"),
+    # benzene ortho-fused to an eight-membered ring: roadmap N5b (name-quality lane
+    # L2) gives the fusion name, the Blue Book: both rings have five
+    # or more members) at the complete tier and in the engine; the PIN path still
+    # abstains. Was 'bicyclo[6.4.0]dodeca-1,3,5,7,9,11-hexaene'.
+    ("C1=CC=CC2=CC=CC=CC=C12",          # benzo[8]annulene (6 + 8)
+     "benzo[8]annulene"),
     # v52 a phase Task 3 (SP2): was asserted as '...-1(13),2,5,7,9,11-hexaene'.
     # Both numberings are legal tricyclo[7.4.0.0^3,7] hydrocarbon numberings
     # (either fusion carbon may be locant 1; both tie on 's
@@ -68,21 +72,10 @@ AROMATIC_FUSED_CASES = [
     # an arbitrary atom-index backstop pick.
     ("C1=Cc2cc3ccccc3cc2C1",            # as-indacene
      "tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene"),
-    #: was asserted as '8-oxa...-1(13),2,4,6,9,11-hexaene'. Both
-    # numberings are legal bicyclo[7.4.0] hydrocarbon numberings (either fusion
-    # carbon may be locant 1), so "When there is a choice for numbering"
-    # decides -- (the Blue Book): "Low locants are assigned to
-    # the heteroatoms considered together as a set compared in increasing
-    # numerical order." 2 < 8, so the heteroatom takes locant 2 and the ene set
-    # follows it. The old expectation was the higher-locant form.
-    ("O1C=CC=CC=Cc2ccccc21",            # 1-benzoxonine (O fused to benzene)
-     "2-oxabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene"),
+    # 1-benzoxonine and 1-benzothionine used to be here: see
+    # BENZO_HETERO_FUSION_CASES (their benzo names are the PINs).
     # benzocycloheptene and benzosuberane used to be here: see
     # BENZO7_FUSION_CASES (their fusion names are the PINs).
-    ("S1C=CC=CC=Cc2ccccc21",            # 1-benzothionine (S fused to benzene)
-     #: same (:9777) low-locant-to-heteroatom correction
-     # as the oxa sibling above.
-     "2-thiabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene"),
     ("C1=CC=CC=Cc2ccccc2C1",            # benzocyclooctene
      "bicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene"),
 ]
@@ -112,11 +105,28 @@ BENZO7_FUSION_CASES = [
 # What ``name_general_ring`` itself returns for the two BENZO7 cages (never
 # shipped: the full namer names both with the fusion PIN first). The mancude cage
 # now comes back with its fusion name (row 135, R22 as above, was the von Baeyer
-# pentaene); the saturated one still comes back as the von Baeyer polyene (RT
-# exact, unchanged).
+# pentaene); the saturated one too since roadmap N5b (name-quality lane L2; hydro
+# prefixes, the Blue Book), was
+# 'bicyclo[5.4.0]undeca-1(11),7,9-triene'.
 BENZO7_ENGINE_CASES = [
     ("C1=CC=Cc2ccccc2C1", "5H-benzo[7]annulene"),
-    ("C1CCCc2ccccc2C1", "bicyclo[5.4.0]undeca-1(11),7,9-triene"),
+    ("C1CCCc2ccccc2C1", "6,7,8,9-tetrahydro-5H-benzo[7]annulene"),
+]
+
+# Benzene ortho-fused to a nine-membered heteromonocycle: the benzo name
+# is the PIN, at BOTH tiers, and the general engine returns it too. S2c-1,
+# change-asserted-value (was: pin abstains; complete and the engine
+# '2-oxabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene' /
+# '2-thiabicyclo[7.4.0]trideca-1(13),3,5,7,9,11-hexaene').
+# "Heteromonocyclic components fused to a benzene ring" (the Blue Book): an
+# isolated benzo component ortho-fused to a heteromonocycle of five or more members is
+# one unit named by the heteroatom locants, 'benzo' and the Hantzsch-Widman name,
+# "for preferred IUPAC names locants must be cited" ('3-benzoxepine (PIN)':11821);
+# (:23710) allows the fusion name (two rings of five or more members).
+# OPSIN 2.9.0 full-InChIKey exact.
+BENZO_HETERO_FUSION_CASES = [
+    ("O1C=CC=CC=Cc2ccccc21", "1-benzoxonine"),
+    ("S1C=CC=CC=Cc2ccccc21", "1-benzothionine"),
 ]
 
 # Every aromatic fused cage the primitive / flag-gate tests run on.
@@ -177,7 +187,8 @@ FAIL_CLOSED_ENGINE = {
 # Fixtures / helpers (mirror the P1 test module)
 # --------------------------------------------------------------------------
 # Every (SMILES, name) a test here asserts as emitted; each must OPSIN-round-trip.
-_RT_CASES = AROMATIC_FUSED_CASES + BENZO7_FUSION_CASES + BENZO7_ENGINE_CASES[1:]
+_RT_CASES = (AROMATIC_FUSED_CASES + BENZO7_FUSION_CASES + BENZO7_ENGINE_CASES[1:]
+             + BENZO_HETERO_FUSION_CASES)
 
 
 def _find_opsin_jar():
@@ -231,7 +242,8 @@ def _engine_ring(smiles, flag=True):
 # (deterministic; gate-independent).
 # --------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected",
-                         AROMATIC_FUSED_CASES + BENZO7_ENGINE_CASES)
+                         AROMATIC_FUSED_CASES + BENZO7_ENGINE_CASES
+                         + BENZO_HETERO_FUSION_CASES)
 def test_engine_exact_string_and_e1(smiles, expected):
     mol, res = _engine_ring(smiles)
     assert res is not None, f"engine refused aromatic cage {smiles!r}"
@@ -332,8 +344,18 @@ def test_engine_flag_off_inert(smiles, _expected):
 def test_names_opsin_roundtrip(smiles, expected, opsin_roundtrip):
     back = opsin_roundtrip.get(expected)
     assert back, f"OPSIN could not parse {expected!r}"
-    assert Chem.CanonSmiles(back) == Chem.CanonSmiles(smiles), (
-        f"{expected!r} round-trips to {back!r}, not {smiles!r}")
+    if Chem.CanonSmiles(back) != Chem.CanonSmiles(smiles):
+        # A fusion name denotes the mancude ring system, not one Kekule structure
+        # (roadmap N5b, name-quality lane L2): OPSIN builds 'benzo[8]annulene' with an
+        # aromatic benzene ring, the input writes the other localization of the same
+        # twelve-electron periphery; the full InChIKey, the round-trip standard of the
+        # name-quality program, is one. A von Baeyer name cites every double bond and
+        # must give the input's own localization.
+        assert "cyclo[" not in expected, (
+            f"{expected!r} round-trips to {back!r}, not {smiles!r}")
+        assert (Chem.MolToInchiKey(Chem.MolFromSmiles(back))
+                == Chem.MolToInchiKey(Chem.MolFromSmiles(smiles))), (
+            f"{expected!r} round-trips to {back!r}, not {smiles!r}")
 
 
 # --------------------------------------------------------------------------
@@ -361,13 +383,15 @@ def test_complete_tier_emits(smiles, expected, production_gate):
 # --------------------------------------------------------------------------
 # R22: the benzo[7]annulene cages get their fusion PIN at BOTH tiers.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,expected", BENZO7_FUSION_CASES)
+@pytest.mark.parametrize("smiles,expected",
+                         BENZO7_FUSION_CASES + BENZO_HETERO_FUSION_CASES)
 def test_benzo7_pin_tier_names_fusion_pin(smiles, expected, production_gate):
     out = Orthonym(style="pin").name(Chem.CanonSmiles(smiles))
     assert out == expected, f"{smiles}: pin gave {out!r} != {expected!r}"
 
 
-@pytest.mark.parametrize("smiles,expected", BENZO7_FUSION_CASES)
+@pytest.mark.parametrize("smiles,expected",
+                         BENZO7_FUSION_CASES + BENZO_HETERO_FUSION_CASES)
 def test_benzo7_complete_tier_names_fusion_pin(smiles, expected,
                                                production_gate):
     comp = Orthonym(style="pin", general_fallback=True,

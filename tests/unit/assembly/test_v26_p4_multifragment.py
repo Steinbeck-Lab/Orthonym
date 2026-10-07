@@ -74,9 +74,11 @@ COVERAGE_CASES = [
     # the old `4-silyl-5-aza` was a stale higher-locant numbering. Engine now
     # emits `3-silyl-2-aza…` (deterministic; OPSIN round-trips). The pyridine
     # component (monocyclic) is unchanged.
+    # Roadmap N5b (name-quality lane L2): the fusable system takes its fusion name
+    #, the Blue Book). Was '3-silyl-2-azabicyclo[4.4.0]deca-1(10),
+    # 2,4,6,8-pentaene—2-silylpyridine (1/1)'.
     ("[SiH3]c1ccccn1.[SiH3]c1ccc2ccccc2n1",
-     "3-silyl-2-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene"
-     "—2-silylpyridine (1/1)"),
+     "2-silylquinoline—2-silylpyridine (1/1)"),
 ]
 
 # BYTE-IDENTICAL: the PIN path ALREADY names these (existing adduct

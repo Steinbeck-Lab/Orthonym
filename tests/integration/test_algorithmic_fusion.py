@@ -54,10 +54,20 @@ ALGORITHMIC_FUSION_CASES = [
     ('c1cc2ccoc2cn1', 'furo[2,3-c]pyridine'),
 
     # 5. isoxazolo[4,5-c]pyridine: isoxazole fused at edge c of pyridine
-    ('c1cc2oncc2cn1', 'isoxazolo[4,5-c]pyridine'),
+    # S2c-1 (change-asserted-value, was 'isoxazolo[4,5-c]pyridine'): 'Heteromonocycles'
+    # (the Blue Book): "The Hantzsch-Widman names 1,2-thiazole, 1,2-oxazole, 1,3-
+    # thiazole, and 1,3-oxazole, respectively, must be used; the locants are enclosed in
+    # square brackets in the completed fusion name"; the certified two-ring parent names
+    # the system first. OPSIN 2.9.0 full-InChIKey exact.
+    ('c1cc2oncc2cn1', '[1,2]oxazolo[4,5-c]pyridine'),
 
     # 6. isothiazolo[4,5-c]pyridine: isothiazole fused at edge c of pyridine
-    ('c1cc2sncc2cn1', 'isothiazolo[4,5-c]pyridine'),
+    # S2c-1 (change-asserted-value, was 'isothiazolo[4,5-c]pyridine'): 'Heteromonocycles'
+    # (the Blue Book): "The Hantzsch-Widman names 1,2-thiazole, 1,2-oxazole, 1,3-
+    # thiazole, and 1,3-oxazole, respectively, must be used; the locants are enclosed in
+    # square brackets in the completed fusion name"; the certified two-ring parent names
+    # the system first. OPSIN 2.9.0 full-InChIKey exact.
+    ('c1cc2sncc2cn1', '[1,2]thiazolo[4,5-c]pyridine'),
 
     # 7. pyrazolo[4,5-c]pyridine: pyrazole fused to pyridine
     # a phase update:.3 V18 (Appendix A.6) picks larger ring
@@ -128,10 +138,20 @@ ALGORITHMIC_FUSION_CASES = [
     ('c1cc2c[nH]cc2o1', '5H-furo[2,3-c]pyrrole'),
 
     # 17. oxazolo[5,4-d]pyrimidine: oxazole fused to pyrimidine
-    ('c1ncc2ncoc2n1', 'oxazolo[5,4-d]pyrimidine'),
+    # S2c-1 (change-asserted-value, was 'oxazolo[5,4-d]pyrimidine'): 'Heteromonocycles'
+    # (the Blue Book): "The Hantzsch-Widman names 1,2-thiazole, 1,2-oxazole, 1,3-
+    # thiazole, and 1,3-oxazole, respectively, must be used; the locants are enclosed in
+    # square brackets in the completed fusion name"; the certified two-ring parent names
+    # the system first. OPSIN 2.9.0 full-InChIKey exact.
+    ('c1ncc2ncoc2n1', '[1,3]oxazolo[5,4-d]pyrimidine'),
 
     # 18. thiazolo[5,4-d]pyrimidine: thiazole fused to pyrimidine
-    ('c1ncc2ncsc2n1', 'thiazolo[5,4-d]pyrimidine'),
+    # S2c-1 (change-asserted-value, was 'thiazolo[5,4-d]pyrimidine'): 'Heteromonocycles'
+    # (the Blue Book): "The Hantzsch-Widman names 1,2-thiazole, 1,2-oxazole, 1,3-
+    # thiazole, and 1,3-oxazole, respectively, must be used; the locants are enclosed in
+    # square brackets in the completed fusion name"; the certified two-ring parent names
+    # the system first. OPSIN 2.9.0 full-InChIKey exact.
+    ('c1ncc2ncsc2n1', '[1,3]thiazolo[5,4-d]pyrimidine'),
 
     # 19. 1,5-dihydropyrrolo[3,4-b]pyrrole: pyrrole fused to pyrrole, both N-H.
     # Suite fix j6 (TRIAGE g3 C08): the mancude parent pyrrolo[3,4-b]pyrrole has
@@ -258,9 +278,9 @@ class TestDictionaryRegression:
         ('c1ccc2cnccc2c1', 'isoquinoline'),
         ('c1ccc2occc2c1', '1-benzofuran'),
         ('c1ccc2sccc2c1', '1-benzothiophene'),
-        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+        ('c1ccc2[nH]cnc2c1', '1H-1,3-benzimidazole'),
         ('c1ccc2[nH]ncc2c1', '1H-indazole'),
-        ('c1ccc2[nH]nnc2c1', '1H-benzotriazole'),
+        ('c1ccc2[nH]nnc2c1', '1H-1,2,3-benzotriazole'),
         ('c1cnc2ccoc2c1', 'furo[3,2-b]pyridine'),
         ('c1cnc2[nH]ccc2c1', '1H-pyrrolo[2,3-b]pyridine'),
     ]

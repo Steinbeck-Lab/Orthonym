@@ -204,7 +204,7 @@ class TestBicyclicFusedHeterocyclesUnchanged:
         ('c1ccc2[nH]ccc2c1', '1H-indole'),
         ('c1ccc2ncccc2c1', 'quinoline'),
         ('c1ccc2cnccc2c1', 'isoquinoline'),
-        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+        ('c1ccc2[nH]cnc2c1', '1H-1,3-benzimidazole'),
     ])
     def test_bicyclic_fused_heterocycle(self, smiles, expected_name):
         """Bicyclic fused heterocycles must not be affected by tricyclic routing guards."""

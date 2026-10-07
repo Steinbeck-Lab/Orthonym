@@ -46,6 +46,7 @@ Source: IUPAC 2013 Blue Book (the Blue Book Blue Book ~line 12079).
 from __future__ import annotations
 
 import math
+from functools import lru_cache as _lru_cache
 from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
@@ -841,3 +842,270 @@ def best_orientations(
         scored.append((score_orientation_general(graph, layout), i, layout))  # type: ignore[arg-type]
     best_score = min(s for s, _, _ in scored)
     return [layout for s, _, layout in scored if s == best_score]
+
+
+# ---------------------------------------------------------------------------
+# Grid-cell drawing of a cata-fused system with rings other than six-membered
+#
+# (the Blue Book): "Individual rings... are drawn in such a way
+# so that as many as possible of the various individual rings are arranged in
+# horizontal rows... Permitted shapes for three- to eight-membered rings are as
+# follows"; (:12063): "If a compound cannot be drawn only using the
+# shapes shown in a distorted ring shape will be required." Every ring
+# is drawn as one cell of the hexagonal grid the six-membered path uses: a ring of n
+# < 6 atoms leaves out 6 - n cell vertices (never two neighbouring ones: a
+# five-membered ring is a hexagon with one vertex left out, which keeps two
+# vertical sides, so it can stand inside a horizontal row), a ring of 6 < n <= 12
+# atoms puts n - 6 atoms on distinct cell edges. A fusion bond is a whole cell edge
+# shared by the two cells. Coordinates are exact integers (doubled lattice units),
+# every drawing of the system is enumerated (so the candidate set is a property of
+# the graph, never of the input atom order), then the 12 symmetries of the grid,
+# then (a)-(d) on the cell centres.
+# ---------------------------------------------------------------------------
+
+_GRID_V = ((0, 4), (2, 2), (2, -2), (0, -4), (-2, -2), (-2, 2))
+_GRID_SLOTS: Tuple[Tuple[int, int], ...] = tuple(
+    p for k in range(6) for p in (
+        _GRID_V[k],
+        ((_GRID_V[k][0] + _GRID_V[(k + 1) % 6][0]) // 2,
+         (_GRID_V[k][1] + _GRID_V[(k + 1) % 6][1]) // 2)))
+_GRID_SLOT_INDEX = {p: i for i, p in enumerate(_GRID_SLOTS)}
+_GRID_DIRS = frozenset(((4, 0), (2, 6), (-2, 6), (-4, 0), (-2, -6), (2, -6)))
+GRID_MAX_RING = 6          # rings above six members stay out (S2c-1: see the CODE study, section 3)
+GRID_MAX_DRAWINGS = 4096
+
+
+def _grid_patterns(n: int) -> List[Tuple[int, ...]]:
+    """Relative slot sequences (clockwise from slot 0, a vertex) for a ring of n atoms."""
+    out: List[Tuple[int, ...]] = []
+    if 3 <= n <= 6:
+        from itertools import product
+        for skip in product((0, 1), repeat=6):
+            if skip[0] or sum(skip) != 6 - n:
+                continue
+            if any(skip[k] and skip[(k + 1) % 6] for k in range(6)):
+                continue
+            out.append(tuple(2 * k for k in range(6) if not skip[k]))
+    elif 6 < n <= 12:
+        from itertools import product
+        for mids in product((0, 1), repeat=6):
+            if sum(mids) != n - 6:
+                continue
+            seq: List[int] = []
+            for k in range(6):
+                seq.append(2 * k)
+                if mids[k]:
+                    seq.append(2 * k + 1)
+            out.append(tuple(seq))
+    return out
+
+
+def _grid_place(order, centre, pattern, rot: int, direction: int):
+    cx, cy = centre
+    return {atom: (cx + _GRID_SLOTS[(rot + direction * rel) % 12][0],
+                   cy + _GRID_SLOTS[(rot + direction * rel) % 12][1])
+            for atom, rel in zip(order, pattern)}
+
+
+def _grid_drawings(mol: Chem.Mol, graph) -> List[Tuple[Dict[int, Tuple[int, int]], Dict[int, Tuple[int, int]]]]:
+    """Every (cell centre per ring, atom coordinate) drawing, up to the grid symmetries
+    of the first ring (which ``grid_orientations`` applies afterwards)."""
+    nodes = sorted(graph)
+    # the first ring: the smallest (its atoms are all on vertices when n <= 6), ties by key
+    seed = min(nodes, key=lambda nd: (len(graph[nd]['atoms']), nd))
+    seed_atoms = graph[seed]['atoms']
+    walk = _ordered_ring_walk(mol, set(seed_atoms))
+    if walk is None:
+        return []
+    starts = [0] if len(walk) <= 6 else range(len(walk))
+    states = []
+    for s in starts:
+        order = walk[s:] + walk[:s]
+        for pat in _grid_patterns(len(order)):
+            states.append(({seed: (0, 0)}, _grid_place(order, (0, 0), pat, 0, 1)))
+    seen = {seed}
+    frontier = [seed]
+    while frontier:
+        nxt = []
+        for cur in frontier:
+            for nb in sorted(graph[cur]['neighbours']):
+                if nb in seen:
+                    continue
+                seen.add(nb)
+                nxt.append((cur, nb))
+        frontier = [nb for _, nb in nxt]
+        for parent, nd in nxt:
+            a, b = tuple(graph[parent]['neighbours'][nd])
+            ring = graph[nd]['atoms']
+            order = _ring_order_from_edge(mol, ring, a, b)
+            if order is None:
+                return []
+            pats = [p for p in _grid_patterns(len(order)) if p[1] == 2]
+            new_states = []
+            for centres, coords in states:
+                pc = centres[parent]
+                c = (coords[a][0] + coords[b][0] - pc[0], coords[a][1] + coords[b][1] - pc[1])
+                if (c[0] - pc[0], c[1] - pc[1]) not in _GRID_DIRS or c in centres.values():
+                    continue
+                ra = _GRID_SLOT_INDEX.get((coords[a][0] - c[0], coords[a][1] - c[1]))
+                rb = _GRID_SLOT_INDEX.get((coords[b][0] - c[0], coords[b][1] - c[1]))
+                if ra is None or rb is None or ra % 2 or rb % 2:
+                    continue
+                for direction in (1, -1):
+                    if (ra + 2 * direction) % 12 != rb:
+                        continue
+                    for pat in pats:
+                        new = _grid_place(order, c, pat, ra, direction)
+                        if any(x in coords and coords[x] != xy for x, xy in new.items()):
+                            continue
+                        merged = dict(coords)
+                        merged.update(new)
+                        if len(set(merged.values())) != len(merged):
+                            continue
+                        nc = dict(centres)
+                        nc[nd] = c
+                        new_states.append((nc, merged))
+            states = new_states
+            if not states or len(states) > GRID_MAX_DRAWINGS:
+                return []
+    if len(seen) != len(nodes):
+        return []
+    return states
+
+
+def _grid_transform(xy: Tuple[int, int], t: int) -> Tuple[int, int]:
+    return _transform(xy, t)
+
+
+def score_orientation_grid(graph, centres, coords) -> Tuple[int, ...]:
+    """ (a)-(d) (:12083-:12117) on cell centres: (a) the longest chain of
+    rings joined by vertical common bonds, (b) most rings in the upper right quadrant,
+    (c) fewest in the lower left, (d) most above the row; a ring on an axis counts as
+    halves, on both axes as quarters."""
+    nodes = sorted(graph)
+    vadj: Dict[int, Set[int]] = {nd: set() for nd in nodes}
+    for nd in nodes:
+        for nb, edge in graph[nd]['neighbours'].items():
+            a, b = tuple(edge)
+            if coords[a][0] == coords[b][0]:
+                vadj[nd].add(nb)
+                vadj[nb].add(nd)
+    seen: Set[int] = set()
+    rows: List[List[int]] = []
+    for nd in nodes:
+        if nd in seen:
+            continue
+        comp, stack = [], [nd]
+        while stack:
+            c = stack.pop()
+            if c in seen:
+                continue
+            seen.add(c)
+            comp.append(c)
+            stack.extend(vadj[c] - seen)
+        rows.append(comp)
+    max_row = max(len(r) for r in rows)
+    best: Optional[Tuple[int, int, int]] = None
+    for row in rows:
+        if len(row) != max_row:
+            continue
+        xs = sorted(row, key=lambda nd: centres[nd][0])
+        k = len(xs)
+        ox = 2 * centres[xs[k // 2]][0] if k % 2 else centres[xs[k // 2 - 1]][0] + centres[xs[k // 2]][0]
+        oy = 2 * centres[row[0]][1]
+        ur = ll = above = 0
+        for nd in nodes:
+            x = 2 * centres[nd][0] - ox
+            y = 2 * centres[nd][1] - oy
+            right, left = (2 if x > 0 else (1 if x == 0 else 0)), (2 if x < 0 else (1 if x == 0 else 0))
+            up, down = (2 if y > 0 else (1 if y == 0 else 0)), (2 if y < 0 else (1 if y == 0 else 0))
+            ur += right * up
+            ll += left * down
+            above += up
+        sub = (-ur, ll, -above)
+        if best is None or sub < best:
+            best = sub
+    assert best is not None
+    return (-max_row,) + best
+
+
+def grid_orientations(mol: Chem.Mol, ring_atoms: Set[int]):
+    """(graph, [(cell centres, atom coordinates)] of every drawing tying for best by
+    , or None when the system is not cata-fused, a ring is outside
+    3..GRID_MAX_RING members, or it cannot be drawn on the grid. The drawings depend
+    on the ring graph only, so they are computed once per element-blind skeleton
+    (``_grid_orientations_of_skeleton``) and carried over to ``mol``'s atoms."""
+    info = classify_ring_system(mol, ring_atoms)
+    if not (info['cata_fused'] and info['connected']):
+        return None
+    graph = info['graph']
+    if any(not 3 <= len(r) <= GRID_MAX_RING for r in info['rings']):
+        return None
+    idx = sorted(ring_atoms)
+    pos = {a: i for i, a in enumerate(idx)}
+    rw = Chem.RWMol()
+    for _ in idx:
+        rw.AddAtom(Chem.Atom(6))
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in pos and j in pos:
+            rw.AddBond(pos[i], pos[j], Chem.BondType.SINGLE)
+    sk = rw.GetMol()
+    sk.UpdatePropertyCache(strict=False)
+    key = Chem.MolToSmiles(sk)
+    order = list(sk.GetPropsAsDict(True, True).get('_smilesAtomOutputOrder', ()))
+    got = _grid_orientations_of_skeleton(key)
+    if got is None or len(order) != len(idx):
+        return None
+    to_mol = {k: idx[order[k]] for k in range(len(order))}   # key atom -> mol atom
+    node_of = {frozenset(graph[nd]['atoms']): nd for nd in graph}
+    out = []
+    for centres, coords in got:
+        c2 = {}
+        for ring_atoms_key, c in centres:
+            nd = node_of.get(frozenset(to_mol[a] for a in ring_atoms_key))
+            if nd is None:
+                return None
+            c2[nd] = c
+        out.append((c2, {to_mol[a]: xy for a, xy in coords.items()}))
+    return graph, out
+
+
+@_lru_cache(maxsize=2048)
+def _grid_orientations_of_skeleton(key: str):
+    """``_grid_orientations_uncached`` on the all-carbon skeleton ``key``, with each cell
+    centre keyed by the ring's atom set (stable across the two graphs)."""
+    km = Chem.MolFromSmiles(key)
+    if km is None:
+        return None
+    got = _grid_orientations_uncached(km, set(range(km.GetNumAtoms())))
+    if got is None:
+        return None
+    graph, layouts = got
+    return tuple((tuple((tuple(sorted(graph[nd]['atoms'])), c) for nd, c in centres.items()), coords)
+                 for centres, coords in layouts)
+
+
+def _grid_orientations_uncached(mol: Chem.Mol, ring_atoms: Set[int]):
+    info = classify_ring_system(mol, ring_atoms)
+    if not (info['cata_fused'] and info['connected']):
+        return None
+    graph = info['graph']
+    if any(not 3 <= len(r) <= GRID_MAX_RING for r in info['rings']):
+        return None
+    drawings = _grid_drawings(mol, graph)
+    if not drawings:
+        return None
+    scored = []
+    seen: Set[Tuple] = set()
+    for centres, coords in drawings:
+        for t in range(12):
+            x2 = {a: _grid_transform(v, t) for a, v in coords.items()}
+            sig = tuple(sorted(x2.items()))
+            if sig in seen:
+                continue
+            seen.add(sig)
+            c2 = {nd: _grid_transform(v, t) for nd, v in centres.items()}
+            scored.append((score_orientation_grid(graph, c2, x2), c2, x2))
+    top = min(s for s, _, _ in scored)
+    return graph, [(c, x) for s, c, x in scored if s == top]

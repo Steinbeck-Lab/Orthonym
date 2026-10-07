@@ -1556,7 +1556,9 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
                         is_compound = needs_brackets(prefix_name)
                         if (is_compound and '(' not in prefix_name
                                 and '[' not in prefix_name):
-                            prefix_name = f'({prefix_name})'
+                            # Lane L2 (R2): the marks keep the writer's record
+                            from ..assembly.prefix_derivation import carried
+                            prefix_name = carried(f'({prefix_name})', like=prefix_name)
                         return {
                             'name': prefix_name,
                             'atoms': sub_atoms,

@@ -264,7 +264,7 @@ class TestDataCoverage:
 
         expected_names = [
             '1H-indole',
-            '1H-benzimidazole',
+            '1H-1,3-benzimidazole',
             'quinoline',
             'isoquinoline',
             '9H-purine',
@@ -293,7 +293,7 @@ class TestFusedHeterocycleE2E:
         ('c1ccc2[nH]ccc2c1', '1H-indole'),
         ('c1ccc2ncccc2c1', 'quinoline'),
         ('c1ccc2cnccc2c1', 'isoquinoline'),
-        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+        ('c1ccc2[nH]cnc2c1', '1H-1,3-benzimidazole'),
         #: the PIN carries the heteroatom locant,
         # the Blue Book "1-benzofuran (PIN) benzofuran";:13443 for
         # 1-benzothiophene). RETAINED_NAMES was corrected to the '1-' PIN form.
@@ -340,7 +340,7 @@ class TestPhase6Regression:
         # a phase fused heterocycle tests that should still pass
         ('c1ccc2[nH]ccc2c1', '1H-indole'),
         ('c1ccc2ncccc2c1', 'quinoline'),
-        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+        ('c1ccc2[nH]cnc2c1', '1H-1,3-benzimidazole'),
     ])
     def test_phase6_fused_heterocycles_unchanged(self, smiles, expected):
         """a phase fused heterocycle naming should be unchanged."""

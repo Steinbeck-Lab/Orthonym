@@ -417,6 +417,7 @@ def spend_perf_work(n: int = 1) -> None:
     pb -= n
     if pb <= 0:
         _fragment_guard.perf_budget = 0
+        _count_hang_budget_trip()
         raise PerfBudgetExceeded()
     _fragment_guard.perf_budget = pb
 
@@ -437,6 +438,7 @@ def spend_analysis_call(n: int = 1) -> None:
     ab -= n
     if ab <= 0:
         _fragment_guard.analysis_budget = 0
+        _count_hang_budget_trip()
         raise PerfBudgetExceeded()
     _fragment_guard.analysis_budget = ab
 
@@ -580,9 +582,23 @@ def spend_fragment_work() -> bool:
     if wb is None:
         return True
     if wb <= 0:
+        _count_hang_budget_trip()
         return False
     _fragment_guard.work_budget = wb - 1
     return True
+
+
+def hang_budget_trips() -> int:
+    """How many times a hang budget ran out on this thread (``spend_perf_work``,
+    ``spend_analysis_call``, ``spend_fragment_work``). A counter that is never reset:
+    a caller compares its value before and after a naming call (roadmap N5: the
+    mechanical-spelling retry of ``Orthonym.name`` never names a molecule again whose
+    first run hit a hang guard)."""
+    return getattr(_fragment_guard, 'hang_budget_trips', 0)
+
+
+def _count_hang_budget_trip() -> None:
+    _fragment_guard.hang_budget_trips = hang_budget_trips() + 1
 
 
 import contextlib as _contextlib

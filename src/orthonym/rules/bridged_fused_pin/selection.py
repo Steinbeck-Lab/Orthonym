@@ -327,6 +327,53 @@ def _in_mancude_ring(mol, atom: int, unsaturated: FrozenSet[int]) -> bool:
                                        for ring in mol.GetRingInfo().AtomRings())
 
 
+def _sp2_atom(atom) -> bool:
+    """An atom of the double-bond system of a mancude parent: aromatic, or carrying a double
+    bond in the ring or to an exocyclic =O, =S, =N- or =C< (a ketone or ylidene of a mancude
+    parent keeps its ring a ring of that parent:, the Blue Book)."""
+    return atom.GetIsAromatic() or any(
+        b.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.AROMATIC) for b in atom.GetBonds())
+
+
+def _cuts_a_crossed_mancude_system(mol, split: Split) -> bool:
+    """True when a carbon bridge atom of ``split`` lies in a ring system of the input whose
+    atoms are all ``_sp2_atom`` (fused rings sharing two or more atoms grouped) and a ring of
+    the input outside that system shares three or more of its atoms: the system is linked to
+    a chain at nonadjacent positions, (1) (the Blue Book) "at least one ring
+    or ring system of which must be a mancude system attached to adjacent atoms or chains at
+    nonadjacent ring positions", and the reading cuts it into a bridge (a quinone ring of an
+    ansa macrocycle cut into a methano bridge; a para-phenylene linked by -O- and -O-O-S- cut
+    into an etheno bridge). (:23843): "cyclic phane systems > fused ring systems >
+    bridged fused systems"."""
+    rings = [frozenset(r) for r in mol.GetRingInfo().AtomRings()]
+    systems: List[Set[int]] = []
+    for ring in rings:
+        if not all(_sp2_atom(mol.GetAtomWithIdx(a)) for a in ring):
+            continue
+        joined = [s for s in systems if len(s & ring) >= 2]
+        merged = set(ring).union(*joined)
+        systems = [s for s in systems if not any(s is j for j in joined)] + [merged]
+    carbons = {a for chain in split.bridges for a in chain
+               if mol.GetAtomWithIdx(a).GetAtomicNum() == 6}
+    return any(system & carbons
+               and any(not ring <= system and len(ring & system) >= 3 for ring in rings)
+               for system in systems)
+
+
+def _on_a_produced_parent(mol, split: Split) -> bool:
+    """True when the fused parent of ``split`` comes from the two-component producer of slice
+    S2c-1 (``hetero_fusion``, source 'hetero_fusion_name+opsin'), a parent no Blue Book row
+    reads as a bridged fused PIN. The boundary rows of ``phane_reading`` below are the book's
+    and hold for the table parents; on a produced parent the literal reading of (1)
+    applies (``_cuts_a_crossed_mancude_system``) until a cyclophane namer decides the class."""
+    from .parents import fused_parent
+    try:
+        got = fused_parent(mol, set(split.residual))
+    except Exception:
+        return False
+    return got is not None and got.source == "hetero_fusion_name+opsin"
+
+
 def phane_reading(mol, split: Split) -> bool:
     """ (the Blue Book-:23897): True when ``split`` reads a cyclophane as a
     bridged fused system -- a carbon atom of a bridge belongs to a mancude ring of the input
@@ -362,7 +409,12 @@ def phane_reading(mol, split: Split) -> bool:
       joined at its 5,8-positions, is the same shape as the naphthalene of:23895 (II), and
        (1) asks for "a mancude system", not an aromatic one. In the same way a
       polycycle whose only atom without a ring double bond is the indicated hydrogen of a
-      mancude ring has no chain: it is the all-mancude case above with an odd atom count."""
+      mancude ring has no chain: it is the all-mancude case above with an odd atom count.
+    - A reading on a parent of the S2c-1 producer (``_on_a_produced_parent``) that cuts a
+      carbon bridge out of an sp2 ring system a chain-linked ring crosses
+      (``_cuts_a_crossed_mancude_system``) is a cyclophane by (1) read literally."""
+    if _on_a_produced_parent(mol, split) and _cuts_a_crossed_mancude_system(mol, split):
+        return True
     unsaturated = frozenset(split.unsaturated)
     if not any(mol.GetAtomWithIdx(a).GetAtomicNum() == 6 and _in_mancude_ring(mol, a, unsaturated)
                for chain in split.bridges for a in chain):

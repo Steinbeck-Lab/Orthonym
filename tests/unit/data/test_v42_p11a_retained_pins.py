@@ -15,11 +15,16 @@ indicated hydrogen, corrected in the report + baseline, ZERO engine change):
   * 2H-isoindole the Blue Book "(2H-isomer shown; the PIN is 2H-isoindole)"
   * 4H-quinolizine the Blue Book "(4H-isomer shown; the PIN is 4H-quinolizine)"
 
-Group 2 — terminal-``e`` retained-name spelling:
-  * arsindole the Blue Book "arsindole (PIN)"
-  * isoarsindole the Blue Book "isoarsindole (PIN)"
-  * phosphindole the Blue Book "phosphindole (PIN)"
-  * isophosphindole the Blue Book "isophosphindole (PIN)"
+Group 2 — terminal-``e`` retained-name spelling, with the
+indicated hydrogen of the indole / isoindole analogue (Table 2.9 prints 'indole (PIN)',
+the Blue Book, where entry (19) says "the PIN is 1H-indole", the Blue Book;, the Blue Book "in a
+preferred IUPAC name a locant and the symbol 'H' must be cited"; the table spelling is a
+listing spelling by analogy with Note 1, the Blue Book, the note of the seniority
+lists: "Indicated hydrogen atoms are not shown in this kind of listing"):
+  * 1H-arsindole the Blue Book "arsindole (PIN)"
+  * 2H-isoarsindole the Blue Book "isoarsindole (PIN)"
+  * 1H-phosphindole the Blue Book "phosphindole (PIN)"
+  * 2H-isophosphindole the Blue Book "isophosphindole (PIN)"
 
 Group 3 — catalog adds for von-Baeyer-emitting retained parents:
   * octalene the Blue Book "pentalene (PIN) octalene (PIN)" /
@@ -56,10 +61,10 @@ _GROUP1 = [
 
 # Groups 2, 3, 4 — engine-changed entries (hand-curated retained-name catalog).
 _ENGINE_CHANGED = [
-    ("C1=Cc2ccccc2[AsH]1", "arsindole"),        # G2, the Blue Book
-    ("C1=c2ccccc2=C[AsH]1", "isoarsindole"),     # G2, the Blue Book
-    ("c1ccc2[pH]ccc2c1", "phosphindole"),        # G2, the Blue Book
-    ("c1ccc2c[pH]cc2c1", "isophosphindole"),     # G2, the Blue Book
+    ("C1=Cc2ccccc2[AsH]1", "1H-arsindole"),        # G2, the Blue Book, the Blue Book
+    ("C1=c2ccccc2=C[AsH]1", "2H-isoarsindole"),     # G2, the Blue Book, the Blue Book
+    ("c1ccc2[pH]ccc2c1", "1H-phosphindole"),        # G2, the Blue Book, the Blue Book
+    ("c1ccc2c[pH]cc2c1", "2H-isophosphindole"),     # G2, the Blue Book, the Blue Book
     ("c1cccc2ccccccc-2cc1", "octalene"),         # G3, the Blue Book
     ("C1=CC2=CC=C[As]2C=C1", "arsindolizine"),   # G3, the Blue Book
     ("c1ccp2cccc2c1", "phosphindolizine"),       # G3, the Blue Book

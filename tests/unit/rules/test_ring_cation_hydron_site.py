@@ -7,7 +7,7 @@ more hydrons to any position of a neutral parent hydride... is named by replacin
 the final letter 'e' of the parent hydride name, if any, by the suffix 'ium'";
 example:41396 '1H-imidazol-3-ium (PIN)'. C[N+]1=CNc2ccccc21 is 1-methyl-1H-
 benzimidazole with a hydron added at N-3 (its other resonance drawing is
-CN1C=[NH+]c2ccccc21): '1-methyl-1H-benzimidazol-3-ium'. The name that used to ship,
+CN1C=[NH+]c2ccccc21): '1-methyl-1H-1,3-benzimidazol-3-ium'. The name that used to ship,
 '1-methyl-1H-benzimidazol-1-ium', adds the hydron at the methylated N-1 (OPSIN:
 C[NH+]1C=NC2=C1C=CC=C2), a different cation with the same standard InChIKey.
 
@@ -39,11 +39,11 @@ def _exact(name, smiles):
 
 
 @pytest.mark.parametrize("smiles,name", [
-    ("C[N+]1=CNc2ccccc21", "1-methyl-1H-benzimidazol-3-ium"),
-    ("CN1C=[NH+]c2ccccc21", "1-methyl-1H-benzimidazol-3-ium"),   # the other drawing
-    ("C1=CC=C2C(=C1)NC=[N+]2C3=COC=C3.[I-]", "1-(furan-3-yl)-1H-benzimidazol-3-ium iodide"),
+    ("C[N+]1=CNc2ccccc21", "1-methyl-1H-1,3-benzimidazol-3-ium"),
+    ("CN1C=[NH+]c2ccccc21", "1-methyl-1H-1,3-benzimidazol-3-ium"),   # the other drawing
+    ("C1=CC=C2C(=C1)NC=[N+]2C3=COC=C3.[I-]", "1-(furan-3-yl)-1H-1,3-benzimidazol-3-ium iodide"),
     ("CC(C1=[N+](C2=CC=CC=C2N1)CC=CC3=CC=CC=C3)O",
-     "2-(1-hydroxyethyl)-1-(3-phenylprop-2-en-1-yl)-1H-benzimidazol-3-ium"),
+     "2-(1-hydroxyethyl)-1-(3-phenylprop-2-en-1-yl)-1H-1,3-benzimidazol-3-ium"),
     ("CCC1=C([N+](=C(C=C(N1)C)C)c2ccccc2)CC",
      "2,3-diethyl-5,7-dimethyl-1-phenyl-1H-1,4-diazepin-4-ium"),
     # (the Blue Book): indicated hydrogen (b):3246 and the '-ium'

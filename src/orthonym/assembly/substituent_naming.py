@@ -1400,6 +1400,12 @@ def _name_carbamoylamino_chain_substituent(
         if c_in_chain > max_chain:
             return None
     loc = len(ordered)  # bridge-N carbon is the far end
+    if len(chain) == 1:
+        # (a) (the Blue Book): no locant on a prefix of a methyl group
+        # ('chloromethyl',:25805) -> '(carbamoylamino)methyl'
+        from .book_prefixes import book_forms_enabled, methyl_group_name
+        if book_forms_enabled():
+            return methyl_group_name(["carbamoylamino"], 1)
     from ..data.chain_names import get_chain_prefix
     stem = get_chain_prefix(len(chain))
     return f"{loc}-(carbamoylamino){stem}yl"
@@ -3381,7 +3387,30 @@ def _name_polyfunctional_acyclic_substituent_impl(
     if not core_double_bonds:
         if pos_out is not None:
             pos_out.update(pos)
-        return f"{joined}{stem}yl"
+        from .prefix_derivation import built
+        _whole = f"{joined}{stem}yl"
+        # properfix a performance pass : a ONE-CARBON core bearing an ylidene-type
+        # chalcogen decoration (oxo/sulfanylidene/selanylidene/tellanylidene)
+        # alongside at least one more substituent is an ACYL-group carbon
+        # spelled as a methyl group -- the general name of
+        # (the Blue Book 'oxo(phenyl)methyl') and, for its chalcogen
+        # siblings, (:30313 'benzene-1,2-dicarbodithioic acid
+        # (PIN)', "likewise for the selenium and tellurium analogues" at
+        #,:30436), not the systematic 'sulfanyl(sulfanylidene)
+        # methyl' this writer gives when the acid-suffix path does not claim
+        # the group).
+        # Task 5 already records this for the plain-oxo case at a
+        # sibling writer (``universal_substituent._book_spelling``,
+        # ``book_prefixes._acyl_group_prefix``); this is the SAME fact at
+        # THIS writer (traced: this exact fragment reaches here, not those).
+        if single_position and {'oxo', 'sulfanylidene', 'selanylidene',
+                                 'tellanylidene'} & set(groups):
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(_whole)
+        # Lane L2 (R2): the chain carries the prefixes it joined (c),:7035),
+        # a compound prefix cited in marks,:7232; '[hydroxy(phenyl)methyl]')
+        return built(_whole, substituted=bool(groups),
+                     enclosed=True if groups else None)
     # B2: unsaturated substituent chain (aconitic/lignin-monomer family).
     # Add the 'ene' infix + free-valence yl locant + (nE/nZ) descriptor, numbered
     # from the free valence (locant 1, -- NOT the references' longest-chain
@@ -4210,9 +4239,12 @@ def _name_ether_substituted_chain(
     #, the Blue Book elides the locant only when the free valence
     # "terminates a chain", i.e. k==1). A hyphen is needed before the digit
     # whenever the joined prefix string ends in a letter or a closing mark.
+    # Lane L2 (R2): the chain carries the oxy prefixes it joined (c),:7035);
+    # its returns reach the multiplier ('2,4-bis(methoxymethyl)pyridine')
+    from .prefix_derivation import built
     if k_attach == 1:
-        return f"{joined}{stem}yl"
-    return f"{joined}{stem}an-{k_attach}-yl"
+        return built(f"{joined}{stem}yl", substituted=bool(part_strings))
+    return built(f"{joined}{stem}an-{k_attach}-yl", substituted=bool(part_strings))
 
 
 # ============================================================================
@@ -4666,7 +4698,10 @@ def acyl_prefix_from_branch(mol, carbonyl_c: int, attach_idx: int,
         if not acyl or not fragment_acid_name_verified(acid_name, frag_smi):
             return None
         record_prefix_from_acid_status(acid_name, acyl)
-        return acyl
+        # Lane L2: the acyl group's multiplier and marks, from its atoms
+        from .book_prefixes import acyl_derivation
+        from .prefix_derivation import with_derivation
+        return with_derivation(acyl, acyl_derivation(mol, carbonyl_c, acyl_set))
     except Exception:
         return None
 
@@ -6872,13 +6907,15 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
     from .composer import _format_prefix_groups
     prefix = _l5 or (_format_prefix_groups(branch_groups) if branch_groups else "")
 
+    from .prefix_derivation import built
+    # Lane L2 (R2): the chain carries its branch prefixes or none,:7033-:7035)
     if k == 1:
         try:
             base = get_alkyl_name(chain_len)  # 'butyl', 'pentyl',...
         except (ValueError, KeyError):
             base = f"{stem}yl"
-        return _ret(f"{prefix}{base}", 1)
-    return _ret(f"{prefix}{stem}an-{k}-yl", k)
+        return _ret(built(f"{prefix}{base}", substituted=bool(branch_groups)), 1)
+    return _ret(built(f"{prefix}{stem}an-{k}-yl", substituted=bool(branch_groups)), k)
 
 
 def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with_pos):
@@ -6955,6 +6992,28 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
     chain_set_c = set(chain)
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
 
+    if chain_len == 1:
+        # Roadmap N5e: a one-carbon chain carrying =O and one more group is an acyl
+        # group (2), the Blue Book) -- 'carbamoyl', '(R)carbamoyl',
+        # '<ring>-1-carbonyl', 'methoxycarbonyl', 'benzoyl' -- never the hyphen-joined
+        # '{[R]amino}-oxomethyl',:32922-:32928).
+        from .book_prefixes import acyl_group_prefix, book_forms_enabled
+        if book_forms_enabled():
+            _parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+                        if nb.GetIdx() not in sub_set]
+            if len(_parents) == 1:
+                def _part(atoms, root):
+                    boundary = [nb.GetIdx() for nb in mol.GetAtomWithIdx(root).GetNeighbors()
+                                if nb.GetIdx() not in atoms]
+                    try:
+                        nm = name_substituent_fragment(mol, sorted(atoms), root, boundary)
+                    except Exception:  # noqa: BLE001
+                        return None
+                    return None if (not nm or nm == 'substituent') else nm
+                _acyl = acyl_group_prefix(mol, attach_idx, _parents[0], sub_set, _part)
+                if _acyl:
+                    return (_acyl, 1, chain_pos) if with_pos else (_acyl, 1)
+
     from collections import defaultdict
     branch_groups: dict = defaultdict(list)
     for c in chain:
@@ -7014,6 +7073,39 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
             for gname in sorted(branch_groups.keys(), key=alpha_sort_key)
         ]
         prefix = "-".join(_parts)
+        # Roadmap N5e/N5f: the second and further prefixes of a methyl group are
+        # enclosed, not hyphen-joined, the Blue Book):
+        # 'hydroxy(phenyl)methyl', 'cyclohexyl(oxo)methyl' (:30628)
+        from .book_prefixes import book_forms_enabled, methyl_group_name
+        if book_forms_enabled() and k == 1:
+            _flat = [g for g in sorted(branch_groups, key=alpha_sort_key)
+                     for _ in branch_groups[g]]
+            _whole = methyl_group_name(_flat, 1)
+            if _whole:
+                # properfix a performance pass : a host carbon bearing an ylidene-type
+                # chalcogen decoration (oxo/sulfanylidene/selanylidene/
+                # tellanylidene) alongside at least one more substituent is an
+                # ACYL-group carbon spelled as a methyl group -- the general
+                # name of (the Blue Book 'oxo(phenyl)methyl')
+                # and, for its chalcogen siblings, (:30313
+                # 'benzene-1,2-dicarbodithioic acid (PIN)'; "likewise for the
+                # selenium and tellurium analogues" at,:30436).
+                # 'benzene-1,2-dicarbodithioic acid (PIN)' (:30313) is
+                # the acid-suffix PIN for S=C(S)c1ccccc1C(=S)S, never the
+                # systematic 'sulfanyl(sulfanylidene)methyl' this writer gives
+                # when the suffix path does not claim the group. Task 5
+                # already records this for the O-only case at
+                # ``universal_substituent._book_spelling``'s sibling acyl path;
+                # this is the SAME fact at THIS writer, which that site never
+                # reaches (traced: 0 calls for this exact molecule).
+                if _flat and {'oxo', 'sulfanylidene', 'selanylidene',
+                              'tellanylidene'} & set(_flat):
+                    from ..metrics.provenance import record_non_pin_fragment
+                    record_non_pin_fragment(_whole)
+                _stereo = _located_stereo_block(mol, chain_pos)
+                from .prefix_derivation import carried
+                _whole = carried(f"{_stereo}{_whole}", like=_whole) if _stereo else _whole
+                return (_whole, k, chain_pos) if with_pos else (_whole, k)
     else:
         prefix = _format_prefix_groups(branch_groups) if branch_groups else ""
     try:
@@ -7063,6 +7155,13 @@ def _fg_enclose(tok: str) -> str:
     from .naming_utils import _is_fully_enclosed, italicized_prefix_is_bare
     if _is_fully_enclosed(tok):
         return tok
+    # Lane L2: the writer's record decides the marks when it has decided them
+    # (``assembly.prefix_derivation``;, the Blue Book)
+    from .prefix_derivation import derivation_of
+    _rec = derivation_of(tok)
+    if _rec is not None and _rec.enclosed is not None:
+        from .naming_utils import apply_enclosing_marks
+        return apply_enclosing_marks(tok, -1) if _rec.enclosed else tok
     # carve-out (shared primitive): 'tert-butyl' is a simple prefix,
     # cited bare ('*tert*-butyldi(methyl)phosphane (PIN)', the Blue Book).
     if italicized_prefix_is_bare(tok):
@@ -7090,6 +7189,39 @@ def _fg_branch_atoms(mol, start, block, sub_set):
             if nn.GetIdx() != block and nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
                 stk.append(nn.GetIdx())
     return br
+
+
+def _is_amide_acyl_carbon(mol, c_idx: int, n_idx: int) -> bool:
+    """``c_idx`` is the carbon of an acyl group -CO-R on the nitrogen ``n_idx`` whose R is a
+    carbon or a ring nitrogen, OR nothing (the formyl case): the -NH-CO-R of
+     (the Blue Book), not a carbamate (-CO-O-) or a carbamoyl (-CO-NH2).
+
+    Properfix a performance pass (review-2 M7): R = H (formyl) used to fail the ``len(others) != 1``
+    test below and so was never recognised as this class, although 's own
+    example list opens on exactly that acyl group -- '(1) 4-formamidobenzoic acid (PIN)'
+    / '(2) 4-(formylamino)benzoic acid' (:33000): "Method (1) generates preferred IUPAC
+    names". A caller that builds the method-(2) compound prefix for an N,N-disubstituted
+    amide (``formyl`` alongside another N-branch, '[formyl(methyl)amino]') must record it
+    as never the PIN exactly as it already does for 'acetyl'/'benzoyl' acyl carbons --
+    this predicate is what decided that, from the atoms, not a name pattern; R=H is the
+    SAME fact ('4-formamidobenzoic acid' is this rule's own PIN witness), only missing
+    from the structural test, not a different rule.
+    """
+    c = mol.GetAtomWithIdx(c_idx)
+    if c.GetAtomicNum() != 6 or c.IsInRing():
+        return False
+    oxo = [nb.GetIdx() for nb in c.GetNeighbors()
+           if nb.GetAtomicNum() == 8 and nb.GetDegree() == 1
+           and mol.GetBondBetweenAtoms(c_idx, nb.GetIdx()).GetBondType()
+           == Chem.BondType.DOUBLE]
+    others = [nb for nb in c.GetNeighbors()
+              if nb.GetIdx() != n_idx and nb.GetAtomicNum() > 1 and nb.GetIdx() not in oxo]
+    if len(oxo) != 1 or len(others) > 1:
+        return False
+    if not others:
+        return True
+    r = others[0]
+    return r.GetAtomicNum() == 6 or (r.GetAtomicNum() == 7 and r.IsInRing())
 
 
 def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
@@ -7201,9 +7333,48 @@ def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
             subs.append(r)
         if not subs:
             return 'amino'
-        from .naming_utils import alpha_sort_key
-        inner = ''.join(_fg_enclose(s) for s in sorted(subs, key=alpha_sort_key))
-        return f"{inner}amino"
+        from .prefix_derivation import built
+        if len(subs) == 1:
+            # One branch: no citation-order ambiguity only governs
+            # the SECOND and further substituent of a mononuclear parent), so the
+            # lone-item enclosure test (compound -> marks, simple -> bare) is
+            # enough: 'methylamino', '(2-hydroxyethyl)amino'.
+            full = f"{_fg_enclose(subs[0])}amino"
+        else:
+            # properfix a performance pass : (the Blue Book) "For
+            # mononuclear parent hydrides with two or more substituents the
+            # first cited substituent never has enclosing marks unless it
+            # includes a locant. The second and further substituents are each
+            # enclosed with parentheses even for simple substituents." --
+            # 'methyl(phenyl)amino' (:26308). ``_fg_enclose`` decides per-token
+            # from the token's OWN shape alone, with no notion of citation
+            # position or of repeated identical branches 's
+            # multiplier), so two-or-more simple branches concatenated bare and
+            # unmarked -- 'formyl' + 'methyl' -> 'formylmethylamino', which
+            # OPSIN's own grammar reads as the compound substituent
+            # '(formylmethyl)amino' (-NH-CH2-CHO), a different molecule's
+            # prefix; 'methyl' + 'methyl' -> 'methylmethylamino' instead of
+            # 'dimethylamino'. Route through the ONE shared assembler
+            # (``substituent_enumerator._assemble_amino_prefix_core``, a two-
+            # line delegation to ``composer._assemble_decorated_amino_prefix``)
+            # that already owns ordering, the per-branch mark and the
+            # multiplier for every other multi-branch amino writer in this
+            # tree; it returns the 'amino'-headed core itself, not a fragment
+            # this function should still append 'amino' to.
+            from .substituent_enumerator import _assemble_amino_prefix_core
+            full = _assemble_amino_prefix_core([(s, False) for s in subs])
+            if full is None:
+                return None
+        # Lane L2: an amino group carrying substituent prefixes is a compound prefix,
+        # multiplied by 'bis' and enclosed (a) 'bis(dimethylamino)',
+        # the Blue Book;:7232, '2-[(methylcarbamoyl)amino]...':33354)
+        out = built(full, substituted=True, enclosed=True)
+        if any(_is_amide_acyl_carbon(mol, h, attach_idx) for h in heavy):
+            # (the Blue Book) "Method (1) generates preferred IUPAC
+            # names": '(R-carbonyl)amino' is method (2), never part of a PIN
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(out)
+        return out
     return None
 
 
@@ -7328,6 +7499,14 @@ def carbocyclic_ring_yl_attachment_descriptor(mol, frag_atoms, attach_idx):
 
 
 def _add_substituent_stereo(mol, sub_atoms, name, attach_idx=None, located=None):
+    """``_add_substituent_stereo_text``; the descriptor block it adds keeps the writer's
+    record of ``name`` (``assembly.prefix_derivation.carried``)."""
+    from .prefix_derivation import carried
+    return carried(_add_substituent_stereo_text(mol, sub_atoms, name, attach_idx=attach_idx,
+                                                located=located), like=name)
+
+
+def _add_substituent_stereo_text(mol, sub_atoms, name, attach_idx=None, located=None):
     """Add CIP stereodescriptors to a substituent name if stereocenters exist.
 
     When a substituent contains one or more stereocenters with defined CIP
@@ -7809,7 +7988,9 @@ def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
     order, the stereo labels of the fragment atoms and bonds (they are assigned
     lazily on the same object, as in ``name_substituent``'s key), the fragment
     naming session (visited set, depth, the fragment cache object) and every
-    context variable a naming path branches on."""
+    context variable a naming path branches on (among them the book-forms switch of
+    roadmap N5, ``memo.book_forms_var``: the terminal-fragment writer names a fragment
+    with its mechanical spellings first, inside the same memo scope)."""
     from ..decomposition.engine import nacyl_float_refusing
     from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
                                       full_coverage_ctx, general_fallback_ctx)
@@ -7819,6 +8000,7 @@ def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
     from .group_splitting import _IN_SPLIT_PROBE
     from .locant_omission import (_ISOTOPE_PARENT_POSITIONAL, _ISOTOPIC_NAMING_SCOPE,
                                   forced_locant_reason)
+    from .memo import book_forms_var
     from .substituent_enumerator import _gate_is_reentrant
     sub = tuple(sub_atoms)
     sub_set = set(sub)
@@ -7846,7 +8028,8 @@ def _nsf_memo_key(mol, sub_atoms, attach_idx, parent_chain):
             allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
             nacyl_float_refusing(), _dt._PEPTIDE_SUBST_ACTIVE, _gate_is_reentrant(),
             getattr(_IN_SPLIT_PROBE, 'active', False), forced_locant_reason(),
-            _ISOTOPIC_NAMING_SCOPE.get(), _ISOTOPE_PARENT_POSITIONAL.get())
+            _ISOTOPIC_NAMING_SCOPE.get(), _ISOTOPE_PARENT_POSITIONAL.get(),
+            book_forms_var.get())
 
 
 def name_substituent_fragment(

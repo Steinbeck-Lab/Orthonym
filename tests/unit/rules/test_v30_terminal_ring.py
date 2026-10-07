@@ -63,16 +63,26 @@ def test_monocycle_branch_is_total_where_von_baeyer_cannot_reach():
     MUTATION: make ``build_monocycle_replacement_name`` return None for
     ``n < 7`` -> both assertions below fail.
     """
+    # roadmap N5d (name-quality lane L2): with the book spellings switched off (the
+    # rings of ten or fewer members take their Hantzsch-Widman names otherwise:
+    # 'oxane', 'piperazine', basis 'monocycle_book'; the 15-membered ring keeps its
+    # replacement name either way, the Blue Book)
+    from orthonym.assembly.book_prefixes import mechanical_forms
     for smiles, expected in (
         ('C1CCOCC1', '1-oxacyclohexane'),
         ('C1CNCCN1', '1,4-diazacyclohexane'),
         ('C1COCCOCCOCCOCCO1', '1,4,7,10,13-pentaoxacyclopentadecane'),
     ):
         mol, ring = _ring(smiles)
-        res = terminal_ring_name(mol, ring, None)
+        with mechanical_forms():
+            res = terminal_ring_name(mol, ring, None)
         assert res is not None, smiles
         assert res.basis == 'monocycle'
         assert res.name == expected
+    for smiles, expected in (('C1CCOCC1', 'oxane'), ('C1CNCCN1', 'piperazine')):
+        mol, ring = _ring(smiles)
+        res = terminal_ring_name(mol, ring, None)
+        assert (res.basis, res.name) == ('monocycle_book', expected)
 
 
 # -------------------------------------------- replacement prefix, with lambda
@@ -91,11 +101,16 @@ def test_replacement_prefix_cites_every_heteroatom_with_a_locant_and_lambda():
     assert res is not None
     assert res.name == '1λ4-thiacyclopenta-2,4-diene'
 
-    # two heteroatoms -> two locants, multiplied, in element order
+    # two heteroatoms -> two locants, multiplied, in element order (the
+    # replacement spelling, with the book spellings switched off; roadmap N5d gives
+    # the Hantzsch-Widman '1,4-oxathiane' otherwise, the Blue Book)
+    from orthonym.assembly.book_prefixes import mechanical_forms
     mol, ring = _ring('C1COCCS1')
-    res = terminal_ring_name(mol, ring, None)
+    with mechanical_forms():
+        res = terminal_ring_name(mol, ring, None)
     assert res is not None
     assert res.name == '1-oxa-4-thiacyclohexane'
+    assert terminal_ring_name(mol, ring, None).name == '1,4-oxathiane'
 
 
 def test_off_table_skeletal_element_refuses_rather_than_dropping_the_atom():
@@ -145,21 +160,27 @@ def test_every_ring_multiple_bond_gets_a_locant_over_a_kekulized_graph():
     without kekulizing -> benzene names as ``cyclohexane`` (all six double bonds
     dropped) and the audit then refuses, so the call returns None.
     """
+    # roadmap N5d (name-quality lane L2): the writer gives the book's names first
+    # ('benzene', the Blue Book); the replacement spelling these
+    # assertions are about is the one it gives with the book spellings switched off
+    from orthonym.assembly.book_prefixes import mechanical_forms
     mol, ring = _ring('c1ccccc1')
-    res = terminal_ring_name(mol, ring, None)
-    assert res is not None
-    assert res.name == 'cyclohexa-1,3,5-triene'
+    assert terminal_ring_name(mol, ring, None).name == 'benzene'
+    with mechanical_forms():
+        res = terminal_ring_name(mol, ring, None)
+        assert res is not None
+        assert res.name == 'cyclohexa-1,3,5-triene'
 
-    mol, ring = _ring('c1ccsc1')                     # thiophene
-    res = terminal_ring_name(mol, ring, None)
-    assert res is not None
-    assert res.name == '1-thiacyclopenta-2,4-diene'
+        mol, ring = _ring('c1ccsc1')                     # thiophene
+        res = terminal_ring_name(mol, ring, None)
+        assert res is not None
+        assert res.name == '1-thiacyclopenta-2,4-diene'
 
-    # a single ene elides the stem's 'a'; a multiplied one keeps it
-    mol, ring = _ring('C1=CCOC1')                    # 2,5-dihydrofuran
-    res = terminal_ring_name(mol, ring, None)
-    assert res is not None
-    assert res.name == '1-oxacyclopent-3-ene'
+        # a single ene elides the stem's 'a'; a multiplied one keeps it
+        mol, ring = _ring('C1=CCOC1')                    # 2,5-dihydrofuran
+        res = terminal_ring_name(mol, ring, None)
+        assert res is not None
+        assert res.name == '1-oxacyclopent-3-ene'
 
 
 def test_the_audit_reads_an_aromatic_bond_as_1_5_and_never_as_single():

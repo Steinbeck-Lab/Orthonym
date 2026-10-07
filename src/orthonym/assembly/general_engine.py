@@ -1563,6 +1563,17 @@ def name_general_ring(
     else:
         cage_seed = None
 
+    # Roadmap N5b: a fusable ring system takes its fusion name before the von
+    # Baeyer polyene the Blue Book,:24221).
+    if allow_aromatic_general and cage_seed:
+        try:
+            fused = _emit_fused_ring(mol, features, cage_seed, allow_aromatic_general)
+        except Exception as e:  # noqa: BLE001 - the von Baeyer route stays the answer
+            logger.info("fused ring tail raised %s; von Baeyer route", type(e).__name__)
+            fused = None
+        if fused is not None:
+            return fused
+
     cage = analyze_cage_universal(
         mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general)
     if cage is None:
@@ -1874,6 +1885,81 @@ def _emit_ring_from_analysis(
     bindings.extend(_ring_parent_bindings(cage, name, parent_block))
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
                                stereo_atom_to_locant=dict(atom_to_locant))
+
+
+def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
+                     suppress_principal_group: bool = False
+                     ) -> Optional[GeneralEngineResult]:
+    """Roadmap N5b: the ring-parent tail for a fusable ring system spelled by its
+    fusion name (``rules.fused_forms.fused_system_form``) instead of the von Baeyer
+    polyene, or ``None`` (the caller keeps its von Baeyer route).
+
+     (the Blue Book): "Fusion nomenclature gives preferred IUPAC names
+    only to compounds having at least two rings of at least five or more members";
+     (:24221): the partly and fully saturated systems take 'hydro' prefixes;
+     (:24864): every group not expressed as a suffix is a prefix, so a ring
+    C=O is 'oxo' on a saturated position of the parent ('1-oxo-1,2-dihydrophthalazine').
+
+    Scope: a parent with no principal-group suffix -- the molecule has none, or the
+    caller (the assembly tier, ``suppress_principal_group``) cites every group as a
+    prefix; a neutral molecule (a charge suffix on a fused parent is the ring-ion
+    producers'); every substituted ring atom takes a numbered locant. Substituents,
+    their order and marks, and the parent-scope stereo come from the same
+    helpers as ``_emit_ring_from_analysis``."""
+    from ..rules.fused_forms import fused_system_form, locant_key
+    from .substituent_enumerator import discover_substituents, name_substituent
+
+    if getattr(features, 'principal_group', None) and not suppress_principal_group:
+        return _refuse("fused parent with a suffix (the fusion producers' scope)")
+    if Chem.GetFormalCharge(mol) != 0 or _has_ionic_centres(mol):
+        return _refuse("fused parent with a charge")
+    ring_set = set(ring_atoms)
+    carriers = [a for a in sorted(ring_set)
+                for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                if nb.GetIdx() not in ring_set and nb.GetAtomicNum() > 1]
+    form = fused_system_form(mol, sorted(ring_set), None, carriers)
+    if form is None:
+        return None
+    a2l = dict(form.numbering)
+    ordered = sorted(ring_set, key=lambda i: locant_key(a2l[i]))
+    try:
+        subs = discover_substituents(
+            mol, ring_set, parent_type='ring', oriented_ring=ordered,
+            ring_atom_to_locant=a2l, general_fallback=True)
+    except AssertionError as e:
+        return _refuse(f"partition incomplete: {e}")
+    if subs is None:
+        return _refuse("partition incomplete: unassigned atoms")
+    groups: Dict[str, List] = {}
+    bindings: List[TokenBinding] = []
+    for sub in subs:
+        frag = set(sub.frag_atoms)
+        attach_nbrs = [n.GetIdx() for n in
+                       mol.GetAtomWithIdx(sub.attach_mol_idx).GetNeighbors()
+                       if n.GetIdx() in frag]
+        if not attach_nbrs:
+            return _refuse("substituent without ring attachment")
+        prefix = name_substituent(mol, frag, attach_nbrs[0],
+                                  allow_mancude=allow_aromatic_general)
+        if is_refusal_sentinel(prefix):
+            return _refuse("branch unnameable (tier-5 fallback)")
+        groups.setdefault(prefix, []).append(sub.locant)
+        bindings.append(TokenBinding(tuple(sorted(frag)), prefix, 'prefix'))
+    entries = []
+    for prefix, locs in groups.items():
+        locs = sorted(locs, key=locant_key)
+        text = _mult_prefix(len(locs), prefix)
+        if text is None:
+            return _refuse("multiplicity beyond table")
+        entries.append((_alpha_key(prefix), ','.join(map(str, locs)) + '-' + text))
+    entries.sort(key=lambda t: t[0])
+    joined = '-'.join(tok for _k, tok in entries)
+    parent = form.parent
+    name = (joined + ('-' if parent[:1].isdigit() else '') + parent) if joined else parent
+    name = _apply_parent_stereo(name, mol, a2l)
+    bindings.append(TokenBinding(tuple(sorted(ring_set)), parent, 'parent'))
+    return GeneralEngineResult(name=name, bindings=tuple(bindings),
+                               stereo_atom_to_locant=dict(a2l))
 
 
 def _ring_parent_bindings(cage, name: str, parent_block: str
@@ -2808,8 +2894,34 @@ def _name_terminal_ring_assembly(
     # enforces MAX_CAGE_ATOMS / MAX_CAGE_RINGS, and RE-PROVES the von Baeyer
     # reconstruction audit at the emission point. Its answer is not merely a
     # hint -- if it declines, this tier declines.
+    # Roadmap N5b: a fusable senior ring system takes its fusion name, every group
+    # cited as a prefix, the Blue Book), before the von Baeyer route.
     try:
-        gate = terminal_ring_name(mol, senior, None)
+        fused = _emit_fused_ring(mol, features, senior, allow_aromatic_general,
+                                 suppress_principal_group=True)
+    except Exception as e:  # noqa: BLE001 - the von Baeyer route stays the answer
+        logger.info("fused ring tail raised %s; von Baeyer route", type(e).__name__)
+        fused = None
+    if fused is not None:
+        from ..metrics.candidate_ledger import Scope as _LScope
+        from ..metrics.candidate_ledger import Stage as _LStage
+        from ..metrics.candidate_ledger import record_candidate as _lrecord
+        _lrecord(TERMINAL_RING_ASSEMBLY_SITE, _LStage.PRODUCED, fused.name,
+                 scope=_LScope.MOLECULE,
+                 detail=f"basis:fused_book suffix_free:{bool(_pg)}")
+        if _pg:
+            from ..metrics.provenance import record_suffix_free_prefix_name
+            record_suffix_free_prefix_name(True)
+        return fused
+
+    # The gate is asked in the mechanical spelling: with the book forms on,
+    # terminal_ring_name answers a fusable system with its fusion name (roadmap N5b,
+    # terminal_ring._book_fused), whose numbering is not the von Baeyer numbering
+    # this path spells and checks below.
+    from .book_prefixes import mechanical_forms
+    try:
+        with mechanical_forms():
+            gate = terminal_ring_name(mol, senior, None)
     except Exception as e:  # noqa: BLE001 - a generator bug must degrade
         logger.info("assembly gate raised %s; refuse", type(e).__name__)
         return None

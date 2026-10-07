@@ -111,12 +111,17 @@ class TerminalRingName:
                   from (never re-derived), so a consumer can place its own
                   substituent locants consistently.
     ``basis`` which generator + audit produced it: ``'monocycle'``,
-                  ``'von_baeyer'`` or ``'spiro'``.
+                  ``'monocycle_book'``, ``'fused_book'``, ``'von_baeyer'`` or
+                  ``'spiro'``.
+    ``cites_locant`` ``name`` cites a locant on its own, the Blue Book):
+                  its ``MonocycleForm`` / ``FusedForm`` source's own fact, carried here
+                  for a caller that does not hold that form.
     """
 
     name: str
     numbering: Dict[int, int]
     basis: str
+    cites_locant: bool = False
 
 
 # --------------------------------------------------------------------------
@@ -624,6 +629,12 @@ def terminal_ring_name(
         return None
 
     if rank == 1:
+        # Roadmap N5d: the book's name of the ring (benzene / phenyl, a cycloalkyl,
+        # a retained or Hantzsch-Widman heteromonocycle) before the 'a' replacement
+        # spelling, which stays for the rings the book names no other way.
+        book = _book_monocycle(mol, ring, free_valence_atom)
+        if book is not None:
+            return book
         numbering = monocycle_numbering(kek, sorted(ring), free_valence_atom)
         if numbering is None:
             logger.info("terminal_ring: not a single simple cycle; refuse")
@@ -658,8 +669,73 @@ def terminal_ring_name(
     return _polycyclic_terminal_name(mol, ring, free_valence_atom)
 
 
+def _book_monocycle(mol, ring, free_valence_atom) -> Optional[TerminalRingName]:
+    """The book's name of a single ring, numbered for its substituents, or ``None``.
+
+     (the Blue Book) 'benzene', (:16290) 'phenyl';
+    (:8482) and (:23682): a heteromonocycle of ten or fewer members takes its
+    Hantzsch-Widman (or retained) name, never 'a' replacement; (1) (:15813) and
+     (c) (:2913) 'cyclopropyl'. ``rules.monocycle_forms`` builds and audits
+    the name; the numbering gives the substituents of the ring (every heavy neighbour
+    outside it, less the free-valence bond) lowest locants (f))."""
+    from ..assembly.book_prefixes import book_forms_enabled
+    if not book_forms_enabled():
+        return None
+    from .monocycle_forms import branch_carriers, monocycle_form
+    ring_atoms = sorted(ring)
+    form = monocycle_form(mol, ring_atoms, free_valence_atom,
+                          branch_carriers(mol, ring_atoms, free_valence_atom))
+    if form is None:
+        return None
+    name = (form.parent if free_valence_atom is None
+            else form.prefix(free_valence_atom, 1))
+    if name is None:
+        return None
+    fv_loc = (form.numbering.get(free_valence_atom) if free_valence_atom is not None
+              else None)
+    return TerminalRingName(name=name, numbering=dict(form.numbering),
+                            basis='monocycle_book', cites_locant=form.cites_locant(fv_loc))
+
+
+def _book_fused(mol, ring, free_valence_atom) -> Optional[TerminalRingName]:
+    """Roadmap N5b: the fusion name of a fusable ring system, numbered for its
+    substituents, or ``None``.
+
+     (the Blue Book): "Fusion nomenclature gives preferred IUPAC names
+    only to compounds having at least two rings of at least five or more members";
+     (:24221): hydro prefixes for the partly and fully saturated systems.
+    ``rules.fused_forms`` builds the name from the catalogue's mancude parent; the
+    numbering gives the substituents of the system lowest locants (f)), the
+    lettered fusion atoms keep their letters."""
+    from ..assembly.book_prefixes import book_forms_enabled
+    if not book_forms_enabled():
+        return None
+    from .fused_forms import fused_system_form
+    from .monocycle_forms import branch_carriers
+    ring_atoms = sorted(ring)
+    try:
+        form = fused_system_form(mol, ring_atoms, free_valence_atom,
+                                 branch_carriers(mol, ring_atoms, free_valence_atom))
+    except Exception:  # noqa: BLE001 - a producer that raises is a decline
+        return None
+    if form is None:
+        return None
+    name = (form.parent if free_valence_atom is None
+            else form.prefix(free_valence_atom, 1))
+    if name is None:
+        return None
+    fv_loc = (form.numbering.get(free_valence_atom) if free_valence_atom is not None
+              else None)
+    return TerminalRingName(name=name, numbering=dict(form.numbering),
+                            basis='fused_book', cites_locant=form.cites_locant(fv_loc))
+
+
 def _polycyclic_terminal_name(mol, ring, free_valence_atom):
-    """Delegate to the existing audited cage / spiro analyzers."""
+    """Delegate to the existing audited cage / spiro analyzers -- after the fusion
+    name of a fusable system (roadmap N5b, ``_book_fused``)."""
+    book = _book_fused(mol, ring, free_valence_atom)
+    if book is not None:
+        return book
     from .vonbaeyer_universal import (
         analyze_cage_universal,
         analyze_spiro_universal,

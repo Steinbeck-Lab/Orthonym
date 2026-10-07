@@ -163,7 +163,7 @@ class TestLocantCorrectness:
     def test_benzimidazole_locants(self):
         """Benzimidazole: 9 atoms, positions 1-7 + 3a + 7a."""
         data = FUSED_HETEROCYCLE_DATA['c1ccc2[nH]cnc2c1']
-        assert data['name'] == '1H-benzimidazole'
+        assert data['name'] == '1H-1,3-benzimidazole'
         locants = data['iupac_locants']
         locant_values = set(locants.values())
         expected = {1, 2, 3, '3a', 4, 5, 6, 7, '7a'}
@@ -319,7 +319,7 @@ class TestIndicatedHydrogen:
         """Benzimidazole name must contain '1H-'."""
         name = name_compound('c1ccc2[nH]cnc2c1')
         assert '1H-' in name, f"Expected '1H-' in '{name}'"
-        assert name == '1H-benzimidazole'
+        assert name == '1H-1,3-benzimidazole'
 
     def test_methylbenzimidazole_preserves_1H(self):
         """Substituted benzimidazole must preserve '1H-'."""
@@ -407,7 +407,7 @@ class TestE2ENaming:
         ('c1ccc2[nH]ccc2c1', '1H-indole'),
         ('c1ccc2ncccc2c1', 'quinoline'),
         ('c1ccc2cnccc2c1', 'isoquinoline'),
-        ('c1ccc2[nH]cnc2c1', '1H-benzimidazole'),
+        ('c1ccc2[nH]cnc2c1', '1H-1,3-benzimidazole'),
         ('c1ccc2c(c1)[nH]c1ccccc12', '9H-carbazole'),
         ('c1ncc2nc[nH]c2n1', '9H-purine'),
     ])
@@ -425,7 +425,7 @@ class TestE2ENaming:
     def test_5_methylbenzimidazole(self):
         """Substituted benzimidazole preserves indicated hydrogen."""
         name = name_compound('Cc1ccc2[nH]cnc2c1')
-        assert '1H-benzimidazole' in name
+        assert '1H-1,3-benzimidazole' in name
         assert 'methyl' in name
 
 

@@ -314,11 +314,19 @@ def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], .
         from .fusion_names import opsin_structure, two_component_name
         made = two_component_name(key_mol)
         struct = opsin_structure(made, key_mol.GetNumAtoms()) if made else None
+        source = "fusion_name+opsin"
+        if made is None:
+            # slice S2c-1: a two-component name with a heterocyclic component, or a
+            # benzo name (``hetero_fusion``), numbered the same way
+            from . import hetero_fusion
+            made = hetero_fusion.hetero_component_name(key_mol)
+            struct = hetero_fusion.opsin_structure(made, key_mol.GetNumAtoms()) if made else None
+            source = "hetero_fusion_name+opsin"
         pm = Chem.MolFromSmiles(struct[0]) if struct else None
         iso = _iso(pm, key_mol) if pm is not None else None
         if iso is not None:
             candidates.append((made, {iso[a]: normalize_locant(loc) for a, loc in enumerate(struct[1])},
-                               "fusion_name+opsin"))
+                               source))
             sources.append((pm, iso))
     if not candidates or len({c[0] for c in candidates}) != 1:
         return None

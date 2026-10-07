@@ -78,7 +78,7 @@ GOOD_CASES = [
     # '...-N,N-dimethylquinolin-2-amine'.
     ("CN(C)c1ccc2ccccc2n1", "N,N-dimethylquinolin-2-amine"),
     ("c1ccc2[nH]ccc2c1", "1H-indole"),
-    ("Cc1nc2ccccc2[nH]1", "2-methyl-1H-benzimidazole"),
+    ("Cc1nc2ccccc2[nH]1", "2-methyl-1H-1,3-benzimidazole"),
 ]
 
 # Under complete: a DROP case is never the group-dropping name. (SMILES,
@@ -107,8 +107,9 @@ COMPLETE_EXPECT = {
     "CB(O)Oc1ccc2ccccc2n1": RT_EXACT,
     "CS(=O)(=O)c1ccc2ccccc2n1": RT_EXACT,
     "[Se]c1ccc2ccccc2n1": RT_EXACT,
-    "[SiH3]c1ccc2ccccc2n1":
-        "3-silyl-2-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene",
+    # roadmap N5b (name-quality lane L2): the fusion name,
+    # the Blue Book); was '3-silyl-2-azabicyclo[4.4.0]deca-1(10),2,4,6,8-pentaene'
+    "[SiH3]c1ccc2ccccc2n1": "2-silylquinoline",
 }
 
 # COVERAGE (C): pin abstains cleanly, complete emits an RT-OK general name.

@@ -67,7 +67,10 @@ BOUNDARY_ROWS = [
     # tetradecine' reads back but is not the PIN (:23897 "A phane name is senior to a
     # bridged fused ring name"). The builder computes no phane seniority: it declines
     # because that one fused reading's parent (rings 14, 6, 6) is not a PIN parent name
-    # in its table, whose largest ring has eight members
+    # in its table, whose largest ring has eight members; since S2c-1 the readings with
+    # three bridges have a parent (2,11-benzodithiacyclohexadecine), but (a)
+    # (most rings) ranks the two-bridge reading first, and its parent (three components,
+    # slice S2c-2) has no name
     ("C12=CC=CC=3CSCC4=CC5=C(CSCC(=CC31)C=C2)C=CC=C5C=C4", "no parent name"),
 ]
 
@@ -121,6 +124,8 @@ def test_boundary_rows_get_no_bridged_fused_name(smiles, reason):
     elif reason == "no fused reading":
         assert not fused
     else:
-        assert fused and all(selection._parent_name(mol, res) is None for _, res, _ in fused)
+        fewest = min(len(combo) for combo, _, _ in fused)
+        assert fused and all(selection._parent_name(mol, res) is None
+                             for combo, res, _ in fused if len(combo) == fewest)
     assert selection.best_splits(mol, system) is None
     assert name_bridged_fused_pin(mol) is None

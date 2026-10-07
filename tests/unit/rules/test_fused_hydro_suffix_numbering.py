@@ -29,7 +29,7 @@ ROWS = [
     ("OC(=O)c1cc2CCCCc2[nH]1", "4,5,6,7-tetrahydro-1H-indole-2-carboxylic acid"),
     ("OC(=O)c1nccc2CCCCc12", "5,6,7,8-tetrahydroisoquinoline-1-carboxylic acid"),
     ("OC(=O)c1n[nH]c2CCCCc12", "4,5,6,7-tetrahydro-1H-indazole-3-carboxylic acid"),
-    ("OC(=O)c1nc2CCCCc2[nH]1", "4,5,6,7-tetrahydro-1H-benzimidazole-2-carboxylic acid"),
+    ("OC(=O)c1nc2CCCCc2[nH]1", "4,5,6,7-tetrahydro-1H-1,3-benzimidazole-2-carboxylic acid"),
     # prefixes only: (f) the set ({5,6} < {7,8}), then (g) (:3307) the prefix cited first
     ("BrC1CCc2nccnc2C1Cl", "6-bromo-5-chloro-5,6,7,8-tetrahydroquinoxaline"),
     ("Clc1nc2CCCCc2nc1Br", "2-bromo-3-chloro-5,6,7,8-tetrahydroquinoxaline"),

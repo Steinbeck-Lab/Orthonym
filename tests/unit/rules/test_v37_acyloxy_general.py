@@ -87,7 +87,6 @@ BEST_EFFORT_WITNESSES = [
     # (the enclosed acyl marker: see DEFAULT_WITNESSES)
     ("OC(=O)CCCCCOC(=O)CC(C)(C)O", "(3-hydroxy-3-methylbutanoyl)oxy"),  # chain
     ("OC(=O)CCCCCOC(=O)[C@](C)(O)CCl", "chloro"),   # stereo acyl
-    ("OC(=O)CCCCOC(=O)CCl", "chloro"),              # chloroacetyloxy
 ]
 
 
@@ -102,6 +101,15 @@ def test_besteffort_systematic_acyloxy_prefers_acyloxy_form(smi, frag):
             or "oyl)oxy" in name or "oyl]oxy" in name), \
         f"{smi} -> {name!r} not in acyloxy form"
     assert not _OXA_CHAIN.search(name), f"{smi} -> {name!r} still an oxa-chain"
+
+
+def test_besteffort_chloroacetyl_acyloxy_is_enclosed():
+    # (the Blue Book) '(1) (chloroacetyl)oxyl (PIN)'; (:7232)
+    # "Parentheses are used around compound... and complex... prefixes"
+    smi = "OC(=O)CCCCOC(=O)CCl"
+    name = _name_besteffort(smi)
+    assert name == "5-[(chloroacetyl)oxy]pentanoic acid"
+    assert _rt_exact(smi, name)
 
 
 # --------------------------------------------------------------------------- #

@@ -102,11 +102,14 @@ def test_book_parents_the_older_tables_could_not_certify_are_named(smiles, name)
     assert fp is not None and fp.name == name and name in BB_PARENTS, fp
 
 
-def test_a_table_map_the_fusion_numbering_contradicts_declines():
-    # decision 7 of S2 holds for the table too: OPSIN's cyclopenta[a]naphthalene numbering
-    # (3a, 5a, 9a, 9b, the book's own locants in '3a,9b-dihydro-1H-cyclopenta[a]naphthalene-
-    # 3,5(2H,4H)-dione (PIN)':25456) and compute_fused_numbering's ({2a, 5a, 5b, 9a}) are not
-    # one orbit, so the skeleton declines although the table holds its name
+def test_the_fusion_numbering_agrees_with_the_table_on_cyclopenta_a_naphthalene():
+    # decision 7 of S2 holds for the table too: each table map is cross-checked by the fusion
+    # numbering. Since S2c-1 the fusion numbering draws a system with a five-membered ring on
+    # the hexagon grid (``fusion_orientation.grid_orientations``) and gives OPSIN's
+    # cyclopenta[a]naphthalene numbering (3a, 5a, 9a, 9b, the book's own locants in
+    # '3a,9b-dihydro-1H-cyclopenta[a]naphthalene-3,5(2H,4H)-dione (PIN)':25456), so the two
+    # maps are one orbit and the skeleton is named; before S2c-1 the fusion numbering gave
+    # {2a, 5a, 5b, 9a} and the skeleton declined
     from orthonym.rules.fusion_numbering import compute_fused_numbering
     mol = Chem.MolFromSmiles("C1=Cc2c(ccc3ccccc23)C1")
     key = parents._key_of(mol)
@@ -120,8 +123,11 @@ def test_a_table_map_the_fusion_numbering_contradicts_declines():
     assert iso is not None and cfn and len(cfn) == pm.GetNumAtoms()
     table_map = {iso[a]: loc for a, loc in fixed.items()}
     fusion_map = {iso[a]: parents.normalize_locant(loc) for a, loc in cfn.items()}
-    assert not parents._same_orbit(key_mol, table_map, fusion_map)
-    assert parents.fused_parent(mol, set(range(mol.GetNumAtoms()))) is None
+    assert parents._same_orbit(key_mol, table_map, fusion_map)
+    fp = parents.fused_parent(mol, set(range(mol.GetNumAtoms())))
+    assert fp is not None and fp.name == "cyclopenta[a]naphthalene", fp
+    assert sorted(str(loc) for loc in fp.numberings[0].values() if not str(loc).isdigit()) == \
+        ["3a", "5a", "9a", "9b"]
 
 
 #: the Table 2.8 isomer notes (the Blue Book,:11563): "1,7-isomer shown; the PIN is

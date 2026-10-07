@@ -64,8 +64,8 @@ def test_map_equals_opsin_numbering_up_to_automorphism(key):
 
 @pytest.mark.parametrize("name,smiles,atom_symbol,locant", [
     ("4H-quinolizine", "C1=CCN2C=CC=CC2=C1", "N", 5),
-    ("pyrrolizine", "C1=Cn2cccc2C1", "N", 4),
-    ("imidazo[2,1-b]thiazole", "c1cn2ccsc2n1", "N", 4),
+    ("1H-pyrrolizine", "C1=Cn2cccc2C1", "N", 4),
+    ("imidazo[2,1-b][1,3]thiazole", "c1cn2ccsc2n1", "N", 4),
 ])
 def test_a_fusion_nitrogen_gets_a_number(name, smiles, atom_symbol, locant):
     key = Chem.CanonSmiles(smiles)

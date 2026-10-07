@@ -83,23 +83,28 @@ class TestSP2VonBaeyerMinimumCompoundLocants:
             "tricyclo[8.3.1.0^4,7]tetradeca-4,6,10-trien-2-yne"
 
 
-class TestSP3PhenoFusedPnictogenChalcogenNoIndicatedH:
-    """SP3 - "Pheno...ine components": the P/As/Sb 10H-isomer is
-    the PIN WITHOUT indicated H - "phenoxaphosphinine (PIN, 10H-isomer shown)"
-    (the Blue Book Blue Book,:11801/:11805/:11807/:11811).
+class TestSP3PhenoFusedPnictogenChalcogenIndicatedH:
+    """SP3 - "Pheno...ine components": the P/As/Sb 10H-isomer cites its
+    indicated hydrogen. the Blue Book Blue Book list
+    "phenoxaphosphinine (PIN, 10H-isomer shown)" beside "the PIN is 10H-phenoxazine"
+    (:11781) for the N analogue, and a PIN cites it:3721 "in a preferred
+    IUPAC name a locant and the symbol 'H' must be cited";:24639). The bare
+    spelling is a listing spelling, by analogy with Note 1 (:14685, the note of
+    the seniority lists: "Indicated hydrogen atoms are not shown in this kind of
+    listing").
     """
 
     def test_sp3_phenoxaphosphinine(self):
-        assert name_compound("c1ccc2c(c1)Oc1ccccc1P2") == "phenoxaphosphinine"
+        assert name_compound("c1ccc2c(c1)Oc1ccccc1P2") == "10H-phenoxaphosphinine"
 
     def test_sp3_phenoxarsinine(self):
-        assert name_compound("c1ccc2c(c1)Oc1ccccc1[AsH]2") == "phenoxarsinine"
+        assert name_compound("c1ccc2c(c1)Oc1ccccc1[AsH]2") == "10H-phenoxarsinine"
 
     def test_sp3_phenoxastibinine(self):
-        assert name_compound("c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2") == "phenoxastibinine"
+        assert name_compound("c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2") == "10H-phenoxastibinine"
 
     def test_sp3_phenothiarsinine(self):
-        assert name_compound("c1ccc2c(c1)Sc1ccccc1[AsH]2") == "phenothiarsinine"
+        assert name_compound("c1ccc2c(c1)Sc1ccccc1[AsH]2") == "10H-phenothiarsinine"
 
 
 class TestSP4ChalcogenAcidLocantOmission:
