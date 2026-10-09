@@ -36,10 +36,16 @@ class TestIonRecursionGuard:
         assert 'succinate' in result.lower() or 'butanedio' in result.lower()
 
     def test_diammonium_propane(self):
-        """Propane-1,3-diammonium should not crash, names as neutral."""
+        """Propane-1,3-diammonium should not crash; it keeps both charges (bis(aminium))."""
         result = self.namer.name('[NH3+]CCC[NH3+]')
         assert result
-        assert 'amine' in result.lower() or 'diamine' in result.lower()
+        # (1) (the Blue Book): the cationic suffix 'aminium' is "used with
+        # the multiplying prefixes 'bis', 'tris', etc. to denote multiplicity";
+        # 'CHOICE OF A PARENT STRUCTURE' (:42340) '2-(piperidin-1-ium-3-yl)propane-1,2-
+        # bis(aminium) (PIN)'. A neutral '...diamine' name would drop the charges.
+        # Commits eeb54c92b (poly-aminium bis, and 4cceedcf8 (bis-suffix
+        # multiplication for poly-cations).
+        assert result == 'propane-1,3-bis(aminium)'
 
     def test_calcium_phosphate_salt(self):
         """Calcium hydrogen phosphate should name as salt, not crash."""
@@ -49,10 +55,12 @@ class TestIonRecursionGuard:
         assert 'phosphate' in result.lower()
 
     def test_multi_cation_organic(self):
-        """Ethane-1,2-diammonium should not crash."""
+        """Ethane-1,2-diammonium should not crash; it keeps both charges (bis(aminium))."""
         result = self.namer.name('[NH3+]CC[NH3+]')
         assert result
-        assert 'amine' in result.lower() or 'diamine' in result.lower()
+        # (1) (the Blue Book) and (:42340): see
+        # test_diammonium_propane. A neutral '...diamine' name would drop the charges.
+        assert result == 'ethane-1,2-bis(aminium)'
 
     def test_iron_salt_returns_nonempty_or_empty(self):
         """Iron-containing salt should not crash (metallic = out of scope)."""
@@ -225,4 +233,7 @@ class TestIonNamingRegression:
 
     def test_methylammonium(self):
         result = self.namer.name('C[NH3+]')
-        assert result == 'methylammonium'
+        # 'Cation and anion names' (the Blue Book): method (1), adding 'ium'
+        # to the amine name, "leads to preferred IUPAC names" ('methanaminium chloride
+        # (PIN)',:26672); commit 12541211e.
+        assert result == 'methanaminium'

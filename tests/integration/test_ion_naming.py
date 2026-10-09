@@ -42,19 +42,24 @@ class TestCationNaming:
         """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
         assert name_compound('[NH4+]') == 'azanium'
 
+    # 'Cation and anion names' (the Blue Book): R4N+ salts are named by
+    # "(1) adding the suffix 'ium' to the name of the amine or imine, [...] (3) by
+    # substituting the parent hydride 'ammonium', NH4+, for quaternary salts only.
+    # Method (1) leads to preferred IUPAC names." (examples: 'methanaminium chloride
+    # (PIN)',:26672; 'N,N,N-trimethylmethanaminium iodide (PIN)',:26683). The
+    # substitutive aminium names replaced the '(alkyl)ammonium' forms in commit 12541211e.
+
     def test_methylammonium(self):
-        """Test methylammonium cation naming."""
-        assert name_compound('C[NH3+]') == 'methylammonium'
+        """CH3-NH3+ is 'methanaminium' (PIN), not 'methylammonium'."""
+        assert name_compound('C[NH3+]') == 'methanaminium'
 
     def test_dimethylammonium(self):
-        """Test dimethylammonium cation naming."""
-        name = name_compound('C[NH2+]C')
-        assert 'dimethyl' in name.lower() or 'ammonium' in name.lower()
+        """(CH3)2NH2+ is 'N-methylmethanaminium' (PIN), not 'dimethylammonium'."""
+        assert name_compound('C[NH2+]C') == 'N-methylmethanaminium'
 
     def test_trimethylammonium(self):
-        """Test trimethylammonium cation naming."""
-        name = name_compound('C[NH+](C)C')
-        assert 'trimethyl' in name.lower() or 'ammonium' in name.lower()
+        """(CH3)3NH+ is 'N,N-dimethylmethanaminium' (PIN), not 'trimethylammonium'."""
+        assert name_compound('C[NH+](C)C') == 'N,N-dimethylmethanaminium'
 
 
 class TestSaltNaming:

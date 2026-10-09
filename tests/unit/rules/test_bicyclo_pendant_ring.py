@@ -147,9 +147,14 @@ class TestVonBaeyerByteIdenticalRegression:
         ("C1CC2CC1C(=O)C2", "bicyclo[2.2.1]heptan-2-one"),
         # M4#1: main bridge maximized (2) before symmetric division,
         # so tricyclo[5.2.2.0^2,6] (main bridge 2) is preferred over the older
-        # tricyclo[4.3.0.2^2,5] (main bridge 0). Both OPSIN-round-trip to the same
-        # C11 cage; the new form is the more -conformant decomposition.
-        ("C1CC2CCC1C1CCCC21", "tricyclo[5.2.2.0^2,6]undecane"),
+        # tricyclo[4.3.0.2^2,5] (main bridge 0). Since 7ea3918e4 (2026-10-07) this all-carbon
+        # C11 cage has a fusion reading (indene + ethano bridge) and is named as a bridged
+        # fused system before the von Baeyer path: (the Blue Book) with the
+        # seniority "fused ring systems > bridged fused systems > non-fused bridged systems"
+        # (:23843) and the example:23875/:23883 "the bridged fused ring name is preferred to
+        # the von Baeyer name". OPSIN 2.9.0 reads 'octahydro-1H-4,7-ethanoindene' back to the
+        # full an InChIKey, the same key as the von Baeyer spelling.
+        ("C1CC2CCC1C1CCCC21", "octahydro-1H-4,7-ethanoindene"),
     ]
 
     def test_byte_identical_names(self):

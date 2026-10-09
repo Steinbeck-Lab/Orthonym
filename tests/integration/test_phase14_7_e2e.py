@@ -103,48 +103,49 @@ class TestSimpleEstersPreserved:
 # ============================================================================
 
 
+# (under 'Definitions', the Blue Book): "All preferred
+# IUPAC names for esters are named by functional class nomenclature." The ring is the
+# 'alcoholic' component, cited as the organyl group (cf. '6-[4-(acetyloxy)phenyl]pyridin-3-yl
+# acetate (PIN)',:31895); the acyloxy prefix is reserved for esters cited as prefixes,
+# when a senior group is present,:31696), so the earlier acyloxy-on-ring
+# names ('acetyloxycyclohexane', 'acetyloxybenzene') are not preferred names.
+
+
 class TestRingAttachedEsters:
-    """Test that esters on ring systems use acyloxy prefix naming."""
+    """Test that esters on ring systems are named as functional-class esters."""
 
     @pytest.mark.integration
     def test_cyclohexyl_acetate_not_hexyl(self):
-        """Cyclohexyl acetate should NOT produce 'hexyl acetate'."""
+        """Cyclohexyl acetate should NOT produce 'hexyl acetate' (a chain parent)."""
         result = name_compound("CC(=O)OC1CCCCC1")
-        assert "hexyl acetate" not in result.lower(), (
-            f"Should not produce 'hexyl acetate': got '{result}'"
-        )
-        assert "acetyloxy" in result.lower(), (
-            f"Should contain 'acetyloxy' prefix: got '{result}'"
-        )
-        assert "cyclohexane" in result.lower(), (
-            f"Should contain 'cyclohexane' parent: got '{result}'"
+        # 'cyclohexyl acetate' itself contains the substring 'hexyl acetate', so the old
+        # substring guard cannot be kept; the exact PIN excludes the chain-parent name.
+        assert result == "cyclohexyl acetate", (
+            f"Expected 'cyclohexyl acetate', got '{result}'"
         )
 
     @pytest.mark.integration
     def test_phenyl_acetate(self):
-        """Phenyl acetate should use acyloxy prefix on benzene parent."""
+        """Phenyl acetate: the ring is the alcohol component, not an acyloxy-prefixed parent."""
         result = name_compound("CC(=O)Oc1ccccc1")
-        assert "hexyl" not in result.lower(), (
-            f"Should not contain 'hexyl': got '{result}'"
-        )
-        assert "acetyloxy" in result.lower(), (
-            f"Should contain 'acetyloxy' prefix: got '{result}'"
+        assert result == "phenyl acetate", (
+            f"Expected 'phenyl acetate', got '{result}'"
         )
 
     @pytest.mark.integration
     def test_cyclohexyl_acetate_full_name(self):
         """Full expected name for cyclohexyl acetate."""
         result = name_compound("CC(=O)OC1CCCCC1")
-        assert result == "acetyloxycyclohexane", (
-            f"Expected 'acetyloxycyclohexane', got '{result}'"
+        assert result == "cyclohexyl acetate", (
+            f"Expected 'cyclohexyl acetate', got '{result}'"
         )
 
     @pytest.mark.integration
     def test_phenyl_acetate_full_name(self):
-        """Full expected name for phenyl acetate with benzene parent."""
+        """Full expected name for phenyl acetate."""
         result = name_compound("CC(=O)Oc1ccccc1")
-        assert result == "acetyloxybenzene", (
-            f"Expected 'acetyloxybenzene', got '{result}'"
+        assert result == "phenyl acetate", (
+            f"Expected 'phenyl acetate', got '{result}'"
         )
 
 
@@ -227,9 +228,11 @@ class TestSuccessCriteria:
 
     @pytest.mark.integration
     def test_truth_cyclohexyl_acetate_uses_ring_parent(self):
-        """Truth: CC(=O)OC1CCCCC1 names correctly with ring parent (not 'hexyl acetate')."""
+        """Truth: CC(=O)OC1CCCCC1 names correctly with the ring as the alcohol component."""
         result = name_compound("CC(=O)OC1CCCCC1")
-        assert "hexyl acetate" not in result, f"Got '{result}'"
+        # (the Blue Book); the substring guard 'hexyl acetate' matches the
+        # PIN itself ('cyclohexyl acetate'), so the exact name is asserted.
+        assert result == "cyclohexyl acetate", f"Got '{result}'"
 
     @pytest.mark.integration
     def test_truth_methyl_acetate_preserved(self):
@@ -243,9 +246,13 @@ class TestSuccessCriteria:
 
     @pytest.mark.integration
     def test_truth_esters_on_complex_rings_use_acyloxy(self):
-        """Truth: Esters on complex ring systems use acyloxy prefix naming."""
+        """Truth: an ester on a ring is the principal group, so no acyloxy prefix is used."""
         result = name_compound("CC(=O)OC1CCCCC1")
-        assert "acetyloxy" in result, f"Expected acyloxy prefix, got '{result}'"
+        # (the Blue Book): functional class name when the ester is the
+        # principal characteristic group; 'acetyloxy' is only for esters cited as prefixes
+        #,:31696) when a senior group is present.
+        assert result == "cyclohexyl acetate", f"Got '{result}'"
+        assert "acetyloxy" not in result
 
     @pytest.mark.integration
     def test_truth_zero_regressions(self):

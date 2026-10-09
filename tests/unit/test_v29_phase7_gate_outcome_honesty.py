@@ -30,13 +30,27 @@ from orthonym.metrics import provenance as pv
 # The three leaks from FINDINGS.md, with the exit each one takes in
 # `_final_opsin_validity_gate` (established by the Task 1 trace: a sys.settrace
 # line tracer scoped to the function's code object).
-# CC=C.C=C.[Ti+2] -> exit line 1030, _ORGANOMETALLIC_ADDITIVE_PIN_RE
-# C[C@@H]1C[C@H]1CO -> exit line 1110, BBR-GATE stereo carve-out
-# C/C(=C\\C1C=CC=C1)/C(=O)O -> exit line 1110, BBR-GATE stereo carve-out
+#
+# Re-derived at HEAD 2026-10-09 (the 2026-08 probes had gone stale): the three original
+# fixtures no longer leave through these exits.
+# CC=C.C=C.[Ti+2] declines now (d961ed8b9: the atom-conservation veto on the
+# organometallic-additive carve-out; its old name, '(η²-ethene)(η³-prop-2-en-1-yl)
+# titanium', named a different molecule: η³-prop-2-en-1-yl is the C3H5 allyl
+# ligand, the input holds neutral propene C3H6), so it ships no name;
+# C[C@@H]1C[C@H]1CO and C/C(=C\C1C=CC=C1)/C(=O)O round-trip with their stereo intact now,
+# so they report a full ``self_consistency_verified``.
+# Replacements, measured with the gate on:
+# C=C.C=C.[Ni] -> 'bis(η²-ethene)nickel', exit `_ORGANOMETALLIC_ADDITIVE_PIN_RE`
+# (formula conserving: Ni + 2 C2H4; OPSIN 2.9.0 cannot parse it, so the
+# carve-out ships it on its construction alone)
+# O[C@H]1CC[C@@H](O)CC1 -> '(1s,4s)-cyclohexane-1,4-diol', exit BBR-GATE stereo carve-out
+# (the verbatim Blue Book PIN, "Achiral cyclic compounds",
+# the Blue Book 'cis-cyclohexane-1,4-diol'; OPSIN has no r/s grammar)
+# C[C@H]1CC[C@@H](C)CC1 -> '(1s,4s)-1,4-dimethylcyclohexane', the same exit
 T1_LEAKS = {
-    "CC=C.C=C.[Ti+2]": "carveout:organometallic_additive",
-    "C[C@@H]1C[C@H]1CO": "self_consistency_constitution_only",
-    r"C/C(=C\C1C=CC=C1)/C(=O)O": "self_consistency_constitution_only",
+    "C=C.C=C.[Ni]": "carveout:organometallic_additive",
+    "O[C@H]1CC[C@@H](O)CC1": "self_consistency_constitution_only",
+    "C[C@H]1CC[C@@H](C)CC1": "self_consistency_constitution_only",
 }
 
 
@@ -85,7 +99,7 @@ def test_stereo_carveout_is_labelled_constitution_only():
     """The BBR-GATE carve-out checked the CONSTITUTION on the stereo-stripped
     parse and never checked the stereo layer. It says so, and it says so with a
     token distinct from a full."""
-    row = Orthonym().name_tiered("C[C@@H]1C[C@H]1CO")
+    row = Orthonym().name_tiered("O[C@H]1CC[C@@H](O)CC1")   # '(1s,4s)-cyclohexane-1,4-diol'
     assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY
     assert row["opsin"] == "verified_constitution_only"
     assert "self_consistency_constitution_only" in row["gates_passed"]
@@ -98,12 +112,17 @@ def test_stereo_carveout_is_labelled_constitution_only():
 
 @pytest.mark.opsin_gate
 def test_carveout_reports_its_slug():
-    """`CC=C.C=C.[Ti+2]` hits the organometallic-additive carve-out
+    """`C=C.C=C.[Ni]` hits the organometallic-additive carve-out
     (`_ORGANOMETALLIC_ADDITIVE_PIN_RE`), which returns the name BEFORE
     `_self_consistency_decision` is called. The name still ships — only the
-    label changes."""
-    row = Orthonym().name_tiered("CC=C.C=C.[Ti+2]")
-    assert row["name"] == "(η²-ethene)(η³-prop-2-en-1-yl)titanium"
+    label changes.
+
+    (The former probe `CC=C.C=C.[Ti+2]` declines since d961ed8b9, whose atom-conservation veto
+    stopped the carve-out shipping a name that dropped hydrogens; this one conserves its atoms.
+    The name is the current value: no nickel/ethene example was found in the Blue Book, and OPSIN 2.9.0
+    cannot parse it, which is why the carve-out exists.)"""
+    row = Orthonym().name_tiered("C=C.C=C.[Ni]")
+    assert row["name"] == "bis(η²-ethene)nickel"
     assert row["gate_outcome"] == "carveout:organometallic_additive"
     assert row["gate_outcome"].startswith("carveout:")
     assert row["opsin"] == "unverified"
@@ -128,14 +147,16 @@ def test_gate_disabled_never_reports_verified():
 
 # The leak-sensitive probe PAIR, measured at. Both ship the exact
 # same string, and that collision is the point — see the test below.
-# `[C-]#[O+]` the gate SUPPRESSES the candidate to the descriptive fallback
-# and records `suppressed` FOR 'unknown organic compound'.
+# `CN(C=O)Br` the gate SUPPRESSES the candidate to the descriptive fallback
+# and records `suppressed` FOR 'unknown organic compound'. (Replaces `[C-]#[O+]`,
+# which the default tier now declines before the gate runs, so it records
+# `not_run`; re-measured 2026-10-09 with the gate on.)
 # the C16H8 PAH ships 'unknown organic compound' having reached NO
 # gate-recording branch at all, so its honest outcome is
 # `not_run`. (5 of 60 pubchem_2000 rows land here; no EMITTED
 # row does — a descriptive-fallback abstain is the realistic
 # shape of "the gate was never invoked".)
-LEAK_PROBE_RECORDS = "[C-]#[O+]"
+LEAK_PROBE_RECORDS = "CN(C=O)Br"
 LEAK_PROBE_NO_GATE = "C1=CC2=CC3=CC4=CC=CC5=C4C3=C2C1=C5"
 
 
@@ -154,14 +175,14 @@ def test_consecutive_molecules_each_report_their_own_gate_branch():
     """
     nm = Orthonym()
 
-    first = nm.name_tiered("CC=C.C=C.[Ti+2]")          # carve-out
+    first = nm.name_tiered("C=C.C=C.[Ni]")             # carve-out
     second = nm.name_tiered("CCO")                     # genuinely verified
     assert first["gate_outcome"] == "carveout:organometallic_additive"
     assert second["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert "self_consistency" in second["gates_passed"]
 
     third = nm.name_tiered("CCO")
-    fourth = nm.name_tiered("CC=C.C=C.[Ti+2]")
+    fourth = nm.name_tiered("C=C.C=C.[Ni]")
     assert third["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert fourth["gate_outcome"] == "carveout:organometallic_additive"
     assert "self_consistency" not in fourth["gates_passed"]

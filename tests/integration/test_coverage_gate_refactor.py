@@ -163,7 +163,9 @@ CANARY_SPOT_CHECK = [
     ("Cc1ccccc1", "toluene"),
     ("c1ccc2ccccc2c1", "naphthalene"),
     ("c1ccncc1", "pyridine"),
-    ("c1cc[nH]c1", "pyrrole"),
+    # 'Retained names of heteromonocycles' (the Blue Book): "pyrrole
+    # (1H-isomer shown; the PIN is 1H-pyrrole)".
+    ("c1cc[nH]c1", "1H-pyrrole"),
     ("Cn1c(=O)c2c(ncn2C)n(C)c1=O",
      "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),
     ("O=C(O)c1ccccc1", "benzoic acid"),

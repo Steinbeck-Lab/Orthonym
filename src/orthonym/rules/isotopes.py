@@ -3880,10 +3880,22 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     # weaker than ``forced_locant_scope`` (entered further down only once a locant is
     # known to be REQUIRED): the weaker flag must not gag the omissions that stay
     # correct under, i.e. ``(13C1)benzenehexol`` and ``(2H6)benzene``.
+    #
+    # (``:44190``, "Locants are omitted when there is only one atom of a
+    # given element"): when EVERY labelled nuclide is the only atom of its element in
+    # the molecule, the descriptor can never "require a locant to specify its
+    # position", so the second sentence of never applies and the skeleton
+    # keeps the omissions of its unmodified name -- ``(13C)methyltrisulfane``, not
+    # ``1-(13C)methyltrisulfane`` (the lone carbon is the methyl; the trisulfane's
+    # ``1-`` is omitted in the unmodified PIN,. No ambient declaration then.
     from ..assembly.locant_omission import isotopic_naming_scope
+    _label_elements = {original.GetAtomWithIdx(i).GetSymbol() for i in label_map}
+    _scope = (contextlib.nullcontext() if all(
+        _element_singleton_in(original, el) for el in _label_elements)
+        else isotopic_naming_scope("isotope"))
     _shift_token = _BOND_SHIFT_PARSE_REFUSED.set(False)
     try:
-        with isotopic_naming_scope("isotope"):
+        with _scope:
             result = _decorate_isotopic_name_inner(
                 smiles, style, namer, original, stripped, label_map)
             if result is None:

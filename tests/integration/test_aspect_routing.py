@@ -56,14 +56,18 @@ class TestIonFallThrough:
         assert result == 'azanium', f'Expected azanium, got: {result}'
 
     def test_retained_cation_methylammonium(self):
-        """Methylammonium should use retained name directly from namer.py."""
+        """CH3-NH3+ is named by the substitutive aminium PIN, not 'methylammonium'."""
+        # 'Cation and anion names': method (1), adding 'ium' to the amine name,
+        # leads to preferred IUPAC names ('methanaminium chloride (PIN)'). Behaviour changed
+        # on purpose by commit 12541211e (alkylammonium -> substitutive aminium PIN).
         result = name_compound('C[NH3+]')
-        assert result == 'methylammonium', f'Expected methylammonium, got: {result}'
+        assert result == 'methanaminium', f'Expected methanaminium, got: {result}'
 
     def test_retained_cation_ethylammonium(self):
-        """Ethylammonium should use retained name directly from namer.py."""
+        """CH3CH2-NH3+ is named by the substitutive aminium PIN, not 'ethylammonium'."""
+        # method (1) (commit 12541211e); see test_retained_cation_methylammonium.
         result = name_compound('CC[NH3+]')
-        assert result == 'ethylammonium', f'Expected ethylammonium, got: {result}'
+        assert result == 'ethanaminium', f'Expected ethanaminium, got: {result}'
 
     def test_salt_early_exit(self):
         """Salts should use early exit in namer.py (never reach assemble_name)."""

@@ -18,7 +18,6 @@ from orthonym.assembly.coverage_scoring import CandidateName, select_best_candid
 from orthonym.assembly.name_tree import NameTreeNode
 from orthonym.namer import Orthonym, name_with_tree
 from orthonym.rules.parent_correctness import (
-    OPSIN_JAR,
     clear_reference_name,
     set_reference_name,
 )
@@ -27,9 +26,13 @@ from orthonym.assembly.per_substring_scoring import (
     PerNodeScorer,
     compare_by_node_scores,
 )
+from tests.support.jars import jar_or_none
 
+# The OPSIN jar is fetched at install, not shipped in the tree: resolve it
+# through tests/support/jars.py, which fails instead of skipping under
+# ORTHONYM_REQUIRE_JARS=1 so a run meant to exercise the jar cannot go green-but-blind.
 opsin_required = pytest.mark.skipif(
-    not OPSIN_JAR.exists(), reason="OPSIN jar required for subprocess tests"
+    jar_or_none() is None, reason="OPSIN jar required for subprocess tests"
 )
 
 

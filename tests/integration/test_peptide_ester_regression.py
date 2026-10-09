@@ -100,9 +100,18 @@ class TestPeptideGuardInNaming:
         assert result == "glycine"
 
     def test_alanine_still_named_correctly(self):
-        """Alanine should still return 'alanine'."""
+        """The alanine constitution is named as the amino acid, not as a peptide.
+
+        The input defines no alpha configuration, and a bare retained amino-acid name
+        is read as the L enantiomer, so the stereo-free input takes the systematic
+        name of Table 10.4, the Blue Book: 'alanine...
+        2-aminopropanoic acid'); the retained name is emitted with a D/L descriptor
+         'The stereodescriptors D and L',:54291; 'C[C@H](N)C(=O)O' ->
+        'L-alanine'). Commit 9292c013d (2026-08-16) 'stop fabricating implicit-L on
+        stereo-undefined AAs/esters'.
+        """
         result = name_compound("CC(N)C(=O)O")
-        assert result == "alanine"
+        assert result == "2-aminopropanoic acid"
 
     def test_n_methylglycine_still_works(self):
         """N-methylglycine should still be named correctly -- systematically.
@@ -132,14 +141,20 @@ class TestPeptideGuardInNaming:
         assert "aminohexanoic" not in result, f"Tripeptide linearized: {result}"
 
     def test_asparagine_still_works(self):
-        """Asparagine (has amide side chain) should still be named correctly."""
+        """Asparagine constitution (amide side chain) is named systematically."""
+        # Stereo-free input: systematic name of Table 10.4, the Blue Book
+        # 'asparagine 2,4-diamino-4-oxobutanoic acid'); see test_alanine_still_named_correctly
+        # (commit 9292c013d).
         result = name_compound("NC(CC(N)=O)C(=O)O")
-        assert result == "asparagine"
+        assert result == "2,4-diamino-4-oxobutanoic acid"
 
     def test_glutamine_still_works(self):
-        """Glutamine (has amide side chain) should still be named correctly."""
+        """Glutamine constitution (amide side chain) is named systematically."""
+        # Stereo-free input: systematic name of Table 10.4, the Blue Book
+        # 'glutamine 2,5-diamino-5-oxopentanoic acid'); see test_alanine_still_named_correctly
+        # (commit 9292c013d).
         result = name_compound("NC(CCC(N)=O)C(=O)O")
-        assert result == "glutamine"
+        assert result == "2,5-diamino-5-oxopentanoic acid"
 
 
 # ============================================================================

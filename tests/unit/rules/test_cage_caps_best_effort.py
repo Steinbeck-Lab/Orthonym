@@ -133,8 +133,8 @@ def test_a_pin_path_name_on_a_raised_cage_is_not_labelled_a_pin():
 
 @pytest.mark.unit
 def test_name_with_confidence_sets_the_request_tier_for_its_call():
-    # name_with_confidence calls _name_impl without name's _budget_scope, so it
-    # sets the request tier itself: the ceilings inside follow the engine's tier,
+    # name_with_confidence names through name, whose _budget_scope sets the request
+    # tier for the outermost call: the ceilings inside follow the engine's tier,
     # and nothing is left behind after the call.
     seen = []
 
@@ -147,9 +147,15 @@ def test_name_with_confidence_sets_the_request_tier_for_its_call():
         mp.setattr(Orthonym, "_name_impl", fake_impl)
         Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_with_confidence("C")
         Orthonym().name_with_confidence("C")
-        # inside a request the call keeps that request's tier
-        _in_request(False, Orthonym(style="pin", **_emit_tier_flags(
-            "best-effort")).name_with_confidence, "C")
+        # inside a request (an enclosing name scope) the call keeps that
+        # request's tier
+        from orthonym.assembly.fragment_naming import enter_name_scope, exit_name_scope
+        enter_name_scope()
+        try:
+            _in_request(False, Orthonym(style="pin", **_emit_tier_flags(
+                "best-effort")).name_with_confidence, "C")
+        finally:
+            exit_name_scope()
     assert seen == [(True, raised), (False, (40, 8)), (False, (40, 8))], seen
     assert best_effort_request_ctx.get() is None
 

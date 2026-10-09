@@ -66,7 +66,10 @@ class TestION01AlkoxideAnions:
     def test_isopropoxide(self):
         """Isopropoxide (branched alkoxide)."""
         result = name_compound('CC(C)[O-]')
-        assert result == 'isopropoxide', f'Got: {result}'
+        # "Anions derived from hydroxy compounds" (the Blue Book): isopropoxide
+        # is excluded from the retained anion names ('but not isopropoxide'); the
+        # example at the Blue Book is 'propan-2-olate (PIN) isopropoxide'.
+        assert result == 'propan-2-olate', f'Got: {result}'
 
     def test_tert_butoxide(self):
         """tert-Butoxide."""
@@ -117,11 +120,14 @@ class TestION01CarbanionAnions:
 class TestION02AminiumCations:
     """Test aminium cation naming (R-NH3+, R4N+)."""
 
+    # (the Blue Book): the -aminium names are the preferred IUPAC names, not
+    # the Table 7.3 'ammonium' ones; 'methanaminium (PIN)' the Blue Book. The ids keep the
+    # pre-aminium spelling so the row identity is stable across the suite history.
     @pytest.mark.parametrize("smiles,expected", [
         ('[NH4+]', 'azanium'),  # PIN (was 'ammonium', Table-7.3 retained)
-        ('C[NH3+]', 'methylammonium'),
-        ('CC[NH3+]', 'ethylammonium'),
-        ('CCC[NH3+]', 'propylammonium'),
+        pytest.param('C[NH3+]', 'methanaminium', id='C[NH3+]-methylammonium'),
+        pytest.param('CC[NH3+]', 'ethanaminium', id='CC[NH3+]-ethylammonium'),
+        pytest.param('CCC[NH3+]', 'propan-1-aminium', id='CCC[NH3+]-propylammonium'),
     ])
     def test_primary_aminium_cations(self, smiles, expected):
         """Primary aminium cations (R-NH3+)."""
@@ -129,8 +135,8 @@ class TestION02AminiumCations:
         assert result == expected, f'Expected {expected}, got {result}'
 
     @pytest.mark.parametrize("smiles,expected", [
-        ('C[NH2+]C', 'dimethylammonium'),
-        ('CC[NH2+]CC', 'diethylammonium'),
+        pytest.param('C[NH2+]C', 'N-methylmethanaminium', id='C[NH2+]C-dimethylammonium'),
+        pytest.param('CC[NH2+]CC', 'N-ethylethanaminium', id='CC[NH2+]CC-diethylammonium'),
     ])
     def test_secondary_aminium_cations(self, smiles, expected):
         """Secondary aminium cations (R2-NH2+)."""
@@ -140,11 +146,13 @@ class TestION02AminiumCations:
     def test_trimethylammonium(self):
         """Trimethylammonium (tertiary)."""
         result = name_compound('C[NH+](C)C')
-        assert result == 'trimethylammonium', f'Got: {result}'
+        assert result == 'N,N-dimethylmethanaminium', f'Got: {result}'
 
     @pytest.mark.parametrize("smiles,expected", [
-        ('C[N+](C)(C)C', 'tetramethylammonium'),
-        ('CC[N+](CC)(CC)CC', 'tetraethylammonium'),
+        pytest.param('C[N+](C)(C)C', 'N,N,N-trimethylmethanaminium',
+                     id='C[N+](C)(C)C-tetramethylammonium'),
+        pytest.param('CC[N+](CC)(CC)CC', 'N,N,N-triethylethanaminium',
+                     id='CC[N+](CC)(CC)CC-tetraethylammonium'),
     ])
     def test_quaternary_ammonium_cations(self, smiles, expected):
         """Quaternary ammonium cations (R4N+)."""
@@ -599,8 +607,8 @@ class TestRequirementsVerification:
 
     def test_ion02_aminium(self):
         """: Aminium cations work."""
-        assert name_compound('[NH4+]') == 'ammonium'
-        assert name_compound('C[NH3+]') == 'methylammonium'
+        assert name_compound('[NH4+]') == 'azanium'  # (the Blue Book)
+        assert name_compound('C[NH3+]') == 'methanaminium'  # the Blue Book (PIN)
 
     def test_ion02_ylium(self):
         """: Ylium cations work."""

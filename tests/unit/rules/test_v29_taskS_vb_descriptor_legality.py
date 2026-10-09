@@ -134,9 +134,38 @@ def test_audit_accepts_secondary_bridge_numbered_from_higher_bridgehead():
     the higher numbered bridgehead."* The analyzer numbers it that way, but its
     ``BridgeInfo.atoms`` records the reverse order, so the previous audit walked
     a non-bonded pair and refused this perfectly correct cage.
+
+    The cage's descriptor is ``tricyclo[3.2.2.1^1,5]``: since e3b71b4a9 (M4 #1,
+    " largest main bridge is the PIN") the main bridge takes the 2-atom path
+    and the secondary bridge the 1-atom one, where this test used to pin
+    ``tricyclo[3.2.1.2^1,5]`` (main bridge 1, secondary bridge 2). (:9603)
+    "the main bridge... includes as many of the atoms as possible that are not included
+    in the main ring", (:9661). Both spellings denote the same cage (OPSIN
+    2.9.0: an InChIKey); the string's own skeleton is rebuilt below.
+    A one-atom secondary bridge has no internal order, so the multi-atom case this
+    regression is really about is pinned by the next test.
     """
     mol, ring, desc = _cage("C1CC23CCC(C1)(CC2)C3")
-    assert desc.descriptor_string == "tricyclo[3.2.1.2^1,5]"
+    assert desc.descriptor_string == "tricyclo[3.2.2.1^1,5]"
+    assert audit_von_baeyer_descriptor(
+        mol, ring, desc.numbering, desc.descriptor_string) is True
+
+
+@pytest.mark.parametrize("descriptor", [
+    # examples (:9717; the PINs at:9721 and:9727): two-atom / one-atom secondary bridges whose
+    # first-numbered bridge is linked to the HIGHER bridgehead (10 and 11).
+    "tetracyclo[4.4.2.2^2,5.2^7,10]",
+    "tetracyclo[5.4.2.2^2,6.1^8,11]",
+])
+def test_audit_accepts_the_blue_book_secondary_bridge_examples(descriptor):
+    """The Blue Book's own PINs for 'Numbering of secondary bridges'
+    ('tetracyclo[4.4.2.2^2,5.2^7,10]hexadecane (PIN)',:9721; 'tetracyclo[5.4.2.2^2,6.
+    1^8,11hexadecane (PIN)',:9727): the analyzer reproduces each descriptor for the
+    cage it denotes, and the audit accepts it. These carry secondary bridges of two atoms,
+    the case the 556/14 false rejections were about. OPSIN 2.9.0 reads both full names back
+    to the rebuilt cage (an InChIKey, an InChIKey)."""
+    mol, ring, desc = _cage(_rebuild_smiles(descriptor))
+    assert desc.descriptor_string == descriptor
     assert audit_von_baeyer_descriptor(
         mol, ring, desc.numbering, desc.descriptor_string) is True
 
@@ -155,14 +184,24 @@ def test_audit_rejects_bridge_dropping_descriptor():
     shipped. wired this audit into ``analyze`` and the three
     name-producers, so that molecule now abstains; the audit's own verdict,
     asserted here, is unchanged.
+
+    The analyzer no longer PRODUCES the defective string for this cage (it gives
+    ``tetracyclo[4.2.2.1^1,10.1^3,5]``, which accounts for all 12 atoms, since e3b71b4a9),
+    so the literal defective descriptor the analyzer once emitted is fed to the audit
+    directly: the audit must still refuse it, and still accept the analyzer's own.
     """
     mol, ring, desc = _cage("C1C2CC1C1CCC3(C2)CC1C3")
     assert len(ring) == 12
-    assert desc.descriptor_string == "tetracyclo[5.1.1.2^3,6]"
+    defective = "tetracyclo[5.1.1.2^3,6]"
     # the string denotes an 11-atom cage: 5+1+1+2 bridge atoms + 2 bridgeheads
-    assert reconstruct_von_baeyer_skeleton(desc.descriptor_string)[0] == 11
+    assert reconstruct_von_baeyer_skeleton(defective)[0] == 11
     assert audit_von_baeyer_descriptor(
-        mol, ring, desc.numbering, desc.descriptor_string) is False
+        mol, ring, desc.numbering, defective) is False
+    # control: the descriptor the analyzer produces now rebuilds the whole cage
+    assert desc.descriptor_string == "tetracyclo[4.2.2.1^1,10.1^3,5]"
+    assert reconstruct_von_baeyer_skeleton(desc.descriptor_string)[0] == 12
+    assert audit_von_baeyer_descriptor(
+        mol, ring, desc.numbering, desc.descriptor_string) is True
 
 
 def test_audit_rejects_wrong_size_descriptor():

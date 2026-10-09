@@ -40,9 +40,16 @@ def test_metal_raises_unsupported_element():
 
 def test_isolated_atom_raises():
     n = Orthonym()
+    # A carbon-bearing single heavy atom the engine cannot name is the ISOLATED_ATOM case.
+    with pytest.raises(OrthonymLimitError) as ei:
+        n.name("[C]", raise_on_limit=True)
+    assert ei.value.code == "ISOLATED_ATOM"
+    # [H] holds no carbon at all: since 4c33b3271 ("honest inorganic abstain -- carbon-free
+    # structural check") classify_failure_limit calls any carbon-free input UNSUPPORTED_ELEMENT
+    # ('inorganic compound (not supported)') before the isolated-atom branch is reached.
     with pytest.raises(OrthonymLimitError) as ei:
         n.name("[H]", raise_on_limit=True)
-    assert ei.value.code in ("ISOLATED_ATOM", "UNNAMEABLE")
+    assert ei.value.code == "UNSUPPORTED_ELEMENT"
 
 
 # ---- default path is byte-identical (no raise, legacy strings) ----

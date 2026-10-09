@@ -54,8 +54,18 @@ class TestUnsaturationTierRelation:
         assert ring_system_score(mol, furan) < ring_system_score(mol, benzene)
 
     def test_score_tuple_length_is_29(self):
+        # The method keeps its historical name so the node id is stable. The tuple has
+        # grown since this was written: 29 -> 39 elements as the.x tiebreakers
+        # were appended after the unsaturation tier (spiro-fusion count 8c933a1b4, the
+        # spiro/fusion/component terms, the four pre-bridge metrics). The
+        # sibling length checks were moved to 39 by e67099324 ("fix stale score-tuple
+        # length tests (29->39)", 2026-07-20) and this one was missed. The length is an
+        # internal shape, so it is also pinned against the empty-system sentinel the
+        # function returns, which is built separately and must have the same width.
         mol, systems = _systems("c1ccccc1")
-        assert len(ring_system_score(mol, systems[0])) == 29
+        score = ring_system_score(mol, systems[0])
+        assert len(score) == 39
+        assert len(ring_system_score(mol, set())) == len(score)
 
 
 class TestSelectPrincipalRingSystem:

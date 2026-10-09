@@ -35,10 +35,12 @@ class TestFusedAromaticSubstituents:
         assert 'quinoline' in name, f"Expected 'quinoline' in '{name}'"
 
     def test_hydroxybenzimidazole(self):
-        """Hydroxybenzimidazole must contain 'hydroxy' prefix."""
+        """Hydroxybenzimidazole: the OH is the principal characteristic group, so it is
+        the suffix '-ol' on the benzimidazole parent, the Blue Book; cf.
+        'naphthalen-1-ol (PIN)', the Blue Book), with the component spelled
+        '1H-1,3-benzimidazol-...' (the Blue Book)."""
         name = name_compound('Oc1ccc2[nH]cnc2c1')
-        assert 'hydroxy' in name, f"Expected 'hydroxy' in '{name}'"
-        assert 'benzimidazole' in name, f"Expected 'benzimidazole' in '{name}'"
+        assert name == '1H-1,3-benzimidazol-5-ol', f"Expected '1H-1,3-benzimidazol-5-ol', got '{name}'"
 
     def test_dimethylindole(self):
         """Disubstituted indole must contain 'dimethyl' and correct parent."""
@@ -62,11 +64,13 @@ class TestBenzeneSubstituents:
     """Benzene derivatives must retain all substituent prefixes."""
 
     def test_dimethylamino_amino_benzene(self):
-        """Benzene with both dimethylamino and amino must keep both groups."""
+        """Benzene with both a dimethylamino and an amino group keeps both: two amine
+        suffixes on one parent, 'benzene-1,3-diamine' with the N-substituents cited as
+        'N1,N1-dimethyl'; cf. 'N1-ethyl-N3-methylpropane-1,3-diamine
+        (PIN)', the Blue Book and 'benzene-1,4-diamine' parents, the Blue Book)."""
         name = name_compound('c1ccc(N(C)C)cc1N')
-        assert 'amino' in name, f"Expected 'amino' in '{name}'"
-        assert 'dimethylamino' in name, f"Expected 'dimethylamino' in '{name}'"
-        assert 'benzene' in name, f"Expected 'benzene' in '{name}'"
+        assert name == 'N1,N1-dimethylbenzene-1,3-diamine', \
+            f"Expected 'N1,N1-dimethylbenzene-1,3-diamine', got '{name}'"
 
     def test_diethylbenzene(self):
         """Diethylbenzene must retain both ethyl groups."""
@@ -87,10 +91,10 @@ class TestBenzeneSubstituents:
         assert 'benzene' in name, f"Expected 'benzene' in '{name}'"
 
     def test_methylamino_benzene(self):
-        """Methylaminobenzene must retain the methylamino group."""
+        """N-methylaniline keeps the methyl on nitrogen: 'N-methylaniline (PIN)', the Blue Book
+        under (aniline is substitutable on ring and nitrogen)."""
         name = name_compound('c1ccc(NC)cc1')
-        assert 'methylamino' in name, f"Expected 'methylamino' in '{name}'"
-        assert 'benzene' in name, f"Expected 'benzene' in '{name}'"
+        assert name == 'N-methylaniline', f"Expected 'N-methylaniline', got '{name}'"
 
 
 # ---------------------------------------------------------------------------
@@ -167,10 +171,10 @@ class TestRingSubstituentEdgeCases:
         assert 'indole' in name, f"Expected 'indole' in '{name}'"
 
     def test_dimethylaminobenzene(self):
-        """N,N-dimethylaminobenzene must have dimethylamino group."""
+        """N,N-dimethylaniline: aniline takes full substitution on nitrogen
+        , the Blue Book; 'N-methylaniline (PIN)', the Blue Book)."""
         name = name_compound('c1ccc(N(C)C)cc1')
-        assert 'dimethylamino' in name, f"Expected 'dimethylamino' in '{name}'"
-        assert 'benzene' in name, f"Expected 'benzene' in '{name}'"
+        assert name == 'N,N-dimethylaniline', f"Expected 'N,N-dimethylaniline', got '{name}'"
 
 
 # ---------------------------------------------------------------------------
@@ -220,10 +224,10 @@ class TestPAHSubstituents:
         assert 'naphthalene' in name, f"Expected 'naphthalene' in '{name}'"
 
     def test_hydroxynaphthalene(self):
-        """Hydroxynaphthalene (naphthol) must contain 'hydroxy' or 'naphthol'."""
+        """2-Naphthol: the OH is the suffix, 'naphthalen-2-ol'; cf. 'naphthalen-1-ol
+        (PIN)', the Blue Book."""
         name = name_compound('Oc1ccc2ccccc2c1')
-        assert ('hydroxy' in name or 'naphthol' in name.lower()), \
-            f"Expected 'hydroxy' or 'naphthol' in '{name}'"
+        assert name == 'naphthalen-2-ol', f"Expected 'naphthalen-2-ol', got '{name}'"
 
     def test_dimethylnaphthalene(self):
         """Dimethylnaphthalene must contain 'dimethyl' prefix."""
@@ -232,10 +236,10 @@ class TestPAHSubstituents:
         assert 'naphthalene' in name, f"Expected 'naphthalene' in '{name}'"
 
     def test_aminonaphthalene(self):
-        """Aminonaphthalene must contain 'amino' prefix."""
+        """2-Aminonaphthalene: the amine is the suffix, 'naphthalen-2-amine'
+         family; 'naphthalen-2-amine (PIN)' stem of the Blue Book)."""
         name = name_compound('Nc1ccc2ccccc2c1')
-        assert 'amino' in name, f"Expected 'amino' in '{name}'"
-        assert 'naphthalene' in name, f"Expected 'naphthalene' in '{name}'"
+        assert name == 'naphthalen-2-amine', f"Expected 'naphthalen-2-amine', got '{name}'"
 
     def test_nitronaphthalene_locant(self):
         """Nitronaphthalene must have locant and nitro prefix."""
@@ -255,29 +259,32 @@ class TestBenzeneNSubstitution:
     """N-substituted amino groups on benzene include N-locant prefixes."""
 
     def test_nn_dimethylamino_includes_nn(self):
-        """N,N-dimethylaminobenzene must include 'N,N-' prefix."""
+        """N,N-dimethylaniline: the N,N- locants are kept ('N-methylaniline (PIN)',
+        the Blue Book,."""
         name = name_compound('CN(C)c1ccccc1')
-        assert 'N,N-dimethylamino' in name, \
-            f"Expected 'N,N-dimethylamino' in '{name}'"
+        assert name == 'N,N-dimethylaniline', \
+            f"Expected 'N,N-dimethylaniline', got '{name}'"
 
     def test_n_methylamino_includes_n(self):
-        """N-methylaminobenzene must include 'N-' prefix."""
+        """N-methylaniline: the N- locant is kept ('N-methylaniline (PIN)', the Blue Book,
+        ."""
         name = name_compound('CNc1ccccc1')
-        assert 'N-methylamino' in name, \
-            f"Expected 'N-methylamino' in '{name}'"
+        assert name == 'N-methylaniline', \
+            f"Expected 'N-methylaniline', got '{name}'"
 
     def test_nn_diethylamino_includes_nn(self):
-        """N,N-diethylaminobenzene must include 'N,N-' prefix."""
+        """N,N-diethylaniline: the N,N- locants are kept, the Blue Book)."""
         name = name_compound('CCN(CC)c1ccccc1')
-        assert 'N,N-diethylamino' in name, \
-            f"Expected 'N,N-diethylamino' in '{name}'"
+        assert name == 'N,N-diethylaniline', \
+            f"Expected 'N,N-diethylaniline', got '{name}'"
 
     def test_polysubstituted_with_nn_dimethyl(self):
-        """Polysubstituted benzene with N,N-dimethylamino keeps all substituents."""
+        """Benzene with an N,N-dimethylamino and an amino group keeps all substituents:
+        two amine suffixes, 'N1,N1-dimethylbenzene-1,4-diamine';
+        'benzene-1,4-diamine' parents, the Blue Book)."""
         name = name_compound('CN(C)c1ccc(N)cc1')
-        assert 'amino' in name, f"Expected 'amino' in '{name}'"
-        assert 'dimethylamino' in name, f"Expected 'dimethylamino' in '{name}'"
-        assert 'benzene' in name, f"Expected 'benzene' in '{name}'"
+        assert name == 'N1,N1-dimethylbenzene-1,4-diamine', \
+            f"Expected 'N1,N1-dimethylbenzene-1,4-diamine', got '{name}'"
 
 
 # ---------------------------------------------------------------------------

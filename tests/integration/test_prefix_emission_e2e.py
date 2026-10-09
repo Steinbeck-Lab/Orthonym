@@ -12,20 +12,25 @@ class TestPrefixEmissionE2E:
     """End-to-end naming tests for non-principal functional group prefixes."""
 
     def test_glutamine_full_name(self):
-        """Glutamine should be named with carbamoyl prefix and amino prefix.
+        """The amide carbon stays in the acid chain: 'amino' + 'oxo', not a 'carbamoyl' prefix.
 
-        Expected: 2-amino-4-carbamoylbutanoic acid (or 2-amino-5-carbamoylpentanoic acid
-        depending on chain length computation, but MUST contain carbamoyl).
+        NC(=O)CCCC(N)C(=O)O is homoglutamine (six carbons; glutamine is NC(=O)CCC(N)C(=O)O,
+        '2,5-diamino-5-oxopentanoic acid', Table 10.4, the Blue Book).
+        'Amic acids' (the Blue Book): '4-amino-4-oxobutanoic acid (PIN)
+        3-carbamoylpropanoic acid' -- the preferred name takes the amide carbon into the
+        principal chain, expressed as amino + oxo; 'carbamoyl' is the non-preferred form.
         """
         name = name_compound("NC(=O)CCCC(N)C(=O)O")
-        assert "carbamoyl" in name, f"Expected 'carbamoyl' in '{name}'"
-        assert "amino" in name, f"Expected 'amino' in '{name}'"
-        assert "oic acid" in name, f"Expected 'oic acid' suffix in '{name}'"
+        assert name == "2,6-diamino-6-oxohexanoic acid", (
+            f"Expected '2,6-diamino-6-oxohexanoic acid', got '{name}'"
+        )
 
     def test_cyanopropanoic_acid_full(self):
-        """3-cyanopropanoic acid end-to-end."""
+        """Cyanoacetic acid end-to-end (N#CCC(=O)O has two chain carbons plus the cyano carbon)."""
         name = name_compound("N#CCC(=O)O")
-        assert name == "3-cyanopropanoic acid", f"Expected '3-cyanopropanoic acid', got '{name}'"
+        # 'Cyanic acid' (the Blue Book): 'NC-CH2-COOH cyanoacetic acid (PIN)'.
+        # (The earlier expected value '3-cyanopropanoic acid' is N#CCCC(=O)O, one CH2 more.)
+        assert name == "cyanoacetic acid", f"Expected 'cyanoacetic acid', got '{name}'"
 
     def test_formylbenzoic_acid_full(self):
         """4-formylbenzoic acid end-to-end."""
@@ -35,24 +40,28 @@ class TestPrefixEmissionE2E:
     def test_mixed_acid_amide(self):
         """Compound with both acid (principal) and amide (subordinate).
 
-        5-amino-5-carbamoylpentanoic acid or similar.
+        2,6-diamino-6-oxohexanoic acid (amide carbon in the chain;.
         """
-        # NC(=O)CCCC(N)C(=O)O is glutamine
+        # NC(=O)CCCC(N)C(=O)O is homoglutamine (see test_glutamine_full_name)
         name = name_compound("NC(=O)CCCC(N)C(=O)O")
-        # Must have carbamoyl for non-principal amide
-        assert "carbamoyl" in name
-        # Must have amino for non-principal amine
-        assert "amino" in name
-        # Acid is the principal group suffix
-        assert "acid" in name
+        # 'Amic acids' (the Blue Book): '4-amino-4-oxobutanoic acid (PIN)
+        # 3-carbamoylpropanoic acid' -- the amide stays in the chain as amino + oxo.
+        assert name == "2,6-diamino-6-oxohexanoic acid", (
+            f"Expected '2,6-diamino-6-oxohexanoic acid', got '{name}'"
+        )
 
     def test_acid_nitrile_compound(self):
         """Compound with acid (principal) and nitrile (subordinate).
 
-        N#CCCC(=O)O -> 4-cyanobutanoic acid.
+        N#CCCC(=O)O -> 3-cyanopropanoic acid (the nitrile carbon is part of 'cyano', not
+        of the propanoic chain; '4-cyanobutanoic acid' is N#CCCCC(=O)O).
         """
         name = name_compound("N#CCCC(=O)O")
-        assert name == "4-cyanobutanoic acid", f"Expected '4-cyanobutanoic acid', got '{name}'"
+        # (the Blue Book): when a group with priority for citation as the
+        # principal characteristic group is present, -CN is the prefix 'cyano', which "must
+        # also be used when the -CN group is located at the end of a chain"; example
+        # '3-cyanopropanoic acid (PIN)' (:34742).
+        assert name == "3-cyanopropanoic acid", f"Expected '3-cyanopropanoic acid', got '{name}'"
 
     def test_amide_as_principal_not_affected(self):
         """When amide IS the principal group, no carbamoyl prefix should appear."""

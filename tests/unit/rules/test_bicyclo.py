@@ -588,11 +588,23 @@ class TestSUB02NegativeCanary:
         # tricyclo[5.2.2.0^4,10]undecane, not the older tricyclo[5.2.1.1^4,10]
         # (main bridge 1, secondary bridge 1). (the Blue Book): the
         # main bridge "includes as many of the atoms as possible that are not
-        # included in the main ring", so 2 is preferred over 1. Both descriptors
-        # round-trip to the same C11 cage via OPSIN; the new form is the more
-        # -conformant decomposition.
+        # included in the main ring", so 2 is preferred over 1.
+        #
+        # Since 7ea3918e4 (2026-10-07, "all-carbon fused systems are named by fusion
+        # nomenclature before the von Baeyer path") this C11 cage is named as a bridged
+        # fused system: indene (5/6 ortho-fused, so the two-rings-of-five-or-
+        # more requirement holds) with an ethano bridge. "When the conditions
+        # given in for cyclic phane systems are not fulfilled, names of fused
+        # ring systems, bridged fused systems, or von Baeyer systems are preferred IUPAC
+        # names" (the Blue Book), with the seniority order "cyclic phane systems >
+        # fused ring systems > bridged fused systems > non-fused bridged systems"
+        # (:23843) and the worked example 'hexadecahydro-1H-8,12-methanobenzo[13]annulene
+        # (PIN) (a bridged ring fused name)' against 'tricyclo[12.3.1.0^5,10]octadecane
+        # (a von Baeyer name)': "the bridged fused ring name is preferred to the von
+        # Baeyer name" (:23875-:23883). Both names read back to the same cage with OPSIN
+        # 2.9.0 (full an InChIKey).
         assert name_compound("C1CC2CCC3CCC1C2C3") == \
-            "tricyclo[5.2.2.0^4,10]undecane"
+            "octahydro-1H-1,6-ethanoindene"
 
 
 @pytest.mark.unit

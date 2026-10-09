@@ -38,20 +38,28 @@ from orthonym.rules.polycyclic import (
 )
 
 # A cage whose emitted descriptor does NOT rebuild the cage bond set, so the
-# legality audit must reject it and every producer must refuse. From the
-# systematic N<=12 enumeration
-# (internal notes). The specific descriptor
-# string, and whether it fails on the atom-count arithmetic or on the bond-set
-# edge-audit, are implementation details the main-bridge selection
-# legitimately changed (it now emits ``tetracyclo[4.2.2.1^1,9.1^3,5]``, whose
-# bracket sum matches the atom count but whose bonds still do not rebuild the
-# cage) -- so this pins only the DURABLE invariant: legality=False + refusal.
+# legality audit must reject it and every producer must refuse. The specific
+# descriptor string, and whether it fails on the atom-count arithmetic or on the bond-set
+# edge-audit, are implementation details that legitimately move -- so this pins only the DURABLE
+# invariant: legality=False + refusal.
 #
-# (The 10-atom cage ``C1CC23CC(C2)C12CC3C2`` used to sit here too; the same
-# main-bridge fix turns it into a LEGAL, OPSIN-round-tripping name -- a breadth
-# gain, pinned by test_main_bridge_fix_rescues_a_previously_refused_cage below.)
+# The cages are a bicycle with a spiro-fused cyclopropane: their ring atoms are not a
+# von Baeyer polyalicycle (a spiro junction is named by spiro nomenclature), and the
+# analyzer's descriptor stops at ``tricyclo[3.1.1]`` / ``tricyclo[3.2.1]``, whose bracket sum plus
+# two, the Blue Book "the total number of ring atoms... corresponds to the sum
+# of the arabic numbers in the numerical descriptor enclosed by brackets plus two") is 7 / 8, not the
+# 9 / 10 ring atoms. Found by scanning pubchem_2000 / chebi_5000 / opsin_selftest_500 ring systems
+# (35 of 284 analysed polyalicycles still carry an illegal descriptor) and carving the smallest.
+#
+# History: the 12-atom cage ``C1C2CC1C1CCC3(C2)CC1C3`` sat here until d6f633508 ("the
+# secondary-bridge superscripts are as low as possible on every cage",,:9685)
+# re-ranked the candidates and a changed descriptor now has to pass the legality audit: it names
+# with the LEGAL ``tetracyclo[4.2.2.1^1,10.1^3,5]`` (below). The 10-atom cage
+# ``C1CC23CC(C2)C12CC3C2`` was rescued by the main-bridge selection
+# (test_main_bridge_fix_rescues_a_previously_refused_cage).
 ILLEGAL_CAGES = [
-    ("C1C2CC1C1CCC3(C2)CC1C3", 12),
+    ("C1CC2CC(C1)C23CC3", 9),
+    ("C1CC2CCC(C1)C23CC3", 10),
 ]
 
 # Cages whose descriptor does rebuild them. These must keep naming exactly as
@@ -92,6 +100,23 @@ def test_analyze_marks_an_unrebuildable_descriptor_illegal(smiles, n_cage):
     # atom-count arithmetic (the Blue Book) or on the
     # bond-set edge-audit. Either way nothing correct can be spelled from it.
     assert desc.legality is False
+
+
+def test_superscript_ranking_rescues_a_previously_illegal_cage():
+    """d6f633508 side effect (verified 0-wrong improvement): the 12-atom cage
+    ``C1C2CC1C1CCC3(C2)CC1C3`` carried the non-rebuilding ``tetracyclo[4.2.2.1^1,9.1^3,5]``
+    (it used to be this file's illegal cage). The candidates now keep the ring analysis and rank
+    by the secondary-bridge superscripts first, (the Blue Book) "The superscript
+    locants for the secondary bridges must be as low as possible when considered as a set in
+    ascending numerical order"; a changed descriptor must pass the legality audit, and this one
+    does: ``tetracyclo[4.2.2.1^1,10.1^3,5]`` rebuilds the cage (legality=True). The name
+    OPSIN 2.9.0 round-trips to the input's full InChIKey (an InChIKey). Pinned
+    as the current value: that 1^1,10.1^3,5 is the lowest set was not enumerated independently."""
+    mol, ring = _cage("C1C2CC1C1CCC3(C2)CC1C3")
+    desc = VonBaeyerAnalyzer().analyze(mol, ring)
+    assert desc.descriptor_string == "tetracyclo[4.2.2.1^1,10.1^3,5]"
+    assert desc.legality is True
+    assert generate_polycyclic_name(mol) == "tetracyclo[4.2.2.1^1,10.1^3,5]dodecane"
 
 
 def test_main_bridge_fix_rescues_a_previously_refused_cage():

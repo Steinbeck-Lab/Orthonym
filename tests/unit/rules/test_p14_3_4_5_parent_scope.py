@@ -195,7 +195,10 @@ class TestLicensedOmission:
         # ``:3007``'s SECOND carve-out: "and to the carbon atoms of formyl groups
         # (aldehydes)". The formyl C-H does not count, so C2+C3 is the whole set.
         ("FC(F)(F)C(F)(F)C=O", "pentafluoropropanal"),
-        ("FC(F)(F)C=O", "trifluoroethanal"),
+        # acetaldehyde is the retained parent with substitution allowed,
+        # the Blue Book; 'phenoxyacetaldehyde (PIN)':35076), all its hydrogen on one
+        # carbon, so the locants are omitted ('trifluoroacetaldehyde', as 'trifluoroacetic acid')
+        ("FC(F)(F)C=O", "trifluoroacetaldehyde"),
         # A nitrile carbon carries no hydrogen at all.
         ("FC(F)(F)C(F)(F)C(F)(F)C#N", "heptafluorobutanenitrile"),
         ("FC(F)(F)C(F)(F)C#N", "pentafluoropropanenitrile"),

@@ -120,9 +120,9 @@ class TestLargeCompoundSubstituentDelivered:
 # (V37-a trace-SP4.md Claim 3) traced only the first (cap) warning and its premise
 # that g1/g3 reduce ENTIRELY to SP1's cap+flag is incomplete: the compound
 # substituent IS now nameable (proven above + by the aglycone-alone RT), but the
-# whole molecule still abstains on the aglycone parent. g2 is SP3-owned
-# (mixed-spiro-fused). The full-RT rows are xfail(strict) so they FLIP LOUDLY to
-# a failure the moment SP3/SP1.5 rescues them.
+# whole molecule still abstained on the aglycone parent. g2 is SP3-owned
+# (mixed-spiro-fused). The full-RT rows were xfail(strict) so they FLIP LOUDLY the
+# moment SP3/SP1.5 rescued them; they did, and they are plain passing witnesses now.
 # ---------------------------------------------------------------------------
 class TestSP4GlycanWitnesses:
     @pytest.mark.opsin_gate
@@ -136,13 +136,12 @@ class TestSP4GlycanWitnesses:
             f"{smi}: emitted a non-RT name {name!r} (0-wrong violation)")
 
     @pytest.mark.opsin_gate
-    @pytest.mark.xfail(reason="residual SP3/SP1.5 aglycone blocker: the von-Baeyer "
-                              "steroid parent + complex sugar substituent fails "
-                              "'descriptor edge-audit' — downstream of SP1.1b's "
-                              "cap+flag fix (the substituent itself is now nameable)",
-                       strict=True)
     @pytest.mark.parametrize("smi", [G1, G3])
     def test_diglycoside_full_round_trip_pending_sp3(self, smi):
+        # The strict xfail ("residual SP3/SP1.5 aglycone blocker: the von-Baeyer steroid parent
+        # + complex sugar substituent fails 'descriptor edge-audit'") flipped loudly, as designed:
+        # both witnesses now name RT-exact under best-effort (the fixing commit was not
+        # bisected). The marker is removed and the rows stay as ordinary passing witnesses.
         name = _best_effort().name(smi)
         assert _rt_full_inchikey(smi, name), f"did not RT: {name!r}"
 

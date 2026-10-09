@@ -335,19 +335,24 @@ DEPTH_LIMIT_COMPOUNDS = [
 # Full evidence: internal notes
 # ---------------------------------------------------------------------------
 _RT_BREADTH_GAPS = {
-    "001_chloroquinoline_ester",
+    # "001_chloroquinoline_ester", "007_galactitol_glucoside", "011_macrolide_lactone"
+    # -- REMOVED 2026-10-09 (fix-all merge): the strict xfails went XPASS once the
+    # ester fixes landed (the general acyclic fallback declines a principal ester, the
+    # ester producer builds the group word from the alcohol's structure).
     "002_penicillin_like",
     # "003_terpene_dioxolane" -- REMOVED 2026-09-27 (suite fix j6, TRIAGE g3
     # C17b): the decorated 1,3-dioxolan-4-yl prefix is now built at the PIN tier
     # (Hantzsch-Widman stem,; '(3R)-3,7-dimethyl-9-(2,2,5,5-
     # tetramethyl-1,3-dioxolan-4-yl)nona-1,6-dien-3-ol' round-trips exact.
     "005_steroid_polyol",
-    "007_galactitol_glucoside",
     # "008_allylamine_benzophenone" -- REMOVED 2026-08-21: now round-trips
     # (verify_or_none True): '(4-bromophenyl)({2-fluoro-4-[6-(methyl(prop-2-en-
     # 1-yl)amino)hexyloxy]phenyl})methanone'. Same treatment as 013/020.
-    "011_macrolide_lactone",
-    "012_biaryl_ether",
+    # "012_biaryl_ether" -- REMOVED 2026-10-09 (fix-all lane L3a): the strict xfail
+    # went XPASS -- with the gate off the generator now emits a name OPSIN reads back to
+    # the input's canonical SMILES (see test_opsin_roundtrip below). Its
+    # _TIER_CONTRACT_IDS entry stays: that row asserts the tier contract in
+    # test_naming_completes and still holds.
     # "013_dipeptide_proline" -- REMOVED 2026-08-21 (a phase Task 2.2
     # cleanup): verified via `scripts/an A/B check` that this already
     # round-trips correctly at HEAD 799d3491 (before Task 2.2's own code),
@@ -391,7 +396,7 @@ _RT_PARAMS = [
     for p in DEPTH_LIMIT_COMPOUNDS
 ]
 
-assert len(_RT_BREADTH_GAPS) == 10, "the measured gap list changed size"
+assert len(_RT_BREADTH_GAPS) == 6, "the measured gap list changed size"
 assert _RT_BREADTH_GAPS <= {p.id for p in DEPTH_LIMIT_COMPOUNDS}, (
     "a _RT_BREADTH_GAPS id does not match any DEPTH_LIMIT_COMPOUNDS param"
 )

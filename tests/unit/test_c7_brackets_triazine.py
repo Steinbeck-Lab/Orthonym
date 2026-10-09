@@ -50,8 +50,26 @@ class TestEnclosingMarks:
 
     @pytest.mark.unit
     def test_phenylmethyl_piperidine_no_extra_brackets(self):
-        """1-(phenylmethyl)piperidine — single-token, no inner parens -> stays ()."""
-        assert name_compound("C1CCCCN1Cc1ccccc1") == "1-(phenylmethyl)piperidine"
+        """1-benzylpiperidine — the unsubstituted C6H5-CH2- is the retained prefix
+        'benzyl'. (The method keeps its historical name so the node id is stable: it
+        used to pin '1-(phenylmethyl)piperidine', the single-token compound prefix in
+        parentheses.) "The following retained names are used as preferred
+        prefixes for which no substitution is recommended" (under PREFIXES DERIVED
+        FROM PARENT HYDRIDES, the Blue Book): 'C6H5-CH2- benzyl (preferred prefix)
+        phenylmethyl' (:24414). Both names read back to the input's full InChIKey with
+        OPSIN 2.9.0 (an InChIKey). The enclosing-mark guard this row was
+        written for (a single-token compound prefix with no inner parentheses stays in
+        parentheses) is kept by the next test, on a prefix that has no retained name."""
+        assert name_compound("C1CCCCN1Cc1ccccc1") == "1-benzylpiperidine"
+
+    @pytest.mark.unit
+    def test_cyclohexylmethyl_piperidine_single_token_stays_parenthesised(self):
+        """1-(cyclohexylmethyl)piperidine — single-token compound prefix, no inner
+        parens -> stays . The Blue Book writes this prefix in parentheses too:
+        '1-[(cyclohexylmethoxy)methyl]-4-{[4-(cyclohexylmethyl)cyclohexyl]methyl}
+        cyclohexane (PIN)', NONALPHANUMERICAL ORDER, the Blue Book. OPSIN 2.9.0 reads the name back to the input's
+        full InChIKey (an InChIKey)."""
+        assert name_compound("C1CCCCN1CC1CCCCC1") == "1-(cyclohexylmethyl)piperidine"
 
     @pytest.mark.unit
     def test_ethyl_pyrimidinyl_morpholine_stays_bracketed(self):

@@ -100,10 +100,14 @@ class TestSubstitutedIndoles:
 
     @pytest.mark.integration
     def test_n_methylindole(self):
-        """N-methylindole: N-methyl not 1-methyl."""
+        """N-methylindole: a ring nitrogen takes its numeric locant, '1-methyl-1H-indole'.
+
+        A substituent on a ring heteroatom is cited with the ring locant, not the
+        italic 'N': '4-(...)morpholine (PIN)' the Blue Book and
+        '1-hydroxy-1H-pyrrole-2,5-dione (PIN)' the Blue Book.
+        """
         result = name_compound('Cn1ccc2ccccc12')
-        assert 'N-methyl' in result, f"Expected N-methyl prefix, got: {result}"
-        assert 'indole' in result.lower(), f"Expected 'indole' in name, got: {result}"
+        assert result == '1-methyl-1H-indole', f"Expected 1-methyl-1H-indole, got: {result}"
 
     @pytest.mark.integration
     def test_2_methylindole(self):
@@ -203,10 +207,13 @@ class TestPhase7Requirements:
 
     @pytest.mark.integration
     def test_fused_05_n_substitution(self):
-        """FUSED-05: N-methyl format (not 1-methyl)."""
+        """FUSED-05: a ring N substituent is cited with the numeric ring locant.
+
+        '1-hydroxy-1H-pyrrole-2,5-dione (PIN)', the Blue Book; the italic 'N'
+        locant is for N atoms outside the ring.
+        """
         result = name_compound('Cn1ccc2ccccc12')
-        assert 'N-methyl' in result, f"Expected 'N-methyl' format, got: {result}"
-        assert '1-methyl' not in result, f"Should NOT use '1-methyl', got: {result}"
+        assert result == '1-methyl-1H-indole', f"Expected '1-methyl-1H-indole', got: {result}"
 
     @pytest.mark.integration
     def test_fused_06_indicated_hydrogen(self):
@@ -310,7 +317,10 @@ class TestFusedHeterocycleE2E:
     @pytest.mark.parametrize("smiles,expected_contains,alt_result", [
         # Substituted indoles
         ('Cc1ccc2[nH]ccc2c1', '5-methyl', None),  # 5-methylindole
-        ('Cn1ccc2ccccc12', 'N-methyl', None),     # N-methylindole
+        # N-methylindole: ring N takes the numeric locant (the Blue Book,. The id
+        # keeps the original 'N-methyl' spelling so the row identity is stable.
+        pytest.param('Cn1ccc2ccccc12', '1-methyl-1H-indole', None,
+                     id='Cn1ccc2ccccc12-N-methyl-None'),
         # Substituted quinolines
         ('Cc1ccc2ccccc2n1', '2-methyl', None),    # 2-methylquinoline
         # Amino-substituted purines - IUPAC 2013 prefers retained name "adenine"
@@ -353,7 +363,8 @@ class TestPhase6Regression:
         # These are a phase heterocycles, not fused
         assert name_compound('c1ccncc1') == 'pyridine'
         assert name_compound('c1ccoc1') == 'furan'
-        assert name_compound('c1cc[nH]c1') == 'pyrrole'
+        # (the Blue Book): the PIN cites the indicated hydrogen, '1H-pyrrole' (the Blue Book).
+        assert name_compound('c1cc[nH]c1') == '1H-pyrrole'
         assert name_compound('c1ccsc1') == 'thiophene'
 
 

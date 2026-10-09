@@ -80,10 +80,13 @@ def test_regression_methyl_propanoate():
 
 @pytest.mark.integration
 def test_regression_glycerol_diacetate():
-    """Polyfunctional ester+alcohol: glycerol diacetate stays on polyfunctional path."""
+    """Glycerol 1,3-diacetate: a PIN names an ester by functional class nomenclature
+    , the Blue Book) and an ester outranks an alcohol, class 9 over class
+    17, the Blue Book / the Blue Book), so the free OH is the 'hydroxy' prefix on the multivalent
+    group; identical anions give 'propane-1,3-diyl bis(chloroacetate) (PIN)', the Blue Book
+    ."""
     result = name_compound("CC(=O)OCC(O)COC(=O)C")
-    assert "ol" in result, f"Expected 'ol' in result, got: {result}"
-    assert "acetyloxy" in result, f"Expected 'acetyloxy' in result, got: {result}"
+    assert result == "2-hydroxypropane-1,3-diyl diacetate", f"Got: {result}"
 
 
 # ============================================================================
@@ -95,39 +98,40 @@ class TestPolyolPolyester:
 
     @pytest.mark.integration
     def test_triacetin(self):
-        """Triacetin: glycerol triacetate -- 3 acetyloxy groups on propane backbone."""
+        """Triacetin: glycerol triacetate, functional class multiplicative name.
+
+        'propane-1,2,3-triyl triacetate (PIN)', the Blue Book under (the Blue Book,
+        'When anions are identical functional class multiplicative nomenclature is
+        used'); all PIN ester names are functional class names, the Blue Book),
+        so there is no 'acetyloxy' prefix.
+        """
         result = name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O")
-        assert result is not None, "Got None"
-        # Should contain acyloxy prefix (acetyloxy or ethanoyloxy)
-        has_acyloxy = "acetyloxy" in result or "ethanoyloxy" in result
-        assert has_acyloxy, f"Expected 'acetyloxy' or 'ethanoyloxy' in result, got: {result}"
-        # Should contain propane parent
-        assert "propane" in result, f"Expected 'propane' in result, got: {result}"
-        # Should have tri multiplier for 3 identical groups
-        assert "tri" in result, f"Expected 'tri' in result, got: {result}"
+        assert result == "propane-1,2,3-triyl triacetate", f"Got: {result}"
 
     @pytest.mark.integration
     def test_glycerol_tripropanoate(self):
-        """Glycerol tripropanoate: 3 propanoyloxy groups on propane backbone."""
+        """Glycerol tripropanoate: functional class multiplicative name
+        , the Blue Book; 'propane-1,2,3-triyl triacetate (PIN)', the Blue Book)."""
         result = name_compound("CCC(=O)OCC(COC(=O)CC)OC(=O)CC")
-        assert result is not None, "Got None"
-        assert "propanoyloxy" in result, f"Expected 'propanoyloxy' in result, got: {result}"
-        assert "propane" in result, f"Expected 'propane' in result, got: {result}"
+        assert result == "propane-1,2,3-triyl tripropanoate", f"Got: {result}"
 
     @pytest.mark.integration
     def test_glycerol_diacetate_mono_propanoate(self):
-        """Mixed-acid triester: 2 acetyl + 1 propanoyl on glycerol backbone."""
+        """Mixed-acid triester: 2 acetyl + 1 propanoyl on glycerol backbone.
+
+        Byte-identical to the Blue Book example 'propane-1,2,3-triyl 1,2-diacetate
+        3-propanoate (PIN)', the Blue Book under (method (1) generates
+        preferred IUPAC names).
+        """
         result = name_compound("CC(=O)OCC(COC(=O)CC)OC(C)=O")
-        assert result is not None, "Got None"
-        assert "acetyloxy" in result, f"Expected 'acetyloxy' in result, got: {result}"
-        assert "propanoyloxy" in result, f"Expected 'propanoyloxy' in result, got: {result}"
+        assert result == "propane-1,2,3-triyl 1,2-diacetate 3-propanoate", f"Got: {result}"
 
     @pytest.mark.integration
     def test_regression_glycerol_diacetate_polyol(self):
-        """Glycerol diacetate with free -OH: must still use polyfunctional path."""
+        """Glycerol diacetate with free -OH: the ester is senior, the Blue Book over
+        the Blue Book), so the OH is a 'hydroxy' prefix on the multivalent group."""
         result = name_compound("CC(=O)OCC(O)COC(=O)C")
-        assert "ol" in result, f"Expected 'ol' in result, got: {result}"
-        assert "acetyloxy" in result, f"Expected 'acetyloxy' in result, got: {result}"
+        assert result == "2-hydroxypropane-1,3-diyl diacetate", f"Got: {result}"
 
     @pytest.mark.integration
     def test_regression_dimethyl_malonate_unaffected(self):

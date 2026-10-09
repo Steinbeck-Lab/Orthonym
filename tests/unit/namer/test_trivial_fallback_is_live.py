@@ -62,6 +62,17 @@ MEASURED_LIVE = [
 ]
 
 
+# Rows of MEASURED_LIVE retired because the default pipeline now derives a name (the gate no
+# longer suppresses anything for them). Each name is OPSIN 2.9.0 round-trip exact to the
+# input's full InChIKey (an InChIKey, an InChIKey);
+# citric acid's is the Blue Book PIN, "Retained names only for general
+# nomenclature" (the Blue Book '2-hydroxypropane-1,2,3-tricarboxylic acid (PIN)').
+NOW_DERIVED = {
+    "CC(=O)Nc1ccc(O)cc1": "N-(4-hydroxyphenyl)acetamide",
+    "O=C(O)CC(O)(CC(=O)O)C(=O)O": "2-hydroxypropane-1,2,3-tricarboxylic acid",
+}
+
+
 @pytest.fixture(scope="module")
 def plain():
     return Orthonym()
@@ -101,10 +112,18 @@ def test_flag_emits_the_general_only_name_when_pin_derivation_fails(
     if GENERAL_RETAINED_NAMES.get(smiles) != expected:
         pytest.skip("%r no longer maps to %r in GENERAL_RETAINED_NAMES" % (smiles, expected))
     default = plain.name(smiles)
+    if smiles in NOW_DERIVED:
+        # Retired witness: the systematic pipeline now derives a real name for it, so the
+        # fallback can no longer fire (clause 3) -- an IMPROVEMENT, not a regression. The row
+        # keeps its id and now pins the safety half of the contract on the same molecule:
+        # the flag must NOT replace a derived name with the trivial one.
+        assert default == NOW_DERIVED[smiles]
+        assert trivial.name(smiles) == default != expected
+        return
     assert is_failure_name(default), (
         "precondition moved: %s now names as %r, so the fallback can no longer "
         "fire on it (clause 3). This is an IMPROVEMENT, not a regression — "
-        "retire this row." % (smiles, default)
+        "retire this row (add it to NOW_DERIVED)." % (smiles, default)
     )
     assert trivial.name(smiles) == expected
 

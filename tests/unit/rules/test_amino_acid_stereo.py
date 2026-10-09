@@ -13,14 +13,18 @@ class TestAminoAcidSystematicStereo:
     """Systematic amino acid names include CIP stereo prefix."""
 
     # -07 (a phase): a stereo-tagged free STANDARD amino acid now resolves to
-    # its retained PIN with the configurational descriptor: L implicit,
-    # D explicit), not the old wrong-parent systematic '(2S)-2-aminopropanoic acid'.
+    # its retained PIN with the configurational descriptor, not the old wrong-parent
+    # systematic '(2S)-2-aminopropanoic acid'. a6cadc255 ("a free amino acid keeps its
+    # L") then made the L explicit too: "The stereodescriptors 'D' and 'L'"
+    # (the Blue Book) designates the configuration at the alpha-carbon by 'D' or 'L';
+    # the omission of 'L' is licensed only for peptides, (:54717). A bare
+    # `alanine` for L-alanine is also the same string as the configuration-free name.
     # Both retained forms are OPSIN-round-trip-verified.
     def test_alanine_enantiomers_resolve_to_retained_pin(self):
-        """The two alanine enantiomers resolve to 'alanine' (L) and 'D-alanine'."""
+        """The two alanine enantiomers resolve to 'L-alanine' and 'D-alanine'."""
         # CIP-based: [C@@H](N)(C)C(=O)O is the R (D) enantiomer; [C@H](...) is S (L).
         assert name_compound("[C@@H](N)(C)C(=O)O") == "D-alanine"
-        assert name_compound("[C@H](N)(C)C(=O)O") == "alanine"
+        assert name_compound("[C@H](N)(C)C(=O)O") == "L-alanine"
 
     def test_l_and_d_alanine_different_names(self):
         """L and D alanine produce different (retained) names — stereo not dropped."""
@@ -97,20 +101,26 @@ class TestWSD07RetainedStereo:
     DEFERS to the systematic namer."""
 
     def test_true_l_isoleucine(self):
-        assert name_compound("CC[C@H](C)[C@H](N)C(=O)O") == "isoleucine"
+        # a6cadc255: a free amino acid keeps its L, the Blue Book).
+        assert name_compound("CC[C@H](C)[C@H](N)C(=O)O") == "L-isoleucine"
 
     def test_d_alanine(self):
         assert name_compound("C[C@@H](N)C(=O)O") == "D-alanine"
 
     def test_l_alanine_implicit(self):
-        assert name_compound("C[C@H](N)C(=O)O") == "alanine"
+        # a6cadc255: the L is no longer implicit for a free amino acid,
+        # the Blue Book; the omission is licensed for peptides only,.
+        assert name_compound("C[C@H](N)C(=O)O") == "L-alanine"
 
     def test_allo_isoleucine_named(self):
         # W8 P3 Task 3.1: the 2-centre allo diastereomers of
         # threonine/isoleucine now emit their retained-name PIN. This SMILES is
         # (2R,3S) = D-allo-isoleucine (CIP + OPSIN-RT verified). Previously this
         # deferred to the systematic name (test formerly `test_allo_isoleucine_defers`).
-        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-allo-isoleucine"
+        # bcd75afe2: 'allo' is FUSED into the name, 'D-alloisoleucine' -- "Use of
+        # the prefix 'allo'" (the Blue Book, 'L-alloisoleucine (symbol 'aIle')
+        # (2S,3R)-2-amino-3-methylpentanoic acid'), not hyphenated onto the stem.
+        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-alloisoleucine"
 
     def test_glycine_achiral(self):
         assert name_compound("NCC(=O)O") == "glycine"

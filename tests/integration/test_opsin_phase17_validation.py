@@ -56,9 +56,10 @@ class TestPhase17Regressions:
         assert result == "azanium", f"Expected azanium, got: {result}"
 
     def test_ion_retained_methylammonium(self):
-        """Methylammonium retained name via ion fall-through."""
+        """Methylammonium is no longer a PIN: (the Blue Book) makes the -aminium
+        names preferred, 'methanaminium (PIN)' the Blue Book."""
         result = name_compound("C[NH3+]")
-        assert result == "methylammonium", f"Expected methylammonium, got: {result}"
+        assert result == "methanaminium", f"Expected methanaminium, got: {result}"
 
     def test_ion_retained_benzoate(self):
         """Benzoate retained name via ion fall-through."""

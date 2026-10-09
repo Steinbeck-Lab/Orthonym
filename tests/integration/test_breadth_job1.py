@@ -79,7 +79,15 @@ RERUN_BUILT = frozenset({
     "COc1c(C)cnc(CS(=O)c2nc3ccc(O)cc3[nH]2)c1C",
     "COc1ccc(C2=C(Cc3ccc4c(c3)CC(O)C(C)(C)O4)[C@H](OC)OC2=O)cc1",
     "Cc1nnc(C(C)C)n1C1CC2CCC(C1)N2CC[C@H](NC(=O)C1CCC(F)(F)CC1)c1ccc(O)cc1",
-    "C1CC1C2=NC3=CC=CC=C3C(=C2)C(=O)O[C@H](C4=CC=CC=C4)C(=O)NC5CC5",
+    # (L4, 2026-10-09) '(1R)-2-(cyclopropylamino)-2-oxo-1-phenylethyl 2-cyclopropylquinoline-
+    # 4-carboxylate' left this list: the ester producer now names the alcohol group from its
+    # structure (``fragment_assembly._alcohol_group_candidates``), so the strict first run builds
+    # the name itself (it used to glue the amide alcohol's own name in front of the acid word,
+    # '(2R)-N-cyclopropyl-2-hydroxy-2-phenylacetamide 2-cyclopropylquinoline-4-carboxylate',
+    # which the gate rejected) and it is pin_verified: (the Blue Book) "All
+    # preferred IUPAC names for esters are named by functional class nomenclature"; the
+    # ester is senior to the amide,:18158), so the amide stays in the group as the
+    # prefixes '2-(cyclopropylamino)-2-oxo' (enclosing marks,,:7232).
     "CO[C@H]1[C@H](O)[C@@H](O)[C@H](OCc2cc3cc(O)cc(O)c3c(=O)o2)O[C@@H]1CO",
     "CC/C=C\\C[C@H](O)/C=C/[C@@H]1[C@@H](C/C=C\\CCCC(=O)[O-])[C@@H](O)C[C@H]1O",
     "O=C(O)CCCCCC[C@H]1C(=O)C[C@@H](O)[C@@H]1/C=C/[C@@H](O)CCCCCO",

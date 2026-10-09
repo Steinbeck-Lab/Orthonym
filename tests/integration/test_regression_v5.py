@@ -440,8 +440,12 @@ class TestFattyAcidIdentification:
         assert "{[(9Z,12Z,15Z)-octadeca-9,12,15-trienoyl]oxy}" in name, (
             f"Expected systematic C18:3 acyloxy prefix: '{name}'"
         )
-        assert "{[(11Z,14Z)-icosa-11,14-dienoyl]oxy}" in name, (
-            f"Expected systematic C20:2 acyloxy prefix: '{name}'"
+        # fix-all 2026-10-09: the C20:2 ester is the functional-class word now, the
+        # alcohol component cited before it 'Esters', the Blue Book,
+        # 'All preferred IUPAC names for esters are named by functional class
+        # nomenclature'); OPSIN 2.9.0 reads the whole name back full-InChIKey exact.
+        assert "propan-2-yl (11Z,14Z)-icosa-11,14-dienoate" in name, (
+            f"Expected the systematic C20:2 ester word: '{name}'"
         )
 
     @pytest.mark.integration

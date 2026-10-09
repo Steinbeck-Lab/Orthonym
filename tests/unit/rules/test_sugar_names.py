@@ -80,22 +80,24 @@ class TestSugarLookup:
         assert result == ("β", "D", "glucuronopyranose")
 
     def test_nonstereo_fallback(self):
-        """Sugar SMILES without @ characters returns base name only."""
-        # Non-stereo glucose-like: strip all stereo from glucose SMILES
-        # OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O -> OCC1OC(O)C(O)C(O)C1O
+        """A sugar SMILES without @ falls back to connectivity-only matching, but ONLY for a
+        skeleton that exactly one configurational base name occupies (71f61338c, PF:
+        names that assert stereochemistry the input never defined).
+
+        All 8 hexopyranoses share the single skeleton OCC1OC(O)C(O)C(O)C1O, so 'glucopyranose'
+        would pick one of 8 by dictionary order: the ambiguous skeleton returns None and the
+        systematic namer handles it (see lookup_sugar's docstring example)."""
         from rdkit import Chem
         stereo_smi = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
         mol = Chem.MolFromSmiles(stereo_smi)
         # Remove stereo
         Chem.RemoveStereochemistry(mol)
         nonstereo = Chem.MolToSmiles(mol)
-        result = lookup_sugar(nonstereo)
-        assert result is not None
-        # Should have empty anomer and config, but base name present
-        anomer, config, base_name = result
-        assert anomer == ""
-        assert config == ""
-        assert "glucopyranose" in base_name
+        assert lookup_sugar(nonstereo) is None
+        assert lookup_sugar("OCC1OC(O)C(O)C(O)C1O") is None  # the docstring example
+        # An unambiguous skeleton keeps the fallback: empty anomer and config, base name only.
+        result = lookup_sugar("CC(=O)NC1C(O)CC(O)(C(=O)O)OC1C(O)C(O)CO")
+        assert result == ("", "", "N-acetylneuraminic acid")
 
 
 # ============================================================================
@@ -255,15 +257,17 @@ class TestOpsinCarbohydrateIntegration:
         assert "glucopyranose" in result.lower(), f"Expected sugar name, got: {result}"
 
     def test_nonstereo_sugar_fallback_expanded(self):
-        """Non-stereo glucose SMILES still returns a sugar name after expansion."""
+        """Non-stereo glucose SMILES: the hexopyranose skeleton is shared by 8 sugars, so it
+        gets no retained sugar name (None); 71f61338c made every ambiguous skeleton decline,
+        and the unambiguous ones keep the connectivity-only fallback."""
         from rdkit import Chem
         stereo_smi = "OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
         mol = Chem.MolFromSmiles(stereo_smi)
         Chem.RemoveStereochemistry(mol)
         nonstereo = Chem.MolToSmiles(mol)
-        result = lookup_sugar(nonstereo)
-        assert result is not None, f"Non-stereo glucose fallback broken after expansion"
-        assert "glucopyranose" in result[2]
+        assert lookup_sugar(nonstereo) is None
+        result = lookup_sugar("OC1OC2COC(C1O)C2O")  # an unambiguous skeleton
+        assert result is not None and result[:2] == ("", "")  # base name only, no anomer/config
 
     def test_carbohydrate_suffix_rules_cataloged(self):
         """Carbohydrate suffix rules dict is populated."""

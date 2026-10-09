@@ -154,6 +154,18 @@ def is_monocyclic_lactam(mol) -> Optional[Dict]:
                 if extra_ring_hetero:
                     continue
 
+                # The Hantzsch-Widman / azacycloalkane parent below is keyed on the
+                # ring SIZE alone and is the SATURATED one ('piperidin-2-one',
+                # 'azecan-2-one'). A ring carrying a double bond or an aromatic
+                # bond would be named without it ('O=C1C=CCCN1' -> 'piperidin-2-one',
+                # a macrolactam polyene -> '1-azacyclotetracosan-2-one'): leave it
+                # to the producers that name the unsaturated ring.
+                if any(b.GetBondType() != Chem.BondType.SINGLE
+                       for b in mol.GetBonds()
+                       if b.GetBeginAtomIdx() in ring_set
+                       and b.GetEndAtomIdx() in ring_set):
+                    continue
+
                 return {
                     "ring_atoms": ring,
                     "nitrogen_idx": n_idx,
@@ -433,6 +445,12 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
                 n_groups[sub_name].append(sub_info.locant)
             else:
                 groups[sub_name].append(sub_info.locant)
+        else:
+            # The cascade has no name for this branch ('substituent' is its
+            # refusal placeholder). Skipping it names the ring without the branch,
+            # a different molecule: a macrolactam lost the amino-sugar glycoside
+            # on its C-12 oxygen. Decline, so the next producer names the whole.
+            return None
 
     if not groups and not n_groups:
         if stereo_descriptors:

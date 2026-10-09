@@ -38,26 +38,31 @@ class TestAcyloxyParenthesization:
 
     @pytest.mark.integration
     def test_triacetin_uses_tris(self):
-        """Glycerol triacetate uses tris(acetyloxy) not tri(acetyloxy)."""
+        """Glycerol triacetate: a PIN ester is a functional class name,
+        the Blue Book), so there is no acyloxy prefix to multiply; 'propane-1,2,3-triyl
+        triacetate (PIN)', the Blue Book."""
         name = name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O")
-        assert "tris(acetyloxy)" in name, (
-            f"Expected 'tris(acetyloxy)' in '{name}'"
+        assert name == "propane-1,2,3-triyl triacetate", (
+            f"Expected 'propane-1,2,3-triyl triacetate', got '{name}'"
         )
 
     @pytest.mark.integration
     def test_diacetate_uses_bis(self):
-        """Glycerol diacetate uses bis(acetyloxy) not di(acetyloxy)."""
+        """Glycerol diacetate: functional class multiplicative name with the free OH as a
+        'hydroxy' prefix on the multivalent group (esters outrank alcohols,,
+        the Blue Book / the Blue Book; 'propane-1,3-diyl bis(chloroacetate) (PIN)', the Blue Book)."""
         name = name_compound("CC(=O)OCC(O)COC(C)=O")
-        assert "bis(acetyloxy)" in name, (
-            f"Expected 'bis(acetyloxy)' in '{name}'"
+        assert name == "2-hydroxypropane-1,3-diyl diacetate", (
+            f"Expected '2-hydroxypropane-1,3-diyl diacetate', got '{name}'"
         )
 
     @pytest.mark.integration
     def test_tripropionin_uses_tris(self):
-        """Glycerol tripropionate uses tris(propanoyloxy)."""
+        """Glycerol tripropionate: functional class multiplicative name,
+        the Blue Book; 'propane-1,2,3-triyl triacetate (PIN)', the Blue Book)."""
         name = name_compound("CCC(=O)OCC(COC(=O)CC)OC(=O)CC")
-        assert "tris(propanoyloxy)" in name, (
-            f"Expected 'tris(propanoyloxy)' in '{name}'"
+        assert name == "propane-1,2,3-triyl tripropanoate", (
+            f"Expected 'propane-1,2,3-triyl tripropanoate', got '{name}'"
         )
 
     @pytest.mark.integration
@@ -106,18 +111,33 @@ class TestParenthesizationCompounds:
         assert name_is_rt_exact(name, self.COMPOUND_11), name
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_compound_65_no_hybrid_format(self):
-        """Compound #65 (HA=55): bis(acetyloxy) and (benzoyloxy), not di(acetyloxy)."""
+        """Compound #65 (HA=55): bis(acetyloxy), not di(acetyloxy); the acyls are cinnamoyl.
+
+        Compound #65 is a sucrose ester with four acetyl and two cinnamoyl (3-phenylprop-2-
+        enoyl) groups. The old text also asked for '(benzoyloxy)', but no acyl group of the
+        molecule is a benzoyl, and the raw name that satisfied the old checks,
+        '(2S,3R,4S,5S,6R)-1,3-bis(acetyloxy)-4-[(acetyloxy)methyl]-2-hydroxyoxane', names a
+        fragment (an acetyloxy on the ring oxygen, 6 R centres, no second sugar): OPSIN cannot
+        parse it. No PIN is built for this molecule, so the default tier declines (the plan's
+        decision D-b) and best-effort names it: the tier contract. The multiplying prefix
+        of a compound substituent group is 'bis': (the Blue Book), "For
+        compound or complex substituent groups... the multiplicative prefixes 'bis',
+        'tris', 'tetrakis-', etc. are used", never 'di(acetyloxy)'.
+        """
+        from tests.support.rt_assert import assert_tier_contract
+
         smiles = (
             "CC(=O)OC[C@H]1O[C@@H](O[C@]2(COC(C)=O)O[C@H](COC(=O)/C=C/c3ccccc3)"
             "[C@@H](O)[C@@H]2OC(=O)/C=C/c2ccccc2)[C@H](OC(C)=O)[C@@H](O)[C@@H]1OC(C)=O"
         )
-        name = name_compound(smiles)
+        _pin, name = assert_tier_contract(smiles)
         assert "bis(acetyloxy)" in name, (
             f"Expected 'bis(acetyloxy)' in '{name}'"
         )
-        assert "(benzoyloxy)" in name, (
-            f"Expected '(benzoyloxy)' in '{name}'"
+        assert "(2E)-3-phenylprop-2-enoyl" in name, (
+            f"Expected the cinnamoyl groups in '{name}'"
         )
         assert "di(acetyloxy)" not in name, (
             f"Unexpected hybrid 'di(acetyloxy)' in '{name}'"

@@ -279,6 +279,7 @@ def assemble_fragment_name(
     style: str = "pin",
     fragment_smiles: Optional[Dict[str, str]] = None,
     parent_smiles: Optional[str] = None,
+    outcome: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """Assemble fragment names into a multi-component IUPAC name.
 
@@ -297,6 +298,11 @@ def assemble_fragment_name(
             only the glycoside assembler consumes this (the sugar-skeleton
             deriver and the aglycone seniority guard both need structure); all
             other assemblers ignore it, keeping them byte-identical.
+        outcome: Optional mapping the assembler may fill to say more than ``None`` does.
+            The ester and carbamate assemblers set ``outcome['unproven']`` to the name the
+            string rule built from the alcohol's own name when they could not prove a group
+            word (the split is then UNPROVEN, ``engine._try_single_bond_decompose``). The
+            name is never returned: the return value is ``None`` all the same.
 
     Returns:
         Assembled multi-component name, or None if assembly fails.
@@ -326,6 +332,21 @@ def assemble_fragment_name(
     # keeps its two-arg signature byte-identical.
     if bond_type == "amide":
         return _assemble_amide(fragment_names, style, fragment_smiles=fragment_smiles)
+
+    # The ester assembler needs the alcohol fragment's structure to write its group
+    # word ('<group> <acid>ate') when the alcohol's name cannot carry it: a name
+    # whose hydroxy is a prefix, or one with several hydroxy groups, does not say
+    # which oxygen is the ester's.
+    if bond_type == "ester":
+        return _assemble_ester(
+            fragment_names, style, fragment_smiles=fragment_smiles,
+            parent_smiles=parent_smiles, outcome=outcome,
+        )
+
+    # Same for the carbamate assembler: it reports through ``outcome`` the name it could not
+    # build a monovalent group word for.
+    if bond_type == "carbamate":
+        return _assemble_carbamate(fragment_names, style, outcome=outcome)
 
     assemblers = {
         "ester": _assemble_ester,
@@ -628,15 +649,317 @@ def _group_n_substituents(name: str) -> str:
 # Bond-type-specific assemblers
 # ============================================================================
 
-def _assemble_ester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+# ----------------------------------------------------------------------------
+# The group word of a functional-class name, derived from the alcohol fragment
+# ----------------------------------------------------------------------------
+# An ester ('<group> <acid>ate'), a glycoside, a carbamate and a phosphate diester cite the
+# alcohol part as a monovalent GROUP word. The alcohol fragment arrives named as an alcohol,
+# and the string rule ``_alcohol_to_alkyl`` turns '...-ol' into '...yl'. That rule can only
+# be right when the '-ol' IS the one hydroxy group of the fragment. It is not right when
+# * the name has no '-ol' (a ketone, an ester or a lactone ranks above the hydroxy, so
+# the alcohol O is cited as a 'hydroxy' prefix and the name does not say which carbon
+# it sat on: '2-dodecyl-3-hydroxynaphthalene-1,4-dione' + 'acetate'), or
+# * the name has a multiplied '-ol' ('ethane-1,2-diol' -> 'ethane-1,2-diyl', a group
+# with two free valences), or
+# * the fragment has other hydroxy groups, so no name can say which one is the ester's.
+# ``_is_monovalent_group_word`` rejects the second case at every caller. The ester
+# producer (``_alcohol_group_candidates``) and the glycoside producer
+# (``_aglycone_polyol_group``) build the group word from the STRUCTURE of the fragment in the
+# other two and ship it only after a round trip; the carbamate producer declines.
+
+#: A multiplied '-ol' suffix: the alcohol fragment's name cites several hydroxy groups
+#: ('-diol', '-triol', '-tetrol'/'-tetraol', '-pentol', '-hexol': the multiplier's final 'a' is
+#: elided before the vowel of 'ol', "Elision of vowels", (c), the Blue Book).
+_POLYOL_NAME_RE = _re.compile(r'(?:di|tri|tetra?|penta?|hexa?|hepta?|octa?|nona?|deca?)ol$')
+
+#: A free-valence multiplier on a group word: '-diyl', '-triyl', '-tetrayl'.
+_POLYVALENT_GROUP_RE = _re.compile(r'(?:di|tri|tetra|penta|hexa|hepta|octa)yl$')
+
+
+def _is_monovalent_group_word(word: Optional[str]) -> bool:
+    """True when ``word`` is ONE monovalent group word ('ethyl', 'heptan-2-yl',
+    '4-hydroxyphenyl'): a single token that ends in '-yl' and not in a multiplied
+    free valence ('ethane-1,2-diyl'), and is not a refusal label.
+
+    ``_alcohol_to_alkyl`` returns its input unchanged when it matches no alcohol
+    pattern, so a caller that glues its result into a name must test it with this."""
+    if not word or " " in word:
+        return False
+    if is_refusal_sentinel(word) or word == "substituent":
+        return False
+    return word.endswith("yl") and not _POLYVALENT_GROUP_RE.search(word)
+
+
+def _free_hydroxyl_sites(mol) -> List[Tuple[int, int]]:
+    """The (oxygen, carbon) pairs of every free hydroxy group on a carbon of ``mol``:
+    an uncharged O with one heavy neighbour, a carbon, and at least one H."""
+    sites = []
+    for atom in mol.GetAtoms():
+        if (atom.GetAtomicNum() == 8 and atom.GetDegree() == 1
+                and atom.GetTotalNumHs() >= 1 and atom.GetFormalCharge() == 0):
+            nb = atom.GetNeighbors()[0]
+            if nb.GetAtomicNum() == 6:
+                sites.append((atom.GetIdx(), nb.GetIdx()))
+    return sites
+
+
+def _constitution_smiles(mol) -> Optional[str]:
+    """Stereo-free canonical SMILES of ``mol`` (None when it does not sanitise)."""
+    try:
+        return _Chem.MolToSmiles(_Chem.Mol(mol), isomericSmiles=False)
+    except Exception:
+        return None
+
+
+def _condense(alcohol_mol, partner, a_o: int, p_o: int, p_c: int):
+    """The molecule made by joining the alcohol's oxygen ``a_o`` to the partner's carbon
+    ``p_c`` in place of the partner's oxygen ``p_o`` (loss of water), or None.
+
+    The alcohol's atoms keep their indices (the partner's follow them). The partner carbon
+    swaps its old oxygen for the alcohol's, which moves the new neighbour to the END of its
+    bond list: an odd move inverts the meaning of a chiral tag, so it is inverted back
+    (the anomeric carbon of a sugar)."""
+    off = alcohol_mol.GetNumAtoms()
+    rw = _Chem.RWMol(_Chem.CombineMols(alcohol_mol, partner))
+    link = rw.GetAtomWithIdx(a_o)
+    link.SetNumExplicitHs(0)
+    link.SetNoImplicit(False)
+    pc_atom = rw.GetAtomWithIdx(p_c + off)
+    order = [bd.GetOtherAtomIdx(p_c + off) for bd in pc_atom.GetBonds()]
+    tag = pc_atom.GetChiralTag()
+    odd_move = (len(order) - 1 - order.index(p_o + off)) % 2 == 1
+    rw.AddBond(a_o, p_c + off, _Chem.BondType.SINGLE)
+    rw.RemoveAtom(p_o + off)
+    if odd_move and tag in (_Chem.ChiralType.CHI_TETRAHEDRAL_CW,
+                            _Chem.ChiralType.CHI_TETRAHEDRAL_CCW):
+        new_pc = p_c + off - (1 if p_o < p_c else 0)
+        rw.GetAtomWithIdx(new_pc).InvertChirality()
+    try:
+        joined = rw.GetMol()
+        _Chem.SanitizeMol(joined)
+        _Chem.AssignStereochemistry(joined, cleanIt=True, force=True)
+    except Exception:
+        return None
+    return joined
+
+
+def _alcohol_sites_joined_to_parent(
+    alcohol_mol,
+    partner_smiles: Optional[str],
+    parent_smiles: Optional[str],
+    want_joined: bool = False,
+):
+    """The hydroxy sites of the alcohol fragment that, joined to the partner fragment
+    (the acid) by loss of water, give back the parent molecule.
+
+    The alcohol fragment was cut from the parent and capped with -OH, so when it holds
+    several hydroxy groups its SMILES does not say which one was the linking oxygen.
+    Every (alcohol hydroxy, partner hydroxy) pair is condensed again and kept only when
+    the constitution equals the parent's. Sites that are symmetry-equivalent in the
+    fragment are one site; when two sites differ only in their stereo environment (the
+    two ends of a hexitol) the stereo-aware condensation picks the one that gives the
+    parent's isomeric SMILES. Returns  when no site, or two different sites, reproduce
+    the parent (the caller then declines).
+
+    With one hydroxy site the answer is that site; with several and no SMILES pair, .
+    Returns ``(sites, joined)``: ``joined`` is the condensed molecule of the chosen site
+    (the parent, rebuilt), in which the alcohol keeps its atom indices, built only when
+    ``want_joined`` is true and None when it could not be rebuilt.
+    """
+    sites = _free_hydroxyl_sites(alcohol_mol)
+    partner = _Chem.MolFromSmiles(partner_smiles) if partner_smiles else None
+    parent = _Chem.MolFromSmiles(parent_smiles) if parent_smiles else None
+    parent_con = _constitution_smiles(parent) if parent is not None else None
+    parent_iso = _Chem.MolToSmiles(parent) if parent is not None else None
+    partner_sites = _free_hydroxyl_sites(partner) if partner is not None else []
+    can_join = bool(parent_con and partner_sites)
+
+    if len(sites) <= 1 and not (want_joined and can_join):
+        return sites, None  # the cap -OH of the fragment is the only candidate
+    if not can_join:
+        return [], None
+
+    ranks = list(_Chem.CanonicalRankAtoms(alcohol_mol, breakTies=False))
+    found: List[Tuple[int, int, object]] = []
+    found_iso: List[Tuple[int, int, object]] = []
+    for a_o, a_c in sites:
+        for p_o, p_c in partner_sites:
+            joined = _condense(alcohol_mol, partner, a_o, p_o, p_c)
+            if joined is None:
+                continue
+            if _constitution_smiles(joined) == parent_con:
+                found.append((a_o, a_c, joined))
+                if _Chem.MolToSmiles(joined) == parent_iso:
+                    found_iso.append((a_o, a_c, joined))
+                break
+
+    def _pick(cands):
+        if cands and len({ranks[c] for _, c, _j in cands}) == 1:
+            a_o, a_c, joined = cands[0]
+            return [(a_o, a_c)], joined
+        return None
+
+    # Several sites reproduce the constitution: the stereo-aware condensation decides.
+    chosen = _pick(found_iso) if len(sites) > 1 and len(found) > 1 else None
+    chosen = chosen or _pick(found)
+    if chosen is None:
+        if len(sites) == 1:  # a lone site needs no proof; the join only supplies the context
+            return sites, None
+        return [], None
+    return chosen
+
+
+def _alcohol_structural_group(
+    alcohol_smiles: Optional[str],
+    partner_smiles: Optional[str] = None,
+    parent_smiles: Optional[str] = None,
+) -> Optional[str]:
+    """The monovalent group word of an alcohol fragment, derived from its STRUCTURE.
+
+    The linking oxygen is located (``_alcohol_sites_joined_to_parent``), removed, and the
+    rest of the fragment is named as a substituent group whose free valence sits on the
+    carbon that bore it, through the substituent namer free-valence morphology;
+     lowest locant for the free valence). Every other hydroxy group stays in the
+    group as a 'hydroxy' prefix: '4-hydroxyphenyl'.
+
+    The group is named in the internal notes of the molecule it belongs to when that can be
+    rebuilt (the fragment condensed with its partner): a stereodescriptor inside the group
+    is a CIP label of the whole molecule, and the cut-off fragment alone, whose linking
+    oxygen is gone, can rank a centre's neighbours differently ('(2R)' for a glycerol
+    carbon that is 'S' in the parent).
+
+    Determinism: the fragment is re-parsed through its canonical SMILES first, so the
+    numbering does not depend on the incoming atom order. Fails closed (None) when the
+    linking oxygen is not identified or the fragment cannot be named as one group word.
+    """
+    if not alcohol_smiles:
+        return None
+    mol = _Chem.MolFromSmiles(alcohol_smiles)
+    if mol is None:
+        return None
+    mol = _Chem.MolFromSmiles(_Chem.MolToSmiles(mol))
+    if mol is None:
+        return None
+    sites, joined = _alcohol_sites_joined_to_parent(
+        mol, partner_smiles, parent_smiles, want_joined=True)
+    if len(sites) != 1:
+        return None
+    o_idx, c_idx = sites[0]
+    frag = [a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() != o_idx]
+    from ..assembly.substituent_enumerator import name_substituent
+    try:
+        word = name_substituent(
+            joined if joined is not None else mol, frag, c_idx, allow_mancude=True)
+    except Exception:
+        return None
+    if not _is_monovalent_group_word(word) or _has_unlocanted_cip_descriptor(word):
+        return None
+    return word
+
+
+#: A CIP descriptor block with no locant inside a group word: '(S)', '(R,S)'.
+_UNLOCANTED_CIP_RE = _re.compile(r'\((?:[RS])(?:,[RS])*\)')
+
+
+def _has_unlocanted_cip_descriptor(word: str) -> bool:
+    """True when ``word`` cites an R/S descriptor without its locant ('(S)-6-hydroxy-...-8-yl').
+
+     "Naming of stereoisomers" (the Blue Book, the paragraph after the heading):
+    descriptors "are preceded by a numerical or letter locant to describe the position of the
+    stereogenic unit when such locants are present". A ring group has such locants. The
+    substituent namer drops the locant for the stereocentre of some hydro-fused ring groups, and a
+    name that carries such a group is not offered: OPSIN still reads it, but a later spelling
+    gate refuses it and the molecule then loses the name the general pipeline would have built.
+    The candidate is declined here so that the caller falls through to that pipeline."""
+    return bool(_UNLOCANTED_CIP_RE.search(word))
+
+
+def _name_round_trips(smiles: str, name: str) -> bool:
+    """True iff OPSIN reads ``name`` back to ``smiles`` (full InChI: constitution, stereo).
+
+    Fail-OPEN when OPSIN / Java is unavailable, the posture of the final validity gate: the
+    round trip cannot be checked then, so it cannot veto."""
+    try:
+        from ..validation.opsin_roundtrip import (
+            _find_opsin_jar,
+            _java_available,
+            opsin_roundtrip_check,
+        )
+        if _find_opsin_jar() is None or not _java_available():
+            return True
+        return bool(opsin_roundtrip_check(smiles, name).get("passed"))
+    except Exception:
+        return True
+
+
+def _alcohol_group_candidates(
+    alcohol_name: str,
+    fragment_smiles: Optional[Dict[str, str]] = None,
+    parent_smiles: Optional[str] = None,
+) -> List[Tuple[str, bool]]:
+    """``[(word, needs_proof)]``: the group words that may stand for an alcohol fragment
+    in an ester name, in the order they are tried.
+
+    The string rule (``_alcohol_to_alkyl``) is faithful where the fragment has exactly ONE
+    hydroxy group (so the '-ol' it reads is the linking oxygen) and the rule produced a
+    monovalent '-yl' word: that word is returned alone and needs no proof. Where the
+    fragment has several hydroxy groups, or its name cites its hydroxy group as a prefix, the
+    name does not say which oxygen was the ester's. Two candidates are then offered, each
+    ``needs_proof``: the string rule's word where it is a monovalent '-yl' word (the form
+    this producer has always built, right whenever the '-ol' happens to be the linking
+    oxygen), and the group word built from the STRUCTURE of the fragment
+    (``_alcohol_structural_group``). A candidate is shipped only after its name round-trips
+    to the parent, so a wrong linking oxygen costs the candidate, not the molecule.
+    """
+    word = _alcohol_to_alkyl(alcohol_name)
+    monovalent = _is_monovalent_group_word(word)
+    alcohol_smiles = (fragment_smiles or {}).get("alkyl")
+    if not alcohol_smiles:
+        return [(word, False)] if monovalent else []
+    alcohol_mol = _Chem.MolFromSmiles(alcohol_smiles)
+    if (alcohol_mol is not None and len(_free_hydroxyl_sites(alcohol_mol)) == 1
+            and monovalent):
+        return [(word, False)]
+    out: List[Tuple[str, bool]] = [(word, True)] if monovalent else []
+    if parent_smiles:
+        structural = _alcohol_structural_group(
+            alcohol_smiles, (fragment_smiles or {}).get("acid"), parent_smiles)
+        if structural and structural != word:
+            out.append((structural, True))
+    return out
+
+
+def _assemble_ester(
+    fragment_names: Dict[str, str],
+    style: str,
+    fragment_smiles: Optional[Dict[str, str]] = None,
+    parent_smiles: Optional[str] = None,
+    outcome: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
     """Assemble ester name as 'alkyl alkanoate'.
 
     Args:
         fragment_names: {"acid": acid_name, "alkyl": alkyl_name}
         style: Naming style.
+        fragment_smiles: Optional {"acid":..., "alkyl":...} SMILES of the two capped
+            fragments. When present, the group word is derived from the alcohol's
+            STRUCTURE whenever its name cannot carry it (see
+            ``_alcohol_group_candidates``).
+        parent_smiles: Optional SMILES of the whole molecule, used to find which
+            hydroxy group of the alcohol fragment is the ester's oxygen.
+        outcome: Optional mapping; when no candidate is proven it receives the name the
+            string rule alone would have built, as ``outcome['unproven']``. The return value
+            is ``None`` all the same.
 
     Returns:
         Ester name like "ethyl acetate", or None.
+
+     "General methodology", (the Blue Book): "All preferred
+    IUPAC names for esters are named by functional class nomenclature" -- 'ethyl acetate'
+    (:31667), 'trimethylsilyl acetate' (:31657): the first word is the name of the
+    organyl GROUP, never the name of the alcohol. "Definitions" (:31649): the
+    alcohol may be an "alcohol, phenol, heterol, or enol", so the group word is a
+    substituent name for any of them, ('2-hydroxyethyl', '4-hydroxyphenyl', '...-2-yl').
     """
     acid_name = fragment_names.get("acid")
     alkyl_name = fragment_names.get("alkyl")
@@ -661,12 +984,28 @@ def _assemble_ester(fragment_names: Dict[str, str], style: str) -> Optional[str]
         return None
 
     ate_name = _acid_to_ate(acid_name)
-    alkyl_prefix = _alcohol_to_alkyl(alkyl_name)
-
-    if not ate_name or not alkyl_prefix:
+    if not ate_name:
         return None
 
-    return f"{alkyl_prefix} {ate_name}"
+    # A group word that is not the trusted one-hydroxy string rule rests on proofs this
+    # producer cannot make by reading names (which oxygen was the ester's; that the
+    # substituent namer described every atom of the group). The round trip is the net
+    # (0-wrong): a name OPSIN does not read back to the parent is not offered, and the next
+    # candidate is tried. With no parent to check against (``parent_smiles`` None) the
+    # string word is built as it always was.
+    for alkyl_prefix, needs_proof in _alcohol_group_candidates(
+            alkyl_name, fragment_smiles, parent_smiles):
+        name = f"{alkyl_prefix} {ate_name}"
+        if not needs_proof or not parent_smiles or _name_round_trips(parent_smiles, name):
+            return name
+    # Nothing is proven. Say what the string rule would have built (never returned): the
+    # decomposition search is told that this split is UNPROVEN and not simply unnamed, which
+    # it bounds the search that follows by (``engine._exploration_exhausted``).
+    if outcome is not None:
+        string_word = _alcohol_to_alkyl(alkyl_name)
+        if string_word:
+            outcome["unproven"] = f"{string_word} {ate_name}"
+    return None
 
 
 #: Suffix spellings of an acid with MORE than one acid group. Its acyl prefix
@@ -1120,9 +1459,61 @@ def _aglycone_to_substituent(
     # malformed two-word name that the validity gate would then reject as
     # "unknown". All four in-scope aglycones convert to a -yl prefix
     # (methyl/ethyl/2-aminoethyl/phenyl/2-naphthyl).
-    if not prefix.endswith("yl"):
+    #
+    # '-yl' is necessary but not sufficient: '-diyl'/'-triyl' also end in it ('benzene-
+    # 1,4-diyl' for hydroquinone), and a group with two free valences is not the
+    # group of a glycoside (it counts the glycosidic oxygen twice and OPSIN cannot parse
+    # it). A '-diyl' word is not offered. A monovalent word is only FAITHFUL when the
+    # aglycone has ONE hydroxy group (the glycosidic one); with others the name cannot say
+    # which hydroxy was glycosylated, so ``_assemble_glycoside`` proves such a word by a
+    # round trip before it ships it (``_aglycone_polyol_group``).
+    if not _is_monovalent_group_word(prefix):
         return None
     return prefix
+
+
+def _aglycone_polyol_group(
+    aglycone_smiles: Optional[str],
+    sugar_smiles: Optional[str],
+    parent_smiles: Optional[str],
+) -> Optional[str]:
+    """The monovalent group word of an aglycone that has OTHER hydroxy groups, from its
+    STRUCTURE ('4-hydroxyphenyl' for hydroquinone), or None.
+
+    The aglycone name ('benzene-1,4-diol') cannot say which hydroxy group the sugar sits on,
+    so the string rule cannot build the group word (it reads the multiplied '-ol' as
+    '-diyl'). The glycosylated oxygen is found by condensing each hydroxy group of the
+    aglycone with the sugar back to the parent (``_alcohol_structural_group``) and the other
+    hydroxy groups stay in the group as 'hydroxy' prefixes. "Names"
+    (the Blue Book): "Glycosides are named by using functional class nomenclature....
+    The class name is preceded, as a separate word, by the name of the substituent group
+    that is part of the acetal or ketal function."
+
+    Same seniority guard as ``_aglycone_to_substituent`` : a group senior to hydroxy
+    keeps the substitutive form,:53915). An aglycone that is itself a
+    carbohydrate ring (a pyranose or furanose with its hydroxy groups) makes the molecule an
+    oligosaccharide, named by "Disaccharides and oligosaccharides" (:54101, "Names of
+    disaccharides and oligosaccharides are formed by the principles, rules, and conventions
+    described above for monosaccharides") and not by a functional-class group word built here;
+    it keeps the name of the general pipeline. The caller round-trips the result.
+    """
+    if not (aglycone_smiles and sugar_smiles and parent_smiles):
+        return None
+    mol = _Chem.MolFromSmiles(aglycone_smiles)
+    if mol is None or len(_free_hydroxyl_sites(mol)) < 2:
+        return None
+    from ..namer import _has_sugar_ring_pattern
+    if _has_sugar_ring_pattern(mol):
+        return None
+    try:
+        pg, _atoms = get_principal_group(mol, detect_functional_groups(mol))
+    except Exception:
+        return None
+    if pg is not None:
+        rank = SENIORITY_ORDER.index(pg) if pg in SENIORITY_ORDER else 999
+        if rank < HYDROXY_TOP:
+            return None
+    return _alcohol_structural_group(aglycone_smiles, sugar_smiles, parent_smiles)
 
 
 def _aglycone_structural_substituent(aglycone_smiles: Optional[str]) -> Optional[str]:
@@ -1302,7 +1693,21 @@ def _assemble_glycoside(
                     if parent_smiles else None
                 )
                 structural_form = None
-                if structural_prefix:
+                # An aglycone with OTHER hydroxy groups: the string word is right only when
+                # its '-ol' happens to be the glycosylated oxygen, which the name does not
+                # say. Both the string word and the word built from structure are then
+                # offered to the round trip (branch B); neither ships on trust.
+                aglycone_polyol_mol = _Chem.MolFromSmiles(aglycone_smiles) if aglycone_smiles else None
+                polyol_aglycone = (
+                    aglycone_polyol_mol is not None
+                    and len(_free_hydroxyl_sites(aglycone_polyol_mol)) > 1
+                )
+                if polyol_aglycone:
+                    polyol_prefix = _aglycone_polyol_group(
+                        aglycone_smiles, sugar_smiles, parent_smiles)
+                    if polyol_prefix:
+                        structural_form = f"{polyol_prefix} {head}"
+                elif structural_prefix:
                     # Enclose a complex substituent (locants/brackets) per
                     #; a bare 'cyclohexyl'/'phenyl' stays unenclosed.
                     wrapped = (
@@ -1327,7 +1732,7 @@ def _assemble_glycoside(
                 # change. Closing it (RT-gating the fast path) would re-introduce the
                 # warm-cache OPSIN perturbation documented at branch B / in the
                 # report, so it is deliberately DEFERRED (out of Incr-1a scope).
-                if string_form is not None and (
+                if string_form is not None and not polyol_aglycone and (
                     structural_prefix is None
                     or aglycone_prefix == structural_prefix
                 ):
@@ -1358,7 +1763,7 @@ def _assemble_glycoside(
                             parent_smiles, cand
                         ).get("passed"):
                             return cand
-                elif string_form is not None:
+                elif string_form is not None and not polyol_aglycone:
                     return string_form
 
     # --- The legacy substitutive fallback is REMOVED (it could not be right) ---
@@ -1395,7 +1800,11 @@ def _assemble_glycoside(
     return None
 
 
-def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[str]:
+def _assemble_carbamate(
+    fragment_names: Dict[str, str],
+    style: str,
+    outcome: Optional[Dict[str, str]] = None,
+) -> Optional[str]:
     """Assemble carbamate name.
 
     Basic pattern: "[alkyl] [amine]carbamate"
@@ -1403,6 +1812,9 @@ def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[
     Args:
         fragment_names: {"acid": acid_name, "alkyl": alkyl_name, "amine": amine_name}
         style: Naming style.
+        outcome: Optional mapping; when the alcohol's name yields no monovalent group word
+            it receives the name the string rule would have built, as
+            ``outcome['unproven']``. The return value is ``None`` all the same.
 
     Returns:
         Carbamate name, or None.
@@ -1417,12 +1829,21 @@ def _assemble_carbamate(fragment_names: Dict[str, str], style: str) -> Optional[
     if not alkyl_prefix:
         return None
 
+    name = f"{alkyl_prefix} carbamate"
     if amine_name:
         amine_prefix = _amine_to_prefix(amine_name)
         if amine_prefix:
-            return f"{alkyl_prefix} {amine_prefix}carbamate"
+            name = f"{alkyl_prefix} {amine_prefix}carbamate"
 
-    return f"{alkyl_prefix} carbamate"
+    if not _is_monovalent_group_word(alkyl_prefix):
+        # The alcohol's name carries no single group (a polyol, a name whose hydroxy is a
+        # prefix): the string word would name another molecule. Not offered; reported as an
+        # unproven split.
+        if outcome is not None:
+            outcome["unproven"] = name
+        return None
+
+    return name
 
 
 _POSITION_INVARIANT_PARENTS = frozenset({
@@ -2699,6 +3120,14 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
     if name.endswith("yl"):
         return name
 
+    # A multiplied '-ol' ('ethane-1,2-diol') names an alcohol with several hydroxy groups:
+    # no monovalent group can be read from the name (which hydroxy is the linking one?),
+    # and '-diyl' would be a group with TWO free valences. Return the name unchanged, as
+    # for every other name this rule cannot convert; callers test the result with
+    # ``_is_monovalent_group_word``.
+    if _POLYOL_NAME_RE.search(name):
+        return name
+
     # Systematic alcohol: "propan-1-ol" -> "propyl"
     # Strip locant + "-ol" suffix
     if "-ol" in name:
@@ -2795,6 +3224,12 @@ def _amine_to_prefix(amine_name: str) -> Optional[str]:
 
         base = name[:-5]  # "methylamine" -> "methyl"
         if not base:
+            return None
+        # A polyamine ('ethane-1,2-diamine', 'propane-1,2,3-triamine') is not ONE
+        # alkylamino prefix: stripping 'amine' left 'ethane-1,2-diyl', a divalent
+        # group that drops one nitrogen. Decline, the caller keeps its other routes.
+        import re as _re_poly
+        if _re_poly.search(r'(?:di|tri|tetra|penta|hexa|hepta|octa)$', base):
             return None
         # If base already looks like a prefix (ends with "yl"), return it
         if base.endswith("yl"):

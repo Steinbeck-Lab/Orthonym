@@ -156,7 +156,10 @@ class TestRetainedIonNames:
 
     def test_naphthoate(self):
         result = name_compound('O=C([O-])c1ccc2ccccc2c1')
-        assert result == 'naphthoate', f"Got: {result}"
+        # (the Blue Book): '2-naphthoic acid... naphthalene-2-carboxylic acid
+        # (PIN)'. The bare 'naphthoate' is also the wrong isomer (OPSIN reads it as the
+        # 1-isomer), so the PIN anion carries the locant.
+        assert result == 'naphthalene-2-carboxylate', f"Got: {result}"
 
     def test_4_chlorobenzoate(self):
         result = name_compound('O=C([O-])c1ccc(Cl)cc1')
@@ -283,7 +286,11 @@ class TestAminoAcidZwitterionNaming:
     def test_racemic_alanine_zwitterion(self):
         """Racemic alanine zwitterion."""
         result = name_compound('[NH3+]C(C)C([O-])=O')
-        assert result == 'alanine', f"Expected alanine, got: {result}"
+        # The input has an undefined alpha centre, so the configuration-implying
+        # retained name 'alanine' (L) would over-specify it; the
+        # zwitterion is named by method (1) of (the Blue Book,
+        # 'azaniumylacetate glycine zwitterion', the Blue Book).
+        assert result == '2-azaniumylpropanoate', f"Expected 2-azaniumylpropanoate, got: {result}"
 
     def test_no_azaniumyl_for_amino_acids(self):
         """Amino acid zwitterions should NOT produce azaniumyl ionic names."""

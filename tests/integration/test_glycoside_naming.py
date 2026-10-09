@@ -41,19 +41,28 @@ class TestBasicGlycosideNaming:
         assert name == "methyl α-D-glucopyranoside"
 
     def test_galactoside(self):
-        """4-Hydroxyphenyl β-D-galactopyranoside stays legacy (diol aglycone).
+        """4-Hydroxyphenyl β-D-galactopyranoside: functional-class form (diol aglycone).
 
-        The aglycone here is hydroquinone (a diol), which is NOT a clean
-        monovalent substituent (``_alcohol_to_alkyl`` cannot produce a -yl
-        prefix), so the triad fails closed to the legacy substitutive
-        ``(β-D-galactopyranosyloxy)hydroquinone`` form (zero regression).
+        The aglycone is hydroquinone, a diol: its name cannot say which hydroxy group the
+        sugar sits on, and the string rule (``_alcohol_to_alkyl``) read the multiplied '-ol' as
+        the divalent 'benzene-1,4-diyl', a group with two free valences that counts the
+        glycosidic oxygen twice ('benzene-1,4-diyl beta-D-galactopyranoside', which OPSIN
+        cannot parse). The group word is now built from the STRUCTURE of the aglycone
+        (``_aglycone_polyol_group``: the oxygen that condenses with the sugar back to the parent
+        is the glycosidic one, the other hydroxy group stays a 'hydroxy' prefix) and is shipped
+        only after it round-trips to the parent. "Names" (the Blue Book):
+        "Glycosides are named by using functional class nomenclature.... The class name is
+        preceded, as a separate word, by the name of the substituent group that is part of the
+        acetal or ketal function." Only a group senior to hydroxy turns a glycoside
+        substitutive,:53915: "not 4-acetylphenyl β-D-glucopyranoside; a ketone is
+        senior to a hydroxy compound"); a second hydroxy group is not senior to the glycosidic
+        one. OPSIN 2.9.0 full-InChIKey exact. The old text asserted the legacy
+        '(glycosyloxy)hydroquinone' form, which was removed (see ``_assemble_glycoside``).
         """
         name = name_compound(
             "OC[C@H]1O[C@@H](Oc2ccc(O)cc2)[C@H](O)[C@@H](O)[C@H]1O"
         )
-        assert name is not None
-        assert name != "unknown"
-        assert "galactopyranosyloxy" in name.lower()
+        assert name == "4-hydroxyphenyl β-D-galactopyranoside", name
 
     def test_rhamnoside(self):
         """Phenyl α-L-rhamnopyranoside: functional-class form (-08 flip).
@@ -76,13 +85,16 @@ class TestBasicGlycosideNaming:
         assert name == "ethyl β-D-glucopyranoside"
 
     def test_naphthyl_glucoside(self):
-        """2-Naphthyl β-D-glucopyranoside: functional-class form (WSD-08 flip)."""
+        """Naphthalen-2-yl β-D-glucopyranoside: functional-class form (WSD-08 flip)."""
         name = name_compound(
             "OC[C@H]1O[C@@H](Oc2ccc3ccccc3c2)[C@H](O)[C@@H](O)[C@@H]1O"
         )
         assert name is not None
         assert name != "unknown"
-        assert name == "2-naphthyl β-D-glucopyranoside"
+        # (the Blue Book; the naphthyl entry is:16382) retains the traditional ring prefixes "only for
+        # general nomenclature": '2-naphthyl (also 1-isomer) naphthalen-2-yl (also
+        # 1-isomer; preferred prefixes)' -- the preferred prefix is naphthalen-2-yl.
+        assert name == "naphthalen-2-yl β-D-glucopyranoside"
 
 
 # ============================================================================

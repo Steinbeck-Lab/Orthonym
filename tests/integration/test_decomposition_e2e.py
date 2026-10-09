@@ -27,17 +27,21 @@ class TestEsterDecomposition:
     produced incomplete names due to fragment loss."""
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_phthalate_monoester_produces_complete_name(self):
         """Phthalic acid monoester: was 'benzoic acid', now includes alkyl chain."""
-        # CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O = 8-methylnonyl phthalate
+        # CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O = 8-methylnonyl hydrogen phthalate
         name = name_compound("CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O")
         assert name != "unknown", "Should not be unknown"
         assert name != "benzoic acid", "Should not be just 'benzoic acid' (fragment loss)"
         assert len(name) > 10, "Name should be longer than a simple retained name"
-        # Should contain ester-related suffix
-        assert "ate" in name.lower() or "oate" in name.lower(), (
-            f"Expected ester name (contains 'ate'), got: {name}"
-        )
+        # A partial ester of a dibasic acid is named by method (1): "Partial
+        # esters of polybasic acids and their salts" (the Blue Book), "Method (1)
+        # generates preferred IUPAC names." (:31940), the free acid owning the suffix and the
+        # ester cited as a prefix ('2-chloro-6-(ethoxycarbonyl)benzoic acid (PIN)',:31950).
+        # It used to be asserted as an 'ate' name; the old 'decyloxycarbonyl' spelling named the
+        # n-decyl isomer. OPSIN 2.9.0 full-InChIKey exact.
+        assert name == "2-{[(8-methylnonyl)oxy]carbonyl}benzoic acid", name
 
     @pytest.mark.integration
     def test_triglyceride_produces_complete_name(self):
@@ -73,13 +77,26 @@ class TestEsterDecomposition:
         )
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_hexacyclic_oxa_acetate(self):
-        """Complex hexacyclic compound with acetate: was 'icosyl acetate'."""
+        """Complex hexacyclic compound with acetate: was 'icosyl acetate'.
+
+        With the validity gate off this test passed on the cage producer's raw
+        '2-ethoxy-6,9,14-trihydroxy-...-icos-10-en-18-one' (the 2-acetyloxy group
+        spelled by its carbon count, the C=O lost, no stereo: C22H28O8 for the
+        input's C22H26O9), which only the round trip stops. A name that shipped
+        like that is not what this test is about; it asserts what ships, with the
+        gate on: the tier contract (best-effort RT-exact, the PIN tier never a
+        name that is not RT-exact) and the acetyl group kept as 'acetate' or
+        'acetyloxy'. The policy is 4e4e7cc52 (default tier = verified PIN or
+        decline); the same pattern is used by test_macrolide_ester_produces_
+        complete_name below."""
+        from tests.support.rt_assert import assert_tier_contract
         smi = (
             "C=C1[C@@H](O)O[C@H]2[C@H]1C[C@@H](OC(C)=O)[C@]13C(=O)O"
             "[C@H]4C[C@](C)(O)[C@H]([C@H]41)[C@@]31C=C(C)[C@]2(O)O1"
         )
-        name = name_compound(smi)
+        pin, name = assert_tier_contract(smi)
         assert name != "unknown"
         assert name != "icosyl acetate", "Should not be just 'icosyl acetate' (fragment loss)"
         # With seniority swap, the name may use substitutive (acetyloxy) prefix
@@ -143,21 +160,31 @@ class TestAmideDecomposition:
         )
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_histidyl_adenylate_produces_complete_name(self):
         """Nucleotide ester (histidyl-adenylate): a phase-03 coverage
         guard rejects 'adenine' (7 chars for 33 HA = ratio 0.21),
-        triggering decomposition that produces a more complete name."""
+        triggering decomposition that produces a more complete name.
+
+        The old expected value 'adenine (2S)-2-amino-3-imidazolylpropanoate' is a
+        glue OPSIN cannot parse. With the gate off the producer's raw name was the
+        histidine alcohol '(2S)-2-amino-3-(1H-imidazol-4-yl)propanol' (C6H11N3O for
+        the input's C16H21N8O8P: the whole adenosine phosphate dropped and the ester
+        C=O read as '-ol'). The test asserts what ships, with the gate on: the tier
+        contract (policy 4e4e7cc52) -- best-effort names the molecule and
+        round-trips to the input's full InChIKey, which is the completeness the old
+        string was standing in for; the PIN tier names nothing that is not exact."""
+        from tests.support.rt_assert import assert_tier_contract
         smi = (
             "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](OC(=O)"
             "[C@@H](N)Cc2c[nH]cn2)[C@H]1O"
         )
-        name = name_compound(smi)
+        pin, name = assert_tier_contract(smi)
         assert name != "unknown"
         # Coverage guard (a phase-03): 'adenine' ratio 0.21 < 0.25 threshold
-        # for HA=33 molecule -> decomposition produces more descriptive name
-        assert name == "adenine (2S)-2-amino-3-imidazolylpropanoate", (
-            f"Expected decomposition result, got '{name}'"
-        )
+        # for HA=33 molecule -> a bare fragment name is never the answer
+        assert pin != "adenine" and name != "adenine"
+        assert len(name) > 40, f"Expected a complete name, got '{name}'"
 
     @pytest.mark.integration
     @pytest.mark.opsin_gate
@@ -270,11 +297,15 @@ class TestDecompositionNameQuality:
     contain expected IUPAC name components for the bond type."""
 
     @pytest.mark.integration
+    @pytest.mark.opsin_gate
     def test_ester_decomposition_has_ate_suffix(self):
-        """Ester decomposition should produce names with '-ate' suffix."""
-        # Phthalate monoester
+        """A partial ester of a dibasic acid is named on the acid, not 'ate'."""
+        # Phthalate monoester: the free acid is the senior class and owns the suffix, so the
+        # ester is the prefix of the PIN, method (1) of "Partial esters of
+        # polybasic acids and their salts" (the Blue Book,:31940,:31950). The test
+        # name is kept; it used to assert an '-ate' ester name.
         name = name_compound("CC(C)CCCCCCCOC(=O)c1ccccc1C(=O)O")
-        assert "ate" in name.lower(), f"Ester name should contain 'ate': {name}"
+        assert name == "2-{[(8-methylnonyl)oxy]carbonyl}benzoic acid", name
 
     @pytest.mark.integration
     def test_triglyceride_references_multiple_acyl_chains(self):

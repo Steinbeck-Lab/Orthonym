@@ -91,7 +91,12 @@ class TestAmidineNSubstituentEnclosure:
          "methyl 4-(dimethylamino)-4-(methylimino)butanoate"),
         ("COC(=O)CCC(=NCc1ccccc1)NC",
          "methyl 4-(benzylimino)-4-(methylamino)butanoate"),
-        ("CC(=NCC)N(C)C", "N,N-dimethyl-N'-ethylethanimidamide"),
+        # (the Blue Book, under the heading "ALPHANUMERICAL ORDER"):
+        # "Simple prefixes (i.e., those describing atoms and unsubstituted substituents) are
+        # arranged alphabetically; multiplicative prefixes, if necessary, are then inserted and
+        # do not alter the alphabetical order already established": 'ethyl' precedes 'methyl',
+        # whatever the primes. (The old value cited the N,N pair first.)
+        ("CC(=NCC)N(C)C", "N'-ethyl-N,N-dimethylethanimidamide"),
     ])
     def test_simple_n_substituents_are_byte_identical(self, smiles, expected):
         """The regression half. A SIMPLE substituent (methyl/ethyl/benzyl) must

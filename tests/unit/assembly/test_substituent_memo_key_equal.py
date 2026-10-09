@@ -1,10 +1,16 @@
 """Lever G: the optimised _substituent_memo_key must return EXACTLY the value of the frozen
-reference below (a verbatim copy of the function as of commit b48165466, 2026-09-12)."""
+reference below (a verbatim copy of the function as of commit b48165466, 2026-09-12), followed by
+the three breadth-flag components that dd759cc50 (a lever, 2026-09-17) appended on purpose."""
 import itertools
 import pytest
 from rdkit import Chem
 from orthonym.assembly import substituent_enumerator as se
 from orthonym.assembly import memo
+from orthonym.metrics.provenance import (
+    allow_aromatic_general_ctx,
+    full_coverage_ctx,
+    general_fallback_ctx,
+)
 from orthonym.perception.molcache import bonds_of
 
 
@@ -125,7 +131,17 @@ def test_key_identical_to_reference(smi):
             others = [i for i in range(n) if i != attach]
             for frag in (others[: max(2, n // 2)], others[n // 3: n // 3 + max(2, n // 2)], [attach] + others[:3]):
                 for am, be in itertools.product((False, True), (False, True)):
-                    assert se._substituent_memo_key(mol, frag, attach, am, be) == _reference_key(mol, frag, attach, am, be)
+                    key = se._substituent_memo_key(mol, frag, attach, am, be)
+                    ref = _reference_key(mol, frag, attach, am, be)
+                    if ref is None:  # the fail-open "do not cache" answer must stay the same
+                        assert key is None
+                        continue
+                    # dd759cc50 (a lever) appended the three breadth flags to the key so a value cached
+                    # at one breadth configuration is never served to another; the first ten components
+                    # are still byte-identical to the frozen reference.
+                    assert key[:10] == ref
+                    assert key[10:] == (general_fallback_ctx.get(), allow_aromatic_general_ctx.get(),
+                                        full_coverage_ctx.get())
     finally:
         memo.pop_scope(tok)
 

@@ -139,6 +139,7 @@ def test_declines_no_oxo_phosphite():
 
 
 @pytest.mark.slow
+@pytest.mark.opsin_gate
 def test_end_to_end_diphosphate_names_on_best_effort():
     # The primary form is now the diphosphoxane PIN skeletal parent (method 2),
     # emitted on the best-effort tier; method-1 recursive-phosphoryl is the fallback.

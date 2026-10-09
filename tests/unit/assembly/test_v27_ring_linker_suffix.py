@@ -135,9 +135,12 @@ def test_sulfonyl_branch_never_drops_oxygens_default():
     """PIN default (allow_mancude=False): unchanged -- the pre-existing route
     owns S-attached branches; the new complete-tier guard does not fire, so the
     branch namer must NOT return a =O-dropping 'methyl'/'ethyl'."""
-    # byte-identical to pre-P2 default (the ring engine that would drop it is
-    # tier-gated and never runs at the default tier).
-    assert _s_branch("CS(=O)(=O)c1ccccc1", allow_mancude=False) == "methyl"
+    # The default-tier branch namer now builds the sulfonyl prefix itself: the
+    # PIN prefix 'methanesulfonyl' "General methodology", the Blue Book
+    # '2-(methanesulfonyl)benzoic acid (PIN)'), which covers the S and both =O. The
+    # former assertion pinned a =O-dropping 'methyl', contradicting this test's own
+    # docstring; the S atom and its oxygens must never be lost.
+    assert _s_branch("CS(=O)(=O)c1ccccc1", allow_mancude=False) == "methanesulfonyl"
 
 
 def test_fused_methanesulfonyl_covered():

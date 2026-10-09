@@ -83,24 +83,29 @@ def test_low_ha_canaries_produce_name_in_both_modes(
 
 @pytest.mark.integration
 def test_min_ratio_fallback_constant_exists():
-    """Verify `_MIN_RATIO_FALLBACK = 0.20` exists in composer.py per.
+    """Verify `_MIN_RATIO_FALLBACK = 0.20` exists in tier_a_ring.py per.
 
     This is a source-level assertion: the constant must be present as a
     literal in the module source so static introspection confirms the
     preservation invariant. Renaming to a different literal (e.g., 0.15
     or 0.25) silently breaks and this test catches it.
+
+    The Tier-A ring cascade (with the rescue) lives in
+    assembly/handlers/tier_a_ring.py since commit 38f7788da ("register
+    tier_a_ring + remove inline Tier-A ring cascade", internal notes); the
+    literal and the condition carried over unchanged from composer.py.
     """
-    import orthonym.assembly.composer as composer
-    with open(composer.__file__) as fp:
+    import orthonym.assembly.handlers.tier_a_ring as tier_a_ring
+    with open(tier_a_ring.__file__) as fp:
         src = fp.read()
     assert "_MIN_RATIO_FALLBACK = 0.20" in src, (
         "D-10 PRESERVATION FAILURE: _MIN_RATIO_FALLBACK constant "
-        "missing or not set to 0.20 in composer.py"
+        "missing or not set to 0.20 in tier_a_ring.py"
     )
     # Confirm the fallback condition is still present.
     assert "if total_heavy <= 15" in src, (
         "D-10 PRESERVATION FAILURE: low-heavy-atom rescue condition "
-        "(`if total_heavy <= 15 or ...`) removed from composer.py"
+        "(`if total_heavy <= 15 or ...`) removed from tier_a_ring.py"
     )
 
 

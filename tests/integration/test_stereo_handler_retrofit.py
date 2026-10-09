@@ -126,10 +126,15 @@ class TestNearMissStereoCompounds:
                 "thiazinone polycycle; the old stereo-bearing name was a fragment "
                 "(bdd69a673) -- TODO in TRIAGE.md 'Suite fix -- j1-regressions'"))],
         ),
-        # Benzofuran with (7aS)
-        (
+        # Benzofuran, one stereocentre: C2 of the 2,3-dihydro-1-benzofuran, '(2S)'. The
+        # '7a' atom is an aromatic ring-fusion atom with no stereo, so the old '(7aS)'
+        # pattern was unsatisfiable; the input has exactly one stereocentre (the CH(CH3)
+        # carbon, position 2 of the 2,3-dihydro-1-benzofuran). The id keeps the original
+        # pattern's spelling so the row identity is stable.
+        pytest.param(
             r'COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2',
-            r'\(7aS\)',
+            r'\(2S\)',
+            id=r'COc1c(Cl)c2c(c(C(=O)O)c1Cl)C[C@H](C)O2-\(7aS\)',
         ),
     ])
     def test_individual_near_miss_has_stereo(self, smiles, expected_stereo_pattern):

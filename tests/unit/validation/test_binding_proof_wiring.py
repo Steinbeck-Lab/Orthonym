@@ -23,12 +23,27 @@ PROBES = ["CCO", "CC(=O)O", "Cc1ccccc1", "CCCCCCCCCCCC(=O)O",
 #
 # NOTE: conftest disables the OPSIN validity gate for the whole unit suite
 # (``_disable_opsin_validity_gate_for_tests``), which changes WHICH molecules
-# reach the engine: two of these three are named by a legacy handler here and
+# reach the engine: some of these are named by a legacy handler here and
 # only reach the engine in production, where suppresses that emission.
-ENGINE_PROBES = ["ClCCOc1ccccc1", "CC1CCC2CCCCC2C1", "CC1C2C=CC1c1ccccc12"]
+#
+# The probes are re-measured each time the PIN path grows: the previous set
+# ('ClCCOc1ccccc1', 'CC1CCC2CCCCC2C1', 'CC1C2C=CC1c1ccccc12') is named by the PIN path
+# now -- (2-chloroethoxy)benzene, 2-methyldecahydronaphthalene and the bridged fused
+# '9-methyl-1,4-dihydro-1,4-methanonaphthalene' -- so none of them reaches the engine
+# and the three tests below that needed a recorded spine failed (or, for
+# test_off_mode_records_nothing, passed vacuously). Measured 2026-10-09 with this
+# harness state (gate disabled, best-effort flags, binding_proof='audit') over the
+# <=30-heavy-atom molecules of benchmarks/pubchem_2000.csv: 30 of 1396 record a
+# spine ('general_engine' 26, 'general_engine_recovery' 4); the four below are four of them,
+# of different classes (a Boc-protected thiazolidine acid, a hydroxyamino enone, a diazinane
+# carbamate, a decalin sulfenyl chloride), each with a computed verdict.
+ENGINE_PROBES = ["CC(C)(C)OC(=O)N1CCS[C@@H]1C(=O)O", "C1CC(=CC(=O)C1)NO",
+                 "CCOC(=O)N1CCCC(N1)C(=O)O", "C1CCC2C(C1)CCCC2SCl"]
 # The one verified to record under THIS harness (gate disabled). Used where a
-# test needs a recorded spine as a precondition rather than as a sweep.
-ENGINE_PROBE = "CC1C2C=CC1c1ccccc12"
+# test needs a recorded spine as a precondition rather than as a sweep. It must reach the
+# LATE-RECOVERY site (stage 'general_engine_recovery'): that is the only site where the retained-name
+# swap that test_a_retained_name_swap_after_the_certificate_is_reported pins can fire.
+ENGINE_PROBE = "C1CCC2C(C1)CCCC2SCl"
 
 
 def _best_effort(**kw):

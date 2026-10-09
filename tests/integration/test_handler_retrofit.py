@@ -550,14 +550,21 @@ class TestBenzeneRetrofit:
         pytest.fail("Did not find ester C on benzene ring")
 
     def test_succinimide_not_collapsed_to_carboxamide(self):
-        """Succinimide (imide ring) on benzene identified as ring substituent, not amide suffix.
+        """N-phenylsuccinimide: the imide ring is the parent, never collapsed to 'carboxamide'.
 
         a phase Plan 03 requirement: when a succinimide ring is attached to
-        benzene via N, the benzene handler must recognize it as an imide ring
-        substituent ('succinimidyl'), not collapse it to 'carboxamide' suffix.
+        benzene via N, it must not be collapsed to a 'carboxamide' suffix. The
+        benzene handler's helper now declines the N-linked imide ring (returns None
+        and falls through) because the ring that carries the principal characteristic
+        group is the parent, not benzene: IMIDES (the Blue Book)
+        '1-bromopyrrolidine-2,5-dione (PIN) (not N-bromosuccinimide; substitution is
+        not allowed on succinimide)' and:33851 '2-phenyl-1H-isoindole-1,3(2H)-dione
+        (PIN)... N-phenylphthalimide'. So no 'succinimidyl' prefix exists to be
+        identified, and the whole-molecule name pins the outcome.
         """
         from rdkit import Chem
         from orthonym.rules.benzene import _identify_substituent
+        from orthonym.namer import name_compound
 
         mol = Chem.MolFromSmiles("O=C1CCC(=O)N1c1ccccc1")
         ring_atoms = set()
@@ -575,11 +582,12 @@ class TestBenzeneRetrofit:
             for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
                 if nbr.GetIdx() not in ring_atoms and nbr.GetSymbol() == 'N':
                     result = _identify_substituent(mol, nbr.GetIdx(), ring_atoms)
-                    assert result is not None, "Succinimide N returned None"
-                    # Must NOT be 'carboxamide' (suffix collapse)
-                    assert result['name'] != 'carboxamide', (
+                    # Must NOT be 'carboxamide' (suffix collapse); None = declined.
+                    assert result is None or result['name'] != 'carboxamide', (
                         f"Succinimide collapsed to 'carboxamide': {result}"
                     )
+                    assert name_compound("O=C1CCC(=O)N1c1ccccc1") == (
+                        "1-phenylpyrrolidine-2,5-dione")
                     return
         pytest.fail("Did not find N-substituent on benzene ring")
 
@@ -588,8 +596,9 @@ class TestBenzeneRetrofit:
         from orthonym.namer import name_compound
         result = name_compound("CC(C)Cc1ccccc1")
         assert result is not None
-        assert "isobutyl" in result.lower(), f"Expected 'isobutyl' in '{result}'"
-        assert "benzene" in result.lower(), f"Expected 'benzene' in '{result}'"
+        # 'Retained prefixes no longer recommended as approved prefixes'
+        # (the Blue Book): '2-methylpropyl (preferred prefix) (not isobutyl)' (:16412).
+        assert result == "(2-methylpropyl)benzene", f"Expected '(2-methylpropyl)benzene', got '{result}'"
 
     def test_benzoyl_chloride_no_double_counting(self):
         """Benzoyl chloride: suffix FG correctly handled, no carbonyl prefix."""
@@ -743,13 +752,19 @@ class TestCategoryCHandlerSafety:
         """Isocyanate handler correctly names simple R-groups."""
         from orthonym import name_compound
         result = name_compound("CN=C=O")
-        assert "isocyanate" in result.lower()
+        # 'ISOCYANATES' (the Blue Book): "Preferred IUPAC names are
+        # generated substitutively using the prefix isocyanato"; the functional class
+        # name 'methyl isocyanate' is the previous recommendation (cf.:26007
+        # 'isocyanatocyclohexane (PIN) cyclohexyl isocyanate').
+        assert result == "isocyanatomethane"
 
     def test_isothiocyanate_simple_works(self):
         """Isothiocyanate handler correctly names simple R-groups."""
         from orthonym import name_compound
         result = name_compound("CN=C=S")
-        assert "isothiocyanate" in result.lower()
+        # 'ISOCYANATES' covers the chalcogen analogues: ':26009 isothiocyanatobenzene
+        # (PIN) phenyl isothiocyanate'.
+        assert result == "isothiocyanatomethane"
 
     def test_boronic_acid_simple_works(self):
         """Boronic acid handler names simple R-groups correctly."""
@@ -799,14 +814,21 @@ class TestCategoryCHandlerSafety:
         from orthonym import name_compound
         result = name_compound("CS(=O)C")
         assert result is not None
-        assert "sulfoxide" in result.lower(), f"Expected 'sulfoxide' in '{result}'"
+        # 'SULFOXIDES AND SULFONES' (the Blue Book): "Methods (1) and (3)
+        # generate preferred names." -- (1) substitutively, by prefixing the acyl group
+        # R'-SO-; (2) functional class 'sulfoxide' is not a PIN method.
+        # '(methanesulfinyl)methane (PIN)' is printed at:46154.
+        assert result == "(methanesulfinyl)methane", f"Expected '(methanesulfinyl)methane', got '{result}'"
 
     def test_sulfone_simple(self):
         """Sulfone handler names simple dimethyl sulfone."""
         from orthonym import name_compound
         result = name_compound("CS(=O)(=O)C")
         assert result is not None
-        assert "sulfone" in result.lower(), f"Expected 'sulfone' in '{result}'"
+        # 'SULFOXIDES AND SULFONES' (the Blue Book): "Methods (1) and (3)
+        # generate preferred names."; the functional class name 'sulfone' is method (2)
+        # ('(ethanesulfonyl)ethane (PIN)... diethyl sulfone',:28118).
+        assert result == "(methanesulfonyl)methane", f"Expected '(methanesulfonyl)methane', got '{result}'"
 
     def test_guanidine_retained(self):
         """Guanidine handler produces retained name."""
@@ -819,7 +841,11 @@ class TestCategoryCHandlerSafety:
         from orthonym import name_compound
         result = name_compound("CC(=NO)C")
         assert result is not None
-        assert "oxime" in result.lower(), f"Expected 'oxime' in '{result}'"
+        # 'Oximes' (under, the Blue Book): "Preferred IUPAC
+        # names are formed substitutively as N-hydroxy derivatives of imines" (example
+        #:38468 'N-hydroxypentan-2-imine (PIN)... pentan-2-one oxime'); the oxime name
+        # is the functional class form.
+        assert result == "N-hydroxypropan-2-imine", f"Expected 'N-hydroxypropan-2-imine', got '{result}'"
 
     def test_carbamate_functional_class(self):
         """Carbamate handler uses functional class naming."""

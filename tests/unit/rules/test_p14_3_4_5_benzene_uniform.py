@@ -346,23 +346,34 @@ class TestIsotopeEndToEnd:
         from orthonym.namer import Orthonym
         assert Orthonym().name("[13CH3]OC(C)=O") == "(13C)methyl acetate"
 
-    # ---------------- STILL OPEN, with evidence ------------------------------------- #
+    # ---------------- two labelled atoms: the isotopomers are distinct ---------------- #
+    # "Locants are not omitted when there is a possibility of isomers"
+    # (the Blue Book): the 1,2- / 1,3- / 1,4-isotopomers of two 13C on benzenehexol
+    # are three distinct compounds, so the label locants are cited, and "if
+    # isotopic modification requires a locant to specify its position, then all locants
+    # must be specified and none are omitted" (:44180) restores the six hydroxy locants.
+    # This row was an OPEN DEFECT (strict xfail: only the 1,2-isotopomer was named, by luck
+    # of OPSIN's default parse; the others gave 'unknown organic compound') until ffcb9c551
+    # (2026-09-23, "cite locant when a split isotopomer is distinct ") built
+    # the multi-locant descriptor. Each name reads back to its input's full InChIKey with
+    # OPSIN 2.9.0 (an InChIKey for 1,2; -VFZPYAPFSA-N for 1,3;
+    # -JQBJTBFPSA-N for 1,4: the isotope layers differ, so the three names are not
+    # interchangeable).
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "OPEN DEFECT, evidenced not guessed. Two 13C on benzenehexol: the 1,2- / 1,3- / "
-        "1,4-isotopomers are three distinct compounds, so P-82.6.1.4 (BB:44198, "
-        "'Locants are not omitted when there is a possibility of isomers') requires the "
-        "label locants, and P-82.6.1.1 would then restore the six hydroxy locants. "
-        "MEASURED: we emit `(13C2)benzenehexol` for the 1,2-isotopomer only because "
-        "OPSIN's default parse lands there, while the 1,3- and 1,4-isotopomers emit "
-        "`unknown organic compound`. Blocked on a MULTI-locant descriptor: "
-        "`_descriptor(locant)` takes a single locant and cannot spell `(1,2-13C2)`. "
-        "Not fixed by the ambient-scope mechanism, because the trigger is the "
-        "descriptor's own locant, which is never reached here."))
     def test_double_labelled_benzenehexol_needs_locants(self):
         from orthonym.namer import Orthonym
         assert Orthonym().name("O[13c]1[13c](O)c(O)c(O)c(O)c1O") == \
             "(1,2-13C2)benzene-1,2,3,4,5,6-hexol"
+
+    def test_double_labelled_benzenehexol_1_3_isotopomer(self):
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("O[13c]1c(O)[13c](O)c(O)c(O)c1O") == \
+            "(1,3-13C2)benzene-1,2,3,4,5,6-hexol"
+
+    def test_double_labelled_benzenehexol_1_4_isotopomer(self):
+        from orthonym.namer import Orthonym
+        assert Orthonym().name("O[13c]1c(O)c(O)[13c](O)c(O)c1O") == \
+            "(1,4-13C2)benzene-1,2,3,4,5,6-hexol"
 
 
 class TestForcedLocantScope:

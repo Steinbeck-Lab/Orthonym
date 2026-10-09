@@ -147,11 +147,19 @@ def test_real_dev500_witness_now_abstains():
     at tier=T4/source=general_engine despite being genuinely OPSIN-unparseable
     (measured via eval/harness.py --tier best-effort, outcome=opsin_parse_fail).
     With the real verify_or_none wired (name_facts=None, no extractor for this
-    shape), it must now abstain rather than ship it bare."""
+    shape), it must never ship an unverified name bare.
+
+    The witness is no longer an abstention: the spiro engine now numbers it
+    differently and emits ``(1S,6R)-4-chloro-5,7,10-trioxospiro[11-oxatricyclo
+    [4.4.1.0^1,6]undeca-3,8-diene-2,3'-2,4-dioxatricyclo[7.3.1.0^5,13]trideca-
+    1(12),5(13),6,8,10-pentaene]``, which OPSIN parses back to the input's full
+    InChIKey. The wiring contract is therefore: ``None`` (abstain) OR a name that
+    round-trips exactly -- the OPSIN-unparseable name must not ship."""
+    from tests.support.rt_assert import name_is_rt_exact
     smi = "O=C1C=CC(=O)[C@@]23O[C@@]12C(=O)C(Cl)=CC31Oc2cccc3cccc(c23)O1"
     from orthonym.jvm_budget import jvm_slots
     nm = Orthonym(general_fallback=True, general_fallback_unverified=True)
     with jvm_slots(1, purpose="test-verify-or-none-real-witness"):
         out = nm._try_general_engine_recovery(smi)
-    assert out is None, (
-        f"real dev500 witness still shipped an OPSIN-unparseable name: {out!r}")
+    assert out is None or name_is_rt_exact(out, smi), (
+        f"real dev500 witness shipped a name that does not round-trip: {out!r}")

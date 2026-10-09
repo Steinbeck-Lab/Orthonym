@@ -23,8 +23,8 @@ import pytest
 from orthonym.namer import Orthonym, name_compound
 
 
-# A molecule the systematic engine genuinely cannot name (returns the
-# "unknown organic compound" fallback at HEAD, robustly — even with the OPSIN
+# A molecule the systematic engine genuinely cannot name (returns a failure
+# fallback label at HEAD, robustly — even with the OPSIN
 # validity gate disabled, which is the state the test conftest autouse fixture
 # forces). Used as the fail-closed / fallback SEAM: no real in-scope molecule
 # has an underivable PIN but a trivial name (controller-verified), so the
@@ -32,12 +32,19 @@ from orthonym.namer import Orthonym, name_compound
 # GENERAL_RETAINED_NAMES for this SMILES.
 _SEAM_SMILES = "[Se]=[Se]"
 _SEAM_NAME = "SYNTHETIC-SEAM-TRIVIAL-NAME"
+# The label of the fail-closed answer for the seam molecule. The seam is carbon-free, so
+# since 4c33b3271 (2026-08-23, "fix(-B3): honest inorganic abstain -- carbon-free
+# structural check (no more unknown-organic-compound sentinel)") its failure label is the
+# honest inorganic one, 'inorganic compound (not supported)' (errors.classify_failure_limit,
+# the has_carbon floor); it is still a failure name, and the fail-closed behaviour these
+# tests pin (no trivial name without --trivial) is unchanged: only the label text moved.
+_SEAM_FAILURE = "inorganic compound (not supported)"
 
 
 @pytest.fixture
 def seam_general_name(monkeypatch):
     """Inject a synthetic general-only (PIN-denied) retained name for a
-    molecule the systematic engine returns 'unknown organic compound' for.
+    molecule the systematic engine returns a failure label for (_SEAM_FAILURE).
 
     Restores the real GENERAL_RETAINED_NAMES dict on teardown (never mutates
     the shared module dict permanently).
@@ -63,12 +70,15 @@ class TestTrivialFallbackMechanism:
         """Sanity: the seam molecule has no derivable PIN (fails closed)."""
         # name_compound normalizes the raw 'unknown' failure signal to the
         # descriptive fallback string.
-        assert name_compound(_SEAM_SMILES, style="pin") == "unknown organic compound"
+        from orthonym.errors import is_failure_name
+        out = name_compound(_SEAM_SMILES, style="pin")
+        assert out == _SEAM_FAILURE
+        assert is_failure_name(out)
 
     def test_default_fails_closed_no_trivial(self, seam_general_name):
         """Default pipeline fails closed even when a general-only trivial
         name exists for the molecule."""
-        assert name_compound(_SEAM_SMILES, style="pin") == "unknown organic compound"
+        assert name_compound(_SEAM_SMILES, style="pin") == _SEAM_FAILURE
 
     def test_trivial_flag_falls_back(self, seam_general_name):
         """--trivial opts into the general-only retained name when (and only
@@ -105,7 +115,7 @@ class TestTrivialFallbackMechanism:
 
     def test_name_compound_accepts_trivial_fallback_kwarg(self, seam_general_name):
         """name_compound threads trivial_fallback through to Orthonym."""
-        assert name_compound(_SEAM_SMILES, style="pin") == "unknown organic compound"
+        assert name_compound(_SEAM_SMILES, style="pin") == _SEAM_FAILURE
         assert name_compound(_SEAM_SMILES, style="pin",
                              trivial_fallback=True) == _SEAM_NAME
 
@@ -484,7 +494,7 @@ class TestC8TrivialThreading:
         assert len(lines) == 2
         # Without --trivial the second line must be the failure string
         second_name = lines[1].split("\t")[1] if "\t" in lines[1] else lines[1]
-        assert second_name == "unknown organic compound", (
-            f"Without --trivial, failure must give 'unknown organic compound', "
+        assert second_name == _SEAM_FAILURE, (
+            f"Without --trivial, failure must give {_SEAM_FAILURE!r}, "
             f"got {second_name!r}"
         )

@@ -140,7 +140,17 @@ class TestCollectStereodescriptorsEZ:
         assert descriptors == [(5, 'E')]  # Uses min(5, 6) = 5
 
     def test_double_bond_one_atom_missing_excluded(self):
-        """Double bond excluded if one atom not in mapping."""
+        """A double bond with only one atom in the mapping is the '-ylidene' double
+        bond of that chain position and is cited with that atom's locant (the test
+        keeps its historical name; it no longer EXCLUDES the bond).
+
+        This used to be excluded ("one atom not in mapping"); 49a0e838f dropped the
+        ring-only condition: (1)(a) "the double bond is considered as an
+        integral part of the parent structure; the stereodescriptor is placed at the
+        front of the substitutive name, preceded by the locant indicating its point of
+        attachment to the parent structure" (the Blue Book;:48279 "Method (a)
+        generates preferred IUPAC names", '(2E)-1-chloro-2-ethylidene-2H-indene (PIN)'
+        :48283)."""
         mol = Chem.MolFromSmiles('C/C=C/C')
         rdCIPLabeler.AssignCIPLabels(mol)
 
@@ -148,7 +158,20 @@ class TestCollectStereodescriptorsEZ:
         atom_to_locant = {0: 1, 1: 2, 3: 4}  # Missing atom 2
 
         descriptors = collect_stereodescriptors(mol, atom_to_locant)
-        assert descriptors == []
+        assert descriptors == [(2, 'E')]  # the in-scope atom's locant
+
+    def test_double_bond_to_an_endocyclic_atom_of_another_ring_excluded(self):
+        """The out-of-scope end of a one-sided double bond must be acyclic: an
+        endocyclic bond of another ring stays out (condition (2) of
+        ``_is_true_exocyclic``, kept by 49a0e838f); the descriptor then belongs to the
+        substituent."""
+        mol = Chem.MolFromSmiles('C/C=C1\\CCCCC1C')
+        rdCIPLabeler.AssignCIPLabels(mol)
+
+        # chain atoms 0,1 in scope; the ring atom 2 carrying the double bond is not
+        assert collect_stereodescriptors(mol, {0: 1, 1: 2}) == []
+        # control: the same bond is cited once both ends are in scope
+        assert collect_stereodescriptors(mol, {0: 1, 1: 2, 2: 3}) == [(2, 'E')]
 
     def test_double_bond_both_atoms_missing_excluded(self):
         """Double bond excluded if both atoms not in mapping."""

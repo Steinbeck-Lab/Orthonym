@@ -123,8 +123,12 @@ class TestHETERO06:
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected_contains", [
-        # Triazines have retained names
-        ("c1nncnn1", "1,2,4-triazine"),
+        # Triazines have retained names. 'c1nncnn1' is 1,2,4,5-TETRAZINE (four ring N),
+        # not a triazine: the 1,2,4-triazine row uses its own SMILES (the id keeps the
+        # original 'c1nncnn1' spelling so the row identity is stable) and the original
+        # SMILES is pinned to its real name beside it.
+        pytest.param("n1ncncc1", "1,2,4-triazine", id="c1nncnn1-1,2,4-triazine"),
+        ("c1nncnn1", "1,2,4,5-tetrazine"),
         ("c1ncncn1", "1,3,5-triazine"),
         # Tetrazole has retained name
         ("c1nnn[nH]1", "tetrazole"),
@@ -182,11 +186,14 @@ class TestHETERO09:
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
-        # N-substitution uses N-locant format
-        ("CN1CCCC1", "N-methylpyrrolidine"),
-        ("CCN1CCCC1", "N-ethylpyrrolidine"),
-        ("CN1CCCCC1", "N-methylpiperidine"),
-        ("CN1CCOCC1", "N-methylmorpholine"),
+        # A substituent on a ring nitrogen takes the ring's numeric locant, not the
+        # italic N: '4-(...)morpholine (PIN)' the Blue Book and
+        # '4-(cyclohexanesulfinyl)morpholine-2-carboxylic acid (PIN)' the Blue Book.
+        # The ids keep the original 'N-...' spelling so the row identity is stable.
+        pytest.param("CN1CCCC1", "1-methylpyrrolidine", id="CN1CCCC1-N-methylpyrrolidine"),
+        pytest.param("CCN1CCCC1", "1-ethylpyrrolidine", id="CCN1CCCC1-N-ethylpyrrolidine"),
+        pytest.param("CN1CCCCC1", "1-methylpiperidine", id="CN1CCCCC1-N-methylpiperidine"),
+        pytest.param("CN1CCOCC1", "4-methylmorpholine", id="CN1CCOCC1-N-methylmorpholine"),
         # C-substitution uses numeric locants
         ("Cc1ccccn1", "2-methylpyridine"),
         ("Cc1cccnc1", "3-methylpyridine"),
@@ -200,10 +207,13 @@ class TestHETERO09:
 
     @pytest.mark.integration
     def test_n_locant_format(self):
-        """Test that N-substitution uses N-locant, not numeric."""
+        """Test that substitution on a ring N uses the numeric ring locant, not 'N-'.
+
+        '4-(...)morpholine (PIN)', the Blue Book.
+        """
         result = name_compound("CN1CCCC1")
-        assert result.startswith("N-")
-        assert "1-" not in result  # Should not be "1-methyl..."
+        assert result == "1-methylpyrrolidine"
+        assert not result.startswith("N-")
 
     @pytest.mark.integration
     def test_c_locant_is_numeric(self):
@@ -289,13 +299,13 @@ class TestPhase3Regression:
     def test_all_substituted_heterocycles(self):
         """Comprehensive test of substituted heterocycle naming."""
         substituted = [
-            # N-substituted (use N-locant)
-            ("CN1CCCC1", "N-methylpyrrolidine"),
-            ("CCN1CCCC1", "N-ethylpyrrolidine"),
-            ("CN1CCCCC1", "N-methylpiperidine"),
-            ("CN1CCOCC1", "N-methylmorpholine"),
-            ("CN1CC1", "N-methylaziridine"),
-            ("CN1CCC1", "N-methylazetidine"),
+            # N-substituted (the ring nitrogen takes its numeric locant; the Blue Book)
+            ("CN1CCCC1", "1-methylpyrrolidine"),
+            ("CCN1CCCC1", "1-ethylpyrrolidine"),
+            ("CN1CCCCC1", "1-methylpiperidine"),
+            ("CN1CCOCC1", "4-methylmorpholine"),
+            ("CN1CC1", "1-methylaziridine"),
+            ("CN1CCC1", "1-methylazetidine"),
             # C-substituted aromatic (use numeric locants)
             ("Cc1ccccn1", "2-methylpyridine"),
             ("Cc1cccnc1", "3-methylpyridine"),

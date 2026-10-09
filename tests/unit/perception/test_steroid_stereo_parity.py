@@ -43,19 +43,23 @@ def _wiring(info):
 
 
 # (smiles, {locant: expected α/β}, {locants that must be ABSENT/None})
+# The descriptors are the Greek letters the Blue Book writes, the Blue Book: "the
+# stereochemistry at 'C-5', when relevant, is indicated by α, β or ξ... called 'α' if it lies below or
+# 'β' if it lies above the plane of the paper"); b946aa5e0  moved the emitters from the ASCII words
+# to α/β. The literals are spelled out here, not imported, so the tripwire pins the spelling itself.
 PINNED = [
     ("CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O",
-     {5: "alpha", 3: "beta"}, ()),                                                   # row 1
+     {5: "α", 3: "β"}, ()),                                                   # row 1
     ("CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@@H](CC[C@]4(C)[C@H]3CC[C@]12C)O",
-     {5: "alpha", 3: "alpha"}, ()),                                                  # row 2
+     {5: "α", 3: "α"}, ()),                                                  # row 2
     ("CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@@H](CC[C@]4(C)[C@H]3CC[C@]12C)O",
-     {5: "beta", 3: "alpha"}, ()),                                                   # row 3
+     {5: "β", 3: "α"}, ()),                                                   # row 3
     ("O[C@@H]1C[C@@H]2CC[C@H]3[C@@H]4CC[C@@H]([C@@]4(C)CC[C@@H]3[C@]2(CC1)C)O",
-     {5: "alpha", 3: "beta", 17: "beta"}, ()),                                       # row 4
+     {5: "α", 3: "β", 17: "β"}, ()),                                       # row 4
     ("C[C@]12CC[C@H]3[C@@H](CC=C4C[C@@H](O)CC[C@]34C)[C@@H]1CCC2",
-     {3: "beta"}, (5,)),                                                             # row 5 (Δ5 androstenol: C-5 sp2)
+     {3: "β"}, (5,)),                                                             # row 5 (Δ5 androstenol: C-5 sp2)
     ("CC([C@H]1CC[C@H]2[C@@H]3CC[C@H]4C[C@H](CC[C@]4(C)[C@H]3CC[C@]12C)O)O",
-     {5: "alpha", 3: "beta"}, ()),                                                   # row 6
+     {5: "α", 3: "β"}, ()),                                                   # row 6
 ]
 
 
@@ -93,4 +97,4 @@ def test_collect_returns_structured_result():
     result = collect_steroid_alpha_beta(mol, info, numbering)
     assert result is not None, "expected a structured result for a resolvable steroid"
     ring_ab = result["ring_ab"]
-    assert ring_ab.get(3) == "beta" and ring_ab.get(5) == "alpha", ring_ab
+    assert ring_ab.get(3) == "β" and ring_ab.get(5) == "α", ring_ab

@@ -132,8 +132,17 @@ def test_helper_acidnamer_migration_R_fails_closed():
 
 
 def test_helper_acidnamer_drop_R_fails_closed():
-    # a review review: R = acetamidomethyl -> the gate-disabled acid namer DROPPED the
-    # acetamido (`ethanesulfonic acid`). Guard 2 (gate-ON) rejects it -> fail closed.
+    # (The method keeps its historical name so the node id is stable.) a review review: R =
+    # acetamidomethyl -> the gate-disabled acid namer DROPPED the acetamido
+    # (`ethanesulfonic acid`) and guard 2 (gate-ON) rejected it -> fail closed (None).
+    # That drop is gone: the helper now builds the prefix with the acetamido kept,
+    # 'acetamidomethanesulfonamido', the BB pattern of "Substituents of the
+    # types -NH-CO-R and -NH-SO2-R" (the Blue Book; examples:33019 '3-
+    # (methanesulfonamido)propanoic acid (PIN)',:33024 '(1-cyclohexylmethanesulfonamido)
+    # acetic acid'). change-asserted-value: the new value is checked independently below
+    # (OPSIN reads '(acetamidomethanesulfonamido)benzene' back to the exact input, so
+    # nothing is dropped -- the very property the old guard enforced), a capability gain
+    # like test_helper_hetarene_now_names_after_v51_r2 below, not a relaxation.
     m = Chem.MolFromSmiles("O=S(=O)(Nc1ccccc1)CNC(C)=O")  # -NH-SO2-CH2-NHC(=O)CH3
     n_idx = next(a.GetIdx() for a in m.GetAtoms() if a.GetSymbol() == 'N'
                  and any(nb.GetSymbol() == 'S' for nb in a.GetNeighbors()))
@@ -141,7 +150,13 @@ def test_helper_acidnamer_drop_R_fails_closed():
                 if len(r) == 6 and all(m.GetAtomWithIdx(i).GetIsAromatic() for i in r)
                 and any(nb.GetIdx() in r for nb in m.GetAtomWithIdx(n_idx).GetNeighbors()))
     frag = set(range(m.GetNumAtoms())) - benz
-    assert sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz) is None
+    prefix = sulfonamido_prefix_from_n_branch(m, n_idx, frag, benz)
+    assert prefix == "acetamidomethanesulfonamido"
+    from rdkit.Chem import inchi
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    parsed = opsin_parse(f"({prefix})benzene")
+    assert parsed and (inchi.MolToInchiKey(Chem.MolFromSmiles(parsed))
+                       == inchi.MolToInchiKey(m))
 
 
 def test_helper_hetarene_now_names_after_v51_r2():

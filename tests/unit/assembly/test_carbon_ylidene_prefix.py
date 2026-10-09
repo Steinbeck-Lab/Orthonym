@@ -146,6 +146,26 @@ class TestCarbonYlidenePrefixes:
         mol = _mol("CC#CC1CCCCC1")
         assert name_substituent(mol, {0, 1}, 1) == "ethylidyne"
 
+    def test_boronic_acid_ylidene_is_a_built_prefix(self):
+        """``(HO)2B-CH=`` on a ring carbon is a ``methylidene`` carrying the
+        ``dihydroxyboranyl`` group, never a single-valence token.
+
+        This is the witness that used to demonstrate the best-effort None
+        abstention (``test_mancude_tier_abstains_with_none``); the tier now
+        builds it. Blue Book "Substituent groups for the boron
+        acids" (the Blue Book): ``(HO)2B- borono (preselected prefix)
+        dihydroxyboranyl`` -- ``dihydroxyboranyl`` is the systematic spelling
+        of the same group (method (2) of,:15856), and the
+        ``methylidene`` morpheme is:15876 "methylidene (preferred
+        prefix)". OPSIN reads ``(dihydroxyboranyl)methylidenecyclohexane`` back
+        to the full InChIKey of the input ``OB(O)C=C1CCCCC1``.
+        """
+        mol = _mol("OB(O)C=C1CCCCC1")
+        frag = {0, 1, 2, 3}
+        assert _free_valence_at_attachment(mol, frag, 3) == 2
+        assert name_substituent(mol, frag, 3, allow_mancude=True) == \
+            "(dihydroxyboranyl)methylidene"
+
     def test_constructor_is_not_a_yl_producer(self):
         """``_carbon_ylidene_prefix`` owns the MULTI-valent morphology only.
         A single free valence belongs to the retained-name cascade (which knows
@@ -238,15 +258,19 @@ class TestFailsClosedOutsideTheClass:
         """Under the best-effort tier the abstention is a clean None, matching
         the Tier-4.5 de-masking convention.
 
-        The example moved. This used to use the branched 2-methylpropylidene
-        shape, which the class did not cover when it was written; the decorated
-        constructor now names it ((2-methylpropylidene)cyclohexane, OPSIN
-        round-trips the exact input), so it is no longer an abstention and
-        cannot demonstrate one. The boronic-acid ylidene below still is: the
-        recursive namer produces no readable single-valence reading for it, so
-        the gate has nothing to give the morpheme to.
+        The example moved twice. It first used the branched 2-methylpropylidene
+        shape, then the boronic-acid ylidene ``OB(O)C=C1CCCCC1``; the class now
+        builds both ((2-methylpropylidene)cyclohexane and
+        ``(dihydroxyboranyl)methylidene``, see
+        ``TestCarbonYlidenePrefixes.test_boronic_acid_ylidene_is_a_built_prefix``),
+        so neither can demonstrate an abstention. The cumulene carbon below
+        still does: a carbon that is double-bonded BOTH to the parent and to a
+        ring (``=C=C1CCCC1``) has no ``-ylidene`` reading the constructor
+        or the recursive namer can give, so the cascade has nothing to hand the
+        free-valence morpheme to and the best-effort tier returns None (the
+        default tier returns the ``'substituent'`` sentinel).
         """
-        mol = _mol("OB(O)C=C1CCCCC1")
-        assert _free_valence_at_attachment(mol, {0, 1, 2, 3}, 3) == 2
-        assert name_substituent(mol, {0, 1, 2, 3}, 3,
-                                allow_mancude=True) is None
+        mol = _mol("CC(C)=C=C1CCCC1")
+        frag = {3, 4, 5, 6, 7, 8}
+        assert _free_valence_at_attachment(mol, frag, 3) == 2
+        assert name_substituent(mol, frag, 3, allow_mancude=True) is None

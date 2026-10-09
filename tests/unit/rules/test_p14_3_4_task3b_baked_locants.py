@@ -252,9 +252,17 @@ def test_defect_c_polyfunctional_prefix_locant_omitted(namer, smiles, expected):
         ("OCC(=O)O", "hydroxyacetic acid"),
         ("N#CCC(=O)O", "cyanoacetic acid"),
         ("SCC(=O)O", "sulfanylacetic acid"),
-        # Retained amino-acid names must still pre-empt the systematic form.
+        # Retained amino-acid names must still pre-empt the systematic form -- for an
+        # input that defines the configuration they imply. A bare retained name asserts
+        # the L configuration 'The stereodescriptors D and L',
+        # the Blue Book: 'The stereodescriptor xi indicates unknown
+        # configuration'; OPSIN reads 'aspartic acid' as the L isomer, full InChIKey
+        # an InChIKey), so the stereo-free input takes the systematic
+        # name (9292c013d, 6ed78b1e4), and with a single substituted position the
+        # locant is omitted like 'chlorobutanedioic acid (PIN)',:2883).
         ("NCC(=O)O", "glycine"),
-        ("OC(=O)C(N)CC(=O)O", "aspartic acid"),
+        ("OC(=O)[C@@H](N)CC(=O)O", "L-aspartic acid"),
+        ("OC(=O)C(N)CC(=O)O", "aminobutanedioic acid"),
     ],
 )
 def test_defect_c_guards(namer, smiles, expected):

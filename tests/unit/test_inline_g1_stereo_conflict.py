@@ -57,10 +57,18 @@ SMILES_2_CENTRES = "C[C@@H](O)[C@@H](N)C"
 CONFLICT_NAME = "(3R)-3-aminobutan-2-ol"
 
 # Omits the butan-2-ol centre but asserts the CORRECT value for the amino
-# centre -- a genuine, SAFE partial omission (must still ship: /
-# sanction citing fewer descriptors than the input defines as a valid,
-# less-specific best-effort degrade -- never gate a true omission).
+# centre -- a genuine partial omission. It used to ship as a flagged best-effort
+# degrade; since 3aabf9bf7 ("reclaim P1: general-engine stereo count-veto ->
+# compose-and-verify reclaim") a candidate that cites fewer descriptors than the input
+# defines is either COMPOSED to full stereo (STEP 4b) or abstained (STEP 5), never
+# shipped as a partial: "Stereodescriptors used in substitutive
+# nomenclature" (the Blue Book) "In preferred IUPAC names, stereodescriptors,
+# preceded by a locant, must be cited to specify each stereogenic unit".
 SAFE_OMISSION_NAME = "(3S)-3-aminobutan-2-ol"
+
+# The complete name the composer reaches for this input (OPSIN 2.9.0 parses it to the
+# input's full InChIKey, an InChIKey).
+COMPOSED_FULL_NAME = "(2R,3S)-3-aminobutan-2-ol"
 
 
 def _run_inline_g1_isolated(monkeypatch, stub_name: str) -> str:
@@ -94,12 +102,19 @@ def test_stereo_conflict_does_not_ship_from_inline_g1(monkeypatch):
 
 
 def test_safe_partial_omission_still_ships_from_inline_g1(monkeypatch):
-    """Regression guard: a genuine, CORRECT partial-omission name (the
-    documented, intentional best-effort degrade) must still ship straight
-    out of the inline-G1 lane -- the fix tightens CONFLICT, not OMISSION."""
+    """Policy guard (3aabf9bf7,: the inline-G1 lane never ships a PARTIAL
+    omission, even a correct one. It either abstains (STEP 5, the all-or-nothing rule: the
+    composer completes the flat base but returns None on an already partially labelled
+    one, so today this lane abstains) or ships the complete composed name. The name was
+    not lost: `.name` and the best-effort style both reach the complete
+    '(2R,3S)-3-aminobutan-2-ol'."""
+    from orthonym.errors import is_failure_name
+
     out = _run_inline_g1_isolated(monkeypatch, SAFE_OMISSION_NAME)
-    assert out == SAFE_OMISSION_NAME, (
-        f"a safe partial-omission name was wrongly rejected: {out!r}")
+    assert out != SAFE_OMISSION_NAME, (
+        f"a partial-omission name shipped from the inline-G1 lane: {out!r}")
+    assert is_failure_name(out) or out == COMPOSED_FULL_NAME, (
+        f"expected an abstention or the composed complete name, got {out!r}")
 
 
 def test_unflagged_stereo_complete_emission_unaffected(monkeypatch):

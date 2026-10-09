@@ -160,7 +160,18 @@ class TestOrgmDispatch:
             # dithioxane), HOMONUCLEAR_PNICTOGEN_CHAIN@47.6,
             # PNICTOGEN_CARBOXYLIC_ACID@47.65, ACYL_CHALCOGENCHAIN_PSEUDOKETONE
             # @48.65 — all element-hydride-family recognizers with predicates
-            # disjoint from ORGM (they mutually decline); all < 50.)
+            # disjoint from ORGM (they mutually decline); all < 50. Latest:
+            # MONONUCLEAR_HYDRIDE_ADDED_CARBON@47.66 (e5c89c15f, v52-p03: an added-carbon
+            # -carbaldehyde/-carbonitrile on a bare Si/Ge/Sn/Pb/P/As/Sb/Bi parent hydride,
+            # H2P-CHO -> phosphanecarbaldehyde, the Blue Book /
+            # the Blue Book; placed deliberately right after PNICTOGEN_CARBOXYLIC_ACID@47.65,
+            # same disjoint-from-ORGM hydride family, < 50. Four more deliberate sub-50
+            # interceptors, each a fail-closed graph classifier registered ahead of ORGM@50 in
+            # `_register_dispatch` (their sections and descriptions are there):
+            # CUMULATIVE_ZWITTERION@48.35 (65b24afc5, same-parent -ium-...-ide
+            # zwitterion on a homogeneous heteroatom chain), YLIDE@48.36 (125047614,
+            #, LAMBDA5_PHOSPHANIMINE@48.66 (8c135bd9b, and
+            # NITRAMIDE_SUBSTITUTED@49.75 (512cc9fbf, -- all < 50.)
             if cls in (StoutClass.INORGANIC_ACID, StoutClass.MONONUCLEAR_HYDRIDE,
                        StoutClass.CHALCOGEN_CHAIN, StoutClass.POLYAZANE,
                        StoutClass.CATENATED_HYDRIDE, StoutClass.DINUCLEAR_HYDRIDE,
@@ -176,6 +187,10 @@ class TestOrgmDispatch:
                        StoutClass.HETEROCHALCOGEN_ABA,
                        StoutClass.HOMONUCLEAR_PNICTOGEN_CHAIN,
                        StoutClass.PNICTOGEN_CARBOXYLIC_ACID,
+                       StoutClass.MONONUCLEAR_HYDRIDE_ADDED_CARBON,
+                       StoutClass.CUMULATIVE_ZWITTERION, StoutClass.YLIDE,
+                       StoutClass.LAMBDA5_PHOSPHANIMINE,
+                       StoutClass.NITRAMIDE_SUBSTITUTED,
                        StoutClass.ACYL_CHALCOGENCHAIN_PSEUDOKETONE):
                 continue
             assert orgm_prio < entry.priority, (

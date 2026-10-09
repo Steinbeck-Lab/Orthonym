@@ -84,18 +84,34 @@ def _run_bounded(smiles: str, inner_alarm_s: int = 20, hard_kill_s: int = 35) ->
     return {"hung": False, "result": None, "stderr": proc.stderr[-2000:] + proc.stdout[-2000:]}
 
 
+# Wall-clock bounds of the fullerene test. The defect it guards is a SPIN: C70 took 63.1 s
+# before the fix (4241e505a message) and the cost is CPU time, so it stays above any bound
+# under 63 s however loaded the machine is. The cost of the declining path itself is ~17-20 s:
+# measured in this session with the same C70 at the fix commit 4241e505a (16.6 s CPU, 17.1 s
+# wall, load average ~21) and at 395b19b1b (19.4 s wall), and a single run under the suite at
+# load 7.8 took 21.5 s. A 20 s in-process alarm therefore sat 15% above the normal time at
+# the commit that introduced it and failed on a loaded machine with the right answer (the
+# abstain) in hand. Alarm 40 s / OS kill 50 s: 2x the declining path, still below the spin.
+_FULLERENE_ALARM_S = 40
+_FULLERENE_HARD_KILL_S = 50
+
+
 def test_fullerene_abstains_within_bound():
     """RED at HEAD before the fix: the C70 fullerene spins ~63s and exceeds the
-    35s hard bound. After the fix it must decline FAST (abstain / 'unknown organic
-    compound' / TIMEOUT-never), never a spin past the bound."""
-    res = _run_bounded(FULLERENE_C70, inner_alarm_s=20, hard_kill_s=35)
+    hard bound. After the fix it must decline within the bound (abstain / 'unknown
+    organic compound' / TIMEOUT-never), never a spin past it. The bounds are
+    ``_FULLERENE_ALARM_S`` / ``_FULLERENE_HARD_KILL_S``, set from the measured cost of
+    the declining path (~17-20 s) and the measured spin (63 s)."""
+    res = _run_bounded(FULLERENE_C70, inner_alarm_s=_FULLERENE_ALARM_S,
+                       hard_kill_s=_FULLERENE_HARD_KILL_S)
     assert not res["hung"], (
-        f"fullerene naming exceeded the {35}s hard bound (the GetSubstructMatches "
-        f"hang is not fixed): {res}")
+        f"fullerene naming exceeded the {_FULLERENE_HARD_KILL_S}s hard bound (the "
+        f"GetSubstructMatches hang is not fixed): {res}")
     result = res["result"]
     assert result is not None, f"no result captured: {res}"
     assert result != "RESULT:TIMEOUT" and "TIMEOUT" not in result, (
-        f"the in-process alarm fired (>20s) even though the hard kill did not: {res}")
+        f"the in-process alarm fired (>{_FULLERENE_ALARM_S}s) even though the hard "
+        f"kill did not: {res}")
     # An out-of-scope giant cage must abstain, never fabricate a wrong PAH name.
     assert "unknown" in result.lower() or result in ("None", "''"), (
         f"fullerene should abstain (out-of-scope giant cage), got {result!r}")

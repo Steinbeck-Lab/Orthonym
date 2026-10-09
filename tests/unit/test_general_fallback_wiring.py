@@ -94,13 +94,23 @@ def test_mancude_refused_regardless_of_optin_no_jar():
 def test_flag_propagates_into_recursion():
     from orthonym.metrics.provenance import general_fallback_ctx
     from orthonym.namer import name_compound
+    from tests.support.rt_assert import name_is_rt_exact
+    smi = "CC1C2C=CC1c1ccccc12"
     tok = general_fallback_ctx.set(True)
     try:
-        out = name_compound("CC1C2C=CC1c1ccccc12",
-                            general_fallback_unverified=True)
+        out = name_compound(smi, general_fallback_unverified=True)
     finally:
         general_fallback_ctx.reset(tok)
-    assert "tricyclo" in out or out == "unknown organic compound"
+    # The flag reaches the recursion and the call completes with a name or the failure
+    # sentinel. The name is no longer the von Baeyer 'tricyclo[...]' spelling: since
+    # 7ea3918e4 (2026-10-07, "all-carbon fused systems are named by fusion nomenclature
+    # before the von Baeyer path") this benzonorbornadiene is the bridged fused name
+    # '9-methyl-1,4-dihydro-1,4-methanonaphthalene', the Blue Book;
+    # "fused ring systems > bridged fused systems > non-fused bridged systems":23843;
+    # '1,4-methanonaphthalene (PIN)':19479), which OPSIN reads back to the input's
+    # full InChIKey (an InChIKey).
+    assert out == "unknown organic compound" or (
+        "methano" in out and name_is_rt_exact(out, smi)), out
 
 
 def test_best_effort_no_java_never_ships_valence_illegal():
@@ -169,11 +179,19 @@ def _jar_absent_patches():
     ]
 
 
+@pytest.mark.opsin_gate
 def test_jar_absent_besteffort_recovery_lane_never_ships_unverified():
     """The a review 0-wrong hole, for the lane the fix covers: with the jar absent
     and best-effort ON, once a recovery lane is engaged (assemble_name abstains)
     every witness must ABSTAIN -- never a wrong-molecule name shipped unverified.
-    Before the fix these shipped `methane`, `(phosphonooxy)benzene`, etc."""
+    Before the fix these shipped `methane`, `(phosphonooxy)benzene`, etc.
+
+    The test is ABOUT the validity gate's jar-absent behaviour, so it runs with the
+    gate ON (``opsin_gate``; the suite disables the gate by default, tests/conftest.py).
+    With the gate off nothing verifies or withdraws a name, whatever the jar patches
+    say, and a name that is correct by construction (``diethyl phosphoramidate`` for
+    CCOP(=O)(OCC)N) legitimately ships: the test was green-but-blind then, and red once
+    the recovery lane stopped abstaining on its own."""
     import contextlib
     from unittest import mock as _m
     from orthonym.errors import is_failure_name

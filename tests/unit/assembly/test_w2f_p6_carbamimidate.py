@@ -33,16 +33,33 @@ class TestCarbamimidateNSub:
     def test_unnameable_n_fragment_fails_closed(self):
         # Fail-closed boundary at the HANDLER (JAR-independent; the name_compound
         # validity gate is a subprocess/OPSIN backstop that fails OPEN in a bare
-        # test runner). A phosphono N-substituent is un-nameable: name_substituent
-        # returns the 'substituent' sentinel, so _name_carbamimidate must refuse
-        # (return None) rather than emit a truncated/wrong name.
+        # test runner). An N-substituent that name_substituent cannot spell returns the
+        # 'substituent' sentinel (or junk containing a space, e.g. 'boronic acidyl'),
+        # so _name_carbamimidate must refuse (return None) rather than emit a
+        # truncated/wrong name.
         # NOTE (reproduce-first re-anchor): the plan's original probe
         # -N=[Si](C)(C)C is NOT a fail-closed case -- 'trimethylsilyl' is
         # nameable and 'ethyl N'-trimethylsilylcarbamimidate' round-trips in
-        # OPSIN (see test_silyl_n_prime_is_nameable_not_refused).
+        # OPSIN (see test_silyl_n_prime_is_nameable_not_refused). Neither is the
+        # phosphono N-substituent the first version of this test used: -P(=O)(OH)2
+        # is now spelled 'phosphono' (see test_phosphono_n_prime_is_nameable), so
+        # the unnameable fixtures are a boron acid group (the code comment's own
+        # 'boronic acidyl' case) and a mercury chloride (an organometallic,,
+        # outside the nomenclature this engine covers).
+        for smi in ("CCOC(=NB(O)O)N", "CCOC(=N[Hg]Cl)N"):
+            mol = Chem.MolFromSmiles(smi)
+            match = detect_functional_groups(mol)["carbamimidate"][0]
+            assert _name_carbamimidate(mol, match) is None, smi
+
+    def test_phosphono_n_prime_is_nameable(self):
+        # The former fail-closed fixture: -P(=O)(OH)2 on the imino N is now named with the
+        # preselected prefix 'phosphono' "Retained names for substituent
+        # groups derived from mononuclear noncarbon oxoacids", the Blue Book
+        # '-P(O)(OH)2 | phosphono (preselected prefix)'). OPSIN 2.9.0 parses the name to
+        # the input's full InChIKey (an InChIKey).
         mol = Chem.MolFromSmiles("CCOC(=NP(=O)(O)O)N")
         match = detect_functional_groups(mol)["carbamimidate"][0]
-        assert _name_carbamimidate(mol, match) is None
+        assert _name_carbamimidate(mol, match) == "ethyl N'-phosphonocarbamimidate"
 
     def test_silyl_n_prime_is_nameable_not_refused(self):
         # Documents the reproduce-first finding: a trimethylsilyl imino-N

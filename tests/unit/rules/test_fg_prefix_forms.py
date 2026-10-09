@@ -104,6 +104,44 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     'seleninimidamide',       #: demoted prefix fails closed
     'imidohydrazide',         # ring prefix not built; the chain-end
                               # split is owned elsewhere -> fail closed
+    # ------------------------------------------------------------------
+    # Later waves set these sixteen to None in `rules/seniority.py` PREFIX_FORMS, each with a
+    # comment there recording the decision; the allow-list below transcribes it so this record
+    # is complete again. Every one is a DELIBERATE fail-closed or functional-class-only entry
+    # (a demoted occurrence abstains or degrades rather than inventing an unattested prefix).
+    #
+    # a phase: the trivalent -ous acids are principal-group
+    # producers (direct-return handlers in inner_dispatch); there is no verified static
+    # substituent-prefix spelling. "Names of mononuclear noncarbon oxoacids"
+    # (the Blue Book) and "Mononuclear noncarbon oxoacids modified by infixes"
+    # (:35485; its table lists:35499 'HP(OH)2 phosphonous acid',:35501 'H2P(OH) phosphinous acid').
+    'phosphonous_acid',  #: no verified static prefix; principal-group producer
+    'phosphinous_acid',  #: no verified static prefix; principal-group producer
+    'arsonous_acid',     #: no verified static prefix; principal-group producer
+    'arsinous_acid',     #: no verified static prefix; principal-group producer
+    'stibonous_acid',    #: no verified static prefix; principal-group producer
+    'stibinous_acid',    #: no verified static prefix; principal-group producer
+    # -3: a demoted sulfonyl cyanide prefix fails closed -- the target
+    # compounds are mono-functional (always the principal group); class name
+    # "Cyanides corresponding to the sulfur, selenium, and tellurium acids" (the Blue Book;
+    #:34811 'CH3-SO2-CN methanesulfonyl cyanide (PIN)').
+    'sulfonyl_cyanide',
+    # a phase: demoted imidoyl / carbothioyl / carboselenoyl halide prefix
+    # fails closed -- the halide is always the principal group and a halide-dependent prefix
+    # is not derived here (the sibling of 'sulfonyl_halide' above).
+    'imidoyl_halide',
+    'carbothioyl_halide',
+    'carboselenoyl_halide',
+    # Functional-class esters of non-carbon oxoacids: named as a whole molecule,
+    # "Esters of mononuclear noncarbon oxoacids" (the Blue Book; 'P(O)(O-CH3)(OH)2
+    # methyl dihydrogen phosphate (PIN)',:35940), the same family as 'phosphate_triester' above.
+    'phosphite_triester',    # 7a975fd0d (tail): functional class naming
+    'phosphonate_diester',   # 7a975fd0d (tail): functional class naming
+    'sulfate_diester',       # v50 B2: a demoted DIESTER needs its second organyl in the
+                             # prefix, which a per-FG string cannot carry -> None
+    'phosphinate_ester',     # a review: functional class naming
+    'arsinate_ester',        # a review: functional class naming
+    'stibinate_ester',       # a review: functional class naming
 })
 
 

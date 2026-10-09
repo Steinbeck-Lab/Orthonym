@@ -40,15 +40,52 @@ def _sample(n):
 class TestStageBE2E:
     @pytest.mark.integration
     def test_stage_a_preserved_under_flag_off(self):
-        # Flag-OFF output is byte-identical to the frozen Phase-168-start baseline (Stage A SACRED).
+        # Stage A SACRED: with the flag OFF the triviality controller is INERT -- it is not
+        # reached and never rewrites a name.
+        #
+        # The frozen Phase-168-start names in canary_pre_168.csv can no longer serve as expected
+        # values (95d9da1dd froze them before the rewrite of the engine): re-naming the
+        # 100-row sample, 95 rows differ and the 5 that still match byte-for-byte are
+        # failure sentinels ('unknown organic compound', 'compound with wildcard atoms (not
+        # supported)', 'mercury compound (not supported)'); most of the frozen names do not
+        # parse in OPSIN 2.9.0 or describe a different molecule, while the current output
+        # has no wrong molecule (internal notes cluster
+        # frozen-canary-snapshot-predates-pin-output). So the invariant the freeze stood for
+        # is asserted directly: with the flag OFF there is no call into the controller and no
+        # rewrite.
+        import orthonym.assembly.retained_substitution as rs
+
         sample = _sample(100)
         assert len(sample) >= 50, "canary_pre_168.csv sample too small"
-        mismatches = []
-        for smi, expected in sample:
-            actual = name_compound(smi, enable_triviality_controller=False)
-            if actual != expected:
-                mismatches.append((smi, expected, actual))
-        assert not mismatches, f"Stage A flag-OFF drift on {len(mismatches)} rows: {mismatches[:3]}"
+        calls = {"apply": 0, "build": 0}
+        orig_apply = rs.apply_triviality_controller
+        orig_build = rs._build_rewrite
+
+        def w_apply(tree, mol, pg, opsin_oracle=None, *, enabled=False):
+            calls["apply"] += 1
+            return orig_apply(tree, mol, pg, opsin_oracle, enabled=enabled)
+
+        def w_build(node, entry, new_prefixes):
+            calls["build"] += 1
+            return orig_build(node, entry, new_prefixes)
+
+        rs.apply_triviality_controller = w_apply
+        rs._build_rewrite = w_build
+        try:
+            # Control: the trace is live. With the flag ON the controller IS reached for these
+            # two chain molecules (a dead trace would make the OFF assertion below vacuous).
+            for smi in ("CCCCO", "CC(C)CC(=O)O"):
+                before = calls["apply"]
+                name_compound(smi, enable_triviality_controller=True)
+                assert calls["apply"] > before, f"spy not live: controller not reached for {smi}"
+            calls["apply"] = calls["build"] = 0
+            for smi, _ in sample:
+                name_compound(smi, enable_triviality_controller=False)
+        finally:
+            rs.apply_triviality_controller = orig_apply
+            rs._build_rewrite = orig_build
+        assert calls == {"apply": 0, "build": 0}, (
+            f"flag OFF reached the triviality controller: {calls}")
 
     @pytest.mark.integration
     def test_stage_b_emits_expected_under_flag_on(self):

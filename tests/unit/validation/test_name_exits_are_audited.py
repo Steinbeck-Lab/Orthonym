@@ -1,6 +1,7 @@
 """ (fix wave 1): EVERY exit of ``Orthonym.name`` is audited.
 
-``name`` has eight ``return`` statements (five originally + two added in
+``name`` has nine ``return`` statements (eight, plus the PIN-promotion delegation of
+818c36360; five originally + two added in
 a phase for producer-exception resilience: the generic ``except Exception``
 routes to recovery success / descriptive fallback so a raising producer degrades
 instead of crashing out of ``name``; + one added in Wave 0 Task 1 (D1) for the
@@ -105,12 +106,28 @@ def _is_finish_call(value) -> bool:
             and value.func.value.id == "self")
 
 
+def _is_finished_delegate(value) -> bool:
+    """``return self._name_with_pin_promotion(...)`` -- the PIN-tier promotion wrapper
+    . It is not an exit of its own: the wrapper runs the name through
+    re-entrant ``self.name`` calls (``_PIN_PROMOTION_WRAPPED`` stops those from entering the
+    wrapper again), and every exit of THOSE calls is routed through ``self._finish`` (this guard
+    checks them), so the binding proof sees each shipped name."""
+    return (isinstance(value, ast.Call)
+            and isinstance(value.func, ast.Attribute)
+            and value.func.attr == "_name_with_pin_promotion"
+            and isinstance(value.func.value, ast.Name)
+            and value.func.value.id == "self")
+
+
 def test_every_return_in_name_is_routed_through_finish():
     """THE regression guard for the whole class.
 
     A bare ``return <something>`` added to ``name`` in a future edit ships a
     name that the binding proof never sees. Counting them at the AST level is
     the only check that scales past the exits that exist today.
+
+    The one allow-listed shape is the delegation to ``self._name_with_pin_promotion``
+    , whose results come from ``self.name`` calls that are finished themselves.
     """
     src_path, returns = _returns_in_name()
     assert returns, "parsed no return statements -- the guard would be vacuous"
@@ -119,6 +136,7 @@ def test_every_return_in_name_is_routed_through_finish():
         (lineno, ast.unparse(value))
         for lineno, value in returns
         if value is not None and not _is_finish_call(value)
+        and not _is_finished_delegate(value)
     ]
     assert not offenders, (
         "Orthonym.name() has return statement(s) that bypass self._finish(), "
@@ -133,16 +151,19 @@ def test_the_guard_sees_all_known_exits():
     """Pins the guard's own reach: if a refactor collapsed ``name`` so the
     walker found (say) one return, the guard above would pass vacuously.
 
-    Count is 8 as of Wave 0 Task 1 (D1): the original 5, plus the two
+    Count is 9: 8 as of Wave 0 Task 1 (D1) -- the original 5, plus the two
     producer-exception resilience exits (recovery success + descriptive
     fallback) added in a phase to the generic ``except Exception`` handler
     so a producer that raises degrades to recovery/abstain instead of crashing
     out of ``name``, plus the wildcard fail-close exit added in Wave 0 Task 1
     (the unconditional ``classify_scope_limit`` pre-check's default-path
-    return). All route through ``self._finish`` (checked by the guard
-    above)."""
+    return) -- plus the PIN-promotion delegation added by 818c36360 (the first
+    statement of ``name``: ``return self._name_with_pin_promotion(...)``). All
+    route through ``self._finish`` (checked by the guard above), except that
+    delegation, whose re-entrant ``self.name`` calls are finished themselves."""
     _src, returns = _returns_in_name()
-    assert len(returns) == 8, [(ln, ast.unparse(v)) for ln, v in returns]
+    assert len(returns) == 9, [(ln, ast.unparse(v)) for ln, v in returns]
+    assert sum(1 for _ln, v in returns if _is_finished_delegate(v)) == 1
 
 
 # ---------------------------------------------------------------------------

@@ -18,19 +18,26 @@ class TestOximeEnrichment:
     def test_oxime_simple_no_extra_substituents(self):
         """Simple oxime (no extra subs) produces unchanged name."""
         from orthonym import name_compound
-        # Propan-2-one oxime: CC(=NO)C -- just ketone oxime, no extra subs
+        # Propan-2-one oxime: CC(=NO)C -- just ketone oxime, no extra subs.
+        # The preferred name is substitutive, not the functional class name
+        # 'propan-2-one oxime': Oximes (heading in the contents list,
+        # the Blue Book; body:38458) "In these recommendations preferred IUPAC
+        # names for oximes are generated substitutively as N-hydroxy derivatives of
+        # imines rather than by functional class nomenclature as in previous
+        # recommendations", with 'N-hydroxypentan-2-imine (PIN)... pentan-2-one
+        # oxime' at:38468. Both spellings read back to the input with OPSIN 2.9.0
+        # (full an InChIKey); the old assertion (the
+        # substring 'oxime') accepted the non-preferred spelling.
         result = name_compound("CC(=NO)C")
-        assert result is not None
-        # The name should contain "oxime"
-        assert "oxime" in result.lower()
+        assert result == "N-hydroxypropan-2-imine"
 
     def test_oxime_name_unchanged_for_simple_case(self):
         """Simple oxime naming is not regressed."""
         from orthonym import name_compound
-        # Acetone oxime
+        # Acetone oxime: the substitutive PIN, 'N-hydroxypropan-2-imine',
+        # the Blue Book; see the sibling test above).
         result = name_compound("CC(=NO)C")
-        assert result is not None
-        assert "oxime" in result.lower()
+        assert result == "N-hydroxypropan-2-imine"
 
 
 # ---------------------------------------------------------------------------
@@ -42,10 +49,14 @@ class TestIsocyanateEnrichment:
     def test_simple_isocyanate_unchanged(self):
         """Simple methyl isocyanate naming is not regressed."""
         from orthonym import name_compound
-        # methyl isocyanate: CN=C=O
+        # methyl isocyanate: CN=C=O. ISOCYANATES (the Blue Book-26007)
+        # "Preferred IUPAC names are generated substitutively using the prefix
+        # 'isocyanato' attached directly to a parent hydride. Previously, functional
+        # class names were recommended for this class." (example 'isocyanatocyclohexane
+        # (PIN) cyclohexyl isocyanate'), so the PIN of CH3-NCO is 'isocyanatomethane',
+        # which does not contain the functional class word 'isocyanate'.
         result = name_compound("CN=C=O")
-        assert result is not None
-        assert "isocyanate" in result.lower()
+        assert result == "isocyanatomethane"
 
     def test_phenyl_isocyanate_unchanged(self):
         """Phenyl isocyanate naming is not regressed."""

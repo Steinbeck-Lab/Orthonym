@@ -29,10 +29,14 @@ def test_heteroaryl_sulfinyl_names_at_best_effort(smi, expected):
 
 
 def test_pin_default_byte_identical():
-    """The block is best-effort-gated (best_effort_ctx default False), so the PIN
-    default path is unchanged — pyridine-sulfinyl still abstains at PIN."""
-    from orthonym.errors import is_failure_name
-    assert is_failure_name(Orthonym(style="pin").name("CS(=O)c1ccncc1"))
+    """The PIN default no longer abstains on pyridine-sulfinyl: the PIN tier gained the class
+    and names it with the same 'methanesulfinyl' prefix as the benzene control below
+    (the Blue Book '1-(methanesulfinyl)-2-(methylsulfanyl)ethane (PIN)', under the
+    heading "Classes denoted by the senior atom in heterane nomenclature"). The name is the
+    best-effort tier's own, so the two tiers agree byte for byte; OPSIN 2.9.0 parses it to the
+    input's full InChIKey (an InChIKey)."""
+    assert Orthonym(style="pin").name("CS(=O)c1ccncc1") == "4-(methanesulfinyl)pyridine"
+    assert _be().name_tiered("CS(=O)c1ccncc1")["name"] == "4-(methanesulfinyl)pyridine"
 
 
 def test_benzene_control_unchanged():

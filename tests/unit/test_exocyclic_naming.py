@@ -252,29 +252,36 @@ class TestNoFalseEZInSubstituentContext:
         )
 
     def test_no_false_ez_on_chain_substituent_bond(self):
-        """E/Z should NOT be emitted for chain double bonds where one atom
-        is outside the principal chain mapping.
+        """A chain atom's double bond to an acyclic atom OUTSIDE the scope is the '-ylidene'
+        double bond of that chain position and takes its E/Z with the chain locant; an
+        ENDOcyclic bond of another ring still gets none.
 
-        This guards against the regression where chain C=N or C=C bonds
-        at the edge of a principal chain got false E/Z descriptors.
+        49a0e838f ("a chain atom's '-ylidene' double bond takes its E/Z with the chain locant,
+        '(4E)-4-(chloromethylidene)heptanoic acid'") dropped condition (1) of
+        ``_is_true_exocyclic`` (the in-scope atom must be in a ring) on purpose:
+         (1)(a) (the Blue Book) "the double bond is considered as an
+        integral part of the parent structure; the stereodescriptor is placed at the front of
+        the substitutive name, preceded by the locant indicating its point of attachment to the
+        parent structure";:48279 "Method (a) generates preferred IUPAC names". Skipping it left
+        the name stereo-incomplete. Condition (2) (the other end is not in a ring) still holds.
         """
         from orthonym.rules.stereochemistry import collect_stereodescriptors
 
-        # A chain compound with E/Z on a C=N bond, one atom not in mapping
+        # A chain compound with E/Z on a C=N bond: C2 is in scope (locant 2), the imino N1 is
+        # an acyclic atom outside the mapping -> the -ylidene bond is cited at locant 2.
         mol = Chem.MolFromSmiles('C/N=C(\\N)C')
         rdCIPLabeler.AssignCIPLabels(mol)
-
-        # Only include carbon chain atoms in mapping, exclude N
         atom_to_locant = {0: 1, 2: 2, 4: 3}
-
         descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        assert [d for d in descriptors if d[1] in ('E', 'Z')] == [(2, 'Z')], descriptors
 
-        # The C=N bond has atom 0 (C, in mapping, NOT in ring) and atom 1 (N, not in mapping)
-        # Since atom 0 is NOT in a ring, the exocyclic guard should skip this bond
-        ez_descriptors = [d for d in descriptors if d[1] in ('E', 'Z')]
-        assert len(ez_descriptors) == 0, (
-            f"Chain C=N bond should NOT get exocyclic E/Z treatment, got {ez_descriptors}"
-        )
+        # What still holds: an endocyclic C=C of another ring, with only one of its atoms in
+        # scope, borrows no locant (the 'tri(cyclodec-1-en-1-yl)propanoate' case of
+        # _is_true_exocyclic's docstring); with both atoms numbered it is cited as usual.
+        ring = Chem.MolFromSmiles('C1CCCC/C=C\\CCC1')
+        rdCIPLabeler.AssignCIPLabels(ring)
+        assert collect_stereodescriptors(ring, {5: 1}) == []
+        assert collect_stereodescriptors(ring, {5: 1, 6: 2}) == [(1, 'Z')]
 
 
 # =============================================================================

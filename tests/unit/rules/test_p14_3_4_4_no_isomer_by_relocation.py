@@ -152,12 +152,19 @@ def test_licence_denies_when_an_isomer_exists(namer, smiles, expected, why):
 # molecule.md` requires all THREE checks of any new licence. #
 # --------------------------------------------------------------------------- #
 @pytest.mark.parametrize("smiles,expected,why", [
-    ("[13CH3]SSS", "(13C)1-methyltrisulfane",
+    ("[13CH3]SSS", "(13C)methyltrisulfane",
+     "P-82.6.1.2 (:44190 'Locants are omitted when there is only one atom of a given "
+     "element'): the lone carbon is the labelled methyl, so the descriptor can never "
+     "require a locant and P-82.6.1.1 (:44180) keeps the unmodified PIN's omission "
+     "(P-14.3.4.4: `methyltrisulfane`, :39335). The isotope path declares no ambient "
+     "`isotopic_naming_scope` when every labelled element is a singleton"),
+    ("C[13CH2]SSS", "1-(1-13C)ethyltrisulfane",
      "★ ARCH-a instance 2, measured at this site: the isotope path names an "
      "isotope-STRIPPED skeleton, so `locants_are_forced()` reads False AND every "
      "GetIsotope() reads 0 — both structural signals negative — while the finished "
-     "name carries `(13C)` (count subscript omitted per P-82.2.1/FIX-A). Only the "
-     "ambient `isotopic_naming_scope` denies here, and P-82.6.1.1 (:44180) requires it to"),
+     "name carries `(1-13C)`. The ethyl's two carbons are not one orbit, so the "
+     "descriptor DOES require a locant; only the ambient `isotopic_naming_scope` "
+     "denies the licence here, and P-82.6.1.1 (:44180) requires it to"),
     ("CSSS[13CH3]", "1-(13C)methyl-3-methyltrisulfane",
      "★ and here the locants are genuinely ESSENTIAL — the two methyls are "
      "inequivalent — so stripping them would have been a wrong name, not merely an "

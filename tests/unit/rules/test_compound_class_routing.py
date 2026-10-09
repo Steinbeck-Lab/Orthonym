@@ -195,14 +195,29 @@ class TestSugarInMainCascade:
     """Sugar detection wired into name_compound returns sugar name."""
 
     def test_glucose_nonstereo_returns_sugar_name(self):
-        """Non-stereo glucose should return a sugar name, not systematic oxane."""
+        """A hexopyranose WITHOUT stereo takes the systematic oxane name; a
+        configured one takes the sugar name.
+
+        (The method keeps its historical name so the node id is stable; the
+        contract it pins changed on purpose in 71f61338c, PF, 2026-08-04:
+        "names that assert stereochemistry the input never defined".) All eight
+        hexopyranoses reduce to the one skeleton ``OCC1OC(O)C(O)C(O)C1O``, and
+        the sugar base name is itself configurational: "Systematic
+        carbohydrate names", paragraph (the Blue Book) "The configuration of >CH-OH
+        groups of the sugar is designated by the configurational prefix(es)...
+        such as 'glycero', 'gluco', 'manno', etc. Each name is qualified by a 'D'
+        or 'L' stereodescriptor". 'glucopyranose' for a ring that has no
+        stereocentres defined asserts four centres the input does not carry (OPSIN
+        2.9.0 reads 'glucopyranose' to...-GASJEMHNSA-N, the input is
+        an InChIKey), so the non-stereo fallback refuses a skeleton
+        shared by several base names and the systematic namer supplies the name that
+        is true of the input; it reads back to the input's full InChIKey.
+        """
         result = name_compound(GLUCOSE_NONSTEREO_SMILES)
-        assert result is not None
-        result_lower = result.lower()
-        # Should contain 'pyranose' or 'glucose' -- NOT be a systematic name
-        assert "pyranose" in result_lower or "glucose" in result_lower, (
-            f"Expected sugar name for glucose, got: '{result}'"
-        )
+        assert result == "6-(hydroxymethyl)oxane-2,3,4,5-tetrol"
+        # control: the same skeleton WITH its configuration keeps the sugar name
+        assert name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == (
+            "β-D-glucopyranose")
 
 
 # ===========================================================================

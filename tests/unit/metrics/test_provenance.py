@@ -52,10 +52,14 @@ def test_engine_emission_is_t3_or_t4():
 
 def test_t5_row_carries_formula_and_reason():
     nm = Orthonym(_disable_opsin_validity_gate=True)
-    row = nm.name_tiered("CC1C2C=CC1c1ccccc12")  # abstains with engine OFF
+    # The former witness 'CC1C2C=CC1c1ccccc12' is named now (9-methyl-1,4-dihydro-1,4-
+    # methanonaphthalene, pin_unverified, by the bridged fused builder:, the Blue Book:
+    # 23710), so the abstention row is an organomercury compound: an element outside the
+    # nomenclature this engine covers (organometallics,, which abstains with the engine OFF.
+    row = nm.name_tiered("C1CCC(=O)C(C1)[Hg]Cl")
     assert row["tier"] == "abstain"
-    assert row["formula"] == "C12H12"
-    assert row["limit_code"]
+    assert row["formula"] == "C6H9ClHgO"
+    assert row["limit_code"] == "UNSUPPORTED_ELEMENT"
 
 
 def test_non_t5_row_schema_stable():

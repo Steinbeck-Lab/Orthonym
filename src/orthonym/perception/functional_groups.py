@@ -1027,7 +1027,19 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     _ri = mol.GetRingInfo()
     _ring_atoms = set(a for r in _ri.AtomRings() for a in r)
     if _ring_atoms:
-        _het_matches = []
+        # The chalcogen analogues of the heterone rank after it, ketones,
+        # pseudoketones and heterones "in the order O, S, Se, Te") and are senior to
+        # amines in the same way: a ring c=S beside a ring heteroatom is a thione
+        # (pyrimidine-2(1H)-thione), not a 'sulfanylidene' prefix on an amine parent.
+        # Each analogue is registered only when the ring carries no senior heterone
+        # (the oxo registered first stays the principal group and the c=S remains a
+        # 'sulfanylidene' prefix, rhodanine-like) and only for a carbon no other
+        # functional group already reads (a thioamide / thiourea carbon is theirs).
+        _HETERONE_CLASSES = (('O', 'ketone'), ('S', 'thioketone'),
+                             ('Se', 'selenoketone'), ('Te', 'telluroketone'))
+        _CHALCOGEN_SYMBOLS = {_s for _s, _c in _HETERONE_CLASSES}
+        _read_atoms = {_i for _ms in results.values() for _m in _ms for _i in _m}
+        _per_class = {}
         _carbonyl_cs = set()
         for _a in _ring_atoms:
             _at = mol.GetAtomWithIdx(_a)
@@ -1036,16 +1048,17 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
             for _b in _at.GetBonds():
                 _o = _b.GetOtherAtom(_at)
                 if (_o.GetIdx() not in _ring_atoms
-                        and _o.GetSymbol() == 'O'
+                        and _o.GetSymbol() in _CHALCOGEN_SYMBOLS
                         and _b.GetBondTypeAsDouble() == 2.0
                         and _o.GetDegree() == 1):
-                    # tuple (carbonylC, carbonylC, O): index [1] is the principal
+                    # tuple (carbonylC, carbonylC, X): index [1] is the principal
                     # atom per PG_ATTACHMENT_INDICES['ketone'] == [1] (seniority.py:32).
                     # carbonylC is used at both [0] and [1] to avoid the flanking-atom
                     # locant misread (a heterone C is flanked by ring N, not C).
-                    _het_matches.append((_a, _a, _o.GetIdx()))
+                    _per_class.setdefault(_o.GetSymbol(), []).append(
+                        (_a, _a, _o.GetIdx()))
                     _carbonyl_cs.add(_a)
-        if _het_matches:
+        if _per_class:
             # residual-unsaturation gate (mirrors name_cyclic_oxo_compound scope):
             # aromatic ring, or a ring-internal C=C not part of a carbonyl.
             _res = any(mol.GetAtomWithIdx(i).GetIsAromatic() for i in _ring_atoms)
@@ -1059,8 +1072,25 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
                         break
             # Only supply the heterone when the SMARTS found no genuine 2-carbon
             # ketone (never clobber a real acyclic ketone read).
-            if _res and 'ketone' not in results:
-                results['ketone'] = _het_matches
+            if _res:
+                for _sym, _cls in _HETERONE_CLASSES:
+                    _het_matches = _per_class.get(_sym)
+                    if not _het_matches:
+                        continue
+                    if _sym == 'O':
+                        if _cls not in results:
+                            results[_cls] = _het_matches
+                        continue
+                    # a chalcogen analogue only where no ketone is read at all, one
+                    # class at a time (S before Se before Te), on carbons no other
+                    # functional group reads
+                    if 'ketone' in results or any(
+                            _c in results for _s, _c in _HETERONE_CLASSES[1:]):
+                        continue
+                    _het_matches = [_m for _m in _het_matches
+                                    if _m[0] not in _read_atoms]
+                    if _het_matches:
+                        results[_cls] = _het_matches
 
     _reclassify_ring_heterols(mol, results)
 

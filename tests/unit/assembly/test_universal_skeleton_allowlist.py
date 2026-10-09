@@ -163,8 +163,17 @@ def test_borane_takes_the_pin():
     assert _names_and_roundtrips("CCB(CC)CC").name == "triethylborane"
 
 def test_stannane_threads_stanna():
-    r = _names_and_roundtrips("C[Sn](C)(C)C")
-    assert "stanna" in r.name
+    """Tin is deliberately NOT threaded by the universal floor (885ece7c4, TRIAGE g6 C24b):
+    only B/Si/Ge are in ``_COVALENT_SKELETAL_METALLOIDS`` -- OPSIN mis-valences 'stanna'/
+    'plumba' replacement names, so the floor declines an organotin compound (None) rather
+    than ship one. The molecule is not left unnamed: the whole engine names it
+    substitutively on the stannane parent hydride, "Substituted parent hydrides"
+    (the Blue Book; the Group 14 examples 'di(dodecyl)silane (PIN)',
+    'bis(4,5-dihydrothiophen-2-yl)di(methyl)germane (PIN)' take the same -ane parent form).
+    """
+    from orthonym.namer import Orthonym
+    assert name_universal_substitutive(Chem.MolFromSmiles("C[Sn](C)(C)C")) is None
+    assert Orthonym().name("C[Sn](C)(C)C") == "tetramethylstannane"
 
 
 # ---------------------------------------------------------------------------

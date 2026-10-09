@@ -42,7 +42,12 @@ pytestmark = pytest.mark.opsin_gate
 # correctly.
 CERAMIDE = ("CCCCCCCCCCCCCCCCCCCC[C@@H](O)C(=O)N[C@@H](CO)"
             "[C@H](O)[C@H](O)CCCCCCCCCCCCCC")
-CERAMIDE_NAME = "(2R)-2-hydroxy-N-(1,3,4-trihydroxyoctadecan-2-yl)docosanamide"
+# The N-substituent now carries its three stereodescriptors. The former expectation,
+# '(2R)-2-hydroxy-N-(1,3,4-trihydroxyoctadecan-2-yl)docosanamide', omitted them: it matched the
+# input only on the InChIKey skeleton, and a name that omits defined stereo is a mismatch
+# since 0c4d4a2d3 ("reject stereo OMISSION as a mismatch"). OPSIN 2.9.0 parses this name to the
+# input's full InChIKey.
+CERAMIDE_NAME = "(2R)-2-hydroxy-N-[(2S,3S,4R)-1,3,4-trihydroxyoctadecan-2-yl]docosanamide"
 
 
 def test_a_gate_rejection_now_falls_through_to_a_later_class():
@@ -59,12 +64,37 @@ def test_names_that_already_passed_are_untouched(smiles, expected):
     assert Orthonym(style="pin").name(smiles) == expected
 
 
-def test_it_still_abstains_when_no_class_can_clear_the_gate():
-    """The retry must not manufacture a name. This molecule's every candidate is
-    gate-rejected (its first is `(5-carbamoylpentyl)oxirane`, a DIFFERENT
-    molecule), so the fallback must survive the retry unchanged."""
-    assert Orthonym(style="pin").name("CC(=O)N(CC1CO1)C(C)C") \
-        in _DESCRIPTIVE_FALLBACK_NAMES
+# The former witness ``CC(=O)N(CC1CO1)C(C)C`` is named now ('N-(oxiranylmethyl)-N-(propan-2-yl)acetamide',
+# OPSIN 2.9.0 full-InChIKey exact, so there is nothing for the gate to reject). This dicarbamate is a
+# molecule whose first candidate is a DIFFERENT molecule that the gate rejects
+# ('3-{1-[(carbamoyloxy)methyl]-1-octylcyclohexyl}-N,N-dimethylpropan-1-amine'); the retry then
+# runs and no later class clears the gate.
+NO_CLASS_CLEARS = "CN(C)CCCNC(=O)OCC1(CCCCC1)COC(=O)NC2CCCCC2"
+
+
+def test_it_still_abstains_when_no_class_can_clear_the_gate(monkeypatch):
+    """The retry must not manufacture a name. This molecule's candidates are gate-rejected (its
+    first is a different molecule), so the fallback must survive the retry unchanged.
+
+    The retry is traced on, so the test cannot go green-but-blind: it asserts that the retry RAN
+    past a gate-rejected real name, excluded at least one dispatch class, and returned the
+    fallback."""
+    from orthonym.errors import is_failure_name
+
+    seen = []
+    real = Orthonym._retry_cascade_on_gate_rejection
+
+    def spy(self, smiles, pre_gate, gated):
+        out = real(self, smiles, pre_gate, gated)
+        seen.append((pre_gate, gated, out, set(self._excluded_dispatch_classes)))
+        return out
+
+    monkeypatch.setattr(Orthonym, "_retry_cascade_on_gate_rejection", spy)
+    assert Orthonym(style="pin").name(NO_CLASS_CLEARS) in _DESCRIPTIVE_FALLBACK_NAMES
+    ran = [t for t in seen if t[0] and not is_failure_name(t[0]) and is_failure_name(t[1])]
+    assert ran, "the gate never rejected a real name, so the retry was not exercised"
+    assert all(is_failure_name(t[2]) for t in ran)
+    assert ran[0][3], "the retry excluded no dispatch class"
 
 
 class TestNoOrderDependence:

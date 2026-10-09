@@ -36,9 +36,14 @@ pytestmark = [pytest.mark.integration, pytest.mark.roundtrip,
 
 # (smiles, expected_besteffort_name_or_None). None => assert RT-match only.
 WITNESSES = [
+    # (the Blue Book, '## SKELETAL REPLACEMENT (a) NOMENCLATURE'):
+    # skeletal replacement is required only when FOUR or more heterounits are in the
+    # chain; this one has two (N, O), so the best-effort name is the substitutive
+    # chain name (the 'oxa-aza-heptenyl' form it replaces is not a book form here).
+    # (_WITNESS_IDS keeps the original spelling so the row identity is stable.)
     ("C=C(O)N(C)[C@H](CCC)C(C)O/C=C/CF",
-     "1-[(2R,5E)-7-fluoro-1,3-dimethyl-2-propyl-4-oxa-1-azahept-5-en-1-yl]"
-     "eth-1-en-1-ol"),
+     "(3R)-2-{[(1E)-3-fluoroprop-1-en-1-yl]oxy}-3-"
+     "[(1-hydroxyethen-1-yl)(methyl)amino]hexane"),
     # Suite fix j6: covalent Si is in the universal floor's scope since TRIAGE
     # g6 C24, which names this witness before the CQ5 fall-through
     # ('2-(2,2-diiodo-1-methyl-1-aza-2-silaethyl)propane' before). Both are
@@ -98,7 +103,16 @@ def _rt_inchikey_match(name, smiles):
     return _inchikey(osmi) == _inchikey(smiles)
 
 
-@pytest.mark.parametrize("smiles,expected", WITNESSES)
+# None => the default pytest id. Entry 0's id is the pre-N5c expected name's id.
+_WITNESS_IDS = [
+    "C=C(O)N(C)[C@H](CCC)C(C)O/C=C/CF-1-[(2R,5E)-7-fluoro-1,3-dimethyl-2-propyl-"
+    "4-oxa-1-azahept-5-en-1-yl]eth-1-en-1-ol",
+    None,
+    None,
+]
+
+
+@pytest.mark.parametrize("smiles,expected", WITNESSES, ids=_WITNESS_IDS)
 def test_witness_converts_and_roundtrips(smiles, expected):
     be = _besteffort()
     out = be.name(smiles)

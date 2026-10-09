@@ -108,16 +108,59 @@ def test_atom_drop_witness_abstains_jar_absent(monkeypatch, smiles):
         f"{smiles} still ships the atom-dropped wrong name {name!r}")
 
 
+# Witnesses the engine now NAMES in full, jar-absent: the sulfooxy / hydrogen-sulfate
+# prefix and ester builders (ef5904001 "sulfuric-acid monoester... is sulfooxy",
+# c863df6ab "hydrogen sulfate", 32cf861c8 / cfc7c3ab6 / ead81330b oxoacid prefixes)
+# made the premise "no whole-graph alternative exists" obsolete for these six. For
+# each, the claim is no longer an abstention but that the name is ATOM-COMPLETE: the
+# independent OPSIN round trip (full InChIKey) of what shipped is the input. The
+# exact string is pinned where the Blue Book itself prints that name as a PIN; the
+# amine row is only required to round-trip (its PIN is the ester '1-aminoethyl
+# hydrogen sulfate', 'SENIORITY ORDER FOR CLASSES': an ester is senior to an
+# amine, so '1-(sulfooxy)ethan-1-amine' is a valid but non-preferred spelling).
+# COS(=O)(=O)O "Esters of mononuclear noncarbon oxoacids"
+# (the Blue Book): 'methyl hydrogen sulfate (PIN)' (:35968)
+# *-OS(=O)(=O)O + COOH "Substituent groups derived from chalcogen
+# acids", (:36484): '3-(sulfooxy)propanoic acid (PIN)'
+# (:36488); the acid is senior to the sulfate ester, so 'sulfooxy'
+# is the prefix; acetic acid keeps its retained PIN
+# "Retained names as preferred IUPAC names",:29715) with the
+# single alpha locant omitted,:3031: 'difluoroacetic
+# acid (PIN)',:3037)
+_JAR_ABSENT_NOW_NAMED = {
+    "COS(=O)(=O)O": "methyl hydrogen sulfate",
+    "CC(C(=O)O)OS(=O)(=O)O": "2-(sulfooxy)propanoic acid",
+    "OC(=O)C(C)OS(=O)(=O)O": "2-(sulfooxy)propanoic acid",
+    "OC(=O)CCOS(=O)(=O)O": "3-(sulfooxy)propanoic acid",
+    "OC(=O)COS(=O)(=O)O": "(sulfooxy)acetic acid",
+    "CC(N)OS(=O)(=O)O": None,   # RT-exact required, spelling not pinned (see above)
+}
+
+
 @pytest.mark.parametrize("smiles", [METHYL_SULFATE, *list(_SUFFIX_WITNESS_WRONG),
                                      *list(_PREFIX_WITNESS_WRONG)])
 def test_atom_drop_witness_abstains_cleanly_jar_absent(monkeypatch, smiles):
-    """Strengthening: the surviving result is an honest abstention (sentinel),
-    never a DIFFERENT atom-incomplete name silently swapped in."""
+    """Strengthening: the surviving result is never a DIFFERENT atom-incomplete name
+    silently swapped in. It is an honest abstention (sentinel), or, for the witnesses
+    the engine now names (``_JAR_ABSENT_NOW_NAMED``), a name that round-trips to the
+    input's full InChIKey."""
     _force_jar_absent(monkeypatch)
     name = Orthonym(style="pin").name(smiles)
-    assert is_failure_name(name), (
-        f"{smiles} jar-absent produced {name!r}, expected an abstention "
-        f"sentinel (no whole-graph alternative exists for these witnesses)")
+    if smiles not in _JAR_ABSENT_NOW_NAMED:
+        assert is_failure_name(name), (
+            f"{smiles} jar-absent produced {name!r}, expected an abstention "
+            f"sentinel (no whole-graph alternative exists for these witnesses)")
+        return
+    # Naming is done: restore the jar so the independent OPSIN check can run.
+    monkeypatch.undo()
+    from tests.support.rt_assert import name_is_rt_exact
+    assert not is_failure_name(name), (
+        f"{smiles} jar-absent abstained ({name!r}); the engine names it in full")
+    expected = _JAR_ABSENT_NOW_NAMED[smiles]
+    if expected is not None:
+        assert name == expected, f"{smiles}: {name!r} != {expected!r}"
+    assert name_is_rt_exact(name, smiles), (
+        f"{smiles} jar-absent name {name!r} does not round-trip to the input")
 
 
 @pytest.mark.parametrize("smiles,expected", list(_GUARD.items()))

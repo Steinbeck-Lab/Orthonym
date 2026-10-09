@@ -34,6 +34,7 @@ from .errors import (
     is_failure_name,
     is_refusal_sentinel,
     no_verified_pin,
+    unsupported_ring_system,
 )
 
 logger = logging.getLogger(__name__)
@@ -8399,160 +8400,62 @@ class Orthonym:
         return md
 
     def _name_with_confidence_impl(self, smiles: str) -> dict:
-        """The body of:meth:`name_with_confidence`, for the string it names."""
+        """The body of:meth:`name_with_confidence`, for the string it names.
+
+        The name is the one:meth:`name` gives. This entry point used to run its own
+        copy of the naming pipeline (``_name_impl`` and the three final gates) and
+        so lacked everything ``name`` adds around it: the per-molecule state
+        reset (a ``name`` on the same instance left the cascade's excluded-class
+        set behind and the next ``name_with_confidence`` named nothing, as
+        ``None``), the catch-all that turns a producer exception into the late
+        recovery or an abstention (a molecule ``name`` names crashed it with an
+        ``AttributeError``), the late recoveries and rescues, the offer selection
+        and the floor, and the one canonical abstention label. A molecule
+        ``name`` named could come back from here as ``''`` or as a label. As
+        ``name_tiered`` and ``name_with_tree`` do, it now calls ``name`` (a nested
+        public call names the string it is given, ``_lone_pair_input_enter``) and
+        reads the confidence record that call stored.
+        """
         from .assembly.coverage_scoring import (
             clear_confidence,
             retrieve_confidence,
             unmeasured_confidence,
         )
-        from .assembly.fragment_naming import (
-            end_naming_session,
-            is_top_level_naming,
-            start_naming_session,
-        )
-        from .metrics.abstention import (
-            AbstentionCode,
-            abstention_code_for,
-            clear_abstention,
-            record_abstention,
-        )
-        from .metrics.provenance import best_effort_request_ctx
-        start_naming_session()
-        clear_confidence()
-        # Task 0.1: reset the typed-abstention slot (twin of name).
-        if is_top_level_naming():
-            clear_abstention()
-        # The tier of the request (``provenance.best_effort_request_ctx``), as
-        # ``_budget_scope`` sets it for ``name``: this entry point calls
-        # ``_name_impl`` without that scope. Set only outside a request, so a call
-        # made inside a ``name`` keeps that request's tier; reset below.
-        _request_token = None
-        if best_effort_request_ctx.get() is None:
-            _request_token = best_effort_request_ctx.set(
-                bool(getattr(self, '_general_fallback_unverified', False)))
+        from .metrics.abstention import abstention_code_for, peek_abstention
         try:
-            # Wave-0 D1: same wildcard pre-check as name. name_with_confidence
-            # returns a metadata dict, so mirror the limit handler's fallback dict
-            # (lines ~4405–4419) rather than name's string return.
-            # Perf: zero-false-negative pre-filter -- an RDKit dummy/wildcard
-            # atom (atomic number 0) is spelled ONLY as `*`/`[*]` (bare `*`,
-            # `[*]`, `[1*]`,...) or as `[#0]`/decorated (`[13#0]`, `[#0-]`,
-            #...) -- both spellings are checked, so the filter has no false
-            # negative, and skips the extra RDKit parse on the common
-            # (non-wildcard) path.
-            if '*' in smiles or '#0' in smiles:
-                _probe = Chem.MolFromSmiles(smiles)
-                if _probe is not None:
-                    _scope = classify_scope_limit(_probe)
-                    if _scope is not None:
-                        _scope.smiles = smiles
-                        record_abstention(AbstentionCode.OTHER, detail=_scope.code)
-                        _fallback_name = self._exit_round_trip_check(
-                            self._apply_trivial_fallback(_scope.message, smiles),
-                            smiles)
-                        _abst = abstention_code_for(_fallback_name)
-                        _md = unmeasured_confidence(
-                            name=_fallback_name, handler='fallback')
-                        _md['limit'] = _scope.as_dict()
-                        _md['abstention'] = _abst.value if _abst else None
-                        return _md
-            # --- Wave-2 P2: isotopic substitution decorator / ---
-            # Twin of name's hook (:2938). name_with_confidence bypassed it and
-            # called _name_impl directly, so an isotope-labeled mol named as the
-            # UNLABELED skeleton (label silently dropped = wrong molecule; the OPSIN
-            # validity gate cannot catch it — it parses to the unlabeled structure,
-            # and 's skeleton compare ignores isotopes). Route to the
-            # fail-closed decorator BEFORE _name_impl strips the label. has_isotopes
-            # gate => zero cost + byte-identical on the entire unlabeled corpus.
-            # Nothing scored coverage on this early-return path, so both exits use
-            # the honest unmeasured record (C4). We are already INSIDE the try
-            # whose finally ends the session, so just return — no second
-            # end_naming_session (unlike name, whose hook sat outside its try).
-            if is_top_level_naming():
-                _iso_probe = Chem.MolFromSmiles(smiles)
-                if _iso_probe is not None:
-                    from .rules.isotopes import decorate_isotopic_name, has_isotopes
-                    if has_isotopes(_iso_probe):
-                        _iso_name = decorate_isotopic_name(smiles, self.style, self)
-                        if _iso_name is not None:
-                            # Claims conformance part 2: same exit check as name.
-                            _iso_name = self._exit_round_trip_check(_iso_name, smiles)
-                            _md = unmeasured_confidence(
-                                name=_iso_name,
-                                handler=('fallback' if is_failure_name(_iso_name)
-                                         else 'isotope'))
-                            _md['limit'] = None
-                            _md['abstention'] = None
-                            return _md
-                        # Decorator failed closed on an isotope-labeled molecule:
-                        # REFUSE. Falling through to _name_impl would emit the
-                        # UNLABELED skeleton name (label silently dropped). Abstain
-                        # to the descriptive fallback, exactly as name does (:2967).
-                        record_abstention(AbstentionCode.OTHER,
-                                          detail='isotope_decorator_failed')
-                        _fallback_name = _descriptive_fallback(smiles)
-                        _abst = abstention_code_for(_fallback_name)
-                        _md = unmeasured_confidence(
-                            name=_fallback_name, handler='fallback')
-                        _md['limit'] = None
-                        _md['abstention'] = _abst.value if _abst else None
-                        return _md
-            try:
-                name = self._name_impl(smiles)
-            except OrthonymLimitError as _limit:
-                # G0 fail-closed (DD7 S1): a ring subsystem refused. Surface the
-                # descriptive-fallback name + the named limit code (no crash).
-                if _limit.smiles is None:
-                    _limit.smiles = smiles
-                # Task 0.1: mirror name's classification of the
-                # limit signal (top-level ring refusal = NO_PARENT).
-                if _limit.code == 'UNSUPPORTED_RING_SYSTEM':
-                    record_abstention(
-                        AbstentionCode.NO_PARENT if is_top_level_naming()
-                        else AbstentionCode.BRANCH_UNNAMEABLE,
-                        detail=_limit.code,
-                    )
-                else:
-                    record_abstention(AbstentionCode.OTHER, detail=_limit.code)
-                # Task 1.9 (C8): apply trivial fallback here, mirroring name.
-                # Claims conformance part 2: then the same exit check as name.
-                _fallback_name = self._exit_round_trip_check(
-                    self._apply_trivial_fallback(_limit.message, smiles), smiles)
-                _abst = abstention_code_for(_fallback_name)
-                # C4: nothing scored this either, so report the shared
-                # unmeasured record rather than a fabricated 0.0 (a verdict of
-                # FAIL is as unfounded as a verdict of PASS when no measurement
-                # happened). The 'limit'/'abstention' keys already carry the
-                # out-of-scope signal a consumer needs.
-                _md = unmeasured_confidence(name=_fallback_name,
-                                            handler='fallback')
-                _md['limit'] = _limit.as_dict()
-                _md['abstention'] = _abst.value if _abst else None
-                return _md
-            # Universal stereo backstop (a phase,)
-            if is_top_level_naming():
-                mol = Chem.MolFromSmiles(smiles)
-                if mol is not None:
-                    _conf = retrieve_confidence()
-                    handler = _conf.get('handler', 'unknown')
-                    # a phase -01 : thread the authoritative parent
-                    # map + phenol flag to the backstop.
-                    name = _final_stereo_check(
-                        mol, name, handler=handler,
-                        atom_to_locant=_conf.get('atom_to_locant'),
-                        is_phenol_benzene=_conf.get('is_phenol_benzene'),
-                    )
-                    # Universal OPSIN-grammar backstop (a phase,).
-                    name = _final_grammar_check(
-                        name, smiles, handler,
-                        self._grammar, self._grammar_stats,
-                    )
-                    # (169.5): real-OPSIN validity gate (twin of name).
-                    if not self._disable_opsin_validity_gate:
-                        name = _final_opsin_validity_gate(
-                            name, smiles, self._grammar_stats,
-                            besteffort_unverified=self._general_fallback_unverified, general_fallback_tier=self._general_fallback,
-                        )
+            name = self.name(smiles)
+            _probe = Chem.MolFromSmiles(smiles)
+            # Wave-0 D1: a wildcard input is declined before any producer runs, and
+            # its record says so (the honest unmeasured record, handler 'fallback',
+            # and the named limit).
+            # Perf: zero-false-negative pre-filter -- an RDKit dummy/wildcard atom
+            # (atomic number 0) is spelled ONLY as `*`/`[*]` (bare `*`, `[*]`,
+            # `[1*]`,...) or as `[#0]`/decorated (`[13#0]`, `[#0-]`,...) -- both
+            # spellings are checked, so the filter has no false negative, and skips
+            # the scope check on the common (non-wildcard) path.
+            if _probe is not None and ('*' in smiles or '#0' in smiles):
+                _scope = classify_scope_limit(_probe)
+                if _scope is not None:
+                    _scope.smiles = smiles
+                    _abst = abstention_code_for(name)
+                    _md = unmeasured_confidence(name=name, handler='fallback')
+                    _md['limit'] = _scope.as_dict()
+                    _md['abstention'] = _abst.value if _abst else None
+                    return _md
+            # Wave-2 P2: an isotope-labelled molecule is named by the isotopic
+            # substitution decorator / inside name; nothing
+            # scored coverage on that path, so the record is the honest unmeasured
+            # one (C4). A decorator that failed closed gives the abstention.
+            if _probe is not None:
+                from .rules.isotopes import has_isotopes
+                if has_isotopes(_probe):
+                    _failed = is_failure_name(name)
+                    _abst = abstention_code_for(name) if _failed else None
+                    _md = unmeasured_confidence(
+                        name=name, handler='fallback' if _failed else 'isotope')
+                    _md['limit'] = None
+                    _md['abstention'] = _abst.value if _abst else None
+                    return _md
             metadata = retrieve_confidence()
             # C4: no candidate was scored (early-return path). This used to
             # fabricate confidence=1.0 with all four factors at 1.0 and
@@ -8579,11 +8482,17 @@ class Orthonym:
             # not change 'name'). None for in-scope inputs; otherwise the named
             # out-of-scope code (scope pre-check, else failure mapping).
             _limit = None
-            _probe = Chem.MolFromSmiles(smiles)
             if _probe is not None:
                 _lim = classify_scope_limit(_probe)
                 if _lim is None and is_failure_name(metadata.get('name')):
-                    _lim = classify_failure_limit(_probe, smiles=smiles)
+                    # A ring system a producer refused (OrthonymLimitError, caught
+                    # inside name) left its code as the detail of the abstention
+                    # record; that refusal is the limit, not the structural guess.
+                    _rec = peek_abstention()
+                    if getattr(_rec, 'detail', None) == 'UNSUPPORTED_RING_SYSTEM':
+                        _lim = unsupported_ring_system(smiles)
+                    else:
+                        _lim = classify_failure_limit(_probe, smiles=smiles)
                 if _lim is not None:
                     _limit = _lim.as_dict()
             metadata['limit'] = _limit
@@ -8612,9 +8521,6 @@ class Orthonym:
 
             return metadata
         finally:
-            if _request_token is not None:
-                best_effort_request_ctx.reset(_request_token)
-            end_naming_session()
             clear_confidence()
 
     def _try_retained_fused_upgrade(self, mol, smiles: str) -> Optional[str]:

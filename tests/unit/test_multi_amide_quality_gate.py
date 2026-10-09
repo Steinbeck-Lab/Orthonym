@@ -112,8 +112,17 @@ class TestMultiAmideEndToEnd:
         result = name_compound(smiles)
 
         # Should still be the correct single-amide name
-        # method (1): acetamido is the preferred prefix)
-        assert result == "2-acetamidoethanoic acid", (
+        # method (1): acetamido is the preferred prefix). The parent acid is 'acetic
+        # acid', not 'ethanoic acid': "Retained names as preferred IUPAC
+        # names" (the Blue Book-29717) "Only the following five carboxylic acids
+        # retained names and are also preferred IUPAC names. All can be functionalized,
+        # but only acetic acid, benzoic acid, and oxamic acid can be substituted", with
+        # 'CH3-COOH acetic acid (PIN) (substitution allowed; see ethanoic
+        # acid' (:17646); a substituted acetic acid cites no locant, as in '(1H-indol-1-yl)
+        # acetic acid (PIN)' (:2039). Both spellings read back to the input's full
+        # InChIKey with OPSIN 2.9.0 (an InChIKey); the old assertion
+        # pinned the non-preferred 'ethanoic acid' parent.
+        assert result == "acetamidoacetic acid", (
             f"Single amide should keep its correct name. Got: {result}"
         )
 

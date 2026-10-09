@@ -36,10 +36,14 @@ def test_skeleton_mismatch_still_caught():
 
 
 def test_neutral_input_exempt_from_charge_check():
-    # 'methyl phosphate' (neutral input OP(=O)(O)OC) round-trips through OPSIN to the
-    # deprotonated -2 phosphate dianion. The NAME is correct — a neutral input must
-    # NOT be suppressed on this protonation-ambiguity (regression guard).
-    assert _self_consistency_verdict("OP(=O)(O)OC", "P(=O)(OC)([O-])[O-]") == "ok"
+    # Policy reversed by baeb8d1ab ("a name must reproduce the input's charge form...
+    # compares the net charge and the protonation flag for every input"): a neutral input
+    # is NOT exempt from the charge check. OPSIN reads 'methyl phosphate' as the dianion
+    # (OP(=O)(O)OC is the neutral ester, whose name is 'methyl dihydrogen phosphate',
+    # "Esters of mononuclear noncarbon oxoacids", the Blue Book
+    # 'P(O)(O-CH3)(OH)2 methyl dihydrogen phosphate (PIN)'), so a name that parses to the
+    # dianion denotes a different species and the gate must reject it.
+    assert _self_consistency_verdict("OP(=O)(O)OC", "P(=O)(OC)([O-])[O-]") == "mismatch"
 
 
 # --- No over-suppression: same constitution+charge is still "ok" ---------------
@@ -52,8 +56,14 @@ def test_charge_check_does_not_oversuppress():
 
 
 def test_stereo_only_difference_is_ok():
-    # Stereo lives outside the skeleton block and net charge is equal -> ok.
-    assert _self_consistency_verdict("C[C@H](O)CC", "CC(O)CC") == "ok"
+    # Policy: since 0c4d4a2d3 ("reject stereo OMISSION as a mismatch (0-wrong; 20/500 default
+    # stereo-drops)") a parse that carries LESS stereo than the input defines is a
+    # mismatch -- the name describes a less specific, different molecule. Stereo that is
+    # identical on both sides is still fine, and the stereo carve-out (ignore_stereo=True,
+    # a constitution-only comparison) stays tolerant.
+    assert _self_consistency_verdict("C[C@H](O)CC", "CC(O)CC") == "mismatch"
+    assert _self_consistency_verdict("C[C@H](O)CC", "C[C@H](O)CC") == "ok"
+    assert _self_consistency_verdict("C[C@H](O)CC", "CC(O)CC", ignore_stereo=True) == "ok"
 
 
 # --- Audit mis-reads: these are CORRECT names (must NOT be fail-closed) ---------
@@ -66,6 +76,14 @@ def test_indene_substituent_is_correct_not_a_leak():
 
 
 def test_methylestrane_is_correct_not_a_leak():
-    # Ring sizes [5,6,6,6] (estrane), stereo-stripped identical to 5-methylestrane;
-    # audit mislabeled it "D-homo steroid".
-    assert name_compound("CC12CCC3C(CCC4(CCCCC34)C)C1CCC2", style="pin") == "5-methylestrane"
+    # Ring sizes [5,6,6,6] (estrane skeleton); audit mislabeled it "D-homo steroid".
+    # The input defines no stereochemistry, so the stereoparent name 'estrane' is not
+    # emitted: "Stereochemical configuration of parent structures"
+    # (the Blue Book) "The name of a fundamental parent structure usually implies the
+    # absolute configuration of all chirality centers", and OPSIN reads '5-methylestrane' as
+    # a molecule with four defined stereocentres (full an InChIKey,
+    # the input's is an InChIKey), so that name fabricates configuration
+    # (rejects it since be9f7cabc). The stereo-free input gets the fusion name, which
+    # OPSIN parses to the input's full InChIKey.
+    assert name_compound("CC12CCC3C(CCC4(CCCCC34)C)C1CCC2", style="pin") == (
+        "5,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthrene")

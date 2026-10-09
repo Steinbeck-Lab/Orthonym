@@ -469,17 +469,10 @@ def _number_parent(parent: List[int], suffix_carbons: Set[int],
     return {a: i + 1 for i, a in enumerate(best)}
 
 
-def _assemble(mol, parent: List[int], numbering: Dict[int, int],
-              suffix_carbons: Set[int], prefix_on: Dict[int, List[str]]) -> Optional[str]:
-    n = len(parent)
-    stem = get_chain_prefix(n)
-    if not stem:
-        return None
-
-    groups: Dict[str, List[int]] = {}
-    for c, toks in prefix_on.items():
-        for t in toks:
-            groups.setdefault(t, []).append(numbering[c])
+def _prefix_string(groups: Dict[str, List[int]]) -> Optional[str]:
+    """The detachable-prefix block of a name: each token once, with its locants and
+    multiplier, in alphanumerical order, or None for a count with no
+    multiplier."""
     parts: List[str] = []
     from ..assembly.naming_utils import _is_fully_enclosed, apply_enclosing_marks
     for tok in sorted(groups, key=alpha_sort_key):
@@ -500,7 +493,23 @@ def _assemble(mol, parent: List[int], numbering: Dict[int, int],
             return None
         loc_str = ','.join(str(x) for x in locs)
         parts.append(f"{loc_str}-{mult}{tok_cited}")
-    prefix_str = '-'.join(parts)
+    return '-'.join(parts)
+
+
+def _assemble(mol, parent: List[int], numbering: Dict[int, int],
+              suffix_carbons: Set[int], prefix_on: Dict[int, List[str]]) -> Optional[str]:
+    n = len(parent)
+    stem = get_chain_prefix(n)
+    if not stem:
+        return None
+
+    groups: Dict[str, List[int]] = {}
+    for c, toks in prefix_on.items():
+        for t in toks:
+            groups.setdefault(t, []).append(numbering[c])
+    prefix_str = _prefix_string(groups)
+    if prefix_str is None:
+        return None
 
     if suffix_carbons:
         ol_locs = sorted(numbering[c] for c in suffix_carbons)
@@ -534,6 +543,128 @@ def _assemble(mol, parent: List[int], numbering: Dict[int, int],
     except Exception:
         pass
 
+    return name
+
+
+def _assemble_ester_form(mol, core_order: List[int], arms: List[dict],
+                         suffix_carbons: Set[int]) -> Optional[str]:
+    """The name of a core with a carboxylic ester arm as that ester: '<yl> <acylate>'.
+
+     (the Blue Book) ranks esters (class 9,:18182) above alcohols (17,
+    :18190) and ethers, so a core bearing an acyloxy arm is not named on the polyol
+    ('1-{[...]oxy}-3-(acyloxy)propan-2-ol'): the ester is the principal group, cited
+    as the functional class name of its alkyl group and its acid. Under
+    "Phosphatidylethanolamine" (the Blue Book, example name at:55180) the diacyl
+    phospho lipid is
+    '(2R)-3-{[(2-aminoethoxy)hydroxyphosphoryl]oxy}propane-1,2-diyl dihexadecanoate':
+    the ester is the parent and the phosphoric acid diester is a prefix.
+
+    The acid of the principal ester is the one with the greater number of skeletal
+    atoms, as ``name_polyfunctional_diester_free_hydroxy`` applies it); every
+    other ester is an acyloxy prefix and every free hydroxyl a hydroxy prefix, all
+    cited on the 'yl' word, method (2): the Blue Book "two
+    methods are used";:31836 "names formed by using method (2) are acceptable in
+    general nomenclature", so a name with more than one ester is recorded below the
+    PIN). The attachment atom takes the lowest locant on the 'yl' word, then
+    the prefixes the lowest locants, then the first cited in alphanumerical order.
+
+    Returns None outside this scope (the caller keeps the polyol name).
+    """
+    from ..rules import esters as _es
+    ester_arms = [a for a in arms if a['acyl_c'] is not None]
+    if not ester_arms:
+        return None
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    infos = []
+    for a in ester_arms:
+        acyl = mol.GetAtomWithIdx(a['acyl_c'])
+        dbl_o = next((x.GetIdx() for x in acyl.GetNeighbors()
+                      if x.GetSymbol() == 'O' and x.GetDegree() == 1
+                      and mol.GetBondBetweenAtoms(a['acyl_c'], x.GetIdx()).GetBondType()
+                      == Chem.BondType.DOUBLE), None)
+        if dbl_o is None:
+            return None
+        match = (a['acyl_c'], dbl_o, a['o'], a['core'])
+        acid_atoms, alkyl_atoms = _es.parse_ester_fragments(mol, match)
+        if not acid_atoms or not alkyl_atoms:
+            return None
+        chain = _es._find_acid_principal_chain(mol, acid_atoms)
+        infos.append({'arm': a, 'match': match, 'acid_atoms': acid_atoms,
+                      'alkyl_atoms': alkyl_atoms,
+                      'acid_len': len(chain) if chain else len(acid_atoms)})
+    infos.sort(key=lambda i: (-i['acid_len'], ranks[i['arm']['core']],
+                              ranks[i['arm']['acyl_c']]))
+    principal = infos[0]
+    attach = principal['arm']['core']
+
+    # every other arm is a prefix of the 'yl' word, every free hydroxyl a 'hydroxy'
+    decorations: Dict[int, List[str]] = {}
+    for a in arms:
+        if a is principal['arm']:
+            continue
+        decorations.setdefault(a['core'], []).append(a['token'])
+    for c in suffix_carbons:
+        decorations.setdefault(c, []).append('hydroxy')
+
+    def _score(order: List[int]):
+        pos = {a: i + 1 for i, a in enumerate(order)}
+        locs = sorted(pos[c] for c, toks in decorations.items() for _t in toks)
+        alpha = sorted((alpha_sort_key(t), pos[c])
+                       for c, toks in decorations.items() for t in toks)
+        return (pos[attach], locs, alpha)
+
+    fwd, rev = list(core_order), list(reversed(core_order))
+    chain = min((fwd, rev), key=_score)
+    chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+    k = chain_pos[attach]
+
+    groups: Dict[str, List[int]] = {}
+    for c, toks in decorations.items():
+        for t in toks:
+            groups.setdefault(t, []).append(chain_pos[c])
+    prefix_str = _prefix_string(groups)
+    if prefix_str is None:
+        return None
+    n = len(chain)
+    if k == 1:
+        from ..data.chain_names import get_alkyl_name
+        try:
+            yl_word = f"{prefix_str}{get_alkyl_name(n)}"
+        except (ValueError, KeyError):
+            return None
+    else:
+        stem = get_chain_prefix(n)
+        if not stem:
+            return None
+        yl_word = f"{prefix_str}{stem}an-{k}-yl"
+
+    # core stereocentres in the numbering of the 'yl' word, before the name of
+    # the alkyl group; the arms' own stereo is already inside their strings
+    try:
+        from ..rules.stereochemistry import (
+            collect_stereodescriptors,
+            format_stereodescriptor_string,
+        )
+        descriptors = [(loc, cip) for loc, cip in collect_stereodescriptors(
+            mol, chain_pos, include_near_parent_ez=False) if cip in ('R', 'S')]
+        if descriptors:
+            yl_word = format_stereodescriptor_string(descriptors) + yl_word
+    except Exception:
+        pass
+
+    acylate = _es._build_ester_acid_word(
+        mol, principal['match'], principal['acid_atoms'], principal['alkyl_atoms'])
+    if not acylate:
+        return None
+    name = f"{yl_word} {acylate}"
+    # The phosphoryloxy prefix is rendered head first, which is the alphanumerical
+    # order of its two substituents only when the head sorts before 'hydroxy'
+    #; tests/unit/rules/test_v38_drop23_phosphodiester.py), and a name with
+    # more than one ester is method (2) of. The name is valid and
+    # round-trip verified, and it is recorded below the PIN, as the polyol name of
+    # these arms was not.
+    from ..metrics.provenance import record_non_pin_fragment
+    record_non_pin_fragment(name)
     return name
 
 
@@ -582,6 +713,7 @@ def _build_from_core(mol, core_set: Set[int], acyl_carbons: Set[int]) -> Optiona
     suffix_carbons: Set[int] = set()
     acyloxy_arm = False
     phosphoryloxy_arm = False
+    arms: List[dict] = []
 
     for c in core_order:
         ca = mol.GetAtomWithIdx(c)
@@ -598,7 +730,9 @@ def _build_from_core(mol, core_set: Set[int], acyl_carbons: Set[int]) -> Optiona
             else:
                 prefix_on.setdefault(c, []).append(payload)
                 far = [o for o in n.GetNeighbors() if o.GetIdx() != c]
-                if any(o.GetIdx() in acyl_carbons for o in far):
+                acyl_c = next((o.GetIdx() for o in far if o.GetIdx() in acyl_carbons), None)
+                arms.append({'core': c, 'o': ni, 'token': payload, 'acyl_c': acyl_c})
+                if acyl_c is not None:
                     acyloxy_arm = True
                 if any(o.GetSymbol() == 'P' for o in far):
                     phosphoryloxy_arm = True
@@ -611,6 +745,13 @@ def _build_from_core(mol, core_set: Set[int], acyl_carbons: Set[int]) -> Optiona
     numbering = _number_parent(core_order, suffix_carbons, prefix_on)
     if numbering is None:
         return None
+
+    if acyloxy_arm and phosphoryloxy_arm:
+        # A phosphoric acid diester arm beside a carboxylic ester: the ester is the
+        # principal group, so the name is the ester's, not the polyol's.
+        ester_name = _assemble_ester_form(mol, core_order, arms, suffix_carbons)
+        if ester_name:
+            return ester_name
 
     name = _assemble(mol, core_order, numbering, suffix_carbons, prefix_on)
     if name and acyloxy_arm and not phosphoryloxy_arm:

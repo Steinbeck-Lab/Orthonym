@@ -144,6 +144,23 @@ def test_concurrent_first_use_download(fake_spec):
     assert Path(paths.pop()).read_bytes() == PAYLOAD
 
 
+def test_first_start_download_says_why_it_is_slow(fake_spec, capsys):
+    """A download nobody asked for (the first start) is announced on stderr, once."""
+    spec, hits = fake_spec
+    jars.find_jar("opsin")
+    err = capsys.readouterr().err
+    assert hits["n"] == 1 and err.count("[orthonym] first start: downloading the opsin 9.9.9 jar") == 1
+    assert "(0.0 MB)" in err and "This happens once" in err and "orthonym --fetch-jars" in err
+    jars._reset_cache()
+    jars.find_jar("opsin")                      # second start: the jar is there, no message
+    assert hits["n"] == 1 and "first start" not in capsys.readouterr().err
+
+
+def test_explicit_fetch_is_not_called_a_first_start(fake_spec, capsys):
+    jars.fetch_all(verbose=False)
+    assert "first start" not in capsys.readouterr().err
+
+
 def test_fetch_all_ignores_no_download(fake_spec, monkeypatch):
     spec, hits = fake_spec
     monkeypatch.setitem(jars.JARS, "centres", jars.JarSpec(**{**spec.__dict__, "kind": "centres",

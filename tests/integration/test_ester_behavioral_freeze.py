@@ -6,6 +6,12 @@ The fixture at tests/fixtures/ester_freeze.json was generated before
 the a phase fragment-aware naming changes. This test ensures zero
 behavioral regression from ester/amide routing modifications.
 
+One fixture value was re-based on purpose: 'methyl laurate' is now 'methyl dodecanoate'.
+Lauric acid is not a retained name in the 2013 recommendations (the book has no
+'lauric' entry; 'Retained names only for general nomenclature' lists e.g.
+'palmitic acid hexadecanoic acid (PIN)', the Blue Book), so the ester acyl word
+follows the systematic acid stem 'Systematic names').
+
 Marked as @pytest.mark.integration since 53 RDKit calls are fast (<5s).
 Run with: pytest -m integration tests/integration/test_ester_behavioral_freeze.py -v
 """

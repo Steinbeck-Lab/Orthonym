@@ -26,12 +26,19 @@ class TestGlycerides:
         assert name_compound(smiles) == "propane-1,2,3-triyl trihexadecanoate"
 
     def test_tag_unsaturated(self):
-        """Triolein → propane-1,2,3-triyl tris[(9Z)-octadec-9-enoate]."""
+        """Triolein → propane-1,2,3-triyl tri[(9Z)-octadec-9-enoate].
+
+        An anion name enclosed only for its stereodescriptor takes 'tri', not 'tris': the Blue
+        Book's own example "Specification of configuration in compounds with
+        multiple stereogenic units" (the Blue Book) is
+        '(2R)-3-hydroxypropane-1,2-diyl di[(3E,5E)-hepta-3,5-dienoate] (PIN)'. 'tris' is for a
+        name that would be ambiguous with 'tri' "Use of multiplicative prefixes
+        'bis', 'tris', etc.", the Blue Book), which this is not."""
         from orthonym.rules.lipids import name_lipid  # noqa: F401
         smiles = ("CCCCCCCC/C=C\\CCCCCCCC(=O)OCC("
                   "COC(=O)CCCCCCC/C=C\\CCCCCCCC)"
                   "OC(=O)CCCCCCC/C=C\\CCCCCCCC")
-        assert name_compound(smiles) == "propane-1,2,3-triyl tris[(9Z)-octadec-9-enoate]"
+        assert name_compound(smiles) == "propane-1,2,3-triyl tri[(9Z)-octadec-9-enoate]"
 
     def test_mag(self):
         """1-monopalmitin → 2,3-dihydroxypropyl hexadecanoate."""

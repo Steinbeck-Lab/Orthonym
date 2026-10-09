@@ -32,18 +32,25 @@ class TestDicarboxylicAminoAcidBailout:
 
     def test_aspartic_acid_stereo(self):
         """-07 (a phase): a stereo-tagged free aspartic acid resolves to the
-        retained PIN 'aspartic acid' (OPSIN-round-trip-verified), not the old
-        systematic 'aminobutanedioic acid' bailout (standard AAs use the retained
-        name with the configurational descriptor,."""
+        retained name carrying its configurational descriptor, 'L-aspartic acid'
+        (OPSIN-round-trip-verified), not the old systematic 'aminobutanedioic acid'
+        bailout. The descriptor is cited since a6cadc255 ("a free amino acid keeps its L": the
+        namer used to drop the 'L-' that it kept for 'D-' and so emitted a bare name
+        for either form of a defined-configuration input): "The stereodescriptors 'D' and
+        'L'" (the Blue Book) -- "The absolute configuration at the α-carbon
+        atom of the α-amino carboxylic acids is designated by the stereodescriptor
+        'D' or 'L'" -- and the Blue Book itself writes 'L-glutamic acid' inside a
+        name (:54506)."""
         result = name_compound("N[C@@H](CC(=O)O)C(=O)O")
-        assert result == "aspartic acid", f"Expected 'aspartic acid', got: {result}"
+        assert result == "L-aspartic acid", f"Expected 'L-aspartic acid', got: {result}"
 
     def test_glutamic_acid_stereo(self):
         """-07 (a phase): a stereo-tagged free glutamic acid resolves to the
-        retained PIN 'glutamic acid' (OPSIN-round-trip-verified), not the old
-        systematic 'aminopentanedioic acid' bailout."""
+        retained name with its configurational descriptor, 'L-glutamic acid'
+        (OPSIN-round-trip-verified;, see `test_aspartic_acid_stereo`),
+        not the old systematic 'aminopentanedioic acid' bailout."""
         result = name_compound("N[C@@H](CCC(=O)O)C(=O)O")
-        assert result == "glutamic acid", f"Expected 'glutamic acid', got: {result}"
+        assert result == "L-glutamic acid", f"Expected 'L-glutamic acid', got: {result}"
 
     def test_mono_cooh_amino_acid_unchanged(self):
         """Mono-COOH amino acid should NOT bail out -- regression guard.

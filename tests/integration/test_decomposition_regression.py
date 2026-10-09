@@ -50,11 +50,16 @@ BASIC_CANARIES = [
     ("C1CCCCC1", "cyclohexane"),
     ("c1ccncc1", "pyridine"),
     ("c1ccoc1", "furan"),
-    ("c1cc[nH]c1", "pyrrole"),
+    # (the Blue Book): "in a preferred IUPAC name a locant and the symbol 'H' must be
+    # cited"; 'the PIN is 1H-pyrrole' (the Blue Book,.
+    ("c1cc[nH]c1", "1H-pyrrole"),
     ("C1CCNCC1", "piperidine"),
     ("CS", "methanethiol"),
-    ("OCCO", "ethylene glycol"),
-    ("OCC(O)CO", "glycerol"),
+    # (the Blue Book): 'ethylene glycol' / 'glycerol' are retained for general
+    # nomenclature only; the PINs are ethane-1,2-diol (the Blue Book) and
+    # propane-1,2,3-triol (the Blue Book). Both are on the PIN deny list.
+    ("OCCO", "ethane-1,2-diol"),
+    ("OCC(O)CO", "propane-1,2,3-triol"),
     ("C/C=C/C", "(2E)-but-2-ene"),
     ("C/C=C\\C", "(2Z)-but-2-ene"),
 ]
@@ -103,8 +108,10 @@ ESTER_CANARIES = [
     # acetate/benzoate/formate rows are correct AS-IS -- those three acids
     # ARE retained as PINs, which is exactly the distinction that matters.
     ("CCCCCCCCCCCCCCCC(=O)OC", "methyl hexadecanoate"),
-    # Ester on aromatic (acetyloxy pattern)
-    ("CC(=O)Oc1ccccc1", "acetyloxybenzene"),
+    # Ester on aromatic: esters are named by functional class nomenclature in a PIN,
+    # (the Blue Book, 'All preferred IUPAC names for esters are named by
+    # functional class nomenclature').
+    ("CC(=O)Oc1ccccc1", "phenyl acetate"),
     # Formate esters
     ("O=COCC", "ethyl formate"),
     # NP ester
@@ -193,7 +200,10 @@ ROUNDTRIP_CANARIES = [
     ("CCCCCCCCCC/C=C/CCCCCCCCCC(=O)O", "(11E)-docos-11-enoic acid"),
     ("CCCCCCCCCCCCCC(O)CC", "hexadecan-3-ol"),
     ("C/C=C/CCCCCCCCC", "(2E)-dodec-2-ene"),
-    ("Cc1ccc(N)cc1N", "2,4-diamino-1-methylbenzene"),
+    # Two amine suffixes outrank the methyl prefix: benzene-1,3-diamine is the
+    # parent; cf. '4-methylbenzene-1,3-disulfonic acid (PIN) (not toluene-2,4-
+    # disulfonic acid)', the Blue Book.
+    ("Cc1ccc(N)cc1N", "4-methylbenzene-1,3-diamine"),
     ("OCc1ccc(O)cc1", "4-(hydroxymethyl)phenol"),  #: phenol suffix routing
     ("c1ccc2ccccc2c1", "naphthalene"),
     # Fatty acid with Z geometry
@@ -233,7 +243,9 @@ DECO_22_25_CANARIES = [
     ("COC(=O)CC(=O)OCC", "ethyl methyl propanedioate"),
     ("COC(=O)CCCC(=O)OC", "dimethyl pentanedioate"),
     # Triester via multi-bond ester cleavage
-    ("CC(=O)OCC(COC(C)=O)OC(C)=O", "1,2,3-tris(acetyloxy)propane"),
+    # (the Blue Book): identical anions -> 'propane-1,2,3-triyl triacetate
+    # (PIN)', the Blue Book.
+    ("CC(=O)OCC(COC(C)=O)OC(C)=O", "propane-1,2,3-triyl triacetate"),
 ]
 
 

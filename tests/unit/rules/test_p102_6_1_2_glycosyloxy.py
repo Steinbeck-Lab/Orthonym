@@ -41,14 +41,31 @@ class TestGlycosidicOxygenCountedOnce:
     cited the 7-O both as a hydroxy on the aglycone and inside the prefix."""
 
     def test_flavan_glucoside_locanted_and_single_counted(self):
-        """The 7-O bears the sugar, so only 3 and 5 remain as hydroxy."""
+        """The 7-O bears the sugar, so only 3 and 5 remain as hydroxy.
+
+        The aglycone is a polyol, and the string rule read its multiplied '-ol' as
+        '-3,5,7-triyl', a group with three free valences ('...-3,5,7-triyl beta-D-
+        glucopyranoside', which OPSIN cannot parse). The group word is now built from the
+        STRUCTURE of the aglycone (``_aglycone_polyol_group``): the oxygen that condenses with
+        the sugar back to the parent is the 7-O, it is the group's free valence ('-7-yl'), and
+        the 3- and 5-hydroxy groups stay 'hydroxy' prefixes; the name is shipped only after it
+        round-trips to the parent. "Names" (the Blue Book): "Glycosides are
+        named by using functional class nomenclature.... The class name is preceded, as a
+        separate word, by the name of the substituent group that is part of the acetal or
+        ketal function." A second hydroxy group is not senior to the glycosidic one (only a
+        senior group turns a glycoside substitutive,,:53915), so the functional
+        class form stands. The oxygen is counted once and the locant 7 is cited, as the test
+        always required; the old text asserted '7-(glycosyloxy)-3,5-dihydroxy-...-benzopyran',
+        a name with hydroxy groups cited as prefixes and no suffix. OPSIN 2.9.0 full-InChIKey
+        exact.
+        """
         name = _name(
             "OC[C@H]1O[C@@H](Oc2cc(O)c3c(c2)O[C@@H](c2ccc(O)cc2)[C@H](O)C3)"
             "[C@H](O)[C@@H](O)[C@@H]1O"
         )
         assert name == (
-            "(2S,3R)-7-(β-D-glucopyranosyloxy)-3,5-dihydroxy-"
-            "2-(4-hydroxyphenyl)-3,4-dihydro-2H-1-benzopyran"
+            "(2S,3R)-3,5-dihydroxy-2-(4-hydroxyphenyl)-"
+            "3,4-dihydro-2H-1-benzopyran-7-yl β-D-glucopyranoside"
         )
         # The oxygen is not double-counted: 'trihydroxy' was the bug.
         assert "trihydroxy" not in name

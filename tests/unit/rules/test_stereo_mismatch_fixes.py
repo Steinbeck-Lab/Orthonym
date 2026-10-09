@@ -103,9 +103,19 @@ class TestSM41:
         assert len(cip_atoms) == 0, f"Unexpected CIP labels on SM-41: {len(cip_atoms)}"
 
     def test_name_is_steroid(self):
-        """ should produce a steroid retained name."""
+        """ has no stereo, so it gets the cyclopenta[a]phenanthrene fusion name, not the
+        stigmastane stereoparent.
+
+         "Stereochemical configuration of parent structures" (the Blue Book):
+        'The name of a fundamental parent structure usually implies the absolute configuration
+        of all chirality centers', so 'stigmastane' would assert configuration the input lacks;
+        0c46e83ca declines the stereoparent when every scaffold centre is undefined. OPSIN
+        2.9.0 parses the fusion name to the input's full InChIKey."""
         name = name_compound(SM_41_SMILES)
-        assert "stigmast" in name.lower(), f"Expected steroid name: {name}"
+        assert "stigmast" not in name.lower(), f"stereoparent asserted without stereo: {name}"
+        assert name == (
+            "10,13-dimethyl-17-[5-(propan-2-yl)heptan-2-yl]-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
+            "tetradecahydro-1H-cyclopenta[a]phenanthrene-3,7-diol"), name
 
 
 # ============================================================================
@@ -210,9 +220,14 @@ class TestSM44:
         assert len(cip_atoms) == 0, f"Unexpected CIP labels on SM-44: {len(cip_atoms)}"
 
     def test_name_is_steroid(self):
-        """ should produce a steroid retained name."""
+        """ has no stereo, so it gets the cyclopenta[a]phenanthrene fusion name, not the
+        ergostane stereoparent, the Blue Book; 0c46e83ca). OPSIN 2.9.0 parses
+        the fusion name to the input's full InChIKey."""
         name = name_compound(SM_44_SMILES)
-        assert "ergosta" in name.lower(), f"Expected steroid name: {name}"
+        assert "ergosta" not in name.lower(), f"stereoparent asserted without stereo: {name}"
+        assert name == (
+            "17-(5,6-dimethylhept-6-en-2-yl)-10,13-dimethyl-2,3,4,5,6,9,10,11,12,13,14,15,16,17-"
+            "tetradecahydro-1H-cyclopenta[a]phenanthren-3-ol"), name
 
 
 # ============================================================================

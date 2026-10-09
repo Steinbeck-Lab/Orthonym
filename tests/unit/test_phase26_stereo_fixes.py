@@ -77,7 +77,7 @@ class TestSteroidStereoPresence:
         (`5β-androstan-3α,17α-diol`) rather than a whole-graph (R/S) block.
         """
         name = name_compound(ANDROSTANDIOL_SMILES)
-        assert re.search(r"\d+(alpha|beta)", name) or re.search(r"\(\d+[RS]", name), (
+        assert re.search(r"\d+(α|β)", name) or re.search(r"\(\d+[RS]", name), (
             f"Expected stereo descriptors (α/β or R/S) in name, got: {name}"
         )
 
@@ -124,26 +124,29 @@ class TestSteroidStereoFormat:
     """
 
     def test_alpha_beta_descriptors_lowercase_latin(self):
-        """Ring-face descriptors are lowercase Latin 'alpha'/'beta' tokens at locants."""
+        """Ring-face descriptors are the Greek α/β tokens at locants (the test id predates the
+        Greek spelling: b946aa5e0 changed the steroid emitters from ASCII 'alpha'/'beta' to the
+        Blue Book Greek letters,, the Blue Book)."""
         name = name_compound(ANDROSTANDIOL_SMILES)
-        tokens = re.findall(r"\d+(alpha|beta)", name)
+        tokens = re.findall(r"\d+(α|β)", name)
         assert len(tokens) > 0, f"No α/β ring-face descriptors found in: {name}"
 
     def test_inline_alpha_beta_format(self):
         """α/β attach inline as '{locant}{greek}' with no hyphen between locant and greek."""
         name = name_compound(ANDROSTANDIOL_SMILES)
-        # e.g. "5β-androstan-3α,17α-diol"
-        assert re.search(r"\d+(alpha|beta)", name), f"No inline α/β in: {name}"
+        # e.g. "5β-androstane-3α,17α-diol" (the 'e' stays before the consonant of 'diol',
+        # (a) "ELISION OF VOWELS", the Blue Book)
+        assert re.search(r"\d+(α|β)", name), f"No inline α/β in: {name}"
         # NEVER a leading parenthesised greek block (the OPSIN-unparseable anti-pattern)
-        assert not re.match(r"^\(\d+(alpha|beta)", name), (
+        assert not re.match(r"^\(\d+(α|β)", name), (
             f"α/β must not be a leading parenthesis block: {name}"
         )
 
     def test_stem_prefix_starts_name(self):
         """A free ring-face descriptor (e.g. 5β-) is prepended to the stem, name-initial."""
         name = name_compound(ANDROSTANDIOL_SMILES)
-        # "5β-androstan-..." — starts with a locant+greek stem prefix
-        assert re.match(r"\d+(alpha|beta)-[a-z]", name), (
+        # "5β-androstane-..." — starts with a locant+greek stem prefix
+        assert re.match(r"\d+(α|β)-[a-z]", name), (
             f"Expected a '{{locant}}{{greek}}-' stem prefix, got: {name}"
         )
 
@@ -181,7 +184,16 @@ class TestSteroidStereoRegression:
     def test_non_stereo_testosterone_no_stereo_prefix(self):
         """Testosterone from non-stereo SMILES should NOT get stereo prefix."""
         name = name_compound("CC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C")
-        assert name == "17-hydroxyandrost-4-en-3-one", (
+        # fa7a9a109: an undefined implied centre declines the stereoparent.
+        # "Stereochemical configuration of parent structures" (the Blue Book) 'The name of a
+        # fundamental parent structure usually implies the absolute configuration of all chirality
+        # centers': OPSIN reads 'androst-4-ene' with a fully specified configuration that this
+        # stereo-free input does not state. It gets the fusion name instead, which OPSIN 2.9.0
+        # parses to the input's full InChIKey.
+        assert "androst" not in name, f"stereoparent asserted without stereo: {name}"
+        assert name == (
+            "17-hydroxy-10,13-dimethyl-1,2,6,7,8,9,10,11,12,13,14,15,16,17-"
+            "tetradecahydro-3H-cyclopenta[a]phenanthren-3-one"), (
             f"Non-stereo testosterone regression, got: {name}"
         )
 

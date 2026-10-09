@@ -85,7 +85,10 @@ CFR_DISPATCH_CANARY: "OrderedDict[StoutClass, Tuple[str, str]]" = OrderedDict([
     (StoutClass.RADICAL,                 ("[CH3]",                  "methyl")),
     (StoutClass.ZWITTERION,              ("[NH3+]CC(=O)[O-]",       "glycine")),
     (StoutClass.ANION_RETAINED,          ("CC(=O)[O-]",             "acetate")),
-    (StoutClass.CATION_RETAINED,         ("C[N+](C)(C)C",           "tetramethylammonium")),
+    # Commit 12541211e (alkylammonium -> substitutive aminium PIN):
+    # (the Blue Book) 'N,N,N-trimethylmethanaminium (PIN) tetramethylammonium';
+    # 'Cation and anion names' (:26660): "Method (1) leads to preferred IUPAC names".
+    (StoutClass.CATION_RETAINED,         ("C[N+](C)(C)C",           "N,N,N-trimethylmethanaminium")),
     (StoutClass.ANION_SMALL,             ("C(=O)([O-])CCCCCC",      "heptanoate")),
     (StoutClass.POLY_ANION,              ("[O-]C(=O)CCCC(=O)[O-]",  "pentanedioate")),
     (StoutClass.MULTI_COMPONENT_NEUTRAL, ("CCO.OCC",                "ethanol ethanol")),
@@ -99,8 +102,14 @@ CFR_DISPATCH_CANARY: "OrderedDict[StoutClass, Tuple[str, str]]" = OrderedDict([
     #: peptide PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
     (StoutClass.PEPTIDE,                 ("NCC(=O)NCC(=O)O",        "(2-aminoacetamido)acetic acid")),
     (StoutClass.RETAINED_NAME,           ("CCO",                    "ethanol")),
-    (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "(2S)-2-aminopropanoic acid")),
-    (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOC",                 "2,5-dioxahexane")),
+    # Commit a6cadc255 (-p3reg-I12): a free amino acid keeps its L; 'The
+    # stereodescriptors D and L' (the Blue Book). Gold row.0 pins 'L-alanine'.
+    (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "L-alanine")),
+    # Commit 36464b71c (simple 1,2-O ethers are substitutive, not oxa-replacement):
+    # 'Systematic names of ethers' (the Blue Book) '(1) 1,2-dimethoxyethane
+    # (PIN)'. The row therefore no longer reaches the skeletal-replacement producer; it keeps
+    # pinning the dispatch byte-identity of the PIN name for this fixture.
+    (StoutClass.SKELETAL_REPLACEMENT,    ("COCCOC",                 "1,2-dimethoxyethane")),
     (StoutClass.CYCLOPHANE,              ("C1CCc2ccccc2CCCc2ccccc21",
                                           "[3.3]orthocyclophane")),
     #: was 'propyl palmitate'. The ester acyl word follows the PIN
@@ -164,6 +173,29 @@ _PIN_NOT_BUILT = {
         "needs the substitutive name of the Asn-Glu acid fragment (the glutamyl "
         "residue's carboxy side chain); PIN spelling ASSUMED; TODO "
         ".planning/preexisting-triage/TRIAGE.md 'Suite fix -- j7-defects-misc'"),
+    # The next two rows: the frozen value names a DIFFERENT molecule (OPSIN 2.9.0 full
+    # InChIKey, inchi_l1_match False in the CSV), and the default (pin) tier DECLINES the
+    # input -- 'PIN or decline' (the paper-conformant default tier, v1.0.2) -- so there is no
+    # PIN string to pin. The expected value below is NOT a PIN: it is the best-effort tier's
+    # name (--emit-tier best-effort: tier systematic_verified, is_pin false, OPSIN-exact),
+    # the stand-in for 'a name that round-trips'. The strict xfail turns red (XPASS) only
+    # if the default tier ships exactly this string; until a PIN is built the decline
+    # stays unasserted here (a test must not accept the abstention).
+    "test_canary_name_stability_398": (
+        "4-(3-oxa-2-azaprop-2-en-2-ium-1-ylidene)-1-({[4-(3-oxa-2-azaprop-2-en-2-ium-1-"
+        "ylidene)-1,4-dihydropyridin-1-yl]methoxy}methyl)-1,4-dihydropyridine",
+        "cfr-frozen-wrong-molecule-default-tier-declines -- see "
+        ".planning/preexisting-triage/TRIAGE-2026-10-09.md (frozen value is another "
+        "molecule; default tier declines; no PIN built; stand-in is the best-effort name)"),
+    "test_canary_name_stability_483": (
+        "S-{2-[(3-{[(2R)-3-{[(3-{[(2R,3S,4R,5R)-5-(6-amino-9H-purin-9-yl)-4-hydroxy-3-"
+        "(phosphonooxy)oxolan-2-yl]methoxy}-1,3-dihydroxy-1,3-dioxo-1λ5,3λ5-"
+        "diphosphoxan-1-yl)oxy]methyl}-2-hydroxy-3-methyl-1-oxobutyl]amino}-1-oxopropyl)"
+        "amino]ethyl} (9Z,12Z)-octadeca-9,12-dienethioate",
+        "cfr-frozen-wrong-molecule-default-tier-declines -- see "
+        ".planning/preexisting-triage/TRIAGE-2026-10-09.md (acyl-CoA: frozen value is an "
+        "atom-dropped different molecule; default tier declines; no PIN built; stand-in is "
+        "the best-effort name)"),
 }
 
 
@@ -214,11 +246,27 @@ SUPPLEMENTARY_CANARY: List[Tuple[str, str, str, str]] = [
 ][:15]
 
 
-# Frozen rows whose value names a DIFFERENT molecule (OPSIN: not the input)
-# and whose current name is the verified PIN. The CSV stays the frozen record
+# Frozen rows whose value names a DIFFERENT molecule (OPSIN: not the input), or
+# the right molecule under a name that is not the PIN, and whose current name is the
+# verified PIN. The CSV stays the frozen record
 # (tests/integration/test_orgm_byte_identical_v18_canary.py md5-pins it against
 # the post-CFR CSV); the expected value comes from here, with its evidence.
 _SUPPLEMENTARY_REBASELINE = {
+    # Same molecule, non-PIN spelling: the frozen '1-oxa-4-azacyclooctane' is a
+    # skeletal-replacement name for an 8-membered ring. (the Blue Book):
+    # "Hantzsch-Widman names, except for azine and oxine, are preferred IUPAC names for
+    # both the unsaturated and saturated compounds" (3- to 10-membered rings), so the PIN of
+    # C1CCNCCOC1 is the Hantzsch-Widman name. OPSIN 2.9.0: full InChIKey exact.
+    "test_canary_name_stability_143": "1,4-oxazocane",
+    # (the Blue Book, under ALPHANUMERICAL ORDER): "The name of a
+    # prefix for a substituent is considered to begin with the first letter of its
+    # complete name." '(4-hydroxy-3,5-dimethoxyphenyl)' begins with 'h' and
+    # '(2,4,6-trihydroxy-3-methoxyphenyl)' with 't' (the multiplying prefix is part of a
+    # compound prefix), so 'h' is cited first; the frozen value cites them t before h.
+    # Same locants, same molecule: OPSIN 2.9.0 full InChIKey exact for both orders.
+    "test_canary_rt75_0": (
+        "3-(4-hydroxy-3,5-dimethoxyphenyl)-1-(2,4,6-trihydroxy-3-methoxyphenyl)"
+        "propane-1,2-dione"),
     # N5b step 2. The frozen value is the abstention. A fused ring system with a ring heteroatom
     # has its fusion name, (the Blue Book, "Five-membered ring requirement"):
     # naphtho[2,3-c]furan is a two-component fusion name,:11903). OPSIN 2.9.0:
@@ -297,3 +345,27 @@ def test_cfr_supplementary_byte_identical(tier, fixture_id, smiles, expected_nam
         f"  Expected: {expected_name}\n"
         f"  Got:      {result}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Tier contract for the two supplementary rows whose PIN is not built
+#
+# ``test_cfr_supplementary_byte_identical`` keeps those rows (398, 483) as strict xfails
+# (``_PIN_NOT_BUILT``): there is no PIN string to pin, and the test must not accept the
+# default tier's decline. What can be pinned today is the contract around them, the same
+# one ``test_parent_mismatch_tier_contract`` asserts for its declared rows: the best-effort
+# tier names the molecule and the name round-trips to the input's FULL InChIKey (breadth
+# never drops), and whatever the PIN tier ships is RT-exact too (never another molecule).
+# Run with the OPSIN validity gate on, as production does.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("fixture_id", [
+    "test_canary_name_stability_398",
+    "test_canary_name_stability_483",
+])
+def test_cfr_supplementary_tier_contract(fixture_id):
+    from tests.support.rt_assert import assert_tier_contract
+    smiles = next(r[2] for r in PRE_CANARY_ROWS if r[1] == fixture_id)
+    assert_tier_contract(smiles)

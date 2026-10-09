@@ -3131,6 +3131,27 @@ def _assemble_fragments(
                 getattr(suffix_frag, 'count', 1)) == 1
         and (not stereo or _acetic_stereo is not None)
     )
+    # (the Blue Book, "with substitution allowed for acetaldehyde
+    # and benzaldehyde"; "Substitution of aldehydes parallels that of
+    # carboxylic acids"): the 2-carbon aldehyde is the same case as the acid above,
+    # 'phenylacetaldehyde', 'chloroacetaldehyde' ('phenoxyacetaldehyde (PIN)':35076).
+    # Same scope as the polyfunctional arm (``polyfunctional._retained_acetaldehyde``):
+    # with two or more prefixes each must be a simple single-word prefix (the first is
+    # then bare, the others enclosed,; a multiplied prefix follows another
+    # enclosing rule,:29852), and a stereo descriptor is only the alpha carbon's bare
+    # '(2R)-'; anything else keeps the systematic '...ethanal'.
+    _SIMPLE_ALDEHYDE_PREFIX = re.compile(
+        r"(?:2-)?(?!(?:di|tri|tetra|penta|hexa)[a-z]*(?:[^a-z]|$))[a-z]+|\([a-z]+\)")
+    _is_substituted_acetaldehyde = (
+        stem == "eth" and prefix_str
+        and suffix_frag and suffix_frag.text == "al"
+        and not double_locants and not triple_locants
+        and max(len(list(suffix_frag.locants) if suffix_frag.locants else []),
+                getattr(suffix_frag, 'count', 1)) == 1
+        and (not stereo or _acetic_stereo is not None)
+        and (len(prefix_texts) == 1
+             or all(_SIMPLE_ALDEHYDE_PREFIX.fullmatch(t) for t in prefix_texts))
+    )
 
     # Handle suffix attachment using PIN-style formatting
     if suffix_frag and suffix_frag.text:
@@ -3205,6 +3226,13 @@ def _assemble_fragments(
         # the systematic spelling assembled above, for the amido converter
         record_retained_acetic_systematic(retained, name)
         return retained
+
+    if _is_substituted_acetaldehyde:
+        from ..composition_primitives import retained_acetic_from_prefixes
+        _bare = f"({_acetic_stereo.group(1)})-" if _acetic_stereo else ""
+        return retained_acetic_from_prefixes(
+            prefix_texts, _bare, parent="acetaldehyde",
+            enclose_subsequent=len(prefix_texts) > 1)
 
     return name
 

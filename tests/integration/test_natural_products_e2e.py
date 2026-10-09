@@ -28,6 +28,31 @@ def canonical(smiles: str) -> str:
     return Chem.MolToSmiles(mol, canonical=True) if mol else smiles
 
 
+# Camphor is no longer named by its trivial name on the default (pin) path: the PIN
+# deny-list row 'camphor' (data/iupac_2013_pin_list.json,; commit 788f91b4b)
+# withdrew it. (the Blue Book, "The stereodescriptors 'R' and 'S' are used
+# to describe the absolute configuration of stereogenic centers for a compound whose parent
+# structure is achiral, for example bornane") prints '(1R,4R)-bornan-2-one (+)-camphor'
+# (:52646) and, on the next example line, the von Baeyer name
+# '(1R,4R)-1,7,7-trimethylbicyclo[2.2.1]heptan-2-one' (:52648); the input here carries no
+# stereo, so no descriptors are due. 'camphor' stays reachable under --trivial/general.
+CAMPHOR_SMILES = "CC12CCC(CC1=O)C2(C)C"
+CAMPHOR_PIN = "1,7,7-trimethylbicyclo[2.2.1]heptan-2-one"
+
+# The two earlier inputs for beta-pinene and gamma-terpineol were NOT those compounds:
+# 'CC1(C)C2=CCC1CC2' is C9H14 (7,7-dimethylbicyclo[2.2.1]hept-1-ene) where beta-pinene is
+# C10H16, and 'C=CCC(O)CC=C(C)C' is an acyclic C9H16O where gamma-terpineol is a
+# monocyclic C10H18O. The data rows built on them were deleted as wrong-structure rows
+# (commit 8a0a9bc0e, src/orthonym/data/natural_products.py), so those inputs stopped
+# emitting the trivial names. The real structures are used here.
+# Beta-pinene = 6,6-dimethyl-2-methylidenebicyclo[3.1.1]heptane; the book has no entry
+# for 'pinene' (only the parent 'pinane' in the stereoparent list), so the name of
+# the real structure is the von Baeyer one.
+BETA_PINENE_SMILES = "CC1(C)C2CCC(=C)C1C2"
+BETA_PINENE_PIN = "6,6-dimethyl-2-methylidenebicyclo[3.1.1]heptane"
+GAMMA_TERPINEOL_SMILES = "CC(C)=C1CCC(C)(O)CC1"
+
+
 # ---------------------------------------------------------------------------
 # Steroid E2E tests
 # ---------------------------------------------------------------------------
@@ -238,7 +263,7 @@ class TestTerpenoidE2E:
 
     @pytest.mark.integration
     def test_camphor(self):
-        assert name_compound("CC12CCC(CC1=O)C2(C)C") == "camphor"
+        assert name_compound(CAMPHOR_SMILES) == CAMPHOR_PIN
 
     @pytest.mark.integration
     def test_limonene(self):
@@ -250,7 +275,7 @@ class TestTerpenoidE2E:
 
     @pytest.mark.integration
     def test_beta_pinene(self):
-        assert name_compound("CC1(C)C2=CCC1CC2") == "beta-pinene"
+        assert name_compound(BETA_PINENE_SMILES) == BETA_PINENE_PIN
 
     @pytest.mark.integration
     def test_alpha_terpineol(self):
@@ -262,13 +287,13 @@ class TestTerpenoidE2E:
 
     @pytest.mark.integration
     def test_gamma_terpineol(self):
-        assert name_compound("C=CCC(O)CC=C(C)C") == "gamma-terpineol"
+        assert name_compound(GAMMA_TERPINEOL_SMILES) == "gamma-terpineol"
 
     @pytest.mark.integration
     def test_camphor_canonical(self):
         """Camphor via canonicalized SMILES."""
-        smiles = canonical("CC12CCC(CC1=O)C2(C)C")
-        assert name_compound(smiles) == "camphor"
+        smiles = canonical(CAMPHOR_SMILES)
+        assert name_compound(smiles) == CAMPHOR_PIN
 
     @pytest.mark.integration
     def test_limonene_canonical(self):
@@ -280,13 +305,13 @@ class TestTerpenoidE2E:
     def test_terpenoid_count(self):
         """Verify we can name at least 7 terpenoid derivatives."""
         terpenoids = {
-            "camphor": "CC12CCC(CC1=O)C2(C)C",
+            CAMPHOR_PIN: CAMPHOR_SMILES,
             "limonene": "C=C(C)C1CC=C(C)CC1",
             "alpha-pinene": "CC1=CCC2CC1C2(C)C",
-            "beta-pinene": "CC1(C)C2=CCC1CC2",
+            BETA_PINENE_PIN: BETA_PINENE_SMILES,
             "alpha-terpineol": "CC1=CCC(C(C)(C)O)CC1",
             "beta-terpineol": "C=C(C)C1CCC(C)(O)CC1",
-            "gamma-terpineol": "C=CCC(O)CC=C(C)C",
+            "gamma-terpineol": GAMMA_TERPINEOL_SMILES,
         }
         named = 0
         for expected, smi in terpenoids.items():
@@ -457,8 +482,8 @@ class TestSuccessCriteria:
 
     @pytest.mark.integration
     def test_sc5_camphor_recognition(self):
-        """SC5: name_compound('CC12CCC(CC1=O)C2(C)C') -> 'camphor'."""
-        assert name_compound("CC12CCC(CC1=O)C2(C)C") == "camphor"
+        """SC5: name_compound('CC12CCC(CC1=O)C2(C)C') -> the PIN (camphor is withdrawn,."""
+        assert name_compound(CAMPHOR_SMILES) == CAMPHOR_PIN
 
     @pytest.mark.integration
     def test_sc6_no_regression_ethanol(self):
@@ -503,13 +528,13 @@ class TestParametrizedDerivatives:
         ("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2C(=O)CC[C@H]3[C@H]1C5",
          "(4R,4aR,7aR,12bS)-9-hydroxy-3-methyl-2,3,4,4a,5,6-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinolin-7(7aH)-one"),
         # Terpenoid derivatives
-        ("CC12CCC(CC1=O)C2(C)C", "camphor"),
+        (CAMPHOR_SMILES, CAMPHOR_PIN),
         ("C=C(C)C1CC=C(C)CC1", "limonene"),
         ("CC1=CCC2CC1C2(C)C", "alpha-pinene"),
-        ("CC1(C)C2=CCC1CC2", "beta-pinene"),
+        (BETA_PINENE_SMILES, BETA_PINENE_PIN),
         ("CC1=CCC(C(C)(C)O)CC1", "alpha-terpineol"),
         ("C=C(C)C1CCC(C)(O)CC1", "beta-terpineol"),
-        ("C=CCC(O)CC=C(C)C", "gamma-terpineol"),
+        (GAMMA_TERPINEOL_SMILES, "gamma-terpineol"),
         # Beta-lactam scaffolds
         ("O=C(O)C1CSC2CC(=O)N21", "penam"),
         ("O=C(O)C1CSCC2CC(=O)N21", "cepham"),

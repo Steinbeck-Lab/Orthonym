@@ -26,27 +26,42 @@ PHASE105_CANARY = [
     # -- Polyfunctional chain compounds --
     ("OCC(CC(=O)O)CC=O", "3-(hydroxymethyl)-5-oxopentanoic acid"),
     ("OC(CC)CC(=O)O", "3-hydroxypentanoic acid"),
-    ("NC(CC)C(=O)O", "butyrine"),
+    # 'butyrine' is not a retained amino-acid name: 'Systematic substitutive names are
+    # given to homologues of glycine and alanine, for example 2-aminobutanoic acid'
+    #, the Blue Book). The id keeps the original spelling (stable row identity).
+    pytest.param("NC(CC)C(=O)O", "2-aminobutanoic acid", id="butyrine"),
     ("OC(CC=O)CC(=O)O", "3-hydroxy-5-oxopentanoic acid"),
     # -- Ring polyfunctional --
-    ("OC1CCCCC1C(=O)O", "2-hydroxycyclohexan-1-carboxylic acid"),
+    # 'cyclohexane-1-carboxylic acid': the ring name keeps its 'e' before the
+    # consonant of 'carboxylic acid' (a), the Blue Book; 'cyclohexane-1-carboxylic
+    # acid', the Blue Book). The id keeps the original spelling.
+    pytest.param("OC1CCCCC1C(=O)O", "2-hydroxycyclohexane-1-carboxylic acid",
+                 id="2-hydroxycyclohexan-1-carboxylic_acid"),
     # -- Multi-FG complexity --
     # (g) (the Blue Book): {2,4} ties, and 'amino' is cited before
     # 'aminomethyl':3448), so amino takes 2 (d3c164db2, plan ruling
     # R26; the old snapshot '4-amino-2-(aminomethyl)...' numbered from the other end).
     ("NCC(CC(N)C(=O)O)C(=O)O", "2-amino-4-(aminomethyl)pentanedioic acid"),
     # -- Ring prefix conversion (Plan 03): heterocyclic -ane ring names --
-    ("O=C(O)CC1CCOCC1", "2-oxanylethanoic acid"),
-    ("O=C(O)CC1CCNCC1", "2-piperidinylethanoic acid"),
-    ("O=C(O)CC1CCCO1", "2-oxolanylethanoic acid"),
+    # Acetic acid is the retained PIN and takes substituents, the Blue Book), the
+    # ring is a substituent prefix with a locant, enclosed: '(1,3-thiazol-2-yl)acetic
+    # acid (PIN)', the Blue Book. The ids keep the original spellings.
+    pytest.param("O=C(O)CC1CCOCC1", "(oxan-4-yl)acetic acid",
+                 id="2-oxanylethanoic_acid"),
+    pytest.param("O=C(O)CC1CCNCC1", "(piperidin-4-yl)acetic acid",
+                 id="2-piperidinylethanoic_acid"),
+    pytest.param("O=C(O)CC1CCCO1", "(oxolan-2-yl)acetic acid",
+                 id="2-oxolanylethanoic_acid"),
     # -- Unsaturation format (Plan 02): 'a' euphonic connector --
     ("CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)O",
      "(9Z,12Z,15Z)-octadeca-9,12,15-trienoic acid"),
 ]
 
 _CANARY_IDS = [
-    name.replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")[:50]
-    for _, name in PHASE105_CANARY
+    # a pytest.param row carries its own stable id
+    row.id if hasattr(row, "id")
+    else row[1].replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")[:50]
+    for row in PHASE105_CANARY
 ]
 
 

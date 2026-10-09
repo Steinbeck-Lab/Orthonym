@@ -133,7 +133,7 @@ import re as _re
 
 _PLAIN_IMINE_NAME_RE = _re.compile(r"^[a-z]+an(?:imine|-\d+-imine)$")
 
-# W3-P15: a SUBSTITUTED alkane-imine parent — a block of
+# W3-P15: a SUBSTITUTED alkane-imine parent -- a block of
 # numeric-locant detachable prefixes followed by the '<stem>an[-N-]imine' parent
 # (e.g. '1-nitropropan-1-imine'). The stem alternation (longest-first) anchors
 # the parent so a prefix ending in an alkane-like fragment is not mis-split.
@@ -145,23 +145,67 @@ _SUBST_IMINE_RE = _re.compile(
     r"^(?P<pre>\d.*?)(?P<par>(?:cyclo)?(?:" + _ALKANE_STEM_ALT
     + r")an(?:-\d+-)?imine)$"
 )
-_SIMPLE_MULT_BY_COUNT = {2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+_OPEN_MARKS, _CLOSE_MARKS = "([{", ")]}"
+
+
+def _balanced(text: str) -> bool:
+    """True when every enclosing mark of ``text`` is closed in order."""
+    stack = []
+    for ch in text:
+        if ch in _OPEN_MARKS:
+            stack.append(_CLOSE_MARKS[_OPEN_MARKS.index(ch)])
+        elif ch in _CLOSE_MARKS:
+            if not stack or stack.pop() != ch:
+                return False
+    return not stack
+
+
+def _split_prefix_block(pre: str) -> Optional[list]:
+    """The detachable prefixes of a name's prefix block, each with its own locants
+    ('2-chloro-3-nitro' -> ['2-chloro', '3-nitro']; '5-(methylsulfanyl)' stays one).
+
+    A new prefix starts at the hyphen that follows a letter or a closing mark and
+    precedes a locant, outside every enclosing mark; the hyphen inside 'tert-butyl'
+    (a letter follows) and the one after a locant ('2,3-dichloro') are not boundaries.
+    ``None`` for a block whose marks do not balance."""
+    if not _balanced(pre):
+        return None
+    tokens, cur, depth = [], "", 0
+    for i, ch in enumerate(pre):
+        if ch in _OPEN_MARKS:
+            depth += 1
+        elif ch in _CLOSE_MARKS:
+            depth -= 1
+        if (ch == "-" and depth == 0 and cur and i + 1 < len(pre)
+                and pre[i + 1].isdigit()
+                and (cur[-1].isalpha() or cur[-1] in _CLOSE_MARKS)):
+            tokens.append(cur)
+            cur = ""
+            continue
+        cur += ch
+    if cur:
+        tokens.append(cur)
+    return tokens
 
 
 def _insert_n_hydroxy(sub: str) -> Optional[str]:
     """Insert the italic-N prefix 'N-hydroxy' alphanumerically among the
-    detachable prefixes of a substituted alkane-imine name:
-    '1-nitropropan-1-imine' -> 'N-hydroxy-1-nitropropan-1-imine'.
+    detachable prefixes of a substituted alkane-imine name,:
+    '1-nitropropan-1-imine' -> 'N-hydroxy-1-nitropropan-1-imine';
+    '5-(methylsulfanyl)pentan-1-imine' -> 'N-hydroxy-5-(methylsulfanyl)pentan-1-imine';
+    '2-chloro-3-nitropropan-1-imine' -> '2-chloro-N-hydroxy-3-nitropropan-1-imine'.
 
-    Fail-closed (returns None) for any imine name that is not a plain block of
-    numeric-locant prefixes on an '<stem>an-imine' parent (complex/bracketed
-    prefixes, non-alkane parents, etc.) — those keep the functional-class
+    The prefix block is split at its depth-zero locant boundaries, so a substituent
+    that carries its own enclosing marks is one prefix. Fail-closed (returns None)
+    for any imine name that is not a block of numeric-locant prefixes on an
+    '<stem>an-imine' parent (a name starting with a stereodescriptor, non-alkane
+    parents, an existing hydroxy prefix, etc.) -- those keep the functional-class
     oxime fallback."""
     from ..naming_utils import alpha_sort_key
 
     def _join(parts):
         # Insert a hyphen between adjacent prefix tokens when the previous ends
-        # in a letter / closing bracket and the next starts with a LOCANT — a
+        # in a letter / closing bracket and the next starts with a LOCANT -- a
         # digit (numeric locant, '1-nitro') OR an uppercase italic locant letter
         # ('N-hydroxy'). Substituent names are lowercase, so an uppercase start
         # unambiguously marks an italic locant.
@@ -179,36 +223,20 @@ def _insert_n_hydroxy(sub: str) -> Optional[str]:
     if not m:
         return None
     pre, par = m.group("pre"), m.group("par")
-    # Tokenize the prefix block: a new token starts at a locant digit that
-    # follows a letter or a closing bracket (mirror of _joined_prefix_parts).
-    tokens, cur = [], ""
-    for ch in pre:
-        if ch.isdigit() and cur and (cur[-1].isalpha() or cur[-1] in ")]}"):
-            tokens.append(cur)
-            cur = ch
-        else:
-            cur += ch
-    if cur:
-        tokens.append(cur)
-
-    def _name_of(tok: str) -> Optional[str]:
-        mm = _re.match(r"^([\dN,]+)-(.+)$", tok)
-        if not mm:
-            return None
-        locs, rest = mm.group(1).split(","), mm.group(2)
-        if "(" in rest or "[" in rest:
-            return None                        # complex substituent -> defer
-        mult = _SIMPLE_MULT_BY_COUNT.get(len(locs))
-        if mult and rest.startswith(mult):
-            rest = rest[len(mult):]
-        return rest
+    tokens = _split_prefix_block(pre)
+    if not tokens:
+        return None
 
     entries = []
     for tok in tokens:
-        nm = _name_of(tok)
-        if nm is None:
+        mm = _re.match(r"^(\d+(?:,\d+)*)-(.+)$", tok)
+        if not mm:
             return None
-        entries.append((alpha_sort_key(nm), tok))
+        # alpha_sort_key drops the multiplying prefix and the enclosing marks
+        key = alpha_sort_key(mm.group(2))
+        if key == "hydroxy":
+            return None                        # one 'hydroxy' set: the cited locants merge
+        entries.append((key, tok))
     entries.append((alpha_sort_key("hydroxy"), "N-hydroxy"))
     entries.sort(key=lambda e: e[0])
     return _join([e[1] for e in entries]) + par

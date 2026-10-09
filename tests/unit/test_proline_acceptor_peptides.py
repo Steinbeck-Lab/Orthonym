@@ -74,13 +74,28 @@ def test_proline_acceptor_0_wrong_constitution():
                 r["smiles"], r.get("name"), op)
 
 
+# The two dipeptide rows below take the substitutive PIN, as the tripeptide row already did
+# (j7, 4f2284331, 2026-09-27: "a tripeptide takes the substitutive PIN through a nested amido
+# prefix"; controller ruling there: peptide names are not PINs,:50943).
+# "Substituents of the types -NH-CO-R and -NH-SO2-R" (the Blue Book): the R-CO-NH-
+# group is named "(1) substitutively, by using a prefix formed by changing the final letter
+# 'e' in the complete name of the amide to 'o'... 'carboxamide' into 'carboxamido'" and
+# "Method (1) generates preferred IUPAC names." The old retained peptide names read back to
+# the same molecule with OPSIN 2.9.0 (full an InChIKey and
+# an InChIKey, identical for old and new names), so the change is the
+# PIN-conformant spelling, not a different structure. The parametrize ids are the OLD
+# strings on purpose: the node id embeds the expected value and is kept stable.
 @pytest.mark.parametrize("smi,expected", [
-    # non-proline peptides + proline-as-acyl (N-terminal) must be UNCHANGED
-    ("N[C@@H](Cc1ccccc1)C(=O)N[C@@H](C)C(=O)O", "phenylalanylalanine"),
+    # non-proline peptides + proline-as-acyl (N-terminal) take the substitutive PIN
+    pytest.param("N[C@@H](Cc1ccccc1)C(=O)N[C@@H](C)C(=O)O",
+                 "(2S)-2-[(2S)-2-amino-3-phenylpropanamido]propanoic acid",
+                 id="N[C@@H](Cc1ccccc1)C(=O)N[C@@H](C)C(=O)O-phenylalanylalanine"),
     # j7 (TRIAGE g3 C05): the substitutive PIN method (1)), OPSIN exact
     ("N[C@@H](C)C(=O)N[C@@H](C)C(=O)N[C@@H](C)C(=O)O",
      "(2S)-2-{(2S)-2-[(2S)-2-aminopropanamido]propanamido}propanoic acid"),
-    ("OC(=O)[C@@H](C)NC(=O)[C@@H]1CCCN1", "prolyl-D-alanine"),
+    pytest.param("OC(=O)[C@@H](C)NC(=O)[C@@H]1CCCN1",
+                 "(2R)-2-[(2S)-pyrrolidine-2-carboxamido]propanoic acid",
+                 id="OC(=O)[C@@H](C)NC(=O)[C@@H]1CCCN1-prolyl-D-alanine"),
 ])
 def test_non_proline_acceptor_unchanged(smi, expected):
     assert _pin().name(smi) == expected

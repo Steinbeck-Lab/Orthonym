@@ -45,9 +45,15 @@ pytestmark = [pytest.mark.integration, pytest.mark.roundtrip,
 # the memo cache with a depth-limited SKIP.
 WITNESSES = [
     # The a review witness.
+    # Since the pnictogen -inate ester handler (2a099c9ff, 2026-09-07; stereodescriptor
+    # fix 70f322cbf) names this witness on the PIN path as a functional-class ester,
+    # the Blue Book "All preferred IUPAC names for esters are named by
+    # functional class nomenclature."), so it no longer reaches the fall-through;
+    # best-effort ships the PIN (test_witness1_pin_spelling pins the same name).
+    # OPSIN 2.9.0: full InChIKey exact. The negative test below puts the witness
+    # back on the fall-through path.
     ("COP(=O)(C=C(F)F)C=C(F)F",
-     "1-[1-(2,2-difluoroeth-1-en-1-yl)-1-oxo-2-oxa-1-phosphapropyl]-"
-     "2,2-difluoroeth-1-ene"),
+     "methyl bis(2,2-difluoroethen-1-yl)phosphinate"),
     # A stereocentre-carrying phosphapentyl (full-InChIKey RT, stereo retained).
     ("CCOC(OCC)P(=O)(C[C@@H](O)CCl)OCC", None),
     # A diaza-phosphapropyl (phosphoramide).
@@ -168,13 +174,34 @@ def test_negative_rt_mismatch_stays_abstained():
     ``_rt_match`` to False on a witness that otherwise converts proves the
     fresh-cache fall-through never ships an RT-failing name (immune to going
     stale, the same mechanism-level guard Task A's file uses)."""
+    # Witness 1 is now named by the PIN path itself functional-class
+    # ester, handler 2a099c9ff / 70f322cbf), validated by the OPSIN validity gate rather
+    # than by ``_rt_match``, so it no longer reaches the fall-through this test
+    # guards (the other witnesses are named by the general engine's own pass, also
+    # without ``_rt_match``). Put the witness back on that path, as
+    # tests/integration/test_cq_fallthrough.py::test_negative_rt_mismatch_stays_abstained
+    # does: the primary producer builds a non-failure, RT-INVALID name (a different
+    # molecule), the validity gate voids it, and the floor offer is not made, so
+    # the only route left is the RT-gated fall-through, which consults ``_rt_match``.
     be = _besteffort()
     smi = WITNESSES[0][0]
-    assert not is_failure_name(be.name(smi)), (
-        "sanity: this witness must normally convert (so the mock below is the "
-        "only thing causing the abstain)")
-    with patch.object(Orthonym, "_rt_match", staticmethod(lambda *a, **kw: False)):
-        out = be.name(smi)
+    wrong_primary = "ethyl bis(2,2-difluoroethen-1-yl)phosphinate"   # a different molecule
+    orig_impl = Orthonym._name_impl
+
+    def _wrong_primary(self, smiles, *a, **kw):
+        return wrong_primary if smiles == smi else orig_impl(self, smiles, *a, **kw)
+
+    with patch.object(Orthonym, "_name_impl", _wrong_primary), \
+            patch.object(Orthonym, "_maybe_append_t4_floor_offer",
+                         lambda *a, **kw: None):
+        sane = be.name(smi)
+        assert not is_failure_name(sane) and sane != wrong_primary, (
+            "sanity: the fall-through must normally convert this witness (so "
+            f"the mock below is the only thing causing the abstain), got {sane!r}")
+        assert _rt_inchikey_match(sane, smi)
+        with patch.object(Orthonym, "_rt_match",
+                          staticmethod(lambda *a, **kw: False)):
+            out = be.name(smi)
     assert is_failure_name(out), (
         f"shipped {out!r} for {smi!r} even though _rt_match reported no match "
         f"-- invariant 9 violated")

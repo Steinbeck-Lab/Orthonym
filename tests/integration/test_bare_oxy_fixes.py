@@ -93,30 +93,40 @@ class TestOSNeighborNaming:
 
     @pytest.mark.integration
     def test_benzene_o_sulfinyl(self):
-        """Benzene O-S(=O): should produce sulfinyloxybenzene."""
+        """Benzene O-S(=O)CH3: an ester of methanesulfinic acid, named functional-class."""
         name = name_compound("c1ccc(OS(=O)C)cc1")
-        assert "sulfinyloxy" in name.lower(), (
-            f"Expected 'sulfinyloxy', got: {name}"
+        # (under 'Definitions'): "All preferred IUPAC names for
+        # esters are named by functional class nomenclature."; the acyloxy-prefix form
+        # ('sulfinyloxy...benzene') is only for esters cited as prefixes.
+        assert name == "phenyl methanesulfinate", (
+            f"Expected 'phenyl methanesulfinate', got: {name}"
         )
+        assert not _has_bare_oxy(name), f"Bare 'oxy' found in: {name}"
 
     @pytest.mark.integration
     def test_benzene_o_sulfonyl(self):
-        """Benzene O-SO2: should produce sulfonyloxybenzene."""
+        """Benzene O-SO2CH3: an ester of methanesulfonic acid, named functional-class."""
         name = name_compound("c1ccc(OS(=O)(=O)C)cc1")
-        assert "sulfonyloxy" in name.lower(), (
-            f"Expected 'sulfonyloxy', got: {name}"
+        # (under 'Definitions'): "All preferred IUPAC names for
+        # esters are named by functional class nomenclature." (cf. 'methyl
+        # 4-ethylbenzene-1-sulfonate (PIN)').
+        assert name == "phenyl methanesulfonate", (
+            f"Expected 'phenyl methanesulfonate', got: {name}"
         )
 
 
 class TestOPNeighborNaming:
-    """Verify O-P neighbors produce phosphonooxy."""
+    """Verify O-P neighbors are named as phosphate esters."""
 
     @pytest.mark.integration
     def test_benzene_o_phosphono(self):
-        """Benzene O-P(=O)(OH)2: should produce phosphonooxybenzene."""
+        """Benzene O-P(=O)(OH)2: an ester of phosphoric acid, named functional-class."""
         name = name_compound("c1ccc(OP(=O)(O)O)cc1")
-        assert "phosphonooxy" in name.lower(), (
-            f"Expected 'phosphonooxy', got: {name}"
+        # 'Esters of mononuclear noncarbon oxoacids' ('methyl dihydrogen
+        # phosphate (PIN)'): esters are named by functional class nomenclature
+        #, not as 'phosphonooxy...benzene'.
+        assert name == "phenyl dihydrogen phosphate", (
+            f"Expected 'phenyl dihydrogen phosphate', got: {name}"
         )
 
 
