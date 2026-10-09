@@ -24,10 +24,11 @@ The parent name of a heteromonocycle is built from the ring skeleton and this fo
 numbering: the retained name Tables 2.2, 2.3), when one applies and its fixed
 numbering matches this ring's, else the Hantzsch-Widman name (``heterocycles.build_hw_name``)
 on this form's own heteroatom locants. No namer's output is parsed. Out of scope (``None``): charged
+(an 'ium' nitrogen only for a caller that passes ``allow_cation`` and expresses the charge)
 or isotopically labelled ring atoms, rings with partial unsaturation other than one
 indicated-hydrogen atom of a mancude ring (hydro prefixes are the ring-hydrogen lane's
-build), an aromatic ring atom carrying an exocyclic double bond (a pyridinone needs added
-hydrogen), ring heteroatoms with a nonstandard bonding number, and elements outside the
+build; a mancude ring whose atoms carry an exocyclic double bond takes them for the ring
+atoms without a ring double bond), ring heteroatoms with a nonstandard bonding number, and elements outside the
 Hantzsch-Widman table.
 """
 from __future__ import annotations
@@ -82,6 +83,11 @@ class MonocycleForm:
     numbering: Dict[int, int]
     kind: str
     parent_cites_locant: bool = False
+    #: the free valence sits on a hydro-prefix atom that is not the indicated-hydrogen atom
+    #: ('2,4-dioxo-1,2,3,4-tetrahydropyrimidin-1-yl'); ``fv_locant`` is its locant,
+    #: ``fv_has_hydrogen`` says the atom is a ring carbon (it keeps a hydrogen to substitute)
+    fv_hydro_locant: Optional[int] = None
+    fv_has_hydrogen: bool = True
 
     def cites_locant(self, free_valence_locant: Optional[int] = None) -> bool:
         """The parent or its prefix at ``free_valence_locant`` cites a locant,
@@ -111,7 +117,16 @@ class MonocycleForm:
                 return None
             return self.parent[:-3] + ("yl" if bond_order == 1 else "ylidene")
         stem = self.parent[:-1] if self.parent.endswith("e") else self.parent
-        return f"{stem}-{loc}-{'yl' if bond_order == 1 else 'ylidene'}"
+        out = f"{stem}-{loc}-{'yl' if bond_order == 1 else 'ylidene'}"
+        if loc == self.fv_hydro_locant and (bond_order == 2 or not self.fv_has_hydrogen):
+            # (the Blue Book): "When no hydrogen atoms are present or when
+            # an 'ylidene' type substituent group is needed, it is necessary to use 'added
+            # [indicated] hydrogen'"; 'pyridin-1(4H)-yl (preferred prefix)' (:16079),
+            # (:24703). This spelling uses hydro prefixes instead: valid, not the PIN.
+            from ..metrics.provenance import record_non_pin_label
+            record_non_pin_label(out, rule="P-58.2.2.2",
+                                 detail="hydro prefixes where added hydrogen is required")
+        return out
 
 
 def _cycle_order(mol, ring: Sequence[int]) -> Optional[list]:
@@ -199,7 +214,7 @@ def free_valence_carries_indicated_hydrogen(state, free_valence_atom) -> bool:
 
 
 def _numbering(mol, order, hetero, sp3_atoms, free_valence_atom, branch_atoms,
-               ih_atom=None) -> Dict[int, int]:
+               ih_atom=None, cationic=()) -> Dict[int, int]:
     n = len(order)
     ranks = _canonical_ranks(mol)
     senior = min((_RANK[mol.GetAtomWithIdx(a).GetSymbol()] for a in hetero), default=None)
@@ -216,12 +231,17 @@ def _numbering(mol, order, hetero, sp3_atoms, free_valence_atom, branch_atoms,
                 hetero, key=lambda x: (_RANK[mol.GetAtomWithIdx(x).GetSymbol()], a2p[x])))
             ih, hydro = _split_hydro((a2p[a] for a in sp3_atoms),
                                      a2p.get(ih_atom) if ih_atom is not None else None)
+            # "CATIONIC PREFIX NAMES" (1) (the Blue Book, method (1) leads to
+            # preferred names): "Where there is a choice for numbering, free valences receive
+            # lowest possible locants"; '4,4-dimethylpiperazin-4-ium-1-ylium (PIN)' (:42205).
+            # Then (:42219): low locants for the skeletal cationic centres.
+            chg = tuple(sorted(a2p[a] for a in cationic))
             fv = a2p[free_valence_atom] if free_valence_atom in a2p else 0
             br = tuple(sorted(a2p[a] for a in branch_atoms if a in a2p))
             tie = tuple(ranks[order[(start + direction * p) % n]] for p in range(n))
             # (a) heteroatoms, (b) indicated hydrogen, (c) free valence,
             # (e) hydro prefixes, (f) detachable prefixes
-            key = (first_ok, het_set, sen, ih, fv, hydro, br, tie)
+            key = (first_ok, het_set, sen, ih, fv, chg, hydro, br, tie)
             if best_key is None or key < best_key:
                 best_key, best = key, a2p
     return best
@@ -231,18 +251,20 @@ _HYDRO_MULT = {2: "di", 4: "tetra", 6: "hexa", 8: "octa"}
 
 
 def monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[int] = None,
-                   branch_atoms: Sequence[int] = ()) -> Optional[MonocycleForm]:
+                   branch_atoms: Sequence[int] = (),
+                   allow_cation: bool = False) -> Optional[MonocycleForm]:
     """The book's name and numbering of one ring (``_monocycle_form``), recorded with
     ``assembly.book_prefixes.note_book_form`` when one is given."""
-    form = _monocycle_form(mol, ring_atoms, free_valence_atom, branch_atoms)
+    form = _monocycle_form(mol, ring_atoms, free_valence_atom, branch_atoms, allow_cation)
     if form is not None:
         from ..assembly.book_prefixes import note_book_form
-        note_book_form()
+        note_book_form("ring")
     return form
 
 
 def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[int] = None,
-                    branch_atoms: Sequence[int] = ()) -> Optional[MonocycleForm]:
+                    branch_atoms: Sequence[int] = (),
+                    allow_cation: bool = False) -> Optional[MonocycleForm]:
     """The book's name and numbering of the single ring ``ring_atoms``, or ``None``.
 
     ``branch_atoms`` lists the ring atoms that carry a substituent prefix, once per prefix
@@ -260,28 +282,39 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
     order = _cycle_order(mol, ring)
     if order is None:
         return None
+    cationic = []
     for a in ring:
         atom = mol.GetAtomWithIdx(a)
-        if atom.GetFormalCharge() or atom.GetIsotope() or atom.GetNumRadicalElectrons():
+        if atom.GetIsotope() or atom.GetNumRadicalElectrons():
             return None
+        if atom.GetFormalCharge():
+            # an 'ium' ring nitrogen: only for a caller that expresses the charge
+            if not (allow_cation and atom.GetSymbol() == "N" and atom.GetFormalCharge() == 1):
+                return None
+            cationic.append(a)
     hetero = [a for a in ring if mol.GetAtomWithIdx(a).GetSymbol() != "C"]
     if any(mol.GetAtomWithIdx(a).GetSymbol() not in _RANK for a in hetero):
         return None
     for a in hetero:
         atom = mol.GetAtomWithIdx(a)
-        if atom.GetTotalValence() != _BONDING[atom.GetSymbol()]:
+        if atom.GetTotalValence() != _BONDING[atom.GetSymbol()] + (a in cationic):
             return None
     aromatic = all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring)
     if not aromatic and any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring):
         return None
-    if aromatic and any(_exocyclic_multiple(mol, a, ring_set) for a in ring):
-        return None  # a ring C=O on a mancude ring needs added hydrogen (pyridin-2(1H)-one)
+    # a ring C=O (or C=S, C=N) of a mancude ring leaves that atom without a ring double bond:
+    # it takes indicated hydrogen or a hydro prefix and the caller cites the 'oxo' prefix
+    # ('2-oxo-2H-pyran-5-yl', '6-oxo-1,6-dihydropyridin-3-yl'; the Blue Book,
+    #:43483)
+    exo_multiple = aromatic and any(_exocyclic_multiple(mol, a, ring_set) for a in ring)
     ring_bonds = [mol.GetBondBetweenAtoms(order[i], order[(i + 1) % len(order)])
                   for i in range(len(order))]
     saturated = (not aromatic) and all(
         b.GetBondType() == Chem.BondType.SINGLE for b in ring_bonds)
 
     if not hetero:
+        if exo_multiple:
+            return None  # no book name spells a carbocycle that has a ring C=X on a mancude ring
         if aromatic and len(ring) == 6:
             kind, parent = "benzene", "benzene"
         elif saturated:
@@ -305,11 +338,13 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
     sp3 = [] if saturated else [
         a for a in ring if a not in dbl
         and _BONDING.get(mol.GetAtomWithIdx(a).GetSymbol(), 4) >= 3]
-    if aromatic and len(sp3) > 1:
+    if aromatic and len(sp3) > 1 and not exo_multiple:
         return None
+    if any(a in sp3 for a in cationic):
+        return None  # an 'ium' nitrogen with hydro prefixes or indicated hydrogen is not built
     ih_atom = _free_valence_ih_atom(mol, ring, order, sp3, free_valence_atom)
     numbering = _numbering(mol, order, hetero, sp3, free_valence_atom, list(branch_atoms),
-                           ih_atom)
+                           ih_atom, cationic)
     het = {numbering[a]: mol.GetAtomWithIdx(a).GetSymbol() for a in hetero}
     from .heterocycles import (_apply_retained_stem, _mancude_retained_stem,
                                _saturated_ring_retained_name, build_hw_name)
@@ -349,8 +384,12 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
     parent_cites_locant = bool(ih) or bool(hydro) or (
         stem not in _RETAINED_HETERO_LOCANTS and len(het) > 1
         and not (len(set(het.values())) == 1 and len(het) >= len(ring) - 1))
+    fv_hydro = (numbering[free_valence_atom] if free_valence_atom in sp3
+                and numbering[free_valence_atom] not in ih else None)
     return MonocycleForm(parent=parent, numbering=numbering, kind="heteromonocycle",
-                         parent_cites_locant=parent_cites_locant)
+                         parent_cites_locant=parent_cites_locant, fv_hydro_locant=fv_hydro,
+                         fv_has_hydrogen=(free_valence_atom is None or
+                                          mol.GetAtomWithIdx(free_valence_atom).GetSymbol() == "C"))
 
 
 def _free_valence_ih_atom(mol, ring, order, sp3, free_valence_atom):

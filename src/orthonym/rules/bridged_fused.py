@@ -790,6 +790,52 @@ def name_bridged_fused_pin(mol):
     return _package_pin(mol)
 
 
+def name_fused_carbocycle_pin(mol):
+    """The fusion name of ``mol`` whose ring system is an ortho- or ortho- and peri-fused
+    system, carbocyclic or with ring heteroatoms, with at least two rings of five or more members,
+    the Blue Book), from ``bridged_fused_pin.build_fused``: the complex-ring tuple
+    ``(name, ring_atoms, atom_to_locant, True)`` (the builder spells every prefix, suffix and
+    stereodescriptor on its own numbering), or None when the builder declines. An internal
+    error of the builder is a decline (``builder_declining_on_error``)."""
+    if mol is None:
+        return None
+    from .bridged_fused_pin import build_fused, selection
+    if joins_identical_hetero_ring_systems(mol, selection.ring_system(mol)):
+        return None
+    return builder_declining_on_error(build_fused, mol)
+
+
+def joins_identical_hetero_ring_systems(mol, system) -> bool:
+    """True when ``system`` (the ring atoms being named) has a ring heteroatom and a bond joins it
+    to another ring system of ``mol`` with the same skeleton: a ring assembly,
+    the Blue Book) is a parent of its own,:19461) and takes the assembly name
+    ('2'H-1,2'-biindole'), so a name with one component as the parent is not the PIN
+    (``ring_assembly_screen``). The test is scoped to the ring system being named: a hetero ring
+    elsewhere in the molecule, or a phenyl on a benzene ring, does not decide for a carbocyclic
+    ``system``, whose assemblies keep the older behaviour. On error it is True (fail closed)."""
+    from .ring_assembly_screen import _ring_systems, ring_system_key
+    system = set(system)
+    if not any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in system):
+        return False
+    try:
+        systems = _ring_systems(mol)
+        owner = {a: k for k, s in enumerate(systems) for a in s}
+        mine = {owner[a] for a in system if a in owner}
+        keys = {}
+        for b in mol.GetBonds():
+            ki, kj = owner.get(b.GetBeginAtomIdx()), owner.get(b.GetEndAtomIdx())
+            if ki is None or kj is None or ki == kj or (ki in mine) == (kj in mine):
+                continue
+            for k in (ki, kj):
+                if k not in keys:
+                    keys[k] = ring_system_key(mol, systems[k])
+            if keys[ki] == keys[kj]:
+                return True
+        return False
+    except Exception:  # noqa: BLE001 - unknown: fail closed
+        return True
+
+
 def _package_pin(mol):
     """The complex-ring tuple of the bridged fused PIN builder (``rules/bridged_fused_pin``),
     or None when it declines.

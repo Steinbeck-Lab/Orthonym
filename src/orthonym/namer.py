@@ -654,9 +654,10 @@ _BOOK_RETRY_OWNED = contextvars.ContextVar("orthonym_book_retry_owned", default=
 _LABEL_RANK = {"pin_verified": 4, "pin_unverified": 3, "systematic_verified": 2,
                "best_effort": 1}
 
-# Set by ``Orthonym._strict_pin_twin_name`` while the strict twin names: the twin
-# reports the strict path's own name to ``name_tiered``, so the default tier's
-# emission rule (``Orthonym._default_tier_decision``) is not applied to it.
+# Set while a caller needs the strict path's own name to ``name_tiered``, so the default
+# tier's emission rule (``Orthonym._default_tier_decision``) is not applied to it. NOT set
+# by ``_strict_pin_twin_name``: the twin keeps the rule (a pin_verified label at a wider
+# tier requires the default tier to emit the same string).
 _DEFAULT_TIER_POLICY_OFF = contextvars.ContextVar("orthonym_default_tier_policy_off",
                                                   default=False)
 
@@ -1110,6 +1111,17 @@ def _self_consistency_skeleton(smiles: str) -> Optional[str]:
 
 
 def _self_consistency_full_key(smiles: str) -> Optional[str]:
+    """:func:`_self_consistency_full_key_impl`, memoised for the life of the process:
+    the key is a pure function of ``smiles`` (an RDKit parse and its InChIKey; no
+    provenance, no budget), so one process computes it once per string.
+    ``ORTHONYM_MEMO=off|verify`` and ``ORTHONYM_PROCESS_CACHE=0`` bypass the memo
+    exactly as for ``fg_detect``."""
+    from .assembly.memo import pure_cache_or_compute
+    return pure_cache_or_compute("self_consistency_full_key", smiles,
+                                 lambda: _self_consistency_full_key_impl(smiles))
+
+
+def _self_consistency_full_key_impl(smiles: str) -> Optional[str]:
     """The FULL standard InChIKey (skeleton block + stereo block + mobile-H /
     charge-normalized proton layer) of ``smiles`` — None if RDKit cannot parse it.
 
@@ -2868,6 +2880,19 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
 
 def _full_inchikey_offer_match(input_smiles: str, opsin_smiles: str,
                                name: Optional[str] = None) -> bool:
+    """:func:`_full_inchikey_offer_match_impl`, memoised for the life of the process:
+    the answer is a pure function of the three strings (two RDKit parses, their
+    InChIKeys and the protonation verdict; no provenance, no budget), so one process
+    computes it once per triple. ``ORTHONYM_MEMO=off|verify`` and
+    ``ORTHONYM_PROCESS_CACHE=0`` bypass the memo exactly as for ``fg_detect``."""
+    from .assembly.memo import pure_cache_or_compute
+    return pure_cache_or_compute(
+        "full_inchikey_offer_match", (input_smiles, opsin_smiles, name),
+        lambda: _full_inchikey_offer_match_impl(input_smiles, opsin_smiles, name))
+
+
+def _full_inchikey_offer_match_impl(input_smiles: str, opsin_smiles: str,
+                                    name: Optional[str] = None) -> bool:
     """ a phase L3-1: True iff ``input_smiles`` and ``opsin_smiles`` share
     the SAME FULL (all-layer) InChIKey -- constitution AND stereo AND
     protonation/mobile-H-tautomer state all identical.
@@ -4769,6 +4794,13 @@ class Orthonym:
                     self._general_fallback)))
             except Exception:
                 pass
+            # the P/S oxoacid group prefixes (rules/oxoacid_group_prefix): the wider-tier
+            # flag that survives the isolated naming sessions of the fragment recursion
+            try:
+                from .rules.oxoacid_group_prefix import ps_tier_ctx
+                _ctx_tokens.append((ps_tier_ctx, ps_tier_ctx.set(bool(self._general_fallback))))
+            except Exception:
+                pass
             #: publish the BEST-EFFORT discriminator for the same reason and
             # with the same lifetime -- read by
             # `composer._integrate_universal_prefixes` to pick the substituent
@@ -5320,8 +5352,12 @@ class Orthonym:
         # guard it re-ran with the promoted best-effort producers and reproduced
         # the breadth name it exists to tell apart ('...-(2,6-dioxo-1H-pyrimidin-3-
         # yl)propanoic acid' came out pin_verified at best-effort).
+        # The twin runs WITH the default tier's emission rule: a string the strict path
+        # builds but the default tier itself labels as not a verified PIN (it comes back
+        # as the NO_VERIFIED_PIN label, never equal to the name) must not certify a
+        # pin_verified label at a wider tier. A pin_verified label at a wider tier
+        # therefore requires that the default tier emits the same string.
         _wrapped = _PIN_PROMOTION_WRAPPED.set(True)
-        _policy_off = _DEFAULT_TIER_POLICY_OFF.set(True)
         try:
             return tw.name(smiles)
         except Exception:
@@ -5329,7 +5365,6 @@ class Orthonym:
             # did not produce this name" (conservative -> demote), never a crash.
             return None
         finally:
-            _DEFAULT_TIER_POLICY_OFF.reset(_policy_off)
             _PIN_PROMOTION_WRAPPED.reset(_wrapped)
 
     def name_tiered(self, smiles: Union[str, Chem.Mol]) -> dict:
@@ -5474,7 +5509,8 @@ class Orthonym:
         ``mechanical_forms`` in a fresh memo scope, and that row is returned when its
         label is strictly higher. The wider tiers only, and not after a hang guard
         fired, as in ``name`` (``_book_retry_applies``)."""
-        from .assembly.book_prefixes import mechanical_forms, watch_book_forms
+        from .assembly.book_prefixes import (
+            mechanical_forms, retry_rungs, retry_spelling, watch_book_forms)
         from .assembly.fragment_naming import hang_budget_trips
         owned = _BOOK_RETRY_OWNED.set(True)
         try:
@@ -5483,10 +5519,24 @@ class Orthonym:
                 row = self._name_tiered_scoped(smiles)
             if (fired[0] and hang_budget_trips() == trips and self._book_retry_applies()
                     and row.get("tier") in ("abstain", "best_effort")):
+                # Ladder order: book -> the keep-forms rungs (``RETRY_KEEP_ORDER``: ring-only,
+                # then the other lanes' kinds) -> mechanical. One chain or acyl spelling that
+                # no round trip confirmed must not take every ring name of the molecule
+                # with it. The row returned is never lower than the first run's, nor than
+                # the best of the rungs run; a verified label ends the ladder.
+                best = row
+                for rung in retry_rungs(fired[1]):
+                    with retry_spelling(rung):
+                        alt = self._name_tiered_scoped(smiles)
+                    if _LABEL_RANK.get(alt.get("tier"), 0) > _LABEL_RANK.get(best.get("tier"), 0):
+                        best = alt
+                    if _LABEL_RANK.get(best.get("tier"), 0) >= _LABEL_RANK[SYSTEMATIC_VERIFIED]:
+                        return best
                 with mechanical_forms():
                     alt = self._name_tiered_scoped(smiles)
-                if _LABEL_RANK.get(alt.get("tier"), 0) > _LABEL_RANK.get(row.get("tier"), 0):
-                    return alt
+                if _LABEL_RANK.get(alt.get("tier"), 0) > _LABEL_RANK.get(best.get("tier"), 0):
+                    best = alt
+                return best
             return row
         finally:
             _BOOK_RETRY_OWNED.reset(owned)
@@ -5709,13 +5759,6 @@ class Orthonym:
         # gate-mismatched twin could false-keep). Necessary-not-sufficient: catches
         # the strict-vs-breadth divergence class, not the ~517 strict-path
         # non-PINs (a separate axis). See CAROTENOID-B-DESIGN-2026-09-09.md.
-        if (tier == PIN_VERIFIED
-                and (self._general_fallback or self._general_fallback_unverified
-                     or self._allow_aromatic_general or self._full_coverage)):
-            _strict_name = self._strict_pin_twin_name(smiles)
-            if _strict_name != name:
-                tier = PIN_UNVERIFIED
-                is_pin = False
         # "Preferred IUPAC multiplicative names" (the Blue Book):
         # identical parent structures, identically substituted at identical locants,
         # take the multiplicative name as the PIN (:23180-23184); '4,4′-methylene
@@ -5919,6 +5962,17 @@ class Orthonym:
                 logger.info("name_tiered lowered %r: %s", name,
                             "; ".join(f"{f['rule']} {f['detail']}" for f in _checked))
             spelling_failures += _checked
+        # The strict-twin demotion runs LAST among the demotions that read
+        # ``tier == PIN_VERIFIED``, the no-PIN elements, the spelling check): a
+        # pin_verified name those lower to systematic_verified must keep that label, not be
+        # caught first by the twin and stay pin_unverified.
+        if (tier == PIN_VERIFIED
+                and (self._general_fallback or self._general_fallback_unverified
+                     or self._allow_aromatic_general or self._full_coverage)):
+            _strict_name = self._strict_pin_twin_name(smiles)
+            if _strict_name != name:
+                tier = PIN_UNVERIFIED
+                is_pin = False
         # A name from the exact-match coordination list (D1: heme, chlorophyll,
         # cobalamin, siroheme, coenzyme F430; checked by exact InChIKey identity,
         # 'identity') keeps the label its naming path gives it (user decision
@@ -7901,7 +7955,8 @@ class Orthonym:
         row ``name`` returns the book-spelled best-effort name where ``name_tiered``
         can return the mechanical, verified one. Deriving the label of every first run
         here would cost each molecule the row computation of ``name_tiered``."""
-        from .assembly.book_prefixes import mechanical_forms, watch_book_forms
+        from .assembly.book_prefixes import (
+            mechanical_forms, retry_rungs, retry_spelling, watch_book_forms)
         from .assembly.fragment_naming import hang_budget_trips
         owned = _BOOK_RETRY_OWNED.set(True)
         try:
@@ -7913,13 +7968,14 @@ class Orthonym:
                     out, limit_error = None, e
             if (fired[0] and hang_budget_trips() == trips and self._book_retry_applies()
                     and (limit_error is not None or is_failure_name(out))):
-                with mechanical_forms():
-                    try:
-                        alt = run()
-                    except OrthonymLimitError:
-                        alt = None
-                if alt is not None and not is_failure_name(alt):
-                    return alt
+                for rung in [*retry_rungs(fired[1]), ("keep", ())]:
+                    with retry_spelling(rung):
+                        try:
+                            alt = run()
+                        except OrthonymLimitError:
+                            alt = None
+                    if alt is not None and not is_failure_name(alt):
+                        return alt
             if limit_error is not None:
                 raise limit_error
             return out
@@ -10097,6 +10153,24 @@ class Orthonym:
                         features.mol, features.principal_ring,
                         features.principal_group, features.functional_groups
                     )
+                    _ring_set_pg = set(features.principal_ring)
+                    _pg_on_ring = any(
+                        a in _ring_set_pg or any(
+                            n.GetIdx() in _ring_set_pg
+                            for n in features.mol.GetAtomWithIdx(a).GetNeighbors())
+                        for m in (features.principal_group_atoms
+                                  or features.functional_groups.get(
+                                      features.principal_group, ()))
+                        for a in m)
+                    if not pg_ring_atoms and not _pg_on_ring:
+                        # the principal group is carried off the ring: the heterocycle
+                        # assembler still cites a ring suffix of its own (c))
+                        from .rules.heterocycles import (
+                            ring_suffix_atoms_the_assembler_cites,
+                        )
+                        pg_ring_atoms |= ring_suffix_atoms_the_assembler_cites(
+                            features.mol, features.principal_ring,
+                            features.principal_group)
 
                     # Orient considering heteroatoms, the principal group, then
                     # other substituents for lowest locants order).

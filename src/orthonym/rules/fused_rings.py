@@ -3534,6 +3534,14 @@ def _identify_fused_substituent(
 
     # Nitrogen groups (amino, nitro, N-alkyl amino, etc.)
     if symbol == 'N':
+        if start_atom.IsInRing():
+            # A ring nitrogen bonded to the core is the free-valence atom of a
+            # ring-system substituent ('pyrrolidin-1-yl', '1H-imidazol-1-yl',
+            #, named whole by the ring delegate. The amino shapes below
+            # walk chains: read through a ring they took the two halves of a
+            # pyrrolidine for two butyl groups ('butan-1-yl(butan-4-ylamino)'),
+            # another molecule.
+            return _ring_rooted_substituent(mol, start_idx, excluded)
         h_count = start_atom.GetTotalNumHs()
         neighbors = [n for n in start_atom.GetNeighbors() if n.GetIdx() not in excluded]
 
@@ -3935,6 +3943,103 @@ def _chain_is_unbranched_alkanoyl(mol, chain_atoms, acyl_c: int) -> bool:
     return oxygens == 1
 
 
+def _ring_rooted_substituent(mol, start_idx: int, excluded: Set[int]):
+    """A substituent whose atom on the core is a ring atom of another ring system,
+    named whole by ``ring_substituents.name_ring_system_substituent``.
+
+    The delegate is called first as the PIN tier calls it, at every tier:
+    ``allow_mancude=False`` and the best-effort context cleared for the call
+    (the producers behind the delegate read that context themselves; under it
+    they name the same group '4-(amino-oxomethyl)piperidin-1-yl'), so the
+    ring-yl has the spelling the PIN tier certifies wherever that call builds
+    it ('4-carbamoylpiperidin-1-yl'), as the best-effort clean fall-through
+    clears it so that substituent recursion takes the PIN vocabulary. Only when
+    that call declines, and only at the best-effort tier, is the delegate
+    called again in the best-effort context with ``allow_mancude=True``, as
+    the carbon branch of ``_identify_fused_substituent`` calls it for a
+    ring-bearing substituent.
+    Both calls keep the universal enumerator (``allow_enumerator_fallback``),
+    as that carbon branch does: a decorated ring-yl on a ring nitrogen
+    ('4-carbamoylpiperidin-1-yl', '(3R)-3-methylpyrrolidin-1-yl') is built by
+    it, and a free-valence locant it gets wrong (the '1,3,4-oxadiazol-3-yl'
+    that the bare connective of ``ring_substituents`` excludes) names another
+    molecule, which the round trip rejects: a coverage cost, never a wrong name.
+
+    None when the fragment touches the core again, when the molecule joins two
+    identical ring systems by a bond (a ring assembly,, the Blue Book:
+    15542, is then the parent,:19461; ``ring_assembly_screen``), or
+    when the delegate declines."""
+    _ring_info = mol.GetRingInfo()
+    sub_atoms = _bfs_collect_all(mol, start_idx, excluded)
+    if not sub_atoms:
+        return None
+    _sub_set = set(sub_atoms)
+    for _r in _ring_info.AtomRings():
+        _r_set = set(_r)
+        if (_r_set & _sub_set) and (_r_set & excluded):
+            return None
+    from .ring_assembly_screen import joins_identical_ring_systems
+    if joins_identical_ring_systems(mol):
+        return None
+    from ..metrics.provenance import best_effort_ctx as _rbe_ctx
+    from .ring_substituents import name_ring_system_substituent
+    _mancude = bool(_rbe_ctx.get())
+    _tok = _rbe_ctx.set(False)
+    try:
+        name = name_ring_system_substituent(
+            mol, sub_atoms, start_idx, allow_enumerator_fallback=True,
+            allow_mancude=False)
+    finally:
+        _rbe_ctx.reset(_tok)
+    if not name and _mancude:
+        name = name_ring_system_substituent(
+            mol, sub_atoms, start_idx, allow_enumerator_fallback=True,
+            allow_mancude=True)
+    if not name:
+        return None
+    return {'name': name, 'type': 'functionalized', 'atoms': list(sub_atoms)}
+
+
+def _terminal_group_chain(mol, chain_atoms, start_idx: int) -> bool:
+    """True when ``chain_atoms`` is an unbranched, acyclic, singly bonded run of
+    sp3 carbons starting at ``start_idx`` (the atom on the ring), whose
+    heteroatoms (and a carbonyl or nitrile carbon) all hang off the LAST carbon
+    of the run: the only shape a carbon-count name such as '3-hydroxypropyl' or
+    '2-carboxyethyl' describes, the Blue Book; the free valence is
+    locant 1 and the group sits on the chain end)."""
+    chain = set(chain_atoms)
+    if start_idx not in chain or mol.GetAtomWithIdx(start_idx).GetAtomicNum() != 6:
+        return False
+    hetero = [i for i in chain if mol.GetAtomWithIdx(i).GetAtomicNum() != 6]
+    if not hetero:
+        return False
+    # walk the carbon run from the ring side
+    path = [start_idx]
+    seen = {start_idx}
+    while True:
+        cur = path[-1]
+        atom = mol.GetAtomWithIdx(cur)
+        if atom.IsInRing():
+            return False
+        c_next = [n.GetIdx() for n in atom.GetNeighbors()
+                  if n.GetIdx() in chain and n.GetIdx() not in seen
+                  and n.GetAtomicNum() == 6]
+        if len(c_next) > 1:
+            return False
+        if not c_next:
+            break
+        nxt = c_next[0]
+        if mol.GetBondBetweenAtoms(cur, nxt).GetBondType() != Chem.BondType.SINGLE:
+            return False
+        path.append(nxt)
+        seen.add(nxt)
+    if set(path) | set(hetero) != chain:
+        return False
+    # no heteroatom on any carbon of the run but the last one
+    return all(mol.GetBondBetweenAtoms(h, c) is None
+               for h in hetero for c in path[:-1])
+
+
 def _identify_functionalized_substituent(
     mol,
     start_idx: int,
@@ -4029,6 +4134,48 @@ def _identify_functionalized_substituent(
                     'type': 'suffix',
                     'suffix_name': 'carboxamide',
                 }
+
+    # Check for acetyl/acyl terminus: -C(=O)-R on ring
+    # Handles acetyl (-C(=O)-CH3), etc.
+    acyl_pattern = _compiled_smarts('[CX3](=O)[#6]')
+    if acyl_pattern:
+        matches = mol.GetSubstructMatches(acyl_pattern)
+        for match in matches:
+            acyl_c = match[0]
+            if acyl_c in chain_atoms and acyl_c == start_idx:
+                # Acyl group directly on ring. 2026-09-25 (pre-existing-failures
+                # plan, Task 4 continuation): the SMARTS' [#6] also matches the
+                # RING carbon, so an ester -C(=O)-O-CH3 (two carbons) was named
+                # 'acetyl' -- '3-acetyl-1H-indole' for methyl
+                # 1H-indole-3-carboxylate, a different molecule. 'acetyl' is
+                # CH3-CO- (the Blue Book, "acyl groups are formed by
+                # subtracting all -OH groups from oxoacids for example 'acetyl',
+                # CH3-CO-"), so the branch now requires exactly that shape.
+                if not _chain_is_unbranched_alkanoyl(mol, chain_atoms, acyl_c):
+                    continue
+                if carbon_count == 2:
+                    return {
+                        'name': 'acetyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'ketone',
+                        'type': 'functionalized'
+                    }
+                elif carbon_count == 3:
+                    return {
+                        'name': 'propanoyl',
+                        'atoms': chain_atoms,
+                        'functional_group': 'ketone',
+                        'type': 'functionalized'
+                    }
+
+    # The names below are read from the carbon count alone ('3-hydroxypropyl',
+    # '2-cyanoethyl', 'carboxymethyl'), which describes only an unbranched chain
+    # of sp3 carbons from the ring with the group on its far carbon. Any other
+    # shape (a branched '2-hydroxypropan-2-yl', a '1-hydroxyethyl', a ring in
+    # the chain) is another molecule under that name, so it is left to the
+    # general substituent namer (``_terminal_group_chain``).
+    if not _terminal_group_chain(mol, chain_atoms, start_idx):
+        return None
 
     # Check for nitrile terminus (N with triple bond to C)
     for idx in chain_atoms:
@@ -4132,13 +4279,6 @@ def _identify_functionalized_substituent(
                         'type': 'suffix',
                         'suffix_name': 'carbaldehyde',
                     }
-                elif carbon_count == 2:
-                    return {
-                        'name': 'acetyl',
-                        'atoms': chain_atoms,
-                        'functional_group': 'aldehyde',
-                        'type': 'functionalized'
-                    }
 
     # Check for hydroxyl terminus: -CH2-OH or -CH(-OH)-
     # Handles hydroxymethyl (-CH2OH), 2-hydroxyethyl (-CH2CH2OH), etc.
@@ -4216,39 +4356,6 @@ def _identify_functionalized_substituent(
                         }
                     except (ValueError, KeyError):
                         pass
-
-    # Check for acetyl/acyl terminus: -C(=O)-R on ring
-    # Handles acetyl (-C(=O)-CH3), etc.
-    acyl_pattern = _compiled_smarts('[CX3](=O)[#6]')
-    if acyl_pattern:
-        matches = mol.GetSubstructMatches(acyl_pattern)
-        for match in matches:
-            acyl_c = match[0]
-            if acyl_c in chain_atoms and acyl_c == start_idx:
-                # Acyl group directly on ring. 2026-09-25 (pre-existing-failures
-                # plan, Task 4 continuation): the SMARTS' [#6] also matches the
-                # RING carbon, so an ester -C(=O)-O-CH3 (two carbons) was named
-                # 'acetyl' -- '3-acetyl-1H-indole' for methyl
-                # 1H-indole-3-carboxylate, a different molecule. 'acetyl' is
-                # CH3-CO- (the Blue Book, "acyl groups are formed by
-                # subtracting all -OH groups from oxoacids for example 'acetyl',
-                # CH3-CO-"), so the branch now requires exactly that shape.
-                if not _chain_is_unbranched_alkanoyl(mol, chain_atoms, acyl_c):
-                    continue
-                if carbon_count == 2:
-                    return {
-                        'name': 'acetyl',
-                        'atoms': chain_atoms,
-                        'functional_group': 'ketone',
-                        'type': 'functionalized'
-                    }
-                elif carbon_count == 3:
-                    return {
-                        'name': 'propanoyl',
-                        'atoms': chain_atoms,
-                        'functional_group': 'ketone',
-                        'type': 'functionalized'
-                    }
 
     # An ester -C(=O)-O-R directly on the ring is NOT recognised here.
     # 2026-09-25 (pre-existing-failures plan, Task 4 continuation): this branch
@@ -5211,12 +5318,11 @@ _FUSED_CARBOCYCLIC_PARENTS = {
     (5, 6): 'indene',
     (5, 7): 'azulene',
     (6, 6): 'naphthalene',
-    (6, 7): 'heptalene',
 }
 
 # Intrinsic indicated-hydrogen form for the fused carbocyclic parents above
 # that are not fully mancude (the Blue Book-11319: indene's PIN is
-# "1H-indene"). pentalene/naphthalene/azulene/heptalene are fully conjugated
+# "1H-indene"). pentalene/naphthalene/azulene are fully conjugated
 # mancude ring systems and carry no indicated hydrogen.
 _FUSED_CARBOCYCLIC_INTRINSIC_IH = {
     'indene': '1H-indene',
@@ -5235,7 +5341,6 @@ _PARENT_HYDRO_COUNTS = {
     'indene': 8,
     'azulene': 10,
     'naphthalene': 10,
-    'heptalene': 10,
 }
 
 

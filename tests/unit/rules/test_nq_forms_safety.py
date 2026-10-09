@@ -80,8 +80,9 @@ def test_a_failing_book_spelling_never_costs_the_name(monkeypatch, tier):
     assert name_is_rt_exact(plain, CF3_THIOUREA)
 
 
-NILOTINIB = ("CC1=C(C=C(C(=O)NC2=CC(=CC(=C2)C(F)(F)F)N2C=NC(=C2)C)C=C1)NC1=NC=CC(=N1)"
-             "C=1C=NC=CC1")
+#: nilotinib now has its PIN and no longer reaches the terminal-fragment writer; this acid
+#: with an N-aryl carbamoyl group does, at the valid tier (traced: ``_same_reach_name`` runs)
+WITNESS = "OC(=O)c1ccc(cc1)C(=O)Nc1cccc(c1)C(F)(F)F"
 
 
 @pytest.mark.opsin_gate
@@ -109,11 +110,11 @@ def test_memo_verify_mode_finds_no_mismatch_with_the_mechanical_pre_pass(monkeyp
         memo.clear_process_cache()
         memo.reset_verify_mismatches()
         names[mode] = Orthonym(style="pin", **_emit_tier_flags("valid")).name_tiered(
-            NILOTINIB).get("name")
+            WITNESS).get("name")
         assert memo.verify_mismatch_count() == 0, mode
     assert pre_passes[0] > 0
     assert names["on"] == names["verify"], names
-    assert name_is_rt_exact(names["on"], NILOTINIB), names
+    assert name_is_rt_exact(names["on"], WITNESS), names
 
 
 def test_the_mechanical_forms_switch_every_writer_back():

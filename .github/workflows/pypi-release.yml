@@ -24,22 +24,16 @@ name: pypi-release
 # Release made by release-please skips this whole workflow. To upload an existing
 # tag later: set PYPI_ENABLED=true, then run this workflow from that tag (see above).
 #
-# Run in ONE home only: every job requires the repository variable
-# RELEASE_HOME == 'true', which is set in the release home only: exactly one
-# home, the one the maintainer's local publish tooling pushes first (see
-# release-please.yml).
+# Run in ONE repository only: every job requires the repository variable
+# RELEASE_HOME == 'true', which is set on Steinbeck-Lab/Orthonym only (see
+# release-please.yml); a fork never uploads.
 #
-# The approval gate. There is NO human approval step inside this workflow while
-# the repository is private: required reviewers on an environment need a PUBLIC
-# repository on GitHub Free, Pro and Team plans. The human gate is merging the
-# release PR (release-please.yml); the Release that merge produces uploads at
-# once. The `pypi` environment is still used, because the PyPI trusted publisher
-# is bound to it. While the repository is private, restrict the `pypi`
-# environment to the deployment tag rule `v*` (Settings -> Environments ->
-# Deployment branches and tags -> Selected branches and tags; available for
-# private repositories on a user-owned Pro plan; an organization on GitHub Free
-# cannot create environments for a private repository at all). Once the
-# repository is public, add required reviewers to `pypi` as well.
+# The approval gate. The human gate is merging the release PR (release-please.yml);
+# the Release that merge produces uploads through the `pypi` environment, to which
+# the PyPI trusted publisher is bound. Restrict that environment to the deployment
+# tag rule `v*` (Settings -> Environments -> Deployment branches and tags ->
+# Selected branches and tags), and add required reviewers to it as well: the
+# repository is public, so both are available.
 #
 # One-time setup, outside this file: create the `pypi` and `testpypi`
 # environments first (a workflow that names a missing environment creates it
@@ -50,7 +44,7 @@ name: pypi-release
 #
 # The upload also publishes digital attestations (on by default with Trusted
 # Publishing); they name the source repository, workflow and commit in a public
-# transparency log, even while the repository is private.
+# transparency log.
 
 on:
   release:
@@ -239,7 +233,7 @@ jobs:
       # environment is the check GitHub enforces. Neither stops someone with
       # write access from creating a new v* tag on any commit and uploading from
       # it: only a tag ruleset limiting who may create v* tags, or required
-      # reviewers once the repository is public, closes that.)
+      # reviewers on the environment, closes that.)
       - name: Refuse unless running from the release tag
         env:
           REF: ${{ github.ref }}

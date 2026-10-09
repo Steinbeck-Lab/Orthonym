@@ -29,11 +29,8 @@ OPSIN — opsin-cli-2.9.0-jar-with-dependencies.jar
 - Download:   https://github.com/dan2097/opsin/releases/download/2.9.0/opsin-cli-2.9.0-jar-with-dependencies.jar
 - SHA-256:    c2e29326c281f87b59a05d934d8589adac6e9d17b95b984931b3e739111b360f
 - License:    MIT (OPSIN itself; Copyright (c) Daniel Lowe and contributors).
-              The jar also bundles automaton, xsdlib, stax2-api (BSD family);
-              woodstox, commons-io, commons-cli, log4j (Apache-2.0); isorelax
-              (MIT); jna-inchi (LGPL-2.1) wrapping the IUPAC InChI library
-              (IUPAC-InChI-Trust Licence). Their notices are inside the jar's
-              META-INF.
+              The jar also bundles further third-party libraries under their own
+              licences; see the OPSIN release and the notices inside the jar.
 - Used for:   round-trip validation of names: OPSIN reads a name back to a
               structure, which must match the input. The few names the default
               tier ships that OPSIN cannot read in full (names from exact-match
@@ -51,14 +48,16 @@ centres — centres-cli-1.2.1.jar
 - Download:   https://github.com/SiMolecule/centres/releases/download/1.2.1/centres.jar
 - SHA-256:    6c5d5cafa9393ed7b667a2340222348cd15a9bbdd0d1b92518229f26cc5e87fb
 - Size:       2,291,742 bytes; Main-Class com.simolecule.centres.LabelCip
-- License:    BSD-2-Clause (centres itself; Copyright (c) 2020, John Mayfield).
+- License:    BSD-2-Clause (centres itself; Copyright (c) 2020, John Mayfield;
+              its LICENSE file, source headers and README; the Maven pom names
+              LGPL-3.0, which the LICENSE file does not).
               As a shaded jar it also bundles, in binary form:
-                * CDK (Chemistry Development Kit) — LGPL-2.1-or-later
+                * CDK 2.9 (Chemistry Development Kit) — LGPL-2.1-or-later
                   (source: https://github.com/cdk/cdk)
-                * javax.vecmath — GPLv2 with the Classpath exception
+                * javax.vecmath 1.5.2 — GPL-2.0-only with the Classpath exception
                   (source: https://github.com/hharrison/vecmath)
-                * Beam (uk.ac.ebi.beam) — BSD/MIT family
-                  (source: https://github.com/johnmay/beam)
+                * Beam 1.3.5 (uk.ac.ebi.beam) — BSD-2-Clause (the FreeBSD text
+                  with the "views" paragraph; source: https://github.com/johnmay/beam)
 - Used for:   R/S and E/Z stereo descriptors. On the Hanson 2018 CIP Validation
               Suite it labels 281/290 correctly (RDKit's rdCIPLabeler: 235/290);
               tests/integration/test_cip_validation.py asserts the score.

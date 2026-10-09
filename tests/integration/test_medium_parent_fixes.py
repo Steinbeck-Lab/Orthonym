@@ -562,13 +562,11 @@ STEROID_DECORATION_COMPLETENESS = [
         "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",
         "cyclopenta[a]phenanthren",
         id="stigmastane-diol-retained-name",
-marks=_XF_STEROID,
     ),
     pytest.param(
         "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",
         "cyclopenta[a]phenanthren",
         id="ergostane-dienol-retained-name",
-marks=_XF_STEROID,
     ),
     pytest.param(
         "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1"
@@ -593,3 +591,29 @@ def test_steroid_decoration_completeness(smiles, expected_substr):
     name = _dt_name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert expected_substr in name, f"Expected '{expected_substr}' in name: {name}"
+
+
+# The two stereo-free steroids below carry no stereocentre in the input, so the
+# stereoparent names (stigmastane, ergostane) cannot be used, the Blue Book);
+# the name is the hydro-prefixed fusion parent. "Five-membered ring
+# requirement" (the Blue Book-23710): fusion nomenclature gives preferred names to
+# systems with at least two rings of five or more members, so the cyclopenta[a]phenanthrene
+# name, not a von Baeyer name, is the one. The assertion is the name AND its OPSIN round trip
+# to the input's full InChIKey.
+STEREO_FREE_STEROID_FUSION_NAMES = [
+    ("CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",
+     "10,13-dimethyl-17-[5-(propan-2-yl)heptan-2-yl]-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
+     "tetradecahydro-1H-cyclopenta[a]phenanthrene-3,7-diol"),
+    ("C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",
+     "17-(5,6-dimethylhept-6-en-2-yl)-10,13-dimethyl-2,3,4,5,6,9,10,11,12,13,14,15,16,17-"
+     "tetradecahydro-1H-cyclopenta[a]phenanthren-3-ol"),
+]
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize("smiles,expected", STEREO_FREE_STEROID_FUSION_NAMES)
+def test_stereo_free_steroid_fusion_name_round_trips(smiles, expected):
+    from tests.support.rt_assert import assert_full_rt
+    name = _dt_name_compound(smiles)
+    assert name == expected, name
+    assert_full_rt(name, smiles)

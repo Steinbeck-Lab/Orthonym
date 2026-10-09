@@ -53,6 +53,14 @@ __all__ = [
     "acyl_group_prefix",
     "acyl_side_atoms",
     "book_forms_enabled",
+    "RETRY_KEEP_ORDER",
+    "forms_enabled",
+    "ring_forms_enabled",
+    "retry_keeps",
+    "retry_rungs",
+    "retry_spelling",
+    "book_forms_minus",
+    "RETRY_DROP_ORDER",
     "hetero_roots_composable",
     "mechanical_forms",
     "methyl_group_name",
@@ -67,31 +75,51 @@ __all__ = [
 #: variable is ``assembly.memo.book_forms_var``, so every memo key of a naming path
 #: carries the switch (a value computed with one spelling is never served to the other).
 from .memo import book_forms_var as _BOOK_FORMS  # noqa: E402
+from .memo import dropped_forms_var as _DROPPED  # noqa: E402
+from .memo import kept_forms_var as _KEPT  # noqa: E402
 
 
 def book_forms_enabled() -> bool:
     return _BOOK_FORMS.get()
 
 
-#: Set by ``watch_book_forms``: a one-item list that ``note_book_form`` sets to True.
+def forms_enabled(kind: str) -> bool:
+    """The writers of one kind of book spelling ('ring') give it: always when
+    ``book_forms_enabled``, and inside ``mechanical_forms(keep_forms=...)`` naming the kind;
+    never inside ``book_forms_minus(...)`` naming it."""
+    return (_BOOK_FORMS.get() or kind in _KEPT.get()) and kind not in _DROPPED.get()
+
+
+def ring_forms_enabled() -> bool:
+    """The writers of single rings spell the book's form (``forms_enabled('ring')``)."""
+    return forms_enabled("ring")
+
+
+#: Set by ``watch_book_forms``: ``[False, set]``, set by ``note_book_form``.
 _FIRED = contextvars.ContextVar("orthonym_book_forms_fired", default=None)
 
 
-def note_book_form() -> None:
+def note_book_form(kind: str = "other") -> None:
     """A writer records that it gave a book spelling in place of its mechanical one
-    (read by ``watch_book_forms``; a no-op outside one)."""
+    (read by ``watch_book_forms``; a no-op outside one). ``kind``: 'ring' for a single
+    ring's name (``rules.monocycle_forms``), the kind the keep-forms retry keeps;
+    'other' for every other spelling. A lane that adds a kept kind (a chain, a phosphorus
+    or sulfur group) names it here and in ``RETRY_KEEP_ORDER``."""
     box = _FIRED.get()
     if box is not None:
         box[0] = True
+        box[1].add(kind)
 
 
 @contextlib.contextmanager
 def watch_book_forms():
     """``with watch_book_forms as fired:`` -- ``fired[0]`` is True after the block when
-    a writer inside it gave a book spelling. The public naming calls use it to decide
-    whether a molecule the book spellings left without a verified name is named again
-    with ``mechanical_forms`` (``namer.Orthonym.name`` / ``name_tiered``)."""
-    box = [False]
+    a writer inside it gave a book spelling, ``fired[1]`` is the set of the kinds of the
+    spellings given ('ring', 'other'). The public naming calls use it to decide whether a
+    molecule the book spellings left without a verified name is named again, the rungs of
+    ``retry_keeps(fired[1])`` first and ``mechanical_forms`` last
+    (``namer.Orthonym.name`` / ``name_tiered``)."""
+    box = [False, set()]
     token = _FIRED.set(box)
     try:
         yield box
@@ -100,14 +128,71 @@ def watch_book_forms():
 
 
 @contextlib.contextmanager
-def mechanical_forms():
+def mechanical_forms(keep_forms=()):
     """Inside the block every writer gives its mechanical spelling (the spelling
-    before roadmap N5)."""
+    before roadmap N5); the kinds named in ``keep_forms`` ('ring': the single-ring names of
+    ``rules.monocycle_forms``) stay the book's (``forms_enabled``)."""
     token = _BOOK_FORMS.set(False)
+    kept_token = _KEPT.set(frozenset(keep_forms))
     try:
         yield
     finally:
+        _KEPT.reset(kept_token)
         _BOOK_FORMS.reset(token)
+
+
+@contextlib.contextmanager
+def book_forms_minus(drop_forms):
+    """Inside the block every writer gives its book spelling EXCEPT the kinds named in
+    ``drop_forms`` ('chain', 'ps',...), which give their mechanical one (``forms_enabled``):
+    the rung that returns the spelling before one lane's kind while every other kind stays."""
+    token = _DROPPED.set(frozenset(drop_forms))
+    try:
+        yield
+    finally:
+        _DROPPED.reset(token)
+
+
+@contextlib.contextmanager
+def retry_spelling(rung):
+    """The spelling of one rung of ``retry_rungs``: ``('keep', kinds)`` is
+    ``mechanical_forms(keep_forms=kinds)``, ``('drop', kinds)`` is ``book_forms_minus(kinds)``."""
+    how, kinds = rung
+    with (book_forms_minus(kinds) if how == "drop" else mechanical_forms(keep_forms=kinds)):
+        yield
+
+
+#: The keep-forms rungs of the retry ladder, in order. The ladder is
+#: book -> these rungs -> mechanical: one failing spelling of a kind that is not kept does
+#: not take the kept kinds' names with it. U2 adds {'chain'} (the N/O group
+#: prefixes and 'cyano', ``hetero_group_prefixes``). The P and S groups ('ps') have a drop rung only:
+#: a failing P/S group costs only the P/S kind, and a keep rung of {'ps'} would repeat it.
+RETRY_KEEP_ORDER = (frozenset({"ring"}), frozenset({"chain"}))
+
+
+#: The drop rungs of the retry ladder, in order: after the keep rungs and before the mechanical
+#: one, "every book spelling except this kind". One kind per rung; a lane adds its kind here
+#: ('chain': item 12a; 'ps': the P and S oxoacid groups, item 12b).
+RETRY_DROP_ORDER = (frozenset({"chain"}), frozenset({"ps"}))
+
+
+def retry_rungs(fired_kinds):
+    """The rungs between the book run and the mechanical one, in order, as ``(how, kinds)``:
+    first ``('drop', kinds)`` for every kind of ``RETRY_DROP_ORDER`` that was given together with
+    another kind (a drop of the only kind given is the mechanical rung): "every book spelling
+    except this kind" is the spelling before that lane's forms, so a name a lane's forms cost is
+    never worse than it was; then the keep rungs of ``retry_keeps`` (``('keep', kinds)``). Run
+    each under ``retry_spelling(rung)``."""
+    fired = set(fired_kinds)
+    return ([("drop", d) for d in RETRY_DROP_ORDER if d <= fired and fired - d]
+            + [("keep", k) for k in retry_keeps(fired)])
+
+
+def retry_keeps(fired_kinds):
+    """The rungs of ``RETRY_KEEP_ORDER`` worth running after a run that gave the kinds
+    ``fired_kinds``: every kept kind was given, and some other kind was too (when only the
+    kept kinds were given, the rung repeats the run)."""
+    return [k for k in RETRY_KEEP_ORDER if k <= set(fired_kinds) and set(fired_kinds) - k]
 
 
 #: the mononuclear carbon parent and its substituent prefixes by free-valence bond order
@@ -603,7 +688,7 @@ MONONUCLEAR_HEAD = {"Si": "silyl", "Ge": "germyl", "Sn": "stannyl", "Pb": "plumb
                     "P": "phosphanyl", "As": "arsanyl", "B": "boranyl"}
 
 
-def hetero_roots_composable(mol, path) -> bool:
+def hetero_roots_composable(mol, path, group_leaves: bool = True) -> bool:
     """True when every heteroatom of the atom ``path`` can root a composed substituent
     prefix ('methoxy', '(R)amino', 'azaniumyl', 'trimethylsilyl'): an element of
     ``HETERO_ROOT_VALENCE`` at its standard bonding number with no charge and no isotope
@@ -611,24 +696,37 @@ def hetero_roots_composable(mol, path) -> bool:
     (the S+ of a sulfoxide written as S+-O-, the N+ of a nitrone, a sulfate sulfur) has
     no composed prefix here, so a writer keeps its chain spelling for such a path rather
     than cut the chain into a branch it can only spell as another 'a' chain. An -OO- link
-    likewise: an oxygen roots 'R-oxy' from a carbon R only, and the book's 'R-peroxy'
-     the Blue Book "'R′-peroxy' (not R′-dioxy)"; '(methylperoxy)ethane
-    (PIN)',:27870) is not built here. (An -SS- link is cut: '[(R)sulfanyl]sulfanyl' reads
-    back, the book's 'R-disulfanyl' of the same rule is not built either; residual.)"""
+    is cut at its first oxygen (``group_leaves``; without it the chain stays): that oxygen roots
+    the group '(R)peroxy' / 'hydroperoxy'
+    (``hetero_group_prefixes``; the Blue Book "'R′-peroxy' (not R′-dioxy)",
+    '(methylperoxy)ethane (PIN)',:27870;:27944). (An -SS- link is cut:
+    '[(R)sulfanyl]sulfanyl' reads back, the book's 'R-disulfanyl' of the same rule is not
+    built either; residual.)"""
     on_path = set(path)
     for a in path:
         atom = mol.GetAtomWithIdx(a)
         if atom.GetAtomicNum() == 6:
             continue
         sym = atom.GetSymbol()
-        if sym == "O" and any(nb.GetAtomicNum() == 8 and nb.GetIdx() in on_path
-                              for nb in atom.GetNeighbors()):
-            return False
+        if (not group_leaves and sym == "O"
+                and any(nb.GetAtomicNum() == 8 and nb.GetIdx() in on_path
+                        for nb in atom.GetNeighbors())):
+            return False  # the spelling before item 12a: no '(R)peroxy' leaf, the chain stays
         if sym not in HETERO_ROOT_VALENCE or atom.GetIsotope():
             return False
         ammonium = (sym == "N" and atom.GetFormalCharge() == 1
                     and atom.GetTotalValence() == 4
                     and all(b.GetBondTypeAsDouble() == 1.0 for b in atom.GetBonds()))
+        # an iminium or oxonium centre =[NR2]+ / =[OR]+ roots 'azaniumylidene' /
+        # 'oxidaniumylidene' (``hetero_group_prefixes``; the Blue Book)
+        onium_ylidene = (sym in ("N", "O") and atom.GetFormalCharge() == 1
+                         and atom.GetTotalValence() == (4 if sym == "N" else 3)
+                         and sorted(b.GetBondTypeAsDouble() for b in atom.GetBonds()).count(2.0) == 1
+                         and all(b.GetBondTypeAsDouble() in (1.0, 2.0) for b in atom.GetBonds())
+                         and all(b.GetOtherAtom(atom).GetAtomicNum() == 6
+                                 for b in atom.GetBonds() if b.GetBondTypeAsDouble() == 2.0))
+        if onium_ylidene and group_leaves:
+            continue
         if atom.GetFormalCharge() and not ammonium:
             return False
         if not ammonium and atom.GetTotalValence() != HETERO_ROOT_VALENCE[sym]:

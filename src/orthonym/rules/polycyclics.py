@@ -4,8 +4,8 @@ Polycyclic aromatic hydrocarbon (PAH) naming rules.
 Handles identification and naming of common polycyclic aromatics:
 - Bicyclic: naphthalene
 - Tricyclic: anthracene, phenanthrene, fluorene, acenaphthene, acenaphthylene
-- Tetracyclic: pyrene, chrysene, tetracene, triphenylene, benz[a]anthracene, benzo[c]phenanthrene
-- Pentacyclic: pentacene, perylene, benzo[a]pyrene
+- Tetracyclic: pyrene, chrysene, tetracene, triphenylene, tetraphene, benzo[c]phenanthrene
+- Pentacyclic: pentacene, perylene, benzo[pqr]tetraphene
 - Hexacyclic+: coronene
 
 Also coordinates with fused_rings module for fused heterocyclic systems.
@@ -527,7 +527,7 @@ def _engine_canonical_numbering(canonical_mol) -> Dict[int, Any]:
 
     Used by ``get_polycyclic_iupac_locants`` to supply a numbering for cataloged
     PAH entries whose ``iupac_numbering`` was never tabulated (tetracene,
-    chrysene, triphenylene, benz[a]anthracene,...). Returns the numbering keyed
+    chrysene, triphenylene, tetraphene,...). Returns the numbering keyed
     by the canonical-mol atom index, in the SAME storage form as the tabulated
     maps (plain ``int`` for peripheral atoms, ``'4a'`` strings for fusion
     carbons) so the existing automorphism-minimization downstream is reused
@@ -604,7 +604,7 @@ def get_polycyclic_iupac_locants(
     canonical_numbering = entry.get('iupac_numbering') or {}
     if not canonical_numbering:
         # 13B(a) S1: a real PAH entry whose IUPAC numbering was never
-        # tabulated (tetracene, chrysene, triphenylene, benz[a]anthracene,
+        # tabulated (tetracene, chrysene, triphenylene, tetraphene,
         # picene, pentacene,...). Derive it deterministically from the bare
         # skeleton with the fusion-numbering engine; the SAME automorphism-
         # minimization below then assigns the lowest substituent locants.

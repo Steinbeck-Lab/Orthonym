@@ -69,7 +69,6 @@ def test_monocycle_form_names_and_prefixes(smiles, parent, prefix):
 
 
 @pytest.mark.parametrize("smiles", [
-    "OCc1ccc(=O)[nH]c1",          # a ring C=O on a mancude ring: added hydrogen
     "OCC1CCS(=O)(=O)C1",          # a lambda-6 ring atom
     "OCC1=CCCCC1",                # partly unsaturated carbocycle: 'cyclohex-1-en-1-yl'
     "OC[n+]1ccccc1",              # a ring cation

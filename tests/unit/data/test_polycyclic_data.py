@@ -255,11 +255,11 @@ class TestNewPahEntries:
     @pytest.mark.parametrize("name,expected_atoms,expected_rings", [
         ('tetracene', 18, 4),
         ('triphenylene', 18, 4),
-        ('benz[a]anthracene', 18, 4),
+        ('tetraphene', 18, 4),
         ('benzo[c]phenanthrene', 18, 4),
         ('pentacene', 22, 5),
         ('perylene', 20, 6),
-        ('benzo[a]pyrene', 20, 5),
+        ('benzo[pqr]tetraphene', 20, 5),
         ('coronene', 24, 7),
         ('9,10-dihydroanthracene', 14, 3),
         ('1,2-dihydronaphthalene', 10, 2),
@@ -274,11 +274,11 @@ class TestNewPahEntries:
     @pytest.mark.parametrize("name", [
         'tetracene',
         'triphenylene',
-        'benz[a]anthracene',
+        'tetraphene',
         'benzo[c]phenanthrene',
         'pentacene',
         'perylene',
-        'benzo[a]pyrene',
+        'benzo[pqr]tetraphene',
         'coronene',
     ])
     def test_new_pah_substructure_match(self, name):

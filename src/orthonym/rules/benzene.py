@@ -998,19 +998,44 @@ def _identify_suffix_fg_on_benzene(
     return None
 
 
-def _detect_n_substituents(mol, amide_match: Tuple[int, ...], ring_atoms: Set[int]) -> List[str]:
-    """
-    Detect N-alkyl substituents on an amide nitrogen.
+def _detect_n_substituents(mol, amide_match: Tuple[int, ...],
+                           ring_atoms: Set[int]) -> List[str]:
+    """Names of the substituents on an amide nitrogen (the italic-N prefixes).
+
+     (the Blue Book): R-CO-NHR' is named by citing R' as a
+    prefix with the locant N; an N-aryl group is such a prefix in a PIN
+    ('names expressing N-substitution by a phenyl group on an amide are
+    preferred IUPAC names',,:32849; 'N,4-dimethyl-N-(3-methyl
+    phenyl)benzamide (PIN)',:32879). A pure alkyl branch is named as before; any
+    other carbon-rooted branch (an aryl or heteroaryl ring with its own
+    substituents, 'N-[3-(4-methyl-1H-imidazol-1-yl)-5-(trifluoromethyl)phenyl]')
+    is named whole by the amide N-substituent namer of rules.amides, so a ring
+    amide and a benzamide name their N-substituents the same way.
+
+    A branch this function does not name is left out of the list, as before:
+    one that is not carbon-rooted, that loops back into the parent ring or the
+    carbonyl carbon, that holds a stereocentre (the namer cites no descriptor
+    inside the prefix;,:44643, cites it at the front of the prefix,
+    'N-[(3R)-piperidin-3-yl]benzamide (PIN)', which the amide producers of
+    rules.amides build), that sits in a molecule whose PIN may be a linear
+    phane name (2), ``linear_phane_screen``) or that joins two
+    identical ring systems by a bond (a ring assembly,:15542, which is
+    then the parent,:19461: 'N-(pyridin-2-yl)[1,1'-biphenyl]-4-
+    carboxamide', not '4-phenyl-N-(pyridin-2-yl)benzamide';
+    ``ring_assembly_screen``), or that the namer declines. The name built from
+    such a list does not cover the molecule and the other amide producers name
+    it, as before this function named rings.
 
     Args:
         mol: RDKit Mol object
-        amide_match: SMARTS match tuple (C, O/N indices depending on pattern)
-        ring_atoms: Set of ring atom indices
+        amide_match: SMARTS match tuple; its first atom is the carbonyl carbon
+        ring_atoms: Set of ring atom indices of the parent
 
     Returns:
-        List of alkyl names attached to nitrogen (e.g., ['methyl'] or ['methyl', 'methyl'])
+        Sorted list of N-substituent prefix names ( for none named).
     """
-    # Find the nitrogen atom in the amide
+    from ..assembly.substituent_naming import name_substituent_fragment
+
     c_idx = amide_match[0]
     c_atom = mol.GetAtomWithIdx(c_idx)
 
@@ -1024,32 +1049,62 @@ def _detect_n_substituents(mol, amide_match: Tuple[int, ...], ring_atoms: Set[in
         return []
 
     n_idx = n_atom.GetIdx()
-    alkyl_names = []
+    names: List[str] = []
 
     for nbr in n_atom.GetNeighbors():
         nbr_idx = nbr.GetIdx()
         if nbr_idx == c_idx or nbr_idx in ring_atoms:
             continue
-        if nbr.GetSymbol() == 'C':
-            # Collect alkyl chain
-            alkyl_atoms, carbon_count = _collect_pure_alkyl(
-                mol, nbr_idx, ring_atoms | {n_idx, c_idx}
+        if nbr.GetSymbol() != 'C':
+            continue
+        blocked = set(ring_atoms) | {n_idx, c_idx}
+        alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, nbr_idx, blocked)
+        if alkyl_atoms is not None and carbon_count > 0:
+            rec_name = name_substituent_fragment(
+                mol, alkyl_atoms, nbr_idx, list(blocked)
             )
-            if alkyl_atoms is not None and carbon_count > 0:
-                from ..assembly.substituent_naming import name_substituent_fragment
-                rec_name = name_substituent_fragment(
-                    mol, alkyl_atoms, nbr_idx, list(ring_atoms | {n_idx, c_idx})
-                )
-                if rec_name:
-                    alkyl_names.append(rec_name)
-                else:
-                    try:
-                        alkyl_names.append(get_alkyl_name(carbon_count))
-                    except (ValueError, KeyError):
-                        pass
+            if rec_name:
+                names.append(rec_name)
+            else:
+                try:
+                    names.append(get_alkyl_name(carbon_count))
+                except (ValueError, KeyError):
+                    pass
+            continue
+        rec_name = _ring_bearing_n_substituent(mol, nbr_idx, blocked, ring_atoms, c_idx)
+        if rec_name:
+            names.append(rec_name)
 
-    alkyl_names.sort()
-    return alkyl_names
+    names.sort()
+    return names
+
+
+def _ring_bearing_n_substituent(mol, nbr_idx: int, blocked: Set[int],
+                                ring_atoms: Set[int], c_idx: int) -> Optional[str]:
+    """The prefix name of a carbon-rooted, ring-bearing amide N-substituent, or None
+    (see ``_detect_n_substituents`` for when it declines)."""
+    branch = _bfs_substituent_atoms(mol, nbr_idx, blocked)
+    if any(a in ring_atoms or a == c_idx for a in branch):
+        return None
+    from .ring_substituents import _carries_stereo
+    if _carries_stereo(mol, branch):
+        return None
+    from .linear_phane_screen import phane_may_be_pin
+    if phane_may_be_pin(mol):
+        return None
+    from .ring_assembly_screen import joins_identical_ring_systems
+    if joins_identical_ring_systems(mol):
+        return None
+    from .amides import _name_n_substituent
+    # the writer's own refusal comes back as None (a fragment no namer of the pipeline
+    # named is left to the other producers), not as a placeholder word to be read
+    from ..errors import CASCADE_PLACEHOLDER
+    name = _name_n_substituent(
+        mol, branch,
+        sum(1 for a in branch if mol.GetAtomWithIdx(a).GetSymbol() == 'C'),
+        refusal_as_none=True)
+    # the placeholder word alone is never a name, whatever carried it here
+    return None if name == CASCADE_PLACEHOLDER else (name or None)
 
 
 def _detect_sulfonamide_n_substituents(
@@ -1264,9 +1319,18 @@ def _chalcogen_linked_carbon_substituent(
 
     The dedicated O and S branches build the plain-alkyl R (and the other R-O-
     shapes they recognise) first; this covers the R they decline and every R-Se- /
-    R-Te-. Declines (None) when R holds an aromatic atom: a second benzene ring in R
-    raises the multiplicative choice (1,1'-sulfanediyldibenzene (PIN),
-    :27826), which the multiplicative producer decides, not this collector.
+    R-Te-. Declines (None) when R holds an aromatic atom and the carbon of R bonded
+    to E is not a ring atom: a second benzene ring in R raises the
+    multiplicative choice (1,1'-sulfanediyldibenzene (PIN),:27826), which the
+    multiplicative producer decides, not this collector. An R whose carbon bonded
+    to E is a ring atom is a ring-yl ('(R)oxy', '(R)sulfanyl'), named whole by the
+    shared namer. For such an R that holds an aromatic atom this collector
+    declines when the PIN may have another parent than the benzene ring, a ring
+    assembly:15542, ``ring_assembly_screen``) or a linear phane
+     (2), ``linear_phane_screen``), and when R holds a stereocentre or
+    a stereogenic double bond, whose descriptor the outer emitter would cite in
+    front of the whole name:44643 cites it "at the front of the
+    corresponding prefix").
     """
     e_atom = mol.GetAtomWithIdx(e_idx)
     if (e_atom.GetSymbol() not in _CHALCOGEN_LINK_SYMBOLS
@@ -1282,7 +1346,19 @@ def _chalcogen_linked_carbon_substituent(
         return None
     sub_atoms = _bfs_substituent_atoms(mol, e_idx, ring_atoms)
     if any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in sub_atoms):
-        return None
+        if not others[0].IsInRing():
+            return None
+        # An R whose carbon bonded to E is a ring atom is a ring-yl: '(R)oxy',
+        # '(R)sulfanyl' ('2-[(pyridin-3-yl)oxy]pyrazine (PIN)',,
+        # the Blue Book), named whole by the shared namer below, which
+        # does not choose the parent: declined where a ring assembly or a
+        # linear phane may be the PIN parent, or R holds a stereo element.
+        from .linear_phane_screen import phane_may_be_pin
+        from .ring_assembly_screen import joins_identical_ring_systems
+        from .ring_substituents import _carries_stereo
+        if (joins_identical_ring_systems(mol) or phane_may_be_pin(mol)
+                or _carries_stereo(mol, sub_atoms)):
+            return None
     from ..assembly.naming_utils import enclose_if_compound
     from ..assembly.substituent_naming import name_substituent_fragment
     try:
@@ -2409,6 +2485,26 @@ def _collect_pure_alkyl(mol, start_idx: int, excluded: Set[int]):
     return all_atoms, carbon_count
 
 
+def _ring_size_oxy_name_fits(mol, ring, c_idx: int, group_atoms: Set[int]) -> bool:
+    """True when '(oxan-2-yl)oxy' / '(oxolan-2-yl)oxy' describes the O-linked group exactly:
+    the group is the bare ring (no other atom, no charge, no isotope), its one heteroatom is an
+    oxygen bonded to the linking carbon ``c_idx`` (locant 2 next to the ring oxygen 1), and every
+    ring bond is single."""
+    ring = set(ring)
+    if set(group_atoms) != ring:
+        return False
+    atoms = [mol.GetAtomWithIdx(a) for a in ring]
+    if any(a.GetFormalCharge() or a.GetIsotope() or a.GetIsAromatic() for a in atoms):
+        return False
+    hetero = [a.GetIdx() for a in atoms if a.GetAtomicNum() != 6]
+    if len(hetero) != 1 or mol.GetAtomWithIdx(hetero[0]).GetAtomicNum() != 8:
+        return False
+    if mol.GetBondBetweenAtoms(c_idx, hetero[0]) is None:
+        return False
+    return all(b.GetBondType() == Chem.BondType.SINGLE for b in mol.GetBonds()
+               if b.GetBeginAtomIdx() in ring and b.GetEndAtomIdx() in ring)
+
+
 def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
     """Identify oxygen-based substituent (hydroxy, methoxy, alkoxy, hydroperoxy, etc.)."""
     o_atom = mol.GetAtomWithIdx(o_idx)
@@ -2549,15 +2645,21 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
         if nbr_symbol == 'C':
             c_atom = nbr
             sub_atoms = _bfs_substituent_atoms(mol, o_idx, ring_atoms)
+            # the ring-size name of a bare O-ring (Case 3), where it fits the group
+            ring_size_group = None
 
             # Case 1: O -> aromatic C in benzene ring -> "phenoxy"
             if c_atom.GetIsAromatic() and c_atom.IsInRing():
                 ring_info = mol.GetRingInfo()
                 for ring in ring_info.AtomRings():
                     if c_atom.GetIdx() in ring and len(ring) == 6:
+                        # A benzene ring fused to another ring is part of that
+                        # ring system ('(1H-indol-5-yl)oxy'), never 'phenoxy';
+                        # the shared namer below names the system whole.
                         all_arom_c = all(
                             mol.GetAtomWithIdx(r).GetIsAromatic() and
                             mol.GetAtomWithIdx(r).GetSymbol() == 'C'
+                            and ring_info.NumAtomRings(r) == 1
                             for r in ring
                         )
                         if all_arom_c:
@@ -2654,15 +2756,46 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
                                     'atoms': sub_atoms,
                                     'is_complex': True,
                                 }
-                            # Use systematic heterocyclic names:
-                            # 5-membered with O = oxolane (tetrahydrofuran)
-                            # 6-membered with O = oxane (tetrahydropyran)
-                            glyco_prefix = "(oxolan-2-yl)oxy" if ring_size == 5 else "(oxan-2-yl)oxy"
-                            return {
-                                'name': glyco_prefix,
-                                'atoms': sub_atoms,
-                                'is_complex': True,
-                            }
+                            # Any other O-ring is named whole, with its free
+                            # valence locant and decorations, by the shared
+                            # namer below ('(oxan-4-yl)oxy'). A name read from
+                            # the ring size alone ('(oxan-2-yl)oxy' for every
+                            # six-membered O-ring) described another molecule
+                            # whenever the ring was linked at another atom,
+                            # carried a decoration or a second heteroatom, so
+                            # it is kept only for the group it describes (a bare
+                            # oxane or oxolane linked at the carbon next to its
+                            # oxygen), as the name of this group when the shared
+                            # namer declines it.
+                            if _ring_size_oxy_name_fits(
+                                    mol, ring, c_atom.GetIdx(),
+                                    set(sub_atoms) - {o_idx}):
+                                ring_size_group = {
+                                    'name': ("(oxolan-2-yl)oxy" if ring_size == 5
+                                             else "(oxan-2-yl)oxy"),
+                                    'atoms': sub_atoms,
+                                    'is_complex': True,
+                                }
+                            # The shared namer does not choose the parent:
+                            # where a ring assembly,:15542;,
+                            #:24153) or a linear phane (2)) may be
+                            # the PIN parent, it is not called. The group keeps
+                            # its ring-size name where that name fits, and says
+                            # that the benzene parent built around it may not be
+                            # the PIN: the composer of the whole name
+                            # (``name_substituted_benzene``) records that name as
+                            # a label-only non-PIN name (the PIN tier declines
+                            # it, the other tiers keep it labelled below the
+                            # PIN). The group is left unnamed otherwise.
+                            from .linear_phane_screen import phane_may_be_pin
+                            from .ring_assembly_screen import (
+                                joins_identical_ring_systems,
+                            )
+                            if (joins_identical_ring_systems(mol)
+                                    or phane_may_be_pin(mol)):
+                                if ring_size_group is not None:
+                                    ring_size_group['parent_may_not_be_pin'] = True
+                                return ring_size_group
                         break
 
             # An R that carries other atoms (a halogen,...) is named whole by
@@ -2671,10 +2804,16 @@ def _identify_oxygen_group(mol, o_idx: int, ring_atoms: Set[int]) -> Optional[Di
             _linked = _chalcogen_linked_carbon_substituent(mol, o_idx, ring_atoms)
             if _linked is not None:
                 return _linked
+            if ring_size_group is not None:
+                return ring_size_group
 
             # Case 4: O-C that's not pure alkyl but not ring/aromatic
             # Try to count total carbons and make a best-effort alkoxy name
             all_sub = _bfs_substituent_atoms(mol, nbr.GetIdx(), ring_atoms | {o_idx})
+            if any(mol.GetAtomWithIdx(a).IsInRing() for a in all_sub):
+                # A ring in R is never a chain: counting its carbons named
+                # -O-(pyridin-2-yl) 'pentyloxy', another molecule. Decline.
+                return None
             total_c = sum(
                 1 for a in all_sub
                 if mol.GetAtomWithIdx(a).GetSymbol() == 'C'
@@ -3843,6 +3982,57 @@ def _calculate_locants(
 
 
 def name_substituted_benzene(
+    mol,
+    ring_atoms: Tuple[int, ...],
+    oriented_ring: List[int],
+    substituents: Dict[int, List[Dict]],
+    detected_fgs: Optional[Dict] = None,
+    assembly_label: bool = True,
+) -> str:
+    """The name of ``_name_substituted_benzene``, recorded as a label-only non-PIN name
+    when a group of the ring says that the benzene parent may not be the PIN
+    (``'parent_may_not_be_pin'``: the group's writer found a ring assembly or a linear phane
+    that may be the senior parent, the Blue Book, (2)). Two
+    records: the whole name this composer built (``record_non_pin_label``, the candidate
+    pool's provenance: the acid keeps 'systematic_verified' below the PIN) and the whole-call
+    flag (``record_general_ring_prefix``) for the names that later composers rewrite from it
+    (ester, salt, anion), whose text no longer contains it."""
+    name = _name_substituted_benzene(
+        mol, ring_atoms, oriented_ring, substituents, detected_fgs)
+    if name and any(isinstance(s, dict) and s.get('parent_may_not_be_pin')
+                    for subs in substituents.values() for s in subs):
+        from ..metrics.provenance import (
+            record_general_ring_prefix,
+            record_non_pin_label,
+        )
+        record_non_pin_label(name)
+        # the composers of the acid's esters, salts and anions rewrite this name
+        # ('...benzoic acid' to '...benzoate'), so no text of it survives to the label
+        # step; the fact is also recorded for the whole call, as a structural one: a name of
+        # this molecule built on this benzene parent is not certified as the PIN
+        record_general_ring_prefix()
+    elif name and assembly_label:
+        # The parent ring is one member of a biphenyl or polyphenyl assembly:15542):
+        # the assembly has more rings than the benzene ring and is the senior parent
+        #:19461;:27722-27724 'not 1-methoxy-4-phenylbenzene; the
+        # biphenyl ring system is senior to a single benzene ring'). The assembly handler names
+        # a molecule only when every ring system of it joins the assembly, so a molecule that
+        # holds a further ring (benzyloxy, pyridinylmethyl) reaches this writer: its name is
+        # right but not the PIN. Label only, name-scoped, as the producers that consult
+        # ``ring_assembly_screen``.
+        from .ring_assembly_screen import ring_is_in_biphenyl_assembly
+        if ring_is_in_biphenyl_assembly(mol, ring_atoms):
+            from ..metrics.provenance import (
+                record_general_ring_prefix,
+                record_non_pin_label,
+            )
+            record_non_pin_label(name)
+            # the ester, salt and anion composers rewrite the acid name, see above
+            record_general_ring_prefix()
+    return name
+
+
+def _name_substituted_benzene(
     mol,
     ring_atoms: Tuple[int, ...],
     oriented_ring: List[int],
@@ -5864,12 +6054,25 @@ def _preferred_benzene_parent_ring(mol):
                 mol, ring_atoms, substituents,
                 principal_group_positions=pcg_positions or None,
             )
-            nm = name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents)
+            nm = name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents,
+                                          assembly_label=False)
         if nm:
             scored.append((ring_atoms, nm))
     if not scored:
         return None
     return min(scored, key=lambda rn: _alphanumerical_name_key(rn[1]))
+
+
+def record_biphenyl_parent_label(mol, ring_atoms, name) -> None:
+    """Label-only record for a benzene-parent NAME that a caller ships (see
+    ``name_substituted_benzene``): the parent ring is a member of a biphenyl assembly."""
+    if not name or name == "benzene":
+        return
+    from .ring_assembly_screen import ring_is_in_biphenyl_assembly
+    if ring_is_in_biphenyl_assembly(mol, ring_atoms):
+        from ..metrics.provenance import record_general_ring_prefix, record_non_pin_label
+        record_non_pin_label(name)
+        record_general_ring_prefix()
 
 
 def name_benzene_derivative(mol) -> Optional[str]:

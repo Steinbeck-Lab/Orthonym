@@ -94,12 +94,30 @@ def test_pseudoasymmetric_ring_stereo_abstains():
     assert not _pseudoasymmetric_name_verified("(1R,3r,5S)-tropan-3-ol", smiles)
 
 
-def test_out_of_scope_organotin_abstains():
-    # organo-tin: PIN abstains ("tin compound (not supported)"); best-effort
-    # must too (Sn is in REPLACEMENT_TERMS, so the core would otherwise build a
-    # `stanna` name whose OPSIN re-perception mis-valences Sn and never full-RTs).
+def test_organotin_best_effort_is_exact_or_abstains():
+    # A tin compound is named by substitutive nomenclature, not as an organometallic:
+    # the Blue Book-1032 " Nomenclature for Compounds of Group 14 Elements",
+    # " Silicon, germanium, tin, and lead parent hydrides" is the
+    # organometallic chapter). The PIN tier still declines this one ("tin compound
+    # (not supported)"). Best-effort used to decline too, because its 'stanna' chain
+    # name never read back; since the chain spelling ladder (lane U2) it reads back.
+    # RDKit perceives the bare [Sn] of this SMILES as a diradical, so the name is a
+    # '-ylidene' radical name and OPSIN must be allowed radicals ('-r') to read it.
+    # The rule this test keeps: best-effort abstains, or ships a name that reads back
+    # to the full InChIKey AND the same radical electrons on every tin atom.
     smi = "CC(C)OP(=O)(C(C[Sn]Cl)P(=O)(OC(C)C)OC(C)C)OC(C)C"
-    assert _abstains(_be(smi)), f"named an out-of-scope organometallic: {_be(smi)!r}"
+    name = _be(smi)
+    if _abstains(name):
+        return
+    p = subprocess.run(java_cmd() + ["-jar", jar_or_skip(), "-o", "smi", "-r"],
+                       input=name + "\n", capture_output=True, text=True)
+    out = p.stdout.strip().splitlines()
+    mo = Chem.MolFromSmiles(out[0]) if out and out[0] else None
+    mi = Chem.MolFromSmiles(smi)
+    assert mo is not None, f"shipped a name OPSIN cannot read: {name!r}"
+    assert inchi.MolToInchiKey(mo) == inchi.MolToInchiKey(mi), f"wrong molecule: {name!r}"
+    rad = lambda m: sorted(a.GetNumRadicalElectrons() for a in m.GetAtoms() if a.GetSymbol() == "Sn")
+    assert rad(mo) == rad(mi), f"tin radical state differs: {name!r}"
 
 
 def test_in_scope_organosilicon_still_names():

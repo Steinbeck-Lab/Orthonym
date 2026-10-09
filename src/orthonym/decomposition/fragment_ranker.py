@@ -27,6 +27,17 @@ _NO_FG_RANK = 999
 
 
 def score_fragment_seniority(frag_smiles: Optional[str]) -> Tuple[int, int, int, int, int]:
+    """:func:`_score_fragment_seniority_impl`, memoised for the life of the process:
+    the score is a pure function of ``frag_smiles`` (an RDKit parse, the functional
+    groups it carries and its ring/heavy-atom counts; no provenance, no budget), so
+    one process computes it once per string. ``ORTHONYM_MEMO=off|verify`` and
+    ``ORTHONYM_PROCESS_CACHE=0`` bypass the memo exactly as for ``fg_detect``."""
+    from ..assembly.memo import pure_cache_or_compute
+    return pure_cache_or_compute("score_fragment_seniority", frag_smiles,
+                                 lambda: _score_fragment_seniority_impl(frag_smiles))
+
+
+def _score_fragment_seniority_impl(frag_smiles: Optional[str]) -> Tuple[int, int, int, int, int]:
     """Score a fragment SMILES by seniority.
 
     Returns a comparison tuple where LOWER = MORE SENIOR:

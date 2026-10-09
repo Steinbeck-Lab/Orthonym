@@ -68,7 +68,12 @@ RERUN_BUILT = frozenset({
     "O=C(O)C(=O)C[C@H]1C=C[C@H](O)CC1",
     "CC1=C(CC/C(C)=C/C=C/C(C)=C/CO)C(C)(C)CCC1",
     "C1C2CC3CC1CC(C2)(C3)COC(=O)CCl",
-    "CC1=C(C=CC(=C1)OCC(=O)NC2=CC=C(C=C2)N3CCCCC3)C(C)C",
+    # '2-[3-methyl-4-(propan-2-yl)phenoxy]-N-[4-(piperidin-1-yl)phenyl]acetamide' is
+    # built by the strict first run since the drug lane's Task L3.5 (ring-yl prefixes of
+    # two ring systems, the -NH-/-O-/-S- connective): (the Blue Book-
+    # 32693) 'acetamide (PIN)' can be substituted; (:32849) "names
+    # expressing N-substitution by a phenyl group on an amide are preferred IUPAC
+    # names", 'N-phenylacetamide (PIN)' (:32859); pin_verified.
     "C=C1C[C@@H](O)CC(C)(C)[C@@H]1/C=C/C1=CC(=O)OC1",
     "CC1=CCC(CC1)C(=C)CCO",
     "COc1c(C)cnc(CS(=O)c2nc3ccc(O)cc3[nH]2)c1C",

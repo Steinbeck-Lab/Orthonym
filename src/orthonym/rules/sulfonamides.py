@@ -407,9 +407,11 @@ def n_substituted_sulfonamide_name(
     # misrouted to a benzene parent. Fail-safe: accept only a result that is still
     # a sulfonamide name (the excision-class check, mirrored here).
     if _sulfonyl_on_benzene(mol, s_idx):
-        from .benzene import name_benzene_derivative
-        ring_name = name_benzene_derivative(mol)
+        from .benzene import _preferred_benzene_parent_ring, record_biphenyl_parent_label
+        _pref = _preferred_benzene_parent_ring(mol)
+        ring_name = _pref[1] if _pref else None
         if ring_name and ring_name.endswith(_PARENT_SUFFIX):
+            record_biphenyl_parent_label(mol, _pref[0], ring_name)
             return ring_name
         # Fall through: the bare-ring excise path below is the proven backstop and
         # a substituted-ring parent is refused there anyway (never a wrong name).

@@ -109,11 +109,17 @@ GPI_FAILING_FRAGMENT = (
 # Suite fix j6 (TRIAGE g3 C17b): that producer now exists for saturated
 # chalcogen heteromonocycles (Hantzsch-Widman stem,, so both PIN
 # rungs name the dioxolane row RT-exact and it no longer anchors anything. The
-# anchor is now the PAH_10 hexahydronaphthalene: its PIN (a hydro-naphthalene
-# fusion name, has no producer, both PIN rungs decline, and the T4
-# rung names it '2,6-dimethyl-8-(prop-1-en-2-yl)bicyclo[4.4.0]deca-1(10),2-
-# diene', RT-exact (measured 2026-09-27).
-PIN_TIER_FAILING_FRAGMENT = "C=C(C)C1CC=C2C(C)=CCCC2(C)C1"
+# anchor was the PAH_10 hexahydronaphthalene. N5b (2026-10-08): the fusion
+# name of a carbon-only ortho-fused system is the PIN "Five-membered
+# ring requirement", the Blue Book-23710; hydro prefixes, and
+# both PIN rungs now name PAH_10 '5,8a-dimethyl-2-(prop-1-en-2-yl)-1,2,3,7,8,8a-
+# hexahydronaphthalene' (RT-exact; HYDRO_FUSED_FRAGMENT below). The anchor is now
+# a stereo-free 3-acetoxy-androstane-17-ol: both PIN rungs decline (no producer
+# for the steroid fusion name), and the rung names it '5-(acetyloxy)-14-
+# hydroxy-2,15-dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecane', RT-exact
+# (measured 2026-10-08).
+HYDRO_FUSED_FRAGMENT = "C=C(C)C1CC=C2C(C)=CCCC2(C)C1"
+PIN_TIER_FAILING_FRAGMENT = "CC(=O)OC1CCC2(C)C(CCC3C2CCC2(C)C(O)CCC32)C1"
 
 # 74-heavy-atom lipopeptide (fatty-acyl N-cap + 6 amide-linked residues,
 # non-standard/branched residues). VERIFIED (this session, monkeypatch trace):
@@ -242,19 +248,24 @@ class TestT4RescueMechanism:
         to the fragment's full InChIKey (TRIAGE got_rt=exact; re-measured
         2026-09-25). So the test now asserts (a) that measured truth for
         GPI_FAILING_FRAGMENT, and (b) the anchor's original claim on
-        PIN_TIER_FAILING_FRAGMENT, which still fails both PIN rungs and which
-        the rung names RT-exact. The GPI fragment's spelling
+        PIN_TIER_FAILING_FRAGMENT (re-pointed 2026-10-08 to a steroid), which
+        still fails both PIN rungs and which the rung names RT-exact. The GPI fragment's spelling
         '(6-sulfanylhexyloxy)' (an enclosing-mark defect) is Task 5's, so no
         spelling is pinned here -- only round-trip identity.
         """
         from orthonym.assembly.fragment_naming import name_fragment_recursively
         from orthonym.namer import name_pipeline_only
 
-        # (a) the GPI fragment is now PIN-nameable on both rungs, RT-exact.
+        # (a) the GPI fragment and the hydro-naphthalene are now PIN-nameable on
+        # both rungs, RT-exact (the latter by fusion nomenclature,.
         for rung in (name_fragment_recursively, name_pipeline_only):
             got = rung(GPI_FAILING_FRAGMENT)
             assert got and not is_failure_name(got), (rung.__name__, got)
             assert _full_rt(GPI_FAILING_FRAGMENT, got), (rung.__name__, got)
+            got = rung(HYDRO_FUSED_FRAGMENT)
+            assert got == ("5,8a-dimethyl-2-(prop-1-en-2-yl)-1,2,3,7,8,8a-"
+                           "hexahydronaphthalene"), (rung.__name__, got)
+            assert _full_rt(HYDRO_FUSED_FRAGMENT, got), (rung.__name__, got)
 
         # (b) a fragment that fails both PIN rungs; the rung names it.
         assert not name_fragment_recursively(PIN_TIER_FAILING_FRAGMENT)

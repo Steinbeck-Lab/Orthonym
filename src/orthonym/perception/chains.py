@@ -511,8 +511,10 @@ def find_principal_chain(
     mol,
     functional_groups: Dict[str, List[tuple]],
     principal_group: Optional[str] = None,
-    exclude_atoms: Optional[Set[int]] = None
-) -> List[int]:
+    exclude_atoms: Optional[Set[int]] = None,
+    *,
+    ring_prefixes: bool = False,
+) -> Optional[List[int]]:
     """
     Find the principal chain following IUPAC 2013 rules.
 
@@ -536,9 +538,24 @@ def find_principal_chain(
         functional_groups: Dict from detect_functional_groups
         principal_group: Name of principal functional group (or None)
         exclude_atoms: Optional set of atom indices to skip (e.g., ring atoms)
+        ring_prefixes: False (every production caller): an atom of
+            ``exclude_atoms`` bonded to a chain atom is neither counted nor
+            located nor named as a substituent by criteria 8, 9 and the
+            tie-break. True: such an atom (a ring bonded to the chain) is a
+            substituent cited as a prefix like any other, as to
+             require (the Blue Book,:21698,:21791; the chain
+            parent of the example at:21624 counts its ring
+            substituent). In this mode the tie-break names each whole branch
+            with the side-effect-free ``name_substituent_for_ordering``, and the
+            call returns None when two different chains reach that tie-break
+            and a branch has no name, or when two different chains still tie
+            after it (the comparison cannot be decided). Used by
+            ``chain_parent_prefix_seniority`` to check the chain a producer
+            was given.
 
     Returns:
-        List of atom indices forming the principal chain, in order
+        List of atom indices forming the principal chain, in order (None only
+        with ``ring_prefixes=True``, see above)
     """
     np_terminal_carbons = _get_non_principal_terminal_carbons(
         mol, functional_groups, principal_group
@@ -586,6 +603,10 @@ def find_principal_chain(
     # carbon by _normalize_pcg_match, which deflated the other chain's count and
     # let a 1-carbon "chain" out-score the genuine ethane-1,2-diamine backbone.
     fg_bearing_carbons: List[Set[int]] = []
+    # The non-carbon atoms of the principal group's own matches (a ketone's '=O', an
+    # alcohol's 'O', an amide's 'N'): the characteristic group the chain carries as its
+    # suffix, which the key of ``ring_prefixes`` mode must not cite as a prefix.
+    pcg_own_hetero: Set[int] = set()
     if principal_group and principal_group in functional_groups:
         # DD5: count the principal characteristic group over its
         # WHOLE equal-seniority class (e.g. primary + secondary OH = two hydroxy
@@ -680,6 +701,8 @@ def find_principal_chain(
 
         for match in fg_matches:
             fg_atoms.update(_pcg_anchor_atoms(match))
+            pcg_own_hetero.update(
+                a for a in match if mol.GetAtomWithIdx(a).GetAtomicNum() != 6)
         # Build the bearing-carbon set for each PCG instance (deduped by
         # heteroatom so a group present under >1 SMARTS subtype counts once).
         # Bearing carbons = carbons DIRECTLY bonded to the characteristic
@@ -740,6 +763,12 @@ def find_principal_chain(
         return double_bonds, triple_bonds
 
     exclude = exclude_atoms or set()
+    # Atoms that are never a substituent of the chain for criteria 8 and 9: the
+    # excluded atoms, unless ``ring_prefixes`` asks for the count in which
+    # a ring bonded to the chain is a prefix too.
+    not_prefix = set() if ring_prefixes else exclude
+    #: ring_prefixes mode: attachment atoms of branches the tie-break could not name
+    unnamed_branches: List[int] = []
 
     def _compute_fg_locant_score(chain: List[int]) -> tuple:
         """Criterion 6: Lowest locants for principal group."""
@@ -795,7 +824,7 @@ def find_principal_chain(
             atom = mol.GetAtomWithIdx(atom_idx)
             for nbr in atom.GetNeighbors():
                 nbr_idx = nbr.GetIdx()
-                if nbr_idx not in chain_set and nbr_idx not in exclude:
+                if nbr_idx not in chain_set and nbr_idx not in not_prefix:
                     if nbr.GetSymbol() != 'H':
                         count += 1
                         if nbr_idx in fg_hetero_atoms:
@@ -804,7 +833,7 @@ def find_principal_chain(
                             # than this chain carbon)..
                             for sub in nbr.GetNeighbors():
                                 si = sub.GetIdx()
-                                if si == atom_idx or si in exclude:
+                                if si == atom_idx or si in not_prefix:
                                     continue
                                 if sub.GetAtomicNum() > 1:
                                     count += 1
@@ -849,7 +878,7 @@ def find_principal_chain(
             for i, a in enumerate(ch):
                 for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
                     ni = nbr.GetIdx()
-                    if ni not in cset and ni not in exclude and nbr.GetSymbol() != 'H':
+                    if ni not in cset and ni not in not_prefix and nbr.GetSymbol() != 'H':
                         out.append(i + 1)
                         break
             return sorted(out)
@@ -882,9 +911,13 @@ def find_principal_chain(
             atom = mol.GetAtomWithIdx(atom_idx)
             for nbr in atom.GetNeighbors():
                 nbr_idx = nbr.GetIdx()
-                if nbr_idx not in chain_set and nbr_idx not in exclude and nbr.GetSymbol() != 'H':
+                if nbr_idx not in chain_set and nbr_idx not in not_prefix and nbr.GetSymbol() != 'H':
                     positions.append(i)
-                    break
+                    # ring_prefixes mode: compares the locant of every
+                    # prefix ('2,2,3' is not '2,3'), so a carbon with two
+                    # prefixes gives its locant twice.
+                    if not ring_prefixes:
+                        break
         if not positions:
             return ()
         return tuple(-p for p in sorted(positions))
@@ -986,7 +1019,10 @@ def find_principal_chain(
         shared namer; the multiplier-free base name is the alpha sort key.
         """
         from ..assembly.naming_utils import alpha_sort_key
-        from ..assembly.substituent_enumerator import name_substituent
+        from ..assembly.substituent_enumerator import (
+            name_substituent,
+            name_substituent_for_ordering,
+        )
 
         #: orient via the SAME full cascade `_compute_sub_locant_score` uses
         # (PCG -> multiple-bonds -> double-bonds -> substituents), not just the PCG,
@@ -996,24 +1032,44 @@ def find_principal_chain(
         # substituent fragment matches what the real enumerator sees.
         oriented = list(reversed(chain)) if _cascade_reverse(chain) else chain
         cset = set(oriented)
-        bfs_boundary = cset | combined_exclude
+        # ring_prefixes mode: each branch is named whole (a ring bonded to the
+        # chain, or a branch that reaches one, is one prefix: '(3-nitrophenyl)methyl',
+        # '3-nitrophenyl'), so only the chain bounds it.
+        bfs_boundary = cset if ring_prefixes else cset | combined_exclude
         pos = {a: i + 1 for i, a in enumerate(oriented)}
         entries = []  # (alpha_key, locant)
         sub_locants = []
+        raw_names = []
         for chain_atom in oriented:
             for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
                 ni = nbr.GetIdx()
-                if ni in cset or ni in combined_exclude or ni in fg_atoms:
+                if ni in cset or ni in fg_atoms:
+                    continue
+                if ring_prefixes and ni in pcg_own_hetero:
+                    # (the Blue Book) orders "substituents cited as
+                    # prefixes"; the principal group is the suffix ('-one', '-ol',
+                    # '-amide'), never an 'oxo' / 'hydroxy' / 'amino' prefix
+                    continue
+                if not ring_prefixes and ni in combined_exclude:
                     continue
                 if nbr.GetSymbol() == 'H':
                     continue
                 frag = _bfs_substituent(mol, ni, bfs_boundary)
-                try:
-                    nm = name_substituent(mol, frag, ni)
-                except Exception:
-                    nm = "zzz"
+                if ring_prefixes:
+                    try:
+                        nm = name_substituent_for_ordering(mol, frag, ni)
+                    except Exception:
+                        nm = None
+                    if not nm:
+                        unnamed_branches.append(ni)
+                else:
+                    try:
+                        nm = name_substituent(mol, frag, ni)
+                    except Exception:
+                        nm = "zzz"
                 entries.append((alpha_sort_key(nm or "zzz"), pos[chain_atom]))
                 sub_locants.append(pos[chain_atom])
+                raw_names.append(nm or "")
         entries.sort()
         #: when every structural criterion ties, the PIN is the name
         # that comes first in alphanumerical order. The locant tuple alone
@@ -1030,6 +1086,18 @@ def find_principal_chain(
         # letter, so the PIN is `4-(1,2-difluoropropyl)-5,6-dinitroheptanoic
         # acid`. Appending the citation SEQUENCE makes that comparison explicit
         # instead of accidental.
+        if ring_prefixes:
+            # (the Blue Book): "Alphabetic letters are considered first
+            # in the order that they appear in the name; all Roman letters are
+            # considered before any italic letters". The prefixes as cited: equal
+            # names multiplied ('dibromo', 'bis(...)' -- 'bromo' is earlier than
+            # 'dibromo',:22245), in alphanumerical order; their Roman
+            # letters in that order. A tie here between different chains is left
+            # undecided by the caller.
+            return (sorted(sub_locants),
+                    tuple(loc for _a, loc in entries),
+                    _cited_prefix_letters(raw_names),
+                    _cited_prefix_italics(raw_names))
         return (sorted(sub_locants),
                 tuple(loc for _a, loc in entries),
                 tuple(a for a, _loc in entries))
@@ -1105,13 +1173,168 @@ def find_principal_chain(
         # alphanumerical comparator (all terms already tied within `top`).
         best_lambda = max(_lambda_direct_key(c) for c in top)
         top = [c for c in top if _lambda_direct_key(c) == best_lambda]
-        best_chain = top[0] if len(top) == 1 else min(top, key=_p45_alpha_key)
+        if not ring_prefixes:
+            best_chain = top[0] if len(top) == 1 else min(top, key=_p45_alpha_key)
+        elif len(top) == 1 or len({chain_symmetry_key(mol, c) for c in top}) == 1:
+            # one chain, or chains that a symmetry of the molecule maps onto each other
+            # (a chain and its reverse, the two methyl ends of an isopropyl group): the
+            # caller reads only the length and the symmetry key of the chain, which are
+            # the same for each of them, so no prefix is named
+            best_chain = top[0]
+        else:
+            # ring_prefixes mode: the tie is decided only between different chains
+            # (a chain and its own reverse are one chain, and so are two chains
+            # that a symmetry of the molecule maps onto each other: the two methyl
+            # ends of an isopropyl group). It is undecided (None) when a branch
+            # without a name took part, or when two different chains keep the same
+            # key: the key compares prefix names without their locants, so the
+            # full-name comparison of (the Blue Book) that would
+            # decide between them is not made here.
+            keyed = [(_p45_alpha_key(c), c) for c in top]
+            best_key = min(k for k, _c in keyed)
+            best = [c for k, c in keyed if k == best_key]
+            if (unnamed_branches
+                    and len({chain_symmetry_key(mol, c) for c in top}) > 1):
+                return None
+            if len({chain_symmetry_key(mol, c) for c in best}) > 1:
+                return None
+            best_chain = best[0]
 
     # Determine numbering direction (lowest locants for principal group)
     if principal_group and fg_atoms:
         best_chain = _orient_chain_for_lowest_locants(best_chain, fg_atoms)
 
     return best_chain
+
+
+#: attribute that memoises ``chain_parent_prefix_seniority`` on one features object
+_PREFIX_SENIORITY_ATTR = "_p45_ring_prefix_seniority"
+
+
+def _cited_prefixes(names):
+    """The prefixes of a chain as a name cites them: equal names multiplied
+    (``assembly.naming_utils.get_multiplier_prefix``: ``di`` for a simple prefix, ``bis``
+    for a substituted one), the groups in alphanumerical order (``alpha_sort_key``)."""
+    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix
+    counts: Dict[str, int] = {}
+    for nm in names:
+        counts[nm] = counts.get(nm, 0) + 1
+    cited = []
+    for nm, n in counts.items():
+        mult = "" if n == 1 else get_multiplier_prefix(n, nm)
+        cited.append((alpha_sort_key(nm or "zzz"), mult + nm))
+    cited.sort()
+    return [text for _k, text in cited]
+
+
+def _cited_prefix_letters(names) -> str:
+    """The Roman letters of a chain's prefixes as a name cites them, in citation order
+    , the Blue Book; 'bromo' is earlier than 'dibromo',:22245). The letters
+    are those of every other key (``assembly.naming_utils.prefix_roman_and_italic``):
+    locants, letter locants, fusion letters, Greek letters and descriptors are not part
+    of them."""
+    from ..assembly.naming_utils import prefix_roman_and_italic
+    return "".join(prefix_roman_and_italic(text)[0] for text in _cited_prefixes(names))
+
+
+def _cited_prefix_italics(names) -> tuple:
+    """The italic prefixes ('sec', 'tert') of a chain's cited prefixes, in citation order:
+    considered only when the Roman letters tie, absence first, the Blue Book;
+    '3-(butan-2-yl)-5-tert-butyl...':3513)."""
+    from ..assembly.naming_utils import prefix_roman_and_italic
+    return tuple(i for text in _cited_prefixes(names) for i in prefix_roman_and_italic(text)[1])
+
+
+def chain_symmetry_key(mol, chain) -> tuple:
+    """The chain as its sequence of atom symmetry classes (constitution only, no
+    tie-breaking), read in the lower of its two directions: two chains with the same
+    key name the molecule alike (the two methyl ends of an isopropyl group; ASSUMED
+    for a sequence of equal classes that no symmetry of the whole molecule maps
+    onto each other, a case that leaves a name below the PIN at worst)."""
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False, includeChirality=False))
+    seq = tuple(ranks[int(a)] for a in chain)
+    return min(seq, seq[::-1])
+
+
+def chain_parent_prefix_seniority(features) -> Optional[str]:
+    """Check a chain parent against to where a ring is bonded
+    to the chain or to another chain of the same rank.
+
+    ``find_principal_chain`` chooses the chain of a cyclic molecule with the ring
+    atoms excluded, and its criteria 8 and 9 and its tie-break then skip
+    every ring atom: a ring bonded to a chain atom is never a prefix there, and a
+    branch that reaches a ring is named only up to the ring ('methyl' for
+    '(3-nitrophenyl)methyl'). The book counts, locates and orders a ring prefix
+    like any other:, "the maximum number of substituents cited as
+    prefixes" (the Blue Book; the chain parent of example (4),:21624,
+    counts its ring substituent), (:21698), and (:21791), "the
+    lower locant or set of locants for substituents cited as prefixes... in
+    their order of citation in the name" ('3-bromo-2-(2-bromo-1-hydroxyethyl)-4-
+    hydroxybutanoic acid (PIN)',:22108). So for
+    ``N#CC(CO)Cc1cccc([N+](=O)[O-])c1`` the selector keeps the CH2OH chain,
+    '3-hydroxy-2-[(3-nitrophenyl)methyl]propanenitrile' (prefix locants 3,2 in
+    citation order), while the PIN is '2-(hydroxymethyl)-3-(3-nitrophenyl)
+    propanenitrile' (2,3); and for ``OC(=O)C(C)Cc1ccccc1`` it gives
+    '2-benzylpropanoic acid' (one prefix) for the PIN '2-methyl-3-
+    phenylpropanoic acid' (two).
+
+    The same selector, asked to count ring prefixes (``ring_prefixes=True``),
+    answers which chain makes senior. Returns ``'senior_alternative'``
+    when that is another chain of the same length (a name built on the
+    features' chain is not the PIN), ``'undecided'`` when the comparison cannot
+    be made (a branch without a name in a tie, two different chains that still
+    tie, or an error), and None when the
+    chain stands or the check does not apply (no ring, a ring parent, or a chain
+    this selector did not choose: one with a heteroatom, or of another length).
+    The answer is kept on ``features``, keyed by its chain and principal group.
+    """
+    key = (bool(getattr(features, 'chain_is_parent', False)),
+           tuple(getattr(features, 'principal_chain', None) or ()),
+           getattr(features, 'principal_group', None))
+    cached = getattr(features, _PREFIX_SENIORITY_ATTR, None)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    status = _chain_parent_prefix_seniority(features)
+    try:
+        setattr(features, _PREFIX_SENIORITY_ATTR, (key, status))
+    except AttributeError:
+        pass
+    return status
+
+
+def _chain_parent_prefix_seniority(features) -> Optional[str]:
+    if not (getattr(features, 'chain_is_parent', False)
+            and getattr(features, 'is_cyclic', False)):
+        return None
+    chain = getattr(features, 'principal_chain', None)
+    ring_systems = getattr(features, 'ring_systems', None) or ()
+    mol = getattr(features, 'mol', None)
+    if not chain or not ring_systems or mol is None:
+        return None
+    try:
+        if any(mol.GetAtomWithIdx(int(a)).GetAtomicNum() != 6 for a in chain):
+            return None
+        ring_atoms: Set[int] = set()
+        for rs in ring_systems:
+            ring_atoms.update(int(a) for a in rs)
+        from ..metrics.provenance import isolated_provenance
+        with isolated_provenance():
+            senior = find_principal_chain(
+                mol,
+                getattr(features, 'functional_groups', None) or {},
+                getattr(features, 'principal_group', None),
+                exclude_atoms=ring_atoms,
+                ring_prefixes=True,
+            )
+    except Exception:                            # fail closed
+        return 'undecided'
+    if senior is None:
+        return 'undecided'
+    if len(senior) != len(chain):
+        return None
+    if chain_symmetry_key(mol, senior) != chain_symmetry_key(mol, chain):
+        return 'senior_alternative'
+    return None
 
 
 def _orient_chain_for_lowest_locants(chain: List[int], priority_atoms: Set[int]) -> List[int]:

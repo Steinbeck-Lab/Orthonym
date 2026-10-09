@@ -345,20 +345,39 @@ def _verified_universal_floor(mol, smi: str, first=None) -> Optional[str]:
     name, fired = _verified_floor_ladder(mol, smi, first, book_forms=True)
     if name is not None or not fired:
         return name
+    # One book spelling that fails the round trip (a chain, an acyl group, a fused ring) must
+    # not take the ring names of the whole molecule with it. Ladder order: book -> the
+    # keep-forms rungs (``book_prefixes.RETRY_KEEP_ORDER``: ring-only, then the other lanes'
+    # kinds) -> mechanical. A rung runs only when it differs from the run it follows
+    # (``retry_keeps``: every kept kind was given and another kind was too).
+    from .book_prefixes import book_forms_minus, retry_rungs
+    for how, kinds in retry_rungs(fired):
+        if how == "drop":
+            # every book spelling except one kind (item 12a, ``RETRY_DROP_ORDER``): the
+            # spelling before that lane's forms, the other kinds' names kept
+            with book_forms_minus(kinds):
+                name, _kept_fired = _verified_floor_ladder(mol, smi, None, book_forms=True)
+        else:
+            name, _kept_fired = _verified_floor_ladder(mol, smi, None, book_forms=False,
+                                                       keep_forms=kinds)
+        if name is not None:
+            return name
     name, _fired = _verified_floor_ladder(mol, smi, None, book_forms=False)
     return name
 
 
-def _verified_floor_ladder(mol, smi: str, first, book_forms: bool):
-    """``(name, book_forms_fired)``: the ladder of ``_verified_universal_floor`` at one
-    spelling setting."""
+def _verified_floor_ladder(mol, smi: str, first, book_forms: bool,
+                           keep_forms: frozenset = frozenset()):
+    """``(name, kinds)``: the ladder of ``_verified_universal_floor`` at one spelling
+    setting; ``kinds`` is the set of kinds of book spelling its floor names carried (empty
+    when none: falsy, as the bool it replaces)."""
     from ..validation.reconstruct import verify_or_none
-    fired = False
+    fired = frozenset()
     try:
         from .universal_substituent import name_universal_substitutive
         uni = first if first is not None else name_universal_substitutive(
-            mol, book_forms=book_forms)
-        fired = bool(uni is not None and uni.book_forms_fired)
+            mol, book_forms=book_forms, keep_forms=keep_forms)
+        fired = frozenset(uni.book_forms_kinds) if uni is not None else frozenset()
         if uni is not None and uni.name and verify_or_none(uni.name, smi) is not None:
             return uni.name, fired
         # Task C retry: the systematic fused-spiro name (a fusion descriptor the
@@ -367,8 +386,9 @@ def _verified_floor_ladder(mol, smi: str, first, book_forms: bool):
         # component -- always constitution-faithful, so it recovers breadth at
         # 0-wrong with an uglier (non-PIN, floor-only) covering name.
         uni_vb = name_universal_substitutive(mol, force_vonbaeyer_spiro=True,
-                                             book_forms=book_forms)
-        fired = fired or bool(uni_vb is not None and uni_vb.book_forms_fired)
+                                             book_forms=book_forms,
+                                             keep_forms=keep_forms)
+        fired = fired | (frozenset(uni_vb.book_forms_kinds) if uni_vb is not None else frozenset())
         if uni_vb is not None and uni_vb.name \
                 and verify_or_none(uni_vb.name, smi) is not None:
             return uni_vb.name, fired
@@ -380,8 +400,8 @@ def _verified_floor_ladder(mol, smi: str, first, book_forms: bool):
             for force_vb in (False, True):
                 alt = name_universal_substitutive(
                     mol, force_vonbaeyer_spiro=force_vb, acyloxy_leaf=False,
-                    book_forms=book_forms)
-                fired = fired or bool(alt is not None and alt.book_forms_fired)
+                    book_forms=book_forms, keep_forms=keep_forms)
+                fired = fired | (frozenset(alt.book_forms_kinds) if alt is not None else frozenset())
                 if alt is not None and alt.name \
                         and verify_or_none(alt.name, smi) is not None:
                     return alt.name, fired
@@ -440,6 +460,21 @@ def _book_checked_floor(mol, uni):
             return uni
     except Exception:  # an unverifiable book name: prefer the mechanical one
         pass
+    # the kept kinds stay the book's when the name that keeps only them verifies: one
+    # failing chain or acyl spelling does not cost the molecule its ring names. Same rung
+    # order as ``_verified_universal_floor``.
+    from .book_prefixes import retry_rungs, retry_spelling
+    for rung in retry_rungs(uni.book_forms_kinds):
+        try:
+            with retry_spelling(rung):
+                kept = name_universal_substitutive(
+                    mol, book_forms=rung[0] == "drop", keep_forms=rung[1] if rung[0] == "keep"
+                    else frozenset())
+            if (kept is not None and kept.name and kept.book_forms_fired
+                    and verify_or_none(kept.name, Chem.MolToSmiles(mol)) is not None):
+                return kept
+        except Exception:  # a keep-forms rung that raises is a decline
+            pass
     alt = name_universal_substitutive(mol, book_forms=False)
     return alt if alt is not None and alt.name else uni
 
@@ -684,7 +719,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
             all_heavy = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1]
             _prefix_name = name_universal_substituent_prefix(
                 mol, all_heavy, radical_sites[0]['atom_idx'],
-                bond_order=radical_sites[0]['n_electrons'])
+                bond_order=radical_sites[0]['n_electrons'], cap_attachment=True)
             if _prefix_name:
                 return _Candidate(name=_prefix_name, result_obj=None,
                                   final_floor=True)

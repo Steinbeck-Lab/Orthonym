@@ -1881,6 +1881,76 @@ def _catalog_entry_is_mancude(smiles: str) -> bool:
     return has_double and is_mancude_ring_system(cmol, ring) is True
 
 
+#: Catalogue entries of ``_resolve_oxo_parent``, parsed once per process: the parent
+#: mol, its intrinsic indicated-hydrogen locants and the generic-bond query, each a
+#: pure function of the catalogue's SMILES and numbering. Callers read the mol and
+#: match the query only (every kekulisation downstream works on a copy).
+_OXO_CATALOG_ENTRIES = {}
+
+
+def _oxo_catalog_entry(cs, numbering):
+    """``(cmol, ih_locants, q)`` for one catalogue entry of ``_resolve_oxo_parent``,
+    or None when RDKit cannot parse ``cs``; computed once per ``(cs, numbering)`` for
+    the life of the process (``_OXO_CATALOG_ENTRIES``)."""
+    try:
+        ck = (cs, tuple(numbering.items()))
+        return _OXO_CATALOG_ENTRIES[ck]
+    except KeyError:
+        pass
+    except (TypeError, AttributeError):  # an unhashable numbering: no memo
+        ck = None
+    cmol = Chem.MolFromSmiles(cs)
+    if cmol is None:
+        if ck is not None:
+            _OXO_CATALOG_ENTRIES[ck] = None
+        return None
+    # Intrinsic indicated-H locants of THIS parent: ring carbons that are NOT
+    # in a ring double bond of the kekulised parent (the >CH2 of the mancude
+    # system). Independent of the match; computed once per candidate.
+    ih_locants = set()
+    kek = Chem.Mol(cmol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+        cring = set().union(*[set(r) for r in cmol.GetRingInfo().AtomRings()]) \
+            if cmol.GetRingInfo().AtomRings() else set()
+        in_ring_db = set()
+        for bond in kek.GetBonds():
+            if bond.GetBondType() == Chem.BondType.DOUBLE:
+                i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+                if i in cring and j in cring:
+                    in_ring_db.add(i)
+                    in_ring_db.add(j)
+        for c, loc in numbering.items():
+            # A mancude parent's intrinsic indicated-hydrogen positions are ring
+            # atoms attached only by single ring bonds (not in a ring double
+            # bond) that carry hydrogen. These sit on CARBON (1H-indene,
+            # 2H-/4H-chromene) OR on NITROGEN (9H-purine, 1H-indole,
+            # 1H-benzimidazole, 9H-carbazole,...). Nitrogen was previously
+            # excluded, so an N-indicated-H parent reported NO intrinsic IH; the
+            # carbonyl-at-IH validity check below was then bypassed and the
+            # catalog's baked-in tautomer label (e.g. "9H-") was emitted without
+            # verifying it fits the target — over-saturating the ring (the
+            # caffeine "9H-purine-2,6(1H,3H,7H)-dione" bug, caught only by the
+            # backstop). Detecting N here restores the check for the
+            # whole N-indicated-H parent class.
+            if (c < cmol.GetNumAtoms() and isinstance(loc, int)
+                    and cmol.GetAtomWithIdx(c).GetSymbol() in ('C', 'N')
+                    and cmol.GetAtomWithIdx(c).GetTotalNumHs() > 0
+                    and c not in in_ring_db):
+                ih_locants.add(loc)
+    except Exception:
+        ih_locants = set()
+    params = Chem.AdjustQueryParameters.NoAdjustments()
+    params.makeBondsGeneric = True
+    params.aromatizeIfPossible = False
+    params.adjustDegree = False
+    q = Chem.AdjustQueryProperties(cmol, params)
+    entry = (cmol, frozenset(ih_locants), q)
+    if ck is not None:
+        _OXO_CATALOG_ENTRIES[ck] = entry
+    return entry
+
+
 def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None,
                         alternative_indicated_h: bool = False):
     """Resolve the mancude parent(s) of a ring-ketone's ring system.
@@ -2019,50 +2089,11 @@ def _resolve_oxo_parent(mol, ring_atoms, monocyclic: Optional[bool] = None,
         cands.append((e['name'], cs, e['iupac_locants'], True))
     out = []
     for nm, cs, numbering, heterocycle_entry in cands:
-        cmol = Chem.MolFromSmiles(cs)
-        if cmol is None or cmol.GetNumAtoms() != n:
+        entry = _oxo_catalog_entry(cs, numbering)
+        if entry is None or entry[0].GetNumAtoms() != n:
             continue
-        # Intrinsic indicated-H locants of THIS parent: ring carbons that are NOT
-        # in a ring double bond of the kekulised parent (the >CH2 of the mancude
-        # system). Independent of the match; computed once per candidate.
-        ih_locants = set()
-        kek = Chem.Mol(cmol)
-        try:
-            Chem.Kekulize(kek, clearAromaticFlags=True)
-            cring = set().union(*[set(r) for r in cmol.GetRingInfo().AtomRings()]) \
-                if cmol.GetRingInfo().AtomRings() else set()
-            in_ring_db = set()
-            for bond in kek.GetBonds():
-                if bond.GetBondType() == Chem.BondType.DOUBLE:
-                    i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-                    if i in cring and j in cring:
-                        in_ring_db.add(i)
-                        in_ring_db.add(j)
-            for c, loc in numbering.items():
-                # A mancude parent's intrinsic indicated-hydrogen positions are ring
-                # atoms attached only by single ring bonds (not in a ring double
-                # bond) that carry hydrogen. These sit on CARBON (1H-indene,
-                # 2H-/4H-chromene) OR on NITROGEN (9H-purine, 1H-indole,
-                # 1H-benzimidazole, 9H-carbazole,...). Nitrogen was previously
-                # excluded, so an N-indicated-H parent reported NO intrinsic IH; the
-                # carbonyl-at-IH validity check below was then bypassed and the
-                # catalog's baked-in tautomer label (e.g. "9H-") was emitted without
-                # verifying it fits the target — over-saturating the ring (the
-                # caffeine "9H-purine-2,6(1H,3H,7H)-dione" bug, caught only by the
-                # backstop). Detecting N here restores the check for the
-                # whole N-indicated-H parent class.
-                if (c < cmol.GetNumAtoms() and isinstance(loc, int)
-                        and cmol.GetAtomWithIdx(c).GetSymbol() in ('C', 'N')
-                        and cmol.GetAtomWithIdx(c).GetTotalNumHs() > 0
-                        and c not in in_ring_db):
-                    ih_locants.add(loc)
-        except Exception:
-            ih_locants = set()
-        params = Chem.AdjustQueryParameters.NoAdjustments()
-        params.makeBondsGeneric = True
-        params.aromatizeIfPossible = False
-        params.adjustDegree = False
-        q = Chem.AdjustQueryProperties(cmol, params)
+        cmol, ih_cached, q = entry
+        ih_locants = set(ih_cached)
         pairs = []
         for match in mol.GetSubstructMatches(q, uniquify=False):
             a2l = {match[c]: loc for c, loc in numbering.items() if c < len(match)}

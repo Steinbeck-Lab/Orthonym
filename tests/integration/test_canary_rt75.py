@@ -1003,11 +1003,15 @@ CANARY_COMPOUNDS = [
     # Failure taxonomy sentinels: stereo_mismatch (2 compounds)
     (
         "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",  # Sentinel: stereo_mismatch - ergostadienol
-        "ergosta-7,25-dien-3-ol",
+        # n5b RB-FUSION (change-asserted-value): "Five-membered ring requirement"
+        # (the Blue Book-23710), the fusion name, no stereoparent for a stereo-free input
+        #,:51047); OPSIN 2.9.0 full key exact. Was "ergosta-7,25-dien-3-ol".
+        "17-(5,6-dimethylhept-6-en-2-yl)-10,13-dimethyl-2,3,4,5,6,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-3-ol",
     ),
     (
         "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",  # Sentinel: stereo_mismatch - stigmastandiol
-        "stigmast-5-en-3,7-diol",
+        # n5b RB-FUSION (as above); OPSIN 2.9.0 full key exact. Was "stigmast-5-en-3,7-diol".
+        "10,13-dimethyl-17-[5-(propan-2-yl)heptan-2-yl]-2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthrene-3,7-diol",
     ),
     # Failure taxonomy sentinels: opsin_vocab_limit (2 compounds)
     (
@@ -1742,7 +1746,10 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC1(C)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)CC[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1",  # fused-ring,large
-        "(1S,2R,5R,7S,10R,11R,15S,20S)-7-hydroxy-1,2,6,6,10,17,17-heptamethyl-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docos-13-ene-20-carboxylic acid",
+        # n5b RB-FUSION (change-asserted-value): (the Blue Book-23710), the
+        # picene fusion name, not von Baeyer; OPSIN 2.9.0 full key exact. Was
+        # "(1S,2R,5R,7S,10R,11R,15S,20S)-7-hydroxy-1,2,6,6,10,17,17-heptamethyl-pentacyclo[12.8.0.0(2,11).0(5,10).0(15,20)]docos-13-ene-20-carboxylic acid".
+        "(4aS,6aS,6bR,8aR,10S,12aR,12bR,14bS)-10-hydroxy-2,2,6a,6b,9,9,12a-heptamethyl-1,3,4,5,6,6a,6b,7,8,8a,9,10,11,12,12a,12b,13,14b-octadecahydropicene-4a(2H)-carboxylic acid",
     ),
     (
         "CC(=O)OC1C(c2ccccc2)CCC(c2ccccc2)C1O",  # aromatic,medium

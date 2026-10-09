@@ -2301,10 +2301,15 @@ def get_substituted_fused_het_prefix(
     if locant is None:
         return None
 
-    # Ensure inner prefix ends with hyphen for proper concatenation
+    # (a) (the Blue Book): a hyphen separates a locant from a
+    # word, so the inner prefixes meet the stem with a hyphen only when the stem
+    # starts with a digit ('5-methyl-1H-indol-3-yl'); a stem that starts with a
+    # letter or a bracket follows them directly ('3-methylisoquinolin-6-yl',
+    # '2-methyl[1,2,4]triazolo[1,5-a]pyridin-6-yl').
     inner = inner_substituent_prefixes.rstrip('-')
     if inner:
-        prefix = f"({inner}-{stem}-{locant}-yl)"
+        from ..assembly.composition_primitives import _join_prefix_to_name
+        prefix = f"({_join_prefix_to_name(inner, stem)}-{locant}-yl)"
     else:
         prefix = f"({stem}-{locant}-yl)"
 

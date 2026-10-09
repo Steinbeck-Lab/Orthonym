@@ -135,12 +135,30 @@ def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
     assert r["source"] != "general_engine"
 
 
-def test_converted_row_provenance_is_general_engine(retained="ursane"):
+def test_converted_row_provenance_is_general_engine(retained="hopane"):
     """The adopted (converted) row DOES carry the general-engine source -- the
-    restore fires only on reject, never on adopt."""
+    restore fires only on reject, never on adopt. `hopane` is a converter whose
+    systematic name is von Baeyer (general engine); `ursane`'s is the fusion name
+    of a carbon-only ortho-fused system, "Five-membered ring
+    requirement" (the Blue Book-23710), which the PIN path builds, so its
+    row is `pin_path` (test below)."""
+    from tests.support.rt_assert import assert_full_rt
     r = _best_effort_namer().name_tiered(_BY_NAME[retained])
     assert r["name"] != retained
     assert r["source"] == "general_engine"
+    assert_full_rt(r["name"], _BY_NAME[retained])
+
+
+def test_converted_fusion_row_is_pin_path_and_round_trips(retained="ursane"):
+    """`ursane` converts to a picene fusion name through the PIN path (not the
+    general engine); the name reads back to the input's full InChIKey."""
+    from tests.support.rt_assert import assert_full_rt
+    r = _best_effort_namer().name_tiered(_BY_NAME[retained])
+    assert r["name"] == (
+        "(1S,2R,4aR,6aR,6bR,8aS,12aS,12bR,14aR,14bS)-1,2,4a,6a,6b,9,9,12a-"
+        "octamethyldocosahydropicene"), r
+    assert r["source"] == "pin_path"
+    assert_full_rt(r["name"], _BY_NAME[retained])
 
 
 def test_downgrade_helper_declines_off_the_best_effort_path():

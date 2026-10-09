@@ -573,6 +573,64 @@ def _rings_removed(removed: FrozenSet[int], adj: Dict[int, Set[int]]) -> int:
     return (lost - inner) - len(removed)
 
 
+#: limit of this lane's fused readings: a ring of eight or more members is left to the
+#: von Baeyer name until the larger-ring fusion parents are certified
+MAX_FUSED_RING_SIZE = 7
+
+
+def _standard_bonding(mol, system: Set[int]) -> bool:
+    """True when every ring heteroatom of ``system`` is neutral, has no unpaired electron and has
+    its standard bonding number. (the Blue Book) "The bonding number of a skeletal
+    atom is standard when it has the value given in Table 1.3" (3 for B, N, P, As, Sb, Bi; 2 for
+    O, S, Se, Te; 4 for Si, Ge, Sn, Pb); (:2756) "Nonstandard bonding numbers": a
+    neutral atom with another one is cited with the lambda convention ('1lambda4', 'lambda5'),
+    which this builder does not spell, and a ring cation is named by its own rules. Both decline.
+    The standard number is RDKit's default valence, which ``hydro.hydro_state`` also uses to find
+    the atoms that can carry a ring double bond; for Sn and Pb (Table 1.3: 4, RDKit: 2) the two
+    differ, so a ring of either declines."""
+    pt = Chem.GetPeriodicTable()
+    for a in system:
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetAtomicNum() == 6:
+            continue
+        if (atom.GetFormalCharge() or atom.GetNumRadicalElectrons()
+                or atom.GetTotalValence() != pt.GetDefaultValence(atom.GetAtomicNum())):
+            return False
+    return True
+
+
+def fused_split(mol, system: Set[int]) -> Optional[Split]:
+    """The one-split reading of an ortho- or ortho- and peri-fused ring system, with or without
+    ring heteroatoms, as its own fused parent with no bridges, or None.
+
+     (the Blue Book): "Fusion nomenclature gives preferred IUPAC names only to
+    compounds having at least two rings of at least five or more members" (``_five_membered_
+    rule``); (:11865) "Two rings that have only two atoms and one bond in common
+    are said to be ortho-fused" (``fused_rings``). The parent is named by ``parents.fused_
+    parent``,:11903; hetero parents: the retained, Hantzsch-Widman and two-component
+    fusion names the parent tables and ``hetero_fusion`` build), so a skeleton no table or fusion
+    rule names (three or more components, a catalogue parent) declines. Rings of more than
+    ``MAX_FUSED_RING_SIZE`` members, a ring heteroatom with a nonstandard bonding number or a
+    charge (``_standard_bonding``) decline: the von Baeyer name stays the fallback.
+    ``_candidate`` with no bridge checks that the ring double bonds of the input are a matching
+    of the parent atoms (``Split.n_double``)."""
+    system = set(system)
+    if not _standard_bonding(mol, system):
+        return None
+    unsat = ring_unsaturation(mol, system)
+    if unsat is None:
+        return None
+    got = _candidate(mol, system, unsat, ())
+    if got is None:
+        return None
+    _key, not_divalent, split = got
+    rings = fused_rings(mol, system)
+    if not_divalent or rings is None or any(len(r) > MAX_FUSED_RING_SIZE for r in rings):
+        return None
+    parent = _parent_name(mol, system)
+    return replace(split, parent=parent) if parent else None
+
+
 #: ring systems best_splits has declined, keyed by the molecule and the system (the engine
 #: asks for the same ring system many times while it ranks parents and substituents)
 _DECLINED: Dict[Tuple[str, Tuple[int, ...]], bool] = {}

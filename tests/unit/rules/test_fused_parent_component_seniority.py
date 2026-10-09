@@ -37,6 +37,10 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 
 PIN_ROWS = [
+    # N5b step 2: the retained phenanthroline, the Blue Book (isomers 1,9- and 3,7- listed);
+    # were "pyrido[3,2-h]isoquinoline" and "pyrido[3,2-f]isoquinoline", not PINs
+    ("c1cnc2c(c1)ccc1ccncc12", "1,9-phenanthroline"),
+    ("c1cnc2ccc3cnccc3c2c1", "3,7-phenanthroline"),
     # F11a (d): quinoxaline (2 heteroatoms) over quinoline (1); was
     # 'pyrazino[2,3-g]quinoline' (the tie fell to the string order)
     ("c1cnc2cc3nccnc3cc2c1", "pyrido[2,3-g]quinoxaline"),
@@ -98,15 +102,16 @@ def test_fusion_parent_component(smiles, pin):
 
 # F11b: the only parent this namer could offer was a fusion-named pair; the PIN
 # ("thieno[2',3':4,5]thieno[2,3-b]pyridine", "furo[2',3':4,5]furo[2,3-b]pyridine")
-# needs primed higher-order locants. The phenanthroline isomers not in the catalog
-# have a retained PIN. None of these may be labelled pin_verified; the best-effort
-# tier still names each one round-trip exact.
+# needs primed higher-order locants. None of these may be labelled pin_verified; the
+# best-effort tier still names each one round-trip exact. (The two phenanthroline isomers
+# that stood here left this list: Table 2.8 "Retained names of heterocyclic parent ring
+# components" (the Blue Book) prints "phenanthroline... the PIN is 1,7-phenanthroline;
+# other isomers are: 1,8-; 1,9-; 1,10-; 2,7-; 2,8-; 2,9-; 3,7-; 3,8-; 4,7-" (:11521-11523), and the zero-bridge reading of the bridged fused builder
+# spells them; see PIN_ROWS.)
 NOT_PIN_ROWS = [
     ("c1cnc2sc3ccsc3c2c1", "pyrido[3,2-d]thieno[3,2-b]thiophene"),
     ("c1cnc2c(c1)sc1sccc12", "pyrido[2,3-d]thieno[2,3-b]thiophene"),
     ("c1cnc2oc3ccoc3c2c1", "pyrido[3,2-d]furo[3,2-b]furan"),
-    ("c1cnc2c(c1)ccc1ccncc12", "pyrido[3,2-h]isoquinoline"),
-    ("c1cnc2ccc3cnccc3c2c1", "pyrido[3,2-f]isoquinoline"),
     # (:13451) "A multiparent name is preferred to a fused ring system,
     # when there is a choice": 'benzo[1,2-b:4,5-c']difuran (PIN) (not furo[3,4-f]
     # [1]benzofuran'; the multiparent name is not built here

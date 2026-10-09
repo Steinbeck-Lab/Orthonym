@@ -47,6 +47,7 @@ import pytest
 from orthonym import Orthonym
 from orthonym.assembly import fragment_naming as fn
 from orthonym.assembly import memo
+from tests.support.pin_tiers import assert_pin_at_both_tiers
 from tests.support.rt_assert import assert_full_rt, name_best_effort
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -389,8 +390,7 @@ CLEAN_OFFER_ROWS = [
     # roadmap N5c/N5d (name-quality lane L2): 'phenyl', '(phenylamino)'
     # the Blue Book;:6465)
     ("O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3ccccc3)cc2)c1",
-     "3-(1,1-dioxo-2-oxa-1λ6-thiaethyl)-1-{2-[4-(phenylamino)phenyl]-1,2-diazaeth-"
-     "1-en-1-yl}benzene",
+     "1-{[4-(phenylamino)phenyl]diazenyl}-3-sulfobenzene",
      [(1, False), (1, True)]),
 ]
 
@@ -406,33 +406,42 @@ def test_clean_offer_names_are_kept(monkeypatch, smiles, expected, offer_runs):
     assert runs == offer_runs
 
 
-# a dev split / milestone1500. Roadmap N5 (name-quality lane L2): with the book spellings
-# ('phenoxy', 'benzoyl', '(...)amino'; the Blue Book,
-#:30446,:6465) the main path names the row and the offer never runs; the
-# offer is pinned on it with the book spellings switched off.
-PYRIDINE_ROW = "O=C(NCc1ccccn1)c1ccc(Oc2ccccc2)cc1"
+# Roadmap N5 (name-quality lane L2): with the book spellings ('phenoxy', 'benzoyl',
+# '(...)amino'; the Blue Book,:30446,:6465) the
+# main path names a row of this class and the offer never runs. The offer is pinned on two
+# rows that still reach it with the book spellings switched off (``mechanical_forms``): the
+# glucosinolate and the sulfonyl azo row of ``CLEAN_OFFER_ROWS``, named with the mechanical
+# spellings the switch keeps. Not PIN claims: the names are the systematic form.
+MECHANICAL_OFFER_ROWS = [
+    ("C=CCC(=NOS(=O)(=O)O)S[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O",
+     "(2R,3S,4S,5R,6S)-6-[5,5-dioxo-2-(prop-2-en-1-yl)-4,6-dioxa-1,5\u03bb6-dithia-3-"
+     "azahex-2-en-1-yl]-3,4,5-trihydroxy-2-(hydroxymethyl)oxane"),
+    ("O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3ccccc3)cc2)c1",
+     "1-(2-{4-[1-(cyclohexa-1,3,5-trien-1-yl)-1-azamethyl]cyclohexa-1,3,5-trien-1-yl}-1,2-"
+     "diazaeth-1-en-1-yl)-3-(1,1-dioxo-2-oxa-1\u03bb6-thiaethyl)benzene"),
+]
 
 
-def test_clean_offer_name_is_kept_mechanical_spelling(monkeypatch):
+@pytest.mark.parametrize("smiles,expected", MECHANICAL_OFFER_ROWS,
+                         ids=["glucosinolate", "sulfonyl"])
+def test_clean_offer_name_is_kept_mechanical_spelling(monkeypatch, smiles, expected):
     from orthonym.assembly.book_prefixes import mechanical_forms
     runs = _spy_clean_offer(monkeypatch)
     with mechanical_forms():
-        row = name_best_effort(PYRIDINE_ROW)
-    assert row["name"] == (
-        "2-(3-{4-[1-(cyclohexa-1,3,5-trien-1-yl)-1-oxamethyl]cyclohexa-1,3,5-trien-1-yl}"
-        "-4-oxa-2-azabut-3-en-1-yl)pyridine")
+        row = name_best_effort(smiles)
+    assert row["name"] == expected
     assert row["tier"] == "systematic_verified"
-    assert_full_rt(row["name"], PYRIDINE_ROW)
+    assert_full_rt(row["name"], smiles)
     assert runs == [(1, False), (1, True)]
 
 
-def test_the_book_spellings_name_the_row_without_the_offer(monkeypatch):
-    runs = _spy_clean_offer(monkeypatch)
-    row = name_best_effort(PYRIDINE_ROW)
-    assert row["name"] == "2-{[(4-phenoxybenzoyl)amino]methyl}pyridine"
-    assert row["tier"] == "systematic_verified"
-    assert_full_rt(row["name"], PYRIDINE_ROW)
-    assert runs == []
+def test_the_former_offer_row_with_an_n_substituted_benzamide_is_the_pin():
+    # a dev split / milestone1500; once the clean-offer row "pyridine" ('2-(3-{4-[1-(cyclohexa-
+    # 1,3,5-trien-1-yl)-1-oxamethyl]...}-4-oxa-2-azabut-3-en-1-yl)pyridine'): the benzamide
+    # producer names the N-substituent, the Blue Book), so the strict
+    # path builds the PIN and no offer runs
+    smiles = "O=C(NCc1ccccn1)c1ccc(Oc2ccccc2)cc1"
+    assert_pin_at_both_tiers(smiles, "4-phenoxy-N-[(pyridin-2-yl)methyl]benzamide")
 
 
 # The ChEBI row the recipe lost first (ChEBI 18872, 119 heavy atoms): named

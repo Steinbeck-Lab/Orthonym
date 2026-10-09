@@ -242,9 +242,11 @@ def test_a_parent_hydride_that_denotes_a_different_molecule_is_suppressed(
 # with another producer's work and, worse, would have pinned the WRONG spelling
 # as expected. Re-checked rather than trusted (a project rule).
 ASSEMBLY_POSITIVES = [
-    ("CN1C(=O)c2ccccc2NC(=O)[C@@H]1Cc1ccccc1",
-     "(4S)-4-benzyl-5-methyl-3,6-dioxo-2,5-diazabicyclo[5.4.0]undeca-"
-     "1(11),7,9-triene"),
+    # (three rows left this list: a fused ring system with a ring heteroatom has its fusion name,
+    #, the Blue Book; pinned in test_n5b2_hetero_routing.py:
+    # '(3S)-3-benzyl-4-methyl-3,4-dihydro-1H-1,4-benzodiazepine-2,5-dione',
+    # '(3R,3aS,9aS,9bS)-3,6,9-trimethyl-3,3a,4,5,9a,9b-hexahydroazuleno[4,5-b]furan-2,7-dione',
+    # '6,7-dichloro-3-hydroxy-1,5-dihydroimidazo[2,1-b]quinazolin-2(3H)-one')
     # lever B: 'hydroxymethyl' is a compound substituent and is now
     # ENCLOSED -> '(hydroxymethyl)'; the perturbed candidate strings also let the
     # PIN-preferred SUFFIX form win (ring 4-OH -> '-4-ol', not a '4-hydroxy'
@@ -256,17 +258,8 @@ ASSEMBLY_POSITIVES = [
     # quick-wins F-Q1: '0^2,6' before '0^5,9', the Blue Book), the
     # oxygen follows the fixed numbering,:9765); was
     # '(5S,6R,9S,10S)-2,6,11-trimethyl-7,13-dioxo-8-oxatricyclo[8.3.0.0^5,9]trideca-1,11-diene'
-    ("CC1=CC(=O)C2=C(C)CC[C@@H]3[C@H](OC(=O)[C@@H]3C)[C@@H]12",
-     "(1S,2S,5R,6S)-5,9,13-trimethyl-4,11-dioxo-3-oxatricyclo"
-     "[8.3.0.0^2,6]trideca-9,12-diene"),
-    ("O=C1NC2=Nc3ccc(Cl)c(Cl)c3CN2C1O",
-     "10,11-dichloro-6-hydroxy-5-oxo-2,4,7-triazatricyclo[7.4.0.0^3,7]"
-     "trideca-1(9),2,10,12-tetraene"),
-    # lever B: '(hydroxymethyl)' now enclosed + PIN-preferred
-    # SUFFIX form (ring 1,5-diol, not a '1,5-dihydroxy' prefix). RT-verified.
-    ("C=C1[C@@H](CO)C[C@H](O)[C@H](C)[C@@H]2CC(C)(C)C[C@]12O",
-     "(1R,3S,5S,6R,7S)-3-(hydroxymethyl)-6,9,9-trimethyl-2-"
-     "methylidenebicyclo[5.3.0]decane-1,5-diol"),
+    # (the bicyclo[5.3.0]decane-1,5-diol row left this list: an all-carbon fused system has its
+    # fusion name,, the Blue Book; pinned in test_n5b_fused_routing.py)
     ("CC1CCCC(O)/C=C/C2C(O)CC(O)CC2/C=C/C=C\\C/C=C/C=C\\C(=O)O1",
      "(2E,11Z,13E,16Z,18E)-4,22,24-trihydroxy-8-methyl-10-oxo-9-oxabicyclo"
      "[18.4.0]tetracosa-2,11,13,16,18-pentaene"),
@@ -344,13 +337,14 @@ def test_the_assembly_site_is_the_one_that_produced_the_name(opsin_gate):
         finally:
             cl.disable()
 
-    assert TERMINAL_RING_ASSEMBLY_SITE in sites_for(ASSEMBLY_POSITIVES[0][0])
+    # [1]: the first row the terminal ring assembly names (rows [0] left that site long before)
+    assert TERMINAL_RING_ASSEMBLY_SITE in sites_for(ASSEMBLY_POSITIVES[1][0])
     assert TERMINAL_RING_ASSEMBLY_SITE not in sites_for("c1ccc2ccccc2c1")
     # And the negative that matters most for LAST-RESORT ordering: a row the
     # ordinary ring producer already names in the PIN-preferred SUFFIX form must
     # not be taken over by this tier's prefix form.
     already = "C[C@H]1CCC[C@@]2(C)CCC(O)CC12"
-    assert _namer("best-effort").name(already).endswith("decan-3-ol")
+    assert _namer("best-effort").name(already).endswith("dimethyldecahydronaphthalen-2-ol")
     assert TERMINAL_RING_ASSEMBLY_SITE not in sites_for(already)
 
 
@@ -422,7 +416,7 @@ def test_the_suffix_free_debt_is_tagged_per_row(opsin_gate):
     ``suffix_free_prefix_name`` so can ENUMERATE these rows."""
     namer = _namer("best-effort")
     # a PG-suppressed emission -> flagged
-    row = namer.name_tiered("CN1C(=O)c2ccccc2NC(=O)[C@@H]1Cc1ccccc1")
+    row = namer.name_tiered(ASSEMBLY_POSITIVES[1][0])
     assert row["suffix_free_prefix_name"] is True, row
 
     # a catalog name -> NOT flagged (the flag must not leak across molecules)

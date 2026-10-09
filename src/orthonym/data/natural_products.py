@@ -532,6 +532,15 @@ def get_carotene_parent_name(mol) -> Optional[str]:
     Stereo-exact: only the all-E fundamental parent matches; a Z-isomer or a modified
     carotenoid returns None and is named systematically (fail-closed). The Greek name
     is OPSIN-round-trip gated by the caller, so a mismatch can never ship."""
+    # Every key in the table belongs to a C40 hydrocarbon, and equal InChIKeys share
+    # the formula layer, so a structure that is not exactly 40 heavy atoms, all carbon,
+    # can never hit: its InChIKey is not computed (the answer is None either way).
+    try:
+        if mol.GetNumHeavyAtoms() != 40 or any(
+                a.GetAtomicNum() != 6 for a in mol.GetAtoms() if a.GetAtomicNum() != 1):
+            return None
+    except Exception:
+        pass
     # Perf lever A6 (2026-09-13): the InChIKey of the INPUT was recomputed here on every
     # pipeline pass (2,334 direct RDKit calls per 300 molecules, 1.5 s). molcache.inchikey_of
     # memoises it per Mol object within the naming scope with a structure signature guard.

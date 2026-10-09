@@ -27,7 +27,6 @@ from rdkit import RDLogger
 RDLogger.DisableLog("rdApp.*")
 
 from orthonym import Orthonym, name_compound
-from orthonym.errors import is_failure_name
 
 
 # (smiles, expected PIN) — each verified: OPSIN parse(name) InChIKey == input InChIKey.
@@ -88,44 +87,35 @@ def test_protect_unchanged(smiles, expected):
 
 
 # --------------------------------------------------------------------------- #
-# Fail-closed boundary: out-of-class systems MUST stay refused (no wrong name) #
+# Ortho-fused small rings are fusion-named, never a bridge #
 # --------------------------------------------------------------------------- #
-STILL_REFUSED = [
-    # NOTE: difuropyridine + furo+thieno+pyridine were here as polycomponent
-    # out-of-class examples; Phase G1b (2026-06-20) now NAMES them correctly
-    # (difuro[3,2-b:2',3'-e]pyridine etc.) via the polycomponent ortho-fusion
-    # constructor, so they moved out of this fail-closed list.
-    # Wave-2 completion B4 (2026-07-07): spirobi-indane
-    # C1Cc2ccccc2C13Cc1ccccc1C3 moved OUT of this list — the cata-fused skip
-    # in is_polycyclic_system lets the spirobi path name it correctly as
-    # "1,2'-spirobi[indane]" (OPSIN-RT verified); it was previously refused
-    # only because the VB misroute raised before the spirobi check.
-    # CRITICAL-1 (code review): ortho-fused small rings share a BOND with naphthalene
-    # (fusion nomenclature, e.g. 1H-cyclopropa[b]naphthalene) — the bridgeheads are
-    # adjacent + aromatic, so they are NOT a bridge. Must NOT emit
-    # '2,3-methano-/ethano-/propanonaphthalene' (a non-PIN that even OPSIN re-parses
-    # to the same structure, so the RT gate can't catch it).
-    "c1ccc2cc3c(cc2c1)C3",         # cyclopropa[b]naphthalene
-    "c1ccc2cc3c(cc2c1)CC3",        # cyclobuta[b]naphthalene
-    "c1ccc2cc3c(cc2c1)CCC3",       # cyclopenta[b]naphthalene
-    # (the -O-O- row moved to tests/unit/rules/test_bf_s2_prefixes.py: slice S2 names it
-    # 1,4-dihydro-1,4-epidioxynaphthalene,:14101)
-    # (the -CH2-O-CH2- and -CH2-S-CH2- rows moved to tests/unit/rules/test_bf_s2_selection.py:
-    # by (b) slice S2 names them on the 3-benzoxepine and 3-benzothiepine
-    # parents with an etheno bridge)
+# Ortho-fused small rings share a BOND with naphthalene (fusion nomenclature):
+# the bridgeheads are adjacent + aromatic, so they are NOT a bridge and the
+# name must NOT be '2,3-methano-/ethano-/propanonaphthalene' (a non-PIN that even
+# OPSIN re-parses to the same structure, so the RT gate cannot catch it). These
+# three used to be refused (no fusion producer for a carbocycle fused to a
+# 6-membered ring that is not a 5-ring pair); the fusion name is the PIN now:
+# "Five-membered ring requirement" (the Blue Book-23710): "Fusion
+# nomenclature gives preferred IUPAC names only to compounds having at least two
+# rings of at least five or more members. This requirement is not necessarily
+# applied in general nomenclature, in which names such as cyclopropabenzene and
+# cyclobutabenzene can be used." Here the naphthalene gives two six-membered rings, so
+# the fusion name is allowed. OPSIN 2.9.0 full InChIKey = input's (assert_full_rt).
+ORTHO_FUSED_SMALL_RING_NAMES = [
+    ("c1ccc2cc3c(cc2c1)C3", "1H-cyclopropa[b]naphthalene"),
+    ("c1ccc2cc3c(cc2c1)CC3", "1,2-dihydrocyclobuta[b]naphthalene"),
+    ("c1ccc2cc3c(cc2c1)CCC3", "2,3-dihydro-1H-cyclopenta[b]naphthalene"),
 ]
 
 
-@pytest.mark.parametrize("smiles", STILL_REFUSED)
-def test_out_of_class_still_fails_closed(smiles, monkeypatch):
-    # Assert the PRODUCTION fail-closed behavior: the suite's autouse fixture
-    # disables the validity gate, but these out-of-class bridged systems
-    # are fail-closed IN PRODUCTION via that gate (a raw benzene/parent candidate
-    # is suppressed). Re-enable it. (Wave-close note: p8's benzene parent-selection
-    # chokepoint made a few of these emit a raw 'benzene' pre-gate — a handler-level
-    # tightening is a documented follow-up; production stays correct via the gate.)
+@pytest.mark.parametrize("smiles,expected", ORTHO_FUSED_SMALL_RING_NAMES)
+def test_ortho_fused_small_ring_is_fusion_named(smiles, expected, monkeypatch):
+    # Production semantics: the validity gate is re-enabled (the suite's autouse
+    # fixture disables it).
     import orthonym.namer as _nm
+    from tests.support.rt_assert import assert_full_rt
     monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
     out = name_compound(smiles)
-    assert is_failure_name(out), f"{smiles} must stay refused, got {out!r}"
-    assert "cyclo[" not in out.lower()  # never a de-aromatised cage
+    assert out == expected, f"{smiles}: {out!r} != {expected!r}"
+    assert "methano" not in out and "ethano" not in out and "propano" not in out
+    assert_full_rt(out, smiles)

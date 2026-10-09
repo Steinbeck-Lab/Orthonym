@@ -98,7 +98,16 @@ class TestSaturatedBareScaffoldStereoEmission:
         RT-gate on the fallback (ship only if it OPSIN-round-trips) makes this abstain
         rather than ship the wrong '(5S,8S,9S,10S,13R,14S)-pregnane'. If a future fix
         legitimately recovers this input RT-exact, update this assertion accordingly
-        (it must still never equal the WRONG_OVERSPEC_NAME)."""
+        (it must still never equal the WRONG_OVERSPEC_NAME).
+
+        N5b (2026-10-08): it does. A carbon-only ortho-fused system is named by fusion
+        nomenclature "Five-membered ring requirement", the Blue Book-
+        23710), and the name cites the six ring centres the input defines and leaves C17
+        unlabelled, as the input does -- not a stereoparent, which would imply C17
+        ,:51047). OPSIN 2.9.0 full InChIKey = the input's."""
         name = name_compound(BLOCKER_PARTIAL_STEREO)
         assert name != WRONG_OVERSPEC_NAME, name
-        assert is_failure_name(name), name
+        assert name == ("(5S,8S,9S,10S,13R,14S)-17-ethyl-10,13-dimethylhexadecahydro-1H-"
+                        "cyclopenta[a]phenanthrene"), name
+        from tests.support.rt_assert import assert_full_rt
+        assert_full_rt(name, BLOCKER_PARTIAL_STEREO)

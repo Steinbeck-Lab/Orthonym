@@ -3,9 +3,10 @@
 `_name_amino_branch` names alkyl (methylamino) and aryl (anilino) R, but declined a
 saturated-ring or ring-on-chain R, so `-NH-cyclohexyl` / `-NH-CH2Ar` fell through to
 the ugly replacement name. Under the best-effort tier, recurse `name_substituent` on R
-and wrap 'amino' — mirroring the O-rooted alkoxy path (`cyclohexyloxy`). PIN default is
-byte-identical (the intercept gates on allow_mancude and only fires after
-`_name_amino_branch` declines).
+and wrap 'amino' — mirroring the O-rooted alkoxy path (`cyclohexyloxy`). That intercept
+gates on allow_mancude and only fires after `_name_amino_branch` declines; at the PIN
+tier the -NH- of an undecorated ring-yl is the bare connective of `ring_substituents`
+('cyclohexylamino',, and every other row still declines there.
 """
 import pytest
 from rdkit import Chem
@@ -37,10 +38,19 @@ def test_best_effort_names_n_rooted_ring_amino(smi, expected):
     assert name_substituent(m, frag, fv, allow_mancude=True) == expected
 
 
-@pytest.mark.parametrize("smi,_expected", BEST_EFFORT)
-def test_pin_default_byte_identical(smi, _expected):
+#: An -NH- joining an undecorated ring-yl to the parent is the compound prefix '(R)amino' at the
+#: PIN tier too, the Blue Book "Preferred IUPAC names for prefixes
+#: corresponding to -NHR, -NRR', or -NR2 are formed by prefixing the names of the groups R and
+#: R' to the prefix 'amino'"; the bare connective of ``ring_substituents``). The other rows keep
+#: the PIN-tier decline: a carbon carrier, or a ring that carries a group of its own.
+PIN_TIER_NAMED = {"[*]NC1CCCCC1", "[*]NC1CCCC1"}
+
+
+@pytest.mark.parametrize("smi,expected", BEST_EFFORT)
+def test_pin_default_tier(smi, expected):
     m, frag, fv = _frag(smi)
-    assert name_substituent(m, frag, fv, allow_mancude=False) == "substituent"
+    want = expected if smi in PIN_TIER_NAMED else "substituent"
+    assert name_substituent(m, frag, fv, allow_mancude=False) == want
 
 
 # unchanged at BOTH tiers (existing alkyl/aryl amino path owns these)

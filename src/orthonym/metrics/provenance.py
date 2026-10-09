@@ -388,6 +388,45 @@ def restore_provenance(snapshot: dict) -> None:
            "non_pin_label_rules", "uncertified_pin_names")
 
 
+class isolated_provenance:
+    """Context manager: every provenance variable, the name-scoped records included,
+    is exactly what it was on entry when the body exits, and the record calls the
+    body made are taken out of the armed record-call logs again.
+
+    For a check that names prefixes only to compare two parents
+    (``perception.chains.chain_parent_prefix_seniority``) and whose own verdict is
+    recorded after it, outside the body. Unlike:func:`restore_provenance`, the
+    non-PIN records the body made are dropped too: the body's namings run through
+    ``name_substituent_for_ordering``, whose memo and fragment-cache writes are
+    discarded on exit (``memo.push_sandbox``, ``speculative_fragment_naming``), so no
+    later cache hit can return a string whose record was dropped; a record kept from
+    such a body would lower the label of a name the real naming built by another
+    route only because the check ran. A provenance read in the body stays in the
+    logs (``PROVENANCE_READ``), so an enclosing memo still declines to store a call
+    whose path read provenance. Only a variable the body changed is written back."""
+
+    _VARS = (_SOURCE, _OPSIN, _STEREO_UNEXPRESSED, _GATE_OUTCOME, _GATE_OUTCOME_NAME,
+             _GENERAL_RING_PREFIX, _SUFFIX_FREE_PREFIX_NAME, _NON_PIN_FRAGMENTS,
+             _PIN_PROMOTION_RERUN, _NON_PIN_LABELS, _UNCERTIFIED_PIN_NAMES)
+
+    def __enter__(self):
+        self._values = [(var, var.get()) for var in self._VARS]
+        stack = _NON_PIN_LOG.get()
+        self._logs = [(log, len(log)) for log in stack] if stack else []
+        return self
+
+    def __exit__(self, *exc):
+        for var, value in self._values:
+            if var.get() is not value:
+                var.set(value)
+        for log, n in self._logs:
+            tail = log[n:]
+            del log[n:]
+            if any(item is PROVENANCE_READ for item in tail):
+                log.append(PROVENANCE_READ)
+        return False
+
+
 def record_source(source: str, opsin: Optional[str] = None) -> None:
     _SOURCE.set(source)
     _touch("source")

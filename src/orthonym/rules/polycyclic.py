@@ -3975,6 +3975,13 @@ def name_polycyclic_complete(mol, features=None):
     bridged = name_bridged_fused_pin(mol)
     if bridged is not None:
         return bridged
+    # (the Blue Book): an ortho- and peri-fused system (an atom
+    # common to three rings counts as a bridgehead here) is named by fusion nomenclature,
+    # never by a von Baeyer descriptor
+    from .bridged_fused import name_fused_carbocycle_pin
+    fused = name_fused_carbocycle_pin(mol)
+    if fused is not None:
+        return fused
     if vonbaeyer_cage_has_aromaticity(mol, desc.numbering):
         # (a phase): a partially-saturated PAH (e.g. 9,10-dihydro-
         # anthracene) reaches this von-Baeyer path because its cage still

@@ -726,8 +726,11 @@ class TestFunctionalizedSubstituents:
 
         # Simple nitrile: N#CC (acetonitrile without attachment)
         mol = Chem.MolFromSmiles('N#CC')
-        # Start from C (index 1), exclude nothing
-        result = _identify_functionalized_substituent(mol, 1, set())
+        # Start from the CH3 carbon (index 2), the atom a ring would be bonded to: the free
+        # valence of 'cyanomethyl', the Blue Book). Started at the nitrile
+        # carbon (index 1) the fragment is no 'cyanomethyl' group, and the namer declines.
+        assert _identify_functionalized_substituent(mol, 1, set()) is None
+        result = _identify_functionalized_substituent(mol, 2, set())
         assert result is not None, "Should detect nitrile chain"
         assert result['name'] == 'cyanomethyl'
         assert result['functional_group'] == 'nitrile'
@@ -800,9 +803,11 @@ class TestFunctionalizedSubstituents:
         """Test detection of 2-cyanoethyl substituent (3 carbons)."""
         from orthonym.rules.fused_rings import _identify_functionalized_substituent
 
-        # Propionitrile: N#CCC
+        # Propionitrile: N#CCC, started at the CH3 carbon (index 3), the free valence of
+        # '2-cyanoethyl'; the nitrile carbon (index 1) is no attachment atom of that group
         mol = Chem.MolFromSmiles('N#CCC')
-        result = _identify_functionalized_substituent(mol, 1, set())
+        assert _identify_functionalized_substituent(mol, 1, set()) is None
+        result = _identify_functionalized_substituent(mol, 3, set())
         assert result is not None
         assert result['name'] == '2-cyanoethyl'
         assert result['functional_group'] == 'nitrile'
@@ -812,10 +817,11 @@ class TestFunctionalizedSubstituents:
         """Test detection of 2-carboxyethyl substituent."""
         from orthonym.rules.fused_rings import _identify_functionalized_substituent
 
-        # Propanoic acid: OC(=O)CC (3 carbons)
+        # Propanoic acid: OC(=O)CC (3 carbons), started at the CH3 carbon (index 4), the free
+        # valence of '2-carboxyethyl'; index 2 is the carbonyl oxygen, no attachment atom
         mol = Chem.MolFromSmiles('OC(=O)CC')
-        # Start from the alpha carbon (index 2)
-        result = _identify_functionalized_substituent(mol, 2, set())
+        assert _identify_functionalized_substituent(mol, 2, set()) is None
+        result = _identify_functionalized_substituent(mol, 4, set())
         assert result is not None
         assert result['name'] == '2-carboxyethyl'
         assert result['functional_group'] == 'carboxylic_acid'
@@ -1019,8 +1025,11 @@ class TestTask60FusedNBicyclicLeakVeto:
         assert "cyclohexane" not in out, (
             f"atom-dropping leak: expected NOT 'cyclohexane' in output, got {out!r}"
         )
-        assert out == "unknown organic compound" or "octahydro" in out, (
-            f"expected fail-closed or a real octahydro-N-heterobicyclic name, got {out!r}"
+        # the fusion name of the ring system, (the Blue Book); total
+        # hydrogenation of quinoline omits the locants, (:17026). OPSIN 2.9.0:
+        # full InChIKey exact.
+        assert out == "(4aR,8aR)-decahydroquinoline", (
+            f"expected the decahydroquinoline fusion name, got {out!r}"
         )
 
     @pytest.mark.unit

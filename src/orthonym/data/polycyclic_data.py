@@ -18,8 +18,8 @@ Reference: IUPAC Blue Book 2013, Section (Fused and Bridged Fused Ring Systems)
 PAH Classification:
 - Bicyclic: naphthalene
 - Tricyclic: anthracene, phenanthrene, fluorene, acenaphthene, acenaphthylene
-- Tetracyclic: pyrene, chrysene, tetracene, triphenylene, benz[a]anthracene, benzo[c]phenanthrene
-- Pentacyclic: pentacene, perylene, benzo[a]pyrene
+- Tetracyclic: pyrene, chrysene, tetracene, triphenylene, tetraphene, benzo[c]phenanthrene
+- Pentacyclic: pentacene, perylene, benzo[pqr]tetraphene
 - Hexacyclic+: coronene
 
 Partially saturated PAHs:
@@ -295,8 +295,9 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 4,
     },
-    'benz[a]anthracene': {
-        # Bent 4-ring PAH (benzene fused to anthracene)
+    'tetraphene': {
+        # Bent 4-ring PAH (benzene fused to anthracene); Polyaphenes
+        # (the Blue Book) names it tetraphene, formerly benz[a]anthracene
         'canonical_smiles': 'c1ccc2cc3c(ccc4ccccc43)cc2c1',
         'smarts': 'c1ccc2cc3c(ccc4ccccc43)cc2c1',
         'num_atoms': 18,
@@ -347,8 +348,9 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 6,  # RDKit counts 6 rings due to perception
     },
-    'benzo[a]pyrene': {
-        # Important carcinogen - benzene fused to pyrene
+    'benzo[pqr]tetraphene': {
+        # benzo[a]pyrene; (the Blue Book) 'benzo[pqr]tetraphene (PIN) [tetraphene (3 rings in
+        # horizontal row) preferred to chrysene or pyrene (2 rings in horizontal row)]'
         'canonical_smiles': 'c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34',
         'smarts': 'c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34',
         'num_atoms': 20,

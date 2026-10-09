@@ -68,11 +68,21 @@ YLIDENE_ROWS = [
     "Cc1cc(N2CCCC2)ccc1/C=C(/Sc1nnc(-c2ccc(Cl)cc2)o1)C(=O)O",
 ]
 
-# Every E/Z bond of these rows lies in a substituent: the parent ring has none,
-# so a descriptor block at the front of the whole name has no parent double bond
-# to refer to, the Blue Book: "When they relate to substituent
+# Every E/Z bond of rows 1, 3 and 4 lies in a substituent: the parent ring has
+# none, so a descriptor block at the front of the whole name has no parent double
+# bond to refer to, the Blue Book: "When they relate to substituent
 # groups, they are cited at the front of the corresponding prefix").
 _LEADING_EZ_BLOCK = re.compile(r"^\((?:\d+[EZ],?)+\)-")
+
+# Row 5's carboxylic acid is the suffix since the drug lane's Task L3.4 (before it,
+# the best-effort name cited no suffix and a ring was the parent), so its E/Z bond
+# is C-2=C-3 of the parent chain 'prop-2-enoic acid' and its block stands at the
+# front of the complete name, the Blue Book: "They are placed at the
+# front of the complete name when related to the parent structure"). The block
+# and the parent ending the name must agree.
+PARENT_EZ_BLOCK = {
+    YLIDENE_ROWS[3]: ("(2E)-", "prop-2-enoic acid"),
+}
 
 
 @pytest.mark.parametrize("smiles", YLIDENE_ROWS, ids=["row1", "row3", "row4", "row5"])
@@ -84,8 +94,14 @@ def test_ylidene_rows_name_rt_exact(smiles):
     # each stereogenic unit cited exactly once (no double citation)
     assert (count_expressed_stereo_descriptors(name)
             == count_defined_stereo_elements(mol)), name
-    # the misplaced whole-name block of the paper names does not come back
-    assert not _LEADING_EZ_BLOCK.match(name), name
+    block = _LEADING_EZ_BLOCK.match(name)
+    if smiles in PARENT_EZ_BLOCK:
+        # the block at the front is the parent chain's own E/Z unit
+        lead, parent = PARENT_EZ_BLOCK[smiles]
+        assert block and block.group(0) == lead and name.endswith(parent), name
+    else:
+        # the misplaced whole-name block of the paper names does not come back
+        assert not block, name
 
 
 def test_floor_cites_the_ylidene_bond_once():

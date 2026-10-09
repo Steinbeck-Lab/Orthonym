@@ -39,11 +39,37 @@ LOWERED = [
 ]
 
 
+#: the row is lowered before the spelling checks run: the chain-parent check of the
+#: candidate pool (``perception.chains.chain_parent_prefix_seniority``;:21604, with
+#: the ring prefix counted as in example (4):21624) records the name as not the PIN, so no
+#: pin_verified label reaches ``check_pin_spelling`` and the decline row carries no spelling
+#: failure; both checks fail the name (``test_the_p45_2_1_row_is_lowered_by_both_checks``)
+P4521_ROW = LOWERED[2]
+LOWERED_BY_SPELLING = [row for row in LOWERED if row is not P4521_ROW]
+
+
 def _rules(row):
     return [f["rule"] for f in row.get("spelling_failures") or []]
 
 
-@pytest.mark.parametrize("smiles,name,rule", LOWERED)
+def test_the_p45_2_1_row_is_lowered_by_both_checks(monkeypatch):
+    """The PIN is 'methyl 3-[1-(2-chlorophenyl)-3,5-dimethyl-1H-pyrazol-4-yl]-2-methylpropanoate'
+    (two prefixes on its chain, one on the name's). The lexical check fails the name on its own;
+    with that check switched off the chain-parent check still lowers the label at every tier and
+    keeps the name (known positive: before the chain-parent check, the same name was
+    pin_verified with the spelling check off)."""
+    from tests.support.spelling_checks import disable_spelling_rule
+    smiles, name, rule = P4521_ROW
+    assert rule in [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name)]
+    disable_spelling_rule(monkeypatch, rule)
+    assert_default_tier_declines(smiles)
+    strict = strict_path_row(smiles)
+    assert (strict["name"], strict["tier"], strict["is_pin"]) == (name, "systematic_verified", False), strict
+    best = assert_best_effort_gives(smiles, name)
+    assert (best["tier"], best["is_pin"]) == ("systematic_verified", False), best
+
+
+@pytest.mark.parametrize("smiles,name,rule", LOWERED_BY_SPELLING)
 def test_a_spelling_failure_lowers_the_label_never_the_name(smiles, name, rule):
     declined = assert_default_tier_declines(smiles)
     assert rule in _rules(declined), declined                  # the decline carries its reason

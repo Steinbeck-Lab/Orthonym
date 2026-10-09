@@ -97,15 +97,23 @@ def test_an_amide_n_substituent_ring_system_is_named_whole(smiles, name, tier):
 
 
 @pytest.mark.opsin_gate
-def test_a_tautomer_sensitive_hetero_parent_n_substituent_is_declined():
-    # N-acetyl on C3 of 4,5,6,7-tetrahydro-1H-4,7-methanoindazole: the indicated hydrogen
-    # is on a ring N (spec section 8), so build_substituent declines; the PIN tier
-    # abstains (as at the S2 base) and best-effort keeps an RT-exact name
-    smiles = "CC(=O)Nc1n[nH]c2c1C1CCC2C1"
-    assert _prefix(smiles) is None
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    row = _row(smiles, "best-effort")
-    assert row["tier"] != "abstain" and name_is_rt_exact(row["name"], smiles), row
+@pytest.mark.parametrize("smiles,prefix,name", [
+    ("CC(=O)Nc1n[nH]c2c1C1CCC2C1", "4,5,6,7-tetrahydro-1H-4,7-methanoindazol-3-yl",
+     "N-(4,5,6,7-tetrahydro-1H-4,7-methanoindazol-3-yl)acetamide"),
+    ("CC(=O)Nc1[nH]nc2c1C1CCC2C1", "4,5,6,7-tetrahydro-2H-4,7-methanoindazol-3-yl",
+     "N-(4,5,6,7-tetrahydro-2H-4,7-methanoindazol-3-yl)acetamide"),
+])
+def test_a_tautomer_sensitive_hetero_parent_n_substituent_keeps_its_tautomer(smiles, prefix, name):
+    # N-acetyl on C3 of 4,5,6,7-tetrahydro-1H-4,7-methanoindazole: the indicated hydrogen is on
+    # a ring N (spec section 8). build_substituent used to decline every such prefix; it now
+    # names it when OPSIN's reading of the prefix, its free valence capped by a hydrogen, is the
+    # input's tautomer (``_same_tautomer_as_radical``): the 1H input keeps 1H and the 2H input
+    # keeps 2H, and both whole names read back to the input's full InChIKey
+    assert _prefix(smiles) == prefix
+    for tier in ("pin", "best-effort"):
+        row = _row(smiles, tier)
+        assert (row["name"], row["tier"]) == (name, "pin_verified"), row
+    assert name_is_rt_exact(name, smiles)
 
 
 @pytest.mark.parametrize("smiles", [

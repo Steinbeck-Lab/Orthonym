@@ -225,7 +225,7 @@ def test_stereo_bearing_witness_now_full_ws_stereo_win():
     result = name_universal_substitutive(mol)
     assert result is not None
     assert result.covers == _heavy_atoms(smi)
-    assert result.name == "(5Z)-5-carboxy-2-hydroxy-2-oxo-1,3-dioxa-2-thiahepta-1,5-diene"
+    assert result.name == "(2Z)-2-carboxy-1-(sulfooxy)but-2-ene"
     cov = validate_atom_coverage(mol, result.name)
     assert cov.constitution_match is True
     assert verify_or_none(result.name, smi) == result.name  # full: stereo now expressed
@@ -442,7 +442,7 @@ def test_m2_neutralize_does_not_touch_n_oxide():
     the ``oxido``/``-ium`` path. Guarded by the ions semipolar detector, which
     rejects any rewrite whose InChIKey differs."""
     result, _ = _name_and_verify("[O-][n+]1ccccc1")
-    assert result.name == "1-oxido-1-azacyclohexa-1,3,5-trien-1-ium"
+    assert result.name == "1-oxidopyridin-1-ium"
 
 
 def test_m2_polynitro_now_named_not_voided():
@@ -592,10 +592,10 @@ def test_internal_charge_classes_void_never_misname(label, smiles):
 
 @pytest.mark.parametrize(
     "smiles,expected", [
-        ("[O-][n+]1ccccc1", "1-oxido-1-azacyclohexa-1,3,5-trien-1-ium"),
-        ("CC=[N+](C)[O-]", "2-oxido-2-azabut-2-en-2-ium"),               # nitrone
+        ("[O-][n+]1ccccc1", "1-oxidopyridin-1-ium"),
+        ("CC=[N+](C)[O-]", "[methyl(oxido)azaniumylidene]ethane"),       # nitrone
         ("CC#[N+][O-]", "1-oxido-1-azaprop-1-yn-1-ium"),                 # nitrile oxide
-        ("CC=[N+]([O-])O", "2-oxido-1-oxa-2-azabut-2-en-2-ium"),         # aci-nitro
+        ("CC=[N+]([O-])O", "[hydroxy(oxido)azaniumylidene]ethane"),     # aci-nitro
         ("CC[N+](=S)[O-]", "2-oxido-1-thia-2-azabut-1-en-2-ium"),       # thionitro
         ("C[S+](C)[O-]", "2-oxido-2-thiapropan-2-ium"),                  # sulfoxide (DMSO)
     ],

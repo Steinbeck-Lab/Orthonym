@@ -219,6 +219,12 @@ SUPPLEMENTARY_CANARY: List[Tuple[str, str, str, str]] = [
 # (tests/integration/test_orgm_byte_identical_v18_canary.py md5-pins it against
 # the post-CFR CSV); the expected value comes from here, with its evidence.
 _SUPPLEMENTARY_REBASELINE = {
+    # N5b step 2. The frozen value is the abstention. A fused ring system with a ring heteroatom
+    # has its fusion name, (the Blue Book, "Five-membered ring requirement"):
+    # naphtho[2,3-c]furan is a two-component fusion name,:11903). OPSIN 2.9.0:
+    # full InChIKey and canonical SMILES exact; labelled pin_verified.
+    "test_canary_name_stability_313": (
+        "5,7,8-trihydroxy-6-methoxy-1-methylnaphtho[2,3-c]furan-4,9-dione"),
     # Suite fix j4 (TRIAGE g3 C10c). (the Blue Book): "the
     # nesting order is as follows: {[({})]}";: the
     # stereodescriptor's parentheses count. OPSIN 2.9.0: full InChIKey and
