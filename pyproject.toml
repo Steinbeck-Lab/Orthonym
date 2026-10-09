@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "orthonym"
-version = "1.0.5"
+version = "1.0.6"
 description = "Open Structure-To-IUPAC-Name Generator - Rule-based IUPAC nomenclature from molecular structures"
 readme = "README.md"
 license = "MIT"
