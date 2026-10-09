@@ -5,6 +5,20 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.6](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.5...v1.0.6) (2026-10-09)
+
+
+### Features
+
+* name quality -- fusion names, preferred-name labels, book prefix forms at the wider tiers, faster validation ([bb658a7](https://github.com/Steinbeck-Lab/Orthonym/commit/bb658a7c5e33a46312f26c2abb625b5b3584b51c))
+
+
+### Bug Fixes
+
+* name quality -- fusion names, preferred-name labels, book prefix forms at the wider tiers, faster validation ([dc79af0](https://github.com/Steinbeck-Lab/Orthonym/commit/dc79af04839a67d3b86409ff0beae9d779b56953))
+* names built from structure for esters and partial producers; a first start says why it is slow ([695b360](https://github.com/Steinbeck-Lab/Orthonym/commit/695b360ff4f46feac68c7952ce36e1600f78a80f))
+* names built from structure for esters and partial producers; a first start says why it is slow ([968ba64](https://github.com/Steinbeck-Lab/Orthonym/commit/968ba64b1d559246460da77786e83e554978732f))
+
 ## [1.0.5](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.4...v1.0.5) (2026-10-07)
 
 
