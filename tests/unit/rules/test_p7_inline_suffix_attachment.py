@@ -124,27 +124,24 @@ class TestRecoveredName:
         # also the configuration the breadth harness measures.
         from orthonym import Orthonym
 
-        # Spelling updated with the (a) elision fix on the von Baeyer
-        # path: 'diamine' begins with a CONSONANT, so the terminal 'e' of the
-        # 'ene' ending is RETAINED ('...triene-3,4-diamine'). The previous
-        # expectation '...trien-3,4-diamine' encoded the defect -- the cage
-        # producer hardcoded '-en' and never tested the suffix at all.
-        #
-        # Evidence for the moved value (OPSIN accepts BOTH spellings and
-        # returns the same structure, so round-trip cannot adjudicate it):
-        # * "ELISION OF VOWELS", (a) (the Blue Book) --
-        # elision applies to the 'ene'/'yne' endings only before a suffix
-        # beginning 'a', 'e', 'i', 'o', 'u', or 'y'.
-        # * Worked example in the Blue Book: 'undeca-2,9-diene-4,8-diol
-        # (PIN)' -- the identical ene + consonant-initial multiplied suffix
-        # shape, 'e' retained. The elided 'trien-N-di...' form appears
-        # nowhere in the Blue Book.
-        # * Internal consistency: Orthonym's chain engine, an independent
-        # producer, already spelled this 'but-2-ene-1,4-diamine'.
+        # Since cb3bf9850 (2026-10-08, "fused ring systems with ring heteroatoms are named
+        # by fusion nomenclature ") this 5/5 ortho-fused bicycle is named by
+        # fusion nomenclature, not as the von Baeyer '6-thia-1,7-diazabicyclo[3.3.0]octa-
+        # 2,4,7-triene-3,4-diamine' this row used to pin (whose spelling had itself been
+        # corrected for the (a) elision, 'triene' before the consonant-initial
+        # 'diamine'). "Five-membered ring requirement" (the Blue Book):
+        # "Fusion nomenclature gives preferred IUPAC names only to compounds having at least
+        # two rings of at least five or more members... When fusion names are not allowed,
+        # unsaturated von Baeyer ring system names are preferred IUPAC names" -- here the
+        # fusion name is allowed (two five-membered rings), and the seniority order of
+        # (:23843) ranks "fused ring systems > bridged fused systems > non-fused
+        # bridged systems" (von Baeyer), so the fusion name is the preferred one.
+        # OPSIN 2.9.0 reads 'pyrrolo[1,2-d][1,2,4]thiadiazole-6,7-diamine' back to the
+        # input's full InChIKey (an InChIKey); the parent has no symmetry, so
+        # its fusion numbering (and so the locants 6,7 OPSIN resolves to the two C-NH2 atoms)
+        # does not depend on the substituents.
         name = Orthonym(**BEST_EFFORT).name("C1=C(C(=C2N1C=NS2)N)N")
-        assert name == (
-            "6-thia-1,7-diazabicyclo[3.3.0]octa-2,4,7-triene-3,4-diamine"
-        )
+        assert name == "pyrrolo[1,2-d][1,2,4]thiadiazole-6,7-diamine"
 
     @pytest.mark.slow
     def test_inline_suffix_locant_is_found_for_an_aromatic_amine(self):

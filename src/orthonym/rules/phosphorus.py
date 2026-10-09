@@ -1229,6 +1229,13 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
             c_tokens.append(tok)
             accounted |= frag
         stem_prefix = _assemble_p_owner_text(c_tokens)
+        if len(c_tokens) == 1:
+            # (the Blue Book): "Parentheses (round brackets)... are
+            # used around compound and complex prefixes" -- the
+            # one organyl ligand of the phosphonate is cited as '(naphthalen-2-yl)
+            # phosphonate (PIN)' (:44383), so '(1-cyano-1-isocyanoethyl)phosphonate'.
+            from ..assembly.naming_utils import enclose_if_compound
+            stem_prefix = enclose_if_compound(c_tokens[0])
 
     # Every heavy atom must be accounted for, or this is not a whole-molecule name.
     if accounted != set(range(mol.GetNumAtoms())):

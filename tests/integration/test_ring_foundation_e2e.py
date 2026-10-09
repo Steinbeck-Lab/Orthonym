@@ -191,12 +191,17 @@ class TestRING05BenzeneRetainedNames:
         assert name_compound('Nc1ccccc1') == 'aniline'
 
     def test_styrene(self):
-        """Styrene (ethenylbenzene) retained name."""
-        assert name_compound('C=Cc1ccccc1') == 'styrene'
+        """Styrene: retained for ring substitution only, the PIN is 'ethenylbenzene'
+        , the Blue Book 'styrene (ring substitution only) ethenylbenzene (PIN)';
+        the Blue Book under."""
+        assert name_compound('C=Cc1ccccc1') == 'ethenylbenzene'
 
     def test_cumene(self):
-        """Cumene (isopropylbenzene) retained name."""
-        assert name_compound('CC(C)c1ccccc1') == 'cumene'
+        """Cumene is not a retained name ('The names cumene and cymene are not retained',
+        , the Blue Book); 'isopropyl' is general nomenclature only ('propan-2-yl
+        (preferred prefix)', the Blue Book,, and a prefix with a locant is enclosed
+        ('1,4-di(propan-2-yl)cyclohexane (PIN)', the Blue Book)."""
+        assert name_compound('CC(C)c1ccccc1') == '(propan-2-yl)benzene'
 
 
 @pytest.mark.integration

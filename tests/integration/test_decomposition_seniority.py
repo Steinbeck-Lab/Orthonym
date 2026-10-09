@@ -119,7 +119,11 @@ class TestDecompositionCanaryStability:
         ("CCOC(=O)C", "ethyl acetate"),
         ("CC(=O)NC", "N-methylacetamide"),
         ("CC(=O)OCC", "ethyl acetate"),
-        ("O=C(O)COc1ccccc1", "2-phenoxyethanoic acid"),
+        # 'Retained names as preferred IUPAC names' (the Blue Book):
+        # acetic acid is a retained PIN and can be substituted (example under
+        # 'General methodology',:31400: '[2,3-dichloro-4-(2-methylidenebutanoyl)phenoxy]
+        # acetic acid (PIN)'); 'ethanoic acid' is never the PIN.
+        ("O=C(O)COc1ccccc1", "phenoxyacetic acid"),
         ("c1ccccc1", "benzene"),
         ("CCO", "ethanol"),
         ("CC(=O)O", "acetic acid"),
@@ -127,7 +131,9 @@ class TestDecompositionCanaryStability:
         ("CC(C)C", "2-methylpropane"),
         ("c1ccncc1", "pyridine"),
         ("C1CCCC1", "cyclopentane"),
-        ("OCC(O)CO", "glycerol"),
+        # 'Retained names' (the Blue Book): 'glycerol
+        # propane-1,2,3-triol (PIN)'; the retained name is for general nomenclature only.
+        ("OCC(O)CO", "propane-1,2,3-triol"),
         ("CCOCC", "ethoxyethane"),
     ]
 

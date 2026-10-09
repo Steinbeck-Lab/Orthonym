@@ -50,10 +50,19 @@ EXPECTED_FIXED = [
         "furostan",
         "Steroid: cholestane retained NP name",
     ),
+    # The next two inputs define no stereo at all. 'Stereochemical configuration
+    # of parent structures' (the Blue Book): "The name of a fundamental parent
+    # structure usually implies the absolute configuration of all chirality centers [...]
+    # All chirality must be defined", so a stereo-free input cannot take the stereoparent
+    # name ('stigmast'/'ergost'). Commit fa7a9a109 (2026-09-27, 'an undefined implied centre
+    # declines the stereoparent') made the producer decline it on purpose; the name that
+    # ships is the fully systematic one on the cyclopenta[a]phenanthrene fusion parent
+    #; OPSIN 2.9.0 full InChIKey exact). The stereoparent path is still
+    # asserted by the stereo-defined steroid rows of this list.
     (
         "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",
-        "stigmast",
-        "Steroid: stigmastane diol retained NP",
+        "cyclopenta[a]phenanthren",
+        "Steroid: stigmastane diol, stereo-free input -> systematic fusion parent",
     ),
     (
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
@@ -67,8 +76,8 @@ EXPECTED_FIXED = [
     ),
     (
         "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",
-        "ergost",
-        "Steroid: ergostadienol retained NP",
+        "cyclopenta[a]phenanthren",
+        "Steroid: ergostadienol, stereo-free input -> systematic fusion parent",
     ),
     (
         "C[C@H](CCC(=O)O)[C@H]1CC[C@@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
@@ -440,9 +449,18 @@ def test_parent_mismatch_unfixed(smiles, expected_parent_substring, description)
 
 @pytest.mark.integration
 def test_parent_mismatch_improvement_count():
-    """At least 37/43 parent_mismatch failures should now produce correct parent names.
+    """At least 34/39 parent_mismatch rows should produce correct parent names.
 
-    Updated by a phase-02: 37 EXPECTED_FIXED + 6 EXPECTED_UNFIXED = 43 total.
+    Updated by a phase-02: 37 EXPECTED_FIXED + 6 EXPECTED_UNFIXED = 43 total, target
+    >= 37/43. Re-based when the rows whose PIN the PIN tier cannot build became declared
+    strict xfails (``_PIN_TIER_TARGETS``, commits c7c94308f and 590e232e2): those four
+    rows must NOT produce the substring through the PIN tier (their old passing names
+    described another molecule or dropped a fragment), so they are asserted separately
+    (strict xfail + ``test_parent_mismatch_tier_contract``) and are left out of this count.
+    43 - 4 = 39 rows remain; the same ratio (37/43 = 86.0%) rounded up over 39 rows is 34.
+    FusedHet_18 (a name that drops the quinoline) is a source defect that still counts
+    against the 39 until the code fix lands; it is asserted on its own by
+    ``test_parent_mismatch_fixed[FusedHet_18]``.
     a phase-02 promoted tropane + ergostene from EXPECTED_UNFIXED to EXPECTED_FIXED.
     The self-check fix is a correctness improvement (zero behavioral change for
     all_ring_atoms callers, but ensures symmetry with chain counterparts).
@@ -457,10 +475,11 @@ def test_parent_mismatch_improvement_count():
       - 1 (b) PG count comparison
     """
     correct = 0
-    total = len(PARENT_MISMATCH_COMPOUNDS)
+    counted = [row for row in PARENT_MISMATCH_COMPOUNDS if row[2] not in _PIN_TIER_TARGETS]
+    total = len(counted)
     failures = []
 
-    for smiles, expected, desc in PARENT_MISMATCH_COMPOUNDS:
+    for smiles, expected, desc in counted:
         name = name_compound(smiles)
         if name and expected.lower() in name.lower():
             correct += 1
@@ -470,14 +489,14 @@ def test_parent_mismatch_improvement_count():
     # Report results regardless of pass/fail
     print(f"\n=== Parent Mismatch Improvement Count ===")
     print(f"Correct parent: {correct}/{total}")
-    print(f"Target: >= 37/{total}")
+    print(f"Target: >= 34/{total}")
     if failures:
         print(f"\nStill failing ({len(failures)}):")
         for f in failures:
             print(f)
 
-    assert correct >= 37, (
-        f"Phase 118-02 target not met: {correct}/{total} correct (need >= 37).\n"
+    assert correct >= 34, (
+        f"Phase 118-02 target not met: {correct}/{total} correct (need >= 34).\n"
         f"Still failing:\n" + "\n".join(failures)
     )
 

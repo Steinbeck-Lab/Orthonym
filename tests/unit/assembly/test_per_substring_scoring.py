@@ -23,10 +23,10 @@ from orthonym.assembly.candidate_pool import CandidatePool
 from orthonym.assembly.coverage_scoring import CandidateName
 from orthonym.namer import Orthonym, name_with_tree
 from orthonym.rules.parent_correctness import (
-    OPSIN_JAR,
     clear_reference_name,
     set_reference_name,
 )
+from tests.support.jars import jar_or_none
 
 # RED dependency: this module is the Plan 02/03 deliverable. Importing it at
 # module top makes collection fail (ModuleNotFoundError) until it lands — the
@@ -39,7 +39,7 @@ from orthonym.assembly.per_substring_scoring import (
 
 # OPSIN-required guard (mirrors test_parent_correctness.py:36-38).
 opsin_required = pytest.mark.skipif(
-    not OPSIN_JAR.exists(), reason="OPSIN jar required for subprocess tests"
+    jar_or_none() is None, reason="OPSIN jar required for subprocess tests"
 )
 
 

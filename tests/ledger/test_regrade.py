@@ -12,12 +12,19 @@ def test_regrade_marks_passing_rule_implemented():
     assert out["actual"] == "phosphoric acid"
 
 
-def test_regrade_marks_failing_rule_open():
+def test_regrade_marks_failing_rule_open(monkeypatch):
+    # This used to depend on a live defect (the engine once emitted "dihydroxalate" for
+    # oxalic acid); the engine now emits 'oxalic acid', so the failing case is
+    # simulated: the namer is stubbed to return the old wrong name, which keeps the test
+    # deterministic and independent of the engine's current output.
+    monkeypatch.setattr("scripts.ledger.regrade.name_compound",
+                        lambda smiles, style="pin": "dihydroxalate")
     row = {"bb_ref": "P-65.1.1.1", "capability": "oxalic acid", "status": "OPEN",
            "evidence_smiles": "OC(=O)C(=O)O", "expected": "oxalic acid",
            "actual": None, "code_locus": None, "verified_at": None, "wave": None}
     out = regrade_row(row)
-    assert out["status"] == "OPEN"      # currently emits "dihydroxalate"
+    assert out["status"] == "OPEN"
+    assert out["actual"] == "dihydroxalate"
     assert out["actual"] != "oxalic acid"
 
 

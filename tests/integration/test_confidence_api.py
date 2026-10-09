@@ -70,9 +70,14 @@ class TestNameWithConfidence:
         confidence aggregation, preserving byte-identical behavior).
         """
         namer = Orthonym()
-        # Substituted quinoline -- goes through candidate collection
+        # C4: factors are populated only when a candidate was actually
+        # scored; a molecule that took no scoring path reports confidence None and
+        # factors {} (handler 'unmeasured'), so the 5 factor keys are pinned on a
+        # molecule that does go through candidate collection (caffeine; see also
+        # test_calibrated_gate.test_measured_candidate_scores_well). The substituted
+        # quinoline this test used to name is now unmeasured.
         result = namer.name_with_confidence(
-            "CCCCCCCCCc1cc(=O)c2ccccc2n1C"
+            "Cn1c(=O)c2c(ncn2C)n(C)c1=O"
         )
         assert isinstance(result['factors'], dict)
         expected_keys = {'ratio', 'atom_coverage',

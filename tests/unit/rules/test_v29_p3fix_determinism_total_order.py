@@ -155,11 +155,22 @@ def test_one_molecule_gets_one_name_however_it_is_spelled(family, smiles):
 
 
 def test_the_trisulfane_witness_is_cited_in_the_blue_book_order():
-    """Not just stable — stable on the RIGHT one. BB 3521: '2' before '3'."""
+    """Not just stable — stable on the RIGHT one. BB 3521: '2' before '3'.
+
+    The terminal locants are no longer cited: "Three or more homogeneous
+    contiguous chalcogen atoms", "...are treated as parent hydrides in
+    substitutive nomenclature" (the Blue Book), whose PIN examples give the two
+    terminal substituents of a trichalcogenane no locants -- 'dimethyltrisulfane (PIN)'
+    (:39339) and, with two different substituents, 'methyl(phenyl)triselane (PIN)'
+    (:39341). The substitutable positions of HS-S-SH are the two terminal ones only
+    (the middle S carries no H), so nothing needs a locant. The order the test guards
+    is kept: the '2-' prefix is cited before the '3-' one. The old spelling and the new
+    both read back to the input's full InChIKey with OPSIN 2.9.0
+    (an InChIKey)."""
     from orthonym.namer import Orthonym
     namer = Orthonym()
     got = namer.name(Chem.CanonSmiles('CCC(C)CSSSCCC(C)C'))
-    assert got == '1-(2-methylbutyl)-3-(3-methylbutyl)trisulfane', got
+    assert got == '(2-methylbutyl)(3-methylbutyl)trisulfane', got
 
 
 def test_the_locant_tier_is_in_order_of_appearance_not_sorted():

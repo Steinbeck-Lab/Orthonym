@@ -118,8 +118,18 @@ GPI_FAILING_FRAGMENT = (
 # for the steroid fusion name), and the rung names it '5-(acetyloxy)-14-
 # hydroxy-2,15-dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecane', RT-exact
 # (measured 2026-10-08).
+# L4 (2026-10-09): the ester producer names the ester of an alcohol whose name cannot
+# carry the group word ('...-diol' here) from the alcohol's STRUCTURE
+# (``fragment_assembly._alcohol_structural_group``;, the Blue Book "All
+# preferred IUPAC names for esters are named by functional class nomenclature"), so the
+# acetoxy-hydroxy anchor is now named by the strict rungs too, as '14-hydroxy-2,15-
+# dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecan-5-yl acetate' (RT-exact; a von Baeyer
+# group, so it is labelled below the PIN and the default tier declines it,
+# NO_VERIFIED_PIN). The anchor is re-pointed to the stereo-free 3-hydroxy-pregnan-20-one
+# skeleton, which both PIN rungs still decline and the rung names '14-acetyl-5-hydroxy-
+# 2,15-dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecane', RT-exact (measured 2026-10-09).
 HYDRO_FUSED_FRAGMENT = "C=C(C)C1CC=C2C(C)=CCCC2(C)C1"
-PIN_TIER_FAILING_FRAGMENT = "CC(=O)OC1CCC2(C)C(CCC3C2CCC2(C)C(O)CCC32)C1"
+PIN_TIER_FAILING_FRAGMENT = "CC(=O)C1CCC2C3CCC4CC(O)CCC4(C)C3CCC12C"
 
 # 74-heavy-atom lipopeptide (fatty-acyl N-cap + 6 amide-linked residues,
 # non-standard/branched residues). VERIFIED (this session, monkeypatch trace):
@@ -248,7 +258,7 @@ class TestT4RescueMechanism:
         to the fragment's full InChIKey (TRIAGE got_rt=exact; re-measured
         2026-09-25). So the test now asserts (a) that measured truth for
         GPI_FAILING_FRAGMENT, and (b) the anchor's original claim on
-        PIN_TIER_FAILING_FRAGMENT (re-pointed 2026-10-08 to a steroid), which
+        PIN_TIER_FAILING_FRAGMENT (re-pointed 2026-10-08 to a steroid, again 2026-10-09), which
         still fails both PIN rungs and which the rung names RT-exact. The GPI fragment's spelling
         '(6-sulfanylhexyloxy)' (an enclosing-mark defect) is Task 5's, so no
         spelling is pinned here -- only round-trip identity.

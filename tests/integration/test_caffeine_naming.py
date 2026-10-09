@@ -3,7 +3,7 @@ Integration tests for caffeine family (xanthine derivatives) naming.
 
 Tests end-to-end naming through the full Orthonym pipeline for:
 - Caffeine: 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione
-- Theophylline: 1,3-dimethyl-7H-purine-2,6-dione
+- Theophylline: 1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione
 - Theobromine: 3,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione
 - Related xanthine derivatives
 
@@ -65,22 +65,31 @@ class TestTheophyllineNaming:
         """Theophylline should return full systematic IUPAC name."""
         smiles = 'Cn1c2c(c(=O)n(c1=O)C)[nH]cn2'
         result = name_compound(smiles)
-        expected = '1,3-dimethyl-7H-purine-2,6-dione'
+        # Same family form as caffeine/theobromine: the 2,6-dione needs the hydro prefixes
+        # plus indicated hydrogen ('7H-purine-2,6-dione' under-counts hydrogen and is not
+        # the PIN). Commit 921908d55 (purine-2,6-dione class: "theophylline emitted the
+        # non-preferred 7H- form (PIN is 3,7-dihydro-1H-)");: 'added indicated
+        # hydrogen' atoms are not cited when a pair of principal characteristic groups
+        # simply removes a double bond.
+        expected = '1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione'
         assert result == expected, f"Expected '{expected}', got '{result}'"
 
     @pytest.mark.integration
     def test_theophylline_no_saturation(self):
-        """Theophylline should NOT have dihydro prefix."""
+        """Theophylline should have the 3,7-dihydro prefix (as caffeine does)."""
         smiles = 'Cn1c2c(c(=O)n(c1=O)C)[nH]cn2'
         result = name_compound(smiles)
-        assert 'dihydro' not in result, f"Unexpected 'dihydro' in name, got '{result}'"
+        # The two C=O groups of the 2,6-dione remove double bonds of the mancude purine;
+        # the hydro prefixes account for them (commit 921908d55).
+        assert '3,7-dihydro' in result, f"Expected '3,7-dihydro' in name, got '{result}'"
 
     @pytest.mark.integration
     def test_theophylline_indicated_h(self):
-        """Theophylline should have 7H indicated hydrogen."""
+        """Theophylline should have 1H indicated hydrogen with the 3,7-dihydro prefix."""
         smiles = 'Cn1c2c(c(=O)n(c1=O)C)[nH]cn2'
         result = name_compound(smiles)
-        assert '7H-purine' in result, f"Expected '7H-purine' in name, got '{result}'"
+        # Commit 921908d55: PIN is the '3,7-dihydro-1H-purine' family form, not '7H-purine'.
+        assert '3,7-dihydro-1H-purine' in result, f"Expected '3,7-dihydro-1H-purine' in name, got '{result}'"
 
     @pytest.mark.integration
     def test_theophylline_dimethyl(self):
@@ -124,11 +133,12 @@ class TestXanthineFamily:
         # Caffeine
         ('Cn1cnc2c1c(=O)n(c(=O)n2C)C', '1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione', 'caffeine'),
         # Theophylline
-        ('Cn1c2c(c(=O)n(c1=O)C)[nH]cn2', '1,3-dimethyl-7H-purine-2,6-dione', 'theophylline'),
+        ('Cn1c2c(c(=O)n(c1=O)C)[nH]cn2', '1,3-dimethyl-3,7-dihydro-1H-purine-2,6-dione', 'theophylline'),
         # Theobromine
         ('Cn1cnc2c1c(=O)[nH]c(=O)n2C', '3,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione', 'theobromine'),
-        # Paraxanthine
-        ('Cn1c(=O)[nH]c(=O)c2ncn(C)c12', '1,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione', 'paraxanthine'),
+        # Paraxanthine (1,7-dimethylxanthine; the earlier SMILES here was 3,9-dimethylxanthine,
+        # which only passed while name_oxo_purine always put the six-ring N-H at N1, e3b439eb6)
+        ('Cn1c(=O)c2c(ncn2C)[nH]c1=O', '1,7-dimethyl-3,7-dihydro-1H-purine-2,6-dione', 'paraxanthine'),
         # Xanthine (parent): 'xanthine' does not occur in the Blue Book (0 hits);
         # "the PIN is 7H-purine" (the Blue Book)
         ('O=c1[nH]c(=O)c2[nH]cnc2[nH]1', '3,7-dihydro-1H-purine-2,6-dione', 'xanthine'),

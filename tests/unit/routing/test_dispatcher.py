@@ -55,7 +55,13 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
         (StoutClass.RADICAL,                 ("[CH3]",                  "methyl")),
         (StoutClass.ZWITTERION,              ("[NH3+]CC(=O)[O-]",       "glycine")),
         (StoutClass.ANION_RETAINED,          ("CC(=O)[O-]",             "acetate")),
-        (StoutClass.CATION_RETAINED,         ("C[N+](C)(C)C",           "tetramethylammonium")),
+        # 12541211e (cluster C): an alkylammonium is a substitutive aminium PIN, so
+        # C[N+](C)(C)C routes via CATION_QUATERNARY@480 (below). CATION_RETAINED keeps the
+        # parent-hydride cation: "Cations centers in parent hydrides",
+        # "General rule for systematically naming cationic centers in parent hydrides"
+        # (the Blue Book) 'H4N+ azanium (preselected name)'.
+        (StoutClass.CATION_RETAINED,         ("[NH4+]",                 "azanium")),
+        (StoutClass.CATION_QUATERNARY,       ("C[N+](C)(C)C",           "N,N,N-trimethylmethanaminium")),  #, the Blue Book '(PIN)'
         (StoutClass.ANION_SMALL,             ("C(=O)([O-])CCCCCC",      "heptanoate")),
         (StoutClass.POLY_ANION,              ("[O-]C(=O)CCCC(=O)[O-]",  "pentanedioate")),
         (StoutClass.MULTI_COMPONENT_NEUTRAL, ("CCO.OCC",                "ethanol ethanol")),
@@ -69,7 +75,10 @@ STOUTCLASS_REPRESENTATIVES: "OrderedDict[StoutClass, tuple]" = OrderedDict(
         #: peptide PIN is the SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
         (StoutClass.PEPTIDE,                 ("NCC(=O)NCC(=O)O",        "(2-aminoacetamido)acetic acid")),
         (StoutClass.RETAINED_NAME,           ("CCO",                    "ethanol")),
-        (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "alanine")),  # -07: retained PIN (was systematic '(2S)-2-aminopropanoic acid')
+        # A defined-configuration amino acid carries its D/L prefix: "The
+        # stereodescriptors 'D' and 'L'" (the Blue Book-54295, "as drawn below for
+        # L-alanine"); OPSIN parses 'L-alanine' to this input's full InChIKey.
+        (StoutClass.AMINO_ACID,              ("C[C@H](N)C(=O)O",        "L-alanine")),
         # fix a performance pass: (the Blue Book) -- the 'a' name is the PIN
         # only with four or more heterounits, so the representative is the BB's own
         # four-O chain, "(4) 2,5,8,11-tetraoxadodecane (PIN)" (:27762); the former

@@ -170,4 +170,9 @@ def test_general_acyclic_loc_target():
     # Ceiling raised 300->320 (task-W2 Witness B): the handler gained the OPSIN-free
     # atom-coverage close (a one-line _w2_atom_coverage_declines call + its import; the
     # check body itself lives in _handler_shared to keep this handler thin).
-    assert 100 <= loc <= 320, f"general_acyclic.py LOC = {loc}, expected 100-320"
+    # Ceiling raised 320->350 on purpose: 8ae2bccf1 (a measured complete atom partition
+    # replaces the ratio floor; 320 -> 332 lines) and 0ae52bc59 (a chain parent compound
+    # with one substitutable atom cites no prefix locant; 332 -> 341 lines) each added
+    # the handler logic that the fix needs. This is an internal size budget, not a
+    # nomenclature assertion: the floor and the intent (a thin handler) are unchanged.
+    assert 100 <= loc <= 350, f"general_acyclic.py LOC = {loc}, expected 100-350"

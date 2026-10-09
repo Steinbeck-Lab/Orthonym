@@ -207,26 +207,42 @@ def test_naming_rate_maintained(smiles, expected_name):
 # A sampling of the 75 golden canary compounds that round-trip correctly.
 # These must produce EXACTLY the expected name (not just non-unknown).
 
+# Rows whose expected name changed keep their original pytest id (an id derived from
+# the old expected name) so the row identity is stable across the suite history.
 CANARY_SAMPLE = [
-    (
+    # (the Blue Book): a compound substituent prefix is alphanumerised at the first
+    # letter of its complete name, so '(4-hydroxy-...)' (h) precedes '(2,4,6-trihydroxy-
+    #...)' (t); cf. '7-(1,2-difluorobutyl)-5-ethyltridecane (PIN)', the Blue Book.
+    pytest.param(
         "COc1cc(CC(=O)C(=O)c2c(O)cc(O)c(OC)c2O)cc(OC)c1O",
-        "1-(2,4,6-trihydroxy-3-methoxyphenyl)-3-(4-hydroxy-3,5-dimethoxyphenyl)propane-1,2-dione",
+        "3-(4-hydroxy-3,5-dimethoxyphenyl)-1-(2,4,6-trihydroxy-3-methoxyphenyl)propane-1,2-dione",
+        id="1-(246-trihydroxy-3-methoxyphenyl)-3-(4-hydroxy-",
     ),
-    (
+    # lowest locants: the suffix (carboxylic acid) takes locant 2, so the
+    # methyl is at 5 criterion (c)).
+    pytest.param(
         "Cc1ccc(C(=O)O)s1",
-        "2-methylthiophene-5-carboxylic acid",
+        "5-methylthiophene-2-carboxylic acid",
+        id="2-methylthiophene-5-carboxylic_acid",
     ),
     (
         "SS",
         "disulfane",
     ),
-    (
+    # (the Blue Book): the parent implies the 8,9,10,13,14 configuration and the
+    # remaining centres are given as alpha/beta (Greek symbols, b946aa5e0); the terminal
+    # 'e' is kept before the consonant of '-diol'.
+    pytest.param(
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol",
+        "5β-androstane-3α,17α-diol",
+        id="(3R5R8R9S10S13S14S17R)-androstan-317-diol",
     ),
-    (
+    # Peptides: the PIN is the substitutive name, method (1) (the Blue Book);
+    # the Chapter peptide names are not PINs, the Blue Book); 4f2284331.
+    pytest.param(
         "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
-        "L-leucyl-L-serylglycine",
+        "{(2S)-2-[(2S)-2-amino-4-methylpentanamido]-3-hydroxypropanamido}acetic acid",
+        id="L-leucyl-L-serylglycine",
     ),
     (
         "C=CC(=O)CCCC",
@@ -236,21 +252,40 @@ CANARY_SAMPLE = [
         "CCCCCC/C=C/C=C(\\CCCC(=O)O)[N+](=O)[O-]",
         "(5E,7E)-5-nitrotetradeca-5,7-dienoic acid",
     ),
-    (
+    pytest.param(
         "N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](Cc1ccc(O)cc1)C(=O)N[C@@H](CO)C(=O)O",
-        "L-tryptophyl-L-tyrosyl-L-serine",
+        "(2S)-2-{(2S)-2-[(2S)-2-amino-3-(1H-indol-3-yl)propanamido]-3-(4-hydroxyphenyl)propanamido}-3-hydroxypropanoic acid",
+        id="L-tryptophyl-L-tyrosyl-L-serine",
     ),
-    (
+    pytest.param(
         "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCCCN)C(=O)N[C@@H](CS)C(=O)O",
-        "L-lysyl-L-threonyl-L-cysteine",
+        "(2R)-2-{(2S,3R)-2-[(2S)-2,6-diaminohexanamido]-3-hydroxybutanamido}-3-sulfanylpropanoic acid",
+        id="L-lysyl-L-threonyl-L-cysteine",
     ),
     (
         "CC(C)CCCC(C)CCCC(C)CCCC(C)CCCC(C)CCCC(C)CCCC(C)C",
         "2,6,10,14,18,22,26-heptamethylheptacosane",
     ),
+    # L5 (TRIAGE pin-path-double-cited-hydroxy-prefix-and-suffix): the old
+    # '2-(acetyloxy)-4-hydroxyheptadec-16-yn-1-ol' cites the 4-OH as a prefix and keeps a
+    # single '-1-ol'; since the same-class alcohols were merged into one multiplied suffix
+    # (audit fix 2026-06-22) the ester-demotion path cited the 4-OH TWICE,
+    # '2-(acetyloxy)-4-hydroxyheptadec-16-yne-1,4-diol', which reads as a gem-diol (OPSIN:
+    # RBGVRZZBBJVDNQ, one extra O). The re-selected principal group now drops its same-class
+    # subtypes from the prefix loop too, as at the top of name_polyfunctional.
+    # (the Blue Book, heading 'SENIORITY ORDER FOR PARENT STRUCTURES'): the
+    # parent has the maximum number of principal characteristic groups, so both OH are the
+    # suffix: '3-(4-chlorobutyl)pentane-1,4-diol (PIN)' (:18883). The name is OPSIN
+    # full-InChIKey exact but NOT the PIN: the ester is senior to the alcohol,:18158),
+    # so the PIN is the functional-class '1,4-dihydroxyheptadec-16-yn-2-yl acetate'
+    # 'Esters cited as prefixes', heading:31696, sentence:31698: the 'acyloxy'
+    # prefix only when another group has priority as principal group or the ester cannot be
+    # described by the ester methods); name_substituent cannot spell the unsaturated
+    # hydroxylated alkyl, so rules/esters.py:name_polyfunctional_ester_via_acid declines.
+    # The test id keeps the old name (_CANARY_ID_KEEP).
     (
         "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O",
-        "2-(acetyloxy)-4-hydroxyheptadec-16-yn-1-ol",
+        "2-(acetyloxy)heptadec-16-yne-1,4-diol",
     ),
     (
         "CCCCC/C=C\\C/C=C\\C/C=C\\C/C=C\\C[C@@H](O)CC(=O)O",
@@ -258,9 +293,15 @@ CANARY_SAMPLE = [
     ),
 ]
 
+# A row whose expected name changed keeps the id it had (names -> ids below).
+_CANARY_ID_KEEP = {
+    "2-(acetyloxy)heptadec-16-yne-1,4-diol": "2-(acetyloxy)-4-hydroxyheptadec-16-yn-1-ol",
+}
 _CANARY_IDS = [
-    name[:50].replace(" ", "_").replace(",", "")
-    for _, name in CANARY_SAMPLE
+    # a pytest.param row carries its own stable id
+    row.id if hasattr(row, "id")
+    else _CANARY_ID_KEEP.get(row[1], row[1])[:50].replace(" ", "_").replace(",", "")
+    for row in CANARY_SAMPLE
 ]
 
 

@@ -1651,6 +1651,76 @@ def _p41_rank(name: Optional[str]) -> Optional[int]:
     return min(SENIORITY_ORDER.index(m) for m in members if m in SENIORITY_ORDER)
 
 
+def _unproven_split_key(mol, bond: Dict, style: str):
+    """The key of one split's unproven verdict (``_try_single_bond_decompose``): the atom-ordered
+    graph and the bond the split cuts, the style, and everything else the fragment namings read
+    (the ambient breadth context, the N-acyl float scope, the peptide re-entrancy flag, the
+    locant and isotope scopes, the fragment-session depth)."""
+    from ..assembly.fragment_naming import _session_depth
+    from ..assembly.locant_omission import (_ISOTOPE_PARENT_POSITIONAL,
+                                            _ISOTOPIC_NAMING_SCOPE,
+                                            forced_locant_reason)
+    from ..assembly.substituent_enumerator import _mol_graph_key
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    from ..routing import dispatch_table as _dispatch_table
+    return (_mol_graph_key(mol), bond["type"], bond.get("bond_idx"), bond.get("acid_atom"),
+            bond.get("alkyl_atom"), bond.get("amine_atom"), bool(bond.get("roles_swapped")),
+            style, general_fallback_ctx.get(), best_effort_ctx.get(),
+            allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+            nacyl_float_refusing(), _dispatch_table._PEPTIDE_SUBST_ACTIVE,
+            forced_locant_reason(), _ISOTOPIC_NAMING_SCOPE.get(),
+            _ISOTOPE_PARENT_POSITIONAL.get(), _session_depth())
+
+
+#: The share of a molecule's analysis-call budget (``fragment_naming._ANALYSIS_CALL_BUDGET``)
+#: that its searches may spend on other bonds, from the start of its first unproven split: one
+#: eighth (62 of 500 calls). The first unproven split of the three 70-130-atom molecules
+#: of the sample split cost 10, 104 and 104 calls (naming the remainder); the nine
+#: diacylglycerophospholipids and sterol / terpene esters whose other ester gives the name cost
+#: 0-3 and need under 8 more.
+_UNPROVEN_EXPLORATION_SHARE = 8
+
+
+def _note_unproven_split(budget_before) -> None:
+    """Fix, once per naming scope and when the first unproven split is met, the level of the
+    analysis-call budget at which the molecule's searches stop opening other bonds
+    (``_exploration_exhausted``): the share below the level ``budget_before`` the budget
+    stood at when that split was begun, so the split's own cost is part of the share. No level
+    without an armed budget or a naming scope."""
+    from ..assembly import fragment_naming as _fn
+    from ..assembly import memo as _memo
+    if _memo.side_get("unproven_exploration", "floor") is not None:
+        return
+    ceiling = _fn._ANALYSIS_CALL_BUDGET
+    floor = (budget_before - max(1, ceiling // _UNPROVEN_EXPLORATION_SHARE)
+             if budget_before is not None and ceiling > 0 else False)
+    _memo.side_put("unproven_exploration", "floor", floor)
+
+
+def _exploration_exhausted() -> bool:
+    """True when the naming scope has spent the share of its analysis-call budget that the
+    searches may spend on other bonds once the molecule has met an unproven split
+    (``_note_unproven_split``). A molecule that met none has no share and is never bounded.
+
+    The search that follows an unproven split cleaves every other bond, names each remainder
+    (up to 120 atoms) in full, and does so again in every remainder it names: it is the
+    far larger search a molecule the general pipeline names in 30 s may never leave (four
+    70-130-atom molecules ran out of the budget in it and were abstained, or ran 64 s). It is
+    kept where it is cheap (a diacylglycerophosphoglycerol finds the ester name of its other
+    ester in fewer than 8 analysis calls) and ends once its share is spent, the first split's own
+    cost included: a split whose remainder alone costs the share (104 calls for a 126-atom
+    alcohol) opens nothing more, and the molecule is named by the general pipeline with the rest
+    of the budget. A count of operations, not a clock."""
+    from ..assembly import fragment_naming as _fn
+    from ..assembly import memo as _memo
+    floor = _memo.side_get("unproven_exploration", "floor")
+    if floor is None or floor is False:
+        return False
+    remaining = getattr(_fn._fragment_guard, "analysis_budget", None)
+    return remaining is not None and remaining <= floor
+
+
 def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[str]:
     """Attempt decomposition using a single bond.
 
@@ -1668,8 +1738,25 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
         Assembled multi-component IUPAC name, or None if decomposition
         fails at any step (capping, size guard, fragment naming, assembly).
     """
+    from ..assembly import fragment_naming as _fn
+    from ..assembly import memo as _memo
     from .fragment_assembly import assemble_fragment_name
     from .fragment_capping import cleave_and_cap
+
+    # The level of the analysis-call budget when this split is begun (``_note_unproven_split``).
+    _budget_before = getattr(_fn._fragment_guard, "analysis_budget", None)
+
+    # An unproven verdict is final for the molecule being named: the same split asked again
+    # (the decomposition is entered again from the charged-route re-entry and from every
+    # fragment naming that reaches the same remainder) names the same fragments, gets the same
+    # answer from the assembler, and cannot prove it. The first ask names the remainder in full;
+    # a repeat must not name it again (each repeat of a 120-atom remainder charges the analysis
+    # budget its first naming charged). Held for the naming scope only, and not read in
+    # ``verify`` mode, which recomputes.
+    _split_key = _unproven_split_key(mol, bond, style) if _memo._MODE == "on" else None
+    if _split_key is not None and _memo.side_get("unproven_split", _split_key):
+        _note_unproven_split(_budget_before)
+        return None
 
     # Cleave and cap
     # For ether bonds, the acid side (larger fragment) gets H-cap (no OH),
@@ -1839,11 +1926,21 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
     # Incr-1a: thread the parent SMILES too -- the glycoside assembler
     # RT-gates the STRUCTURAL aglycone-substituent fallback against it (0-wrong).
     # Purely additive; every other assembler ignores the kwarg.
+    _outcome: Dict[str, str] = {}
     _assembled = assemble_fragment_name(
         bond["type"], fragment_names, style=style,
         fragment_smiles=fragment_smiles,
         parent_smiles=Chem.MolToSmiles(mol),
+        outcome=_outcome,
     )
+    # An assembler that proves its group word returns None when no candidate round-trips, and
+    # reports that it built a name it could not prove: the split is UNPROVEN, which is not the
+    # same as unnamed. The name is not used. The molecule's searches are bounded from here
+    # (``_exploration_exhausted``); a repeat of the split is not named again.
+    if not _assembled and _outcome.get("unproven"):
+        _note_unproven_split(_budget_before)
+        if _split_key is not None:
+            _memo.side_put("unproven_split", _split_key, True)
     if bond["type"] == "ester" and _assembled:
         # Branch review fixes, the Blue Book;:18875):
         # when another ester group shares this ester's acid parent the molecule is
@@ -2405,6 +2502,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
             continue
         if len(tried_indices) >= MAX_BOND_RETRY_ATTEMPTS:
             break
+        if _exploration_exhausted():
+            break
         tried_indices.add(bond["bond_idx"])
         alt_result = _try_single_bond_decompose(mol, bond, style)
         # Coverage gate on retry results
@@ -2421,7 +2520,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # cleavable bonds of multiple types, try iterative decomposition.
     if not single_result or not _name_quality_is_acceptable(single_result, mol):
         bond_types_present = set(b["type"] for b in bonds)
-        if len(bond_types_present) >= 2 and mol.GetNumHeavyAtoms() > 30:
+        if (len(bond_types_present) >= 2 and mol.GetNumHeavyAtoms() > 30
+                and not _exploration_exhausted()):
             iterative_result = _try_iterative_mixed_decompose(mol, bonds, style)
             if iterative_result:
                 if not (existing_name and _decomposition_is_worse(iterative_result, existing_name, mol)):
@@ -2436,7 +2536,7 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     # Only attempt when single-bond produced no result at all.
     from collections import Counter as _BondCounter
     bond_type_counts = _BondCounter(b["type"] for b in bonds)
-    if not single_result:
+    if not single_result and not _exploration_exhausted():
         for bond_type_key, count in bond_type_counts.most_common():
             threshold = _MULTI_BOND_THRESHOLD.get(bond_type_key, 99)
             if count >= threshold:
@@ -2455,7 +2555,8 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
     if not single_result or not _name_quality_is_acceptable(single_result, mol):
         total_cleavable = sum(bond_type_counts.values())
         ester_count = bond_type_counts.get("ester", 0)
-        if total_cleavable >= 3 and ester_count >= 2 and len(bond_type_counts) >= 2:
+        if (total_cleavable >= 3 and ester_count >= 2 and len(bond_type_counts) >= 2
+                and not _exploration_exhausted()):
             # Only apply relaxation if standard threshold was NOT reached
             if ester_count < _MULTI_BOND_THRESHOLD.get("ester", 99):
                 ester_bonds = [b for b in bonds if b["type"] == "ester"]

@@ -252,6 +252,33 @@ def get_fg_prefix_form(
     return get_prefix(fg_name)
 
 
+#: FG classes whose prefix is built from the groups on the heteroatom. The table form
+#: (``get_prefix``: 'sulfonyl', 'sulfinyl',...) names the S=O core ONLY: it is what the
+#: dispatcher falls back to when it cannot name the substituent on S.
+_GROUP_BEARING_PREFIX_FGS = frozenset({
+    'sulfoxide', 'sulfone', 'selenoxide', 'selenone', 'telluroxide', 'tellurone',
+})
+
+
+def _group_bearing_prefix(fg_name: str, mol, matches, principal_chain) -> Optional[str]:
+    """The prefix of a group-bearing FG (sulfone, sulfoxide,...) for ALL its matches, or
+    None when a prefix cannot be given faithfully.
+
+    ``get_fg_prefix_form`` answers for one match, and falls back to the bare table form
+    ('sulfonyl') when it cannot name what is on the sulfur; applied to every match, that
+    bare form spells the group without its substituent ('3-hydroxy-4-sulfonylbutanoic
+    acid' for the carboxymethyl sulfone). A form the matches do not share, or the bare
+    table form, is no prefix: the substituent walk names the branch or the handler
+    declines."""
+    forms = {get_fg_prefix_form(fg_name, mol, m, principal_chain) for m in matches}
+    if len(forms) != 1:
+        return None
+    form = next(iter(forms))
+    if not form or form == get_prefix(fg_name):
+        return None
+    return form
+
+
 def _get_alkoxy_prefix(
     mol,
     ether_atoms: tuple,
@@ -1094,6 +1121,12 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
 
     # --- Step 5: Generate non-principal FG prefixes with ring locants ---
     all_prefixes = []
+    # The FG matches Step 5 really named (their FG has a prefix form). Step 6 may
+    # treat only these as "accounted for": consuming the atoms of a group that has
+    # no prefix form (a phosphate / sulfate diester,...) hid its whole branch from
+    # the universal walk and nobody named it ('cyclohexane-1,2,3,4,5-pentol' for a
+    # glycerophosphoinositol: the glycerophosphate lost).
+    _step5_named_matches: set = set()
     # task 9 consumption plumbing: atoms named by an exocyclic
     # carbon-including prefix (formyl/n-oxoalkyl/...) must be consumed even
     # when outside the SMARTS match (the CH2 of -CH2CHO); atoms of a branch
@@ -1134,11 +1167,13 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             _ia_locs.sort()
             all_prefixes.append(format_fg_prefix(
                 'C-hydroxycarbonimidoyl', _ia_locs, len(_ia_locs)))
+            _step5_named_matches.update(tuple(_m) for _m in matches)
             continue
         if fg_name in NO_SENIORITY_GROUPS and fg_name not in ('alkene', 'alkyne'):
             # Named as prefix if it has a prefix form
             prefix_form = get_fg_prefix_form(fg_name, mol, matches[0], None)
             if prefix_form:
+                _step5_named_matches.update(tuple(_m) for _m in matches)
                 fg_locants = []
                 for match in matches:
                     for atom_idx in match:
@@ -1158,8 +1193,11 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             continue
 
         # Seniority-bearing non-principal groups
-        prefix_form = get_prefix(fg_name)
+        prefix_form = (
+            _group_bearing_prefix(fg_name, mol, matches, None)
+            if fg_name in _GROUP_BEARING_PREFIX_FGS else get_prefix(fg_name))
         if prefix_form:
+            _step5_named_matches.update(tuple(_m) for _m in matches)
             fg_locants = []
             _diverted = 0
             for match in matches:
@@ -1271,6 +1309,8 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             # test_mirror_shape_methoxycarbonyl_ring_diacid_monoester.
             if fg_name == 'ester' and match[-1] not in ring_set:
                 continue
+            if tuple(match) not in _step5_named_matches:
+                continue  # no prefix was emitted for it: leave the branch to the walk
             for idx in match:
                 if idx not in ring_set:
                     consumed_atoms.add(idx)
@@ -1287,11 +1327,16 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
             oriented_ring=ring_atoms,
             atom_to_locant=atom_to_locant,
             exclude_atoms=consumed_atoms,
+            fail_closed=True,
         )
         if sub_prefix_str:
             all_prefixes.append(sub_prefix_str)
     except Exception as exc:
+        # A branch the universal pipeline could not name (or a discovery that
+        # failed) used to be dropped here and the ring named without it. Decline:
+        # the next producer names the whole molecule.
         logger.debug("Ring-as-parent universal prefix failed: %s", exc)
+        return None
 
     # Sort prefixes alphabetically, with lowest-locant
     # tie-break for identical-letter prefixes.
@@ -2098,12 +2143,16 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # (e.g. >1 ester, or a junior group on the removed alkyl side).
     ester_acyloxy_prefixes = []
     _esters_demoted = False
+    # Atoms of the esters this block turns into 'acyloxy' prefixes: the walk below may
+    # treat those branches as named (see ``_fg_prefix_atoms``).
+    _demoted_ester_atoms: Set[int] = set()
     if principal_group == "ester":
         from ..rules.esters import name_ester_as_prefix
         ester_matches = features.functional_groups.get("ester", [])
         for match in ester_matches:
             acyloxy = name_ester_as_prefix(mol, match)
             if acyloxy:
+                _demoted_ester_atoms.update(match)
                 # Find the alkyl carbon (last in match) on the principal chain
                 alkyl_c = match[-1] if len(match) >= 4 else match[3] if len(match) > 3 else None
                 locant = atom_to_locant.get(alkyl_c) if alkyl_c is not None else None
@@ -2121,6 +2170,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             # Update non_principal to exclude the new principal group
             non_principal = {k: v for k, v in filtered_fgs.items()
                             if k != new_principal and k not in ("alkene", "alkyne")}
+            # The re-selected principal group unions every present subtype of its
+            # equal-seniority class into ``principal_group_atoms`` (alcohols: one
+            # multiplied '-1,4-diol'), so the same-class subtypes must leave the
+            # prefix loop here too, exactly as at the top of this function. Without
+            # this the secondary OH of 'C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O' was cited
+            # twice, '4-hydroxy' and '-1,4-diol', which reads as a gem-diol.
+            non_principal = _drop_union_class_subtypes(non_principal, principal_group)
 
     # Collect all prefixes (FG prefixes + alkyl substituents)
     all_prefixes = []
@@ -2295,6 +2351,14 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     #: already-rendered prefix.
     _l3_render_from = None
 
+    # Atoms of the FG matches whose iteration of the loop below EMITTED a prefix.
+    # The substituent walk may hand a branch to the FG loop only when the loop
+    # really named it; this set is the proof (see `fg_prefix_atoms` there). An
+    # iteration is credited when `all_prefixes` grew during it, whichever of the
+    # loop's many arms did the appending.
+    _fg_prefix_atoms: Set[int] = set(_demoted_ester_atoms)
+    _fg_iter_mark = None
+
     # Collect substituent branch atoms for FG-on-branch filtering (BUG-B).
     # FGs located entirely on a substituent branch are already named by the
     # substituent naming path (e.g., hydroxymethyl), so skip them here.
@@ -2307,6 +2371,11 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     for fg_name, matches in non_principal.items():
         if not matches:
             continue
+
+        # Credit the previous iteration with its atoms when it emitted a prefix.
+        if _fg_iter_mark is not None and len(all_prefixes) > _fg_iter_mark[0]:
+            _fg_prefix_atoms.update(_fg_iter_mark[1])
+        _fg_iter_mark = (len(all_prefixes), {a for _m in matches for a in _m})
 
         # When chain is parent, separate FGs on ring from FGs on chain
         if getattr(features, 'chain_is_parent', False):
@@ -3142,9 +3211,13 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             matches = _ester_kept
 
         # Get prefix form for this FG
-        prefix_form = get_fg_prefix_form(
-            fg_name, mol, matches[0], principal_chain
-        )
+        if fg_name in _GROUP_BEARING_PREFIX_FGS:
+            prefix_form = _group_bearing_prefix(
+                fg_name, mol, matches, principal_chain)
+        else:
+            prefix_form = get_fg_prefix_form(
+                fg_name, mol, matches[0], principal_chain
+            )
         if not prefix_form:
             # a phase tier-3 fallback : when a composite loser FG
             # has no clean strict-IUPAC prefix (the substituent_no_prefix_form case), decompose it into
@@ -3265,6 +3338,9 @@ def name_polyfunctional(features: Any) -> Optional[str]:
             ):
                 _l3_render_from = (prefix_form, count)
 
+    if _fg_iter_mark is not None and len(all_prefixes) > _fg_iter_mark[0]:
+        _fg_prefix_atoms.update(_fg_iter_mark[1])
+
     # --- Generate ring substituent prefixes (when chain is parent) ---
     if getattr(features, 'chain_is_parent', False):
         from ..assembly.composer import _generate_ring_substituent_prefixes
@@ -3280,9 +3356,18 @@ def name_polyfunctional(features: Any) -> Optional[str]:
 
     # --- Generate alkyl substituent prefixes ---
     if features.substituents:
+        # The alpha-chalcogen acetic arm below reads the =O/=S and the single-bonded
+        # chalcogen groups off the alpha carbon itself, so for that shape it names
+        # every carbon-free branch: no ownership claim is made for the walk to check.
+        _alpha_arm_names_branches = (
+            principal_group == 'carboxylic_acid'
+            and _alpha_chalcogen_acetic_name(
+                mol, principal_chain, atom_to_locant) is not None)
         alkyl_prefixes = _generate_alkyl_prefixes_for_polyfunctional(
             features, skip_acyloxy=_esters_demoted,
             exclude_branch_atoms=_amidine_excluded_n,
+            fg_prefix_atoms=(None if _alpha_arm_names_branches
+                             else _fg_prefix_atoms),
         )
         if alkyl_prefixes is None:
             # fail-closed (see the free-valence gate in that function):
@@ -3538,7 +3623,28 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     _chain_set = set(principal_chain)
     _pga_all = features.principal_group_atoms or []
     _pga_on_chain = [m for m in _pga_all if any(a in _chain_set for a in m)]
-    _pga_for_suffix = _pga_on_chain if _pga_on_chain else _pga_all
+    if _pga_all and not _pga_on_chain:
+        # A group whose own atoms exclude the chain (a heteroatom-centred acid such
+        # as -P(O)(OH) / -SO3H on a carbon chain: the match is the P and its O) is
+        # still ON the parent when it is bonded to a chain atom: that is how every
+        # suffix attaches to a skeleton. Only a group joined to no chain atom at all
+        # is off the parent.
+        _pga_on_chain = [
+            m for m in _pga_all
+            if any(nb.GetIdx() in _chain_set
+                   for a in m for nb in mol.GetAtomWithIdx(a).GetNeighbors())]
+    if _pga_all and not _pga_on_chain:
+        # 'SENIORITY ORDER FOR PARENT STRUCTURES', (the Blue Book:
+        # 18875): "The senior parent structure has the maximum number of
+        # substituents corresponding to the principal characteristic group
+        # (suffix)". A suffix names groups that sit ON the parent; a chain that
+        # holds none of them cannot carry it. This used to fall back to the whole
+        # off-chain list, which spelled an '-ol' / 'hexol' suffix on a chain none of
+        # those OH are on: a C20 acyl chain 'icosa-8,11,14-trienehexol' for a
+        # phosphatidylinositol (the six OH are the inositol's), 'propanol' for the
+        # ester O of histidyl adenylate. Decline, so the next producer names it.
+        return None
+    _pga_for_suffix = _pga_on_chain
     suffix_locants = []
     if _pga_for_suffix:
         suffix_locants = get_functional_group_locants(
@@ -4134,9 +4240,26 @@ def _acid_linked_poly_branch(mol, sub_atoms, features, check_fg_link: bool,
         acyl_carbon=acyl_carbon)
 
 
+def _branch_holds_oxoacid_group(mol, sub_atoms) -> bool:
+    """True when a substituent branch holds a P/S oxoacid group (a phosphate / sulfate ester,
+    a phosphonate,...).
+
+    The ownership proof (``fg_prefix_atoms``) does not reach these: the substituent walk
+    would name them in the legacy spelling ('[(2-aminoethoxy)hydroxyphosphoryl]oxy', no
+    enclosing mark after a compound prefix, where, the Blue Book, writes
+    '3-{[hydroxy(sulfanyl)phosphorothioyl]amino}propanoic acid (PIN)'), and the name would
+    ship labelled PIN. The branch is left to the wider-tier prefix builder
+    (``rules/oxoacid_group_prefix``, which labels its own spelling); measured, naming it here
+    instead of skipping it turned the default-tier decline of 'OC(=O)CCOP(=O)(O)OCCN' into a
+    pin_verified name and kept the glycerophospholipids out of the weaver."""
+    from .oxoacid_group_prefix import is_oxoacid_centre
+    return any(is_oxoacid_centre(mol, a) for a in sub_atoms)
+
+
 def _generate_alkyl_prefixes_for_polyfunctional(
     features: Any, skip_acyloxy: bool = False,
     exclude_branch_atoms: Optional[Set[int]] = None,
+    fg_prefix_atoms: Optional[Set[int]] = None,
 ) -> Optional[List[str]]:
     """
     Generate alkyl substituent prefixes for polyfunctional compounds.
@@ -4151,11 +4274,26 @@ def _generate_alkyl_prefixes_for_polyfunctional(
         exclude_branch_atoms: Atom indices whose containing substituent branch
                       must be skipped (owned by a dedicated FG-prefix path, e.g.
                        chain-terminal amidine N atoms named amino/imino).
+        fg_prefix_atoms: Atoms of the functional-group matches for which the
+                      FG-prefix loop of ``name_polyfunctional`` EMITTED a prefix.
+                      The walk may skip a branch as "named by the FG-prefix loop"
+                      only when its atoms are in this set; a thioether/ether/ester
+                      too large for ``get_sulfanyl_prefix`` / ``get_alkoxy_prefix``
+                      / the ester split got no prefix, so nobody has named its
+                      branch and the walk names it or refuses the handler.
+                      None = the caller keeps no such record (no new refusal).
     """
     from collections import defaultdict
 
     mol = features.mol
     substituent_groups: Dict[str, List[int]] = defaultdict(list)
+    # Atoms some part of this handler is known to name besides the walk itself:
+    # the principal group (the suffix) and every FG whose prefix the loop emitted.
+    _fg_proven = None
+    if fg_prefix_atoms is not None:
+        _fg_proven = set(fg_prefix_atoms)
+        for _pm in (getattr(features, 'principal_group_atoms', None) or ()):
+            _fg_proven.update(_pm)
 
     # Collect ring atoms that should be skipped (handled by ring substituent prefixes)
     ring_atoms_to_skip: set = set()
@@ -4407,8 +4545,18 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         substituent_groups[_g14].append(position)
                         continue
 
-            # Skip non-alkyl substituents
+            # A carbon-free branch nobody above named is skipped only when the
+            # functional-group loop (or the suffix) is KNOWN to name it. A group no
+            # FG pattern covers is named by no one: the =O of an acyl sulfate
+            # 'OCC(=O)OS(=O)(=O)O' is no ketone, no ester and no acid, so the name
+            # '2-(sulfooxy)ethan-1-ol' silently dropped it. Refuse the handler.
             if carbon_count == 0:
+                if _fg_proven is not None and not set(sub_atoms) <= _fg_proven:
+                    logger.debug(
+                        "FAILCLOSED-POLY-SUB: carbon-free branch named by no one "
+                        "atoms=%s smiles=%s", sorted(sub_atoms),
+                        getattr(features, 'canonical_smiles', '?'))
+                    return None
                 continue
 
             # Check for heteroatoms
@@ -4467,6 +4615,14 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                                     break
                             if _skip_s_branch:
                                 break
+                        # Ownership is a claim the FG loop must have kept: when it
+                        # emitted no prefix for this match, nobody has named the
+                        # branch and the walk may not skip it ('2-oxobutanoic
+                        # acid' for the S-(2-acetamido-2-carboxyethyl) thioether
+                        # of 'CC(=O)NC(CSCCC(=O)C(=O)O)C(=O)O').
+                        if (_fg_proven is not None and _attach not in _fg_proven
+                                and not _branch_holds_oxoacid_group(mol, sub_atoms)):
+                            _skip_s_branch = False
                     # OWNERSHIP, NOT ELEMENT. This veto used to read
                     # `_attach_sym != 'O'`, justified as "Ethers (O-attached) are
                     # handled by the FG prefix system". That holds only for a MONO
@@ -4491,6 +4647,11 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                         )
                         _o_owned_by_fg_prefix = not is_dichalcogen_bridge_attach(
                             mol, _attach, set(sub_atoms))
+                        # Same ownership proof as for the S branch above: an ether
+                        # or ester O whose FG match emitted no prefix is unowned.
+                        if (_fg_proven is not None and _attach not in _fg_proven
+                                and not _branch_holds_oxoacid_group(mol, sub_atoms)):
+                            _o_owned_by_fg_prefix = False
                     if (not sub_has_ring and not _o_owned_by_fg_prefix
                             and not _skip_s_branch):
                         from ..assembly.naming_utils import (
@@ -4593,11 +4754,16 @@ def _generate_alkyl_prefixes_for_polyfunctional(
                     alkyl_name = get_alkyl_name(carbon_count)
                     substituent_groups[alkyl_name].append(position)
                 except ValueError:
-                    continue
+                    # an alkyl longer than the stem table: nobody else names it
+                    return None
             else:
                 branch_name = _enumerate_pure_c_branch_name(mol, sub_atoms, features, position)
                 if branch_name:
                     substituent_groups[branch_name].append(position)
+                elif _fg_proven is not None and not set(sub_atoms) <= _fg_proven:
+                    # "Fail-closed if it declines" (W2F-P3 above): an all-carbon
+                    # branch the enumerator cannot name and no FG names is lost.
+                    return None
                 continue
 
     # Build formatted prefixes using format_substituent_prefix for proper

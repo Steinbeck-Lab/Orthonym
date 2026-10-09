@@ -142,12 +142,15 @@ class TestBug6Thiazolidine:
     def test_thiazolidine(self):
         """Thiazolidine: 5-membered ring with N and S not adjacent."""
         result = name_compound('C1CSCN1')  # S-C-C-N (not adjacent)
-        assert result == 'thiazolidine', f"Got {result}"
+        # 'Retained names of heteromonocycles' (the Blue Book): 'thiazolidine
+        #... 1,3-thiazolidine (PIN)' -- the Hantzsch-Widman locants belong to the PIN.
+        assert result == '1,3-thiazolidine', f"Got {result}"
 
     def test_isothiazolidine(self):
         """Isothiazolidine: 5-membered ring with N and S adjacent."""
         result = name_compound('C1CSNC1')  # S-N adjacent (canonicalizes to C1CNSC1)
-        assert result == 'isothiazolidine', f"Got {result}"
+        # (the Blue Book): 'isothiazolidine... 1,2-thiazolidine (PIN)'.
+        assert result == '1,2-thiazolidine', f"Got {result}"
 
 
 class TestRegressionExistingFunctionality:
@@ -231,7 +234,11 @@ class TestAdditionalCoverage:
     def test_naphthyl_carboxylate(self):
         """Test naphthalene carboxylate naming."""
         result = name_compound('O=C([O-])c1ccc2ccccc2c1')
-        assert 'naphthoate' in result.lower(), f"Got {result}"
+        # 'Retained names only for general nomenclature' (the Blue Book):
+        # '2-naphthoic acid (also 1-isomer) naphthalene-2-carboxylic acid (PIN)'; the anion
+        # is named from the PIN acid 'Anions derived from acids', the Blue Book:
+        # 40955: "by replacing the 'ic acid' [...] ending of the acid name by 'ate'").
+        assert result == 'naphthalene-2-carboxylate', f"Got {result}"
 
     def test_benzofuran(self):
         """Test benzofuran naming."""

@@ -151,19 +151,36 @@ _NO_PARENT_SMI = ("C1CC12[C@@H]3C=C([C@@H]([C@H]2[C@H]4[C@@H]3[C@@H]5"
 
 
 class TestEndToEndCodes:
+    # Replacement witnesses, re-verified 2026-10-09 under the max-breadth namer (gate off,
+    # as the suite runs). The bis(pyrazolyl)boranyl radical of ``_BRANCH_UNNAMEABLE_SMI`` is
+    # named now ('di(1H-pyrazol-5-yl)boranyl', the radical build), and the 13C-labelled
+    # diphenyl carbonate of ``_GATE_SUPPRESSED_SMI`` is named '{[phenoxy(13C)carbonyl]oxy}benzene',
+    # so neither can demonstrate an abstention any more.
+    #
+    # A phenyl branch on a hypervalent iodide centre that the whole best-effort substituent
+    # ladder declines: the ring-fallback census record fires at the ladder's true exhaustion.
+    # (It is the 'charge-conservation veto' example of namer.py's P10 veto block, a class the
+    # radical/ion builders do not reach.)
+    _RING_FALLBACK_SMI = "[I-](CCO)c1ccccc1"
+    # A metal coordination compound (cisplatin drawn with explicit NH3 ligands): the
+    # Java-free organometallic/coordination veto (namer.py, has_metal_coordination_bond;
+    # coordination compounds are out of scope, suppresses the generated name.
+    _COORDINATION_VETO_SMI = "[NH3][Pt]([NH3])(Cl)Cl"
+
     def test_branch_unnameable_fixture(self, be_namer):
         # A ring-bearing branch the whole best-effort substituent ladder declines
         # -> the enumerator_ring_fallback census record fires at the ladder's TRUE
         # exhaustion (fix) -> BRANCH_UNNAMEABLE.
-        result = be_namer.name(_BRANCH_UNNAMEABLE_SMI)
+        result = be_namer.name(self._RING_FALLBACK_SMI)
         assert is_failure_name(result), f"fixture must abstain, got {result!r}"
         assert abstention_code_for(result) is AbstentionCode.BRANCH_UNNAMEABLE
 
     def test_gate_suppressed_fixture(self, be_namer):
-        # structure-conservation veto (Java-free, runs with the OPSIN gate
-        # disabled): a generated name whose oxoacid/anhydride motif is illegal is
-        # suppressed post-generation -> GATE_SUPPRESSED.
-        result = be_namer.name(_GATE_SUPPRESSED_SMI)
+        # A Java-free veto (runs with the OPSIN gate disabled): the organometallic /
+        # metal-coordination veto suppresses the generated name post-generation ->
+        # GATE_SUPPRESSED. (The oxoacid/anhydride witness this test used to carry,
+        # a 13C-labelled diphenyl carbonate, is named now.)
+        result = be_namer.name(self._COORDINATION_VETO_SMI)
         assert is_failure_name(result), f"fixture must abstain, got {result!r}"
         assert abstention_code_for(result) is AbstentionCode.GATE_SUPPRESSED
 
@@ -179,7 +196,7 @@ class TestEndToEndCodes:
         # recorded only when the best-effort substituent ladder is fully exhausted
         # (moved out of _descriptive_fallback, which the PIN Tier-5 path also
         # reaches). A genuinely ring-fallback branch still records it.
-        result = be_namer.name(_BRANCH_UNNAMEABLE_SMI)
+        result = be_namer.name(self._RING_FALLBACK_SMI)
         assert is_failure_name(result)
         rec = peek_abstention()
         assert rec is not None and rec.detail == "enumerator_ring_fallback"
@@ -220,7 +237,7 @@ class TestEndToEndCodes:
     def test_slot_resets_between_top_level_calls(self, be_namer):
         # Failure first, then success: the success call clears the slot at
         # its top-level start, so no stale code leaks across molecules.
-        first = be_namer.name(_BRANCH_UNNAMEABLE_SMI)
+        first = be_namer.name(self._RING_FALLBACK_SMI)
         assert is_failure_name(first)
         assert abstention_code_for(first) is AbstentionCode.BRANCH_UNNAMEABLE
 
@@ -238,14 +255,31 @@ class TestEndToEndCodes:
 # Telemetry surface: name_with_confidence carries the code (additive key)
 # ---------------------------------------------------------------------------
 
+# A titanium complex: out of scope (organometallics,, so it stays unnamed under the
+# max-breadth namer whatever the organic producers come to name; its branch is the one that
+# records BRANCH_UNNAMEABLE. ``name_with_confidence`` names through ``name``, so the
+# organic fixture above (bis(pyrazolyl)boranyl, which ``name`` names as
+# 'di(1H-pyrazol-5-yl)boranyl') can no longer stand for an abstention here.
+_ORGANOMETALLIC_BRANCH_SMI = "CCC1=CC[C-]=C1C.CCC1=CC[C-]=C1C.CC(=[Ti+2])C.[Cl-].[Cl-]"
+
+
 class TestConfidenceSurface:
     def test_confidence_dict_carries_abstention_on_failure(self):
         meta = Orthonym(
             general_fallback=True, general_fallback_unverified=True,
             allow_aromatic_general=True).name_with_confidence(
-                _BRANCH_UNNAMEABLE_SMI)
+                _ORGANOMETALLIC_BRANCH_SMI)
         assert is_failure_name(meta["name"])
         assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
+
+    def test_confidence_name_is_the_name_of_name(self):
+        # One pipeline: name_with_confidence['name'] is what name gives, for a
+        # molecule only name's late rescue names (bis(pyrazolyl)boranyl radical,
+        # which the producer chain alone declines) and for one the producer chain names.
+        be = Orthonym(general_fallback=True, general_fallback_unverified=True,
+                      allow_aromatic_general=True)
+        for smi in ("[B](C1=CC=NN1)C2=CC=NN2", "[CH2]C", "CCO"):
+            assert be.name_with_confidence(smi)["name"] == be.name(smi), smi
 
     def test_confidence_dict_abstention_none_on_success(self):
         meta = Orthonym().name_with_confidence("CCO")

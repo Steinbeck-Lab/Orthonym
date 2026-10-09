@@ -140,7 +140,9 @@ def test_name_with_tree_tree_population_status(namer):
     from orthonym.assembly.name_tree_to_string import name_tree_to_string
 
     # Routes via dispatch_inner -> handler-populated tree.
-    for smi in ["CCCCO", "CN=C=O"]:  # general_acyclic (structured), isocyanate (coarse)
+    # general_acyclic (structured), isocyanate (coarse), sulfoxide (DMSO now dispatches
+    # through its handler: '(methanesulfinyl)methane (PIN)', the Blue Book under
+    for smi in ["CCCCO", "CN=C=O", "CS(=O)C"]:
         result = namer.name_with_tree(smi)
         assert isinstance(result.tree, NameTreeNode), (
             f"Expected a populated tree for {smi!r} (Phase 165 SCORE-01); "
@@ -150,7 +152,7 @@ def test_name_with_tree_tree_population_status(namer):
 
     # Functional-class name produced BELOW dispatch_inner -> boundary
     # coarse fallback (a phase Plan 04): non-null + parity, class_id marks it.
-    result = namer.name_with_tree("CS(=O)C")  # dimethyl sulfoxide (bypasses dispatch_inner)
+    result = namer.name_with_tree("CC(=O)OC")  # methyl acetate (bypasses dispatch_inner)
     assert isinstance(result.tree, NameTreeNode)
     assert name_tree_to_string(result.tree, "pin") == result.name
     assert result.tree.class_id == "coarse_fallback"

@@ -3,8 +3,9 @@
 The runtime cache stores (canonical SMILES -> name) pairs during a single
 naming session, avoiding redundant re-computation of the same fragment.
 
-Updated for cycle-detection architecture: session nesting is determined
-by visited-set emptiness, not a depth counter.
+Session nesting is an explicit counter (``session_depth``, cdb8db132), not the visited
+set's emptiness, and the fragment cache is owned by the name scope (``name_call_depth``,
+60cb5f8f6 / be5449980); the tests that need a nested or open session set those counters.
 """
 
 import threading
@@ -80,11 +81,19 @@ def test_end_clears_cache():
 
 
 def test_end_noop_when_nested():
-    """end_naming_session is a no-op when visited set is non-empty."""
+    """end_naming_session closes only the INNER session when sessions are nested: the outer
+    one keeps its cache and visited set.
+
+    "Nested" is the explicit ``session_depth`` counter (see ``start_naming_session``), not a
+    non-empty visited set; this test used to pass only on the depth the previous test leaked
+    (TRIAGE g8 C2, d093d2cb7: the autouse fixture now resets the counters)."""
     _get_visited().add("PARENT_SMILES")
+    _fragment_guard.session_depth = 2  # an outer session and one nested session are open
     _fragment_guard.cache = {"CCO": "ethanol"}
     end_naming_session()
     assert getattr(_fragment_guard, 'cache', None) == {"CCO": "ethanol"}
+    assert _fragment_guard.session_depth == 1
+    assert "PARENT_SMILES" in _get_visited()
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +101,13 @@ def test_end_noop_when_nested():
 # ---------------------------------------------------------------------------
 
 def test_cache_populates_on_success():
-    """Successful naming stores result in runtime cache."""
+    """Successful naming stores result in runtime cache.
+
+    The cache is owned by the name scope (60cb5f8f6, be5449980) and the session is an explicit
+    counter; the autouse fixture resets both counters to 0, so the test
+    opens the scope itself instead of relying on a depth leaked by an earlier test."""
+    _fragment_guard.name_call_depth = 1   # inside a name scope
+    _fragment_guard.session_depth = 1     # inside its naming session
     _fragment_guard.cache = {}
 
     # Name something not in the static cache

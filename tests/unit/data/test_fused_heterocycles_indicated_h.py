@@ -1,6 +1,6 @@
 """a phase.B unit tests: tautomer_locant per-entry catalog audit.
 
-Parametrized over all 153 FUSED_HETEROCYCLE_DATA entries. Each test asserts
+Parametrized over every FUSED_HETEROCYCLE_DATA entry. Each test asserts
 that the catalog's ``tautomer_locant`` matches the audit-derived
 ``expected_locant`` per the internal notes-B.md classification verdict.
 
@@ -33,8 +33,13 @@ import pytest
 
 from orthonym.data.fused_heterocycles import FUSED_HETEROCYCLE_DATA
 
-# Audit JSON sidecar: 153 entries, one per catalog row, classified by
-# ``scripts/audit_indicated_h.py`` against OPSIN round-trip.
+# Audit JSON sidecar: one entry per catalog row (220 at its 2026-10-09 regeneration),
+# classified by ``scripts/audit_indicated_h.py`` against OPSIN round-trip. Three
+# multi-indicated-hydrogen names ('2H,4H-', '3H,5H-', '1H,3H-') are classified
+# CORRECT-locant by hand: the script's ``^(\d+)H-`` prefix pattern does not match a
+# ``nH,mH-`` prefix and reports them WRONG-locant, but the catalogue locant equals the
+# first indicated-H locant of each name, which is the signal the script reads for
+# every other prefix.
 _AUDIT_JSON = (
     Path(__file__).resolve().parents[2]
     / "fixtures"

@@ -47,12 +47,17 @@ class TestPhosphonicAcidE2E:
     """E2E tests for phosphonic acid naming (PHOSPH-04)."""
 
     def test_methanephosphonic_acid(self):
-        """CP(=O)(O)O -> methanephosphonic acid (PHOSPH-04)"""
-        assert name_compound("CP(=O)(O)O") == "methanephosphonic acid"
+        """CP(=O)(O)O -> methylphosphonic acid (PHOSPH-04).
+
+        'CH3-P(O)(OH)2 methylphosphonic acid (PIN)', the Blue Book; the parent-hydride-stem
+        form is rejected ('ethylphosphonic acid (PIN) (not ethanephosphonic acid)',
+        the Blue Book); 9ab971737."""
+        assert name_compound("CP(=O)(O)O") == "methylphosphonic acid"
 
     def test_ethanephosphonic_acid(self):
-        """CCP(=O)(O)O -> ethanephosphonic acid"""
-        assert name_compound("CCP(=O)(O)O") == "ethanephosphonic acid"
+        """CCP(=O)(O)O -> ethylphosphonic acid ('C2H5-P(O)(OH)2 ethylphosphonic acid
+        (PIN) (not ethanephosphonic acid)', the Blue Book; 9ab971737)."""
+        assert name_compound("CCP(=O)(O)O") == "ethylphosphonic acid"
 
     def test_phenylphosphonic_acid(self):
         """c1ccccc1P(=O)(O)O -> phenylphosphonic acid"""
@@ -161,8 +166,9 @@ class TestPhosphorusRequirements:
         assert name_compound("CP(C)(C)=O") == "trimethyl-λ5-phosphanone"
 
     def test_phosph_04_methanephosphonic_acid(self):
-        """PHOSPH-04: name_compound('CP(=O)(O)O') returns 'methanephosphonic acid'"""
-        assert name_compound("CP(=O)(O)O") == "methanephosphonic acid"
+        """PHOSPH-04: name_compound('CP(=O)(O)O') returns 'methylphosphonic acid'
+        (the Blue Book, 'methylphosphonic acid (PIN)'; 9ab971737)."""
+        assert name_compound("CP(=O)(O)O") == "methylphosphonic acid"
 
     def test_phosph_05_dimethylphosphinic_acid(self):
         """PHOSPH-05: name_compound('CP(C)(=O)O') returns 'dimethylphosphinic acid'"""
@@ -182,9 +188,12 @@ class TestPhosphanylPrefix:
         assert result == "triphenylphosphane"
 
     def test_diphenylphosphanyl_on_substituted_ring(self):
-        """PPh2 on methylbenzene produces diphenylphosphanyl prefix ."""
+        """PPh2 on methylbenzene : the phosphane is the parent (P is senior to C,
+        , the Blue Book), so the name is '(4-methylphenyl)di(phenyl)phosphane';
+        'phenyl' is enclosed after the multiplier as in '(arsanylmethyl)di(phenyl)phosphane
+        (PIN)', the Blue Book."""
         result = name_compound("Cc1ccc(P(c2ccccc2)c3ccccc3)cc1")
-        assert "diphenylphosphanyl" in result
+        assert result == "(4-methylphenyl)di(phenyl)phosphane"
 
     def test_phenyl_not_counted_as_alkyl(self):
         """Phenyl groups on P should not be counted as hexyl (regression)."""
@@ -215,8 +224,8 @@ class TestPhosphorusOnComplexSubstrate:
     """E2E tests for phosphorus on complex substrates (,)."""
 
     def test_phosphonate_still_correct(self):
-        """Phosphonic acid naming unaffected ."""
-        assert name_compound("CP(=O)(O)O") == "methanephosphonic acid"
+        """Phosphonic acid naming : 'methylphosphonic acid (PIN)', the Blue Book."""
+        assert name_compound("CP(=O)(O)O") == "methylphosphonic acid"
 
     def test_phenylphosphonic_acid(self):
         """Phenylphosphonic acid ."""
@@ -279,3 +288,9 @@ class TestPhosphiteAndPhosphonateEsterE2E:
         r = name_compound(smi)
         assert r is not None and "phosphonate" in r
         assert "cyano" in r and "isocyano" in r
+        # "Parentheses are used around compound... prefixes"
+        # (the Blue Book, under ENCLOSING MARKS): the compound organyl
+        # ligand is enclosed, as in '(naphthalen-2-yl)phosphonate (PIN)' (:44383), and
+        # the two propan-2-yl owners are 'di(propan-2-yl)' (:36921). OPSIN full
+        # InChIKey exact.
+        assert r == "di(propan-2-yl) (1-cyano-1-isocyanoethyl)phosphonate"

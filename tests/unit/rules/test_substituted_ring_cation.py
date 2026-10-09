@@ -20,11 +20,12 @@ substituent (phenyl / halo /...), each cited as an ordinary ring-substituent
 prefix at its own locant. No new locant assembler was written.
 
 Scope: substituents ``name_substituent``/``_p74_ring_substituent_prefix`` CAN
-spell (phenyl, halo, alkyl). An oxime-type ring substituent, and an
-N-glycoside pyridinium carrying a phosphate group (the NAD+/NMN shape), are
+spell (phenyl, halo, alkyl). An oxime-type ring substituent is
 OUT of scope and must abstain rather than emit a wrong name -- verified below
 via the real, gate-enforced abstention path (`errors.is_failure_name`), not a
-producer-internal guard.
+producer-internal guard. (An N-glycoside pyridinium carrying a phosphate group,
+the NMN shape, was the second out-of-scope witness; it is now named with its
+phosphate kept, see test_nmn_shape_is_named_with_its_phosphate_kept.)
 """
 
 import pytest
@@ -105,14 +106,26 @@ def test_regressions_unchanged(namer, smiles, expected):
     # ('4-(N-hydroxymethaniminyl)-1-methylpyridin-1-ium') does not parse back
     # through OPSIN, so the gate suppresses it.
     "C[n+]1ccc(C=NO)cc1",
-    # An N-glycoside pyridinium carrying a phosphate group (the NAD+/NMN
-    # nucleotide shape, deferred): the raw candidate silently drops the
-    # phosphate group entirely, so catches the wrong-molecule mismatch
-    # and suppresses it.
-    "NC(=O)c1ccc[n+](c1)C1OC(COP(=O)(O)O)C(O)C1O",
 ])
 def test_out_of_scope_shapes_fail_closed(namer, smiles):
     name = namer.name(smiles)
     assert is_failure_name(name), (
         f"{smiles!r} must abstain (out of scope), not emit a name: {name!r}"
     )
+
+
+def test_nmn_shape_is_named_with_its_phosphate_kept(namer):
+    """The N-glycoside pyridinium carrying a phosphate group (the NMN nucleotide shape)
+    used to be the second fail-closed witness above: its raw candidate silently dropped
+    the phosphate group, so caught the wrong-molecule mismatch and suppressed
+    it. That premise is gone: the name now keeps the phosphate
+    ('(phosphonooxy)methyl') and OPSIN 2.9.0 reads it back to the input's full InChIKey,
+    so the row moved from the fail-closed list to this positive test (a breadth gain, not
+    a loosened check: a name that dropped the phosphate would fail the round trip).
+    The molecule is named by substitutive nomenclature over the whole graph; the
+    specialised nucleotide retained-name system / is not used."""
+    from tests.support.rt_assert import name_is_rt_exact
+    smiles = "NC(=O)c1ccc[n+](c1)C1OC(COP(=O)(O)O)C(O)C1O"
+    name = namer.name(smiles)
+    assert name == "3-carbamoyl-1-{3,4-dihydroxy-5-[(phosphonooxy)methyl]oxolan-2-yl}pyridin-1-ium"
+    assert name_is_rt_exact(name, smiles)

@@ -44,7 +44,12 @@ def test_cluster_e_stereo_differing_bis_fails_closed():
     ("CC(C)C(C)C", "2,3-dimethylbutane"),
     ("Cc1cc(C)cc(C)c1", "1,3,5-trimethylbenzene"),
     ("OCC(O)CO", "propane-1,2,3-triol"),
-    ("BrCc1ccccc1CBr", "1,2-di(bromomethyl)benzene"),
+    # a compound substituent prefix takes 'bis' "Numerical terms for compound or
+    # complex features", the Blue Book: 'The prefixes bis and tris correspond to di and tri');
+    # the PIN example is "Halogen atoms in its standard bonding number" Halogen
+    # compounds), the Blue Book '1,2-bis(bromomethyl)benzene (PIN)'; 'di(bromomethyl)'
+    # was the old spelling. OPSIN 2.9.0 parses both to the input's full InChIKey.
+    ("BrCc1ccccc1CBr", "1,2-bis(bromomethyl)benzene"),
 ])
 def test_cluster_e_veto_does_not_over_veto_correct_multiplicative(smiles, expected):
     assert Orthonym().name(smiles) == expected

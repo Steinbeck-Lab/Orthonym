@@ -420,9 +420,16 @@ class TestIsPolycyclicSystem:
         assert is_polycyclic_system(adamantane) is True
 
     @pytest.mark.unit
-    def test_cubane_is_polycyclic(self, cubane):
-        """Cubane (ring_count=5, bridged) -> True."""
-        assert is_polycyclic_system(cubane) is True
+    def test_cubane_is_polycyclic(self):
+        """Cubane (ring_count=5, bridged) -> True.
+
+        Uses the real cubane graph C12C3C4C1C5C2C3C45 (RDKit: 6 rings, an InChIKey, named 'cubane'). The shared `cubane` fixture's SMILES
+        C12C3C4C1C5C3C4C25 is a different (CH)8 cage (InChIKey BOLISNSTKUABPW...), a graph with
+        cyclomatic number 5 of which RDKit lists only 4 rings, so the cata-fused skip of
+        is_polycyclic_system (297928851) correctly does not call it polycyclic.
+        """
+        mol = Chem.MolFromSmiles('C12C3C4C1C5C2C3C45')
+        assert is_polycyclic_system(mol) is True
 
     @pytest.mark.unit
     def test_norbornane_is_not_polycyclic(self, norbornane):

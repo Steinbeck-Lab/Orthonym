@@ -48,6 +48,8 @@ def test_cap_attachment_leaves_other_shapes_alone():
 def test_end_to_end_nitro_in_a_row_the_floor_names():
     smiles = "CC(=O)NC(COC(C)=O)C(O)c1ccc([N+](=O)[O-])cc1"
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert row["name"] == "1-[2-acetamido-3-(acetyloxy)-1-hydroxypropyl]-4-nitrobenzene"
+    # fix-all 2026-10-09: the ester is named by functional class, the alcohol component a
+    # separate word 'Esters', the Blue Book); OPSIN 2.9.0 full InChIKey exact
+    assert row["name"] == "2-acetamido-3-hydroxy-3-(4-nitrophenyl)propyl acetate"
     assert not F.ach_hits(row["name"])
     assert name_is_rt_exact(row["name"], smiles)

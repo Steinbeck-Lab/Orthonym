@@ -156,7 +156,9 @@ _JUNIOR_HEAD_ROWS = [
     ("O=CCOS(=O)(=O)O", "(sulfooxy)acetaldehyde"),
     ("Nc1ccc(OS(=O)(=O)O)cc1", "4-(sulfooxy)aniline"),
     ("NNC(=O)CCOS(=O)(=O)O", "3-(sulfooxy)propanehydrazide"),
-    ("ON=CCOS(=O)(=O)O", "(sulfooxy)acetaldehyde oxime"),
+    # oximes are named substitutively, 'N-hydroxy' among the prefixes of the imine,
+    # the Blue Book 'propanal oxime... N-hydroxypropan-1-imine (PIN)')
+    ("ON=CCOS(=O)(=O)O", "N-hydroxy-2-(sulfooxy)ethan-1-imine"),
     ("O=Cc1ccc(OP(=O)(O)O)cc1", "4-(phosphonooxy)benzaldehyde"),
 ]
 

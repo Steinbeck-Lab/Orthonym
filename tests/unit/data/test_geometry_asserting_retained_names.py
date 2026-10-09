@@ -24,11 +24,16 @@ Evidence for the change (`change-asserted-value`, three artifacts):
   3. MUTATION -- restoring the three dict entries makes
      `test_geometry_free_keys_are_not_in_the_retained_table` fail.
 
-⚠ The 19 unqualified amino-acid entries (alanine, leucine, isoleucine,...) look
-identical to a round-trip metric and are deliberately NOT touched:
-spells configuration with the D/L prefix, and the table lists bare `alanine`
-against a structure drawn without stereochemistry. `test_amino_acids_are_kept`
-pins that, so a future round-trip-driven sweep cannot quietly delete them.
+⚠ The unqualified amino-acid entries (alanine, leucine, isoleucine,...) were first
+left alone here, and were then removed from the flat retained table on purpose by
+9292c013d (a phase T5, "stop fabricating implicit-L on stereo-undefined
+AAs/esters"): "The stereodescriptors 'D' and 'L'" (the Blue Book)
+says "The stereodescriptor 'ξ' (Greek letter xi) indicates unknown configuration",
+and OPSIN reads a bare `alanine` as the defined L form, so the bare name cannot
+describe a stereo-free input (same skeleton, stereo layer only on the OPSIN side).
+`test_amino_acids_are_kept` now pins the current policy: the entry is absent from the
+flat table, the bare name is still the amino-acid table's name for a defined-
+configuration input, and the stereo-free input gets the systematic name.
 """
 
 import pytest
@@ -42,13 +47,24 @@ _REMOVED = [
     ("CC=CC=O", "crotonaldehyde", "(2E)"),
 ]
 
-#: Bare amino-acid names that are Blue-Book-correct and must survive.
+#: Bare amino-acid names that belong to the amino-acid table (a defined-configuration
+#: input), not to the flat retained table.
 _KEPT_AMINO_ACIDS = [
     ("CC(N)C(=O)O", "alanine"),
     ("CC(C)CC(N)C(=O)O", "leucine"),
     ("CCC(C)C(N)C(=O)O", "isoleucine"),
     ("CC(O)C(N)C(=O)O", "threonine"),
 ]
+
+#: What the stereo-free key is named instead (OPSIN 2.9.0 parses each to the key's full
+#: InChIKey, which has no stereo layer: QNAYBMKLOCPYGJ / ROHFNLRQFUQHCH / AGPKZVBTJJNPAG /
+#: AYFVYJQAPQTCCC, all -UHFFFAOYSA-N).
+_STEREO_FREE_SYSTEMATIC = {
+    "CC(N)C(=O)O": "2-aminopropanoic acid",
+    "CC(C)CC(N)C(=O)O": "2-amino-4-methylpentanoic acid",
+    "CCC(C)C(N)C(=O)O": "2-amino-3-methylpentanoic acid",
+    "CC(O)C(N)C(=O)O": "2-amino-3-hydroxybutanoic acid",
+}
 
 
 def _defined_stereo(smiles):
@@ -78,19 +94,28 @@ def test_geometry_free_keys_are_not_in_the_retained_table(key, name, geometry):
 
 @pytest.mark.parametrize("key,name", _KEPT_AMINO_ACIDS)
 def test_amino_acids_are_kept(key, name):
-    """Guard against a round-trip-driven sweep deleting Blue-Book-correct names.
+    """The bare amino-acid name stays with the amino-acid table, not the flat table.
 
-    These fail round-trip for the same surface reason the three above did -- OPSIN
-    resolves a bare `isoleucine` to the L-form -- but makes the D/L
-    PREFIX the carrier of configuration, and the table lists bare `alanine`
-    against a stereo-free structure. Removing them would trade conformance for
-    round-trip points.
+    Policy of 9292c013d: a bare retained name asserts the DEFINED (L) configuration
+     "The stereodescriptors 'D' and 'L'", the Blue Book: 'The
+    stereodescriptor "xi" indicates unknown configuration'), so a structure drawn
+    without stereochemistry must not be keyed to it in the stereo-blind flat table.
+    The name is NOT lost: `STANDARD_AMINO_ACIDS` still carries it for a defined-
+    configuration input, and the stereo-free input gets the systematic name.
     """
-    assert ALL_RETAINED_NAMES.get(key) == name, (
-        f"{name!r} was removed for {key!r}. If that was done to gain round-trip, "
-        f"revert it: P-103.1.3.1 (BlueBookV2.md:54291) spells configuration with "
-        f"D/L, so the unqualified name is correct for a stereo-free input."
+    from orthonym import Orthonym
+    from orthonym.data.amino_acids import STANDARD_AMINO_ACIDS
+
+    assert ALL_RETAINED_NAMES.get(key) != name, (
+        f"{name!r} is back in the flat retained table for the stereo-free key {key!r}. "
+        f"A bare amino-acid name asserts the L configuration (P-103.1.3.1); 9292c013d "
+        f"removed these entries on purpose."
     )
+    assert STANDARD_AMINO_ACIDS.get(key) == name, (
+        f"{name!r} was lost from the amino-acid table, where defined-stereo inputs "
+        f"resolve it."
+    )
+    assert Orthonym().name(key) == _STEREO_FREE_SYSTEMATIC[key]
 
 
 @pytest.mark.opsin_gate

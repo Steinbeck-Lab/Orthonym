@@ -646,25 +646,46 @@ class TestP2581QuinolizineLock157:
 # ============================================================================
 
 
+# Files under src/orthonym in which the token 'dehydro' occurs, each classified. The test
+# below fails on a hit in ANY OTHER file: a new site that spells 'dehydro' is a possible new
+# generator of the prefix and must be audited before it is added here.
+_DEHYDRO_SITES = {
+    # static OPSIN-imported retained-name strings looked up by SMILES match: 'dehydroalan',
+    # 'dehydrophenylalan', 'dehydroascorbic acid' (the internal notes S5.1 baseline, kept)
+    "data/opsin_imports/amino_acids_opsin.py",
+    "data/opsin_imports/carbohydrates_opsin.py",
+    # curated retained names of corrin complexes (CHEBI) -- looked up, not composed
+    "data/coordination_retained.py",
+    # the ONE generator: didehydro_benzene_name builds '1,2-didehydrobenzene', the PIN of
+    # benzyne, added by 297928851, 2026-07-08); composer.py is its call site and
+    # _handler_shared.py cites it in a docstring
+    "rules/benzene.py",
+    "assembly/composer.py",
+    "assembly/handlers/_handler_shared.py",
+    # comments/docstrings that cite the hydro/dehydro prefix rules (e)(i),
+    # natural-product stereoparents such as 7,8-didehydromorphinan)
+    "rules/natural_products.py",
+    "rules/heterocycles.py",
+    "rules/partial_saturation.py",
+    "decomposition/fragment_assembly.py",
+}
+
+
 def test_dehydro_not_applicable_grep_157() -> None:
-    """ NA re-verification: only OPSIN-imported retained-name hits.
+    """ re-verification: 'dehydro' only at the classified sites (_DEHYDRO_SITES).
 
-    Per internal notes S5.1: `grep -rn "dehydro" src/orthonym/ | grep -v
-    __pycache__` returns exactly 3 hits, all in `data/opsin_imports/`:
-      - amino_acids_opsin.py:72 -- 'dehydroalan'
-      - amino_acids_opsin.py:324 -- 'dehydrophenylalan'
-      - carbohydrates_opsin.py:1332 -- 'dehydroascorbic acid'
-
-    These are static OPSIN-imported retained-name strings looked up by
-    SMILES match, NOT generated as composable prefixes.
-
-    If this test fails, dehydro-prefix generation has been introduced
-    somewhere in src/orthonym/rules or src/orthonym/assembly. The
-    NA classification no longer holds. a phase audit doc and
-    docs/iupac_errata_applied.md MUST be updated to APPLY status with the
-    dehydro-before-hydro ordering rule enforced at the prefix-assembly site.
-
-    Source: 157-internal notes + internal notes S5.1.
+    Per internal notes S5.1 the token once occurred in exactly 3 places, all static
+    OPSIN-imported retained-name strings in ``data/opsin_imports/``
+    ('dehydroalan', 'dehydrophenylalan', 'dehydroascorbic acid'), and this test pinned
+    that count. The premise no longer holds, on purpose: since 297928851 (2026-07-08)
+    ``rules/benzene.py::didehydro_benzene_name`` builds '1,2-didehydrobenzene', which
+     "The prefix 'dehydro'" (the Blue Book) makes the preferred name
+    ("Applied to benzene, it leads to the name '1,2-didehydrobenzene', the preferred IUPAC
+    name, rather than 'benzyne' that was formerly used"); the PIN is asserted end to end
+    in test_wave2_completion_b4_misc.py. The tripwire is kept in the form that still
+    holds: the token may occur only in the files classified above. A hit in any other file
+    means dehydro-prefix generation may have been introduced somewhere new, and then
+     ordering applies there: see 157-internal notes + internal notes S5.1.
     """
     src_dir = _repo_root() / "src" / "orthonym"
     result = subprocess.run(
@@ -676,19 +697,21 @@ def test_dehydro_not_applicable_grep_157() -> None:
         line for line in result.stdout.strip().split("\n")
         if line and "__pycache__" not in line
     ]
-    assert len(hits) == 3, (
-        f"P-31.2 NA re-verification: hit count {len(hits)} != 3. "
-        f"NA classification may have changed. AUDIT REQUIRED.\n"
-        f"Hits:\n" + "\n".join(hits)
+    assert hits, "no 'dehydro' hit at all: the grep itself is broken"
+    outside = [
+        hit for hit in hits
+        if hit.split(":", 1)[0][len(str(src_dir)) + 1:] not in _DEHYDRO_SITES
+    ]
+    assert not outside, (
+        "P-31.2 re-verification: 'dehydro' occurs OUTSIDE the classified sites.\n"
+        "Dehydro-prefix generation may have been introduced; audit it against P-31.2 and "
+        "add the file to _DEHYDRO_SITES with its classification.\nHits:\n"
+        + "\n".join(outside)
     )
-    for hit in hits:
-        assert "data/opsin_imports/" in hit, (
-            f"P-31.2 NA re-verification: dehydro hit OUTSIDE OPSIN imports!\n"
-            f"  {hit}\n"
-            f"Dehydro-prefix generation may have been introduced.\n"
-            f"P-31.2 ordering rule MUST now be applied; see CONTEXT D-07 + "
-            f"docs/iupac_errata_applied.md S P-31.2."
-        )
+    # every classified site is still live (a stale entry would hide a later regression)
+    seen = {hit.split(":", 1)[0][len(str(src_dir)) + 1:] for hit in hits}
+    assert seen == _DEHYDRO_SITES, (
+        f"stale classification: {sorted(_DEHYDRO_SITES - seen)} no longer mention 'dehydro'")
 
 
 def test_compound_locants_not_applicable_grep_157() -> None:

@@ -186,7 +186,15 @@ def test_probe_routes_to_expected_handler(probe, namer):
     reset_inner_dispatch_stats()
     namer.name_with_tree(probe["smiles"])
     fired = [k for k, v in get_inner_dispatch_stats().items() if v]
-    assert probe["expected_handler"] in fired, (
-        f"{probe['handler_id']}: probe {probe['smiles']!r} fired {fired}, "
-        f"expected {probe['expected_handler']!r}"
-    )
+    if probe["expected_handler"]:
+        assert probe["expected_handler"] in fired, (
+            f"{probe['handler_id']}: probe {probe['smiles']!r} fired {fired}, "
+            f"expected {probe['expected_handler']!r}"
+        )
+    else:
+        # An empty expected_handler marks a probe named BEFORE dispatch_inner (the
+        # fixture note says so): no inner handler may fire for it.
+        assert not fired, (
+            f"{probe['handler_id']}: probe {probe['smiles']!r} is declared as "
+            f"pre-dispatch but dispatch_inner fired {fired}"
+        )

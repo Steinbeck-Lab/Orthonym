@@ -129,11 +129,23 @@ def _name_best_effort(smiles: str, timeout_s: int = _WALL_KILL_S) -> str:
 @pytest.mark.parametrize("label,smiles", sorted(_HANG_WITNESSES.items()))
 def test_hang_witness_abstains_cleanly(label, smiles):
     """Each compute-bound-hang witness returns in bounded time with a CLEAN
-    abstain (the honest '(no name —...)' sentinel), never a wrong / partial /
-    atom-dropped name (inv 9)."""
+    abstain (the honest '(no name —...)' sentinel) OR with a name that reads back
+    to the input's full InChIKey -- never a wrong / partial / atom-dropped name
+    (inv 9).
+
+    The 'must abstain' clause was the guard's first form: the hang was the defect and
+    an abstain the bounded outcome. Since the breadth work the thiopeptide and the
+    vancomycin witnesses are NAMED at best-effort within the same wall bound (5 s and
+    24 s here, bound 55 s), and OPSIN 2.9.0 reads each name back to the input's FULL
+    InChIKey (an InChIKey; an InChIKey, stereo layer
+    included). A name that round-trips exactly is not what the guard exists to stop;
+    an unparseable, partial or atom-dropped one still fails here, as does a return
+    past the wall bound (``_name_best_effort``)."""
+    from tests.support.rt_assert import name_is_rt_exact
     out = _name_best_effort(smiles)
-    assert out.startswith("(no name"), (
-        f"{label}: expected a clean abstain, got {out[:80]!r}")
+    assert out.startswith("(no name") or name_is_rt_exact(out, smiles), (
+        f"{label}: expected a clean abstain or a name that round-trips exactly, "
+        f"got {out[:80]!r}")
 
 
 @pytest.mark.parametrize("label,smiles,expected", sorted(

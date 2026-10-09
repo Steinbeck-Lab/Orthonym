@@ -151,11 +151,12 @@ class TestRingParentWithChainFGs:
         assert "acid" in name.lower() or "carboxyl" in name.lower()
 
     def test_3_aminopyridine(self):
-        """3-aminopyridine: amino on heterocycle."""
+        """3-aminopyridine: the amine is the principal group, cited as suffix."""
         name = name_compound("Nc1cccnc1")
-        assert name is not None
-        assert "amino" in name.lower()
-        assert "pyridin" in name.lower()
+        # 'Primary amines': "Method (1) leads to preferred IUPAC names" (method (1)
+        # = adding the suffix 'amine' to the parent hydride name); cf. the example
+        # 'N-phenylpyridin-3-amine (PIN)'. The 'amino' prefix form is not the PIN.
+        assert name == "pyridin-3-amine"
 
     def test_isonicotinic_acid(self):
         """Isonicotinic acid (pyridine-4-carboxylic acid): acid on pyridine."""

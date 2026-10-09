@@ -222,6 +222,19 @@ _CANARY_DEFECT_REASONS = {
         "tricyclo[3.3.1.1^3,7]decane for adamantane; P-23.7 :9881 retains adamantane as "
         "the PIN (large-polycycle Task 12)"
     ),
+    "DK-BRIDGEDFUSED": (
+        # re-baselined 2026-10-09 (change-asserted-value): these four rows (canary calls 39, 385,
+        # 601, 611) used to be DK-VBFUSED von Baeyer names; fusion routing (likely sources
+        # 7ea3918e4 all-carbon and cb3bf9850 with ring heteroatoms; not bisected) now names them
+        # as bridged fused systems, as "Five-membered ring requirement" (the Blue Book) asks ('When fusion
+        # names are not allowed, unsaturated von Baeyer ring system names are preferred IUPAC
+        # names'). Each name is OPSIN 2.9.0 full-InChIKey exact. They stay pinned here, not in the
+        # fixture, because the choice of the bridge excision, the ring numbering and the
+        # hydro/indicated-hydrogen spelling of each, were not checked
+        # against the Blue Book row by row.
+        "bridged fused name, RT-exact; the PIN status of the bridge selection and numbering is "
+        "unverified (P-25.4.3.4.2 / P-25.4.3.3), so the row is a change detector, not a fixture"
+    ),
     "DK-ETHANAMINE": (
         "'ethan-1-amine' with only N-substituents: P-14.3.4.2 (b) omits the locant "
         "('N,N-diethylethanamine (PIN)' :26235); the old fixture value was right"
@@ -281,6 +294,10 @@ _CANARY_DEFECT_REASONS = {
         "diol must be -1,3-diol (P-31.1.4 / P-14.4 (c) :3256 suffixes before hydro/ene)"
     ),
     "DK-VBFUSED": (
+        # d6f633508 (2026-10-02) re-numbered the secondary-bridge superscripts of these cages
+        #, the Blue Book "The superscript locants for the secondary bridges
+        # must be as low as possible when considered as a set in ascending numerical order"):
+        # e.g. 0^4,8 -> 0^1,5; the recorded names below follow it (all OPSIN-exact).
         "von Baeyer name for a system with ortho-fused rings of 5+ members; the "
         "(hydro/bridged) fusion name is the PIN (P-52.2.4.1 :23710; P-44.2.2.2 :19532 "
         "fused > bridged fused > von Baeyer); R22 class, large-polycycle Task 6a"
@@ -327,7 +344,7 @@ _CANARY_DEFECT_REASONS = {
 # SMILES -> (current PIN-tier name with the gate off, class, canary call numbers).
 CANARY_KNOWN_DEFECTS = {
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O": (
-        "2-(acetyloxy)-4-hydroxyheptadec-16-yne-1,4-diol",
+        "2-(acetyloxy)heptadec-16-yne-1,4-diol",
         "DK-NOTEXACT", (6,),
     ),
     "CC1=CC[C@]23O[C@@]2(C)CC[C@@H]2[C@H](OC(=O)[C@H]2C)[C@@H]13": (
@@ -343,11 +360,11 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (17,),
     ),
     "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O": (
-        "(1S,2Z,5S,7R,8Z,12R,15S,16S,17S,18R,20S)-15-benzyl-7-hydroxy-5,7,17,18-tetramethyl-11,19-dioxa-14-azatetracyclo[10.8.0.0^12,16.0^18,20]icosa-2,8-diene-6,10,13-trione",
+        "(1R,4Z,6R,8S,10Z,12S,13S,15R,16S,17S,18S)-18-benzyl-6-hydroxy-6,8,15,16-tetramethyl-2,14-dioxa-19-azatetracyclo[10.8.0.0^1,17.0^13,15]icosa-4,10-diene-3,7,20-trione",
         "DK-VBFUSED", (22, 318, 325),
     ),
     "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C": (
-        "(1S,2E,7S,8E,12R,15S,16S,17S)-7-hydroxy-3,17,18-trimethyl-15-(2-methylpropyl)-11-oxa-14-azatricyclo[10.7.0.0^12,16]nonadeca-2,8,18-triene-10,13-dione",
+        "(1R,4E,6S,10E,12S,15S,16S,17S)-6-hydroxy-10,14,15-trimethyl-17-(2-methylpropyl)-2-oxa-18-azatricyclo[10.7.0.0^1,16]nonadeca-4,10,13-triene-3,19-dione",
         "DK-VBFUSED", (23, 319, 327),
     ),
     "C[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CCCCN)C(=O)O": (
@@ -363,8 +380,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (36,),
     ),
     "CC1(C)C[C@H](O)[C@]23CC[C@@H](O)[C@](C)(CC[C@@H]12)C3": (
-        "(1S,2S,5S,8R,9R)-4,4,8-trimethyltricyclo[6.3.1.0^1,5]dodecane-2,9-diol",
-        "DK-VBFUSED", (39,),
+        "(3S,3aS,6R,7R,9aS)-1,1,7-trimethyldecahydro-3a,7-methanocyclopenta[8]annulene-3,6-diol",
+        "DK-BRIDGEDFUSED", (39,),
     ),
     "NCCCC[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](CS)C(=O)O": (
         "glutaminyllysylcysteine",
@@ -391,8 +408,11 @@ CANARY_KNOWN_DEFECTS = {
         "DK-INDH", (133,),
     ),
     "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3": (
-        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholesta-8,23-dien-3-yl acetate",
-        "DK-ACIDPFX", (143, 317),
+        # fix-all merge: the acid is the '-21-oic acid' suffix now (acids rank above esters,
+        #, the acetate an '(acetyloxy)' prefix; OPSIN 2.9.0 full InChIKey
+        # exact. The row keeps its whole-graph R/S block on implied centres (was DK-ACIDPFX).
+        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-3-(acetyloxy)-16,25-dihydroxy-4,4,14-trimethylcholesta-8,23-dien-21-oic acid",
+        "DK-P101CIP", (143, 317),
     ),
     "CCN(CC)Cc1ccccc1": (
         "N-benzyl-N-ethylethan-1-amine",
@@ -499,7 +519,7 @@ CANARY_KNOWN_DEFECTS = {
         "DK-ADAM", (344,),
     ),
     "C[C@@H]1CC[C@@H]2C=C(C(=O)O)[C@H]3C[C@](C)(C(=O)O)C[C@]132": (
-        "(1S,4R,7R,8R,10S)-7,10-dimethyltricyclo[6.3.0.0^4,8]undec-2-ene-2,10-dicarboxylic acid",
+        "(1R,3S,5S,8R,11R)-3,11-dimethyltricyclo[6.3.0.0^1,5]undec-6-ene-3,6-dicarboxylic acid",
         "DK-VBFUSED", (356,),
     ),
     "C[C@H](CCC1OCC1CO)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C": (
@@ -527,8 +547,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (383,),
     ),
     "CC1=C2C(=O)C[C@@]2(C)[C@@H]2C[C@@H]3[C@H](O)C[C@@H](C)[C@@]2(CC1)C3(C)C": (
-        "(1S,3S,4S,11R,12R,14R)-14-hydroxy-4,8,12,15,15-pentamethyltetracyclo[9.3.1.0^3,11.0^4,7]pentadec-7-en-6-one",
-        "DK-VBFUSED", (385,),
+        "(5aR,6R,8R,9S,10aS,10bS)-8-hydroxy-3,6,10b,11,11-pentamethyl-1,4,5,6,7,8,9,10,10a,10b-decahydro-2H-5a,9-methanocyclobuta[a]heptalen-2-one",
+        "DK-BRIDGEDFUSED", (385,),
     ),
     "NC(=O)CC[C@H](NC(=O)[C@H](Cc1ccccc1)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
         "glutaminylphenylalanylglutamine",
@@ -539,7 +559,7 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (406,),
     ),
     "C[C@@H]1CC[C@H]2C(C=O)=C[C@@H]3CC(C)(C)CC132": (
-        "(1R,4S,9R)-6,6,9-trimethyltricyclo[6.3.0.0^4,8]undec-2-ene-2-carbaldehyde",
+        "(2R,5R,8S)-2,10,10-trimethyltricyclo[6.3.0.0^1,5]undec-6-ene-6-carbaldehyde",
         "DK-VBFUSED", (413,),
     ),
     "C/C(=C\\CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)C(C)(C)[C@@H]1C[C@H]3O)C(=O)O": (
@@ -567,7 +587,7 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (428,),
     ),
     "CC1CCC2C(C(=O)O)=CC3CC(C)(C)CC132": (
-        "6,6,9-trimethyltricyclo[6.3.0.0^4,8]undec-2-ene-2-carboxylic acid",
+        "2,10,10-trimethyltricyclo[6.3.0.0^1,5]undec-6-ene-6-carboxylic acid",
         "DK-VBFUSED", (429,),
     ),
     "N[C@@H](CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CC(=O)O)C(=O)O": (
@@ -627,7 +647,7 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (495,),
     ),
     "CC1=CCC(=O)CC(=O)[C@@]23C(=O)N[C@@H](CC(C)C)[C@@H]2[C@H](C)C(C)=C[C@@H]3C1": (
-        "(1S,9S,12S,13R,14S)-7,11,12-trimethyl-14-(2-methylpropyl)-15-azatricyclo[7.7.0.0^1,13]hexadeca-6,10-diene-2,4,16-trione",
+        "(1S,4S,5R,6S,9S)-6,7,11-trimethyl-4-(2-methylpropyl)-3-azatricyclo[7.7.0.0^1,5]hexadeca-7,11-diene-2,14,16-trione",
         "DK-VBFUSED", (500,),
     ),
     "N[C@@H](CCC(=O)O)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
@@ -635,8 +655,11 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (501,),
     ),
     "CC(=O)OC[C@]12CC[C@H](O)C(C)(C)[C@@H]1CCC1=C2CC[C@]2(C)[C@@H]([C@H](C)[C@H](C/C=C(/C)C(=O)O)OC(C)=O)CC[C@@]12C": (
-        "(3S,5R,10R,13R,14R,17R,20S,22S,24Z)-3,26-dihydroxy-4,4,14-trimethyl-26-oxocholesta-8,24-dien-19,22-diyl diacetate",
-        "DK-ACIDPFX", (510,),
+        # fix-all merge: the acid is the '-26-oic acid' suffix now (acids rank above esters,
+        #, the acetate an '(acetyloxy)' prefix; OPSIN 2.9.0 full InChIKey
+        # exact. The row keeps its whole-graph R/S block on implied centres (was DK-ACIDPFX).
+        "(3S,5R,10R,13R,14R,17R,20S,22S,24Z)-19,22-bis(acetyloxy)-3-hydroxy-4,4,14-trimethylcholesta-8,24-dien-26-oic acid",
+        "DK-P101CIP", (510,),
     ),
     "CC[C@H](C)[C@H](NC(=O)[C@@H](N)CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
         "asparaginylisoleucylhistidine",
@@ -655,7 +678,7 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (538,),
     ),
     "CC1=CC2/C=C(\\C)CCC3OC3/C=C/C(=O)C23C(=O)NC(CC(C)C)C3C1C": (
-        "(2E,9E)-3,17,18-trimethyl-15-(2-methylpropyl)-7-oxa-14-azatetracyclo[10.7.0.0^6,8.0^12,16]nonadeca-2,9,18-triene-11,13-dione",
+        "(3E,10E)-10,14,15-trimethyl-17-(2-methylpropyl)-6-oxa-18-azatetracyclo[10.7.0.0^1,16.0^5,7]nonadeca-3,10,13-triene-2,19-dione",
         "DK-VBFUSED", (540,),
     ),
     "CCC(=O)OCC(=O)[C@@]1(OC(=O)CC)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C": (
@@ -675,7 +698,7 @@ CANARY_KNOWN_DEFECTS = {
         "DK-P101CIP", (566,),
     ),
     "C#CCCCCCCCCCCCC(CC(O)CO)OC(C)=O": (
-        "4-(acetyloxy)-2-hydroxyheptadec-16-yne-1,2-diol",
+        "4-(acetyloxy)heptadec-16-yne-1,2-diol",
         "DK-NOTEXACT", (567,),
     ),
     "C[C@@H](O)[C@H](NC(=O)[C@H](CCCCN)NC(=O)[C@@H](N)CCC(=O)O)C(=O)O": (
@@ -703,8 +726,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-NOTEXACT", (600,),
     ),
     "C[C@@]12C=C[C@]3(C1)[C@@H](O)C[C@H]1[C@@](C)(CCC[C@@]1(C)C(=O)O)[C@@H]3CC2": (
-        "(1S,4S,5S,9R,10S,12S,13S)-12-hydroxy-1,5,9-trimethyltetracyclo[11.2.1.0^4,13.0^5,10]hexadec-14-ene-9-carboxylic acid",
-        "DK-VBFUSED", (601,),
+        "(4R,4aS,6S,6aS,9S,11aS,11bS)-6-hydroxy-4,9,11b-trimethyl-1,2,3,4,4a,5,6,9,10,11,11a,11b-dodecahydro-6a,9-methanocyclohepta[a]naphthalene-4-carboxylic acid",
+        "DK-BRIDGEDFUSED", (601,),
     ),
     "N[C@@H](CC(=O)O)C(=O)N[C@@H](CS)C(=O)O": (
         "aspartylcysteine",
@@ -715,8 +738,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-NOTEXACT", (608,),
     ),
     "CC1(C)CCC(=O)[C@@]2(C)O[C@]3(O)CC[C@@]12C[C@H]3O": (
-        "(1R,3S,8R,10R)-1,10-dihydroxy-3,7,7-trimethyl-2-oxatricyclo[6.2.2.0^3,8]dodecan-4-one",
-        "DK-VBFUSED", (611,),
+        "(2R,3R,4aR,8aS)-2,3-dihydroxy-5,5,8a-trimethyltetrahydro-2H,5H-2,4a-ethano-1-benzopyran-8(8aH)-one",
+        "DK-BRIDGEDFUSED", (611,),
     ),
     "N[C@@H](CCC(=O)O)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
         "glutamylcysteinyltryptophan",
@@ -890,7 +913,20 @@ def test_canary_not_rt_exact_rows_ship_no_wrong_name(smiles):
 #: the Blue Book): the xfail is lifted for them. Re-baselined: 'COC1OC2(OC)CC3CCC(O)C(C)C3(C)
 #: C(OC)C2=C1C' is '2,4,9a-trimethoxy-3,4a,5-trimethyl-2,4,4a,5,6,7,8,8a,9,9a-decahydronaphtho[2,3-b]
 #: furan-6-ol' (canary call 600).
-_NOW_RT_EXACT = frozenset({"COC1OC2(OC)CC3CCC(O)C(C)C3(C)C(OC)C2=C1C"})
+#: L5 (the fixall round, 2026-10-09): the two heptadecyne acetates of a diol (canary calls 6 and 567)
+#: cited the secondary OH twice, as 'hydroxy' and inside '-1,4-diol' / '-1,2-diol' (a gem-diol to OPSIN),
+#: because the ester-demotion path of name_polyfunctional re-selected the principal group without
+#: dropping its same-class alcohol subtypes from the prefix loop. (the Blue Book): "The
+#: senior parent structure has the maximum number of substituents corresponding to the principal
+#: characteristic group (suffix)". The raw names are now '2-(acetyloxy)heptadec-16-yne-1,4-diol' and
+#: '4-(acetyloxy)heptadec-16-yne-1,2-diol', OPSIN 2.9.0 full-InChIKey exact (fresh java run outside the
+#: engine); valid but not the PIN (the PIN is the functional-class ester,:18158 class 9 over class
+#: 17, which name_substituent cannot spell for an unsaturated hydroxylated alkyl).
+_NOW_RT_EXACT = frozenset({
+    "COC1OC2(OC)CC3CCC(O)C(C)C3(C)C(OC)C2=C1C",
+    "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O",
+    "C#CCCCCCCCCCCCC(CC(O)CO)OC(C)=O",
+})
 
 
 @pytest.mark.parametrize("smiles", [

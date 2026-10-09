@@ -66,6 +66,10 @@ PIN_ROWS = [
     ("O=C(O)c1ccc(CC(N)=O)cc1", "4-(2-amino-2-oxoethyl)benzoic acid"),
     ("NC(=O)CCc1ccc(C(=O)O)cc1", "4-(3-amino-3-oxopropyl)benzoic acid"),
     ("NC(=O)C(C)c1ccc(C(=O)O)cc1", "4-(1-amino-1-oxopropan-2-yl)benzoic acid"),
+    # fix-all 2026-10-09: the strict path builds and verifies this Blue Book PIN now (was
+    # an XFAIL_PIN_ROWS row); OPSIN 2.9.0 full InChIKey exact
+    ("COc1cc2c(Oc3ccc4[nH]c(C)cc4c3F)ncnc2cc1OCCCN1CCCC1",
+     "4-[(4-fluoro-2-methyl-1H-indol-5-yl)oxy]-6-methoxy-7-[3-(pyrrolidin-1-yl)propoxy]quinazoline"),  #:19437
 ]
 
 _NEEDS_COMPOSITION = ("needs a best-effort composition producer at the strict path "
@@ -78,8 +82,9 @@ XFAIL_PIN_ROWS = [
      "N,N-dimethyl-4-(4-methylcyclohex-3-en-1-yl)but-3-en-2-amine"),       #:26269
     ("[CH3][Sn]1([CH3])[CH2]CC(B2C3CCCC2CCC3)[CH2]1",
      "3-(9-borabicyclo[3.3.1]nonan-9-yl)-1,1-dimethylstannolane"),         #:37486
-    ("COc1cc2c(Oc3ccc4[nH]c(C)cc4c3F)ncnc2cc1OCCCN1CCCC1",
-     "4-[(4-fluoro-2-methyl-1H-indol-5-yl)oxy]-6-methoxy-7-[3-(pyrrolidin-1-yl)propoxy]quinazoline"),  #:19437
+    # "4-[(4-fluoro-2-methyl-1H-indol-5-yl)oxy]-6-methoxy-7-[3-(pyrrolidin-1-yl)
+    # propoxy]quinazoline" (:19437) -- moved to PIN_ROWS 2026-10-09 (fix-all): the
+    # strict path now builds and verifies it.
 ]
 # (smiles, the non-PIN spelling the default tier shipped at pin_verified at 39803cb6e)
 NOT_PIN_ROWS = [

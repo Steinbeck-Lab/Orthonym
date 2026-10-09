@@ -47,9 +47,24 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CCCC/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)OC[C@@H](O)CO)OC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC",
 })
 #... whose best-effort name is another one (it reads back exactly)
+#
+# L5 (the fixall round, 2026-10-09): the diacyl phosphatidylglycerol joined them. On main the
+# polyfunctional producer first returned a whole-molecule '...propanediol' name that cites the
+# hydroxyls of the glycerol HEAD as the suffix of the glycerol BACKBONE (not the input molecule), so
+# the best-effort tier fell back to the weaver, which gave the strict path's acyloxy-on-propane name.
+# 'SENIORITY ORDER FOR PARENT STRUCTURES', (the Blue Book): "The senior parent
+# structure has the maximum number of substituents corresponding to the principal characteristic
+# group (suffix) or senior parent hydride...": a suffix cites groups on the parent, so 001ee404c makes
+# the producer decline that name. The best-effort general engine then names the molecule as the ester
+# it is 'SENIORITY ORDER FOR CLASSES', class 9 Esters,:18182), and the decomposition engine keeps
+# an existing result that reads back exactly (try_decompose, its own rule). 'Esters cited
+# as prefixes' (:31696) reserves 'acyloxy' for an ester when another group has priority as principal
+# group or the ester methods cannot name it, so the strict path's acyloxy-on-propane name is the
+# method-(2) spelling the default tier declines. Both names are OPSIN full-InChIKey exact.
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
     "CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)OCCN)O/C=C\\CCCCCC/C=C\\CCCCCCCC",
     "CCCC/C=C\\CCCCCCCC(=O)OC[C@@H](O)COP(=O)(O)OC[C@@H](O)CO",
+    "CCCC/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)OC[C@@H](O)CO)OC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC",
 })
 
 

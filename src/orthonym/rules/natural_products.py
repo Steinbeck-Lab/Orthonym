@@ -785,11 +785,11 @@ def name_natural_product_with_substituents(
                 modification_prefix=modification_prefix, ring_ab=rab,
                 glycosyloxys=glycosyloxys,
             )
-        # Only the ester/conjugate emitter still writes a terminal acid as
-        # 'hydroxy' + 'oxo'; _assemble_np_name now cites it as the '-oic acid'
-        # suffix, the Blue Book '3-oxoandrost-4-en-18-oic acid'
-        #:52554), so only the joined form is marked non-PIN.
-        if joined:
+        # Only the conjugate spelling of the ester emitter still writes a terminal acid
+        # as 'hydroxy' + 'oxo'; _assemble_np_name and the ester spelling cite it as the
+        # '-oic acid' suffix, the Blue Book '3-oxoandrost-4-en-18-oic
+        # acid':52554), so only a conjugate name is marked non-PIN.
+        if conjugates:
             _record_if_acid_as_prefixes(out, hydroxyls, ketones)
         return out
 
@@ -977,8 +977,9 @@ def _record_if_acid_as_prefixes(name, hydroxyls, ketones) -> None:
     order for classes" (the Blue Book; 7a carboxylic acids:18172, 17 alcohols);
     ('-oic acid'). The name is valid and round-trip verified, so it still ships; this marks
     it as a non-PIN fragment (name-scoped). The name is unchanged. j7: only the ester /
-    conjugate emitter (``_assemble_np_ester_name``) still spells the acid this way;
-    ``_assemble_np_name`` cites it as the suffix, the Blue Book)."""
+    conjugate spelling of the emitter (``_assemble_np_ester_name``) still writes the acid
+    this way; ``_assemble_np_name`` and the ester spelling cite it as the suffix
+    , the Blue Book)."""
     if name and hydroxyls and ketones and set(hydroxyls) & set(ketones):
         from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(name)
@@ -1693,6 +1694,7 @@ def _assemble_np_name(
     modification_prefix: str = "",
     ring_ab: Optional[Dict[int, str]] = None,
     glycosyloxys: Optional[List[Tuple[int, str, frozenset]]] = None,
+    acyloxys: Optional[List[Tuple[int, str]]] = None,
 ) -> str:
     """Assemble a decorated natural product name.
 
@@ -1730,6 +1732,7 @@ def _assemble_np_name(
     n_alkyls = n_alkyls or []
     methoxys = methoxys or []
     glycosyloxys = glycosyloxys or []
+    acyloxys = acyloxys or []
     ring_ab = ring_ab or {}
 
     # A stereoparent carbon carrying both an '-OH' and an '=O' decoration is a
@@ -1786,6 +1789,21 @@ def _assemble_np_name(
     for _loc, _oxy, _atoms in glycosyloxys:
         _tok = _oxy if _oxy.startswith(('(', '[')) else f"({_oxy})"
         prefix_entries.append((_oxy, f"{_greek_locant(_loc)}-{_tok}"))
+
+    # Acyloxy prefixes (an ester of the parent's hydroxy group when a senior class holds
+    # the suffix): "Esters cited as prefixes" (the Blue Book), "when,
+    # in an ester... another group is present that has priority for citation as the
+    # principal group... an ester group is indicated by prefixes as 'acyloxy'";
+    # '2-(acetyloxy)-5-butoxy-2-methyl-5-oxopentanoic acid (PIN)' (the Blue Book).
+    # Identical acyloxy groups take 'bis' (a compound prefix,, the Blue Book).
+    _acyloxy_by_word: Dict[str, List[int]] = defaultdict(list)
+    for _loc, _word in acyloxys:
+        _acyloxy_by_word[_word].append(_loc)
+    for _word in sorted(_acyloxy_by_word):
+        _locs = sorted(_acyloxy_by_word[_word])
+        _locant_str = ",".join(_greek_locant(loc) for loc in _locs)
+        _mult = "bis" if len(_locs) > 1 else ""
+        prefix_entries.append((_word, f"{_locant_str}-{_mult}({_word})"))
 
     # Hydroxy prefix: added to prefix_entries for the ketone+hydroxyl path
     # (line 957-965) where hydroxyl is a non-principal group prefix.
@@ -1897,7 +1915,7 @@ def _assemble_np_name(
     # parenthesised block (the OPSIN-unparseable anti-pattern). The side-chain R/S block
     # (stereo_prefix) stays at the very front .
     _consumed = (set(hydroxyls) | set(methyls) | set(methoxys) | set(ketones)
-                 | set(oxos) | set(acids)
+                 | set(oxos) | set(acids) | {loc for loc, _ in acyloxys}
                  | {loc for loc, _ in halogens} | {loc for loc, _ in n_alkyls})
     _free = sorted(loc for loc in ring_ab if loc not in _consumed)
     stem_stereo = "".join(f"{loc}{ring_ab[loc]}-" for loc in _free)
@@ -2390,6 +2408,25 @@ def _assemble_np_ester_name(
     methyls = methyls or []
     halogens = halogens or []
     ring_ab = ring_ab or {}
+
+    # A stereoparent carbon that carries both an '-OH' and an '=O' is a carboxylic acid
+    # carbon (the side-chain terminus of a steroid). The acid is senior to the ester, so it
+    # owns the suffix and the ester becomes an 'acyloxy' PREFIX: (the Blue Book
+    #:31696), "Seniority order for classes" (:18158; 7a carboxylic acids above
+    # 9 esters), (:52550; '3-oxoandrost-4-en-18-oic acid'). Writing it as
+    # '21-hydroxy...-21-oxo' with a functional-class ester word ('...-3-yl acetate') cited
+    # the acid as two prefixes and the ester as the principal group (TRIAGE DK-ACIDPFX).
+    # The suffix, the prefix order and the stereo handling are the ones of
+    # ``_assemble_np_name``, which already cites the acid this way. Conjugate dicts (a
+    # ``word`` key: sulfate, glycosiduronic acid) keep the functional-class spelling.
+    if (set(hydroxyls) & set(ketones) and esters
+            and all(e.get("acylate") and not e.get("word") for e in esters)):
+        return _assemble_np_name(
+            stem, scaffold_name, hydroxyls, ketones, unsaturation,
+            stereo_prefix=stereo_prefix, methyls=methyls, halogens=halogens,
+            ring_ab=ring_ab,
+            acyloxys=[(e["locant"], _acylate_to_acyloxy(e["acylate"])) for e in esters],
+        )
 
     # a phase (-02): render a ring locant with its ring-face α/β descriptor (Latin,
     # no locant-greek hyphen) when cited; else plain.

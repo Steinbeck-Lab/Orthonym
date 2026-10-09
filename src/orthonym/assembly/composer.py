@@ -151,6 +151,7 @@ def _integrate_universal_prefixes(
     exclude_atoms=None,
     allow_mancude=None,
     prefix_texts_out=None,
+    fail_closed=False,
 ):
     """Discover and format all substituents on a parent structure.
 
@@ -197,6 +198,12 @@ def _integrate_universal_prefixes(
             ⚠ It is gated on the best-effort discriminator, NOT on
             ``allow_aromatic_general``: that one is True for ``complete`` too,
             and widening ``complete``'s vocabulary would break H3 one tier up.
+        fail_closed: ``False`` (default, every existing caller): a substituent
+            the namer refuses, or a discovery that fails, is DROPPED and the
+            rest is returned -- the caller's name then describes fewer atoms
+            than the molecule has. ``True``: either raises
+            ``UnnameableSubstituentError`` (the typed candidate-void signal), so
+            a caller that cannot afford a lost branch declines instead.
 
     Returns:
         Prefix string (e.g., ``"3-methyl-"`` or ``"2-chloro-3-methyl-"``)
@@ -238,6 +245,8 @@ def _integrate_universal_prefixes(
         )
     except (AssertionError, Exception) as exc:
         logger.debug("_integrate_universal_prefixes discovery failed: %s", exc)
+        if fail_closed:
+            raise UnnameableSubstituentError('substituent_discovery_failed')
         return ""
 
     if not subs:
@@ -251,6 +260,8 @@ def _integrate_universal_prefixes(
                                        allow_mancude=allow_mancude)
         if prefix_name and prefix_name != "substituent":
             prefix_groups[prefix_name].append(sub_info.locant)
+        elif fail_closed:
+            raise UnnameableSubstituentError('substituent_branch_unnameable')
 
     if not prefix_groups:
         return ""
@@ -5998,7 +6009,11 @@ def _amide_acyl_parent_locants(mol, amide_atoms) -> Optional[Dict[int, int]]:
             continue
         seen.add(cur)
         atom = mol.GetAtomWithIdx(cur)
-        if atom.GetSymbol() != 'C':
+        # A ring carbon is never an acyl-CHAIN atom: a ring hanging off the chain
+        # is a substituent. Crawling into it numbered the 17 carbons of a steroid
+        # as chain positions 12..16 of 'undecanamide', so the amide assembler took
+        # every atom for named and cited the ring's two OH as '16,16-dihydroxy'.
+        if atom.GetSymbol() != 'C' or atom.IsInRing():
             continue
         acyl_atoms.append(cur)
         for n in atom.GetNeighbors():
@@ -8734,10 +8749,18 @@ def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment
             else:
                 text = base_name
 
+        # The merged prefix accounts for every atom its parts did; ``None`` when any
+        # part did not report its atoms (the coverage close then skips the name,
+        # never a false decline). Without this the merged fragment reported None
+        # and a name that had dropped a substituent escaped the close.
+        _merged_atoms = (
+            None if any(f.atoms is None for f in group)
+            else frozenset().union(*(f.atoms for f in group)))
         merged.append(NameFragment(
             text=text,
             locants=all_locants,
-            fragment_type="prefix"
+            fragment_type="prefix",
+            atoms=_merged_atoms,
         ))
 
     return merged
@@ -10430,6 +10453,25 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     "universal_pipeline_unnameable_substituent substituent_skip: reason=universal_pipeline_unnameable locant=%d",
                     sub_info.locant,
                 )
+                # Every guard above has had its say, so nobody else names this
+                # branch: SKIPPING it ships the rest of the molecule as if the
+                # branch were not there (a 10-carbon ether lost from
+                # 'C/C=C/C=C/C(=O)CC(CCO)OCC[C@H](O)CC(=O)CC/C=C/C', a N-methyl lost
+                # from a peptide). Void this CANDIDATE with the typed signal (the
+                # ring branch above does the same), whatever the branch's elements.
+                # Scope: the tiers whose names are NOT round-trip verified before they
+                # ship (best-effort, or any tier with the validity gate off). Under the
+                # valid/complete/default tiers the gate rejects the candidate a skipped
+                # branch leaves behind, and the molecule goes on to the next producer
+                # (a decomposition fragment that a void turned into a glued name there
+                # lost the substitutive prefix the whole-molecule engine builds).
+                from ..metrics.provenance import best_effort_ctx as _be_ctx
+                from .. import namer as _namer_mod
+                if _be_ctx.get() or getattr(_namer_mod, '_DISABLE_VALIDITY_GATE', False):
+                    from ..metrics.abstention import AbstentionCode, record_abstention
+                    record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
+                                      detail='substituent_branch_unnameable')
+                    raise UnnameableSubstituentError('substituent_branch_unnameable')
                 continue
 
         # IUPAC: Convert -yl to -ylidene for exocyclic double bonds.
@@ -11090,6 +11132,14 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                 if _ni not in _af and _ni not in _exc:
                     _qq.append(_ni)
         _acyl_has_ring = any(_ri.NumAtomRings(c) > 0 for c in _af)
+        # Every atom of the substituent is the amide N, the acyl fragment or its
+        # =O. When the N carries a further substituent (-N(CH3)-CO-R) that atom is
+        # in none of them, and a prefix spelled from the acyl alone ('ethanoylamino'
+        # for -N(CH3)-CO-CH3) describes a different molecule: the N-substituent is
+        # lost. The method-(2) spellings below are only faithful when this holds.
+        _acyl_accounts_for_branch = (
+            set(sub_atoms) == _af | {idx}
+            | ({carbonyl_o} if carbonyl_o is not None else set()))
 
         def _recursive_acyl_amido(allow_acylamino_fallback):
             # Method (1) PIN amido prefix for a well-defined acyl:
@@ -11153,7 +11203,7 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
                                     )
                                     return _aem(_amido, -1)
                                 return _amido
-                        if allow_acylamino_fallback:
+                        if allow_acylamino_fallback and _acyl_accounts_for_branch:
                             from ..decomposition.fragment_assembly import (
                                 _acid_to_acyl,
                             )
@@ -11183,6 +11233,20 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
         _amido_nm = linear_acyl_amido_prefix(mol, carbonyl_c, idx, sub_atoms)
         if _amido_nm:
             return _amido_nm
+
+        # 'Substituents of the types -NH-CO-R and -NH-SO2-R'
+        # (the Blue Book): "Method (1) generates preferred IUPAC names." (:32998);
+        # an N-substituted amide is cited with its N locant, '2-(N-methylpropanamido)
+        # benzene-1-sulfonic acid (PIN)' against '2-[methyl(propanoyl)amino]...' (:33039-
+        # 33040). The strict builder above declines a substituted N, so the acyl would
+        # drop to a method-(2) spelling labelled PIN. The substituent walk already builds
+        # this prefix (``_name_amino_branch``, same builder, OPSIN re-anchored): use it
+        # here too, so the two sites cannot disagree about the same -N(R')-CO-R branch.
+        from .substituent_naming import n_substituted_acyl_amido_prefix
+        _n_amido = n_substituted_acyl_amido_prefix(mol, idx, sub_atoms, chain_set)
+        if _n_amido:
+            from .naming_utils import apply_enclosing_marks as _aem
+            return _aem(_n_amido, -1)
 
         # note (m)): an ACYCLIC DECORATED acyl the strict linear amido
         # builder just declined (a 2-amino/2,2-dichloro/... acyl) -> the acid-
@@ -11234,6 +11298,8 @@ def _check_for_acylamino(mol, sub_atoms: List[int], principal_chain: List[int]) 
         # exactly that shape, so the faithful cases stay byte-identical.
         if _pure_linear_alkyl_len(mol, carbonyl_c, exclude) is None:
             return None
+        if not _acyl_accounts_for_branch:
+            return None   # an N-substituent the count cannot spell (see above)
 
         acyl_carbons = _count_carbon_chain(mol, carbonyl_c, exclude)
 

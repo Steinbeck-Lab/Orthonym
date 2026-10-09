@@ -28,8 +28,10 @@ class TestRingChainParentSelection:
     def test_phenylacetic_acid_chain_is_parent(self):
         """Phenylacetic acid: 2-carbon chain with FG, chain is parent."""
         result = name_compound('c1ccc(CC(=O)O)cc1')
-        # IUPAC systematic: 2-phenylethanoic acid (ethanoic = acetic)
-        assert result == '2-phenylethanoic acid'
+        # 'Retained names as preferred IUPAC names' (the Blue Book): acetic
+        # acid is retained as the PIN and can be substituted example:6694
+        # 'phenylacetic acid (PIN)'); the systematic 'ethanoic acid' is never the PIN.
+        assert result == 'phenylacetic acid'
 
     def test_benzoic_acid_ring_is_parent(self):
         """Benzoic acid: FG directly on ring, so ring is parent.
@@ -138,10 +140,10 @@ class TestLocantAssignment:
         assert '3-phenyl' in result
 
     def test_2_phenylethanoic_acid_locant(self):
-        """Phenyl at position 2 of ethanoic acid (systematic name for acetic acid)."""
+        """Phenyl at position 2 of acetic acid (the only substitutable carbon: no locant)."""
         result = name_compound('c1ccc(CC(=O)O)cc1')
-        # IUPAC systematic: 2-phenylethanoic acid
-        assert result == '2-phenylethanoic acid'
+        # (the Blue Book); example:6694 'phenylacetic acid (PIN)'.
+        assert result == 'phenylacetic acid'
 
     def test_4_cyclohexylbutanoic_acid_locant(self):
         """Cyclohexyl at position 4 of butanoic acid."""
@@ -153,10 +155,15 @@ class TestEdgeCases:
     """Test edge cases in ring-chain naming."""
 
     def test_phenylalanine_amino_acid(self):
-        """Phenylalanine should use trivial name (amino acid)."""
-        # NC(Cc1ccccc1)C(=O)O = phenylalanine
+        """The phenylalanine constitution (no alpha configuration given) gets the systematic name."""
+        # NC(Cc1ccccc1)C(=O)O = phenylalanine, configuration undefined. A bare retained name
+        # is read as the L enantiomer, so the stereo-free input takes the systematic name of
+        # Table 10.4, the Blue Book 'phenylalanine
+        # 2-amino-3-phenylpropanoic acid'); the retained name needs a D/L descriptor
+        #,:54291). Commit 9292c013d (2026-08-16) 'stop fabricating implicit-L
+        # on stereo-undefined AAs/esters'.
         result = name_compound('NC(Cc1ccccc1)C(=O)O')
-        assert result == 'phenylalanine'
+        assert result == '2-amino-3-phenylpropanoic acid'
 
     def test_phenyl_with_alcohol(self):
         """Phenyl substituent with alcohol on chain."""
@@ -218,17 +225,20 @@ class TestP441ParentCorrections:
         )
 
     def test_cyclohexanol_chain_longer_wins(self):
-        """Alcohol on both ring and chain, chain is longer -> chain should be parent.
+        """Alcohol on both ring and chain (one -OH each): the ring is the parent.
 
-        OC1CCCCC1CCCCO: cyclohexanol (ring, 6 atoms) + butan-1-ol chain (chain has
-        more atoms including the cyclohexyl-bearing carbon). chain-length
-        criterion should select chain as parent when PG count ties.
+        OC1CCCCC1CCCCO: cyclohexanol (ring) + butan-1-ol chain. The number of principal
+        characteristic groups ties (one -OH each), and 'Systems composed of
+        rings and chains' (the Blue Book): "(1) Within the same class, a ring or
+        ring system has seniority over a chain." (:19340); 'Selection between a ring
+        and a chain as parent hydride' (:24092): "a ring is always selected as the parent
+        hydride to construct a preferred IUPAC name" (:24096). The chain-length premise of
+        the original test is the 1979 rule (method (2) of is for general
+        nomenclature).
         """
         result = name_compound('OC1CCCCC1CCCCO')
-        # Chain is parent: "cyclohexyl" should appear as substituent prefix
-        assert 'cyclohexyl' in result.lower() or 'butan' in result.lower(), (
-            f"Chain-length criterion should produce chain parent with cyclohexyl "
-            f"substituent. Got: {result}"
+        assert result == '2-(4-hydroxybutyl)cyclohexan-1-ol', (
+            f"Ring is the parent (P-44.1.2.2 (1)). Got: {result}"
         )
 
     def test_multi_ring_pg_proximity_selects_ketone_ring(self):

@@ -98,17 +98,28 @@ def test_declining_molecule_returns_none():
 def test_universal_floor_names_former_unroutable_carbamate():
     """Phase B4: the organophosphorus carbamate that USED to be the clean-abstain
     fixture (``C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl`` -- its recursive substituent namer
-    hit the depth cap) is now named by the unconditional universal
-    floor rung, coverage-complete and carrying no ``result_obj`` (verified
-    downstream by). This is the abstention-rate lever the phase exists
-    for: a hard branch degrades to an ugly-but-valid systematic name instead of
+    hit the depth cap) is named. This is the abstention-rate lever the phase
+    exists for: a hard branch degrades to an ugly-but-valid systematic name instead of
     failing the whole molecule.
+
+    Since 32cf861c8 ("P and S oxoacid groups read from the structure as substituent prefixes")
+    an earlier general-engine rung names that carbamate itself (its candidate now carries a
+    ``result_obj``; the name is OPSIN-exact), so it is no longer a universal-floor-only fixture
+    and the floor rung is locked with a molecule only the floor converts: the carbazate
+    ``CC(O)COC(=O)NN`` (cid 3017679) -- rungs 0-2 decline, and the candidate is the floor's
+    (``final_floor``), coverage-complete and carrying no ``result_obj`` (verified downstream by
+    ). Its name '1-[(aminocarbamoyl)oxy]-2-hydroxypropane' is OPSIN 2.9.0 round-trip exact.
     """
     mol, feats = _classified("C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl")
     name = t4_coverage.name_t4_complete(mol, feats)
-    assert name is not None and name, "universal floor must name it, not abstain"
+    assert name is not None and name, "the former unroutable carbamate must be named, not abstain"
+
+    mol, feats = _classified("CC(O)COC(=O)NN")
+    assert t4_coverage._run_general_e1(mol, feats) is None, "rung 0 must decline: not floor-only"
+    name = t4_coverage.name_t4_complete(mol, feats)
+    assert name == "1-[(aminocarbamoyl)oxy]-2-hydroxypropane", name
     cand = t4_coverage._best_effort_candidate(mol, feats)
-    assert cand is not None and cand.result_obj is None, (
+    assert cand is not None and cand.result_obj is None and cand.final_floor, (
         "the universal floor rung carries no result_obj (like polyol-polyester)")
 
 
@@ -438,6 +449,17 @@ def test_t4_wired_into_namer_emits_for_abstainer():
     assert name == _T4_TARGET_EXPECTED, name
 
 
+# A molecule the verified general-fallback tier abstains on but the producer names (cid 21030412,
+# a bis-imine of a polyol; pubchem_2000). The former witness ``_ABSTAINER_SMILES`` is now named by
+# the PIN path itself ('(1R,2R)-2-[(dimethylamino)methyl]cyclohexan-1-ol', pin_verified), so it
+# can no longer show the gate; the name below is OPSIN 2.9.0 round-trip exact to the input's
+# full InChIKey (a polyol-polyester rung candidate, no result_obj).
+_VERIFIED_TIER_ABSTAINER_SMILES = "CC(CCC(C)N=C(CO)C(C(C(CO)O)O)O)C(C)N=C(CO)C(C(C(CO)O)O)O"
+_VERIFIED_TIER_ABSTAINER_T4_NAME = (
+    "5-({3-methyl-6-[(1,3,4,5,6-pentahydroxyhexan-2-ylidene)amino]heptan-2-yl}imino)"
+    "hexane-1,2,3,4,6-pentol")
+
+
 @pytest.mark.unit
 @pytest.mark.opsin_gate
 def test_t4_wiring_does_not_fire_without_unverified_optin():
@@ -445,14 +467,21 @@ def test_t4_wiring_does_not_fire_without_unverified_optin():
     (conservative) verified general-fallback tier on, the abstainer still
     abstains -- the aggressive producer must not run for it. Gate ON for the
     same reason as the emission test above.
+
+    The witness is ``_VERIFIED_TIER_ABSTAINER_SMILES`` (the former CLASS-A molecule is named by
+    the PIN path now); the control line shows the tier DOES name it, so the abstention is the
+    gate's doing and not an input nobody can name.
     """
     from orthonym.jvm_budget import jvm_slots
     from orthonym.errors import is_failure_name
     with jvm_slots(1, purpose="test-t4-gate"):
         verified_only = Orthonym(general_fallback=True)
-        name = verified_only.name(_ABSTAINER_SMILES)
+        name = verified_only.name(_VERIFIED_TIER_ABSTAINER_SMILES)
+        t4 = Orthonym(general_fallback=True, general_fallback_unverified=True)
+        t4_name = t4.name(_VERIFIED_TIER_ABSTAINER_SMILES)
     assert is_failure_name(name), (
         f"verified-only tier must not emit the aggressive T4 name: {name!r}")
+    assert t4_name == _VERIFIED_TIER_ABSTAINER_T4_NAME, t4_name
 
 
 @pytest.mark.unit
@@ -613,10 +642,19 @@ def test_t4_backbone_acceptance_probe():
 # producer for 5/400 molecules -- the ring-less / chain-preferred class where
 # rung 1's chain_is_parent=False forces a ring parent the engine then cannot
 # host, so rung 1 declines while rung 2 succeeds. So rung 2 is NOT redundant
-# belt-and-braces and NOT dead code (invariants 8/17). Anchor: cid 266765, the
-# simplest (stereo-free) of the 5; its rung-2 name OPSIN-round-trips.
-_RUNG2_UNIQUE_SMILES = "CC(C)(CC(=O)NC1CCCCC1)CBr"  # cid 266765
-_RUNG2_UNIQUE_EXPECTED = "4-bromo-1-(cyclohexylamino)-3,3-dimethyl-1-oxobutane"
+# belt-and-braces and NOT dead code (invariants 8/17).
+#
+# Re-anchored 2026-10-09: the original anchor, cid 266765 ``CC(C)(CC(=O)NC1CCCCC1)CBr``, is no
+# longer rung-2-unique -- rung 0 of the general engine now names that amide itself
+# ('4-bromo-N-cyclohexyl-3,3-dimethylbutanamide', an improvement). Re-measured on pubchem_2000
+# (1,758 of its 2,000 molecules, gate on, same short-circuit): rung 2 is still the sole
+# producer for 3 molecules; the smallest, cid 19793565, is the new anchor. Its rung-2 name
+# OPSIN-round-trips to the input's full InChIKey.
+_RUNG2_UNIQUE_SMILES = (
+    "C1=CC=C2C(=C1)C=C(N2)C(=O)NC3=CC=C(C=C3)/C=C/C(=O)OC4=CC=C(C=C4)[N+](=O)[O-]"
+)  # cid 19793565
+_RUNG2_UNIQUE_EXPECTED = (
+    "(2E)-3-[4-(1H-indole-2-carboxamido)phenyl]-1-(4-nitrophenoxy)-1-oxoprop-2-ene")
 
 
 @pytest.mark.unit

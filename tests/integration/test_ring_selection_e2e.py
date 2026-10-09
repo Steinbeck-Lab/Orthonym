@@ -36,7 +36,11 @@ class TestSingleRingUnchanged:
     """Single-ring molecules should name identically to pre-integration."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("OC1CCCCC1", "cyclohexan-1-ol"),
+        # "The locant '1' is omitted:" (the Blue Book), item (c) (:2913): "in
+        # monosubstituted homogeneous monocyclic rings" (examples 'cyclohexanethiol (PIN)',
+        # 'bromobenzene (PIN)'); (:4770) names 'cyclohexanol'. The
+        # deny-by-default does not bite: no other locant is cited.
+        ("OC1CCCCC1", "cyclohexanol"),
         ("C1CCCCC1", "cyclohexane"),
         ("C1CCCC1", "cyclopentane"),
         ("c1ccncc1", "pyridine"),

@@ -154,9 +154,16 @@ class TestDispatchTableIntegrity:
           (predicate-is-handler pattern), so the half-step cannot fire on any
           shape it does not also correctly name — it does not affect
           insertability of the dense region.
+        - charged Slice B MIXED_SIGN_ZWITTERION @ 302 (Tier-1, 0e7b6437a "PIN-correct
+          azaniumyl zwitterion namer "): a deliberate half-step interceptor
+          directly AFTER ESTER_ANION_ZWITTERION@301 (same family, no hundreds slot is
+          free between 300 and ANION_RETAINED@400). It is the NET-CHARGED door for a
+          single-fragment mixed-sign organic that `detect_species_type` buckets as 'ion',
+          which ZWITTERION@300 never sees; predicate-IS-handler like @301.
         """
         LIPID_HALF_STEP = 250  # a phase Tier-1 interceptor (documented exception)
         ESTER_ANION_ZWITTERION_HALF_STEP = 301  # a phase B1 (documented exception)
+        MIXED_SIGN_ZWITTERION_HALF_STEP = 302  # charged Slice B, 0e7b6437a (documented exception)
         # a phase CATION_QUATERNARY @ 480 (Tier-1): a deliberate half-step
         # interceptor between ANION_RETAINED@400 and CATION_RETAINED@500 (no
         # hundreds slot free there). Same documented-half-step pattern as
@@ -168,6 +175,7 @@ class TestDispatchTableIntegrity:
             for e in DISPATCH_TABLE.values()
             if 100 <= e.priority < 10000
             and e.priority not in (LIPID_HALF_STEP, ESTER_ANION_ZWITTERION_HALF_STEP,
+                                   MIXED_SIGN_ZWITTERION_HALF_STEP,
                                    CATION_QUATERNARY_HALF_STEP)  # dense region
         )
         for prev, curr in zip(outer, outer[1:]):

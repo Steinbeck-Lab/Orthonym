@@ -20,6 +20,12 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 
 ROWS = [
+    # the suffix (d) ranks before the hydro prefixes (f) and the added hydrogen (e) is cited
+    # after it: the thione of these rings is the suffix class 16,
+    # the Blue Book, before the class 19 amines:18192;:29504), so the
+    # numbering is '2(1H)' with the amino group at 6, not '2,3-dihydro...-4-amine'.
+    ("Nc1ccnc(=S)[nH]1", "6-aminopyrimidine-2(1H)-thione"),
+    ("Nc1[nH]c(=S)ncc1F", "6-amino-5-fluoropyrimidine-2(1H)-thione"),
     ("O=C1C=NC1", "azet-3(2H)-one"),
     ("O=C1C=NN1", "1,2-diazet-3(2H)-one"),
     ("O=C1C=CC=NCC=C1", "azocin-5(2H)-one"),
@@ -52,23 +58,6 @@ def _row(smiles, tier):
 def test_a_heteromonocycle_with_a_group_is_numbered_by_its_hydrogen(smiles, name, tier):
     row = _row(smiles, tier)
     assert (row.get("name"), row["tier"]) == (name, "pin_verified"), (row.get("name"), row["tier"])
-
-
-#: the suffix (d) is ranked before the hydro prefixes (f). The thione of this ring is still
-#: cited as a prefix (the principal group the namer picks is the amine), so the name is not
-#: the PIN, the Blue Book: class 16 ketones and pseudoketones:18189
-#: rank before class 19 amines:18192); the numbering and the hydrogen are those of the name
-#: as built: '2,3-dihydro...-4-amine', not '1,2-dihydro...-6-amine'.
-SUFFIX_BEFORE_HYDRO = [
-    ("Nc1ccnc(=S)[nH]1", "2-sulfanylidene-2,3-dihydropyrimidin-4-amine"),
-    ("Nc1[nH]c(=S)ncc1F", "5-fluoro-2-sulfanylidene-2,3-dihydropyrimidin-4-amine"),
-]
-
-
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,name", SUFFIX_BEFORE_HYDRO)
-def test_the_suffix_is_ranked_before_the_hydro_prefixes(smiles, name):
-    assert _row(smiles, "best-effort").get("name") == name
 
 
 def test_the_numbering_authority_leaves_a_ring_of_a_fused_system():

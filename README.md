@@ -82,6 +82,10 @@ pip install "git+https://github.com/Steinbeck-Lab/Orthonym.git"
 orthonym --fetch-jars          # one-time: downloads and checks the OPSIN and centres jars
 ```
 
+If you skip `--fetch-jars`, the first call that names a molecule downloads the two jars (about
+17 MB) and says so; later calls are fast. If your shell does not find `orthonym` right after the
+install, open a new terminal (or run `hash -r`); `python -m orthonym` works in any case.
+
 ```python
 from orthonym import name_compound
 

@@ -47,9 +47,23 @@ class TestWholeMoleculeUnaffectedControl:
     passed: a plain non-spiro tricyclo+ von-Baeyer PIN stays byte-identical."""
 
     def test_whole_molecule_vonbaeyer_unaffected_control(self):
+        # The control is unaffected by the SPIRO criterion (no spiro atom is passed). Its
+        # descriptor moved for a different, deliberate reason: e3b71b4a9 (2026-09-01,
+        # " largest main bridge is the PIN") made the main-bridge selection take the
+        # LARGEST bridge, where it took the shortest, so this cage's main bicycle is now
+        # [15.3.2] (main bridge 2) instead of [9.9.1] (main bridge 1). "Selection of
+        # the main ring" (the Blue Book) fixes the 20-atom main ring and
+        # "Selection of the main bridge" (:9603; paragraph:9605) takes "the bridge that
+        # includes as many of the atoms as possible that are not included in the main ring";
+        # symmetric division of the main ring,:9661) applies only after that.
+        # Independent enumeration (networkx, not the code under test): the largest simple cycle
+        # of this 25-atom graph has 20 atoms, there is exactly one, and the longest bridge of
+        # atoms outside it has 2 atoms. Both descriptors read back to the input's full
+        # InChIKey with OPSIN 2.9.0 (the structure is the same, so that does not choose between
+        # them; the rules above do).
         assert name_compound(
             "C1CC2CCCC3C(C2)C(C1)C1CC3C2CCCC3CCCC1C2C3"
-        ) == "hexacyclo[9.9.1.2^2,6.2^16,20.0^10,25.0^12,22]pentacosane"
+        ) == "hexacyclo[15.3.2.2^3,7.1^2,12.0^13,21.0^11,25]pentacosane"
 
 
 class TestSpiroPriorityNumbering:

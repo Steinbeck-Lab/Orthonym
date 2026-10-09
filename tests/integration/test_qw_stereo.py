@@ -46,11 +46,15 @@ class TestStereoMismatchCompounds:
         """
         smiles = "CC[C@@H](C)c1ncc(C(C)C)[nH]c1=O"
         name = name_compound(smiles)
-        # Must contain (R)-sec-butyl with square brackets
-        assert "[(R)-sec-butyl]" in name, (
-            f"Expected [(R)-sec-butyl] in name, got: {name}"
+        # 'sec-butyl' is not a preferred prefix: 'butan-2-yl (preferred prefix)... (not
+        # sec-butyl)', the Blue Book under; a stereodescriptor on a substituent is
+        # cited inside the enclosing marks, '[(2R)-butan-2-yl]' (the Blue Book, '1-[(2R)-butan-2-
+        # yl]-3-[(2S)-butan-2-yl]benzene (PIN)'); 'isopropyl' is general nomenclature
+        # only ('propan-2-yl (preferred prefix)', the Blue Book,.
+        assert "[(2R)-butan-2-yl]" in name, (
+            f"Expected [(2R)-butan-2-yl] in name, got: {name}"
         )
-        assert name == "3-[(R)-sec-butyl]-6-isopropyl-2-oxo-1,4-diazine"
+        assert name == "3-[(2R)-butan-2-yl]-6-(propan-2-yl)pyrazin-2(1H)-one"
 
     def test_compound2_peptide_pyrrolidine_stereo_present(self):
         """Compound 2: peptide with pyrrolidine-2-carbonyl has (2S) stereo.
@@ -129,9 +133,10 @@ class TestSystemicSubstituentStereo:
         # 3-[(R)-sec-butyl]pyridine
         smiles = "CC[C@@H](C)c1cccnc1"
         name = name_compound(smiles)
-        # Must have CIP descriptor on sec-butyl
-        assert "(R)-sec-butyl" in name or "(S)-sec-butyl" in name, (
-            f"Expected stereo on sec-butyl, got: {name}"
+        # Must have the CIP descriptor on the butan-2-yl prefix (the Blue Book,;
+        # the Blue Book for the '[(2R)-butan-2-yl]' spelling)
+        assert name == "3-[(2R)-butan-2-yl]pyridine", (
+            f"Expected stereo on butan-2-yl, got: {name}"
         )
 
     def test_sec_butyl_on_furan(self):
@@ -139,8 +144,8 @@ class TestSystemicSubstituentStereo:
         # 2-[(S)-sec-butyl]furan
         smiles = "CC[C@H](C)c1ccco1"
         name = name_compound(smiles)
-        assert "(R)-sec-butyl" in name or "(S)-sec-butyl" in name, (
-            f"Expected stereo on sec-butyl, got: {name}"
+        assert name == "2-[(2S)-butan-2-yl]furan", (
+            f"Expected stereo on butan-2-yl, got: {name}"
         )
 
     def test_sec_butyl_without_stereo(self):
@@ -149,10 +154,11 @@ class TestSystemicSubstituentStereo:
         smiles = "CCC(C)c1cccnc1"
         name = name_compound(smiles)
         # Should NOT have (R) or (S) prefix
-        assert "(R)" not in name and "(S)" not in name, (
-            f"Expected no stereo on achiral sec-butyl, got: {name}"
+        assert "(R)" not in name and "(S)" not in name and "(2R)" not in name \
+            and "(2S)" not in name, (
+            f"Expected no stereo on achiral butan-2-yl, got: {name}"
         )
-        assert "sec-butyl" in name
+        assert name == "3-(butan-2-yl)pyridine"
 
     def test_sec_butyl_opposite_config(self):
         """Test opposite CIP configuration gives opposite descriptor."""
@@ -161,12 +167,14 @@ class TestSystemicSubstituentStereo:
         smiles_s = "CC[C@H](C)c1ncc(C(C)C)[nH]c1=O"
         name_r = name_compound(smiles_r)
         name_s = name_compound(smiles_s)
-        # One should be (R), the other (S)
-        assert "[(R)-sec-butyl]" in name_r or "[(S)-sec-butyl]" in name_r
-        assert "[(R)-sec-butyl]" in name_s or "[(S)-sec-butyl]" in name_s
+        # One should be (2R), the other (2S)
+        assert "[(2R)-butan-2-yl]" in name_r or "[(2S)-butan-2-yl]" in name_r
+        assert "[(2R)-butan-2-yl]" in name_s or "[(2S)-butan-2-yl]" in name_s
+        assert name_r == "3-[(2R)-butan-2-yl]-6-(propan-2-yl)pyrazin-2(1H)-one"
+        assert name_s == "3-[(2S)-butan-2-yl]-6-(propan-2-yl)pyrazin-2(1H)-one"
         # And they should be different
-        r_has_r = "[(R)-sec-butyl]" in name_r
-        s_has_r = "[(R)-sec-butyl]" in name_s
+        r_has_r = "[(2R)-butan-2-yl]" in name_r
+        s_has_r = "[(2R)-butan-2-yl]" in name_s
         assert r_has_r != s_has_r, (
             f"Expected opposite configs, got: {name_r} vs {name_s}"
         )

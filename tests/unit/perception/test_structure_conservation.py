@@ -178,17 +178,39 @@ def test_charge_dropped_false_for_empty_name():
 # R12-spillover veto (partial_sat sp3-ring substituent drop)
 # ---------------------------------------------------------------------------
 
+# Documented leaks the hydro-fused producer still declines: the veto is what keeps the Java-free
+# path from shipping a substitute. 2-Aminotetralin LEFT this set when the producer began to
+# spell the ring '-amine' suffix (measured: producer, raw name and OPSIN all agree on
+# '1,2,3,4-tetrahydronaphthalen-2-amine'); its id is kept below as a retired witness so the
+# set stays traceable.
+_STILL_LEAKS = ("NC1CCc2cc(O)ccc2C1",)
+#: Retired witnesses: now named correctly at the source, with the name OPSIN 2.9.0 parses back
+#: to the input (full an InChIKey both sides).
+_NOW_NAMED = {"NC1CCc2ccccc2C1": "1,2,3,4-tetrahydronaphthalen-2-amine"}
+
+
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,bad_name", [
-    # Still a leak: no producer can name a 2-aminotetralin (the amine wants a
-    # SUFFIX, `1,2,3,4-tetrahydronaphthalen-2-amine`, the Blue Book shows
-    # the 1-isomer as PIN), so the hydro-fused producer fails closed and this
+    # Still a leak: the hydro-fused producer refuses this hydroxy-2-aminotetralin (measured:
+    # producer None, Java-free name 'unknown organic compound'), so it fails closed and this
     # veto is what keeps the Java-free path from shipping a substitute.
+    ("NC1CCc2cc(O)ccc2C1", "1,2,3,4-tetrahydronaphthalene"),
+    # Retired witness (id kept): `NC1CCc2ccccc2C1` is now named at the source,
+    # `1,2,3,4-tetrahydronaphthalen-2-amine` (the Blue Book shows the 1-isomer as PIN,
+    # "Modification of the degree of saturation/unsaturation of primary amines").
+    # The veto is scoped to the producer's own emission
+    # (structure_conservation: `if name != produced.name: return False`), so the old bad
+    # name no longer trips it -- nothing ships it any more.
     ("NC1CCc2ccccc2C1", "1,2,3,4-tetrahydronaphthalene"),
 ])
 def test_partial_sat_drop_true_for_documented_leaks(smiles, bad_name):
     mol = Chem.MolFromSmiles(smiles)
-    assert partial_sat_sp3_substituent_drop(mol, bad_name) is True
+    if smiles in _NOW_NAMED:
+        assert partial_sat_sp3_substituent_drop(mol, bad_name) is False
+        assert partial_sat_sp3_substituent_drop(mol, _NOW_NAMED[smiles]) is False
+    else:
+        assert smiles in _STILL_LEAKS
+        assert partial_sat_sp3_substituent_drop(mol, bad_name) is True
 
 
 @pytest.mark.unit
@@ -208,6 +230,10 @@ def test_partial_sat_drop_true_for_documented_leaks(smiles, bad_name):
     # encoding these molecules' correct names.
     ("Cc1ccc2c(c1)CC(C)CC2", "2,7-dimethyl-1,2,3,4-tetrahydronaphthalene"),
     ("OC1CCc2ccccc2C1", "1,2,3,4-tetrahydronaphthalen-2-ol"),
+    # '1,2,3,4-tetrahydronaphthalen-2-amine' -> NC1CCc2ccccc2C1 (OPSIN 2.9.0; the 1-isomer is
+    # the PIN of the Blue Book, "Modification of the degree of
+    # saturation/unsaturation of primary amines")
+    ("NC1CCc2ccccc2C1", "1,2,3,4-tetrahydronaphthalen-2-amine"),
 ])
 def test_former_leaks_are_now_named_at_the_source(smiles, pin):
     mol = Chem.MolFromSmiles(smiles)
@@ -263,11 +289,14 @@ def test_partial_sat_drop_false_for_mixed_hydro_shape():
     # metalloid charge-NORMALIZATIONs (borate-olate coincidence; over-coordinated
     # silane/stannane named neutral per test_charged_suffixes_ft6.py) are
     # gated-safe no-Java residuals, NOT vetoed here (precision-over-recall).
-    # R12: the amine wants a SUFFIX no producer builds yet, so the hydro-fused
-    # producer fails closed and this veto keeps the Java-free path from
-    # shipping the substitute it otherwise reaches (measured:
-    # `4-butylcyclohexan-1-amine` -- the aromatic half re-spelled as a butyl
-    # chain on a monocycle, a wrong molecule).
+    # R12: the hydro-fused producer refuses this hydroxy-2-aminotetralin (measured: producer
+    # None), so it fails closed and this veto keeps the Java-free path from shipping the
+    # substitute it otherwise reaches (measured earlier for the plain 2-aminotetralin:
+    # `4-butylcyclohexan-1-amine` -- the aromatic half re-spelled as a butyl chain on a
+    # monocycle, a wrong molecule).
+    "NC1CCc2cc(O)ccc2C1",
+    # Retired witness (id kept): `NC1CCc2ccccc2C1` is now named at the source, see
+    # test_former_leaks_are_now_named_at_the_source.
     "NC1CCc2ccccc2C1",
     # `Cc1ccc2c(c1)CC(C)CC2` and `OC1CCc2ccccc2C1` MOVED OUT of this list:
     # both are now named correctly at the source, see
@@ -275,7 +304,7 @@ def test_partial_sat_drop_false_for_mixed_hydro_shape():
 ])
 def test_veto_fails_closed_on_documented_leaks_no_java(smiles):
     raw = Orthonym(style="pin", _disable_opsin_validity_gate=True)
-    assert raw.name(smiles) == "unknown organic compound"
+    assert raw.name(smiles) == _NOW_NAMED.get(smiles, "unknown organic compound")
 
 
 @pytest.mark.unit

@@ -212,7 +212,9 @@ AB_CANARY_COMPOUNDS = [
     ("CCCCCCCCC(C)CC(C)C", "2,4-dimethyldodecane"),
     # Alcohol
     ("CC(O)C(=O)O", "2-hydroxypropanoic acid"),
-    ("OCC(O)CO", "glycerol"),
+    # 'Retained names' (the Blue Book): 'glycerol
+    # propane-1,2,3-triol (PIN)'; the retained name is for general nomenclature only.
+    ("OCC(O)CO", "propane-1,2,3-triol"),
     # Carboxylic acid (chain)
     ("CC(=O)O", "acetic acid"),
     ("O=C(O)CCC(=O)O", "butanedioic acid"),
@@ -229,7 +231,10 @@ AB_CANARY_COMPOUNDS = [
     # numbering, so methyl, cited first, takes {2,3,5} (c10268e95; was the
     # snapshot '2,3,6-trimethyl-5-propylpyrazine', same molecule, OPSIN exact).
     ("CCCc1nc(C)c(C)nc1C", "2,3,5-trimethyl-6-propylpyrazine"),
-    ("Oc1ccnc2ccccc12", "4-hydroxyquinoline"),
+    # 'Systematic names of alcohols, phenols, enols, and ynols'
+    # (the Blue Book): the -OH is the principal characteristic group and is cited
+    # as the suffix 'ol'; '4-hydroxyquinoline' is the prefix-only non-PIN form.
+    ("Oc1ccnc2ccccc12", "quinolin-4-ol"),
     # Ester
     ("CCCCCCCCCCCCCCCCCCCCCC(=O)OCC", "ethyl docosanoate"),
     # Stereo compound

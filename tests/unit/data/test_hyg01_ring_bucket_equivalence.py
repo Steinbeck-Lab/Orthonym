@@ -16,6 +16,7 @@ from orthonym.data.fused_heterocycles import (
     FUSED_HETEROCYCLE_DATA,
     match_fused_heterocycle_core,
     ring_skeleton_key,
+    _correct_indicated_h_tautomer,
     _get_substructure_patterns,
     _build_pattern_index,
     _PATTERN_BUCKETS,
@@ -95,6 +96,16 @@ def _assert_equiv(smi):
         warnings.simplefilter("ignore")
         old = _old_full_scan(mol)
         new = match_fused_heterocycle_core(mol)
+    if old is not None:
+        # ``match_fused_heterocycle_core`` post-processes the matcher's hit with the
+        # indicated-hydrogen tautomer guard (ba6c75456, the Blue Book
+        #:14607): a hit whose baked indicated-H locant is not the input's is re-anchored
+        # to the atom that bears it. The verbatim pre-Phase-173 loop has no such step, and
+        # since the 7H-purine entry sits beside 9H-purine the full scan's first
+        # match names the 7H tautomer '9H-purine'. The oracle gets the same guard so the
+        # comparison stays an exact name + core + map one; the guard is not what is bucketed.
+        corrected = _correct_indicated_h_tautomer(mol, old[0], old[1], old[2])
+        old = None if corrected is None else (corrected, old[1], old[2])
     # Normalise dict identity (atom_mapping) for comparison.
     def norm(r):
         if r is None:
@@ -114,6 +125,24 @@ def _assert_equiv(smi):
         msg + "\n (not the orientation with the lowest substituent locants)")
     assert best <= _substituent_locants(mol, dict(old[1])), (
         msg + "\n (substituent locants higher than the full scan's)")
+
+
+@pytest.mark.parametrize("smi,expected", [
+    ("c1ncc2[nH]cnc2n1", "7H-purine"),
+    ("c1ncc2nc[nH]c2n1", "9H-purine"),
+])
+def test_purine_tautomer_is_named_at_its_indicated_hydrogen(smi, expected):
+    """ (16) "purine (special numbering, 7H-isomer shown; the PIN is
+    7H-purine)" (the Blue Book), with (:14607): the indicated hydrogen
+    sits at the atom that bears it, so the N7-H input is '7H-purine' although the 9H
+    entry is the first catalogue hit. OPSIN 2.9.0 reads '7H-purine' back to the input's
+    full InChIKey AND fixed-H InChI (the standard key alone cannot tell the tautomers
+    apart); '9H-purine' does not read back to the 7H input's fixed-H InChI."""
+    mol = Chem.MolFromSmiles(smi)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        got = match_fused_heterocycle_core(mol)
+    assert got is not None and got[0] == expected, got
 
 
 CATALOG_SMILES = list(FUSED_HETEROCYCLE_DATA.keys())

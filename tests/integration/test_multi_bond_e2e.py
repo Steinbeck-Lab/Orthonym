@@ -66,19 +66,24 @@ class TestTriglycerides:
 
     @pytest.mark.integration
     def test_triacetin_exact_name_backward_compat(self):
-        """Triacetin: backward compat -- polyfunctional path should produce
-        the same name as before a phase."""
+        """Triacetin: named as a functional-class ester of the triol (the PIN)."""
         name = name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O")
-        assert name == "1,2,3-tris(acetyloxy)propane", (
-            f"Triacetin backward compat failure: {name}"
+        # (under 'Definitions'): "All preferred IUPAC names for
+        # esters are named by functional class nomenclature."; the book prints
+        # 'propane-1,2,3-triyl triacetate (PIN)' (the Blue Book). The acyloxy form
+        # '1,2,3-tris(acetyloxy)propane' is for esters cited as prefixes.
+        assert name == "propane-1,2,3-triyl triacetate", (
+            f"Triacetin name mismatch: {name}"
         )
 
     @pytest.mark.integration
     def test_tripropionin_exact_name_backward_compat(self):
-        """Tripropionin: backward compat -- should still produce polyfunctional name."""
+        """Tripropionin: named as a functional-class ester of the triol (the PIN)."""
         name = name_compound("CCC(=O)OCC(COC(=O)CC)OC(=O)CC")
-        assert name == "1,2,3-tris(propanoyloxy)propane", (
-            f"Tripropionin backward compat failure: {name}"
+        # Same rule as triacetin; 'propane-1,2,3-triyl triacetate (PIN)',
+        # the Blue Book).
+        assert name == "propane-1,2,3-triyl tripropanoate", (
+            f"Tripropionin name mismatch: {name}"
         )
 
 

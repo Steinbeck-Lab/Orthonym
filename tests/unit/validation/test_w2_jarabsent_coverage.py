@@ -156,9 +156,17 @@ def test_captopril_surviving_name_is_atom_complete_jar_absent(monkeypatch):
 
 
 def test_methyl_sulfate_abstains_jar_absent(monkeypatch):
+    """Witness B jar-absent. It used to ABSTAIN (the atom-dropping 'methane' was voided); since
+    9966747fd ("build organic sulfate esters, 0-wrong") a by-construction producer
+    names it 'methyl hydrogen sulfate' -- the Blue Book PIN, "Esters of mononuclear
+    noncarbon oxoacids" (the Blue Book 'CH3-O-SO2-OH methyl hydrogen sulfate (PIN)'),
+    which OPSIN 2.9.0 parses to the input's full InChIKey. The test's real goal holds: the
+    atom-dropping 'methane' is never shipped, and the new name keeps every atom."""
     _force_jar_absent(monkeypatch)
     from orthonym import Orthonym
-    assert Orthonym(style="pin").name(METHYL_SULFATE) == "unknown organic compound"
+    name = Orthonym(style="pin").name(METHYL_SULFATE)
+    assert name != _WITNESS_WRONG[METHYL_SULFATE]
+    assert name == "methyl hydrogen sulfate"
 
 
 @pytest.mark.parametrize("smiles,expected", list(_GUARD.items()))

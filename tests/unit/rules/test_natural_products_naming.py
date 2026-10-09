@@ -522,7 +522,15 @@ class TestNoRegressionExistingNP:
         assert name_compound("CC1=CCC2CC1C2(C)C") == "alpha-pinene"
 
     def test_beta_pinene(self):
-        assert name_compound("CC1(C)C2=CCC1CC2") == "beta-pinene"
+        # The key `CC1(C)C2=CCC1CC2` is NOT beta-pinene: it is C9H14 (OPSIN 2.9.0 parses
+        # '7,7-dimethylbicyclo[2.2.1]hept-1-ene' to it), while beta-pinene is C10H16 with an
+        # exocyclic methylidene. 8a0a9bc0e ("fix(pa1): retire 12 non-PIN emissions + 8
+        # wrong-structure data rows") deleted the wrong row, so this structure now gets its
+        # own systematic name and real beta-pinene is named on its von Baeyer parent. Both
+        # names are OPSIN round-trip exact to their inputs (an InChIKey and
+        # an InChIKey).
+        assert name_compound("CC1(C)C2=CCC1CC2") == "7,7-dimethylbicyclo[2.2.1]hept-1-ene"
+        assert name_compound("CC1(C)C2CCC(=C)C1C2") == "6,6-dimethyl-2-methylidenebicyclo[3.1.1]heptane"
 
     def test_alpha_terpineol(self):
         assert name_compound("CC1=CCC(C(C)(C)O)CC1") == "alpha-terpineol"

@@ -563,15 +563,21 @@ class TestAromaticCarboxylateNaming:
         """2-naphthoate (naphthalene-2-carboxylate) should be named correctly."""
         mol = Chem.MolFromSmiles('O=C([O-])c1ccc2ccccc2c1')
         name = name_anion(mol)
-        # Should be naphthoate-based, not "undecanoate" (11 carbons)
-        assert 'naphthoate' in name, f"Expected naphthoate-based name, got '{name}'"
+        # Not "undecanoate" (11 carbons). The fused-ring carboxylate is named on the PIN
+        # parent hydride, not with the general-nomenclature-only retained 'naphthoic acid':
+        # "Retained names only for general nomenclature" (the Blue Book)
+        # '2-naphthoic acid (also 1-isomer) naphthalene-2-carboxylic acid (PIN)'. OPSIN 2.9.0
+        # parses the name to the input's full InChIKey (an InChIKey).
+        assert name == 'naphthalene-2-carboxylate', f"Expected 'naphthalene-2-carboxylate', got '{name}'"
 
     def test_1_naphthoate(self):
         """1-naphthoate (naphthalene-1-carboxylate) should be named correctly."""
         mol = Chem.MolFromSmiles('O=C([O-])c1cccc2ccccc12')
         name = name_anion(mol)
-        # Should be naphthoate-based
-        assert 'naphthoate' in name, f"Expected naphthoate-based name, got '{name}'"
+        # PIN spelling, "Retained names only for general nomenclature"
+        # (the Blue Book, '(also 1-isomer)'); OPSIN 2.9.0 parses the name to the input's
+        # full InChIKey (an InChIKey).
+        assert name == 'naphthalene-1-carboxylate', f"Expected 'naphthalene-1-carboxylate', got '{name}'"
 
 
 class TestAromaticCarboxylateRegressions:

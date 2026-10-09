@@ -93,14 +93,29 @@ class TestZwitterionGuard4:
         assert _rc("C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
 
     def test_protonated_amine_deferred(self):
-        """D-06: GUARD 4's azaniumyl prefix is the QUATERNARY-ammonium betaine
-        class. A PROTONATED amine (NH3+, >0 H) neutralizes to a free amino
-        SUBSTITUENT, so amino-acid zwitterions / zwitterionic peptides are named
-        by their established neutral / retained / peptide form -> route_charged
-        defers (''). (This keeps L-alanyl-L-valine, 2-amino-4-oxopentanoic acid
-        etc. byte-identical — no malformed 2-(azaniumyl)4-oxo... emission.)"""
+        """, as amended by 0e7b6437a (2026-08-20, " charged Slice B: PIN-correct
+        azaniumyl zwitterion namer"). The method keeps its historical name so the node id
+        is stable.
+
+        The glycine zwitterion still defers ('' -- the retained amino-acid table names it
+        'glycine' before the router). A primary protonated amine on an anion parent is NO
+        LONGER deferred: ``_name_primary_amine_azaniumyl_zwitterion`` builds the ionic name
+        -- the carboxylate anion is the parent and each -NH3+ an 'azaniumyl' prefix
+         "Anionic and cationic centers on different parent structures",
+        the Blue Book: "may be named by prefixing the name of the cationic center...
+        to the name of the anionic parent structure"; the Blue Book's own amino-acid
+        zwitterions, "Ionization of characteristic groups", '(2S)-2-azaniumyl-3-
+        (methylsulfanyl)propanoate':54569 and 'azaniumylacetate glycine zwitterion':54561).
+        The commit replaced the earlier defer-to-neutral policy on purpose, because the neutral
+        name is not the PIN of a zwitterion. The docstring's old fear, a malformed
+        '2-(azaniumyl)4-oxo...', did not come true: the name is well formed and OPSIN 2.9.0
+        reads it back to the input's full InChIKey (an InChIKey) and to the
+        same protonation site."""
+        from tests.support.rt_assert import name_is_rt_exact
         assert _rc("[NH3+]CC(=O)[O-]") == ""                 # glycine zwitterion
-        assert _rc("CC(=O)CC([NH3+])C(=O)[O-]") == ""        # 2-amino-4-oxopentanoate
+        got = _rc("CC(=O)CC([NH3+])C(=O)[O-]")               # 2-amino-4-oxopentanoate
+        assert got == "2-azaniumyl-4-oxopentanoate"
+        assert name_is_rt_exact(got, "CC(=O)CC([NH3+])C(=O)[O-]")
 
     def test_p74_1_2_ring_cation_implemented(self):
         """F- (DD3,: the cation N+ is SKELETAL to the anion's parent

@@ -40,7 +40,9 @@ class TestAssembleNpNamePrefixParts:
             "androst", "androstane", hydroxyls=[3, 17], ketones=[],
             unsaturation={"ene": [], "yne": []}, stereo_prefix="",
         )
-        assert result == "androstan-3,17-diol"
+        # (a) (the Blue Book): the terminal 'e' is elided only before a suffix
+        # beginning with a vowel; 'diol' begins with a consonant, so it is kept.
+        assert result == "androstane-3,17-diol"
 
     @pytest.mark.integration
     def test_hydroxy_prefix_with_ketone_suffix(self):
@@ -76,7 +78,8 @@ class TestAssembleNpNamePrefixParts:
             "pregn", "pregnane", hydroxyls=[], ketones=[3, 20],
             unsaturation={"ene": [4], "yne": []}, stereo_prefix="",
         )
-        assert result == "pregn-4-en-3,20-dione"
+        # (a) (the Blue Book): 'e' of 'ene' is kept before the consonant of 'dione'.
+        assert result == "pregn-4-ene-3,20-dione"
 
     @pytest.mark.integration
     def test_unsaturation_only(self):
@@ -253,10 +256,16 @@ class TestSteroidE2EFormat:
 
     @pytest.mark.integration
     def test_cholesterol_no_stereo_e2e(self):
-        """Cholesterol without stereo should get systematic steroid name."""
+        """Cholesterol without stereo gets the systematic hydro-cyclopenta[a]phenanthrene
+        name, not the stereoparent name: 'The name of a fundamental parent structure
+        usually implies the absolute configuration of all chirality centers',
+        the Blue Book), and this input defines none, so 'cholest-5-en-3-ol' would over-specify
+        it."""
         smiles = "CC(C)CCCC(C)C1CCC2C3CC=C4CC(O)CCC4(C)C3CCC12C"
         result = name_compound(smiles)
-        assert result == "cholest-5-en-3-ol", f"Got '{result}'"
+        assert result == (
+            "10,13-dimethyl-17-(6-methylheptan-2-yl)-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
+            "tetradecahydro-1H-cyclopenta[a]phenanthren-3-ol"), f"Got '{result}'"
 
     @pytest.mark.integration
     def test_testosterone_type_e2e(self):
@@ -264,8 +273,11 @@ class TestSteroidE2EFormat:
         smiles = "OC1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C"
         result = name_compound(smiles)
         assert result is not None, "Should produce a name"
-        # Should contain androst stem and proper functional groups
-        assert "androst" in result.lower() or "androstane" in result.lower(), f"Got '{result}'"
+        # Stereo-free input: the androstane stereoparent would imply a configuration
+        #, the Blue Book), so the systematic name is given.
+        assert result == (
+            "17-hydroxy-10,13-dimethyl-1,2,6,7,8,9,10,11,12,13,14,15,16,17-"
+            "tetradecahydro-3H-cyclopenta[a]phenanthren-3-one"), f"Got '{result}'"
 
     @pytest.mark.integration
     def test_progesterone_type_e2e(self):
@@ -273,8 +285,11 @@ class TestSteroidE2EFormat:
         smiles = "CC(=O)C1CCC2C3CCC4=CC(=O)CCC4(C)C3CCC12C"
         result = name_compound(smiles)
         assert result is not None, "Should produce a name"
-        # Should contain pregn stem
-        assert "pregn" in result.lower(), f"Got '{result}'"
+        # Stereo-free input: the pregnane stereoparent would imply a configuration
+        #, the Blue Book), so the systematic name is given.
+        assert result == (
+            "17-acetyl-10,13-dimethyl-1,2,6,7,8,9,10,11,12,13,14,15,16,17-"
+            "tetradecahydro-3H-cyclopenta[a]phenanthren-3-one"), f"Got '{result}'"
 
     @pytest.mark.integration
     def test_androstanediol_e2e(self):

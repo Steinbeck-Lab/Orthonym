@@ -27,6 +27,19 @@ MONOCYCLES = [
     ("O=C1C=CC=COC1", "oxepin-3(2H)-one"),
     ("O=C1C=COC=CN1", "1,4-oxazepin-5(4H)-one"),
     ("S=C1C=NN=C1", "4H-pyrazole-4-thione"),
+    # the ring =S / =Se is the suffix when the ring holds no senior group: ketones,
+    # pseudoketones and heterones with their chalcogen analogues class 16,
+    # the Blue Book;:29504 '=S -thione and sulfanylidene';:29561
+    # 'C=O > C=S > C=Se > C=Te') come before the class 17 hydroxy compounds (:18190) and the
+    # class 19 amines (:18192) these rings carry. OPSIN 2.9.0 reads every name back to the
+    # input's full InChIKey.
+    ("S=c1occo1", "2H-1,3-dioxole-2-thione"),
+    ("S=C1C=CC=N1", "2H-pyrrole-2-thione"),
+    ("[Se]=c1occo1", "2H-1,3-dioxole-2-selone"),
+    ("Nc1[nH]c(=S)ncc1F", "6-amino-5-fluoropyrimidine-2(1H)-thione"),
+    ("Nc1ccnc(=S)[nH]1", "6-aminopyrimidine-2(1H)-thione"),
+    ("Oc1ccc(=S)oc1", "5-hydroxy-2H-pyran-2-thione"),
+    ("Nc1nc(=S)cc[nH]1", "2-aminopyrimidine-4(1H)-thione"),
     ("N=C1C=CSSS1", "4H-1,2,3-trithiin-4-imine"),
     ("C=C1C=NC=N1", "4-methylidene-4H-imidazole"),
     ("O=C1C=CO1", "2H-oxet-2-one"),
@@ -68,41 +81,6 @@ def test_a_heteromonocycle_with_a_group_cites_its_hydrogen(smiles, name, tier):
     assert (row.get("name"), row["tier"]) == (name, "pin_verified"), (row.get("name"), row["tier"])
 
 
-#: the hydrogen is right; the thione is still cited as a prefix, so the name is not the PIN
-#:, the Blue Book: ketones and their chalcogen analogues are senior
-#: to the classes these rings have). Kept as the producer writes it, labelled below the PIN
-#: (``test_a_ring_group_cited_below_its_class_is_not_the_pin``).
-THIONE_PREFIX = [
-    ("S=c1occo1", "2-sulfanylidene-2H-1,3-dioxole"),
-    ("S=C1C=CC=N1", "2-sulfanylidene-2H-pyrrole"),
-]
-
-
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,name", THIONE_PREFIX)
-def test_a_thione_prefix_ring_cites_its_hydrogen(smiles, name):
-    assert _row(smiles, "best-effort").get("name") == name
-
-
-#: a ring carbon's =X group cited as a PREFIX while the name cites no suffix, or only a suffix
-#: of a class junior to the group's, is not the PIN. (the Blue Book) ranks
-#: class 16, ketones, pseudoketones and heterones (:18189), with their chalcogen analogues
-#::29502, '-thione' / 'sulfanylidene', '-selone' / 'selanylidene'), before class 17
-#: hydroxy compounds (:18190) and class 19 amines (:18192). The PINs cite the group as the
-#: suffix ('2H-1,3-dioxole-2-thione', '2H-pyrrole-2-thione', '2H-1,3-dioxole-2-selone',
-#: '6-amino-5-fluoropyrimidine-2(1H)-thione', '6-aminopyrimidine-2(1H)-thione',
-#: '5-hydroxy-2H-pyran-2-thione', '2-aminopyrimidine-4(1H)-thione'; OPSIN 2.9.0 FULL). The
-#: producer's name is kept below the PIN: the default tier declines, best-effort keeps it.
-GROUP_BELOW_ITS_CLASS = [
-    ("S=c1occo1", "2-sulfanylidene-2H-1,3-dioxole"),
-    ("S=C1C=CC=N1", "2-sulfanylidene-2H-pyrrole"),
-    ("[Se]=c1occo1", "2-selanylidene-2H-1,3-dioxole"),
-    ("Nc1[nH]c(=S)ncc1F", "5-fluoro-2-sulfanylidene-2,3-dihydropyrimidin-4-amine"),
-    ("Nc1ccnc(=S)[nH]1", "2-sulfanylidene-2,3-dihydropyrimidin-4-amine"),
-    ("Oc1ccc(=S)oc1", "2-sulfanylidene-2H-pyran-5-ol"),
-    ("Nc1nc(=S)cc[nH]1", "4-sulfanylidene-1,4-dihydropyrimidin-2-amine"),
-]
-
 #: a group cited as a prefix beside a SENIOR suffix stays the PIN: nitriles 14 (:18187) and
 #: aldehydes 15 (:18188) before class 16; amines 19 (:18192) before imines 20 (:18193); C=O
 #: before C=S:29561, '2-sulfanylidene-1,3-thiazolidin-4-one (PIN)':29569).
@@ -112,14 +90,6 @@ GROUP_BESIDE_A_SENIOR_SUFFIX = [
     ("Nc1ccc(=N)oc1", "2-imino-2H-pyran-5-amine"),
     ("O=c1[nH]c(=S)cc[nH]1", "4-sulfanylidene-3,4-dihydropyrimidin-2(1H)-one"),
 ]
-
-
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,name", GROUP_BELOW_ITS_CLASS)
-def test_a_ring_group_cited_below_its_class_is_not_the_pin(smiles, name):
-    assert _row(smiles, "pin")["tier"] == "abstain"
-    best = _row(smiles, "best-effort")
-    assert (best.get("name"), best["tier"]) == (name, "systematic_verified"), best
 
 
 @pytest.mark.opsin_gate

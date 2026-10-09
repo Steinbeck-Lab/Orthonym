@@ -94,11 +94,40 @@ def test_unmeasured_record_never_reports_atom_coverage():
 # ---------------------------------------------------------------------------
 
 def test_public_api_does_not_certify_the_atom_dropping_name(namer):
-    """The headline regression test: no perfect score on a name that drops 6/9 atoms."""
+    """The headline regression test: no perfect score on a name that drops 6/9 atoms.
+
+    The producer no longer drops the peroxy atoms: the name is now
+    '2-(tert-butylperoxy)ethan-1-ol' (OPSIN 2.9.0 reads it back to the input's full
+    an InChIKey; the dropped name 'ethan-1-ol' reads to
+    an InChIKey, a different molecule), so the reference defect is no
+    longer reachable through the real producer. This test keeps the honesty half on that name, which
+    still has no measured coverage, and the next test restores the atom-dropping half
+    by feeding the old dropped name through the same public API."""
+    from tests.support.rt_assert import name_is_rt_exact
     md = namer.name_with_confidence(DROPPING_SMILES)
 
-    # The wrong name is still emitted -- fixing THAT is a separate task
-    # (producer-side routing). What must never happen again is certifying it.
+    assert md['name'] == '2-(tert-butylperoxy)ethan-1-ol'
+    assert name_is_rt_exact(md['name'], DROPPING_SMILES)
+    assert md['name'] != DROPPED_NAME
+    assert md['confidence'] is None, (
+        'nothing scored this name, so no confidence number is warranted'
+    )
+    assert md['verification'] == VERIFICATION_UNVERIFIED
+    assert md['factors'] == {}
+    assert md['factors'].get('atom_coverage') is None
+    assert md['handler'] != 'direct'
+
+
+def test_public_api_does_not_certify_a_producer_that_drops_atoms(namer, monkeypatch):
+    """The atom-dropping half of the headline test, independent of the producer's state.
+
+    ``_name_impl`` is made to return the old defective name 'ethan-1-ol' (3 heavy atoms)
+    for the 9-heavy-atom input, as the producer did before the peroxy prefix was built; the
+    public API must still not certify it with a confidence number, a verification or an
+    atom-coverage factor, whatever the producer does."""
+    monkeypatch.setattr(Orthonym, '_name_impl', lambda self, smiles: DROPPED_NAME)
+    md = namer.name_with_confidence(DROPPING_SMILES)
+
     assert md['name'] == DROPPED_NAME
     assert md['confidence'] is None, (
         'nothing scored this name, so no confidence number is warranted'

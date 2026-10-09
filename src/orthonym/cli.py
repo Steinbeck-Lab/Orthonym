@@ -309,6 +309,12 @@ def main(args: List[str] = None) -> int:
 
     parsed = parser.parse_args(args)
 
+    # Nothing to name: the help needs no jars, so print it before the jar check (which
+    # downloads a missing jar and makes a first call without arguments slow).
+    if not parsed.smiles and not parsed.batch and not parsed.fetch_jars:
+        parser.print_help()
+        return 1
+
     from orthonym.jars import JarUnavailable, fetch_all, require_all
     if parsed.fetch_jars:
         try:

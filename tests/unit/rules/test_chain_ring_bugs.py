@@ -147,8 +147,11 @@ class TestAminoAcidRingAtomLeakage:
 
     def test_tyrosine_has_phenyl_or_hydroxyphenyl(self):
         """-07 (a phase): free L-tyrosine resolves to its retained PIN
-        'tyrosine' (OPSIN-round-trip-verified), so no ring atoms can leak into a
+        'L-tyrosine' (OPSIN-round-trip-verified), so no ring atoms can leak into a
         chain name (the original leakage concern is moot for the retained form).
-        Was the systematic '...(4-hydroxyphenyl)propanoic acid'."""
+        Was the systematic '...(4-hydroxyphenyl)propanoic acid'. The L is cited since
+        a6cadc255 ("a free amino acid keeps its L"): "The stereodescriptors
+        'D' and 'L'" (the Blue Book); its omission is licensed for peptides only
+        ,:54717)."""
         name = name_compound("N[C@@H](Cc1ccc(O)cc1)C(=O)O")
-        assert name == "tyrosine", f"Expected retained 'tyrosine', got: {name}"
+        assert name == "L-tyrosine", f"Expected retained 'L-tyrosine', got: {name}"

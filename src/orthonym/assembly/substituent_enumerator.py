@@ -4365,6 +4365,18 @@ def _senior_longest_carbon_path_from(mol, frag_set, start):
                and not mol.GetAtomWithIdx(i).IsInRing()}
     if start not in carbons:
         return None
+    # The carbon of a cyano / isocyano group (a triple bond to a non-carbon atom) is
+    # part of that prefix and is never a chain atom: counted among the candidates, the
+    # chain through it wins on "substituents cited as prefixes" (its nitrogen counts as
+    # one more) and the group is then spelled 'azanyl' / '3-azaprop-2-yn-1-yl', so a
+    # '1-cyanoethyl' prefix was never built (a phosphonate diester ligand
+    # 'CC(C)OP(=O)(C(C)(C#N)[N+]#[C-])OC(C)C' named nothing since 2bbf85a45).
+    _group_carbons = {
+        i for i in carbons if i != start and any(
+            b.GetBondType() == Chem.BondType.TRIPLE
+            and b.GetOtherAtom(mol.GetAtomWithIdx(i)).GetAtomicNum() != 6
+            for b in mol.GetAtomWithIdx(i).GetBonds())}
+    carbons -= _group_carbons
     try:
         from .substituent_naming import _longest_carbon_chains_from
         chains = _longest_carbon_chains_from(mol, carbons, start)

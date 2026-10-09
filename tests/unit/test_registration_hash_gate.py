@@ -33,10 +33,12 @@ def test_stereo_conflict_is_mismatch_on_primary_path():
 
 
 def test_stereo_omission_is_tolerated_on_primary_path():
-    # A name that under-specifies stereo (parse drops the centre) is NOT a
-    # constitutional error -> ok (breadth-preserving; 0-wrong is about constitution).
+    # Policy reversed by 0c4d4a2d3 ("reject stereo OMISSION as a mismatch (0-wrong; 20/500
+    # default stereo-drops)"): a name that under-specifies stereo (the parse drops the
+    # defined centre) describes a less specific, different molecule, so on the primary
+    # path it is a mismatch. The ignore_stereo=True carve-out below stays tolerant.
     assert namer._self_consistency_verdict(
-        "C[C@H](N)C(=O)O", "CC(N)C(=O)O") == "ok"
+        "C[C@H](N)C(=O)O", "CC(N)C(=O)O") == "mismatch"
 
 
 def test_stereo_difference_is_ok_when_ignore_stereo():
@@ -50,10 +52,14 @@ def test_unparseable_is_inconclusive():
 
 
 def test_neutral_input_charge_ambiguous_name_still_ok():
-    # methyl phosphate (neutral) vs its OPSIN dianion parse: protonation-ambiguous,
-    # NOT a wrong molecule -> must stay ok (documented exempt case).
+    # Policy reversed by baeb8d1ab (" compares the net charge and the protonation
+    # flag for every input"): a neutral input has no protonation exemption. OPSIN reads
+    # 'methyl phosphate' as the dianion; the neutral ester COP(=O)(O)O is 'methyl dihydrogen
+    # phosphate' "Esters of mononuclear noncarbon oxoacids", the Blue Book
+    # 'P(O)(O-CH3)(OH)2 methyl dihydrogen phosphate (PIN)'), so the dianion parse is a
+    # different species -> mismatch.
     assert namer._self_consistency_verdict(
-        "COP(=O)(O)O", "COP(=O)([O-])[O-]") == "ok"
+        "COP(=O)(O)O", "COP(=O)([O-])[O-]") == "mismatch"
 
 
 def test_charged_input_charge_drop_is_mismatch():

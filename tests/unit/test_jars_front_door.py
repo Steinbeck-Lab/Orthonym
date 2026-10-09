@@ -39,6 +39,15 @@ def test_name_compound_refuses_without_jars(tmp_path):
 
 
 @pytest.mark.skipif(not ORTHONYM_CLI.exists(), reason="console script not installed in this venv")
+def test_cli_without_arguments_prints_help_without_the_jars(tmp_path):
+    """The help needs no jar: with none in the jar directory (and no download allowed)
+    a bare `orthonym` still prints the usage at once, rather than refusing."""
+    r = _run([str(ORTHONYM_CLI)], _no_jar_env(tmp_path), tmp_path)
+    assert r.returncode == 1 and r.stdout.startswith("usage: orthonym"), (r.stdout, r.stderr)
+    assert "fetch-jars" not in r.stderr and not (tmp_path / "empty-jar-dir").exists()
+
+
+@pytest.mark.skipif(not ORTHONYM_CLI.exists(), reason="console script not installed in this venv")
 def test_cli_exits_2_with_the_fix(tmp_path):
     r = _run([str(ORTHONYM_CLI), "CCO"], _no_jar_env(tmp_path), tmp_path)
     assert r.returncode == 2

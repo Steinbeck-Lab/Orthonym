@@ -124,7 +124,10 @@ def _row(smiles, tier):
 #: rows whose name carried a BENZ / MONO / ANYL form at the base (shared baseline)
 E2E = [
     ("CC1=CC(=O)OC1CC(=O)[O-]", "valid", "2,5-dihydrofuran-2-yl"),
-    ("C1CCN(CC1)C2=CCCNC2=O", "valid", "tetrahydropyridine"),
+    # fix-all 2026-10-09: the lactam ring keeps its C=C (it was named as the saturated ring
+    # parent before); added hydrogen as in '3,4-dihydronaphthalen-1(2H)-one (PIN)'
+    # (the Blue Book). OPSIN 2.9.0 full InChIKey exact.
+    ("C1CCN(CC1)C2=CCCNC2=O", "valid", "5,6-dihydropyridin-2(1H)-one"),
     ("C=C[C@@H](/C=C\\c1ccc(O)cc1)c1ccc(O)cc1", "valid", "phenyl"),
     ("Cc1cc(O)cc(O)c1C(=O)OC1=COC(C)C(O)C1=O", "best-effort", "3,4-dihydro-2H-pyran-5-yl"),
     ("C1=CC(C(C(=C1)C(=O)O)C(=O)O)(N2C(=O)C=CC2=O)N3C(=O)C=CC3=O", "best-effort",

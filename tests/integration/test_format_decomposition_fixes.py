@@ -125,15 +125,19 @@ class TestHWElisionAndSuffixes:
         name = name_compound(smiles)
         assert "oxaazole" not in name, f"Bad elision: {name}"
         assert "oxazole" in name, f"Expected 'oxazole' in: {name}"
-        assert name == "2-methyloxazole", f"Expected '2-methyloxazole', got: {name}"
+        # 'Retained names of heteromonocycles' (the Blue Book):
+        # 'oxazole 1,3-oxazole (PIN)' -- the Hantzsch-Widman locants are part of the PIN.
+        assert name == "2-methyl-1,3-oxazole", f"Expected '2-methyl-1,3-oxazole', got: {name}"
 
     @pytest.mark.integration
     def test_oxazolane_elision(self):
-        """Compound #86 (HA=25): 'oxazolane' not 'oxaazolane'."""
+        """Compound #86 (HA=25): 'oxazolidine' not 'oxaazolidine' / 'oxaazolane'."""
         smiles = "O1CCN(c2ncc[nH]2)[C@@]1(c1ccccc1)C(C)(C)C"
         name = name_compound(smiles)
-        assert "oxaazolane" not in name, f"Bad elision: {name}"
-        assert "oxazolane" in name, f"Expected 'oxazolane' in: {name}"
+        assert "oxaazol" not in name, f"Bad elision: {name}"
+        # 'Retained names of heteromonocycles' (the Blue Book): 'oxazolidine
+        # 1,3-oxazolidine (PIN)'; the saturated 1,3-oxazole ring is not named 'oxazolane'.
+        assert "1,3-oxazolidine" in name, f"Expected '1,3-oxazolidine' in: {name}"
 
     @pytest.mark.integration
     def test_garbled_ion_suffix_absent(self):

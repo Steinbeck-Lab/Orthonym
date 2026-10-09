@@ -41,10 +41,12 @@ class TestPhenylSubstituent:
         assert result == '3-phenylpropanoic acid', f'Got: {result}'
 
     def test_2_phenylacetic_acid(self):
-        """2-Phenylacetic acid (or phenylacetic acid)."""
+        """Phenylacetic acid (PIN)."""
         result = name_compound('c1ccc(CC(=O)O)cc1')
-        # Locant 2 can be omitted for 2-carbon chains
-        assert 'phenyl' in result.lower() and 'ethanoic acid' in result.lower(), f'Got: {result}'
+        # 'Retained names as preferred IUPAC names': acetic acid is retained
+        # as the PIN and can be substituted (example: 'phenylacetic acid (PIN)');
+        # the systematic 'ethanoic acid' is never the preferred name.
+        assert result == 'phenylacetic acid', f'Got: {result}'
 
     def test_5_phenylpentanoic_acid(self):
         """5-Phenylpentanoic acid."""
@@ -156,24 +158,18 @@ class TestRetainedNamesNotBroken:
 
     def test_phenylalanine_amino_acid(self):
         """
-        RINGCHAIN-05: Phenylalanine amino acid retained name must work.
+        RINGCHAIN-05: the phenylalanine constitution (a benzene ring AND a functionalized
+        chain) is named with the amino acid as parent, not the ring.
 
-        This is the critical test - phenylalanine has both a benzene ring
-        AND a chain with functional groups. If parent selection ran before
-        retained name detection, it would produce a systematic name instead
-        of 'phenylalanine'.
-
-        The correct behavior is:
-        1. Check retained names FIRST (in name method)
-        2. Match 'phenylalanine' pattern
-        3. Return 'phenylalanine' without ever running parent selection
-
-        Note: Uses non-stereo SMILES because amino acid lookup currently
-        uses the canonical non-stereo form. Stereo-annotated SMILES would
-        need additional lookup entries.
+        Note: the input defines no alpha configuration. A bare retained amino-acid name
+        is read as the L enantiomer, so for the stereo-free input the engine emits the
+        systematic name of the constitution (commit 9292c013d 'stop fabricating implicit-L
+        on stereo-undefined AAs/esters'; src/orthonym/data/amino_acids.py). The retained
+        name is emitted only with an L/D descriptor 'The stereodescriptors
+        D and L'); Table 10.4 gives '2-amino-3-phenylpropanoic acid' as the systematic name.
         """
         result = name_compound('NC(Cc1ccccc1)C(=O)O')
-        assert result.lower() == 'phenylalanine' or 'phenylalanine' in result.lower(), f'Got: {result}'
+        assert result == '2-amino-3-phenylpropanoic acid', f'Got: {result}'
 
     def test_phenylalanine_stereo_systematic(self):
         """
@@ -189,9 +185,11 @@ class TestRetainedNamesNotBroken:
         assert 'amino' in result.lower() or 'phenylalanine' in result.lower(), f'Got: {result}'
 
     def test_tyrosine_amino_acid(self):
-        """Tyrosine (another aromatic amino acid) should use retained name."""
+        """Tyrosine constitution without alpha configuration gets the systematic name."""
+        # Stereo-free input: the retained name would assert L (commit 9292c013d;
+        #, so the systematic name of the constitution is emitted.
         result = name_compound('NC(Cc1ccc(O)cc1)C(=O)O')
-        assert result.lower() == 'tyrosine' or 'tyrosine' in result.lower(), f'Got: {result}'
+        assert result == '2-amino-3-(4-hydroxyphenyl)propanoic acid', f'Got: {result}'
 
 
 class TestEdgeCases:
@@ -294,8 +292,9 @@ class TestLocantAssignment:
     def test_2_phenylacetic_acid_locant(self):
         """Phenyl at position 2 of acetic acid."""
         result = name_compound('c1ccc(CC(=O)O)cc1')
-        # Could be '2-phenylacetic acid' or 'phenylacetic acid' (locant 2 implied)
-        assert 'phenyl' in result.lower() and 'ethanoic acid' in result.lower()
+        #: substituted retained acetic acid is the PIN example
+        # 'phenylacetic acid (PIN)'); the locant of the only substitutable carbon is omitted.
+        assert result == 'phenylacetic acid'
 
     def test_4_cyclohexylbutanoic_acid_locant(self):
         """Cyclohexyl at position 4."""

@@ -151,8 +151,11 @@ class _DirLock:
         return False
 
 
-def _download(spec: JarSpec, target: Path, verbose: bool = False) -> None:
-    """Download ``spec`` to ``target`` (temp file, checksum, atomic replace)."""
+def _download(spec: JarSpec, target: Path, verbose: bool = False, first_start: bool = False) -> None:
+    """Download ``spec`` to ``target`` (temp file, checksum, atomic replace).
+
+    ``first_start``: the download was not asked for (a namer found the jar missing), so
+    say on stderr why this call is slow."""
     target.parent.mkdir(parents=True, exist_ok=True)
     with _DirLock(target.parent):
         if _verified(target, spec):  # another process finished while we waited
@@ -166,6 +169,10 @@ def _download(spec: JarSpec, target: Path, verbose: bool = False) -> None:
         fd, tmp = tempfile.mkstemp(prefix=f".{spec.filename}.", dir=str(target.parent))
         try:
             with os.fdopen(fd, "wb") as out, urllib.request.urlopen(spec.url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
+                if first_start:
+                    # once: later starts find the verified jar in the jar directory
+                    print(_first_start_message(spec, target, resp.headers.get("Content-Length")),
+                          file=sys.stderr, flush=True)
                 while True:
                     block = resp.read(1 << 20)
                     if not block:
@@ -179,6 +186,15 @@ def _download(spec: JarSpec, target: Path, verbose: bool = False) -> None:
         finally:
             if os.path.exists(tmp):
                 os.unlink(tmp)
+
+
+def _first_start_message(spec: JarSpec, target: Path, length: Optional[str]) -> str:
+    size = ""
+    if length and length.isdigit():
+        size = f" ({int(length) / 1e6:.1f} MB)"
+    return (f"[orthonym] first start: downloading the {spec.kind} {spec.version} jar{size} to "
+            f"{target.parent}. This happens once; later starts are fast. To fetch the jars "
+            f"in advance, run `orthonym --fetch-jars`.")
 
 
 _CACHE: Dict[str, object] = {}
@@ -198,7 +214,7 @@ def _resolve(spec: JarSpec, download: bool) -> str:
     if not download or _truthy(os.environ.get("ORTHONYM_NO_DOWNLOAD")):
         raise JarUnavailable(f"the {spec.kind} {spec.version} jar is not in {target.parent}; {FETCH_HINT}")
     try:
-        _download(spec, target)
+        _download(spec, target, first_start=True)
     except JarUnavailable:
         raise
     except Exception as exc:  # network, permissions, disk

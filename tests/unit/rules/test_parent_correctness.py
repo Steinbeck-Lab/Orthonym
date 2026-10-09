@@ -29,14 +29,14 @@ from orthonym.rules.parent_correctness import (
     match_token_atoms_in_mol,
     opsin_reference_mol,
     set_reference_name,
-    OPSIN_JAR,
     OPSIN_TIMEOUT,
 )
 from orthonym.assembly.coverage_scoring import CandidateName
+from tests.support.jars import jar_or_none
 
-# OPSIN-required guard (mirrors test_benchmark_multi_corpus.py:23-25)
+# OPSIN-required guard (the jar is resolved by orthonym.jars, not by a module constant)
 opsin_required = pytest.mark.skipif(
-    not OPSIN_JAR.exists(), reason="OPSIN jar required for subprocess tests"
+    jar_or_none() is None, reason="OPSIN jar required for subprocess tests"
 )
 
 

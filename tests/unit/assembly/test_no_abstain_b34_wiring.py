@@ -142,9 +142,12 @@ def test_b3_fallback_guards_undecidable_bond_order():
     on ``None``.
 
     Pure unit test -- gate-independent (the guard blocks before any naming). The
-    NONE case is non-vacuous: ``name_substituent`` returns the ``'substituent'``
-    decline sentinel, proving the B3 block WAS reached (``best_effort_ctx`` True,
-    ``token`` a sentinel) and that the ONLY thing suppressing the call is the
+    NONE case is non-vacuous: ``name_substituent`` returns the decline value
+    (``None`` -- since 3028d3ad3 ``name_substituent`` honours the ambient
+    ``best_effort_ctx`` as ``allow_mancude``, and under ``allow_mancude`` a
+    declined fragment is ``None`` rather than the ``'substituent'`` sentinel; see
+    its docstring), proving the B3 block WAS reached (``best_effort_ctx`` True,
+    ``token`` declined) and that the ONLY thing suppressing the call is the
     bond-order guard. The FV=1 positive control proves the trace actually fires
     when the guard permits, so the empty NONE-case list is not a broken-trace
     artifact (``feedback_harness_that_reports_success``).
@@ -172,17 +175,19 @@ def test_b3_fallback_guards_undecidable_bond_order():
     # (a bridge), so _free_valence_at_attachment is None -> guard must block.
     fv, calls, ret = _run("C1CCC2(CC1)CCCC2", {5, 6, 7, 8, 9}, 5)
     assert fv is None, f"fixture no longer has an undecidable free valence: {fv}"
-    assert ret == "substituent", (
-        f"B3 block not reached (no decline sentinel): {ret!r}")
+    assert ret is None, (
+        f"B3 block not reached (no best-effort decline): {ret!r}")
     assert calls == [], (
         f"universal prefix invoked with UNDECIDABLE bond_order: {calls}")
 
-    # POSITIVE CONTROL: the carbamate's O-C(=O)-N-P(=O)Cl2 branch has a single
-    # single-bonded attachment (free_valence == 1), so the SAME B3 block DOES
-    # call the universal prefix -- proving the empty list above is the guard,
-    # not a dead trace.
-    fv, calls, ret = _run(
-        "C1CCC(CC1)OC(=O)NP(=O)(Cl)Cl", {6, 7, 8, 9, 10, 11, 12, 13}, 6)
+    # POSITIVE CONTROL: the trimethylazaniumyl branch of a choline-type cation has
+    # a single single-bonded attachment (free_valence == 1), so the SAME B3 block
+    # DOES call the universal prefix -- proving the empty list above is the guard,
+    # not a dead trace. (The control used to be the carbamate
+    # O-C(=O)-N-P(=O)Cl2 branch; the cascade now names that branch before the B3
+    # block is reached, so it no longer reaches the universal prefix and cannot
+    # show the trace firing. The cationic nitrogen branch still does.)
+    fv, calls, ret = _run("C[N+](C)(C)CCO", {0, 1, 2, 3}, 1)
     assert fv == 1, f"positive-control fixture free valence changed: {fv}"
     assert calls == [1], (
         f"universal prefix NOT called for a decidable free valence: {calls}")

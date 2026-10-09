@@ -13,9 +13,10 @@ rejected ANY heteroatom in the fragment, and the polyfunctional acyclic path
 is terminal-attachment-only, so heteroatom-bearing internally-attached
 N-fragments had no producer. Fix: the deriver's CHAIN stays all-carbon, but
 degree-1 halogens and hydroxyl oxygens are now allowed as BRANCHES (named by
-the shared substituent namer: bromo/chloro/hydroxy). Everything else (ethers,
-amino, carbonyl — the intra-fragment double-bond check, charges) still
-declines fail-closed.
+the shared substituent namer: bromo/chloro/hydroxy; a degree-1 -NH2 'amino'
+joined them in d4917ae85). Everything else (ethers, secondary amines,
+carbonyl — the intra-fragment double-bond check, charges) still declines
+fail-closed.
 
 Locant rules exercised: free valence lowest; direction tie broken
 by lowest branch-locant set at first point of difference, shipped
@@ -93,11 +94,27 @@ def test_tier5b_deriver_hydroxy_propanyl():
 
 
 @pytest.mark.unit
+def test_tier5b_deriver_amino_propanyl():
+    # The amino branch used to be a fail-closed row (out of scope). Since d4917ae85
+    # (2026-08-01) the deriver admits a degree-1 uncharged -NH2 on a fragment carbon as
+    # a detachable 'amino' prefix, exactly as it does hydroxy and the halogens
+    # (substituent_naming.py: "a PROOF of the admissible shape, not a deny-list"; a
+    # secondary amine, nitro, nitrile, imine and N-oxide still decline). The name is the
+    # amino analogue of the Blue Book's '1-hydroxypropan-2-yl (preferred prefix)',
+    # "THE PRINCIPAL SUBSTITUENT CHAIN", example (the Blue Book), with
+    # the chain chosen by "lowest locants for substituents" (:22768). OPSIN
+    # 2.9.0 reads '(1-aminopropan-2-yl)benzene' back to CC(CN)c1ccccc1's full InChIKey
+    # (an InChIKey), so the prefix carries the amine.
+    mol = Chem.MolFromSmiles("C(C)CN")
+    res = _located_acyclic_alkyl_name(mol, list(range(mol.GetNumAtoms())), 0)
+    assert res == ("1-aminopropan-2-yl", 2)
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "smiles,attach,why",
     [
         ("C(C)OC", 0, "ether oxygen (degree 2) — not a simple branch"),
-        ("C(C)CN", 0, "amino branch — out of scope, must decline"),
         ("C(C)C=O", 0, "carbonyl — unsaturated bond inside fragment"),
         ("C(C)C(=O)O", 0, "carboxyl — must decline"),
         ("C(C)C[O-]", 0, "charged oxygen — must decline"),

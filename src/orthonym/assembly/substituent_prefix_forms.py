@@ -135,6 +135,75 @@ def _collect_fragment_atoms(mol, start_atom: int, exclude: Set[int]) -> Set[int]
     return visited
 
 
+def _has_unrecognised_class_group(mol, atoms) -> bool:
+    """True when a group among ``atoms`` holds a double or triple bond to a hetero atom
+    (C=O, C=S, C=N, C#N, S=O, P=O) that the functional-group perception does not recognise,
+    other than a nitro group.
+
+    Such a group is a characteristic group that can outrank the principal group of the
+    molecule "Seniority order for classes", the Blue Book). A group the
+    perception recognises is ranked by the producer that chose the parent, so naming it here
+    as part of a prefix is consistent with that choice. A group it does not know (an O-alkyl
+    thiocarbamate 'COC(=S)N-', an O-alkyl dithiocarbonate) is invisible to the ranking and
+    would be hidden inside an aryloxy prefix ('2-[4-({[methoxy(sulfanylidene)methyl]amino}
+    methyl)phenoxy]-6-methyloxane-3,4,5-triol': an alcohol named as the parent while an
+    ester-type group is cited as a prefix, under the label of a preferred name). The aryl
+    group is then not named here and the caller keeps declining, as it did before decorated
+    aryl groups were named from their structure."""
+    atoms = set(atoms)
+    suspect = []
+    for bond in mol.GetBonds():
+        a, b = bond.GetBeginAtom(), bond.GetEndAtom()
+        if a.GetIdx() not in atoms or b.GetIdx() not in atoms:
+            continue
+        if bond.GetBondTypeAsDouble() not in (2.0, 3.0):  # aromatic bonds read 1.5
+            continue
+        if a.GetAtomicNum() == 6 and b.GetAtomicNum() == 6:
+            continue  # C=C, C#C
+        if _is_nitro_n_o_bond(a, b):
+            continue
+        suspect.append((a.GetIdx(), b.GetIdx()))
+    if not suspect:
+        return False
+    from ..perception.functional_groups import detect_functional_groups
+
+    covered: Set[int] = set()
+    for matches in detect_functional_groups(mol).values():
+        for match in matches:
+            covered.update(match)
+    return any(a not in covered or b not in covered for a, b in suspect)
+
+
+def _is_nitro_n_o_bond(a, b) -> bool:
+    """True for the N=O bond of a nitro group ('[N+](=O)[O-]'), a prefix-only class."""
+    n, o = (a, b) if a.GetAtomicNum() == 7 else (b, a)
+    return (
+        n.GetAtomicNum() == 7 and o.GetAtomicNum() == 8
+        and n.GetFormalCharge() == 1
+        and sum(1 for nb in n.GetNeighbors() if nb.GetAtomicNum() == 8) == 2
+    )
+
+
+def _structural_aryloxy_prefix(mol, aryl_atoms, attach_carbon: int) -> Optional[str]:
+    """The '(aryl)oxy' prefix of an aryl group named from its STRUCTURE, or None.
+
+    ``aryl_atoms`` is the whole aryl fragment (the ring system and everything hanging off
+    it), ``attach_carbon`` the aromatic carbon bonded to the ether oxygen. The group is
+    named as a substituent through the shared cascade and cited as an R-oxy prefix, a
+    decorated benzene contracting to 'phenoxy', the Blue Book)."""
+    from ..errors import is_refusal_sentinel
+    from .substituent_enumerator import alkoxy_prefix_from_substituent, name_substituent
+
+    if _has_unrecognised_class_group(mol, aryl_atoms):
+        return None
+    # ``allow_mancude``: the fused and heterocyclic ring systems are named by the mancude
+    # tier of the cascade ('5-chloroquinolin-8-yl'); without it they come back unnameable.
+    token = name_substituent(mol, sorted(aryl_atoms), attach_carbon, allow_mancude=True)
+    if not token or token == "substituent" or is_refusal_sentinel(token) or " " in token:
+        return None
+    return alkoxy_prefix_from_substituent(token)
+
+
 def get_alkoxy_prefix(
     mol,
     ether_atoms: tuple,
@@ -249,7 +318,14 @@ def get_alkoxy_prefix(
                     _sys |= _r
                     _changed = True
         if set(frag) != _sys:
-            return None  # undecorated extra atoms -> fail closed
+            # Extra atoms hang off the aromatic RING SYSTEM (a chloro on a quinoline, a
+            # methyl on a naphthalene): a DECORATED fused or heterocyclic aryl, which neither
+            # branch above names. Declining here made the caller drop the whole aryloxy
+            # group ('butanoic acid' for 4-[(5-chloroquinolin-8-yl)oxy]butanoic acid), so the
+            # group is named from its structure through the substituent namer instead:
+            # '[(5-chloroquinolin-8-yl)oxy]', the Blue Book; the Blue Book
+            # '(5-chloropyridin-2-yl)oxy'). Fail closed (None) when it cannot be named.
+            return _structural_aryloxy_prefix(mol, frag, sub_carbon)
         if all_carbon_6 and len(_sys) == 6:
             return "phenoxy"
         from ..rules.ring_substituents import get_ring_substituent_name
@@ -261,7 +337,7 @@ def get_alkoxy_prefix(
             # (F-spell-oxy).
             from .substituent_enumerator import alkoxy_prefix_from_substituent
             return alkoxy_prefix_from_substituent(_nm)
-        return None
+        return _structural_aryloxy_prefix(mol, frag, sub_carbon)
 
     # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
     # (a phase): single shared aryl-count helper (was inline benzyloxy here).
@@ -419,40 +495,37 @@ def get_alkoxycarbonyl_prefix(
     if ester_o is None:
         return None
 
-    # Early return for aromatic alkyl: phenoxycarbonyl, (benzyloxy)carbonyl
-    first_alkyl = alkyl_atoms[0]
-    first_atom = mol.GetAtomWithIdx(first_alkyl)
+    # The alkyl carbon is the ester oxygen's neighbour that is not the carbonyl carbon.
+    alkyl_c = next(
+        (n.GetIdx() for n in mol.GetAtomWithIdx(ester_o).GetNeighbors()
+         if n.GetIdx() != carbonyl_c),
+        None,
+    )
+    if alkyl_c is None or alkyl_c not in alkyl_atoms:
+        return None
+    alkyl_set = set(alkyl_atoms)
 
-    if first_atom.GetIsAromatic():
-        ring_info = mol.GetRingInfo()
-        for ring in ring_info.AtomRings():
-            if first_alkyl in ring and len(ring) == 6:
-                if all(
-                    mol.GetAtomWithIdx(r).GetIsAromatic()
-                    and mol.GetAtomWithIdx(r).GetSymbol() == "C"
-                    for r in ring
-                ):
-                    return "phenoxycarbonyl"
+    # The two retained shapes, proved on the fragment itself: an UNSUBSTITUTED phenyl
+    # ('phenoxycarbonyl') and an UNSUBSTITUTED benzyl ('(benzyloxy)carbonyl', BB 18116).
+    # They used to be recognised from the first alkyl atom alone, so a tolyl, a naphthyl,
+    # a 4-methylbenzyl or a 2-phenylethyl ester was spelled 'phenoxycarbonyl' or
+    # '(benzyloxy)carbonyl' with the rest of the group dropped.
+    if _is_plain_phenyl(mol, alkyl_set, alkyl_c):
         return "phenoxycarbonyl"
-
     if (
-        not first_atom.GetIsAromatic()
-        and first_atom.GetSymbol() == "C"
-        and first_atom.GetTotalNumHs() >= 1
+        len(alkyl_set) == 7
+        and mol.GetAtomWithIdx(alkyl_c).GetSymbol() == "C"
+        and not mol.GetAtomWithIdx(alkyl_c).GetIsAromatic()
+        and mol.GetAtomWithIdx(alkyl_c).GetTotalNumHs() == 2
     ):
-        arom_nbrs = [
-            n
-            for n in first_atom.GetNeighbors()
-            if n.GetIdx() != ester_o and n.GetIsAromatic()
+        ring_part = [
+            n.GetIdx()
+            for n in mol.GetAtomWithIdx(alkyl_c).GetNeighbors()
+            if n.GetIdx() != ester_o and n.GetIdx() in alkyl_set
         ]
-        non_h_non_arom = [
-            n
-            for n in first_atom.GetNeighbors()
-            if n.GetIdx() != ester_o
-            and not n.GetIsAromatic()
-            and n.GetSymbol() != "H"
-        ]
-        if arom_nbrs and not non_h_non_arom:
+        if len(ring_part) == 1 and _is_plain_phenyl(
+            mol, alkyl_set - {alkyl_c}, ring_part[0]
+        ):
             return "(benzyloxy)carbonyl"
 
     # Guard 3: the alkyl (OR) fragment must be pure carbon (no heteroatoms)
@@ -474,7 +547,6 @@ def get_alkoxycarbonyl_prefix(
     if chain_len > 0 and carbon_count > chain_len:
         return None
     # Reject non-aromatic ring-containing alkyl fragments (macrocyclic esters).
-    # Aromatic rings (phenyl) are already handled above.
     ring_info = mol.GetRingInfo()
     has_non_aromatic_ring = any(
         ring_info.NumAtomRings(a) > 0 and not mol.GetAtomWithIdx(a).GetIsAromatic()
@@ -485,6 +557,34 @@ def get_alkoxycarbonyl_prefix(
 
     if carbon_count == 0:
         return None
+
+    # A carbon COUNT names only an UNBRANCHED, SATURATED, ACYCLIC chain attached at its
+    # end ('decyl'); ``ALKOXY_NAMES[n]`` and ``get_alkyl_name(n)`` spell exactly that and
+    # nothing else. Handed a branched, unsaturated or aromatic group they renamed the
+    # molecule: 8-methylnonyl became 'decyloxycarbonyl', isopropyl 'propoxycarbonyl',
+    # allyl 'propoxycarbonyl', vinyl 'ethoxycarbonyl', 4-chlorophenyl 'phenoxycarbonyl'
+    # (OPSIN reads each as a DIFFERENT constitution; sibling of the C4d fix in
+    # ``_alkoxy_name_for_branch`` for the carbamate prefix). So the count path is gated on
+    # the group actually BEING that chain, and every other group is named from its
+    # structure, through the same BB-cited primitives the composed prefixes use:
+    # "Partial esters of polybasic acids" (the Blue Book), method (1),
+    # '2-chloro-6-(ethoxycarbonyl)benzoic acid (PIN)'; (BB 27667-27691) for the
+    # alkoxy part, with its retained contractions ('tert-butoxy') and the enclosing marks
+    # of a compound alkoxy ('[(propan-2-yl)oxy]carbonyl').
+    from .substituent_naming import fragment_is_linear_terminal_alkyl
+
+    if not fragment_is_linear_terminal_alkyl(mol, sorted(alkyl_set), alkyl_c):
+        from .naming_utils import enclose_if_compound
+        from .substituent_enumerator import (
+            alkoxy_prefix_from_substituent,
+            composed_prefix_organyl_name,
+        )
+
+        organyl = composed_prefix_organyl_name(mol, sorted(alkyl_set), alkyl_c)
+        alkoxy = alkoxy_prefix_from_substituent(organyl) if organyl else None
+        if not alkoxy:
+            return None
+        return f"{enclose_if_compound(alkoxy)}carbonyl"
 
     # Build the alkoxycarbonyl name from ALKOXY_NAMES (same table as ethers)
     if carbon_count in ALKOXY_NAMES:
@@ -505,6 +605,23 @@ def get_alkoxycarbonyl_prefix(
             return f"{prefix}yloxycarbonyl"
         except (ValueError, KeyError):
             return None
+
+
+def _is_plain_phenyl(mol, atoms, attach_idx: int) -> bool:
+    """True when ``atoms`` is exactly an UNSUBSTITUTED phenyl group attached at
+    ``attach_idx``: six aromatic carbons forming one benzene ring and nothing else."""
+    atoms = set(atoms)
+    if len(atoms) != 6 or attach_idx not in atoms:
+        return False
+    if any(
+        mol.GetAtomWithIdx(a).GetSymbol() != "C"
+        or not mol.GetAtomWithIdx(a).GetIsAromatic()
+        for a in atoms
+    ):
+        return False
+    return any(
+        set(ring) == atoms and len(ring) == 6 for ring in mol.GetRingInfo().AtomRings()
+    )
 
 
 def get_alkoxycarbonimidoyl_prefix(

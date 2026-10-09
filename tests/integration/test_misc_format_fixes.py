@@ -18,12 +18,15 @@ class TestOxolaneSubstituentNaming:
         assert name_compound("C1CCOC1") == "oxolane"
 
     def test_thf_substituent_uses_oxolanyl(self):
-        """THF ring as substituent on another structure uses 'oxolanyl'."""
+        """THF ring as substituent on another structure uses 'oxolan-2-yl'."""
         # 6-amino-2-oxo-N-oxolanyl-1,3,5-triazine (azacitidine core)
         name = name_compound(
             "Nc1ncn([C@@H]2O[C@H](CO)[C@@H](O)[C@H]2O)c(=O)n1"
         )
-        assert "oxolanyl" in name, f"Expected 'oxolanyl' in '{name}'"
+        # The free-valence locant is cited: the BB nucleoside examples read '...-4-hydroxy-5-
+        # (hydroxymethyl)oxolan-2-yl]pyrimidin-2(1H)-one' (the Blue Book,:54975,
+        # under; 'Citation of locants' is deny-by-default).
+        assert "oxolan-2-yl" in name, f"Expected 'oxolan-2-yl' in '{name}'"
         assert "tetrahydrofuryl" not in name, (
             f"Should not contain 'tetrahydrofuryl' in '{name}'"
         )

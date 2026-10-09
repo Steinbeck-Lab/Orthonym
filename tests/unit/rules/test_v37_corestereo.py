@@ -104,11 +104,27 @@ _CANARIES = [
         "octane-2-carboxylic acid",
     ),
     (
+        # Since 7ea3918e4 (2026-10-07, "all-carbon fused systems are named by fusion
+        # nomenclature before the von Baeyer path") this all-carbon cage is a bridged
+        # fused system (naphthalene + methano bridge) and ships that name, not the
+        # von Baeyer '(1S,8R)-4-(2-methoxyethyl)-2,2,7,7-tetramethyltricyclo
+        # [6.2.1.0^3,8]undec-3-ene' this canary used to pin. (the Blue Book
+        #:23831) with "fused ring systems > bridged fused systems > non-fused bridged
+        # systems" (:23843); example:23875/:23883, "the bridged fused ring name is
+        # preferred to the von Baeyer name". OPSIN 2.9.0 reads this name back to the
+        # input's FULL InChIKey (an InChIKey, stereo layer included:
+        # the (2S,4aR) descriptors are the same stereoisomer as the old (1S,8R)).
+        # The parametrize id keeps the OLD expected name on purpose: the node id embeds
+        # the expected value and is kept stable.
         "COCCC1=C2C(C)(C)[C@H]3CC[C@@]2(C3)C(C)(C)CC1",
-        "(1S,8R)-4-(2-methoxyethyl)-2,2,7,7-tetramethyltricyclo"
-        "[6.2.1.0^3,8]undec-3-ene",
+        "(2S,4aR)-8-(2-methoxyethyl)-1,1,5,5-tetramethyl-1,3,4,5,6,7-hexahydro-"
+        "2H-2,4a-methanonaphthalene",
     ),
 ]
+_CANARIES[1] = pytest.param(
+    *_CANARIES[1],
+    id="COCCC1=C2C(C)(C)[C@H]3CC[C@@]2(C3)C(C)(C)CC1-(1S,8R)-4-(2-methoxyethyl)-2,2,7,7-"
+       "tetramethyltricyclo[6.2.1.0^3,8]undec-3-ene")
 
 
 class TestCoreStereoAlreadyCompletes:

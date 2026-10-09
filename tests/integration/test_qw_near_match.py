@@ -26,7 +26,12 @@ from orthonym import name_compound
 LIPID_SATURATION_FIXES = [
     pytest.param(
         r"CCCCC[C@@H](/C=C/C=C\CCCCCCCC(=O)OC)OO",
-        "(9Z,11E,13S)-(linoleoyloxy)octadeca-9,11-dien-13-peroxol",
+        # The ester is the principal class (esters are senior to the hydroperoxy
+        # group, /, the Blue Book) and 'hydroperoxy' is the prefix for
+        # -OOH in the presence of a senior group, the Blue Book; '2-hydroperoxy-
+        # 1-phenylethan-1-one (PIN)', the Blue Book). The old '(linoleoyloxy)...peroxol' was
+        # a different molecule (a linoleoyl ester), not the methyl ester.
+        "methyl (9Z,11E,13S)-13-hydroperoxyoctadeca-9,11-dienoate",
         id="lipid-C7-HPODE-methyl-ester",
     ),
     pytest.param(

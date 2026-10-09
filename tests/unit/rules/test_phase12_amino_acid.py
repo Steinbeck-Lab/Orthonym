@@ -59,12 +59,15 @@ class TestBranchedAminoAcid:
     def test_branched_side_chain(self):
         # CC[C@H](C)[C@@H](N)C(=O)O = (2R,3S)-2-amino-3-methylpentanoic acid, i.e.
         # a stereoisomer of isoleucine. W8 P3 Task 3.1 now names it with the
-        # retained-name PIN 'D-allo-isoleucine'; OPSIN-RT verified).
+        # retained-name PIN 'D-alloisoleucine' "Use of the prefix 'allo'",
+        # the Blue Book 'L-alloisoleucine... (2S,3R)-2-amino-3-methylpentanoic acid' --
+        # one word, no hyphen between 'allo' and 'isoleucine' -- bcd75afe2 "'allo' is fused into an
+        # amino-acid name, not hyphenated onto it"; OPSIN-RT verified).
         # The anti-collapse property this test guarded (HEAD once dropped the methyl
         # -> '2-aminohexanoic acid') still holds: the retained name preserves the
         # full 3-methylpentanoic skeleton (see test_straight_chain_unaffected for the
         # non-retained-AA branched-chain guard).
-        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-allo-isoleucine"
+        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-alloisoleucine"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("CCCC[C@H](N)C(=O)O", "(2S)-2-aminohexanoic acid"),  # straight chain — unaffected

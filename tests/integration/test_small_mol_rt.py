@@ -31,6 +31,12 @@ Each compound from the 94-compound triage has an individual test entry below.
 RT-passing compounds assert exact name match.
 Non-RT compounds assert structural keywords to catch regressions.
 Tests are organized by category.
+
+Names that were rebased to the preferred IUPAC name (each cites its rule at the test):
+esters are functional-class names, the Blue Book), 'glycerol' and
+'mesityl oxide' are not preferred names, oximes are N-hydroxy imines,
+'isobutyl' is '2-methylpropyl', and a stereo-free input takes the systematic
+name of its constitution instead of a retained stereo-specific one (commit 9292c013d).
 """
 
 import pytest
@@ -63,16 +69,21 @@ class TestWrongParent:
         assert name_compound("CCCCCCCCCC=O") == "decanal"
 
     def test_021_glycerol(self):
-        """#21: OCC(O)CO -> glycerol [RT]."""
-        assert name_compound("OCC(O)CO") == "glycerol"
+        """#21: OCC(O)CO -> propane-1,2,3-triol [RT]."""
+        # 'Retained names' (the Blue Book): 'glycerol propane-1,2,3-triol
+        # (PIN)'; the retained name is for general nomenclature only: "retained
+        # but only for general nomenclature and only when unsubstituted").
+        assert name_compound("OCC(O)CO") == "propane-1,2,3-triol"
 
     def test_026_dihydroxybenzoic_acid(self):
         """#26: OC(=O)c1ccc(O)c(O)c1 -> 3,4-dihydroxybenzoic acid [RT]."""
         assert name_compound("OC(=O)c1ccc(O)c(O)c1") == "3,4-dihydroxybenzoic acid"
 
     def test_031_triacetoxypropane(self):
-        """#31: CC(=O)OCC(COC(C)=O)OC(C)=O -> 1,2,3-tris(acetyloxy)propane [RT]."""
-        assert name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O") == "1,2,3-tris(acetyloxy)propane"
+        """#31: CC(=O)OCC(COC(C)=O)OC(C)=O -> propane-1,2,3-triyl triacetate [RT]."""
+        # (the Blue Book) esters are functional-class names;
+        # 'propane-1,2,3-triyl triacetate (PIN)' (:31687,:31827 under.
+        assert name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O") == "propane-1,2,3-triyl triacetate"
 
     def test_039_acetamide(self):
         """#39: CC(N)=O -> acetamide [RT]."""
@@ -131,13 +142,18 @@ class TestMissingSubstituent:
         assert name_compound("CC(C)=CC=O") == "3-methylbut-2-enal"
 
     def test_019_acetyloxycyclohexane(self):
-        """#19: CC(=O)OC1CCCCC1 -> acetyloxycyclohexane [RT]."""
-        assert name_compound("CC(=O)OC1CCCCC1") == "acetyloxycyclohexane"
+        """#19: CC(=O)OC1CCCCC1 -> cyclohexyl acetate [RT]."""
+        # 'Monoesters' (the Blue Book): the organyl group is placed "in
+        # front of the name of the acid component expressed as an anion" ('ethyl acetate
+        # (PIN)'); the acyloxy prefix is for esters cited as prefixes.
+        assert name_compound("CC(=O)OC1CCCCC1") == "cyclohexyl acetate"
 
     def test_020_acetyloxytoluene(self):
-        """#20: CC(=O)Oc1ccc(C)cc1 - missing methyl on ring."""
+        """#20: CC(=O)Oc1ccc(C)cc1 - 4-methylphenyl acetate (methyl kept on the ring)."""
         name = name_compound("CC(=O)Oc1ccc(C)cc1")
-        assert "acetyloxy" in name or "acetoxy" in name
+        # (the Blue Book): the ester is the principal group, named
+        # functional-class; 'acetyloxy' is only for esters cited as prefixes.
+        assert name == "4-methylphenyl acetate"
 
     def test_022_sorbofuranose(self):
         """#22: sorbofuranose - oxolane with hydroxy groups."""
@@ -170,7 +186,10 @@ class TestMissingSubstituent:
     def test_033_butanoyloxy_phenethanol(self):
         """#33: CCCC(=O)OCCc1ccc(O)cc1 - ester of hydroxyphenyl ethanol."""
         name = name_compound("CCCC(=O)OCCc1ccc(O)cc1")
-        assert "butanoyloxy" in name or "butyryloxy" in name
+        # (the Blue Book): esters (class 9) outrank hydroxy compounds (class 17),
+        # so the ester is the principal group, named functional-class,
+        #:31743); the phenolic -OH is the prefix 'hydroxy'.
+        assert name == "2-(4-hydroxyphenyl)ethyl butanoate"
 
     def test_034_amino_ester(self):
         """#34: ester with amine."""
@@ -178,8 +197,10 @@ class TestMissingSubstituent:
         assert name is not None and len(name) > 5
 
     def test_035_disubstituted_phenol(self):
-        """#35: CC(C)Cc1cccc(CC(C)C)c1O -> 2,6-diisobutylphenol [RT]."""
-        assert name_compound("CC(C)Cc1cccc(CC(C)C)c1O") == "2,6-diisobutylphenol"  #: phenol suffix routing
+        """#35: CC(C)Cc1cccc(CC(C)C)c1O -> 2,6-bis(2-methylpropyl)phenol [RT]."""
+        # 'Retained prefixes no longer recommended as approved prefixes'
+        # (the Blue Book): '2-methylpropyl (preferred prefix) (not isobutyl)' (:16412).
+        assert name_compound("CC(C)Cc1cccc(CC(C)C)c1O") == "2,6-bis(2-methylpropyl)phenol"  #: phenol suffix routing
 
     def test_036_cyclohexyl_icosanoate(self):
         """#36: CCCCCCCCCCCCCCCCCCCC(=O)OC1CCCCC1 -> cyclohexyl icosanoate [RT].
@@ -243,7 +264,11 @@ class TestMissingSubstituent:
 
     def test_067_methyloxane(self):
         """#67: CC1OC(O)C(O)C(O)C1O -> oxane derivative [RT]."""
-        assert name_compound("CC1OC(O)C(O)C(O)C1O") == "rhamnopyranose"
+        # The input defines no stereo, while the retained name 'rhamnopyranose' is read as
+        # a stereo-defined sugar (four stereocentres the input lacks), so the systematic
+        # name of the constitution is emitted (commit 9292c013d; the same principle as the
+        # amino acids, 'The stereodescriptors D and L', the Blue Book).
+        assert name_compound("CC1OC(O)C(O)C(O)C1O") == "6-methyloxane-2,3,4,5-tetrol"
 
     def test_068_butenolide_acid(self):
         """#68: O=C(O)C1C=CC(=O)O1 - butenolide with acid."""
@@ -280,8 +305,13 @@ class TestMissingSubstituent:
         assert "alanine" in name.lower() or "amino" in name
 
     def test_094_galactitol(self):
-        """#94: OCC(O)C(O)C(O)C(O)CO -> 2,3,4,5-tetrahydroxyhexane-1,6-diol [RT]."""
-        assert name_compound("OCC(O)C(O)C(O)C(O)CO") == "2,3,4,5-tetrahydroxyhexane-1,6-diol"
+        """#94: OCC(O)C(O)C(O)C(O)CO -> hexane-1,2,3,4,5,6-hexol [RT]."""
+        # (the Blue Book): method (1), "using the suffix 'ol' and the prefix
+        # 'hydroxy'... The presence of several 'ol' characteristic groups is denoted by the
+        # numerical multiplying prefixes"; identical principal groups are all expressed in
+        # the suffix (cf. 'cyclohexane-1,2,3,4,5,6-hexols',:54823). The input has no stereo,
+        # so 'galactitol' does not apply.
+        assert name_compound("OCC(O)C(O)C(O)C(O)CO") == "hexane-1,2,3,4,5,6-hexol"
 
 
 # ============================================================================
@@ -301,12 +331,23 @@ class TestStereo:
         assert name_compound("OC(=O)/C=C/c1ccccc1") == "(2E)-3-phenylprop-2-enoic acid"
 
     def test_013_benzaldehyde_oxime(self):
-        """#13: C(=N\\O)c1ccccc1 -> benzaldehyde oxime [RT]."""
-        assert name_compound(r"C(=N\O)c1ccccc1") == "benzaldehyde oxime"
+        """#13: C(=N\\O)c1ccccc1 -> N-hydroxy-1-phenylmethanimine [RT]."""
+        # 'Functional class nomenclature using functional modifiers'
+        # (the Blue Book): "Functional modifiers are still acceptable for general
+        # nomenclature purposes, but the preferred IUPAC names are substitutive names for
+        # azines, oximes, hydrazones, [...]" (example:5092 'N-hydroxypropan-1-imine (PIN)');
+        # 'Oximes' (:38460). The input has one directional bond only, so no
+        # C=N descriptor is due.
+        assert name_compound(r"C(=N\O)c1ccccc1") == "N-hydroxy-1-phenylmethanimine"
 
     def test_015_mesityl_oxide(self):
-        """#15: CC(=O)/C=C(\\C)C -> mesityl oxide [RT]."""
-        assert name_compound(r"CC(=O)/C=C(\C)C") == "mesityl oxide"
+        """#15: CC(=O)/C=C(\\C)C -> 4-methylpent-3-en-2-one [RT]."""
+        # 'mesityl oxide' has no entry in the Blue Book (0 hits) and is not on the closed
+        # list of retained ketone names of (the Blue Book, under
+        # 'Retained names'), which ends: "Substitutive names, systematically constructed, are
+        # the preferred IUPAC names for ketones". Deny-list row 'mesityl oxide'
+        # (data/iupac_2013_pin_list.json, commit 788f91b4b).
+        assert name_compound(r"CC(=O)/C=C(\C)C") == "4-methylpent-3-en-2-one"
 
     def test_016_methyl_octadienoate(self):
         """#16: C=CC/C=C/CCC(=O)OC -> methyl (4E)-octa-4,7-dienoate [RT]."""
@@ -316,7 +357,10 @@ class TestStereo:
         """#28: isochromane -> PIN 3,4-dihydro-1H-2-benzopyran (,."""
         name = name_compound("C[C@@H]1Cc2cc(O)cc(O)c2CO1")
         assert "3,4-dihydro-1H-2-benzopyran" in name
-        assert "dihydroxy" in name
+        # (the Blue Book): the -OH groups are the principal characteristic
+        # group, so they are cited in the suffix ('-6,8-diol'), not as 'dihydroxy' prefixes.
+        assert "6,8-diol" in name
+        assert "dihydroxy" not in name
         assert "3-methyl" in name  # corrected from 1-methyl
 
     def test_037_octanoyloxycyclohexanone(self):
@@ -528,13 +572,16 @@ class TestOther:
         assert "biphenyl" in name or "phenyl" in name
 
     def test_082_tert_butylphenylacetic_acid(self):
-        """#82: CC(C)(C)c1ccc(CC(=O)O)cc1 -> 2-(4-tert-butylphenyl)ethanoic acid [RT].
+        """#82: CC(C)(C)c1ccc(CC(=O)O)cc1 -> (4-tert-butylphenyl)acetic acid [RT].
 
         a phase (b)/(d): tert-butyl is a simple substituent — no enclosing marks.
+         (the Blue Book): acetic acid is a retained PIN and can be
+        substituted; 'ethanoic acid' is never the PIN, and the only substitutable carbon
+        takes no locant (cf. 'difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)',:3037).
         """
         assert name_compound(
             "CC(C)(C)c1ccc(CC(=O)O)cc1"
-        ) == "2-(4-tert-butylphenyl)ethanoic acid"
+        ) == "(4-tert-butylphenyl)acetic acid"
 
 
 # ============================================================================

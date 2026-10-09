@@ -121,10 +121,21 @@ class TestAlkoxycarbonylNegative:
 class TestAlkoxycarbonylCIRegression:
     """Compounds from CI benchmark that must not change."""
 
+    @pytest.mark.opsin_gate
     def test_ci091_unchanged(self):
-        """ci-091: complex naphthoquinone ester must not regress."""
+        """ci-091: the ester of an enol is named as a functional-class ester.
+
+        The test name is kept; the old value '(acetyloxy)-1-docosyloxyethanedione' is a
+        wrong molecule and the raw name '2-dodecyl-3-hydroxynaphthalene-1,4-dione acetate'
+        glued the alcohol's own name in front of 'acetate' (OPSIN reads two molecules).
+         "Definitions" (the Blue Book): an ester is derived from an acid
+        "and an alcohol, phenol, heterol, or enol"; (:31663): "All preferred
+        IUPAC names for esters are named by functional class nomenclature", the group name
+        first ('ethyl acetate'). The ketones rank below the ester, so they are
+        'dioxo' inside the group. OPSIN 2.9.0 full-InChIKey exact; pin_verified.
+        """
         result = name_compound("CCCCCCCCCCCCC1=C(OC(C)=O)C(=O)c2ccccc2C1=O")
-        assert result == "(acetyloxy)-1-docosyloxyethanedione"
+        assert result == "3-dodecyl-1,4-dioxo-1,4-dihydronaphthalen-2-yl acetate"
 
     def test_separate_ether_and_ester(self):
         """Compound with both ester and genuine separate ether."""

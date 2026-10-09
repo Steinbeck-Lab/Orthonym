@@ -252,9 +252,17 @@ ASSEMBLY_POSITIVES = [
     # PIN-preferred SUFFIX form win (ring 4-OH -> '-4-ol', not a '4-hydroxy'
     # prefix), which this file's own header (lines ~238-243) marks as better.
     # RT-verified identical InChIKey.
+    # Since 7ea3918e4 (2026-10-07, "all-carbon fused systems are named by fusion
+    # nomenclature before the von Baeyer path") this all-carbon cage ships as a bridged
+    # fused name (naphthalene + methano bridge); it used to be '(1R,3R,4R,7S,8S)-4-
+    # (hydroxymethyl)-1,7,8-trimethyltricyclo[5.4.0.0^3,8]undecan-4-ol'.
+    # (the Blue Book), seniority "fused ring systems > bridged fused systems >
+    # non-fused bridged systems" (:23843), example:23875/:23883 "the bridged fused ring
+    # name is preferred to the von Baeyer name". This test's own InChIKey assertion is the
+    # OPSIN full-key round trip of the new name (an InChIKey).
     ("C[C@@]12CCC[C@@]3(C)[C@@H](C1)[C@@](O)(CO)CC[C@@]23C",
-     "(1R,3R,4R,7S,8S)-4-(hydroxymethyl)-1,7,8-trimethyltricyclo"
-     "[5.4.0.0^3,8]undecan-4-ol"),
+     "(1R,2R,4aS,5R,8aS)-2-(hydroxymethyl)-4a,5,8a-trimethyldecahydro-1,5-"
+     "methanonaphthalen-2-ol"),
     # quick-wins F-Q1: '0^2,6' before '0^5,9', the Blue Book), the
     # oxygen follows the fixed numbering,:9765); was
     # '(5S,6R,9S,10S)-2,6,11-trimethyl-7,13-dioxo-8-oxatricyclo[8.3.0.0^5,9]trideca-1,11-diene'
@@ -289,8 +297,18 @@ ASSEMBLY_POSITIVES = [
 ]
 
 
+# The node id of a parametrized row embeds its expected name. The row whose expected name moved
+# when the all-carbon cage began to ship as a bridged fused name (see its comment in
+# ASSEMBLY_POSITIVES) keeps the OLD id on purpose, so the id stays stable.
+_STABLE_IDS = {
+    "(1R,2R,4aS,5R,8aS)-2-(hydroxymethyl)-4a,5,8a-trimethyldecahydro-1,5-methanonaphthalen-2-ol":
+        "(1R,3R,4R,7S,8S)-4-(hydroxymethyl)-1,7,8-trimethyltricyclo[5.4.0.0^3,8]undecan-4-ol",
+}
+
+
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,expected", ASSEMBLY_POSITIVES)
+@pytest.mark.parametrize("smiles,expected", ASSEMBLY_POSITIVES,
+                         ids=lambda val: _STABLE_IDS.get(val))
 def test_decorated_ring_assembles_a_round_tripping_name(
         smiles, expected, opsin_gate):
     """A decorated ring system whose parent and every substituent are nameable

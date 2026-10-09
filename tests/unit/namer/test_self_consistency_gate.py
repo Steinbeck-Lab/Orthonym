@@ -1,8 +1,9 @@
 """ a phase  — constitutional self-consistency gate unit tests.
 
 The gate suppresses an emitted name ONLY when OPSIN re-perceives it as a
-CONSTITUTIONALLY DIFFERENT molecule than the input. It must be stereo-insensitive,
-tautomer-/aromaticity-tolerant, and fail-OPEN on every inconclusive outcome. These
+CONSTITUTIONALLY DIFFERENT molecule than the input (and, on the stereo-strict primary
+path, a stereo CONFLICT or OMISSION -- 64d63fe02, 0c4d4a2d3; the ignore_stereo carve-out stays
+stereo-insensitive). It must be tautomer-/aromaticity-tolerant. These
 tests exercise the pure comparison helpers directly and the decision/gate logic with
 the OPSIN oracle monkeypatched (no Java needed)."""
 import pytest
@@ -25,10 +26,30 @@ class TestVerdict:
         assert nm._self_consistency_verdict("Fc1ccc2CCCCc2c1", "c1ccc2CCCCc2c1") == "mismatch"
 
     def test_stereo_only_is_ok(self):
-        # R vs S — constitution identical; the gate must NOT suppress (-07)
-        assert nm._self_consistency_verdict("C[C@H](O)CC", "C[C@@H](O)CC") == "ok"
+        # Policy (the original -07 "stereo-insensitive" reading is superseded):
+        # on the stereo-strict primary path a name whose OPSIN parse is a different
+        # stereoisomer, or is missing stereo the input defines, describes a different
+        # molecule. 64d63fe02 " uses RegistrationHash stereo-conflict guard;
+        # layer-selective (stereo carve-out stays stereo-insensitive)" made a stereo
+        # CONFLICT a mismatch; 0c4d4a2d3 "reject stereo OMISSION as a mismatch (0-wrong;
+        # 20/500 default stereo-drops)" did the same for an omission. Only the
+        # ignore_stereo=True carve-out (the OPSIN-validity check of a stereo-STRIPPED
+        # parse) stays stereo-insensitive.
+        # R vs S -- constitution identical, configuration in conflict
+        assert nm._self_consistency_verdict("C[C@H](O)CC", "C[C@@H](O)CC") == "mismatch"
         # E vs Z
-        assert nm._self_consistency_verdict(r"C/C=C/C", r"C/C=C\C") == "ok"
+        assert nm._self_consistency_verdict(r"C/C=C/C", r"C/C=C\C") == "mismatch"
+        # omission: the parse carries no stereo for a defined input centre
+        assert nm._self_consistency_verdict("C[C@H](O)CC", "CC(O)CC") == "mismatch"
+        # identical stereo is still fine
+        assert nm._self_consistency_verdict("C[C@H](O)CC", "C[C@H](O)CC") == "ok"
+        # the carve-out compares constitution only
+        assert nm._self_consistency_verdict(
+            "C[C@H](O)CC", "C[C@@H](O)CC", ignore_stereo=True) == "ok"
+        assert nm._self_consistency_verdict(
+            "C[C@H](O)CC", "CC(O)CC", ignore_stereo=True) == "ok"
+        assert nm._self_consistency_verdict(
+            r"C/C=C/C", r"C/C=C\C", ignore_stereo=True) == "ok"
 
     def test_tautomer_is_ok(self):
         # adenine 7H vs 9H tautomers normalize to the same standard-InChI skeleton
@@ -137,8 +158,18 @@ class TestDecision:
         assert self._decide(monkeypatch, "on", "ethanol", "CCO", "CCO") == "ethanol"
 
     def test_on_ships_stereo_only_diff(self, monkeypatch):
-        assert self._decide(monkeypatch, "on", "(R)-butan-2-ol",
-                            "C[C@H](O)CC", "C[C@@H](O)CC") == "(R)-butan-2-ol"
+        # A name OPSIN reads back as the opposite enantiomer is a wrong stereoisomer and is
+        # suppressed to the descriptive fallback (64d63fe02; the stereo omission case is
+        # likewise a mismatch since 0c4d4a2d3). Only the stereo carve-out
+        # (ignore_stereo=True, which judges a stereo-STRIPPED parse) ships it.
+        out = self._decide(monkeypatch, "on", "(R)-butan-2-ol",
+                           "C[C@H](O)CC", "C[C@@H](O)CC")
+        assert out != "(R)-butan-2-ol"
+        assert out == nm._descriptive_fallback("C[C@H](O)CC")
+        monkeypatch.setattr(nm, "_SC_MODE", "on")
+        assert nm._self_consistency_decision(
+            "(R)-butan-2-ol", "C[C@H](O)CC", "C[C@@H](O)CC", {},
+            ignore_stereo=True) == "(R)-butan-2-ol"
 
     def test_on_fails_closed_when_inconclusive(self, monkeypatch):
         # OPSIN SMILES unparseable by RDKit -> inconclusive -> nothing was compared,

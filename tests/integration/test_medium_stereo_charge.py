@@ -42,6 +42,15 @@ _XF_FUSED_VB_LOCANTS = pytest.mark.xfail(strict=True, reason=(
 # selection. Validates that a phase stereo wiring works automatically
 # once the correct parent is identified.
 # ---------------------------------------------------------------------------
+# The default (PIN) tier declines this molecule on purpose: its only buildable name
+# is a von Baeyer name of an ortho-fused ring system, which is not a PIN, so the
+# default tier never ships it (the paper rule, commit 4e4e7cc52); the best-effort
+# tier names it RT-exact with the stereodescriptors. The row therefore asserts the
+# tier contract rather than a name at the default tier.
+_TRICYCLIC_AZA = (
+    "CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2CN("
+    "[C@H]2CCCNC2=O)C3=O)C[C@@H]1O")
+
 STEREO_AUTOUNLOCK = [
     pytest.param(
         "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O",
@@ -55,10 +64,12 @@ STEREO_AUTOUNLOCK = [
         id="trihydroxychromane-2R3S4R",
     ),
     pytest.param(
-        "CC(C)=CCC/C(C)=C/CC[C@]1(C)Cc2c(c(O)cc3c2CN("
-        "[C@H]2CCCNC2=O)C3=O)C[C@@H]1O",
+        _TRICYCLIC_AZA,
         "(11S,12R)",
         id="tricyclic-aza-11S12R",
+        # tier contract (see test_stereo_auto_unlock): runs with the OPSIN validity gate
+        # on, as the engine ships.
+        marks=pytest.mark.opsin_gate,
     ),
     pytest.param(
         "C/C1=C/C[C@@H](/C(C)=C/c2csc(C)n2)OC(=O)C[C@H](O)"
@@ -98,10 +109,23 @@ STEREO_AUTOUNLOCK = [
         "(4R,7Z,10S,13Z,15R,16S)",
         id="macrolide-6stereo",
     ),
+    # L4: the ring's stereocentres are C-1 (the carboxylate carbon, which takes locant 1 as the
+    # parent's attachment) and C-3; C-2 is the gem-dimethyl carbon. "Naming of
+    # stereoisomers" (the Blue Book): the descriptors are "preceded by a numerical...
+    # locant to describe the position of the stereogenic unit...; general rules of numbering
+    # are applied (see " -- so '(1R,3R)', never '(2R,3R)'. The marker is the WHOLE ester
+    # name, group word included,:31663: "All preferred IUPAC names for esters are
+    # named by functional class nomenclature"): the bare '(1R,3R)' also sits in the old wrong
+    # name, the carboxylate anion that dropped the whole alcohol component (OPSIN: C10H15O2- for
+    # the C17H22N2O4 ester), and a shorter 'methyl... carboxylate' would also match the
+    # different molecule that lacks the imidazolidinyl group. Marked opsin_gate: the production
+    # configuration. The id keeps its old text. OPSIN 2.9.0 full-InChIKey exact.
     pytest.param(
         "C#CCN1CC(=O)N(COC(=O)[C@@H]2[C@@H](C=C(C)C)C2(C)C)C1=O",
-        "(2R,3R)",
+        "[2,5-dioxo-3-(prop-2-yn-1-yl)imidazolidin-1-yl]methyl "
+        "(1R,3R)-2,2-dimethyl-3-(2-methylprop-1-en-1-yl)cyclopropane-1-carboxylate",
         id="cyclopropane-ester-2R3R",
+        marks=pytest.mark.opsin_gate,
     ),
     pytest.param(
         "CC(C)=CCC/C(C)=C/COC[C@H]1O[C@@H](N2CCC(=O)NC2=O)"
@@ -116,6 +140,14 @@ STEREO_AUTOUNLOCK = [
 @pytest.mark.parametrize("smiles,stereo_marker", STEREO_AUTOUNLOCK)
 def test_stereo_auto_unlock(smiles, stereo_marker):
     """Stereo descriptors must appear after Wave 1 parent selection fixes."""
+    if smiles == _TRICYCLIC_AZA:
+        # Default tier declines (no PIN built); best-effort carries the stereo and
+        # round-trips to the full InChIKey; whatever the default ships is RT-exact.
+        from tests.support.rt_assert import assert_tier_contract
+        _pin, be = assert_tier_contract(smiles)
+        assert stereo_marker in be, (
+            f"Expected stereo '{stereo_marker}' in best-effort: {be}")
+        return
     name = name_compound(smiles)
     assert name is not None, "name_compound returned None"
     assert stereo_marker in name, (
@@ -131,7 +163,10 @@ def test_stereo_auto_unlock(smiles, stereo_marker):
 CHARGE_FIXES = [
     pytest.param(
         "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(C)=O",
-        "palmitate",
+        # 'palmitic acid' is retained for general nomenclature only; the PIN is
+        # 'hexadecanoic acid' (the Blue Book,, so the acyl prefix is
+        # 'hexadecanoyloxy' (cf. '2-(acetyloxy)-3-(hexadecanoyloxy)propyl', the Blue Book).
+        "hexadecanoyloxy",
         id="phospholipid-palmitate",
     ),
     pytest.param(
@@ -222,9 +257,16 @@ NEWLY_RT_P66 = [
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)"
         "[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)"
         "C(=O)O)[C@@]1(C)CC3",
-        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-"
-        "trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-"
-        "dien-3-yl acetate",
+        # L4 (TRIAGE DK-ACIDPFX): C-21 is a carboxylic acid carbon. The acid is the senior class
+        # "Seniority order for classes", the Blue Book) so it owns the suffix, and
+        # the ester becomes the prefix '(acetyloxy)': "Esters cited as prefixes"
+        # (:31696), '2-(acetyloxy)-5-butoxy-2-methyl-5-oxopentanoic acid (PIN)' (:31964); the
+        # steroid terminal acid is '-21-oic acid', (:52550). 'cholesta' keeps the
+        # euphonic 'a' before the multiplied 'dien',:16497). The old text wrote the
+        # acid as '21-hydroxy...21-oxo' with a functional-class ester word. OPSIN 2.9.0
+        # full-InChIKey exact.
+        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-3-(acetyloxy)-16,25-"
+        "dihydroxy-4,4,14-trimethylcholesta-8,23-dien-21-oic acid",
         id="cholest-steroid-acetate-RT",
     ),
 ]

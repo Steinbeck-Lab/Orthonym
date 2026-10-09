@@ -69,35 +69,47 @@ class TestSulfideE2E:
 
 
 class TestSulfoxideE2E:
-    """E2E tests for sulfoxide naming (SULFUR-03)."""
+    """E2E tests for sulfoxide naming (SULFUR-03).
+
+     'SULFOXIDES AND SULFONES' (the Blue Book): R-SO-R' and R-SO2-R' are named
+    "(1) substitutively, by prefixing the name of the acyl group R'-SO- or R'-SO2- to the
+    name of the parent hydride corresponding to R; (2) by functional class nomenclature,
+    using the class names 'sulfoxide' and 'sulfone'; (3) by multiplicative nomenclature,
+    except where R and R' are alkyl groups" and (:28088) "Methods (1) and (3) generate
+    preferred names." The functional-class names 'dimethyl sulfoxide' etc. are method (2),
+    so they are not PINs (example:28094 '1-(ethanesulfinyl)butane (PIN)... butyl ethyl
+    sulfoxide'; '(methanesulfinyl)methane (PIN)',:46154). These assertions were migrated
+    from the method-2 forms, like the sulfide class below; each new value OPSIN-round-trips
+    to the input.
+    """
 
     def test_dimethyl_sulfoxide(self):
-        """CS(=O)C -> dimethyl sulfoxide (DMSO)"""
-        assert name_compound("CS(=O)C") == "dimethyl sulfoxide"
+        """CS(=O)C -> (methanesulfinyl)methane (PIN; DMSO)"""
+        assert name_compound("CS(=O)C") == "(methanesulfinyl)methane"
 
     def test_diethyl_sulfoxide(self):
-        """CCS(=O)CC -> diethyl sulfoxide"""
-        assert name_compound("CCS(=O)CC") == "diethyl sulfoxide"
+        """CCS(=O)CC -> (ethanesulfinyl)ethane (PIN)"""
+        assert name_compound("CCS(=O)CC") == "(ethanesulfinyl)ethane"
 
     def test_ethyl_methyl_sulfoxide(self):
-        """CCS(=O)C -> ethyl methyl sulfoxide"""
-        assert name_compound("CCS(=O)C") == "ethyl methyl sulfoxide"
+        """CCS(=O)C -> (methanesulfinyl)ethane (PIN)"""
+        assert name_compound("CCS(=O)C") == "(methanesulfinyl)ethane"
 
 
 class TestSulfoneE2E:
-    """E2E tests for sulfone naming (SULFUR-04)."""
+    """E2E tests for sulfone naming (SULFUR-04); method (1), see TestSulfoxideE2E."""
 
     def test_dimethyl_sulfone(self):
-        """CS(=O)(=O)C -> dimethyl sulfone"""
-        assert name_compound("CS(=O)(=O)C") == "dimethyl sulfone"
+        """CS(=O)(=O)C -> (methanesulfonyl)methane (PIN)"""
+        assert name_compound("CS(=O)(=O)C") == "(methanesulfonyl)methane"
 
     def test_diethyl_sulfone(self):
-        """CCS(=O)(=O)CC -> diethyl sulfone"""
-        assert name_compound("CCS(=O)(=O)CC") == "diethyl sulfone"
+        """CCS(=O)(=O)CC -> (ethanesulfonyl)ethane (PIN, the Blue Book)"""
+        assert name_compound("CCS(=O)(=O)CC") == "(ethanesulfonyl)ethane"
 
     def test_ethyl_methyl_sulfone(self):
-        """CCS(=O)(=O)C -> ethyl methyl sulfone"""
-        assert name_compound("CCS(=O)(=O)C") == "ethyl methyl sulfone"
+        """CCS(=O)(=O)C -> (methanesulfonyl)ethane (PIN)"""
+        assert name_compound("CCS(=O)(=O)C") == "(methanesulfonyl)ethane"
 
 
 class TestSulfonicAcidE2E:
@@ -120,10 +132,12 @@ class TestSulfurRetainedNames:
     """E2E tests for sulfur retained names."""
 
     def test_dmso_retained(self):
-        """DMSO should return retained name."""
-        # Multiple SMILES forms should work
+        """DMSO (another SMILES form) is named by the substitutive PIN, not 'dimethyl sulfoxide'."""
+        # Multiple SMILES forms should work. (the Blue Book): "Methods (1) and
+        # (3) generate preferred names"; the functional-class 'dimethyl sulfoxide' is method
+        # (2) (see TestSulfoxideE2E); '(methanesulfinyl)methane (PIN)' is printed at:46154.
         result = name_compound("CS(C)=O")
-        assert result == "dimethyl sulfoxide"
+        assert result == "(methanesulfinyl)methane"
 
     def test_methanesulfonic_retained(self):
         """Common sulfonic acid retained name."""
@@ -156,21 +170,21 @@ class TestSulfurAdditionalCompounds:
         assert name_compound("CCCCSCCCC") == "1-(butylsulfanyl)butane"
 
     def test_dipropyl_sulfoxide(self):
-        """CCCS(=O)CCC -> dipropyl sulfoxide"""
-        assert name_compound("CCCS(=O)CCC") == "dipropyl sulfoxide"
+        """CCCS(=O)CCC -> 1-(propanesulfinyl)propane (PIN; method (1), locant 1 as in '1-(ethanesulfinyl)butane')"""
+        assert name_compound("CCCS(=O)CCC") == "1-(propanesulfinyl)propane"
 
     def test_dipropyl_sulfone(self):
-        """CCCS(=O)(=O)CCC -> dipropyl sulfone"""
-        assert name_compound("CCCS(=O)(=O)CCC") == "dipropyl sulfone"
+        """CCCS(=O)(=O)CCC -> 1-(propanesulfonyl)propane (PIN; method (1))"""
+        assert name_compound("CCCS(=O)(=O)CCC") == "1-(propanesulfonyl)propane"
 
     def test_butyl_methyl_sulfide(self):
         """CCCCSC -> 1-(methylsulfanyl)butane (was 2-thiahexane). fix a performance pass: (the Blue Book) needs four heterounits for a skeletal replacement PIN; the ether analog is "methoxyethane (PIN)" (:27745). OPSIN 2.9.0 RT: exact."""
         assert name_compound("CCCCSC") == "1-(methylsulfanyl)butane"
 
     def test_butyl_methyl_sulfoxide(self):
-        """CCCCS(=O)C -> butyl methyl sulfoxide"""
-        assert name_compound("CCCCS(=O)C") == "butyl methyl sulfoxide"
+        """CCCCS(=O)C -> 1-(methanesulfinyl)butane (PIN; method (1))"""
+        assert name_compound("CCCCS(=O)C") == "1-(methanesulfinyl)butane"
 
     def test_butyl_methyl_sulfone(self):
-        """CCCCS(=O)(=O)C -> butyl methyl sulfone"""
-        assert name_compound("CCCCS(=O)(=O)C") == "butyl methyl sulfone"
+        """CCCCS(=O)(=O)C -> 1-(methanesulfonyl)butane (PIN; method (1))"""
+        assert name_compound("CCCCS(=O)(=O)C") == "1-(methanesulfonyl)butane"

@@ -3237,7 +3237,7 @@ def get_polycyclic_substituents(
     ring_atoms: Set[int],
     numbering: Dict[int, int],
     exclude_atoms: Optional[Set[int]] = None
-) -> List[Dict]:
+) -> Optional[List[Dict]]:
     """
     Detect substituents attached to a polycyclic ring system.
 
@@ -3256,12 +3256,16 @@ def get_polycyclic_substituents(
         - 'locant': VB locant where substituent attaches
         - 'name': substituent name (e.g., 'methyl', 'ethyl')
         - 'atom_indices': list of atom indices in the substituent
+        ``None`` when a branch has no name this function can honestly spell: the
+        caller then declines the whole cage (a name that spells a branch by its
+        carbon count describes a different molecule).
 
     Note:
         Skips exocyclic double bonds (=O, =S) as those are handled as suffixes.
     """
 
     from ..assembly.naming_utils import get_alkyl_name
+    from ..assembly.substituent_naming import fragment_is_linear_terminal_alkyl
 
     substituents = []
 
@@ -3397,7 +3401,13 @@ def get_polycyclic_substituents(
                     n for n in first_atom.GetNeighbors()
                     if n.GetIdx() in set(sub_atoms) and n.GetSymbol() == 'C'
                 ]
-                if o_c_neighbors:
+                # 'methoxy'..'hexyloxy' spell an O joined to an UNBRANCHED SATURATED
+                # chain of exactly carbon_count carbons and nothing else. Counting
+                # carbons alone named the acetate -O-C(=O)-CH3 'ethoxy' (the C=O
+                # lost) and a glycosyloxy branch by its carbon count.
+                if o_c_neighbors and fragment_is_linear_terminal_alkyl(
+                        mol, set(sub_atoms) - {nbr_idx},
+                        o_c_neighbors[0].GetIdx()):
                     _ALKOXY_NAMES = {
                         1: 'methoxy', 2: 'ethoxy', 3: 'propoxy',
                         4: 'butoxy', 5: 'pentyloxy', 6: 'hexyloxy',
@@ -3424,13 +3434,31 @@ def get_polycyclic_substituents(
                         mol, sub_atoms, nbr_idx, list(ring_atoms)
                     )
                 if name is None:
+                    # get_alkyl_name(n) spells only an unbranched saturated chain
+                    # attached at a terminus. For any other branch the carbon COUNT
+                    # discards every other atom (a docosyl for a glycosyloxy chain)
+                    # -- decline the cage instead of naming a different molecule.
+                    if not fragment_is_linear_terminal_alkyl(
+                            mol, sub_atoms, nbr_idx):
+                        logger.debug(
+                            "polycyclic substituent at locant %s has no honest "
+                            "name (atoms=%s): declining the cage", locant,
+                            sorted(sub_atoms))
+                        return None
                     try:
                         name = get_alkyl_name(carbon_count)
                     except (ValueError, KeyError):
                         name = f"C{carbon_count}H{2*carbon_count+1}"
             else:
-                # Non-carbon substituent (like hydroxy, amino)
-                # For now, skip these as they're functional groups
+                # Non-carbon substituent (like hydroxy, amino): a functional group
+                # the caller already carries in exclude_atoms. A carbon-free branch
+                # that is NOT in it is named by no one.
+                if exclude_atoms is not None and not set(sub_atoms) <= set(exclude_atoms):
+                    logger.debug(
+                        "polycyclic carbon-free branch at locant %s is named by "
+                        "no functional group (atoms=%s): declining the cage",
+                        locant, sorted(sub_atoms))
+                    return None
                 continue
 
             substituents.append({
@@ -4040,6 +4068,8 @@ def name_polycyclic_complete(mol, features=None):
     substituents = get_polycyclic_substituents(
         mol, ring_atoms, desc.numbering, exclude_atoms=fg_atoms
     )
+    if substituents is None:
+        return None  # a branch with no honest name: never name the cage without it
 
     # 4. Get unsaturation.
     # macrocycle F2 (1)): a ring double bond whose two locants are NOT

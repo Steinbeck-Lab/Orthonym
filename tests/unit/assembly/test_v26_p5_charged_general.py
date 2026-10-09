@@ -129,10 +129,12 @@ FAILCLOSED_CASES = [
     "[SiH3][CH-]c1ccccc1",   # charge not expressible as a parent suffix
 ]
 
-# The full complete tier still abstains on this one.
-COMPLETE_FAILCLOSED_CASES = ["[SiH3][CH-]c1ccccc1"]
+# The full complete tier still abstains on this one: a dianion whose two charge sites are
+# both on substituents (the former witness '[SiH3][CH-]c1ccccc1' is named now, see below).
+# Measured with the OPSIN gate on: 'unknown organic compound', never a charge-dropped name.
+COMPLETE_FAILCLOSED_CASES = ["[SiH3][CH-]c1ccccc1[N-]C"]
 
-# The engine still refuses these two, but the full complete tier now NAMES them
+# The engine still refuses these three, but the full complete tier now NAMES them
 # through another producer. Pre-existing-failures plan, Task 9 (TRIAGE.csv rows
 # 120, 121; they were test_complete_fails_closed[...]), user decision D-b (plan
 # 'User decisions (answered 2026-09-24)'): "D-b -> the policy wins: where a
@@ -143,7 +145,11 @@ COMPLETE_FAILCLOSED_CASES = ["[SiH3][CH-]c1ccccc1"]
 # '1-(ethan-2-ylium-1-yl)cyclohexa-1,3,5-triene' (RT exact, but benzene is
 # spelled as cyclohexatriene: a best-effort name, not a PIN). The test asserts
 # the round trip, not those spellings.
-COMPLETE_RT_CASES = ["[CH2+]Cc1ccccc1", "[CH2+]C[CH2]"]
+# The third, '[SiH3][CH-]c1ccccc1' (it was the last test_complete_fails_closed[...] row), moves
+# here by the same decision D-b: the complete tier names it '(1-silylmethan-1-id-1-yl)benzene'
+# (OPSIN 2.9.0 full-InChIKey exact; a best-effort spelling, not a PIN -- the anion centre should be
+# the parent, as 'phenyl(silyl)methanide').
+COMPLETE_RT_CASES = ["[CH2+]Cc1ccccc1", "[CH2+]C[CH2]", "[SiH3][CH-]c1ccccc1"]
 
 # Round-trip the names the full namer actually ships.
 _RT_NAMES = dict(FULL_NAMER_CASES)

@@ -88,12 +88,29 @@ class TestST1FlatDegradationRescue:
     before ST.1)."""
 
     def test_pseudoasym_vonbaeyer_ships_flat_not_abstain(self):
-        # norbornane: pseudoasym (1s,4s), OPSIN-unparseable -> flat constitution.
+        # norbornane: pseudoasym (1s,4s), OPSIN-unparseable. It no longer ships the flat
+        # constitution: at the best-effort tier the full InChIKey must match, so a name
+        # that omits the bridgehead stereo is not emitted (guide/checking.md, "The three
+        # checks" 3). The universal floor builds the 'cis' form instead, which OPSIN
+        # reads back to the input's full InChIKey: "Stereodescriptors 'cis'
+        # and 'trans'" (the Blue Book): "can be used in general nomenclature only
+        # to specify the 'cis' or 'trans' arrangement of ligands on bridgeheads" -- a
+        # non-PIN spelling, which is what this tier gives (the PIN tier still abstains,
+        # test_pseudoasym_named_blocker_pin_tier_still_abstains).
         smi = "C1C[C@H]2CC[C@@H]1C2"
         name = _be_name(smi)
         assert not errors.is_failure_name(name)          # NOT 'unknown organic compound'
-        assert name == "bicyclo[2.2.1]heptane"           # stereo omitted (constitution)
+        assert name == "cis-bicyclo[2.2.1]heptane"
+        assert _rt(smi, name)                            # full isomeric InChIKey
 
+    @pytest.mark.xfail(strict=True, reason=(
+        "be-flat-stereo-omission-voided-by-coverage-gate -- see "
+        ".planning/preexisting-triage/TRIAGE-2026-10-09.md. The flat constitution is "
+        "not shipped at the best-effort tier any more (the full InChIKey must match, "
+        "guide/checking.md 'The three checks' 3) and the full-stereo name is not "
+        "buildable: OPSIN 2.9.0 answers 'Failed to assign CIP stereochemistry' for any "
+        "R/S descriptor on this tricyclo[2.2.1.0^2,6]heptane cage (a limitation of "
+        "OPSIN, VERIFIED with opsin-cli), so the candidate cannot be verified."))
     def test_sesquiterpene_cage_ships_flat_not_abstain(self):
         # genuine R/S cage candidate-B cannot place -> flat constitution (
         # residual after ST.1: flat, never abstain).
@@ -102,14 +119,24 @@ class TestST1FlatDegradationRescue:
         assert ok, why
 
     def test_endoperoxide_substituent_stereo_ships_flat_not_abstain(self):
-        #: pseudoasym stereo in a ring substituent on a chain parent;
-        # subsumed by ST.1's top-level reanchor -> flat constitution.
+        #: pseudoasym stereo in a ring substituent on a chain parent. The best-effort
+        # tier needs the full InChIKey (guide/checking.md, "The three checks" 3), so it no
+        # longer ships the stereo-omitted flat constitution; it ships the name with the
+        # two bridgeheads cited 'cis', the Blue Book, general
+        # nomenclature), which OPSIN reads back to the input's full InChIKey.
         smi = "C[C@]12OO[C@](CCC(=O)O)(c3ccccc31)c1ccccc12"
-        ok, why = _ships_flat_constitution(smi, _be_name(smi))
-        assert ok, why
+        name = _be_name(smi)
+        assert not errors.is_failure_name(name)
+        assert _rt(smi, name)                            # full isomeric InChIKey
 
 
 class TestST1NeverWrongAndPinPreserved:
+    @pytest.mark.xfail(strict=True, reason=(
+        "be-flat-stereo-omission-voided-by-coverage-gate -- see "
+        ".planning/preexisting-triage/TRIAGE-2026-10-09.md. Same cage as the "
+        "sesquiterpene row: the stereo-stripped constitution is not shipped at the "
+        "best-effort tier (full InChIKey required, guide/checking.md) and OPSIN 2.9.0 "
+        "cannot read an R/S descriptor on the tricyclo[2.2.1.0^2,6]heptane cage."))
     def test_ez_chain_with_ring_substituent_ships_never_wrong(self):
         # E/Z on a chain parent + R/S in a ring substituent. Never abstain,
         # never wrong: FULL RT, or a stereo-stripped constitution (block-1 RT).
