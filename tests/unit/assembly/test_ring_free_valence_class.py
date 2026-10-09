@@ -128,18 +128,15 @@ RING_FAMILY_YLIDENES = [
 # contains 'methylidene' / 'ethylideneamino'); what is wrong is something else,
 # which is why fixing it belongs to a different phase:
 #
-# decalin/tetralin -- the producer names ONE ring of an ortho-fused pair as
-# the parent and the other ring's atoms as an open 'butan-1-yl' chain
-# (handler=fallback_chain_ring, which self-reports accounted=7/11 and
-# ships anyway). A partial-coverage emitter, not a bond-order reader.
+# (decalin/tetralin used to be listed here: the producer named ONE ring of an
+# ortho-fused pair as the parent and the other ring's atoms as an open
+# 'butan-1-yl' chain. They are fusion-named now, FUSED_YLIDENE_NAMES below.)
 # CC=NCC(=O)O -- the C=N is claimed TWICE, once by the correct
 # 'ethylideneamino' prefix and again as an 'imino'. An atom double-count.
 #
-# All four abstain correctly in production (with a JVM); they escape
+# Both abstain correctly in production (with a JVM); they escape
 # only on a Java-less host, which is what the no_jvm parameter reproduces.
 OUT_OF_CLASS_LEAKS = [
-    ("ortho-fused-decalin", "C=C1CCC2CCCCC2C1", "partial-coverage emitter"),
-    ("ortho-fused-tetralin", "C=C1CCc2ccccc2C1", "partial-coverage emitter"),
     ("imine-double-count", "CC=NCC(=O)O", "C=N claimed twice"),
     ("imine-double-count-long", "CC=NCCCC(=O)O", "C=N claimed twice"),
 ]
@@ -238,6 +235,34 @@ def test_exocyclic_ylidene_reaches_its_known_pin(
     monkeypatch.undo()
     assert name == expected_pin, (
         f"[{family}] {smiles} named {name!r}, expected {expected_pin!r}")
+
+
+# Ortho-fused carbocycles with an exocyclic =CH2: the fusion parent (naphthalene, hydro
+# prefixes) carries the 'methylidene' prefix. "Five-membered ring requirement"
+# (the Blue Book-23710): fusion names are the preferred names of ortho-fused systems of
+# rings of five or more members; hydro prefixes; the free valence 2 of =CH2 is
+# 'methylidene'. Were: out-of-class leaks (one ring named as a parent, the other as an
+# open chain). OPSIN 2.9.0 full InChIKey = the input's (assert_full_rt).
+FUSED_YLIDENE_NAMES = [
+    ("ortho-fused-decalin", "C=C1CCC2CCCCC2C1",
+     "2-methylidenedecahydronaphthalene"),
+    ("ortho-fused-tetralin", "C=C1CCc2ccccc2C1",
+     "2-methylidene-1,2,3,4-tetrahydronaphthalene"),
+]
+
+
+@pytest.mark.parametrize("mode", ["jar_present", "no_jvm"])
+@pytest.mark.parametrize(
+    "label,smiles,expected", FUSED_YLIDENE_NAMES,
+    ids=[case[0] for case in FUSED_YLIDENE_NAMES])
+def test_fused_ylidene_is_fusion_named_and_round_trips(
+        label, smiles, expected, mode, monkeypatch):
+    from tests.support.rt_assert import assert_full_rt
+    jar_or_skip()  # OPSIN jar required
+    name = _name_under(mode, smiles, monkeypatch)
+    monkeypatch.undo()
+    assert name == expected, f"[{label}/{mode}] {name!r} != {expected!r}"
+    assert_full_rt(name, smiles)
 
 
 @pytest.mark.parametrize(

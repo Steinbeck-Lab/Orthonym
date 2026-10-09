@@ -75,8 +75,8 @@ BOOK_NAME = (
     "2-phosphabicyclo[3.3.0]octan-2-yl]oxy}oxolan-2-yl]-5-methylpyrimidine-"
     "2,4(1H,3H)-dione")
 COMPLETE_BOOK_NAME = (
-    "(2S,4R,5S)-2-{[(2R,5R)-2-(hydroxymethyl)-5-(5-methyl-2,4-dioxo-1,3-diazacyclohex-"
-    "5-en-1-yl)oxolan-3-yl]oxy}-4-methyl-4-phenyl-3-oxa-1-aza-2-phosphabicyclo[3.3.0]"
+    "(2S,4R,5S)-2-{[(2R,5R)-2-(hydroxymethyl)-5-(5-methyl-2,4-dioxo-1,2,3,4-"
+    "tetrahydropyrimidin-1-yl)oxolan-3-yl]oxy}-4-methyl-4-phenyl-3-oxa-1-aza-2-phosphabicyclo[3.3.0]"
     "octane")
 
 

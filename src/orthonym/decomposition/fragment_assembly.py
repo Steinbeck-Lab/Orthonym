@@ -228,6 +228,15 @@ _TRIVIAL_ALCOHOL_TO_ALKYL = {
     # phenylmethyl" -- the unsubstituted benzyl alcohol's organyl is 'benzyl'
     # ('phenylmethyl 2-(...)ethanoate' read worse and is not the preferred form).
     "phenylmethanol": "benzyl",
+    # "Retained prefixes that are preferred prefixes" (the Blue Book): "The
+    # retained name 'tert-butyl' has never been recommended for further substitution";
+    # (:24412) "-C(CH3)3 tert-butyl (preferred prefix)"; "Monoesters"
+    # (:31743, example:31751) "tert-butyl octanoate (PIN)". ('2-methylpropan-2-yl (PIN)' at
+    #:40453 names the radical: (1),:40376, "the preferred IUPAC name for a radical may
+    # not be the same as the preferred prefix".) The key is the unsubstituted alcohol
+    # 2-methylpropan-2-ol "Retained names",:26848): a substituted one
+    # ('1-chloro-2-methylpropan-2-ol') keeps the systematic '1-chloro-2-methylpropan-2-yl' (:16288).
+    "2-methylpropan-2-ol": "tert-butyl",
 }
 
 # Alcohol/parent -> alkoxy prefix (retained alkoxy names per IUPAC
@@ -2697,7 +2706,10 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
         # Find the base: everything before the first locant-ol
         import re
         # Match pattern: base-N-ol or baseol, CAPTURING the locant.
-        match = re.match(r'^(.+?)(?:-(\d+))?-ol$', name)
+        # The locant may carry a fusion letter and the 'added indicated hydrogen' of a ring
+        # parent ('3a(4H)',, the Blue Book): '...furan-3a(4H)-ol' is
+        # '...furan-3a(4H)-yl', never '...furan-3a(4H)yl'.
+        match = re.match(r'^(.+?)(?:-(\d+[a-z]?(?:\(\d*[a-z]?H(?:,\d*[a-z]?H)*\))?))?-ol$', name)
         if match:
             base = match.group(1)
             locant = match.group(2)

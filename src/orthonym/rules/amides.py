@@ -153,8 +153,13 @@ def get_n_substituents(mol, amide_atoms: tuple) -> List[Dict]:
     return substituents
 
 
-def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optional[str]:
+def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int, *,
+                        refusal_as_none: bool = False) -> Optional[str]:
     """Name an N-substituent by delegating to the universal naming pipeline.
+
+    ``refusal_as_none``: where the pipeline declines the fragment (the cascade's own
+    refusal, ``errors.is_cascade_refusal``) the answer is ``None`` rather than the
+    placeholder word; a caller that cites the name asks for it.
 
     All N-substituent naming is handled by ``name_substituent`` from the
     universal pipeline (a phase), which provides correct IUPAC names via
@@ -190,6 +195,9 @@ def _name_n_substituent(mol, sub_atoms: List[int], carbon_count: int) -> Optiona
 
     result = name_substituent(mol, sub_set, attach_idx)
     if result:
+        from ..errors import is_cascade_refusal
+        if refusal_as_none and is_cascade_refusal(result):
+            return None
         result = _enrich_ring_n_substituent(mol, result, sub_atoms)
         return result
 

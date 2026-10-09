@@ -36,6 +36,13 @@ from .parent_table import BB_PARENTS
 
 Locant = Union[int, str]
 
+#: (the Blue Book): "Anthracene, phenanthrene, acridine, carbazole, xanthene and
+#: its chalcogen analogues, purine, and cyclopenta[a]phenanthrene are exceptions; traditional
+#: numberings are retained." Of these, the parents whose fusion carbon atoms carry plain
+#: numbers (the steroid numbering 5, 8, 9, 10, 13, 14) are listed here; the others keep their
+#: lettered fusion locants.
+TRADITIONAL_NUMBERING = frozenset({"cyclopenta[a]phenanthrene"})
+
 #: Fused parent names (indicated hydrogen dropped) that the Blue Book prints as PINs, with
 #: the line of the Blue Book that shows it. A name outside this table, outside
 #: ``parent_table.BB_PARENTS``, outside ``derived_parents.DERIVED_PARENTS`` and outside the
@@ -256,10 +263,15 @@ def _table_index() -> Dict[str, List[Tuple[str, Chem.Mol, Dict[int, Locant], str
     return index
 
 
-def _locant_types_ok(key_mol, numbering: Dict[int, Locant]) -> bool:
+def _locant_types_ok(key_mol, numbering: Dict[int, Locant], traditional: bool = False) -> bool:
     """ (:12501): every nonfusion atom and every heteroatom has a number,
-    every fusion carbon atom a lettered locant; the numbers are distinct."""
+    every fusion carbon atom a lettered locant; the numbers are distinct. ``traditional``:
+    a parent of ``TRADITIONAL_NUMBERING`` numbers its fusion carbon atoms like the others
+    ,:12493), so every locant is a number."""
     seen = set()
+    if traditional:
+        locs = [numbering.get(a.GetIdx()) for a in key_mol.GetAtoms()]
+        return all(isinstance(x, int) for x in locs) and len(set(locs)) == len(locs)
     for a in key_mol.GetAtoms():
         loc = numbering.get(a.GetIdx())
         if loc is None or loc in seen:
@@ -339,7 +351,8 @@ def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], .
     # quinolizine N '4a') is discarded; every remaining map must agree up to symmetry.
     name = candidates[0][0]
     maps = [(c[1], c[2]) for c in candidates] + [(m, "fusion_numbering") for m in checks]
-    maps = [(m, src) for m, src in maps if _locant_types_ok(key_mol, m)]
+    maps = [(m, src) for m, src in maps
+            if _locant_types_ok(key_mol, m, name in TRADITIONAL_NUMBERING)]
     if not maps:
         return None
     fixed, source = maps[0]

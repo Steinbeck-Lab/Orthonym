@@ -3904,6 +3904,23 @@ def _key_letters(text: str) -> str:
     return ''.join(ch for ch in _NON_TIER1_LETTERS_RE.sub('', text) if ch.isalpha())
 
 
+def prefix_roman_and_italic(text: str) -> tuple:
+    """``(Roman letters, italic prefixes)`` of a prefix as a name cites it (so a
+    multiplier is part of the text): the two tiers of ``AlphaKey`` for a text that is
+    not reduced to its key.
+
+     (``the Blue Book``, ``## **** CRITERIA RELATED TO ALPHANUMERICAL
+    ORDER OF NAMES``): "all Roman letters are considered before any italic letters, unless
+    the latter are used as locants or are a part of a compound or composite locant";
+     (:3442,:3446) leaves out Greek letters and isotopic and stereochemical
+    descriptors; (:3495) considers 'sec' and 'tert' after the Roman letters,
+    their absence first. The Roman letters are read as ``_key_letters`` reads them for
+    every other key (letter locants, '4a', fusion letters, 's-indacene' are not
+    Roman letters of the name)."""
+    return (_key_letters(strip_alphanumerical_noise(text.lower())),
+            _italic_prefixes(text))
+
+
 class AlphaKey(str):
     """The text of a sort key, ORDERED letters first.
 

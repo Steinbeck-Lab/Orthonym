@@ -181,24 +181,26 @@ class TestNPDecorationEdgeCases:
         result = name_compound(smiles)
         assert result == "(8R,9S,10R,13S,14S)-androstan-3-one", f"Got '{result}'"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "PIN tier abstains on the stereo-free input: a stereoparent name implies "
-        "the configuration (P-101.2.6, BlueBookV2.md:51047) and the hydro-"
-        "cyclopenta[a]phenanthrene PIN is not built; the old passing name "
-        "'1-methyl-2-(6-methylheptan-2-yl)-5-tridecylcyclopentane' named one ring "
-        "as a monocycle (OPSIN: a different molecule; bdd69a673) -- TODO in "
-        "TRIAGE.md 'Suite fix -- j1-regressions'"))
     def test_double_bond_only(self):
         """Steroid with only a double bond modification, no FG substituents."""
         # Cholest-5-ene (cholestane with one C=C, no -OH or =O)
         # Use non-stereo to avoid exact match
         smiles = "CC(C)CCCC(C)C1CCC2C3CC=C4CCCCC4(C)C3CCC12C"
         result = name_compound(smiles)
-        assert "en" in result, f"Expected 'en' suffix in '{result}'"
+        # A stereoparent name (cholestane) would imply the configuration of the ring
+        # centres this stereo-free input leaves open, the Blue Book), so the
+        # name is the hydro-prefixed fusion parent: "Five-membered ring
+        # requirement" (the Blue Book-23710), hydro prefixes. Was
+        # xfail (PIN tier abstained); OPSIN 2.9.0 full InChIKey = the input's.
+        assert result == (
+            "10,13-dimethyl-17-(6-methylheptan-2-yl)-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
+            "tetradecahydro-1H-cyclopenta[a]phenanthrene"), result
+        from tests.support.rt_assert import assert_full_rt
+        assert_full_rt(result, smiles)
 
     @pytest.mark.opsin_gate
     def test_double_bond_only_tier_contract(self):
-        """Production (gate on) for the strict-xfail row above: the PIN tier fails
+        """Production (gate on) for the row above: the PIN tier fails
         closed or ships an RT-exact name; best-effort names it RT-exact with the
         ring C=C as an 'ene' ending."""
         from tests.support.rt_assert import assert_tier_contract

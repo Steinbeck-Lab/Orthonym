@@ -3577,6 +3577,33 @@ def ring_principal_suffix_atoms(
     return anchors
 
 
+def ring_suffix_atoms_the_assembler_cites(mol, ring_atoms, principal_group) -> Set[int]:
+    """RING atom indices that bear the suffix ``name_substituted_heterocycle`` cites for
+    this ring, read off the writer's own inputs: the substituent table
+    ``get_heterocycle_substituents`` builds (its ``is_suffix`` rows) and the choice
+    ``_choose_ring_suffix`` makes among them. The orientation uses it as an anchor, so the
+    suffix the name cites takes the lowest locant before any detachable prefix:
+    NUMBERING, criterion (c) (the Blue Book, "principal characteristic groups and
+    free valences (suffixes)") precedes (f) (:3301).
+
+    Which rows are suffix rows does not depend on the numbering, so any orientation of the
+    ring serves to read them; the atoms are returned, not the locants."""
+    ring = list(ring_atoms)
+    oriented, atom_to_locant = orient_heterocycle(mol, ring)
+    subs = get_heterocycle_substituents(
+        mol, ring, oriented, atom_to_locant, principal_group=principal_group)
+    by_suffix: Dict[str, Set[int]] = {}
+    for sub_list in subs.values():
+        for info in sub_list:
+            if info.get('is_suffix') and info.get('connecting_atom') is not None:
+                by_suffix.setdefault(info['suffix_name'], set()).add(info['connecting_atom'])
+    if not by_suffix:
+        return set()
+    cited, _ = _choose_ring_suffix(
+        principal_group, {k: sorted(v) for k, v in by_suffix.items()})
+    return by_suffix[cited]
+
+
 def _ring_n_acyl_prefix_under_ring_acid(mol, ring_n_idx: int, carbonyl_c: int,
                                         sub_atoms, ring_set,
                                         principal_group: Optional[str]

@@ -111,4 +111,16 @@ DERIVED_PARENTS: Dict[str, DerivedParent] = {
         locants=("1", "2", "3", "4", "4a", "5", "6", "7", "7a", "12b", "12a", "8a", "8",
                  "9", "10", "11", "12"),
     ),
+    "cyclopenta[a]phenanthrene": DerivedParent(
+        derivation=(
+            ("P-25.3.2.4 (b) more rings: phenanthrene is the parent component", 12163),
+            ("P-25.3.2.2.1 monocyclic hydrocarbon prefix cyclopenta", 12000),
+            ("P-25.3.1.3 side letter of the attached component", 11911),
+            ("P-25.3.3 traditional numbering retained", 12493),
+        ),
+        opsin_name="cyclopenta[a]phenanthrene",
+        smiles="C1=CC=CC2=CC=C3C=4CC=CC4C=CC3=C12",
+        locants=("1", "2", "3", "4", "5", "6", "7", "8", "14", "15", "16", "17", "13",
+                 "12", "11", "9", "10"),
+    ),
 }

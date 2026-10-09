@@ -43,12 +43,14 @@ WITNESS = "COC(=O)c1ccc2[nH]c(=N[C@H]3C[C@@H](NC(=O)[C@H]4CCOC4)C3)sc2c1"
 # the Blue Book; hydro prefixes:24221), the ester as
 # 'methoxycarbonyl',:31698), the rings by their book names,
 #:8482; 'cyclobutyl',:15813) and the chain cut at the amide N,
-#:6465). 171c54d5e shipped '8-[1-(cis-3-{2-[(1S)-3-oxacyclopentan-1-yl]-3-oxa-1-
+#:6465), and item 12a the =N-R group as '(R)imino' Oximes, the Blue Book;
+# Changes from the 1979 edition 7(b),:1695), not '1-(R)-1-azamethan-1-ylidene'.
+# 171c54d5e shipped '8-[1-(cis-3-{2-[(1S)-3-oxacyclopentan-1-yl]-3-oxa-1-
 # azaprop-2-en-1-yl}cyclobutan-1-yl)-1-azamethan-1-ylidene]-4-(1-oxo-2-oxapropan-1-yl)-
 # 7-thia-9-azabicyclo[4.3.0]nona-1(6),2,4-triene'.
 WITNESS_NAME = (
-    "6-(methoxycarbonyl)-2-{1-[cis-3-({oxo[(3S)-oxolan-3-yl]methyl}amino)"
-    "cyclobutyl]-1-azamethan-1-ylidene}-2,3-dihydro-1,3-benzothiazole")
+    "6-(methoxycarbonyl)-2-{[cis-3-({oxo[(3S)-oxolan-3-yl]methyl}amino)"
+    "cyclobutyl]imino}-2,3-dihydro-1,3-benzothiazole")
 
 
 def _be(smiles):

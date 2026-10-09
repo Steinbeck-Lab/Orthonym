@@ -28,12 +28,16 @@ def test_gate_disabled_is_not_verified():
 
 def test_abstention_is_t5():
     nm = Orthonym(_disable_opsin_validity_gate=True)
-    row = nm.name_tiered("O=C1CCC2CCCCC2C1")  # suppression class; engine OFF
-    # gate disabled -> the wrong legacy candidate ships in unit tests; accept
-    # either the shipped string or the failure sentinel, but tier must be
-    # T1/ accordingly and never T3/ with the engine off.
-    assert row["tier"] in ("pin_verified", "abstain")
+    row = nm.name_tiered("O=C1CCC2CCCCC2C1")  # was a suppression-class abstention
+    # N5b: an ortho-fused carbocycle is named by fusion nomenclature, not von
+    # Baeyer "Five-membered ring requirement", the Blue Book-
+    # 23710), so this molecule no longer abstains. Gate disabled -> labelled
+    # pin_unverified; the name must still read back to the input's full InChIKey.
+    from tests.support.rt_assert import assert_full_rt
+    assert row["name"] == "octahydronaphthalen-2(1H)-one", row
+    assert row["tier"] == "pin_unverified" and row["verified"] == "unverified"
     assert row["source"] != "general_engine"
+    assert_full_rt(row["name"], "O=C1CCC2CCCCC2C1")
 
 
 def test_engine_emission_is_t3_or_t4():

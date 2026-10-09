@@ -322,6 +322,27 @@ class UnnameableSubstituentError(Exception):
 CASCADE_PLACEHOLDER = 'substituent'
 
 
+class CascadeRefusal(str):
+    """The cascade's own refusal: the placeholder word, carrying where it came from.
+
+    It compares and hashes as the bare word, so every reader that tests for the word is
+    unchanged; a reader that must tell "the writer declined this fragment" from a name
+    asks ``isinstance`` (``is_cascade_refusal``) instead of testing the text of a name that
+    may have been decorated or joined on the way. A name built around the placeholder is
+    a plain ``str``, not this type.
+    """
+    __slots__ = ()
+
+
+#: the one value the cascade's refusal returns hand back
+CASCADE_REFUSAL = CascadeRefusal(CASCADE_PLACEHOLDER)
+
+
+def is_cascade_refusal(name) -> bool:
+    """True when ``name`` is the substituent cascade's refusal itself (see ``CascadeRefusal``)."""
+    return isinstance(name, CascadeRefusal)
+
+
 def is_refusal_sentinel(name: Optional[str]) -> bool:
     """True if ``name`` is any refusal sentinel and so must never be CONSUMED
     as a name component (a substituent prefix, a parent stem, an ester word...).

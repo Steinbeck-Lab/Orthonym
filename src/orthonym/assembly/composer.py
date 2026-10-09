@@ -3661,6 +3661,8 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
         if len(_bz_rings) > 1:
             _pref = _preferred_benzene_parent_ring(mol)
             if _pref is not None:
+                from ..rules.benzene import record_biphenyl_parent_label
+                record_biphenyl_parent_label(mol, _pref[0], _pref[1])
                 return _pref[1]
 
     ring_atoms = features.benzene_ring
@@ -4439,6 +4441,15 @@ def _assemble_complex_ring_name(mol, features):
                     #: no smiles arg — Orthonym.name back-fills the input SMILES.
                     from ..errors import unsupported_ring_system
                     raise unsupported_ring_system()
+                return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
+
+            # (the Blue Book): an ortho- or ortho- and peri-fused system, with
+            # or without ring heteroatoms, with two rings of five or more members is named by
+            # fusion nomenclature in every hydrogenation state, never by a von Baeyer descriptor
+            from ..rules.bridged_fused import name_fused_carbocycle_pin
+            result = name_fused_carbocycle_pin(mol)
+            if result:
+                name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
 
             # Try ortho-fused bicyclic (carbocyclic fallback)

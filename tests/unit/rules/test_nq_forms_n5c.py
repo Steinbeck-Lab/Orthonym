@@ -59,7 +59,7 @@ def test_a_chain_licence(smiles, licensed):
     ("C[S+](C)[O-]", False),           # a sulfoxide written S+-O-
     ("CC=[N+](C)[O-]", False),         # a nitrone N+
     ("COS(=O)(=O)OC", False),          # a hypervalent sulfur
-    ("COOC", False),                   # an -OO- link: '(R)peroxy' is not built here
+    ("COOC", True),                    # an -OO- link is cut at its first oxygen: '(R)peroxy' (item 12a)
     ("CSSC", True),                    # '[(R)sulfanyl]sulfanyl'
 ])
 def test_hetero_roots_composable(smiles, composable):
@@ -177,7 +177,7 @@ def test_an_acyl_part_of_an_amino_prefix_is_enclosed():
 @pytest.mark.parametrize("smiles,book,mechanical", [
     ("c1ccccc1COCCSSCCOC", "(2-{[(2-methoxyethyl)sulfanyl]sulfanyl}ethoxy)methyl",
      "2,9-dioxa-5,6-dithiadecyl"),
-    ("c1ccccc1COCCOOCCOC", "2,5,6,9-tetraoxadecyl", "2,5,6,9-tetraoxadecyl"),
+    ("c1ccccc1COCCOOCCOC", "{2-[(2-methoxyethyl)peroxy]ethoxy}methyl", "2,5,6,9-tetraoxadecyl"),
 ])
 def test_heterounits_decide_the_cut(smiles, book, mechanical):
     from orthonym.assembly.universal_substituent import name_universal_substitutive

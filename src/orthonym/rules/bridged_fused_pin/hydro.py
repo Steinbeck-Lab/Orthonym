@@ -58,6 +58,8 @@ class HydroState:
     adj: Dict[int, FrozenSet[int]] = field(default_factory=dict, compare=False, hash=False)
     # free valences left on each eligible atom by its ring-system bonds (valence - bonds)
     free: Dict[int, int] = field(default_factory=dict, compare=False, hash=False)
+    # the fusion carbon atoms of the parent: three or more ring bonds inside the parent
+    fusion: FrozenSet[int] = field(default_factory=frozenset, compare=False, hash=False)
 
 
 def hydro_state(mol, split: Split) -> Optional[HydroState]:
@@ -95,8 +97,11 @@ def hydro_state(mol, split: Split) -> Optional[HydroState]:
             ih_sets.append(frozenset(combo))
     if not ih_sets:
         return None
+    fusion = frozenset(a for a in residual if mol.GetAtomWithIdx(a).GetAtomicNum() == 6
+                       and sum(1 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                               if nb.GetIdx() in residual) >= 3)
     return HydroState(frozenset(eligible), frozenset(saturated), split.n_double, mancude,
-                      tuple(ih_sets), {a: frozenset(v) for a, v in adj.items()}, free)
+                      tuple(ih_sets), {a: frozenset(v) for a, v in adj.items()}, free, fusion)
 
 
 def choose_indicated_hydrogen(state: HydroState, atom_to_locant: Dict[int, Any]):
@@ -106,7 +111,7 @@ def choose_indicated_hydrogen(state: HydroState, atom_to_locant: Dict[int, Any])
     '3a,5-dihydro-4H-indene (PIN) (not 4,5-dihydro-3aH-indene)'); among the allowed
     sets, the fewest fusion atoms, then the lowest locants:16880)."""
     def n_fusion(atoms):
-        return sum(1 for a in atoms if not isinstance(atom_to_locant[a], int))
+        return sum(1 for a in atoms if a in state.fusion)
     ih = min(state.ih_sets,
              key=lambda s: (n_fusion(s), locant_tuple(atom_to_locant[a] for a in s)))
     return ih, state.saturated - ih
@@ -172,7 +177,7 @@ def accommodate(state: HydroState, atom_to_locant: Dict[int, Any], need: FrozenS
         return None
 
     def fusion(a):
-        return not isinstance(atom_to_locant[a], int)
+        return a in state.fusion
 
     sets = state.ih_sets
     cands = [s for s in sets if need <= s]

@@ -73,7 +73,10 @@ class TestP25HeterocyclicBridgesFailClosed:
         # 'benzene' pre-gate — documented handler follow-up; production is correct.
         import orthonym.namer as _nm
         monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
-        assert name_compound(smiles) == "unknown organic compound"
+        # N5b step 2: the dihydrofuran ring shares a bond with the central ring, so the system
+        # is ortho-fused, the Blue Book), not bridged; its fusion name
+        #,:23710) is OPSIN 2.9.0 full-InChIKey exact
+        assert name_compound(smiles) == "3a,11b-dihydrophenanthro[9,10-b]furan"
 
 
 @pytest.mark.unit
@@ -127,8 +130,12 @@ class TestP25CompositeBridgeOrdering:
         monkeypatch.setattr(_nm, "_DISABLE_VALIDITY_GATE", False, raising=False)
         smi = "C1=CC2=C(C=C1)C1=CC3=C(C=C1C2)OCOC3"
         name = name_compound(smi)
+        # N5b step 2: the SMILES is an ortho-fused fluorene + 1,3-dioxine system,
+        # the Blue Book), which has a fusion name,:23710); OPSIN 2.9.0: full
+        # InChIKey exact
         assert name in ("unknown organic compound",
-                        "1,4:8,5-bis(epoxymethano)anthracene")
+                        "1,4:8,5-bis(epoxymethano)anthracene",
+                        "4,10-dihydro-2H-fluoreno[2,3-d][1,3]dioxine")
 
 
 @pytest.mark.unit

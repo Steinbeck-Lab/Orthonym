@@ -612,20 +612,30 @@ def _decorated_biphenylyl_substituent_name(
     ri = mol.GetRingInfo()
     frag_set = set(frag_atoms)
     rings = [set(r) for r in ri.AtomRings() if set(r) <= frag_set]
-    if len(rings) != 2:
-        return None
-    for r in rings:
+
+    def _isolated_benzene(r):
         if len(r) != 6:
-            return None
+            return False
         for a in r:
             at = mol.GetAtomWithIdx(a)
             if (at.GetSymbol() != 'C' or not at.GetIsAromatic()
                     or ri.NumAtomRings(a) != 1 or at.GetFormalCharge() != 0):
-                return None
+                return False
+        return True
+
     ring_a = next((r for r in rings if attachment_atom in r), None)
-    if ring_a is None:
+    if ring_a is None or not _isolated_benzene(ring_a):
         return None
-    ring_b = rings[1] if rings[0] is ring_a else rings[0]
+    # The partner ring is the one benzene ring joined to ring_a by a direct bond;
+    # a ring inside a decoration (an oxanyl of an oxy group, a cyclohexyl) is no
+    # part of the assembly. Two partners would be a terphenyl-type assembly.
+    partners = [r for r in rings
+                if r is not ring_a and _isolated_benzene(r)
+                and any(mol.GetBondBetweenAtoms(x, y) is not None
+                        for x in ring_a for y in r)]
+    if len(partners) != 1:
+        return None
+    ring_b = partners[0]
     if ring_a & ring_b:
         return None
     both = ring_a | ring_b
@@ -657,6 +667,8 @@ def _decorated_biphenylyl_substituent_name(
                     return None
                 has_parent_bond = True
                 continue
+            if any(ni in r and _isolated_benzene(r) for r in rings):
+                return None  # benzene joined to a benzene ring: a longer assembly
             deco: Set[int] = set()
             stack = [ni]
             while stack:
@@ -741,10 +753,20 @@ def _decorated_heteroaryl_substituent_name(
     ring_atoms: Tuple[int, ...],
     attachment_atom: int,
     allow_mancude: bool = False,
+    *,
+    carbocyclic_stem: Optional[str] = None,
+    facts_out: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """ cluster R: PIN substituent name for a monocyclic heteroaryl ring that
     carries its OWN decorations, with the free valence on a ring atom — e.g.
     ``5-hydroxy-1,3-dimethylpyrazol-4-yl``.
+
+    ``carbocyclic_stem``: the word that closes the name of a benzene ring in place of
+    'phenyl' ('phenoxy', 'anilino': the retained prefixes of and
+    with full substitution, the Blue Book,:26139), composed here with the
+    decorations it carries. It applies to the benzene ring only; when it does, the writer
+    says so in ``facts_out['carbocyclic_stem']``, and a ring of another kind keeps its own
+    stem and leaves ``facts_out`` empty.
 
     Extends the ``pin_heteroaryl_substituent_name`` free-valence numbering cascade
     : heteroatoms as a set → element seniority → indicated H → free
@@ -1036,7 +1058,9 @@ def _decorated_heteroaryl_substituent_name(
         # so fail closed rather than emit an unlocanted prefix.
         if attach_locant != 1 or indicated_h_atom is not None:
             return None
-        core = "phenyl"
+        core = carbocyclic_stem or "phenyl"
+        if carbocyclic_stem and facts_out is not None:
+            facts_out['carbocyclic_stem'] = carbocyclic_stem
     elif _azine_tail is not None:
         core = _azine_tail
     else:
@@ -1607,6 +1631,18 @@ def _bridged_fused_substituent_name(sub, attach_sub) -> Optional[str]:
     return builder_declining_on_error(build_substituent, sub, attach_sub)
 
 
+def _fused_carbocycle_substituent_name(sub, attach_sub) -> Optional[str]:
+    """An ortho- or ortho- and peri-fused ring system, carbocyclic or heterocyclic, with two rings of five or
+    more members as a '-yl' prefix in every hydrogenation state, the Blue Book:
+    23710; free valence): ``bridged_fused_pin.build_fused_substituent``. Tried after the
+    narrow namers of this list, so every name they build stays as it is, and before the
+    complete-tier cage namers, which would give such a system a von Baeyer prefix. An internal
+    error of the builder declines and is logged; the caller then tries the next namer."""
+    from .bridged_fused import builder_declining_on_error
+    from .bridged_fused_pin import build_fused_substituent
+    return builder_declining_on_error(build_fused_substituent, sub, attach_sub)
+
+
 def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
     """``bicyclo[2.2.1]heptan-2-yl`` etc. for a detached carbocyclic von-Baeyer
     ring system, reusing the bicyclo parent namer with the free valence
@@ -2050,10 +2086,15 @@ def _polycyclic_substituent_name(
     sub, attach_sub = _extract_ring_submol(mol, ring_atoms, attachment_atom)
     if sub is None:
         return None
+    from .bridged_fused import joins_identical_hetero_ring_systems
+    assembly = joins_identical_hetero_ring_systems(mol, ring_atoms)
     for namer in (_bridged_fused_substituent_name,
                   _vonbaeyer_substituent_name,
                   _spiro_substituent_name,
-                  _fused_hydro_substituent_name):
+                  _fused_hydro_substituent_name,
+                  _fused_carbocycle_substituent_name):
+        if assembly and namer is _fused_carbocycle_substituent_name:
+            continue                    # a ring assembly is the parent, not one component
         try:
             name = namer(sub, attach_sub)
         except Exception:
@@ -2442,6 +2483,9 @@ def name_ring_system_substituent(
     allow_enumerator_fallback: bool = True,
     allow_mancude: bool = False,
     pos_out: Optional[Dict[int, int]] = None,
+    *,
+    carbocyclic_stem: Optional[str] = None,
+    facts_out: Optional[Dict[str, str]] = None,
 ) -> Optional[str]:
     """Name a RING-CONTAINING substituent fragment (task 9 chokepoint).
 
@@ -2465,6 +2509,11 @@ def name_ring_system_substituent(
     for why the stereo emitter needs it. Every other producer here numbers a
     RING, not a chain, and leaves the map empty; an empty map is exactly the
     pre-existing behaviour, so no caller is affected by passing one.
+
+    ``carbocyclic_stem`` / ``facts_out``: see ``_decorated_heteroaryl_substituent_name``.
+    The stem is offered to the producers that build a decorated benzene ring; the one
+    that used it records it in ``facts_out['carbocyclic_stem']``, and the name it
+    returns is then the whole prefix ('4-chlorophenoxy').
     """
     ring_info = mol.GetRingInfo()
     frag_atoms = list(frag_atoms)
@@ -2518,6 +2567,23 @@ def name_ring_system_substituent(
                                              allow_mancude=allow_mancude)
         except Exception:
             name = None
+        if name is None:
+            # A fragment made only of ring atoms that holds MORE than one ring
+            # system, joined by bonds: the ring system bearing the free valence
+            # is the substituent stem and every other ring system is a ring-yl
+            # prefix on it, the Blue Book; '4-(pyridin-4-yl)
+            # benzamide (PIN)',:32893, read as a substituent:
+            # '4-(pyridin-3-yl)pyrimidin-2-yl'). Identical rings joined by a
+            # bond are a ring assembly instead,:15560), which
+            # get_ring_substituent_name above owns, so such a fragment is
+            # left to it (``_multi_system_ring_yl``).
+            try:
+                name = _multi_system_ring_yl(
+                    mol, frag_atoms, frag_ring_atoms, attach_idx,
+                    allow_mancude=allow_mancude, carbocyclic_stem=carbocyclic_stem,
+                    facts_out=facts_out)
+            except Exception:
+                name = None
     elif (frag_ring_atoms and frag_ring_atoms < frag_set
           and ring_info.NumAtomRings(attach_idx) > 0):
         # cluster R: a ring that carries its OWN decorations, rooted at a
@@ -2535,7 +2601,8 @@ def name_ring_system_substituent(
             if name is None:
                 name = _decorated_heteroaryl_substituent_name(
                     mol, frag_atoms, tuple(frag_ring_atoms), attach_idx,
-                    allow_mancude=allow_mancude,
+                    allow_mancude=allow_mancude, carbocyclic_stem=carbocyclic_stem,
+                    facts_out=facts_out,
                 )
         except Exception:
             name = None
@@ -2599,6 +2666,195 @@ def name_ring_system_substituent(
     if name and name != 'substituent' and ' ' not in name:
         return name
     return None
+
+
+def _lone_benzene_ring(mol, atom_idx: int) -> Optional[Tuple[int, ...]]:
+    """The ring of ``atom_idx`` when it is a lone six-membered ring of aromatic neutral
+    carbons (no atom shared with another ring), else ``None``: the C6H5- group of
+    'phenoxy' and 'anilino' (a benzo ring of a fused system is not one)."""
+    ri = mol.GetRingInfo()
+    rings = [r for r in ri.AtomRings() if atom_idx in r]
+    if len(rings) != 1 or len(rings[0]) != 6:
+        return None
+    if any(ri.NumAtomRings(i) != 1 for i in rings[0]):
+        return None
+    for i in rings[0]:
+        a = mol.GetAtomWithIdx(i)
+        if not (a.GetIsAromatic() and a.GetAtomicNum() == 6 and a.GetFormalCharge() == 0):
+            return None
+    return tuple(rings[0])
+
+
+def _ring_yl_cites_locant(mol, ring_yl_atoms, attach_atom: int) -> bool:
+    """The ring-yl of the fragment ``ring_yl_atoms`` cites a locant: it carries
+    decorations, or its ring system has more than one symmetry class of ring atom, so that its free
+    valence has a position to name ('pyridin-3-yl', '4-chlorophenyl'). A ring system of
+    one symmetry class of ring atom ('phenyl', 'cyclohexyl') omits it (a), the Blue Book,
+    "when there is no ambiguity"). (:7255) encloses a simple prefix "to
+    separate locants"; a prefix without one is cited bare."""
+    from rdkit import Chem
+    ring_yl_atoms = set(ring_yl_atoms)
+    system = {attach_atom}
+    stack = [attach_atom]
+    while stack:
+        cur = stack.pop()
+        for b in mol.GetAtomWithIdx(cur).GetBonds():
+            j = b.GetOtherAtomIdx(cur)
+            if b.IsInRing() and j in ring_yl_atoms and j not in system:
+                system.add(j)
+                stack.append(j)
+    if system != ring_yl_atoms:
+        return True  # decorations: cited with their locants
+    bonds = [b.GetIdx() for b in mol.GetBonds()
+             if b.GetBeginAtomIdx() in system and b.GetEndAtomIdx() in system]
+    ranks = list(Chem.CanonicalRankAtomsInFragment(
+        mol, atomsToUse=sorted(system), bondsToUse=bonds, breakTies=False,
+        includeIsotopes=False))
+    return len({ranks[i] for i in system}) > 1
+
+
+def _bare_connective_ring_yl(mol, frag_set, ring_yl_atoms, hetero_idx: int,
+                             ring_name: str, attach_atom: int,
+                             allow_mancude: bool = False) -> Optional[str]:
+    """The compound prefix for a ring system joined to the parent by one
+    divalent heteroatom: -NH-R, -O-R, -S-R.
+
+    - N: 'anilino' (and '4-chloroanilino') for a phenyl ring-yl, the preferred
+      prefix, the Blue Book,:26153); '(R)amino' for every
+      other ring-yl, the prefix 'amino' with the name of R prefixed,
+      :26298; 'N-phenylpyridin-3-amine (PIN)',:26245, gives the ring-yl spelling).
+    - O: 'phenoxy' for phenyl, '(R)oxy' otherwise
+      ('2-[(pyridin-3-yl)oxy]pyrazine (PIN)',:27772; '2-chloro-4-[(5-chloro
+      pyridin-2-yl)oxy]pyridine (PIN)',:6267).
+    - S: '(R)sulfanyl' ('3-chloro-7-[(4-chloro-3-nitroquinolin-7-yl)sulfanyl]-
+      4-nitroquinoline (PIN)',:22088); 'phenylsulfanyl' for phenyl.
+
+    The ring-yl R is enclosed when it carries locants,:7255; the
+    nesting order of,:7446, is applied by ``apply_enclosing_marks``).
+    The returned prefix is not enclosed as a whole: the caller encloses it as a
+    compound prefix.
+
+    Declines (None) when the substitutive name may not be the PIN because the
+    ring-yl carries the principal characteristic group or the molecule may take
+    a multiplicative name (``_ring_branch_may_need_other_parent``,, or,
+    at the PIN tier, a linear phane name (2),
+    ``linear_phane_screen.phane_may_be_pin``); when the N carries anything but
+    one hydrogen; and, at every tier, when the fragment holds a stereocentre or
+    a stereogenic double bond,:44643: the descriptor is cited "at the
+    front of the corresponding prefix", '4-{[(3R)-piperidin-3-yl]amino}benzoic
+    acid'; the ring-yl handed in here carries none, and the outer emitter would
+    write it in front of the whole name with the prefix's locant, '(3R)-4-
+    [(piperidin-3-yl)amino]benzoic acid') or when the molecule joins two
+    identical ring systems by a bond (a ring assembly,:15542, which is
+    then the parent,:19461: '5-[(pyrimidin-2-yl)amino][1,1'-
+    biphenyl]-2-carboxamide', not '2-phenyl-4-[(pyrimidin-2-yl)amino]
+    benzamide'; ``ring_assembly_screen``). A declined fragment is left to the
+    producers that named it before this connective existed.
+    """
+    from ..assembly.naming_utils import apply_enclosing_marks
+    from ..assembly.substituent_naming import _ring_branch_may_need_other_parent
+    het = mol.GetAtomWithIdx(hetero_idx)
+    sym = het.GetSymbol()
+    if sym == 'N' and het.GetTotalNumHs() != 1:
+        return None
+    if sym in ('O', 'S') and het.GetTotalNumHs() != 0:
+        return None
+    if _carries_stereo(mol, frag_set):
+        return None
+    from .ring_assembly_screen import joins_identical_ring_systems
+    if joins_identical_ring_systems(mol):
+        return None
+    try:
+        if _ring_branch_may_need_other_parent(
+                mol, set(frag_set), hetero_idx, sorted(ring_yl_atoms)):
+            return None
+        # The connective atom itself carries the principal characteristic group (the NH of
+        # a diarylamine is the amine suffix, the Blue Book: the parent
+        # is the aniline '4-chloro-N-(4-methylphenyl)aniline'): it is not a prefix.
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        _pg, _pg_matches = get_principal_group(mol, detect_functional_groups(mol))
+        if _pg and any(hetero_idx in match for match in (_pg_matches or ())):
+            return None
+    except Exception:
+        return None
+    if not allow_mancude:
+        from .linear_phane_screen import phane_may_be_pin
+        if phane_may_be_pin(mol):
+            return None
+    # A lone benzene ring bonded to the heteroatom takes the retained prefix of its
+    # connective: 'anilino' for -NH-, the Blue Book: "The prefix name
+    # 'anilino' is retained as the preferred prefix for C6H5-NH- with full substitution
+    # allowed"; '4-chloroanilino':26153), 'phenoxy' for -O- ('phenoxy (preferred prefix)
+    # (full substitution; see ',:17796; '2-(4-bromo-2-carboxyphenoxy)-5-
+    # fluorobenzoic acid (PIN)',:6287). The ring is read from the atoms; the decorated
+    # prefix is composed by the ring-yl writer, with the retained word as its stem.
+    if sym in ('N', 'O'):
+        benzene = _lone_benzene_ring(mol, attach_atom)
+        if benzene is not None:
+            word = 'anilino' if sym == 'N' else 'phenoxy'
+            if set(ring_yl_atoms) == set(benzene):
+                return word
+            facts: Dict[str, str] = {}
+            named = name_ring_system_substituent(
+                mol, sorted(ring_yl_atoms), attach_atom, allow_enumerator_fallback=False,
+                allow_mancude=allow_mancude, carbocyclic_stem=word, facts_out=facts)
+            if named and facts.get('carbocyclic_stem') == word:
+                return named
+    connective = {'N': 'amino', 'O': 'oxy'}.get(sym, 'sulfanyl')
+    inner = (apply_enclosing_marks(ring_name, -1)
+             if _ring_yl_cites_locant(mol, ring_yl_atoms, attach_atom) else ring_name)
+    return f'{inner}{connective}'
+
+
+def _multi_system_ring_yl(mol, frag_atoms, frag_ring_atoms, attach_idx,
+                          allow_mancude: bool = False, *,
+                          carbocyclic_stem: Optional[str] = None,
+                          facts_out: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """A fragment of ring atoms only that holds two or more ring systems joined
+    by single bonds, free valence on a ring atom: the ring bearing the free
+    valence is the stem and the other ring systems are its ring-yl prefixes
+    ('4-(pyridin-3-yl)pyrimidin-2-yl', '3-(1H-imidazol-1-yl)phenyl'), built by
+    the decorated-ring producer, which names each ring-yl prefix through the
+    ring producers at the caller's tier.
+
+    Declines (None) when the stem is not a monocycle, when the molecule joins
+    two identical ring systems by a bond (a ring assembly,, the Blue Book:
+    15542: inside the fragment it is one unit, '[1,1'-biphenyl]-4-yl', which
+    ``get_ring_substituent_name`` names; next to the parent ring it is the
+    parent,:19461; ``ring_assembly_screen``), when the fragment holds
+    a stereocentre or a stereogenic double bond, or when the producer declines.
+    The decorated-ring producer cites no stereodescriptor of a ring-yl prefix it
+    builds ('4-(piperidin-3-yl)phenyl'), and the descriptor the outer emitter
+    then writes in front of the whole name carries the prefix's locant against
+    the parent ('(3S)-2-[4-(piperidin-3-yl)phenyl]-2H-indazole-7-carboxamide');
+     (:44643) cites it "at the front of the corresponding prefix"
+    ('[(3S)-piperidin-3-yl]').
+    """
+    from ..perception.rings import get_ring_systems
+    if _carries_stereo(mol, frag_atoms):
+        return None
+    frag_set = set(frag_atoms)
+    systems = [s for s in get_ring_systems(mol, include_spiro=True) if s <= frag_set]
+    if len(systems) < 2 or set().union(*systems) != set(frag_ring_atoms):
+        return None
+    stem = next((s for s in systems if attach_idx in s), None)
+    if stem is None:
+        return None
+    ri = mol.GetRingInfo()
+    if sum(1 for r in ri.AtomRings() if set(r) <= stem) != 1:
+        return None
+    from .ring_assembly_screen import joins_identical_ring_systems
+    if joins_identical_ring_systems(mol):
+        return None
+    if not allow_mancude:
+        from .linear_phane_screen import phane_may_be_pin
+        if phane_may_be_pin(mol):
+            return None
+    return _decorated_heteroaryl_substituent_name(
+        mol, frag_atoms, tuple(sorted(frag_ring_atoms)), attach_idx,
+        allow_mancude=allow_mancude, carbocyclic_stem=carbocyclic_stem,
+        facts_out=facts_out)
 
 
 def _carries_stereo(mol, atoms) -> bool:
@@ -2808,7 +3064,10 @@ def _compound_ring_on_chain_substituent(
     for a in carrier:
         atom = mol.GetAtomWithIdx(a)
         if atom.GetSymbol() != 'C':
-            if (not allow_mancude or atom.GetSymbol() not in ('S', 'O', 'N')
+            # At the PIN tier only the bare connective is admitted: the
+            # heteroatom alone is the carrier (``_bare_connective_ring_yl``).
+            if ((not allow_mancude and len(carrier) != 1)
+                    or atom.GetSymbol() not in ('S', 'O', 'N')
                     or atom.GetFormalCharge() != 0
                     or atom.GetNumRadicalElectrons() != 0
                     or atom.GetIsAromatic()
@@ -2887,8 +3146,16 @@ def _compound_ring_on_chain_substituent(
                 return None
         except Exception:
             return None
+    # The bare connective ('(ring-yl)amino', '(ring-yl)oxy', '(ring-yl)sulfanyl',
+    # ``_bare_connective_ring_yl``) takes its ring-yl from the ring producers
+    # only: the universal enumerator behind ``allow_enumerator_fallback`` numbers
+    # a monocycle core on its own walk and can cite a free valence the ring does
+    # not have ('5-{[(quinolin-8-yl)oxy]methyl}-1,3,4-oxadiazol-3-yl' for the
+    # 2-yl group), which the compound prefix would carry into the name.
+    _bare_connective = hetero_carrier_atom is not None and len(path) == 1
     ring_name = name_ring_system_substituent(
         mol, sorted(frag_ring_atoms), ring_side_atoms[0],
+        allow_enumerator_fallback=not _bare_connective,
         allow_mancude=allow_mancude,
     )
     if not ring_name:
@@ -2933,9 +3200,12 @@ def _compound_ring_on_chain_substituent(
             return None
         carbon_path = path[:-1]
         if not carbon_path:
-            # Bare heteroatom directly on the parent (no methylene carrier) —
-            # a different substituent shape owned by other tiers.
-            return None
+            # The heteroatom alone joins the ring system to the parent: the
+            # compound prefix '(ring-yl)amino' / '(ring-yl)oxy' /
+            # '(ring-yl)sulfanyl' (``_bare_connective_ring_yl``).
+            return _bare_connective_ring_yl(
+                mol, frag_set, frag_ring_atoms, hetero_carrier_atom, ring_name,
+                ring_side_atoms[0], allow_mancude=allow_mancude)
         try:
             from ..assembly.naming_utils import get_alkyl_name
             hetero_alkyl = get_alkyl_name(len(carbon_path))

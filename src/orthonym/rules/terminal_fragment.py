@@ -44,6 +44,7 @@ from ..assembly.book_prefixes import (
     MONONUCLEAR_HEAD,
     a_chain_licensed,
     hetero_roots_composable,
+    forms_enabled,
 )
 from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_alkyl_name
 from .ring_replacement import build_replacement_prefix
@@ -747,6 +748,166 @@ def _book_hetero_fragment(mol, frag: Set[int], attach_idx: int
                                 atoms=frozenset(frag))
 
 
+def _group_part_names(mol, shape):
+    """The names of the parts of an N/O group (``assembly.hetero_group_prefixes``), each by
+    this module's own recursion; ``None`` when a part is unnameable. A lone heteroatom takes
+    its standard prefix ('hydroxy', never the 'a' chain '1-oxamethyl'); a part joined by a
+    double bond is a one-carbon ylidene ('diaminomethylidene', ``methyl_group_name``) with
+    its geometry cited at the front when defined."""
+    names = []
+    for part in shape.parts:
+        if part.order == 2:
+            name = _ylidene_part_name(mol, part)
+            if name is None:
+                return None
+            names.append(name)
+            continue
+        lone = _single_heteroatom_branch_prefix(mol, set(part.atoms))
+        if lone is not None:
+            names.append(lone)
+            continue
+        sub = _terminal_fragment_name(mol, set(part.atoms), part.attach)
+        if sub is None:
+            return None
+        names.append(sub.name)
+    return names
+
+
+def _ylidene_part_name(mol, part) -> Optional[str]:
+    """'(E)-phenylmethylidene' for the part of an N=C group: a carbon with single-bonded
+    branches (one-carbon parent, (a) the Blue Book)."""
+    from ..assembly.book_prefixes import methyl_group_name
+    atoms = set(part.atoms)
+    c = part.attach
+    if mol.GetAtomWithIdx(c).GetSymbol() != "C" or mol.GetAtomWithIdx(c).IsInRing():
+        return None
+    branch_names = []
+    claimed = {c}
+    for nb in mol.GetAtomWithIdx(c).GetNeighbors():
+        j = nb.GetIdx()
+        if j not in atoms or j in claimed:
+            continue
+        if mol.GetBondBetweenAtoms(c, j).GetBondType() != Chem.BondType.SINGLE:
+            return None
+        comp, stack = set(), [j]
+        while stack:
+            cur = stack.pop()
+            if cur in comp or cur == c:
+                continue
+            comp.add(cur)
+            for nb2 in mol.GetAtomWithIdx(cur).GetNeighbors():
+                k = nb2.GetIdx()
+                if k in atoms and k not in comp and k != c:
+                    stack.append(k)
+        claimed |= comp
+        if all(mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in comp) and _is_acyclic(mol, comp):
+            return None  # an alkylidene ('ethylidene'), not 'methylmethylidene': not built here
+        lone = _single_heteroatom_branch_prefix(mol, comp)
+        if lone is not None:
+            branch_names.append(lone)
+            continue
+        sub = _terminal_fragment_name(mol, comp, j)
+        if sub is None:
+            return None
+        branch_names.append(sub.name)
+    if claimed != atoms:
+        return None
+    name = methyl_group_name(branch_names, 2) if branch_names else "methylidene"
+    if name is None:
+        return None
+    bond = mol.GetBondBetweenAtoms(part.host, c)
+    if bond.GetStereo() != Chem.BondStereo.STEREONONE:
+        from ..perception.stereo import assign_stereochemistry
+        assign_stereochemistry(mol)
+        ez = bond.GetProp('_CIPCode') if bond.HasProp('_CIPCode') else None
+        if ez not in ('E', 'Z'):
+            return None
+        name = f"(1{ez})-{name}"
+    return name
+
+
+def _book_group_fragment(mol, frag: Set[int], attach_idx: int, late: bool = False
+                         ) -> Optional[TerminalFragmentName]:
+    """A fragment that is a diazenyl, hydrazinyl or peroxy group attached by a single bond
+    ('phenyldiazenyl', '2-methylhydrazinyl', '(tert-butyl)peroxy', 'hydroperoxy'),
+    composed from its parts (roadmap item 12a; the Blue Book,
+    :27858,:27944), not spelled as the 'a' chain '2-phenyl-1,2-diazaeth-1-en-1-yl'
+    that (:6465) does not allow. The N=N geometry of a diazenyl group is cited
+    at the front, '(1E)-'; ``None`` for any other shape."""
+    from ..assembly.hetero_group_prefixes import LATE_KINDS, compose_group, group_shape
+    if not forms_enabled("chain"):
+        return None
+    parents = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+               if nb.GetIdx() not in frag and nb.GetAtomicNum() > 1]
+    if len(parents) != 1:
+        return None
+    if mol.GetBondBetweenAtoms(attach_idx, parents[0]).GetBondType() != Chem.BondType.SINGLE:
+        return None
+    shape = group_shape(mol, attach_idx, frozenset(frag), parents[0], unstereo_iminyl=True)
+    if shape is None or shape.kind not in ("diazenyl", "hydrazinyl", "peroxy", "hydroperoxy",
+                                           "iminyl", "nitroso", "aminooxy"):
+        return None
+    if (shape.kind in LATE_KINDS) != late:
+        return None
+    names = _group_part_names(mol, shape)
+    if names is None:
+        return None
+    token = compose_group(shape, names)
+    if not token:
+        return None
+    if shape.stereo_bond is not None:
+        bond = mol.GetBondBetweenAtoms(*shape.stereo_bond)
+        if bond.GetStereo() != Chem.BondStereo.STEREONONE:
+            from ..perception.stereo import assign_stereochemistry
+            assign_stereochemistry(mol)
+            ez = bond.GetProp('_CIPCode') if bond.HasProp('_CIPCode') else None
+            if ez not in ('E', 'Z'):
+                return None
+            from ..assembly.prefix_derivation import carried
+            token = carried(f"(1{ez})-{token}", like=token)
+    from ..assembly.book_prefixes import note_book_form
+    note_book_form("chain")
+    return TerminalFragmentName(name=token, numbering={attach_idx: 1}, basis="hetero",
+                                atoms=frozenset(frag))
+
+
+def _book_ylidene_branch(mol, battach: int, comp: Set[int], backbone_atom: int
+                         ) -> Optional[str]:
+    """The prefix of a branch joined to the backbone by a double bond that is an imino or
+    hydrazinylidene group ('hydroxyimino', '(methoxyimino)', 'dimethylhydrazinylidene';
+     the Blue Book, Changes from the 1979 edition 7(j):1703), or
+    ``None``. This module has no other -ylidene constructor."""
+    from ..assembly.hetero_group_prefixes import compose_group, group_shape
+    if not forms_enabled("chain"):
+        return None
+    shape = group_shape(mol, battach, frozenset(comp), backbone_atom)
+    if shape is None or shape.kind not in ("imino", "hydrazinylidene"):
+        return None
+    names = _group_part_names(mol, shape)
+    if names is None:
+        return None
+    token = compose_group(shape, names)
+    if token:
+        from ..assembly.book_prefixes import note_book_form
+        note_book_form("chain")
+    return token
+
+
+def _ylidene_geometry(mol, bond, numbering, branches) -> bool:
+    """True when ``bond`` joins a backbone atom to the root of a branch that is an imino or
+    hydrazinylidene group (``_book_ylidene_branch``)."""
+    for _loc, battach, comp in branches:
+        ends = (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+        if battach in ends and (ends[0] in numbering or ends[1] in numbering):
+            other = ends[0] if ends[1] == battach else ends[1]
+            if other not in numbering:
+                return False
+            from ..assembly.hetero_group_prefixes import group_shape
+            shape = group_shape(mol, battach, frozenset(comp), other)
+            return shape is not None and shape.kind in ("imino", "hydrazinylidene")
+    return False
+
+
 def _book_acyl_fragment(mol, frag: Set[int], attach_idx: int
                         ) -> Optional[TerminalFragmentName]:
     """The acyl-group name of a fragment attached through a carbonyl carbon
@@ -763,6 +924,11 @@ def _book_acyl_fragment(mol, frag: Set[int], attach_idx: int
         return None
 
     def part(atoms, root):
+        # a lone heteroatom takes its standard prefix: '(hydroxy)carbamoyl', never the 'a'
+        # chain '(1-oxamethyl)carbamoyl' (``_single_heteroatom_branch_prefix``)
+        lone = _single_heteroatom_branch_prefix(mol, set(atoms)) if forms_enabled("chain") else None
+        if lone is not None:
+            return lone
         sub = _terminal_fragment_name(mol, set(atoms), root)
         return sub.name if sub is not None else None
 
@@ -770,6 +936,27 @@ def _book_acyl_fragment(mol, frag: Set[int], attach_idx: int
     if token is None:
         return None
     return TerminalFragmentName(name=token, numbering={attach_idx: 1}, basis="acyl",
+                                atoms=frozenset(frag))
+
+
+def _book_oxoacid_fragment(mol, frag: Set[int], attach_idx: int
+                           ) -> Optional[TerminalFragmentName]:
+    """A P or S oxoacid group (sulfo, phosphono, '[ethoxy(hydroxy)phosphoryl]oxy',...) is one
+    prefix read from the structure, the Blue Book;,:36484),
+    never an 'a' chain that threads its central atom,:6465); the kind 'ps'."""
+    from ..assembly.book_prefixes import forms_enabled
+    from .oxoacid_group_prefix import (
+        is_oxoacid_centre, is_oxoacid_linker, note_ps_form, oxoacid_group_prefix_ex,
+        ps_tier_ctx)
+    if not (ps_tier_ctx.get() and forms_enabled("ps")):
+        return None     # wider tiers only: PIN-path callers reach this writer too
+    if not (is_oxoacid_centre(mol, attach_idx) or is_oxoacid_linker(mol, attach_idx)):
+        return None
+    token, preferred = oxoacid_group_prefix_ex(mol, frag, attach_idx)
+    if token is None:
+        return None
+    note_ps_form(token, preferred)
+    return TerminalFragmentName(name=token, numbering={attach_idx: 1}, basis="chain",
                                 atoms=frozenset(frag))
 
 
@@ -823,6 +1010,10 @@ def _terminal_fragment_name_impl(
         return None
     if any(a >= mol.GetNumAtoms() for a in frag):
         return None
+    if book:
+        oxoacid = _book_oxoacid_fragment(mol, frag, attach_idx)
+        if oxoacid is not None:
+            return oxoacid
     # SCOPE, mirroring terminal_ring.py:582: a charged skeletal atom is,
     # not replacement nomenclature, and naming it neutral denotes a different
     # species.
@@ -863,10 +1054,30 @@ def _terminal_fragment_name_impl(
     acyl = _book_acyl_fragment(mol, frag, attach_idx)
     if acyl is not None:
         return acyl
+    # a chain the book allows as an 'a' chain the Blue Book) stays one
+    licensed_a = False
+    if book and any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in frag):
+        _bb = _backbone_from(mol, frag, attach_idx, _canonical_ranks(mol),
+                             stop_at_ring=not _is_acyclic(mol, frag))
+        _het = [a for a in _bb if mol.GetAtomWithIdx(a).GetAtomicNum() != 6]
+        # (:6465) ends and (:23348) four or more hetero atoms, at least one C
+        licensed_a = bool(_het) and (a_chain_licensed(mol, _bb) or (
+            len(_het) >= 4 and len(_het) < len(_bb)
+            and all(mol.GetAtomWithIdx(e).GetSymbol() in ("C", "P", "As", "Sb", "Bi", "Si", "Ge",
+                                                          "Sn", "Pb", "B", "Al", "Ga", "In", "Tl")
+                    for e in (_bb[0], _bb[-1]))))
+    _licensed_backbone = licensed_a
     if book:
+        group = None if licensed_a else _book_group_fragment(mol, frag, attach_idx)
+        if group is not None:
+            return group
         hetero = _book_hetero_fragment(mol, frag, attach_idx)
         if hetero is not None:
             return hetero
+        late_group = (None if licensed_a
+                      else _book_group_fragment(mol, frag, attach_idx, late=True))
+        if late_group is not None:
+            return late_group
         retained = _book_retained_fragment(mol, frag, attach_idx)
         if retained is not None:
             return retained
@@ -877,7 +1088,7 @@ def _terminal_fragment_name_impl(
                               stop_at_ring=_frag_has_ring)
     if (book and mol.GetAtomWithIdx(attach_idx).GetAtomicNum() == 6
             and not a_chain_licensed(mol, backbone)
-            and hetero_roots_composable(mol, backbone)):
+            and hetero_roots_composable(mol, backbone, group_leaves=forms_enabled('chain'))):
         # Roadmap N5c: (the Blue Book) and (:23348) allow an
         # 'a' chain only with C (or P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga, In, Tl)
         # ends, at least one carbon atom and four or more heterounits; otherwise the
@@ -962,6 +1173,14 @@ def _terminal_fragment_name_impl(
             elif any(b.GetBeginAtomIdx() in s and b.GetEndAtomIdx() in s
                      for s in _branch_sets):
                 continue  # inside a branch -> its own recursion emits the E/Z
+            elif book and not _licensed_backbone and forms_enabled('chain') and _ylidene_geometry(mol, b, numbering, branches):
+                # roadmap item 12a: the =N- group's bond to the backbone is cited with the
+                # backbone atom's locant, (1) method (a) (the Blue Book)
+                if not b.HasProp('_CIPCode') or b.GetProp('_CIPCode') not in ('E', 'Z'):
+                    return None
+                _bb_end = b.GetBeginAtomIdx() if b.GetBeginAtomIdx() in numbering \
+                    else b.GetEndAtomIdx()
+                _bits.append((numbering[_bb_end], b.GetProp('_CIPCode')))
             else:
                 return None  # off-backbone geometry we cannot place -> refuse
         if _bits:
@@ -1025,6 +1244,14 @@ def _terminal_fragment_name_impl(
         # acyclic methylidene one (a review ring-review R1).
         _bbn = next((n.GetIdx() for n in mol.GetAtomWithIdx(battach).GetNeighbors()
                      if n.GetIdx() in _backbone_set), None)
+        if (book and not _licensed_backbone and _bbn is not None
+                and mol.GetBondBetweenAtoms(battach, _bbn).GetBondType() == Chem.BondType.DOUBLE):
+            _yl = _book_ylidene_branch(mol, battach, comp, _bbn)
+            if _yl is not None:
+                accounted |= set(comp)
+                prefix_tokens.append((alpha_sort_key(_yl), locant, enclose_if_compound(_yl)))
+                raw_names.append(_yl)
+                continue
         if (_bbn is not None and mol.GetBondBetweenAtoms(battach, _bbn)
                 .GetBondType() != Chem.BondType.SINGLE):
             logger.info("terminal_fragment: branch at locant %s is joined by a "

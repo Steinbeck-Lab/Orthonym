@@ -317,6 +317,13 @@ _CANARY_DEFECT_REASONS = {
 #, the Blue Book), its raw PIN-tier name '4,7,8-trihydroxy-7,8-dihydroquinoline-
 # 2-carboxylic acid' is RT-exact (OPSIN 2.9.0 full key and FixedH InChI) and is a verified fixture
 # row (tests/integration/test_canary_rt75.py, tag 'bf RB-HYDRO').
+# N5b (2026-10-08) change-asserted-value: canary calls 180, 181 (the stereo-free ergostadienol and
+# stigmastadienediol) and 353 (the pentacyclic triterpenoid acid) left this table: a carbon-only
+# ortho-fused system with two rings of five or more members is named by fusion nomenclature, not
+# von Baeyer "Five-membered ring requirement", the Blue Book-23710), so their raw
+# PIN-tier names are real names now (previously the sentinel 'unknown organic compound'); each is
+# OPSIN 2.9.0 full-InChIKey exact (fresh java run outside the engine) and re-baselined in
+# tests/integration/test_canary_rt75.py (tag 'n5b RB-FUSION').
 # SMILES -> (current PIN-tier name with the gate off, class, canary call numbers).
 CANARY_KNOWN_DEFECTS = {
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O": (
@@ -423,14 +430,6 @@ CANARY_KNOWN_DEFECTS = {
         "N-heptanoyl(7aS)-3-amino-5,6,7,7a-tetrahydropyrrolizin-1(3aH)-one",
         "DK-NOTEXACT", (179,),
     ),
-    "C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C": (
-        "unknown organic compound",
-        "DK-NOTEXACT", (180,),
-    ),
-    "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C": (
-        "unknown organic compound",
-        "DK-NOTEXACT", (181,),
-    ),
     "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl": (
         "(1R,3r,5S)-tropan-3-yl 1H-indole-3-carboxylate—hydrogen chloride (1/1)",
         "DK-NOTEXACT", (182,),
@@ -498,10 +497,6 @@ CANARY_KNOWN_DEFECTS = {
     "OC1C2CC3CC1CC(O)(C3)C2": (
         "tricyclo[3.3.1.1^3,7]decane-1,4-diol",
         "DK-ADAM", (344,),
-    ),
-    "CC1(C)CC[C@]2(C(=O)O)CC[C@]3(C)C(=CC[C@@H]4[C@@]5(C)CC[C@H](O)C(C)(C)[C@@H]5CC[C@]43C)[C@@H]2C1": (
-        "unknown organic compound",
-        "DK-NOTEXACT", (353,),
     ),
     "C[C@@H]1CC[C@@H]2C=C(C(=O)O)[C@H]3C[C@](C)(C(=O)O)C[C@]132": (
         "(1S,4R,7R,8R,10S)-7,10-dimethyltricyclo[6.3.0.0^4,8]undec-2-ene-2,10-dicarboxylic acid",
@@ -890,7 +885,16 @@ def test_canary_not_rt_exact_rows_ship_no_wrong_name(smiles):
         assert name_is_rt_exact(r["name"], smiles), r
 
 
+#: DK-NOTEXACT rows whose raw name is OPSIN full-InChIKey exact since the zero-bridge reading of the
+#: bridged fused builder spells a ring system with heteroatoms (N5b step 2,,
+#: the Blue Book): the xfail is lifted for them. Re-baselined: 'COC1OC2(OC)CC3CCC(O)C(C)C3(C)
+#: C(OC)C2=C1C' is '2,4,9a-trimethoxy-3,4a,5-trimethyl-2,4,4a,5,6,7,8,8a,9,9a-decahydronaphtho[2,3-b]
+#: furan-6-ol' (canary call 600).
+_NOW_RT_EXACT = frozenset({"COC1OC2(OC)CC3CCC(O)C(C)C3(C)C(OC)C2=C1C"})
+
+
 @pytest.mark.parametrize("smiles", [
+    smi if smi in _NOW_RT_EXACT else
     pytest.param(smi, marks=pytest.mark.xfail(strict=True, reason=(
         "DK-NOTEXACT, canary call(s) %s: the raw (gate-off) PIN-tier producer gives a name "
         "that is not OPSIN full-InChIKey exact (wrong molecule, unparseable, "

@@ -3,7 +3,7 @@
 Covers:
 * ``get_polycyclic_iupac_locants`` derives numbering from the deterministic
   fusion engine for cataloged PAH whose ``iupac_numbering`` was never tabulated
-  (tetracene/chrysene/triphenylene/benz[a]anthracene/pentacene/picene), and
+  (tetracene/chrysene/triphenylene/tetraphene/pentacene/picene), and
   returns None (fail-closed) for systems the engine declines (fluorene: sp3 + a
   5-membered ring);
 * the fused-catalog coverage guard rejects subset-hallucinations
@@ -33,7 +33,7 @@ class TestEngineWiringIntoConsumer:
 
     @pytest.mark.parametrize("name", [
         "tetracene", "chrysene", "triphenylene",
-        "benz[a]anthracene", "benzo[c]phenanthrene", "pentacene", "picene",
+        "tetraphene", "benzo[c]phenanthrene", "pentacene", "picene",
     ])
     def test_empty_catalog_numbering_supplied_by_engine(self, name):
         entry = POLYCYCLIC_DATA[name]
@@ -99,7 +99,9 @@ class TestSubstitutedPahNaming:
 
     @pytest.mark.parametrize("smi,expected", [
         # angular / branched cata-fused (numbering engine)
-        ("Cc1ccc2ccc3cc4ccccc4cc3c2c1", "2-methylbenz[a]anthracene"),
+        # Polyaphenes: n=4 ortho-fused rings is "tetraphene", the PIN
+        # (the Blue Book;:25762 "2,6-di(tetraphen-1-yl)pyridine (PIN)").
+        ("Cc1ccc2ccc3cc4ccccc4cc3c2c1", "2-methyltetraphene"),
         ("Cc1ccc2c3ccccc3c3ccccc3c2c1", "2-methyltriphenylene"),
         ("Cc1ccc2ccc3c4ccccc4ccc3c2c1", "3-methylchrysene"),
         # 5-ring (coverage guard + picene data)

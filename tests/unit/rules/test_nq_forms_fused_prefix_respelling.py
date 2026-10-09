@@ -9,7 +9,12 @@ import pytest
 from orthonym import Orthonym
 
 ROWS = [
-    ("di(5-methyl-1-benzofuran-2-yl)methanol", "pin_unverified", [
+    # systematic_verified: the name breaks the PIN spelling rule ('di' before the
+    # substituted component '5-methyl-1-benzofuran-2-yl'; 'bis', 'tris'... are the numerical
+    # prefixes there, the Blue Book), which ``check_pin_spelling`` reports. The label used
+    # to read pin_unverified because the strict-twin demotion ran before the spelling check
+    # and hid it; the name is unchanged.
+    ("di(5-methyl-1-benzofuran-2-yl)methanol", "systematic_verified", [
         "OC(c1cc2cc(C)ccc2o1)c1cc2cc(C)ccc2o1",
         'c1(C)ccc2oc(cc2c1)C(c1cc2c(o1)ccc(C)c2)O',
         'c1c2cc(C)ccc2oc1C(c1cc2c(o1)ccc(c2)C)O',

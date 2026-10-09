@@ -256,7 +256,7 @@ CANARY_SUBSET = [
     ("Cc1ccc(O)c(C(C)C)c1", "2-isopropyl-4-methylphenol"),  #: phenol suffix routing
     ("OC(=O)/C=C\\C(=O)O", "(2Z)-but-2-enedioic acid"),
     ("OC(=O)c1ccccc1O", "2-hydroxybenzoic acid"),
-    ("c1ccc2c(c1)cc1ccc3ccccc3c1c2", "benz[a]anthracene"),
+    ("c1ccc2c(c1)cc1ccc3ccccc3c1c2", "tetraphene"),
     ("OCCO", "ethylene glycol"),
     ("OC(=O)CCCCC(=O)O", "hexanedioic acid"),
     ("OC(=O)CCC(=O)O", "butanedioic acid"),

@@ -20,12 +20,10 @@ name: release-please
 # approval on the `pypi` environment is only available once the repository is
 # public (see pypi-release.yml).
 #
-# Run in ONE home only. The same history is pushed to two repositories
-# (Kohulan/Orthonym and Beilstein-Institut/Orthonym). Only the home whose
-# repository variable RELEASE_HOME is 'true' runs this job, so the other home
-# never opens a release PR and never tags. Set that variable in exactly one home,
-# and it must be the home that the maintainer's local publish tooling pushes
-# first.
+# Run in ONE repository only: Steinbeck-Lab/Orthonym, the home that the maintainer's
+# local publish tooling pushes to. Only a repository whose variable RELEASE_HOME is
+# 'true' runs this job, so a fork (Beilstein-Institut/Orthonym is one) never opens a
+# release PR and never tags. Set that variable in the home only.
 #
 # Versions come from the Conventional Commit types of the commits after
 # `bootstrap-sha` (release-please-config.json) until the first release exists, and
@@ -61,7 +59,7 @@ jobs:
         with:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
-          # A personal access token is REQUIRED here. Both homes report
+          # A personal access token is REQUIRED here. The repository reports
           # can_approve_pull_request_reviews=false and default_workflow_permissions=read,
           # so the built-in GITHUB_TOKEN cannot open the release PR. A Release made
           # with the PAT also starts pypi-release.yml; one made with GITHUB_TOKEN

@@ -96,6 +96,18 @@ def _stereo_free_smiles(mol) -> str:
 
 
 def radical_identity_verdict(input_smiles: str, parsed_smiles: str) -> str:
+    """:func:`_radical_identity_verdict_impl`, memoised for the life of the process:
+    the verdict is a pure function of the two strings (RDKit parses and radical
+    profiles only; no provenance, no budget), so one process computes it once per
+    pair. ``ORTHONYM_MEMO=off|verify`` and ``ORTHONYM_PROCESS_CACHE=0`` bypass the
+    memo exactly as for ``fg_detect``."""
+    from ..assembly.memo import pure_cache_or_compute
+    return pure_cache_or_compute(
+        "radical_identity_verdict", (input_smiles, parsed_smiles),
+        lambda: _radical_identity_verdict_impl(input_smiles, parsed_smiles))
+
+
+def _radical_identity_verdict_impl(input_smiles: str, parsed_smiles: str) -> str:
     """``"n/a"`` when neither side carries a chemical radical (the caller's own
     checks decide), else ``"ok"`` or ``"mismatch"``. A radical input whose parse
     RDKit cannot read is a ``"mismatch"`` (fail closed)."""

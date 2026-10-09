@@ -44,6 +44,7 @@ from ..metrics.candidate_ledger import Stage as _LedgerStage
 from ..metrics.candidate_ledger import record_candidate as _ledger_record
 from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..rules.seniority import get_prefix
+from ..errors import CASCADE_REFUSAL
 from .naming_utils import SIMPLE_MULTIPLIERS, get_alkyl_name
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
 from .substituent_prefix_forms import _check_substituent_prefix_form
@@ -1602,7 +1603,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             logger.debug(
                 "P-29.2 guard: refused %r for a free valence of %d at atom %d",
                 token, free_valence, attach_idx)
-            return None if allow_mancude else "substituent"
+            return None if allow_mancude else CASCADE_REFUSAL
 
         # B2 stereo-completeness guard: a substituent whose fragment carries a
         # DEFINED-stereo double bond MUST cite its E/Z descriptor, else the token names
@@ -1625,7 +1626,7 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                     for b in bonds_of(mol)):
                 logger.debug("B2 stereo-completeness: refused %r (defined C=C, no E/Z)",
                              token)
-                return None if allow_mancude else "substituent"
+                return None if allow_mancude else CASCADE_REFUSAL
 
         # Phase B3 -- branch-fallback via the unconditional universal recursive
         # namer. The five-tier cascade above declined this branch (``token`` is the
@@ -1672,7 +1673,8 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
             try:
                 from .universal_substituent import name_universal_substituent_prefix
                 _uni = name_universal_substituent_prefix(
-                    mol, frag_atoms_set, attach_idx, bond_order=free_valence)
+                    mol, frag_atoms_set, attach_idx, bond_order=free_valence,
+                    cap_attachment=True)
             except Exception:  # a producer bug must never crash branch naming
                 _uni = None
             if _uni and not is_refusal_sentinel(_uni) and ' ' not in _uni:
@@ -2381,6 +2383,13 @@ def name_acid_linked_branch(mol, frag_atoms, attach_idx, principal_group,
     return None
 
 
+def _oxoacid_prefix_wanted() -> bool:
+    """True at the wider tiers with the book spellings on (P/S oxoacid group prefixes)."""
+    from ..rules.oxoacid_group_prefix import ps_tier_ctx
+    from .book_prefixes import forms_enabled
+    return bool(ps_tier_ctx.get()) and forms_enabled("ps")
+
+
 def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                               allow_mancude: bool = False):
     """Name any substituent fragment.
@@ -2433,7 +2442,7 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
 
     # Edge case: empty fragment
     if not frag_atoms_set:
-        return "substituent"
+        return CASCADE_REFUSAL
 
     # ---- (a phase -02): stereo-dropping tier double-apply guard ----
     # Tiers 0.5/1/1.5/1.6/2/3 build their prefix from a canonicalised fragment
@@ -2543,6 +2552,25 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                 mol, attach_idx, frag_atoms_set)
             if _sa is not None:
                 return _stereo_route(_sa)
+
+    # ---- Tier 0.56 / /: P / S oxoacid group ----
+    # A phosphorus or sulfur oxoacid group (sulfo, sulfonato, sulfooxy, phosphono,
+    # phosphonooxy, the phosphoryl and sulfonyl ester/amide/anhydride groups) is a
+    # substituent prefix read from the structure (rules/oxoacid_group_prefix.py);
+    # the generic tiers below spell its central atom as a skeletal 'a' atom of a
+    # chain ('1,1-dioxo-2-oxa-1lambda6-thiaethyl'). Wider tiers only: ``allow_mancude``
+    # is passed by PIN-path callers too (phosphorus.py, purine.py, heterocycles.py), so
+    # the gate is the wider-tier context and the book-spelling switch; a name this tier
+    # gives is a book form (``note_book_form``), so a name the gate rejects is built
+    # again with the mechanical spellings. The PIN default and the strict twin keep the
+    # old string.
+    if (allow_mancude and _oxoacid_prefix_wanted()
+            and attach_idx is not None and attach_idx in frag_atoms_set):
+        from ..rules.oxoacid_group_prefix import note_ps_form, oxoacid_group_prefix_ex
+        _og, _og_preferred = oxoacid_group_prefix_ex(mol, frag_atoms_set, attach_idx)
+        if _og is not None:
+            note_ps_form(_og, _og_preferred)
+            return _stereo_route(_og)
 
     # ---- Tier 0.6 / BB 1710): thiocyanato pseudohalide ----
     # The terminal thiocyanate group -S-C#N is ALWAYS cited as the substituent
@@ -3308,9 +3336,24 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
         _desc = _descriptive_fallback(mol, frag_atoms_set, attach_idx)
         if _desc != 'substituent':
             return _desc
+        # A fragment that carries a P/S oxoacid group is a decorated chain whose group is
+        # one prefix (Tier 0.56). Where the 'a'-replacement writer threads the group's
+        # central atom into a chain, the Blue Book: a chain is not
+        # terminated by O), the decoration composer below is offered first; the writer's
+        # own name stands when the composer declines or the writer names no 'a' chain.
         from ..rules.terminal_fragment import terminal_fragment_name
         _tf = terminal_fragment_name(mol, frag_atoms_set, attach_idx)
         if _tf is not None:
+            from ..rules.oxoacid_group_prefix import (
+                has_replacement_chain, is_oxoacid_centre)
+            if (_oxoacid_prefix_wanted() and has_replacement_chain(_tf.name)
+                    and any(is_oxoacid_centre(mol, _i) for _i in frag_atoms_set)):
+                _chain = _recursive_chain_fragment_substituent_name(
+                    mol, frag_atoms_set, attach_idx, allow_mancude=True)
+                if _chain is not None:
+                    from .book_prefixes import note_book_form
+                    note_book_form('ps')
+                    return _chain
             return _tf.name
         # ---- C4 : decorated acyclic-chain substituent -----------------
         # LAST resort for a chain-rooted multi-functional fragment the narrow
@@ -3409,7 +3452,7 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
         str: Always non-None, always non-empty.
     """
     if not frag_atoms:
-        return "substituent"
+        return CASCADE_REFUSAL
 
     # Wave2 constitution-conservation guard: a ring-bearing fragment down
     # here was declined by every honest namer (incl. the ring engine). The
@@ -3432,7 +3475,7 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
             # finding). The record now fires only at the best-effort ladder's TRUE
             # exhaustion in name_substituent (after the chain composer), so
             # blocker_detail reflects the real best-effort blocker.
-            return "substituent"
+            return CASCADE_REFUSAL
     except Exception:
         pass
 
@@ -3487,7 +3530,7 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
                 # Undecidable shape (bridge, aromatic linkage). Naming it
                 # 'methyl' would assert a single free valence this function
                 # cannot see; abstain instead.
-                return "substituent"
+                return CASCADE_REFUSAL
             return f"meth{suffix}"
 
     # Carbon-only fragments: use alkyl names
@@ -3580,7 +3623,7 @@ def _descriptive_fallback(mol, frag_atoms, attach_idx):
     from ..metrics.abstention import AbstentionCode, record_abstention
     record_abstention(AbstentionCode.BRANCH_UNNAMEABLE,
                       detail='enumerator_last_resort')
-    return "substituent"
+    return CASCADE_REFUSAL
 
 
 # ============================================================================
@@ -3984,8 +4027,8 @@ def _book_monocycle_core_tail(mol, core, attach_idx, deco_carriers):
     ('2H-pyran-3-yl', '1,3-oxazol-4-yl', 'cyclopropyl'; the Blue Book,
     , or ``None``. ``deco_carriers`` lists the core atom of each decoration
      (f) lowest locants)."""
-    from .book_prefixes import book_forms_enabled
-    if not book_forms_enabled():
+    from .book_prefixes import ring_forms_enabled
+    if not ring_forms_enabled():
         return None
     from ..rules.monocycle_forms import monocycle_form
     form = monocycle_form(mol, sorted(core), attach_idx, list(deco_carriers))

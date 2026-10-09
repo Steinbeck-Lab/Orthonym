@@ -45,8 +45,14 @@ class BridgedParent:
         ('2H,7H-4a,7-ethano-1-benzopyran',:14648)."""
         base = self.base[:-1] if elide and self.base.endswith("e") else self.base
         head = [p for p in (self.hydro, self.indicated_hydrogen) if p]
-        joint = "-" if base[:1].isdigit() else ""
-        return "-".join(head + [f"{self.bridges}{joint}{base}"])
+        joint = "-" if self.bridges and base[:1].isdigit() else ""
+        stem = f"{self.bridges}{joint}{base}"
+        if not self.bridges and not self.indicated_hydrogen and self.hydro:
+            # (the Blue Book): hydro prefixes stand "immediately at the front of
+            # the name of the parent hydride"; a stem that begins with a letter follows them
+            # without a hyphen ('decahydronaphthalene'), one that begins with a locant needs it
+            return self.hydro + ("-" if stem[:1].isdigit() or stem[:1] == "[" else "") + stem
+        return "-".join(head + [stem])
 
 
 # The suffixes the package spells -ol, -carboxylic acid,
@@ -124,6 +130,32 @@ def _pseudoketone_principal(mol, system: Set[int], groups) -> Optional[str]:
     return "ketone"
 
 
+#: functional-group classes that are parent hydrides of their own (urea, thiourea, guanidine, carbamic
+#: acid and its esters, cyanamide, carbamimidic esters) and that ``rules/seniority.SENIORITY_ORDER``
+#: does not rank, so ``get_principal_group`` answers None for a molecule that carries no ranked group
+#: besides them. (the Blue Book) "The preferred IUPAC name for the 'amidine'
+#: related to carbonic acid... is the retained name 'guanidine'"; (:34266) "In the
+#: presence of a characteristic group having seniority over guanidine (see item 11 in, the
+#: following prefixes are used": 'carbamimidoylamino' (preferred), never the 'guanidinyl' the
+#: substituent namer spells. Whether the ring system or such a parent is the parent of the molecule
+#: is the engine's choice, not this builder's.
+_UNRANKED_PARENT_CLASSES = ("urea", "thiourea", "guanidine", "carbamate", "carbamimidate", "cyanamide")
+
+#: the prefix the substituent namer spells for a guanidine group on the ring system, which the Blue
+#: Book does not print:34266 gives 'carbamimidoylamino'); a name that carries it is
+#: valid but never a PIN, so it is recorded as a non-PIN fragment (name-scoped, demote not delete)
+_GUANIDINE_PREFIX_SPELLED = "guanidinyl"
+
+
+def _unranked_groups_outside(mol, groups, system: Set[int]) -> Set[str]:
+    """The classes of ``_UNRANKED_PARENT_CLASSES`` with a connecting atom (one with two or more
+    heavy neighbours) outside the ring system. A ring-internal one, a cyclic carbamate or urea of
+    the ring system, has only terminal atoms outside it (its =O, =S, -NH2): a pseudoketone
+    (``_pseudoketone_principal``), not a parent of its own."""
+    return {cls for cls in _UNRANKED_PARENT_CLASSES for match in groups.get(cls) or ()
+            if any(mol.GetAtomWithIdx(a).GetDegree() > 1 for a in match if a not in system)}
+
+
 def principal_suffix(mol, system: Set[int]):
     """('none', None, set, set) when the principal characteristic group has no suffix;
     ('suffix', kind, ring atoms, exocyclic suffix atoms) for the suffixes the package spells;
@@ -136,6 +168,18 @@ def principal_suffix(mol, system: Set[int]):
     from ..seniority import get_principal_group
     groups = detect_functional_groups(mol)
     pg, _ = get_principal_group(mol, groups)
+    outside = _unranked_groups_outside(mol, groups, system)
+    if outside:
+        # no ranked group: the urea, guanidine or carbamate is the parent, not the ring system.
+        # A senior group (an acid, an ester,...) makes the ring the parent and the group a prefix
+        #:34266). The substituent namer spells a cyanamide as 'carbamoyl' (another
+        # molecule) and a guanidine as 'guanidinyl' (not the book's form, so never a PIN); the urea,
+        # thiourea and carbamate it does not spell at all.
+        if pg is None or "cyanamide" in outside:
+            return None
+        if "guanidine" in outside:
+            from ...metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(_GUANIDINE_PREFIX_SPELLED)
     if pg is None:
         return ("none", None, set(), set())
     if pg in _PSEUDOKETONE_CLASSES:
@@ -383,7 +427,74 @@ def build(mol) -> Optional[Tuple[str, Set[int], Dict[int, Any], bool]]:
     system = selection.ring_system(mol)
     if not system or not _other_ring_systems_are_junior(mol, system):
         return None
-    options = _options(mol, system)
+    return _name_options(mol, system, _options(mol, system))
+
+
+def _fused_options(mol, system: Set[int]):
+    """The one option of a fused ring system (carbocyclic or heterocyclic) that is its own parent
+    (``selection.fused_split``): the same ``(split, bridge prefixes, hydrogenation state,
+    numberings)`` tuple ``_options`` returns, with no bridge."""
+    split = selection.fused_split(mol, system)
+    if split is None:
+        return None
+    state = hydro.hydro_state(mol, split)
+    if state is None:
+        return None
+    nums = numbering.numberings(mol, split, [], [])
+    return [(split, [], state, nums)] if nums else None
+
+
+def _lone_pair_centre_in(mol, system: Set[int]) -> bool:
+    """True when a ring atom of ``system`` is a lone-pair stereocentre (P(III), As(III), S(IV),
+    Se(IV): three ligands and the lone pair). The descriptor the labeller gives such a centre on the
+    working molecule can be the other configuration than the input's (RDKit's reading of the
+    parity, ``namer._exit_lone_pair_check``), and the engine's exit check then withdraws the whole
+    name, leaving no fallback: the builder does not name it, and the older ring producers, which
+    carry the lone-pair handling, keep the molecule."""
+    from ...namer import _lone_pair_compared_atom
+    return any(mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+               and _lone_pair_compared_atom(mol.GetAtomWithIdx(a))
+               and mol.GetAtomWithIdx(a).GetTotalDegree() == 3 for a in system)
+
+
+def _isotope_labels_pending(mol, system: Set[int]) -> bool:
+    """True when the molecule is named without its isotope labels (``rules/isotopes.
+    decorate_isotopic_name`` names the stripped skeleton, then splices the descriptor in) and the
+    ring system has a heteroatom. (the Blue Book) puts the descriptor in front of
+    the part it modifies, and OPSIN 2.9.0 cannot read it on the heteroatom of an indicated-
+    hydrogen fusion name ('(2-2H)octahydro-1H-isoindole'), so no decoration of a fusion name
+    round-trips; the vonBaeyer path, whose '(8-2H)-8-azabicyclo[4.3.0]nonane' does, stays the name
+    of such an input as before this builder named hetero systems."""
+    from ...assembly.locant_omission import scope_has_isotopic_modification
+    return scope_has_isotopic_modification() and any(
+        mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in system)
+
+
+def build_fused(mol) -> Optional[Tuple[str, Set[int], Dict[int, Any], bool]]:
+    """The fusion name of ``mol`` whose largest ring system is an ortho- or ortho-
+    and peri-fused system with at least two rings of five or more members, in any hydrogenation
+    state, with substituent prefixes and the suffixes ``principal_suffix`` spells; the same
+    tuple as ``build``. (the Blue Book) gives such a system the fusion name as
+    its preferred IUPAC name ("When fusion names are not allowed, unsaturated von Baeyer ring
+    system names are preferred IUPAC names"); the hydrogenation is spelled as in ``build``
+     :16872,:16880,:24766) and the numbering is chosen by
+     (b)-(g) (:3246-:3307). None when the system is not that class or a step declines;
+    the caller keeps its older path."""
+    if mol is None:
+        return None
+    system = selection.ring_system(mol)
+    if not system or not _other_ring_systems_are_junior(mol, system):
+        return None
+    if _isotope_labels_pending(mol, system):
+        return None
+    if _lone_pair_centre_in(mol, system):
+        return None
+    return _name_options(mol, system, _fused_options(mol, system))
+
+
+def _name_options(mol, system: Set[int], options):
+    """The name of ``mol`` from the options of its ring system (``_options`` for a bridged
+    fused system, ``_fused_options`` for a fused one), or None."""
     if not options:
         return None
     # Splits still tied after (a)-(j) with the same parent and the same bridges are one
@@ -521,6 +632,34 @@ def _same_tautomer(mol, name: str) -> bool:
     return tautomer_verdict(Chem.MolToSmiles(mol), parsed) == "ok"
 
 
+def _same_tautomer_as_radical(mol, name: str) -> bool:
+    """OPSIN's reading of the '-yl' prefix ``name`` (a radical), its free valence capped with a
+    hydrogen atom, is the input's tautomer: equal fixed-H InChIs (``validation.protonation_identity.
+    tautomer_verdict``), the check ``_same_tautomer`` makes for a whole name. ``mol`` is the ring
+    system with the broken bond left as a hydrogen atom, so the capped parse is that hydride.
+    False when OPSIN cannot read the name or the verdict is not 'ok'."""
+    from ...jvm_bridge import opsin_stdout
+    from ...validation.opsin_roundtrip import _find_opsin_jar
+    from ...validation.protonation_identity import tautomer_verdict
+    jar = _find_opsin_jar("2.9.0")
+    text, served = opsin_stdout(name, True, jar) if jar else (None, False)
+    smiles = (text or "").strip()
+    parsed = Chem.MolFromSmiles(smiles) if served and smiles else None
+    if parsed is None:
+        return False
+    rw = Chem.RWMol(parsed)
+    for atom in rw.GetAtoms():
+        if atom.GetNumRadicalElectrons():
+            atom.SetNumRadicalElectrons(0)
+            atom.SetNoImplicit(False)
+    try:
+        capped = rw.GetMol()
+        Chem.SanitizeMol(capped)
+    except Exception:
+        return False
+    return tautomer_verdict(Chem.MolToSmiles(mol), Chem.MolToSmiles(capped)) == "ok"
+
+
 def build_substituent(mol, attach: int) -> Optional[str]:
     """The '-yl' prefix of a bare bridged fused ring system ``mol`` (a detached ring
     system whose free valence is on atom ``attach``, the broken bond left as a hydrogen),
@@ -530,7 +669,8 @@ def build_substituent(mol, attach: int) -> Optional[str]:
     followed by free valence suffix, and finally 'hydro' prefixes" -- the free valence
     takes the place of the suffix in (c) (:3256). Declined: a decorated ring
     system, a stereocentre, an indicated-hydrogen or hydro atom on or next to a ring
-    nitrogen (the whole name is not read back here)."""
+    nitrogen whose tautomer OPSIN's reading of the prefix does not share
+    (``_same_tautomer_as_radical``)."""
     if mol is None or attach is None:
         return None
     system = selection.ring_system(mol)
@@ -538,13 +678,33 @@ def build_substituent(mol, attach: int) -> Optional[str]:
         return None
     if any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms()):
         return None
-    options = _options(mol, system)
+    return _substituent_name(mol, system, attach, _options(mol, system))
+
+
+def build_fused_substituent(mol, attach: int) -> Optional[str]:
+    """The '-yl' prefix of a bare fused ring system ``mol``, carbocyclic or heterocyclic
+    (``selection.fused_split``), whose free valence is on atom ``attach``: the rules and declines of
+    ``build_substituent``."""
+    if mol is None or attach is None:
+        return None
+    system = selection.ring_system(mol)
+    if set(system) != {a.GetIdx() for a in mol.GetAtoms()} or attach not in system:
+        return None
+    if any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms()):
+        return None
+    if _isotope_labels_pending(mol, system):
+        return None
+    return _substituent_name(mol, system, attach, _fused_options(mol, system))
+
+
+def _substituent_name(mol, system: Set[int], attach: int, options) -> Optional[str]:
     if not options:
         return None
     if len({(o[0].parent, tuple(sorted(bp.name for bp in o[1]))) for o in options}) != 1:
         return None
     suffix = ("suffix", "yl", {attach}, set())
     scored = []
+    sensitive = False
     for sp, bps, state, nums in options:
         need = _lacking(state, "yl", {attach})
         for nb in nums:
@@ -553,8 +713,7 @@ def build_substituent(mol, attach: int) -> Optional[str]:
             if got is None:
                 continue
             ih, added, hydro_atoms = got
-            if _tautomer_sensitive(mol, set(ih) | set(added), hydro_atoms):
-                return None
+            sensitive = sensitive or _tautomer_sensitive(mol, set(ih) | set(added), hydro_atoms)
             key = (nb.attachment_set, nb.citation_order,
                    numbering.locant_tuple(a2l[a] for a in ih),
                    numbering.locant_tuple([a2l[attach]]),
@@ -567,6 +726,8 @@ def build_substituent(mol, attach: int) -> Optional[str]:
     if picked is None:
         return None
     name, parent, bps = picked
+    if sensitive and not _same_tautomer_as_radical(mol, name):
+        return None
     if any(not bp.is_pin_form for bp in bps):
         from ..bridged_fused import _record_general_bridge
         for bp in bps:

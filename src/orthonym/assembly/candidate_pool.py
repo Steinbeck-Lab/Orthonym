@@ -727,6 +727,34 @@ _TIER1_FILTERS: List[Callable[[List['CandidateName']], List['CandidateName']]] =
 ]
 
 
+def _label_chain_parent_prefix_seniority(name: str, features: Any) -> None:
+    """Label a chain-parent candidate below the PIN when makes another chain
+    of the same rank senior.
+
+    Every producer that names a cyclic molecule on a chain parent (the chain
+    catch-all, the amide, ester and polyfunctional producers,...) builds the name
+    on ``features.principal_chain`` and adds it here with those features, so the
+    check sits here once. ``perception.chains.chain_parent_prefix_seniority``
+    counts, locates and orders a ring bonded to a candidate chain as a prefix
+     to, the Blue Book,:21698,:21791), which the chain
+    selector does not do. ``'senior_alternative'``: the name is recorded as a
+    label-only non-PIN part (``systematic_verified``); ``'undecided'``: as an
+    uncertified PIN-form name (``pin_unverified``). Fail closed and label only:
+    the name stays, so the tiers below the PIN keep it.
+    """
+    if (not name or not getattr(features, 'chain_is_parent', False)
+            or not getattr(features, 'is_cyclic', False)):
+        return
+    from ..perception.chains import chain_parent_prefix_seniority
+    status = chain_parent_prefix_seniority(features)
+    if status == 'senior_alternative':
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name)
+    elif status == 'undecided':
+        from ..metrics.provenance import record_uncertified_pin_name
+        record_uncertified_pin_name(name)
+
+
 # ---------------------------------------------------------------------------
 # CandidatePool class — collects scored candidates from one assemble_name call
 # ---------------------------------------------------------------------------
@@ -977,6 +1005,10 @@ class CandidatePool:
             # isolated unit test scenario). Default to 0.5 (no-decision;
             # safe because FACTOR_WEIGHTS['parent_correctness']=0.0).
             cand.factors['parent_correctness'] = 0.5
+        # to counted with ring prefixes: a chain-parent name
+        # whose chain is not the senior one is labelled below the PIN (label only;
+        # the name, its read-back and every tier's name are unchanged).
+        _label_chain_parent_prefix_seniority(name, features)
         self._candidates.append(cand)
         if policy is not None and policy.direct_return:
             if self._direct_return_winner is None:

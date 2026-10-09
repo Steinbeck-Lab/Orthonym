@@ -70,7 +70,9 @@ AROMATIC_FUSED_CASES = [
     # predates the compound-locant-count/cited-set tiers in
     # ``VonBaeyerAnalyzer._unsaturation_locant_key`` (polycyclic.py) and was
     # an arbitrary atom-index backstop pick.
-    ("C1=Cc2cc3ccccc3cc2C1",            # as-indacene
+    # (the engine's own string; the full namer names this cage with its fusion name at
+    # both tiers, FUSION_NAMED_CAGES below)
+    ("C1=Cc2cc3ccccc3cc2C1",            # 1H-cyclopenta[b]naphthalene
      "tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene"),
     # 1-benzoxonine and 1-benzothionine used to be here: see
     # BENZO_HETERO_FUSION_CASES (their benzo names are the PINs).
@@ -79,6 +81,21 @@ AROMATIC_FUSED_CASES = [
     ("C1=CC=CC=Cc2ccccc2C1",            # benzocyclooctene
      "bicyclo[7.4.0]trideca-1(13),2,4,6,9,11-hexaene"),
 ]
+
+# Cages of AROMATIC_FUSED_CASES that the full namer names with the fusion name at BOTH
+# tiers (the engine alone still returns the von Baeyer polyene above). N5b: a carbon-only
+# ortho-fused system of two or more rings of five or more members is named by fusion
+# nomenclature, "Five-membered ring requirement" (the Blue Book-23710:
+# "Fusion nomenclature gives preferred IUPAC names only to compounds having at least two
+# rings of at least five or more members... When fusion names are not allowed,
+# unsaturated von Baeyer ring system names are preferred IUPAC names"); was: pin
+# abstains, complete 'tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene'. OPSIN 2.9.0
+# full-InChIKey exact (test_fusion_named_cages_round_trip).
+FUSION_NAMED_CAGES = {
+    "C1=Cc2cc3ccccc3cc2C1": "1H-cyclopenta[b]naphthalene",
+}
+_ABSTAINING_AROMATIC_FUSED_CASES = [
+    case for case in AROMATIC_FUSED_CASES if case[0] not in FUSION_NAMED_CAGES]
 
 # Benzene ortho-fused to a seven-membered ring: FUSION nomenclature gives the
 # PIN, so the full namer names both at BOTH tiers with the fusion PIN (not the
@@ -361,7 +378,7 @@ def test_names_opsin_roundtrip(smiles, expected, opsin_roundtrip):
 # --------------------------------------------------------------------------
 # Reproduce-first: the aromatic-fused cases ABSTAIN under the default pin path.
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,_expected", AROMATIC_FUSED_CASES)
+@pytest.mark.parametrize("smiles,_expected", _ABSTAINING_AROMATIC_FUSED_CASES)
 def test_pin_abstains(smiles, _expected, production_gate):
     pin = Orthonym(style="pin")
     out = pin.name(Chem.CanonSmiles(smiles))
@@ -372,12 +389,26 @@ def test_pin_abstains(smiles, _expected, production_gate):
 # --------------------------------------------------------------------------
 # complete-tier full namer emits the von-Baeyer polyene (PIN abstained first).
 # --------------------------------------------------------------------------
-@pytest.mark.parametrize("smiles,expected", AROMATIC_FUSED_CASES)
+@pytest.mark.parametrize("smiles,expected", _ABSTAINING_AROMATIC_FUSED_CASES)
 def test_complete_tier_emits(smiles, expected, production_gate):
     comp = Orthonym(style="pin", general_fallback=True,
                      allow_aromatic_general=True)
     out = comp.name(Chem.CanonSmiles(smiles))
     assert out == expected, f"{smiles}: complete gave {out!r} != {expected!r}"
+
+
+# --------------------------------------------------------------------------
+# N5b: the cages whose fusion name the full namer builds, at BOTH tiers, RT-exact.
+# --------------------------------------------------------------------------
+@pytest.mark.parametrize("smiles,expected", sorted(FUSION_NAMED_CAGES.items()))
+@pytest.mark.parametrize("tier", ["pin", "complete"])
+def test_fusion_named_cages_round_trip(smiles, expected, tier, production_gate):
+    from tests.support.rt_assert import assert_full_rt
+    namer = (Orthonym(style="pin") if tier == "pin" else
+             Orthonym(style="pin", general_fallback=True, allow_aromatic_general=True))
+    out = namer.name(Chem.CanonSmiles(smiles))
+    assert out == expected, f"{smiles}: {tier} gave {out!r} != {expected!r}"
+    assert_full_rt(out, smiles)
 
 
 # --------------------------------------------------------------------------

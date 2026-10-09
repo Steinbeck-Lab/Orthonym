@@ -678,8 +678,8 @@ def _book_monocycle(mol, ring, free_valence_atom) -> Optional[TerminalRingName]:
      (c) (:2913) 'cyclopropyl'. ``rules.monocycle_forms`` builds and audits
     the name; the numbering gives the substituents of the ring (every heavy neighbour
     outside it, less the free-valence bond) lowest locants (f))."""
-    from ..assembly.book_prefixes import book_forms_enabled
-    if not book_forms_enabled():
+    from ..assembly.book_prefixes import ring_forms_enabled
+    if not ring_forms_enabled():
         return None
     from .monocycle_forms import branch_carriers, monocycle_form
     ring_atoms = sorted(ring)

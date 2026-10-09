@@ -421,6 +421,19 @@ def tautomer_verdict(input_smiles: str, parsed_smiles: str) -> str:
 
 def protonation_site_verdict(input_smiles: str, parsed_smiles: str,
                              name: str = None) -> str:
+    """:func:`_protonation_site_verdict_impl`, memoised for the life of the process:
+    the verdict is a pure function of the three strings (RDKit parses and InChI
+    layers only; no provenance, no budget), so one process computes it once per
+    triple. ``ORTHONYM_MEMO=off|verify`` and ``ORTHONYM_PROCESS_CACHE=0`` bypass the
+    memo exactly as for ``fg_detect``."""
+    from ..assembly.memo import pure_cache_or_compute
+    return pure_cache_or_compute(
+        "protonation_site_verdict", (input_smiles, parsed_smiles, name),
+        lambda: _protonation_site_verdict_impl(input_smiles, parsed_smiles, name))
+
+
+def _protonation_site_verdict_impl(input_smiles: str, parsed_smiles: str,
+                                   name: str = None) -> str:
     """``"n/a"``, ``"ok"`` or ``"mismatch"``.
 
     Both structures carry a protonated heavy atom: ``"ok"`` if the fixed-H

@@ -155,7 +155,10 @@ def test_the_flag_does_not_leak_between_namings(monkeypatch):
 
 @pytest.mark.parametrize("frag_smiles,attach", [
     ("NS(=O)=O", 0),
-    ("c1ccc2c(c1)OCO2", 0),
+    # (2H-1,3-benzodioxole left this list: a fused ring system with a ring heteroatom has its
+    # fusion name at every tier,, the Blue Book; dibenzo[b,f]oxepine has no
+    # parent table, so only the best-effort vocabulary names it)
+    ("c1ccc2c(c1)C=Cc1ccccc1O2", 0),
 ])
 def test_the_two_flags_really_do_differ_for_these_fragments(frag_smiles, attach):
     """The premise, asserted rather than assumed. If a vocabulary fix later makes

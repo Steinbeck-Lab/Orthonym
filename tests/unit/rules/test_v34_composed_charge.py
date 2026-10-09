@@ -619,9 +619,13 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
     # In, Tl) ends, the Blue Book;:23348); otherwise the
     # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
     # '(R)amino', 'azaniumyl';:27633,:27667).
-    assert name == ("(5Z,8Z,11Z,14Z)-1-{[(1R)-2-(hexadecyloxy)-1-(3-hydroxy-7,7-"
-                    "dimethyl-3-oxo-2,4-dioxa-7-aza-3-phosphaoctan-7-ium-1-"
-                    "yl)ethyl]sulfanyl}-1-oxoicosa-5,8,11,14-tetraene")
+    # nq-forms-ps: the phosphoester group is the one prefix of
+    # (the Blue Book, "Compound and complex substituent groups"),
+    # '{[hydroxy(R-oxy)phosphoryl]oxy}', not the 'a' chain '3-oxo-2,4-dioxa-3-phosphaoctan-1-yl'
+    #,:6465: a chain is not terminated by O).
+    assert name == ("(5Z,8Z,11Z,14Z)-1-({(1R)-2-(hexadecyloxy)-1-[({hydroxy[2-"
+                    "(trimethylazaniumyl)ethoxy]phosphoryl}oxy)methyl]ethyl}sulfanyl)-"
+                    "1-oxoicosa-5,8,11,14-tetraene")
     assert verified == name
 
 
@@ -1091,5 +1095,5 @@ def test_ws_noabstain_p74_end_to_end_still_ships_full_via_floor():
     # In, Tl) ends, the Blue Book;:23348); otherwise the
     # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
     # '(R)amino', 'azaniumyl';:27633,:27667).
-    assert r.name == "(2S)-1-methyl-2-[oxido(oxo)methyl]-1-azacyclopentan-1-ium"
+    assert r.name == "(2S)-1-methyl-2-[oxido(oxo)methyl]pyrrolidin-1-ium"
     assert verify_or_none(r.name, smi) == r.name  # full-InChIKey CONFIRMED

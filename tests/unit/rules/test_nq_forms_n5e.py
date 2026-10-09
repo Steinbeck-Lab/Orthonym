@@ -114,15 +114,16 @@ def _row(smiles, tier):
     return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
-NILOTINIB = ("CC1=C(C=C(C(=O)NC2=CC(=CC(=C2)C(F)(F)F)N2C=NC(=C2)C)C=C1)NC1=NC=CC(=N1)"
-             "C=1C=NC=CC1")
+#: N-aryl carbamoyl prefixes of an acid parent (nilotinib now has its PIN, the benzamide, and
+#: no longer reaches the fallback writers; it is covered in test_nq_drugs_benzamide.py)
+CYCLOHEXANE_ACID = "OC(=O)C1CCC(CC1)C(=O)Nc1cc(cc(c1)C(F)(F)F)-n1cnc(C)c1"
+BENZOIC_ACID = "OC(=O)c1ccc(cc1)C(=O)Nc1cccc(c1)C(F)(F)F"
 
 #: rows whose name carried '-oxomethyl' (or an amide 'a' chain) at the base
 E2E = [
-    (NILOTINIB, "best-effort",
+    (CYCLOHEXANE_ACID, "best-effort",
      "{[3-(4-methyl-1H-imidazol-1-yl)-5-(trifluoromethyl)phenyl]carbamoyl}"),
-    (NILOTINIB, "valid",
-     "{[3-(4-methyl-1H-imidazol-1-yl)-5-(trifluoromethyl)phenyl]carbamoyl}"),
+    (BENZOIC_ACID, "valid", "{[3-(trifluoromethyl)phenyl]carbamoyl}"),
     ("CC(=O)NC(=O)NC1CCS(=O)(=O)C1", "best-effort", "[(acetylcarbamoyl)amino]"),
     ("O=C(Nc1ccccc1C(=O)O)OCC1c2ccccc2-c2ccccc21", "best-effort",
      "{[(9H-fluoren-9-yl)methoxy]carbonyl}amino"),

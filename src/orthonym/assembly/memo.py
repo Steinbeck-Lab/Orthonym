@@ -80,6 +80,10 @@ pin_promotion_var = contextvars.ContextVar("orthonym_pin_promotion", default=Fal
 _PROMOTION_INDEPENDENT = frozenset({
     "fg_detect", "sugar_c_substituted", "opsin_extended_smiles",
     "polycyclic.main_ring_struct",
+    # five process-wide pure namespaces keyed by SMILES strings alone: an InChIKey,
+    # two identity verdicts, an offer match and a fragment seniority score
+    "self_consistency_full_key", "full_inchikey_offer_match",
+    "protonation_site_verdict", "radical_identity_verdict", "score_fragment_seniority",
 })
 
 
@@ -98,12 +102,29 @@ prefixes_apart_var = contextvars.ContextVar("orthonym_prefixes_apart", default=F
 #: key, so the caches below key them apart, as for the promotion re-run.
 book_forms_var = contextvars.ContextVar("orthonym_book_forms", default=True)
 
+#: The kinds of book spelling kept inside ``book_prefixes.mechanical_forms(keep_forms=...)``:
+#: every writer gives its mechanical spelling except those of the kept kinds ('ring': the
+#: single-ring names of ``rules.monocycle_forms``). A middle rung of the retry that follows a
+#: book-spelled name no round trip confirmed: one failing spelling must not take the kept
+#: kinds with it.
+kept_forms_var = contextvars.ContextVar("orthonym_kept_forms", default=frozenset())
+
+
+#: The kinds of book spelling switched OFF inside ``book_prefixes.book_forms_minus(kinds)``: every
+#: writer gives its book spelling except those of the dropped kinds ('chain': the N/O group
+#: prefixes and 'cyano'). The rung that follows a book-spelled name no round trip confirmed when
+#: the failing spelling is one kind: the other book spellings stay.
+dropped_forms_var = contextvars.ContextVar("orthonym_dropped_forms", default=frozenset())
+
 
 def _ck(namespace, key):
     """The cache key for ``(namespace, key)`` in the current run (see above)."""
     if namespace in _PROMOTION_INDEPENDENT:
         return (namespace, key)
-    tag = () if book_forms_var.get() else ("mechanical-forms",)
+    tag = () if book_forms_var.get() else (
+        ("mechanical-forms",) + tuple(sorted(kept_forms_var.get())))
+    if dropped_forms_var.get():
+        tag = tag + ("minus",) + tuple(sorted(dropped_forms_var.get()))
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
             return (namespace, key, "pin-promotion", "prefixes-apart") + tag
