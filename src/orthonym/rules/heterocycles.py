@@ -4691,6 +4691,44 @@ def _retained_heteroatom_locant_prefix(
     return ",".join(str(loc) for loc in expected) + "-"
 
 
+_STEREO_BLOCK_IN_NAME = re.compile(r'[(,]\d*[EZRSrsMP][a-z]?[),]')
+_LEADING_STEREO_BLOCK = re.compile(r'^\([^()]*\)-$')
+
+
+def _with_native_stereo_block(mol, sub_atoms, attach_idx, sub_name):
+    """``sub_name`` with the stereodescriptor block of its own prefix, when the fragment
+    has a defined stereo element and ``sub_name`` cites none.
+
+     'NAMING OF STEREOISOMERS' (the Blue Book, sentence:44643) cites a substituent's
+    descriptor "at the front of the corresponding prefix" ('4-hydroxy-6-[(1E)-3-oxobut-1-en-1-yl]-2H-pyran-2-one'). The
+    fragment namer leaves it out for an oxo-bearing alkenyl ('3-oxobut-1-en-1-yl'), and the
+    descriptor was then put back at the FRONT of the whole name with the substituent's own
+    locants ('(1E)-4-hydroxy-6-(3-oxobut-1-en-1-yl)-2H-pyran-2-one'), where it cites the
+    ring's locant 1. The recursive namer cites it natively; its name is used only when it is
+    the fragment namer's name with a descriptor block in front, so no atom is added or
+    dropped by the substitution."""
+    if not sub_name or _STEREO_BLOCK_IN_NAME.search(sub_name):
+        return sub_name
+    frag = set(sub_atoms)
+    stereo = any(
+        b.GetBondType() == Chem.BondType.DOUBLE
+        and b.GetStereo() in (Chem.BondStereo.STEREOE, Chem.BondStereo.STEREOZ,
+                              Chem.BondStereo.STEREOCIS, Chem.BondStereo.STEREOTRANS)
+        and b.GetBeginAtomIdx() in frag and b.GetEndAtomIdx() in frag
+        for b in bonds_of(mol))
+    if not stereo:
+        return sub_name
+    try:
+        from ..assembly.substituent_enumerator import name_substituent as _rec_name_substituent
+        cand = _rec_name_substituent(mol, list(sub_atoms), attach_idx)
+    except Exception:  # noqa: BLE001 -- keep the fragment namer's name
+        return sub_name
+    if (isinstance(cand, str) and cand.endswith(sub_name) and len(cand) > len(sub_name)
+            and _LEADING_STEREO_BLOCK.match(cand[:-len(sub_name)])):
+        return cand
+    return sub_name
+
+
 def _n_anchored_substituent_covers(mol, sub_name: str, sub_atoms) -> bool:
     """Gate-INDEPENDENT atom-coverage check for an N/O/S-anchored ring substituent
     named by the recursive ``name_substituent``.
@@ -4890,6 +4928,8 @@ def name_substituted_heterocycle(
                     sub_name = name_substituent_fragment(
                         mol, sub_atoms, attach_idx, list(ring_set_local)
                     )
+                    sub_name = _with_native_stereo_block(
+                        mol, sub_atoms, attach_idx, sub_name)
                 # #29: an N/O/S-anchored COMPOUND substituent (acetamido,
                 # methylamino, methanesulfonamido,...). name_substituent_fragment
                 # above is carbon-anchored only and mis-roots these (an N-attached
@@ -5047,6 +5087,24 @@ def name_substituted_heterocycle(
     # order; an N-substituent with no identical partner keeps its place.
     _chosen_suffix_early = (_choose_ring_suffix(principal_group, suffix_fg)[0]
                             if suffix_fg else None)
+    # (the Blue Book, 'SENIORITY ORDER FOR CLASSES'): the name cites ONE
+    # class as its suffix; every other suffix-capable ring group is a substituent
+    # prefix ('carbamoyl', 'carboxy', 'cyano', 'formyl',...) cited in the
+    # alphanumerical series with the others, never dropped. This used to be done
+    # after the name was assembled, by editing ``prefix_str`` when the ring had no
+    # other prefix and by nothing at all when it had one ('1-methyl-...-3-carboxylic
+    # acid' lost the 2-carbamoyl), and it joined '2-carbamoyl' to a hydro-locant
+    # parent without a hyphen ('2-carbamoyl3,6-dihydro-...'). A group whose
+    # nitrogen carries substituents, or a suffix with no prefix form, cannot be
+    # cited from here: decline the candidate rather than cite a different group.
+    for _sfx_name, _sfx_locs in suffix_fg.items():
+        if _sfx_name == _chosen_suffix_early:
+            continue
+        _sfx_prefix = _SUFFIX_TO_PREFIX.get(_sfx_name)
+        if (_sfx_prefix is None or suffix_n_substituents.get(_sfx_name)
+                or _sfx_name in suffix_n_hydroxy):
+            return None
+        c_groups.setdefault(_sfx_prefix, []).extend(_sfx_locs)
     _suffix_n_entries = _suffix_nitrogen_prefix_entries(
         _chosen_suffix_early, suffix_fg, suffix_n_substituents, amine_n_by_locant,
         suffix_n_hydroxy)
@@ -5414,27 +5472,9 @@ def name_substituted_heterocycle(
             combined = ("N-hydroxy-" if _starts_with_locant(combined)
                         else "N-hydroxy") + combined
 
-        # Remaining suffix FGs become prefixes (carboxy, formyl, etc.)
-        _SUFFIX_TO_PREFIX = {
-            'carboxylic acid': 'carboxy',
-            'carbaldehyde': 'formyl',
-            'carboxamide': 'carbamoyl',
-            'carbohydrazide': 'hydrazinecarbonyl',  # C1
-            'carbonitrile': 'cyano',
-            'carboximidamide': 'carbamimidoyl',  #
-            'carbothioamide': 'carbamothioyl',
-            'carboselenoamide': 'carbamoselenoyl',
-            'carbotelluroamide': 'carbamotelluroyl',
-        }
-        for suf_name, suf_locants in suffix_fg.items():
-            if suf_name == chosen_suffix:
-                continue
-            prefix_name = _SUFFIX_TO_PREFIX.get(suf_name, suf_name)
-            prefix = _format_c_substituent(prefix_name, sorted(suf_locants), len(suf_locants))
-            if prefix_str:
-                prefix_str = f"{prefix}-{prefix_str}" if prefix_str[0].isdigit() else f"{prefix}{prefix_str}"
-            else:
-                combined = f"{prefix}{combined}"
+        # The suffix classes this name does not cite were demoted to prefix groups
+        # (``c_groups``) above, so they are alphabetized with the ring prefixes and
+        # joined to the parent with the rest of the prefix string.
 
     # Assemble with stereo prefix if present
     if stereo_descriptors:
@@ -5546,6 +5586,22 @@ _RING_SUFFIX_PRIORITY = (
     'carbonitrile', 'carbaldehyde',
     'carbothioamide', 'carboselenoamide', 'carbotelluroamide',
 )
+
+#: The prefix form of each ring suffix, for a suffix-capable ring group that is not
+#: the class the name cites as its suffix: one class is the principal
+#: characteristic group; / give each its prefix: 'carboxy', 'carbamoyl',
+#: 'cyano', 'formyl',...).
+_SUFFIX_TO_PREFIX = {
+    'carboxylic acid': 'carboxy',
+    'carbaldehyde': 'formyl',
+    'carboxamide': 'carbamoyl',
+    'carbohydrazide': 'hydrazinecarbonyl',  # C1
+    'carbonitrile': 'cyano',
+    'carboximidamide': 'carbamimidoyl',  #
+    'carbothioamide': 'carbamothioyl',
+    'carboselenoamide': 'carbamoselenoyl',
+    'carbotelluroamide': 'carbamotelluroyl',
+}
 
 #: The ring suffixes whose nitrogen carries the ``N``-locanted substituents
 #: collected by the ring collector (``amine_n_substituents``).

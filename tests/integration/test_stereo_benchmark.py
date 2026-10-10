@@ -150,7 +150,13 @@ _TIER_CONTRACT = {
 # Small stereo compounds (<=20 HA, 58 non-RT at v6.0 baseline)
 # ---------------------------------------------------------------------------
 SMALL_STEREO_COMPOUNDS = [
-    ('C[C@@H]([NH3+])P(=O)([O-])[O-]', '(1S)-1-azaniumylethane-1-phosphonate'),  # MISSING_STEREO - wrong parent
+    # s00, leads program L4 item 30b: was '(1S)-1-azaniumylethane-1-phosphonate', the suffix form
+    # that "Substitution of mononuclear noncarbon oxoacids with hydrogen atoms attached
+    # to the central atom (substitutable hydrogen)" (the Blue Book) rejects ('ethylphosphonic
+    # acid (PIN) (not ethanephosphonic acid)',:35461; Note:35457). The functional-parent name is
+    # OPSIN 2.9.0 full-InChIKey exact (asserted by _assert_demoted); the row stays a known non-PIN
+    # (the azaniumyl zwitterion label), only its spelling moved.
+    ('C[C@@H]([NH3+])P(=O)([O-])[O-]', '[(1S)-1-azaniumylethyl]phosphonate'),  # MISSING_STEREO - wrong parent
     ('O=C([O-])/C=C/C(=O)O.[Na+]', None),  # a phase: partial salt hydrogen prefix
     ('CC[C@H](C)[C@H](N)C(=O)[O-]', '(2S,3S)-2-amino-3-methylpentanoate'),  # a phase: amino acid stereo injection
     ('N[C@H](C[13C](=O)O)[13C](=O)O', '(2R)-2-amino(1,4-13C2)butanedioic acid'),  # fix: dioic acid via polyfunctional pipeline

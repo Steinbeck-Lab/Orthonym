@@ -229,7 +229,10 @@ def test_determinism(smiles):
     ("COP(=O)(O)O", "methyl dihydrogen phosphate"),
     ("OP(=O)(O)OCC", "ethyl dihydrogen phosphate"),
     ("CP(=O)(O)O", "methylphosphonic acid"),
-    ("OCCP(=O)(O)O", "2-hydroxyethane-1-phosphonic acid"),
+    # leads program L4, item 30b: (the Blue Book) 'ethylphosphonic acid (PIN)
+    # (not ethanephosphonic acid)' (:35461): the acid is a functional parent, not a suffix; the
+    # old string was '2-hydroxyethane-1-phosphonic acid' (OPSIN reads both to one InChIKey).
+    ("OCCP(=O)(O)O", "(2-hydroxyethyl)phosphonic acid"),
     ("OCCOP(=O)(O)O", "2-(phosphonooxy)ethan-1-ol"),
     ("OC(=O)CP(=O)(O)O", "phosphonoacetic acid"),
     ("c1ccccc1CP(=O)(O)O", "benzylphosphonic acid"),

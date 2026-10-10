@@ -244,6 +244,18 @@ def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
         all_carbon = all(
             mol.GetAtomWithIdx(idx).GetSymbol() == 'C' for idx in ring
         )
+        # The 'cyclo<alk>anecarboxylic' stem names a SATURATED ring (e)(i),
+        # the Blue Book: an 'ene' ending is part of the parent hydride's name and is
+        # cited with its own locant). A ring with a double bond has no
+        # name here: 'methyl cyclohexanecarboxylate' for 'COC(=O)C1=CCCCC1' dropped the
+        # 'ene' and described a different molecule. Return None so the caller names
+        # the acid component with the general pipeline ('methyl cyclohex-1-ene-1-
+        # carboxylate') -- the same route a ring acid this table cannot spell takes.
+        if all_carbon and any(
+                mol.GetBondBetweenAtoms(ring[i], ring[(i + 1) % len(ring)]).GetBondType()
+                != Chem.BondType.SINGLE
+                for i in range(len(ring))):
+            return None
         if all_carbon:
             ring_size = len(ring)
             stem = get_chain_prefix(ring_size)
@@ -1484,17 +1496,17 @@ def _build_ester_acid_word(
 
             # Build exclude set: carbonyl C, carbonyl O(s), ester O, alkyl atoms
             ester_o = ester_match[2] if len(ester_match) > 2 else None
-            carbonyl_o_set = set()
-            for idx in acid_atoms:
-                atom = mol.GetAtomWithIdx(idx)
-                if atom.GetSymbol() == 'O':
-                    for bond in atom.GetBonds():
-                        nbr_atom = bond.GetOtherAtom(atom)
-                        # Only match true carbonyl O (O=C), not nitro O (O=N)
-                        if (bond.GetBondTypeAsDouble() == 2.0
-                                and nbr_atom.GetSymbol() == 'C'):
-                            carbonyl_o_set.add(idx)
-                            break
+            # Only THIS ester's carbonyl oxygen is part of the ester group. The
+            # carbonyl oxygen of another group on the ring (a carbamoyl, a formyl,
+            # an acyl) belongs to that group's substituent: excluding it from the
+            # substituent walk named C(N)=O 'aminomethyl' and C=O 'methyl' --
+            # 'methyl 2-(aminomethyl)benzoate' for methyl 2-carbamoylbenzoate.
+            carbonyl_o_set = {
+                nbr.GetIdx()
+                for nbr in mol.GetAtomWithIdx(carbonyl_c).GetNeighbors()
+                if nbr.GetIdx() in acid_set and nbr.GetSymbol() == 'O'
+                and mol.GetBondBetweenAtoms(carbonyl_c, nbr.GetIdx()).GetBondTypeAsDouble() == 2.0
+            }
             exclude = set(alkyl_atoms) | carbonyl_o_set | {carbonyl_c}
             if ester_o is not None:
                 exclude.add(ester_o)

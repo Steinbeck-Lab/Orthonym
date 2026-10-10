@@ -37,6 +37,7 @@ IUPAC cite: (principal chain vs ring competition).
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any, Optional
 
 from ..name_tree import NameTreeNode, NamingResult
@@ -142,6 +143,89 @@ def _benzene_is_phenol(features: Any) -> bool:
                     and nbr.GetDegree() == 1:
                 return True
     return False
+
+
+#: An indicated hydrogen written in the open ('2H-', '1H,6H-', '4aH-').
+_INDICATED_HYDROGEN_IN_TEXT = re.compile(r'\d+[a-z]?H(?:,|-)')
+
+#: An added-hydrogen group ('(1H)', '(1H,3H)', '(4aH)') as 'quinolin-2(1H)-one' spells it.
+_ADDED_HYDROGEN_GROUP = re.compile(r'\(\d+[a-z]?H(?:,\d+[a-z]?H)*\)')
+
+#: The principal-group classes whose ring C=O (C=S, C=Se, C=Te) a fusion parent cites as the
+#: '-one' ('-thione',...) suffix.
+_RING_KETONE_PGS = ('ketone', 'thioketone', 'selenoketone', 'telluroketone')
+
+
+def _parent_part_spells_ring_hydrogen(name: str) -> bool:
+    """True when the PARENT's own part of ``name`` spells an indicated or added hydrogen: an
+    added-hydrogen group ('(1H)', '(1H,3H)') or an indicated hydrogen ('2H-', '1H,6H-') outside every
+    enclosing mark that wraps a substituent prefix. A substituent's own hydrogen
+    ('4-[(5-acetyl-1H-pyrrol-2-yl)methyl]...', '7-(1H-pyrrol-3-yl)...') belongs to that substituent's
+    ring and says nothing about the parent. A reading of the finished name, never a rewrite of it."""
+    depth = 0
+    top = []
+    i = 0
+    while i < len(name):
+        if depth == 0:
+            added = _ADDED_HYDROGEN_GROUP.match(name, i)
+            if added:
+                return True
+        ch = name[i]
+        if ch in '([{':
+            depth += 1
+        elif ch in ')]}':
+            depth = max(0, depth - 1)
+        elif depth == 0:
+            top.append(ch)
+        i += 1
+    return _INDICATED_HYDROGEN_IN_TEXT.search(''.join(top)) is not None
+
+
+def _complex_ring_hydrogen_unspelled(features: Any, complex_result: Any,
+                                     name: str) -> bool:
+    """True when ``name`` cites a ring C=O of its fusion parent as the suffix but does not spell
+    the indicated or added hydrogen that the shared rule (``rules.ring_hydrogen``) places under
+    the numbering the name was built with.
+
+     (the Blue Book, 'Added indicated hydrogen'): a ketone of a mancude parent is
+    'quinolin-2(1H)-one (PIN)' (:28334), 'naphthalen-1(2H)-one (PIN)' (:24699); (:3721)
+    "in a preferred IUPAC name a locant and the symbol 'H' must be cited". 'quinolin-2-one' and
+    'phthalazin-1-one' describe the right molecule (OPSIN adds the hydrogen itself) but are not
+    the PIN, and the fusion producer that writes them (``fused_rings._apply_suffix_to_core``)
+    has no ring-hydrogen step on this path.
+
+    An AUDIT of the finished name against the rule, never a rewrite, and deliberately narrow: a
+    name is flagged only when the rule places indicated or added hydrogen on an ortho- or
+    ortho- and peri-fused system AND the PARENT part of the name spells no indicated or added
+    hydrogen ('phthalazin-1-one', also when a substituent spells its own '1H-pyrrol-2-yl'). A parent
+    that spells some ('2H-1-benzopyran-2-one', 'quinolin-2(1H)-one', '1H,6H-...-1-one')
+    is the producer's own placement and is not second-guessed; a ring the rule declines, a
+    bridged or spiro system, and a ring with no hydrogen to place are not flagged."""
+    try:
+        if getattr(features, 'principal_group', None) not in _RING_KETONE_PGS:
+            return False
+        mol = features.mol
+        a2l = getattr(complex_result, 'atom_to_locant', None)
+        # the atoms the name numbers: the fusion parent (``ring_atoms`` lists every ring atom
+        # of the molecule, a substituent's ring included)
+        ring = set(a2l or ()) & set(getattr(complex_result, 'ring_atoms', None) or ())
+        if not a2l or not ring or ring != set(a2l):
+            return False
+        suffix = {m[1] for m in (getattr(features, 'principal_group_atoms', None) or ())
+                  if len(m) > 1 and m[1] in ring and mol.GetAtomWithIdx(m[1]).GetAtomicNum() == 6}
+        if not suffix:
+            return False
+        from ...rules import ring_hydrogen as _rh
+        from ...rules.fused_forms import is_fusable_system
+        if not is_fusable_system(mol, ring):
+            return False
+        locants = {a: a2l[a] for a in ring}
+        rh = _rh.ring_hydrogen(mol, ring, suffix, locants)
+        if rh is None or not (rh.added or rh.indicated):
+            return False
+        return not _parent_part_spells_ring_hydrogen(name)
+    except Exception:  # noqa: BLE001 -- not decidable: leave the label as it is
+        return False
 
 
 def name_tier_a_ring(
@@ -413,6 +497,12 @@ def name_tier_a_ring(
                         # PIN: it is labelled below it.
                         from ...metrics.provenance import record_non_pin_fragment
                         record_non_pin_fragment(complex_name)
+                if _complex_ring_hydrogen_unspelled(features, complex_result, complex_name):
+                    # (the Blue Book): valid, round-trip verified, but not the
+                    # PIN -- the ring '-one' lacks its added/indicated hydrogen; the PIN tier
+                    # declines it and the wider tiers ship it below the PIN.
+                    from ...metrics.provenance import record_non_pin_fragment
+                    record_non_pin_fragment(complex_name)
                 _complex_result_for_injection = complex_result
                 _complex_cand = _tier_a_pool.add(
                     complex_name, 'complex_ring', features,

@@ -11,7 +11,7 @@ Handles:
 """
 
 from collections import Counter, deque
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
@@ -409,6 +409,9 @@ def _find_central_atom(mol, atoms: Tuple[int, ...], symbol: str) -> Optional[int
     return None
 
 
+_NITRO_PATTERN = Chem.MolFromSmarts("[#6][NX3+](=O)[O-]")
+
+
 def _organyl_or_junior_prefix(mol, c_idx: int, central_idx: int) -> Optional[str]:
     """Name the organyl rooted at ``c_idx`` (parent-side neighbour ``central_idx``)
     as a detachable prefix for a pnictogen-oxoacid parent.
@@ -452,8 +455,16 @@ def _organyl_or_junior_prefix(mol, c_idx: int, central_idx: int) -> Optional[str
             if j == central_idx or j in frag:
                 continue
             stack.append(j)
+    # A charge-separated nitro group ([N+](=O)[O-]) is a neutral substituent drawn as an
+    # ion pair, 'nitro'), not an ion; every other charge is an ion, senior to the
+    # acid, and defers.
+    nitro_atoms: set = set()
+    for m in mol.GetSubstructMatches(_NITRO_PATTERN):
+        nitro_atoms.update(m)
     for a in frag:                          # ion / radical -> senior class, defer
         at = mol.GetAtomWithIdx(a)
+        if a in nitro_atoms:
+            continue
         if at.GetFormalCharge() != 0 or at.GetNumRadicalElectrons() != 0:
             return None
 
@@ -905,6 +916,52 @@ def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str
     return _name_pnictogen_inic_acid(mol, phosphinic_atoms, 'P')
 
 
+#: Organo-oxoacids with a substitutable hydrogen on the central atom: the principal
+#: group name -> the namer of ``{organyl}{stem} acid``.
+_ONIC_ACID_NAMERS = {
+    "phosphonic_acid": name_phosphonic_acid,
+    "phosphinic_acid": name_phosphinic_acid,
+    "arsonic_acid": name_arsonic_acid,
+    "arsinic_acid": name_arsinic_acid,
+    "stibonic_acid": name_stibonic_acid,
+    "stibinic_acid": name_stibinic_acid,
+}
+
+
+def name_oxoacid_functional_parent(mol, group_name: str, matches) -> Optional[str]:
+    """The substituent-prefix name of a molecule whose principal group is a phosphonic,
+    phosphinic, arsonic, arsinic, stibonic or stibinic acid, or None.
+
+     "Substitution of mononuclear noncarbon oxoacids with hydrogen atoms attached to
+    the central atom (substitutable hydrogen)" (the Blue Book): the acid is a functional
+    parent whose central-atom hydrogen is substituted, so the carbon framework is a prefix on
+    the acid word ('ethylphosphonic acid (PIN) (not ethanephosphonic acid)',:35461;
+    '[2-(methoxysulfonyl)phenyl]phosphonic acid (PIN)',,:36540). Its Note
+    (:35457) rejects the suffix method ('benzenephosphonic acid').
+
+    OFFERED to the suffix assemblers (polyfunctional, ring): they build the acid as a suffix only
+    when this builder declines. One acid group is required (several are named multiplicatively,
+    ``rules.multiplicative``), and the organyl must be nameable as a prefix by the namers of
+    ``_organyl_or_junior_prefix``; the name covers every atom outside the acid group, which the
+    callers' round-trip verification confirms."""
+    try:
+        namer = _ONIC_ACID_NAMERS.get(group_name)
+        if namer is None or not matches or len(matches) != 1:
+            return None
+        name = namer(mol, tuple(matches[0]))
+        if not name:
+            return None
+        # Offered only as a PIN-vocabulary name: an organyl the wider tiers spell with a
+        # skeletal-replacement or similar non-PIN form ('5-hydroxy-5-oxo-6-oxa-5-arsahexyl') is
+        # worse than the suffix form it would replace, so the suffix assembly keeps that row.
+        from .pin_vocabulary import non_pin_vocabulary
+        if non_pin_vocabulary(name):
+            return None
+        return name
+    except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
+        return None
+
+
 def _p_ester_owner_group(mol, o_idx: int, p_idx: int) -> Optional[str]:
     """Name the -O-R ester owner R as a substituent token (recursive namer).
 
@@ -1249,6 +1306,59 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
         pieces.append(hyd)
     pieces.append(f"{stem_prefix}{stem}")
     return " ".join(pieces)
+
+
+#: The functional-class ester name carries the stereodescriptors inside its owners
+#: ('2-aminoethyl (2S)-2,3-dihydroxypropyl hydrogen phosphate'). The ``phosphate_ester`` handler
+#: (``assembly/handlers/phosphate_ester.py``) asks the stereo injector for a front-of-name block
+#: without declaring that scope, and the injector adds a second, misplaced one
+#: ('(2S)-2-aminoethyl...'), which is accepted when OPSIN happens to read it and rejected
+#: otherwise. So a molecule that has stereo is not offered the ester rank. HELD at False, by
+#: measurement: with the handler scope declared and this switch True the 188-molecule phosphate set
+#: improves (0 rows lost) but six existing tests fail, because the decomposition engine scores and
+#: names fragments through ``get_principal_group`` and cannot compose a fragment named by a
+#: functional-class ester (the GPI mannoside's raw name space-joins four fragment names at the
+#: pin, valid and complete tiers; the ceramide-phosphoinositol raw name drops the N-substituent).
+#: Item 42c of the L4 report lists what stands before the switch can be True.
+_OFFER_STEREO_OWNERS = False
+
+
+def _has_stereo(mol) -> bool:
+    """True when an atom carries a chiral tag or a double bond a stereo specification."""
+    for a in mol.GetAtoms():
+        if a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+            return True
+    for b in mol.GetBonds():
+        if b.GetStereo() != Chem.BondStereo.STEREONONE:
+            return True
+    return False
+
+
+def phosphate_ester_offered(mol, matches) -> bool:
+    """True when the functional-class name of the molecule's single acyclic phosphoric-acid
+    ester can be built (:func:`name_phosphate_ester` returns a name that covers every atom).
+
+    The offer behind the principal-group rank of ``rules.seniority.get_principal_group``
+     class 9, the Blue Book; "Esters of mononuclear noncarbon
+    oxoacids",:35916): the class outranks the amines, hydroxy compounds, ketones, aldehydes
+    and nitriles only when its name can be written. More than one ester match, a phosphorus
+    ring atom (a cyclic ester is named as a heterocycle) or a charged phosphorus is never
+    offered."""
+    try:
+        if not matches or len(matches) != 1:
+            return False
+        p_idx = next((a for a in matches[0]
+                      if mol.GetAtomWithIdx(a).GetSymbol() == 'P'), None)
+        if p_idx is None:
+            return False
+        p = mol.GetAtomWithIdx(p_idx)
+        if p.IsInRing() or p.GetFormalCharge() != 0:
+            return False
+        if not _OFFER_STEREO_OWNERS and _has_stereo(mol):
+            return False
+        return name_phosphate_ester(mol, p_idx) is not None
+    except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
+        return False
 
 
 def name_phosphate_ester_anion(mol, phosphorus_idx: int) -> Optional[str]:
@@ -1734,11 +1844,23 @@ def name_phosphoanhydride_oxy_substituent(
         return 'phosphonooxy'
     # General phosphoryl bridge: cite branches in alphanumerical order,
     # then 'phosphoryl', wrapped and attached via the linking O -> '...oxy'
-    # method 1). Enclose each branch that is complex (carries a locant or
-    # its own enclosure); a bare 'hydroxy' stays unenclosed.
+    # method 1). Identical branches are multiplied, not repeated:
+    # "General methodology" (the Blue Book), point (a), "Simple components are...
+    # unsubstituted prefixes... All of these are multiplied by the multiplicative prefixes
+    # di..." (:7031) -- 'dimethoxyphosphoryl' (:55874), '3-[(dimethoxyphosphoryl)sulfanyl]
+    # propanoic acid (PIN)' "Compound and complex substituent groups",
+    #:36327/:36335). (:7272): "the first cited substituent never has
+    # enclosing marks unless it includes a locant. The second and further substituents are
+    # each enclosed with parentheses even for simple substituents." A bare 'hydroxy' after an
+    # enclosed branch stays unenclosed, the Blue Book's own lipid spelling
+    # '(2-aminoethoxy)hydroxyphosphoryl' (:55180).
     from ..assembly.naming_utils import (_is_fully_enclosed, alpha_sort_key,
-                                         apply_enclosing_marks)
-    ordered = sorted(branches, key=alpha_sort_key)
+                                         apply_enclosing_marks, enclose_if_compound,
+                                         multiplied_component)
+    counts: Dict[str, int] = {}
+    for t in branches:
+        counts[t] = counts.get(t, 0) + 1
+    ordered = sorted(counts, key=alpha_sort_key)
 
     # The marks ESCALATE past any inside the branch and inside the body
     #, the Blue Book: nesting '{[({})]}'). A raw '(...)' /
@@ -1750,7 +1872,18 @@ def name_phosphoanhydride_oxy_substituent(
             return tok
         return apply_enclosing_marks(tok, -1)
 
-    body = ''.join(_enc(t) for t in ordered) + 'phosphoryl'
+    parts: List[str] = []
+    for pos, tok in enumerate(ordered):
+        if counts[tok] > 1:
+            parts.append(multiplied_component(counts[tok], tok, tok))
+        elif pos == 0:
+            parts.append(tok if tok == 'hydroxy' else enclose_if_compound(tok))
+        elif tok == 'hydroxy' and parts[-1].endswith((')', ']', '}')):
+            parts.append(tok)
+        else:
+            parts.append(apply_enclosing_marks(tok, -1)
+                         if tok == 'hydroxy' else _enc(tok))
+    body = ''.join(parts) + 'phosphoryl'
     return apply_enclosing_marks(body, -1) + 'oxy'
 
 

@@ -1905,7 +1905,18 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
     prefix; a neutral molecule (a charge suffix on a fused parent is the ring-ion
     producers'); every substituted ring atom takes a numbered locant. Substituents,
     their order and marks, and the parent-scope stereo come from the same
-    helpers as ``_emit_ring_from_analysis``."""
+    helpers as ``_emit_ring_from_analysis``.
+
+    The one suffix the assembly tier does cite: the ring C=O groups of the fusion parent
+    when no group senior to ketones is present (``_ketone_class_ring_suffix_atoms``).
+     (the Blue Book) names a ketone of a mancude parent by 'added indicated
+    hydrogen' ('naphthalen-1(2H)-one (PIN)',:28418; 'quinolin-2(1H)-one (PIN)',:28334), and
+     (PSEUDOKETONES,:29370) counts the ring lactams, the lactones and the hidden amides
+    in that class: '1-oxo-1,2-dihydrophthalazine' is the parent with its group demoted to a
+    prefix, which (:29446) allows only where a senior group is present or the C=O
+    cannot be the suffix. The hidden amide is then the acyl prefix of the ring that holds its
+    nitrogen ('azetidine-1-carbonyl'). The form is built by ``fused_forms.fused_system_ketone_form``;
+    a ring it does not read keeps the prefix spelling."""
     from ..rules.fused_forms import fused_system_form, locant_key
     from .substituent_enumerator import discover_substituents, name_substituent
 
@@ -1917,10 +1928,21 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
     carriers = [a for a in sorted(ring_set)
                 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
                 if nb.GetIdx() not in ring_set and nb.GetAtomicNum() > 1]
-    form = fused_system_form(mol, sorted(ring_set), None, carriers)
-    if form is None:
-        return None
-    a2l = dict(form.numbering)
+    suffix_atoms = (_ketone_class_ring_suffix_atoms(mol, features, ring_set)
+                    if suppress_principal_group and getattr(features, 'principal_group', None)
+                    else None)
+    ketone_form = None
+    if suffix_atoms:
+        from ..rules.fused_forms import fused_system_ketone_form
+        ketone_form = fused_system_ketone_form(
+            mol, sorted(ring_set), suffix_atoms,
+            [a for a in carriers if a not in suffix_atoms])
+    form = None
+    if ketone_form is None:
+        form = fused_system_form(mol, sorted(ring_set), None, carriers)
+        if form is None:
+            return None
+    a2l = dict((ketone_form or form).numbering)
     ordered = sorted(ring_set, key=lambda i: locant_key(a2l[i]))
     try:
         subs = discover_substituents(
@@ -1932,8 +1954,14 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
         return _refuse("partition incomplete: unassigned atoms")
     groups: Dict[str, List] = {}
     bindings: List[TokenBinding] = []
+    suffix_o: set = set()
     for sub in subs:
         frag = set(sub.frag_atoms)
+        if (ketone_form is not None and sub.attach_mol_idx in suffix_atoms
+                and len(frag) == 1
+                and mol.GetAtomWithIdx(next(iter(frag))).GetAtomicNum() == 8):
+            suffix_o.update(frag)   # the =O of a ring '-one' is the suffix, not an 'oxo' prefix
+            continue
         attach_nbrs = [n.GetIdx() for n in
                        mol.GetAtomWithIdx(sub.attach_mol_idx).GetNeighbors()
                        if n.GetIdx() in frag]
@@ -1945,6 +1973,8 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
         bindings.append(TokenBinding(tuple(sorted(frag)), prefix, 'prefix'))
+    if ketone_form is not None and len(suffix_o) != len(suffix_atoms):
+        return _refuse("ring '-one' atoms do not match the substituent partition")
     entries = []
     for prefix, locs in groups.items():
         locs = sorted(locs, key=locant_key)
@@ -1954,12 +1984,71 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
         entries.append((_alpha_key(prefix), ','.join(map(str, locs)) + '-' + text))
     entries.sort(key=lambda t: t[0])
     joined = '-'.join(tok for _k, tok in entries)
-    parent = form.parent
+    if ketone_form is not None:
+        parent = ketone_form.join()
+        bindings.append(TokenBinding(tuple(sorted(ring_set)), ketone_form.parent_token(),
+                                     'parent'))
+        bindings.append(TokenBinding(tuple(sorted(suffix_o)), 'one', 'suffix'))
+    else:
+        parent = form.parent
+        bindings.append(TokenBinding(tuple(sorted(ring_set)), parent, 'parent'))
     name = (joined + ('-' if parent[:1].isdigit() else '') + parent) if joined else parent
     name = _apply_parent_stereo(name, mol, a2l)
-    bindings.append(TokenBinding(tuple(sorted(ring_set)), parent, 'parent'))
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
                                stereo_atom_to_locant=dict(a2l))
+
+
+#: Perceived classes that are NOT entries of ``SENIORITY_ORDER`` (the perception reads them as a
+#: whole: an acyclic urea, carbamate, carbamimidate, guanidine or cyanamide; a ring urea is read as
+#: ring C=O) and still rank above ketones. 'Seniority order of urea among amides'
+#: (the Blue Book), sentence:33386: "Amides are ranked in the same way as the corresponding
+#: acids (see " -- class 11 of Table 4.1 (:18184), the chalcogen analogue (thiourea) with it;
+#: (:34266) puts guanidine under 'item 11 in '; (:33529) names
+#: cyanamide the amide of cyanic acid; a carbamate and a carbamimidate are esters (class 9,:18182)
+#: of carbamic and carbamimidic acid,:30758).
+_UNRANKED_SENIOR_TO_KETONES = frozenset({
+    'urea', 'thiourea', 'carbamate', 'carbamimidate', 'guanidine', 'cyanamide'})
+
+
+def _ketone_class_ring_suffix_atoms(mol, features, ring_set) -> Optional[frozenset]:
+    """The ring carbons of ``ring_set`` whose C=O is cited as the '-one' suffix of the ring
+    parent, or None when the molecule has a group the suffix may not outrank.
+
+    Ketones, pseudoketones and heterones are one class, the Blue Book), below
+    the acids, the acid derivatives, the amides, the imides and the nitriles and above the
+    alcohols and amines 'SENIORITY ORDER FOR CLASSES',:18158, classes 16 and 17). A
+    group of the perceived classes that ranks above ketones keeps the C=O a prefix, except a
+    hidden amide -- an acyl group on a ring nitrogen -- which (:29370) names as a
+    pseudoketone ('Acyclic pseudoketones, including those in which the carbonyl group is linked
+    to a heteroatom of a heterocycle (hidden amides, for instance), are named substitutively
+    by using the suffix 'one''). The perceived classes outside ``SENIORITY_ORDER`` that rank
+    above ketones (``_UNRANKED_SENIOR_TO_KETONES``) keep it a prefix as well."""
+    groups = getattr(features, 'functional_groups', None) or {}
+    from ..rules.pseudoketones import _AMIDE_FGS, is_hidden_amide
+    from ..rules.seniority import SENIORITY_ORDER
+    ketone_rank = SENIORITY_ORDER.index('ketone')
+    for name, matches in groups.items():
+        if matches and name in _UNRANKED_SENIOR_TO_KETONES:
+            return None
+        if not matches or name not in SENIORITY_ORDER:
+            continue
+        if SENIORITY_ORDER.index(name) >= ketone_rank:
+            continue
+        for match in matches:
+            if name in _AMIDE_FGS and is_hidden_amide(mol, match) is not None:
+                continue
+            return None
+    atoms = set()
+    for match in groups.get('ketone', ()):
+        c = match[1]
+        atom = mol.GetAtomWithIdx(c)
+        if c not in ring_set or atom.GetAtomicNum() != 6:
+            continue
+        if any(nb.GetAtomicNum() == 8 and nb.GetIdx() not in ring_set and nb.GetDegree() == 1
+               and mol.GetBondBetweenAtoms(c, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
+               for nb in atom.GetNeighbors()):
+            atoms.add(c)
+    return frozenset(atoms) or None
 
 
 def _ring_parent_bindings(cage, name: str, parent_block: str
@@ -2310,7 +2399,10 @@ def name_general_monocycle(
         oriented, atom_to_locant = _orient_carbocycle(
             mol, parent_ring, sub_positions, pg_ring_atoms)
         parent_name = _carbocycle_parent_name(mol, oriented, atom_to_locant)
-    if not parent_name or 'unknown' in parent_name.lower():
+    # A hetero ring that carries a ring ketone/lactone '-one' is named below by the shared
+    # hydrogen rule under the numbering in use, so the bare-ring name may be missing here.
+    _ring_one = has_hetero and suffix_core == 'one'
+    if (not parent_name or 'unknown' in parent_name.lower()) and not _ring_one:
         return _refuse("monocycle parent name underivable")
     if any(i not in atom_to_locant for i in ring_set):
         return _refuse("ring atom missing from numbering")
@@ -2350,6 +2442,30 @@ def name_general_monocycle(
             mol.GetAtomWithIdx(i).GetIsAromatic()
             for m in pg_matches for i in m if i in ring_set):
         return _refuse("ring ketone on aromatic carbon (added-H not built)")
+
+    # / (the Blue Book,:24689): the hydrogen of a hetero ring that
+    # carries a ring '-one' is that of its mancude parent with the group accommodated, under
+    # the numbering the suffix selects ('5,6-dihydro-2H-pyran-2-one', 'oxepin-3(2H)-one'):
+    # the shared rule the composer applies to every heteromonocycle with an exocyclic
+    # double bond. A fixed-locant retained row ('3,6-dihydro-2H-pyran') cannot follow the
+    # numbering and named another isomer here; the bare-ring name is only the fallback.
+    _added_hydrogen = ''
+    if _ring_one and pg_locants:
+        from ..rules.heterocycles import (
+            heteromonocycle_parent_with_hydrogen,
+            heteromonocycle_ring_hydrogen,
+        )
+        _one_subs = {loc: [{'is_suffix': True, 'suffix_name': 'one'}]
+                     for loc in pg_locants}
+        _hyd = heteromonocycle_ring_hydrogen(
+            mol, parent_ring, _one_subs, atom_to_locant)
+        if _hyd is not None:
+            _hyd_parent = heteromonocycle_parent_with_hydrogen(
+                mol, parent_ring, _hyd[0], atom_to_locant)
+            if _hyd_parent is not None:
+                parent_name, _added_hydrogen = _hyd_parent, _hyd[1]
+    if not parent_name or 'unknown' in parent_name.lower():
+        return _refuse("monocycle parent name underivable")
 
     # --- substituent prefixes (universal recursion; mirror name_general_ring) ---
     ordered_ring = sorted(ring_set, key=lambda i: atom_to_locant[i])
@@ -2425,11 +2541,17 @@ def name_general_monocycle(
         suffix_text = _ring_suffix_text(suffix_core, pg_locants)
         if suffix_text is None:
             return _refuse("unsupported suffix multiplicity/placement")
+        if _added_hydrogen:
+            # 'oxepin-3(2H)-one': the added hydrogen follows the last suffix locant
+            _loc_end = suffix_text.index('-', 1)
+            suffix_text = (suffix_text[:_loc_end] + f"({_added_hydrogen})"
+                           + suffix_text[_loc_end:])
         # (c) for a lone suffix ('cyclohexanone (PIN)' the Blue Book,
         # 'cyclohexanethiol (PIN)':2917): the same deny-by-default licence the
         # composer's ring-suffix path uses (bare saturated carbocycle + one
         # suffix heteroatom, BB-evidenced suffix classes only).
-        if not prefix_parts and len(pg_locants) == 1 and features is not None:
+        if (not prefix_parts and len(pg_locants) == 1 and features is not None
+                and not _added_hydrogen):
             from .handlers._handler_shared import _ring_suffix_locant_is_trivial
             if _ring_suffix_locant_is_trivial(features, oriented, atom_to_locant):
                 suffix_text = suffix_core
@@ -2906,10 +3028,12 @@ def _name_terminal_ring_assembly(
         from ..metrics.candidate_ledger import Scope as _LScope
         from ..metrics.candidate_ledger import Stage as _LStage
         from ..metrics.candidate_ledger import record_candidate as _lrecord
+        # a name that cites its ring '-one' as the suffix is not a suffix-free name
+        _suffix_free = bool(_pg) and not any(b.role == 'suffix' for b in fused.bindings)
         _lrecord(TERMINAL_RING_ASSEMBLY_SITE, _LStage.PRODUCED, fused.name,
                  scope=_LScope.MOLECULE,
-                 detail=f"basis:fused_book suffix_free:{bool(_pg)}")
-        if _pg:
+                 detail=f"basis:fused_book suffix_free:{_suffix_free}")
+        if _suffix_free:
             from ..metrics.provenance import record_suffix_free_prefix_name
             record_suffix_free_prefix_name(True)
         return fused

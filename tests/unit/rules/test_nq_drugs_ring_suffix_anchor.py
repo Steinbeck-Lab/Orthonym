@@ -25,9 +25,11 @@ def test_a_carbocycle_keeps_the_principal_groups_suffix_at_locant_1(smiles, name
 
 
 @pytest.mark.parametrize("smiles,name", [
-    ("COC(=O)C1=CCCN(C)C1C(N)=O",
-     "6-carbamoyl-5-(methoxycarbonyl)-1-methyl-1,2,3,6-tetrahydropyridine"),
-    ("COC(=O)C1=CCCOC1C(N)=O", "5-(methoxycarbonyl)-3,6-dihydro-2H-pyran-6-carboxamide"),
+    # The two hydro-heterocycle rows that stood here ('COC(=O)C1=CCCN(C)C1C(N)=O' and
+    # 'COC(=O)C1=CCCOC1C(N)=O') named an amide or a '(methoxycarbonyl)' prefix because the ring
+    # writer dropped its non-cited ring group; they are now the ester names
+    # 'methyl 2-carbamoyl-...-3-carboxylate' (PIN,: esters 9 above amides 11), pinned with an
+    # OPSIN full-InChIKey read-back in test_leads_l5_item22.py (leads item 22).
     ("O=C1OCC(C(N)=O)C1C", "3-methyl-2-oxooxolane-4-carboxamide"),
 ])
 def test_a_hydro_heterocycle_with_an_ester_and_an_amide_keeps_main_s_name(smiles, name):

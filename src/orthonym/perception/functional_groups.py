@@ -1078,8 +1078,22 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
                     if not _het_matches:
                         continue
                     if _sym == 'O':
+                        # Ketones, pseudoketones and heterones are ONE class,
+                        # the Blue Book, 'There is no seniority order difference
+                        # between ketones and pseudoketones'): the class holds the SMARTS
+                        # ketones AND the ring heterones, each carbonyl carbon once. A
+                        # heterone was registered only when no SMARTS ketone existed, so
+                        # beside a chain ketone the ring C=O was dropped, the parent
+                        # selection counted one ketone (on the chain) and none on the ring,
+                        # and the chain won over a ring that carries ring C=O,
+                        #:24096, 'a ring is always selected as the parent hydride').
                         if _cls not in results:
                             results[_cls] = _het_matches
+                        else:
+                            _read_ketone_cs = {_m[1] for _m in results[_cls]}
+                            results[_cls] = list(results[_cls]) + [
+                                _m for _m in _het_matches
+                                if _m[1] not in _read_ketone_cs]
                         continue
                     # a chalcogen analogue only where no ketone is read at all, one
                     # class at a time (S before Se before Te), on carbons no other
