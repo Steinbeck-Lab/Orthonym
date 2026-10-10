@@ -58,6 +58,19 @@ def test_the_pin_rows_keep_their_label(smiles, name):
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
 
 
-def test_a_chain_that_is_not_the_senior_one_is_still_not_certified():
-    row = Orthonym(style="pin").name_tiered("N#CC(CO)Cc1cccc([N+](=O)[O-])c1")
-    assert row["tier"] != "pin_verified", row
+def test_the_senior_chain_is_built_and_certified():
+    # Leads item N8b. The chain handed to parent selection is the one makes senior
+    # (ring branches counted as prefixes), so this row is the PIN and is certified; it was the
+    # name below the PIN ('3-hydroxy-2-[(3-nitrophenyl)methyl]propanenitrile') and not certified
+    # while the ring atoms were left out of the prefix count. (the Blue Book,
+    # '**** The preferred IUPAC name is based on the senior parent structure that has the
+    # lower locant or set of locants for substituents cited as prefixes... in their order of
+    # citation in the name'): the two chains hold two prefixes at {2,3}, and the order of
+    # citation gives (2,3) for 'hydroxymethyl' then 'nitrophenyl' against (3,2) for 'hydroxy'
+    # then '(nitrophenyl)methyl'.
+    from tests.support.rt_assert import name_is_rt_exact
+    smiles = "N#CC(CO)Cc1cccc([N+](=O)[O-])c1"
+    pin = "2-(hydroxymethyl)-3-(3-nitrophenyl)propanenitrile"
+    assert name_is_rt_exact(pin, smiles), pin
+    row = Orthonym(style="pin").name_tiered(smiles)
+    assert (row["name"], row["tier"]) == (pin, "pin_verified"), row

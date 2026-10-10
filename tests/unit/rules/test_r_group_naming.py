@@ -13,8 +13,12 @@ class TestSubstitutedRGroupNaming:
 
     def test_chlorophenyl_isocyanate(self):
         result = name_compound("Clc1ccc(N=C=O)cc1")
-        assert "chloro" in result, f"Expected 'chloro' in '{result}'"
-        assert "isocyanate" in result, f"Expected 'isocyanate' in '{result}'"
+        # ISOCYANATES (the Blue Book),:26001: the PIN is the substitutive
+        # 'isocyanato' prefix on the parent hydride, not the functional-class
+        # 'R isocyanate' (:26009 'isothiocyanatobenzene (PIN) phenyl isothiocyanate').
+        # OPSIN 2.9.0 reads '1-chloro-4-isocyanatobenzene' to the input's full InChIKey
+        # (tests/unit/rules/test_leads_l7_43c.py).
+        assert result == "1-chloro-4-isocyanatobenzene", result
 
     def test_methylphenyl_boronic_acid(self):
         result = name_compound("Cc1ccc(B(O)O)cc1")
@@ -32,7 +36,9 @@ class TestSubstitutedRGroupNaming:
 
     def test_unsubstituted_phenyl_isocyanate_unchanged(self):
         result = name_compound("c1ccc(N=C=O)cc1")
-        assert "phenyl isocyanate" == result, f"Expected 'phenyl isocyanate', got '{result}'"
+        # (the Blue Book,:26001, example:26009): the PIN is
+        # 'isocyanatobenzene'; 'phenyl isocyanate' is the non-PIN functional-class synonym.
+        assert "isocyanatobenzene" == result, f"Expected 'isocyanatobenzene', got '{result}'"
 
     def test_unsubstituted_phenylboronic_acid_unchanged(self):
         result = name_compound("c1ccc(B(O)O)cc1")

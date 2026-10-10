@@ -546,8 +546,11 @@ class TestUniformMultiplierBracketStepUp:
         # ⚠ MANDATORY hazard guard: apply_enclosing_marks routes a leading (2H)
         # through _INDICATED_H_RE and would return ((2H)methyl) (parens, no step-up)
         # instead of [(2H)methyl]; OPSIN-RT is blind to that bracket-level error. The
-        # branch is scoped to NON-hydrogen nuclides, so a deuterium uniform multiplier
-        # fails closed here (el == 'H') BEFORE any candidate is built.
+        # branch used to be scoped to NON-hydrogen nuclides for that reason; it now steps
+        # the marks up with a stand-in descriptor (leads L7 / 17b: tests/unit/rules/
+        # test_leads_l7_17b.py pins 'tetra[(2H3)methyl]silane' and the stand-in itself).
+        # With no molecule to read a candidate back against (``original`` None) it places
+        # nothing, whichever the nuclide.
         from orthonym.rules.isotopes import _decorate_uniform_multiplier
         assert _decorate_uniform_multiplier(
             "1,2-dimethylbenzene", [((2, "H"), 2, 1)], None, None) is None

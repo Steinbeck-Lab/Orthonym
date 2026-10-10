@@ -48,10 +48,26 @@ class TestTask91EtaCarveOut:
         )
 
     def test_cymantrene_systematic_name_ships_gated(self):
+        # Cymantrene is the NEUTRAL complex: Mn(+1) with Cp(-1) and three CO.
+        # The previous input here, "[Mn].c1cc[cH-]c1.3CO", is the ANION (Mn(0)
+        # + Cp(-1), net -1) and was asserted to ship the neutral name -- a
+        # wrong name (leads program N8c). Re-asserted: the neutral input keeps
+        # the name; the anion is declined (test_cymantrene_anion_declines).
         assert (
-            Orthonym().name("[Mn].c1cc[cH-]c1.[C-]#[O+].[C-]#[O+].[C-]#[O+]")
+            Orthonym().name("[Mn+].c1cc[cH-]c1.[C-]#[O+].[C-]#[O+].[C-]#[O+]")
             == "tricarbonyl(η⁵-cyclopentadienyl)manganese"
         )
+
+    def test_cymantrene_anion_declines(self):
+        # 'Compounds with at least one metal-carbon single bond'
+        # (the Blue Book): a charged complex carries its charge number,
+        # 'pentaammine(ethanido)osmium(1+) chloride' (:39793). The name
+        # 'tricarbonyl(η⁵-cyclopentadienyl)manganese' states a neutral complex,
+        # so it does not describe the net -1 input; the engine declines rather
+        # than ship a wrong structure (core principle 2).
+        smi = "[Mn].c1cc[cH-]c1.[C-]#[O+].[C-]#[O+].[C-]#[O+]"
+        assert Chem.GetFormalCharge(Chem.MolFromSmiles(smi)) == -1
+        assert Orthonym().name(smi) == "manganese compound (not supported)"
 
     def test_tricarbonyl_cycloheptatrienyl_molybdenum_abstains_lossy_ligand(self):
         # (item 4, PREP-T4): the LIGAND_ETA_DEFAULTS key 'C1=CC=CC=CC=1'

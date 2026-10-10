@@ -1784,23 +1784,246 @@ def _lone_pair_standard_spelling(smiles: Optional[str]) -> Optional[str]:
 
 #: The lone-pair input scope of this thread's outermost public naming call
 #: (``_lone_pair_input_enter``): ``open``, and ``rewrite`` = (the string named, the
-#: caller's string as written, the atom order) when the two differ, else None.
+#: caller's string as written, the atom order, whether stereo groups were cleared)
+#: when the string named is not the caller's, else None. "As written" is the caller's
+#: string, or the string with its stereo-group members cleared when that was named
+#: (:func:`_enhanced_stereo_cleared_spelling`).
 _LP_INPUT = threading.local()
+
+#: The Blue Book rule a name that left out the configuration of an AND or OR stereo
+#: group breaks: 'Racemates' (the Blue Book), sentence:45916 'This
+#: prefix rac with plain stereodescriptors is preferred in preferred IUPAC names'.
+_STEREO_GROUP_RULE = "P-93.1.3"
+
+
+def _stereo_group_inverts_to_itself(mol, group) -> bool:
+    """True when inverting every stereocentre of the AND or OR stereo group ``group`` gives the
+    molecule ``mol`` again (a meso compound: both centres of 'C[C@H](O)[C@H](O)C |o1:1,3|' in
+    one group), so the group holds no configuration that is not known: a racemate or an
+    unknown enantiomer of such a structure is the one compound the string draws.
+
+    The comparison is of RDKit's canonical isomeric SMILES of the structure as drawn and with the
+    group's members inverted (the other stereo elements as drawn). A group with a stereo
+    double bond, or any group RDKit cannot compare, is not shown to invert to itself: False,
+    and the group is cleared as before."""
+    try:
+        if any(bond.GetStereo() != Chem.BondStereo.STEREONONE
+               or bond.GetBondDir() != Chem.BondDir.NONE for bond in group.GetBonds()):
+            return False
+        atoms = [atom.GetIdx() for atom in group.GetAtoms()]
+        flip = {Chem.ChiralType.CHI_TETRAHEDRAL_CW: Chem.ChiralType.CHI_TETRAHEDRAL_CCW,
+                Chem.ChiralType.CHI_TETRAHEDRAL_CCW: Chem.ChiralType.CHI_TETRAHEDRAL_CW}
+        if not atoms or any(mol.GetAtomWithIdx(k).GetChiralTag() not in flip for k in atoms):
+            return False
+
+        def canonical(inverted):
+            rw = Chem.RWMol(mol)
+            rw.SetStereoGroups([])
+            for k in inverted:
+                atom = rw.GetAtomWithIdx(k)
+                atom.SetChiralTag(flip[atom.GetChiralTag()])
+            out = rw.GetMol()
+            Chem.AssignStereochemistry(out, cleanIt=True, force=True)
+            return Chem.MolToSmiles(out)
+
+        return canonical(()) == canonical(atoms)
+    except Exception:
+        return False
+
+
+def _enhanced_stereo_cleared_spelling(
+        smiles: Optional[str]) -> Optional[Tuple[str, List[int]]]:
+    """(the string to name, the atom order) for a SMILES with an AND or OR stereo
+    group (CXSMILES ``|&1:1|``, ``|o1:1|``), else None.
+
+    A SMILES string holds a configuration only as an absolute one, and the naming
+    steps below the public call write plain SMILES, which keeps no stereo group:
+    '[C@H](C)(O)CC |&1:1|' (a racemate) or '|o1:1|' (one enantiomer, which is not
+    said) was named '(2S)-butan-2-ol', the name of one enantiomer, a wrong name for
+    both. The structure is named with the configuration of the group members cleared,
+    which holds for a racemate and for an unknown enantiomer; the members of an
+    absolute ('a') group and the ungrouped stereo elements keep theirs. The PIN
+    names the group: 'Racemates' (the Blue Book), ':45940
+    rac-(2R)-2-bromobutane (PIN)', and 'Relative configuration'
+    (:45901); that spelling is not built, so the name is recorded as a non-PIN one
+    (:func:`_record_stereo_group_non_pin`) and the default tier declines it.
+
+    The cleared structure is written once from RDKit's reading (the same atoms, in
+    RDKit's non-canonical order); a lone-pair stereocentre (:func:`_lone_pair_
+    compared_atom`) of such a molecule is cleared too, because the string RDKit
+    writes can read otherwise at one for the standard reading than the caller's own
+    string does (:func:`_lone_pair_standard_spelling`). The configuration left out is
+    always omitted, never changed. A group whose inversion gives the same molecule (a meso
+    compound,:func:`_stereo_group_inverts_to_itself`) holds nothing that is not known and
+    is not cleared. None when there is no group, when a group holds no stereo element
+    (nothing is left out), or when RDKit cannot read the string."""
+    if not smiles or '|' not in smiles:
+        return None
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        groups = [g for g in mol.GetStereoGroups()
+                  if g.GetGroupType() != Chem.StereoGroupType.STEREO_ABSOLUTE]
+        if not groups:
+            return None
+        unspecified = Chem.ChiralType.CHI_UNSPECIFIED
+        rw = Chem.RWMol(mol)
+        left_out = False
+        for group in groups:
+            if _stereo_group_inverts_to_itself(mol, group):
+                continue                # meso: nothing the group could leave out is unknown
+            for atom in group.GetAtoms():
+                target = rw.GetAtomWithIdx(atom.GetIdx())
+                if target.GetChiralTag() != unspecified:
+                    left_out = True
+                    target.SetChiralTag(unspecified)
+            for bond in group.GetBonds():
+                target = rw.GetBondWithIdx(bond.GetIdx())
+                if (target.GetStereo() != Chem.BondStereo.STEREONONE
+                        or target.GetBondDir() != Chem.BondDir.NONE):
+                    left_out = True
+                    target.SetStereo(Chem.BondStereo.STEREONONE)
+                    target.SetBondDir(Chem.BondDir.NONE)
+        if not left_out:
+            return None
+        for atom in rw.GetAtoms():
+            if _lone_pair_compared_atom(atom) and atom.GetTotalDegree() == 3:
+                atom.SetChiralTag(unspecified)
+        rw.SetStereoGroups([])
+        cleared = rw.GetMol()
+        written = None
+        try:
+            Chem.AssignStereochemistry(cleared, cleanIt=True, force=True)
+            written = Chem.MolToSmiles(cleared, canonical=False)
+            order = _smiles_output_order_of(cleared)
+            back = Chem.MolFromSmiles(written)
+            if (back is None or order is None or len(order) != cleared.GetNumAtoms()
+                    or Chem.MolToSmiles(back) != Chem.MolToSmiles(Chem.Mol(cleared))):
+                written = None
+        except Exception:
+            written = None
+        if written is None:
+            # The cleared structure does not survive a SMILES round trip: name the
+            # constitution alone, which every configuration of it shares.
+            Chem.RemoveStereochemistry(rw)
+            cleared = rw.GetMol()
+            written = Chem.MolToSmiles(cleared, canonical=False)
+            order = _smiles_output_order_of(cleared)
+            if (Chem.MolFromSmiles(written) is None or order is None
+                    or len(order) != cleared.GetNumAtoms()):
+                return None
+        return written, order
+    except Exception:
+        return None
+
+
+def _smiles_output_order_of(mol) -> Optional[List[int]]:
+    """RDKit's atom output order of the last ``MolToSmiles(mol)`` call on ``mol``."""
+    from .perception.centres_bridge import _smiles_output_order
+    return _smiles_output_order(mol)
+
+
+def _redundant_bracket_spelling(
+        smiles: Optional[str]) -> Optional[Tuple[str, List[int]]]:
+    """(the string to name, the atom order) for a SMILES whose atoms are written in
+    brackets RDKit does not need, else None.
+
+    A bracket atom carries its hydrogen count and no implicit hydrogens
+    ('[CH3][O][C](=[O])...' is methyl formate written with every atom bracketed), so
+    a bond a producer cuts leaves a radical in place of an H (esters.py's acid of an
+    ester, radicals.py's identity check, multiplicative.py's bridge split), and a
+    structure that names from its plain spelling abstained from this one. One
+    molecule gets one name whatever its spelling (the contributor guide core principle 4).
+
+    The string named is RDKit's own non-canonical SMILES of its reading of ``smiles``
+    (:func:`Chem.MolToSmiles` with ``canonical=False``: the caller's atom order,
+    brackets only where a charge, an isotope, a radical, a stereo tag or a valence
+    needs them), and only when it reads with fewer ``NoImplicit`` atoms than
+    ``smiles`` and as the same molecule (equal canonical isomeric SMILES). A string
+    with a lone-pair stereocentre is left as it is: the standard reading of such a
+    centre depends on where it is written (:func:`_lone_pair_standard_spelling`)."""
+    if not smiles or '[' not in smiles:
+        return None
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if mol is None:
+            return None
+        if _has_lone_pair_stereocentre(smiles):
+            return None
+        written = Chem.MolToSmiles(mol, canonical=False)
+        order = _smiles_output_order_of(mol)
+        if written == smiles or order is None or len(order) != mol.GetNumAtoms():
+            return None
+        back = Chem.MolFromSmiles(written)
+        if back is None or back.GetNumAtoms() != mol.GetNumAtoms():
+            return None
+        if (sum(a.GetNoImplicit() for a in back.GetAtoms())
+                >= sum(a.GetNoImplicit() for a in mol.GetAtoms())):
+            return None
+        if Chem.MolToSmiles(back) != Chem.MolToSmiles(mol):
+            return None
+        return written, order
+    except Exception:
+        return None
+
+
+def _compose_atom_orders(first: Optional[List[int]], then: List[int]) -> List[int]:
+    """The atom order of two rewrites in a row: ``first`` (None for none) maps the atoms
+    of the string after the first rewrite to the atoms of the caller's reading, ``then``
+    those of the string after the second to the atoms of the string after the first."""
+    return list(then) if first is None else [first[k] for k in then]
 
 
 def _lone_pair_input_enter(smiles: Optional[str]) -> Tuple[Optional[str], bool]:
-    """Open the lone-pair input scope of a public naming call: (the string to name,
-    whether this call opened the scope). Only the outermost call rewrites
-    (:func:`_lone_pair_standard_spelling`); a nested public call (``name_tiered`` ->
-    ``name``, ``name_with_tree`` -> ``name``, the strict PIN twin, a fragment's
-    own ``name``) names the string it is given. Close with
-    :func:`_lone_pair_input_exit`."""
+    """Open the input scope of a public naming call: (the string to name, whether this
+    call opened the scope). Only the outermost call rewrites; a nested public call
+    (``name_tiered`` -> ``name``, ``name_with_tree`` -> ``name``, the strict PIN
+    twin, a fragment's own ``name``) names the string it is given. The rewrites, in
+    this order, each of the string the one before gave:
+
+    1. an AND or OR stereo group of the caller's string is read and its members'
+       configuration cleared (:func:`_enhanced_stereo_cleared_spelling`), before
+       anything writes a plain SMILES, which keeps no group;
+    2. brackets RDKit does not need are dropped (:func:`_redundant_bracket_spelling`);
+    3. a lone-pair stereocentre RDKit reads unlike the standard reading is spelled
+       the standard way (:func:`_lone_pair_standard_spelling`).
+
+    Close with:func:`_lone_pair_input_exit`."""
     if getattr(_LP_INPUT, 'open', False):
         return smiles, False
-    spelled, order = _lone_pair_standard_spelling_and_order(smiles)
+    named, as_written, order, cleared = smiles, smiles, None, False
+    stage = _enhanced_stereo_cleared_spelling(named)
+    if stage is not None:
+        named, order = stage
+        as_written, cleared = named, True
+    stage = _redundant_bracket_spelling(named)
+    if stage is not None:
+        named, stage_order = stage
+        order = _compose_atom_orders(order, stage_order)
+    spelled, stage_order = _lone_pair_standard_spelling_and_order(named)
+    if stage_order is not None:
+        named = spelled
+        order = _compose_atom_orders(order, stage_order)
     _LP_INPUT.open = True
-    _LP_INPUT.rewrite = (spelled, smiles, order) if spelled != smiles else None
-    return spelled, True
+    _LP_INPUT.rewrite = (named, as_written, order, cleared) if named != smiles else None
+    return named, True
+
+
+def _record_stereo_group_non_pin(name) -> None:
+    """The name of a structure whose AND or OR stereo group was cleared
+    (:func:`_enhanced_stereo_cleared_spelling`) is recorded as a non-PIN label, so it
+    is labelled below the PIN and the default tier declines it with the rule; the
+    wider tiers keep it (a configuration left out is not another molecule)."""
+    rewrite = getattr(_LP_INPUT, 'rewrite', None)
+    if rewrite is None or len(rewrite) < 4 or not rewrite[3]:
+        return
+    if not isinstance(name, str) or not name or is_failure_name(name):
+        return
+    from .metrics.provenance import record_non_pin_label
+    record_non_pin_label(
+        name, rule=_STEREO_GROUP_RULE,
+        detail="the AND/OR stereo group of the input is not named (rac-/rel-/R*,S*)")
 
 
 def _lone_pair_input_exit(opened: bool) -> None:
@@ -2885,11 +3108,26 @@ def _full_inchikey_offer_match(input_smiles: str, opsin_smiles: str,
     the answer is a pure function of the three strings (two RDKit parses, their
     InChIKeys and the protonation verdict; no provenance, no budget), so one process
     computes it once per triple. ``ORTHONYM_MEMO=off|verify`` and
-    ``ORTHONYM_PROCESS_CACHE=0`` bypass the memo exactly as for ``fg_detect``."""
+    ``ORTHONYM_PROCESS_CACHE=0`` bypass the memo exactly as for ``fg_detect``.
+
+    A compare that raised is inconclusive, and the fail-open ``True`` it gets is not a
+    function of the three strings (the memo's contract: "the caller guarantees the key
+    determines the value"), so it is not memoised: the compute function raises
+    :class:`_InconclusiveCompare`, which the memo does not store, and the verdict is given
+    here, outside it -- the pattern of ``validation.opsin_roundtrip.
+    extended_smiles_or_unavailable``."""
     from .assembly.memo import pure_cache_or_compute
-    return pure_cache_or_compute(
-        "full_inchikey_offer_match", (input_smiles, opsin_smiles, name),
-        lambda: _full_inchikey_offer_match_impl(input_smiles, opsin_smiles, name))
+    try:
+        return pure_cache_or_compute(
+            "full_inchikey_offer_match", (input_smiles, opsin_smiles, name),
+            lambda: _full_inchikey_offer_match_impl(input_smiles, opsin_smiles, name))
+    except _InconclusiveCompare:
+        return True
+
+
+class _InconclusiveCompare(Exception):
+    """:func:`_full_inchikey_offer_match_impl` could not make its compare (an RDKit or
+    protonation-check exception). Raised, not returned, so that the memo stores nothing."""
 
 
 def _full_inchikey_offer_match_impl(input_smiles: str, opsin_smiles: str,
@@ -2910,7 +3148,9 @@ def _full_inchikey_offer_match_impl(input_smiles: str, opsin_smiles: str,
     PIN-emission gate's tolerant one.
 
     Fail-OPEN (``True``) on any parse/hash failure -- an inconclusive compare
-    must never reject an offer.
+    must never reject an offer. A compare that RAISES is inconclusive and raises
+    :class:`_InconclusiveCompare`;:func:`_full_inchikey_offer_match` gives the
+    fail-open ``True`` for it without memoising it.
     """
     try:
         mi = Chem.MolFromSmiles(input_smiles)
@@ -2927,8 +3167,8 @@ def _full_inchikey_offer_match_impl(input_smiles: str, opsin_smiles: str,
         # An equal key does not place a hydron (validation/protonation_identity.py).
         from .validation.protonation_identity import protonation_site_verdict
         return protonation_site_verdict(input_smiles, opsin_smiles, name) != "mismatch"
-    except Exception:
-        return True
+    except Exception as exc:
+        raise _InconclusiveCompare(repr(exc)) from exc
 
 
 def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
@@ -3902,6 +4142,248 @@ def _caller_input() -> Optional[str]:
     return getattr(_CALLER_INPUT, 'smiles', None)
 
 
+def _is_callers_molecule(mol) -> bool:
+    """Whether ``mol`` is the molecule of this thread's public naming call (the caller's
+    string, as ``_caller_input`` holds it) and not a fragment a producer names inside it
+    (the acid of an ester, an acyl side): the same canonical SMILES. True outside a public
+    call (a direct classification of a molecule); False when either cannot be read.
+
+    The caller's canonical SMILES is kept per caller string on ``_CALLER_INPUT``."""
+    caller = _caller_input()
+    if caller is None:
+        return True
+    try:
+        cached = getattr(_CALLER_INPUT, 'canonical', None)
+        if cached is None or cached[0] != caller:
+            read = Chem.MolFromSmiles(caller)
+            cached = (caller, Chem.MolToSmiles(read) if read is not None else None)
+            _CALLER_INPUT.canonical = cached
+        return cached[1] is not None and Chem.MolToSmiles(mol) == cached[1]
+    except Exception:
+        return False
+
+
+#: Set while ``Orthonym._name_with_form_choice`` runs one charge form of an input.
+_FORM_RUN_OWNED = contextvars.ContextVar("orthonym_form_run_owned", default=False)
+
+#: A cationic nitrogen that can hand its charge on: an N+ with a double or aromatic bond that is
+#: no nitro group or N-oxide (the charge of those sits on the oxygen).
+_CHARGE_MOBILE_N = Chem.MolFromSmarts(
+    '[#7+;!$([#7+]~[#8-]);!$([#7+]=[#8]);$([#7+]=*),$([#7+]:*)]')
+#: bounds of the form enumeration: a larger or more delocalised input is named as drawn
+_FORMS_MAX_HEAVY = 70
+_FORMS_MAX_STRUCTURES = 64
+_FORMS_MAX = 8
+#: the work of the choice, heavy atoms x forms, decided before any form is named: each form is a
+#: whole naming run, and a run of a peptide with an arginine takes seconds (measured at the
+#: best-effort tier: 39 heavy atoms x 4 forms 6 s; 51 x 4 15 s; 62 x 5 19 s, the cost of one form
+#: rising steeply with the size). The bound is the same for every drawing of a species and
+#: does not depend on the speed of the machine, so the form chosen, and with it the name, cannot
+#: (a wall-clock cutoff made the set of forms named depend on the load)
+_FORMS_MAX_WORK = 160
+
+
+def _exocyclic_double_bonds_to_aromatic(mol) -> int:
+    """The number of double bonds between an aromatic atom and an atom that is not."""
+    return sum(1 for bond in mol.GetBonds()
+               if bond.GetBondType() == Chem.BondType.DOUBLE
+               and bond.GetBeginAtom().GetIsAromatic() != bond.GetEndAtom().GetIsAromatic())
+
+
+@_functools.lru_cache(maxsize=512)
+def _charge_forms(smiles: str) -> Optional[Tuple[Tuple[str, Optional[Tuple[int, ...]]], ...]]:
+    """The charge-only resonance forms of ``smiles``, as ((string, atom order),...) in the
+    order of their canonical SMILES (the first is the canonical form), or None when there
+    are fewer than two or the input is out of bounds.
+
+    A charge-only form moves a formal +1 between nitrogen atoms along a conjugated path
+    ('Cc1c[nH]c[nH+]1' and 'Cc1c[nH+]c[nH]1', 'CCCCn1cc[n+](C)c1' and 'CCCC[n+]1ccn(C)c1',
+    'NC(=[NH2+])NC' and 'NC(N)=[NH+]C'): every atom keeps its hydrogen count, no other atom's
+    charge changes, the standard InChIKey is the input's, and the string reads back as the
+    same canonical SMILES. They are one species, and the name of a species does not depend on
+    where its SMILES draws the charge (the contributor guide core principle 4); a hydrogen is never moved
+    (``validation.protonation_identity`` rightly tells '1-methyl-1H-benzimidazol-1-ium' from
+    '-3-ium'). The string of the form the input draws is ``smiles`` itself (order None); the
+    others are RDKit's non-canonical SMILES of the form, in the atom order of RDKit's reading
+    of ``smiles`` (``order[k]`` is that reading's atom of atom ``k`` of the string).
+
+    The +1 goes onto a neutral nitrogen that has three connections, one that holds a lone pair to
+    give. A cumulated or dipolar nitrogen cation (an azide, a diazo compound, a nitrilium) moves
+    a -1, not a +1, between its resonance structures, and those are other drawings of one dipole
+    that the producers read as other functional groups (an acyl azide came out as a phenol with an
+    'azido-oxoethyl' prefix, the name of the form whose canonical SMILES comes first): such an
+    input is named as it is drawn.
+
+    A form with another number of double bonds between an aromatic and a non-aromatic atom than
+    the drawing is no form of its species here: '[NH2+]=c1cc[nH]cc1' is the iminium depiction of
+    4-aminopyridinium, the charge moved through the ring and not between the two nitrogens of an
+    amidinium or azolium unit. That class (an aromatic amine's cation, in the corpora far larger
+    than the one measured for this item) is named as it is drawn, as before: the iminium
+    drawing names 'pyridin-4(1H)-iminium' pin_verified where the conventional one is declined,
+    and offering it to the conventional drawing would label a name the PIN that no one checked.
+
+    Bounded (a 215-atom mixture blew up the enumeration): at most ``_FORMS_MAX_HEAVY`` heavy
+    atoms, ``_FORMS_MAX_STRUCTURES`` resonance structures, ``_FORMS_MAX`` forms, and
+    ``_FORMS_MAX_WORK`` heavy atoms x forms. None for an
+    input with a lone-pair stereocentre, whose standard reading depends on where it is written
+    (:func:`_lone_pair_standard_spelling`), and for a CXSMILES string (its stereo groups are
+    read first,:func:`_enhanced_stereo_cleared_spelling`)."""
+    if not smiles or '|' in smiles or '+' not in smiles:
+        return None
+    try:
+        from rdkit.Chem import rdchem
+        mol = Chem.MolFromSmiles(smiles)
+        if (mol is None or mol.GetNumHeavyAtoms() > _FORMS_MAX_HEAVY
+                or not mol.HasSubstructMatch(_CHARGE_MOBILE_N)
+                or _has_lone_pair_stereocentre(smiles)):
+            return None
+        key = Chem.MolToInchiKey(mol)
+        if not key:
+            return None
+        supplier = rdchem.ResonanceMolSupplier(
+            mol, rdchem.ResonanceFlags.UNCONSTRAINED_CATIONS, _FORMS_MAX_STRUCTURES)
+        supplier.SetNumThreads(1)
+        base_h = [a.GetTotalNumHs() for a in mol.GetAtoms()]
+        base_charge = [a.GetFormalCharge() for a in mol.GetAtoms()]
+        is_n = [a.GetSymbol() == 'N' for a in mol.GetAtoms()]
+        n_charges = sorted(c for k, c in enumerate(base_charge) if is_n[k])
+        drawn = Chem.MolToSmiles(mol)
+        exocyclic = _exocyclic_double_bonds_to_aromatic(mol)
+        found: Dict[str, Tuple[str, Optional[Tuple[int, ...]]]] = {drawn: (smiles, None)}
+        for i in range(len(supplier)):
+            form = supplier[i]
+            if form is None:
+                continue
+            try:
+                form = Chem.Mol(form)
+                Chem.SanitizeMol(form)
+            except Exception:
+                continue
+            charge = [a.GetFormalCharge() for a in form.GetAtoms()]
+            lost = {k for k in range(len(charge)) if base_charge[k] == 1 and charge[k] == 0}
+            gained = {k for k in range(len(charge)) if base_charge[k] == 0 and charge[k] == 1}
+            if ([a.GetTotalNumHs() for a in form.GetAtoms()] != base_h
+                    or any(a.GetNumRadicalElectrons() for a in form.GetAtoms())
+                    or any(not is_n[k] and charge[k] != base_charge[k]
+                           for k in range(len(charge)))
+                    or sorted(c for k, c in enumerate(charge) if is_n[k]) != n_charges
+                    # the +1 only changes places, and it goes onto a neutral nitrogen with three
+                    # connections (a lone pair to give: amidinium, guanidinium, azolium)
+                    or len(lost) != len(gained)
+                    or any(charge[k] != base_charge[k] and k not in lost and k not in gained
+                           for k in range(len(charge)))
+                    or any(mol.GetAtomWithIdx(k).GetTotalDegree() != 3 for k in gained)
+                    or _exocyclic_double_bonds_to_aromatic(form) != exocyclic):
+                continue
+            written = Chem.MolToSmiles(form, canonical=False)
+            order = _smiles_output_order_of(form)
+            back = Chem.MolFromSmiles(written)
+            if (back is None or order is None or back.GetNumAtoms() != mol.GetNumAtoms()
+                    or len(order) != mol.GetNumAtoms() or Chem.MolToInchiKey(back) != key):
+                continue
+            found.setdefault(Chem.MolToSmiles(back), (written, tuple(order)))
+        if (not 2 <= len(found) <= _FORMS_MAX
+                or mol.GetNumHeavyAtoms() * len(found) > _FORMS_MAX_WORK):
+            return None
+        return tuple(found[canonical] for canonical in sorted(found))
+    except Exception:
+        return None
+
+
+_LOCANT_TOKEN = re.compile(r"(?<![A-Za-z\d\[\]^.])(\d+[a-z]?|[NOPS]'*)(?![A-Za-z\d])")
+
+
+def _locant_sort_item(token: str):
+    """A locant as a sortable item: an italic letter ('N', 'N'') before the numbers, unprimed
+    before primed 'lowest locants')."""
+    if token[0].isdigit():
+        digits = re.match(r"\d+", token).group(0)
+        return (1, int(digits), token[len(digits):])
+    return (0, len(token) - 1, token[0])
+
+
+_INDICATED_H = re.compile(r"(?<![A-Za-z\d])(\d+[a-z]?(?:,\d+[a-z]?)*)H-")
+
+
+#: the locants of the hydro / dehydro prefixes ('2,3-dihydro-', '1,2-didehydro-'): (e)(i)
+_HYDRO_LOCANTS = re.compile(
+    r"(?<![A-Za-z\d\[\]^.])((?:\d+[a-z]?|[NOPS]'*)(?:,(?:\d+[a-z]?|[NOPS]'*))*)-"
+    r"(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?(?:de)?hydro(?![a-z])")
+
+
+def _locant_roles(name: str):
+    """(the name with its locants taken out, then the roles 'NUMBERING' (the Blue Book)
+    ranks in turn: (b) indicated hydrogen, (c) the principal characteristic group or ionic
+    suffix, (e) the hydro prefixes, (f) the detachable alphabetized prefixes 'all considered
+    together in a series of increasing numerical order' (:3301, the sorted set of their
+    locants), then (g) 'lowest locants for the substituent cited first as a prefix in the
+    name' (:3307, their locants in the order the name cites them))."""
+    indicated = tuple(_locant_sort_item(t) for m in _INDICATED_H.finditer(name)
+                      for t in m.group(1).split(','))
+    rest = _INDICATED_H.sub('H-', name)
+    ending = re.search(r"-((?:\d+[a-z]?|[NOPS]'*)(?:,(?:\d+[a-z]?|[NOPS]'*))*)-(?:ium|ide|uide|ylium|"
+                       r"ylidene|ylidyne|aminium|aminide|iminium)(?:\b|$)", rest)
+    hydro_spans = [(m.start(1), m.end(1)) for m in _HYDRO_LOCANTS.finditer(rest)]
+    suffix, hydro, cited = [], [], []
+    for m in _LOCANT_TOKEN.finditer(rest):
+        item = _locant_sort_item(m.group(1))
+        if ending is not None and ending.start(1) <= m.start(1) < ending.end(1):
+            suffix.append(item)
+        elif any(lo <= m.start(1) < hi for lo, hi in hydro_spans):
+            hydro.append(item)
+        else:
+            cited.append(item)
+    return (_LOCANT_TOKEN.sub('', rest), indicated, tuple(sorted(suffix)), tuple(sorted(hydro)),
+            tuple(sorted(cited)), tuple(cited))
+
+
+def _lower_locants(a: str, b: str) -> int:
+    """-1 if the name ``a`` has the lower locants by (b), (c), (e), (f), then (g) than
+    ``b``, 1 if ``b`` does, 0 if they tie or the two names are not the same skeleton with other
+    locants (the comparison is then left to the order of the forms).
+
+    The roles are compared in the order of the rule, each as a whole before the next: the set
+    of all the prefix locants (f) is compared before the locants of the first-cited prefix (g)
+    ('6-bromo-4-chloro-1H-1,3-benzimidazol-3-ium', the set 4,6, over '5-bromo-7-chloro-', 5,7,
+    although the first cited, bromo, has the higher locant in the first)."""
+    skeleton_a, *roles_a = _locant_roles(a)
+    skeleton_b, *roles_b = _locant_roles(b)
+    if skeleton_a != skeleton_b:
+        return 0
+    for ra, rb in zip(roles_a, roles_b):
+        if ra != rb:
+            return -1 if ra < rb else 1
+    return 0
+
+
+def _form_choice_scope(fn):
+    """Name the charge forms of the caller's input (:func:`_charge_forms`) and keep the best.
+
+    Outside ``_book_retry_scope`` (each form gets its own book-spelling retry), for the
+    caller's own ``name`` call only (a nested call and a form's own run call ``fn``
+    directly). An input with a single form is named as it always was."""
+    @_functools.wraps(fn)
+    def _wrapper(self, *args, **kwargs):
+        from .assembly.fragment_naming import name_scope_depth
+        if _FORM_RUN_OWNED.get() or name_scope_depth() > 0:
+            return fn(self, *args, **kwargs)
+        given = args[0] if args else kwargs.get('smiles')
+        if not isinstance(given, str):
+            if given is None or not _input_mol.handles(given):
+                return fn(self, *args, **kwargs)
+            try:
+                given = _input_mol.smiles_for(given)
+            except Exception:                      # fn raises it as it always did
+                return fn(self, *args, **kwargs)
+            args, kwargs = ((given,) + tuple(args[1:]), kwargs) if args else (
+                args, {**kwargs, 'smiles': given})
+        forms = _charge_forms(given)
+        if not forms:
+            return fn(self, *args, **kwargs)
+        return self._name_with_form_choice(fn, forms, args, kwargs)
+    return _wrapper
+
+
 def _book_retry_scope(fn):
     """Roadmap N5 safety net around the public ``name``, outside ``_budget_scope``.
 
@@ -3988,6 +4470,8 @@ def _budget_scope(fn):
                     from .metrics.provenance import clear_provenance
                     clear_provenance()
             _result = fn(self, *args, **kwargs)
+            if depth == 1:
+                _record_stereo_group_non_pin(_result)
             if _policy:
                 _result = self._default_tier_decision(
                     _result, args[0] if args else kwargs.get('smiles'),
@@ -4025,6 +4509,7 @@ def _budget_scope(fn):
             _rescued = self._try_perf_budget_t4_rescue(smiles)
             if _rescued is not None and not is_failure_name(_rescued):
                 _result = self._finish(_rescued, smiles)
+                _record_stereo_group_non_pin(_result)
                 if _policy:
                     _result = self._default_tier_decision(_result, smiles, False)
                 return _result
@@ -4444,7 +4929,10 @@ class Orthonym:
         spelled, _lp_opened = _lone_pair_input_enter(smiles)
         try:
             result = self._name_with_tree_impl(spelled)
-            if spelled != smiles and result.atom_to_locant_hint:
+            # (a charge form other than the string named,:meth:`_name_with_form_choice`,
+            # leaves its own rewrite in the scope)
+            if ((spelled != smiles or getattr(_LP_INPUT, 'rewrite', None) is not None)
+                    and result.atom_to_locant_hint):
                 result = result._replace(
                     atom_to_locant_hint=_lone_pair_caller_atoms(result.atom_to_locant_hint))
             return result
@@ -4621,6 +5109,7 @@ class Orthonym:
                 return _gated_cand
         return gated
 
+    @_form_choice_scope
     @_book_retry_scope
     @_budget_scope
     def name(self, smiles: Union[str, Chem.Mol], *, raise_on_limit: bool = False) -> str:
@@ -7983,6 +8472,127 @@ class Orthonym:
         finally:
             _BOOK_RETRY_OWNED.reset(owned)
 
+    def _name_with_form_choice(self, fn, forms, args, kwargs) -> str:
+        """The charge forms of one input (:func:`_charge_forms`), each named as an outermost
+        ``name`` call of its own; the call returns the best result, with the provenance and
+        records of the run that gave it (the winner is run again last when it was not).
+
+        Best is the highest label (``_LABEL_RANK``; a failure label or a limit error is 0),
+        then the lower locants by (:func:`_lower_locants`: indicated hydrogen, suffix,
+        hydro prefixes, the set of the prefix locants, the first-cited prefix, for names that
+        differ only in their locants), then the form that comes first by canonical SMILES. The form the caller drew is one of them, so the result is never
+        lower than the one the drawing gave, and every drawing of one species gets one name:
+         'NUMBERING' (the Blue Book), 'low locants are assigned to them in the
+        following decreasing order of seniority'; the PIN of 'Cc1c[nH+]c[nH]1' is
+        '4-methyl-1H-imidazol-3-ium', as it is of 'Cc1c[nH]c[nH+]1' example
+        '1H-imidazol-3-ium (PIN)',:41396)."""
+        from .assembly.memo import (
+            pop_sandbox as _memo_pop_sandbox, push_sandbox as _memo_push_sandbox)
+        from .metrics import provenance as _pv
+        given = args[0] if args else kwargs.get('smiles')
+        rest = tuple(args[1:])
+        extra = {k: v for k, v in kwargs.items() if k != 'smiles'}
+        scope_open = getattr(_LP_INPUT, 'open', False)
+        entry_rewrite = getattr(_LP_INPUT, 'rewrite', None) if scope_open else None
+
+        last_run = [None]
+
+        def run(form):
+            string, order = form
+            last_run[0] = forms.index(form)
+            _pv.clear_provenance()
+            if scope_open:
+                # the entry that opened the input scope re-keys an atom map of the string
+                # named to the caller's atoms: the string of this form is that string
+                if order is None:
+                    _LP_INPUT.rewrite = entry_rewrite
+                else:
+                    base = entry_rewrite[2] if entry_rewrite else None
+                    _LP_INPUT.rewrite = (
+                        string, entry_rewrite[1] if entry_rewrite else given,
+                        _compose_atom_orders(list(base) if base else None, list(order)),
+                        bool(entry_rewrite and entry_rewrite[3]))
+            # Each form is named in a memo scope of its own: inside ``name_tiered``'s scope the
+            # naming call's own scope is a nested no-op, and a value one form's run memoised
+            # (a producer's record of a non-PIN part is a side effect the memo does not replay)
+            # would be served to the next run of the same string, which then labels a name the
+            # PIN that the first run recorded as not one.
+            box = _memo_push_sandbox()
+            try:
+                out = fn(self, string, *rest, **extra)
+            except OrthonymLimitError as exc:
+                return exc
+            finally:
+                _memo_pop_sandbox(box)
+            return out
+
+        def rank(form, result):
+            # (the label, 1 for a decline of the default tier that says a name exists below the
+            # PIN): of two forms that name nothing at the default tier, the one whose decline is
+            # NO_VERIFIED_PIN (a wider tier keeps its name) stands over one that names nothing
+            if not isinstance(result, str) or not result or is_failure_name(result):
+                stash = getattr(self, "_default_tier_row", None)
+                declined = (isinstance(stash, tuple) and len(stash) > 1
+                            and isinstance(stash[1], dict) and stash[0] == result
+                            and stash[1].get("limit_code") == "NO_VERIFIED_PIN")
+                return (0, 1 if declined else 0)
+            try:
+                row, _pin_form = self._tier_row_and_pin_form(form[0], result,
+                                                             _pv.get_provenance())
+                return (_LABEL_RANK.get(row.get("tier"), 0), 0)
+            except Exception:
+                return (1, 0)
+
+        from .assembly.fragment_naming import hang_budget_trips
+        owned = _FORM_RUN_OWNED.set(True)
+        try:
+            # the form the caller drew is named first: where a hang guard fires on it, the result
+            # is the one the drawing always gave (a guard is a count of work, not of seconds: the
+            # forms named before it fires are the same on every run of the same string)
+            drawn = next((k for k, form in enumerate(forms) if form[1] is None), 0)
+            sequence = [drawn] + [k for k in range(len(forms)) if k != drawn]
+            results = {}
+            trips = hang_budget_trips()
+            for k in sequence:
+                results[k] = run(forms[k])
+                results[k] = (results[k], rank(forms[k], results[k]))
+                if hang_budget_trips() != trips:
+                    break
+            # the best of the forms run, by canonical order: the highest label, then the
+            # lower locants, then the form that comes first
+            best = None
+            for k in sorted(results):
+                result, label = results[k]
+                if best is None or label > best[2] or (
+                        label == best[2] and isinstance(result, str)
+                        and isinstance(best[1], str) and not is_failure_name(result)
+                        and _lower_locants(result, best[1]) < 0):
+                    best = (k, result, label)
+            k = best[0]
+            # A tie that no rule decides, between a name the drawing gave and another, both
+            # labelled pin_verified (names that are not the same skeleton with other locants):
+            # at most one of them is the PIN, and which is not known here, so the drawing's name
+            # is not moved (the canonical order decides ties of the labels below the PIN only)
+            drawn_result = results.get(drawn)
+            if (drawn_result is not None and k != drawn and drawn_result[1] == best[2]
+                    and best[2][0] >= _LABEL_RANK.get("pin_verified", 99)
+                    and isinstance(drawn_result[0], str) and isinstance(best[1], str)
+                    and not is_failure_name(drawn_result[0])
+                    and drawn_result[0] != best[1]
+                    and _lower_locants(best[1], drawn_result[0]) >= 0):
+                k = drawn
+                best = (k, drawn_result[0], drawn_result[1])
+            # the winner is run again unless the last form named gave the same result (the
+            # name and its label): its provenance and records are then the winner's too
+            if k != last_run[0] and results[last_run[0]] != results[k]:
+                results[k] = (run(forms[k]), best[2])
+            result = results[k][0]
+            if isinstance(result, OrthonymLimitError):
+                raise result
+            return result
+        finally:
+            _FORM_RUN_OWNED.reset(owned)
+
     def _book_retry_applies(self) -> bool:
         """The mechanical-spelling retry runs at the wider tiers only, where the default
         tier's emission rule does not apply (``_default_tier_policy_applies``). The
@@ -8369,7 +8979,8 @@ class Orthonym:
                     _DEFAULT_TIER_POLICY_OFF.reset(_policy_off)
             if _policy and isinstance(metadata, dict):
                 metadata = self._default_tier_confidence(metadata, spelled)
-            if spelled != smiles and isinstance(metadata, dict) and metadata.get('atom_to_locant'):
+            if ((spelled != smiles or getattr(_LP_INPUT, 'rewrite', None) is not None)
+                    and isinstance(metadata, dict) and metadata.get('atom_to_locant')):
                 metadata['atom_to_locant'] = _lone_pair_caller_atoms(metadata['atom_to_locant'])
             return metadata
         finally:
@@ -9496,6 +10107,27 @@ class Orthonym:
                 features.principal_group,
                 exclude_atoms=all_ring_atoms
             )
+            # 'Maximum number of substituents cited as prefixes' (the Blue Book:
+            # 21604): "The preferred IUPAC name is based on the senior parent structure
+            # that has the maximum number of substituents cited as prefixes" (the hydro
+            # prefixes excepted, as the rule says); example (4),:21624, counts the
+            # ring substituent of the parent chain. The call above leaves a ring bonded
+            # to the chain out of that count, so two chains of one length bearing one
+            # prefix each tie and the input's atom order decided ('methyl 2-benzyl
+            # propanoate' for some spellings of methyl 2-methyl-3-phenylpropanoate).
+            # The chain is the one makes senior (ring branches counted, located
+            # and ordered as prefixes); the call above stands where that comparison is
+            # undecided (None), for a group whose producer is not known to build on
+            # the chain it is given (``chains.GIVEN_CHAIN_GROUPS``) and for a fragment
+            # named inside another name (``_is_callers_molecule``). A chain of another
+            # length is never taken. A chain of one carbon has no second chain of its length
+            # to be told from by its prefixes, and counting ring branches on a large ring
+            # system named whole branches for 0.1-0.7 s (measured on a dev split).
+            if potential_chain and len(potential_chain) >= 2:
+                from .perception.chains import GIVEN_CHAIN_GROUPS, p45_principal_chain
+                if (features.principal_group in GIVEN_CHAIN_GROUPS
+                        and _is_callers_molecule(features.mol)):
+                    potential_chain = p45_principal_chain(features, potential_chain)
 
             # Only do parent selection if we found a meaningful chain (>= 2
             # carbons) OR (C- / V-4, a 1-carbon chain whose

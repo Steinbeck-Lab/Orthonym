@@ -88,7 +88,9 @@ class TestIsothiocyanatoMethyl:
                 == "(isocyanatomethyl)benzene")
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("c1ccc(cc1)N=C=S", "phenyl isothiocyanate"),  # aryl keeps FC form
+        # (the Blue Book) 'C6H5-NCS isothiocyanatobenzene (PIN) phenyl
+        # isothiocyanate': the aryl form is substitutive too (leads L7 / 43c).
+        ("c1ccc(cc1)N=C=S", "isothiocyanatobenzene"),
         ("CCN=C=S", "isothiocyanatoethane"),
         ("CCN=C=O", "isocyanatoethane"),
     ])

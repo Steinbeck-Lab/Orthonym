@@ -14,6 +14,14 @@ kept at every tier but never labelled pin_verified (``assembly.candidate_pool``,
 The chain selector excludes ring atoms from chain membership and, before this check, also from
 the prefix count, the prefix locants and the citation-order tie-break, so a chain that ends at a
 ring lost to one that did not.
+
+Leads item N8b (``Orthonym._classify`` -> ``chains.p45_principal_chain``): the chain handed to
+parent selection is now the one this selector makes senior, for the principal groups whose
+producer builds on the chain it is given (``chains.GIVEN_CHAIN_GROUPS``), so the names of those
+rows are the PINs and are labelled pin_verified at every tier. The ester is not in the set: its
+producer walks the acid fragment itself (``rules/esters.py:_find_acid_principal_chain``), so its
+row keeps the old name, below the PIN, and the label check stays load-bearing for it
+(``test_the_label_is_what_lowers_the_name``).
 """
 import pytest
 from rdkit import Chem
@@ -117,21 +125,27 @@ def test_the_pin_by_p45_2_reads_back(smiles, built, pin):
     assert name_is_rt_exact(built, smiles), built
 
 
+#: the rows whose producer walks its own chain (the ester): not on the senior chain
+ESTER_ROWS = [r for r in P4521_ROWS if r[0].startswith("COC(=O)")]
+SENIOR_CHAIN_ROWS = P4523_ROWS + [r for r in P4521_ROWS if r not in ESTER_ROWS]
+
+
 @pytest.mark.parametrize("tier", TIERS)
-@pytest.mark.parametrize("smiles,built,pin", P4523_ROWS[:2])
-def test_a_chain_that_is_not_the_senior_one_is_never_certified(tier, smiles, built, pin):
+@pytest.mark.parametrize("smiles,built,pin", SENIOR_CHAIN_ROWS)
+def test_the_senior_chain_is_built_and_certified(tier, smiles, built, pin):
+    # (the Blue Book) 'the maximum number of substituents cited as prefixes',
+    # (:21791): the PIN is built on the chain with the ring prefixes counted, and
+    # read back (``test_the_pin_by_p45_2_reads_back``); it was the name below the PIN, labelled
+    # systematic_verified, before the selector counted ring prefixes
     row = _tier_row(tier, smiles)
-    assert row.get("tier") != "pin_verified", row
-    if tier == "pin":
-        return
-    # the name stays below the PIN, read back
-    assert (row["name"], row["tier"]) == (built, "systematic_verified"), row
+    assert (row["name"], row["tier"]) == (pin, "pin_verified"), row
+    assert row["is_pin"] is True, row
     assert name_is_rt_exact(row["name"], smiles), row
 
 
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
-@pytest.mark.parametrize("smiles,built,pin", P4523_ROWS[2:] + P4521_ROWS)
-def test_the_class_is_never_certified(tier, smiles, built, pin):
+@pytest.mark.parametrize("smiles,built,pin", ESTER_ROWS)
+def test_a_chain_that_is_not_the_senior_one_is_never_certified(tier, smiles, built, pin):
     row = _tier_row(tier, smiles)
     assert row.get("tier") != "pin_verified", row
     if tier == "best-effort":
@@ -148,18 +162,21 @@ def test_the_senior_chain_keeps_its_pin(tier, smiles, pin):
 
 def test_a_stereodescriptor_does_not_hide_the_name():
     smiles = "N#C[C@@H](CO)Cc1cccc([N+](=O)[O-])c1"
-    assert _tier_row("pin", smiles).get("tier") != "pin_verified"
-    row = _tier_row("best-effort", smiles)
-    assert (row["name"], row["tier"]) == (
-        "(2S)-3-hydroxy-2-[(3-nitrophenyl)methyl]propanenitrile", "systematic_verified"), row
+    pin = "(2S)-2-(hydroxymethyl)-3-(3-nitrophenyl)propanenitrile"
+    assert name_is_rt_exact(pin, smiles), pin
+    for tier in ("pin", "best-effort"):
+        row = _tier_row(tier, smiles)
+        assert (row["name"], row["tier"]) == (pin, "pin_verified"), row
 
 
 def test_the_label_is_what_lowers_the_name(monkeypatch):
-    # known positive: without the label the producer's name is certified, as on main (a SMILES
-    # used by no other test here, a fresh engine)
+    # known positive, an ester (its producer walks its own chain): without the label the
+    # producer's name is certified, as on main (a SMILES used by no other test here, a fresh
+    # engine)
     from orthonym.assembly import candidate_pool
-    smiles = "N#CC(CO)Cc1ccc([N+](=O)[O-])cc1"
-    built = "3-hydroxy-2-[(4-nitrophenyl)methyl]propanenitrile"
+    smiles = "CCOC(=O)C(C)Cc1ccccc1"
+    built = "ethyl 2-benzylpropanoate"
+    assert name_is_rt_exact(built, smiles), built
     row = _tier_row("pin", smiles)
     assert row.get("tier") != "pin_verified", row
     monkeypatch.setattr(candidate_pool, "_label_chain_parent_prefix_seniority",

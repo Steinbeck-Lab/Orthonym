@@ -61,6 +61,7 @@ def name_organometallic(
     from ...rules.organometallics import (
         _assemble_metallacycle,
         assemble_organometallic_name,
+        organometallic_charge_conserved,
     )
 
     # W8-P9 Task 9.5: a metal RING atom (metallacycle) is checked
@@ -80,6 +81,8 @@ def name_organometallic(
         if mc_result is None:
             return None  # narrow builder declined -- cascade (Task 9.2 backstops)
         full_name, _metal_part, _tree_nodes = mc_result
+        if not organometallic_charge_conserved(full_name, mol):
+            return None  # the name states a different net charge than the input
         tree = NameTreeNode(
             parent_stem=full_name,
             class_id='organometallic',
@@ -117,6 +120,12 @@ def name_organometallic(
         return None  # cascade to SALT@100
 
     full_name, _metal_name_part, _ligand_tree_nodes = result
+    # 0-wrong charge-conservation veto (leads program N8c): the name must state
+    # the net charge of the whole input, whichever assembler branch built it. A
+    # dot-separated, charge-imbalanced input otherwise ships the neutral
+    # complex's name (see organometallic_charge_conserved).
+    if not organometallic_charge_conserved(full_name, mol):
+        return None  # cascade to SALT@100
     # Use flat tree with full name as parent_stem to satisfy the byte-identical
     # round-trip contract (name_tree_to_string(tree) == result.name).
     # internal notes allows the metal_name_part + prefixes structure too; the

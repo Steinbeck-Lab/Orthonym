@@ -6,7 +6,8 @@ composer.py:2180-2190 (_name_isocyanate body) + composer.py:2204-2230
 migration discipline, bodies stay in composer.py until Plan-03 commit
 03-10 thinning.
 
-IUPAC cite: (isocyanates; functional class naming).
+IUPAC cite: (isocyanates; the functional-class form is non-PIN, so this
+handler runs only for the non-PIN style).
 
 References:
 - composer.py:828-836 (inline dispatch branch; REMOVED at this commit).
@@ -45,17 +46,19 @@ def name_isocyanate(
         _name_isocyanate,
     )
 
-    # Wave2: the functional-class 'R isocyanate' form is
-    # general nomenclature only — the PIN is the substitutive isocyanato
-    # prefix on the parent hydride (BB VERBATIM 'isocyanatocyclohexane
-    # (PIN) cyclohexyl isocyanate'). Decline under PIN style so the
-    # generic prefix path (NO_SENIORITY_GROUPS) emits 'isocyanatoethane';
-    # the functional-class name stays available under --trivial. SCOPED to
-    # NON-AROMATIC attachment: the benzene ring path cannot emit
-    # 'isocyanatobenzene' yet, so aryl isocyanates keep the RT-valid
-    # functional-class form rather than regressing to unknown (deferred
-    # with the benzene FG-prefix table).
-    if style == "pin" and not _aromatic_attachment(features, 'isocyanate'):
+    # 'ISOCYANATES' (the Blue Book),:26001: "Preferred IUPAC names
+    # are generated substitutively using the prefix 'isocyanato' attached
+    # directly to a parent hydride. Previously, functional class names were
+    # recommended for this class." (BB VERBATIM 'isocyanatocyclohexane (PIN)
+    # cyclohexyl isocyanate':26007). The functional-class 'R isocyanate' form is
+    # general nomenclature only, so this handler declines under PIN style for
+    # EVERY attachment and the generic prefix path (NO_SENIORITY_GROUPS) emits
+    # 'isocyanatoethane', 'isocyanatobenzene', '1-chloro-4-isocyanatobenzene';
+    # the functional-class name stays available under --trivial. (An earlier
+    # carve-out kept the functional-class form for an AROMATIC attachment on the
+    # premise that the benzene ring path could not emit 'isocyanatobenzene'; it
+    # can, and every aryl isocyanate it kept was a non-PIN name labelled PIN.)
+    if style == "pin":
         return None
 
     iso_name = _name_isocyanate(features)
@@ -78,18 +81,4 @@ def name_isocyanate(
     )
 
 
-def _aromatic_attachment(features: Any, fg_key: str) -> bool:
-    """True when the iso(thio)cyanate N is attached to an AROMATIC atom.
-
-    SMARTS match layout: (R_atom, N, C, O/S) — R_atom is match[0].
-    """
-    mol = getattr(features, 'mol', None)
-    if mol is None:
-        return False
-    for match in (getattr(features, 'functional_groups', None) or {}).get(fg_key, []):
-        if match and mol.GetAtomWithIdx(match[0]).GetIsAromatic():
-            return True
-    return False
-
-
-__all__ = ["name_isocyanate", "_is_isocyanate", "_aromatic_attachment"]
+__all__ = ["name_isocyanate", "_is_isocyanate"]

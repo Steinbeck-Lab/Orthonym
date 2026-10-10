@@ -54,7 +54,17 @@ DEFAULT_TIER_DECLINES = frozenset({
     "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+# Leads item 29: 'NC(N)=[NH+]CC(CC(=O)[O-])C(=O)[O-]' and '[NH2+]=C(N)NCC(CC(=O)[O-])C(=O)[O-]' are
+# one species (the +1 on either of the three guanidinium nitrogens, one standard InChIKey). The
+# strict path names the first '2-[(diaminomethylideneazaniumyl)methyl]butanedioate' and the second
+# '2-({[amino(azaniumylidene)methyl]amino}methyl)butanedioate', both systematic_verified. The wider
+# tiers give one name for both drawings, that of the form whose canonical SMILES comes first, so the
+# best-effort name of the first drawing is the second's, read back to the full InChIKey by the helper;
+# tests/unit/namer/test_leads_l1_29_charge_forms.py pins it. No Blue Book rule ranks these two spellings
+# (neither is the PIN: the default tier declines both, 'azaniumyl' is the unmarked prefix): the choice of
+# the form whose canonical SMILES comes first is a determinism choice (one species, one name whatever
+# the drawing), not a nomenclature one, and the structure is right either way.
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({"NC(N)=[NH+]CC(CC(=O)[O-])C(=O)[O-]"})
 
 
 def _declined_pin_row(smiles):
