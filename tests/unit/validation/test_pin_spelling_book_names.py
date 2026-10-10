@@ -37,6 +37,16 @@ EXPLAINED = {
     (11509, "xanthene", "P-14.7.1"): _LISTING,
     # the book's row against (:3448): 'oxo' sorts before 'phenyl'
     (38894, "2-(2-phenyl-2-oxo-2λ5-diazenyl)naphthalen-1-yl", "P-14.5"): "book row against :3448",
+    # two names of one radical prefix extracted as one row: the name is the non-preferred and the
+    # preferred prefix side by side, which OPSIN reads as two radicals joined by a bond (a
+    # ring assembly of two copies); the book line prints each name once,:15542)
+    (17313, "3,4-dihydro-1-aza[12]annulen-6-yl 1-azacyclododeca-1,5,7,9,11-pentaen-6-yl", "P-28.1"):
+        "two names extracted into one row",
+    (17315, "12,13-dihydro-1H-1-aza[13]annulen-4-yl 1-azacyclotrideca-2,4,6,8,10-pentaen-4-yl", "P-28.1"):
+        "two names extracted into one row",
+    (17319, "dihydro-2H-pyran-3(4H)-ylidene oxan-3-ylidene", "P-28.1"): "two names extracted into one row",
+    (24882, "1,4-dihydronaphthalene-1,4-diylidene naphthalene-1,4-diylidene", "P-28.1"):
+        "two names extracted into one row",
 }
 
 

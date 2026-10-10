@@ -50,6 +50,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_locants",
     "orthonym.validation.spelling.checks_parent",
     "orthonym.validation.spelling.checks_phane",
+    "orthonym.validation.spelling.checks_assembly",
 )
 
 _loaded = False

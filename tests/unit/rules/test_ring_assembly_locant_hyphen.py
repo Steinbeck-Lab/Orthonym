@@ -59,7 +59,11 @@ CONTROLS = [
     ("C1CCC(C1)=C1CCCC1", "1,1'-bi(cyclopentylidene)"),
     ("c1ccc2[nH]c(cc2c1)-c1cc2ccccc2[nH]1", "1H,1'H-2,2'-biindole"),
     ("C1C=COC1=C1OC=CC1", "3H,3'H-2,2'-bifuranylidene"),
-    ("s1cccc1-c1ccc(s1)-c1cccs1", "2,5':2',2''-terthiophene"),
+    # the middle ring takes the lower locant for its bond to the previous ring,
+    # the Blue Book "the locant set 1,1':2',1'':3'',1''' is lower than 1,1':3',1'':2'',1'''";
+    # the book's own '2,2':6',2'':6'',2'''-quaterpyridine':15667): '2,2':5',2''-terthiophene',
+    # which OPSIN 2.9.0 reads back to the full InChIKey (leads L2 item N9c; was '2,5':2',2''-')
+    ("s1cccc1-c1ccc(s1)-c1cccs1", "2,2':5',2''-terthiophene"),
 ]
 
 
@@ -113,7 +117,7 @@ def test_the_writer_puts_a_hyphen_only_before_a_locant():
 # spells these assemblies with primed locants, so such a name is never labelled a PIN:
 # the default tier declines it and the wider tiers return it below the PIN label.
 PRIMED_THREE_PLUS = [
-    ("s1cccc1-c1ccc(s1)-c1cccs1", "2,5':2',2''-terthiophene"),
+    ("s1cccc1-c1ccc(s1)-c1cccs1", "2,2':5',2''-terthiophene"),
     ("c1csc(n1)-c1csc(n1)-c1nccs1", "2,4':2',2''-ter-1,3-thiazole"),
     ("c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1''-terphenyl"),
     ("c1ccc(cc1)-c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1'':4'',1'''-quaterphenyl"),

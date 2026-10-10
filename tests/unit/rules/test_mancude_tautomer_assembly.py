@@ -27,6 +27,8 @@ from orthonym.rules.ring_assemblies import (
     detect_ring_assembly,
     _is_mancude_indicated_h_state,
 )
+from tests.support.hydro_wiring import needs_wiring
+from tests.support.rt_assert import assert_full_rt
 
 
 class TestMancudeTautomerTarget:
@@ -70,9 +72,19 @@ class TestMustNotMisdetect:
         assert info is None, f"{label} wrongly detected as ring assembly: {info}"
 
     @pytest.mark.unit
-    def test_piperidine_names_as_substituent(self):
-        # Right molecule, non-assembly systematic name (NOT bipyridine).
-        assert name_compound("C1CCN(c2ccccn2)CC1") == "2-(piperidin-1-yl)pyridine"
+    @needs_wiring
+    def test_piperidine_names_as_hydro_assembly(self):
+        # Leads R2A: the detector above rightly leaves pyridine + piperidine alone (they are no mancude
+        # tautomer pair), and the molecule is the hydro-modified assembly of (the Blue Book
+        # "When assemblies of otherwise identical rings contain both mancude and saturated rings, the use of
+        # hydro prefixes is preferred";:24159 '1,2,3,4,5,6-hexahydro-2,2'-bipyridine (PIN)'): the junction
+        # nitrogen carries no double bond,:15593; '2H-1,2'-bipyridine (PIN)',:15634), so the
+        # remaining positions are indicated hydrogen 2H and the hydro prefixes 3,4,5,6.
+        # It is not '2-(piperidin-1-yl)pyridine', the substituent name this test used to pin (a non-PIN).
+        smiles = "C1CCN(c2ccccn2)CC1"
+        name = name_compound(smiles)
+        assert name == "3,4,5,6-tetrahydro-2H-1,2'-bipyridine"
+        assert_full_rt(name, smiles)
 
     @pytest.mark.unit
     def test_phenylpyridine_unchanged(self):

@@ -45,7 +45,14 @@ LOWERED = [
 #: pin_verified label reaches ``check_pin_spelling`` and the decline row carries no spelling
 #: failure; both checks fail the name (``test_the_p45_2_1_row_is_lowered_by_both_checks``)
 P4521_ROW = LOWERED[2]
-LOWERED_BY_SPELLING = [row for row in LOWERED if row is not P4521_ROW]
+#: the piperazine row named '1-(1-phenylpiperazin-4-yl)-...': the producer numbered the ring from two
+#: independent numberings (leads L2, item N8a name part); it now builds the PIN
+#: '1-(4-phenylpiperazin-1-yl)-3-[(1,2,3,4-tetrahydronaphthalen-1-yl)oxy]propan-2-ol'
+#: (test_leads_l2_mixed_ring_prefix.py), so the engine no longer builds the name this row asserts.
+#: The check still fails that name, which ``test_the_check_still_fails_the_numbering_the_producer_
+#: no_longer_builds`` keeps under test.
+FIXED_ROW = LOWERED[1]
+LOWERED_BY_SPELLING = [row for row in LOWERED if row is not P4521_ROW and row is not FIXED_ROW]
 
 
 def _rules(row):
@@ -79,6 +86,21 @@ def test_a_spelling_failure_lowers_the_label_never_the_name(smiles, name, rule):
     best = assert_best_effort_gives(smiles, name)              # the same name, full-key round trip
     assert (best["tier"], best["is_pin"]) == ("systematic_verified", False), best
     assert rule in _rules(best), best
+
+
+def test_the_check_still_fails_the_numbering_the_producer_no_longer_builds():
+    """ (c), (f) (the Blue Book,:3301): free valences take the lowest locants before the
+    detachable prefixes, so '1-(1-phenylpiperazin-4-yl)-...' (free valence 4, phenyl 1) is not the PIN;
+    the producer now names the ring once ('4-phenylpiperazin-1-yl') and the corrected name is
+    pin_verified with no failure at the default tier and at best-effort."""
+    smiles, old_name, rule = FIXED_ROW
+    assert rule in [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), old_name)]
+    new_name = ("1-(4-phenylpiperazin-1-yl)-3-[(1,2,3,4-tetrahydronaphthalen-1-yl)oxy]propan-2-ol")
+    assert check_pin_spelling(Chem.MolFromSmiles(smiles), new_name, strict=True) == []
+    for row in (default_tier_row(smiles), strict_path_row(smiles)):
+        assert (row["name"], row["tier"]) == (new_name, "pin_verified"), row
+        assert not row.get("spelling_failures"), row
+    assert_best_effort_gives(smiles, new_name)
 
 
 def test_name_with_confidence_declines_with_the_failures():
