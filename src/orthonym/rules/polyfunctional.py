@@ -1825,6 +1825,16 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     principal_chain = features.principal_chain
     atom_to_locant = features.atom_to_locant
     principal_group = features.principal_group
+    # (the Blue Book): an oxoacid with a substitutable hydrogen on its central
+    # atom is a functional parent, never a suffix ('(2-hydroxyethyl)phosphonic acid', not
+    # '2-hydroxyethane-1-phosphonic acid'; Note:35457 rejects 'benzenephosphonic acid'). The
+    # dedicated namer is OFFERED first; the suffix assembly below runs only when it declines.
+    from .phosphorus import name_oxoacid_functional_parent
+    _functional_parent = name_oxoacid_functional_parent(
+        mol, principal_group,
+        (getattr(features, 'functional_groups', None) or {}).get(principal_group))
+    if _functional_parent:
+        return _functional_parent
     non_principal = getattr(features, 'non_principal_groups', {})
     # audit fix 2026-06-22: drop same-union-class subtypes already in the
     # multiplied suffix (prevents the 'n-hydroxy…-1,n-diol' double-listing).

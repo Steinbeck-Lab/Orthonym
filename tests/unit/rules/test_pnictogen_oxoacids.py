@@ -320,18 +320,31 @@ def test_benzyl_case_names_correctly_even_without_the_opsin_gate(
     assert name == expected
 
 
+# RESOLVED (leads program, lane L4, item 30b): the polyfunctional suffix assembly offers the
+# dedicated namer first, so the three rows below are the PINs the docstring describes.
+# Blue Book, "Substitution of mononuclear noncarbon oxoacids with hydrogen atoms
+# attached to the central atom (substitutable hydrogen)" (the Blue Book): 'ethylphosphonic
+# acid (PIN) (not ethanephosphonic acid)' (:35461), and (:36534) '[2-(methoxysulfonyl)
+# phenyl]phosphonic acid (PIN)' (:36540). OPSIN 2.9.0 reads each name back to the full InChIKey
+# of its SMILES (the old suffix spellings read back too, so a read-back alone does not decide
+# them; the Blue Book does). The old strings were '2-hydroxyethane-1-phosphonic acid',
+# '2-hydroxyethan-1-arsonic acid' and '2-hydroxyethane-1-stibonic acid'.
 @pytest.mark.parametrize("smiles,element,shipped", [
-    ("OCCP(=O)(O)O",    "phosphon", "2-hydroxyethane-1-phosphonic acid"),
-    # NOTE the elision difference from its P and Sb siblings ('ethan-1-' vs
-    # 'ethane-1-'): a separate pre-existing defect in the generic assembler,
-    # pinned here so the PIN upgrade below cannot quietly paper over it.
-    ("OCC[As](=O)(O)O", "arsonic",  "2-hydroxyethan-1-arsonic acid"),
-    ("OCC[Sb](=O)(O)O", "stibonic", "2-hydroxyethane-1-stibonic acid"),
+    ("OCCP(=O)(O)O",    "phosphon", "(2-hydroxyethyl)phosphonic acid"),
+    ("OCC[As](=O)(O)O", "arsonic",  "(2-hydroxyethyl)arsonic acid"),
+    ("OCC[Sb](=O)(O)O", "stibonic", "(2-hydroxyethyl)stibonic acid"),
 ])
 def test_heteroatom_organyl_defers_to_the_generic_path_on_every_element(
     gated_namer, smiles, element, shipped,
 ):
-    """A substituent the namer cannot prove defers, it does not abstain.
+    """RESOLVED (leads program L4, item 30b): the PIN spelling is shipped (rows above).
+
+    The text below is the record of the defect as it stood when this test pinned the
+    parent-hydride-stem spelling; the blocker it names (which handler claims a polyfunctional
+    oxoacid) was closed by offering the namer from ``rules.polyfunctional.name_polyfunctional``
+    before the suffix assembly.
+
+    A substituent the namer cannot prove defers, it does not abstain.
 
     ``organyl_prefix_name`` is bounded to C/H/halogen fragments, so a
     heteroatom-bearing organyl still returns None; the handler defers and the
@@ -390,11 +403,7 @@ def test_heteroatom_organyl_defers_to_the_generic_path_on_every_element(
     """
     name = gated_namer.name(smiles)
     assert element in name, f"{smiles} -> {name!r}"
-    assert name == shipped, (
-        f"{smiles}: shipped non-PIN form moved. If this is the "
-        f"(2-hydroxyethyl)... PIN upgrade described above, update the expectation "
-        f"and the docstring together; got {name!r}"
-    )
+    assert name == shipped, f"{smiles}: expected the P-67.1.1.2 PIN {shipped!r}, got {name!r}"
 
 
 @pytest.mark.parametrize("smiles", [

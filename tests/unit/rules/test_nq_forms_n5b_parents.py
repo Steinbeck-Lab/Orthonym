@@ -66,11 +66,12 @@ VENADAPARIB = "C1(CC1)NCC1CN(C1)C(=O)C=1C=C(C=CC1F)CC1=NNC(C2=CC=CC=C12)=O"
 @pytest.mark.parametrize("tier", ["valid", "complete", "best-effort"])
 def test_venadaparib_carries_no_reject_on_sight_form(tier):
     """Spec Q4: venadaparib free of every form at the valid, complete and best-effort
-    tiers. The fused parent is '1-oxo-1,2-dihydrophthalazine' (prefix form; the suffix
-    form 'phthalazin-1(2H)-one' is the PIN path's, lanes L1b/L3)."""
+    tiers. The fused parent cites the ring C=O as the suffix with added indicated hydrogen,
+    'phthalazin-1(2H)-one', the Blue Book; leads item 7 (a), lane L5); it
+    was '1-oxo-1,2-dihydrophthalazine' (the group demoted to a prefix) before."""
     row = _row(VENADAPARIB, tier)
     name = row.get("name")
     assert name and name_is_rt_exact(name, VENADAPARIB), row
     forms = {t for t in F.detect(name) if t in F.TARGET}
     assert forms == set(), (name, forms)
-    assert "1,2-dihydrophthalazine" in name or "phthalazin-1(2H)-one" in name, name
+    assert "phthalazin-1(2H)-one" in name and "1-oxo-1,2-dihydrophthalazine" not in name, name

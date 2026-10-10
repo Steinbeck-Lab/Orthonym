@@ -4856,9 +4856,19 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
         (name, locs), = groups.items()
         prefix_str = _mc(len(locs), name, _eic(name))
     elif not any(_is_complex_prefix(nm) for nm in groups):
-        # byte-identical legacy path — simple-prefix rings are unchanged.
+        # byte-identical legacy path — simple-prefix rings are unchanged, except that a
+        # simple prefix with an italicized detachable part sorts by its Roman letters:
+        # "ALPHANUMERICAL ORDER" (the Blue Book) "Nonitalic Roman letters are
+        # considered first" (:3442); (:3495) lets italic letters decide only when
+        # the Roman letters do not: '1-(butan-2-yl)-3-tert-butylbenzene (PIN)' (:3507), so
+        # 'tert-butyl' is cited by 'butyl' (before 'hydroxy'), not by 't'.
+        from ..assembly.naming_utils import (
+            strip_italicized_structural_prefix as _strip_italic_prefix,
+        )
         parts = []
-        for name in sorted(groups):  # alphabetical citation order
+        # only the italicized sec-/tert- part is set aside; every other name keeps the plain
+        # string order it always had ('disulfanyl' stays under 'd')
+        for name in sorted(groups, key=lambda nm: (_strip_italic_prefix(nm)[0], nm)):
             locs = sorted(groups[name])
             loc_str = ','.join(str(loc) for loc in locs)
             from ..assembly.naming_utils import multiplied_component as _mc

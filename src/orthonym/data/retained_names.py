@@ -284,8 +284,16 @@ RETAINED_NAMES = {
     # OPSIN does not recognize "oxine"; these retained names ensure compatibility
     "C1=CCOC=C1": "2H-pyran",            # 2H-pyran (two C=C bonds)
     "C1=COC=CC1": "4H-pyran",            # 4H-pyran (two C=C bonds)
-    "C1=COCCC1": "3,4-dihydro-2H-pyran", # dihydropyran (one C=C bond)
-    "C1=CCOCC1": "3,6-dihydro-2H-pyran", # dihydropyran (one C=C bond)
+    # No rows for the two mono-ene dihydropyrans ('3,4-dihydro-2H-pyran',
+    # '3,6-dihydro-2H-pyran'): their hydro locants depend on the numbering the
+    # ring takes, and a fixed-locant row cannot follow it. (the Blue Book,
+    # 'NUMBERING') gives the principal characteristic group (c,:3256) a lower locant
+    # than hydro/'ene' (e,:3289), so a ring that bears a suffix is numbered from that
+    # group and its hydro prefixes follow ('5,6-dihydro-2H-pyran-3-carboxylic acid', not
+    # '3,6-dihydro-2H-pyran-3-carboxylic acid' = OPSIN's O=C(O)C1C=CCOC1). The rows
+    # returned the bare-ring locants for every substituted dihydropyran, bypassing
+    # ``heterocycles._mancude_hydro_name`` that spells the thiopyran twin correctly.
+    # The unsubstituted rings are named through that generic path.
 
     # === SATURATED HETEROCYCLES ===
     "C1CO1": "oxirane",

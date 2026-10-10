@@ -1097,6 +1097,84 @@ PREFIX_FORMS = {
 }
 
 
+#: Esters of acyclic phosphoric acid ranked with the esters when their functional-class name
+#: can be built (``get_principal_group``). Tri- before di-: the ``SENIORITY_ORDER`` order.
+_PHOSPHATE_ESTER_PROMOTED = ("phosphate_triester", "phosphate_diester")
+
+#: Molecules (by ``id``) whose phosphate-ester offer is being built right now. The functional-
+#: class namer names the owners through the substituent namer, which may ask for the
+#: principal group of the same molecule again; that nested question gets the head answer.
+_PHOSPHATE_OFFER_ACTIVE: set = set()
+
+
+def _promoted_phosphate_ester(mol, functional_groups, head_name):
+    """The acyclic phosphoric-acid ester to rank as the principal group, or None.
+
+     "SENIORITY ORDER FOR CLASSES" (the Blue Book), Table 4.1: "9 Esters
+    (functional class names are given to noncyclic esters; lactones and other cyclic esters
+    are named as heterocycles; see 16 below)" (:18182) ranks above "16 Ketones" (:18189),
+    "17 Hydroxy compounds" (:18190) and "19 Amines" (:18192); "Esters of
+    mononuclear noncarbon oxoacids" (:35916) names 'trimethyl phosphate (PIN)' (:35936) and
+    'methyl dihydrogen phosphate (PIN)' (:35940) as functional-class esters.
+
+    The tri- and diester are ranked with the esters (after ``phosphonate_diester``) only when
+    the functional-class name of ``rules.phosphorus.name_phosphate_ester`` can be built for
+    the molecule: the class is OFFERED, not returned. A suffix-less functional-class
+    principal group that cannot be built would demote the next class's suffix to a prefix
+    ('propan-2-ol' to '2-hydroxy...propane'), so a phosphate ester the namer declines
+    keeps the head order. A phosphorus ring atom is a cyclic ester, named as a heterocycle
+    (the same note of Table 4.1), and is not ranked here. Only a head group below
+    ``phosphonate_diester`` is outranked: the acids, the carboxylic and sulfonic esters, the
+    amides and the groups between keep their head rank. Table 4.1 puts the esters (class 9)
+    above the amides (class 11), but that placement of the phosphate esters was not measured,
+    so the amides stay ahead of them (follow-up of lane L4).
+
+    A molecule whose ester outranks the head but cannot be offered is named on the head
+    group; that name is not the PIN, and the label rule for it is the phosphoryl-oxy prefix
+    test of ``rules.pin_vocabulary.non_pin_vocabulary`` (a name decides it, so it does not
+    depend on which tier built the name).
+
+    Only for a whole molecule (``is_top_level_naming``): a fragment named inside another name
+    keeps the substitutive principal group that name needs, because a functional-class name
+    cannot take the substituents of the other fragments. Follow-up (item 42c): the same rule
+    moves a decomposition fragment of a large ester between two names that are both correct
+    and neither better (the stereo-stripped ceramide phosphoinositol: the cyclohexane-1,2,3,
+    4,5-pentol name with an N-(2-hydroxytetracosanoyl) group becomes the skeletal-replacement
+    form with a '3-hydroxy-3-oxo-4-(2,3,4,5,6-pentahydroxycyclohexyl)-2,4-dioxa-3-phosphabutyl'
+    group; both are systematic_verified): the fragment case needs its own measurement."""
+    if head_name is None or head_name in _PHOSPHATE_ESTER_PROMOTED:
+        return None
+    if not any(functional_groups.get(n) for n in _PHOSPHATE_ESTER_PROMOTED):
+        return None                          # no phosphate ester: the head answer, at no cost
+    # Only a whole molecule: a fragment named inside another name (a decomposition fragment, a
+    # substituent's capped fragment) keeps the substitutive principal group its enclosing name
+    # needs, because a functional-class name ('X Y hydrogen phosphate') cannot take the
+    # substituents of the other fragments (the same reasoning as name_general_multiplicative).
+    from ..assembly.fragment_naming import is_top_level_naming
+    if not is_top_level_naming():
+        return None
+    try:
+        floor = SENIORITY_ORDER.index("phosphonate_diester")
+        if SENIORITY_ORDER.index(head_name) <= floor:
+            return None
+    except ValueError:
+        return None
+    for fg_name in _PHOSPHATE_ESTER_PROMOTED:
+        matches = functional_groups.get(fg_name)
+        if not matches:
+            continue
+        if id(mol) in _PHOSPHATE_OFFER_ACTIVE:
+            return None
+        from .phosphorus import phosphate_ester_offered
+        _PHOSPHATE_OFFER_ACTIVE.add(id(mol))
+        try:
+            if phosphate_ester_offered(mol, matches):
+                return fg_name, matches
+        finally:
+            _PHOSPHATE_OFFER_ACTIVE.discard(id(mol))
+    return None
+
+
 def get_principal_group(
     mol,
     functional_groups: Dict[str, List[tuple]]
@@ -1115,6 +1193,17 @@ def get_principal_group(
         Tuple of (group_name, list_of_atom_index_tuples)
         Returns (None, ) if no suffix-capable group found
     """
+    head = _head_principal_group(mol, functional_groups)
+    promoted = _promoted_phosphate_ester(mol, functional_groups, head[0])
+    return promoted if promoted is not None else head
+
+
+def _head_principal_group(
+    mol,
+    functional_groups: Dict[str, List[tuple]]
+) -> Tuple[Optional[str], List[tuple]]:
+    """The first group of ``SENIORITY_ORDER`` that is present and suffix-capable (the answer
+    before the phosphate esters are offered; see ``get_principal_group``)."""
     for fg_name in SENIORITY_ORDER:
         if fg_name in functional_groups and functional_groups[fg_name]:
             # functional-group perception fix/ (169.7): a principal characteristic group MUST be

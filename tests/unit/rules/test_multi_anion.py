@@ -109,7 +109,9 @@ DEFAULT_TIER_DECLINES = frozenset({
     "C[N+](C)(C)CCC(=O)[O-]",
     "Cc1ccc([O-])c(C([O-])=O)c1.[Na+].[Na+]",
     "[O-]CC(C)C([O-])=O.[Na+].[Na+]",
-    "[O-]CCP(=O)([O-])[O-].[Na+].[Na+].[Na+]",
+    # '[O-]CCP(=O)([O-])[O-].[Na+].[Na+].[Na+]' left this set (leads program L4, item 30b): the
+    # functional-parent form is built now, see test_chain_phosphonate_is_the_functional_
+    # parent_form.
     "[O-]c1cc(C)cc(C([O-])=O)c1.[Na+].[Na+]",
 })
 #... whose best-effort name is another one (it reads back exactly)
@@ -214,16 +216,22 @@ def test_p72_7a_boundary_is_not_pin_verified(namer):
 
 
 @pytest.mark.opsin_gate
-def test_chain_phosphonate_suffix_form_is_demoted(namer):
-    # The name is the right molecule, but the chain phosphonic acid comes from
-    # the neutral namer's suffix form; the PIN is the functional-parent form,
-    # the Blue Book "ethylphosphonic acid (PIN) (not ethanephosphonic
-    # acid)" -> '(2-oxidoethyl)phosphonate'. Not pin_verified.
+def test_chain_phosphonate_is_the_functional_parent_form(namer):
+    # RESOLVED (leads program, lane L4, item 30b). This row pinned the defect: the chain
+    # phosphonic acid came from the neutral namer's suffix form
+    # ('trisodium 2-oxidoethane-1-phosphonate', right molecule, not the PIN) and was demoted.
+    # The polyfunctional suffix assembly now offers the namer first, so the PIN is
+    # built: the Blue Book "Substitution of mononuclear noncarbon oxoacids with hydrogen
+    # atoms attached to the central atom (substitutable hydrogen)",:35461 "ethylphosphonic acid
+    # (PIN) (not ethanephosphonic acid)" -> 'trisodium (2-oxidoethyl)phosphonate' (OPSIN reads
+    # it back to the full InChIKey, asserted below; the suffix form reads back too).
     smi = "[O-]CCP(=O)([O-])[O-].[Na+].[Na+].[Na+]"
     res = _dt_obj_row(namer, smi)
+    assert res["name"] == "trisodium (2-oxidoethyl)phosphonate"
     assert name_is_rt_exact(res["name"], smi)
-    assert res["tier"] != "pin_verified"
-    assert res["is_pin"] is False
+    assert res["tier"] == "pin_verified"
+    assert res["is_pin"] is True
+    assert name_is_rt_exact("trisodium 2-oxidoethane-1-phosphonate", smi)
 
 
 # (the Blue Book) "Simple prefixes... are arranged

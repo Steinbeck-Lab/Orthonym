@@ -130,8 +130,12 @@ _JUNIOR_TO_ESTER_END = re.compile(
     r"(?:amide|nitrile|carbaldehyde|al|one|ol|thiol|amine|imine)$")
 # Branch review fixes: the same rule for the esters of the mononuclear noncarbon
 # oxoacids of sulfur and phosphorus attached by oxygen -- 'sulfooxy' (-O-SO2-OH),
-# 'phosphonooxy' (-O-PO(OH)2) and the phosphodiester link '(hydroxy)phosphoryl...
-# oxy' (-O-PO(OH)-O-). (the Blue Book) and (:36327)
+# 'phosphonooxy' (-O-PO(OH)2) and every phosphoryl link 'phosphoryl... oxy'
+# (-O-PO(OR)(OR'), -O-PO(OH)(OR): '[(diethoxyphosphoryl)oxy]', '[ethoxy(methoxy)
+# phosphoryl]oxy', '[(2-aminoethoxy)hydroxyphosphoryl]oxy'). Leads program item 42:
+# the alkoxy branches were missing, so the lactone '3-chloro-7-[(diethoxyphosphoryl)
+# oxy]-4-methyl-2H-1-benzopyran-2-one' kept a PIN label under class 16 while the ester,
+# class 9, is the PIN. (the Blue Book) and (:36327)
 # cite such a group as a prefix only when "another substituent having priority over
 # the... group for citation as principal group" is present ('3-(sulfooxy)propanoic
 # acid (PIN)',:36488; '(phosphonooxy)acetic acid',:36333); otherwise the ester is
@@ -178,7 +182,7 @@ def _oxoacid_ester_prefix_re() -> "re.Pattern":
         alt = "|".join(sorted((re.escape(a) for a in acyl), key=len, reverse=True))
         _OXOACID_ESTER_PREFIX_RE = re.compile(
             rf"(?<![a-z])(?:{alt})(?:oxy|sulfanyl|selanyl|tellanyl)"
-            r"|(?:\(hydroxy\)|hydroxy)phosphoryl[)\]}]*oxy")
+            r"|phosphoryl[)\]}]*oxy")
     return _OXOACID_ESTER_PREFIX_RE
 
 # Breadth job 3 review fixes: the class of the parent that carries an ester prefix,
@@ -549,6 +553,21 @@ _CARBOXYMETHYL_ON_ACETIC = re.compile(r"carboxymethyl.*acet(?:ic acid|ate)$")
 # 'methyl' carrier is that carbon chain written by method (2).
 _CARBAMOYL_ON_METHYL = re.compile(r"carbamoyl[)\]}]*methyl")
 
+# "Substitution of mononuclear noncarbon oxoacids with hydrogen atoms attached
+# to the central atom (substitutable hydrogen)" (the Blue Book): the acid is a
+# functional parent that is substituted ('ethylphosphonic acid (PIN) (not
+# ethanephosphonic acid)',:35461; (:37313) 'methylboronic acid (PIN) (not
+# methylboranediol)',:37323). Its Note (:35457) rejects the method that "would treat the
+# acid as a suffix (like sulfonic acid) leading to names such as benzenephosphonic acid".
+# A phosphonic, phosphinic, arsonic, arsinic, stibonic, stibinic or boronic acid (or its
+# anion or ester) cited as a suffix on a parent hydride after a locant ('benzene-1-
+# phosphonic acid', 'ethane-1,1-diphosphonic acid') is that rejected form; the multiplied
+# parent ('benzene-1,4-diylbis(phosphonic acid)') has 'diylbis(' after the locants and is
+# not matched. Label-only: the name stays (it round-trips), it is not the PIN.
+_OXOACID_AS_SUFFIX = re.compile(
+    r"-\d+[a-z]?(?:,\d+[a-z]?)*-(?:di|tri|tetra)?"
+    r"(?:phosphon|phosphin|arson|arsin|stibon|stibin|boron)(?:ic acid|ate)(?![a-z])")
+
 # (the Blue Book, "if any locants are essential for defining the
 # structure of the parent structure... then all locants must be cited") with
 # (c) (:2913, the locant '1' is omitted only "in monosubstituted
@@ -681,7 +700,8 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
                _UNRETAINED_C1C2_ACID, _ACYLAMINO, _ALKAN_1_YL, _MISSING_HYPHEN,
                _UNCONTRACTED_OXY, _METHYL_ON_ETHYL, _ADAMANTANE_VB, _DIOXIDANYL,
                _OXO_ALKYL_ACYL, _UNENCLOSED_COMPOUND, _UNENCLOSED_ELEMENT_LOCANT,
-               _GEMINAL_N_N_PRIME_MULTIPLIED, _UNLOCANTED_RING_YL, _CARBAMOYL_ON_METHYL):
+               _GEMINAL_N_N_PRIME_MULTIPLIED, _UNLOCANTED_RING_YL, _CARBAMOYL_ON_METHYL,
+               _OXOACID_AS_SUFFIX):
         m = rx.search(name)
         if m:
             return m.group(0)
@@ -944,7 +964,309 @@ def _linker_sequence(mol, linker, start_system) -> tuple:
     return tuple(seq)
 
 
+#: Principal-group classes whose chain units take a multiplicative PIN when two or more
+#: identical units are joined by a ring or a heteroatom: the carbo-suffix classes (the
+#: group's carbon ends the chain unit) and the hetero-suffix classes (the group sits on
+#: a chain carbon).
+_CHAIN_UNIT_CARBO_GROUPS = frozenset({
+    "carboxylic_acid", "primary_amide", "nitrile", "aldehyde", "ketone"})
+_CHAIN_UNIT_HETERO_GROUPS = frozenset({
+    "primary_alcohol", "secondary_alcohol", "tertiary_alcohol", "alcohol", "thiol",
+    "primary_amine"})
+_CHAIN_UNIT_GROUPS = _CHAIN_UNIT_CARBO_GROUPS | _CHAIN_UNIT_HETERO_GROUPS
+#: An amine nitrogen in the linker is a second principal group when the principal group
+#: is itself an amine: "Polyamines" (the Blue Book), "[not...2,2'-
+#: azanediyldi(ethan-1-amine); the preferred IUPAC name must be a diamine]" (:26398). It
+#: is not one beside a senior group ('3,3'-azanediyldipropanenitrile (PIN)',
+#: "Substituted nitriles",:34831).
+_AMINE_GROUPS = frozenset({"primary_amine"})
+
+
+def _group_anchor(mol, match):
+    """The carbon that carries a principal-group instance: the one carbon of the match
+    that is bonded to the group's own heteroatom (the carbonyl or nitrile carbon of an
+    acid, amide, nitrile, aldehyde or ketone; the carbinol, thiol or amine carbon).
+    None when that is not one carbon."""
+    mset = set(match)
+    carbons = []
+    for a in match:
+        at = mol.GetAtomWithIdx(a)
+        if at.GetAtomicNum() != 6:
+            continue
+        if any(n.GetIdx() in mset and n.GetAtomicNum() in (7, 8, 16)
+               for n in at.GetNeighbors()):
+            carbons.append(a)
+    return carbons[0] if len(carbons) == 1 else None
+
+
+def _linker_atom_ok(mol, idx, pg) -> bool:
+    """A linker atom a multiplicative central group can consist of: any ring atom (a
+    ring or ring system as the central group), an acyclic carbon with no multiple
+    bond to a heteroatom, a divalent -O- or -S- "Assemblies of identical
+    structural units", the Blue Book: '2,2'-sulfanediyldi(ethan-1-ol) (PIN)',
+    :5813; '2,2'-oxydi(ethan-1-amine) (PIN)',:6124), or a neutral acyclic amine
+    nitrogen when the principal group is not itself an amine (see ``_AMINE_GROUPS``)."""
+    at = mol.GetAtomWithIdx(idx)
+    if at.IsInRing():
+        return True
+    z = at.GetAtomicNum()
+    nbrs = list(at.GetNeighbors())
+    if at.GetFormalCharge() or at.GetNumRadicalElectrons():
+        return False
+    if z == 6:
+        return not any(b.GetBondTypeAsDouble() > 1 and b.GetOtherAtom(at).GetAtomicNum() != 6
+                       for b in at.GetBonds())
+    if z in (8, 16):
+        return (len(nbrs) == 2 and all(n.GetAtomicNum() in (6, 16) for n in nbrs)
+                and all(b.GetBondTypeAsDouble() == 1 for b in at.GetBonds()))
+    if z == 7:
+        if pg in _AMINE_GROUPS:
+            return False
+        return (all(n.GetAtomicNum() == 6 and not n.GetIsAromatic() for n in nbrs)
+                and all(b.GetBondTypeAsDouble() == 1 for b in at.GetBonds())
+                and not any(b2.GetBondTypeAsDouble() > 1 and b2.GetOtherAtom(n).GetAtomicNum() != 6
+                            for n in nbrs for b2 in n.GetBonds()))
+    return False
+
+
+def _path_reads_same_both_ways(mol, path) -> bool:
+    """The atoms of ``path`` read from either end give the same (element, aromatic,
+    bond order from the previous atom) sequence: the central group is symmetrical."""
+    def seq(order):
+        out, prev = [], None
+        for a in order:
+            at = mol.GetAtomWithIdx(a)
+            bond = None if prev is None else mol.GetBondBetweenAtoms(prev, a)
+            out.append((at.GetSymbol(), at.GetIsAromatic(),
+                        None if bond is None else bond.GetBondTypeAsDouble()))
+            prev = a
+        return tuple(out)
+    fwd = seq(path)
+    bwd = seq(list(reversed(path)))
+    # the first entry carries no bond: compare element/aromaticity and the bonds that follow
+    return fwd[0][:2] == bwd[0][:2] and fwd[1:] == bwd[1:]
+
+
+def _four_or_more_ring_systems(mol) -> bool:
+    """True when the molecule holds four or more ring systems. "Preferred IUPAC names in
+    phane nomenclature" (the Blue Book), (:23826): "(2) linear phanes consist of
+    four or more rings or ring systems, two of which must be terminal, and together with acyclic
+    atoms or chains must consist of at least seven nodes (components)" (:23829); (:23174)
+    names a phane name rather than a multiplicative one then. The linear-phane check of
+    ``validation.pin_spelling`` owns those molecules and records its own reason, so the two rules
+    of this module make no claim for them."""
+    rings = [set(r) for r in mol.GetRingInfo().AtomRings()]
+    systems = []
+    for r in rings:
+        merged = [x for x in systems if x & r]
+        for x in merged:
+            systems.remove(x)
+            r = r | x
+        systems.append(r)
+    return len(systems) >= 4
+
+
+def _chain_unit_multiplicative_expected(mol) -> bool:
+    """True when two or more identical CHAIN units, each carrying one instance of the
+    principal characteristic group, are joined by a ring or a heteroatom, so the
+    PIN is a multiplicative name ('1,1'-(cyclohexane-1,4-diyl)di(propan-2-one)'), a
+    skeletal-replacement ('a') name or a phane name, never the substitutive name.
+
+     "Preferred IUPAC multiplicative names" (the Blue Book):
+    "Multiplicative nomenclature is preferred to substitutive nomenclature for
+    generating preferred IUPAC names to express multiple occurrences of identical
+    parent structures" when the linking bonds are identical, the multiplicative
+    groups other than the central one are symmetrically substituted and the locants
+    of all substituent groups, including suffix groups, are identical (:23180-23184);
+    '3,3'-(1,4-phenylene)di(propan-1-ol) (PIN)' "Selection of parent
+    compounds",:25171);
+    '1,1'-(ferrocene-1,1'-diyl)di(ethan-1-one) (PIN)' "Ocenes",:40133);
+    '2,2'-sulfanediyldiacetic acid (PIN, multiplicative name)' (:23192). (:23174)
+    names skeletal replacement ('a') and phane names ahead of a multiplicative name
+    when their conditions are met, so the substitutive name is not the PIN either way
+    ('3,6,9,12-tetraoxatetradecane-1,14-dioic acid [PIN,...]',:23212).
+
+    Every condition is required, and any doubt gives False (no claim): all instances
+    of the principal group of the molecule are in one symmetry class (two or more);
+    each carries its group on an acyclic carbon, a carbo-suffix group's carbon not
+    bonded to a ring atom (else the ring is the unit); that carbon is bonded to
+    carbon only besides its own group (no dicarbonic or imidodicarbonic acids); the
+    shortest path between any two instances runs through a ring or a heteroatom (else
+    one chain carries both groups, 'butanedioic acid'), only through atoms a central
+    multiplicative group is made of, and reads the same from both ends."""
+    try:
+        from rdkit import Chem
+
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        pg, matches = get_principal_group(mol, detect_functional_groups(mol))
+        if pg not in _CHAIN_UNIT_GROUPS or not matches or len(matches) < 2:
+            return False
+        if _four_or_more_ring_systems(mol):
+            return False
+        anchors = []
+        for m in matches:
+            a = _group_anchor(mol, m)
+            if a is None:
+                return False
+            anchors.append(a)
+        if len(set(anchors)) != len(anchors):
+            return False
+        ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+        if len({tuple(sorted(ranks[a] for a in m)) for m in matches}) != 1:
+            return False
+        for m, a in zip(matches, anchors):
+            at = mol.GetAtomWithIdx(a)
+            if at.IsInRing() or at.GetFormalCharge():
+                return False
+            if pg in _CHAIN_UNIT_CARBO_GROUPS and pg != "ketone" and any(
+                    n.IsInRing() for n in at.GetNeighbors()):
+                return False
+            mset = set(m)
+            if any(n.GetIdx() not in mset and n.GetAtomicNum() != 6
+                   for n in at.GetNeighbors()):
+                return False
+        for i in range(len(anchors)):
+            for j in range(i + 1, len(anchors)):
+                path = list(Chem.GetShortestPath(mol, anchors[i], anchors[j]))
+                inner = path[1:-1]
+                if not inner:
+                    return False
+                if not any(mol.GetAtomWithIdx(x).IsInRing()
+                           or mol.GetAtomWithIdx(x).GetAtomicNum() != 6 for x in inner):
+                    return False
+                if not all(_linker_atom_ok(mol, x, pg) for x in inner):
+                    return False
+                if not _path_reads_same_both_ways(mol, path):
+                    return False
+        return True
+    except Exception:  # noqa: BLE001 - unknown: no claim
+        return False
+
+
+def _pg_free_unit_multiplicative_expected(mol) -> bool:
+    """True when the molecule has no principal characteristic group and its senior ring
+    skeleton occurs in two identical, symmetry-equivalent ring systems that are not
+    bonded directly (not a ring assembly) and are joined by a symmetrical central group
+    of carbon, -O- or -S- atoms: the PIN is a multiplicative, 'a' or phane name.
+
+     (the Blue Book): "identical parent structures do not have to have a
+    principal characteristic group in order to construct a multiplicative name";
+    (:23178) prefers it to the substitutive name. The check is narrower than the rule:
+    the molecule holds only C, O, S and halogens outside its ring systems (a senior
+    acyclic N, P, Si, Sn... parent hydride,, or a hub of a different class
+    would be the parent), no carbon is double-bonded to a heteroatom (a carbonyl is a
+    principal group the perception may not report), and no atom is charged."""
+    try:
+        from itertools import combinations
+
+        from rdkit import Chem
+
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        if mol.GetRingInfo().NumRings() < 2 or _four_or_more_ring_systems(mol):
+            return False
+        pg, _ = get_principal_group(mol, detect_functional_groups(mol))
+        if pg:
+            return False
+        ri = mol.GetRingInfo()
+        rings = [set(r) for r in ri.AtomRings()]
+        systems = []
+        for r in rings:
+            merged = [x for x in systems if x & r]
+            for x in merged:
+                systems.remove(x)
+                r = r | x
+            systems.append(r)
+        in_ring = set().union(*systems) if systems else set()
+        for at in mol.GetAtoms():
+            if at.GetFormalCharge() or at.GetNumRadicalElectrons() or at.GetIsotope():
+                return False
+            z = at.GetAtomicNum()
+            if at.GetIdx() in in_ring:
+                continue
+            if z in (9, 17, 35, 53):
+                if at.GetDegree() != 1:
+                    return False
+            elif z in (8, 16):
+                if at.GetDegree() != 2 or any(b.GetBondTypeAsDouble() != 1
+                                              for b in at.GetBonds()):
+                    return False
+            elif z != 6:
+                return False
+        for b in mol.GetBonds():
+            if b.GetBondTypeAsDouble() > 1 and not b.GetIsAromatic():
+                a, c = b.GetBeginAtom(), b.GetEndAtom()
+                if a.GetAtomicNum() != 6 or c.GetAtomicNum() != 6:
+                    return False
+
+        def skel(atoms):
+            return Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(atoms),
+                                            canonical=True, isomericSmiles=False,
+                                            kekuleSmiles=False)
+        groups = {}
+        for i, sy in enumerate(systems):
+            groups.setdefault(skel(sy), []).append(i)
+
+        def seniority(sy):
+            syms = {mol.GetAtomWithIdx(a).GetSymbol() for a in sy}
+            n_rings = sum(1 for r in rings if r <= sy)
+            return ('N' in syms, bool(syms - {'C'}), n_rings, len(sy))
+        top = max(seniority(sy) for sy in systems)
+        ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+        system_of = {a: n for n, sy in enumerate(systems) for a in sy}
+
+        def in_assembly(n):
+            """A unit bonded directly to a ring system of its own skeleton is part of a ring
+            assembly 'terphenyl'), which takes precedence over a multiplicative name."""
+            for a in systems[n]:
+                for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                    m = system_of.get(nb.GetIdx())
+                    if m is not None and m != n and skel(systems[m]) == skel(systems[n]):
+                        return True
+            return False
+        for members in groups.values():
+            if len(members) < 2 or seniority(systems[members[0]]) != top:
+                continue
+            if any(in_assembly(n) for n in members):
+                continue
+            for i, j in combinations(members, 2):
+                if (sorted(ranks[a] for a in systems[i])
+                        != sorted(ranks[a] for a in systems[j])):
+                    continue
+                info = {}
+                if _unit_identity(mol, systems[i], systems[j], info) is not True:
+                    continue
+                linker = info.get("linker") or []
+                if not linker:
+                    continue
+                if not all(_linker_atom_ok(mol, x, None) and mol.GetAtomWithIdx(x).GetAtomicNum()
+                           in (6, 8, 16) for x in linker):
+                    continue
+                if _linker_sequence(mol, linker, systems[i]) != _linker_sequence(
+                        mol, list(reversed(linker)), systems[j]):
+                    continue
+                return True
+        return False
+    except Exception:  # noqa: BLE001 - unknown: no claim
+        return False
+
+
 def multiplicative_pin_expected(mol) -> bool:
+    """True when the molecule's PIN is a multiplicative name (or an 'a' or phane name
+    that takes its place,, the Blue Book), so no substitutive name built
+    for it is its PIN: the ring-unit rule (``_ring_unit_multiplicative_pin_expected``),
+    the chain-unit rule (``_chain_unit_multiplicative_expected``) or the rule for
+    ring units with no principal group (``_pg_free_unit_multiplicative_expected``).
+    Nothing but a substitutive name is judged by it: the caller leaves the names of the
+    multiplicative, skeletal-replacement, retained-name, amino-acid and inorganic-acid
+    routes alone."""
+    return bool(_ring_unit_multiplicative_pin_expected(mol)
+                or _chain_unit_multiplicative_expected(mol)
+                or _pg_free_unit_multiplicative_expected(mol))
+
+
+def _ring_unit_multiplicative_pin_expected(mol) -> bool:
     """True when the molecule's PIN is a multiplicative name, so no other name built
     for it is its PIN.
 

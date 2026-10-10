@@ -36,16 +36,15 @@ def test_the_cited_suffix_takes_the_lowest_locant(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,name", [
-    # the ring carries the ester: the amide is a prefix, the numbering is main's
-    ("COC(=O)C1=CCCN(C)C1C(N)=O", "6-carbamoyl-5-(methoxycarbonyl)-1-methyl-1,2,3,6-tetrahydropyridine"),
-    ("COC(=O)C1=CCCOC1C(N)=O", "5-(methoxycarbonyl)-3,6-dihydro-2H-pyran-6-carboxamide"),
     # an ester principal group on a side chain with no ring suffix competing: unchanged
     ("COC(=O)CCc1ccc(C(=O)NC)n1C", "methyl 3-[1-methyl-5-(methylcarbamoyl)-1H-pyrrol-2-yl]propanoate"),
     ("OC(=O)CCc1ccc(C(N)=O)o1", "3-(5-carbamoylfuran-2-yl)propanoic acid"),
 ])
 def test_rows_outside_this_task_are_unchanged(smiles, name):
-    # Unchanged rows, NOT a claim that they are right: with the ester ON the ring the writer
-    # still cites its suffix at a higher locant than (c) (the Blue Book) allows
-    # (e.g. the pyran carboxamide could take locant 2). Known residual, checklist item 22.
+    # Unchanged rows. The two rows with the ester ON the ring that this test used to pin
+    # ('6-carbamoyl-5-(methoxycarbonyl)-1-methyl-1,2,3,6-tetrahydropyridine' and
+    # '5-(methoxycarbonyl)-3,6-dihydro-2H-pyran-6-carboxamide', names that cited the ring
+    # suffix at a higher locant than (c), the Blue Book, allows) are now named by
+    # the ester functional class and pinned in test_leads_l5_item22.py (leads item 22).
     row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert row["name"] == name, row
