@@ -79,6 +79,15 @@ from .ions import (
 # unwinds to the outermost boundary and becomes a clean abstention. Recursion
 # through the route is bounded by ``_MAX_ROUTE_DEPTH`` below. The work, not the
 # heavy-atom count, is bounded.
+#
+# One ask per ion. Several naming paths ask the route for the SAME ion of one molecule
+# (``salts.name_salt``, ``ions.name_anion``, ``dispatch_table._handle_anion_small``,
+# ``composer.assemble_ion_name``, ``namer._retry_cascade_on_gate_rejection``, and the
+# radical handlers on a radical piece), and a refusal costs the whole re-entry each time:
+# the 108-heavy-atom sulfate anion of a ChEBI glycolipid was routed 8 times at 48-107
+# analysis calls each, 483 of the 500 the molecule gets, so the budget ran out and the
+# molecule was not named (measured, fresh process, best-effort tier). ``route_charged`` is
+# memoised for the outermost ``name`` by ``_memoised_route`` below, a refusal included.
 # =============================================================================
 
 # charged-species fix, 169.6 caveats (a phase): canonical SMILES of retained charged species
@@ -2255,6 +2264,141 @@ def _declined_route_keeps_producer_record(fn):
     return _wrapped
 
 
+def _group14_metal_radical_element(mol) -> Optional[str]:
+    """'Sn' or 'Pb' when ``mol`` is a neutral molecule of one fragment whose only atom
+    outside the organic allowlist (``ions._has_metal``) is a single tin or lead atom, and
+    that atom carries the molecule's only radical electrons; None otherwise.
+
+     'Specific method and retained names' (the Blue Book): "A radical
+    formally derived by the removal of two hydrogen atom from one skeletal atom of a
+    mononuclear parent hydride of an element of Group 14... is named by replacing the 'ane'
+    ending of the systematic name of the parent hydride by the suffix '-ylidene'" (:40476;
+    'silylidene (preselected name)':40484, 'benzylsilylidene (PIN)':40490);
+    gives '-yl' for one hydrogen atom removed. The Group-14 radicals of silicon and
+    germanium (in the allowlist) reach the radical path below; tin and lead (``stannane``,
+    ``plumbane``, ``radicals._GROUP14_HYDRIDE_RADICAL``) are metals to ``_has_metal`` and
+    were refused at step 1. Ions stay out of scope: a formal charge anywhere, a second
+    fragment, a second metal atom or a second radical site gives None, and so does a tin
+    atom with no radical electron (tetramethylstannane is no radical).
+
+    Only for the molecule that IS the caller's input (``_is_the_callers_input``). A tin or
+    lead piece of a mixture is a COMPONENT of it, the Blue Book: "Names are
+    formed by citing the names of individual compounds..."), named by a nested ``name``
+    (``rules.adducts._name_component``) or by the salt writer, and a radical word cannot
+    stand in a multi-component name: OPSIN reads none of
+    '3,5,5-trimethylhexanoic acid—dioctylstannylidene (2/1)', so the adduct would not be
+    named at all where its component's lambda-convention name ('9λ2-stannaheptadecane') is
+    read back (measured: 2 eval molecules, 4 rows, lost at best-effort without this
+    condition). The piece keeps that naming."""
+    try:
+        from rdkit import Chem as _Chem
+        if len(_Chem.GetMolFrags(mol)) != 1:
+            return None
+        from .ions import _ORGANIC_NONMETALS
+        outside = [a for a in mol.GetAtoms() if a.GetSymbol() not in _ORGANIC_NONMETALS]
+        if len(outside) != 1 or outside[0].GetSymbol() not in ('Sn', 'Pb'):
+            return None
+        if any(a.GetFormalCharge() for a in mol.GetAtoms()):
+            return None
+        radical_atoms = [a.GetIdx() for a in mol.GetAtoms() if a.GetNumRadicalElectrons()]
+        if radical_atoms != [outside[0].GetIdx()]:
+            return None
+        if not _is_the_callers_input(mol):
+            return None
+        return outside[0].GetSymbol()
+    except Exception:
+        return None
+
+
+def _is_the_callers_input(mol) -> bool:
+    """True when ``mol`` is the molecule the caller of the outermost ``name`` gave
+    (``namer._caller_input``: its string while that call runs), or when no ``name`` is
+    running (a direct call of a producer names the molecule it is given). False for a piece
+    of it (a component of a mixture) and when either side cannot be read.
+
+    The depth of the ``name`` stack does not say it: the default tier runs the caller's
+    molecule a second time inside the first call (``Orthonym._name_with_pin_promotion``),
+    one level down, and a component of an adduct is named by a nested ``name`` too."""
+    try:
+        from ..namer import _caller_input
+        given = _caller_input()
+        if given is None:
+            return True
+        from rdkit import Chem as _Chem
+        whole = _Chem.MolFromSmiles(given)
+        return whole is not None and _Chem.MolToSmiles(whole) == _Chem.MolToSmiles(mol)
+    except Exception:
+        return False
+
+
+def _has_tin_or_lead(mol) -> bool:
+    return any(a.GetAtomicNum() in (50, 82) for a in mol.GetAtoms())
+
+
+def _route_memo_key(mol, style: str):
+    """The memo key of one ``route_charged`` ask, or None when the molecule cannot be
+    keyed (the ask then runs unmemoised).
+
+    The route re-enters the whole naming pipeline on the neutral form, so its value is
+    a function of the ion and of everything that pipeline reads from its context: the
+    style, the breadth contexts of the call (general-fallback, best-effort,
+    aromatic-general, full-coverage), the N-acyl float scope, the peptide substitutive
+    attempt, the forced-locant and isotope scopes, the gate re-entry and the
+    session depth (the same set the decomposition memos key on,
+    ``decomposition.engine._name_fragment_t4_rescue``), of whether a tin or lead ion is the
+    caller's whole input or a piece of it (``_group14_metal_radical_element``), and of the
+    route's own nesting depth: a route that sits ``_MAX_ROUTE_DEPTH - 1`` levels down has
+    its own re-entry cut off, which a route at the top is not. The ion is its canonical isomeric SMILES
+    (isotopes and radical electrons included)."""
+    try:
+        smiles = Chem.MolToSmiles(mol)
+    except Exception:
+        return None
+    from ..assembly.fragment_naming import _fragment_guard
+    from ..assembly.locant_omission import (_ISOTOPE_PARENT_POSITIONAL,
+                                            _ISOTOPIC_NAMING_SCOPE,
+                                            forced_locant_reason)
+    from ..assembly.substituent_enumerator import _gate_is_reentrant
+    from ..decomposition.engine import nacyl_float_refusing
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    from ..routing import dispatch_table as _dispatch_table
+    return (smiles, style, getattr(_route_reentry, 'depth', 0),
+            general_fallback_ctx.get(), best_effort_ctx.get(),
+            allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+            nacyl_float_refusing(), _dispatch_table._PEPTIDE_SUBST_ACTIVE,
+            forced_locant_reason(), _ISOTOPIC_NAMING_SCOPE.get(),
+            _ISOTOPE_PARENT_POSITIONAL.get(), _gate_is_reentrant(),
+            getattr(_fragment_guard, 'session_depth', 0),
+            _is_the_callers_input(mol) if _has_tin_or_lead(mol) else None)
+
+
+def _memoised_route(fn):
+    """Ask the route once per ion for the outermost ``name``: a repeat of the same ask
+    gets the value of the first, without running the re-entry again.
+
+    The scope-bound replay memo of nested namings (``assembly.nested_memo``): the value
+    kept is a RETURNED one, a refusal (``''``) included; an exception, a spent hang
+    budget (``PerfBudgetExceeded``) or the cap of an optional naming
+    (``OptionalNamingCapExceeded``), passes through and keeps nothing, so a repeat after
+    one asks again. A hit replays the provenance the first ask wrote and spends no
+    budget (``replay_budgets=False``): the repeat is the same deterministic work whose
+    outcome is already known, and charging its cold cost per hit is what ran the 500
+    analysis calls out. The memo sits UNDER ``_declined_route_keeps_producer_record``,
+    so a hit that carries a refusal is put back to the producer record of the caller
+    exactly as a fresh refusal is, and OVER the body only; ``_reentry_guarded``'s depth
+    bail-out stays outside it and is never kept. ``ORTHONYM_MEMO=off`` or no scope: the
+    ask is always run (``assembly.memo``)."""
+    def _wrapped(mol, style: str = 'pin') -> str:
+        key = _route_memo_key(mol, style)
+        if key is None:
+            return fn(mol, style)
+        from ..assembly.nested_memo import cached_nested_call
+        return cached_nested_call("route_charged", key, lambda: fn(mol, style),
+                                  replay_budgets=False)
+    return _wrapped
+
+
 # A neutral oxoacid OH (carboxylic, sulfur or phosphorus oxoacid).
 _OXOACID_OH = Chem.MolFromSmarts(
     "[OX2H1]-[$([CX3]=O),$([SX4](=O)=O),$([SX3]=O),$([PX4]=O)]")
@@ -2406,6 +2550,7 @@ def _uronium_rt_ok(name: str, mol) -> bool:
 
 @_reentry_guarded
 @_declined_route_keeps_producer_record
+@_memoised_route
 def route_charged(mol, style: str = 'pin') -> str:
     """THE single mandatory parent-selection chokepoint (CHOKE-01 / CHOKE-02).
 
@@ -2427,7 +2572,11 @@ def route_charged(mol, style: str = 'pin') -> str:
     # --- Step 1: metal complex -> Plan 04 (keep the anion-path regression clean).
     # simple-metal-salt composition (<cation word> <anion>) is Plan 04;
     # for now metals fall through so the byte-identical anion seam is untouched.
-    if _has_metal(mol):
+    # One exception: the tin or lead atom of a neutral molecule that carries
+    # all of its radical electrons is the Group-14 mononuclear parent hydride of a radical
+    # ('dimethylstannylidene'), named on the path silicon and germanium take below.
+    _group14_centre = _group14_metal_radical_element(mol)
+    if _has_metal(mol) and _group14_centre is None:
         return ''
 
     # --- Step 2: multi-fragment (dot-disconnected salt / arbitrary) -> Plan 04.
@@ -3118,6 +3267,14 @@ def route_charged(mol, style: str = 'pin') -> str:
         return ''
     if not neutral_name or _is_malformed_parent(neutral_name):
         return ''
+    #: the suffix replaces the 'ane' of the name of THE tin or lead parent
+    # hydride. A neutral name that is not named on it (the tin atom is a substituent of a
+    # phosphonate, a ring member, one of several skeletal atoms) is no radical of the
+    # mononuclear hydride: the route declines and the other producers name it.
+    if _group14_centre is not None:
+        from .radicals import _GROUP14_HYDRIDE_RADICAL
+        if not neutral_name.endswith(_GROUP14_HYDRIDE_RADICAL[_group14_centre]):
+            return ''
 
     # --- Step 5b (B1): ATOM-COVERAGE GUARD for the aminium re-entry.
     # ``_reenter`` runs with the OPSIN validity gate DISABLED , which also

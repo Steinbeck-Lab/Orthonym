@@ -32,6 +32,16 @@ from orthonym.decomposition.fragment_assembly import assemble_fragment_name
 pytestmark = pytest.mark.unit
 
 
+@pytest.fixture(autouse=True)
+def _no_floor_between_tests():
+    """The tests below arm ``analysis_budget`` by hand, outside ``enter_name_scope``, which is
+    what clears the floor of the unproven-split search (``fragment_naming._fragment_guard.
+    unproven_floor``, a level of that budget): clear it around every test."""
+    fn._fragment_guard.unproven_floor = None
+    yield
+    fn._fragment_guard.unproven_floor = None
+
+
 # --- the assemblers report the name they could not prove ------------------------------------
 
 def test_ester_with_no_group_word_reports_the_string_rule_name():

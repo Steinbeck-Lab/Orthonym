@@ -662,27 +662,45 @@ class TestTerminalGroup14Gate:
 @pytest.mark.unit
 class TestBelowThresholdLambdaChainGeneralTier:
     """ fix a performance pass: a chain below four heterounits is not an 'a' PIN
-    , the Blue Book). For a lambda heteroatom chain the
-    substitutive PIN needs a lambda parent hydride ('dioctyl-λ2-stannane';
-    "SnH2 λ2-stannane (preselected name, see ",:7968), which the engine
-    does not build, so the PIN tier declines and the best-effort tier keeps the
-    RT-exact 'a' name, labelled general (not is_pin). Breadth never drops (the
-    m1500 dioctyltin adduct row stays RT-exact at best-effort)."""
+    , the Blue Book), so the skeletal-replacement producer declines
+    it. The lambda chain ('9λ2-stannaheptadecane') that the best-effort tier then
+    kept is general nomenclature only 'The λ-convention', the Blue Book:
+    "This method is only for general nomenclature").
+
+    Leads program 2026-10-09, item 31 (change-asserted-value): RDKit gives the
+    bracket atom of 'CCC[Sn]CCC' two radical electrons, as it does that of
+    'CCC[Ge]CCC', and the divalent tin or lead atom is the mononuclear Group-14 parent
+    hydride of a radical: 'Specific method and retained names'
+    (the Blue Book): "A radical formally derived by the removal of two hydrogen
+    atom from one skeletal atom of a mononuclear parent hydride of an element of Group
+    14... is named by replacing the 'ane' ending of the systematic name of the parent
+    hydride by the suffix '-ylidene'" (:40476)... "Systematic names are the preferred
+    IUPAC names." ('benzylsilylidene (PIN)':40490; the λ form is the second name of
+    'dichloromethylidene (PIN)',:40566). The route that names silicon and germanium
+    this way now names tin and lead (``charged_router.route_charged``): both rows are
+    pin_verified at every tier, OPSIN 2.9.0 full-InChIKey and radical-profile exact
+    (fresh java run, ``-r``: an InChIKey, an InChIKey).
+    The old expectations ('9λ2-stannaheptadecane', '4λ2-stannaheptane', general names)
+    are replaced. Mutation check: ``charged_router._group14_metal_radical_element``
+    returning None brings the λ chain back and fails these rows. Breadth never
+    drops: a tin piece of a MIXTURE (the m1500 dioctyltin adduct row) keeps its
+    component name, and stays RT-exact at best-effort."""
 
     # What SHIPS: gate on. (Gate off, a pre-existing producer offers the wrong
     # molecule 'dioctylstannane' at the PIN tier, before and after this change;
     # the validity gate voids it -- the recorded gate-off latent class.)
     @pytest.mark.opsin_gate
-    @pytest.mark.parametrize("smiles,a_name", [
-        ("CCCCCCCC[Sn]CCCCCCCC", "9λ2-stannaheptadecane"),
-        ("CCC[Sn]CCC", "4λ2-stannaheptane"),
+    @pytest.mark.parametrize("smiles,pin_name", [
+        ("CCCCCCCC[Sn]CCCCCCCC", "dioctylstannylidene"),
+        ("CCC[Sn]CCC", "dipropylstannylidene"),
     ])
-    def test_pin_tier_declines_best_effort_keeps_general_name(self, smiles, a_name):
+    def test_the_producer_declines_and_the_radical_is_named_on_its_parent_hydride(
+            self, smiles, pin_name):
         from tests.support.rt_assert import name_best_effort, name_is_rt_exact
         assert try_skeletal_replacement_name(Chem.MolFromSmiles(smiles)) is None
         res = name_best_effort(smiles)
-        assert res["name"] == a_name
-        assert res["is_pin"] is False
+        assert res["name"] == pin_name
+        assert res["is_pin"] is True
         assert name_is_rt_exact(res["name"], smiles)
 
 

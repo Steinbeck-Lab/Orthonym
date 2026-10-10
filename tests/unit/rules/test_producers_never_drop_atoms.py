@@ -296,14 +296,23 @@ def test_default_tier_declines_an_n_substituted_acyl_it_cannot_spell_as_method_1
 # open: S-conjugate branch named inside name_polyfunctional (reviewer MAJOR 2)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.xfail(strict=True, reason=(
-    "mercapturate best-effort spelling -- see .planning/preexisting-triage/TRIAGE-2026-10-09.md. "
-    "Cause (VERIFIED by call trace): inside name_polyfunctional the S-branch "
-    "'CC(=O)N[C@@H](C[*])C(=O)O' is named by substituent_naming step 4 "
-    "(parent_to_prefix of '(2S)-2-acetamidopropanoic acid' -> ''), so get_sulfanyl_prefix "
-    "returns None and the walk refuses the handler; main reached the right name only because a "
-    "perception-time name_substituent call had warmed the memo with the cascade's "
-    "'(acetylamino)' arm. The glue name it falls to round-trips exactly."))
+# change-asserted-value (leads program L6, item 43a, merged in 89b7abd72, b80c73f52 and the
+# 263d27eaa acylsulfanyl hunk): this was a strict xfail. The cause recorded there (the
+# S-branch 'CC(=O)N[C@@H](C[*])C(=O)O' named as '' inside name_polyfunctional, so
+# get_sulfanyl_prefix returned None and the handler was refused) is gone: the decomposition
+# fallback now cites an acylated non-suffix nitrogen as the acylamino prefix instead of gluing
+# 'N-acetyl<systematic name>', and a substituted acyl on sulfur is an enclosed compound prefix.
+# (the Blue Book) 'Method (1) generates preferred IUPAC names.' (:32998)
+# -> the 'acetamido' prefix; (:7232) "Parentheses are used around compound...
+# prefixes" -> '[(2,3-dihydroxypropanoyl)sulfanyl]'; (:17758,:17764) 'acyl groups,
+# full substitution allowed'.
+# Names now (both read back by OPSIN 2.9.0 to the input's full InChIKey, independently of the
+# engine): 'CC(=O)N[C@@H](CSC(=O)C(O)CO)C(=O)O' is
+# '(2R)-2-acetamido-3-[(2,3-dihydroxypropanoyl)sulfanyl]propanoic acid' (pin_verified at both
+# tiers, tests/unit/assembly/test_leads_l6_acylsulfanyl.py) and 'CC(=O)N[C@@H](CSCCC(=O)C(=O)O)C(=O)O'
+# is '4-{[(2R)-2-acetamido-2-carboxyethyl]sulfanyl}-2-oxobutanoic acid' (best-effort,
+# systematic_verified). Mutation: with the three L6 changes reverted both rows give the glued
+# 'N-acetyl' name again and this test fails.
 @pytest.mark.parametrize("smiles", [
     "CC(=O)N[C@@H](CSCCC(=O)C(=O)O)C(=O)O",
     "CC(=O)N[C@@H](CSC(=O)C(O)CO)C(=O)O",

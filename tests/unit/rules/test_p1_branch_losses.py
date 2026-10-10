@@ -386,17 +386,18 @@ CLEAN_OFFER_ROWS = [
      "(2R,3S,4S,5R,6S)-6-{[4,4-dioxo-1-(prop-2-en-1-yl)-3,5-dioxa-4λ6-thia-2-"
      "azapent-1-en-1-yl]sulfanyl}-3,4,5-trihydroxy-2-(hydroxymethyl)oxane",
      [(1, False), (1, True)]),
-    # dev2000
-    # roadmap N5c/N5d (name-quality lane L2): 'phenyl', '(phenylamino)'
-    # the Blue Book;:6465)
-    ("O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3ccccc3)cc2)c1",
-     "1-{[4-(phenylamino)phenyl]diazenyl}-3-sulfobenzene",
-     [(1, False), (1, True)]),
+    # The sulfonyl azo row of dev2000 ('O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3ccccc3)cc2)c1', once
+    # '1-{[4-(phenylamino)phenyl]diazenyl}-3-sulfobenzene') is no longer a clean-offer row: leads
+    # program L3 (43e) names it on the parent of its principal group, '3-[(4-anilinophenyl)diazenyl]
+    # benzene-1-sulfonic acid', the Blue Book,:38791; '4-(phenyldiazenyl)
+    # benzene-1-sulfonic acid (PIN)',:38798; 'anilino (preferred prefix)',:17800), so the main path
+    # names it and the offer never runs. The row is a PIN in
+    # tests/unit/assembly/test_leads_l3_43e_organyl_diazenyl.py. The two rows above still reach the offer.
 ]
 
 
 @pytest.mark.parametrize("smiles,expected,offer_runs", CLEAN_OFFER_ROWS,
-                         ids=["hexatrienyl", "glucosinolate", "sulfonyl"])
+                         ids=["hexatrienyl", "glucosinolate"])
 def test_clean_offer_names_are_kept(monkeypatch, smiles, expected, offer_runs):
     runs = _spy_clean_offer(monkeypatch)
     row = name_best_effort(smiles)
@@ -408,22 +409,20 @@ def test_clean_offer_names_are_kept(monkeypatch, smiles, expected, offer_runs):
 
 # Roadmap N5 (name-quality lane L2): with the book spellings ('phenoxy', 'benzoyl',
 # '(...)amino'; the Blue Book,:30446,:6465) the
-# main path names a row of this class and the offer never runs. The offer is pinned on two
-# rows that still reach it with the book spellings switched off (``mechanical_forms``): the
-# glucosinolate and the sulfonyl azo row of ``CLEAN_OFFER_ROWS``, named with the mechanical
-# spellings the switch keeps. Not PIN claims: the names are the systematic form.
+# main path names a row of this class and the offer never runs. The offer is pinned on the
+# row that still reaches it with the book spellings switched off (``mechanical_forms``): the
+# glucosinolate row of ``CLEAN_OFFER_ROWS`` (the sulfonyl azo row went with leads program L3 43e,
+# see ``CLEAN_OFFER_ROWS``), named with the mechanical spellings the switch keeps. Not PIN
+# claims: the names are the systematic form.
 MECHANICAL_OFFER_ROWS = [
     ("C=CCC(=NOS(=O)(=O)O)S[C@@H]1O[C@H](CO)[C@@H](O)[C@H](O)[C@H]1O",
      "(2R,3S,4S,5R,6S)-6-[5,5-dioxo-2-(prop-2-en-1-yl)-4,6-dioxa-1,5\u03bb6-dithia-3-"
      "azahex-2-en-1-yl]-3,4,5-trihydroxy-2-(hydroxymethyl)oxane"),
-    ("O=S(=O)(O)c1cccc(N=Nc2ccc(Nc3ccccc3)cc2)c1",
-     "1-(2-{4-[1-(cyclohexa-1,3,5-trien-1-yl)-1-azamethyl]cyclohexa-1,3,5-trien-1-yl}-1,2-"
-     "diazaeth-1-en-1-yl)-3-(1,1-dioxo-2-oxa-1\u03bb6-thiaethyl)benzene"),
 ]
 
 
 @pytest.mark.parametrize("smiles,expected", MECHANICAL_OFFER_ROWS,
-                         ids=["glucosinolate", "sulfonyl"])
+                         ids=["glucosinolate"])
 def test_clean_offer_name_is_kept_mechanical_spelling(monkeypatch, smiles, expected):
     from orthonym.assembly.book_prefixes import mechanical_forms
     runs = _spy_clean_offer(monkeypatch)

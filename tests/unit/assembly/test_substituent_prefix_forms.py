@@ -950,8 +950,11 @@ class TestAcylOnChalcogenSulfanyl:
     'acetylsulfanyl'. The alkyl counter previously collapsed the acyl C=O into
     the alkyl count ('ethylsulfanyl' = a constitutionally different molecule).
     v1 scope: unsubstituted LINEAR alkanoyl (retained formyl/acetyl +
-    systematic alkanoyl via rules/acid_halides._build_acyl_name) + benzoyl;
-    everything else fail-closed (None)."""
+    systematic alkanoyl via rules/acid_halides._build_acyl_name) + benzoyl.
+    Leads program L6 (item 43a): a substituted, branched or ring acyl is named by the
+    shared acyl-prefix authority of the chalcogen cations (rules.ions) and enclosed as
+    a compound prefix; a thioacyl (C=S on the S side) and the Se/Te
+    analogues stay fail-closed (None)."""
 
     def _thioether_atoms(self, smiles):
         mol = Chem.MolFromSmiles(smiles)
@@ -994,11 +997,24 @@ class TestAcylOnChalcogenSulfanyl:
         result = get_sulfanyl_prefix(mol, m, principal_chain=[3, 4])
         assert result == "formylsulfanyl", f"got {result!r}"
 
-    def test_substituted_acyl_fail_closed(self):
-        # 2-hydroxyacetyl: heteroatom inside the acyl -> v1 refuses
-        # 'acetyl' cannot be chain-extended; substituted-acyl assembly out of v1)
+    def test_substituted_acyl_is_an_enclosed_compound_prefix(self):
+        # change-asserted-value (leads program L6, item 43a, merged in 263d27eaa): this row
+        # asserted None while only the v1 unsubstituted-acyl writer existed ('acetyl' is
+        # substitutable, so the refusal was a gap, not a rule). Now the acyl is named by
+        # the shared acyl-prefix authority and enclosed:
+        # 'Acyl groups' (the Blue Book,:17764): "acetyl (preferred
+        # prefix) (full substitution allowed except that the carbon chain cannot be
+        # extended...)"; the acid is 'hydroxyacetic acid (PIN)',:29854);
+        # the acyl on a chalcogen is a compound prefix, '(chloroacetyl)oxyl (PIN)'
+        #,:40677; example:40694), and (:7232) "Parentheses are used around
+        # compound... prefixes".
+        # OPSIN 2.9.0 reads the whole name '3-[(hydroxyacetyl)sulfanyl]propanoic acid' back
+        # to the input's full InChIKey (tests/integration/test_polyfunctional_split.py
+        #::TestAcylSulfanylWholeMolecule::test_substituted_acyl_on_sulfur_names_the_molecule).
+        # Mutation: with the 263d27eaa hunk of get_sulfanyl_prefix reverted this returns None.
         mol, m = self._thioether_atoms("OCC(=O)SCCC(=O)O")
-        assert get_sulfanyl_prefix(mol, m, principal_chain=[5, 6]) is None
+        result = get_sulfanyl_prefix(mol, m, principal_chain=[5, 6])
+        assert result == "(hydroxyacetyl)sulfanyl", f"got {result!r}"
 
     def test_thioacyl_fail_closed(self):
         # C(=S) on the S-side (dithioester): ethanethioyl not built -> None
@@ -1006,10 +1022,16 @@ class TestAcylOnChalcogenSulfanyl:
         mol, m = self._thioether_atoms("CC(=S)SCCC(=O)O")
         assert get_sulfanyl_prefix(mol, m, principal_chain=[4, 5]) is None
 
-    def test_branched_acyl_fail_closed(self):
-        # 2-methylpropanoyl (branched) -> v1 refuses
+    def test_branched_acyl_is_an_enclosed_compound_prefix(self):
+        # change-asserted-value (leads program L6, item 43a, merged in 263d27eaa): asserted
+        # None (v1 refused a branched acyl); the acyl of '2-methylpropanoic acid (PIN)'
+        #,:29846) is '2-methylpropanoyl' by (:30608) "changing
+        # the ending 'oic acid' to 'oyl'", a compound prefix enclosed by (:7232).
+        # OPSIN 2.9.0 reads '3-[(2-methylpropanoyl)sulfanyl]propanoic acid' back to the
+        # input's full InChIKey. Mutation: reverting the 263d27eaa hunk returns None.
         mol, m = self._thioether_atoms("CC(C)C(=O)SCCC(=O)O")
-        assert get_sulfanyl_prefix(mol, m, principal_chain=[6, 7]) is None
+        result = get_sulfanyl_prefix(mol, m, principal_chain=[6, 7])
+        assert result == "(2-methylpropanoyl)sulfanyl", f"got {result!r}"
 
     def test_selanyl_acyl_fail_closed(self):
         # acylselanyl spellings not OPSIN-verified -> v1 refuses for Se/Te

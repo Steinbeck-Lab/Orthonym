@@ -35,10 +35,16 @@ _TERPENOID_CANARY_SMILES = (
 # same incomplete-spine winner (verdict.complete is False, asserted below) and
 # OPSIN round-trips to the canary (verify_or_none True). change-asserted-value:
 # updated to the current deterministic shadow-mode emission.
+#
+# Leads program L3 (N8f): the side chain is '[(2R,5S)-5-ethyl-6-methylheptan-2-yl]',
+# the Blue Book, the chain with the greater number of substituents; '6,7-dichloro-5-(2-
+# chloropropyl)octan-2-yl (preferred prefix) [not 7-chloro-5-(1,2-dichloropropyl)octan-2-yl]',
+#:22746), not the first of two tied arms '[(2R,5S)-5-(propan-2-yl)heptan-2-yl]'; it moves ahead of
+# '2,15-dimethyl' in the alphanumerical order. Both names below were read back to the
+# canary's full InChIKey by a fresh OPSIN call.
 _TERPENOID_MALFORMED_NAME = (
-    "(2S,5S,7R,11S,12S,14R,15R,17R)-2,15-dimethyl-6-methylidene-"
-    "14-[(2R,5S)-5-(propan-2-yl)heptan-2-yl]tetracyclo[8.7.0.0^2,7.0^11,15]"
-    "heptadec-1(10)-ene-5,11,12,17-tetrol"
+    "(2S,5S,7R,11S,12S,14R,15R,17R)-14-[(2R,5S)-5-ethyl-6-methylheptan-2-yl]-2,15-dimethyl-"
+    "6-methylidenetetracyclo[8.7.0.0^2,7.0^11,15]heptadec-1(10)-ene-5,11,12,17-tetrol"
 )
 
 # The VETO-mode rescue: when the veto rejects the incomplete-spine winner above,
@@ -47,9 +53,8 @@ _TERPENOID_MALFORMED_NAME = (
 # instead of abstaining -- so a name still ships and 0-wrong is held. It uses the
 # tetrahydroxy PREFIX + '-ene' form rather than the '-tetrol' suffix.
 _TERPENOID_VETO_RESCUE_NAME = (
-    "(2S,5S,7R,11S,12S,14R,15R,17R)-5,11,12,17-tetrahydroxy-2,15-dimethyl-"
-    "6-methylidene-14-[(2R,5S)-5-(propan-2-yl)heptan-2-yl]"
-    "tetracyclo[8.7.0.0^2,7.0^11,15]heptadec-1(10)-ene"
+    "(2S,5S,7R,11S,12S,14R,15R,17R)-14-[(2R,5S)-5-ethyl-6-methylheptan-2-yl]-5,11,12,17-"
+    "tetrahydroxy-2,15-dimethyl-6-methylidenetetracyclo[8.7.0.0^2,7.0^11,15]heptadec-1(10)-ene"
 )
 
 

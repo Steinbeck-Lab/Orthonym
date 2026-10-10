@@ -253,8 +253,40 @@ class TestAcylSulfanylWholeMolecule:
 
     @_opsin_rt
     @pytest.mark.roundtrip
+    @pytest.mark.parametrize("smiles,expected", [
+        # change-asserted-value (leads program L6, item 43a, merged in 263d27eaa): these rows
+        # sat in test_fail_closed_boundaries as 'substituted acyl -> v1 refuses (research
+        # §E Q4)'. 'acetyl' is substitutable, the Blue Book,:17764:
+        # "acetyl (preferred prefix) (full substitution allowed except that the carbon chain
+        # cannot be extended...)"), the acids are 'hydroxyacetic acid (PIN)' (:29854) and
+        # '2-methylpropanoic acid (PIN)' (:29846) under, and an acyl on a
+        # chalcogen is a compound prefix, '(chloroacetyl)oxyl (PIN)',:40694),
+        # enclosed by (:7232). The writer is
+        # substituent_prefix_forms.get_sulfanyl_prefix; with its 263d27eaa hunk reverted both
+        # rows are 'unknown organic compound' again (the mutation check).
+        ("OCC(=O)SCCC(=O)O", "3-[(hydroxyacetyl)sulfanyl]propanoic acid"),
+        ("CC(C)C(=O)SCCC(=O)O", "3-[(2-methylpropanoyl)sulfanyl]propanoic acid"),
+    ])
+    def test_substituted_acyl_on_sulfur_names_the_molecule(self, smiles, expected, monkeypatch):
+        # The production OPSIN validity gate is on (the autouse fixture turns it off for
+        # speed), and the name is read back independently to the full InChIKey.
+        import orthonym.namer as _namer
+        from tests.support.rt_assert import name_is_rt_exact
+        monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
+        assert name_compound(smiles) == expected
+        assert name_is_rt_exact(expected, smiles)
+
+    @_opsin_rt
+    @pytest.mark.roundtrip
     @pytest.mark.parametrize("smiles", [
-        "OCC(=O)SCCC(=O)O",   # substituted acyl -> v1 refuses (research §E Q4)
+        # thioacyl on the S side (a dithioester): 'ethanethioyl' is not built by the prefix
+        # writer (unit pin: test_substituent_prefix_forms.py::TestAcylOnChalcogenSulfanyl::
+        # test_thioacyl_fail_closed). Unchanged since v1.0.6; the molecule is nameable
+        # ('3-[(ethanethioyl)sulfanyl]propanoic acid' reads back to the input's full
+        # InChIKey in OPSIN 2.9.0; cf. the prefix in 'Di- and polyanhydrides',
+        # 'acetic 4-[(ethanethioyl)sulfanyl]-4-sulfanylidenebutanethioic anhydride (PIN)',
+        # the Blue Book), so this abstention is a gap listed as a lead, not a rule.
+        "CC(=S)SCCC(=O)O",
         # CC(=O)SC(=O)C (symmetric thioanhydride) used to be here; the
         # thioanhydride namer now exists -> test_symmetric_thioanhydride_pin.
     ])

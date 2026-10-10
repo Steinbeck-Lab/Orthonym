@@ -467,6 +467,9 @@ def rearm_hang_budgets() -> None:
     _fragment_guard.perf_budget = _PERF_BUDGET if _PERF_BUDGET > 0 else None
     _fragment_guard.analysis_budget = (
         _ANALYSIS_CALL_BUDGET if _ANALYSIS_CALL_BUDGET > 0 else None)
+    # The unproven-split floor is a level of THIS budget (``unproven_floor``): a fresh
+    # ceiling has met no unproven split yet.
+    _fragment_guard.unproven_floor = None
 
 
 def enter_name_scope():
@@ -493,6 +496,7 @@ def enter_name_scope():
         _fragment_guard.perf_budget = _PERF_BUDGET if _PERF_BUDGET > 0 else None
         _fragment_guard.analysis_budget = (
             _ANALYSIS_CALL_BUDGET if _ANALYSIS_CALL_BUDGET > 0 else None)
+        _fragment_guard.unproven_floor = None
         # The name scope OWNS the fragment memo cache for the whole molecule.
         # Allocate a fresh one here so a leaked cache from a prior molecule can
         # never carry over (start_naming_session then keeps this live cache).
@@ -564,6 +568,7 @@ def exit_name_scope():
         _fragment_guard.work_budget = None
         _fragment_guard.perf_budget = None
         _fragment_guard.analysis_budget = None
+        _fragment_guard.unproven_floor = None
         _fragment_guard.cache = None
         _fragment_guard.naming_pass_cap = None
     else:
@@ -626,6 +631,11 @@ def own_hang_budgets():
         yield
         return
     saved = {attr: getattr(_fragment_guard, attr, None) for attr in _OWNED_BUDGETS}
+    # The floor of the unproven-split search is a level of the analysis-call budget
+    # (``unproven_floor``, engine._note_unproven_split): the body's fresh budget has met
+    # no unproven split, and what the body notes is a level of ITS budget, which the
+    # enclosing budget must not inherit.
+    saved_floor = getattr(_fragment_guard, 'unproven_floor', None)
     fresh = {'perf_budget': _PERF_BUDGET if _PERF_BUDGET > 0 else None,
              'analysis_budget': (_ANALYSIS_CALL_BUDGET
                                  if _ANALYSIS_CALL_BUDGET > 0 else None),
@@ -633,11 +643,13 @@ def own_hang_budgets():
     for attr, value in saved.items():
         if value is not None:
             setattr(_fragment_guard, attr, fresh[attr])
+    _fragment_guard.unproven_floor = None
     try:
         yield
     finally:
         for attr, value in saved.items():
             setattr(_fragment_guard, attr, value)
+        _fragment_guard.unproven_floor = saved_floor
 
 
 @_contextlib.contextmanager
@@ -706,7 +718,7 @@ def isolated_naming_session(reset_cache: bool = False):
 
 
 _SPECULATIVE_STATE = ('cache', 'session_depth', 'visited',
-                      'work_budget', 'perf_budget', 'analysis_budget')
+                      'work_budget', 'perf_budget', 'analysis_budget', 'unproven_floor')
 _UNSET = object()
 
 

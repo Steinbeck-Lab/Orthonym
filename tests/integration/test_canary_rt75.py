@@ -1011,7 +1011,13 @@ CANARY_COMPOUNDS = [
     (
         "CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",  # Sentinel: stereo_mismatch - stigmastandiol
         # n5b RB-FUSION (as above); OPSIN 2.9.0 full key exact. Was "stigmast-5-en-3,7-diol".
-        "10,13-dimethyl-17-[5-(propan-2-yl)heptan-2-yl]-2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthrene-3,7-diol",
+        # Leads program L3 (N8f, change-asserted-value): (the Blue Book) "The
+        # principal substituent chain has the greatest number of substituents of any kind" takes the
+        # side chain through the isopropyl arm, '5-ethyl-6-methylheptan-2-yl' (two substituents),
+        # not '5-(propan-2-yl)heptan-2-yl' (one; the first of two tied arms), as in '6,7-dichloro-5-
+        # (2-chloropropyl)octan-2-yl (preferred prefix) [not 7-chloro-5-(1,2-dichloropropyl)octan-2-yl]'
+        # (:22746); OPSIN 2.9.0 reads the new name to the input's full InChIKey.
+        "17-(5-ethyl-6-methylheptan-2-yl)-10,13-dimethyl-2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthrene-3,7-diol",
     ),
     # Failure taxonomy sentinels: opsin_vocab_limit (2 compounds)
     (
@@ -1370,7 +1376,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",
-        "L-glutaminyl-L-threonyl-L-tryptophan",
+        "(2S)-2-{(2S,3R)-2-[(2S)-2,5-diamino-5-oxopentanamido]-3-hydroxybutanamido}-3-(1H-indol-3-yl)propanoic acid",  # l6 RB-ACYLAMINO method (1):32995; controller ruling, peptides are not PINs; OPSIN 2.9.0 full InChIKey exact); was 'L-glutaminyl-L-threonyl-L-tryptophan'
     ),
     (
         "C[C@@H](O)[C@H](NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CC(N)=O)C(=O)O",
@@ -2196,7 +2202,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)O",  # acyclic,polyfunctional,medium
-        "L-glutaminyl-L-valine",
+        "(2S)-2-[(2S)-2,5-diamino-5-oxopentanamido]-3-methylbutanoic acid",  # l6 RB-ACYLAMINO method (1):32995; controller ruling, peptides are not PINs; OPSIN 2.9.0 full InChIKey exact); was 'L-glutaminyl-L-valine'
     ),
     (
         "O=c1c2cccc(O)c2oc2ccc(O)c(O)c12",  # aromatic,heterocycle,fused-ring,medium
@@ -2430,7 +2436,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H](C)[C@H](NC(=O)[C@@H](N)CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
-        "L-asparaginyl-L-isoleucyl-L-histidine",
+        "(2S)-2-{(2S,3S)-2-[(2S)-2,4-diamino-4-oxobutanamido]-3-methylpentanamido}-3-(1H-imidazol-5-yl)propanoic acid",  # l6 RB-ACYLAMINO method (1):32995; controller ruling, peptides are not PINs; OPSIN 2.9.0 full InChIKey exact); was 'L-asparaginyl-L-isoleucyl-L-histidine'
     ),
     (
         "C[C@H](CCCC(C)(C)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid

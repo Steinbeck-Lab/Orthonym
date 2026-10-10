@@ -12,30 +12,140 @@ from rdkit import Chem
 
 from ..pin_spelling import SpellingFailure, register
 from .lexer import normalise
-from .models import P10, RINGS, read_units, ring_or_chain_model, show
+from .models import P10, RINGS, UNSAT, int_locs, read_units, ring_or_chain_model, show
 from .units import MULT, MULT_RE, STEM_RE, STEMS
 
 
 # ------------------------------------------------------------------ / principal chain
-def _alkyl(p):
-    """(m, own substituent count) of a unit that is an unbranched saturated alkyl attached at C1."""
-    mm = re.fullmatch(r"(" + STEM_RE + r")yl", p.parent or '')
-    if not mm or p.repl or p.hydro or p.ih:
+def _chain_model(p, enclosed):
+    """``ring_or_chain_model`` of a unit, reading an enclosed free-valence chain whose parent is a
+    bare stem with its endings ('hex-5-yn-2-yl', 'prop-2-en-1-yl') as the chain it is."""
+    mdl = ring_or_chain_model(p, enclosed)
+    if mdl is None and enclosed and any(t in ('yl', 'ylidene') for _, t, _ in p.endings):
+        mdl = ring_or_chain_model(p, False)
+    return mdl
+
+
+class _Branch:
+    """A prefix that is an unbranched carbon chain attached at its C1: ``m`` atoms, the lower
+    atom locants of its multiple bonds ``mult`` (``dbl``: the double bonds), the locants of its own
+    prefixes ``subs``, all in its own numbering from the attachment atom."""
+
+    def __init__(self, m, mult, dbl, subs):
+        self.m, self.mult, self.dbl, self.subs = m, sorted(mult), sorted(dbl), sorted(subs)
+
+
+def _branch(pr, by_enc):
+    """The:class:`_Branch` of prefix ``pr``, or None when it is not an unbranched carbon chain
+    attached at C1 that the reader holds with certainty: 'propyl', 'prop-2-en-1-yl',
+    '1-hydroxyethyl', 'hydroxymethyl' (the locant of a one-carbon group is omitted)."""
+    if pr.kind != 'enclosed':
+        ms = re.fullmatch(r"(" + STEM_RE + r")yl", pr.key)
+        if ms and not pr.ital:
+            return _Branch(STEMS[ms.group(1)], [], [], [])
         return None
-    if any(t for _, t, _ in p.endings):
+    sub = by_enc.get(id(pr.enc))
+    if sub is None or sub.repl or sub.hydro or sub.ih or sub.parent_locs or set(sub.notes) - {'parent_from_last_prefix'}:
         return None
-    return STEMS[mm.group(1)], sum(max(len(pr.locs), pr.mult) for pr in p.prefixes)
+    par = sub.parent or ''
+    mult, dbl = [], []
+    ms = re.fullmatch(r"(" + STEM_RE + r")yl", par)
+    if ms:
+        if sub.endings:
+            return None
+        m = STEMS[ms.group(1)]
+    elif re.fullmatch(STEM_RE, par):
+        m = STEMS[par]
+        free = 0
+        for locs, txt, _added in sub.endings:
+            il = int_locs(locs)
+            if il is None or not txt:
+                return None
+            if txt == 'yl':
+                if il != [1]:
+                    return None
+                free += 1
+            elif UNSAT.match(txt):
+                mult += il
+                if 'en' in txt:
+                    dbl += il
+            else:
+                return None
+        if free != 1:
+            return None
+    else:
+        return None
+    subs = []
+    for x in sub.prefixes:
+        if x.locs:
+            il = int_locs(x.locs)
+            if il is None or len(il) != max(1, x.mult):
+                return None
+            subs += il
+        elif m == 1:
+            subs += [1] * max(1, x.mult)
+        else:
+            return None
+    if any(x < 1 or x > m for x in subs) or any(x < 1 or x >= m for x in mult):
+        return None
+    return _Branch(m, mult, dbl, subs)
+
+
+def _best_numbering(n, sfx, mult, dbl, subs):
+    """``(sfx, mult, dbl, subs)`` of a chain of ``n`` atoms in the better of its two numberings."""
+    forward = (sorted(sfx), sorted(mult), sorted(dbl), sorted(subs))
+    reverse = (sorted(n + 1 - x for x in sfx), sorted(n - x for x in mult), sorted(n - x for x in dbl),
+               sorted(n + 1 - x for x in subs))
+    return min(forward, reverse)
+
+
+def _alternative_chain(n, k, side, sfx, mult, dbl, subs, br):
+    """The principal chain of a unit of ``n`` atoms read through its prefix ``br`` at locant ``k``
+    instead of through the tail on ``side`` ('up': the atoms after ``k``; 'down': those before),
+    for a branch as long as the tail it replaces: ``(sfx, mult, dbl, subs)`` of that chain in its best
+    numbering (suffix and free-valence locants, multiple bonds, double bonds, substituents, each
+    compared as a sorted list). The tail becomes one substituent at ``k``; the branch's own
+    prefixes join the chain. ``subs`` is the unit's substituent positions with the branch's at ``k``
+    once removed."""
+    if side == 'up':
+        mult_kept = [x for x in mult if x <= k - 1]
+        dbl_kept = [x for x in dbl if x <= k - 1]
+        subs_kept = [x for x in subs if x <= k]
+        at = lambda j: k + j                # noqa: E731 -- position of branch atom j
+        bond = lambda j: k + j              # noqa: E731 -- lower locant of branch bond j (atom j-atom j+1)
+    else:
+        mult_kept = [x for x in mult if x >= k]
+        dbl_kept = [x for x in dbl if x >= k]
+        subs_kept = [x for x in subs if x >= k]
+        at = lambda j: k - j                # noqa: E731
+        bond = lambda j: k - j - 1          # noqa: E731
+    mult2 = mult_kept + [bond(j) for j in br.mult]
+    dbl2 = dbl_kept + [bond(j) for j in br.dbl]
+    subs2 = subs_kept + [k] + [at(j) for j in br.subs]
+    return _best_numbering(n, sfx, mult2, dbl2, subs2)
 
 
 @register('P-45.2.1')
 def principal_chain_check(mol, name):
-    """ (:20916) the principal chain has the greater number of skeletal atoms, length before
+    """The principal chain of a name is the one the criteria choose.
+
+     (:20916) the principal chain has the greater number of skeletal atoms, length before
     unsaturation (:18865; '2-ethylideneoctanoic acid (PIN) [not 2-hexylbut-2-enoic acid...]'
-    :29938); (:21604) then the maximum number of substituents cited as prefixes
-    ('N,N,2-trimethyl-3-{...}propanamide (PIN)':21624). A prefix at locant i of an unbranched
-    carbon chain that is itself an acyclic carbon chain gives an alternative parent through it;
-    the name fails when that chain is longer than the segment it replaces, or as long with more
-    prefixes and no unsaturation to tie."""
+    :29938); then, for chains as long, the cascade of (:21016) for a parent chain and of
+     'THE PRINCIPAL SUBSTITUENT CHAIN' (:22632) for a substituent chain:
+    (d) the greater number of multiple bonds regardless of type, then of double bonds
+    :21033,:21066;:22682),
+    (i) the lowest locants for multiple bonds regardless of type, then for double bonds
+     :21366;:22726; 'hept-1-en-6-yn-4-yl (preferred prefix)':17256),
+    (k) the maximum number of substituents cited as prefixes:21604, 'N,N,2-trimethyl-3-
+    {...}propanamide (PIN)':21624;:22740) and
+    (l) their lowest locants:21698;:22768, '4-hydroxy-3-(2-hydroxyethyl)pentan-
+    2-yl (preferred prefix)':22780).
+
+    A prefix at locant i of an unbranched carbon chain that is itself an acyclic carbon chain
+    attached at its C1 gives one alternative parent through it, replacing the tail of the chain on
+    one side of i; the name fails when the alternative wins at the first criterion that tells the
+    two apart. A tie, or a branch the reader does not hold with certainty, passes."""
     if P10.search(name):
         return None
     parsed = read_units(name)
@@ -44,50 +154,80 @@ def principal_chain_check(mol, name):
     _s, _encs, ps = parsed
     by_enc = {id(p.unit.encl): p for p in ps if p.unit.encl is not None}
     for p in ps:
-        mdl = ring_or_chain_model(p, p.unit.encl is not None)
+        enclosed = p.unit.encl is not None
+        mdl = _chain_model(p, enclosed)
         if mdl is None or mdl[0] != 'chain':
             continue
         _kind, n, _perms, feats = mdl
-        occupied_suffix = set(feats['suffix'])
         if feats['hetero']:
             continue
-        unsat = set(feats['unsat_b']) | {x + 1 for x in feats['unsat_b']}
-        pref_pos = {}
-        total = 0
+        # a free-valence chain is a substituent:; a parent chain:
+        subst = enclosed or any(t in ('yl', 'ylidene') for _, t, _ in p.endings) \
+            or (p.parent or '').endswith('yl')
+        occupied_suffix = set(feats['suffix'])
+        sfx = list(feats['suffix'])
+        mult = list(feats['unsat_b'])
+        dbl = list(feats['double_b'])
+        subs = sorted(x for _key, locs in feats['prefix'] for x in locs)
+        total = len(subs)
         # the prefixes on numbered positions, as the model read them (element-locant prefixes
         # sit on the suffix group and are not part of the chain)
-        skel = feats['prefix_src']
-        for (_key, locs), pr in zip(feats['prefix'], skel, strict=True):
-            total += len(locs)
-            for loc in locs:
-                pref_pos.setdefault(loc, []).append(pr)
-        for pr in skel:
-            if len(pr.locs) != 1 or not pr.locs[0].isdigit():
+        for pr in feats['prefix_src']:
+            if len(pr.locs) != 1 or not pr.locs[0].isdigit() or pr.mult != 1:
                 continue
-            if pr.kind == 'enclosed':
-                sub = by_enc.get(id(pr.enc))
-                if sub is None:
-                    continue
-                al = _alkyl(sub)
-            else:
-                ms = re.fullmatch(r"(" + STEM_RE + r")yl", pr.key)
-                al = (STEMS[ms.group(1)], 0) if ms and not pr.ital else None
-            if al is None:
+            br = _branch(pr, by_enc)
+            if br is None:
                 continue
-            m, pcount = al
             k = int(pr.locs[0])
             for side in ('up', 'down'):
                 tail = list(range(k + 1, n + 1)) if side == 'up' else list(range(1, k))
                 if not tail or (set(tail) & occupied_suffix):
                     continue
                 t = len(tail)
-                q = sum(len(pref_pos.get(x, [])) for x in tail)
-                if m > t:
+                if br.m > t:
                     return SpellingFailure('P-44.3.2', f"substituent '{pr.raw[:40]}' at {k} of '{p.parent}' "
-                                                       f"carries a longer chain ({m} > {t})")
-                if m == t and pcount > q and not (set(tail) & unsat):
-                    return SpellingFailure('P-45.2.1', f"'{pr.raw[:40]}' at {k} of '{p.parent}': chain through "
-                                                       f"it has {total + pcount - q} prefixes vs {total}")
+                                                       f"carries a longer chain ({br.m} > {t})")
+                if br.m < t:
+                    continue
+                subs_wo = list(subs)
+                subs_wo.remove(k)
+                _sfx2, mult2, dbl2, subs2 = _alternative_chain(n, k, side, sfx, mult, dbl, subs_wo, br)
+                # the unit's own numbering is judged by the numbering checks; the chains are
+                # compared in their better numberings
+                _sfx1, mult1, dbl1, subs1 = _best_numbering(n, sfx, mult, dbl, subs)
+                where = f"'{pr.raw[:40]}' at {k} of '{p.parent}'"
+                if len(mult2) != len(mult1):
+                    if len(mult2) > len(mult1):
+                        return SpellingFailure('P-46.1.4' if subst else 'P-44.4.1.1',
+                                               f"{where}: the chain through it has {len(mult2)} multiple "
+                                               f"bond(s) vs {len(mult1)}")
+                    continue
+                if len(dbl2) != len(dbl1):
+                    if len(dbl2) > len(dbl1):
+                        return SpellingFailure('P-46.1.4' if subst else 'P-44.4.1.2',
+                                               f"{where}: the chain through it has {len(dbl2)} double "
+                                               f"bond(s) vs {len(dbl1)}")
+                    continue
+                if mult2 != mult1:
+                    if mult2 < mult1:
+                        return SpellingFailure('P-46.1.9' if subst else 'P-44.4.1.10.1',
+                                               f"{where}: the chain through it has the multiple bonds at "
+                                               f"{mult2} vs {mult1}")
+                    continue
+                if dbl2 != dbl1:
+                    if dbl2 < dbl1:
+                        return SpellingFailure('P-46.1.9' if subst else 'P-44.4.1.10.1',
+                                               f"{where}: the chain through it has the double bonds at "
+                                               f"{dbl2} vs {dbl1}")
+                    continue
+                if len(subs2) != total:
+                    if len(subs2) > total:
+                        return SpellingFailure('P-45.2.1', f"{where}: chain through it has {len(subs2)} "
+                                                           f"prefixes vs {total}")
+                    continue
+                if subs2 < subs1:
+                    return SpellingFailure('P-45.2.2', f"{where}: the chain through it has the prefixes at "
+                                                       f"{subs2} vs {subs1}")
     return None
 
 

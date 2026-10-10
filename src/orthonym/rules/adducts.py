@@ -714,9 +714,12 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
         if component_name is None:
             return None  # fail-closed: never drop or placeholder a component
         named.append((component_name, count))
-    if general_fallback_unverified:
-        # Best-effort tier: spellings whose adduct name OPSIN can read back
-        # (``_readable_spellings``); unchanged when the name already reads back.
+    if general_fallback or general_fallback_unverified:
+        # The tiers that name general-engine components (valid, complete, best-effort):
+        # spellings whose adduct name OPSIN can read back (``_readable_spellings``);
+        # unchanged when the name already reads back, so no name that ships today changes.
+        # Each respelled component reads back to its own full InChIKey (``verify_or_none``) and
+        # the whole adduct name still passes the full-InChIKey gates of the tier.
         named = _readable_spellings(ordered, named, style, dict(
             general_fallback=general_fallback,
             allow_aromatic_general=allow_aromatic_general,

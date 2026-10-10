@@ -17,11 +17,10 @@ ring lost to one that did not.
 
 Leads item N8b (``Orthonym._classify`` -> ``chains.p45_principal_chain``): the chain handed to
 parent selection is now the one this selector makes senior, for the principal groups whose
-producer builds on the chain it is given (``chains.GIVEN_CHAIN_GROUPS``), so the names of those
-rows are the PINs and are labelled pin_verified at every tier. The ester is not in the set: its
-producer walks the acid fragment itself (``rules/esters.py:_find_acid_principal_chain``), so its
-row keeps the old name, below the PIN, and the label check stays load-bearing for it
-(``test_the_label_is_what_lowers_the_name``).
+producer builds on the chain it is given (``chains.GIVEN_CHAIN_GROUPS``, the ester included since its
+producer takes the acid chain of ``chains.p45_acid_chain``), so the names of those rows are the PINs
+and are labelled pin_verified at every tier. The label check stays: it lowers the name of a producer
+that builds on another chain (``test_the_label_is_what_lowers_the_name``).
 """
 import pytest
 from rdkit import Chem
@@ -125,9 +124,7 @@ def test_the_pin_by_p45_2_reads_back(smiles, built, pin):
     assert name_is_rt_exact(built, smiles), built
 
 
-#: the rows whose producer walks its own chain (the ester): not on the senior chain
-ESTER_ROWS = [r for r in P4521_ROWS if r[0].startswith("COC(=O)")]
-SENIOR_CHAIN_ROWS = P4523_ROWS + [r for r in P4521_ROWS if r not in ESTER_ROWS]
+SENIOR_CHAIN_ROWS = P4523_ROWS + P4521_ROWS
 
 
 @pytest.mark.parametrize("tier", TIERS)
@@ -141,16 +138,6 @@ def test_the_senior_chain_is_built_and_certified(tier, smiles, built, pin):
     assert (row["name"], row["tier"]) == (pin, "pin_verified"), row
     assert row["is_pin"] is True, row
     assert name_is_rt_exact(row["name"], smiles), row
-
-
-@pytest.mark.parametrize("tier", ["pin", "best-effort"])
-@pytest.mark.parametrize("smiles,built,pin", ESTER_ROWS)
-def test_a_chain_that_is_not_the_senior_one_is_never_certified(tier, smiles, built, pin):
-    row = _tier_row(tier, smiles)
-    assert row.get("tier") != "pin_verified", row
-    if tier == "best-effort":
-        assert (row["name"], row["tier"]) == (built, "systematic_verified"), row
-        assert name_is_rt_exact(row["name"], smiles), row
 
 
 @pytest.mark.parametrize("tier", TIERS)
@@ -170,13 +157,14 @@ def test_a_stereodescriptor_does_not_hide_the_name():
 
 
 def test_the_label_is_what_lowers_the_name(monkeypatch):
-    # known positive, an ester (its producer walks its own chain): without the label the
-    # producer's name is certified, as on main (a SMILES used by no other test here, a fresh
-    # engine)
+    # known positive: a producer that builds on a chain that is not the senior one (the selector
+    # without ring prefixes, restored here) is not certified; without the label its name is, as
+    # on main (a SMILES used by no other test here, a fresh engine)
     from orthonym.assembly import candidate_pool
-    smiles = "CCOC(=O)C(C)Cc1ccccc1"
-    built = "ethyl 2-benzylpropanoate"
-    assert name_is_rt_exact(built, smiles), built
+    from orthonym.perception import chains
+    smiles = "N#CC(CO)Cc1ccc([N+](=O)[O-])cc1"
+    built = "3-hydroxy-2-[(4-nitrophenyl)methyl]propanenitrile"
+    monkeypatch.setattr(chains, "p45_principal_chain", lambda features, default: default)
     row = _tier_row("pin", smiles)
     assert row.get("tier") != "pin_verified", row
     monkeypatch.setattr(candidate_pool, "_label_chain_parent_prefix_seniority",

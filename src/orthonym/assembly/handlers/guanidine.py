@@ -47,7 +47,19 @@ def name_guanidine(
     if cand is None:
         return None
 
-    final_name = _inject_stereo_if_missing(features, cand.name, atom_to_locant=None)
+    # Guanidine, like urea, has no numbered skeleton: its only locants are the
+    # italic letters N, N', N'', the Blue Book "Guanidine and its
+    # derivatives": "the locants N, N' and N'' are used in preferred IUPAC names.
+    # The locants 1, 2, and 3 have been used but are no longer recommended").
+    # A front-of-name block with NUMERIC locants therefore resolves to nothing in
+    # the parent "Citation of locants", the Blue Book); the stereo of the
+    # N-substituents is cited inside their own prefixes "NAMING OF
+    # STEREOISOMERS", the Blue Book), which the substituent namer does. Without the
+    # declared scope the ring and chain readings both agreed and the block was
+    # prepended: '(1E)-N,N'-di[(1E)-prop-1-en-1-yl]guanidine', which OPSIN rejects.
+    final_name = _inject_stereo_if_missing(features, cand.name,
+                                           atom_to_locant=None,
+                                           parent_scope='retained_no_locants')
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="guanidine", iupac_section_cite="P-66.4.1.2.1", fragment_legacy=final_name),

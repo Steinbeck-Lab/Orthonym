@@ -63,6 +63,25 @@ def namer():
     return Orthonym()
 
 
+# A probe runs under the default PIN style unless the fixture gives it ``"style"``. The
+# functional-class handlers ('isocyanate', 'isothiocyanate') decline under PIN style for
+# every attachment since leads item 43c ISOCYANATES, the Blue Book,:26001:
+# "Preferred IUPAC names are generated substitutively using the prefix 'isocyanato' attached
+# directly to a parent hydride"), so they are reachable only under style="general", where the
+# 'R isocyanate' name is the output. The contract (tree present, byte-identical to the name,
+# well-formed) is checked for them there.
+_STYLE_NAMERS: dict = {}
+
+
+def _namer_for(probe, namer):
+    style = probe.get("style", "pin")
+    if style == "pin":
+        return namer
+    if style not in _STYLE_NAMERS:
+        _STYLE_NAMERS[style] = Orthonym(style=style)
+    return _STYLE_NAMERS[style]
+
+
 #: the coarse/structured classifier now lives once in
 # orthonym.assembly.name_tree.is_coarse_node (the provenance-based
 # parent_stem == fragment_legacy form), shared with
@@ -75,7 +94,7 @@ def namer():
 @pytest.mark.parametrize("probe", CONTRACT_PROBES, ids=CONTRACT_IDS)
 def test_tree_non_null(probe, namer):
     """SCORE-01: every reachable handler populates a non-None NameTreeNode."""
-    result = namer.name_with_tree(probe["smiles"])
+    result = _namer_for(probe, namer).name_with_tree(probe["smiles"])
     assert result.tree is not None, (
         f"{probe['handler_id']}: tree is None for {probe['smiles']!r} -> "
         f"{result.name!r}. RED until the handler (or its router) populates a tree."
@@ -85,7 +104,7 @@ def test_tree_non_null(probe, namer):
 @pytest.mark.parametrize("probe", CONTRACT_PROBES, ids=CONTRACT_IDS)
 def test_tree_parity(probe, namer):
     """: name_tree_to_string(tree) is byte-identical to the name field."""
-    result = namer.name_with_tree(probe["smiles"])
+    result = _namer_for(probe, namer).name_with_tree(probe["smiles"])
     assert result.tree is not None, f"{probe['handler_id']}: tree is None (RED)"
     assert name_tree_to_string(result.tree, "pin") == result.name, (
         f"{probe['handler_id']}: tree serialization "
@@ -96,7 +115,7 @@ def test_tree_parity(probe, namer):
 @pytest.mark.parametrize("probe", CONTRACT_PROBES, ids=CONTRACT_IDS)
 def test_tree_well_formed(probe, namer):
     """SCORE-02: structured trees carry their own fields; coarse nodes recorded."""
-    result = namer.name_with_tree(probe["smiles"])
+    result = _namer_for(probe, namer).name_with_tree(probe["smiles"])
     assert result.tree is not None, f"{probe['handler_id']}: tree is None (RED)"
     if is_coarse_node(result.tree):
         COARSE_HANDLERS.add(probe["handler_id"])
@@ -126,7 +145,7 @@ def test_structured_tree_not_silently_downgraded(probe, namer):
     in ``STRUCTURED_PROBES`` (they legitimately carry ``fragment_legacy`` and would
     falsely fail this guard).
     """
-    result = namer.name_with_tree(probe["smiles"])
+    result = _namer_for(probe, namer).name_with_tree(probe["smiles"])
     assert result.tree is not None, f"{probe['handler_id']}: tree is None (RED)"
     assert result.tree.class_id != "coarse_fallback", (
         f"{probe['handler_id']}: structured handler tree was silently swapped for "
@@ -149,7 +168,7 @@ def test_capture_slot_written_for_all_reachable(namer):
     the pre-pool bypass — documented inline (not a skip marker)."""
     for probe in PROBES:
         reset_inner_dispatch_stats()
-        result = namer.name_with_tree(probe["smiles"])
+        result = _namer_for(probe, namer).name_with_tree(probe["smiles"])
         assert isinstance(result, NamingResult)
         assert result.name, f"{probe['handler_id']}: empty name for {probe['smiles']!r}"
         fired = [k for k, v in get_inner_dispatch_stats().items() if v]
@@ -184,7 +203,7 @@ def test_probe_routes_to_expected_handler(probe, namer):
     claims via dispatch_inner. This guards the fixture against routing drift so a
     later-plan tree population actually green-flips the matching contract case."""
     reset_inner_dispatch_stats()
-    namer.name_with_tree(probe["smiles"])
+    _namer_for(probe, namer).name_with_tree(probe["smiles"])
     fired = [k for k, v in get_inner_dispatch_stats().items() if v]
     if probe["expected_handler"]:
         assert probe["expected_handler"] in fired, (
