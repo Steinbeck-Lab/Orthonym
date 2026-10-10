@@ -12,6 +12,7 @@ from rdkit import Chem
 
 from ..pin_spelling import SpellingFailure, register
 from . import indicated_hydrogen
+from .checks_assembly import ASSEMBLY_HEAD
 from .lexer import normalise
 
 
@@ -36,4 +37,26 @@ def indicated_hydrogen_check(mol, name):
     if r.get('verdict') == 'OMISSION':
         return SpellingFailure('P-14.7.1', f"indicated hydrogen required {dict(r['reqd'])}, "
                                            f"cited {[g[1] for g in r['front']]}")
+    return None
+
+
+# ------------------------------------------------------------------ ring assemblies
+#: an indicated-hydrogen group directly after the multiplying prefix of a ring assembly, inside the
+#: parentheses of its component or after the hyphen of a locant-initial one: 'bi(4H-1,4-oxazine)',
+#: 'bi-6H-pyran', 'bi(1H-indole)'
+_IH_INSIDE_ASSEMBLY = re.compile(ASSEMBLY_HEAD + r"[(\[-]?\d+[a-z]?(?:,\d+[a-z]?)*H-")
+
+
+@register('P-28.2.3')
+def assembly_indicated_hydrogen_check(mol, name):
+    """ (the Blue Book) "Any remaining saturated ring positions are designated as
+    indicated hydrogen, placed together with the appropriate locant(s) at the front of the name of
+    the assembly.";:15599 '6H,6'H-2,2'-bipyran (PIN) (not 2,2'-bi-6H-pyran)'; the next paragraph
+    (:15595) calls the front position "a change from its position in previous editions (refs. 1
+    and 2) where it was kept with the name of the individual ring, for example, 2,2'-bi-2H-pyran".
+    A name that keeps the indicated hydrogen with the component, after the multiplying prefix
+    ('4,4'-bi(4H-1,4-oxazine)'), is the previous editions' spelling, not the PIN. Lexical only."""
+    if _IH_INSIDE_ASSEMBLY.search(normalise(name)):
+        return SpellingFailure('P-28.2.3', "indicated hydrogen cited with the component after the "
+                                           "assembly multiplier, not at the front of the assembly name")
     return None

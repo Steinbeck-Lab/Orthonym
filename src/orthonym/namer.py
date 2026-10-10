@@ -4305,7 +4305,7 @@ def _locant_sort_item(token: str):
 _INDICATED_H = re.compile(r"(?<![A-Za-z\d])(\d+[a-z]?(?:,\d+[a-z]?)*)H-")
 
 
-#: the locants of the hydro / dehydro prefixes ('2,3-dihydro-', '1,2-didehydro-'): (e)(i)
+#: the locants of the hydro prefixes ('2,3-dihydro-') and of the 'de'-hydro prefixes of: (e)(i)
 _HYDRO_LOCANTS = re.compile(
     r"(?<![A-Za-z\d\[\]^.])((?:\d+[a-z]?|[NOPS]'*)(?:,(?:\d+[a-z]?|[NOPS]'*))*)-"
     r"(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?(?:de)?hydro(?![a-z])")
@@ -5346,7 +5346,12 @@ class Orthonym:
                 if _iso_probe is not None:
                     from .rules.isotopes import decorate_isotopic_name, has_isotopes
                     if has_isotopes(_iso_probe):
-                        _iso_name = decorate_isotopic_name(smiles, self.style, self)
+                        # The skeleton is named without the hydro ring assembly producer: its
+                        # name takes no isotopic descriptor (rules/ring_assemblies.py, the
+                        # comment at hydro_assembly_withheld).
+                        from .rules.ring_assemblies import hydro_assembly_withheld
+                        with hydro_assembly_withheld():
+                            _iso_name = decorate_isotopic_name(smiles, self.style, self)
                         if _iso_name is not None:
                             # (fix wave 1): every exit of name goes
                             # through _finish. This one lives OUTSIDE the main
@@ -10218,6 +10223,16 @@ class Orthonym:
             if len(features.ring_systems) >= 2:
                 from .rules.ring_assemblies import detect_ring_assembly
                 assembly_info = detect_ring_assembly(features.mol, features.ring_systems)
+                if not assembly_info and not features.chain_is_parent:
+                    # / (the Blue Book,:24153): two ring systems of
+                    # one skeleton that differ in hydrogenation are a ring assembly named with
+                    # 'hydro' prefixes ('2,3-dihydro-1,1'-biphenyl'). The detector offers a name
+                    # only when it is built and OPSIN reads it back to this structure, so a
+                    # molecule it declines keeps the ring classification it had. A chain parent never
+                    # reads the assembly, so no name is built for it.
+                    from .rules.ring_assemblies import detect_hydro_ring_assembly
+                    assembly_info = detect_hydro_ring_assembly(
+                        features.mol, features.ring_systems)
                 if assembly_info:
                     features.ring_assembly_info = assembly_info
                     if not features.chain_is_parent:

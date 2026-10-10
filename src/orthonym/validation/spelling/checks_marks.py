@@ -277,3 +277,21 @@ def hyphen_after_enclosure_check(mol, name):
         return SpellingFailure('P-16.2.4.1', f"no hyphen between '{s[m.start()]}' and the locant: "
                                              f"...{s[max(0, m.start() - 15):m.start() + 6]}")
     return None
+
+
+# ------------------------------------------------------------------ 'bi' before 'cyclo'
+@register('P-28.2.1')
+def assembly_component_enclosure_check(mol, name):
+    """ (heading:15560) "Ring assemblies with a single bond junction",:15564 "(1) by
+    placing the prefix 'bi' (see before the name of the corresponding parent hydride
+    enclosed in parentheses, if necessary. Parentheses are used to avoid confusion with von Baeyer
+    names": '1,1'-bi(cyclohexane)', '[1,1'-bi(cyclohexan)]-4-yl-4'-ylidene' (:16122),
+    '4,4'-dimethyl[1,1'-bi(cyclohexan)]-2-ol (PIN)' (:49838). 'bi' set directly before 'cyclo'
+    reads as the von Baeyer prefix 'bicyclo', and a von Baeyer name always has its descriptor
+    ('bicyclo[2.2.1]heptane'): 'bicyclo' not followed by '[' is the assembly of a cycloalkane
+    without its parentheses ('[1,1'-bicyclohexane]-4-ol'), not a PIN. Lexical only."""
+    m = re.search(r"bicyclo(?!\[)", normalise(name))
+    if m:
+        return SpellingFailure('P-28.2.1', "'bi' before 'cyclo' without parentheses reads as a von "
+                                           "Baeyer prefix: ..." + normalise(name)[max(0, m.start() - 8):m.end() + 10])
+    return None

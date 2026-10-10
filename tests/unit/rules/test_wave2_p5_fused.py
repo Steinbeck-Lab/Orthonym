@@ -286,13 +286,19 @@ class TestP31HeteroatomicRingAssembly:
     def test_bi_oxaphosphinine(self):
         #: heteroatomic ring assembly named by a-replacement;
         # low locants to ring junctions -> heteroatoms -> unsaturation.
-        # OPSIN-RT-verified: 4,4'-bi(4H-1,4-oxaphosphinine) -> O1C=CP(C=C1)P1C=COC=C1
-        # Three defects fixed: (1) stem 'oxaphosphine' -> 'oxaphosphinine'
-        # (HW Table 2.7 class 6C '-inine' unsaturated ending); (2) missing '4H'
-        # indicated hydrogen (computed on the isolated parent hydride, not the
-        # assembly-embedded ring); (3) missing enclosing parentheses
-        # compound-component enclosure with the indicated-H kept inside).
-        assert name_compound("O1C=CP(C=C1)P1C=COC=C1") == "4,4'-bi(4H-1,4-oxaphosphinine)"
+        # OPSIN-RT-verified: 4,4'-bi-1,4-oxaphosphinine -> O1C=CP(C=C1)P1C=COC=C1
+        # (leads L2, 2026-10-09: the spelling was '4,4'-bi(4H-1,4-oxaphosphinine)'.)
+        # (the Blue Book): remaining saturated ring positions are designated as indicated
+        # hydrogen "placed together with the appropriate locant(s) at the front of the name of
+        # the assembly" (:15599 '6H,6'H-2,2'-bipyran (PIN) (not 2,2'-bi-6H-pyran)'). The
+        # junction P holds no hydrogen, so no indicated hydrogen is cited (:15603
+        # '1,1'-bipyrrole (PIN) (no indicated hydrogen needed)'), and a component name that
+        # starts with a locant follows the multiplier after a hyphen (a),:6938 'to
+        # separate locants from words or word fragments'; printed in the example of
+        #,:20912 '2,2'-bi-3,1,5-benzoxadiarsepine (PIN)').
+        # Earlier fixes kept: (1) stem 'oxaphosphine' -> 'oxaphosphinine' (HW Table 2.7 class 6C
+        # '-inine' unsaturated ending).
+        assert name_compound("O1C=CP(C=C1)P1C=COC=C1") == "4,4'-bi-1,4-oxaphosphinine"
 
     def test_hw_6c_inine_stem_monomer(self):
         # HW Table 2.7 class 6C: an unsaturated 6-ring with a 6C heteroatom

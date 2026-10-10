@@ -16,6 +16,8 @@ Example outputs:
   - 4-chlorobiphenyl SMILES -> "4-chloro-1,1'-biphenyl"
 """
 
+import contextlib
+import contextvars
 import re
 from collections import Counter
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
@@ -98,7 +100,7 @@ _VON_BAEYER_NAME_RE = re.compile(
 _INDICATED_H_ATOM_ELEMENTS = frozenset({5, 6, 7, 14, 15, 32, 33, 50, 51, 83})
 
 
-def _ring_indicated_h_atoms(mol, ring) -> List[int]:
+def _ring_indicated_h_atoms(mol, ring, include_substituted: bool = False) -> List[int]:
     """Ring atoms holding a mancude saturated (indicated-hydrogen) position.
 
     IUPAC (the Blue Book) /: the indicated hydrogen of a component
@@ -120,6 +122,12 @@ def _ring_indicated_h_atoms(mol, ring) -> List[int]:
         left) leaves the ring fully mancude with NO saturated position, so no
         indicated hydrogen is cited — ``1,1'-bipyrrole``, not ``1H,1'H-…``
         .
+
+    ``include_substituted`` is for a ring that is a SUBSTITUENT group, not an assembly component: it
+    keeps an aromatic atom that has lost its hydrogen to a substituent or to the free valence.
+     (the Blue Book,:3721) cites the indicated hydrogen of the mancude parent whatever
+    sits on that atom, "in a preferred IUPAC name a locant and the symbol 'H' must be cited", and a
+    substituent group keeps it: '(1H-indol-1-yl)acetic acid (PIN)' (:2039).
 
     Returns the list of such atom indices (unsorted; caller maps them to the
     assembly numbering). Fails soft to ```` if the ring cannot be kekulized.
@@ -166,7 +174,8 @@ def _ring_indicated_h_atoms(mol, ring) -> List[int]:
         # A genuinely-sp3 indicated position (2H-pyran's C2) keeps 1 H after the
         # ring bond and is still cited (2H,2'H-2,2'-bipyran), so 0-H is the clean
         # discriminator regardless of aromaticity.
-        if atom.GetTotalNumHs() == 0:
+        # (``include_substituted``: a substituent prefix keeps it, see the docstring)
+        if atom.GetTotalNumHs() == 0 and not (include_substituted and atom.GetIsAromatic()):
             continue
         out.append(idx)
     return out
@@ -236,6 +245,21 @@ def _enclose_component(name: str) -> str:
     return f"({name})" if _needs_von_baeyer_parens(name) else name
 
 
+def _component_before_suffix(name: str, suffix: str) -> str:
+    """The component name of an assembly parent that carries a principal characteristic group as a
+    suffix: enclosed when requires it and, before a suffix that begins with a vowel, with
+    its final 'e' elided inside the enclosure.
+
+     (the Blue Book) "Parentheses are used to avoid confusion with von Baeyer names":
+    '[1,1'-bi(cyclohexan)]-4-ol', never '[1,1'-bicyclohexane]-4-ol' ('bicyclohexane' reads as a
+    bicyclo name). (a) elides the final 'e' of a parent hydride before a suffix that begins
+    with a vowel; the book prints it for an assembly ('(1S,1's,2S,4S,4'R)-4,4'-dimethyl[1,1'-bi
+    (cyclohexan)]-2-ol (PIN)':49838, '[1,1'-bi(cyclohexan)]-4-yl-4'-ylidene':16122); before a
+    consonant it stays ('[1,1'-bi(cyclohexane)]-4-carbonitrile', 'cyclohexane-1,4-diol')."""
+    shown = name[:-1] if name.endswith("e") and suffix[:1] in "aeiouy" else name
+    return f"({shown})" if _needs_von_baeyer_parens(name) else shown
+
+
 def _cite_after_multiplier(multiplier: str, component: str) -> str:
     """Join a ring-assembly multiplying prefix ('bi', 'ter',...) to the text of
     its component name, as written after any parentheses.
@@ -250,6 +274,18 @@ def _cite_after_multiplier(multiplier: str, component: str) -> str:
     if component[:1].isdigit():
         return f"{multiplier}-{component}"
     return f"{multiplier}{component}"
+
+
+def _is_enclosed(text: str) -> bool:
+    """True when one pair of parentheses encloses the whole of ``text``."""
+    if not (text.startswith("(") and text.endswith(")")):
+        return False
+    depth = 0
+    for i, ch in enumerate(text):
+        depth += (ch == "(") - (ch == ")")
+        if depth == 0 and i < len(text) - 1:
+            return False
+    return depth == 0
 
 
 def _multiplied_assembly(connection_str: str, multiplier: str, component: str,
@@ -267,6 +303,14 @@ def _multiplied_assembly(connection_str: str, multiplier: str, component: str,
     the rule (``spelling_failures``) as the reason. Two components keep
     the primed PIN numbering of ('1,1'-biphenyl (PIN)',:15575).
     """
+    if count >= 3 and _is_enclosed(component):
+        # (the Blue Book) "...placing the appropriate numerical Latin-based
+        # prefix, 'ter', 'quater', 'quinque', etc., before the name of the parent hydride
+        # corresponding to the repeating unit": no parentheses, because 'ter' + 'cyclo' is
+        # no von Baeyer prefix,:15564, keeps them for 'bi' + 'cyclo' = 'bicyclo'):
+        # '1,1':2',1''-tercyclopropane' (:15657), '[1,1':4',1''-tercyclohexane]-1',2-diene'
+        # (:16849), '[1,1':4',1''-terbicyclo[2.2.2]octane]-2,2',2''-triene' (:16853).
+        component = component[1:-1]
     text = f"{connection_str}-{_cite_after_multiplier(multiplier, component)}"
     if count >= 3 and "'" in connection_str:
         from ..metrics.provenance import record_non_pin_label
@@ -1085,6 +1129,527 @@ def detect_ring_assembly(
     }
 
 
+# ---------------------------------------------------------------------------
+# /: a ring assembly of identical skeletons that differ in hydrogenation
+# ---------------------------------------------------------------------------
+#
+# ``### **** Ring assemblies composed of monocyclic components`` (the Blue Book),
+# (a):17079: "Low locants are assigned to 'hydro' prefixes in accordance with the fixed numbering
+# of each assembly. In biphenyl and polyphenyl assemblies, one benzene ring must remain in the
+# assembly; otherwise, the starting parent hydride is the saturated assembly and the ending 'ene' is
+# used to denote unsaturation (see. Furthermore, when a modified ring assembly of two rings
+# consists of a benzene ring and a cyclohexane ring substitutive nomenclature is preferred (see
+#."; '2,3-dihydro-1,1'-biphenyl (PIN)' (:17083, not '(cyclohexa-1,3-dien-1-yl)benzene').
+# (b):17112 (heteromonocycles) and ``### **** Ring assemblies composed of polycyclic
+# compounds`` (:17153): "Low locants are assigned to junctions between rings, then to indicated
+# hydrogen, if any, and finally to 'hydro' prefixes" ('1,2',3',4-tetrahydro-2,2'-binaphthalene (PIN)'
+#:17161). ``## **** UNSATURATION IN RING ASSEMBLIES COMPOSED OF MONOCYCLIC MANCUDE AND
+# SATURATED RINGS`` (:24151),:24153: "When assemblies of otherwise identical rings contain both
+# mancude and saturated rings, the use of hydro prefixes is preferred, except in the case of a two
+# ring assembly consisting of one benzene ring and a cyclohexane ring";
+# '1,2,3,4,5,6-hexahydro-2,2'-bipyridine (PIN)' (:24159). ``****`` (:16872, under ``### ****
+# SUBSTITUENT GROUPS MODIFIED BY THE PREFIXES 'HYDRO' OR 'DEHYDRO'``): 'hydro' prefixes "are
+# detachable prefixes but are not included in those prefixes that are cited in alphanumerical order.
+# Thus, in names, they are cited immediately at the front of the name of the parent hydride, after
+# alphabetized prefixes"; ``### **** General methodology`` (:16878),:16880: "Indicated
+# hydrogen atoms have priority over 'hydro' prefixes for low locants. If indicated hydrogen atoms are
+# present in a name, the 'hydro' prefixes precede them." ``### **** NUMBERING`` (:3219): the low
+# locants go to (b) indicated hydrogen, (c) principal characteristic groups, (e)(i) hydro prefixes,
+# (f) the detachable alphabetized prefixes together, (g) the prefix cited first.
+#
+# The assembly is named as the MANCUDE assembly (``1,1'-biphenyl``, ``2,2'-bipyridine``). Both
+# components keep the fixed numbering of the mancude parent (``bridged_fused_pin.parents`` for a fused
+# component, ``monocycle_forms`` for a ring) composed with every automorphism of its skeleton, and the
+# numbering of the assembly is the one with the lowest locants in the order of the book: the junction
+#,:15567 "Lowest possible locants must be used to denote the positions of attachment"),
+# the indicated hydrogen, the hydro prefixes, the substituent prefixes. The hydrogen of each component
+# is that of ``bridged_fused_pin.hydro``, the one rule every producer of a hydro name shares, read with
+# the atom of the other ring that the junction bond leads to counted as a bridge atom:
+# (:15593) adds "the maximum number of noncumulative double bonds... taking into account the junction
+# positions" ('2H-1,2'-bipyridine (PIN)',:15634).
+#
+# A name is offered only when OPSIN 2.9.0 reads it back to the input structure (full InChIKey), so a
+# numbering defect cannot ship a wrong molecule; with no OPSIN answer there is no offer. Scope (any
+# other molecule is declined and keeps the producers it had): exactly two ring systems joined by one
+# single bond, of one skeleton and of different hydrogenation, no stereo, charge, isotope or ring-atom
+# multiple bond to an atom outside the ring, at least one mancude component unless both are fused
+# systems, and substituent prefixes of the simple kinds ``_hydro_simple_prefix`` spells.
+
+#: the name of a ring skeleton's parent hydride carries no leading indicated hydrogen ('2H-pyran')
+_HYDRO_LEADING_IH = re.compile(r"^\d+H-")
+
+#: the nitro group as RDKit reads it, with its formal charges
+_HYDRO_NITRO = Chem.MolFromSmarts("[N+](=O)[O-]")
+
+_HYDRO_HALOGEN_PREFIX = {9: 'fluoro', 17: 'chloro', 35: 'bromo', 53: 'iodo'}
+_HYDRO_ALKYL_PREFIX = {1: 'methyl', 2: 'ethyl', 3: 'propyl', 4: 'butyl', 5: 'pentyl',
+                       6: 'hexyl', 7: 'heptyl', 8: 'octyl'}
+_HYDRO_ALKOXY_PREFIX = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy', 4: 'butoxy'}
+
+
+def _hydro_key(loc, prime: int) -> Tuple[int, str, int]:
+    """Order of the locants of a ring assembly: the number, then the fusion letter, then the prime.
+    ``## **** Lowest set of locants`` (the Blue Book),:3193: "Primed locants are placed
+    immediately after the corresponding unprimed locants in a set arranged in ascending order; locants
+    consisting of a number and a lower-case letter with or without primes as 4a and 4'a (not 4a') are
+    placed immediately after the corresponding numeric locant"; the book prints '7,7',7a,7'a-' in
+    '3a,3'a,4,4',5,5',6,6',7,7',7a,7'a-dodecahydro-1H,1'H-2,2'-biindole (PIN)' (:17169)."""
+    from .bridged_fused_pin.numbering import loc_key
+    num, letter = loc_key(loc)
+    return (num, letter, prime)
+
+
+def _hydro_text(key: Tuple[int, str, int]) -> str:
+    num, letter, prime = key
+    return f"{num}{_format_prime(prime)}{letter}"
+
+
+def _hydro_monocycle(mol, ring) -> Optional[Tuple[str, List[Dict[int, Any]]]]:
+    """``(stem, numberings)`` of a single ring: the stem of its mancude parent hydride ('phenyl' for
+    benzene,:15569 'The name biphenyl is retained as 1,1'-biphenyl'; 'pyridine') and every
+    numbering of that parent: the book's numbering of the mancude ring (``monocycle_forms``) composed
+    with each automorphism of the ring skeleton. None for a ring that has no book name."""
+    from ..perception.automorphisms import skeleton_automorphisms
+    from .bridged_fused_pin.parents import _mancude, _skeleton
+    from .monocycle_forms import _monocycle_form
+    atoms = set(ring)
+    skeleton, index = _skeleton(mol, atoms)
+    standalone = _mancude(skeleton)
+    if standalone is None:
+        return None
+    form = _monocycle_form(standalone, range(standalone.GetNumAtoms()))
+    if form is None or form.kind == 'cycloalkane' or len(form.numbering) != len(index):
+        return None
+    base = {index[k]: loc for k, loc in form.numbering.items()}
+    stem = 'phenyl' if form.kind == 'benzene' else _HYDRO_LEADING_IH.sub('', form.parent)
+    automorphisms, exhaustive = skeleton_automorphisms(
+        mol, atoms, element_blind=False, cap=64)
+    if not exhaustive:
+        return None
+    numberings, seen = [], set()
+    for sigma in automorphisms:
+        numbering = {a: base[sigma[a]] for a in atoms}
+        signature = tuple(sorted(numbering.items()))
+        if signature not in seen:
+            seen.add(signature)
+            numberings.append(numbering)
+    return stem, numberings
+
+
+def _hydro_ring_count(mol, atoms) -> int:
+    return sum(1 for r in mol.GetRingInfo().AtomRings() if set(r) <= atoms)
+
+
+def _hydro_stem_and_numberings(mol, atoms) -> Optional[Tuple[str, List[Dict[int, Any]]]]:
+    """``(stem, numberings)`` of one component of a hydro assembly: a ring (``_hydro_monocycle``) or
+    a fused ring system (``bridged_fused_pin.parents.fused_parent``: its parent name and every
+    numbering, the fixed one composed with each automorphism); None otherwise."""
+    count = _hydro_ring_count(mol, atoms)
+    if count == 0:
+        return None
+    if count == 1:
+        ring = next(r for r in mol.GetRingInfo().AtomRings() if set(r) <= atoms)
+        return _hydro_monocycle(mol, ring)
+    from .bridged_fused_pin.parents import fused_parent
+    parent = fused_parent(mol, atoms)
+    if parent is None:
+        return None
+    return parent.name, list(parent.numberings)
+
+
+def _hydro_component_state(kek, atoms, junction_atom: int, partner_atom: int):
+    """The hydrogen state of one component (``bridged_fused_pin.hydro.hydro_state``), with the atom
+    of the other ring that the junction bond leads to counted as a bridge atom: the junction bond uses
+    a valence of the junction atom, the Blue Book "The maximum number of
+    noncumulative double bonds is then added taking into account the junction positions":
+    '1,1'-bipyrrole (PIN) (no indicated hydrogen needed)',:15603). None when the ring is no hydro
+    derivative of its mancude parent."""
+    from .bridged_fused_pin import hydro
+    from .bridged_fused_pin.selection import Split
+    unsaturated, n_double = set(), 0
+    for b in kek.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in atoms and j in atoms and b.GetBondType() == Chem.BondType.DOUBLE:
+            unsaturated.update((i, j))
+            n_double += 1
+    split = Split(frozenset(atoms), ((partner_atom,),), ((junction_atom, junction_atom),),
+                  None, n_double, frozenset(unsaturated))
+    return hydro.hydro_state(kek, split)
+
+
+def _hydro_is_mancude(state) -> bool:
+    """The component needs no hydro prefix: every saturated atom of it is an indicated-hydrogen atom."""
+    return len(state.saturated) == len(state.eligible) - 2 * state.mancude_double
+
+
+def _hydro_simple_chain(mol, start: int, prev: int) -> Optional[int]:
+    """The carbon count of the unbranched saturated acyclic carbon chain that starts at ``start``
+    (reached from ``prev``), or None."""
+    count, current = 0, start
+    while True:
+        atom = mol.GetAtomWithIdx(current)
+        if (atom.GetAtomicNum() != 6 or atom.GetFormalCharge() or atom.GetIsotope()
+                or atom.IsInRing() or atom.GetNumRadicalElectrons()):
+            return None
+        count += 1
+        onward = []
+        for b in atom.GetBonds():
+            if b.GetBondType() != Chem.BondType.SINGLE:
+                return None
+            other = b.GetOtherAtomIdx(current)
+            if other != prev and mol.GetAtomWithIdx(other).GetAtomicNum() > 1:
+                onward.append(other)
+        if not onward:
+            return count
+        if len(onward) > 1:
+            return None
+        prev, current = current, onward[0]
+
+
+def _hydro_simple_prefix(mol, sub_atoms: List[int], attach: int, ring_atom: int) -> Optional[str]:
+    """The prefix name of the substituent ``sub_atoms`` (first atom ``attach``, on ring atom
+    ``ring_atom``) when it is of the simple kinds a hydro assembly names, else None (the assembly is
+    then declined and keeps the producers it had): a halogen atom, a nitro group, an unbranched alkyl
+    group up to octyl and an unbranched alkoxy group up to butoxy. The groups that are principal
+    characteristic groups elsewhere in the assembly family (hydroxy, amino, carboxy, formyl, cyano)
+    are not prefixes of this producer: expressed as a suffix they take their own place in the
+    numbering (c), the Blue Book)."""
+    heavy = [a for a in sub_atoms if mol.GetAtomWithIdx(a).GetAtomicNum() > 1]
+    first = mol.GetAtomWithIdx(attach)
+    bond = mol.GetBondBetweenAtoms(ring_atom, attach)
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+    if first.GetFormalCharge() and first.GetAtomicNum() != 7:
+        return None
+    if len(heavy) == 1 and first.GetAtomicNum() in _HYDRO_HALOGEN_PREFIX:
+        if first.GetFormalCharge() or first.GetIsotope() or first.GetNumRadicalElectrons():
+            return None
+        return _HYDRO_HALOGEN_PREFIX[first.GetAtomicNum()]
+    if first.GetAtomicNum() == 7 and _is_nitro_substituent(mol, heavy, attach):
+        return 'nitro'
+    if first.GetAtomicNum() == 6:
+        n = _hydro_simple_chain(mol, attach, ring_atom)
+        return _HYDRO_ALKYL_PREFIX.get(n) if n is not None and n == len(heavy) else None
+    if first.GetAtomicNum() == 8:
+        if (first.GetFormalCharge() or first.GetIsotope() or first.GetNumRadicalElectrons()
+                or len(heavy) < 2):
+            return None
+        onward = [nb.GetIdx() for nb in first.GetNeighbors()
+                  if nb.GetIdx() != ring_atom and nb.GetAtomicNum() > 1]
+        if len(onward) != 1:
+            return None
+        if mol.GetBondBetweenAtoms(attach, onward[0]).GetBondType() != Chem.BondType.SINGLE:
+            return None
+        n = _hydro_simple_chain(mol, onward[0], attach)
+        return _HYDRO_ALKOXY_PREFIX.get(n) if n is not None and n == len(heavy) - 1 else None
+    return None
+
+
+def _hydro_certified(mol, name: str) -> bool:
+    """OPSIN 2.9.0 reads ``name`` back to the structure of ``mol`` (full InChIKey). False when OPSIN
+    rejects the name, reads another structure, or cannot answer: a name that no round trip confirms
+    is never offered."""
+    from ..validation.opsin_roundtrip import OpsinUnavailable, extended_smiles_or_unavailable
+    try:
+        line = extended_smiles_or_unavailable(name)
+    except OpsinUnavailable:
+        return False
+    if not line or not line.strip():
+        return False
+    parsed = Chem.MolFromSmiles(line.strip().split()[0])
+    if parsed is None:
+        return False
+    try:
+        wanted, read = Chem.MolToInchiKey(mol), Chem.MolToInchiKey(parsed)
+    except Exception:  # noqa: BLE001 - an unreadable structure is no confirmation
+        return False
+    return bool(wanted) and wanted == read
+
+
+def _hydro_pair(mol, ring_systems):
+    """``(systems, junction)`` when ``mol`` has the shape of a hydro assembly, else None: ``systems``
+    are the two ring systems (atom sets) and ``junction`` is ``(atom_in_first, atom_in_second)`` of the
+    one single bond that joins them."""
+    if len(ring_systems) != 2 or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    systems = [set(s) for s in ring_systems]
+    connections = _find_inter_system_bonds(mol, systems)
+    if len(connections) != 1:
+        return None
+    a1, a2, s1, _s2 = connections[0]
+    if mol.GetBondBetweenAtoms(a1, a2).GetBondType() != Chem.BondType.SINGLE:
+        return None
+    from .ring_assembly_screen import _benzene_cyclohexane_pair, ring_system_key
+    if ring_system_key(mol, systems[0]) != ring_system_key(mol, systems[1]):
+        return None
+    if _system_signature(mol, systems[0]) == _system_signature(mol, systems[1]):
+        return None  # identical rings: ``detect_ring_assembly`` names them
+    if _benzene_cyclohexane_pair(mol, systems, (0, 1)):
+        return None  # (:24153): the one two-ring assembly that is named substitutively
+    nitro = {i for match in mol.GetSubstructMatches(_HYDRO_NITRO) for i in match}
+    for atom in mol.GetAtoms():
+        if ((atom.GetFormalCharge() and atom.GetIdx() not in nitro) or atom.GetIsotope()
+                or atom.GetNumRadicalElectrons() or atom.GetAtomicNum() == 0
+                or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED):
+            return None   # a charge (the nitro group's own aside), isotope, dummy atom or stereocentre
+    if any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()):
+        return None       # the stereodescriptors of an assembly name are not written here
+    return systems, ((a1, a2) if s1 == 0 else (a2, a1))
+
+
+def _hydro_substituents(mol, systems):
+    """``[(system_index, ring_atom, prefix_name)]`` for the substituents of the two ring systems, or
+    None when one is not of the simple kinds (``_hydro_simple_prefix``)."""
+    ring_atoms = set().union(*systems)
+    found = []
+    for k, atoms in enumerate(systems):
+        for a in sorted(atoms):
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                j = nb.GetIdx()
+                if j in ring_atoms or nb.GetAtomicNum() <= 1:
+                    continue
+                name = _hydro_simple_prefix(mol, _walk_substituent(mol, j, ring_atoms), j, a)
+                if name is None:
+                    return None
+                found.append((k, a, name))
+    return found
+
+
+def _hydro_benzene_cyclohexane(mol, kek, systems, mancude) -> bool:
+    """The two-ring assembly of one benzene ring and one cyclohexane ring, which (the Blue Book
+    "except in the case of a two ring assembly consisting of one benzene ring and a cyclohexane ring") names
+    substitutively ('cyclohexylbenzene (PIN)',:24157): two lone six-membered carbon rings, one mancude and
+    the other with no ring double bond. Read from the Kekule structure, so that it does not depend on the
+    aromatic flags of ``mol``."""
+    for atoms in systems:
+        if (len(atoms) != 6 or _hydro_ring_count(mol, atoms) != 1
+                or any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6 for a in atoms)):
+            return False
+    saturated = [not any(b.GetBondType() == Chem.BondType.DOUBLE
+                         and b.GetBeginAtomIdx() in atoms and b.GetEndAtomIdx() in atoms
+                         for b in kek.GetBonds()) for atoms in systems]
+    return (mancude[0] and saturated[1]) or (mancude[1] and saturated[0])
+
+
+def _hydro_name(mol, ring_systems) -> Optional[str]:
+    """The name of the hydro-modified ring assembly ``mol`` is (see the block comment above for the
+    rules and the scope), or None. Not certified: ``detect_hydro_ring_assembly`` does that."""
+    pair = _hydro_pair(mol, ring_systems)
+    if pair is None:
+        return None
+    systems, junctions = pair
+    partners = (junctions[1], junctions[0])
+    kek = Chem.Mol(mol)
+    try:
+        Chem.Kekulize(kek, clearAromaticFlags=True)
+    except Exception:  # noqa: BLE001 - no Kekule structure: out of scope
+        return None
+    ring_atoms = set().union(*systems)
+    for a in ring_atoms:
+        for b in mol.GetAtomWithIdx(a).GetBonds():
+            if b.GetBondTypeAsDouble() >= 2.0 and b.GetOtherAtomIdx(a) not in ring_atoms:
+                return None  # an oxo, ylidene or imino group on a ring atom: not built here
+    states = []
+    for k in (0, 1):
+        state = _hydro_component_state(kek, systems[k], junctions[k], partners[k])
+        if state is None:
+            return None
+        states.append(state)
+    mancude = [_hydro_is_mancude(s) for s in states]
+    if all(mancude):
+        return None  # two mancude components: the indicated-hydrogen path of ``detect_ring_assembly``
+    if _hydro_benzene_cyclohexane(mol, kek, systems, mancude):
+        return None  # (:24153) again, read from the Kekule structure: no aromatic flag needed
+    if not any(mancude) and any(_hydro_ring_count(mol, atoms) == 1 for atoms in systems):
+        return None  # no mancude ring left: for rings that is the saturated assembly + 'ene' (:17079)
+    parts = [_hydro_stem_and_numberings(mol, atoms) for atoms in systems]
+    if any(p is None for p in parts) or parts[0][0] != parts[1][0]:
+        return None
+    stem = parts[0][0]
+    substituents = _hydro_substituents(mol, systems)
+    if substituents is None:
+        return None
+
+    from ..assembly.naming_utils import alpha_sort_key, multiplied_component
+    from .bridged_fused_pin import hydro as hydro_rule
+    # every numbering of the assembly: which component is unprimed, and a numbering of each
+    best = None
+    for unprimed in (0, 1):
+        first, second = unprimed, 1 - unprimed
+        for numbering_1 in parts[first][1]:
+            ih_1, hydro_1 = hydro_rule.choose_indicated_hydrogen(states[first], numbering_1)
+            for numbering_2 in parts[second][1]:
+                ih_2, hydro_2 = hydro_rule.choose_indicated_hydrogen(states[second], numbering_2)
+                numberings = {first: numbering_1, second: numbering_2}
+                primes = {first: 0, second: 1}
+                junction_key = (_hydro_key(numbering_1[junctions[first]], 0),
+                                _hydro_key(numbering_2[junctions[second]], 1))
+                ih_key = tuple(sorted(
+                    [_hydro_key(numbering_1[a], 0) for a in ih_1]
+                    + [_hydro_key(numbering_2[a], 1) for a in ih_2]))
+                hydro_key = tuple(sorted(
+                    [_hydro_key(numbering_1[a], 0) for a in hydro_1]
+                    + [_hydro_key(numbering_2[a], 1) for a in hydro_2]))
+                cited = sorted(
+                    (alpha_sort_key(name), _hydro_key(numberings[k][a], primes[k]))
+                    for k, a, name in substituents)
+                prefix_key = tuple(sorted(loc for _name, loc in cited))
+                first_cited_key = tuple(loc for _name, loc in cited)
+                key = (junction_key, ih_key, hydro_key, prefix_key, first_cited_key)
+                if best is None or key < best[0]:
+                    best = (key, numberings, primes)
+    if best is None:
+        return None
+    (junction_key, ih_key, hydro_key, _prefix_key, _cited_key), numberings, primes = best
+
+    hydro_word = hydro_rule._HYDRO.get(len(hydro_key))
+    if hydro_word is None:
+        return None
+    groups: Dict[str, List[Tuple[int, str, int]]] = {}
+    for k, a, name in substituents:
+        groups.setdefault(name, []).append(_hydro_key(numberings[k][a], primes[k]))
+    prefixes = "-".join(
+        f"{','.join(_hydro_text(x) for x in sorted(groups[n]))}-"
+        f"{multiplied_component(len(groups[n]), n, n)}"
+        for n in sorted(groups, key=alpha_sort_key))
+    hydro_prefix = f"{','.join(_hydro_text(x) for x in hydro_key)}-{hydro_word}"
+    indicated = ",".join(f"{_hydro_text(x)}H" for x in ih_key)
+    core = _multiplied_assembly(",".join(_hydro_text(x) for x in junction_key), 'bi', stem, 2)
+    return "-".join(part for part in (prefixes, hydro_prefix, indicated, core) if part)
+
+
+# An isotope-labelled molecule is named through its isotope-STRIPPED skeleton, and the descriptor is
+# then spliced into the skeleton's name (``rules.isotopes.decorate_isotopic_name``,,
+# the Blue Book "before the part of the compound that is isotopically substituted"). That
+# splice cannot reach a name of this producer. Its single-descriptor search tries integer and
+# letter (N, O) locants only, so a label on the primed component is never offered
+# ("2,3,4,5-tetrahydro(2'-2H)-1,1'-biphenyl", which OPSIN 2.9.0 reads), and it offers no slot
+# between the hydro prefixes and a locant set that carries a prime (``_INTERIOR_LOCANT_STEM_RE``).
+# The skeleton name would then be a name the label cannot enter, and a molecule that the producers
+# open to it named before would become an abstention. The namer therefore runs the decorator inside
+# ``hydro_assembly_withheld``: this producer makes no offer there, and the molecule keeps exactly the
+# producers it had.
+_HYDRO_WITHHELD: "contextvars.ContextVar[bool]" = contextvars.ContextVar(
+    "orthonym_hydro_assembly_withheld", default=False)
+
+
+@contextlib.contextmanager
+def hydro_assembly_withheld():
+    """Name nothing as a hydro-modified ring assembly while this block runs (see the comment above):
+    entered by the namer around the isotope decorator, which names the stripped skeleton of a
+    labelled molecule. The previous state is restored on every exit."""
+    token = _HYDRO_WITHHELD.set(True)
+    try:
+        yield
+    finally:
+        _HYDRO_WITHHELD.reset(token)
+
+
+def detect_hydro_ring_assembly(mol, ring_systems: List[Set[int]]) -> Optional[Dict]:
+    """The assembly info of a ring assembly of two identical ring skeletons that differ in
+    hydrogenation (``_hydro_name``), with its name, or None.
+
+    ``detect_ring_assembly`` does not claim these molecules: its consumers (the prefix builders of
+    ring fragments) name every ring system of an assembly alike, and a hydro assembly is not that.
+    This detector is for the one caller that names the whole molecule, and it returns a result only
+    when the name is built and certified (``_hydro_certified``), so a molecule it declines keeps
+    exactly the classification it had. Nothing is offered inside ``hydro_assembly_withheld``."""
+    if _HYDRO_WITHHELD.get():
+        return None
+    try:
+        name = _hydro_name(mol, ring_systems)
+    except Exception:  # noqa: BLE001 - a structure this producer cannot read is declined
+        return None
+    if name is None or not _hydro_certified(mol, name):
+        return None
+    systems = [set(s) for s in ring_systems]
+    return {
+        'ring_systems': systems,
+        'connections': _find_inter_system_bonds(mol, systems),
+        'count': 2,
+        'ring_type': ('heterocyclic' if any(mol.GetAtomWithIdx(a).GetAtomicNum() != 6
+                                            for s in systems for a in s) else 'carbocyclic'),
+        'double_bond_junction': False,
+        'mancude_tautomer': False,
+        'hydro': True,
+        'name': name,
+    }
+
+
+def _von_baeyer_component(
+    mol, system_atoms: Set[int], junction_atoms: Tuple[int, ...] = (),
+) -> Optional[Tuple[str, Dict[int, int]]]:
+    """``(name, {atom: locant})`` of a ring system that is a saturated all-carbon bicyclo[x.y.z]alkane
+    standing alone as a component of a ring assembly; None for anything else.
+
+    ``### **** DEFINITIONS`` (the Blue Book) lists "alicyclic von Baeyer systems" among
+    the cyclic systems of a ring assembly, and (:24072) prints "2,2'-bi(bicyclo[2.2.2]
+    octane) (PIN)" (:24076). The component is the von Baeyer parent hydride itself, numbered by its
+    own rules 'Numbering bicyclic alicyclic hydrocarbons',:9589); of the numberings that keep the
+    descriptor the one that gives the junction atoms the lowest locants is kept (c): free
+    valences and principal groups come before substituents; "Locants indicating points of
+    attachment are placed before the name of the assembly"). Delegates to the von Baeyer namer
+    (``bicyclo.get_bicyclo_numbering``, whose tiers are the ladder) on the component taken out
+    of the molecule; heteroatoms, multiple bonds, charges, isotopes and spiro or fused systems are
+    not this question and return None (the heteroatomic ones need the 'a' prefixes of in
+    front of the assembly name,:15685)."""
+    from . import bicyclo
+
+    atoms = sorted(system_atoms)
+    rw = Chem.RWMol()
+    index: Dict[int, int] = {}
+    for a in atoms:
+        src = mol.GetAtomWithIdx(a)
+        if (src.GetAtomicNum() != 6 or src.GetFormalCharge() or src.GetIsotope()
+                or src.GetIsAromatic() or src.GetNumRadicalElectrons()):
+            return None
+        index[a] = rw.AddAtom(Chem.Atom(6))
+    for b in mol.GetBonds():
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in index and j in index:
+            if b.GetBondType() != rdchem.BondType.SINGLE:
+                return None
+            rw.AddBond(index[i], index[j], rdchem.BondType.SINGLE)
+    frag = rw.GetMol()
+    try:
+        Chem.SanitizeMol(frag)
+    except Exception:
+        return None
+    if not bicyclo.is_bicyclo_system(frag):
+        return None
+    name = bicyclo.name_bicyclo_system(frag)
+    if not name or not name.startswith("bicyclo["):
+        return None                       # a retained name, or no name at all
+    junctions = [index[j] for j in junction_atoms if j in index]
+    if not junctions:
+        # no junction to place: the name alone is asked for
+        return name, {}
+    # The admissible numberings are the von Baeyer namer's: the descriptor is kept); the
+    # one chosen gives the junction atoms the lowest locant SET (c)), then the lowest locant
+    # to the junction cited first in the assembly name -- the bond to the previous ring
+    #,:15663 "the locant set 1,1':2',1'':3'',1''' is lower than 1,1':3',1'':2'',1'''")
+    # -- then the canonical atom ranks, which decide nothing the book decides and only stop the
+    # order of the input atoms from deciding.
+    from ..perception.rings import find_ring_bridgeheads
+    ring_atoms = bicyclo.get_bicyclo_ring_atoms(frag) or set()
+    bridgeheads = list(find_ring_bridgeheads(frag, ring_atoms))
+    if len(bridgeheads) != 2:
+        return None
+    candidates = bicyclo._enumerate_bicyclo_numberings(frag, bridgeheads)
+    if not candidates:
+        return None
+    ranks = list(Chem.CanonicalRankAtoms(frag, breakTies=True))
+
+    def key(numbering):
+        cited = [numbering[j] for j in junctions]
+        return (sorted(cited), cited, tuple(ranks[i] for i in sorted(numbering, key=numbering.get)))
+
+    best = min(candidates, key=key)
+    if set(best) != set(range(len(atoms))):
+        return None
+    return name, {a: best[index[a]] for a in atoms}
+
+
 def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
     """
     Determine the parent name for a ring system in an assembly context.
@@ -1207,6 +1772,12 @@ def _get_ring_parent_name(mol, system_atoms: Set[int]) -> Optional[str]:
     algo_name = _try_algorithmic_fusion_name(sub_mol)
     if algo_name:
         return algo_name
+
+    # Step 6: a saturated all-carbon von Baeyer (bicyclo) system is a component of its own
+    #, the Blue Book; '2,2'-bi(bicyclo[2.2.2]octane) (PIN)':24076).
+    von_baeyer = _von_baeyer_component(mol, system_atoms)
+    if von_baeyer is not None:
+        return von_baeyer[0]
 
     return None
 
@@ -1530,7 +2101,7 @@ def _number_carbocyclic_from_anchor(
 
 
 def _compute_per_system_ring_locants(
-    mol, assembly_info: Dict,
+    mol, assembly_info: Dict, free_valence_atoms: Optional[List[int]] = None,
 ) -> Optional[List[Dict[int, int]]]:
     """a phase-03 /: per-system IUPAC locant maps for a ring
     assembly. Each entry is a Dict[int, int] mapping atom_idx -> locant
@@ -1552,6 +2123,13 @@ def _compute_per_system_ring_locants(
     Args:
         mol: RDKit Mol object.
         assembly_info: dict from detect_ring_assembly.
+        free_valence_atoms: the atoms of a substituent-prefix assembly that bear its
+            free valence (the attachment atom), or None. (the Blue Book)
+            "Low locants are assigned to ring junctions, then to free valences": among
+            the walking directions of a heterocyclic component that tie on the junction
+            locants and the indicated hydrogen, the one giving the free valence the
+            lowest locant is kept ('[4,4'-bi-1,4-oxazin]-2-yl', never '-6-yl': the
+            junction N is locant 4 in both directions).
 
     Returns:
         List of per-system Dict[int, int] locant maps, indexed by system
@@ -1656,9 +2234,12 @@ def _compute_per_system_ring_locants(
                 # is the next tiebreak: 2 < 6 selects 2H-1,2'-bipyridine for
                 # every writing.
                 ih_atoms = _ring_indicated_h_atoms(mol, ring)
+                fv_atoms = [a for a in (free_valence_atoms or []) if a in ring]
                 best_map: Optional[Dict[int, int]] = None
                 best_locant_set: Optional[List[int]] = None
+                best_anchor: Optional[int] = None
                 best_ih_set: Optional[List[int]] = None
+                best_fv_set: Optional[List[int]] = None
                 for direction in (1, -1):
                     oriented = [
                         ring_list[(start_pos + direction * i) % n]
@@ -1671,21 +2252,44 @@ def _compute_per_system_ring_locants(
                     cand_ih_set = sorted(
                         cand_map[a] for a in ih_atoms if a in cand_map
                     )
+                    cand_fv_set = sorted(
+                        cand_map[a] for a in fv_atoms if a in cand_map
+                    )
+                    # the junction locant in the CITATION order of the assembly name:
+                    # the bond to the previous ring is cited first
+                    cand_anchor = (cand_map.get(anchor_atom)
+                                   if anchor_atom is not None else None)
                     if best_locant_set is None:
                         take = True
                     else:
                         c = compare_locant_sets(cand_set, best_locant_set)
-                        # Primary: lowest connection-locant set. When
-                        # it ties, secondary: lowest indicated-H locant set
-                        #. direction +1 (tried first) is the final
-                        # stable tiebreak, so the order is total & deterministic.
-                        take = c < 0 or (
-                            c == 0
-                            and compare_locant_sets(cand_ih_set, best_ih_set) < 0
-                        )
+                        # Primary: lowest connection-locant set. When it
+                        # ties, the locant set is read in the order of citation
+                        #, the Blue Book: "the locant set
+                        # 1,1':2',1'':3'',1''' is lower than 1,1':3',1'':2'',1'''"):
+                        # the junction to the previous ring takes the lower locant,
+                        # '2,2':5',2''-terthiophene', not '2,5':2',2''-terthiophene'.
+                        # Then the lowest indicated-H locant set; then the
+                        # lowest free-valence locant of a substituent prefix
+                        #. direction +1 (tried first) is the final stable
+                        # tiebreak, so the order is total & deterministic.
+                        c_cite = 0
+                        if (c == 0 and cand_anchor is not None
+                                and best_anchor is not None):
+                            c_cite = (cand_anchor > best_anchor) - (cand_anchor < best_anchor)
+                        c_ih = (compare_locant_sets(cand_ih_set, best_ih_set)
+                                if c == 0 and c_cite == 0 else 0)
+                        take = c < 0 or (c == 0 and (
+                            c_cite < 0
+                            or (c_cite == 0 and (
+                                c_ih < 0
+                                or (c_ih == 0 and fv_atoms
+                                    and compare_locant_sets(cand_fv_set, best_fv_set) < 0)))))
                     if take:
                         best_locant_set = cand_set
+                        best_anchor = cand_anchor
                         best_ih_set = cand_ih_set
+                        best_fv_set = cand_fv_set
                         best_map = cand_map
                 if best_map is not None:
                     sys_map = best_map
@@ -1709,10 +2313,17 @@ def _compute_per_system_ring_locants(
             # (v52 P4 T2: the old unconditional ``sys_map[atom_idx] = loc``
             # stored a bogus locant 1 for every atom, which was always
             # "complete" coverage even though every value was wrong).
-            for atom_idx in sys_atoms:
-                loc = _get_connection_locant(mol, atom_idx, sys_atoms)
-                if loc is not None:
-                    sys_map[atom_idx] = loc
+            von_baeyer = _von_baeyer_component(
+                mol, sys_atoms,
+                tuple(([anchor_atom] if anchor_atom is not None else []) + sorted(other_atoms)))
+            if von_baeyer is not None:
+                # a von Baeyer component is numbered as one ring system, junction atoms lowest
+                sys_map = dict(von_baeyer[1])
+            else:
+                for atom_idx in sys_atoms:
+                    loc = _get_connection_locant(mol, atom_idx, sys_atoms)
+                    if loc is not None:
+                        sys_map[atom_idx] = loc
             result.append(sys_map)
 
     return result
@@ -2554,8 +3165,9 @@ def _build_mixed_pcg_ring_assembly(
     # left untouched. Route through the shared elision primitive rather than the
     # raw f-string so ``[1,1'-biphenyl]-2,4,4',6-tetrol`` (PIN) is emitted.
     from ..assembly.naming_utils import _join_multiplied_suffix
-    core = (f"[{_multiplied_assembly(connection_str, multiplier, ring_name, count)}]"
-            f"-{suffix_loc_str}-{_join_multiplied_suffix(smult, senior)}")
+    suffix_text = _join_multiplied_suffix(smult, senior)
+    core = (f"[{_multiplied_assembly(connection_str, multiplier, _component_before_suffix(ring_name, suffix_text), count)}]"
+            f"-{suffix_loc_str}-{suffix_text}")
 
     # Prefix block (alphanumerical, grouped multipliers). Directly abuts '[' with
     # NO hyphen: no hyphen before an opening enclosing mark).
@@ -2613,6 +3225,11 @@ def name_ring_assembly(
         2,2'-bipyridine -> "2,2'-bipyridine"
         4-chlorobiphenyl -> "4-chloro-1,1'-biphenyl"
     """
+    # /: a hydro-modified assembly of two identical skeletons was named, and
+    # certified, when it was detected (``detect_hydro_ring_assembly``).
+    if assembly_info.get('hydro'):
+        return assembly_info.get('name')
+
     #: skeletal-replacement ring assembly (mixed/single-heteroatom
     # same-skeleton monocycles) -> dedicated 'a'-nomenclature namer.
     if assembly_info.get('replacement'):
@@ -2687,6 +3304,14 @@ def name_ring_assembly(
     # "None") -- so the whole assembly offer is dropped and the cascade degrades
     # to a von Baeyer name. Mirrors the connection-locant None guard above (T2).
     if any(s.get('locant') is None for s in substituent_list):
+        return None
+
+    # A von Baeyer component is built bare only: the locants of its substituents come from the
+    # von Baeyer numbering of the component (``_von_baeyer_component``), which the substituent
+    # walk above (a monocycle walk from the junction) does not read, so a substituted assembly of
+    # bicyclo components is declined here and keeps the producer that can name it -- whose name
+    # is then withdrawn from the PIN by the check (``checks_assembly``).
+    if substituent_list and ring_name.startswith("bicyclo["):
         return None
 
     # ⚠ Do NOT hoist a ``s['name'] is None`` abstention to here. ``s['name']``
@@ -2874,15 +3499,23 @@ def name_ring_assembly(
             indicated_h_match.group(1),
             indicated_h_match.group(2),
         )
-        # /: a COMPOUND component name (a skeletal-'a'
-        # mancude heterocycle carrying its own heteroatom-locant set, e.g.
-        # '4H-1,4-oxaphosphinine') is ENCLOSED in parentheses with its
-        # indicated-H kept INSIDE, cited once — '4,4'-bi(4H-1,4-oxaphosphinine)'.
-        # This differs from the biindole class (bare stem 'indole', no internal
-        # locants), which front-replicates the indicated-H per primed ring
-        # ("1H,1'H-2,2'-biindole",. Distinguish by whether the stem
-        # itself carries a locant set (a comma-locant '<d>,<d>-' prefix).
-        if re.match(r"^\d[\d,]*-", ring_stem):
+        # (the Blue Book): "The maximum number of noncumulative double
+        # bonds is then added taking into account the junction positions. Any remaining
+        # saturated ring positions are designated as indicated hydrogen, placed together
+        # with the appropriate locant(s) at the front of the name of the assembly."
+        # (:15599 '6H,6'H-2,2'-bipyran (PIN)' not '2,2'-bi-6H-pyran';:15603
+        # '1,1'-bipyrrole (PIN) (no indicated hydrogen needed)'). A COMPONENT name that
+        # carries its own heteroatom-locant set ('4H-1,4-oxazine', a skeletal-'a' or
+        # Hantzsch-Widman name) is no exception: its indicated hydrogen is cited per ring
+        # at the front, and the stem follows the multiplier after a hyphen (a),
+        #:6938; '2,2'-bi-3,1,5-benzoxadiarsepine (PIN)':20912) -- '4H,4'H-2,2'-bi-1,4-
+        # oxazine', '4,4'-bi-1,4-oxaphosphinine' (the junction P holds no hydrogen). The
+        # per-ring branch below builds both. Only a component whose per-ring locants are
+        # not known (fused, or not numbered) keeps its own descriptor inside parentheses:
+        # a correct name that is not the PIN, which the spelling check
+        # (``checks_hydrogen``) labels below the PIN.
+        if (re.match(r"^\d[\d,]*-", ring_stem)
+                and not all(locs is not None for locs in per_ring_ih_locants)):
             base_name = _multiplied_assembly(connection_str, multiplier,
                                              f"({ring_name})", count)
         elif all(locs is not None for locs in per_ring_ih_locants):
@@ -2989,8 +3622,9 @@ def name_ring_assembly(
         # '-carboxylic acid'/'-carbaldehyde'/'-carbonitrile' and 'di'/'tri'
         # untouched. Route through the shared elision primitive, not a raw f-string.
         from ..assembly.naming_utils import _join_multiplied_suffix
-        return (f"[{_multiplied_assembly(connection_str, multiplier, ring_name, count)}]"
-                f"-{locant_str}-{_join_multiplied_suffix(mult, _suffix_stem)}")
+        _suffix_text = _join_multiplied_suffix(mult, _suffix_stem)
+        return (f"[{_multiplied_assembly(connection_str, multiplier, _component_before_suffix(ring_name, _suffix_text), count)}]"
+                f"-{locant_str}-{_suffix_text}")
 
     # +: MIXED prefix+suffix assembly (a suffix-expressible PCG
     # coexists with other substituents). The senior PCG becomes the suffix, the
@@ -3107,6 +3741,8 @@ def name_ring_assembly_prefix(
     Both directions of the assembly's ring chain are numbered and the one with the
     lower junction locants, then the lower free-valence locant (unprimed before
     primed), is kept."""
+    if assembly_info.get('hydro'):
+        return None  # a hydro assembly is named as a whole molecule only (``_hydro_name``)
     orientations = [assembly_info]
     try:
         n = len(assembly_info['ring_systems'])
@@ -3203,7 +3839,8 @@ def _name_ring_assembly_prefix_oriented(
     # attachment locant must be 4' for para-terphenyl). This bug was fixed on
     # the parent path (151-03 /) but the substituent-prefix path kept
     # the old code; a biphenyl (single junction) is unaffected either way.
-    per_system_locants = _compute_per_system_ring_locants(mol, assembly_info)
+    per_system_locants = _compute_per_system_ring_locants(
+        mol, assembly_info, free_valence_atoms=[attachment_atom_idx])
 
     def _lookup_locant(sys_idx, atom_idx, sys_atoms):
         if (per_system_locants is not None
@@ -3310,11 +3947,30 @@ def _name_ring_assembly_prefix_oriented(
             indicated_h_match.group(1),
             indicated_h_match.group(2),
         )
-        indicated_h_replicated = ",".join(
-            f"{locant_int}{_format_prime(i)}H" for i in range(count)
-        ) + "-"
         # Vowel elision for the -yl form: "indole" -> "indol".
         display_stem = ring_stem[:-1] if ring_stem.endswith('e') else ring_stem
+        # (the Blue Book), the same rule as the parent path: the indicated
+        # hydrogen of each component ring is cited at ITS OWN position, in front of the
+        # assembly name, ignoring the descriptor of the isolated component name ('1H-pyrrole')
+        # -- the junction atom holds no indicated hydrogen ('1,1'-bipyrrole (PIN)':15603, so
+        # '[1,1'-bipyrrol]-3-yl', never '[1H,1'H-1,1'-bipyrrol]-3-yl'). Copying the first
+        # ring's descriptor onto every ring put it on a junction atom. A component whose
+        # per-ring locants are not known (fused: the biindole class) keeps the copy.
+        per_ring_ih_locants = _compute_per_ring_ih_locants(
+            mol, ring_systems, per_system_locants)
+        if all(locs is not None for locs in per_ring_ih_locants):
+            indicated_h_prefix = ",".join(
+                f"{loc}{_format_prime(sys_idx)}H"
+                for loc, sys_idx in sorted(
+                    (loc, sys_idx)
+                    for sys_idx, locs in enumerate(per_ring_ih_locants)
+                    for loc in locs)
+            )
+            indicated_h_replicated = indicated_h_prefix + "-" if indicated_h_prefix else ""
+        else:
+            indicated_h_replicated = ",".join(
+                f"{locant_int}{_format_prime(i)}H" for i in range(count)
+            ) + "-"
         # Assembly base: "1H,1'H-2,2'-biindol"
         assembly_base = indicated_h_replicated + _multiplied_assembly(
             connection_str, multiplier, display_stem, count)
@@ -3344,6 +4000,79 @@ def _name_ring_assembly_prefix_oriented(
     # Full prefix: "[1,1'-biphenyl]-4-yl" or "[1H,1'H-2,2'-biindol]-5-yl"
     return (f"[{assembly_base}]-{attach_locant}{attach_prime}-yl",
             (tuple(junction_key), attach_system_idx, _locant_key(attach_locant)))
+
+
+def _heteromonocycle_prefix_locants(
+    mol, ring_atoms: Set[int], attachment_atom: int, connection_atom: Optional[int] = None,
+) -> Optional[Tuple[int, Optional[int]]]:
+    """``(attachment locant, connection locant)`` of a heteromonocycle that carries the free valence
+    of a compound substituent prefix (``attachment_atom``) and one substituent ring
+    (``connection_atom``; None for a ring with the free valence alone, whose connection locant is
+    then None), from ONE numbering of the ring; None when this does not decide the ring.
+
+     'NUMBERING' (the Blue Book): the lowest locants go, in order, to the heteroatoms
+    all together and then in the order O > S >... > N (the fixed numbering of a heteromonocycle,
+    ,:8284), then to indicated hydrogen (b), then to "(c) principal characteristic groups and
+    free valences (suffixes)" (:3256), then to "(f) detachable alphabetized prefixes" (:3301): the
+    free valence is 1-yl-ed before the substituent ring is cited. So the piperazine that carries a
+    chain on one nitrogen and a phenyl on the other is '4-phenylpiperazin-1-yl', and 1,4-dioxane
+    attached next to an oxygen is 'dioxan-2-yl'. The two locants were read off two independent
+    numberings (each atom took its own lowest locant over the walking directions and the starting
+    heteroatoms), which cannot describe one ring: '1-phenylpiperazin-4-yl' ('1,4-dioxan-3-yl') and,
+    for pyridine, an attachment and a connection atom that both read 3.
+
+    Scope: a monocycle that is wholly saturated or wholly mancude. A partly hydrogenated ring has
+    hydro prefixes whose locants come before the free valence, and is left to the caller."""
+    from ..data.hw_heteroatoms import get_heteroatom_priority
+
+    ring_set = set(ring_atoms)
+    rings = [r for r in mol.GetRingInfo().AtomRings() if set(r) == ring_set]
+    if len(rings) != 1:
+        return None
+    if len([r for r in mol.GetRingInfo().AtomRings() if set(r) <= ring_set]) != 1:
+        return None                                  # fused, bridged or spiro: not a monocycle
+    ring = list(rings[0])
+    n = len(ring)
+    if attachment_atom not in ring_set or (
+            connection_atom is not None and connection_atom not in ring_set):
+        return None
+    hetero = [i for i in ring if mol.GetAtomWithIdx(i).GetAtomicNum() != 6]
+    if not hetero:
+        return None
+    aromatic = [mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring]
+    ring_doubles = any(
+        b.GetBondType() == rdchem.BondType.DOUBLE
+        for b in mol.GetBonds()
+        if b.GetBeginAtomIdx() in ring_set and b.GetEndAtomIdx() in ring_set)
+    if any(aromatic):
+        if not all(aromatic):
+            return None
+        mancude = True
+    elif ring_doubles:
+        return None                                  # partly hydrogenated
+    else:
+        mancude = False
+    ih_atoms = _ring_indicated_h_atoms(mol, ring, include_substituted=True) if mancude else []
+
+    # (:8284): "The locant '1' is given to a heteroatom that occurs first in the
+    # seniority sequence... The numbering is then chosen to give lowest locants to heteroatoms
+    # considered as a set": every numbering starts at a heteroatom of the most senior element
+    priority = {i: get_heteroatom_priority(mol.GetAtomWithIdx(i).GetSymbol()) for i in hetero}
+    senior = min(priority.values())
+    best = None
+    for start in (i for i in hetero if priority[i] == senior):
+        pos = ring.index(start)
+        for direction in (1, -1):
+            number = {ring[(pos + direction * k) % n]: k + 1 for k in range(n)}
+            het_locs = sorted(number[i] for i in hetero)
+            het_by_priority = [loc for _prio, loc in sorted((priority[i], number[i]) for i in hetero)]
+            key = (het_locs, het_by_priority, sorted(number[i] for i in ih_atoms),
+                   number[attachment_atom],
+                   number[connection_atom] if connection_atom is not None else 0)
+            if best is None or key < best[0]:
+                best = (key, number)
+    return (best[1][attachment_atom],
+            best[1][connection_atom] if connection_atom is not None else None)
 
 
 def name_mixed_ring_prefix(
@@ -3413,6 +4142,19 @@ def name_mixed_ring_prefix(
                 if n.GetAtomicNum() > 1 and n.GetIdx() not in _frag]
         if len(_ext) > (1 if _a == attachment_atom_idx else 0):
             return None
+
+    # This prefix writes the parent as a bare stem: '4-phenylimidazol-1-yl'. A mancude parent with a
+    # pyrrole-type atom (every azole: pyrrole, pyrazole, imidazole, the triazoles, tetrazole) takes
+    # its indicated hydrogen -- 'Indicated hydrogen' (the Blue Book): "in a preferred
+    # IUPAC name a locant and the symbol 'H' must be cited" (:3721), and a substituent group keeps
+    # it, '(1H-indol-1-yl)acetic acid (PIN)' (:2039). The stem is also ambiguous here: a pyrazole is
+    # reported as 'imidazole'. Decline, so the ring-by-ring producers, which cite it, name the ring:
+    # '4-phenyl-1H-imidazol-1-yl'.
+    _parent_rings = [r for r in mol.GetRingInfo().AtomRings() if set(r) <= set(parent_atoms)]
+    if len(_parent_rings) == 1 and all(
+            mol.GetAtomWithIdx(i).GetIsAromatic() for i in _parent_rings[0]) and \
+            _ring_indicated_h_atoms(mol, _parent_rings[0], include_substituted=True):
+        return None
 
     # Get the parent ring's system name (for stem)
     parent_ring_tuple = tuple(sorted(parent_atoms))
@@ -3484,9 +4226,16 @@ def name_mixed_ring_prefix(
         mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in parent_atoms
     )
     if parent_has_het:
-        # Standard IUPAC numbering from _get_connection_locant
-        connection_locant = _get_connection_locant(mol, parent_conn_atom, parent_atoms)
-        attach_locant = _get_connection_locant(mol, attachment_atom_idx, parent_atoms)
+        # ONE numbering of the heteromonocycle: the free valence takes the lowest locant, then the
+        # connection atom (c), (f), the Blue Book,:3301)
+        _one_numbering = _heteromonocycle_prefix_locants(
+            mol, parent_atoms, attachment_atom_idx, parent_conn_atom)
+        if _one_numbering is not None:
+            attach_locant, connection_locant = _one_numbering
+        else:
+            # fused or partly hydrogenated parent: the standard numbering of each atom
+            connection_locant = _get_connection_locant(mol, parent_conn_atom, parent_atoms)
+            attach_locant = _get_connection_locant(mol, attachment_atom_idx, parent_atoms)
         # v52 P4 fix a performance pass: `parent_has_het` only means the WHOLE
         # `parent_atoms` system contains a heteroatom somewhere (e.g. a
         # quinoline parent) -- the specific atom passed in can still sit on
@@ -3523,8 +4272,12 @@ def name_mixed_ring_prefix(
         else:
             return f"({connection_locant}-{sub_display}phenyl)"
     else:
-        # General case: stem-attach_locant-yl
-        return f"({connection_locant}-{sub_display}{parent_stem}-{attach_locant}-yl)"
+        # General case: stem-attach_locant-yl. (a) 'Hyphens are used in substitutive names:
+        # to separate locants from words or word fragments' (the Blue Book,:6938): a stem that
+        # begins with a locant is set off from the prefix, '4-phenyl-1,3,5-triazin-2-yl', never
+        # '4-phenyl1,3,5-triazin-2-yl'
+        _hyphen = "-" if parent_stem[:1].isdigit() else ""
+        return f"({connection_locant}-{sub_display}{_hyphen}{parent_stem}-{attach_locant}-yl)"
 
 
 # ============================================================================

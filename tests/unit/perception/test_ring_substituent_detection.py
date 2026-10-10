@@ -14,6 +14,8 @@ from orthonym.perception.chains import (
     is_ring_substituent,
 )
 from orthonym.namer import name_compound
+from tests.support.hydro_wiring import needs_wiring
+from tests.support.rt_assert import assert_full_rt
 
 
 class TestIsRingSubstituent:
@@ -179,11 +181,21 @@ class TestEndToEndRingSubstituents:
             if 'hexyl' in part and 'cyclohexyl' not in part:
                 pytest.fail(f'Should not have standalone hexyl, got {result}')
 
+    @needs_wiring
     def test_piperidinyl_substituent_on_pyridine(self):
-        """Piperidinyl on pyridine should be detected, not pentyl."""
+        """A piperidine ring on a pyridine ring is detected as a ring, not as pentyl.
+
+        Leads R2A: the PIN is not the substituent name '3-(piperidin-2-yl)pyridine' but the hydro-modified
+        ring assembly. (the Blue Book 'UNSATURATION IN RING ASSEMBLIES COMPOSED OF MONOCYCLIC
+        MANCUDE AND SATURATED RINGS'),:24153 "When assemblies of otherwise identical rings contain both
+        mancude and saturated rings, the use of hydro prefixes is preferred";:24159
+        '1,2,3,4,5,6-hexahydro-2,2'-bipyridine (PIN)' (not '2-(piperidin-2-yl)pyridine'). The junction
+        locants are the lowest, (2,3') before (3,2'),:15567 "Lowest possible locants must be
+        used to denote the positions of attachment")."""
         result = name_compound('c1cncc(C2CCCCN2)c1')
         assert 'pentyl' not in result.lower(), f'Should not be pentyl, got {result}'
-        assert 'piperid' in result.lower(), f'Expected piperidinyl, got {result}'
+        assert result == "1,2,3,4,5,6-hexahydro-2,3'-bipyridine", result
+        assert_full_rt(result, 'c1cncc(C2CCCCN2)c1')
 
     def test_cyclopentyl_substituent(self):
         """Cyclopentyl substituent should be named correctly."""

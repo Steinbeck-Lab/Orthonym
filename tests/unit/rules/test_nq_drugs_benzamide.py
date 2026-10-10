@@ -189,26 +189,16 @@ def test_a_ring_assembly_is_never_certified_as_a_benzene_parent(tier, smiles, no
 @pytest.mark.parametrize("smiles,non_pin", [
     # the hydro ring assembly is one unit of the PIN,:24153,:24159): PINs
     # 'N-(1',2',3',4',5',6'-hexahydro[3,4'-bipyridin]-6-yl)benzamide' and
-    # "1',2',3',4',5',6'-hexahydro[2,4'-bipyridin]-5-amine" (FULL)
-    pytest.param("O=C(Nc1ccc(cn1)C1CCNCC1)c1ccccc1", "N-[5-(piperidin-4-yl)pyridin-2-yl]benzamide",
-                 marks=pytest.mark.xfail(strict=True, reason=(
-                     "pre-existing on main, not built by this lane's routes: a hydro ring "
-                     "assembly taken apart (residual R4)"))),
-    pytest.param("Nc1ccc(nc1)C1CCNCC1", "6-(piperidin-4-yl)pyridin-3-amine",
-                 marks=pytest.mark.xfail(strict=True, reason=(
-                     "pre-existing on main, not built by this lane's routes: a hydro ring "
-                     "assembly taken apart (residual R4)"))),
+    # "1',2',3',4',5',6'-hexahydro[2,4'-bipyridin]-5-amine" (FULL). Leads L2 (item 32 part A): the
+    # spelling check (``validation/spelling/checks_assembly.py``) declines these names, which
+    # take the assembly apart (these rows were xfail(strict) 'residual R4' before it)
+    ("O=C(Nc1ccc(cn1)C1CCNCC1)c1ccccc1", "N-[5-(piperidin-4-yl)pyridin-2-yl]benzamide"),
+    ("Nc1ccc(nc1)C1CCNCC1", "6-(piperidin-4-yl)pyridin-3-amine"),
     # joined at a ring nitrogen, '2H-1,2'-bipyridine (PIN)':15634): PINs
     # "3,4,5,6-tetrahydro-2H-1,2'-bipyridine" and
     # "N-(3,4,5,6-tetrahydro-2H-[1,3'-bipyridin]-6'-yl)benzamide" (FULL)
-    pytest.param("c1ccc(nc1)N1CCCCC1", "2-(piperidin-1-yl)pyridine",
-                 marks=pytest.mark.xfail(strict=True, reason=(
-                     "pre-existing on main, not built by this lane's routes: a hydro ring "
-                     "assembly taken apart (residual R4)"))),
-    pytest.param("O=C(Nc1ccc(cn1)N1CCCCC1)c1ccccc1", "N-[5-(piperidin-1-yl)pyridin-2-yl]benzamide",
-                 marks=pytest.mark.xfail(strict=True, reason=(
-                     "pre-existing on main, not built by this lane's routes: a hydro ring "
-                     "assembly taken apart (residual R4)"))),
+    ("c1ccc(nc1)N1CCCCC1", "2-(piperidin-1-yl)pyridine"),
+    ("O=C(Nc1ccc(cn1)N1CCCCC1)c1ccccc1", "N-[5-(piperidin-1-yl)pyridin-2-yl]benzamide"),
 ])
 def test_a_hydro_ring_assembly_is_not_taken_apart_in_a_pin(smiles, non_pin):
     assert_not_pin_labelled(smiles, non_pin)
@@ -257,10 +247,13 @@ def test_an_o_ring_ether_keeps_its_name_below_the_pin(tier, smiles, name):
 
 
 def test_the_label_record_is_what_lowers_the_o_ring_ether(monkeypatch):
-    # known positive: without the record the same name is certified, as on main
+    # known positive: without the record the same name is certified, as on main. Row 1 is a biphenyl
+    # taken apart ('2-phenylbenzoic acid',:15542), which the spelling check (leads L2,
+    # item 32 part A) lowers on its own: it is switched off here so that the record alone decides
     from orthonym.metrics import provenance
     monkeypatch.setattr(provenance, "record_non_pin_label", lambda fragment: None)
     monkeypatch.setattr(provenance, "record_general_ring_prefix", lambda: None)
+    disable_spelling_rule(monkeypatch, "P-28.1")
     smiles, name = O_RING_BELOW_THE_PIN_ROWS[0]
     row = name_default(smiles)
     assert (row["tier"], row["name"]) == ("pin_verified", name), row
