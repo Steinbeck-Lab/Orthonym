@@ -3491,80 +3491,302 @@ def _decorate_one_labelled_copy(skeleton, keys, original, stripped,
     return winners[0][1]
 
 
+#: The multiplying prefixes that can open a multiplied substituent and the number
+#: of copies each states /: 'di', 'tri',... for a simple
+#: substituent, 'bis', 'tris',... for a compound one). Longest first, so 'tetrakis'
+#: is not read as 'tetra'.
+_UNIT_MULTIPLIER_COUNT = {
+    "tetrakis": 4, "tris": 3, "bis": 2, "hepta": 7, "octa": 8, "nona": 9,
+    "deca": 10, "tetra": 4, "penta": 5, "hexa": 6, "tri": 3, "di": 2,
+}
+_UNIT_MULTIPLIER_RE = re.compile(
+    "(?:" + "|".join(_UNIT_MULTIPLIER_COUNT) + r")(?=[a-z(\[{]|-(?:tert|sec)-)")
+
+#: Bounds of the per-unit search of:func:`_decorate_uniform_multiplier`, like the
+#: ``_MULTI_LOCANT`` caps above: the highest unit locant tried, the number of locant
+#: specifications tried per (multiplier, substituent word) slot, and the OPSIN parses
+#: one call may spend in all. Beyond a bound the call fails closed (None).
+_UNIT_LOCANT_SWEEP_CAP = 30
+_UNIT_LOCANT_COMBO_CAP = 150
+_UNIT_PARSE_BUDGET = 400
+
+
+def _name_constitution_key(name: str) -> Optional[str]:
+    """First InChIKey block (constitution) of OPSIN's parse of ``name``, or None."""
+    smi = _opsin_parse(name)
+    mol = Chem.MolFromSmiles(smi) if smi else None
+    if mol is None:
+        return None
+    try:
+        return Chem.MolToInchiKey(mol).split("-")[0] or None
+    except Exception:
+        return None
+
+
+def _escalate_for_unit_descriptor(name: str, desc_start: int, desc: str) -> str:
+    """:func:`_escalate_marks_for_descriptor` for the descriptor ``desc`` at
+    ``desc_start``, safe for a hydrogen nuclide.
+
+    ``apply_enclosing_marks`` reads a leading '(2H)' as an indicated hydrogen and
+    then leaves a group's parentheses unstepped ('((2H)methyl)'), a spelling error
+    OPSIN cannot see. The descriptor is a single parenthesised unit whatever it holds,
+    so a shape-equal stand-in ('(13C)') carries the nesting through the step-up and
+    is replaced by the real descriptor afterwards; the step-up only swaps the
+    characters of enclosing marks, so every offset is preserved."""
+    stand_in = "(13C)"
+    masked = name[:desc_start] + stand_in + name[desc_start + len(desc):]
+    out = _escalate_marks_for_descriptor(masked, desc_start)
+    return out[:desc_start] + desc + out[desc_start + len(stand_in):]
+
+
+def _multiplied_unit_slots(skeleton: str):
+    """Every place of ``skeleton`` where a multiplying prefix opens a multiplied
+    substituent, as ``(copies, head, base, tail, enclosed)``: the name up to and
+    including the multiplier, the substituent word, and what follows it.
+
+     (the Blue Book): the descriptor is inserted "before the part of the
+    compound that is isotopically substituted"; for a multiplied substituent that is
+    the substituent word, inside the multiplier's marks:43770; the verbatim
+    '1,2-di[(13C)methyl]benzene (PIN)',:43734). The multiplier may lead the name
+    ('tetramethylsilane', 'dimethyl sulfate'), follow locants ('1,2-diethylbenzene',
+    'N,N,N-trimethyl...') or sit inside the marks of an outer group ('...-2,3-bis(
+    hexadecanoyloxy)propoxy...'). A multiplied word is enclosed ('bis(hexadecanoyloxy)')
+    or, for a simple prefix, bare ('diethyl'); a multiplier-like run inside a word
+    ('hexadecanoyl', 'dihydro') is not offered, and a slot that reads no unit fails
+    the caller's round trip, so a surplus slot costs a parse, never a wrong name."""
+    from ..assembly.naming_utils import _SIMPLE_PREFIX_VOCABULARY
+    for m in _UNIT_MULTIPLIER_RE.finditer(skeleton):
+        p = m.start()
+        if p and skeleton[p - 1] not in "-([{ ,":
+            continue
+        copies = _UNIT_MULTIPLIER_COUNT[m.group(0)]
+        head, rest = skeleton[:m.end()], skeleton[m.end():]
+        if rest[:1] in ("(", "[", "{"):
+            depth = 0
+            for i, ch in enumerate(rest):
+                if ch in "([{":
+                    depth += 1
+                elif ch in ")]}":
+                    depth -= 1
+                    if depth == 0:
+                        yield copies, head, rest[1:i], rest[i + 1:], True
+                        break
+            continue
+        run = re.match(r"[a-z]+", rest)
+        if not run:
+            continue
+        word = run.group(0)
+        for k in range(len(word), 0, -1):
+            if word[:k] in _SIMPLE_PREFIX_VOCABULARY:
+                yield copies, head, word[:k], rest[k:], False
+
+
+def _unit_locant_choices(el: str, u: int, k_max: int):
+    """The locant specifications of ONE nuclide's ``u`` labels per unit, in the order
+     prefers (no locant, then the lowest locants): None; one position shared
+    by all ``u`` (the repeated locant of '(2,2,2-2H3)') for a hydrogen nuclide or a
+    single label; and ``u`` distinct positions ('(1,2-13C2)', '(2,4-2H2)')."""
+    from itertools import combinations
+    yield None
+    if u == 1 or el == "H":
+        for loc in range(1, k_max + 1):
+            yield loc
+    if u >= 2:
+        for combo in combinations(range(1, k_max + 1), u):
+            yield combo
+
+
+def _unit_descriptor_offsets(base: str) -> List[int]:
+    """Offsets in the substituent word ``base`` at which the unit's descriptor may be
+    spliced, latest first. (the Blue Book): "before the part of the
+    compound that is isotopically substituted", so a word made of several prefix units
+    takes it before the unit that holds the label ('amino(14C)methyl', not
+    '(14C)aminomethyl'); a word that is one unit ('methyl', 'hexadecanoyloxy') only at
+    its front. The boundaries are those of the shared prefix vocabulary; the round trip
+    chooses among them (OPSIN reads '(13C)chloromethyl' as the same carbon, so the later
+    offset, the Blue Book's, is tried first)."""
+    from ..assembly.naming_utils import _SIMPLE_PREFIX_VOCABULARY
+    offsets = [0]
+    pos = 0
+    while pos < len(base):
+        rest = base[pos:]
+        unit = next((rest[:k] for k in range(len(rest) - 1, 0, -1)
+                     if rest[:k] in _SIMPLE_PREFIX_VOCABULARY), None)
+        if unit is None:
+            break
+        pos += len(unit)
+        offsets.append(pos)
+    return sorted(set(offsets), reverse=True)
+
+
+def _decorate_uniform_multiplier_ex(skeleton, keys, original, stripped,
+                                    stereo_blind: bool = False):
+    """:func:`_decorate_uniform_multiplier` returning ``(name, needs_locant)``;
+    ``(None, False)`` when it places nothing."""
+    from itertools import islice, product
+
+    from ..metrics.provenance import record_non_pin_fragment
+
+    if original is None:
+        return None, False      # nothing to read a candidate back against
+    try:
+        want = Chem.MolToInchiKey(original).split("-")[0]
+    except Exception:
+        want = ""
+    n_heavy = original.GetNumHeavyAtoms()
+    budget = [_UNIT_PARSE_BUDGET]
+
+    def round_trips(cand: str) -> bool:
+        if budget[0] <= 0:
+            return False
+        budget[0] -= 1
+        return _isotope_round_trips(cand, original, stereo_blind=stereo_blind)
+
+    def constitution(cand: str) -> Optional[str]:
+        if budget[0] <= 0:
+            return None
+        budget[0] -= 1
+        return _name_constitution_key(cand)
+
+    winners = []   # (needs_locant, slot_pos, -len(base), name)
+    for slot_no, (copies, head, base, tail, enclosed) in enumerate(
+            _multiplied_unit_slots(skeleton)):
+        # UNIFORM scope: every nuclide's labels split evenly over the copies. A
+        # single labelled copy among bare ones, or an uneven split, is another shape
+        # (_decorate_demultiplied / _decorate_reduced_multiplier, and
+        # would not read back as this name.
+        if not keys or any(count % copies for _k, count, _m in keys):
+            continue
+        unit_keys = [((mass, el), count // copies, maxpos)
+                     for (mass, el), count, maxpos in keys]
+        k_max = max(1, min(_UNIT_LOCANT_SWEEP_CAP, n_heavy // copies))
+
+        offsets = _unit_descriptor_offsets(base)
+
+        def build(desc: str, off: int, _head=head, _base=base, _tail=tail) -> str:
+            # The substituent is enclosed in plain parentheses first and the marks are
+            # stepped up from its own nesting, the Blue Book: the
+            # descriptor's parentheses count), the primitive every descriptor
+            # placement uses.
+            name = f"{_head}({_base[:off]}{desc}{_base[off:]}){_tail}"
+            return _escalate_for_unit_descriptor(
+                name, len(_head) + 1 + off, desc)
+
+        def licenses_omission(i: int, combo, off: int) -> bool:
+            """ / for the locant-free descriptor of nuclide
+            ``i`` of the candidate ``combo``: the unit holds no further position for
+            it. Asked of OPSIN as:func:`_unit_completely_labelled` does: the unit with
+            ONE more nuclide of that kind must not read as the input's constitution
+            (OPSIN refuses '(14C2)methyl' and '(2H4)methyl', not '(14C2)ethyl' or
+            '(14C2)hexadecanoyloxy'), and the control with its own count must."""
+            def groups_with(extra: int):
+                return [(None if j == i else combo[j], mass, el,
+                         c + (extra if j == i else 0), maxpos)
+                        for j, ((mass, el), c, maxpos) in enumerate(unit_keys)]
+            if constitution(build(format_isotope_descriptor(
+                    groups_with(0), force_show=True), off)) != want:
+                return False
+            return constitution(build(format_isotope_descriptor(
+                groups_with(1), force_show=True), off)) != want
+
+        choices = [list(_unit_locant_choices(el, c, k_max))
+                   for (_mass, el), c, _maxpos in unit_keys]
+        # fewest cited locants first, then the lowest locants
+        combos = sorted(
+            islice(product(*choices), _UNIT_LOCANT_COMBO_CAP * 40),
+            key=lambda combo: (sum(1 for x in combo if x is not None),
+                               [(x if isinstance(x, tuple) else (x,))
+                                if x is not None else () for x in combo]))
+        # the always-shown count subscript is only a fallback for the one spelling OPSIN
+        # refuses without it, a lone deuterium on a CH ('(2H)')
+        force_passes = (False, True) if any(
+            el == "H" and c == 1 and maxpos == 1
+            for (_m, el), c, maxpos in unit_keys) else (False,)
+        tried = 0
+        found = None
+        for force in force_passes:
+            for combo in combos:
+                if tried >= _UNIT_LOCANT_COMBO_CAP or budget[0] <= 0:
+                    break
+                groups = [(loc, mass, el, c, maxpos)
+                          for loc, ((mass, el), c, maxpos) in zip(combo, unit_keys)]
+                desc = format_isotope_descriptor(groups, force_show=force)
+                if force and desc == format_isotope_descriptor(groups):
+                    continue            # the same spelling was tried already
+                tried += 1
+                for off in offsets:
+                    cand = build(desc, off)
+                    if not round_trips(cand):
+                        continue
+                    # (the Blue Book): locants are not omitted when
+                    # there is a possibility of isomers, so a locant-free descriptor
+                    # is shipped only where the unit leaves no room (the round trip
+                    # alone is not proof: OPSIN places an unlocanted label by
+                    # default).
+                    if any(loc is None and not licenses_omission(i, combo, off)
+                           for i, loc in enumerate(combo)):
+                        continue
+                    found = (cand, desc, force,
+                             any(loc is not None for loc in combo))
+                    break
+                if found:
+                    break
+            if found:
+                break
+            tried = 0
+        if found:
+            cand, desc, force, needs_locant = found
+            if force:
+                # the always-shown count subscript is only the spelling OPSIN reads
+                record_non_pin_fragment(cand)
+            winners.append((needs_locant, slot_no, -len(base), cand))
+    if not winners:
+        return None, False
+    winners.sort()
+    return winners[0][3], winners[0][0]
+
+
 def _decorate_uniform_multiplier(skeleton, keys, original, stripped,
                                  stereo_blind: bool = False) -> Optional[str]:
-    """ + — a UNIFORM multiplied substituent: every copy of a
-    de-multipliable prefix carries the IDENTICAL nuclide descriptor.
+    """ + + -- a UNIFORM multiplied substituent: every
+    copy of a multiplied substituent carries the SAME isotope descriptor, cited once
+    inside the multiplier's marks.
 
-    ``_decorate_demultiplied`` deliberately DECLINES the repeated-identical-nuclide
-    case (its docstring: identical copies must stay GROUPED under the multiplier, a
-    DIFFERENT name shape). This builds that shape. It keeps the ``di``/``tri``/...
-    multiplier and scopes ONE descriptor to the repeated substituent, then steps the
-    enclosing marks up ```` -> ```` because the substituent already carries the
-    descriptor's parentheses, the Blue Book; verbatim example the Blue Book
-    ``1,2-di[(13C)methyl]benzene``). The step-up reuses the shared
-    ``apply_enclosing_marks`` primitive -- no string post-processing.
+    ``_decorate_demultiplied`` and ``_decorate_reduced_multiplier`` handle the copies
+    that are labelled differently or not at all; this builds the name that
+    keeps the multiplier and scopes ONE per-unit descriptor to the repeated word:
+    '1,2-di[(13C)methyl]benzene (PIN)' (the Blue Book), 'tetra[(2H3)methyl]silane',
+    'di[(14C)methyl] sulfate', '2-[({(R)-2,3-bis[(1-14C)hexadecanoyloxy]propoxy}hydroxy-
+    phosphoryl)oxy]-N,N,N-trimethylethan-1-aminium' (the descriptor of ONE hexadecanoyl,
+    which has one C-1, not the sum over both). It is built for EVERY multiplied unit of
+    the skeleton, not only a multiplier opening the name, and for any number of atoms
+    per unit:
 
-    ⚠ SCOPE — NON-hydrogen nuclides ONLY. ``apply_enclosing_marks`` routes a leading
-    ``(2H)``/``(3H)`` through ``_INDICATED_H_RE`` (naming_utils.py:1127) and returns
-    ``((2H)methyl)`` (parentheses, NO step-up) instead of ``[(2H)methyl]``; OPSIN-RT
-    is blind to that bracket-level spelling error and would NOT reject it. A
-    deuterium/tritium uniform multiplier therefore fails closed here and falls
-    through to the enumeration path (an RT-valid, non-bracket-stepped spelling),
-    never shipping a wrong bracket.
+    * the multipliers are found anywhere in the name (:func:`_multiplied_unit_slots`):
+      leading or after locants or inside the marks of an outer group, 'di'/'tri'/... or
+      'bis'/'tris'/..., a bare simple prefix or an enclosed one, a functional-class word
+      included ('dimethyl sulfate', 'diethyl oxalate');
+    * each nuclide's labels must split evenly over the copies; the per-unit count is
+      ``count / copies`` and the descriptor is that of ONE copy (the search over the
+      locants of the unit's own numbering::func:`_unit_locant_choices`);
+    * the locant is omitted only under ("only one atom of a given element")
+      or ("all positions... completely isotopically substituted"), i.e.
+      where the unit holds no further position for the nuclide
+      (``licenses_omission``), and never because OPSIN's default placement happens to
+      match,:44202, "Locants are not omitted when there is a possibility
+      of isomers"): '1,2-di[(1-13C)ethyl]benzene', not '1,2-di[(13C)ethyl]benzene';
+    * the marks step up from the descriptor's own parentheses by the shared
+      ``_escalate_marks_for_descriptor``, with a stand-in descriptor so that a
+      hydrogen nuclide is not read as an indicated hydrogen ('di[(2H3)methyl]').
 
-    Every candidate is OPSIN-RT gated (isotopes retained), so a wrong split fails
-    closed. Fail-closed (None) when the skeleton is not a leading-locant simple
-    multiplier, the labels are not ONE uniform non-hydrogen nuclide with exactly one
-    atom per copy (``count == mult_count``), or nothing round-trips.
+    Every candidate is OPSIN-RT gated against the full original (isotopes retained),
+    so a wrong split, an uneven labelling or a wrong unit fails closed. The search is
+    bounded by ``_UNIT_LOCANT_SWEEP_CAP``, ``_UNIT_LOCANT_COMBO_CAP`` and
+    ``_UNIT_PARSE_BUDGET``. ``stereo_blind`` caller): constitution-only gate;
+    the caller re-gates the stereo-prefixed candidate on the full InChIKey.
     """
-    from ..assembly.naming_utils import apply_enclosing_marks
-
-    m = re.match(
-        r"^(?P<locs>\d+(?:,\d+)+)-(?P<mult>di|tri|tetra|penta|hexa)(?P<tail>[a-z].+)$",
-        skeleton,
-    )
-    if not m:
-        return None
-    mult_count = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}[m.group("mult")]
-    locs = sorted(int(x) for x in m.group("locs").split(","))
-    if len(locs) != mult_count or len(set(locs)) != len(locs):
-        # gem/repeated locants: not the distinct-copy uniform shape -> fail closed.
-        return None
-    tail = m.group("tail")
-
-    # UNIFORM scope: exactly one distinct nuclide, one atom on EACH of the
-    # mult_count copies (count == mult_count), and NOT hydrogen (bracket hazard
-    # above). A single labeled copy among bare ones, or count != mult_count, is a
-    # different (or non-uniform) shape -> fail closed.
-    if len(keys) != 1:
-        return None
-    (mass, el), count, maxpos = keys[0]
-    if el == "H" or count != mult_count:
-        return None
-
-    # One descriptor for the repeated copy (count 1 per copy). ``maxpos`` decides
-    # the subscript (FIX-A): a carbon position holds one carbon -> ``(13C)``.
-    desc = format_isotope_descriptor([(None, mass, el, 1, maxpos)])
-
-    # Split ``tail`` into the repeated substituent (``methyl``) and the parent
-    # (``benzene``). The grammar is opaque to this module, so every split is offered
-    # and the OPSIN round-trip oracle keeps only the one that reproduces the mol
-    # descriptor scope). ``apply_enclosing_marks(..., -1)`` steps ->
-    #. Deterministic: lowest split index, then candidate string.
-    winners = []
-    for k in range(1, len(tail)):
-        base, parent = tail[:k], tail[k:]
-        sub = apply_enclosing_marks(f"{desc}{base}", -1)
-        cand = f"{m.group('locs')}-{m.group('mult')}{sub}{parent}"
-        # ``stereo_blind`` caller): constitution-only gate; the caller
-        # re-gates the stereo-prefixed candidate full-InChIKey (0-wrong preserved).
-        if _isotope_round_trips(cand, original, stereo_blind=stereo_blind):
-            winners.append((k, cand))
-    if not winners:
-        return None
-    winners.sort()
-    return winners[0][1]
+    return _decorate_uniform_multiplier_ex(
+        skeleton, keys, original, stripped, stereo_blind=stereo_blind)[0]
 
 
 # ---------------------------------------------------------------------------
@@ -4265,19 +4487,58 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
         if demux is not None:
             return demux
 
-        # +: a UNIFORM multiplied substituent, every copy carrying
-        # the IDENTICAL nuclide descriptor (which _decorate_demultiplied declines by
-        # design -- identical copies stay grouped under the multiplier). Keep the
-        # multiplier and scope one bracket-stepped descriptor to the repeated copy:
-        # 1,2-di[(13C)methyl]benzene, NOT 1,2-di(1,1-13C2)methylbenzene. Runs before the
-        # single-combined-descriptor enumeration (which would place a whole-molecule
-        # (1,1-13C2) descriptor before the multiplier). Non-hydrogen nuclides only
-        # (deuterium bracket hazard -- see the function's docstring); fails through
-        # otherwise.
-        uniform = _decorate_uniform_multiplier(skeleton, keys, original, stripped)
+        # + +: a UNIFORM multiplied substituent, every copy
+        # carrying the SAME descriptor (which _decorate_demultiplied declines by design --
+        # identical copies stay grouped under the multiplier). Keep the multiplier and scope
+        # ONE per-unit descriptor to the repeated word, bracket-stepped, for every multiplied
+        # unit of the skeleton and any number of atoms per unit (hydrogen nuclides included):
+        # 1,2-di[(13C)methyl]benzene, NOT 1,2-di(1,1-13C2)methylbenzene; and
+        # bis[(1-14C)hexadecanoyloxy], the descriptor of ONE hexadecanoyl, not the sum over
+        # both. Runs before the single-combined-descriptor enumeration (which would place a
+        # whole-molecule descriptor before the multiplier); fails through otherwise.
+        uniform, uniform_needs_locant = _decorate_uniform_multiplier_ex(
+            skeleton, keys, original, stripped)
         if uniform is not None:
-            # One locant-free descriptor on every copy.
-            _carry_skeleton_status(skeleton, uniform)
+            # The descriptor is spliced INSIDE the multiplied word, so a non-PIN
+            # fragment the skeleton's naming recorded ('(R)-2,3-bis(hexadecanoyloxy)
+            # prop...') does not survive in the name; the labelled name keeps the
+            # skeleton's status (never labelled above the stripped skeleton).
+            from ..metrics.provenance import (
+                record_derived_non_pin_fragment, record_non_pin_fragment)
+            record_derived_non_pin_fragment(skeleton, uniform)
+            #... and a name built on a spelling other than the PIN spelling of the
+            # skeleton is not the PIN either: 'dimethyl sulfoxide' (the systematic
+            # engine's functional-class name) against the PIN '(methanesulfinyl)methane'
+            #, so 'di[(2H3)methyl] sulfoxide' is a valid name below the PIN.
+            _pin_spelling = skeleton == pin_name or not _usable(pin_name)
+            if not _pin_spelling:
+                record_non_pin_fragment(uniform)
+            if not uniform_needs_locant:
+                # One locant-free descriptor on every copy.
+                _carry_skeleton_status(skeleton, uniform)
+                return uniform
+            # A per-unit descriptor that needs a locant: (the Blue Book) "if
+            # isotopic modification requires a locant to specify its position, then
+            # all locants must be specified and none are omitted". The skeleton was
+            # named from the stripped molecule and elided freely, so re-render it in
+            # the forced-locant scope and build the name on that spelling when it still
+            # round-trips (the pattern of the single-descriptor placement below).
+            _prov_skeleton = get_provenance()
+            with _isotope_locant_scopes(original):
+                skel2 = _flagged_systematic_namer(namer).name(stripped_smiles)
+            _prov_skel2 = get_provenance()
+            restore_provenance(_prov_skeleton)
+            if (skel2 and "unknown" not in skel2.lower() and skel2 != skeleton
+                    and (not is_pin_pass
+                         or _is_same_parent_locanted(skeleton, skel2))):
+                uniform2, _ = _decorate_uniform_multiplier_ex(
+                    skel2, keys, original, stripped)
+                if uniform2 is not None:
+                    restore_provenance(_prov_skel2)
+                    record_derived_non_pin_fragment(skel2, uniform2)
+                    if not _pin_spelling:
+                        record_non_pin_fragment(uniform2)
+                    return uniform2
             return uniform
 
         # A3 Task 3, letter-locant class): a repeated IDENTICAL

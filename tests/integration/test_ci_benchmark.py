@@ -78,11 +78,13 @@ _GATE = pytest.mark.opsin_gate
 class _TierRow:
     """The expected outcome of one tier-contract row (see the comment above)."""
 
-    def __init__(self, kind, name=None, code=None, strict_name_must_round_trip=False):
+    def __init__(self, kind, name=None, code=None, strict_name_must_round_trip=False,
+                 best_effort_same=True):
         self.kind = kind
         self.name = name
         self.code = code
         self.strict_name_must_round_trip = strict_name_must_round_trip
+        self.best_effort_same = best_effort_same
 
     def __repr__(self):
         return f"{self.kind}({self.name or self.code or ''})"
@@ -105,7 +107,7 @@ class _TierRow:
         assert_tier_contract(smiles)
 
     def _check_declined_at_default(self, smiles):
-        declined_at_default(smiles, self.name)
+        declined_at_default(smiles, self.name, best_effort_same=self.best_effort_same)
 
     def _check_declined(self, smiles):
         row = default_tier_row(smiles)
@@ -178,8 +180,8 @@ def _tier_contract():
     return _TierRow("tier_contract")
 
 
-def _declined_at_default(name):
-    return _TierRow("declined_at_default", name)
+def _declined_at_default(name, best_effort_same=True):
+    return _TierRow("declined_at_default", name, best_effort_same=best_effort_same)
 
 
 def _declined(code=None, strict_name_must_round_trip=False):
@@ -546,9 +548,19 @@ CI_BENCHMARK = [
     pytest.param(
         "CC/C=C\\C/C=C\\C/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)"
         "OC[C@H](N)C(=O)O)OC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC",
-        # Not pinned by spelling: declined at the default tier, and the strict path's enclosing
-        # marks do not follow ({[({})]}); the name must round-trip.
-        _declined("NO_VERIFIED_PIN", strict_name_must_round_trip=True),
+        # Declined at the default tier (NO_VERIFIED_PIN); the strict path's name is pinned, and
+        # the best-effort tier gives the same name. Its enclosing marks follow
+        # 'Multiple types of enclosing marks' (the Blue Book, nesting order {[({})]}
+        #:7446): the propoxy group holds a stereo '(2R)' and two '{' groups, so its natural
+        # level-4 mark '(' would stand next to '(2R)'; (:7509) "When the nesting
+        # order given in results in consecutive enclosing marks of the same level, the
+        # next level of enclosing mark is used" escalates it to '[', and the outer group is
+        # '{' -- the Blue Book's own '(3S)-2-[(2S)-2-{[(2S)-...]amino}propanoyl]-...' (:7509ff).
+        # Re-derived independently in tests/unit/rules/test_leads_l7_39.py.
+        _declined_at_default(
+            "O-{[(2R)-2-{[(11Z,14Z)-icosa-11,14-dienoyl]oxy}-3-{[(9Z,12Z,15Z)-octadeca-9,12,15-"
+            "trienoyl]oxy}propoxy]hydroxyphosphoryl}-L-serine"
+        ),
         marks=_GATE,
     ),
     pytest.param(
@@ -620,9 +632,20 @@ CI_BENCHMARK = [
     ),
     pytest.param(
         "NC(CCC(=O)NC(CSC(CC=O)c1ccccc1O)C(=O)NCC(=O)O)C(=O)O",
-        # Not pinned by spelling: declined at the default tier, and the strict path's enclosing
-        # marks do not follow ({[({})]}); the name must round-trip.
-        _declined("NO_VERIFIED_PIN", strict_name_must_round_trip=True),
+        # Declined at the default tier (NO_VERIFIED_PIN); the strict path's name is pinned (the
+        # best-effort tier names it differently; that name must round-trip). Its enclosing marks
+        # follow (the Blue Book, order:7446): the deepest child of the propanoyl
+        # group is the '{...}' (level 3), so its mark is the level-4 '(' (the first child
+        # '(4-amino-4-carboxybutanamido)' is not adjacent to it, so:7509 does not
+        # escalate), and that child keeps its own level as a sibling does in '4-(6-{2-[(3-
+        # methylphenyl)methylidene]hydrazin-1-yl}-2-[2-(pyridin-2-yl)ethoxy]pyrimidin-4-yl)
+        # morpholine (PIN)' (:19441, 'General methodology':19420). Re-derived
+        # independently in tests/unit/rules/test_leads_l7_39.py.
+        _declined_at_default(
+            "N-(2-(4-amino-4-carboxybutanamido)-3-{[1-(2-hydroxyphenyl)-3-oxopropyl]sulfanyl}"
+            "propanoyl)glycine",
+            best_effort_same=False,
+        ),
         marks=_GATE,
     ),
     (
@@ -713,22 +736,17 @@ CI_BENCHMARK = [
     ),
     pytest.param(
         "CC1CCC/C=C\\C=C\\C(O)CC(O)C/C=C\\C=C\\C(O)C/C=C/C=C\\C(=O)O1",
-        # The engine ships 'oxacyclotetracos-3,5,9,11,17,19-hexaen-2-one', which OPSIN reads
-        # back exactly but which lacks the 'a' inserts before a multiplied 'ene'
-        # ending (the Blue Book; cf. '1-oxacycloundeca-2,4,6,8,10-pentaene (PIN)',
-        #:8498). The expected value below is the Blue Book spelling, also read back exactly.
+        # (heading 'General methodology', the Blue Book),:16497:
+        # "For euphonic reasons, when the endings 'ene' and 'yne' are preceded by a multiplying
+        # prefix and a locant the letter 'a' is inserted." (cf. '1-oxacycloundeca-2,4,6,8,10-
+        # pentaene (PIN)',:8498). The macrolactone namer used to ship '...oxacyclotetracos-
+        # 3,5,9,11,17,19-hexaen-2-one' (OPSIN read it back exactly, but it lacks the 'a'); the
+        # name below is the Blue Book spelling, also read back exactly (leads L7 / 38).
         _ships(
             "(3Z,5E,9E,11Z,17E,19Z)-8,14,16-trihydroxy-24-methyl-1-oxacyclotetracosa-3,5,9,"
             "11,17,19-hexaen-2-one"
         ),
-        marks=[
-            _GATE,
-            pytest.mark.xfail(
-                strict=True,
-                reason="ene-a-insertion-missing-in-oxacyclo-polyene (P-31.1.1.2) -- see "
-                       ".planning/preexisting-triage/TRIAGE-2026-10-09.md",
-            ),
-        ],
+        marks=_GATE,
     ),
     # L5 (TRIAGE gateoff-chain-handler-names-fragment): the old text is a wrong molecule.
     # With the gate off the polyfunctional producer named a C20 chain with a 'hexol' suffix

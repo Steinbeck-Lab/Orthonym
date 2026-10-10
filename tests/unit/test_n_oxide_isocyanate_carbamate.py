@@ -84,8 +84,8 @@ class TestIsocyanate:
     """Isocyanates. Wave2: the PIN is the SUBSTITUTIVE
     isocyanato prefix on the parent hydride (BB VERBATIM
     'isocyanatocyclohexane (PIN) cyclohexyl isocyanate'); the functional-
-    class 'R isocyanate' remains for --trivial and (interim) for AROMATIC
-    attachment (the benzene FG table cannot emit isocyanatobenzene yet)."""
+    class 'R isocyanate' remains for --trivial only (aromatic attachment
+    included: 'isocyanatobenzene', leads L7 / 43c)."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
@@ -93,7 +93,8 @@ class TestIsocyanate:
         ("CCN=C=O", "isocyanatoethane"),
         ("CCCN=C=O", "1-isocyanatopropane"),
         ("CCCCN=C=O", "1-isocyanatobutane"),
-        ("c1ccc(cc1)N=C=O", "phenyl isocyanate"),  # aryl: functional class kept
+        # (the Blue Book,:26001): substitutive for an aryl parent too.
+        ("c1ccc(cc1)N=C=O", "isocyanatobenzene"),
     ])
     def test_isocyanate_pin_forms(self, smiles, expected):
         result = name_compound(smiles)
@@ -120,13 +121,14 @@ class TestIsocyanate:
 
 class TestIsothiocyanate:
     """Isothiocyanates. Wave2: substitutive isothiocyanato PIN
-    (parallel to isocyanato); aryl keeps functional class interim."""
+    (parallel to isocyanato), aryl included."""
 
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
         ("CN=C=S", "isothiocyanatomethane"),
         ("CCN=C=S", "isothiocyanatoethane"),
-        ("c1ccc(cc1)N=C=S", "phenyl isothiocyanate"),  # aryl: kept
+        # (the Blue Book 'isothiocyanatobenzene (PIN)').
+        ("c1ccc(cc1)N=C=S", "isothiocyanatobenzene"),
     ])
     def test_isothiocyanate_pin_forms(self, smiles, expected):
         result = name_compound(smiles)

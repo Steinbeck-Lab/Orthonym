@@ -1209,6 +1209,8 @@ def find_principal_chain(
 
 #: attribute that memoises ``chain_parent_prefix_seniority`` on one features object
 _PREFIX_SENIORITY_ATTR = "_p45_ring_prefix_seniority"
+#: attribute that memoises ``principal_chain_with_ring_prefixes`` on one features object
+_SENIOR_CHAIN_ATTR = "_p45_ring_prefix_chain"
 
 
 def _cited_prefixes(names):
@@ -1302,6 +1304,113 @@ def chain_parent_prefix_seniority(features) -> Optional[str]:
     return status
 
 
+def principal_chain_with_ring_prefixes(features) -> Optional[List[int]]:
+    """The principal chain of a cyclic molecule as chooses it: the chain
+    ``find_principal_chain`` gives with the ring atoms excluded from the chain and
+    counted, located and ordered as prefixes (``ring_prefixes=True``).
+
+     (the Blue Book) 'The preferred IUPAC name is based on the senior
+    parent structure that has the maximum number of substituents cited as prefixes'
+    (the hydro prefixes excepted, as the rule says); its example (4),:21624,
+    counts the ring substituent of the parent chain; (:21698),
+    (:21791). With the ring atoms left out of the count, two chains of the same
+    length bearing one prefix each tie and the input's atom order decides:
+    ``COC(=O)C(C)Cc1ccccc1`` (methyl 2-methyl-3-phenylpropanoate, the PIN) gave
+    'methyl 2-benzylpropanoate' for some spellings.
+
+    None when the comparison cannot be made (a branch without a name in a tie, two
+    different chains that still tie, no chain, or an error); the caller then keeps
+    the chain of the call without ring prefixes. The answer is kept on ``features``,
+    keyed by the principal group and the ring atoms, so that the check of a chain
+    parent (:func:`chain_parent_prefix_seniority`) does not make it twice."""
+    mol = getattr(features, 'mol', None)
+    ring_systems = getattr(features, 'ring_systems', None) or ()
+    if mol is None or not ring_systems:
+        return None
+    principal_group = getattr(features, 'principal_group', None)
+    ring_atoms: Set[int] = set()
+    for rs in ring_systems:
+        ring_atoms.update(int(a) for a in rs)
+    key = (principal_group, tuple(sorted(ring_atoms)))
+    cached = getattr(features, _SENIOR_CHAIN_ATTR, None)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    try:
+        from ..metrics.provenance import isolated_provenance
+        with isolated_provenance():
+            senior = find_principal_chain(
+                mol,
+                getattr(features, 'functional_groups', None) or {},
+                principal_group,
+                exclude_atoms=ring_atoms,
+                ring_prefixes=True,
+            )
+    except Exception:                            # fail closed: undecided
+        senior = None
+    senior = list(senior) if senior else None
+    try:
+        setattr(features, _SENIOR_CHAIN_ATTR, (key, senior))
+    except AttributeError:
+        pass
+    return senior
+
+
+#: Principal groups whose producer builds the name on ``features.principal_chain``, the chain
+#: it is given, and for which:func:`p45_principal_chain` hands parent selection the chain
+#: makes senior. Each group is here because 20 random SMILES orders of a molecule with
+#: a tie between two chains of one length (``CC(Cc1ccccc1)X`` with X the group, a ring on one
+#: of the chains) gave the PIN spelling, labelled pin_verified, for every order, where the
+#: chain without ring prefixes gave 'benzyl' spellings for some orders
+#: (``tests/unit/namer/test_leads_l1_n8b_chain_prefixes.py``). A group that is not here keeps
+#: the chain of the call without ring prefixes, as before; among them are the producers that
+#: choose the chain themselves: the ester (``rules/esters.py:_find_acid_principal_chain``, a
+#: breadth-first walk whose first longest path wins, so a tie is decided by the input's atom
+#: order: 'methyl 2-benzylpropanoate' in 7 of 20 orders of 'COC(=O)C(C)Cc1ccccc1'; given the
+#: senior chain the check of:func:`chain_parent_prefix_seniority` passes and the name is
+#: labelled pin_verified), the thio-, seleno- and telluroester handler, the oxime handler (the
+#: same, for 'CC(Cc1ccccc1)C=NO'), the imidate and anhydride producers. A group joins the set
+#: when its producer takes the chain it is given.
+GIVEN_CHAIN_GROUPS = frozenset({
+    'carboxylic_acid', 'acid_chloride', 'acid_bromide',
+    'primary_amide', 'secondary_amide', 'tertiary_amide', 'imide', 'hydrazide', 'amidine',
+    'nitrile', 'aldehyde', 'ketone', 'imine',
+    'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'thiol',
+    'primary_amine', 'secondary_amine', 'tertiary_amine',
+    'sulfonic_acid', 'primary_sulfonamide', 'thioamide', 'thioic_S_acid', 'peroxy_acid',
+})
+
+
+def p45_principal_chain(features, default_chain: Optional[List[int]]) -> Optional[List[int]]:
+    """The chain parent selection is given for a cyclic molecule: ``default_chain``
+    (``find_principal_chain`` with the ring atoms excluded and not counted) replaced by the
+    chain makes senior (:func:`principal_chain_with_ring_prefixes`) when that is a
+    chain of the same length and the group's producer builds on the chain it is given
+    (:data:`GIVEN_CHAIN_GROUPS`). ``default_chain`` stands where the comparison is
+    undecided too. The caller decides whether the molecule is the one the call names
+    (``namer.Orthonym._classify``): a fragment named inside another name keeps the chain
+    of the call without ring prefixes, because the string of a part built on another chain
+    than the whole's would be recorded as a non-PIN part of the name that contains it
+    (measured: '2-hydroxyethyl 2-methyl-3-phenylpropanoate', whose acid is a nested name,
+    labelled systematic_verified for the 7 of 10 orders in which it was pin_verified)."""
+    if not default_chain:
+        return default_chain
+    if getattr(features, 'principal_group', None) not in GIVEN_CHAIN_GROUPS:
+        return default_chain
+    senior = principal_chain_with_ring_prefixes(features)
+    if not senior or len(senior) != len(default_chain):
+        return default_chain
+    #: the chain carries the principal characteristic group before is reached.
+    # The selector counts an instance for any chain that holds a carbon bearing it, so for
+    # 'CC(=O)N[C@@H](Cc1ccccc1)c1cc(OC)cc(=O)o1' the CH-CH2 chain of the nitrogen's other
+    # substituent ties with the acetyl chain and wins on its prefixes: a chain that does not
+    # hold the atoms of the group the default chain holds is not taken.
+    group_atoms = {int(a) for match in (getattr(features, 'principal_group_atoms', None) or ())
+                   for a in match}
+    if ({int(a) for a in senior} & group_atoms) != ({int(a) for a in default_chain} & group_atoms):
+        return default_chain
+    return senior
+
+
 def _chain_parent_prefix_seniority(features) -> Optional[str]:
     if not (getattr(features, 'chain_is_parent', False)
             and getattr(features, 'is_cyclic', False)):
@@ -1314,26 +1423,18 @@ def _chain_parent_prefix_seniority(features) -> Optional[str]:
     try:
         if any(mol.GetAtomWithIdx(int(a)).GetAtomicNum() != 6 for a in chain):
             return None
-        ring_atoms: Set[int] = set()
-        for rs in ring_systems:
-            ring_atoms.update(int(a) for a in rs)
-        from ..metrics.provenance import isolated_provenance
-        with isolated_provenance():
-            senior = find_principal_chain(
-                mol,
-                getattr(features, 'functional_groups', None) or {},
-                getattr(features, 'principal_group', None),
-                exclude_atoms=ring_atoms,
-                ring_prefixes=True,
-            )
     except Exception:                            # fail closed
         return 'undecided'
+    senior = principal_chain_with_ring_prefixes(features)
     if senior is None:
         return 'undecided'
-    if len(senior) != len(chain):
-        return None
-    if chain_symmetry_key(mol, senior) != chain_symmetry_key(mol, chain):
-        return 'senior_alternative'
+    try:
+        if len(senior) != len(chain):
+            return None
+        if chain_symmetry_key(mol, senior) != chain_symmetry_key(mol, chain):
+            return 'senior_alternative'
+    except Exception:                            # fail closed
+        return 'undecided'
     return None
 
 

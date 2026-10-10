@@ -153,19 +153,30 @@ def test_neutral_parents_unchanged(namer, smiles, expected):
 
 
 # --- Code-review hardening (valence gate, / fail-closed,) -
-@pytest.mark.parametrize("smiles,expected", [
+@pytest.mark.parametrize("smiles,neutral_name", [
     # 4-coordinate (over-coordinated) Group-14 metalloid anion = the -uide
     # family, NOT a parent-hydride -ide. The valence gate (degree+H+1 == valence)
-    # must EXCLUDE it so it stays on the neutral organometallic path and keeps its
-    # structure-preserving name — never charge-dropped to '' (the regression).
+    # must EXCLUDE it, so it is never named as a parent-hydride -ide (the
+    # regression) -- and, since leads L7 / N8c, never named by the NEUTRAL
+    # organometallic name either: 'tetramethylsilane' / 'tetramethylstannane'
+    # state a neutral compound, the input is an anion (net -1), so that name drops
+    # the charge. 'GENERAL METHODOLOGY' (the Blue Book): "Anions are
+    # named in two ways: (1) by using suffixes and endings; (2) by functional class
+    # nomenclature." (:40860: 'elide' for the addition of an electron). No such
+    # name is built for this over-coordinated anion, so the engine declines.
+    # Independent check (RDKit InChI, not the engine): the input is
+    # an InChIKey (/q-1), 'tetramethylsilane' reads as
+    # an InChIKey; the Sn anion NALGFIPSECPFJF vs VXKWYPOMXBVZSJ.
+    # (With the OPSIN validity gate on, this input was already suppressed to a
+    # decline; the charge-conservation veto makes the gate-off path agree.)
     ("C[Si-](C)(C)C", "tetramethylsilane"),
     ("C[Sn-](C)(C)C", "tetramethylstannane"),
 ])
-def test_overcoordinated_heteroatom_anion_not_regressed(namer, smiles, expected):
+def test_overcoordinated_heteroatom_anion_not_regressed(namer, smiles, neutral_name):
     out = namer.name(smiles)
-    assert out == expected
+    assert out != neutral_name              # not charge-dropped to the neutral name
     assert not out.endswith("ide")          # not a spurious -ide
-    assert out and "unknown" not in out      # not charge-dropped to ''/unknown
+    assert namer.name_tiered(smiles)["tier"] == "abstain"
 
 
 def test_valence_gate_excludes_invalid_arities():
@@ -258,9 +269,14 @@ def test_group13_uide_borate(namer, smiles, expected):
 
 def test_overcoordinated_silicon_has_no_uide(namer):
     """`C[Si-](C)(C)C` (4-coordinate Si, 0 H) is NOT silanuide (that name adds an H:
-    C[SiH-](C)(C)C). It has no clean PIN, so it stays the organometallic neutral name
-    rather than a wrong -uide."""
-    assert namer.name("C[Si-](C)(C)C") == "tetramethylsilane"
+    C[SiH-](C)(C)C). It has no clean PIN, so it is declined rather than named by a
+    wrong -uide or by the neutral organometallic name 'tetramethylsilane', which states
+    no charge for a net -1 input (leads L7 / N8c; 'GENERAL METHODOLOGY',
+    the Blue Book,:40860)."""
+    out = namer.name("C[Si-](C)(C)C")
+    assert out != "tetramethylsilane"
+    assert not out.endswith(("ide", "uide"))
+    assert namer.name_tiered("C[Si-](C)(C)C")["tier"] == "abstain"
 
 
 def test_fg_substituted_ring_cation_fails_closed():

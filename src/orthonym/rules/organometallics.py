@@ -25,6 +25,7 @@ a phase (first scope-expansion phase per -07).
 
 from __future__ import annotations
 
+import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from ..assembly.name_tree import NameTreeNode
@@ -491,6 +492,73 @@ def _organometallic_conserves(metal_complex: Any, mol: Any) -> bool:
         if _fragment_formula(mol, lg.ligand_atom_indices) != want:
             return False
     return True
+
+
+# The Ewens-Bassett charge number that closes an organometallic name, '(1-)' /
+# '(2+)': the charge of the whole complex.
+_EWENS_BASSETT_CHARGE_RE = re.compile(r"\((\d+)([+-])\)$")
+# The Stock number that closes a systematic-style name, '(III)' / '(-I)' / '(0)': the
+# oxidation number of the metal, NOT the charge of the complex.
+_STOCK_NUMERAL_VALUE = {v: k for k, v in _ROMAN_NUMERALS.items()}
+_STOCK_NUMBER_RE = re.compile(
+    r"\((" + "|".join(sorted((re.escape(k) for k in _STOCK_NUMERAL_VALUE),
+                             key=len, reverse=True)) + r")\)$")
+
+
+def stated_charge(full_name: str) -> Tuple[str, int]:
+    """What the assembled organometallic name states about charge, as ``(kind, n)``:
+    ``('net', n)`` the charge of the whole complex (its Ewens-Bassett number; ``n`` = 0
+    for a name without one, which describes a neutral compound) or ``('oxidation', n)``
+    the oxidation number of the metal (its Stock number)."""
+    m = _EWENS_BASSETT_CHARGE_RE.search(full_name)
+    if m is not None:
+        n = int(m.group(1))
+        return "net", (n if m.group(2) == "+" else -n)
+    m = _STOCK_NUMBER_RE.search(full_name)
+    if m is not None:
+        return "oxidation", _STOCK_NUMERAL_VALUE[m.group(1)]
+    return "net", 0
+
+
+def organometallic_charge_conserved(full_name: str, mol: Any) -> bool:
+    """0-wrong charge-conservation veto for an assembled organometallic name.
+
+    True iff what the name states about charge (``stated_charge``) holds for the WHOLE
+    input: a stated net charge equals the formal charge of the input; a Stock number
+    equals the formal charge of the metal (the complex's charge is then that number
+    plus the charges of the ligands as drawn, so it follows); a name with neither
+    describes a neutral compound and the input must be neutral. The formula veto
+    ``_organometallic_conserves`` proves the pi-ligand atoms; it cannot see charge. A
+    dot-separated input such as ``[Fe].c1cc[cH-]c1.c1cc[cH-]c1`` (net -2) or
+    ``[Cr+].c1ccccc1.c1ccccc1`` (net +1) has the same ligand atoms as the neutral
+    complex, so the additive names 'bis(eta5-cyclopentadienyl)iron' /
+    'bis(eta6-benzene)chromium' passed every other check and described a different
+    species (and the systematic style's default Stock number 'iron(II)' states a metal
+    charge the input does not have). The pin tier ships these names past OPSIN
+    (namer._ORGANOMETALLIC_ADDITIVE_PIN_RE), so this predicate is the only certificate
+    of the charge.
+
+    The test is on the charge, NOT on whether the metal-ligand bonds are drawn:
+    dot-separated pi-ligands are the SMILES convention for sandwich complexes and the
+    balanced forms ('[Fe+2].c1cc[cH-]c1.c1cc[cH-]c1' = ferrocene,
+    'c1ccccc1.[Cl-].[Cl-].[Fe+2]', net 0; '[Fe+3].Cp-.Cp-' = 'bis(eta5-cyclopentadienyl)
+    iron(III)', the ferrocenium cation) name correctly and keep their names.
+
+    Governing rule: (organometallics) is out of scope, so the rule is the
+    project's core principle 2 (never emit a wrong structure). The Blue Book states a
+    charged complex with a charge number: 'Compounds with at least one
+    metal-carbon single bond' (the Blue Book), example 'pentaammine(ethanido)
+    osmium(1+) chloride'; (:39799), example 'tricarbonyl(eta7-
+    cycloheptatrienylium)molybdenum(1+)'."""
+    from rdkit import Chem
+
+    from ..perception.metals import is_metal_element
+    kind, n = stated_charge(full_name)
+    if kind == "net":
+        return n == Chem.GetFormalCharge(mol)
+    metal_charge = sum(a.GetFormalCharge() for a in mol.GetAtoms()
+                       if is_metal_element(a.GetSymbol()))
+    return n == metal_charge
 
 
 def _sigma_additive_ligands_certified(metal_complex: Any, mol: Any,
@@ -1518,4 +1586,6 @@ __all__ = [
     'METAL_RANKING_FOR_PARENT_SELECTION',
     'select_ligand_naming',
     'assemble_organometallic_name',
+    'organometallic_charge_conserved',
+    'stated_charge',
 ]

@@ -5,7 +5,8 @@ composer.py:2192-2202 (_name_isothiocyanate body) + composer.py:2204-2230
 (shared _name_iso_x_cyanate helper). Per internal notes, bodies stay in
 composer.py until Plan-03 commit 03-10.
 
-IUPAC cite: (isothiocyanates; functional class naming).
+IUPAC cite: (isothiocyanates; the functional-class form is non-PIN, so
+this handler runs only for the non-PIN style).
 
 References:
 - composer.py:842-850 (inline dispatch branch; REMOVED at this commit).
@@ -40,14 +41,14 @@ def name_isothiocyanate(
         _name_isothiocyanate,
     )
 
-    # Wave2: functional-class 'R isothiocyanate' is general
-    # nomenclature only — the PIN is the substitutive isothiocyanato prefix
-    # on the parent hydride (parallel to isocyanato; BB. Decline
-    # under PIN style; the form stays available under --trivial. SCOPED to
-    # non-aromatic attachment (aryl forms keep the RT-valid functional
-    # class until the benzene FG-prefix table learns isothiocyanato).
-    from .isocyanate import _aromatic_attachment
-    if style == "pin" and not _aromatic_attachment(features, 'isothiocyanate'):
+    # 'ISOCYANATES' (the Blue Book),:26001: "Preferred IUPAC names
+    # are generated substitutively using the prefix 'isocyanato' attached
+    # directly to a parent hydride." The chalcogen analogue follows it:
+    # 'isothiocyanatobenzene (PIN) phenyl isothiocyanate' (:26009). Functional-
+    # class 'R isothiocyanate' is general nomenclature only, so this handler
+    # declines under PIN style for EVERY attachment (aromatic included; see
+    # isocyanate.name_isocyanate) and the form stays available under --trivial.
+    if style == "pin":
         return None
 
     isothio_name = _name_isothiocyanate(features)

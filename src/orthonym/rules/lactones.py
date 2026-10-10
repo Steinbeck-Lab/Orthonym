@@ -357,7 +357,17 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
     # suffix are cited, so the 'oxa' replacement locant '1' is cited too
     # (e.g. '1-oxacyclotridec-10-en-2-one'). Same rule as the saturated
     # branch above; OPSIN parses both forms to the identical structure.
-    ene_stem = f"1-oxacyclo{chain_prefix}-{loc_str}-{mult}ene"
+    #
+    # (heading 'General methodology', the Blue Book),
+    #:16497: "For euphonic reasons, when the endings 'ene' and 'yne' are preceded
+    # by a multiplying prefix and a locant the letter 'a' is inserted." The
+    # chain prefix ends in a consonant ('tridec', 'tetracos'), so a multiplied
+    # ene takes the connecting 'a': '1-oxacyclotrideca-3,5-diene' (cf.,
+    #:8498, '1-oxacycloundeca-2,4,6,8,10-pentaene (PIN)'; with a suffix,
+    #:26555, '4-iminocyclohexa-2,5-dien-1-one (PIN)'). A single ene has no
+    # multiplying prefix and no 'a' ('1-oxacyclotridec-10-en-2-one').
+    connecting_a = "a" if mult else ""
+    ene_stem = f"1-oxacyclo{chain_prefix}{connecting_a}-{loc_str}-{mult}ene"
     return _join_lactone_suffix(ene_stem, 2, suffix)
 
 

@@ -107,6 +107,14 @@ _TERMINAL_COOH_SMARTS = "[CX3](=O)[OX2H1]"
 _ALPHA_AA_CORE_SMARTS = "[NX3;H2,H1][CX4][CX3](=O)"
 
 
+# The retained names of Table 10.4 ('common' alpha-amino acids, the Blue Book).
+# STANDARD_AMINO_ACIDS holds exactly the Table 10.4 set; NON_STANDARD_AMINO_ACIDS and
+# the OPSIN-imported entries (ornithine, sarcosine, dopa,...) are NOT in it. Used by
+# ``_assemble_peptide_name``: the licence to omit 'L' belongs to a peptide
+# composed ONLY of these.
+_TABLE_10_4_AMINO_ACID_NAMES = frozenset(STANDARD_AMINO_ACIDS.values())
+
+
 # Constitution-robust residue identification (InChIKey first block = the skeleton
 # layer). Exact-SMILES matching in get_amino_acid_name misses a residue whose
 # reconstructed guanidine/imidazole TAUTOMER, or a FragmentOnBonds isotope label,
@@ -721,6 +729,13 @@ def _get_stereo_prefix(mol: Chem.Mol, aa_name: str) -> str:
     return ""
 
 
+def _cites_leading_descriptor(name: str) -> bool:
+    """True when the assembled peptide ``name`` opens with a cited 'D-' / 'L-': a name
+    part placed in front of it (an N-acyl cap, an 'N-methyl', a donor's acyl group) is
+    then separated by a hyphen ('octanoyl-L-ornithyl...', 'N-methyl-D-alanyl...')."""
+    return name.startswith(("D-", "L-"))
+
+
 def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
     """
     Assemble the final peptide name from identified residues.
@@ -728,15 +743,22 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
     IUPAC / rules:
     - C-terminal (last) residue: use full amino acid name
     - All other residues: use acyl form (e.g., glycyl-, alanyl-)
-    -: the stereodescriptor 'L' is NOT indicated for peptides composed
-      of Table-10.4 amino acids (the only ones Orthonym names -- non-standard
-      residues fail closed in _identify_residues). Only 'D' is cited, at the front
-      of each acyl group / name that has that configuration. (BB verbatim:
-      "The stereodescriptor 'L' is not indicated in the names... of peptides
-      composed of amino acids listed in Table 10.4. In contrast, the
-      stereodescriptor 'D' is indicated at the front of the acyl group or name of
-      each component having that configuration.")
-    - Hyphen ONLY before a residue that carries a cited (D-) descriptor.
+    - 'Indication of configuration in peptides' (the Blue Book),
+      :54717, verbatim: "The stereodescriptor 'L' is not indicated in the names nor in
+      the symbolic representation of peptides composed of amino acids listed in
+      Table 10.4. In contrast, the stereodescriptor 'D' is indicated at the front of
+      the acyl group or name of each component having that configuration." The
+      licence to omit 'L' is a property of the PEPTIDE ("peptides composed of amino
+      acids listed in Table 10.4", Table 10.4:54186), not of a residue. The BB's own
+      example (:54721), 'L-leucyl-D-glutamyl-L-allothreonyl-D-valyl-L-leucine',
+      cites EVERY 'L', including the two leucines; it is a peptide that contains
+      allothreonine, which is in Table 10.5 (:54220), not Table 10.4, so the
+      licence does not apply to it (the reading adopted here). So: when every
+      residue is a Table 10.4 amino acid only 'D' is cited;
+      when any residue is outside Table 10.4 (ornithine, sarcosine, dopa,... --
+      ``get_amino_acid_name`` also returns the NON_STANDARD_AMINO_ACIDS names) both
+      'L-' and 'D-' are cited on every chiral residue.
+    - Hyphen ONLY before a residue that carries a cited descriptor.
     - The residue's true config is preserved in res['stereo']; the L-omission is a
       display rule applied here, so a standalone amino acid still shows L.
 
@@ -748,7 +770,17 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
         L-valyl+L-tyrosyl+L-Ile -> valyltyrosylisoleucine
         D-alanyl + glycine -> D-alanylglycine
         glycyl + D-alanine -> glycyl-D-alanine
+        L-glutamyl + L-ornithine (ornithine is not in Table 10.4)
+                                -> L-glutamyl-L-ornithine
     """
+    #: the omission licence holds only for a peptide composed of Table 10.4
+    # amino acids alone (see the docstring).
+    # The amino acid is what Table 10.4 lists: a Lever C C-terminal 'valinamide' keeps
+    # its amino acid ('valine') under 'amino_acid'.
+    l_omitted = all(
+        res.get('amino_acid', res['name']) in _TABLE_10_4_AMINO_ACID_NAMES
+        for res in named_residues)
+
     parts = []
     for i, res in enumerate(named_residues):
         is_c_terminal = (i == len(named_residues) - 1)
@@ -758,16 +790,18 @@ def _assemble_peptide_name(named_residues: List[Dict[str, str]]) -> str:
         else:
             base = res['acyl']
 
-        #: suppress the 'L-' descriptor for display; keep 'D-' (and the
-        # achiral "" for glycine). res['stereo'] retains the true configuration.
-        display_stereo = "" if res['stereo'] == "L-" else res['stereo']
+        #: suppress the 'L-' descriptor for display only when the whole
+        # peptide is composed of Table 10.4 amino acids; keep 'D-' (and the achiral
+        # "" for glycine). res['stereo'] retains the true configuration.
+        display_stereo = "" if (l_omitted and res['stereo'] == "L-") else res['stereo']
         parts.append((display_stereo, base))
 
-    # Build the name: insert hyphen only before a cited (D-) descriptor.
+    # Build the name: insert hyphen only before a cited descriptor.
     result = parts[0][0] + parts[0][1]  # First residue
     for stereo, base in parts[1:]:
         if stereo:
-            # Has a cited descriptor (D-) -> hyphen before it
+            # Has a cited descriptor (D-, or L- when the licence does not apply)
+            # -> hyphen before it
             result += "-" + stereo + base
         else:
             # No cited descriptor (L omitted, or achiral) -> concatenate directly
@@ -972,7 +1006,7 @@ def _try_n_acyl_cap(mol) -> Optional[str]:
     if cap_acyl is None:
         return None
 
-    if remainder_name.startswith('D-'):
+    if _cites_leading_descriptor(remainder_name):
         return f"{cap_acyl}-{remainder_name}"
     return f"{cap_acyl}{remainder_name}"
 
@@ -1137,7 +1171,7 @@ def _try_gamma_donor_link(mol, carbonyl_c: int, amide_n: int) -> Optional[str]:
     acceptor_name, mode = acceptor
 
     if mode == 'flat':
-        if acceptor_name.startswith('D-'):
+        if _cites_leading_descriptor(acceptor_name):
             return f"{oyl_group}-{acceptor_name}"
         return f"{oyl_group}{acceptor_name}"
 
@@ -1339,16 +1373,18 @@ def _try_capped_termini(mol) -> Optional[str]:
             return None
         named = list(named)
         named[-1] = dict(named[-1])
+        named[-1]['amino_acid'] = cterm_name
         named[-1]['name'] = _acid_name_to_amide(cterm_name)
 
     candidate = _assemble_peptide_name(named)
 
     if methyl_applied:
         # The N-terminal token always starts at position 0 of the assembled
-        # string in this flat convention; a cited 'D-' descriptor sits
-        # before it, so 'N-methyl' needs its own hyphen only
-        # then (matching the established 'N-methyl-D-aspartic acid' style).
-        prefix = "N-methyl-" if candidate.startswith("D-") else "N-methyl"
+        # string in this flat convention; a cited 'D-' (or, for a peptide with a
+        # residue outside Table 10.4, 'L-') descriptor sits before it,
+        # so 'N-methyl' needs its own hyphen only then (matching the established
+        # 'N-methyl-D-aspartic acid' style).
+        prefix = "N-methyl-" if _cites_leading_descriptor(candidate) else "N-methyl"
         candidate = prefix + candidate
 
     return candidate
@@ -1719,7 +1755,7 @@ def _try_backbone_substitutive(mol) -> Optional[str]:
             acyl, _amido, next_is_open = forms
             if acyl is None:
                 return None
-            if name.startswith('D-'):
+            if _cites_leading_descriptor(name):
                 name = f"{acyl}-{name}"
             else:
                 name = f"{acyl}{name}"

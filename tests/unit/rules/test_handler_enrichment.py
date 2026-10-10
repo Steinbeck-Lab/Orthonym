@@ -59,12 +59,18 @@ class TestIsocyanateEnrichment:
         assert result == "isocyanatomethane"
 
     def test_phenyl_isocyanate_unchanged(self):
-        """Phenyl isocyanate naming is not regressed."""
+        """Phenyl isocyanate: the PIN is the substitutive name (leads L7 / 43c)."""
         from orthonym import name_compound
-        # phenyl isocyanate: O=C=Nc1ccccc1
+        # O=C=Nc1ccccc1. ISOCYANATES (the Blue Book),:26001:
+        # "Preferred IUPAC names are generated substitutively using the prefix
+        # 'isocyanato' attached directly to a parent hydride. Previously, functional
+        # class names were recommended for this class.";:26009 'C6H5-NCS
+        # isothiocyanatobenzene (PIN) phenyl isothiocyanate'. The functional-class
+        # 'phenyl isocyanate' this test used to accept is the non-PIN synonym.
+        # Independent check: OPSIN 2.9.0 reads 'isocyanatobenzene' back to the input's
+        # full InChIKey (tests/unit/rules/test_leads_l7_43c.py).
         result = name_compound("O=C=Nc1ccccc1")
-        assert result is not None
-        assert "isocyanate" in result.lower()
+        assert result == "isocyanatobenzene"
 
 
 # ---------------------------------------------------------------------------
