@@ -192,13 +192,8 @@ def test_h1_producer_spells_the_added_hydrogen(smiles, expected):
     assert_full_rt(expected, smiles)
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "leads item 28 hazard H2, carbocycle half: assembly/substituent_naming._name_unsaturated_oxo_substituent "
-    "(lane L3's file) returns '3-oxobut-1-en-1-yl' with no E/Z descriptor, the stereo reclaim puts it "
-    "at the FRONT of the name with the substituent's own locant and the PIN tier declines. Patch "
-    "L5-oxo-alkenyl-stereo.patch (p3/patches) cites the descriptor in the prefix as the sibling writers do "
-    "(P-91.3 'NAMING OF STEREOISOMERS', BlueBookV2.md:44639, sentence :44643). Delete this marker "
-    "when the patch is applied."))
+# The marker for hazard H2 (carbocycle half) is gone: L5-oxo-alkenyl-stereo.patch, applied at the
+# leads integration, cites the descriptor in the prefix, the Blue Book,:44643).
 def test_h2_carbocycle_the_descriptor_is_cited_in_its_prefix():
     smiles, expected = "CC(=O)/C=C/C1CCCCC1=O", "2-[(1E)-3-oxobut-1-en-1-yl]cyclohexan-1-one"
     row = PIN.name_tiered(smiles)

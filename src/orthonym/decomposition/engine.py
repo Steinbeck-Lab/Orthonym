@@ -724,17 +724,125 @@ def _nacyl_float_n_is_suffix_nitrogen(amine_smiles: str,
         return True
 
 
+#: The 'amino' prefix of a name: a prefix of its own ('2-amino', '(4-aminophenoxy)', '(aminomethyl)'),
+#: never the end of a longer word ('dimethylamino', 'benzenamine').
+_AMINO_PREFIX_RE = re.compile(r"(?<![A-Za-z])amino")
+
+
+def _acylamino_prefix(acid_name: str) -> Optional[str]:
+    """The method-(1) acylamino prefix of the acyl group of ``acid_name`` ('acetic acid' ->
+    'acetamido'): "a prefix formed by changing the final letter e in the complete name of the
+    amide to o" 'Substituents of the types -NH-CO-R and -NH-SO2-R',
+    the Blue Book). A compound prefix is enclosed,:7232). None when the acid
+    has no simple amide name."""
+    from .fragment_assembly import _acid_to_amide
+    from ..assembly.naming_utils import enclose_if_compound
+    amide = _acid_to_amide(acid_name or "")
+    if not amide or " " in amide or not amide.endswith("amide"):
+        return None
+    return enclose_if_compound(amide[:-1] + "o")
+
+
+def _round_trips_to(smiles: str, name: str) -> bool:
+    """True iff OPSIN reads ``name`` back to the full InChI of ``smiles`` (constitution and
+    stereo). Fails CLOSED when OPSIN cannot be run: a name nothing has read is not shipped."""
+    try:
+        from ..validation.opsin_roundtrip import (_find_opsin_jar, _java_available,
+                                                  opsin_roundtrip_check)
+        if _find_opsin_jar() is None or not _java_available():
+            return False
+        return bool(opsin_roundtrip_check(smiles, name).get("passed"))
+    except Exception:
+        return False
+
+
+def nacyl_float_as_acylamino(amine_smiles: Optional[str], amine_name: Optional[str],
+                             acid_name: Optional[str], parent_smiles: Optional[str]
+                             ) -> Optional[str]:
+    """The name of ``parent_smiles`` with its acylated nitrogen cited as the method-(1) acylamino
+    PREFIX of the amine parent ('(2R)-2-acetamido-...propanoic acid'), in place of the bare
+    'N-<acyl>' float onto a nitrogen that is not a suffix nitrogen.
+
+     (the Blue Book): "When a group having preference for citation as a
+    principal characteristic group is present, the group R-CO-NH-... is named... (1)
+    substitutively, by using a prefix formed by changing the final letter e in the complete name
+    of the amide to o... Method (1) generates preferred IUPAC names." (:32998). The float
+    cites the acyl group in front of the whole name ('N-acetyl(2R)-2-amino-...') and leaves the
+    stereodescriptor of the parent after it, which 'Naming of stereoisomers' (:44643)
+    puts "at the front of the complete name when related to the parent structure".
+
+    The amine fragment's name cites its nitrogen as an 'amino' prefix; the acylamino prefix
+    takes its place at the same locant. Which 'amino' of the name is that nitrogen is not read
+    from the name: every prefix of the name that is an 'amino' is a candidate and a candidate is
+    offered only when OPSIN reads its name back to ``parent_smiles`` (full InChI) AND the
+    registered spelling checks (``validation.pin_spelling``) find nothing wrong with it, exactly
+    one doing so. Declines (None, the float keeps its place) when the nitrogen is not the one
+    primary, acyclic, uncharged nitrogen of the amine fragment, when the amine parent's principal
+    class is not senior to the amide, when the acid has no simple amide name, when no or several
+    candidates pass, and when OPSIN cannot be run."""
+    if not (amine_smiles and amine_name and acid_name and parent_smiles):
+        return None
+    try:
+        amine = Chem.MolFromSmiles(amine_smiles)
+        if amine is None:
+            return None
+        nitrogens = [a for a in amine.GetAtoms()
+                     if a.GetSymbol() == 'N' and (a.GetTotalNumHs() >= 1 or a.GetIsAromatic())]
+        if len(nitrogens) != 1:
+            return None
+        n = nitrogens[0]
+        if (n.IsInRing() or n.GetIsAromatic() or n.GetDegree() != 1 or n.GetTotalNumHs() != 2
+                or n.GetFormalCharge() or n.GetIsotope() or n.GetNumRadicalElectrons()):
+            return None
+        # the premise of: "When a group having preference for citation as a principal
+        # characteristic group is present" -- a group senior to the amide (an acid, an ester) is
+        # the principal group of the amine parent. Where the parent's own class is junior to the
+        # amide (an alcohol, an amine, a ketone: an amino sugar, a ceramide) the amide is the
+        # principal group, cited as the suffix of 'N-[...]acetamide', and no acylamino prefix
+        # is its name.
+        if not _split_parent_is_junior(amine, _SPLIT_EXPRESSED_CLASS["amide"]):
+            return None
+        prefix = _acylamino_prefix(acid_name)
+        if not prefix:
+            return None
+        parent = Chem.MolFromSmiles(parent_smiles)
+        if parent is None:
+            return None
+        from ..validation.pin_spelling import check_pin_spelling
+        proven = []
+        for hit in _AMINO_PREFIX_RE.finditer(amine_name):
+            candidate = amine_name[:hit.start()] + prefix + amine_name[hit.end():]
+            # read back to the molecule, and spelled as the Blue Book spells it where the
+            # registered spelling checks can see it: the prefix takes the place of 'amino' in
+            # the name, so a prefix that now sorts out of its alphanumerical place, or a
+            # parent whose principal class is junior to the amide that the prefix expresses
+            #: the amide is the suffix there, 'N-[...]acetamide'), is not a conversion
+            if _round_trips_to(parent_smiles, candidate) and not check_pin_spelling(
+                    parent, candidate):
+                proven.append(candidate)
+        return proven[0] if len(proven) == 1 else None
+    except Exception:
+        return None
+
+
 def gate_nonsuffix_nacyl_float(amine_smiles: Optional[str],
                                float_name: Optional[str],
-                               amine_name: Optional[str] = None) -> Optional[str]:
+                               amine_name: Optional[str] = None,
+                               *, acid_name: Optional[str] = None,
+                               parent_smiles: Optional[str] = None) -> Optional[str]:
     """Decision A gate for a bare ``N-<acyl>`` float (the amide branch of
     ``_try_single_bond_decompose`` and ``fragment_assembly._assemble_amide``).
 
     Returns ``float_name`` unchanged when the acylated N is a suffix nitrogen
     (``_nacyl_float_n_is_suffix_nitrogen``). Otherwise, inside a refusal scope the float
-    is withheld (None) so that a systematic name can be built; outside one it ships as
-    an honest demotion: validated as before, but recorded as a non-PIN fragment, so
-    ``name_tiered`` labels any name that carries it below pin_verified.
+    is withheld (None) so that a systematic name can be built; outside one the float is not
+    shipped as it stands when the nitrogen can be cited as the method-(1) acylamino prefix of
+    the amine parent (``nacyl_float_as_acylamino``, given ``acid_name`` and ``parent_smiles``):
+    that name, proven by a round trip, is returned instead. Where it cannot be built the float
+    ships as an honest demotion: validated as before, but recorded as a non-PIN fragment, so
+    ``name_tiered`` labels any name that carries it below pin_verified. The acylamino name is
+    recorded the same way: it is built from fragment names by a string assembler, which this
+    gate does not certify as the PIN.
     """
     if (not float_name or not amine_smiles
             or _nacyl_float_n_is_suffix_nitrogen(amine_smiles, amine_name)):
@@ -744,6 +852,10 @@ def gate_nonsuffix_nacyl_float(amine_smiles: Optional[str],
         refusals.append(float_name)
         return None
     from ..metrics.provenance import record_non_pin_fragment
+    acylamino = nacyl_float_as_acylamino(amine_smiles, amine_name, acid_name, parent_smiles)
+    if acylamino:
+        record_non_pin_fragment(acylamino)
+        return acylamino
     record_non_pin_fragment(float_name)
     return float_name
 
@@ -1681,27 +1793,51 @@ def _unproven_split_key(mol, bond: Dict, style: str):
 #: 0-3 and need under 8 more.
 _UNPROVEN_EXPLORATION_SHARE = 8
 
+#: The second bound of that share: the most analysis calls the searches may spend on other
+#: bonds AFTER the first unproven split has ended, whatever is left of the share. The share is
+#: counted from the start of the split, so a split that cost 7 calls left 55 for an
+#: exploration whose own need is a few calls (above: under 8), and a 129-atom molecule whose
+#: first split was cheap kept opening other bonds for about 15 s of its 33-48 s at best-effort.
+#: Measured (leads program item 44, one core, operation counts, gate on): the 91 molecules of the
+#: eval sets that meet an unproven split, at the valid, complete and best-effort tiers (273
+#: namings per bound), keep every name and label with the bound at 16, 8, 4 and even 0 calls
+#: after the split (no exploration after it); at 16 they spend 13-15 % fewer analysis calls. 16 is
+#: twice the largest need ever measured (under 8): the margin of a bound that is only a ceiling.
+_UNPROVEN_EXPLORATION_AFTER_SPLIT = 16
+
 
 def _note_unproven_split(budget_before) -> None:
-    """Fix, once per naming scope and when the first unproven split is met, the level of the
-    analysis-call budget at which the molecule's searches stop opening other bonds
+    """Fix, once per analysis-call budget and when the first unproven split is met, the level of
+    that budget at which the molecule's searches stop opening other bonds
     (``_exploration_exhausted``): the share below the level ``budget_before`` the budget
-    stood at when that split was begun, so the split's own cost is part of the share. No level
-    without an armed budget or a naming scope."""
+    stood at when that split was begun, so the split's own cost is part of the share, but no
+    more than ``_UNPROVEN_EXPLORATION_AFTER_SPLIT`` calls below the level at which it ended.
+    No level without an armed budget or a naming scope.
+
+    The level is kept with the budget it is a level of (``fragment_naming._fragment_guard.
+    unproven_floor``, beside ``analysis_budget``), not in the naming scope: a budget that is
+    armed afresh (``own_hang_budgets``, the component of an adduct; ``rearm_hang_budgets``, the
+    last-resort rescue and the exit re-arm) has met no unproven split, and the level of another
+    budget would read as spent after 70 analysis calls of it, and a level noted inside such a
+    body must not reach the enclosing budget it is put back to."""
     from ..assembly import fragment_naming as _fn
-    from ..assembly import memo as _memo
-    if _memo.side_get("unproven_exploration", "floor") is not None:
-        return
     ceiling = _fn._ANALYSIS_CALL_BUDGET
-    floor = (budget_before - max(1, ceiling // _UNPROVEN_EXPLORATION_SHARE)
-             if budget_before is not None and ceiling > 0 else False)
-    _memo.side_put("unproven_exploration", "floor", floor)
+    if (budget_before is None or ceiling <= 0
+            or getattr(_fn._fragment_guard, "unproven_floor", None) is not None):
+        return
+    floor = budget_before - max(1, ceiling // _UNPROVEN_EXPLORATION_SHARE)
+    after = getattr(_fn._fragment_guard, "analysis_budget", None)
+    if after is not None:
+        # the tighter of the two bounds: the share from the start of the split, and the cap
+        # from its end (the budget now stands where the split left it)
+        floor = max(floor, after - _UNPROVEN_EXPLORATION_AFTER_SPLIT)
+    _fn._fragment_guard.unproven_floor = floor
 
 
 def _exploration_exhausted() -> bool:
-    """True when the naming scope has spent the share of its analysis-call budget that the
-    searches may spend on other bonds once the molecule has met an unproven split
-    (``_note_unproven_split``). A molecule that met none has no share and is never bounded.
+    """True when the analysis-call budget has spent the share that the searches may spend on
+    other bonds once the molecule has met an unproven split (``_note_unproven_split``). A budget
+    that met none has no share and is never bounded.
 
     The search that follows an unproven split cleaves every other bond, names each remainder
     (up to 120 atoms) in full, and does so again in every remainder it names: it is the
@@ -1713,9 +1849,8 @@ def _exploration_exhausted() -> bool:
     alcohol) opens nothing more, and the molecule is named by the general pipeline with the rest
     of the budget. A count of operations, not a clock."""
     from ..assembly import fragment_naming as _fn
-    from ..assembly import memo as _memo
-    floor = _memo.side_get("unproven_exploration", "floor")
-    if floor is None or floor is False:
+    floor = getattr(_fn._fragment_guard, "unproven_floor", None)
+    if floor is None:
         return False
     remaining = getattr(_fn._fragment_guard, "analysis_budget", None)
     return remaining is not None and remaining <= floor
@@ -1899,7 +2034,8 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                             # attempt) or demoted when the acylated N is not a suffix
                             # nitrogen of the amine parent.
                             sub_name = gate_nonsuffix_nacyl_float(
-                                amine_frag["smiles"], sub_name, amine_name)
+                                amine_frag["smiles"], sub_name, amine_name,
+                                acid_name=acid_name, parent_smiles=Chem.MolToSmiles(mol))
                             if sub_name:
                                 return sub_name
         except Exception:

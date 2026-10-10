@@ -137,7 +137,16 @@ def _row(smiles, tier):
 
 E2E = [
     ("ON=CCc1ccc(O)cc1", "1-hydroxy-4-[2-(hydroxyimino)ethyl]benzene"),
-    ("CN(C)c1ccc(/N=N/c2ccccc2)cc1", "{(1E)-[4-(dimethylamino)phenyl]diazenyl}benzene"),
+    # Leads program L3 (43e, change-asserted-value): the azo row is named on the parent of its
+    # principal characteristic group now. 'Unsymmetrical monoazo compounds are
+    # named in two ways' (the Blue Book),:38791: "Monoazo compounds with the general
+    # structure R-N=N-R' in which R is substituted by a principal characteristic group are named
+    # on the basis of the parent hydride, RH, substituted by an organyl diazenyl group, R'-N=N-";
+    # the amine is aniline,:17722) and the descriptor of the N=N bond is cited at
+    # the front of its prefix,:44643). The test reads the name back to the input's full
+    # InChIKey (``name_is_rt_exact``) and it fails on the code before (the old
+    # '{(1E)-[4-(dimethylamino)phenyl]diazenyl}benzene').
+    ("CN(C)c1ccc(/N=N/c2ccccc2)cc1", "N,N-dimethyl-4-[(1E)-phenyldiazenyl]aniline"),
     ("Clc1ccc(CO/N=C(\\Cn2ccnc2)c2ccc(Cl)cc2Cl)c(Cl)c1",
      "2,4-dichloro-1-[({[(1Z)-1-(2,4-dichlorophenyl)-2-(1H-imidazol-1-yl)ethylidene]amino}oxy)methyl]benzene"),
 ]

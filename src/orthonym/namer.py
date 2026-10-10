@@ -4142,27 +4142,6 @@ def _caller_input() -> Optional[str]:
     return getattr(_CALLER_INPUT, 'smiles', None)
 
 
-def _is_callers_molecule(mol) -> bool:
-    """Whether ``mol`` is the molecule of this thread's public naming call (the caller's
-    string, as ``_caller_input`` holds it) and not a fragment a producer names inside it
-    (the acid of an ester, an acyl side): the same canonical SMILES. True outside a public
-    call (a direct classification of a molecule); False when either cannot be read.
-
-    The caller's canonical SMILES is kept per caller string on ``_CALLER_INPUT``."""
-    caller = _caller_input()
-    if caller is None:
-        return True
-    try:
-        cached = getattr(_CALLER_INPUT, 'canonical', None)
-        if cached is None or cached[0] != caller:
-            read = Chem.MolFromSmiles(caller)
-            cached = (caller, Chem.MolToSmiles(read) if read is not None else None)
-            _CALLER_INPUT.canonical = cached
-        return cached[1] is not None and Chem.MolToSmiles(mol) == cached[1]
-    except Exception:
-        return False
-
-
 #: Set while ``Orthonym._name_with_form_choice`` runs one charge form of an input.
 _FORM_RUN_OWNED = contextvars.ContextVar("orthonym_form_run_owned", default=False)
 
@@ -6270,7 +6249,8 @@ class Orthonym:
             _mult_cls = getattr(self, "_last_dispatch_class", None)
             if getattr(_mult_cls, "name", None) not in (
                     "MULTIPLICATIVE", "CARBOHYDRATE_LOOKUP", "NATURAL_PRODUCT",
-                    "PEPTIDE", "LIPID"):
+                    "PEPTIDE", "LIPID", "SKELETAL_REPLACEMENT", "INORGANIC_ACID",
+                    "RETAINED_NAME", "AMINO_ACID"):
                 from .rules.pin_vocabulary import multiplicative_pin_expected
                 _mol_mult = Chem.MolFromSmiles(smiles)
                 if _mol_mult is not None and multiplicative_pin_expected(_mol_mult):
@@ -10122,17 +10102,25 @@ class Orthonym:
             # propanoate' for some spellings of methyl 2-methyl-3-phenylpropanoate).
             # The chain is the one makes senior (ring branches counted, located
             # and ordered as prefixes); the call above stands where that comparison is
-            # undecided (None), for a group whose producer is not known to build on
-            # the chain it is given (``chains.GIVEN_CHAIN_GROUPS``) and for a fragment
-            # named inside another name (``_is_callers_molecule``). A chain of another
+            # undecided (None) and for a group whose producer is not known to build on
+            # the chain it is given (``chains.GIVEN_CHAIN_GROUPS``). A chain of another
             # length is never taken. A chain of one carbon has no second chain of its length
-            # to be told from by its prefixes, and counting ring branches on a large ring
-            # system named whole branches for 0.1-0.7 s (measured on a dev split).
-            if potential_chain and len(potential_chain) >= 2:
-                from .perception.chains import GIVEN_CHAIN_GROUPS, p45_principal_chain
-                if (features.principal_group in GIVEN_CHAIN_GROUPS
-                        and _is_callers_molecule(features.mol)):
-                    potential_chain = p45_principal_chain(features, potential_chain)
+            # to be told from by its prefixes.
+            #
+            # The comparison is made after ``select_parent`` has chosen the chain (below), not
+            # before it. It only ever swaps in a chain of the same length that holds the same
+            # principal-group atoms, and ``p44_scorer.compare_with_reason`` ranks a chain
+            # against a ring on the count of principal groups it holds, its atom class and
+            # then 'ring senior to chain',,, none of which tells
+            # two such chains apart. So the choice between ring and chain does not depend on
+            # which of the two is passed, and a ring parent never reads the chain. Counting the
+            # ring branches of a large ring system names whole macrocyclic branches (about 2 s
+            # for each branch of a 105-atom fragment, six branches a call): run before parent
+            # selection it cost +35 s on an allyl oligosaccharide and +20 s on a decacyclic
+            # macrocycle, whose parent is the ring either way.
+            from .perception.chains import GIVEN_CHAIN_GROUPS, p45_principal_chain
+            _p45_pending = bool(potential_chain and len(potential_chain) >= 2
+                                and features.principal_group in GIVEN_CHAIN_GROUPS)
 
             # Only do parent selection if we found a meaningful chain (>= 2
             # carbons) OR (C- / V-4, a 1-carbon chain whose
@@ -10185,17 +10173,28 @@ class Orthonym:
                 features._ring_info = _ring_info
 
                 # Pass pre-computed chain to select_parent
-                selection = select_parent(
-                    mol=features.mol,
-                    ring_systems=features.ring_systems,
-                    principal_chain=potential_chain,
-                    principal_group=features.principal_group,
-                    principal_group_atoms=features.principal_group_atoms,
-                    ring_info=_ring_info,
-                    #: 0 for every normal call (byte-identical);
-                    # >0 only on a best-effort offer-retry inner instance.
-                    _offer_rank=self._forced_parent_rank,
-                )
+                def _select(chain):
+                    return select_parent(
+                        mol=features.mol,
+                        ring_systems=features.ring_systems,
+                        principal_chain=chain,
+                        principal_group=features.principal_group,
+                        principal_group_atoms=features.principal_group_atoms,
+                        ring_info=_ring_info,
+                        #: 0 for every normal call (byte-identical);
+                        # >0 only on a best-effort offer-retry inner instance.
+                        _offer_rank=self._forced_parent_rank,
+                    )
+
+                selection = _select(potential_chain)
+                if _p45_pending and selection.parent_type == 'chain':
+                    # (see above): the chain is the parent, so the chain
+                    # makes senior is the one to pass; selection is made again only when
+                    # it differs, with the arguments of the call above.
+                    _senior = p45_principal_chain(features, potential_chain)
+                    if _senior != potential_chain:
+                        potential_chain = _senior
+                        selection = _select(potential_chain)
                 features.parent_selection_result = selection  # a phase (V18 Appendix A.5)
                 #: publish the top-level pool size so the offer-retry
                 # can bound its loop at the real pool length. Guarded to the true

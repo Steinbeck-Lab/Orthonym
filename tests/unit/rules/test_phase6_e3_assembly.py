@@ -41,14 +41,15 @@ the three witnesses, confirmed via producer tracing):
   "(2-hydroxyethyl)" by the compound-substituent namer). The guard instead
   requires concrete evidence: the branch containing the aldehyde must already
   have been rendered as one prefix whose TEXT literally mentions "oxo".
-  The harder witness (168479 itself) still ABSTAINS: its arm's own "(Z)-"
-  double-bond descriptor is dropped by a DIFFERENT, deeper namer-capability
+  The harder witness (168479 itself) first ABSTAINED: its arm's own "(Z)-"
+  double-bond descriptor was dropped by a DIFFERENT, deeper namer-capability
   gap in `assembly/substituent_naming.py::name_substituent_fragment` (a
-  second, PARALLEL substituent chokepoint that has no stereo-injection path
-  at all) -- out of scope for an assembly-only fix; correctly
-  suppresses the resulting name rather than shipping it, so 0-wrong holds
-  and the molecule FALLS THROUGH to abstain, per this batch's explicit
-  license for an unresolved residual.
+  second, PARALLEL substituent chokepoint that had no stereo-injection path
+  at all); correctly suppressed the resulting name rather than
+  shipping it, so 0-wrong held and the molecule fell through to abstain.
+  That residual is closed (leads program, 263d27eaa): the oxo-alkenyl arm
+  cites its own E/Z descriptor at the front of the prefix, so
+  168479 is named '3-[(2Z)-1-oxobut-2-en-2-yl]pentanedioic acid'.
 """
 import pytest
 from rdkit import Chem
@@ -160,27 +161,34 @@ def test_short_chain_amide_control_unchanged(namer):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.opsin_gate
-def test_168479_no_longer_ships_a_duplicate_carbonyl(namer):
-    # CHEBI:168479, 'C/C=C(\\C=O)C(CC(=O)O)CC(=O)O'. Before this fix the
-    # emitted name was 'oxo-3-(1-oxobut-2-en-2-yl)pentanedioic acid' --
-    # OPSIN-parseable, but to a 2-OXOpentanedioic acid the input SMILES does
-    # not contain (a wrong, different molecule). After the fix the duplicate
-    # unlocated "oxo" is gone and the name is atom-correct
-    # ('3-(1-oxobut-2-en-2-yl)pentanedioic acid', the exact target from
-    # CHEBI:168479's own reference name minus its "(Z)-" descriptor).
-    #
-    # The arm's own "(Z)-" stereo descriptor is still dropped by a SEPARATE,
-    # deeper namer-capability gap (`substituent_naming.py::
-    # name_substituent_fragment` has no stereo-injection path at all, unlike
-    # the sibling `substituent_enumerator.py::name_substituent` cascade) --
-    # out of scope for an assembly fix. correctly refuses to ship the
-    # now-stereo-incomplete name, so the molecule FALLS THROUGH to abstain
-    # (0-wrong holds; this is the explicitly-licensed residual for Task 6).
-    smi = "C/C=C(\\C=O)C(CC(=O)O)CC(=O)O"
+@pytest.mark.parametrize("smi,expected", [
+    # CHEBI:168479 'C/C=C(\C=O)C(CC(=O)O)CC(=O)O': the arm's methyl and aldehyde carbon are
+    # cis (cf. the Z isomer of the 1-oxobut-2-en-2-yl group).
+    ("C/C=C(\\C=O)C(CC(=O)O)CC(=O)O", "3-[(2Z)-1-oxobut-2-en-2-yl]pentanedioic acid"),
+    # the E isomer: the descriptor is read from the structure, not constant
+    ("C/C=C(/C=O)C(CC(=O)O)CC(=O)O", "3-[(2E)-1-oxobut-2-en-2-yl]pentanedioic acid"),
+])
+def test_168479_names_the_arm_with_its_own_stereo_descriptor(namer, smi, expected):
+    # change-asserted-value (leads program, merged in 263d27eaa). History: before Task 6 the
+    # emitted name was 'oxo-3-(1-oxobut-2-en-2-yl)pentanedioic acid' (a 2-OXOpentanedioic acid
+    # the input does not contain: a wrong molecule); Task 6 removed the duplicate unlocated
+    # 'oxo', and this row then asserted the documented fall-through abstain
+    # ('unknown organic compound') because the arm's own (Z) descriptor was dropped and
+    # refused the stereo-incomplete name. That residual is closed:
+    # `substituent_naming._name_unsaturated_oxo_substituent` now cites the descriptor of the
+    # substituent's own backbone. NAMING OF STEREOISOMERS (the Blue Book),:44643:
+    # "When they relate to substituent groups, they are cited at the front of the corresponding
+    # prefix" -> '[(2Z)-1-oxobut-2-en-2-yl]' (locant 2 = the arm's double bond C2=C3; the arm is
+    # numbered from the aldehyde carbon C1, the free valence is at C2).
+    # OPSIN 2.9.0 reads each name back to the input's full InChIKey (Z: an InChIKey,
+    # E: an InChIKey), independently of the engine.
+    # Mutation: with the 263d27eaa hunk of _name_unsaturated_oxo_substituent reverted the engine
+    # names the stereo-less arm, refuses it, and this returns 'unknown organic compound'.
+    from tests.support.rt_assert import name_is_rt_exact
     name = namer.name(smi)
-    assert name == "unknown organic compound", (
-        f"expected the documented fall-through abstain, got: {name}"
-    )
+    assert name == expected, name
+    assert _full_rt(smi, name), name
+    assert name_is_rt_exact(name, smi), name
     assert inchi.MolToInchiKey(Chem.MolFromSmiles(smi)).startswith("IVZLDVMNNVAWDA")
 
 

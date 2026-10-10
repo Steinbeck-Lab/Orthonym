@@ -29,8 +29,15 @@ from tests.support.default_tier import (
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
+# Leads program L3 (N8a): the ring-nitrile row, 'CCc1ccc(OC2CCCCC2C#N)cc1' ->
+# '6-(4-ethylphenoxy)cyclohexane-1-carbonitrile', is gone from this list. The producer numbered the
+# ring in perception order and the check lowered the label; the ring is now numbered from the
+# carbonitrile suffix (c), the Blue Book) and the engine gives the PIN
+# '2-(4-ethylphenoxy)cyclohexane-1-carbonitrile', so no name of this row is lowered. The row is
+# asserted as a PIN at both tiers, from every atom order, in
+# tests/unit/assembly/test_leads_l3_n8a_ring_nitrile_orientation.py, and the check still failing the
+# old spelling in tests/unit/validation/test_leads_l3_n8a_numbering_check.py.
 LOWERED = [
-    ("CCc1ccc(OC2CCCCC2C#N)cc1", "6-(4-ethylphenoxy)cyclohexane-1-carbonitrile", "P-14.4"),
     ("OC(COC1CCCc2ccccc21)CN1CCN(c2ccccc2)CC1",
      "1-(1-phenylpiperazin-4-yl)-3-[(1,2,3,4-tetrahydronaphthalen-1-yl)oxy]propan-2-ol", "P-14.4"),
     ("COC(=O)C(C)Cc1c(C)nn(-c2ccccc2Cl)c1C",
@@ -44,14 +51,14 @@ LOWERED = [
 #: the ring prefix counted as in example (4):21624) records the name as not the PIN, so no
 #: pin_verified label reaches ``check_pin_spelling`` and the decline row carries no spelling
 #: failure; both checks fail the name (``test_the_p45_2_1_row_is_lowered_by_both_checks``)
-P4521_ROW = LOWERED[2]
+P4521_ROW = LOWERED[1]
 #: the piperazine row named '1-(1-phenylpiperazin-4-yl)-...': the producer numbered the ring from two
 #: independent numberings (leads L2, item N8a name part); it now builds the PIN
 #: '1-(4-phenylpiperazin-1-yl)-3-[(1,2,3,4-tetrahydronaphthalen-1-yl)oxy]propan-2-ol'
 #: (test_leads_l2_mixed_ring_prefix.py), so the engine no longer builds the name this row asserts.
 #: The check still fails that name, which ``test_the_check_still_fails_the_numbering_the_producer_
 #: no_longer_builds`` keeps under test.
-FIXED_ROW = LOWERED[1]
+FIXED_ROW = LOWERED[0]
 LOWERED_BY_SPELLING = [row for row in LOWERED if row is not P4521_ROW and row is not FIXED_ROW]
 
 
@@ -59,21 +66,20 @@ def _rules(row):
     return [f["rule"] for f in row.get("spelling_failures") or []]
 
 
-def test_the_p45_2_1_row_is_lowered_by_both_checks(monkeypatch):
-    """The PIN is 'methyl 3-[1-(2-chlorophenyl)-3,5-dimethyl-1H-pyrazol-4-yl]-2-methylpropanoate'
-    (two prefixes on its chain, one on the name's). The lexical check fails the name on its own;
-    with that check switched off the chain-parent check still lowers the label at every tier and
-    keeps the name (known positive: before the chain-parent check, the same name was
-    pin_verified with the spelling check off)."""
-    from tests.support.spelling_checks import disable_spelling_rule
-    smiles, name, rule = P4521_ROW
-    assert rule in [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name)]
-    disable_spelling_rule(monkeypatch, rule)
-    assert_default_tier_declines(smiles)
-    strict = strict_path_row(smiles)
-    assert (strict["name"], strict["tier"], strict["is_pin"]) == (name, "systematic_verified", False), strict
-    best = assert_best_effort_gives(smiles, name)
-    assert (best["tier"], best["is_pin"]) == ("systematic_verified", False), best
+def test_the_check_still_fails_the_p45_2_1_chain_the_producer_no_longer_builds():
+    """ (the Blue Book): the senior parent has the maximum number of substituents cited
+    as prefixes, counting the ring branch (example (4),:21624), so the PIN is 'methyl
+    3-[1-(2-chlorophenyl)-3,5-dimethyl-1H-pyrazol-4-yl]-2-methylpropanoate' (two prefixes on its
+    chain). Since the leads program (N8b, ester half) the producer picks that chain; the lexical
+    check still fails the old one-prefix name, and the new name is pin_verified with no failure."""
+    smiles, old_name, rule = P4521_ROW
+    assert rule in [f.rule for f in check_pin_spelling(Chem.MolFromSmiles(smiles), old_name)]
+    new_name = "methyl 3-[1-(2-chlorophenyl)-3,5-dimethyl-1H-pyrazol-4-yl]-2-methylpropanoate"
+    assert check_pin_spelling(Chem.MolFromSmiles(smiles), new_name, strict=True) == []
+    for row in (default_tier_row(smiles), strict_path_row(smiles)):
+        assert (row["name"], row["tier"]) == (new_name, "pin_verified"), row
+        assert not row.get("spelling_failures"), row
+    assert_best_effort_gives(smiles, new_name)
 
 
 @pytest.mark.parametrize("smiles,name,rule", LOWERED_BY_SPELLING)
@@ -108,7 +114,7 @@ def test_name_with_confidence_declines_with_the_failures():
     lowered name is declined with NO_VERIFIED_PIN, and the record keeps the spelling failures as
     the reason, as the ``name_tiered`` decline row does. A decline for another reason (betaine:
     the strict path labels it systematic_verified) records none."""
-    smiles, _name, rule = LOWERED[3]
+    smiles, _name, rule = LOWERED[2]
     md = Orthonym().name_with_confidence(smiles)
     assert md["limit"]["code"] == "NO_VERIFIED_PIN", md
     assert rule in [f["rule"] for f in md["spelling_failures"]], md

@@ -209,6 +209,14 @@ class TestNoBarePhenylamino:
 # two classes are gone with them.
 # fix a performance pass (wp7-verify-fixes): call 296 (DK-ALPHA) now gives the order (the shared
 # key compares letters first,:3442/:3477) and moved to the fixture; the class is gone with it.
+# Leads program 2026-10-09, item 43a (change-asserted-value): an acylated nitrogen that is not a
+# suffix nitrogen of its amine parent is cited as the method-(1) acylamino prefix, not as an
+# 'N-<acyl>' float 'Substituents of the types -NH-CO-R and -NH-SO2-R', the Blue Book
+#:32991,:32995,:32998 "Method (1) generates preferred IUPAC names."). Canary call 460
+# (DK-NACYL, the class is gone with it) and the two peptide rows 263 and 518 (DK-PEP) now give the
+# substitutive names the classes asked for, each OPSIN 2.9.0 full-InChIKey exact (fresh java run
+# outside the engine); they moved to the fixture (tests/integration/test_canary_rt75.py, tag
+# 'l6 RB-ACYLAMINO').
 
 # Class -> reason (Task 11, 2026-09-26). The reasons, the Blue Book lines and the best-effort
 # evidence per row are in internal notes (disposition 'known-defect').
@@ -263,10 +271,6 @@ _CANARY_DEFECT_REASONS = {
         "prefixes; cf. 'hexahydro-1H-2-benzopyran-1,3(4H)-dithione (PIN)' (:32549), "
         "'3,4-dihydronaphthalen-1(2H)-one (PIN)' (:3276). PIN "
         "'(3S)-6,7-dihydroxy-8-methoxy-3-methyl-1H-2-benzopyran-4(3H)-one' (OPSIN exact)"
-    ),
-    "DK-NACYL": (
-        "N-acyl float onto an amino-acid name ('N-[...]pentanoyl](2S)-2-amino...acid'); "
-        "not a PIN spelling (P-62.2.2.1 :26225; PIN form as T9 row 18)"
     ),
     "DK-NOTEXACT": (
         "new name is not OPSIN full-InChIKey exact (wrong molecule, unparseable, "
@@ -486,10 +490,6 @@ CANARY_KNOWN_DEFECTS = {
         "glutamylvalylphenylalanine",
         "DK-PEP", (258,),
     ),
-    "C[C@@H](O)[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O": (
-        "glutaminylthreonyltryptophan",
-        "DK-PEP", (263,),
-    ),
     "C[C@@H](O)[C@H](NC(=O)[C@@H](N)Cc1c[nH]c2ccccc12)C(=O)N[C@@H](CC(N)=O)C(=O)O": (
         "tryptophylthreonylasparagine",
         "DK-PEP", (264,),
@@ -622,10 +622,6 @@ CANARY_KNOWN_DEFECTS = {
         "isoleucylglutaminylleucine",
         "DK-PEP", (459,),
     ),
-    "CC(C)[C@H](NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
-        "N-[(2S)-2,5-diamino-5-oxopentanoyl](2S)-2-amino-3-methylbutanoic acid",
-        "DK-NACYL", (460,),
-    ),
     "C[C@@H]1C=C[C@H]2C3C1CC[C@@](C)(O)O[C@@H]3OC(=O)[C@@H]2C": (
         "(1R,4R,5S,8R,12S)-12-hydroxy-4,8,12-trimethyl-2,13-dioxatricyclo[7.4.1.0^5,14]tetradec-6-en-3-one",
         "DK-VBFUSED", (472,),
@@ -660,10 +656,6 @@ CANARY_KNOWN_DEFECTS = {
         # exact. The row keeps its whole-graph R/S block on implied centres (was DK-ACIDPFX).
         "(3S,5R,10R,13R,14R,17R,20S,22S,24Z)-19,22-bis(acetyloxy)-3-hydroxy-4,4,14-trimethylcholesta-8,24-dien-26-oic acid",
         "DK-P101CIP", (510,),
-    ),
-    "CC[C@H](C)[C@H](NC(=O)[C@@H](N)CC(N)=O)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
-        "asparaginylisoleucylhistidine",
-        "DK-PEP", (518,),
     ),
     "C[C@H](CC[C@H](O)C(C)(C)O)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3": (
         "(3S,5R,10S,13R,14R,17R,20R,24S)-4,4,14-trimethylcholest-8-ene-3,24,25-triol",

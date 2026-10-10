@@ -1135,6 +1135,15 @@ def get_sulfanyl_prefix(
             return None
         acyl = _acyl_on_chalcogen_name(mol, sub_carbon, sulfur_idx)
         if not acyl:
+            # Outside the v1 scope of ``_acyl_on_chalcogen_name`` (a substituted or ring acyl:
+            # 'hydroxyacetyl', 'cyclohexanecarbonyl'): the shared acyl-prefix authority of the
+            # chalcogen cations (the neutral acid named, then acid -> acyl). Such an acyl is a
+            # compound prefix, enclosed before the chalcogen stem.
+            from ..rules.ions import _acyl_on_chalcogen_prefix
+            acyl = _acyl_on_chalcogen_prefix(mol, sub_carbon, sulfur_idx)
+            if acyl:
+                acyl = f"({acyl})"
+        if not acyl:
             return None
         return f"{acyl}{suffix}"
 

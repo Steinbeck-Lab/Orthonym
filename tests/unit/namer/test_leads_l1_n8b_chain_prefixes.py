@@ -120,37 +120,26 @@ def test_the_wider_tiers_give_the_pin_too(smiles, pin, old, tier):
         assert (row["name"], row["tier"]) == (pin, "pin_verified"), (tier, order)
 
 
-def test_the_leads_ester_and_the_label_stay_honest():
-    # An ester's producer walks the acid fragment itself (rules/esters.py:
-    # _find_acid_principal_chain); ester is not in GIVEN_CHAIN_GROUPS, so it keeps the chain it
-    # had and its labelling: a name on the chain without the senior prefixes is never
-    # labelled pin_verified (given the senior chain it would be: the check would pass).
-    assert "ester" not in chains.GIVEN_CHAIN_GROUPS
-    token = namer._DEFAULT_TIER_POLICY_OFF.set(True)
-    try:
-        engine = _strict_engine()
-        for smiles in ("COC(=O)C(C)Cc1ccccc1", "CC(Cc1ccccc1)C(=O)OCc1ccccc1",
-                       "COC(=O)C(C)Cc1c(C)nn(-c2ccccc2Cl)c1C"):
-            for order in _random_orders(smiles, 10):
-                row = engine.name_tiered(order)
-                if re.search(r"2-benzylpropanoate|\]methyl\}propanoate", row["name"]):
-                    assert row["tier"] != "pin_verified", (order, row["name"])
-    finally:
-        namer._DEFAULT_TIER_POLICY_OFF.reset(token)
+ESTER_CASES = [
+    ("COC(=O)C(C)Cc1ccccc1", "methyl 2-methyl-3-phenylpropanoate"),
+    ("CC(Cc1ccccc1)C(=O)OCC", "ethyl 2-methyl-3-phenylpropanoate"),
+    ("CC(Cc1ccccc1)C(=O)OCc1ccccc1", "benzyl 2-methyl-3-phenylpropanoate"),
+    ("CC(Cc1ccccc1)C(=O)OCCO", "2-hydroxyethyl 2-methyl-3-phenylpropanoate"),
+    ("COC(=O)C(C)Cc1c(C)nn(-c2ccccc2Cl)c1C",
+     "methyl 3-[1-(2-chlorophenyl)-3,5-dimethyl-1H-pyrazol-4-yl]-2-methylpropanoate"),
+    ("COC(=O)C(C)CC1CCCCC1", "methyl 3-cyclohexyl-2-methylpropanoate"),
+]
 
 
-def test_a_fragment_named_inside_a_name_keeps_the_chain_it_had():
-    # '2-hydroxyethyl 2-methyl-3-phenylpropanoate' names its acid as a nested name; the nested
-    # acid must not take the senior chain while the ester keeps its own, or the nested string
-    # is recorded as a non-PIN part of the ester name (7 of 10 orders lost pin_verified)
-    token = namer._DEFAULT_TIER_POLICY_OFF.set(True)
-    try:
-        engine = _strict_engine()
-        rows = [engine.name_tiered(o) for o in _random_orders("CC(Cc1ccccc1)C(=O)OCCO", 10)]
-    finally:
-        namer._DEFAULT_TIER_POLICY_OFF.reset(token)
-    pins = [r for r in rows if r["name"] == "2-hydroxyethyl 2-methyl-3-phenylpropanoate"]
-    assert pins and all(r["tier"] == "pin_verified" for r in pins)
+@pytest.mark.parametrize("smiles, pin", ESTER_CASES)
+def test_every_atom_order_of_an_ester_gives_the_pin(smiles, pin, strict):
+    # the ester's producer takes the acid chain of chains.p45_acid_chain, the Blue Book:
+    # 21604), not the first longest path of its breadth-first walk: 'methyl 2-benzylpropanoate'
+    # was built for 7 of 20 orders of the first molecule
+    assert opsin_key(pin) == rdkit_key(smiles)
+    for order in _random_orders(smiles, 12):
+        row = strict.name_tiered(order)
+        assert (row["name"], row["tier"]) == (pin, "pin_verified"), order
 
 
 def test_a_chain_without_the_principal_group_atoms_of_the_default_chain_is_not_taken():
@@ -186,17 +175,6 @@ def test_a_chain_without_the_principal_group_atoms_of_the_default_chain_is_not_t
     assert chains.p45_principal_chain(f, default) == default
 
 
-def test_is_callers_molecule():
-    # outside a public call every molecule is the caller's
-    assert namer._is_callers_molecule(Chem.MolFromSmiles("CCO")) is True
-    namer._CALLER_INPUT.smiles = "OC(=O)C(C)Cc1ccccc1"
-    try:
-        assert namer._is_callers_molecule(Chem.MolFromSmiles("c1ccccc1CC(C)C(=O)O")) is True
-        assert namer._is_callers_molecule(Chem.MolFromSmiles("CC(C)C(=O)O")) is False
-    finally:
-        namer._CALLER_INPUT.smiles = None
-
-
 def test_the_selector_returns_the_senior_chain_and_undecided_is_none():
     from orthonym.perception.functional_groups import detect_functional_groups
     from orthonym.rules.seniority import get_principal_group
@@ -217,5 +195,5 @@ def test_the_selector_returns_the_senior_chain_and_undecided_is_none():
     assert chains.principal_chain_with_ring_prefixes(f) is senior or \
         chains.principal_chain_with_ring_prefixes(f) == senior
     # a group that is not in the set keeps the chain it was given
-    f.principal_group = "ester"
+    f.principal_group = "oxime"
     assert chains.p45_principal_chain(f, [0, 1, 2]) == [0, 1, 2]

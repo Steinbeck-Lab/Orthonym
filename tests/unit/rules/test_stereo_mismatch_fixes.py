@@ -113,8 +113,13 @@ class TestSM41:
         2.9.0 parses the fusion name to the input's full InChIKey."""
         name = name_compound(SM_41_SMILES)
         assert "stigmast" not in name.lower(), f"stereoparent asserted without stereo: {name}"
+        # Leads program L3 (N8f): '5-ethyl-6-methylheptan-2-yl' is the side chain with the greater
+        # number of substituents, (the Blue Book; '6,7-dichloro-5-(2-chloropropyl)
+        # octan-2-yl (preferred prefix) [not 7-chloro-5-(1,2-dichloropropyl)octan-2-yl]',:22746);
+        # the old '5-(propan-2-yl)heptan-2-yl' was the first of two tied arms. OPSIN 2.9.0 reads the
+        # new name to the input's full InChIKey too.
         assert name == (
-            "10,13-dimethyl-17-[5-(propan-2-yl)heptan-2-yl]-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
+            "17-(5-ethyl-6-methylheptan-2-yl)-10,13-dimethyl-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
             "tetradecahydro-1H-cyclopenta[a]phenanthrene-3,7-diol"), name
 
 

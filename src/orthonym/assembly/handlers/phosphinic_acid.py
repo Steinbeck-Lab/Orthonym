@@ -51,7 +51,11 @@ def name_phosphinic_acid(
     pool = get_current_pool()
     pool.add(name, "phosphinic_acid", features)
     # composer.py:1079 inline: _inject_stereo_if_missing(features, pool.best.name)
-    final_name = _inject_stereo_if_missing(features, pool.best().name)
+    # The substituent-prefix name has no numbered skeleton: the organyl carries its own
+    # stereodescriptors ('[(2E)-but-2-en-1-yl]phosphonic acid'), so a front-of-name block never
+    # resolves, the Blue Book;,:2869): the caller declares the scope.
+    final_name = _inject_stereo_if_missing(
+        features, pool.best().name, parent_scope='retained_no_locants')
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="phosphinic_acid", iupac_section_cite="P-67.1", fragment_legacy=final_name),

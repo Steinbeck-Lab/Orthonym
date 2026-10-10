@@ -263,12 +263,18 @@ CANARY_SUBSET = [
     # incorrect -- it dropped the N=N azo linkage because _check_retained_substituent
     # wrongly returned "phenyl" for the N=N-phenyl fragment. The fix (counting all
     # non-ring heavy atoms, not just carbons) correctly rejects that shortcut.
-    # Proper azo naming support is deferred.
-    # The azo PIN is not built yet (the abstention is the pinned value), and the
-    # abstention is only reached with the OPSIN validity gate on: with it off (the
-    # suite default, tests/conftest.py) the producer ships a wrong-structure name, so
-    # this one row runs under `opsin_gate`.
-    pytest.param("CCN(CC)c1ccc(N=Nc2ccccc2)cc1", "unknown organic compound",
+    # Leads program L3 (43e, change-asserted-value): the abstention that was pinned here is the
+    # defect, and the row is the PIN now. 'Unsymmetrical monoazo compounds are
+    # named in two ways' (the Blue Book),:38791: "Monoazo compounds with the general
+    # structure R-N=N-R' in which R is substituted by a principal characteristic group are named
+    # on the basis of the parent hydride, RH, substituted by an organyl diazenyl group, R'-N=N-";
+    # '4-(phenyldiazenyl)benzene-1-sulfonic acid (PIN)' (:38798); the amine is aniline,
+    #:17722). OPSIN 2.9.0 reads the name back to the input's full InChIKey (checked by a fresh
+    # call in tests/unit/assembly/test_leads_l3_43e_organyl_diazenyl.py), and the old abstention
+    # returns on the code before the change. The row runs under `opsin_gate`: with the validity
+    # gate off (the suite default, tests/conftest.py) a producer outside the PIN path could ship a
+    # wrong-structure name, which the gate suppresses.
+    pytest.param("CCN(CC)c1ccc(N=Nc2ccccc2)cc1", "N,N-diethyl-4-(phenyldiazenyl)aniline",
                  marks=pytest.mark.opsin_gate),
     ("CC(=O)O", "acetic acid"),
     ("Cc1ccc(O)c(C(C)C)c1", "4-methyl-2-(propan-2-yl)phenol"),  #: phenol suffix routing

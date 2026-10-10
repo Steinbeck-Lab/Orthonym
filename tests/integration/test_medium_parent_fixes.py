@@ -600,9 +600,15 @@ def test_steroid_decoration_completeness(smiles, expected_substr):
 # systems with at least two rings of five or more members, so the cyclopenta[a]phenanthrene
 # name, not a von Baeyer name, is the one. The assertion is the name AND its OPSIN round trip
 # to the input's full InChIKey.
+# Leads program L3 (N8f): the side chain is '5-ethyl-6-methylheptan-2-yl', not '5-(propan-2-yl)heptan-2-yl'. The
+# two chains through C-24 are as long (seven atoms): 'THE PRINCIPAL SUBSTITUENT CHAIN' (the Blue Book),
+# (:22740) "The principal substituent chain has the greatest number of substituents of any kind",
+# '6,7-dichloro-5-(2-chloropropyl)octan-2-yl (preferred prefix) [not 7-chloro-5-(1,2-dichloropropyl)octan-2-yl]' (:22746):
+# two substituents (ethyl, methyl) against one (propan-2-yl). The old string kept the first of the tied arms in atom
+# order. The new name is read back to the input's full InChIKey by a fresh OPSIN call.
 STEREO_FREE_STEROID_FUSION_NAMES = [
     ("CCC(CCC(C)C1CCC2C3C(O)C=C4CC(O)CCC4(C)C3CCC12C)C(C)C",
-     "10,13-dimethyl-17-[5-(propan-2-yl)heptan-2-yl]-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
+     "17-(5-ethyl-6-methylheptan-2-yl)-10,13-dimethyl-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
      "tetradecahydro-1H-cyclopenta[a]phenanthrene-3,7-diol"),
     ("C=C(C)C(C)CCC(C)C1CCC2C3=CCC4CC(O)CCC4(C)C3CCC21C",
      "17-(5,6-dimethylhept-6-en-2-yl)-10,13-dimethyl-2,3,4,5,6,9,10,11,12,13,14,15,16,17-"

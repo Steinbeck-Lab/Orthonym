@@ -41,14 +41,25 @@ def test_the_amide_is_not_the_parent_when_an_acid_is_present(smiles):
     assert be["name"].endswith("acetic acid"), be["name"]
 
 
-def test_an_acyl_floated_onto_a_senior_amine_fragment_is_kept():
-    # The amide assembler floats the acyl onto an amine fragment that is not a simple
-    # amine; the parent is then that fragment ('...-2-aminoethane-1-sulfonic acid', a
-    # sulfonic acid, class 7,:18170), so the split is not junior and stays.
+def test_an_acyl_on_a_senior_amine_fragment_is_kept():
+    # The amide assembler cuts the acyl from an amine fragment that is not a simple amine;
+    # the parent is then that fragment (a sulfonic acid, class 7,:18170), so the split
+    # is not junior and stays. Its nitrogen is not a suffix nitrogen of that parent, and is
+    # cited as the method-(1) acylamino prefix, not as a float of the acyl in front of the
+    # whole name ('N-(3α-hydroxy-7-oxo-5β-cholan-24-oyl)-2-aminoethane-1-sulfonic acid'):
+    # 'Substituents of the types -NH-CO-R and -NH-SO2-R' (the Blue Book):
+    # "(1) substitutively, by using a prefix formed by changing the final letter 'e' in the
+    # complete name of the amide to 'o', thus changing the suffixes 'amide' and
+    # 'carboxamide' into 'amido' and 'carboxamido'"... "Method (1) generates preferred
+    # IUPAC names." (:32998). Leads program item 43a (change-asserted-value): the old
+    # expectation ended in '-2-aminoethane-1-sulfonic acid'; the new name is OPSIN 2.9.0
+    # full-InChIKey exact (fresh java run, an InChIKey) and stays on the
+    # sulfonic acid parent. Mutation check: ``engine.nacyl_float_as_acylamino`` returning
+    # None brings the float back and fails this test.
     smiles = ("C[C@H](CCC(=O)NCCS(=O)(=O)O)[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@@H]4C[C@H](O)"
               "CC[C@]4(C)[C@H]3CC[C@]12C")
     be = _row(smiles, "best-effort")
-    assert be["name"].endswith("-2-aminoethane-1-sulfonic acid"), be["name"]
+    assert be["name"] == "2-(3α-hydroxy-7-oxo-5β-cholan-24-amido)ethane-1-sulfonic acid", be["name"]
     assert name_is_rt_exact(be["name"], smiles)
 
 

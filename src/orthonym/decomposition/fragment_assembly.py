@@ -331,7 +331,8 @@ def assemble_fragment_name(
     # ambiguous). Special-cased like the glycoside above so every other assembler
     # keeps its two-arg signature byte-identical.
     if bond_type == "amide":
-        return _assemble_amide(fragment_names, style, fragment_smiles=fragment_smiles)
+        return _assemble_amide(fragment_names, style, fragment_smiles=fragment_smiles,
+                               parent_smiles=parent_smiles)
 
     # The ester assembler needs the alcohol fragment's structure to write its group
     # word ('<group> <acid>ate') when the alcohol's name cannot carry it: a name
@@ -1240,7 +1241,8 @@ def _expand_n_locant_for_multiplier(prefix: str) -> str:
 
 
 def _assemble_amide(fragment_names: Dict[str, str], style: str,
-                    fragment_smiles: Optional[Dict[str, str]] = None) -> Optional[str]:
+                    fragment_smiles: Optional[Dict[str, str]] = None,
+                    parent_smiles: Optional[str] = None) -> Optional[str]:
     """Assemble amide name as 'N-[substituent][acid-amide]'.
 
     For simple amines, uses amide suffix: "N-methylacetamide".
@@ -1383,8 +1385,14 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
         # suffix nitrogen of the amine parent -- the alpha-amino N of 'glycine', a ring
         # N. Same gate as engine.py's amide branch (engine.gate_nonsuffix_nacyl_float).
         from .engine import gate_nonsuffix_nacyl_float
+        floated = result
         result = gate_nonsuffix_nacyl_float(
-            (fragment_smiles or {}).get("amine"), result, amine_name)
+            (fragment_smiles or {}).get("amine"), result, amine_name,
+            acid_name=acid_name, parent_smiles=parent_smiles)
+        if result != floated:
+            # withheld (None) or cited as the acylamino prefix of the amine parent: no N-prefix
+            # left whose place in the citation order there is to record
+            return result
 
     if order_parts is not None:
         _record_if_out_of_citation_order(result, [order_parts[0]], order_parts[1])

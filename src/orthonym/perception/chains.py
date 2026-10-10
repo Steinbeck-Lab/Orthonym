@@ -5,6 +5,7 @@ Implements IUPAC 2013 rules for selecting the principal chain.
 Key change in IUPAC 2013: Chain length takes priority over unsaturation!
 """
 
+import contextvars as _contextvars
 import os as _os
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
@@ -505,6 +506,18 @@ def _get_non_principal_terminal_carbons(
                 terminal_carbons.add(carbon_atom_idx)
 
     return terminal_carbons
+
+
+#: True while a comparison (``find_principal_chain(ring_prefixes=True)``) names the whole
+#: branches of its candidate chains to put them in order. Those names are sort keys. A
+#: comparison that starts inside that naming (the branch's own chain parent, a nested ester)
+#: is not made: ``principal_chain_with_ring_prefixes`` and ``p45_acid_chain`` answer None, as
+#: they do where the comparison is undecided, and the chain the caller has stands. Without
+#: this the comparison of a molecule re-enters itself through every branch it names, and each
+#: level runs the rescue ladders of a whole naming on its fragments: the macrocycle witnesses of
+#: ``tests/unit/rules/test_m25_workbudget.py`` made 994 ``name`` calls (323 s under a
+#: profiler) where the release, which made no such comparison, made 2 (3.6 s).
+_P45_NAMING_BRANCHES = _contextvars.ContextVar("orthonym_p45_naming_branches", default=False)
 
 
 def find_principal_chain(
@@ -1056,10 +1069,13 @@ def find_principal_chain(
                     continue
                 frag = _bfs_substituent(mol, ni, bfs_boundary)
                 if ring_prefixes:
+                    token = _P45_NAMING_BRANCHES.set(True)
                     try:
                         nm = name_substituent_for_ordering(mol, frag, ni)
                     except Exception:
                         nm = None
+                    finally:
+                        _P45_NAMING_BRANCHES.reset(token)
                     if not nm:
                         unnamed_branches.append(ni)
                 else:
@@ -1319,13 +1335,16 @@ def principal_chain_with_ring_prefixes(features) -> Optional[List[int]]:
     'methyl 2-benzylpropanoate' for some spellings.
 
     None when the comparison cannot be made (a branch without a name in a tie, two
-    different chains that still tie, no chain, or an error); the caller then keeps
-    the chain of the call without ring prefixes. The answer is kept on ``features``,
+    different chains that still tie, no chain, an error, or the call is made while the
+    branches of another comparison are being named: ``_P45_NAMING_BRANCHES``); the caller
+    then keeps the chain of the call without ring prefixes. The answer is kept on ``features``,
     keyed by the principal group and the ring atoms, so that the check of a chain
     parent (:func:`chain_parent_prefix_seniority`) does not make it twice."""
     mol = getattr(features, 'mol', None)
     ring_systems = getattr(features, 'ring_systems', None) or ()
     if mol is None or not ring_systems:
+        return None
+    if _P45_NAMING_BRANCHES.get():       # a branch named as a sort key: no comparison inside it
         return None
     principal_group = getattr(features, 'principal_group', None)
     ring_atoms: Set[int] = set()
@@ -1363,15 +1382,15 @@ def principal_chain_with_ring_prefixes(features) -> Optional[List[int]]:
 #: chain without ring prefixes gave 'benzyl' spellings for some orders
 #: (``tests/unit/namer/test_leads_l1_n8b_chain_prefixes.py``). A group that is not here keeps
 #: the chain of the call without ring prefixes, as before; among them are the producers that
-#: choose the chain themselves: the ester (``rules/esters.py:_find_acid_principal_chain``, a
-#: breadth-first walk whose first longest path wins, so a tie is decided by the input's atom
-#: order: 'methyl 2-benzylpropanoate' in 7 of 20 orders of 'COC(=O)C(C)Cc1ccccc1'; given the
-#: senior chain the check of:func:`chain_parent_prefix_seniority` passes and the name is
-#: labelled pin_verified), the thio-, seleno- and telluroester handler, the oxime handler (the
-#: same, for 'CC(Cc1ccccc1)C=NO'), the imidate and anhydride producers. A group joins the set
-#: when its producer takes the chain it is given.
+#: choose the chain themselves: the thio-, seleno- and telluroester handler, the oxime handler
+#: ('CC(Cc1ccccc1)C=NO' gives '2-benzyl-N-hydroxypropan-1-imine' for every order, labelled
+#: pin_verified, as before), the imidate and anhydride producers. The ester's producer walked
+#: the acid fragment itself (``rules/esters.py:_find_acid_principal_chain``, breadth first,
+#: the first longest path wins, so a tie was decided by the input's atom order) and takes the
+#: chain of:func:`p45_acid_chain` now. A group joins the set when its producer takes the
+#: chain it is given.
 GIVEN_CHAIN_GROUPS = frozenset({
-    'carboxylic_acid', 'acid_chloride', 'acid_bromide',
+    'carboxylic_acid', 'ester', 'acid_chloride', 'acid_bromide',
     'primary_amide', 'secondary_amide', 'tertiary_amide', 'imide', 'hydrazide', 'amidine',
     'nitrile', 'aldehyde', 'ketone', 'imine',
     'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'thiol',
@@ -1386,12 +1405,14 @@ def p45_principal_chain(features, default_chain: Optional[List[int]]) -> Optiona
     chain makes senior (:func:`principal_chain_with_ring_prefixes`) when that is a
     chain of the same length and the group's producer builds on the chain it is given
     (:data:`GIVEN_CHAIN_GROUPS`). ``default_chain`` stands where the comparison is
-    undecided too. The caller decides whether the molecule is the one the call names
-    (``namer.Orthonym._classify``): a fragment named inside another name keeps the chain
-    of the call without ring prefixes, because the string of a part built on another chain
-    than the whole's would be recorded as a non-PIN part of the name that contains it
-    (measured: '2-hydroxyethyl 2-methyl-3-phenylpropanoate', whose acid is a nested name,
-    labelled systematic_verified for the 7 of 10 orders in which it was pin_verified)."""
+    undecided too. ``namer.Orthonym._classify`` makes the comparison after parent selection
+    and only for a chain parent: a ring parent never reads the chain, and counting the ring
+    branches of a large ring system names whole macrocyclic branches. A fragment named inside
+    another name takes it like the whole (the string of a part built on another chain than
+    the whole's would be recorded as a non-PIN part of the name that contains it: measured,
+    '2-hydroxyethyl 2-methyl-3-phenylpropanoate', whose acid is a nested name, labelled
+    systematic_verified for the 7 of 10 orders in which it was pin_verified), except a
+    branch that another comparison names as a sort key (``_P45_NAMING_BRANCHES``)."""
     if not default_chain:
         return default_chain
     if getattr(features, 'principal_group', None) not in GIVEN_CHAIN_GROUPS:
@@ -1409,6 +1430,37 @@ def p45_principal_chain(features, default_chain: Optional[List[int]]) -> Optiona
     if ({int(a) for a in senior} & group_atoms) != ({int(a) for a in default_chain} & group_atoms):
         return default_chain
     return senior
+
+
+def p45_acid_chain(mol, acid_atoms, carbonyl_c: int) -> Optional[List[int]]:
+    """The acid chain of an ester as chooses it: the chain ``find_principal_chain``
+    gives with the ring atoms and the alkyl side left out and the ring prefixes counted
+    (``ring_prefixes=True``), carbonyl carbon first; None when it cannot be decided or does
+    not start at ``carbonyl_c`` (the caller keeps its own walk).
+
+     'Maximum number of substituents cited as prefixes' (the Blue Book): of two
+    chains of one length the one with the ring branches counted as prefixes is the parent.
+    ``rules/esters.py:_find_acid_principal_chain`` walks the acid fragment breadth first and
+    the first longest path wins, so a tie between a methyl and a ring-bearing CH2 on one carbon
+    was decided by the input's atom order ('methyl 2-benzylpropanoate' for 7 of 20 orders of
+    'COC(=O)C(C)Cc1ccccc1')."""
+    if _P45_NAMING_BRANCHES.get():       # a branch named as a sort key: no comparison inside it
+        return None
+    try:
+        from ..metrics.provenance import isolated_provenance
+        from ..perception.functional_groups import detect_functional_groups
+        acid = {int(a) for a in acid_atoms}
+        outside = {a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in acid}
+        ring_atoms = {a for ring in mol.GetRingInfo().AtomRings() for a in ring}
+        with isolated_provenance():
+            chain = find_principal_chain(
+                mol, detect_functional_groups(mol), 'ester',
+                exclude_atoms=outside | ring_atoms, ring_prefixes=True)
+    except Exception:                            # fail closed: the caller's own walk stands
+        return None
+    if not chain or int(chain[0]) != int(carbonyl_c):
+        return None
+    return [int(a) for a in chain]
 
 
 def _chain_parent_prefix_seniority(features) -> Optional[str]:

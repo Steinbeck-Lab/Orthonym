@@ -448,8 +448,13 @@ def _name_unsaturated_chain(
                 triple_locs.append(i + 1)
 
         all_unsat = sorted(double_locs + triple_locs)
-        # IUPAC: lowest to free valence first, then to unsaturation
-        key = (a_locant, all_unsat)
+        # IUPAC: lowest to free valence first, then to unsaturation; (the Blue Book
+        #:22632): (h) the free valence,:22718), (i) the multiple bonds regardless of
+        # type, then the double bonds,:22726;,:16489 "If a choice remains,
+        # preference for low locants is given to the double bonds", 'hept-1-en-6-yn-4-yl (preferred
+        # prefix)',:17256). Without the last term 'C#CC[CH]CC=C' (the multiple bonds at {1,6}
+        # either way) was named from whichever end the atoms of the input listed first.
+        key = (a_locant, all_unsat, sorted(double_locs))
 
         if best_key is None or key < best_key:
             best_key = key
@@ -589,6 +594,154 @@ def _build_alkenyl_name(
     return name
 
 
+#: the most chains the shared principal-chain selector enumerates for one substituent; past it
+#: the producers decline (the fragment then reaches the recursive naming path)
+_CHAIN_ENUM_CAP = 4096
+
+
+def _maximal_chains_through(mol, carbon_set, attach_idx):
+    """Every chain of the acyclic carbon skeleton ``carbon_set`` that passes through the free
+    valence atom ``attach_idx`` and has the greatest number of atoms, once each, as an atom list
+    in one of its two orientations; None when there are more than ``_CHAIN_ENUM_CAP``.
+
+     'THE PRINCIPAL SUBSTITUENT CHAIN' (the Blue Book), criterion (b) 'the greater
+    number of skeletal atoms, i.e., the longest chain',:22660), which the book ranks
+    above unsaturation in a substituent ('In acyclic substituents the order of seniority between
+    unsaturation and length of chain given in earlier recommendations is reversed',:22639). The
+    skeleton is a tree, so the longest chain through ``attach_idx`` joins the two deepest arms
+    out of it; every pair of arms of that total depth and every longest path in each arm gives
+    one chain. The producers used to keep the first of tied arms, which made the name depend
+    on the order of the atoms of the input."""
+    nbrs = {a: [n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors() if n.GetIdx() in carbon_set]
+            for a in carbon_set}
+    parent = {attach_idx: None}
+    order = []
+    stack = [attach_idx]
+    while stack:
+        a = stack.pop()
+        order.append(a)
+        for n in nbrs[a]:
+            if n not in parent:
+                parent[n] = a
+                stack.append(n)
+    depth = {}
+    for a in reversed(order):
+        depth[a] = 1 + max((depth[n] for n in nbrs[a] if parent.get(n) == a), default=0)
+    arms = [n for n in nbrs[attach_idx] if parent.get(n) == attach_idx]
+
+    def down(root):
+        """every longest path from ``root`` away from the free valence"""
+        out, todo = [], [[root]]
+        while todo:
+            path = todo.pop()
+            node = path[-1]
+            kids = [n for n in nbrs[node] if parent.get(n) == node and depth[n] == depth[node] - 1]
+            if not kids:
+                out.append(path)
+            else:
+                todo.extend(path + [n] for n in kids)
+            if len(out) + len(todo) > _CHAIN_ENUM_CAP:
+                return None
+        return out
+
+    if not arms:
+        return [[attach_idx]]
+    arms.sort(key=lambda n: -depth[n])
+    if len(arms) == 1:
+        paths = down(arms[0])
+        return None if paths is None else [[attach_idx] + p for p in paths]
+    best = depth[arms[0]] + depth[arms[1]]
+    chains = []
+    for i in range(len(arms)):
+        for j in range(i + 1, len(arms)):
+            if depth[arms[i]] + depth[arms[j]] != best:
+                continue
+            pi, pj = down(arms[i]), down(arms[j])
+            if pi is None or pj is None or len(chains) + len(pi) * len(pj) > _CHAIN_ENUM_CAP:
+                return None
+            chains.extend(list(reversed(a)) + [attach_idx] + b for a in pi for b in pj)
+    return chains
+
+
+def _principal_chain_candidates(mol, sub_set, carbon_set, attach_idx):
+    """The oriented chains that tie for the principal chain of an acyclic substituent, in a fixed
+    order, or None when the selector declines (too many chains).
+
+     (the Blue Book), criteria applied in turn to the chains of greatest length
+    (``_maximal_chains_through``): (d) the greater number of multiple bonds regardless of type,
+    then of double bonds,:22682); (h) the lowest locant for the free valence,
+    :22718); (i) the lowest locants for multiple bonds regardless of type, then for double bonds
+    ,:22726; 'hept-1-en-6-yn-4-yl (preferred prefix)',:17256); (k) the greatest number
+    of substituents of any kind,:22740); (l) their lowest locants,:22768;
+    '4-hydroxy-3-(2-hydroxyethyl)pentan-2-yl (preferred prefix)',:22780). A chain's orientation
+    is a candidate too: the two numberings of one chain are ranked by the same key. The caller
+    breaks a tie that remains with criterion (m) (``_resolve_chain_tie``)."""
+    chains = _maximal_chains_through(mol, carbon_set, attach_idx)
+    if chains is None:
+        return None
+
+    def key(chain):
+        pos = {a: i for i, a in enumerate(chain, 1)}
+        mult, dbl = [], []
+        for i in range(len(chain) - 1):
+            bt = mol.GetBondBetweenAtoms(chain[i], chain[i + 1]).GetBondTypeAsDouble()
+            if bt >= 2.0:
+                mult.append(i + 1)
+                if bt == 2.0:
+                    dbl.append(i + 1)
+        subs = sorted(pos[c] for c in chain for n in mol.GetAtomWithIdx(c).GetNeighbors()
+                      if n.GetIdx() in sub_set and n.GetIdx() not in pos)
+        return (-len(mult), -len(dbl), pos[attach_idx], mult, dbl, -len(subs), subs)
+
+    scored = {}
+    for ch in chains:
+        for o in (ch, ch[::-1]):
+            scored[tuple(o)] = key(o)
+    best = min(scored.values())
+    tied = [list(o) for o, kv in scored.items() if kv == best]
+    if len(tied) > 1:
+        # a fixed order whatever the order of the atoms of the input: the descriptor block of
+        # the chain, then its atoms
+        tied.sort(key=lambda o: (_located_stereo_block(mol, {a: i for i, a in enumerate(o, 1)}), o))
+    return tied
+
+
+def _resolve_chain_tie(candidates, branch_groups_of):
+    """``(chain, branch_groups)`` of the chain selects among the ``candidates`` that tie
+    on (d) to (l), or None.
+
+    ``branch_groups_of(chain)`` is the ``{prefix name: [locants]}`` of the chain's substituents
+    (None when one cannot be named). Chains that give one name are one choice. Otherwise
+    criterion (m) 'the lowest locants for the substituent(s) cited earlier in alphanumerical order'
+    , the Blue Book) decides between chains that cite the same substituents; chains
+    that tie on (k) and (l) with different substituents, or that (m) does not separate, are not
+    built (fail closed, as ``_name_branched_polyfunctional_substituent`` does)."""
+    built = []
+    for ch in candidates:
+        groups = branch_groups_of(ch)
+        if groups is None:
+            return None
+        built.append((ch, groups))
+    if len(built) == 1:
+        return built[0]
+
+    def signature(groups):
+        return tuple(sorted((n, tuple(sorted(locs))) for n, locs in groups.items()))
+
+    if len({signature(g) for _, g in built}) == 1:
+        return built[0]
+    if len({tuple(sorted((n, len(locs)) for n, locs in g.items())) for _, g in built}) != 1:
+        return None
+
+    def citation(groups):
+        return [loc for n in sorted(groups, key=alpha_sort_key) for loc in sorted(groups[n])]
+
+    ranked = sorted(built, key=lambda b: citation(b[1]))
+    if citation(ranked[0][1]) == citation(ranked[1][1]):
+        return None
+    return ranked[0]
+
+
 def _name_branched_alkenyl_substituent(mol, sub_atoms, attach_idx):
     """ / /: a BRANCHED acyclic ALL-CARBON substituent
     bearing >=1 C=C/C#C, named by its own principal chain THROUGH the free valence
@@ -636,72 +789,58 @@ def _name_branched_alkenyl_substituent(mol, sub_atoms, attach_idx):
     if not (has_unsat and branched):
         return None
 
-    # Principal chain = longest simple path THROUGH the free valence, tie-broken
-    # by MAX on-chain unsaturation. The fragment is an acyclic tree,
-    # so the path between any two atoms is unique; enumerate atom pairs (bounded:
-    # substituents are small) and keep the best chain that contains attach_idx.
-    from collections import deque
-
-    def _tree_path(a, b):
-        prev = {a: None}
-        dq = deque([a])
-        while dq:
-            x = dq.popleft()
-            if x == b:
-                break
-            for nbr in mol.GetAtomWithIdx(x).GetNeighbors():
-                ni = nbr.GetIdx()
-                if ni in sub_set and ni not in prev:
-                    prev[ni] = x
-                    dq.append(ni)
-        if b not in prev:
-            return None
-        path = []
-        cur = b
-        while cur is not None:
-            path.append(cur)
-            cur = prev[cur]
-        return list(reversed(path))
-
-    def _onchain_unsat(chain):
-        n = 0
-        for i in range(len(chain) - 1):
-            bond = mol.GetBondBetweenAtoms(chain[i], chain[i + 1])
-            if bond and bond.GetBondTypeAsDouble() != 1.0:
-                n += 1
-        return n
-
-    atoms = sorted(sub_set)  # deterministic order for tie-breaking
-    best = None  # ((length, unsat), chain)
-    for i in range(len(atoms)):
-        for j in range(i + 1, len(atoms)):
-            p = _tree_path(atoms[i], atoms[j])
-            if not p or attach_idx not in p:
-                continue
-            key = (len(p), _onchain_unsat(p))
-            if best is None or key > best[0]:
-                best = (key, p)
-    if best is None:
+    # Principal chain: (the Blue Book), shared with the other acyclic substituent
+    # producers -- the longest chain through the free valence (every one of them, not the first of
+    # ties), then (d) the greater number of multiple bonds and of double bonds, (h) the lowest
+    # free-valence locant, (i) the lowest multiple-bond locants then double-bond locants, (k) the
+    # number of substituents, (l) their locants, (m) their citation order. The fragment is an
+    # acyclic tree, so the chains through the free valence are its leaf-to-leaf paths.
+    cands = _principal_chain_candidates(mol, sub_set, sub_set, attach_idx)
+    if cands is None:
         return None
-    chain = best[1]
 
-    def _dir_key(ch):
-        k = ch.index(attach_idx) + 1
-        unsat = []
-        for i in range(len(ch) - 1):
-            bond = mol.GetBondBetweenAtoms(ch[i], ch[i + 1])
-            bt = bond.GetBondTypeAsDouble() if bond else 1.0
-            if bt in (2.0, 3.0):
-                unsat.append(i + 1)
-        # (1): free valence lowest first, then unsaturation lowest.
-        return (k, sorted(unsat))
+    # Off-chain branches -> the substituent's own substituents,
+    # named recursively and located on this chain (mirror _located_acyclic_alkyl_name).
+    from collections import defaultdict
 
-    fwd = chain
-    rev = list(reversed(chain))
-    chain = fwd if _dir_key(fwd) <= _dir_key(rev) else rev
+    from .substituent_enumerator import name_substituent
 
+    def _branch_groups_for(chain):
+        chain_set_c = set(chain)
+        chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+        groups: dict = defaultdict(list)
+        for chain_atom in chain:
+            for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
+                nidx = nbr.GetIdx()
+                if nidx in chain_set_c or nidx not in sub_set:
+                    continue
+                frag = []
+                seen = set(chain_set_c)
+                stack = [nidx]
+                while stack:
+                    cur = stack.pop()
+                    if cur in seen:
+                        continue
+                    seen.add(cur)
+                    frag.append(cur)
+                    for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                        if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
+                            stack.append(nn.GetIdx())
+                try:
+                    bname = name_substituent(mol, frag, nidx)
+                except Exception as exc:  # noqa: BLE001 — missing beats wrong
+                    logger.debug("branched-alkenyl branch naming failed: %s", exc)
+                    return None
+                if not bname or bname == "substituent":
+                    return None
+                groups[bname].append(chain_pos[chain_atom])
+        return groups
+
+    picked = _resolve_chain_tie(cands, _branch_groups_for)
+    if picked is None:
+        return None
+    chain, branch_groups = picked
     k = chain.index(attach_idx) + 1
-    chain_set_c = set(chain)
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
     double_locs, triple_locs = [], []
     for i in range(len(chain) - 1):
@@ -711,38 +850,6 @@ def _name_branched_alkenyl_substituent(mol, sub_atoms, attach_idx):
             double_locs.append(i + 1)
         elif bt == 3.0:
             triple_locs.append(i + 1)
-
-    # Off-chain branches -> the substituent's own substituents,
-    # named recursively and located on this chain (mirror _located_acyclic_alkyl_name).
-    from collections import defaultdict
-
-    from .substituent_enumerator import name_substituent
-    branch_groups: dict = defaultdict(list)
-    for chain_atom in chain:
-        for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
-            nidx = nbr.GetIdx()
-            if nidx in chain_set_c or nidx not in sub_set:
-                continue
-            frag = []
-            seen = set(chain_set_c)
-            stack = [nidx]
-            while stack:
-                cur = stack.pop()
-                if cur in seen:
-                    continue
-                seen.add(cur)
-                frag.append(cur)
-                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
-                    if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
-                        stack.append(nn.GetIdx())
-            try:
-                bname = name_substituent(mol, frag, nidx)
-            except Exception as exc:  # noqa: BLE001 — missing beats wrong
-                logger.debug("branched-alkenyl branch naming failed: %s", exc)
-                return None
-            if not bname or bname == "substituent":
-                return None
-            branch_groups[bname].append(chain_pos[chain_atom])
 
     core = _build_alkenyl_name(len(chain), k, double_locs, triple_locs)
     if not branch_groups:
@@ -861,8 +968,14 @@ def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
             stem = _build_alkenyl_name(n, fv, dbl, trp)   # 'prop-1-en-2-yl'
             _M = {1: "", 2: "di", 3: "tri", 4: "tetra"}
             ostr = f"{','.join(map(str, oxo_locs))}-{_M.get(len(oxo_locs), '')}oxo"
-            best = (key, f"{ostr}{stem}")                 # '3-oxo' + 'prop-1-en-2-yl'
-    return best[1] if best else None
+            best = (key, f"{ostr}{stem}", pos)            # '3-oxo' + 'prop-1-en-2-yl'
+    if not best:
+        return None
+    # NAMING OF STEREOISOMERS (the Blue Book, sentence:44643): the E/Z (and R/S) descriptors of the substituent's own backbone
+    # are cited "at the front of the corresponding prefix", at the substituent's own locants --
+    # '(1E)-3-oxobut-1-en-1-yl'. The fragment is an unbranched all-carbon chain (guards above), so
+    # every stereo element lies on the numbered backbone (same contract as `_name_unsaturated_chain`).
+    return _located_stereo_block(mol, best[2]) + best[1]
 
 
 _HALOGEN_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
@@ -6705,180 +6818,84 @@ def _located_acyclic_alkyl_name(mol, sub_atoms, attach_idx, with_pos=False,
     if attach_idx not in carbon_set:
         return None
 
-    # Longest carbon chain THROUGH the free valence: the two longest arms out of
-    # the attachment atom joined through it (the attachment is an interior or
-    # terminal vertex of that chain). Iterative (explicit-stack post-order) so a
-    # pathologically long chain cannot raise RecursionError ; result and
-    # tie behaviour are identical to the recursive form (first-of-ties kept).
-    def _longest_arm(start, came_from):
-        best_child: Dict[int, List[int]] = {}
-        stack = [(start, came_from, False)]
-        while stack:
-            node, parent, processed = stack.pop()
-            if processed:
-                best = [node]
-                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
-                    nidx = nbr.GetIdx()
-                    if nidx in carbon_set and nidx != parent:
-                        cand = [node] + best_child.get(nidx, [nidx])
-                        if len(cand) > len(best):
-                            best = cand
-                best_child[node] = best
-            else:
-                stack.append((node, parent, True))
-                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
-                    nidx = nbr.GetIdx()
-                    if nidx in carbon_set and nidx != parent:
-                        stack.append((nidx, node, False))
-        return best_child[start]
+    # Principal chain: (the Blue Book), shared with the other acyclic substituent
+    # producers (``_principal_chain_candidates``): the longest chain through the free valence --
+    # every chain of that length, not the first of tied arms -- then (h) the lowest free-valence
+    # locant,:22718: 'pentan-3-yl' not 'pentan-4-yl'), (k) the greatest number of
+    # detachable prefixes,:22740) and (l) their lowest locants,:22768),
+    # then, between chains that tie, (m) the lowest locants for the prefix cited first in
+    # alphanumerical order,:22802): '2-bromo-4-chloropentan-3-yl', never
+    # '4-bromo-2-chloro'. -C(CH3)2CH2OH picks the chain THROUGH the CH2: it has two prefixes,
+    # the chain through the two methyls one ('1-hydroxy-2-methylpropan-2-yl', never the
+    # '(hydroxymethyl)' form). Both numberings of a chain are candidates, which also covers the
+    # free valence at the exact centre of the chain.
+    cands = _principal_chain_candidates(mol, sub_set, carbon_set, attach_idx)
+    if cands is None or len(cands[0]) < 2:
+        return None
 
-    arms = []
-    for nbr in mol.GetAtomWithIdx(attach_idx).GetNeighbors():
-        if nbr.GetIdx() in carbon_set:
-            arms.append(_longest_arm(nbr.GetIdx(), attach_idx))
-    arms.sort(key=len, reverse=True)
+    # Off-chain branches -> the substituent's own substituents,
+    # named by the shared substituent namer and located on the chain.
+    from collections import defaultdict
 
-    def _branch_locs(order):
-        oset = set(order)
-        opos = {a: i + 1 for i, a in enumerate(order)}
-        locs = []
-        for ci in order:
-            for nb in mol.GetAtomWithIdx(ci).GetNeighbors():
-                ni = nb.GetIdx()
-                if ni in oset or ni not in sub_set:
+    from .substituent_enumerator import name_substituent
+
+    def _branch_groups_for(chain):
+        chain_set_c = set(chain)
+        chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+        groups: dict = defaultdict(list)
+        for chain_atom in chain:
+            for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
+                nidx = nbr.GetIdx()
+                if nidx in chain_set_c or nidx not in sub_set:
                     continue
-                locs.append(opos[ci])
-        return sorted(locs)
+                # BFS the branch fragment within the substituent (excluding the chain).
+                frag = []
+                seen = set(chain_set_c)
+                stack = [nidx]
+                while stack:
+                    cur = stack.pop()
+                    if cur in seen:
+                        continue
+                    seen.add(cur)
+                    frag.append(cur)
+                    for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                        if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
+                            stack.append(nn.GetIdx())
+                # Single-atom simple branches (Wave2 T5b): the guard loop above
+                # admitted only degree-1 halogens / hydroxyl O, so a 1-atom
+                # non-carbon frag maps directly to its prefix.
+                _SIMPLE_BRANCH = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo',
+                                  'I': 'iodo', 'O': 'hydroxy', 'N': 'amino'}
+                _sym0 = mol.GetAtomWithIdx(nidx).GetSymbol()
+                if len(frag) == 1 and _sym0 in _SIMPLE_BRANCH:
+                    groups[_SIMPLE_BRANCH[_sym0]].append(chain_pos[chain_atom])
+                    continue
+                try:
+                    bname = name_substituent(mol, frag, nidx)
+                except Exception as exc:  # noqa: BLE001
+                    # Missing-beats-wrong: a branch we cannot name -> decline the
+                    # whole located form (fall through to the recursive path). Logged
+                    # at debug so a genuine namer bug here stays observable .
+                    logger.debug("located-alkyl branch naming failed: %s", exc)
+                    return None
+                if not bname or bname == "substituent":
+                    return None
+                groups[bname].append(chain_pos[chain_atom])
+        return groups
 
-    def _orient(chain):
-        """Number so the free valence gets the LOWEST locant;
-        on an exact-centre tie, break toward the LOWEST side-chain locant
-        set at first point of difference (Wave2 T3c,:
-        '2-methylpentan-3-yl' not '4-methylpentan-3-yl'."""
-        _fwd_k = chain.index(attach_idx) + 1
-        _rev_k = len(chain) - chain.index(attach_idx)
-        if _rev_k < _fwd_k:
-            return list(reversed(chain))
-        if _rev_k == _fwd_k and \
-                _branch_locs(list(reversed(chain))) < _branch_locs(chain):
-            return list(reversed(chain))
-        return chain
-
-    # Wave2 T5b: when several arm PAIRS tie for the longest chain (a
-    # quaternary/branched attach with equal arms), the pick was atom-order-
-    # dependent. Enumerate every maximal-length pair and choose by the
-    # cascade tail: (free-valence locant k) -> (greatest number of detachable
-    # prefixes) -> (lowest branch-locant set): -C(CH3)2CH2OH must pick the
-    # chain THROUGH the CH2 so the name is '1-hydroxy-2-methylpropan-2-yl',
-    # never the lossy-locant '(hydroxymethyl)' form. Pure-alkyl fragments are
-    # unaffected (tied pairs there are symmetric).
-    if len(arms) >= 2:
-        best_total = len(arms[0]) + len(arms[1])
-        candidates = [
-            list(reversed(arms[i])) + [attach_idx] + arms[j]
-            for i in range(len(arms))
-            for j in range(i + 1, len(arms))
-            if len(arms[i]) + len(arms[j]) == best_total
-        ]
-    elif len(arms) == 1:
-        candidates = [[attach_idx] + arms[0]]
-    else:
-        candidates = [[attach_idx]]
-
-    chain = None
-    _best_key = None
-    for cand in candidates:
-        oriented = _orient(cand)
-        locs = _branch_locs(oriented)
-        key = (oriented.index(attach_idx) + 1, -len(locs), locs)
-        if _best_key is None or key < _best_key:
-            _best_key = key
-            chain = oriented
+    picked = _resolve_chain_tie(cands, _branch_groups_for)
+    if picked is None:
+        return None
+    chain, branch_groups = picked
 
     chain_len = len(chain)
-    if chain_len < 2:
-        return None
     k = chain.index(attach_idx) + 1
-    chain_set_c = set(chain)
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
 
     def _ret(nm, kk):
         # Attach ``chain_pos`` only for the stereo adapter (``with_pos``); the
         # two 2-tuple callers keep their ``(name, k)`` contract.
         return (nm, kk, chain_pos) if with_pos else (nm, kk)
-
-    # Off-chain branches -> the substituent's own substituents,
-    # named by the shared substituent namer and located on this chain.
-    from collections import defaultdict
-
-    from .substituent_enumerator import name_substituent
-    branch_groups: dict = defaultdict(list)
-    for chain_atom in chain:
-        for nbr in mol.GetAtomWithIdx(chain_atom).GetNeighbors():
-            nidx = nbr.GetIdx()
-            if nidx in chain_set_c or nidx not in sub_set:
-                continue
-            # BFS the branch fragment within the substituent (excluding the chain).
-            frag = []
-            seen = set(chain_set_c)
-            stack = [nidx]
-            while stack:
-                cur = stack.pop()
-                if cur in seen:
-                    continue
-                seen.add(cur)
-                frag.append(cur)
-                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
-                    if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
-                        stack.append(nn.GetIdx())
-            # Single-atom simple branches (Wave2 T5b): the guard loop above
-            # admitted only degree-1 halogens / hydroxyl O, so a 1-atom
-            # non-carbon frag maps directly to its prefix.
-            _SIMPLE_BRANCH = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo',
-                              'I': 'iodo', 'O': 'hydroxy', 'N': 'amino'}
-            _sym0 = mol.GetAtomWithIdx(nidx).GetSymbol()
-            if len(frag) == 1 and _sym0 in _SIMPLE_BRANCH:
-                branch_groups[_SIMPLE_BRANCH[_sym0]].append(
-                    chain_pos[chain_atom])
-                continue
-            try:
-                bname = name_substituent(mol, frag, nidx)
-            except Exception as exc:  # noqa: BLE001
-                # Missing-beats-wrong: a branch we cannot name -> decline the
-                # whole located form (fall through to the recursive path). Logged
-                # at debug so a genuine namer bug here stays observable .
-                logger.debug("located-alkyl branch naming failed: %s", exc)
-                return None
-            if not bname or bname == "substituent":
-                return None
-            branch_groups[bname].append(chain_pos[chain_atom])
-
-    # Wave2 (g), BB 3307 -- has NO lettered sub-items):
-    # when the free valence sits at the exact chain
-    # centre AND the branch-locant multiset is direction-invariant (the T3c
-    # first-point-of-difference tie-break above could not decide), assign the
-    # lowest locants to the substituent cited FIRST in alphanumerical order:
-    # Br@2/Cl@4 -> '2-bromo-4-chloropentan-3-yl', never '4-bromo-2-chloro'.
-    # Renumbering position l on the reversed chain is chain_len+1-l, so the
-    # flip is a pure remap — no re-collection (branch membership is
-    # direction-independent). Also removes a latent atom-order dependence for
-    # different-name equal-set branches.
-    if branch_groups and k == chain_len + 1 - k:
-        _cur_all = sorted(l for locs in branch_groups.values() for l in locs)
-        _flip_all = sorted(chain_len + 1 - l for l in _cur_all)
-        if _cur_all == _flip_all:
-            from .naming_utils import alpha_sort_key
-            _names_alpha = sorted(branch_groups, key=alpha_sort_key)
-            _cur_seq = [tuple(sorted(branch_groups[n])) for n in _names_alpha]
-            _flip_seq = [
-                tuple(sorted(chain_len + 1 - l for l in branch_groups[n]))
-                for n in _names_alpha
-            ]
-            if _flip_seq < _cur_seq:
-                branch_groups = {
-                    n: sorted(chain_len + 1 - l for l in locs)
-                    for n, locs in branch_groups.items()
-                }
 
     from ..data.chain_names import get_chain_prefix
     if k == 1 and not branch_groups:
@@ -6931,65 +6948,23 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
     """
     sub_set = set(sub_atoms)
 
-    def _longest_arm(start, came_from):
-        best_child = {}
-        stack = [(start, came_from, False)]
-        while stack:
-            node, parent, processed = stack.pop()
-            if processed:
-                best = [node]
-                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
-                    nidx = nbr.GetIdx()
-                    if nidx in carbon_set and nidx != parent:
-                        cand = [node] + best_child.get(nidx, [nidx])
-                        if len(cand) > len(best):
-                            best = cand
-                best_child[node] = best
-            else:
-                stack.append((node, parent, True))
-                for nbr in mol.GetAtomWithIdx(node).GetNeighbors():
-                    nidx = nbr.GetIdx()
-                    if nidx in carbon_set and nidx != parent:
-                        stack.append((nidx, node, False))
-        return best_child[start]
-
-    arms = []
-    for nbr in mol.GetAtomWithIdx(attach_idx).GetNeighbors():
-        if nbr.GetIdx() in carbon_set:
-            arms.append(_longest_arm(nbr.GetIdx(), attach_idx))
-    arms.sort(key=len, reverse=True)
-    if len(arms) >= 2:
-        chain = list(reversed(arms[0])) + [attach_idx] + arms[1]
-    elif len(arms) == 1:
-        chain = [attach_idx] + arms[0]
-    else:
-        chain = [attach_idx]
-    # free valence gets the lowest locant
-    _rev_k = len(chain) - chain.index(attach_idx)
-    _fwd_k = chain.index(attach_idx) + 1
-    if _rev_k < _fwd_k:
-        chain = list(reversed(chain))
-    elif _rev_k == _fwd_k and len(chain) > 1:
-        # Breadth Job 1 (M03): on an exact-centre tie the detachable prefixes
-        # decide, lowest locant set at the first point of difference -- (f)
-        # (the Blue Book, "detachable (alphabetized) prefixes, all together")
-        # after (c) the free valence: '1-(adamantan-1-yl)propan-2-yl', never
-        # '3-(adamantan-1-yl)propan-2-yl'. Every off-chain branch counts once per
-        # bond (a gem pair twice), the rule the plain-alkyl sibling ``_orient``
-        # applies in ``_located_acyclic_alkyl_name``.
-        def _prefix_locs(order):
-            oset = set(order)
-            opos = {a: i + 1 for i, a in enumerate(order)}
-            return sorted(opos[ci] for ci in order
-                          for nb in mol.GetAtomWithIdx(ci).GetNeighbors()
-                          if nb.GetIdx() not in oset and nb.GetIdx() in sub_set)
-        if _prefix_locs(list(reversed(chain))) < _prefix_locs(chain):
-            chain = list(reversed(chain))
+    # Principal chain: (the Blue Book), shared with the other acyclic substituent
+    # producers (``_principal_chain_candidates``): the longest ACYCLIC carbon chain through the
+    # free valence -- every chain of that length, not the first of tied arms -- then (h) the lowest
+    # free-valence locant,:22718), (k) the number of prefixes,:22740), (l)
+    # their lowest locants,:22768) -- on an exact-centre tie the detachable prefixes
+    # decide, '1-(adamantan-1-yl)propan-2-yl', never '3-(adamantan-1-yl)propan-2-yl' (f),
+    # the Blue Book) -- and (m) between chains that still tie the lowest locants for the
+    # prefix cited first,:22802). Every off-chain branch counts once per bond (a gem
+    # pair twice).
+    cands = _principal_chain_candidates(mol, sub_set, carbon_set, attach_idx)
+    if cands is None:
+        return None
+    chain = cands[0]
     chain_len = len(chain)
     if chain_len < 1:
         return None
     k = chain.index(attach_idx) + 1
-    chain_set_c = set(chain)
     chain_pos = {a: i + 1 for i, a in enumerate(chain)}
 
     if chain_len == 1:
@@ -7015,51 +6990,63 @@ def _located_fg_assemble(mol, sub_atoms, attach_idx, carbon_set, ring_info, with
                     return (_acyl, 1, chain_pos) if with_pos else (_acyl, 1)
 
     from collections import defaultdict
-    branch_groups: dict = defaultdict(list)
-    for c in chain:
-        for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
-            nidx = nbr.GetIdx()
-            if nidx in chain_set_c or nidx not in sub_set:
-                continue
-            bond = mol.GetBondBetweenAtoms(c, nidx)
-            sym = nbr.GetSymbol()
-            # chain-carbon =O -> oxo as a prefix); =N -> imino
-            if bond.GetBondTypeAsDouble() == 2.0 and nbr.GetDegree() == 1:
-                if sym == 'O':
-                    branch_groups['oxo'].append(chain_pos[c]); continue
-                if sym == 'N':
-                    branch_groups['imino'].append(chain_pos[c]); continue
-            # collect the whole off-chain branch
-            frag = []
-            seen = set(chain_set_c)
-            stk = [nidx]
-            while stk:
-                cur = stk.pop()
-                if cur in seen:
+
+    def _branch_groups_for(chain):
+        chain_set_c = set(chain)
+        chain_pos = {a: i + 1 for i, a in enumerate(chain)}
+        groups: dict = defaultdict(list)
+        for c in chain:
+            for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
+                nidx = nbr.GetIdx()
+                if nidx in chain_set_c or nidx not in sub_set:
                     continue
-                seen.add(cur)
-                frag.append(cur)
-                for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
-                    if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
-                        stk.append(nn.GetIdx())
-            if len(frag) == 1 and sym in ('F', 'Cl', 'Br', 'I'):
-                branch_groups[{'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo',
-                               'I': 'iodo'}[sym]].append(chain_pos[c]); continue
-            if len(frag) == 1 and sym == 'O' and nbr.GetTotalNumHs() >= 1:
-                branch_groups['hydroxy'].append(chain_pos[c]); continue
-            if len(frag) == 1 and sym == 'N' and nbr.GetTotalNumHs() == 2:
-                branch_groups['amino'].append(chain_pos[c]); continue
-            try:
-                # recurse through the central substituent entry so the branch
-                # reaches the same tiers (rings, phospho Step 0, and Tier FG for a
-                # nested FG chain), rooted at the branch's own attachment atom.
-                bname = name_substituent_fragment(mol, sorted(frag), nidx, list(chain))
-            except Exception as exc:  # noqa: BLE001
-                logger.debug("located-fg branch naming failed: %s", exc)
-                return None
-            if not bname or bname == 'substituent':
-                return None
-            branch_groups[bname].append(chain_pos[c])
+                bond = mol.GetBondBetweenAtoms(c, nidx)
+                sym = nbr.GetSymbol()
+                # chain-carbon =O -> oxo as a prefix); =N -> imino
+                if bond.GetBondTypeAsDouble() == 2.0 and nbr.GetDegree() == 1:
+                    if sym == 'O':
+                        groups['oxo'].append(chain_pos[c]); continue
+                    if sym == 'N':
+                        groups['imino'].append(chain_pos[c]); continue
+                # collect the whole off-chain branch
+                frag = []
+                seen = set(chain_set_c)
+                stk = [nidx]
+                while stk:
+                    cur = stk.pop()
+                    if cur in seen:
+                        continue
+                    seen.add(cur)
+                    frag.append(cur)
+                    for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
+                        if nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
+                            stk.append(nn.GetIdx())
+                if len(frag) == 1 and sym in ('F', 'Cl', 'Br', 'I'):
+                    groups[{'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo',
+                                   'I': 'iodo'}[sym]].append(chain_pos[c]); continue
+                if len(frag) == 1 and sym == 'O' and nbr.GetTotalNumHs() >= 1:
+                    groups['hydroxy'].append(chain_pos[c]); continue
+                if len(frag) == 1 and sym == 'N' and nbr.GetTotalNumHs() == 2:
+                    groups['amino'].append(chain_pos[c]); continue
+                try:
+                    # recurse through the central substituent entry so the branch
+                    # reaches the same tiers (rings, phospho Step 0, and Tier FG for a
+                    # nested FG chain), rooted at the branch's own attachment atom.
+                    bname = name_substituent_fragment(mol, sorted(frag), nidx, list(chain))
+                except Exception as exc:  # noqa: BLE001
+                    logger.debug("located-fg branch naming failed: %s", exc)
+                    return None
+                if not bname or bname == 'substituent':
+                    return None
+                groups[bname].append(chain_pos[c])
+        return groups
+
+    picked = _resolve_chain_tie(cands, _branch_groups_for)
+    if picked is None:
+        return None
+    chain, branch_groups = picked
+    k = chain.index(attach_idx) + 1
+    chain_pos = {a: i + 1 for i, a in enumerate(chain)}
 
     from .composer import _format_prefix_groups
     if chain_len == 1 and branch_groups:
@@ -8104,6 +8091,80 @@ def name_substituent_fragment(
     return value
 
 
+def _diazenyl_prefix(mol, sub_atoms, attach_idx, parent_chain) -> Optional[str]:
+    """'(1E)-(phenyl)diazenyl'-style prefix of a fragment rooted at an -N=N- unit attached to its
+    parent by a single bond, composed from the names of its parts; None for any other fragment
+    (and when a part has no name, which fails the whole prefix closed). The N=N geometry, when
+    defined, is cited at the front as '(1E)-', the Blue Book: descriptors relating
+    to a substituent group are cited at the front of its prefix), as ``rules.terminal_fragment``
+    cites it for the same group."""
+    root = mol.GetAtomWithIdx(attach_idx)
+    if root.GetSymbol() != 'N' or root.GetFormalCharge() != 0 or root.IsInRing():
+        return None
+    group = frozenset(sub_atoms)
+    parents = [nb.GetIdx() for nb in root.GetNeighbors()
+               if nb.GetIdx() not in group and nb.GetAtomicNum() > 1]
+    if len(parents) != 1:
+        return None
+    if mol.GetBondBetweenAtoms(attach_idx, parents[0]).GetBondType() != Chem.BondType.SINGLE:
+        return None
+    from .hetero_group_prefixes import compose_group, group_shape
+    shape = group_shape(mol, attach_idx, group, parents[0])
+    if shape is None or shape.kind != 'diazenyl':
+        return None
+    # A RING parent only. A chain parent (the chain producers of ``rules.polyfunctional`` and the
+    # chain handlers) cites the perceived 'azo' group as the bare prefix 'diazenyl' as well, so the
+    # prefix composed here would be cited twice ('1-diazenyl-1-[(4-methylphenyl)diazenyl]methanamine'
+    # for 'NCN=Nc1ccc(C)cc1', a different molecule the round trip rejects) and the rows those
+    # producers name today ('1-[(4-methylphenyl)diazenyl]methanamine') would be lost at the pin
+    # tier. The chain half of is written up as a separate item with its design.
+    if not mol.GetAtomWithIdx(parents[0]).IsInRing():
+        return None
+    # The principal characteristic group is R's, not R-prime's: 'Monoazo compounds... in which R is
+    # substituted by a principal characteristic group are named on the basis of the parent hydride,
+    # RH, substituted by an organyl diazenyl group', the Blue Book); when R-prime
+    # carries an instance of it too, the name is multiplicative ('If both R and R-prime are substituted
+    # by the same number of the principal characteristic group, a multiplicative name, using the
+    # prefix 'diazenediyl'... is preferred') or the parent is on R-prime's side, and the parent choice
+    # is not this producer's (the guard of ``_ring_branch_may_need_other_parent``, suite fix j6).
+    # A ring producer given the prefix would otherwise name the ring as the parent and cite the
+    # group of R-prime as a prefix ('1-{[2-(acetyloxy)ethyl]diazenyl}-4-methylbenzene', not the ester).
+    try:
+        from ..perception.functional_groups import detect_functional_groups
+        from ..rules.seniority import get_principal_group
+        _pg, _pg_matches = get_principal_group(mol, detect_functional_groups(mol))
+    except Exception:  # noqa: BLE001 -- fail closed
+        return None
+    if _pg and any(set(m) & group for m in (_pg_matches or ())):
+        return None
+    # An ORGANYL diazenyl group: R' is bonded to the second nitrogen through a carbon. A nitrogen
+    # (a triazene, -N=N-NR2: 'triaz-1-en-1-yl',, an oxygen or a sulfur on that nitrogen
+    # is another class with its own producers; 'diazenyl' with a hetero atom behind it is theirs.
+    if any(mol.GetAtomWithIdx(part.attach).GetSymbol() != 'C' for part in shape.parts):
+        return None
+    outer = list(parent_chain or []) + [attach_idx]
+    names = []
+    for part in shape.parts:
+        nm = name_substituent_fragment(mol, sorted(part.atoms), part.attach,
+                                       outer + [part.host])
+        if not nm or nm == 'substituent':
+            return None
+        names.append(nm)
+    token = compose_group(shape, names)
+    if not token:
+        return None
+    if shape.stereo_bond is not None:
+        bond = mol.GetBondBetweenAtoms(*shape.stereo_bond)
+        if bond.GetStereo() != Chem.BondStereo.STEREONONE:
+            assign_stereochemistry(mol)
+            ez = bond.GetProp('_CIPCode') if bond.HasProp('_CIPCode') else None
+            if ez not in ('E', 'Z'):
+                return None
+            from .prefix_derivation import carried
+            token = carried(f"(1{ez})-{token}", like=token)
+    return token
+
+
 _POLYAZANE_MULTIPLIER = {3: "tri", 4: "tetra"}
 
 
@@ -8248,6 +8309,23 @@ def _name_substituent_fragment_uncached(
     _polyaz = _polyazane_prefix(mol, sub_atoms, attach_idx)
     if _polyaz is not None:
         return _polyaz
+
+    # Step 0b': a fragment rooted at an -N=N- unit is the organyl diazenyl
+    # prefix. 'Unsymmetrical monoazo compounds... Monoazo compounds with the general structure
+    # R-N=N-R' in which R is substituted by a principal characteristic group are named on the
+    # basis of the parent hydride, RH, substituted by an organyl diazenyl group, R'-N=N-'
+    # (the Blue Book,:38791; '4-(phenyldiazenyl)benzene-1-sulfonic acid (PIN)',:38798;
+    # '(methyldiazenyl)acetic acid (PIN)',:38740), and 'The prefix diazenyl is a preselected
+    # prefix',:38732). Without it the fragment fell to the generic steps below,
+    # which name a free molecule and cut a locant-less 'yl' from it: the PIN path declined the
+    # whole molecule (every aromatic azo compound with a principal suffix abstained at the pin
+    # tier) or, with the validity gate off, wrote 'diazenyl-N,N-diethylanamine'. The group is
+    # composed from the names of its parts by the primitive the general engine and the terminal-
+    # fragment writer already use (``hetero_group_prefixes``); any part this function cannot
+    # name fails the prefix closed.
+    _diaz = _diazenyl_prefix(mol, sub_atoms, attach_idx, parent_chain)
+    if _diaz is not None:
+        return _diaz
 
     # Step 0 (Wave-2 C2,: an O-ATTACHED fragment is an R-oxy prefix.
     # The generic Steps 3-5 mis-anchored it ('1-hydroxy-1-methoxymethyl' for

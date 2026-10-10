@@ -1012,6 +1012,13 @@ def _find_acid_principal_chain(mol, acid_atoms: List[int]) -> Optional[List[int]
         if not extended and len(path) > len(best_path):
             best_path = path
 
+    # 'Maximum number of substituents cited as prefixes' (the Blue Book): of two
+    # chains of this length the one with the ring branches counted as prefixes is the parent;
+    # the first path of the walk above is the input's atom order, not the rule.
+    from ..perception.chains import p45_acid_chain
+    senior = p45_acid_chain(mol, acid_atoms, carbonyl_c)
+    if senior and len(senior) == len(best_path):
+        return senior
     return best_path
 
 

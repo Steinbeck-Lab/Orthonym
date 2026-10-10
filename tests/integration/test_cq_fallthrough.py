@@ -125,12 +125,35 @@ def test_witness_converts_and_roundtrips(smiles, expected):
         f"shipped name {out!r} does not OPSIN-round-trip to {smiles!r}")
 
 
+# Leads program L3 (43e, change-asserted-value): the azo witness is no longer a PIN abstention.
+# 'Unsymmetrical monoazo compounds are named in two ways' (the Blue Book),
+#:38791: "Monoazo compounds with the general structure R-N=N-R' in which R is substituted by a
+# principal characteristic group are named on the basis of the parent hydride, RH, substituted by
+# an organyl diazenyl group, R'-N=N-"; here R is the indole carrying the hydroxy group, R' the
+# 3-(trifluoromethyl)phenyl group. The prefixes are alphanumerical: 'fluoro', 'thietan-3-yl',
+# '[3-(trifluoromethyl)phenyl]diazenyl', 'th' before 'tr'). The PIN tier builds it from
+# the organyl diazenyl prefix and the OPSIN round trip of the test below reads it back to the
+# input's full InChIKey; on the code before the change the PIN tier abstains (the test fails).
+PIN_NAMES_GAINED = {
+    "Oc1c(N=Nc2cccc(C(F)(F)F)c2)c2cc(F)cc(F)c2n1C1CSC1":
+        "5,7-difluoro-1-(thietan-3-yl)-3-{[3-(trifluoromethyl)phenyl]diazenyl}-1H-indol-2-ol",
+}
+
+
 def test_pin_tier_unchanged_on_witnesses():
-    """PIN tier (gfu=False) must be byte-identical to HEAD: it abstains on all
-    three. If the fall-through leaked into PIN, PIN would emit a name here."""
+    """PIN tier (gfu=False) must be byte-identical to HEAD: it abstains on the
+    witnesses, except the azo row that leads program L3 (43e) names as a PIN
+    (``PIN_NAMES_GAINED``). If the fall-through leaked into PIN, PIN would emit
+    a name for the others."""
     pin = Orthonym()
     for smiles, _ in WITNESSES:
         out = pin.name(smiles)
+        gained = PIN_NAMES_GAINED.get(smiles)
+        if gained is not None:
+            assert out == gained, f"PIN name of {smiles!r} is {out!r}, expected {gained!r}"
+            assert _rt_inchikey_match(out, smiles), (
+                f"PIN name {out!r} does not OPSIN-round-trip to {smiles!r}")
+            continue
         assert is_failure_name(out), (
             f"PIN tier changed on {smiles!r}: emitted {out!r} (must stay abstain)")
 

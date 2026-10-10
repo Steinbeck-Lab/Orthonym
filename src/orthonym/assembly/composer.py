@@ -1247,7 +1247,11 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
             if _amidine_name:
                 pool = get_current_pool()
                 pool.add(_amidine_name, "amidine", features)
-                return pool.best().name
+                # pool.add can reject the candidate; an empty pool falls through
+                # to the next producer rather than being dereferenced.
+                _best = pool.best()
+                if _best is not None:
+                    return _best.name
 
     # W2E-D4 /: N-substituted GEMINAL ring
     # dicarboximidamide -> per-group primed + superscript italic-N locants
@@ -1266,7 +1270,9 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         if _gem_name:
             pool = get_current_pool()
             pool.add(_gem_name, "amidine", features)
-            return pool.best().name
+            _best = pool.best()
+            if _best is not None:
+                return _best.name
 
     # Wave2: acyclic N/N'-substituted (thio)hydrazide, or a
     # hydrazinecarboxylic acid. Runs BEFORE dispatch_inner for the same reason
@@ -1292,7 +1298,9 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
         if _hz_name:
             pool = get_current_pool()
             pool.add(_hz_name, "hydrazide", features)
-            return pool.best().name
+            _best = pool.best()
+            if _best is not None:
+                return _best.name
 
     from .inner_dispatch import dispatch_inner
     _inner_result = dispatch_inner(features, mol=features.mol, style=style)
@@ -1388,7 +1396,10 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                             "Phase 168 Stage-B re-render failed on amide surface: %s; "
                             "falling back to systematic name", exc,
                         )
-                return pool.best().name
+                # pool.add can reject the candidate (an empty pool); then fall
+                # through to the general safety net instead of dereferencing None.
+                if _best is not None:
+                    return _best.name
 
     # complete: Amine handler uses _assemble_amine_name which adds
     # N-alkyl prefixes and generates chain/ring substituent prefixes.
@@ -1426,7 +1437,9 @@ def _assemble_name_impl(features: Any, style: str = "pin", _composing_ion: bool 
                         "Phase 168 Stage-B re-render failed on amine surface: %s; "
                         "falling back to systematic name", exc,
                     )
-            return pool.best().name
+            # an empty pool falls through to the general safety net
+            if _best is not None:
+                return _best.name
 
     # a phase Plan-02-04: chain-fallback section (composer.py:935-1082 in
     # pre-amendment line numbers) DELETED — extracted to handlers/general_acyclic.py
@@ -7016,6 +7029,23 @@ def _n_substituted_fragment_amide_name(fragments, n_subs, n_prefix, base_name, s
     return name
 
 
+# The truthy stub ``_assemble_amide_name`` returns when it cannot name an amide. It is truthy and is
+# KEPT ON PURPOSE: both callers offer it to the candidate pool, and where the pool accepts it
+# ``assemble_name`` returns the stub-only name, which ``Orthonym._name_impl`` reads as 'garbled'
+# (fewer than 6 characters for more than 15 heavy atoms) and answers with the decomposition
+# fallback -- the route that names, at the pin tier,
+# 'CC(O)C(NC(=O)C1CCCN1C)C1OC(SCCOC(=O)c2ccccc2N)C(O)C(O)C1O' as
+# '2-({3,4,5-trihydroxy-6-[2-hydroxy-1-(1-methylpyrrolidine-2-carboxamido)propyl]oxan-2-yl}
+# sulfanyl)ethyl 2-aminobenzoate' (pin_verified) and one more row of the 2,148 amide-like rows of
+# the v1.0.6 evals. A falsy decline skips that fallback (``_name_impl`` gates it on a non-empty
+# name): measured, it loses those two pin rows and gains one ('1,3-dimethylcyclopent-2-ene-1-
+# carboxamide'). Where the pool REJECTS the stub (the ratio floor of a large molecule)
+# ``pool.best`` is None: the callers guard that and fall through; before, they dereferenced it and
+# an ``AttributeError`` left the producer (157 of the 2,148 rows, swallowed by ``Orthonym.name``'s
+# catch-all, which then ran the general-engine recovery).
+_AMIDE_STUB = "amide"
+
+
 def _assemble_amide_name(features: Any, style: str) -> str:
     """
     Assemble name for amide compounds with N-substitution handling.
@@ -7038,7 +7068,9 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         style: Naming style (only "pin" supported for now)
 
     Returns:
-        Complete IUPAC name for the amide
+        Complete IUPAC name for the amide, ``""`` for the hidden-amide decline (falsy: the
+        callers fall through), or the truthy stub ``_AMIDE_STUB`` when it cannot name the molecule
+        (kept on purpose; the reason is with the constant above).
     """
     #: reset the transient side-channel BEFORE any early return. Only the
     # unsaturated-chain branch (below) sets ``features._amide_tree``; the
@@ -7076,7 +7108,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
         amide_atoms = features.principal_group_atoms[0]
 
     if not amide_atoms:
-        return "amide"
+        return _AMIDE_STUB
 
     # FAIL-CLOSED — acyl-on-ring-N "hidden amide" is a PSEUDOKETONE, never a
     # substitutive amide, the Blue Book: "an N-acyl group attached
@@ -7210,7 +7242,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     sep = "-" if base_name[:1] == "N" else ""
                     return _inject_stereo_if_missing(features, f"{prefix_str}{sep}{base_name}")
             return _inject_stereo_if_missing(features, base_name)
-        return "amide"
+        return _AMIDE_STUB
 
     # Chain amides: use general assembly fragments when the chain has unsaturation
     # or E/Z stereo that name_amide cannot handle. For saturated chains, use
@@ -7372,7 +7404,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                             break
                     # every heavy atom must now be accounted for
                     if not _acyl_ok or _named_atoms != _heavy:
-                        return "amide"  # fail-closed fallthrough, as before
+                        return _AMIDE_STUB  # fail-closed fallthrough, as before
                     if _acyl_prefixes:
                         _acyl_prefixes.sort(
                             key=lambda t: (alpha_sort_key(t[1]), t[0]))
@@ -7390,7 +7422,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
                     return _inject_stereo_if_missing(
                         features, base_name, atom_to_locant=_acyl_locants,
                     )
-                return "amide"
+                return _AMIDE_STUB
             # Add non-principal group prefixes (halogens, hydroxy, etc.)
             # Note: _generate_prefixes returns NameFragments whose.text
             # already includes locants (e.g., "2-methyl"), so use.text
@@ -7442,7 +7474,7 @@ def _assemble_amide_name(features: Any, style: str) -> str:
     else:
         # Unexpected for chain amide, but fallback gracefully
         base_name = name_amide(mol, amide_atoms, suffix_form=amide_suffix_form)
-        return base_name if base_name else "amide"
+        return base_name if base_name else _AMIDE_STUB
 
     fragments.append(parent)
 
@@ -7972,6 +8004,15 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     else:
         return None
 
+    # A parent that has no name is not a parent: the base would be the bare suffix
+    # ('anamine') with the prefixes in front of it ('diazenyl-N,N-diethylanamine' for
+    # 4-(phenyldiazenyl)-N,N-diethylaniline, whose aromatic ring this assembler gives no
+    # parent hydride). Decline; the producers that name the ring own that molecule
+    # 'aniline (PIN)', the Blue Book;,:38778, for the
+    # organyl diazenyl prefix).
+    if not (getattr(parent, 'text', parent) or ''):
+        return None
+
     fragments.append(parent)
 
     if features.principal_group:
@@ -8490,7 +8531,23 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
     # a phase-03: Discover ring substituents via universal pipeline
     # The nitrile C#N atoms are excluded so they are not named as substituents
     parent_atoms = set(principal_ring)
-    oriented_ring = list(principal_ring)
+    # The ring is numbered the way the terminal-suffix branch of ``_generate_suffix`` numbers it
+    # for the acids and aldehydes (``namer`` orients it, ``orient_cycloalkane`` /
+    # ``orient_cycloalkene``): 'NUMBERING' (the Blue Book) gives the lowest locants, in
+    # order, to (c) 'principal characteristic groups and free valences (suffixes)' (:3256) -- the
+    # ring atom that carries the carbonitrile carbon is 1 -- and then to (f) 'detachable
+    # alphabetized prefixes, all considered together in a series of increasing numerical order'
+    # (:3301). ``principal_ring`` is the perception order of the atoms, which numbers the ring
+    # from wherever the input listed it: '6-(4-ethylphenoxy)cyclohexane-1-carbonitrile' for the
+    # PIN '2-(4-ethylphenoxy)cyclohexane-1-carbonitrile', and, from one order of the atoms,
+    # '8-[(tert-butylamino)amino]cyclooctane-1-carbonitrile' for a molecule whose substituent is
+    # on the carbon that carries the nitrile (a different molecule; the round trip rejected it).
+    # Perception without an orientation (any ring the namer does not orient) keeps its order.
+    _oriented = getattr(features, 'oriented_ring', None)
+    if _oriented and set(_oriented) == parent_atoms and len(_oriented) == len(principal_ring):
+        oriented_ring = list(_oriented)
+    else:
+        oriented_ring = list(principal_ring)
 
     prefix_str = _integrate_universal_prefixes(
         features.mol, parent_atoms,
@@ -8520,8 +8577,8 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
         # SUBSTITUTED ring acid citing its 1: the Blue Book and the Blue Book,
         # `4,4'-oxydi(cyclohexane-1-carboxylic acid) (PIN)`.
         #
-        # The ring is already numbered with the nitrile carbon's ring atom at 1 (the
-        # prefix locants above are computed against that orientation), so the restored
+        # The ring is numbered with the nitrile carbon's ring atom at 1 (``oriented_ring``
+        # above; the prefix locants are computed against that orientation), so the restored
         # locant is 1 by construction rather than by search.
         _suffix_tail = "carbonitrile"
         if base_name.endswith(_suffix_tail) and parent_name.endswith("e"):

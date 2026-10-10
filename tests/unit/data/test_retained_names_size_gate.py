@@ -14,13 +14,13 @@ import pytest
 @pytest.mark.unit
 def test_all_retained_names_at_least_900():
     """ + G5 hard gate: ALL_RETAINED_NAMES must not drop below its floor
-    (900 at a phase close, 308 now -- see the assertion message for the history).
+    (900 at a phase close, 306 now -- see the assertion message for the history).
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html retained-name PIN tier).
     Source: 150-internal notes + G5 +.
     """
     from orthonym.data import ALL_RETAINED_NAMES
-    assert len(ALL_RETAINED_NAMES) >= 308, (
+    assert len(ALL_RETAINED_NAMES) >= 306, (
         f"ALL_RETAINED_NAMES has {len(ALL_RETAINED_NAMES)} entries; "
         "C6 (homo-ring demotion) intentionally denied 6 non-PIN homo- names "
         "(homopiperidine/homomorpholine/homopiperazine/thiahomomorpholine/"
@@ -54,5 +54,14 @@ def test_all_retained_names_at_least_900():
         "by tests/unit/data/test_opsin_import_pin_evidence.py). e3b439eb6 (2026-10-02) "
         "then removed the 7 purine-base SMILES keys (adenine, guanine, hypoxanthine, "
         "xanthine tautomers: 0 hits in the Blue Book, not P-25.2.1 Table 2.8 names; "
-        "315 -> 308). New accurate floor: 308."
+        "315 -> 308). cfce696a1 (leads item 22, 2026-10-09) then deleted the two "
+        "fixed-locant rows for the mono-ene dihydropyrans ('C1=COCCC1' -> "
+        "'3,4-dihydro-2H-pyran', 'C1=CCOCC1' -> '3,6-dihydro-2H-pyran'; 308 -> 306): "
+        "they returned the bare-ring hydro locants for every substituted ring, and P-14.4 "
+        "'NUMBERING' (BlueBookV2.md:3219) gives the principal characteristic group (c, "
+        ":3256) a lower locant than the hydro prefixes (e, :3289). They are not retained "
+        "names (the Blue Book holds no 'dihydropyran'); the two unsubstituted rings are "
+        "named by the generic hydro path to the same strings, pinned by "
+        "tests/unit/rules/test_leads_l5_item22.py and "
+        "tests/integration/test_opsin_format_heterocycles.py. New accurate floor: 306."
     )
