@@ -5,6 +5,16 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.7](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.6...v1.0.7) (2026-10-10)
+
+
+### Bug Fixes
+
+* input handling and wrong-name guards -- racemic stereo groups, all-bracket SMILES, ions, chain choice ([#15](https://github.com/Steinbeck-Lab/Orthonym/issues/15)) ([f4f3a87](https://github.com/Steinbeck-Lab/Orthonym/commit/f4f3a87bd663796ca479e7f0d122aee0224f025a))
+* preferred-name labels and seniority -- phosphorus acids and esters, multiplied names, ketones ([#18](https://github.com/Steinbeck-Lab/Orthonym/issues/18)) ([eddb929](https://github.com/Steinbeck-Lab/Orthonym/commit/eddb92953859bfba8820cc113fbe6bfcead68dee))
+* ring assemblies -- hydro prefixes, indicated hydrogen, primed components, assembly labels ([#17](https://github.com/Steinbeck-Lab/Orthonym/issues/17)) ([73e79c2](https://github.com/Steinbeck-Lab/Orthonym/commit/73e79c25a1c4302f9336412d03123221110c2f92))
+* substituent prefixes, decomposition and speed -- guanidines, azo groups, acylsulfanyl, mercapturates ([#19](https://github.com/Steinbeck-Lab/Orthonym/issues/19)) ([082ccab](https://github.com/Steinbeck-Lab/Orthonym/commit/082ccabfc52d63333693adcabf6ee1dd287bbaab))
+
 ## [1.0.6](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.5...v1.0.6) (2026-10-09)
 
 

@@ -26,7 +26,7 @@ Examples
 'acetic acid'
 """
 
-__version__ = "1.0.6"  # x-release-please-version
+__version__ = "1.0.7"  # x-release-please-version
 __author__ = "Kohulan Rajan"
 
 from .assembly.name_tree import NameTreeNode, NamingResult
