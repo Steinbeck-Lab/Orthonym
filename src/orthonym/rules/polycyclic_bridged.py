@@ -397,34 +397,6 @@ def find_main_ring(mol, bridgeheads: Set[int]) -> Optional[List[int]]:
     return list(candidates[0][1])
 
 
-def identify_main_bridgeheads(mol, bridgeheads: Set[int]) -> Optional[Tuple[int, int]]:
-    """
-    Identify the two main bridgeheads for the primary bicyclic skeleton.
-    
-    These are the bridgeheads in the main ring that will be numbered 1 and n.
-    
-    Args:
-        mol: RDKit Mol object
-        bridgeheads: Set of all bridgehead atom indices
-        
-    Returns:
-        Tuple of (primary_bh, secondary_bh) or None
-    """
-    main_ring = find_main_ring(mol, bridgeheads)
-    if not main_ring:
-        return None
-
-    ring_set = set(main_ring)
-    main_bhs = [bh for bh in bridgeheads if bh in ring_set]
-
-    if len(main_bhs) < 2:
-        return None
-
-    # Return first two bridgeheads in the main ring
-    # (Could be optimized with more sophisticated selection)
-    return (main_bhs[0], main_bhs[1])
-
-
 # ============================================================================
 # Complete System Analysis
 # ============================================================================

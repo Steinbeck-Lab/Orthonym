@@ -24,9 +24,6 @@ from ..assembly.naming_utils import (
     prefix_citation_sort_key,
 )
 from ..assembly.substituent_prefix_forms import (
-    get_alkoxy_prefix as _ASSEMBLY_get_alkoxy_prefix,
-)
-from ..assembly.substituent_prefix_forms import (
     get_alkoxycarbonyl_prefix as _ASSEMBLY_get_alkoxycarbonyl_prefix,
 )
 
@@ -35,9 +32,6 @@ from ..assembly.substituent_prefix_forms import (
 # re-exports preserving the existing polyfunctional.py public API.
 from ..assembly.substituent_prefix_forms import (
     get_substituent_prefix_form as _ASSEMBLY_get_substituent_prefix_form,
-)
-from ..assembly.substituent_prefix_forms import (
-    get_sulfanyl_prefix as _ASSEMBLY_get_sulfanyl_prefix,
 )
 from ..assembly.substituent_prefix_forms import (
     get_sulfinyl_prefix as _ASSEMBLY_get_sulfinyl_prefix,
@@ -279,20 +273,6 @@ def _group_bearing_prefix(fg_name: str, mol, matches, principal_chain) -> Option
     return form
 
 
-def _get_alkoxy_prefix(
-    mol,
-    ether_atoms: tuple,
-    principal_chain: List[int]
-) -> Optional[str]:
-    """Thin re-export — see assembly/substituent_prefix_forms.get_alkoxy_prefix.
-
-    a phase internal notes: chemistry rule lifted to
-    assembly/substituent_prefix_forms.py. This shim preserves the
-    polyfunctional.py public API for existing callers.
-    """
-    return _ASSEMBLY_get_alkoxy_prefix(mol, ether_atoms, principal_chain)
-
-
 def _get_alkoxycarbonyl_prefix(
     mol,
     ester_atoms: tuple,
@@ -333,20 +313,6 @@ def _get_sulfonyl_prefix(
     polyfunctional.py public API for existing callers.
     """
     return _ASSEMBLY_get_sulfonyl_prefix(mol, sulfone_atoms, principal_chain)
-
-
-def _get_sulfanyl_prefix(
-    mol,
-    thioether_atoms: tuple,
-    principal_chain: List[int]
-) -> Optional[str]:
-    """Thin re-export — see assembly/substituent_prefix_forms.get_sulfanyl_prefix.
-
-    a phase internal notes: chemistry rule lifted to
-    assembly/substituent_prefix_forms.py. This shim preserves the
-    polyfunctional.py public API for existing callers.
-    """
-    return _ASSEMBLY_get_sulfanyl_prefix(mol, thioether_atoms, principal_chain)
 
 
 def _count_fragment_atoms(

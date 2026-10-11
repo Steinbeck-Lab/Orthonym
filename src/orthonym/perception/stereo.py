@@ -246,32 +246,6 @@ def get_double_bond_stereo(mol) -> List[Dict]:
     return stereo_bonds
 
 
-def has_stereochemistry(mol) -> bool:
-    """
-    Check if molecule has any defined stereochemistry.
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        True if molecule has stereocenters or double bond stereo
-    """
-    assign_stereochemistry(mol)
-
-    # Check for atom stereocenters
-    for atom in mol.GetAtoms():
-        if atom.HasProp('_CIPCode'):
-            return True
-
-    # Check for defined double bond stereochemistry via _CIPCode
-    for bond in mol.GetBonds():
-        if bond.GetBondType() == Chem.BondType.DOUBLE:
-            if bond.HasProp('_CIPCode') and bond.GetProp('_CIPCode') in ('E', 'Z'):
-                return True
-
-    return False
-
-
 def get_stereodescriptor_string(
     mol,
     locant_map: Optional[Dict[int, int]] = None
@@ -319,32 +293,6 @@ def count_stereocenters(mol) -> int:
         Number of defined stereocenters
     """
     return len(get_stereocenters(mol))
-
-
-def count_double_bond_stereo(mol) -> int:
-    """
-    Count the number of double bonds with defined E/Z stereochemistry.
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        Number of E/Z defined double bonds
-    """
-    return len(get_double_bond_stereo(mol))
-
-
-def is_chiral(mol) -> bool:
-    """
-    Check if molecule has any chiral centers.
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        True if molecule has at least one defined stereocenter
-    """
-    return count_stereocenters(mol) > 0
 
 
 def get_undefined_stereocenters(mol) -> List[int]:

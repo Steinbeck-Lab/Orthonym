@@ -172,29 +172,3 @@ def name_nitrile(
 
         # stem + ane -> stem + anenitrile (e.g., propane -> propanenitrile)
         return f"{stem}anenitrile"
-
-
-def get_nitrile_locant(
-    nitrile_atoms: tuple,
-    atom_to_locant: dict
-) -> Optional[int]:
-    """
-    Get the locant for a nitrile group.
-
-    For chain-terminal nitriles, the locant is always 1 (implicit).
-    For nitriles as prefixes (cyano-), we need the chain position.
-
-    Args:
-        nitrile_atoms: Atom indices from nitrile SMARTS match
-        atom_to_locant: Mapping from atom index to chain locant
-
-    Returns:
-        Locant position or None if not on chain
-    """
-    nitrile_carbon_idx = nitrile_atoms[0]
-
-    # Check if nitrile carbon is on the chain
-    if nitrile_carbon_idx in atom_to_locant:
-        return atom_to_locant[nitrile_carbon_idx]
-
-    return None

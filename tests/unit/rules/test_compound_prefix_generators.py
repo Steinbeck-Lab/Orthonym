@@ -111,7 +111,7 @@ class TestSulfonylPrefixGenerator:
 # ============================================================================
 
 class TestSulfanylPrefixGenerator:
-    """Tests for _get_sulfanyl_prefix (thioether as non-principal group)."""
+    """Tests for the sulfanyl prefix (thioether as non-principal group)."""
 
     @pytest.mark.unit
     def test_methylsulfanyl_on_acid(self):

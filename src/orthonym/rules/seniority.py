@@ -1280,19 +1280,6 @@ def get_prefix(fg_name: str) -> Optional[str]:
     return PREFIX_FORMS.get(fg_name)
 
 
-def is_suffix_group(fg_name: str) -> bool:
-    """
-    Check if a functional group can be expressed as a suffix.
-
-    Args:
-        fg_name: Name of functional group
-
-    Returns:
-        True if group can be a suffix (is in seniority order)
-    """
-    return fg_name in SENIORITY_ORDER
-
-
 def compare_seniority(fg1: str, fg2: str) -> int:
     """
     Compare seniority of two functional groups.
@@ -1320,31 +1307,3 @@ def compare_seniority(fg1: str, fg2: str) -> int:
     elif idx1 > idx2:
         return 1   # fg2 is higher
     return 0       # Equal
-
-
-def get_all_prefix_groups(
-    functional_groups: Dict[str, List[tuple]],
-    principal_group: Optional[str]
-) -> Dict[str, List[tuple]]:
-    """
-    Get all functional groups that should be named as prefixes.
-
-    This includes all groups except the principal group.
-
-    Args:
-        functional_groups: Dict from detect_functional_groups
-        principal_group: Name of the principal group (or None)
-
-    Returns:
-        Dict of functional group names to their atom indices,
-        excluding the principal group
-    """
-    prefix_groups = {}
-
-    for fg_name, matches in functional_groups.items():
-        if fg_name == principal_group:
-            continue
-        if matches:
-            prefix_groups[fg_name] = matches
-
-    return prefix_groups

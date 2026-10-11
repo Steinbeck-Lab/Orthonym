@@ -1595,19 +1595,6 @@ def _bfs_substituent(mol, start_idx: int, exclude_set: Set[int]) -> List[int]:
     return list(visited)
 
 
-def get_chain_atoms_with_locants(chain: List[int]) -> Dict[int, int]:
-    """
-    Create mapping from atom index to locant number.
-
-    Args:
-        chain: Ordered list of atom indices
-
-    Returns:
-        Dict mapping atom_idx -> locant (1-indexed)
-    """
-    return {atom_idx: locant for locant, atom_idx in enumerate(chain, 1)}
-
-
 def is_ring_substituent(mol, sub_atoms: List[int], parent_atoms: Set[int]) -> bool:
     """
     Check if substituent atoms form a complete ring.

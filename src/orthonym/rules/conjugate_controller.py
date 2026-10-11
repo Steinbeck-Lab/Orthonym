@@ -106,17 +106,6 @@ def _other_neighbor(mol, atom_idx: int, skip: int) -> Optional[int]:
     return None
 
 
-def _has_double_bonded_oxygen(mol, central_idx: int) -> bool:
-    central = mol.GetAtomWithIdx(central_idx)
-    for nbr in central.GetNeighbors():
-        if nbr.GetAtomicNum() != 8:
-            continue
-        b = mol.GetBondBetweenAtoms(central_idx, nbr.GetIdx())
-        if b.GetBondType() == Chem.BondType.DOUBLE:
-            return True
-    return False
-
-
 def _count_double_bonded_oxygens(mol, central_idx: int) -> int:
     n = 0
     central = mol.GetAtomWithIdx(central_idx)

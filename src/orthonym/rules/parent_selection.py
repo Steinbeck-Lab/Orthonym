@@ -441,37 +441,6 @@ def _count_substituents_on_atoms(mol, atom_set: Set[int]) -> int:
 # Each returns: 1 (chain wins), -1 (ring wins), 0 (tie)
 
 
-def _compare_chain_length(chain_len: int, ring_size: int) -> int:
-    """(c): Maximum chain length / ring skeletal atoms."""
-    if chain_len > ring_size:
-        return 1
-    elif ring_size > chain_len:
-        return -1
-    return 0
-
-
-def _compare_multiple_bonds(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
-    """(d): Maximum number of multiple bonds (double + triple)."""
-    chain_mult = _count_multiple_bonds(mol, chain_set)
-    ring_mult = _count_multiple_bonds(mol, ring_set)
-    if chain_mult > ring_mult:
-        return 1
-    elif ring_mult > chain_mult:
-        return -1
-    return 0
-
-
-def _compare_double_bonds(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
-    """(e): Maximum number of double bonds."""
-    chain_db = _count_double_bonds(mol, chain_set)
-    ring_db = _count_double_bonds(mol, ring_set)
-    if chain_db > ring_db:
-        return 1
-    elif ring_db > chain_db:
-        return -1
-    return 0
-
-
 def _compare_pg_locants(
     mol, chain: List[int], ring_set: Set[int],
     principal_group_atoms: List[tuple],
@@ -741,17 +710,6 @@ def _has_bridging_heteroatom(mol, chain: List[int]) -> bool:
         if chain_nbrs >= 2:
             return True
     return False
-
-
-def _compare_substituent_count(mol, chain_set: Set[int], ring_set: Set[int]) -> int:
-    """(h): Maximum number of substituents."""
-    chain_subs = _count_substituents_on_atoms(mol, chain_set)
-    ring_subs = _count_substituents_on_atoms(mol, ring_set)
-    if chain_subs > ring_subs:
-        return 1
-    elif ring_subs > chain_subs:
-        return -1
-    return 0
 
 
 def select_parent(

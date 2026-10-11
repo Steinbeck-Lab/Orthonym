@@ -9156,27 +9156,6 @@ def _name_substituent_fragment_uncached(
 
 
 # ============================================================================
-# Convenience: check if substituent needs recursive naming
-# ============================================================================
-
-
-def needs_recursive_naming(mol, sub_atoms: List[int]) -> bool:
-    """Check whether a substituent requires recursive naming.
-
-    Returns True if the substituent is branched or contains heteroatoms
-    (i.e., not a simple linear alkyl chain).
-
-    Args:
-        mol: RDKit Mol object.
-        sub_atoms: Atom indices of the substituent.
-
-    Returns:
-        True if recursive naming may be needed, False for simple linear alkyls.
-    """
-    return not _is_linear_alkyl(mol, sub_atoms)
-
-
-# ============================================================================
 # CATION-AS-SUBSTITUENT PREFIX PRODUCER / — 169.6-04
 # ============================================================================
 #

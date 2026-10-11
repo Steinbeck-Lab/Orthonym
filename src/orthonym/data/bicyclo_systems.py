@@ -130,27 +130,6 @@ def get_retained_bicyclo_name(canonical_smiles: str) -> Optional[str]:
     return BICYCLO_RETAINED_NAMES.get(canonical_smiles)
 
 
-def get_bicyclo_by_descriptor(descriptor: str) -> Optional[str]:
-    """
-    Get the standard descriptor format for a bicyclo system.
-
-    Validates that the descriptor is in the correct format.
-
-    Args:
-        descriptor: Bicyclo descriptor string (e.g., "bicyclo[2.2.1]")
-
-    Returns:
-        Normalized descriptor if valid, None otherwise
-
-    Examples:
-        >>> get_bicyclo_by_descriptor("bicyclo[2.2.1]")
-        'bicyclo[2.2.1]'
-        >>> get_bicyclo_by_descriptor("invalid")
-        None
-    """
-    return BICYCLO_DESCRIPTOR_NAMES.get(descriptor)
-
-
 def is_retained_bicyclo(canonical_smiles: str) -> bool:
     """
     Check if a bicyclic compound has a retained name.

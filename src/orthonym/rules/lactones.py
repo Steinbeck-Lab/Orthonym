@@ -804,37 +804,6 @@ def name_cyclic_polyester(mol) -> Optional[str]:
     return name
 
 
-def _detect_lactone_substituents(mol, ordered_ring, atom_to_locant, excluded):
-    """
-    Detect substituents on a lactone ring.
-
-    Args:
-        mol: RDKit Mol object
-        ordered_ring: List of atom indices in IUPAC numbering order
-        atom_to_locant: Dict mapping atom index to IUPAC locant
-        excluded: Set of atom indices to exclude (ring + carbonyl O)
-
-    Returns:
-        List of (substituent_name, locant) tuples
-    """
-    substituents = []
-
-    for ring_atom_idx in ordered_ring:
-        ring_atom = mol.GetAtomWithIdx(ring_atom_idx)
-        locant = atom_to_locant[ring_atom_idx]
-
-        for neighbor in ring_atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
-            if nbr_idx in excluded:
-                continue
-
-            sub_name = _identify_lactone_substituent(mol, nbr_idx, excluded)
-            if sub_name:
-                substituents.append((sub_name, locant))
-
-    return substituents
-
-
 def _identify_lactone_substituent(mol, start_idx, excluded):
     """
     Identify a substituent on a lactone ring by its starting atom.

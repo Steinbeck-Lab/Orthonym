@@ -970,46 +970,11 @@ def _parse_anhydride_core(mol, match: tuple) -> Optional[dict]:
     }
 
 
-def _count_acyl_fragment_carbons(mol, carbonyl_c: int, bridge_o: int) -> int:
-    """Count carbons in an acyl fragment (one side of the anhydride).
-
-    BFS from carbonyl carbon, following only carbon atoms, avoiding the bridge oxygen.
-
-    Args:
-        mol: RDKit Mol object.
-        carbonyl_c: Atom index of the carbonyl carbon.
-        bridge_o: Atom index of the bridge oxygen (to exclude).
-
-    Returns:
-        Number of carbons in the acyl fragment (including carbonyl carbon).
-    """
-    visited = {carbonyl_c}
-    queue = deque([carbonyl_c])
-    carbon_count = 1
-
-    while queue:
-        current = queue.popleft()
-        atom = mol.GetAtomWithIdx(current)
-        for neighbor in atom.GetNeighbors():
-            nidx = neighbor.GetIdx()
-            if nidx in visited:
-                continue
-            if nidx == bridge_o:
-                continue
-            # Only follow carbon atoms (skip oxygens, halogens etc.)
-            if neighbor.GetSymbol() == 'C':
-                visited.add(nidx)
-                queue.append(nidx)
-                carbon_count += 1
-
-    return carbon_count
-
-
 def _collect_acyl_fragment_atoms(mol, carbonyl_c: int, bridge_o: int) -> set:
     """Collect ALL heavy atom indices in an acyl fragment via BFS.
 
-    Unlike _count_acyl_fragment_carbons which only follows carbons,
-    this follows all bonds except through the bridge oxygen.
+    Unlike a carbon-only count, this follows all bonds except through the
+    bridge oxygen.
 
     Args:
         mol: RDKit Mol object.

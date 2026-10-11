@@ -745,18 +745,6 @@ ALKALOID_NUMBERING_MAPS: Dict[str, Dict[int, int]] = {
 }
 
 
-def get_steroid_numbering(scaffold_smiles: str) -> Optional[Dict[int, int]]:
-    """Get IUPAC numbering map for a steroid scaffold.
-
-    Args:
-        scaffold_smiles: Canonical SMILES of the scaffold.
-
-    Returns:
-        Dict mapping query atom index to IUPAC locant, or None if not found.
-    """
-    return STEROID_NUMBERING_MAPS.get(scaffold_smiles)
-
-
 def get_scaffold_numbering(scaffold_smiles: str) -> Optional[Dict[int, int]]:
     """Get IUPAC numbering map for any scaffold (steroid or alkaloid).
 

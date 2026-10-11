@@ -1204,39 +1204,6 @@ def get_spiro_numbering(
         suffix_set, rank_full_molecule)
 
 
-def _get_ring_adjacent_to_spiro(
-    mol, ring_atoms: List[int], spiro_center: int
-) -> List[int]:
-    """Order ring atoms starting from atom adjacent to spiro center."""
-    ring_set = set(ring_atoms)
-    spiro_atom = mol.GetAtomWithIdx(spiro_center)
-
-    ring_neighbors = []
-    for neighbor in spiro_atom.GetNeighbors():
-        if neighbor.GetIdx() in ring_set:
-            ring_neighbors.append(neighbor.GetIdx())
-
-    if len(ring_neighbors) != 2:
-        return ring_atoms
-
-    start_atom = ring_neighbors[0]
-    ordered = [start_atom]
-    visited = {start_atom}
-    current = start_atom
-
-    while len(ordered) < len(ring_atoms):
-        atom = mol.GetAtomWithIdx(current)
-        for neighbor in atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
-            if nbr_idx in ring_set and nbr_idx not in visited:
-                ordered.append(nbr_idx)
-                visited.add(nbr_idx)
-                current = nbr_idx
-                break
-
-    return ordered
-
-
 def get_spiro_substituents(
     mol,
     spiro_center: int,

@@ -34,7 +34,6 @@ JVM never hard-fails a name .
 
 import logging
 import os
-import re
 import subprocess
 import tempfile
 from functools import lru_cache
@@ -66,22 +65,6 @@ _CENTRES_LABEL_CACHE: Dict[str, Dict[int, str]] = {}
 # (src/orthonym/perception/centres_bridge.py -> project root)
 # Same depth / parent chain as src/orthonym/validation/opsin_roundtrip.py.
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-
-
-def _centres_jar_version_key(path: Path):
-    """Sort key for a vendored ``centres-cli-<version>.jar`` filename.
-
-    Parses the leading dotted-numeric version so newer jars sort higher::
-
-        centres-cli-1.2.1.jar -> (1, 2, 1)
-        centres-cli-1.5.jar -> (1, 5)
-        centres-cli-1.5-SNAPSHOT.jar-> (1, 5)
-
-    An unparseable name sorts lowest (``(-1,)``)."""
-    m = re.match(r"centres-cli-(\d+(?:\.\d+)*)", path.name)
-    if not m:
-        return (-1,)
-    return tuple(int(p) for p in m.group(1).split("."))
 
 
 def _find_centres_jar(version: Optional[str] = None) -> Optional[str]:

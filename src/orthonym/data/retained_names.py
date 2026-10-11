@@ -939,26 +939,6 @@ def get_retained_name(canonical_smiles: str) -> Optional[str]:
         return RETAINED_NAMES.get(canonical_smiles)
 
 
-def is_retained_name_compound(canonical_smiles: str) -> bool:
-    """
-    Check if compound has a retained name.
-
-    a phase + RESEARCH ADDITION 1 root-cause fix: consults
-    merged ALL_RETAINED_NAMES via late binding.
-
-    Args:
-        canonical_smiles: Canonical SMILES string
-
-    Returns:
-        True if compound has a retained name
-    """
-    try:
-        from orthonym.data import ALL_RETAINED_NAMES
-        return canonical_smiles in ALL_RETAINED_NAMES
-    except ImportError:
-        return canonical_smiles in RETAINED_NAMES
-
-
 def add_retained_name(canonical_smiles: str, name: str) -> None:
     """DEPRECATED: prefer ``orthonym.data.register_retained_name``.
 

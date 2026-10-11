@@ -146,33 +146,6 @@ def _is_acyclic(mol, atoms: Set[int]) -> bool:
     return not any(ri.NumAtomRings(a) > 0 for a in atoms)
 
 
-def _has_defined_stereo(mol, frag: Set[int]) -> bool:
-    """True if any atom or wholly-internal bond of ``frag`` carries DEFINED stereo.
-
-    ⚠ **Do not relax this to raise coverage.** This module emits no
-    stereodescriptors at all, and -- the gate that delivers 0-wrong --
-    suppresses only on a *verified constitutional* mismatch
-    (``namer.py:920-924``). A stereocentre is not a constitutional difference, so
-    an achiral token emitted for a stereocentred fragment ships a DIFFERENT
-    COMPOUND with every gate green. Nothing downstream catches it.
-
-    Keys on DEFINED stereo, not on the presence of a double bond: an undefined
-    double bond is ordinary Task 3 unsaturation and must still name, or the guard
-    would swallow that whole feature.
-
-    Only stereo INSIDE the fragment matters. A centre elsewhere in the molecule
-    belongs to whatever names that part; blocking on it would refuse fragments
-    this module handles correctly.
-
-    Split (internal-C=C lever) into an ATOM half and a BOND half. A defined
-    R/S centre is still never expressible here, but a defined BACKBONE C=C
-    configuration is now emitted as a leading ``(nE)/(nZ)`` block on the ACYCLIC
-    path, so only the atom half unconditionally refuses; the bond half still
-    guards the composite/ring path, which emits no stereodescriptor.
-    """
-    return _has_defined_atom_stereo(mol, frag) or _has_defined_bond_stereo(mol, frag)
-
-
 def _has_defined_atom_stereo(mol, frag: Set[int]) -> bool:
     """True if any atom of ``frag`` carries a DEFINED chiral tag. This module
     emits no R/S descriptor, so such a fragment always refuses (0-wrong)."""

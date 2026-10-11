@@ -2316,17 +2316,6 @@ def get_substituted_fused_het_prefix(
     return prefix
 
 
-# Build SMARTS patterns for substructure matching
-# Use the same SMILES but allow variable substituents
-def _build_smarts_lookup() -> Dict[str, str]:
-    """
-    Build SMARTS patterns from canonical SMILES for substructure matching.
-
-    Returns dict mapping canonical SMILES to core name.
-    """
-    return {smiles: data['name'] for smiles, data in FUSED_HETEROCYCLE_DATA.items()}
-
-
 # Cache for substructure matching patterns
 _SUBSTRUCTURE_PATTERNS: Dict[str, Chem.Mol] = {}
 

@@ -1514,15 +1514,6 @@ def token_arity(token: str, kind: "object" = "prefix") -> ArityEstimate:
                                 if s.category not in (OPEN, CLOSE)))
 
 
-def lexicon_size(include_suffixes: bool = True) -> int:
-    """Number of morphemes the oracle knows. For measurement passes.
-
-    ``include_suffixes`` is accepted and ignored: there is now one lexicon for
-    every binding kind (see ``_lexicon``), so both answers are the same number.
-    """
-    return len(_lexicon())
-
-
 def lexicon_entries() -> Dict[str, Tuple[int, str, bool]]:
     """``{morpheme: (atoms, category, suffix_only)}`` -- the whole lexicon.
 

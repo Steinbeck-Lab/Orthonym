@@ -1699,24 +1699,6 @@ def has_functional_group(mol, fg_name: str) -> bool:
     return mol.HasSubstructMatch(pattern)
 
 
-def get_functional_group_atoms(mol, fg_name: str) -> List[Tuple[int, ...]]:
-    """
-    Get atom indices for all instances of a specific functional group.
-    
-    Args:
-        mol: RDKit Mol object
-        fg_name: Name of functional group
-        
-    Returns:
-        List of tuples of atom indices
-    """
-    pattern = _COMPILED_FG_SMARTS.get(fg_name)
-    if pattern is None:
-        return []
-
-    return list(mol.GetSubstructMatches(pattern, uniquify=True))
-
-
 def count_functional_groups(mol) -> Dict[str, int]:
     """
     Count occurrences of each functional group.

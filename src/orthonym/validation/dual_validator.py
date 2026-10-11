@@ -16,7 +16,7 @@ import subprocess
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 from rdkit import Chem
 from rdkit.Chem.inchi import MolToInchi
@@ -225,74 +225,3 @@ def validate_compound(
     result.combined_rt = result.opsin_rt or result.pubchem_rt
 
     return result
-
-
-def validate_batch(
-    compounds: List[Tuple[str, str]],
-    opsin_jar: Optional[str] = None,
-    pubchem_cache: Optional[dict] = None,
-    skip_pubchem_api: bool = False,
-) -> List[DualResult]:
-    """
-    Validate a batch of compounds using batch OPSIN parsing for efficiency.
-
-    Args:
-        compounds: List of (smiles, name) tuples.
-        opsin_jar: Path to OPSIN JAR file.
-        pubchem_cache: Mutable dict for PubChem cache.
-        skip_pubchem_api: If True, skip PubChem API calls.
-
-    Returns:
-        List of DualResult, one per compound in same order.
-    """
-    if pubchem_cache is None:
-        pubchem_cache = {}
-
-    if opsin_jar is None:
-        opsin_jar = _find_opsin_jar()
-
-    # Compute original InChIs
-    original_inchis = []
-    for smi, _ in compounds:
-        original_inchis.append(_get_inchi(smi))
-
-    # Batch OPSIN parse
-    names = [name for _, name in compounds]
-    opsin_results: Dict[str, Optional[str]] = {}
-    if opsin_jar:
-        opsin_results = _parse_batch_with_opsin(names, opsin_jar)
-
-    # Build results
-    results = []
-    for i, (smi, name) in enumerate(compounds):
-        dr = DualResult()
-        orig_inchi = original_inchis[i]
-        if orig_inchi is None:
-            results.append(dr)
-            continue
-
-        # OPSIN path
-        opsin_smi = opsin_results.get(name)
-        if opsin_smi is not None:
-            dr.opsin_parsed = True
-            dr.opsin_smiles = opsin_smi
-            opsin_inchi = _get_inchi(opsin_smi)
-            if opsin_inchi and opsin_inchi == orig_inchi:
-                dr.opsin_rt = True
-
-        # PubChem fallback (only if OPSIN did NOT parse)
-        if not dr.opsin_parsed:
-            pc_result = lookup_name_pubchem(
-                name, pubchem_cache, skip_api=skip_pubchem_api
-            )
-            if pc_result is not None:
-                dr.pubchem_resolved = True
-                pc_inchi = pc_result.get("inchi", "")
-                dr.pubchem_inchi = pc_inchi
-                if pc_inchi and pc_inchi == orig_inchi:
-                    dr.pubchem_rt = True
-
-        dr.combined_rt = dr.opsin_rt or dr.pubchem_rt
-        results.append(dr)
-
-    return results

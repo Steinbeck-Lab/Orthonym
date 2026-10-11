@@ -432,8 +432,8 @@ class TestFormatEdgeFixes:
       produces "N,N,di..." instead of "N,N-di...". Fixed by using
       ",".join(["N"] * count) + "-" for correct IUPAC N-locant format.
     - benzene-vs-phenyl: decomposition fragment assembly used "benzene" parent
-      name when fragment was used as a substituent prefix. Fixed by adding
-      _parent_to_substituent_prefix conversion per IUPAC.
+      name when fragment was used as a substituent prefix. Fixed by converting
+      the ring parent name to its substituent prefix form per IUPAC.
     """
 
     def test_no_missing_separator_before_n_prefix(self):
@@ -513,7 +513,7 @@ class TestFormatEdgeFixes:
 
         Root cause: decomposition fragment assembly used parent name 'benzene'
         directly when constructing substituent prefixes. Fixed by
-        _parent_to_substituent_prefix converting benzene -> phenyl per
+        converting benzene -> phenyl (the substituent prefix form) per
         IUPAC.
         """
         smiles = "COc1cccc2c1[C@@H](OC)O[C@H]2c1c(O)ccc2c1C(=O)CC(C)(O)C2"

@@ -4266,45 +4266,9 @@ def _classify_single_atom_bridge_ext(
     return None
 
 
-def _bridge_is_pnictogen_oxoacid(mol, atom) -> bool:
-    """True when the single-atom bridge is a mononuclear P/As/Sb OXOACID centre:
-    a neutral, H-free pnictogen bearing a terminal =E chalcogen (=O / =S) AND at
-    least one free terminal -OH / -SH residual.
-
-    Such a centre is an arsinic / phosphinic / stibinic ACID — a characteristic
-    group SENIOR to a ring. When it bridges two units carrying no senior
-    PCG of their own, the acid (not the ring) is the parent, so the substitutive
-    di-organyl pnictogen acid is the PIN, not the multiplicative name. This is
-    the recogniser behind the guard in:func:`_try_single_atom_bridges`.
-
-    Fail-closed (returns False) for the ESTER residual (-O-R, degree 2), for a
-    charged / hydridic centre, and for any non-pnictogen atom: those keep their
-    established paths.
-    """
-    if atom.GetSymbol() not in ("P", "As", "Sb"):
-        return False
-    if atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0:
-        return False
-    has_dbl_chalco = False
-    has_free_acid_xh = False
-    for nbr in atom.GetNeighbors():
-        bond = mol.GetBondBetweenAtoms(atom.GetIdx(), nbr.GetIdx())
-        if (bond.GetBondType() == Chem.BondType.DOUBLE
-                and nbr.GetSymbol() in ("O", "S")
-                and nbr.GetDegree() == 1 and nbr.GetTotalNumHs() == 0
-                and nbr.GetFormalCharge() == 0):
-            has_dbl_chalco = True
-        elif (bond.GetBondType() == Chem.BondType.SINGLE
-                and nbr.GetSymbol() in ("O", "S")
-                and nbr.GetDegree() == 1 and nbr.GetTotalNumHs() == 1
-                and nbr.GetFormalCharge() == 0):
-            has_free_acid_xh = True
-    return has_dbl_chalco and has_free_acid_xh
-
-
 def _bridge_is_pnictogen_oxoacid_or_ester(mol, atom) -> bool:
-    """Like:func:`_bridge_is_pnictogen_oxoacid` but ALSO true for the ESTER
-    residual. The single-atom bridge is a mononuclear P/As/Sb centre — neutral,
+    """True for a pnictogen oxoacid bridge AND for its ESTER residual. The
+    single-atom bridge is a mononuclear P/As/Sb centre — neutral,
     H-free — bearing a terminal =E chalcogen (=O / =S) AND either
 
       * a free terminal -OH / -SH (a phosphinic/arsinic/stibinic ACID,
@@ -4316,10 +4280,8 @@ def _bridge_is_pnictogen_oxoacid_or_ester(mol, atom) -> bool:
     Both classes are senior to a ring bearing only class-≥17 groups, so the
     substitutive acid/ester is the parent, not the multiplicative bridge name
     , the Blue Bookff). This is the recogniser behind the broadened
-    guard in:func:`_try_single_atom_bridges` — the acid-only sibling
-    :func:`_bridge_is_pnictogen_oxoacid` stays for callers that must exclude the
-    ester. Fail-closed (False) for a charged / hydridic centre and any
-    non-pnictogen atom.
+    guard in:func:`_try_single_atom_bridges`. Fail-closed (False) for a charged /
+    hydridic centre and any non-pnictogen atom.
     """
     if atom.GetSymbol() not in ("P", "As", "Sb"):
         return False

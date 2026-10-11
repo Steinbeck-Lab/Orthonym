@@ -54,9 +54,3 @@ def get_cation_word(frag_mol) -> Optional[str]:
         return _METAL_NAMES.get(atoms[0].GetSymbol())
 
     return None
-
-
-def is_simple_cation(frag_mol) -> bool:
-    """True iff ``frag_mol`` is a simple metal/ammonium counter-cation that
-    ``get_cation_word`` can name scope)."""
-    return get_cation_word(frag_mol) is not None

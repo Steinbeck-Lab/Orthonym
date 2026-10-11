@@ -4837,43 +4837,6 @@ def _count_frag_heavy_atoms(frag_mol):
     return counts
 
 
-def _collect_frag_original_atoms(mol, ring_set, attach_ring_idx):
-    """BFS from a ring atom to collect all non-ring substituent atoms.
-
-    Note: This collects ALL substituent atoms from the ring atom. For geminal
-    substituents, use _collect_frag_atoms_for_fragment instead.
-
-    Args:
-        mol: RDKit Mol object.
-        ring_set: Set of ring atom indices.
-        attach_ring_idx: Ring atom index that the substituent is attached to.
-
-    Returns:
-        Frozenset of original mol atom indices belonging to the substituent.
-    """
-    visited = set()
-    stack = []
-
-    # Start from neighbors of the ring atom that are NOT in the ring
-    ring_atom = mol.GetAtomWithIdx(attach_ring_idx)
-    for nbr in ring_atom.GetNeighbors():
-        nbr_idx = nbr.GetIdx()
-        if nbr_idx not in ring_set:
-            stack.append(nbr_idx)
-
-    while stack:
-        idx = stack.pop()
-        if idx in visited or idx in ring_set:
-            continue
-        visited.add(idx)
-        for nbr in mol.GetAtomWithIdx(idx).GetNeighbors():
-            nbr_idx = nbr.GetIdx()
-            if nbr_idx not in visited and nbr_idx not in ring_set:
-                stack.append(nbr_idx)
-
-    return frozenset(visited)
-
-
 # ============================================================================
 # Chain Substituent Extraction
 # ============================================================================
@@ -5621,10 +5584,9 @@ def _name_alkoxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
             return f"{enclose_if_compound(alkyl_name)}oxy"
         # name_substituent_fragment failed — fall through to ALKOXY_NAMES approximation
 
-    # TODO: _check_for_alkoxy (composer.py) and get_alkoxy_prefix
-    # (substituent_prefix_forms.py) share the same ALKOXY_NAMES table and have the
-    # same branching bug; fix them too if those paths are ever extended to pure-ether
-    # whole-molecule naming.
+    # TODO: get_alkoxy_prefix (substituent_prefix_forms.py) shares the same
+    # ALKOXY_NAMES table and has the same branching bug; fix it too if that path is
+    # ever extended to pure-ether whole-molecule naming.
     ALKOXY_NAMES = {
         1: "methoxy", 2: "ethoxy", 3: "propoxy", 4: "butoxy",
         5: "pentyloxy", 6: "hexyloxy", 7: "heptyloxy", 8: "octyloxy",

@@ -15,8 +15,8 @@ Authority: ``the Blue Book Blue Book``, the sole PIN authority for this repo.
 These are therefore NOT merely non-preferred: the Blue Book grants unmarked
 alternatives the status of a "general IUPAC name", while a ``not``-marked name
 is "discarded or no longer recommended" and has no acceptable status at all.
-Emitting one is an accuracy defect, so ``rules.parent_ranking`` uses this table
-as a fail-closed veto on general-nomenclature fall-through emissions.
+Emitting one is an accuracy defect, so this table lists names that must never be
+emitted (read by tests only; no runtime module imports it).
 
 The table is an EXACT-MATCH veto over lowercase/whitespace-collapsed names. It
 may only ever suppress, so every extraction compromise is in the safe direction:

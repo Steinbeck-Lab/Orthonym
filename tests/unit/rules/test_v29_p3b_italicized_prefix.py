@@ -495,11 +495,6 @@ _TRIPWIRE_ALLOWLIST = {
     ("rules/oligosaccharides.py", 'if "-" in base:'):
         "NOT THE DECISION — splits a decorated sugar base into its prefix block and "
         "stem so the configurational descriptor goes before the stem (j7 review).",
-    ("rules/polycyclics.py",
-     "'core_name': heterocycle_name.split('-')[-1] if '-' in heterocycle_name "
-     "else heterocycle_name,"):
-        "NOT THE DECISION — splits off a locant block; also in "
-        "identify_fused_system, which has no callers.",
 }
 
 

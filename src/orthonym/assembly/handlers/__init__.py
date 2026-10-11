@@ -8,7 +8,7 @@ callable registered in ``src/orthonym/assembly/inner_dispatch.py`` per
 internal notes +.
 
 Substrate commit 02-00 ships the package SKELETON: this ``__init__.py``,
-the private ``_enrichment.py`` + ``_handler_shared.py`` modules, and the
+the private ``_handler_shared.py`` module, and the
 re-exports of NameTreeNode + NamingResult + name_tree_to_string. No
 handler files yet — those land in commits 02-01..02-29 (Plan-02 Tier-1 +
 Tier-1.5) + 03-01..03-09 (Plan-03 Tier-2 + Tier-3).
@@ -24,7 +24,7 @@ shape):
 - ``dispatch_inner`` + ``INNER_DISPATCH_TABLE`` re-export from
   ``assembly/inner_dispatch.py`` (convenience for tests + Plan-04 CLI).
 
-Internal helpers (``_enrichment.py``, ``_handler_shared.py``) are PRIVATE
+The internal helper ``_handler_shared.py`` is PRIVATE
 and intentionally not exported per internal notes + a phase mirror
 (no public plugin API; + extracts one if needed).
 

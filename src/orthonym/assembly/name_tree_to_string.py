@@ -343,21 +343,6 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
     return name
 
 
-def _format_locant_set(locants: Tuple[int, ...]) -> str:
-    """Format a sorted tuple of locants as a comma-separated string.
-
-    Example::
-
-        >>> _format_locant_set((1, 2, 3))
-        '1,2,3'
-        >>> _format_locant_set()
-        ''
-    """
-    if not locants:
-        return ""
-    return ",".join(str(l) for l in sorted(locants))
-
-
 # a phase (-03): the placeholder ``_apply_unsaturation_infix``,
 # ``_unsaturation_multiplier``, and ``_format_suffix`` stubs were DELETED.
 # Their (divergent, never-production-exercised) logic is superseded by the

@@ -853,8 +853,8 @@ def detect_carbocyclic_partial_saturation(
     # Fail closed if no all-carbon parent of this exact ring size matches — never
     # guess the parent by ring-atom count (the old size->name guess mislabelled
     # phenanthrene as anthracene) and never number by a naive sp3 walk (the old
-    # _build_naphthalene_type_locants mis-numbered non-adjacent hydro positions,
-    # e.g. 1,4-dihydronaphthalene -> wrong "1,2-").
+    # walk mis-numbered non-adjacent hydro positions, e.g. 1,4-dihydronaphthalene
+    # -> wrong "1,2-").
     sp3_set = set(sp3_indices)
     candidates = _carbocyclic_mancude_parents_by_size(total_ring_atoms)
     # tiebreak: ring atoms bearing an off-ring (substituent) heavy atom.
@@ -912,127 +912,6 @@ def detect_carbocyclic_partial_saturation(
         'pcg_kind': pcg_kind,
         'pcg_ring_atoms': pcg_ring_atoms,
     }
-
-
-def _build_naphthalene_type_locants(
-    mol: Chem.Mol,
-    ring_atoms: Set[int],
-    sp3_indices: List[int]
-) -> Dict[int, int]:
-    """
-    Build IUPAC locant mapping for naphthalene-type fused systems.
-
-    For tetrahydronaphthalene, IUPAC numbering is:
-    - Positions 1-4: saturated ring (the sp3 atoms)
-    - Positions 4a, 5-8, 8a: aromatic ring
-
-    For simplicity, we assign:
-    - sp3 atoms get locants 1, 2, 3, 4 (in order around the saturated ring)
-    - Aromatic atoms get locants 5, 6, 7, 8 (in order)
-
-    Args:
-        mol: RDKit molecule
-        ring_atoms: Set of atom indices in the fused system
-        sp3_indices: List of sp3 atom indices
-
-    Returns:
-        Dict mapping atom index to IUPAC locant (1-indexed)
-    """
-    from collections import defaultdict
-
-    if not sp3_indices:
-        return {idx: i + 1 for i, idx in enumerate(sorted(ring_atoms))}
-
-    # Get ring info
-    ri = mol.GetRingInfo()
-    atom_rings = ri.AtomRings()
-
-    # Find the ring containing sp3 atoms (the saturated ring)
-    saturated_ring = None
-    for ring in atom_rings:
-        ring_set = set(ring)
-        if not (ring_set & ring_atoms):
-            continue
-        ring_sp3 = ring_set & set(sp3_indices)
-        if len(ring_sp3) >= 2:
-            saturated_ring = ring
-            break
-
-    if saturated_ring is None:
-        return {idx: i + 1 for i, idx in enumerate(sorted(ring_atoms))}
-
-    # Find fusion atoms (shared between rings)
-    atom_ring_count = defaultdict(int)
-    for ring in atom_rings:
-        ring_set = set(ring)
-        if ring_set & ring_atoms:
-            for idx in ring:
-                if idx in ring_atoms:
-                    atom_ring_count[idx] += 1
-
-    fusion_atoms = {idx for idx, count in atom_ring_count.items() if count > 1}
-
-    # Build ordered traversal around the saturated ring
-    # Start from an sp3 atom that's adjacent to a fusion atom
-    sp3_set = set(sp3_indices)
-
-    # Find starting sp3 atom adjacent to fusion
-    start_atom = None
-    for idx in sp3_indices:
-        atom = mol.GetAtomWithIdx(idx)
-        for neighbor in atom.GetNeighbors():
-            if neighbor.GetIdx() in fusion_atoms:
-                start_atom = idx
-                break
-        if start_atom:
-            break
-
-    if start_atom is None:
-        start_atom = sp3_indices[0]
-
-    # Traverse the sp3 atoms in order (simple chain traversal)
-    visited = set()
-    sp3_order = []
-    current = start_atom
-
-    while len(sp3_order) < len(sp3_indices):
-        if current in visited:
-            break
-        visited.add(current)
-        sp3_order.append(current)
-
-        # Find next unvisited sp3 neighbor
-        atom = mol.GetAtomWithIdx(current)
-        found_next = False
-        for neighbor in atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
-            if nbr_idx in sp3_set and nbr_idx not in visited:
-                current = nbr_idx
-                found_next = True
-                break
-
-        if not found_next:
-            # No more sp3 neighbors, break
-            break
-
-    # Add any missed sp3 atoms
-    for idx in sp3_indices:
-        if idx not in visited:
-            sp3_order.append(idx)
-
-    # Build locant mapping: sp3 atoms get locants 1,2,3,4
-    atom_to_locant = {}
-    for i, idx in enumerate(sp3_order):
-        atom_to_locant[idx] = i + 1
-
-    # Non-sp3 atoms get higher locants (5, 6, 7, 8,...)
-    non_sp3 = [idx for idx in ring_atoms if idx not in sp3_set]
-    next_locant = len(sp3_order) + 1
-    for idx in sorted(non_sp3):  # Simple ordering for now
-        atom_to_locant[idx] = next_locant
-        next_locant += 1
-
-    return atom_to_locant
 
 
 def is_tetrahydronaphthalene(mol: Chem.Mol, fused_ring_atoms: Set[int]) -> bool:

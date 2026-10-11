@@ -12,7 +12,6 @@ Public API:
 * ``name_cyclophane(mol) -> Optional[str]`` -- top-level handler
 * ``_classify_phane_topology(mol) -> PhaneTopology`` -- sub-class enum
 * ``_build_composite_locant(ring_idx, ring_locant, style)``-- composite-locant emitter
-* ``_enumerate_inter_ring_chains(mol, small_rings)`` -- BFS chain walker
 * ``PhaneTopology`` -- enum
 
 Source:
@@ -176,38 +175,6 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
                 if chain_atoms <= macro:
                     return True
     return False
-
-
-# ---------------------------------------------------------------------------
-# _enumerate_inter_ring_chains (helper)
-# ---------------------------------------------------------------------------
-
-
-def _enumerate_inter_ring_chains(
-    mol: Chem.Mol,
-    small_rings: List[Set[int]],
-) -> List[List[int]]:
-    """Return chain atom-index lists for every disjoint pair of small rings.
-
-    A chain = ordered intermediate atoms (NOT in either endpoint ring) on the
-    shortest path between two disjoint small rings. Empty list if no chains.
-
-    Used by ``_classify_phane_topology`` to determine ring-attachment positions.
-
-    Source: 155-internal notes (graph-topology classification);
-    internal notes Code Examples
-    """
-    chains: List[List[int]] = []
-    for i in range(len(small_rings)):
-        for j in range(i + 1, len(small_rings)):
-            ring_i = small_rings[i]
-            ring_j = small_rings[j]
-            if ring_i & ring_j:
-                continue
-            chain = _shortest_chain_path(mol, ring_i, ring_j)
-            if chain is not None:
-                chains.append(chain)
-    return chains
 
 
 def _shortest_chain_atoms(

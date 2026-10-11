@@ -132,68 +132,6 @@ def is_aromatic_ring(mol, ring_atoms) -> bool:
     return all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring_atoms)
 
 
-def get_aromatic_rings(mol) -> List[Tuple[int, ...]]:
-    """
-    Get all aromatic rings in the molecule.
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        List of tuples, each tuple contains atom indices of an aromatic ring
-    """
-    ri = mol.GetRingInfo()
-    return [ring for ring in ri.AtomRings() if is_aromatic_ring(mol, ring)]
-
-
-def get_ring_size(mol, atom_idx: int) -> int:
-    """
-    Get the smallest ring size containing an atom.
-    
-    Args:
-        mol: RDKit Mol object
-        atom_idx: Index of atom
-        
-    Returns:
-        Smallest ring size, or 0 if atom is not in any ring
-    """
-    ri = mol.GetRingInfo()
-    sizes = [len(ring) for ring in ri.AtomRings() if atom_idx in ring]
-    return min(sizes) if sizes else 0
-
-
-def is_in_ring(mol, atom_idx: int) -> bool:
-    """
-    Check if an atom is in any ring.
-    
-    Args:
-        mol: RDKit Mol object
-        atom_idx: Index of atom
-        
-    Returns:
-        True if atom is in a ring
-    """
-    return mol.GetRingInfo().NumAtomRings(atom_idx) > 0
-
-
-def atoms_in_same_ring(mol, idx1: int, idx2: int) -> bool:
-    """
-    Check if two atoms are in the same ring.
-    
-    Args:
-        mol: RDKit Mol object
-        idx1, idx2: Atom indices
-        
-    Returns:
-        True if atoms share at least one ring
-    """
-    ri = mol.GetRingInfo()
-    for ring in ri.AtomRings():
-        if idx1 in ring and idx2 in ring:
-            return True
-    return False
-
-
 def get_ring_heteroatoms(mol, ring_atoms) -> List[Tuple[int, str]]:
     """
     Get heteroatoms (non-carbon) in a ring.

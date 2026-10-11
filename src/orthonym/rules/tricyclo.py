@@ -514,11 +514,6 @@ def get_retained_tricyclo_name(canonical_smiles: str) -> Optional[str]:
     return None
 
 
-def is_retained_tricyclo(canonical_smiles: str) -> bool:
-    """Check if a SMILES has a retained tricyclo name."""
-    return get_retained_tricyclo_name(canonical_smiles) is not None
-
-
 # ============================================================================
 # General Polycyclo Naming (for higher systems)
 # ============================================================================
@@ -582,26 +577,6 @@ def _generate_higher_polycyclo_descriptor(mol, classification: str) -> Optional[
         return desc.descriptor_string
     except Exception:
         return None
-
-
-def _ring_path_length(ring: Tuple[int, ...], bh1: int, bh2: int) -> int:
-    """Calculate the number of atoms between two bridgeheads in a ring."""
-    ring_list = list(ring)
-    if bh1 not in ring_list or bh2 not in ring_list:
-        return -1
-
-    idx1 = ring_list.index(bh1)
-    idx2 = ring_list.index(bh2)
-
-    # Ensure idx1 < idx2
-    if idx1 > idx2:
-        idx1, idx2 = idx2, idx1
-
-    # Two possible paths: direct and wrap-around
-    path1_len = idx2 - idx1 - 1  # Atoms between (exclusive)
-    path2_len = len(ring_list) - idx2 + idx1 - 1  # Wrap around
-
-    return max(path1_len, path2_len)
 
 
 def name_polycyclo_system(mol) -> Optional[str]:

@@ -1375,45 +1375,6 @@ class VonBaeyerAnalyzer:
 
         return best_ring, best_bh_pair
 
-    def _find_path_avoiding_direct(
-        self, mol, start: int, end: int, allowed: Set[int]
-    ) -> List[int]:
-        """Find a path from start to end that doesn't use the direct bond.
-
-        Bounded by ``_MAX_DFS_EXPANSIONS``  so a dense cage cannot hang;
-        on abort the best path found so far is returned.
-        """
-        # Use BFS to find shortest path first, then try longer paths
-        best_path = []
-        expansions = 0
-
-        def dfs(current, visited, path):
-            nonlocal best_path, expansions
-            expansions += 1
-            if expansions > _MAX_DFS_EXPANSIONS:
-                return  # cap: abort exploration, keep best-so-far
-            if current == end:
-                if len(path) > len(best_path):
-                    best_path = path[:]
-                return
-
-            atom = mol.GetAtomWithIdx(current)
-            for neighbor in atom.GetNeighbors():
-                nbr_idx = neighbor.GetIdx()
-                if nbr_idx in allowed and nbr_idx not in visited:
-                    # Skip direct bond from start to end
-                    if current == start and nbr_idx == end:
-                        continue
-                    visited.add(nbr_idx)
-                    path.append(nbr_idx)
-                    dfs(nbr_idx, visited, path)
-                    path.pop()
-                    visited.remove(nbr_idx)
-
-        visited = {start}
-        dfs(start, visited, [start])
-        return best_path
-
     def _find_main_ring_fallback(
         self, mol, ring_atoms: Set[int], bridgeheads: Set[int]
     ) -> Tuple[List[int], Tuple[int, int]]:
@@ -2026,32 +1987,6 @@ class VonBaeyerAnalyzer:
             end_bh=bh2,
         )
 
-    def _find_shortest_path(
-        self, mol, start: int, end: int, allowed: Set[int]
-    ) -> List[int]:
-        """Find shortest path between two atoms through allowed atoms using BFS."""
-        from collections import deque
-
-        if start == end:
-            return [start]
-
-        queue = deque([(start, [start])])
-        visited = {start}
-
-        while queue:
-            current, path = queue.popleft()
-
-            atom = mol.GetAtomWithIdx(current)
-            for neighbor in atom.GetNeighbors():
-                nbr_idx = neighbor.GetIdx()
-                if nbr_idx == end:
-                    return path + [end]
-                if nbr_idx in allowed and nbr_idx not in visited:
-                    visited.add(nbr_idx)
-                    queue.append((nbr_idx, path + [nbr_idx]))
-
-        return []
-
     # ========================================================================
     #: Secondary Bridges
     # ========================================================================
@@ -2560,62 +2495,6 @@ class VonBaeyerAnalyzer:
             remaining = still_remaining
 
         return ordered, numbering
-
-    # ========================================================================
-    #: Numbering (legacy — used by _order_and_number_secondary_bridges)
-    # ========================================================================
-
-    def _assign_numbering(
-        self,
-        mol,
-        main_ring: List[int],
-        main_bridge: Optional[BridgeInfo],
-        secondary_bridges: List[BridgeInfo],
-        bh_pair: Tuple[int, int]
-    ) -> Dict[int, int]:
-        """
-        : Assign IUPAC locants to all ring atoms.
-
-        Order:
-        1. Main ring: start at bh1 (locant 1), go along longer path to bh2,
-           then back along shorter path
-        2. Main bridge atoms
-        3. Secondary bridge atoms (independent first, then dependent)
-
-        Args:
-            mol: RDKit Mol object
-            main_ring: Ordered list of main ring atoms (bh1 first, longer path first)
-            main_bridge: Main bridge info
-            secondary_bridges: List of secondary bridge infos
-            bh_pair: Main bridgehead pair
-
-        Returns:
-            Dict mapping atom_idx -> VB locant (1-indexed)
-        """
-        numbering = {}
-        locant = 1
-
-        # 1. Number main ring atoms in order
-        for atom_idx in main_ring:
-            if atom_idx not in numbering:
-                numbering[atom_idx] = locant
-                locant += 1
-
-        # 2. Number main bridge atoms
-        if main_bridge and main_bridge.atoms:
-            for atom_idx in main_bridge.atoms:
-                if atom_idx not in numbering:
-                    numbering[atom_idx] = locant
-                    locant += 1
-
-        # 3. Number secondary bridge atoms
-        for bridge in secondary_bridges:
-            for atom_idx in bridge.atoms:
-                if atom_idx not in numbering:
-                    numbering[atom_idx] = locant
-                    locant += 1
-
-        return numbering
 
     # ========================================================================
     # Descriptor String Building
@@ -3217,15 +3096,6 @@ def name_polycyclic_with_heteroatoms(mol) -> Optional[str]:
     name = f"{hetero_prefix}{descriptor}{parent_name}{suffix}"
 
     return name
-
-
-def _has_ring_heteroatoms(mol, ring_atoms: Set[int]) -> bool:
-    """Check if the ring system contains any heteroatoms (non-carbon atoms)."""
-    for idx in ring_atoms:
-        atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() != 'C':
-            return True
-    return False
 
 
 # ============================================================================

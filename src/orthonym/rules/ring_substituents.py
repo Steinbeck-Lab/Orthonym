@@ -4082,48 +4082,6 @@ def _get_ring_position_for_attachment(
     return None
 
 
-def _build_ring_path_from_start(
-    mol,
-    ring_atoms: Tuple[int, ...],
-    start_idx: int
-) -> List[int]:
-    """
-    Build an ordered path around the ring starting from a given atom.
-
-    Args:
-        mol: RDKit Mol object
-        ring_atoms: Tuple of atom indices in the ring
-        start_idx: Starting atom index
-
-    Returns:
-        List of atom indices in order around the ring
-    """
-    ring_set = set(ring_atoms)
-    path = [start_idx]
-    visited = {start_idx}
-
-    current = start_idx
-    while len(path) < len(ring_atoms):
-        atom = mol.GetAtomWithIdx(current)
-
-        # Find next ring neighbor not yet visited
-        next_idx = None
-        for neighbor in atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
-            if nbr_idx in ring_set and nbr_idx not in visited:
-                next_idx = nbr_idx
-                break
-
-        if next_idx is None:
-            break
-
-        path.append(next_idx)
-        visited.add(next_idx)
-        current = next_idx
-
-    return path
-
-
 def _build_ring_path_from_start_via(
     mol,
     ring_atoms: Tuple[int, ...],

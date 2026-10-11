@@ -70,10 +70,6 @@ def _cip(atom) -> str:
 # --------------------------------------------------------------------------- #
 # Small structural helpers
 # --------------------------------------------------------------------------- #
-def _heavy_neighbors(atom):
-    return [n for n in atom.GetNeighbors() if n.GetAtomicNum() > 1]
-
-
 def _o_neighbors(atom):
     return [n for n in atom.GetNeighbors() if n.GetAtomicNum() == 8]
 

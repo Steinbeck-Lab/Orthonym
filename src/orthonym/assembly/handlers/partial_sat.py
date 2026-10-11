@@ -1,11 +1,11 @@
 """a phase partial_sat handler — Tier B shim (gate 0.40).
 
 Verbatim move of composer.py:1116-1131 dispatch logic. Wraps the inline
-``_try_partially_saturated_carbocycle(features.mol)`` check + enrichment +
-pool.add gate.
+``_try_partially_saturated_carbocycle_with_locants(features.mol)`` check +
+enrichment + pool.add gate.
 
 Per internal notes incremental migration: the underlying
-``_try_partially_saturated_carbocycle`` body STAYS in composer.py during
+``_try_partially_saturated_carbocycle_with_locants`` body STAYS in composer.py during
 Plan-02 and moves to this module in Plan-03 commit 03-10.
 
 Byte-identical contract: same mutex as polycyclic — the inline gate is
@@ -18,7 +18,7 @@ IUPAC cite: (partially saturated carbocycles; tetrahydronaphthalene).
 
 References:
 - composer.py:1116-1131 (inline partial_sat branch; TRIMMED at this commit).
-- composer.py:_try_partially_saturated_carbocycle (STAYS until 03-10).
+- composer.py:_try_partially_saturated_carbocycle_with_locants (STAYS until 03-10).
 - composer.py:_enrich_handler_name (STAYS until 03-10).
 - internal notes-DECOMP.md row 'partial_sat' + purity proof.
 """
@@ -50,7 +50,7 @@ def _is_partial_sat(features: Any) -> bool:
     if mol is None:
         return False
     # A ring ketone (ring C=O) makes this a cyclic-oxo compound, not a bare
-    # partially-saturated carbocycle — _try_partially_saturated_carbocycle would
+    # partially-saturated carbocycle — name_partially_saturated_carbocycle would
     # DROP the C=O (2,3-dihydronaphthalene-1,4-dione -> 2,3-dihydronaphthalene,
     # a wrong structure suppressed by). Decline so tier_a_ring
     # (name_cyclic_oxo_compound) names it correctly /.

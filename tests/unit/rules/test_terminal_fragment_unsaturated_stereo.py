@@ -4,7 +4,7 @@ refusing (internal-C=C acyl breadth lever).
 
 The producer already names a stereo-FREE unsaturated backbone
 (``2-oxo-1-azapent-3-en-1-yl`` for ``-N-C(=O)-CH=CH-CH3``); the only blocker was
-``_has_defined_stereo``, which refused any fragment with a defined double-bond
+a guard that refused any fragment with a defined double-bond
 configuration because the module emitted no stereodescriptor. It now emits one
 for a BACKBONE C=C (numbered from the free valence,, so the amido /
 acyloxy enamide + unsaturated-fatty-acyl class stops aborting the whole molecule.

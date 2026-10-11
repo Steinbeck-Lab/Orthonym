@@ -3834,31 +3834,8 @@ def _assemble_polycyclic_name(features: Any, style: str) -> str:
     )
 
 
-def _try_partially_saturated_carbocycle(mol) -> Optional[str]:
-    """
-    Try to name a molecule as a partially saturated carbocycle.
-
-    Checks if the molecule is a partially saturated PAH (like tetrahydronaphthalene)
-    and returns the IUPAC name if so.
-
-    Args:
-        mol: RDKit Mol object
-
-    Returns:
-        IUPAC name if partially saturated carbocycle detected, None otherwise
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
-        >>> _try_partially_saturated_carbocycle(mol)
-        '1,2,3,4-tetrahydronaphthalene'
-    """
-    from ..rules.polycyclics import name_partially_saturated_carbocycle
-
-    return name_partially_saturated_carbocycle(mol)
-
-
 def _try_partially_saturated_carbocycle_with_locants(mol):
-    """As:func:`_try_partially_saturated_carbocycle`, but returns
+    """Name a partially saturated carbocycle and return
     ``(name, atom_to_locant)`` — the name together with the numbering it was
     spelled from.
 
@@ -8599,44 +8576,6 @@ def _assemble_ring_nitrile_name(features: Any, style: str) -> str:
 # forbidden-boundary preservation.
 
 
-def _get_unsaturation_suffix(features: Any) -> str:
-    """
-    Get the unsaturation suffix (an, en, yn, etc.).
-    
-    Returns suffix without the 'e' ending (that's added later based on what follows).
-    """
-    num_double = len(features.double_bonds)
-    num_triple = len(features.triple_bonds)
-
-    if num_double == 0 and num_triple == 0:
-        return "an"  # Saturated
-
-    parts = []
-
-    # Double bonds
-    if num_double == 1:
-        parts.append("en")
-    elif num_double > 1:
-        multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
-        parts.append(f"{multiplier}en")  # dien, trien, etc.
-
-    # Triple bonds
-    if num_triple == 1:
-        parts.append("yn")
-    elif num_triple > 1:
-        multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
-        parts.append(f"{multiplier}yn")
-
-    if not parts:
-        return "an"
-
-    # For mixed unsaturation, use "a" connector
-    if num_double > 0 and num_triple > 0:
-        return "a" + "".join(parts)  # e.g., "adienyn"
-
-    return "".join(parts)
-
-
 # a phase Plan-02-01: _generate_suffix lifted to handlers/_handler_shared.py per internal notes +.
 
 
@@ -10638,94 +10577,6 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
     return prefixes
 
 
-def _check_for_alkoxy(mol, sub_atoms: List[int], principal_chain: List[int]) -> Optional[str]:
-    """
-    Check if a substituent is an alkoxy group (ether attached to chain).
-
-    An alkoxy group is: -O-alkyl where the O is bonded to the chain carbon
-    and to an alkyl group.
-
-    Args:
-        mol: RDKit Mol object
-        sub_atoms: Atom indices in the substituent
-        principal_chain: Atom indices of the principal chain
-
-    Returns:
-        Alkoxy name (e.g., "methoxy", "ethoxy") or None if not an alkoxy
-    """
-    chain_set = set(principal_chain)
-
-    # Find oxygen atom in the substituent
-    oxygen_idx = None
-    for idx in sub_atoms:
-        atom = mol.GetAtomWithIdx(idx)
-        if atom.GetSymbol() == 'O':
-            # Check if it's bonded to exactly 2 atoms (typical ether O)
-            if atom.GetDegree() == 2:
-                oxygen_idx = idx
-                break
-
-    if oxygen_idx is None:
-        return None
-
-    oxygen = mol.GetAtomWithIdx(oxygen_idx)
-
-    # Find the alkyl carbon attached to oxygen (not on principal chain)
-    alkyl_start = None
-    for neighbor in oxygen.GetNeighbors():
-        nbr_idx = neighbor.GetIdx()
-        if nbr_idx not in chain_set and neighbor.GetSymbol() == 'C':
-            alkyl_start = nbr_idx
-            break
-
-    if alkyl_start is None:
-        return None
-
-    # Check if the ether fragment is aromatic (phenoxy, naphthyloxy, benzyloxy)
-    alkyl_atom = mol.GetAtomWithIdx(alkyl_start)
-
-    # Case A: O -> aromatic C in 6-membered all-carbon ring -> "phenoxy"
-    if alkyl_atom.GetIsAromatic():
-        ring_info = mol.GetRingInfo()
-        for ring in ring_info.AtomRings():
-            if alkyl_start in ring and len(ring) == 6:
-                if all(mol.GetAtomWithIdx(r).GetIsAromatic()
-                       and mol.GetAtomWithIdx(r).GetSymbol() == 'C'
-                       for r in ring):
-                    return "phenoxy"
-        # Fallback for other aromatic ethers (e.g., naphthyloxy)
-        return "phenoxy"
-
-    # Case B: O -> CH(aryl)n -> benzyloxy (1 aryl) / diphenylmethoxy (2 phenyl).
-    # (a phase): single shared aryl-count helper (was inline benzyloxy here).
-    _aryl_ether = _name_aryl_methyl_ether(mol, alkyl_start, oxygen_idx)
-    if _aryl_ether is not None:
-        return _aryl_ether
-
-    # Count carbons in the alkyl part (excluding the oxygen)
-    carbon_count = _count_alkyl_carbons(mol, alkyl_start, {oxygen_idx})
-
-    # Get alkoxy name
-    ALKOXY_NAMES = {
-        1: "methoxy",
-        2: "ethoxy",
-        3: "propoxy",
-        4: "butoxy",
-        5: "pentyloxy",
-        6: "hexyloxy",
-        7: "heptyloxy",
-        8: "octyloxy",
-        9: "nonyloxy",
-        10: "decyloxy",
-    }
-
-    if carbon_count in ALKOXY_NAMES:
-        return ALKOXY_NAMES[carbon_count]
-    elif carbon_count > 10:
-        return get_chain_prefix(carbon_count) + "yloxy"
-    return None
-
-
 def _amino_branch_atoms(mol, branch_start: int, n_idx: int, chain_set: set) -> list:
     """Collect ONE N-branch's heavy atoms by BFS from ``branch_start``,
     never crossing the amino N (``n_idx``) or the principal chain (w2f p1,
@@ -12689,58 +12540,11 @@ def _inject_stereo_if_missing(features: Any, name: str, atom_to_locant: Optional
 # handlers/_handler_shared.py per internal notes (a phase).
 
 
-def _split_parent_stem(parent: str) -> tuple:
-    """
-    Split parent string into stem and unsaturation components.
-
-    The parent string from _generate_chain_parent is stem + unsaturation,
-    e.g., "propan" = "prop" + "an", "buten" = "but" + "en".
-
-    Returns:
-        Tuple of (stem, unsaturation)
-    """
-    # Unsaturation suffixes in order of longest first to avoid partial matches
-    unsaturation_patterns = [
-        "adienyn", "adien", "adiyn", "aenyn",  # Complex unsaturation
-        "dien", "diyn", "enyn",  # Double unsaturation
-        "en", "yn", "an",  # Simple unsaturation
-    ]
-
-    for pattern in unsaturation_patterns:
-        if parent.endswith(pattern):
-            stem = parent[:-len(pattern)]
-            return (stem, pattern)
-
-    # No recognized unsaturation - return as-is with empty unsaturation
-    return (parent, "")
-
-
 # Note: alpha_sort_key is imported from naming_utils for IUPAC-compliant sorting.
 
 
 # a phase : _join_prefixes and _join_prefix_to_name were lifted VERBATIM
 # to composition_primitives.py and are re-exported via the top-of-module import.
-
-
-def _build_long_chain_prefix(length: int) -> str:
-    """
-    Build prefix for long chains.
-
-    Delegates to centralized chain_names module.
-    Kept for backward compatibility.
-    """
-    return get_chain_prefix(length)
-
-
-def format_locants(locants: tuple) -> str:
-    """
-    Format a tuple of locants for name insertion.
-
-    Example: (2, 3) -> "2,3-"
-    """
-    if not locants:
-        return ""
-    return ",".join(str(l) for l in sorted(locants)) + "-"
 
 
 def assemble_ion_name(features: Any, mol, style: str = 'pin') -> str:

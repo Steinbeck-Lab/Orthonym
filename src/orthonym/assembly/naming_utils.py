@@ -3414,7 +3414,6 @@ def format_substituent_prefix(name: str, locants: List[int], count: int) -> str:
       - rules/amides.py _has_positional_locants(name)
       - assembly/naming_utils.py is_complex_substituent(name)
       - assembly/naming_utils.py apply_enclosing_marks(name, depth)
-      - rules/ortho_fused.py format_substituent_prefix(substituents) (different signature)
 
     -FIX Item 9 — this paragraph used to assert three things that are all
     FALSE today, and a false comment is how the next session acquires a wrong

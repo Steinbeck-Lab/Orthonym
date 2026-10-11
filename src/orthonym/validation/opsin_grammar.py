@@ -435,10 +435,6 @@ class OpsinGrammar:
         """Return a defensive copy of the per-instance counters ."""
         return dict(self._stats)
 
-    def last_repair_class(self) -> Optional[str]:
-        """Diagnostic accessor: most recent successful repair class."""
-        return self._last_repair_class
-
     # -----------------------------------------------------------------
     # Strict-grammar checks (Surface A / B / C — internal notes)
     # -----------------------------------------------------------------

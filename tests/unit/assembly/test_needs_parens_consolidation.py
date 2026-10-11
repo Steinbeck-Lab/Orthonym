@@ -4,7 +4,6 @@ The audit  found N divergent "needs-parens / enclosing-mark" predicates:
   - rules/amides.py:_has_positional_locants (digit-only locant test)
   - assembly/naming_utils.py:is_complex_substituent (complex-substituent test)
   - assembly/naming_utils.py:apply_enclosing_marks
-  - rules/ortho_fused.py:format_substituent_prefix (a second, different-signature copy)
 with assembly/naming_utils.py:format_substituent_prefix as the ONE correct reference.
 
 169.7 BEGINS the consolidation (BBR-HYG(e)): it inventories the predicates (a comment

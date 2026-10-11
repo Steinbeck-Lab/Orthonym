@@ -99,29 +99,6 @@ _RING_PARENT_TO_SUBSTITUENT = {
 }
 
 
-def _parent_to_substituent_prefix(name: str) -> str:
-    """Convert ring parent names to substituent prefix form per IUPAC.
-
-    When a fragment name ending in a ring parent name (e.g., "methoxybenzene")
-    is used as a substituent prefix, the ring name must be converted to its
-    substituent form (e.g., "methoxyphenyl").
-
-    Only converts the LAST ring-parent-name token in the name to preserve
-    any substituent prefixes already present (e.g., "methoxy" stays).
-
-    Args:
-        name: Fragment name that may contain a ring parent name.
-
-    Returns:
-        Name with ring parent converted to substituent form, or original
-        name if no conversion applies.
-    """
-    for parent, sub in _RING_PARENT_TO_SUBSTITUENT.items():
-        if name.endswith(parent):
-            return name[:-len(parent)] + sub
-    return name
-
-
 # ============================================================================
 # Trivial acid conversions that don't follow simple suffix rules
 # ============================================================================

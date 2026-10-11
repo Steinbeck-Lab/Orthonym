@@ -385,16 +385,3 @@ def get_component_prefix(name: str) -> str:
     if name.endswith('e'):
         return name[:-1] + 'o'
     return name + 'o'
-
-
-def get_component_info(name: str) -> Optional[Dict[str, Any]]:
-    """
-    Get full property dict for a named component.
-
-    Args:
-        name: Component name
-
-    Returns:
-        Property dict or None if not found
-    """
-    return MONOCYCLIC_COMPONENTS.get(name)

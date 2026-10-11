@@ -938,23 +938,6 @@ def _placement_quality(skel: str, off: int, locant_free: bool = False) -> int:
     return 1
 
 
-def _isotopomer_key(cand: str) -> Optional[str]:
-    """The distinct-structure key OPSIN assigns a candidate name (isotope-aware
-    InChIKey, SMILES fallback); None when it does not parse. Shared by the
-    uniqueness oracle so the seed and the probes are compared at one layer."""
-    smi = _opsin_parse(cand)
-    if not smi:
-        return None
-    m = Chem.MolFromSmiles(smi)
-    if m is None:
-        return None
-    try:
-        from rdkit.Chem import inchi as _inchi
-        return _inchi.MolToInchiKey(m) or Chem.MolToSmiles(m)
-    except Exception:
-        return Chem.MolToSmiles(m)
-
-
 def _isotope_carrier(atom: Chem.Atom) -> int:
     """The heavy-atom POSITION a nuclide occupies: itself for a heavy nuclide,
     else the heavy atom that bears the labelled H. A descriptor's locant names

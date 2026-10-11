@@ -40,7 +40,7 @@ numbers re-verified 2026-07-28 after drift, function names are the durable ancho
   * the three prefix targets are joined INLINE in ``name_substituted_benzene``
     (``:3074`` ``format_substituent_prefix`` -> ``:3103`` ``_join_benzene_prefixes``),
     **not** in ``_build_prefix_string_with_locants`` as the task brief stated -- that
-    function and its sibling ``_build_prefix_string`` record ZERO hits for
+    function and its locant-free sibling (since removed) record ZERO hits for
     ``hexamethylbenzene`` AND zero for the prefix known positive
     ``1,4-dibromobenzene``.
 

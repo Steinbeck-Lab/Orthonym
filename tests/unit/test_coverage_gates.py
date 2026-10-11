@@ -1,7 +1,4 @@
-"""Tests for coverage estimation utilities, NP scaffold gates, composer gates, and quality gates.
-
-Tests coverage_utils.py functions:
-- estimate_parent_coverage: atom-index-based coverage ratio
+"""Tests for NP scaffold gates, composer gates, and quality gates.
 
 Task Z2 (2026-08-02) removed the tests for ``estimate_name_coverage_heuristic``
 along with the function itself: it had zero callers and measured a name's
@@ -24,69 +21,13 @@ Tests decomposition quality gate:
 - Small molecules with short names still pass
 - Fragment context uses appropriate thresholds
 
-Tests coverage heuristic edge cases:
-- Empty name -> 0.0
-- Zero heavy atoms -> 1.0
-
 Tests retained name exact-match :
 - Exact benzene SMILES -> "benzene"
 - Toluene SMILES -> NOT bare "benzene"
 - Large benzene-containing molecule -> NOT bare "benzene"
 """
 
-import pytest
 from rdkit import Chem
-
-from orthonym.assembly.coverage_utils import estimate_parent_coverage
-
-
-# ---------------------------------------------------------------------------
-# estimate_parent_coverage tests
-# ---------------------------------------------------------------------------
-
-class TestEstimateParentCoverage:
-    """Tests for estimate_parent_coverage."""
-
-    def test_full_coverage_benzene(self):
-        """Benzene (6 atoms) with all 6 atoms in parent -> 1.0."""
-        mol = Chem.MolFromSmiles("c1ccccc1")
-        assert mol is not None
-        parent_atoms = set(range(mol.GetNumHeavyAtoms()))  # all 6
-        result = estimate_parent_coverage(mol, parent_atoms)
-        assert result == pytest.approx(1.0)
-
-    def test_partial_coverage_ring_in_large_mol(self):
-        """Benzene ring (6 atoms) in a 20-atom mol -> 0.3."""
-        mol = Chem.MolFromSmiles("c1ccc(CCCCCCCCCCCCCC)cc1")
-        assert mol is not None
-        total_heavy = mol.GetNumHeavyAtoms()
-        # Use first 6 atoms as parent (the ring)
-        parent_atoms = set(range(6))
-        result = estimate_parent_coverage(mol, parent_atoms)
-        assert result == pytest.approx(6.0 / total_heavy, abs=0.01)
-
-    def test_empty_parent_set(self):
-        """Empty parent set in a 10-atom mol -> 0.0."""
-        mol = Chem.MolFromSmiles("CCCCCCCCCC")  # decane
-        assert mol is not None
-        result = estimate_parent_coverage(mol, set())
-        assert result == pytest.approx(0.0)
-
-    def test_full_molecule_coverage(self):
-        """All atoms in parent -> 1.0."""
-        mol = Chem.MolFromSmiles("CCCCC")  # pentane, 5 heavy atoms
-        assert mol is not None
-        parent_atoms = set(range(mol.GetNumHeavyAtoms()))
-        result = estimate_parent_coverage(mol, parent_atoms)
-        assert result == pytest.approx(1.0)
-
-    def test_zero_heavy_atoms(self):
-        """Molecule with zero heavy atoms -> 1.0 (edge case)."""
-        # This is degenerate but we handle it gracefully
-        mol = Chem.MolFromSmiles("[H][H]")
-        if mol is not None and mol.GetNumHeavyAtoms() == 0:
-            result = estimate_parent_coverage(mol, set())
-            assert result == pytest.approx(1.0)
 
 
 # ---------------------------------------------------------------------------

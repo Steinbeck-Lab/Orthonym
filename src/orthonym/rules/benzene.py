@@ -29,7 +29,6 @@ from ..assembly.naming_utils import (
     get_alkyl_name,
     get_multiplier_prefix,
     get_suffix_multiplier_prefix,
-    is_complex_substituent,
     prefix_citation_sort_key,
     should_omit_locant_one,
 )
@@ -4694,7 +4693,7 @@ def _assemble_benzene_with_suffix(
     # Build prefix part from remaining groups.
     # W3-P04 /: the general multi-suffix path must PRESERVE
     # prefix locants — remaining_prefix_groups is already keyed by the final ring
-    # locants (same numbering as chosen_locants), so a bare _build_prefix_string
+    # locants (same numbering as chosen_locants), so a locant-free prefix builder
     # would drop e.g. the '4-' on sulfo ('sulfobenzene-1,2-dicarboxylic acid' ->
     # OPSIN reparses to the wrong isomer ->). Use the locant-preserving
     # builder (mono_needs_locant=True) exactly like the retained-base branches.
@@ -5651,53 +5650,6 @@ def _benzene_l5_uniform_licence(
 
     return l5_uniform_complete(
         _benzene_parent_hydride(), decoration_of=decoration_of)
-
-
-def _build_prefix_string(prefix_groups: Dict[str, List[int]]) -> str:
-    """
-    Build prefix part string from prefix groups.
-
-    For groups where locants are all 1 and single, omits locants.
-    Handles monosubstituted (no locant needed).
-
-    Args:
-        prefix_groups: Dict of prefix name -> list of locants
-
-    Returns:
-        Prefix string to prepend to parent name
-    """
-    if not prefix_groups:
-        return ""
-
-    total = sum(len(locs) for locs in prefix_groups.values())
-    is_mono = total == 1
-    _omit = should_omit_locant_one(
-        context="prefix",
-        is_ring=True,
-        is_heterocyclic=False,  # Benzene is always carbocyclic
-        is_monosubstituted=is_mono,
-    )
-
-    prefixes = []
-    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
-        locants = prefix_groups[name]
-        count = len(locants)
-
-        if _omit:
-            if name.startswith('(') or name.startswith('['):
-                # Already has enclosing marks -- keep as-is
-                prefix_str = name
-            elif is_complex_substituent(name):
-                # Complex substituent needs enclosing marks per IUPAC
-                prefix_str = f"({name})"
-            else:
-                prefix_str = name
-        else:
-            prefix_str = format_substituent_prefix(name, locants, count)
-
-        prefixes.append(prefix_str)
-
-    return _join_benzene_prefixes(prefixes)
 
 
 def _build_prefix_string_with_locants(

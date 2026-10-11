@@ -215,7 +215,7 @@ def get_alkoxy_prefix(
     We need to determine which side is the substituent (smaller/not in chain)
     and name it as alkoxy.
 
-    Lifted from rules/polyfunctional._get_alkoxy_prefix verbatim with a NEW
+    Lifted from rules/polyfunctional verbatim with a NEW
     None-guard at function entry per a phase RESEARCH lift-blocking
     analysis: when ``principal_chain`` is None (the Tier-0.5 sub-fragment
     caller passes None), ``chain_set`` becomes empty and the orientation
@@ -1049,7 +1049,7 @@ def get_sulfanyl_prefix(
     SMARTS ``[SX2]([#6])[#6]`` / ``[SeX2]([#6])[#6]`` / ``[TeX2]([#6])[#6]``
     each match (chalcogen, C1, C2).
 
-    Lifted from rules/polyfunctional._get_sulfanyl_prefix verbatim with a NEW
+    Lifted from rules/polyfunctional verbatim with a NEW
     None-guard at function entry per a phase RESEARCH functional-group perception fix (169.7)
     added the ``suffix`` param (default "sulfanyl" → backward-compatible).
 
