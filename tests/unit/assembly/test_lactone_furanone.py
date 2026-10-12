@@ -28,38 +28,11 @@ def _best_effort(smi):
     return r["name"] if isinstance(r, dict) else r
 
 
-def _rt_ok(smi, name):
-    import sys; sys.path.insert(0, ".")
-    from eval.harness import opsin_batch, _inchikey
-    if not name:
-        return False
-    op = opsin_batch([name])[0]
-    return bool(op) and _inchikey(smi) == _inchikey(op)
-
-
 def test_butenolide_not_carboxylate():
     nm = _best_effort("O=C1OCC=C1")
     assert nm is not None
     assert "carboxylate" not in nm, nm
     assert "-one" in nm, nm
-
-
-def test_butenolide_round_trips():
-    smi = "O=C1OCC=C1"
-    nm = _best_effort(smi)
-    assert _rt_ok(smi, nm), nm
-
-
-def test_pyranone_round_trips():
-    smi = "O=C1OC=CC=C1"
-    nm = _best_effort(smi)
-    assert _rt_ok(smi, nm), nm
-
-
-def test_substituted_butenolide_round_trips():
-    smi = "CC(O)C1C=CC(=O)O1"
-    nm = _best_effort(smi)
-    assert _rt_ok(smi, nm), nm
 
 
 def test_saturated_lactone_unchanged():

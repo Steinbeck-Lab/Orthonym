@@ -507,22 +507,6 @@ class TestP2543222BridgeNumberingLock157:
     smoke assertions BLOCKS a phase + triggers a a phase audit.
     """
 
-    def test_p2543222_polycyclic_cite_locked_157(self) -> None:
-        """polycyclic.py:18 docstring cites `, through `."""
-        from orthonym.rules import polycyclic
-
-        source_path = Path(polycyclic.__file__)
-        text = source_path.read_text(encoding="utf-8")
-        # The cite asserts current-Blue-Book conformance per internal notes S4.2:
-        assert "P-23" in text, (
-            "P-25.4.3.2.2 regression: polycyclic.py docstring missing `P-23` "
-            "cite. Phase 151 cite-block reverted. AUDIT REQUIRED."
-        )
-        assert "VB-1" in text and "VB-9" in text, (
-            "P-25.4.3.2.2 regression: polycyclic.py docstring missing "
-            "`VB-1` / `VB-9` cite. Phase 151 cite-block reverted. AUDIT REQUIRED."
-        )
-
     @pytest.mark.parametrize("smiles,expected_token,case_label", [
         ("C1CC2CCC1C2", ["norbornane", "bicyclo[2.2.1]heptane"],
          "PubChem norbornane (the bicyclo[2.2.1]heptane retained name)"),

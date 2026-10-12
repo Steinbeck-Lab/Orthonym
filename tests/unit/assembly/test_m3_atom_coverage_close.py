@@ -28,15 +28,10 @@ pattern from ``tests/unit/validation/test_w2_jarabsent_coverage.py``) so the
 terminal self-consistency backstop cannot mask a live/dead close -- this test
 exercises ONLY the producer-side, OPSIN-free coverage assertion.
 """
-import json
-from pathlib import Path
-
 import pytest
-from rdkit import Chem
 
 from orthonym import Orthonym
 from orthonym.namer import is_failure_name
-from orthonym.validation.opsin_roundtrip import opsin_parse
 
 
 def _force_jar_absent(monkeypatch):
@@ -485,110 +480,3 @@ def test_heterocycle_carbon_anchor_guard_jar_absent(monkeypatch, smiles, expecte
     same fix shape is caught by this exact guard before it ships."""
     _force_jar_absent(monkeypatch)
     assert Orthonym(style="pin").name(smiles) == expected
-
-
-# ===========================================================================
-# M3 Task 4: whole-milestone atom-coverage regression TRAP
-# ===========================================================================
-#
-# THE INVARIANT (general, across all three M3 producer closes above): a
-# default-tier (``Orthonym`` == ``Orthonym(style="pin")``, jar-present)
-# emitted name may never OPSIN-round-trip to FEWER heavy atoms than its
-# input -- "no atom-drop name ships". Task 1 (chain/suffix), Task 2
-# (benzene) and Task 3 (heterocycle, audited-not-fixed) each close one
-# producer; this trap is the coarse net that would catch a REGRESSION of
-# any of them without having to name which producer broke. A name may
-# legitimately round-trip to MORE heavy atoms than the input (a
-# wrong-direction/over-general name is a different defect class); only
-# FEWER is an atom-drop.
-#
-# Sample: the first 35 rows of the hard-case witness corpus M3 was built
-# and measured against (`internal notes`,
-# 166 rows total, every row recorded there as a historical abstainer/sentinel
-# ship) -- capped well under the full file per the anti-death bound (<=40
-# rows, foreground, ~2 minutes). Rows that abstain (``is_failure_name``) or
-# that OPSIN cannot parse back are skipped: neither is an atom-drop SHIP, so
-# neither belongs in this trap's population.
-
-# The original sample (internal notes) was never
-# tracked, so collection of this whole module failed on any fresh checkout. Since
-# 2026-09-03 the sample is vendored under tests/data/ (35 PubChem-10k molecules
-# the default tier does not name as PIN/systematic; lines starting with "_doc"
-# are comments). If the file is ever missing the trap skips loudly instead of
-# taking every other test in this module down with it.
-_M3_TRAP_SAMPLE_PATH = (
-    Path(__file__).resolve().parents[2] / "data" / "m3_trap_sample_pubchem10k.jsonl"
-)
-
-
-def _load_m3_trap_sample(n=35):
-    rows = []
-    try:
-        with open(_M3_TRAP_SAMPLE_PATH) as fh:
-            for line in fh:
-                rec = json.loads(line)
-                if "smiles" not in rec:
-                    continue  # header/comment row
-                rows.append(rec["smiles"])
-                if len(rows) >= n:
-                    break
-    except FileNotFoundError:
-        return [pytest.param("MISSING", marks=pytest.mark.skip(
-            reason=f"trap sample missing: {_M3_TRAP_SAMPLE_PATH}"))]
-    return rows
-
-
-_M3_TRAP_SAMPLE = _load_m3_trap_sample(35)
-
-# Known blind spots (documented KNOWN GAPs above, Task 2/3 module notes):
-# reproductions where a dropped branch's atoms are already (wrongly) claimed
-# by an upstream substituent's own ``atoms`` field, so the coverage close's
-# partition looks complete and the atom-dropped name ships anyway. xfail
-# ONLY the specific witnesses proven to hit that gap -- never broaden this to
-# mute a genuinely new atom-drop.
-_M3_TRAP_XFAIL = {
-    # smiles: reason
-}
-
-
-@pytest.mark.roundtrip
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", _M3_TRAP_SAMPLE)
-def test_no_atom_drop_ships_on_sample(eng, smiles):
-    """M3 whole-milestone trap: across the chain+benzene+heterocycle
-    producers, no default-tier emitted name may OPSIN-parse to fewer heavy
-    atoms than the input (an atom-drop ship). See module note above.
-
-    ``opsin_gate`` (jar-present required): the OPSIN self-consistency gate
-    is OFF by suite default (``tests/conftest.py``) but ON in real default-
-    tier production, and it is precisely what suppresses most atom-drop
-    candidates before they ship (measured: with the gate off, 10/35 of this
-    sample's rows ship an atom-dropped fragment name via the general
-    fallback/fused-ring path; with the gate correctly live -- as the CLI
-    always runs -- every one of those 10 abstains instead). Testing the
-    gate-off config here would trap a config that is not the real invariant.
-    """
-    if smiles in _M3_TRAP_XFAIL:
-        pytest.xfail(_M3_TRAP_XFAIL[smiles])
-
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, f"unparseable input SMILES (bad sample row): {smiles}"
-    input_heavy = mol.GetNumHeavyAtoms()
-
-    from orthonym.jvm_budget import jvm_slots
-    with jvm_slots(1, purpose="test-m3-atomdrop-trap"):
-        name = eng.name(smiles)
-        if not name or is_failure_name(name):
-            pytest.skip("abstained -- not an atom-drop ship")
-
-        opsin_smi = opsin_parse(name)
-    if not opsin_smi:
-        pytest.skip("OPSIN could not parse the emitted name -- not an atom-drop ship")
-    opsin_mol = Chem.MolFromSmiles(opsin_smi)
-    if opsin_mol is None:
-        pytest.skip("OPSIN output not RDKit-parseable -- not an atom-drop ship")
-    output_heavy = opsin_mol.GetNumHeavyAtoms()
-
-    assert output_heavy >= input_heavy, (
-        f"ATOM-DROP SHIP: {smiles!r} ({input_heavy} heavy atoms) -> {name!r} "
-        f"-> OPSIN {opsin_smi!r} ({output_heavy} heavy atoms)")

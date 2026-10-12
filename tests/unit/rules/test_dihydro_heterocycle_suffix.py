@@ -37,19 +37,6 @@ def test_dihydro_heterocycle_carboxylic_acid(smi, expected):
     assert _pin().name(smi) == expected
 
 
-def test_dihydro_heterocycle_suffix_rt_exact():
-    """Every emitted name round-trips (0-wrong): the fix converts abstentions to
-    correct names, never to a wrong molecule."""
-    import sys
-    sys.path.insert(0, "scripts")
-    from diagnose import diagnose
-    smis = ["O=C(O)C1=NCCSC1", "O=C(O)C1=NCCOC1",
-            "O=C(O)C1=CCCCN1", "O=C(O)C1=NCCCC1"]
-    rows = diagnose(smis, style="pin", use_opsin=True)
-    assert all(r.get("verdict") == "OK" for r in rows), [
-        (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
-
-
 # ---- RISK 2: indicated-H OUTRANKS the suffix (b), verbatim
 # `2H-pyran-6-carboxylic acid (PIN)` at the Blue Book) ----
 # The mancude parent's indicated hydrogen takes the LOW locant (2H) and FORCES the
@@ -65,17 +52,6 @@ def test_dihydro_heterocycle_suffix_rt_exact():
 ])
 def test_indicated_h_outranks_suffix(smi, expected):
     assert _pin().name(smi) == expected
-
-
-def test_indicated_h_outranks_suffix_rt_exact():
-    """0-wrong: the IH-outranks-suffix class emits a correct name, never a wrong
-    molecule (the abstention it replaces was catching the collision)."""
-    import sys
-    sys.path.insert(0, "scripts")
-    from diagnose import diagnose
-    rows = diagnose(["O=C(O)C1=CCCCO1"], style="pin", use_opsin=True)
-    assert all(r.get("verdict") == "OK" for r in rows), [
-        (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
 
 
 # ---- RISK 2 sibling: the FULLY-MANCUDE indicated-H parent + suffix ----

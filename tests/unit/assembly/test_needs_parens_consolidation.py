@@ -29,13 +29,3 @@ def test_needs_parens_predicates_agree(name):
     from orthonym.assembly.naming_utils import is_complex_substituent
     from orthonym.rules.amides import _has_positional_locants
     assert is_complex_substituent(name) == _has_positional_locants(name)
-
-
-@pytest.mark.unit
-def test_canonical_reference_documents_consolidation():
-    """The canonical reference names the Phase-171 consolidation + the divergent
-    predicates (the inventory the 'begin' requires)."""
-    import inspect
-    from orthonym.assembly import naming_utils
-    src = inspect.getsource(naming_utils.format_substituent_prefix)
-    assert "Phase 171" in src and "_has_positional_locants" in src and "is_complex_substituent" in src

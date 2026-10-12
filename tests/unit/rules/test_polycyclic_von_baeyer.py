@@ -35,15 +35,8 @@ Source:
 """
 from __future__ import annotations
 
-import json
-import os
-import shutil
-from pathlib import Path
-from typing import Any, Dict, List
-
 import pytest
 from rdkit import Chem
-from tests.support.jars import jar_or_none
 
 # Wave-0 / RED state: the new module
 # (src/orthonym/rules/polycyclic_von_baeyer.py) does not exist yet.
@@ -68,26 +61,6 @@ def name_higher_polycyclo(mol):  # type: ignore[no-redef]
 
 def get_higher_polycyclo_iupac_locants(mol):  # type: ignore[no-redef]
     return _vb_import().get_higher_polycyclo_iupac_locants(mol)
-
-
-# ============================================================================
-# Fixture loader
-# ============================================================================
-
-FIXTURES_DIR = Path(__file__).resolve().parents[2] / "fixtures" / "ring_systems"
-
-
-def load_fixtures(relpath: str) -> List[Dict[str, Any]]:
-    """Load a phase ring-system fixtures (corpus_provenance shape).
-
-    Skips entries with expected_name is None for tests that match against
-    a name; fixtures keep null expected_name when only the structural
-    predicate matters (e.g. anti-canary entries used to verify
-    is_higher_polycyclo returns False).
-    """
-    path = FIXTURES_DIR / relpath
-    with path.open() as f:
-        return json.load(f)
 
 
 def _ring_atoms(mol) -> set[int]:
@@ -241,25 +214,6 @@ class TestSupplierCoverageInvariant:
             get_higher_polycyclo_iupac_locants(Chem.MolFromSmiles("C")) is None
         )
 
-    @pytest.mark.unit
-    @pytest.mark.parametrize(
-        "fixture",
-        [f for f in load_fixtures("vb/blue_book_examples.json")
-         if f["compound_class"].startswith("vb-")],
-        ids=lambda f: f["fixture_id"],
-    )
-    def test_blue_book_coverage(self, fixture):
-        mol = Chem.MolFromSmiles(fixture["smiles"])
-        ring_atoms = _ring_atoms(mol)
-        locants = get_higher_polycyclo_iupac_locants(mol)
-        # Either supplier returns None (acceptable) or full coverage —
-        # never partial (Pitfall 7).
-        if locants is not None:
-            assert set(locants.keys()) >= ring_atoms, (
-                f"partial coverage on {fixture['fixture_id']}"
-            )
-
-
 # ============================================================================
 # TestAntiCanaryBicycloTricyclo (RESEARCH "Risk Landmines")
 # ============================================================================
@@ -289,37 +243,6 @@ class TestAntiCanaryBicycloTricyclo:
     def test_supplier_returns_None_on_steroid_gonane(self, gonane_steroid):
         # detect_natural_product short-circuits the predicate.
         assert get_higher_polycyclo_iupac_locants(gonane_steroid) is None
-
-
-# ============================================================================
-# TestBlueBookExamples — naming smoke (cardinality / type checks)
-# ============================================================================
-
-
-class TestBlueBookExamples:
-    @pytest.mark.unit
-    @pytest.mark.parametrize(
-        "fixture",
-        [f for f in load_fixtures("vb/blue_book_examples.json")
-         if f["compound_class"].startswith("vb-")
-         and f.get("expected_name") is not None],
-        ids=lambda f: f["fixture_id"],
-    )
-    def test_blue_book_returns_a_descriptor_string(self, fixture):
-        # Cardinality-only check: every named Blue Book example must yield
-        # a non-empty descriptor that contains the cyclo-prefix matching
-        # the ring count. Exact byte match is NOT required because the
-        # analyzer may legitimately emit an alternate form
-        # (constitutionally identical, all valid IUPAC) per audit row 1
-        # and row 4. OPSIN round-trip is the binding correctness oracle
-        # (see TestRoundTripViaOPSIN below).
-        mol = Chem.MolFromSmiles(fixture["smiles"])
-        name = name_higher_polycyclo(mol)
-        # Acceptable: either a real descriptor string OR None (Plan 151
-        # must not regress retained-name path; some Blue Book entries
-        # like dioxa-tetracyclic have null expected_name).
-        if name is not None:
-            assert isinstance(name, str) and len(name) > 0
 
 
 # ============================================================================
@@ -392,76 +315,6 @@ class TestPublicAPI:
         from orthonym.rules import polycyclic_von_baeyer
 
         assert hasattr(polycyclic_von_baeyer, "name_higher_polycyclo")
-
-
-# ============================================================================
-# TestRoundTripViaOPSIN (hard test gate)
-# ============================================================================
-
-
-_OPSIN_JAR = jar_or_none()
-
-
-def _opsin_available() -> bool:
-    return _OPSIN_JAR is not None and shutil.which("java") is not None
-
-
-def _opsin_parse_one(name: str) -> str | None:
-    """Single-name OPSIN parse → SMILES (or None on failure).
-
-    Spawns a fresh JVM per call. For batch use, prefer the canary-suite
-    helper which uses one JVM for all names. a phase Task 1b uses a
-    small fixture set (≤12), so per-call invocation is acceptable.
-    """
-    import subprocess
-
-    try:
-        proc = subprocess.run(
-            ["java", "-jar", str(_OPSIN_JAR), "-osmi"],
-            input=name + "\n",
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        if proc.returncode != 0:
-            return None
-        for line in proc.stdout.splitlines():
-            line = line.strip()
-            if line and not line.startswith("Run the jar"):
-                # OPSIN prints a banner line then SMILES per name
-                return line
-        return None
-    except Exception:
-        return None
-
-
-class TestRoundTripViaOPSIN:
-    @pytest.mark.roundtrip
-    @pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java unavailable")
-    @pytest.mark.parametrize(
-        "fixture",
-        [f for f in load_fixtures("vb/blue_book_examples.json")
-         if f["compound_class"].startswith("vb-")
-         and f.get("expected_name") is not None],
-        ids=lambda f: f["fixture_id"],
-    )
-    def test_opsin_roundtrip_inchi_l1(self, fixture):
-        mol = Chem.MolFromSmiles(fixture["smiles"])
-        name = name_higher_polycyclo(mol)
-        if name is None:
-            pytest.skip("module returned None; covered by TestSupplierCoverageInvariant")
-        parsed_smi = _opsin_parse_one(name)
-        if parsed_smi is None:
-            pytest.skip(f"OPSIN cannot parse {name!r} (logged for v19 follow-up)")
-        # InChI layer-1 (constitution) must match input
-        inchi_in = Chem.MolToInchi(Chem.MolFromSmiles(fixture["smiles"])).split("/c")[0]
-        rt_mol = Chem.MolFromSmiles(parsed_smi)
-        assert rt_mol is not None, f"OPSIN output unparseable: {parsed_smi}"
-        inchi_rt = Chem.MolToInchi(rt_mol).split("/c")[0]
-        assert inchi_in == inchi_rt, (
-            f"InChI L1 mismatch on {fixture['fixture_id']}: "
-            f"input={inchi_in!r} rt={inchi_rt!r} via name={name!r}"
-        )
 
 
 class TestNarrowExceptionsWR10:

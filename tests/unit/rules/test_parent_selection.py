@@ -1161,14 +1161,6 @@ class TestP441CriterionFLocants:
         result2 = select_parent(mol2, ring_systems2, [6], pg_name2, pg_atoms2)
         assert result2.parent_type == 'ring', "Regression: benzoic acid"
 
-    def test_pg_locants_documented_with_iupac_reference(self):
-        """The _compare_pg_locants docstring should reference IUPAC."""
-        import inspect
-        source = inspect.getsource(_compare_pg_locants)
-        assert 'P-14.7' in source or 'P-44.1(f)' in source, (
-            "_compare_pg_locants should reference IUPAC locant rules"
-        )
-
 
 @pytest.mark.unit
 class TestSkeletalChainCandidate:

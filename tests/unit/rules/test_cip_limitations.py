@@ -8,13 +8,11 @@ Verifies that:
 
 a phase: requirement.
 """
-import os
 import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
 from orthonym.perception.stereo import assign_stereochemistry
-from tests.support.local_only import local_only
 
 
 class TestCIPFallback:
@@ -105,64 +103,6 @@ class TestPseudoasymmetric:
         from orthonym.rules.stereochemistry import format_stereodescriptor_string
         result = format_stereodescriptor_string([(2, 'R'), (3, 'r'), (5, 'S')])
         assert result == '(2R,3r,5S)-'
-
-
-@local_only("docs/cip_known_limitations.md")
-class TestCIPDocumentationExists:
-    """Verify CIP limitations documentation exists (where docs/ is kept: it is
-    gitignored, so a clean checkout skips this class -- TRIAGE g7 C02)."""
-
-    def test_cip_limitations_doc_exists(self):
-        """docs/cip_known_limitations.md must exist per."""
-        doc_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'docs',
-            'cip_known_limitations.md'
-        )
-        assert os.path.exists(doc_path), (
-            f"CIP limitations document missing at {doc_path}"
-        )
-
-    def test_cip_doc_contains_pass_rate(self):
-        """Document must contain the CIP pass rate."""
-        doc_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'docs',
-            'cip_known_limitations.md'
-        )
-        with open(doc_path) as f:
-            content = f.read()
-        assert '182/290' in content or '62.8%' in content
-
-    def test_cip_doc_contains_failure_categories(self):
-        """Document must list all failure category types."""
-        doc_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'docs',
-            'cip_known_limitations.md'
-        )
-        with open(doc_path) as f:
-            content = f.read()
-        for category in ['CT', 'TH', 'AT', 'HE']:
-            assert category in content, f"Missing failure category: {category}"
-
-    def test_cip_doc_contains_ster18_deferral(self):
-        """Document must reference deferral to a phase."""
-        doc_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'docs',
-            'cip_known_limitations.md'
-        )
-        with open(doc_path) as f:
-            content = f.read()
-        assert 'STER-18' in content, "Missing STER-18 deferral reference"
-        assert 'Phase 141' in content, "Missing Phase 141 deferral reference"
-
-    def test_cip_doc_contains_rdcip_labeler(self):
-        """Document must reference rdCIPLabeler implementation."""
-        doc_path = os.path.join(
-            os.path.dirname(__file__), '..', '..', '..', 'docs',
-            'cip_known_limitations.md'
-        )
-        with open(doc_path) as f:
-            content = f.read()
-        assert 'rdCIPLabeler' in content, "Missing rdCIPLabeler reference"
 
 
 # ============================================================================

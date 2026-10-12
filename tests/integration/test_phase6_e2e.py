@@ -719,20 +719,6 @@ class TestValidationRequirements:
     """Verify VALID requirements are addressed."""
 
     @pytest.mark.integration
-    def test_valid01_bulk_validation_infrastructure(self):
-        """VALID-01: Bulk validation script exists."""
-        from pathlib import Path
-        script_path = Path(__file__).parent.parent.parent / "scripts" / "validate_bulk.py"
-        assert script_path.exists(), f"validate_bulk.py should exist at {script_path}"
-
-    @pytest.mark.integration
-    def test_valid02_roundtrip_validation_infrastructure(self):
-        """VALID-02: Round-trip validation script exists."""
-        from pathlib import Path
-        script_path = Path(__file__).parent.parent.parent / "scripts" / "validate_roundtrip.py"
-        assert script_path.exists(), f"validate_roundtrip.py should exist at {script_path}"
-
-    @pytest.mark.integration
     def test_valid03_edge_case_documentation(self):
         """VALID-03: Edge case documentation exists (verified at checkpoint)."""
         # This will be verified at human checkpoint

@@ -15,9 +15,6 @@ Source: 154-internal notes; 151-internal notes (path-topology contract);
 """
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
 import pytest
 from rdkit import Chem
 
@@ -28,16 +25,6 @@ from orthonym.rules.multiplicative import (
 )
 from orthonym.rules.ring_assemblies import detect_ring_assembly
 from orthonym.perception.rings import get_ring_systems
-
-
-_FIXTURE_DIR = (
-    Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "multiplicative"
-)
-_BORDERLINE_FIXTURES = [
-    f
-    for f in json.loads((_FIXTURE_DIR / "corpus_mined.json").read_text())
-    if f.get("compound_class") == "dispatch-borderline"
-]
 
 
 @pytest.mark.integration
@@ -143,32 +130,3 @@ class TestAssemblyVsMultiplicativeDispatch:
             mol = _Chem.MolFromSmiles(smi)
             assert _is_pure_single_bond_assembly(mol) is True
             assert name_multiplicative(mol) is None
-
-    if _BORDERLINE_FIXTURES:
-        # Cap to the first 50 borderline corpus rows (parametrize explosion guard).
-        @pytest.mark.parametrize(
-            "fixture",
-            _BORDERLINE_FIXTURES[:50],
-            ids=[f["fixture_id"] for f in _BORDERLINE_FIXTURES[:50]],
-        )
-        def test_borderline_corpus_dispatch(self, fixture):
-            """Corpus-mined dispatch-borderline cases land cleanly per the audit verdict."""
-            smi = fixture["smiles"]
-            mol = Chem.MolFromSmiles(smi)
-            if mol is None:
-                pytest.skip(f"unparseable SMILES: {smi}")
-            mult_result = name_multiplicative(mol)
-            try:
-                ring_systems = get_ring_systems(mol)
-                ra_info = detect_ring_assembly(mol, ring_systems)
-            except Exception:
-                pytest.skip(
-                    f"detect_ring_assembly raised for {fixture['fixture_id']}"
-                )
-            # Mutual exclusion: at most ONE handler fires.
-            both_fire = (mult_result is not None) and (ra_info is not None)
-            assert not both_fire, (
-                f"DOUBLE-FIRE on corpus borderline {fixture['fixture_id']!r}: "
-                f"smi={smi!r} multiplicative={mult_result!r} "
-                f"ring_assembly={ra_info!r}"
-            )

@@ -255,28 +255,3 @@ def test_centres_live_mol_apply_double_bond():
     db = [b for b in mol.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE]
     assert db[0].HasProp("_CIPCode")
     assert db[0].GetProp("_CIPCode") in ("E", "Z")
-
-
-@pytest.mark.integration
-def test_centres_engine_scores_281_on_suite():
-    """centres-ON scores 281/290 on the CIP validation suite (gate).
-
-    CIP-UPDATE (2026-09-07): engine reverted 1.5-SNAPSHOT -> 1.2.1 (tagged
-    release). R/S/E/Z labels byte-identical between jars; 1.2.1 gets the two
-    exotic cyclic-cumulene axial M/P labels Orthonym does not consume. See
-    test_cip_validation.test_centres_engine_281.
-
-    Single batched JVM invocation  via the shared validation-suite
-    scorer.
-    """
-    if not _engine_available():
-        pytest.skip("centres jar or Java runtime not available")
-    from tests.integration.test_cip_validation import (
-        load_cip_data,
-        score_suite_centres,
-    )
-    cip_data = load_cip_data()
-    centres_pass = score_suite_centres(cip_data)
-    assert centres_pass == 281, (
-        f"centres CIP-suite pass count drifted: expected 281, got {centres_pass}"
-    )

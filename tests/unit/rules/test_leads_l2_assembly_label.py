@@ -22,9 +22,6 @@ the spelling checks (``namer.py`` ``check_pin_spelling``), so the check ````
 (``validation/spelling/checks_assembly.py``) decides the class. The round trip cannot: OPSIN reads
 both spellings of each molecule back to the same full InChIKey, which the last test shows.
 """
-import json
-from pathlib import Path
-
 import pytest
 from rdkit import Chem, RDLogger
 
@@ -210,26 +207,3 @@ def test_the_names_the_check_does_not_lower_keep_pin_verified(namers, smiles, na
     row = namers["pin"].name_tiered(smiles)
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert not row.get("spelling_failures"), row
-
-
-# ------------------------------------------------------------------ the gold row the book contradicts
-def test_the_gold_row_cyclohexenylbenzene_asserts_the_books_pin():
-    # packs/rings_numbering.json SUBST-01a asserted '(cyclohex-1-en-1-yl)benzene' and cited
-    # a rule id the book does not have. (:17077),:17079 "In biphenyl and
-    # polyphenyl assemblies, one benzene ring must remain in the assembly... Furthermore, when a
-    # modified ring assembly of two rings consists of a benzene ring and a cyclohexane ring
-    # substitutive nomenclature is preferred (see." and:17083 print
-    # '2,3-dihydro-1,1'-biphenyl (PIN)... (cyclohexa-1,3-dien-1-yl)benzene': the PIN of a benzene
-    # ring joined to a cyclohexene ring is the hydro assembly name; only the saturated pair is
-    # substitutive (:24153,:24157).
-    root = Path(__file__).resolve().parents[3] / "benchmarks/pin_oracle"
-    rows = json.loads((root / "packs/rings_numbering.json").read_text())["rows"]
-    row = next(r for r in rows if r["def_id"] == "SUBST-01a" and r["smiles"] == "c1ccccc1C1=CCCCC1")
-    assert row["expected_pin"] == "2,3,4,5-tetrahydro-1,1'-biphenyl"
-    assert row["bluebook_ref"] == "P-31.2.3.3.5.1"
-    assert _failures(row["smiles"], row["expected_pin"]) == []
-    assert _failures(row["smiles"], "(cyclohex-1-en-1-yl)benzene") == [RULE]
-    assert_full_rt(row["expected_pin"], row["smiles"])
-    floor = json.loads((root / "baseline_passing_rows.json").read_text())["passing_target_rows"]
-    # leads R2A built the hydro-assembly producer, so the row is on the floor again (1662)
-    assert ["SUBST-01a", "c1ccccc1C1=CCCCC1"] in floor

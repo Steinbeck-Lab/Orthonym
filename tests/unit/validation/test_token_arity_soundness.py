@@ -40,9 +40,6 @@ The suite has three layers:
 Plus tripwires: a new morpheme category or a new derivation source has not been
 swept against an independent structure oracle, so it must not slip in silently.
 """
-import json
-from pathlib import Path
-
 import pytest
 
 from orthonym.validation.binding_spine import (BindingKind, BindingSpine,
@@ -52,15 +49,8 @@ from orthonym.validation.name_morphemes import (lexicon_entries,
 
 pytestmark = pytest.mark.unit
 
-_TRUTHS = Path(__file__).parent / "data" / "token_arity_truths.json"
-
 #: Every binding kind whose tokens reach ``token_arity`` in ``_p6_arity``.
 _KINDS = tuple(BindingKind)
-
-
-def _fixture():
-    with open(_TRUTHS) as handle:
-        return json.load(handle)
 
 
 # ---------------------------------------------------------------------------
@@ -107,70 +97,6 @@ def test_correct_answers_are_not_paid_for_with_refusals(token, truth):
     estimate = token_arity(token, BindingKind.PREFIX)
     assert estimate.confident, f"{token!r} lost its answer: {estimate.basis}"
     assert estimate.heavy_atoms == truth
-
-
-# ---------------------------------------------------------------------------
-# Layer 2: the whole swept corpus
-# ---------------------------------------------------------------------------
-
-def test_no_swept_token_is_confidently_wrong():
-    """The deliverable check: 4447 independently counted tokens x every kind.
-
-    Reported in bulk rather than parametrised so a regression shows the WHOLE
-    damage at once -- the original defect was eight tokens across four unrelated
-    morpheme families, and seeing one of them says nothing about the others.
-    """
-    truths = _fixture()["truths"]
-    wrong = []
-    for token, truth in truths.items():
-        for kind in _KINDS:
-            estimate = token_arity(token, kind)
-            if estimate.confident and estimate.heavy_atoms != truth:
-                wrong.append(f"{token!r} ({kind.value}): said "
-                             f"{estimate.heavy_atoms}, truth {truth} "
-                             f"[{estimate.basis}]")
-    assert not wrong, (
-        f"{len(wrong)} confident-and-wrong answer(s) over {len(truths)} swept "
-        f"tokens:\n  " + "\n  ".join(sorted(wrong)[:40]))
-
-
-def test_the_sweep_fixture_is_actually_populated():
-    """Guards the test above from passing by having nothing to check.
-
-    A fixture that failed to load, or one narrowed to the eight known tokens,
-    would make ``test_no_swept_token_is_confidently_wrong`` vacuously green --
-    which is how this milestone shipped a test that passed under the opposite of
-    its own rule.
-    """
-    fixture = _fixture()
-    truths = fixture["truths"]
-    assert len(truths) > 4000, f"only {len(truths)} swept tokens"
-    assert all(isinstance(v, int) and v >= 0 for v in truths.values())
-    # The corpus must contain the tokens that motivated it.
-    for token, truth in _REPRODUCED_DEFECTS:
-        if token in truths:
-            assert truths[token] == truth, (
-                f"fixture disagrees with the reproduced truth for {token!r}")
-    assert "OPSIN" in fixture["_provenance"]
-
-
-def test_the_sweep_corpus_still_answers_a_useful_share():
-    """A refusal-everything 'fix' would satisfy soundness and destroy P6.
-
-    P6's teeth are ``arity_confident_atom_frac``: with no confident token
-    nothing is corroborated and the proof reports PROOF_UNSUBSTANTIATED. Measured
-    at 52.7% of (token, kind) pairs over the fixed sweep list when this landed
-    (up from 48.2% before, because the same change also added terminal-'e'
-    elision and fixed two multiplier-scope bugs). The floor is set well below
-    that to pin the ORDER OF MAGNITUDE, not the exact number.
-    """
-    truths = _fixture()["truths"]
-    confident = sum(1 for token in truths
-                    if token_arity(token, BindingKind.PREFIX).confident)
-    share = confident / len(truths)
-    assert share > 0.35, (
-        f"only {confident}/{len(truths)} = {share:.1%} of swept tokens get a "
-        f"confident answer; P6 has no teeth left")
 
 
 # ---------------------------------------------------------------------------

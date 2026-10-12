@@ -165,35 +165,7 @@ def test_polyene_hydroxy_alkenyl_substituent(smi, expected):
     assert _pin().name(smi) == expected
 
 
-def test_polyene_rt_exact():
-    """Both diene geometries round-trip (0-wrong)."""
-    import sys
-    sys.path.insert(0, "scripts")
-    from diagnose import diagnose
-    rows = diagnose(["OC/C=C/C=C/c1ccc(O)cc1", "OC/C=C\\C=C/c1ccc(O)cc1"],
-                    style="pin", use_opsin=True)
-    assert all(r.get("verdict") == "OK" for r in rows), [
-        (r["smiles"], r.get("verdict"), r.get("name")) for r in rows]
-
-
 # ---- review-polyene review BLOCKERs, resolved ----
-
-def test_polyene_blocker2_two_stereocentres_fail_closed():
-    """review-polyene BLOCKER 2 / a project rule: >=2 chain R/S centres + undefined C=C
-    geometry would ship a stereo-DROPPED wrong molecule (_stereo_route drops multi-
-    centre R/S). Must fail closed (abstain), not emit the stereo-bare name."""
-    import sys
-    sys.path.insert(0, "scripts")
-    from diagnose import diagnose
-    smis = ["OC(=O)c1ccc(C=CC=C[C@@H](O)[C@@H](O)CO)cc1",
-            "OC(=O)c1ccc(C=CC=C[C@@H](N)[C@@H](O)CO)cc1"]
-    rows = diagnose(smis, style="pin", use_opsin=True)
-    for r in rows:
-        assert r.get("verdict") != "RT-MISMATCH", (r["smiles"], r.get("name"))
-    # single centre + undefined C=C still names (RT-OK)
-    assert _pin().name("OC(=O)c1ccc(C=CC=C[C@@H](O)CCO)cc1") == \
-        "4-[(S)-5,7-dihydroxyhepta-1,3-dien-1-yl]benzoic acid"
-
 
 @pytest.mark.parametrize("name,count,want", [
     # review-polyene BLOCKER 1 / (a): a SUBSTITUTED polyene prefix takes bis

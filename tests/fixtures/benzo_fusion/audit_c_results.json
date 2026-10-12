@@ -84,6 +84,32 @@
     "ring_size": 5
   },
   {
+    "actual_seniority": 52,
+    "classification": "NO-EXPECTED-TIER",
+    "expected_hi": null,
+    "expected_lo": null,
+    "heteroatoms": [
+      "N",
+      "N",
+      "N"
+    ],
+    "name": "1,2,3-triazole",
+    "ring_size": 5
+  },
+  {
+    "actual_seniority": 53,
+    "classification": "NO-EXPECTED-TIER",
+    "expected_hi": null,
+    "expected_lo": null,
+    "heteroatoms": [
+      "N",
+      "N",
+      "N"
+    ],
+    "name": "1,2,4-triazole",
+    "ring_size": 5
+  },
+  {
     "actual_seniority": 63,
     "classification": "CORRECT-tier",
     "expected_hi": 69,

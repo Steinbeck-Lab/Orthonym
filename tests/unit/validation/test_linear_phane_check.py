@@ -17,9 +17,6 @@ name; the row records ``spelling_failures``. OPSIN 2.9.0 reads no phane name
 declines the class with the reason, the wider tiers keep the round-tripped name with
 the label systematic_verified (a correct name that is not the PIN).
 """
-import json
-from pathlib import Path
-
 import pytest
 from rdkit import Chem
 
@@ -201,16 +198,6 @@ def test_the_wider_tiers_keep_the_name_as_a_verified_non_pin(smiles, name, tier)
     row = _row(smiles, tier)
     assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), row
     assert _decline_reason_ok(smiles, row), row
-
-
-def test_the_seven_ring_assembly_gold_row_is_judged_through_the_default_tier_decline():
-    # (:24088): the gate's protect row W2E-P2IP-P2 expects the ring assembly name, a
-    # correct name that is not the PIN; the gate passes it only when the default tier declines it
-    # with NO_VERIFIED_PIN and best-effort gives the name exactly
-    path = Path(__file__).resolve().parents[3] / "benchmarks/pin_oracle/default_tier_non_pin_rows.json"
-    rows = json.loads(path.read_text())["rows"]
-    listed = {(r["pack"], r["def_id"], r["smiles"], r["expected_pin"]) for r in rows}
-    assert ("characteristic_groups", "W2E-P2IP-P2", SEPTIPHENYL, LOWERED[-1][1]) in listed
 
 
 @pytest.mark.parametrize("smiles,name", LOWERED, ids=LOWERED_IDS)

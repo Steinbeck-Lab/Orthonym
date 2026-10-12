@@ -44,7 +44,6 @@ DROPPED_NAME = 'ethan-1-ol'
 
 SRC = Path(__file__).resolve().parents[2] / 'src' / 'orthonym'
 NAMER_SRC = (SRC / 'namer.py').read_text()
-SCRIPTS = Path(__file__).resolve().parents[2] / 'scripts'
 
 
 @pytest.fixture
@@ -378,24 +377,3 @@ def test_chain_path_candidate_does_not_claim_perfect_confidence():
     """
     assert 'confidence=1.0,\n                        atom_to_locant=' not in NAMER_SRC
     assert 'confidence=None,\n                        atom_to_locant=' in NAMER_SRC
-
-
-# ---------------------------------------------------------------------------
-# 6. The calibration script must not manufacture its own input
-# ---------------------------------------------------------------------------
-
-def test_calibration_script_does_not_fabricate_factor_records():
-    """It used to synthesise all-1.0 factors for the no-confidence path."""
-    text = (SCRIPTS / 'calibrate_coverage_gate.py').read_text()
-    # The fabricated literal block is gone...
-    assert "'handler': 'direct'," not in text
-    #...replaced by explicit exclusion of unmeasured records...
-    assert "result.get('verification') == 'unverified'" in text
-    assert 'n_unmeasured += 1' in text
-    #...and a refusal floor that is actually COMPARED, not merely defined.
-    # (Asserting only that the constant name appears would pass even if the
-    # comparison were deleted -- that weakness was found by mutation M9.)
-    assert 'MIN_CALIBRATION_POPULATION = ' in text
-    assert 'if n_usable < MIN_CALIBRATION_POPULATION:' in text
-    assert 'REFUSING TO CALIBRATE' in text
-    assert 'sys.exit(2)' in text

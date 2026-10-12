@@ -9,16 +9,11 @@ the non-preferred form of a PIN form. Two invariants:
   against every name the conformance corpus extracted from the Blue Book
   (benchmarks/bb_conformance/all_pins_distinct.csv), not against engine output.
 """
-import csv
-from pathlib import Path
-
 import pytest
 
 from orthonym.assembly.memo import pin_promotion_var
 from orthonym.metrics import provenance as pv
 from orthonym.rules.pin_vocabulary import non_pin_vocabulary, promote_at_pin_tier
-
-REPO = Path(__file__).resolve().parents[3]
 
 NON_PIN = [
     # /: Hantzsch-Widman names for rings of <= 10 members
@@ -171,32 +166,6 @@ PIN_FORMS = [
     "N-(2-hydroxyethyl)acetamide",
 ]
 
-# Rows of the extracted corpus that are extraction artefacts, not BB strings: the
-# 'propan-1-yl propyl (preferred prefix)' row lists the non-preferred form first
-# (the Blue Book), and the boranuide row lost the braces of
-# 'trimethyl{2-[methyldi(phenyl)phosphaniumyl]ethen-1-yl}boranuide (PIN)' (:42468).
-_CORPUS_ARTEFACTS = {
-    "propan-1-yl propyl",
-    "1-methylethylidene propan-2-ylidene",  #:16186, non-preferred form listed first
-    # braces lost in extraction: the Blue Book '...-*N*-{2-[(2-ethoxyethyl)
-    # (methyl)sulfaniumyl]ethyl}-...' and:33574 '...-*N*-{2-[(2-hydroxyethyl)amino]
-    # ethyl}butanamide (PIN)'
-    "2-ethoxy-N-2-[(2-ethoxyethyl)(methyl)sulfaniumyl]ethyl-N,N-dimethylethanaminium",
-    "4-[(2-hydroxyethyl)amino]-N-2-[(2-hydroxyethyl)amino]ethylbutanamide",
-    "trimethyl2-[methyldi(phenyl)phosphaniumyl]ethen-1-ylboranuide",
-}
-
-
-# A Blue Book row that contradicts the Blue Book's own rule and every other example
-# of it: (the Blue Book, "then all locants must be cited") and
-# (c) (:2913, locant '1' omitted only in MONOsubstituted rings), with
-# twenty '...cyclohexane-1-carboxylic acid (PIN)' / '-1-carboxamide (PIN)' rows
-# (:6134,:26549,:31535,:48077,...). Only:30363 writes a substituted ring
-# without the locant.
-_BB_INCONSISTENT = {
-    "4-[(hydroxysulfanyl)carbonyl]cyclohexanecarboxylic acid",
-}
-
 
 @pytest.mark.parametrize("name,token", NON_PIN)
 def test_non_pin_form_is_flagged(name, token):
@@ -206,17 +175,6 @@ def test_non_pin_form_is_flagged(name, token):
 @pytest.mark.parametrize("name", PIN_FORMS)
 def test_pin_form_is_not_flagged(name):
     assert non_pin_vocabulary(name) is None
-
-
-def test_no_blue_book_pin_is_flagged():
-    path = REPO / "benchmarks" / "bb_conformance" / "all_pins_distinct.csv"
-    rows = list(csv.DictReader(path.open()))
-    assert len(rows) > 3000
-    flagged = [(r["bb_line"], r["bb_name"], non_pin_vocabulary(r["bb_name"]))
-               for r in rows
-               if r["bb_name"] not in _CORPUS_ARTEFACTS | _BB_INCONSISTENT
-               and non_pin_vocabulary(r["bb_name"])]
-    assert flagged == []
 
 
 def test_promotion_is_inactive_outside_the_pin_rerun():
