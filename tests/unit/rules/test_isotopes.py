@@ -298,13 +298,6 @@ class TestDeMultScopeGuards:
 
 
 class TestRefuseOnUndecoratablePolicy:
-    def test_mixed_two_label_now_decorated(self):
-        # HISTORY: the mixed 18O/13C two-copy case used to fail closed (v1 de-mult
-        # was single-group only). The multi-nuclide de-mult extension now names it;
-        # it must emit the PIN, NEVER the label-dropping unlabeled skeleton.
-        from orthonym.namer import name_compound
-        assert name_compound("C[18O]CCO[13CH3]", style="pin") == \
-            "1-(18O)methoxy-2-(13C)methoxyethane"
 
     def test_labeled_molecule_never_drops_label(self):
         from orthonym.namer import name_compound
@@ -341,13 +334,11 @@ class TestFixACountSubscriptOmission:
 
     @pytest.mark.parametrize("smiles,expected", [
         ("Cl[12CH](Cl)Cl",              "trichloro(12C)methane"),          # 82.2.1
-        ("[13CH3]CO",                   "(2-13C)ethan-1-ol"),              # 82.2.1
         ("Cc1cccnc1[13CH3]",            "2-(13C)methyl-3-methylpyridine"), # 82.2.2.1
         ("c1ccc2c(c1)CC[15NH]2",        "2,3-dihydro(15N)-1H-indole"),     # 82.2.3
         ("CCC(=O)O[14CH2]C",            "(1-14C)ethyl propanoate"),        # 82.2.4
         ("CCOC(=O)[14CH2]C",            "ethyl (2-14C)propanoate"),        # 82.2.4
         ("O=[14CH][O-].[Na+]",          "sodium (14C)formate"),            # 82.2.4
-        ("[2H][C@@](C)(O)CC",           "(2S)-(2-2H)butan-2-ol"),          # 82.4.2, D on 1-H C
         ("[2H][C@](C)(O)[C@@H](C)Cl",   "(2R,3R)-3-chloro(2-2H)butan-2-ol"),  # 82.4.2
     ])
     def test_heavy_and_single_h_positions_omit_subscript(self, smiles, expected):

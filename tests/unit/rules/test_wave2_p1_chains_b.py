@@ -16,11 +16,6 @@ class TestWave2P1ChainsBVerify:
         # no-N form irene/olane).
         ("N1CC1", "aziridine"),
         ("O1CC1", "oxirane"),
-        ("C1CNC1", "azetidine"),
-        ("C1CCNC1", "pyrrolidine"),
-        ("C1CCOC1", "oxolane"),
-        #: homogeneous monocyclic parent hydrides (cyclo + chain).
-        ("C1CCCCCCC1", "cyclooctane"),
         ("N1NNNN1", "pentazolidine"),
         #: monocyclic hydrocarbon parent (cycloheptatriene).
         ("C1=CC=CCC=C1", "cyclohepta-1,3,5-triene"),

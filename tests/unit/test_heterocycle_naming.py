@@ -35,19 +35,6 @@ class TestThreeMemberedHeterocycles:
     """Tests for 3-membered saturated heterocycles (HETERO-01)."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("smiles,expected", [
-        # Oxygen
-        ("C1CO1", "oxirane"),
-        # Nitrogen
-        ("C1CN1", "aziridine"),
-        # Sulfur
-        ("C1CS1", "thiirane"),
-    ])
-    def test_retained_names(self, smiles, expected):
-        """Test retained names for common 3-membered heterocycles."""
-        assert name_compound(smiles) == expected
-
-    @pytest.mark.unit
     def test_oxirane_ring_smiles(self):
         """Test canonical SMILES extraction for oxirane."""
         mol = Chem.MolFromSmiles("C1CO1")
@@ -191,22 +178,6 @@ class TestSixMemberedSaturatedHeterocycles:
     """Tests for 6-membered saturated heterocycles (HETERO-04)."""
 
     @pytest.mark.unit
-    @pytest.mark.parametrize("smiles,expected", [
-        # Oxygen - oxane
-        ("C1CCOCC1", "oxane"),
-        # Nitrogen - piperidine
-        ("C1CCNCC1", "piperidine"),
-        # Sulfur - thiane
-        ("C1CCSCC1", "thiane"),
-        # Two heteroatoms
-        ("C1COCCN1", "morpholine"),   # O and N
-        ("C1CNCCN1", "piperazine"),   # Two N
-    ])
-    def test_retained_names(self, smiles, expected):
-        """Test retained names for common 6-membered saturated heterocycles."""
-        assert name_compound(smiles) == expected
-
-    @pytest.mark.unit
     def test_piperidine_classification(self):
         """Test classification of piperidine."""
         mol = Chem.MolFromSmiles("C1CCNCC1")
@@ -259,19 +230,6 @@ class TestSixMemberedSaturatedHeterocycles:
 
 class TestSixMemberedAromaticHeterocycles:
     """Tests for 6-membered aromatic heterocycles (HETERO-05)."""
-
-    @pytest.mark.unit
-    @pytest.mark.parametrize("smiles,expected", [
-        # Single nitrogen - pyridine
-        ("c1ccncc1", "pyridine"),
-        # Two nitrogens - diazines
-        ("c1ccnnc1", "pyridazine"),   # 1,2-diazine
-        ("c1cncnc1", "pyrimidine"),   # 1,3-diazine
-        ("c1cnccn1", "pyrazine"),     # 1,4-diazine
-    ])
-    def test_retained_names(self, smiles, expected):
-        """Test retained names for common 6-membered aromatic heterocycles."""
-        assert name_compound(smiles) == expected
 
     @pytest.mark.unit
     def test_pyridine_classification(self):
@@ -513,24 +471,6 @@ class TestPipelineIntegration:
         ("C1CO1", "oxirane"),
         ("C1CN1", "aziridine"),
         ("C1CS1", "thiirane"),
-        # 4-membered
-        ("C1COC1", "oxetane"),
-        ("C1CNC1", "azetidine"),
-        ("C1CSC1", "thietane"),
-        # 5-membered saturated
-        ("C1CCOC1", "oxolane"),
-        ("C1CCNC1", "pyrrolidine"),
-        ("C1CCSC1", "thiolane"),  # Wave2 T1d: HW PIN (was tetrahydrothiophene)
-        # 5-membered aromatic (: N-H azoles carry leading 1H-)
-        ("c1ccoc1", "furan"),
-        ("c1cc[nH]c1", "1H-pyrrole"),
-        ("c1ccsc1", "thiophene"),
-        ("c1c[nH]cn1", "1H-imidazole"),
-        ("c1cnco1", "1,3-oxazole"),   # Wave2 PIN
-        ("c1cncs1", "1,3-thiazole"),
-        ("c1cc[nH]n1", "1H-pyrazole"),
-        ("c1ccno1", "1,2-oxazole"),
-        ("c1ccsn1", "1,2-thiazole"),
         # 6-membered saturated
         ("C1CCOCC1", "oxane"),
         ("C1CCNCC1", "piperidine"),
@@ -753,3 +693,24 @@ class TestHeteroarenePCGLowestLocant:
     ])
     def test_no_regression(self, smiles, expected):
         assert name_compound(smiles) == expected
+
+
+@pytest.mark.parametrize(
+    "smiles, expected, style",
+    [
+        pytest.param("c1nncnn1", "1,2,4,5-tetrazine", None, id="c1nncnn1"),
+        pytest.param("C1CCNCCOC1", "1,4-oxazocane", "pin", id="C1CCNCCOC1"),
+    ],
+)
+def test_merged_hw_ring_names(smiles, expected, style):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/integration/test_heterocycles_e2e.py::TestHETERO06::test_hw_fallback_or_retained (1)
+      - tests/integration/test_cfr_dispatch_consistency.py::test_cfr_supplementary_byte_identical (1)
+    """
+    from orthonym import name_compound
+    kwargs = {} if style is None else {"style": style}
+    assert name_compound(smiles, **kwargs) == expected

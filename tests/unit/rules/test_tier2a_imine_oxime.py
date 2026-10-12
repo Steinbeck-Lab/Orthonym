@@ -34,7 +34,6 @@ class TestImineParents:
         ("CC=N", "ethanimine"),          # was 'ethan-1-imine'
         ("CCC=N", "propan-1-imine"),     # 3+C keeps locant
         ("CC(C)=N", "propan-2-imine"),
-        ("N=C1CCCCC1", "cyclohexan-1-imine"),
     ])
     def test_bare_imines(self, smiles, expected):
         assert name_compound(smiles) == expected

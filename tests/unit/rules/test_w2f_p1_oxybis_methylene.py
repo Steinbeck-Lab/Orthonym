@@ -32,10 +32,6 @@ def _ring_atoms(mol):
 class TestOxybisMethyleneBridge:
     """Task 4: symmetric -CH2-X-CH2- bridge, end-to-end + direct."""
 
-    def test_curated_target_diphenol(self):
-        assert name_compound("Oc1ccc(COCc2ccc(O)cc2)cc1") == \
-            "4,4'-[oxybis(methylene)]diphenol"
-
     def test_sulfur_analog(self):
         assert name_compound("Oc1ccc(CSCc2ccc(O)cc2)cc1") == \
             "4,4'-[sulfanediylbis(methylene)]diphenol"

@@ -40,10 +40,12 @@ LOW_HA_CANARIES = [
 
 @pytest.fixture(params=[
     ("false", "first_applicable"),  # V17
-    ("true",  "score_based"),        # V18
-], ids=["v17", "v18"])
+], ids=["v17"])
 def both_modes(request, monkeypatch):
-    """Parametrized fixture: each test runs under V17 and V18.
+    """Fixture: each test runs under V17 (first_applicable, the production mode).
+
+    The score_based V18 variant candidate-pool cascade) is no longer run:
+    the pool never holds more than one candidate in production.
 
     The two modules are reloaded to read the env vars at import time and put
     back after the test (``tests.support.module_reload.reloaded``, TRIAGE

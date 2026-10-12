@@ -8,30 +8,6 @@ import pytest
 from orthonym import name_compound
 
 
-class TestPhase1SuccessCriteria:
-    """Validate all 5 a phase success criteria."""
-
-    @pytest.mark.integration
-    def test_sc1_simple_alkane(self):
-        """SC1: CCCC -> butane"""
-        assert name_compound("CCCC") == "butane"
-
-    @pytest.mark.integration
-    def test_sc2_branched_alkane(self):
-        """SC2: CC(C)C -> 2-methylpropane"""
-        assert name_compound("CC(C)C") == "2-methylpropane"
-
-    @pytest.mark.integration
-    def test_sc3_functional_group_with_locant(self):
-        """SC3: CCCO -> propan-1-ol"""
-        assert name_compound("CCCO") == "propan-1-ol"
-
-    @pytest.mark.integration
-    def test_sc4_multiplicative_prefix(self):
-        """SC4: CC(C)(C)CC -> 2,2-dimethylbutane"""
-        assert name_compound("CC(C)(C)CC") == "2,2-dimethylbutane"
-
-
 class TestPhase1Requirements:
     """Test representative compounds for each FOUND requirement."""
 
@@ -51,17 +27,6 @@ class TestPhase1Requirements:
         result = name_compound("CC(C)CC")
         assert result == "2-methylbutane"
         assert "2-methyl" in result
-
-    # FOUND-03: First-point-of-difference
-    @pytest.mark.integration
-    def test_found03_first_point_of_difference(self):
-        """FOUND-03: First-point-of-difference rule for locant sets.
-
-        For 2,3-dimethylbutane vs other numberings,
-        the [2,3] set wins over alternatives.
-        """
-        result = name_compound("CC(C)C(C)C")
-        assert result == "2,3-dimethylbutane"
 
     # FOUND-04: Alphabetization
     @pytest.mark.integration
@@ -84,94 +49,6 @@ class TestPhase1Requirements:
         result = name_compound("CC(C)(C)CC")
         assert result == "2,2-dimethylbutane"
         assert "dimethyl" in result
-
-    # FOUND-06: Simple alkanes
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("CCCCC", "pentane"),
-        ("CCCCCC", "hexane"),
-        ("CCCCCCC", "heptane"),
-    ])
-    def test_found06_simple_alkanes(self, smiles, expected):
-        """FOUND-06: Simple alkane naming."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-07: Branched alkanes
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("CC(C)CC", "2-methylbutane"),
-        ("CCC(CC)CC", "3-ethylpentane"),
-    ])
-    def test_found07_branched_alkanes(self, smiles, expected):
-        """FOUND-07: Branched alkane naming."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-08: Alcohols
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("CCCO", "propan-1-ol"),
-        ("CCC(O)C", "butan-2-ol"),
-    ])
-    def test_found08_alcohols(self, smiles, expected):
-        """FOUND-08: Alcohol naming with locants."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-09: Aldehydes
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("CCC=O", "propanal"),
-        ("CCCC=O", "butanal"),
-    ])
-    def test_found09_aldehydes(self, smiles, expected):
-        """FOUND-09: Aldehyde naming (no locant for terminal group)."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-10: Ketones
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("CCC(C)=O", "butan-2-one"),
-        ("CCC(CC)=O", "pentan-3-one"),
-    ])
-    def test_found10_ketones(self, smiles, expected):
-        """FOUND-10: Ketone naming with locants."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-11: Carboxylic acids
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("CCC(=O)O", "propanoic acid"),
-        ("CCCC(=O)O", "butanoic acid"),
-    ])
-    def test_found11_carboxylic_acids(self, smiles, expected):
-        """FOUND-11: Carboxylic acid naming."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-12: Alkenes
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("C=CCC", "but-1-ene"),
-        ("CC=CC", "but-2-ene"),
-    ])
-    def test_found12_alkenes(self, smiles, expected):
-        """FOUND-12: Alkene naming with locants."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-13: Alkynes
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        ("C#CCC", "but-1-yne"),
-        ("CC#CC", "but-2-yne"),
-    ])
-    def test_found13_alkynes(self, smiles, expected):
-        """FOUND-13: Alkyne naming with locants."""
-        assert name_compound(smiles) == expected
-
-    # FOUND-14: Enynes
-    @pytest.mark.integration
-    def test_found14_enynes(self):
-        """FOUND-14: Enyne naming with double bond priority."""
-        result = name_compound("C=CC#C")
-        assert result == "but-1-en-3-yne"
 
     # FOUND-15: Vowel elision
     @pytest.mark.integration
@@ -281,32 +158,4 @@ class TestEdgeCases:
         """Methane (single carbon)."""
         assert name_compound("C") == "methane"
 
-    @pytest.mark.integration
-    def test_ethane_two_carbons(self):
-        """Ethane (two carbons)."""
-        assert name_compound("CC") == "ethane"
 
-    @pytest.mark.integration
-    def test_decane_ten_carbons(self):
-        """Decane (ten carbons)."""
-        assert name_compound("CCCCCCCCCC") == "decane"
-
-    @pytest.mark.integration
-    def test_retained_name_benzene(self):
-        """Benzene (retained name)."""
-        assert name_compound("c1ccccc1") == "benzene"
-
-    @pytest.mark.integration
-    def test_retained_name_methanol(self):
-        """Methanol (retained name)."""
-        assert name_compound("CO") == "methanol"
-
-    @pytest.mark.integration
-    def test_retained_name_ethanol(self):
-        """Ethanol (retained name)."""
-        assert name_compound("CCO") == "ethanol"
-
-    @pytest.mark.integration
-    def test_propan_2_one_pin(self):
-        """Propan-2-one is the IUPAC 2013 PIN (not acetone retained name)."""
-        assert name_compound("CC(C)=O") == "propan-2-one"

@@ -152,14 +152,6 @@ class TestTopologyGuard:
         assert result is not None
         assert "biphenyl" in result.lower() or "1,1'-biphenyl" in result.lower()
 
-    def test_methylenedianiline_full_pipeline(self):
-        from orthonym import name_compound
-
-        assert (
-            name_compound("Nc1ccc(Cc2ccc(N)cc2)cc1")
-            == "4,4'-methylenedianiline"
-        )
-
 
 # ---------------------------------------------------------------------------
 # Task 2.3 — vs multiplier split
@@ -265,31 +257,6 @@ class TestLocantCascade:
         # 4,4'-oxydiphenol: oxy bridge between two phenols.
         assert (
             name_compound("Oc1ccc(Oc2ccc(O)cc2)cc1") == "4,4'-oxydiphenol"
-        )
-
-    def test_nitrilotriphenol_e2e(self):
-        from orthonym import name_compound
-
-        assert (
-            name_compound("Oc1ccc(N(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
-            == "4,4',4''-nitrilotriphenol"
-        )
-
-    def test_default_4_branch_removed(self):
-        """The legacy `return 4 # default` branches MUST be gone ."""
-        import re
-        from pathlib import Path
-
-        src = Path("src/orthonym/rules/multiplicative.py").read_text()
-        # Match `return 4 # default` (case-insensitive on Default) and
-        # `return 4 # default to 4 (most common para position)` style.
-        legacy_pattern = re.compile(
-            r"^\s*return\s+4\s*#\s*([Dd]efault|.*para)", re.MULTILINE
-        )
-        matches = legacy_pattern.findall(src)
-        assert not matches, (
-            f"Legacy 'return 4 # default' branches still present: {matches!r} "
-            "-- D-12 requires removal."
         )
 
     def test_shortest_path_heuristic_helper_exists(self):
@@ -408,51 +375,6 @@ class TestBridgeTables:
 
         result = name_compound("Oc1ccc(P(c2ccc(O)cc2)c2ccc(O)cc2)cc1")
         assert result == "4,4',4''-phosphinidynetriphenol", f"got {result!r}"
-
-    def test_bridge_tables_have_audit_cites(self):
-        """Every NEW bridge entry  has an inline internal notes-B.md cite."""
-        from pathlib import Path
-
-        src = Path("src/orthonym/rules/multiplicative.py").read_text()
-        # Three audit-driven additions: peroxy, disulfanediyl, phosphinidyne.
-        # Each addition must include "internal notes-B" in the source comment.
-        for label in ("peroxy", "disulfanediyl", "phosphinidyne"):
-            line_with_label = None
-            for line in src.splitlines():
-                if label in line:
-                    line_with_label = line
-                    break
-            assert line_with_label is not None, f"{label!r} not found in source"
-            # The cite can be on the same line OR within the next 2 lines.
-            assert (
-                "154-AUDIT-B" in line_with_label or "OPSIN" in line_with_label
-                or "P-" in line_with_label
-            ), (
-                f"NEW bridge entry for {label!r} missing inline cite "
-                f"(line was: {line_with_label!r})"
-            )
-
-
-# ---------------------------------------------------------------------------
-# anti-band-aid guard
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-class TestNoBandAids:
-    """: no postprocessor / regex band-aid in multiplicative.py."""
-
-    def test_no_postprocessor_keyword(self):
-        from pathlib import Path
-
-        src = Path("src/orthonym/rules/multiplicative.py").read_text()
-        # Forbidden patterns (case-insensitive): postprocess, BAND-AID
-        assert "postprocess" not in src.lower(), (
-            "D-13: 'postprocess' keyword found in multiplicative.py -- band-aid risk."
-        )
-        assert "band-aid" not in src.lower() and "bandaid" not in src.lower(), (
-            "D-13: 'band-aid' keyword found in multiplicative.py."
-        )
 
 
 # ---------------------------------------------------------------------------

@@ -121,8 +121,6 @@ class TestFusedRingRetainedSubstituents:
         assert "isopropyl" in result or "1-methylethyl" in result
 
     @pytest.mark.integration
-    @pytest.mark.xfail(reason="Fused ring fallback path uses simple carbon count; "
-                               "ortho-fused namer returns None for substituted naphthalene")
     def test_tert_butylnaphthalene(self):
         """tert-butyl on naphthalene should use retained name."""
         result = name_compound("CC(C)(C)c1cccc2ccccc12")

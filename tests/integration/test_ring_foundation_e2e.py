@@ -28,24 +28,6 @@ from orthonym import name_compound
 class TestPhase2SuccessCriteria:
     """Tests for a phase success criteria."""
 
-    def test_sc1_cyclohexane(self):
-        """SC1: C1CCCCC1 -> cyclohexane"""
-        assert name_compound('C1CCCCC1') == 'cyclohexane'
-
-    def test_sc2_methylcyclohexane(self):
-        """SC2: CC1CCCCC1 -> methylcyclohexane"""
-        assert name_compound('CC1CCCCC1') == 'methylcyclohexane'
-
-    def test_sc3_benzene(self):
-        """SC3: c1ccccc1 -> benzene"""
-        assert name_compound('c1ccccc1') == 'benzene'
-
-    def test_sc4_toluene(self):
-        """SC4: Cc1ccccc1 -> toluene (retained name)"""
-        result = name_compound('Cc1ccccc1')
-        # Toluene is a retained name for methylbenzene
-        assert result == 'toluene'
-
     def test_sc5_ring_over_chain_cyclohexylmethane(self):
         """SC5: When ring is parent, chain is substituent."""
         # methylcyclohexane: cyclohexane ring with methyl substituent
@@ -55,97 +37,8 @@ class TestPhase2SuccessCriteria:
 
 
 @pytest.mark.integration
-class TestRING01Cycloalkanes:
-    """Tests for: Cycloalkane detection and naming."""
-
-    def test_cyclopropane(self):
-        """Cyclopropane (3-membered ring)."""
-        assert name_compound('C1CC1') == 'cyclopropane'
-
-    def test_cyclobutane(self):
-        """Cyclobutane (4-membered ring)."""
-        assert name_compound('C1CCC1') == 'cyclobutane'
-
-    def test_cyclopentane(self):
-        """Cyclopentane (5-membered ring)."""
-        assert name_compound('C1CCCC1') == 'cyclopentane'
-
-    def test_cyclohexane(self):
-        """Cyclohexane (6-membered ring)."""
-        assert name_compound('C1CCCCC1') == 'cyclohexane'
-
-    def test_cycloheptane(self):
-        """Cycloheptane (7-membered ring)."""
-        assert name_compound('C1CCCCCC1') == 'cycloheptane'
-
-    def test_cyclooctane(self):
-        """Cyclooctane (8-membered ring)."""
-        assert name_compound('C1CCCCCCC1') == 'cyclooctane'
-
-
-@pytest.mark.integration
-class TestRING02SubstitutedCycloalkanes:
-    """Tests for: Substituted cycloalkane naming."""
-
-    def test_methylcyclopentane(self):
-        """Methylcyclopentane: monosubstituted (no locant)."""
-        result = name_compound('CC1CCCC1')
-        assert result == 'methylcyclopentane'
-
-    def test_methylcyclohexane(self):
-        """Methylcyclohexane: monosubstituted (no locant)."""
-        result = name_compound('CC1CCCCC1')
-        assert result == 'methylcyclohexane'
-
-    def test_ethylcyclohexane(self):
-        """Ethylcyclohexane: monosubstituted (no locant)."""
-        result = name_compound('CCC1CCCCC1')
-        assert result == 'ethylcyclohexane'
-
-    def test_1_2_dimethylcyclohexane(self):
-        """1,2-dimethylcyclohexane: disubstituted (locants required)."""
-        result = name_compound('CC1CCCCC1C')
-        assert '1,2-dimethylcyclohexane' == result
-
-    def test_1_3_dimethylcyclohexane(self):
-        """1,3-dimethylcyclohexane: disubstituted."""
-        result = name_compound('CC1CCCC(C)C1')
-        assert '1,3-dimethylcyclohexane' == result
-
-    def test_1_4_dimethylcyclohexane(self):
-        """1,4-dimethylcyclohexane: disubstituted."""
-        result = name_compound('CC1CCC(C)CC1')
-        assert '1,4-dimethylcyclohexane' == result
-
-
-@pytest.mark.integration
 class TestRING03Cycloalkenes:
     """Tests for: Cycloalkene detection and naming."""
-
-    def test_cyclopropene(self):
-        """Cyclopropene (3-membered ring with double bond)."""
-        result = name_compound('C1=CC1')
-        assert result == 'cyclopropene'
-
-    def test_cyclobutene(self):
-        """Cyclobutene (4-membered ring with double bond)."""
-        result = name_compound('C1=CCC1')
-        assert result == 'cyclobutene'
-
-    def test_cyclopentene(self):
-        """Cyclopentene (5-membered ring with double bond)."""
-        result = name_compound('C1=CCCC1')
-        assert result == 'cyclopentene'
-
-    def test_cyclohexene(self):
-        """Cyclohexene (6-membered ring with double bond)."""
-        result = name_compound('C1=CCCCC1')
-        assert result == 'cyclohexene'
-
-    def test_cycloheptene(self):
-        """Cycloheptene (7-membered ring with double bond)."""
-        result = name_compound('C1=CCCCCC1')
-        assert result == 'cycloheptene'
 
     def test_cyclohexa_1_3_diene(self):
         """Cyclohexa-1,3-diene (6-membered ring with 2 double bonds)."""
@@ -171,107 +64,6 @@ class TestRING04RingVsChainParentSelection:
 
 
 @pytest.mark.integration
-class TestRING05BenzeneRetainedNames:
-    """Tests for: Benzene derivatives with retained names."""
-
-    def test_benzene(self):
-        """Benzene retained name."""
-        assert name_compound('c1ccccc1') == 'benzene'
-
-    def test_toluene(self):
-        """Toluene (methylbenzene) retained name."""
-        assert name_compound('Cc1ccccc1') == 'toluene'
-
-    def test_phenol(self):
-        """Phenol (hydroxybenzene) retained name."""
-        assert name_compound('Oc1ccccc1') == 'phenol'
-
-    def test_aniline(self):
-        """Aniline (aminobenzene) retained name."""
-        assert name_compound('Nc1ccccc1') == 'aniline'
-
-    def test_styrene(self):
-        """Styrene: retained for ring substitution only, the PIN is 'ethenylbenzene'
-        , the Blue Book 'styrene (ring substitution only) ethenylbenzene (PIN)';
-        the Blue Book under."""
-        assert name_compound('C=Cc1ccccc1') == 'ethenylbenzene'
-
-    def test_cumene(self):
-        """Cumene is not a retained name ('The names cumene and cymene are not retained',
-        , the Blue Book); 'isopropyl' is general nomenclature only ('propan-2-yl
-        (preferred prefix)', the Blue Book,, and a prefix with a locant is enclosed
-        ('1,4-di(propan-2-yl)cyclohexane (PIN)', the Blue Book)."""
-        assert name_compound('CC(C)c1ccccc1') == '(propan-2-yl)benzene'
-
-
-@pytest.mark.integration
-class TestRING06SubstitutedBenzenes:
-    """Tests for: Substituted benzene naming with locants."""
-
-    def test_chlorobenzene(self):
-        """Chlorobenzene: monosubstituted (no locant)."""
-        result = name_compound('Clc1ccccc1')
-        assert result == 'chlorobenzene'
-
-    def test_1_2_dimethylbenzene(self):
-        """1,2-dimethylbenzene (o-xylene) systematic name."""
-        result = name_compound('Cc1ccccc1C')
-        assert result == '1,2-dimethylbenzene'
-
-    def test_1_3_dimethylbenzene(self):
-        """1,3-dimethylbenzene (m-xylene) systematic name."""
-        result = name_compound('Cc1cccc(C)c1')
-        assert result == '1,3-dimethylbenzene'
-
-    def test_1_4_dimethylbenzene(self):
-        """1,4-dimethylbenzene (p-xylene) systematic name."""
-        result = name_compound('Cc1ccc(C)cc1')
-        assert result == '1,4-dimethylbenzene'
-
-    def test_1_chloro_4_methylbenzene(self):
-        """1-chloro-4-methylbenzene: alphabetical ordering."""
-        result = name_compound('Cc1ccc(Cl)cc1')
-        assert result == '1-chloro-4-methylbenzene'
-
-
-@pytest.mark.integration
-class TestRING07PolycyclicAromatics:
-    """Tests for: Polycyclic aromatic naming."""
-
-    def test_naphthalene(self):
-        """Naphthalene retained name."""
-        assert name_compound('c1ccc2ccccc2c1') == 'naphthalene'
-
-    def test_anthracene(self):
-        """Anthracene retained name."""
-        assert name_compound('c1ccc2cc3ccccc3cc2c1') == 'anthracene'
-
-    def test_phenanthrene(self):
-        """Phenanthrene retained name."""
-        assert name_compound('c1ccc2c(c1)ccc1ccccc12') == 'phenanthrene'
-
-    def test_1_methylnaphthalene(self):
-        """1-methylnaphthalene: alpha position."""
-        result = name_compound('Cc1cccc2ccccc12')
-        assert result == '1-methylnaphthalene'
-
-    def test_2_methylnaphthalene(self):
-        """2-methylnaphthalene: beta position."""
-        result = name_compound('Cc1ccc2ccccc2c1')
-        assert result == '2-methylnaphthalene'
-
-    def test_1_chloronaphthalene(self):
-        """1-chloronaphthalene: alpha position."""
-        result = name_compound('Clc1cccc2ccccc12')
-        assert result == '1-chloronaphthalene'
-
-    def test_2_chloronaphthalene(self):
-        """2-chloronaphthalene: beta position."""
-        result = name_compound('Clc1ccc2ccccc2c1')
-        assert result == '2-chloronaphthalene'
-
-
-@pytest.mark.integration
 class TestEdgeCases:
     """Tests for edge cases in ring foundation."""
 
@@ -287,11 +79,6 @@ class TestEdgeCases:
         assert result == 'benzene'
         assert 'hexatriene' not in result
 
-    def test_cyclodecane(self):
-        """Cyclodecane (10-membered ring)."""
-        result = name_compound('C1CCCCCCCCC1')
-        assert 'cyclodecane' == result
-
     def test_complex_substitution_dimethyl_ethyl_cyclohexane(self):
         """Multiple different substituents on cyclohexane."""
         # 1-ethyl-3,3-dimethylcyclohexane or similar
@@ -301,30 +88,3 @@ class TestEdgeCases:
         assert 'methyl' in result
 
 
-@pytest.mark.integration
-class TestPhase1Regression:
-    """Regression tests ensuring a phase functionality still works."""
-
-    def test_simple_alkanes_still_work(self):
-        """Simple alkanes should still be named correctly."""
-        assert name_compound('CC') == 'ethane'
-        assert name_compound('CCC') == 'propane'
-        assert name_compound('CCCC') == 'butane'
-
-    def test_branched_alkanes_still_work(self):
-        """Branched alkanes should still be named correctly."""
-        result = name_compound('CC(C)C')
-        assert '2-methylpropane' == result
-
-    def test_functional_groups_still_work(self):
-        """Functional group compounds should still be named correctly."""
-        assert name_compound('CO') == 'methanol'
-        assert name_compound('CCO') == 'ethanol'
-        assert name_compound('CC(=O)O') == 'acetic acid'
-
-    def test_unsaturated_still_work(self):
-        """Unsaturated compounds should still be named correctly."""
-        assert name_compound('C=C') == 'ethene'
-        assert name_compound('C#C') == 'acetylene'  # retained name PIN)
-        # (d): unsubstituted propene omits the bond locant (PIN)
-        assert name_compound('CC=C') == 'propene'

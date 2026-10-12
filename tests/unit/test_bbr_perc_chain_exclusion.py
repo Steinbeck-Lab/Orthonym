@@ -52,12 +52,6 @@ def test_structural_not_blocklist_edit():
     assert "detect_functional_groups" in src
 
 
-# --- end-to-end: prefix-only FG atoms are NOT walked into an aza chain ---
-@pytest.mark.unit
-def test_azidomethane_not_diazabutane(namer):
-    assert namer.name("CN=[N+]=[N-]") == "azidomethane"
-
-
 @pytest.mark.unit
 def test_diazomethane_prefix_not_dropped(namer):
     # diazo was previously consumed-as-principal-then-dropped -> 'methane'

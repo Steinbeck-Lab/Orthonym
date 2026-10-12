@@ -29,7 +29,6 @@ def test_aldehyde_still_formyl():
 @pytest.mark.parametrize(
     "smi,expected",
     [
-        ("CC(=O)O", "acetic acid"),
         ("OC(=O)Cc1ccccc1", "phenylacetic acid"),
         ("CC(=O)c1ccccc1", "1-phenylethan-1-one"),
     ],

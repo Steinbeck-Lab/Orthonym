@@ -43,6 +43,7 @@ def _one_shot(name):
 
 @_needs_opsin
 @pytest.mark.unit
+@pytest.mark.real_opsin_cli  # _one_shot IS the real command line this test compares with
 @pytest.mark.parametrize("name", [
     "benzene", "toluene", "pyridine",
     "4H-furo[3,2-b]pyrrole", "1H-1-benzazepine", "pentaphene", "hexahelicene",

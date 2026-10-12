@@ -12,24 +12,6 @@ from orthonym import name_compound
 class TestDicarboxylicAminoAcidBailout:
     """: Dicarboxylic amino acids should produce 'dioic' names."""
 
-    def test_aspartic_acid_nonstereo(self):
-        """Non-stereo (alpha-carbon CHI_UNSPECIFIED) aspartic acid now DEFERS to
-        the systematic name rather than the retained name, which asserts a
-        defined (L) configuration this input lacks.
-
-         a phase (change-asserted-value, was `== "aspartic acid"`): see
-        `test_amino_acids.py`'s module docstring for the full /
-        InChIKey / mutation-test evidence -- identical argument, same input.
-        """
-        result = name_compound("NC(CC(=O)O)C(=O)O")
-        assert result == "aminobutanedioic acid"
-
-    def test_glutamic_acid_nonstereo(self):
-        """Non-stereo glutamic acid now DEFERS to the systematic name (T5, see
-        `test_aspartic_acid_nonstereo`'s docstring)."""
-        result = name_compound("NC(CCC(=O)O)C(=O)O")
-        assert result == "2-aminopentanedioic acid"
-
     def test_aspartic_acid_stereo(self):
         """-07 (a phase): a stereo-tagged free aspartic acid resolves to the
         retained name carrying its configurational descriptor, 'L-aspartic acid'

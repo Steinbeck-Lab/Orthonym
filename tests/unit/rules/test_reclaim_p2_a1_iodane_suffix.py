@@ -185,8 +185,15 @@ def test_a1_charged_and_hypervalent_cl_stay_abstained(smi):
     assert not r["emits"], f"0-wrong canary regressed — expected abstain, got {r}"
 
 
+# Three fresh processes per row: one row runs in the PR run, the other two in the nightly run.
+_NIGHTLY_DETERMINISM_SMILES = {"CC1C2C1=NC=C(O2)I=C", "CC1CCCCC(CC1)(N)I(C)C2CCCC2"}
+
+
 @pytest.mark.roundtrip
-@pytest.mark.parametrize("smi", DETERMINISM_SMILES)
+@pytest.mark.parametrize(
+    "smi",
+    [pytest.param(s, marks=pytest.mark.slow) if s in _NIGHTLY_DETERMINISM_SMILES else s
+     for s in DETERMINISM_SMILES])
 def test_a1_determinism_across_fresh_subprocesses(smi):
     names = {_name_fresh(smi)["name"] for _ in range(3)}
     assert len(names) == 1, f"non-deterministic name for {smi!r}: {names}"

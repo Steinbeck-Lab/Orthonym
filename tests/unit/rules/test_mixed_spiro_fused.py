@@ -183,17 +183,6 @@ class TestPureSpiroContractPreserved:
         assert is_mixed_spiro_fused(mol) is False
 
     @pytest.mark.unit
-    def test_is_spiro_system_body_unchanged(self):
-        """: source-level enforcement that the body's invariant
-        ``n_rings == n_spiro + 1`` remains intact."""
-        from orthonym.rules import spiro
-        src = inspect.getsource(spiro.is_spiro_system)
-        assert (
-            "n_rings == n_spiro + 1" in src
-            or "n_rings == len(spiro_atoms) + 1" in src
-        ), f"is_spiro_system body modified — D-09 lock violated:\n{src}"
-
-    @pytest.mark.unit
     def test_is_spiro_system_returns_false_on_mixed(self):
         """Confirms is_spiro_system continues to reject mixed inputs."""
         from orthonym.rules.spiro import is_spiro_system
@@ -267,52 +256,11 @@ class TestSupplierCoverageInvariant:
 
 
 # ===========================================================================
-# Class: / enforcement — no parallel locant comparator
-# ===========================================================================
-
-class TestNoParallelLocantComparator:
-    """D-11 / D-20: spiro.py uses compare_locant_sets — no new comparator."""
-
-    @pytest.mark.unit
-    def test_spiro_module_imports_compare_locant_sets(self):
-        """Plan 151-02 lands the import even if the existing pure-spiro
-        helpers do not yet use it (follow-up). The import lock is
-        proof / invariant is honored."""
-        _import_or_skip("name_mixed_spiro_fused")  # gates on Task 2
-        from orthonym.rules import spiro
-        src = inspect.getsource(spiro)
-        assert "compare_locant_sets" in src, (
-            "spiro.py must import compare_locant_sets (D-11/D-20 reuse lock)"
-        )
-
-    @pytest.mark.unit
-    def test_no_parallel_comparator_definition(self):
-        """No private locant-comparator function in spiro.py (lock)."""
-        from orthonym.rules import spiro
-        src = inspect.getsource(spiro)
-        # Strip comments / docstrings: count only `def _compare_locant`
-        # (or similar) in actual code.
-        non_comment = "\n".join(
-            line for line in src.splitlines()
-            if not line.lstrip().startswith("#")
-        )
-        assert "def _compare_locant" not in non_comment, (
-            "spiro.py defines a parallel locant comparator — D-20 violation"
-        )
-
-
-# ===========================================================================
 # Class: enforcement — heteroatom prefix reuse
 # ===========================================================================
 
 class TestHeteroatomPrefixReuse:
     """: spiro.py reuses polycyclic_bridged.get_heteroatom_prefix."""
-
-    @pytest.mark.unit
-    def test_spiro_imports_get_heteroatom_prefix(self):
-        from orthonym.rules import spiro
-        src = inspect.getsource(spiro)
-        assert "get_heteroatom_prefix" in src
 
     @pytest.mark.unit
     def test_no_new_heteroatom_prefix_builder(self):

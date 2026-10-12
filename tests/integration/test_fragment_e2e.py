@@ -22,84 +22,6 @@ from orthonym import name_compound
 # ============================================================================
 
 
-class TestPeptideE2E:
-    """Verify peptide naming through the full pipeline."""
-
-    @pytest.mark.integration
-    def test_glycylglycine(self):
-        """Gly-Gly dipeptide.: the peptide PIN is the SUBSTITUTIVE form
-        (V38-PEPTIDE-PIN-VERDICT.md; Chapter identifies no PINs, so the
-        retained peptide name is non-PIN). Full-InChIKey round-trip verified."""
-        result = name_compound("NCC(=O)NCC(=O)O")
-        assert result == "(2-aminoacetamido)acetic acid"
-
-    @pytest.mark.integration
-    def test_l_alanyl_l_alanine(self):
-        """L-Ala-L-Ala dipeptide. substitutive PIN
-        (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
-        result = name_compound("N[C@@H](C)C(=O)N[C@@H](C)C(=O)O")
-        assert result == "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"
-
-    @pytest.mark.integration
-    def test_glycyl_l_alanine(self):
-        """Gly-L-Ala dipeptide. substitutive PIN
-        (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
-        result = name_compound("NCC(=O)N[C@@H](C)C(=O)O")
-        assert result == "(2S)-2-(2-aminoacetamido)propanoic acid"
-
-    @pytest.mark.integration
-    def test_l_alanylglycine(self):
-        """L-Ala-Gly dipeptide. substitutive PIN
-        (V38-PEPTIDE-PIN-VERDICT.md); full-InChIKey round-trip verified."""
-        result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "[(2S)-2-aminopropanamido]acetic acid"
-
-    @pytest.mark.integration
-    def test_tripeptide_gly_ala_leu(self):
-        """Gly-L-Ala-L-Leu tripeptide -> its substitutive PIN (j7; was the
-        peptide name 'glycylalanylleucine',:54717).
-
-         (the Blue Book): both L-descriptors omitted."""
-        result = name_compound(
-            "NCC(=O)N[C@@H](C)C(=O)N[C@@H](CC(C)C)C(=O)O"
-        )
-        # j7 (TRIAGE g3 C05 / g5 C15): a tripeptide now takes the substitutive PIN, the
-        assert result == "(2S)-2-[(2S)-2-(2-aminoacetamido)propanamido]-4-methylpentanoic acid"
-
-    @pytest.mark.integration
-    def test_asparagine_not_misrouted(self):
-        """Asparagine (amide side chain), UNDEFINED stereo, must NOT route to
-        peptide naming -- it is one molecule. Bare 'asparagine' implies L
-        (Phase-1 stereo honesty), so undefined stereo names systematically;
-        the single-molecule systematic name confirms no peptide misrouting.
-        OPSIN round-trip verified."""
-        result = name_compound("NC(CC(N)=O)C(=O)O")
-        assert result == "2,4-diamino-4-oxobutanoic acid"
-
-    @pytest.mark.integration
-    def test_glutamine_not_misrouted(self):
-        """Glutamine (amide side chain), UNDEFINED stereo, must NOT route to
-        peptide naming. Same stereo-honesty rule as asparagine above.
-        OPSIN round-trip verified."""
-        result = name_compound("NC(CCC(N)=O)C(=O)O")
-        assert result == "2,5-diamino-5-oxopentanoic acid"
-
-    @pytest.mark.integration
-    def test_simple_glycine_unchanged(self):
-        """Single amino acid glycine should still produce 'glycine'."""
-        result = name_compound("NCC(=O)O")
-        assert result == "glycine"
-
-    @pytest.mark.integration
-    def test_simple_alanine_unchanged(self):
-        """Single amino acid alanine, UNDEFINED stereo -> systematic name.
-
-         Phase-1 stereo honesty: bare 'alanine' implies L
-        /, so an undefined-stereo input declines it."""
-        result = name_compound("CC(N)C(=O)O")
-        assert result == "2-aminopropanoic acid"
-
-
 # ============================================================================
 # 2. NP Ester Decoration E2E Tests
 # ============================================================================
@@ -138,28 +60,6 @@ class TestNPEsterE2E:
 # ============================================================================
 # 3. Multiplicative Nomenclature E2E Tests
 # ============================================================================
-
-
-class TestMultiplicativeE2E:
-    """Verify multiplicative nomenclature through the full pipeline."""
-
-    @pytest.mark.integration
-    def test_methylenedianiline(self):
-        """4,4'-methylenedianiline: symmetric CH2-bridge, both amino groups preserved."""
-        result = name_compound("Nc1ccc(Cc2ccc(N)cc2)cc1")
-        assert result == "4,4'-methylenedianiline"
-
-    @pytest.mark.integration
-    def test_simple_benzene_unaffected(self):
-        """Simple benzene should NOT be routed to multiplicative naming."""
-        result = name_compound("c1ccccc1")
-        assert result == "benzene"
-
-    @pytest.mark.integration
-    def test_toluene_unaffected(self):
-        """Toluene should NOT be routed to multiplicative naming."""
-        result = name_compound("Cc1ccccc1")
-        assert result == "toluene"
 
 
 # ============================================================================
@@ -213,55 +113,3 @@ class TestRecursionGuardE2E:
 # ============================================================================
 
 
-class TestCrossFeatureRegression:
-    """Verify a phase changes do not break existing naming features."""
-
-    @pytest.mark.integration
-    def test_simple_amide_unchanged(self):
-        """Acetamide should still return 'acetamide'."""
-        assert name_compound("CC(=O)N") == "acetamide"
-
-    @pytest.mark.integration
-    def test_simple_ester_methyl_acetate(self):
-        """Methyl acetate should still return 'methyl acetate' (freeze check)."""
-        assert name_compound("CC(=O)OC") == "methyl acetate"
-
-    @pytest.mark.integration
-    def test_simple_ester_ethyl_acetate(self):
-        """Ethyl acetate should still return 'ethyl acetate' (freeze check)."""
-        assert name_compound("CC(=O)OCC") == "ethyl acetate"
-
-    @pytest.mark.integration
-    def test_glycine_single_amino_acid(self):
-        """Glycine should still be 'glycine' (not misrouted to peptide)."""
-        assert name_compound("NCC(=O)O") == "glycine"
-
-    @pytest.mark.integration
-    def test_naphthalene_ring_system(self):
-        """Naphthalene retained name should be preserved."""
-        assert name_compound("c1ccc2ccccc2c1") == "naphthalene"
-
-    @pytest.mark.integration
-    def test_ethanol_basic_alcohol(self):
-        """Ethanol basic naming should be preserved."""
-        assert name_compound("CCO") == "ethanol"
-
-    @pytest.mark.integration
-    def test_acetic_acid_basic_acid(self):
-        """Acetic acid basic naming should be preserved."""
-        assert name_compound("CC(=O)O") == "acetic acid"
-
-    @pytest.mark.integration
-    def test_pyridine_heterocycle(self):
-        """Pyridine retained name should be preserved."""
-        assert name_compound("c1ccncc1") == "pyridine"
-
-    @pytest.mark.integration
-    def test_phenol_retained_name(self):
-        """Phenol retained name should be preserved."""
-        assert name_compound("Oc1ccccc1") == "phenol"
-
-    @pytest.mark.integration
-    def test_cyclohexane_simple_ring(self):
-        """Cyclohexane simple ring should be preserved."""
-        assert name_compound("C1CCCCC1") == "cyclohexane"

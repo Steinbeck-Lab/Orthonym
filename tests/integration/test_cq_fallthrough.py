@@ -74,13 +74,8 @@ NEGATIVE_DISPIRO = "C1C2(CCC2)C11CCO1"
 
 # PIN gold controls (byte-identical current PIN output; must not shift).
 PIN_GOLD = [
-    ("CCCCCCCc1ccccc1", "heptylbenzene"),
-    ("CCCCCCCCC1CCCCC1", "octylcyclohexane"),
-    ("ClCCCCC", "1-chloropentane"),
     ("ClCC(F)C", "1-chloro-2-fluoropropane"),
     ("FCCCl", "1-chloro-2-fluoroethane"),
-    ("O=C1CCNCC1", "piperidin-4-one"),
-    ("Cc1ccc(O)nc1", "5-methylpyridin-2-ol"),
     ("O=C(O)CCS(=O)(=O)[O-]", "2-carboxyethane-1-sulfonate"),
 ]
 

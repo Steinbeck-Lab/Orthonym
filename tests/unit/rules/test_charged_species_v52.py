@@ -35,12 +35,6 @@ ROWS = [
     ("CC[O+]=C(C)C", "ethyl(propan-2-ylidene)oxidanium", "73.1.2.1"),
     ("C[O+](C)C(=O)C1CCCCC1", "(cyclohexanecarbonyl)di(methyl)oxidanium", "73.1.2.1"),
     ("C[S+](C)C(=O)c1ccccc1", "benzoyldi(methyl)sulfanium", "73.1.2.1"),
-    ("O=C(O[OH2+])c1ccccc1", "2-benzoyldioxidan-1-ium", "73.1.2.1"),
-    # --- B:.x catenated / substituted parent-hydride cations ---
-    ("CN(C)[N+](C)(C)C", "pentamethylhydrazinium", "73.1.1.2"),
-    ("CS[S+](C)SC", "1,2,3-trimethyltrisulfan-2-ium", "73.1.1.2"),
-    ("C[P+](C)(C)Cl", "chlorotri(methyl)phosphanium", "73.1.1.1"),
-    ("C[P+](C)(C)P(Cl)Cl", "2,2-dichloro-1,1,1-trimethyldiphosphan-1-ium", "73.1.1.2"),
     ("CC#[O+]", "ethylidyneoxidanium", "73.1.1.1"),
     # abstainers to recover:
     ("C[F+]Cl", "chloro(methyl)fluoranium", "73.1.1.1"),

@@ -29,12 +29,6 @@ class TestXantheneLocants:
     """Verify locant correctness for xanthene (9H-xanthene)."""
 
     @pytest.mark.integration
-    def test_unsubstituted_xanthene(self):
-        """Unsubstituted xanthene must produce '9H-xanthene'."""
-        result = name_compound('c1ccc2c(c1)Cc1ccccc1O2')
-        assert result == '9H-xanthene', f"Got '{result}'"
-
-    @pytest.mark.integration
     def test_substituted_xanthene_has_locant(self):
         """Methyl-substituted xanthene must contain 'xanthene' and 'methyl' with locant."""
         # Methyl on the benzene ring (position 3 based on canonical atom mapping)
@@ -91,12 +85,6 @@ class TestPhenothiazineLocants:
 
 class TestPhenoxazineLocants:
     """Verify locant correctness for phenoxazine (10H-phenoxazine)."""
-
-    @pytest.mark.integration
-    def test_unsubstituted_phenoxazine(self):
-        """Unsubstituted phenoxazine must produce '10H-phenoxazine'."""
-        result = name_compound('c1ccc2c(c1)Nc1ccccc1O2')
-        assert result == '10H-phenoxazine', f"Got '{result}'"
 
     @pytest.mark.integration
     def test_substituted_phenoxazine_has_locant(self):

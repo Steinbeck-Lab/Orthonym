@@ -218,16 +218,6 @@ class TestAttachmentLocants:
         per_amp = _attachment_locants(struct, locants)
         assert [a[1] for a in per_amp] == [(1, 3), (1, 3)]
 
-    def test_ortho_gives_1_2(self):
-        # Synthetic ortho-substituted [2.2]orthocyclophane-like control.
-        mol = Chem.MolFromSmiles("c1ccc2c(c1)CCc1ccccc1CC2")
-        struct = _simplify(mol)
-        if struct is None:
-            pytest.skip("ortho control SMILES did not perceive as a simplifiable phane")
-        locants = _number_skeleton(struct)
-        per_amp = _attachment_locants(struct, locants)
-        assert all(a[1] == (1, 2) for a in per_amp)
-
 
 # ---------------------------------------------------------------------------
 # Task 8.7 -- integration: monocyclic all-benzene homophane PIN (ANCHOR GOLD)

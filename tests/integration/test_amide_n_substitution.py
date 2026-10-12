@@ -50,12 +50,6 @@ class TestSimpleAmideNSubstitution:
     """Verify existing amide N-substitution is not broken."""
 
     @pytest.mark.integration
-    def test_n_phenylacetamide_exact(self):
-        """N-phenylacetamide exact match."""
-        result = name_compound("CC(=O)Nc1ccccc1")
-        assert result == "N-phenylacetamide"
-
-    @pytest.mark.integration
     def test_n_ethylacetamide(self):
         """N-ethylacetamide contains N-ethyl."""
         result = name_compound("CC(=O)NCC")

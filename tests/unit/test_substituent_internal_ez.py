@@ -12,7 +12,6 @@ IUPAC: E/Z descriptors are assigned to all double bonds in
 the principal chain or ring that have defined geometry.
 """
 
-import pytest
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 
@@ -108,40 +107,6 @@ class TestSubstituentInternalEZ:
             f"Substituent-internal E/Z should NOT be emitted. "
             f"Got: {ez_descriptors}"
         )
-
-
-class TestExocyclicEZ:
-    """Test E/Z emission for ring-exocyclic double bonds."""
-
-    def test_exocyclic_ring_ez_emitted(self):
-        """Ring with exocyclic =CHR: C=C1CCCCC1 (methylenecyclohexane).
-
-        One atom of C=C is in the ring, the other outside. Exocyclic E/Z
-        should be emitted using the ring atom's locant.
-        """
-        # Note: methylenecyclohexane doesn't have defined E/Z (only 2 substituents
-        # on exocyclic C), so we need a more substituted example
-        # (E)-1-ethylidenecyclohexane: CC=C1CCCCC1
-        mol = Chem.MolFromSmiles(r"C/C=C/1CCCCC1")
-        rdCIPLabeler.AssignCIPLabels(mol)
-
-        # Check if any bonds have CIP labels
-        has_ez = any(bond.HasProp('_CIPCode') for bond in mol.GetBonds())
-        if not has_ez:
-            pytest.skip("RDKit did not assign E/Z to this exocyclic bond")
-
-        ring_atoms = set()
-        for ring in mol.GetRingInfo().AtomRings():
-            if len(ring) == 6:
-                ring_atoms = set(ring)
-                break
-
-        atom_to_locant = {idx: loc + 1 for loc, idx in enumerate(sorted(ring_atoms))}
-        descriptors = collect_stereodescriptors(mol, atom_to_locant)
-        # If E/Z is assigned by RDKit, the exocyclic handler should emit it
-        ez_descriptors = [(loc, cip) for loc, cip in descriptors if cip in ('E', 'Z')]
-        # This test documents current behavior -- exocyclic E/Z is handled
-        # if RDKit assigns _CIPCode to the bond
 
 
 class TestNoFalseEZ:

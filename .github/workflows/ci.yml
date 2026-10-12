@@ -7,7 +7,9 @@ name: CI
 # contributor's PR can pass this without the full benchmarking apparatus.
 #
 # The test suite runs every test except those marked `slow` on each push and
-# pull request; the nightly run includes the `slow` tests.
+# pull request; the nightly run includes the `slow` tests and runs the OPSIN
+# round-trip calls of the tests against the real `java -jar opsin` command line
+# (the push and pull-request runs answer them in process).
 
 on:
   push:
@@ -118,6 +120,10 @@ jobs:
 
       - name: Run all tests, `slow` included (nightly)
         if: github.event_name == 'schedule'
+        # The PR run answers the tests' `java -jar opsin` calls in process
+        # (tests/support/opsin_cli_inproc.py); the nightly run keeps the real command line.
+        env:
+          ORTHONYM_TEST_REAL_OPSIN_CLI: "1"
         run: python -m pytest tests -n auto -q --tb=short --timeout=1800 --timeout-method=thread -o addopts=""
 
   lint:

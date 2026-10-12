@@ -63,20 +63,6 @@ class TestAcylaminoFormat:
     4-formamidobenzoic acid, 4-acetamidobenzoic acid.
     """
 
-    def test_pentanamido_format(self):
-        """N-pentanoylglutamic acid -> 2-pentanamidopentanedioic acid."""
-        name = name_compound("CCCCC(=O)NC(CCC(=O)O)C(=O)O")
-        assert name == "2-pentanamidopentanedioic acid", (
-            f"Expected '2-pentanamidopentanedioic acid', got '{name}'"
-        )
-
-    def test_acetamido_format(self):
-        """N-acetylaspartic acid -> 2-acetamidobutanedioic acid."""
-        name = name_compound("CC(=O)NC(CC(=O)O)C(=O)O")
-        assert name == "2-acetamidobutanedioic acid", (
-            f"Expected '2-acetamidobutanedioic acid', got '{name}'"
-        )
-
     def test_octadecanamido_format(self):
         """Long-chain N-acyl: octadecanamido, unbracketed."""
         name = name_compound("CCCCCCCCCCCCCCCCCC(=O)NCC(=O)O")

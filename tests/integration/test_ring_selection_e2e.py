@@ -35,20 +35,6 @@ def _get_features(smiles: str):
 class TestSingleRingUnchanged:
     """Single-ring molecules should name identically to pre-integration."""
 
-    @pytest.mark.parametrize("smiles,expected", [
-        # "The locant '1' is omitted:" (the Blue Book), item (c) (:2913): "in
-        # monosubstituted homogeneous monocyclic rings" (examples 'cyclohexanethiol (PIN)',
-        # 'bromobenzene (PIN)'); (:4770) names 'cyclohexanol'. The
-        # deny-by-default does not bite: no other locant is cited.
-        ("OC1CCCCC1", "cyclohexanol"),
-        ("C1CCCCC1", "cyclohexane"),
-        ("C1CCCC1", "cyclopentane"),
-        ("c1ccncc1", "pyridine"),
-    ])
-    def test_single_ring_names(self, smiles, expected):
-        result = name_compound(smiles)
-        assert result == expected
-
     def test_single_ring_senior_system_matches_principal(self):
         """For a single-ring molecule, senior_ring_system and principal_ring
         should contain the same atoms (though ordering may differ)."""
@@ -61,18 +47,6 @@ class TestSingleRingUnchanged:
 # ---------------------------------------------------------------------------
 # Test 2: Benzene + chain -- retained name preserved
 # ---------------------------------------------------------------------------
-
-@pytest.mark.integration
-class TestBenzeneChainPreserved:
-    """Benzene derivatives should continue using retained names."""
-
-    @pytest.mark.parametrize("smiles,expected", [
-        ("Cc1ccccc1", "toluene"),
-        ("CCc1ccccc1", "ethylbenzene"),
-    ])
-    def test_benzene_retained_names(self, smiles, expected):
-        result = name_compound(smiles)
-        assert result == expected
 
 
 # ---------------------------------------------------------------------------

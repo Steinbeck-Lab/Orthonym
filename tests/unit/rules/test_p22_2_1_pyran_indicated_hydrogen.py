@@ -105,8 +105,6 @@ def test_no_bare_pyran_stem_is_a_headline_retained_name():
 # "remove the redundant mask" cleanup is only safe for pyran. Recorded as a
 # test so the next person measures instead of assuming.
 TABLE_2_2_INDICATED_H = [
-    ("c1cc[nH]c1", "1H-pyrrole"),
-    ("c1c[nH]cn1", "1H-imidazole"),
     ("c1cn[nH]c1", "1H-pyrazole"),
 ]
 

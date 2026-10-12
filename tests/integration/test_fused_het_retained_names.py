@@ -18,8 +18,6 @@ class TestRetainedNamesPreserved:
     """Guard bypass does not break retained fused heterocycle names."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("c1ccc2ncccc2c1", "quinoline"),
-        ("c1ccc2[nH]ccc2c1", "1H-indole"),
         ("CCc1nc2ccccc2[nH]1", "2-ethyl-1H-1,3-benzimidazole"),
         ("Nc1ccc2ncccc2c1", "quinolin-6-amine"),
         ("OC(=O)c1cnc2ccccc2c1", "quinoline-3-carboxylic acid"),

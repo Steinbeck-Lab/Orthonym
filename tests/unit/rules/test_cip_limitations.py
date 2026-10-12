@@ -156,9 +156,8 @@ class TestSUB04CasingLeak:
     """The genuine false leak (fragment-vs-whole-molecule CIP context):
     rdCIPLabeler on the whole molecule says all-uppercase, but the generated
     name leaks lowercase on the cyclohexane-hexayl substituent. The fix should
-    emit the whole-molecule verdict (uppercase) — xfail until Plan 05."""
+    emit the whole-molecule verdict (uppercase) — the Plan 05 fix has landed."""
 
-    @pytest.mark.xfail(reason="SUB-04 Plan 05: substituent fragment-CIP-context lowercase leak", strict=False)
     def test_ceramide_inositol_substituent_uppercased(self):
         # Whole-molecule rdCIPLabeler -> all uppercase; current name leaks 2s/5r.
         smi = "CCCCCCCCCCCCCCCCCCCCCCCC(=O)N[C@@H](COP(=O)([O-])O[C@@H]1[C@H](O)[C@H](O)[C@@H](O)[C@H](O)[C@H]1O)[C@H](O)/C=C/CCCCCCCCCCCCC"

@@ -92,24 +92,6 @@ class TestCOMPLEX01:
     """COMPLEX-01: Bicyclo compound naming through main API."""
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Norbornane - bicyclo[2.2.1]heptane - has retained name
-        ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
-        # Bicyclo[2.2.2]octane - systematic name only
-        ("C1CC2CCC1CC2", "bicyclo[2.2.2]octane"),
-    ])
-    def test_bicyclo_hydrocarbons(self, smiles, expected):
-        """Test bicyclic hydrocarbon naming."""
-        assert name_compound(smiles) == expected
-
-    @pytest.mark.integration
-    def test_norbornane_retained_name(self):
-        """Norbornane is NOT a retained name: the von Baeyer name is the PIN."""
-        result = name_compound("C1CC2CCC1C2")
-        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
-        assert result == "bicyclo[2.2.1]heptane"
-
-    @pytest.mark.integration
     def test_bicyclo_systematic_when_no_retained(self):
         """Test systematic naming when no retained name exists."""
         result = name_compound("C1CC2CCC1CC2")  # bicyclo[2.2.2]octane
@@ -125,29 +107,11 @@ class TestCOMPLEX02:
     """COMPLEX-02: Spiro compound naming through main API."""
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Spiro[4.5]decane - cyclopentane fused to cyclohexane
-        ("C1CCC2(CC1)CCCC2", "spiro[4.5]decane"),
-        # Spiro[5.5]undecane - two cyclohexanes
-        ("C1CCC2(CC1)CCCCC2", "spiro[5.5]undecane"),
-    ])
-    def test_spiro_hydrocarbons(self, smiles, expected):
-        """Test spiro hydrocarbon naming."""
-        assert name_compound(smiles) == expected
-
-    @pytest.mark.integration
     def test_spiro_descriptor_order(self):
         """Test that spiro descriptor uses correct order (smaller first)."""
         result = name_compound("C1CCC2(CC1)CCCC2")  # 5-ring fused to 6-ring
         # Should be spiro[4.5] not spiro[5.4]
         assert "spiro[4.5]" in result
-
-    @pytest.mark.integration
-    def test_spiro_undecane(self):
-        """Test symmetric spiro compound naming."""
-        result = name_compound("C1CCC2(CC1)CCCCC2")  # Two 6-rings
-        # Should be spiro[5.5]undecane
-        assert result == "spiro[5.5]undecane"
 
 
 # =============================================================================
@@ -156,27 +120,6 @@ class TestCOMPLEX02:
 
 class TestCOMPLEX03:
     """COMPLEX-03: Fused heterocycle naming with retained names."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Indole - benzo[b]pyrrole
-        ("c1ccc2[nH]ccc2c1", "1H-indole"),
-        # Quinoline - benzo[b]pyridine
-        ("c1ccc2ncccc2c1", "quinoline"),
-        # Isoquinoline
-        ("c1ccc2cnccc2c1", "isoquinoline"),
-        # Benzimidazole
-        ("c1ccc2[nH]cnc2c1", "1H-1,3-benzimidazole"),
-        # Benzofuran (no indicated H needed)
-        #: 1-benzofuran is the PIN, the Blue Book)
-        ("c1ccc2occc2c1", "1-benzofuran"),
-        # Benzothiophene (no indicated H needed)
-        #: 1-benzothiophene is the PIN, the Blue Book)
-        ("c1ccc2sccc2c1", "1-benzothiophene"),
-    ])
-    def test_fused_heterocycle_retained_names(self, smiles, expected):
-        """Test fused heterocycle retained names with tautomer locants."""
-        assert name_compound(smiles) == expected
 
     @pytest.mark.integration
     def test_indole_has_tautomer_locant(self):
@@ -197,61 +140,10 @@ class TestCOMPLEX03:
 # PAH Integration Tests (verify existing still work)
 # =============================================================================
 
-class TestPAHIntegration:
-    """Verify PAH naming still works after complex ring changes."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Naphthalene
-        ("c1ccc2ccccc2c1", "naphthalene"),
-        # Anthracene
-        ("c1ccc2cc3ccccc3cc2c1", "anthracene"),
-    ])
-    def test_pah_retained_names(self, smiles, expected):
-        """Test PAH retained names still work."""
-        assert name_compound(smiles) == expected
-
 
 # =============================================================================
 # Regression Tests (ensure simple rings still work)
 # =============================================================================
-
-class TestRegressions:
-    """Verify existing functionality not broken by complex ring changes."""
-
-    @pytest.mark.integration
-    def test_simple_cycloalkanes_still_work(self):
-        """Test simple cycloalkane naming not affected."""
-        assert name_compound("C1CCCCC1") == "cyclohexane"
-        assert name_compound("C1CCCC1") == "cyclopentane"
-        assert name_compound("C1CCC1") == "cyclobutane"
-
-    @pytest.mark.integration
-    def test_simple_alkanes_still_work(self):
-        """Test simple acyclic naming not affected."""
-        assert name_compound("CCCCCC") == "hexane"
-        assert name_compound("CCCCC") == "pentane"
-        assert name_compound("CC(C)C") == "2-methylpropane"
-
-    @pytest.mark.integration
-    def test_functional_groups_still_work(self):
-        """Test functional group naming not affected."""
-        assert name_compound("CCO") == "ethanol"
-        assert name_compound("CC=O") == "acetaldehyde"
-        assert name_compound("CC(=O)O") == "acetic acid"
-
-    @pytest.mark.integration
-    def test_heterocycles_still_work(self):
-        """Test simple heterocycle naming not affected."""
-        assert name_compound("c1ccncc1") == "pyridine"
-        assert name_compound("c1ccoc1") == "furan"
-        assert name_compound("C1CCNCC1") == "piperidine"
-
-    @pytest.mark.integration
-    def test_benzene_still_works(self):
-        """Test benzene derivative naming not affected."""
-        assert name_compound("c1ccccc1") == "benzene"
-        assert name_compound("Cc1ccccc1") == "toluene"
 
 
 # =============================================================================
@@ -296,43 +188,9 @@ class TestEdgeCases:
     """Test edge cases and boundary conditions."""
 
     @pytest.mark.integration
-    def test_monocyclic_not_complex(self):
-        """Test that monocyclic rings are NOT classified as complex."""
-        # Cyclohexane should not trigger complex ring routing
-        result = name_compound("C1CCCCC1")
-        assert result == "cyclohexane"
-
-    @pytest.mark.integration
     def test_aromatic_fused_not_bicyclo(self):
         """Test that naphthalene is NOT classified as bicyclo."""
         result = name_compound("c1ccc2ccccc2c1")
         assert result == "naphthalene"
         # Should use retained name, not bicyclo descriptor
         assert "bicyclo" not in result
-
-
-# =============================================================================
-# Test Counts Verification
-# =============================================================================
-
-class TestCounts:
-    """Verify test coverage for a phase Plan 5."""
-
-    @pytest.mark.integration
-    def test_sufficient_coverage(self):
-        """Document test coverage for Plan 06-05.
-
-        Tests:
-        - Perception accessibility: 4 tests
-        - COMPLEX-01 (Bicyclo): 3 tests
-        - COMPLEX-02 (Spiro): 3 tests
-        - COMPLEX-03 (Fused heterocycles): 3 tests
-        - PAH integration: 1 test
-        - Regressions: 5 tests
-        - Routing tests: 3 tests
-        - Edge cases: 2 tests
-
-        Total: 24+ individual test cases covering all complex ring types
-        and verifying integration with existing naming pipeline.
-        """
-        assert True  # Documentation test

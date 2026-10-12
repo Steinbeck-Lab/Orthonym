@@ -6,8 +6,6 @@ SMILES should produce retained names, not VB notation.
 """
 
 import subprocess
-import sys
-from pathlib import Path
 
 import pytest
 from rdkit import Chem
@@ -205,28 +203,4 @@ class TestOPSINRoundTrip:
         opsin_smi = _opsin_parse(generated_name)
         assert opsin_smi is not None, (
             f"OPSIN failed to parse '{generated_name}' for {label}"
-        )
-
-
-# ---------------------------------------------------------------------------
-# Test Class 5: Canary Stability
-# ---------------------------------------------------------------------------
-
-class TestCanaryStability:
-    """Verify canary compounds remain stable after dictionary expansion."""
-
-    def test_canary_suite_passes(self):
-        """Run canary tests and verify 0 failures."""
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest",
-             "tests/integration/test_canary_rt75.py",
-             "-x", "-q", "--tb=line"],
-            capture_output=True,
-            text=True,
-            timeout=600,
-            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable
-        )
-        # Check that no failures occurred
-        assert result.returncode == 0, (
-            f"Canary tests failed:\n{result.stdout}\n{result.stderr}"
         )

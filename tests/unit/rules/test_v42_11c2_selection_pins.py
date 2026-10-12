@@ -137,11 +137,6 @@ def test_hydrazinyl_prefix_leaf():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # Regression: acyl hydrazide keeps its senior -hydrazide suffix (the -NH-NH2
-    # must NOT be pulled out as a hydrazinyl prefix).
-    ("CC(=N)NN", "ethanimidohydrazide"),
-    ("N=CNN", "methanimidohydrazide"),
-    ("CC(=O)NN", "acetohydrazide"),
     ("O=C(NN)c1ccccc1", "benzohydrazide"),
 ])
 def test_acyl_hydrazide_suffix_unaffected(smiles, expected):

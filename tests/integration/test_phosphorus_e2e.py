@@ -1,8 +1,5 @@
 """End-to-end tests for phosphorus compound naming."""
 
-import sys
-from pathlib import Path
-
 import pytest
 from orthonym import name_compound
 
@@ -17,10 +14,6 @@ class TestPhosphineE2E:
     def test_ethylphosphane(self):
         """CCP -> ethylphosphane"""
         assert name_compound("CCP") == "ethylphosphane"
-
-    def test_trimethylphosphane(self):
-        """CP(C)C -> trimethylphosphane (PHOSPH-02)"""
-        assert name_compound("CP(C)C") == "trimethylphosphane"
 
     def test_triethylphosphane(self):
         """CCP(CC)CC -> triethylphosphane"""
@@ -45,14 +38,6 @@ class TestPhosphineOxideE2E:
 
 class TestPhosphonicAcidE2E:
     """E2E tests for phosphonic acid naming (PHOSPH-04)."""
-
-    def test_methanephosphonic_acid(self):
-        """CP(=O)(O)O -> methylphosphonic acid (PHOSPH-04).
-
-        'CH3-P(O)(OH)2 methylphosphonic acid (PIN)', the Blue Book; the parent-hydride-stem
-        form is rejected ('ethylphosphonic acid (PIN) (not ethanephosphonic acid)',
-        the Blue Book); 9ab971737."""
-        assert name_compound("CP(=O)(O)O") == "methylphosphonic acid"
 
     def test_ethanephosphonic_acid(self):
         """CCP(=O)(O)O -> ethylphosphonic acid ('C2H5-P(O)(OH)2 ethylphosphonic acid
@@ -82,14 +67,6 @@ class TestPhosphinicAcidE2E:
 
 class TestPhosphateEsterE2E:
     """E2E tests for phosphate ester naming (PHOSPH-06)."""
-
-    def test_methyl_phosphate(self):
-        """COP(=O)(O)O -> methyl dihydrogen phosphate (PHOSPH-06).
-
-        Bare 'methyl phosphate' is the ANION name (OPSIN parses it to the
-        dianion COP(=O)([O-])[O-], a different species) -- fix.
-        """
-        assert name_compound("COP(=O)(O)O") == "methyl dihydrogen phosphate"
 
     def test_dimethyl_phosphate(self):
         """COP(=O)(OC)O -> dimethyl hydrogen phosphate (1 free -OH cited, fix)."""
@@ -129,11 +106,6 @@ class TestPhosphorusRetainedNames:
 class TestPhosphorusEdgeCases:
     """Edge case tests for phosphorus naming."""
 
-    def test_primary_phosphine(self):
-        """Primary phosphine with single substituent."""
-        result = name_compound("CP")
-        assert result == "methylphosphane"
-
     def test_asymmetric_phosphate(self):
         """Asymmetric phosphate diester -> cites the free -OH as 'hydrogen'.
 
@@ -148,35 +120,6 @@ class TestPhosphorusEdgeCases:
         """Dipropylphosphinic acid."""
         result = name_compound("CCCP(CCC)(=O)O")
         assert result == "dipropylphosphinic acid"
-
-
-class TestPhosphorusRequirements:
-    """Tests verifying all PHOSPH requirements are met."""
-
-    def test_phosph_01_methylphosphane(self):
-        """PHOSPH-01: name_compound('CP') returns 'methylphosphane'"""
-        assert name_compound("CP") == "methylphosphane"
-
-    def test_phosph_02_trimethylphosphane(self):
-        """PHOSPH-02: name_compound('CP(C)C') returns 'trimethylphosphane'"""
-        assert name_compound("CP(C)C") == "trimethylphosphane"
-
-    def test_phosph_03_trimethylphosphane_oxide(self):
-        """PHOSPH-03: name_compound('CP(C)(C)=O') returns 'trimethylphosphane oxide'"""
-        assert name_compound("CP(C)(C)=O") == "trimethyl-λ5-phosphanone"
-
-    def test_phosph_04_methanephosphonic_acid(self):
-        """PHOSPH-04: name_compound('CP(=O)(O)O') returns 'methylphosphonic acid'
-        (the Blue Book, 'methylphosphonic acid (PIN)'; 9ab971737)."""
-        assert name_compound("CP(=O)(O)O") == "methylphosphonic acid"
-
-    def test_phosph_05_dimethylphosphinic_acid(self):
-        """PHOSPH-05: name_compound('CP(C)(=O)O') returns 'dimethylphosphinic acid'"""
-        assert name_compound("CP(C)(=O)O") == "dimethylphosphinic acid"
-
-    def test_phosph_06_methyl_phosphate(self):
-        """PHOSPH-06: name_compound('COP(=O)(O)O') returns 'methyl dihydrogen phosphate' (fix)."""
-        assert name_compound("COP(=O)(O)O") == "methyl dihydrogen phosphate"
 
 
 class TestPhosphanylPrefix:
@@ -223,42 +166,9 @@ class TestBisPhosphanyl:
 class TestPhosphorusOnComplexSubstrate:
     """E2E tests for phosphorus on complex substrates (,)."""
 
-    def test_phosphonate_still_correct(self):
-        """Phosphonic acid naming : 'methylphosphonic acid (PIN)', the Blue Book."""
-        assert name_compound("CP(=O)(O)O") == "methylphosphonic acid"
-
-    def test_phenylphosphonic_acid(self):
-        """Phenylphosphonic acid ."""
-        assert name_compound("c1ccccc1P(=O)(O)O") == "phenylphosphonic acid"
-
     def test_diphenylphosphinic_acid_e2e(self):
         """Diphenylphosphinic acid via e2e ."""
         assert name_compound("O=P(O)(c1ccccc1)c2ccccc2") == "diphenylphosphinic acid"
-
-    def test_phosphate_ester_not_disrupted(self):
-        """Phosphate ester naming not disrupted (routing safety, fix)."""
-        assert name_compound("COP(=O)(O)O") == "methyl dihydrogen phosphate"
-
-    def test_phosphine_oxide_not_disrupted(self):
-        """Phosphine oxide naming not disrupted (routing safety)."""
-        assert name_compound("CP(C)(C)=O") == "trimethyl-λ5-phosphanone"
-
-
-class TestCanaryRegression:
-    """Verify zero regression on canary compounds for a phase."""
-
-    def test_canary_no_regression(self):
-        """All 88 canary compounds should still pass after phosphanyl changes."""
-        import subprocess
-        result = subprocess.run(
-            [sys.executable, "-m", "pytest",
-             "tests/integration/test_canary_rt75.py", "-x", "-q"],
-            capture_output=True, text=True, timeout=120,
-            cwd=str(Path(__file__).resolve().parents[2]),  # project root — CI-portable
-        )
-        assert result.returncode == 0, (
-            f"Canary regression detected:\n{result.stdout}\n{result.stderr}"
-        )
 
 
 class TestPhosphiteAndPhosphonateEsterE2E:

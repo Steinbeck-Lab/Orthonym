@@ -80,12 +80,6 @@ class TestAcetoneRemoved:
         for val in RETAINED_NAMES.values():
             assert val != "acetone", f"Found 'acetone' as retained name value"
 
-    @pytest.mark.unit
-    def test_acetone_smiles_produces_propan_2_one(self):
-        """name_compound('CC(C)=O') should produce 'propan-2-one'."""
-        result = name_compound("CC(C)=O")
-        assert result == "propan-2-one", f"Got '{result}'"
-
 
 class TestCresolsRemoved:
     """Cresol isomers should NOT be retained names -- PINs are methylphenols."""

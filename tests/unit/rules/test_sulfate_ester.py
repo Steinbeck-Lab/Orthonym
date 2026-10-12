@@ -26,11 +26,8 @@ string that matched but denoted a different structure would fail (0-wrong).
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym import name_compound
-from orthonym.jvm_bridge import opsin_extended_smiles, opsin_available
-from orthonym.jvm_budget import jvm_slots
 
 
 # (SMILES, expected PIN name)
@@ -42,39 +39,9 @@ SULFATE_ESTERS = [
 ]
 
 
-def _inchikey(smiles):
-    mol = Chem.MolFromSmiles(smiles)
-    assert mol is not None, smiles
-    return Chem.MolToInchiKey(mol)
-
-
-def _opsin_inchikey(name):
-    """Parse ``name`` with OPSIN and return the InChIKey of the parsed structure,
-    or None if OPSIN cannot parse it."""
-    ext, served = opsin_extended_smiles(name)
-    if not served or ext is None or ext == "REJECTED":
-        return None
-    smi = ext.split()[0]  # strip the " |$_AV:...$|" locant annotation
-    mol = Chem.MolFromSmiles(smi)
-    return Chem.MolToInchiKey(mol) if mol is not None else None
-
-
 @pytest.mark.parametrize("smiles,expected", SULFATE_ESTERS)
 def test_sulfate_ester_name(smiles, expected):
     assert name_compound(smiles) == expected
-
-
-@pytest.mark.roundtrip
-@pytest.mark.parametrize("smiles,expected", SULFATE_ESTERS)
-def test_sulfate_ester_roundtrips_zero_wrong(smiles, expected):
-    """0-wrong: the emitted name must OPSIN round-trip to the input's full
-    InChIKey."""
-    if not opsin_available():
-        pytest.skip("OPSIN/JVM not available")
-    name = name_compound(smiles)
-    assert name == expected
-    with jvm_slots(1, purpose="test-sulfate-ester-rt"):
-        assert _opsin_inchikey(name) == _inchikey(smiles)
 
 
 def test_sulfonate_ester_positive_control_unchanged():

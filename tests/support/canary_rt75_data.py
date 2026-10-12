@@ -1,17 +1,16 @@
 """
-Golden canary regression tests for compounds that round-trip correctly.
+Data module: the golden canary compounds that round-trip correctly.
 
 These compounds matched on InChI round-trip (Orthonym name -> OPSIN parse -> InChI
 comparison) as of the a phase baseline (v4.0+), extended in a phase with 10 new
 compound classes (acetals, disulfides, cyclic imides, thiocarboxylic acids, carbamic
-acid). They form a regression safety net: any naming change that breaks one of these
-tests must be investigated before merging.
+acid). The live consumer is
+tests/unit/rules/test_opsin_format_compliance.py::TestCanaryRegression, which names
+every row; a few other tests import ``CANARY_COMPOUNDS`` and ``_opsin_parse_batch``.
 
-If a test fails, first check whether the NEW name is also valid IUPAC nomenclature
-(it might be an equally correct alternative). Only revert if the new name is wrong.
-
-These tests run as part of the normal test suite (no @pytest.mark.slow) so that
-regressions are caught immediately during development.
+The byte-identical test module that used to hold this data (the -era canary,
+retired 2026-09-11 in favour of the phase gate) is gone; only the data and the
+batch OPSIN helper are kept here.
 
 Original 75: internal notes
 a phase additions: 10 compounds from missing compound classes (to)
@@ -21,15 +20,9 @@ a phase additions: 2 compounds newly RT-matching in v10.0 (steroid + epoxycycloh
 """
 
 import os
-import shutil
 import subprocess
 import tempfile
-from pathlib import Path
 
-import pytest
-pytestmark = pytest.mark.skip(reason="v18-era byte-identical canary RETIRED 2026-09-11: superseded by the v22 phase gate (the live PIN-regression detector, which passes). The engine legitimately evolved v18->v47 (e.g. 312/1406 RT rows drifted to correct, round-tripping names), so these frozen snapshots no longer anchor a current state. Revive = remove this mark + regenerate.")
-
-from orthonym import name_compound
 from tests.support.jars import jar_or_none
 
 
@@ -50,7 +43,7 @@ from tests.support.jars import jar_or_none
 # ---------------------------------------------------------------------------
 # 2026-09-26 (pre-existing-failures plan, Task 11) change-asserted-value: canary re-baseline.
 # The live consumer is tests/unit/rules/test_opsin_format_compliance.py::TestCanaryRegression
-# (this module itself stays retired, see pytestmark). 317 of the 703 rows name differently
+# (this module is a data module now: its test functions were removed). 317 of the 703 rows name differently
 # at the current engine (name_compound, gate off, fixture order). Evidence per row:
 # internal notes summary: TRIAGE.md ' outcome'.
 # - 97 rows are re-baselined here: a targeted edit of the expected name only, each line
@@ -3205,35 +3198,12 @@ CANARY_COMPOUNDS = [
     ),  # heterocycle handler, HA=7, retained-scaffold boost → ratio=1.0
 ]
 
-# Build test IDs from expected names (first 40 chars, sanitized for pytest)
-_CANARY_IDS = [
-    name[:40].replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")
-    for _, name in CANARY_COMPOUNDS
-]
-
-
-@pytest.mark.parametrize("smiles,expected_name", CANARY_COMPOUNDS, ids=_CANARY_IDS)
-def test_canary_rt312(smiles, expected_name):
-    """Golden canary test: verify round-trip-matching compound still names correctly (312 compounds)."""
-    result = name_compound(smiles)
-    assert result == expected_name, (
-        f"CANARY REGRESSION: {smiles}\n"
-        f"  Expected: {expected_name}\n"
-        f"  Got: {result}"
-    )
-
 
 # ---------------------------------------------------------------------------
-# OPSIN parse assertions — format regression guard
-# Single JVM invocation for all 202 canary names (batch mode)
+# OPSIN batch parse helper: one JVM invocation for a list of names
 # ---------------------------------------------------------------------------
 
 _OPSIN_JAR = jar_or_none()
-
-
-def _opsin_available() -> bool:
-    """Check if OPSIN JAR and Java runtime are available."""
-    return _OPSIN_JAR is not None and shutil.which("java") is not None
 
 
 def _opsin_parse_batch(names: list[str]) -> dict[str, str | None]:
@@ -3280,68 +3250,3 @@ def _opsin_parse_batch(names: list[str]) -> dict[str, str | None]:
         else:
             results[name] = None
     return results
-
-
-# Lazy-cached batch results (computed once on first access)
-_OPSIN_RESULTS_CACHE: dict[str, str | None] | None = None
-
-
-def _get_opsin_results() -> dict[str, str | None]:
-    """Return cached OPSIN parse results for all canary names."""
-    global _OPSIN_RESULTS_CACHE
-    if _OPSIN_RESULTS_CACHE is None:
-        names = [name for _, name in CANARY_COMPOUNDS]
-        _OPSIN_RESULTS_CACHE = _opsin_parse_batch(names)
-    return _OPSIN_RESULTS_CACHE
-
-
-# Known OPSIN limitations: correct IUPAC names that OPSIN cannot parse.
-# These are xfail'd rather than treated as Orthonym bugs.
-_OPSIN_LIMITATIONS: dict[str, str] = {
-    # OPSIN vocabulary gaps — valid IUPAC names beyond OPSIN's parser coverage
-    "(1R,3r,5S)-tropan-3-yl nonanoate": (
-        "Phase 118-02: tropane NP naming correctly identifies tropane as parent. OPSIN may not parse tropan-3-yl ester format."
-    ),
-    "2,6-diamino-3-(hydroxymethyl)heptanetrioic acid": (
-        "OPSIN cannot parse 'heptanetrioic acid' (rare tricarboxylic acid suffix)"
-    ),
-    "(2R)-2-phenylethan-1-ol": (
-        "PERC-06: diol reclassified as non-polyfunctional (same parent class). "
-        "Non-polyfunctional path drops second OH — Phase 131 assembly fix needed."
-    ),
-    "N-heptanoyl(2S)-5-aminoazol-3-one": (
-        "Phase 139.1-01: middle fragment OH capping produces decomposed name for "
-        "heptanoyl-pyrrolidinone compound. OPSIN may not parse this format. "
-        "Phase 170 WS-4: ring ketone now -one suffix (still unparseable — pre-existing)."
-    ),
-    "(3R)-9-(1,3-dioxolan-5-yl)-3,7-dimethylnona-1,6-dien-3-ol": (
-        "Phase 142-03: dioxolane ring correctly identified (was wrongly named as "
-        "cyclopentyl). OPSIN cannot parse dioxolanyl substituent prefix."
-    ),
-}
-
-
-@pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java not available")
-@pytest.mark.parametrize(
-    "smiles,expected_name",
-    CANARY_COMPOUNDS,
-    ids=[s for s, _ in CANARY_COMPOUNDS],
-)
-def test_canary_opsin_parseable(smiles, expected_name):
-    """Verify canary compound names are OPSIN-parseable (format regression guard).
-
-    Every canary compound's expected name is sent through OPSIN. Names that are
-    correct IUPAC but beyond OPSIN's parser capability are marked xfail with
-    documented reasons. Any other parse failure indicates a format regression.
-    """
-    # Phase G0 (DD7 S1): a canary whose expected value is a deliberate
-    # fail-closed refusal ('unknown organic compound') is NOT an IUPAC name and
-    # is intentionally not OPSIN-parseable — skip the format-parse guard for it.
-    from orthonym.errors import is_failure_name
-    if is_failure_name(expected_name):
-        pytest.skip("G0 fail-closed refusal signal, not an IUPAC name to parse")
-    if expected_name in _OPSIN_LIMITATIONS:
-        pytest.xfail(f"OPSIN limitation: {_OPSIN_LIMITATIONS[expected_name]}")
-    results = _get_opsin_results()
-    parsed = results.get(expected_name)
-    assert parsed, f"OPSIN cannot parse canary name: {expected_name}"

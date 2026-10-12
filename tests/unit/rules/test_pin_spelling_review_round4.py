@@ -32,9 +32,7 @@ ETHER_ONE_MARK_ROWS = [
     ("CC(C)OC1CCCCC1", "[(propan-2-yl)oxy]cyclohexane"),
     ("CC(C)OC1CCCC1", "[(propan-2-yl)oxy]cyclopentane"),
     ("CCC(C)OC1CCCCC1", "[(butan-2-yl)oxy]cyclohexane"),
-    ("CC(C)OC(C)C", "2-[(propan-2-yl)oxy]propane"),
     ("CC(C)OC1CCC(C)CC1", "1-methyl-4-[(propan-2-yl)oxy]cyclohexane"),
-    ("CC(C)OC(C)COC(C)C", "1,2-bis[(propan-2-yl)oxy]propane"),
     ("CC(C)Oc1ccccc1", "[(propan-2-yl)oxy]benzene"),
 ]
 
@@ -83,9 +81,6 @@ COMPLETE_OXY_ROWS = [
     ("[2H]C([2H])([2H])C([2H])([2H])Oc1ccccc1", "(2H5)ethoxybenzene"),
     ("[2H]C([2H])([2H])C([2H])([2H])OCCCC", "1-(2H5)ethoxybutane"),
     ("[2H]C([2H])([2H])C([2H])([2H])Oc1ccc(C)cc1", "1-(2H5)ethoxy-4-methylbenzene"),
-    # a free position left: the locants stay
-    ("[2H]C([2H])([2H])C([2H])([2H])O", "(1,1,2,2,2-2H5)ethan-1-ol"),
-    ("[2H]c1c([2H])c([2H])c(COC(C)=O)c([2H])c1[2H]", "(2,3,4,5,6-2H5)benzyl acetate"),
 ]
 
 

@@ -90,16 +90,6 @@ class TestTriazine:
     """ /: triazine PIN names and locants."""
 
     @pytest.mark.unit
-    def test_124_triazine_bare(self):
-        """c1cnncn1 -> 1,2,4-triazine (PIN)."""
-        assert name_compound("c1cnncn1") == "1,2,4-triazine"
-
-    @pytest.mark.unit
-    def test_135_triazine_bare(self):
-        """c1ncncn1 -> 1,3,5-triazine (PIN); must not regress."""
-        assert name_compound("c1ncncn1") == "1,3,5-triazine"
-
-    @pytest.mark.unit
     def test_124_triazine_methyl(self):
         """Cc1cnncn1 -> 5-methyl-1,2,4-triazine."""
         assert name_compound("Cc1cnncn1") == "5-methyl-1,2,4-triazine"

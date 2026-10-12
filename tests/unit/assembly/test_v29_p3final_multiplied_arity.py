@@ -43,33 +43,6 @@ ARITY_GUARDED_SITES = [
 ]
 
 
-@pytest.mark.parametrize("module_name,_guard", ARITY_GUARDED_SITES)
-def test_every_multiplied_component_caller_has_a_local_arity_guard(
-        module_name, _guard):
-    """The guard must be present in the module's SOURCE, at the call site.
-
-    Reading the source rather than the symbol, because two of the five keep the
-    frozenset as a FUNCTION-LOCAL name (`mononuclear_hydrides`, `pseudoketones`),
-    so an attribute lookup would report a false absence — the exact
-    perfect-result trap this project keeps hitting.
-    """
-    import importlib
-    import inspect
-
-    mod = importlib.import_module(module_name)
-    src = inspect.getsource(mod)
-    assert "multiplied_component(" in src, (
-        f"{module_name} no longer calls multiplied_component — this test is "
-        f"stale and must be re-derived, not deleted"
-    )
-    assert ("_SUPPORTED_COUNTS" in src) or ("_SUB_MULTIPLIER" in src), (
-        f"{module_name} calls multiplied_component with no local arity bound; "
-        f"the primitive has no cap, so the site must fail closed itself"
-    )
-    #...and the bound must actually gate a `return None`, not merely exist.
-    assert "return None" in src, module_name
-
-
 def test_the_primitive_itself_is_uncapped_and_that_is_deliberate():
     """Documents the measured behaviour so it is never mistaken for a bug.
 

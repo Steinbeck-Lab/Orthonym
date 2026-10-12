@@ -298,31 +298,7 @@ class TestIsotopeEndToEnd:
         from orthonym.namer import Orthonym
         assert Orthonym().name("[2H]C1CCCCC1O") == "(2-2H1)cyclohexan-1-ol"
 
-    def test_chain_analogue_matches_the_bb_example(self):
-        """the Blue Book verbatim: ``13CH3-CH2-OH (2-13C)ethan-1-ol [not (2-13C)ethanol]``.
-        The count subscript is omitted per (FIX-A), matching the BB
-        verbatim ``(2-13C)`` exactly."""
-        from orthonym.namer import Orthonym
-        assert Orthonym().name("[13CH3]CO") == "(2-13C)ethan-1-ol"
-
     # ---------------- CORRECT ALREADY: omission is right, sweep over-claimed -------- #
-
-    def test_hexamethylbenzene_scoped_descriptor_is_correct(self):
-        """★ The adversarial sweep reported ``hexamethyl(13C1)benzene`` as a defect and
-        it is NOT one. **** (``:44182``, verbatim) says the descriptor is inserted
-        *"before the part of the compound that is isotopically substituted"* -- so its
-        POSITION carries its scope. Here it precedes ``benzene``, scoping the ring, whose
-        six carbons are all equivalent; one isotopomer, no locant required, so
-        's condition is not met and the parent keeps its licensed omission.
-
-        ``:7492`` ``1,2-di[(13C)methyl]benzene (PIN. `` is the direct witness for
-        scoped descriptors carrying no locant of their own.
-
-        Contrast ``:44206`` ``1-(79Br)bromo(2-13C)benzene (PIN)``: bromobenzene's ring
-        carbons are NOT equivalent, so there the label does need a locant and the bromo
-        locant is duly restored. That is the real discriminator."""
-        from orthonym.namer import Orthonym
-        assert Orthonym().name("Cc1c(C)c(C)c(C)c(C)[13c]1C") == "hexamethyl(13C)benzene"
 
     def test_hexafluorobenzene_correctly_omits(self):
         """Also reported by the sweep, also correct: hexafluorobenzene has exactly ONE

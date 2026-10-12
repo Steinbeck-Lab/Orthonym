@@ -24,11 +24,9 @@ FRAGMENT_LOSS_SMILES = [
                  marks=pytest.mark.xfail(strict=False, reason="fused ring naming fails for ortho-fused system; correct phenol suffix form is shorter than coverage threshold"),
                  id="HA29_dimethylphenyl_lactone"),
     pytest.param("O=C(/C=C/c1ccc(O)cc1)O[C@@H]1C[C@](O)(C(=O)[O-])C[C@@H](O)[C@H]1O", 24,
-                 marks=pytest.mark.xfail(strict=False, reason="fallback may not fully recover this compound"),
                  id="HA24_cinnamate_ester"),
     # Amide decomposition failures
     pytest.param("CCCCCCC(=O)NC1=CC(=O)[C@@H]2CCCN12", 18,
-                 marks=pytest.mark.xfail(strict=False, reason="fallback may not fully recover this compound"),
                  id="HA18_pyrrolidinone_heptanamide"),
     pytest.param("COc1cc(C2OC2C(=O)NCCCCN)ccc1O", 20, id="HA20_epoxy_amide"),
     pytest.param("CC(C)[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O", 31, id="HA31_peptide"),
@@ -47,13 +45,11 @@ FRAGMENT_LOSS_SMILES = [
                  id="HA86_mycolic_acid"),
     # Mixed-type / aromatic failures
     pytest.param("Nc1c(/N=N/c2ccc([N+](=O)[O-])cc2)c(S(=O)(=O)O)cc2cc(S(=O)(=O)O)c(/N=N/c3ccccc3)c(O)c12", 39,
-                 marks=pytest.mark.xfail(strict=False, reason="fallback may not fully recover this compound"),
                  id="HA39_azo_dye"),
     pytest.param("O=c1cc(-c2cc(O)c(O)cc2O)oc2cc(O)cc(O)c12", 22, id="HA22_flavone_polyol"),
     pytest.param("COc1cc(O)cc2c1C(=O)O[C@@H](C)CCCCC/C=C/2", 21, id="HA21_macrolide"),
     pytest.param("Nc1ccc(S(=O)(=O)Nc2ncc(CC(=O)O)s2)cc1", 20, id="HA20_sulfonamide_thiazole"),
     pytest.param("COc1cc(-c2oc3cc(O)c(C)c(O)c3c(=O)c2OC)ccc1O", 25,
-                 marks=pytest.mark.xfail(strict=False, reason="fused ring naming fails; correct phenol suffix form is shorter than coverage threshold"),
                  id="HA25_methoxyflavone"),
     pytest.param("CCc1oc2ccc(-c3cnn(C)c3)cc2c1C(=O)c1ccc(O)cc1", 26, id="HA26_benzofuran_ketone"),
 ]

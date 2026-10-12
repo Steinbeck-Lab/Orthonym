@@ -278,29 +278,6 @@ class TestStereoEdgeCases:
 # Specific Compound Validation
 # =============================================================================
 
-class TestSpecificCompounds:
-    """Exact output validation for specific compounds."""
-
-    def test_r_butan_2_ol(self):
-        """(2R)-butan-2-ol exact match."""
-        result = name_compound("C[C@@H](O)CC")
-        assert result == "(2R)-butan-2-ol", f"Got: {result}"
-
-    def test_s_butan_2_ol(self):
-        """(2S)-butan-2-ol exact match."""
-        result = name_compound("C[C@H](O)CC")
-        assert result == "(2S)-butan-2-ol", f"Got: {result}"
-
-    def test_e_but_2_ene(self):
-        """(2E)-but-2-ene exact match."""
-        result = name_compound("C/C=C/C")
-        assert result == "(2E)-but-2-ene", f"Got: {result}"
-
-    def test_z_but_2_ene(self):
-        """(2Z)-but-2-ene exact match."""
-        result = name_compound(r"C/C=C\C")
-        assert result == "(2Z)-but-2-ene", f"Got: {result}"
-
 
 # =============================================================================
 # Requirement Coverage Summary Tests

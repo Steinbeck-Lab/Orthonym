@@ -31,87 +31,6 @@ import pytest
 from orthonym import name_compound
 
 
-class TestStandardAminoAcids:
-    """Test trivial names for standard amino acids."""
-
-    def test_glycine(self):
-        """Glycine is achiral, simplest amino acid."""
-        assert name_compound("NCC(=O)O") == "glycine"
-
-    def test_alanine(self):
-        """Alanine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"
-
-    def test_valine(self):
-        """Valine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        assert name_compound("CC(C)C(N)C(=O)O") == "2-amino-3-methylbutanoic acid"
-
-    def test_leucine(self):
-        """Leucine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        assert name_compound("CC(C)CC(N)C(=O)O") == "2-amino-4-methylpentanoic acid"
-
-    def test_isoleucine(self):
-        """Isoleucine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        assert name_compound("CCC(C)C(N)C(=O)O") == "2-amino-3-methylpentanoic acid"
-
-    def test_serine(self):
-        """Serine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        result = name_compound("NC(CO)C(=O)O")
-        assert result == "2-amino-3-hydroxypropanoic acid"
-
-    def test_cysteine(self):
-        """Cysteine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        result = name_compound("NC(CS)C(=O)O")
-        assert result == "2-amino-3-sulfanylpropanoic acid"
-
-    def test_methionine(self):
-        """Methionine: 2-amino-4-(methylthio)butanoic acid.
-
-        The SMILES was `CSCC(N)C(=O)O` and that is NOT methionine -- it is
-        S-methylcysteine, and the docstring above says so itself: 4-(methylthio)
-        puts the sulfur on C4, so the chain needs three carbons before the
-        alpha-carbon's carboxyl, not two. Formulae settle it: methionine is
-        C5H11NO2S, the old fixture is C4H9NO2S. OPSIN (independent of our code)
-        parses `S-methylcysteine` to the old fixture's exact constitution
-        (skeleton IDIDJDIHTAOVLG) and `methionine` to a different one
-        (FFEARJCKVFRZRR).
-
-        So Orthonym was RIGHT to answer 'S-methylcysteine' and this expectation
-        was impossible. Fixed by correcting the input, not the expected name,
-        because the test's purpose is to cover methionine.
-
-         a phase T5: this input is also stereo-UNDEFINED, so the retained
-        name expectation moved to the systematic name too (see module note).
-        """
-        result = name_compound("CSCCC(N)C(=O)O")
-        assert result == "2-amino-4-(methylsulfanyl)butanoic acid"
-
-    def test_phenylalanine(self):
-        """Phenylalanine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        result = name_compound("NC(Cc1ccccc1)C(=O)O")
-        assert result == "2-amino-3-phenylpropanoic acid"
-
-    def test_proline(self):
-        """Proline, stereo-UNDEFINED input: the systematic name (see module note)."""
-        result = name_compound("OC(=O)C1CCCN1")
-        assert result == "pyrrolidine-2-carboxylic acid"
-
-    def test_threonine(self):
-        """Threonine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        result = name_compound("CC(O)C(N)C(=O)O")
-        assert result == "2-amino-3-hydroxybutanoic acid"
-
-    def test_tyrosine(self):
-        """Tyrosine, stereo-UNDEFINED input: the systematic name (see module note)."""
-        result = name_compound("NC(Cc1ccc(O)cc1)C(=O)O")
-        assert result == "2-amino-3-(4-hydroxyphenyl)propanoic acid"
-
-    def test_tryptophan(self):
-        """Tryptophan, stereo-UNDEFINED input: the systematic name (see module note)."""
-        result = name_compound("NC(Cc1c[nH]c2ccccc12)C(=O)O")
-        assert result == "2-amino-3-(1H-indol-3-yl)propanoic acid"
-
-
 class TestAcidicAminoAcids:
     """Test acidic amino acids and their amides."""
 
@@ -319,22 +238,6 @@ class TestAminoAcidDataModule:
 
 class TestIntegrationWithNameCompound:
     """Test that name_compound correctly handles amino acids."""
-
-    def test_amino_acid_before_polyfunctional(self):
-        """Amino acid naming should take precedence over polyfunctional."""
-        # Glycine would be "2-aminoacetic acid" via polyfunctional
-        # but should return "glycine" via trivial name
-        assert name_compound("NCC(=O)O") == "glycine"
-
-    def test_amino_acid_through_full_pipeline(self):
-        """Multiple amino acids work through the full pipeline.
-
-         a phase T5: glycine is achiral (unaffected); the other two are
-        stereo-UNDEFINED, so they now emit the systematic name (see module note).
-        """
-        assert name_compound("NCC(=O)O") == "glycine"
-        assert name_compound("CC(N)C(=O)O") == "2-aminopropanoic acid"
-        assert name_compound("NC(Cc1ccccc1)C(=O)O") == "2-amino-3-phenylpropanoic acid"
 
     def test_non_amino_acid_not_affected(self):
         """Regular compounds still work correctly."""

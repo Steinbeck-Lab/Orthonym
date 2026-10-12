@@ -240,12 +240,6 @@ class TestOPSINParseability:
         assert name == "cyclohexanone"
         assert_full_rt(name, "O=C1CCCCC1")
 
-    def test_suffix_locant_present_for_ring_alcohol(self):
-        """A monosubstituted ring alcohol is the locant-free PIN and round-trips."""
-        name = name_compound("OC1CCCCC1")
-        assert name == "cyclohexanol"
-        assert_full_rt(name, "OC1CCCCC1")
-
     def test_prefix_and_suffix_at_different_positions(self):
         """Substituted ring with FG: prefix and suffix at different atoms."""
         name = name_compound("ClC1CCC(=O)CC1")

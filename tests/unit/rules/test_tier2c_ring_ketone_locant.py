@@ -71,7 +71,6 @@ class TestSingleHeteroatomDirectionNonDefect:
         # the SUBSTITUTED parent, so this row was internally inconsistent.
         ("O=C1CCCCCN1", "azepan-2-one"),
         ("O=C1CCCCN1", "piperidin-2-one"),
-        ("C1COCCN1", "morpholine"),
     ])
     def test_direction_already_correct(self, smiles, expected):
         assert name_compound(smiles) == expected

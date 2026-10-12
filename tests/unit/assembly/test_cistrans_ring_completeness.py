@@ -154,7 +154,11 @@ def _inchikey(smi):
 
 @pytest.mark.opsin_gate
 @pytest.mark.roundtrip
-@pytest.mark.parametrize("smi,partner", RECLAIM)
+# The first row takes 36 s: it runs in the nightly run only; the other row stays in the PR run.
+@pytest.mark.parametrize(
+    "smi,partner",
+    [pytest.param(smi, partner, marks=pytest.mark.slow) if i == 0 else (smi, partner)
+     for i, (smi, partner) in enumerate(RECLAIM)])
 def test_symmetric_ring_reclaims_verified_cistrans(engine, smi, partner):
     name = engine.name_tiered(smi).get("name")
     assert name is not None, f"should reclaim: {smi}"

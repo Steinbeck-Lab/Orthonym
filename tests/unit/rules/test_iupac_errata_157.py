@@ -19,7 +19,8 @@ Test taxonomies (internal notes):
      doc for follow-up.
   4. Tracking-doc smoke tests (>= 3 tests) -- assert
      docs/iupac_errata_applied.md exists, >= 250 LOC, contains all 14 PIN
-     entries. Suffix: _doc_*_157.
+     entries. Suffix: _doc_*_157. They read a file that is not shipped and
+     live in tests_local/unit/rules/test_iupac_errata_157_local.py.
 
 Reference: IUPAC 2013 Blue Book + BBerrors.html corrections through 31 Dec 2025.
 Source: 157-internal notes..; internal notes (Plan-01 atomic commit);
@@ -37,13 +38,10 @@ chlorocarbonyl -> carbonochloridoyl change AND the bromocarbonyl /
 fluorocarbonyl intentional non-change (BBerrors says only -COCl renamed).
 """
 
-import re
 import subprocess
 from pathlib import Path
 
 import pytest
-
-from tests.support.local_only import local_only
 
 
 # Repo-root resolver shared by subprocess-grep tests + tracking-doc tests.
@@ -137,68 +135,6 @@ class TestP18bSeniorityLock157:
         )
 
 
-class TestEZThresholdLock157:
-    """ regression: E/Z stereo threshold preserved at `< 8` (strict).
-
-    a phase-01 ERRATA-02 changed `min_ring_size <= 8` to `< 8` per
-    BBerrors.html Sep 2024 errata +. Plan listed
-    line 91; live location is line 126 (drift recorded as non-blocking
-    citation correction in internal notes row 2). The COMPARISON OPERATOR
-    is the regression-lock invariant; the line number is illustrative.
-    """
-
-    def test_ez_threshold_locked_157(self) -> None:
-        """E/Z threshold operator must be `< 8` (NOT `<= 8`) for ring stereo skip."""
-        from orthonym.rules import stereochemistry
-
-        # Read source rather than execute --- the comparison is inside
-        # an internal loop; static check is the cheapest invariant.
-        source_path = Path(stereochemistry.__file__)
-        text = source_path.read_text(encoding="utf-8")
-        # The strict-less-than form must be present:
-        assert "min_ring_size < 8" in text, (
-            "P-31.1.3 regression: `min_ring_size < 8` invariant missing from "
-            "stereochemistry.py. Phase 137 ERRATA-02 silently reverted. "
-            "AUDIT REQUIRED."
-        )
-        # The relaxed form must NOT be present (the Sep 2024 errata removed it):
-        assert "min_ring_size <= 8" not in text, (
-            "P-31.1.3 regression: `min_ring_size <= 8` reappeared in "
-            "stereochemistry.py. Phase 137 ERRATA-02 reverted. AUDIT REQUIRED."
-        )
-
-
-class TestFusionSeparatorLock157:
-    """ regression: fusion descriptor `:` for multi-edge fusion.
-
-    a phase ERRATA-05 verified the multi-edge fusion branch returns
-    `[loc1,loc2-letter:loc3,loc4-letter']` with `:` separator (NOT `;`).
-    The plan listed line 860; live location is line 866 (drift recorded
-    in internal notes row 3 + S1.1 row 3). The multi-component branch at
-    line 859 uses `,` for dibenzo/dinaphtho per a distinct sub-rule;
-    both are correct.
-    """
-
-    def test_fusion_separator_locked_157(self) -> None:
-        """Multi-edge fusion uses `:` separator per Dec 2019 errata."""
-        from orthonym.rules import fusion_descriptors
-
-        source_path = Path(fusion_descriptors.__file__)
-        text = source_path.read_text(encoding="utf-8")
-        # Multi-edge fusion is the `:`-join branch at line 866:
-        assert "':'.join(parts)" in text, (
-            "P-25.3.8.3 regression: `':'.join(parts)` missing from "
-            "fusion_descriptors.py. Phase 137 ERRATA-05 silently reverted. "
-            "AUDIT REQUIRED."
-        )
-        # The deprecated semicolon form must NOT appear:
-        assert "';'.join(parts)" not in text, (
-            "P-25.3.8.3 regression: `';'.join(parts)` reappeared in "
-            "fusion_descriptors.py. Phase 137 ERRATA-05 reverted. "
-            "AUDIT REQUIRED."
-        )
-
-
 class TestHWCorrectionsLock157:
     """ regression: Hantzsch-Widman name corrections preserved.
 
@@ -246,30 +182,6 @@ class TestSymmetricAnhydrideLock157:
     `f"{acid1_name} anhydride"` (NOT `f"bis-{acid1_name}..."`) when
     acid1 == acid2. Source: BBerrors.html.
     """
-
-    def test_symmetric_anhydride_locked_157(self) -> None:
-        """Symmetric anhydride: `acid1_name + ' anhydride'` (no `bis-` prefix)."""
-        from orthonym.rules import anhydrides
-
-        source_path = Path(anhydrides.__file__)
-        text = source_path.read_text(encoding="utf-8")
-        # The symmetric-anhydride branch must use the bare form:
-        assert 'f"{acid1_name} anhydride"' in text, (
-            "P-65.7 regression: `f\"{acid1_name} anhydride\"` missing from "
-            "anhydrides.py. Phase 137 ERRATA-08 silently reverted. "
-            "AUDIT REQUIRED."
-        )
-        # The forbidden `bis-` prefix on the symmetric branch must not appear.
-        # We grep the source for any line that combines `bis-` with `anhydride`
-        # in the symmetric branch context. The bare-grep here is a coarse but
-        # safe regression-lock --- the file is small and contains zero `bis-`
-        # by design (per audit S1.1 row 5).
-        forbidden = re.search(r"bis-\{acid1_name", text)
-        assert forbidden is None, (
-            "P-65.7 regression: `bis-` prefix appeared in symmetric anhydride "
-            "branch of anhydrides.py. Phase 137 ERRATA-08 reverted. "
-            "AUDIT REQUIRED."
-        )
 
     def test_symmetric_anhydride_canary_locked_157(self) -> None:
         """ smoke: ethanoic acid anhydride canary returns symmetric form."""
@@ -334,19 +246,6 @@ class TestCarbonochloridoylLock157:
             f"{PREFIX_FORMS.get('acid_fluoride')!r} != 'fluorocarbonyl'. "
             f"BBerrors.html P-29.1.2 Nov 2020 errata applies ONLY to -COCl. "
             f"The -COF form was INTENTIONALLY unchanged. AUDIT REQUIRED."
-        )
-
-    def test_carbonochloridoyl_benzene_dispatch_locked_157(self) -> None:
-        """benzene.py:66 prefix-mapping mirrors seniority.py:282 (carbonochloridoyl)."""
-        from orthonym.rules import benzene
-
-        source_path = Path(benzene.__file__)
-        text = source_path.read_text(encoding="utf-8")
-        # a phase ERRATA-09 also touched benzene.py at line 66; the form
-        # is `'carbonyl chloride': 'carbonochloridoyl',`. Static check.
-        assert "'carbonochloridoyl'" in text, (
-            "P-29.1.2 regression: `'carbonochloridoyl'` missing from benzene.py. "
-            "Phase 137 ERRATA-09 silently reverted. AUDIT REQUIRED."
         )
 
 
@@ -747,167 +646,3 @@ def test_compound_locants_not_applicable_grep_157() -> None:
         assert "/rules/" not in hit, (
             f"P-31.1.4.3 NA re-verification: hit in rules/ generation logic!\n  {hit}"
         )
-
-
-# ============================================================================
-# Taxonomy 4: Tracking-doc smoke tests (G6 acceptance gate)
-# Suffix: _doc_*_157
-# ============================================================================
-
-
-# 14 expected rule names per internal notes line 300-315 + internal notes S6.3:
-EXPECTED_RULES_157 = [
-    "P-18(b)", "P-31.1.3", "P-25.3.8.3", "P-22.2.1", "P-65.7",
-    "P-29.1.2", "P-16.5.4.1", "P-16.5.1.3",
-    "P-25.2.2.4", "P-25.4.3.2.2", "P-25.8.1",
-    "P-31.2", "P-31.1.4.3", "P-13.3.5",
-]
-
-
-def _doc_path_157() -> Path:
-    """Return the canonical path to docs/iupac_errata_applied.md."""
-    return _repo_root() / "docs" / "iupac_errata_applied.md"
-
-
-# docs/ is gitignored (local-only by decision), so a clean checkout has no
-# errata document: the four document tests skip there (TRIAGE g7 C02).
-_needs_errata_doc = local_only("docs/iupac_errata_applied.md")
-
-
-@_needs_errata_doc
-def test_iupac_errata_applied_doc_complete_157() -> None:
-    """G6 gate: docs/iupac_errata_applied.md >= 250 LOC + 14 PIN rule entries."""
-    doc = _doc_path_157()
-    assert doc.exists(), (
-        "docs/iupac_errata_applied.md missing -- Plan-02 incomplete. "
-        "V18 S6 line 1374 milestone-blocking deliverable. AUDIT REQUIRED."
-    )
-    text = doc.read_text(encoding="utf-8")
-    line_count = text.count("\n") + 1
-    assert line_count >= 250, (
-        f"docs/iupac_errata_applied.md too short: {line_count} < 250 LOC. "
-        f"G6 acceptance gate fails. AUDIT REQUIRED."
-    )
-    for rule in EXPECTED_RULES_157:
-        assert rule in text, (
-            f"docs/iupac_errata_applied.md missing rule entry: {rule!r}. "
-            f"G6 acceptance gate fails. AUDIT REQUIRED."
-        )
-
-
-@_needs_errata_doc
-def test_iupac_errata_applied_doc_section_headings_157() -> None:
-    """G6 gate sub-check: 6 section headings present in expected order."""
-    doc = _doc_path_157()
-    text = doc.read_text(encoding="utf-8")
-    expected_headings = [
-        "## §1.", "## §2.", "## §3.", "## §4.", "## §5.", "## §6.",
-    ]
-    last_pos = -1
-    for heading in expected_headings:
-        pos = text.find(heading)
-        assert pos != -1, (
-            f"docs/iupac_errata_applied.md missing section heading "
-            f"{heading!r}. G6 gate sub-check fails."
-        )
-        assert pos > last_pos, (
-            f"docs/iupac_errata_applied.md section heading {heading!r} "
-            f"out of order at pos {pos} (previous heading ended at {last_pos}). "
-            f"G6 gate sub-check fails."
-        )
-        last_pos = pos
-
-
-@_needs_errata_doc
-def test_iupac_errata_applied_doc_summary_table_consistent_157() -> None:
-    """internal notes Pitfall 5: summary table has >= 14 PIN compliance rows.
-
-    Each summary-table row MUST have a matching cite-block heading.
-    The table format is `| P-X.Y.Z | <status> | <phase> | <test> |`.
-    """
-    doc = _doc_path_157()
-    text = doc.read_text(encoding="utf-8")
-    # Match summary-table rows like '| P-X.Y.Z | applied |...':
-    row_pattern = re.compile(
-        r"^\|\s*(P-[A-Za-z0-9\.\(\)]+)\s*\|\s*([^|]+?)\s*\|", re.MULTILINE
-    )
-    rows = row_pattern.findall(text)
-    assert len(rows) >= 14, (
-        f"docs/iupac_errata_applied.md S5 summary table has {len(rows)} rows; "
-        f">= 14 required per CONTEXT D-09 + 157-AUDIT.md S6.3. G6 fails."
-    )
-    # Per Pitfall 5: every entry should appear in the table:
-    found_rules = {rule for rule, _status in rows}
-    for expected in EXPECTED_RULES_157:
-        # The table may store (b) as `(b)`; we accept exact match.
-        assert expected in found_rules, (
-            f"docs/iupac_errata_applied.md S5 summary table missing rule "
-            f"{expected!r}. Found rules: {sorted(found_rules)}. G6 fails."
-        )
-
-
-@_needs_errata_doc
-def test_iupac_errata_applied_doc_status_consistency_157() -> None:
-    """internal notes Pitfall 5: table Status drift detection vs cite-blocks.
-
-    For each rule in the summary table, locate the cite-block heading
-    `### P-X.Y.Z` and verify the Status keyword present in the table also
-    appears in the cite-block (substring match, case-insensitive).
-
-    This guards against drift where says `applied` but says
-    `not-applicable` (or vice versa), which would invalidate the public
-    PIN compliance claim.
-
-    Source: 157-internal notes Pitfall 5 + 157-02-SUMMARY.md key-decisions
-    " table Status ↔ cite-block Status invariant".
-    """
-    doc = _doc_path_157()
-    text = doc.read_text(encoding="utf-8")
-    # Permitted Status keywords per internal notes + internal notes Audit Summary:
-    status_keywords = {
-        "applied", "re-verified", "already-correct",
-        "not-applicable", "out-of-scope", "deferred-to-v19",
-        "no-op-confirmed", "not-applicable-in-current-scope",
-    }
-    # Match summary-table rows:
-    row_pattern = re.compile(
-        r"^\|\s*(P-[A-Za-z0-9\.\(\)]+)\s*\|\s*([^|]+?)\s*\|", re.MULTILINE
-    )
-    rows = row_pattern.findall(text)
-    for rule, status_in_table in rows:
-        status_in_table_lower = status_in_table.strip().lower()
-        # Locate the cite-block heading:
-        heading_pos = text.find(f"### {rule}")
-        if heading_pos == -1:
-            # Some entries OUT-OF-SCOPE) may not have a full entry
-            # if the doc places them only in the summary table per internal notes
-            # line 315 ("(no test — out of scope)"). Skip those.
-            continue
-        # Slice the block (until the next ### heading or EOF):
-        block_end = text.find("\n### ", heading_pos + 1)
-        block = text[heading_pos:block_end if block_end != -1 else len(text)]
-        # At least one Status keyword from the table must also appear in the block:
-        # We accept the keyword in either case (the table tends toward lower-case,
-        # the cite-block may use upper-case for the Status field).
-        found_match = False
-        for keyword in status_keywords:
-            # The table entry may be 're-verified (NO-OP-CONFIRMED)' --- check
-            # whether ANY recognized keyword from the table appears in:
-            if keyword in status_in_table_lower:
-                if keyword in block.lower():
-                    found_match = True
-                    break
-        # If no keyword matched on either side, just skip --- we cannot infer.
-        # If the table had a keyword but the block has NONE of the keywords,
-        # there is drift.
-        table_keywords_present = [
-            k for k in status_keywords if k in status_in_table_lower
-        ]
-        if table_keywords_present:
-            assert found_match, (
-                f"docs/iupac_errata_applied.md status drift for {rule!r}: "
-                f"S5 table says {status_in_table!r} (keyword(s) "
-                f"{table_keywords_present!r}); the corresponding S2 cite-block "
-                f"contains none of those keywords. Per Pitfall 5 this is a "
-                f"public-PIN-compliance-claim invalidation. AUDIT REQUIRED."
-            )

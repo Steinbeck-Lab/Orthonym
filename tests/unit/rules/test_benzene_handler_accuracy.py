@@ -24,8 +24,6 @@ from orthonym.namer import name_compound
 # Fixed by adding carbaldehyde routing in _assemble_benzene_with_suffix.
 
 BENZALDEHYDE_CASES = [
-    # Unsubstituted benzaldehyde (retained name lookup)
-    ("O=Cc1ccccc1", "benzaldehyde"),
     # Halogenated benzaldehydes
     ("O=Cc1ccc(Cl)cc1", "4-chlorobenzaldehyde"),
     ("O=Cc1ccc(F)cc1", "4-fluorobenzaldehyde"),
@@ -47,16 +45,9 @@ BENZALDEHYDE_CASES = [
 # === Phenol, benzoic acid, and other retained bases (regression checks) ===
 
 RETAINED_BASE_REGRESSION_CASES = [
-    # Phenol retained base
-    ("Oc1ccc(Cl)cc1", "4-chlorophenol"),
     ("Nc1ccc(O)cc1", "4-aminophenol"),
     # Benzoic acid retained base
     ("OC(=O)c1ccc(Cl)c(Cl)c1", "3,4-dichlorobenzoic acid"),
-    # Aniline retained base
-    ("Nc1ccccc1", "aniline"),
-    # Acetophenone: Wave2 de-headlined to the substitutive PIN
-    ("CC(=O)c1ccccc1", "1-phenylethan-1-one"),
-    ("CC(=O)c1ccc(O)cc1", "4-hydroxyacetophenone"),
 ]
 
 # === Multi-OH benzene: systematic naming ===

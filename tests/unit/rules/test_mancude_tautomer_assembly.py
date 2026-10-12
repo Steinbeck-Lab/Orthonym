@@ -45,11 +45,6 @@ class TestMancudeTautomerTarget:
         assert info["double_bond_junction"] is False
         assert info["mancude_tautomer"] is True
 
-    @pytest.mark.unit
-    def test_names_2H_bipyridine(self):
-        # /: mancude stem 'pyridine', 2H on the tautomer ring.
-        assert name_compound("C1=CCN(c2ccccn2)C=C1") == "2H-1,2'-bipyridine"
-
 
 class TestMustNotMisdetect:
     """Two rings joined by a bond that are NOT one mancude parent + its

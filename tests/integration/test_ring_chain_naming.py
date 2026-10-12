@@ -25,14 +25,6 @@ class TestRingChainParentSelection:
         result = name_compound('c1ccc(CCC(=O)O)cc1')
         assert result == '3-phenylpropanoic acid'
 
-    def test_phenylacetic_acid_chain_is_parent(self):
-        """Phenylacetic acid: 2-carbon chain with FG, chain is parent."""
-        result = name_compound('c1ccc(CC(=O)O)cc1')
-        # 'Retained names as preferred IUPAC names' (the Blue Book): acetic
-        # acid is retained as the PIN and can be substituted example:6694
-        # 'phenylacetic acid (PIN)'); the systematic 'ethanoic acid' is never the PIN.
-        assert result == 'phenylacetic acid'
-
     def test_benzoic_acid_ring_is_parent(self):
         """Benzoic acid: FG directly on ring, so ring is parent.
 
@@ -95,35 +87,10 @@ class TestRingSubstituentNames:
 class TestRetainedNamesPreserved:
     """Test that retained names are not broken by parent selection."""
 
-    def test_benzene_alone(self):
-        """Unsubstituted benzene still named benzene."""
-        result = name_compound('c1ccccc1')
-        assert result == 'benzene'
-
-    def test_toluene(self):
-        """Toluene retained name preserved."""
-        result = name_compound('Cc1ccccc1')
-        assert result == 'toluene'
-
-    def test_benzoic_acid_retained(self):
-        """Benzoic acid retained name preserved."""
-        result = name_compound('c1ccc(C(=O)O)cc1')
-        assert result == 'benzoic acid'
-
     def test_phenol_retained(self):
         """Phenol retained name preserved."""
         result = name_compound('c1ccc(O)cc1')
         assert result == 'phenol'
-
-    def test_cyclohexane_alone(self):
-        """Unsubstituted cyclohexane still named cyclohexane."""
-        result = name_compound('C1CCCCC1')
-        assert result == 'cyclohexane'
-
-    def test_methylcyclohexane(self):
-        """Methylcyclohexane naming preserved."""
-        result = name_compound('CC1CCCCC1')
-        assert result == 'methylcyclohexane'
 
 
 class TestLocantAssignment:
@@ -154,29 +121,11 @@ class TestLocantAssignment:
 class TestEdgeCases:
     """Test edge cases in ring-chain naming."""
 
-    def test_phenylalanine_amino_acid(self):
-        """The phenylalanine constitution (no alpha configuration given) gets the systematic name."""
-        # NC(Cc1ccccc1)C(=O)O = phenylalanine, configuration undefined. A bare retained name
-        # is read as the L enantiomer, so the stereo-free input takes the systematic name of
-        # Table 10.4, the Blue Book 'phenylalanine
-        # 2-amino-3-phenylpropanoic acid'); the retained name needs a D/L descriptor
-        #,:54291). Commit 9292c013d (2026-08-16) 'stop fabricating implicit-L
-        # on stereo-undefined AAs/esters'.
-        result = name_compound('NC(Cc1ccccc1)C(=O)O')
-        assert result == '2-amino-3-phenylpropanoic acid'
-
     def test_phenyl_with_alcohol(self):
         """Phenyl substituent with alcohol on chain."""
         result = name_compound('c1ccc(CCO)cc1')
         # PIN style: 2-phenylethan-1-ol (with locant for -ol)
         assert result == '2-phenylethan-1-ol'
-
-    def test_short_chain_no_fg(self):
-        """Short chain with ring but no functional group."""
-        # Ethylbenzene should use retained name path, not ring-chain selection
-        result = name_compound('CCc1ccccc1')
-        # Should be ethylbenzene (ring is parent, chain is substituent)
-        assert result == 'ethylbenzene'
 
     def test_long_alkyl_on_benzene(self):
         """Propylbenzene: still ring is parent for simple alkyl."""
@@ -205,23 +154,6 @@ class TestP441ParentCorrections:
         )
         assert 'one' in result.lower() or 'on-' in result.lower(), (
             f"Should contain ketone suffix. Got: {result}"
-        )
-
-    def test_benzoic_acid_ring_parent_preserved(self):
-        """Benzoic acid: retained name, ring is parent. No regression."""
-        result = name_compound('c1ccc(C(=O)O)cc1')
-        assert result == 'benzoic acid', (
-            f"Benzoic acid retained name must be preserved. Got: {result}"
-        )
-
-    def test_phenylbutanoic_acid_chain_parent_preserved(self):
-        """4-Phenylbutanoic acid: PG exclusively on chain, chain is parent.
-
-        Verifies the pg_on_chain-only path is not broken by cascade changes.
-        """
-        result = name_compound('c1ccc(CCCC(=O)O)cc1')
-        assert result == '4-phenylbutanoic acid', (
-            f"Chain-only PG should give chain parent. Got: {result}"
         )
 
     def test_cyclohexanol_chain_longer_wins(self):

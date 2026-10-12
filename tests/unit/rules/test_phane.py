@@ -213,3 +213,22 @@ class TestNameCyclophane:
 
     def test_name_cyclophane_returns_none_on_none_input(self) -> None:
         assert name_cyclophane(None) is None
+
+
+@pytest.mark.parametrize(
+    "smiles, expected",
+    [
+        pytest.param("c1cc2cc(c1)CCc1cccc(c1)CC2", "1,4(1,3)-dibenzenacyclohexaphane", id="c1cc2cc(c1)CCc1cccc(c1)CC2"),
+    ],
+)
+def test_merged_phane_names(smiles, expected):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/integration/test_phane_vs_ring_assembly_dispatch.py::TestPhaneVsRingAssemblyDispatch::test_name_compound_full_dispatch_lands_on_phane (1)
+    Rules cited by those tests:.
+    """
+    from orthonym import name_compound
+    assert name_compound(smiles) == expected

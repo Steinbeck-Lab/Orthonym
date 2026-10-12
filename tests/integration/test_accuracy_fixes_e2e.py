@@ -43,7 +43,6 @@ class TestBug1AromaticSubstituents:
         # cyclohexyl contains hexyl, so check it's cyclohexyl specifically
         assert 'cyclohexyl' in result.lower(), f"Expected cyclohexyl: {result}"
 
-    @pytest.mark.xfail(reason="Chain-based aromatic detection needs further work - deferred")
     def test_amino_phenyl_propanol(self):
         """(1S,2R)-2-amino-1-phenylpropan-1-ol from GAP_ANALYSIS."""
         result = name_compound('C[C@@H](N)[C@@H](O)c1ccccc1')
@@ -295,7 +294,6 @@ class TestEdgeCasesFromGapAnalysis:
         assert 'phenyl' in result.lower() or 'phenethyl' in result.lower()
         assert 'hexyl' not in result.lower()
 
-    @pytest.mark.xfail(reason="Benzyl functional group naming needs further work - deferred")
     def test_benzyl_alcohol(self):
         """Benzyl alcohol."""
         result = name_compound('OCc1ccccc1')

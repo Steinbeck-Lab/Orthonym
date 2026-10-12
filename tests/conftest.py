@@ -359,7 +359,15 @@ def pytest_configure(config):
         "markers", "roundtrip: Round-trip validation with OPSIN"
     )
     config.addinivalue_line(
-        "markers", "slow: Full 100k validation suite"
+        "markers",
+        "slow: nightly-run tests: the full 100k validation suite and single "
+        "cases that take 20 s or more (the PR run uses -m 'not slow')"
+    )
+    config.addinivalue_line(
+        "markers",
+        "real_opsin_cli: run this test with the real `java -jar opsin` command line "
+        "(the PR run answers the test code's OPSIN command-line calls in process, "
+        "tests/support/opsin_cli_inproc.py); for a test that compares something with it"
     )
     config.addinivalue_line(
         "markers",
@@ -628,6 +636,38 @@ def pytest_unconfigure(config):
     if _ORIGINAL_RELOAD is not None:
         importlib.reload = _ORIGINAL_RELOAD
         _ORIGINAL_RELOAD = None
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _opsin_cli_in_process():
+    """PR runs: answer the test code's ``java -jar opsin -osmi`` calls in process.
+
+    A JVM start per case made about 60 files the slowest of the suite. The served
+    result is what the command line prints (``jvm_bridge._opsin_stdout_uncached``'s
+    contract, compared on 40 names by ``test_opsin_cli_inproc.py``). The nightly run sets
+    ORTHONYM_TEST_REAL_OPSIN_CLI=1 and runs every call against the real command line; the
+    ``real_opsin_cli`` marker does the same for one test. Calls from ``src/orthonym`` are
+    never served in process. See tests/support/opsin_cli_inproc.py for the exact scope.
+    """
+    from tests.support import opsin_cli_inproc
+    installed = opsin_cli_inproc.install()
+    yield installed
+    if installed:
+        opsin_cli_inproc.uninstall()
+
+
+@pytest.fixture(autouse=True)
+def _real_opsin_cli_marker(request):
+    """A test marked ``real_opsin_cli`` runs against the real OPSIN command line."""
+    if request.node.get_closest_marker("real_opsin_cli") is None:
+        yield
+        return
+    from tests.support import opsin_cli_inproc
+    opsin_cli_inproc.SUSPENDED = True
+    try:
+        yield
+    finally:
+        opsin_cli_inproc.SUSPENDED = False
 
 
 @pytest.fixture(autouse=True)

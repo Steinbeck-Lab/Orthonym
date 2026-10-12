@@ -76,22 +76,6 @@ class TestSulfoxideAsNonPrincipal:
     """Sulfoxide as non-principal group alongside a higher-priority acid."""
 
     @pytest.mark.integration
-    def test_methylsulfinyl_ethanoic_acid(self):
-        """OC(=O)CS(=O)C -> (methanesulfinyl)acetic acid."""
-        result = name_compound("OC(=O)CS(=O)C")
-        # PIN per R8: "SULFOXIDES AND SULFONES" "(1) substitutively, by prefixing the name
-        # of the acyl group R′-SO– or R′-SO2– to the name of the parent hydride"
-        # the Blue Book, "Methods (1) and (3) generate preferred names.":28088;
-        # "the preferred prefixes are enclosed in parentheses even though they are
-        # simple prefixes":31262; "2-(methanesulfonyl)ethan-1-ol (PIN)
-        # 2-(methylsulfonyl)ethan-1-ol":28150; and per R3:
-        # "only acetic acid, benzoic acid, and oxamic acid can be
-        # substituted" the Blue Book, "acetic acid (PIN) ethanoic acid":29725;
-        # "All locants are omitted for parent compounds when all substitutable
-        # hydrogen atoms have the same locant.":3031. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-        assert result == "(methanesulfinyl)acetic acid"
-
-    @pytest.mark.integration
     def test_methylsulfinyl_propanoic_acid(self):
         """OC(=O)CCS(=O)C -> 3-(methanesulfinyl)propanoic acid."""
         result = name_compound("OC(=O)CCS(=O)C")
@@ -102,18 +86,6 @@ class TestSulfoxideAsNonPrincipal:
         # simple prefixes":31262; "2-(methanesulfonyl)ethan-1-ol (PIN)
         # 2-(methylsulfonyl)ethan-1-ol":28150. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
         assert result == "3-(methanesulfinyl)propanoic acid"
-
-    @pytest.mark.integration
-    def test_methylsulfinyl_benzoic_acid(self):
-        """OC(=O)c1ccc(S(=O)C)cc1 -> 4-(methanesulfinyl)benzoic acid.
-
-         PIN: a ring-attached sulfoxide substituent is the acid-stem oxide
-        form ``methanesulfinyl``, not the ``methyl``+``sulfinyl`` concatenation.
-        Value corrected (was ``methylsulfinyl``): OPSIN round-trips the new form to
-        the input structure, and it matches the benzene-parent path's own output.
-        """
-        result = name_compound("OC(=O)c1ccc(S(=O)C)cc1")
-        assert result == "4-(methanesulfinyl)benzoic acid"
 
     @pytest.mark.integration
     def test_sulfinyl_prefix_present(self):
@@ -131,22 +103,6 @@ class TestSulfoneAsNonPrincipal:
     """Sulfone as non-principal group alongside a higher-priority acid."""
 
     @pytest.mark.integration
-    def test_methylsulfonyl_ethanoic_acid(self):
-        """OC(=O)CS(=O)(=O)C -> (methanesulfonyl)acetic acid."""
-        result = name_compound("OC(=O)CS(=O)(=O)C")
-        # PIN per R8: "SULFOXIDES AND SULFONES" "(1) substitutively, by prefixing the name
-        # of the acyl group R′-SO– or R′-SO2– to the name of the parent hydride"
-        # the Blue Book, "Methods (1) and (3) generate preferred names.":28088;
-        # "the preferred prefixes are enclosed in parentheses even though they are
-        # simple prefixes":31262; "2-(methanesulfonyl)ethan-1-ol (PIN)
-        # 2-(methylsulfonyl)ethan-1-ol":28150; and per R3:
-        # "only acetic acid, benzoic acid, and oxamic acid can be
-        # substituted" the Blue Book, "acetic acid (PIN) ethanoic acid":29725;
-        # "All locants are omitted for parent compounds when all substitutable
-        # hydrogen atoms have the same locant.":3031. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-        assert result == "(methanesulfonyl)acetic acid"
-
-    @pytest.mark.integration
     def test_methylsulfonyl_propanoic_acid(self):
         """OC(=O)CCS(=O)(=O)C -> 3-(methanesulfonyl)propanoic acid."""
         result = name_compound("OC(=O)CCS(=O)(=O)C")
@@ -157,18 +113,6 @@ class TestSulfoneAsNonPrincipal:
         # simple prefixes":31262; "2-(methanesulfonyl)ethan-1-ol (PIN)
         # 2-(methylsulfonyl)ethan-1-ol":28150. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
         assert result == "3-(methanesulfonyl)propanoic acid"
-
-    @pytest.mark.integration
-    def test_methylsulfonyl_benzoic_acid(self):
-        """OC(=O)c1ccc(S(=O)(=O)C)cc1 -> 4-(methanesulfonyl)benzoic acid.
-
-         PIN: a ring-attached sulfone substituent is the acid-stem oxide
-        form ``methanesulfonyl``, not the ``methyl``+``sulfonyl`` concatenation.
-        Value corrected (was ``methylsulfonyl``): OPSIN round-trips the new form to
-        the input structure, and it matches the benzene-parent path's own output.
-        """
-        result = name_compound("OC(=O)c1ccc(S(=O)(=O)C)cc1")
-        assert result == "4-(methanesulfonyl)benzoic acid"
 
 
 # ============================================================================
@@ -413,26 +357,6 @@ class TestExistingPolyfunctionalNoRegression:
     """Regression battery -- all must still pass."""
 
     @pytest.mark.integration
-    def test_hydroxy_ethanoic_acid(self):
-        """OCC(=O)O -> hydroxyacetic acid."""
-        # PIN per R3: "only acetic acid, benzoic acid, and oxamic acid can be
-        # substituted" the Blue Book, "acetic acid (PIN) ethanoic acid":29725;
-        # "All locants are omitted for parent compounds when all substitutable
-        # hydrogen atoms have the same locant.":3031; "hydroxyacetic acid (PIN) (not glycolic acid)":29854.
-        # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-        assert name_compound("OCC(=O)O") == "hydroxyacetic acid"
-
-    @pytest.mark.integration
-    def test_oxopropanoic_acid(self):
-        """CC(=O)C(=O)O -> 2-oxopropanoic acid."""
-        assert name_compound("CC(=O)C(=O)O") == "2-oxopropanoic acid"
-
-    @pytest.mark.integration
-    def test_methoxypropanoic_acid(self):
-        """COCCC(=O)O -> 3-methoxypropanoic acid."""
-        assert name_compound("COCCC(=O)O") == "3-methoxypropanoic acid"
-
-    @pytest.mark.integration
     def test_ethanoyloxy_propanoic_acid(self):
         """OC(=O)CCOC(=O)C -> 3-(acetyloxy)propanoic acid."""
         # PIN per R4: "acetyl (preferred prefix) ethanoyl" the Blue Book;
@@ -440,33 +364,6 @@ class TestExistingPolyfunctionalNoRegression:
         # to the contracted name 'acetoxy'":31700; "3-(benzoyloxy)propanoic acid (PIN)":31711.
         # OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
         assert name_compound("OC(=O)CCOC(=O)C") == "3-(acetyloxy)propanoic acid"
-
-    @pytest.mark.integration
-    def test_dimethyl_sulfoxide_functional_class(self):
-        """CS(=O)C -> (methanesulfinyl)methane (substitutive; the class name is not a PIN)."""
-        # PIN per R8: "SULFOXIDES AND SULFONES" "(1) substitutively, by prefixing the name
-        # of the acyl group R′-SO– or R′-SO2– to the name of the parent hydride"
-        # the Blue Book, "Methods (1) and (3) generate preferred names.":28088;
-        # "the preferred prefixes are enclosed in parentheses even though they are
-        # simple prefixes":31262; "2-(methanesulfonyl)ethan-1-ol (PIN)
-        # 2-(methylsulfonyl)ethan-1-ol":28150; "(methanesulfinyl)methane (PIN)":46154. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-        assert name_compound("CS(=O)C") == "(methanesulfinyl)methane"
-
-    @pytest.mark.integration
-    def test_dimethyl_sulfone_functional_class(self):
-        """CS(=O)(=O)C -> (methanesulfonyl)methane (substitutive; the class name is not a PIN)."""
-        # PIN per R8: "SULFOXIDES AND SULFONES" "(1) substitutively, by prefixing the name
-        # of the acyl group R′-SO– or R′-SO2– to the name of the parent hydride"
-        # the Blue Book, "Methods (1) and (3) generate preferred names.":28088;
-        # "the preferred prefixes are enclosed in parentheses even though they are
-        # simple prefixes":31262; "2-(methanesulfonyl)ethan-1-ol (PIN)
-        # 2-(methylsulfonyl)ethan-1-ol":28150; "(methanesulfinyl)methane (PIN)":46154. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-        assert name_compound("CS(=O)(=O)C") == "(methanesulfonyl)methane"
-
-    @pytest.mark.integration
-    def test_hydroxy_dioxo_hexanoic_acid(self):
-        """OCC(=O)CC(=O)CC(=O)O -> 6-hydroxy-3,5-dioxohexanoic acid (3+ FGs)."""
-        assert name_compound("OCC(=O)CC(=O)CC(=O)O") == "6-hydroxy-3,5-dioxohexanoic acid"
 
     @pytest.mark.integration
     def test_no_double_naming_sulfoxide(self):

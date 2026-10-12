@@ -160,19 +160,6 @@ def test_multiplied_italicized_prefix_keeps_its_hyphen(name, expected):
 # part B: the mononuclear pair (sites 1 + 2), end to end
 # ==========================================================================
 
-def test_mononuclear_multi_prefix_transform_survives_a_tert_butyl(ungated_namer):
-    """Sites 1+2: the raw hyphen test corrupted EVERY prefix, not just the tert- one.
-
-    ``_is_simple_prefix`` feeds an ``all(...)``, so classing 'tert-butyl' compound
-    flipped the whole guard False and silently switched OFF the
-    first-bare/rest-enclosed transform for every prefix in the name. BB 16286
-    writes the directly analogous phosphane as
-    '*tert*-butyldi(methyl)phosphane' (PIN): first group bare, each later group
-    enclosed, multiplier OUTSIDE the marks. OPSIN-exact against the input.
-    """
-    assert (ungated_namer.name("CC(C)(C)[Si](C)(C)OCC1CO1")
-            == "tert-butyldi(methyl)(oxiranylmethoxy)silane")
-
 
 def test_mononuclear_multiplied_italicized_prefix_is_not_malformed(ungated_namer):
     """The multiplier leg, live and MALFORMED before this phase.

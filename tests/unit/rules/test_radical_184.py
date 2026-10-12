@@ -22,8 +22,8 @@ Blue Book sources (the Blue Book Blue Book):
 RED-by-design on HEAD (verified): ``CC[CH]CC`` / ``CCC[CH]CC`` / ``[CH3]`` all
 -> ``unknown organic compound`` (gate-suppressed). The ``[CH3]`` -> ``methyl``
 guard is therefore ALSO RED today (the gate suppresses the retained radical too)
-and is marked xfail until Plan 184-05 exempts radical names via the ``-r``
-oracle; it is documented, not a collection error.
+and was marked xfail until Plan 184-05 exempted radical names via the ``-r``
+oracle; it passes now.
 """
 
 import pytest
@@ -50,12 +50,6 @@ class TestNonTerminalRadicalLocant:
         6-carbon chain; numbering from either end gives 3)."""
         assert Orthonym().name("CCC[CH]CC") == "hexan-3-yl"
 
-    @pytest.mark.xfail(
-        strict=False,
-        reason="Retained radical methyl is gate-suppressed to 'unknown' on HEAD "
-        "(OPSIN run without --allowRadicals); goes GREEN when Plan 184-05 adds "
-        "-r to the OPSIN oracle. Tracked, not blocking Wave 0.",
-    )
     def test_methyl_retained_no_locant(self):
         """: the retained radical name ``methyl`` carries no locant
         (single carbon). Guard that the new locant primitive does NOT inject a

@@ -94,11 +94,6 @@ class TestPeptideGuardInNaming:
         result = name_amino_acid(mol, canonical)
         assert result is None, f"Tripeptide incorrectly named as amino acid: {result}"
 
-    def test_glycine_still_named_correctly(self):
-        """Glycine should still return 'glycine'."""
-        result = name_compound("NCC(=O)O")
-        assert result == "glycine"
-
     def test_alanine_still_named_correctly(self):
         """The alanine constitution is named as the amino acid, not as a peptide.
 
@@ -113,23 +108,6 @@ class TestPeptideGuardInNaming:
         result = name_compound("CC(N)C(=O)O")
         assert result == "2-aminopropanoic acid"
 
-    def test_n_methylglycine_still_works(self):
-        """N-methylglycine should still be named correctly -- systematically.
-
-        Was ``== "sarcosine"``, stale since: 'sarcosine' has 0 Blue Book
-        hits and is in neither retained table; "Systematic
-        substitutive names" (the Blue Book),:54251: "When not denoted by a
-        retained name, amino acids receive systematic substitutive names...". User
-        decision A (2026-09-26) states the class: an amino acid substituted on its
-        nitrogen takes the systematic substitutive name. The deny row
-        (data/iupac_2013_pin_list.json 'sarcosine') names the replacement; OPSIN 2.9.0
-        full-InChIKey round trip checked below, outside the engine.
-        """
-        from tests.support.rt_assert import assert_full_rt
-        result = name_compound("CNCC(=O)O")
-        assert result == "(methylamino)acetic acid"
-        assert_full_rt(result, "CNCC(=O)O")
-
     def test_dipeptide_does_not_produce_wrong_carbon_count(self):
         """Ala-Gly dipeptide should NOT produce '2-aminopentanoic acid' (5C)."""
         result = name_compound("CC(N)C(=O)NCC(=O)O")
@@ -139,22 +117,6 @@ class TestPeptideGuardInNaming:
         """Gly-Gly-Gly should NOT produce '2-aminohexanoic acid' (6C)."""
         result = name_compound("NCC(=O)NCC(=O)NCC(=O)O")
         assert "aminohexanoic" not in result, f"Tripeptide linearized: {result}"
-
-    def test_asparagine_still_works(self):
-        """Asparagine constitution (amide side chain) is named systematically."""
-        # Stereo-free input: systematic name of Table 10.4, the Blue Book
-        # 'asparagine 2,4-diamino-4-oxobutanoic acid'); see test_alanine_still_named_correctly
-        # (commit 9292c013d).
-        result = name_compound("NC(CC(N)=O)C(=O)O")
-        assert result == "2,4-diamino-4-oxobutanoic acid"
-
-    def test_glutamine_still_works(self):
-        """Glutamine constitution (amide side chain) is named systematically."""
-        # Stereo-free input: systematic name of Table 10.4, the Blue Book
-        # 'glutamine 2,5-diamino-5-oxopentanoic acid'); see test_alanine_still_named_correctly
-        # (commit 9292c013d).
-        result = name_compound("NC(CCC(N)=O)C(=O)O")
-        assert result == "2,5-diamino-5-oxopentanoic acid"
 
 
 # ============================================================================
@@ -218,25 +180,10 @@ class TestRingAcidNaming:
 class TestEsterRingNaming:
     """Test complete ester naming with ring-containing acids."""
 
-    def test_methyl_benzoate(self):
-        """Methyl benzoate: NOT 'methyl heptanoate'."""
-        result = name_compound("COC(=O)c1ccccc1")
-        assert result == "methyl benzoate"
-
-    def test_ethyl_benzoate(self):
-        """Ethyl benzoate: NOT 'ethyl heptanoate'."""
-        result = name_compound("CCOC(=O)c1ccccc1")
-        assert result == "ethyl benzoate"
-
     def test_methyl_cyclopentanecarboxylate(self):
         """Methyl cyclopentanecarboxylate: ring acid named correctly."""
         result = name_compound("COC(=O)C1CCCC1")
         assert result == "methyl cyclopentanecarboxylate"
-
-    def test_methyl_cyclohexanecarboxylate(self):
-        """Methyl cyclohexanecarboxylate: ring acid named correctly."""
-        result = name_compound("COC(=O)C1CCCCC1")
-        assert result == "methyl cyclohexanecarboxylate"
 
     def test_methyl_indole_carboxylate_not_linearized(self):
         """Methyl indole-3-carboxylate: NOT 'methyl nonanoate'."""
@@ -248,10 +195,6 @@ class TestEsterRingNaming:
 class TestSimpleEstersStillWork:
     """Verify simple esters are not broken by ring detection guards."""
 
-    def test_methyl_acetate(self):
-        """Methyl acetate should still work."""
-        assert name_compound("CC(=O)OC") == "methyl acetate"
-
     def test_ethyl_propanoate(self):
         """Ethyl propanoate should still work."""
         assert name_compound("CCC(=O)OCC") == "ethyl propanoate"
@@ -260,25 +203,9 @@ class TestSimpleEstersStillWork:
         """Methyl formate should still work."""
         assert name_compound("COC=O") == "methyl formate"
 
-    def test_ethyl_acetate(self):
-        """Ethyl acetate should still work."""
-        assert name_compound("CC(=O)OCC") == "ethyl acetate"
-
 
 class TestPolycyclicEsterRouting:
     """Test that polycyclic esters are not routed to simple ring ester naming."""
-
-    def test_cyclohexyl_acetate_still_works(self):
-        """Cyclohexyl acetate (simple ring ester) should still work.
-
-         a phase: the assertion now matches this test's own title. It read
-        `"acetyloxy" in result or "cyclohexane" in result` — the substitutive
-        form — which is neither of the words in `cyclohexyl acetate`, the
-        functional-class PIN required by. The routing property the
-        class is here to protect (a SIMPLE ring ester must not fall into the
-        polycyclic path) is asserted more sharply by naming it exactly.
-        """
-        assert name_compound("CC(=O)OC1CCCCC1") == "cyclohexyl acetate"
 
     def test_fused_ring_ester_not_simple_cycloalkane(self):
         """Fused ring ester should NOT be named as simple cycloalkane."""

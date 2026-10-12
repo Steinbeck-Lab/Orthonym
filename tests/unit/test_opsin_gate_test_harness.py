@@ -37,7 +37,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # CC(=O)N(CC1CO1)C(C)C ('(5-carbamoylpentyl)oxirane' ungated), is now named
 # correctly with the gate off ('N-(oxiranylmethyl)-N-(propan-2-yl)acetamide'), so
 # the pair stopped disagreeing and this file went red, as designed. The new one is
-# canary call 678 of tests/integration/test_canary_rt75.py (DK-NOTEXACT, a known
+# canary call 678 of tests/support/canary_rt75_data.py (DK-NOTEXACT, a known
 # gate-off 0-wrong producer that the gate voids; probe 2026-09-26). When it is
 # fixed, pick another row whose ungated name is a wrong molecule.
 CANARY = "CCCCOc1ccc(CC(=O)NO)cc1"

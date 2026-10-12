@@ -221,14 +221,18 @@ def test_exocyclic_ylidene_never_names_a_different_molecule(
         f"named with a single-valence (-yl) morpheme (P-29.2).")
 
 
+_PIN_UNDERTAKEN = [case for case in RING_FAMILY_YLIDENES if case[2] is not None]
+
+
 @pytest.mark.parametrize(
-    "family,smiles,expected_pin", RING_FAMILY_YLIDENES,
-    ids=[case[0] for case in RING_FAMILY_YLIDENES])
+    "family,smiles,expected_pin", _PIN_UNDERTAKEN,
+    ids=[case[0] for case in _PIN_UNDERTAKEN])
 def test_exocyclic_ylidene_reaches_its_known_pin(
         family, smiles, expected_pin, monkeypatch):
-    """Families whose PIN this phase constructs must actually reach it."""
-    if expected_pin is None:
-        pytest.skip(f"{family}: no PIN undertaken by this phase")
+    """Families whose PIN this phase constructs must actually reach it.
+
+    Families with no PIN undertaken by this phase (expected_pin is None) are
+    not parametrized."""
     jar_or_skip()  # OPSIN jar required
 
     name = _name_under("no_jvm", smiles, monkeypatch)

@@ -177,19 +177,22 @@ def _shipped_or_strict(fixture_id, name, limit, strict, be):
     return name
 
 
-@pytest.mark.parametrize("seed", [0, 1, 2, 3, 42])
-@pytest.mark.parametrize("fixture_id,smi,expected_substring", AROMATIC_NP_FIXTURES)
+@pytest.mark.parametrize("seed", [0])
+@pytest.mark.parametrize(
+    "fixture_id,smi,expected_substring",
+    [row for row in AROMATIC_NP_FIXTURES if row[0] in _NEEDS_ETHYNYL_DECORATION],
+)
 def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
     seed, fixture_id, smi, expected_substring, request,
 ):
-    """Per internal notes: ALL aromatic-NP-scaffold canary rows produce
-    byte-identical output across PYTHONHASHSEED ∈ {0, 1, 2, 3, 42}.
+    """Strict-xfail tripwire of the two ethynyl fixtures (``_NEEDS_ETHYNYL_DECORATION``),
+    at PYTHONHASHSEED 0: the '1,3,5(10)-trien' substring may only come back as a real,
+    decoration-complete name.
 
-    The harness runs name_compound in a subprocess with the given
-    PYTHONHASHSEED, then compares the output against the expected
-    canonical substring (1,3,5(10)-trien for estradiol-class). If the
-    substring is None, only cross-seed determinism is asserted
-    (output is invariant across seeds even if specific form is uncertain).
+    The cross-seed check of every fixture, with the same substring assertion for the
+    other fixtures, is ``test_aromatic_np_scaffold_byte_identical_across_seeds``: it
+    runs the same five (fixture, seed) subprocesses, so a per-seed copy of it for all
+    fixtures was a duplicate (and the slowest test of the suite).
     """
     if fixture_id in _NEEDS_ETHYNYL_DECORATION:
         request.applymarker(pytest.mark.xfail(strict=True,
@@ -216,7 +219,16 @@ def test_aromatic_np_scaffold_deterministic_across_pythonhashseed(
         )
 
 
-@pytest.mark.parametrize("fixture_id,smi,expected_substring", AROMATIC_NP_FIXTURES)
+# Three fixtures run in the PR run (the original Kekulé-bug row, a plain steroid and a
+# row the default tier declines); the other eight run in the nightly run only.
+_PR_RUN_FIXTURES = {"name_stability_265", "estradiol", "4_hydroxyestradiol"}
+
+
+@pytest.mark.parametrize(
+    "fixture_id,smi,expected_substring",
+    [row if row[0] in _PR_RUN_FIXTURES else pytest.param(*row, marks=pytest.mark.slow)
+     for row in AROMATIC_NP_FIXTURES],
+)
 def test_aromatic_np_scaffold_byte_identical_across_seeds(
     fixture_id, smi, expected_substring,
 ):
@@ -252,6 +264,14 @@ def test_aromatic_np_scaffold_byte_identical_across_seeds(
             f"  seed={s}: {o!r}" for s, o in sorted(outputs.items())
         )
     )
+
+    # The two ethynyl fixtures are strict xfails in the per-seed test above: their
+    # substring is missing today.
+    if expected_substring is not None and fixture_id not in _NEEDS_ETHYNYL_DECORATION:
+        assert expected_substring in outputs[seeds[0]], (
+            f"Determinism contract violated for {fixture_id}: expected substring "
+            f"{expected_substring!r} in output, got: {outputs[seeds[0]]!r}"
+        )
 
 
 @pytest.mark.parametrize("fixture_id", sorted(_NEEDS_ETHYNYL_DECORATION))

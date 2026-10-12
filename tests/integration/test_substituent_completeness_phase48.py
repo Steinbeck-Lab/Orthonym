@@ -265,49 +265,6 @@ class TestChainParentSulfurSubstituents:
 
 
 # ---------------------------------------------------------------------------
-# Class 8: Canary regression
-# ---------------------------------------------------------------------------
-
-def _verified_canary_rows():
-    """The canary fixture rows whose name is a verified baseline.
-
-    Task 12 fix a performance pass (wp6-tests; TRIAGE.md ' outcome', follow-ups): the rows in
-    CANARY_KNOWN_DEFECTS (tests/unit/rules/test_opsin_format_compliance.py) keep an
-    OLD fixture value on purpose -- their current name is a recorded defect, checked
-    there (RT-exact non-PIN classes by their recorded name; not-RT-exact rows by the
-    gate-on tier contract). Comparing them with the fixture here made both tests below
-    fail on exactly those rows (220 of them; 317 before Task 11), so they are left to
-    the owning test."""
-    from tests.integration.test_canary_rt75 import CANARY_COMPOUNDS
-    from tests.unit.rules.test_opsin_format_compliance import CANARY_KNOWN_DEFECTS
-    return [(smi, exp) for smi, exp in CANARY_COMPOUNDS if smi not in CANARY_KNOWN_DEFECTS]
-
-
-class TestCanaryRegression:
-    """Verify the verified canary compounds still pass."""
-
-    @pytest.mark.integration
-    def test_canary_75_stable(self):
-        """Every verified canary compound still produces its expected name (the
-        known-defect rows are owned by test_opsin_format_compliance.py)."""
-        rows = _verified_canary_rows()
-        failures = []
-        for smiles, expected_name in rows:
-            result = name_compound(smiles)
-            if result != expected_name:
-                failures.append(
-                    f"  {smiles}\n"
-                    f"    Expected: {expected_name}\n"
-                    f"    Got:      {result}"
-                )
-
-        assert not failures, (
-            f"CANARY REGRESSIONS ({len(failures)}/{len(rows)}):\n" +
-            "\n".join(failures)
-        )
-
-
-# ---------------------------------------------------------------------------
 # Impact measurement
 # ---------------------------------------------------------------------------
 
@@ -372,14 +329,6 @@ class TestImpactMeasurement:
                 chain_pass += 1
             chain_details.append(f"  {'PASS' if passed else 'FAIL'} {desc:20s} -> {name}")
 
-        # Measurement 3: Canary regression (verified rows; the known-defect rows are
-        # owned by test_opsin_format_compliance.py, see _verified_canary_rows)
-        canary_rows = _verified_canary_rows()
-        canary_pass = 0
-        for smiles, expected_name in canary_rows:
-            if name_compound(smiles) == expected_name:
-                canary_pass += 1
-
         # Print summary
         print("\n" + "=" * 70)
         print("Phase 48 Impact Measurement")
@@ -390,12 +339,9 @@ class TestImpactMeasurement:
         print(f"\n  Chain silent drops fixed: {chain_pass}/8")
         for d in chain_details:
             print(d)
-        canary_total = len(canary_rows)
-        print(f"\n  Canary: {canary_pass}/{canary_total}")
         print("=" * 70)
 
         # The test passes -- this is a measurement, not a strict gate
         # But we assert minimum thresholds based on what Plans 01-02 should fix
         assert ring_pass >= 15, f"Ring substituents: {ring_pass}/20, expected >= 15"
         assert chain_pass >= 6, f"Chain silent drops: {chain_pass}/8, expected >= 6"
-        assert canary_pass == canary_total, f"Canary regressions: {canary_total - canary_pass} failures"

@@ -90,8 +90,13 @@ def test_retained_catalog_entry_present(smiles, expected):
     assert ALL_RETAINED_NAMES.get(smiles) == expected
 
 
+# '4H-quinolizine' is asserted with the same call by test_fused_heterocycles.py
+# (test_4h_quinolizine_e2e); left out here.
+_EMIT_PIN_ROWS = [row for row in _ALL if row[0] != "C1=CCN2C=CC=CC2=C1"]
+
+
 @pytest.mark.unit
-@pytest.mark.parametrize("smiles,expected", _ALL)
+@pytest.mark.parametrize("smiles,expected", _EMIT_PIN_ROWS)
 def test_name_compound_emits_pin(smiles, expected):
     """End-to-end: name_compound emits the Blue-Book PIN (not the OPSIN stem
     without ``e``, not a von Baeyer name, not the retained functional-class name)."""

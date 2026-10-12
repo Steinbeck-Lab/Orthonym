@@ -199,6 +199,7 @@ class TestBackboneSubstitutiveAbstainsCorrectly:
             "-3-(1H-indol-3-yl)propanamido}-5-oxopentanoic acid"), result
         assert _full_rt(self.UNDEFINED_STEREO_WITNESS, result), result
 
+    @pytest.mark.slow  # one 49 s molecule: nightly run only
     def test_side_chain_acid_trap_witness_abstains(self):
         result = _dt_name_compound(self.SIDE_CHAIN_ACID_TRAP_WITNESS)
         assert is_failure_name(result), (

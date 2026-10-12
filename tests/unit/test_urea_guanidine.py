@@ -8,7 +8,6 @@ Covers:
 - OPSIN round-trip validation for generated names
 """
 
-import pytest
 from rdkit import Chem
 from orthonym import name_compound
 from orthonym.perception.functional_groups import detect_functional_groups
@@ -134,26 +133,6 @@ class TestFGCollisionAvoidance:
 # OPSIN round-trip validation
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("smiles,expected_name", [
-    ("NC(=O)N", "urea"),
-    # Monosubstituted urea OMITS the italic-N locant, the Blue Book methylurea).
-    ("CNC(=O)N", "methylurea"),
-    ("CCNC(=O)N", "ethylurea"),
-    ("CNC(=O)NC", "N,N'-dimethylurea"),
-    ("CN(C)C(=O)N", "N,N-dimethylurea"),
-    ("NC(=O)Nc1ccccc1", "phenylurea"),
-    ("CN(C)C(=O)N(C)C", "tetramethylurea"),            #:3007,:3025
-    ("CCNC(=O)NC", "N-ethyl-N'-methylurea"),
-    ("NC(=N)N", "guanidine"),
-    ("CNC(=N)N", "N-methylguanidine"),
-    ("CCNC(=N)N", "N-ethylguanidine"),
-    ("CN(C)C(=N)N", "N,N-dimethylguanidine"),
-])
-def test_urea_guanidine_naming(smiles, expected_name):
-    """Parameterized test for all urea/guanidine naming."""
-    result = name_compound(smiles)
-    assert result == expected_name, f"For {smiles}: got '{result}', expected '{expected_name}'"
-
 
 # ---------------------------------------------------------------------------
 # Prefix form tests (when subordinate to higher-seniority group)
@@ -168,12 +147,6 @@ class TestPrefixForms:
         # The polyfunctional assembly produces a name containing "carbamoylamino"
         # The full name format may have imperfections but the prefix form is correct
         assert "carbamoylamino" in result or "ureido" in result
-
-    def test_guanidine_as_prefix_with_acid(self):
-        """Guanidine subordinate to carboxylic acid takes the carbamimidoylamino prefix."""
-        result = name_compound("NC(=N)NCCCC(=O)O")
-        # (the Blue Book-34268): 'carbamimidoylamino (preferred prefix)'; 7. Prefixes (g) (:1700) 'guanidino' is no longer acceptable in PINs
-        assert result == "4-(carbamimidoylamino)butanoic acid"
 
     def test_diaminomethylidene_tautomer_prefix(self):
         """(H2N)2C=N- takes '(diaminomethylidene)amino (preferred prefix)'

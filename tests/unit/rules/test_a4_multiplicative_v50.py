@@ -60,9 +60,6 @@ class TestP6461ThioneKetoneParent:
         # cites indicated hydrogen for the mancude parent whatever sits on the pyrrole-type atom; a substituent group keeps it: "(1H-indol-1-yl)acetic acid (PIN)" (the Blue Book). OPSIN RT exact.
         assert name_compound(smi) == "di(1-methyl-1H-imidazol-2-yl)methanethione"
 
-    def test_diphenylmethanone(self):
-        assert name_compound("O=C(c1ccccc1)c1ccccc1") == "diphenylmethanone"
-
     def test_di_imidazol_1_yl_methanethione(self):
         # (the Blue Book) 'di(1H-imidazol-1-yl)methanethione (PIN)';
         # (:23309): the thione bridge is the parent. Built by

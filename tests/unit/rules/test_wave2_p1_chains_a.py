@@ -68,14 +68,6 @@ class TestP44SeniorAtomParent:
 
 @pytest.mark.unit
 class TestP64RingKetonicSuffixSeniority:
-    def test_thiazolidinone_structural(self):
-        # root heal: the lactam handler was DROPPING the ring S
-        # (O=C1CSCN1 -> 'pyrrolidin-2-one', -suppressed). The narrowed
-        # lactam predicate + the ring-ketone '-one' suffix now name it
-        # structurally correctly (OPSIN-RT verified). Since the
-        # heteroatom-locant citation shipped, the exact PIN form '1,3-...' is
-        # now emitted (see test_thiazolidinone_exact_pin).
-        assert name_compound("O=C1CSCN1") == "1,3-thiazolidin-4-one"
 
     def test_thiazolidinone_exact_pin(self):
         #: suffixed retained HW-derived saturated hetero-ring parent

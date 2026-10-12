@@ -283,13 +283,6 @@ class TestDataLookupFunctions:
 class TestMultiFusionDescriptorGeneration:
     """Tests for multi-component fusion descriptor formatting (format_complex_fusion)."""
 
-    def test_generate_multi_fusion_simple(self):
-        """Test generating descriptor for simple multi-fusion."""
-        parent_ring = list(range(14))  # Anthracene-like
-        components = [
-            ('benzene', parent_ring, {0, 1}),  # Edge a
-            ('benzene', parent_ring, {4, 5}),  # Edge e (approx)
-        ]
         # Note: actual edges depend on ring ordering
         # This tests the function can be called
 

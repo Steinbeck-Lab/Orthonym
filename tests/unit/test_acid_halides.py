@@ -72,11 +72,6 @@ class TestSystematicAcidHalides:
 class TestRingAttachedAcidHalides:
     """Test ring-attached acid halide naming."""
 
-    def test_benzoyl_chloride(self):
-        """Benzoyl chloride - benzene-attached acid chloride."""
-        result = name_compound("O=C(Cl)c1ccccc1")
-        assert result == "benzoyl chloride"
-
     def test_benzoyl_bromide(self):
         """Benzoyl bromide - benzene-attached acid bromide."""
         result = name_compound("O=C(Br)c1ccccc1")
@@ -259,6 +254,3 @@ class TestRetainedDiacylAndCarbonicHalides:
         # Regression: the same-halide carbonic dihalide keeps its retained name.
         assert name_compound("O=C(Cl)Cl") == "carbonyl dichloride"
 
-    def test_longer_diacyl_stays_systematic(self):
-        # Regression: only the 2-carbon diacyl is 'oxalyl'; C4 stays 'butanedioyl'.
-        assert name_compound("ClC(=O)CCC(=O)Cl") == "butanedioyl dichloride"

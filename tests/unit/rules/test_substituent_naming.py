@@ -316,18 +316,6 @@ class TestNameSubstituentFragment:
 
     # --- Compound substituents (recursive naming) ---
 
-    def test_1_methylpropyl(self):
-        """CH(CH3)CH2CH3 -> 1-methylpropyl (when not at branch = sec-butyl case).
-
-        Actually 1-methylpropyl IS sec-butyl. Let's test 2-methylbutyl instead.
-        """
-        # 2-methylbutyl = CH2CH(CH3)CH2CH3
-        # parent-CH2CH(CH3)CH2CH3 -> CCCC(C)CC
-        # Structure: 0-1-2-3(-4)-5-6... this gets complex.
-        # Simpler: CC(C)CCC where parent=[5], sub_atoms through atom 4
-        # Let me just verify the function handles a compound case
-        pass  # Covered by 2_methylbutyl test below
-
     def test_phenyl(self):
         """Benzene ring as substituent -> phenyl."""
         mol = Chem.MolFromSmiles("c1ccccc1C")  # toluene

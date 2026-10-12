@@ -102,8 +102,6 @@ def test_ring_carbohydrazide(smiles, expected):
         ("C1CCCCC1C(=O)NN", "cyclohexanecarbohydrazide"),
         # aromatic carboxamide -- must not be caught by the new hydrazide branch
         ("O=C(N)c1ccc(cc1)C(=O)N", "benzene-1,4-dicarboxamide"),
-        # acyclic diamide -- the (a) regex change must not break decomposition here
-        ("NC(=O)CCC(=O)N", "butanediamide"),
         # ordinary sulfonamide -- new sulfonohydrazide SMARTS must not over-match
         ("CS(=O)(=O)N", "methanesulfonamide"),
     ],

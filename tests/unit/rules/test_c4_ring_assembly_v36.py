@@ -162,7 +162,17 @@ def test_harness_validates_against_a_known_positive():
     assert _c4_rt("C(c1ccccc1)Sc1ccccc1") == "RT-OK"  # benzyl phenyl sulfide
 
 
-@pytest.mark.parametrize("wid,linker,smiles", RT_OK_WITNESSES, ids=_RT_OK_TEST_IDS)
+# One witness per linker class runs in the PR run (c_chain, glycosidic, ester_ether,
+# thioether_sulfinyl, amide_mixed); the other 16 and the w21 abstain check (about 6 s
+# each) run in the nightly run only.
+_PR_RUN_WITNESSES = {"w00", "w01", "w03", "w05", "w18"}
+
+
+@pytest.mark.parametrize(
+    "wid,linker,smiles",
+    [w if w[0] in _PR_RUN_WITNESSES else pytest.param(*w, marks=pytest.mark.slow)
+     for w in RT_OK_WITNESSES],
+    ids=_RT_OK_TEST_IDS)
 def test_c4_witness_names_and_round_trips(wid, linker, smiles):
     """-C4 PROGRESS: these witnesses now name to a full-InChI OPSIN round-trip
     (RT-OK). Promoted from the original "all 22 abstain" baseline as later
@@ -173,6 +183,7 @@ def test_c4_witness_names_and_round_trips(wid, linker, smiles):
     assert _c4_rt(smiles) == "RT-OK"
 
 
+@pytest.mark.slow
 @pytest.mark.parametrize("wid,linker,smiles", ABSTAIN_WITNESSES, ids=_ABSTAIN_TEST_IDS)
 def test_c4_witness_abstains_today(wid, linker, smiles):
     """BASELINE remnant: this witness still emits ``unknown organic compound``

@@ -26,13 +26,6 @@ class TestDipeptidesAchiral:
         result = name_compound("NCC(=O)NCC(=O)O")
         assert result == "(2-aminoacetamido)acetic acid"
 
-    def test_glycylglycine_is_single_word(self):
-        """: Gly-Gly now emits the substitutive PIN (see test_glycylglycine
-        and V38-PEPTIDE-PIN-VERDICT.md); the old 'single word / no hyphen'
-        property was a property of the retained name, no longer emitted."""
-        result = name_compound("NCC(=O)NCC(=O)O")
-        assert result == "(2-aminoacetamido)acetic acid"
-
 
 # ── Dipeptides (with stereochemistry) ─────────────────────────────────
 
@@ -96,18 +89,27 @@ class TestTetrapeptideOrder:
         assert result is not None and "glutamyl" in result and "isoleucyl" in result
         assert result.index("glutamyl") < result.index("isoleucyl"), result
 
-    def test_tetrapeptide_order_is_spelling_stable(self):
-        """The same molecule in different SMILES spellings gives ONE name."""
+    def _assert_spelling_stable(self, n_spellings):
+        """The same molecule in n_spellings seeded random SMILES spellings gives ONE name."""
         smi = "C[C@H](N)C(=O)N[C@@H](CO)C(=O)N[C@@H](Cc1ccccc1)C(=O)NCC(=O)O"
         m = Chem.MolFromSmiles(smi)
         names = set()
-        for _ in range(200):
-            names.add(name_compound(Chem.MolToSmiles(m, canonical=False, doRandom=True)))
+        for spelling in Chem.MolToRandomSmilesVect(m, n_spellings, randomSeed=0):
+            names.add(name_compound(spelling))
             if len(names) >= 15:
                 break
         names.add(name_compound(Chem.MolToSmiles(m, canonical=True)))
         # 'seryl' before 'phenylalanyl' in every spelling
         assert len(names) == 1, names
+
+    def test_tetrapeptide_order_is_spelling_stable(self):
+        """The same molecule in different SMILES spellings gives ONE name."""
+        self._assert_spelling_stable(20)
+
+    @pytest.mark.slow
+    def test_tetrapeptide_order_is_spelling_stable_full(self):
+        """The same check over 200 seeded spellings (nightly run; the PR run uses 20)."""
+        self._assert_spelling_stable(200)
 
 
 # ── Isopeptide (non-alpha linkage) must fail closed ──────────────────────
@@ -197,46 +199,12 @@ class TestProlineNTerminus:
 class TestPeptideEdgeCases:
     """Test that non-peptide amides are NOT misrouted to peptide naming."""
 
-    def test_asparagine_not_misrouted(self):
-        """Asparagine has a primary amide side chain but is a single amino acid.
-
-         a phase (change-asserted-value, was `== "asparagine"`): the input
-        SMILES has NO wedge/parity at the alpha-carbon (CHI_UNSPECIFIED) -- a
-        genuinely stereo-undefined structure. The bare retained name `asparagine`
-        is Table 10.4's name for the DEFINED (L) configuration (`## ****
-        The stereodescriptors 'D' and 'L'`, the Blue Book: "The
-        stereodescriptor 'xi'... indicates unknown configuration"), and OPSIN's
-        grammar always resolves a bare amino-acid retained name to that ONE
-        defined stereocentre -- so asserting it against this input is provably
-        impossible to round-trip: input full InChIKey
-        `an InChIKey` (no stereo layer) vs OPSIN's parse of
-        'asparagine' `an InChIKey` (defined stereo layer) --
-        same skeleton, different (missing-vs-present) stereo layer, so a
-        byte-identical full round-trip is impossible by construction, not by
-        chance. `2,4-diamino-4-oxobutanoic acid` is the Blue Book's OWN
-        systematic name for asparagine (Table 10.4, the Blue Book) and
-        full-InChIKey RT-exacts to this exact input (`DCXYFEDJOCDNAF-
-        UHFFFAOYSA-N` both sides, OPSIN-verified independently of this fix's
-        code). Mutation-tested: `scripts/an A/B check` with the pre-fix
-        (HEAD-committed-at-35d5e921) versions of `data/amino_acids.py` +
-        `data/retained_names.py` + `rules/esters.py` swapped in makes this
-        assertion FAIL (old code still emits bare 'asparagine'); the working
-        tree's fix makes it PASS.
-        """
-        result = name_compound("NC(CC(N)=O)C(=O)O")
-        assert result == "2,4-diamino-4-oxobutanoic acid"
-
     def test_n_acetylglycine_not_misrouted(self):
         """N-acetylglycine has an amide bond but NO terminal NH2 on acyl side."""
         result = name_compound("CC(=O)NCC(=O)O")
         # Should NOT produce a peptide name (acetyl is not an amino acid residue)
         assert "glycylglycine" not in result.lower()
         assert "peptide" not in result.lower()
-
-    def test_simple_acetamide_not_misrouted(self):
-        """Simple amide: no amino acid pattern at all."""
-        result = name_compound("CC(=O)N")
-        assert result == "acetamide"
 
 
 # ── Data validation ───────────────────────────────────────────────────
@@ -277,18 +245,6 @@ class TestAminoAcidAcylNames:
 @pytest.mark.unit
 class TestStereoMapping:
     """Test S->L and R->D stereo prefix mapping."""
-
-    def test_s_config_maps_to_l(self):
-        """S-configured alpha-carbon must be preserved as (2S) in the name.
-
-        : L-Ala-Gly now emits the substitutive PIN (V38-PEPTIDE-PIN-VERDICT.md;
-        full-InChIKey round-trip verified). The N-terminal L-alanine's S centre
-        surfaces as (2S) in the acyl amido prefix (a broken S mapping would emit
-        (2R) and fail the round-trip gate -> fallback), and never a 'D-' prefix.
-        """
-        result = name_compound("N[C@@H](C)C(=O)NCC(=O)O")
-        assert result == "[(2S)-2-aminopropanamido]acetic acid"
-        assert not result.startswith("D-")
 
     def test_glycine_no_stereo_prefix(self):
         """Glycine is achiral -- no L/D prefix."""

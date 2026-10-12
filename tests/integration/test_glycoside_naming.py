@@ -204,36 +204,6 @@ class TestGlycosideSeniorAglyconeProtect:
 # ============================================================================
 
 
-@pytest.mark.integration
-class TestGlycosideRegressions:
-    """Ensure non-glycoside molecules are unaffected by glycoside naming."""
-
-    def test_simple_ester_unchanged(self):
-        """Ethyl acetate still produces 'ethyl acetate'."""
-        name = name_compound("CC(=O)OCC")
-        assert name == "ethyl acetate"
-
-    def test_simple_amide_unchanged(self):
-        """N-methylacetamide still produces expected name."""
-        name = name_compound("CC(=O)NC")
-        assert name == "N-methylacetamide"
-
-    def test_benzene_unchanged(self):
-        """Benzene still produces 'benzene'."""
-        name = name_compound("c1ccccc1")
-        assert name == "benzene"
-
-    def test_ethanol_unchanged(self):
-        """Ethanol still produces 'ethanol'."""
-        name = name_compound("CCO")
-        assert name == "ethanol"
-
-    def test_acetic_acid_unchanged(self):
-        """Acetic acid still produces 'acetic acid'."""
-        name = name_compound("CC(=O)O")
-        assert name == "acetic acid"
-
-
 # ============================================================================
 # Benchmark glycoside coverage
 # ============================================================================
@@ -388,11 +358,6 @@ class TestSystematicCarbohydrateDispatch:
 
     # --- PROTECT: byte-identical to the pre-183 behaviour ------------------
 
-    def test_protect_cataloged_glucose_byte_identical(self):
-        """A cataloged clean sugar stays on the lookup fast-path ."""
-        name = name_compound("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
-        assert name == "β-D-glucopyranose"
-
     def test_protect_simple_glycoside_byte_identical(self):
         """A Phase-176 simple glycoside (methyl β-D-glucopyranoside) is
         NOT pulled into the disaccharide engine (Pitfall 4) and stays
@@ -406,14 +371,3 @@ class TestSystematicCarbohydrateDispatch:
         name = name_compound("N[C@@H]1[C@@H](O)[C@H](O)[C@@H](CO)O[C@H]1O")
         assert name == "β-D-glucosamine"
 
-    def test_protect_glucuronide_glycoside_byte_identical(self):
-        """The Phase-182 steroid glucuronide glycoside still emits the
-        ``-osiduronic acid`` head (coupling held: the free-acid emitter
-        does not regress ``uronic_glycoside_head``)."""
-        name = name_compound(
-            "C[C@]12CC[C@H](O[C@@H]3O[C@H](C(=O)O)[C@@H](O)[C@H](O)[C@H]3O)"
-            "C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12"
-        )
-        assert name == (
-            "17-oxo-5β-androstan-3β-yl β-D-glucopyranosiduronic acid"
-        )

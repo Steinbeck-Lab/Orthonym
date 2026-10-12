@@ -45,37 +45,6 @@ class TestPhase17Regressions:
 
     # --- Ion fall-through routing (17-03) ---
 
-    def test_ion_retained_acetate(self):
-        """Acetate retained name via ion fall-through routing."""
-        result = name_compound("CC(=O)[O-]")
-        assert result == "acetate", f"Expected acetate, got: {result}"
-
-    def test_ion_retained_ammonium(self):
-        """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
-        result = name_compound("[NH4+]")
-        assert result == "azanium", f"Expected azanium, got: {result}"
-
-    def test_ion_retained_methylammonium(self):
-        """Methylammonium is no longer a PIN: (the Blue Book) makes the -aminium
-        names preferred, 'methanaminium (PIN)' the Blue Book."""
-        result = name_compound("C[NH3+]")
-        assert result == "methanaminium", f"Expected methanaminium, got: {result}"
-
-    def test_ion_retained_benzoate(self):
-        """Benzoate retained name via ion fall-through."""
-        result = name_compound("[O-]C(=O)c1ccccc1")
-        assert result == "benzoate", f"Expected benzoate, got: {result}"
-
-    def test_ion_retained_methoxide(self):
-        """Methoxide retained name via ion fall-through."""
-        result = name_compound("C[O-]")
-        assert result == "methoxide", f"Expected methoxide, got: {result}"
-
-    def test_ion_retained_ethoxide(self):
-        """Ethoxide retained name via ion fall-through."""
-        result = name_compound("CC[O-]")
-        assert result == "ethoxide", f"Expected ethoxide, got: {result}"
-
     # --- Ion aspect composition (17-03) ---
 
     def test_ion_aspect_pentanoate(self):
@@ -97,11 +66,6 @@ class TestPhase17Regressions:
         """Non-retained alkoxide: propanolate via aspect composition."""
         result = name_compound("CCC[O-]")
         assert "prop" in result.lower(), f"Expected prop- prefix, got: {result}"
-
-    def test_ion_methanide(self):
-        """Carbanion methanide retained name."""
-        result = name_compound("[CH3-]")
-        assert result == "methanide", f"Expected methanide, got: {result}"
 
     # --- Locant collision detection (17-04) ---
 
@@ -225,21 +189,6 @@ class TestPhase17Regressions:
         assert "ol" in result.lower() or "oxide" in result.lower(), \
             f"Expected phenolate/oxide name, got: {result}"
 
-    def test_species_sodium_acetate_salt(self):
-        """Sodium acetate: salt routing preserved."""
-        result = name_compound("[Na+].[O-]C(C)=O")
-        assert result == "sodium acetate", f"Expected sodium acetate, got: {result}"
-
-    def test_species_sodium_chloride_salt(self):
-        """Sodium chloride: salt routing preserved."""
-        result = name_compound("[Na+].[Cl-]")
-        assert result == "sodium chloride", f"Expected sodium chloride, got: {result}"
-
-    def test_species_radical_methyl(self):
-        """Methyl radical: radical routing preserved."""
-        result = name_compound("[CH3]")
-        assert result == "methyl", f"Expected methyl, got: {result}"
-
     def test_species_zwitterion_glycine(self):
         """Glycine zwitterion: does not crash, produces valid name."""
         result = name_compound("[NH3+]CC([O-])=O")
@@ -247,22 +196,6 @@ class TestPhase17Regressions:
         assert isinstance(result, str), f"Expected string, got: {type(result)}"
 
     # --- General neutral molecules (no regressions) ---
-
-    def test_neutral_ethanol(self):
-        """Ethanol: basic naming unchanged."""
-        assert name_compound("CCO") == "ethanol"
-
-    def test_neutral_acetic_acid(self):
-        """Acetic acid: retained name unchanged."""
-        assert name_compound("CC(=O)O") == "acetic acid"
-
-    def test_neutral_benzene(self):
-        """Benzene: retained name unchanged."""
-        assert name_compound("c1ccccc1") == "benzene"
-
-    def test_neutral_butanoic_acid(self):
-        """Butanoic acid: systematic naming unchanged."""
-        assert name_compound("CCCC(=O)O") == "butanoic acid"
 
     def test_neutral_hexanol(self):
         """Hexan-1-ol: chain alcohol naming unchanged."""

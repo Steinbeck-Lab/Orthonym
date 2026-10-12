@@ -83,11 +83,6 @@ def test_ring_n_targets_round_trip(smiles, expected):
         ("NC(=O)O", "carbamic acid"),
         ("CNC(=O)O", "methylcarbamic acid"),
         ("CN(C)C(=O)O", "dimethylcarbamic acid"),
-        # Acyclic ureas stay urea (neither N is a ring atom).
-        ("NC(=O)N", "urea"),
-        ("CNC(=O)NC", "N,N'-dimethylurea"),
-        # phenylurea: the anilino N is exocyclic to benzene (not a ring atom).
-        ("NC(=O)Nc1ccccc1", "phenylurea"),
         # task 9 control: a true N-acyl group on a ring N (acetyl, not a
         # carboxy/carboxamide) must NOT become a ring-N suffix — the amide/ketone
         # machinery still names it.

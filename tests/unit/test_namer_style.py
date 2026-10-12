@@ -44,15 +44,4 @@ class TestStyleParameter:
         # Should be the systematic form, not the retained name
         assert result == "ethan-1-ol" or result == "ethanol"
 
-    @pytest.mark.unit
-    def test_pin_style_explicit(self):
-        """Explicit style='pin' should behave like default."""
-        assert name_compound("C=CCO", style="pin") == "prop-2-en-1-ol"
 
-    @pytest.mark.unit
-    def test_backward_compatibility(self):
-        """Existing code calling name_compound(smiles) should work unchanged."""
-        # These should all still work
-        assert name_compound("CCO") == "ethanol"
-        assert name_compound("CC(=O)O") == "acetic acid"
-        assert name_compound("c1ccccc1") == "benzene"

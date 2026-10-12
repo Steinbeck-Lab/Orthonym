@@ -220,20 +220,7 @@ class TestIonNamingRegression:
     def _namer(self):
         self.namer = Orthonym()
 
-    def test_ammonium(self):
-        # NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')
-        assert self.namer.name('[NH4+]') == 'azanium'
-
-    def test_acetate(self):
-        assert self.namer.name('CC(=O)[O-]') == 'acetate'
-
     def test_sodium_acetate(self):
         result = self.namer.name('[Na+].CC(=O)[O-]')
         assert result == 'sodium acetate'
 
-    def test_methylammonium(self):
-        result = self.namer.name('C[NH3+]')
-        # 'Cation and anion names' (the Blue Book): method (1), adding 'ium'
-        # to the amine name, "leads to preferred IUPAC names" ('methanaminium chloride
-        # (PIN)',:26672); commit 12541211e.
-        assert result == 'methanaminium'

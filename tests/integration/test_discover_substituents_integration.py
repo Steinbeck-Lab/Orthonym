@@ -255,17 +255,27 @@ AB_CANARY_COMPOUNDS = [
     ("O=C(O)CCO", "3-hydroxypropanoic acid"),
 ]
 
-_AB_IDS = [
-    name[:40].replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")
-    for _, name in AB_CANARY_COMPOUNDS
-]
+def _ab_id(name):
+    return name[:40].replace(" ", "_").replace(",", "").replace("(", "").replace(")", "")
+
+
+_AB_IDS = [_ab_id(name) for _, name in AB_CANARY_COMPOUNDS]
+
+# Only these rows have no exact duplicate in another test (the same name call and expected
+# name): the other rows of test_naming_unchanged were removed as duplicates.
+_NAMING_UNCHANGED_ONLY_HERE = {
+    "CCCCCCCCCCC(C)C(=O)O", "CCCCCCCCC(C)CC(C)C", "Cc1ccc(O)cc1C", "CCCc1nc(C)c(C)nc1C",
+    "Oc1ccnc2ccccc12", "C=C[C@@H](O)CCCCC", "CCCCCCCC/C=C/CCCCCCCC=O",
+}
+_NAMING_UNCHANGED_ROWS = [row for row in AB_CANARY_COMPOUNDS if row[0] in _NAMING_UNCHANGED_ONLY_HERE]
 
 
 @pytest.mark.integration
 class TestCanaryABComparison:
     """A/B comparison: verify naming is unchanged after a phase."""
 
-    @pytest.mark.parametrize("smiles,expected_name", AB_CANARY_COMPOUNDS, ids=_AB_IDS)
+    @pytest.mark.parametrize("smiles,expected_name", _NAMING_UNCHANGED_ROWS,
+                             ids=[_ab_id(name) for _, name in _NAMING_UNCHANGED_ROWS])
     def test_naming_unchanged(self, smiles, expected_name):
         """Name must match golden canary expectation exactly."""
         result = name_compound(smiles)

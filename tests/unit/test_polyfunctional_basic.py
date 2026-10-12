@@ -109,24 +109,10 @@ class TestPolyfunctionalDetection:
 class TestPolyfunctionalIntegration:
     """End-to-end polyfunctional naming tests."""
 
-    def test_hydroxy_acid_full_pipeline(self):
-        """-CLEANUP: the `"oic acid" in result` half was wrong and had been
-        failing. It encoded an assumption -- that every acid is named on a
-        systematic `-oic acid` stem -- which `## **** Systematic names`
-        (the Blue Book) explicitly denies for formic, acetic, oxalic and
-        oxamic acid. The PIN here is `hydroxyacetic acid` (:29854, verbatim
-        `HO-CH2-COOH hydroxyacetic acid (PIN) (not glycolic acid)`), so assert the
-        name itself rather than a stem shape that cannot hold for the exceptions."""
-        result = name_compound("OCC(=O)O")
-        assert result == "hydroxyacetic acid"
-
     def test_keto_acid_full_pipeline(self):
         result = name_compound("CC(=O)C(=O)O")
         assert "oxo" in result
         assert "oic acid" in result
-
-    def test_ether_hydrocarbon_parent(self):
-        assert name_compound("COCC") == "methoxyethane"
 
     def test_ether_acid_parent(self):
         result = name_compound("COCCC(=O)O")

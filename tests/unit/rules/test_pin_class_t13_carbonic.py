@@ -289,3 +289,23 @@ def test_bis_before_a_di_initial_prefix(smiles, pin):
 
 def test_bis_before_a_di_initial_prefix_not_pin():
     assert_not_pin_labelled("OC(=O)c1ccc(N=N)c(N=N)c1", "3,4-didiazenylbenzoic acid")
+
+
+@pytest.mark.parametrize(
+    "smiles, expected",
+    [
+        pytest.param("O=C(N(Cl)Cl)N(Cl)Cl", "tetrachlorourea", id="O=C(N(Cl)Cl)N(Cl)Cl"),
+        pytest.param("O=C(NF)N", "fluorourea", id="O=C(NF)N"),
+        pytest.param("O=C(NCl)N", "chlorourea", id="O=C(NCl)N"),
+    ],
+)
+def test_merged_urea_names(smiles, expected):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/unit/assembly/handlers/test_urea.py::TestHalogenSubstitutedUrea::test_unambiguous_halogen_urea (3)
+    """
+    from orthonym import name_compound
+    assert name_compound(smiles) == expected

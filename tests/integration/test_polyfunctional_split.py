@@ -187,7 +187,6 @@ class TestNarrowDefaultOnP6563:
     @_opsin_rt
     @pytest.mark.roundtrip
     @pytest.mark.parametrize("smiles,expected", [
-        ("COC(=O)CCC(=O)O", "4-methoxy-4-oxobutanoic acid"),
         ("O=C(OC)CCCCCCCC(=O)O", "9-methoxy-9-oxononanoic acid"),
         # curated target, brief items 5+6 (benzyloxy IS the preferred prefix,
         # /:18097; alphanumerical benzyloxy < oxo,
@@ -214,14 +213,6 @@ class TestNarrowDefaultOnP6563:
         out = name_compound("O=C(OCc1ccc(O)cc1)CCCCCCCC(=O)O")
         assert out == "unknown organic compound"
 
-    @_opsin_rt
-    @pytest.mark.roundtrip
-    def test_acyloxy_orientation_untouched(self):
-        # Gold P3A-P06: acyloxy orientation (ester O on chain, carbonyl off) ->
-        # anchored filter empty -> byte-identical continue; composer acyloxy
-        # path keeps ownership.
-        assert name_compound("OC(=O)CCOC(=O)C") == "3-(acetyloxy)propanoic acid"
-
 
 @pytest.mark.integration
 class TestAcylSulfanylWholeMolecule:
@@ -231,8 +222,6 @@ class TestAcylSulfanylWholeMolecule:
     @_opsin_rt
     @pytest.mark.roundtrip
     @pytest.mark.parametrize("smiles,expected", [
-        # curated target, brief item 7 (acetylsulfanyl < oxo,
-        ("CC(=O)SC(=O)CCCCCCCC(=O)O", "9-(acetylsulfanyl)-9-oxononanoic acid"),
         # thioether-prefix leg ALONE (thioester carbonyl off-chain, no split)
         ("CC(=O)SCCCCCCCC(=O)O", "8-(acetylsulfanyl)octanoic acid"),
         ("CCC(=O)SCCC(=O)O", "3-(propanoylsulfanyl)propanoic acid"),

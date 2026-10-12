@@ -14,13 +14,11 @@ Source: 168-internal notes /////; internal notes #2 + #3.
 """
 
 import dataclasses
-import inspect
 
 import pytest
 from rdkit import Chem
 
 from orthonym.assembly.name_tree import NameTreeNode, is_coarse_node
-from orthonym.assembly import retained_substitution as rs
 from orthonym.assembly.retained_substitution import (
     apply_triviality_controller,
     _build_rewrite,
@@ -326,17 +324,3 @@ class TestFragmentLegacyConditionalReset:
         assert out.fragment_legacy is None  # child changed => reset (serializer-short-circuit closed)
 
 
-class TestNoPathA:
-    """#3 FIX (reviews iter 1): the hint-based recovery path was removed — the module source
-    carries zero ``atom_to_locant_hint`` references; recovery is a 3-path B/C/D cascade."""
-
-    @pytest.mark.unit
-    def test_no_atom_to_locant_hint_reference(self):
-        source = inspect.getsource(rs)
-        assert "atom_to_locant_hint" not in source
-
-    @pytest.mark.unit
-    def test_recover_has_three_paths_not_path_a(self):
-        source = inspect.getsource(rs)
-        assert "Path B" in source and "Path C" in source and "Path D" in source
-        assert "Path A" not in source

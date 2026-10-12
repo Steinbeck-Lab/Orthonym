@@ -684,3 +684,26 @@ class TestPhosphateEsterProtonationRegression:
         assert rt["passed"], (
             f"{smiles!r} -> {result!r} failed OPSIN round-trip: {rt['error']}"
         )
+
+
+@pytest.mark.parametrize(
+    "smiles, expected",
+    [
+        pytest.param("C1CNCCPC1", "1,4-azaphosphepane", id="C1CNCCPC1"),
+        pytest.param("C1CCPCC1", "phosphinane", id="C1CCPCC1"),
+        pytest.param("C1CCPCCO1", "1,4-oxaphosphepane", id="C1CCPCCO1"),
+        pytest.param("C1CCPC1", "phospholane", id="C1CCPC1"),
+        pytest.param("C1CP1", "phosphirane", id="C1CP1"),
+        pytest.param("C1CCPCCC1", "phosphepane", id="C1CCPCCC1"),
+    ],
+)
+def test_merged_phosphorus_ring_names(smiles, expected):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/unit/assembly/handlers/test_phosphine.py::TestD4RingMutex::test_ring_phosphorus_hw_name (6)
+    """
+    from orthonym import name_compound
+    assert name_compound(smiles) == expected

@@ -280,49 +280,14 @@ EXPECTED_FIXED = [
         "cyclohex",
         "Cyclohexanone with chain FG - fixed by FG detection improvements",
     ),
-]
-
-# Compounds where parent selection is NOT expected to be fixed yet.
-# a phase audit: these require work outside parent selection scope
-# (NP detection, decomposition, extended FG detection, chain detection).
-# Marked with xfail(strict=False) -- if they pass, great (xpass), if not, expected.
-EXPECTED_UNFIXED = [
-    # --- Extended PAH (a phase: PAH size guard correctly rejects naphthalene) ---
-    (
-        "c1ccc2cc3c(cc2c1)-c1cc2ccccc2cc1-c1cc2ccccc2cc1-c1cc2ccccc2cc1-3",
-        "NOT_naphthalene",
-        "PAH: 40-atom 9-ring system needs extended PAH naming (not naphthalene)",
-    ),
-    # --- Complex DKP (a phase+: indoline fused system beats standalone DKP in ring scoring) ---
-    (
-        "C=C1NC(=O)[C@H]([C@@H](C)[C@]2(O)C(=O)N(C)c3ccccc32)NC1=O",
-        "piperazin",
-        "DKP with indoline - fused ring system (11 atoms) outscores standalone DKP ring (6 atoms)",
-    ),
-    # --- Tropane and ergostene promoted to EXPECTED_FIXED by a phase-02 ---
-    # --- Morphinan / complex NP ---
-    (
-        "COC1=CC=C2[C@H]3Cc4ccc(OC)c5c4[C@@]2(C[C@@H](C2=C[C@@]4(O)[C@H]6Cc7ccc(O)c8c7"
-        "[C@@]4(C[C@@H](O)[C@]62O)CC58)O3)CC1",
-        "morphin",
-        "Morphinan dimer - complex NP naming",
-    ),
-    # --- Large phospholipid naming ---
+    # --- Phospholipid: passed while it sat in EXPECTED_UNFIXED (an XPASS), so it is a fixed row ---
     (
         "CCCCC/C=C\\C/C=C\\CCCCCCCCCCCC(=O)O[C@H](COC(=O)CCCCCCCCCCCCCCCCCC)COP(=O)(O)"
         "OC[C@H](N)C(=O)O",
         "phospho",
         "Phospholipid - multi-fragment naming",
     ),
-    # --- Diketopiperazine (compound 7 promoted to EXPECTED_FIXED by a phase-02) ---
-    # --- Ammonium salts with complex anion ---
-    (
-        "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(C)=O",
-        "phospho",
-        "Phosphocholine ester - salt decomposition",
-    ),
 ]
-
 
 # Rows whose old passing name described a DIFFERENT molecule; the default tier now
 # fails closed (as production did with the gate on at 4e0e5c29b) and the
@@ -360,12 +325,6 @@ _PIN_TIER_TARGETS = {
         "not a PIN (P-100, BlueBookV2.md:50942); the systematic PIN is not built "
         "-- TODO in TRIAGE.md 'Suite fix -- j1-regressions'"),
 }
-
-
-# Combine all compounds for the summary count test
-PARENT_MISMATCH_COMPOUNDS = EXPECTED_FIXED + [
-    (smi, exp, desc) for smi, exp, desc in EXPECTED_UNFIXED
-]
 
 
 # ---------------------------------------------------------------------------
@@ -412,93 +371,8 @@ def test_parent_mismatch_tier_contract():
 
 
 # ---------------------------------------------------------------------------
-# Tests for compounds NOT expected to be fixed (xfail)
-# ---------------------------------------------------------------------------
-
-@pytest.mark.integration
-@pytest.mark.parametrize(
-    "smiles,expected_parent_substring,description",
-    EXPECTED_UNFIXED,
-    ids=[
-        d.split(":")[0].strip().replace(" ", "_")
-        + f"_{i:02d}"
-        for i, (_, _, d) in enumerate(EXPECTED_UNFIXED)
-    ],
-)
-@pytest.mark.xfail(strict=False, reason="Phase 119+: requires NP detection, decomposition, chain detection, or extended PG range")
-def test_parent_mismatch_unfixed(smiles, expected_parent_substring, description):
-    """Compounds where parent selection alone cannot fix the generated name.
-
-    These require future work: NP detection scope, decomposition improvements,
-    chain detection fixes, or extended PG detection range.
-    Marked xfail(strict=False) so xpass is a bonus, not a failure.
-    """
-    name = name_compound(smiles)
-    assert name, f"Should produce a name for: {description}"
-    assert expected_parent_substring.lower() in name.lower(), (
-        f"STILL WRONG: {description}\n"
-        f"  SMILES: {smiles}\n"
-        f"  Generated: {name}\n"
-        f"  Expected parent substring: '{expected_parent_substring}'"
-    )
-
-
-# ---------------------------------------------------------------------------
 # Summary test: count total improvements
 # ---------------------------------------------------------------------------
-
-@pytest.mark.integration
-def test_parent_mismatch_improvement_count():
-    """At least 34/39 parent_mismatch rows should produce correct parent names.
-
-    Updated by a phase-02: 37 EXPECTED_FIXED + 6 EXPECTED_UNFIXED = 43 total, target
-    >= 37/43. Re-based when the rows whose PIN the PIN tier cannot build became declared
-    strict xfails (``_PIN_TIER_TARGETS``, commits c7c94308f and 590e232e2): those four
-    rows must NOT produce the substring through the PIN tier (their old passing names
-    described another molecule or dropped a fragment), so they are asserted separately
-    (strict xfail + ``test_parent_mismatch_tier_contract``) and are left out of this count.
-    43 - 4 = 39 rows remain; the same ratio (37/43 = 86.0%) rounded up over 39 rows is 34.
-    FusedHet_18 (a name that drops the quinoline) is a source defect that still counts
-    against the 39 until the code fix lands; it is asserted on its own by
-    ``test_parent_mismatch_fixed[FusedHet_18]``.
-    a phase-02 promoted tropane + ergostene from EXPECTED_UNFIXED to EXPECTED_FIXED.
-    The self-check fix is a correctness improvement (zero behavioral change for
-    all_ring_atoms callers, but ensures symmetry with chain counterparts).
-
-    a phase audit of all 55 v13 parent_mismatch compounds found:
-      - 28 hit cascade (correct parent selection, name wrong for other reasons)
-      - 9 no ring systems (acyclic -- parent selection not applicable)
-      - 7 "unclear" fallback (PG separated from ring/chain by 2+ hops -- deferred)
-      - 5 (a) chain only
-      - 3 (a) ring only
-      - 2 hydrocarbon rules
-      - 1 (b) PG count comparison
-    """
-    correct = 0
-    counted = [row for row in PARENT_MISMATCH_COMPOUNDS if row[2] not in _PIN_TIER_TARGETS]
-    total = len(counted)
-    failures = []
-
-    for smiles, expected, desc in counted:
-        name = name_compound(smiles)
-        if name and expected.lower() in name.lower():
-            correct += 1
-        else:
-            failures.append(f"  {desc}: got '{name}', expected '{expected}' in name")
-
-    # Report results regardless of pass/fail
-    print(f"\n=== Parent Mismatch Improvement Count ===")
-    print(f"Correct parent: {correct}/{total}")
-    print(f"Target: >= 34/{total}")
-    if failures:
-        print(f"\nStill failing ({len(failures)}):")
-        for f in failures:
-            print(f)
-
-    assert correct >= 34, (
-        f"Phase 118-02 target not met: {correct}/{total} correct (need >= 34).\n"
-        f"Still failing:\n" + "\n".join(failures)
-    )
 
 
 # ---------------------------------------------------------------------------

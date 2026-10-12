@@ -905,3 +905,58 @@ class TestBenzeneAcidEsterDemotion:
         # it (the acid-senior gate never fires) -> multiplicative dioate.
         assert name_compound("COC(=O)c1ccccc1C(=O)OC") == \
             "dimethyl benzene-1,2-dicarboxylate"
+
+
+@pytest.mark.parametrize(
+    "smiles, expected",
+    [
+        pytest.param("CC(C)OC(=O)c1ccccc1", "propan-2-yl benzoate", id="CC(C)OC(=O)c1ccccc1"),
+        pytest.param("CCCCCCCC(=O)OC", "methyl octanoate", id="CCCCCCCC(=O)OC"),
+        pytest.param("CCCCCCCCCCCCCCCC(=O)OCCC", "propyl hexadecanoate", id="CCCCCCCCCCCCCCCC(=O)OCCC"),
+        pytest.param("CCCCC(=O)OCC", "ethyl pentanoate", id="CCCCC(=O)OCC"),
+        pytest.param("CCCCC(=O)OCCC", "propyl pentanoate", id="CCCCC(=O)OCCC"),
+        pytest.param("CCCCCC(=O)OCC", "ethyl hexanoate", id="CCCCCC(=O)OCC"),
+        pytest.param("CCCCCCC(=O)OC", "methyl heptanoate", id="CCCCCCC(=O)OC"),
+        pytest.param("CCCCCCC(=O)OCC", "ethyl heptanoate", id="CCCCCCC(=O)OCC"),
+        pytest.param("CCCCCCCCC(=O)OC", "methyl nonanoate", id="CCCCCCCCC(=O)OC"),
+        pytest.param("CCCCCCCCCC(=O)OC", "methyl decanoate", id="CCCCCCCCCC(=O)OC"),
+        pytest.param("CCCCCCCCCCC(=O)OC", "methyl undecanoate", id="CCCCCCCCCCC(=O)OC"),
+        pytest.param("CCCCCCCCCCCCC(=O)OC", "methyl tridecanoate", id="CCCCCCCCCCCCC(=O)OC"),
+        pytest.param("CCCCCCCCCCCCOC(C)=O", "dodecyl acetate", id="CCCCCCCCCCCCOC(C)=O"),
+        pytest.param("CCCCCCCCCCCCOC=O", "dodecyl formate", id="CCCCCCCCCCCCOC=O"),
+        pytest.param("CCCCCCCCCCOC(C)=O", "decyl acetate", id="CCCCCCCCCCOC(C)=O"),
+        pytest.param("CCCCCCCCCOC(C)=O", "nonyl acetate", id="CCCCCCCCCOC(C)=O"),
+        pytest.param("CCCCCCCCOC(C)=O", "octyl acetate", id="CCCCCCCCOC(C)=O"),
+        pytest.param("CCCCCCCOC(C)=O", "heptyl acetate", id="CCCCCCCOC(C)=O"),
+        pytest.param("CCCCCCCOC=O", "heptyl formate", id="CCCCCCCOC=O"),
+        pytest.param("CCCCCCOC(=O)CC", "hexyl propanoate", id="CCCCCCOC(=O)CC"),
+        pytest.param("CCCCCCOC(=O)CCC", "hexyl butanoate", id="CCCCCCOC(=O)CCC"),
+        pytest.param("CCCCCCOC(C)=O", "hexyl acetate", id="CCCCCCOC(C)=O"),
+        pytest.param("CCCCCCOC=O", "hexyl formate", id="CCCCCCOC=O"),
+        pytest.param("CCCCCOC(=O)CCC", "pentyl butanoate", id="CCCCCOC(=O)CCC"),
+        pytest.param("CCCCCOC(C)=O", "pentyl acetate", id="CCCCCOC(C)=O"),
+        pytest.param("CCCCCOC=O", "pentyl formate", id="CCCCCOC=O"),
+        pytest.param("CCCCOC(=O)CC", "butyl propanoate", id="CCCCOC(=O)CC"),
+        pytest.param("CCCCOC(=O)CCC", "butyl butanoate", id="CCCCOC(=O)CCC"),
+        pytest.param("CCCCOC(=O)CCCC", "butyl pentanoate", id="CCCCOC(=O)CCCC"),
+        pytest.param("CCCCOC=O", "butyl formate", id="CCCCOC=O"),
+        pytest.param("CCCOC(=O)CC", "propyl propanoate", id="CCCOC(=O)CC"),
+        pytest.param("CCCOC(=O)c1ccccc1", "propyl benzoate", id="CCCOC(=O)c1ccccc1"),
+        pytest.param("CCCOC=O", "propyl formate", id="CCCOC=O"),
+        pytest.param("CCOC(=O)C1CCCC1", "ethyl cyclopentanecarboxylate", id="CCOC(=O)C1CCCC1"),
+        pytest.param("CCOC(=O)C1CCCCC1", "ethyl cyclohexanecarboxylate", id="CCOC(=O)C1CCCCC1"),
+        pytest.param("CCOC=O", "ethyl formate", id="CCOC=O"),
+    ],
+)
+def test_merged_ester_names(smiles, expected):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/integration/test_decomposition_regression.py::TestEsterCanaries::test_ester_canary (2)
+      - tests/unit/routing/test_dispatcher.py::TestPerStoutClassDispatch::test_per_stoutclass_dispatch (1)
+      - tests/integration/test_ester_behavioral_freeze.py::TestEsterBehavioralFreeze::test_ester_name_unchanged (33)
+    """
+    from orthonym import name_compound
+    assert name_compound(smiles) == expected

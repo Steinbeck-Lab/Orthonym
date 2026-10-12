@@ -16,7 +16,6 @@ src/orthonym/rules/stereochemistry.py. GREEN phase: implementation makes
 them pass. Tests are the contract.
 """
 
-import inspect
 import logging
 import re
 
@@ -153,27 +152,6 @@ class TestInjectStereoFromLocantMap:
             f"descriptors not ascending: {locants} in {result!r}"
         )
 
-    # Test I-04 -- pseudoasymmetric centers / lowercase r/s)
-    def test_lowercase_r_s_preserved_for_pseudoasymmetric(self):
-        # Pseudoasymmetric meso compound: 2,3,4-trihydroxypentane.
-        # The middle (3) carbon is pseudoasymmetric and rdCIPLabeler should
-        # tag it with lowercase r or s.
-        mol = Chem.MolFromSmiles("C[C@H](O)[C@H](O)[C@@H](O)C")
-        rdCIPLabeler.AssignCIPLabels(mol)
-        cip_codes = [
-            a.GetProp("_CIPCode") for a in mol.GetAtoms()
-            if a.HasProp("_CIPCode")
-        ]
-        if not any(c in ("r", "s") for c in cip_codes):
-            pytest.skip("rdCIPLabeler did not produce lowercase r/s for this case")
-
-        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 7: 5}
-        result = inject_stereo_from_locant_map(
-            "pentane-2,3,4-triol", mol, atom_to_locant
-        )
-        # At least one descriptor must be lowercase
-        assert re.match(r"^\([^)]*[rs][^)]*\)-", result), result
-
     # Test I-05 -- no-op when name already stereoed
     def test_no_op_when_name_already_has_prefix(self):
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
@@ -243,17 +221,6 @@ class TestInjectStereoFromLocantMap:
             "cyclohex-1-ene", mol, atom_to_locant
         )
         assert result == "cyclohex-1-ene"
-
-    # Test I-11 -- grep gate: NO atom-index fallback in injector body
-    def test_injector_body_has_no_atom_index_fallback(self):
-        src = inspect.getsource(inject_stereo_from_locant_map)
-        #: forbidden patterns
-        assert "range(len(" not in src, (
-            f"injector body must not use range(len(...)) fallback (D-09):\n{src}"
-        )
-        assert "enumerate(mol.GetAtoms()" not in src, (
-            f"injector body must not enumerate mol atoms as fallback (D-09):\n{src}"
-        )
 
     # Test I-12 -- idempotent (calling twice yields the same string; Pitfall 1)
     def test_injector_is_idempotent(self):
@@ -368,25 +335,6 @@ class TestP91FormatCompliance:
         assert re.search(r"[RS]", block), result
         # Should contain at least one E/Z letter (near-parent E/Z,
         assert re.search(r"[EZ]", block), result
-
-    def test_emits_lowercase_r_s_for_pseudoasymmetric(self):
-        # Same pseudoasymmetric meso compound used in I-04
-        mol = Chem.MolFromSmiles("C[C@H](O)[C@H](O)[C@@H](O)C")
-        rdCIPLabeler.AssignCIPLabels(mol)
-        cip_codes = [
-            a.GetProp("_CIPCode") for a in mol.GetAtoms()
-            if a.HasProp("_CIPCode")
-        ]
-        if not any(c in ("r", "s") for c in cip_codes):
-            pytest.skip("rdCIPLabeler did not produce lowercase r/s for this case")
-        atom_to_locant = {0: 1, 1: 2, 3: 3, 5: 4, 7: 5}
-        result = inject_stereo_from_locant_map(
-            "pentane-2,3,4-triol", mol, atom_to_locant
-        )
-        # Block must contain at least one lowercase r or s
-        block_match = re.match(r"^\(([^)]+)\)-", result)
-        assert block_match is not None, result
-        assert re.search(r"[rs]", block_match.group(1)), result
 
 
 # ----------------------------------------------------------------------

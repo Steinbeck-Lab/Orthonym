@@ -37,16 +37,6 @@ class TestAcyloxyParenthesization:
     """Test that acyloxy prefixes use IUPAC complex multipliers."""
 
     @pytest.mark.integration
-    def test_triacetin_uses_tris(self):
-        """Glycerol triacetate: a PIN ester is a functional class name,
-        the Blue Book), so there is no acyloxy prefix to multiply; 'propane-1,2,3-triyl
-        triacetate (PIN)', the Blue Book."""
-        name = name_compound("CC(=O)OCC(COC(C)=O)OC(C)=O")
-        assert name == "propane-1,2,3-triyl triacetate", (
-            f"Expected 'propane-1,2,3-triyl triacetate', got '{name}'"
-        )
-
-    @pytest.mark.integration
     def test_diacetate_uses_bis(self):
         """Glycerol diacetate: functional class multiplicative name with the free OH as a
         'hydroxy' prefix on the multivalent group (esters outrank alcohols,,

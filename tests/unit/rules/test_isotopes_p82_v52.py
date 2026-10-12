@@ -73,7 +73,6 @@ P82_TARGETS = [
     ("A", "[3H]c1c([3H])c([3H])c(OC)c(O)c1[3H]", "2-methoxy(3,4,5,6-3H4)phenol"),
     # Sub-pattern B — retained PIN parent (acetic acid / acetonitrile).
     ("B", "[2H]CC(=O)O", "(2-2H1)acetic acid"),
-    ("B", "[2H]C([2H])([2H])C#N", "(2H3)acetonitrile"),
     # Sub-pattern C — O-isotope on the suffix.
     ("C", "NCC1([18OH])CCCC1", "1-(aminomethyl)cyclopentan-1-(18O)ol"),
     # Sub-pattern D — substituent locant / hyphen /.
@@ -82,12 +81,6 @@ P82_TARGETS = [
     ("D", "CC(=O)Nc1ccc2c(c1)Cc1cc([131I])ccc1-2",
      "N-[7-(131I)iodo-9H-fluoren-2-yl]acetamide"),
     ("D", "CCC=[15N]N", "1-propylidene(1-15N)hydrazine"),
-    # Sub-pattern E — systematic ring-carbon parent.
-    ("E", "N#[13C]c1ccccc1", "benzene(13C)carbonitrile"),
-    ("E", "O=[13C](O)c1ccccc1", "benzene(13C)carboxylic acid"),
-    ("E", "NN[13CH2]c1ccccc1", "[phenyl(13C)methyl]hydrazine"),
-    ("E", "O=C(O)C1([13C](=O)O)CCCCC1",
-     "1-carboxycyclohexane-1-(13C)carboxylic acid"),
     ("E", "O=[13C](O)C1([14C](=O)O)CCCCC1",
      "1-(13C)carboxycyclohexane-1-(14C)carboxylic acid"),
     # Sub-pattern F — mixed H + single-heteroatom on a ring /.
@@ -115,15 +108,24 @@ P82_GUARDS = [
 ]
 
 
+# The only target row that still fails (the two differently labelled carboxyl
+# carbons of the cyclohexane gem-diacid); the others pass and are plain asserts.
+_P82_STILL_XFAIL = {"O=[13C](O)C1([14C](=O)O)CCCCC1"}
+
+
 @pytest.mark.unit
-@pytest.mark.xfail(strict=False, reason="Phase 07 Tasks 2-7 flip these P-82 target rows")
 @pytest.mark.parametrize(
     "smiles,expected",
-    [(smi, exp) for _pat, smi, exp in P82_TARGETS],
+    [
+        pytest.param(smi, exp, marks=pytest.mark.xfail(
+            strict=False, reason="Phase 07 Tasks 2-7 flip these P-82 target rows"))
+        if smi in _P82_STILL_XFAIL else (smi, exp)
+        for _pat, smi, exp in P82_TARGETS
+    ],
     ids=[f"{pat}-{smi}" for pat, smi, _exp in P82_TARGETS],
 )
 def test_p82_targets(smiles, expected):
-    """P-82 target rows — RED baseline; Tasks 2-7 make each pass."""
+    """ target rows; the rows that pass are plain asserts."""
     assert _best_effort().name(smiles) == expected
 
 

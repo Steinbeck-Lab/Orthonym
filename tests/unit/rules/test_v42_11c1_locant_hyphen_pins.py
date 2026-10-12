@@ -69,9 +69,6 @@ def test_isotope_nested_mark_escalation(gf_namer, smi, expected):
 @pytest.mark.parametrize("smi,expected", [
     ("N=C(NN)C1CCCCC1", "cyclohexanecarboximidohydrazide"),
     ("N=C(NN)C(=N)NN", "ethanediimidohydrazide"),
-    # regression pins: the MONO forms keep their elision
-    ("CC(=N)NN", "ethanimidohydrazide"),
-    ("N=CNN", "methanimidohydrazide"),
 ])
 def test_imidohydrazide_suffix_locant_omission(smi, expected):
     assert name_compound(smi) == expected

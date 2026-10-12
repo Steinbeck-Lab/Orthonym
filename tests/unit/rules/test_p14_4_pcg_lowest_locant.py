@@ -395,25 +395,6 @@ def test_discriminator_respects_the_functional_class_guard():
     )
 
 
-def test_the_azide_twin_is_treated_the_OTHER_way_and_that_is_correct():
-    """★ The row the dead ``'azide'`` key made accidentally green.
-
-    §** "AZIDES"** (``the Blue Book Blue Book``): azides "are named
-    using substitutive nomenclature and the prefix 'azido'. This method gives
-    preferred IUPAC names rather than names based on the class name 'azido' in
-    functional class nomenclature", with ``:25997``
-    ``3-azidonaphthalene-2-sulfonic acid (PIN)`` -- azido cited as a prefix while a
-    SUFFIX governs. So azido must NOT block the promotion, the anchor MUST fire,
-    and the answer is genuinely right rather than right by accident.
-    """
-    atoms = _pcg_atoms("Oc1c(O)c(O)c(O)c(O)c1N=[N+]=[N-]")
-    assert len(atoms) == 5, atoms
-    assert (
-        name_compound("Oc1c(O)c(O)c(O)c(O)c1N=[N+]=[N-]")
-        == "6-azidobenzene-1,2,3,4,5-pentol"
-    )
-
-
 def _parent_selection_locant_hint(smiles):
     """The benzene locant HINT that namer.py Branch 3 publishes for the ring.
 

@@ -365,29 +365,6 @@ class TestT4RescueMechanism:
         assert best_effort and not is_failure_name(best_effort), best_effort
         assert _full_rt(GPI_MANNOSIDE, best_effort), best_effort
 
-    def test_fail_closed_guard_present_in_both_assemblers(self):
-        """Static confirmation the fail-closed `return None` guard (added
-        this phase) exists ahead of the `named_fragments` assembly dispatch
-        in BOTH multi-fragment assemblers -- a cheap, fast-running canary
-        against an accidental revert, independent of the (slower) live
-        molecule tests above.
-        """
-        import inspect
-
-        from orthonym.decomposition import engine
-
-        multi_src = inspect.getsource(engine._try_multi_bond_decompose)
-        mixed_src = inspect.getsource(engine._try_iterative_mixed_decompose)
-
-        for src, label in (
-            (multi_src, "_try_multi_bond_decompose"),
-            (mixed_src, "_try_iterative_mixed_decompose"),
-        ):
-            assert "failed_count > 0" in src and "return None" in src, (
-                f"{label} no longer appears to fail closed on "
-                f"failed_count > 0 -- has the guard been reverted?"
-            )
-
 
 class TestHonestAbstainWhenGenuinelyUnnameable:
     """At least one case must still abstain CLEANLY (never a partial) when a

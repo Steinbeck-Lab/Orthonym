@@ -39,13 +39,6 @@ class TestEsterSenioritySwap:
         _pin, be = assert_tier_contract(smiles)
         assert "acetate" in be, be
 
-    def test_simple_ester_ethyl_acetate_unchanged(self):
-        """CCOC(=O)C (ethyl acetate): simple ester, should NOT swap."""
-        name = name_compound("CCOC(=O)C")
-        assert name == "ethyl acetate", (
-            f"Expected 'ethyl acetate', got: {name}"
-        )
-
     def test_methyl_benzoate_unchanged(self):
         """COC(=O)c1ccccc1 (methyl benzoate): should preserve functional class name."""
         name = name_compound("COC(=O)c1ccccc1")
@@ -226,11 +219,3 @@ class TestSenioritySwapCanaryPreservation:
         ("c1ccncc1", "pyridine"),
     ]
 
-    @pytest.mark.parametrize("smiles,expected", CANARY_COMPOUNDS)
-    def test_canary_preserved(self, smiles, expected):
-        """Canary compound must produce exact expected name."""
-        result = name_compound(smiles)
-        assert result == expected, (
-            f"Canary regression for {smiles}: "
-            f"expected '{expected}', got '{result}'"
-        )

@@ -68,7 +68,14 @@ def _assert_identity_label(fx, row):
     assert _independent_parse(row["name"]) is None, row["name"]  # OPSIN reads nothing
 
 
-@pytest.mark.parametrize("tier", TIERS)
+# The PIN and best-effort tiers run in the PR run; the 'valid' and 'complete' tiers (30 s
+# of the 3 x 4 rows) run in the nightly run only.
+_NIGHTLY_TIERS = {"valid", "complete"}
+
+
+@pytest.mark.parametrize(
+    "tier",
+    [pytest.param(t, marks=pytest.mark.slow) if t in _NIGHTLY_TIERS else t for t in TIERS])
 @pytest.mark.parametrize("fx", [HEME_B, CHLOROPHYLL_A, CYANOCOBALAMIN],
                          ids=["heme_b", "chlorophyll_a", "cyanocobalamin"])
 def test_coordination_list_name_keeps_the_label_of_its_naming_path(fx, tier):

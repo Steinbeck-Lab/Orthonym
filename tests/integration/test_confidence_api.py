@@ -98,12 +98,6 @@ class TestNameCompoundConfidence:
         assert 'factors' in result
         assert 'handler' in result
 
-    def test_default_returns_str(self):
-        """name_compound without include_confidence returns str."""
-        result = name_compound("CCO")
-        assert isinstance(result, str)
-        assert result == "ethanol"
-
     def test_confidence_values_in_range(self):
         """All confidence and factor values are in [0.0, 1.0]."""
         test_smiles = [

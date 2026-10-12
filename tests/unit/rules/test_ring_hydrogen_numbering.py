@@ -20,12 +20,6 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 
 ROWS = [
-    # the suffix (d) ranks before the hydro prefixes (f) and the added hydrogen (e) is cited
-    # after it: the thione of these rings is the suffix class 16,
-    # the Blue Book, before the class 19 amines:18192;:29504), so the
-    # numbering is '2(1H)' with the amino group at 6, not '2,3-dihydro...-4-amine'.
-    ("Nc1ccnc(=S)[nH]1", "6-aminopyrimidine-2(1H)-thione"),
-    ("Nc1[nH]c(=S)ncc1F", "6-amino-5-fluoropyrimidine-2(1H)-thione"),
     ("O=C1C=NC1", "azet-3(2H)-one"),
     ("O=C1C=NN1", "1,2-diazet-3(2H)-one"),
     ("O=C1C=CC=NCC=C1", "azocin-5(2H)-one"),
@@ -40,8 +34,6 @@ UNCHANGED = [
     ("Cn1cc(C(=O)O)c(=O)cc1", "1-methyl-4-oxo-1,4-dihydropyridine-3-carboxylic acid"),
     ("C=C1C=CC(N)=CN1", "6-methylidene-1,6-dihydropyridin-3-amine"),
     ("Cc1cc(=O)n(-c2ccccc2)[nH]1", "5-methyl-2-phenyl-1,2-dihydro-3H-pyrazol-3-one"),
-    ("O=C1C=CC=COC1", "oxepin-3(2H)-one"),
-    ("O=C1C=COCO1", "2H,4H-1,3-dioxin-4-one"),
 ]
 
 

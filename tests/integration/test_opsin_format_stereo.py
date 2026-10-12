@@ -236,7 +236,6 @@ class TestStereoFormatRetainedNames:
     but multi-center always fails. Our format is IUPAC correct.
     """
 
-    @pytest.mark.xfail(reason="OPSIN limitation: multi-center stereo on chromane")
     def test_trihydroxychromane_stereo(self):
         """Compound #9: (2R,3S,4R)-3,4,7-trihydroxychromane
         SMILES: Oc1ccc2c(c1)O[C@H](c1ccc(O)c(O)c1)[C@@H](O)[C@@H]2O
@@ -248,7 +247,6 @@ class TestStereoFormatRetainedNames:
         result = opsin_parse(name)
         assert result is not None, f"OPSIN failed to parse: {name}"
 
-    @pytest.mark.xfail(reason="OPSIN limitation: multi-center stereo on steroid")
     def test_stigmastadienol_stereo(self):
         """Compound #19: (3S,...,24Z)-stigmasta-7,24-dien-3-ol
         8+ stereo centers on steroid retained name.
@@ -317,7 +315,6 @@ class TestStereoFormatMultiCenter:
         result = opsin_parse(name)
         assert result is not None, f"OPSIN failed to parse: {name}"
 
-    @pytest.mark.xfail(reason="OPSIN limitation: 2-center stereo on oxolane")
     def test_methyloxooxolane_stereo(self):
         """Compound #10: (2R,3S)-4-methyl-5-oxooxolane
         2-center stereo on simple heterocycle.
@@ -329,7 +326,6 @@ class TestStereoFormatMultiCenter:
         result = opsin_parse(name)
         assert result is not None, f"OPSIN failed to parse: {name}"
 
-    @pytest.mark.xfail(reason="OPSIN limitation: 2-center stereo on hexanoate")
     def test_aminohexanoate_stereo(self):
         """Compound #11: (2S,3S)-2-aminohexanoate
         2-center stereo blocks OPSIN; single (2S)- would pass.
@@ -367,7 +363,6 @@ class TestStereoFormatComplexMultiCenter:
     but exceed OPSIN's parser capabilities.
     """
 
-    @pytest.mark.xfail(reason="OPSIN limitation: 9-center stereo on ester")
     def test_nonacosyl_ester_stereo(self):
         """Compound #8: (8S,...,18S)-nonacosyl (9Z)-hexadec-9-enoate
         9 stereo centers on long-chain ester.
@@ -440,7 +435,6 @@ class TestStereoFormatSpecificPatterns:
     support. Each has been individually verified to parse without stereo.
     """
 
-    @pytest.mark.xfail(reason="OPSIN limitation: inline stereo in substituent name")
     def test_inline_stereo_substituent(self):
         """Compound #1: 2-[(R)-2-oxo(3R)-3-aminobutyl]benzoic acid
         Stereo descriptors inline within substituent block are IUPAC-correct
@@ -450,7 +444,6 @@ class TestStereoFormatSpecificPatterns:
         result = opsin_parse(name)
         assert result is not None, f"OPSIN failed to parse: {name}"
 
-    @pytest.mark.xfail(reason="OPSIN limitation: E/Z stereo on piperazine")
     def test_ez_piperazine_stereo(self):
         """Compound #2: (6E)-6-imidazolyl-2,5-dioxo-3-pyrrolylpiperazine
         E/Z descriptor on piperazine ring double bond.
@@ -473,7 +466,6 @@ class TestStereoFormatSpecificPatterns:
         result = opsin_parse(name)
         assert result is not None, f"OPSIN failed to parse: {name}"
 
-    @pytest.mark.xfail(reason="OPSIN limitation: stereo on phenylethan-1-ol")
     def test_phenylethan_1_ol_stereo(self):
         """Compound #33: (2R)-2-phenylethan-1-ol
         Single R descriptor on simple alcohol. OPSIN accepts the base
@@ -483,7 +475,6 @@ class TestStereoFormatSpecificPatterns:
         result = opsin_parse(name)
         assert result is not None, f"OPSIN failed to parse: {name}"
 
-    @pytest.mark.xfail(reason="OPSIN limitation: E/Z stereo on oxolanone")
     def test_tribenzyloxolanone_stereo(self):
         """Compound #41: (5E)-3,4,5-tribenzyloxolan-2-one
         E/Z descriptor on oxolane ring system.
@@ -569,12 +560,18 @@ class TestStereoFormatAllCompounds:
             f"  Stripped: {stripped}"
         )
 
-    @pytest.mark.parametrize("smiles", ALL_STEREO_SMILES)
-    @pytest.mark.xfail(reason="OPSIN limitation: stereo descriptor format")
+    # The first three SMILES above (pseudoasymmetric r/s) still fail OPSIN with the
+    # full name (documented OPSIN parser limitation); the other five now parse.
+    @pytest.mark.parametrize("smiles", [
+        pytest.param(s, marks=pytest.mark.xfail(
+            reason="OPSIN limitation: stereo descriptor format"))
+        if i < 3 else s
+        for i, s in enumerate(ALL_STEREO_SMILES)])
     def test_full_name_opsin_parses(self, smiles):
-        """Full name with stereo descriptors -- expected to fail OPSIN.
+        """Full name with stereo descriptors.
 
-        These are documented OPSIN parser limitations, not our bugs.
+        The pseudoasymmetric r/s compounds are documented OPSIN parser
+        limitations (xfail), not our bugs.
         """
         name = name_compound(smiles)
         result = opsin_parse(name)

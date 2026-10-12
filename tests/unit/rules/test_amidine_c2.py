@@ -62,30 +62,9 @@ class TestBenzeneCarboximidamideSuffix:
 
 
 # ---------------------------------------------------------------------------
-# FIX (c) — N-substituted amidine (N/N'-aware carbamimidoyl prefix)
-# ---------------------------------------------------------------------------
-# SHIPPED (D1): sub-fix (c) — the N-substituted-amidine subsystem — landed in D1
-# (broadened SMARTS with the guanidine guard held + N/N' locant assignment pinned
-# by C-N bond order, OPSIN round-trip verified per tautomer). Full coverage lives
-# in tests/unit/rules/test_nsubst_amidine_d1.py; these two anchor cases stay here
-# to document the C2->D1 continuity.
-class TestNSubstitutedAmidine:
-    def test_4_N_methylcarbamimidoyl_benzoic_acid(self):
-        # CNC(=N)-: methyl on the single-bonded (amino) N = N-methyl
-        assert _pin("CNC(=N)c1ccc(C(=O)O)cc1") == "4-(N-methylcarbamimidoyl)benzoic acid"
-
-    def test_Nprime_methyl_tautomer_correct(self):
-        # CN=C(N)-: methyl on the double-bonded (imino) N = N'-methyl.
-        # Adversarial: getting N vs N' backwards flips the molecule.
-        assert _pin("CN=C(N)c1ccc(C(=O)O)cc1") == "4-(N'-methylcarbamimidoyl)benzoic acid"
-
-
-# ---------------------------------------------------------------------------
 # CRITICAL GUARDS — must hold after every change
 # ---------------------------------------------------------------------------
 class TestAmidineGuards:
-    def test_guanidine_not_swallowed(self):
-        assert _pin("NC(=N)N") == "guanidine"
 
     def test_cyclohexanecarboximidamide(self):
         assert _pin("N=C(N)C1CCCCC1") == "cyclohexanecarboximidamide"

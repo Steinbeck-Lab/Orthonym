@@ -206,12 +206,6 @@ class TestLactamEndToEnd:
         """
         assert name_compound("C1CCCCC(=O)N1") == "azepan-2-one"
 
-    def test_succinimide_not_lactam_e2e(self):
-        """Succinimide is a cyclic imide -> the ring DIONE pseudoketone
-        pyrrolidine-2,5-dione, the Blue Book), NOT a mono-'one' lactam."""
-        name = name_compound("O=C1CCC(=O)N1")
-        assert name == "pyrrolidine-2,5-dione"
-
     def test_lactone_still_works(self):
         """Lactone naming is not broken by lactam integration."""
         assert name_compound("O=C1CCCO1") == "oxolan-2-one"

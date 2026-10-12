@@ -22,14 +22,6 @@ class TestIsoindolineDioneLocants:
     """Verify isoindoline-1,3-dione locants are correct from source."""
 
     @pytest.mark.unit
-    def test_bare_phthalimide(self):
-        """Bare phthalimide -> the pseudoketone PIN (phthalimide is general only)."""
-        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
-        # R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs. OPSIN RT exact.
-        name = name_compound("O=C1NC(=O)c2ccccc21")
-        assert name == "1H-isoindole-1,3(2H)-dione"
-
-    @pytest.mark.unit
     def test_hydroxy_phthalimide(self):
         """Hydroxy-substituted phthalimide has correct locants.
 

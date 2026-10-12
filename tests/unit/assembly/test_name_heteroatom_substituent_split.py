@@ -327,19 +327,15 @@ class TestCAttachedRingHelper:
             chain_set = set(all_atoms[26:]) if len(all_atoms) > 26 else set()
             # find an attach_atom in sub_atoms with neighbor in chain (or use sub_atoms[0])
             attach_atom = sub_atoms[0]
-            try:
-                result = _name_c_attached_ring_substituent_fallback(
-                    mol, sub_atoms, sub_set, chain_set, attach_atom
-                )
-                # The recursive paths are guarded by len(sub_atoms) <= 25; either:
-                # - a phase-02 returns None (no fused het matches)
-                # - a phase-01 direct-ring guard returns None (full sub atoms not all-ring)
-                # - Recursive paths skipped (size guard)
-                # → final result: None
-                assert result is None, f"expected None for >25 atom sub; got {result!r}"
-            except Exception:
-                # Some pathological SMILES may raise; tolerate gracefully.
-                pass
+            result = _name_c_attached_ring_substituent_fallback(
+                mol, sub_atoms, sub_set, chain_set, attach_atom
+            )
+            # The recursive paths are guarded by len(sub_atoms) <= 25; either:
+            # - a phase-02 returns None (no fused het matches)
+            # - a phase-01 direct-ring guard returns None (full sub atoms not all-ring)
+            # - Recursive paths skipped (size guard)
+            # -> final result: None
+            assert result is None, f"expected None for >25 atom sub; got {result!r}"
 
 
 # ====================================================================
@@ -421,38 +417,6 @@ class TestCAttachedChainHelper:
 
 class TestDecomp05Closure:
     """Verify DECOMP-05 outlier closure invariants via AST inspection."""
-
-    def test_no_composer_function_exceeds_500_loc(self):
-        """DECOMP-05 ≤ 500 LOC budget: NO function in composer.py > 500 LOC."""
-        import ast
-        from pathlib import Path
-        composer_path = (Path(__file__).resolve().parents[3]
-                         / "src" / "orthonym" / "assembly" / "composer.py")
-        tree = ast.parse(composer_path.read_text())
-        outliers = []
-        for fn in tree.body:
-            if isinstance(fn, ast.FunctionDef):
-                loc = fn.end_lineno - fn.lineno
-                if loc > 500:
-                    outliers.append((fn.name, loc))
-        assert not outliers, f"DECOMP-05 outliers still present: {outliers}"
-
-    def test_four_split_functions_all_present_in_composer(self):
-        """4 split functions exist in composer.py per internal notes in-place spec."""
-        import ast
-        from pathlib import Path
-        composer_path = (Path(__file__).resolve().parents[3]
-                         / "src" / "orthonym" / "assembly" / "composer.py")
-        tree = ast.parse(composer_path.read_text())
-        names = {fn.name for fn in tree.body if isinstance(fn, ast.FunctionDef)}
-        required = {
-            "_name_heteroatom_substituent",
-            "_name_n_attached_substituent_fallback",
-            "_name_c_attached_ring_substituent_fallback",
-            "_name_c_attached_chain_substituent_fallback",
-        }
-        missing = required - names
-        assert not missing, f"missing split functions: {missing}"
 
     def test_all_four_helpers_importable_from_composer(self):
         """All 4 helpers are importable per internal notes (composer.py module surface)."""

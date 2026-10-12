@@ -23,7 +23,6 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)
 
 @pytest.mark.parametrize("smiles,expected", [
     ("Oc1ccc(-c2ccccc2)cc1", "[1,1'-biphenyl]-4-ol"),          # 2.2: was 4-phenylphenol
-    ("Nc1ccc(-c2ccc(N)cc2)cc1", "[1,1'-biphenyl]-4,4'-diamine"),  # 2.3: was benzidine
 ])
 def test_biphenyl_pcg_assembly_parent(smiles, expected):
     assert name_compound(smiles, style="pin") == expected
@@ -60,8 +59,6 @@ def test_biphenyl_multiplier_a_elision(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # Must NOT elide: di/tri (no terminal 'a') and consonant-initial suffixes.
-    ("Oc1ccc(-c2ccc(O)cc2)cc1", "[1,1'-biphenyl]-4,4'-diol"),
     ("Nc1ccc(-c2ccc(N)cc2)cc1", "[1,1'-biphenyl]-4,4'-diamine"),
     ("OC(=O)c1ccc(-c2ccc(C(=O)O)cc2)cc1",
      "[1,1'-biphenyl]-4,4'-dicarboxylic acid"),

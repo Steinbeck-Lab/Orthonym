@@ -447,28 +447,18 @@ class TestRingNameTokensReplacement:
 
 
 class TestWR06MultiStereocenterSubstituentLocants:
-    """ (code review 2026-06-02) — TRACKING xfail for the known
-    multi-stereocenter substituent locant defect.
+    """ (code review 2026-06-02) — tracking test (formerly an xfail) for the
+    known multi-stereocenter substituent locant defect.
 
     A substituent that itself carries >=2 stereocenters currently gets a
     double-applied, atom-index-numbered (heteroatom-counting) descriptor, e.g.
     '(2R,3R)-(2R)-2-bromochloropropyl'. The proper fix threads the substituent's
     OWN IUPAC numbering out of name_fragment_recursively and de-duplicates the
     recursive stereo descriptor — high blast radius, ~0 corpus reach, and the
-    malformed output is already OPSIN-gated by in production. This xfail
-    pins the defect; it flips green when the root-cause fix lands.
+    malformed output is already OPSIN-gated by in production. This test
+    pinned the defect as an xfail; it passes now.
     """
 
-    @pytest.mark.xfail(
-        reason="WR-06 DEFERRED (169.5 code review): multi-stereocenter substituent "
-               "uses raw atom-index locants AND double-applies the recursive stereo "
-               "descriptor. Correct fix needs the substituent's own numbering threaded "
-               "out of name_fragment_recursively (recursion-contract change, high blast "
-               "radius; branch fires ~25/1282 canary rows that currently pass, so a "
-               "behavior change risks regression; malformed cases SUB-03-gated). "
-               "Tracked here + in the V20 audit.",
-        strict=False,
-    )
     def test_multi_stereocenter_substituent_single_attachment_rooted_descriptor(self):
         from rdkit.Chem import rdCIPLabeler
         from orthonym.assembly.substituent_naming import name_substituent_fragment

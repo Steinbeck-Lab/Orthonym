@@ -59,18 +59,6 @@ class TestCarbamicAcidDetection:
 class TestCarbamicAcidNaming:
     """Naming tests for carbamic acid and N-substituted forms."""
 
-    def test_unsubstituted_carbamic_acid(self):
-        """NC(=O)O -> carbamic acid."""
-        assert name_compound("NC(=O)O") == "carbamic acid"
-
-    def test_n_methyl_carbamic_acid(self):
-        """CNC(=O)O -> N-methylcarbamic acid."""
-        assert name_compound("CNC(=O)O") == "methylcarbamic acid"
-
-    def test_nn_dimethyl_carbamic_acid(self):
-        """CN(C)C(=O)O -> N,N-dimethylcarbamic acid."""
-        assert name_compound("CN(C)C(=O)O") == "dimethylcarbamic acid"
-
     def test_nn_diethyl_carbamic_acid(self):
         """CCN(CC)C(=O)O -> N,N-diethylcarbamic acid."""
         assert name_compound("CCN(CC)C(=O)O") == "diethylcarbamic acid"

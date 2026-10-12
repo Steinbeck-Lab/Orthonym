@@ -38,11 +38,6 @@ class TestQuaternaryAminium:
     """.1 standalone quaternary cation -> systematic ``-aminium`` PIN .
     RED on HEAD by design (trivial name or '')."""
 
-    def test_tetramethyl_quaternary(self):
-        """ (the Blue Book): (CH3)4N+ ->
-        ``N,N,N-trimethylmethanaminium``; ``tetramethylammonium`` is non-PIN."""
-        assert Orthonym().name("C[N+](C)(C)C") == "N,N,N-trimethylmethanaminium"
-
     def test_choline_quaternary(self):
         """ +: 2-hydroxyethyl-trimethyl quaternary cation ->
         ``2-hydroxy-N,N,N-trimethylethan-1-aminium`` (``choline`` is a non-PIN

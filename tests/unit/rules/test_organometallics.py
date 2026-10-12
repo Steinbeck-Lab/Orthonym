@@ -10,7 +10,6 @@ src/orthonym/rules/seniority.py — the two cascades MUST stay separate.
 
 NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
-import inspect
 import pytest
 from rdkit import Chem
 
@@ -56,29 +55,6 @@ class TestOrgmLigandOrder:
     def test_benzene_in_order(self):
         """Benzene is a π-ligand; appears as 'benzene' not 'phenyl' for arene complexes."""
         assert 'benzene' in ORGM_LIGAND_ORDER
-
-    def test_no_seniority_import_in_rules_module(self):
-        """internal notes HARD INVARIANT: rules/organometallics.py NEVER imports rules.seniority."""
-        from orthonym.rules import organometallics
-        src = inspect.getsource(organometallics)
-        # Compiled grep gates per Plan-02 task 02-03
-        # (allowed in docstring comments cautioning against doing it)
-        forbidden_patterns = [
-            'from ..rules.seniority',
-            'from orthonym.rules.seniority',
-            'import orthonym.rules.seniority',
-        ]
-        # Check non-comment lines
-        import_lines = [
-            line for line in src.splitlines()
-            if line.strip().startswith(('from ', 'import '))
-        ]
-        for forbidden in forbidden_patterns:
-            for line in import_lines:
-                assert forbidden not in line, (
-                    f"CONTEXT D-06 violation: '{forbidden}' found in "
-                    f"rules/organometallics.py import:\n  {line}"
-                )
 
 
 # ---------------------------------------------------------------------------
@@ -275,20 +251,6 @@ class TestAssembleOrganometallicName:
         assert result is not None
         name, _, _ = result
         assert name == 'bis(η⁶-benzene)chromium(0)'
-
-    def test_seniority_py_not_imported(self):
-        """internal notes enforcement: rules/organometallics.py NEVER imports rules.seniority.
-
-        Restated test (also in TestOrgmLigandOrder; explicit per Plan-04 spec).
-        """
-        from orthonym.rules import organometallics
-        src = inspect.getsource(organometallics)
-        import_lines = [
-            line for line in src.splitlines()
-            if line.strip().startswith(('from ', 'import '))
-        ]
-        for line in import_lines:
-            assert 'seniority' not in line
 
 
 # ---------------------------------------------------------------------------

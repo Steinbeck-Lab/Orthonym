@@ -121,17 +121,6 @@ class TestRingVsChainSelection:
     """Tests for ring vs chain parent selection per IUPAC 2013 Method 1."""
 
     @pytest.mark.unit
-    def test_ring_as_parent_methylcyclohexane(self):
-        """Ring is parent when attached group is small."""
-        # Methylcyclohexane: 6C ring + 1C substituent -> ring is parent
-        assert name_compound("CC1CCCCC1") == "methylcyclohexane"
-
-    @pytest.mark.unit
-    def test_ring_as_parent_ethylcyclopentane(self):
-        """5C ring + 2C chain -> ring is parent."""
-        assert name_compound("CCC1CCCC1") == "ethylcyclopentane"
-
-    @pytest.mark.unit
     def test_ring_as_parent_propylcyclobutane(self):
         """4C ring + 3C chain -> ring is parent."""
         assert name_compound("CCCC1CCC1") == "propylcyclobutane"
@@ -286,20 +275,6 @@ class TestMonosubstitutedLocantOmission:
     """Tests verifying that monosubstituted cycloalkanes omit locant 1."""
 
     @pytest.mark.unit
-    def test_no_locant_methylcyclohexane(self):
-        """Result should be 'methylcyclohexane' not '1-methylcyclohexane'."""
-        result = name_compound("CC1CCCCC1")
-        assert result == "methylcyclohexane"
-        assert not result.startswith("1-")
-
-    @pytest.mark.unit
-    def test_no_locant_ethylcyclopentane(self):
-        """Result should be 'ethylcyclopentane' not '1-ethylcyclopentane'."""
-        result = name_compound("CCC1CCCC1")
-        assert result == "ethylcyclopentane"
-        assert not result.startswith("1-")
-
-    @pytest.mark.unit
     def test_di_substituted_requires_locants(self):
         """Disubstituted cycloalkanes MUST include locants."""
         result = name_compound("CC1CCCCC1C")
@@ -319,13 +294,6 @@ class TestSubstitutedCycloalkaneEdgeCases:
         # Both represent methylcyclohexane
         assert name_compound("CC1CCCCC1") == "methylcyclohexane"
         assert name_compound("C1CCCCC1C") == "methylcyclohexane"
-
-    @pytest.mark.unit
-    def test_symmetrical_substitution(self):
-        """Symmetrical substitution patterns."""
-        # 1,4-dimethylcyclohexane
-        result = name_compound("CC1CCC(C)CC1")
-        assert result == "1,4-dimethylcyclohexane"
 
 
 # ============================================================================

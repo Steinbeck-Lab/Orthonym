@@ -101,15 +101,6 @@ class TestDerivePrefixStem:
 class TestLocantResolution:
     """Test get_fused_heterocycle_prefix returns correct stem-locant-yl strings."""
 
-    @pytest.mark.parametrize("smiles,attach_idx,expected_prefix", [
-        # Quinoline: attach at C-2 (IUPAC locant 2)
-        # Build a molecule with quinoline + something attached
-        ("c1ccc2ncccc2c1", None, None),  # placeholder - real test below
-    ])
-    def test_locant_resolution_placeholder(self, smiles, attach_idx, expected_prefix):
-        """Placeholder - real locant tests use match_fused_heterocycle_core."""
-        pass
-
     def test_quinoline_prefix(self):
         """Quinoline attached at C-2 → 'quinolin-2-yl'."""
         # 2-methylquinoline: methyl at position 2

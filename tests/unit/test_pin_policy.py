@@ -434,27 +434,6 @@ class TestC8TrivialThreading:
 
     # --- Locus A: _process_batch signature threading ---
 
-    def test_process_batch_accepts_trivial_fallback_param(self):
-        """_process_batch must accept a trivial_fallback keyword argument
-        without raising TypeError (signature threading test)."""
-        from orthonym.cli import _process_batch
-        import inspect
-        sig = inspect.signature(_process_batch)
-        assert "trivial_fallback" in sig.parameters, (
-            "_process_batch must have a 'trivial_fallback' parameter"
-        )
-
-    def test_process_batch_trivial_fallback_default_false(self):
-        """_process_batch's trivial_fallback default must be False to preserve
-        backward-compatibility (existing callers must be unaffected)."""
-        from orthonym.cli import _process_batch
-        import inspect
-        sig = inspect.signature(_process_batch)
-        param = sig.parameters["trivial_fallback"]
-        assert param.default is False, (
-            f"trivial_fallback default should be False, got {param.default!r}"
-        )
-
     def test_cli_batch_trivial_smoke(self, tmp_path):
         """Subprocess CLI smoke: --batch --trivial must not crash and must
         produce output (one line per SMILES input)."""

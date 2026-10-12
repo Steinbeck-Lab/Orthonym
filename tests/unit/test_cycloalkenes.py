@@ -34,16 +34,6 @@ class TestSimpleCycloalkenes:
         assert name_compound("C1=CCC1") == "cyclobutene"
 
     @pytest.mark.unit
-    def test_cyclopentene(self):
-        """C1=CCCC1 -> cyclopentene (5-membered ring with double bond)."""
-        assert name_compound("C1=CCCC1") == "cyclopentene"
-
-    @pytest.mark.unit
-    def test_cyclohexene(self):
-        """C1=CCCCC1 -> cyclohexene (6-membered ring with double bond)."""
-        assert name_compound("C1=CCCCC1") == "cyclohexene"
-
-    @pytest.mark.unit
     def test_cycloheptene(self):
         """C1=CCCCCC1 -> cycloheptene (7-membered ring with double bond)."""
         assert name_compound("C1=CCCCCC1") == "cycloheptene"

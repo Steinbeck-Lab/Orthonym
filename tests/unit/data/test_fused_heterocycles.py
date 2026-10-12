@@ -1170,6 +1170,101 @@ class TestPhase101EndToEndNaming:
         assert '2-methyl' in result
         assert 'pyrrolizine' in result
 
+    @pytest.mark.parametrize(
+        "smiles, expected, style",
+        [
+            pytest.param("c1ccc2[nH]ncc2c1", "1H-indazole", None, id="c1ccc2[nH]ncc2c1"),
+            pytest.param("c1ccc2[se]cnc2c1", "1,3-benzoselenazole", None, id="c1ccc2[se]cnc2c1"),
+            pytest.param("c1ccc2c(c1)-c1ccccc1-2", "biphenylene", None, id="c1ccc2c(c1)-c1ccccc1-2"),
+            pytest.param("c1ccc2c(c1)CCO2", "2,3-dihydro-1-benzofuran", None, id="c1ccc2c(c1)CCO2"),
+            pytest.param("c1ccc2c(c1)COc1ccccc1-2", "6H-dibenzo[b,d]pyran", None, id="c1ccc2c(c1)COc1ccccc1-2"),
+            pytest.param("c1ccc2c(c1)NCCN2", "1,2,3,4-tetrahydroquinoxaline", None, id="c1ccc2c(c1)NCCN2"),
+            pytest.param("c1ccc2c(c1)OCCO2", "2,3-dihydro-1,4-benzodioxine", None, id="c1ccc2c(c1)OCCO2"),
+            pytest.param("c1ccc2c(c1)[nH]c1cnccc12", "9H-beta-carboline", None, id="c1ccc2c(c1)[nH]c1cnccc12"),
+            pytest.param("c1ccc2c(c1)c1ccccc1c1ccccc21", "triphenylene", None, id="c1ccc2c(c1)c1ccccc1c1ccccc21"),
+            pytest.param("c1ccc2c(c1)ccc1sccc12", "naphtho[2,1-b]thiophene", None, id="c1ccc2c(c1)ccc1sccc12"),
+            pytest.param("c1ccc2c(c1)oc1ccccc12", "dibenzo[b,d]furan", None, id="c1ccc2c(c1)oc1ccccc12"),
+            pytest.param("c1ccc2cc3[nH]ccc3cc2c1", "1H-naphtho[2,3-b]pyrrole", None, id="c1ccc2cc3[nH]ccc3cc2c1"),
+            pytest.param("c1ccc2cc3cc4ccccc4cc3cc2c1", "tetracene", None, id="c1ccc2cc3cc4ccccc4cc3cc2c1"),
+            pytest.param("c1ccc2cc3cnccc3cc2c1", "benzo[g]isoquinoline", None, id="c1ccc2cc3cnccc3cc2c1"),
+            pytest.param("c1ccc2cc3ncccc3cc2c1", "benzo[g]quinoline", None, id="c1ccc2cc3ncccc3cc2c1"),
+            pytest.param("c1ccc2cc3occc3cc2c1", "naphtho[2,3-b]furan", None, id="c1ccc2cc3occc3cc2c1"),
+            pytest.param("c1ccc2cc3sccc3cc2c1", "naphtho[2,3-b]thiophene", None, id="c1ccc2cc3sccc3cc2c1"),
+            pytest.param("c1ccc2cnncc2c1", "phthalazine", None, id="c1ccc2cnncc2c1"),
+            pytest.param("c1ccc2c(c1)COC2", "1,3-dihydro-2-benzofuran", None, id="c1ccc2c(c1)COC2"),
+            pytest.param("c1ccc2nnccc2c1", "cinnoline", None, id="c1ccc2nnccc2c1"),
+            pytest.param("c1ccc2nonc2c1", "2,1,3-benzoxadiazole", None, id="c1ccc2nonc2c1"),
+            pytest.param("c1ccc2nscc2c1", "2,1-benzothiazole", None, id="c1ccc2nscc2c1"),
+            pytest.param("c1ccn2cccc2c1", "indolizine", None, id="c1ccn2cccc2c1"),
+            pytest.param("c1ccn2cncc2c1", "imidazo[1,5-a]pyridine", None, id="c1ccn2cncc2c1"),
+            pytest.param("c1ccn2ncnc2c1", "[1,2,4]triazolo[1,5-a]pyridine", None, id="c1ccn2ncnc2c1"),
+            pytest.param("c1ccn2nnnc2c1", "[1,2,3,4]tetrazolo[1,5-a]pyridine", None, id="c1ccn2nnnc2c1"),
+            pytest.param("c1cnc2[nH]ccc2c1", "1H-pyrrolo[2,3-b]pyridine", None, id="c1cnc2[nH]ccc2c1"),
+            pytest.param("c1cnc2[nH]ncc2c1", "1H-pyrazolo[3,4-b]pyridine", None, id="c1cnc2[nH]ncc2c1"),
+            pytest.param("c1cnc2c(c1)CCN2", "2,3-dihydro-1H-pyrrolo[2,3-b]pyridine", None, id="c1cnc2c(c1)CCN2"),
+            pytest.param("c1cnc2cc[nH]c2c1", "1H-pyrrolo[3,2-b]pyridine", None, id="c1cnc2cc[nH]c2c1"),
+            pytest.param("c1cnc2cccnc2c1", "1,5-naphthyridine", None, id="c1cnc2cccnc2c1"),
+            pytest.param("c1cnc2ccncc2c1", "1,6-naphthyridine", None, id="c1cnc2ccncc2c1"),
+            pytest.param("c1cnc2ccnn2c1", "pyrazolo[1,5-a]pyrimidine", None, id="c1cnc2ccnn2c1"),
+            pytest.param("c1cnc2ccnnc2c1", "pyrido[3,2-c]pyridazine", None, id="c1cnc2ccnnc2c1"),
+            pytest.param("c1cnc2ccoc2c1", "furo[3,2-b]pyridine", None, id="c1cnc2ccoc2c1"),
+            pytest.param("c1cnc2ccsc2c1", "thieno[3,2-b]pyridine", None, id="c1cnc2ccsc2c1"),
+            pytest.param("c1cnc2cnccc2c1", "1,7-naphthyridine", None, id="c1cnc2cnccc2c1"),
+            pytest.param("c1cnc2cnncc2c1", "pyrido[2,3-d]pyridazine", None, id="c1cnc2cnncc2c1"),
+            pytest.param("c1cnc2nccn2c1", "imidazo[1,2-a]pyrimidine", None, id="c1cnc2nccn2c1"),
+            pytest.param("c1cnc2nccnc2c1", "pyrido[2,3-b]pyrazine", None, id="c1cnc2nccnc2c1"),
+            pytest.param("c1cnc2nccnc2n1", "pyrazino[2,3-b]pyrazine", None, id="c1cnc2nccnc2n1"),
+            pytest.param("c1cnc2ncncc2c1", "pyrido[2,3-d]pyrimidine", None, id="c1cnc2ncncc2c1"),
+            pytest.param("c1cnc2nncn2c1", "[1,2,4]triazolo[4,3-a]pyrimidine", None, id="c1cnc2nncn2c1"),
+            pytest.param("c1cnc2occc2c1", "furo[2,3-b]pyridine", None, id="c1cnc2occc2c1"),
+            pytest.param("C1=COc2ccccc2C1", "4H-1-benzopyran", None, id="C1=COc2ccccc2C1"),
+            pytest.param("C1=Cc2c3c(ccc2=C1)=CC=C3", "as-indacene", None, id="C1=Cc2c3c(ccc2=C1)=CC=C3"),
+            pytest.param("c1cnn2cccc2c1", "pyrrolo[1,2-b]pyridazine", None, id="c1cnn2cccc2c1"),
+            pytest.param("c1cnn2ccnc2c1", "imidazo[1,2-b]pyridazine", None, id="c1cnn2ccnc2c1"),
+            pytest.param("c1ncc2[nH]ccc2n1", "5H-pyrrolo[3,2-d]pyrimidine", None, id="c1ncc2[nH]ccc2n1"),
+            pytest.param("c1ncc2ncncc2n1", "pyrimido[5,4-d]pyrimidine", None, id="c1ncc2ncncc2n1"),
+            pytest.param("COc1c(O)c(O)c2c(c1O)C(=O)c1coc(C)c1C2=O", "5,7,8-trihydroxy-6-methoxy-1-methylnaphtho[2,3-c]furan-4,9-dione", "pin", id="COc1c(O)c(O)c2c(c1O)C(=O)c1coc(C)c1C2=O"),
+            pytest.param("C1=Cc2cc3c(cc2=C1)C=CC=3", "s-indacene", None, id="C1=Cc2cc3c(cc2=C1)C=CC=3"),
+            pytest.param("C1=Cc2cccc3cccc(c23)C1", "1H-phenalene", None, id="C1=Cc2cccc3cccc(c23)C1"),
+            pytest.param("C1=CSc2ccccc2C1", "4H-1-benzothiopyran", None, id="C1=CSc2ccccc2C1"),
+            pytest.param("C1=Cc2ccccc2CO1", "1H-2-benzopyran", None, id="C1=Cc2ccccc2CO1"),
+            pytest.param("C1=NCc2ccccc2C1", "1,4-dihydroisoquinoline", None, id="C1=NCc2ccccc2C1"),
+            pytest.param("C1=Nc2ccccc2C1", "3H-indole", None, id="C1=Nc2ccccc2C1"),
+            pytest.param("O=c1[nH]c(=O)c2nc3ccccc3nc2[nH]1", "benzo[g]pteridine-2,4(1H,3H)-dione", None, id="O=c1[nH]c(=O)c2nc3ccccc3nc2[nH]1"),
+            pytest.param("O=c1[nH]c(=O)c2nc[nH]c2[nH]1", "3,9-dihydro-1H-purine-2,6-dione", None, id="O=c1[nH]c(=O)c2nc[nH]c2[nH]1"),
+            pytest.param("O=c1[nH]c2ccccc2c2ccccc12", "phenanthridin-6(5H)-one", None, id="O=c1[nH]c2ccccc2c2ccccc12"),
+            pytest.param("O=c1[nH]cnc2nc[nH]c12", "1,7-dihydro-6H-purin-6-one", None, id="O=c1[nH]cnc2nc[nH]c12"),
+            pytest.param("c1cc2[nH]ccc2cn1", "1H-pyrrolo[3,2-c]pyridine", None, id="c1cc2[nH]ccc2cn1"),
+            pytest.param("c1cc2[nH]ncc2cn1", "1H-pyrazolo[4,3-c]pyridine", None, id="c1cc2[nH]ncc2cn1"),
+            pytest.param("c1cc2cc[nH]c2cn1", "1H-pyrrolo[2,3-c]pyridine", None, id="c1cc2cc[nH]c2cn1"),
+            pytest.param("c1cc2ccncc2cn1", "2,7-naphthyridine", None, id="c1cc2ccncc2cn1"),
+            pytest.param("c1cc2ccncn2c1", "pyrrolo[1,2-c]pyrimidine", None, id="c1cc2ccncn2c1"),
+            pytest.param("c1cc2ccsc2cn1", "thieno[2,3-c]pyridine", None, id="c1cc2ccsc2cn1"),
+            pytest.param("c1cc2ccsc2nn1", "thieno[2,3-c]pyridazine", None, id="c1cc2ccsc2nn1"),
+            pytest.param("c1cc2ccsc2s1", "thieno[2,3-b]thiophene", None, id="c1cc2ccsc2s1"),
+            pytest.param("c1cc2cnccn2c1", "pyrrolo[1,2-a]pyrazine", None, id="c1cc2cnccn2c1"),
+            pytest.param("c1cc2nc[nH]cc-2n1", "3H-pyrrolo[3,2-d]pyrimidine", None, id="c1cc2nc[nH]cc-2n1"),
+            pytest.param("c1cc2nccnc2cn1", "pyrido[3,4-b]pyrazine", None, id="c1cc2nccnc2cn1"),
+            pytest.param("c1cc2nccnc2nn1", "pyrazino[2,3-c]pyridazine", None, id="c1cc2nccnc2nn1"),
+            pytest.param("c1cc2ncncc2cn1", "pyrido[4,3-d]pyrimidine", None, id="c1cc2ncncc2cn1"),
+            pytest.param("c1cc2occc2cn1", "furo[3,2-c]pyridine", None, id="c1cc2occc2cn1"),
+            pytest.param("c1cc2sccc2cn1", "thieno[3,2-c]pyridine", None, id="c1cc2sccc2cn1"),
+            pytest.param("c1cc2sccc2s1", "thieno[3,2-b]thiophene", None, id="c1cc2sccc2s1"),
+        ],
+    )
+    def test_merged_catalog_names(self, smiles, expected, style):
+        """Names that development-era snapshot tests pinned and that no other test asserts.
+
+        These (SMILES, name) pairs were asserted only by test files removed in the test
+        slimming change; they move here so the names stay pinned by a rule-level test.
+        Removed tests this replaces:
+          - tests/unit/data/test_catalog_byte_identical.py::test_catalog_byte_identical (76)
+          - tests/integration/test_cfr_dispatch_consistency.py::test_cfr_supplementary_byte_identical (1)
+        """
+        from orthonym import name_compound
+        kwargs = {} if style is None else {"style": style}
+        assert name_compound(smiles, **kwargs) == expected
+
 
 class TestPhase101ComprehensiveCanonicalConsistency:
     """Comprehensive test that ALL dictionary entries have canonical SMILES keys."""

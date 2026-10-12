@@ -307,6 +307,7 @@ GIANT_PEPTIDES = [
 
 
 @pytest.mark.opsin_gate
+@pytest.mark.slow  # 12- and 13-residue peptides, 31 s in all: nightly run only
 @pytest.mark.parametrize("smiles,expected", GIANT_PEPTIDES,
                          ids=["chebi-ile-12mer", "chebi-12mer", "hand-13mer", "hand-12mer"])
 def test_giant_peptide_names_inside_the_budget(smiles, expected):

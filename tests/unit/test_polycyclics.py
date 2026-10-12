@@ -396,9 +396,6 @@ class TestRetainedFusedStemAzulene:
         assert names == {'azulene'}, names
 
     @pytest.mark.parametrize("smiles,expected", [
-        ('c1ccc2ccccc2c1', 'naphthalene'),       # bicyclic 6-6
-        ('c1ccc2cc3ccccc3cc2c1', 'anthracene'),  # linear tricyclic
-        ('c1ccc2c(c1)ccc1ccccc12', 'phenanthrene'),  # angular tricyclic
         ('C1=CC=C2C=CC=CC=C12', 'azulene'),       # bicyclic 5-7 (this fix)
     ])
     def test_retained_fused_carbocyclic_class(self, smiles, expected):

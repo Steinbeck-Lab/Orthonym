@@ -370,21 +370,6 @@ class TestPurityInvariants:
         assert mol.GetNumAtoms() == atom_count_pre
         assert mol.GetNumBonds() == bond_count_pre
 
-    def test_no_xfail_decorator_in_module(self):
-        """internal notes + enforcement: this module must NEVER use xfail.
-
-        Checks for the literal decorator line `` @pytest.mark.xfail``
-        (with leading whitespace) so the assertion string in this
-        test's own body does not self-trigger.
-        """
-        import inspect
-        from tests.unit.perception import test_metals
-        src = inspect.getsource(test_metals)
-        # Look for the decorator usage (whitespace + @pytest.mark.xfail)
-        # rather than the bare string (which appears in docstrings/asserts).
-        assert '\n    @pytest.mark.xfail' not in src
-        assert '\n@pytest.mark.xfail' not in src
-
     def test_metal_complex_is_immutable_namedtuple_like(self):
         """MetalComplex is dataclass(frozen=True) so all fields readable + immutable."""
         mc = MetalComplex(

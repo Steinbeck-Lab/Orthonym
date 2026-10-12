@@ -130,20 +130,6 @@ class TestCLS02Disulfides:
     """Disulfide and trisulfide naming via replacement nomenclature."""
 
     @pytest.mark.integration
-    def test_dithiabutane(self):
-        """Simplest dialkyl disulfide: CSSC. DD2 (Phase D, P-63.3.1(1)): a dialkyl
-        disulfide is a substitutive PIN ((R)disulfanyl on the senior parent), NOT
-        a 'dithia' skeletal-replacement chain (the skeletal form consumed the S-S
-        as two skeletal thia atoms — the C3 defect)."""
-        assert name_compound("CSSC") == "(methyldisulfanyl)methane"
-
-    @pytest.mark.integration
-    def test_dithiahexane(self):
-        """Symmetric disulfide: CCSSCC. DD2 (Phase D, (1)): substitutive
-        PIN, not the 'dithia' skeletal form."""
-        assert name_compound("CCSSCC") == "(ethyldisulfanyl)ethane"
-
-    @pytest.mark.integration
     def test_trithiaheptane(self):
         """Symmetric trisulfide: CCSSSCC."""
         # PIN per R9: "Compounds with three or more contiguous identical
@@ -222,30 +208,6 @@ class TestCLS03CyclicImides:
     """Cyclic imide naming -- retained names and systematic."""
 
     @pytest.mark.integration
-    def test_succinimide(self):
-        """Succinimide: the PIN is the heterocyclic pseudoketone."""
-        # PIN per R7: "Cyclic imides are preferably named as heterocyclic
-        # pseudoketones." the Blue Book; "pyrrolidine-2,5-dione (PIN) succinimide"
-        #:33584; OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-        assert name_compound("O=C1CCC(=O)N1") == "pyrrolidine-2,5-dione"
-
-    @pytest.mark.integration
-    def test_maleimide(self):
-        """Maleimide: the PIN is the heterocyclic pseudoketone."""
-        # 2026-09-26 (pre-existing-failures plan, Task 12 fix a performance pass, item 4) change-asserted-value:
-        # (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones";
-        # "1H-pyrrole-2,5-dione (PIN) pyrrole-2,5-dione" (:33843); (:24721) added indicated
-        # hydrogen is not cited when the suffix pair only removes ring double bonds. OPSIN 2.9.0 RT exact.
-        assert name_compound("O=C1C=CC(=O)N1") == "1H-pyrrole-2,5-dione"
-
-    @pytest.mark.integration
-    def test_phthalimide_retained(self):
-        """Phthalimide is general nomenclature only; the PIN is the pseudoketone."""
-        # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
-        # R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs. OPSIN RT exact.
-        assert name_compound("O=C1NC(=O)c2ccccc21") == "1H-isoindole-1,3(2H)-dione"
-
-    @pytest.mark.integration
     def test_methyl_succinimide_derivative(self):
         """C-substituted succinimide: 3-methyl-2,5-dioxopyrrolidine."""
         name = name_compound("CC1CC(=O)NC1=O")
@@ -307,39 +269,9 @@ class TestCLS04ThiocarboxylicAcids:
     """Thiocarboxylic acid naming -- S-acid, O-acid, dithioic acid."""
 
     @pytest.mark.integration
-    def test_ethanethioic_s_acid(self):
-        """Thioic S-acid: C(=O)SH -> ethanethioic S-acid."""
-        assert name_compound("CC(=O)S") == "ethanethioic S-acid"
-
-    @pytest.mark.integration
-    def test_ethanethioic_o_acid(self):
-        """Thioic O-acid: C(=S)OH -> ethanethioic O-acid."""
-        assert name_compound("CC(=S)O") == "ethanethioic O-acid"
-
-    @pytest.mark.integration
-    def test_ethanedithioic_acid(self):
-        """Dithioic acid: C(=S)SH -> ethane(dithioic acid)."""
-        # PIN per R12 (worked-example analogue; no general sentence found):
-        # "Functional replacement in systematic names of carboxylic acids", example
-        # "3-amino-3-(ethylsulfanyl)prop-2-ene(dithioic acid) (PIN)" the Blue Book;
-        # "sodium propane(dithioate) (PIN)":31569; OPSIN RT exact (TRIAGE.csv;
-        # re-checked in Task 7/8).
-        assert name_compound("CC(=S)S") == "ethane(dithioic acid)"
-
-    @pytest.mark.integration
-    def test_propanethioic_s_acid(self):
-        """Three-carbon thioic S-acid."""
-        assert name_compound("CCC(=O)S") == "propanethioic S-acid"
-
-    @pytest.mark.integration
     def test_butanethioic_s_acid(self):
         """Four-carbon thioic S-acid."""
         assert name_compound("CCCC(=O)S") == "butanethioic S-acid"
-
-    @pytest.mark.integration
-    def test_benzenecarbothioic_s_acid(self):
-        """Aromatic thiocarboxylic acid: no regression on ring-attached."""
-        assert name_compound("SC(=O)c1ccccc1") == "benzenecarbothioic S-acid"
 
     @pytest.mark.integration
     def test_ethanethioic_s_acid_opsin_roundtrip(self):
@@ -378,31 +310,6 @@ class TestCLS05CarbamicAcid:
     """
 
     @pytest.mark.integration
-    def test_carbamic_acid(self):
-        """Parent carbamic acid: NC(=O)O."""
-        assert name_compound("NC(=O)O") == "carbamic acid"
-
-    @pytest.mark.integration
-    def test_n_methylcarbamic_acid(self):
-        """N-monosubstituted: N-methylcarbamic acid."""
-        assert name_compound("CNC(=O)O") == "methylcarbamic acid"
-
-    @pytest.mark.integration
-    def test_n_n_dimethylcarbamic_acid(self):
-        """N,N-disubstituted: N,N-dimethylcarbamic acid."""
-        assert name_compound("CN(C)C(=O)O") == "dimethylcarbamic acid"
-
-    @pytest.mark.integration
-    def test_n_n_diethylcarbamic_acid(self):
-        """N,N-disubstituted with ethyl: N,N-diethylcarbamic acid."""
-        assert name_compound("CCN(CC)C(=O)O") == "diethylcarbamic acid"
-
-    @pytest.mark.integration
-    def test_n_phenylcarbamic_acid(self):
-        """N-aryl substituted: N-phenylcarbamic acid."""
-        assert name_compound("c1ccc(NC(=O)O)cc1") == "phenylcarbamic acid"
-
-    @pytest.mark.integration
     def test_carbamic_acid_opsin_roundtrip(self):
         """OPSIN round-trip: carbamic acid."""
         name = name_compound("NC(=O)O")
@@ -430,30 +337,3 @@ class TestCLS05CarbamicAcid:
 # ====================================================================
 
 
-class TestRegressionSpotChecks:
-    """Spot-check that core compound classes remain unaffected."""
-
-    @pytest.mark.integration
-    def test_ethanol(self):
-        assert name_compound("CCO") == "ethanol"
-
-    @pytest.mark.integration
-    def test_benzene(self):
-        assert name_compound("c1ccccc1") == "benzene"
-
-    @pytest.mark.integration
-    def test_cyclohexane(self):
-        assert name_compound("C1CCCCC1") == "cyclohexane"
-
-    @pytest.mark.integration
-    def test_acetic_acid(self):
-        assert name_compound("CC(=O)O") == "acetic acid"
-
-    @pytest.mark.integration
-    def test_pyridine(self):
-        assert name_compound("c1ccncc1") == "pyridine"
-
-    @pytest.mark.integration
-    def test_disulfane(self):
-        """Disulfane (SS) -- already in canary suite, verify no regression."""
-        assert name_compound("SS") == "disulfane"

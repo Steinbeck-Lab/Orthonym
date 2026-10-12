@@ -182,14 +182,12 @@ class TestPrefixForms:
     """When isocyanate/isothiocyanate is subordinate, use prefix form."""
 
     @pytest.mark.unit
-    @pytest.mark.xfail(reason="Polyfunctional handler does not yet assemble isocyanato prefix on benzene")
     def test_isocyanato_prefix_on_acid(self):
         """Isocyanato prefix when carboxylic acid is principal."""
         result = name_compound("OC(=O)c1ccc(N=C=O)cc1")
         assert "isocyanato" in result, f"Expected 'isocyanato' in '{result}'"
 
     @pytest.mark.unit
-    @pytest.mark.xfail(reason="Polyfunctional handler does not yet assemble isothiocyanato prefix on benzene")
     def test_isothiocyanato_prefix_on_acid(self):
         """Isothiocyanato prefix when carboxylic acid is principal."""
         result = name_compound("OC(=O)c1ccc(N=C=S)cc1")

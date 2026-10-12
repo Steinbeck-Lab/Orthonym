@@ -53,22 +53,6 @@ class TestHeterocycleExistingPatterns:
         assert result == "pyridin-4-ol", f"Expected 'pyridin-4-ol', got '{result}'"
 
 
-class TestUnsubstitutedHeterocycles:
-    """Unsubstituted heterocycles must remain unchanged."""
-
-    def test_pyridine(self):
-        result = name_compound("c1ccncc1")
-        assert result == "pyridine"
-
-    def test_thiophene(self):
-        result = name_compound("c1ccsc1")
-        assert result == "thiophene"
-
-    def test_furan(self):
-        result = name_compound("c1ccoc1")
-        assert result == "furan"
-
-
 class TestLargeSubstituentsOnComplexRings:
     """Large substituents (>12 HA) on complex rings should not be silently dropped."""
 

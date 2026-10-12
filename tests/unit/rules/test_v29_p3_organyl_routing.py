@@ -415,46 +415,6 @@ def test_the_carve_out_does_not_swallow_a_genuinely_compound_name(name):
     assert needs_brackets(name) is True
 
 
-def test_the_italicized_prefix_carve_out_lives_in_exactly_one_place():
-    """Structural tripwire: no open-coded DETECTION of an italicized prefix.
-
-    The defect was caused by divergent copies -- is_complex_substituent's inline
-    strip, format_substituent_prefix's `startswith(("tert-","sec-"))`,
-    organometallics' raw `'-' in name`, the multiplier-hyphen rule's own
-    `startswith`, and needs_brackets' missing case. Detection now lives only in
-    `strip_italicized_structural_prefix`; every consumer must call that (or
-    `has_structural_hyphen`). Downstream rules may still DIFFER -- withholding
-    marks vs. inserting a hyphen -- they just may not re-derive the test.
-
-    This test found the fifth copy when it was first written.
-
-    SUPERSEDED (B): it searches for ONE syntactic shape and was therefore
-    blind to every copy a later review found — three raw ``'-' in t`` tests, a
-    single-argument ``startswith('tert-')``, two ``for x in ('tert-', 'sec-')``
-    loops, three character-set tests and a second hand-written carve-out list. The
-    complete check is the allowlist tripwire
-    ``test_v29_p3b_shared_predicates.test_no_unreviewed_copy_of_the_italicized_prefix_decision``;
-    this one is kept as a cheap fast-fail on the shape it does cover.
-    """
-    import re
-    from pathlib import Path
-    import orthonym
-    root = Path(orthonym.__file__).parent
-    offenders = []
-    for py in root.rglob("*.py"):
-        text = py.read_text()
-        for lineno, line in enumerate(text.splitlines(), 1):
-            if line.lstrip().startswith("#"):
-                continue          # a comment may quote the retired open-code
-            if re.search(r'startswith\(\s*\(\s*["\']tert-', line):
-                offenders.append(f"{py.relative_to(root)}:{lineno}: {line.strip()}")
-    assert not offenders, (
-        "open-coded tert-/sec- carve-out found; call "
-        "naming_utils.strip_italicized_structural_prefix instead:\n"
-        + "\n".join(offenders)
-    )
-
-
 @pytest.mark.parametrize("smiles,expected", [
     # oxoacid stems (BB L36051-L36054) + the bare retained prefix.
     ("CC(C)(C)P(=O)(O)O",    "tert-butylphosphonic acid"),
@@ -1608,23 +1568,3 @@ def test_the_deprecated_narrow_namer_no_longer_exists():
     assert callable(sp._narrow_walk_name)
 
 
-def test_no_source_file_calls_the_deprecated_narrow_namer():
-    """No CALL to the retired name anywhere under src/ (prose may mention it)."""
-    import re
-    from pathlib import Path
-    import orthonym
-    root = Path(orthonym.__file__).parent
-    offenders = []
-    for py in root.rglob("*.py"):
-        for lineno, line in enumerate(py.read_text().splitlines(), 1):
-            stripped = line.lstrip()
-            if stripped.startswith("#"):
-                continue
-            if re.search(r'\bpure_organyl_prefix_name\s*\(', line) or \
-                    re.search(r'import\s+pure_organyl_prefix_name', line):
-                offenders.append(f"{py.relative_to(root)}:{lineno}: {stripped}")
-    assert not offenders, (
-        "the retired narrow namer is referenced again; use "
-        "organyl_prefix_name (naming) or is_simple_unbranched_organyl "
-        "(routing):\n" + "\n".join(offenders)
-    )

@@ -64,8 +64,6 @@ class TestPhenylacetylAcylaminoPIN:
         ("CC(NC(=O)Cc1ccccc1)C(=O)O", "2-(2-phenylacetamido)propanoic acid"),
         ("CC(C)C[C@H](NC(=O)Cc1ccccc1)C(=O)O",
          "(2S)-4-methyl-2-(2-phenylacetamido)pentanoic acid"),
-        # regression guard: the SIMPLE benzamido sibling is unchanged (no locant/marks).
-        ("OC(=O)CNC(=O)c1ccccc1", "benzamidoacetic acid"),
     ])
     def test_exact_pin(self, smiles, expected):
         from orthonym import name_compound

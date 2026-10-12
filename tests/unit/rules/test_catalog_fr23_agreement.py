@@ -111,10 +111,55 @@ def _ring_has_heteroatom(mol, ring_atoms):
     )
 
 
+def _locant_1_atom(entry):
+    """Atom index the catalog numbers 1, or None."""
+    iupac_locants = entry.get('iupac_locants', {})
+    return next(
+        (idx for idx, loc in iupac_locants.items() if loc == 1),
+        None,
+    )
+
+
+def _in_scope(smiles):
+    """True iff the locant-1 predicate is reliable for this catalog entry.
+
+    The scope is the 2-ring fused systems with exactly one heterocyclic ring
+    and a catalog locant 1 (module docstring, "Scope adjustment"). The entries
+    outside it are not parametrized: they used to be skipped with a rationale
+    per category on every run, and so never asserted anything.
+
+    - SMILES that does not parse, or a single-component entry.
+    - 3+ ring fused systems:.3 correctly selects the middle/heterocyclic
+      ring as base, but IUPAC peripheral numbering places locant 1 on a
+      carbocyclic peripheral atom per.x lowest-locant rules (RESEARCH
+      section 548);.3 base selection is verified by other test scopes.
+    - Het-vs-het 2-ring systems:.3(c) larger-ring criterion picks the ring
+      matching the IUPAC name suffix while the catalog locant 1 lives in the
+      prefix component (RESEARCH section 551 case 3, "genuine.3 vs
+      catalog policy divergence"). Verified separately in
+      test_fused_ring_selection.py, which covers.3(a)-(c) on synthetic
+      rings without locant-1 ambiguity.
+    - An entry without a locant 1: nothing to verify.
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        return False
+    components = _enumerate_components(mol)
+    if len(components) != 2:
+        return False
+    if sum(1 for c in components if _ring_has_heteroatom(mol, c)) >= 2:
+        return False
+    return _locant_1_atom(FUSED_HETEROCYCLE_DATA[smiles]) is not None
+
+
+IN_SCOPE_CATALOG = [(smi, name) for smi, name in NON_PAH_CATALOG if _in_scope(smi)]
+assert IN_SCOPE_CATALOG, "no catalog entry is in the scope of the locant-1 predicate"
+
+
 @pytest.mark.parametrize(
     "smiles,expected_name",
-    NON_PAH_CATALOG,
-    ids=[name for _smi, name in NON_PAH_CATALOG],
+    IN_SCOPE_CATALOG,
+    ids=[name for _smi, name in IN_SCOPE_CATALOG],
 )
 def test_fr23_agrees_with_catalog(smiles, expected_name):
     """For each non-PAH cataloged entry whose decomposition fits the
@@ -122,70 +167,18 @@ def test_fr23_agrees_with_catalog(smiles, expected_name):
     .3's chosen base contains the catalog's locant-1 atom.
 
     Out-of-scope entries (3+ ring systems, het-vs-het 2-ring systems,
-    single-component) are skipped with documented rationale per
-    RESEARCH -554 + module docstring "Scope adjustment".
+    single-component) are left out of the parameter list (``_in_scope``)
+    with documented rationale per RESEARCH section 548-554 + module
+    docstring "Scope adjustment".
 
     Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
     Source: 149-internal notes Tier 2; no band-aids.
-    Source: internal notes triage taxonomy.
+    Source: internal notes section 551 triage taxonomy.
     """
-    entry = FUSED_HETEROCYCLE_DATA[smiles]
     mol = Chem.MolFromSmiles(smiles)
-    if mol is None:
-        pytest.skip(f"{expected_name}: SMILES did not parse")
-
     components = _enumerate_components(mol)
-    if len(components) < 2:
-        pytest.skip(f"{expected_name}: single-component catalog entry")
-
-    # Scope guard #1: 3+ ring fused systems.
-    #.3 correctly selects the middle/heterocyclic ring as base, but
-    # IUPAC peripheral numbering for 3+ ring systems places locant 1 on a
-    # carbocyclic peripheral atom per.x lowest-locant rules. The
-    # locant-1 predicate is unreliable here. a phase owns peripheral
-    # numbering for these systems.
-    if len(components) >= 3:
-        pytest.skip(
-            f"{expected_name}: 3+ ring fused system — locant-1 predicate "
-            f"unreliable per RESEARCH §548; FR-2.3 base selection is "
-            f"verified by other test scopes (Plan 03 Tier 3)."
-        )
-
-    # Scope guard #2: het-vs-het 2-ring systems.
-    # Both rings heterocyclic →.3(a) ties →.3(c) larger ring
-    # wins. Catalog's locant-1 atom can live in the smaller het-rich ring
-    # (matching IUPAC convention for prefix component) while.3 picks
-    # the larger ring (matching the IUPAC name's suffix). This is the
-    # suffix-vs-peripheral-locant divergence —.3 is CORRECT, the
-    # locant-1 predicate just doesn't capture.3's architectural
-    # output. Verified separately in Tier 1 unit tests
-    # (test_fused_ring_selection.py covers.3(a)-(c) on synthetic
-    # rings without locant-1 ambiguity).
-    het_count_per_ring = [
-        sum(1 for c in components if _ring_has_heteroatom(mol, c))
-    ][0]
-    if het_count_per_ring >= 2:
-        pytest.skip(
-            f"{expected_name}: het-vs-het 2-ring system — FR-2.3(c) "
-            f"larger-ring criterion picks ring matching IUPAC name "
-            f"suffix; catalog locant-1 lives in prefix component per "
-            f"IUPAC peripheral numbering. Predicate mismatched for this "
-            f"scope per RESEARCH §551 case 3 'genuine FR-2.3 vs catalog "
-            f"policy divergence'."
-        )
-
     base_atoms, _ = select_base_component(mol, components)
-
-    iupac_locants = entry.get('iupac_locants', {})
-    locant_1_atom = next(
-        (idx for idx, loc in iupac_locants.items() if loc == 1),
-        None,
-    )
-    if locant_1_atom is None:
-        pytest.skip(
-            f"{expected_name}: catalog entry has no locant 1; "
-            f"cannot verify"
-        )
+    locant_1_atom = _locant_1_atom(FUSED_HETEROCYCLE_DATA[smiles])
 
     assert locant_1_atom in base_atoms, (
         f"FR-2.3 disagrees with catalog for {expected_name}: locant-1 "

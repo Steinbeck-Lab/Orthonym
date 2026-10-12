@@ -66,23 +66,6 @@ class TestRingSeniorToChainProtect:
 
 
 @pytest.mark.unit
-class TestRingSeniorToChainEsterInvestigate:
-    """`methyl 4-cyclohexylbutanoate` — ester PG is on the chain, so the
-    PG-count branch SHOULD pick the chain. It is currently mis-named
-    `methyl cyclohexanecarboxylate` (among-rings gold MISMATCH), which points
-    at ester-routing upstream of this cascade, not the S4 reorder. Captured
-    here as a target; resolved during S4 implementation if the reorder
-    surfaces it, otherwise tracked as a separate routing defect.
-    """
-
-    def test_methyl_cyclohexylbutanoate(self):
-        assert (
-            name_compound("COC(=O)CCCC1CCCCC1").strip()
-            == "methyl 4-cyclohexylbutanoate"
-        )
-
-
-@pytest.mark.unit
 class TestRingClosureBondLocant:
     """The ring-closure bond (oriented positions 0 and n-1) is locant n,
     never 1. The naive min(pos)+1 let the cycloalkene orientation comparator

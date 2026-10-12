@@ -55,8 +55,6 @@ def test_a_gate_rejection_now_falls_through_to_a_later_class():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("CCO", "ethanol"),
-    ("c1ccccc1", "benzene"),
     ("BrCc1cccc(CBr)n1", "2,6-bis(bromomethyl)pyridine"),
 ])
 def test_names_that_already_passed_are_untouched(smiles, expected):

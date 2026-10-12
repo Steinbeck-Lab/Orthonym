@@ -289,9 +289,6 @@ class TestHydrateWordForms:
         assert self._nc("O.OC(=O)C(=O)O", style="pin") == (
             "oxalic acid—water (1/1)")
 
-    def test_general_without_water_uses_adduct_form(self):
-        assert self._nc("c1ccccc1.c1ccncc1") == "benzene—pyridine (1/1)"
-
     def test_unequal_parent_counts_fall_back_to_proportions(self):
         # 2 oxalic + 1 pyridine + 1 water: no single parent count -> the
         # word form is undefined; fall back to the always-valid PIN form

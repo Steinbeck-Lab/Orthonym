@@ -35,8 +35,6 @@ ROWS = [
 #: the senior heteroatom already took locant 1 under the lowest set
 UNCHANGED = [
     ("O=c1[nH]cno1", "1,2,4-oxadiazol-5(4H)-one"),
-    ("O=c1occo1", "2H-1,3-dioxol-2-one"),
-    ("O=c1cccc[nH]1", "pyridin-2(1H)-one"),                                        #:21316
 ]
 
 

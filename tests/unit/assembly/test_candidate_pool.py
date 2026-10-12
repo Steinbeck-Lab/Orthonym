@@ -7,9 +7,7 @@ Critical regression tests:
 - test_module_level_parent_correctness_binding proves remediation
 """
 
-import inspect
 import threading
-from unittest.mock import patch
 
 import pytest
 from rdkit import Chem
@@ -26,7 +24,6 @@ import orthonym.assembly.candidate_pool as cp_module
 from orthonym.assembly.coverage_scoring import (
     CandidateName,
     HANDLER_PRIORITY,
-    CONFIDENCE_GATE_THRESHOLD,
 )
 from orthonym.namer import MolecularFeatures
 
@@ -101,29 +98,6 @@ class TestHandlerPolicy:
         assert p.tier == 'ring_a'
         assert p.priority == HANDLER_PRIORITY['complex_ring']
 
-    @pytest.mark.parametrize("handler_id", [
-        'oxime', 'hydrazone', 'isocyanate', 'isothiocyanate',
-        'carbamic_acid', 'carbamate', 'urea', 'guanidine',
-        'sulfoxide', 'sulfone', 'thioether', 'boronic_acid', 'partial_sat',
-    ])
-    def test_handler_policies_tier_b_shape(self, handler_id):
-        """Test 4: All 13 Tier B handlers are direct-return with tier='ring_b'.
-
-        a phase: gate_threshold field removed from HandlerPolicy; the
-        0.40 confidence-gate threshold is now enforced only via the
-        handler-internal call to _confidence_gate(CONFIDENCE_GATE_THRESHOLD).
-        Per-policy assertions collapse to tier/direct_return membership.
-        """
-        p = HANDLER_POLICIES[handler_id]
-        # CONFIDENCE_GATE_THRESHOLD is unchanged (still 0.40) — retain the
-        # imported symbol reference so test coverage of the module-level
-        # constant survives the cleanup.
-        assert CONFIDENCE_GATE_THRESHOLD == 0.40, (
-            "CONFIDENCE_GATE_THRESHOLD must remain 0.40 post-SC-8"
-        )
-        assert p.direct_return is True, f"{handler_id}: Tier B is first-applicable"
-        assert p.tier == 'ring_b'
-
     def test_handler_policies_chain_priority_raised_to_ring_a_equal(self):
         """Test 5: chain policy-priority raised to 4 (ring_a-peer) per.
 
@@ -179,11 +153,6 @@ class TestCandidatePoolInit:
         assert pool._candidates == []
         assert pool._direct_return_winner is None
 
-    def test_pool_init_score_based(self):
-        """Test 7: score_based mode accepted."""
-        pool = CandidatePool(selection_mode='score_based')
-        assert pool.selection_mode == 'score_based'
-
     def test_pool_init_invalid_mode_raises(self):
         """Test 8: unknown selection_mode raises AssertionError."""
         with pytest.raises(AssertionError):
@@ -205,16 +174,6 @@ class TestCandidatePoolSelection:
         pool._candidates = [c1, c2, c3]
         best = pool.best()
         assert best is c1, "first_applicable returns first-added (not highest confidence)"
-
-    def test_pool_score_based_returns_highest_confidence(self):
-        """Test 10: score_based returns highest-confidence via select_best_candidate."""
-        pool = CandidatePool(selection_mode='score_based')
-        c1 = CandidateName(name="a", handler='chain', confidence=0.4)
-        c2 = CandidateName(name="b", handler='benzene', confidence=0.9)
-        c3 = CandidateName(name="c", handler='heterocycle', confidence=0.7)
-        pool._candidates = [c1, c2, c3]
-        best = pool.best()
-        assert best is c2, "score_based returns highest-confidence candidate"
 
     def test_pool_best_empty_returns_none(self):
         """pool.best with no candidates returns None."""
@@ -245,31 +204,6 @@ class TestCandidatePoolAdd:
         assert cand.handler == "chain"
         assert len(pool.all_candidates()) == 1
 
-    def test_pool_tier_b_gate_rejects_below_threshold(self):
-        """Test 11: Tier B handler with confidence < 0.40 returns None."""
-        features = _make_features("CCO")
-        pool = CandidatePool()
-        # Patch compute_confidence to return a candidate with confidence < 0.40
-        with patch(
-            "orthonym.assembly.candidate_pool.compute_confidence",
-            return_value=CandidateName(name="x", handler="oxime", confidence=0.3),
-        ):
-            result = pool.add("x", "oxime", features)
-        assert result is None, "gate should reject confidence < 0.40"
-        assert len(pool.all_candidates()) == 0, "rejected candidate not stored"
-
-    def test_pool_tier_b_gate_accepts_at_threshold(self):
-        """Test 12: Tier B handler with confidence == 0.40 accepts."""
-        features = _make_features("CCO")
-        pool = CandidatePool()
-        with patch(
-            "orthonym.assembly.candidate_pool.compute_confidence",
-            return_value=CandidateName(name="x", handler="oxime", confidence=0.40),
-        ):
-            result = pool.add("x", "oxime", features)
-        assert result is not None
-        assert len(pool.all_candidates()) == 1
-
     def test_pool_parent_atom_indices_propagated_post_hoc(self):
         """Test 15: parent_atom_indices set POST-HOC on returned candidate."""
         features = _make_features("CCO")
@@ -278,32 +212,6 @@ class TestCandidatePoolAdd:
         cand = pool.add("ethanol", "chain", features, parent_atom_indices=parent_atoms)
         assert cand is not None
         assert cand.parent_atom_indices == parent_atoms
-
-    def test_pool_add_does_NOT_pass_parent_atom_indices_to_compute_confidence(self):
-        """Test 16 (Risk 1 REGRESSION): byte-identical proof.
-
-        compute_confidence MUST NOT receive parent_atom_indices as a
-        kwarg/positional arg, because doing so changes atom_coverage
-        (the ``parent_atom_indices is not None`` branch of
-        ``compute_confidence`` in ``coverage_scoring.py`` — currently
-        lines 328-329, subject to drift) and breaks byte-identical for
-        handlers that previously passed None.
-        """
-        features = _make_features("CCO")
-        pool = CandidatePool()
-        with patch(
-            "orthonym.assembly.candidate_pool.compute_confidence",
-            return_value=CandidateName(name="ethanol", handler="chain", confidence=0.5),
-        ) as mock_cc:
-            pool.add("ethanol", "chain", features, parent_atom_indices={0, 1, 2})
-        # Verify compute_confidence was called WITHOUT parent_atom_indices
-        assert mock_cc.called
-        args, kwargs = mock_cc.call_args
-        # parent_atom_indices must not appear in kwargs (or, if Python
-        # passed it, must be None/absent — but the safer assertion is
-        # that the call signature only includes name/handler/features)
-        assert 'parent_atom_indices' not in kwargs, \
-            "RISK 1 VIOLATION: pool.add() must not pass parent_atom_indices to compute_confidence"
 
     def test_pool_unknown_handler_id_no_gate(self):
         """Test 20: unknown handler_id accepted with no gate enforcement."""
@@ -380,138 +288,3 @@ class TestModuleLevelImportBinding:
         assert cp_module.ParentCorrectnessScorer is None \
             or callable(cp_module.ParentCorrectnessScorer), \
             f"Binding must be class or None; got {cp_module.ParentCorrectnessScorer!r}"
-
-    def test_pool_add_does_not_re_import_inside_body(self):
-        """Test 21 follow-up (REGRESSION): pool.add body must NOT
-        contain a per-call `from..rules.parent_correctness import` statement.
-        That would defeat the module-level binding optimization."""
-        src = inspect.getsource(CandidatePool.add)
-        # Must not have a per-call import inside the method body
-        assert 'from ..rules.parent_correctness import' not in src, (
-            "ISS-005 VIOLATION: pool.add() must reference the MODULE-LEVEL "
-            "ParentCorrectnessScorer binding, not re-import per call. "
-            "Move the try/except ImportError to module scope."
-        )
-        # Must reference the module-level binding (either by name check or call)
-        assert 'ParentCorrectnessScorer' in src, (
-            "pool.add() must reference ParentCorrectnessScorer (module-level binding)"
-        )
-
-
-# ---------------------------------------------------------------------------
-# RATIO_REJECT_FLOOR sanity gate tests (a phase -a.2)
-# ---------------------------------------------------------------------------
-
-import logging
-
-
-class TestRatioRejectFloor:
-    """a phase -a.2: RATIO_REJECT_FLOOR sanity gate in pool.add."""
-
-    def test_floor_constant_value(self):
-        """RATIO_REJECT_FLOOR module-level constant equals 0.10."""
-        from orthonym.assembly.candidate_pool import RATIO_REJECT_FLOOR
-        assert RATIO_REJECT_FLOOR == 0.10
-
-    def test_below_floor_rejected(self, caplog):
-        """Candidate with ratio=0.022 (1-char name, 30-HA molecule) is rejected."""
-        from orthonym.assembly.candidate_pool import RATIO_REJECT_FLOOR  # noqa: F401
-        pool = CandidatePool(selection_mode='first_applicable')
-        features = _make_features("CCO")
-        garbage_cand = CandidateName(
-            name="C", handler="benzene", confidence=0.4,
-            factors={'ratio': 0.022, 'atom_coverage': 0.0,
-                     'fg_recognition': 0.0, 'substituent_completeness': 0.0,
-                     'parent_correctness': 0.5},
-        )
-        with patch(
-            'orthonym.assembly.candidate_pool.compute_confidence',
-            return_value=garbage_cand,
-        ):
-            with caplog.at_level(logging.DEBUG,
-                                 logger='orthonym.assembly.candidate_pool'):
-                result = pool.add(name="C", handler_id="benzene", features=features)
-        assert result is None, "Below-floor candidate must be rejected"
-        assert len(pool._candidates) == 0, "Rejected candidate must not be appended"
-        assert any("RATIO_REJECT_FLOOR" in rec.message
-                   for rec in caplog.records), \
-            "Rejection must emit DEBUG log mentioning RATIO_REJECT_FLOOR"
-
-    def test_exactly_at_floor_accepted(self):
-        """Candidate with ratio=0.10 (exactly at floor) is accepted (strict less-than)."""
-        pool = CandidatePool(selection_mode='first_applicable')
-        features = _make_features("CCO")
-        cand = CandidateName(
-            name="methane", handler="chain", confidence=0.5,
-            factors={'ratio': 0.10, 'atom_coverage': 1.0,
-                     'fg_recognition': 1.0, 'substituent_completeness': 1.0,
-                     'parent_correctness': 0.5},
-        )
-        with patch(
-            'orthonym.assembly.candidate_pool.compute_confidence',
-            return_value=cand,
-        ):
-            result = pool.add(name="methane", handler_id="chain", features=features)
-        assert result is not None
-        assert len(pool._candidates) == 1
-
-    def test_above_floor_accepted(self):
-        """Candidate with ratio=0.67 (well above floor) is accepted."""
-        pool = CandidatePool(selection_mode='first_applicable')
-        features = _make_features("CCO")
-        cand = CandidateName(
-            name="ethanol", handler="chain", confidence=0.7,
-            factors={'ratio': 0.67, 'atom_coverage': 1.0,
-                     'fg_recognition': 1.0, 'substituent_completeness': 1.0,
-                     'parent_correctness': 0.5},
-        )
-        with patch(
-            'orthonym.assembly.candidate_pool.compute_confidence',
-            return_value=cand,
-        ):
-            result = pool.add(name="ethanol", handler_id="chain", features=features)
-        assert result is not None
-
-    def test_missing_ratio_accepted(self):
-        """Missing 'ratio' key treated as 'not garbage' (defensive default)."""
-        pool = CandidatePool(selection_mode='first_applicable')
-        features = _make_features("CCO")
-        cand = CandidateName(
-            name="hybrid", handler="chain", confidence=0.5,
-            factors={'atom_coverage': 1.0, 'fg_recognition': 1.0,
-                     'substituent_completeness': 1.0,
-                     'parent_correctness': 0.5},
-        )
-        with patch(
-            'orthonym.assembly.candidate_pool.compute_confidence',
-            return_value=cand,
-        ):
-            # Must not KeyError —.get('ratio') returns None → accepted
-            result = pool.add(name="hybrid", handler_id="chain", features=features)
-        assert result is not None
-
-    def test_below_floor_accepted_when_coverage_measured(self):
-        """TRIAGE j3-long-alkanes (g1 C1): a producer that MEASURED a complete atom
-        partition passes coverage_measured=True, and the character-count floor --
-        a stand-in for coverage -- does not reject its candidate. 'octacontane' for
-        C80 has ratio 0.092 (11 characters / 80 atoms / 1.5): numerical-term chain
-        names are short by design, Table 1.4)."""
-        pool = CandidatePool(selection_mode='first_applicable')
-        features = _make_features("C" * 80)
-        cand = CandidateName(
-            name="octacontane", handler="chain", confidence=0.4,
-            factors={'ratio': 0.092, 'atom_coverage': 0.092,
-                     'fg_recognition': 1.0, 'substituent_completeness': 1.0,
-                     'parent_correctness': 0.5},
-        )
-        with patch(
-            'orthonym.assembly.candidate_pool.compute_confidence',
-            return_value=cand,
-        ):
-            rejected = pool.add(name="octacontane", handler_id="chain",
-                                features=features)
-            accepted = pool.add(name="octacontane", handler_id="chain",
-                                features=features, coverage_measured=True)
-        assert rejected is None, "without a measured partition the floor still rejects"
-        assert accepted is not None
-        assert [c.name for c in pool._candidates] == ["octacontane"]

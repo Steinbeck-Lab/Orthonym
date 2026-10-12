@@ -160,14 +160,8 @@ def test_scope_precheck_is_wildcard_exclusive():
         f"scope pre-check is not wildcard-exclusive: {over_reach[:5]}")
 
 
-def test_default_mode_never_raises_limit_on_canary_sample():
-    """Criterion 3 (binding): in the DEFAULT mode the canary/production use,
-    naming never raises OrthonymLimitError — including for the wildcard rows."""
+def _assert_default_mode_never_raises_limit(sample):
     n = Orthonym()
-    smis = _canary_smiles()
-    # Sample (incl. all wildcard rows, which are the interesting ones) for speed.
-    wild = [s for s in smis if '*' in s]
-    sample = wild + smis[:40]
     for smi in sample:
         try:
             n.name(smi)  # default: raise_on_limit=False
@@ -179,6 +173,24 @@ def test_default_mode_never_raises_limit_on_canary_sample():
             # are out of scope for this test — it only asserts the limit
             # is never raised in default mode. Unchanged by a phase.
             pass
+
+
+def test_default_mode_never_raises_limit_on_canary_sample():
+    """Criterion 3 (binding): in the DEFAULT mode the canary/production use,
+    naming never raises OrthonymLimitError — including for the wildcard rows."""
+    smis = _canary_smiles()
+    # Sample (incl. all wildcard rows, which are the interesting ones) for speed.
+    wild = [s for s in smis if '*' in s]
+    _assert_default_mode_never_raises_limit(wild + smis[:10])
+
+
+@pytest.mark.slow
+def test_default_mode_never_raises_limit_on_canary_sample_full():
+    """The same check over the larger sample (the first 40 canary rows plus the
+    wildcard rows); it runs in the nightly run, the PR run uses the first 10."""
+    smis = _canary_smiles()
+    wild = [s for s in smis if '*' in s]
+    _assert_default_mode_never_raises_limit(wild + smis[:40])
 
 
 def test_back_compat_metal_names_import():

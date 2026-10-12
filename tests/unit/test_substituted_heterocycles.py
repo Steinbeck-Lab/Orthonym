@@ -55,11 +55,6 @@ class TestNSubstitution:
         # the Blue Book `1-(piperidin-1-yl)ethan-1-one (PIN)`.
         ("CN1CCCCC1", "1-methylpiperidine"),
         ("CCN1CCCCC1", "1-ethylpiperidine"),
-        # Morpholine ring N is locant 4 (O=1 is the senior heteroatom):
-        # the Blue Book `morpholin-4-yl* (not morpholino)`. The old expectation's own
-        # comment conceded "N is at position 4... but uses N-locant" -- that
-        # concession was the defect.
-        ("CN1CCOCC1", "4-methylmorpholine"),
         # Azetidine / aziridine ring N is locant 1 (the Blue Book `azetidine (PIN)`).
         ("CN1CCC1", "1-methylazetidine"),
         ("CN1CC1", "1-methylaziridine"),

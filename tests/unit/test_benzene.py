@@ -31,11 +31,6 @@ class TestBenzeneRetainedNames:
     """Test that common benzene derivatives use retained names."""
 
     @pytest.mark.unit
-    def test_benzene(self):
-        """Unsubstituted benzene should return 'benzene'."""
-        assert name_compound("c1ccccc1") == "benzene"
-
-    @pytest.mark.unit
     def test_toluene(self):
         """Methylbenzene should return retained name 'toluene'."""
         assert name_compound("Cc1ccccc1") == "toluene"
@@ -554,3 +549,21 @@ class TestNitrileDetection:
         # Check that nitrile was detected (suffix FG detection returns 'carbonitrile')
         sub_names = [s['name'] for s_list in subs.values() for s in s_list]
         assert 'carbonitrile' in sub_names or 'nitrile' in sub_names
+
+
+@pytest.mark.parametrize(
+    "smiles, expected",
+    [
+        pytest.param("c1ccc(-c2cccc3ccccc23)cc1", "1-phenylnaphthalene", id="c1ccc(-c2cccc3ccccc23)cc1"),
+    ],
+)
+def test_merged_aryl_names(smiles, expected):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/unit/rules/test_wave2_completion_b3_bridged_fused.py::TestProductionEndToEnd::test_pah_and_heterocycle_protections (1)
+    """
+    from orthonym import name_compound
+    assert name_compound(smiles) == expected

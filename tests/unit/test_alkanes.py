@@ -22,33 +22,10 @@ class TestSimpleAlkanes:
     @pytest.mark.unit
     @pytest.mark.parametrize("smiles,expected", [
         ("C", "methane"),
-        ("CC", "ethane"),
-        ("CCC", "propane"),
-        ("CCCC", "butane"),
-        ("CCCCC", "pentane"),
-        ("CCCCCC", "hexane"),
-        ("CCCCCCC", "heptane"),
-        ("CCCCCCCC", "octane"),
-        ("CCCCCCCCC", "nonane"),
-        ("CCCCCCCCCC", "decane"),
     ])
     def test_simple_alkanes(self, smiles, expected):
         """Test C1-C10 straight-chain alkanes."""
         assert name_compound(smiles) == expected
-
-    @pytest.mark.unit
-    def test_methane_through_butane_are_retained(self):
-        """Methane through butane are retained names, not generated systematically."""
-        # These should be looked up from retained_names, not generated
-        retained = [
-            ("C", "methane"),
-            ("CC", "ethane"),
-            ("CCC", "propane"),
-            ("CCCC", "butane"),
-        ]
-        for smiles, expected in retained:
-            result = name_compound(smiles)
-            assert result == expected, f"{smiles} should be retained name '{expected}'"
 
     @pytest.mark.unit
     def test_pentane_through_decane_are_systematic(self):
@@ -204,13 +181,6 @@ class TestEdgeCases:
     def test_single_carbon_is_methane(self):
         """Single carbon should be named methane (retained name)."""
         assert name_compound("C") == "methane"
-
-    @pytest.mark.unit
-    def test_symmetrical_molecule(self):
-        """Symmetrical molecules should give consistent names."""
-        # 2,2-dimethylpropane is symmetrical
-        result = name_compound("CC(C)(C)C")
-        assert result == "2,2-dimethylpropane"
 
     @pytest.mark.integration
     def test_highly_branched_alkane(self):

@@ -77,7 +77,16 @@ _RESCUES = [
 ]
 
 
-@pytest.mark.parametrize("owner,attr", _RESCUES, ids=[a for _o, a in _RESCUES])
+# Three of the five take 23 s each: they run in the nightly run only. All five go through
+# ``_FailureRescues.run`` (namer.py), so the two that stay cover the mechanism in the PR run.
+_SLOW_RESCUES = {"_try_demote_senior_group_rescue", "try_decompose", "_try_alternate_parent_rescue"}
+
+
+@pytest.mark.parametrize(
+    "owner,attr",
+    [pytest.param(o, a, marks=pytest.mark.slow) if a in _SLOW_RESCUES else (o, a)
+     for o, a in _RESCUES],
+    ids=[a for _o, a in _RESCUES])
 def test_a_rescue_that_exhausts_the_budget_declines(monkeypatch, owner, attr):
     real = getattr(owner, attr)
     tripped = []

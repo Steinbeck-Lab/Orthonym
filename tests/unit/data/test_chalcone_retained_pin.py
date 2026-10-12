@@ -142,7 +142,6 @@ class TestChalconeEmission:
             ("O=C1C=CC(=O)C=C1", "cyclohexa-2,5-diene-1,4-dione"),
             ("CC(=O)c1ccccc1", "1-phenylethan-1-one"),
             ("O=C(c1ccccc1)c1ccccc1", "diphenylmethanone"),
-            ("O=C1CCCCC1", "cyclohexanone"),
         ],
     )
     def test_nearby_ketones_unregressed(self, namer, smiles, expected):

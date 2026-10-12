@@ -14,7 +14,6 @@ IUPAC 2013 Blue Book:
 - dihydronaphthalene: 2 positions saturated = dihydro prefix
 - perhydronaphthalene (decalin): all saturated = perhydro/decahydro
 """
-import pytest
 from rdkit import Chem
 
 from orthonym.rules.partial_saturation import (
@@ -125,7 +124,6 @@ class TestTetrahydronaphthaleneNaming:
         # Should be 1,2,3,4-tetrahydronaphthalene
         assert '1,2,3,4-tetrahydro' in result.lower()
 
-    @pytest.mark.xfail(reason="Substituent handling for partial saturation not implemented yet")
     def test_methyltetrahydronaphthalene(self):
         """Substituted tetrahydronaphthalene."""
         result = name_compound('Cc1ccc2c(c1)CCCC2')

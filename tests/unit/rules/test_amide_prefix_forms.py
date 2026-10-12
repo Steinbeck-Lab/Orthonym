@@ -51,12 +51,6 @@ class TestAmidePrefixUnit:
 class TestCarbamoylPrefixE2E:
     """End-to-end tests: primary amide as non-principal FG produces carbamoyl."""
 
-    def test_4_carbamoylbutanoic_acid(self):
-        """NC(=O)CCC(=O)O -> 4-amino-4-oxobutanoic acid amino-oxo PIN;
-        carbamoyl is general-only for the linear-chain terminal primary amide)."""
-        result = name_compound("NC(=O)CCC(=O)O")
-        assert result == "4-amino-4-oxobutanoic acid"
-
     def test_3_carbamoylpropanoic_acid(self):
         """NC(=O)CC(=O)O -> 3-amino-3-oxopropanoic acid amino-oxo PIN)."""
         result = name_compound("NC(=O)CC(=O)O")

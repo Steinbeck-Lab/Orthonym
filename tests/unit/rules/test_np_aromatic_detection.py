@@ -80,18 +80,3 @@ class TestAromaticBondDetection:
         assert len(result['ene']) <= 6
 
 
-class TestFlavonoidScaffolds:
-    """: flavonoid scaffolds. Ph4: flavone/flavanone are general-
-    nomenclature-only trivial names; the PIN is systematic."""
-
-    def test_flavone_pin(self):
-        """Flavone -> systematic PIN 2-phenyl-4H-1-benzopyran-4-one."""
-        from orthonym import name_compound
-        assert name_compound('O=c1cc(-c2ccccc2)oc2ccccc12') == \
-            '2-phenyl-4H-1-benzopyran-4-one'
-
-    def test_flavanone_pin(self):
-        """Flavanone -> systematic PIN."""
-        from orthonym import name_compound
-        assert name_compound('O=C1CC(c2ccccc2)Oc2ccccc21') == \
-            '2-phenyl-2,3-dihydro-4H-1-benzopyran-4-one'

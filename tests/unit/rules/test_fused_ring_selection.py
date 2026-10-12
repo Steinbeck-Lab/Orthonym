@@ -19,7 +19,6 @@ Source: AUTONOM-1990 (Wisniewski J. Chem. Inf. Comput. Sci. 30, 324-332)
         — hybrid catalog + algorithmic fallback validation; 61% agreement.
 Source: a phase internal notes..,.
 """
-import inspect
 
 import pytest
 from rdkit import Chem
@@ -833,20 +832,6 @@ class TestSelectBaseComponentAPI:
     Source: V18_MILESTONE_PLAN a phase SC #1.
     Source: 149-internal notes.
     """
-
-    def test_signature_matches_v18_plan(self):
-        """select_base_component(mol, fused_components) per lock.
-
-        Source: V18_MILESTONE_PLAN a phase SC #1.
-        Source: https://iupac.qmul.ac.uk/fusedring/FR23.html
-        Source: AUTONOM-1990
-        Source: a phase internal notes (signature lock).
-        """
-        sig = inspect.signature(select_base_component)
-        params = list(sig.parameters)
-        assert params == ['mol', 'fused_components'], (
-            f"V18 plan §6 SC #1 signature lock; got {params}"
-        )
 
     def test_raises_on_single_component(self):
         """Edge case: fusion naming undefined for single component .

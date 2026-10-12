@@ -95,9 +95,7 @@ def test_foxane_drop_failclosed_drops_no_heteroatoms():
 # --- Regression guards: catalog sugars + ordinary heterocycles unchanged ----
 
 @pytest.mark.parametrize("smiles, expected", [
-    ("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "β-D-glucopyranose"),
     ("OC[C@H]1O[C@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "α-D-glucopyranose"),
-    ("Cc1ccccn1", "2-methylpyridine"),
     ("CC1CCCCO1", "2-methyloxane"),
     ("OC1CCOCC1", "oxan-4-ol"),
     ("OC1CCNCC1", "piperidin-4-ol"),

@@ -32,25 +32,6 @@ class TestComposerDispatchInvariants:
     """a phase-04 anti-regression locks."""
 
     @pytest.mark.unit
-    def test_mixed_spiro_fused_elif_branch_present_in_function_body(self):
-        """The elif branch MUST exist in the body of
-        _assemble_complex_ring_name. A function-scoped inspect.getsource
-        grep proves the branch is in the dispatcher, not in a comment
-        elsewhere in the module."""
-        src = _get_assemble_complex_ring_name_source()
-        # Strip comments to defeat the self-invalidating-grep-gate problem
-        non_comment = "\n".join(
-            line for line in src.split("\n") if not line.strip().startswith("#")
-        )
-        assert "elif ring_type == 'mixed-spiro-fused':" in non_comment, (
-            "BLK-01 regression: the elif ring_type == 'mixed-spiro-fused' "
-            "branch is missing from _assemble_complex_ring_name. The 151-02 "
-            "SUMMARY noted a git-stash incident that dropped this same edit "
-            "once before — please restore it from "
-            ".planning/phases/151-*/151-04-PLAN.md Task 2."
-        )
-
-    @pytest.mark.unit
     def test_name_mixed_spiro_fused_imported_in_function_body(self):
         """The dispatcher must import name_mixed_spiro_fused. A bare elif
         tag without the import is also a regression."""

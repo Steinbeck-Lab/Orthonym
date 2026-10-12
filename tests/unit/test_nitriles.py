@@ -144,12 +144,6 @@ class TestNitrileIntegration:
         from orthonym import name_compound
         assert name_compound("CC#N") == "acetonitrile"
 
-    def test_propanenitrile_systematic(self):
-        """CCC#N should be named propanenitrile (systematic)."""
-        from orthonym import name_compound
-        result = name_compound("CCC#N")
-        assert result == "propanenitrile"
-
     def test_butanenitrile_systematic(self):
         """CCCC#N should be named butanenitrile."""
         from orthonym import name_compound

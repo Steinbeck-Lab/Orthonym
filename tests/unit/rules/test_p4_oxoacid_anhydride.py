@@ -25,9 +25,6 @@ class TestMixedCyanicAnhydride:
     def test_acetic_cyanic_anhydride_gated(self):
         assert name_compound("CC(=O)OC#N") == "acetic cyanic anhydride"
 
-    def test_acetic_cyanic_anhydride_raw(self):
-        assert RAW.name("CC(=O)OC#N") == "acetic cyanic anhydride"
-
 
 @pytest.mark.unit
 class TestCyclicThioAnhydrideDione:
@@ -40,9 +37,6 @@ class TestCyclicThioAnhydrideDione:
 
     def test_benzothiophene_dione_gated(self):
         assert name_compound("O=C1SC(=O)c2ccccc12") == "2-benzothiophene-1,3-dione"
-
-    def test_benzothiophene_dione_raw(self):
-        assert RAW.name("O=C1SC(=O)c2ccccc12") == "2-benzothiophene-1,3-dione"
 
     def test_acyclic_thioanhydride_still_correct(self):
         # Regression guard: the cyclic-guard added alongside this build must
@@ -58,10 +52,6 @@ class TestChalcogenDianhydride:
 
     def test_bis_thioanhydride_gated(self):
         result = name_compound("CC(=O)SC(=O)CCC(=O)SC(C)=O")
-        assert result == "diacetic butanedioic bis(thioanhydride)"
-
-    def test_bis_thioanhydride_raw(self):
-        result = RAW.name("CC(=O)SC(=O)CCC(=O)SC(C)=O")
         assert result == "diacetic butanedioic bis(thioanhydride)"
 
 

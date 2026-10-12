@@ -172,21 +172,6 @@ class TestP44BridgedFusedTiebreakers:
             m, {a.GetIdx() for a in m.GetAtoms() if a.IsInRing()})
         assert len(metrics) == 4
 
-    @pytest.mark.skip(reason="ORACLE-BLOCKED (not buildable): P-44.2.2.2.4 criteria (d)-(m) "
-                             "(bridge-attachment locants, composite/dependent-bridge classification) "
-                             "need the full bridged-fused bridge parser, and every molecule they would "
-                             "discriminate is OPSIN-2.9-unparseable (the p5_bridged secondary/hetero"
-                             "cyclic/polyvalent-bridge class — see WAVE2-COMPLETION-DEFERRED.md oracle-"
-                             "blocked section). There is no verifiable target to build against, so the "
-                             "scorer correctly stops at the implemented pre-bridge metrics (a)-(c), which "
-                             "ARE spelling-independent (guarded by test_prebridge_metrics_spelling_independent). "
-                             "Emitting a (d)-(m) tiebreak with no OPSIN oracle would be unverifiable — revisit "
-                             "only if OPSIN gains support for these bridged PIN forms.")
-    def test_bridge_attachment_locant_tiebreak(self):
-        # (e) lower bridge-attachment locants — no OPSIN-verifiable exemplar exists;
-        # the pre-bridge metric determinism is covered by the next test.
-        pass
-
     def test_prebridge_metrics_spelling_independent(self):
         from orthonym.rules.ring_selection import _bridged_fused_prebridge_metrics
         def m4(smi):

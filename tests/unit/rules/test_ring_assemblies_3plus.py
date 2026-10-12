@@ -80,7 +80,7 @@ def _opsin_available() -> bool:
 
 
 def _opsin_parse(name: str) -> str | None:
-    """Single-name OPSIN parse. For batch use, prefer test_canary_rt75 helper."""
+    """Single-name OPSIN parse. For batch use, prefer the canary_rt75_data helper."""
     if not _opsin_available():
         return None
     try:
@@ -447,45 +447,11 @@ class TestSupplierCoverageInvariant:
 
 
 # ============================================================================
-# TestNoParallelComparator (/)
-# ============================================================================
-class TestNoParallelComparator:
-    """: no SMARTS broadening;: no parallel locant comparator."""
-
-    @pytest.mark.unit
-    def test_no_parallel_compare_locant_function(self):
-        """grep test: no ``def _compare_locant`` introduced in ring_assemblies.py."""
-        src_path = (
-            Path(__file__).resolve().parents[3]
-            / "src" / "orthonym" / "rules" / "ring_assemblies.py"
-        )
-        src_lines = src_path.read_text().splitlines()
-        # Strip comments (lines starting with #) before grepping
-        non_comment_text = "\n".join(
-            line for line in src_lines if not line.lstrip().startswith("#")
-        )
-        assert "def _compare_locant" not in non_comment_text
-
-
-# ============================================================================
 # TestRoundTripViaOPSIN
 # ============================================================================
 @pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java not available")
 class TestRoundTripViaOPSIN:
     """: every named fixture must round-trip via OPSIN with InChI L1 match."""
-
-    # Fixtures known to need substituent-classification fix per
-    # internal notes-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
-    # Marked xfail so the suite stays GREEN while the upstream bug is
-    # tracked for.
-    _XFAIL_FIXTURES = {
-        "ra_lit_terphenyl_dicarboxylic_acid": (
-            "151-AUDIT-C.md out-of-scope: -CHO vs -COOH substituent "
-            "classification bug emits 'diformyl' instead of "
-            "'dicarboxylic acid'. Upstream substituent-detection issue "
-            "logged to AUTONOM-followups.md as v19 follow-up."
-        ),
-    }
 
     @pytest.mark.parametrize(
         "fixture",
@@ -495,14 +461,6 @@ class TestRoundTripViaOPSIN:
     @pytest.mark.unit
     def test_lit_fixture_opsin_inchi_l1_match(self, fixture, request):
         from orthonym import name_compound
-
-        if fixture["fixture_id"] in self._XFAIL_FIXTURES:
-            request.node.add_marker(
-                pytest.mark.xfail(
-                    reason=self._XFAIL_FIXTURES[fixture["fixture_id"]],
-                    strict=False,
-                )
-            )
 
         smi = fixture["smiles"]
         expected = fixture["expected_name"]

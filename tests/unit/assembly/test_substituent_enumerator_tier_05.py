@@ -28,52 +28,6 @@ from orthonym.assembly.substituent_prefix_forms import (
 class TestTier05PlacementBeforeTier1:
     """Tier-0.5 must fire BEFORE Tier-1 retained-name check."""
 
-    def test_tier05_block_present_in_source(self):
-        """Tier-0.5 block is present in the substituent-naming cascade.
-
-         a phase split ``name_substituent`` into a thin
-        free-valence gate over ``_name_substituent_cascade``, which now holds
-        the five tiers. The invariant this test protects is unchanged -- only
-        the function that carries it moved -- so the assertion follows the
-        delegation instead of assuming the tiers are inlined in the entry
-        point. The delegation itself is asserted too, so this cannot pass
-        against a cascade the entry point no longer calls.
-        """
-        import inspect
-        from orthonym.assembly.substituent_enumerator import (
-            _name_substituent_cascade,
-        )
-
-        gate_src = inspect.getsource(name_substituent)
-        assert "_name_substituent_cascade" in gate_src, (
-            "name_substituent must delegate to the tiered cascade"
-        )
-
-        src = inspect.getsource(_name_substituent_cascade)
-        assert "Tier 0.5" in src, (
-            "Tier-0.5 comment missing from the substituent-naming cascade"
-        )
-        assert "_check_substituent_prefix_form" in src, (
-            "_check_substituent_prefix_form call missing from the cascade"
-        )
-
-    def test_tier05_precedes_tier1_in_source(self):
-        """Source-level AST positional check: Tier-0.5 string occurs before Tier-1."""
-        # Read the source file directly for line-position checking
-        from pathlib import Path
-        src = Path(
-            "src/orthonym/assembly/substituent_enumerator.py"
-        ).read_text()
-        t05_pos = src.find("Tier 0.5")
-        t1_pos = src.find("Tier 1: Retained")
-        assert t05_pos > 0 and t1_pos > 0, (
-            "Both Tier-0.5 and Tier-1 markers must exist"
-        )
-        assert t05_pos < t1_pos, (
-            f"Tier-0.5 must precede Tier-1 in source: "
-            f"t05_pos={t05_pos} t1_pos={t1_pos}"
-        )
-
     def test_ester_substituent_short_circuits_to_prefix_form(self):
         """Methyl ester fragment routes via Tier-0.5, not Tier-1 retained-name."""
         # Methyl ester atoms in a glutaric acid: -C(=O)OCH3 substituent

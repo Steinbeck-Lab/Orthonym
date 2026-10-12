@@ -79,14 +79,6 @@ class TestMultipleEstersPlusSubstituent:
 class TestLocantConsistency:
     """Verify that locants are consistent (no conflicts, proper ordering)."""
 
-    def test_no_duplicate_locants(self):
-        """Locants should not be duplicated between ester and non-ester substituents."""
-        result = name_compound("CC(=O)OC1CCC(C)CC1")
-        # The ester is the principal group, so its ring carbon is C-1 (the free valence of
-        # the 'cyclohexyl' substituent) and the methyl gets 4; one locant per group, none
-        # duplicated
-        assert result == "4-methylcyclohexyl acetate", f"Got: {result}"
-
     def test_alphabetical_ordering(self):
         """Prefixes should be in alphabetical order per IUPAC."""
         result = name_compound("CC(=O)Oc1ccc(Cl)c(C)c1")

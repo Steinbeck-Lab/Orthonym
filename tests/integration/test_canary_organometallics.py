@@ -107,8 +107,15 @@ def _orgm_params(rows):
             for r in rows]
 
 
+# Rows another test checks with the same name call and the same expected name (the
+# saturated-alkyl rows: tests/unit/rules/test_phase10_organometallic_core.py and
+# tests/integration/test_organometallics.py); they are left out of the pin test here.
+_PIN_TEST_DUPLICATES = {"ORG-T3-01", "ORG-T3-07", "ORG-T4-14", "ORG-T4-20", "ORG-T4-24"}
+
+
 @pytest.mark.integration
-@pytest.mark.parametrize("row", _orgm_params(ORGM_CANARY))
+@pytest.mark.parametrize(
+    "row", _orgm_params([r for r in ORGM_CANARY if r['id'] not in _PIN_TEST_DUPLICATES]))
 def test_canary_organometallic_pin(row):
     """ Tier-A name-string equality per fixture (style='pin').
 
@@ -139,51 +146,19 @@ def test_canary_organometallic_systematic(row):
     )
 
 
-@pytest.mark.integration
-@pytest.mark.parametrize(
-    "row",
-    [r for r in ORGM_CANARY if r['tier_tag'] == 'tier1'],
-    ids=lambda r: r['id'],
-)
-def test_tier1_metallocenes(row):
-    """Tier-1 sub-canary per VALIDATION row 161-03-01. All 9 fixtures pass."""
-    smiles = row['smiles']
-    result_pin = name_compound(smiles, style='pin')
-    assert result_pin == row['expected_name_pin']
+# The other tier-4 rows are the same name call and expected name as
+# test_canary_organometallic_pin above (or, for T4-14/20/24, as the saturated-alkyl test
+# of test_phase10_organometallic_core.py): only the rows with their own check stay here.
+_TIER4_ONLY_HERE = {"ORG-T4-03", "ORG-T4-06", "ORG-T4-07", "ORG-T4-08", "ORG-T4-13"}
 
 
 @pytest.mark.integration
 @pytest.mark.parametrize(
-    "row",
-    [r for r in ORGM_CANARY if r['tier_tag'] == 'tier2'],
-    ids=lambda r: r['id'],
-)
-def test_tier2_carbonyls(row):
-    """Tier-2 sub-canary. All 8 fixtures pass."""
-    smiles = row['smiles']
-    result_pin = name_compound(smiles, style='pin')
-    assert result_pin == row['expected_name_pin']
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize(
-    "row",
-    [r for r in ORGM_CANARY if r['tier_tag'] == 'tier3'],
-    ids=lambda r: r['id'],
-)
-def test_tier3_sigma_bonded(row):
-    """Tier-3 sub-canary. All 11 fixtures pass."""
-    smiles = row['smiles']
-    result_pin = name_compound(smiles, style='pin')
-    assert result_pin == row['expected_name_pin']
-
-
-@pytest.mark.integration
-@pytest.mark.parametrize(
-    "row", _orgm_params([r for r in ORGM_CANARY if r['tier_tag'] == 'tier4']))
+    "row", _orgm_params([r for r in ORGM_CANARY
+                         if r['tier_tag'] == 'tier4' and r['id'] in _TIER4_ONLY_HERE]))
 def test_tier4_eta_bonded(row):
-    """Tier-4 sub-canary: 22/25 fixtures pass; T4-06, T4-07 and T4-08 are the
-    strict-xfail backlog rows."""
+    """Tier-4 sub-canary: the tier-4 rows without a duplicate in the pin test; T4-06,
+    T4-07 and T4-08 are the strict-xfail backlog rows."""
     smiles = row['smiles']
     result_pin = name_compound(smiles, style='pin')
     assert result_pin == row['expected_name_pin']

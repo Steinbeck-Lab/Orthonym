@@ -79,25 +79,6 @@ class TestSimpleRetainedNames:
         assert canon in RETAINED_NAMES, f"Canonical SMILES '{canon}' not in RETAINED_NAMES"
         assert RETAINED_NAMES[canon] == expected
 
-    @pytest.mark.unit
-    @pytest.mark.parametrize("smiles,expected", [
-        # F-T9/DD6: 'biphenyl'/'anisole' are general-only; the PIN headline is
-        # the systematic 1,1'-biphenyl / methoxybenzene. acetylene stays (hc_override).
-        ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
-        ("C#C", "acetylene"),
-        ("COc1ccccc1", "anisole"),  # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book)
-        #: same treatment as biphenyl/anisole above -- 'caprolactam'
-        # is general-only (0 the Blue Book hits) and the PIN headline is the
-        # systematic pseudoketone, (the Blue Book), printed `azepan-2-one
-        # (PIN)` at the Blue Book. The raw hand-curated dict still carries the trivial
-        # name, which is why the two tests above are unchanged.
-        ("O=C1CCCCCN1", "azepan-2-one"),
-    ], ids=["biphenyl-e2e", "acetylene-e2e", "anisole-e2e", "caprolactam-e2e"])
-    def test_name_compound_e2e(self, smiles, expected):
-        """name_compound should return the PIN headline (retained PIN or systematic)."""
-        result = name_compound(smiles)
-        assert result == expected, f"Expected '{expected}', got '{result}'"
-
 
 # ============================================================================
 # Test 2: Nucleoside Retained Names (8 entries)

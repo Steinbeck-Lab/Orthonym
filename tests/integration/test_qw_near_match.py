@@ -168,14 +168,6 @@ VB_COUNTING_FIXES = [
 # "pentadec-10-en-1-yl". Fixed with _name_alkyl_fragment_with_unsaturation.
 # ============================================================================
 
-MACROCYCLIC_ESTER_FIXES = [
-    pytest.param(
-        r"CCCC/C=C\CCCCCCCCCOC(C)=O",
-        "(10Z)-pentadec-10-en-1-yl acetate",
-        id="macro-C19-pentadecenyl-acetate",
-    ),
-]
-
 
 # ============================================================================
 # DEFERRED_COMPOUNDS: Steroid side chain (3) and Glycoceramide (2)
@@ -302,17 +294,6 @@ def test_vb_counting_fix(smiles, expected_name):
     result = name_compound(smiles)
     assert result == expected_name, (
         f"VB COUNTING FIX: {smiles}\n"
-        f"  Expected: {expected_name}\n"
-        f"  Got:      {result}"
-    )
-
-
-@pytest.mark.parametrize("smiles,expected_name", MACROCYCLIC_ESTER_FIXES)
-def test_macrocyclic_ester_fix(smiles, expected_name):
-    """Verify double bond positions preserved in ester alkyl chains."""
-    result = name_compound(smiles)
-    assert result == expected_name, (
-        f"MACROCYCLIC ESTER FIX: {smiles}\n"
         f"  Expected: {expected_name}\n"
         f"  Got:      {result}"
     )

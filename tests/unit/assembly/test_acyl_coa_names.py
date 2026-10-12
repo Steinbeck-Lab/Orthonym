@@ -37,11 +37,6 @@ def test_adenosine_names_and_round_trips():
     assert rt["passed"], rt
 
 
-def test_9_methyladenine_names():
-    # the canonical substituted-purine target, end-to-end
-    assert Orthonym().name("Cn1cnc2c(N)ncnc21") == "9-methyl-9H-purin-6-amine"
-
-
 def test_acetyl_coa_0wrong_holds():
     # 0-wrong is ABSOLUTE: whatever acetyl-CoA emits, it must never be a WRONG
     # molecule. Today it abstains (residual non-purine blockers); if it ever

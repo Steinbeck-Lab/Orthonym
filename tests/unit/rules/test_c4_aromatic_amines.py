@@ -159,9 +159,6 @@ def test_compound_n_substituent_encloses(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # Invariant 9: a SIMPLE N-substituent stays bare (no enclosure needed).
-    ("CNc1ccccc1", "N-methylaniline"),
-    ("CN(C)c1ccccc1", "N,N-dimethylaniline"),
     ("c1ccc(Nc2ccccc2)cc1", "N-phenylaniline"),
     ("CCNc1ccc(Cl)cc1", "4-chloro-N-ethylaniline"),
 ])

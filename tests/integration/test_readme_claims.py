@@ -21,7 +21,6 @@ from rdkit.Chem import inchi
 from orthonym import Orthonym, name_compound
 from orthonym.cli import _emit_tier_flags
 from tests.support.rt_assert import _independent_parse
-from tests.unit.rules.test_d1_coordination_v36 import HEME_B
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
 
@@ -105,10 +104,9 @@ def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers()
     assert diol["verified"] == "opsin_constitution", diol
     assert diol["tier"] != "pin_verified", diol
     assert _independent_parse(diol["name"]) is None
-    heme = _row(HEME_B["smiles"])             # a metal-complex list name
-    # the label of its naming path, as in the paper's measured run (user decision
-    # 2026-09-30, replacing the 2026-09-28 label systematic_verified)
-    assert heme["verified"] == "identity" and heme["tier"] == "pin_verified", heme
+    # The third exception, the heme b metal-complex list name, and its label at every tier
+    # are asserted by test_p2_labels_public_claims.py::
+    # test_coordination_list_name_keeps_the_label_of_its_naming_path.
     for tier in ("valid", "best-effort"):
         wide = {s: _row(s, tier) for s in ("CSO", "O[C@H]1CC[C@@H](O)CC1")}
         for s, row in wide.items():
@@ -116,4 +114,3 @@ def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers()
             if row["name"]:
                 assert row["verified"] == "opsin", row
                 assert _key(_independent_parse(row["name"])) == _key(s), row
-        assert _row(HEME_B["smiles"], tier)["name"] == heme["name"]

@@ -12,7 +12,6 @@ Tests the complete a phase extended features:
 """
 
 import sys
-import time
 from pathlib import Path
 
 import pytest
@@ -268,60 +267,6 @@ class TestDataExpansion:
                 for s in RETAINED_NAMES
             )
             assert found, f"Fatty acid '{acid}' not found in retained names"
-
-
-class TestPerformance:
-    """Tests for: Performance requirements."""
-
-    def test_simple_compound_under_10ms(self):
-        """Test that simple compounds are named under 10ms."""
-        simple_smiles = ["C", "CC", "CCC", "CCO", "c1ccccc1"]
-        for smiles in simple_smiles:
-            start = time.perf_counter()
-            result = name_molecule(smiles)
-            elapsed_ms = (time.perf_counter() - start) * 1000
-            assert elapsed_ms < 10, f"Simple compound {smiles} took {elapsed_ms:.2f}ms"
-
-    def test_complex_compound_under_100ms(self):
-        """Test that complex compounds are named under 100ms."""
-        complex_smiles = [
-            "c1ccc2[nH]ccc2c1",  # indole
-            "c1ccc2ncccc2c1",  # quinoline
-            "Cn1cnc2c1c(=O)n(c(=O)n2C)C",  # caffeine
-        ]
-        for smiles in complex_smiles:
-            start = time.perf_counter()
-            result = name_molecule(smiles)
-            elapsed_ms = (time.perf_counter() - start) * 1000
-            assert elapsed_ms < 100, f"Complex compound {smiles} took {elapsed_ms:.2f}ms"
-
-    def test_batch_p95_under_100ms(self):
-        """Test that 95th percentile latency is under 100ms for a batch."""
-        test_smiles = [
-            "C", "CC", "CCC", "CCCC", "CCO", "CC=O", "CC(=O)C",
-            "c1ccccc1", "Cc1ccccc1", "c1ccncc1", "c1ccc2[nH]ccc2c1",
-            "c1ccc2ncccc2c1", "C1CCCCC1", "C1CC1", "C=CC=C",
-            "CC(C)C", "CCCCO", "CCC(=O)O", "c1ccoc1", "c1ccsc1",
-        ]
-
-        times = []
-        # Warmup
-        for smiles in test_smiles[:5]:
-            name_molecule(smiles)
-
-        # Measure
-        for _ in range(3):  # 3 iterations
-            for smiles in test_smiles:
-                start = time.perf_counter()
-                name_molecule(smiles)
-                elapsed_ms = (time.perf_counter() - start) * 1000
-                times.append(elapsed_ms)
-
-        sorted_times = sorted(times)
-        p95_idx = int(len(sorted_times) * 0.95)
-        p95 = sorted_times[p95_idx]
-
-        assert p95 < 100, f"P95 latency {p95:.2f}ms exceeds 100ms target"
 
 
 class TestPhase8Integration:

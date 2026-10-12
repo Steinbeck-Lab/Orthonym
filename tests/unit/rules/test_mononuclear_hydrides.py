@@ -20,6 +20,16 @@ def _name(smiles):
     return name_mononuclear_hydride(Chem.MolFromSmiles(smiles))
 
 
+def _parseable(rows):
+    """Keep the rows whose SMILES RDKit accepts.
+
+    RDKit refuses some of the decline SMILES outright (hypervalent halides,
+    silole/arsole). Those rows used to skip on every run and never asserted
+    anything, so they are left out of the parameter list.
+    """
+    return [row for row in rows if Chem.MolFromSmiles(row[0]) is not None]
+
+
 class TestLambdaWins:
     @pytest.mark.parametrize("smiles,expected", [
         ("FS(F)(F)(F)(F)F", "hexafluoro-λ6-sulfane"),    # SF6
@@ -95,20 +105,18 @@ class TestGroup14Halides:
         """
         assert _name("C[Si](F)(F)F") == "trifluoro(methyl)silane"
 
-    @pytest.mark.parametrize("smiles,why", [
+    @pytest.mark.parametrize("smiles,why", _parseable([
         ("C[Si](C)(C)C", "tetramethylsilane: organyl Si -> P-69 namer owns it"),
         ("CO[Si](OC)(OC)OC", "tetramethoxysilane: alkoxy ligands, not halides"),
         ("c1cc[siH]c1", "silole: Si ring member, not a parent hydride"),
-    ])
+    ]))
     def test_group14_declines(self, smiles, why):
         mol = Chem.MolFromSmiles(smiles)
-        if mol is None:
-            pytest.skip(f"RDKit rejects SMILES ({why})")
         assert name_mononuclear_hydride(mol) is None, why
 
 
 class TestFailClosedDecline:
-    @pytest.mark.parametrize("smiles,why", [
+    @pytest.mark.parametrize("smiles,why", _parseable([
         ("O=S(=O)(O)O", "sulfuric acid: O neighbours are non-halogen"),
         ("O=P(O)(O)O", "phosphoric acid"),
         ("O=S(Cl)Cl", "thionyl chloride SOCl2: has an O"),
@@ -120,12 +128,9 @@ class TestFailClosedDecline:
         ("FS(F)(F)(F)(F)S(F)(F)(F)(F)F", "S2F10: two hubs (di-nuclear)"),
         ("CSC", "dimethyl sulfide: organyl chalcogen is not in the organyl regime"),
         ("c1cc[as]c1", "arsole: As is a ring member, not a parent hydride"),
-    ])
+    ]))
     def test_declines(self, smiles, why):
         mol = Chem.MolFromSmiles(smiles)
-        # Some hypervalent halides RDKit refuses outright; treat as N/A.
-        if mol is None:
-            pytest.skip(f"RDKit rejects SMILES ({why})")
         assert name_mononuclear_hydride(mol) is None, why
 
     def test_organyl_phosphane_is_named_on_the_phosphane_parent(self):

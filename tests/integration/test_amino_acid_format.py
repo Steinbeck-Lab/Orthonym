@@ -12,46 +12,6 @@ import pytest
 from orthonym import name_compound
 
 
-class TestSimpleAminoAcidRegression:
-    """Regression guards: simple amino acids must stay correct."""
-
-    @pytest.mark.integration
-    def test_alanine_systematic(self):
-        """Alanine (UNDEFINED stereo): 2-aminopropanoic acid.
-
-         Phase-1 stereo honesty: the retained name 'alanine'
-        implies the L enantiomer +, so an
-        undefined-stereo input honestly declines it and emits the systematic
-        name. OPSIN round-trip verified."""
-        result = name_compound("NC(C)C(=O)O")
-        assert result == "2-aminopropanoic acid"
-
-    @pytest.mark.integration
-    def test_glycine(self):
-        """Glycine: simplest amino acid."""
-        assert name_compound("NCC(=O)O") == "glycine"
-
-    @pytest.mark.integration
-    def test_ornithine(self):
-        """Ornithine (UNDEFINED stereo): 2,5-diaminopentanoic acid.
-
-        Same stereo-honesty rule as test_alanine_systematic: bare 'ornithine'
-        implies L, so undefined stereo declines to the systematic name.
-        OPSIN round-trip verified."""
-        result = name_compound("NCCCC(N)C(=O)O")
-        assert result == "2,5-diaminopentanoic acid"
-
-    @pytest.mark.integration
-    def test_lysine(self):
-        """Lysine (UNDEFINED stereo): 2,6-diaminohexanoic acid.
-
-        Same stereo-honesty rule as test_alanine_systematic: bare 'lysine'
-        implies L, so undefined stereo declines to the systematic name.
-        OPSIN round-trip verified."""
-        result = name_compound("NCCCCC(N)C(=O)O")
-        assert result == "2,6-diaminohexanoic acid"
-
-
 class TestMultiAmineFormat:
     """Core fix: multi-amine amino acids must have correct locant format."""
 

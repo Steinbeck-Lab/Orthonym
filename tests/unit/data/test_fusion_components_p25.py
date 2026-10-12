@@ -42,22 +42,20 @@ _AUDIT_TIERS_PATH = (
     / "audit_c_results.json"
 )
 _AUDIT_TIERS = json.loads(_AUDIT_TIERS_PATH.read_text())
+# Entries with no expected tier defined are not parametrized: add an
+# entry to scripts/audit_benzo_fusion.py:EXPECTED_TIERS with a Blue Book
+# citation if a tier becomes appropriate.
+_TIERED = [r for r in _AUDIT_TIERS if r["classification"] != "NO-EXPECTED-TIER"]
 
 
 @pytest.mark.unit
 @pytest.mark.parametrize(
     "row",
-    _AUDIT_TIERS,
-    ids=[r["name"] for r in _AUDIT_TIERS],
+    _TIERED,
+    ids=[r["name"] for r in _TIERED],
 )
 def test_component_seniority_in_tier(row):
     """Every catalog entry's seniority falls within its tier."""
-    if row["classification"] == "NO-EXPECTED-TIER":
-        pytest.skip(
-            f"No P-25.2.2.4 expected tier defined for {row['name']!r} — "
-            f"add an entry to scripts/audit_benzo_fusion.py:EXPECTED_TIERS "
-            f"with a Blue Book citation if a tier becomes appropriate."
-        )
     actual = MONOCYCLIC_COMPONENTS[row["name"]]["seniority"]
     assert row["expected_lo"] <= actual <= row["expected_hi"], (
         f"155-AUDIT-C.md classification={row['classification']!r}: "

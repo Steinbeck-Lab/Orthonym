@@ -244,10 +244,6 @@ ALREADY_CORRECT_CONTROLS = [
     ("C1COCN1", "1,3-oxazolidine"),
     ("C1C[Se]CN1", "1,3-selenazolidine"),
     ("C1C[Te]CN1", "1,3-tellurazolidine"),
-    ("c1ccsc1", "thiophene"),
-    ("c1ccoc1", "furan"),
-    ("C1CCNC1", "pyrrolidine"),
-    ("C1COCCN1", "morpholine"),
     ("C1CNNC1", "pyrazolidine"),
     ("C1CNCN1", "imidazolidine"),
 ]

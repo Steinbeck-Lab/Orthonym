@@ -358,11 +358,6 @@ def test_canaries_emit_chebi_name(fx):
     assert _name(fx["smiles"]) == fx["name"]
 
 
-def test_every_table_entry_names_via_dispatch():
-    for fx in FIXTURES:
-        assert _name(fx["smiles"]) == fx["name"], fx["chebi"]
-
-
 def test_non_table_metal_complex_still_abstains():
     out = _name(NON_TABLE_METAL)
     assert out not in COORDINATION_RETAINED.values()

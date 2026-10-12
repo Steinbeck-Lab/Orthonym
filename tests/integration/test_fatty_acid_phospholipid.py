@@ -139,14 +139,6 @@ class TestFattyAcidEsterNaming:
         result = name_compound("CCCCCCCCCCCCCC(=O)OC")
         assert result == "methyl tetradecanoate", f"got: {result!r}"
 
-    def test_regression_methyl_acetate(self):
-        """Methyl acetate is unchanged."""
-        assert name_compound("COC(C)=O") == "methyl acetate"
-
-    def test_regression_ethyl_propanoate(self):
-        """Ethyl propanoate is unchanged."""
-        assert name_compound("CCOC(=O)CC") == "ethyl propanoate"
-
 
 # ===========================================================================
 # Phospholipid functional group detection

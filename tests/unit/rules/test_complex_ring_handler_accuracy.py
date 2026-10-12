@@ -18,20 +18,6 @@ from orthonym.namer import name_compound
 # 1. Polycyclic aromatics as parent structures (retained names)
 # ---------------------------------------------------------------------------
 
-@pytest.mark.unit
-@pytest.mark.parametrize("smiles, expected_name", [
-    # Basic retained names - must be exact
-    ("c1ccc2ccccc2c1", "naphthalene"),
-    ("c1ccc2cc3ccccc3cc2c1", "anthracene"),
-    ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),
-    # F-T9/DD6: 'biphenyl' is general-only; the PIN is 1,1'-biphenyl.
-    ("c1ccc(-c2ccccc2)cc1", "1,1'-biphenyl"),
-])
-def test_polycyclic_retained_names(smiles, expected_name):
-    """Polycyclic aromatics produce correct retained / systematic PIN names."""
-    result = name_compound(smiles)
-    assert result == expected_name, f"Expected '{expected_name}', got '{result}'"
-
 
 # ---------------------------------------------------------------------------
 # 2. Substituted polycyclic aromatics (ring is parent)
@@ -112,7 +98,6 @@ def test_spiro_systems(smiles, expected_name):
 
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles, expected_name", [
-    ("C1CC2CCC1CC2", "bicyclo[2.2.2]octane"),
     # PIN per R11: "RETAINED NAMES FOR VON BAEYER PARENT HYDRIDES" the Blue Book "The retained names adamantane and cubane are used in general nomenclature and as preferred IUPAC names."; "bicyclo[2.2.1]heptane (PIN)":2038; OPSIN RT exact.
     ("C1CC2CC1CC2", "bicyclo[2.2.1]heptane"),
 ])
@@ -145,7 +130,6 @@ def test_fused_heterocyclic_retained(smiles, expected_substring):
 # ---------------------------------------------------------------------------
 
 @pytest.mark.unit
-@pytest.mark.xfail(reason="Anthraquinone routed to VB handler instead of retained name")
 def test_anthraquinone():
     """anthraquinone or anthracene-9,10-dione."""
     result = name_compound("O=C1c2ccccc2C(=O)c2ccccc21")
@@ -157,12 +141,6 @@ def test_anthraquinone():
 # ---------------------------------------------------------------------------
 # 9. Phenanthrene variants
 # ---------------------------------------------------------------------------
-
-@pytest.mark.unit
-def test_phenanthrene_basic():
-    """Phenanthrene retained name."""
-    result = name_compound("c1ccc2c(c1)ccc1ccccc12")
-    assert result == "phenanthrene", f"Expected 'phenanthrene', got '{result}'"
 
 
 # ---------------------------------------------------------------------------

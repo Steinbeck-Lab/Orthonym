@@ -40,7 +40,6 @@ FUSED = [
 UNCHANGED = [
     ("c1cc2c[nH]cc2s1", "5H-thieno[2,3-c]pyrrole"),
     ("Cc1cc2c[nH]cc2s1", "2-methyl-5H-thieno[2,3-c]pyrrole"),
-    ("O=c1[nH]ccc2sccc12", "thieno[3,2-c]pyridin-4(5H)-one"),
 ]
 
 

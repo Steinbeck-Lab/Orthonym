@@ -25,21 +25,6 @@ def _name_or_tiered(smiles: str) -> str:
     return name
 
 
-class TestSP1LocantOneOmission:
-    """SP1 - "The locant '1' is omitted:" (c) "in monosubstituted
-    homogeneous monocyclic rings" (the Blue Book Blue Book,:2913).
-    """
-
-    def test_sp1_cyclohexanecarboximidic_acid(self):
-        assert name_compound("N=C(O)C1CCCCC1") == "cyclohexanecarboximidic acid"
-
-    def test_sp1_cyclohexanecarbohydrazonic_acid(self):
-        assert name_compound("NN=C(O)C1CCCCC1") == "cyclohexanecarbohydrazonic acid"
-
-    def test_sp1_benzenesulfinyl_chloride(self):
-        assert name_compound("O=S(Cl)c1ccccc1") == "benzenesulfinyl chloride"
-
-
 class TestSP2VonBaeyerMinimumCompoundLocants:
     """SP2 - "If there is a choice of names and numbering..." (1)
     "a minimum number of compound locants" (the Blue Book Blue Book,
@@ -81,30 +66,6 @@ class TestSP2VonBaeyerMinimumCompoundLocants:
         """
         assert _name_or_tiered("C1#CC2CCC=C(CCC3=CC=C13)C2") == \
             "tricyclo[8.3.1.0^4,7]tetradeca-4,6,10-trien-2-yne"
-
-
-class TestSP3PhenoFusedPnictogenChalcogenIndicatedH:
-    """SP3 - "Pheno...ine components": the P/As/Sb 10H-isomer cites its
-    indicated hydrogen. the Blue Book Blue Book list
-    "phenoxaphosphinine (PIN, 10H-isomer shown)" beside "the PIN is 10H-phenoxazine"
-    (:11781) for the N analogue, and a PIN cites it:3721 "in a preferred
-    IUPAC name a locant and the symbol 'H' must be cited";:24639). The bare
-    spelling is a listing spelling, by analogy with Note 1 (:14685, the note of
-    the seniority lists: "Indicated hydrogen atoms are not shown in this kind of
-    listing").
-    """
-
-    def test_sp3_phenoxaphosphinine(self):
-        assert name_compound("c1ccc2c(c1)Oc1ccccc1P2") == "10H-phenoxaphosphinine"
-
-    def test_sp3_phenoxarsinine(self):
-        assert name_compound("c1ccc2c(c1)Oc1ccccc1[AsH]2") == "10H-phenoxarsinine"
-
-    def test_sp3_phenoxastibinine(self):
-        assert name_compound("c1cc[c]2c(c1)Oc1cccc[c]1[SbH]2") == "10H-phenoxastibinine"
-
-    def test_sp3_phenothiarsinine(self):
-        assert name_compound("c1ccc2c(c1)Sc1ccccc1[AsH]2") == "10H-phenothiarsinine"
 
 
 class TestSP4ChalcogenAcidLocantOmission:
@@ -164,13 +125,6 @@ class TestD1RingSuffixLocantEssentialWhenRingUnsaturated:
         # Pre-existing instance of the same root cause (not a v52 regression).
         assert name_compound("OC(=O)C1CCC=CC1") == "cyclohex-3-ene-1-carboxylic acid"
 
-    def test_d1_guard_saturated_ring_still_omits_locant_one(self):
-        # SP1 guard: a SATURATED ring has no essential locant, so the
-        # trivial mono-suffix locant '1' must still be omitted.
-        assert name_compound("N=C(O)C1CCCCC1") == "cyclohexanecarboximidic acid"
-        assert name_compound("NN=C(O)C1CCCCC1") == "cyclohexanecarbohydrazonic acid"
-        assert name_compound("O=S(Cl)c1ccccc1") == "benzenesulfinyl chloride"
-
 
 class TestD5PolyfunctionalThioAcidDesignatorKept:
     """D5 (v52 a review-fix a performance pass, REGRESSION) -: the Task-5
@@ -188,17 +142,6 @@ class TestD5PolyfunctionalThioAcidDesignatorKept:
 
     def test_d5_oxobutanethioic_o_acid(self):
         assert _name_or_tiered("CC(=O)CC(O)=S") == "3-oxobutanethioic O-acid"
-
-    def test_d5_guard_selenoic_o_acid_keeps_designator(self):
-        # The Se/Te strip is refuted by the same specified-tautomer reading as thio.
-    # PIN per R13::30215 designates the tautomer with an italic element
-    # symbol; the designator is dropped only where "the location of the sulfur atoms is
-    # unknown" (:31081 vs "1,3-dithiodicarbonic S1,S3-acid (PIN)":31083); the
-    # determined -CS-OH is "hexanethioic O-acid (PIN)" (:30225), and "hexaneselenoic acid
-    # (PIN)" (:30235) is drawn C{O/Se}H (undetermined). C(=Se)-OH is determined, so the
-    # PIN keeps "O-acid". OPSIN RT exact (constitution; the tautomer is fixed by the FG
-    # class, not by RT).
-        assert _name_or_tiered("CCCCCC(O)=[Se]") == "hexaneselenoic O-acid"
 
 
 class TestD3SulfurRingSuffixNumberingOutranksEne:
@@ -249,11 +192,6 @@ class TestD2SulfurRingSuffixLocantOneOmission:
 
     def test_d2_cyclopropanesulfinyl_chloride(self):
         assert name_compound("O=S(Cl)C1CC1") == "cyclopropanesulfinyl chloride"
-
-    def test_d2_guard_unsaturated_ring_keeps_locant_one(self):
-        # D3 guard: an ene ring makes the suffix locant essential
-        # deny-default), so D2's omission licence must NOT fire here.
-        assert name_compound("O=S(=O)(Cl)C1CCC=CC1") == "cyclohex-3-ene-1-sulfonyl chloride"
 
     def test_d2_guard_benzene_unaffected(self):
         assert name_compound("O=S(Cl)c1ccccc1") == "benzenesulfinyl chloride"

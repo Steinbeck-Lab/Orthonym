@@ -100,10 +100,6 @@ class TestWSD07RetainedStereo:
     wrong-parent systematic name; a diastereomer the bare name cannot represent
     DEFERS to the systematic namer."""
 
-    def test_true_l_isoleucine(self):
-        # a6cadc255: a free amino acid keeps its L, the Blue Book).
-        assert name_compound("CC[C@H](C)[C@H](N)C(=O)O") == "L-isoleucine"
-
     def test_d_alanine(self):
         assert name_compound("C[C@@H](N)C(=O)O") == "D-alanine"
 
@@ -121,15 +117,6 @@ class TestWSD07RetainedStereo:
         # the prefix 'allo'" (the Blue Book, 'L-alloisoleucine (symbol 'aIle')
         # (2S,3R)-2-amino-3-methylpentanoic acid'), not hyphenated onto the stem.
         assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-alloisoleucine"
-
-    def test_glycine_achiral(self):
-        assert name_compound("NCC(=O)O") == "glycine"
-
-    def test_peptide_not_regressed(self):
-        # get_amino_acid_name is shared by name_peptide; the default (no-descriptor)
-        # path must keep peptides intact.: the peptide PIN is now the
-        # SUBSTITUTIVE form (V38-PEPTIDE-PIN-VERDICT.md); RT verified.
-        assert name_compound("NCC(=O)NCC(=O)O") == "(2-aminoacetamido)acetic acid"
 
     def test_nonstandard_aa_keeps_systematic(self):
         # A non-standard AA (-aminobutanoic acid) keeps the systematic name —

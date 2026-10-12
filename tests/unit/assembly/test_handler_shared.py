@@ -60,26 +60,6 @@ def test_shim_reexport_assemble_fragments_is_same_object():
 # =============================================================================
 
 
-def test_chain_parent_butane_named_butane():
-    """_generate_chain_parent exercises 'but' stem -> name 'butane'."""
-    assert name_compound("CCCC") == "butane"
-
-
-def test_chain_parent_pentane_named_pentane():
-    """_generate_chain_parent exercises 'pent' stem -> name 'pentane'."""
-    assert name_compound("CCCCC") == "pentane"
-
-
-def test_ring_parent_cyclohexane_named():
-    """_generate_ring_parent exercises 'cyclohex' stem -> name 'cyclohexane'."""
-    assert name_compound("C1CCCCC1") == "cyclohexane"
-
-
-def test_ring_parent_cyclopentane_named():
-    """_generate_ring_parent exercises 'cyclopent' stem -> name 'cyclopentane'."""
-    assert name_compound("C1CCCC1") == "cyclopentane"
-
-
 def test_suffix_propanol_named():
     """_generate_suffix exercises -ol suffix for propan-1-ol."""
     # The exact expected name depends on canary. Just assert it ends with -ol
@@ -119,12 +99,6 @@ def test_stereodescriptors_e_z_double_bond():
     name = name_compound("C/C=C/C")
     # but-2-ene with E configuration
     assert name
-
-
-def test_assemble_fragments_simple_compound():
-    """_assemble_fragments exercises final name assembly."""
-    # ethanol exercises stereo (none) + prefix (none) + parent + suffix
-    assert name_compound("CCO") == "ethanol"
 
 
 def test_assemble_fragments_complex_compound():

@@ -60,10 +60,6 @@ class TestWrongParent:
         """#7: O=CO -> formic acid [RT]."""
         assert name_compound("O=CO") == "formic acid"
 
-    def test_017_pentanal(self):
-        """#17: CCCCC=O -> pentanal [RT]."""
-        assert name_compound("CCCCC=O") == "pentanal"
-
     def test_018_decanal(self):
         """#18: CCCCCCCCCC=O -> decanal [RT]."""
         assert name_compound("CCCCCCCCCC=O") == "decanal"
@@ -93,10 +89,6 @@ class TestWrongParent:
         """#49: NC(=O)c1cccc(O)c1 -> 3-hydroxybenzamide [RT]."""
         assert name_compound("NC(=O)c1cccc(O)c1") == "3-hydroxybenzamide"
 
-    def test_052_acetic_acid(self):
-        """#52: CC(=O)O -> acetic acid [RT]."""
-        assert name_compound("CC(=O)O") == "acetic acid"
-
     def test_071_heptadecanoic_acid(self):
         """#71: CCCCCCCCCCCCCCCCC(=O)O -> heptadecanoic acid [RT]."""
         assert name_compound("CCCCCCCCCCCCCCCCC(=O)O") == "heptadecanoic acid"
@@ -121,10 +113,6 @@ class TestWrongParent:
         """#88: OC(=O)c1ccc(O)cc1 -> 4-hydroxybenzoic acid [RT]."""
         assert name_compound("OC(=O)c1ccc(O)cc1") == "4-hydroxybenzoic acid"
 
-    def test_089_lactic_acid(self):
-        """#89: CC(O)C(=O)O -> 2-hydroxypropanoic acid [RT]."""
-        assert name_compound("CC(O)C(=O)O") == "2-hydroxypropanoic acid"
-
     def test_092_gallic_acid(self):
         """#92: O=C(O)c1cc(O)c(O)c(O)c1 -> 3,4,5-trihydroxybenzoic acid [RT]."""
         assert name_compound("O=C(O)c1cc(O)c(O)c(O)c1") == "3,4,5-trihydroxybenzoic acid"
@@ -140,13 +128,6 @@ class TestMissingSubstituent:
     def test_014_methylbutenal(self):
         """#14: CC(C)=CC=O -> 3-methylbut-2-enal [RT]."""
         assert name_compound("CC(C)=CC=O") == "3-methylbut-2-enal"
-
-    def test_019_acetyloxycyclohexane(self):
-        """#19: CC(=O)OC1CCCCC1 -> cyclohexyl acetate [RT]."""
-        # 'Monoesters' (the Blue Book): the organyl group is placed "in
-        # front of the name of the acid component expressed as an anion" ('ethyl acetate
-        # (PIN)'); the acyloxy prefix is for esters cited as prefixes.
-        assert name_compound("CC(=O)OC1CCCCC1") == "cyclohexyl acetate"
 
     def test_020_acetyloxytoluene(self):
         """#20: CC(=O)Oc1ccc(C)cc1 - 4-methylphenyl acetate (methyl kept on the ring)."""
@@ -597,7 +578,6 @@ class TestSkip:
         name = name_compound("C=[SiH]C#[SiH]")
         assert "silicon" in name.lower() or "silane" in name.lower()
 
-    @pytest.mark.xfail(reason="Contains deuterium isotope [2H]")
     def test_009_deuterated_methanol(self):
         """#9: [2H]C([2H])([2H])O - deuterated compound."""
         name = name_compound("[2H]C([2H])([2H])O")

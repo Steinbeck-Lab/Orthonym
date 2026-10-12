@@ -37,7 +37,6 @@ ROWS = [
 
 #: one indicated hydrogen: unchanged
 UNCHANGED = [
-    ("C1=COCO1", "2H-1,3-dioxole"),
     ("C1=CCC=CO1", "4H-pyran"),
     ("c1ccc2c(c1)Oc1ccccc1S2", "phenoxathiine"),                 #:11795, no hydrogen
     ("C1=CC2=CC=C[As]2C=C1", "arsindolizine"),                   #:11709, none needed

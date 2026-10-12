@@ -225,10 +225,6 @@ CANARY_SAMPLE = [
         "5-methylthiophene-2-carboxylic acid",
         id="2-methylthiophene-5-carboxylic_acid",
     ),
-    (
-        "SS",
-        "disulfane",
-    ),
     # (the Blue Book): the parent implies the 8,9,10,13,14 configuration and the
     # remaining centres are given as alpha/beta (Greek symbols, b946aa5e0); the terminal
     # 'e' is kept before the consonant of '-diol'.

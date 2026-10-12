@@ -102,7 +102,6 @@ def test_free_inorganic_oxoacid_is_not_an_organo_oxoacid(smiles, fg):
     ("CC[Sb](=O)(O)O",           "ethylstibonic acid"),
     # -inic (two C, one OH) -- BB L36052 / L36054
     ("C[As](C)(=O)O",            "dimethylarsinic acid"),
-    ("c1ccccc1[As](=O)(O)c1ccccc1", "diphenylarsinic acid"),
     ("C[Sb](C)(=O)O",            "dimethylstibinic acid"),
     # BB L36066 verbatim PIN: C6H5-As(CH3)(O)OH
     ("c1ccccc1[As](C)(=O)O",     "methyl(phenyl)arsinic acid"),

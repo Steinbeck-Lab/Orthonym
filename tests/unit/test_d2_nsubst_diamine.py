@@ -105,7 +105,6 @@ SUPERSCRIPT_FLIP_GUARDS = [
     ("NCCNCN", "N1-(aminomethyl)ethane-1,2-diamine"),          # complex/demoted
     ("CN(C)CCN(C)CCN",
      "N1-(2-aminoethyl)-N1,N2,N2-trimethylethane-1,2-diamine"),  # complex/demoted
-    ("Nc1ccc(-c2ccc(N)cc2)cc1", "[1,1'-biphenyl]-4,4'-diamine"),
     ("Cc1cc(-c2ccc(N)c(C)c2)ccc1N",
      "3,3'-dimethyl[1,1'-biphenyl]-4,4'-diamine"),
     # Mononuclear parent (methanediamine): methane has no cited skeletal locant,

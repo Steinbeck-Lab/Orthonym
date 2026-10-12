@@ -351,3 +351,24 @@ class TestHydrazidesV42P43:
         assert name_compound("C(CCCC)(=O)NN") == "pentanehydrazide"
         assert name_compound("C(C)(=O)NN") == "acetohydrazide"
         assert name_compound("C(C1=CC=CC=C1)(=O)NN") == "benzohydrazide"
+
+
+@pytest.mark.parametrize(
+    "smiles, expected",
+    [
+        pytest.param("CCCC(=O)NCC", "N-ethylbutanamide", id="CCCC(=O)NCC"),
+        pytest.param("CC(=O)NCCC", "N-propylacetamide", id="CC(=O)NCCC"),
+        pytest.param("O=C(CCl)N(CCCl)CCCl", "2-chloro-N,N-bis(2-chloroethyl)acetamide", id="O=C(CCl)N(CCCl)CCCl"),
+    ],
+)
+def test_merged_amide_names(smiles, expected):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/integration/test_decomposition_regression.py::TestAmideCanaries::test_amide_canary (2)
+      - tests/unit/test_perception_171_gold_tripwires.py::test_def8_bis_chloroethyl_acetamide (1)
+    """
+    from orthonym import name_compound
+    assert name_compound(smiles) == expected

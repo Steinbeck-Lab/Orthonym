@@ -11,13 +11,18 @@ CAGES = ["C1CC2CCC1C2", "C1CC2CC1CC2", "C12C3C4C1C5C2C3C45", "C1C2CC3CC1CC(C2)C3
 def _adj(mol):
     return {a.GetIdx(): [n.GetIdx() for n in a.GetNeighbors()] for a in mol.GetAtoms()}
 
-@pytest.mark.parametrize("smi", CAGES)
-def test_adjacency_list_gives_identical_ordered_paths(smi):
-    mol = Chem.MolFromSmiles(smi); ri = mol.GetRingInfo()
-    ring_atoms = {i for r in ri.AtomRings() for i in r}
+def _ring_atoms_and_bridgeheads(mol):
+    ring_atoms = {i for r in mol.GetRingInfo().AtomRings() for i in r}
     bhs = sorted(i for i in ring_atoms if sum(1 for n in mol.GetAtomWithIdx(i).GetNeighbors() if n.GetIdx() in ring_atoms) >= 3)
-    if len(bhs) < 2:
-        pytest.skip(f"{smi} is spiro (1 shared atom, not a bridged system) -- no bridgehead pair to compare")
+    return ring_atoms, bhs
+
+# A spiro cage (1 shared atom, not a bridged system) has no bridgehead pair to compare.
+BRIDGED_CAGES = [s for s in CAGES if len(_ring_atoms_and_bridgeheads(Chem.MolFromSmiles(s))[1]) >= 2]
+
+@pytest.mark.parametrize("smi", BRIDGED_CAGES)
+def test_adjacency_list_gives_identical_ordered_paths(smi):
+    mol = Chem.MolFromSmiles(smi)
+    ring_atoms, bhs = _ring_atoms_and_bridgeheads(mol)
     adj = _adj(mol)
     for s in bhs:
         for e in bhs:

@@ -35,18 +35,6 @@ class TestAmideRingSubstituentEnrichment:
         assert result == "N-cyclohexylacetamide", f"Got {result!r}"
 
     @pytest.mark.integration
-    def test_n_methylacetamide_unchanged(self):
-        """N-methylacetamide: regression guard for simple non-ring N-substituent."""
-        result = name_compound("CC(=O)NC")
-        assert result == "N-methylacetamide", f"Got {result!r}"
-
-    @pytest.mark.integration
-    def test_n_phenylacetamide_unchanged(self):
-        """N-phenylacetamide: regression guard for aromatic ring N-substituent."""
-        result = name_compound("CC(=O)Nc1ccccc1")
-        assert result == "N-phenylacetamide", f"Got {result!r}"
-
-    @pytest.mark.integration
     def test_n_dimethylcyclohexyl_acetamide_has_locants(self):
         """N-(3,5-dimethylcyclohexyl)acetamide: both methyls must have locants."""
         result = name_compound("CC(=O)NC1CC(C)CC(C)C1")

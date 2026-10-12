@@ -23,8 +23,6 @@ class TestUreido:
     """F3: ureido substituent must be a single (carbamoylamino), not split."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("NC(=O)NCCC[C@H](N)C(=O)O", "(2S)-2-amino-5-(carbamoylamino)pentanoic acid"),  # citrulline
-        ("NC(=O)NCCC(=O)O", "3-(carbamoylamino)propanoic acid"),
         ("NC(=O)NCCCC(=O)O", "4-(carbamoylamino)butanoic acid"),
     ])
     def test_ureido_single_prefix(self, smiles, expected):
@@ -32,9 +30,7 @@ class TestUreido:
 
     @pytest.mark.parametrize("smiles,expected", [
         ("O=CNCCCC(=O)O", "4-formamidobutanoic acid"),    # real formamido — (1)
-        ("CC(=O)NCCC(=O)O", "3-acetamidopropanoic acid"),  # real acetamido — (1)
         ("NCCC(=O)O", "3-aminopropanoic acid"),            # plain amino — unaffected
-        ("CNC(N)=O", "methylurea"),                        # terminal urea — mono omits locant,:2943)
     ])
     def test_acylamino_regressions(self, smiles, expected):
         assert name_compound(smiles) == expected

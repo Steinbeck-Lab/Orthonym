@@ -53,10 +53,7 @@ def _inchikey(smiles):
 @pytest.mark.parametrize(
     "smiles,expected",
     [
-        ("CNCC(=O)N", "2-(methylamino)acetamide"),
         ("CCNCC(=O)N", "2-(ethylamino)acetamide"),
-        ("CCCCNCC(=O)N", "2-(butylamino)acetamide"),      # 4-carbon branch
-        ("CN(C)CC(=O)N", "2-(dimethylamino)acetamide"),   # tertiary N
         ("CNCCC(=O)N", "3-(methylamino)propanamide"),     # beta, not alpha-specific
     ],
 )

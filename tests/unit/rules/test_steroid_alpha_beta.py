@@ -131,3 +131,21 @@ class TestProtect:
         from orthonym.rules.steroid_stereo import collect_steroid_alpha_beta  # noqa: F401
         n = name_compound("CN1[C@@H]2CC[C@H]1C[C@H](C2)OC(=O)C(CO)c1ccccc1")
         assert "alpha" not in n.lower() and "beta" not in n.lower(), n
+
+
+@pytest.mark.parametrize(
+    "smiles, expected",
+    [
+        pytest.param("C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@]34C)[C@@H]1CC[C@@H]2O", "(8R,9S,10S,13S,14S,17S)-17-hydroxyandrost-4-en-3-one", id="C[C@]12CC[C@H]3[C@@H](CCC4=CC(=O)CC[C@@]34C)[C@@H]1CC[C@@H]2O"),
+    ],
+)
+def test_merged_steroid_names(smiles, expected):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/unit/routing/test_dispatcher.py::TestPerStoutClassDispatch::test_per_stoutclass_dispatch (1)
+    """
+    from orthonym import name_compound
+    assert name_compound(smiles) == expected

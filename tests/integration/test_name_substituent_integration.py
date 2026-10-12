@@ -15,7 +15,6 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly.substituent_enumerator import name_substituent
-from orthonym.namer import name_compound
 
 
 # ============================================================================
@@ -128,35 +127,6 @@ class TestNameSubstituentNeverNone:
 # TestCanaryNamingStability: verify name_compound stability
 # ============================================================================
 
-CANARY_COMPOUNDS = [
-    ("CCO", "ethanol"),
-    ("CC(=O)O", "acetic acid"),
-    ("c1ccccc1", "benzene"),
-    ("CC(C)C", "2-methylpropane"),
-    ("CC(O)C", "propan-2-ol"),
-    ("c1ccncc1", "pyridine"),
-    ("C1CCNCC1", "piperidine"),
-    ("c1ccc2ccccc2c1", "naphthalene"),
-]
-
-
-class TestCanaryNamingStability:
-    """All canary compounds produce identical names after a phase."""
-
-    @pytest.mark.parametrize(
-        "smi,expected_name",
-        CANARY_COMPOUNDS,
-        ids=[smi for smi, _ in CANARY_COMPOUNDS],
-    )
-    def test_name_unchanged(self, smi, expected_name):
-        """Verify canary compound name matches expected value."""
-        name = name_compound(smi)
-        assert name is not None
-        assert len(name) > 0
-        assert name == expected_name, (
-            f"Canary regression for {smi}: expected '{expected_name}', got '{name}'"
-        )
-
 
 # ============================================================================
 # TestGapClosureVerification: verify specific gap fixes work
@@ -257,25 +227,3 @@ class TestGapClosureVerification:
 # TestZeroRegressionValidation: confirm full test suite stability
 # ============================================================================
 
-class TestZeroRegressionValidation:
-    """Verify that a phase changes do not regress any existing behavior."""
-
-    def test_simple_compounds_unchanged(self):
-        """Core compound naming must be unchanged."""
-        # These are fundamental compounds that must always work
-        cases = [
-            ("C", "methane"),
-            ("CC", "ethane"),
-            ("CCC", "propane"),
-            ("CCCC", "butane"),
-            ("C=C", "ethene"),
-            ("C#C", "acetylene"),  # retained name PIN)
-            ("CO", "methanol"),
-            ("CCO", "ethanol"),
-            ("C=O", "formaldehyde"),  # retained name
-            ("CC=O", "acetaldehyde"),  # retained name
-            ("CC(=O)C", "propan-2-one"),  # IUPAC 2013 PIN
-        ]
-        for smi, expected in cases:
-            name = name_compound(smi)
-            assert name == expected, f"{smi}: expected '{expected}', got '{name}'"

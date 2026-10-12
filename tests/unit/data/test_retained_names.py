@@ -38,13 +38,6 @@ class TestBenzonitrileRetainedName:
         result = get_retained_name('N#Cc1ccccc1')
         assert result == 'benzonitrile', f"Got {result}"
 
-    @pytest.mark.unit
-    def test_benzonitrile_naming_e2e(self):
-        """name_compound should return 'benzonitrile' via retained name lookup."""
-        # This tests the full pipeline through retained names
-        result = name_compound('N#Cc1ccccc1')
-        assert result == 'benzonitrile', f"Got {result}"
-
 
 # =============================================================================
 # Test Thiazolidine Retained Names
@@ -149,22 +142,10 @@ class TestThiazolidineRetainedNames:
         assert 'isothiazolidine' in demoted
 
     @pytest.mark.unit
-    def test_thiazolidine_naming_e2e(self):
-        """name_compound returns the PIN '1,3-thiazolidine' (the Blue Book)."""
-        result = name_compound('C1CSCN1')
-        assert result == '1,3-thiazolidine', f"Got {result}"
-
-    @pytest.mark.unit
     def test_thiazolidine_naming_alt_input(self):
         """Alternate input form gives the same PIN."""
         result = name_compound('C1SCNC1')
         assert result == '1,3-thiazolidine', f"Got {result}"
-
-    @pytest.mark.unit
-    def test_isothiazolidine_naming_e2e(self):
-        """name_compound returns the PIN '1,2-thiazolidine' (the Blue Book)."""
-        result = name_compound('C1CNSC1')
-        assert result == '1,2-thiazolidine', f"Got {result}"
 
     @pytest.mark.unit
     def test_isothiazolidine_naming_alt_input(self):

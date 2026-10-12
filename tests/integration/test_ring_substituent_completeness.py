@@ -179,13 +179,6 @@ class TestRegressionPureAlkylRings:
     """Pure alkyl substituents on rings are not regressed by the fixes."""
 
     @pytest.mark.integration
-    def test_methylcyclohexane_no_locant(self):
-        """CC1CCCCC1 -> 'methylcyclohexane' (locant omitted for monosubstituted)."""
-        name = name_compound('CC1CCCCC1')
-        assert name == 'methylcyclohexane', \
-            f"Expected 'methylcyclohexane', got '{name}'"
-
-    @pytest.mark.integration
     def test_dimethylcyclohexane_with_locants(self):
         """CC1CCCC(C)C1 -> contains 'dimethyl' and locants."""
         name = name_compound('CC1CCCC(C)C1')

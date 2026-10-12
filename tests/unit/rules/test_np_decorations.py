@@ -39,15 +39,6 @@ def _mol(smiles: str):
 class TestNPDecorationEnumeration:
     """Test that steroid decorations (-OH, =O, C=C) are correctly enumerated."""
 
-    def test_cholesterol_exact_match(self):
-        """Cholesterol with correct stereochemistry should still use exact match."""
-        smiles = (
-            "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C"
-            "[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C"
-        )
-        result = name_compound(smiles)
-        assert result == "cholesterol"
-
     def test_testosterone_decoration(self):
         """Testosterone-configured input: 17β-hydroxyandrost-4-en-3-one.
 

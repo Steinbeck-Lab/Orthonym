@@ -16,7 +16,6 @@ EXACTLY 7 binding gold rows (5 sulfate + 2 glucuronide) + 1 deferred-tripwire
 disulfate (out-of-scope multi-conjugate, RESEARCH Open Q1).
 """
 
-import pytest
 
 from orthonym import name_compound
 
@@ -141,14 +140,13 @@ def test_androstan_3α_glucuronide():
 # ---------------------------------------------------------------------------
 # DEFERRED TRIPWIRE (NOT a gold target): multi-conjugate disulfate (Open Q1)
 # ---------------------------------------------------------------------------
-@pytest.mark.xfail(reason="multi-conjugate deferred to honest-fail; tripwire only (RESEARCH Open Q1)")
 def test_disulfate_honest_fail():
     """CHEBI:137389 (disulfate) -> must NOT silently drop a fragment.
 
     Out-of-scope multi-conjugate (two equal-seniority sulfates). The completeness
     invariant  makes it honest-fail (None / legacy / 'unknown organic
-    compound') rather than emit a fragment-omitting name. The xfail marks the
-    out-of-scope deferral — it is NOT an output band-aid. Full multi-conjugate
+    compound') rather than emit a fragment-omitting name. It was an xfail marking
+    the out-of-scope deferral and passes today — it is NOT an output band-aid. Full multi-conjugate
     prefix treatment is a phase/184.
     """
     from orthonym.rules.conjugate_controller import classify_conjugate  # noqa: F401

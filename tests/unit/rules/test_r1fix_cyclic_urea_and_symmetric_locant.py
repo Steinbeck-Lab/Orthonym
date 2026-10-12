@@ -59,8 +59,13 @@ SYMMETRIC_N_LOCANT = [
     ("OC(=O)N1CCNC(=O)C1", "3-oxopiperazine-1-carboxylic acid"),
 ]
 
+# 'O=C1CSCN1' is asserted with the same name by test_wave2_p1_chains_a.py
+# (test_thiazolidinone_exact_pin); left out here.
+_CYCLIC_UREA_ROWS = [row for row in CYCLIC_UREA_ONE if row[0] != "O=C1CSCN1"]
+
+
 @pytest.mark.unit
-@pytest.mark.parametrize("smiles,expected", CYCLIC_UREA_ONE)
+@pytest.mark.parametrize("smiles,expected", _CYCLIC_UREA_ROWS)
 def test_cyclic_urea_names_as_one_suffix(smiles, expected):
     """A cyclic urea / ring amide is a '-one' pseudoketone."""
     assert name_compound(smiles) == expected

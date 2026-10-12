@@ -281,7 +281,17 @@ DETERMINISM_ROWS = [
 ]
 
 
-@pytest.mark.parametrize("smiles", DETERMINISM_ROWS)
+# Three fresh processes per row: one row runs in the PR run, the other two in the nightly run.
+_NIGHTLY_DETERMINISM_ROWS = {
+    "C1CCC2(CC1)CC3=C(NC2=NCC4=CC=CC=C4)ON=C3",
+    "CC1=C(SC2=C1C(=O)C3(CCC3)C(=O)N2)C4=NC=CO4",
+}
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [pytest.param(s, marks=pytest.mark.slow) if s in _NIGHTLY_DETERMINISM_ROWS else s
+     for s in DETERMINISM_ROWS])
 def test_hydro_set_is_deterministic_across_fresh_processes(smiles):
     names = {_name_in_fresh_subprocess(smiles) for _ in range(3)}
     assert len(names) == 1, f"non-deterministic name for {smiles}: {names}"

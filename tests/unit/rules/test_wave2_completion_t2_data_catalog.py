@@ -19,7 +19,6 @@ def _name(smiles):
 
 @pytest.mark.parametrize("smiles,expected", [
     ("NC(=S)N", "thiourea"),         # retained parent
-    ("N1NNNN1", "pentazolidine"),    # all-N HW-preselected ring
 ])
 def test_retained_parents(smiles, expected):
     assert _name(smiles) == expected

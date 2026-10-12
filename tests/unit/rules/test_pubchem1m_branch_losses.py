@@ -310,8 +310,15 @@ def _fixed_h_inchi(smiles):
     return inchi.MolToInchi(mol, options="/FixedH") if mol is not None else None
 
 
-@pytest.mark.parametrize("smiles", list(MULTI_DESCRIPTOR_ROWS.values()),
-                         ids=list(MULTI_DESCRIPTOR_ROWS))
+# The two 150 s rows run in the nightly run only; the other two stay in the PR run.
+_SLOW_MULTI_DESCRIPTOR_ROWS = {"pc1m_168012462", "peptide_2h5"}
+
+
+@pytest.mark.parametrize(
+    "smiles",
+    [pytest.param(smiles, marks=pytest.mark.slow) if row_id in _SLOW_MULTI_DESCRIPTOR_ROWS else smiles
+     for row_id, smiles in MULTI_DESCRIPTOR_ROWS.items()],
+    ids=list(MULTI_DESCRIPTOR_ROWS))
 def test_multi_descriptor_propanoyl_rows_name_rt_exact(smiles):
     res = name_best_effort(smiles)
     name = assert_full_rt(res.get("name"), smiles)

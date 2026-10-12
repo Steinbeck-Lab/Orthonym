@@ -58,10 +58,15 @@ def test_name_with_tree_returns_naming_result(
     assert result.name
 
 
+# 'CCO' and 'c1ccccc1' are compared with Orthonym.name the same way by
+# tests/unit/rules/test_hyg02_error_catalog.py and test_tier_a_ring.py; left out here.
+_NAME_FIELD_ROWS = [row for row in REPRESENTATIVE_SMILES if row[0] not in {"CCO", "c1ccccc1"}]
+
+
 @pytest.mark.parametrize(
     "smi,expected_name_or_none",
-    REPRESENTATIVE_SMILES,
-    ids=[s[0] for s in REPRESENTATIVE_SMILES],
+    _NAME_FIELD_ROWS,
+    ids=[s[0] for s in _NAME_FIELD_ROWS],
 )
 def test_name_field_matches_name(smi, expected_name_or_none, namer):
     """The name field is byte-identical to Orthonym.name(smi)."""

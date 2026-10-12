@@ -13,10 +13,6 @@ pytestmark = pytest.mark.integration
 class TestOxolaneSubstituentNaming:
     """Saturated 5-membered O-heterocycle substituents use systematic 'oxolanyl'."""
 
-    def test_standalone_thf_retained_name(self):
-        """Standalone oxolane keeps retained name."""
-        assert name_compound("C1CCOC1") == "oxolane"
-
     def test_thf_substituent_uses_oxolanyl(self):
         """THF ring as substituent on another structure uses 'oxolan-2-yl'."""
         # 6-amino-2-oxo-N-oxolanyl-1,3,5-triazine (azacitidine core)

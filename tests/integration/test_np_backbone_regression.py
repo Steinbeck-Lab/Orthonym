@@ -11,9 +11,10 @@ compound that was previously protected by the fused-guard, it will drop into
 
 These tests run BEFORE a phase lands as a regression guard.
 
-Each of the 20 NP compounds runs under BOTH V17 (first_applicable) and V18
-(score_based) modes via the `feature_flag_mode` parametrized fixture —
-mirroring the pattern in tests/integration/test_score_based_mode.py.
+Each of the 20 NP compounds runs under V17 (first_applicable, the production
+mode) via the `feature_flag_mode` fixture. (It used to run under the score_based
+V18 mode as well; that variant was removed with the candidate-pool cascade
+tests.)
 
 Acceptance model (intentionally soft per):
   - name_compound(smiles) MUST NOT crash and MUST produce a non-empty name
@@ -148,12 +149,12 @@ NP_CANARIES = [
 
 @pytest.fixture(params=[
     ("false", "first_applicable"),  # V17 (default soak per)
-    ("true",  "score_based"),        # V18 (two-tier active per)
-], ids=["v17", "v18"])
+], ids=["v17"])
 def feature_flag_mode(request, monkeypatch):
-    """Parametrized fixture: each test runs under both V17 and V18.
+    """Fixture: each test runs under V17 (first_applicable, the production mode).
 
-    Mirrors tests/integration/test_score_based_mode.py::feature_flag_mode.
+    The score_based V18 variant candidate-pool cascade) is no longer run:
+    the pool never holds more than one candidate in production.
 
     Sets ORTHONYM_USE_V18_WEIGHTS + ORTHONYM_SELECTION_MODE and reloads
     coverage_scoring + candidate_pool so the env vars are picked up at

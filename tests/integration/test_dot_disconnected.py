@@ -29,11 +29,6 @@ class TestNeutralDotDisconnected:
         assert "ethanol" in result
         assert "acetic acid" in result
 
-    def test_neutral_single_component_unchanged(self):
-        """Single-component SMILES CCO should produce just 'ethanol'."""
-        result = self.namer.name("CCO")
-        assert result == "ethanol"
-
     def test_salt_still_routes_to_salt_naming(self):
         """[Na+].[O-]C=O should use salt naming path, not dot-disconnected."""
         result = self.namer.name("[Na+].[O-]C=O")

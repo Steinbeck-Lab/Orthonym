@@ -177,8 +177,6 @@ class TestKnownAdjacentDefects:
         ("OC(=O)C1CCC(C)CC1", "4-methylcyclohexane-1-carboxylic acid",
          "the sibling that was already correct -- the reference behaviour"),
         ("O=CC1CCC(C)CC1", "4-methylcyclohexane-1-carbaldehyde", "ditto"),
-        ("OOC(=O)C1CCC(C)CC1", "4-methylcyclohexane-1-carboperoxoic acid",
-         "the peroxy sibling, correct via TERMINAL_GROUPS"),
     ])
     def test_the_four_sibling_classes_now_agree(self, namer, smiles, expected, why):
         """All four ring `carb-` suffix classes must answer the same way. The

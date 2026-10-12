@@ -52,10 +52,6 @@ class TestWave2P5FusedVerify:
     """C5 fused rows already correct at HEAD — lock them against regression."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),          #
-        ("c1ccc2ccccc2c1", "naphthalene"),                 # (g)
-        ("c1ccc2ncccc2c1", "quinoline"),                   # (h)
-        ("c1ccc2[nH]ccc2c1", "1H-indole"),                 # (i)
         ("c1ccc2nc[nH]c2c1", "1H-1,3-benzimidazole"),          # (j)
     ])
     def test_already_correct(self, smiles, expected):

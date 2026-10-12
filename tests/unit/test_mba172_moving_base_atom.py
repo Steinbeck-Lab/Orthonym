@@ -59,10 +59,7 @@ def test_mba02_formyl_on_ring_preserved(namer):
 # structural namer -- and the string converter is pinned as declining.
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
-    ("OC(=O)c1ccc(CCCCC=O)cc1", "4-(5-oxopentyl)benzoic acid"),
-    ("OC(=O)c1ccc(CCCC=O)cc1",  "4-(4-oxobutyl)benzoic acid"),
     ("OC(=O)c1ccc(CCC=O)cc1",   "4-(3-oxopropyl)benzoic acid"),
-    ("OC(=O)c1ccc(CC=O)cc1",    "4-(2-oxoethyl)benzoic acid"),
 ])
 def test_mba02_oxo_locant_end_to_end(namer, smiles, expected):
     # The oxo locant is the terminus opposite the attachment, NOT C1 (the

@@ -66,7 +66,6 @@ WITNESSES = [
 PIN_GOLD = [
     ("CCCCCCCc1ccccc1", "heptylbenzene"),
     ("CCCCCCCCC1CCCCC1", "octylcyclohexane"),
-    ("ClCCCCC", "1-chloropentane"),
     ("O=C1CCNCC1", "piperidin-4-one"),
     ("Cc1ccc(O)nc1", "5-methylpyridin-2-ol"),
 ]

@@ -173,14 +173,6 @@ class TestSteroidStereoRegression:
             f"Bare androstane name broken, got: {name}"
         )
 
-    def test_morphine_retained_name(self):
-        """Morphine: its bridged fused PIN with CIP descriptors (slice S4;
-        the Blue Book)."""
-        name = name_compound(
-            "CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5"
-        )
-        assert name == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol"
-
     def test_non_stereo_testosterone_no_stereo_prefix(self):
         """Testosterone from non-stereo SMILES should NOT get stereo prefix."""
         name = name_compound("CC12CCC3C(C1CCC2O)CCC4=CC(=O)CCC34C")

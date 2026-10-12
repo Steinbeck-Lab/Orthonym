@@ -25,7 +25,7 @@ UNSUBSTITUTED_TERPHENYL_SMI = "c1ccc(-c2ccc(-c3ccccc3)cc2)cc1"
 
 
 def _opsin_available():
-    """Match the helper pattern from tests/integration/test_canary_rt75.py."""
+    """Match the helper pattern from tests/support/canary_rt75_data.py."""
     import shutil
     from tests.support.jars import jar_or_none
     return jar_or_none() is not None and shutil.which("java") is not None
@@ -63,7 +63,7 @@ class TestSubstitutedTerphenylRoundTrip:
         )
 
         # Round-trip via OPSIN: name -> SMILES -> InChI L1
-        from tests.integration.test_canary_rt75 import _opsin_parse_batch
+        from tests.support.canary_rt75_data import _opsin_parse_batch
 
         parsed = _opsin_parse_batch([name]).get(name)
         if parsed is None:
@@ -96,7 +96,7 @@ class TestSubstitutedTerphenylRoundTrip:
         regressing the unsubstituted path while fixing the substituted
         path."""
         from orthonym.namer import name_compound
-        from tests.integration.test_canary_rt75 import _opsin_parse_batch
+        from tests.support.canary_rt75_data import _opsin_parse_batch
 
         name = name_compound(UNSUBSTITUTED_TERPHENYL_SMI)
         assert name == "1,1':4',1''-terphenyl", (

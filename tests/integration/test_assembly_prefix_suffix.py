@@ -44,11 +44,6 @@ class TestASML13PhenolRouting:
         assert "phenol" in result.lower(), f"Expected phenol, got: {result}"
         assert "chloro" in result.lower(), f"Expected chloro prefix, got: {result}"
 
-    def test_plain_phenol(self):
-        result = name_compound("Oc1ccccc1")
-        assert result is not None
-        assert result.lower() == "phenol", f"Expected phenol, got: {result}"
-
     def test_hydroxybenzoic_acid_unchanged(self):
         """OH stays as prefix when acid is the principal group."""
         result = name_compound("OC1=CC=C(C(O)=O)C=C1")

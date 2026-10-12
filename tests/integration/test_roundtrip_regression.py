@@ -323,106 +323,21 @@ ROUNDTRIP_VERIFIED = [
 ]
 
 
+# Rows 3, 19, 20, 22 and 23 are exact duplicates (the same name call and expected name) of
+# rows of other tests and were removed from test_roundtrip_verified; its ids stay positional,
+# so no other row's id moved.
+_RT_VERIFIED_DUPLICATES = {3, 19, 20, 22, 23}
+
+
 # ---------------------------------------------------------------------------
 # Section 2: Core naming foundations (manually verified)
 # These are fundamental IUPAC naming rules that must always work.
 # ---------------------------------------------------------------------------
 
 CORE_NAMING = [
-    # Alkanes
-    ("C", "methane"),
-    ("CC", "ethane"),
-    ("CCC", "propane"),
-    ("CCCC", "butane"),
-    ("CCCCC", "pentane"),
-
-    # Alcohols
-    ("CCO", "ethanol"),
-    ("CCCO", "propan-1-ol"),
-    ("CC(O)C", "propan-2-ol"),
-
-    # Aldehydes
-    ("CC=O", "acetaldehyde"),
-    ("CCC=O", "propanal"),
-
-    # Ketones
-    ("CC(=O)C", "propan-2-one"),
-
-    # Carboxylic acids
-    ("CC(=O)O", "acetic acid"),
-    ("CCC(=O)O", "propanoic acid"),
-    ("CCCC(=O)O", "butanoic acid"),
-
-    # Alkenes and alkynes
-    ("C=C", "ethene"),
-    ("CC=CC", "but-2-ene"),
-    ("C#C", "acetylene"),  # retained name PIN)
-
-    # Nitriles and amides
-    ("CC#N", "acetonitrile"),
-    ("CC(=O)N", "acetamide"),
-
     # Halogenated
     ("CCl", "chloromethane"),
     ("CCBr", "bromoethane"),
-
-    # Cycloalkanes
-    ("C1CC1", "cyclopropane"),
-    ("C1CCC1", "cyclobutane"),
-    ("C1CCCC1", "cyclopentane"),
-    ("C1CCCCC1", "cyclohexane"),
-
-    # Retained aromatic names
-    ("c1ccccc1", "benzene"),
-    ("Cc1ccccc1", "toluene"),
-    ("Oc1ccccc1", "phenol"),
-    ("Nc1ccccc1", "aniline"),
-    ("c1ccc2ccccc2c1", "naphthalene"),
-    ("OC(=O)c1ccccc1", "benzoic acid"),
-
-    # Retained heterocyclic names
-    ("c1ccncc1", "pyridine"),
-    ("c1ccoc1", "furan"),
-    # PIN per R1: "in preferred IUPAC names indicated hydrogen must always be
-    # cited when present in the corresponding structure" the Blue Book; "1H-pyrrole
-    # (PIN)":24645. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-    ("c1cc[nH]c1", "1H-pyrrole"),
-    ("c1ccsc1", "thiophene"),
-
-    # Simple ethers
-    ("COC", "methoxymethane"),
-
-    # Esters (retained)
-    ("CC(=O)OC", "methyl acetate"),
-    ("CC(=O)OCC", "ethyl acetate"),
-
-    # Amino acids. Glycine is achiral so its retained name stands; undefined-
-    # stereo alanine declines the L-implying retained name for the systematic
-    # form (Phase-1 stereo honesty, /.
-    ("NCC(=O)O", "glycine"),
-    ("CC(N)C(=O)O", "2-aminopropanoic acid"),
-
-    # Cycloalkenes
-    ("C1=CCCCC1", "cyclohexene"),
-
-    # Saturated heterocycles (retained)
-    ("C1CCNCC1", "piperidine"),
-    ("C1CCOCC1", "oxane"),
-    ("C1CCOC1", "oxolane"),
-
-    # Stereochemistry
-    ("C/C=C/C", "(2E)-but-2-ene"),
-    ("C/C=C\\C", "(2Z)-but-2-ene"),
-
-    # Sulfur compounds
-    ("CS", "methanethiol"),
-    # PIN per R8: "SULFOXIDES AND SULFONES" "(1) substitutively, by prefixing the name
-    # of the acyl group R′-SO– or R′-SO2– to the name of the parent hydride" the Blue Book;
-    # "Methods (1) and (3) generate preferred names.":28088; "the preferred
-    # prefixes are enclosed in parentheses even though they are simple prefixes":31262;
-    # "(methanesulfinyl)methane (PIN)":46154. OPSIN RT exact (TRIAGE.csv; re-checked in
-    # Task 7/8).
-    ("CS(=O)(=O)C", "(methanesulfonyl)methane"),
 
     # Retained names are general-nomenclature only; the PINs are systematic.
     # PIN per R2: (under "Retained names") "The following names are
@@ -430,8 +345,10 @@ CORE_NAMING = [
     # the Blue Book; "ethylene glycol ethane-1,2-diol (PIN)":26774; "glycerol
     # propane-1,2,3-triol (PIN)":26776. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
     ("OCCO", "ethane-1,2-diol"),
-    ("OCC(O)CO", "propane-1,2,3-triol"),
 ]
+# The other rows of this table were exact duplicates of rows of other tests and were
+# removed; the ids of the three that are left keep their original positions.
+_CORE_NAMING_IDS = ["core-19", "core-20", "core-48"]
 
 
 class TestRoundTripRegression:
@@ -442,8 +359,10 @@ class TestRoundTripRegression:
     """
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected_name", _tier_params(ROUNDTRIP_VERIFIED),
-                             ids=[f"rt-{i}" for i in range(len(ROUNDTRIP_VERIFIED))])
+    @pytest.mark.parametrize(
+        "smiles,expected_name",
+        _tier_params([row for i, row in enumerate(ROUNDTRIP_VERIFIED) if i not in _RT_VERIFIED_DUPLICATES]),
+        ids=[f"rt-{i}" for i in range(len(ROUNDTRIP_VERIFIED)) if i not in _RT_VERIFIED_DUPLICATES])
     def test_roundtrip_verified(self, smiles, expected_name):
         """Verify round-trip confirmed names never regress."""
         if smiles in _LARGE_POLYCYCLE_BLOCKED:
@@ -469,8 +388,7 @@ class TestCoreNamingRegression:
     """
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected_name", CORE_NAMING,
-                             ids=[f"core-{i}" for i in range(len(CORE_NAMING))])
+    @pytest.mark.parametrize("smiles,expected_name", CORE_NAMING, ids=_CORE_NAMING_IDS)
     def test_core_naming(self, smiles, expected_name):
         """Verify core naming foundations never regress."""
         name = _dt_name_compound(smiles)
@@ -693,10 +611,6 @@ class TestPhase22NPEsterRoundTrip:
         )
 
     @pytest.mark.roundtrip
-    @pytest.mark.xfail(
-        reason="OPSIN stereo handling differs for steroids -- connectivity matches but CIP labels may differ",
-        strict=False,
-    )
     @pytest.mark.parametrize(
         "smiles,expected_name",
         PHASE22_NP_ESTER_PARSE,
@@ -760,11 +674,6 @@ PHASE24_WAVE2_FIXES = [
 
     # Group E: Retained name fixes
     # E1: SS -> disulfane
-    (
-        "SS",
-        "disulfane",
-        "disulfane-retained",
-    ),
 
     # Group F: Misc format fixes
     # F1: Steroid ester prefix hyphen fix (was "3-hydroxy7-oxo", now "3-hydroxy-7-oxo")
@@ -834,20 +743,6 @@ PHASE24_PARSE_FIXES = [
         "4-(hydroxymethyl)phenol",  #: phenol suffix routing
         "bracket-hydroxymethyl-benzene",
     ),
-    # A2: hydroxymethyl + chloro on benzene
-    (
-        "OCc1ccc(Cl)cc1",
-        # PIN (no plan ruling; derived from the quoted rules): "Hydroxy groups are indicated
-        # by the prefix 'hydroxy' when: (1) a group having priority for citation as the principal
-        # characteristic group is present; or (2) a hydroxy group cannot be denoted by a suffix."
-        # the Blue Book-27260 -- neither holds; "The senior parent structure has the
-        # maximum number of substituents corresponding to the principal characteristic group
-        # (suffix)" (:18875), so the -OH carbon is the parent (methanol); cf.
-        # "cyclopropyl(phenyl)methanol (PIN)":7302. OPSIN RT exact (TRIAGE.csv; re-checked in
-        # Task 7/8).
-        "(4-chlorophenyl)methanol",
-        "bracket-chloro-hydroxymethyl",
-    ),
     # A3: (a) chain-as-parent on indole (a phase Plan 02 Task 03)
     # Pre-148 was `3-carboxymethyl-5-chloro-1H-indole` (ring-as-parent w/
     # acid prefix; violation); post-148 cascade picks chain (acid
@@ -880,13 +775,6 @@ PHASE24_PARSE_FIXES = [
         "(2R,4R,6R)-3,4,5-trihydroxy-6-(2-hydroxy-4-methylphenoxy)oxane-2-carboxylic acid",
         "oxy-glycoside-oxanyloxy",
     ),
-    # B3: Galloyl ester chain -> tetradecoxy (was bare "oxy")
-    (
-        "O=C(O)c1cc(O)c(O)c(OC(=O)c2cc(O)c(O)c(OC(=O)c3cc(O)c(O)c(O)c3)c2)c1",
-        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE rows 79/86) change-asserted-value:: a compound acyl/organyl is cited inside its own marks with "oxy" outside ("4-[(3-ethoxy-3-oxopropanoyl)oxy]phenyl..." the Blue Book, "4-[(4-carboxycyclohexyl)oxy]":23198); nesting "{[({})]}" (:7446); alphanumerical order by the complete name (:3477) and (g) lowest locants to the prefix cited first (:3307). The old value named a different molecule. OPSIN RT exact.
-        "3-({3,4-dihydroxy-5-[(3,4,5-trihydroxybenzoyl)oxy]benzoyl}oxy)-4,5-dihydroxybenzoic acid",
-        "oxy-galloyl-ester-tetradecoxy",
-    ),
     # B4: Complex ether chain -> decoxy (was bare "oxy")
     (
         "C=CCN(C)CCCCCCOc1ccc(C(=O)c2ccc(Br)cc2)c(F)c1",
@@ -918,23 +806,6 @@ PHASE24_PARSE_FIXES = [
         "Cc1c(O)cc2c(c1C)C(=O)O[C@@H]([C@@]1([C@@H]3CC=C4CCC[C@H](C)[C@@]4(C)C3)CO1)O2",
         "2,3-dimethylphenol",  #: phenol suffix routing (was hydroxydimethylbenzene)
         "oxy-dimethyl-benzene-oxanyloxy",
-    ),
-
-    # Additional stability checks
-    # S1: Anisole (retained name, PIN)
-    (
-        "COc1ccccc1",
-        "anisole",
-        "stability-anisole-retained-name",
-    ),
-    # S2: phenyl acetate (the ester is the principal class)
-    (
-        "CC(=O)Oc1ccccc1",
-        # PIN per R5: "All preferred IUPAC names for esters are named by functional
-        # class nomenclature." the Blue Book; "ethyl acetate (PIN)":31667;
-        # "acetic acid (PIN)":29725. OPSIN RT exact (TRIAGE.csv; re-checked in Task 7/8).
-        "phenyl acetate",
-        "stability-acetyloxy-unchanged",
     ),
 ]
 
@@ -1086,24 +957,6 @@ class TestPhase24ParseFixesRoundTrip:
 # ---------------------------------------------------------------------------
 
 PHASE24_RT_IMPROVEMENTS = [
-    # VB format: secondary bridge locants with parentheses (OPSIN-compatible)
-    # tricyclo[3.3.1.1(3,7)] -- unambiguous for multi-digit locants
-    (
-        "C1C2CC3CC1CC(C2)C3",
-        "adamantane",
-        "retained-name-adamantane",
-    ),
-    # Isoindoline dione format (phthalimide) -- normalized to isoindoline-1,3-dione
-    (
-        "Cc1cc(N2C(=O)c3ccccc3C2=O)n(C)n1",
-        # 2026-09-25 (pre-existing-failures plan, Task 5, TRIAGE row 87)
-        # change-asserted-value: R21: (the Blue Book) "Cyclic imides are preferably named as heterocyclic pseudoketones"; "2-phenyl-1H-isoindole-1,3(2H)-dione (PIN)... N-phenylphthalimide" (:33853); (:24689) added indicated hydrogen is preferred over hydro prefixes for PINs; (:24256) 'isoindoline' is not
-        # used in PINs; the pyrazolyl keeps its indicated hydrogen;
-        # '(1H-indol-1-yl)acetic acid (PIN)':2039). The old value was a fragment
-        # of the name. OPSIN RT exact.
-        "2-(1,3-dimethyl-1H-pyrazol-5-yl)-1H-isoindole-1,3(2H)-dione",
-        "isoindoline-dione-format",
-    ),
     # Isoindoline dione with prefix -- normalized to isoindoline-1,3-dione
     (
         "O=C1CCC(N2C(=O)c3ccc(O)cc3C2=O)C(=O)N1",
@@ -1130,23 +983,6 @@ PHASE24_RT_IMPROVEMENTS = [
 # ---------------------------------------------------------------------------
 
 PHASE24_RT_ANALYSIS = [
-    # --- Phenylamino prefix (systematic, was anilino before P29) ---
-    (
-        "CC(=O)Nc1ccccc1",
-        "N-phenylacetamide",
-        "phenylamino-acetamide",
-    ),
-    # --- Key exact RT matches that must stay matching ---
-    (
-        "SS",
-        "disulfane",
-        "disulfane-rt-match",
-    ),
-    (
-        "O=CC1=CC(O)C(O)C(O)C1O",
-        "3,4,5,6-tetrahydroxycyclohex-1-ene-1-carbaldehyde",
-        "cyclohexenecarbaldehyde-rt-match",
-    ),
     (
         "O=C1C=CCCC1",
         "cyclohex-2-en-1-one",
@@ -1158,29 +994,10 @@ PHASE24_RT_ANALYSIS = [
         "(2R,3S,4R,5S)-2,3,4,5-tetrahydroxyhexanedioate",  #: [O-] -> -oate
         "glucarate-neutralization",
     ),
-    # --- Steroid naming (with stereodescriptors for defined stereocenters) ---
-    (
-        "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "5β-androstane-3α,17α-diol",
-        "steroid-androstanediol",
-    ),
-    # --- Peptide naming (exact RT match) ---
-    (
-        "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
-        # j7 (TRIAGE g3 C05): the substitutive PIN, was 'leucylserylglycine'.
-        "{(2S)-2-[(2S)-2-amino-4-methylpentanamido]-3-hydroxypropanamido}acetic acid",
-        "peptide-leu-ser-gly",
-    ),
     (
         "N[C@@H](CC(=O)O)C(=O)N[C@@H](CO)C(=O)N[C@@H](CO)C(=O)O",
         "aspartylserylserine",
         "peptide-asp-ser-ser",
-    ),
-    # --- Fatty acid naming (exact RT match pattern) ---
-    (
-        "CCCCCCCC/C=C\\CCCCCCCC(=O)O",
-        "(9Z)-octadec-9-enoic acid",
-        "fatty-acid-oleic-z",
     ),
     # --- Cyclohexenone OPSIN-compatible format ---
     (

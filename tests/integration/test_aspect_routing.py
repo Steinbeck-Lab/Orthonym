@@ -40,39 +40,16 @@ class TestIonFallThrough:
         result = name_compound('O=C[O-]')
         assert result == 'formate', f'Expected formate, got: {result}'
 
-    def test_retained_anion_methoxide(self):
-        """Methoxide should use retained name directly from namer.py."""
-        result = name_compound('C[O-]')
-        assert result == 'methoxide', f'Expected methoxide, got: {result}'
-
     def test_retained_anion_ethoxide(self):
         """Ethoxide should use retained name directly from namer.py."""
         result = name_compound('CC[O-]')
         assert result == 'ethoxide', f'Expected ethoxide, got: {result}'
-
-    def test_retained_cation_ammonium(self):
-        """NH4+ PIN is 'azanium', the Blue Book; was 'ammonium')."""
-        result = name_compound('[NH4+]')
-        assert result == 'azanium', f'Expected azanium, got: {result}'
-
-    def test_retained_cation_methylammonium(self):
-        """CH3-NH3+ is named by the substitutive aminium PIN, not 'methylammonium'."""
-        # 'Cation and anion names': method (1), adding 'ium' to the amine name,
-        # leads to preferred IUPAC names ('methanaminium chloride (PIN)'). Behaviour changed
-        # on purpose by commit 12541211e (alkylammonium -> substitutive aminium PIN).
-        result = name_compound('C[NH3+]')
-        assert result == 'methanaminium', f'Expected methanaminium, got: {result}'
 
     def test_retained_cation_ethylammonium(self):
         """CH3CH2-NH3+ is named by the substitutive aminium PIN, not 'ethylammonium'."""
         # method (1) (commit 12541211e); see test_retained_cation_methylammonium.
         result = name_compound('CC[NH3+]')
         assert result == 'ethanaminium', f'Expected ethanaminium, got: {result}'
-
-    def test_salt_early_exit(self):
-        """Salts should use early exit in namer.py (never reach assemble_name)."""
-        result = name_compound('[Na+].[O-]C(C)=O')
-        assert result == 'sodium acetate', f'Expected sodium acetate, got: {result}'
 
     def test_zwitterion_early_exit(self):
         """Zwitterions should use early exit in namer.py."""
@@ -118,21 +95,11 @@ class TestIonAspectComposition:
         assert 'ol' in result.lower() or 'oxide' in result.lower(), \
             f'Expected phenolate/oxide name, got: {result}'
 
-    def test_neutral_molecule_unchanged_ethanol(self):
-        """Neutral molecules should not be affected by ion routing."""
-        result = name_compound('CCO')
-        assert result == 'ethanol', f'Expected ethanol, got: {result}'
-
     def test_neutral_molecule_unchanged_butanone(self):
         """Neutral ketone should not be affected by ion routing."""
         result = name_compound('CCC(=O)C')
         assert 'butan' in result.lower() and 'one' in result.lower(), \
             f'Expected butanone, got: {result}'
-
-    def test_neutral_molecule_unchanged_butene(self):
-        """Neutral alkene should not be affected by ion routing."""
-        result = name_compound('CC=CC')
-        assert result == 'but-2-ene', f'Expected but-2-ene, got: {result}'
 
     def test_ion_fallback_to_existing_naming(self):
         """Ion without matching aspect composition should fall back to name_anion."""
@@ -231,16 +198,6 @@ class TestLocantValidation:
             assert ',0,' not in result, f'{smiles}: contains ,0, in {result}'
             assert not result.startswith('0-'), f'{smiles}: starts with 0- in {result}'
 
-    def test_existing_ethanol_unchanged(self):
-        """Ethanol should be unchanged by locant validation."""
-        result = name_compound('CCO')
-        assert result == 'ethanol', f'Expected ethanol, got: {result}'
-
-    def test_existing_propanone_unchanged(self):
-        """Propan-2-one is the IUPAC 2013 PIN."""
-        result = name_compound('CC(=O)C')
-        assert result == 'propan-2-one', f'Got: {result}'
-
     def test_hexanol_locant_valid(self):
         """Hexan-1-ol locant should be within parent size 6."""
         result = name_compound('CCCCCCO')
@@ -260,28 +217,6 @@ class TestLocantValidation:
 
 class TestOverallIntegrity:
     """Smoke tests to verify no regressions in common naming paths."""
-
-    def test_simple_alkane(self):
-        """Simple alkane unchanged."""
-        assert name_compound('CCC') == 'propane'
-
-    def test_simple_alkene(self):
-        """Simple alkene unchanged."""
-        assert name_compound('C=C') == 'ethene'
-
-    def test_benzene(self):
-        """Benzene unchanged."""
-        assert name_compound('c1ccccc1') == 'benzene'
-
-    def test_carboxylic_acid(self):
-        """Carboxylic acid unchanged."""
-        result = name_compound('CC(=O)O')
-        assert result == 'acetic acid', f'Got: {result}'
-
-    def test_formic_acid(self):
-        """Formic acid unchanged."""
-        result = name_compound('O=CO')
-        assert result == 'formic acid', f'Got: {result}'
 
     def test_amine(self):
         """Simple amine unchanged."""

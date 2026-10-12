@@ -222,6 +222,7 @@ class TestPoolStateIsolationUnderRecursion:
         )
 
     @pytest.mark.opsin_gate
+    @pytest.mark.slow  # one 147 s molecule: nightly run only
     def test_drift_stereo_chebi_83420_production(self):
         """What ships for the strict-xfail row above (gate on): the default tier
         and best-effort each ship the failure sentinel or a name that round-trips

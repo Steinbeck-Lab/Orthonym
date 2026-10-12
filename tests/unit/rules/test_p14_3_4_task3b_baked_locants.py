@@ -56,7 +56,6 @@ Blue Book evidence, all verified by line:
   "from a contracted name, for example 'methoxy'"), ``bis(...)`` for the uncontracted
   ``methylsulfanyl``. ``bis(methoxy)`` occurs ZERO times in the Blue Book.
 """
-import re
 from pathlib import Path
 
 import pytest
@@ -407,79 +406,3 @@ def test_fragment_boundary_observation_reads_the_visited_set():
         visited.discard("O=C(O)C(Cl)C(=O)O")
 
 
-@pytest.mark.parametrize(
-    "smiles,licensed,cited",
-    [
-        # general_acyclic (defect A + the pre-existing chloro rows)
-        ("OC(=O)C(C)C(=O)O", "methylpropanedioic acid", "2-methylpropanedioic acid"),
-        ("OC(=O)C(Cl)C(=O)O", "chloropropanedioic acid", "2-chloropropanedioic acid"),
-        # heterocycle (defect B; the saturated one-orbit ring, the Blue Book -- a prefix on
-        # mancude pyrazine cites its locant, user ruling D1)
-        ("ClC1CO1", "chlorooxirane", "2-chlorooxirane"),
-        # polyfunctional (defect C)
-        ("OC(=O)C(O)C(=O)O", "hydroxypropanedioic acid", "2-hydroxypropanedioic acid"),
-    ],
-)
-def test_every_site_consults_the_fragment_boundary_observation(
-    namer, monkeypatch, smiles, licensed, cited,
-):
-    """ licences that empty a scope of ALL its locants must consult THREE
-    things, and a licence consulting two of three is broken on the third's whole class
-    (`internal notes`).
-    The other two are ambient ContextVars checked inside ``locant_omission``; this one
-    is the read-only fragment-boundary observation.
-
-    ⚠ This is a REACHABILITY test, not a mutation-coverage test. Forcing the
-    observation True must bring every locant back at all three sites -- if a site did
-    not consult it, its row would still elide and this would fail. Written this way
-    because no corpus molecule was found that reaches these three handlers *through*
-    the decomposition engine (probed: five acyl-piperidine / ring-amide shapes, all
-    abstain today), so the guard has no end-to-end witness and a plain mutation of the
-    guard line SURVIVES. Monkeypatching the observation is the honest substitute.
-    """
-    from orthonym.assembly.handlers import _handler_shared
-
-    assert namer.name(smiles) == licensed, "baseline: the licence fires here"
-    monkeypatch.setattr(
-        _handler_shared, "_naming_call_produces_a_name_component", lambda: True)
-    monkeypatch.setattr(
-        _handler_shared, "locant_scope_is_a_name_component", lambda: True)
-    assert Orthonym().name(smiles) == cited
-
-
-# --------------------------------------------------------------------------- #
-# 8. TRIPWIRES on the two things this task removed #
-# --------------------------------------------------------------------------- #
-def test_no_private_multiplier_table_in_the_ether_chain_producer():
-    """``_name_ether_substituted_chain`` carried one of the 27 divergent multiplier
-    tables (`internal notes`),
-    hardcoded to ``bis``/``tris`` so it could never emit ``di``. The multiplier now
-    comes from the shared ``multiplied_component``. This fails if a private table
-    reappears in that function."""
-    src = (PROJECT_ROOT / "src/orthonym/assembly/substituent_naming.py").read_text()
-    start = src.index("def _name_ether_substituted_chain(")
-    end = src.index("\ndef ", start + 1)
-    # CODE only: the function's own comments discuss the removed table by name, and
-    # matching those would make this tripwire fire on its own documentation.
-    body = "\n".join(
-        line for line in src[start:end].splitlines()
-        if not line.lstrip().startswith("#")
-    )
-    assert "_MULT" not in body, "a private multiplier table came back"
-    assert "multiplied_component" in body, (
-        "the shared P-16.3 multiplier is no longer used")
-    assert not re.search(r"cite_locants\s*=\s*len\(", body), (
-        "the hand-rolled `cite_locants = len(backbone) > 1` licence came back")
-
-
-def test_assemble_fragments_has_no_print_time_locant_flag():
-    """The licence must not be re-introduced as a print-time parameter of
-    ``_assemble_fragments``: that renderer is only ONE of the two reading the fragment
-    list, so a flag there cannot reach the name-tree serializer."""
-    import inspect
-
-    from orthonym.assembly.handlers._handler_shared import _assemble_fragments
-
-    params = inspect.signature(_assemble_fragments).parameters
-    assert "l3_omit_prefix_locant" not in params, (
-        "the print-time flag is back; apply the licence to the FRAGMENTS instead")

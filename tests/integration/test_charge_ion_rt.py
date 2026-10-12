@@ -148,9 +148,6 @@ class TestSaltNaming:
 class TestRetainedIonNames:
     """Ensure retained ion names are stable after changes."""
 
-    def test_acetate(self):
-        assert name_compound('CC(=O)[O-]') == 'acetate'
-
     def test_benzoate(self):
         assert name_compound('O=C([O-])c1ccccc1') == 'benzoate'
 

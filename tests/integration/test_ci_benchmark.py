@@ -981,6 +981,23 @@ CI_BENCHMARK = [
 ]
 
 
+_CI_SLOW_ROWS = {14, 37, 74}
+# Row 48 (CSCCSC, 1,2-bis(methylsulfanyl)ethane) is checked with the same call and name by
+# test_skeletal_replacement.py (test_dithiahexane_e2e) and was removed here; the ids stay positional.
+_CI_DUPLICATE_ROWS = {48}
+
+
+def _slow_if_listed(i, row):
+    """The benchmark row, with the ``slow`` mark added when its index is in _CI_SLOW_ROWS.
+
+    A row is a plain (smiles, expected) tuple or a ``pytest.param`` carrying marks.
+    """
+    if i not in _CI_SLOW_ROWS:
+        return row
+    values, marks = (row.values, tuple(row.marks)) if hasattr(row, "marks") else (row, ())
+    return pytest.param(*values, marks=(*marks, pytest.mark.slow))
+
+
 class TestCIBenchmark:
     """CI benchmark: 100 ChEBI compounds for regression detection.
 
@@ -991,11 +1008,12 @@ class TestCIBenchmark:
     Sampling: random.Random(123).sample(111823_unique_smiles, 500)[:100]
     """
 
+    # Three rows (_CI_SLOW_ROWS, 25 s each) run in the nightly run only.
     @pytest.mark.integration
     @pytest.mark.parametrize(
         "smiles,expected_name",
-        CI_BENCHMARK,
-        ids=[f"ci-{i:03d}" for i in range(len(CI_BENCHMARK))],
+        [_slow_if_listed(i, row) for i, row in enumerate(CI_BENCHMARK) if i not in _CI_DUPLICATE_ROWS],
+        ids=[f"ci-{i:03d}" for i in range(len(CI_BENCHMARK)) if i not in _CI_DUPLICATE_ROWS],
     )
     def test_ci_benchmark(self, smiles, expected_name):
         """Verify naming output matches pre-computed expected name."""

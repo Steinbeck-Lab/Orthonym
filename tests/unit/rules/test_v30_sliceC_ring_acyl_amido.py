@@ -59,10 +59,6 @@ class TestRingAcylAmidoPIN:
         # nesting: a compound amido prefix that itself contains marks
         # escalates -> (a review review of cbb28539).
         ("OC(=O)CNC(=O)Cc1ccncc1", "[2-(pyridin-4-yl)acetamido]acetic acid"),
-        # regression: benzoyl (all-carbon ring) unchanged, bare (no marks)
-        ("OC(=O)CNC(=O)c1ccccc1", "benzamidoacetic acid"),
-        # regression: slice-1 mark-free prefix stays single parens (depth 0)
-        ("OC(=O)CNC(=O)Cc1ccccc1", "(2-phenylacetamido)acetic acid"),
     ])
     def test_exact_pin(self, smiles, expected):
         from orthonym import name_compound

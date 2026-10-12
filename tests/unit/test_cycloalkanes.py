@@ -124,26 +124,6 @@ class TestSimpleCycloalkanes:
     """Tests for basic cycloalkane naming (ring sizes 3-10)."""
 
     @pytest.mark.unit
-    def test_cyclopropane(self):
-        """C1CC1 -> cyclopropane (3-membered ring)."""
-        assert name_compound("C1CC1") == "cyclopropane"
-
-    @pytest.mark.unit
-    def test_cyclobutane(self):
-        """C1CCC1 -> cyclobutane (4-membered ring)."""
-        assert name_compound("C1CCC1") == "cyclobutane"
-
-    @pytest.mark.unit
-    def test_cyclopentane(self):
-        """C1CCCC1 -> cyclopentane (5-membered ring)."""
-        assert name_compound("C1CCCC1") == "cyclopentane"
-
-    @pytest.mark.unit
-    def test_cyclohexane(self):
-        """C1CCCCC1 -> cyclohexane (6-membered ring)."""
-        assert name_compound("C1CCCCC1") == "cyclohexane"
-
-    @pytest.mark.unit
     def test_cycloheptane(self):
         """C1CCCCCC1 -> cycloheptane (7-membered ring)."""
         assert name_compound("C1CCCCCC1") == "cycloheptane"
@@ -201,22 +181,3 @@ class TestCycloalkaneEdgeCases:
 # Alternative SMILES Notation Tests
 # ============================================================================
 
-class TestCycloalkaneAlternativeSMILES:
-    """Tests ensuring different valid SMILES give the same name."""
-
-    @pytest.mark.unit
-    def test_cyclohexane_different_start(self):
-        """Different ring numbering in SMILES should give same result."""
-        # These are all cyclohexane with different starting points
-        assert name_compound("C1CCCCC1") == "cyclohexane"
-        # Note: C(C1CCCC1) is methylcyclopentane, NOT cyclohexane!
-
-    @pytest.mark.unit
-    def test_cyclopentane_different_notation(self):
-        """Different SMILES notations for cyclopentane."""
-        assert name_compound("C1CCCC1") == "cyclopentane"
-
-    @pytest.mark.unit
-    def test_cyclobutane_different_notation(self):
-        """Different SMILES notations for cyclobutane."""
-        assert name_compound("C1CCC1") == "cyclobutane"

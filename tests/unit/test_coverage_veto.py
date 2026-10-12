@@ -18,7 +18,6 @@ CARRIED CONSTRAINTS (bind this file too):
 import pytest
 
 from orthonym.namer import Orthonym, is_failure_name
-from orthonym.assembly.coverage_audit import CoverageVerdict
 
 pytestmark = pytest.mark.unit
 
@@ -118,54 +117,3 @@ class TestVetoLeavesCompleteWinnersUnchanged:
         assert verdict is not None and verdict.complete is True
 
 
-class TestVetoNeverFiresOnUnavailable:
-    def test_method_unavailable_incomplete_is_not_vetoed(self, monkeypatch):
-        # Fail-OPEN carried constraint: an "unavailable" verdict must never
-        # be vetoed even if (hypothetically) `complete` were False on it --
-        # monkeypatch `audit_coverage` directly to force this combination,
-        # since production code never actually produces
-        # complete=False+method=unavailable together (skip_reanchor forces
-        # complete=True there) -- this proves the GUARD checks `.method`,
-        # not just `.complete`.
-        monkeypatch.setenv("ORTHONYM_COVERAGE_AUDIT", "veto")
-
-        def _fake_audit_coverage(mol, name, result_obj, **kwargs):
-            return CoverageVerdict(False, "unavailable", "forced for test")
-
-        monkeypatch.setattr(
-            "orthonym.assembly.coverage_audit.audit_coverage",
-            _fake_audit_coverage)
-        nm = Orthonym()
-        name = nm.name("CCO")
-        assert name == "ethanol", (
-            "method=='unavailable' must NEVER be vetoed (fail-open)")
-
-
-class TestVetoShadowModeParity:
-    def test_shadow_mode_never_vetoes_even_when_incomplete(self, monkeypatch):
-        monkeypatch.setenv("ORTHONYM_COVERAGE_AUDIT", "shadow")
-
-        def _fake_audit_coverage(mol, name, result_obj, **kwargs):
-            return CoverageVerdict(False, "e1_spine", "forced incomplete")
-
-        monkeypatch.setattr(
-            "orthonym.assembly.coverage_audit.audit_coverage",
-            _fake_audit_coverage)
-        nm = Orthonym()
-        name = nm.name("CCO")
-        assert name == "ethanol"
-
-
-class TestVetoFailsOpenOnAuditException:
-    def test_audit_exception_does_not_veto(self, monkeypatch):
-        monkeypatch.setenv("ORTHONYM_COVERAGE_AUDIT", "veto")
-
-        def _boom(mol, name, result_obj, **kwargs):
-            raise RuntimeError("certificate blew up")
-
-        monkeypatch.setattr(
-            "orthonym.assembly.coverage_audit.audit_coverage", _boom)
-        nm = Orthonym()
-        name = nm.name("CCO")
-        assert name == "ethanol", (
-            "an audit exception must fail OPEN -- never veto/crash a name")

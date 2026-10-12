@@ -52,12 +52,6 @@ B1_NO_REGRESSION = [
 # PIN gold controls: byte-identical current PIN output (the fix is best-effort
 # gated on allow_mancude, so PIN must not shift).
 PIN_GOLD = [
-    ("CCO", "ethanol"),
-    ("CC(=O)O", "acetic acid"),
-    ("CCCCCCCc1ccccc1", "heptylbenzene"),
-    ("ClCCCCC", "1-chloropentane"),
-    ("O=C1CCNCC1", "piperidin-4-one"),
-    ("Cc1ccc(O)nc1", "5-methylpyridin-2-ol"),
     ("CCS(=O)(=O)c1ccccc1", "(ethanesulfonyl)benzene"),
     ("CS(=O)(=O)CCC", "1-(methanesulfonyl)propane"),
 ]

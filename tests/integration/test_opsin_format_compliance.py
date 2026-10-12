@@ -485,20 +485,6 @@ class TestFormatEdgeFixes:
                 f"Missing separator between chloro and N-prefix: {name}"
             )
 
-    def test_benzene_as_parent_unchanged(self):
-        """The ring of benzyl alcohol is a substituent: the parent carries the -OH.
-
-         (the Blue Book, under ' SENIORITY ORDER FOR PARENT
-        STRUCTURES'): "The senior parent structure has the maximum number of
-        substituents corresponding to the principal characteristic group
-        (suffix)". The -OH sits on the CH2, so methanol is the parent and the
-        ring is 'phenyl', as in 'cyclopropyl(phenyl)methanol (PIN)' (:7302).
-        'hydroxymethylbenzene' denotes the same molecule but is not the PIN.
-        """
-        smiles = "OCc1ccccc1"
-        name = name_compound(smiles)
-        assert name == "phenylmethanol", name
-
     def test_phenyl_in_chain_context(self):
         """Benzene ring as substituent on chain should use 'phenyl'."""
         # 2-phenylethanoic acid: benzene is substituent on chain

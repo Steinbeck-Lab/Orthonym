@@ -467,6 +467,7 @@ CHEBI_18872_NAME = (
     "methylbenzene")
 
 
+@pytest.mark.slow  # one 322 s molecule: nightly run only
 def test_chebi_18872_names_without_the_repeated_work(monkeypatch):
     promo = _spy_promotion(monkeypatch, CHEBI_18872)
     runs = _spy_clean_offer(monkeypatch)

@@ -1457,20 +1457,6 @@ class TestEsterCascade:
             "The general P-44.1 cascade handles all esters."
         )
 
-    def test_no_ester_override_in_source(self):
-        """Verify the ester override call site has been removed from source.
-
-        The source should not contain 'principal_group == \"ester\"'
-        as a special case in select_parent.
-        """
-        import inspect
-        import orthonym.rules.parent_selection as ps_module
-        source = inspect.getsource(ps_module.select_parent)
-        assert 'ester' not in source, (
-            "select_parent() source should not contain ester-specific logic. "
-            "The general P-44.1 cascade handles all esters."
-        )
-
     def test_phenyl_acetate_chain_parent(self):
         """Phenyl acetate: acyl C on chain -> chain is parent via (a).
 

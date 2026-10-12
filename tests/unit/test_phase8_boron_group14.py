@@ -68,7 +68,6 @@ class TestMultiSuffixSpelling:
     @pytest.mark.parametrize("smiles,expected", [
         ("N[Si](N)(N)N", "silanetetramine"),     # BB: not silanetetraamine
         ("N[Ge](N)(N)N", "germanetetramine"),
-        ("C[Si](N)(N)N", "methylsilanetriamine"),  # tri unaffected
         ("C[Si](C)(O)O", "dimethylsilanediol"),    # di unaffected
     ])
     def test_group14_multi_suffix(self, st, smiles, expected):

@@ -37,42 +37,6 @@ class TestRegressionGuards:
     """Simple molecules that MUST produce the same names as before."""
 
     @pytest.mark.integration
-    def test_ethane(self):
-        assert name_compound("CC") == "ethane"
-
-    @pytest.mark.integration
-    def test_butane(self):
-        assert name_compound("CCCC") == "butane"
-
-    @pytest.mark.integration
-    def test_pentane(self):
-        assert name_compound("CCCCC") == "pentane"
-
-    @pytest.mark.integration
-    def test_2_methylpropane(self):
-        assert name_compound("CC(C)C") == "2-methylpropane"
-
-    @pytest.mark.integration
-    def test_3_ethylpentane(self):
-        assert name_compound("CCC(CC)CC") == "3-ethylpentane"
-
-    @pytest.mark.integration
-    def test_2_methylbutane(self):
-        assert name_compound("CC(C)CC") == "2-methylbutane"
-
-    @pytest.mark.integration
-    def test_2_2_dimethylpropane(self):
-        assert name_compound("CC(C)(C)C") == "2,2-dimethylpropane"
-
-    @pytest.mark.integration
-    def test_acetic_acid(self):
-        assert name_compound("CC(=O)O") == "acetic acid"
-
-    @pytest.mark.integration
-    def test_propan_1_ol(self):
-        assert name_compound("CCCO") == "propan-1-ol"
-
-    @pytest.mark.integration
     def test_butan_2_one(self):
         assert name_compound("CC(=O)CC") == "butan-2-one"
 
@@ -83,10 +47,6 @@ class TestRegressionGuards:
     @pytest.mark.integration
     def test_3_methylpentane(self):
         assert name_compound("CCC(C)CC") == "3-methylpentane"
-
-    @pytest.mark.integration
-    def test_decane(self):
-        assert name_compound("CCCCCCCCCC") == "decane"
 
 
 # ============================================================================

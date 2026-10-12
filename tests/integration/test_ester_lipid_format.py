@@ -60,10 +60,6 @@ class TestRingEsterPrefixJoining:
         """
         assert name_compound("CC(=O)Oc1ccccc1") == "phenyl acetate"
 
-    def test_single_ester_on_cyclohexane_is_functional_class(self):
-        """As above: `cyclohexyl acetate` (PIN), not `acetyloxycyclohexane`."""
-        assert name_compound("CC(=O)OC1CCCCC1") == "cyclohexyl acetate"
-
     def test_different_acyloxy_benzene(self):
         """Two different acyloxy prefixes on benzene have locants and hyphens."""
         result = name_compound("CC(=O)Oc1ccc(OC(=O)CC)cc1")
@@ -96,17 +92,6 @@ class TestPolyfunctionalEsterDemotion:
         result = name_compound("CC(=O)OCC(O)COC(=O)C")
         assert result is not None
         assert "oate" not in result, f"Got '-oate' suffix in polyfunctional ester: {result}"
-        # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks "9 Esters"
-        # (:18182) above "17 Hydroxy compounds" (:18190), so the ester is the principal class,
-        # not an acyloxy prefix; "When anions are identical functional class
-        # multiplicative nomenclature is used." (:31819); "ethane-1,2-diyl diacetate (PIN)"
-        # (:31823), "propane-1,2,3-triyl triacetate (PIN)" (:31827). OPSIN RT exact
-        # (TRIAGE.csv; re-checked in Task 7/8).
-        assert result == "2-hydroxypropane-1,3-diyl diacetate", result
-
-    def test_glycerol_diacetate_has_acyloxy(self):
-        """Glycerol diacetate: the esters are the principal class, not acyloxy prefixes."""
-        result = name_compound("CC(=O)OCC(O)COC(=O)C")
         # PIN per R5: "SENIORITY ORDER FOR CLASSES" (the Blue Book) ranks "9 Esters"
         # (:18182) above "17 Hydroxy compounds" (:18190), so the ester is the principal class,
         # not an acyloxy prefix; "When anions are identical functional class
@@ -151,14 +136,6 @@ class TestPolyfunctionalEsterDemotion:
         result = name_compound("OCC(O)COC(=O)C")
         assert result is not None
         assert "oate" not in result, f"Got '-oate' suffix: {result}"
-
-    def test_simple_ester_unaffected_ethyl_acetate(self):
-        """Simple mono-esters still use functional class naming."""
-        assert name_compound("CCOC(C)=O") == "ethyl acetate"
-
-    def test_simple_ester_unaffected_methyl_propanoate(self):
-        """Methyl propanoate is NOT polyfunctional -- no demotion."""
-        assert name_compound("COC(=O)CC") == "methyl propanoate"
 
     def test_simple_ester_unaffected_propyl_acetate(self):
         """Propyl acetate is NOT polyfunctional -- no demotion."""

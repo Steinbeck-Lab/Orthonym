@@ -15,22 +15,6 @@ from rdkit import Chem
 class TestOximeEnrichment:
     """Test that oxime handler includes additional substituents."""
 
-    def test_oxime_simple_no_extra_substituents(self):
-        """Simple oxime (no extra subs) produces unchanged name."""
-        from orthonym import name_compound
-        # Propan-2-one oxime: CC(=NO)C -- just ketone oxime, no extra subs.
-        # The preferred name is substitutive, not the functional class name
-        # 'propan-2-one oxime': Oximes (heading in the contents list,
-        # the Blue Book; body:38458) "In these recommendations preferred IUPAC
-        # names for oximes are generated substitutively as N-hydroxy derivatives of
-        # imines rather than by functional class nomenclature as in previous
-        # recommendations", with 'N-hydroxypentan-2-imine (PIN)... pentan-2-one
-        # oxime' at:38468. Both spellings read back to the input with OPSIN 2.9.0
-        # (full an InChIKey); the old assertion (the
-        # substring 'oxime') accepted the non-preferred spelling.
-        result = name_compound("CC(=NO)C")
-        assert result == "N-hydroxypropan-2-imine"
-
     def test_oxime_name_unchanged_for_simple_case(self):
         """Simple oxime naming is not regressed."""
         from orthonym import name_compound

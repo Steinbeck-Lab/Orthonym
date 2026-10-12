@@ -87,21 +87,3 @@ class TestBlocker1RegressionPins:
                 == "4,4'-methylenedianiline")
 
 
-class TestBlocker2Phosphinolizine:
-    """ (the Blue Book) + (the Blue Book): indicated hydrogen is cited.
-    phosphinolizine is the 6+6 quinolizine analogue (the Blue Book parallel)."""
-
-    def test_phosphinolizine_carries_indicated_hydrogen(self):
-        assert name_compound("C1=CCP2C=CC=CC2=C1") == "4H-phosphinolizine"
-
-    def test_quinolizine_parent_parallel(self):
-        # the isostructural N parent — the model for the 4H- placement
-        assert name_compound("C1=CCN2C=CC=CC2=C1") == "4H-quinolizine"
-
-    def test_arsindolizine_stays_bare(self):
-        # 5+6 indolizine-type, fully mancude -> NO indicated hydrogen
-        assert name_compound("C1=CC2=CC=C[As]2C=C1") == "arsindolizine"
-
-    def test_phosphindolizine_stays_bare(self):
-        # 5+6 indolizine-type, fully mancude -> NO indicated hydrogen
-        assert name_compound("c1ccp2cccc2c1") == "phosphindolizine"

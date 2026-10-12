@@ -31,15 +31,6 @@ def test_r8a_hydrazide_pins():
 # R8b — amidine prefix carbamimidoyl
 # ---------------------------------------------------------------------------
 
-def test_r8b_amidine_prefix_carbamimidoyl():
-    """: amidine as non-principal substituent uses prefix 'carbamimidoyl'.
-    When COOH is the principal group and C(=NH)NH2 is a ring substituent,
-    the amidine must be named as 'carbamimidoyl', not 'carbamoyl' (amide prefix).
-    """
-    assert name_compound("N=C(N)c1ccc(C(=O)O)cc1", style="pin") == "4-carbamimidoylbenzoic acid"
-    # REGRESSION GUARD: saturated-ring amidine suffix must remain correct
-    assert name_compound("N=C(N)C1CCCCC1", style="pin") == "cyclohexanecarboximidamide"
-
 
 # ---------------------------------------------------------------------------
 # R8c — hydroxamic acid -> N-hydroxy...amide PIN /

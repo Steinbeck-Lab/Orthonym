@@ -11,7 +11,6 @@ mixed η-bonded).
 
 NEVER uses @pytest.mark.xfail (internal notes) — honest-fail-on-data.
 """
-import inspect
 import pytest
 from rdkit import Chem
 
@@ -30,14 +29,6 @@ from orthonym.routing.dispatch_table import DISPATCH_TABLE, StoutClass
 @pytest.mark.unit
 class TestNameOrganometallicSignature:
     """Per internal notes +: name_organometallic(features, mol, style='pin') -> Optional[NamingResult]."""
-
-    def test_signature_shape(self):
-        """Handler has (features, mol, style) signature."""
-        sig = inspect.signature(name_organometallic)
-        params = list(sig.parameters.keys())
-        assert len(params) >= 2, (
-            f"Expected >= 2 parameters (features, mol[, style]); got {params}"
-        )
 
     def test_returns_none_on_none_mol(self):
         """Defensive guard: name_organometallic(None, None) returns None."""

@@ -634,11 +634,6 @@ class TestW6bSugarAcylEster:
     """Wave 6b Task 2: free-sugar O-acyl esters -> functional-class
     ester name; anomeric O-acyl (glycosyl ester) and mixed-acyl fail closed."""
 
-    def test_glucose_6_acetate(self):
-        from orthonym import name_compound
-        assert name_compound("C(C)(=O)OC[C@@H]1[C@H]([C@@H]([C@H]([C@H](O)O1)O)O)O") == \
-            "β-D-glucopyranose 6-acetate"
-
     def test_glucose_6_benzoate_not_hexyl(self):
         from orthonym import name_compound
         # ACCURACY: previously mis-named '(...)-hexyl benzoate' (sugar dropped).

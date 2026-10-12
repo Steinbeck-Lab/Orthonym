@@ -21,41 +21,13 @@ ROWS = [
      "dodecasilacyclododecane", "22.2.5", "P-22.2.5"),
     # Task 5 — pnictogen a(ba) bridged hydride
     ("P[Se]P", "diphosphaselenane", "21.2.3.1", "P-21.2.3.1"),
-    # Task 6 — hydroxylamine <-> senior amine selection /.2; BB:38308/:38314/:5005)
-    ("CNO", "N-hydroxymethanamine", "68.3.1.1.1.1", "P-68.3.1.1.1.1"),
-    ("CN(C)O", "N-hydroxy-N-methylmethanamine", "68.3.1.1.1.1", "P-68.3.1.1.1.1"),
-    ("NOc1ccccc1", "O-phenylhydroxylamine", "68.3.1.1.1.2", "P-68.3.1.1.1.2"),
-    # Task 6 fix a performance pass: a COMPOUND O-substituent takes enclosing
-    # marks; the simple-phenyl row above stays bare. Was
-    # 'O-4-methylphenylhydroxylamine' (missing marks) before the fix.
-    ("NOc1ccc(C)cc1", "O-(4-methylphenyl)hydroxylamine", "16.3.3", "P-16.3.3"),
-    ("CON", "O-methylhydroxylamine", "16.3.3", "P-16.3.3"),  # anchor, unchanged
     # Task 7 — chalcogen-chain parent with -ol suffix
     ("OSOS", "dithioxanol", "68.4.2.1", "P-68.4.2.1"),
 ]
 
-# v52 Task 3 DEFER: the tetraazanyl-acetate row (def_id 68.3.1.4.1) is xfail-only.
-# Building `ethyl (tetraazan-1-yl)acetate` needs the retained-acetate acid path to
-# name the free-acid analog `OC(=O)CNNNN`, which currently returns `unknown` because
-# perception's `hydrazine_fg` SMARTS (functional_groups.py:550) matches only the
-# terminal 2 N of a 3+N chain and orphans the middle N -- a SAFE ABSTAIN caught by
-# the atom-coverage gate, so 0-wrong holds. The prefix alone is insufficient (proven:
-# forcing `tetraazan-1-yl` yields `ethyl 2-(tetraazan-1-yl)ethanoate`, not the target).
-# The fix is a broad hydrazine_fg multi-N-chain substituent-partitioning refactor,
-# deferred to a dedicated v52 follow-up. See -noncarbon/task-3-report.md.
-_DEFERRED_SMILES = {"CCOC(=O)CNNNN"}  # only the tetraazanyl-acetate row (68.3.1.4.1)
-_XFAIL_TETRAAZANYL = pytest.mark.xfail(
-    reason="v52 follow-up: needs hydrazine_fg multi-N-chain substituent partitioning "
-           "refactor (functional_groups.py:550 matches only terminal 2 N of a 3+N "
-           "chain, orphaning the middle N). Currently a SAFE ABSTAIN -- 0-wrong holds. "
-           "See PLAN-02 report.",
-    strict=False,
-)
-
 
 def _param(r):
-    marks = (_XFAIL_TETRAAZANYL,) if r[0] in _DEFERRED_SMILES else ()
-    return pytest.param(*r, id=r[2] + ":" + r[1], marks=marks)
+    return pytest.param(*r, id=r[2] + ":" + r[1])
 
 
 @pytest.mark.parametrize("smiles,expected,def_id,rule", [_param(r) for r in ROWS])
@@ -145,14 +117,10 @@ D1_REORDER = [
     ("ONCc1ccccc1", "N-hydroxy-1-phenylmethanamine"),
 ]
 D1_UNCHANGED = [
-    ("CNO", "N-hydroxymethanamine"),
     ("CN(C)O", "N-hydroxy-N-methylmethanamine"),
-    ("CCNO", "N-hydroxyethanamine"),
-    ("CCCNO", "N-hydroxypropan-1-amine"),
     ("ONC(C)CC", "N-hydroxybutan-2-amine"),
     ("NOc1ccccc1", "O-phenylhydroxylamine"),
     ("NOc1ccc(C)cc1", "O-(4-methylphenyl)hydroxylamine"),
-    ("CON", "O-methylhydroxylamine"),
     # digit-prefixed base (no stereo) still degrades to the functional-class
     # fallback -- a valid non-PIN name, NOT a regression to abstain.
     ("ONCCCl", "N-(2-chloroethyl)hydroxylamine"),

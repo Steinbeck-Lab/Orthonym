@@ -18,10 +18,6 @@ class TestKeteneCompletion:
         assert name_compound("O=C=C(c1ccccc1)c1ccccc1", style="pin") \
             == "diphenylethenone"
 
-    def test_cyclohexylidenemethanone(self):
-        assert name_compound("O=C=C1CCCCC1", style="pin") \
-            == "cyclohexylidenemethanone"
-
     def test_ethenone_protect(self):
         assert name_compound("C=C=O", style="pin") == "ethenone"
 

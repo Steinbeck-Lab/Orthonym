@@ -40,11 +40,6 @@ class TestOximeFunctionalClassNaming:
         result = name_compound("CC(=NO)C")
         assert result == "N-hydroxypropan-2-imine"
 
-    def test_aldehyde_oxime(self):
-        """CC=NO -> 'N-hydroxyethanimine' (PIN)."""
-        result = name_compound("CC=NO")
-        assert result == "N-hydroxyethanimine"
-
     def test_cyclic_oxime(self):
         """C1(=NO)CCCCC1 -> 'N-hydroxycyclohexan-1-imine' (PIN)."""
         result = name_compound("C1(=NO)CCCCC1")
@@ -179,16 +174,6 @@ class TestFGDetectionNewGroups:
         mol = Chem.MolFromSmiles("C[N+](C)(C)[O-]")
         fgs = detect_functional_groups(mol)
         assert "n_oxide_aliphatic" in fgs
-
-
-class TestRetainedNames:
-    """Verify retained names for urea and guanidine."""
-
-    def test_urea_retained_name(self):
-        assert name_compound("NC(=O)N") == "urea"
-
-    def test_guanidine_retained_name(self):
-        assert name_compound("NC(=N)N") == "guanidine"
 
 
 class TestSeniorityData:

@@ -231,53 +231,8 @@ class TestPipelineIntegrity:
     the decomposition engine integration."""
 
     @pytest.mark.integration
-    def test_ethanol_unchanged(self):
-        assert name_compound("CCO") == "ethanol"
-
-    @pytest.mark.integration
-    def test_acetic_acid_unchanged(self):
-        assert name_compound("CC(=O)O") == "acetic acid"
-
-    @pytest.mark.integration
-    def test_benzene_unchanged(self):
-        assert name_compound("c1ccccc1") == "benzene"
-
-    @pytest.mark.integration
-    def test_methyl_acetate_unchanged(self):
-        assert name_compound("CC(=O)OC") == "methyl acetate"
-
-    @pytest.mark.integration
-    def test_ethyl_acetate_unchanged(self):
-        assert name_compound("CC(=O)OCC") == "ethyl acetate"
-
-    @pytest.mark.integration
-    def test_acetamide_unchanged(self):
-        assert name_compound("CC(=O)N") == "acetamide"
-
-    @pytest.mark.integration
-    def test_n_phenylacetamide_unchanged(self):
-        assert name_compound("CC(=O)Nc1ccccc1") == "N-phenylacetamide"
-
-    @pytest.mark.integration
-    def test_ethyl_benzoate_unchanged(self):
-        assert name_compound("CCOC(=O)c1ccccc1") == "ethyl benzoate"
-
-    @pytest.mark.integration
     def test_butyl_benzoate_unchanged(self):
         assert name_compound("CCCCOC(=O)c1ccccc1") == "butyl benzoate"
-
-    @pytest.mark.integration
-    def test_methyl_hexadecanoate_unchanged(self):
-        """Long-chain ester that the existing pipeline names correctly.
-
-        : the expectation was 'methyl palmitate'. The acyl word must
-        follow the PIN acid stem -- (the Blue Book) retains
-        only formic/oxalic/acetic/benzoic/oxamic as PINs and (:29860)
-        makes systematic names preferred for the rest;:29787 prints '(PIN)' on
-        'hexadecanoic acid'. What this test guards -- that decomposition leaves
-        the pipeline name untouched -- is unaffected by the spelling.
-        """
-        assert name_compound("CCCCCCCCCCCCCCCC(=O)OC") == "methyl hexadecanoate"
 
     @pytest.mark.integration
     def test_propyl_butanoate_unchanged(self):

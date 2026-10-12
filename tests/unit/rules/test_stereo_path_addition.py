@@ -173,12 +173,6 @@ class TestRingEZFilter:
 class TestPolycyclicStereo:
     """Tests for stereo on polycyclic aromatic naming path."""
 
-    def test_naphthalene_no_stereo(self):
-        """Unsubstituted naphthalene should not have stereo prefix."""
-        smiles = 'c1ccc2ccccc2c1'
-        name = name_compound(smiles)
-        assert name == 'naphthalene', f"Expected naphthalene, got: {name}"
-
     def test_methylnaphthalene_no_stereo(self):
         """Methylnaphthalene has no stereocenters."""
         smiles = 'Cc1ccc2ccccc2c1'

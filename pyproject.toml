@@ -111,7 +111,7 @@ markers = [
     "unit: Fast unit tests (<1s each)",
     "integration: Compound class integration tests",
     "roundtrip: Round-trip validation with OPSIN",
-    "slow: Full validation suite (100k+ compounds)",
+    "slow: Nightly-run tests: the full validation suite (100k+ compounds) and single cases that take 20 s or more; the PR run skips them (-m \"not slow\")",
     "benchmark: Performance benchmark tests (pytest-benchmark)",
 ]
 addopts = "-v --tb=short"

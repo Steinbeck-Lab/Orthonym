@@ -65,18 +65,6 @@ _FIXTURE_DIR = (
 _LIT_FIXTURES = json.loads((_FIXTURE_DIR / "literature_validated.json").read_text())
 
 
-# Fixtures known to need substituent-classification fix per
-# internal notes-C.md "Out-of-scope follow-ups" + AUTONOM-followups.md.
-_XFAIL_FIXTURES = {
-    "ra_lit_terphenyl_dicarboxylic_acid": (
-        "151-AUDIT-C.md out-of-scope: -CHO vs -COOH substituent "
-        "classification bug emits 'diformyl' instead of "
-        "'dicarboxylic acid'. Upstream substituent-detection issue "
-        "logged to AUTONOM-followups.md as v19 follow-up."
-    ),
-}
-
-
 @pytest.mark.skipif(not _opsin_available(), reason="OPSIN/Java not available")
 @pytest.mark.integration
 @pytest.mark.parametrize(
@@ -89,13 +77,6 @@ def test_ring_assembly_opsin_roundtrip_inchi_l1(fixture, request):
 
     Skips fixtures whose name is None (corpus_mined.json placeholders).
     """
-    if fixture["fixture_id"] in _XFAIL_FIXTURES:
-        request.node.add_marker(
-            pytest.mark.xfail(
-                reason=_XFAIL_FIXTURES[fixture["fixture_id"]],
-                strict=False,
-            )
-        )
     from orthonym import name_compound
 
     smi = fixture["smiles"]

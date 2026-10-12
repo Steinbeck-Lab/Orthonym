@@ -44,10 +44,6 @@ class TestThioetherDrop:
         # top-level with the alpha-carbon undefined it now defers to the
         # systematic name, same defect class as the sibling cysteine row below.
         ("CSCC(N)C(=O)O", "2-amino-3-(methylsulfanyl)propanoic acid"),
-        # a phase (change-asserted-value, was "cysteine"): stereo-UNDEFINED
-        # at the alpha-carbon now DEFERS to the systematic name -- see
-        # test_amino_acids.py's module docstring for the full evidence.
-        ("NC(CS)C(=O)O", "2-amino-3-sulfanylpropanoic acid"),
     ])
     def test_catalog_amino_acids_unaffected(self, smiles, expected):
         assert name_compound(smiles) == expected
@@ -55,19 +51,6 @@ class TestThioetherDrop:
 
 class TestBranchedAminoAcid:
     """: a branched side chain must not collapse into a straight chain."""
-
-    def test_branched_side_chain(self):
-        # CC[C@H](C)[C@@H](N)C(=O)O = (2R,3S)-2-amino-3-methylpentanoic acid, i.e.
-        # a stereoisomer of isoleucine. W8 P3 Task 3.1 now names it with the
-        # retained-name PIN 'D-alloisoleucine' "Use of the prefix 'allo'",
-        # the Blue Book 'L-alloisoleucine... (2S,3R)-2-amino-3-methylpentanoic acid' --
-        # one word, no hyphen between 'allo' and 'isoleucine' -- bcd75afe2 "'allo' is fused into an
-        # amino-acid name, not hyphenated onto it"; OPSIN-RT verified).
-        # The anti-collapse property this test guarded (HEAD once dropped the methyl
-        # -> '2-aminohexanoic acid') still holds: the retained name preserves the
-        # full 3-methylpentanoic skeleton (see test_straight_chain_unaffected for the
-        # non-retained-AA branched-chain guard).
-        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-alloisoleucine"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("CCCC[C@H](N)C(=O)O", "(2S)-2-aminohexanoic acid"),  # straight chain — unaffected
@@ -84,10 +67,7 @@ class TestGlycinateAnion:
         assert name_compound("[O-]C(=O)CN") == "glycinate"
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("CC(=O)[O-]", "acetate"),                       # no amino — unaffected
-        ("[O-]C(=O)c1ccccc1", "benzoate"),               # aromatic carboxylate — unaffected
         ("[O-]C(=O)CCCC", "pentanoate"),                 # simple chain — unaffected
-        ("[O-]C(=O)CCC(=O)[O-]", "butanedioate"),        # dicarboxylate — butanedioate is PIN; succinate general-only
     ])
     def test_carboxylate_regressions(self, smiles, expected):
         assert name_compound(smiles) == expected

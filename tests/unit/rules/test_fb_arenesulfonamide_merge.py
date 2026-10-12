@@ -47,7 +47,6 @@ def _producer(smiles: str):
 # suppress it.
 # ----------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
-    ("NS(=O)(=O)c1ccc(C)cc1",   "4-methylbenzene-1-sulfonamide"),
     ("NS(=O)(=O)c1cccc(Cl)c1",  "3-chlorobenzene-1-sulfonamide"),
     ("NS(=O)(=O)c1ccc(C)cc1C",  "2,4-dimethylbenzene-1-sulfonamide"),
 ])

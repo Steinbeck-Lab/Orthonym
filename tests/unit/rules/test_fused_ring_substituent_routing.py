@@ -47,12 +47,6 @@ class TestFusedRoutingGold:
             == "2-[(naphthalen-2-yl)methyl]pyridine"
         )
 
-    def test_naphthalenyl_pyrrolidine(self):
-        assert (
-            name_compound("c1ccc2cc(N3CCCC3)ccc2c1").strip()
-            == "1-(naphthalen-2-yl)pyrrolidine"
-        )
-
     def test_benzofuranyl_pyridine(self):
         assert (
             name_compound("c1ccc2c(c1)cc(-c3ccccn3)o2").strip()

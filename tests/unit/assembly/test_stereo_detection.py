@@ -30,17 +30,6 @@ class TestStereoDetectionRegex:
         """(1S)- should be detected as existing stereo."""
         assert re.match(self.PATTERN, "(1S)-methylcyclohexane")
 
-    def test_locanted_multi(self):
-        """(2R,3S)- starts with (2R so first char check matches."""
-        # The regex checks the START; multi-center names like (2R,3S)- won't match
-        # this simple pattern but that's OK because the full function handles them.
-        # What matters: the name does start with "(" and the full function already
-        # detects multi-center patterns via the same regex.
-        # Actually (2R,3S)- does NOT match r'\(\d*[RSrsEZez]\)-' because after "2R"
-        # comes "," not ")". The function in composer.py should detect this as stereo too.
-        # This test documents the current expected behavior.
-        pass  # multi-center stereo has a different regex path in the codebase
-
     def test_unlocanted_R(self):
         """(R)- should be detected as existing stereo (no digit before R)."""
         assert re.match(self.PATTERN, "(R)-sec-butyl")

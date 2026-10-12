@@ -27,25 +27,14 @@ class TestCOMPLEX01_Bicyclo_Hydrocarbons:
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
-        # Norbornane - uses retained name
-        ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
-        # Bicyclo[2.2.2]octane - systematic name
-        ("C1CC2CCC1CC2", "bicyclo[2.2.2]octane"),
         # Bicyclo[3.2.1]octane
         ("C1CC2CCCC1C2", "bicyclo[3.2.1]octane"),
-        # Decalin - fused naming (zero-bridge routes to fused nomenclature)
-        ("C1CCC2CCCCC2C1", "decahydronaphthalene"),
+        # Bicyclo[4.2.1]nonane (pinned here since the pass-or-xfail test_accuracy test was removed)
+        ("C1CC2CCCCC1C2", "bicyclo[4.2.1]nonane"),
     ])
     def test_bicyclo_systematic_naming(self, smiles, expected):
         """Test systematic bicyclo naming with various bridge sizes."""
         assert name_compound(smiles) == expected
-
-    @pytest.mark.integration
-    def test_norbornane_uses_retained_name(self):
-        """Norbornane is NOT retained: the PIN is the von Baeyer name bicyclo[2.2.1]heptane."""
-        result = name_compound("C1CC2CCC1C2")
-        # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
-        assert result == "bicyclo[2.2.1]heptane"
 
     @pytest.mark.integration
     def test_bicyclo_descriptor_format(self):
@@ -81,12 +70,6 @@ class TestCOMPLEX01_Bicyclo_EdgeCases:
         assert result == "naphthalene"
         assert "bicyclo" not in result
 
-    @pytest.mark.integration
-    def test_simple_cycloalkane_not_bicyclo(self):
-        """Simple cycloalkanes should not be classified as bicyclo."""
-        assert name_compound("C1CCCCC1") == "cyclohexane"
-        assert name_compound("C1CCCC1") == "cyclopentane"
-
 
 # =============================================================================
 # COMPLEX-02: Spiro Compound Naming
@@ -94,17 +77,6 @@ class TestCOMPLEX01_Bicyclo_EdgeCases:
 
 class TestCOMPLEX02_Spiro_Hydrocarbons:
     """COMPLEX-02: Spiro hydrocarbon systematic naming."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # spiro[4.5]decane - cyclopentane fused to cyclohexane
-        ("C1CCC2(CC1)CCCC2", "spiro[4.5]decane"),
-        # spiro[5.5]undecane - two cyclohexanes
-        ("C1CCC2(CC1)CCCCC2", "spiro[5.5]undecane"),
-    ])
-    def test_spiro_systematic_naming(self, smiles, expected):
-        """Test systematic spiro naming."""
-        assert name_compound(smiles) == expected
 
     @pytest.mark.integration
     def test_spiro_descriptor_order(self):
@@ -159,37 +131,11 @@ class TestCOMPLEX03_OrthoFused:
     """COMPLEX-03: Ortho-fused bicyclic naming."""
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Naphthalene - retained name
-        ("c1ccc2ccccc2c1", "naphthalene"),
-        # Decalin (decahydronaphthalene) - fused nomenclature for zero-bridge system
-        ("C1CCC2CCCCC2C1", "decahydronaphthalene"),
-    ])
-    def test_ortho_fused_retained_names(self, smiles, expected):
-        """Test ortho-fused bicyclics with retained and systematic names."""
-        assert name_compound(smiles) == expected
-
-    @pytest.mark.integration
     def test_naphthalene_is_fused_not_bridged(self):
         """Naphthalene should be identified as fused aromatic, not bridged."""
         result = name_compound("c1ccc2ccccc2c1")
         assert result == "naphthalene"
         assert "bicyclo" not in result  # Not bridged naming
-
-
-class TestCOMPLEX03_OrthoFusedTricyclics:
-    """Ortho-fused tricyclic aromatics."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Anthracene - linear tricyclic
-        ("c1ccc2cc3ccccc3cc2c1", "anthracene"),
-        # Phenanthrene - angular tricyclic
-        ("c1ccc2c(c1)ccc1ccccc12", "phenanthrene"),
-    ])
-    def test_tricyclic_aromatics(self, smiles, expected):
-        """Test tricyclic aromatic retained names."""
-        assert name_compound(smiles) == expected
 
 
 # =============================================================================
@@ -255,31 +201,6 @@ class TestCOMPLEX04_SystematicFusionNames:
 # COMPLEX-05: Heterocyclic Fused Systems
 # =============================================================================
 
-class TestCOMPLEX05_FusedHeterocycles:
-    """COMPLEX-05: Heterocyclic fused system naming with retained names."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Indole - benzo[b]pyrrole
-        ("c1ccc2[nH]ccc2c1", "1H-indole"),
-        # Quinoline - benzo[b]pyridine
-        ("c1ccc2ncccc2c1", "quinoline"),
-        # Isoquinoline
-        ("c1ccc2cnccc2c1", "isoquinoline"),
-        # Benzimidazole
-        ("c1ccc2[nH]cnc2c1", "1H-1,3-benzimidazole"),
-        # Benzofuran
-        #: PIN carries the O locant, the Blue Book
-        # "1-benzofuran (PIN) benzofuran")
-        ("c1ccc2occc2c1", "1-benzofuran"),
-        # Benzothiophene
-        #: PIN carries the S locant, the Blue Book)
-        ("c1ccc2sccc2c1", "1-benzothiophene"),
-    ])
-    def test_fused_heterocycle_retained_names(self, smiles, expected):
-        """Test fused heterocycle retained names."""
-        assert name_compound(smiles) == expected
-
 
 class TestCOMPLEX05_TautomerLocants:
     """Tautomer locant (indicated H) in heterocyclic names."""
@@ -333,20 +254,6 @@ class TestCOMPLEX05_SubstitutedFusedHeterocycles:
 # COMPLEX-06: Complex PAHs (Polycyclic Aromatic Hydrocarbons)
 # =============================================================================
 
-class TestCOMPLEX06_Tetracyclic:
-    """COMPLEX-06: Tetracyclic PAH naming."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Pyrene - 4 fused rings
-        ("c1cc2ccc3cccc4ccc(c1)c2c34", "pyrene"),
-        # Chrysene - angular 4-ring
-        ("c1ccc2c(c1)ccc1c3ccccc3ccc21", "chrysene"),
-    ])
-    def test_tetracyclic_pah_retained_names(self, smiles, expected):
-        """Test tetracyclic PAH retained names."""
-        assert name_compound(smiles) == expected
-
 
 class TestCOMPLEX06_PentacyclicAndHigher:
     """Pentacyclic and larger PAH naming."""
@@ -379,123 +286,6 @@ class TestCOMPLEX06_PAHLookup:
 # =============================================================================
 # a phase-5 Regression Tests
 # =============================================================================
-
-class TestPhase1Regression:
-    """Regression tests for a phase (Foundation)."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Simple alkanes
-        ("C", "methane"),
-        ("CC", "ethane"),
-        ("CCC", "propane"),
-        ("CCCC", "butane"),
-        ("CCCCC", "pentane"),
-        ("CCCCCC", "hexane"),
-        ("CCCCCCC", "heptane"),
-        ("CCCCCCCC", "octane"),
-        ("CCCCCCCCC", "nonane"),
-        ("CCCCCCCCCC", "decane"),
-        # Branched alkanes
-        ("CC(C)C", "2-methylpropane"),
-        ("CC(C)CC", "2-methylbutane"),
-        ("CC(C)(C)CC", "2,2-dimethylbutane"),
-        ("CC(C)C(C)C", "2,3-dimethylbutane"),
-        # Alcohols
-        ("CO", "methanol"),
-        ("CCO", "ethanol"),
-        ("CCCO", "propan-1-ol"),
-        ("CCC(O)C", "butan-2-ol"),
-    ])
-    def test_phase1_simple_compounds(self, smiles, expected):
-        """a phase simple compound naming unchanged."""
-        assert name_compound(smiles) == expected
-
-
-class TestPhase2Regression:
-    """Regression tests for a phase (Ring Foundation)."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Simple cycloalkanes
-        ("C1CC1", "cyclopropane"),
-        ("C1CCC1", "cyclobutane"),
-        ("C1CCCC1", "cyclopentane"),
-        ("C1CCCCC1", "cyclohexane"),
-        ("C1CCCCCC1", "cycloheptane"),
-        ("C1CCCCCCC1", "cyclooctane"),
-        # Benzene derivatives
-        ("c1ccccc1", "benzene"),
-        ("Cc1ccccc1", "toluene"),
-    ])
-    def test_phase2_ring_compounds(self, smiles, expected):
-        """a phase ring compound naming unchanged."""
-        assert name_compound(smiles) == expected
-
-
-class TestPhase3Regression:
-    """Regression tests for a phase (Heterocycles)."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # 3-membered
-        ("C1CO1", "oxirane"),
-        ("C1CN1", "aziridine"),
-        ("C1CS1", "thiirane"),
-        # 4-membered
-        ("C1COC1", "oxetane"),
-        ("C1CNC1", "azetidine"),
-        ("C1CSC1", "thietane"),
-        # 5-membered saturated
-        ("C1CCOC1", "oxolane"),
-        ("C1CCNC1", "pyrrolidine"),
-        # 5-membered aromatic
-        ("c1ccoc1", "furan"),
-        # Task 12 fix a performance pass (wp6-tests), change-asserted-value (were 'pyrrole'
-        # and 'imidazole'): (the Blue Book) cites indicated
-        # hydrogen in parent hydrides, '1H-pyrrole (PIN)' (:24645),
-        # '1-(trimethylsilyl)-1H-imidazole (PIN)' (:18940). OPSIN RT exact.
-        ("c1cc[nH]c1", "1H-pyrrole"),
-        ("c1ccsc1", "thiophene"),
-        ("c1c[nH]cn1", "1H-imidazole"),
-        # 6-membered saturated
-        ("C1CCOCC1", "oxane"),
-        ("C1CCNCC1", "piperidine"),
-        ("C1COCCN1", "morpholine"),
-        # 6-membered aromatic
-        ("c1ccncc1", "pyridine"),
-        ("c1cncnc1", "pyrimidine"),
-        ("c1cnccn1", "pyrazine"),
-    ])
-    def test_phase3_heterocycle_compounds(self, smiles, expected):
-        """a phase heterocycle naming unchanged."""
-        assert name_compound(smiles) == expected
-
-
-class TestPhase4Regression:
-    """Regression tests for a phase (Polyfunctional)."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Aldehydes
-        ("CC=O", "acetaldehyde"),
-        ("CCC=O", "propanal"),
-        # Ketones
-        ("CC(C)=O", "propan-2-one"),
-        ("CCC(C)=O", "butan-2-one"),
-        # Carboxylic acids
-        ("CC(=O)O", "acetic acid"),
-        ("CCC(=O)O", "propanoic acid"),
-        # Alkenes
-        ("C=CCC", "but-1-ene"),
-        ("CC=CC", "but-2-ene"),
-        # Alkynes
-        ("C#CCC", "but-1-yne"),
-        ("CC#CC", "but-2-yne"),
-    ])
-    def test_phase4_functional_compounds(self, smiles, expected):
-        """a phase polyfunctional naming unchanged."""
-        assert name_compound(smiles) == expected
 
 
 class TestPhase5Regression:
@@ -593,26 +383,6 @@ class TestBoundaryConditions:
         """Single atom molecule."""
         assert name_compound("C") == "methane"
 
-    @pytest.mark.integration
-    def test_two_atom_molecule(self):
-        """Two atom molecule."""
-        assert name_compound("CC") == "ethane"
-
-    @pytest.mark.integration
-    def test_long_chain(self):
-        """Long alkane chain."""
-        assert name_compound("CCCCCCCCCC") == "decane"
-
-    @pytest.mark.integration
-    def test_smallest_cycloalkane(self):
-        """Smallest cycloalkane (cyclopropane)."""
-        assert name_compound("C1CC1") == "cyclopropane"
-
-    @pytest.mark.integration
-    def test_smallest_heterocycle(self):
-        """Smallest heterocycle (oxirane)."""
-        assert name_compound("C1CO1") == "oxirane"
-
 
 class TestKnownLimitations:
     """Document known limitations (expected failures)."""
@@ -644,83 +414,3 @@ class TestKnownLimitations:
         'dispiro[3.2.3^7.2^4]dodecane (PIN)' (:9981)."""
         assert name_compound("C1CC2(C1)CC3(CC2)CC3") == "dispiro[2.1.3^5.2^3]decane"
 
-    @pytest.mark.integration
-    def test_carbazole_detection(self):
-        """9H-carbazole is detected (the non-strict xfail marker was stale: the
-        test XPASSed; Task 12 fix a performance pass, wp6-tests). Carbazole is a retained
-        PIN parent with its indicated hydrogen: '(special numbering;
-        9H-isomer shown; the PIN is 9H-carbazole)' (the Blue Book). OPSIN
-        RT exact."""
-        result = name_compound("c1ccc2c(c1)[nH]c1ccccc12")
-        assert result == "9H-carbazole"
-
-
-# =============================================================================
-# Integration Summary Tests
-# =============================================================================
-
-class TestPhaseSummaryCounts:
-    """Document test coverage summary."""
-
-    @pytest.mark.integration
-    def test_phase6_e2e_coverage(self):
-        """Document comprehensive a phase E2E coverage.
-
-        COMPLEX-01 (Bicyclo): 8 tests
-        - Systematic naming: 4 parametrized
-        - Retained name: 1
-        - Format verification: 2
-        - Edge cases: 2
-
-        COMPLEX-02 (Spiro): 7 tests
-        - Systematic naming: 2 parametrized
-        - Descriptor order: 1
-        - Format verification: 1
-        - Edge cases: 3
-
-        COMPLEX-03 (Ortho-fused): 5 tests
-        - Bicyclics: 2 parametrized
-        - Tricyclics: 2 parametrized
-        - Fused vs bridged: 1
-
-        COMPLEX-04 (Fusion descriptors): 5 tests
-        - Prefix generation: 1
-        - Edge calculation: 1
-        - Format verification: 1
-        - No vowel elision: 1
-
-        COMPLEX-05 (Heterocyclic fused): 12 tests
-        - Retained names: 6 parametrized
-        - Tautomer locants: 3
-        - Substituted: 2 parametrized
-
-        COMPLEX-06 (Complex PAHs): 6 tests
-        - Tetracyclic: 2 parametrized
-        - Larger PAHs: 2 parametrized
-        - Data lookup: 2
-
-        Regression (Phases 1-5): 60+ tests
-        - a phase: 20 parametrized
-        - a phase: 10 parametrized
-        - a phase: 19 parametrized
-        - a phase: 12 parametrized
-        - a phase: 2
-
-        Routing/Classification: 6 tests
-        Boundary conditions: 5 tests
-        Known limitations: 2 tests (xfail)
-
-        TOTAL: 100+ unique test cases
-        """
-        assert True  # Documentation test
-
-
-class TestValidationRequirements:
-    """Verify VALID requirements are addressed."""
-
-    @pytest.mark.integration
-    def test_valid03_edge_case_documentation(self):
-        """VALID-03: Edge case documentation exists (verified at checkpoint)."""
-        # This will be verified at human checkpoint
-        # Documentation in EDGE_CASES.md
-        assert True

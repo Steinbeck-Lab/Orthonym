@@ -114,37 +114,6 @@ class TestAcylaminoBrackets:
     """
 
     @pytest.mark.unit
-    def test_amido_short_chain(self):
-        """C2 acyl on glycine -> acetamido, unbracketed."""
-        name = name_compound("CC(=O)NCC(=O)O")
-        # PIN per R3 (analogy): "only acetic acid, benzoic acid, and oxamic acid
-        # can be substituted" the Blue Book, "acetic acid (PIN) ethanoic acid":29725;
-        # "All locants are omitted for parent compounds when all substitutable
-        # hydrogen atoms have the same locant.":3031; "acetamido* = acetylamino" (the '*'
-        # "designates the preferred prefix"):55416/:55422, unenclosed as in
-        # "(4-acetamido-3-methylphenyl)arsonic acid (PIN)":33010. OPSIN RT exact (TRIAGE.csv;
-        # re-checked in Task 7/8).
-        assert name == "acetamidoacetic acid", (
-            f"Expected 'acetamidoacetic acid', got '{name}'"
-        )
-
-    @pytest.mark.unit
-    def test_amido_long_chain(self):
-        """C5 acyl on glutamic acid -> pentanamido, unbracketed."""
-        name = name_compound("CCCCC(=O)NC(CCC(=O)O)C(=O)O")
-        assert name == "2-pentanamidopentanedioic acid", (
-            f"Expected '2-pentanamidopentanedioic acid', got '{name}'"
-        )
-
-    @pytest.mark.unit
-    def test_amido_medium_chain(self):
-        """C3 acyl on GABA -> propanamido, unbracketed."""
-        name = name_compound("CCC(=O)NCCCC(=O)O")
-        assert name == "4-propanamidobutanoic acid", (
-            f"Expected '4-propanamidobutanoic acid', got '{name}'"
-        )
-
-    @pytest.mark.unit
     @pytest.mark.skipif(not OPSIN_AVAILABLE, reason="OPSIN JAR not found")
     def test_amido_opsin_parses(self):
         """OPSIN should parse names with amido prefixes."""
@@ -215,7 +184,7 @@ class TestNoBarePhenylamino:
 #:32991,:32995,:32998 "Method (1) generates preferred IUPAC names."). Canary call 460
 # (DK-NACYL, the class is gone with it) and the two peptide rows 263 and 518 (DK-PEP) now give the
 # substitutive names the classes asked for, each OPSIN 2.9.0 full-InChIKey exact (fresh java run
-# outside the engine); they moved to the fixture (tests/integration/test_canary_rt75.py, tag
+# outside the engine); they moved to the fixture (tests/support/canary_rt75_data.py, tag
 # 'l6 RB-ACYLAMINO').
 
 # Class -> reason (Task 11, 2026-09-26). The reasons, the Blue Book lines and the best-effort
@@ -327,24 +296,24 @@ _CANARY_DEFECT_REASONS = {
 # Suite fix j6-breadth (2026-09-27): canary calls 135/142/323 (the prenylated-phenol trienoic
 # acid) and 171 (the tetramethyl-1,3-dioxolanyl terpene) left this table -- their raw PIN-tier
 # names are RT-exact now (strict XPASS below) and they are verified fixture rows
-# (tests/integration/test_canary_rt75.py, tags 'j6 RB-RINGBR' / 'j6 RB-HWSTEM').
+# (tests/support/canary_rt75_data.py, tags 'j6 RB-RINGBR' / 'j6 RB-HWSTEM').
 # Breadth job 3 review fixes (2026-09-29): canary calls 155 (DK-NOTEXACT, the fused
 # ring ketone that raised TypeError on the '4a'/7 locant sort, fixed by 2c79719e3) and
 # 684 (DK-SFXNUM, fixed by 7c39f2243: every ring -OH of the alcohol class is a suffix)
 # left this table: both raw PIN-tier names are RT-exact now and are verified fixture
-# rows (tests/integration/test_canary_rt75.py, tags 'b3 RB-...').
+# rows (tests/support/canary_rt75_data.py, tags 'b3 RB-...').
 # Bridged fused S0 follow-up (2026-10-01): canary call 175 (DK-NOTEXACT, the 'cyclohexa[b]pyridine'
 # acid with no hydro prefixes) left this table: the hydro prefixes now go on the mancude parent
 #, the Blue Book), its raw PIN-tier name '4,7,8-trihydroxy-7,8-dihydroquinoline-
 # 2-carboxylic acid' is RT-exact (OPSIN 2.9.0 full key and FixedH InChI) and is a verified fixture
-# row (tests/integration/test_canary_rt75.py, tag 'bf RB-HYDRO').
+# row (tests/support/canary_rt75_data.py, tag 'bf RB-HYDRO').
 # N5b (2026-10-08) change-asserted-value: canary calls 180, 181 (the stereo-free ergostadienol and
 # stigmastadienediol) and 353 (the pentacyclic triterpenoid acid) left this table: a carbon-only
 # ortho-fused system with two rings of five or more members is named by fusion nomenclature, not
 # von Baeyer "Five-membered ring requirement", the Blue Book-23710), so their raw
 # PIN-tier names are real names now (previously the sentinel 'unknown organic compound'); each is
 # OPSIN 2.9.0 full-InChIKey exact (fresh java run outside the engine) and re-baselined in
-# tests/integration/test_canary_rt75.py (tag 'n5b RB-FUSION').
+# tests/support/canary_rt75_data.py (tag 'n5b RB-FUSION').
 # SMILES -> (current PIN-tier name with the gate off, class, canary call numbers).
 CANARY_KNOWN_DEFECTS = {
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O": (
@@ -881,11 +850,21 @@ _KNOWN_DEFECT_PIN_TARGETS = {
 }
 
 
+# One strict-xfail row takes 55 s: it runs in the nightly run only.
+_SLOW_NOT_RT_EXACT = {"CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2.Cl"}
+
+
+def _not_rt_exact_param(smi):
+    marks = []
+    if smi in _NOT_RT_EXACT_SHIP_DEFECTS:
+        marks.append(pytest.mark.xfail(strict=True, reason=_NOT_RT_EXACT_SHIP_DEFECTS[smi]))
+    if smi in _SLOW_NOT_RT_EXACT:
+        marks.append(pytest.mark.slow)
+    return pytest.param(smi, marks=marks) if marks else smi
+
+
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", [
-    pytest.param(smi, marks=pytest.mark.xfail(strict=True, reason=_NOT_RT_EXACT_SHIP_DEFECTS[smi]))
-    if smi in _NOT_RT_EXACT_SHIP_DEFECTS else smi
-    for smi in _NOT_RT_EXACT])
+@pytest.mark.parametrize("smiles", [_not_rt_exact_param(smi) for smi in _NOT_RT_EXACT])
 def test_canary_not_rt_exact_rows_ship_no_wrong_name(smiles):
     """Gate ON: a DK-NOTEXACT row never ships its wrong or unparseable raw name. The
     best-effort tier names it RT-exact (breadth), and whatever the PIN tier ships is a
@@ -958,7 +937,7 @@ def test_canary_known_defect_takes_its_pin(smiles, target):
 
 
 class TestCanaryRegression:
-    """The 703 canary compounds (tests/integration/test_canary_rt75.py) name as recorded.
+    """The 703 canary compounds (tests/support/canary_rt75_data.py) name as recorded.
 
     Re-baselined in Task 11 (2026-09-26): verified rows assert their fixture name; the rows in
     CANARY_KNOWN_DEFECTS assert their current (defective) name, so any change is flagged --
@@ -969,7 +948,7 @@ class TestCanaryRegression:
     @pytest.mark.unit
     def test_canary_compounds_no_regressions(self):
         """Verified rows keep their name; a known-defect row that changes is flagged too."""
-        from tests.integration.test_canary_rt75 import CANARY_COMPOUNDS
+        from tests.support.canary_rt75_data import CANARY_COMPOUNDS
 
         fixture_smiles = {smi for smi, _ in CANARY_COMPOUNDS}
         stale = sorted(set(CANARY_KNOWN_DEFECTS) - fixture_smiles)

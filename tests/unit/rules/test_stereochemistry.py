@@ -707,3 +707,25 @@ class TestClusterBSpiroCipCeiling:
         o = Orthonym(_disable_opsin_validity_gate=True)
         out = o.name("Cl[C@H]1C[C@]2(C1)C[C@@H](Cl)C2")
         assert out == "2,6-dichlorospiro[3.3]heptane", f"got {out!r}"
+
+
+@pytest.mark.parametrize(
+    "smiles, expected, style",
+    [
+        pytest.param("CC(C)(C)/C=C/C(=O)O", "(2E)-4,4-dimethylpent-2-enoic acid", "pin", id="CC(C)(C)/C=C/C(=O)O"),
+        pytest.param("CCCCCCCC/C=C\\CCCCCCO", "(7Z)-hexadec-7-en-1-ol", "pin", id="CCCCCCCC/C=C\\CCCCCCO"),
+        pytest.param("CC/C=C\\CC/C=C\\C/C=C\\CC/C=C\\CC/C=C\\CCC(=O)O", "(4Z,8Z,12Z,15Z,19Z)-docosa-4,8,12,15,19-pentaenoic acid", "pin", id="CC/C=C\\CC/C=C\\C/C=C\\CC/C=C\\CC/C=C\\CCC(=O)O"),
+        pytest.param("C/C=C/CCCCCCCCCCCCCCC(=O)O", "(16E)-octadec-16-enoic acid", "pin", id="C/C=C/CCCCCCCCCCCCCCC(=O)O"),
+    ],
+)
+def test_merged_ez_chain_names(smiles, expected, style):
+    """Names that development-era snapshot tests pinned and that no other test asserts.
+
+    These (SMILES, name) pairs were asserted only by test files removed in the test
+    slimming change; they move here so the names stay pinned by a rule-level test.
+    Removed tests this replaces:
+      - tests/integration/test_cfr_dispatch_consistency.py::test_cfr_supplementary_byte_identical (4)
+    """
+    from orthonym import name_compound
+    kwargs = {} if style is None else {"style": style}
+    assert name_compound(smiles, **kwargs) == expected

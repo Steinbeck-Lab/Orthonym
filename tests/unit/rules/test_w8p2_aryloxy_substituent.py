@@ -18,21 +18,6 @@ pytestmark = pytest.mark.unit
 RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw namer
 
 
-# No `2-` locant: acetic acid has ONE substitutable position, so the substituent
-# locant is omitted in the PIN; cf. `(1H-indol-1-yl)acetic acid (PIN)`
-# the Blue Book). The locant-bearing heteroaryl/fused '-yl' keeps its OWN enclosing
-# marks, the Blue Book '(pyridin-2-yl)oxy (preferred prefix)'; the Blue Book
-# '(naphthalen-2-yl)oxy'), so the citation escalates to `[(...)oxy]acetic acid`
-# (F-spell-oxy 2026-08-08: was the non-PIN unenclosed `(pyridin-2-yloxy)…`).
-@pytest.mark.parametrize("smiles,expected", [
-    ("OC(=O)COc1ccccn1",       "[(pyridin-2-yl)oxy]acetic acid"),    # bare heteroaryl-oxy
-    ("OC(=O)COc1cccc2ccccc12", "[(naphthalen-1-yl)oxy]acetic acid"), # bare fused-aryl-oxy
-    ("OC(=O)COc1ccc2ccccc2c1", "[(naphthalen-2-yl)oxy]acetic acid"),
-])
-def test_bare_aryloxy_named_not_dropped(smiles, expected):
-    assert RAW.name(smiles) == expected
-
-
 def test_bare_phenoxy_unregressed():
     """Bare benzene ether still contracts to the retained phenoxy (simple
     substituent, no enclosing marks)."""

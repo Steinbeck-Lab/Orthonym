@@ -488,18 +488,3 @@ class TestCollectStereodescriptorsAxial:
         import re
         has_point_chirality = bool(re.search(r'\d[RS](?![a])', result))
         assert has_point_chirality, f"Should contain R/S point chirality descriptor in {result}"
-
-    def test_opsin_limitation_documented(self):
-        """OPSIN cannot interpret Ra/Sa descriptors.
-
-        This test documents the known OPSIN limitation: OPSIN's
-        StereochemistryHandler.java throws StereochemistryException
-        for AXIAL_TYPE_VAL. Names containing Ra/Sa will fail OPSIN
-        round-trip validation. This is NOT an Orthonym bug.
-
-        See: opsin/opsin-core/src/main/java/.../StereochemistryHandler.java
-        See: internal notes Pitfall 4
-        """
-        # This is a documentation-only test -- it always passes.
-        # The actual OPSIN limitation is documented in the docstring.
-        pass

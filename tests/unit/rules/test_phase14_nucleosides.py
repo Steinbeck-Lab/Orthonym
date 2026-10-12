@@ -18,8 +18,6 @@ from orthonym.rules.nucleosides import name_nucleoside
     # 5'-phosphate chain: di / tri across bases
     ("Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O",
      "adenosine 5'-(tetrahydrogen triphosphate)"),
-    ("Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]1O",
-     "adenosine 5'-(trihydrogen diphosphate)"),
     ("Nc1nc2c(ncn2[C@@H]2O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]2O)c(=O)[nH]1",
      "guanosine 5'-(tetrahydrogen triphosphate)"),
     ("O=c1ccn([C@@H]2O[C@H](COP(=O)(O)OP(=O)(O)OP(=O)(O)O)[C@@H](O)[C@H]2O)c(=O)[nH]1",
@@ -40,22 +38,6 @@ from orthonym.rules.nucleosides import name_nucleoside
 ])
 def test_decorated_nucleotides(smiles, expected):
     assert name_compound(smiles) == expected
-
-
-@pytest.mark.parametrize("smiles,expected", [
-    # 2'-deoxynucleoside PINs (data rename; the prime is required)
-    ("Nc1ncnc2c1ncn2[C@H]1C[C@H](O)[C@@H](CO)O1", "2'-deoxyadenosine"),
-    ("Nc1nc2c(ncn2[C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1", "2'-deoxyguanosine"),
-    ("Nc1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)n1", "2'-deoxycytidine"),
-    ("O=c1ccn([C@H]2C[C@H](O)[C@@H](CO)O2)c(=O)[nH]1", "2'-deoxyuridine"),
-])
-def test_deoxynucleoside_pins(smiles, expected):
-    assert name_compound(smiles) == expected
-
-
-def test_bare_nucleoside_unaffected():
-    # bare nucleosides keep the retained-name path (engine declines)
-    assert name_compound("Nc1ncnc2c1ncn2[C@@H]1O[C@H](CO)[C@@H](O)[C@H]1O") == "adenosine"
 
 
 def test_retained_monophosphate_unaffected():
@@ -88,7 +70,6 @@ def test_determinism_across_spellings():
     ("C1=C2CCC(=N2)C=C2CCC(N2)C2CCC(=N2)C=C2CCC1=N2", "corrin"),
     ("C1=CC(=CC2=NC(=CC3=NC(=Cc4ccc[nH]4)C=C3)C=C2)N=C1", "21H-biline"),
     ("CC1CC[C@@]2(OC1)O[C@H]1C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]1[C@@H]2C", "spirostan"),
-    ("CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]2[C@@H]1C", "furostan"),
     ("CC(C)[C@@H](C)[C@@]1(C)C[C@@H]1[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C", "gorgostane"),
     ("CC[C@@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C)C(C)C", "poriferastane"),
 ])
@@ -104,18 +85,7 @@ def test_poriferastane_distinct_from_stigmastane():
     assert name_compound(stigmastane) == "stigmastane"
 
 
-# --------------------------------------------------------------------------- #
-# Batch 2 — free phosphatidic acid
-# --------------------------------------------------------------------------- #
-def test_free_phosphatidic_acid():
-    pa = "CCCCCCCCCCCCCCCC(=O)OCC(COP(O)(O)=O)OC(=O)CCCCCCCCCCCCCCC"
-    assert name_compound(pa) == "2,3-bis(hexadecanoyloxy)propyl dihydrogen phosphate"
-
-
 @pytest.mark.parametrize("smiles,expected", [
-    # phospholipid regression guards (unchanged by the free-phosphate branch)
-    ("CCCCCCCCCCCCCCCC(=O)OCC(COP([O-])(=O)OCC[N+](C)(C)C)OC(=O)CCCCCCCCCCCCCCC",
-     "[2,3-bis(hexadecanoyloxy)propyl] 2-(trimethylazaniumyl)ethyl phosphate"),
     ("CCCCCCCCCCCCCCCCCC(=O)OCC(OC(=O)CCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCC",
      "propane-1,2,3-triyl trioctadecanoate"),
 ])

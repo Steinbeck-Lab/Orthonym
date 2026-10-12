@@ -27,8 +27,5 @@ class TestP292FreeValence:
         # -diyl is a free valence; a diol keeps the -diol suffix (contrast).
         assert name_compound("OCCCCO") == "butane-1,4-diol"
 
-    def test_dioic_acid(self):
-        assert name_compound("OC(=O)CCCCCC(=O)O") == "heptanedioic acid"
-
     def test_dicarbaldehyde(self):
         assert name_compound("O=Cc1ccc(C=O)cc1") == "benzene-1,4-dicarbaldehyde"

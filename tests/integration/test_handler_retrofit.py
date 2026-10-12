@@ -461,48 +461,6 @@ class TestBenzeneRetrofit:
                     return
         pytest.fail("Did not find C-substituent on benzene ring")
 
-    def test_benzoic_acid_no_double_counting(self):
-        """Benzoic acid remains 'benzoic acid' -- no 'carboxy' prefix."""
-        from orthonym.namer import name_compound
-        result = name_compound("OC(=O)c1ccccc1")
-        assert result is not None
-        assert result.lower() == "benzoic acid", f"Expected 'benzoic acid', got '{result}'"
-
-    def test_benzamide_no_double_counting(self):
-        """Benzamide remains 'benzamide' -- no 'carbamoyl' prefix."""
-        from orthonym.namer import name_compound
-        result = name_compound("NC(=O)c1ccccc1")
-        assert result is not None
-        assert result.lower() == "benzamide", f"Expected 'benzamide', got '{result}'"
-
-    def test_benzonitrile_no_double_counting(self):
-        """Benzonitrile remains 'benzonitrile' -- no 'cyano' prefix."""
-        from orthonym.namer import name_compound
-        result = name_compound("N#Cc1ccccc1")
-        assert result is not None
-        assert result.lower() == "benzonitrile", f"Expected 'benzonitrile', got '{result}'"
-
-    def test_benzaldehyde_no_double_counting(self):
-        """Benzaldehyde remains 'benzaldehyde' -- no 'formyl' prefix."""
-        from orthonym.namer import name_compound
-        result = name_compound("O=Cc1ccccc1")
-        assert result is not None
-        assert result.lower() == "benzaldehyde", f"Expected 'benzaldehyde', got '{result}'"
-
-    def test_toluene_unchanged(self):
-        """Toluene still works (simple alkyl)."""
-        from orthonym.namer import name_compound
-        result = name_compound("Cc1ccccc1")
-        assert result is not None
-        assert result.lower() == "toluene", f"Expected 'toluene', got '{result}'"
-
-    def test_chlorobenzene_unchanged(self):
-        """Chlorobenzene still works (halogen)."""
-        from orthonym.namer import name_compound
-        result = name_compound("Clc1ccccc1")
-        assert result is not None
-        assert result.lower() == "chlorobenzene", f"Expected 'chlorobenzene', got '{result}'"
-
     def test_4_methylbenzoic_acid_unchanged(self):
         """4-methylbenzoic acid retains methyl substituent."""
         from orthonym.namer import name_compound
@@ -700,24 +658,6 @@ class TestRingNitrileRetrofit:
             f"Expected 'carbonitrile' in '{result}'"
         )
 
-    def test_unsubstituted_cyclohexanecarbonitrile_no_regression(self):
-        """Unsubstituted cyclohexanecarbonitrile still works."""
-        from orthonym.namer import name_compound
-        result = name_compound("C1CCCCC1C#N")
-        assert result is not None
-        assert result.lower() == "cyclohexanecarbonitrile", (
-            f"Expected 'cyclohexanecarbonitrile', got '{result}'"
-        )
-
-    def test_unsubstituted_cyclopentanecarbonitrile_no_regression(self):
-        """Unsubstituted cyclopentanecarbonitrile still works."""
-        from orthonym.namer import name_compound
-        result = name_compound("C1CCCC1C#N")
-        assert result is not None
-        assert result.lower() == "cyclopentanecarbonitrile", (
-            f"Expected 'cyclopentanecarbonitrile', got '{result}'"
-        )
-
 
 # ============================================================================
 # Category C handler safety tests (Plan 03, Task 2)
@@ -747,24 +687,6 @@ class TestCategoryCHandlerSafety:
         # Methyl(cyclopentyl) sulfide -- cyclopentyl is complex for simple alkyl naming
         result = name_compound("C1CCCC1SC")
         assert result is not None  # Falls through to general naming
-
-    def test_isocyanate_simple_works(self):
-        """Isocyanate handler correctly names simple R-groups."""
-        from orthonym import name_compound
-        result = name_compound("CN=C=O")
-        # 'ISOCYANATES' (the Blue Book): "Preferred IUPAC names are
-        # generated substitutively using the prefix isocyanato"; the functional class
-        # name 'methyl isocyanate' is the previous recommendation (cf.:26007
-        # 'isocyanatocyclohexane (PIN) cyclohexyl isocyanate').
-        assert result == "isocyanatomethane"
-
-    def test_isothiocyanate_simple_works(self):
-        """Isothiocyanate handler correctly names simple R-groups."""
-        from orthonym import name_compound
-        result = name_compound("CN=C=S")
-        # 'ISOCYANATES' covers the chalcogen analogues: ':26009 isothiocyanatobenzene
-        # (PIN) phenyl isothiocyanate'.
-        assert result == "isothiocyanatomethane"
 
     def test_boronic_acid_simple_works(self):
         """Boronic acid handler names simple R-groups correctly."""
@@ -808,27 +730,6 @@ class TestCategoryCHandlerSafety:
         result = name_compound("[O-][n+]1ccccc1")
         assert result is not None
         assert "oxide" in result.lower(), f"Expected 'oxide' in '{result}'"
-
-    def test_sulfoxide_simple(self):
-        """Sulfoxide handler names simple dimethyl sulfoxide."""
-        from orthonym import name_compound
-        result = name_compound("CS(=O)C")
-        assert result is not None
-        # 'SULFOXIDES AND SULFONES' (the Blue Book): "Methods (1) and (3)
-        # generate preferred names." -- (1) substitutively, by prefixing the acyl group
-        # R'-SO-; (2) functional class 'sulfoxide' is not a PIN method.
-        # '(methanesulfinyl)methane (PIN)' is printed at:46154.
-        assert result == "(methanesulfinyl)methane", f"Expected '(methanesulfinyl)methane', got '{result}'"
-
-    def test_sulfone_simple(self):
-        """Sulfone handler names simple dimethyl sulfone."""
-        from orthonym import name_compound
-        result = name_compound("CS(=O)(=O)C")
-        assert result is not None
-        # 'SULFOXIDES AND SULFONES' (the Blue Book): "Methods (1) and (3)
-        # generate preferred names."; the functional class name 'sulfone' is method (2)
-        # ('(ethanesulfonyl)ethane (PIN)... diethyl sulfone',:28118).
-        assert result == "(methanesulfonyl)methane", f"Expected '(methanesulfonyl)methane', got '{result}'"
 
     def test_guanidine_retained(self):
         """Guanidine handler produces retained name."""

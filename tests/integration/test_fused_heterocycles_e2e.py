@@ -35,12 +35,6 @@ class TestPurineDerivatives:
     """Test naming of purine-based compounds."""
 
     @pytest.mark.integration
-    def test_purine_base(self):
-        """Unsubstituted purine should be 9H-purine."""
-        result = name_compound('c1ncc2nc[nH]c2n1')
-        assert result == '9H-purine', f"Got: {result}"
-
-    @pytest.mark.integration
     def test_adenine(self):
         """Adenine: IUPAC 2013 prefers retained name 'adenine'.
 
@@ -87,18 +81,6 @@ class TestSubstitutedIndoles:
     """Test correct locant assignment for substituted indoles."""
 
     @pytest.mark.integration
-    def test_unsubstituted_indole(self):
-        """Indole should be 1H-indole."""
-        result = name_compound('c1ccc2[nH]ccc2c1')
-        assert result == '1H-indole', f"Got: {result}"
-
-    @pytest.mark.integration
-    def test_5_methylindole(self):
-        """5-methylindole: methyl at position 5."""
-        result = name_compound('Cc1ccc2[nH]ccc2c1')
-        assert result == '5-methyl-1H-indole', f"Got: {result}"
-
-    @pytest.mark.integration
     def test_n_methylindole(self):
         """N-methylindole: a ring nitrogen takes its numeric locant, '1-methyl-1H-indole'.
 
@@ -141,18 +123,6 @@ class TestSubstitutedIndoles:
 
 class TestSubstitutedQuinolines:
     """Test correct locant assignment for substituted quinolines."""
-
-    @pytest.mark.integration
-    def test_unsubstituted_quinoline(self):
-        """Quinoline should be quinoline (no tautomer locant needed)."""
-        result = name_compound('c1ccc2ncccc2c1')
-        assert result == 'quinoline', f"Got: {result}"
-
-    @pytest.mark.integration
-    def test_isoquinoline(self):
-        """Isoquinoline naming."""
-        result = name_compound('c1ccc2cnccc2c1')
-        assert result == 'isoquinoline', f"Got: {result}"
 
     @pytest.mark.integration
     def test_2_methylquinoline(self):
@@ -295,25 +265,6 @@ class TestFusedHeterocycleE2E:
     """End-to-end tests through the complete naming pipeline."""
 
     @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # Unsubstituted fused heterocycles
-        ('c1ccc2[nH]ccc2c1', '1H-indole'),
-        ('c1ccc2ncccc2c1', 'quinoline'),
-        ('c1ccc2cnccc2c1', 'isoquinoline'),
-        ('c1ccc2[nH]cnc2c1', '1H-1,3-benzimidazole'),
-        #: the PIN carries the heteroatom locant,
-        # the Blue Book "1-benzofuran (PIN) benzofuran";:13443 for
-        # 1-benzothiophene). RETAINED_NAMES was corrected to the '1-' PIN form.
-        ('c1ccc2occc2c1', '1-benzofuran'),
-        ('c1ccc2sccc2c1', '1-benzothiophene'),
-        ('c1ncc2nc[nH]c2n1', '9H-purine'),
-    ])
-    def test_unsubstituted_fused_heterocycles(self, smiles, expected):
-        """Test unsubstituted fused heterocycle naming through pipeline."""
-        result = name_compound(smiles)
-        assert result == expected, f"SMILES {smiles}: expected '{expected}', got '{result}'"
-
-    @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected_contains,alt_result", [
         # Substituted indoles
         ('Cc1ccc2[nH]ccc2c1', '5-methyl', None),  # 5-methylindole
@@ -341,31 +292,6 @@ class TestFusedHeterocycleE2E:
 # =============================================================================
 # Regression Tests (Ensure a phase still works)
 # =============================================================================
-
-class TestPhase6Regression:
-    """Regression tests for a phase fused system naming."""
-
-    @pytest.mark.integration
-    @pytest.mark.parametrize("smiles,expected", [
-        # a phase fused heterocycle tests that should still pass
-        ('c1ccc2[nH]ccc2c1', '1H-indole'),
-        ('c1ccc2ncccc2c1', 'quinoline'),
-        ('c1ccc2[nH]cnc2c1', '1H-1,3-benzimidazole'),
-    ])
-    def test_phase6_fused_heterocycles_unchanged(self, smiles, expected):
-        """a phase fused heterocycle naming should be unchanged."""
-        result = name_compound(smiles)
-        assert result == expected, f"Regression: {smiles} changed from '{expected}' to '{result}'"
-
-    @pytest.mark.integration
-    def test_simple_heterocycles_unchanged(self):
-        """Simple (non-fused) heterocycle naming should be unchanged."""
-        # These are a phase heterocycles, not fused
-        assert name_compound('c1ccncc1') == 'pyridine'
-        assert name_compound('c1ccoc1') == 'furan'
-        # (the Blue Book): the PIN cites the indicated hydrogen, '1H-pyrrole' (the Blue Book).
-        assert name_compound('c1cc[nH]c1') == '1H-pyrrole'
-        assert name_compound('c1ccsc1') == 'thiophene'
 
 
 # =============================================================================
@@ -396,55 +322,3 @@ class TestFusedRingsModule:
         mol = Chem.MolFromSmiles('c1ccncc1')  # pyridine - not fused
         result = name_fused_heterocycle(mol)
         assert result is None, f"Expected None for non-fused, got: {result}"
-
-
-# =============================================================================
-# Test Summary and Coverage Documentation
-# =============================================================================
-
-class TestPhaseSummaryCounts:
-    """Document test coverage summary for a phase."""
-
-    @pytest.mark.integration
-    def test_phase7_e2e_coverage(self):
-        """Document comprehensive a phase E2E coverage.
-
-        TestPurineDerivatives: 4 tests
-        - purine_base: 1
-        - adenine: 1
-        - hypoxanthine_like: 1
-        - caffeine_structure: 1 (resolved in a phase plan 04)
-
-        TestSubstitutedIndoles: 7 tests
-        - unsubstituted_indole: 1
-        - 5_methylindole: 1
-        - n_methylindole: 1
-        - 2_methylindole: 1
-        - 3_methylindole: 1
-        - halogenated_indoles: 2 parametrized
-
-        TestSubstitutedQuinolines: 3 tests
-        - unsubstituted_quinoline: 1
-        - isoquinoline: 1
-        - 2_methylquinoline: 1
-
-        TestPhase7Requirements: 7 tests (FUSED-01 through FUSED-07)
-
-        TestDataCoverage: 3 tests
-        - minimum_entry_count: 1
-        - all_entries_have_locants: 1
-        - key_fused_heterocycles_present: 1
-
-        TestFusedHeterocycleE2E: 11 tests
-        - unsubstituted: 7 parametrized
-        - substituted: 4 parametrized
-
-        TestPhase6Regression: 7 tests
-        - fused_heterocycles_unchanged: 3 parametrized
-        - simple_heterocycles_unchanged: 4
-
-        TestFusedRingsModule: 3 tests
-
-        TOTAL: ~45 unique test cases
-        """
-        assert True  # Documentation test

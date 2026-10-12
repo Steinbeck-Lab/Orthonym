@@ -422,11 +422,22 @@ def test_primitive_spells_the_added_elements_and_leaves_nothing_unexpressed(
     assert [m for _idx, m in result.per_atom] == [morpheme]
 
 
+def _tricyclo_cage_smiles(symbol):
+    return f'C1C2C[{symbol}H]C3C1C23'
+
+
+# A symbol that RDKit does not accept in this cage has nothing to name: it is
+# left out of the parameter list (it used to skip on every run).
+_TRICYCLO_ROWS = [
+    (symbol, morpheme) for symbol, morpheme in [
+        ('O', 'oxa'), ('Al', 'alumina'), ('Ga', 'galla'),
+        ('In', 'inda'), ('Tl', 'thalla'),
+    ] if Chem.MolFromSmiles(_tricyclo_cage_smiles(symbol)) is not None
+]
+
+
 @pytest.mark.unit
-@pytest.mark.parametrize('symbol,morpheme', [
-    ('O', 'oxa'), ('Al', 'alumina'), ('Ga', 'galla'),
-    ('In', 'inda'), ('Tl', 'thalla'),
-])
+@pytest.mark.parametrize('symbol,morpheme', _TRICYCLO_ROWS)
 def test_the_tricyclo_speller_also_reaches_the_added_rows(symbol, morpheme):
     """The four Table-1.5 consumer sites must not diverge again.
 
@@ -437,9 +448,7 @@ def test_the_tricyclo_speller_also_reaches_the_added_rows(symbol, morpheme):
     a tricyclo, which is the sibling-drift shape this milestone keeps hitting.
     """
     from orthonym.rules.tricyclo import _generate_heteroatom_prefix
-    mol = Chem.MolFromSmiles(f'C1C2C[{symbol}H]C3C1C23')
-    if mol is None:
-        pytest.skip(f'{symbol} not accepted in this cage by RDKit')
+    mol = Chem.MolFromSmiles(_tricyclo_cage_smiles(symbol))
     ring = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
     hetero = [(i, mol.GetAtomWithIdx(i).GetSymbol()) for i in ring
               if mol.GetAtomWithIdx(i).GetSymbol() != 'C']

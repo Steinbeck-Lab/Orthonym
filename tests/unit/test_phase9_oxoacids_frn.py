@@ -207,15 +207,8 @@ def namer():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # 9a organyl-stem phosphonic
-    ("CP(=O)(O)O", "methylphosphonic acid"),
-    ("CCP(=O)(O)O", "ethylphosphonic acid"),
-    ("CCCP(=O)(O)O", "propylphosphonic acid"),
-    ("OP(=O)(O)c1ccccc1", "phenylphosphonic acid"),
     # phosphinic must NOT regress
     ("CCP(=O)(O)CC", "diethylphosphinic acid"),
-    # 9b
-    ("ClP(=O)(Cl)Cl", "phosphoryl trichloride"),
     ("NP(=O)(N)N", "phosphoric triamide"),
     ("NS(=O)(=O)N", "sulfuric diamide"),
     # 9c
@@ -315,7 +308,6 @@ def test_bare_trivalent_hydride_amide_is_substitutive_not_frn(namer):
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("[PH2]N", "phosphanamine"),
     ("[AsH2]N", "arsanamine"),
     ("[SbH2]N", "stibanamine"),
     ("[BiH2]N", "bismuthanamine"),
