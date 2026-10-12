@@ -251,6 +251,8 @@ SITE_PAGES = {
     "guide/how-it-works.md": "how-it-works.md",
     "guide/declines.md": "declines.md",
     "guide/accuracy.md": "accuracy.md",
+    "guide/architecture.md": "architecture.md",
+    "guide/rule-index.md": "rule-index.md",
     "CHANGELOG.md": "project/changelog.md",
     "CONTRIBUTING.md": "project/contributing.md",
 }

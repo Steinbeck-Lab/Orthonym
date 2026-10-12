@@ -30,7 +30,7 @@ src/orthonym/
 └── data/           # naming tables
 ```
 
-Every module has a page under [Internals](reference/internals/index.md).
+Every module has a page under [Internals](reference/internals/index.md). To change the code, read [Architecture](architecture.md), which follows one SMILES through it, and the [Rule index](rule-index.md), which says where each rule lives.
 
 ## Built on
 

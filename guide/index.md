@@ -105,7 +105,7 @@ orthonym --fetch-jars</code></pre>
     </nav>
     <nav aria-label="Project" class="ot-path">
       <h3>Project</h3>
-      <ul><li><a href="project/contributing.html">Contributing</a></li><li><a href="project/changelog.html">Changelog</a></li><li><a href="project/cite.html">How to cite</a></li><li><a href="project/licence.html">Licence</a></li><li><a href="project/llms.html">llms.txt</a></li></ul>
+      <ul><li><a href="project/contributing.html">Contributing</a></li><li><a href="architecture.html">Architecture</a></li><li><a href="rule-index.html">Rule index</a></li><li><a href="project/changelog.html">Changelog</a></li><li><a href="project/cite.html">How to cite</a></li><li><a href="project/licence.html">Licence</a></li><li><a href="project/llms.html">llms.txt</a></li></ul>
     </nav>
   </div>
   <p class="ot-paper">A paper describing Orthonym is in preparation. Until it is published, please <a href="project/cite.html">cite the software</a>.</p>
@@ -157,6 +157,8 @@ reference/internals/index
 :caption: Project
 
 project/contributing
+architecture
+rule-index
 project/changelog
 project/cite
 project/licence
