@@ -32,6 +32,7 @@ from ..assembly.name_tree import NameTreeNode
 
 # Import from data layer only; forbids cross-contamination with
 # the seniority cascade (no import of rules dot seniority).
+from ..data.multipliers import multiplier_table
 from ..data.organometallics import (
     LIGAND_ETA_DEFAULTS,
     LIGAND_NAMES,
@@ -61,16 +62,7 @@ def _to_roman(n: int) -> str:
 
 
 # Multiplicative prefixes for simple ligand counts per Salzer
-_SIMPLE_MULTIPLICATIVE_PREFIXES: Dict[int, str] = {
-    1: '',
-    2: 'di',
-    3: 'tri',
-    4: 'tetra',
-    5: 'penta',
-    6: 'hexa',
-    7: 'hepta',
-    8: 'octa',
-}
+_SIMPLE_MULTIPLICATIVE_PREFIXES: Dict[int, str] = multiplier_table(8, one='')
 
 
 def _multiplicative_prefix(count: int) -> str:
@@ -1528,10 +1520,7 @@ def _superscript_int(n: int) -> str:
 
 # Complex-ligand multiplicative prefixes per Salzer (used when ligand
 # contains parens / locants / η-prefix).
-_COMPLEX_MULTIPLICATIVE_PREFIXES: Dict[int, str] = {
-    2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis',
-    6: 'hexakis', 7: 'heptakis', 8: 'octakis',
-}
+_COMPLEX_MULTIPLICATIVE_PREFIXES: Dict[int, str] = multiplier_table(8, kind='complex')
 
 
 # Style-aware ligand name overrides for systematic forms.

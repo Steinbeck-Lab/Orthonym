@@ -34,6 +34,8 @@ from typing import Callable, List, NamedTuple, Optional, Set
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
+
 #: True while a wider-tier call (complete / best-effort: ``Orthonym(general_fallback=True)``) runs.
 #: ``general_fallback_ctx`` is reset inside the isolated naming sessions of the fragment
 #: recursion, so the P/S prefixes would stop at the first nested fragment; this variable is
@@ -44,8 +46,8 @@ ps_tier_ctx = contextvars.ContextVar("orthonym_ps_tier", default=False)
 _HAL = {9: "fluoro", 17: "chloro", 35: "bromo", 53: "iodo"}
 _CONTRACTED = {"sulfo", "sulfino", "sulfonato", "sulfinato", "sulfamoyl",
                "phosphono", "phosphonato"}
-_MULT = {2: "di", 3: "tri", 4: "tetra"}
-_MULT_BIS = {2: "bis", 3: "tris", 4: "tetrakis"}
+_MULT = multiplier_table(4)
+_MULT_BIS = multiplier_table(4, kind="complex")
 _MAX_DEPTH = 8
 _SIMPLE_LIGANDS = frozenset({"hydroxy", "oxido", "amino", "sulfanyl", "fluoro", "chloro",
                             "bromo", "iodo"})

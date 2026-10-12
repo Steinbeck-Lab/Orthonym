@@ -38,6 +38,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
+from ..data.multipliers import multiplier_table
 from .substituent_purity import organyl_prefix_name
 
 _GROUP14_STEM = {'Si': 'sil', 'Ge': 'germ', 'Sn': 'stann', 'Pb': 'plumb'}
@@ -193,8 +194,7 @@ _PNICTOGEN_STEM = {'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane',
                    'Bi': 'bismuthane'}
 # Basic multiplying prefixes (Table 1.4). NO elision of the terminal vowel
 #: penta+arsane -> "pentaarsane".
-_PNICTOGEN_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
-                   7: 'hepta', 8: 'octa'}
+_PNICTOGEN_MULT = multiplier_table(8)
 
 
 def name_homonuclear_pnictogen_chain(mol) -> Optional[str]:
@@ -279,8 +279,8 @@ def name_homonuclear_pnictogen_chain(mol) -> Optional[str]:
 _CHALCOGEN_ATERM = {'O': 'oxa', 'S': 'thia', 'Se': 'selena', 'Te': 'tellura'}
 # Seniority index (lower = senior) for the a[ba]n terminal/central choice.
 _CHALCOGEN_SENIORITY = {'O': 0, 'S': 1, 'Se': 2, 'Te': 3}
-_ABA_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
-_SUB_MULT_ABA = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+_ABA_MULT = multiplier_table(6)
+_SUB_MULT_ABA = multiplier_table(4, one='')
 
 
 def _join_aterms(terms) -> str:

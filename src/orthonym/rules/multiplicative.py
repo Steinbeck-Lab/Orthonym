@@ -24,6 +24,7 @@ from ..assembly.naming_utils import (
     simple_multiplier_word,
 )
 from ..data.chain_names import get_chain_name, get_chain_prefix
+from ..data.multipliers import multiplier_table
 from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
     atoms_of,
     bonds_of,
@@ -814,7 +815,7 @@ def _group14_hydride_unit_name(canon_smiles: str) -> Optional[str]:
     an unbranched fully-H-saturated standard-valence chain of 2-5 atoms."""
     _STEMS = {'Si': 'silane', 'Ge': 'germane', 'Sn': 'stannane',
               'Pb': 'plumbane'}
-    _MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta'}
+    _MULT = multiplier_table(5)
     frag = Chem.MolFromSmiles(canon_smiles)
     if frag is None:
         return None
@@ -854,13 +855,10 @@ _G14_HYDRIDE_STEMS = {'Si': 'silane', 'Ge': 'germane',
 # seniority of Group-14 parent hydrides (the Blue Book-18205):
 # Si > Ge > Sn > Pb (most senior first). Lower rank value = MORE senior.
 _G14_SENIORITY_RANK = {'Si': 0, 'Ge': 1, 'Sn': 2, 'Pb': 3}
-_G14_CHAIN_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
-                   7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca',
-                   # v52 P02T2 (Table 28.1): basic multiplying prefixes past
-                   # deca, no terminal-vowel elision before the consonant
-                   # stem ('trideca' + 'stannane' -> 'tridecastannane').
-                   11: 'undeca', 12: 'dodeca', 13: 'trideca', 14: 'tetradeca',
-                   15: 'pentadeca'}
+# v52 P02T2 (Table 28.1): basic multiplying prefixes past
+# deca, no terminal-vowel elision before the consonant
+# stem ('trideca' + 'stannane' -> 'tridecastannane').
+_G14_CHAIN_MULT = multiplier_table(15)
 
 # a phase (a)): a MONONUCLEAR Group-14 hydride cited as a
 # multiplicative parent unit ('silane', 'trimethylsilane',...) takes bis/tris,
@@ -1385,7 +1383,7 @@ def _try_linked_phosphonic_acids(mol) -> Optional[str]:
         # the rejected suffix style ('methanediphosphonic acid', and its anion
         # word) is not a PIN and is labelled below it.
         from ..metrics.provenance import record_non_pin_fragment
-        word = {2: 'di', 3: 'tri', 4: 'tetra'}.get(len(matches))
+        word = multiplier_table(4).get(len(matches))
         if word:
             record_non_pin_fragment(f"{word}phosphonic acid")
             record_non_pin_fragment(f"{word}phosphonate")

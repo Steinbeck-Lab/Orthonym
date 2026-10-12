@@ -32,6 +32,7 @@ from rdkit import Chem
 
 from ..data.hw_heteroatoms import HETEROATOM_PRIORITY, get_heteroatom_priority, get_hw_prefix
 from ..data.hw_stems import HW_STEMS, get_hw_stem
+from ..data.multipliers import multiplier_table
 from ..data.retained_names import get_retained_name
 from ..perception.rings import (
     is_aromatic_ring,
@@ -41,10 +42,7 @@ from ..perception.smarts_cache import compiled as _compiled_smarts
 from ..perception.molcache import bonds_of
 
 # Simple multiplicative prefixes for HW naming
-SIMPLE_MULTIPLIERS = {
-    2: "di", 3: "tri", 4: "tetra", 5: "penta",
-    6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
-}
+SIMPLE_MULTIPLIERS = multiplier_table(10)
 
 
 def classify_heterocycle(mol, ring_atoms) -> Dict:

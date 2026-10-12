@@ -26,6 +26,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..data.chain_names import get_chain_prefix
+from ..data.multipliers import multiplier_table
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Anhydride core SMARTS: C(=O)-O-C(=O)
@@ -323,13 +324,13 @@ _THIOACYL_ANHYDRIDE_SMARTS = (
     "[CX3](=[OX1,SX1,SeX1])[OX2,SX2,SeX2,TeX2][CX3](=[OX1,SX1,SeX1])")
 
 
-_NUMERIC_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+_NUMERIC_MULT = multiplier_table(6)
 
 # W8-P4: 'bis'/'tris'/... wrap the chalcogen-anhydride class
 # word for a chalcogen di-/poly-anhydride (BB 32446 'bis(thioanhydride)'),
 # unlike the plain numeric-prefixed 'dianhydride'/'trianhydride' used for the
 # O-bridge case.
-_BIS_MULT = {2: "bis", 3: "tris", 4: "tetrakis"}
+_BIS_MULT = multiplier_table(4, kind="complex")
 
 
 def _diacid_stem(mol, frag_atoms, carbonyls) -> Optional[str]:

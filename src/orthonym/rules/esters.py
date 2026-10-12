@@ -25,6 +25,7 @@ from rdkit import Chem
 from ..assembly.naming_utils import get_alkyl_name
 from ..data.chain_names import get_acid_stem, get_chain_prefix
 from ..data.chain_names import get_alkyl_name as _chain_alkyl_name
+from ..data.multipliers import multiplier_table
 from ..data.trivial_acids import get_acylate_name
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -3572,7 +3573,7 @@ def name_polyacid_polyester(mol) -> Optional[str]:
                 and acid.GetAtomWithIdx(_chain[1]).GetTotalNumHs() < 2):
             return None
         acid_name = assemble_name(feats, style="pin")
-        mult = {2: "di", 3: "tri", 4: "tetra"}[len(matches)]
+        mult = multiplier_table(4)[len(matches)]
         if not acid_name or not (acid_name.endswith(f"{mult}oic acid")
                                  or acid_name.endswith(f"{mult}carboxylic acid")):
             return None
@@ -3686,7 +3687,7 @@ def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str
 
 
 _POLYOL_VALENCE = {2: "diyl", 3: "triyl", 4: "tetrayl"}
-_POLYOL_MULTIPLIER = {2: "di", 3: "tri", 4: "tetra"}
+_POLYOL_MULTIPLIER = multiplier_table(4)
 
 
 def _polyol_organyl_name(mol, attach_atoms: list, ester_oxygens: set,

@@ -62,6 +62,7 @@ from typing import List, Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_multiplier_prefix
+from ..data.multipliers import multiplier_table
 from ..metrics.provenance import best_effort_ctx
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .lambda_convention import LAMBDA, nonstandard_bonding_number
@@ -1100,7 +1101,7 @@ def name_heteroimine(mol) -> Optional[str]:
 
 
 _PHOSPHANIMINE_STEMS = {'P': 'phosphan', 'As': 'arsan', 'Sb': 'stiban'}
-_PHOSPHANIMINE_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+_PHOSPHANIMINE_MULT = multiplier_table(4, one='')
 
 
 def name_lambda5_phosphanimine(mol) -> Optional[str]:
@@ -1205,7 +1206,7 @@ _LAMBDA_IMINE_OXIDE_HUBS = {'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane'}
 # Suffix multipliers for the -one / -imine char-group suffix.
 _IO_SUFFIX_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetr'}
 # Prefix multipliers (di/tri) for substituent + imino prefixes.
-_IO_PREFIX_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+_IO_PREFIX_MULT = multiplier_table(4, one='')
 
 
 def _apply_hydride_suffix(stem: str, suffix: str) -> str:

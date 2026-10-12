@@ -28,8 +28,10 @@ gold rather than round-trip validation (V23 plan, a phase).
 import re
 from typing import Dict, Optional
 
+from ..data.multipliers import multiplier_table
+
 # Numerical multiplying prefixes. Index = count.
-_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+_MULT = multiplier_table(6, one="")
 
 # --- a phase: ACYL-PREFIX TABLE (SHARED — a phase consumes it) -
 # /.1.4: an acyl prefix is formed from the acid name by changing

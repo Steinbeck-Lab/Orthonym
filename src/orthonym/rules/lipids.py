@@ -22,6 +22,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import apply_enclosing_marks, get_multiplier_prefix, is_complex_substituent
 from ..data.chain_names import get_chain_prefix
+from ..data.multipliers import multiplier_table
 from ..data.sugar_names import sugar_to_glycosyloxy_prefix
 from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
 
@@ -452,7 +453,7 @@ def _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atom
     subs = []  # (alpha_key, rendered)
     if oh_atoms:
         locs = sorted(num[a] for a in oh_atoms)
-        mult = {1: "", 2: "di", 3: "tri"}[len(locs)]
+        mult = multiplier_table(3, one="")[len(locs)]
         rendered = f"{','.join(str(x) for x in locs)}-{mult}hydroxy"
         subs.append(("hydroxy", rendered))
     for a in glyco_atoms:
@@ -737,7 +738,7 @@ def _assemble_ceramide(mol, match, style) -> Optional[str]:
     elif len(dbs) == 1:
         sub_core = f"{stem}-{dbs[0]}-en{yl}"
     else:
-        mult = {2: "di", 3: "tri", 4: "tetra"}.get(len(dbs), "")
+        mult = multiplier_table(4).get(len(dbs), "")
         sub_core = f"{stem}a-{','.join(map(str, dbs))}-{mult}en{yl}"
 
     prefixes = _sphingoid_prefixes(match)

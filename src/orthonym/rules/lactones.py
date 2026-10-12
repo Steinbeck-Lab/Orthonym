@@ -29,6 +29,7 @@ from typing import Dict, List, Optional
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
     atoms_of,
     bonds_of,
@@ -349,7 +350,7 @@ def name_lactone_ring(ring_size: int, extra_o_locant: Optional[int] = None,
     # vowel-initial suffix elides its terminal 'e': tridec-10-en-2-one).
     locs = sorted(ene_locants)
     loc_str = ",".join(str(l) for l in locs)
-    mult = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}.get(len(locs))
+    mult = multiplier_table(6, one="").get(len(locs))
     if mult is None:
         return None  # more double bonds than this namer enumerates -> fail closed
     # deny-by-default (the Blue Book): the ene locants and the '-2-one'
@@ -748,7 +749,7 @@ def name_cyclic_polyester(mol) -> Optional[str]:
         return None
 
     c_locs = sorted(loc[a] for a in carbonyls)
-    mult = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}.get(len(c_locs))
+    mult = multiplier_table(6).get(len(c_locs))
     if mult is None:
         return None
     suffix = f"{mult}one"  # 'dione' / 'trione' (consonant-initial: no elision)

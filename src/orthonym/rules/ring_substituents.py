@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
+from ..data.multipliers import multiplier_table
 
 # IUPAC: Standard substituent names for rings
 # Maps ring system name to substituent prefix name
@@ -553,9 +554,7 @@ def pin_heteroaryl_substituent_name(
     return f"{prefix}{stem}-{attach_locant}-yl"
 
 
-_DECO_MULT: Dict[int, str] = {
-    1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
-}
+_DECO_MULT: Dict[int, str] = multiplier_table(6, one='')
 
 
 
@@ -1247,9 +1246,7 @@ def _decorated_fused_substituent_name(
 
 
 # Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra...).
-_UNSAT_MULT: Dict[int, str] = {
-    2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa',
-}
+_UNSAT_MULT: Dict[int, str] = multiplier_table(8)
 
 
 def _fmt_locant(loc) -> str:

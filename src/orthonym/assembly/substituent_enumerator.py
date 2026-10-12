@@ -39,6 +39,7 @@ from rdkit.Chem import RWMol
 
 # candidate ledger. Leaf module (threading + typing only), so cycle-free;
 # OFF unless a consumer calls enable, so the production cost is one boolean test.
+from ..data.multipliers import multiplier_table
 from ..metrics.candidate_ledger import Scope as _LedgerScope
 from ..metrics.candidate_ledger import Stage as _LedgerStage
 from ..metrics.candidate_ledger import record_candidate as _ledger_record
@@ -6296,10 +6297,7 @@ def _name_peroxy_branch(mol, frag_atoms, attach_idx, parent_atoms):
 # substituent-chain multipliers for a homogeneous contiguous chalcogen
 # chain named ``...<mult>sulfanyl``: k=2 disulfanyl, k=3 trisulfanyl,... Capped at
 # octa (each verified OPSIN-parseable, 2026-09-23); a longer chain fails closed.
-_CHALCOGEN_CHAIN_SUB_MULT = {
-    2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta',
-    6: 'hexa', 7: 'hepta', 8: 'octa',
-}
+_CHALCOGEN_CHAIN_SUB_MULT = multiplier_table(8)
 
 
 _CHALCOGEN_CHAIN_STEM = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}

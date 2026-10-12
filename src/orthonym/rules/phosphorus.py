@@ -16,6 +16,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
+from ..data.multipliers import multiplier_table
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .lambda_convention import LAMBDA, nonstandard_bonding_number
 
@@ -790,7 +791,7 @@ def name_acyloxy_phosphonic_acid(mol) -> Optional[str]:
 
 
 _PNICTOGEN_ACID_STEM = {'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane'}
-_PNICTOGEN_ACID_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta'}
+_PNICTOGEN_ACID_MULT = multiplier_table(5, one='')
 
 
 def name_phosphane_carboxylic_acid(mol) -> Optional[str]:
@@ -1887,8 +1888,7 @@ def name_phosphoanhydride_oxy_substituent(
     return apply_enclosing_marks(body, -1) + 'oxy'
 
 
-_PHOSPHOXANE_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
-                     7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
+_PHOSPHOXANE_MULT = multiplier_table(10)
 
 
 def _walk_phosphoanhydride_chain(mol, o_idx: int, from_idx: int):

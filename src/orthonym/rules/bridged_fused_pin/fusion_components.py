@@ -43,6 +43,8 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 
 from rdkit import Chem
 
+from ...data.multipliers import multiplier_table
+
 #: (:8284) citation order of the 'a' prefixes, also the order of
 #: (f) (:12298) and (i) (:12407)
 HW_ORDER = ("F", "Cl", "Br", "I", "O", "S", "Se", "Te", "N", "P", "As", "Sb", "Bi", "Si", "Ge",
@@ -70,8 +72,7 @@ _NUMERAL = {3: "propa", 4: "buta", 5: "penta", 6: "hexa", 7: "hepta", 8: "octa",
 _A_PREFIX = {"O": "oxa", "S": "thia", "Se": "selena", "Te": "tellura", "N": "aza", "P": "phospha",
              "As": "arsa", "Sb": "stiba", "Bi": "bisma", "Si": "sila", "Ge": "germa", "Sn": "stanna",
              "Pb": "plumba", "B": "bora", "Al": "aluma", "Ga": "galla", "In": "indiga", "Tl": "thalla"}
-_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa", 7: "hepta", 8: "octa", 9: "nona",
-         10: "deca"}
+_MULT = multiplier_table(10)
 
 
 def numeral(n: int) -> Optional[str]:

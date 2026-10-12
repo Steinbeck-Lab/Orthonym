@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .substituent_purity import organyl_prefix_name
 
@@ -35,7 +36,7 @@ from .substituent_purity import organyl_prefix_name
 # each `<mult>azane` was OPSIN-round-trip verified before adding (0-wrong).
 _SAT_MULT = {3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa',
              9: 'nona', 10: 'deca', 11: 'undeca', 12: 'dodeca'}
-_SUB_MULTIPLIER = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+_SUB_MULTIPLIER = multiplier_table(4, one='')
 
 
 def _saturated_parent(n: int) -> Optional[str]:

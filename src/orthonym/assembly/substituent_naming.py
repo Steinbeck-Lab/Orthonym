@@ -29,6 +29,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..perception.stereo import assign_stereochemistry
 from .fragment_naming import name_fragment_recursively
 from .naming_utils import SIMPLE_MULTIPLIERS, alpha_sort_key, get_alkyl_name, has_structural_hyphen, multiplied_component, simple_multiplier_word
@@ -966,7 +967,7 @@ def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
         key = (fv, unsat, oxo_locs)
         if best is None or key < best[0]:
             stem = _build_alkenyl_name(n, fv, dbl, trp)   # 'prop-1-en-2-yl'
-            _M = {1: "", 2: "di", 3: "tri", 4: "tetra"}
+            _M = multiplier_table(4, one="")
             ostr = f"{','.join(map(str, oxo_locs))}-{_M.get(len(oxo_locs), '')}oxo"
             best = (key, f"{ostr}{stem}", pos)            # '3-oxo' + 'prop-1-en-2-yl'
     if not best:
@@ -1391,7 +1392,7 @@ def _name_saturated_substituted_chain(
     if _l5:
         return f"{_l5}{stem}yl"
 
-    _MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+    _MULT = multiplier_table(6, one="")
     # Past 'hexa' the multiplier is composed, the Blue Book-2813;
     # 21 'henicosa':2820) by simple_multiplier_word; the old digit fallback wrote
     # '21fluoro' for twenty-one fluoro prefixes. The halogen prefixes here always
@@ -3631,7 +3632,7 @@ def _unsaturated_substituent_name(
     elif len(ene_locs) == 1:
         ene_stem = f"{stem}-{eloc_str}-en"
     else:
-        emult = {2: "di", 3: "tri", 4: "tetra"}.get(len(ene_locs))
+        emult = multiplier_table(4).get(len(ene_locs))
         if emult is None:
             return None  # > tetraene -> out of scope
         ene_stem = f"{stem}a-{eloc_str}-{emult}en"

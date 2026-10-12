@@ -22,6 +22,7 @@ from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ...data.multipliers import multiplier_table
 from ..partial_saturation import _PARTIAL_SAT_PCG_SUFFIX
 from ..stereochemistry import format_stereodescriptor_string
 from . import hydro, numbering, prefixes, selection
@@ -310,7 +311,7 @@ def _assemble(mol, system: Set[int], parent: BridgedParent, suffix, added=frozen
     suffix_text, elide = "", False
     if status == "suffix":
         locs = sorted((a2l[a] for a in ring_atoms), key=numbering.loc_key)
-        mult = {1: "", 2: "di", 3: "tri", 4: "tetra"}.get(len(locs))
+        mult = multiplier_table(4, one="").get(len(locs))
         if mult is None:
             return None
         stem, elides = _SUFFIX_STEM[kind]

@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..perception.ions import get_radical_sites
 
 # === SUFFIX MAPPINGS ===
@@ -572,8 +573,8 @@ def _aminoxyl_prefix_string(prefixes: List[str]) -> str:
     from ..assembly.naming_utils import (alpha_sort_key, enclose_if_compound,
                                          multiplier_needs_hyphen)
     counts = Counter(prefixes)
-    simple = {2: 'di', 3: 'tri', 4: 'tetra'}
-    compound_mult = {2: 'bis', 3: 'tris', 4: 'tetrakis'}
+    simple = multiplier_table(4)
+    compound_mult = multiplier_table(4, kind='complex')
     out = []
     for i, p in enumerate(sorted(counts, key=alpha_sort_key)):
         compound = enclose_if_compound(p) != p
@@ -1018,7 +1019,7 @@ def _name_carbon_radical(mol, idx: int) -> str:
 
 # === MULTI-CENTRE RADICALS,, ===
 
-_SIMPLE_MULT = {2: 'di', 3: 'tri', 4: 'tetra'}
+_SIMPLE_MULT = multiplier_table(4)
 
 
 def _ring_polyvalent_name(frag, centers: List[int]) -> str:
@@ -1451,7 +1452,7 @@ def _name_homogeneous_chain_radical(mol, sites) -> str:
         return ''
     best = min(tuple(sorted(o.index(c) + 1 for c in centres)) for o in (order, order[::-1]))
     k = len(centres)
-    mult = {1: '', 2: 'di', 3: 'tri'}.get(k)
+    mult = multiplier_table(3, one='').get(k)
     if mult is None:
         return ''
     tail = f"-{','.join(map(str, best))}-{mult}yl"
@@ -1724,7 +1725,7 @@ _ELIDE_E_HYDRIDE_RADICAL = {
 }
 _RADICAL_SUFFIX_BY_NE = {1: 'yl', 2: 'ylidene', 3: 'ylidyne'}
 #: multiplying prefixes 'bis'/'tris'/... precede compound suffixes.
-_COMPOUND_MULTIPLIER = {2: 'bis', 3: 'tris', 4: 'tetrakis'}
+_COMPOUND_MULTIPLIER = multiplier_table(4, kind='complex')
 
 
 def _parent_hydride_radical_name(element: str, n_electrons: int) -> str:

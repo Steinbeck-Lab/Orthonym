@@ -33,6 +33,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Set
 
 from rdkit import Chem
+from ..data.multipliers import multiplier_table
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 
@@ -308,7 +309,7 @@ def _assemble(mol, parent, numbering, suffix_carbons, prefix_on) -> Optional[str
 
     # --- -ol suffix with lowest locants. ---
     ol_locs = sorted(numbering[c] for c in suffix_carbons)
-    ol_mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}.get(
+    ol_mult = multiplier_table(6, one='').get(
         len(ol_locs))
     if ol_mult is None:
         return None

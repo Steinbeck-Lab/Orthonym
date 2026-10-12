@@ -29,6 +29,7 @@ from typing import List, Optional, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import apply_vowel_elision
+from ..data.multipliers import multiplier_table
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 from .substituent_purity import organyl_prefix_name
 
@@ -37,11 +38,9 @@ _CHALCOGEN_STEMS = {'O': 'oxidane', 'S': 'sulfane', 'Se': 'selane', 'Te': 'tella
 
 # Basic multiplying prefixes (Table 1.4). NO elision of the terminal vowel
 #: di+oxidane -> "dioxidane", tetra+oxidane -> "tetraoxidane".
-_MULTIPLIER = {
-    2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa', 7: 'hepta', 8: 'octa',
-}
+_MULTIPLIER = multiplier_table(8)
 # Substituent multiplying prefixes (used WITH locants, normal elision rules).
-_SUB_MULTIPLIER = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+_SUB_MULTIPLIER = multiplier_table(4, one='')
 
 
 def _chalcogen_chain(mol, element: str) -> Optional[List[int]]:

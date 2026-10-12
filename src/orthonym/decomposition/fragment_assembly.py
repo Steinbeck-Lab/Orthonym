@@ -25,6 +25,7 @@ from ..assembly.naming_utils import (
     _wrap_n_substituent,
     enclose_if_compound,
 )
+from ..data.multipliers import multiplier_table
 from ..data.sugar_names import (
     lookup_sugar,
     recognize_sugar_skeleton,
@@ -608,13 +609,12 @@ def _group_n_substituents(name: str) -> str:
 
             if is_complex_substituent(sub_name):
                 # Complex: use bis/tris/tetrakis with parentheses
-                _COMPLEX_MULT = {2: "bis", 3: "tris", 4: "tetrakis",
-                                 5: "pentakis"}
+                _COMPLEX_MULT = multiplier_table(5, kind="complex")
                 mult = _COMPLEX_MULT.get(count, f"{count}kis")
                 parts.append(f"{n_locants}-{mult}({sub_name})")
             else:
                 # Simple: use di/tri/tetra without parentheses
-                _SIMPLE_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+                _SIMPLE_MULT = multiplier_table(5)
                 mult = _SIMPLE_MULT.get(count, str(count))
                 parts.append(f"{n_locants}-{mult}{sub_name}")
 
@@ -2205,7 +2205,7 @@ def _assemble_multi_ester(
 
     # Identical acids: use multiplicative prefix (per: compare names not SMILES)
     if len(set(ate_names)) == 1:
-        _MULT_PREFIX = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+        _MULT_PREFIX = multiplier_table(5, one="")
         mult = _MULT_PREFIX.get(len(ate_names), str(len(ate_names)))
         return f"{core_name} {mult}{ate_names[0]}"
 
@@ -2326,7 +2326,7 @@ def _assemble_multi_glycoside(
 
     # Handle identical sugars with multiplicative prefix
     prefix_counts = _Counter(glycosyloxy_prefixes)
-    _MULT_PREFIX = {1: "", 2: "bis", 3: "tris", 4: "tetrakis", 5: "pentakis"}
+    _MULT_PREFIX = multiplier_table(5, one="", kind="complex")
 
     if len(prefix_counts) == 1:
         # All identical sugars
@@ -2441,7 +2441,7 @@ def _assemble_multi_amide(
 
     # Group identical acyls for multiplicative prefix
     acyl_counts = _Counter(acyl_names)
-    _MULT_PREFIX = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+    _MULT_PREFIX = multiplier_table(5, one="")
 
     # Build the N-prefix assembly
     n_parts: List[str] = []

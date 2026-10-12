@@ -30,17 +30,19 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 from rdkit.Chem import RWMol
 
+from ..data.multipliers import multiplier_table
+
 # Phosphate H-count -> word /.2). The "<n>hydrogen" multiplier counts
 # the free acidic -OH groups on the linear terminal polyphosphate ester:
 # mono: -O-P(=O)(OH)2 -> 2 OH -> dihydrogen phosphate
 # di: -O-P(=O)(OH)-O-P(=O)(OH)2 -> 3 OH -> trihydrogen diphosphate
 # tri: -O-P(=O)(OH)-O-P(=O)(OH)-O-P(=O)(OH)2 -> 4 OH -> tetrahydrogen triphosphate
-_HYDROGEN_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa", 7: "hepta"}
+_HYDROGEN_MULT = multiplier_table(7, one="")
 _PHOSPHATE_STEM = {1: "phosphate", 2: "diphosphate", 3: "triphosphate", 4: "tetraphosphate"}
 
 # O-acyl ester: acyl carbon count -> functional-class ester word. Straight-chain only.
 _ACYL_NAME = {1: "formate", 2: "acetate", 3: "propanoate", 4: "butanoate"}
-_PRIME_MULT = {2: "di", 3: "tri", 4: "tetra"}
+_PRIME_MULT = multiplier_table(4)
 
 # ---------------------------------------------------------------------------
 # Base-ring numbering + tautomer-robust base classification ring

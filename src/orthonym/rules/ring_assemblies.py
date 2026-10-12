@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from rdkit import Chem
 from rdkit.Chem import rdchem
+from ..data.multipliers import multiplier_table
 from ..perception.molcache import bonds_of
 
 
@@ -732,7 +733,7 @@ def _name_replacement_ring_assembly(mol, assembly_info: Dict) -> Optional[str]:
         by_elem.setdefault(sym, []).append((loc, primed))
     if not by_elem:
         return None
-    _MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}
+    _MULT = multiplier_table(4, one='')
     cited: List[Tuple[int, str]] = []
     for sym, entries in by_elem.items():
         entries.sort()
@@ -3155,7 +3156,7 @@ def _build_mixed_pcg_ring_assembly(
     suffix_keys = sorted(_loc(s) for s in suffix_subs)
     suffix_loc_str = ",".join(
         f"{num}{_format_prime(pr)}" for num, pr in suffix_keys)
-    smult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(len(suffix_keys))
+    smult = multiplier_table(4, one='').get(len(suffix_keys))
     if smult is None:
         return None
     # (c) (BB 7623/7625): the terminal 'a' of a numerical multiplier is
@@ -3611,7 +3612,7 @@ def name_ring_assembly(
             f"{loc}{_format_prime(sys_idx)}" for loc, sys_idx in suffix_locants
         )
         n = len(suffix_locants)
-        mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(n)
+        mult = multiplier_table(4, one='').get(n)
         if mult is None:
             return None
         if indicated_h_match:

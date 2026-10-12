@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..errors import is_refusal_sentinel
 from ..perception.molcache import atoms_of
 
@@ -215,10 +216,8 @@ def _urea_ring_carboxamide_match(mol, functional_groups, ring_set):
     return None
 
 
-_MULT_SIMPLE = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa',
-                7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca'}
-_MULT_COMPLEX = {2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis',
-                 6: 'hexakis'}
+_MULT_SIMPLE = multiplier_table(10)
+_MULT_COMPLEX = multiplier_table(6, kind='complex')
 # Complex prefix (needs bis/tris + enclosure): contains locants, hyphens,
 # brackets, or an internal multiplying prefix.
 _COMPLEX_PREFIX_RE = re.compile(r"[0-9\-\(\)\[\]]")

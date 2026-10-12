@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from .fused_rings import get_shared_atoms
 
 logger = logging.getLogger(__name__)
@@ -79,13 +80,7 @@ def _record_general_bridge(prefix: str) -> None:
             pass
 
 # Multiplier prefixes for multiple identical bridges
-MULTIPLIERS: Dict[int, str] = {
-    2: 'di',
-    3: 'tri',
-    4: 'tetra',
-    5: 'penta',
-    6: 'hexa',
-}
+MULTIPLIERS: Dict[int, str] = multiplier_table(6)
 
 
 # ============================================================================

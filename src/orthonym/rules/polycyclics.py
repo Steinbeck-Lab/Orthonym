@@ -46,6 +46,7 @@ from ..assembly.naming_utils import (
     format_substituent_prefix,
     get_suffix_multiplier_prefix,
 )
+from ..data.multipliers import multiplier_table
 from ..data.polycyclic_data import (
     POLYCYCLIC_DATA,
     get_polycyclic_by_smiles,
@@ -1948,7 +1949,7 @@ def _assemble_partially_saturated_carbocycle_name(
         if not pcg_exclude:
             return None  # suffix atoms not found -> never spell a bare parent
         pcg_locants.sort(key=_locant_key)
-        _mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra'}.get(len(pcg_locants))
+        _mult = multiplier_table(4, one='').get(len(pcg_locants))
         if _mult is None:
             return None  # too many suffix groups for this scoped path
         _stem, _elides = _PARTIAL_SAT_PCG_SUFFIX[pcg_kind]

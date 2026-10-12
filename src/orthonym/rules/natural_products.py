@@ -25,6 +25,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..data.natural_products import (
     get_natural_product_name,
 )
@@ -185,13 +186,7 @@ def format_np_modification_prefix(modifications: List[Dict]) -> str:
         return ""
 
     # Multiplicative prefixes for nor-
-    _NOR_MULTIPLIERS = {
-        1: "",
-        2: "di",
-        3: "tri",
-        4: "tetra",
-        5: "penta",
-    }
+    _NOR_MULTIPLIERS = multiplier_table(5, one="")
 
     # Sort alphabetically by prefix name
     sorted_mods = sorted(modifications, key=lambda m: m["prefix"])

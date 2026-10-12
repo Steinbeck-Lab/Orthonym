@@ -77,6 +77,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from ...data.chain_names import get_chain_prefix
+from ...data.multipliers import multiplier_table
 from ...rules.locants import get_bond_locants, get_functional_group_locants
 from ...rules.seniority import get_prefix, get_suffix
 from ..naming_utils import (
@@ -250,8 +251,7 @@ def _generate_chain_parent(features: Any) -> "NameFragment":
         # Citation: seniority order O > S > Se > Te > N > P > Si > B
         #, each term with its locants and multiplier.
         _SENIORITY = ['O', 'S', 'Se', 'Te', 'N', 'P', 'Si', 'B']
-        _MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta',
-                 6: 'hexa', 7: 'hepta', 8: 'octa'}
+        _MULT = multiplier_table(8, one='')
         _terms = []
         for _sym in _SENIORITY:
             if _sym not in _het_positions:

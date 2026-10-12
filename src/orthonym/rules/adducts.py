@@ -31,6 +31,8 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
+
 EM_DASH = "—"
 
 # Single-heavy-atom NEUTRAL molecular components of a adduct, keyed by
@@ -143,7 +145,7 @@ _METAL_HALIDE_OXIDE_LIGANDS: Dict[Tuple[int, float], str] = {
     (53, 1.0): 'iodo', (8, 2.0): 'oxo',
 }
 
-_LIGAND_MULTIPLIERS = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_LIGAND_MULTIPLIERS = multiplier_table(6, one='')
 
 
 def _metal_halide_oxide_component_name(frag_mol) -> Optional[str]:
@@ -367,10 +369,7 @@ def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
 
 
 #: "an appropriate numerical prefix, such as 'mono','di', 'tri'"
-_HYDRATE_MULTIPLIERS = {
-    1: "mono", 2: "di", 3: "tri", 4: "tetra", 5: "penta",
-    6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
-}
+_HYDRATE_MULTIPLIERS = multiplier_table(10, one="mono")
 
 
 def _hydrate_word_form(named: List[Tuple[str, int]],

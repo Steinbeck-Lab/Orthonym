@@ -25,6 +25,7 @@ from __future__ import annotations
 import re
 from typing import List, Optional, Tuple
 
+from ..data.multipliers import multiplier_table
 from .naming_utils import (
     SIMPLE_MULTIPLIERS,
     italicized_prefix_is_bare,
@@ -577,7 +578,7 @@ def unlocanted_prefix_block(prefix_texts: List[str],
     # 'decanoyl', 'heptanoyl', 'triazolyl', 'tetrazolyl', 'diazenyl'. A
     # 'bis(...)'-type prefix is enclosed by its own marks already.
     if enclose_subsequent and len(unlocanted) > 1:
-        _count_mult = {2: 'di', 3: 'tri'}
+        _count_mult = multiplier_table(3)
 
         def _locant_count(t: str) -> int:
             m = re.match(r'^(\d+[a-z]?(?:,\d+[a-z]?)*)-', t)

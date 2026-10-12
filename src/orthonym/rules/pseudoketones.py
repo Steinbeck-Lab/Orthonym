@@ -28,6 +28,7 @@ from typing import Any, Optional, Tuple
 
 from ..assembly.naming_utils import apply_vowel_elision
 from ..data.chain_names import get_chain_prefix
+from ..data.multipliers import multiplier_table
 from ..perception.chains import find_longest_carbon_chain
 from ..perception.molcache import atoms_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .ring_substituents import name_ring_system_substituent
@@ -416,7 +417,7 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
 # Chalcogen-chain parent-hydride stems for the trioxidanyl substituent.
 _CHALCOGENCHAIN_STEMS = {"O": "oxidane", "S": "sulfane", "Se": "selane",
                          "Te": "tellane"}
-_CHALCOGENCHAIN_MULT = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+_CHALCOGENCHAIN_MULT = multiplier_table(6)
 
 
 def name_acyl_chalcogenchain_pseudoketone(mol) -> Optional[str]:

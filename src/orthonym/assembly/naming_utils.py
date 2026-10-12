@@ -992,51 +992,10 @@ def get_alkyl_name(carbon_count: int) -> str:
 # Multiplier Prefixes
 # ============================================================================
 
-# Simple multiplicative prefixes (for simple substituent names)
-SIMPLE_MULTIPLIERS = {
-    2: "di",
-    3: "tri",
-    4: "tetra",
-    5: "penta",
-    6: "hexa",
-    7: "hepta",
-    8: "octa",
-    9: "nona",
-    10: "deca",
-    11: "undeca",
-    12: "dodeca",
-    13: "trideca",
-    14: "tetradeca",
-    15: "pentadeca",
-    16: "hexadeca",
-    17: "heptadeca",
-    18: "octadeca",
-    19: "nonadeca",
-    20: "icosa",
-}
-
-# Complex multiplicative prefixes (for substituents with locants/hyphens)
-COMPLEX_MULTIPLIERS = {
-    2: "bis",
-    3: "tris",
-    4: "tetrakis",
-    5: "pentakis",
-    6: "hexakis",
-    7: "heptakis",
-    8: "octakis",
-    9: "nonakis",
-    10: "decakis",
-    11: "undecakis",
-    12: "dodecakis",
-    13: "tridecakis",
-    14: "tetradecakis",
-    15: "pentadecakis",
-    16: "hexadecakis",
-    17: "heptadecakis",
-    18: "octadecakis",
-    19: "nonadecakis",
-    20: "icosakis",
-}
+# The multiplying prefixes (di, tri,... / bis, tris,...) live in ``data/multipliers.py``, a leaf
+# module with no orthonym imports. These names are the same dict objects, so every importer of
+# ``naming_utils.SIMPLE_MULTIPLIERS`` / ``COMPLEX_MULTIPLIERS`` is unchanged.
+from ..data.multipliers import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS  # noqa: E402
 
 
 def simple_multiplier_word(n: int) -> Optional[str]:

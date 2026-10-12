@@ -27,6 +27,7 @@ from ..data.ion_retained_names import (
     get_anion_name,
     get_cation_name,
 )
+from ..data.multipliers import multiplier_table
 from ..errors import UnnameableSubstituentError  # a voided candidate (Task 3)
 from ..errors import is_failure_name
 from ..perception.ions import get_ion_sites
@@ -909,7 +910,7 @@ _MONONUCLEAR_ANION_PARENT = {
     'O': ('oxidane', 2), 'S': ('sulfane', 2), 'Se': ('selane', 2),
     'Te': ('tellane', 2),
 }
-_ANION_MULT = {2: 'di', 3: 'tri', 4: 'tetra'}
+_ANION_MULT = multiplier_table(4)
 
 
 def _name_mononuclear_hydride_anion(mol) -> str:
@@ -5480,7 +5481,7 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
         grouped[name].sort()
 
     # Build prefix: alphabetically sorted, with multipliers
-    MULTIPLIERS = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+    MULTIPLIERS = multiplier_table(6, one='')
 
     prefixes = []
     for sub_name in sorted(grouped.keys()):
@@ -5618,7 +5619,7 @@ def _build_partial_acid_salt_chain_name(
     for name in groups:
         groups[name].sort()
 
-    plain_mult = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+    plain_mult = multiplier_table(6, one='')
     parts = []
     for name in sorted(groups.keys()):
         locs = groups[name]
@@ -7279,7 +7280,7 @@ def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
 # locant) rather than the cation-as-prefix construction.
 # =============================================================================
 
-_HETEROCHAIN_NUM_PREFIX = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_HETEROCHAIN_NUM_PREFIX = multiplier_table(6, one='')
 _HETEROCHAIN_ELEMENTS = frozenset({'N', 'O', 'S'})
 
 

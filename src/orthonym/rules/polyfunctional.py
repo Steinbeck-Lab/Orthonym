@@ -39,6 +39,7 @@ from ..assembly.substituent_prefix_forms import (
 from ..assembly.substituent_prefix_forms import (
     get_sulfonyl_prefix as _ASSEMBLY_get_sulfonyl_prefix,
 )
+from ..data.multipliers import multiplier_table
 from ..errors import is_refusal_sentinel
 from .ring_unsaturation import render_ring_unsaturation
 from .seniority import (
@@ -48,7 +49,7 @@ from .seniority import (
 )
 
 # Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra…),.
-_RING_UNSAT_MULT = {2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_RING_UNSAT_MULT = multiplier_table(6)
 
 
 def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):

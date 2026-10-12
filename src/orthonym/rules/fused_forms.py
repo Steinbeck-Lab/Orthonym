@@ -48,6 +48,8 @@ from typing import Dict, Iterable, Optional, Sequence, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
+
 logger = logging.getLogger(__name__)
 
 __all__ = ["FusedForm", "FusedKetoneForm", "fused_system_form", "fused_system_ketone_form",
@@ -275,7 +277,7 @@ class FusedKetoneForm:
         return self.parent.endswith("e") and word[:1] in "aeiouy"
 
 
-_KETONE_MULTIPLIERS = {2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+_KETONE_MULTIPLIERS = multiplier_table(6)
 
 
 def fused_system_ketone_form(mol, ring_atoms: Iterable[int], suffix_atoms: Iterable[int],

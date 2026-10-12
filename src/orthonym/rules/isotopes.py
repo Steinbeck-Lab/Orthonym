@@ -24,6 +24,8 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
+
 
 def has_isotopes(mol: Optional[Chem.Mol]) -> bool:
     """True iff any atom of ``mol`` carries a non-zero isotope label."""
@@ -3358,7 +3360,7 @@ def _decorate_reduced_multiplier(skeleton, keys, original, stripped,
     if not valid_ks:
         return None
 
-    _RED = {2: "di", 3: "tri", 4: "tetra", 5: "penta"}
+    _RED = multiplier_table(5)
 
     def _assemble(lab_loc: int, k: int) -> str:
         base, parent = tail[:k], tail[k:]

@@ -35,6 +35,7 @@ from typing import Optional
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .functional_replacement import (
     build_acyl_halide_name,
@@ -469,7 +470,7 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
         sub_names.append(nm)
     if not sub_names:
         return ""                                    # bare -NH2
-    _MULT = {1: "", 2: "di", 3: "tri"}
+    _MULT = multiplier_table(3, one="")
     counts = Counter(sub_names)
     segs = []
     #: the guard above is the shared chokepoint, so a prefix here may carry
@@ -1169,7 +1170,7 @@ def name_silicic_acid_frn(mol) -> Optional[str]:
             return None
     if oh_count < 1 or not chalco:
         return None
-    _MULT = {1: "", 2: "di", 3: "tri"}
+    _MULT = multiplier_table(3, one="")
     parts = []
     for pre in sorted(chalco, key=lambda p: _CHALCOGEN_PREFIX_ORDER[p]):
         c = chalco[pre]
@@ -1218,7 +1219,7 @@ def name_borane_amine(mol) -> Optional[str]:
         return None
     if n_count == 1:
         return "boranamine"                          # borane + amine (e elided)
-    return "borane" + {2: "di", 3: "tri", 4: "tetra"}.get(n_count, "") + "amine"
+    return "borane" + multiplier_table(4).get(n_count, "") + "amine"
 
 
 # --- W3-P10 Engine B: di-/polynuclear noncarbon-oxoacid derivatives ---
@@ -1562,8 +1563,7 @@ _CARB_HALO_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
 # Terminal-only prefixes (cannot sit at a bridge): a lone one on a symmetric parent
 # omits its locant; 'chlorodicarbonic acid', not '1-chloro...').
 _CARB_TERMINAL_ONLY = set(_CARB_HALO_PREFIX.values()) | {"amido", "hydrazido"}
-_CARB_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa",
-              7: "hepta", 8: "octa", 9: "nona", 10: "deca"}
+_CARB_MULT = multiplier_table(10, one="")
 
 
 def _carb_acyl(mol, c):
@@ -2184,7 +2184,7 @@ def name_carbonic_class_derivative(mol) -> Optional[str]:
 # hydrazine N1 = the C-bonded hydrazine N, hydrazine N2 = the terminal one), and
 # names either the substituted monomer or the multiplicative dimer. Fails
 # closed on any senior group, unaccounted atom, or unnameable substituent.
-_HZC_MULT = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_HZC_MULT = multiplier_table(6, one='')
 
 
 def _hzc_branch_atoms(mol, start, banned):

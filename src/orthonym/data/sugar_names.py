@@ -30,6 +30,7 @@ from typing import Dict, Optional, Tuple
 from rdkit import Chem
 from rdkit.Chem import rdCIPLabeler
 from ..perception.molcache import atoms_of, bonds_of, canon_smiles
+from .multipliers import multiplier_table
 
 logger = logging.getLogger(__name__)
 
@@ -1920,7 +1921,7 @@ def _build_o_acyl_prefix_terms(o_acyl_mods):
     if len(words) != 1:
         return None  # mixed acyl -> out of scope, fail closed
     word = next(iter(words))
-    mult = {1: "", 2: "di", 3: "tri", 4: "tetra"}.get(len(o_acyl_mods))
+    mult = multiplier_table(4, one="").get(len(o_acyl_mods))
     if mult is None:
         return None  # >4 of one acyl -> out of scope, fail closed
     locs = sorted(loc for loc, _w in o_acyl_mods)
@@ -1986,7 +1987,7 @@ def _build_o_acid_prefix_terms(o_sulfo, o_phospho):
     ignores the italic ``O-`` locant marker, mirroring how the halo grouping
     ignores its own multiplying prefix), or ``None`` on overflow (>4 of one
     word — out of scope, fail-closed, never a wrong multiplier)."""
-    mult = {1: "", 2: "di", 3: "tri", 4: "tetra"}
+    mult = multiplier_table(4, one="")
     by_word: Dict[str, list] = {}
     for loc, word in o_sulfo:
         by_word.setdefault(word, []).append(loc)
@@ -2601,7 +2602,7 @@ def name_monosaccharide_systematic(mol, for_glycosidic_unit: bool = False) -> Op
         # HALO: group by halogen, cite locants + multiplier, alpha-key = halogen
         # name (fluoro/chloro/bromo/iodo — ordered ignoring the di/tri multiplier).
         _HALO_NAME = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
-        _HALO_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra"}
+        _HALO_MULT = multiplier_table(4, one="")
         halo_by_sym: Dict[str, list] = {}
         for loc, sym in halo_locants:
             halo_by_sym.setdefault(sym, []).append(loc)
@@ -3149,7 +3150,7 @@ def _name_sugar_acyl_ester(mol) -> Optional[str]:
     #: a complex acylate word (carrying a locant/space) takes the
     # bis/tris multiplier and enclosing marks; a simple word (acetate) does not.
     if n > 1 and any(ch in word for ch in "- ("):
-        _BIS = {2: "bis", 3: "tris", 4: "tetrakis", 5: "pentakis", 6: "hexakis"}
+        _BIS = multiplier_table(6, kind="complex")
         mult = _BIS[n]
         ester_term = f"({word})"
     else:
@@ -3245,10 +3246,10 @@ def name_sugar_ester(mol, canonical_smiles: str) -> Optional[str]:
         #: a word carrying a space/locant takes bis/tris + enclosing
         # marks; a simple word (ionized 'sulfate') takes di/tri.
         if any(ch in word for ch in " -("):
-            mult = {2: "bis", 3: "tris"}.get(n)
+            mult = multiplier_table(3, kind="complex").get(n)
             ester_term = f"({word})"
         else:
-            mult = {2: "di", 3: "tri"}.get(n)
+            mult = multiplier_table(3).get(n)
             ester_term = word
         if mult is None:
             return None
@@ -4327,7 +4328,7 @@ def _has_open_chain_amino_aldose(mol) -> bool:
     return has_cho and has_nh_alkyl and oh_c >= 3
 
 
-_OMETHYL_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+_OMETHYL_MULT = multiplier_table(6, one="")
 
 
 def name_sugar_o_methyl(mol, canonical_smiles: str) -> Optional[str]:

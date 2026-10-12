@@ -17,6 +17,7 @@ numerical order".
 from dataclasses import dataclass
 from typing import Any, List, Optional, Sequence, Tuple
 
+from ...data.multipliers import multiplier_table
 from ..bridged_fused import GENERAL_ONLY_BRIDGE_PREFIXES
 from .numbering import loc_key
 
@@ -32,7 +33,7 @@ _ALKENO = {(2, (1,)): "etheno", (3, (1,)): "prop[1]eno", (4, (1,)): "but[1]eno",
 #: recorded as not a PIN)
 _ONE_ATOM = {"O": "epoxy", "S": "epithio", "N": "epimino", "Si": "silano", "Sn": "stannano",
              "B": "borano"}
-_MULTIPLIER = {2: "di", 3: "tri", 4: "tetra"}
+_MULTIPLIER = multiplier_table(4)
 #: (the Blue Book) "The bonding number of a skeletal atom is standard when it
 #: has the value given in Table 1.3" (:2750-:2754): B 3, C Si Sn 4, N 3, O S 2
 _STANDARD_BONDING = {"B": 3, "C": 4, "Si": 4, "Sn": 4, "N": 3, "O": 2, "S": 2}

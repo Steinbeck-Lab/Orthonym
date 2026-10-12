@@ -32,6 +32,7 @@ from ..data.fused_heterocycles import (
     get_fused_heterocycle_name,
     match_fused_heterocycle_core,
 )
+from ..data.multipliers import multiplier_table
 from ..data.xanthine_derivatives import (
     get_xanthine_name,
 )
@@ -51,10 +52,7 @@ from .stereochemistry import (
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Simple multiplicative prefixes for substituent naming
-SIMPLE_MULTIPLIERS = {
-    2: "di", 3: "tri", 4: "tetra", 5: "penta",
-    6: "hexa", 7: "hepta", 8: "octa", 9: "nona", 10: "deca",
-}
+SIMPLE_MULTIPLIERS = multiplier_table(10)
 
 
 def _compute_general_indicated_h(mol, ring_atom_set: Set[int],
@@ -1664,7 +1662,7 @@ _PCF_CARBOCYCLIC = {
     'cycloheptadiene', 'cycloheptene', 'cyclohexene',
     'cyclooctatetraene', 'cyclooctene',
 }
-_PCF_MULTIPLIERS = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
+_PCF_MULTIPLIERS = multiplier_table(6, one='')
 # Heteroatom seniority for the base's isolated IUPAC numbering (senior -> low
 # locant): O > S > Se > Te > N > P > As > B (Hantzsch-Widman element order).
 _PCF_HET_NUM_SENIORITY = {
@@ -5329,11 +5327,7 @@ _FUSED_CARBOCYCLIC_INTRINSIC_IH = {
 }
 
 # Numeric prefix for hydrogen count
-_SATURATION_PREFIXES = {
-    2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta',
-    6: 'hexa', 7: 'hepta', 8: 'octa', 9: 'nona',
-    10: 'deca', 11: 'undeca', 12: 'dodeca',
-}
+_SATURATION_PREFIXES = multiplier_table(12)
 
 # Hydro count for each aromatic parent when fully saturated
 _PARENT_HYDRO_COUNTS = {

@@ -68,6 +68,7 @@ from ..assembly.naming_utils import (
 )
 from ..assembly.substituent_enumerator import name_substituent
 from ..data.chain_names import get_chain_prefix
+from ..data.multipliers import multiplier_table
 
 # Onium elements whose closed-shell cation (no free H) can terminate a
 # Part-B charged arm (mirrors `rules/ions.py`'s `_YLIDE_ONIUM_ELEMENTS`,
@@ -75,7 +76,7 @@ from ..data.chain_names import get_chain_prefix
 # plausibly uses).
 _ONIUM_ELEMENTS = frozenset({'N', 'P', 'S', 'O', 'As', 'Sb', 'Se', 'Te'})
 
-_HYDRO_MULT = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+_HYDRO_MULT = multiplier_table(6, one="")
 
 
 def try_weave(mol, style: str = "pin") -> Optional[str]:

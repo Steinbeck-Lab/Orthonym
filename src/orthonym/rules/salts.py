@@ -27,6 +27,7 @@ import re
 from rdkit import Chem
 
 from ..data.ion_retained_names import INORGANIC_ANIONS, INORGANIC_CATIONS
+from ..data.multipliers import multiplier_table
 from ..errors import is_failure_name
 from ..perception.ions import get_ion_sites, parse_salt_fragments
 from ..perception.metals import assembly_has_out_of_scope_metal
@@ -76,26 +77,13 @@ def _with_stock_if_variable_valence(frag_mol, word: str) -> str:
 
 # === STOICHIOMETRIC PREFIXES ===
 
-STOICHIOMETRIC_PREFIXES = {
-    2: 'di',
-    3: 'tri',
-    4: 'tetra',
-    5: 'penta',
-    6: 'hexa',
-    7: 'hepta',
-    8: 'octa',
-    9: 'nona',
-    10: 'deca',
-}
+STOICHIOMETRIC_PREFIXES = multiplier_table(10)
 
 
 # (:41013) / (:41431): a COMPOSITE ion is multiplied
 # with the enclosing multipliers bis/tris/tetrakis (name wrapped in parens),
 # NOT the simple di/tri/tetra (which are glued directly onto the name).
-COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = {
-    2: 'bis', 3: 'tris', 4: 'tetrakis', 5: 'pentakis', 6: 'hexakis',
-    7: 'heptakis', 8: 'octakis', 9: 'nonakis', 10: 'decakis',
-}
+COMPLEX_STOICHIOMETRIC_PREFIXES: Dict[int, str] = multiplier_table(10, kind='complex')
 
 
 # / (avoid-ambiguity): a bare mononuclear-oxoanion word W

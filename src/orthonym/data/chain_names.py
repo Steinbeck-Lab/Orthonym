@@ -50,6 +50,7 @@ Examples:
     'henkili'
 """
 
+from .multipliers import multiplier_table
 
 # ============================================================================
 # Direct lookup for standard prefixes (1-20)
@@ -305,7 +306,7 @@ def get_anoate_name(n: int) -> str:
     return prefix + "anoate"
 
 
-_ENE_MULTIPLIER = {1: "", 2: "di", 3: "tri", 4: "tetra", 5: "penta", 6: "hexa"}
+_ENE_MULTIPLIER = multiplier_table(6, one="")
 
 
 def get_enoate_name(n: int, unsaturation=None) -> str:

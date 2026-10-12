@@ -60,6 +60,7 @@ from typing import Optional
 
 from rdkit import Chem
 
+from ..data.multipliers import multiplier_table
 from ..perception.ions import _get_internal_charge_atoms, get_ion_sites
 from .ions import (
     _has_metal,
@@ -845,9 +846,8 @@ def _name_polyacid_zwitterion(mol, cations: list, anions: list, style: str) -> s
 # (bis/tris/...) that the azaniumyl ionic prefix takes instead:
 # ``bis``/``tris`` are used before a substituted/parenthesised substituent group
 # name; ``2,5-bis(azaniumyl)pentanoate`` is OPSIN-RT verified).
-_SIMPLE_MULTIPLIER = {1: '', 2: 'di', 3: 'tri', 4: 'tetra', 5: 'penta', 6: 'hexa'}
-_MULTIPLICATIVE_PREFIX = {2: 'bis', 3: 'tris', 4: 'tetrakis',
-                          5: 'pentakis', 6: 'hexakis'}
+_SIMPLE_MULTIPLIER = multiplier_table(6, one='')
+_MULTIPLICATIVE_PREFIX = multiplier_table(6, kind='complex')
 
 
 def _full_inchikey_rt_ok(mol, name: str) -> bool:

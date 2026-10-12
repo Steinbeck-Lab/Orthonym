@@ -32,6 +32,7 @@ from typing import Any, List, Optional
 
 from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
 from ..data.chain_names import get_chain_prefix
+from ..data.multipliers import multiplier_table
 from ..perception.chains import find_longest_carbon_chain
 from .seniority import SUFFIX_FORMS
 from ..perception.molcache import inchikey_of
@@ -399,7 +400,7 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
     # euphonic 'a' before the consonant-initial multiplied ending (buta-1,3-diene).
     if core_double_bonds:
         elocs = ene_locants(reverse)
-        emult = {1: "", 2: "di", 3: "tri", 4: "tetra"}.get(len(elocs))
+        emult = multiplier_table(4, one="").get(len(elocs))
         if emult is None:
             return None
         eloc_str = ",".join(str(x) for x in elocs)
