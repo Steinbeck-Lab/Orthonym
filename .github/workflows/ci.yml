@@ -1,9 +1,10 @@
 name: CI
 
 # Lightweight public CI: install the package, confirm it imports and names a
-# handful of molecules correctly, and run advisory linting. Does not depend on
-# the internal benchmark baselines or the large corpora — a contributor's PR can
-# pass this without the full benchmarking apparatus.
+# handful of molecules correctly, check that no new function or file outgrows the
+# source-size budget, and run advisory linting. Does not depend on the internal
+# benchmark baselines or the large corpora — a contributor's PR can pass this
+# without the full benchmarking apparatus.
 
 on:
   push:
@@ -36,6 +37,7 @@ jobs:
           java-version: '17'
 
       - name: Install package
+        id: install
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
@@ -65,6 +67,15 @@ jobs:
               raise SystemExit(f"smoke test failed: {fails}")
           print("smoke OK")
           PY
+
+      - name: Source size budget
+        # No function over 200 lines and no file over 5,000 lines in src/orthonym,
+        # except those already listed in tests/support/size_budget_baseline.py,
+        # which may not grow (and the list may only shrink). Pure ast: no JVM, no
+        # jars, a few seconds. Runs even when the smoke test failed, so one run
+        # reports both (but not when the install itself failed).
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python -m pytest tests/unit/test_size_budget.py -q -o addopts=""
 
   lint:
     name: Lint (advisory)
