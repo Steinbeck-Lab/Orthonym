@@ -3539,7 +3539,7 @@ def _multiplied_unit_slots(skeleton: str):
     or, for a simple prefix, bare ('diethyl'); a multiplier-like run inside a word
     ('hexadecanoyl', 'dihydro') is not offered, and a slot that reads no unit fails
     the caller's round trip, so a surplus slot costs a parse, never a wrong name."""
-    from ..assembly.naming_utils import _SIMPLE_PREFIX_VOCABULARY
+    from ..assembly.naming_utils import _SIMPLE_PREFIX_VOCABULARY, matching_close
     for m in _UNIT_MULTIPLIER_RE.finditer(skeleton):
         p = m.start()
         if p and skeleton[p - 1] not in "-([{ ,":
@@ -3547,15 +3547,9 @@ def _multiplied_unit_slots(skeleton: str):
         copies = _UNIT_MULTIPLIER_COUNT[m.group(0)]
         head, rest = skeleton[:m.end()], skeleton[m.end():]
         if rest[:1] in ("(", "[", "{"):
-            depth = 0
-            for i, ch in enumerate(rest):
-                if ch in "([{":
-                    depth += 1
-                elif ch in ")]}":
-                    depth -= 1
-                    if depth == 0:
-                        yield copies, head, rest[1:i], rest[i + 1:], True
-                        break
+            close = matching_close(rest, 0, "([{")
+            if close is not None:
+                yield copies, head, rest[1:close], rest[close + 1:], True
             continue
         run = re.match(r"[a-z]+", rest)
         if not run:

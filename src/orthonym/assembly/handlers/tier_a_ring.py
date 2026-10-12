@@ -52,6 +52,7 @@ import re
 from typing import Any, Optional
 
 from ..name_tree import NameTreeNode, NamingResult
+from ..naming_utils import bracket_depths, top_level_text
 
 logger = logging.getLogger(__name__)
 
@@ -173,23 +174,10 @@ def _parent_part_spells_ring_hydrogen(name: str) -> bool:
     enclosing mark that wraps a substituent prefix. A substituent's own hydrogen
     ('4-[(5-acetyl-1H-pyrrol-2-yl)methyl]...', '7-(1H-pyrrol-3-yl)...') belongs to that substituent's
     ring and says nothing about the parent. A reading of the finished name, never a rewrite of it."""
-    depth = 0
-    top = []
-    i = 0
-    while i < len(name):
-        if depth == 0:
-            added = _ADDED_HYDROGEN_GROUP.match(name, i)
-            if added:
-                return True
-        ch = name[i]
-        if ch in '([{':
-            depth += 1
-        elif ch in ')]}':
-            depth = max(0, depth - 1)
-        elif depth == 0:
-            top.append(ch)
-        i += 1
-    return _INDICATED_HYDROGEN_IN_TEXT.search(''.join(top)) is not None
+    #: one depth over '(', '[' and '{'; a closer with no opener leaves the depth at 0 (clamp)
+    return (any(_ADDED_HYDROGEN_GROUP.match(name, i)
+                for i, _ch, before, _after in bracket_depths(name, '([{', clamp=True) if before == 0)
+            or _INDICATED_HYDROGEN_IN_TEXT.search(top_level_text(name, '([{', clamp=True)) is not None)
 
 
 def _complex_ring_hydrogen_unspelled(features: Any, complex_result: Any,

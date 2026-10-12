@@ -3899,28 +3899,16 @@ def _escalate_enclosing_marks(name: str, token: str, replacement: str) -> Option
     if len(pat.findall(name)) != 1:
         return None
     i = pat.search(name).start()
-    depth = 0
-    open_i = None
-    for j in range(i - 1, -1, -1):
-        if name[j] == ")":
-            depth += 1
-        elif name[j] == "(":
-            if depth == 0:
-                open_i = j
-                break
-            depth -= 1
+    # the '' group that holds the token: only parentheses count here, a '[' or '{' inside is not seen
+    from ..assembly.naming_utils import (
+        enclosing_closer,
+        enclosing_opener,
+        renest_group_and_ancestors,
+    )
+    open_i = enclosing_opener(name, i, '(')
     if open_i is None:
         return None
-    depth = 0
-    close_i = None
-    for j in range(i + len(token), len(name)):
-        if name[j] == "(":
-            depth += 1
-        elif name[j] == ")":
-            if depth == 0:
-                close_i = j
-                break
-            depth -= 1
+    close_i = enclosing_closer(name, i + len(token), '(')
     if close_i is None:
         return None
     inner = pat.sub(replacement, name[open_i + 1:close_i])
@@ -3928,7 +3916,6 @@ def _escalate_enclosing_marks(name: str, token: str, replacement: str) -> Option
     # group enclosing it move up the order (the Blue Book); a
     # fixed '[' left '3-[[3-(...)decanoyl]oxy]' once the enclosing composed
     # prefix was itself bracketed.
-    from ..assembly.naming_utils import renest_group_and_ancestors
     return renest_group_and_ancestors(
         name[:open_i] + "(" + inner + ")" + name[close_i + 1:], open_i)
 

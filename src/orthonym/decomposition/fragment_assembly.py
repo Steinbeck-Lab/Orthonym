@@ -24,6 +24,8 @@ from ..assembly.naming_utils import (
     _SIMPLE_PREFIX_VOCABULARY,
     _wrap_n_substituent,
     enclose_if_compound,
+    matching_close,
+    top_level_tokens,
 )
 from ..data.multipliers import multiplier_table
 from ..data.sugar_names import (
@@ -1072,16 +1074,8 @@ _SIMPLE_UNITS: Tuple[str, ...] = tuple(sorted(
 def _enclosed_content(token: str, start: int) -> Optional[str]:
     """The text inside the enclosing marks that open at ``token[start]``, or None when
     they do not close."""
-    depth = 0
-    for j in range(start, len(token)):
-        ch = token[j]
-        if ch in "([{":
-            depth += 1
-        elif ch in ")]}":
-            depth -= 1
-            if depth == 0:
-                return token[start + 1:j]
-    return None
+    close = matching_close(token, start, "([{")
+    return None if close is None else token[start + 1:close]
 
 
 def _first_ordered_prefix(first: str) -> Optional[str]:
@@ -1114,19 +1108,7 @@ def _first_ordered_prefix(first: str) -> Optional[str]:
 
 def _top_level_tokens(name: str) -> List[str]:
     """``name`` split at the hyphens outside every enclosing mark."""
-    out, cur, depth = [], [], 0
-    for ch in name:
-        if ch in "([{":
-            depth += 1
-        elif ch in ")]}":
-            depth -= 1
-        if ch == "-" and depth == 0:
-            out.append("".join(cur))
-            cur = []
-        else:
-            cur.append(ch)
-    out.append("".join(cur))
-    return out
+    return top_level_tokens(name, "-", "([{")
 
 
 def n_prefix_breaks_citation_order(n_prefixes: List[str], name: str) -> bool:

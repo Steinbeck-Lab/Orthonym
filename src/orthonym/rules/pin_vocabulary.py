@@ -661,15 +661,8 @@ def _bare_ih_ring_one(name: str) -> Optional[str]:
 
 
 def _top_level(word: str) -> str:
-    depth, out = 0, []
-    for ch in word:
-        if ch in "([{":
-            depth += 1
-        elif ch in ")]}":
-            depth -= 1
-        elif depth == 0:
-            out.append(ch)
-    return "".join(out)
+    from ..assembly.naming_utils import top_level_text
+    return top_level_text(word, "([{")
 
 
 def _unlocanted_ring_suffix(name: str) -> Optional[str]:

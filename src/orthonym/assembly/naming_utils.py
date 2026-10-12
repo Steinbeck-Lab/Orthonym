@@ -1272,6 +1272,140 @@ def needs_brackets(name: str) -> bool:
 
 
 # ============================================================================
+# Enclosing-mark scanner
+# ============================================================================
+#
+# ENCLOSING MARKS (the Blue Book) and "Multiple types of
+# enclosing marks" (:7444): "the nesting order is as follows: {[({})]}", so
+# the marks of every type nest in one sequence and a name is read with ONE depth
+# counter over the types it counts. The functions below are that counter, and
+# nothing else: pure, no orthonym import, no regex, no name logic.
+#
+# ``marks`` lists the OPENING marks a call counts ('(', '[' or '{', any
+# combination); the matching closers follow from it. A mark of a type that is not
+# listed is an ordinary character. Every site keeps its own mark set visible at
+# the call, because the sites differ and the difference is behaviour:
+# '(' alone (a '[' inside is invisible), '([{' together, '([' without '{'.
+# Depth is a count, not a stack: only is_fully_enclosed compares the type of the
+# close with the type of the open, and only for the outer pair. ``clamp`` says
+# what an unmatched closer does: False lets the depth go negative, True keeps it
+# at 0; the two readings agree on every balanced name and differ on an
+# unbalanced one, so a caller states which it had.
+
+_MARK_CLOSE = {'(': ')', '[': ']', '{': '}'}
+
+
+def _mark_sets(marks: str) -> Tuple[str, str]:
+    """The opening and closing characters ``marks`` counts."""
+    if not marks or any(m not in _MARK_CLOSE for m in marks):
+        raise ValueError(f"marks must be a non-empty combination of '(', '[' and '{{', got {marks!r}")
+    return marks, ''.join(_MARK_CLOSE[m] for m in marks)
+
+
+def _walk_depths(s: str, opens: str, closes: str, clamp: bool, start: int):
+    depth = 0
+    for i in range(start, len(s)):
+        ch = s[i]
+        before = depth
+        if ch in opens:
+            depth += 1
+        elif ch in closes:
+            depth = max(0, depth - 1) if clamp else depth - 1
+        yield i, ch, before, depth
+
+
+def bracket_depths(s: str, marks: str = '([{', *, clamp: bool = False, start: int = 0):
+    """Yield ``(index, char, depth before, depth after)`` for ``s[start:]``, the depth
+    counting the marks of ``marks`` from 0 at ``start``. An opener at depth 0 is
+    outside the group it opens (before 0, after 1); a closer ends the group it closes
+    (after = before - 1, or 0 when ``clamp`` holds the depth at 0)."""
+    opens, closes = _mark_sets(marks)
+    if start < 0:
+        raise ValueError(f"start must not be negative, got {start}")
+    return _walk_depths(s, opens, closes, clamp, start)
+
+
+def is_fully_enclosed(s: str, marks: str = '([{') -> bool:
+    """True when ``s`` is one fully marked token: it opens with a mark of ``marks``
+    whose MATCHING close is the final character and is that mark's own closer
+    ('(2-methylpropyl)', '[bis(sulfanyl)]'). False for trailing text outside the
+    leading mark ('(oxan-2-yl)oxy'), for a close of the wrong type, and for an
+    unbalanced ``s``. The inner marks are counted, not type-checked."""
+    opens, closes = _mark_sets(marks)
+    if not s or s[0] not in opens:
+        return False
+    close = _MARK_CLOSE[s[0]]
+    for i, ch, _before, after in _walk_depths(s, opens, closes, False, 0):
+        if ch in closes and after == 0:
+            return i == len(s) - 1 and ch == close
+    return False
+
+
+def top_level_tokens(s: str, sep: str, marks: str = '([{', *, clamp: bool = False) -> List[str]:
+    """``s`` split at each ``sep`` that lies outside every mark of ``marks``. ``sep`` is
+    one character that is not itself one of the counted marks. The tokens keep
+    their empty ends: 'a-b' gives ['a', 'b'], '-a' gives ['', 'a'], '' gives ['']."""
+    opens, closes = _mark_sets(marks)
+    if len(sep) != 1 or sep in opens or sep in closes:
+        raise ValueError(f"sep must be one character that is not a counted mark, got {sep!r}")
+    tokens: List[str] = []
+    begin = 0
+    for i, ch, before, _after in _walk_depths(s, opens, closes, clamp, 0):
+        if ch == sep and before == 0:
+            tokens.append(s[begin:i])
+            begin = i + 1
+    tokens.append(s[begin:])
+    return tokens
+
+
+def top_level_text(s: str, marks: str = '([{', *, clamp: bool = False) -> str:
+    """The characters of ``s`` that lie outside every mark of ``marks``, the counted
+    marks themselves left out: 'a(b)c' gives 'ac'."""
+    opens, closes = _mark_sets(marks)
+    return ''.join(ch for _i, ch, before, _after in _walk_depths(s, opens, closes, clamp, 0)
+                   if before == 0 and ch not in opens and ch not in closes)
+
+
+def matching_close(s: str, start: int, marks: str = '([{') -> Optional[int]:
+    """Index of the close that brings the depth back to 0 when counting from
+    ``s[start]``, which is expected to be an opener; None when it never does."""
+    opens, closes = _mark_sets(marks)
+    if start < 0:
+        raise ValueError(f"start must not be negative, got {start}")
+    for i, ch, _before, after in _walk_depths(s, opens, closes, False, start):
+        if ch in closes and after == 0:
+            return i
+    return None
+
+
+def enclosing_closer(s: str, pos: int, marks: str = '([{') -> Optional[int]:
+    """Index of the first close at or after ``pos`` that has no opener in ``s[pos:]``,
+    i.e. the close of the group that holds position ``pos``; None when there is none."""
+    opens, closes = _mark_sets(marks)
+    if pos < 0:
+        raise ValueError(f"pos must not be negative, got {pos}")
+    for i, ch, before, _after in _walk_depths(s, opens, closes, False, pos):
+        if ch in closes and before == 0:
+            return i
+    return None
+
+
+def enclosing_opener(s: str, pos: int, marks: str = '([{') -> Optional[int]:
+    """Index of the nearest opener before ``pos`` that has no closer in ``s[:pos]``,
+    i.e. the opener of the group that holds position ``pos``; None when there is none."""
+    opens, closes = _mark_sets(marks)
+    depth = 0
+    for j in range(min(pos, len(s)) - 1, -1, -1):
+        if s[j] in closes:
+            depth += 1
+        elif s[j] in opens:
+            if depth == 0:
+                return j
+            depth -= 1
+    return None
+
+
+# ============================================================================
 # IUPAC Enclosing Marks
 # ============================================================================
 
@@ -1496,33 +1630,14 @@ def renest_group_and_ancestors(name: str, open_idx: int) -> str:
     pairs = {'(': ')', '[': ']', '{': '}'}
     i = open_idx
     while i is not None and 0 <= i < len(name) and name[i] in pairs:
-        depth = 0
-        close = None
-        for j in range(i, len(name)):
-            if name[j] in '([{':
-                depth += 1
-            elif name[j] in ')]}':
-                depth -= 1
-                if depth == 0:
-                    close = j
-                    break
+        close = matching_close(name, i, '([{')
         if close is None:
             return name
         content = name[i + 1:close]
         marked = apply_enclosing_marks(content, -1)
         name = name[:i] + marked[0] + content + marked[-1] + name[close + 1:]
         # the enclosing opener of position i
-        depth = 0
-        parent = None
-        for j in range(i - 1, -1, -1):
-            if name[j] in ')]}':
-                depth += 1
-            elif name[j] in '([{':
-                if depth == 0:
-                    parent = j
-                    break
-                depth -= 1
-        i = parent
+        i = enclosing_opener(name, i, '([{')
     return name
 
 
@@ -3210,21 +3325,7 @@ def _is_fully_enclosed(name: str) -> bool:
     bracket ('(oxan-2-yl)oxy', '(benzylsulfanyl)methyl') — those still need an
     OUTER enclosing mark. Used by format_substituent_prefix's escalation.
     """
-    if not name or name[0] not in '([{':
-        return False
-    pairs = {'(': ')', '[': ']', '{': '}'}
-    close = pairs[name[0]]
-    depth = 0
-    for i, ch in enumerate(name):
-        if ch in '([{':
-            depth += 1
-        elif ch in ')]}':
-            depth -= 1
-            if depth == 0:
-                # Matched the opening bracket; fully enclosed only if this is
-                # the last character AND the close matches the open type.
-                return i == len(name) - 1 and ch == close
-    return False
+    return is_fully_enclosed(name, '([{')
 
 
 _ITALIC_LOCANT_LETTERS = frozenset({
