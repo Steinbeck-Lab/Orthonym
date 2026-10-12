@@ -21,6 +21,14 @@ dispatch_inner loop then continues to the next handler — typically the
 Tier-A ring cascade composite).
 
 IUPAC cite: (ester family); (polyfunctional); (diester).
+
+NAMING NOTE: despite the id, this is the POLYFUNCTIONAL handler as much as an
+ester handler. _is_ester_family matches (a) an ester principal group (sub-paths
+2 and 3) and (b) polyfunctional molecules (sub-path 1, name_polyfunctional): a
+chain parent with a principal characteristic group, a saturated acyclic chain
+whose groups are all prefixes, and a single saturated ring parent. So molecules
+that are not esters are named here too. The id 'ester_family' is used by the
+inner dispatch table, by tests and by log names, so it is kept.
 """
 from __future__ import annotations
 

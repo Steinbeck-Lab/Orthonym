@@ -1923,7 +1923,7 @@ def _fused_component_locant_map(
     over the one canonical ``compute_fused_numbering`` map), pick the one giving
     the lowest SORTED TUPLE of the junction locants first ring-assembly
     bonds get lowest locants), then of the substituent/suffix locants
-    . Every junction and substituent locant is then read off THIS
+     (c), (f)). Every junction and substituent locant is then read off THIS
     map, so they are mutually consistent by construction.
 
     A point of interest is a ring atom with an exocyclic heavy-atom bond: to
@@ -3026,7 +3026,7 @@ def _build_mixed_pcg_ring_assembly(
     The most SENIOR PCG (via rules.seniority) is expressed as the assembly
     SUFFIX on the enclosed parent; every other substituent becomes a detachable
     PREFIX. The PCG-bearing ring is numbered UNPRIMED so the suffix takes the
-    lowest locant; the numbering direction of each ring is chosen
+    lowest locant (c)); the numbering direction of each ring is chosen
     by first-point-of-difference on (suffix locants, then all substituent
     locants, then the alphabetically-first prefix). PIN form places NO hyphen
     between the prefix block and the opening bracket (`****`, BB 6968:
@@ -3330,12 +3330,12 @@ def name_ring_assembly(
     # ``_name_substituent`` first, gets None, and the assembly died before the
     # producer that spells 'nitro' ever ran.
 
-    # (connection/"free valence" locant) + (lowest
+    # (connection/"free valence" locant) + (f) (lowest
     # locants to substituents): for a 2-component assembly, decide ONCE,
     # deterministically, which physical ring system is UNPRIMED by
     # first-point-of-difference on the COMBINED citation set the assembly
     # actually uses -- connection locants first (tier 1,, then
-    # substituent-prefix locants (tier 2,. ``ring_systems``/
+    # substituent-prefix locants (tier 2, (f)). ``ring_systems``/
     # ``connections`` order coming out of ``detect_ring_assembly`` is RDKit
     # atom-index (SMILES-spelling) dependent, so without this the choice of
     # which ring is "system 0" (unprimed) was non-deterministic AND, whenever

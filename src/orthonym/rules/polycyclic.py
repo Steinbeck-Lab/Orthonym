@@ -16,6 +16,12 @@ Key algorithm:
 6. Verification: sum(bridge_lengths) + 2 == total_ring_atoms
 
 Reference: IUPAC 2013 Blue Book, through.
+
+Name check: this module, polycyclic.py (singular), is the von Baeyer namer for
+bridged and caged ring systems (VonBaeyerAnalyzer, bicyclo through decacyclo).
+The fused polycyclic aromatic hydrocarbons (naphthalene, anthracene,...) are
+named in polycyclics.py (plural). rules/polycyclic_von_baeyer.py wraps
+VonBaeyerAnalyzer from this file.
 """
 
 import logging

@@ -37,7 +37,7 @@ class TestPrefixFormsViaNameCompound:
     @pytest.mark.xfail(strict=True, reason=(
         "PIN tier abstains: needs the '4-methyl-2,5-dioxo-2,5-dihydrofuran-3-yl' "
         "prefix (oxo and hydro prefixes on a mancude heteromonocycle, "
-        "P-31.1.4.2.4) at the PIN tier; best-effort ships the non-PIN "
+        "P-31.2.3.1) at the PIN tier; best-effort ships the non-PIN "
         "'1-oxacyclopent-3-en' form -- TODO in TRIAGE.md 'Suite fix -- "
         "j6-breadth'"))
     def test_row1_regression_fixture_full(self):

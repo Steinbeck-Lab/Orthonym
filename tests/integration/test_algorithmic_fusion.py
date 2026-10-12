@@ -164,7 +164,7 @@ ALGORITHMIC_FUSION_CASES = [
         'c1cc2c[nH]cc2[nH]1', '1,5-dihydropyrrolo[3,4-b]pyrrole',
         marks=pytest.mark.xfail(strict=True, reason=(
             "needs the hydro prefix for an N,N'-dihydro mancude 2-component "
-            "fusion (P-31.1.4.2.4) in _try_algorithmic_fusion_name -- TODO in "
+            "fusion (P-31.2.3.3.2) in _try_algorithmic_fusion_name -- TODO in "
             "TRIAGE.md 'Suite fix -- j6-breadth'"))),
 
     # 20. 6H-pyrrolo[3,4-c]pyridazine: pyrrole fused to pyridazine

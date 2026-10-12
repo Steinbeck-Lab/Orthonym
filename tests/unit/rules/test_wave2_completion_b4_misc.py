@@ -9,7 +9,7 @@ Every expected name OPSIN-RT verified against its evidence SMILES. Rows:
   * selenazolo fusion coverage (f)).
   * 1,6-dihydropyrrolo[2,3-b]pyrrole catalog row, corrected
     PIN — the bare mancude name is a different molecule).
-  * fluorene cata-fused skip + 9H indicated-H /.
+  * fluorene cata-fused skip + 9H indicated-H.
   * didehydrobenzene, benzyne).
   * internal-charge zwitterion mask, azido+nitro coexistence).
   * ring-assembly acid suffix, [1,1'-biphenyl]-4,4'-dicarboxylic).

@@ -52,6 +52,21 @@ PERFORMANCE (remediation):
   references the module-level binding directly. Eliminates the 7,500x
   per-call import overhead that the original per-call try-import would
   have incurred during full byte-identical runs.
+
+MAINTENANCE NOTE (2026-10): what this module does in the shipped configuration
+-----------------------------------------------------------------------------
+selection_mode defaults to 'first_applicable'. 'score_based' and
+'score_based_per_substring' are reached only through the ORTHONYM_SELECTION_MODE
+environment variable (read once, at import) or an explicit
+CandidatePool(selection_mode=...) argument. In the default mode pool.best
+returns the first candidate, and the pool size seen by best was ONE in 517 of
+517 measured calls (block comment "UNREACHABLE IN PRODUCTION" above
+_filter_max_pcg_count), so the criteria cascade below decides no shipped
+name. This pool ranks parent SKELETONS (offer_pool.py says the same in its
+module docstring); the ranking of whole finished names is assembly/offer_pool.py
+(rank_offers, select_offer, select_rt_passing), which namer.py consumes. Whether
+to retire this pool or to let producers OFFER several candidates to it is an open
+design decision that the 2026-10 maintenance phase deliberately leaves alone.
 """
 
 import logging

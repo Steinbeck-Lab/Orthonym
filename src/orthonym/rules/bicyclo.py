@@ -639,10 +639,10 @@ def get_bicyclo_numbering(mol, suffix_ring_atoms: Optional[Set[int]] = None) -> 
     def _key_lists(a2l):
         het = sorted(a2l[i] for i in hetero if i in a2l)
         suf = sorted(a2l[i] for i in suffix_set if i in a2l)
-        # `ene` is the COMBINED ene+yne locant SET general
+        # `ene` is the COMBINED ene+yne locant SET (1) general
         # unsaturation tier); `dbl` is the DOUBLE-bond-only locant set that
         # breaks a combined-set tie in favour of the ene,
-        # inherited by von-Baeyer parents via. Mirrors
+        # inherited by von-Baeyer parents via (2)). Mirrors
         # `orient_chain` criteria (b) [combined] -> (c) [doubles only]:
         # bicyclo[11.3.1]heptadec-2-en-11-yne, NOT...-11-en-2-yne. Pure
         # tie-break -- inert whenever `ene` already differs.

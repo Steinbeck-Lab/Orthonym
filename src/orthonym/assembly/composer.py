@@ -5286,7 +5286,7 @@ def _assemble_complete_bicyclo_name(mol, features):
     main_name = f"{descriptor}{unsat_suffix}"
     suffix_str, elide_terminal_e = principal_suffix
     if suffix_str:
-        # IUPAC (a) / vowel elision: drop the parent's trailing
+        # IUPAC (a) vowel elision: drop the parent's trailing
         # 'e' ONLY before a vowel-initial suffix. '-one' elides
         # ('...heptan-6-one', and '...hept-5-en-6-one' for an unsaturated parent);
         # the consonant-initial multiplied '-dione'/'-trione' keeps the 'e'
@@ -8146,7 +8146,7 @@ def _assemble_polyamine_name(
             return None  # un-nameable hetero branch -> fail closed
         per_n_subs.append((n_idx, Counter(subs)))
 
-    # / (low-locant tie-break, plan P1AM Task 9 +
+    # (f)/(g) / (low-locant tie-break, plan P1AM Task 9 +
     # Task 6A2): after the principal characteristic group (the -diamine suffix)
     # has fixed its locant SET, a remaining choice of chain-numbering direction
     # goes to the assignment that gives the lowest locants to the detachable
@@ -9365,7 +9365,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 if _ring_attach_atom is not None:
                     break
 
-        # cluster R integration / /: a
+        # cluster R integration / (c) /: a
         # MONOCYCLIC ring substituent carrying its OWN decorations is named as
         # ONE bracketed ring-yl prefix via the substituent chokepoint
         # (name_ring_system_substituent, which numbers the free valence and

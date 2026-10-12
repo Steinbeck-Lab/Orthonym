@@ -40,7 +40,7 @@ LAMBDA = "λ"
 # prints each 'a' prefix under its standard bonding number; Table 2.4
 # [BBv2:8236-8248] repeats them in a "Bonding Number (Valence)"
 # column and agrees on every shared element. (Earlier revisions cited
-# ", Table 2.8"; Table 2.8 is the retained heterocyclic-parent name
+# "Table 2.8" under a rule id the book does not have; Table 2.8 is the retained heterocyclic-parent name
 # table [BBv2:11511] and has no bonding numbers. Corrected against the book;
 # ``rules/ring_replacement.TABLE_1_5`` now carries the same numbers as data and a
 # test locks the two against each other.)

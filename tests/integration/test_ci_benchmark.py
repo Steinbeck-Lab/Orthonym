@@ -906,7 +906,7 @@ CI_BENCHMARK = [
             "numbering 'not re-optimised for lowest substituent locants') has no suffix "
             "form and the general engine's spiro analysis declines a von Baeyer "
             "component; the numbering of the suffix form (lowest locants to the "
-            "ketones, P-31.1.4.2.4) is ASSUMED -- see "
+            "ketones, P-14.4 (c)) is ASSUMED -- see "
             ".planning/preexisting-triage/TRIAGE-2026-10-09.md")),
     ),
     # L4: the ester of an enol, named as functional class: "Definitions"

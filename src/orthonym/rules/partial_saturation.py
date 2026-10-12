@@ -474,7 +474,7 @@ def _match_mancude_parent_numbering(
     the LOWEST locant set FIRST to the principal-characteristic-group ring atoms
     (``pcg_ring_atoms``, — the suffix outranks hydro), then to the
     hydro positions (the sp3 ring atoms), then to the residual ring double bonds
-    — IUPAC 2013.
+    — IUPAC 2013 (c), (e).
 
     Returns ``(parent_name, {atom_idx: locant})`` for the winning numbering, or
     ``None`` if no candidate's skeleton matches the ring system exactly (fail
@@ -837,7 +837,7 @@ def detect_carbocyclic_partial_saturation(
             return None
 
     # Residual non-aromatic ring C=C double bonds — needed both to choose the
-    # lowest-locant numbering and to recognise full saturation.
+    # lowest-locant numbering (e)) and to recognise full saturation.
     ring_double_bonds: List[Tuple[int, int]] = []
     for bond in bonds_of(mol):
         if bond.GetBondType() != Chem.BondType.DOUBLE or bond.GetIsAromatic():
@@ -1019,7 +1019,7 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
       3. Enumerate every automorphic numbering of the parent skeleton onto the
          molecule (bond-order-agnostic substructure match), and pick the one
          giving the LOWEST locant set to the ``hydro`` prefixes (the sp3 ring
-         atoms), then to the residual double bonds.
+         atoms), then to the residual double bonds (e)(i)).
       4. Emit ``<locants>-<count>hydro<parent>`` (e.g.
          ``1,2,3,4,4a,5,6,8a-octahydronaphthalene``).
 
@@ -1130,7 +1130,7 @@ def name_hydrogenated_fused_carbocycle(mol: Chem.Mol) -> Optional[str]:
     n_canonical = canonical_mol.GetNumAtoms()
 
     # Choose the numbering minimizing (hydro-locant set, then residual-double-bond
-    # locant set) per (lowest locants to hydro prefixes + ene).
+    # locant set) per (e)(i) (lowest locants to hydro prefixes + ene).
     best_key = None
     best_map: Optional[Dict[int, Any]] = None
     for match in matches:
@@ -1460,7 +1460,7 @@ def name_hydro_fused_chalcogen_suffix(mol: Chem.Mol) -> Optional[str]:
 
 
 # =============================================================================
-# Added indicated hydrogen + ring-ketone suffix /
+# Added indicated hydrogen + ring-ketone suffix (d) /
 # =============================================================================
 
 

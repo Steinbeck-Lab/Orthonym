@@ -2132,8 +2132,8 @@ def _aromatizable_hydro_name(mol, ring_atoms, ring_set, mol_unsat,
     if not parent_name:
         return None
 
-    # Number the ring: lowest locants to the heteroatom set, then heteroatom
-    # seniority, then the hydro set. Enumerate all 2N numberings.
+    # Number the ring: senior heteroatom at locant 1, then the heteroatom set, then heteroatom
+    # seniority, then the hydro set, (e)(i)). Enumerate all 2N numberings.
     ordered = _macrocycle_ordered_ring(mol, ring_set)
     if ordered is None or len(ordered) != n:
         return None
@@ -2275,7 +2275,7 @@ def name_partially_saturated_monocyclic_heterocycle(
     parent but have LOST it in the molecule (the hydro positions — detected by
     bond topology, NOT hybridization, so a conjugated enamine N still counts),
     (3) numbering the ring with the heteroatom set lowest then the hydro set
-    lowest, and (4) emitting ``<locants>-<prefix>hydro<parent>``.
+    lowest, (e)(i)), and (4) emitting ``<locants>-<prefix>hydro<parent>``.
 
     Scope (fail closed otherwise — never a wrong name, -safe):
       * the mancude parent must aromatize and carry NO leading indicated

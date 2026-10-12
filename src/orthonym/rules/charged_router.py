@@ -1471,7 +1471,7 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
         return ''
     if not parent_smi:
         return ''
-    # The suffix decides chain choice and numbering, and a cation
+    # The suffix decides chain choice and numbering (c)), and a cation
     # outranks every neutral class, the Blue Book), so the parent's
     # own characteristic groups are prefixes: '2,4-dioxopentane-3-diazonium
     # (PIN)'. Appending 'diazonium' to the NEUTRAL parent's name cannot do that
@@ -1493,7 +1493,7 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
 # A monovalent -XH suffix group standing in for -N2+ while the neutral parent is
 # named: the element must be absent from the molecule, so its suffix is the only
 # one of its kind in the name. All three suffixes start with a consonant, as
-# 'diazonium' does, so the parent keeps its final 'e' in both and
+# 'diazonium' does, so the parent keeps its final 'e' in both (a) and
 # 'benzene-1,4-bis(diazonium)'): the stem transfers unchanged.
 _DIAZONIUM_STAND_INS = (('S', 16, 'thiol'), ('Se', 34, 'selenol'),
                         ('Te', 52, 'tellurol'))
@@ -3331,7 +3331,7 @@ def route_charged(mol, style: str = 'pin') -> str:
             if simple and _full_inchikey_rt_ok(mol, simple):
                 return simple
         # NON-terminal / branched / unsaturated radical: the centre needs a
-        # first-class locant / lowest-locant for the free
+        # first-class locant / (c) lowest-locant for the free
         # valence, competing with unsaturation/substituents per / —
         # exactly like the.2 carbanion -ide centre (the Blue Book
         # 'ethan-2-id-1-yl (PIN)'). Route through the 184-01 primitive so

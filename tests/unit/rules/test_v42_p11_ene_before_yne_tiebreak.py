@@ -11,7 +11,7 @@ lower locants -- is given to the DOUBLE bonds. So `cycloicos-1-en-3-yne`, NOT
 
 Governing rule: the general unsaturation ordering the Blue Book states at
  (assign low locants first to the combined ene+yne set, then to the
-double bonds) is inherited by ring / von-Baeyer parents through.
+double bonds) is inherited by ring / von-Baeyer parents through (1) and (2).
 The acyclic chain numberer already implements it as `orient_chain` criteria
 (b) [combined set] -> (c) [double bonds specifically]; this task ports the same
 (b)->(c) pair into the two cyclic numberers that were missing criterion (c):
@@ -83,7 +83,7 @@ def test_cyclododeca_pentaen_11_yne_mancude_monocycle():
 
 def test_bicyclo_11_3_1_heptadec_2_en_11_yne_von_baeyer():
     """von Baeyer: combined set {2,11} either way -> the ene takes 2, the yne 11
-     inherits the ene-before-yne tie-break). def 31.1.4.3."""
+     (2) inherits the ene-before-yne tie-break). def 31.1.4.3."""
     res = _name_one("C1#CC2CCCC(C=CCCCCCCC1)C2")
     assert res.get("name") == "bicyclo[11.3.1]heptadec-2-en-11-yne", res
     assert res.get("rt") is True

@@ -613,8 +613,9 @@ def _suffix_group_on_parent_hydride(name: str) -> Optional[str]:
     return m.group(0) if m else None
 
 
-# (the Blue Book, indicated hydrogen; '2H-pyran-2-one',
-# '1H-pyrrole-2,5-dione', '1,3-dihydro-2H-imidazol-2-one'): a mancude parent that
+# Indicated hydrogen, the Blue Book: "in preferred IUPAC
+# names indicated hydrogen must always be cited when present in the corresponding
+# structure"; book example '1H-pyrrole-2,5-dione (PIN)',:33843): a mancude parent that
 # itself needs indicated hydrogen (pyrrole, pyran, the azoles, azepine, indole,
 # indene, purine,...) keeps it when a ring position becomes C=O / C=S / C=NH, so
 # a ring ketone written on the bare stem ('...pyrrol-2-one') names no definite

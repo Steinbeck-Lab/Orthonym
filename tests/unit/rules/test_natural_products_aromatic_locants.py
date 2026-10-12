@@ -33,7 +33,7 @@ class TestNPAromaticRingLocantsTable:
         ene = _NP_AROMATIC_RING_LOCANTS["estrane"]
         assert ene == [(1, 2, None), (3, 4, None), (5, 10, 10)], (
             f"Expected canonical estra-1,3,5(10)-trien locants per "
-            f"IUPAC P-31.1.4.3.4; got: {ene}"
+            f"IUPAC P-31.1.1.1; got: {ene}"
         )
 
     def test_estrane_aromatic_a_ring_emits_1_3_5_10_trien(self):
@@ -44,7 +44,7 @@ class TestNPAromaticRingLocantsTable:
         smi = "C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O"
         name = name_compound(smi)
         assert "1,3,5(10)" in name, (
-            f"Expected 1,3,5(10) indicated-H marker per IUPAC P-31.1.4.3.4; "
+            f"Expected 1,3,5(10) indicated-H marker per IUPAC P-31.1.1.1; "
             f"got: {name!r}"
         )
         assert "estra-1,3,5(10)-trien" in name, (

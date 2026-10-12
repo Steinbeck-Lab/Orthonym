@@ -2,7 +2,7 @@
 (W2F p6 Task 3).
 
 BB (the Blue Book,33354); naphthalene fixed fusion numbering
-(alpha 1,4,5,8 / beta 2,3,6,7) + low-locants-to-suffix -> acid=2,
+(alpha 1,4,5,8 / beta 2,3,6,7) + (c) low-locants-to-suffix -> acid=2,
 urea-N=1. The plain-amino analog must stay working.
 """
 import orthonym

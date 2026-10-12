@@ -1918,7 +1918,7 @@ def _name_internal_polyfunctional_substituent(
 
     The chain is the whole (unbranched) backbone. Numbering,
     the Blue Book;: the free valence gets the lowest locant,
-    then the detachable prefixes together the lowest locant set,
+    then the detachable prefixes together the lowest locant set (f)),
     then the prefix cited first in alphanumerical order the lowest locant. If
     the two directions tie on all three, both must spell the same name (a
     symmetric chain); otherwise None. Form '{prefixes}{stem}an-{k}-yl'
@@ -7576,7 +7576,7 @@ def _add_substituent_stereo_text(mol, sub_atoms, name, attach_idx=None, located=
         s_idx, cip = stereo_atoms[0]
         # STEREO-03 (a phase -02): a stereogenic acyclic-alkyl
         # substituent needs the PIN systematic name + the descriptor at its
-        # attachment locant / /. The name and the
+        # attachment locant / (c) /. The name and the
         # locant are derived FROM STRUCTURE (the substituent atoms + attachment
         # atom) by `_acyclic_alkyl_located_stereo_name` — NOT a hardcoded
         # name->PIN table and NOT a BFS-from-attachment heuristic. This covers

@@ -456,7 +456,7 @@ def _cip_orientation_key(mol, oriented: List[int],
 def _pg_anchor_multiplicity(mol, pg_set, substituent_positions):
     """How many principal-group suffixes each ring anchor atom carries.
 
-     gives the lowest locants to the suffixes as a SET WITH
+     (c) gives the lowest locants to the suffixes as a SET WITH
     MULTIPLICITY, so the geminal pair of OC1(O)CCC(O)CC1 counts twice:
     {1,1,4} beats {1,4,4} ('cyclohexane-1,1,4-triol'). A suffix that can sit
     twice on one ring carbon is a monovalent -XH group (-ol, -thiol, -amine,
@@ -536,7 +536,7 @@ def _orient_cycloalkane_with_pg(
      numbering for a saturated ring whose principal characteristic
     group sits on ring atoms (suffix expression: -ol, -one, -amine,...).
 
-    Tier order, first-decision-wins /:
+    Tier order, first-decision-wins:
       (c) lowest locants to the suffix anchor atoms,
       (f) lowest locants to the detachable-prefix-only set — the suffix
           expression itself (the heteroatom-rooted substituent list at a PG

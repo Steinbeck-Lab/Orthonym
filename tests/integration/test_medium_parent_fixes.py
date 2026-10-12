@@ -99,7 +99,7 @@ _XF_INDOLONE = pytest.mark.xfail(strict=True, reason=(
     "expected token is 'indol' -- " + _J6_TODO))
 _XF_DIHYDRO_OXO = pytest.mark.xfail(strict=True, reason=(
     "PIN tier abstains: needs the '4-methyl-2,5-dioxo-2,5-dihydrofuran-3-yl' "
-    "prefix (oxo and hydro prefixes on a mancude heteromonocycle, P-31.1.4.2.4) "
+    "prefix (oxo and hydro prefixes on a mancude heteromonocycle, P-31.2.3.1) "
     "at the PIN tier; best-effort ships the non-PIN '1-oxacyclopent-3-en' form. "
     "PIN '(2E)-3-(methoxycarbonyl)-2-[16-(4-methyl-2,5-dioxo-2,5-dihydrofuran-3-"
     "yl)hexadecyl]pent-2-enedioic acid' (OPSIN exact) -- " + _J6_TODO))

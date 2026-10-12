@@ -350,7 +350,7 @@ _PIN_TIER_TARGETS = {
         "RT-exact -- TODO in TRIAGE.md 'Suite fix -- j6-breadth'"),
     "PAH: decahydronaphthalene": (
         "PIN tier abstains: needs the hydro-naphthalene fusion PIN (P-52.2.4.1, "
-        "BlueBookV2.md:23710; P-31.1.4.2.4); the molecule has two ring C=C, so "
+        "BlueBookV2.md:23710; P-31.2.3.3.2); the molecule has two ring C=C, so "
         "it is a hexahydronaphthalene and the expected 'decahydro' substring is "
         "itself wrong -- TODO in TRIAGE.md 'Suite fix -- j6-breadth'"),
     "Nucleotide conjugate - fixed by multi-fragment assembly improvements": (

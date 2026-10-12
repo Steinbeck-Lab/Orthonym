@@ -173,7 +173,7 @@ class TestNitrosoUrea:
 class TestMixedDiamines:
     @pytest.mark.parametrize("smiles,expected", [
         # a phase Thread A, the Blue Book) + the low-locant
-        # tie-break /: a single N-substituent on a
+        # tie-break (f)/(g) /: a single N-substituent on a
         # symmetric terminal diamine takes numeric-superscript N1 (the reversal
         # is a legal tie-break that gives the cited prefix the lowest locant),
         # not the non-lowest N2/N3 the old numbering left. Each still OPSIN

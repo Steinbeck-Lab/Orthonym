@@ -192,7 +192,7 @@ def _ring_frag_attach(mol):
     # equal-length middle-ring arcs (both 2 carbons) are a genuine
     # numbering tie the descriptor/spiro-atom-locant rules do not resolve
     # (same descriptor "dispiro[3.2.3.2]", same spiro-atom locants {4,7}
-    # either way) -- (lowest locant to the free valence) then
+    # either way) -- (c) (lowest locant to the free valence) then
     # picks locant 5 over the old code's arbitrary 12. Both denote the
     # IDENTICAL molecule (confirmed: OPSIN-parsing "dispiro[3.2.3.2]dodecan-
     # 5-yl"acetic acid and the -12-yl form give the same InChIKey,

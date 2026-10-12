@@ -1460,7 +1460,7 @@ def name_charged_spiro_system(mol, cation_idx: int) -> str:
     The cation reference-set spellings ``7-azoniadispiro[5.0.5.3]pentadecane``
     etc. are the non-PIN method-(2) alternative; the PIN this returns is
     ``6-azadispiro[5.0.5.3]pentadecan-6-ium`` (the heteroatom takes the lowest
-    spiro locant,. Both spellings OPSIN-round-trip to the same
+    spiro locant, (a)). Both spellings OPSIN-round-trip to the same
     structure, so the caller's RT gate accepts the emission and 0-wrong holds.
 
     Returns the candidate '-ium' name, or '' when the shape is out of scope
@@ -4603,8 +4603,8 @@ def _hoisted_hw_monocycle_state(mol, comp_atoms: Set[int], spiro_center: int,
                                 unsaturated: Set[int], prefix_atoms):
     """An unsaturated heteromonocyclic spiro component named by its mancude
     Hantzsch-Widman name ('[1,3]oxazole'), numbered by the heteroatoms first
-     and then as in ``_hoisted_state_rank``, with its saturation
-    hoisted. Returns the state dict or None."""
+    , its own Hantzsch-Widman numbering) and then as in
+    ``_hoisted_state_rank`` (saturation hoisted). Returns the state dict or None."""
     name = _mancude_monocycle_name(mol, comp_atoms)
     if not name:
         return None

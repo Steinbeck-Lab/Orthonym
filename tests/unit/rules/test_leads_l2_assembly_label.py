@@ -215,7 +215,7 @@ def test_the_names_the_check_does_not_lower_keep_pin_verified(namers, smiles, na
 # ------------------------------------------------------------------ the gold row the book contradicts
 def test_the_gold_row_cyclohexenylbenzene_asserts_the_books_pin():
     # packs/rings_numbering.json SUBST-01a asserted '(cyclohex-1-en-1-yl)benzene' and cited
-    #, an id the book does not have. (:17077),:17079 "In biphenyl and
+    # a rule id the book does not have. (:17077),:17079 "In biphenyl and
     # polyphenyl assemblies, one benzene ring must remain in the assembly... Furthermore, when a
     # modified ring assembly of two rings consists of a benzene ring and a cyclohexane ring
     # substitutive nomenclature is preferred (see." and:17083 print

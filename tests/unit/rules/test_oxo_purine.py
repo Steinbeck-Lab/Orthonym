@@ -67,7 +67,7 @@ def test_bare_guanine_is_named_on_purine():
 @pytest.mark.parametrize("smiles,expected", [
     # the saturated six-ring N is N3, not N1: the 1,7-/1,9-dihydro spelling would be
     # another tautomer (OPSIN 2.9.0 parse: same standard InChIKey, different fixed-H
-    # InChI). indicated/added hydrogen at the atoms that carry it.
+    # InChI). / indicated/added hydrogen at the atoms that carry it.
     ("Nc1nc(=O)c2[nH]cnc2[nH]1", "2-amino-3,7-dihydro-6H-purin-6-one"),
     ("O=c1nc[nH]c2nc[nH]c12", "3,7-dihydro-6H-purin-6-one"),
     ("Nc1nc(=O)c2[nH]c(C)nc2[nH]1", "2-amino-8-methyl-3,7-dihydro-6H-purin-6-one"),

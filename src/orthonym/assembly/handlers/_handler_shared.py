@@ -879,8 +879,9 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
 
     if features.principal_chain and features.atom_to_locant and features.principal_group_atoms:
         # One locant per DISTINCT characteristic group, kept as a multiset.
-        # cites a locant once for each suffix it locates, so a
-        # geminal pair on one chain carbon is 'ethane-1,1-diamine' /
+        # One locant per suffix group Citation of locants: "if any locants
+        # are essential... then all locants must be cited"; a geminal pair makes them
+        # essential), so on one chain carbon it is 'ethane-1,1-diamine' /
         # 'butane-1,1-diol' (the hydroxy-compound suffix rule; the
         # appended ring suffixes below already keep the multiset,). A
         # locant set here merged the two groups into ONE suffix
@@ -922,7 +923,7 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
         # the locant on a charged one exposed an order-dependent numbering
         # ('1-hydroxy...ethan-2-aminium' vs '2-hydroxy...ethan-1-aminium'); the
         # quaternary-aminium producer has since oriented its chain from the
-        # N-carbon (ions.name_quaternary_aminium,, and the
+        # N-carbon (ions.name_quaternary_aminium, (c)), and the
         # elided form shipped as a PIN ('2-hydroxy-N,N,N-trimethylethanaminium',
         # wp7 verification panel).
         _pg_match_atoms: set = set()
@@ -1139,7 +1140,8 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
 
         # One locant per DISTINCT group, as a multiset (the chain branch's
         # _distinct_group_locants rule): geminal ring suffixes are
-        # 'cyclohexane-1,1-diol' cites a locant for each suffix).
+        # 'cyclohexane-1,1-diol' (one per suffix group; Citation of locants:
+        # "if any locants are essential... then all locants must be cited", geminal ones are).
         # Matches sharing a characteristic atom are one group matched twice.
         _groups: List[set] = []
         _multiset: List[int] = []

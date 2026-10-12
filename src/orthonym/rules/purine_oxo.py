@@ -1,5 +1,5 @@
 """Substituted purine-2,6-dione naming retained purine parent; fixed
-purine numbering; dione suffix).
+purine numbering (a); dione suffix).
 
 The purine-2,6-dione parent (the xanthine skeleton) is named systematically as
 ``3,{X}-dihydro-1H-purine-2,6-dione``, where {X} (7 or 9) is the locant of the

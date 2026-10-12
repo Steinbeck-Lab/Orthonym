@@ -396,7 +396,7 @@ def pin_heteroaryl_substituent_name(
 ) -> Optional[str]:
     """PIN substituent name for a monocyclic heteroaromatic ring substituent.
 
-    Computes free-valence-aware numbering per IUPAC 2013: when a
+    Computes free-valence-aware numbering per IUPAC 2013 and: when a
     ring is detached as a substituent it is renumbered so low locants go, in
     order of decreasing priority, to (1) the heteroatoms as a set, (2) the
     heteroatoms in element-seniority order, (3) the indicated hydrogen, and
@@ -600,7 +600,7 @@ def _decorated_biphenylyl_substituent_name(
     and cites the other as a 'phenyl' decoration (TRIAGE g5 C14, shipped at
     pin_verified).
 
-    Numbering connection locants 1,1'; then the free valence,;
+    Numbering connection locants 1,1'; then the free valence, (c);
     then the decoration locants as one set, an unprimed locant lower than the
     same primed one; then (g) alphanumerical order): the ring bearing the
     free valence is unprimed, its connection atom is 1; the other ring is primed,

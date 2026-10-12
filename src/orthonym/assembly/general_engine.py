@@ -2189,7 +2189,7 @@ def _orient_carbocycle(mol, ring_order, sub_positions, pg_ring_atoms):
             uns.sort()
             dbl.sort()
             sub = sorted(loc[i] for i in sub_positions if i in loc)
-            # /: after the COMBINED ene+yne locant set
+            # (e)(ii) /: after the COMBINED ene+yne locant set
             # (`uns`) is made as low as possible, the remaining choice is broken
             # by giving the DOUBLE bonds (`ene`) the lower locants -- i.e.
             # cycloicos-1-en-3-yne, NOT cycloicos-3-en-1-yne. This mirrors

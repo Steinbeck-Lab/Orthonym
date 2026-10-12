@@ -342,7 +342,7 @@ def _ring_system_automorphisms(
     Once the ring criteria fix the numbering, the only residual
     freedom is the ring system's own symmetry (e.g. furo[2,3-b]furan is
     symmetric: positions 2 and 5 are equivalent). (substituents) /
-     (hydro) break that tie by lowest locants, so the caller
+     (e)(i) (hydro) break that tie by lowest locants, so the caller
     enumerates these permutations.
 
     ``ignore_bond_order=True`` matches on element + topology only (all bonds
@@ -870,7 +870,7 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
 
     Locants follow: lowest to indicated H (b), then hydro/'ene' (e), then
     detachable prefixes (f); ties broken over the mancude-skeleton automorphisms
-     /. A produced valid-but-non-PIN numbering still
+    . A produced valid-but-non-PIN numbering still
     round-trips and the gate keeps accuracy intact.
     """
     if not mancude_parent:

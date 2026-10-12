@@ -28,6 +28,11 @@ Integration with fused_rings.py:
 - This module handles carbocyclic PAHs (naphthalene, anthracene, etc.)
 - fused_rings.py handles fused heterocycles (indole, quinoline, etc.)
 - This module can delegate to fused_rings for heterocyclic detection
+
+Name check: this module, polycyclics.py (plural), names fused polycyclic aromatic
+hydrocarbons by their retained names and FIXED numbering. The von Baeyer namer for
+bridged and caged ring systems is polycyclic.py (singular), with
+rules/polycyclic_von_baeyer.py as a thin wrapper around its VonBaeyerAnalyzer.
 """
 
 import weakref

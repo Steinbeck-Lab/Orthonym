@@ -4,7 +4,7 @@ Every structure here is OPSIN-authoritative (canonical SMILES obtained by parsin
 the accepted name through OPSIN), and every expected PIN round-trips to that
 structure (verified 2026-07-17). The engine names N-/C8-substituted
 purine-2,6-diones systematically retained purine parent + fixed
-numbering + dione), and FAILS CLOSED (returns None) on
+numbering (a) + dione), and FAILS CLOSED (returns None) on
 anything outside that scope so a wrong name is never emitted.
 """
 import pytest

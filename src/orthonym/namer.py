@@ -10803,7 +10803,7 @@ class Orthonym:
                                 # acid, -carbonitrile). Its expressed-suffix
                                 # ANCHOR (the ring atom bonded to the match
                                 # carbon) takes the lowest locant per
-                                # (2-methylcyclohexane-1-
+                                # (c) (2-methylcyclohexane-1-
                                 # carbaldehyde, never 1-methyl-2-). Matches
                                 # with no ring contact at all (a CHO at the
                                 # end of a demoted chain) contribute nothing.

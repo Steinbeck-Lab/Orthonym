@@ -216,7 +216,7 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
         # (the Blue Book): a positional label on a diazene nitrogen
         # needs its locant, so every locant is cited -- '1-(naphthalen-2-yl)-2-phenyl
         # (1-15N)diazene (PIN)',:44267;:44381 with the label on N2). The
-        # substituent cited first in alphanumerical order takes locant 1,
+        # substituent cited first in alphanumerical order takes locant 1 (g)),
         # whichever nitrogen carries the label (:44267 and:44381 both put the
         # naphthalenyl at 1). ``labelled_parent`` is read only inside the re-render
         # that rules/isotopes.py makes when a descriptor cites a locant.

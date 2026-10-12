@@ -77,7 +77,7 @@ def test_biphenyl_multiplier_no_over_elision(smiles, expected):
 # substituents on a biaryl, the SENIOR PCG is the suffix on the enclosed
 # assembly parent and every other substituent is a prefix /
 # seniority, reused from rules/seniority.py). The PCG ring is UNPRIMED so the
-# suffix gets the lowest locant. PIN form has NO hyphen between
+# suffix gets the lowest locant (c)). PIN form has NO hyphen between
 # the prefix block and the opening bracket (the Blue Book,6'-dinitro[1,1'-biphenyl]-
 # 2,2'-dicarboxylic acid; 4'-cyano[1,1'-biphenyl]-4-yl). All 6 targets below
 # were derived from the Blue Book and RT-verified against OPSIN 2.9 to the

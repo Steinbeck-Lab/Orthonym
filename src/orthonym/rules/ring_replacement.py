@@ -1,6 +1,6 @@
 """Total skeletal ('a') replacement-prefix construction for RING systems.
 
- / (von Baeyer) and (spiro): a skeletal non-carbon
+ (von Baeyer) and (spiro): a skeletal non-carbon
 ring atom is expressed by a replacement ('a') prefix carrying its locant --
 ``3-oxabicyclo[2.2.1]heptane``, ``2-oxa-6-thiaspiro[4.5]decane``.
 

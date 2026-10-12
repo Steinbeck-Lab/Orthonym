@@ -1,4 +1,4 @@
-""" /: a quaternary ammonium whose parent branch is
+""" (c) /: a quaternary ammonium whose parent branch is
 substituted must number that branch with the N-attached carbon as C1 (the amine
 principal group takes the lowest locant). Regression: `CC[N+](CC)(CC)CCF` emitted
 `1-fluoro-N,N,N-triethylethanaminium` (fluoro at C1 — the chain numbered from the

@@ -12,11 +12,11 @@ The lowest-locant cascade is then applied across all surviving
 ``rules/locants.py`` (``compare_locant_sets`` / ``_compare_heteroatom_seniority``
 via ``compare_numbering``) — the comparison logic is NEVER reimplemented here.
 
-Fixed-numbering exceptions /
+Fixed-numbering exceptions / (a))
 ----------------------------------------------------
 ``anthracene`` and ``phenanthrene`` are retained names with FIXED, traditional
 numbering ("special numbering" — Blue Book entries (11) and (12); also
-: "in purine, anthracene, and phenanthrene, this numbering must be
+ (a): "in purine, anthracene, and phenanthrene, this numbering must be
 used"). Their traditional numbers do NOT follow the systematic
 peripheral walk (anthracene numbers its meso carbons 9,10 last; phenanthrene
 uses 4a,4b/8a,10a fusion labels). A correct engine must encode these two
@@ -36,7 +36,7 @@ carbons — the existing ``rules.locants._Locant`` type, so downstream consumers
 (``compare_locant_sets``, the cascade) are unchanged.
 
 Source: IUPAC 2013 Blue Book (the Blue Book Blue Book ~line 12501);
-         / (anthracene/phenanthrene fixed numbering).
+         / (a) (anthracene/phenanthrene fixed numbering).
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ from .fusion_orientation import (
 from .locants import _Locant, compare_locant_sets, compare_numbering
 
 # ---------------------------------------------------------------------------
-# Fixed-numbering retained ring systems /.
+# Fixed-numbering retained ring systems / (a)).
 #
 # anthracene and phenanthrene have traditional "special" numbering that the
 # systematic peripheral walk does NOT reproduce. Each reference is a
@@ -541,7 +541,7 @@ def compute_fused_numbering(
     if len(graph) < 2:
         return None
 
-    # / fixed-numbering exceptions (anthracene,
+    # / (a) fixed-numbering exceptions (anthracene,
     # phenanthrene) — their traditional numbering is NOT the systematic walk.
     fixed = _try_fixed_numbering(mol, ring_atoms)
     if fixed is not None:

@@ -95,7 +95,7 @@ def test_the_terminal_group_chain_shape(smiles):
 
 
 @pytest.mark.parametrize("smiles,pin", [
-    # ciprofloxacin; added hydrogen with the 4-oxo prefix
+    # ciprofloxacin; (4-oxo with hydro prefixes)
     ("OC(=O)C1=CN(C2CC2)c2cc(N3CCNCC3)c(F)cc2C1=O",
      "1-cyclopropyl-6-fluoro-4-oxo-7-(piperazin-1-yl)-1,4-dihydroquinoline-3-carboxylic acid"),
     ("OC(=O)c1cnc2ccc(N3CCCC3)cc2c1", "6-(pyrrolidin-1-yl)quinoline-3-carboxylic acid"),

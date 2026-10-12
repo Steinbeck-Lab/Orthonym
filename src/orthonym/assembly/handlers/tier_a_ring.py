@@ -33,6 +33,17 @@ CRITICAL PRESERVATION CONSTRAINTS:
   runs per internal notes.
 
 IUPAC cite: (principal chain vs ring competition).
+
+NAMING NOTE: 'tier_a_ring' is the RING CASCADE, not one producer. _is_tier_a_ring
+fires for every cyclic molecule whose parent is not a chain; the handler then
+tries complex_ring, polycyclic, partial_sat, heterocycle and benzene in the order
+listed above, pushes the chain candidate to the pool and lets select_best_candidate
+choose. For spiro parents it also calls general_engine.name_general
+(_spiro_principal_suffix_preference). "Tier-A" is the 'ring_a' handler-policy tier
+of candidate_pool.HANDLER_POLICIES; it has nothing to do with the result tiers
+(pin_verified, systematic_verified, best_effort) of the public API. The id
+'tier_a_ring' is used by the inner dispatch table, by tests and by log names, so
+it is kept.
 """
 from __future__ import annotations
 

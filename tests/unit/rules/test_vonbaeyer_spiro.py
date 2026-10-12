@@ -31,7 +31,7 @@ physical terminal ring is numbered first when the two tie in size; the
 traversal direction within each terminal ring; which middle-ring arc goes
 first when the two tie in length) -- and ``_get_polyspiro_numbering`` picks
 among them DETERMINISTICALLY via 's lowest-heteroatom-locant rule
-(then lowest free-valence locant for a substituent, then a
+(then (c) lowest free-valence locant for a substituent, then a
 canonical-rank tiebreak), mirroring ``get_spiro_numbering``'s monospiro
 sibling. Both witnesses now emit the single lowest-locant PIN
 (``1-oxadispiro[3.0.3^5.1^4]nonane`` / ``1-oxadispiro[2.0.2^4.2^3]octane``)
@@ -138,7 +138,7 @@ class TestExistingSpiroFixturesUnchanged:
     @pytest.mark.unit
     def test_polyspiro_substituent_free_valence_lowest_locant_unchanged(self):
         """a performance pass threaded ``suffix_ring_atoms`` (free-valence bias,
-         through ``_get_polyspiro_numbering`` -- previously only
+         (c)) through ``_get_polyspiro_numbering`` -- previously only
         the monospiro ``get_spiro_numbering`` had it. Locked in via the
         ``tests/unit/rules/test_v27_p3_spiro_engine.py`` PIN correction
         (dispiro[3.2.3^7.2^4]dodecan-5-yl, not the old arbitrary -12-yl -- both

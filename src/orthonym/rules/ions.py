@@ -3691,7 +3691,7 @@ def emit_catenated_hydride_cation(mol, center_idx: int) -> str:
     re-entering the neutral namer (``_bare_parent_hydride_name`` -> trisulfane /
     hydrazine / diphosphane / dioxidane / phosphane -- so the multiplier / retained
     tables are NOT re-spelled here), number the chain giving the cationic centre
-    the lowest locant /, cite the substituents as
+    the lowest locant (c) /, cite the substituents as
     detachable prefixes, and append '-{loc}-ium' with 'e'-elision. Substituents
     named by TYPE (halogen / acyl-on-chalcogen / organyl) with a whole-heavy-atom
     drop veto; '' on ANY decline so the caller's RT gate never sees a mis-built
@@ -3759,7 +3759,7 @@ def emit_catenated_hydride_cation(mol, center_idx: int) -> str:
         is_complex_substituent,
     )
 
-    # Orientation.: lowest locant to the cationic centre first, then
+    # Orientation. (c), (f): lowest locant to the cationic centre first, then
     # the lowest substituent-locant SET. On a tie of BOTH, "lowest locants
     # to the substituent cited first in alphanumerical order" — compared as the
     # per-NAME sorted locant tuples taken in alphanumerical citation order, NOT the
@@ -3988,9 +3988,9 @@ def _charged_ring_locants(mol, ring_system, center_idx, anion_attach_idx=None,
       (a) all heteroatoms as a set;
       (b) the senior heteroatom (O > S > … > N > P …) —;
       (c) the indicated hydrogen (pyrrole-type aromatic ring atom bearing H) —
-          ;
+           (b);
       (d) the charged centre (the principal characteristic group, the -ium/-ide) —
-           / — so a symmetric di-N azinium gets the cation
+           / (c) — so a symmetric di-N azinium gets the cation
           at the LOWEST locant (pyridazin-1-ium, not -2-ium);
       (d2) OPTIONAL, only when ``anion_attach_idx`` is given: the ring position
           bearing an ANIONIC-SUFFIX characteristic group (a ``-carboxylate``).
@@ -7309,7 +7309,7 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         features.functional_groups.pop('ammonium', None)
         namer._classify(features)
 
-        #: the amine is the principal characteristic group, so
+        # (c)): the amine is the principal characteristic group, so
         # the N-attached carbon must be position 1 of the parent chain (lowest
         # locant to the PG). find_principal_chain can orient a symmetric-length
         # parent from the WRONG end when equal-length N-branches compete — e.g.
