@@ -2,7 +2,7 @@
 
 Tests end-to-end naming of molecules with complex (branched/functionalized)
 substituents through the full pipeline, plus unit-level checks on the
-utility functions (apply_enclosing_marks, get_bracket_depth, format_substituent_prefix).
+utility functions (apply_enclosing_marks, format_substituent_prefix).
 
 Test categories:
 1. Regression guards: simple molecules that MUST NOT change
@@ -18,7 +18,6 @@ from rdkit import Chem
 from orthonym import name_compound
 from orthonym.assembly.naming_utils import (
     apply_enclosing_marks,
-    get_bracket_depth,
     is_complex_substituent,
     format_substituent_prefix,
 )
@@ -167,22 +166,6 @@ class TestEnclosingMarks:
     def test_wrap_around_depth_3(self):
         """Depth 3 wraps around to parentheses again."""
         assert apply_enclosing_marks("test", 3) == "(test)"
-
-    @pytest.mark.integration
-    def test_get_bracket_depth_none(self):
-        assert get_bracket_depth("methyl") == 0
-
-    @pytest.mark.integration
-    def test_get_bracket_depth_parens(self):
-        assert get_bracket_depth("(2-methylpropyl)") == 1
-
-    @pytest.mark.integration
-    def test_get_bracket_depth_brackets(self):
-        assert get_bracket_depth("[test]") == 2
-
-    @pytest.mark.integration
-    def test_get_bracket_depth_braces(self):
-        assert get_bracket_depth("{test}") == 3
 
 
 # ============================================================================

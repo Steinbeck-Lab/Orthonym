@@ -1681,24 +1681,6 @@ def _resolve_fg_collisions(results):
     return results
 
 
-def has_functional_group(mol, fg_name: str) -> bool:
-    """
-    Check if molecule contains a specific functional group.
-    
-    Args:
-        mol: RDKit Mol object
-        fg_name: Name of functional group (must be in FUNCTIONAL_GROUP_SMARTS)
-        
-    Returns:
-        True if functional group is present
-    """
-    pattern = _COMPILED_FG_SMARTS.get(fg_name)
-    if pattern is None:
-        return False
-
-    return mol.HasSubstructMatch(pattern)
-
-
 def count_functional_groups(mol) -> Dict[str, int]:
     """
     Count occurrences of each functional group.

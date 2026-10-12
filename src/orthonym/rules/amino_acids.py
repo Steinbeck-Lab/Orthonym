@@ -574,14 +574,3 @@ def _build_amino_acid_locant_map(mol) -> dict:
                 visited.add(nbr_idx)
 
     return atom_to_locant
-
-
-def is_n_substituted_amino_acid(mol) -> bool:
-    """
-    Check if amino acid has N-substituents (like sarcosine = N-methylglycine).
-    """
-    # Look for secondary amine in amino acid context
-    pattern = _compiled_smarts("[NX3;H1]([CX4])[CX4][CX3](=O)[OX2H1]")
-    if pattern is None:
-        return False
-    return mol.HasSubstructMatch(pattern)

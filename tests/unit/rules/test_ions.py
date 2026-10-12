@@ -13,12 +13,7 @@ from orthonym.rules.ions import (
     name_anion,
     name_cation,
     name_carboxylate_anion,
-    name_alkoxide_anion,
-    name_phenolate_anion,
     name_aminium_cation,
-    name_carbenium_cation,
-    get_anion_suffix,
-    get_cation_suffix,
 )
 from orthonym.perception.ions import get_ion_sites
 
@@ -335,26 +330,6 @@ class TestSuffixTransformations:
         """'butanoic acid' -> 'butanoate'"""
         assert name_carboxylate_anion('butanoic acid') == 'butanoate'
 
-    def test_alkoxide_pin_style(self):
-        """'methanol' -> 'methanolate' (PIN style)"""
-        assert name_alkoxide_anion('methanol') == 'methanolate'
-
-    def test_alkoxide_pin_ethanol(self):
-        """'ethanol' -> 'ethanolate' (PIN style)"""
-        assert name_alkoxide_anion('ethanol') == 'ethanolate'
-
-    def test_alkoxide_common_style(self):
-        """'methanol' -> 'methoxide' (common style)"""
-        assert name_alkoxide_anion('methanol', style='common') == 'methoxide'
-
-    def test_alkoxide_common_ethanol(self):
-        """'ethanol' -> 'ethoxide' (common style)"""
-        assert name_alkoxide_anion('ethanol', style='common') == 'ethoxide'
-
-    def test_phenolate_from_phenol(self):
-        """'phenol' -> 'phenolate'"""
-        assert name_phenolate_anion('phenol') == 'phenolate'
-
     def test_aminium_from_methanamine(self):
         """'methanamine' -> 'methanaminium'"""
         assert name_aminium_cation('methanamine') == 'methanaminium'
@@ -366,58 +341,6 @@ class TestSuffixTransformations:
     def test_aminium_from_ammonia(self):
         """'ammonia' -> 'ammonium'"""
         assert name_aminium_cation('ammonia') == 'ammonium'
-
-    def test_carbenium_ylium_from_methane(self):
-        """'methane' -> 'methylium'"""
-        assert name_carbenium_cation('methane') == 'methylium'
-
-    def test_carbenium_ylium_from_ethane(self):
-        """'ethane' -> 'ethylium'"""
-        assert name_carbenium_cation('ethane') == 'ethylium'
-
-    def test_carbenium_ylium_from_propane(self):
-        """'propane' -> 'propylium'"""
-        assert name_carbenium_cation('propane') == 'propylium'
-
-
-class TestSuffixGetters:
-    """Test suffix getter functions."""
-
-    def test_anion_suffix_carboxylate(self):
-        """Carboxylate suffix is 'ate'."""
-        assert get_anion_suffix('carboxylate') == 'ate'
-
-    def test_anion_suffix_alkoxide(self):
-        """Alkoxide suffix is 'olate'."""
-        assert get_anion_suffix('alkoxide') == 'olate'
-
-    def test_anion_suffix_carbanion(self):
-        """Carbanion suffix is 'ide'."""
-        assert get_anion_suffix('carbanion') == 'ide'
-
-    def test_anion_suffix_aminide(self):
-        """Aminide suffix is 'aminide'."""
-        assert get_anion_suffix('aminide') == 'aminide'
-
-    def test_anion_suffix_unknown(self):
-        """Unknown anion type defaults to 'ide'."""
-        assert get_anion_suffix('unknown') == 'ide'
-
-    def test_cation_suffix_aminium(self):
-        """Aminium suffix is 'aminium'."""
-        assert get_cation_suffix('aminium') == 'aminium'
-
-    def test_cation_suffix_ylium(self):
-        """Ylium suffix is 'ylium'."""
-        assert get_cation_suffix('ylium') == 'ylium'
-
-    def test_cation_suffix_onium(self):
-        """Onium suffix is 'onium'."""
-        assert get_cation_suffix('onium') == 'onium'
-
-    def test_cation_suffix_unknown(self):
-        """Unknown cation type defaults to 'ium'."""
-        assert get_cation_suffix('unknown') == 'ium'
 
 
 class TestSystematicNaming:

@@ -15,9 +15,6 @@ from orthonym.data.fused_heterocycles import (
     FUSED_HETEROCYCLE_DATA,
     get_fused_heterocycle_name,
     match_fused_heterocycle_core,
-    get_fused_heterocycle_info,
-    is_fused_heterocycle,
-    get_ring_system_type,
 )
 
 
@@ -361,53 +358,6 @@ class TestCoverageByRingSystem:
     def test_minimum_total_entries(self):
         """Should have at least 25 total entries."""
         assert len(FUSED_HETEROCYCLE_DATA) >= 25
-
-
-class TestHelperFunctions:
-    """Test additional helper functions."""
-
-    @pytest.mark.unit
-    def test_get_fused_heterocycle_info_returns_full_data(self):
-        """get_fused_heterocycle_info should return complete data dict."""
-        mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
-        canonical = Chem.MolToSmiles(mol, canonical=True)
-        info = get_fused_heterocycle_info(canonical)
-        assert info is not None
-        assert 'name' in info
-        assert 'tautomer_locant' in info
-        assert 'ring_system' in info
-        assert 'parent_atoms' in info
-        assert info['name'] == '1H-indole'
-
-    @pytest.mark.unit
-    def test_is_fused_heterocycle_returns_true_for_known(self):
-        """is_fused_heterocycle should return True for known systems."""
-        mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')  # quinoline
-        assert is_fused_heterocycle(mol) is True
-
-    @pytest.mark.unit
-    def test_is_fused_heterocycle_returns_false_for_unknown(self):
-        """is_fused_heterocycle should return False for unknown systems."""
-        mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
-        assert is_fused_heterocycle(mol) is False
-
-    @pytest.mark.unit
-    def test_get_ring_system_type_returns_classification(self):
-        """get_ring_system_type should return correct classification."""
-        mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')  # indole
-        assert get_ring_system_type(mol) == 'benzo-5-membered'
-
-        mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')  # quinoline
-        assert get_ring_system_type(mol) == 'benzo-6-membered'
-
-        mol = Chem.MolFromSmiles('c1ccc2c(c1)[nH]c1ccccc12')  # carbazole
-        assert get_ring_system_type(mol) == 'tricyclic'
-
-    @pytest.mark.unit
-    def test_get_ring_system_type_returns_none_for_unknown(self):
-        """get_ring_system_type should return None for unknown systems."""
-        mol = Chem.MolFromSmiles('c1ccccc1')  # benzene
-        assert get_ring_system_type(mol) is None
 
 
 class TestAlternativeInputSMILES:

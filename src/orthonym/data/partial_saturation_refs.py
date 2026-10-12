@@ -362,24 +362,3 @@ def get_reference_smiles(name: str) -> Optional[str]:
     if ref_data:
         return ref_data['smiles']
     return None
-
-
-def get_reference_ring_atoms(name: str) -> int:
-    """
-    Get the number of ring atoms for a named reference compound.
-
-    Args:
-        name: Reference compound name
-
-    Returns:
-        Number of ring atoms, or 0 if not found
-    """
-    ref_data = AROMATIC_REFERENCES.get(name)
-    if ref_data:
-        return ref_data['ring_atoms']
-    return 0
-
-
-def list_reference_names() -> list:
-    """Return list of all available reference compound names."""
-    return list(AROMATIC_REFERENCES.keys())

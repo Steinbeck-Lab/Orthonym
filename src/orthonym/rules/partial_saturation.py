@@ -349,79 +349,6 @@ def analyze_saturation_for_naming(
     return format_saturation_prefix(prefix, locants)
 
 
-def is_fully_saturated(mol: Chem.Mol, aromatic_parent_smiles: str) -> bool:
-    """
-    Check if a molecule is fully saturated (perhydro) relative to parent.
-
-    Args:
-        mol: RDKit molecule to check
-        aromatic_parent_smiles: SMILES of the aromatic parent
-
-    Returns:
-        True if the molecule is fully saturated (perhydro)
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('C1CCCC2CCCCC12') # decalin (perhydronaphthalene)
-        >>> is_fully_saturated(mol, 'c1ccc2ccccc2c1') # naphthalene
-        True
-    """
-    result = detect_partial_saturation(mol, aromatic_parent_smiles)
-    if result is None:
-        # No saturation info - could be already fully aromatic or no match
-        return False
-    return result.get('is_perhydro', False)
-
-
-def count_ring_sp3_atoms(mol: Chem.Mol) -> int:
-    """
-    Count sp3-hybridized atoms in ring systems.
-
-    Utility function for saturation analysis.
-
-    Args:
-        mol: RDKit molecule
-
-    Returns:
-        Number of sp3 atoms in rings
-    """
-    ri = mol.GetRingInfo()
-    ring_atoms = set()
-    for ring in ri.AtomRings():
-        ring_atoms.update(ring)
-
-    count = 0
-    for idx in ring_atoms:
-        atom = mol.GetAtomWithIdx(idx)
-        if atom.GetHybridization() == Chem.HybridizationType.SP3:
-            count += 1
-
-    return count
-
-
-def get_ring_saturation_level(
-    mol: Chem.Mol,
-    aromatic_parent_smiles: str
-) -> str:
-    """
-    Get a human-readable saturation level description.
-
-    Args:
-        mol: RDKit molecule
-        aromatic_parent_smiles: SMILES of aromatic parent
-
-    Returns:
-        Description string: 'aromatic', 'partially saturated', or 'fully saturated'
-    """
-    result = detect_partial_saturation(mol, aromatic_parent_smiles)
-
-    if result is None:
-        return 'aromatic'
-    elif result.get('is_perhydro', False):
-        return 'fully saturated'
-    else:
-        return 'partially saturated'
-
-
 # =============================================================================
 # Carbocyclic Partial Saturation (PAH systems)
 # =============================================================================
@@ -912,54 +839,6 @@ def detect_carbocyclic_partial_saturation(
         'pcg_kind': pcg_kind,
         'pcg_ring_atoms': pcg_ring_atoms,
     }
-
-
-def is_tetrahydronaphthalene(mol: Chem.Mol, fused_ring_atoms: Set[int]) -> bool:
-    """
-    Check if fused system is tetrahydronaphthalene-type.
-
-    Tetrahydronaphthalene has:
-    - 10 ring atoms total
-    - 4 sp3 carbons (saturated ring)
-    - 6 aromatic carbons (benzene ring)
-    - All carbons (no heteroatoms)
-
-    Args:
-        mol: RDKit molecule
-        fused_ring_atoms: Set of atom indices in the fused ring system
-
-    Returns:
-        True if the system is tetrahydronaphthalene-type
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
-        >>> ri = mol.GetRingInfo
-        >>> ring_atoms = set
-        >>> for ring in ri.AtomRings:
-        ... ring_atoms.update(ring)
-        >>> is_tetrahydronaphthalene(mol, ring_atoms)
-        True
-    """
-    if len(fused_ring_atoms) != 10:
-        return False
-
-    sp3_count = 0
-    aromatic_count = 0
-
-    for idx in fused_ring_atoms:
-        atom = mol.GetAtomWithIdx(idx)
-
-        # Must be carbon
-        if atom.GetSymbol() != 'C':
-            return False
-
-        if atom.GetHybridization() == Chem.HybridizationType.SP3:
-            sp3_count += 1
-        elif atom.GetIsAromatic():
-            aromatic_count += 1
-
-    # Tetrahydronaphthalene: 4 sp3 + 6 aromatic
-    return sp3_count == 4 and aromatic_count == 6
 
 
 # =============================================================================

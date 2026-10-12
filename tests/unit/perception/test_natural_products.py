@@ -4,7 +4,6 @@ Tests cover:
 - Scaffold detection for steroids and alkaloids
 - Largest-match-wins logic for overlapping scaffolds
 - Non-scaffold atom identification
-- Convenience functions (is_steroid, is_alkaloid)
 - Substituent detection on scaffolds
 """
 
@@ -15,8 +14,6 @@ from orthonym.perception.natural_products import (
     detect_natural_product,
     get_non_scaffold_atoms,
     get_scaffold_substituents,
-    is_alkaloid,
-    is_steroid,
 )
 
 
@@ -253,66 +250,6 @@ class TestNonScaffoldAtoms:
         matched = tuple(range(mol.GetNumAtoms()))
         non_scaffold = get_non_scaffold_atoms(mol, matched)
         assert len(non_scaffold) == 0
-
-
-# ===========================================================================
-# TestConvenienceFunctions
-# ===========================================================================
-
-class TestConvenienceFunctions:
-    """Test is_steroid and is_alkaloid convenience functions."""
-
-    @pytest.mark.unit
-    def test_is_steroid_true(self):
-        mol = Chem.MolFromSmiles(CHOLESTANE_SMILES)
-        assert is_steroid(mol) is True
-
-    @pytest.mark.unit
-    def test_is_steroid_true_for_cholesterol(self):
-        mol = Chem.MolFromSmiles(CHOLESTEROL_SMILES)
-        assert is_steroid(mol) is True
-
-    @pytest.mark.unit
-    def test_is_steroid_false_for_benzene(self):
-        mol = Chem.MolFromSmiles("c1ccccc1")
-        assert is_steroid(mol) is False
-
-    @pytest.mark.unit
-    def test_is_steroid_false_for_none(self):
-        assert is_steroid(None) is False
-
-    @pytest.mark.unit
-    def test_is_alkaloid_true(self):
-        mol = Chem.MolFromSmiles(MORPHINAN_SMILES)
-        assert is_alkaloid(mol) is True
-
-    @pytest.mark.unit
-    def test_is_alkaloid_true_for_morphine(self):
-        mol = Chem.MolFromSmiles(MORPHINE_SMILES)
-        assert is_alkaloid(mol) is True
-
-    @pytest.mark.unit
-    def test_is_alkaloid_false_for_cyclohexane(self):
-        mol = Chem.MolFromSmiles("C1CCCCC1")
-        assert is_alkaloid(mol) is False
-
-    @pytest.mark.unit
-    def test_is_alkaloid_false_for_none(self):
-        assert is_alkaloid(None) is False
-
-    @pytest.mark.unit
-    def test_steroid_not_alkaloid(self):
-        """Steroids should not register as alkaloids."""
-        mol = Chem.MolFromSmiles(ANDROSTANE_SMILES)
-        assert is_steroid(mol) is True
-        assert is_alkaloid(mol) is False
-
-    @pytest.mark.unit
-    def test_alkaloid_not_steroid(self):
-        """Alkaloids should not register as steroids."""
-        mol = Chem.MolFromSmiles(TROPANE_SMILES)
-        assert is_alkaloid(mol) is True
-        assert is_steroid(mol) is False
 
 
 # ===========================================================================

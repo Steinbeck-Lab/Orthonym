@@ -392,16 +392,6 @@ def _count_multiple_bonds(mol, atom_set: Set[int]) -> int:
     return count
 
 
-def _count_double_bonds(mol, atom_set: Set[int]) -> int:
-    """Count double bonds (not triple) where both atoms are in atom_set."""
-    count = 0
-    for bond in mol.GetBonds():
-        if bond.GetBeginAtomIdx() in atom_set and bond.GetEndAtomIdx() in atom_set:
-            if bond.GetBondType() == Chem.BondType.DOUBLE:
-                count += 1
-    return count
-
-
 def _get_largest_individual_ring_size(mol, ring_system_atoms: Set[int]) -> int:
     """Get size of largest individual SSSR ring in a ring system.
 
@@ -422,17 +412,6 @@ def _get_largest_individual_ring_size(mol, ring_system_atoms: Set[int]) -> int:
         if ring_set.issubset(ring_system_atoms):
             max_size = max(max_size, len(ring))
     return max_size if max_size > 0 else len(ring_system_atoms)
-
-
-def _count_substituents_on_atoms(mol, atom_set: Set[int]) -> int:
-    """Count non-H substituents attached to atoms in atom_set but not in it."""
-    count = 0
-    for idx in atom_set:
-        atom = mol.GetAtomWithIdx(idx)
-        for nbr in atom.GetNeighbors():
-            if nbr.GetIdx() not in atom_set and nbr.GetSymbol() != 'H':
-                count += 1
-    return count
 
 
 # ============================================================================

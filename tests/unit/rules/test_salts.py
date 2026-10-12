@@ -4,8 +4,6 @@ from rdkit import Chem
 from orthonym.rules.salts import (
     name_salt,
     name_zwitterion,
-    is_salt,
-    is_zwitterion,
     _is_amino_acid_zwitterion,
     _apply_stoichiometric_prefix,
 )
@@ -116,54 +114,6 @@ class TestNameZwitterion:
         # Should contain some form of amino acid naming
         assert name is not None
         assert len(name) > 0
-
-
-class TestIsSalt:
-    """Test salt detection."""
-
-    def test_is_salt_positive(self):
-        """Test that salts are detected correctly."""
-        mol = Chem.MolFromSmiles('[Na+].[Cl-]')
-        assert is_salt(mol) is True
-
-    def test_is_salt_negative_neutral(self):
-        """Test that neutral molecules are not salts."""
-        mol = Chem.MolFromSmiles('CCO')
-        assert is_salt(mol) is False
-
-    def test_is_salt_negative_single_ion(self):
-        """Test that single ions are not salts."""
-        mol = Chem.MolFromSmiles('[Na+]')
-        assert is_salt(mol) is False
-
-    def test_is_salt_negative_zwitterion(self):
-        """Test that zwitterions are not salts (single fragment)."""
-        mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
-        assert is_salt(mol) is False
-
-
-class TestIsZwitterion:
-    """Test zwitterion detection."""
-
-    def test_is_zwitterion_positive(self):
-        """Test that zwitterions are detected correctly."""
-        mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
-        assert is_zwitterion(mol) is True
-
-    def test_is_zwitterion_negative_neutral(self):
-        """Test that neutral molecules are not zwitterions."""
-        mol = Chem.MolFromSmiles('CCO')
-        assert is_zwitterion(mol) is False
-
-    def test_is_zwitterion_negative_salt(self):
-        """Test that salts are not zwitterions."""
-        mol = Chem.MolFromSmiles('[Na+].[Cl-]')
-        assert is_zwitterion(mol) is False
-
-    def test_is_zwitterion_negative_single_ion(self):
-        """Test that single ions are not zwitterions."""
-        mol = Chem.MolFromSmiles('[NH4+]')
-        assert is_zwitterion(mol) is False
 
 
 class TestIsAminoAcidZwitterion:

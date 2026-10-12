@@ -17,8 +17,6 @@ Provides:
 - detect_natural_product: Main detection entry point
 - get_non_scaffold_atoms: Identify atoms not part of matched scaffold
 - get_scaffold_substituents: Identify substituents attached to scaffold
-- is_steroid: Quick steroid check
-- is_alkaloid: Quick alkaloid check
 """
 
 import logging
@@ -436,41 +434,3 @@ def get_scaffold_substituents(mol, matched_atoms: tuple) -> List[Dict]:
                 })
 
     return substituents
-
-
-# ---------------------------------------------------------------------------
-# Convenience functions
-# ---------------------------------------------------------------------------
-
-def is_steroid(mol) -> bool:
-    """Quick check: does molecule contain a steroid scaffold?
-
-    Args:
-        mol: RDKit Mol object. Returns False if mol is None.
-
-    Returns:
-        True if molecule contains a steroid scaffold.
-    """
-    if mol is None:
-        return False
-    result = detect_natural_product(mol)
-    if result is None:
-        return False
-    return result["scaffold_class"] == "steroid"
-
-
-def is_alkaloid(mol) -> bool:
-    """Quick check: does molecule contain an alkaloid scaffold?
-
-    Args:
-        mol: RDKit Mol object. Returns False if mol is None.
-
-    Returns:
-        True if molecule contains an alkaloid scaffold.
-    """
-    if mol is None:
-        return False
-    result = detect_natural_product(mol)
-    if result is None:
-        return False
-    return result["scaffold_class"] == "alkaloid"

@@ -24,7 +24,6 @@ from orthonym.assembly.naming_utils import (
     apply_vowel_elision,
     format_suffix_with_locants,
     apply_enclosing_marks,
-    get_bracket_depth,
     needs_brackets,
     _ALKYL_ROOTS_FULL,
 )
@@ -498,16 +497,6 @@ class TestEnclosingMarksDepthCycling:
             assert content in result
             # Result is exactly open_mark + content + close_mark
             assert result[1:-1] == content
-
-    @pytest.mark.parametrize("name,expected_depth", [
-        ("methyl", 0),
-        ("(2-methylpropyl)", 1),
-        ("[2-(methylamino)ethyl]", 2),
-        ("{complex}", 3),
-    ])
-    def test_bracket_depth_detects_all_types(self, name, expected_depth):
-        """get_bracket_depth correctly identifies nesting depth from bracket type."""
-        assert get_bracket_depth(name) == expected_depth
 
 
 # ============================================================================

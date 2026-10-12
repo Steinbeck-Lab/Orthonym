@@ -183,27 +183,6 @@ def classify_radical(mol, radical_site: Dict[str, Any]) -> Dict[str, Any]:
 
 # === SUFFIX HELPERS ===
 
-def get_radical_suffix(n_electrons: int) -> str:
-    """
-    Return suffix based on radical electron count.
-
-    Args:
-        n_electrons: Number of unpaired electrons (1, 2, or 3)
-
-    Returns:
-        Suffix string: 'yl' for 1, 'ylidene' for 2, 'ylidyne' for 3
-
-    Example:
-        >>> get_radical_suffix(1)
-        'yl'
-        >>> get_radical_suffix(2)
-        'ylidene'
-        >>> get_radical_suffix(3)
-        'ylidyne'
-    """
-    return RADICAL_SUFFIXES.get(n_electrons, 'yl')
-
-
 def _count_chain_carbons(mol, start_idx: int, exclude: set) -> int:
     """Count carbon atoms in a chain via BFS from a starting point."""
     from collections import deque

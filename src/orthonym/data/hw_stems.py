@@ -276,32 +276,3 @@ def get_saturated_stem(ring_size: int, heteroatom: str = 'C') -> Optional[str]:
         'inane'
     """
     return get_hw_stem(ring_size, is_saturated=True, heteroatom=heteroatom)
-
-
-def is_supported_ring_size(ring_size: int) -> bool:
-    """
-    Check if a ring size is supported by HW nomenclature.
-
-    Args:
-        ring_size: Number of atoms in the ring
-
-    Returns:
-        True if ring size 3-10 (HW supported range)
-
-    Examples:
-        >>> is_supported_ring_size(5)
-        True
-        >>> is_supported_ring_size(11)
-        False
-    """
-    return ring_size in HW_STEMS
-
-
-def get_supported_ring_sizes() -> list:
-    """
-    Get list of ring sizes supported by HW nomenclature.
-
-    Returns:
-        List of integers [3, 4, 5, 6, 7, 8, 9, 10]
-    """
-    return sorted(HW_STEMS.keys())

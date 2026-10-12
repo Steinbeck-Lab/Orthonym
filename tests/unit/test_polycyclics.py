@@ -21,7 +21,6 @@ from orthonym.data.polycyclic_data import (
     POLYCYCLIC_DATA,
     get_polycyclic_by_smiles,
     is_polycyclic_aromatic,
-    get_pah_names,
 )
 
 
@@ -55,14 +54,6 @@ class TestPolycyclicDataLookup:
     def test_is_polycyclic_aromatic_benzene(self):
         """Benzene is NOT a polycyclic aromatic."""
         assert is_polycyclic_aromatic('c1ccccc1') is False
-
-    def test_get_pah_names(self):
-        """get_pah_names returns list of all PAH names."""
-        names = get_pah_names()
-        assert isinstance(names, list)
-        assert 'naphthalene' in names
-        assert 'anthracene' in names
-        assert len(names) >= 8
 
 
 class TestPolycyclicIdentification:

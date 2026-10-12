@@ -14,7 +14,7 @@ IUPAC naming for xanthines:
 Reference: IUPAC 2013 Blue Book (Purines and xanthines)
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from rdkit import Chem
 
@@ -256,33 +256,3 @@ def get_xanthine_info(mol: Chem.Mol) -> Optional[Dict[str, Any]]:
         return None
 
     return XANTHINE_DERIVATIVES[key].copy()
-
-
-def get_xanthine_n_positions(mol: Chem.Mol) -> Optional[List[int]]:
-    """
-    Get N-substitution positions for a xanthine derivative.
-
-    Args:
-        mol: RDKit molecule object
-
-    Returns:
-        List of N-positions that are substituted (e.g., [1, 3, 7] for caffeine),
-        or None if not a known xanthine.
-    """
-    info = get_xanthine_info(mol)
-    if info is None:
-        return None
-    return info.get('n_positions', [])
-
-
-def is_xanthine_derivative(mol: Chem.Mol) -> bool:
-    """
-    Check if a molecule is a known xanthine derivative.
-
-    Args:
-        mol: RDKit molecule object
-
-    Returns:
-        True if molecule is a known xanthine derivative
-    """
-    return identify_xanthine(mol) is not None

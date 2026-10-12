@@ -697,9 +697,9 @@ def _name_organic_ion_best_effort(ion_smiles: str, *,
     per-component pattern. Returns the ion word (``...-ium`` / ``...-ide`` /
     ``...-oate``) or ``''`` on failure.
 
-    Cycle-safe: ``ion_smiles`` is a SINGLE charged fragment (no ``.``), so
-    ``is_salt`` (which requires BOTH a cation and an anion fragment) is False
-    and the fresh instance never re-enters ``name_salt``.
+    Cycle-safe: ``ion_smiles`` is a SINGLE charged fragment (no ``.``), so it
+    has no cation/anion pair (salt naming requires BOTH a cation and an anion
+    fragment) and the fresh instance never re-enters ``name_salt``.
 
     Gated by the caller: the widening fires ONLY when a best-effort flag is set,
     so the PIN tier (all flags False) is unchanged. On the PIN path this helper
@@ -1102,8 +1102,8 @@ def name_salt(mol, style: str = 'pin', *,
     # applicable here -- a zwitterion, which `parse_salt_fragments`
     # (ions.py:551) buckets by WHOLE-FRAGMENT net formal charge, so a
     # net-neutral zwitterion is a SINGLE fragment with no separate
-    # cation/anion entries and never reaches `name_salt` at all (`is_salt`
-    # requires both `cations` and `anions` non-empty). So any survivor in
+    # cation/anion entries and never reaches `name_salt` at all (a salt has
+    # both `cations` and `anions` non-empty). So any survivor in
     # `neutrals` here is a real extraneous organic/inorganic co-fragment.
     #
     # Previously this ALWAYS aborted (mirroring the cation/anion guards
@@ -1681,75 +1681,3 @@ def _infer_zwitterion_name(
         return neutral_name
 
     return ''
-
-
-# === SALT DETECTION HELPERS ===
-
-def is_salt(mol) -> bool:
-    """
-    Check if a molecule is a salt (has separate cation and anion fragments).
-
-    Args:
-        mol: RDKit Mol object
-
-    Returns:
-        True if molecule is a salt
-
-    Example:
-        >>> mol = Chem.MolFromSmiles('[Na+].[Cl-]')
-        >>> is_salt(mol)
-        True
-    """
-    if mol is None:
-        return False
-
-    # a phase-a: a genuine salt is charge-balanced overall; see the
-    # matching guard (and its rationale) in name_salt above.
-    if Chem.GetFormalCharge(mol) != 0:
-        return False
-
-    frags = parse_salt_fragments(mol)
-    return bool(frags['cations'] and frags['anions'])
-
-
-def is_zwitterion(mol) -> bool:
-    """
-    Check if a molecule is a zwitterion (internal + and - charges).
-
-    Args:
-        mol: RDKit Mol object
-
-    Returns:
-        True if molecule is a zwitterion
-
-    Example:
-        >>> mol = Chem.MolFromSmiles('[NH3+]CC([O-])=O')
-        >>> is_zwitterion(mol)
-        True
-    """
-    if mol is None:
-        return False
-
-    # Zwitterion: single fragment with both + and - charges that cancel
-    frags = Chem.GetMolFrags(mol, asMols=True)
-
-    if len(frags) != 1:
-        return False
-
-    # Check for both positive and negative atoms
-    has_positive = False
-    has_negative = False
-
-    for atom in mol.GetAtoms():
-        charge = atom.GetFormalCharge()
-        if charge > 0:
-            has_positive = True
-        elif charge < 0:
-            has_negative = True
-
-    if not (has_positive and has_negative):
-        return False
-
-    # Net charge should be zero
-    net_charge = Chem.GetFormalCharge(mol)
-    return net_charge == 0

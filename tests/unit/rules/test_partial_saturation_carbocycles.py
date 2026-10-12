@@ -19,7 +19,6 @@ from rdkit import Chem
 
 from orthonym.rules.partial_saturation import (
     detect_carbocyclic_partial_saturation,
-    is_tetrahydronaphthalene,
     format_saturation_prefix,
     get_saturation_prefix,
 )
@@ -107,37 +106,6 @@ class TestCarbocyclicPartialSaturationDetection:
             ring_atoms.update(ring)
         result = detect_carbocyclic_partial_saturation(mol, ring_atoms)
         assert result is None  # Has nitrogen, not pure carbocycle
-
-
-class TestIsTetrahydronaphthalene:
-    """Test is_tetrahydronaphthalene helper function."""
-
-    def test_tetrahydronaphthalene_true(self):
-        """Standard tetrahydronaphthalene should return True."""
-        mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCC2')
-        ri = mol.GetRingInfo()
-        ring_atoms = set()
-        for ring in ri.AtomRings():
-            ring_atoms.update(ring)
-        assert is_tetrahydronaphthalene(mol, ring_atoms) == True
-
-    def test_naphthalene_false(self):
-        """Fully aromatic naphthalene should return False."""
-        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
-        ri = mol.GetRingInfo()
-        ring_atoms = set()
-        for ring in ri.AtomRings():
-            ring_atoms.update(ring)
-        assert is_tetrahydronaphthalene(mol, ring_atoms) == False
-
-    def test_decalin_false(self):
-        """Fully saturated decalin should return False (not tetrahydro)."""
-        mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')
-        ri = mol.GetRingInfo()
-        ring_atoms = set()
-        for ring in ri.AtomRings():
-            ring_atoms.update(ring)
-        assert is_tetrahydronaphthalene(mol, ring_atoms) == False
 
 
 class TestTetrahydronaphthaleneNaming:

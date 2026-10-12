@@ -16,8 +16,6 @@ from orthonym.data.xanthine_derivatives import (
     identify_xanthine,
     get_xanthine_name,
     get_xanthine_info,
-    get_xanthine_n_positions,
-    is_xanthine_derivative,
 )
 
 
@@ -230,34 +228,3 @@ class TestXanthineInfoFunctions:
         assert info['n_positions'] == [1, 3, 7]
         assert info['indicated_h'] == '1H'
         assert info['saturation'] == '3,7-dihydro'
-
-    @pytest.mark.unit
-    def test_get_xanthine_n_positions_caffeine(self):
-        """Caffeine should have N-positions [1, 3, 7]."""
-        mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(c(=O)n2C)C')
-        positions = get_xanthine_n_positions(mol)
-        assert positions == [1, 3, 7]
-
-    @pytest.mark.unit
-    def test_get_xanthine_n_positions_theophylline(self):
-        """Theophylline should have N-positions [1, 3]."""
-        mol = Chem.MolFromSmiles('Cn1c2c(c(=O)n(c1=O)C)[nH]cn2')
-        positions = get_xanthine_n_positions(mol)
-        assert positions == [1, 3]
-
-    @pytest.mark.unit
-    def test_is_xanthine_derivative_caffeine(self):
-        """Caffeine should be recognized as xanthine derivative."""
-        mol = Chem.MolFromSmiles('Cn1cnc2c1c(=O)n(c(=O)n2C)C')
-        assert is_xanthine_derivative(mol) is True
-
-    @pytest.mark.unit
-    def test_is_xanthine_derivative_benzene(self):
-        """Benzene should not be recognized as xanthine derivative."""
-        mol = Chem.MolFromSmiles('c1ccccc1')
-        assert is_xanthine_derivative(mol) is False
-
-    @pytest.mark.unit
-    def test_is_xanthine_derivative_none(self):
-        """None input should return False."""
-        assert is_xanthine_derivative(None) is False

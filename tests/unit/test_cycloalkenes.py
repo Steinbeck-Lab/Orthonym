@@ -12,7 +12,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import name_compound
-from orthonym.perception.rings import classify_ring, get_ring_double_bond_atoms
+from orthonym.perception.rings import classify_ring
 from orthonym.rules.cycloalkanes import orient_cycloalkene, get_ring_double_bonds
 
 
@@ -144,7 +144,7 @@ class TestCycloalkeneClassification:
 # ============================================================================
 
 class TestRingDoubleBondDetection:
-    """Tests for get_ring_double_bonds and get_ring_double_bond_atoms."""
+    """Tests for get_ring_double_bonds."""
 
     @pytest.mark.unit
     def test_single_double_bond_detection(self):
@@ -161,18 +161,6 @@ class TestRingDoubleBondDetection:
         ring = mol.GetRingInfo().AtomRings()[0]
         double_bonds = get_ring_double_bonds(mol, ring)
         assert len(double_bonds) == 2
-
-    @pytest.mark.unit
-    def test_double_bond_atoms_function(self):
-        """get_ring_double_bond_atoms returns same result."""
-        mol = Chem.MolFromSmiles("C1=CCCCC1")
-        ring = mol.GetRingInfo().AtomRings()[0]
-        double_bonds = get_ring_double_bond_atoms(mol, ring)
-        assert len(double_bonds) == 1
-        # Each double bond is a tuple of two atom indices
-        a1, a2 = double_bonds[0]
-        assert isinstance(a1, int)
-        assert isinstance(a2, int)
 
 
 # ============================================================================

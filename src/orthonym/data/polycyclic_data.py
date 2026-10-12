@@ -568,22 +568,6 @@ def get_polycyclic_by_smiles(canonical_smiles: str) -> Optional[Dict[str, Any]]:
     return {'name': name, **POLYCYCLIC_DATA[name]}
 
 
-def get_polycyclic_by_name(name: str) -> Optional[Dict[str, Any]]:
-    """
-    Look up polycyclic data by name.
-
-    Args:
-        name: PAH name (e.g., 'naphthalene', 'anthracene')
-
-    Returns:
-        Dict with PAH data if found, None otherwise
-    """
-    if name not in POLYCYCLIC_DATA:
-        return None
-
-    return {'name': name, **POLYCYCLIC_DATA[name]}
-
-
 def is_polycyclic_aromatic(canonical_smiles: str) -> bool:
     """
     Check if a canonical SMILES represents a known polycyclic aromatic.
@@ -595,16 +579,6 @@ def is_polycyclic_aromatic(canonical_smiles: str) -> bool:
         True if the SMILES matches a known PAH
     """
     return canonical_smiles in _SMILES_TO_NAME
-
-
-def get_pah_names() -> List[str]:
-    """
-    Get list of all supported PAH names.
-
-    Returns:
-        List of PAH names
-    """
-    return list(POLYCYCLIC_DATA.keys())
 
 
 def match_polycyclic_core(mol) -> Optional[Tuple[str, Dict[int, int]]]:
@@ -699,48 +673,6 @@ def get_pah_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
         return set(matches[0])
 
     return None
-
-
-def get_pah_substituent_positions(mol, pah_name: str) -> List[int]:
-    """
-    Get IUPAC locant positions where substituents are attached.
-
-    Args:
-        mol: RDKit Mol object with substituted PAH
-        pah_name: Name of the PAH core (e.g., 'naphthalene')
-
-    Returns:
-        List of IUPAC locants with substituents
-
-    Example:
-        >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('Cc1ccc2ccccc2c1') # 2-methylnaphthalene
-        >>> get_pah_substituent_positions(mol, 'naphthalene')
-        [2] # Methyl at position 2
-    """
-
-    core_atoms = get_pah_core_atoms(mol, pah_name)
-    if not core_atoms:
-        return []
-
-    result = match_polycyclic_core(mol)
-    if not result or result[0] != pah_name:
-        return []
-
-    _, atom_mapping = result
-
-    # Find atoms with non-core neighbors (these have substituents)
-    substituted_positions = []
-    for atom_idx in core_atoms:
-        atom = mol.GetAtomWithIdx(atom_idx)
-        for neighbor in atom.GetNeighbors():
-            if neighbor.GetIdx() not in core_atoms:
-                # This core atom has a substituent
-                if atom_idx in atom_mapping:
-                    substituted_positions.append(atom_mapping[atom_idx])
-                break
-
-    return sorted(set(substituted_positions))
 
 
 # =============================================================================
@@ -1052,98 +984,3 @@ EXTENDED_FUSION_PREFIXES: Dict[str, str] = {
     'pyridazino': 'pyridazino',
     'triazino': 'triazino',
 }
-
-
-def get_complex_fusion_info(smiles: str) -> Optional[Tuple[str, str, str]]:
-    """
-    Look up pre-computed fusion descriptor for a known complex polycyclic.
-
-    Args:
-        smiles: SMILES string of the compound
-
-    Returns:
-        Tuple of (prefix, descriptor, parent) if found, None otherwise
-        Example: ('dibenzo', '[a,c]', 'anthracene')
-
-    Example:
-        >>> get_complex_fusion_info('c1ccc2c(c1)cc1ccc3cc4ccccc4cc3c1c2')
-        ('dibenzo', '[a,c]', 'anthracene')
-    """
-    # Try exact SMILES match first
-    name = _COMPLEX_SMILES_TO_NAME.get(smiles)
-    if name and name in COMPLEX_FUSION_DATA:
-        data = COMPLEX_FUSION_DATA[name]
-        return (data['prefix'], data['descriptor'], data['parent'])
-
-    # Canonicalize and try again
-    try:
-        from rdkit import Chem
-        mol = Chem.MolFromSmiles(smiles)
-        if mol:
-            canonical = Chem.MolToSmiles(mol)
-            name = _COMPLEX_SMILES_TO_NAME.get(canonical)
-            if name and name in COMPLEX_FUSION_DATA:
-                data = COMPLEX_FUSION_DATA[name]
-                return (data['prefix'], data['descriptor'], data['parent'])
-    except Exception:
-        pass
-
-    return None
-
-
-def get_complex_fusion_by_name(name: str) -> Optional[Dict[str, Any]]:
-    """
-    Look up complex fusion data by name.
-
-    Args:
-        name: Full fusion name (e.g., 'dibenzo[a,c]anthracene')
-
-    Returns:
-        Dict with fusion data if found, None otherwise
-    """
-    return COMPLEX_FUSION_DATA.get(name)
-
-
-def get_edge_letter(ring_name: str, edge_index: int) -> str:
-    """
-    Get the IUPAC edge letter for a given edge index in a parent ring.
-
-    Args:
-        ring_name: Name of the parent ring (e.g., 'anthracene')
-        edge_index: 0-indexed edge position
-
-    Returns:
-        Edge letter ('a', 'b', etc.) or empty string if not found
-
-    Example:
-        >>> get_edge_letter('anthracene', 0)
-        'a'
-        >>> get_edge_letter('anthracene', 2)
-        'c'
-    """
-    if ring_name not in PARENT_RING_EDGES:
-        return ''
-
-    edges = PARENT_RING_EDGES[ring_name]
-    return edges.get(edge_index, '')
-
-
-def get_all_edge_letters(ring_name: str) -> List[str]:
-    """
-    Get all available edge letters for a parent ring.
-
-    Args:
-        ring_name: Name of the parent ring
-
-    Returns:
-        List of edge letters in order
-
-    Example:
-        >>> get_all_edge_letters('benzene')
-        ['a', 'b', 'c', 'd', 'e', 'f']
-    """
-    if ring_name not in PARENT_RING_EDGES:
-        return []
-
-    edges = PARENT_RING_EDGES[ring_name]
-    return [edges[i] for i in sorted(edges.keys())]

@@ -413,24 +413,6 @@ def _token_matches_name(name_lower, token_patterns, bond_type):
         return True  # Guard: never crash the quality gate
 
 
-
-def _name_has_ring_system_token(name: str) -> bool:
-    """Check if a name contains a recognized ring-system token.
-
-    Used by the quality gate to distinguish legitimate retained names
-    (e.g., "phenothiazine" for a 26-atom molecule) from partial names
-    that only cover a small fragment.
-
-    Args:
-        name: IUPAC name string.
-
-    Returns:
-        True if the name contains at least one recognized ring-system token.
-    """
-    name_lower = name.lower()
-    return any(token in name_lower for token in _RING_SYSTEM_TOKENS)
-
-
 # ---------------------------------------------------------------------------
 # The real coverage oracle (Task Z3)
 # ---------------------------------------------------------------------------

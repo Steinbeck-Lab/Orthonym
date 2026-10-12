@@ -7,7 +7,6 @@ from rdkit import Chem
 
 from orthonym.perception.functional_groups import (
     detect_functional_groups,
-    has_functional_group,
     count_functional_groups,
 )
 
@@ -128,13 +127,7 @@ class TestFunctionalGroupDetection:
 @pytest.mark.unit
 class TestFunctionalGroupHelpers:
     """Tests for helper functions."""
-    
-    def test_has_functional_group(self, mol_from_smiles):
-        mol = mol_from_smiles("CCO")
-        
-        assert has_functional_group(mol, "primary_alcohol")
-        assert not has_functional_group(mol, "ketone")
-    
+
     def test_count_functional_groups(self, mol_from_smiles):
         mol = mol_from_smiles("OCCO")  # ethylene glycol
         counts = count_functional_groups(mol)

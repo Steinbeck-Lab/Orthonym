@@ -20,8 +20,6 @@ from orthonym.rules.fused_rings import (
     get_fused_heterocycle_substituents,
     get_shared_atoms,
     name_ortho_fused_bicyclic as _name_ortho_fused_bicyclic_raw,
-    is_fused_aromatic_system,
-    is_fused_heterocyclic_system,
 )
 
 
@@ -386,50 +384,6 @@ class TestNameOrthoFusedBicyclic:
         result = name_ortho_fused_bicyclic(mol)
         # Should delegate to name_fused_heterocycle
         assert result == '1H-indole'
-
-
-# ============================================================================
-# Test is_fused_aromatic_system and is_fused_heterocyclic_system
-# ============================================================================
-
-class TestFusedSystemDetection:
-    """Tests for fused system detection functions."""
-
-    @pytest.mark.unit
-    def test_naphthalene_is_fused_aromatic(self):
-        """Naphthalene should be detected as fused aromatic."""
-        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
-        assert is_fused_aromatic_system(mol) is True
-
-    @pytest.mark.unit
-    def test_indole_is_fused_aromatic(self):
-        """Indole should be detected as fused aromatic."""
-        mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
-        assert is_fused_aromatic_system(mol) is True
-
-    @pytest.mark.unit
-    def test_benzene_not_fused_aromatic(self):
-        """Benzene should not be detected as fused aromatic."""
-        mol = Chem.MolFromSmiles('c1ccccc1')
-        assert is_fused_aromatic_system(mol) is False
-
-    @pytest.mark.unit
-    def test_indole_is_fused_heterocyclic(self):
-        """Indole should be detected as fused heterocyclic."""
-        mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1')
-        assert is_fused_heterocyclic_system(mol) is True
-
-    @pytest.mark.unit
-    def test_naphthalene_not_fused_heterocyclic(self):
-        """Naphthalene should not be detected as fused heterocyclic."""
-        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')
-        assert is_fused_heterocyclic_system(mol) is False
-
-    @pytest.mark.unit
-    def test_quinoline_is_fused_heterocyclic(self):
-        """Quinoline should be detected as fused heterocyclic."""
-        mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')
-        assert is_fused_heterocyclic_system(mol) is True
 
 
 # ============================================================================

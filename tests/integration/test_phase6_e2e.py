@@ -367,21 +367,6 @@ class TestCOMPLEX06_PAHLookup:
     """PAH data lookup and verification."""
 
     @pytest.mark.integration
-    def test_pah_data_contains_all_expected(self):
-        """Verify PAH data contains all expected compounds."""
-        from orthonym.data.polycyclic_data import get_pah_names
-
-        expected_pahs = [
-            'naphthalene', 'anthracene', 'phenanthrene', 'pyrene',
-            'chrysene', 'perylene', 'coronene', 'fluorene',
-            'acenaphthene', 'acenaphthylene'
-        ]
-
-        pah_names = get_pah_names()
-        for pah in expected_pahs:
-            assert pah in pah_names, f"Missing PAH: {pah}"
-
-    @pytest.mark.integration
     def test_pah_smiles_lookup_works(self):
         """Test PAH lookup by SMILES."""
         from orthonym.data.polycyclic_data import get_polycyclic_by_smiles

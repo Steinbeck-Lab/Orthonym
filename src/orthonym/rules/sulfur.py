@@ -22,30 +22,6 @@ from rdkit import Chem
 from ..assembly.naming_utils import get_alkyl_name
 
 
-def name_thiol(mol, thiol_atoms: Tuple[int, ...], parent_name: str, locant: Optional[int] = None) -> str:
-    """
-    Name a thiol compound with -thiol suffix.
-
-    Args:
-        mol: RDKit Mol object
-        thiol_atoms: Atom indices from SMARTS match (S, C)
-        parent_name: Parent chain/ring name without suffix
-        locant: Position of thiol group (None if implied)
-
-    Returns:
-        Name like "methanethiol", "propane-1-thiol"
-    """
-    # Terminal thiols: locant is 1, often omitted for 1-2 carbon chains
-    if locant is None or locant == 1:
-        # For methane/ethane, no locant needed
-        if parent_name in ("methan", "ethan"):
-            return f"{parent_name}ethiol"
-        # For longer chains, include locant in PIN style
-        return f"{parent_name}e-1-thiol"
-    else:
-        return f"{parent_name}e-{locant}-thiol"
-
-
 def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
     """
     Build the functional-class (method 2) name of a sulfide (thioether).
@@ -235,22 +211,6 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
         return f"{multiplied_component(2, sub_names[0], enclose_if_compound(sub_names[0]))} {class_word}"
     else:
         return f"{sub_names[0]} {sub_names[1]} {class_word}"
-
-
-def name_sulfonic_acid(mol, sulfonic_atoms: Tuple[int, ...], parent_name: str) -> str:
-    """
-    Name a sulfonic acid with -sulfonic acid suffix.
-
-    Args:
-        mol: RDKit Mol object
-        sulfonic_atoms: Atom indices from SMARTS match
-        parent_name: Parent chain/ring name
-
-    Returns:
-        Name like "methanesulfonic acid", "benzenesulfonic acid"
-    """
-    # Sulfonic acid always at chain/ring end, no locant needed
-    return f"{parent_name}sulfonic acid"
 
 
 def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
@@ -795,23 +755,3 @@ def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
     """Count carbon atoms in an alkyl group via BFS (backward-compatible)."""
     _, count = _characterize_sulfur_substituent(mol, start_idx, exclude)
     return count
-
-
-def get_sulfur_prefix(fg_name: str) -> Optional[str]:
-    """
-    Get prefix form for sulfur functional groups.
-
-    Returns:
-        Prefix string, or None if group uses functional class naming
-    """
-    SULFUR_PREFIXES = {
-        "thiol": "sulfanyl",  # IUPAC (2013), not "mercapto"
-        "sulfonic_acid": "sulfo",
-        "sulfinic_acid": "sulfino",
-        # These use functional class naming, no prefix:
-        "thioether": None,
-        "sulfide": None,
-        "sulfoxide": None,
-        "sulfone": None,
-    }
-    return SULFUR_PREFIXES.get(fg_name)

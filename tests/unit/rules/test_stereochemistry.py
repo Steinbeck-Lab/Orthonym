@@ -11,9 +11,7 @@ from rdkit.Chem import rdCIPLabeler
 
 from orthonym.rules.stereochemistry import (
     collect_stereodescriptors,
-    collect_ring_stereodescriptors,
     format_stereodescriptor_string,
-    get_double_bond_locant,
 )
 
 
@@ -261,63 +259,6 @@ class TestCollectStereodescriptorsPseudoasymmetric:
 
 
 # =============================================================================
-# Test get_double_bond_locant
-# =============================================================================
-
-class TestGetDoubleBondLocant:
-    """Tests for get_double_bond_locant function."""
-
-    def test_both_atoms_in_mapping(self):
-        """Returns min locant when both atoms in mapping."""
-        mol = Chem.MolFromSmiles('C/C=C/C')
-        bond = mol.GetBondBetweenAtoms(1, 2)
-
-        atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4}
-
-        locant = get_double_bond_locant(bond, atom_to_locant)
-        assert locant == 2  # min(2, 3)
-
-    def test_returns_minimum_of_locants(self):
-        """Returns minimum of the two locants."""
-        mol = Chem.MolFromSmiles('C/C=C/C')
-        bond = mol.GetBondBetweenAtoms(1, 2)
-
-        # Reverse numbering
-        atom_to_locant = {0: 4, 1: 3, 2: 2, 3: 1}
-
-        locant = get_double_bond_locant(bond, atom_to_locant)
-        assert locant == 2  # min(3, 2)
-
-    def test_one_atom_missing_returns_none(self):
-        """Returns None if one atom not in mapping."""
-        mol = Chem.MolFromSmiles('C/C=C/C')
-        bond = mol.GetBondBetweenAtoms(1, 2)
-
-        atom_to_locant = {0: 1, 1: 2, 3: 4}  # Missing atom 2
-
-        locant = get_double_bond_locant(bond, atom_to_locant)
-        assert locant is None
-
-    def test_both_atoms_missing_returns_none(self):
-        """Returns None if both atoms not in mapping."""
-        mol = Chem.MolFromSmiles('C/C=C/C')
-        bond = mol.GetBondBetweenAtoms(1, 2)
-
-        atom_to_locant = {0: 1, 3: 2}  # Missing atoms 1 and 2
-
-        locant = get_double_bond_locant(bond, atom_to_locant)
-        assert locant is None
-
-    def test_empty_mapping_returns_none(self):
-        """Returns None with empty mapping."""
-        mol = Chem.MolFromSmiles('C/C=C/C')
-        bond = mol.GetBondBetweenAtoms(1, 2)
-
-        locant = get_double_bond_locant(bond, {})
-        assert locant is None
-
-
-# =============================================================================
 # Test format_stereodescriptor_string
 # =============================================================================
 
@@ -374,72 +315,6 @@ class TestFormatStereodescriptorString:
         # Note: format doesn't sort; sorting is done by collect_*
         descriptors = [(5, 'E'), (2, 'R')]
         assert format_stereodescriptor_string(descriptors) == "(5E,2R)-"
-
-
-# =============================================================================
-# Test collect_ring_stereodescriptors
-# =============================================================================
-
-class TestCollectRingStereodescriptors:
-    """Tests for collect_ring_stereodescriptors function."""
-
-    def test_ring_single_stereocenter(self):
-        """Ring with single stereocenter returns correct locant."""
-        # Use 1,2-dimethylcyclohexane which has actual stereocenters
-        # We'll just check one stereocenter by limiting the mapping
-        mol = Chem.MolFromSmiles('[C@H]1(O)C[C@@H](C)CCC1')  # 4-methylcyclohexan-1-ol
-        rdCIPLabeler.AssignCIPLabels(mol)
-
-        # Atom 0 is the OH-bearing carbon (R), atom 3 is the methyl-bearing carbon (S)
-        # Include only atom 0 in the ring map to test single stereocenter
-        ring_atom_to_locant = {0: 1, 2: 2, 3: 3, 5: 4, 6: 5, 7: 6}
-
-        descriptors = collect_ring_stereodescriptors(mol, ring_atom_to_locant)
-
-        # Should have stereocenters at atom 0 (locant 1) and atom 3 (locant 3)
-        assert len(descriptors) == 2
-        locants = [d[0] for d in descriptors]
-        assert 1 in locants  # stereocenter at locant 1
-
-    def test_ring_multiple_stereocenters_sorted(self):
-        """Ring with multiple stereocenters sorted by locant."""
-        # cis-1,2-dimethylcyclohexane: C[C@H]1[C@H](C)CCCC1
-        mol = Chem.MolFromSmiles('C[C@H]1[C@H](C)CCCC1')
-        rdCIPLabeler.AssignCIPLabels(mol)
-
-        # Ring atoms are 1,2,4,5,6,7 (assuming structure)
-        ring_atom_to_locant = {1: 1, 2: 2, 4: 3, 5: 4, 6: 5, 7: 6}
-
-        descriptors = collect_ring_stereodescriptors(mol, ring_atom_to_locant)
-
-        # Should have two stereocenters, sorted by locant
-        assert len(descriptors) == 2
-        locants = [d[0] for d in descriptors]
-        assert locants == sorted(locants)
-
-    def test_atoms_outside_ring_excluded(self):
-        """Atoms outside ring are excluded from results."""
-        # Methylcyclohexane with stereo at ring junction
-        mol = Chem.MolFromSmiles('C[C@H]1CCCCC1')
-        rdCIPLabeler.AssignCIPLabels(mol)
-
-        # Only include some ring atoms, exclude methyl (atom 0)
-        ring_atom_to_locant = {2: 2, 3: 3, 4: 4, 5: 5, 6: 6}  # Exclude atoms 0 and 1
-
-        descriptors = collect_ring_stereodescriptors(mol, ring_atom_to_locant)
-
-        # Stereocenter at atom 1 should be excluded
-        assert len(descriptors) == 0
-
-    def test_ring_with_no_stereocenters(self):
-        """Ring without stereocenters returns empty list."""
-        mol = Chem.MolFromSmiles('C1CCCCC1')  # Cyclohexane
-        rdCIPLabeler.AssignCIPLabels(mol)
-
-        ring_atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6}
-
-        descriptors = collect_ring_stereodescriptors(mol, ring_atom_to_locant)
-        assert descriptors == []
 
 
 # =============================================================================

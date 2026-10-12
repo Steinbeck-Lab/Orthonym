@@ -3319,56 +3319,6 @@ def _build_core_result(
     return (name, atom_mapping, core_smiles)
 
 
-def get_fused_heterocycle_info(canonical_smiles: str) -> Optional[Dict[str, Any]]:
-    """
-    Get full information about a fused heterocycle from canonical SMILES.
-
-    Args:
-        canonical_smiles: Canonical SMILES string
-
-    Returns:
-        Dict with name, tautomer_locant, ring_system, parent_atoms, iupac_locants
-        or None if not found.
-    """
-    return FUSED_HETEROCYCLE_DATA.get(canonical_smiles)
-
-
-def is_fused_heterocycle(mol: Chem.Mol) -> bool:
-    """
-    Check if molecule is a known fused heterocycle (exact match only).
-
-    Args:
-        mol: RDKit molecule object
-
-    Returns:
-        True if molecule is a known fused heterocycle
-    """
-    if mol is None:
-        return False
-    canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
-    return canonical_smiles in FUSED_HETEROCYCLE_DATA
-
-
-def get_ring_system_type(mol: Chem.Mol) -> Optional[str]:
-    """
-    Get the ring system type classification for a fused heterocycle.
-
-    Args:
-        mol: RDKit molecule object
-
-    Returns:
-        Ring system type string (e.g., 'benzo-5-membered', 'tricyclic'),
-        or None if not a known fused heterocycle
-    """
-    if mol is None:
-        return None
-    canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
-    data = FUSED_HETEROCYCLE_DATA.get(canonical_smiles)
-    if data:
-        return data['ring_system']
-    return None
-
-
 def _validate_all_entries() -> bool:
     """Verify all FUSED_HETEROCYCLE_DATA entries have complete iupac_locants.
 

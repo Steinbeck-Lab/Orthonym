@@ -12,7 +12,6 @@ from rdkit import Chem
 from orthonym.rules.radicals import (
     classify_radical,
     name_radical,
-    get_radical_suffix,
     name_alkyl_radical,
     name_acyl_radical,
     name_oxyl_radical,
@@ -158,31 +157,6 @@ class TestClassifyRadical:
         info = classify_radical(acetyl_radical, sites[0])
         assert info['n_electrons'] == 1
         assert info['subtype'] == 'acyl'
-
-
-# =============================================================================
-# Test get_radical_suffix
-# =============================================================================
-
-class TestRadicalSuffix:
-    """Test radical suffix selection."""
-
-    def test_monovalent_suffix(self):
-        """Monovalent radicals use -yl suffix."""
-        assert get_radical_suffix(1) == 'yl'
-
-    def test_divalent_suffix(self):
-        """Divalent radicals use -ylidene suffix."""
-        assert get_radical_suffix(2) == 'ylidene'
-
-    def test_trivalent_suffix(self):
-        """Trivalent radicals use -ylidyne suffix."""
-        assert get_radical_suffix(3) == 'ylidyne'
-
-    def test_default_suffix(self):
-        """Unknown valency defaults to -yl."""
-        assert get_radical_suffix(4) == 'yl'
-        assert get_radical_suffix(0) == 'yl'
 
 
 # =============================================================================

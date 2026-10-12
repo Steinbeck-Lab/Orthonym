@@ -25,7 +25,6 @@ Examples:
     O=C1CCCCCCCCCO1 (10-membered lactone) -> oxacycloundecan-2-one
 """
 
-from collections import deque
 from typing import Dict, List, Optional
 
 from rdkit import Chem
@@ -802,70 +801,3 @@ def name_cyclic_polyester(mol) -> Optional[str]:
     if stereo_descriptors:
         name = f"{format_stereodescriptor_string(stereo_descriptors)}{name}"
     return name
-
-
-def _identify_lactone_substituent(mol, start_idx, excluded):
-    """
-    Identify a substituent on a lactone ring by its starting atom.
-
-    Returns:
-        Substituent prefix name (e.g., 'amino', 'methyl', 'hydroxy') or None
-    """
-    atom = mol.GetAtomWithIdx(start_idx)
-    symbol = atom.GetSymbol()
-
-    # Halogens
-    halogen_map = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
-    if symbol in halogen_map:
-        return halogen_map[symbol]
-
-    # Nitrogen: amino (-NH2), nitro, etc.
-    if symbol == 'N':
-        h_count = atom.GetTotalNumHs()
-        neighbors = [n for n in atom.GetNeighbors() if n.GetIdx() not in excluded]
-        if h_count == 2 and len(neighbors) == 0:
-            return 'amino'
-        if atom.GetFormalCharge() == 1:
-            o_count = sum(1 for n in neighbors if n.GetSymbol() == 'O')
-            if o_count == 2:
-                return 'nitro'
-
-    # Oxygen: hydroxy
-    if symbol == 'O':
-        h_count = atom.GetTotalNumHs()
-        neighbors = [n for n in atom.GetNeighbors() if n.GetIdx() not in excluded]
-        if h_count == 1 and len(neighbors) == 0:
-            return 'hydroxy'
-
-    # Carbon: alkyl groups
-    if symbol == 'C':
-        # BFS for pure alkyl
-        visited = {start_idx}
-        queue = deque([start_idx])
-        all_atoms = []
-        carbon_count = 0
-        is_pure_alkyl = True
-
-        while queue:
-            idx = queue.popleft()
-            a = mol.GetAtomWithIdx(idx)
-            all_atoms.append(idx)
-            if a.GetSymbol() == 'C':
-                carbon_count += 1
-            elif a.GetSymbol() != 'H':
-                is_pure_alkyl = False
-
-            for nbr in a.GetNeighbors():
-                nbr_idx = nbr.GetIdx()
-                if nbr_idx not in visited and nbr_idx not in excluded:
-                    visited.add(nbr_idx)
-                    queue.append(nbr_idx)
-
-        if is_pure_alkyl and carbon_count > 0:
-            from ..assembly.naming_utils import get_alkyl_name
-            try:
-                return get_alkyl_name(carbon_count)
-            except (ValueError, KeyError):
-                pass
-
-    return None

@@ -4173,37 +4173,6 @@ def get_ring_attachment_locant(
     )
 
 
-def get_ring_attachment_atom(
-    mol,
-    ring_atoms: Tuple[int, ...],
-    chain_atoms: List[int]
-) -> Optional[int]:
-    """
-    Find the ring atom that attaches to the chain.
-
-    Args:
-        mol: RDKit Mol object
-        ring_atoms: Tuple of atom indices in the ring
-        chain_atoms: List of atom indices in the principal chain
-
-    Returns:
-        Ring atom index that connects to chain, or None if not found
-    """
-    ring_set = set(ring_atoms)
-    chain_set = set(chain_atoms)
-
-    for ring_idx in ring_atoms:
-        ring_atom = mol.GetAtomWithIdx(ring_idx)
-
-        for neighbor in ring_atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
-
-            if nbr_idx in chain_set:
-                return ring_idx
-
-    return None
-
-
 def _collect_acyclic_branch(mol, start_idx: int, ring_atom_set: Set[int]
                             ) -> Optional[Set[int]]:
     """All atom indices of the exocyclic branch rooted at ``start_idx`` (BFS),

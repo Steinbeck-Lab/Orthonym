@@ -1152,24 +1152,13 @@ _STEREO_BLOCK_TOKEN_RE = re.compile(r"^(\d+[a-z]?['′]*)?([RSrsEZMP])$")
 _STEREO_BLOCK_RE = re.compile(r"\(([^()]*)\)(-?)")
 
 
-def _drop_pseudoasymmetric_descriptors(name: str):
+def _drop_pseudoasymmetric_tokens(name: str):
     """``name`` with every lowercase r/s (pseudoasymmetric) descriptor removed from
-    its stereodescriptor blocks, and the removed codes; ``(name, )`` if none.
-
-    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' ->
-    ('(1R,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane', ['s']). A block left
+    its stereodescriptor blocks, and each removed descriptor with its locant:
+    ``[('4', 's')]``; the locant is ``None`` for a bare ``(s)``. A block left
     empty is removed with its hyphen. Only blocks whose every comma-separated
     token is a descriptor are touched, so a substituent in parentheses is never
-    edited.
-    """
-    reduced, tokens = _drop_pseudoasymmetric_tokens(name)
-    return reduced, [code for _loc, code in tokens]
-
-
-def _drop_pseudoasymmetric_tokens(name: str):
-    """As:func:`_drop_pseudoasymmetric_descriptors`, but each removed descriptor
-    comes with its locant: ``[('4', 's')]``; the locant is ``None`` for a bare
-    ``(s)``."""
+    edited."""
     removed = []
 
     def _edit(m):

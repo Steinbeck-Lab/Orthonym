@@ -11,81 +11,10 @@ import pytest
 from rdkit import Chem
 from orthonym.perception.chains import (
     classify_substituent,
-    is_ring_substituent,
 )
 from orthonym.namer import name_compound
 from tests.support.hydro_wiring import needs_wiring
 from tests.support.rt_assert import assert_full_rt
-
-
-class TestIsRingSubstituent:
-    """Test ring detection in substituent atoms."""
-
-    def test_phenyl_ring_is_detected(self):
-        """Phenyl ring should be detected as ring substituent."""
-        mol = Chem.MolFromSmiles('c1ccccc1C')  # toluene
-        # In toluene, benzene ring atoms are 0-5, methyl carbon is 6
-        ri = mol.GetRingInfo()
-        ring_atoms = list(ri.AtomRings()[0])
-        parent_atoms = {6}  # methyl is parent (simplified test)
-        assert is_ring_substituent(mol, ring_atoms, parent_atoms)
-
-    def test_piperidine_ring_is_detected(self):
-        """Piperidine should be detected as ring substituent."""
-        mol = Chem.MolFromSmiles('C1CCNCC1C')  # methylpiperidine
-        ri = mol.GetRingInfo()
-        ring_atoms = list(ri.AtomRings()[0])
-        # Find the methyl carbon (not in ring)
-        all_ring = set(ring_atoms)
-        methyl_idx = None
-        for atom in mol.GetAtoms():
-            if atom.GetIdx() not in all_ring:
-                methyl_idx = atom.GetIdx()
-                break
-        assert is_ring_substituent(mol, ring_atoms, {methyl_idx})
-
-    def test_cyclohexane_ring_is_detected(self):
-        """Cyclohexane should be detected as ring substituent."""
-        mol = Chem.MolFromSmiles('C1CCCCC1C')  # methylcyclohexane
-        ri = mol.GetRingInfo()
-        ring_atoms = list(ri.AtomRings()[0])
-        all_ring = set(ring_atoms)
-        methyl_idx = None
-        for atom in mol.GetAtoms():
-            if atom.GetIdx() not in all_ring:
-                methyl_idx = atom.GetIdx()
-                break
-        assert is_ring_substituent(mol, ring_atoms, {methyl_idx})
-
-    def test_pyrrolidine_ring_is_detected(self):
-        """Pyrrolidine (5-membered N heterocycle) should be detected."""
-        mol = Chem.MolFromSmiles('C1CCNC1C')  # methylpyrrolidine
-        ri = mol.GetRingInfo()
-        ring_atoms = list(ri.AtomRings()[0])
-        all_ring = set(ring_atoms)
-        methyl_idx = None
-        for atom in mol.GetAtoms():
-            if atom.GetIdx() not in all_ring:
-                methyl_idx = atom.GetIdx()
-                break
-        assert is_ring_substituent(mol, ring_atoms, {methyl_idx})
-
-    def test_alkyl_chain_not_ring(self):
-        """Alkyl chains should NOT be detected as ring substituents."""
-        mol = Chem.MolFromSmiles('CCCCC')  # pentane
-        assert not is_ring_substituent(mol, [0, 1, 2], set())
-
-    def test_partial_ring_not_ring_substituent(self):
-        """Partial ring atoms should NOT be detected as ring substituent."""
-        mol = Chem.MolFromSmiles('C1CCCCC1C')  # methylcyclohexane
-        # Only include some ring atoms - not a complete ring
-        partial_ring = [0, 1, 2]
-        assert not is_ring_substituent(mol, partial_ring, set())
-
-    def test_empty_substituent(self):
-        """Empty substituent should return False."""
-        mol = Chem.MolFromSmiles('C')  # methane
-        assert not is_ring_substituent(mol, [], set())
 
 
 class TestClassifySubstituent:

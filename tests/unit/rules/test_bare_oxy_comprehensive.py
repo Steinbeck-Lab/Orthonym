@@ -130,31 +130,6 @@ class TestNameAlkoxyBranchNoBareOxy:
 
 
 # ---------------------------------------------------------------------------
-# 5. Defensive check in composer catches stray bare oxy with WARNING
-# ---------------------------------------------------------------------------
-
-class TestComposerDefensiveOxyCheck:
-    """Composer final assembly logs WARNING for any remaining bare oxy."""
-
-    def test_defensive_check_exists(self):
-        """Verify defensive oxy check function exists and is callable."""
-        from orthonym.assembly.composer import _warn_if_bare_oxy
-        assert callable(_warn_if_bare_oxy)
-
-    def test_defensive_check_detects_bare_oxy(self):
-        """_warn_if_bare_oxy returns True for names containing bare oxy."""
-        from orthonym.assembly.composer import _warn_if_bare_oxy
-        assert _warn_if_bare_oxy("2-oxy-hexane") is True
-
-    def test_defensive_check_ignores_qualified_oxy(self):
-        """_warn_if_bare_oxy returns False for qualified oxy names."""
-        from orthonym.assembly.composer import _warn_if_bare_oxy
-        assert _warn_if_bare_oxy("2-methoxyhexane") is False
-        assert _warn_if_bare_oxy("ethoxybenzene") is False
-        assert _warn_if_bare_oxy("1,1'-oxybispropane") is False
-
-
-# ---------------------------------------------------------------------------
 # 6. End-to-end: no bare oxy in generated names for ether compounds
 # ---------------------------------------------------------------------------
 

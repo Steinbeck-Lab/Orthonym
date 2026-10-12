@@ -4,42 +4,11 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules.sulfur import (
-    name_thiol,
     name_sulfide,
     name_sulfoxide,
     name_sulfone,
-    name_sulfonic_acid,
-    get_sulfur_prefix,
     _count_alkyl_carbons,
 )
-
-
-class TestThiolNaming:
-    """Tests for thiol (-SH) naming."""
-
-    def test_methanethiol(self):
-        """CS -> methanethiol"""
-        mol = Chem.MolFromSmiles("CS")
-        result = name_thiol(mol, (1, 0), "methan", locant=1)
-        assert result == "methanethiol"
-
-    def test_ethanethiol(self):
-        """CCS -> ethanethiol"""
-        mol = Chem.MolFromSmiles("CCS")
-        result = name_thiol(mol, (2, 1), "ethan", locant=1)
-        assert result == "ethanethiol"
-
-    def test_propane_1_thiol(self):
-        """CCCS -> propane-1-thiol"""
-        mol = Chem.MolFromSmiles("CCCS")
-        result = name_thiol(mol, (3, 2), "propan", locant=1)
-        assert result == "propane-1-thiol"
-
-    def test_propane_2_thiol(self):
-        """CC(S)C -> propane-2-thiol"""
-        mol = Chem.MolFromSmiles("CC(S)C")
-        result = name_thiol(mol, (2, 1), "propan", locant=2)
-        assert result == "propane-2-thiol"
 
 
 class TestSulfideNaming:
@@ -114,53 +83,6 @@ class TestSulfoneNaming:
         mol = Chem.MolFromSmiles("CCS(=O)(=O)C")
         result = name_sulfone(mol, (2, 3, 4, 1, 5))
         assert result == "ethyl methyl sulfone"
-
-
-class TestSulfonicAcidNaming:
-    """Tests for sulfonic acid (-SO3H) naming."""
-
-    def test_methanesulfonic_acid(self):
-        """CS(=O)(=O)O -> methanesulfonic acid"""
-        mol = Chem.MolFromSmiles("CS(=O)(=O)O")
-        result = name_sulfonic_acid(mol, (1, 2, 3, 4), "methane")
-        assert result == "methanesulfonic acid"
-
-    def test_ethanesulfonic_acid(self):
-        """CCS(=O)(=O)O -> ethanesulfonic acid"""
-        mol = Chem.MolFromSmiles("CCS(=O)(=O)O")
-        result = name_sulfonic_acid(mol, (2, 3, 4, 5), "ethane")
-        assert result == "ethanesulfonic acid"
-
-    def test_benzenesulfonic_acid(self):
-        """c1ccccc1S(=O)(=O)O -> benzenesulfonic acid"""
-        mol = Chem.MolFromSmiles("c1ccccc1S(=O)(=O)O")
-        result = name_sulfonic_acid(mol, (6, 7, 8, 9), "benzene")
-        assert result == "benzenesulfonic acid"
-
-
-class TestSulfurPrefix:
-    """Tests for sulfur group prefix forms."""
-
-    def test_thiol_prefix(self):
-        """Thiol prefix is 'sulfanyl', not 'mercapto'."""
-        assert get_sulfur_prefix("thiol") == "sulfanyl"
-
-    def test_sulfonic_acid_prefix(self):
-        """Sulfonic acid prefix is 'sulfo'."""
-        assert get_sulfur_prefix("sulfonic_acid") == "sulfo"
-
-    def test_sulfide_no_prefix(self):
-        """Sulfides use functional class naming, no prefix."""
-        assert get_sulfur_prefix("sulfide") is None
-        assert get_sulfur_prefix("thioether") is None
-
-    def test_sulfoxide_no_prefix(self):
-        """Sulfoxides use functional class naming, no prefix."""
-        assert get_sulfur_prefix("sulfoxide") is None
-
-    def test_sulfone_no_prefix(self):
-        """Sulfones use functional class naming, no prefix."""
-        assert get_sulfur_prefix("sulfone") is None
 
 
 class TestAlkylCounting:

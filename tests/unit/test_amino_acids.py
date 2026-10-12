@@ -317,26 +317,6 @@ class TestAminoAcidDataModule:
         assert is_standard_amino_acid("CCCCC") is False
 
 
-class TestNSubstitutedAminoAcidDetection:
-    """Test N-substituted amino acid detection."""
-
-    def test_sarcosine_is_n_substituted(self):
-        """Sarcosine (N-methylglycine) should be detected as N-substituted."""
-        from rdkit import Chem
-        from orthonym.rules.amino_acids import is_n_substituted_amino_acid
-
-        mol = Chem.MolFromSmiles("CNCC(=O)O")
-        assert is_n_substituted_amino_acid(mol) is True
-
-    def test_glycine_not_n_substituted(self):
-        """Glycine is not N-substituted."""
-        from rdkit import Chem
-        from orthonym.rules.amino_acids import is_n_substituted_amino_acid
-
-        mol = Chem.MolFromSmiles("NCC(=O)O")
-        assert is_n_substituted_amino_acid(mol) is False
-
-
 class TestIntegrationWithNameCompound:
     """Test that name_compound correctly handles amino acids."""
 

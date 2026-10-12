@@ -24,7 +24,6 @@ Examples:
     C1CCCCC(=O)N1 (epsilon-lactam) -> azepan-2-one
 """
 
-from collections import deque
 from typing import Dict, Optional
 
 from rdkit import Chem
@@ -510,65 +509,3 @@ def _format_n_prefix(name: str, count: int) -> str:
     n_locants = ",".join(["N"] * count)
     from ..assembly.naming_utils import multiplied_component as _mc
     return f"{n_locants}-{_mc(count, name, wrapped)}"
-
-
-def _identify_lactam_substituent(mol, start_idx, excluded):
-    """
-    Identify a substituent on a lactam ring by its starting atom.
-
-    Returns:
-        Substituent prefix name (e.g., 'amino', 'methyl', 'hydroxy') or None
-    """
-    atom = mol.GetAtomWithIdx(start_idx)
-    symbol = atom.GetSymbol()
-
-    # Halogens
-    halogen_map = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
-    if symbol in halogen_map:
-        return halogen_map[symbol]
-
-    # Nitrogen: amino (-NH2)
-    if symbol == "N":
-        h_count = atom.GetTotalNumHs()
-        neighbors = [n for n in atom.GetNeighbors() if n.GetIdx() not in excluded]
-        if h_count == 2 and len(neighbors) == 0:
-            return "amino"
-
-    # Oxygen: hydroxy (-OH)
-    if symbol == "O":
-        h_count = atom.GetTotalNumHs()
-        neighbors = [n for n in atom.GetNeighbors() if n.GetIdx() not in excluded]
-        if h_count == 1 and len(neighbors) == 0:
-            return "hydroxy"
-
-    # Carbon: alkyl groups
-    if symbol == "C":
-        # BFS for pure alkyl
-        visited = {start_idx}
-        queue = deque([start_idx])
-        carbon_count = 0
-        is_pure_alkyl = True
-
-        while queue:
-            idx = queue.popleft()
-            a = mol.GetAtomWithIdx(idx)
-            if a.GetSymbol() == "C":
-                carbon_count += 1
-            elif a.GetSymbol() != "H":
-                is_pure_alkyl = False
-
-            for nbr in a.GetNeighbors():
-                nbr_idx = nbr.GetIdx()
-                if nbr_idx not in visited and nbr_idx not in excluded:
-                    visited.add(nbr_idx)
-                    queue.append(nbr_idx)
-
-        if is_pure_alkyl and carbon_count > 0:
-            from ..assembly.naming_utils import get_alkyl_name
-
-            try:
-                return get_alkyl_name(carbon_count)
-            except (ValueError, KeyError):
-                pass
-
-    return None

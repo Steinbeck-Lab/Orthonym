@@ -7,7 +7,6 @@ indices) to IUPAC nomenclature (indexed by locants on the principal chain/ring).
 Key functions:
 - collect_stereodescriptors: Get R/S and E/Z descriptors with IUPAC locants
 - format_stereodescriptor_string: Format as "(2R,3S)-" prefix
-- get_double_bond_locant: Get lower locant for E/Z double bond
 
 Ring junction stereochemistry functions:
 - get_bridgehead_atoms: Find ring fusion stereocenter atoms
@@ -351,43 +350,6 @@ def collect_stereodescriptors(
             ]
 
     return descriptors
-
-
-def get_double_bond_locant(
-    bond,
-    atom_to_locant: Dict[int, int]
-) -> Optional[int]:
-    """
-    Get the IUPAC locant for a double bond.
-
-    Per IUPAC convention, the locant is the lower of the two atom locants.
-
-    Args:
-        bond: RDKit Bond object
-        atom_to_locant: Mapping from atom index to IUPAC locant
-
-    Returns:
-        Lower locant of the two bond atoms, or None if either atom is
-        not in the mapping (not on principal chain/ring).
-
-    Example:
-        >>> mol = Chem.MolFromSmiles('C/C=C/C')
-        >>> bond = mol.GetBondWithIdx(1) # the C=C bond
-        >>> atom_to_locant = {0: 1, 1: 2, 2: 3, 3: 4}
-        >>> get_double_bond_locant(bond, atom_to_locant)
-        2
-    """
-    begin_idx = bond.GetBeginAtomIdx()
-    end_idx = bond.GetEndAtomIdx()
-
-    # Both atoms must be in mapping
-    if begin_idx not in atom_to_locant or end_idx not in atom_to_locant:
-        return None
-
-    locant_a = atom_to_locant[begin_idx]
-    locant_b = atom_to_locant[end_idx]
-
-    return min(locant_a, locant_b)
 
 
 def _render_locant_token(locant: Union[int, str, Tuple]) -> str:
@@ -1070,93 +1032,6 @@ def _ring_atom_to_locant_from_oriented(oriented_ring: List[int]) -> Dict[int, in
             oriented_ring,
         )
     return {idx: pos + 1 for pos, idx in enumerate(oriented_ring)}
-
-
-def collect_ring_stereodescriptors(
-    mol,
-    ring_atom_to_locant: Dict[int, int]
-) -> List[Tuple[int, str]]:
-    """
-    Collect stereodescriptors for ring compounds.
-
-    Same as collect_stereodescriptors but specifically for ring naming,
-    where only atoms in the ring are considered.
-
-    Args:
-        mol: RDKit Mol object (stereochemistry should already be assigned)
-        ring_atom_to_locant: Mapping from ring atom indices to IUPAC locants.
-                            Only atoms that are keys in this dict are included.
-
-    Returns:
-        List of (locant, cip_code) tuples, sorted by locant ascending.
-
-    Note:
-        For rings, double bond E/Z is less common (ring strain), but
-        we still handle it for completeness.
-    """
-    # Reuse the main function - it already handles the filtering correctly
-    return collect_stereodescriptors(mol, ring_atom_to_locant)
-
-
-def determine_ring_cis_trans(
-    mol,
-    ring_atoms: List[int],
-    sub1_idx: int,
-    sub2_idx: int
-) -> Optional[str]:
-    """
-    Determine if two substituents on a ring are cis or trans.
-
-    For a ring with exactly 2 substituents at specified positions,
-    determine their relative stereochemistry based on CIP labels.
-
-    The rule for 1,2-disubstituted rings:
-    - SAME CIP codes (R,R or S,S) -> CIS (substituents on same face)
-    - DIFFERENT CIP codes (R,S or S,R) -> TRANS (substituents on opposite faces)
-
-    This is because in a ring, atoms with the same absolute configuration
-    at adjacent positions have their substituents on the same face.
-
-    Args:
-        mol: RDKit Mol object (CIP labels should already be assigned)
-        ring_atoms: List of atom indices that form the ring
-        sub1_idx: Atom index of first substituted ring carbon
-        sub2_idx: Atom index of second substituted ring carbon
-
-    Returns:
-        'cis' or 'trans', or None if cannot be determined (missing CIP labels)
-
-    Example:
-        >>> mol = Chem.MolFromSmiles('C[C@H]1CCCC[C@@H]1C') # cis-1,2-dimethylcyclohexane
-        >>> rdCIPLabeler.AssignCIPLabels(mol)
-        >>> ring_atoms = [1, 2, 3, 4, 5, 6]
-        >>> determine_ring_cis_trans(mol, ring_atoms, 1, 6)
-        'cis'
-    """
-    # Both atoms must be in the ring
-    if sub1_idx not in ring_atoms or sub2_idx not in ring_atoms:
-        return None
-
-    # Get atoms
-    atom1 = mol.GetAtomWithIdx(sub1_idx)
-    atom2 = mol.GetAtomWithIdx(sub2_idx)
-
-    # Both must have CIP labels
-    if not atom1.HasProp('_CIPCode') or not atom2.HasProp('_CIPCode'):
-        return None
-
-    cip1 = atom1.GetProp('_CIPCode')
-    cip2 = atom2.GetProp('_CIPCode')
-
-    # Only handle R/S (not r/s pseudoasymmetric for now)
-    if cip1 not in ['R', 'S'] or cip2 not in ['R', 'S']:
-        return None
-
-    # Same CIP = cis, Different CIP = trans
-    if cip1 == cip2:
-        return 'cis'
-    else:
-        return 'trans'
 
 
 # =============================================================================

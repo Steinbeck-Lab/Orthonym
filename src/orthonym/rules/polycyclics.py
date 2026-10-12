@@ -51,9 +51,6 @@ from ..data.polycyclic_data import (
     get_polycyclic_by_smiles,
     is_polycyclic_aromatic,
 )
-from ..perception.rings import (
-    is_aromatic_ring,
-)
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -1675,57 +1672,6 @@ def _join_pah_prefixes(prefixes: List[str]) -> str:
     return result
 
 
-def is_peri_condensed(mol) -> bool:
-    """
-    Detect peri-condensed PAH systems.
-
-    Peri-condensed PAHs have interior atoms (not on the periphery) that are
-    shared by more than two rings. Examples include pyrene, perylene, and coronene.
-
-    In full IUPAC numbering, these interior atoms may have letter suffixes
-    (like 4a, 8a in naphthalene for fusion atoms, but more complex in peri systems).
-
-    Args:
-        mol: RDKit Mol object
-
-    Returns:
-        True if the molecule is a peri-condensed PAH
-
-    Examples:
-        >>> from rdkit import Chem
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene
-        >>> is_peri_condensed(mol)
-        False
-        >>> mol = Chem.MolFromSmiles('c1cc2ccc3cccc4ccc(c1)c2c34') # pyrene
-        >>> is_peri_condensed(mol)
-        True
-        >>> mol = Chem.MolFromSmiles('c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61') # coronene
-        >>> is_peri_condensed(mol)
-        True
-    """
-    # Peri-condensed PAHs have atoms shared by MORE than 2 rings
-    # Ortho-fused PAHs only have atoms shared by exactly 2 rings
-
-    ri = mol.GetRingInfo()
-    atom_rings = ri.AtomRings()
-
-    if len(atom_rings) < 3:
-        return False  # Need at least 3 rings for peri-condensation
-
-    # Count how many rings each atom belongs to
-    atom_ring_count = defaultdict(int)
-    for ring in atom_rings:
-        for atom_idx in ring:
-            atom_ring_count[atom_idx] += 1
-
-    # Check for atoms in 3 or more rings (peri-condensation)
-    for count in atom_ring_count.values():
-        if count >= 3:
-            return True
-
-    return False
-
-
 def name_polycyclic(mol) -> Optional[str]:
     """
     Generate IUPAC name for a polycyclic aromatic hydrocarbon.
@@ -2212,53 +2158,3 @@ def _partial_sat_substituent_prefix(
     if spelled_out is not None:
         spelled_out.update(spelled)
     return joined if joined.endswith('-') else joined + '-'
-
-
-# ============================================================================
-# Fused Aromatic System Integration
-# ============================================================================
-
-
-def is_fused_aromatic_system(mol) -> bool:
-    """
-    Check if molecule contains a fused aromatic ring system.
-
-    A fused aromatic system has 2+ aromatic rings sharing edges.
-    This includes both carbocyclic PAHs and fused heterocycles.
-
-    Args:
-        mol: RDKit Mol object
-
-    Returns:
-        True if fused aromatic system detected
-
-    Examples:
-        >>> mol = Chem.MolFromSmiles('c1ccc2ccccc2c1') # naphthalene
-        >>> is_fused_aromatic_system(mol)
-        True
-        >>> mol = Chem.MolFromSmiles('c1ccc2[nH]ccc2c1') # indole
-        >>> is_fused_aromatic_system(mol)
-        True
-        >>> mol = Chem.MolFromSmiles('c1ccccc1') # benzene
-        >>> is_fused_aromatic_system(mol)
-        False
-    """
-    ri = mol.GetRingInfo()
-    atom_rings = ri.AtomRings()
-
-    # Find aromatic rings
-    aromatic_rings = [ring for ring in atom_rings if is_aromatic_ring(mol, ring)]
-
-    if len(aromatic_rings) < 2:
-        return False
-
-    # Check if any pair of aromatic rings are fused (share 2+ atoms)
-    for i, ring1 in enumerate(aromatic_rings):
-        for j, ring2 in enumerate(aromatic_rings):
-            if i >= j:
-                continue
-            shared = set(ring1) & set(ring2)
-            if len(shared) >= 2:
-                return True
-
-    return False

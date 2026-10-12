@@ -11,7 +11,6 @@ from orthonym.data.hw_heteroatoms import (
     HETEROATOM_PRIORITY,
     get_hw_prefix,
     get_heteroatom_priority,
-    compare_heteroatom_priority,
     sort_heteroatoms_by_priority,
 )
 from orthonym.data.hw_stems import (
@@ -21,8 +20,6 @@ from orthonym.data.hw_stems import (
     get_hw_stem,
     get_unsaturated_stem,
     get_saturated_stem,
-    is_supported_ring_size,
-    get_supported_ring_sizes,
 )
 
 
@@ -147,17 +144,6 @@ class TestHeteroatomPriority:
         assert get_heteroatom_priority('Si') < get_heteroatom_priority('B')
 
     @pytest.mark.unit
-    def test_compare_heteroatom_priority(self):
-        """Test compare_heteroatom_priority function."""
-        # O has higher priority than N (returns -1)
-        assert compare_heteroatom_priority('O', 'N') == -1
-        # N has lower priority than O (returns 1)
-        assert compare_heteroatom_priority('N', 'O') == 1
-        # Same element has same priority (returns 0)
-        assert compare_heteroatom_priority('O', 'O') == 0
-        assert compare_heteroatom_priority('N', 'N') == 0
-
-    @pytest.mark.unit
     def test_sort_heteroatoms_by_priority(self):
         """Test sorting heteroatoms by priority."""
         unsorted = ['N', 'O', 'S']
@@ -244,21 +230,6 @@ class TestHWStems:
 
 class TestHWStemsHelpers:
     """Test HW stem helper functions."""
-
-    @pytest.mark.unit
-    def test_is_supported_ring_size(self):
-        """Test ring size support detection."""
-        for size in [3, 4, 5, 6, 7, 8, 9, 10]:
-            assert is_supported_ring_size(size) is True
-        for size in [0, 1, 2, 11, 12, 100]:
-            assert is_supported_ring_size(size) is False
-
-    @pytest.mark.unit
-    def test_get_supported_ring_sizes(self):
-        """Test getting list of supported ring sizes."""
-        sizes = get_supported_ring_sizes()
-        assert sizes == [3, 4, 5, 6, 7, 8, 9, 10]
-        assert len(sizes) == 8
 
     @pytest.mark.unit
     def test_heteroatoms_use_ane_set(self):

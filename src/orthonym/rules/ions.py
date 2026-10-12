@@ -478,70 +478,6 @@ def name_carboxylate_anion(parent_name: str) -> str:
     return name + 'ate'
 
 
-def name_alkoxide_anion(parent_name: str, style: str = 'pin') -> str:
-    """
-    Convert alcohol name to alkoxide anion name.
-
-    IUPAC 2013 PIN style uses -olate (methanolate, ethanolate).
-    Common style uses -oxide (methoxide, ethoxide).
-
-    Args:
-        parent_name: Parent alcohol name (e.g., 'methanol', 'ethanol')
-        style: 'pin' for -olate, 'common' for -oxide
-
-    Returns:
-        Anion name
-
-    Example:
-        >>> name_alkoxide_anion('methanol')
-        'methanolate'
-        >>> name_alkoxide_anion('methanol', style='common')
-        'methoxide'
-    """
-    name = parent_name.strip()
-    name_lower = name.lower()
-
-    if style == 'pin':
-        # PIN style: methanol -> methanolate
-        if name_lower.endswith('ol'):
-            return name + 'ate'
-        elif name_lower.endswith('anol'):
-            return name + 'ate'
-        else:
-            return name + 'olate'
-    else:
-        # Common style: methanol -> methoxide
-        if name_lower.endswith('anol'):
-            return name[:-4] + 'oxide'
-        elif name_lower.endswith('ol'):
-            return name[:-2] + 'oxide'
-        else:
-            return name + 'oxide'
-
-
-def name_phenolate_anion(parent_name: str) -> str:
-    """
-    Convert phenol name to phenolate anion name.
-
-    Args:
-        parent_name: Parent phenol name (e.g., 'phenol')
-
-    Returns:
-        Anion name (e.g., 'phenolate')
-
-    Example:
-        >>> name_phenolate_anion('phenol')
-        'phenolate'
-    """
-    name = parent_name.strip()
-    name_lower = name.lower()
-
-    if name_lower.endswith('ol'):
-        return name + 'ate'
-    else:
-        return name + 'olate'
-
-
 def name_aminium_cation(parent_name: str) -> str:
     """
     Convert amine name to aminium cation name.
@@ -583,67 +519,6 @@ def name_aminium_cation(parent_name: str) -> str:
         if name.endswith('e'):
             return name[:-1] + 'ium'
         return name + 'ium'
-
-
-def name_carbenium_cation(parent_name: str) -> str:
-    """
-    Convert alkane/alkyl name to carbenium (ylium) cation name.
-
-    The ylium suffix indicates loss of hydride (H-) from the parent.
-
-    Args:
-        parent_name: Parent name (e.g., 'methane', 'methyl')
-
-    Returns:
-        Cation name (e.g., 'methylium')
-
-    Example:
-        >>> name_carbenium_cation('methane')
-        'methylium'
-        >>> name_carbenium_cation('ethane')
-        'ethylium'
-    """
-    name = parent_name.strip()
-    name_lower = name.lower()
-
-    # Handle -ane suffix (alkanes)
-    if name_lower.endswith('ane'):
-        return name[:-3] + 'ylium'
-
-    # Handle -yl suffix (already a radical/substituent form)
-    if name_lower.endswith('yl'):
-        return name + 'ium'
-
-    # Default: add -ylium
-    return name + 'ylium'
-
-
-# === ANION SUFFIX GETTERS ===
-
-def get_anion_suffix(anion_type: str) -> str:
-    """
-    Get the appropriate suffix for an anion type.
-
-    Args:
-        anion_type: Type from classify_anion
-
-    Returns:
-        Suffix string (e.g., 'ate', 'olate', 'ide')
-    """
-    return ANION_SUFFIXES.get(anion_type, 'ide')
-
-
-def get_cation_suffix(cation_type: str) -> str:
-    """
-    Get the appropriate suffix for a cation type.
-
-    Args:
-        cation_type: Type from classify_cation
-
-    Returns:
-        Suffix string (e.g., 'ium', 'ylium', 'aminium')
-    """
-    return CATION_SUFFIXES.get(cation_type, 'ium')
 
 
 # === ACID / AZANIDE ANION HELPERS / ===

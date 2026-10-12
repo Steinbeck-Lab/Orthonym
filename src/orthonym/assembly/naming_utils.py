@@ -1317,37 +1317,6 @@ def needs_brackets(name: str) -> bool:
 # ============================================================================
 
 
-def get_bracket_depth(name: str) -> int:
-    """Determine the current bracket nesting depth of a name.
-
-    Returns 0 if no brackets, 1 if contains , 2 if contains , etc.
-    Used to determine what enclosing marks to use at the next level.
-
-    Args:
-        name: A substituent or compound name.
-
-    Returns:
-        Integer nesting depth (0-3).
-
-    Examples:
-        >>> get_bracket_depth("methyl")
-        0
-        >>> get_bracket_depth("2-methylpropyl")
-        0
-        >>> get_bracket_depth("(2-methylpropyl)")
-        1
-        >>> get_bracket_depth("2-[(1-methylethyl)]propyl")
-        2
-    """
-    if '{' in name:
-        return 3
-    if '[' in name:
-        return 2
-    if '(' in name:
-        return 1
-    return 0
-
-
 # Pre-compiled patterns for compute_nesting_depth
 #: Indicated hydrogen -- (1H), (3H), (9aH) etc.
 _INDICATED_H_RE = re.compile(r'\(\d+[a-z]?H\)')

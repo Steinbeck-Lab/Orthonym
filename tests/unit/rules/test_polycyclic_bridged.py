@@ -15,11 +15,8 @@ from rdkit import Chem
 
 from orthonym.rules.polycyclic_bridged import (
     get_ring_count,
-    count_cuts_to_open,
     classify_bridged_system,
     is_tricyclo_system,
-    is_tetracyclo_system,
-    is_pentacyclo_or_higher,
     find_all_bridgeheads,
     get_ring_atoms,
     find_all_bridge_paths,

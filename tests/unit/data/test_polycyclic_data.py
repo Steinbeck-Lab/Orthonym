@@ -11,12 +11,9 @@ from rdkit import Chem
 from orthonym.data.polycyclic_data import (
     POLYCYCLIC_DATA,
     get_polycyclic_by_smiles,
-    get_polycyclic_by_name,
     is_polycyclic_aromatic,
-    get_pah_names,
     match_polycyclic_core,
     get_pah_core_atoms,
-    get_pah_substituent_positions,
 )
 
 
@@ -114,29 +111,10 @@ class TestLookupFunctions:
         result = get_polycyclic_by_smiles('c1ccccc1')  # benzene
         assert result is None
 
-    def test_get_polycyclic_by_name_found(self):
-        """Test lookup by name."""
-        result = get_polycyclic_by_name('anthracene')
-        assert result is not None
-        assert result['name'] == 'anthracene'
-
-    def test_get_polycyclic_by_name_not_found(self):
-        """Non-existent name should return None."""
-        result = get_polycyclic_by_name('notapah')
-        assert result is None
-
     def test_is_polycyclic_aromatic(self):
         """Test is_polycyclic_aromatic function."""
         assert is_polycyclic_aromatic('c1ccc2ccccc2c1')  # naphthalene
         assert not is_polycyclic_aromatic('c1ccccc1')  # benzene
-
-    def test_get_pah_names(self):
-        """Test get_pah_names returns all PAH names."""
-        names = get_pah_names()
-        assert 'naphthalene' in names
-        assert 'pyrene' in names
-        assert 'coronene' in names
-        assert len(names) >= 15
 
 
 # ============================================================================
@@ -251,25 +229,6 @@ class TestCoreAtomRetrieval:
 @pytest.mark.unit
 class TestNewPahEntries:
     """Tests for newly added PAH entries."""
-
-    @pytest.mark.parametrize("name,expected_atoms,expected_rings", [
-        ('tetracene', 18, 4),
-        ('triphenylene', 18, 4),
-        ('tetraphene', 18, 4),
-        ('benzo[c]phenanthrene', 18, 4),
-        ('pentacene', 22, 5),
-        ('perylene', 20, 6),
-        ('benzo[pqr]tetraphene', 20, 5),
-        ('coronene', 24, 7),
-        ('9,10-dihydroanthracene', 14, 3),
-        ('1,2-dihydronaphthalene', 10, 2),
-    ])
-    def test_new_pah_lookup(self, name, expected_atoms, expected_rings):
-        """Test lookup for each new PAH entry."""
-        result = get_polycyclic_by_name(name)
-        assert result is not None, f"{name} not found in POLYCYCLIC_DATA"
-        assert result['num_atoms'] == expected_atoms, f"{name} atom count mismatch"
-        assert result['num_rings'] == expected_rings, f"{name} ring count mismatch"
 
     @pytest.mark.parametrize("name", [
         'tetracene',

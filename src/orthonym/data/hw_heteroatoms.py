@@ -211,38 +211,6 @@ def get_heteroatom_priority(element: str) -> int:
     return HETEROATOM_PRIORITY.get(element, 999)
 
 
-def compare_heteroatom_priority(element1: str, element2: str) -> int:
-    """
-    Compare two heteroatoms by IUPAC priority.
-
-    Args:
-        element1: First element symbol
-        element2: Second element symbol
-
-    Returns:
-        -1 if element1 has higher priority (lower number)
-         0 if same priority
-         1 if element2 has higher priority
-
-    Examples:
-        >>> compare_heteroatom_priority('O', 'N')
-        -1 # O has higher priority
-        >>> compare_heteroatom_priority('N', 'O')
-        1 # O has higher priority
-        >>> compare_heteroatom_priority('O', 'O')
-        0 # Same priority
-    """
-    p1 = get_heteroatom_priority(element1)
-    p2 = get_heteroatom_priority(element2)
-
-    if p1 < p2:
-        return -1
-    elif p1 > p2:
-        return 1
-    else:
-        return 0
-
-
 def sort_heteroatoms_by_priority(elements: list) -> list:
     """
     Sort heteroatom element symbols by IUPAC priority (highest first).

@@ -25,7 +25,7 @@ from rdkit import Chem
 from orthonym import Orthonym, name_compound
 from orthonym.cli import _emit_tier_flags
 from orthonym.namer import (
-    _drop_pseudoasymmetric_descriptors,
+    _drop_pseudoasymmetric_tokens,
     _pseudoasymmetric_name_verified,
 )
 
@@ -42,7 +42,8 @@ GERMACRANE_SYSTEMATIC = "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
     ("(2R,3S)-butane-2,3-diol", "(2R,3S)-butane-2,3-diol", []),
 ])
 def test_drop_pseudoasymmetric_descriptors(name, reduced, codes):
-    assert _drop_pseudoasymmetric_descriptors(name) == (reduced, codes)
+    got, tokens = _drop_pseudoasymmetric_tokens(name)
+    assert (got, [code for _loc, code in tokens]) == (reduced, codes)
 
 
 def test_verifier_accepts_the_correct_pseudoasymmetric_name():

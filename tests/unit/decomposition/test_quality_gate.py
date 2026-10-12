@@ -232,18 +232,6 @@ class TestConservativeQualityGate:
         assert _name_quality_is_acceptable("carbazole", mock_mol) is True
 
     @pytest.mark.unit
-    def test_ring_system_token_detected_pyridine(self):
-        """_name_has_ring_system_token should detect 'pyridine' in name."""
-        from orthonym.decomposition.engine import _name_has_ring_system_token
-        assert _name_has_ring_system_token("2-methylpyridine") is True
-
-    @pytest.mark.unit
-    def test_ring_system_token_not_detected_hexane(self):
-        """_name_has_ring_system_token should not detect anything in 'hexane'."""
-        from orthonym.decomposition.engine import _name_has_ring_system_token
-        assert _name_has_ring_system_token("hexane") is False
-
-    @pytest.mark.unit
     def test_decomposition_no_false_positive_no_garbled(self):
         """_decomposition_is_worse should NOT flag when decomp is clean."""
         from orthonym.decomposition.engine import _decomposition_is_worse

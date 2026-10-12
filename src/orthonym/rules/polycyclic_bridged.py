@@ -91,21 +91,6 @@ def get_ring_count(mol) -> int:
     return ring_bonds - len(ring_atoms) + 1
 
 
-def count_cuts_to_open(mol) -> int:
-    """
-    Count how many bonds must be cut to make the ring system acyclic.
-    
-    This is equivalent to the ring count (cycle rank).
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        Number of cuts needed
-    """
-    return get_ring_count(mol)
-
-
 # ============================================================================
 # System Classification
 # ============================================================================
@@ -173,33 +158,6 @@ def is_tricyclo_system(mol) -> bool:
         True
     """
     return classify_bridged_system(mol) == 'tricyclo'
-
-
-def is_tetracyclo_system(mol) -> bool:
-    """
-    Check if molecule is a tetracyclo (4-ring bridged) system.
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        True if molecule has exactly 4 rings in bridged configuration
-    """
-    return classify_bridged_system(mol) == 'tetracyclo'
-
-
-def is_pentacyclo_or_higher(mol) -> bool:
-    """
-    Check if molecule is pentacyclo or higher (5+ rings).
-    
-    Args:
-        mol: RDKit Mol object
-        
-    Returns:
-        True if molecule has 5 or more rings
-    """
-    ring_count = get_ring_count(mol)
-    return ring_count >= 5
 
 
 # ============================================================================

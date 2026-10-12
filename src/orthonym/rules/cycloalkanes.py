@@ -869,58 +869,6 @@ def orient_cycloalkene(
     return tied[0]
 
 
-def select_ring_or_chain_parent(
-    mol,
-    rings: List[Tuple[int, ...]],
-    chain: List[int],
-    principal_group: Optional[str] = None
-) -> str:
-    """
-    Determine whether ring or chain should be the parent structure.
-
-    IUPAC 2013 Method 1 (PIN):
-    1. Principal characteristic group location: If principal FG is on chain
-       but not ring, chain wins. If on ring but not chain, ring wins.
-    2. Same class (both carbon): Ring has seniority over chain
-    3. Exception: Chain is parent if it's significantly longer than ring
-
-    For pure hydrocarbons (no FG):
-    - Ring is parent when ring carbon count >= chain carbon count
-    - Chain is parent when significantly longer than ring
-
-    Args:
-        mol: RDKit Mol object
-        rings: List of ring atom tuples
-        chain: List of chain atom indices
-        principal_group: Name of principal functional group, if any
-
-    Returns:
-        'ring' or 'chain'
-    """
-    if not rings:
-        return 'chain'
-
-    if not chain:
-        return 'ring'
-
-    # Get the largest ring
-    largest_ring = max(rings, key=len)
-    ring_size = len(largest_ring)
-    chain_length = len(chain)
-
-    # For pure hydrocarbons or when FG is not a deciding factor:
-    # Ring is parent if ring_size >= chain_length
-    # This follows IUPAC convention that rings are preferred as parent
-
-    # Exception: If chain is much longer than ring (>2x), chain wins
-    # This handles cases like decylcyclopropane vs cyclopropyldecan-X-yl
-    if chain_length > ring_size * 2:
-        return 'chain'
-
-    # Default: Ring is parent (IUPAC preference)
-    return 'ring'
-
-
 def _rotate_list(lst: List, start: int) -> List:
     """Rotate list so element at index start becomes first."""
     return lst[start:] + lst[:start]

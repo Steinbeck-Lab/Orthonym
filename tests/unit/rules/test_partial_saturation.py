@@ -23,20 +23,14 @@ from orthonym.rules.partial_saturation import (
     format_saturation_prefix,
     get_saturation_locants,
     analyze_saturation_for_naming,
-    is_fully_saturated,
-    count_ring_sp3_atoms,
-    get_ring_saturation_level,
 )
 from orthonym.data.partial_saturation_refs import (
     AROMATIC_REFERENCES,
     get_aromatic_reference,
     get_reference_smiles,
-    get_reference_ring_atoms,
-    list_reference_names,
 )
 from orthonym.assembly.composer import (
     get_saturation_prefix_for_fused_ring,
-    assemble_fused_ring_with_saturation,
 )
 
 
@@ -184,42 +178,6 @@ class TestSaturationPrefixFormat:
 class TestComposerIntegration:
     """Tests for composer helper functions."""
 
-    def test_assemble_basic(self):
-        """Test basic name assembly with saturation prefix."""
-        result = assemble_fused_ring_with_saturation(
-            core_name='indole',
-            saturation_prefix='2,3-dihydro',
-            indicated_h='1H'
-        )
-        assert result == '2,3-dihydro-1H-indole'
-
-    def test_assemble_with_substituent(self):
-        """Test name assembly with substituent and saturation prefix."""
-        result = assemble_fused_ring_with_saturation(
-            core_name='indole',
-            saturation_prefix='2,3-dihydro',
-            substituent_prefixes='5-methyl',
-            indicated_h='1H'
-        )
-        assert result == '5-methyl-2,3-dihydro-1H-indole'
-
-    def test_assemble_perhydro(self):
-        """Test name assembly for perhydro compound."""
-        result = assemble_fused_ring_with_saturation(
-            core_name='naphthalene',
-            saturation_prefix='perhydro'
-        )
-        assert result == 'perhydro-naphthalene'
-
-    def test_assemble_no_saturation(self):
-        """Test name assembly without saturation prefix."""
-        result = assemble_fused_ring_with_saturation(
-            core_name='indole',
-            saturation_prefix=None,
-            indicated_h='1H'
-        )
-        assert result == '1H-indole'
-
     def test_get_saturation_prefix_quinoline(self):
         """Test saturation prefix detection for tetrahydroquinoline."""
         mol = Chem.MolFromSmiles('c1ccc2c(c1)CCCN2')
@@ -304,65 +262,6 @@ class TestAromaticReferences:
         smiles2 = get_reference_smiles('nonexistent')
         assert smiles2 is None
 
-    def test_get_reference_ring_atoms(self):
-        """Test get_reference_ring_atoms function."""
-        count = get_reference_ring_atoms('naphthalene')
-        assert count == 10
-
-        count2 = get_reference_ring_atoms('nonexistent')
-        assert count2 == 0
-
-    def test_list_reference_names(self):
-        """Test list_reference_names function."""
-        names = list_reference_names()
-        assert 'quinoline' in names
-        assert 'indole' in names
-        assert 'naphthalene' in names
-        assert 'purine' in names
-
-
-class TestUtilityFunctions:
-    """Tests for utility functions."""
-
-    def test_is_fully_saturated_true(self):
-        """Test is_fully_saturated returns True for decalin."""
-        mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin
-        ref = 'c1ccc2ccccc2c1'  # naphthalene
-        assert is_fully_saturated(mol, ref) is True
-
-    def test_is_fully_saturated_false(self):
-        """Test is_fully_saturated returns False for partial saturation."""
-        mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # indoline
-        ref = 'c1ccc2[nH]ccc2c1'  # indole
-        assert is_fully_saturated(mol, ref) is False
-
-    def test_count_ring_sp3_atoms(self):
-        """Test counting sp3 atoms in ring systems."""
-        mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin
-        count = count_ring_sp3_atoms(mol)
-        assert count == 10  # All 10 ring atoms are sp3
-
-    def test_get_ring_saturation_level_aromatic(self):
-        """Test saturation level for aromatic compound."""
-        mol = Chem.MolFromSmiles('c1ccc2ncccc2c1')  # quinoline
-        ref = 'c1ccc2ncccc2c1'
-        level = get_ring_saturation_level(mol, ref)
-        assert level == 'aromatic'
-
-    def test_get_ring_saturation_level_partial(self):
-        """Test saturation level for partially saturated compound."""
-        mol = Chem.MolFromSmiles('c1ccc2c(c1)CCN2')  # indoline
-        ref = 'c1ccc2[nH]ccc2c1'  # indole
-        level = get_ring_saturation_level(mol, ref)
-        assert level == 'partially saturated'
-
-    def test_get_ring_saturation_level_full(self):
-        """Test saturation level for fully saturated compound."""
-        mol = Chem.MolFromSmiles('C1CCC2CCCCC2C1')  # decalin
-        ref = 'c1ccc2ccccc2c1'  # naphthalene
-        level = get_ring_saturation_level(mol, ref)
-        assert level == 'fully saturated'
-
 
 class TestEdgeCases:
     """Tests for edge cases and error handling."""
@@ -409,23 +308,6 @@ class TestIUPACCompliance:
         result = format_saturation_prefix('perhydro', [1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
         assert result == 'perhydro'
         assert ',' not in result  # No locant numbers
-
-    def test_prefix_ordering_substituent_saturation_indicatedh_parent(self):
-        """Test IUPAC ordering: substituent-saturation-indicatedH-parent."""
-        result = assemble_fused_ring_with_saturation(
-            core_name='indole',
-            saturation_prefix='2,3-dihydro',
-            substituent_prefixes='5-methyl',
-            indicated_h='1H'
-        )
-        # Order should be: 5-methyl-2,3-dihydro-1H-indole
-        parts = result.split('-')
-        assert parts[0] == '5'  # substituent locant
-        assert 'methyl' in parts[1]  # substituent name
-        assert '2,3' in result  # saturation locants
-        assert 'dihydro' in result  # saturation prefix
-        assert '1H' in result  # indicated H
-        assert result.endswith('indole')  # parent
 
 
 class TestWSD02TetralinNoPhantomAlkyl:

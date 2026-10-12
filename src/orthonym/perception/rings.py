@@ -192,31 +192,6 @@ def count_ring_triple_bonds(mol, ring_atoms) -> int:
     )
 
 
-def get_ring_double_bond_atoms(mol, ring_atoms) -> List[Tuple[int, int]]:
-    """
-    Get all double bonds within a ring as atom pairs.
-
-    Args:
-        mol: RDKit Mol object
-        ring_atoms: Iterable of atom indices
-
-    Returns:
-        List of (atom_idx1, atom_idx2) tuples for each double bond
-    """
-    ring_set = set(ring_atoms)
-    double_bonds = []
-
-    for bond in mol.GetBonds():
-        begin_idx = bond.GetBeginAtomIdx()
-        end_idx = bond.GetEndAtomIdx()
-
-        if begin_idx in ring_set and end_idx in ring_set:
-            if bond.GetBondType() == Chem.BondType.DOUBLE:
-                double_bonds.append((begin_idx, end_idx))
-
-    return double_bonds
-
-
 def is_saturated_ring(mol, ring_atoms) -> bool:
     """
     Check if a ring is fully saturated (no double bonds).

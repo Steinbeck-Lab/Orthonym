@@ -16,7 +16,6 @@ from orthonym import name_compound
 from orthonym.rules.cycloalkanes import (
     orient_cycloalkane,
     get_ring_substituents,
-    select_ring_or_chain_parent,
     get_substituent_name,
 )
 
@@ -136,18 +135,6 @@ class TestRingVsChainSelection:
     def test_ring_as_parent_propylcyclobutane(self):
         """4C ring + 3C chain -> ring is parent."""
         assert name_compound("CCCC1CCC1") == "propylcyclobutane"
-
-    @pytest.mark.unit
-    def test_select_ring_or_chain_function(self):
-        """Test select_ring_or_chain_parent function directly."""
-        mol = Chem.MolFromSmiles("CC1CCCCC1")  # methylcyclohexane
-        ring = mol.GetRingInfo().AtomRings()[0]
-        # Find the chain (methyl substituent)
-        ring_set = set(ring)
-        chain = [i for i in range(mol.GetNumAtoms()) if i not in ring_set]
-
-        result = select_ring_or_chain_parent(mol, [ring], chain)
-        assert result == 'ring'
 
 
 # ============================================================================

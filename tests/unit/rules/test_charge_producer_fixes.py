@@ -5,7 +5,7 @@ premise was REFUTED; these are the 3 measured WRONG-guess producers instead,
 each independently RT-validated). Plan: docs/the workflow tooling/plans/
 2026-08-12-phase3-correctness-tail-hardening.md Sec 3A.
 
-3A-a: rules/salts.py -- is_salt/name_salt must require the disconnected
+3A-a: rules/salts.py -- name_salt must require the disconnected
       fragment set to be net-charge-balanced (a neutral salt, by definition,
       always is). A charge-imbalanced assembly (e.g. a bare metal cation +
       one anion, net nonzero) is an out-of-scope ionic/coordination complex,
@@ -60,11 +60,6 @@ class TestSaltChargeBalance:
         if name and "acetate" in name:
             assert _full_rt(smi, name), name
 
-    def test_is_salt_declines_charge_imbalanced_fragment_set(self):
-        from orthonym.rules.salts import is_salt
-        mol = Chem.MolFromSmiles("CC(=O)[O-].[Pd+2]")
-        assert is_salt(mol) is False
-
     def test_name_salt_declines_charge_imbalanced_fragment_set(self):
         from orthonym.rules.salts import name_salt
         mol = Chem.MolFromSmiles("CC(=O)[O-].[Pd+2]")
@@ -87,16 +82,6 @@ class TestSaltChargeBalance:
         # must still name -- the guard must not reject legitimate stoichiometry.
         name = name_compound("[Ca+2].[O-]C(C)=O.[O-]C(C)=O")
         assert "calcium" in name and "acetate" in name, name
-
-    def test_regression_is_salt_positive_still_true(self):
-        from orthonym.rules.salts import is_salt
-        assert is_salt(Chem.MolFromSmiles("[Na+].[Cl-]")) is True
-
-    def test_regression_is_salt_negative_cases_unchanged(self):
-        from orthonym.rules.salts import is_salt
-        assert is_salt(Chem.MolFromSmiles("CCO")) is False
-        assert is_salt(Chem.MolFromSmiles("[Na+]")) is False
-        assert is_salt(Chem.MolFromSmiles("[NH3+]CC([O-])=O")) is False
 
 
 # ============================================================================

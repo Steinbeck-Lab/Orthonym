@@ -592,54 +592,6 @@ def get_saturation_prefix_for_fused_ring(
     return result['prefix']
 
 
-def assemble_fused_ring_with_saturation(
-    core_name: str,
-    saturation_prefix: Optional[str],
-    substituent_prefixes: Optional[str] = None,
-    indicated_h: Optional[str] = None
-) -> str:
-    """
-    Assemble a fused ring name with saturation prefix in correct IUPAC order.
-
-    IUPAC 2013 ordering rule for partially saturated fused heterocycles:
-    [substituents]-[saturation prefix]-[indicated H]-[parent]
-
-    Args:
-        core_name: Parent name (e.g., 'indole', 'quinoline')
-        saturation_prefix: Saturation prefix (e.g., '2,3-dihydro', 'tetrahydro')
-        substituent_prefixes: Optional substituent prefixes (e.g., '5-methyl')
-        indicated_h: Optional indicated hydrogen (e.g., '1H')
-
-    Returns:
-        Assembled IUPAC name
-
-    Examples:
-        >>> assemble_fused_ring_with_saturation('indole', '2,3-dihydro', None, '1H')
-        '2,3-dihydro-1H-indole'
-        >>> assemble_fused_ring_with_saturation('indole', '2,3-dihydro', '5-methyl', '1H')
-        '5-methyl-2,3-dihydro-1H-indole'
-    """
-    parts = []
-
-    # Add substituent prefixes (alphabetized, with locants)
-    if substituent_prefixes:
-        parts.append(substituent_prefixes)
-
-    # Add saturation prefix (comes after substituents, before indicated H)
-    if saturation_prefix:
-        parts.append(saturation_prefix)
-
-    # Add indicated hydrogen (e.g., 1H, 9H)
-    if indicated_h:
-        parts.append(indicated_h)
-
-    # Add parent name
-    parts.append(core_name)
-
-    # Join with hyphens
-    return '-'.join(parts)
-
-
 # Prefixes to IGNORE for alphabetization
 IGNORE_FOR_ALPHA = set(SIMPLE_MULTIPLIERS.values()) | set(COMPLEX_MULTIPLIERS.values())
 
@@ -12646,31 +12598,3 @@ def get_multiplier(count: int, is_complex: bool = False) -> str:
 
     multipliers = COMPLEX_MULTIPLIERS if is_complex else SIMPLE_MULTIPLIERS
     return multipliers.get(count, str(count))
-
-
-def _warn_if_bare_oxy(name: str) -> bool:
-    """Defensive check: detect bare 'oxy' prefix in a generated name.
-
-    Returns True if the name contains a standalone 'oxy' token that is
-    NOT part of a qualified compound word (methoxy, ethoxy, oxybis, etc.).
-    This is a safety net -- the primary fix is at the generation point.
-
-    Args:
-        name: Generated IUPAC name string.
-
-    Returns:
-        True if bare 'oxy' detected, False otherwise.
-    """
-    import re
-    if not name:
-        return False
-    # Split on hyphens, spaces, commas, parentheses
-    tokens = re.split(r'[-\s,()]', name)
-    for tok in tokens:
-        if tok == 'oxy':
-            logger.warning(
-                "BARE_OXY_DETECTED: name=%r contains standalone 'oxy' prefix",
-                name,
-            )
-            return True
-    return False

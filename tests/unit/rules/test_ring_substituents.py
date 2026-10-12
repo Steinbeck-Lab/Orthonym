@@ -12,7 +12,6 @@ from orthonym.rules.ring_substituents import (
     identify_ring_system,
     get_ring_substituent_name,
     get_ring_attachment_locant,
-    get_ring_attachment_atom,
     RING_SUBSTITUENT_NAMES,
     POSITION_SPECIFIC_RINGS,
 )
@@ -231,30 +230,6 @@ class TestRingAttachmentLocant:
 
         locant = get_ring_attachment_locant(mol, ring_atoms, chain_atoms, atom_to_locant)
         assert locant == 4
-
-
-class TestGetRingAttachmentAtom:
-    """Test finding the ring atom that connects to chain."""
-
-    def test_find_attachment_atom_phenyl(self):
-        """Find which benzene carbon attaches to the chain."""
-        mol = Chem.MolFromSmiles('c1ccc(CCCC(=O)O)cc1')
-
-        ring_info = mol.GetRingInfo()
-        ring_atoms = None
-        for ring in ring_info.AtomRings():
-            if len(ring) == 6:
-                if all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in ring):
-                    ring_atoms = tuple(ring)
-                    break
-
-        # Chain atoms 4-5-6-7
-        chain_atoms = [4, 5, 6, 7]
-
-        attachment = get_ring_attachment_atom(mol, ring_atoms, chain_atoms)
-        assert attachment is not None
-        # The attachment should be a ring atom bonded to chain atom 4
-        assert attachment in ring_atoms
 
 
 class TestRingSubstituentData:

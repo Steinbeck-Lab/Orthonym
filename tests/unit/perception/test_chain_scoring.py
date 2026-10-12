@@ -356,7 +356,7 @@ class TestFGInstanceCounting:
 
 
 class TestSkeletalChainFinding:
-    """Tests for find_all_skeletal_chains and find_longest_skeletal_chain .
+    """Tests for find_longest_skeletal_chain .
 
     Skeletal chains follow C, O, N, S atoms per IUPAC /.
     """
@@ -428,28 +428,6 @@ class TestSkeletalChainFinding:
         mol = Chem.MolFromSmiles("[He]")
         chain = find_longest_skeletal_chain(mol)
         assert chain == []
-
-    def test_max_chains_limit(self):
-        """PEG-like molecule respects max_chains limit."""
-        from orthonym.perception.chains import find_all_skeletal_chains
-        import time
-        #: C-O-C-C-O-C-C-O-C-C-O-C-C-O-C-C-O-C
-        mol = Chem.MolFromSmiles("COCCOCCOCCOCCOCCOC")
-        start = time.time()
-        chains = find_all_skeletal_chains(mol, max_chains=100)
-        elapsed = time.time() - start
-        assert len(chains) <= 100, f"Should respect max_chains limit, got {len(chains)}"
-        assert elapsed < 1.0, f"Should complete in < 1s, took {elapsed:.2f}s"
-
-    def test_find_all_returns_multiple_chains(self):
-        """find_all_skeletal_chains returns all chains, not just longest."""
-        from orthonym.perception.chains import find_all_skeletal_chains
-        mol = Chem.MolFromSmiles("COCC")  # C-O-C-C
-        chains = find_all_skeletal_chains(mol, min_length=2)
-        # Should have multiple chains of different lengths
-        assert len(chains) > 1, "Should find multiple skeletal chains"
-        lengths = [len(c) for c in chains]
-        assert max(lengths) == 4, "Longest chain should be 4"
 
 
 class TestChainScoreReturnsTuple:

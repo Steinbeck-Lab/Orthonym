@@ -11,13 +11,10 @@ Reference: IUPAC 2013 Blue Book, Section (Fused Ring Systems)
 """
 
 import pytest
-from rdkit import Chem
 
 from orthonym.rules.fusion_descriptors import (
     format_complex_fusion,
     handle_duplicate_edge_fusion,
-    generate_multi_fusion_descriptor,
-    identify_fusion_edges,
     edge_position_to_letter,
     get_fusion_letter,
     build_multi_component_name,
@@ -26,10 +23,6 @@ from orthonym.rules.fusion_descriptors import (
 )
 from orthonym.data.polycyclic_data import (
     COMPLEX_FUSION_DATA,
-    get_complex_fusion_info,
-    get_complex_fusion_by_name,
-    get_edge_letter,
-    get_all_edge_letters,
     PARENT_RING_EDGES,
 )
 
@@ -215,45 +208,6 @@ class TestEdgeLetterGeneration:
 class TestFusionEdgeIdentification:
     """Tests for identifying fusion edges between rings."""
 
-    def test_find_shared_edge_simple(self):
-        """Test finding shared edge between two rings.
-
-        Use rings with known overlapping atoms that form a shared edge.
-        """
-        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
-        if mol is not None:
-            # Get actual ring info from RDKit
-            ri = mol.GetRingInfo()
-            rings = ri.AtomRings()
-            if len(rings) >= 2:
-                ring1 = list(rings[0])
-                ring2 = list(rings[1])
-                # Find shared atoms
-                shared = set(ring1) & set(ring2)
-                if len(shared) >= 2:
-                    edges = identify_fusion_edges(mol, ring1, ring2)
-                    # Should find at least one shared edge in fused naphthalene
-                    assert len(edges) >= 1
-                else:
-                    # If no shared atoms detected, skip gracefully
-                    pytest.skip("Ring perception didn't find shared atoms")
-            else:
-                pytest.skip("Ring perception didn't find 2 rings")
-
-    def test_identify_fusion_edges_with_shared_atoms(self):
-        """Test fusion edge identification with known shared atoms."""
-        mol = Chem.MolFromSmiles('c1ccc2ccccc2c1')  # naphthalene
-        if mol is not None:
-            # Manually construct rings with shared edge
-            parent = [0, 1, 2, 3, 4, 5]  # Synthetic ring
-            child = [3, 4, 5, 6, 7, 8]   # Overlaps at 3, 4, 5
-            # Even though these aren't real ring indices for this molecule,
-            # the function should find edges where atoms overlap and are bonded
-            # For unit test purposes, just verify the function runs
-            edges = identify_fusion_edges(mol, parent, child)
-            # Result depends on actual bonding - could be empty or have edges
-            assert isinstance(edges, list)
-
     def test_edge_to_letter_conversion(self):
         """Test converting edge tuple to letter."""
         ring = [0, 1, 2, 3, 4, 5]
@@ -314,39 +268,6 @@ class TestE2EComplexFusion:
 class TestDataLookupFunctions:
     """Tests for complex fusion data lookup functions."""
 
-    def test_get_complex_fusion_by_name(self):
-        """Test looking up fusion data by name."""
-        data = get_complex_fusion_by_name('naphtho[2,3-b]thiophene')
-        assert data is not None
-        assert data['prefix'] == 'naphtho'
-        assert data['parent'] == 'thiophene'
-
-    def test_get_complex_fusion_by_name_not_found(self):
-        """Test lookup returns None for unknown name."""
-        data = get_complex_fusion_by_name('unknown[a,b]compound')
-        assert data is None
-
-    def test_get_edge_letter_anthracene(self):
-        """Test edge letter lookup for anthracene."""
-        assert get_edge_letter('anthracene', 0) == 'a'
-        assert get_edge_letter('anthracene', 2) == 'c'
-        assert get_edge_letter('anthracene', 7) == 'h'
-
-    def test_get_edge_letter_benzene(self):
-        """Test edge letter lookup for benzene."""
-        assert get_edge_letter('benzene', 0) == 'a'
-        assert get_edge_letter('benzene', 5) == 'f'
-
-    def test_get_all_edge_letters_benzene(self):
-        """Test getting all edge letters for benzene."""
-        letters = get_all_edge_letters('benzene')
-        assert letters == ['a', 'b', 'c', 'd', 'e', 'f']
-
-    def test_get_all_edge_letters_naphthalene(self):
-        """Test getting all edge letters for naphthalene."""
-        letters = get_all_edge_letters('naphthalene')
-        assert len(letters) == 10  # naphthalene has 10 edges
-
     def test_parent_ring_edges_data(self):
         """Test PARENT_RING_EDGES data is populated."""
         assert 'anthracene' in PARENT_RING_EDGES
@@ -360,7 +281,7 @@ class TestDataLookupFunctions:
 # =============================================================================
 
 class TestMultiFusionDescriptorGeneration:
-    """Tests for generate_multi_fusion_descriptor function."""
+    """Tests for multi-component fusion descriptor formatting (format_complex_fusion)."""
 
     def test_generate_multi_fusion_simple(self):
         """Test generating descriptor for simple multi-fusion."""
