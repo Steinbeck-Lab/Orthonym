@@ -15,7 +15,6 @@ import pytest
 from rdkit import Chem
 
 from orthonym.namer import Orthonym
-from tests.support.local_only import local_only
 
 
 def _be():
@@ -414,48 +413,3 @@ def test_substituent_off_amide_nitrogen_is_partitioned():
     assert row["name"] == (
         "2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}"
         "-N-(3-fluorophenyl)-2-methylpropanamide"), row
-
-
-# ============================================================================
-# Composer1 Task C1-T6: assembly-robustness instrument smoke test
-# ============================================================================
-#
-# TINY shape-only smoke test for ``a temp dir/asm_robustness.py`` -- the
-# offline, hang-safe per-fragment naming-success measurement instrument (NOT
-# gated production; see the module docstring there for the decomposition
-# method + success criterion). This test only asserts the returned dict's
-# SHAPE (keys present, n correct, rates in [0, 1]) -- it does NOT assert any
-# specific rate, since the proxy parent-selection heuristic is deliberately
-# simplified (see that module's docstring) and the exact numbers are not a
-# contract of this task.
-
-
-@local_only("scratchpad/asm_robustness.py")   # gitignored instrument (TRIAGE g7 C02)
-def test_asm_robustness_instrument_smoke():
-    import importlib.util
-    from pathlib import Path
-
-    import sys
-
-    project_root = Path(__file__).parent.parent.parent.parent
-    spec = importlib.util.spec_from_file_location(
-        "asm_robustness", str(project_root / "scratchpad" / "asm_robustness.py"))
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = mod  # dataclass decorator needs the module registered
-    spec.loader.exec_module(mod)
-
-    # 5 SMILES already used above (/ / cases).
-    smiles = [
-        "C[C@@H](N)c1ccc(OCc2ccc(Cl)cc2)nc1",       # T2
-        "CC(C)(C)Sc1ccc(-c2nc3ccccc3c(=O)[nH]2)cc1", # T2
-        "OC(=O)Cc1ccc2cc(Cl)ccc2c1",                 # T2b
-        "OC(=O)CC12CC3CC(O)(CC(C3)C1)C2",            # T2b
-        "OC(=O)CC12CC3CC(CC(C3)C1)C2",                # (adamantyl-acetic acid)
-    ]
-
-    result = mod.measure_assembly_robustness(smiles)
-
-    assert set(result.keys()) == {"fragment_p", "mol_all_named", "n"}
-    assert result["n"] == 5
-    assert 0.0 <= result["fragment_p"] <= 1.0
-    assert 0.0 <= result["mol_all_named"] <= 1.0

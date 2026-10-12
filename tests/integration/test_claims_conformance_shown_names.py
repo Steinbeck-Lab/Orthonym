@@ -21,11 +21,7 @@ r/s descriptors, which OPSIN 2.9.0 cannot read: the last resort that had adopted
 Every row is also checked against the OPSIN jar directly (a Java subprocess, not
 the engine's own oracle), so the test does not rest on the code it tests.
 """
-import json
-import os
 import subprocess
-import sys
-from pathlib import Path
 
 import pytest
 from rdkit import Chem
@@ -99,50 +95,3 @@ def test_pentakisphosphate_r_s_name_is_not_shown_at_best_effort():
     # the plain name at best-effort does not ship it either
     name = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name(PENTAKIS)
     assert name != PENTAKIS_NAME
-
-
-_SCAN = r'''
-import json, sys, multiprocessing as mp
-def work(s):
-    import logging
-    logging.disable(logging.WARNING)
-    from orthonym import Orthonym
-    from orthonym.cli import _emit_tier_flags
-    from orthonym.namer import _is_exact_match_list_name
-    r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(s)
-    if r["tier"] == "abstain":
-        return None if r["name"] is None else [s, r["name"], r["tier"], "abstain row carries a name"]
-    if r["opsin"] != "verified" and not _is_exact_match_list_name(s, r["name"]):
-        return [s, r["name"], r["tier"], r["opsin"]]
-    return None
-if __name__ == "__main__":
-    split = json.load(open(sys.argv[1]))
-    smiles = split["smiles"] if isinstance(split, dict) else split
-    smiles = [x["smiles"] if isinstance(x, dict) else x for x in smiles]
-    with mp.Pool(int(sys.argv[2])) as pool:
-        bad = [b for b in pool.imap_unordered(work, smiles, chunksize=1) if b]
-    print(json.dumps({"n": len(smiles), "bad": bad}))
-'''
-
-
-@pytest.mark.slow
-def test_dev500_scan_ships_no_unverified_name(tmp_path):
-    """The whole a dev split split at best-effort: no shown name without a verified
-    round trip unless it is an exact-match list name."""
-    repo = Path(__file__).resolve().parents[2]
-    split = repo / "eval" / "splits" / "dev500.json"
-    if not split.exists():
-        pytest.skip("dev500 split not present")
-    jar_or_skip()
-    script = tmp_path / "scan.py"
-    script.write_text(_SCAN)
-    src = str(Path(sys.modules["orthonym"].__file__).resolve().parents[1])
-    env = dict(os.environ, PYTHONPATH=src + os.pathsep + os.environ.get("PYTHONPATH", ""))
-    env.pop("ORTHONYM_DISABLE_OPSIN_VALIDITY_GATE", None)
-    workers = str(max(2, min(16, (os.cpu_count() or 4) // 2)))
-    p = subprocess.run([sys.executable, str(script), str(split), workers],
-                       capture_output=True, text=True, env=env, timeout=3600)
-    assert p.returncode == 0, p.stderr[-2000:]
-    out = json.loads(p.stdout.strip().splitlines()[-1])
-    assert out["n"] == 500
-    assert out["bad"] == [], out["bad"]

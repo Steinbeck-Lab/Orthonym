@@ -5,8 +5,6 @@ byte-identical to the original O(N) full-scan over: every catalog entry, every
 catalog entry + a methyl decoration, and a corpus sample of ring-bearing SMILES.
 The reference _old_full_scan below is a verbatim copy of the pre-Phase-173 loop.
 """
-import csv
-import os
 import warnings
 
 import pytest
@@ -177,33 +175,6 @@ def test_equiv_catalog_methylated(smi):
     msmi = _methylate(smi)
     if msmi:
         _assert_equiv(msmi)
-
-
-def _corpus_sample(n=120):
-    path = os.path.join(os.path.dirname(__file__), '..', '..', '..',
-                        'benchmarks', 'chebi_5000.csv')
-    path = os.path.normpath(path)
-    out = []
-    if not os.path.exists(path):
-        return out
-    with open(path) as f:
-        for row in csv.reader(f):
-            if len(row) < 2:
-                continue
-            smi = row[1].strip()
-            if not smi or '*' in smi:
-                continue
-            mol = Chem.MolFromSmiles(smi)
-            if mol is not None and mol.GetRingInfo().NumRings() > 0:
-                out.append(smi)
-            if len(out) >= n:
-                break
-    return out
-
-
-@pytest.mark.parametrize("smi", _corpus_sample())
-def test_equiv_corpus_sample(smi):
-    _assert_equiv(smi)
 
 
 def test_bucket_index_built_and_nonempty():

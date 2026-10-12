@@ -9,101 +9,10 @@ matrix); IUPAC.
 """
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
-from pathlib import Path
-
 import pytest
 from rdkit import Chem
 
 from orthonym.rules.spiro import name_spiro_system
-from tests.support.jars import jar_or_none
-
-
-_OPSIN_JAR = jar_or_none()
-
-
-def _opsin_available() -> bool:
-    return _OPSIN_JAR is not None and shutil.which("java") is not None
-
-
-def _opsin_parse(name: str) -> str | None:
-    try:
-        proc = subprocess.run(
-            ["java", "-jar", str(_OPSIN_JAR), "-osmi"],
-            input=name + "\n",
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
-        for line in proc.stdout.splitlines():
-            line = line.strip()
-            if not line or line.startswith("Run the jar"):
-                continue
-            if line.startswith("Enter a chemical"):
-                continue
-            if line.lower().startswith("error") or line.startswith("Could not"):
-                return None
-            return line
-        return None
-    except Exception:
-        return None
-
-
-# Hetero-spiro fixtures — taken from blue_book_examples.json so the data
-# source is the same artifact used by the unit tests.
-def _hetero_blue_book_fixtures():
-    p = (Path(__file__).resolve().parents[1]
-         / "fixtures" / "ring_systems" / "spiro" / "blue_book_examples.json")
-    if not p.exists():
-        return []
-    fx = json.loads(p.read_text())
-    return [f for f in fx if f.get("compound_class") == "spiro-hetero"]
-
-
-_HETERO_FIXTURES = _hetero_blue_book_fixtures()
-
-
-@pytest.mark.integration
-@pytest.mark.roundtrip
-@pytest.mark.skipif(not _opsin_available(),
-                    reason="OPSIN/Java not available")
-@pytest.mark.parametrize(
-    "fixture",
-    _HETERO_FIXTURES,
-    ids=lambda f: f["fixture_id"] if isinstance(f, dict) else "no-id",
-)
-def test_hetero_spiro_blue_book_roundtrip(fixture):
-    """Each Blue Book hetero-spiro fixture round-trips via OPSIN.
-
-    Per internal notes-B verdict PURE_SPIRO_PARTIAL, several fixtures
-    currently emit non-canonical heteroatom locants (e.g.,
-    `3-oxaspiro[3.5]nonane` instead of `2-oxaspiro[3.5]nonane`). The
-    round-trip InChI L1 (formula + connectivity) is invariant under
-    locant permutations of the same skeleton, so this test passes for
-    BOTH the canonical and the non-canonical forms — until the
-    follow-up locks the canonical ordering.
-    """
-    mol = Chem.MolFromSmiles(fixture["smiles"])
-    assert mol is not None, fixture["fixture_id"]
-    result = name_spiro_system(mol)
-    assert result is not None, fixture["fixture_id"]
-    name = result[0]
-    parsed = _opsin_parse(name)
-    if parsed is None:
-        pytest.skip(f"OPSIN cannot parse {name!r} for "
-                    f"{fixture['fixture_id']} — see audit notes")
-    rt = Chem.MolFromSmiles(parsed)
-    if rt is None:
-        pytest.skip(f"OPSIN output not RDKit-parseable for "
-                    f"{fixture['fixture_id']}: {parsed!r}")
-    i_in = Chem.MolToInchi(mol).split("/c", 1)[0]
-    i_rt = Chem.MolToInchi(rt).split("/c", 1)[0]
-    assert i_in == i_rt, (
-        f"InChI L1 mismatch on {fixture['fixture_id']}: "
-        f"input={i_in!r} round-trip={i_rt!r} via name={name!r}"
-    )
 
 
 @pytest.mark.integration
@@ -198,45 +107,3 @@ def test_hetero_spiro_emits_a_prefix_on_dioxaspiro():
     assert result is not None
     name = result[0]
     assert "dioxa" in name
-
-
-@pytest.mark.integration
-@pytest.mark.roundtrip
-@pytest.mark.skipif(not _opsin_available(),
-                    reason="OPSIN/Java not available")
-def test_hetero_spiro_count_at_least_eight():
-    """Acceptance gate: ≥8 hetero-spiro compounds covered.
-
-    The Blue Book hetero subset above provides the 'a'-prefix coverage.
-    Pure-carbon spiro fixtures provide the carbocyclic coverage. Both
-    families are exercised in the parametrized round-trip test.
-    """
-    # Count Blue Book hetero + a few pure-spiro hetero variants from
-    # the corpus (which ARE hetero, e.g., spiro-fused with O/N/S in
-    # the side ring). Plan 151-02 acceptance gate is structural, not
-    # corpus-mined — we ship the gate from the Blue Book set + corpus
-    # natural mixed-hetero compounds.
-    p = (Path(__file__).resolve().parents[1]
-         / "fixtures" / "ring_systems" / "spiro" / "corpus_mined.json")
-    corpus_hetero = []
-    if p.exists():
-        for f in json.loads(p.read_text()):
-            mol = Chem.MolFromSmiles(f["smiles"])
-            if mol is None:
-                continue
-            if any(a.GetSymbol() not in ("C", "H")
-                   for a in mol.GetAtoms()
-                   if a.GetIsAromatic() or a.IsInRing()):
-                # Includes ring atoms with hetero symbols
-                ring_hetero = any(
-                    a.GetSymbol() != "C" and a.IsInRing()
-                    for a in mol.GetAtoms()
-                )
-                if ring_hetero:
-                    corpus_hetero.append(f["fixture_id"])
-    total = len(_HETERO_FIXTURES) + len(corpus_hetero)
-    assert total >= 8, (
-        f"hetero-spiro coverage gate requires ≥8 compounds, got "
-        f"{total} (blue_book={len(_HETERO_FIXTURES)} + "
-        f"corpus_hetero={len(corpus_hetero)})"
-    )

@@ -104,7 +104,7 @@ def _opsin_parse(name: str) -> str | None:
     return last
 
 
-# Fixture registry — load Blue Book + literature_validated entries.
+# Fixture registry — load the literature_validated entries.
 _FIXTURE_DIR = (
     Path(__file__).resolve().parents[3]
     / "tests"
@@ -112,7 +112,6 @@ _FIXTURE_DIR = (
     / "ring_systems"
     / "assemblies"
 )
-_BLUE_BOOK_FIXTURES = json.loads((_FIXTURE_DIR / "blue_book_examples.json").read_text())
 _LIT_FIXTURES = json.loads((_FIXTURE_DIR / "literature_validated.json").read_text())
 
 

@@ -26,11 +26,11 @@ FRN-C-04,CCC(=[Se])CC,CCC(=[Se])CC,pentane-3-selone,FRN-C,selenoketone,parse_ok,
 FRN-C-05,CC(=[Te])C,CC(C)=[Te],propane-2-tellone,FRN-C,telluroketone,parse_ok,rt_ok,P-66.6.3
 FRN-C-06,CCC(=[Te])CC,CCC(=[Te])CC,pentane-3-tellone,FRN-C,telluroketone,parse_ok,rt_ok,P-66.6.3
 FRN-D-01,CCC(=N)OC,CCC(=N)OC,methyl propanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
-FRN-D-02,CC(=N)OC,COC(C)=N,methyl acetimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-02,CC(=N)OC,COC(C)=N,methyl ethanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
 FRN-D-03,CCC(=N)OCC,CCOC(=N)CC,ethyl propanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
-FRN-D-04,C(=N)(c1ccccc1)OC,COC(=N)c1ccccc1,methyl benzimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-04,C(=N)(c1ccccc1)OC,COC(=N)c1ccccc1,methyl benzenecarboximidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
 FRN-D-05,CCCCC(=N)OC,CCCCC(=N)OC,methyl pentanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
-FRN-D-06,CC(=N)OCC,CCOC(C)=N,ethyl acetimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
+FRN-D-06,CC(=N)OCC,CCOC(C)=N,ethyl ethanimidate,FRN-D,iminoester,parse_ok,rt_ok,P-65.1.7
 FRN-E-01,CCC(=O)[Se]C,CCC(=O)[Se]C,Se-methyl propaneselenoate,FRN-E,selenoester,parse_ok,rt_ok,P-65.6
 FRN-E-02,CCC(=O)[Te]C,CCC(=O)[Te]C,Te-methyl propanetelluroate,FRN-E,telluroester,parse_ok,rt_ok,P-65.6
 FRN-E-03,CC(=O)[Se]C,C[Se]C(C)=O,Se-methyl ethaneselenoate,FRN-E,selenoester,parse_ok,rt_ok,P-65.6

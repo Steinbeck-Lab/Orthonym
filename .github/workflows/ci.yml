@@ -1,16 +1,21 @@
 name: CI
 
-# Lightweight public CI: install the package, confirm it imports and names a
-# handful of molecules correctly, check that no new function or file outgrows the
-# source-size budget, and run advisory linting. Does not depend on the internal
-# benchmark baselines or the large corpora — a contributor's PR can pass this
-# without the full benchmarking apparatus.
+# Public CI: install the package, confirm it imports and names a handful of
+# molecules correctly, check that no new function or file outgrows the
+# source-size budget, run the test suite, and run advisory linting. Does not
+# depend on the internal benchmark baselines or the large corpora — a
+# contributor's PR can pass this without the full benchmarking apparatus.
+#
+# The test suite runs every test except those marked `slow` on each push and
+# pull request; the nightly run includes the `slow` tests.
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 2 * * *'   # nightly, 02:00 UTC: the full suite incl. `slow`
   workflow_dispatch:
 
 env:
@@ -76,6 +81,44 @@ jobs:
         # reports both (but not when the install itself failed).
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: python -m pytest tests/unit/test_size_budget.py -q -o addopts=""
+
+  tests:
+    name: Test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Set up Java 17 (for OPSIN round-trip validation)
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Fetch and verify the OPSIN and centres jars
+        run: orthonym --fetch-jars
+
+      - name: Run the tests (all except `slow`)
+        if: github.event_name != 'schedule'
+        # --timeout stops one stuck test (for example a blocked OPSIN pipe)
+        # instead of letting it hold the whole job. The thread method leaves
+        # SIGALRM to the naming time limit (orthonym.wallclock) and its tests.
+        run: python -m pytest tests -m "not slow" -n auto -q --tb=short --timeout=900 --timeout-method=thread -o addopts=""
+
+      - name: Run all tests, `slow` included (nightly)
+        if: github.event_name == 'schedule'
+        run: python -m pytest tests -n auto -q --tb=short --timeout=1800 --timeout-method=thread -o addopts=""
 
   lint:
     name: Lint (advisory)

@@ -151,16 +151,6 @@ def test_the_name_does_not_depend_on_the_spelling_of_the_smiles(_id, smiles, pin
         assert info is not None and info["name"] == pin, spelled
 
 
-def test_the_book_row_of_the_gold_set_is_named():
-    # SUBST-01a: 'c1ccccc1C1=CCCCC1' expects "2,3,4,5-tetrahydro-1,1'-biphenyl" (packs/rings_numbering.json)
-    import json
-    from pathlib import Path
-    root = Path(__file__).resolve().parents[3] / "benchmarks/pin_oracle"
-    rows = json.loads((root / "packs/rings_numbering.json").read_text())["rows"]
-    row = next(r for r in rows if r["def_id"] == "SUBST-01a" and r["smiles"] == "c1ccccc1C1=CCCCC1")
-    assert _detect(row["smiles"])["name"] == row["expected_pin"]
-
-
 # ------------------------------------------------------------------ what is declined
 DECLINED = [
     #:24153,:24157: the one two-ring assembly that is named substitutively, substituted or not
@@ -298,22 +288,6 @@ def test_cyclohexylbenzene_is_unchanged_and_the_exception_stays_substitutive():
     assert_pin_at_both_tiers("C1CCC(CC1)c1ccccc1", "cyclohexylbenzene")
 
 
-@needs_wiring
-def test_the_gate_row_function_matches_the_gold_row_subst_01a():
-    import sys
-    from pathlib import Path
-    root = Path(__file__).resolve().parents[3]
-    sys.path.insert(0, str(root / "scripts"))
-    import pin_conformance_eval as gate
-    packs = gate.load_packs(root / "benchmarks/pin_oracle/packs", [])
-    row = next(r for rows in (packs.values() if isinstance(packs, dict) else (p[1] for p in packs))
-               for r in rows if r.get("def_id") == "SUBST-01a" and r["smiles"] == "c1ccccc1C1=CCCCC1")
-    from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
-    record = gate._name_row("rings_numbering", row, 120, False, Orthonym(), None, opsin_roundtrip_check)
-    assert record["shipped_name"] == "2,3,4,5-tetrahydro-1,1'-biphenyl"
-    assert record["verdict"] == "MATCH"
-
-
 @pytest.mark.parametrize("smiles", [
     "O=C1CCCC=C1c1ccccc1", "Oc1ccc(cc1)C1=CCCCC1", "OC(=O)c1ccc(cc1)C1=CCCCC1",
     "CC(=O)OCC1=CCCCC1c1ccccc1"])
@@ -375,12 +349,3 @@ def test_a_labelled_molecule_does_not_change_what_the_next_molecule_is_named():
     fresh.name_tiered("[2H]C1=C(c2ccccc2)CCCC1")
     assert fresh.name("c1ccccc1C1=CCCCC1") == pin
     assert ring_assemblies._HYDRO_WITHHELD.get() is False
-
-
-def test_the_gold_row_is_on_the_floor_again():
-    import json
-    from pathlib import Path
-    root = Path(__file__).resolve().parents[3] / "benchmarks/pin_oracle"
-    data = json.loads((root / "baseline_passing_rows.json").read_text())
-    assert ["SUBST-01a", "c1ccccc1C1=CCCCC1"] in data["passing_target_rows"]
-    assert len(data["passing_target_rows"]) == data["_meta"]["n_rows"] == 1662

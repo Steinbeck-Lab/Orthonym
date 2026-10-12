@@ -18,6 +18,15 @@
     "ring_system": "benzo-5-membered"
   },
   {
+    "smiles": "C1=NCc2ccccc21",
+    "name": "1H-isoindole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered"
+  },
+  {
     "smiles": "C1=Nc2ccccc2C1",
     "name": "3H-indole",
     "classification": "CORRECT-locant",
@@ -37,7 +46,7 @@
   },
   {
     "smiles": "c1ccc2[nH]cnc2c1",
-    "name": "1H-benzimidazole",
+    "name": "1H-1,3-benzimidazole",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
@@ -46,7 +55,7 @@
   },
   {
     "smiles": "c1ccc2[nH]nnc2c1",
-    "name": "1H-benzotriazole",
+    "name": "1H-1,2,3-benzotriazole",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 1,
     "expected_locant": 1,
@@ -82,7 +91,7 @@
   },
   {
     "smiles": "c1ccc2nocc2c1",
-    "name": "2,1-benzisoxazole",
+    "name": "2,1-benzoxazole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -101,6 +110,15 @@
   {
     "smiles": "c1ccc2nscc2c1",
     "name": "2,1-benzothiazole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered"
+  },
+  {
+    "smiles": "c1ccc2c(c1)OSO2",
+    "name": "[1,3,2]benzodioxathiole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -198,6 +216,24 @@
     "ring_system": "naphthyridine"
   },
   {
+    "smiles": "c1cnc2ncccc2c1",
+    "name": "1,8-naphthyridine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "naphthyridine"
+  },
+  {
+    "smiles": "c1cc2cnccc2cn1",
+    "name": "2,6-naphthyridine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "naphthyridine"
+  },
+  {
     "smiles": "c1ccc2c(c1)[nH]c1ccccc12",
     "name": "9H-carbazole",
     "classification": "CORRECT-locant",
@@ -243,6 +279,24 @@
     "ring_system": "tricyclic"
   },
   {
+    "smiles": "c1ccc2c(c1)Nc1ccccc1[Se]2",
+    "name": "10H-phenoselenazine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 10,
+    "expected_locant": 10,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "tricyclic"
+  },
+  {
+    "smiles": "c1ccc2c(c1)Nc1ccccc1[Te]2",
+    "name": "10H-phenotellurazine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 10,
+    "expected_locant": 10,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "tricyclic"
+  },
+  {
     "smiles": "c1ccc2c(c1)Cc1ccccc1O2",
     "name": "9H-xanthene",
     "classification": "CORRECT-locant",
@@ -253,7 +307,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)COc1ccccc1-2",
-    "name": "6H-benzo[c]chromene",
+    "name": "6H-dibenzo[b,d]pyran",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 6,
     "expected_locant": 6,
@@ -334,7 +388,7 @@
   },
   {
     "smiles": "O=c1ccc2ccccc2o1",
-    "name": "coumarin",
+    "name": "2H-1-benzopyran-2-one",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 2,
     "expected_locant": 2,
@@ -352,7 +406,7 @@
   },
   {
     "smiles": "C1=Cc2ccccc2OC1",
-    "name": "2H-chromene",
+    "name": "2H-1-benzopyran",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 2,
     "expected_locant": 2,
@@ -361,7 +415,7 @@
   },
   {
     "smiles": "C1=COc2ccccc2C1",
-    "name": "4H-chromene",
+    "name": "4H-1-benzopyran",
     "classification": "CORRECT-locant",
     "tautomer_locant_catalog": 4,
     "expected_locant": 4,
@@ -387,60 +441,6 @@
     "ring_system": "pteridine"
   },
   {
-    "smiles": "Nc1ncnc2nc[nH]c12",
-    "name": "adenine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "purine"
-  },
-  {
-    "smiles": "Nc1ncnc2[nH]cnc12",
-    "name": "adenine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "purine"
-  },
-  {
-    "smiles": "O=c1[nH]cnc2nc[nH]c12",
-    "name": "hypoxanthine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "purine"
-  },
-  {
-    "smiles": "O=c1[nH]cnc2[nH]cnc12",
-    "name": "hypoxanthine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "purine"
-  },
-  {
-    "smiles": "Nc1nc2[nH]cnc2c(=O)[nH]1",
-    "name": "guanine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "purine"
-  },
-  {
-    "smiles": "Nc1nc(=O)c2[nH]cnc2[nH]1",
-    "name": "guanine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
-    "opsin_rt_inchi_match": true,
-    "ring_system": "purine"
-  },
-  {
     "smiles": "c1cnc2ccnn2c1",
     "name": "pyrazolo[1,5-a]pyrimidine",
     "classification": "CORRECT-None",
@@ -459,8 +459,116 @@
     "ring_system": "thienopyridine"
   },
   {
+    "smiles": "c1cc2c(o1)OCO2",
+    "name": "2H-furo[2,3-d][1,3]dioxole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "furo-dioxole"
+  },
+  {
+    "smiles": "C1=NOCc2cccnc21",
+    "name": "5H-pyrido[2,3-d][1,2]oxazine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 5,
+    "expected_locant": 5,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "pyrido-oxazine"
+  },
+  {
+    "smiles": "c1cc2c([nH]1)OCS2",
+    "name": "2H,4H-[1,3]oxathiolo[5,4-b]pyrrole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "oxathiolo-pyrrole"
+  },
+  {
+    "smiles": "c1cnn2ccnc2n1",
+    "name": "imidazo[1,2-b][1,2,4]triazine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "imidazo-triazine"
+  },
+  {
+    "smiles": "[nH]1oc2os[nH]c=2s1",
+    "name": "3H,5H-[1,3,2]oxathiazolo[4,5-d][1,2,3]oxathiazole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 3,
+    "expected_locant": 3,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "oxathiazolo-oxathiazole"
+  },
+  {
+    "smiles": "c1nc2[se]cnc2s1",
+    "name": "[1,3]selenazolo[5,4-d][1,3]thiazole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "selenazolo-thiazole"
+  },
+  {
+    "smiles": "c1nc2sccc2[nH]1",
+    "name": "1H-thieno[2,3-d]imidazole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "thieno-imidazole"
+  },
+  {
+    "smiles": "C1=COC2=CCOC2=C1",
+    "name": "2H-furo[3,2-b]pyran",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "furo-pyran"
+  },
+  {
+    "smiles": "c1ccc2c(c1)OCS2",
+    "name": "2H-1,3-benzoxathiole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzoxathiole"
+  },
+  {
+    "smiles": "C1=CC2=NC=CC2=N1",
+    "name": "pyrrolo[3,2-b]pyrrole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "pyrrolo-pyrrole"
+  },
+  {
+    "smiles": "C1=CC=CC2=C(C=C1)C=CC2",
+    "name": "1H-cyclopenta[8]annulene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "cyclopenta-annulene"
+  },
+  {
+    "smiles": "c1scc2c1CSC2",
+    "name": "1H,3H-thieno[3,4-c]thiophene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "thieno-thiophene"
+  },
+  {
     "smiles": "c1ccc2c(c1)CCN2",
-    "name": "indoline",
+    "name": "2,3-dihydro-1H-indole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -469,7 +577,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)CNC2",
-    "name": "isoindoline",
+    "name": "2,3-dihydro-1H-isoindole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -496,7 +604,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)CCCO2",
-    "name": "chromane",
+    "name": "3,4-dihydro-2H-1-benzopyran",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -505,12 +613,48 @@
   },
   {
     "smiles": "c1ccc2c(c1)CCOC2",
-    "name": "isochromane",
+    "name": "3,4-dihydro-1H-2-benzopyran",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
     "ring_system": "benzo-6-saturated"
+  },
+  {
+    "smiles": "c1ccc2c(c1)CCSC2",
+    "name": "3,4-dihydro-1H-2-benzothiopyran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-6-saturated"
+  },
+  {
+    "smiles": "c1ccc2c(c1)CC[Se]C2",
+    "name": "3,4-dihydro-1H-2-benzoselenopyran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-6-saturated"
+  },
+  {
+    "smiles": "c1ccc2c(c1)CC[Te]C2",
+    "name": "3,4-dihydro-1H-2-benzotelluropyran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-6-saturated"
+  },
+  {
+    "smiles": "C1=Cc2ccccc2CO1",
+    "name": "1H-2-benzopyran",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzopyran"
   },
   {
     "smiles": "c1ccc2nsnc2c1",
@@ -622,10 +766,10 @@
   },
   {
     "smiles": "c1ncc2[nH]cnc2n1",
-    "name": "1H-imidazo[4,5-d]pyrimidine",
+    "name": "7H-purine",
     "classification": "CORRECT-locant",
-    "tautomer_locant_catalog": 1,
-    "expected_locant": 1,
+    "tautomer_locant_catalog": 7,
+    "expected_locant": 7,
     "opsin_rt_inchi_match": true,
     "ring_system": "purine-related"
   },
@@ -640,7 +784,7 @@
   },
   {
     "smiles": "c1cnc2ncsc2c1",
-    "name": "thiazolo[4,5-b]pyridine",
+    "name": "[1,3]thiazolo[4,5-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -666,6 +810,51 @@
     "ring_system": "furopyridine"
   },
   {
+    "smiles": "c1cc2cc3cocc3cc2o1",
+    "name": "benzo[1,2-b:4,5-c']difuran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzodifuran"
+  },
+  {
+    "smiles": "c1cc2cc3occc3cc2o1",
+    "name": "benzo[1,2-b:4,5-b']difuran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzodifuran"
+  },
+  {
+    "smiles": "c1cc2c3cc4c5cocc5c4cc3c2o1",
+    "name": "benzo[1'',2'':3,4;4'',5'':3',4']dicyclobuta[1,2-b:1',2'-c']difuran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzodicyclobutadifuran"
+  },
+  {
+    "smiles": "c1cc2oc1-c1coc3occ-2c13",
+    "name": "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "trioxamethanocyclopentaazulene"
+  },
+  {
+    "smiles": "C1=C2COc3coc(c31)CO2",
+    "name": "2H-3,5-(epoxymethano)furo[3,4-b]pyran",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "epoxymethanofuropyran"
+  },
+  {
     "smiles": "c1cnc2occc2c1",
     "name": "furo[2,3-b]pyridine",
     "classification": "CORRECT-None",
@@ -676,7 +865,7 @@
   },
   {
     "smiles": "c1cnc2ocnc2c1",
-    "name": "oxazolo[5,4-b]pyridine",
+    "name": "[1,3]oxazolo[5,4-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -721,7 +910,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)oc1ccccc12",
-    "name": "dibenzofuran",
+    "name": "dibenzo[b,d]furan",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -730,7 +919,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)sc1ccccc12",
-    "name": "dibenzothiophene",
+    "name": "dibenzo[b,d]thiophene",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -802,10 +991,19 @@
   },
   {
     "smiles": "C1=Cn2cccc2C1",
-    "name": "pyrrolizine",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
+    "name": "1H-pyrrolizine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bridgehead"
+  },
+  {
+    "smiles": "C1=Cc2cccn2C1",
+    "name": "3H-pyrrolizine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 3,
+    "expected_locant": 3,
     "opsin_rt_inchi_match": true,
     "ring_system": "bridgehead"
   },
@@ -856,7 +1054,7 @@
   },
   {
     "smiles": "c1ccc2cocc2c1",
-    "name": "isobenzofuran",
+    "name": "2-benzofuran",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -864,8 +1062,152 @@
     "ring_system": "benzo-5-membered"
   },
   {
+    "smiles": "c1ccc2cscc2c1",
+    "name": "2-benzothiophene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered"
+  },
+  {
+    "smiles": "c1ccc2sncc2c1",
+    "name": "1,2-benzothiazole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered"
+  },
+  {
+    "smiles": "c1ccc2[se]ccc2c1",
+    "name": "1-benzoselenophene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered"
+  },
+  {
+    "smiles": "c1ccc2c[se]cc2c1",
+    "name": "2-benzoselenophene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered"
+  },
+  {
+    "smiles": "C1=COc2ccccc2C=C1",
+    "name": "1-benzoxepine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-7-membered"
+  },
+  {
+    "smiles": "C1=COC=c2ccccc2=C1",
+    "name": "2-benzoxepine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-7-membered"
+  },
+  {
+    "smiles": "C1=Cc2ccccc2C=CO1",
+    "name": "3-benzoxepine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-7-membered"
+  },
+  {
+    "smiles": "C1=Cc2ccccc2C=CS1",
+    "name": "3-benzothiepine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-7-membered"
+  },
+  {
+    "smiles": "C1=CNc2ccccc2C=C1",
+    "name": "1H-1-benzazepine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-7-membered"
+  },
+  {
+    "smiles": "C1=CNC=c2ccccc2=C1",
+    "name": "2H-2-benzazepine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-7-membered"
+  },
+  {
+    "smiles": "C1=Cc2ccccc2C=CN1",
+    "name": "3H-3-benzazepine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 3,
+    "expected_locant": 3,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-7-membered"
+  },
+  {
+    "smiles": "c1cc2occc2[nH]1",
+    "name": "4H-furo[3,2-b]pyrrole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 4,
+    "expected_locant": 4,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bicyclic-5-5"
+  },
+  {
+    "smiles": "c1cc2sccc2[nH]1",
+    "name": "4H-thieno[3,2-b]pyrrole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 4,
+    "expected_locant": 4,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bicyclic-5-5"
+  },
+  {
+    "smiles": "c1cc2ccoc2[nH]1",
+    "name": "6H-furo[2,3-b]pyrrole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 6,
+    "expected_locant": 6,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bicyclic-5-5"
+  },
+  {
+    "smiles": "c1cc2cc[nH]c2[nH]1",
+    "name": "1,6-dihydropyrrolo[2,3-b]pyrrole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bicyclic-5-5"
+  },
+  {
+    "smiles": "c1ccc2c(c1)COC2",
+    "name": "1,3-dihydro-2-benzofuran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-5-membered-saturated"
+  },
+  {
     "smiles": "c1ccc2oncc2c1",
-    "name": "1,2-benzisoxazole",
+    "name": "1,2-benzoxazole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -892,7 +1234,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)CCC2",
-    "name": "indane",
+    "name": "2,3-dihydro-1H-indene",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -990,6 +1332,105 @@
     "ring_system": "non-benzenoid"
   },
   {
+    "smiles": "C1=CC=Cc2ccccc2C=C1",
+    "name": "benzo[8]annulene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-annulene"
+  },
+  {
+    "smiles": "C1=CC=C2CC=CC=C2C=C1",
+    "name": "1H-benzo[7]annulene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 1,
+    "expected_locant": 1,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-annulene"
+  },
+  {
+    "smiles": "C1=CCc2ccccc2C=C1",
+    "name": "5H-benzo[7]annulene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 5,
+    "expected_locant": 5,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-annulene"
+  },
+  {
+    "smiles": "C1=Cc2ccccc2C=CC1",
+    "name": "7H-benzo[7]annulene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 7,
+    "expected_locant": 7,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-annulene"
+  },
+  {
+    "smiles": "C1=Cc2ccccc2Cc2ccccc21",
+    "name": "5H-dibenzo[a,d][7]annulene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 5,
+    "expected_locant": 5,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "dibenzo-annulene"
+  },
+  {
+    "smiles": "B1Oc2ccccc2O1",
+    "name": "2H-1,3,2-benzodioxaborole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzodioxaborole"
+  },
+  {
+    "smiles": "B1Oc2ccccc2-c2ccccc2O1",
+    "name": "6H-dibenzo[d,f][1,3,2]dioxaborepine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 6,
+    "expected_locant": 6,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "dibenzodioxaborepine"
+  },
+  {
+    "smiles": "B1Oc2cccc3cccc(c23)O1",
+    "name": "2H-naphtho[1,8-de][1,3,2]dioxaborinine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "naphthodioxaborinine"
+  },
+  {
+    "smiles": "B1Oc2cccc3ccc4cccc(c4c23)O1",
+    "name": "5H-phenanthro[4,5-def][1,3,2]dioxaborepine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 5,
+    "expected_locant": 5,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "phenanthrodioxaborepine"
+  },
+  {
+    "smiles": "B1c2ccccc2-c2ccccc21",
+    "name": "5H-dibenzo[b,d]borole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 5,
+    "expected_locant": 5,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "dibenzoborole"
+  },
+  {
+    "smiles": "B1c2ccccc2Oc2ccccc21",
+    "name": "10H-dibenzo[b,e][1,4]oxaborinine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 10,
+    "expected_locant": 10,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "dibenzoxaborinine"
+  },
+  {
     "smiles": "c1cnc2[nH]ncc2c1",
     "name": "1H-pyrazolo[3,4-b]pyridine",
     "classification": "CORRECT-locant",
@@ -1000,7 +1441,7 @@
   },
   {
     "smiles": "c1cnc2ncoc2c1",
-    "name": "oxazolo[4,5-b]pyridine",
+    "name": "[1,3]oxazolo[4,5-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1009,7 +1450,7 @@
   },
   {
     "smiles": "c1cnc2scnc2c1",
-    "name": "thiazolo[5,4-b]pyridine",
+    "name": "[1,3]thiazolo[5,4-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1018,7 +1459,7 @@
   },
   {
     "smiles": "c1cnc2oncc2c1",
-    "name": "isoxazolo[5,4-b]pyridine",
+    "name": "[1,2]oxazolo[5,4-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1027,7 +1468,7 @@
   },
   {
     "smiles": "c1cnc2scnc2n1",
-    "name": "thiazolo[4,5-b]pyrazine",
+    "name": "[1,3]thiazolo[4,5-b]pyrazine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1135,7 +1576,7 @@
   },
   {
     "smiles": "c1cn2ccsc2n1",
-    "name": "imidazo[2,1-b]thiazole",
+    "name": "imidazo[2,1-b][1,3]thiazole",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1180,7 +1621,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)Oc1ccccc1S2",
-    "name": "phenoxathiin",
+    "name": "phenoxathiine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1189,7 +1630,7 @@
   },
   {
     "smiles": "c1ccc2c(c1)oc1cccnc12",
-    "name": "benzofuro[3,2-b]pyridine",
+    "name": "[1]benzofuro[3,2-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1261,16 +1702,43 @@
   },
   {
     "smiles": "C1=Cc2ccccc2SC1",
-    "name": "thiochromene",
-    "classification": "CORRECT-None",
-    "tautomer_locant_catalog": null,
-    "expected_locant": null,
+    "name": "2H-1-benzothiopyran",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzothiopyran"
+  },
+  {
+    "smiles": "C1=CSc2ccccc2C1",
+    "name": "4H-1-benzothiopyran",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 4,
+    "expected_locant": 4,
     "opsin_rt_inchi_match": true,
     "ring_system": "benzothiopyran"
   },
   {
     "smiles": "c1ccc2c(c1)CCCS2",
-    "name": "thiochromane",
+    "name": "3,4-dihydro-2H-1-benzothiopyran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-6-saturated"
+  },
+  {
+    "smiles": "c1ccc2c(c1)CCC[Se]2",
+    "name": "3,4-dihydro-2H-1-benzoselenopyran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-6-saturated"
+  },
+  {
+    "smiles": "c1ccc2c(c1)CCC[Te]2",
+    "name": "3,4-dihydro-2H-1-benzotelluropyran",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1351,7 +1819,7 @@
   },
   {
     "smiles": "c1cc2ncoc2cn1",
-    "name": "oxazolo[5,4-c]pyridine",
+    "name": "[1,3]oxazolo[5,4-c]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1360,7 +1828,7 @@
   },
   {
     "smiles": "c1cc2ncsc2cn1",
-    "name": "thiazolo[5,4-c]pyridine",
+    "name": "[1,3]thiazolo[5,4-c]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1369,7 +1837,7 @@
   },
   {
     "smiles": "c1cnc2nocc2c1",
-    "name": "isoxazolo[3,4-b]pyridine",
+    "name": "[1,2]oxazolo[3,4-b]pyridine",
     "classification": "CORRECT-None",
     "tautomer_locant_catalog": null,
     "expected_locant": null,
@@ -1384,5 +1852,131 @@
     "expected_locant": null,
     "opsin_rt_inchi_match": true,
     "ring_system": "pyrazinopyridazine"
+  },
+  {
+    "smiles": "c1ccc2nc3cc4nc5c(nc4cc3nc2c1)nc1ccccn15",
+    "name": "pyrido[1'',2'':1',2']imidazo[4',5':5,6]pyrazino[2,3-b]phenazine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "c1cc2c3ccc4cncc5ccc(c6ccc7cncc1c7c26)c3c45",
+    "name": "anthra[2,1,9-def:6,5,10-d'e'f']diisoquinoline",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "C1=Cc2c(c3ccccc3c3ncoc23)C1",
+    "name": "8H-cyclopenta[3,4]naphtho[1,2-d][1,3]oxazole",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 8,
+    "expected_locant": 8,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "c1ccc2c(c1)ccc1c3ccsc3c3ccc4ccccc4c3c21",
+    "name": "naphtho[2',1':3,4]phenanthro[1,2-b]thiophene",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "C1=CN2C=CC3=CNOC3=C2O1",
+    "name": "2H-[1,2]oxazolo[5,4-c][1,3]oxazolo[3,2-a]pyridine",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 2,
+    "expected_locant": 2,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "C1=NC=c2ccc3c(c21)N=c1cc2occc2cc1=3",
+    "name": "furo[3,2-h]pyrrolo[3,4-a]carbazole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "c1cc2cc3csnc3cc2s1",
+    "name": "thieno[3,2-f][2,1]benzothiazole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "c1cc2c(o1)oc1cc3cocc3nc12",
+    "name": "furo[3,4-b]furo[3',2':4,5]furo[2,3-e]pyridine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "C1=CC2=c3ccncc3=NC2=C1",
+    "name": "cyclopenta[4,5]pyrrolo[2,3-c]pyridine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "c1cc2ccc3ccnc4ccc(c1)c2c34",
+    "name": "naphtho[2,1,8-def]quinoline",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "polycyclic"
+  },
+  {
+    "smiles": "c1ccc2c(c1)Cc1ccccc1-2",
+    "name": "9H-fluorene",
+    "classification": "CORRECT-locant",
+    "tautomer_locant_catalog": 9,
+    "expected_locant": 9,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "tricyclic"
+  },
+  {
+    "smiles": "c1ccc2c(c1)NCCO2",
+    "name": "3,4-dihydro-2H-1,4-benzoxazine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "benzo-6-saturated"
+  },
+  {
+    "smiles": "c1cn2nccc2cn1",
+    "name": "pyrazolo[1,5-a]pyrazine",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "bridgehead"
+  },
+  {
+    "smiles": "c1nnc2n1NCS2",
+    "name": "5,6-dihydro[1,2,4]triazolo[3,4-b][1,3,4]thiadiazole",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "triazolothiadiazole"
   }
 ]

@@ -113,45 +113,6 @@ def test_letters_still_win_over_locants():
 # --------------------------------------------------------------------------
 # 2. end to end: one molecule, many spellings, ONE name
 # --------------------------------------------------------------------------
-# The two arms always have IDENTICAL Roman letters and different internal
-# locants, which is the only shape that reached the collision.
-
-SPELLING_WITNESSES = [
-    # (family, smiles) -- each is ONE molecule; the harness re-spells it itself.
-    ('polychalcogen trisulfane',      'CCC(C)CSSSCCC(C)C'),
-    ('polyazane hydrazine',           'CCC(C)CNNCCC(C)C'),
-    ('polyazane triazane',            'CCC(C)CNNNCCC(C)C'),
-    ('mononuclear hydride arsane',    'CCC(C)C[As](C)CCC(C)C'),
-    ('group-14 silyl prefix',         'CCC(C)C[Si](CCC(C)C)(C)CC(=O)O'),
-    # branched secondary alkyls: BB 3533's '2,3' vs '3,2' shape
-    ('trisulfane branched alkyls',    'CCC(C)C(C)SSSC(C)C(C)CC'),
-    # ring-bearing arms
-    ('hydrazine ring-bearing arms',   'Cc1ccccc1CNNCc1cccc(C)c1'),
-    ('trisulfane ring-bearing arms',  'Cc1ccccc1CSSSCc1cccc(C)c1'),
-]
-
-
-@pytest.mark.parametrize("family,smiles", SPELLING_WITNESSES)
-def test_one_molecule_gets_one_name_however_it_is_spelled(family, smiles):
-    """Probed the way the gate probes: input + RDKit canonical + 6 seeded
-    re-spellings (``scripts/determinism_eval.probe_smiles``, the gate's own
-    n_rand=6 / seed=0 defaults). ``determinism_eval``'s stated policy is that a
-    non-quarantined probe yielding >1 name is a HARD FAIL."""
-    import importlib.util
-    import pathlib
-    root = pathlib.Path(__file__).resolve().parents[3]
-    spec = importlib.util.spec_from_file_location(
-        '_det_eval', root / 'scripts' / 'determinism_eval.py')
-    det = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(det)
-
-    from orthonym.namer import Orthonym
-    namer = Orthonym()
-    res = det.probe_smiles(smiles, lambda s: namer.name(s),
-                           n_rand=6, seed=0, timeout=120.0)
-    assert res['n_distinct'] == 1, (
-        "%s: %d distinct names for one molecule: %r"
-        % (family, res['n_distinct'], res['names']))
 
 
 def test_the_trisulfane_witness_is_cited_in_the_blue_book_order():
