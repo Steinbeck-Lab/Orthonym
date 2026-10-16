@@ -16,6 +16,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 logger = logging.getLogger(__name__)
 
 from ..assembly.composition_primitives import RETAINED_C2_ACYL_BY_SUFFIX, RETAINED_C2_PARENT_BY_SUFFIX
+from ..assembly.identical_prefixes import group_identical_prefixes
 from ..assembly.naming_utils import (
     BRANCH_HANDLED_FGS,
     format_suffix_with_locants,
@@ -1306,11 +1307,9 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         logger.debug("Ring-as-parent universal prefix failed: %s", exc)
         return None
 
-    # Sort prefixes alphabetically, with lowest-locant
-    # tie-break for identical-letter prefixes.
-    # RENDERED prefix strings (locants already attached) -> parent_locants=True.
-    all_prefixes.sort(key=lambda p: prefix_citation_sort_key(
-        p, parent_locants=True))
+    # Identical prefixes of the sources are one multiplied prefix, then sorted
+    # alphabetically with the lowest-locant tie-break (RENDERED strings).
+    all_prefixes = group_identical_prefixes(all_prefixes)
 
     # --- Step 7: Assemble the complete name ---
     # Format: [prefixes]-[ring_parent]-[suffix_locants]-[multiplier][suffix]
@@ -3531,7 +3530,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # both produce the same bare prefix form ("hydroxy"), merge into one entry
     # with the correct multiplier ("dihydroxy"). Only bare (no-locant) prefixes
     # are merged; locanted prefixes represent distinct chain positions.
-    all_prefixes = _merge_bare_duplicate_prefixes(all_prefixes)
+    all_prefixes = group_identical_prefixes(_merge_bare_duplicate_prefixes(all_prefixes))
 
     # Sort all prefixes alphabetically, with lowest-locant
     # tie-break for identical-letter prefixes.

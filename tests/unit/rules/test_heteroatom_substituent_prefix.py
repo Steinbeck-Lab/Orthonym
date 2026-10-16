@@ -8,7 +8,7 @@ substituted amine, so the fragment fell to `parent_to_prefix` string-surgery whi
 this test pins the general-engine (best-effort) path to the same composer.
 
 Targets verified by OPSIN round-trip:
-  CNCC1=CC=CO1 -> 2-[(methylamino)methyl]furan
+  CNCC1=CC=CO1 -> 1-(furan-2-yl)-N-methylmethanamine (amine suffix since SL-M1)
   OC(=O)c1ccc(CCN(CC)CC)cc1 ->...[2-(diethylamino)ethyl]... (benzenecarboxylic-acid form ok)
 """
 from orthonym import Orthonym
@@ -36,6 +36,12 @@ def test_diethylaminoethyl_prefix_is_composed():
 
 
 def test_methylaminomethyl_furan_no_longer_abstains():
+    # SL-M1 (2026-10-16): the amine parent count now sees the nitrogen, so the best-effort tier
+    # gives the amine-suffix name instead of the composed `(methylamino)methyl` prefix form. The
+    # amine is the principal characteristic group "SENIORITY ORDER FOR CLASSES", the Blue Book "19 Amines"; no
+    # senior group here) and the parent is the methanamine chain, `1-` kept because the N still
+    # carries an H (cf. `1-hydrazinylmethanamine (PIN)`:38535). The composed-prefix path stays
+    # pinned by test_diethylaminoethyl_prefix_is_composed.
     nm = _best_effort_name("CNCC1=CC=CO1")
     assert nm is not None, "should emit a name, not abstain"
-    assert "(methylamino)methyl" in nm, nm
+    assert nm == "1-(furan-2-yl)-N-methylmethanamine", nm

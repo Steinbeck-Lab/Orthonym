@@ -8026,7 +8026,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     # are used with second and subsequent simple substituents" ('bromo(chloro)acetic
     # acid (PIN)'), so 'N,N-dimethyl(phenyl)methanamine'.
     from .naming_utils import _is_fully_enclosed as _fully_enclosed
-    from .naming_utils import apply_enclosing_marks as _enclose
+    from .prefix_marks import enclose_second_prefix as _enclose
     from .naming_utils import starts_with_locant as _starts_with_locant
     c_texts = {id(item) for item in c_prefix_items}
     merged = sorted(c_prefix_items + n_prefix_items, key=lambda t: t[0])

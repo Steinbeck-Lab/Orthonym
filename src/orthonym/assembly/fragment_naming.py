@@ -67,6 +67,12 @@ def _get_visited() -> set:
     return visited
 
 
+def in_fragment_recursion() -> bool:
+    """True while a fragment is being named as a molecule on behalf of a substituent prefix
+    (``name_fragment_recursively``): the name is then the source of a prefix, not a name offered."""
+    return bool(getattr(_fragment_guard, 'visited', None))
+
+
 # Pre-computed names for common fragments that frequently hit the depth limit.
 # Checked BEFORE the cycle guard so these fragments are always nameable,
 # regardless of recursion state. Analogous to retained_names.py but for

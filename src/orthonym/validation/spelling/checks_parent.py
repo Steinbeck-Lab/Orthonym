@@ -255,8 +255,11 @@ def n_aryl_parent_check(mol, name):
                 pair = mm.group(1) + 'yl'
         if not pair:
             continue
-        ring_pref = sum(max(len(x.locs), x.mult) for x in p.prefixes
-                        if x.locs and all(loc.isdigit() for loc in x.locs))
+        # a group that cites the nitrogen with the ring ('N,4-dimethyl',,:7027) holds one
+        # prefix of the ring per numeral
+        ring_pref = sum(max(len(x.locs), x.mult) if all(loc.isdigit() for loc in x.locs)
+                        else sum(1 for loc in x.locs if loc.isdigit())
+                        for x in p.prefixes if x.locs)
         for pr in p.prefixes:
             if pr.kind != 'enclosed' or pr.locs != ('N',):
                 continue

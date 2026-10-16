@@ -443,6 +443,28 @@ def _get_non_principal_terminal_carbons(
 #: profiler) where the release, which made no such comparison, made 2 (3.6 s).
 _P45_NAMING_BRANCHES = _contextvars.ContextVar("orthonym_p45_naming_branches", default=False)
 
+#: True once a ``find_principal_chain(ring_prefixes=True)`` call has chosen between chains that differ
+#: in structure and tie on every term of the chain score prefix count and locants
+#: included), by the alphanumerical key of their prefixes alone (:func:`_tied`).
+#: ``principal_chain_with_ring_prefixes`` resets it before the call and reads it after.
+_P45_TIE = _contextvars.ContextVar("orthonym_p45_tie", default=False)
+
+
+def _tied(chain):
+    """``chain``, noting that it was chosen among structurally different chains that tie through
+     (see:data:`_P45_TIE`)."""
+    _P45_TIE.set(True)
+    return chain
+
+
+def _min_noting_tie(mol, top, key):
+    """``min(top, key=key)``, noting the tie (:func:`_tied`) when ``top`` holds chains that differ in
+    structure: the molecule has no ring, so the selector counts every prefix and its last key decides."""
+    best = min(top, key=key)
+    if len({chain_symmetry_key(mol, c) for c in top}) > 1:
+        _tied(best)
+    return best
+
 
 def find_principal_chain(
     mol,
@@ -1114,7 +1136,7 @@ def find_principal_chain(
         best_lambda = max(_lambda_direct_key(c) for c in top)
         top = [c for c in top if _lambda_direct_key(c) == best_lambda]
         if not ring_prefixes:
-            best_chain = top[0] if len(top) == 1 else min(top, key=_p45_alpha_key)
+            best_chain = top[0] if len(top) == 1 else _min_noting_tie(mol, top, _p45_alpha_key)
         elif len(top) == 1 or len({chain_symmetry_key(mol, c) for c in top}) == 1:
             # one chain, or chains that a symmetry of the molecule maps onto each other
             # (a chain and its reverse, the two methyl ends of an isopropyl group): the
@@ -1138,7 +1160,7 @@ def find_principal_chain(
                 return None
             if len({chain_symmetry_key(mol, c) for c in best}) > 1:
                 return None
-            best_chain = best[0]
+            best_chain = _tied(best[0])
 
     # Determine numbering direction (lowest locants for principal group)
     if principal_group and fg_atoms:
@@ -1151,6 +1173,10 @@ def find_principal_chain(
 _PREFIX_SENIORITY_ATTR = "_p45_ring_prefix_seniority"
 #: attribute that memoises ``principal_chain_with_ring_prefixes`` on one features object
 _SENIOR_CHAIN_ATTR = "_p45_ring_prefix_chain"
+#: attribute that memoises whether that choice was a tie (:func:`amine_parent_tie`)
+_TIE_CHAIN_ATTR = "_p45_ring_prefix_tie"
+#: attribute that memoises:func:`_acyclic_chain_tie`
+_ACYCLIC_TIE_ATTR = "_p45_acyclic_tie"
 
 
 def _cited_prefixes(names):
@@ -1278,6 +1304,7 @@ def principal_chain_with_ring_prefixes(features) -> Optional[List[int]]:
     cached = getattr(features, _SENIOR_CHAIN_ATTR, None)
     if cached is not None and cached[0] == key:
         return cached[1]
+    token = _P45_TIE.set(False)
     try:
         from ..metrics.provenance import isolated_provenance
         with isolated_provenance():
@@ -1288,14 +1315,73 @@ def principal_chain_with_ring_prefixes(features) -> Optional[List[int]]:
                 exclude_atoms=ring_atoms,
                 ring_prefixes=True,
             )
+        tied = _P45_TIE.get()
     except Exception:                            # fail closed: undecided
-        senior = None
+        senior, tied = None, False
+    finally:
+        _P45_TIE.reset(token)
     senior = list(senior) if senior else None
     try:
         setattr(features, _SENIOR_CHAIN_ATTR, (key, senior))
+        setattr(features, _TIE_CHAIN_ATTR, (key, tied))
     except AttributeError:
         pass
     return senior
+
+
+def amine_parent_tie(features) -> bool:
+    """True when the parent of a secondary or tertiary amine is a choice among structurally different
+    chains through its nitrogen that tie on and on and: the same number of prefixes
+    and the same locants, so that only the alphanumerical key of the prefixes, the Blue Book)
+    told them apart. (:21791) "the lower locant or set of locants for substituents cited as
+    prefixes... in their order of citation in the name" reads the N-locants of the nitrogen's prefixes
+    too, and N is lower than a numeral,:3195); the key does not, so the choice is not made
+    by the rule: the name is not certified as the PIN. ``(4-bromo-3-nitrophenyl)-N-[(2-fluorophenyl)methyl]-N-
+    methylmethanamine`` is such a choice between the two benzylic carbons, ``N-benzyl(chloro)-N-methylmethanamine``
+    another, between the CH2Cl and the CH2Ph. Two chains that a symmetry of the molecule maps onto each other
+    (the two benzylic carbons of dibenzylmethylamine) are one chain and no tie. False for a group that is not
+    a secondary or tertiary amine and for a cyclic molecule whose parent is not a chain. A molecule without a
+    ring has no ring prefix to count: the chain selector's own last key decides between its chains
+    (``ClCN(C)CBr``: the CH2Cl and the CH2Br)."""
+    from ..rules.parent_selection import BRIDGING_HETEROATOM_PGS
+    if getattr(features, 'principal_group', None) not in BRIDGING_HETEROATOM_PGS:
+        return False
+    if not getattr(features, 'is_cyclic', False):
+        return _acyclic_chain_tie(features)
+    if not getattr(features, 'chain_is_parent', False):
+        return False
+    senior = principal_chain_with_ring_prefixes(features)       # fills the cache of the tie
+    cached = getattr(features, _TIE_CHAIN_ATTR, None)
+    return bool(senior and cached is not None and cached[1])
+
+
+def _acyclic_chain_tie(features) -> bool:
+    """:func:`amine_parent_tie` of a molecule without a ring: the chain selector is asked again for the
+    chain it gave ``namer.Orthonym._classify`` (same arguments) and says whether its last key decided
+    between chains that differ in structure."""
+    mol = getattr(features, 'mol', None)
+    key = (getattr(features, 'principal_group', None),)
+    cached = getattr(features, _ACYCLIC_TIE_ATTR, None)
+    if cached is not None and cached[0] == key:
+        return cached[1]
+    if mol is None:
+        return False
+    token = _P45_TIE.set(False)
+    try:
+        from ..metrics.provenance import isolated_provenance
+        with isolated_provenance():
+            find_principal_chain(mol, getattr(features, 'functional_groups', None) or {},
+                                 features.principal_group)
+        tied = _P45_TIE.get()
+    except Exception:                            # fail closed: no tie is read
+        tied = False
+    finally:
+        _P45_TIE.reset(token)
+    try:
+        setattr(features, _ACYCLIC_TIE_ATTR, (key, tied))
+    except AttributeError:
+        pass
+    return tied
 
 
 #: Principal groups whose producer builds the name on ``features.principal_chain``, the chain
@@ -1321,6 +1407,24 @@ GIVEN_CHAIN_GROUPS = frozenset({
     'primary_amine', 'secondary_amine', 'tertiary_amine',
     'sulfonic_acid', 'primary_sulfonamide', 'thioamide', 'thioic_S_acid', 'peroxy_acid',
 })
+
+
+def p45_pending(features, chain: Optional[List[int]]) -> bool:
+    """True when ``namer.Orthonym._classify`` compares the chain it found with the chain makes
+    senior (:func:`p45_principal_chain`): the group's producer builds on the chain it is given
+    (:data:`GIVEN_CHAIN_GROUPS`) and the chain has two carbons or more, or is one carbon of a
+    secondary or tertiary amine. The nitrogen of such an amine is bonded to several carbons, and the
+    one-carbon chains through them tie on the length "SENIORITY OF ACYCLIC CHAINS (THE
+    PRINCIPAL CHAIN)", the Blue Book, "(b) has the greater number of skeletal atoms") and, with
+    a ring bonded to the chain left out of the count, on the prefixes they carry: 'CN(C)Cc1ccccc1' has
+    the chains of its two methyls and of its benzylic carbon, which the selector told apart by the
+    order of the atoms. (:21604, "the maximum number of substituents cited as prefixes") makes
+    the benzylic carbon the parent, 'N,N-dimethyl(phenyl)methanamine' (three prefixes), not
+    'N-benzyl-N-methylmethanamine' (two)."""
+    from ..rules.parent_selection import BRIDGING_HETEROATOM_PGS
+    group = getattr(features, 'principal_group', None)
+    return bool(chain and group in GIVEN_CHAIN_GROUPS
+                and (len(chain) >= 2 or group in BRIDGING_HETEROATOM_PGS))
 
 
 def p45_principal_chain(features, default_chain: Optional[List[int]]) -> Optional[List[int]]:
@@ -1349,9 +1453,19 @@ def p45_principal_chain(features, default_chain: Optional[List[int]]) -> Optiona
     # 'CC(=O)N[C@@H](Cc1ccccc1)c1cc(OC)cc(=O)o1' the CH-CH2 chain of the nitrogen's other
     # substituent ties with the acetyl chain and wins on its prefixes: a chain that does not
     # hold the atoms of the group the default chain holds is not taken.
-    group_atoms = {int(a) for match in (getattr(features, 'principal_group_atoms', None) or ())
-                   for a in match}
-    if ({int(a) for a in senior} & group_atoms) != ({int(a) for a in default_chain} & group_atoms):
+    from ..rules.parent_selection import bridging_group_reaches
+    matches = getattr(features, 'principal_group_atoms', None) or ()
+    group_atoms = {int(a) for match in matches for a in match}
+
+    def _held(chain):
+        # a secondary or tertiary amine is held by every chain its nitrogen is bonded to,
+        # ``bridging_group_reaches``): the match keeps one of the nitrogen's carbons only
+        atoms = {int(a) for a in chain}
+        reached = {int(m[0]) for m in matches
+                   if bridging_group_reaches(features.mol, features.principal_group, m, atoms)}
+        return reached or atoms & group_atoms
+
+    if _held(senior) != _held(default_chain):
         return default_chain
     return senior
 
@@ -1388,8 +1502,9 @@ def p45_acid_chain(mol, acid_atoms, carbonyl_c: int) -> Optional[List[int]]:
 
 
 def _chain_parent_prefix_seniority(features) -> Optional[str]:
-    if not (getattr(features, 'chain_is_parent', False)
-            and getattr(features, 'is_cyclic', False)):
+    if not getattr(features, 'is_cyclic', False):
+        return 'undecided' if amine_parent_tie(features) else None
+    if not getattr(features, 'chain_is_parent', False):
         return None
     chain = getattr(features, 'principal_chain', None)
     ring_systems = getattr(features, 'ring_systems', None) or ()
@@ -1402,7 +1517,7 @@ def _chain_parent_prefix_seniority(features) -> Optional[str]:
     except Exception:                            # fail closed
         return 'undecided'
     senior = principal_chain_with_ring_prefixes(features)
-    if senior is None:
+    if senior is None or amine_parent_tie(features):
         return 'undecided'
     try:
         if len(senior) != len(chain):

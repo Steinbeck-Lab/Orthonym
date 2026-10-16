@@ -33,6 +33,7 @@ from ..assembly.naming_utils import (
     should_omit_locant_one,
 )
 from .locants import compare_locant_sets as _compare_locant_sets  #
+from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
 from ..perception.molcache import atoms_of, inchikey_of
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -2182,15 +2183,13 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
     if h_count == 1 and len(neighbors) == 1 and neighbors[0].GetSymbol() == 'C':
         _branch_atoms = _bfs_substituent_atoms(mol, n_idx, ring_atoms)
         _branch_atoms = [a for a in _branch_atoms if a != n_idx]
-        # Fail-closed guard: this LOCAL complex-prefix build is only safe when
-        # the N-substituent branch is a plain acyclic substituted alkyl (e.g.
-        # -CH2Cl). A RING-bearing branch (-NH-pyridinyl, -NH-phenyl) triggers a
-        # parent-hydride SENIORITY competition between the two ring systems
-        # that must be resolved by the parent-selection pipeline, not
-        # forced onto the benzene ring here — so decline and let it fall
-        # through (N-phenylpyridin-4-amine, not [(pyridin-4-yl)amino]benzene).
-        _branch_has_ring = any(mol.GetAtomWithIdx(a).IsInRing()
-                               for a in _branch_atoms)
+        # Fail-closed guard: this LOCAL complex-prefix build is only safe when the branch is a plain
+        # acyclic substituted alkyl (-CH2Cl), or an alkyl chain that holds rings as its own prefixes
+        # (-CH(CH3)CH2SPh,, the Blue Book). A ring ON the nitrogen or an acyl group
+        # with a ring is a parent-hydride SENIORITY competition for the parent-selection
+        # pipeline: decline (N-phenylpyridin-4-amine, not [(pyridin-4-yl)amino]benzene).
+        _branch_has_ring = (any(mol.GetAtomWithIdx(a).IsInRing() for a in _branch_atoms)
+                            and not is_saturated_chain_carbon(neighbors[0]))
         if _branch_atoms and not _branch_has_ring:
             from ..assembly.substituent_naming import name_substituent_fragment
             _bname = name_substituent_fragment(
@@ -2235,6 +2234,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                     'name': _wrapped,
                     'atoms': [n_idx] + list(_branch_atoms),
                     'is_complex': True,
+                    **amine_promotion(mol, _branch_atoms, _bname),
                 }
 
     # (the Blue Book) N,N-disubstituted ANILINO. -N(R)-C6H5 takes the
@@ -2312,7 +2312,10 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
             for cn in c_neighbors:
                 alkyl_atoms, carbon_count = _collect_pure_alkyl(mol, cn.GetIdx(), ring_atoms | {n_idx})
                 if alkyl_atoms is None or carbon_count == 0:
-                    break
+                    #: a chain that holds more than alkyl is a prefix of the ring parent
+                    alkyl_atoms, carbon_count = acyclic_branch_on_nitrogen(mol, cn, ring_atoms | {n_idx})
+                    if alkyl_atoms is None:
+                        break
                 from ..assembly.substituent_naming import name_substituent_fragment
                 aname = name_substituent_fragment(
                     mol, alkyl_atoms, cn.GetIdx(), list(ring_atoms | {n_idx})
@@ -2325,14 +2328,12 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 alkyl_names_list.append(aname)
                 all_sub_atoms.extend(alkyl_atoms)
             else:
-                # Both identified. The amino prefix takes NO italic N locants: the
-                # nitrogen is a mononuclear parent, (the Blue Book)
-                # 'the first cited substituent never has enclosing marks unless it
-                # includes a locant. The second and further substituents are each
-                # enclosed with parentheses'; 'bis(dimethylamino) (preferred prefix)'
-                #, '4-(dimethylamino)-2-methylbutane-2-peroxol (PIN)'
-                # (:27955), '5-methyl-2-[methyl(phenyl)carbamoyl]benzoic acid (PIN)'
-                # (:32957). The ONE amino-prefix assembler owns order and marks.
+                # Both identified. The amino prefix takes NO italic N locants: the nitrogen is a
+                # mononuclear parent, (the Blue Book) 'the first cited substituent
+                # never has enclosing marks unless it includes a locant. The second and further
+                # substituents are each enclosed with parentheses'; 'bis(dimethylamino)',
+                # '4-(dimethylamino)-2-methylbutane-2-peroxol (PIN)' (:27955), '5-methyl-2-[methyl(phenyl)
+                # carbamoyl]benzoic acid (PIN)' (:32957). The ONE amino-prefix assembler owns order and marks.
                 alkyl_names_list.sort()
                 from ..assembly.composer import _assemble_decorated_amino_prefix
                 prefix_name = _assemble_decorated_amino_prefix(
@@ -4814,7 +4815,15 @@ def _name_substituted_aniline(
         IUPAC name like 'aniline', 'N-methylaniline', '4-methylaniline',
         'N,N-dimethylaniline', '4-fluoro-N-methylaniline'.
     """
+    from ..assembly.identical_prefixes import shared_prefix_entries
     from ..assembly.naming_utils import _wrap_n_substituent, enclose_if_compound
+
+    # (the Blue Book): a substituent the ring and the nitrogen both carry is one
+    # multiplied prefix, the italic N cited before the numerals,:3195):
+    # 'N,4-dimethylaniline', not '4-methyl-N-methylaniline'.
+    renumbered_groups = _renumber_relative_to(prefix_groups, amine_locant)
+    renumbered_groups, n_substituents, shared_entries = shared_prefix_entries(
+        renumbered_groups, n_substituents)
 
     # Build the individual N-substituent prefix strings (with N/N,N locants).
     #: a COMPOUND N-substituent (e.g. '3-methylbutyl') takes its own
@@ -4838,21 +4847,18 @@ def _name_substituted_aniline(
                 rendered = f"N-{_wrap_n_substituent(enclose_if_compound(name))}"
                 n_prefix_entries.append((alpha_sort_key(name), rendered))
 
-    # Renumber ring substituents relative to the amine position (= position 1).
-    renumbered_groups = _renumber_relative_to(prefix_groups, amine_locant)
-
-    # Build the individual ring-substituent prefix strings.
+    # Build the individual ring-substituent prefix strings (locants relative to the amine = 1).
     ring_prefix_entries: List[Tuple[str, str]] = []  # (alpha_key, rendered)
     for name in renumbered_groups:
         locants = sorted(renumbered_groups[name])
         rendered = format_substituent_prefix(name, locants, len(locants))
         ring_prefix_entries.append((alpha_sort_key(name), rendered))
 
-    if not n_prefix_entries and not ring_prefix_entries:
+    if not n_prefix_entries and not ring_prefix_entries and not shared_entries:
         return "aniline"
 
     # Alphabetize N- and ring-substituents together.
-    all_entries = n_prefix_entries + ring_prefix_entries
+    all_entries = n_prefix_entries + ring_prefix_entries + shared_entries
     # `e[1]` is an already-RENDERED prefix string, so its leading locants are
     # PARENT locants -> parent_locants=True compares a prefix's OWN
     # locants, and a parent locant is assigned BY this very order). `[1:]` keeps
@@ -4956,11 +4962,16 @@ def _name_substituted_benzenediamine(
     # substituent names are multiplied across the N atoms:
     # 'N1,N4-dimethyl', 'N1,N1-dimethyl'. A compound substituent takes its own
     # enclosing marks first, as in the aniline producer above.
+    from ..assembly.identical_prefixes import shared_prefix_groups
     from ..assembly.naming_utils import enclose_if_compound
     n_locs_by_name: Dict[str, List[int]] = {}
     for n_loc in sorted(new_n_map):
         for nm in new_n_map[n_loc]:
             n_locs_by_name.setdefault(nm, []).append(n_loc)
+    # (the Blue Book): a substituent the ring and a nitrogen both carry is one
+    # multiplied prefix, the italic N locants first,:3195): 'N1,N4,2-trimethyl'.
+    new_ring, n_locs_by_name, shared_entries = shared_prefix_groups(
+        new_ring, n_locs_by_name, lambda loc: f"N{loc}")
     n_prefix_entries: List[Tuple[str, str]] = []
     for nm, locs in n_locs_by_name.items():
         locs = sorted(locs)
@@ -4981,7 +4992,7 @@ def _name_substituted_benzenediamine(
     loc_str = ",".join(str(l) for l in sorted(new_amines))
     suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'amine')}"
 
-    all_entries = n_prefix_entries + ring_prefix_entries
+    all_entries = n_prefix_entries + ring_prefix_entries + shared_entries
     if not all_entries:
         return suffix_part
     # `e[1]` is an already-RENDERED prefix string, so its leading locants are

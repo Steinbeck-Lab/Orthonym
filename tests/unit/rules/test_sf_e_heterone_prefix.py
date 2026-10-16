@@ -18,7 +18,8 @@ are class-16 pseudoketones on an oxygen ring, so they do not keep it either.
 
 The label is lowered, never the name: the best-effort tier ships the name as
 ``systematic_verified``; the default tier declines it. Building the phosphanone parent is a
-separate topic.
+separate topic: SL lane H builds it where the ligand holds only carbon, halogen and one O/S/N link
+(``tests/unit/rules/test_sl_h_heterone_ligand.py``; the hydrocarbon row moved there).
 """
 import pytest
 from rdkit import Chem
@@ -35,7 +36,6 @@ DECLINED = [
     ("C1=CC(=CC=C1CN)OP=O", "1-{4-[(oxophosphanyl)oxy]phenyl}methanamine", "amine, class 19"),
     ("C1C2CC3CC1CC(C2)(C3)N=CC4=CC(=CC=C4)OP=O",
      "N-(adamantan-1-yl)-1-{3-[(oxophosphanyl)oxy]phenyl}methanimine", "imine, class 20"),
-    ("C1=CC=C2C(=C1)C3=C2C(=CC=C3)OP=O", "1-[(oxophosphanyl)oxy]biphenylene", "a hydrocarbon"),
     ("CC(=O)C1=CC=CC=C1OP=O", "1-{2-[(oxophosphanyl)oxy]phenyl}ethan-1-one",
      "ketone on a carbon parent: P > C"),
     ("CC1=C(C(=C(C=C1)C(=O)C2=CC=CC=C2OP=O)C)C",

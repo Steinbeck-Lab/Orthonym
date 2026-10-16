@@ -79,10 +79,32 @@ CHALCOGEN_SUFFIX_PGS = {
 # discards the rest, tie-broken by atom index. Alcohols, primary amines and
 # aromatic amines have exactly one bearing carbon, so they are excluded: nothing
 # is lost for them and the membership loop already answers them.
-_BRIDGING_HETEROATOM_PGS = frozenset({
+BRIDGING_HETEROATOM_PGS = frozenset({
     "secondary_amine",
     "tertiary_amine",
 })
+
+
+def bridging_group_reaches(mol, principal_group, pg_atoms, atoms) -> bool:
+    """True when the secondary/tertiary amine ``pg_atoms`` has its nitrogen bonded to a carbon of ``atoms``.
+
+     "SENIORITY ORDER FOR PARENT STRUCTURES" (the Blue Book): "The senior parent structure
+    has the maximum number of substituents corresponding to the principal characteristic group
+    (suffix)". The amine nitrogen is one group, and it is a suffix of every parent candidate it is
+    bonded to: of the chain through each of its carbons and of each ring it is bonded to
+    ,:26249 "Selection of the principal chain or senior ring system in secondary and
+    tertiary amines"). The perceived match keeps ONE bearing carbon (``seniority._normalize_pcg_match``:
+    the most heavy neighbours, then the lowest index), so a count that reads only that carbon
+    gives 0 for a candidate through another carbon of the same nitrogen: 'CN(C)Cc1ccccc1' (the
+    benzylic carbon kept; the methyl chain and the ring both read 0, the ring won the tie and the
+    amine had no parent) and 'CC(C)(C)Nc1ccccc1' (the tert-butyl carbon kept; the chain read 1 and the
+    ring 0, against "the ring is preferred"). The test asks the nitrogen, as
+    :func:`is_principal_group_on_ring` always did for rings."""
+    if principal_group not in BRIDGING_HETEROATOM_PGS or not pg_atoms:
+        return False
+    het = mol.GetAtomWithIdx(pg_atoms[0])
+    return het.GetSymbol() == 'N' and any(
+        nb.GetSymbol() == 'C' and nb.GetIdx() in atoms for nb in het.GetNeighbors())
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +333,7 @@ def is_principal_group_on_ring(
     # Scoped to the two subtypes whose heteroatom can carry more than one carbon;
     # alcohols, primary and aromatic amines have a single bearing carbon, so the
     # loop above already answers them and this block is a no-op there.
-    # Both members of _BRIDGING_HETEROATOM_PGS are also in SKELETAL_SUFFIX_PGS,
+    # Both members of BRIDGING_HETEROATOM_PGS are also in SKELETAL_SUFFIX_PGS,
     # where "on ring" is MEMBERSHIP-only: the locant-bearing carbon must BE a
     # ring atom, never merely bonded to one. That semantics is preserved exactly
     # -- the heteroatom's heavy neighbours are its bearing carbons, so the test
@@ -320,17 +342,9 @@ def is_principal_group_on_ring(
     # the single one that survived normalisation. The N itself is deliberately
     # NOT accepted by membership: a ring-skeletal nitrogen is a ring heteroatom,
     # not an amine suffix on that ring.
-    if principal_group in _BRIDGING_HETEROATOM_PGS:
-        for pg_atoms in principal_group_atoms:
-            if not pg_atoms:
-                continue
-            het = mol.GetAtomWithIdx(pg_atoms[0])
-            if het.GetSymbol() != 'N':
-                continue  # unexpected match shape -- fail closed to the loop above
-            for neighbor in het.GetNeighbors():
-                if (neighbor.GetSymbol() == 'C'
-                        and neighbor.GetIdx() in ring_atoms_set):
-                    return True
+    if any(bridging_group_reaches(mol, principal_group, pg_atoms, ring_atoms_set)
+           for pg_atoms in principal_group_atoms):
+        return True
 
     return False
 
@@ -788,6 +802,9 @@ def _count_pg_on_ring(
         if key in seen_matches:
             continue
         seen_matches.add(key)
+        if bridging_group_reaches(mol, principal_group, pg_atoms, ring_atoms):
+            count += 1
+            continue
         for attachment in _pg_attachment_atoms(principal_group, pg_atoms):
             # Self-check: attachment atom itself may be a ring atom
             if attachment in ring_atoms:
@@ -833,6 +850,9 @@ def _count_pg_on_chain(
         if key in seen_matches:
             continue
         seen_matches.add(key)
+        if bridging_group_reaches(mol, principal_group, pg_atoms, chain_set):
+            count += 1
+            continue
         for attachment in _pg_attachment_atoms(principal_group, pg_atoms):
             if attachment in chain_set:
                 count += 1

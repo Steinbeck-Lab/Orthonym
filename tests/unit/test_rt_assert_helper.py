@@ -46,3 +46,39 @@ def test_parse_does_not_use_the_engine_oracle(monkeypatch):
         assert rt_assert._independent_parse("ethanol") in ("CCO", "C(C)O")
     finally:
         pop_scope(scope)
+
+
+# ---- SL lane M2: ``-r`` only for an input that has radical electrons ----------------------------
+#
+# "GENERAL METHODOLOGY" (the Blue Book): "Radicals are named by modifying a parent
+# hydride name to signal the subtraction or addition of one or more hydrogen atoms"; "The suffixes
+# 'yl' (-H.), 'ylidene' (-2H.), 'ylidyne' (-3H.) denote the removal of hydrogen atoms". A name with a
+# free valence is a name of a radical or a substituent group. OPSIN's ``-r`` reads such a name and
+# writes the structure without marking the radical: 'methoxyphosphoryl' (CH3O-PO<, two unfilled
+# valences) reads back as COP=O, the closed-shell structure of its atoms, so the helper used to
+# accept it as the name of COP=O. ``orthonym.validation.read_back_policy`` is the engine's rule
+# (SF lane E); the helper reads as the engine does.
+
+def test_a_closed_shell_input_is_read_back_without_radicals():
+    # no input structure: the legacy reading, the name read for its own sake
+    assert rt_assert._independent_parse("methoxyphosphoryl") == "COP=O"
+    # the closed-shell input COP=O: OPSIN reads nothing
+    assert rt_assert._independent_parse("methoxyphosphoryl", "COP=O") is None
+    assert not rt_assert.name_is_rt_exact("methoxyphosphoryl", "COP=O")
+    with pytest.raises(AssertionError):
+        rt_assert.assert_full_rt("methoxyphosphoryl", "COP=O")
+
+
+def test_a_radical_input_is_still_read_back_with_radicals():
+    assert rt_assert._independent_parse("ethyl", "C[CH2]") == "[CH2]C"
+    assert rt_assert._independent_parse("ethyl", "CC") is None          # the closed-shell ethane
+    assert rt_assert.name_is_rt_exact("ethane-1,2-diyl", "[CH2][CH2]")
+    assert rt_assert.name_is_rt_exact("pentan-3-yl", "CC[CH]CC")
+
+
+def test_the_policy_is_the_engines():
+    """The helper asks ``read_back_policy``; it keeps no rule of its own."""
+    from orthonym.validation.read_back_policy import smiles_has_radical_electrons
+    for smiles in ("CCO", "C[CH2]", "[CH2][CH2]", "COP=O", "[Sn+2].[Cl-].[Cl-]"):
+        radical = smiles_has_radical_electrons(smiles)
+        assert (rt_assert._independent_parse("ethyl", smiles) is not None) is radical

@@ -500,7 +500,15 @@ _HYDRIDE_STEM_ROOTS = tuple(
 # rendered prefix "3',4,4'-trihydroxy" kept its locants and its multiplier, and
 # keyed at "t" (or, as a raw string, at the digit "3").
 _LOCANT_PREFIX_RE = re.compile(r"^\d+[a-z]?['\u2032\u2033]*(?:,\d+[a-z]?['\u2032\u2033]*)*-")
-_N_LOCANT_PREFIX_RE = re.compile(r'^[nN],?[nN]?-')
+# A leading locant set that holds an italic N: 'N-', 'N,N-', and a set that mixes the italic
+# letter with numerals ('N,2-dimethyl',, the Blue Book: the letters are cited first).
+_N_LOCANT_PREFIX_RE = re.compile(
+    r"^(?:[nN],?[nN]?|(?:[nN][0-9]*['\u2032\u2033]*|\d+[a-z]?['\u2032\u2033]*)"
+    r"(?:,(?:[nN][0-9]*['\u2032\u2033]*|\d+[a-z]?['\u2032\u2033]*))*)-")
+# The locant set in front of a RENDERED prefix, numerals and italic element letters alike.
+_PARENT_LOCANT_SET_RE = re.compile(
+    r"^(?:[NOSP][0-9]*['\u2032\u2033]*|\d+[a-z]?['\u2032\u2033]*)"
+    r"(?:,(?:[NOSP][0-9]*['\u2032\u2033]*|\d+[a-z]?['\u2032\u2033]*))*-")
 # Leading indicated-hydrogen descriptor (e.g. '1H-', '2H-'). Like a locant, the
 # italic indicated H is IGNORED for alphabetization (IUPAC, so
 # '(1H-imidazol-5-yl)' must sort at 'i', not at the leading digit '1'.
@@ -4315,7 +4323,7 @@ def prefix_citation_sort_key(prefix: str, *,
     """
     from .name_comparison import _LOCANT_TOKEN_FINDER, locant_sort_key
     alpha_letters = _key_letters(alpha_sort_key(prefix))
-    body = _LOCANT_PREFIX_RE.sub('', prefix) if parent_locants else prefix
+    body = _PARENT_LOCANT_SET_RE.sub('', prefix) if parent_locants else prefix
     locs = tuple(locant_sort_key(t)
                  for t in _LOCANT_TOKEN_FINDER.findall(body))
     return (alpha_letters, locs, cip_descriptor_rank_key(prefix), prefix)

@@ -230,8 +230,8 @@ class TestAnilinoPrefixFromAnilineName:
         ("4-chloroaniline", "(4-chloroanilino)"),
         ("4-methylaniline", "(4-methylanilino)"),
         ("N-methylaniline", "(N-methylanilino)"),
-        ("4-methyl-N-methylaniline", "(4-methyl-N-methylanilino)"),
-        ("4-methyl-N,N-dimethylaniline", "(4-methyl-N,N-dimethylanilino)"),
+        ("N,4-dimethylaniline", "(N,4-dimethylanilino)"),
+        ("N,N,4-trimethylaniline", "(N,N,4-trimethylanilino)"),
         ("2,3-dimethylaniline", "(2,3-dimethylanilino)"),
     ])
     def test_head_morpheme_substitution(self, aniline, expected):
@@ -257,7 +257,7 @@ class TestAnilinoPrefixFromAnilineName:
         from orthonym.assembly.substituent_naming import (
             ATTACH_LOCANT_UNKNOWN, parent_to_prefix)
         for aniline in ("aniline", "4-methylaniline", "N-methylaniline",
-                        "4-methyl-N-methylaniline"):
+                        "N,4-dimethylaniline"):
             got = parent_to_prefix(aniline, 6, attach_locant=ATTACH_LOCANT_UNKNOWN)
             assert got is None or "anilinyl" not in got, (
                 f"parent_to_prefix({aniline!r}, attach_locant=ATTACH_LOCANT_UNKNOWN) -> {got!r} fabricates 'anilinyl'"
@@ -272,10 +272,19 @@ class TestAnilinoPrefixFromAnilineName:
 
     def test_ring_and_nitrogen_substituted_end_to_end(self):
         """The case ``anilino_preferred_prefix`` declines (it would have to invent
-        the merge) but this path serves, because the merge is inherited
-        from the parent form Orthonym already ships ('4-methyl-N-methylaniline')."""
+        the merge) but this path serves, because the merge is inherited from the
+        parent form Orthonym ships ('N,4-dimethylaniline'): a substituent the ring and
+        the nitrogen both carry is one multiplied prefix, the italic N before the
+        numerals. (the Blue Book) "Multiplicative prefixes... are the
+        principal method for describing a multiplicity of identical features of a
+        structure in chemical names"; (:3195) "Italic capital and lower-case
+        letter locants are lower than Greek letter locants, which, in turn, are lower
+        than numerals"; 'N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)' (:32879).
+        UNVERIFIED by a verbatim example: the book prints no anilino prefix that
+        carries the same substituent twice (it rests on the rule above). Before SL lane
+        G the value was '3-(4-methyl-N-methylanilino)propanenitrile'."""
         assert (_name("N#CCCN(C)c1ccc(C)cc1")
-                == "3-(4-methyl-N-methylanilino)propanenitrile")
+                == "3-(N,4-dimethylanilino)propanenitrile")
 
     def test_n_alkyl_anilino_on_a_chain_parent(self):
         assert (_name("N#CCCN(C)c1ccccc1")

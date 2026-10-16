@@ -1172,6 +1172,7 @@ def _multiplied_core(mult: Optional[str], core: str) -> str:
 def _assemble(mol, features, chain, part,
               allow_charged: bool = False,
               allow_mancude: bool = False) -> Optional[GeneralEngineResult]:
+    from .retained_c2_chain import is_alkyl_attachment, retained_c2_name
     from .substituent_enumerator import name_substituent
 
     atom_to_locant = part['atom_to_locant']
@@ -1184,6 +1185,7 @@ def _assemble(mol, features, chain, part,
     # --- substituent prefixes (recursion reuse) ---
     groups: Dict[str, List[int]] = {}
     frag_bindings: List[TokenBinding] = []
+    alkyl_prefix = False
     for sub in part['substituents']:
         frag = set(sub.frag_atoms)
         attach_nbrs = [n.GetIdx() for n in
@@ -1197,6 +1199,7 @@ def _assemble(mol, features, chain, part,
         if is_refusal_sentinel(prefix):
             return _refuse("branch unnameable (tier-5 fallback)")
         groups.setdefault(prefix, []).append(sub.locant)
+        alkyl_prefix = alkyl_prefix or is_alkyl_attachment(mol.GetAtomWithIdx(attach_nbrs[0]))
         frag_bindings.append(TokenBinding(tuple(sorted(frag)), prefix,
                                           'prefix'))
 
@@ -1238,6 +1241,19 @@ def _assemble(mol, features, chain, part,
 
     # Prefix text abuts the stem directly ('3-ethyl-2,2-dimethylhexane').
     name = ('-'.join(prefix_parts) + body) if prefix_parts else body
+    # (the Blue Book)... a substituted two-carbon acid, nitrile, amide or aldehyde
+    # is named on its retained word ('[2-(3-hydroxypropyl)quinolin-3-yl]acetic acid'), never
+    # 'ethanoic acid'; the one parent binding then spells the retained word.
+    retained = retained_c2_name(
+        hydride=hydride, chain_length=len(chain), suffix_core=part['suffix_core'],
+        pg_locants=part['pg_locants'], prefix_parts=prefix_parts, charged=Chem.GetFormalCharge(mol) != 0,
+        parent_stereo=bool(_stereo_prefix(mol, {a: atom_to_locant[a] for a in chain})),
+        alkyl_prefix=alkyl_prefix)
+    parent_atoms = tuple(chain)
+    if retained is not None:
+        name, parent_token = retained
+        bindings = [b for b in bindings if b.role != 'suffix']
+        parent_atoms += tuple(sorted(part['suffix_atoms']))
     #: charge suffix on a chain skeletal atom (fail closed otherwise).
     if allow_charged and Chem.GetFormalCharge(mol) != 0:
         charge_result = _append_charge_suffix(
@@ -1262,7 +1278,7 @@ def _assemble(mol, features, chain, part,
     # ST.1 : RT-gated at top level (see _apply_parent_stereo).
     _stereo_locants = {a: atom_to_locant[a] for a in chain}
     name = _apply_parent_stereo(name, mol, _stereo_locants)
-    bindings.append(TokenBinding(tuple(chain), parent_token, 'parent'))
+    bindings.append(TokenBinding(parent_atoms, parent_token, 'parent'))
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
                                stereo_atom_to_locant=_stereo_locants)
 

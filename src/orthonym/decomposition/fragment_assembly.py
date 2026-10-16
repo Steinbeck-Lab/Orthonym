@@ -1309,8 +1309,13 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                     wrapped_prefix = amine_prefix
                 else:
                     wrapped_prefix = _wrap_n_substituent(enclose_if_compound(amine_prefix))
-                result = f"{n_locant}{_join_components(wrapped_prefix, amide_name)}"
-                order_parts = (amine_prefix, amide_name)
+                # (the Blue Book): a substituent the amide name already cites is
+                # one multiplied prefix with the N ('N,3,3-trimethyl...'), the prefixes in the
+                # order of; any other block stays in front as written.
+                from ..assembly.identical_prefixes import merge_n_block_into_name
+                merged = merge_n_block_into_name(f"{n_locant}{wrapped_prefix}", amide_name)
+                result = merged or f"{n_locant}{_join_components(wrapped_prefix, amide_name)}"
+                order_parts = None if merged else (amine_prefix, amide_name)
 
     if result is None:
         # Complex amine: use acyl prefix pattern

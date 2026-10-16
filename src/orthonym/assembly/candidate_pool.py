@@ -224,17 +224,21 @@ def _label_chain_parent_prefix_seniority(name: str, features: Any) -> None:
     uncertified PIN-form name (``pin_unverified``). Fail closed and label only:
     the name stays, so the tiers below the PIN keep it.
     """
-    if (not name or not getattr(features, 'chain_is_parent', False)
-            or not getattr(features, 'is_cyclic', False)):
-        return
+    if not name or (getattr(features, 'chain_is_parent', False) != getattr(features, 'is_cyclic', False)):
+        return                  # a ring parent; an acyclic chain is read for the tie of an amine's nitrogen only
     from ..perception.chains import chain_parent_prefix_seniority
+    from .spelling_offer import note_amine_chain_parent
+    note_amine_chain_parent(features)       # the best-effort tier may prefer a ring parent's cleaner name
     status = chain_parent_prefix_seniority(features)
+    # the record is read as a substring of the shipped name: an amine's stem survives its naming as the
+    # cation, 'methanamine' -> 'methanaminium'), the whole name does not
+    fragment = name[:-1] if name.endswith('amine') else name
     if status == 'senior_alternative':
         from ..metrics.provenance import record_non_pin_label
-        record_non_pin_label(name)
+        record_non_pin_label(fragment)
     elif status == 'undecided':
         from ..metrics.provenance import record_uncertified_pin_name
-        record_uncertified_pin_name(name)
+        record_uncertified_pin_name(fragment)
 
 
 # ---------------------------------------------------------------------------

@@ -83,11 +83,18 @@ def test_default_tier_is_unchanged(smiles, tier, name):
 
 # compound ligands (review B2): every one was lost at the complete tier or fell back to the
 # issue-7 forms ('1-azaethan-1-yl', 'cyclohexa-1,3,5-triene') before the ligand flag.
+# CHANGED ASSERTED VALUES (SL lane G, G3, 2026-10-16): the two-carbon acids were '2-{[bis(...amino)
+# phosphoryl]oxy}ethanoic acid'. "Retained names as preferred IUPAC names" (the Blue Book):
+# "only acetic acid, benzoic acid, and oxamic acid can be substituted", row:29725 'acetic acid (PIN)
+# ethanoic acid'; the same class at the default tier in this file, '(phosphonooxy)acetic acid' (:36333).
+# Machine-confirmed: OPSIN reads the new names back to the input, none of the 4,353 names of the book's
+# PIN list has 'ethanoic acid' as its parent and 65 name 'acetic acid', 'acetonitrile' or 'acetamide'
+# as one; the old value fails that property; reverting retained_c2_name restores the old value.
 COMPOUND = [
-    ("CNP(=O)(NC)OCC(=O)O", "2-{[bis(methylamino)phosphoryl]oxy}ethanoic acid"),
+    ("CNP(=O)(NC)OCC(=O)O", "{[bis(methylamino)phosphoryl]oxy}acetic acid"),
     ("OC(=O)CCOP(=O)(SCC)SCC", "3-{[bis(ethylsulfanyl)phosphoryl]oxy}propanoic acid"),
     ("OC(=O)CCOP(=S)(SC)SC", "3-{[bis(methylsulfanyl)phosphorothioyl]oxy}propanoic acid"),
-    ("CN(C)P(=O)(N(C)C)OCC(=O)O", "2-{[bis(dimethylamino)phosphoryl]oxy}ethanoic acid"),
+    ("CN(C)P(=O)(N(C)C)OCC(=O)O", "{[bis(dimethylamino)phosphoryl]oxy}acetic acid"),
     ("OC(=O)CCOP(=O)(NCC)NCC", "3-{[bis(ethylamino)phosphoryl]oxy}propanoic acid"),
     ("OC(=O)c1ccc(cc1)P(=S)(Nc1ccccc1)Nc1ccccc1",
      "4-[bis(phenylamino)phosphorothioyl]benzene-1-carboxylic acid"),

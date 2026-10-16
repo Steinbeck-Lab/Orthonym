@@ -35,6 +35,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
 RADICAL_ONLY_NAME = "1-[(phosphoryl)oxy]heptane"      # -O-P=O named with the three-valence prefix
 CLOSED_SHELL = "CCCCCCCOP=O"
+SENIOR_GROUP_INPUT = "COC(=O)C(CC1CCCCC1)COP=O"       # -O-P=O under an ester: the prefix is cited
 
 
 def _key(smiles):
@@ -196,7 +197,12 @@ def test_a_producer_that_spells_the_old_radical_only_prefix_cannot_ship(monkeypa
     """The pre-fix producer returned '(phosphoryl)oxy' for the bare -O-P=O. The read-back of the
     closed-shell input must refuse every name built from it, at both tiers, and ship nothing that
     OPSIN reads only with ``-r``. Positive control: with the legacy reading the same patched
-    producer ships it (that is the hole)."""
+    producer ships it (that is the hole).
+
+    The input has a senior group (an ester): the prefix is then cited "HETERONES",
+    the Blue Book, "In the presence of a more senior characteristic group they are described by
+    the compound prefixes oxophosphanyl"). A bare ``CCCCCCCOP=O`` is the heterone itself since SL lane H
+    (``(heptyloxy)phosphanone``) and never reaches the prefix producer."""
     def old_producer(mol, o_idx, from_idx, _depth=0):
         return '(phosphoryl)oxy' if mol.GetAtomWithIdx(o_idx).GetDegree() == 2 else None
     best = dict(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
@@ -205,13 +211,13 @@ def test_a_producer_that_spells_the_old_radical_only_prefix_cannot_ship(monkeypa
         monkeypatch.setattr(phosphorus, "name_phosphoanhydride_oxy_substituent", old_producer)
         monkeypatch.setattr("orthonym.validation.read_back_policy.input_allows_radicals",
                             lambda: allow)
-        return [Orthonym(**kw).name_tiered(CLOSED_SHELL) for kw in ({}, best)]
+        return [Orthonym(**kw).name_tiered(SENIOR_GROUP_INPUT) for kw in ({}, best)]
 
     for res in names(False):
         n = res.get("name") or ""
         assert "(phosphoryl)oxy" not in n, res
         if res.get("tier") not in ("abstain", None):
             back = opsin_parse(n)
-            assert back is not None and _key(back) == _key(CLOSED_SHELL), res
+            assert back is not None and _key(back) == _key(SENIOR_GROUP_INPUT), res
     shipped = [r for r in names(True) if "(phosphoryl)oxy" in (r.get("name") or "")]
     assert shipped, "positive control: the legacy reading ships the radical-only name"

@@ -49,10 +49,23 @@ def test_prefixes_after_front_stereo():
 
 
 @pytest.mark.parametrize("smiles, expected", [
-    # the amide split of an N-methyl amide of a chiral acid (PB final evals, d1914)
+    # the amide split of an N-methyl amide of a chiral acid (PB final evals, d1914). CHANGED
+    # ASSERTED VALUE (SL lane G, 2026-10-16): it was '(2S)-N-methyl-2-{...}-3,3-dimethylbutanamide',
+    # which cites 'methyl' twice. (the Blue Book) "Multiplicative prefixes... are the
+    # principal method for describing a multiplicity of identical features of a structure in chemical
+    # names", the italic N first,:3195), the group in the alphabetical place of its members
+    #,:3448): 'N,3,3-trimethyl' follows '2-{...hydroxy...}'; the book's own 'N,N,2-trimethyl-
+    # 3-{...}propanamide (PIN)' (:21624) cites N and numeral locants in one group. Machine-confirmed:
+    # OPSIN reads the new name back to the full InChIKey (tests/unit/rules/test_sl_g1_identical_prefix_
+    # names.py), and the old one is rejected by the spelling check. The front block is still
+    # first, which is what this test is about. The label is NOT pin_verified (see the last test of this
+    # file): the split names the monoamide chain as the parent, the molecule holds a butanediamide chain,
+    # and (the Blue Book) "The senior parent structure has the maximum number of
+    # substituents corresponding to the principal characteristic group (suffix)" makes the diamide the
+    # parent. This test pins the spelling of the front block of that systematic name.
     ("CNC(=O)[C@@H](NC(=O)[C@H](CC(C)C)[C@H](O)C(=O)NO)C(C)(C)C",
-     "(2S)-N-methyl-2-{(2R)-2-[(1S)-1-hydroxy-2-(hydroxyamino)-2-oxoethyl]-4-methylpentanamido}"
-     "-3,3-dimethylbutanamide"),
+     "(2S)-2-{(2R)-2-[(1S)-1-hydroxy-2-(hydroxyamino)-2-oxoethyl]-4-methylpentanamido}"
+     "-N,3,3-trimethylbutanamide"),
     # the acyl on a ring nitrogen, the Z double bond of the ring name
     ("C/C=C1/C(O)=C(C(=O)CCCCCCC)C(=O)N1C(C)=O",
      "(5Z)-N-acetyl-5-ethylidene-4-hydroxy-3-octanoyl-2-oxo-2,5-dihydro-1H-pyrrole"),
@@ -92,3 +105,13 @@ def test_the_label_still_follows_the_citation_order_of_the_name_without_its_bloc
     assert fa.n_prefix_breaks_citation_order(["methyl"], rest) is True
     assert fa.n_prefix_breaks_citation_order(["methyl"], "(2S)-" + rest) is True       # the block alone does
     assert fa.n_prefix_breaks_citation_order(["chloro"], "2-methylbutanamide") is False
+
+
+def test_the_marimastat_split_names_a_parent_that_is_not_the_pin_parent():
+    """ (the Blue Book): the amide split carries one amide group in its parent chain while the
+    structure has a chain of two; the name is right (read back) and wrong as a PIN, so it never ships as
+    pin_verified at either tier (``checks_group_count``)."""
+    smiles = "CNC(=O)[C@@H](NC(=O)[C@H](CC(C)C)[C@H](O)C(=O)NO)C(C)(C)C"
+    res = Orthonym(**BEST_EFFORT).name_tiered(smiles)
+    assert res.get("tier") != "pin_verified", res
+    assert Orthonym().name_tiered(smiles).get("tier") != "pin_verified"

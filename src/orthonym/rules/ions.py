@@ -7304,6 +7304,9 @@ def name_quaternary_aminium(mol, cation_site: Dict) -> str:
         aminium = name_aminium_cation(amine_name)
         if not aminium or 'aminium' not in aminium:
             return ''
+        # the pool is not reached here: the chain-parent label, an undecided tie) is read for the cation's name
+        from ..assembly.candidate_pool import _label_chain_parent_prefix_seniority
+        _label_chain_parent_prefix_seniority(aminium, features)
         return aminium
     except (RecursionError, ValueError, RuntimeError, KeyError, AttributeError,
             UnnameableSubstituentError):

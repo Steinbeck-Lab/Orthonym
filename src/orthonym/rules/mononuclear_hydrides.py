@@ -1018,6 +1018,10 @@ def name_heterone(mol) -> Optional[str]:
             continue
         name = organyl_prefix_name(mol, nb.GetIdx(), hub.GetIdx())
         if name is None:
+            # -O-P=O, -NH-As=O,:25985): the ligand of a bonding-number-3 hub
+            from .heterone_ligands import hetero_ligand_prefix
+            name = hetero_ligand_prefix(mol, hub.GetIdx(), nb.GetIdx())
+        if name is None:
             return None
         prefixes.append(name)
     from .lambda_convention import nonstandard_bonding_number

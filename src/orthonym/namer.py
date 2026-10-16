@@ -70,6 +70,7 @@ _name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
 )
 
 from .assembly.composer import assemble_name
+from .assembly.spelling_offer import name_tiered_with_offer as _name_tiered_with_offer
 from .assembly.offer_pool import (
     ABSTAIN,
     BEST_EFFORT,
@@ -5693,7 +5694,7 @@ class Orthonym:
         try:
             if _BOOK_RETRY_OWNED.get():
                 return self._name_tiered_scoped(smiles)
-            return self._name_tiered_with_book_retry(smiles)
+            return _name_tiered_with_offer(self, smiles, self._name_tiered_with_book_retry)
         finally:
             _lone_pair_input_exit(_lp_opened)
 
@@ -9860,6 +9861,7 @@ class Orthonym:
         # Source: https://iupac.qmul.ac.uk/BlueBook/P5.html
         # Source: AUTONOM 1990 (full seniority cascade on ALL structures).
         if features.is_cyclic:
+            from .rules.n_branch import reanchor_bridging_amine
             from .rules.parent_selection import select_parent
 
             # Get ring atoms to exclude when finding chain
@@ -9887,12 +9889,12 @@ class Orthonym:
             # and ordered as prefixes); the call above stands where that comparison is
             # undecided (None) and for a group whose producer is not known to build on
             # the chain it is given (``chains.GIVEN_CHAIN_GROUPS``). A chain of another
-            # length is never taken. A chain of one carbon has no second chain of its length
-            # to be told from by its prefixes.
+            # length is never taken. A chain of one carbon is compared too when the group is an
+            # amine whose nitrogen is bonded to several carbons (``chains.p45_pending``).
             #
             # The comparison is made after ``select_parent`` has chosen the chain (below), not
             # before it. It only ever swaps in a chain of the same length that holds the same
-            # principal-group atoms, and ``p44_scorer.compare_with_reason`` ranks a chain
+            # principal group (an amine's nitrogen holds every chain it bonds to), and the scorer ranks a chain
             # against a ring on the count of principal groups it holds, its atom class and
             # then 'ring senior to chain',,, none of which tells
             # two such chains apart. So the choice between ring and chain does not depend on
@@ -9901,9 +9903,8 @@ class Orthonym:
             # for each branch of a 105-atom fragment, six branches a call): run before parent
             # selection it cost +35 s on an allyl oligosaccharide and +20 s on a decacyclic
             # macrocycle, whose parent is the ring either way.
-            from .perception.chains import GIVEN_CHAIN_GROUPS, p45_principal_chain
-            _p45_pending = bool(potential_chain and len(potential_chain) >= 2
-                                and features.principal_group in GIVEN_CHAIN_GROUPS)
+            from .perception.chains import p45_pending, p45_principal_chain
+            _p45_pending = p45_pending(features, potential_chain)
 
             # Only do parent selection if we found a meaningful chain (>= 2
             # carbons) OR (C- / V-4, a 1-carbon chain whose
@@ -9940,11 +9941,8 @@ class Orthonym:
                 # helper covers fused-hetero / PAH / benzene / simple-
                 # hetero / spiro-stub / VB-stub / else->None per.
                 _ring_info = _build_ring_info_for_parent_selection(features)
-                # a phase: stash on features so downstream pool.add
-                # call sites can read it without a signature change at
-                # every composer.py call site (transient runtime
-                # attribute; not a MolecularFeatures dataclass field
-                # per; safe because the dataclass is not frozen).
+                # a phase: stash on features so downstream pool.add call sites read it without a
+                # signature change (transient, not a MolecularFeatures field,; not frozen).
                 features._ring_info = _ring_info
 
                 # Pass pre-computed chain to select_parent
@@ -9971,6 +9969,8 @@ class Orthonym:
                         potential_chain = _senior
                         selection = _select(potential_chain)
                 features.parent_selection_result = selection  # a phase (V18 Appendix A.5)
+                features.principal_group_atoms = reanchor_bridging_amine(
+                    features.mol, features.principal_group, features.principal_group_atoms, selection.parent_atoms)
                 #: publish the top-level pool size so the offer-retry
                 # can bound its loop at the real pool length. Guarded to the true
                 # top-level molecule (visited set empty) so a substituent's own

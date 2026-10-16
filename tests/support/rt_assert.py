@@ -27,26 +27,36 @@ def _canon(smi):
     return Chem.MolToSmiles(m) if m is not None else None
 
 
-def _independent_parse(name: str):
-    """OPSIN 2.9.0's SMILES for ``name`` (``-r -osmi``), from a FRESH call that does not
+def _independent_parse(name: str, smiles=None):
+    """OPSIN 2.9.0's SMILES for ``name`` (``-osmi``), from a FRESH call that does not
     go through the engine: not its validity oracle, not its per-scope or process-wide
     name memo. The in-process JVM serves it when it can (``_opsin_stdout_uncached``, the
     un-memoised entry point, byte-identical to the CLI); otherwise a ``java -jar``
-    subprocess does. None when OPSIN rejects the name or cannot be run."""
+    subprocess does. None when OPSIN rejects the name or cannot be run.
+
+    ``smiles`` is the structure the name is read back for. OPSIN's ``-r`` (allowRadicals) is
+    passed only when that structure has radical electrons (``validation.read_back_policy``,
+    the engine's own rule): a name with a free valence ('(phosphoryl)oxy') reads back to a
+    closed-shell structure under ``-r``, and a test that checks a closed-shell input
+    with it passes for a name that describes a substituent group. With no ``smiles`` (a
+    name read for its own sake: a retained name, a gold substituent string) the legacy
+    reading, ``-r``, stands."""
     import subprocess
     from orthonym.jvm_bridge import _opsin_stdout_uncached
     from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
     from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+    from orthonym.validation.read_back_policy import smiles_has_radical_electrons
     if not name:
         return None
     jar = _find_opsin_jar("2.9.0")
     if not jar:
         return None
-    txt, served = _opsin_stdout_uncached(name, True, jar)
+    allow_radicals = smiles is None or smiles_has_radical_electrons(smiles)
+    txt, served = _opsin_stdout_uncached(name, allow_radicals, jar)
     if not served:
         try:
             proc = subprocess.run(
-                ["java", *JVM_HYGIENE_FLAGS, "-jar", jar, "-r", "-osmi"],
+                ["java", *JVM_HYGIENE_FLAGS, "-jar", jar, *(["-r"] if allow_radicals else []), "-osmi"],
                 input=name + "\n", capture_output=True, text=True, timeout=120)
         except (OSError, subprocess.SubprocessError):
             return None
@@ -62,7 +72,7 @@ def rt_exact_name(smiles: str):
     name = res.get("name")
     if not name or res.get("source") == "abstain":
         return None
-    opsin_smi = _independent_parse(name)
+    opsin_smi = _independent_parse(name, smiles)
     if opsin_smi is None:
         return None
     if _canon(opsin_smi) != _canon(smiles):
@@ -133,13 +143,13 @@ def name_is_rt_exact(name: str, smiles: str) -> bool:
     from orthonym.validation.radical_identity import radical_identity_verdict
     if not name:
         return False
-    opsin_smi = _independent_parse(name)
     key = _full_inchikey(smiles)
     if not key:
         # a drawing with dative bonds has no key: the drawing without them has (decision 1 of
         # the zinc plan, 2026-10-13); every other drawing without a key is never read back
         smiles = smiles_without_dative_bonds(smiles) or smiles
         key = _full_inchikey(smiles)
+    opsin_smi = _independent_parse(name, smiles)
     if not (opsin_smi and key and _full_inchikey(opsin_smi) == key):
         return False
     return (radical_identity_verdict(smiles, opsin_smi) != "mismatch"
@@ -154,8 +164,10 @@ def assert_full_rt(name: str, smiles: str, what: str = "") -> str:
     This is the assertion of the pre-existing-failures plan's decision D-b
     (2026-09-24): where a wider tier now names a molecule instead of declining,
     the test asserts the exact round trip, not the spelling. OPSIN runs as a
-    fresh call outside the engine (with ``-r``), so radical names parse; the
-    full-key comparison alone would NOT reject a radical reading of a
+    fresh call outside the engine, with ``-r`` only for an input that has radical
+    electrons (``_independent_parse``): a name with a free valence is no name of a
+    closed-shell input, and OPSIN reads it back to that input's structure under
+    ``-r``. The full-key comparison alone would NOT reject a radical reading of a
     closed-shell input (the key encodes neither radical electrons nor bond
     order), so ``name_is_rt_exact`` adds the radical-identity check.
     """
