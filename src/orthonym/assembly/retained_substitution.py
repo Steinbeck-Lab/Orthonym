@@ -172,7 +172,9 @@ class OpsinOracle:
             # -r (--allowRadicals): add consistently with _invoke_opsin so the
             # oracle accepts radical names; proven strictly additive over 11,668
             # names (66 gains / 0 changes / 0 regressions; internal notes §-RADICAL).
-            _text, _ran = self._one_shot(post_swap_subtree_str)
+            from ..validation.read_back_policy import legacy_reading
+            with legacy_reading():    # a substituent subtree carries free valences by design
+                _text, _ran = self._one_shot(post_swap_subtree_str)
             if not _ran:
                 # Transient (TRIAGE g7 C01): the check could not be made, so the
                 # swap is refused (fail closed) -- but NOT cached, so a timeout on a
@@ -193,7 +195,8 @@ class OpsinOracle:
         return ok
 
     def _one_shot(self, text: str) -> Tuple[Optional[str], bool]:
-        """Run ``java -jar <opsin> -r -osmi`` on ``text``, walking _ONE_SHOT_LADDER.
+        """Run ``java -jar <opsin> [-r] -osmi`` on ``text``, walking _ONE_SHOT_LADDER; ``-r`` is
+        given under the read-back policy (``validation/read_back_policy.py``).
 
         Returns ``(stdout, True)`` when OPSIN ran and exited 0 (a parse, or a clean
         rejection: empty stdout), ``(None, False)`` when no rung produced an answer.
@@ -206,6 +209,8 @@ class OpsinOracle:
         ``_ONE_SHOT_COOLDOWN_S`` (a dead OPSIN costs one attempt per name, as before
         the ladder existed).
         """
+        from ..validation.read_back_policy import input_allows_radicals
+        allow_radicals = input_allows_radicals()
         rungs = _ONE_SHOT_LADDER
         if time.monotonic() < self._one_shot_down_until:
             rungs = rungs[:1]
@@ -224,7 +229,8 @@ class OpsinOracle:
                     # byte-identical on all non-radical names. NOT a blanket gate
                     # bypass: OPSIN itself still validates the name (the
                     # heptanolate-class suppression hole stays closed).
-                    ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar, "-r", "-osmi"],
+                    ["java", *JVM_HYGIENE_FLAGS, "-jar", self._jar,
+                     *(("-r",) if allow_radicals else ()), "-osmi"],
                     input=text + "\n",
                     capture_output=True, text=True, timeout=timeout,
                 )
@@ -279,10 +285,14 @@ class OpsinOracle:
         # cannot serve the call it reports served=False and we drop to the
         # persistent server, then to the one-shot subprocess -- the tiers below
         # are untouched and remain the correctness path.
+        # ``-r`` only for a radical input (validation/read_back_policy.py): a name with a free
+        # valence must not read back to a closed-shell molecule.
+        from ..validation.read_back_policy import input_allows_radicals
+        _rad = input_allows_radicals()
         if self._jar:
             try:
                 from ..jvm_bridge import opsin_stdout
-                _text, _served = opsin_stdout(name, allow_radicals=True,
+                _text, _served = opsin_stdout(name, allow_radicals=_rad,
                                               jar_path=self._jar)
             except ImportError:  # pragma: no cover - jvm_bridge always present
                 _text, _served = None, False
@@ -292,7 +302,7 @@ class OpsinOracle:
 
         try:
             from ..validation.opsin_server import get_persistent_opsin
-            _srv = get_persistent_opsin(self._jar, ("-r", "-osmi"))
+            _srv = get_persistent_opsin(self._jar, ("-r", "-osmi") if _rad else ("-osmi",))
         except Exception:  # pragma: no cover - import guard
             _srv = None
         if _srv is not None:
@@ -325,12 +335,14 @@ class OpsinOracle:
         """
         if self._jar is None or not name:
             return None
-        if name in self._name_cache:
-            return self._name_cache[name]
+        from ..validation.read_back_policy import cache_key
+        key = cache_key(name)
+        if key in self._name_cache:
+            return self._name_cache[key]
         raw, ran = self._invoke_opsin(name)
         if not ran:
             return None  # transient — do NOT cache
-        self._raw_cache[name] = raw
+        self._raw_cache[key] = raw
         try:
             # OPSIN can emit a SMILES that RDKit cannot parse (e.g. an impossible
             # valence from a lambda-convention candidate such as
@@ -347,7 +359,7 @@ class OpsinOracle:
         except Exception as exc:  # noqa: BLE001 - any RDKit failure on OPSIN output => no structure
             logger.debug("OpsinOracle.name_to_smiles canonicalisation failed for %r: %s", name, exc)
             canon = None
-        self._name_cache[name] = canon
+        self._name_cache[key] = canon
         return canon
 
     def name_to_opsin_smiles(self, name: str) -> Optional[str]:
@@ -362,12 +374,14 @@ class OpsinOracle:
         transient failure is not cached)."""
         if self._jar is None or not name:
             return None
-        if name in self._raw_cache:
-            return self._raw_cache[name]
+        from ..validation.read_back_policy import cache_key
+        key = cache_key(name)
+        if key in self._raw_cache:
+            return self._raw_cache[key]
         raw, ran = self._invoke_opsin(name)
         if not ran:
             return None
-        self._raw_cache[name] = raw
+        self._raw_cache[key] = raw
         return raw
 
     def parse_status(self, name: str) -> str:
@@ -394,15 +408,17 @@ class OpsinOracle:
             return "rejected"
         if self._jar is None:
             return "unavailable"
-        cached = self._parse_status_cache.get(name)
+        from ..validation.read_back_policy import cache_key
+        key = cache_key(name)
+        cached = self._parse_status_cache.get(key)
         if cached is not None:
             return cached
         raw, ran = self._invoke_opsin(name)
         if not ran:
             return "unavailable"  # transient — NOT cached
-        self._raw_cache[name] = raw
+        self._raw_cache[key] = raw
         status = "parsed" if raw else "rejected"
-        self._parse_status_cache[name] = status
+        self._parse_status_cache[key] = status
         return status
 
 

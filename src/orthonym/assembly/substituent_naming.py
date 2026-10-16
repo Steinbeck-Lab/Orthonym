@@ -9134,7 +9134,7 @@ def _name_substituent_fragment_uncached(
                 return get_alkyl_name(carbon_count)
             except (ValueError, KeyError):
                 pass
-        logger.warning(
+        logger.debug(
             "substituent_smiles_extraction_failure substituent_skip: reason=smiles_extraction_failure atom_count=%d",
             len(sub_atoms),
         )
@@ -9155,7 +9155,7 @@ def _name_substituent_fragment_uncached(
                 return get_alkyl_name(carbon_count)
             except (ValueError, KeyError):
                 pass
-        logger.warning(
+        logger.debug(
             "substituent_recursion_depth_exceeded substituent_skip: reason=recursion_depth_fallback frag_smiles=%s",
             frag_smiles[:60],
         )

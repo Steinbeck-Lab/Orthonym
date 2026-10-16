@@ -1034,6 +1034,19 @@ def _is_poly_acid_name(acid_name: str) -> bool:
 _FRONT_STEREO_RE = _re.compile(
     r"^(?:rel-|rac-)?\((?:(?:[0-9]+[a-z]*'*|N'*)?(?:[RSEZrsMP]\*?|RS|SR))"
     r"(?:,(?:(?:[0-9]+[a-z]*'*|N'*)?(?:[RSEZrsMP]\*?|RS|SR)))*\)-")
+
+
+def split_front_stereo(name: str) -> Tuple[str, str]:
+    """('(2S)-', '2-...') for a name that opens with a stereodescriptor block, else ('', name).
+
+     "NAMING OF STEREOISOMERS" (the Blue Book): the descriptors of the parent "are placed
+    at the front of the complete name when related to the parent structure" -- so an N-block that
+    is put in front of the name of its parent follows the block, never stands between the block
+    and the parent: '(2S)-N-methyl-2-...butanamide', not 'N-methyl(2S)-2-...butanamide'."""
+    m = _FRONT_STEREO_RE.match(name or "")
+    return (name[:m.end()], name[m.end():]) if m else ("", name)
+
+
 #: one locant set at the front of a name: '3', '4a,7', "2'", 'N', "N,N'"
 _LOCANT_SET_RE = _re.compile(r"^(?:[0-9]+[a-z]?'*|N'*)(?:,(?:[0-9]+[a-z]?'*|N'*))*$")
 #: a first token that is not an alphanumerically ordered prefix, so none precedes it:
@@ -1244,6 +1257,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
     acyl_float = False
     # (N-prefix, the name it is put in front of), for the citation-order label below
     order_parts = None
+    front = ""      # the descriptor block of the parent, cited at the front of the complete name
 
     # Get amine prefix (simple substituent name)
     amine_prefix = _amine_to_prefix(amine_name)
@@ -1258,6 +1272,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
             amide_name = amide_with_c_locant(amide_name, (fragment_smiles or {}).get("acid"))
             if amide_name is None:
                 return None
+            front, amide_name = split_front_stereo(amide_name)
             if amine_prefix.startswith("N-") or amine_prefix.startswith("N,"):
                 # The amine is a secondary amine ('N-methylcyclohexanamine'): both groups
                 # stay on the amide N and each is cited with the locant N,
@@ -1312,7 +1327,8 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
         acyl_prefix = _acid_to_acyl(acid_name)
         if acyl_prefix and amine_name:
             acyl_float = True
-            if amine_name.startswith("N-") or amine_name.startswith("N,"):
+            front, amine_rest = split_front_stereo(amine_name)
+            if amine_rest.startswith("N-") or amine_rest.startswith("N,"):
                 # Amine already has N-prefix(es) from recursive naming.
                 # Insert the acyl as an additional N-substituent:
                 # amine = "N-methylcyclohexanamine"
@@ -1320,8 +1336,8 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # -> "N-acetyl-N-methylcyclohexanamine"
                 # This keeps each N-substituent as a separate "N-X" segment
                 # so _group_n_substituents can properly merge identical ones.
-                result = f"N-{_wrap_n_substituent(enclose_if_compound(acyl_prefix))}-{amine_name}"
-                order_parts = (acyl_prefix, amine_name)
+                result = f"N-{_wrap_n_substituent(enclose_if_compound(acyl_prefix))}-{amine_rest}"
+                order_parts = (acyl_prefix, amine_rest)
             else:
                 #: a parent-hydride-derived acyl prefix (furan-2-carbonyl,
                 # cyclohexanecarbonyl) must be parenthesised so two parent hydrides
@@ -1331,8 +1347,8 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
                 # via enclose_if_compound (idempotent for a simple acyl like acetyl),
                 # mirroring the already-fixed amine_prefix sibling branch above.
                 wrapped = _wrap_n_substituent(enclose_if_compound(acyl_prefix))
-                result = f"N-{_join_components(wrapped, amine_name)}"
-                order_parts = (acyl_prefix, amine_name)
+                result = f"N-{_join_components(wrapped, amine_rest)}"
+                order_parts = (acyl_prefix, amine_rest)
 
     if result is None:
         return None
@@ -1376,6 +1392,7 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
             # left whose place in the citation order there is to record
             return result
 
+    result = front + result
     if order_parts is not None:
         n_prefixes = order_parts[0] if isinstance(order_parts[0], list) else [order_parts[0]]
         _record_if_out_of_citation_order(result, n_prefixes, order_parts[1])
@@ -2127,8 +2144,9 @@ def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optiona
     amine_prefix = _amine_to_prefix(amine_name)
     if amine_prefix:
         wrapped = _wrap_n_substituent(amine_prefix)
-        result = f"N-{_join_components(wrapped, sulfonamide_parent)}"
-        _record_if_out_of_citation_order(result, [amine_prefix], sulfonamide_parent)
+        front, sulfonamide_rest = split_front_stereo(sulfonamide_parent)
+        result = f"{front}N-{_join_components(wrapped, sulfonamide_rest)}"
+        _record_if_out_of_citation_order(result, [amine_prefix], sulfonamide_rest)
         return result
 
     return sulfonamide_parent
@@ -2461,13 +2479,15 @@ def _assemble_multi_amide(
 
     # Join N-prefix parts with hyphens and append core name
     prefix_str = "-".join(n_parts)
-    result = _join_components(prefix_str, core_name)
+    front, core_rest = split_front_stereo(core_name)
+    result = _join_components(prefix_str, core_rest)
 
     # Apply N-substituent grouping
     if result.count("N-") >= 2:
         result = _group_n_substituents(result)
 
-    _record_if_out_of_citation_order(result, list(acyl_counts), core_name)
+    result = front + result
+    _record_if_out_of_citation_order(result, list(acyl_counts), core_rest)
     return result
 
 

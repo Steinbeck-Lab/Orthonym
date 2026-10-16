@@ -63,6 +63,7 @@ __all__ = [
     "l6_ring_parent_one_substitutable_atom",
     "mononuclear_parent_locant_required",
     "suffix_nitrogen_hydrogens_are_caps",
+    "suffix_nitrogen_gains_hydron",
     "scope_forces_locants",
     "forced_locant_scope",
     "locants_are_forced",
@@ -105,6 +106,13 @@ def _is_aldehyde_formyl_carbon(atom) -> bool:
     return n_carbonyl == 1
 
 
+def _hydron_on(atom) -> int:
+    """1 for the nitrogen the caller protonates inside a:func:`suffix_nitrogen_gains_hydron` scope
+    (the only acyclic nitrogen of the molecule, see ``rules.charged_router._hydron_scope``), else 0."""
+    from .memo import suffix_nitrogen_hydron_var
+    return int(bool(suffix_nitrogen_hydron_var.get()) and atom.GetSymbol() == "N" and not atom.IsInRing())
+
+
 def substitutable_h_count(mol, idx: int) -> int:
     """How many hydrogens on atom ``idx`` are *substitutable* per ``:3007``.
 
@@ -120,7 +128,7 @@ def substitutable_h_count(mol, idx: int) -> int:
         atom = mol.GetAtomWithIdx(int(idx))
     except (OverflowError, RuntimeError, ValueError, TypeError):
         return 0
-    n_h = atom.GetTotalNumHs()
+    n_h = atom.GetTotalNumHs() + _hydron_on(atom)
     if n_h <= 0:
         return 0
     if atom.GetSymbol() in CHALCOGENS:
@@ -625,7 +633,7 @@ def l6_chain_parent_one_substitutable_atom(
                     for b in atom.GetBonds()):
                 continue
             outside = sum(1 for n in atom.GetNeighbors() if n.GetIdx() not in known)
-            if atom.GetTotalNumHs() + outside > 0:
+            if atom.GetTotalNumHs() + _hydron_on(atom) + outside > 0:
                 holders += 1
         return holders == 1
     except Exception:  # noqa: BLE001 -- deny by default
@@ -653,6 +661,21 @@ def suffix_nitrogen_hydrogens_are_caps(movable=(True,)):
         yield
     finally:
         _SUFFIX_NITROGEN_CAPS.reset(token)
+
+
+@contextlib.contextmanager
+def suffix_nitrogen_gains_hydron():
+    """Declare that the molecule named in this scope is the neutral amine of a cation the caller
+    makes by a hydron on the suffix nitrogen: the licence below reads that nitrogen as holding one
+    hydrogen more. (the Blue Book): the hydrogen is a position a group of the carbon
+    could move to, so '1-methoxy-N,N-dimethylmethanaminium' cites the locant where the neutral
+    'methoxy-N,N-dimethylmethanamine' (:36580 'cyano-N,N-dimethylmethanamine N-oxide (PIN)') omits it."""
+    from .memo import suffix_nitrogen_hydron_var
+    token = suffix_nitrogen_hydron_var.set(True)
+    try:
+        yield
+    finally:
+        suffix_nitrogen_hydron_var.reset(token)
 
 
 def _movable_to_parent_carbon(mol, n_idx: int, sub_idx: int) -> bool:
@@ -773,6 +796,7 @@ def mononuclear_parent_locant_required(features) -> bool:
             if caps:
                 n_h -= len(caps)
                 movable.extend(caps)
+            n_h += _hydron_on(n_atom)
             if n_h > 0:
                 return True                  # a C-prefix could move to the N
             if c_h > 0 and any(movable):

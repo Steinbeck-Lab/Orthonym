@@ -983,10 +983,9 @@ def _build_lexicon() -> Dict[str, _Morph]:
     a morpheme wins the CATEGORY over an incidental catalog entry with the
     same count. Disagreements on the COUNT drop the morpheme either way.
     """
-    from rdkit import RDLogger
+    from ..rdkit_log import rdkit_logs_off
 
-    RDLogger.DisableLog("rdApp.*")
-    try:
+    with rdkit_logs_off("rdApp.*"):
         general = _Lexicon()
 
         for key, (atoms, _role, _why) in _STRUCTURAL_AFFIXES.items():
@@ -999,8 +998,6 @@ def _build_lexicon() -> Dict[str, _Morph]:
         _add_ring_derived(general)
         _add_elided_stems(general)
         return dict(general.table)
-    finally:
-        RDLogger.EnableLog("rdApp.*")
 
 
 @lru_cache(maxsize=1)

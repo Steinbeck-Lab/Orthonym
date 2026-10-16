@@ -427,10 +427,11 @@ _TRIPWIRE_ALLOWLIST = {
         "benzonitrile tried (single- or multi-substituted; another handler names "
         "them), so reverting the guard changes no output either. Kept as "
         "drift-prevention, NOT as a verified fix.",
-    ("rules/ring_substituents.py", "return any(c in nm for c in '-()[]0123456789')"):
+    ("rules/ring_prefix_sequence.py", "return any(c in nm for c in '-()[]0123456789')"):
         "GUARDED — italicized_prefix_is_bare early-returns False above it. "
         "UNWITNESSED for the same reason: decorated_ring_substituent_name is not "
-        "reached for any tert-butyl-substituted ring tried.",
+        "reached for any tert-butyl-substituted ring tried. (The line moved from "
+        "rules/ring_substituents.py with the prefix-sequence block, SF lane A item 5.)",
     ("assembly/handlers/hydroxylamine.py",
      'if any(ch.isdigit() for ch in alkyl) or "-" in alkyl or "(" in alkyl:'):
         "GUARDED — the italicized class is resolved (contraction) or refused above.",

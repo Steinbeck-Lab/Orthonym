@@ -5009,7 +5009,7 @@ def classify_and_name_fragment(mol, frag_info, parent_atoms, features=None):
     else:
         # Unknown -- log warning, never silently drop
         _frag_smiles = _get_frag_smiles(mol, frag_atoms)
-        logger.warning(
+        logger.debug(
             "Unrecognized substituent fragment at locant %s: %s",
             frag_info.locant, _frag_smiles
         )
@@ -5175,7 +5175,7 @@ def _name_fg_only(mol, frag_mol, frag_atoms):
         if sym == 'S' and atom.GetTotalNumHs() >= 1:
             return 'sulfanyl'
 
-    logger.warning(
+    logger.debug(
         "Could not name fg_only fragment with atoms: %s",
         [ai['symbol'] for ai in atoms_info]
     )
@@ -5471,7 +5471,7 @@ def _name_compound_substituent(mol, frag_info, parent_atoms):
 
     # If naming infrastructure couldn't handle it, log warning
     frag_smiles = _get_frag_smiles(mol, frag_atoms)
-    logger.warning(
+    logger.debug(
         "Could not name compound substituent at locant %s: %s",
         frag_info.locant, frag_smiles
     )

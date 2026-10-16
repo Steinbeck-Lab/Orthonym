@@ -240,7 +240,7 @@ def _final_stereo_check(
     # 1147 of the gate's warnings across 122 distinct names were this.
     if _stereo_is_implied_by_name(name):
         return name
-    logger.warning(
+    logger.debug(
         "Stereo backstop: '%s' (handler: %s) has %d R/S + %d E/Z but name lacks "
         "descriptors. Fix handler to include stereo natively.",
         name, handler, n_atom_stereo, n_bond_stereo
@@ -617,7 +617,7 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
     if repaired is not None and repaired != name:
         # The grammar layer already incremented the matching
         # `repair_succeeded_<class>` bucket internally per.
-        logger.warning(
+        logger.debug(
             "OPSIN grammar repair: handler=%s class=%s original=%r repaired=%r",
             handler, repair_class, name[:50], repaired[:50],
         )
@@ -626,7 +626,7 @@ def _final_grammar_check(name: str, smiles: Optional[str], handler: str,
     # validate rejected and no class produced a round-trip-passing
     # candidate. Log unrepairable WARNING and fall back to ORIGINAL
     # name per + (never silently mutate).
-    logger.warning(
+    logger.debug(
         "OPSIN grammar validation failed: handler=%s name=%r",
         handler, name[:50],
     )
@@ -1886,8 +1886,8 @@ def _stereo_descriptor_repair(name: str, smiles: str, reduced: str,
             _pv.record_non_pin_fragment(reduced)
             _record_gate_outcome(_pv.GATE_OUTCOME_FULL_KEY_VERIFIED, reduced)
             return reduced
-    logger.warning("OPSIN validity gate: a stereodescriptor does not match the "
-                   "input's CIP labels, suppressed: %r", name[:80])
+    logger.debug("OPSIN validity gate: a stereodescriptor does not match the "
+                 "input's CIP labels, suppressed: %r", name[:80])
     from .metrics.abstention import AbstentionCode, record_suppression
     record_suppression(AbstentionCode.GATE_SUPPRESSED,
                        detail='stereo_descriptor_unverified', candidate=name)
@@ -2380,8 +2380,8 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
         if stats is not None:
             stats["self_consistency_inconclusive_suppressed"] = (
                 stats.get("self_consistency_inconclusive_suppressed", 0) + 1)
-        logger.warning("self_consistency inconclusive and no full-key round trip, "
-                       "suppressed: %r (opsin=%s)", name[:80], opsin_smiles)
+        logger.debug("self_consistency inconclusive and no full-key round trip, "
+                     "suppressed: %r (opsin=%s)", name[:80], opsin_smiles)
         from .metrics.abstention import AbstentionCode, record_suppression
         record_suppression(AbstentionCode.GATE_SUPPRESSED,
                            detail='self01_inconclusive', candidate=name)
@@ -2398,7 +2398,7 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
         return name  # "ok" ships; "inconclusive" fails OPEN
     if stats is not None:
         stats["self_consistency_mismatch"] = stats.get("self_consistency_mismatch", 0) + 1
-    if _SC_MODE == "warn":
+    if _SC_MODE == "warn":  # a WARNING: warn mode ships a name for a different molecule
         logger.warning(
             "SELF-01 would-suppress (warn-only): %r names a constitutionally DIFFERENT "
             "molecule (input=%s opsin=%s)", name[:80], smiles, opsin_smiles)
@@ -2407,8 +2407,8 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     # mode "on": suppress to the honest descriptive fallback.
     if stats is not None:
         stats["self_consistency_suppressed"] = stats.get("self_consistency_suppressed", 0) + 1
-    logger.warning("self_consistency rejected (different molecule): %r (opsin=%s)",
-                   name[:80], opsin_smiles)
+    logger.debug("self_consistency rejected (different molecule): %r (opsin=%s)",
+                 name[:80], opsin_smiles)
     from .metrics.abstention import AbstentionCode, record_suppression
     record_suppression(AbstentionCode.GATE_SUPPRESSED, detail='self01_mismatch',
                        candidate=name)
@@ -2903,7 +2903,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # Definitively unparseable (constitutional defect) -> suppress to the honest fallback.
     if stats is not None:
         stats["opsin_suppressed"] = stats.get("opsin_suppressed", 0) + 1
-    logger.warning("OPSIN validity gate suppressed unparseable name: %r", name[:60])
+    logger.debug("OPSIN validity gate suppressed unparseable name: %r", name[:60])
     from .metrics.abstention import AbstentionCode, record_suppression
     record_suppression(AbstentionCode.GATE_SUPPRESSED, detail='opsin_unparseable',
                        candidate=name)
@@ -4154,7 +4154,7 @@ def _budget_scope(fn):
             exit_name_scope,
         )
         from .metrics.provenance import best_effort_request_ctx
-        depth = enter_name_scope()
+        depth = enter_name_scope(args[0] if args else kwargs.get('smiles'))
         _lp_opened = False
         _policy = False
         _request_token = None
@@ -4234,7 +4234,7 @@ def _budget_scope(fn):
                 if _policy:
                     _result = self._default_tier_decision(_result, smiles, False)
                 return _result
-            logger.warning(
+            logger.debug(
                 "PERF BUDGET exhausted: abstaining on smiles=%s (macrocycle-hang guard)",
                 (smiles or '')[:60])
             try:
@@ -5700,20 +5700,20 @@ class Orthonym:
     def _name_tiered_scoped(self, smiles: str) -> dict:
         """``_name_tiered_impl`` inside its own memo scope.
 
-        B2: ONE memo scope around BOTH the primary name and the strict PIN twin
-        (_strict_pin_twin_name -> tw.name), so the twin reuses this run's
-        breadth-INDEPENDENT memo entries instead of recomputing them. The two
-        breadth-SENSITIVE namespaces (fused_core, name_substituent) carry the four
-        breadth flags in their keys (a lever), so the twin's flags-OFF lookups miss
-        the primary's flags-ON entries and recompute at the correct configuration.
-        push_scope returns None inside name's own push (a nested no-op), so both
-        engines share THIS scope; only this frame tears it down. Roadmap N5: the
-        mechanical-spelling retry of ``_name_tiered_with_book_retry`` runs in a scope
-        of its own, so no memo entry of the book-spelling run reaches it."""
+        B2: ONE memo scope around BOTH the primary name and the strict PIN twin (_strict_pin_twin_name ->
+        tw.name), so the twin reuses this run's breadth-INDEPENDENT memo entries instead of recomputing
+        them. The two breadth-SENSITIVE namespaces (fused_core, name_substituent) carry the four breadth
+        flags in their keys (a lever), so the twin's flags-OFF lookups miss the primary's flags-ON entries
+        and recompute at the correct configuration. push_scope returns None inside name's own push (a
+        nested no-op), so both engines share THIS scope; only this frame tears it down. Roadmap N5: the
+        mechanical-spelling retry of ``_name_tiered_with_book_retry`` runs in a scope of its own, so no memo
+        entry of the book-spelling run reaches it."""
         from .assembly.memo import pop_scope as _memo_pop, push_scope as _memo_push
+        from .validation.read_back_policy import reading_base_for
         _tier_scope = _memo_push()
         try:
-            return self._name_tiered_impl(smiles)
+            with reading_base_for(smiles):    # the labels set after name returns read for this input
+                return self._name_tiered_impl(smiles)
         finally:
             _memo_pop(_tier_scope)
 

@@ -103,7 +103,7 @@ def load_split_rules(json_path: Path, *, validate: bool = False) -> Dict[str, Sp
 
     pinned = data.get("rdkit_version_pin")
     if pinned and pinned != rdkit.__version__:
-        logger.warning(
+        logger.debug(
             "Phase 169 split table was OPSIN-RT-verified against rdkit %s but "
             "this process runs rdkit %s; re-run scripts/lint_group_split_rules.py "
             "--rt to re-confirm round-trips.",

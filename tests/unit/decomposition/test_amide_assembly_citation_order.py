@@ -1,9 +1,10 @@
 """The amide and sulfonamide assemblers of the decomposition engine write 'N-<prefix>' in
 front of the other fragment's name; such a name keeps the Blue Book's citation order only
-when that name has no stereodescriptor block at its front and no alphanumerically ordered
-prefix that sorts before the N-prefix (``fragment_assembly.n_prefix_breaks_citation_order``).
-Otherwise the name still ships at the wider tiers but is labelled below the PIN, and the
-default tier declines it.
+when no alphanumerically ordered prefix of that name sorts before the N-prefix
+(``fragment_assembly.n_prefix_breaks_citation_order``; the stereodescriptor block at the front of
+the fragment name is cited first of the complete name, ``split_front_stereo``, and the order is read
+on the name without it). Otherwise the name still ships at the wider tiers but is labelled below the
+PIN, and the default tier declines it.
 
  (the Blue Book) "Stereodescriptors placed at the front of the complete name
 or name fragment to which they apply"; (:3448) "Simple prefixes... are arranged
@@ -105,11 +106,19 @@ def test_the_citation_order_of_an_n_prefix_put_in_front_of_a_name(n_prefixes, na
 
 #: (SMILES, the assembled name the wider tiers keep, labelled below the PIN)
 BELOW_PIN = [
+    # SF lane A item 7 (changed values: these two read 'N-(prop-2-en-1-yl)(4R,...)-9-...' and
+    # 'N-(propan-2-yl)(4R,...)-3-...'): the descriptor block of the parent goes in front of the complete
+    # name, "NAMING OF STEREOISOMERS" (the Blue Book) "They are placed at the front of the
+    # complete name when related to the parent structure" ('(1S,3R)-3-amino-N-(3-amino-3-iminopropyl)
+    # cyclopentane-1-carboxamide (PIN)',:48077). The N-prefix still stands before 'benzyloxy' and
+    # 'cyclopropylmethyl', out of the alphanumerical order, so the label stays below the PIN. OPSIN
+    # 2.9.0 reads both back to the input (``name_is_rt_exact`` below); the old values pass on the tree
+    # before the change and these fail on it.
     ("C=CCNC(=O)[C@H]1C[C@]2([C@H]3CC4=C5[C@@]2(CCN3CC6CC6)[C@H]([C@H]1O)OC5=C(C=C4)OCC7=CC=CC=C7)O",
-     "N-(prop-2-en-1-yl)(4R,4aS,6S,7S,7aR,12bS)-9-(benzyloxy)-3-(cyclopropylmethyl)-4a,7-"
+     "(4R,4aS,6S,7S,7aR,12bS)-N-(prop-2-en-1-yl)-9-(benzyloxy)-3-(cyclopropylmethyl)-4a,7-"
      f"dihydroxy-2,3,4,4a,5,6,7,7a-octahydro-1H-{_P}-6-carboxamide"),
     ("CC(C)NC(=O)C1=C([C@H]2[C@@]34CCN([C@@H]([C@@]3(C1)O)CC5=C4C(=C(C=C5)O)O2)CC6CC6)C#CC7=CC=CC=C7",
-     "N-(propan-2-yl)(4R,4aS,7aS,12bS)-3-(cyclopropylmethyl)-4a,9-dihydroxy-7-(2-phenylethynyl)-"
+     "(4R,4aS,7aS,12bS)-N-(propan-2-yl)-3-(cyclopropylmethyl)-4a,9-dihydroxy-7-(2-phenylethynyl)-"
      f"2,3,4,4a,5,7a-hexahydro-1H-{_P}-6-carboxamide"),
     ("COC1=C2C3=C(CC4C56C3(CCN4CC7CC7)C(O2)C(CC5)(C(O6)C(=O)NC8=CC=CC=C8)O)C=C1",
      "N-phenyl-3-(cyclopropylmethyl)-7-hydroxy-9-methoxy-1,2,3,4,5,6,7,7a-octahydro-4a,7-"

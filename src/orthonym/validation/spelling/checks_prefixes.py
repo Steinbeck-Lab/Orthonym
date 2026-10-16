@@ -45,8 +45,10 @@ from .lexer import normalise
 _ANILINE_N = Chem.MolFromSmarts("[NX3;!R;+0]-[c;R1]1:[c;R1]:[c;R1]:[c;R1]:[c;R1]:[c;R1]:1")
 
 #: 'phenylamino', '(X-phenyl)amino', '[X-phenyl]amino' and the '(phenyl)amino' of 'methyl(phenyl)amino':
-#: the amino group cited on a phenyl group. 'phenylaminyl', 'phenylaminium' and the like are other words.
-_PHENYLAMINO = re.compile(r"phenyl[)\]}]amino|phenylamino")
+#: the amino group cited on a phenyl group, and the phenyl group cited first of two ('(4-chlorophenyl)(methyl)
+#: amino'). 'phenylaminyl', 'phenylaminium' and the like are other words.
+_PHENYLAMINO = re.compile(r"phenyl[)\]}]amino|phenylamino"
+                          r"|phenyl[)\]}][(\[{](?:[^()\[\]{}]|[(\[{][^()\[\]{}]*[)\]}])*[)\]}]amino")
 
 
 @register("P-62.2.1.1.1")

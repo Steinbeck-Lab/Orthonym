@@ -967,7 +967,9 @@ def _full_inchikey_rt_ok(mol, name: str) -> bool:
     neutralised net charge) -- mirrors ``added_carbon_parent._whole_name_stereo_ok``.
     """
     from ..namer import _validity_gate_name_to_smiles
-    smi = _validity_gate_name_to_smiles(name)
+    from ..validation.read_back_policy import reading_for
+    with reading_for(mol):      # a radical fragment of a closed-shell input keeps its '-yl' names
+        smi = _validity_gate_name_to_smiles(name)
     if not smi:
         return False
     parsed = Chem.MolFromSmiles(smi)
@@ -2100,6 +2102,31 @@ def _neutralize_fragment(mol, *, add_h_for_cation: bool = False):
     return smi or ''
 
 
+def _is_protonated_amine_cation(mol) -> bool:
+    """True for a cation whose one charge is the +1 of an acyclic nitrogen that holds a hydrogen and
+    is the only acyclic nitrogen of the molecule: the hydron the neutral amine lacks is on its suffix
+    nitrogen, the Blue Book)."""
+    if mol is None:
+        return False
+    charged = [a for a in mol.GetAtoms() if a.GetFormalCharge() != 0]
+    if len(charged) != 1 or charged[0].GetFormalCharge() != 1:
+        return False
+    n = charged[0]
+    chain_nitrogens = [a for a in mol.GetAtoms() if a.GetSymbol() == 'N' and not a.IsInRing()]
+    return (n.GetSymbol() == 'N' and not n.IsInRing() and n.GetTotalNumHs() > 0
+            and len(chain_nitrogens) == 1)
+
+
+def _hydron_scope(cation):
+    """The scope that names the neutral amine of a protonated amine cation as if its suffix nitrogen
+    held the hydron (``locant_omission.suffix_nitrogen_gains_hydron``); no scope for any other cation."""
+    if _is_protonated_amine_cation(cation):
+        from ..assembly.locant_omission import suffix_nitrogen_gains_hydron
+        return suffix_nitrogen_gains_hydron()
+    import contextlib
+    return contextlib.nullcontext()
+
+
 def _reenter(neutral_smi: str, style: str) -> str:
     """Re-enter the FULL pipeline on the neutral skeleton (the chokepoint core).
 
@@ -2114,6 +2141,13 @@ def _reenter(neutral_smi: str, style: str) -> str:
     from ..namer import Orthonym
     return Orthonym(style=style, _disable_opsin_validity_gate=True,
                      **_best_effort_reenter_kwargs()).name(neutral_smi)
+
+
+def _reenter_for_cation(neutral_smi: str, style: str, cation) -> str:
+    """``_reenter`` for the neutral amine of ``cation``: a protonated amine is named as if its
+    suffix nitrogen held the hydron (``_hydron_scope``)."""
+    with _hydron_scope(cation):
+        return _reenter(neutral_smi, style)
 
 
 def _best_effort_reenter_kwargs() -> dict:
@@ -2187,6 +2221,13 @@ def _reenter_amine_forced_no_retained(neutral_smi: str, style: str,
                      _principal_group_override=amine_fg,
                      _seed_excluded_dispatch_classes=excl,
                      **_best_effort_reenter_kwargs()).name(neutral_smi)
+
+
+def _reenter_amine_forced_for_cation(neutral_smi: str, style: str, amine_fg: str, cation) -> str:
+    """``_reenter_amine_forced_no_retained`` for the neutral amine of ``cation`` (see
+    ``_reenter_for_cation``)."""
+    with _hydron_scope(cation):
+        return _reenter_amine_forced_no_retained(neutral_smi, style, amine_fg)
 
 
 def _heavy_atom_multiset(smiles: str):
@@ -3443,7 +3484,7 @@ def route_charged(mol, style: str = 'pin') -> str:
 
     # --- Step 5: re-enter the FULL pipeline on the neutral skeleton.
     try:
-        neutral_name = _reenter(neutral_smi, style)
+        neutral_name = _reenter_for_cation(neutral_smi, style, mol)
     except (RecursionError, ValueError, RuntimeError):
         return ''
     if not neutral_name or _is_malformed_parent(neutral_name):
@@ -3597,8 +3638,8 @@ def route_charged(mol, style: str = 'pin') -> str:
                         3: 'tertiary_amine'}.get(n_c)
             if amine_fg is not None:
                 try:
-                    sys_neutral = _reenter_amine_forced_no_retained(
-                        neutral_smi, style, amine_fg)
+                    sys_neutral = _reenter_amine_forced_for_cation(
+                        neutral_smi, style, amine_fg, mol)
                 except (RecursionError, ValueError, RuntimeError):
                     sys_neutral = ''
                 if sys_neutral and not _is_malformed_parent(sys_neutral):

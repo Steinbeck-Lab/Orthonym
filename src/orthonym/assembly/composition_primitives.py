@@ -433,6 +433,21 @@ def _join_prefix_to_name(prefix_str: str, name: str) -> str:
     return f"{prefix_str}{name}"
 
 
+def prefixes_after_front_stereo(prefix_str: str, name: str) -> str:
+    """``prefix_str + name`` with the stereodescriptor block that opens ``name`` kept at the front.
+
+     "NAMING OF STEREOISOMERS" (the Blue Book): the descriptors of the parent "are placed
+    at the front of the complete name when related to the parent structure"; (:4826).
+    '(2S,3R)-' + '4-(3,5-difluorophenyl)-2,3-dimethyl-N-propyl' + 'butan-1-amine', not
+    '4-(3,5-difluorophenyl)-2,3-dimethyl-N-propyl(2S,3R)-butan-1-amine'. The prefixes and the name are
+    concatenated as they were; only the block moves in front of them."""
+    from ..rules.stereochemistry import _STEREO_PREFIX_RE
+    m = _STEREO_PREFIX_RE.match(name or "")
+    if not prefix_str or m is None:
+        return prefix_str + (name or "")
+    return f"{name[:m.end()]}{prefix_str}{name[m.end():]}"
+
+
 # Leading top-level (alpha-carbon) locant run on a formatted prefix, e.g. the
 # "2-" of "2-chloro" or the "2,2-" of "2,2-difluoro". Anchored at the string
 # start so INTERNAL locants of a complex substituent — the "4-" inside

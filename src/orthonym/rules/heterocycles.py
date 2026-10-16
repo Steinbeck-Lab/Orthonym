@@ -4328,16 +4328,8 @@ def _identify_suffix_fg(mol, start_idx: int, sub_atoms, ring_set) -> Optional[Di
 
 
 def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
-    """
-    Identify a non-carbon functional substituent (amino, hydroxy, nitro, etc.).
-
-    Args:
-        mol: RDKit Mol object
-        sub_atoms: List of atom indices in the substituent
-        ring_set: Set of ring atom indices
-
-    Returns:
-        Substituent prefix name or None if not recognized
+    """Prefix name of a non-carbon functional substituent (amino, hydroxy, nitro,...) given
+    its atom indices ``sub_atoms`` and the ring atom set ``ring_set``, or None if not recognized.
     """
     if not sub_atoms:
         return None
@@ -4503,7 +4495,8 @@ def _identify_hetero_substituent(mol, sub_atoms, ring_set) -> Optional[str]:
             if other_idx in ring_set and bond.GetBondType() == Chem.BondType.DOUBLE:
                 return 'imino'
 
-    return None
+    from .phosphorus import bare_oxophosphanyl_oxy_prefix
+    return bare_oxophosphanyl_oxy_prefix(mol, sub_atoms, ring_set)
 
 
 def _bfs_substituent(mol, start_idx: int, excluded: Set[int]) -> List[int]:

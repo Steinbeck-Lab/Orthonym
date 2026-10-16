@@ -597,7 +597,7 @@ def _composite_fragment_name(
         name = descriptor + name
 
     if accounted != frag:
-        logger.error("terminal_fragment: composite completeness violated "
+        logger.debug("terminal_fragment: composite completeness violated "
                      "(%d of %d); refuse", len(accounted), len(frag))
         return None
     return TerminalFragmentName(
@@ -1382,7 +1382,7 @@ def _terminal_fragment_name_impl(
     result = TerminalFragmentName(name=descriptor + name, numbering=numbering,
                                   basis="chain", atoms=frozenset(accounted))
     if result.atoms != frozenset(frag):
-        logger.error("terminal_fragment: completeness invariant violated "
+        logger.debug("terminal_fragment: completeness invariant violated "
                      "(%d named of %d); refuse",
                      len(result.atoms), len(frag))
         return None

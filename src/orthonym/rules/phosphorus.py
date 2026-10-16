@@ -1877,6 +1877,22 @@ def name_phosphoanhydride_oxy_substituent(
             return None                                  # P-C / P-N / no-O ligand
     if oxo != 1:
         return None                                      # need exactly one P=O
+    # Ligand count, "Fundamental acyl groups for substituents derived from
+    # mononuclear noncarbon oxoacids", the Blue Book;:18069 '-PO<' phosphoryl): the
+    # phosphoryl group -P(=O)< has THREE free valences, one to the linking O and two to the
+    # branches cited before 'phosphoryl'. A P with fewer branches leaves valences unfilled
+    # and the name reads only as a radical. The bare -P=O (no branch) is
+    # "Substitutive names for groups derived from mononuclear noncarbon
+    # oxoacids" (:36239; the list at:36299): '-P=O oxophosphanyl (preselected prefix)'.
+    # Preselected prefixes build PINs of organic derivatives "PRESELECTED NAMES",
+    #:2060: "noncarbon-containing characteristic groups, prefixes, and suffixes used in
+    # PINs are designated as preselected prefixes or suffixes"). One branch is a P-H
+    # (-O-PH(=O)OR), which no prefix here spells: decline.
+    if p.GetTotalNumHs() != 0 or len(branches) not in (0, 2):
+        return None
+    if not branches:
+        from ..assembly.naming_utils import apply_enclosing_marks
+        return apply_enclosing_marks('oxophosphanyl', -1) + 'oxy'
     # Terminal -O-P(=O)(OH)2 -> contracted 'phosphonooxy'.
     if sorted(branches) == ['hydroxy', 'hydroxy']:
         return 'phosphonooxy'
@@ -1923,6 +1939,28 @@ def name_phosphoanhydride_oxy_substituent(
                          if tok == 'hydroxy' else _enc(tok))
     body = ''.join(parts) + 'phosphoryl'
     return apply_enclosing_marks(body, -1) + 'oxy'
+
+
+def bare_oxophosphanyl_oxy_prefix(mol, sub_atoms, ring_set) -> Optional[str]:
+    """``'(oxophosphanyl)oxy'`` for a ring substituent that is exactly ``-O-P=O``, else None.
+
+    The ring-parent collectors (``heterocycles._identify_hetero_substituent``) flag every
+    carbon-free exocyclic O-P group as unnameable and decline the PIN parent, so the older
+    ring assembler named the molecule and spelled the ring from its retained table
+    ('acridone', '2,3-dihydro-1H-isoindole-1,3-dione') where the PIN is 'acridin-9(10H)-one'
+    / '1H-isoindole-1,3(2H)-dione'; the Blue Book). Only the bare group
+    is admitted: it has no suffix form,:36239), so it cannot change the
+    principal characteristic group, unlike an O-P ester of an oxoacid (senior to a ketone).
+    The spelling is the shared producer's (:func:`name_phosphoanhydride_oxy_substituent`).
+    """
+    if len(sub_atoms) != 3:
+        return None
+    o = mol.GetAtomWithIdx(sub_atoms[0])
+    ring_nbrs = [n.GetIdx() for n in o.GetNeighbors() if n.GetIdx() in ring_set]
+    if o.GetSymbol() != 'O' or len(ring_nbrs) != 1:
+        return None
+    name = name_phosphoanhydride_oxy_substituent(mol, o.GetIdx(), ring_nbrs[0])
+    return name if name == '(oxophosphanyl)oxy' else None
 
 
 _PHOSPHOXANE_MULT = multiplier_table(10)

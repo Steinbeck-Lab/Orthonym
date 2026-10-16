@@ -472,7 +472,7 @@ def rearm_hang_budgets() -> None:
     _fragment_guard.unproven_floor = None
 
 
-def enter_name_scope():
+def enter_name_scope(smiles=None):
     """Arm the per-top-level fragment work budget AND memo cache at the outermost
     ``name``.
 
@@ -487,6 +487,9 @@ def enter_name_scope():
     """
     d = getattr(_fragment_guard, 'name_call_depth', 0) + 1
     _fragment_guard.name_call_depth = d
+    # The input of each live name frame (innermost last), cut back to this depth first so a
+    # frame that left without its exit cannot leave a stale entry under a later call.
+    _fragment_guard.name_inputs = list(getattr(_fragment_guard, 'name_inputs', ()))[:d - 1] + [smiles]
     if d == 1:
         _fragment_guard.work_budget = _WORK_BUDGET
         # M2.5: arm both macrocycle-hang budgets for the whole molecule alongside
@@ -563,6 +566,7 @@ def exit_name_scope():
     """Close one ``name`` scope; the outermost one disarms the budget and frees
     the whole-molecule memo cache."""
     d = getattr(_fragment_guard, 'name_call_depth', 1) - 1
+    _fragment_guard.name_inputs = list(getattr(_fragment_guard, 'name_inputs', ()))[:max(d, 0)]
     if d <= 0:
         _fragment_guard.name_call_depth = 0
         _fragment_guard.work_budget = None
@@ -573,6 +577,13 @@ def exit_name_scope():
         _fragment_guard.naming_pass_cap = None
     else:
         _fragment_guard.name_call_depth = d
+
+
+def innermost_name_input():
+    """The input (SMILES string) of the innermost live ``name`` frame of this thread, or None
+    outside any ``name`` call (``enter_name_scope`` / ``exit_name_scope`` keep it)."""
+    inputs = getattr(_fragment_guard, 'name_inputs', None)
+    return inputs[-1] if inputs else None
 
 
 def spend_fragment_work() -> bool:
@@ -833,7 +844,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
     # just terminates in bounded time. The catastrophe backstop; memoization
     # (positive + negative below) does the real bounding.
     if not spend_fragment_work():
-        logger.warning(
+        logger.debug(
             "WORK BUDGET exhausted: abstaining on fragment smiles=%s (giant-molecule guard)",
             smiles[:60],
         )
@@ -860,7 +871,7 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
     # to prevent unbounded decomposition chains where every fragment
     # SMILES is different (different capping) but naming never terminates.
     if len(visited) >= _MAX_VISITED_SIZE:
-        logger.warning(
+        logger.debug(
             "DEPTH safety net: visited set size=%d >= %d, smiles=%s -- trying pipeline fallback",
             len(visited), _MAX_VISITED_SIZE, smiles[:60],
         )

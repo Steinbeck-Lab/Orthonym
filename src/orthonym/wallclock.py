@@ -274,11 +274,13 @@ _IDLE_CONTEXTVARS: Tuple[Tuple[str, str, object], ...] = (
     ("orthonym.assembly.memo", "pin_promotion_var", False),
     ("orthonym.assembly.memo", "prefixes_apart_var", False),
     ("orthonym.metrics.producer_trail", "_TRAIL", None),
+    ("orthonym.validation.read_back_policy", "_FORCED", None),
+    ("orthonym.validation.read_back_policy", "_BASE", None),
 )
 _IDLE_THREAD_LOCALS: Tuple[Tuple[str, str, Dict[str, object]], ...] = (
     ("orthonym.assembly.fragment_naming", "_fragment_guard",
      {"work_budget": None, "perf_budget": None, "analysis_budget": None,
-      "cache": None, "naming_pass_cap": None}),
+      "cache": None, "naming_pass_cap": None, "name_inputs": []}),
     ("orthonym.namer", "_LP_INPUT", {"open": False, "rewrite": None}),
     ("orthonym.namer", "_CALLER_INPUT", {"smiles": None}),
     ("orthonym.namer", "_ALT_PARENT_RESCUE", {"active": False}),

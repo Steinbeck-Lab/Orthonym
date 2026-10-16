@@ -5,9 +5,10 @@ The _final_stereo_check function is a safety net that DETECTS gaps in
 handler-specific stereo injection and logs them for targeted fixes.
 
 Design choice: the backstop does NOT inject stereo with raw atom-index locants
-because they don't correspond to IUPAC numbering. It logs a WARNING to
-identify handler gaps. Handler-specific _inject_stereo_if_missing remains
-the primary stereo injection mechanism.
+because they don't correspond to IUPAC numbering. It logs (at DEBUG: internal
+telemetry the command line must not print) to identify handler gaps.
+Handler-specific _inject_stereo_if_missing remains the primary stereo
+injection mechanism. The tests read the message, so they capture at DEBUG.
 """
 
 import logging
@@ -45,7 +46,7 @@ class TestFinalStereoCheck:
         """
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             result = _final_stereo_check(mol, "butan-2-ol", handler="test_handler")
         # Name unchanged -- backstop is detection-only
         assert result == "butan-2-ol"
@@ -65,7 +66,7 @@ class TestFinalStereoCheck:
         """Backstop detects E/Z gap and logs warning but does not modify name."""
         mol = Chem.MolFromSmiles("C/C=C/C")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             result = _final_stereo_check(mol, "but-2-ene")
         # Name unchanged
         assert result == "but-2-ene"
@@ -88,7 +89,7 @@ class TestFinalStereoCheck:
         """No warning should be logged when stereo is already in name."""
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             _final_stereo_check(mol, "(2R)-butan-2-ol")
         stereo_warnings = [r for r in caplog.records if "Stereo backstop" in r.message]
         assert len(stereo_warnings) == 0, "Should not warn when stereo already present"
@@ -97,7 +98,7 @@ class TestFinalStereoCheck:
         """No warning should be logged for achiral molecules."""
         mol = Chem.MolFromSmiles("CCC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             _final_stereo_check(mol, "propane")
         stereo_warnings = [r for r in caplog.records if "Stereo backstop" in r.message]
         assert len(stereo_warnings) == 0, "Should not warn for achiral molecule"
@@ -124,7 +125,7 @@ class TestFinalStereoCheck:
         """WARNING log should include handler attribution."""
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             result = _final_stereo_check(mol, "butan-2-ol", handler="polyfunctional_chain")
         assert result == "butan-2-ol"
         warning_msgs = [r.message for r in caplog.records if "Stereo backstop" in r.message]
@@ -135,7 +136,7 @@ class TestFinalStereoCheck:
         """Calling without handler parameter should still work."""
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             result = _final_stereo_check(mol, "butan-2-ol")
         assert result == "butan-2-ol"
         warning_msgs = [r.message for r in caplog.records if "Stereo backstop" in r.message]
@@ -170,7 +171,7 @@ class TestFinalStereoCheck:
         ]
         for mol, name, expected in panel:
             caplog.clear()
-            with caplog.at_level(logging.WARNING):
+            with caplog.at_level(logging.DEBUG):
                 _final_stereo_check(mol, name, handler="parity_test")
             warned = any(
                 "Stereo backstop" in r.message for r in caplog.records
@@ -196,7 +197,7 @@ class TestFinalStereoCheck:
         stereo natively.'"""
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             _final_stereo_check(mol, "butan-2-ol", handler="locked_handler")
         msgs = [
             r.message for r in caplog.records if "Stereo backstop" in r.message
@@ -222,7 +223,7 @@ class TestFinalStereoCheck:
             "decomposition_fragment", "unknown",
         ):
             caplog.clear()
-            with caplog.at_level(logging.WARNING):
+            with caplog.at_level(logging.DEBUG):
                 _final_stereo_check(mol, "butan-2-ol", handler=unwired)
             msgs = [
                 r.message for r in caplog.records
@@ -243,7 +244,7 @@ class TestFinalStereoCheck:
         produce."""
         mol = Chem.MolFromSmiles("C[C@@H](O)CC")
         rdCIPLabeler.AssignCIPLabels(mol)
-        with caplog.at_level(logging.WARNING):
+        with caplog.at_level(logging.DEBUG):
             result = _final_stereo_check(
                 mol, "(2R)-butan-2-ol", handler="heterocycle"
             )

@@ -24,10 +24,12 @@ def anilino_for_branches(mol, n_idx: int,
 
     ``branches`` holds one ``(atoms, name)`` pair per group on the nitrogen (the atoms of the
     group, the prefix name the caller gave it). One group: a benzene ring with its own
-    decoration ('anilino', '2,6-dichloroanilino'). Two groups: one of them an unsubstituted
-    benzene ring, the other any prefix ('N-methylanilino', 'N-phenylanilino'); cites
-    no ring decoration together with an N-substituent (the helper declines it). ``None``
-    leaves the composition to the caller, so a shape this does not decide is never changed.
+    decoration ('anilino', '2,6-dichloroanilino'). Two groups: one of them a benzene ring, the
+    other any prefix ('N-methylanilino', 'N-phenylanilino'); the ring decoration and the
+    N-substituent are cited in one alphanumerical sequence ('4-chloro-N-methylanilino',
+    "full substitution allowed"). A substituted benzene ring on the other group declines: the more
+    substituted ring is the aniline,:21604). ``None`` leaves the composition to the
+    caller, so a shape this does not decide is never changed.
     """
     from .ring_substituents import anilino_prefix_from_n_branch
     if len(branches) == 1:

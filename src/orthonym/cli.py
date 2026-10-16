@@ -17,6 +17,7 @@ from . import __version__, name_compound
 from .errors import LIMIT_CATALOG, OrthonymLimitError, is_failure_name
 from .failure_mode import DEFAULT_MODE as DEFAULT_ON_FAILURE
 from .failure_mode import MODES as ON_FAILURE_MODES
+from .rdkit_log import rdkit_logs_off, rdkit_logs_on
 
 
 def _emit_tier_flags(emit_tier: str) -> dict:
@@ -103,6 +104,23 @@ def _unnamed_line(smiles: str, code: str, label: str) -> str:
     return f"{smiles}\t{code}: {label}"
 
 
+#: The code and label of an input RDKit cannot read. It is an input error, not a limit of the
+#: engine, so it is not in ``LIMIT_CATALOG``: the Python API raises ``ValueError`` for it.
+_UNREADABLE = ("INVALID_SMILES", "RDKit cannot read this SMILES")
+
+
+def _readable(smiles: str) -> bool:
+    """Whether RDKit reads the user's SMILES. When it does not, RDKit says why on the error
+    stream (the one RDKit message the command line shows: it is about the user's input) and
+    the reason line follows."""
+    from rdkit import Chem
+    with rdkit_logs_on("rdApp.error"):
+        if Chem.MolFromSmiles(smiles) is not None:
+            return True
+    print(_unnamed_line(smiles, *_UNREADABLE), file=sys.stderr)
+    return False
+
+
 class _UnnamedReporter(logging.Filter):
     """Print, on the error stream, the line for each structure the library reports as unnamed.
 
@@ -120,14 +138,17 @@ class _UnnamedReporter(logging.Filter):
 
 
 def _reports_unnamed(fn):
-    """Run ``fn`` (``main``) with the unnamed-structure line printed for each failure."""
+    """Run ``fn`` (``main``) with the unnamed-structure line printed for each failure and
+    RDKit's own warnings and errors off: the engine's internal SMILES probes make them, and
+    only the user's own input is checked with the errors on (:func:`_readable`)."""
     @functools.wraps(fn)
     def _wrapper(*args, **kwargs):
         reporter = _UnnamedReporter()
         logger = logging.getLogger("orthonym")
         logger.addFilter(reporter)
         try:
-            return fn(*args, **kwargs)
+            with rdkit_logs_off("rdApp.warning", "rdApp.error"):
+                return fn(*args, **kwargs)
         finally:
             logger.removeFilter(reporter)
     return _wrapper
@@ -453,9 +474,9 @@ def main(args: List[str] = None) -> int:
                               getattr(parsed, 'binding_proof', 'off'),
                               parsed.on_failure)
 
-    # Single SMILES mode
-    if not parsed.smiles:
-        parser.print_help()
+    # Single SMILES mode (parsed.smiles is set: without it and without --batch the help check
+    # above returned)
+    if not _readable(parsed.smiles):
         return 1
 
     try:
@@ -675,6 +696,7 @@ def _process_batch(input_file: str, output_file: str, style: str,
             results.append("")
             continue
         named += 1
+        _readable(smiles)       # RDKit's reason and the reason line; the ERROR row follows
         try:
             if confidence:
                 result = name_compound(smiles, style=style,

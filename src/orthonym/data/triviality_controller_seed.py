@@ -101,7 +101,7 @@ def load_seed_table(json_path: Path, *, validate: bool = False) -> Dict[str, See
 
     pinned = data.get("rdkit_version_pin")
     if pinned and pinned != rdkit.__version__:
-        logger.warning(
+        logger.debug(
             "Phase 168 seed table was OPSIN-RT-validated against rdkit %s but "
             "this process runs rdkit %s; re-run scripts/lint_triviality_controller_seed.py "
             "--rt to re-confirm round-trips (R-10).",

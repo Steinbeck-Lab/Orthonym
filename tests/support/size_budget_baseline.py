@@ -134,7 +134,7 @@ FUNCTIONS = {
     "src/orthonym/rules/ring_substituents.py::_compound_ring_on_chain_substituent#1": 425,
     "src/orthonym/rules/ring_substituents.py::_decorated_heteroaryl_substituent_name#1": 323,
     "src/orthonym/rules/ring_substituents.py::_ring_atom_simple_substituents#1": 285,
-    "src/orthonym/rules/ring_substituents.py::decorated_ring_substituent_name#1": 378,
+    "src/orthonym/rules/ring_substituents.py::decorated_ring_substituent_name#1": 279,
     "src/orthonym/rules/ring_substituents.py::get_ring_substituent_name#1": 329,
     "src/orthonym/rules/salts.py::name_salt#1": 441,
     "src/orthonym/rules/skeletal_replacement.py::_try_cyclic_replacement_name#1": 248,
@@ -161,6 +161,6 @@ FILES = {
     "src/orthonym/rules/heterocycles.py": 5793,
     "src/orthonym/rules/ions.py": 7741,
     "src/orthonym/rules/multiplicative.py": 5322,
-    "src/orthonym/rules/ring_substituents.py": 5271,
+    "src/orthonym/rules/ring_substituents.py": 5182,
     "src/orthonym/rules/spiro.py": 7250,
 }

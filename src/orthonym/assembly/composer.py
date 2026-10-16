@@ -4248,7 +4248,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Bridged-fused naming failed for molecule")
+            logger.debug("Bridged-fused naming failed for molecule")
             return None
 
         elif ring_type == 'bicyclo':
@@ -4257,7 +4257,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Bicyclo naming failed for molecule")
+            logger.debug("Bicyclo naming failed for molecule")
             return None
 
         elif ring_type == 'polycyclic-bridged':
@@ -4266,7 +4266,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Polycyclic-bridged naming failed for molecule")
+            logger.debug("Polycyclic-bridged naming failed for molecule")
             return None
 
         elif ring_type == 'spiro':
@@ -4275,7 +4275,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Spiro naming failed for molecule")
+            logger.debug("Spiro naming failed for molecule")
             return None
 
         elif ring_type == 'spirobi':
@@ -4286,7 +4286,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Spirobi naming failed for molecule")
+            logger.debug("Spirobi naming failed for molecule")
             return None
 
         elif ring_type == 'spiroter':
@@ -4297,7 +4297,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Spiroter naming failed for molecule")
+            logger.debug("Spiroter naming failed for molecule")
             return None
 
         elif ring_type == 'dispiroter':
@@ -4308,7 +4308,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Dispiroter naming failed for molecule")
+            logger.debug("Dispiroter naming failed for molecule")
             return None
 
         elif ring_type == 'polyspiro-different':
@@ -4319,7 +4319,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Unbranched-polyspiro-different naming failed for molecule")
+            logger.debug("Unbranched-polyspiro-different naming failed for molecule")
             return None
 
         elif ring_type == 'polyspiro-branched-different':
@@ -4331,7 +4331,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Branched-polyspiro-different unsupported (fail-closed)")
+            logger.debug("Branched-polyspiro-different unsupported (fail-closed)")
             return None
 
         elif ring_type == 'spiro-named-components':
@@ -4343,7 +4343,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Spiro-named-components naming failed for molecule")
+            logger.debug("Spiro-named-components naming failed for molecule")
             return None
 
         elif ring_type == 'lambda-multiring-spiro':
@@ -4353,7 +4353,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Lambda-multiring-spiro unsupported (fail-closed)")
+            logger.debug("Lambda-multiring-spiro unsupported (fail-closed)")
             return None
 
         elif ring_type == 'spiro-vonbaeyer':
@@ -4366,7 +4366,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Spiro-von-Baeyer naming failed for molecule")
+            logger.debug("Spiro-von-Baeyer naming failed for molecule")
             return None
 
         elif ring_type == 'mixed-spiro-fused':
@@ -4380,7 +4380,7 @@ def _assemble_complex_ring_name(mol, features):
             if result:
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
-            logging.warning("Mixed-spiro-fused naming failed for molecule")
+            logger.debug("Mixed-spiro-fused naming failed for molecule")
             return None
 
         elif ring_type in ('ortho-fused', 'ortho-peri-fused'):
@@ -4426,7 +4426,7 @@ def _assemble_complex_ring_name(mol, features):
                 name, ring_atoms, atom_to_locant, subs_included = result
                 return ComplexRingResult(name, ring_atoms, atom_to_locant, subs_included)
 
-            logging.warning(f"Fused ring naming failed for {ring_type} system")
+            logger.debug(f"Fused ring naming failed for {ring_type} system")
             return None
 
         else:
@@ -7998,7 +7998,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     # methylphenyl)benzamide (PIN)' (:32879) -- '3-phenyl-N-phenylprop-2-en-1-
     # amine' is 'N,3-diphenylprop-2-en-1-amine'. Recognised by rendering the
     # N-substituent's name at the C-prefix's locants with the shared formatter.
-    from .composition_primitives import identical_prefixes_grouped, prefix_locant_order_key
+    from .composition_primitives import identical_prefixes_grouped, prefix_locant_order_key, prefixes_after_front_stereo
     for name in (sorted(sub_counts.keys(), key=lambda n: (alpha_sort_key(n), n))
                  if identical_prefixes_grouped() else ()):
         for j, (_key, text) in enumerate(c_prefix_items):
@@ -8039,7 +8039,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         if i:
             out += "-" if _starts_with_locant(part) else ""
         out += part
-    return out + base_name
+    return prefixes_after_front_stereo(out, base_name)
 
 
 def _assemble_polyamine_name(
@@ -10441,7 +10441,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
                     _sym = mol.GetAtomWithIdx(_idx).GetSymbol()
                     if _sym not in _ORGANIC_ELEMENTS:
                         raise unsupported_element_branch(_sym)
-                logger.warning(
+                logger.debug(
                     "universal_pipeline_unnameable_substituent substituent_skip: reason=universal_pipeline_unnameable locant=%d",
                     sub_info.locant,
                 )
@@ -12294,7 +12294,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
                 except (ValueError, KeyError):
                     pass
             if name is None:
-                logger.warning(
+                logger.debug(
                     "ring_substituent_fragment_unnameable substituent_skip: reason=unnameable_ring_fragment locant=%d",
                     sub_info.locant,
                 )

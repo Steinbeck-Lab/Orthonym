@@ -362,7 +362,7 @@ def get_polycyclic_substituents(mol, pah_name: str,
                 if position is None or not isinstance(position, int):
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.warning(
+                    logger.debug(
                         "PAH substituent at atom %d on %s mapped to position=%s (skipped)",
                         atom_idx, pah_name, position
                     )

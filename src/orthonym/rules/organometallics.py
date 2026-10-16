@@ -531,7 +531,9 @@ def _opsin_read_net_charge(full_name: str) -> Optional[int]:
     from rdkit import Chem
 
     from ..namer import _validity_gate_name_to_smiles
-    smiles = _validity_gate_name_to_smiles(full_name)
+    from ..validation.read_back_policy import legacy_reading
+    with legacy_reading():      # a veto: the charge of what OPSIN builds, a radical reading included
+        smiles = _validity_gate_name_to_smiles(full_name)
     if not smiles:
         return None
     parsed = Chem.MolFromSmiles(smiles)

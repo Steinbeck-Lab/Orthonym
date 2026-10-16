@@ -20,6 +20,19 @@ name: zenodo-release
 # Manual run (Actions -> zenodo-release -> Run workflow): publish=false makes a
 # Zenodo draft from the chosen tag or branch, prints it and deletes it again, which
 # checks the token, the upload and the metadata without making a DOI.
+#
+# A failed run can be started again. Zenodo allows one unpublished new version per
+# record, so a draft left by an earlier run (or by a call whose answer was lost) is
+# reused: its files are replaced and its metadata is written again. Every request is
+# tried up to 5 times, 5, 10, 20 and 40 seconds apart, when Zenodo answers 5xx or 429
+# (rate limiting, documented as such) or the connection fails; any other 4xx stops the
+# run at once. The publish request is not repeated blindly: before each repeat, and
+# once after the last try, the deposition is read, and a deposition that is already
+# published ends the retry. A release whose version is already the latest version of
+# the record is not archived again, so a run that is started again after a lost
+# publish answer or a killed job does no harm. A test run (publish=false) stops when
+# an unpublished draft exists, since it would delete it; a real run prints the
+# version and the file names of a draft it reuses before it replaces them.
 
 on:
   release:
@@ -62,7 +75,7 @@ jobs:
           PUBLISH: ${{ github.event_name == 'release' && 'true' || inputs.publish }}
         run: |
           python - <<'PY'
-          import datetime, os, sys, requests, yaml
+          import datetime, os, sys, time, requests, yaml
 
           api = "https://zenodo.org/api"
           token = os.environ["ZENODO_TOKEN"]
@@ -72,10 +85,90 @@ jobs:
           repo, ref = os.environ["REPO"], os.environ["REF"]
           publish = os.environ["PUBLISH"].strip().lower() == "true"
 
-          def check(r, what):
+          ATTEMPTS = 5  # tries per request
+          BACKOFF = 5   # seconds before the second try; doubles each time (5, 10, 20, 40)
+          TRANSIENT = (requests.ConnectionError, requests.Timeout, requests.exceptions.ChunkedEncodingError)
+
+          def say(text):
+              # Nothing printed may carry the token.
+              return str(text).replace(token, "***")
+
+          def call(method, url, what, recheck=None, **kw):
+              # One request, tried up to ATTEMPTS times when Zenodo answers 5xx or 429
+              # (rate limiting) or the connection fails; every other answer, 4xx
+              # included, is returned at once. recheck, if given, runs before each
+              # repeat and once after the last try, and may return a response that
+              # settles the matter (used for requests that are not safe to repeat
+              # blindly).
+              kw.setdefault("headers", auth)
+              kw.setdefault("timeout", 60)  # a silent server must not hold the job to its time limit
+              for attempt in range(1, ATTEMPTS + 1):
+                  r = None
+                  try:
+                      r = requests.request(method, url, **kw)
+                  except TRANSIENT as e:
+                      why = type(e).__name__
+                      last = say(e)
+                  else:
+                      if r.status_code < 500 and r.status_code != 429:
+                          r.retried = attempt > 1
+                          return r
+                      why = f"HTTP {r.status_code}"
+                  if attempt == ATTEMPTS:
+                      break
+                  wait = BACKOFF * 2 ** (attempt - 1)
+                  retry_after = (r.headers.get("Retry-After") or "") if r is not None else ""
+                  if retry_after.isdigit():
+                      wait = max(wait, min(int(retry_after), 120))
+                  print(f"{what}: {why}, try {attempt} of {ATTEMPTS}; trying again in {wait} s", flush=True)
+                  time.sleep(wait)
+                  if recheck is not None:
+                      settled = recheck()
+                      if settled is not None:
+                          settled.retried = True
+                          return settled
+              if recheck is not None:
+                  # The last try may have been carried out although its answer was lost.
+                  settled = recheck()
+                  if settled is not None:
+                      settled.retried = True
+                      return settled
+              if r is None:
+                  sys.exit(f"{what} failed: {why} on all {ATTEMPTS} tries: {last}")
+              r.retried = True
+              return r
+
+          def check(r, what, gone_ok=False):
+              # gone_ok: a delete that is repeated after a lost answer finds the
+              # resource gone, which is what the delete was for.
+              if gone_ok and r.retried and r.status_code in (404, 410):
+                  return {}
               if r.status_code >= 300:
-                  sys.exit(f"{what} failed: HTTP {r.status_code}: {r.text[:800]}")
+                  sys.exit(f"{what} failed: HTTP {r.status_code}: {say(r.text[:800])}")
               return r.json() if r.content else {}
+
+          def existing_draft(latest_id):
+              # Zenodo keeps one unpublished new version per record. Its address is
+              # links.latest_draft of the latest version, when there is one.
+              dep = check(call("GET", f"{api}/deposit/depositions/{latest_id}", "latest version deposition", timeout=60),
+                          "latest version deposition")
+              link = (dep.get("links") or {}).get("latest_draft")
+              if not link:
+                  return None
+              r = call("GET", link, "existing draft", timeout=60)
+              if r.status_code in (404, 410):
+                  return None
+              d = check(r, "existing draft")
+              if str(d.get("id")) == str(latest_id) or d.get("submitted") or d.get("state") == "done":
+                  return None  # the link names the published version, not a draft
+              return d
+
+          def settled_publish(dep):
+              # Before the publish request is repeated: is the deposition published already?
+              r = call("GET", f"{api}/deposit/depositions/{dep}", "deposition state", timeout=60)
+              if r.status_code == 200 and (r.json().get("submitted") or r.json().get("state") == "done"):
+                  return r
+              return None
 
           # The metadata comes from CITATION.cff at the archived ref.
           cff = yaml.safe_load(open("CITATION.cff", encoding="utf-8"))
@@ -106,7 +199,7 @@ jobs:
           # The source zip of the ref, as GitHub serves it for a release.
           kind = "tags" if ref.startswith("v") else "heads"
           zip_url = f"https://github.com/{repo}/archive/refs/{kind}/{ref}.zip"
-          archive = requests.get(zip_url, timeout=300)
+          archive = call("GET", zip_url, "download of the source zip", headers={}, timeout=300)
           if archive.status_code != 200:
               sys.exit(f"download of {zip_url} failed: HTTP {archive.status_code}")
           file_name = f'{repo.split("/")[1]}-{ref}.zip'
@@ -115,25 +208,53 @@ jobs:
           if anchor:
               # A new version: start from the latest version of the record family
               # (Zenodo redirects this request to it).
-              latest = check(requests.get(f"{api}/records/{anchor}/versions/latest", headers=auth, timeout=60), "latest version")
-              draft = check(requests.post(f'{api}/deposit/depositions/{latest["id"]}/actions/newversion', headers=auth, timeout=60), "new version")
-              draft = check(requests.get(draft["links"]["latest_draft"], headers=auth, timeout=60), "new version draft")
-              for f in check(requests.get(draft["links"]["files"], headers=auth, timeout=60), "draft files"):
-                  check(requests.delete(f["links"]["self"], headers=auth, timeout=60), "remove the previous file")
+              latest = check(call("GET", f"{api}/records/{anchor}/versions/latest", "latest version", timeout=60), "latest version")
+              if publish and (latest.get("metadata") or {}).get("version") == ref:
+                  # Archived already: this run is a restart after a lost publish answer
+                  # or a killed job, and publishing again would make a second version.
+                  print(f'{ref} is already archived on Zenodo (record {latest["id"]}); nothing to do')
+                  sys.exit(0)
+              draft = existing_draft(latest["id"])
+              reused = draft is not None
+              if not reused:
+                  r = call("POST", f'{api}/deposit/depositions/{latest["id"]}/actions/newversion', "new version", timeout=60)
+                  if r.status_code == 400:
+                      # A draft exists already (a repeat after a lost answer lands here too).
+                      draft = existing_draft(latest["id"])
+                      reused = draft is not None
+                  if draft is None:
+                      draft = check(call("GET", check(r, "new version")["links"]["latest_draft"], "new version draft", timeout=60),
+                                    "new version draft")
+              if reused and not publish:
+                  # The draft may be somebody's unfinished new version: a test run
+                  # replaces its files and deletes it, so it does not start.
+                  sys.exit(f'an unpublished draft {draft["id"]} exists on the record; a test run would delete it. '
+                           f"Publish or delete that draft on Zenodo first, or run with publish=true.")
+              files = check(call("GET", draft["links"]["files"], "draft files", timeout=60), "draft files")
+              if reused:
+                  print(f'reusing the unpublished draft {draft["id"]}: version {(draft.get("metadata") or {}).get("version")!r}, '
+                        f'files {[f.get("filename") for f in files]}; the files are replaced and the metadata is written again')
+              for f in files:
+                  check(call("DELETE", f["links"]["self"], "remove the previous file", timeout=60),
+                        "remove the previous file", gone_ok=True)
           else:
-              draft = check(requests.post(f"{api}/deposit/depositions", headers=auth, json={}, timeout=60), "new record")
+              # Not safe to repeat blindly: a repeat after a lost answer can leave one
+              # empty unpublished draft behind, which the user can delete on Zenodo.
+              draft = check(call("POST", f"{api}/deposit/depositions", "new record", json={}, timeout=60), "new record")
           dep = draft["id"]
           print(f"draft {dep} for {repo} {ref}")
 
-          check(requests.put(f'{draft["links"]["bucket"]}/{file_name}', headers=auth, data=archive.content, timeout=600), "upload")
-          check(requests.put(f"{api}/deposit/depositions/{dep}", headers=auth, json={"metadata": metadata}, timeout=60), "metadata")
+          check(call("PUT", f'{draft["links"]["bucket"]}/{file_name}', "upload", data=archive.content, timeout=600), "upload")
+          check(call("PUT", f"{api}/deposit/depositions/{dep}", "metadata", json={"metadata": metadata}, timeout=60), "metadata")
 
           if not publish:
-              check(requests.delete(f"{api}/deposit/depositions/{dep}", headers=auth, timeout=60), "delete the test draft")
+              check(call("DELETE", f"{api}/deposit/depositions/{dep}", "delete the test draft", timeout=60),
+                    "delete the test draft", gone_ok=True)
               print(f"test only: draft {dep} made with {file_name} ({len(archive.content)} bytes) and the metadata, then deleted")
               sys.exit(0)
 
-          rec = check(requests.post(f"{api}/deposit/depositions/{dep}/actions/publish", headers=auth, timeout=120), "publish")
+          rec = check(call("POST", f"{api}/deposit/depositions/{dep}/actions/publish", "publish",
+                           recheck=lambda: settled_publish(dep), timeout=120), "publish")
           print(f'published: DOI {rec.get("doi")}, concept DOI {rec.get("conceptdoi")}, record {rec.get("id")}')
           if not anchor:
               print(f'set the repository variable ZENODO_RECORD_ID to {rec.get("id")}')

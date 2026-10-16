@@ -117,6 +117,13 @@ kept_forms_var = contextvars.ContextVar("orthonym_kept_forms", default=frozenset
 dropped_forms_var = contextvars.ContextVar("orthonym_dropped_forms", default=frozenset())
 
 
+#: True while a neutral amine is named for the cation its caller makes of it by a hydron on the nitrogen
+#: (``locant_omission.suffix_nitrogen_gains_hydron``): the locant of a group on a one-carbon parent is
+#: decided as if the nitrogen held that hydrogen, so a value computed in that scope differs from the plain
+#: one for the same key and the caches below key them apart, as for the promotion re-run.
+suffix_nitrogen_hydron_var = contextvars.ContextVar("orthonym_suffix_nitrogen_hydron", default=False)
+
+
 def _ck(namespace, key):
     """The cache key for ``(namespace, key)`` in the current run (see above)."""
     if namespace in _PROMOTION_INDEPENDENT:
@@ -125,6 +132,8 @@ def _ck(namespace, key):
         ("mechanical-forms",) + tuple(sorted(kept_forms_var.get())))
     if dropped_forms_var.get():
         tag = tag + ("minus",) + tuple(sorted(dropped_forms_var.get()))
+    if suffix_nitrogen_hydron_var.get():
+        tag = tag + ("suffix-n-hydron",)
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
             return (namespace, key, "pin-promotion", "prefixes-apart") + tag

@@ -4561,7 +4561,8 @@ _HW_STEM_FROM_NUMBERING = object()  # sentinel: stem built after numbering
 
 
 def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
-                                    expected_atoms: Optional[Set[int]] = None
+                                    expected_atoms: Optional[Set[int]] = None,
+                                    n_prefix: Optional[str] = None
                                     ) -> Optional[str]:
     """PIN substituent name for a MONOCYCLIC ring substituent carrying its own
     substituent prefixes: ``2-nitrothiophen-3-yl``, ``2-oxocyclohexyl``,
@@ -4570,7 +4571,9 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     When ``expected_atoms`` is given, the name is returned only if the ring
     plus the detected decoration atoms account for EXACTLY that set — callers
     naming a specific fragment use this so the emitted name can never cover
-    more or less than the fragment.
+    more or less than the fragment. ``n_prefix`` (an anilino ring only) is the name of the
+    substituent of the nitrogen, cited as ``N-<name>`` in the same prefix sequence
+    (``4-chloro-N-methylphenyl``; ``rules.ring_prefix_sequence``).
 
     This is the.2 demoted-ring emitter: when parent selection demotes a
     decorated ring to a substituent, its decoration must be carried (the
@@ -4788,112 +4791,10 @@ def decorated_ring_substituent_name(mol, ring_atoms, attachment_atom: int,
     for p, i in order.items():
         for name in atom_prefixes[i]:
             groups.setdefault(name, []).append(p)
-    from ..assembly.naming_utils import get_multiplier_prefix
-
-    def _is_complex_prefix(nm: str) -> bool:
-        # simple v1-table prefixes are bare lowercase words; a branched/stereo
-        # substituent name carries a locant, hyphen, or enclosing mark.
-        #: a COMPOUND substituent prefix (formed by
-        # substitution, e.g. the alkoxycarbonyl family methoxycarbonyl/
-        # ethoxycarbonyl/phenoxycarbonyl) is enclosed even though it is a bare
-        # lowercase word -> '2-(methoxycarbonyl)cyclohexyl', not '2-methoxy...'.
-        if nm.endswith('oxycarbonyl'):
-            return True
-        #: a SUBSTITUTED pnictogen-yl (diphenylstibanyl / dimethylarsanyl
-        # /...bismuthanyl) is a compound prefix requiring enclosing marks, even
-        # though it is a bare lowercase word; the bare parent-hydride-yl
-        # ('arsanyl'/'stibanyl'/'bismuthanyl') stays simple (cf. naming_utils
-        #.is_complex_substituent). Narrowly scoped so simple alkyl/aryl (methyl,
-        # phenyl) keep the byte-identical legacy path.
-        for _pn in ('arsanyl', 'stibanyl', 'bismuthanyl'):
-            if nm.endswith(_pn) and nm != _pn:
-                return True
-        # The hyphen in the character class made this a copy of the compound
-        # predicate; the carve-out is the shared primitive, so
-        # 'tert-butyl' is simple (BB 16286 cites it bare) while
-        # 'tert-butylsulfanyl' stays compound.
-        from ..assembly.naming_utils import italicized_prefix_is_bare
-        if italicized_prefix_is_bare(nm):
-            return False
-        # lever B: a compound FG-prefix + alkyl ('hydroxymethyl',
-        # 'cyanomethyl', 'carboxymethyl', 'aminoethyl') is a SUBSTITUTED (compound)
-        # substituent and takes enclosing marks even though it carries no
-        # digit/hyphen/mark — the character-class heuristic below misses it, so a
-        # ring decoration 'hydroxymethyl' was cited bare ('4-hydroxymethylphenyl').
-        # BB PINs: '2-(hydroxymethyl)benzene-1,4-diol' (:6802), '(cyanomethyl)'
-        # (:33087). Same set naming_utils.needs_brackets / is_complex_substituent
-        # recognise; scoped to this class to keep every other decoration
-        # byte-identical.
-        from ..assembly.naming_utils import (
-            _ALKYL_ROOTS_FULL as _ARF,
-        )
-        from ..assembly.naming_utils import (
-            _COMPOUND_FG_PREFIXES as _CFG,
-        )
-        _nml = nm.lower()
-        for _fg in _CFG:
-            if _nml.startswith(_fg) and _nml[len(_fg):] in _ARF:
-                return True
-        return any(c in nm for c in '-()[]0123456789')
-
-    # (the Blue Book): every substitutable position of the aromatic
-    # ring other than the free valence carries the same substituent -> no locants
-    # ('pentachlorophenoxy'; '1-chloro-2-(pentafluoroethyl)benzene (PIN)',:3023).
-    _substitutable = sorted(
-        p for p, i in order.items() if i != attachment_atom
-        and (mol.GetAtomWithIdx(i).GetSymbol() == 'C' or atom_prefixes[i]
-             or mol.GetAtomWithIdx(i).GetTotalNumHs() > 0))
-    _complete = (len(groups) == 1 and len(_substitutable) >= 2
-                 and all(mol.GetAtomWithIdx(i).GetIsAromatic()
-                         and mol.GetAtomWithIdx(i).GetSymbol() == 'C' for i in order.values())
-                 and sorted(next(iter(groups.values()))) == _substitutable)
-    if _complete:
-        from ..assembly.naming_utils import enclose_if_compound as _eic
-        from ..assembly.naming_utils import multiplied_component as _mc
-        (name, locs), = groups.items()
-        prefix_str = _mc(len(locs), name, _eic(name))
-    elif not any(_is_complex_prefix(nm) for nm in groups):
-        # byte-identical legacy path — simple-prefix rings are unchanged, except that a
-        # simple prefix with an italicized detachable part sorts by its Roman letters:
-        # "ALPHANUMERICAL ORDER" (the Blue Book) "Nonitalic Roman letters are
-        # considered first" (:3442); (:3495) lets italic letters decide only when
-        # the Roman letters do not: '1-(butan-2-yl)-3-tert-butylbenzene (PIN)' (:3507), so
-        # 'tert-butyl' is cited by 'butyl' (before 'hydroxy'), not by 't'.
-        from ..assembly.naming_utils import (
-            strip_italicized_structural_prefix as _strip_italic_prefix,
-        )
-        parts = []
-        # only the italicized sec-/tert- part is set aside; every other name keeps the plain
-        # string order it always had ('disulfanyl' stays under 'd')
-        for name in sorted(groups, key=lambda nm: (_strip_italic_prefix(nm)[0], nm)):
-            locs = sorted(groups[name])
-            loc_str = ','.join(str(loc) for loc in locs)
-            from ..assembly.naming_utils import multiplied_component as _mc
-            parts.append(f'{loc_str}-{_mc(len(locs), name, name)}')
-        prefix_str = '-'.join(parts)
-    else:
-        #: a complex (branched/stereo) prefix is enclosed; ordering is
-        # by the alphanumerical key of its stereo-stripped base name:
-        # '(1S)-1-chloroethyl' alphabetizes at 'c', descriptor + locant ignored).
-        from ..assembly.naming_utils import (
-            alpha_sort_key as _alpha_sort_key,
-        )
-        from ..assembly.naming_utils import (
-            apply_enclosing_marks,
-        )
-        from .stereochemistry import strip_stereo as _strip_stereo
-
-        def _sort_key(nm: str):
-            return (_alpha_sort_key(_strip_stereo(nm)), nm)
-
-        parts = []
-        for name in sorted(groups, key=_sort_key):
-            locs = sorted(groups[name])
-            loc_str = ','.join(str(loc) for loc in locs)
-            from ..assembly.naming_utils import multiplied_component as _mc
-            rendered = apply_enclosing_marks(name, -1) if _is_complex_prefix(name) else name
-            parts.append(f'{loc_str}-{_mc(len(locs), name, rendered)}')
-        prefix_str = '-'.join(parts)
+    from .ring_prefix_sequence import ring_prefix_sequence
+    prefix_str = ring_prefix_sequence(mol, groups, atom_prefixes, order, attachment_atom, n_prefix)
+    if prefix_str is None:
+        return None
 
     # W4-S2 / BB 48117): emit the ring substituent's OWN internal
     # stereodescriptors, keyed to the SAME numbering `order` the name uses. The
@@ -5024,8 +4925,8 @@ def anilino_preferred_prefix(ring_prefix: Optional[str],
         return None
     if n_substituent and (ring_decoration or (
             n_substituent.endswith(_PHENYL_STEM) and n_substituent != _PHENYL_STEM)):
-        # An N locant and ring locants would have to be merged into ONE alphanumerical
-        # prefix sequence and no Blue Book example fixes that merge: decline.
+        # A ring name given as a string cannot take the N-substituent into its prefix sequence
+        # (``anilino_prefix_from_n_branch`` does, from the graph): decline.
         # So is a substituted benzene on the nitrogen: the more substituted ring is the
         # aniline, the Blue Book;:22250 '2-bromo-4-chloro-N-(2,4-
         # dibromophenyl)aniline (PIN)'), 'N-(4-chlorophenyl)anilino' is never built.
@@ -5160,10 +5061,21 @@ def anilino_prefix_from_n_branch(mol, n_idx: int, branch_atoms, *, enclose: bool
         # Unsubstituted C6H5-NH-: the bare retained prefix (the Blue Book), which is
         # byte-identical to what these sites emitted before.
         return anilino_preferred_prefix(_PHENYL_STEM, n_substituent, enclose=enclose)
+    if n_substituent:
+        # A decorated ring AND an N-substituent: both go into ONE alphanumerical sequence,
+        # '4-chloro-N-methylanilino',:26139 "full substitution allowed"; the order
+        # of the aniline parent,. A substituted benzene on the nitrogen stays the aniline
+        # of the other drawing,:21604): the caller keeps its construction.
+        if n_substituent.endswith(_PHENYL_STEM) and n_substituent != _PHENYL_STEM:
+            return None
+        decorated = decorated_ring_substituent_name(
+            mol, candidate, attachment[0], expected_atoms=branch_set - {n_idx},
+            n_prefix=n_substituent)
+        return anilino_preferred_prefix(decorated, enclose=enclose)
     decorated = decorated_ring_substituent_name(
         mol, candidate, attachment[0], expected_atoms=branch_set - {n_idx},
     )
-    return anilino_preferred_prefix(decorated, n_substituent, enclose=enclose)
+    return anilino_preferred_prefix(decorated, enclose=enclose)
 
 
 def ring_atom_fg_prefixes(

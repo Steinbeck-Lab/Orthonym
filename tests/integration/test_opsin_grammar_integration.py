@@ -169,7 +169,9 @@ class TestKwargDisablesLayer:
 
 
 class TestWarningOnRepair:
-    """A repair fires a WARNING with the LOCKED format string.
+    """A repair is logged with the LOCKED format string. The record is DEBUG:
+    the repair is internal telemetry for the census tools, not something the
+    command line should print (the tests read the message, not the level).
 
     Format: 'OPSIN grammar repair: handler=%s class=%s original=%r repaired=%r'.
 
@@ -186,7 +188,7 @@ class TestWarningOnRepair:
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
         grammar._stats = stats
-        with caplog.at_level("WARNING", logger="orthonym.namer"):
+        with caplog.at_level("DEBUG", logger="orthonym.namer"):
             result = _final_grammar_check(
                 "((2-methylpropyl))methylheptane",
                 None,  # no SMILES => degraded path; INFO log only
@@ -209,7 +211,7 @@ class TestWarningOnRepair:
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
         grammar._stats = stats
-        with caplog.at_level("WARNING", logger="orthonym.namer"):
+        with caplog.at_level("DEBUG", logger="orthonym.namer"):
             result = _final_grammar_check(
                 "(2R)(3S)-2,3-dibromobutane",
                 None,
@@ -228,7 +230,7 @@ class TestWarningOnRepair:
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
         grammar._stats = stats
-        with caplog.at_level("WARNING", logger="orthonym.namer"):
+        with caplog.at_level("DEBUG", logger="orthonym.namer"):
             result = _final_grammar_check(
                 "2,4dichlorobenzene",
                 None,
@@ -247,7 +249,7 @@ class TestWarningOnRepair:
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
         grammar._stats = stats
-        with caplog.at_level("WARNING", logger="orthonym.namer"):
+        with caplog.at_level("DEBUG", logger="orthonym.namer"):
             _final_grammar_check(
                 "((2-methylpropyl))methylheptane",
                 None,
@@ -265,8 +267,9 @@ class TestWarningOnRepair:
 
 
 class TestWarningOnUnrepairable:
-    """A validate-fail with no repair fires a fallback WARNING and
-    returns the ORIGINAL name (+: never silently mutate).
+    """A validate-fail with no repair logs the fallback (DEBUG, like the repair
+    record above) and returns the ORIGINAL name (+: never silently
+    mutate).
     """
 
     def test_warning_on_unrepairable_returns_original(self, caplog):
@@ -280,7 +283,7 @@ class TestWarningOnUnrepairable:
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
         grammar._stats = stats
         original_name = "bad weird unknown name"
-        with caplog.at_level("WARNING", logger="orthonym.namer"):
+        with caplog.at_level("DEBUG", logger="orthonym.namer"):
             result = _final_grammar_check(
                 original_name,
                 None,
@@ -301,7 +304,7 @@ class TestWarningOnUnrepairable:
         grammar = OpsinGrammar()
         stats = {k: 0 for k in OpsinGrammar.STAT_KEYS}
         grammar._stats = stats
-        with caplog.at_level("WARNING", logger="orthonym.namer"):
+        with caplog.at_level("DEBUG", logger="orthonym.namer"):
             _final_grammar_check(
                 "bad weird unknown name",
                 None,

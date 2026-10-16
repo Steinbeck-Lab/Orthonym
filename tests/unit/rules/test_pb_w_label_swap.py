@@ -99,6 +99,10 @@ DEFAULT_ONLY_ROWS = [
     ("CC(=O)OCC(=O)N(C(C)C)c1ccccc1", "2-oxo-2-[N-(propan-2-yl)anilino]ethyl acetate"),
     ("CC(=O)OC(C)C(=O)N(C(C)C)c1ccccc1", "1-oxo-1-[N-(propan-2-yl)anilino]propan-2-yl acetate"),
     ("CC(=O)OCC(=O)N(CCO)c1ccccc1", "2-[N-(2-hydroxyethyl)anilino]-2-oxoethyl acetate"),
+    # SF lane A item 5 (was declined: 'N-(4-chlorophenyl)anilino' is not built,,:21604): the
+    # substituted ring is the aniline and the unsubstituted phenyl its N-substituent, one sequence
+    #,:26139 "full substitution allowed"); OPSIN 2.9.0 reads it back to the full key
+    ("CC(=O)OCC(=O)N(c1ccccc1)c1ccc(Cl)cc1", "2-(4-chloro-N-phenylanilino)-2-oxoethyl acetate"),
     ("CC(=O)OC(C)C(=O)N(CCO)c1ccccc1", "1-[N-(2-hydroxyethyl)anilino]-1-oxopropan-2-yl acetate"),
     ("CC(C)CN(c1ccccc1)C(=O)COC(=O)c1ccccc1", "2-[N-(2-methylpropyl)anilino]-2-oxoethyl benzoate"),
     # p18280110 (lane P merged): the N-sulfonyl group is cited as 'sulfonamido', (1)
@@ -127,7 +131,6 @@ def test_pin_at_the_default_tier(smiles, pin):
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", [
-    "CC(=O)OCC(=O)N(c1ccccc1)c1ccc(Cl)cc1",       #: 'N-(4-chlorophenyl)anilino' is not built
     "CC(OC(=O)c1ccccc1)C(=O)NNC",                  # '(methylamino)amino' is not 'hydrazinyl'
 ])
 def test_a_shape_without_a_producer_is_declined_at_the_default_tier(smiles):
@@ -264,12 +267,27 @@ def test_anilino_for_branches_cites_the_n_substituent():
     assert anilino_for_branches(mol, n, [(methyl, "methyl"), (ring, "phenyl")]) == "N-methylanilino"
 
 
-def test_anilino_for_branches_declines_a_decorated_ring_with_an_n_substituent():
-    """No Blue Book example fixes the order of a ring locant and an N locant in one prefix: the
-    helper declines it and the caller keeps its own composition."""
+def test_anilino_for_branches_cites_ring_and_nitrogen_in_one_sequence():
+    """SF lane A item 5 (changed value: the helper used to decline, 'No Blue Book example fixes the
+    order of a ring locant and an N locant in one prefix').
+
+    Source: (:26139) "The prefix name 'anilino' is retained as the preferred prefix for
+    C6H5-NH– with full substitution allowed" ('4-chloroanilino (preferred prefix)',:26153),
+    (:26308) '3-(N-methylanilino)phenol (PIN)'; the order of the one sequence is the alphanumerical
+    order of (:3436), as in the aniline parent ('2-bromo-4-chloro-N-(2,4-dibromophenyl)aniline
+    (PIN)',:22250; 'N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)',:32879). Independent check:
+    OPSIN 2.9.0 reads '1-(4-chloro-N-methylanilino)-1-oxopropan-2-yl benzoate' back to the full
+    InChIKey of its structure. Mutation: the new test file
+    tests/unit/rules/test_sf_a5_anilino_ring_and_nitrogen.py fails on the tree before the change.
+    What would make this wrong: a Blue Book example that cites the N locant after the ring locants
+    of the same sequence; none is printed (the examples above all follow the alphanumerical order)."""
     from orthonym.rules.anilino_nitrogen import anilino_for_branches
     mol, n, ring, methyl = _ring_and_other("C[NH]c1ccc(Cl)cc1")
-    assert anilino_for_branches(mol, n, [(ring, "4-chlorophenyl"), (methyl, "methyl")]) is None
+    assert anilino_for_branches(mol, n, [(ring, "4-chlorophenyl"), (methyl, "methyl")]) == \
+        "4-chloro-N-methylanilino"
+    # the other N group is a substituted benzene ring: the more substituted ring is the aniline
+    #,:21604), so this helper builds no anilino from the pair
+    assert anilino_for_branches(mol, n, [(ring, "4-chlorophenyl"), (methyl, "4-methylphenyl")]) is None
 
 
 def test_anilino_for_branches_one_group_is_the_ring_with_its_decoration():

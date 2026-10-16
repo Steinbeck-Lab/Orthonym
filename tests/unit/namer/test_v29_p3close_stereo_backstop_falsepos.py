@@ -319,7 +319,7 @@ def test_exempted_name_produces_NO_warning_through_the_real_check(caplog):
     from orthonym.namer import _final_stereo_check
 
     mol = Chem.MolFromSmiles("C[C@@H](N)C(=O)O")   # one carbon R/S centre
-    with caplog.at_level(logging.WARNING, logger="orthonym.namer"):
+    with caplog.at_level(logging.DEBUG, logger="orthonym.namer"):
         out = _final_stereo_check(mol, "myo-inositol", handler="unknown")
     assert out == "myo-inositol"
     assert "Stereo backstop" not in "\n".join(
@@ -337,7 +337,7 @@ def test_NON_exempted_name_STILL_warns_through_the_real_check(caplog):
     from orthonym.namer import _final_stereo_check
 
     mol = Chem.MolFromSmiles("C[C@@H](N)C(=O)O")
-    with caplog.at_level(logging.WARNING, logger="orthonym.namer"):
+    with caplog.at_level(logging.DEBUG, logger="orthonym.namer"):
         out = _final_stereo_check(mol, "alanine", handler="unknown")
     assert out == "alanine"
     assert "Stereo backstop" in "\n".join(
@@ -364,7 +364,7 @@ def test_backstop_log_does_not_truncate_the_name(caplog):
         "a-deliberately-long-systematic-name-well-over-fifty-characters-long"
     )
     assert len(long_name) > 50
-    with caplog.at_level(logging.WARNING, logger="orthonym.namer"):
+    with caplog.at_level(logging.DEBUG, logger="orthonym.namer"):
         out = _final_stereo_check(mol, long_name, handler="unknown")
     assert out == long_name          # detection-only: never mutates the name
     logged = "\n".join(r.getMessage() for r in caplog.records)
