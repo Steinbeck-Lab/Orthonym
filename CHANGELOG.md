@@ -5,6 +5,24 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.9](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.8...v1.0.9) (2026-10-17)
+
+
+### Features
+
+* nomenclature coverage and correctness updates ([ea5e2e7](https://github.com/Steinbeck-Lab/Orthonym/commit/ea5e2e78db803bbcac5d76a27baa8703e66453d8))
+
+
+### Bug Fixes
+
+* fewer wrong PIN labels, OPSIN read-back without the radical option for closed-shell input, quiet CLI, robust Zenodo upload ([#54](https://github.com/Steinbeck-Lab/Orthonym/issues/54)) ([c5f304b](https://github.com/Steinbeck-Lab/Orthonym/commit/c5f304b943400b39333ab02bf1afd93cc7334a53))
+* identical prefixes grouped, amine parent chosen on the nitrogen, -O-P=O named as a heterone ([#55](https://github.com/Steinbeck-Lab/Orthonym/issues/55)) ([02430b1](https://github.com/Steinbeck-Lab/Orthonym/commit/02430b1636957ee8e95f6facb0ff339e8720e02c))
+* isotope labels on acetic acid, acetamide and similar names cite their locants ([#57](https://github.com/Steinbeck-Lab/Orthonym/issues/57)) ([e340f92](https://github.com/Steinbeck-Lab/Orthonym/commit/e340f92aba950c7f9ad9f78db03f9014e6ba7887))
+* more molecules get a verified PIN at the default tier, and fewer non-PIN names carry the PIN label ([76ef142](https://github.com/Steinbeck-Lab/Orthonym/commit/76ef14293c62b7098f010814228b71e1c9ce5591))
+* more molecules get a verified PIN at the default tier, and fewer non-PIN names carry the PIN label ([2aee59a](https://github.com/Steinbeck-Lab/Orthonym/commit/2aee59a65c62cb1cb1dc297808fd6a38b8b8ace6))
+* name more fused ring systems and ring cations by their preferred names ([d5bc040](https://github.com/Steinbeck-Lab/Orthonym/commit/d5bc04022feb390b5e1292ccf592491474a27cff))
+* the default tier gives Blue Book PIN spellings that OPSIN cannot read, checked through a twin spelling ([#56](https://github.com/Steinbeck-Lab/Orthonym/issues/56)) ([32efb4c](https://github.com/Steinbeck-Lab/Orthonym/commit/32efb4cf9e0ccc17802a497fa6a527c984f52cf4))
+
 ## [1.0.8](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.7...v1.0.8) (2026-10-15)
 
 
