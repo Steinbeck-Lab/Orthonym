@@ -752,7 +752,8 @@ def _ion_fragment_roundtrips(frag_mol, name: str) -> bool:
         smiles = Chem.MolToSmiles(frag_mol)  # canonical, isomeric (stereo kept)
         if not smiles:
             return False
-        rt = opsin_roundtrip_check(smiles, name)
+        from ..validation.twin_spellings import opsin_spelling
+        rt = opsin_roundtrip_check(smiles, opsin_spelling(name))
         if rt.get("passed") is not True:
             return False
         # The full InChIKey is protonation-blind: '1-ethyl-...-2-oxo-3,3-

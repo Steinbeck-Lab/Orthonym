@@ -522,8 +522,10 @@ ISOTOPE_DESCRIPTOR_ROWS = [
     ("[2H]NC", "(N-2H1)methanamine", "pin_verified"),
     ("[2H]NCc1ccccc1", "1-phenyl(N-2H1)methanamine", "pin_verified"),  # (Task 11)
     # the Blue Book cites 'N' once ('(N-2H2)aniline (PIN)',:43830), which OPSIN
-    # 2.9.0 cannot read: the readable spelling ships below the PIN, a correct
-    # systematic name that is not the PIN (user decision 2026-09-30)
+    # 2.9.0 cannot read: the best-effort tier ships the readable spelling below the PIN,
+    # a correct systematic name that is not the PIN (user decision 2026-09-30); the
+    # default tier spells the printed form and ships it through its twin spelling
+    # (tests/unit/rules/test_twin_isotopes.py)
     ("[2H]N([2H])c1ccccc1", "(N,N-2H2)aniline", "systematic_verified"),
     # unchanged: a prefix's one position, the suffix slot of -ol, a monocycle
     ("[2H]N([2H])c1ccc(C(=O)O)cc1", "4-(2H2)aminobenzoic acid", "pin_verified"),

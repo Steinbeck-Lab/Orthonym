@@ -39,6 +39,9 @@ CLOSE = {v: k for k, v in OPEN.items()}
 _STEREO_PIECE = re.compile(r"^(?:(?:\d+[a-z]?'*(?:\(\d+'*\))?|[A-Z][a-z]?\d*'*|\d+[a-z]?'*,\d+'*)?"
                            r"(?:R|S|E|Z|r|s|M|P|RS|SR|Ra|Sa|Rp|Sp|ξ|R\*|S\*|EZ|ZE)\*?)$")
 _ADDED_IH = re.compile(r"^\d+[a-z]?'*H(?:,\d+[a-z]?'*H)*$")
+#: the locant an added indicated hydrogen follows ('2(1H)', '4a(2H)', "4'(2H)"); a '(2H)' that follows a name
+#: part ('trichloro(2H)methane', 'ethan(2H)ol') is a hydrogen nuclide of an isotope descriptor
+_LOCANT_END = re.compile(r"\d[a-z]?'*$")
 #: an isotope descriptor, the Blue Book; '(N-2H1)acetamide (PIN)':43828):
 #: nuclides with their count, after locants that may be numerals or element locants ('(13C)',
 #: '(2-2H1)', '(N-2H1)', '(N,N-2H2)', '(O-18O)')
@@ -109,7 +112,7 @@ def _classify(s: str, e: Encl) -> None:
     prevch = before[-1:] if before else ''
     if e.typ == '(':
         pieces = re.split(r',(?![^(]*\))', c)
-        if _ADDED_IH.match(c) and prevch and (prevch.isdigit() or prevch in "'" or prevch.isalpha()):
+        if _ADDED_IH.match(c) and _LOCANT_END.search(before):
             e.kind = 'added_ih'
         elif re.fullmatch(r"\d+'*[a-z]?", c) and prevch and (prevch.isdigit() or prevch == "'"):
             e.kind = 'compound_locant'

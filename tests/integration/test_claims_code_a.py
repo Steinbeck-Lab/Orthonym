@@ -16,10 +16,11 @@ Public claims audit ids critic-1 / R63, R19, R68 / critic-2 / X03 (the audit is
    unchecked; it now ships only after a full-key round trip passes.
 3. Retained trivial names were labelled systematic_verified with no check.
 4. pin_verified / systematic_verified only for a name that passed a full round trip
-   (``verified`` 'opsin') or the documented identity table ('identity'); the grammar
-   carve-outs and the constitution-only stereo branch keep shipping at the default tier
-   one label down, and ``verified`` says 'opsin_constitution' for the latter. Gate
-   outcome strings are unchanged.
+   (``verified`` 'opsin'), a full round trip of its twin spelling when OPSIN has no
+   grammar for the name ('opsin_twin'; ``validation.twin_spellings``) or the documented
+   identity table ('identity'); the grammar carve-outs and the constitution-only stereo
+   branch keep shipping at the default tier one label down, and ``verified`` says
+   'opsin_constitution' for the latter. Gate outcome strings are unchanged.
 
 Every shipped name asserted here is also read back by a FRESH OPSIN call that does not
 go through the engine (``tests.support.rt_assert._independent_parse``) and compared by

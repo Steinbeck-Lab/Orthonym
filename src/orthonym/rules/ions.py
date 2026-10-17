@@ -1604,8 +1604,9 @@ def _validate_cation_name(mol, result: str) -> str:
     if mol_charge > 0:
         from orthonym.namer import _validity_gate_name_to_smiles
         from orthonym.validation.read_back_policy import legacy_reading
+        from orthonym.validation.twin_spellings import opsin_spelling
         with legacy_reading():    # a veto: the charge of what OPSIN builds, a radical reading included
-            parsed = _validity_gate_name_to_smiles(result)
+            parsed = _validity_gate_name_to_smiles(opsin_spelling(result))
         if parsed is not None:
             pm = Chem.MolFromSmiles(parsed)
             if pm is not None and Chem.GetFormalCharge(pm) != mol_charge:

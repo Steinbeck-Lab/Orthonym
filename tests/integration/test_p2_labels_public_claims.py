@@ -35,6 +35,7 @@ from rdkit.Chem import inchi
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data.coordination_retained import COORDINATION_RETAINED
+from orthonym.validation.twin_spellings import twin_of
 from tests.support.rt_assert import _independent_parse
 from tests.unit.rules.test_d1_coordination_v36 import (
     CHLOROPHYLL_A,
@@ -100,14 +101,19 @@ def test_a_certified_pin_keeps_pin_verified():
 
 def test_a_pin_verified_label_means_an_opsin_read_back_or_the_list_identity():
     # The claims-code-a rule: a pin_verified row carries verified 'opsin' (checked
-    # here by a fresh OPSIN call) or 'identity' (the input's key is the table key of
-    # exactly that name).
+    # here by a fresh OPSIN call), 'opsin_twin' (a fresh OPSIN call reads the twin
+    # spelling of the name to the input, and reads nothing for the name itself) or
+    # 'identity' (the input's key is the table key of exactly that name).
     for smiles in ("CCO", "CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O", HEME_B["smiles"],
-                   CHLOROPHYLL_A["smiles"]):
+                   CHLOROPHYLL_A["smiles"], "C12C=CC(C3=CC=CC=C13)S2"):
         row = _row(smiles, "pin")
         if row["tier"] == "pin_verified":
-            assert row["verified"] in ("opsin", "identity"), row
+            assert row["verified"] in ("opsin", "opsin_twin", "identity"), row
             if row["verified"] == "opsin":
                 assert _key(_independent_parse(row["name"])) == _key(smiles), row
+            elif row["verified"] == "opsin_twin":
+                twin, _rules = twin_of(row["name"])
+                assert _independent_parse(row["name"], smiles) is None, row
+                assert _key(_independent_parse(twin, smiles)) == _key(smiles), row
             else:
                 assert COORDINATION_RETAINED.get(_key(smiles)) == row["name"], row

@@ -21,11 +21,13 @@ Design invariants (each is load-bearing for the 0-wrong / byte-identity contract
   fresh one for the same key -- turning an incomplete key into a loud failure
   rather than a silent wrong name.
 
-Dependency-light on purpose (``contextvars`` + ``os`` only).
+Dependency-light on purpose (``contextvars`` + ``os`` and the provenance context variables).
 """
 import contextvars
 import os
 from collections import OrderedDict
+
+from ..metrics.provenance import wider_tier_ctx
 
 #: verify-mode mismatch log (process-global, across scopes). A ``MemoMismatch`` is
 #: RAISED as a loud failure, but the recursive naming cascade wraps the hot loops in
@@ -134,6 +136,8 @@ def _ck(namespace, key):
         tag = tag + ("minus",) + tuple(sorted(dropped_forms_var.get()))
     if suffix_nitrogen_hydron_var.get():
         tag = tag + ("suffix-n-hydron",)
+    if wider_tier_ctx.get():
+        tag = tag + ("wider-tier",)       # the PIN spellings are off in a wider-tier call
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
             return (namespace, key, "pin-promotion", "prefixes-apart") + tag

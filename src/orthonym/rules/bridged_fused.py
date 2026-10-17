@@ -62,7 +62,7 @@ HETEROATOM_BRIDGE_PREFIXES: Dict[str, str] = {
 
 #: (the Blue Book-14110): these bridge prefixes are general nomenclature;
 #: the preselected (PIN) prefixes are 'sulfano', 'disulfano', 'selano', 'tellano' and 'azano',
-#: which OPSIN 2.9.0 cannot read, so a name that uses one of these is never certified a PIN.
+#: so a name that uses one of these is never certified a PIN.
 GENERAL_ONLY_BRIDGE_PREFIXES = frozenset({'epithio', 'epidithio', 'episeleno', 'epitelluro', 'epimino'})
 
 

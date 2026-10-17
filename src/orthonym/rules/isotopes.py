@@ -101,7 +101,8 @@ def _max_atoms_at_position(atom: Chem.Atom) -> int:
 
 
 def format_isotope_descriptor(groups, force_show: bool = False,
-                              bracket: bool = False) -> str:
+                              bracket: bool = False,
+                              letter_once: bool = False) -> str:
     """Build the parenthesized isotopic descriptor from grouped labels.
 
     ``bracket=True`` (FIX-F, / renders the SPECIFICALLY-LABELLED
@@ -124,6 +125,14 @@ def format_isotope_descriptor(groups, force_show: bool = False,
     not round-trip the forced form ``(2H1)`` is tried before abstaining -- the
     right molecule at a non-preferred spelling beats silence (never a wrong name;
     every candidate stays OPSIN-RT gated).
+
+    ``letter_once=True`` cites the element-letter locant of a lone nuclide group once, however
+    many atoms it labels: '(N-2H2)' where the shared-position form repeats it, '(N,N-2H2)'.
+     (heading NAMES, the Blue Book) prints '(N-2H2)aniline (PIN)' (:43830),
+    while an integer locant is repeated per atom,:44208: '(1,1,1,3,3-2H5)pentan-2-one').
+    OPSIN 2.9.0 reads only the repeated letter, so the once-cited spelling is checked through its
+    twin (``validation.twin_spellings``). Only a single capital letter on a single nuclide group
+    is cited once: the shape the twin rule rewrites.
 
     ``groups`` = list of (locant, mass, element, count[, max_at_pos]):
       locant None -> no leading locant (single-position parent / front
@@ -156,6 +165,8 @@ def format_isotope_descriptor(groups, force_show: bool = False,
         sub = str(count) if show_sub else ""
         if locant is None:
             return f"{sym}{sub}"
+        if letter_once and len(groups) == 1 and count > 1 and re.fullmatch(r"[A-Z]", str(locant)):
+            return f"{locant}-{sym}{sub}"
         if isinstance(locant, (tuple, list)):
             #: a nuclide labelled at several DISTINCT positions cites each
             # locant once, ascending -> (2,4-2H2). (A scalar locant instead repeats
@@ -217,6 +228,34 @@ def _opsin_parse(candidate_name: str) -> Optional[str]:
         return opsin_parse(candidate_name)
     except Exception:
         return None
+
+
+def _pin_spellings() -> bool:
+    """True at the default tier, where the descriptors are spelt as the Blue Book prints them
+    (``validation.twin_spellings.pin_spellings_on``)."""
+    from ..validation.twin_spellings import pin_spellings_on
+    return pin_spellings_on()
+
+
+def _twin_parse(candidate_name: str, original: Optional[Chem.Mol] = None) -> Optional[str]:
+    """OPSIN's SMILES for the twin spelling of ``candidate_name`` (default tier only), the
+    reading that stands in for the candidate when OPSIN has no grammar for the printed spelling
+    ('ethan(2H)ol' is read as 'ethan(2H1)ol'); None when no twin applies, OPSIN reads the
+    twin as ambiguous, or a count-less hydrogen item stands where the Blue Book cites its count or
+    a locant (``rules.isotope_licence``). The twin proves the structure only: the spelling is the
+    producer's."""
+    from ..validation.twin_spellings import twin_opsin_parse
+    from .isotope_licence import twin_licensed
+    return twin_opsin_parse(candidate_name) if twin_licensed(candidate_name, original) else None
+
+
+def _hydrogen_needs_locant(original: Chem.Mol, skel: str, off: int) -> bool:
+    """True at the default tier when the one labelled hydrogen of ``original``, cited without count at
+    ``off`` of ``skel``, needs a locant: its unit holds hydrogens that are not all alike (a possibility of
+    isomers, or its unmodified name cites locants; ``rules.isotope_licence``). The
+    placement then goes on to the locanted spellings."""
+    from .isotope_licence import needs_locant
+    return needs_locant(original, skel, off)
 
 
 def _same_fixed_h_inchi(a: Chem.Mol, b: Chem.Mol) -> bool:
@@ -504,7 +543,7 @@ def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
     the full-stereo compare is then re-applied to the prefixed candidate, so no
     isotopologue or stereoisomer is ever shipped on a stereo-blind pass alone.
     """
-    smi = _opsin_parse(candidate_name)
+    smi = _opsin_parse(candidate_name) or _twin_parse(candidate_name, original_mol)
     if not smi:
         return False
     parsed = Chem.MolFromSmiles(smi)
@@ -1915,8 +1954,10 @@ def _complete_unit_spelling_unreadable(skel: str, off: int, keys,
     group at ``off`` is not read by OPSIN 2.9.0 as the input's constitution
     ('(2H7)propylbenzene' reads as the propan-2-yl isomer), so the locanted
     spelling that ships is not the PIN spelling. Graph check of the unit
-    (:func:`_scope_completely_labelled`), then the parse of the locant-free form."""
-    if not _slot_opens_substituent_prefix(skel, off):
+    (:func:`_scope_completely_labelled`), then the parse of the locant-free form. A single
+    hydrogen nuclide that needs a locant there (``rules.isotope_licence``) has no such spelling:
+    the locanted one is the PIN."""
+    if not _slot_opens_substituent_prefix(skel, off) or _hydrogen_needs_locant(original, skel, off):
         return False
     if not _scope_completely_labelled(original, keys):
         return False
@@ -2013,11 +2054,13 @@ def _unit_completely_labelled(skel: str, off: int, keys,
 def _is_held_locant_free(original: Chem.Mol, skel: str, off: int, candidate: str) -> bool:
     """A locant-free candidate that round-trips but does not specify its position: a hydrogen
     nuclide on a nitrogen that has other hydrogens in its unit, or a hydrogen nuclide that OPSIN
-    places on one of several hydrogens. It is kept below the preferred names, for want of a
-    locanted one. Only for hydrogen: a heavy nuclide on equivalent atoms (the oxygens of a nitro
+    places on one of several hydrogens, or a single hydrogen nuclide that needs a locant here
+    (``rules.isotope_licence``). It is kept below the preferred names, for want of a locanted one.
+    Only for hydrogen: a heavy nuclide on equivalent atoms (the oxygens of a nitro
     group, of a carboxylate) is one species whatever the position, the Blue Book),
     and OPSIN warns there too."""
     return (_nitrogen_hydrogen_needs_locant(original, skel, off)
+            or _hydrogen_needs_locant(original, skel, off)
             or (any(a.GetAtomicNum() == 1 and a.GetIsotope() for a in original.GetAtoms())
                 and _opsin_reads_ambiguously(candidate)))
 
@@ -2127,8 +2170,8 @@ def _find_best_placement(
         # fallback so an OPSIN-unparseable omission degrades to the right molecule
         # at a non-preferred spelling rather than abstaining. Identical strings
         # (the predicate already keeps the subscript) collapse to one variant.
-        desc_pref = format_isotope_descriptor(groups_desc)
-        desc_force = format_isotope_descriptor(groups_desc, force_show=True)
+        desc_pref = format_isotope_descriptor(groups_desc, letter_once=_pin_spellings())
+        desc_force = format_isotope_descriptor(groups_desc, force_show=True, letter_once=_pin_spellings())
         variants = [(0, desc_pref)]
         if desc_force != desc_pref:
             variants.append((1, desc_force))
@@ -2373,6 +2416,10 @@ def _enclosing_pairs(name: str) -> List[Tuple[int, int]]:
     return pairs
 
 
+#: a hydrogen nuclide item of a descriptor that cites no count and no locant: '(2H)', '(3H,18O)'
+_BARE_HYDROGEN_NUCLIDE_RE = re.compile(r"[(,][23]H[,)]")
+
+
 def _escalate_marks_for_descriptor(name: str, desc_start: int) -> str:
     """: an isotope descriptor spliced INSIDE a substituent's
     existing enclosing marks makes that substituent compound, so its marks must
@@ -2393,6 +2440,14 @@ def _escalate_marks_for_descriptor(name: str, desc_start: int) -> str:
     """
     from ..assembly.naming_utils import apply_enclosing_marks
 
+    close = name.find(")", desc_start)
+    desc = name[desc_start:close + 1] if name[desc_start:desc_start + 1] == "(" and close > 0 else ""
+    if _BARE_HYDROGEN_NUCLIDE_RE.search(desc):
+        # a '(2H)' / '(3H)' item without a count reads as an indicated hydrogen to ``apply_enclosing_marks``,
+        # which then leaves the enclosing group unstepped: a shape-equal stand-in carries the nesting
+        masked = name[:desc_start] + "(13C)" + name[desc_start + len(desc):]
+        out = _escalate_marks_for_descriptor(masked, desc_start)
+        return out[:desc_start] + desc + out[desc_start + len("(13C)"):]
     pos = desc_start
     while True:
         enclosing = [(o, c) for (o, c) in _enclosing_pairs(name)
@@ -4371,9 +4426,15 @@ def _labels_only_on_xh_chalcogens(original: Chem.Mol, label_map) -> bool:
     name cites none (one such group,, the Blue Book "Locants are
     omitted when there is only one atom of a given element"), so
     (:44180) keeps the locant-free spelling: 'ethan(2H)ol (PIN) (as in ethanol)'
-    (:44184)."""
+    (:44184).
+
+    At the default tier a hydrogen nuclide counts at the atom that bears it (the chalcogen
+    of ``[2H]OCC``), which is how 'ethan(2H)ol' reaches its locant-free skeleton; a wider tier
+    reads the labelled atom itself, as before, so its skeletons and names do not move."""
+    on = _pin_spellings()
     return bool(label_map) and all(
-        _is_xh_chalcogen(original, idx) for idx in label_map)
+        _is_xh_chalcogen(original, _isotope_carrier(original.GetAtomWithIdx(i)) if on else i)
+        for i in label_map)
 
 
 def _labels_an_xh_chalcogen(original: Chem.Mol) -> bool:

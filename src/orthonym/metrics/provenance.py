@@ -75,6 +75,10 @@ GATE_OUTCOME_CARVEOUT_PREFIX = "carveout:"
 #: read equals the input's. That is the round trip the paper claims for every
 #: shown name, and stronger than, so it claims the plain "verified" label.
 GATE_OUTCOME_FULL_KEY_VERIFIED = "full_key_round_trip_verified"
+#: prefix of ``twin_verified:<rule ids>``: OPSIN has no grammar for the name, and it reads a twin
+#: spelling of the same structure (``validation.twin_spellings``) to the input's FULL InChIKey.
+#: The producer owns the spelling; the twin proves the structure.
+GATE_OUTCOME_TWIN_PREFIX = "twin_verified:"
 
 #: The ONLY outcomes that may report anything other than "unverified".
 #: An allowlist, never a blocklist — an outcome string this code has never
@@ -98,6 +102,24 @@ _GATE_TOKENS = {
     GATE_OUTCOME_STEREO_RECOMPOSED: "stereo_omission_full_key_recomposed",
     GATE_OUTCOME_FULL_KEY_VERIFIED: "full_key_round_trip",
 }
+
+#: the ``opsin`` label of the twin outcome and its ``gates_passed`` token
+_TWIN_LABEL, _TWIN_TOKEN = "verified_twin", "twin_round_trip"
+
+#: the ``opsin`` labels of a name that was read back to the input's full structure: the name
+#: itself, or its twin spelling
+VERIFIED_OPSIN_LABELS = ("verified", _TWIN_LABEL)
+
+#: the ``verified`` field of a row by the ``opsin`` label of its gate outcome
+VERIFIED_FIELD_BY_OPSIN_LABEL = {
+    "verified": "opsin",
+    "verified_constitution_only": "opsin_constitution",
+    _TWIN_LABEL: "opsin_twin",
+}
+
+#: the values of ``verified`` that earn a tier named "verified": a read-back of the name, or of
+#: its twin spelling, or the exact-match list identity
+VERIFIED_FIELD_FOR_TIER = ("opsin", "opsin_twin", "identity")
 
 _SOURCE = contextvars.ContextVar("orthonym_prov_source", default=None)
 _OPSIN = contextvars.ContextVar("orthonym_prov_opsin", default=None)
@@ -130,6 +152,13 @@ _SUFFIX_FREE_PREFIX_NAME = contextvars.ContextVar(
 # component recursion (name_compound inherits it).
 general_fallback_ctx = contextvars.ContextVar(
     "orthonym_general_fallback", default=False)
+# True while a wider-tier call (``Orthonym(general_fallback=True)``: complete, best-effort) runs.
+# ``namer.Orthonym.name`` publishes it and never lowers it: a nested naming by a namer built with
+# the default flags (the ion and charged-router re-entries) must not turn the PIN spellings on
+# (``validation.twin_spellings``) inside a name the wider tier has to hand to OPSIN.
+# ``rules.oxoacid_group_prefix.ps_tier_ctx`` is lowered by such a namer, and the isolated naming
+# sessions of the fragment recursion reset ``general_fallback_ctx``.
+wider_tier_ctx = contextvars.ContextVar("orthonym_wider_tier", default=False)
 #: the BEST-EFFORT discriminator (`general_fallback_unverified`), published
 # for code that must choose a VOCABULARY by tier but is called from handlers that
 # do not know the tier.
@@ -526,6 +555,12 @@ def carveout_outcome(slug: str) -> str:
     return GATE_OUTCOME_CARVEOUT_PREFIX + slug
 
 
+def twin_outcome(rules: str) -> str:
+    """``twin_verified:<rule ids>`` — the name ships on its construction, and a twin
+    spelling OPSIN reads round-trips to the input's full InChIKey."""
+    return GATE_OUTCOME_TWIN_PREFIX + rules
+
+
 def resolve_gate_outcome(outcome: Optional[str], outcome_name: Optional[str],
                          shipped_name: Optional[str]) -> str:
     """The outcome that applies to ``shipped_name`` — deny-by-default.
@@ -544,16 +579,21 @@ def resolve_gate_outcome(outcome: Optional[str], outcome_name: Optional[str],
 
 
 def opsin_label_for_gate_outcome(outcome: Optional[str]) -> str:
-    """``verified`` / ``verified_constitution_only`` / ``unverified``.
+    """``verified`` / ``verified_constitution_only`` / ``verified_twin`` /
+    ``unverified``.
 
     Allowlist, so it fails closed: any outcome not explicitly listed —
     including a state that does not exist yet — reports ``unverified``.
     """
+    if outcome and outcome.startswith(GATE_OUTCOME_TWIN_PREFIX):
+        return _TWIN_LABEL
     return _VERIFIED_GATE_OUTCOMES.get(outcome, "unverified")
 
 
 def gate_token_for_gate_outcome(outcome: Optional[str]) -> Optional[str]:
     """The `gates_passed` token this outcome earns, or None if it earns none."""
+    if outcome and outcome.startswith(GATE_OUTCOME_TWIN_PREFIX):
+        return _TWIN_TOKEN
     return _GATE_TOKENS.get(outcome)
 
 

@@ -423,6 +423,7 @@ def _options(mol, system: Set[int]):
         bps = [prefixes.bridge_prefix(mol, sp, i) for i in range(len(sp.bridges))]
         if any(bp is None for bp in bps):
             return None
+        bps = prefixes.multiplied_in_general_form(bps)
         state = hydro.hydro_state(mol, sp)
         if state is None:
             return None
@@ -716,7 +717,8 @@ def _same_tautomer(mol, name: str) -> bool:
     the name or the verdict is not 'ok'."""
     from ...namer import _validity_gate_name_to_smiles
     from ...validation.protonation_identity import tautomer_verdict
-    parsed = _validity_gate_name_to_smiles(name)
+    from ...validation.twin_spellings import opsin_spelling
+    parsed = _validity_gate_name_to_smiles(opsin_spelling(name))
     if not parsed:
         return False
     return tautomer_verdict(Chem.MolToSmiles(mol), parsed) == "ok"
@@ -731,8 +733,9 @@ def _same_tautomer_as_radical(mol, name: str) -> bool:
     from ...jvm_bridge import opsin_stdout
     from ...validation.opsin_roundtrip import _find_opsin_jar
     from ...validation.protonation_identity import tautomer_verdict
+    from ...validation.twin_spellings import opsin_spelling
     jar = _find_opsin_jar("2.9.0")
-    text, served = opsin_stdout(name, True, jar) if jar else (None, False)
+    text, served = opsin_stdout(opsin_spelling(name, radical=True), True, jar) if jar else (None, False)
     smiles = (text or "").strip()
     parsed = Chem.MolFromSmiles(smiles) if served and smiles else None
     if parsed is None:

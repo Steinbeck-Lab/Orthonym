@@ -5,6 +5,7 @@ from rdkit import Chem
 
 from orthonym.rules.bridged_fused_pin import numbering, prefixes
 from orthonym.rules.bridged_fused_pin.selection import best_splits, ring_system
+from tests.support.wider_tier import wider_tier
 
 
 def _one(smiles):
@@ -71,12 +72,30 @@ def test_bridge_prefixes(smiles, expected):
     assert names == expected
 
 
-def test_general_nomenclature_bridge_prefixes_are_not_pin_forms():
-    # (:14097): 'epithio' and 'epimino' are general nomenclature
-    mol = Chem.MolFromSmiles("C12SC(C=C1)c1ccccc12")
+@pytest.mark.parametrize("smiles,preselected,general", [
+    ("C12SC(C=C1)c1ccccc12", "sulfano", "epithio"),
+    ("C12NC(C=C1)c1ccccc12", "azano", "epimino"),
+    ("C12c3ccccc3C(SS1)c1ccccc12", "disulfano", "epidithio"),
+])
+def test_general_nomenclature_bridge_prefixes_are_not_pin_forms(smiles, preselected, general):
+    # (:14097): 'sulfano', 'disulfano' and 'azano' are preselected; 'epithio', 'epidithio'
+    # and 'epimino' are general nomenclature, which a wider tier spells
+    mol = Chem.MolFromSmiles(smiles)
     (split,) = best_splits(mol, ring_system(mol))
     bp = prefixes.bridge_prefix(mol, split, 0)
-    assert (bp.name, bp.is_pin_form) == ("epithio", False)
+    assert (bp.name, bp.is_pin_form) == (preselected, True)
+    with wider_tier():
+        bp = prefixes.bridge_prefix(mol, split, 0)
+    assert (bp.name, bp.is_pin_form) == (general, False)
+
+
+def test_a_preselected_prefix_cited_more_than_once_is_spelled_in_the_general_form():
+    # 'disulfano' names the -S-S- bridge, so two -S- bridges are not 'disulfano'
+    cited = [prefixes.BridgePrefix("sulfano", True), prefixes.BridgePrefix("sulfano", True),
+             prefixes.BridgePrefix("epoxy", True)]
+    assert [(b.name, b.is_pin_form) for b in prefixes.multiplied_in_general_form(cited)] == [
+        ("epithio", False), ("epithio", False), ("epoxy", True)]
+    assert [b.name for b in prefixes.multiplied_in_general_form(cited[:1] + cited[2:])] == ["sulfano", "epoxy"]
 
 
 def test_bridge_text_groups_identical_bridges_with_colons():

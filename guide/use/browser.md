@@ -11,7 +11,7 @@ Next to every result the app draws the structure OPSIN read back from the name, 
 Each result lands on one of five states. The mark carries the state by its shape, so the five stay distinct in greyscale:
 
 {lamp}`pin`
-: The Preferred IUPAC Name. The engine's tier {tier}`pin_verified`: the strict PIN path built the name and verified it (OPSIN read it back to your structure; a name from the natural-product and metal-complex lists is matched to your exact structure instead).
+: The Preferred IUPAC Name. The engine's tier {tier}`pin_verified`: the strict PIN path built the name and verified it (OPSIN read it back to your structure; a PIN spelling OPSIN has no grammar for is read back through a twin spelling of it; a name from the natural-product and metal-complex lists is matched to your exact structure instead).
 
 {lamp}`fallback`
 : A checked name whose preferred status is not certified. The engine's tiers {tier}`pin_unverified` and {tier}`systematic_verified`. Most of these names were read back by OPSIN to your structure; at the default tier a name that OPSIN read back with its constitution only, or could not read, lands here too. The app's own read-back verdict under the name says which.

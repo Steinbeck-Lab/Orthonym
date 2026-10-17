@@ -6,7 +6,7 @@ parent wherever one existed, missing (b) (the Blue Book, "include the
 maximum number of skeletal atoms"; ex.:14277): they shipped
 '1,2,3,4-tetrahydro-1,4-propanonaphthalene' pin_verified. The builder reproduces every
 other name they built on the 1345 bare ring systems of the S2 census, sample and Blue Book
-corpora (S2 planning notes, the differential run); those 47 names are locked here."""
+corpora (S2 planning notes, the differential run); the names of ``REPRODUCED`` are locked here."""
 import logging
 
 import pytest
@@ -62,11 +62,15 @@ REPRODUCED = [
     ("C1CC2OC1C1C3CCC(O3)C21", "decahydro-1,4:5,8-diepoxynaphthalene"),
     ("C1CC2CC1C1C3CCC(C3)C21", "decahydro-1,4:5,8-dimethanonaphthalene"),
     ("C1CC2CC3CCCC2C3C1", "decahydro-1,5-methanonaphthalene"),
-    ("C1CC2CC3CCC2C(C1)N3", "decahydro-1,6-epiminonaphthalene"),
     ("C1CC2CCC3CC2C(C1)O3", "decahydro-1,7-epoxynaphthalene"),
     ("C1C2CC3C(CC4CC3C1N4)N2", "decahydro-1,7:3,5-diepiminonaphthalene"),
     ("C1CC2CCC3CC1CC2C3", "decahydro-2,7-methanonaphthalene"),
     ("C1CCC23CCC(CC2C1)C3", "octahydro-2H-2,4a-methanonaphthalene"),
+]
+
+#: (the Blue Book): '-NH- azano (preselected prefix)'; a prefix cited twice stays 'epimino'
+PRESELECTED = [
+    ("C1CC2CC3CCC2C(C1)N3", "decahydro-1,6-azanonaphthalene"),
 ]
 
 #: (b): the larger parent (benzo[7]/[8]annulene) beats naphthalene + a longer
@@ -79,7 +83,7 @@ CORRECTED = [
 ]
 
 
-@pytest.mark.parametrize("smiles,name", REPRODUCED + CORRECTED)
+@pytest.mark.parametrize("smiles,name", REPRODUCED + CORRECTED + PRESELECTED)
 def test_name_bridged_fused_pin_is_the_builder(smiles, name):
     res = name_bridged_fused_pin(Chem.MolFromSmiles(smiles))
     assert res is not None and res[0] == name, res

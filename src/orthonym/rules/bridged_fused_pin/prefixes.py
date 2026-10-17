@@ -5,9 +5,14 @@ bridge OPSIN 2.9.0 reads, '(epoxymethano)'.
 prefix derived from the corresponding unbranched hydrocarbon name by changing the final
 letter 'e' to 'o'." with the preferred prefixes '-CH2- methano', '-CH2-CH2- ethano',
 '-CH2-CH2-CH2- propano', '-CH=CH- etheno'. (:14095-:14110): '-O-' is 'epoxy'
-(a preselected prefix); 'epithio' and 'epimino' are general nomenclature only (the
-preselected 'sulfano' / 'azano' cannot be read back by OPSIN 2.9.0), so a name that
-carries one is recorded as not a PIN (``bridged_fused.GENERAL_ONLY_BRIDGE_PREFIXES``).
+(a preselected prefix); the preselected prefixes of '-S-', '-S-S-' and '-NH-' are 'sulfano',
+'disulfano' and 'azano'; 'epithio', 'epidithio' and 'epimino' are general nomenclature, so a
+name that carries one is recorded as not a PIN (``bridged_fused.GENERAL_ONLY_BRIDGE_PREFIXES``).
+A default-tier call spells the preselected prefixes (``twin_spellings.pin_spellings_on``);
+OPSIN 2.9.0 has no grammar for them, so the validity gate reads the name through its twin
+spelling (``validation.twin_spellings``). A wider tier spells the general prefixes, which OPSIN
+reads. A prefix cited more than once is spelled in the general form at both tiers: 'disulfano'
+names the -S-S- bridge, so it cannot stand for two -S- bridges.
  (:14173): "If there is more than one bridge, they are cited in alphabetical
 order... Two or more identical bridges are indicated by the numerical prefixes 'di',
 'tri', etc. with simple bridges... The locant pairs of identical bridges are separated by
@@ -28,11 +33,15 @@ _ALKANO = {1: "methano", 2: "ethano", 3: "propano", 4: "butano", 5: "pentano", 6
 #: bond positions numbered from the end that gives them the lowest locants)
 _ALKENO = {(2, (1,)): "etheno", (3, (1,)): "prop[1]eno", (4, (1,)): "but[1]eno",
            (4, (2,)): "but[2]eno", (4, (1, 3)): "buta[1,3]dieno"}
-#: (:14095-:14118): one-atom heteroatom bridges (the preselected 'epoxy',
-#: 'silano', 'stannano', 'borano'; the general-nomenclature 'epithio' / 'epimino',
-#: recorded as not a PIN)
+#: (:14095-:14118): one-atom heteroatom bridges as a wider tier spells them (the
+#: preselected 'epoxy', 'silano', 'stannano', 'borano'; the general-nomenclature 'epithio' /
+#: 'epimino', recorded as not a PIN)
 _ONE_ATOM = {"O": "epoxy", "S": "epithio", "N": "epimino", "Si": "silano", "Sn": "stannano",
              "B": "borano"}
+#: the preselected prefixes of the bridges whose general prefix differs (:14103,:14105,:14110)
+#: and the general prefixes OPSIN reads
+_PRESELECTED = {"epithio": "sulfano", "epidithio": "disulfano", "epimino": "azano"}
+_GENERAL = {v: k for k, v in _PRESELECTED.items()}
 _MULTIPLIER = multiplier_table(4)
 #: (the Blue Book) "The bonding number of a skeletal atom is standard when it
 #: has the value given in Table 1.3" (:2750-:2754): B 3, C Si Sn 4, N 3, O S 2
@@ -65,6 +74,23 @@ def _chain_double_bonds(chain: Sequence[int], unsat: Sequence[bool]) -> Optional
     return tuple(out)
 
 
+def _spelled(general: str) -> BridgePrefix:
+    """``general`` as the call's tier spells it: the preselected prefix of the same bridge at the
+    default tier, ``general`` itself otherwise or when it has no preselected one."""
+    from ...validation.twin_spellings import pin_spellings_on
+    prefix = _PRESELECTED.get(general) if pin_spellings_on() else None
+    prefix = prefix or general
+    return BridgePrefix(prefix, prefix not in GENERAL_ONLY_BRIDGE_PREFIXES)
+
+
+def multiplied_in_general_form(bridges: Sequence[BridgePrefix]) -> List[BridgePrefix]:
+    """``bridges`` with every preselected prefix that is cited more than once spelled in the
+    general form (see the module doc)."""
+    cited = [b.name for b in bridges]
+    return [BridgePrefix(_GENERAL[b.name], False, b.first)
+            if b.name in _GENERAL and cited.count(b.name) > 1 else b for b in bridges]
+
+
 def bridge_prefix(mol, split, i: int) -> Optional[BridgePrefix]:
     """The prefix of bridge ``i`` of ``split``, or None for a bridge this package does not
     spell (a ring bridge, a composite other than '(epoxymethano)', a charged or radical
@@ -81,8 +107,9 @@ def bridge_prefix(mol, split, i: int) -> Optional[BridgePrefix]:
     unsat = [a in split.unsaturated for a in chain]
     symbols = [a.GetSymbol() for a in atoms]
     if len(chain) == 1 and symbols[0] in _ONE_ATOM and not unsat[0]:
-        prefix = _ONE_ATOM[symbols[0]]
-        return BridgePrefix(prefix, prefix not in GENERAL_ONLY_BRIDGE_PREFIXES)
+        return _spelled(_ONE_ATOM[symbols[0]])
+    if symbols == ["S", "S"] and not any(unsat):
+        return _spelled("epidithio")                            #:14105
     if symbols == ["O", "O"] and not any(unsat):
         return BridgePrefix("epidioxy", True)                   #:14101 (preselected)
     if symbols == ["O", "O", "O"] and not any(unsat):

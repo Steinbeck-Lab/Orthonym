@@ -35,6 +35,7 @@ def test_isotope_label_not_dropped_and_roundtrips(namer):
     """
     from orthonym.jvm_budget import jvm_slots
     from orthonym.validation import opsin_roundtrip_check
+    from orthonym.validation.twin_spellings import twin_of
 
     smiles = "[2H]C(Cl)(Cl)Cl"
     with jvm_slots(1, purpose="test-v36-a3-isotope"):
@@ -45,9 +46,11 @@ def test_isotope_label_not_dropped_and_roundtrips(namer):
         assert name != "trichloromethane", (
             "isotope label was silently dropped (0-wrong hole reopened)"
         )
-        # It must be a D3-labelled name that OPSIN round-trips to the input.
+        # It must be a D-labelled name that OPSIN round-trips to the input: the printed
+        # 'trichloro(2H)methane' is read through its twin spelling '(2H1)'.
         assert "2H" in name, f"expected an isotope-labelled name, got {name!r}"
-        rt = opsin_roundtrip_check(smiles, name)
+        twin = twin_of(name)
+        rt = opsin_roundtrip_check(smiles, twin[0] if twin else name)
         assert rt and rt.get("passed"), (
             f"decorated isotope name {name!r} did not round-trip to {smiles}"
         )

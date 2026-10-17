@@ -552,12 +552,15 @@ class TestIsotopeEndToEnd:
         # forced scope IS active here (the descriptor needed locant 2).
         ("Clc1ccccc1C(F)(F)[13C](F)(F)F",
          "1-chloro-2-[1,1,2,2,2-pentafluoro(2-13C)ethyl]benzene"),
-        # partial substitution: denied on its own merits, label or no label. The
-        # D keeps (2H1): its omitted (2H) spelling is not OPSIN-parseable in this
-        # nested substituent slot, so the placement search falls back (FIX-A).
+        # partial substitution: denied on its own merits, label or no label. The unit
+        # cites locants in its unmodified name ('1,2,2,2-tetrafluoroethyl'), so the
+        # descriptor cites its locant too: (heading Omission of
+        # locants, the Blue Book) "locants are omitted if no locants are
+        # necessary in unmodified names"; (:44208,:44210) "all locants must
+        # be cited"; '1,1,1-trifluoro(2-2H1)ethane (PIN)' (:44155).
         # Square brackets by (:7478), as '{[(2H1)methoxy(2H2)methyl]
         # sulfanyl}methaneperoxol (PIN)' (:44188).
-        ("FC(F)(F)C(F)([2H])C1CCCCC1", "[1,2,2,2-tetrafluoro(2H1)ethyl]cyclohexane"),
+        ("FC(F)(F)C(F)([2H])C1CCCCC1", "[1,2,2,2-tetrafluoro(1-2H)ethyl]cyclohexane"),
         ("[13CH3]CO", "(2-13C)ethan-1-ol"),
     ])
     def test_labelled_scopes(self, namer, smiles, expected):

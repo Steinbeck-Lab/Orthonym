@@ -50,6 +50,7 @@ from .stereochemistry import (
     get_junction_locants_for_fused_system,
 )
 from ..perception.smarts_cache import compiled as _compiled_smarts
+from .fused_interior import interior_pin_name as _interior_pin_name
 
 # Simple multiplicative prefixes for substituent naming
 SIMPLE_MULTIPLIERS = multiplier_table(10)
@@ -2917,7 +2918,7 @@ def name_fused_heterocycle(mol):
         return (oxo_purine_name, ring_atoms, {}, True)
 
     # First try exact match for unsubstituted fused heterocycle
-    result = get_fused_heterocycle_name(mol)
+    result = _interior_pin_name(mol) or get_fused_heterocycle_name(mol)
     if result:
         name, tautomer_locant = result
         return (name, ring_atoms, {}, True)  # Name already includes tautomer locant if present
@@ -2975,18 +2976,14 @@ def name_fused_heterocycle(mol):
         naphtho = _name_naphtho_fused_generate_and_test(mol)
         if naphtho:
             return (naphtho, ring_atoms, {}, True)
-        # Wave-2 P5 fused (Task 7) FAIL-CLOSED follow-up: interior-heteroatom
-        # ortho-/peri-fused systems /.2.1/.2.2/.2.3/.3.3.2) require
-        # a superscript interior locant (e.g. 3a1 / 2a1H). OPSIN 2.9 CANNOT
-        # parse any name carrying that token (verified: '2a1H-cyclopenta[cd]-
-        # pyrene', 'pyracylene' -> blank), so there is NO verifiable oracle for
-        # the interior-locant PIN. We deliberately decline here (return None)
-        # rather than emit an unverifiable interior-superscript fusion name;
-        # the production gate additionally suppresses any von-Baeyer
-        # fallback that does not round-trip. Build the interior-atom-numbering
-        # engine when a parseable oracle (newer OPSIN / hand-checked internal
-        # oracle) exists. See tests/unit/rules/test_wave2_p5_fused.py
-        #::TestP25InteriorAtomNumberingFailClosed.
+        # Interior-atom systems need the superscript locant of
+        # (the Blue Book, '3a^1'), which OPSIN 2.9.0 cannot read, so a
+        # general interior-atom numbering has no read-back. The parents the book
+        # prints are in data.fused_interior_pins and are named at the default
+        # tier by the lookup above (checked through their twin spelling, rule
+        # interior_phenalene); every other interior-atom system is declined here.
+        # See tests/unit/rules/test_twin_interior.py and tests/unit/rules/
+        # test_wave2_p5_fused.py::TestP25InteriorAtomNumberingFailClosed.
         return None
 
     core_name, atom_mapping, _core_smiles = core_result

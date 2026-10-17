@@ -270,7 +270,8 @@ def _name_component(frag_smi: str, style: str, *,
     # salt name built on it could not be read back either, and at the default
     # tier it shipped on the stereo-stripped branch.
     from orthonym.namer import _is_exact_match_list_name, _validity_gate_status
-    if (_validity_gate_status(name) == "rejected"
+    from orthonym.validation.twin_spellings import opsin_spelling
+    if (_validity_gate_status(opsin_spelling(name)) == "rejected"
             and not _is_exact_match_list_name(frag_smi, name)):
         return None
     return name

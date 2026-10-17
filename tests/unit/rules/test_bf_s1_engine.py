@@ -68,9 +68,11 @@ def test_a_rejected_bridged_name_leaves_the_von_baeyer_fallback(smiles, monkeypa
 
 
 def test_a_general_bridge_inside_a_larger_name_is_not_a_pin():
-    # Review Focus 1 continued: the package also records 'epithio':14097)
+    # Review Focus 1 continued: the package also records 'epithio':14097); the
+    # default tier spells the preselected 'sulfano', which is a PIN
     smiles = "CC1=CC2SC1c1ccccc12"
-    assert _row(smiles, "pin")["tier"] == "abstain"
+    pin = _row(smiles, "pin")
+    assert (pin["name"], pin["tier"]) == ("2-methyl-1,4-dihydro-1,4-sulfanonaphthalene", "pin_verified")
     be = _row(smiles, "best-effort")
     assert be["name"] == "2-methyl-1,4-dihydro-1,4-epithionaphthalene"
     assert be["tier"] == "systematic_verified" and be["is_pin"] is False

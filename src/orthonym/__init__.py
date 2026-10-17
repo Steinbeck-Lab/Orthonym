@@ -8,7 +8,9 @@ the strict path for the Preferred IUPAC Name built it and verified it; its only
 exceptions are a few names OPSIN cannot read (retained natural-product and
 metal-complex names from exact-match lists, a few name forms outside OPSIN's
 grammar, and stereodescriptors OPSIN cannot parse), returned without that full
-read-back and marked in the provenance row (``Orthonym.name_tiered``). When
+read-back, and a few PIN spellings OPSIN has no grammar for, read back through
+a twin spelling of the same structure; the provenance row marks each of them
+(``Orthonym.name_tiered``). When
 no name passes, you get a label that says so instead of a name; the wider tiers
 also return names that are not the preferred name.
 

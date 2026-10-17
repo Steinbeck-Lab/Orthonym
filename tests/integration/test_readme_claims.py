@@ -12,7 +12,11 @@ witnesses of each class:
 * "The default tier makes a few exceptions for names OPSIN cannot read in full...
   `--provenance` marks each of them. The wider tiers ship none of them, except the
   metal-complex list names" -- a grammar carve-out (thioperoxol), a constitution-only
-  name (cis-cyclohexane-1,4-diol) and the heme b list name.
+  name (cis-cyclohexane-1,4-diol) and the heme b list name;
+* "PIN spellings that OPSIN's grammar lacks and that OPSIN reads back through a twin
+  spelling of the same structure" -- 1,4-dihydro-1,4-sulfanonaphthalene, ``verified``
+  'opsin_twin': a fresh OPSIN call reads nothing for the name and reads its twin to the
+  input; a wider tier names the structure in a spelling OPSIN reads.
 """
 import pytest
 from rdkit import Chem
@@ -20,6 +24,7 @@ from rdkit.Chem import inchi
 
 from orthonym import Orthonym, name_compound
 from orthonym.cli import _emit_tier_flags
+from orthonym.validation.twin_spellings import twin_of
 from tests.support.rt_assert import _independent_parse
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
@@ -114,3 +119,21 @@ def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers()
             if row["name"]:
                 assert row["verified"] == "opsin", row
                 assert _key(_independent_parse(row["name"])) == _key(s), row
+
+
+def test_default_tier_twin_checked_pin_spelling_is_read_back_through_its_twin():
+    sulfano = "C12C=CC(C3=CC=CC=C13)S2"        # naphthalene, C1 and C4 bridged by -S-
+    name, twin = "1,4-dihydro-1,4-sulfanonaphthalene", "1,4-dihydro-1,4-epithionaphthalene"
+    row = _row(sulfano)
+    assert row["name"] == name, row
+    assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
+    assert row["verified"] == "opsin_twin", row
+    assert row["gate_outcome"] == "twin_verified:bridge_sulfano", row
+    assert "twin_round_trip" in row["gates_passed"], row
+    assert twin_of(name) == (twin, ("bridge_sulfano",))
+    assert _independent_parse(name, sulfano) is None              # OPSIN has no grammar for the name
+    assert _key(_independent_parse(twin, sulfano)) == _key(sulfano)   # and reads its twin to the input
+    for tier in ("valid", "best-effort"):                         # a wider tier ships the twin's form
+        wide = _row(sulfano, tier)
+        assert wide["name"] == twin, wide
+        assert wide["verified"] == "opsin" and wide["tier"] != "pin_verified", wide

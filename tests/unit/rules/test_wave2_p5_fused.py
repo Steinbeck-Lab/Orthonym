@@ -151,18 +151,24 @@ class TestP25ParentSelectionTiebreakGtoJ:
 @pytest.mark.unit
 class TestP25InteriorAtomNumberingFailClosed:
     """/.2.1/.2.2/.2.3/.3.3.2 — interior-atom numbering needs
-    superscript interior locants (3a1 / 2a1H). OPSIN 2.9 CANNOT parse any
+    superscript interior locants (3a^1 / 2a^1H). OPSIN 2.9 CANNOT parse any
     name carrying such a token (verified: '2a1H-cyclopenta[cd]pyrene' and
-    'pyracylene' both yield blank), so there is NO verifiable oracle.
-    Orthonym MUST fail closed (never emit an unverifiable interior-locant
-    name). Follow-up: build the interior_atom_numbering_engine when a
-    parseable oracle exists.
+    'pyracylene' both yield blank), so a general interior-atom numbering has
+    no read-back and Orthonym fails closed on it: it never emits an
+    unverifiable interior-locant name.
+
+    The default tier names the parents the Blue Book prints, with the
+    superscript locant of (the Blue Book,
+    '1,3a^1,4,9-tetraazaphenalene (PIN)':14491), and checks each name through
+    its twin spelling with the former locant ('1,9b,4,9-tetraazaphenalene');
+    those rows are in tests/unit/rules/test_twin_interior.py. The two skeletons
+    below are not printed, so they keep the contract.
 
     NOTE 1: the plan's original probe SMILES (benzo[ghi]perylene with an
     interior N/O forced) are INVALID in RDKit; per the plan's fallback
     instruction they are replaced with the RDKit-valid interior-heteroatom
     phenalene skeletons (central N shared by all three peri-fused rings = the
-    3a1 interior position).
+    3a^1 interior position).
 
     NOTE 2 (reproduce-first finding): the test-suite conftest autouse fixture
     `_disable_opsin_validity_gate_for_tests` turns the production OPSIN
@@ -188,10 +194,10 @@ class TestP25InteriorAtomNumberingFailClosed:
         if m is None:
             pytest.skip("probe SMILES invalid in RDKit; substitute a valid interior-heteroatom peri-fused system")
         out = _dt_name_compound(smiles)
-        # a fused interior superscript locant looks like <digit>a<digit> or a
-        # '<digit>a<digit>H-' indicated-H prefix (NOT the von-Baeyer '^n,m').
+        # a fused interior superscript locant looks like <digit>a^<digit> or a
+        # '<digit>a^<digit>H-' indicated-H prefix (NOT the von-Baeyer '0^2,7').
         import re
-        assert not re.search(r"\d+a\d+", out or ""), (
+        assert not re.search(r"\d+a\^?\d+", out or ""), (
             f"emitted an interior-superscript fusion name: {out!r}"
         )
 
@@ -236,7 +242,7 @@ class TestP25InteriorAtomNumberingFailClosed:
         rt = opsin_roundtrip_check(smiles, out)
         assert rt.get("passed"), f"{out!r} did not round-trip: {rt.get('error')}"
         # fail-closed contract: never an unverifiable interior-superscript fusion name.
-        assert not re.search(r"\d+a\d+", out), f"emitted an interior-superscript fusion name: {out!r}"
+        assert not re.search(r"\d+a\^?\d+", out), f"emitted an interior-superscript fusion name: {out!r}"
 
 
 @pytest.mark.unit

@@ -152,13 +152,16 @@ def test_the_cli_default_tier_prints_the_decline():
 
 
 # The --help text of --emit-tier and --trivial, pinned word for word: the guide and the
-# README quote it (the paper's words; guide_sentences Part B).
+# README quote it (the paper's words, with the clause on the PIN spellings that OPSIN
+# reads back through a twin spelling; guide_sentences Part B).
 EMIT_TIER_HELP = (
     "Which names to return. pin (the default): a name only when the pipeline can "
-    "build the preferred IUPAC name (PIN), that is when the strict PIN path built the "
-    "name and verified it (tier pin_verified). The exceptions are names from the "
-    "natural-product and metal-complex lists, the name formats absent from OPSIN's "
-    "grammar (for example inositols, phanes and thioperoxols), PINs whose "
+    "build the preferred IUPAC name (PIN), that is when the strict PIN path built "
+    "the name and verified it (tier pin_verified). The exceptions are names from "
+    "the natural-product and metal-complex lists, the name formats absent from "
+    "OPSIN's grammar (for example inositols, phanes and thioperoxols), PIN "
+    "spellings that OPSIN reads back through a twin spelling of the same structure "
+    "(1,4-dihydro-1,4-sulfanonaphthalene, ethan(2H)ol), PINs whose "
     "stereodescriptors OPSIN cannot read, for which the default tier compares the "
     "constitution, and, with --trivial, a retained trivial name. Otherwise it "
     "declines, with the reason code NO_VERIFIED_PIN when it built a name that is not "

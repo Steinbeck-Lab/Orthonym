@@ -8,6 +8,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules.bridged_fused_pin import build
+from tests.support.wider_tier import wider_tier
 
 
 def _name(smiles):
@@ -135,13 +136,20 @@ def test_a_tie_between_different_bridges_declines(monkeypatch):
 
 
 def test_a_general_bridge_prefix_is_recorded_as_not_a_pin():
-    # (:14097): the name is built, and 'epithio' is recorded as a part that
-    # is never a PIN, so name_tiered labels any name carrying it below pin_verified
+    # (:14097): a wider tier spells 'epithio', recorded as a part that is never a
+    # PIN, so name_tiered labels any name carrying it below pin_verified; the default tier spells
+    # the preselected 'sulfano' and records nothing
     from orthonym.metrics import provenance as pv
     pv.clear_provenance()
-    name = _name("CC1=CC2SC1c1ccccc12")
+    with wider_tier():
+        name = _name("CC1=CC2SC1c1ccccc12")
     assert name == "2-methyl-1,4-dihydro-1,4-epithionaphthalene"
     assert pv.name_carries_non_pin_part(pv.get_provenance(), name)
+    pv.clear_provenance()
+    name = _name("CC1=CC2SC1c1ccccc12")
+    assert name == "2-methyl-1,4-dihydro-1,4-sulfanonaphthalene"
+    assert not pv.name_carries_non_pin_part(pv.get_provenance(), name)
+    pv.clear_provenance()
 
 
 def test_the_prefix_speller_puts_a_letter_locant_after_its_number():

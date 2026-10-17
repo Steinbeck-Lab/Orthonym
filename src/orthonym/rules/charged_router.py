@@ -2282,8 +2282,9 @@ def _cation_name_rt_ok(name: str, mol) -> bool:
     from rdkit.Chem.inchi import MolToInchiKey
 
     from ..validation.opsin_roundtrip import opsin_parse
+    from ..validation.twin_spellings import opsin_spelling
     try:
-        parsed = opsin_parse(name)
+        parsed = opsin_parse(opsin_spelling(name))     # a PIN spelling OPSIN has no grammar for is read as its twin
         if not parsed:
             return False
         pm = Chem.MolFromSmiles(parsed)

@@ -66,10 +66,11 @@ def _reads_back(mol, name: str) -> bool:
         from rdkit import Chem
 
         from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        from ..validation.twin_spellings import opsin_spelling
         smiles = Chem.MolToSmiles(mol)
         if not smiles:
             return False
-        res = opsin_roundtrip_check(smiles, name)
+        res = opsin_roundtrip_check(smiles, opsin_spelling(name))
         if res.get("passed") is not True:
             return False
         back = Chem.MolFromSmiles(res.get("opsin_smiles") or "")

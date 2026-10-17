@@ -267,8 +267,10 @@ def test_nr1_regression_restored_best_effort(smiles, expected):
 # Every string OPSIN-round-trips to the input structure (0-wrong).
 #
 # ⚠ Subscript convention (both settled here): the UNLOCANTED aldehyde -CHO
-# hydrogen KEEPS its count subscript (``(2H1)`` — OPSIN rejects the count-less
-# ``benzene(2H)carbaldehyde``), while a LOCANTED aromatic ring CH OMITS it
+# hydrogen KEEPS its count subscript at the best-effort tier (``(2H1)`` — OPSIN
+# rejects the count-less ``benzene(2H)carbaldehyde``, which the default tier ships
+# through its twin spelling: tests/unit/rules/test_twin_isotopes.py), while a
+# LOCANTED aromatic ring CH OMITS it
 # (``(4-2H)``, not ``(4-2H1)`` — both round-trip, the count-less form is the
 # BB-preferred spelling). These EXACT-STRING plain asserts are the guard: the
 # ¹⁸O front-vs-suffix placement and the ²H subscript are round-trip-BLIND (both

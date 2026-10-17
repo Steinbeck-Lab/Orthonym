@@ -24,7 +24,9 @@ each name test rejects (``scripts/mutation_check.py``).
          its locants,:44202).
     a count subscript the preferred form omits ('ethan-1-(2H1)ol' where the
          Blue Book writes 'ethan(2H)ol (PIN)',,:44184) is only a parse
-         fallback: the name ships below the PIN.
+         fallback: the best-effort name ships below the PIN. The default tier
+         spells the printed form and ships it through its twin spelling
+         (tests/unit/rules/test_twin_isotopes.py).
     an amidine on a heterocycle is the '-carboximidamide' suffix,
          the Blue Book, 'cyclohexanecarboximidamide (PIN)':34206), never
          a 'carbamimidoyl' prefix on the ring.

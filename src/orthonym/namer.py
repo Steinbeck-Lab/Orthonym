@@ -40,6 +40,8 @@ from .errors import (
 from .gate_retry import gate_candidate, name_with_forced_locants
 from .metrics.producer_trail import carried as _carried, noted as _noted, suspended as _suspended
 from .validation.opsin_ambiguity import reject_ambiguous, restore_withdrawn, withdrawn_name
+from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
+                                        twin_outcome_holds, wider_tier_ctx)
 from .validation.stereo_descriptors import (  # noqa: F401 both names are imported FROM this module (tests, spies); callers resolve them here at call time
     stereo_block_units as _stereo_block_units,
     stereo_descriptors_verified as _stereo_descriptors_verified,
@@ -776,12 +778,14 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
     prov = _pv.get_provenance()
     resolved = _pv.resolve_gate_outcome(
         prov["gate_outcome"], prov["gate_outcome_name"], name)
-    if resolved in (_pv.GATE_OUTCOME_SELF01,
-                    _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
-                    _pv.GATE_OUTCOME_STEREO_RECOMPOSED):
+    if (resolved in (_pv.GATE_OUTCOME_SELF01,
+                     _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
+                     _pv.GATE_OUTCOME_STEREO_RECOMPOSED)
+            or resolved.startswith(_pv.GATE_OUTCOME_TWIN_PREFIX)):
         # STEREO_RECOMPOSED is full-InChIKey verified (a review -P2 F3) — a
         # stronger proof than, so it takes the same "verdict ok, no
         # reanchor needed" path (the name is already the reanchored, verified form).
+        # A twin outcome is the full-key proof of the twin spelling.
         return True, False, ""
     if resolved == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH:
         return False, False, ""
@@ -2778,6 +2782,9 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         _record_gate_outcome(
             _pv.carveout_outcome("organometallic_additive"), name)
         return name
+    # A PIN spelling OPSIN has no grammar for ships when its twin spelling reads to the input's full key.
+    if smiles is not None and not general_fallback_tier and twin_gate_ships(name, smiles):
+        return name
     # OPSIN-validity stereo carve-out / (a phase): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
     # constitutional form parses — then OPSIN's narrower generation-side stereo
@@ -3064,6 +3071,9 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
         return verify_or_none(name, input_smiles) is not None
     if not _validity_gate_jar_present():
         return True  # fail-OPEN: no jar to consult
+    _twin_holds = twin_outcome_holds(name, input_smiles)  # OPSIN rejects a twin-verified name
+    if _twin_holds is not None:
+        return _twin_holds
     # NOTE: deliberately NOT short-circuited on `self01_complete is True`
     # (L3-1's whole point) -- proceed to the full-InChIKey compare below,
     # reusing the memoized name_to_smiles lookup regardless of what the
@@ -3089,7 +3099,7 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
         # already fails CLOSED on the same blip. A definitive 'rejected' fails
         # closed for every string regardless.
         return (self01_complete is True
-                and _validity_gate_status(name) == "unavailable")
+                and _validity_gate_status(name) == "unavailable") or twin_offer_holds(name, input_smiles)
     if not input_smiles:
         return True  # nothing to compare against -- inconclusive, fail-OPEN
     return _full_inchikey_offer_match(input_smiles, opsin_smiles, name)
@@ -4998,11 +5008,10 @@ class Orthonym:
                     self._general_fallback)))
             except Exception:
                 pass
-            # the P/S oxoacid group prefixes (rules/oxoacid_group_prefix): the wider-tier
-            # flag that survives the isolated naming sessions of the fragment recursion
+            # the wider-tier flags of the P/S oxoacid group prefixes and of the PIN spellings
+            # (validation/twin_spellings): they survive the isolated naming sessions
             try:
-                from .rules.oxoacid_group_prefix import ps_tier_ctx
-                _ctx_tokens.append((ps_tier_ctx, ps_tier_ctx.set(bool(self._general_fallback))))
+                _ctx_tokens.extend(publish_tier_flags(bool(self._general_fallback)))
             except Exception:
                 pass
             #: publish the BEST-EFFORT discriminator for the same reason and
@@ -5592,9 +5601,10 @@ class Orthonym:
                 The name, or a label when there is none.
             ``tier``
                 How the name was built: ``pin_verified`` (the strict path for the
-                Preferred IUPAC Name built it, certified it and OPSIN read it back;
-                or a name from an exact-match list, matched to the input's exact
-                structure, with ``verified`` ``identity``),
+                Preferred IUPAC Name built it, certified it and OPSIN read it back,
+                or read back a twin spelling of it; or a name from an exact-match
+                list, matched to the input's exact structure, with ``verified``
+                ``identity``),
                 ``pin_unverified`` (a name in preferred-name form that OPSIN read
                 back, but whose preferred status is not certified: a producer outside
                 the strict path built it or a part of it),
@@ -5612,14 +5622,17 @@ class Orthonym:
                 ``abstain``.
             ``opsin``
                 What the OPSIN check found: ``verified``,
-                ``verified_constitution_only``, ``unverified`` or ``n/a``.
+                ``verified_constitution_only``, ``verified_twin`` (OPSIN has no
+                grammar for the name and read a twin spelling of it back to your
+                structure), ``unverified`` or ``n/a``.
             ``gates_passed``
                 The checks this name passed, for example ``self_consistency``
                 (OPSIN read the name back to your structure) and ``atom_coverage``.
             ``gate_outcome``
                 What the final OPSIN check did for this name, for example
                 ``self_consistency_verified``, ``suppressed`` or ``not_run``, or
-                ``carveout:<class>`` for a class OPSIN cannot read.
+                ``carveout:<class>`` for a class OPSIN cannot read, or
+                ``twin_verified:<rules>`` for a name read back through its twin.
             ``formula``
                 The molecular formula, given when there is no name.
             ``limit_code``
@@ -5651,7 +5664,9 @@ class Orthonym:
                 structure; OPSIN cannot read these names), ``opsin_split`` (OPSIN
                 read the whole name back to the drawing of the input without its
                 dative bonds, which has the reference key; the drawing as given has
-                no standard InChIKey) or ``unverified`` (no read-back recorded).
+                no standard InChIKey), ``opsin_twin`` (a PIN spelling OPSIN has no
+                grammar for; OPSIN read a twin spelling of the same structure back
+                to the same molecule) or ``unverified`` (no read-back recorded).
             ``spelling_failures``
                 The spelling rules of the PIN a name in PIN form breaks, as
                 ``{"rule": "", "detail":...}`` entries
@@ -5883,7 +5898,7 @@ class Orthonym:
             # The inline engine lane records no engine verdict (prov["opsin"]
             # None); the validity gate's outcome for this string then decides.
             opsin = prov["opsin"] or gate_opsin_label
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             _tier_if_verified = SYSTEMATIC_VERIFIED
             is_pin = False
             stereo_unexpressed = bool(prov.get("stereo_unexpressed"))
@@ -5920,7 +5935,7 @@ class Orthonym:
                 _non_pin_scope)
             _tier_if_verified = (SYSTEMATIC_VERIFIED if _known_non_pin
                                  else PIN_UNVERIFIED)
-            tier = _tier_if_verified if opsin == "verified" else BEST_EFFORT
+            tier = _tier_if_verified if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
             _label_rule_failures = _pv.non_pin_label_rule_failures(prov, _non_pin_scope)
         else:
@@ -6069,7 +6084,7 @@ class Orthonym:
         # A verified name keeps the tier it earns verified -- systematic_verified
         # for the general engine, pin_unverified for a PIN-path name with a
         # non-PIN part -- instead of the best_effort it read while unverified.
-        if (tier == BEST_EFFORT and opsin == "verified"
+        if (tier == BEST_EFFORT and opsin in _pv.VERIFIED_OPSIN_LABELS
                 and _tier_if_verified is not None):
             tier = _tier_if_verified
         # (The four no-PIN-status demotions below run after the shipped-name check
@@ -6083,7 +6098,7 @@ class Orthonym:
         # "currently do not have PIN status". 'dimethylaluminum' for C[Al]C shipped
         # pin_verified. Such a name is a verified systematic name at most.
         if tier in (PIN_VERIFIED, PIN_UNVERIFIED) and _has_no_pin_status_element(smiles):
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
         # TRIAGE j12 finding 6: likewise (the Blue Book) notes no PIN for
         # organometallic compounds of the Group 1-12 metals, except the ocenes ('tert-butyllithium',
@@ -6095,13 +6110,13 @@ class Orthonym:
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
                 and (_is_p69_organometallic_without_pin(smiles, name) and not _is_coord_list
                      or _is_metal_name_without_pin(smiles, name))):
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
         # Breadth Job 2: a mixed organic-inorganic adduct of a metal has no PIN
         # either, the Blue Book). Same demotion; the name is unchanged.
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
                 and _is_metal_adduct_without_pin(smiles, name)):
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
         # A carbon-free compound ('sodium chloride', 'sulfuric acid', 'ammonia')
         # keeps the label its naming path gives it (user decision 2026-09-30: the
@@ -6116,7 +6131,7 @@ class Orthonym:
         if (tier in (PIN_VERIFIED, PIN_UNVERIFIED)
                 and _is_one_atom_ion_salt(smiles) and _has_metal_atom(smiles)
                 and not _is_carbon_free_compound(smiles)):
-            tier = SYSTEMATIC_VERIFIED if opsin == "verified" else BEST_EFFORT
+            tier = SYSTEMATIC_VERIFIED if opsin in _pv.VERIFIED_OPSIN_LABELS else BEST_EFFORT
             is_pin = False
         gates = []
         if source == "general_engine":
@@ -6147,6 +6162,8 @@ class Orthonym:
         # is confirmed by OPSIN, the descriptors by the CIP check
         # of _stereo_descriptors_verified (R68: this used to say
         # "opsin" although OPSIN rejects the full name)
+        # "opsin_twin" -> OPSIN read a twin spelling of the name (a PIN spelling it
+        # has no grammar for) back to the input's full key
         # "reconstructor" -> (SP5.6, if built) structurally reconstructed
         # "unverified" -> emitted with no passing oracle (/ D2 additive,
         # a grammar carve-out), or an abstain row. Never
@@ -6157,10 +6174,8 @@ class Orthonym:
         if name and not is_failure_name(name):
             if _is_coord_list or _is_np_list:
                 verified = "identity"
-            elif opsin == "verified":
-                verified = "opsin"
-            elif opsin == "verified_constitution_only":
-                verified = "opsin_constitution"
+            else:
+                verified = _pv.VERIFIED_FIELD_BY_OPSIN_LABEL.get(opsin, verified)
         # Spelling checks that do not rely on the round trip (validation/pin_spelling.py):
         # a round trip proves the molecule, never the spelling ('pyrido[1,2-b]pyridazin-
         # 6-one' reads back to the input as well as the PIN '6H-pyrido[1,2-b]pyridazin-
@@ -6217,9 +6232,9 @@ class Orthonym:
         # pin_verified -> pin_unverified (not a certified PIN, as for the other
         # pin_unverified demotions), systematic_verified -> best_effort. Labels
         # only: the name and the gate outcome are unchanged.
-        if tier == PIN_VERIFIED and verified not in ("opsin", "identity"):
+        if tier == PIN_VERIFIED and verified not in _pv.VERIFIED_FIELD_FOR_TIER:
             tier, is_pin = PIN_UNVERIFIED, False
-        elif tier == SYSTEMATIC_VERIFIED and verified not in ("opsin", "identity"):
+        elif tier == SYSTEMATIC_VERIFIED and verified not in _pv.VERIFIED_FIELD_FOR_TIER:
             tier = BEST_EFFORT
         # D3: the best-effort last resort cited the parent's prefixes out of the
         # order (``_maybe_prefix_order_fallback``): never a PIN, best_effort.
@@ -8571,10 +8586,10 @@ class Orthonym:
           already read costs no new parse) unless a full-key proof is recorded
           for this string; pass -> labelled verified, else withdrawn;
         * the default tier: a verified outcome recorded for this string (,
-          the documented constitution-only stereo branch, the full-key ones) or
-          one of the documented grammar carve-outs passes; a string the gate never
-          judged (``bypassed`` / ``not_run``) goes through the default-tier gate
-          now; anything else (an 'inconclusive' compare, 'unavailable' with the
+          the documented constitution-only stereo branch, the full-key ones, the
+          twin-spelling one) or one of the documented grammar carve-outs passes; a
+          string the gate never judged (``bypassed`` / ``not_run``) goes through the
+          default-tier gate now; anything else (an 'inconclusive' compare, 'unavailable' with the
           jar present,...) is withdrawn. The ``off`` / ``warn``
           configurations keep their documented meaning.
         """
@@ -8612,7 +8627,8 @@ class Orthonym:
                                     _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
                                     _pv.GATE_OUTCOME_STEREO_RECOMPOSED,
                                     _pv.GATE_OUTCOME_FULL_KEY_VERIFIED)
-                        or outcome.startswith(_pv.GATE_OUTCOME_CARVEOUT_PREFIX)
+                        or outcome.startswith((_pv.GATE_OUTCOME_CARVEOUT_PREFIX,
+                                               _pv.GATE_OUTCOME_TWIN_PREFIX))
                         or (outcome == _pv.GATE_OUTCOME_SELF01_SKIPPED
                             and _SC_MODE == "off")
                         or (outcome == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH
@@ -11343,7 +11359,7 @@ def name_pipeline_only(smiles: str, style: str = "pin"):
         # nacyl_float_refusing: decision A's N-acyl float scope (see name's key).
         _key = (smiles, style, general_fallback_ctx.get(), best_effort_ctx.get(),
                 allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
-                nacyl_float_refusing())
+                nacyl_float_refusing(), wider_tier_ctx.get())
         return cache_or_compute("name_pipeline_only", _key, _body)
     finally:
         pop_scope(_memo_token)

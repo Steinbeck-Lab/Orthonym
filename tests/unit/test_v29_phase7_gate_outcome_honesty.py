@@ -284,3 +284,16 @@ def test_only_two_outcomes_may_claim_verification():
                     "carveout:inositol", "carveout:phane",
                     "a-state-that-does-not-exist-yet", None):
         assert pv.opsin_label_for_gate_outcome(outcome) == "unverified", outcome
+
+
+def test_a_twin_outcome_claims_the_twin_verification_and_no_other():
+    """The outcome of a name read back through its twin spelling reports the twin label and
+    token; a string that merely resembles it reports ``unverified``."""
+    outcome = pv.twin_outcome("bridge_sulfano")
+    assert outcome == "twin_verified:bridge_sulfano"
+    assert pv.opsin_label_for_gate_outcome(outcome) == "verified_twin"
+    assert pv.gate_token_for_gate_outcome(outcome) == "twin_round_trip"
+    assert pv.VERIFIED_FIELD_BY_OPSIN_LABEL["verified_twin"] == "opsin_twin"
+    for other in ("twin_verified", "carveout:twin_verified:x", "x-twin_verified:bridge_sulfano"):
+        assert pv.opsin_label_for_gate_outcome(other) == "unverified", other
+        assert pv.gate_token_for_gate_outcome(other) is None, other
