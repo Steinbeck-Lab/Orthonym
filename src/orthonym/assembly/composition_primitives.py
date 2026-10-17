@@ -550,10 +550,30 @@ def retained_acetic_from_prefixes(
     aldehyde arm in ``rules/polyfunctional.py``. The caller is likewise responsible
     for gating the whole assembly to the substituted-2-carbon-mono-FG context; this
     function only performs the retained-name assembly.
+
+    While an isotope label that needs a locant sits on the parent (``locant_omission.
+    isotope_retained_c2_unit_scope``) the omission is withdrawn and the locants are
+    cited: ['2-hydroxy'] -> '2-hydroxyacetic acid', so that '2-hydroxy(2,2-2H2)acetic
+    acid' is built on it, the Blue Book).
     """
-    name = _join_prefix_to_name(
-        unlocanted_prefix_block(prefix_texts, enclose_subsequent=enclose_subsequent),
-        parent)
+    # (the Blue Book) is a licence, and (:2869) as an ambient scope withdraws it
+    # while an essential locant is in the scope. (:44180): "if isotopic modification requires a
+    # locant to specify its position, then all locants must be specified and none are omitted";
+    # (:44208) scopes that to the unit that needs the locant, here the parent, whose label the isotope path
+    # declares (``locant_omission.isotope_retained_c2_unit_scope``): '2-hydroxy(2,2-2H2)acetic acid'. The
+    # parent word stays the retained one and its substituent locants are cited, as 'acetamide' cites them.
+    from .locant_omission import (  # local: avoid import cycle
+        locants_are_forced, retained_c2_unit_has_isotope_label)
+    # A bare '(S)-' is the descriptor of the locant-free spelling,:44643, 'preceded by a numerical or
+    # letter locant... when such locants are present'): with the locants cited the descriptor is '(2S)-' and
+    # the spelling the caller built does not fit, so a name with a descriptor of the parent keeps the omitted
+    # form it had.
+    if (locants_are_forced() and retained_c2_unit_has_isotope_label() and prefix_texts and not stereo
+            and all(_ALPHA_LOCANT_RE.match(t) for t in prefix_texts)):
+        block = _join_prefixes(prefix_texts)
+    else:
+        block = unlocanted_prefix_block(prefix_texts, enclose_subsequent=enclose_subsequent)
+    name = _join_prefix_to_name(block, parent)
     return f"{stereo}{name}" if stereo else name
 
 

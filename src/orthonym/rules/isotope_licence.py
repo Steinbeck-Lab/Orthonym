@@ -28,6 +28,17 @@ hydrogens shows its count ('(2H)phosphoric acid' has three equivalent OH). It al
 hydrogens are not all alike ('(2H)formic acid' has the isomer '(O-2H)formic acid') or when the unmodified
 name cites locants ('1-chloro-1,2,2,2-tetrafluoroethane': '1-chloro-1,2,2,2-tetrafluoro(1-2H)ethane').
 
+A count-only descriptor over a retained name whose characteristic group is IMPLIED (``implied_group_hydrogens``).
+ (:43800) prints '(2-2H1)acetic acid (PIN)' (:43804) next to '(O-2H)acetic acid (PIN)' (:43806), and
+ (:43824) '(N-2H1)acetamide (PIN)' (:43828): the O-H of 'acetic acid' and the N-H of 'acetamide' are
+positions of the unit the front descriptor stands before, because the name has no suffix of its own for them
+('ethan(2H)ol',:44184, has one). A descriptor that cites only a count, '(2H3)acetic acid', then has the isomer
+'(2-2H1,O-2H)acetic acid',:44202), so its locants are cited, '(2,2,2-2H3)acetic acid', and with them
+the locants of the unmodified name,:44180). The retained parents 'acetic acid', 'acetonitrile' and
+'acetaldehyde' omit the locants of their substituents,:3031); while the label sits on that parent
+the omission is withdrawn (``retained_c2_unit_carries_isotope``, ``locant_omission.isotope_retained_c2_unit_scope``):
+'2-hydroxy(2,2-2H2)acetic acid'.
+
 OPSIN 2.9.0 rejects the count-less spelling, so it is only ever read through its twin
 (``validation.twin_spellings``, rule ``isotope_count_one``).:func:`twin_licensed` keeps that reading from
 licensing a count-less spelling where the Blue Book shows the count, and:func:`needs_locant` sends the
@@ -62,6 +73,111 @@ def _hydrogen_unit(mol: Chem.Mol, carrier: int) -> set:
     unit = iso._element_scope(mol, carrier, mol.GetAtomWithIdx(carrier).GetSymbol())
     return unit | {nb.GetIdx() for i in unit for nb in mol.GetAtomWithIdx(i).GetNeighbors()
                    if nb.GetAtomicNum() > 1 and nb.GetSymbol() != "C"}
+
+
+#: the word of a name that names the group of an acid or an amide; a hydrogen of such a group is in the unit of
+#: the name that holds the word ('acetic acid', 'acetamide', 'acetamido'), not in the unit of a name that
+#: names the group by a prefix ('1-(nitrosoamino)-1-oxoethane')
+_ACID_WORD = re.compile(r"\bacid\b")
+_AMIDE_WORD = re.compile(r"amid|hydrazid")
+
+
+def _prefix_head(skel: str, off: int) -> Optional[str]:
+    """The substituent prefix that the word at ``off`` of ``skel`` begins with and runs into the next part of the
+    name ('acetamido' of 'acetamidoacetic acid', 'acetyl' of 'acetylacetamide', 'methyl' of 'methylamino'): a
+    prefix that the shared prefix vocabulary recognises, or an alkyl or acyl word ending in 'yl'. None when the
+    word is not a prefix run into a longer one: the unit is the rest of the name then."""
+    from ..assembly.naming_utils import _is_recognised_prefix_component
+    run = re.match(r"[a-z]+", skel[off:])
+    if not run:
+        return None
+    word = run.group(0)
+    for k in range(len(word) - 1, 2, -1):
+        if _is_recognised_prefix_component(word[:k]):
+            return word[:k]
+    acyl = re.match(r"[a-z]*?(?:yl|oyl)(?=[a-z])", word)
+    return acyl.group(0) if acyl else None
+
+
+def implied_group_hydrogens(mol: Chem.Mol, scope: set, carriers: set, skel: str, off: int) -> set:
+    """The heteroatoms of the unit named at ``off`` of ``skel`` whose hydrogen the unit holds without a slot of
+    its own: the O-H of 'acetic acid', the N-H of 'acetamide' and 'acetamido'. ``mol`` is the unlabelled
+    structure with explicit hydrogens, ``scope`` the carbon run of the labelled ``carriers``
+    (``isotopes._element_scope``).
+
+     (the Blue Book) prints '(2-2H1)acetic acid (PIN)' (:43804) and '(O-2H)acetic acid (PIN)'
+    (:43806); (:43824) '(N-2H1)acetamide (PIN)' (:43828): the front descriptor has the O-H and the N-H
+    of the retained name in its scope, so a count-only '(2H3)acetic acid' has an isomer and (:44202,
+    "Locants are not omitted when there is a possibility of isomers") cites the locants. A suffix written out
+    carries its own slot, 'ethan(2H)ol' (:44184), 'pentan(3H)oic acid' (:43812), and a prefix is a unit of its
+    own ('N-(2H3)acetylacetamide' labels the acetyl,:43730 '(2H3)methoxybenzene'; the unit is then the prefix
+    word, ``_prefix_head``): those hydrogens are not in the scope, and neither is a heteroatom group of the
+    labelled carbon itself (a 'hydroxy' prefix or an '-ol' suffix on it).
+
+    The implied group is the characteristic group of an acid or an amide: a non-ring heteroatom with a hydrogen,
+    single-bonded to a carbon of the scope that bears a double bond to a heteroatom, and named by the unit (the
+    word 'acid' for an oxygen, 'amid-' or 'hydrazid-' for a nitrogen). An acid group stays implied unless the
+    unit spells it with a suffix slot (``_GROUP_SLOT``, 'propanoic acid'); the group of a chalcogen heavier than
+    oxygen has the slot of its systematic suffix ('ethanethioic S-acid') and is not read."""
+    head = _prefix_head(skel, off)
+    unit = head if head is not None else skel[off:]
+    found = set()
+    for a in scope - carriers:
+        atom = mol.GetAtomWithIdx(a)
+        if not any(b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtom(atom).GetAtomicNum() not in (1, 6)
+                   for b in atom.GetBonds()):
+            continue
+        for x in atom.GetNeighbors():
+            if (x.IsInRing() or mol.GetBondBetweenAtoms(a, x.GetIdx()).GetBondType() != Chem.BondType.SINGLE
+                    or not any(nb.GetAtomicNum() == 1 for nb in x.GetNeighbors())):
+                continue
+            if x.GetSymbol() == "N":
+                implied = _AMIDE_WORD.search(unit)
+            elif x.GetSymbol() == "O":
+                implied = _ACID_WORD.search(unit) and not _GROUP_SLOT.search(unit)
+            else:
+                implied = False
+            if implied:
+                found.add(x.GetIdx())
+    return found
+
+
+def retained_c2_unit_carries_isotope(mol: Optional[Chem.Mol]) -> bool:
+    """True when a labelled atom sits on a two-carbon chain unit that a retained parent names:
+    'acetic acid' (and 'acetate'), 'acetonitrile', 'acetaldehyde',,
+    . The unit is the carbon C-1 of a carboxyl, ester, nitrile or aldehyde group, the
+    acyclic carbon C-2 bonded to it, and the heteroatoms of the group; an atom of it is labelled when it
+    is, or when a hydrogen on it is, the Blue Book: the locants of the parent are cited
+    when the parent holds the label, not when a substituent does). A label in a substituent unit with
+    marks of its own, an amide unit ('acetamido') or a ring is not read; this is a structural proxy for
+    the parent the isotope module does not name (a longer chain reads too, and its producers do not use
+    the retained parents), and every emission stays OPSIN-round-trip-gated. A stereogenic C-2 is not
+    read: the producers cite its descriptor bare ('(R)-chloro(hydroxy)acetic acid',,:44643) on the
+    locant-free spelling, which does not fit one that cites its locants, so those names keep the omitted
+    form. Gates ``isotope_retained_c2_unit_scope``."""
+    if mol is None:
+        return False
+
+    def labelled(atom: Chem.Atom) -> bool:
+        return bool(atom.GetIsotope()) or any(
+            nb.GetAtomicNum() == 1 and nb.GetIsotope() for nb in atom.GetNeighbors())
+
+    for c1 in mol.GetAtoms():
+        if c1.GetSymbol() != "C" or c1.IsInRing():
+            continue
+        bonds = [(nb, mol.GetBondBetweenAtoms(c1.GetIdx(), nb.GetIdx()).GetBondType())
+                 for nb in c1.GetNeighbors() if nb.GetAtomicNum() not in (1, 6)]
+        nitrile = any(t == Chem.BondType.TRIPLE and nb.GetSymbol() == "N" for nb, t in bonds)
+        oxo = any(t == Chem.BondType.DOUBLE and nb.GetSymbol() == "O" for nb, t in bonds)
+        oxy = any(t == Chem.BondType.SINGLE and nb.GetSymbol() == "O" for nb, t in bonds)
+        if not (nitrile or (oxo and (oxy or c1.GetTotalNumHs(includeNeighbors=True) > 0))):
+            continue
+        for c2 in c1.GetNeighbors():
+            if (c2.GetSymbol() == "C" and not c2.IsInRing()
+                    and c2.GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED
+                    and any(labelled(a) for a in [c1, c2] + [nb for nb, _t in bonds])):
+                return True
+    return False
 
 
 def licensed(skel: str, off: int, original: Chem.Mol) -> bool:

@@ -1329,7 +1329,12 @@ def _placement_unambiguous(original: Chem.Mol,
                 nb.GetIsotope() == mass
                 for nb in orig_h.GetAtomWithIdx(carrier).GetNeighbors()
                 if nb.GetSymbol() == "H")
-            if scope_h_carbons == {carrier} and carrier_h_all_labelled:
+            # An implied group's O-H / N-H ('(2H3)acetic acid', '(2H3)acetamide') is a second host
+            # of the count: / (the Blue Book,:43828), then cites the locants.
+            from .isotope_licence import implied_group_hydrogens
+            if (scope_h_carbons == {carrier} and carrier_h_all_labelled
+                    and not (slot is not None and implied_group_hydrogens(
+                        base_h, scope, carriers, *slot))):
                 continue
         lab_ranks = {ranks[c] for c in carriers}
         if len(lab_ranks) != 1:                   # >1 orbit -> distinguishable
@@ -2500,19 +2505,21 @@ def _parent_carries_positional_isotope(mol: Optional[Chem.Mol]) -> bool:
 
 @contextlib.contextmanager
 def _isotope_locant_scopes(original: Chem.Mol):
-    """Enter ``forced_locant_scope``, every re-render) and, when the parent
-    skeleton itself carries a positional isotope, ALSO
-    ``isotope_parent_positional_scope``, the parent-own-locant licences)."""
+    """Enter ``forced_locant_scope``, every re-render), when the parent skeleton itself
+    carries a positional isotope ALSO ``isotope_parent_positional_scope``, the
+    parent-own-locant licences), and when a retained two-carbon parent holds the label
+    ``isotope_retained_c2_unit_scope``,."""
     from ..assembly.locant_omission import (
         forced_locant_scope, isotope_labelled_original_scope,
-        isotope_parent_positional_scope)
-    with forced_locant_scope("isotope"):
+        isotope_parent_positional_scope, isotope_retained_c2_unit_scope)
+    from .isotope_licence import retained_c2_unit_carries_isotope
+    with forced_locant_scope("isotope"), contextlib.ExitStack() as scopes:
+        if retained_c2_unit_carries_isotope(original):
+            scopes.enter_context(isotope_retained_c2_unit_scope("isotope"))
         if _parent_carries_positional_isotope(original):
-            with isotope_parent_positional_scope("isotope"), \
-                    isotope_labelled_original_scope(original):
-                yield
-        else:
-            yield
+            scopes.enter_context(isotope_parent_positional_scope("isotope"))
+            scopes.enter_context(isotope_labelled_original_scope(original))
+        yield
 
 
 def _forced_locant_skeleton(namer, stripped_smiles: Optional[str],

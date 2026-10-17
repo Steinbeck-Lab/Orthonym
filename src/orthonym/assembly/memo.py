@@ -28,6 +28,7 @@ import os
 from collections import OrderedDict
 
 from ..metrics.provenance import wider_tier_ctx
+from .locant_omission import retained_c2_unit_has_isotope_label
 
 #: verify-mode mismatch log (process-global, across scopes). A ``MemoMismatch`` is
 #: RAISED as a loud failure, but the recursive naming cascade wraps the hot loops in
@@ -138,6 +139,12 @@ def _ck(namespace, key):
         tag = tag + ("suffix-n-hydron",)
     if wider_tier_ctx.get():
         tag = tag + ("wider-tier",)       # the PIN spellings are off in a wider-tier call
+    if retained_c2_unit_has_isotope_label():
+        # the retained two-carbon parents cite their substituent locants while an isotope label sits on
+        # the parent (``composition_primitives.retained_acetic_from_prefixes``), so a value computed in
+        # that scope differs from the plain one for the same key; the isotope path renames the skeleton
+        # in that scope inside the call that named it without
+        tag = tag + ("retained-c2-label",)
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
             return (namespace, key, "pin-promotion", "prefixes-apart") + tag

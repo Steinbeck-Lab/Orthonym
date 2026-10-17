@@ -42,11 +42,15 @@ _ADDED_IH = re.compile(r"^\d+[a-z]?'*H(?:,\d+[a-z]?'*H)*$")
 #: the locant an added indicated hydrogen follows ('2(1H)', '4a(2H)', "4'(2H)"); a '(2H)' that follows a name
 #: part ('trichloro(2H)methane', 'ethan(2H)ol') is a hydrogen nuclide of an isotope descriptor
 _LOCANT_END = re.compile(r"\d[a-z]?'*$")
-#: an isotope descriptor, the Blue Book; '(N-2H1)acetamide (PIN)':43828):
-#: nuclides with their count, after locants that may be numerals or element locants ('(13C)',
-#: '(2-2H1)', '(N-2H1)', '(N,N-2H2)', '(O-18O)')
-_ISOTOPE = re.compile(r"^\s*(?:(?:\d+[a-z]?'*|[A-Z][a-z]?\d*'*)(?:\s*,\s*(?:\d+[a-z]?'*|[A-Z][a-z]?\d*'*))*\s*-\s*)?"
-                      r"(?:\d+\s*(?:H|C|N|O|S|P|F|Cl|Br|I|Se|B)\s*\d*\s*,?\s*)+$")
+#: an isotope descriptor, the Blue Book; '(N-2H1)acetamide (PIN)':43828): nuclides with their
+#: count, after locants that may be numerals or element locants ('(13C)', '(2-2H1)', '(N-2H1)', '(N,N-2H2)',
+#: '(O-18O)'). Nuclides cited at different positions are groups of their own, each with its locants, in one
+#: descriptor,:43834; '(2,4-2H2,15N)pyridine (PIN)':44194, '(O-2H,18O)acetic acid (PIN)':43808,
+#: '(18O-2H,18O)acetic acid (PIN)':43810, '(1-13C,2,2-2H2)'): ``_ISOTOPE_GROUP`` repeated
+_ISOTOPE_LOCANT = r"(?:\d+[a-z]?'*|\d+[A-Z][a-z]?|[A-Z][a-z]?\d*'*)"
+_ISOTOPE_GROUP = (r"(?:" + _ISOTOPE_LOCANT + r"(?:\s*,\s*" + _ISOTOPE_LOCANT + r")*\s*-\s*)?"
+                  r"(?:\d+\s*(?:H|C|N|O|S|P|F|Cl|Br|I|Se|B)\s*\d*\s*,?\s*)+")
+_ISOTOPE = re.compile(r"^\s*(?:" + _ISOTOPE_GROUP + r")+$")
 _ASSEMBLY = re.compile(r"^\d+'*[a-z]?,\d+'*[a-z]?(?:[:,]\d+'*[a-z]?)*-"
                        r"(?:bi(?!s)|ter|quater|quinque|sexi|septi|octi|novi|deci)")
 

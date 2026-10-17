@@ -75,6 +75,8 @@ __all__ = [
     "parent_positional_scope",
     "isotope_labelled_original_scope",
     "isotope_label_on_atoms",
+    "isotope_retained_c2_unit_scope",
+    "retained_c2_unit_has_isotope_label",
 ]
 
 #: ``:3007`` -- "Except for hydrogen atoms attached to chalcogen atoms, such as in
@@ -1095,6 +1097,43 @@ def isotope_label_on_atoms(mol, atoms) -> bool:
     except Exception:  # noqa: BLE001 -- no answer is "not labelled"
         return False
     return False
+
+
+# --------------------------------------------------------------------------------- #
+# "THE RETAINED TWO-CARBON PARENT ITSELF CARRIES AN ISOTOPE LABEL" #
+# --------------------------------------------------------------------------------- #
+# (the Blue Book) omits the substituent locants of the retained two-carbon
+# parents ('difluoroacetic acid (PIN) (not 2,2-difluoroacetic acid)',:3037): their one kind of
+# substitutable hydrogen is the one of C-2. (:44180) withdraws every omission once the
+# isotopic modification needs a locant -- "all locants must be specified and none are omitted"
+# -- and (:44208) scopes that to "the parent structure or... a unit of structure as
+# defined by its appropriate enclosing marks": the locants of the parent are cited when the label
+# sits on the parent ('2-hydroxy(2,2-2H2)acetic acid'), not when it sits in a substituent unit
+# that has its own marks ('[3,4-dihydro(7-2H)-2H-1-benzopyran-2-yl]acetic acid'). Like the scope
+# above for the parent's own substituent-position locant, this one is entered by
+# ``rules/isotopes.py`` alongside ``forced_locant_scope`` and only when the label sits on the
+# parent (``rules.isotope_licence.retained_c2_unit_carries_isotope``); the producers of the retained parents read it
+# through ``composition_primitives.retained_acetic_from_prefixes``.
+_ISOTOPE_RETAINED_C2_LABEL: "contextvars.ContextVar[Optional[str]]" = (
+    contextvars.ContextVar("orthonym_isotope_retained_c2_label", default=None))
+
+
+@contextlib.contextmanager
+def isotope_retained_c2_unit_scope(reason: str = "isotope"):
+    """Declare that an isotope label sits on a two-carbon unit that a retained parent names
+    ('acetic acid', 'acetonitrile', 'acetaldehyde', 'acetate'), so its omitted substituent locants
+    are restored,. Entered by ``rules/isotopes.py`` with
+    :func:`forced_locant_scope`."""
+    token = _ISOTOPE_RETAINED_C2_LABEL.set(reason)
+    try:
+        yield
+    finally:
+        _ISOTOPE_RETAINED_C2_LABEL.reset(token)
+
+
+def retained_c2_unit_has_isotope_label() -> bool:
+    """True when an enclosing:func:`isotope_retained_c2_unit_scope` is active."""
+    return _ISOTOPE_RETAINED_C2_LABEL.get() is not None
 
 
 def scope_forces_locants(

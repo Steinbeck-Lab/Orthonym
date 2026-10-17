@@ -88,7 +88,6 @@ BEST_EFFORT = {
     "[2H]N1C2C=CC1c1ccccc12": "1,4-dihydro-1,4-epimino(9-2H)naphthalene",
     NESTED_ROW[0]: NESTED_ROW[2],
     "[2H]C(=O)O": "(2H1)formic acid",
-    "OC(=O)C([2H])(Cl)Cl": "dichloro(2H1)acetic acid",
     "[2H]OP(=O)(O)O": "(2H1)phosphoric acid",
     "[2H]OS(=O)(=O)O": "(2H1)sulfuric acid",
     "[2H]OC(=O)C(=O)O": "(2H1)oxalic acid",
@@ -173,7 +172,13 @@ def test_isotope_tier_order_independence():
 # spellings itself
 LOCANTED_ROWS = [
     ("[2H]C(=O)O", "(1-2H)formic acid"),                       # isomer '(O-2H)formic acid',:44202
-    ("OC(=O)C([2H])(Cl)Cl", "dichloro(2-2H)acetic acid"),      # isomer on the OH; '(2-2H1)acetic acid (PIN)':43804
+    # isomer on the OH; '(2-2H1)acetic acid (PIN)':43804. The descriptor needs its locant, so the locants of the
+    # parent are cited too: Omission of locants (see also (:44178), (:44180) "if
+    # isotopic modification requires a locant to specify its position, then all locants must be specified and
+    # none are omitted"; printed '(2-13C)ethan-1-ol (PIN)' (:43740) and '(2-13C)ethan-1-ol [not (2-13C)ethanol]'
+    # (:44186), where the descriptor withdraws the omission of the locant of 'ethanol'. The retained 'acetic
+    # acid' keeps its word and shows the locants of its substituents,:3031, omits them otherwise)
+    ("OC(=O)C([2H])(Cl)Cl", "2,2-dichloro(2-2H)acetic acid"),
     ("[2H]CC(F)(F)F", "1,1,1-trifluoro(2-2H1)ethane"),         # the printed control,:44155
     ("FC(F)(F)C([2H])(F)Cl", "1-chloro-1,2,2,2-tetrafluoro(1-2H)ethane"),    #:44180,:44210
     ("FC(F)(F)C(F)([2H])c1ccccc1", "[1,2,2,2-tetrafluoro(1-2H)ethyl]benzene"),
