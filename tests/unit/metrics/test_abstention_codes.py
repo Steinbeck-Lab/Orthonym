@@ -161,7 +161,10 @@ class TestEndToEndCodes:
     # ladder declines: the ring-fallback census record fires at the ladder's true exhaustion.
     # (It is the 'charge-conservation veto' example of namer.py's P10 veto block, a class the
     # radical/ion builders do not reach.)
-    _RING_FALLBACK_SMI = "[I-](CCO)c1ccccc1"
+    # HU (2026-10-17) names the two iodide fixtures that stood here ('(2-hydroxyethyl)(phenyl)iodanuide',
+    # read back through the method (2) twin), so both witnesses were replaced by rows of the frozen
+    # unnamed panel (benchmarks/unnamed_panel) that abstain with this code and detail under this config.
+    _RING_FALLBACK_SMI = "CC(C)(C)NP(=O)(C1=CC=CC=C1)[N-]C(C)(C)C"   # PubChem CID 101220894
     # The same ladder exhaustion on a ring whose numbering has no tie. ``_RING_FALLBACK_SMI`` still
     # abstains with BRANCH_UNNAMEABLE (asserted above), but its phenyl ring has two equivalent
     # orientations, and the (g) tie-break of ``general_engine._orient_carbocycle`` names the
@@ -172,7 +175,7 @@ class TestEndToEndCodes:
     # heteromonocycle tie-break did the same at 0c529ca8d, e.g. 3,5-disubstituted pyridine and
     # 1,4-disubstituted piperazine fixtures). Pyridin-3-yl has no orientation tie, so only the real
     # assembly records, and the detail is the one the test below is about.
-    _RING_FALLBACK_DETAIL_SMI = "[I-](CCO)c1cccnc1"
+    _RING_FALLBACK_DETAIL_SMI = "COC(=O)CC1=C(ON=[N+]1C2CCCCC2)[O-]"   # PubChem CID 24846373
     # A metal coordination compound (cisplatin drawn with explicit NH3 ligands): the
     # Java-free organometallic/coordination veto (namer.py, has_metal_coordination_bond;
     # coordination compounds are out of scope, suppresses the generated name.

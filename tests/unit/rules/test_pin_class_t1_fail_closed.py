@@ -75,7 +75,14 @@ CONTROL_ROWS = [
 UIDE_DECLINED = ["C[B-]1(C)CCC2(CCCCC2)C1", "C1C[PH-]2CCC1CC2", "C[B-]1(C)CCCCC1",
                  "[B-]12(CCCC1)CCCC2", "C1CC[P-]CC1", "C[Si-]1CCCC1"]
 UIDE_NAMED = [("[B-](C)(C)(C)C", "tetramethylboranuide"), ("C[P-](C)(C)C", "tetramethylphosphanuide"),
-              ("F[B-](F)(F)c1ccccc1", "trifluorophenylboranuide")]
+              # was 'trifluorophenylboranuide'. change-asserted-value: primary source the Blue Book
+              # 'difluoro(phenyl)sulfanuide (PIN)' and:7272 ("The second and further
+              # substituents are each enclosed with parentheses even for simple substituents"; 'ethyldi(methyl)
+              # phosphane (PIN)':7290, 'chlorodi(methyl)borane (PIN)':25866); independent check: OPSIN 2.9.0
+              # reads the new name to the input (tests/unit/rules/test_halogen_uide_names.py asserts the fresh
+              # read of the same shape, 'trifluoro(phenyl)boranuide'); mutation: the HEAD emitter spells the old
+              # string, so the new value fails at HEAD.
+              ("F[B-](F)(F)c1ccccc1", "trifluoro(phenyl)boranuide")]
 HALONIUM_DECLINED = ["C1CC[I+]CC1", "c1ccc2c(c1)[I+]c1ccccc1-2"]
 HALONIUM_NAMED = [("c1ccc(cc1)[I+]c1ccccc1", "diphenyliodanium")]
 # A ring radical; one 'ene' with a multiplied 'yne' (a):7595,:16497).

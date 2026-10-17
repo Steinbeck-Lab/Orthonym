@@ -22,6 +22,10 @@ Two functions, deliberately not interchangeable:
     *which producer* handles a fragment rather than to name it: widening a
     routing test silently changes which handler claims a molecule.
 
+``_accepted_prefix_token`` is the private acceptance filter of ``organyl_prefix_name`` (one prefix token,
+the stereo-expression obligation), also used by ``rules.centre_ligands``, which names the ligands of a
+-uide or -onium centre through the same chokepoint without the carbon/halogen element bound.
+
 There is deliberately no third, deprecated entry point. ``pure_organyl_prefix_name``
 existed only as a shim while the nine families migrated (a phase); all 23 of
 its call sites now use one of the two functions above, so it was deleted rather
@@ -178,13 +182,28 @@ def organyl_prefix_name(mol, start_idx: int, exclude_idx: int) -> Optional[str]:
         return None
 
     from ..assembly.substituent_enumerator import name_substituent
-    name = name_substituent(mol, frag, start_idx, allow_mancude=False)
+    return _accepted_prefix_token(
+        mol, frag, name_substituent(mol, frag, start_idx, allow_mancude=False))
 
-    # Strict acceptance filter: only a single prefix TOKEN is usable here.
+
+def _is_single_prefix_token(name) -> bool:
+    """Only a single prefix TOKEN is usable as a detachable prefix: not a refusal sentinel, no space (a
+    multi-word functional-class name leaked out)."""
     from ..errors import is_refusal_sentinel
-    if is_refusal_sentinel(name):
-        return None
-    if ' ' in name:
+    return not is_refusal_sentinel(name) and ' ' not in name
+
+
+def _accepted_prefix_token(mol, frag, name) -> Optional[str]:
+    """``name`` when it is usable as ONE detachable prefix token for the fragment ``frag``
+    (a list of atom indices), else None: the acceptance filter of:func:`organyl_prefix_name`,
+    shared with the namers that call the chokepoint for a fragment of another element class
+    (``rules.centre_ligands``: the ligands of a -uide or -onium centre, where the anion or cation
+    is senior to every group a ligand carries,, so a heteroatom in a ligand never displaces
+    the centre).
+
+    Pure: no mol mutation.
+    """
+    if not _is_single_prefix_token(name):
         return None
 
     # -FIX Item 1: the STEREO-EXPRESSION obligation (see the module

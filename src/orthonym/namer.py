@@ -42,6 +42,7 @@ from .metrics.producer_trail import carried as _carried, noted as _noted, suspen
 from .validation.opsin_ambiguity import reject_ambiguous, restore_withdrawn, withdrawn_name
 from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
                                         twin_outcome_holds, wider_tier_ctx)
+from .validation.uide_twin import uide_twin_outcome
 from .validation.stereo_descriptors import (  # noqa: F401 both names are imported FROM this module (tests, spies); callers resolve them here at call time
     stereo_block_units as _stereo_block_units,
     stereo_descriptors_verified as _stereo_descriptors_verified,
@@ -754,7 +755,7 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
           re-anchor must NOT be attempted at all -- a `carveout:*` outcome (a
           BY-DESIGN OPSIN-unparseable PIN: thioperoxol / inositol /
           np_stereoparent / dianhydride / chalcogen_dianhydride /
-          polyol_polyester / organometallic_additive / phane / halogen_uide
+          polyol_polyester / organometallic_additive / phane
           -- the parse is guaranteed to fail), or `gate_disabled` /
           `unavailable` / `not_run` (no real gate decision exists at all to
           reuse OR to usefully repeat: disabled/unavailable already mean "no
@@ -912,30 +913,6 @@ _PHANE_PIN_RE = re.compile(
     r"(?:[a-z]+|(?:di|tri|tetra|penta|hexa)[a-z]+|"
     r"(?:bis|tris|tetrakis)\([a-z0-9\[\],.]+\))"
     r"(?:cyclo)?[a-z]*phane$"
-)
-
-# W8-P5 Task 2 /, BB 41102-41110/41303): a SUBSTITUTED
-# halogen-uide anion ('diphenyliodanuide (PIN)' BB 41110, the Ph2I- hydride-
-# addition ate-complex) is correct-by-construction (emitted ONLY by the
-# hard-gated `rules.ions._emit_group13_uide` halogen branch, generalized
-# alongside the already-RT-clean silanuide/boranuide/phosphanuide siblings —
-# see `_UIDE_STEMS`/`_UIDE_STD_VALENCE` in `rules/ions.py`) but OPSIN 2.9
-# REJECTS it with "unphysical valency state" whenever the implicit-bonding-
-# number 'iodanuide'/'bromanuide'/'chloranuide' token is SUBSTITUTED
-# (verified 2026-07-18: bare 'iodanuide' parses fine to [IH2-]; the explicit-
-# lambda BB-cited alternative 'diphenyl-lambda3-iodanide' also parses fine to
-# the IDENTICAL structure [I-] with 2 phenyls -- the BB text itself states
-# this equivalence at 41110; 'methyliodanuide'/'diphenylbromanuide'/
-# 'diphenylchloranuide' error the same way -- an OPSIN grammar limitation on
-# SUBSTITUTED halogen-uide tokens, not a naming defect). Exactly the
-# inositol/dianhydride/phane OPSIN-coverage-gap situation. Scoped to the
-# HALOGEN uide stems only (iodan/broman/chloran) -- Si/B/P/Ge/Sn/Pb-uide
-# forms already round-trip cleanly and need no carve-out. This 'uide' suffix
-# string is emitted by no other code path (grep-verified: the only emitter
-# is `rules.ions._emit_group13_uide`, which carries its own source-level
-# atom-conservation veto since the RT-gate would otherwise fail OPEN).
-_HALOGEN_UIDE_PIN_RE = re.compile(
-    r"^[a-z][a-z0-9(),'-]*(?:iodan|broman|chloran)uide$"
 )
 
 # W8-P4 / atom-drop safety floor): source-level structural motifs
@@ -2429,8 +2406,8 @@ def _grammar_gap_carveout(name: str) -> Optional[str]:
     For these classes a healthy OPSIN call can only answer 'rejected' (each
     docstring above records the verification: no thioperoxol suffix family, no
     inositol or Table 10.1 stereoparent name, no 'di'-collapsed or chalcogen
-    anhydride class word, no multi-anion functional-class ester, no phane grammar,
-    no substituted halogen-uide), so the name ships on its construction alone and
+    anhydride class word, no multi-anion functional-class ester, no phane grammar),
+    so the name ships on its construction alone and
     OPSIN's answer adds nothing. The validity gate therefore consults this both
     after a 'rejected' answer and on 'unavailable': the output of these classes does
     not depend on whether OPSIN could be reached (TRIAGE j12 finding 1).
@@ -2462,8 +2439,6 @@ def _grammar_gap_carveout(name: str) -> Optional[str]:
         return "polyol_polyester"
     if _PHANE_PIN_RE.match(name):
         return "phane"
-    if _HALOGEN_UIDE_PIN_RE.match(name):
-        return "halogen_uide"
     return None
 
 
@@ -2707,7 +2682,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # an OPSIN-ROUND-TRIP-VERIFIED name, so an OPSIN-DEFINITIVELY-REJECTED name
     # cannot be verified and MUST abstain rather than ship. This makes the
     # "ship-an-OPSIN-unparseable name" carve-outs below (thioperoxol / inositol /
-    # np_stereoparent / dianhydride / phane / halogen-uide / the stereo-layer
+    # np_stereoparent / dianhydride / phane / the stereo-layer
     # carve-out) PIN/DEFAULT-TIER ONLY: those names are the correct, gold-validated
     # PIN and MUST still ship at the PIN tier (``general_fallback_tier`` False, so
     # this branch is skipped and the 1656 PIN gold gate is byte-identical). At the
@@ -2735,12 +2710,13 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             _np_exact_hit = name in _NP_EXACT
         except Exception:
             _np_exact_hit = False
-        if not _np_exact_hit:
+        # A halogen -uide name (no OPSIN grammar at any tier) ships on its twin read-back (validation.uide_twin).
+        if not (_np_exact_hit or twin_gate_ships(name, smiles, True)):
             _record_unparseable_general_fallback(name, smiles)
             _suppressed_to = _descriptive_fallback(smiles)
             _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
             return _suppressed_to
-        # else: fall through to the np_stereoparent carve-out (ships the retained PIN).
+        # else: fall through to the np_stereoparent carve-out and the twin ship below.
     # The grammar-gap carve-outs (TRIAGE j12 finding 1 put them in one helper, used
     # here and on 'unavailable' above), in their historical order:
     # - DD2 / Phase D thioperoxol: OPSIN's generation grammar does not recognise the
@@ -2766,24 +2742,21 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # - W8-P8 Task 8.12 /.3) phane PINs from the hard-gated
     # rules.phane.build_phane_pin (formula-conservation-vetoed); OPSIN has no phane
     # grammar at all.
-    # - W8-P5 Task 2 / substituted halogen-uide PINs
-    # ('diphenyliodanuide') from the hard-gated rules.ions._emit_group13_uide
-    # halogen branch (atom-conservation-vetoed).
     _gap_slug = _grammar_gap_carveout(name)
     if _gap_slug is not None:
         return _ship_grammar_gap_carveout(name, _gap_slug)
     # W8-P9 Task 9.1 /.4/.6): additive/coordination organometallic
     # PIN carve-out -- see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above. Not a
     # grammar-gap class (OPSIN parses some of its names), so it is reached only
-    # after a 'rejected' answer. It is mutually exclusive with the phane and
-    # halogen-uide patterns (different endings), so checking it after them keeps
+    # after a 'rejected' answer. It is mutually exclusive with the phane
+    # pattern (different endings), so checking it after it keeps
     # every outcome.
     if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name):
         _record_gate_outcome(
             _pv.carveout_outcome("organometallic_additive"), name)
         return name
     # A PIN spelling OPSIN has no grammar for ships when its twin spelling reads to the input's full key.
-    if smiles is not None and not general_fallback_tier and twin_gate_ships(name, smiles):
+    if smiles is not None and twin_gate_ships(name, smiles, general_fallback_tier):
         return name
     # OPSIN-validity stereo carve-out / (a phase): decide on WHERE OPSIN fails. If the name is
     # rejected ONLY because of its stereo layer — i.e. the stereo-STRIPPED
@@ -6052,7 +6025,7 @@ class Orthonym:
         # as one with a lowercase r/s descriptor, is never shown at these tiers).
         # Reduced mode (no jar, ORTHONYM_ALLOW_REDUCED) and a disabled gate keep
         # their documented labels. The default (PIN) tier is unchanged.
-        if (tier != ABSTAIN and opsin != "verified" and name
+        if (tier != ABSTAIN and opsin != "verified" and not uide_twin_outcome(gate_outcome) and name
                 and self._general_fallback
                 and not self._disable_opsin_validity_gate
                 and not _DISABLE_VALIDITY_GATE
@@ -8613,8 +8586,9 @@ class Orthonym:
             if withdrawn_name(name, smiles):
                 return reject_ambiguous(name, smiles, name)
             if self._general_fallback:
-                if resolved in (_pv.GATE_OUTCOME_STEREO_RECOMPOSED,
-                                _pv.GATE_OUTCOME_FULL_KEY_VERIFIED):
+                if (resolved in (_pv.GATE_OUTCOME_STEREO_RECOMPOSED,
+                                 _pv.GATE_OUTCOME_FULL_KEY_VERIFIED)
+                        or uide_twin_outcome(resolved)):
                     return name
                 if _shipped_name_round_trip(name, smiles) == "verified":
                     if resolved != _pv.GATE_OUTCOME_SELF01:

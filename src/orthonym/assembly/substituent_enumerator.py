@@ -970,12 +970,16 @@ def _route_fragment_to_general_engine(mol, frag_atoms, attach_idx):
         return None
     from ..errors import is_refusal_sentinel
     from ..namer import name_compound
+    from ..rules.centre_ligands import capped_probe_ctx
+    _probe = capped_probe_ctx.set(True)         # the cap is no ligand of an ion centre
     try:
         alcohol_name = name_compound(
             frag_smi, general_fallback=True,
             general_fallback_unverified=True, allow_aromatic_general=True)
     except Exception:
         return None
+    finally:
+        capped_probe_ctx.reset(_probe)
     if not alcohol_name or is_refusal_sentinel(alcohol_name) or ' ' in alcohol_name:
         return None
     if alcohol_name.lower().count('hydroxy') > 1:

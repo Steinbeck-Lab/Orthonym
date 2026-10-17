@@ -47,12 +47,19 @@ The families (the rules of:data:`TWIN_RULES`, in table order):
   ('(O-2H)acetic acid') is read as written and is not rewritten, and the ``(2H)`` / ``(3H)`` that
   follows a locant, primed or not ('naphthalen-2(3H)-one', '[1,1'-biphenyl]-4'(2H)-one'), is the
   added-hydrogen mark.
+* ``uide_lambda`` (``validation.uide_twin``): ANIONS FORMED BY ADDITION OF HYDRIDE IONS
+  (the Blue Book), method (1) 'diphenyliodanuide (PIN)' and its method (2) spelling
+  'diphenyl-lambda3-iodanide' (:41110), which OPSIN reads. The family is structure-blind like the
+  others but is not a rewrite of the name alone: the lambda number is the one method (2) pairs with
+  an unmarked -uide name of the element, so it lives in its own module and is reached from
+  :func:`twin_round_trip`; it is the only family a general tier ships through its twin.
 """
 import re
 from typing import Callable, Optional, Tuple
 
 from ..metrics.provenance import wider_tier_ctx
 from .opsin_ambiguity import ambiguity_messages
+from .uide_twin import uide_twin_round_trip
 
 #: one locant pair, cited once before a bridge prefix ('1,4', '4a,8a'); not the second pair of a
 #: colon-separated list, not part of a longer locant list
@@ -174,9 +181,12 @@ def twin_of(name: str) -> Optional[Tuple[str, Tuple[str, ...]]]:
 def twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
     """The applied rule ids joined by ``+`` when the twin of ``name`` reads to the FULL
     InChIKey of ``smiles`` and OPSIN reads it once; else None (no twin, a twin of another
-    structure, an unavailable OPSIN, an ambiguous reading)."""
+    structure, an unavailable OPSIN, an ambiguous reading). A halogen -uide name has its own
+    family, which names the anion itself (``validation.uide_twin``)."""
     found = twin_of(name)
-    if found is None or not smiles:
+    if found is None:
+        return uide_twin_round_trip(name, smiles)
+    if not smiles:
         return None
     twin, rules = found
     from ..namer import _shipped_name_round_trip
@@ -222,10 +232,12 @@ def twin_opsin_parse(name: str) -> Optional[str]:
     return opsin_parse(found[0])
 
 
-def twin_gate_ships(name: str, smiles: Optional[str]) -> bool:
+def twin_gate_ships(name: str, smiles: Optional[str], general_tier: bool = False) -> bool:
     """The twin branch of the validity gate: True, with the outcome ``twin_verified:<rules>``
-    recorded for ``name``, when:func:`twin_round_trip` verifies the twin of ``name``."""
-    rules = twin_round_trip(name, smiles)
+    recorded for ``name``, when:func:`twin_round_trip` verifies the twin of ``name``. A general
+    tier (``general_tier``) ships only a halogen -uide name through its twin: no OPSIN grammar
+    reads that name at any tier, while the other families spell the form OPSIN reads there."""
+    rules = uide_twin_round_trip(name, smiles) if general_tier else twin_round_trip(name, smiles)
     if rules is None:
         return False
     from ..metrics import provenance as pv

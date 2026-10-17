@@ -3092,7 +3092,7 @@ def _emit_mononuclear_heteroatom_ide_direct(mol, center_idx: int) -> str:
 
 
 def _emit_group13_uide(mol, center_idx: int) -> str:
-    """P-72.3 / P-72.8 (W4-I2): name a -uide (hydride-addition) anion — a centre ONE
+    """ / (W4-I2): name a -uide (hydride-addition) anion — a centre ONE
     bond above its standard bonding number carrying the -1 charge (the ate-complex).
     GENERALIZED from Group-13-only to any _UIDE_STEMS element. Substituents on the
     centre are named as prefixes on the '-uide' parent anion (boranuide = BH4-,
@@ -3101,78 +3101,23 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
     (C6H5)2I- -> diphenyliodanuide, BF4- -> tetrafluoroboranuide. Explicit/implicit
     H on the centre stay implicit on the parent. Named directly (cannot
     neutralize-then-re-enter — the neutral hypervalent hydride is invalid). Method
-    (1) PIN, so no λ-convention needed (BB 41098). Returns '' on any decline."""
+    (1) PIN, so no λ-convention needed (BB 41098). Returns '' on any decline.
+
+    Each ligand is named by ``rules.centre_ligands`` (the substitutive path's substituent-prefix
+    namer, with the atom-coverage veto: a ligand without a name, or a heavy atom no prefix
+    covers, declines), and the prefixes are assembled under (the Blue Book:
+    "The second and further substituents are each enclosed with parentheses even for simple
+    substituents"; 'difluoro(phenyl)sulfanuide (PIN)',:41108) by the mononuclear-hydride
+    assembler: CH3-CH2-I(-)-CH3 -> ethyl(methyl)iodanuide, C6H5-BF3- -> trifluoro(phenyl)boranuide.
+    A halogen -uide name ships only when the validity gate reads it back through its method (2)
+    spelling (``validation.uide_twin``): OPSIN 2.9.0 has no grammar for the substituted token."""
     center = mol.GetAtomWithIdx(center_idx)
     stem = _UIDE_STEMS.get(center.GetSymbol())
     if not stem:
         return ''
-    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_multiplier_prefix
-    from ..perception.chains import classify_substituent
-    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
-    parent_atoms = {center_idx}
-    name_to_count: Dict[str, int] = {}
-    # W8-P5 Task 2 (source-level atom-drop veto): the RT-gate fails OPEN for
-    # the substituted-halogen-uide carve-out (OPSIN 2.9 cannot parse ANY
-    # substituted iodanuide/bromanuide/chloranuide token at all — see
-    # namer._HALOGEN_UIDE_PIN_RE — so never gets a chance to run for
-    # that family), and classify_substituent's 'alkyl' branch names a
-    # substituent by CARBON COUNT ONLY (perception/chains.py), silently
-    # ignoring any heteroatom in the branch — reproduced 2026-07-18:
-    # '[I-](CCO)c1ccccc1' -> 'ethylphenyliodanuide' (drops the -OH),
-    # '[B-](CCO)(C)(C)C' -> 'ethyltrimethylboranuide' (same drop). Track
-    # every heavy atom actually represented in the emitted name (centre +
-    # every ligand's full atom set) and veto (decline, never ship the drop)
-    # on any mismatch against the input's heavy-atom count.
-    covered_atoms = {center_idx}
-    for nb in center.GetNeighbors():
-        if nb.GetSymbol() == 'H':
-            continue
-        # A bare halogen ligand (BF4- -> tetrafluoroboranuide): classify_substituent
-        # only names carbon groups, so map a single-atom halogen to its prefix here.
-        if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
-            sub_name = _HALOGEN_PREFIX[nb.GetSymbol()]
-            covered_atoms.add(nb.GetIdx())
-        else:
-            sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
-            if sub_atoms is None:
-                return ''
-            info = classify_substituent(mol, sorted(sub_atoms), parent_atoms)
-            sub_name = info.get('name')
-            # An 'alkyl'-typed substituent whose atom set contains a
-            # heteroatom means classify_substituent silently swallowed it
-            # (the 'ethyl'-for-2-hydroxyethyl bug above) -> decline rather
-            # than ship the drop.
-            if info.get('type') == 'alkyl' and any(
-                    mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in sub_atoms):
-                return ''
-            covered_atoms |= set(sub_atoms)
-        if not sub_name:
-            return ''
-        name_to_count[sub_name] = name_to_count.get(sub_name, 0) + 1
-    if len(covered_atoms) != mol.GetNumHeavyAtoms():
-        return ''
+    from .centre_ligands import centre_name
     suffix = f"{_elide_terminal_e(stem)}uide"
-    if not name_to_count:
-        return suffix  # bare boranuide (BH4-)
-    parts = []
-    for sub_name, count in name_to_count.items():
-        mult = get_multiplier_prefix(count, sub_name)
-        # / (a): a compound prefix takes enclosing marks
-        # whatever its COUNT.
-        # This used to wrap only when count > 1, so a single composite ligand
-        # was concatenated bare and ran straight into the preceding prefix:
-        # `[B-](c1cccc(SC)c1)(F)(F)F` emitted
-        # `trifluoro3-(methylsulfanyl)phenylboranuide` — a letter/digit junction
-        # with no separator. OPSIN happens to parse it to the right molecule, so
-        # no gate catches it; it is a spelling defect, and the PIN is
-        # `trifluoro[3-(methylsulfanyl)phenyl]boranuide`.
-        # `enclose_if_compound` also escalates (-> [ so the mark nests correctly
-        # around a ligand that already carries parentheses.
-        from ..assembly.naming_utils import multiplied_component as _mc
-        body = _mc(count, sub_name, enclose_if_compound(sub_name))
-        parts.append((alpha_sort_key(sub_name), body))
-    parts.sort(key=lambda t: t[0])
-    return f"{''.join(p[1] for p in parts)}{suffix}"
+    return centre_name(mol, center_idx, suffix, suffix)  # bare boranuide (BH4-)
 
 
 # (the Blue Book, 41368): the diorganyl halogen(III) CATION R2X+ named on the
@@ -3196,8 +3141,9 @@ def emit_halogen_onium(mol, center_idx: int) -> str:
     (I/Br/Cl/F), formal charge +1, and degree >= 2 (a hypervalent halonium — a
     1-coordinate R-X+ is a distinct sulfanylium-style species and is excluded). Every
     heavy atom must be covered by the emitted ligand set (atom-drop veto, identical to
-    the uide emitter — ``classify_substituent`` names carbon groups by carbon count and
-    silently drops a heteroatom in the branch, so a mismatch declines).
+    the uide emitter); the ligands are named by ``rules.centre_ligands`` (the substitutive
+    path's substituent-prefix namer — ``classify_substituent`` named a carbon group by its
+    carbon count: isopropyl 'propyl', vinyl 'ethyl'), and a ligand without a name declines.
 
     Named DIRECTLY: a drop-charge neutralize yields an invalid neutral halogen radical,
     and an add-H neutralize yields the λ-parent whose '-ium' form (``…-λ3-iodanium``,
@@ -3210,56 +3156,14 @@ def emit_halogen_onium(mol, center_idx: int) -> str:
         return ''
     if center.GetFormalCharge() != 1 or center.GetDegree() < 2:
         return ''
-    from ..perception.chains import classify_substituent
-    from .mononuclear_hydrides import _build_mixed_substituent_string
-    _HALOGEN_PREFIX = {'F': 'fluoro', 'Cl': 'chloro', 'Br': 'bromo', 'I': 'iodo'}
-    parent_atoms = {center_idx}
-    names: List[str] = []
-    covered_atoms = {center_idx}
-    for nb in center.GetNeighbors():
-        if nb.GetSymbol() == 'H':
-            continue
-        # A bare halogen ligand -> its simple prefix (classify_substituent only
-        # names carbon groups).
-        if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
-            names.append(_HALOGEN_PREFIX[nb.GetSymbol()])
-            covered_atoms.add(nb.GetIdx())
-            continue
-        sub_atoms = _collect_substituent_atoms(mol, center_idx, nb.GetIdx(), set())
-        if sub_atoms is None:
-            return ''
-        # An acyl carbon R-C(=O)- -> the acyl prefix (acetyl / benzoyl). The
-        # helper is centre-agnostic (its "chalcogen" argument is only used to
-        # locate the bond), so it names the R-CO- on a halonium too: C[Cl+]C(C)=O
-        # -> acetyl. classify_substituent would mis-name the acyl carbon by count.
-        if _is_acyl_on_chalcogen(mol, nb, center_idx):
-            sub_name = _acyl_on_chalcogen_prefix(mol, nb.GetIdx(), center_idx)
-        else:
-            info = classify_substituent(mol, sorted(sub_atoms), parent_atoms)
-            sub_name = info.get('name')
-            # classify_substituent's 'alkyl' branch names by carbon count and
-            # silently swallows a heteroatom in the branch -> decline (atom drop).
-            if info.get('type') == 'alkyl' and any(
-                    mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in sub_atoms):
-                return ''
-        if not sub_name:
-            return ''
-        covered_atoms |= set(sub_atoms)
-        names.append(sub_name)
-    if len(covered_atoms) != mol.GetNumHeavyAtoms():
-        return ''
-    if not names:
-        return ''  # bare H2I+ is the retained 'iodanium' (handled by the table)
-    # /: assemble the halogen+organyl+acyl prefix block through
-    # the SHARED mononuclear-hydride assembler, which alone applies the enclosing
-    # marks that disambiguate a halogeno+alkyl pair (the Blue Book "chloro(methyl)silane
-    # would describe Cl-SiH2-CH3"): chloro(methyl)fluoranium (the Blue Book),
-    # acetyl(methyl)chloranium (the Blue Book), diphenyliodanium (the Blue Book). Re-spelling
-    # that rule here would drift from the neutral trichloro(methyl)silane path.
-    block = _build_mixed_substituent_string(names)
-    if not block:
-        return ''
-    return f"{block}{_elide_terminal_e(stem)}ium"
+    from .centre_ligands import centre_name
+    # A bare halogen ligand -> its simple prefix, an acyl carbon R-C(=O)- -> the acyl prefix (acetyl /
+    # benzoyl), any other ligand -> the shared substituent-prefix namer; bare H2I+ is the retained 'iodanium'
+    # (handled by the table). /: the prefix block is assembled through the SHARED
+    # mononuclear-hydride assembler, which alone applies the enclosing marks that disambiguate a
+    # halogeno+alkyl pair (the Blue Book "chloro(methyl)silane would describe Cl-SiH2-CH3"):
+    # chloro(methyl)fluoranium (the Blue Book), acetyl(methyl)chloranium (the Blue Book), diphenyliodanium (the Blue Book).
+    return centre_name(mol, center_idx, f"{_elide_terminal_e(stem)}ium", "")
 
 
 # (W4-I3): R-S+ / R-Se+ chalcogen ylium (sulfanylium / selanylium).

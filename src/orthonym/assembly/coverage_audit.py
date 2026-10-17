@@ -74,7 +74,7 @@ def audit_coverage(mol, name: str, result_obj,
             ``complete=True, method="unavailable"`` directly. Set by the caller
             when a fresh re-anchor is GUARANTEED useless: a carve-out PIN name
             is OPSIN-unparseable BY DESIGN (thioperoxol/inositol/np_stereoparent/
-            dianhydride/.../halogen_uide), and a gate outcome of
+            dianhydride/.../phane), and a gate outcome of
             disabled/unavailable/not_run means no real gate decision exists to
             reuse or repeat. Ignored when ``self01_complete`` is not ``None``
             (a real verdict always wins) and ignored on the GER path.

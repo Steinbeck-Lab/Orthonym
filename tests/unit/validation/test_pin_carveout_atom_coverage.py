@@ -1,12 +1,14 @@
 """ a phase — PIN carve-out decoration-mutation atom-coverage certificate.
 
-``namer._final_opsin_validity_gate`` (:1081-1353) has 9 hard-gated ``return name``
-carve-outs (:1152-1237) that ship a PIN WITHOUT the /OPSIN round-trip,
+``namer._final_opsin_validity_gate`` (:1081-1353) has 8 hard-gated ``return name``
+carve-outs (:1152-1237) that ship a PIN WITHOUT the /OPSIN round-trip (a ninth, ``halogen_uide``,
+ships through its twin read-back since the HU topic: ``validation.uide_twin``,
+``tests/unit/rules/test_halogen_uide_names.py``),
 because the correct PIN for each class is OPSIN-unparseable by construction
 (OPSIN's *generation* grammar has no rule for these suffix/class-word families):
 ``thioperoxol``, ``inositol``, ``np_stereoparent``, ``dianhydride``,
 ``chalcogen_dianhydride``, ``polyol_polyester``, ``organometallic_additive``,
-``phane``, ``halogen_uide``. Each is commented as "emitted ONLY by a hard-gated /
+``phane``. Each is commented as "emitted ONLY by a hard-gated /
 atom-conservation-vetoed" internal producer, i.e. the atom-coverage claim for
 these classes rests entirely on trusting that producer, with no external check
 of any kind — see `internal notes` Gap 2.
@@ -18,7 +20,7 @@ names only the bare core -> a silent atom-drop that the carve-out would wave
 through unexamined (no ever runs on that branch).
 
 This module is a REGRESSION CERTIFICATE, not a source change: for each of the
-9 classes it (1) locks a representative PIN molecule shipping via that exact
+8 classes it (1) locks a representative PIN molecule shipping via that exact
 carve-out (``gate_outcome == "carveout:<class>"``), then (2) builds a DECORATED
 mutant -- the same recognised core plus one small extra substituent that
 changes the molecular formula -- and proves the decoration is never silently
@@ -33,7 +35,7 @@ Three honest outcomes for the decorated mutant, all acceptable:
   (b) HONEST ABSTAIN -- the decorated molecule correctly fails closed
       (``errors.is_failure_name`` true: 'unknown...' / '...(not supported)')
       rather than guessing -- observed for np_stereoparent, chalcogen_dianhydride,
-      organometallic_additive, phane, halogen_uide below.
+      organometallic_additive, phane below.
   (c) SAME-CARVEOUT, ATOM-COMPLETE -- the decorated molecule still matches the
       carve-out's own regex (thioperoxol / polyol_polyester below), because
       OPSIN can NEVER round-trip ANY member of these two classes, decorated or
@@ -46,7 +48,7 @@ Three honest outcomes for the decorated mutant, all acceptable:
       in it.
 
 The ONE failure shape this certificate exists to catch, and did not find live
-in any of the 9 cases (see the module docstring in the phase report for the
+in any of the 8 cases (see the module docstring in the phase report for the
 one adjacent-but-different anomaly that WAS found and is reported, not
 xfailed, because it is a locant-formatting defect, not an atom drop):
 decorated_name == bare_core_name, i.e. the recogniser fired on the bigger
@@ -76,7 +78,7 @@ def namer():
 
 
 # ---------------------------------------------------------------------------
-# The 9 carve-out classes. Each representative was independently confirmed
+# The 8 carve-out classes. Each representative was independently confirmed
 # (2026-08-14) to ship via `gate_outcome == "carveout:<carveout>"` -- i.e. it
 # is the code path at namer.py:1152-1237, not merely a name that happens to
 # look similar.
@@ -178,23 +180,6 @@ CASES = [
         # the recogniser correctly declines rather than naming the bare
         # unsubstituted phane and dropping the Br.
         decorated_smiles="C1Cc2cc(Br)ccc2CCc2ccc1cc2",
-        outcome_kind="abstain",
-    ),
-    dict(
-        carveout="halogen_uide",
-        bare_smiles="[I-](c1ccccc1)c1ccccc1",
-        bare_name="diphenyliodanuide",
-        # A 4-methyl on one phenyl: _emit_group13_uide DOES compute a real,
-        # atom-complete candidate here ("(4-methylphenyl)phenyliodanuide" --
-        # confirmed via direct inspection of the pre-gate warning), so the
-        # methyl is NOT silently dropped at the producer. It then fails
-        # closed to an honest abstain only because _HALOGEN_UIDE_PIN_RE
-        # requires the name to START with a bare `[a-z]` and this candidate
-        # starts with '(' -- a separate, narrower, reportable coverage gap
-        # in the carve-out's OWN regex (fails closed, not open: no wrong
-        # molecule ships). See the phase report for this named separately;
-        # it is not the atom-drop shape this certificate targets.
-        decorated_smiles="[I-](c1ccccc1)c1ccc(C)cc1",
         outcome_kind="abstain",
     ),
 ]

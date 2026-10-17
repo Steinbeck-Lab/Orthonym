@@ -48,7 +48,13 @@ RECLAIM_CASES = [
     ("C[N@+]12CCCC[C@@H]1CCC(=C(C3=CC=CC=C3)C4=CC=CC=C4)C2.[Br-]",
      "(5R,9aR)-3-(diphenylmethylidene)-5-methyloctahydro-2H-quinolizin-5-ium bromide"),
     ("[B-](/C/1=C/C=C\\C/C=C\\C1)(C2=CC=CC=C2)(C3=CC=CC=C3)C4=CC=CC=C4",
-     "(1Z,3Z,6Z)-(cycloocta-1,3,6-trien-1-yl)triphenylboranuide"),
+     # was '...triphenylboranuide'. change-asserted-value: primary source the Blue Book ("The
+     # second and further substituents are each enclosed with parentheses even for simple substituents... the
+     # multiplicative prefixes are not included in the parentheses"), 'tert-butyldi(methyl)phosphane (PIN)'
+     #:16286, 'ethyldi(methyl)phosphane (PIN)':7290; independent check: the test reads the name back with
+     # OPSIN (below), which the cited rule does not affect; mutation: HEAD spells 'triphenyl', so the new
+     # value fails at HEAD.
+     "(1Z,3Z,6Z)-(cycloocta-1,3,6-trien-1-yl)tri(phenyl)boranuide"),
     # D3: the plain C1 methyl is spelled 'methyl' (not 'methan-1-yl');
     # with its inner parens gone the enclosure de-escalates one level ({} ->
     # ), and 'methyl' vs 'methan' flips the alphanumerical order

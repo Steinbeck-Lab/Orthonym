@@ -2541,7 +2541,7 @@ def _route_memo_key(mol, style: str):
     style, the breadth contexts of the call (general-fallback, best-effort,
     aromatic-general, full-coverage), the N-acyl float scope, the peptide substitutive
     attempt, the forced-locant and isotope scopes, the gate re-entry and the
-    session depth (the same set the decomposition memos key on,
+    session depth and a stand-in-capped probe (``rules.centre_ligands``) (the same set the decomposition memos key on,
     ``decomposition.engine._name_fragment_t4_rescue``), of whether a tin or lead ion is the
     caller's whole input or a piece of it (``_group14_metal_radical_element``), and of the
     route's own nesting depth: a route that sits ``_MAX_ROUTE_DEPTH - 1`` levels down has
@@ -2560,7 +2560,8 @@ def _route_memo_key(mol, style: str):
     from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
                                       full_coverage_ctx, general_fallback_ctx)
     from ..routing import dispatch_table as _dispatch_table
-    return (smiles, style, getattr(_route_reentry, 'depth', 0),
+    from .centre_ligands import capped_probe_ctx
+    return (smiles, style, getattr(_route_reentry, 'depth', 0), capped_probe_ctx.get(),
             general_fallback_ctx.get(), best_effort_ctx.get(),
             allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
             nacyl_float_refusing(), _dispatch_table._PEPTIDE_SUBST_ACTIVE, _dispatch_table._PEPTIDE_NAME_STANDS,

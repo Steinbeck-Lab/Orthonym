@@ -132,9 +132,9 @@ def test_diphenyliodanuide_pin():
     AND the BB-cited explicit-lambda alternative 'diphenyl-lambda3-iodanide'
     -> the IDENTICAL 2-coordinate structure (BB 41110 states this
     equivalence verbatim) -- a genuine OPSIN substituted-halogen-uide grammar
-    limitation, not a naming defect. Carved out via
-    namer._HALOGEN_UIDE_PIN_RE (correct-by-construction, same precedent as
-    the inositol/dianhydride/phane carve-outs)."""
+    limitation, not a naming defect. The name ships when that method (2)
+    spelling reads to the input's full InChIKey (validation.uide_twin; it
+    was a carve-out with no read-back until the HU topic)."""
     assert Orthonym().name("[I-](c1ccccc1)c1ccccc1") == "diphenyliodanuide"
 
 
@@ -146,9 +146,10 @@ def test_diphenyliodanuide_gated_equals_raw():
 
 
 def test_uide_atom_drop_veto_iodanuide():
-    """Source-level atom-conservation veto (MANDATORY per Global Constraints:
-    the RT-gate fails OPEN for the halogen-uide carve-out, since OPSIN cannot
-    parse ANY substituted halogen-uide name to run the check).
+    """Source-level atom-conservation veto (kept per Global Constraints from the
+    time the RT-gate failed OPEN for the halogen-uide carve-out, since OPSIN cannot
+    parse ANY substituted halogen-uide name to run the check; the name
+    now ships through its twin read-back, validation.uide_twin).
     classify_substituent, invoked on a bare interior atom subset, silently
     degrades a hetero-substituted branch to a plain hydrocarbon name
     ('CCO' -> 'ethyl', dropping -OH). ``_emit_group13_uide`` must decline

@@ -186,7 +186,21 @@ def test_charge_dropped_false_for_empty_name():
 _STILL_LEAKS = ("NC1CCc2cc(O)ccc2C1",)
 #: Retired witnesses: now named correctly at the source, with the name OPSIN 2.9.0 parses back
 #: to the input (full an InChIKey both sides).
-_NOW_NAMED = {"NC1CCc2ccccc2C1": "1,2,3,4-tetrahydronaphthalen-2-amine"}
+#:
+#: `[I-](CCO)c1ccccc1` is a third retired witness: its ligands were named by carbon count
+#: (`classify_substituent`: 'ethyl' for 2-hydroxyethyl, so the Java-free path dropped the OH and the veto
+#: refused the name); `rules.centre_ligands` now names every ligand through the substitutive path's
+#: substituent-prefix namer, and the name is the anion's own. change-asserted-value: primary source
+#: the Blue Book ("The second and further substituents are each enclosed with parentheses
+#: even for simple substituents", 'ethyl(methyl)(propyl)phosphane (PIN)':7282) with (:41089)
+#: 'diphenyliodanuide (PIN)':41110 and (:18162, class 4 anions are senior to class 17
+#: hydroxy compounds, so the hydroxy group is a prefix of the iodanuide); independent check: OPSIN 2.9.0 reads
+#: '(2-hydroxyethyl)(phenyl)-lambda3-iodanide', the method (2) spelling of (:41094), to the input's
+#: FULL InChIKey, and the neutral '(2-hydroxyethyl)(phenyl)-lambda3-iodane' to the input with its centre made
+#: neutral (tests/unit/rules/test_halogen_uide_names.py::test_the_neutral_iodane_twin_reads_the_name_to_the_input);
+#: mutation: at HEAD this Java-free call returns 'unknown organic compound', so the new value fails there.
+_NOW_NAMED = {"NC1CCc2ccccc2C1": "1,2,3,4-tetrahydronaphthalen-2-amine",
+              "[I-](CCO)c1ccccc1": "(2-hydroxyethyl)(phenyl)iodanuide"}
 #: The hydro-fused producer still refuses the hydroxy-2-aminotetralin, so the veto still answers True for
 #: the wrong name above. What changed: when the producer refuses, the veto asks the read-back of the name
 #: that WAS shipped (perception.structure_conservation._name_reads_back_to_constitution) instead of
