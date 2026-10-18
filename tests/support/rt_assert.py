@@ -199,9 +199,20 @@ def assert_tier_contract(smiles: str) -> tuple:
         f"best-effort name is not RT-exact for {smiles}\n"
         f"  name: {be!r} (tier={res.get('tier')}, source={res.get('source')})")
     pin = name_compound(smiles)
-    assert is_failure_name(pin) or name_is_rt_exact(pin, smiles), (
+    assert is_failure_name(pin) or name_reads_back(pin, smiles), (
         f"PIN tier shipped a name that is not RT-exact for {smiles}: {pin!r}")
     return pin, be
+
+
+def name_reads_back(name: str, smiles: str) -> bool:
+    """``name`` is RT-exact, or OPSIN has no grammar for it and reads the twin spelling of the same structure
+    (``validation.twin_spellings``, a default-tier exception: a PIN spelling OPSIN reads back through its twin)
+    to the input's full InChIKey. Both reads are fresh OPSIN calls outside the engine."""
+    if name_is_rt_exact(name, smiles):
+        return True
+    from orthonym.validation.twin_spellings import twin_of
+    found = twin_of(name)
+    return found is not None and name_is_rt_exact(found[0], smiles)
 
 
 def assert_not_rt_exact(smiles: str) -> None:

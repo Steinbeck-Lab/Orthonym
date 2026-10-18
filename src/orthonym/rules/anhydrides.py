@@ -21,7 +21,8 @@ Reference: IUPAC 2013 Blue Book, (Acid anhydrides)
 
 import re
 from collections import deque
-from typing import Optional
+from functools import lru_cache
+from typing import List, Optional, Tuple
 
 from rdkit import Chem
 
@@ -326,125 +327,287 @@ _THIOACYL_ANHYDRIDE_SMARTS = (
 
 _NUMERIC_MULT = multiplier_table(6)
 
-# W8-P4: 'bis'/'tris'/... wrap the chalcogen-anhydride class
-# word for a chalcogen di-/poly-anhydride (BB 32446 'bis(thioanhydride)'),
-# unlike the plain numeric-prefixed 'dianhydride'/'trianhydride' used for the
-# O-bridge case.
-_BIS_MULT = multiplier_table(4, kind="complex")
+#: 'bis'/'tris'/... wrap the chalcogen-anhydride class word of a chalcogen di-/poly-anhydride,
+#: BB 32446 'bis(thioanhydride)'), unlike the plain numeric-prefixed 'dianhydride'/'trianhydride' of the
+#: O-bridge case, and multiply a substituted acid word (c))
+_COMPLEX_MULT = multiplier_table(6, kind="complex")
+
+#: an acid group of a free acid: the carboxyl group
+_CARBOXYL = Chem.MolFromSmarts("[CX3](=O)[OX2H1]")
+
+@lru_cache(maxsize=1)
+def _multiplying_syllables() -> Tuple[str, ...]:
+    """The numerical terms of (di, tri,... deca, undeca, dodeca... icosa, henicosa, docosa...), longest
+    first: the syllables a name begins with when (c)/(d) enclose it ('hexadecanoic', 'undecanoic')."""
+    from ..assembly.naming_utils import simple_multiplier_word
+    words = {simple_multiplier_word(n) for n in range(2, 200)} - {None}
+    return tuple(sorted(words, key=lambda w: (-len(w), w)))
 
 
-def _diacid_stem(mol, frag_atoms, carbonyls) -> Optional[str]:
-    """Chain diacid stem (e.g. 'butanedioic') for a LINEAR, unsubstituted diacid
-    residue whose two carbonyls sit at both chain ends. Fail-closed (None) for
-    branched / substituted / non-terminal-carbonyl residues."""
-    frag = set(frag_atoms)
-    carbons = [a for a in frag if mol.GetAtomWithIdx(a).GetSymbol() == "C"]
-    # Linear: no chain carbon has >2 in-fragment carbon neighbours.
-    for a in carbons:
-        cn = sum(1 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
-                 if nb.GetIdx() in frag and nb.GetSymbol() == "C")
-        if cn > 2:
-            return None
-    # Both carbonyls terminal (exactly one in-fragment carbon neighbour).
-    for c in carbonyls:
-        cn = sum(1 for nb in mol.GetAtomWithIdx(c).GetNeighbors()
-                 if nb.GetIdx() in frag and nb.GetSymbol() == "C")
-        if cn != 1:
-            return None
-    # Unsubstituted: every non-carbon fragment atom is a carbonyl =O.
-    if any(mol.GetAtomWithIdx(a).GetSymbol() != "O" for a in frag
-           if mol.GetAtomWithIdx(a).GetSymbol() != "C"):
+def _begins_with_multiplier(stem: str) -> bool:
+    """ (c) "simple substituent prefixes and functionalized parent hydrides beginning with a multiplicative
+    prefix" are enclosed when multiplied (the Blue Book; 'di(pentanal)', 'di(dodecyl)', and the PIN
+    '5,5'-(...)di(pentanal)',:38243), (d) those beginning with 'dec'. An acid name is such a functionalized parent
+    hydride: 'di(hexadecanoic)', 'di(undecanoic)'. The ester anion 'dihexadecanoate' of:55180 stands in the
+    lipid examples of (a name not marked PIN) and is not the reading taken here."""
+    return stem.startswith(_multiplying_syllables())
+
+
+def _residue_acid_smiles(mol, frag_atoms, carbonyls):
+    """``(SMILES, the cut copy of mol)`` of the free acid of one residue of a poly-anhydride: ``mol`` cut at the
+    bonds that leave the residue (the bridge atoms between its carbonyl carbons and the other residues) and each
+    carbonyl carbon of the residue given an OH. The copy keeps every stereo element of the residue, and the
+    atoms of the residue keep their indices. ``(None, None)`` when the cut fails."""
+    keep = set(frag_atoms)
+    rw = Chem.RWMol(mol)
+    for bond in list(rw.GetBonds()):
+        first, second = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
+        if (first in keep) != (second in keep):
+            rw.RemoveBond(first, second)
+    for carbonyl in carbonyls:
+        rw.AddBond(carbonyl, rw.AddAtom(Chem.Atom(8)), Chem.BondType.SINGLE)
+    try:
+        cut = rw.GetMol()
+        Chem.SanitizeMol(cut)
+        for atoms in Chem.GetMolFrags(cut):
+            if carbonyls[0] in atoms:
+                return Chem.MolFragmentToSmiles(cut, atomsToUse=list(atoms)), cut
+    except Exception:
+        pass
+    return None, None
+
+
+def _free_labels_are_whole_labels(mol, cut, keep) -> bool:
+    """Whether every stereo element of the residue ``keep`` has, in the free acid ``cut``, the CIP descriptor it has
+    in the whole molecule ``mol`` (the project's labelling, ``perception.stereo.assign_stereochemistry``).
+     (the Blue Book): descriptors "are placed at the front of the part of the name to which they relate"
+    and are those of the structure named; the acid word cites the descriptors of the FREE acid, and where a carbonyl
+    that is linked changes the CIP ranking (an alpha carbon with two carboxyl-type groups, 'acetic... (2S)-... but
+    R in the whole molecule') the word would state another configuration than the molecule has."""
+    from ..perception.stereo import _CIP_ASSIGNED_PROP, assign_stereochemistry
+    if not (any(cut.GetAtomWithIdx(i).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for i in keep)
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in cut.GetBonds()
+                   if b.GetBeginAtomIdx() in keep and b.GetEndAtomIdx() in keep)):
+        return True     # no stereo element in the residue: nothing to label
+    assign_stereochemistry(mol)
+    free = Chem.Mol(cut)
+    free.ClearProp(_CIP_ASSIGNED_PROP)
+    for atom in free.GetAtoms():
+        atom.ClearProp("_CIPCode")
+    for bond in free.GetBonds():
+        bond.ClearProp("_CIPCode")
+    assign_stereochemistry(free)
+    for index in keep:
+        a, b = mol.GetAtomWithIdx(index), free.GetAtomWithIdx(index)
+        if (a.GetProp("_CIPCode") if a.HasProp("_CIPCode") else None) != (
+                b.GetProp("_CIPCode") if b.HasProp("_CIPCode") else None):
+            return False
+    for bond in mol.GetBonds():
+        if bond.GetBeginAtomIdx() in keep and bond.GetEndAtomIdx() in keep:
+            other = free.GetBondBetweenAtoms(bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())
+            if (bond.GetProp("_CIPCode") if bond.HasProp("_CIPCode") else None) != (
+                    other.GetProp("_CIPCode") if other.HasProp("_CIPCode") else None):
+                return False
+    return True
+
+
+def _acid_is_simple(acid) -> bool:
+    """ (a) (the Blue Book): whether the acid is a simple component, multiplied by 'di', 'tri':
+    "Simple components are unsubstituted parent hydrides...; functionalized parent hydrides, such as
+    benzenesulfonic acid; or retained names, such as acetic acid." Its atoms are its carboxyl groups and an
+    unbranched carbon chain, or ring atoms only. A substituted acid is a compound component (c)): it
+    takes 'bis', 'tris'."""
+    groups = {i for match in acid.GetSubstructMatches(_CARBOXYL) for i in match}
+    rest = [atom for atom in acid.GetAtoms() if atom.GetIdx() not in groups]
+    if any(atom.IsInRing() for atom in rest):
+        return all(atom.IsInRing() for atom in rest)
+    return all(atom.GetSymbol() == "C" and atom.GetDegree() <= 2 for atom in rest)
+
+
+def multiplied_acid_word(stem: str, count: int, acid_smiles: str) -> str:
+    """``stem``, the name of the acid ``acid_smiles`` without 'acid', cited ``count`` times as the word of a
+    poly-anhydride name (:func:`_multiplied_acid_word`)."""
+    acid = Chem.MolFromSmiles(acid_smiles) if acid_smiles else None
+    return _multiplied_acid_word(stem, count, acid is not None and _acid_is_simple(acid))
+
+
+def _multiplied_acid_word(stem: str, count: int, simple: bool) -> str:
+    """``stem`` cited ``count`` times: 'di' before a simple acid ('diacetic',, the Blue Book),
+    enclosed when it has a locant or begins with a multiplying syllable (a)-(d),:7085-7104:
+    'di(hexadecanoic)'); 'bis(...)' before a substituted one (c),:7035; 'bis(chloroacetic) anhydride (PIN)',
+    :32249)."""
+    from ..assembly.naming_utils import apply_enclosing_marks, has_structural_hyphen
+    if count == 1:
+        return stem
+    if not simple:
+        return f"{_COMPLEX_MULT[count]}{apply_enclosing_marks(stem, -1)}"        # nesting of the marks
+    if has_structural_hyphen(stem) or any(ch.isdigit() for ch in stem) or _begins_with_multiplier(stem):
+        return f"{_NUMERIC_MULT[count]}{apply_enclosing_marks(stem, -1)}"
+    return f"{_NUMERIC_MULT[count]}{stem}"
+
+
+#: the acids whose retained names are preferred IUPAC names: (the Blue Book) "Only the following
+#: five carboxylic acids retained names and are also preferred IUPAC names" (formic, oxalic, acetic, benzoic and
+#: oxamic acid), and carbamic and carbonic acid,:17650)
+_PIN_RETAINED_ACID_STEMS = frozenset({"formic", "acetic", "oxalic", "benzoic", "oxamic", "carbamic", "carbonic"})
+_SYSTEMATIC_ACID_STEM = re.compile(r"(?:oic|carboxylic|sulfonic|sulfinic|phosphonic|phosphinic|peroxoic)$")
+
+
+@lru_cache(maxsize=1)
+def _trivial_acid_stems() -> frozenset:
+    """The trivial acid names of the retained-name table that no rule makes a PIN: 'suberic', 'azelaic',
+    'sebacic', 'orotic'...,:29725 keeps names such as 'adipic' for general nomenclature only)."""
+    from ..data import ALL_RETAINED_NAMES
+    stems = {name[:-len(" acid")] for name in ALL_RETAINED_NAMES.values() if name.endswith(" acid")}
+    return frozenset(stem for stem in stems
+                     if stem not in _PIN_RETAINED_ACID_STEMS and not _SYSTEMATIC_ACID_STEM.search(stem))
+
+
+#: a retained name that carries its configuration as D-/L-: not one of the descriptors the stereo layer reads
+#: (R, S, E, Z), so the name would get them added in front of a word that already states them
+_STEREO_NAME_WITHOUT_DESCRIPTORS = re.compile(r"(?:D|L|DL|rac|rel|cis|trans)-")
+
+
+#: 'carboxy' as a prefix ('3-(carboxymethoxy)-3-oxopropanoic'); the suffix 'carboxylic' is not one
+_CARBOXY_PREFIX = re.compile(r"carboxy(?!lic)")
+
+
+def _alkanedioic_stem(acid) -> Optional[str]:
+    """'octanedioic' for an unbranched, unsubstituted, saturated alkanedioic acid, else None: the systematic
+    name of the acid that the retained-name table names with a trivial name."""
+    groups = {i for match in acid.GetSubstructMatches(_CARBOXYL) for i in match}
+    rest = [atom for atom in acid.GetAtoms() if atom.GetIdx() not in groups]
+    bonds = sum(b.GetBondTypeAsDouble() - 1 for b in acid.GetBonds())
+    if (len(acid.GetSubstructMatches(_CARBOXYL)) != 2 or bonds != 2
+            or any(a.GetSymbol() != "C" or a.IsInRing() or a.GetDegree() > 2 for a in rest)):
         return None
-    return get_chain_prefix(len(carbons)) + "anedioic"
+    return get_chain_prefix(len(rest) + 2) + "anedioic"
 
 
-def _name_residue_acid(mol, frag_atoms, carbonyls, carbonyl_meta):
-    """Name one acid residue of a di/polyanhydride: a monoacid (1 carbonyl) via
-    _name_acyl_acid, a diacid (2 carbonyls) via _diacid_stem."""
-    if len(carbonyls) == 1:
-        c = carbonyls[0]
-        bo, co = carbonyl_meta[c]
-        nm, _sub = _name_acyl_acid(mol, c, bo, co)
-        return nm
-    if len(carbonyls) == 2:
-        return _diacid_stem(mol, frag_atoms, carbonyls)
-    return None
+def _residue_acid_name(mol, frag_atoms, carbonyls) -> Optional[Tuple[str, bool]]:
+    """``(the acid name without 'acid', whether the acid is simple)`` of one residue, named from its free acid
+    (:func:`_residue_acid_smiles`) by the recursive fragment namer: a ring, a double bond, a stereo centre, an OH
+    or any other group of the residue is part of the acid, never dropped. None when the free acid has no name
+    of the form '<one word> acid' (an amino acid, an acid with an ester group, a name of several words)."""
+    from ..assembly.fragment_naming import name_fragment_recursively
+    from ..metrics.provenance import get_provenance, restore_provenance
+    smiles, cut = _residue_acid_smiles(mol, frag_atoms, carbonyls)
+    acid = Chem.MolFromSmiles(smiles) if smiles else None
+    if acid is None or not _free_labels_are_whole_labels(mol, cut, set(frag_atoms)):
+        return None
+    before = get_provenance()
+    try:
+        name = name_fragment_recursively(smiles)
+    finally:
+        restore_provenance(before)      # the label of the call is the name that ships, not a probe of its acids
+    if not name or not name.endswith(" acid") or " " in name[:-len(" acid")]:
+        return None
+    stem = name[:-len(" acid")]
+    if _STEREO_NAME_WITHOUT_DESCRIPTORS.match(stem):
+        return None     # 'L-glutamic': a descriptor the stereo layer of the name does not count
+    if _CARBOXY_PREFIX.search(stem):
+        return None     # a carboxyl group of the residue is cited as a prefix, not as a suffix: (:32433)
+    if stem in _trivial_acid_stems():
+        # no PIN: the acid has its systematic name when it is an unbranched alkanedioic acid
+        stem = _alkanedioic_stem(acid)
+        if stem is None:
+            return None
+    else:
+        # a name the engine records as not the PIN (or not certified) keeps that status without its 'acid'
+        from ..metrics.provenance import record_derived_non_pin_fragment, record_derived_uncertified_pin_name
+        record_derived_non_pin_fragment(name, stem)
+        record_derived_uncertified_pin_name(name, stem)
+    return stem, stem in _PIN_RETAINED_ACID_STEMS or _acid_is_simple(acid)
+
+
+def _linear_polyanhydride_words(mol, links) -> Optional[List[str]]:
+    """ (the Blue Book): the acid words of a LINEAR poly-anhydride, ``links`` being its
+    ``(carbonyl carbon, bridge atom, carbonyl carbon)`` triples: "citing the acid groups in their order of
+    occurrence in the structure beginning with the end acid group lower in alphabetical order"; identical
+    acids are cited once, with a multiplier. None for a branched or ring topology or an acid with no name."""
+    from ..assembly.naming_utils import alpha_sort_key, cip_descriptor_rank_key
+    bridges = {bridge for _, bridge, _ in links}
+    carbonyls = sorted({c for first, _, second in links for c in (first, second)})
+    frag_of = {c: frozenset(_bfs_side_atoms(mol, c, bridges)) for c in carbonyls}
+    residues = {}
+    for carbonyl, frag in frag_of.items():
+        residues.setdefault(frag, []).append(carbonyl)
+    named = {}
+    for frag, cs in residues.items():
+        named[frag] = _residue_acid_name(mol, frag, cs)
+        if named[frag] is None:
+            return None
+    adjacent = {frag: [] for frag in residues}
+    for first, _, second in links:
+        adjacent[frag_of[first]].append(frag_of[second])
+        adjacent[frag_of[second]].append(frag_of[first])
+    ends = [frag for frag in residues if len(adjacent[frag]) == 1]
+    if len(ends) != 2:
+        return None  # not a simple linear chain
+    # the end acid lower in alphabetical order; acids that differ in configuration only ('(2R)-2-hydroxypropanoic'
+    # and '(2S)-...') by (j): "'R' precedes 'S'" (the Blue Book), whichever way the structure is drawn
+    first = min(ends, key=lambda f: (alpha_sort_key(named[f][0]), cip_descriptor_rank_key(named[f][0])))
+    order, visited, previous, current = [], set(), None, first
+    while current is not None and current not in visited:
+        visited.add(current)
+        order.append(named[current])
+        following = [f for f in adjacent[current] if f != previous and f not in visited]
+        previous, current = current, (following[0] if following else None)
+    if len(visited) != len(residues):
+        return None
+    cited, counts = [], {}
+    for stem, simple in order:
+        if stem not in counts:
+            cited.append((stem, simple))
+            counts[stem] = 0
+        counts[stem] += 1
+    return [_multiplied_acid_word(stem, counts[stem], simple) for stem, simple in cited]
+
+
+def _offered_poly_anhydride(mol, links, class_word: str) -> Optional[str]:
+    """The name of the poly-anhydride of ``mol`` with the ``links`` ``(carbonyl carbon, bridge atom, carbonyl
+    carbon)`` and the class word ``class_word``, or None when the producer has no PIN to offer.
+
+     (the Blue Book) names the dianhydride by its acid groups; with three links or more
+     (:32394) "Method (1) generates preferred IUPAC names", and the numerically multiplied
+    'trianhydride' is method (2): it is no PIN, so the substitutive route names those. The name is offered only when
+    its acids read back to ``mol`` (``validation.anhydride_acids``); a name they do not read leaves the molecule to
+    the producers after this one. At a wider tier the name is offered as well and the validity gate withdraws it
+    (OPSIN reads no name of this class), as it always did: the general engine then names the molecule. The
+    substitutive route would name it 'acetic 4-(acetyloxy)-4-oxobutanoic anhydride', a form the isotope placement
+    of a labelled molecule cannot decorate when two groups of it are one acyl group (the name of 'diacetic
+    butanedioic dianhydride' with both acetyl groups labelled)."""
+    if len(links) != 2:
+        return None
+    words = _linear_polyanhydride_words(mol, links)
+    if words is None:
+        return None
+    name = " ".join(words) + " " + class_word
+    from ..validation.anhydride_acids import anhydride_acids_round_trip
+    if not anhydride_acids_round_trip(name, Chem.MolToSmiles(mol)):
+        return None
+    # this producer builds the name that ships: a probe of the call before it (the decomposition of a thioester
+    # names its pieces with the general engine) must not leave its source on it
+    from ..metrics.provenance import record_source
+    record_source("pin_path")
+    return name
 
 
 def _name_dianhydride(mol, matches) -> Optional[str]:
-    """: di-/polyanhydride (>=2 -CO-O-CO- linkages) ->
-    '<acid groups in occurrence order> {di|tri|...}anhydride'.
+    """: dianhydride (two -CO-O-CO- linkages) ->
+    '<acid groups in occurrence order> dianhydride'.
 
-    Acid residues are cited in their order of occurrence in the structure,
-    beginning with the end acid group lower in alphabetical order; identical
-    residues collapse with a numeric multiplier ('diacetic butanedioic
-    dianhydride', BB 32386). Handles the LINEAR di/poly-anhydride topology
-    (mono-...-diacid-...-mono); fail-closed (None) for branched/complex
-    topologies, whereupon name_anhydride falls through to the single-linkage
-    path."""
-    infos = []
-    bridge_os = set()
-    for m in matches:
-        info = _parse_anhydride_core(mol, m)
+    The acid groups are cited in their order of occurrence in the structure, beginning with the end acid
+    group lower in alphabetical order; identical residues collapse with a multiplier ('diacetic butanedioic
+    dianhydride', BB 32386). Handles the LINEAR topology (mono-diacid-mono); fail-closed (None) for
+    branched/complex topologies, whereupon name_anhydride falls through to the single-linkage path."""
+    links = []
+    for match in matches:
+        info = _parse_anhydride_core(mol, match)
         if info is None or info['o1'] is None or info['o2'] is None:
             return None
-        infos.append(info)
-        bridge_os.add(info['bridge_o'])
-
-    # carbonyl carbon -> (its bridge O, its =O) for monoacid residue naming.
-    carbonyl_meta = {}
-    for info in infos:
-        carbonyl_meta[info['c1']] = (info['bridge_o'], info['o1'])
-        carbonyl_meta[info['c2']] = (info['bridge_o'], info['o2'])
-
-    # Residue fragment for each carbonyl = atoms reachable without crossing ANY
-    # bridge O. Carbonyls in the same fragment (a central diacid) share it.
-    frag_of = {c: frozenset(_bfs_side_atoms(mol, c, bridge_os))
-               for c in carbonyl_meta}
-    uniq = {}
-    for c, f in frag_of.items():
-        uniq.setdefault(f, []).append(c)
-
-    res_name = {}
-    for f, cs in uniq.items():
-        nm = _name_residue_acid(mol, f, cs, carbonyl_meta)
-        if nm is None:
-            return None
-        res_name[f] = nm
-
-    # Residue adjacency graph (one edge per anhydride linkage).
-    adj = {f: [] for f in uniq}
-    for info in infos:
-        fa, fb = frag_of[info['c1']], frag_of[info['c2']]
-        adj[fa].append(fb)
-        adj[fb].append(fa)
-    terminals = [f for f in uniq if len(adj[f]) == 1]
-    if len(terminals) != 2:
-        return None  # not a simple linear di/poly-anhydride chain
-
-    # Walk from the terminal whose acid name is alphabetically lower.
-    start = min(terminals, key=lambda f: res_name[f])
-    order, visited, prev, cur = [], set(), None, start
-    while cur is not None and cur not in visited:
-        visited.add(cur)
-        order.append(res_name[cur])
-        nxts = [x for x in adj[cur] if x != prev and x not in visited]
-        prev, cur = cur, (nxts[0] if nxts else None)
-    if len(visited) != len(uniq):
-        return None  # topology is not a simple path
-
-    # Collapse identical residues (first-occurrence order) with a NUMERIC prefix
-    #: "The numerical prefix 'di-' is used").
-    seq, counts = [], {}
-    for nm in order:
-        if nm not in counts:
-            seq.append(nm)
-            counts[nm] = 0
-        counts[nm] += 1
-    parts = [(_NUMERIC_MULT.get(counts[nm], "") if counts[nm] > 1 else "") + nm
-             for nm in seq]
-    class_term = _NUMERIC_MULT.get(len(matches), "") + "anhydride"
-    return " ".join(parts) + " " + class_term
+        links.append((info['c1'], info['bridge_o'], info['c2']))
+    return _offered_poly_anhydride(mol, links, "dianhydride")
 
 
 def _hydrazido_class_word(mol, nb, ctr_idx: int) -> Optional[str]:
@@ -752,82 +915,24 @@ def _name_thioacyl_anhydride(mol) -> Optional[str]:
 
 
 def _name_chalcogen_dianhydride(mol, matches) -> Optional[str]:
-    """: chalcogen analogue of a di-/poly-anhydride, ALL linkages
-    the SAME chalcogen -> '<residues in occurrence order> {mult}({chalcogen}
-    anhydride)' (BB 32446: 'CH3-CO-S-CO-CH2-CH2-CO-S-CO-CH3 diacetic
-    butanedioic bis(thioanhydride) (PIN)'). Mirrors:func:`_name_dianhydride`'s
-    residue walk (occurrence order starting from the alphabetically-lower
-    terminal; identical residues numeric-collapsed) but the class term is
-    'bis-'/'tris-'/... WRAPPING the singular chalcogen-anhydride word, per
-     -- NOT the plain numeric-prefixed 'dianhydride'/'trianhydride'
-    used for the O-bridge case. Fail-closed (None) for mixed chalcogens
-     seniority tie-break -- out of scope this cycle), non-linear
-    topologies, or any residue the walk can't name."""
-    infos = []
-    bridge_atoms = set()
-    bridge_elems = set()
-    for m in matches:
-        c1, o1, bridge, c2, o2 = m[0], m[1], m[2], m[3], m[4]
-        bridge_elems.add(mol.GetAtomWithIdx(bridge).GetSymbol())
-        infos.append({'c1': c1, 'c2': c2, 'bridge_o': bridge, 'o1': o1, 'o2': o2})
-        bridge_atoms.add(bridge)
-    if len(bridge_elems) != 1:
+    """: chalcogen analogue of a dianhydride, BOTH linkages the SAME chalcogen ->
+    '<residues in occurrence order> bis({chalcogen}anhydride)' (BB 32446: 'CH3-CO-S-CO-CH2-CH2-CO-S-CO-CH3
+    diacetic butanedioic bis(thioanhydride) (PIN)'). The residue walk is that of:func:`_name_dianhydride`
+    (:func:`_linear_polyanhydride_words`) but the class term is 'bis-' WRAPPING the singular
+    chalcogen-anhydride word, per -- NOT the plain numeric-prefixed 'dianhydride' used for the
+    O-bridge case. Fail-closed (None) for mixed chalcogens seniority tie-break -- out of scope
+    this cycle), non-linear topologies, or any residue the walk can't name."""
+    links, elements = [], set()
+    for match in matches:
+        first, _, bridge, second, _ = match[:5]
+        elements.add(mol.GetAtomWithIdx(bridge).GetSymbol())
+        links.append((first, bridge, second))
+    if len(elements) != 1:
         return None   # mixed chalcogens -> tie-break, deferred
-    class_word = _CHALCOGEN_CLASS_TERM.get(next(iter(bridge_elems)))
+    class_word = _CHALCOGEN_CLASS_TERM.get(next(iter(elements)))
     if class_word is None:
         return None
-
-    carbonyl_meta = {}
-    for info in infos:
-        carbonyl_meta[info['c1']] = (info['bridge_o'], info['o1'])
-        carbonyl_meta[info['c2']] = (info['bridge_o'], info['o2'])
-
-    frag_of = {c: frozenset(_bfs_side_atoms(mol, c, bridge_atoms))
-               for c in carbonyl_meta}
-    uniq = {}
-    for c, f in frag_of.items():
-        uniq.setdefault(f, []).append(c)
-
-    res_name = {}
-    for f, cs in uniq.items():
-        nm = _name_residue_acid(mol, f, cs, carbonyl_meta)
-        if nm is None:
-            return None
-        res_name[f] = nm
-
-    adj = {f: [] for f in uniq}
-    for info in infos:
-        fa, fb = frag_of[info['c1']], frag_of[info['c2']]
-        adj[fa].append(fb)
-        adj[fb].append(fa)
-    terminals = [f for f in uniq if len(adj[f]) == 1]
-    if len(terminals) != 2:
-        return None  # not a simple linear chain
-
-    start = min(terminals, key=lambda f: res_name[f])
-    order, visited, prev, cur = [], set(), None, start
-    while cur is not None and cur not in visited:
-        visited.add(cur)
-        order.append(res_name[cur])
-        nxts = [x for x in adj[cur] if x != prev and x not in visited]
-        prev, cur = cur, (nxts[0] if nxts else None)
-    if len(visited) != len(uniq):
-        return None
-
-    seq, counts = [], {}
-    for nm in order:
-        if nm not in counts:
-            seq.append(nm)
-            counts[nm] = 0
-        counts[nm] += 1
-    parts = [(_NUMERIC_MULT.get(counts[nm], "") if counts[nm] > 1 else "") + nm
-             for nm in seq]
-
-    bis_word = _BIS_MULT.get(len(matches))
-    if bis_word is None:
-        return None
-    class_term = f"{bis_word}({class_word})"
-    return " ".join(parts) + " " + class_term
+    return _offered_poly_anhydride(mol, links, f"{_COMPLEX_MULT[2]}({class_word})")
 
 
 def _name_cyclic_chalcogen_dione(mol, c1: int, c2: int, bridge_x: int) -> Optional[str]:

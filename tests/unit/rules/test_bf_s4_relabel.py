@@ -81,12 +81,14 @@ def test_the_trivial_option_emits_a_retained_trivial_name_where_no_pin_is_built(
 
 
 @pytest.mark.opsin_gate
-def test_an_exact_match_list_parent_keeps_its_label():
+def test_an_exact_match_list_parent_keeps_its_name_and_is_no_pin():
     # 'hasubanan', the exact-match list) has a bridged fused reading the
-    # builder does not complete; list names keep the label of the paper's measured run. A
-    # policy carve-out (the paper's deliberate exception for list names, namer.py
-    # _default_tier_emits), not a Blue Book reading: (:50943) names no PIN for it
+    # builder does not complete; the list name is emitted (the default tier's exception for list
+    # names, namer.py _default_tier_emits) and is no PIN. INTRODUCTION (the Blue Book; the sentence at:50943): "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter." The label of a list name is systematic_verified (verified 'identity'), never pin_verified (lead decision 2026-10-17, delegated by the user to the Blue Book: it supersedes the decision of 2026-09-30 (c) for this class); the name and its emission are unchanged.
+    # Independent check: the name is the list entry of the exact structure; mutation: this test
+    # fails on the commit before (it read pin_verified).
     smiles = "c1ccc2c(c1)CC[C@@]13CCCC[C@@]21CCN3"
     assert has_bridged_fused_reading(Chem.MolFromSmiles(smiles))
     row = _row(smiles, "pin")
-    assert (row.get("name"), row["tier"]) == ("hasubanan", "pin_verified"), row
+    assert (row.get("name"), row["tier"]) == ("hasubanan", "systematic_verified"), row
+    assert row["is_pin"] is False and row["verified"] == "identity", row

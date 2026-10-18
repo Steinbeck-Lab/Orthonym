@@ -59,6 +59,15 @@ SKELETAL_SUFFIX_PGS = {
     "secondary_amine",
     "tertiary_amine",
     "imine",
+    # (the Blue Book), Table 6.1 (:27972): '-SO-thioperoxol' (-S-OH), '-OS-thioperoxol'
+    # (-O-SH) and 'dithioperoxol' (-S-SH) are 'peroxol' (-OOH) modified by functional replacement
+    #,:17460): the suffix is the chalcogen group, bonded straight to the skeletal atom, with no
+    # exocyclic-carbon form. Their SMARTS lead with that carbon, so no PG_ATTACHMENT_INDICES entry is due.
+    # Left out, the CH2 between a ring and the group was no host of the suffix, the ring was the parent and
+    # the CH2 was dropped ('cyclopropane-1-SO-thioperoxol' for C1CC1CSO).
+    "so_thioperoxol",
+    "os_thioperoxol",
+    "dithioperoxol",
 }
 
 # /: the suffixes of the sulfonic and sulfinic acids and of their amides name the

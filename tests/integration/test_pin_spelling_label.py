@@ -156,7 +156,9 @@ HOPANE = ("CC(C)[C@H]1CC[C@]2(C)[C@H]3CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@@]
 def test_a_name_of_the_exact_match_list_is_not_read():
     assert check_pin_spelling(Chem.MolFromSmiles(HOPANE), "hopane", strict=True)   # it would fail
     row = Orthonym().name_tiered(HOPANE)
-    assert (row["name"], row["tier"]) == ("hopane", "pin_verified"), row
+    # INTRODUCTION (the Blue Book, sentence:50943): "Preferred IUPAC names (PINs) are not identified fo
+    # r the compounds in this Chapter." Lead decision 2026-10-17 (the user delegated it to the Blue Book) replaced the 2026-09-30 (c) label for the exact-match list: systematic_verified, verified 'identity'.
+    assert (row["name"], row["tier"]) == ("hopane", "systematic_verified"), row
     assert not row.get("spelling_failures"), row
 
 
@@ -167,7 +169,9 @@ def test_a_name_of_the_exact_match_list_is_not_read_on_a_route_outside_p10(monke
     import orthonym.namer as namer_mod
     monkeypatch.setattr(namer_mod, "_SPELLING_CHECK_SKIPPED_CLASSES", ())
     row = Orthonym().name_tiered(HOPANE)
-    assert (row["name"], row["tier"]) == ("hopane", "pin_verified"), row
+    # INTRODUCTION (the Blue Book, sentence:50943): "Preferred IUPAC names (PINs) are not identified fo
+    # r the compounds in this Chapter." Lead decision 2026-10-17 (the user delegated it to the Blue Book) replaced the 2026-09-30 (c) label for the exact-match list: systematic_verified, verified 'identity'.
+    assert (row["name"], row["tier"]) == ("hopane", "systematic_verified"), row
     assert not row.get("spelling_failures"), row
 
 

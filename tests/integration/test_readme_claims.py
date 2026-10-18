@@ -11,7 +11,7 @@ witnesses of each class:
   it back)" -- verified 'opsin' and an independent full-key read-back;
 * "The default tier makes a few exceptions for names OPSIN cannot read in full...
   `--provenance` marks each of them. The wider tiers ship none of them, except the
-  metal-complex list names" -- a grammar carve-out (thioperoxol), a constitution-only
+  metal-complex list names" -- a grammar carve-out (inositol), a constitution-only
   name (cis-cyclohexane-1,4-diol) and the heme b list name;
 * "PIN spellings that OPSIN's grammar lacks and that OPSIN reads back through a twin
   spelling of the same structure" -- 1,4-dihydro-1,4-sulfanonaphthalene, ``verified``
@@ -98,10 +98,10 @@ def test_specimen_uranium_trioxide_declines():
 
 # README "Output tiers" / "Checked.": the default tier's marked exceptions
 def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers():
-    carve = _row("CSO")                       # a name form outside OPSIN's grammar
-    assert carve["name"] == "methane-SO-thioperoxol", carve
+    carve = _row("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")  # a name form outside OPSIN's grammar
+    assert carve["name"] == "scyllo-inositol", carve
     assert carve["verified"] == "unverified", carve
-    assert carve["gate_outcome"] == "carveout:thioperoxol", carve
+    assert carve["gate_outcome"] == "carveout:inositol", carve
     assert carve["tier"] != "pin_verified", carve
     assert _independent_parse(carve["name"]) is None
     diol = _row("O[C@H]1CC[C@@H](O)CC1")      # stereodescriptors OPSIN cannot parse
@@ -113,7 +113,7 @@ def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers()
     # are asserted by test_p2_labels_public_claims.py::
     # test_coordination_list_name_keeps_the_label_of_its_naming_path.
     for tier in ("valid", "best-effort"):
-        wide = {s: _row(s, tier) for s in ("CSO", "O[C@H]1CC[C@@H](O)CC1")}
+        wide = {s: _row(s, tier) for s in ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "O[C@H]1CC[C@@H](O)CC1")}
         for s, row in wide.items():
             assert row["name"] not in (carve["name"], diol["name"]), row
             if row["name"]:

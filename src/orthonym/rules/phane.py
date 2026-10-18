@@ -812,30 +812,33 @@ def _simplify(mol: Optional[Chem.Mol]) -> Optional["PhaneStructure"]:
 # ---------------------------------------------------------------------------
 
 
-def _number_skeleton(struct: "PhaneStructure") -> Optional[Dict[Tuple[str, int], int]]:
-    """ (:14935) + (:14969): number the simplified
-    skeleton so superatoms get the LOWEST locant set.
+def _tied_numberings(struct: "PhaneStructure") -> List[Dict[Tuple[str, int], int]]:
+    """ (:14935) + (:14969): every numbering of the simplified
+    skeleton that gives the superatoms the LOWEST locant set, in a fixed order
+    (start amplificant, then direction).
 
     MONOCYCLIC scope (Task 8.5): enumerate every (start-amplificant,
     direction) pair -- optimal numbering always assigns locant 1 to SOME
     amplificant (any set containing 1 beats any set that doesn't at the
-    first point of difference) -- and keep the candidate whose sorted
-    superatom-locant tuple is lexicographically lowest.
+    first point of difference) -- and keep the candidates whose sorted
+    superatom-locant tuple is lexicographically lowest. "When because of skeletal
+    symmetry, these rules leave alternatives" the alternatives left
+    are the ones the multiple bonds choose among "in accordance with the
+    fixed numbering of the phane parent hydride").
 
     Representative case: 6-node monocycle, 2 superatoms 2 bridge atoms apart
     -> numbers to {1,4} (not {1,3}/{2,5}).
 
-    Returns None for non-MONOCYCLIC structures (Task 8.10 fail-closed) or a
-    structure with no node_cycle.
-    """
+    Empty for non-MONOCYCLIC structures (Task 8.10 fail-closed) or a structure with
+    no node_cycle."""
     if struct.skeleton_class is not SkeletonClass.MONOCYCLIC or struct.node_cycle is None:
-        return None
+        return []
     n = len(struct.node_cycle)
     amp_positions = [i for i, node in enumerate(struct.node_cycle) if node[0] == "amp"]
     if not amp_positions:
-        return None
+        return []
 
-    best_locants: Optional[Dict[Tuple[str, int], int]] = None
+    best: List[Dict[Tuple[str, int], int]] = []
     best_key: Optional[Tuple[int, ...]] = None
     for start_pos in amp_positions:
         for direction in (1, -1):
@@ -845,9 +848,17 @@ def _number_skeleton(struct: "PhaneStructure") -> Optional[Dict[Tuple[str, int],
                 locants[struct.node_cycle[pos]] = k + 1
             key = tuple(sorted(locants[struct.node_cycle[p]] for p in amp_positions))
             if best_key is None or key < best_key:
-                best_key = key
-                best_locants = locants
-    return best_locants
+                best_key, best = key, [locants]
+            elif key == best_key:
+                best.append(locants)
+    return best
+
+
+def _number_skeleton(struct: "PhaneStructure") -> Optional[Dict[Tuple[str, int], int]]:
+    """The first of the:func:`_tied_numberings` (the one the saturated phane is named
+    from: every alternative names it alike), or None."""
+    tied = _tied_numberings(struct)
+    return tied[0] if tied else None
 
 
 # ---------------------------------------------------------------------------
@@ -947,6 +958,206 @@ def _phane_formula_veto(struct: Optional["PhaneStructure"], mol: Optional[Chem.M
 
 
 # ---------------------------------------------------------------------------
+# -- double and triple bonds in the simplified skeleton
+# ---------------------------------------------------------------------------
+#
+# Phane parent hydrides, Double bonds in amplificants and in simplified
+# phane skeletons (the Blue Book,:16793): "The presence of one or more double or triple
+# bonds in an otherwise saturated phane parent hydride, except in amplificants with
+# Hantzsch-Widman names, is denoted by changing the final letter 'e' of the phane parent hydride
+# name to 'ene' or 'yne', with appropriate multiplying prefixes to indicate the multiplicity of
+# each kind of unsaturated site"; "Low locants are allocated for double or triple bonds in
+# accordance with the fixed numbering of the phane parent hydride" (:16795). The saturated
+# bridge name ('1,4(1,4)-dibenzenacyclohexaphane') is the name of another molecule when a bridge
+# holds a double or a triple bond (TRIAGE: 40 of the 66 names of the audit sample, 2026-10-17).
+
+
+def _skeleton_bonds(struct: "PhaneStructure"):
+    """``[(node, next_node, bond)]`` for the edges of the node cycle, or None when an edge is not one
+    bond (a skeleton node pair joined by none or by several bonds is no simple monocycle)."""
+    cycle, mol = struct.node_cycle, struct.mol
+
+    def atoms_of(node):
+        return struct.amplificants[node[1]].atoms if node[0] == "amp" else frozenset((node[1],))
+
+    edges = []
+    for i, node in enumerate(cycle):
+        following = cycle[(i + 1) % len(cycle)]
+        here, there = atoms_of(node), atoms_of(following)
+        bonds = [b for b in mol.GetBonds()
+                 if (b.GetBeginAtomIdx() in here and b.GetEndAtomIdx() in there)
+                 or (b.GetBeginAtomIdx() in there and b.GetEndAtomIdx() in here)]
+        if len(bonds) != 1:
+            return None
+        edges.append((node, following, bonds[0]))
+    return edges
+
+
+def _resolved_orders(struct: "PhaneStructure", edges):
+    """The bond order of each skeleton edge, parallel to ``edges``, or None. RDKit flags the bonds of a
+    macrocycle aromatic when its sp2 bridge atoms close a conjugated ring ('C1=CC2=CC(=C1)C=CC3=...' is
+    [2.2]metacyclophane-1,9-diene for it, and the CH=CH of an ene-diyne bridge is flagged beside its
+    two triple bonds). The amplificant is a benzene, so its bonds to a bridge are single; a bridge atom
+    bonds to its two skeleton neighbours and its hydrogens, so the double bonds it still needs are
+    ``2 - hydrogens`` less those of the bonds the input gives as double or triple. Along a bridge from
+    the amplificant at one end each aromatic bond is double when the atom before it still needs one;
+    every atom has to need none at the end."""
+    mol = struct.mol
+    definite = {Chem.BondType.SINGLE: 1, Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}
+    resolved = [definite.get(bond.GetBondType()) for _, _, bond in edges]
+    need = {node[1]: 2 - mol.GetAtomWithIdx(node[1]).GetTotalNumHs()
+            for node, _, _ in edges if node[0] == "bridge"}
+    for (node, following, _), order in zip(edges, resolved):
+        if order is not None and order > 1:
+            for end in (node, following):
+                if end[0] == "bridge":
+                    need[end[1]] -= order - 1
+    n = len(edges)
+    first = next((i for i, (node, _, _) in enumerate(edges) if node[0] == "amp"), None)
+    if first is None:
+        return None
+    for step in range(n):
+        i = (first + step) % n
+        node, following, bond = edges[i]
+        if bond.GetBondType() != Chem.BondType.AROMATIC:
+            continue
+        if "amp" in (node[0], following[0]):
+            resolved[i] = 1
+        elif need[node[1]] > 0:
+            resolved[i] = 2
+            need[node[1]] -= 1
+            need[following[1]] -= 1
+        else:
+            resolved[i] = 1
+    if any(o is None for o in resolved) or any(left != 0 for left in need.values()):
+        return None
+    return resolved
+
+
+def _multiple_bonds(struct: "PhaneStructure"):
+    """The double and triple bonds of the skeleton as ``[(node, next_node, order, bond)]`` (empty for a
+    saturated phane), or None when the skeleton is not one the endings name: a multiple bond
+    to an amplificant (a quinoid ring is no benzene), two multiple bonds on one bridge atom (a
+    cumulated chain, whose double bonds have no stereodescriptor of the 'ene' kind), a bond of another
+    kind, or an atom that is charged, a radical or an isotope (the name states none of them)."""
+    if any(a.GetFormalCharge() or a.GetIsotope() or a.GetNumRadicalElectrons()
+           for a in struct.mol.GetAtoms()):
+        return None
+    edges = _skeleton_bonds(struct)
+    if edges is None:
+        return None
+    resolved = _resolved_orders(struct, edges)
+    if resolved is None:
+        return None
+    multiple, cited = [], {}
+    for (node, following, bond), order in zip(edges, resolved):
+        if order > 1:
+            if "amp" in (node[0], following[0]):
+                return None
+            multiple.append((node, following, order, bond))
+            for end in (node, following):
+                cited[end] = cited.get(end, 0) + 1
+    return None if any(n > 1 for n in cited.values()) else multiple
+
+
+def _multiple_bond_locants(numbering, multiple):
+    """``(doubles, triples)``, the lower locant of each multiple bond in ascending order:
+    (the Blue Book) "Only the lower locant for a multiple bond is cited, except when the numerical
+    difference between the two locants is greater than one". Bridge atoms are consecutive primary
+    locants here, so the lower one is cited alone; None for a bond whose locants are not consecutive."""
+    doubles, triples = [], []
+    for node, following, order, _ in multiple:
+        a, b = numbering[node], numbering[following]
+        if abs(a - b) != 1:
+            return None
+        (doubles if order == 2 else triples).append(min(a, b))
+    return sorted(doubles), sorted(triples)
+
+
+def _numbering_for_multiple_bonds(struct: "PhaneStructure", multiple):
+    """``(numbering, doubles, triples)`` of the numbering among the:func:`_tied_numberings` that the
+    multiple bonds prefer, or None. (the Blue Book) "Double and triple bonds in a
+    phane structure are described by the method of. Low locants are allocated to double and
+    triple bonds first when considered together as a set in ascending order and, if a choice is still
+    needed, to double bonds"; (:16675) (1) "lower locants are assigned to multiple bonds as
+    a set", (2) "lower locants are assigned to double bonds". Then NUMBERING (j) (:3346): "the lower
+    locant is assigned to CIP stereodescriptors Z, R, M, and r (pseudoasymmetry) that are preferred to E, S,
+    P, and s", read as the other numberings of the naming functions read it
+    (``naming_utils.cip_locant_rank_key``), so that the numbering does not depend on the atom order of the
+    input. The first of equal alternatives is kept."""
+    from ..assembly.naming_utils import cip_locant_rank_key
+
+    best = None
+    total_nodes = len(struct.node_cycle)
+    for numbering in _tied_numberings(struct):
+        found = _multiple_bond_locants(numbering, multiple)
+        if found is None:
+            return None
+        cited = _double_bond_descriptors(multiple, numbering, total_nodes)
+        if cited is None:
+            return None
+        key = (sorted(found[0] + found[1]), found[0], cip_locant_rank_key(cited.items()))
+        if best is None or key < best[0]:
+            best = (key, numbering, found)
+    return None if best is None else (best[1], best[2][0], best[2][1])
+
+
+def _double_bond_descriptors(multiple, locants, total_nodes: int):
+    """``{locant: 'Z' | 'E'}`` of the double bonds the input defines and the name has to cite, or None
+    when the name cannot state the input's configuration. Specification of double bonds
+    (the Blue Book,:49686): "The omission of stereodescriptors 'E' and 'Z' to denote the configuration of
+    double bonds in cyclophanes is related to the total number of nodes in the system; for up to seven
+    nodes, no descriptor is necessary. When more than seven nodes are present, all descriptors are must
+    be cited". Up to seven nodes the configuration is the cis one the ring allows, so an input that
+    defines a trans double bond has no name here; an 'either' bond has none at any size. A double bond
+    the input leaves open is cited by no descriptor."""
+    cited = {}
+    for node, following, order, bond in multiple:
+        if order != 2:
+            continue
+        state = bond.GetStereo()
+        if state in (Chem.BondStereo.STEREOANY,):
+            return None
+        if state in (Chem.BondStereo.STEREOZ, Chem.BondStereo.STEREOCIS):
+            label = "Z"
+        elif state in (Chem.BondStereo.STEREOE, Chem.BondStereo.STEREOTRANS):
+            label = "E"
+        else:
+            continue
+        if total_nodes <= 7:
+            if label == "E":
+                return None
+            continue
+        cited[locants[node] if locants[node] < locants[following] else locants[following]] = label
+    return cited
+
+
+def _unsaturated_phane_name(skeletal_name: str, doubles, triples) -> Optional[str]:
+    """``'cyclohexaphane'`` -> ``'cyclohexaphan-2-ene'`` / ``'cyclohexaphane-2,5-diene'`` /
+    ``'cyclotridecaphan-4-en-2-yne'``: the final 'e' of 'phane' becomes the endings ('ene' before
+    'yne' loses its 'e'), the multiplying prefixes 'di', 'tri' count each kind, and the 'e' of 'phane'
+    is elided before a vowel only: (the Blue Book) "In names, the ending 'ene' always
+    precedes 'yne', with elision of the final letter 'e' in 'ene'", (:16497) "There is no
+    elision of the final letter 'a' of a multiplying prefix before 'ene' or 'yne'"; the Blue Book
+    prints 'cyclohexadecaphan-2-ene' (:16821), 'cyclohexaphane-2,5-diene' (:49692) and
+    'cyclotridecaphan-4-en-2-yne' (:16829)."""
+    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+
+    if not (skeletal_name.endswith("phane") and (doubles or triples)):
+        return None
+    segments = []
+    for locants, stem in ((doubles, "en"), (triples, "yn")):
+        if not locants:
+            continue
+        multiplier = "" if len(locants) == 1 else SIMPLE_MULTIPLIERS.get(len(locants))
+        if multiplier is None:
+            return None
+        segments.append((multiplier, f"-{','.join(str(x) for x in locants)}-{multiplier}{stem}"))
+    base = skeletal_name[:-1] if not segments[0][0] else skeletal_name
+    return base + "".join(text for _, text in segments) + "e"
+
+
+# ---------------------------------------------------------------------------
 # Task 8.7 -- assemble the monocyclic all-benzene homophane PIN (integration)
 # ---------------------------------------------------------------------------
 
@@ -972,9 +1183,13 @@ def build_phane_pin(mol: Optional[Chem.Mol]) -> Optional[str]:
     if any(a.parent_name != "benzene" for a in struct.amplificants):
         return None  # Task 8.7 scope: all-benzene only this phase
 
-    skeleton_locants = _number_skeleton(struct)
-    if skeleton_locants is None:
+    multiple = _multiple_bonds(struct)
+    if multiple is None:
         return None
+    chosen = _numbering_for_multiple_bonds(struct, multiple)
+    if chosen is None:
+        return None
+    skeleton_locants, doubles, triples = chosen
     per_amp = _attachment_locants(struct, skeleton_locants)
     if per_amp is None or len(per_amp) != len(struct.amplificants):
         return None
@@ -1014,10 +1229,19 @@ def build_phane_pin(mol: Optional[Chem.Mol]) -> Optional[str]:
     if skeletal_name is None:
         return None
 
+    descriptors = _double_bond_descriptors(multiple, skeleton_locants, total_nodes)
+    if descriptors is None:
+        return None
+    if doubles or triples:
+        skeletal_name = _unsaturated_phane_name(skeletal_name, doubles, triples)
+        if skeletal_name is None:
+            return None
+    cited = ",".join(f"{loc}{descriptors[loc]}" for loc in sorted(descriptors))
+
     superatom_locants = sorted(sup for sup, _ in per_amp)
     superatom_str = ",".join(str(x) for x in superatom_locants)
     attach_str = ",".join(str(x) for x in shared_attach)
-    return f"{superatom_str}({attach_str})-{multiplied_prefix}{skeletal_name}"
+    return f"{f'({cited})-' if cited else ''}{superatom_str}({attach_str})-{multiplied_prefix}{skeletal_name}"
 
 
 # ---------------------------------------------------------------------------

@@ -4284,8 +4284,9 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
         _element_singleton_in(original, el) for el in _label_elements)
         else isotopic_naming_scope("isotope"))
     _shift_token = _BOND_SHIFT_PARSE_REFUSED.set(False)
+    from ..validation.thioperoxol_twin import embedded_name   # the skeleton is read by OPSIN, candidate by candidate
     try:
-        with _scope:
+        with _scope, embedded_name():
             result = _decorate_isotopic_name_inner(
                 smiles, style, namer, original, stripped, label_map)
             if result is None:

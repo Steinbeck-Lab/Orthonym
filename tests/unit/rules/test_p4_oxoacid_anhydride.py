@@ -56,15 +56,32 @@ class TestChalcogenDianhydride:
 
 
 @pytest.mark.unit
+@pytest.mark.opsin_gate
 class TestLinearPolyanhydrideVerify:
-    """: the general-nomenclature method-2 name IS BB-verbatim for
-    this exact structure (BB 32410-32412), so it must NOT be vetoed (it
-    describes the correct molecule; only the substitutive method-1 PIN is
-    unbuilt this cycle)."""
+    """ Linear polyanhydrides (the Blue Book): "named by one of the following methods:... (2) by
+    citing the acid groups, in their order of appearance, in the structure beginning with the end acid group lower
+    in alphabetical order followed by a class term 'dianhydride', 'trianhydride', etc.... Method (1) generates
+    preferred IUPAC names." The example of BB 32410-32412 gives both names of this structure: (1) 'acetic
+    butanedioic 4-(propanoyloxy)-4-oxobutanoic dianhydride (PIN)' and (2) 'acetic dibutanedioic propanoic
+    trianhydride'. The method (2) name describes the molecule and is no PIN, so the default tier (a PIN or a
+    decline; a name the book gives no PIN for is systematic_verified at best) declines it, and no tier ships it
+    (OPSIN reads no 'trianhydride', so the wider tiers do not): the method (1) name is not built.
+    This test said the default tier ships the method (2) name, from the days the grammar-gap carve-out shipped
+    every name of the class with no read-back."""
 
-    def test_trianhydride_ships_bb_verbatim_general_name(self):
-        smi = "CC(=O)OC(=O)CCC(=O)OC(=O)CCC(=O)OC(=O)CC"
-        assert name_compound(smi) == "acetic dibutanedioic propanoic trianhydride"
+    SMILES = "CC(=O)OC(=O)CCC(=O)OC(=O)CCC(=O)OC(=O)CC"
+
+    def test_the_method_two_trianhydride_is_no_pin_and_is_not_shipped(self):
+        from tests.support.rt_assert import assert_full_rt, name_best_effort
+        assert name_compound(self.SMILES, on_failure="label") != "acetic dibutanedioic propanoic trianhydride"
+        best = name_best_effort(self.SMILES)
+        assert best["name"] and "trianhydride" not in best["name"]
+        assert_full_rt(best["name"], self.SMILES)
+
+    def test_the_default_tier_declines_it_with_no_name(self):
+        from tests.support.default_tier import default_tier_row
+        row = default_tier_row(self.SMILES)
+        assert row["tier"] == "abstain" and row["is_pin"] is False, row
 
 
 @pytest.mark.unit

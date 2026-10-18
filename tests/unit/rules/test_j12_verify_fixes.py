@@ -111,15 +111,15 @@ def test_ocene_group14_and_salt_keep_the_pin_label(smiles, expected):
 # ---------------------------------------------------------------------------
 
 GRAMMAR_GAP_NAMES = [
-    # 'methane-SO-thioperoxol (PIN)' (thioperoxol carve-out)
-    ("methane-SO-thioperoxol", "CSO", "thioperoxol"),
+    # (the thioperoxol names are no carve-out since the CO topic: each ships through its twin read-back,
+    # which needs OPSIN; tests/unit/validation/test_thioperoxol_twin.py)
     # inositol retained name (inositol carve-out)
     ("scyllo-inositol", "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O",
      "inositol"),
-    # method (1) polyol polyester (regex carve-out)
-    ("propane-1,2,3-triyl 1,3-diacetate 2-propanoate",
-     "CC(=O)OCC(COC(=O)C)OC(=O)CC", "polyol_polyester"),
 ]
+# (The polyol polyester name of method (1) was a grammar-gap carve-out here: since the CO topic
+# it ships through its acyloxy twin, which OPSIN has to read, so it fails closed while OPSIN is unavailable:
+# see the list below, and tests/unit/rules/test_polyester_twin.py.)
 
 
 def _gate(monkeypatch, status, name, smiles, general_fallback_tier=False):
@@ -149,6 +149,7 @@ def test_grammar_gap_carveout_verdict_does_not_depend_on_opsin_reachability(
 @pytest.mark.parametrize("name,smiles", [
     ("ethanol", "CCO"),
     ("trichlorido(methyl)titanium", "Cl[Ti](Cl)(Cl)C"),
+    ("propane-1,2,3-triyl 1,3-diacetate 2-propanoate", "CC(=O)OCC(COC(=O)C)OC(=O)CC"),
 ])
 def test_names_needing_an_opsin_observation_still_fail_closed(monkeypatch, name, smiles):
     from orthonym.metrics import provenance as pv
@@ -162,9 +163,9 @@ def test_names_needing_an_opsin_observation_still_fail_closed(monkeypatch, name,
 def test_general_fallback_tier_keeps_suppressing_grammar_gap_names(monkeypatch):
     from orthonym.namer import _descriptive_fallback
     for status in ("rejected", "unavailable"):
-        out, _ = _gate(monkeypatch, status, "methane-SO-thioperoxol", "CSO",
+        out, _ = _gate(monkeypatch, status, "scyllo-inositol", "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O",
                        general_fallback_tier=True)
-        assert out == _descriptive_fallback("CSO"), (status, out)
+        assert out == _descriptive_fallback("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"), (status, out)
 
 
 # ---------------------------------------------------------------------------

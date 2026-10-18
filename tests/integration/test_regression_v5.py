@@ -20,9 +20,11 @@ from tests.support.default_tier import (  # noqa: E402
 # as not the PIN is declined at the default tier with NO_VERIFIED_PIN; for the
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
-DEFAULT_TIER_DECLINES = frozenset({
-    "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCCC(=O)OC[C@H](COC(=O)CCCCCCCCCCCCCCCCCCCCCC)OC(=O)CCCCCCCC/C=C\\C/C=C\\C/C=C\\CC",
-})
+# (The mixed triglyceride of regression 6 was one of them: its '(2S)-' descriptor kept the functional-class name out of
+# the grammar-gap carve-out, OPSIN rejected it and the default tier declined it. The name now ships through its
+# acyloxy twin, validation.polyester_twin, which OPSIN reads to the input's full InChIKey: (the Blue Book
+#:31842) prints '(2S)-propane-1,2,3-triyl 2-acetate 1-hexadecanoate 3-[(9Z)-octadec-9-enoate]' (:55113).)
+DEFAULT_TIER_DECLINES = frozenset()
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
@@ -477,9 +479,10 @@ class TestFattyAcidIdentification:
         name, _be = assert_tier_contract(smiles)
         if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
             name = _declined_pin_row(smiles)["name"]
-        # C23:0 should use systematic name tricosanoyloxy
-        assert "tricosanoyloxy" in name, (
-            f"Expected 'tricosanoyloxy' for C23:0 chain: '{name}'"
+        # C23:0 should use the systematic stem tricosanoyl: 'tricosanoate' in the functional-class name of the
+        # default tier, 'tricosanoyloxy' in the substitutive name of the wider tiers
+        assert "tricosanoate" in name or "tricosanoyloxy" in name, (
+            f"Expected the systematic C23:0 stem in: '{name}'"
         )
         # No trivial fatty-acyl prefix (R20)
         for trivial in ("arachid", "linole", "palmitoyl", "stearoyl", "oleoyl"):

@@ -73,9 +73,14 @@ def test_the_unchecked_numbering_predicate_sees_only_the_tetravalent_parent():
 
 
 def test_a_table_10_1_parent_on_an_unchecked_numbering_keeps_its_list_name_at_the_default_tier():
+    """The list name is emitted at the default tier and is no PIN: INTRODUCTION (the Blue Book;
+    :50943) "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter." (lead decision
+    2026-10-17): label systematic_verified, verified 'identity'. The name is the book's own string (Table 10.1
+    (a),:51396), unchanged."""
     row = name_default(LYCOPODANE)
     assert row.get("name") == "lycopodane", row
-    assert row.get("tier") == "pin_verified", row
+    assert row.get("tier") == "systematic_verified" and row["verified"] == "identity", row
+    assert row["is_pin"] is False, row
 
 
 def test_the_breadth_tier_names_lycopodane_with_the_builder_name_which_reads_back():

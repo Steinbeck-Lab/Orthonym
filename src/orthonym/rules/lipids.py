@@ -234,7 +234,20 @@ def _acid_to_acyl_form(acid_name: str) -> Optional[str]:
 
 
 def _acylate_for_site(mol, site) -> Optional[str]:
-    """site = ('acyl', carbonyl_idx, ester_o_idx) → '<acyl>oate' or None."""
+    """site = ('acyl', carbonyl_idx, ester_o_idx) → '<acyl>oate' or None.
+
+    None as well for the site of a polybasic acid whose other carboxy group is free (a half ester,
+    glycerol 2-glutarate): its '-oate' word would be the dianion ('pentanedioate'), which states no
+    acid hydrogen, so the name would be the name of an anion. Partial esters of
+    polybasic acids and their salts (the Blue Book): the acid group is the senior class, "(1)
+    substitutively on the basis of the anion, the free acid group(s) and the ester group(s) being
+    cited as prefixes" (:31937), "Method (1) generates preferred IUPAC names" (:31941), and
+    Acid esters of organic acids (:40993): "Preferred IUPAC names of acid esters of 'organic acids'...
+    are formed substitutively (see rather than by the method of 'hydrogen salts'"
+    ('5-carboxypentanoate (PIN)',:40997). The glyceride assembler has no such form, and the caller
+    defers to the substitutive pipeline."""
+    if _site_acid_is_polycarboxylic(mol, site[1], site[2]):
+        return None
     acid = _acid_fragment_name(mol, site[1], site[2])
     return _acid_to_oate(acid) if acid else None
 
@@ -271,9 +284,34 @@ def _acyloxy_for_site(mol, site, carboxy_prefixed_polyacid: bool = False) -> Opt
     return built(f"{cited}oxy", substituted=True, enclosed=True) if cited else None
 
 
-def _multiplied_acylate(acylate: str, count: int) -> str:
+def _anion_is_substituted(mol, site) -> bool:
+    """Whether the anion of an acyl site names a SUBSTITUTED acid anion ('chloroacetate',
+    'methylcarbamate', 'hydroxyacetate', '2-methylpropanoate'), read from the atoms of the acyl group.
+
+     (the Blue Book): "Multiplicative prefixes 'di', 'tri', etc. are used when anions
+    are unsubstituted; when substituted, prefixes 'bis', 'tris', etc." ('propane-1,3-diyl
+    bis(chloroacetate) (PIN)',:31825). The acyl group is read as ``assembly.book_prefixes.acyl_derivation``
+    reads it for the acyloxy prefix (c),:7035: R carries an atom outside the unbranched chain or
+    the ring system of the acid); an acid whose R is one heteroatom ('carbamate' H2N-CO-,
+    'carbonochloridate' Cl-CO-) is no substituted acid: 'dicarbamate'."""
+    from ..assembly.book_prefixes import acyl_derivation, acyl_side_atoms
+    atoms = acyl_side_atoms(mol, site[1], site[2])
+    if not acyl_derivation(mol, site[1], atoms).substituted:
+        return False
+    carbonyl = mol.GetAtomWithIdx(site[1])
+    oxo = {nb.GetIdx() for nb in carbonyl.GetNeighbors() if nb.GetIdx() in atoms and nb.GetAtomicNum() == 8
+           and mol.GetBondBetweenAtoms(site[1], nb.GetIdx()).GetBondType() == Chem.BondType.DOUBLE}
+    rest = atoms - {site[1]} - set(list(oxo)[:1])
+    return not (len(rest) == 1 and mol.GetAtomWithIdx(next(iter(rest))).GetAtomicNum() != 6)
+
+
+def _multiplied_acylate(acylate: str, count: int, substituted: bool = False) -> str:
     if count == 1:
         return acylate
+    if substituted:
+        #: 'bis(chloroacetate)', with the enclosing marks of (:7232) after 'bis'
+        from ..data.multipliers import COMPLEX_MULTIPLIERS
+        return f"{COMPLEX_MULTIPLIERS[count]}{apply_enclosing_marks(acylate, -1)}"
     mult = get_multiplier_prefix(count, acylate)
     if is_complex_substituent(acylate):
         # (the Blue Book): the mark follows the acylate's own depth
@@ -348,12 +386,13 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
         return None  # no ester PCG → not a glyceride (glycerol itself / phospho handled elsewhere)
 
     # --- acylate names per acyl position ---
-    acylate_by_loc = {}
+    acylate_by_loc, substituted_by_loc = {}, {}
     for a in acyl_atoms:
         acylate = _acylate_for_site(mol, atom_site[a])
         if acylate is None:
             return None
         acylate_by_loc[num[a]] = acylate
+        substituted_by_loc[num[a]] = _anion_is_substituted(mol, atom_site[a])
     acyl_locants = sorted(acylate_by_loc)
     n_acyl = len(acyl_locants)
 
@@ -389,18 +428,23 @@ def _assemble_glyceride(mol, match, style) -> Optional[str]:
         for _aname in _ordered:
             _locs = sorted(_groups[_aname])
             _loc_str = ",".join(str(x) for x in _locs)
-            _word = _multiplied_acylate(_aname, len(_locs))
-            if len(_locs) == 1 and _aname.startswith("("):
+            _word = _multiplied_acylate(_aname, len(_locs), substituted_by_loc[_locs[0]])
+            if len(_locs) == 1 and (_aname.startswith("(") or _aname[:1].isdigit()):
                 # A single anion that carries its own stereodescriptor is enclosed
                 # after its locant, the mark escalating past the descriptor's
                 # parentheses: 'propane-1,2,3-triyl 2-acetate 1-hexadecanoate
                 # 3-[(9Z)-octadec-9-enoate] (PIN)',
                 # the Blue Book). Was '3-(11Z)-octadec-11-enoate' (TRIAGE g5 C12).
+                # So is one that starts with a locant of its own: (:7255)
+                # "Parentheses are used around simple substituent prefixes [...] to separate
+                # locants of the same type referring to different structural elements"; the
+                # attachment locant and the first locant of '18-methylnonadecanoate' are such
+                # locants ('2-(18-methylnonadecanoate)', not '2-18-methylnonadecanoate').
                 _word = apply_enclosing_marks(_aname, -1)
             _parts.append(f"{_loc_str}-{_word}")
         suffix = " ".join(_parts)
     else:
-        suffix = _multiplied_acylate(acylates[0], n_acyl)
+        suffix = _multiplied_acylate(acylates[0], n_acyl, substituted_by_loc[acyl_locants[0]])
 
     # --- prefixes (free-OH, glycosyl, phosphoryloxy) on the non-acyl positions ---
     prefix = _build_glycerol_prefixes(num, oh_atoms, glyco_atoms, atom_site, phospho_atoms)

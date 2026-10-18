@@ -1431,7 +1431,8 @@ def name_polyacid_derivative(mol) -> Optional[str]:
 
     # --- Case D: full acyl esterification -> anhydride ---
     if kinds_set == {"acyloxy"} and bridge_elem in (None, "O"):
-        from .lipids import _acid_fragment_name
+        from .anhydrides import multiplied_acid_word
+        from .lipids import _acid_fragment_name, _isolated_acid_smiles
         acids = []
         for pl in positions.values():
             for (_, site) in pl:
@@ -1443,7 +1444,9 @@ def name_polyacid_derivative(mol) -> Optional[str]:
         if len(acid_counts) != 1:
             return None                              # mixed acyls -> out of scope
         aname, acnt = next(iter(acid_counts.items()))
-        acid_cited = f"{_MULT.get(acnt, '')}{aname}"
+        first = next(site for pl in positions.values() for (_, site) in pl)
+        #: 'tetraacetic', but 'tetrakis(2,3-dihydroxypropanoic)' for a substituted acid
+        acid_cited = multiplied_acid_word(aname, acnt, _isolated_acid_smiles(mol, first[0], first[1]))
         anh_mult = _MULT.get(n_total, "")
         return f"{acid_cited} {parent_word} {anh_mult}anhydride"
 

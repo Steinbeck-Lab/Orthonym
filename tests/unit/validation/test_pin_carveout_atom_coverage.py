@@ -1,14 +1,16 @@
 """ a phase — PIN carve-out decoration-mutation atom-coverage certificate.
 
-``namer._final_opsin_validity_gate`` (:1081-1353) has 8 hard-gated ``return name``
-carve-outs (:1152-1237) that ship a PIN WITHOUT the /OPSIN round-trip (a ninth, ``halogen_uide``,
-ships through its twin read-back since the HU topic: ``validation.uide_twin``,
-``tests/unit/rules/test_halogen_uide_names.py``),
+``namer._final_opsin_validity_gate`` (:1081-1353) has hard-gated ``return name``
+carve-outs (:1152-1237) that ship a PIN WITHOUT the /OPSIN round-trip (``halogen_uide`` ships
+through its twin read-back since the HU topic: ``validation.uide_twin``,
+``tests/unit/rules/test_halogen_uide_names.py``; with the CO topic ``thioperoxol`` ships through
+``validation.thioperoxol_twin`` (``tests/unit/validation/test_thioperoxol_twin.py``) and ``dianhydride`` and
+``chalcogen_dianhydride`` when ``validation.anhydride_acids`` reads the name back through its acids
+(``tests/unit/rules/test_dianhydride_names.py``)),
 because the correct PIN for each class is OPSIN-unparseable by construction
 (OPSIN's *generation* grammar has no rule for these suffix/class-word families):
-``thioperoxol``, ``inositol``, ``np_stereoparent``, ``dianhydride``,
-``chalcogen_dianhydride``, ``polyol_polyester``, ``organometallic_additive``,
-``phane``. Each is commented as "emitted ONLY by a hard-gated /
+``inositol``, ``np_stereoparent``, ``polyol_polyester``,
+``organometallic_additive``, ``phane``. Each is commented as "emitted ONLY by a hard-gated /
 atom-conservation-vetoed" internal producer, i.e. the atom-coverage claim for
 these classes rests entirely on trusting that producer, with no external check
 of any kind — see `internal notes` Gap 2.
@@ -20,7 +22,7 @@ names only the bare core -> a silent atom-drop that the carve-out would wave
 through unexamined (no ever runs on that branch).
 
 This module is a REGRESSION CERTIFICATE, not a source change: for each of the
-8 classes it (1) locks a representative PIN molecule shipping via that exact
+7 classes it (1) locks a representative PIN molecule shipping via that exact
 carve-out (``gate_outcome == "carveout:<class>"``), then (2) builds a DECORATED
 mutant -- the same recognised core plus one small extra substituent that
 changes the molecular formula -- and proves the decoration is never silently
@@ -37,8 +39,8 @@ Three honest outcomes for the decorated mutant, all acceptable:
       rather than guessing -- observed for np_stereoparent, chalcogen_dianhydride,
       organometallic_additive, phane below.
   (c) SAME-CARVEOUT, ATOM-COMPLETE -- the decorated molecule still matches the
-      carve-out's own regex (thioperoxol / polyol_polyester below), because
-      OPSIN can NEVER round-trip ANY member of these two classes, decorated or
+      carve-out's own regex (polyol_polyester below), because
+      OPSIN can NEVER round-trip ANY member of this class, decorated or
       not -- that unparseability is the entire reason the carve-out exists, so
       "OPSIN-verify the decorated name" is not an available check for this
       residual set. The producer nonetheless computed a real substitutive name
@@ -48,7 +50,7 @@ Three honest outcomes for the decorated mutant, all acceptable:
       in it.
 
 The ONE failure shape this certificate exists to catch, and did not find live
-in any of the 8 cases (see the module docstring in the phase report for the
+in any of the 7 cases (see the module docstring in the phase report for the
 one adjacent-but-different anomaly that WAS found and is reported, not
 xfailed, because it is a locant-formatting defect, not an atom drop):
 decorated_name == bare_core_name, i.e. the recogniser fired on the bigger
@@ -78,7 +80,7 @@ def namer():
 
 
 # ---------------------------------------------------------------------------
-# The 8 carve-out classes. Each representative was independently confirmed
+# The 7 carve-out classes. Each representative was independently confirmed
 # (2026-08-14) to ship via `gate_outcome == "carveout:<carveout>"` -- i.e. it
 # is the code path at namer.py:1152-1237, not merely a name that happens to
 # look similar.
@@ -88,15 +90,6 @@ def namer():
 # constructed mutant, so the assertion helper knows which proof to demand.
 # ---------------------------------------------------------------------------
 CASES = [
-    dict(
-        carveout="thioperoxol",
-        bare_smiles="CSO",
-        bare_name="methane-SO-thioperoxol",
-        # BB verbatim: CH3-S-OH -> methane-SO-thioperoxol (PIN).
-        decorated_smiles="ClCCSO",  # Cl-CH2-CH2-S-OH: same -S-OH core, +Cl +C.
-        outcome_kind="carveout_marker",
-        decoration_marker="chloro",
-    ),
     dict(
         carveout="inositol",
         bare_smiles="O[C@@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O",
@@ -124,51 +117,32 @@ CASES = [
         outcome_kind="abstain",
     ),
     dict(
-        carveout="dianhydride",
-        bare_smiles="CC(=O)OC(=O)CCC(=O)OC(C)=O",
-        bare_name="diacetic butanedioic dianhydride",
-        # _DIANHYDRIDE_PIN_RE requires a straight '...(di|tri|...)anhydride'
-        # tail; a chloro substituent on the central succinic chain breaks
-        # _name_dianhydride's own pattern, so the molecule falls through to
-        # the ordinary mixed-anhydride/acyloxy substitutive namer -- a
-        # DIFFERENT, OPSIN-parseable name that verifies directly.
-        decorated_smiles="CC(=O)OC(=O)C(Cl)CC(=O)OC(C)=O",
-        outcome_kind="self01",
-    ),
-    dict(
-        carveout="chalcogen_dianhydride",
-        bare_smiles="CC(=O)SC(=O)CCC(=O)SC(C)=O",
-        bare_name="diacetic butanedioic bis(thioanhydride)",
-        # Same chloro-on-the-central-chain decoration as dianhydride above,
-        # sulfur analogue; here the fallback substitutive path has no
-        # acylthio-ester namer wired, so it fails closed rather than
-        # producing a parseable alternative -- still an honest abstain, never
-        # the bare thioanhydride name.
-        decorated_smiles="CC(=O)SC(=O)C(Cl)CC(=O)SC(C)=O",
-        outcome_kind="abstain",
-    ),
-    dict(
         carveout="polyol_polyester",
         bare_smiles="CC(=O)OCC(COC(C)=O)OC(=O)CC",
         bare_name="propane-1,2,3-triyl 1,3-diacetate 2-propanoate",
         # A chloro substituent on the (unsubstituted-in-the-bare-case)
-        # propanoate acyl group: _POLYOL_POLYESTER_PIN_RE only requires the
-        # multi-ester SHAPE (triyl parent + >=2 locant-prefixed '...ate'
-        # words), which the decorated acyl word still satisfies, so this is
-        # the other OPSIN-can-never-verify-this-class residual case.
+        # propanoate acyl group. The name is OPSIN-unparseable (no multi-anion
+        # grammar) and, since the CO topic, ships through its acyloxy twin
+        # (validation.polyester_twin: '1,3-bis[acetyloxy]-2-[propanoyloxy]propane',
+        # the substitutive spelling of the same ester, method (2),
+        # the Blue Book,:31840) read back to the FULL InChIKey of the
+        # input: the gate outcome is the twin's, and the decorated name is
+        # proven complete by the same read-back (the marker check stays).
         decorated_smiles="CC(=O)OCC(COC(C)=O)OC(=O)C(Cl)C",
         outcome_kind="carveout_marker",
         decoration_marker="chloro",
+        gate="twin_verified:polyester_acyloxy",
     ),
     dict(
         carveout="organometallic_additive",
-        bare_smiles="C[Ti](Cl)(Cl)Cl",
-        bare_name="trichlorido(methyl)titanium",
-        # Swapping the methyl ligand for 2-chloroethyl exceeds the additive
-        # ligand namer's substituent-recursion depth (observed: "
-        # substituent_skip: reason=recursion_depth_fallback") -> honest
-        # generic-metal descriptive fallback, never the bare methyl name.
-        decorated_smiles="ClCC[Ti](Cl)(Cl)Cl",
+        bare_smiles="C=C.C=C.[Ni]",
+        bare_name="bis(\u03b7\u00b2-ethene)nickel",
+        # Since the CO topic the '-ido' names ('trichlorido(methyl)titanium') ship through their 'chloro'
+        # twin (validation.halido_twin; tests/unit/rules/test_halido_twin.py) and the carve-out holds the
+        # names with an eta, kappa or mu descriptor only, for which no spelling OPSIN reads exists.
+        # Replacing one ethene by chloroethene is not an eta-ethene ligand the additive namer names
+        # (observed: "nickel compound (not supported)") -> honest abstain, never the bare name.
+        decorated_smiles="ClC=C.C=C.[Ni]",
         outcome_kind="abstain",
     ),
     dict(
@@ -197,7 +171,7 @@ def test_carveout_baseline_ships_expected_pin(namer, case):
         f"{case['carveout']}: baseline SMILES {case['bare_smiles']!r} no longer "
         f"ships the expected carve-out PIN. Got {result['name']!r}."
     )
-    assert result.get("gate_outcome") == f"carveout:{case['carveout']}", (
+    assert result.get("gate_outcome") == case.get("gate", f"carveout:{case['carveout']}"), (
         f"{case['carveout']}: baseline shipped the right STRING but not via "
         f"its carve-out (gate_outcome={result.get('gate_outcome')!r}) -- the "
         f"representative no longer proves this carve-out is live."
@@ -267,7 +241,7 @@ def test_carveout_decoration_mutation_no_atom_drop(namer, case):
         f"than emitting a real name; expected the producer to still compute "
         f"a decorated PIN via the same OPSIN-unparseable class."
     )
-    assert gate_outcome == f"carveout:{case['carveout']}", (
+    assert gate_outcome == case.get("gate", f"carveout:{case['carveout']}"), (
         f"{case['carveout']}: decorated mutant's real name {name!r} did not "
         f"ship via the expected carve-out (gate_outcome={gate_outcome!r})."
     )

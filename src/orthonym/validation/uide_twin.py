@@ -48,11 +48,17 @@ _STEM_ELEMENT = {"iodan": "I", "broman": "Br", "chloran": "Cl"}
 
 
 def uide_twin_outcome(outcome: Optional[str]) -> bool:
-    """Whether ``outcome`` is the gate outcome of a halogen -uide name read back through its twin
-    (``twin_verified:uide_lambda``): the one twin outcome a general tier ships (no OPSIN grammar reads
-    the name at any tier; the other families spell the form OPSIN reads there)."""
-    from ..metrics.provenance import twin_outcome
-    return outcome == twin_outcome(UIDE_TWIN_RULE)
+    """Whether ``outcome`` is the gate outcome of a name the best-effort tier ships although OPSIN cannot read it:
+    a halogen -uide name read back through its twin (``twin_verified:uide_lambda``), a thioperoxol name read back
+    through its twin (``validation.thioperoxol_twin``) -- no OPSIN grammar reads these names at any tier; the other
+    twin families spell the form OPSIN reads there -- or a phane name whose structure
+    ``validation.phane_read_back`` builds from the name and finds to be the input's (``carveout:phane``, recorded
+    by ``namer.Orthonym._last_resort_list_name`` for such a name only: at a general tier the gate withdraws a
+    phane name)."""
+    from ..metrics.provenance import carveout_outcome, twin_outcome
+    from .thioperoxol_twin import thioperoxol_twin_outcome
+    return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), carveout_outcome("phane"))
+            or thioperoxol_twin_outcome(outcome))
 
 
 def uide_twin(name: str) -> Optional[str]:

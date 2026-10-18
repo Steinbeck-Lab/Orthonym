@@ -101,6 +101,9 @@ def test_bare_alkaloid_parent_is_spelled_as_the_parent_table(smiles, name):
 @pytest.mark.opsin_gate
 def test_name_exact_hetisan_is_spelled_as_the_parent_table():
     """'hetisan' (:51392,:57087) is a name-exact list parent: OPSIN reads neither spelling, the
-    name is shipped on the exact canonical SMILES."""
+    name is shipped on the exact canonical SMILES. It is no PIN: INTRODUCTION (the Blue Book;
+    :50943) "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter." (lead
+    decision 2026-10-17): label systematic_verified, verified 'identity'. The name is unchanged."""
     row = _row("C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6", "pin")
-    assert row.get("name") == "hetisan" and row["tier"] == "pin_verified", (row.get("name"), row["tier"])
+    assert row.get("name") == "hetisan" and row["tier"] == "systematic_verified", (row.get("name"), row["tier"])
+    assert row["verified"] == "identity" and row["is_pin"] is False, row

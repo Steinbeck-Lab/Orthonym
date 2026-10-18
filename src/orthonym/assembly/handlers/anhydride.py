@@ -47,9 +47,13 @@ def name_anhydride(
     pool = get_current_pool()
     pool.add(anhydride_name, "anhydride", features)
     # composer.py:943 inline: _inject_stereo_if_missing(features, pool.best.name, atom_to_locant=None)
-    final_name = _inject_stereo_if_missing(
-        features, pool.best().name, atom_to_locant=None,
-    )
+    # (the Blue Book): the acid groups of a di- or polyanhydride are cited as separate words, each
+    # a name with its own descriptors ('bis[(2S)-2-aminopropanoic] hexanedioic dianhydride'): no front block of
+    # the whole name,:44643) is added to it
+    from ...validation.anhydride_acids import is_poly_anhydride_name
+    final_name = pool.best().name
+    if not is_poly_anhydride_name(final_name):
+        final_name = _inject_stereo_if_missing(features, final_name, atom_to_locant=None)
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="anhydride", iupac_section_cite="P-65.7", fragment_legacy=final_name),

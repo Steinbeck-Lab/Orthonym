@@ -360,7 +360,9 @@ def test_table_np_parent_exact_list_name(monkeypatch):
     monkeypatch.setattr(general_engine, "name_general", lambda *a, **k: None)
     monkeypatch.setattr(namer, "_np_exact_list_name", lambda smiles: "ethanol")
     r = row("CCO", "best-effort")
-    assert r["name"] == "ethanol" and r["source"] == "pin_path", r
+    # a list name records source trivial_retained since the label decision (lead, 2026-10-17;
+    # the Blue Book "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter")
+    assert r["name"] == "ethanol" and r["source"] == "trivial_retained", r
     assert r["producer"] == "table:np_parent", r
 
 

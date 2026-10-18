@@ -158,14 +158,18 @@ def test_known_non_pin_class_ships_demoted(smiles, expected):
 def test_carveout_stereoparent_is_labelled_by_its_list_identity():
     # 'germacrane' ships through the np_stereoparent carve-out: OPSIN cannot parse it.
     # It is a name of the natural-product list, matched by the exact structure
-    #, Table 10.1 (c) terpenes, the Blue Book). The paper's run
-    # labelled it pin_verified; user decision 2026-09-30: the list names are
-    # labelled pin_verified with verified 'identity' (the exact structure match), not
-    # an OPSIN verdict, and the deviation from (:50943) is recorded in TRIAGE.
+    #, Table 10.1 (c) terpenes, the Blue Book) and its label says so:
+    # verified 'identity' (the exact structure match, not an OPSIN verdict). It is no PIN:
+    # INTRODUCTION (the Blue Book;:50943) "Preferred IUPAC names (PINs) are not
+    # identified for the compounds in this Chapter." The paper's run and the
+    # decision of 2026-09-30 (c) labelled it pin_verified; the lead decided on 2026-10-17 (the user
+    # delegating it to the Blue Book) that this class is systematic_verified. The name is unchanged
+    # (OPSIN reads none, below); mutation: the tier assertion fails on the commit before.
     row = _row("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1")
     assert row["name"] == "germacrane"
     assert row["opsin"] == "unverified"
-    assert row["tier"] == "pin_verified" and row["verified"] == "identity", row
+    assert row["tier"] == "systematic_verified" and row["verified"] == "identity", row
+    assert row["is_pin"] is False, row
 
 
 _CONTROLS = [

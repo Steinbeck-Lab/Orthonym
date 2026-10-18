@@ -42,6 +42,7 @@ from .metrics.producer_trail import carried as _carried, noted as _noted, suspen
 from .validation.opsin_ambiguity import reject_ambiguous, restore_withdrawn, withdrawn_name
 from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
                                         twin_outcome_holds, wider_tier_ctx)
+from .validation.halido_twin import HAPTO_DESCRIPTOR
 from .validation.uide_twin import uide_twin_outcome
 from .validation.stereo_descriptors import (  # noqa: F401 both names are imported FROM this module (tests, spies); callers resolve them here at call time
     stereo_block_units as _stereo_block_units,
@@ -782,7 +783,7 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
     if (resolved in (_pv.GATE_OUTCOME_SELF01,
                      _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
                      _pv.GATE_OUTCOME_STEREO_RECOMPOSED)
-            or resolved.startswith(_pv.GATE_OUTCOME_TWIN_PREFIX)):
+            or resolved.startswith((_pv.GATE_OUTCOME_TWIN_PREFIX, _pv.GATE_OUTCOME_ACID_SPLIT_PREFIX))):
         # STEREO_RECOMPOSED is full-InChIKey verified (a review -P2 F3) — a
         # stronger proof than, so it takes the same "verdict ok, no
         # reanchor needed" path (the name is already the reanchored, verified form).
@@ -828,38 +829,9 @@ def _validity_oracle():
     return oracle
 
 
-# W3-P06: dianhydride/polyanhydride PIN word-form — >=2 acid-like
-# words then a NUMERICALLY-multiplied '...anhydride' ('diacetic butanedioic
-# dianhydride'). Used ONLY by the validity gate to carve out these OPSIN-
-# unparseable-but-correct-by-construction names (see _final_opsin_validity_gate).
-_DIANHYDRIDE_PIN_RE = re.compile(
-    r"^(?:[a-z0-9][a-z0-9,()'\-]* ){2,}(?:di|tri|tetra|penta|hexa)anhydride$"
-)
-
-# W8-P4: the chalcogen di-/poly-anhydride sibling of the above —
-# >=2 acid-like words then a 'bis(thioanhydride)'/'tris(selenoanhydride)'/...
-# class word (BB 32446 'diacetic butanedioic bis(thioanhydride) (PIN)').
-# OPSIN-2.9 has no grammar for the multiplied-and-parenthesised chalcogen-
-# anhydride class word (exactly the plain dianhydride gap above). Emitted ONLY
-# by the hard-gated rules.anhydrides._name_chalcogen_dianhydride (residue walk
-# reused from _name_dianhydride) -- correct by construction.
-_CHALCOGEN_DIANHYDRIDE_PIN_RE = re.compile(
-    r"^(?:[a-z0-9][a-z0-9,()'\-]* ){2,}"
-    r"(?:bis|tris|tetrakis)\((?:thio|seleno|telluro)anhydride\)$"
-)
-
-# W3-P07 method (1)): the functional-class polyol polyester PIN —
-# a multivalent parent-group descriptor ('propane-1,2,3-triyl') followed by >=2
-# space-separated, locant-prefixed anion words each ending in '...ate'
-# ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate'). Emitted ONLY by the
-# hard-gated rules.lipids._assemble_glyceride mixed-acyl branch (correct-by-
-# construction numbering), but OPSIN cannot parse the multi-anion functional-class
-# syntax. Used ONLY by the validity gate to carve out this OPSIN-unparseable-but-
-# correct PIN (exactly the inositol / dianhydride situation).
-_POLYOL_POLYESTER_PIN_RE = re.compile(
-    r"^[a-z]+ane-[0-9,]+-(?:di|tri|tetra|penta)yl"
-    r"(?: [0-9,]+-[A-Za-z0-9()\[\],'*-]*ate){2,}$"
-)
+# Di- and polyanhydrides (the Blue Book): the PIN word-form ('diacetic butanedioic dianhydride',
+# 'diacetic butanedioic bis(thioanhydride)') is a name OPSIN 2.9.0 has no grammar for. It is no grammar-gap
+# carve-out: a name ships when ``validation.anhydride_acids`` reads it back through its acids (the twin gate).
 
 # W3-P10: di-/polynuclear noncarbon-oxoacid PREFIX-derivative PINs —
 # locant-prefixed class groups on a di/hypodi/tri parent oxoacid
@@ -894,25 +866,6 @@ _ORGANOMETALLIC_ADDITIVE_PIN_RE = re.compile(
     r".*(?:titanium|chromium|iron|nickel|molybdenum|tungsten|manganese|"
     r"platinum|iridium|mercury|osmium|ruthenium|cobalt|vanadium|rhodium)"
     r"(?:\([0-9IVX+\-]+\))?$"
-)
-
-# W8-P8 /.3): the phane simplified-skeletal PIN
-# ('1,4(1,4)-dibenzenacyclohexaphane') -- superatom locants, a parenthesized
-# attachment-locant set, an amplification prefix ('...ena'/'...ina' etc,
-# possibly di/tri/bis-multiplied), and the 'phane' suffix. OPSIN 2.9.0 has NO
-# phane grammar whatsoever (verified 2026-07-16: neither this PIN form nor
-# the legacy bracket-prefix '[2.2]paracyclophane' parses), so there is no RT
-# oracle for ANY phane name. This PIN is emitted ONLY by the hard-gated
-# `rules.phane.build_phane_pin` (monocyclic all-benzene-homophane class,
-# correct by construction) and is guarded by a source-level formula-
-# conservation veto (`phane._phane_formula_veto`) since the RT-gate would
-# otherwise fail OPEN with no Java -- exactly the inositol/dianhydride/
-# organometallic carve-out precedent above.
-_PHANE_PIN_RE = re.compile(
-    r"^\d+(?:,\d+)*\([\d,]+\)-"
-    r"(?:[a-z]+|(?:di|tri|tetra|penta|hexa)[a-z]+|"
-    r"(?:bis|tris|tetrakis)\([a-z0-9\[\],.]+\))"
-    r"(?:cyclo)?[a-z]*phane$"
 )
 
 # W8-P4 / atom-drop safety floor): source-level structural motifs
@@ -2399,26 +2352,24 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
     return _suppressed_to
 
 
-def _grammar_gap_carveout(name: str) -> Optional[str]:
+def _grammar_gap_carveout(name: str, smiles: Optional[str] = None) -> Optional[str]:
     """The carve-out slug of a construction-verified name whose CLASS OPSIN 2.9.0
     has no grammar for at all, or None.
 
     For these classes a healthy OPSIN call can only answer 'rejected' (each
-    docstring above records the verification: no thioperoxol suffix family, no
-    inositol or Table 10.1 stereoparent name, no 'di'-collapsed or chalcogen
-    anhydride class word, no multi-anion functional-class ester, no phane grammar),
-    so the name ships on its construction alone and
+    docstring above records the verification: no inositol or Table 10.1 stereoparent name,
+    no phane grammar), so the name ships on its construction alone (a phane name when the
+    structure it states is the input's, validation.phane_read_back) and
     OPSIN's answer adds nothing. The validity gate therefore consults this both
     after a 'rejected' answer and on 'unavailable': the output of these classes does
     not depend on whether OPSIN could be reached (TRIAGE j12 finding 1).
 
-    NOT here: the organometallic additive carve-out (OPSIN parses some '-ido'
-    ligand names, and the class has a known atom-drop hole, so a healthy run's
-     on a parsed name is a real check), the stereo-layer carve-out (its
-    licence is a parse of the stereo-stripped form) and the polyacid carve-out
-    (reached only after a parse)."""
-    if "thioperoxol" in name and not re.search(r"[A-Za-z](SO|OS)-thioperoxol", name):
-        return "thioperoxol"
+    NOT here: the thioperoxol names (no OPSIN grammar either; each ships through its twin
+    read-back, ``validation.thioperoxol_twin``), the organometallic additive carve-out
+    (OPSIN parses some '-ido' ligand names, and the class has a known atom-drop hole, so a
+    healthy run's on a parsed name is a real check), the stereo-layer carve-out (its
+    licence is a parse of the stereo-stripped form) and the polyacid carve-out (reached only
+    after a parse)."""
     try:
         from .rules.inositols import INOSITOL_NAMES
         if name in INOSITOL_NAMES:
@@ -2431,14 +2382,10 @@ def _grammar_gap_carveout(name: str) -> Optional[str]:
             return "np_stereoparent"
     except Exception:
         pass
-    if _DIANHYDRIDE_PIN_RE.match(name):
-        return "dianhydride"
-    if _CHALCOGEN_DIANHYDRIDE_PIN_RE.match(name):
-        return "chalcogen_dianhydride"
-    if _POLYOL_POLYESTER_PIN_RE.match(name):
-        return "polyol_polyester"
-    if _PHANE_PIN_RE.match(name):
-        return "phane"
+    from .validation.phane_read_back import phane_name_shape, phane_read_back
+    if phane_name_shape(name):
+        # OPSIN has no phane grammar; the name ships when the structure it states is the input's
+        return "phane" if phane_read_back(name, smiles) else None
     return None
 
 
@@ -2448,11 +2395,11 @@ def _ship_grammar_gap_carveout(name: str, slug: str) -> str:
     _record_gate_outcome(_pv.carveout_outcome(slug), name)
     if slug == "np_stereoparent":
         # Shipped by design (controller ruling 2026-09-25, data/natural_products
-        #.get_natural_product_name), but OPSIN cannot parse it, so it is not
-        # verified, and (the Blue Book) identifies no PIN for these
-        # parents: the name must not be LABELLED pin_verified. Name-scoped record;
-        # the name itself is unchanged.
-        _pv.record_non_pin_fragment(name)
+        #.get_natural_product_name): a name of the exact-match list, OPSIN cannot parse it,
+        # and (the Blue Book) "Preferred IUPAC names (PINs) are not identified for
+        # the compounds in this Chapter": the label is the one of a retained name of a table,
+        # systematic_verified (verified: identity), never pin_verified. The name is unchanged.
+        _pv.record_source("trivial_retained")
     return name
 
 
@@ -2662,7 +2609,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # The jar-ABSENT reduced mode (, above) is a separate, opt-in
     # configuration and keeps its own policy.
     if _validity_gate_status(name) == "unavailable":
-        _gap_slug = _grammar_gap_carveout(name)
+        _gap_slug = _grammar_gap_carveout(name, smiles)
         if _gap_slug is not None and (not general_fallback_tier
                                       or _gap_slug == "np_stereoparent"):
             return _ship_grammar_gap_carveout(name, _gap_slug)
@@ -2736,22 +2683,22 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # cannot parse the 'di-'-COLLAPSED acid words ("Unexpected number of words in
     # anhydride"); emitted ONLY by the hard-gated rules.anhydrides._name_dianhydride.
     # - W8-P4 chalcogen di-/poly-anhydride PINs (see the regex).
-    # - W3-P07 method (1)) functional-class polyol polyester PIN
-    # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate') from _assemble_glyceride;
-    # OPSIN cannot parse the multi-anion syntax.
+    # - method (1)) the functional-class polyol polyester PIN
+    # ('propane-1,2,3-triyl 1,3-diacetate 2-propanoate'): OPSIN cannot parse the multi-anion
+    # syntax; it ships through its acyloxy twin (validation.polyester_twin), below.
     # - W8-P8 Task 8.12 /.3) phane PINs from the hard-gated
     # rules.phane.build_phane_pin (formula-conservation-vetoed); OPSIN has no phane
     # grammar at all.
-    _gap_slug = _grammar_gap_carveout(name)
+    _gap_slug = _grammar_gap_carveout(name, smiles)
     if _gap_slug is not None:
         return _ship_grammar_gap_carveout(name, _gap_slug)
     # W8-P9 Task 9.1 /.4/.6): additive/coordination organometallic
     # PIN carve-out -- see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above. Not a
     # grammar-gap class (OPSIN parses some of its names), so it is reached only
-    # after a 'rejected' answer. It is mutually exclusive with the phane
-    # pattern (different endings), so checking it after it keeps
-    # every outcome.
-    if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name):
+    # after a 'rejected' answer. A name with an eta/kappa/mu descriptor has no
+    # spelling OPSIN reads and keeps the carve-out; the '-ido' names ship through
+    # their 'chloro' twin below (validation.halido_twin).
+    if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name) and HAPTO_DESCRIPTOR.search(name):
         _record_gate_outcome(
             _pv.carveout_outcome("organometallic_additive"), name)
         return name
@@ -5597,7 +5544,9 @@ class Orthonym:
                 What the OPSIN check found: ``verified``,
                 ``verified_constitution_only``, ``verified_twin`` (OPSIN has no
                 grammar for the name and read a twin spelling of it back to your
-                structure), ``unverified`` or ``n/a``.
+                structure), ``verified_acid_split`` (OPSIN has no grammar for a
+                poly-anhydride name and read each of its acids; the structure built
+                from them is your structure), ``unverified`` or ``n/a``.
             ``gates_passed``
                 The checks this name passed, for example ``self_consistency``
                 (OPSIN read the name back to your structure) and ``atom_coverage``.
@@ -5605,7 +5554,8 @@ class Orthonym:
                 What the final OPSIN check did for this name, for example
                 ``self_consistency_verified``, ``suppressed`` or ``not_run``, or
                 ``carveout:<class>`` for a class OPSIN cannot read, or
-                ``twin_verified:<rules>`` for a name read back through its twin.
+                ``twin_verified:<rules>`` for a name read back through its twin, or
+                ``acid_split_verified:<rule>`` for a poly-anhydride read through its acids.
             ``formula``
                 The molecular formula, given when there is no name.
             ``limit_code``
@@ -5639,7 +5589,10 @@ class Orthonym:
                 dative bonds, which has the reference key; the drawing as given has
                 no standard InChIKey), ``opsin_twin`` (a PIN spelling OPSIN has no
                 grammar for; OPSIN read a twin spelling of the same structure back
-                to the same molecule) or ``unverified`` (no read-back recorded).
+                to the same molecule), ``opsin_acids`` (a di- or poly-anhydride name
+                OPSIN has no grammar for; OPSIN read each acid the name cites and the
+                structure built from those acids is the same molecule) or
+                ``unverified`` (no read-back recorded).
             ``spelling_failures``
                 The spelling rules of the PIN a name in PIN form breaks, as
                 ``{"rule": "", "detail":...}`` entries
@@ -5829,8 +5782,8 @@ class Orthonym:
         _non_pin_scope = None if _is_coord_list else name
         # A name of the exact-match natural-product parent list (NAME_EXACT_NP_PARENTS,
         # the input's exact canonical SMILES; 'germacrane') likewise: the paper's
-        # measured run labelled it pin_verified (user decision 2026-09-30, (c) covers
-        # both list classes). No non-PIN record applies to a verbatim list name, the
+        # label is systematic_verified: no PINs in that chapter; lead decision 2026-10-17
+        # replaced 2026-09-30 (c) for it). No non-PIN record applies to a verbatim list name, the
         # whole-call ones neither (they describe the candidates of the call, e.g. the
         # systematic name the general tiers tried first).
         _is_np_list = bool(name) and not is_failure_name(name) and \
@@ -7700,27 +7653,7 @@ class Orthonym:
             name = restore_withdrawn(_carried(name, self._maybe_prefix_order_fallback(name, smiles)), smiles)
         except Exception as _pe:  # pragma: no cover - defensive, keeps the abstention
             logger.info("prefix-order fallback failed (abstention kept): %s", _pe)
-        # Review fixes (the paper, L74: "At the best-effort tier, a name that OPSIN
-        # rejects is not emitted; the only exceptions are the exact-match list names
-        # described below"): at the general tiers the natural-product lookup gives
-        # way to the systematic name, which the gate verifies; when no
-        # verified name was found, the exact-match natural-product parent name of the
-        # whole input ('germacrane') is the last resort before a decline, as the
-        # metal-complex list name is (above). Only an abstention turns into a name.
-        try:
-            from .assembly.fragment_naming import is_top_level_naming as _np_top
-            from .assembly.fragment_naming import name_scope_depth as _np_depth
-            if (self._general_fallback and is_failure_name(name) and _np_top()
-                    and _np_depth() == 1):
-                _np_name = _np_exact_list_name(smiles)
-                if _np_name is not None:
-                    from .metrics import provenance as _np_pv
-                    _np_pv.record_source("pin_path")
-                    _record_gate_outcome(
-                        _np_pv.carveout_outcome("np_stereoparent"), _np_name)
-                    name = _noted("table:np_parent", _np_name)
-        except Exception as _npe:  # pragma: no cover - defensive, keeps the abstention
-            logger.info("natural-product list fallback failed (abstention kept): %s", _npe)
+        name = self._last_resort_list_name(name, smiles)
         try:
             if self._binding_proof == "off":
                 return name
@@ -7731,6 +7664,46 @@ class Orthonym:
         except Exception as _fe:      # pragma: no cover - defensive
             logger.info("binding-proof finish failed (ignored): %s", _fe)
             return name
+
+    def _last_resort_list_name(self, name: str, smiles: str) -> str:
+        """The last resort of a call at a general tier that has no name: only an abstention turns into a name.
+
+        Review fixes (the paper, L74: "At the best-effort tier, a name that OPSIN rejects is not emitted;
+        the only exceptions are the exact-match list names described below"): at the general tiers the
+        natural-product lookup gives way to the systematic name, which the gate verifies; when no
+        verified name was found, the exact-match natural-product parent name of the whole input
+        ('germacrane') is the last resort before a decline, as the metal-complex list name is (above).
+
+        At the best-effort tier the phane name of the whole input is the last resort after it (a
+        ring system the general engine's limits leave unnamed, 27 nodes of nine benzene rings): OPSIN has no
+        phane grammar, so the name ships when ``validation.phane_read_back`` builds from it the structure of
+        the input (the gate outcome ``carveout:phane`` is recorded for such a name only). A phane name never
+        replaces a name OPSIN reads back: the general engine's von Baeyer name of a phane stands."""
+        try:
+            from .assembly.fragment_naming import is_top_level_naming as _np_top
+            from .assembly.fragment_naming import name_scope_depth as _np_depth
+            if (self._general_fallback and is_failure_name(name) and _np_top()
+                    and _np_depth() == 1):
+                _np_name = _np_exact_list_name(smiles)
+                if _np_name is not None:
+                    from .metrics import provenance as _np_pv
+                    _np_pv.record_source("trivial_retained")
+                    _record_gate_outcome(
+                        _np_pv.carveout_outcome("np_stereoparent"), _np_name)
+                    name = _noted("table:np_parent", _np_name)
+                elif self._general_fallback_unverified:
+                    from .rules.phane import build_phane_pin
+                    from .validation.phane_read_back import phane_read_back
+                    _mol = Chem.MolFromSmiles(smiles)
+                    _phane = build_phane_pin(_mol) if _mol is not None else None
+                    if _phane and phane_read_back(_phane, smiles):
+                        from .metrics import provenance as _ph_pv
+                        _ph_pv.record_source("pin_path")
+                        _record_gate_outcome(_ph_pv.carveout_outcome("phane"), _phane)
+                        name = _phane  # the producer of the string stays outer:cyclophane (the first to return it)
+        except Exception as _npe:  # pragma: no cover - defensive, keeps the abstention
+            logger.info("last-resort list name failed (abstention kept): %s", _npe)
+        return name
 
     def _select_rt_passing_offer_name(self, current_name: str,
                                        smiles: str) -> str:
@@ -8602,7 +8575,8 @@ class Orthonym:
                                     _pv.GATE_OUTCOME_STEREO_RECOMPOSED,
                                     _pv.GATE_OUTCOME_FULL_KEY_VERIFIED)
                         or outcome.startswith((_pv.GATE_OUTCOME_CARVEOUT_PREFIX,
-                                               _pv.GATE_OUTCOME_TWIN_PREFIX))
+                                               _pv.GATE_OUTCOME_TWIN_PREFIX,
+                                               _pv.GATE_OUTCOME_ACID_SPLIT_PREFIX))
                         or (outcome == _pv.GATE_OUTCOME_SELF01_SKIPPED
                             and _SC_MODE == "off")
                         or (outcome == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH

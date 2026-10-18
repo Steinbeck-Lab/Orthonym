@@ -236,11 +236,13 @@ def _name_component(frag_smi: str, style: str, *,
         # Breadth Job 2: a metal halide / oxide the single-component pipeline
         # has no name for (it abstains on Cl[Pd]Cl, O=[V], [Cu]I).
         return _metal_halide_oxide_component_name(frag_mol)
+    from orthonym.validation.thioperoxol_twin import embedded_name
     try:
-        name = (own_names or {}).get(frag_smi) or Orthonym(
-            style=style, general_fallback=general_fallback,
-            allow_aromatic_general=allow_aromatic_general,
-            general_fallback_unverified=general_fallback_unverified).name(frag_smi)
+        with embedded_name():
+            name = (own_names or {}).get(frag_smi) or Orthonym(
+                style=style, general_fallback=general_fallback,
+                allow_aromatic_general=allow_aromatic_general,
+                general_fallback_unverified=general_fallback_unverified).name(frag_smi)
     except Exception:
         return None
     if not name or not isinstance(name, str) or name.startswith("unknown"):

@@ -305,15 +305,20 @@ def test_only_the_uide_twin_outcome_passes_a_general_tier():
     """The two general-tier checks of ``name_tiered`` (the exit check and the full-key check of the label)
     let a name pass on a twin outcome only for ``twin_verified:uide_lambda``: the other twin families spell
     the form OPSIN reads at a wider tier, so a twin outcome of theirs there is no read-back of the shipped
-    string."""
+    string. The one other outcome they pass is ``carveout:phane`` (CO lane P, lead decision 2026-10-17: best-effort
+    names the phane rows the default tier names): a general tier records it only for a phane name that
+    ``validation.phane_read_back`` builds to the input (``Orthonym._last_resort_list_name``, after the engine has no
+    name), and no other carve-out passes."""
     import inspect
 
     import orthonym.namer as namer
     from orthonym.metrics import provenance as pv
     from orthonym.validation.uide_twin import uide_twin_outcome
-    assert uide_twin_outcome("twin_verified:uide_lambda")
+    assert uide_twin_outcome("twin_verified:uide_lambda") and uide_twin_outcome("carveout:phane")
     for other in ("twin_verified:isotope_count_one", "twin_verified:bridge_sulfano", "twin_verified:uide_lambda+x",
-                  "self_consistency_verified", "carveout:phane", "", None):
+                  "self_consistency_verified", "carveout:np_stereoparent", "carveout:polyol_polyester",
+                  "carveout:organometallic_additive", "carveout:dianhydride", "carveout:thioperoxol",
+                  "carveout:phane+x", "", None):
         assert not uide_twin_outcome(other), other
     # the exit check of a best-effort call: a name OPSIN cannot read and an isotope twin outcome is withdrawn
     name, smiles = "ethan(2H)ol", "[2H]OCC"

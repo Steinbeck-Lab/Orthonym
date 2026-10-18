@@ -667,4 +667,8 @@ class TestStereoFormatGermacrane:
         be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
             GERMACRANE)
         assert be["name"] == "germacrane", be
-        assert be["tier"] == "pin_verified" and be["verified"] == "identity", be
+        # the list name is no PIN: INTRODUCTION (the Blue Book;:50943) "Preferred IUPAC names
+        # (PINs) are not identified for the compounds in this Chapter." (lead decision 2026-10-17);
+        # the name is unchanged and OPSIN still reads neither spelling (the checks above)
+        assert be["tier"] == "systematic_verified" and be["verified"] == "identity", be
+        assert be["is_pin"] is False, be

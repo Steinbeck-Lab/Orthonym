@@ -1932,6 +1932,26 @@ def specific_method_cation_name(mol) -> Optional[str]:
         return None
 
 
+#: a neutral '-SO-thioperoxol' / '-OS-thioperoxol' name: the parent (with its suffix locant, if any) and the group
+_THIOPEROXOL_NAME = re.compile(r"^(?P<parent>.+?)-(?P<kind>SO|OS)-thioperoxol$")
+
+
+def _enclosed_thioperoxolate(name: str) -> str:
+    """ Anions derived from hydroxy compounds (the Blue Book): 'CH3-CH2-S-O- ethane(SO-thioperoxolate)
+    (PIN) (ethylsulfanyl)oxidanide (not ethanesulfenate;...)' (:41035): the anion of a thioperoxol whose parent hydride
+    ends without a locant ('methane', 'ethane', 'cyclohexane') encloses the suffix. '' for any other neutral name: the
+    book prints no row for a locant before the suffix, and the generic '-olate' swap names it (uncertified, see
+    ``_thioperoxolate_is_uncertified``)."""
+    m = _THIOPEROXOL_NAME.match(name)
+    return f"{m['parent']}({m['kind']}-thioperoxolate)" if m and m['parent'].endswith('ane') else ''
+
+
+def _thioperoxolate_is_uncertified(name: str) -> bool:
+    """A thioperoxol anion the generic seam spelled ('propane-1-SO-thioperoxolate'): its spelling after a locant is in
+    no Blue Book row, so the name is not labelled a PIN."""
+    return name.endswith(('-SO-thioperoxolate', '-OS-thioperoxolate'))
+
+
 def apply_ion_suffix_to_name(name: str, total_charge: int,
                              allowed_suffixes: Optional[frozenset] = None,
                              cation_class: Optional[str] = None) -> str:
@@ -1978,8 +1998,10 @@ def apply_ion_suffix_to_name(name: str, total_charge: int,
     result = _apply_ion_suffix_to_name_form(name, total_charge, allowed_suffixes,
                                             cation_class)
     if result:
-        from ..metrics.provenance import record_derived_non_pin_fragment
+        from ..metrics.provenance import record_derived_non_pin_fragment, record_uncertified_pin_name
         record_derived_non_pin_fragment(name, result)
+        if total_charge < 0 and _thioperoxolate_is_uncertified(result):
+            record_uncertified_pin_name(result)
     return result
 
 
@@ -2004,6 +2026,9 @@ def _apply_ion_suffix_to_name_form(name: str, total_charge: int,
             if name.endswith(neutral_suffix):
                 return name[:-len(neutral_suffix)] + ionic_suffix
         return ''
+
+    if total_charge < 0 and _enclosed_thioperoxolate(name):
+        return _enclosed_thioperoxolate(name)
 
     # --- Path 2: generic structured-seam map (anion / protonated amine /...) -
     from ..assembly.resolvers import (

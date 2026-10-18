@@ -424,15 +424,16 @@ def _assert_demoted(smiles, expected_name):
 
 def _assert_list_identity(smiles, expected_name):
     """A natural-product list name (_LIST_NAME_NOT_THE_PIN): the default and the
-    best-effort tier ship it, labelled pin_verified by its list identity (verified
-    'identity', gate outcome carveout:np_stereoparent). OPSIN cannot read it, so there
+    best-effort tier ship it, labelled systematic_verified by its list identity (verified
+    'identity', gate outcome carveout:np_stereoparent): (the Blue Book) "Preferred IUPAC
+    names (PINs) are not identified for the compounds in this Chapter" (lead decision 2026-10-17). OPSIN cannot read it, so there
     is no round trip to assert."""
     from tests.support.rt_assert import name_best_effort
     for r in (_dt_row(smiles), name_best_effort(smiles)):
         assert r["name"] == expected_name, (
             f"LIST-NAME ROW CHANGED: {smiles}: expected {expected_name!r}, got "
             f"{r['name']!r} -- re-verify (the list entry + the Blue Book)")
-        assert r["tier"] == "pin_verified" and r["verified"] == "identity", r
+        assert r["tier"] == "systematic_verified" and r["verified"] == "identity", r
         assert r["gate_outcome"] == "carveout:np_stereoparent", r
 
 

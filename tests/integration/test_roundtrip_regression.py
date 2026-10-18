@@ -830,7 +830,9 @@ class TestPseudoasymmetricBestEffort:
         smiles = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
         be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
         assert be["name"] == "germacrane", be
-        assert be["tier"] == "pin_verified" and be["verified"] == "identity", be
+        # INTRODUCTION (the Blue Book, sentence:50943): "Preferred IUPAC names (PINs) are not identified fo
+        # r the compounds in this Chapter." Lead decision 2026-10-17 (the user delegated it to the Blue Book) replaced the 2026-09-30 (c) label for the exact-match list: systematic_verified, verified 'identity'.
+        assert be["tier"] == "systematic_verified" and be["verified"] == "identity", be
 
 
 class TestPhase24ParseFixes:

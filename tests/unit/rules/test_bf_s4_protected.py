@@ -5,7 +5,10 @@
   steroid name; a dev split and milestone1500), 'germacrane' (the exact-match list of
   parents, a monocycle). 'hetisan', an exact-match list parent the bridged fused builder does
   not name, keeps its name at the default tier (best-effort ships a verified von Baeyer
-  name, as before).
+  name, as before). The names of the exact-match list are no PINs: INTRODUCTION
+  (the Blue Book;:50943) "Preferred IUPAC names (PINs) are not identified for the compounds
+  in this Chapter." Their label is systematic_verified, verified 'identity' (lead decision
+  2026-10-17, the user delegating it to the Blue Book; names and emission unchanged).
 - The best-effort tier keeps the name of every class member the builder does not complete
   (an ester, a morphinan without the 4,5-epoxy bridge; the ring ketones are named since slice
   S3, ``test_bf_s3_morphinan.py``), each read back to the
@@ -21,6 +24,9 @@ KEEP_BOTH_TIERS = [
     ("C[C@H](CCCC(C)C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C", "cholesterol"),
     ("CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C=CC4=C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
      "cholesta-4,6-dien-3β-ol"),
+]
+# the exact-match list parent of (a monocycle): the name is kept at both tiers, below the PIN
+KEEP_LIST_NAME_BOTH_TIERS = [
     ("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1", "germacrane"),
 ]
 HETISAN = "C=C1C[C@]23C[C@H]4[C@@H]5[C@@]6(C)CCC[C@]57C(C2C[C@H]1C[C@H]37)N4C6"
@@ -48,9 +54,23 @@ def test_natural_products_outside_the_class_keep_name_and_label(smiles, name, ti
 
 
 @pytest.mark.opsin_gate
+@pytest.mark.parametrize("tier", ["pin", "best-effort"])
+@pytest.mark.parametrize("smiles,name", KEEP_LIST_NAME_BOTH_TIERS)
+def test_an_exact_match_list_name_is_kept_at_both_tiers_below_the_pin(smiles, name, tier):
+    """ INTRODUCTION (the Blue Book;:50943): "Preferred IUPAC names (PINs) are not identified for
+    the compounds in this Chapter." The name is the list name (verified 'identity'), labelled systematic_verified;
+    mutation: the label assertion fails on the commit before (pin_verified)."""
+    row = _row(smiles, tier)
+    assert (row.get("name"), row["tier"]) == (name, "systematic_verified"), (row.get("name"), row["tier"])
+    assert row["verified"] == "identity" and row["is_pin"] is False, row
+
+
+@pytest.mark.opsin_gate
 def test_an_exact_match_list_parent_the_builder_does_not_name_keeps_its_name():
+    """'hetisan': no PIN either,:50943); the name is kept at the default tier, labelled systematic_verified."""
     row = _row(HETISAN, "pin")
-    assert (row.get("name"), row["tier"]) == ("hetisan", "pin_verified"), (row.get("name"), row["tier"])
+    assert (row.get("name"), row["tier"]) == ("hetisan", "systematic_verified"), (row.get("name"), row["tier"])
+    assert row["verified"] == "identity" and row["is_pin"] is False, row
 
 
 @pytest.mark.opsin_gate

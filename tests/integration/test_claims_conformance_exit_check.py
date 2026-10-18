@@ -120,13 +120,13 @@ def _run_fresh(mode, *smiles):
 def test_unavailable_opsin_returns_no_unverified_name_from_any_entry_point():
     """With OPSIN unavailable no entry point returns a name for benzene (the trivial
     last resort 'benzol' used to ship at both tiers), while the documented default-
-    tier grammar carve-out 'methane-SO-thioperoxol' still ships at the default tier
+    tier grammar carve-out 'scyllo-inositol' still ships at the default tier
     only. Control: with OPSIN reachable the same process code names benzene."""
-    stubbed = _run_fresh("stub", "c1ccccc1", "CSO")
+    stubbed = _run_fresh("stub", "c1ccccc1", "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
     for key, name in stubbed.items():
         smi, tier, entry = key.split("|")
-        if smi == "CSO" and tier == "pin":
-            assert name == "methane-SO-thioperoxol", (key, name)
+        if smi == "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O" and tier == "pin":
+            assert name == "scyllo-inositol", (key, name)
             continue
         assert name is None or is_failure_name(name), (key, name)
     control = _run_fresh("real", "c1ccccc1")
@@ -182,9 +182,9 @@ def test_exit_check_keeps_list_names_and_default_tier_carveouts(monkeypatch):
                         lambda name, smiles: "failed")
     assert _fresh_check(_best_effort(), "germacrane", GERMACRANE) == "germacrane"
     pv.clear_provenance()
-    pv.record_gate_outcome(pv.carveout_outcome("thioperoxol"), "methane-SO-thioperoxol")
+    pv.record_gate_outcome(pv.carveout_outcome("inositol"), "scyllo-inositol")
     assert Orthonym(style="pin")._exit_round_trip_check(
-        "methane-SO-thioperoxol", "CSO") == "methane-SO-thioperoxol"
+        "scyllo-inositol", "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O") == "scyllo-inositol"
 
 
 def test_exit_check_reduced_mode(monkeypatch):

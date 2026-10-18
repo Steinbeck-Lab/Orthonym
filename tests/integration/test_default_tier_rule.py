@@ -6,7 +6,7 @@ declines." "The label pin_verified means the strict PIN path built the name and
 verified it." "A decline carries a reason". Exceptions (L75): "names derived from the
 natural-product and metal-complex lists... are emitted based solely on their exact
 structural match. At the default tier, ten further name formats absent from OPSIN's
-grammar (e.g., inositols, phanes, and thioperoxols) are emitted without parse-back
+grammar (e.g., inositols; phanes after a structure check) are emitted without parse-back
 validation"; checks (L74): "At the default tier, it compares only the constitutional
 part of the key".
 
@@ -86,7 +86,6 @@ def test_a_name_only_a_breadth_producer_built_is_declined():
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    ("CSO", "methane-SO-thioperoxol"),                                 # grammar gap
     ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "scyllo-inositol"),
     ("C1Cc2ccc(cc2)CCc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane"),
     ("CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO", "(4E)-sphing-4-enine"),  # NP list
@@ -96,10 +95,12 @@ def test_the_exact_construction_exceptions_are_emitted(smiles, expected):
     assert row["name"] == expected, row
     assert row["gate_outcome"].startswith("carveout:"), row
     assert row["limit_code"] is None, row
-    # a grammar-gap name is labelled below the PIN; a natural-product list name takes
-    # the paper run's label, pin_verified (verified 'identity')
+    # a grammar-gap name is labelled below the PIN; a natural-product list name is no PIN either:
+    # INTRODUCTION (the Blue Book;:50943) "Preferred IUPAC names (PINs) are not identified
+    # for the compounds in this Chapter." (lead decision 2026-10-17): systematic_verified (verified
+    # 'identity'); it is emitted at the default tier as a list name all the same
     if row["gate_outcome"] == "carveout:np_stereoparent":
-        assert row["tier"] == "pin_verified" and row["verified"] == "identity", row
+        assert row["tier"] == "systematic_verified" and row["verified"] == "identity", row
     else:
         assert row["tier"] != "pin_verified", row
 
@@ -159,9 +160,9 @@ EMIT_TIER_HELP = (
     "build the preferred IUPAC name (PIN), that is when the strict PIN path built "
     "the name and verified it (tier pin_verified). The exceptions are names from "
     "the natural-product and metal-complex lists, the name formats absent from "
-    "OPSIN's grammar (for example inositols, phanes and thioperoxols), PIN "
+    "OPSIN's grammar (inositols; phanes, checked by building their structure), PIN "
     "spellings that OPSIN reads back through a twin spelling of the same structure "
-    "(1,4-dihydro-1,4-sulfanonaphthalene, ethan(2H)ol), PINs whose "
+    "(ethan(2H)ol, diphenyliodanuide, methane-SO-thioperoxol) or through their acids (dianhydrides), PINs whose "
     "stereodescriptors OPSIN cannot read, for which the default tier compares the "
     "constitution, and, with --trivial, a retained trivial name. Otherwise it "
     "declines, with the reason code NO_VERIFIED_PIN when it built a name that is not "
@@ -287,16 +288,22 @@ GERMACRANE = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
 GRAYANOTOXANE_ROW = "C[C@H]1C[C@@]23CC[C@H]4[C@@H](CCC4(C)C)[C@H]([C@@H]2CC[C@@H]1C3)C"
 
 
-def test_a_natural_product_list_name_is_labelled_and_emitted_as_in_the_paper_run():
+def test_a_natural_product_list_name_is_emitted_and_labelled_below_the_pin():
     from orthonym.cli import _emit_tier_flags
     from tests.support.rt_assert import _independent_parse
     # the paper run (ChEBI, germacrane) labelled it pin_verified; L74: the exact-match
-    # list names are the exceptions of the best-effort tier
+    # list names are the exceptions of the best-effort tier, emitted as before. Their label
+    # is systematic_verified: INTRODUCTION (the Blue Book;:50943) "Preferred IUPAC names
+    # (PINs) are not identified for the compounds in this Chapter." (lead decision 2026-10-17, the
+    # user delegating it to the Blue Book: it supersedes the decision of 2026-09-30 (c) for this class).
+    # The name and its emission are unchanged (independent check: OPSIN reads no germacrane below;
+    # mutation: the label assertion fails on the commit before).
     for tier in ("pin", "valid", "best-effort"):
         n = Orthonym() if tier == "pin" else Orthonym(**_emit_tier_flags(tier))
         row = n.name_tiered(GERMACRANE)
         assert row["name"] == "germacrane", (tier, row)
-        assert row["tier"] == "pin_verified" and row["verified"] == "identity", (tier, row)
+        assert row["tier"] == "systematic_verified" and row["verified"] == "identity", (tier, row)
+        assert row["is_pin"] is False, (tier, row)
         assert row["gate_outcome"] == "carveout:np_stereoparent", (tier, row)
     assert _independent_parse("germacrane") is None      # OPSIN cannot read it
     # at the wider tiers the list name is the last resort only: a verified name wins

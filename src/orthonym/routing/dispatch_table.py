@@ -1222,12 +1222,14 @@ def _handle_multi_component_neutral(mol, smiles, canonical_smiles, features=None
         return None
     try:
         from orthonym.namer import Orthonym
-        frag_name = Orthonym(
-            style=style,
-            general_fallback=kwargs.get("general_fallback", False),
-            general_fallback_unverified=kwargs.get("general_fallback_unverified", False),
-            allow_aromatic_general=kwargs.get("allow_aromatic_general", False),
-        ).name(frags[0])
+        from orthonym.validation.thioperoxol_twin import embedded_name
+        with embedded_name():
+            frag_name = Orthonym(
+                style=style,
+                general_fallback=kwargs.get("general_fallback", False),
+                general_fallback_unverified=kwargs.get("general_fallback_unverified", False),
+                allow_aromatic_general=kwargs.get("allow_aromatic_general", False),
+            ).name(frags[0])
     except Exception:
         return None
     from orthonym.errors import is_failure_name
@@ -1469,11 +1471,11 @@ def _handle_natural_product(mol, smiles, canonical_smiles, features=None, *,
     tiers keep it labelled below the PIN and the default tier declines it (the user's
     decision on natural-product names, PIN class program Task 32: "the default tier
     declines a natural-product name only where no systematic PIN is built"). A parent of
-    the exact-match list (``NAME_EXACT_NP_PARENTS``, 'hasubanan') keeps the label the namer
-    gives list names (the paper's measured labels, ``namer._np_exact_list_name``): a policy
-    carve-out, the paper's deliberate exception for list names (``namer._default_tier_emits``),
-    not a Blue Book reading names no PIN for it). Every other natural-product name is
-    returned as before."""
+    the exact-match list (``NAME_EXACT_NP_PARENTS``, 'hasubanan') keeps its name and the label
+    the namer gives list names, systematic_verified, verified 'identity' (``namer._np_exact_list_name``;
+    , the Blue Book, "Preferred IUPAC names (PINs) are not identified for the compounds in
+    this Chapter"); the default tier emits it as its exception for list names
+    (``namer._default_tier_emits``). Every other natural-product name is returned as before."""
     systematic = _systematic_pin_before_natural_product(mol, canonical_smiles)
     if systematic is not None:
         return systematic

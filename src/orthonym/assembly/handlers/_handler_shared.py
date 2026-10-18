@@ -437,7 +437,42 @@ _P14_3_4_RING_SUFFIX_CLASSES = frozenset({
     'thiol', 'selenol', 'tellurol',
     'primary_amine', 'amine',
     'secondary_amine', 'tertiary_amine',
+    # (c) (the Blue Book), the same shape with the two-atom chalcogen group of Table 6.1 (:27972)
+    'so_thioperoxol', 'os_thioperoxol', 'dithioperoxol',
 })
+
+# The two-atom suffix groups, the Blue Book): the element of the atom bonded to the
+# skeletal atom, then of the terminal one. Their ring is monosubstituted when nothing else hangs on it.
+_TWO_ATOM_RING_SUFFIX_GROUPS = {
+    'so_thioperoxol': ('S', 'O'), 'os_thioperoxol': ('O', 'S'), 'dithioperoxol': ('S', 'S'),
+}
+
+
+def _ring_carries_only_a_two_atom_group(mol, ring_set, features, suffix_ring_atoms, group) -> bool:
+    """(c) for -SOH / -OSH / -SSH: "The locant '1' is omitted... (c) in monosubstituted homogeneous
+    monocyclic rings" (the Blue Book, 'cyclohexanethiol (PIN)'). True only when the ring (already checked: one
+    saturated all-carbon monocycle) has the group and nothing else: exactly two atoms outside it, the first bonded
+    to one ring atom (the one the suffix is on, when the caller says which) and the second to the first only."""
+    from rdkit import Chem as _Chem
+    first, last = _TWO_ATOM_RING_SUFFIX_GROUPS[group]
+    outside = [a for a in mol.GetAtoms() if a.GetIdx() not in ring_set]
+    if len(outside) != 2 or any(a.GetFormalCharge() or a.IsInRing() for a in outside):
+        return False
+    bearing = [a for a in outside if any(n.GetIdx() in ring_set for n in a.GetNeighbors())]
+    if len(bearing) != 1:
+        return False
+    head = bearing[0]
+    tail = next(a for a in outside if a.GetIdx() != head.GetIdx())
+    ring_links = [n.GetIdx() for n in head.GetNeighbors() if n.GetIdx() in ring_set]
+    bond = mol.GetBondBetweenAtoms(head.GetIdx(), tail.GetIdx())
+    if (head.GetSymbol(), tail.GetSymbol()) != (first, last) or len(ring_links) != 1 or bond is None \
+            or bond.GetBondType() != _Chem.BondType.SINGLE or tail.GetDegree() != 1:
+        return False
+    if suffix_ring_atoms and ring_links[0] not in set(suffix_ring_atoms):
+        return False
+    _canon = getattr(features, 'canonical_smiles', None)
+    _input = _Chem.MolFromSmiles(_canon) if _canon else None
+    return _input is not None and _input.GetNumHeavyAtoms() == len(ring_set) + 2
 
 # The N-substituted amine classes: licensed only through
 # `_ring_amine_carries_only_n_substituents`, the Blue Book).
@@ -481,6 +516,17 @@ def _ring_amine_carries_only_n_substituents(mol, ring_set, features,
     if _input is None or _input.GetNumHeavyAtoms() != mol.GetNumHeavyAtoms():
         return False
     return True
+
+
+def _special_ring_suffix_licence(features, mol, ring_set, suffix_ring_atoms):
+    """The classes whose monosubstituted ring is not 'the ring and one atom': an N-substituted amine and the two-atom
+    chalcogen groups. True or False for them, None for every other class."""
+    group = getattr(features, 'principal_group', None)
+    if group in _N_SUBSTITUTED_RING_AMINE_CLASSES:
+        return _ring_amine_carries_only_n_substituents(mol, ring_set, features, suffix_ring_atoms)
+    if group in _TWO_ATOM_RING_SUFFIX_GROUPS:
+        return _ring_carries_only_a_two_atom_group(mol, ring_set, features, suffix_ring_atoms, group)
+    return None
 
 
 def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
@@ -629,9 +675,9 @@ def _ring_suffix_locant_is_trivial(features, oriented_ring, ring_idx_to_locant,
     #... (not *N*-cyclopropylbutan-1-amine)' (the Blue Book). The `N` locant is NOT an
     # essential locant of the ring's scope there (contrast the oxime above, class
     # `imine`, still excluded).
-    if getattr(features, 'principal_group', None) in _N_SUBSTITUTED_RING_AMINE_CLASSES:
-        return _ring_amine_carries_only_n_substituents(
-            mol, ring_set, features, suffix_ring_atoms)
+    special = _special_ring_suffix_licence(features, mol, ring_set, suffix_ring_atoms)
+    if special is not None:
+        return special
     if mol.GetNumHeavyAtoms() != len(ring) + 1:
         return False
 

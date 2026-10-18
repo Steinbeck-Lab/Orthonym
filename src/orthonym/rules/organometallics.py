@@ -746,6 +746,14 @@ def _extended_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: 
 # the boundary is unambiguous ('tert-butyl(dimethyl)[(oxiran-2-
 # yl)methoxy]silane' BB-style); simple methyl/ethyl stay bare
 # unless multiplied next to a compound neighbour.
+def _halide_ligand_spelling(name: str) -> str:
+    """The ligand word of a halide: 'chlorido' 'trichlorido(methyl)titanium', the Blue Book;
+    ,:39761: an anion name ending in 'ide' ends in 'ido' as a ligand) at every tier. OPSIN 2.9.0 has no
+    'chlorido' ligand word; every tier reads the name back through its 'chloro' twin (``validation.halido_twin``),
+    the long-established spelling of the same ligand (:39767)."""
+    return name
+
+
 def _ligand_token(count: int, name: str, first: bool) -> str:
     """One multiplied ligand prefix of a parent that takes substituent prefixes: a hydride
     parent (Group 14) or a metal (``_assemble_bonded_metal_name``).
@@ -1137,7 +1145,7 @@ def assemble_organometallic_name(metal_complex: Any, mol: Any,
                 if not _sigma_additive_ligands_certified(
                         metal_complex, mol, organic_ligs):
                     return None
-                halide_names = [LIGAND_NAMES[lg.ligand_smarts_key] for lg in halide_ligs]
+                halide_names = [_halide_ligand_spelling(LIGAND_NAMES[lg.ligand_smarts_key]) for lg in halide_ligs]
                 # organic_names is already fully resolved + None-checked above.
                 halide_grouped = _group_ligand_counts(halide_names)
                 organic_grouped = _group_ligand_counts(organic_names)

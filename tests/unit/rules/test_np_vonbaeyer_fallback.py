@@ -109,10 +109,11 @@ def test_best_effort_emits_a_round_tripping_systematic_name(retained):
 # (f67429619, before 594f8a788 withheld it at the general tiers on 2026-09-25)
 # emitted `germacrane` at best-effort, labelled pin_verified (the paper, Methods,
 # "Tiers": the list names are the exception to the full round trip). User decision
-# 2026-09-30: the list names OPSIN cannot read are labelled pin_verified (verified
-# 'identity', the exact structure match) and emitted at the wider tiers again; the
-# known deviation from ("Preferred IUPAC names (PINs) are not identified for
-# the compounds in this Chapter",:50943) is recorded in TRIAGE. Read-back of the
+# 2026-09-30: the list names OPSIN cannot read are emitted at the wider tiers again
+# (verified 'identity', the exact structure match); their label is now systematic_verified,
+# not pin_verified (lead decision 2026-10-17, delegated by the user to the Blue Book):
+# INTRODUCTION (:50939), ":50943" "Preferred IUPAC names (PINs) are not identified for
+# the compounds in this Chapter." Read-back of the
 # structure: OPSIN reads '(1R,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane' (the
 # systematic name without the pseudoasymmetric descriptor) to the input's
 # constitution with the same two R/S centres.
@@ -130,7 +131,7 @@ def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
     clears provenance per call and is what the cohort/census machinery reads."""
     r = _best_effort_namer().name_tiered(_BY_NAME[retained])
     assert r["name"] == retained, r
-    assert r["tier"] == "pin_verified" and r["verified"] == "identity", r
+    assert r["tier"] == "systematic_verified" and r["verified"] == "identity" and r["is_pin"] is False, r
     assert r["gate_outcome"] == "carveout:np_stereoparent", r
     assert r["source"] != "general_engine"
 

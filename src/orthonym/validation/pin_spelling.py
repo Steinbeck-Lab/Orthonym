@@ -58,6 +58,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_heterone",
     "orthonym.validation.spelling.checks_placement",
     "orthonym.validation.spelling.checks_identical_prefixes",
+    "orthonym.validation.spelling.checks_thioperoxol",
     "orthonym.validation.spelling.checks_amine_parent",
     "orthonym.validation.spelling.checks_group_count",
 )

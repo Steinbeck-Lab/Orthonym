@@ -231,9 +231,9 @@ def test_unverified_trivial_name_is_not_labelled_systematic_verified():
 # ---------------------------------------------------------------------------
 
 def test_grammar_carveout_ships_at_pin_unverified_with_its_gate_string():
-    row = _pin_row("CSO")
-    assert row["name"] == "methane-SO-thioperoxol", row
-    assert row["gate_outcome"] == "carveout:thioperoxol", row  # gate string unchanged
+    row = _pin_row("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
+    assert row["name"] == "scyllo-inositol", row
+    assert row["gate_outcome"] == "carveout:inositol", row  # gate string unchanged
     assert row["tier"] == "pin_unverified" and row["is_pin"] is False, row
     assert row["verified"] == "unverified" and row["opsin"] == "unverified", row
     assert _independent_full_key(row["name"]) == ""  # OPSIN has no grammar for it

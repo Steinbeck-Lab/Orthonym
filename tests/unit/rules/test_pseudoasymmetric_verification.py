@@ -128,11 +128,12 @@ def test_best_effort_emits_the_list_name_for_every_spelling(smiles):
     # the natural-product list, matched by the exact structure, Table 10.1
     # (c) terpenes, the Blue Book); the paper's run emitted it
     # at best-effort, labelled pin_verified. User decision 2026-09-30: the list names
-    # OPSIN cannot read are emitted at the wider tiers again, labelled pin_verified
-    # (verified 'identity'), with the deviation from (:50943) recorded in
-    # TRIAGE. Every spelling of the input is the same structure, so every spelling
-    # gets the list name.
+    # OPSIN cannot read are emitted at the wider tiers again (verified 'identity'); their
+    # label is now systematic_verified: INTRODUCTION (the Blue Book; the sentence at:50943): "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter." The label of a list name is systematic_verified (verified 'identity'), never pin_verified (lead decision 2026-10-17, delegated by the user to the Blue Book: it supersedes the decision of 2026-09-30 (c) for this class); the name and its emission are unchanged. Every spelling of the input is
+    # the same structure, so every spelling gets the list name (independent check: the
+    # systematic name reads back to the input below; mutation: the label assertion fails
+    # on the commit before).
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert be["name"] == "germacrane", be
-    assert be["tier"] == "pin_verified" and be["verified"] == "identity", be
+    assert be["tier"] == "systematic_verified" and be["verified"] == "identity" and be["is_pin"] is False, be
     assert _pseudoasymmetric_name_verified(GERMACRANE_SYSTEMATIC, smiles)
