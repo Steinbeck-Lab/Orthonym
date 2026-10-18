@@ -571,6 +571,131 @@ def _find_all_simple_paths_impl(mol, start: int, end: int, allowed_atoms: Set[in
     return all_paths
 
 
+def _interior_masks(paths):
+    """Per path, its interior atoms (``p[1:-1]``) as one int bitmask (atom index -> bit)
+    and the interior size. An ``&`` of two masks is the interior-disjointness test of two
+    bh1->bh2 paths, in place of a ``set`` intersection per pair."""
+    masks = []
+    sizes = []
+    for p in paths:
+        m = 0
+        for a in p[1:-1]:
+            m |= 1 << a
+        masks.append(m)
+        sizes.append(m.bit_count())
+    return masks, sizes
+
+
+class _MainRingBest:
+    """The incumbent of the main-ring search  and the candidates tied with it.
+
+    ``score`` is ``(structural, tie_key)``, compared with ``>`` (higher wins). Faithful to the
+     -> -> cascade:
+      structural = (ring_size, #: main ring includes max skeletal atoms
+                    main_bridge_len, #: main bridge as large as possible
+                    balance) #: main ring divided as symmetrically as possible
+      tie_key = the deterministic canon-rank tie-break (lowest ranks win)
+    ``tied`` holds every decomposition tied at the top of the STRUCTURAL part. These all yield the
+    same von Baeyer descriptor, so does not distinguish them -- the choice between them is
+    exactly the "choice for numbering" that and govern. Retained so
+    ``_choose_lowest_locant_numbering`` can rank them on locants instead of on the arbitrary
+    canonical-rank backstop.
+    """
+
+    __slots__ = ("score", "ring", "bh_pair", "tied", "rank_key")
+
+    def __init__(self, rank_key):
+        self.score = None
+        self.ring = None
+        self.bh_pair = None
+        self.tied = []
+        self.rank_key = rank_key
+
+    def consider(self, ring, bh1, bh2, branch1_len, branch2_len, main_bridge_len):
+        structural = (len(ring), main_bridge_len, min(branch1_len, branch2_len))
+        score = self.score
+        if score is not None and structural < score[0]:
+            # Below the incumbent's structural part: not tied and not better, whatever its
+            # canon-rank tie key is, so the key is not computed.
+            return
+        new = (structural, tuple(-r for r in self.rank_key(ring)))
+        if score is None or structural > score[0]:
+            self.tied.clear()
+        self.tied.append((ring, (bh1, bh2)))
+        if score is None or new > score:
+            self.score = new
+            self.ring = ring
+            self.bh_pair = (bh1, bh2)
+
+
+def _best_disjoint_path_pair(all_paths, spend, rank_key):
+    """Largest, then most symmetric, pair of interior-disjoint paths of ``all_paths``
+    (the bh1->bh2 paths). Deterministic: ties broken by the lowest canon-rank tuple.
+    ``spend`` is charged once per (i, j) pair of the O(paths^2) pairing loop (M2.5)."""
+    npaths = len(all_paths)
+    masks, plens = _interior_masks(all_paths)
+    best_local = None
+    best_pair = None
+    for i in range(npaths - 1):
+        mask_i = masks[i]
+        len_i = plens[i]
+        for j in range(i + 1, npaths):
+            spend()
+            if mask_i & masks[j]:
+                continue
+            len_j = plens[j]
+            ring_size = len_i + len_j + 2  # shared endpoints
+            balance = len_i if len_i < len_j else len_j
+            if best_local is not None and (ring_size, balance) < best_local[:2]:
+                continue  # the rank key only decides a tie of (ring_size, balance)
+            p1 = all_paths[i]
+            p2 = all_paths[j]
+            key = (ring_size, balance, tuple(-r for r in rank_key(set(p1) | set(p2))))
+            if best_local is None or key > best_local:
+                best_local = key
+                best_pair = (p1, p2)
+    return best_pair
+
+
+def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2):
+    """Case 3 of the main-ring search: offer to ``best`` every pair of bh1->bh2 paths that
+    forms a main ring with a 2+-atom main bridge /.
+
+    For the pair (i, j) the main bridge is the longest remaining path that is interior-disjoint
+    from both: with the candidates (interior >= 2 atoms) sorted once, longest first,
+    that is the FIRST candidate other than i, j whose interior is disjoint from both. A pair
+    whose ring is smaller than the incumbent's cannot tie or win, so its bridge is not looked
+    for. ``spend`` is charged once per (i, j) pair, before anything else, as the loop it
+    replaces did (M2.5).
+    """
+    npaths = len(all_paths)
+    masks, plens = _interior_masks(all_paths)
+    bridge_order = sorted((k for k in range(npaths) if plens[k] >= 2), key=lambda k: -plens[k])
+    for i in range(npaths):
+        mask_i = masks[i]
+        len_i = plens[i]
+        for j in range(i + 1, npaths):
+            spend()
+            mask_j = masks[j]
+            if mask_i & mask_j:
+                continue
+            len_j = plens[j]
+            ring_size = len_i + len_j + 2
+            if best.score is not None and ring_size < best.score[0][0]:
+                continue
+            used = mask_i | mask_j
+            best_mb_len = -1
+            for k in bridge_order:
+                if k != i and k != j and not (masks[k] & used):
+                    best_mb_len = plens[k]
+                    break
+            if best_mb_len < 2:
+                # 0/1-atom main bridges are already covered by Cases 1/2.
+                continue
+            p2 = all_paths[j]
+            best.consider(all_paths[i] + p2[1:-1][::-1], bh1, bh2, len_i, len_j, best_mb_len)
+
+
 # ============================================================================
 # VonBaeyerAnalyzer Class
 # ============================================================================
@@ -1217,37 +1342,8 @@ class VonBaeyerAnalyzer:
         def _rank_key(atom_indices):
             return tuple(sorted(_ranks[i] for i in atom_indices))
 
-        best_ring = None
-        best_bh_pair = None
-        # Score tuple, compared with ">" (higher wins). Faithful to the
-        # -> -> cascade:
-        # (ring_size, #: main ring includes max skeletal atoms
-        # main_bridge_len, #: main bridge as large as possible
-        # balance, #: main ring divided as symmetrically as possible
-        # tie_key) # deterministic canon-rank tie-break (lowest ranks win)
-        best_score = None
-        # Every decomposition tied at the top of the STRUCTURAL part of the score
-        # (ring_size, main_bridge_len, balance). These all yield the same von
-        # Baeyer descriptor, so does not distinguish them -- the choice
-        # between them is exactly the "choice for numbering" that and
-        # govern. Retained so ``_choose_lowest_locant_numbering`` can rank
-        # them on locants instead of on the arbitrary canonical-rank backstop.
-        tied_candidates: List[Tuple[List[int], Tuple[int, int]]] = []
-
-        def _consider(ring, bh1, bh2, branch1_len, branch2_len, main_bridge_len):
-            nonlocal best_score, best_ring, best_bh_pair
-            balance = min(branch1_len, branch2_len)
-            tie_key = tuple(-r for r in _rank_key(ring))
-            structural = (len(ring), main_bridge_len, balance)
-            score = (structural, tie_key)
-            if best_score is None or structural > best_score[0]:
-                tied_candidates.clear()
-            if best_score is None or structural >= best_score[0]:
-                tied_candidates.append((ring, (bh1, bh2)))
-            if best_score is None or score > best_score:
-                best_score = score
-                best_ring = ring
-                best_bh_pair = (bh1, bh2)
+        best = _MainRingBest(_rank_key)
+        spend = spend_perf_work   # bound once: the pair loops charge it once per pair
 
         def _best_disjoint_pair(allowed, exclude_direct):
             """Largest, then most symmetric, pair of interior-disjoint bh1->bh2
@@ -1260,23 +1356,7 @@ class VonBaeyerAnalyzer:
                 all_paths = [p for p in all_paths if len(p) >= 3]
             if len(all_paths) < 2:
                 return None
-            best_local = None
-            best_pair = None
-            for i, p1 in enumerate(all_paths):
-                p1_interior = set(p1[1:-1])
-                for p2 in all_paths[i + 1:]:
-                    spend_perf_work()  # M2.5: charge the O(paths^2) pairing loop
-                    p2_interior = set(p2[1:-1])
-                    if p1_interior & p2_interior:
-                        continue
-                    ring_size = len(p1) + len(p2) - 2  # shared endpoints
-                    balance = min(len(p1) - 2, len(p2) - 2)
-                    key = (ring_size, balance,
-                           tuple(-r for r in _rank_key(set(p1) | set(p2))))
-                    if best_local is None or key > best_local:
-                        best_local = key
-                        best_pair = (p1, p2)
-            return best_pair
+            return _best_disjoint_path_pair(all_paths, spend, _rank_key)
 
         for bh1, bh2 in combinations(sorted(bridgeheads), 2):
             # Find common neighbors (potential 1-atom main bridge atoms)
@@ -1296,7 +1376,7 @@ class VonBaeyerAnalyzer:
                 if pair:
                     p1, p2 = pair
                     ring = p1 + p2[1:-1][::-1]
-                    _consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 0)
+                    best.consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 0)
 
             # Case 2: 1-atom main bridge via a common neighbor.
             for bridge_atom in sorted(common_neighbors):
@@ -1305,7 +1385,7 @@ class VonBaeyerAnalyzer:
                 if pair:
                     p1, p2 = pair
                     ring = p1 + p2[1:-1][::-1]
-                    _consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 1)
+                    best.consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 1)
 
             # Case 3 /: a 2+-atom main bridge. Cases 1
             # and 2 only ever offer a 0- or 1-atom main bridge, so a bridgehead
@@ -1332,32 +1412,11 @@ class VonBaeyerAnalyzer:
             # never a regression).
             if not getattr(self, "_allow_multiatom_bridge", True):
                 continue
-            all_paths = _find_all_simple_paths(mol, bh1, bh2, ring_atoms, adj=adj_list)
-            interiors = [set(p[1:-1]) for p in all_paths]
-            npaths = len(all_paths)
-            for i in range(npaths):
-                p1 = all_paths[i]
-                int_i = interiors[i]
-                for j in range(i + 1, npaths):
-                    spend_perf_work()  # M2.5: charge the O(paths^2) pairing loop
-                    int_j = interiors[j]
-                    if int_i & int_j:
-                        continue
-                    used = int_i | int_j
-                    # Largest remaining interior-disjoint path is the main bridge.
-                    best_mb_len = -1
-                    for k in range(npaths):
-                        if k == i or k == j or interiors[k] & used:
-                            continue
-                        if len(interiors[k]) > best_mb_len:
-                            best_mb_len = len(interiors[k])
-                    if best_mb_len < 2:
-                        # 0/1-atom main bridges are already covered by Cases 1/2.
-                        continue
-                    p2 = all_paths[j]
-                    ring = p1 + p2[1:-1][::-1]
-                    _consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, best_mb_len)
+            _consider_multiatom_bridges(
+                _find_all_simple_paths(mol, bh1, bh2, ring_atoms, adj=adj_list),
+                spend, best, bh1, bh2)
 
+        best_ring, best_bh_pair = best.ring, best.bh_pair
         # Fallback: use largest ring method (for bicyclo or unusual cases)
         if best_ring is None:
             best_ring, best_bh_pair = self._find_main_ring_fallback(
@@ -1371,7 +1430,7 @@ class VonBaeyerAnalyzer:
         if return_candidates:
             oriented = []
             seen_c = set()
-            for ring, bhp in tied_candidates:
+            for ring, bhp in best.tied:
                 ring = self._orient_main_ring(ring, bhp)
                 k = (tuple(ring), bhp)
                 if k not in seen_c:
