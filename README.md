@@ -44,12 +44,16 @@ sampling: the same input always gives the same output.
 structure, and parsed back. The structure OPSIN reads must match yours in constitution, charge and
 stereo, so a name that leaves out or adds an atom cannot pass. The default tier makes a few
 exceptions for names OPSIN cannot read in full: names from exact-match lists (metal-complex and
-natural-product parent names), a few name forms that OPSIN's grammar lacks or misreads, PIN
+natural-product parent names), a few name forms that OPSIN's grammar lacks or misreads (a phane
+name ships only when the engine's own phane builder turns the name back into your structure), PIN
 spellings that OPSIN's grammar lacks and that OPSIN reads back through a twin spelling of the same
-structure, and names whose stereodescriptors OPSIN cannot parse (OPSIN confirms their constitution,
-and each descriptor is checked against its CIP label). `--provenance` marks each of them. The
-wider tiers ship none of them, except the names from the exact-match lists: a metal-complex name,
-and a natural-product parent name when no verified systematic name is found.
+structure, poly-anhydride names whose acids OPSIN reads back, and names whose stereodescriptors
+OPSIN cannot parse (OPSIN confirms their constitution, and each descriptor is checked against its
+CIP label). `--provenance` marks each of them. The wider tiers ship none of them, except the names
+from the exact-match lists (a metal-complex name, and a natural-product parent name when no
+verified systematic name is found) and the twin-checked names for which the engine has no other
+spelling: halogen `-uide` anions (`diphenyliodanuide`), thioperoxols (`methane-SO-thioperoxol`) and
+organometallic names with halido ligands (`bromido(ethyl)nickel`).
 
 **Honest.** A candidate that fails a check is withdrawn, and when no name is left Orthonym says so
 instead of guessing. `--provenance` reports the tier each name landed on and, in its `verified`
@@ -148,32 +152,38 @@ Licences and sources of the third-party components are listed in [`NOTICE`](NOTI
 
 The default returns a name only when the strict PIN path built it and verified it, or when the name
 is one of the few exceptions: a name from the exact-match lists, a name format absent from OPSIN's
-grammar, a PIN spelling that OPSIN reads back through its twin spelling, or a PIN whose
-stereodescriptors OPSIN cannot read. With `--trivial` it also returns a retained trivial name,
+grammar, a PIN spelling that OPSIN reads back through its twin spelling, a poly-anhydride name
+whose acids OPSIN reads back, or a PIN whose stereodescriptors OPSIN cannot read. With `--trivial` it also returns a retained trivial name,
 labelled `systematic_verified`. Otherwise it declines. This rule applies to the default
 `--style pin`. Wider tiers are opt-in with `--emit-tier`:
 
 | `--emit-tier` | Returns |
 |:--|:--|
-| `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar, a PIN spelling that OPSIN reads back through its twin spelling or a PIN whose stereodescriptors OPSIN cannot read (with `--trivial`, also a retained trivial name); otherwise nothing (`NO_VERIFIED_PIN`) |
+| `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar, a PIN spelling that OPSIN reads back through its twin spelling, a poly-anhydride name whose acids OPSIN reads back or a PIN whose stereodescriptors OPSIN cannot read (with `--trivial`, also a retained trivial name); otherwise nothing (`NO_VERIFIED_PIN`) |
 | `valid` | also general names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
 | `best-effort` | also the names of the last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build these names for ring systems of up to 40 skeletal atoms and 8 rings), and adducts with a one-atom ion such as chloride, and, for a monocycle whose two stereocentres each carry one ligand and one hydrogen atom, the `cis` or `trans` name (`trans-cyclohexane-1,4-diol`) in place of a name with lowercase `r` and `s`, which OPSIN cannot read |
 
 At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey OPSIN round trip (a
-name from the natural-product and metal-complex lists excepted), so the name formats absent from
+name from the natural-product and metal-complex lists and the twin-checked names below excepted),
+so the name formats absent from
 OPSIN's grammar, which the default tier ships without a full read-back, are not shipped there, and
 a wider tier can, rarely, decline a molecule that a narrower tier names. A PIN spelling that the
 default tier ships through its twin is named there in a form OPSIN reads
-(`1,4-dihydro-1,4-epithionaphthalene` for `1,4-dihydro-1,4-sulfanonaphthalene`).
+(`1,4-dihydro-1,4-epithionaphthalene` for `1,4-dihydro-1,4-sulfanonaphthalene`), and so is a
+poly-anhydride (`1,4-bis(acetyloxy)-1,4-dioxobutane` for `diacetic butanedioic dianhydride`). A
+name for which the engine has no other spelling (a halogen `-uide` anion, a thioperoxol, an
+organometallic name with halido ligands) ships there through its twin, with the same labels.
 
 Whatever the tier, `--provenance` (one SMILES at a time) says what each name is: `pin_verified`
-(the strict PIN path built it and verified it, or OPSIN read back a twin spelling of it),
+(the strict PIN path built it and verified it, or OPSIN read back a twin spelling of it or the
+acids a poly-anhydride name cites),
 `pin_unverified` (a name in PIN form whose preferred status is not certified),
 `systematic_verified` (a correct systematic name that is not the PIN, for example from the general
 engine, from a table of retained names, a strict-path name with a part the engine records as not
 the preferred form, a natural-product name of a molecule whose bridged fused PIN the engine does
-not build yet, a name reached through another drawing of the same compound, or a name of a class for which the Blue Book gives no PIN, such as Group 1-12
+not build yet, a natural-product parent name from the exact-match list (the recommendations
+identify no preferred names for natural products), a name reached through another drawing of the same compound, or a name of a class for which the Blue Book gives no PIN, such as Group 1-12
 organometallic compounds), `best_effort` (a last-resort producer's
 name, or one that no round trip confirmed) or `abstain` (no name). The tier says how a name was
 built.
@@ -185,7 +195,9 @@ by its exact structure; OPSIN cannot read these names), `opsin_split` (OPSIN rea
 to your structure drawn without its dative bonds, because RDKit gives a drawing with dative bonds no
 standard InChIKey to read a name back against; a count of atoms and charges ties the two drawings),
 `opsin_twin` (a PIN spelling OPSIN has no grammar for, read back through its twin spelling: the same
-structure in a spelling OPSIN reads) or `unverified`.
+structure in a spelling OPSIN reads), `opsin_acids` (a poly-anhydride name OPSIN has no grammar
+for: OPSIN read each acid the name cites, and the anhydride built from those acids is your
+structure) or `unverified`.
 
 When Orthonym cannot name a molecule, the plain call returns the empty string and logs the reason
 (a limit code and a label) on the `orthonym` logger; the command line prints an empty name and the

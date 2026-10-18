@@ -137,3 +137,59 @@ def test_default_tier_twin_checked_pin_spelling_is_read_back_through_its_twin():
         wide = _row(sulfano, tier)
         assert wide["name"] == twin, wide
         assert wide["verified"] == "opsin" and wide["tier"] != "pin_verified", wide
+
+
+# README "Checked." / "Output tiers": the twin families the engine has no other spelling for ship at
+# every tier (validation.twin_spellings.general_tier_twin_round_trip). (the Blue Book)
+# 'diphenyliodanuide (PIN)'; (:24318) 'methane-SO-thioperoxol (PIN)'; (:39785) the
+# halido ligand word of an additive organometallic name, a class gives no PIN.
+TWIN_EVERY_TIER = [
+    ("c1ccc(cc1)[I-]c1ccccc1", "diphenyliodanuide", "diphenyl-λ3-iodanide", "pin_verified"),
+    ("CSO", "methane-SO-thioperoxol", "methanesulfenic acid", "pin_verified"),
+    ("C(C)[Ni]Br", "bromido(ethyl)nickel", "bromo(ethyl)nickel", "systematic_verified"),
+]
+
+
+@pytest.mark.parametrize("smiles,name,twin,tier_label", TWIN_EVERY_TIER, ids=[n for _, n, _, _ in TWIN_EVERY_TIER])
+def test_a_twin_family_with_no_other_spelling_ships_through_its_twin_at_every_tier(smiles, name, twin, tier_label):
+    assert _independent_parse(name, smiles) is None                   # OPSIN has no grammar for the name
+    assert _key(_independent_parse(twin, smiles)) == _key(smiles)     # and reads its twin to the input
+    for tier in ("pin", "valid", "best-effort"):
+        row = _row(smiles, tier)
+        if tier == "pin" and tier_label != "pin_verified":
+            assert row["tier"] == "abstain", row                     # the default tier ships PINs only
+            continue
+        assert row["name"] == name, row
+        assert row["tier"] == tier_label and row["verified"] == "opsin_twin", row
+
+
+def _hydrolysed_keys(smiles):
+    """The InChIKeys of the acids an anhydride gives on hydrolysis, by RDKit alone: every
+    C(=O)-O-C(=O) oxygen keeps one acyl carbon and the other gets a new OH."""
+    mol = Chem.RWMol(Chem.MolFromSmiles(smiles))
+    links = {m[2]: m[3] for m in mol.GetSubstructMatches(Chem.MolFromSmarts("[CX3](=O)[OX2][CX3]=O"))}
+    for o, c in links.items():
+        mol.RemoveBond(o, c)
+        mol.AddBond(c, mol.AddAtom(Chem.Atom(8)), Chem.BondType.SINGLE)
+    out = mol.GetMol()
+    Chem.SanitizeMol(out)
+    return sorted(_key(Chem.MolToSmiles(f)) for f in Chem.GetMolFrags(out, asMols=True))
+
+
+def test_default_tier_poly_anhydride_is_read_back_through_its_acids():
+    # Di- and polyanhydrides (the Blue Book): 'diacetic butanedioic dianhydride (PIN)' (:32386)
+    smiles = "CC(=O)OC(=O)CCC(=O)OC(=O)C"
+    name = "diacetic butanedioic dianhydride"
+    row = _row(smiles)
+    assert row["name"] == name, row
+    assert row["tier"] == "pin_verified" and row["verified"] == "opsin_acids", row
+    assert row["gate_outcome"] == "acid_split_verified:anhydride_acids", row
+    assert "acid_split_round_trip" in row["gates_passed"], row
+    assert _independent_parse(name, smiles) is None                   # OPSIN has no grammar for the name
+    acids = [_key(_independent_parse(a)) for a in ("acetic acid", "acetic acid", "butanedioic acid")]
+    assert _hydrolysed_keys(smiles) == sorted(acids)                  # the acids it cites are the input's
+    for tier in ("valid", "best-effort"):                             # a wider tier ships a name OPSIN reads
+        wide = _row(smiles, tier)
+        assert wide["name"] == "1,4-bis(acetyloxy)-1,4-dioxobutane", wide
+        assert wide["verified"] == "opsin" and wide["tier"] != "pin_verified", wide
+        assert _key(_independent_parse(wide["name"], smiles)) == _key(smiles), wide
