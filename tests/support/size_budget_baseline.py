@@ -162,5 +162,5 @@ FILES = {
     "src/orthonym/rules/ions.py": 7741,
     "src/orthonym/rules/multiplicative.py": 5322,
     "src/orthonym/rules/ring_substituents.py": 5182,
-    "src/orthonym/rules/spiro.py": 7171,
+    "src/orthonym/rules/spiro.py": 7068,
 }

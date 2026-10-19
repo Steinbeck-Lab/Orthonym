@@ -146,8 +146,10 @@ def be_namer():
 # abstaining fixtures re-verified 2026-09-03 under the max-breadth namer
 _BRANCH_UNNAMEABLE_SMI = "[B](C1=CC=NN1)C2=CC=NN2"   # bis(pyrazolyl)borane; ring branch declined
 _GATE_SUPPRESSED_SMI = "C1=CC=C(C=C1)O[13C](=O)OC2=CC=CC=C2"  # oxoacid/anhydride veto
-_NO_PARENT_SMI = ("C1CC12[C@@H]3C=C([C@@H]([C@H]2[C@H]4[C@@H]3[C@@H]5"
-                  "[C@@H](C46CC6)C5(Cl)Cl)Cl)Cl")     # unsupported polycyclic parent
+# re-verified 2026-10-19 (UN lane C): the former fixture, a tetrachloro dispiro cage, is now named
+# (best-effort `...dispiro[cyclopropane-1,12'-tetracyclo[6.3.1.0^2,7.0^3,5]dodec-10-ene-6',1''-cyclopropane]`,
+# full read-back); PubChem CID 142408528 (a 12-ring polycyclic cage) still abstains with NO_PARENT
+_NO_PARENT_SMI = "CC12CC34CC(CCC56C3C1(CCC(C5)C7=CC=CC=C7C8=CC=CC=C68)C9=CC=CC=C9C1=CC=CC=C21)C1=CC=CC=C1C1=C4C=CC(=C1)N(C1=CC=CC=C1)C1=CC=CC2=C1C1=CC=CC=C1C21C2=CC=CC=C2C2=CC=CC=C12"  # unsupported polycyclic parent
 
 
 class TestEndToEndCodes:

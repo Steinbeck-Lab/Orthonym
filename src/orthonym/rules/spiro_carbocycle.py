@@ -47,6 +47,17 @@ from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 from ..perception.rings import get_spiro_atoms
 
 
+def component_substituent_locants(mol, component_atoms: Set[int], skip, locant_of) -> Tuple:
+    """The sorted locants of the ring atoms of a component that carry an exocyclic substituent
+     (f), the Blue Book): the key a numbering tie of a monocycle component is broken by.
+    ``skip`` are the spiro atoms (their locants are fixed by; ``locant_of`` maps atom
+    index -> locant."""
+    return tuple(sorted(
+        locant_of[a] for a in component_atoms
+        if a not in skip and a in locant_of
+        and any(nb.GetIdx() not in component_atoms for nb in mol.GetAtomWithIdx(a).GetNeighbors())))
+
+
 def name_carbocyclic_monocycle_component(
     mol, component_atoms: Set[int], spiro_center: int, *,
     other_spiro_atoms: Tuple[int, ...] = (), substituent_tiebreak: bool = False,
@@ -138,11 +149,9 @@ def name_carbocyclic_monocycle_component(
         suffix_key = tuple(sorted(pos[orig_to_frag[a]] for a in suffix_atoms if a in orig_to_frag))
         subst_key = ()
         if substituent_tiebreak:
-            subst_key = tuple(sorted(
-                pos[orig_to_frag[a]] for a in component_atoms
-                if a != spiro_center and a not in other_spiro_atoms
-                and any(nb.GetIdx() not in component_atoms
-                        for nb in mol.GetAtomWithIdx(a).GetNeighbors())))
+            subst_key = component_substituent_locants(
+                mol, component_atoms, {spiro_center, *other_spiro_atoms},
+                {a: pos[orig_to_frag[a]] for a in component_atoms})
         full_key = (spiro_key, suffix_key, key, subst_key)
         if best is None or full_key < best[0]:
             best = (full_key, path)

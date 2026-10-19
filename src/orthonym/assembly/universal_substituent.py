@@ -2801,6 +2801,12 @@ def _mixed_spiro_fused_leaf(
                 restrict_atoms=restrict)
     except Exception:
         return None
+    return _spiro_leaf_result(res, ring_atoms, attach_hint)
+
+
+def _spiro_leaf_result(res, ring_atoms: FrozenSet[int], attach_hint: Optional[int]):
+    """The ring-leaf tuple of a component-name spiro result ``res`` of ``rules.spiro`` (``(name,
+    core_ring_atoms, combined_locants, _)``), or None unless it names exactly ``ring_atoms``."""
     if res is None:
         return None
     name, core_ring_atoms, combined_locants, _subs = res
@@ -2818,6 +2824,20 @@ def _mixed_spiro_fused_leaf(
         atom_to_locant.get(attach_hint) if attach_hint is not None else None
     )
     return frozenset(core_ring_atoms), name, atom_to_locant, attach_locant
+
+
+def _polyspiro_component_leaf(ctx: _Ctx, ring_atoms: FrozenSet[int], attach_hint: Optional[int]):
+    """ (the Blue Book) component-name POLYspiro as the LAST ring-leaf offer of the
+    floor: an unbranched polyspiro chain with a polycyclic component, substituted
+    (``spiro_polyspiro``: the bare chain and its numbering). Asked only when no other
+    producer names the ring system, so a name another producer builds is never replaced (UN lane C)."""
+    from ..rules.spiro import name_unbranched_polyspiro_different
+    try:
+        res = name_unbranched_polyspiro_different(
+            ctx.mol, allow_substituents=True, restrict_atoms=set(ring_atoms))
+    except Exception:
+        return None
+    return _spiro_leaf_result(res, ring_atoms, attach_hint)
 
 
 def _name_ring_spine(
@@ -2880,7 +2900,7 @@ def _name_ring_spine(
                 mol, cage_atoms=set(ring_atoms), allow_mancude=True,
                 free_valence_atoms=fv)
         if cage is None:
-            return None
+            return _polyspiro_component_leaf(ctx, ring_atoms, attach_hint)
         parent_block = _build_parent_with_unsaturation(
             cage.total_atoms, cage.unsaturation, fg_suffix=None)
         core = cage.hetero_prefix + cage.descriptor + parent_block
