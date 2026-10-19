@@ -24,7 +24,7 @@ from ..data.fusion_components import (
     get_component_by_pattern,
     get_component_seniority,
 )
-from ..data.multipliers import multiplier_table
+from ..data.chain_names import multiplying_prefix
 from ..perception.rings import (
     is_aromatic_ring,
     is_heterocyclic,
@@ -814,11 +814,8 @@ def build_multi_component_name(
         >>> build_multi_component_name('anthracene', 'naphthalene', 2, '[a,h]')
         'dinaphtho[a,h]anthracene'
     """
-    # Multiplicative prefixes for ring count
-    MULTIPLIERS = multiplier_table(6)
-
     prefix = get_fusion_prefix(child_name)
-    multiplier = MULTIPLIERS.get(count, '')
+    multiplier = multiplying_prefix(count) if count > 1 else ''
 
     return f"{multiplier}{prefix}{descriptor}{parent_name}"
 

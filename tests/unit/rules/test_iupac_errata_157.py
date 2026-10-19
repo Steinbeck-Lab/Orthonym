@@ -555,6 +555,9 @@ _DEHYDRO_SITES = {
     # rank the locants of names already built, they build no dehydro prefix
     "assembly/form_choice.py",
     "rules/ring_cation_hydro.py",
+    # the spiro component namer quotes (e) in its docstring (UN U2, 2026-10-19);
+    # it numbers ring double bonds, it builds no dehydro prefix
+    "rules/spiro_carbocycle.py",
 }
 
 

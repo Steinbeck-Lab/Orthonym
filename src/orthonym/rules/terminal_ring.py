@@ -79,6 +79,7 @@ logger = logging.getLogger(__name__)
 
 #: Shared with the von Baeyer sibling so the two halves of the terminal namer
 #: cannot drift into two different ceilings.
+from ..data.chain_names import multiplying_prefix  # noqa: E402
 from .lambda_convention import LAMBDA  # noqa: E402
 from . import vonbaeyer_universal as _vbu  # noqa: E402
 # The PIN-tier ceilings, re-exported by value (read by tests and measurement tools);
@@ -255,12 +256,11 @@ def _unsaturation_block(double_locs: Sequence[str], triple_locs: Sequence[str],
     ``a`` (``cyclohexa-1,3-diene``); a single ending elides it
     (``cyclohex-1-ene``).
     """
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
     terms = []
     for locs, ending in ((list(double_locs), 'en'), (list(triple_locs), 'yn')):
         if not locs:
             continue
-        mult = SIMPLE_MULTIPLIERS.get(len(locs), '') if len(locs) > 1 else ''
+        mult = multiplying_prefix(len(locs)) if len(locs) > 1 else ''
         terms.append((locs, mult, ending))
     if not terms:
         return ''
@@ -305,7 +305,7 @@ def build_monocycle_replacement_name(
     # counts it regardless, which is the silent-heteroatom-drop shape
     # (`C1CC2CC[Hg]C2C1` -> `bicyclo[3.3.0]octane`).
     repl = build_replacement_prefix(mol, numbering, ring_set)
-    if repl.unexpressed:
+    if repl.unexpressed or repl.preselected_only:
         logger.info("terminal_ring: %d skeletal atom(s) have no replacement "
                     "morpheme; refuse", len(repl.unexpressed))
         return None

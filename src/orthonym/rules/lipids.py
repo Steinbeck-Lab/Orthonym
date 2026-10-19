@@ -21,7 +21,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..assembly.naming_utils import apply_enclosing_marks, get_multiplier_prefix, is_complex_substituent
-from ..data.chain_names import get_chain_prefix
+from ..data.chain_names import get_chain_prefix, multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..data.sugar_names import sugar_to_glycosyloxy_prefix
 from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
@@ -782,7 +782,7 @@ def _assemble_ceramide(mol, match, style) -> Optional[str]:
     elif len(dbs) == 1:
         sub_core = f"{stem}-{dbs[0]}-en{yl}"
     else:
-        mult = multiplier_table(4).get(len(dbs), "")
+        mult = multiplying_prefix(len(dbs))
         sub_core = f"{stem}a-{','.join(map(str, dbs))}-{mult}en{yl}"
 
     prefixes = _sphingoid_prefixes(match)

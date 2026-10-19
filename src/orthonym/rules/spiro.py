@@ -76,6 +76,10 @@ from ..rules.lambda_convention import (
 # can verify the invariant without inspecting individual function bodies.
 from ..rules.locants import compare_locant_sets  # noqa: F401 — re-export lock
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
+from .spiro_carbocycle import (  # the one namer of a carbocyclic monocycle component
+    name_carbocyclic_monocycle_component as _name_carbocyclic_monocycle_component,
+    name_unsaturated_carbocyclic_side_ring as _name_unsaturated_carbocyclic_side_ring,
+)
 
 # a phase-02 /: locant tuple type alias for cascade-step-6
 # suppliers. Plain int for typical ring atoms; (int, str) tuple for
@@ -1604,7 +1608,7 @@ def _build_hetero_prefix(
     # locant to cite). Refuse before spelling anything -- a ring stem must never
     # count an atom that no morpheme in the name spells.
     totality = build_replacement_prefix(mol, numbering, set(ring_atoms))
-    if totality.unexpressed:
+    if totality.unexpressed or totality.preselected_only:
         return None
 
     from ..assembly.naming_utils import get_multiplier_prefix
@@ -2464,9 +2468,12 @@ def _synthesize_fused_locants(
 
 
 def _name_side_ring(
-    mol, side_ring: List[int],
+    mol, side_ring: List[int], spiro_center: Optional[int] = None,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
     """Name a single algorithmic side ring.
+
+    ``spiro_center``: the ring's spiro atom when the caller knows it; it numbers a
+    carbocycle with a double bond (``rules/spiro_carbocycle.py``).
 
     Returns (name, atom_idx_in_orig -> locant) or None.
     """
@@ -2558,13 +2565,17 @@ def _name_side_ring(
                 if bond.GetBondType() == Chem.BondType.AROMATIC:
                     has_double = True
                     break
+        if has_double:  # 'cyclohex-2-ene', not the bare 'cyclohexene' OPSIN cannot place
+            named = _name_unsaturated_carbocyclic_side_ring(mol, side_ring, spiro_center)
+            if named is not None:
+                return named
         prefix = _get_chain_prefix(ring_size)
         suffix = "ene" if has_double else "ane"
         # cycloprop -> cycloprop + ane = cyclopropane
         # Strip trailing 'a' before -ane already handled by chain_names.
         name = f"cyclo{prefix}{suffix}"
         atom_to_locant = _walk_side_ring_locants(
-            mol, side_ring, hetero_first=False,
+            mol, side_ring, hetero_first=False, spiro_start=spiro_center,
         )
 
     return name, atom_to_locant
@@ -2652,7 +2663,7 @@ def _number_hetero_side_ring(mol, side_ring: List[int]) -> Optional[Dict[int, in
 
 
 def _walk_side_ring_locants(
-    mol, ring: List[int], *, hetero_first: bool,
+    mol, ring: List[int], *, hetero_first: bool, spiro_start: Optional[int] = None,
 ) -> Dict[int, int]:
     """Number a side ring 1..N walking around the ring.
 
@@ -2696,8 +2707,10 @@ def _walk_side_ring_locants(
             start = ring[0]
     else:
         # Carbocyclic: locant 1 at the spiro centre per spiro-descriptor
-        # conventions for the side ring.
-        start = spiro_in_ring[0] if spiro_in_ring else ring[0]
+        # conventions for the side ring; the caller's ``spiro_start`` (the junction toward
+        # the earlier-cited component, when the ring has two spiro atoms.
+        start = (spiro_start if spiro_start in ring else
+                 spiro_in_ring[0] if spiro_in_ring else ring[0])
 
     # Walk the ring and assign 1, 2,..., N.
     # Two directions possible — pick the one giving the LOWEST set of
@@ -2966,7 +2979,7 @@ def name_mixed_spiro_fused(
     fused_name, fused_atom_to_locant = fused_named
 
     # Step 3: name the side ring
-    side_named = _name_side_ring(mol, side_rings[0])
+    side_named = _name_side_ring(mol, side_rings[0], spiro_center=spiro_center)
     if side_named is None:
         return None
     side_name, side_atom_to_locant = side_named
@@ -3152,12 +3165,13 @@ def _partition_rings_at_spiro(
     return comp_a, comp_b
 
 
-def _name_component_either(mol, ring_list, allow_vonbaeyer, force_vonbaeyer=False):
+def _name_component_either(mol, ring_list, allow_vonbaeyer, force_vonbaeyer=False,
+                           spiro_center=None):
     """Name ONE spiro-side component (a list of ring atom lists): a single ring
     via ``_name_side_ring``, a multi-ring fused/bridged system via
     ``_name_fused_component``. Returns ``(name, atom_to_locant)`` or None."""
     if len(ring_list) == 1:
-        return _name_side_ring(mol, ring_list[0])
+        return _name_side_ring(mol, ring_list[0], spiro_center=spiro_center)
     return _name_fused_component(mol, ring_list, allow_vonbaeyer=allow_vonbaeyer,
                                  force_vonbaeyer=force_vonbaeyer)
 
@@ -3253,8 +3267,8 @@ def _assemble_monospiro_from_sides(
     if a_atoms & b_atoms != {spiro_center}:
         return None  # the two sides must meet ONLY at the spiro atom
 
-    a_named = _name_component_either(mol, a_rings, allow_vonbaeyer, force_vonbaeyer)
-    b_named = _name_component_either(mol, b_rings, allow_vonbaeyer, force_vonbaeyer)
+    a_named = _name_component_either(mol, a_rings, allow_vonbaeyer, force_vonbaeyer, spiro_center)
+    b_named = _name_component_either(mol, b_rings, allow_vonbaeyer, force_vonbaeyer, spiro_center)
     if a_named is None or b_named is None:
         return None
     a_name, a_map = a_named
@@ -3478,6 +3492,19 @@ def _fused_components_atoms(mol) -> List[Set[int]]:
     return comps
 
 
+def _terminal_orientation_key(mol, comp_atoms: Set[int], locmap, junction: int, ranks):
+    """Which of two terminal components that carry the same name is cited first: the lower
+    spiro locant, the Blue Book, "the lowest set of locants for all spiro
+    atoms"), then the lower locants of its ring atoms with an exocyclic substituent (f),
+    :3301), a terminal with none after one with; then the canonical rank, which is the same for
+    the same structure in any atom order."""
+    def lk(a):
+        return _locant_sort_key(locmap[a]) if a in locmap else (10 ** 6, "")
+    subst = sorted(lk(a) for a in comp_atoms if a != junction
+                   and any(n.GetIdx() not in comp_atoms for n in mol.GetAtomWithIdx(a).GetNeighbors()))
+    return (lk(junction), (0, tuple(subst)) if subst else (1, ()), min(ranks[a] for a in comp_atoms))
+
+
 def _name_linear_polyspiro_fused(
     mol, allow_vonbaeyer: bool = True, force_vonbaeyer: bool = False,
     restrict_atoms: Optional[Set[int]] = None,
@@ -3529,17 +3556,19 @@ def _name_linear_polyspiro_fused(
     endpoints = [k for k in core_nodes if deg[k] == 1]
     if len(endpoints) != 2 or any(deg[k] > 2 for k in core_nodes):
         return None
-    # order the chain from a deterministic endpoint: name both terminals, start
-    # from the alphanumerically-smaller (tie -> lower min atom index).
-    def _term_name(k):
-        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer, force_vonbaeyer)
-        return r
-    end_named = {k: _term_name(k) for k in endpoints}
+    # order the chain from a deterministic endpoint: name both terminals, start from the
+    # alphanumerically-smaller; a tie goes to ``_terminal_orientation_key``, never to
+    # the atom order of the input.
+    end_named = {k: _name_component_either_atoms(mol, comps[k], allow_vonbaeyer, force_vonbaeyer,
+                                                 nbr[k][0][1]) for k in endpoints}
     if any(v is None for v in end_named.values()):
         return None
     e0, e1 = endpoints
-    key0 = (_component_alpha_key(end_named[e0][0]), min(comps[e0]))
-    key1 = (_component_alpha_key(end_named[e1][0]), min(comps[e1]))
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    key0 = (_component_alpha_key(end_named[e0][0]),
+            _terminal_orientation_key(mol, comps[e0], end_named[e0][1], nbr[e0][0][1], ranks))
+    key1 = (_component_alpha_key(end_named[e1][0]),
+            _terminal_orientation_key(mol, comps[e1], end_named[e1][1], nbr[e1][0][1], ranks))
     start = e0 if key0 <= key1 else e1
     # walk the path
     order: List[int] = [start]
@@ -3568,8 +3597,12 @@ def _name_linear_polyspiro_fused(
         return None
     # name every component; collect its spiro-atom -> locant map
     named = []
-    for k in order:
-        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer, force_vonbaeyer)
+    for p, k in enumerate(order):
+        # (the Blue Book): the lowest locants for the spiro atoms, then "in order of
+        # their citation in the name": a ring numbers from the junction toward the earlier-cited
+        # component (the first ring from its only one), so the numbering never depends on atom order.
+        r = _name_component_either_atoms(mol, comps[k], allow_vonbaeyer, force_vonbaeyer,
+                                         junction[p - 1] if p else junction[0])
         if r is None:
             return None
         named.append(r)  # (name, atom_to_locant)
@@ -3623,7 +3656,8 @@ def _name_linear_polyspiro_fused(
     return (name, core_ring_atoms, combined_locants, False)
 
 
-def _name_component_either_atoms(mol, comp_atoms: Set[int], allow_vonbaeyer, force_vonbaeyer=False):
+def _name_component_either_atoms(mol, comp_atoms: Set[int], allow_vonbaeyer, force_vonbaeyer=False,
+                                 spiro_center=None):
     """Name ONE component given its ATOM set: a single ring via
     ``_name_side_ring``, a multi-ring fused/bridged system via
     ``_name_fused_component``. Returns ``(name, atom_to_locant)`` or None."""
@@ -3631,7 +3665,7 @@ def _name_component_either_atoms(mol, comp_atoms: Set[int], allow_vonbaeyer, for
     ring_list = [list(r) for r in ri.AtomRings() if set(r) <= comp_atoms]
     if not ring_list:
         return None
-    return _name_component_either(mol, ring_list, allow_vonbaeyer, force_vonbaeyer)
+    return _name_component_either(mol, ring_list, allow_vonbaeyer, force_vonbaeyer, spiro_center)
 
 
 def _canonical_spiro_locant(extracted, loc_map: Dict[int, int], spiro_center: int):
@@ -5950,101 +5984,6 @@ def find_monospiro_separation_atom(
     return candidates[0]
 
 
-def _name_carbocyclic_monocycle_component(
-    mol, component_atoms: Set[int], spiro_center: int,
-) -> Optional[Tuple[str, Dict[int, int]]]:
-    """Name a single CARBOCYCLIC ring component of a spiro system, numbering it
-    with locant 1 at the spiro atom (the side-ring convention). Returns
-    ``(cyclo<N>ane / cyclo<stem>a-<enes>-diene / -ene, {orig_idx: locant})`` or
-    None for a heteroatom ring (fail-closed).
-
-     tail #7: a ring bearing C=C (the spiro-cyclohexadienone side of a
-    spiro-quinone alkaloid) is now rendered as the mancude ``cyclohexa-2,5-diene``
-    component. The double-bond locants are cited UNPRIMED here; the caller's spiro
-    assembler is responsible for the primed/unprimed placement of the
-    OTHER (non-first-cited) component and RT-verifies the whole name . The
-    numbering walks from the spiro atom (locant 1) in the direction giving the
-    C=C set the lowest locants; a saturated ring is byte-identical
-    to the old output (no ene infix)."""
-    extracted = _extract_subfragment(mol, component_atoms)
-    if extracted is None:
-        return None
-    frag, orig_to_frag = extracted
-    frag_to_orig = {v: k for k, v in orig_to_frag.items()}
-    rings = frag.GetRingInfo().AtomRings()
-    if len(rings) != 1:
-        return None
-    ring = list(rings[0])
-    for fi in ring:  # carbocyclic only
-        if frag.GetAtomWithIdx(fi).GetAtomicNum() != 6:
-            return None
-    ring_set = set(ring)
-    # Collect ring C=C bonds (frozenset pairs); any ring triple/aromatic bond is
-    # out of this v1 scope (fail-closed -> a richer namer or abstain).
-    double_pairs: Set[frozenset] = set()
-    for bond in frag.GetBonds():
-        if (bond.GetBeginAtomIdx() in ring_set
-                and bond.GetEndAtomIdx() in ring_set):
-            bt = bond.GetBondType()
-            if bt == Chem.BondType.DOUBLE:
-                double_pairs.add(frozenset(
-                    (bond.GetBeginAtomIdx(), bond.GetEndAtomIdx())))
-            elif bt != Chem.BondType.SINGLE:
-                return None  # aromatic / triple ring bond -> out of scope
-    fadj: Dict[int, List[int]] = {a: [] for a in ring}
-    for bond in frag.GetBonds():
-        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-        if i in ring_set and j in ring_set:
-            fadj[i].append(j)
-            fadj[j].append(i)
-    start = orig_to_frag[spiro_center]
-    n = len(ring)
-    stem = _get_chain_prefix(n)
-    best = None  # (ene_locant_tuple, path)
-    for first in sorted(fadj[start]):
-        path = [start, first]
-        visited = {start, first}
-        cur = first
-        while len(path) < n:
-            nxt = next((nb for nb in fadj[cur] if nb not in visited), None)
-            if nxt is None:
-                break
-            path.append(nxt)
-            visited.add(nxt)
-            cur = nxt
-        if len(path) != n:
-            continue
-        pos = {a: i + 1 for i, a in enumerate(path)}
-        # each ring C=C -> its lower endpoint locant; a bond closing n->1 is the
-        # ring-closure double bond and would be cited at locant n.
-        ene_locs = []
-        for pr in double_pairs:
-            a, b = tuple(pr)
-            la, lb = pos[a], pos[b]
-            # consecutive-in-ring endpoints: cite the lower, unless it is the
-            # 1<->n closure bond (locant n).
-            ene_locs.append(min(la, lb) if abs(la - lb) == 1 else n)
-        key = tuple(sorted(ene_locs))
-        if best is None or key < best[0]:
-            best = (key, path)
-    if best is None:
-        return None
-    ene_key, path = best
-    a2l = {frag_to_orig[a]: i + 1 for i, a in enumerate(path)}
-    if not double_pairs:
-        return f"cyclo{stem}ane", a2l
-    # mancude component: 'cyclohexa-2,5-diene' etc. Multiplied ene infix uses the
-    # euphonic 'a' (di/tri-ene); a single C=C is 'cyclohex-2-ene'.
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-    loc_str = ",".join(str(x) for x in ene_key)
-    if len(ene_key) == 1:
-        return f"cyclo{stem}-{loc_str}-ene", a2l
-    mult = SIMPLE_MULTIPLIERS.get(len(ene_key))
-    if mult is None:
-        return None
-    return f"cyclo{stem}a-{loc_str}-{mult}ene", a2l
-
-
 def _tricyclo_plus_spiro_component(
     mol, component_atoms: Set[int], spiro_atom: Optional[int] = None,
 ) -> Optional[Tuple[str, Dict[int, int]]]:
@@ -6679,8 +6618,8 @@ def _name_spiro_component(
         return None
     if extracted[0].GetRingInfo().NumRings() == 1:
         carbo = _name_carbocyclic_monocycle_component(
-            mol, component_atoms, spiro_center
-        )
+            mol, component_atoms, spiro_center, other_spiro_atoms=tuple(sorted(
+                (set(get_spiro_atoms(mol)) & set(component_atoms)) - {spiro_center})))
         if carbo is not None:
             return carbo
         # Hantzsch-Widman stems exist only for ring sizes 3-10; a larger saturated

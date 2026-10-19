@@ -45,7 +45,7 @@ class HandlerResult:
         return len(self.accounted_atoms) / self.total_heavy_atoms if self.total_heavy_atoms > 0 else 0.0
 
 
-from ..data.chain_names import get_chain_prefix
+from ..data.chain_names import get_chain_prefix, multiplying_prefix
 from ..data.partial_saturation_refs import get_aromatic_reference, get_reference_smiles
 from ..errors import (  # G0 fail-closed refusal (DD7 S1); a voided candidate (Task 3)
     OrthonymLimitError,
@@ -5356,7 +5356,7 @@ def _build_bicyclo_unsaturation_suffix(
         if num_double == 1:
             parts.append(f"-{double_str}-en")
         else:
-            multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
+            multiplier = multiplying_prefix(num_double)
             parts.append(f"a-{double_str}-{multiplier}en")
 
     if num_triple > 0:
@@ -5364,7 +5364,7 @@ def _build_bicyclo_unsaturation_suffix(
         if num_triple == 1:
             parts.append(f"-{triple_str}-yn")
         else:
-            multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
+            multiplier = multiplying_prefix(num_triple)
             if num_double == 0:
                 parts.append(f"a-{triple_str}-{multiplier}yn")
             else:
@@ -5605,7 +5605,7 @@ def _build_bicyclo_principal_suffix(
     count = len(locants)
     # Principal-group suffixes always take the SIMPLE multiplier (di/tri), never
     # bis/tris (those are for complex substituents).
-    multiplier = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+    multiplier = multiplying_prefix(count) if count > 1 else ""
     locant_str = ",".join(str(loc) for loc in locants)
 
     #: elide the multiplier-final 'a' before '-ol' (tetra+ol -> tetrol);
@@ -8699,8 +8699,7 @@ def _merge_duplicate_prefixes(prefixes: List[NameFragment]) -> List[NameFragment
             try:
                 multiplied = multiplied_component(total_count, base_name, base_name)
             except ValueError:
-                multiplied = (SIMPLE_MULTIPLIERS.get(total_count, str(total_count))
-                              + base_name)
+                multiplied = multiplying_prefix(total_count) + base_name
             if all_locants:
                 locant_str = ",".join(str(l) for l in all_locants)
                 text = f"{locant_str}-{multiplied}"
@@ -12628,5 +12627,4 @@ def get_multiplier(count: int, is_complex: bool = False) -> str:
     if count <= 1:
         return ""
 
-    multipliers = COMPLEX_MULTIPLIERS if is_complex else SIMPLE_MULTIPLIERS
-    return multipliers.get(count, str(count))
+    return multiplying_prefix(count, "complex" if is_complex else "simple")

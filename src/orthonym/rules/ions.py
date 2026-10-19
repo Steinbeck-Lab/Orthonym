@@ -27,6 +27,7 @@ from ..data.ion_retained_names import (
     get_anion_name,
     get_cation_name,
 )
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..errors import UnnameableSubstituentError  # a voided candidate (Task 3)
 from ..errors import is_failure_name
@@ -5487,7 +5488,7 @@ def _name_aromatic_carboxylate_with_substituents(mol, carboxyl_carbon_idx: int, 
     for sub_name in sorted(grouped.keys()):
         locants = grouped[sub_name]
         count = len(locants)
-        multiplier = MULTIPLIERS.get(count, f'{count}-')
+        multiplier = multiplying_prefix(count, table=MULTIPLIERS)
 
         locant_str = ','.join(str(loc) for loc in locants)
         prefix = f"{locant_str}-{multiplier}{sub_name}"
@@ -5623,7 +5624,7 @@ def _build_partial_acid_salt_chain_name(
     parts = []
     for name in sorted(groups.keys()):
         locs = groups[name]
-        mult = plain_mult.get(len(locs), f'{len(locs)}-')
+        mult = multiplying_prefix(len(locs), table=plain_mult)
         loc_str = ','.join(str(loc) for loc in locs)
         parts.append(f"{loc_str}-{mult}{name}")
     return '-'.join(parts) + stem
@@ -5903,7 +5904,6 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
     elif carbon_count == 2 and not double_bond_locs:
         return 'acetate'
 
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
     from ..data.chain_names import get_chain_prefix
     prefix = get_chain_prefix(carbon_count)
 
@@ -5913,7 +5913,7 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
         if n_double == 1:
             return f"{prefix}-{loc_str}-enoate"
         else:
-            mult = SIMPLE_MULTIPLIERS.get(n_double, str(n_double))
+            mult = multiplying_prefix(n_double)
             return f"{prefix}a-{loc_str}-{mult}enoate"
     else:
         return prefix + "anoate"

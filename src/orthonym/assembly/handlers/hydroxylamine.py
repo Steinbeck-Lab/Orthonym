@@ -216,7 +216,7 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
     the distinction (BB ``O-(4-methylphenyl)hydroxylamine``, not
     ``O-4-methylphenylhydroxylamine``). The sort key stays the bare,
     unenclosed name."""
-    from ..naming_utils import SIMPLE_MULTIPLIERS  # {2: 'di', 3: 'tri',...}
+    from ...data.chain_names import multiplying_prefix  # 'di', 'tri',... for any count
     from ..naming_utils import enclose_if_compound
 
     out: List[Tuple[str, str]] = []
@@ -228,7 +228,7 @@ def _format_locant_block(names: List[str], locant: str) -> List[Tuple[str, str]]
         enclosed = enclose_if_compound(sub_name)
         locs = ",".join([locant] * count)
         if count > 1:
-            mult = SIMPLE_MULTIPLIERS.get(count, "")
+            mult = multiplying_prefix(count)
             # (d) (the Blue Book, 'di-*tert*-butyl':6964): a
             # hyphen after the multiplier before a bare italicized prefix, none
             # before an enclosed one,:6968) -- the shared primitive.

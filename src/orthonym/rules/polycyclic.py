@@ -36,6 +36,7 @@ from rdkit import Chem
 from ..assembly.fragment_naming import _fragment_guard  # Lever N: budget replay on a memo hit
 from ..assembly.memo import cache_or_compute  # R2(a): structure-keyed main-ring memo
 from ..perception.molcache import atoms_of, bonds_of, cached_by_key
+from ..data.chain_names import multiplying_prefix
 from .locants import compound_aware_multibond_set  # (1)/(2), shared w/ bicyclo.py
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
@@ -2940,7 +2941,9 @@ def get_heteroatom_replacement_prefix(
     Returns:
         Formatted prefix string (e.g. "7-oxa"); ``""`` when there is no
         heteroatom to express; or ``None`` when some skeletal atom CANNOT be
-        expressed, in which case **the caller must refuse**.
+        expressed, or the skeleton is a same-kind noncarbon one of more than 20
+        atoms (``ReplacementPrefix.preselected_only``:, its preselected
+        name is not built), in which case **the caller must refuse**.
 
     The ``None`` case is the fix for what this docstring used to concede: the old
     ``-> str`` signature could not report an atom it failed to express, so an
@@ -2954,7 +2957,7 @@ def get_heteroatom_replacement_prefix(
     ``is None``.
     """
     replacement = _build_ring_replacement_prefix(mol, numbering, ring_atoms)
-    if replacement.unexpressed:
+    if replacement.unexpressed or replacement.preselected_only:
         return None
     return replacement.prefix
 
@@ -4246,7 +4249,7 @@ def _build_parent_with_unsaturation(
 
         if double_bonds:
             count = len(double_bonds)
-            mult = unsat_multipliers.get(count, str(count))
+            mult = multiplying_prefix(count, table=unsat_multipliers)
             locant_str = ','.join(str(loc) for loc in double_bonds)
             if count > 1:
                 parts.append(f"-{locant_str}-{mult}en")
@@ -4255,7 +4258,7 @@ def _build_parent_with_unsaturation(
 
         if triple_bonds:
             count = len(triple_bonds)
-            mult = unsat_multipliers.get(count, str(count))
+            mult = multiplying_prefix(count, table=unsat_multipliers)
             locant_str = ','.join(str(loc) for loc in triple_bonds)
             if count > 1:
                 parts.append(f"-{locant_str}-{mult}yn")
@@ -4282,7 +4285,7 @@ def _build_parent_with_unsaturation(
             parts = []
             if double_bonds:
                 count = len(double_bonds)
-                mult = unsat_multipliers.get(count, str(count))
+                mult = multiplying_prefix(count, table=unsat_multipliers)
                 locant_str = ','.join(str(loc) for loc in double_bonds)
                 if count > 1:
                     parts.append(f"-{locant_str}-{mult}en")
@@ -4290,7 +4293,7 @@ def _build_parent_with_unsaturation(
                     parts.append(f"-{locant_str}-en")
             if triple_bonds:
                 count = len(triple_bonds)
-                mult = unsat_multipliers.get(count, str(count))
+                mult = multiplying_prefix(count, table=unsat_multipliers)
                 locant_str = ','.join(str(loc) for loc in triple_bonds)
                 if count > 1:
                     parts.append(f"-{locant_str}-{mult}yn")
@@ -4307,7 +4310,7 @@ def _build_parent_with_unsaturation(
         # _join_multiplied_suffix is a no-op for 'carb...'/one/amine suffixes.
         from ..assembly.naming_utils import _join_multiplied_suffix
         count = len(suffix_locants)
-        mult = fg_multipliers.get(count, str(count))
+        mult = multiplying_prefix(count, table=fg_multipliers)
         full_suffix = _join_multiplied_suffix(mult, suffix_text)
         if suffix_locants:
             locant_str = ','.join(str(loc) for loc in suffix_locants)
@@ -4326,7 +4329,7 @@ def _build_parent_with_unsaturation(
     unsat_parts = []
     if double_bonds:
         count = len(double_bonds)
-        mult = unsat_multipliers.get(count, str(count))
+        mult = multiplying_prefix(count, table=unsat_multipliers)
         locant_str = ','.join(str(loc) for loc in double_bonds)
         if count > 1:
             unsat_parts.append(f"-{locant_str}-{mult}en")
@@ -4335,7 +4338,7 @@ def _build_parent_with_unsaturation(
 
     if triple_bonds:
         count = len(triple_bonds)
-        mult = unsat_multipliers.get(count, str(count))
+        mult = multiplying_prefix(count, table=unsat_multipliers)
         locant_str = ','.join(str(loc) for loc in triple_bonds)
         if count > 1:
             unsat_parts.append(f"-{locant_str}-{mult}yn")
@@ -4372,7 +4375,7 @@ def _build_parent_with_unsaturation(
     from ..assembly.naming_utils import format_suffix_with_locants
 
     fg_count = len(suffix_locants)
-    fg_mult = fg_multipliers.get(fg_count, str(fg_count))
+    fg_mult = multiplying_prefix(fg_count, table=fg_multipliers)
 
     if has_unsaturation:
         parent_stem = stem + ''.join(unsat_parts)

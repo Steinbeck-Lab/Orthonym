@@ -739,7 +739,7 @@ def _generate_heteroatom_prefix(
     from .ring_replacement import build_replacement_prefix
 
     replacement = build_replacement_prefix(mol, numbering, set(ring_atoms))
-    if replacement.unexpressed:
+    if replacement.unexpressed or replacement.preselected_only:
         # Off-table element, or an atom the numbering does not reach: no locant
         # and no morpheme, while the cage stem still counts it.
         return None

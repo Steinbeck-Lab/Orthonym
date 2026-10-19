@@ -23,7 +23,7 @@ from ..assembly.naming_utils import (
     get_alkyl_name,
     simple_multiplier_word,
 )
-from ..data.chain_names import get_chain_name, get_chain_prefix
+from ..data.chain_names import get_chain_name, get_chain_prefix, multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond tuples
     atoms_of,
@@ -3915,7 +3915,7 @@ def _attachment_anchored_benzene_unit(
     parts = []
     for sname in sorted(by_name):
         locs = sorted(by_name[sname])
-        mult = SIMPLE_MULTIPLIERS.get(len(locs), '') if len(locs) > 1 else ''
+        mult = multiplying_prefix(len(locs)) if len(locs) > 1 else ''
         parts.append(f"{','.join(str(l) for l in locs)}-{mult}{sname}")
     return ('-'.join(parts) + 'benzene', 1)
 

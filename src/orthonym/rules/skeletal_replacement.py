@@ -27,7 +27,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-from ..data.chain_names import get_chain_prefix
+from ..data.chain_names import get_chain_prefix, multiplying_prefix
 
 # a phase : shared / λ-convention. A non-standard-valence
 # embedded chain heteroatom cites its bonding number after the locant
@@ -1492,13 +1492,8 @@ def _build_replacement_name(
         )
         count = len(locants)
 
-        if count == 1:
-            multiplier = ''
-        elif count in SIMPLE_MULTIPLIERS:
-            multiplier = SIMPLE_MULTIPLIERS[count]
-        else:
-            # Fallback for very large counts (unlikely for replacement)
-            multiplier = SIMPLE_MULTIPLIERS.get(count, f'{count}')
+        # /: every count has a spelled word, past 20 as well.
+        multiplier = '' if count == 1 else multiplying_prefix(count)
 
         parts.append(f'{locant_str}-{multiplier}{term}')
 
@@ -1535,7 +1530,7 @@ def _build_replacement_name(
     if ene_locants or yne_locants:
         stem = chain_prefix
         if ene_locants:
-            multiplier = (SIMPLE_MULTIPLIERS[len(ene_locants)]
+            multiplier = (multiplying_prefix(len(ene_locants))
                           if len(ene_locants) > 1 else '')
             if multiplier:
                 stem += 'a'
@@ -1544,7 +1539,7 @@ def _build_replacement_name(
             if not yne_locants:
                 stem += 'e'
         if yne_locants:
-            multiplier = (SIMPLE_MULTIPLIERS[len(yne_locants)]
+            multiplier = (multiplying_prefix(len(yne_locants))
                           if len(yne_locants) > 1 else '')
             if multiplier and not ene_locants:
                 stem += 'a'
@@ -1770,12 +1765,7 @@ def _try_cyclic_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
             format_lambda_token(loc, lambda_by_locant.get(loc)) for loc in locants)
         count = len(locants)
 
-        if count == 1:
-            multiplier = ''
-        elif count in SIMPLE_MULTIPLIERS:
-            multiplier = SIMPLE_MULTIPLIERS[count]
-        else:
-            multiplier = SIMPLE_MULTIPLIERS.get(count, f'{count}')
+        multiplier = '' if count == 1 else multiplying_prefix(count)
 
         sep = '' if omit_locants else '-'
         parts.append(f'{locant_str}{sep}{multiplier}{term}')

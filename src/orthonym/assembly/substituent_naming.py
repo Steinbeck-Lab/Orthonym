@@ -30,6 +30,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import acyl_prefix_text, is_acyl_prefix
@@ -976,8 +977,10 @@ def _name_unsaturated_oxo_substituent(mol, sub_atoms, attach_idx, parent_set):
         key = (fv, unsat, oxo_locs)
         if best is None or key < best[0]:
             stem = _build_alkenyl_name(n, fv, dbl, trp)   # 'prop-1-en-2-yl'
+            # ``oxo_hosts`` is non-empty here (refused above otherwise) and every host counts at
+            # least once, so ``oxo_locs`` has an entry: the count is never 0.
             _M = multiplier_table(4, one="")
-            ostr = f"{','.join(map(str, oxo_locs))}-{_M.get(len(oxo_locs), '')}oxo"
+            ostr = f"{','.join(map(str, oxo_locs))}-{multiplying_prefix(len(oxo_locs), table=_M)}oxo"
             best = (key, f"{ostr}{stem}", pos)            # '3-oxo' + 'prop-1-en-2-yl'
     if not best:
         return None

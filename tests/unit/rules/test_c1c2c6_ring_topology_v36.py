@@ -83,11 +83,25 @@ RESOLVED_BY_V38_CP2 = [
 # OPSIN-grammar bug in name_mixed_spiro_fused's component assembly + stereo-omission (the
 # latter closed by the same deferred shared-stereo-path fix as A2). Abstains today (0-wrong).
 B_WITNESSES = [
-    "C1=CCC2(C1)COc1ccccc12",
-    "C1=CC2(C=CC1)Cc1ccccc1O2",
+    # The two B witnesses below were the OPSIN-grammar bug: the carbocyclic side ring with a
+    # double bond was named by the bare 'cyclopentene' / 'cyclohexadiene', with no locant. UN lane
+    # U2 names its double bonds with the ring's own locants ('cyclopent-3-ene',
+    # 'cyclohexa-2,5-diene'); both now name and round-trip, so they moved to B_RESOLVED_BY_U2.
     # The third B witness (C1CC[C@@H]2C[C@]3(CC[C@H]2C1)CO3) built an unparseable
     # spiro[decahydronaphthalene-7,2'-oxirane] at HEAD; CP2 (correct 4a/8a
     # fusion locants + completed stereo) RESOLVED it -> RESOLVED_BY_V38_CP2 below.
+]
+
+# UN lane U2 (spiro_carbocycle.py): a carbocyclic spiro side ring with double bonds cites them
+# with the ring's own locants, the Blue Book, "Low locants are assigned to
+# double bonds in accordance with the fixed numbering of the spiro compound"; the spiro atom is
+# locant 1, Explanation,:10291). Each witness abstained under this file's ``_ring_rt``
+# harness: the engine built the bare 'cyclopentene' / 'cyclohexene' (the diene too), which OPSIN
+# cannot place. Each is named now and read back to the input's full InChIKey by a fresh OPSIN call
+# outside the engine (``test_b_resolved_by_u2_names_and_rt``).
+B_RESOLVED_BY_U2 = [
+    "C1=CCC2(C1)COc1ccccc12",        # -> spiro[2,3-dihydro-1-benzofuran-3,1'-cyclopent-3-ene]
+    "C1=CC2(C=CC1)Cc1ccccc1O2",      # -> spiro[2,3-dihydro-1-benzofuran-2,1'-cyclohexa-2,5-diene]
 ]
 
 # Pattern C: multi-component ortho / ortho-peri-fused mancude that genuinely abstains
@@ -202,6 +216,21 @@ def test_witness_abstains_today(pattern, smiles):
         pytest.skip("naming exceeded timeout (out-of-scope size)")
     assert not r.passed, (
         f"{pattern} witness unexpectedly round-trips already: {r.name!r}")
+
+
+@pytest.mark.parametrize("smiles", B_RESOLVED_BY_U2)
+def test_b_resolved_by_u2_names_and_rt(smiles):
+    """UN lane U2: the B witnesses abstained under this file's own harness (``_ring_rt``) and name
+    now; the name reads back to the input's full InChIKey through a fresh OPSIN call outside the
+    engine, and cites the double bonds with the ring's own locants."""
+    from tests.support.rt_assert import assert_full_rt
+    try:
+        r = _ring_rt(smiles)
+    except _Timeout:
+        pytest.skip("naming exceeded timeout (out-of-scope size)")
+    assert r.passed, f"B witness did not round-trip: name={r.name!r} err={r.error}"
+    assert_full_rt(r.name, smiles, what="B witness: ")
+    assert "cyclopent-3-ene" in r.name or "cyclohexa-2,5-diene" in r.name, r.name
 
 
 @pytest.mark.parametrize("smiles", A1_WITNESSES)

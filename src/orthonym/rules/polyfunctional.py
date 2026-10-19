@@ -41,7 +41,7 @@ from ..assembly.substituent_prefix_forms import (
 from ..assembly.substituent_prefix_forms import (
     get_sulfonyl_prefix as _ASSEMBLY_get_sulfonyl_prefix,
 )
-from ..data.multipliers import multiplier_table
+from ..data.chain_names import multiplying_prefix
 from ..errors import is_refusal_sentinel
 from .ring_unsaturation import render_ring_unsaturation
 from .seniority import (
@@ -49,9 +49,6 @@ from .seniority import (
     get_prefix,
     get_principal_group,
 )
-
-# Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra…),.
-_RING_UNSAT_MULT = multiplier_table(6)
 
 
 def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
@@ -67,10 +64,10 @@ def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
     has_mult = len(ene_locants) >= 2 or len(yne_locants) >= 2
     out = stem + ('a' if has_mult else '')
     if ene_locants:
-        m = _RING_UNSAT_MULT.get(len(ene_locants), '') if len(ene_locants) > 1 else ''
+        m = multiplying_prefix(len(ene_locants)) if len(ene_locants) > 1 else ''
         out += '-' + ','.join(ene_locants) + '-' + m + 'en'
     if yne_locants:
-        m = _RING_UNSAT_MULT.get(len(yne_locants), '') if len(yne_locants) > 1 else ''
+        m = multiplying_prefix(len(yne_locants)) if len(yne_locants) > 1 else ''
         out += '-' + ','.join(yne_locants) + '-' + m + 'yn'
     return out
 

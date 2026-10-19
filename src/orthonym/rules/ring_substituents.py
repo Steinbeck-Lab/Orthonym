@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 
 # IUPAC: Standard substituent names for rings
@@ -1246,9 +1247,6 @@ def _decorated_fused_substituent_name(
     return f"{body}{sep}{stem}-{attach_locant}-yl"
 
 
-# Multiplier stems for skeletal-unsaturation infixes (di/tri/tetra...).
-_UNSAT_MULT: Dict[int, str] = multiplier_table(8)
-
 
 def _fmt_locant(loc) -> str:
     """Render a numbering value (int or lettered fusion locant like '4a')."""
@@ -1270,10 +1268,10 @@ def _build_ene_yne_infix(stem: str, ene: List[int], yne: List[int]) -> Optional[
     has_mult = len(ene) >= 2 or len(yne) >= 2
     out = stem + ('a' if has_mult else '')
     if ene:
-        m = _UNSAT_MULT.get(len(ene), '') if len(ene) > 1 else ''
+        m = multiplying_prefix(len(ene)) if len(ene) > 1 else ''
         out += '-' + ','.join(str(x) for x in ene) + '-' + m + 'en'
     if yne:
-        m = _UNSAT_MULT.get(len(yne), '') if len(yne) > 1 else ''
+        m = multiplying_prefix(len(yne)) if len(yne) > 1 else ''
         out += '-' + ','.join(str(x) for x in yne) + '-' + m + 'yn'
     return out
 

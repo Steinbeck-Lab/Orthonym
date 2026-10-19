@@ -27,6 +27,7 @@ import re
 from rdkit import Chem
 
 from ..data.ion_retained_names import INORGANIC_CATIONS
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..errors import is_failure_name
 from ..perception.ions import get_ion_sites, parse_salt_fragments
@@ -1332,7 +1333,7 @@ def _apply_stoichiometric_prefix(name: str, count: int, *,
         return name
 
     if _ion_needs_enclosing_multiplier(name, organic_cation=organic_cation):
-        word = COMPLEX_STOICHIOMETRIC_PREFIXES.get(count, f"{count}kis")
+        word = multiplying_prefix(count, "complex", table=COMPLEX_STOICHIOMETRIC_PREFIXES)
         # (the Blue Book) nesting order {[({})]}: the mark
         # around the multiplied ion is the next one after the marks the ion name
         # already carries -.5: indicated hydrogen and fusion / ring
@@ -1342,7 +1343,7 @@ def _apply_stoichiometric_prefix(name: str, count: int, *,
         from ..assembly.naming_utils import apply_enclosing_marks
         return f"{word}{apply_enclosing_marks(name, -1)}"
 
-    prefix = STOICHIOMETRIC_PREFIXES.get(count, str(count))
+    prefix = multiplying_prefix(count, table=STOICHIOMETRIC_PREFIXES)
     from ..assembly.naming_utils import multiplier_needs_hyphen
     if multiplier_needs_hyphen(name):
         return f"{prefix}-{name}"          # 'di-tert-butoxide'

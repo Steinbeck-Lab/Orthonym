@@ -21,6 +21,7 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..errors import is_refusal_sentinel
 from ..perception.molcache import atoms_of
@@ -1125,14 +1126,14 @@ def _stem_block(mol, chain, atom_to_locant) -> Optional[Tuple[str, str]]:
         return base, base + "ane"
     block = base
     if ene:
-        mult = _MULT_SIMPLE.get(len(ene), '') if len(ene) > 1 else ''
+        mult = multiplying_prefix(len(ene)) if len(ene) > 1 else ''
         if len(ene) > 1:
             block += 'a'
         block += '-' + ','.join(map(str, ene)) + '-' + mult + 'ene'
     if yne:
         if ene:
             block = block[:-1]  # 'ene' -> 'en' before '-N-yne'
-        mult = _MULT_SIMPLE.get(len(yne), '') if len(yne) > 1 else ''
+        mult = multiplying_prefix(len(yne)) if len(yne) > 1 else ''
         if len(yne) > 1 and not ene:
             block += 'a'
         block += '-' + ','.join(map(str, yne)) + '-' + mult + 'yne'
@@ -2309,14 +2310,14 @@ def _carbocycle_parent_name(mol, oriented, atom_to_locant) -> Optional[str]:
         return 'cyclo' + base + 'ane'
     stem = 'cyclo' + base
     if ene:
-        mult = _MULT_SIMPLE.get(len(ene), '') if len(ene) > 1 else ''
+        mult = multiplying_prefix(len(ene)) if len(ene) > 1 else ''
         if len(ene) > 1:
             stem += 'a'
         stem += '-' + ','.join(map(str, ene)) + '-' + mult + 'ene'
     if yne:
         if ene:
             stem = stem[:-1]  # 'ene' -> 'en' before '-N-yne'
-        mult = _MULT_SIMPLE.get(len(yne), '') if len(yne) > 1 else ''
+        mult = multiplying_prefix(len(yne)) if len(yne) > 1 else ''
         if len(yne) > 1 and not ene:
             stem += 'a'
         stem += '-' + ','.join(map(str, yne)) + '-' + mult + 'yne'

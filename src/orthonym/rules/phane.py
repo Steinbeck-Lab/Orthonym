@@ -43,6 +43,8 @@ from typing import Dict, FrozenSet, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.chain_names import multiplying_prefix
+
 # ---------------------------------------------------------------------------
 # Sub-class enum
 # ---------------------------------------------------------------------------
@@ -543,19 +545,9 @@ def _amplification_prefix(parent_name: str) -> str:
 
 def _phane_node_multiplier(n: int) -> str:
     """Multiplying affix for the TOTAL skeleton node count (superatoms +
-    bridge atoms), per. Reuses the shared simple-multiplier table
-    (di..icosa) with the compositional `chain_names` fallback above 20 (BB
-    `cyclotetratriacontaphane`, example,:15165) -- no duplication."""
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-
-    if n in SIMPLE_MULTIPLIERS:
-        return SIMPLE_MULTIPLIERS[n]
-    from ..data.chain_names import get_chain_prefix
-
-    prefix = get_chain_prefix(n)
-    if not prefix.endswith("a"):
-        prefix += "a"
-    return prefix
+    bridge atoms), per: the shared multiplying prefix, composed above 20
+    (BB `cyclotetratriacontaphane`, example,:15165) -- no duplication."""
+    return multiplying_prefix(n)
 
 
 def _simplified_skeletal_name(n: int, skeleton_class: "SkeletonClass") -> Optional[str]:
@@ -1295,7 +1287,6 @@ def _apply_skeletal_replacement(
     Different-element groups cite in BB seniority order (reuses
     `skeletal_replacement._A_CITATION_ORDER`).
     """
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
     from .skeletal_replacement import _A_CITATION_ORDER, REPLACEMENT_TERMS
 
     by_element: Dict[str, List[int]] = {}
@@ -1309,7 +1300,7 @@ def _apply_skeletal_replacement(
         locants = sorted(by_element[element])
         count = len(locants)
         stem = REPLACEMENT_TERMS[element]
-        mult = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        mult = multiplying_prefix(count) if count > 1 else ""
         loc_str = ",".join(str(x) for x in locants)
         parts.append(f"{loc_str}-{mult}{stem}")
     return "-".join(parts) + "-" + base_name

@@ -35,6 +35,7 @@ from typing import Optional
 
 from rdkit import Chem
 
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from .functional_replacement import (
@@ -1447,7 +1448,7 @@ def name_polyacid_derivative(mol) -> Optional[str]:
         first = next(site for pl in positions.values() for (_, site) in pl)
         #: 'tetraacetic', but 'tetrakis(2,3-dihydroxypropanoic)' for a substituted acid
         acid_cited = multiplied_acid_word(aname, acnt, _isolated_acid_smiles(mol, first[0], first[1]))
-        anh_mult = _MULT.get(n_total, "")
+        anh_mult = multiplying_prefix(n_total, table=_MULT)
         return f"{acid_cited} {parent_word} {anh_mult}anhydride"
 
     # --- Case A: uniform full replacement -> functional class /.2.4) ---
@@ -1460,14 +1461,14 @@ def name_polyacid_derivative(mol) -> Optional[str]:
             if len(hc) != 1:
                 return None                          # mixed halides -> defer
             w, cnt = next(iter(hc.items()))
-            return f"{parent_word} {_MULT.get(cnt, '')}{w}"
+            return f"{parent_word} {multiplying_prefix(cnt, table=_MULT)}{w}"
         if kinds_set == {"amido"}:
             # all-bare-amide functional class ('diphosphoric tetraamide'); any
             # N-substituent would need N-locants (out of scope) -> the amido segs
             # must all be empty.
             if any(seg for pl in positions.values() for (_, seg) in pl):
                 return None
-            return f"{parent_word} {_MULT.get(n_total, '')}amide"
+            return f"{parent_word} {multiplying_prefix(n_total, table=_MULT)}amide"
         return None
 
     # --- Case C / B: >=1 -OH left (class 'acid') -> prefixes on the acid ---
@@ -1500,7 +1501,7 @@ def name_polyacid_derivative(mol) -> Optional[str]:
             # N-substituents on a partial amido would need N-locants -> out of scope
             if key == "amido" and any(class_segs.get("amido", [])):
                 return None
-            mult = _MULT.get(len(ls), "")
+            mult = multiplying_prefix(len(ls), table=_MULT)
             loc_str = ",".join(str(x) for x in ls)
             prefixes.append((key, f"{loc_str}-{mult}{key}"))
         if not prefixes:
@@ -2311,7 +2312,7 @@ def _hzc_assemble_prefix(subs):
     items = []
     for tok, locs in groups.items():
         locs_sorted = sorted(locs, key=_loc_key)
-        mult = _HZC_MULT.get(len(locs), '')
+        mult = multiplying_prefix(len(locs), table=_HZC_MULT)
         #: a compound/complex substituent (internal locant, two prefixes,
         # inner mark) takes enclosing marks -- '2-(propan-2-ylidene)', not
         # '2-propan-2-ylidene'.

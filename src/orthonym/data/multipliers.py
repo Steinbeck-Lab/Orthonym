@@ -1,7 +1,8 @@
 """The multiplying prefixes: ``di, tri, tetra,...`` and ``bis, tris, tetrakis,...``.
 
 This module is the one source for those words (IUPAC 2013, Table 1.4, the
-basic numerical terms, up to ``icosa`` / ``icosakis`` at 20).
+basic numerical terms, up to ``icosa`` / ``icosakis`` at 20). The words above 20 are composed,
+not tabulated: ``data.chain_names.multiplying_prefix`` spells any count from 2 to 9999.
 ``assembly.naming_utils`` re-exports ``SIMPLE_MULTIPLIERS`` and ``COMPLEX_MULTIPLIERS``
 (the same dict objects), and a module that needs a table of its own range builds it with
 ``multiplier_table`` instead of writing the words out again.
@@ -78,7 +79,7 @@ def multiplier_table(
     of another site or the shared ``*_MULTIPLIERS``.
 
     ``max_n`` outside ``2..20`` raises ``ValueError``. Words above 20 are composed, not
-    tabulated (see ``naming_utils.simple_multiplier_word``), so a larger range is a
+    tabulated (see ``chain_names.multiplying_prefix``), so a larger range is a
     naming decision at the caller and never a silent truncation here.
     """
     try:

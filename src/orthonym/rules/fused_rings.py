@@ -32,6 +32,7 @@ from ..data.fused_heterocycles import (
     get_fused_heterocycle_name,
     match_fused_heterocycle_core,
 )
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..data.xanthine_derivatives import (
     get_xanthine_name,
@@ -1781,7 +1782,7 @@ def _pcf_assemble(per, base_name: str) -> str:
     for nm, items in groups.items():
         items.sort(key=lambda x: x[0])  # by edge letter
         prefix = get_fusion_prefix(nm)
-        mult = _PCF_MULTIPLIERS.get(len(items), '')
+        mult = multiplying_prefix(len(items), table=_PCF_MULTIPLIERS)
         any_locs = any(locs is not None for (_, locs) in items)
         parts = []
         for k, (letter, locs) in enumerate(items):
@@ -4860,7 +4861,7 @@ def _assemble_fused_heterocycle_name(
 
         from ..assembly.naming_utils import _join_multiplied_suffix
         count = len(chosen_locants)
-        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count)) if count > 1 else ""
+        multiplier = multiplying_prefix(count) if count > 1 else ""
         locant_str = ",".join(str(loc) for loc in chosen_locants)
         #: elide multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
         suffix_part = f"-{locant_str}-{_join_multiplied_suffix(multiplier, chosen_suffix)}"
@@ -4875,7 +4876,7 @@ def _assemble_fused_heterocycle_name(
             if n == 1:
                 extra_prefix = f"{loc_str}-{prefix_name}-"
             else:
-                mult = SIMPLE_MULTIPLIERS.get(n, str(n))
+                mult = multiplying_prefix(n)
                 extra_prefix = f"{loc_str}-{mult}{prefix_name}-"
             prefix_parts.append((extra_prefix, prefix_name))
 
@@ -5136,7 +5137,7 @@ def _format_suffix(suffix_base: str, locants: List, added_hydrogen=()) -> str:
         return f"-{locant_str}-{suffix_base}"
     else:
         from ..assembly.naming_utils import _join_multiplied_suffix
-        multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+        multiplier = multiplying_prefix(count)
         #: elide multiplier-final 'a' before '-ol' (tetra+ol -> tetrol).
         return f"-{locant_str}-{_join_multiplied_suffix(multiplier, suffix_base)}"
 

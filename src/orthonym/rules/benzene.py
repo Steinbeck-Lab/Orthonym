@@ -23,6 +23,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.chain_names import multiplying_prefix
 from ..assembly.naming_utils import (
     alpha_sort_key,
     format_substituent_prefix,
@@ -4477,11 +4478,8 @@ def _assemble_benzene_with_suffix(
             # Multiple OH on benzene: benzene-1,2-diol, benzene-1,2,3,4,5,6-hexol.
             # Use systematic naming with multiplied -ol suffix; elides
             # the multiplier-final 'a' before '-ol' (hexa+ol → hexol).
-            from ..assembly.naming_utils import (
-                SIMPLE_MULTIPLIERS,
-                _join_multiplied_suffix,
-            )
-            mult = SIMPLE_MULTIPLIERS.get(len(ol_locants), str(len(ol_locants)))
+            from ..assembly.naming_utils import _join_multiplied_suffix
+            mult = multiplying_prefix(len(ol_locants))
             loc_str = ','.join(str(l) for l in sorted(ol_locants))
             multiplied = _join_multiplied_suffix(mult, 'ol')
             # (the Blue Book): when every substitutable ring position bears the
@@ -4910,7 +4908,6 @@ def _name_substituted_benzenediamine(
         'N,N-dimethylbenzene-1,4-diamine', 'N-phenylbenzene-1,2-diamine'.
     """
     from ..assembly.naming_utils import (
-        SIMPLE_MULTIPLIERS,
         _join_multiplied_suffix,
         _wrap_n_substituent,
     )
@@ -4988,7 +4985,7 @@ def _name_substituted_benzenediamine(
         ring_prefix_entries.append((alpha_sort_key(name), rendered))
 
     # --- Parent suffix: benzene-<locants>-<mult>amine ---
-    mult = SIMPLE_MULTIPLIERS.get(len(new_amines), str(len(new_amines)))
+    mult = multiplying_prefix(len(new_amines))
     loc_str = ",".join(str(l) for l in sorted(new_amines))
     suffix_part = f"benzene-{loc_str}-{_join_multiplied_suffix(mult, 'amine')}"
 

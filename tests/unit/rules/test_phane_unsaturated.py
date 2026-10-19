@@ -282,8 +282,16 @@ def test_a_name_of_another_molecule_is_declined_at_the_default_tier(monkeypatch)
 
 
 # ---------------------------------------------------------------------------------------------------------
-# best-effort: a phane name the default tier gives and the general engine cannot replace (limits of its
-# cage machinery: 100 skeletal atoms, 11 rings) is the last resort; it never replaces a name OPSIN reads
+# best-effort: a phane name the default tier gives is the last resort when the general engine cannot name
+# the input; it never replaces a name OPSIN reads (namer.py, the natural-product / phane carve-out docstring:
+# "A phane name never replaces a name OPSIN reads back: the general engine's von Baeyer name of a phane
+# stands."). UN lane U1: these four rows were last-resort rows only because the general engine's von Baeyer
+# name spelled its ene/yne count as digits (more than 20: 'tetracosaene'), which OPSIN cannot read; with the
+# composed multiplier the general engine names them, so best-effort now gives that name (a full read-back by a
+# fresh OPSIN call) and the default tier keeps the phane name. UNVERIFIED which of the two names is preferred
+# (the Blue Book is silent on the best-effort tier); what is confirmed is that each name describes the input
+# (phane_read_back for the phane name, OPSIN for the other) and that the pre-fix code gave the phane name at
+# both tiers.
 # ---------------------------------------------------------------------------------------------------------
 # the four rows of the CO audit sample the default tier named and best-effort left unnamed (PubChem CIDs)
 LAST_RESORT_ROWS = [
@@ -300,12 +308,21 @@ LAST_RESORT_ROWS = [
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("name,smiles", LAST_RESORT_ROWS)
-def test_best_effort_names_the_phane_rows_the_default_tier_names(name, smiles):
+def test_default_tier_names_the_phane_rows_with_the_phane_name(name, smiles):
     from tests.support.default_tier import default_tier_row
-    from tests.support.rt_assert import name_best_effort
     assert phane_read_back(name, smiles)
-    for row in (default_tier_row(smiles), name_best_effort(smiles)):
-        assert row["name"] == name and row["gate_outcome"] == "carveout:phane", row
+    row = default_tier_row(smiles)
+    assert row["name"] == name and row["gate_outcome"] == "carveout:phane", row
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("name,smiles", LAST_RESORT_ROWS)
+def test_best_effort_gives_the_phane_rows_the_general_engine_name_opsin_reads(name, smiles):
+    from tests.support.rt_assert import assert_full_rt, name_best_effort
+    row = name_best_effort(smiles)
+    assert row["name"] != name and row["source"] == "general_engine", row
+    assert row["gate_outcome"] != "carveout:phane", row
+    assert_full_rt(row["name"], smiles, what="best-effort: ")
 
 
 @pytest.mark.opsin_gate

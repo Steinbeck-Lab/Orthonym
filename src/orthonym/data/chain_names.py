@@ -50,7 +50,7 @@ Examples:
     'henkili'
 """
 
-from .multipliers import multiplier_table
+from .multipliers import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS, multiplier_table
 
 # ============================================================================
 # Direct lookup for standard prefixes (1-20)
@@ -178,6 +178,48 @@ def numerical_term(n: int) -> str:
     return (_sub_hundred_term(ones, tens)
             + HUNDREDS_TERMS.get(hundreds, "")
             + THOUSANDS_TERMS.get(thousands, ""))
+
+
+def multiplying_prefix(n: int, kind: str = "simple", table=None) -> str:
+    """The multiplying prefix for ``n`` identical features, for every ``n`` from 2 to 9999.
+
+    The one home of the rule, so no producer ever spells a count as digits
+    (``21oxa``, ``33yne``, ``22kis``), a form OPSIN cannot read. "Basic
+    multiplicative prefixes" (the Blue Book, Table 1.4): the basic terms are
+    ``di tri tetra... icosa``, and the numerical terms above 20 are composed by
+     "Derivation of basic numerical terms" (:2811), as ``numerical_term``
+    does: 21 ``henicosa``, 22 ``docosa``, 33 ``tritriaconta``, 101 ``henhecta``.
+
+    ``kind="simple"`` gives that term (the prefix of a suffix, a replacement 'a'
+    prefix, an 'ene'/'yne' ending, a simple substituent: ``tritriacontayne``,
+    ``henicosaoxa``). ``kind="complex"`` gives the term for compound or complex
+    entities, "Numerical terms for compound or complex features" (:2826):
+    "formed by adding the ending 'kis' to the basic multiplicative prefix ending in
+    'a'", with 'bis' and 'tris' for 2 and 3: 4 ``tetrakis``, 21 ``henicosakis``,
+    231 ``hentriacontadictakis``.
+
+    ``table`` is a producer's own ``{count: word}`` dict (it may carry ``1: ""``);
+    its entry for ``n`` wins, and only a count it lacks is composed here.
+
+    Raises ``ValueError`` for an ``n`` with no word (below 2 and absent from
+    ``table``, or above 9999), never a digit string: a producer that meets it fails
+    closed instead of emitting a name of the wrong spelling.
+
+    The word is the Blue Book's for every count. OPSIN 2.9.0 reads a simple prefix
+    only up to 50 ('pentaconta') and a 'kis' prefix up to 30 ('triacontakis'), so
+    a name past those is spelled right and the read-back gate keeps it from shipping.
+    """
+    if kind not in ("simple", "complex"):
+        raise ValueError(f"kind must be 'simple' or 'complex', not {kind!r}")
+    if table is not None and n in table:
+        return table[n]
+    basic = SIMPLE_MULTIPLIERS if kind == "simple" else COMPLEX_MULTIPLIERS
+    if n in basic:
+        return basic[n]
+    if n < 21 or n > 9999:
+        raise ValueError(f"no {kind} multiplying prefix can be formed for {n}")
+    term = numerical_term(n)
+    return term if kind == "simple" else term + "kis"
 
 
 def _sub_hundred_term(ones: int, tens: int) -> str:
@@ -332,7 +374,7 @@ def get_enoate_name(n: int, unsaturation=None) -> str:
     if k == 1:
         core = f"{prefix}-{locants}-enoate"
     else:
-        mult = _ENE_MULTIPLIER.get(k, "")
+        mult = multiplying_prefix(k, table=_ENE_MULTIPLIER)
         core = f"{prefix}a-{locants}-{mult}enoate"
     block = ",".join(f"{loc}{geom}" for loc, geom in locs if geom in ("E", "Z"))
     return f"({block})-{core}" if block else core

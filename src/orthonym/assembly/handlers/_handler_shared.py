@@ -76,7 +76,7 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from ...data.chain_names import get_chain_prefix
+from ...data.chain_names import get_chain_prefix, multiplying_prefix
 from ...data.multipliers import multiplier_table
 from .prefix_claims import reconcile_prefix_claims
 from ...rules.locants import get_bond_locants, get_functional_group_locants
@@ -259,7 +259,7 @@ def _generate_chain_parent(features: Any) -> "NameFragment":
             if _sym not in _het_positions:
                 continue
             _locs = sorted(_het_positions[_sym])
-            _mult = _MULT.get(len(_locs), str(len(_locs)))
+            _mult = multiplying_prefix(len(_locs), table=_MULT)
             _terms.append(
                 f"{','.join(str(x) for x in _locs)}-{_mult}{_REPL[_sym]}"
             )

@@ -158,7 +158,7 @@ from typing import Dict, FrozenSet, Iterator, List, Optional, Tuple
 from rdkit import Chem
 from rdkit.Chem import inchi
 
-from ..data.chain_names import get_alkyl_name, get_chain_name
+from ..data.chain_names import get_alkyl_name, get_chain_name, multiplying_prefix
 from ..perception.ions import get_ion_sites
 from ..perception.rings import get_ring_systems
 from ..perception.stereo import assign_stereochemistry
@@ -188,7 +188,6 @@ from .general_engine import (
     _zwitterion_suffix_plan,
 )
 from .naming_utils import (
-    SIMPLE_MULTIPLIERS,
     alpha_sort_key,
     format_substituent_prefix,
 )
@@ -3418,7 +3417,7 @@ def _build_hetero_prefix(mol, spine_order: List[int], atom_to_locant: Dict[int, 
         locs = sorted(by_element[el])
         term = REPLACEMENT_TERMS[el]
         count = len(locs)
-        mult = SIMPLE_MULTIPLIERS.get(count, "") if count > 1 else ""
+        mult = multiplying_prefix(count) if count > 1 else ""
         locant_str = ",".join(str(x) for x in locs)
         parts.append(f"{locant_str}-{mult}{term}")
     return "-".join(parts)

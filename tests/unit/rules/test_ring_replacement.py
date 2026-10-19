@@ -305,45 +305,87 @@ def test_per_atom_covers_exactly_the_expressed_heteroatoms(smiles, _expected):
         assert morpheme in res.prefix
 
 
-#: 22 skeletal Si in a bicyclo[10.9.1] cage -- INSIDE ``MAX_CAGE_ATOMS = 40``, so
-#: the >20 multiplying-prefix fallback is reachable today and spelled the bare
-#: integer: ``1,…,22-22sila``. Not a word.
+#: 22 skeletal Si in a bicyclo[10.9.1] cage -- INSIDE ``MAX_CAGE_ATOMS = 40``. The multiplying
+#: prefix past 20 is a composed word (UN lane U1), not the digits the old table fallback spelled
+#: (``1,...,22-22sila``, which OPSIN cannot read): "Derivation of basic numerical terms"
+#: (the Blue Book) "composite numerical terms are formed systematically by citing the basic
+#: terms in the order opposite to that of the constituent digits in the arabic numbers" (:2813).
+#:
+#: The 'a' name is NOT the preferred name of a cage of one noncarbon element: "Heterocyclic
+#: noncarbon von Baeyer and spiro compounds" (:23614) "Preselected names for von Baeyer compounds...
+#: consisting entirely of heteroatoms of the same kind are names formed by citing the appropriate
+#: prefix, such as 'bicyclo', 'spiro', etc., and descriptor enclosed within square brackets followed
+#: by a numerical prefix for the total number of heteroatoms and the name of the mononuclear parent
+#: hydride; alternative names for use in general nomenclature are formed by skeletal replacement
+#: ('a') nomenclature (see and ", with the printed example
+#: ``bicyclo[4.2.1]nonasilane (preselected name)`` (:9810). So the builder spells the 'a' name
+#: (best-effort, ``systematic_verified``), and the PIN callers refuse it (``preselected_only``): the
+#: default tier declines this cage as it did before the composed word existed.
+#:
+#: Machine-confirmed: the hand-written name below is read by OPSIN to this very molecule
+#: (``test_docosasila_name_read_back``), and the pre-fix code fails the first assertions.
 SILA22 = ('[SiH2]1' + '[SiH2]' * 9 + '[SiH]2' + '[SiH2]' * 9
           + '[SiH]1[SiH2]2')
-SILA22_LEGACY_PREFIX = (
-    "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22-22sila")
+SILA21 = ('[SiH2]1' + '[SiH2]' * 9 + '[SiH]2' + '[SiH2]' * 8
+          + '[SiH]1[SiH2]2')
+SILA22_PREFIX = (
+    "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22-docosasila")
 
 
-def test_multiplicity_past_the_table_is_unexpressed_but_prefix_unchanged():
-    """``prefix`` must keep the legacy (malformed) string, and the WRAPPER must
-    now refuse outright.
-
-    The primitive's ``prefix`` contract is unchanged: it still reports the legacy
-    ``22sila`` string, because that field is defined as byte-identical to what the
-    retired inline builder produced for every input.
-
-    ``get_heteroatom_replacement_prefix`` no longer passes that string on. This
-    test used to assert that it did, on the reasoning that "withholding the part
-    there would turn a malformed name into one that silently drops 22 skeletal
-    atoms" -- true only while the wrapper's ``-> str`` signature gave its three
-    PIN callers no way to refuse. Now that it returns ``Optional[str]`` and the
-    callers refuse on ``None``, refusing is strictly better than emitting a name
-    containing ``22sila``: both alternatives were wrong, and only this one emits
-    nothing.
-    """
+def test_multiplicity_past_twenty_is_a_composed_word():
+    """``prefix`` spells the count as the composed numerical term ('docosa'), every atom is
+    expressed, and the same-kind noncarbon cage is flagged ``preselected_only``: the PIN wrapper
+    refuses it (as it refused the ``22sila`` digits)."""
     mol, numbering, ring_atoms = _vb(SILA22)
     res = build_replacement_prefix(mol, numbering, ring_atoms)
-    assert res.prefix == SILA22_LEGACY_PREFIX
+    assert res.prefix == SILA22_PREFIX
+    assert res.unexpressed == ()
+    assert res.preselected_only
+    assert [idx for idx, _m in res.per_atom] == sorted(ring_atoms)
     assert get_heteroatom_replacement_prefix(mol, numbering, ring_atoms) is None
-    assert res.unexpressed == tuple(sorted(ring_atoms))
-    assert res.per_atom == ()
 
 
-def test_analyze_cage_universal_refuses_multiplicity_past_the_table():
+def test_preselected_only_is_the_same_kind_noncarbon_cage_past_twenty():
+    """The flag does not touch a cage with carbon, a mixed-element one, or a 20-atom one (their
+    'a' names are unchanged at the PIN callers)."""
+    for smiles in ("O1CC2CNC1C2", "[SiH2]1[SiH2][SiH]2[SiH2][SiH2][SiH]1[SiH2]2"):
+        mol, numbering, ring_atoms = _vb(smiles)
+        assert not build_replacement_prefix(mol, numbering, ring_atoms).preselected_only
+    mol, numbering, ring_atoms = _vb('[SiH2]1' + '[SiH2]' * 9 + '[SiH]2' + '[SiH2]' * 7 + '[SiH]1[SiH2]2')
+    assert len(ring_atoms) == 20
+    assert not build_replacement_prefix(mol, numbering, ring_atoms).preselected_only
+
+
+def test_analyze_cage_universal_names_multiplicity_past_twenty():
     mol = Chem.MolFromSmiles(SILA22)
     assert mol is not None
-    assert analyze_cage_universal(mol) is None
-    assert analyze_cage_universal(mol, allow_mancude=True) is None
+    for allow_mancude in (False, True):
+        cage = analyze_cage_universal(mol, allow_mancude=allow_mancude)
+        assert cage is not None and cage.hetero_prefix == SILA22_PREFIX
+        assert cage.descriptor == "bicyclo[10.9.1]" and cage.total_atoms == 22
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles", [SILA22, SILA21], ids=["22Si", "21Si"])
+def test_same_kind_noncarbon_cage_past_twenty_is_never_a_pin(smiles):
+    """ (:23614): the default tier declines (no PIN claim, no name), the best-effort
+    tier gives the 'a' name from the general engine with a full read-back."""
+    from tests.support.default_tier import default_tier_row
+    from tests.support.rt_assert import assert_full_rt, name_best_effort
+    row = default_tier_row(smiles)
+    assert row["tier"] == "abstain" and row["is_pin"] is False, row
+    be = name_best_effort(smiles)
+    assert be["tier"] != "pin_verified" and not be.get("is_pin"), be
+    assert_full_rt(be["name"], smiles, what="best-effort: ")
+    assert "silabicyclo[" in be["name"] and "1,2,3" in be["name"]
+
+
+def test_docosasila_name_read_back():
+    """The independent check: a name written by hand from and (no engine code),
+    read by a fresh OPSIN call, is the 22-Si cage (full InChIKey)."""
+    from tests.support.rt_assert import name_is_rt_exact
+    by_hand = SILA22_PREFIX + "bicyclo[10.9.1]docosane"
+    assert name_is_rt_exact(by_hand, SILA22)
 
 
 @pytest.mark.parametrize(

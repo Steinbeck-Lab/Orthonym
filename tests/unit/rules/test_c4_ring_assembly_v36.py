@@ -147,8 +147,10 @@ _IDS = [f"{wid}-{linker}" for wid, linker, _ in WITNESSES]
 # the input's InChI, so RT-OK is an independent correct-constitution check, not a
 # claim about the code under test). Per this file's own protocol, a witness that
 # flips to RT-OK is promoted from the abstain baseline to a plain round-trip
-# assert. Only w21 (a substituted spiro-lactone ring assembly) still abstains.
-_ABSTAIN_IDS = {"w21"}
+# assert. w21 (a substituted spiro-lactone ring assembly) was the last to abstain; it
+# flipped to RT-OK on 2026-10-19 with UN lane U2 (its cyclohexenone spiro component now
+# cites its double-bond locants, /, so the abstain set is empty.
+_ABSTAIN_IDS: set = set()
 RT_OK_WITNESSES = [w for w in WITNESSES if w[0] not in _ABSTAIN_IDS]
 ABSTAIN_WITNESSES = [w for w in WITNESSES if w[0] in _ABSTAIN_IDS]
 _RT_OK_TEST_IDS = [f"{wid}-{linker}" for wid, linker, _ in RT_OK_WITNESSES]

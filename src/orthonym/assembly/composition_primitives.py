@@ -25,9 +25,9 @@ from __future__ import annotations
 import re
 from typing import List, Optional, Tuple
 
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from .naming_utils import (
-    SIMPLE_MULTIPLIERS,
     italicized_prefix_is_bare,
     should_omit_locant_one,
 )
@@ -141,12 +141,12 @@ def _build_unsaturation_infix(
 
     if num_double > 0:
         loc_str = ",".join(str(loc) for loc in double_locants)
-        multiplier = SIMPLE_MULTIPLIERS.get(num_double, str(num_double)) if num_double > 1 else ""
+        multiplier = multiplying_prefix(num_double) if num_double > 1 else ""
         segments.append((loc_str, multiplier, "en"))
 
     if num_triple > 0:
         loc_str = ",".join(str(loc) for loc in triple_locants)
-        multiplier = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple)) if num_triple > 1 else ""
+        multiplier = multiplying_prefix(num_triple) if num_triple > 1 else ""
         segments.append((loc_str, multiplier, "yn"))
 
     # Assemble: "a" (if needed) then each segment as "-locants-[mult]bond"
@@ -311,7 +311,7 @@ def _build_hydrocarbon_name(
                 segments.append((loc_str, "", "en"))
         else:
             loc_str = ",".join(str(loc) for loc in double_locants)
-            mult = SIMPLE_MULTIPLIERS.get(num_double, str(num_double))
+            mult = multiplying_prefix(num_double)
             segments.append((None if _cumulated_ring else loc_str, mult, "en"))
 
     if num_triple > 0:
@@ -323,7 +323,7 @@ def _build_hydrocarbon_name(
                 segments.append((loc_str, "", "yn"))
         else:
             loc_str = ",".join(str(loc) for loc in triple_locants)
-            mult = SIMPLE_MULTIPLIERS.get(num_triple, str(num_triple))
+            mult = multiplying_prefix(num_triple)
             segments.append((loc_str, mult, "yn"))
 
     # Assemble: stem [+ "a" if needed] [+ segments joined with hyphens] + "e"

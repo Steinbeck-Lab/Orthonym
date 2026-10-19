@@ -19,9 +19,8 @@ The primitive below returns the prefix *together with* the information a caller
 needs to fail closed:
 
     ``unexpressed`` -- every skeletal non-carbon ring atom the emitted prefix
-    does not correctly express: an off-table element, an atom the numbering does
-    not reach (no locant to cite), or an occurrence count past the multiplying-
-    prefix table (which spelled the bare integer, ``"22sila"``).
+    does not correctly express: an off-table element or an atom the numbering does
+    not reach (no locant to cite).
 
 **Caller contract: refuse when ``unexpressed`` is non-empty.** Never emit a name
 whose ring stem counts an atom that no morpheme in it spells. Both universal
@@ -97,6 +96,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
+from ..data.chain_names import multiplying_prefix
 from .lambda_convention import format_lambda_token, nonstandard_bonding_number
 
 # ---------------------------------------------------------------------------
@@ -213,8 +213,9 @@ class ReplacementPrefix:
                     ``"5-oxa-3-sila"``, ``""`` when nothing is expressed. NO
                     trailing hyphen: the 'a'-prefix attaches directly
                     to the descriptor, ``2-oxabicyclo[2.2.2]octane``). Always
-                    byte-identical to the legacy inline builder, INCLUDING its
-                    malformed >20 multiplier fallback -- see ``unexpressed``.
+                    byte-identical to the legacy inline builder, except that a count
+                    past 20 is the composed multiplying prefix (``docosasila``),
+                    never the digits it used to spell (``22sila``).
     ``per_atom`` ``(atom_idx, morpheme)`` for every heteroatom the prefix
                     spells CORRECTLY, ascending by atom index. One entry per
                     atom, so a consumer can bind each spelled morpheme to the
@@ -223,12 +224,33 @@ class ReplacementPrefix:
                     express, ascending. **Non-empty means the caller must
                     refuse.**
 
+    ``preselected_only``
+                    True when the skeleton is a homogeneous noncarbon one (every
+                    skeletal atom the same noncarbon element) with more than 20 atoms.
+                    The 'a' name ``prefix`` gives is then a valid name for general
+                    nomenclature and never the preferred one:
+                    "Heterocyclic noncarbon von Baeyer and spiro compounds"
+                    (the Blue Book) "Preselected names for von Baeyer compounds
+                    and for spiro compounds having only monocyclic components and
+                    consisting entirely of heteroatoms of the same kind are names
+                    formed by citing the appropriate prefix, such as 'bicyclo',
+                    'spiro', etc., and descriptor... followed by a numerical prefix
+                    for the total number of heteroatoms and the name of the
+                    mononuclear parent hydride; alternative names for use in general
+                    nomenclature are formed by skeletal replacement ('a')
+                    nomenclature", e.g. ``bicyclo[4.2.1]nonasilane`` (:9810). That
+                    name is not built here, so **a caller that claims a PIN must
+                    refuse when this is set**, as it refused before the count past 20
+                    had a spelled word. (The same-kind cages of 20 atoms or fewer keep
+                    the 'a' name at the PIN callers: a separate, recorded lead.)
+
     ``per_atom`` indices and ``unexpressed`` are disjoint and together cover
     every non-carbon ring atom.
     """
     prefix: str
     per_atom: Tuple[Tuple[int, str], ...]
     unexpressed: Tuple[int, ...]
+    preselected_only: bool = False
 
 
 def vb_lambda_for_atom(mol, atom_idx: int) -> Optional[int]:
@@ -324,8 +346,6 @@ def build_replacement_prefix(
         return ReplacementPrefix(prefix="", per_atom=(),
                                  unexpressed=tuple(sorted(unexpressed)))
 
-    from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
-
     parts: List[str] = []
     per_atom: List[Tuple[int, str]] = []
     # Cite elements in seniority order, NOT ascending locant order
@@ -337,20 +357,20 @@ def build_replacement_prefix(
             format_lambda_token(loc, lam) for loc, lam, _idx in entries)
         count = len(entries)
         if count > 1:
-            # ``SIMPLE_MULTIPLIERS`` stops at 20 and the legacy fallback spelled
-            # the bare integer -- ``"22sila"``, not a word. That IS reachable
-            # today: MAX_CAGE_ATOMS is 40, and a 22-Si bicyclo[10.9.1] currently
-            # yields ``1,…,22-22sila``. ``prefix`` keeps the legacy string (the
-            # PIN callers must not silently lose 22 skeletal atoms instead), but
-            # the atoms are reported unexpressed so the general tier refuses.
-            mult = SIMPLE_MULTIPLIERS.get(count)
-            parts.append(f"{locant_str}-{mult or str(count)}{stem}")
-            if mult is None:
-                unexpressed.extend(idx for _loc, _lam, idx in entries)
-                continue
+            # Table 1.4 stops at 20; past that the multiplying prefix is composed
+            #, 'Derivation of basic numerical terms', the Blue Book),
+            # so a 22-Si bicyclo[10.9.1] (MAX_CAGE_ATOMS is 40) is ``docosasila``,
+            # never the digits ``22sila``.
+            parts.append(f"{locant_str}-{multiplying_prefix(count)}{stem}")
         else:
             parts.append(f"{locant_str}-{stem}")
         per_atom.extend((idx, stem) for _loc, _lam, idx in entries)
+
+    # (the Blue Book): a skeleton of one noncarbon element has a
+    # preselected name this module does not build; see ``preselected_only``.
+    homogeneous_noncarbon = (
+        len(by_element) == 1 and not unexpressed and len(ring_atoms) > 20
+        and all(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_atoms))
 
     # The internal '-' between multiple replacement terms is kept by the join;
     # emit NO trailing '-' (callers concatenate prefix + descriptor directly).
@@ -358,4 +378,5 @@ def build_replacement_prefix(
         prefix='-'.join(parts),
         per_atom=tuple(sorted(per_atom)),
         unexpressed=tuple(sorted(unexpressed)),
+        preselected_only=homogeneous_noncarbon,
     )

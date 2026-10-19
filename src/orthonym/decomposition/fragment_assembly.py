@@ -27,6 +27,7 @@ from ..assembly.naming_utils import (
     matching_close,
     top_level_tokens,
 )
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..data.sugar_names import (
     lookup_sugar,
@@ -617,12 +618,12 @@ def _group_n_substituents(name: str) -> str:
             if is_complex_substituent(sub_name):
                 # Complex: use bis/tris/tetrakis with parentheses
                 _COMPLEX_MULT = multiplier_table(5, kind="complex")
-                mult = _COMPLEX_MULT.get(count, f"{count}kis")
+                mult = multiplying_prefix(count, "complex", table=_COMPLEX_MULT)
                 parts.append(f"{n_locants}-{mult}({sub_name})")
             else:
                 # Simple: use di/tri/tetra without parentheses
                 _SIMPLE_MULT = multiplier_table(5)
-                mult = _SIMPLE_MULT.get(count, str(count))
+                mult = multiplying_prefix(count, table=_SIMPLE_MULT)
                 parts.append(f"{n_locants}-{mult}{sub_name}")
 
     # Join parts with hyphens, then append parent
@@ -2235,7 +2236,7 @@ def _assemble_multi_ester(
     # Identical acids: use multiplicative prefix (per: compare names not SMILES)
     if len(set(ate_names)) == 1:
         _MULT_PREFIX = multiplier_table(5, one="")
-        mult = _MULT_PREFIX.get(len(ate_names), str(len(ate_names)))
+        mult = multiplying_prefix(len(ate_names), table=_MULT_PREFIX)
         return f"{core_name} {mult}{ate_names[0]}"
 
     # Different acids: list each positionally
@@ -2360,7 +2361,7 @@ def _assemble_multi_glycoside(
     if len(prefix_counts) == 1:
         # All identical sugars
         prefix, count = list(prefix_counts.items())[0]
-        mult = _MULT_PREFIX.get(count, str(count))
+        mult = multiplying_prefix(count, "complex", table=_MULT_PREFIX)
         if mult:
             assembled_prefix = f"{mult}({prefix})"
         else:
@@ -2475,7 +2476,7 @@ def _assemble_multi_amide(
     # Build the N-prefix assembly
     n_parts: List[str] = []
     for acyl, count in sorted(acyl_counts.items()):
-        mult = _MULT_PREFIX.get(count, str(count))
+        mult = multiplying_prefix(count, table=_MULT_PREFIX)
         n_locant = ",".join(["N"] * count)
         n_parts.append(f"{n_locant}-{mult}{acyl}")
 

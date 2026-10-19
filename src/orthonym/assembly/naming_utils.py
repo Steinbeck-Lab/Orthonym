@@ -1006,7 +1006,8 @@ def get_alkyl_name(carbon_count: int) -> str:
 # The multiplying prefixes (di, tri,... / bis, tris,...) live in ``data/multipliers.py``, a leaf
 # module with no orthonym imports. These names are the same dict objects, so every importer of
 # ``naming_utils.SIMPLE_MULTIPLIERS`` / ``COMPLEX_MULTIPLIERS`` is unchanged.
-from ..data.multipliers import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS  # noqa: E402
+from ..data.chain_names import multiplying_prefix  # noqa: E402
+from ..data.multipliers import COMPLEX_MULTIPLIERS, SIMPLE_MULTIPLIERS  # noqa: E402,F401 (re-exported)
 
 
 def simple_multiplier_word(n: int) -> Optional[str]:
@@ -1019,9 +1020,8 @@ def simple_multiplier_word(n: int) -> Optional[str]:
     basic terms are cited "in the order opposite to that of the constituent
     digits in the arabic numbers", joined without hyphens -- 21 ``henicosa``,
     22 ``docosa``, 31 ``hentriaconta`` (verbatim examples at ``:2820``-``:2821``).
-    ``data.chain_names.get_chain_prefix`` already implements exactly that
-    composition for chain stems, so the multiplier is its stem plus the
-    terminal ``a``; this function is the single place that states the rule.
+    ``data.chain_names.multiplying_prefix`` is the single place that states the
+    rule; this function only turns its ``ValueError`` into ``None``.
 
     Returns ``None`` -- never a bare integer -- for any ``n`` the composition
     cannot spell (``n < 2``, or outside ``get_chain_prefix``'s 1-9999 range),
@@ -1030,17 +1030,11 @@ def simple_multiplier_word(n: int) -> Optional[str]:
     unmultiplied form is used), which is why it is ``None`` and not ``""``:
     a caller that wants the empty string must say so itself.
     """
-    if n < 2:
-        return None
-    if n in SIMPLE_MULTIPLIERS:
-        return SIMPLE_MULTIPLIERS[n]
-    from ..data.chain_names import get_chain_prefix
     try:
-        prefix = get_chain_prefix(n)
+        return multiplying_prefix(n)
     except ValueError:
-        # Outside the composition's supported range -> no word exists to emit.
+        # n < 2 or past 9999: no word exists to emit.
         return None
-    return prefix if prefix.endswith("a") else prefix + "a"
 
 
 def needs_brackets(name: str) -> bool:
@@ -2342,13 +2336,7 @@ def get_suffix_multiplier_prefix(count: int, suffix_name: str) -> str:
     if count <= 1:
         return ""
     if suffix_takes_derived_multiplier(suffix_name):
-        if count in COMPLEX_MULTIPLIERS:
-            return COMPLEX_MULTIPLIERS[count]
-        from ..data.chain_names import get_chain_prefix
-        prefix = get_chain_prefix(count)
-        if not prefix.endswith("a"):
-            prefix += "a"
-        return prefix + "kis"
+        return multiplying_prefix(count, "complex")
     word = simple_multiplier_word(count)
     if word is None:
         raise ValueError(
@@ -3170,15 +3158,8 @@ def get_multiplier_prefix(count: int, substituent_name: str) -> str:
             or substituent_name in CATENATION_AMBIGUOUS_PREFIXES \
             or opens_with_replacement_prefix(substituent_name) \
             or carries_hydro_prefix(substituent_name):
-        if count in COMPLEX_MULTIPLIERS:
-            return COMPLEX_MULTIPLIERS[count]
-        # For counts > 20, build compositional multiplier using chain_names
-        from ..data.chain_names import get_chain_prefix
-        prefix = get_chain_prefix(count)
-        # Complex multipliers use "-akis" suffix (e.g., "henicosakis")
-        if not prefix.endswith("a"):
-            prefix += "a"
-        return prefix + "kis"
+        # (the Blue Book): the basic term plus 'kis', for every count.
+        return multiplying_prefix(count, "complex")
     else:
         # Single source of the / simple-multiplier rule.
         # ``count <= 1`` already returned above, so ``None`` here can only mean

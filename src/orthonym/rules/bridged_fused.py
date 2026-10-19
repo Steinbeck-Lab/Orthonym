@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
 
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from .fused_rings import get_shared_atoms
 
@@ -710,7 +711,7 @@ def name_bridged_fused_system(mol):
         else:
             # Multiple bridges with same prefix
             loc_strs = [f"{p[0]},{p[1]}" for p in locant_pairs]
-            multiplier = MULTIPLIERS.get(count, str(count))
+            multiplier = multiplying_prefix(count, table=MULTIPLIERS)
             bridge_str = f"{':'.join(loc_strs)}-{multiplier}{prefix}"
 
         name_parts.append(bridge_str)

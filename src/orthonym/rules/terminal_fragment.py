@@ -1284,7 +1284,7 @@ def _terminal_fragment_name_impl(
             descriptor = "(" + ",".join(f"{lc}{c}" for lc, c in _bits) + ")-"
 
     rp = build_replacement_prefix(mol, numbering, set(backbone))
-    if rp.unexpressed:
+    if rp.unexpressed or rp.preselected_only:
         logger.info(
             "terminal_fragment: %d backbone atom(s) have no admitted morpheme; "
             "refuse (Table 1.5 is closed)", len(rp.unexpressed))

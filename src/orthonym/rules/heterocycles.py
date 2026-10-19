@@ -34,6 +34,7 @@ from rdkit import Chem
 
 from ..data.hw_heteroatoms import HETEROATOM_PRIORITY, get_heteroatom_priority, get_hw_prefix
 from ..data.hw_stems import HW_STEMS, get_hw_stem
+from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..data.retained_names import get_retained_name
 from ..perception.rings import (
@@ -1040,7 +1041,7 @@ def build_hw_name(
             return None
         count = len(element_locants[elem])
         if count > 1:
-            multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+            multiplier = multiplying_prefix(count)
             #: elide the multiplier's terminal 'a' before an 'a'
             # (aza/oxa/thia/...) term that begins with a vowel -> tetra+aza=tetraza.
             # (di/tri end in 'i'; only tetra/penta/hexa/... trigger this elision.)
@@ -3214,7 +3215,7 @@ def _build_replacement_name(
 
         locant_str = ','.join(str(loc) for loc in locants)
         if count > 1:
-            multiplier = SIMPLE_MULTIPLIERS.get(count, str(count))
+            multiplier = multiplying_prefix(count)
             prefix_parts.append(f"{locant_str}-{multiplier}{hw_prefix}")
         elif _omit_sole_heteroatom_locant:
             # [BBv2:8494]: "When a single heteroatom is present in
