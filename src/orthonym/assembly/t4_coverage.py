@@ -22,6 +22,7 @@ from __future__ import annotations
 import logging
 from contextvars import ContextVar
 from dataclasses import dataclass
+from dataclasses import replace as _dc_replace
 from typing import TYPE_CHECKING, Optional
 
 from ..validation.coverage_gate import certify_general_result
@@ -292,10 +293,21 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
     namer.py, so a correct rung name (which passes both) is never displaced --
     the change only converts an about-to-be-rejected rung (-> abstain) into the
     floor's correct name (-> emit). Best-effort only; PIN is untouched.
+
+    UN S1a: for a molecule with a ring=ring stereo double bond that the InChIKey checks
+    (``ring_ylidene_stereo``) the order is: the floor's ladder as it was (its ring=ring rung
+    suspended); then the rung name completed with the input's stereo
+    (``namer._try_compose_input_stereo``, the stereo-omission reclaim); only then the floor with
+    its ring=ring rung. The floor's parent is not the senior one 'General criteria
+    (other than phanes)', the Blue Book-19413: a heterocycle, one with a nitrogen atom,
+    first -- a displaced thiazole parent came back as a benzene parent), so the floor does not
+    displace a rung name that the stereo compose completes, and a molecule that a floor spelling
+    named before keeps that name. Every other molecule behaves as before.
     """
     from rdkit import Chem
 
     from ..validation.reconstruct import verify_or_none
+    from .ring_ylidene_stereo import key_visible_ring_ylidene_bonds, ring_ylidene_suspended
 
     smi = Chem.MolToSmiles(mol)
     try:
@@ -303,10 +315,48 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
             return candidate  # rung already RT-correct: keep its nomenclature
     except Exception:
         pass  # treat an unverifiable rung as a candidate for the floor upgrade
-    floor_name = _verified_universal_floor(mol, smi)
+    with ring_ylidene_suspended():  # the floor's ladder as it was before the ring=ring rung
+        floor_name = _verified_universal_floor(mol, smi)
     if floor_name is not None:
         return _Candidate(name=floor_name, result_obj=None, floor_substitute=True)
+    composed = _composed_rung_name(mol, smi, candidate.name)
+    if composed is not None:
+        return _dc_replace(candidate, name=composed)  # keep the rung's nomenclature
+    if key_visible_ring_ylidene_bonds(mol):
+        floor_name = _verified_universal_floor(mol, smi)  # now with the ring=ring rung
+        if floor_name is not None:
+            return _Candidate(name=floor_name, result_obj=None, floor_substitute=True)
     return candidate
+
+
+def _composed_rung_name(mol, smi: str, name: str) -> Optional[str]:
+    """``name`` with the input's stereo composed onto it, or ``None``.
+
+    Only for a ``mol`` with a ring=ring stereo double bond the InChIKey checks, and a ``name``
+    with the input's constitution. The composed name comes from ``namer._try_compose_input_stereo``
+    (the stereo-omission reclaim: full-key gated, off when its kill switch is) and its OPSIN
+    reading also passes the exact isomeric compare the caller applies to a composed name
+    (``Orthonym._rt_match`` unflagged: canonical SMILES and full key), so the name is one the
+    namer ships. Fail-closed: any error is ``None``."""
+    try:
+        from .ring_ylidene_stereo import is_suspended, key_visible_ring_ylidene_bonds
+        if (is_suspended() or not key_visible_ring_ylidene_bonds(mol)
+                or not _reads_back_as_constitution(mol, name)):
+            return None
+        from ..namer import (
+            _STEREO_OMISSION_RECLAIM, Orthonym, _self_consistency_full_key,
+            _try_compose_input_stereo, _validity_gate_name_to_smiles)
+        in_key = _self_consistency_full_key(smi)
+        if not (_STEREO_OMISSION_RECLAIM and in_key):
+            return None
+        from ..metrics.producer_trail import carried
+        composed = carried(name, _try_compose_input_stereo(name, smi, in_key))
+        composed_smi = _validity_gate_name_to_smiles(composed) if composed else None
+        if composed_smi is not None and Orthonym._rt_match(smi, composed_smi, False):
+            return composed
+    except Exception:
+        pass
+    return None
 
 
 def _reads_back_as_constitution(mol, name: str) -> bool:
@@ -725,29 +775,74 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
                 return _Candidate(name=_prefix_name, result_obj=None,
                                   final_floor=True)
         else:
-            from .universal_substituent import name_universal_substitutive
-            _uni = name_universal_substitutive(mol)
-            if _uni is not None and _uni.name:
-                _uni = _book_checked_floor(mol, _uni)
-                _uni = _leaf_checked_floor(mol, _uni)
-                # The retry the rungs above get through ``_prefer_verified_floor``:
-                # when the floor's first spelling does not even read back as the
-                # input's CONSTITUTION (OPSIN cannot parse it, or it parses to a
-                # different molecule), no later step can rescue it, so a verified
-                # alternative spelling (the von Baeyer form of a fused spiro
-                # component, the leaf-free form) is offered instead. A first
-                # spelling with the right constitution ships to the caller's
-                # ladder exactly as before (its stereo composition may still
-                # complete it there).
-                if not _reads_back_as_constitution(mol, _uni.name):
-                    from rdkit import Chem as _Chem
-                    _alt = _verified_universal_floor(
-                        mol, _Chem.MolToSmiles(mol), first=_uni)
-                    if _alt is not None:
-                        return _Candidate(name=_alt, result_obj=None,
-                                          final_floor=True)
-                return _Candidate(name=_uni.name, result_obj=None, final_floor=True)
+            return _final_floor_with_ring_ylidene(mol)
     except Exception as exc:  # fail-closed: a producer bug keeps the abstention
         logger.info("t4 universal-substitutive rung raised: %s", exc)
 
     return None  # every applicable strategy tried -> honest abstain
+
+
+def _final_floor_with_ring_ylidene(mol) -> Optional["_Candidate"]:
+    """The final rung's floor candidate (``_final_floor_candidate``), with the ring=ring rung of
+    the floor (``ring_ylidene_stereo``, UN S1a) offered after the rung as it was.
+
+    A molecule without a key-visible ring=ring stereo bond gets ``_final_floor_candidate`` as
+    before. For one with such a bond the rung runs suspended first, and its candidate is kept when
+    it verifies (the molecule keeps the name it had) or when the input's stereo composes onto it
+    (``_composed_rung_name``, whose composed name is then the candidate). Otherwise the floor runs
+    again with the ring=ring rung, and a candidate that verifies is returned; a molecule neither
+    names gets the first candidate, which the caller's ladder judges as before."""
+    from rdkit import Chem
+
+    from ..validation.reconstruct import verify_or_none
+    from .ring_ylidene_stereo import key_visible_ring_ylidene_bonds, ring_ylidene_suspended
+    if not key_visible_ring_ylidene_bonds(mol):
+        return _final_floor_candidate(mol)
+    smi = Chem.MolToSmiles(mol)
+    with ring_ylidene_suspended():
+        first = _final_floor_candidate(mol)
+    if first is None:
+        return None
+    try:
+        if verify_or_none(first.name, smi) is not None:
+            return first
+    except Exception:
+        pass
+    composed = _composed_rung_name(mol, smi, first.name)
+    if composed is not None:
+        return _dc_replace(first, name=composed)
+    second = _final_floor_candidate(mol)
+    try:
+        if second is not None and verify_or_none(second.name, smi) is not None:
+            return second
+    except Exception:
+        pass
+    return first
+
+
+def _final_floor_candidate(mol) -> Optional["_Candidate"]:
+    """The final rung's universal-floor candidate for ``mol``: the whole-molecule floor, one of
+    its verified spellings when the first one does not read back as the input's constitution,
+    or ``None`` (a declined floor, a radical centre, an error)."""
+    from .universal_substituent import name_universal_substitutive
+    _uni = name_universal_substitutive(mol)
+    if _uni is not None and _uni.name:
+        _uni = _book_checked_floor(mol, _uni)
+        _uni = _leaf_checked_floor(mol, _uni)
+        # The retry the rungs above get through ``_prefer_verified_floor``:
+        # when the floor's first spelling does not even read back as the
+        # input's CONSTITUTION (OPSIN cannot parse it, or it parses to a
+        # different molecule), no later step can rescue it, so a verified
+        # alternative spelling (the von Baeyer form of a fused spiro
+        # component, the leaf-free form) is offered instead. A first
+        # spelling with the right constitution ships to the caller's
+        # ladder exactly as before (its stereo composition may still
+        # complete it there).
+        if not _reads_back_as_constitution(mol, _uni.name):
+            from rdkit import Chem as _Chem
+            _alt = _verified_universal_floor(
+                mol, _Chem.MolToSmiles(mol), first=_uni)
+            if _alt is not None:
+                return _Candidate(name=_alt, result_obj=None, final_floor=True)
+        return _Candidate(name=_uni.name, result_obj=None, final_floor=True)
+    return None

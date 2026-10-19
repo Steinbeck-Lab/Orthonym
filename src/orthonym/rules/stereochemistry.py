@@ -119,6 +119,26 @@ def _is_true_exocyclic(mol, in_scope_idx: int, other_idx: int) -> bool:
     return True
 
 
+def ring_ylidene_bonds(mol) -> List["Chem.Bond"]:
+    """The stereo double bonds that ``_is_true_exocyclic`` leaves uncited: not a ring bond, a
+    ring atom at EACH end (the bond between a ring and a ring '-ylidene' substituent).
+
+    Neither scope of a name can cite such a bond through ``collect_stereodescriptors``: the host
+    skips it because the ylidene end is a ring atom (condition 2 above), and so does the
+    branch. 'Specification by stereodescriptors E and Z' (the Blue Book)
+    licenses it all the same: "The stereodescriptors 'E' and 'Z' are used to specify the
+    configuration of an exo-cyclic double bond." (:48273), cited by method (a), at the front of
+    the name with the parent locant (:48276, the PIN method,:48279), or by method (b), at the
+    front of the ylidene prefix (:48277). The default paths do not use this licence; the
+    best-effort floor does, through ``assembly.ring_ylidene_stereo`` (one scope cites the bond,
+    never both)."""
+    assign_stereochemistry(mol)
+    return [b for b in bonds_of(mol)
+            if (b.GetBondType() == Chem.BondType.DOUBLE and not b.IsInRing()
+                and b.HasProp("_CIPCode") and b.GetProp("_CIPCode") in ("E", "Z")
+                and b.GetBeginAtom().IsInRing() and b.GetEndAtom().IsInRing())]
+
+
 def collect_stereodescriptors(
     mol,
     atom_to_locant: Dict[int, int],
@@ -351,6 +371,16 @@ def collect_stereodescriptors(
             ]
 
     return descriptors
+
+
+def merge_stereodescriptors(base: List[Tuple[Any, str]], extra: List[Tuple[Any, str]]
+                            ) -> List[Tuple[Any, str]]:
+    """``base`` (one scope's ``collect_stereodescriptors``) plus ``extra`` descriptors in locant
+    order. An extra whose locant already carries an E/Z descriptor is dropped: one atom has one
+    double bond, so a second claim on its locant is a numbering the name cannot read."""
+    taken = {loc for loc, code in base if code in ("E", "Z")}
+    kept = [d for d in extra if d[0] not in taken]
+    return sorted(list(base) + kept, key=_composite_locant_sort_key)
 
 
 def _render_locant_token(locant: Union[int, str, Tuple]) -> str:

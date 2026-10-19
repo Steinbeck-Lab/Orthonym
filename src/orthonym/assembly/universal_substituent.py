@@ -153,7 +153,7 @@ from __future__ import annotations
 
 import itertools
 from dataclasses import dataclass, field
-from typing import Dict, FrozenSet, List, Optional, Tuple
+from typing import Dict, FrozenSet, Iterator, List, Optional, Tuple
 
 from rdkit import Chem
 from rdkit.Chem import inchi
@@ -192,6 +192,7 @@ from .naming_utils import (
     alpha_sort_key,
     format_substituent_prefix,
 )
+from .ring_ylidene_stereo import RingYlidene
 
 # ---------------------------------------------------------------------------
 # Work budget -- mandatory in-algorithm backstop (NOT a signal/timeout).
@@ -310,6 +311,9 @@ class _Ctx:
     # Roadmap N5c: while True, a chain spine walks carbon atoms only
     # (``_tree_neighbors``); set by ``_name_chain_spine`` for one spine choice.
     carbon_walk: bool = False
+    # UN S1a: which scope cites the E/Z of which ring=ring double bonds (``ring_ylidene_stereo``);
+    # set only by ``_ring_ylidene_candidates`` for its rebuilds.
+    ring_ylidene: Optional["RingYlidene"] = None
 
     def fire(self, kind: str) -> None:
         """A book spelling of ``kind`` ('ring': a single ring's name, 'other': every other
@@ -714,10 +718,11 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
     the ORIGINAL input's FULL InChIKey (constitution AND stereo AND charge) via
     ``validation.reconstruct.verify_or_none``. A wrong/uncertain descriptor
     fails that gate and the cascade falls through -- it can only ever IMPROVE a
-    name (block-1 -> full), never make one wrong. Up to EIGHT OPSIN verifies
+    name (block-1 -> full), never make one wrong. Up to ELEVEN OPSIN verifies
     (full; rung-1b top-ring cis-/trans-; rung-1c substituent-ring cis/trans, the
-    sense cartesian product of <=2 relative rings, so <=4; top-only), returning on
-    the FIRST match; ``plain`` needs none.
+    sense cartesian product of <=2 relative rings, so <=4; top-only; rung 1d, a
+    key-visible ring=ring double bond cited by its host or its branch: 1 for
+    ``plain`` + <=2), returning on the FIRST match; ``plain`` ships unverified.
 
     Returns ``(name, reordered)``: ``reordered`` is True only when the name came
     from the last rung, ``_prefix_order_fallback`` (armed by
@@ -769,44 +774,11 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         full_name = (top_block + comp_full.name) if top_block else comp_full.name
         if full_name != plain:
             candidates.append(full_name)
-    # rung 1b: RING relative-stereo (cis/trans,. ``_stereo_prefix``
-    # emits an ABSOLUTE R/S block for the top-spine ring (``(1r,3R)-``), which
-    # OPSIN CANNOT parse for a saturated ring -- so rung 1's ``top_block``
-    # candidate is unparseable and the whole stereo layer is dropped, abstaining
-    # a molecule whose stereo IS expressible as the relative ``cis``/``trans``
-    # prefix. When the top spine is a ring bearing EXACTLY TWO stereocentres,
-    # offer ``cis-``/``trans-`` composed with the branch-recursive stereo
-    # (``comp_full.name`` already carries every branch's own descriptors); the
-    # full-InChIKey gate below keeps whichever round-trips, so offering BOTH is
-    # 0-wrong by construction (a wrong relative sense simply fails the gate).
-    # Bounded to 2 ring stereocentres because cis/trans is defined for a pair;
-    # 3+ ring centres need the r/c/t reference system (not attempted here).
-    if comp_full is not None and comp.spine_atom_to_locant:
-        ring_stereo_centres = [
-            a for a in comp.spine_atom_to_locant
-            if ctx.mol.GetAtomWithIdx(a).IsInRing()
-            and ctx.mol.GetAtomWithIdx(a).HasProp("_CIPCode")
-        ]
-        # cis/trans is the relation of two substituents on ONE ring.
-        # When the two stereocentres sit in DIFFERENT rings of a fused/spiro spine,
-        # a leading cis-/trans- denotes ring-FUSION stereo, not the substituent
-        # relation, so it must not be offered there -- guard on same-ring
-        # membership (a review review #6). The offer full-InChIKey gate would still
-        # veto a wrong sense, but a coincidental match could ship an ill-defined
-        # name; this keeps the descriptor semantically correct by construction.
-        same_ring = (len(ring_stereo_centres) == 2
-                     and ctx.mol.GetRingInfo().AreAtomsInSameRing(
-                         ring_stereo_centres[0], ring_stereo_centres[1]))
-        # v47: only offer cis/trans where it is COMPLETE. rung 1b was previously
-        # unguarded (protected only by full-first ordering); a true-pair top ring
-        # whose absolute `full` spelling fails RT would otherwise ship an
-        # under-specified relative name -- the same latent hole rung 1c had.
-        if same_ring and _ring_cistrans_is_complete(
-                ctx.mol, ring_stereo_centres[0], ring_stereo_centres[1]):
-            for rel in ("cis-", "trans-"):
-                rel_name = rel + comp_full.name
-                if rel_name not in candidates:
-                    candidates.append(rel_name)
+    # rung 1b: RING relative-stereo of the top spine (cis-/trans-,; see
+    # ``_top_ring_cistrans_names``
+    if comp_full is not None:
+        candidates += [n for n in _top_ring_cistrans_names(ctx, comp, comp_full)
+                       if n not in candidates]
     # rung 1c (M2.3): RING relative-stereo for a ring the spine carries as a
     # SUBSTITUENT (not the top spine, which rung 1b owns). The floor renders a
     # ring substituent's stereo through ``_stereo_prefix`` (line ~1081), which
@@ -865,9 +837,13 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         top_name = top_block + plain
         if top_name != plain and top_name not in candidates:
             candidates.append(top_name)
-
     can = Chem.MolToSmiles(mol)
-    for candidate in candidates:
+    # rung 1d (UN S1a): a key-visible ring=ring exocyclic double bond cited by its host or its
+    # branch; the generator builds its names only after every candidate above has failed its
+    # round trip and only when ``plain`` fails it too
+    for candidate in itertools.chain(
+            candidates,
+            _ring_ylidene_candidates(ctx, heavy, atom_work_budget, plain, can, candidates)):
         try:
             verified = verify_or_none(candidate, can)
         except Exception:
@@ -888,6 +864,99 @@ def _resolve_floor_stereo(ctx: "_Ctx", mol, heavy: FrozenSet[int],
         if reordered is not None:
             return reordered, True
     return plain, False
+
+
+def _top_ring_cistrans_names(ctx: "_Ctx", comp: "_ComponentResult",
+                             comp_full: "_ComponentResult") -> List[str]:
+    """Rung 1b of ``_resolve_floor_stereo``: the ``cis-``/``trans-`` candidates of the top
+    spine, or ````.
+
+    RING relative-stereo (cis/trans,. ``_stereo_prefix``
+    emits an ABSOLUTE R/S block for the top-spine ring (``(1r,3R)-``), which
+    OPSIN CANNOT parse for a saturated ring -- so rung 1's ``top_block``
+    candidate is unparseable and the whole stereo layer is dropped, abstaining
+    a molecule whose stereo IS expressible as the relative ``cis``/``trans``
+    prefix. When the top spine is a ring bearing EXACTLY TWO stereocentres,
+    offer ``cis-``/``trans-`` composed with the branch-recursive stereo
+    (``comp_full.name`` already carries every branch's own descriptors); the
+    full-InChIKey gate below keeps whichever round-trips, so offering BOTH is
+    0-wrong by construction (a wrong relative sense simply fails the gate).
+    Bounded to 2 ring stereocentres because cis/trans is defined for a pair;
+    3+ ring centres need the r/c/t reference system (not attempted here).
+    """
+    if not comp.spine_atom_to_locant:
+        return []
+    ring_stereo_centres = [
+        a for a in comp.spine_atom_to_locant
+        if ctx.mol.GetAtomWithIdx(a).IsInRing()
+        and ctx.mol.GetAtomWithIdx(a).HasProp("_CIPCode")
+    ]
+    # cis/trans is the relation of two substituents on ONE ring.
+    # When the two stereocentres sit in DIFFERENT rings of a fused/spiro spine,
+    # a leading cis-/trans- denotes ring-FUSION stereo, not the substituent
+    # relation, so it must not be offered there -- guard on same-ring
+    # membership (a review review #6). The offer full-InChIKey gate would still
+    # veto a wrong sense, but a coincidental match could ship an ill-defined
+    # name; this keeps the descriptor semantically correct by construction.
+    same_ring = (len(ring_stereo_centres) == 2
+                 and ctx.mol.GetRingInfo().AreAtomsInSameRing(
+                     ring_stereo_centres[0], ring_stereo_centres[1]))
+    # v47: only offer cis/trans where it is COMPLETE. rung 1b was previously
+    # unguarded (protected only by full-first ordering); a true-pair top ring
+    # whose absolute `full` spelling fails RT would otherwise ship an
+    # under-specified relative name -- the same latent hole rung 1c had.
+    if same_ring and _ring_cistrans_is_complete(
+            ctx.mol, ring_stereo_centres[0], ring_stereo_centres[1]):
+        return [rel + comp_full.name for rel in ("cis-", "trans-")]
+    return []
+
+
+def _ring_ylidene_candidates(ctx: "_Ctx", heavy: FrozenSet[int], atom_work_budget: int,
+                             plain: str, can: str, tried: List[str]) -> Iterator[str]:
+    """Rung 1d of ``_resolve_floor_stereo`` (UN S1a): the full branch-recursive stereo name with
+    the E/Z of the ring=ring double bonds added, once as the host's descriptor
+    (1)(a), the Blue Book, the PIN method) and once as the branch's (:48277, (b)).
+
+    Yields nothing while the rung is suspended (``ring_ylidene_stereo.ring_ylidene_suspended``),
+    when no ring=ring bond has a stereo layer in the input's InChIKey (a bond the key cannot
+    check is left uncited, as before), when ``plain`` already round-trips to the full
+    key (the key then needs no descriptor), and no name in ``tried``. Only the key-visible bonds
+    are cited, so every descriptor this rung writes is checked by the caller's gate; see
+    ``ring_ylidene_stereo`` for the rule."""
+    from ..validation.reconstruct import verify_or_none
+    from .ring_ylidene_stereo import (
+        BRANCH, HOST, RingYlidene, is_suspended, key_visible_ring_ylidene_bonds, scope_block)
+    if is_suspended():
+        return
+    seen_bonds = frozenset(b.GetIdx() for b in key_visible_ring_ylidene_bonds(ctx.mol))
+    if not seen_bonds:
+        return
+    try:
+        if verify_or_none(plain, can) is not None:
+            return
+    except Exception:  # an unverifiable plain name does not block the offer
+        pass
+    seen = set(tried)
+    for mode in (HOST, BRANCH):
+        spec = RingYlidene(mode, seen_bonds)
+        saved = (ctx.budget, ctx.ring_ylidene)
+        try:
+            ctx.budget = _Budget(atom_work_budget)
+            ctx.ring_ylidene = spec
+            comp_m = _name_component(ctx, heavy, attach_hint=None, is_top=True,
+                                     emit_branch_stereo=True)
+        except Exception:  # a stereo rebuild never turns a valid plain name into silence
+            comp_m = None
+        finally:
+            ctx.budget, ctx.ring_ylidene = saved
+        if comp_m is None:
+            continue
+        top = (scope_block(ctx.mol, comp_m.spine_atom_to_locant, spec)
+               if comp_m.spine_atom_to_locant else "")
+        name = top + comp_m.name
+        if name != plain and name not in seen:
+            seen.add(name)
+            yield name
 
 
 #: How many prefix orders ``_prefix_order_fallback`` tries after the one
@@ -1709,7 +1778,7 @@ def _name_component(
                 branch_stereo = f"{rel}-"
             else:
                 branch_stereo = _branch_stereo_block(
-                    ctx.mol, sub.spine_atom_to_locant, s_atom, root)
+                    ctx.mol, sub.spine_atom_to_locant, s_atom, root, ctx.ring_ylidene)
             if branch_stereo:
                 # Lane L2 (R2): the descriptor block keeps the writer's record
                 from .prefix_derivation import carried
@@ -1934,8 +2003,8 @@ def _chain_cites_locant(mol, spine) -> bool:
                    != Chem.BondType.SINGLE for i in range(len(spine) - 1)))
 
 
-def _branch_stereo_block(mol, branch_atom_to_locant: Dict[int, int],
-                         host_atom: int, root: int) -> str:
+def _branch_stereo_block(mol, branch_atom_to_locant: Dict[int, int], host_atom: int, root: int,
+                         ring_ylidene: Optional["RingYlidene"] = None) -> str:
     """The stereodescriptor block of one branch, cited at the front of its prefix
     , the Blue Book: "When they relate to substituent groups, they are
     cited at the front of the corresponding prefix").
@@ -1954,7 +2023,10 @@ def _branch_stereo_block(mol, branch_atom_to_locant: Dict[int, int],
     e.g. '3-{(1Z)-1-[(1Z)-2-azaethan-1-ylidene]-...-3-azaprop-2-en-1-yl}', which
     the round trip cannot read. So the branch leaves that bond to its host; when the
     ylidene end is a ring atom the host does not cite it and the branch keeps it
-    (method (b), as before)."""
+    (method (b), as before).
+
+    ``ring_ylidene`` (``ring_ylidene_stereo.RingYlidene``): also cite the ring=ring double bonds
+    of this scope that it names, which neither scope cites otherwise (UN S1a)."""
     from ..rules.stereochemistry import (
         _is_true_exocyclic,
         collect_stereodescriptors,
@@ -1965,6 +2037,9 @@ def _branch_stereo_block(mol, branch_atom_to_locant: Dict[int, int],
     if (bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE
             and _is_true_exocyclic(mol, host_atom, root)):
         skip = (bond.GetIdx(),)
+    if ring_ylidene is not None:
+        from .ring_ylidene_stereo import scope_block
+        return scope_block(mol, branch_atom_to_locant, ring_ylidene, skip, bond)
     if not skip:
         return _stereo_prefix(mol, branch_atom_to_locant)
     return format_stereodescriptor_string(
@@ -2164,7 +2239,7 @@ def _hetero_root_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
                    if relative_ring_override else None)
             block = (f"{rel}-" if rel is not None else
                      _branch_stereo_block(mol, sub.spine_atom_to_locant, attach_hint,
-                                          p_attach))
+                                          p_attach, ctx.ring_ylidene))
             if block:
                 rendered = block + rendered
         names.append((rendered, False))
@@ -2263,7 +2338,7 @@ def _hetero_group_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
                    if relative_ring_override else None)
             block = (f"{rel}-" if rel is not None else
                      _branch_stereo_block(mol, sub.spine_atom_to_locant, part.host,
-                                          part.attach))
+                                          part.attach, ctx.ring_ylidene))
             if block:
                 rendered = block + rendered
         if part.order == 2 and emit_branch_stereo:
@@ -4255,7 +4330,8 @@ def _oxoacid_group_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
             rel = (relative_ring_override.get(frozenset(sub.spine_atom_to_locant))
                    if relative_ring_override else None)
             block = (f"{rel}-" if rel is not None else
-                     (_branch_stereo_block(mol, sub.spine_atom_to_locant, outside[0], root)
+                     (_branch_stereo_block(mol, sub.spine_atom_to_locant, outside[0], root,
+                                           ctx.ring_ylidene)
                       if len(outside) == 1 else ""))
             if block:
                 rendered = block + rendered
