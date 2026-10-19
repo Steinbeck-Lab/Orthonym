@@ -409,6 +409,9 @@ _TRIPWIRE_ALLOWLIST = {
         "THE ONE definition of the carve-out.",
     ("assembly/naming_utils.py", 'return "-" in remainder'):
         "has_structural_hyphen's own body — decides on the STRIPPED remainder.",
+    ("rules/halogen_ring_fusion.py", "if not hw or '-' not in hw:"):
+        "splits the heteroatom-locant block of a Hantzsch-Widman name ('1\u03bb3,2-iodoxole') from its stem "
+        "to insert 'benzo' (P-25.2.2.4); no italicized prefix can occur in that HW name (UN D, 2026-10-19).",
     ("assembly/naming_utils.py", "if '-' in name:"):
         "needs_brackets, reached only AFTER the strip-and-recurse above it.",
 

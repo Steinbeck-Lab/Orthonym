@@ -62,10 +62,27 @@ class HydroState:
     fusion: FrozenSet[int] = field(default_factory=frozenset, compare=False, hash=False)
 
 
+def _parent_valence(mol, atom) -> Optional[int]:
+    """The bonding number the mancude parent gives ``atom``: the periodic table's default
+    valence, or, for a ring halogen in the lambda state, the Blue Book: "The
+    λ-convention is used to describe atoms with nonstandard bonding numbers... in fused ring
+    systems"), the bonding number it has (``1H-1λ3-iodole``,:9167 prints the
+    same rule for ``1H-1λ4-thiophene``). ``None`` for a lambda halogen with an exocyclic
+    multiple bond: its valences are spent outside the ring, which the matching below would
+    not see."""
+    from ..lambda_convention import ring_lambda_valence
+    lam = ring_lambda_valence(mol, atom.GetIdx())
+    if lam is None:
+        return Chem.GetPeriodicTable().GetDefaultValence(atom.GetAtomicNum())
+    if any(b.GetBondTypeAsDouble() >= 2 for b in atom.GetBonds()
+           if not b.IsInRing()):
+        return None
+    return lam
+
+
 def hydro_state(mol, split: Split) -> Optional[HydroState]:
     residual = set(split.residual)
     system = residual | {a for chain in split.bridges for a in chain}
-    pt = Chem.GetPeriodicTable()
     eligible = set()
     free: Dict[int, int] = {}
     for a in residual:
@@ -73,9 +90,12 @@ def hydro_state(mol, split: Split) -> Optional[HydroState]:
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
         n_sys = sum(1 for nb in atom.GetNeighbors() if nb.GetIdx() in system)
-        if pt.GetDefaultValence(atom.GetAtomicNum()) - n_sys >= 1:
+        valence = _parent_valence(mol, atom)
+        if valence is None:
+            return None
+        if valence - n_sys >= 1:
             eligible.add(a)
-            free[a] = pt.GetDefaultValence(atom.GetAtomicNum()) - n_sys
+            free[a] = valence - n_sys
     if not (residual & split.unsaturated) <= eligible:
         return None
     adj: Dict[int, set] = {a: set() for a in eligible}

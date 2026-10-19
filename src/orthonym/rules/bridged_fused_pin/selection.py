@@ -587,7 +587,9 @@ def _standard_bonding(mol, system: Set[int]) -> bool:
     neutral atom with another one is cited with the lambda convention ('1lambda4', 'lambda5'),
     which this builder does not spell, and a ring cation is named by its own rules. Both decline.
     The standard number is RDKit's default valence, which ``hydro.hydro_state`` also uses to find
-    the atoms that can carry a ring double bond; for Sn and Pb (Table 1.3: 4, RDKit: 2) the two
+    the atoms that can carry a ring double bond (a ring iodine in the lambda state is the one
+    exception there: ``hydro._parent_valence`` gives it its own bonding number, and this builder
+    still declines the ring above); for Sn and Pb (Table 1.3: 4, RDKit: 2) the two
     differ, so a ring of either declines."""
     pt = Chem.GetPeriodicTable()
     for a in system:

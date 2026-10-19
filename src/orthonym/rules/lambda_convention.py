@@ -98,3 +98,62 @@ def format_lambda_token(locant, lam: Optional[int]) -> str:
     the on-the-wire spelling is identical everywhere.
     """
     return f"{locant}{LAMBDA}{lam}" if lam is not None else str(locant)
+
+
+# Ring halogens admitted to the lambda-convention of a fused ring system, the Blue Book,
+# and,:39660: "For cyclic and acyclic parent hydrides the lambda convention is used to
+# indicate nonstandard bonding numbers"). One home for the admission, read by the benzo-heterocycle
+# producer (``rules/halogen_ring_fusion.py``) and by the mancude-parent valence of the ring-hydrogen
+# rule (``rules/bridged_fused_pin/hydro.py``). A halogen is admitted when a measurement showed its
+# names read back; an element not listed keeps its old behaviour in both places.
+FUSED_RING_LAMBDA_HALOGENS = frozenset({'I'})
+
+
+def ring_lambda_valence(mol, atom_idx: int) -> Optional[int]:
+    """The bonding number of an admitted ring halogen in the lambda state, else None.
+
+    The mancude parent of a ring with a lambda halogen counts the atom as a ring atom with its
+    own bonding number (``1H-1lambda3-iodole``,, the Blue Book ``1H-1λ3-benziodole
+    (PIN)``): a ring double bond or a hydrogen takes the valences its two ring bonds leave.
+    ``None`` for every other atom (an acyclic halogen too), so a caller keeps the default valence of the periodic table
+    there."""
+    atom = mol.GetAtomWithIdx(atom_idx)
+    if atom.GetSymbol() not in FUSED_RING_LAMBDA_HALOGENS or not atom.IsInRing():
+        return None
+    return nonstandard_bonding_number(mol, atom_idx)
+
+
+def fused_lambda_entries(mol, ring_atoms, atom_to_locant):
+    """``[(numeric locant, bonding number),...]`` ascending, for the nonstandard-bonding atoms of
+    a fused ring system under the numbering ``atom_to_locant``; ``None`` when the name cannot cite
+    one: a lambda on skeletal carbon, or on an atom with no numeric locant (a fusion atom, '4a').
+     (the Blue Book): the symbol "follows the locant of the atom with the
+    nonstandard bonding number in accordance with the numbering of the fused system"; a name
+    without it would denote a different molecule, so the caller declines."""
+    entries = []
+    for idx in sorted(ring_atoms):
+        lam = nonstandard_bonding_number(mol, idx)
+        if lam is None:
+            continue
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C':
+            return None
+        loc = atom_to_locant.get(idx)
+        if loc is None or not str(loc).isdigit():
+            return None
+        entries.append((int(loc), lam))
+    return sorted(entries)
+
+
+def fused_lambda_prefix(mol, ring_atoms, atom_to_locant) -> Optional[str]:
+    """The lambda tokens cited at the beginning of a fused name, ``'1λ4-'`` or ``'1λ4,3λ4-'``;
+    ``''`` when no ring atom has a nonstandard bonding number; ``None`` when the name must be
+    declined (see ``fused_lambda_entries``).: the tokens "are cited at the beginning
+    of the name of the fused ring system", after any indicated hydrogen (``1H-1λ4-thiophene``,
+    ."""
+    entries = fused_lambda_entries(mol, ring_atoms, atom_to_locant)
+    if entries is None:
+        return None
+    if not entries:
+        return ''
+    return ','.join(format_lambda_token(loc, lam) for loc, lam in entries) + '-'
+

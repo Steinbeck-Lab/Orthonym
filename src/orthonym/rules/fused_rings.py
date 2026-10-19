@@ -52,6 +52,7 @@ from .stereochemistry import (
 )
 from ..perception.smarts_cache import compiled as _compiled_smarts
 from .fused_interior import interior_pin_name as _interior_pin_name
+from .lambda_convention import fused_lambda_prefix
 
 # Simple multiplicative prefixes for substituent naming
 SIMPLE_MULTIPLIERS = multiplier_table(10)
@@ -467,7 +468,8 @@ def _placed_ring_hydrogen(mol, ring_atom_set: Set[int], atom_to_locant, subs):
     return ring_hydrogen.ring_hydrogen(mol, ring_atom_set, suffix, atom_to_locant)
 
 
-def _select_numbering_with_ring_hydrogen(mol, ring_atom_set, canonical, atoms_by_rank):
+def _select_numbering_with_ring_hydrogen(mol, ring_atom_set, canonical, atoms_by_rank,
+                                         any_ring_atoms=False):
     """The numbering of a substituted system whose ring atoms carry an exocyclic double
     bond (a ketone suffix; an ylidene, imino or oxo prefix), chosen over every numbering of
     the MANCUDE skeleton (``ignore_bond_order``: the hydrogen of the name belongs to the
@@ -475,11 +477,13 @@ def _select_numbering_with_ring_hydrogen(mol, ring_atom_set, canonical, atoms_by
     (the Blue Book-25044): (c) indicated hydrogen, (d) the principal group as suffix,
     (e) added indicated hydrogen, (f) hydro prefixes, (g) detachable prefixes -- the key the
     bridged fused builder uses ('4H,5H-pyrano[2,3-b]pyran-4-one', not '...-5-one').
-    ``(atom_to_locant, substituents)``, or None when the system has no such atom or the
-    shared rule declines any numbering (the caller then keeps its own choice)."""
+    ``(atom_to_locant, substituents)``, or None when the system has no such atom (unless
+    ``any_ring_atoms``: a producer whose parent needs the hydro prefixes of every structure, as the
+    benzoheterocycles of ``halogen_ring_fusion``) or the shared rule declines any numbering (the
+    caller then keeps its own choice)."""
     from . import ring_hydrogen
     exo = ring_hydrogen.exocyclic_double_atoms(mol, ring_atom_set)
-    if not exo:
+    if not exo and not any_ring_atoms:
         return None
     best = None
     # Every early ``return None`` below abandons the whole selection, not one permutation
@@ -1587,26 +1591,11 @@ def _try_algorithmic_fusion_name(mol, require_certified: bool = False) -> Option
     # atom's fused-system locant and are cited at the beginning of the name,
     # after any indicated hydrogen (monocyclic precedent 1H-1lambda4-thiophene,
     #. Fail-closed: a lambda atom without a determinate NUMERIC
-    # fused locant (or on skeletal carbon) invalidates the whole name — the
+    # fused locant (or on skeletal carbon) invalidates the whole name -- the
     # lambda-less name would denote a DIFFERENT molecule.
-    from .lambda_convention import LAMBDA, nonstandard_bonding_number
-    lam_entries = []
-    for idx in sorted(ring_atom_set):
-        lam = nonstandard_bonding_number(mol, idx)
-        if lam is None:
-            continue
-        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C':
-            return None
-        loc = atom_to_locant.get(idx)
-        if loc is None or not str(loc).isdigit():
-            return None  # fusion-junction letter locants (4a) out of scope
-        lam_entries.append((int(loc), lam))
-    lam_prefix = ''
-    if lam_entries:
-        lam_entries.sort()
-        lam_prefix = ','.join(
-            f"{loc}{LAMBDA}{lam}" for loc, lam in lam_entries
-        ) + '-'
+    lam_prefix = fused_lambda_prefix(mol, ring_atom_set, atom_to_locant)
+    if lam_prefix is None:
+        return None
 
     if indicated_h:
         h_parts = ','.join(str(loc) + 'H' for loc in indicated_h)
@@ -2872,7 +2861,10 @@ def name_fused_heterocycle(mol):
     from .lambda_convention import LAMBDA as _LAMBDA
     from .lambda_convention import nonstandard_bonding_number as _nsbn
     if any(_nsbn(mol, i) is not None for i in ring_atoms):
-        _lam_name = _try_algorithmic_fusion_name(mol)
+        # a benzene ring fused to a ring with a halogen in the lambda state has no fusion component
+        # above: its benzoheterocycle name is built from the Hantzsch-Widman parts
+        from .halogen_ring_fusion import name_halogen_benzo_system
+        _lam_name = _try_algorithmic_fusion_name(mol) or name_halogen_benzo_system(mol)
         if _lam_name and _LAMBDA in _lam_name:
             return (_lam_name, ring_atoms, {}, True)
         return None
