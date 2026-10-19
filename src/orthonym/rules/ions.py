@@ -356,6 +356,33 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
 
 # === CATION CLASSIFICATION ===
 
+def _heavy_degree(atom) -> int:
+    """Neighbours that are not hydrogen, so an explicit H atom in the graph does not count."""
+    return sum(1 for nb in atom.GetNeighbors() if nb.GetAtomicNum() > 1)
+
+
+def _is_terminal_n2_unit(cation, partner, bond) -> bool:
+    """True iff the multiply bonded N+/N pair is the terminal ``-N2+`` group of a
+    diazonium ion, the Blue Book 'Diazonium ions': "Cations
+    containing an -N2+ group attached to a parent hydride...").
+
+    The group hangs off ONE parent atom and ends there: the pair is not a ring bond,
+    neither nitrogen carries a hydrogen (R-NH+=NH and R-N=NH2+ are protonated
+    diazenes, not -N2+), one of the two nitrogens has no other heavy neighbour (the
+    terminal N; for the charge-shifted twin ``R-N=N+`` that is the cation itself, for
+    ``R-N+#N`` the partner), and the cation carries at most the parent atom and the
+    partner, so a 1,1-disubstituted diazenium ``R2N+=NH`` is not one. Ring cations
+    written in the Kekule form (sydnone, oxatriazolium, tetrazolium, triazolium) have
+    an N+=N ring bond and fail the first test."""
+    if bond.IsInRing():
+        return False
+    if cation.GetTotalNumHs(includeNeighbors=True) or partner.GetTotalNumHs(includeNeighbors=True):
+        return False
+    if _heavy_degree(cation) > 2:
+        return False
+    return _heavy_degree(cation) == 1 or _heavy_degree(partner) == 1
+
+
 def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
     """
     Classify cation type based on the cationic atom environment.
@@ -394,11 +421,21 @@ def classify_cation(mol, cation_site: Dict[str, Any]) -> str:
         # so those route to the ring-N '-ium' emitter (-> 1H-pyrazol-2-ium /
         # pyridazin-1-ium) instead. Real diazonium (benzenediazonium c1ccccc1[N+]#N)
         # keeps its triple-bonded N and is unaffected.
+        #
+        # The bond order alone is not the group. (the Blue Book,
+        # 'Diazonium ions'): "Cations containing an -N2+ group attached to a parent
+        # hydride are traditionally named... by using the suffix 'diazonium'" -- the
+        # group is the TERMINAL N2 unit. In the Kekule drawing a ring cation (a
+        # sydnone, an oxatriazolium, a tetrazolium, a 1,2,3-triazolium) also has an
+        # N+=N bond, and that bond sits inside the ring: no N of it is terminal, so
+        # it is a skeletal -ium of the heterocycle; for the
+        # olate zwitterion), never a diazonium. The cascade below gives it 'aminium'.
         for neighbor in atom.GetNeighbors():
             if neighbor.GetSymbol() == 'N':
                 bond = mol.GetBondBetweenAtoms(atom_idx, neighbor.GetIdx())
-                if bond is not None and bond.GetBondType() in (
-                        Chem.BondType.DOUBLE, Chem.BondType.TRIPLE):
+                if (bond is not None and bond.GetBondType() in (
+                        Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
+                        and _is_terminal_n2_unit(atom, neighbor, bond)):
                     return 'diazonium'
 
         # a phase.1: a QUATERNARY ammonium N (formal charge

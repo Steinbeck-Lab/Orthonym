@@ -175,9 +175,12 @@ class TestEndToEndCodes:
     # into the first-writer-wins slot ahead of the ladder's own ``enumerator_ring_fallback`` record;
     # the speculative wrapper restores the memos and the output-order props but not that slot (the
     # heteromonocycle tie-break did the same at 0c529ca8d, e.g. 3,5-disubstituted pyridine and
-    # 1,4-disubstituted piperazine fixtures). Pyridin-3-yl has no orientation tie, so only the real
-    # assembly records, and the detail is the one the test below is about.
-    _RING_FALLBACK_DETAIL_SMI = "COC(=O)CC1=C(ON=[N+]1C2CCCCC2)[O-]"   # PubChem CID 24846373
+    # 1,4-disubstituted piperazine fixtures). The witness must reach the ladder's own record, so it
+    # carries no ring whose prefix the tie-break names first. UN lane Q (2026-10-19) names the sydnone
+    # that stood here (CID 24846373, '[4-(2-methoxy-2-oxoethyl)-5-oxido-1,2,3-oxadiazol-3-ium-3-yl]
+    # cyclohexane': its ring N+=N cation is no longer classed diazonium,, so it was replaced
+    # by a neutral row of the frozen unnamed panel that abstains with this code and detail under this config.
+    _RING_FALLBACK_DETAIL_SMI = "COC1=CN2C(=C(C=N2)C(=O)N3CCC4=C([C@H]3C5=CC6=CC=CC=C6C=N5)N=CN4)C=C1"   # PubChem CID 176863056
     # A metal coordination compound (cisplatin drawn with explicit NH3 ligands): the
     # Java-free organometallic/coordination veto (namer.py, has_metal_coordination_bond;
     # coordination compounds are out of scope, suppresses the generated name.

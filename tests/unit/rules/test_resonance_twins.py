@@ -74,8 +74,9 @@ def test_genuine_radical_cation_not_swept_by_diazonium_carveout():
     N), not the valence-shortfall artifact the carve-out in
     ``rules.charged_router.route_charged`` targets (2 spurious radical
     electrons on a degree-1 terminal N whose sole bond is a double bond).
-    ``classify_cation`` still labels it 'diazonium' (bond-order-only
-    classifier), so a carve-out keyed on "1 radical site == 1 cation site,
+    ``classify_cation`` still labels it 'diazonium' (it is a terminal N2
+    unit; the classifier does not look at radical electrons), so a
+    carve-out keyed on "1 radical site == 1 cation site,
     classified diazonium" alone is broader than intended and would build a
     wrong ``benzenediazonium`` candidate for a real radical species. The
     tightened carve-out must decline to clear ``radical_sites`` here, so

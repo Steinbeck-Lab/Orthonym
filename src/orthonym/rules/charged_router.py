@@ -2964,8 +2964,9 @@ def route_charged(mol, style: str = 'pin') -> str:
     # exact artifact signature, not just "1 radical site == 1 cation site,
     # classified diazonium" -- that looser test also matches a GENUINE
     # open-shell monoradical cation such as ``c1ccccc1[N+]=N`` (1 radical
-    # electron on a degree-2 N, classify_cation still says 'diazonium' since
-    # that classifier is bond-order-only). Requiring exactly 2 radical
+    # electron on a degree-2 N; classify_cation says 'diazonium' for it because
+    # it is a terminal N2 unit, as it is for the closed-shell ion, and a radical
+    # count is not part of that test). Requiring exactly 2 radical
     # electrons on a DEGREE-1 atom whose SOLE bond is a DOUBLE bond pins this
     # to the valence-shortfall artifact only -- mirrors the rigor of the R-S+/
     # R-Se+ carve-out above (which gates on element/charge/H-count/substituent
