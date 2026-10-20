@@ -26,6 +26,7 @@ VonBaeyerAnalyzer from this file.
 
 import logging
 import re
+from bisect import bisect_left
 from collections import deque
 from dataclasses import dataclass, field
 from itertools import combinations
@@ -658,7 +659,7 @@ def _best_disjoint_path_pair(all_paths, spend, rank_key):
     return best_pair
 
 
-def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2):
+def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room):
     """Case 3 of the main-ring search: offer to ``best`` every pair of bh1->bh2 paths that
     forms a main ring with a 2+-atom main bridge /.
 
@@ -666,23 +667,52 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2):
     from both: with the candidates (interior >= 2 atoms) sorted once, longest first,
     that is the FIRST candidate other than i, j whose interior is disjoint from both. A pair
     whose ring is smaller than the incumbent's cannot tie or win, so its bridge is not looked
-    for. ``spend`` is charged once per (i, j) pair, before anything else, as the loop it
-    replaces did (M2.5).
+    for. ``spend`` is charged once per (i, j) pair VISITED (M2.5).
+
+    ``room`` is the number of ring-system atoms that can lie inside a path, that is the ring
+    atoms other than ``bh1`` and ``bh2``. The loop is pruned without changing what ``best``
+    ends up holding (``score``, ``ring``, ``bh_pair`` and the ``tied`` list in its order):
+
+    * Upper bound. A pair is offered only if a third path ``k`` with >= 2 interior atoms has
+      its interior disjoint from both interiors. A path interior lies in ``room`` and the
+      three interiors are disjoint, so ``len_i + len_j + len_k <= room`` and, with
+      ``len_k >= 2``, ``ring_size = len_i + len_j + 2 <= room``. A pair above ``room`` is
+      never offered, and when the incumbent is already above ``room`` no pair is (return).
+    * Lower bound. ``consider`` drops a structural tuple below the incumbent's and clears
+      ``tied`` on a better one, and the first element of the tuple is the ring size, so
+      ``score``, ``ring``, ``bh_pair`` and ``tied`` end up depending only on the candidates at
+      the largest ring size offered. A pair below the incumbent (as before) or below the
+      ring size of a pair already known to be offered is therefore skipped: it could only be
+      dropped by ``consider`` or cleared from ``tied`` by a later, larger one.
+    * Order. The pairs are visited longest first, so the incumbent reaches the largest ring
+      size early and the window closes; the survivors are then offered to ``consider`` in the
+      original (i, j) order, ring built from the lower index, so ties between candidates
+      (``tied``, the first of equal keys) resolve exactly as before.
     """
+    incumbent = best.score[0][0] if best.score is not None else -1
+    if incumbent > room:
+        return
     npaths = len(all_paths)
     masks, plens = _interior_masks(all_paths)
     bridge_order = sorted((k for k in range(npaths) if plens[k] >= 2), key=lambda k: -plens[k])
-    for i in range(npaths):
-        mask_i = masks[i]
+    order = sorted(range(npaths), key=lambda k: -plens[k])
+    neg_lens = [-plens[k] for k in order]  # ascending, for the bisect of the upper bound
+    offered = []
+    for a in range(npaths - 1):
+        i = order[a]
         len_i = plens[i]
-        for j in range(i + 1, npaths):
+        if len_i + plens[order[a + 1]] + 2 < incumbent:
+            break  # the largest ring left is below the incumbent
+        mask_i = masks[i]
+        # first partner b > a with len_i + len_j + 2 <= room
+        for b in range(bisect_left(neg_lens, len_i + 2 - room, a + 1), npaths):
+            j = order[b]
+            ring_size = len_i + plens[j] + 2
+            if ring_size < incumbent:
+                break
             spend()
             mask_j = masks[j]
             if mask_i & mask_j:
-                continue
-            len_j = plens[j]
-            ring_size = len_i + len_j + 2
-            if best.score is not None and ring_size < best.score[0][0]:
                 continue
             used = mask_i | mask_j
             best_mb_len = -1
@@ -693,8 +723,12 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2):
             if best_mb_len < 2:
                 # 0/1-atom main bridges are already covered by Cases 1/2.
                 continue
-            p2 = all_paths[j]
-            best.consider(all_paths[i] + p2[1:-1][::-1], bh1, bh2, len_i, len_j, best_mb_len)
+            offered.append((i, j, best_mb_len) if i < j else (j, i, best_mb_len))
+            if ring_size > incumbent:
+                incumbent = ring_size
+    for lo, hi, best_mb_len in sorted(offered):
+        best.consider(all_paths[lo] + all_paths[hi][1:-1][::-1], bh1, bh2,
+                      plens[lo], plens[hi], best_mb_len)
 
 
 # ============================================================================
@@ -1415,7 +1449,7 @@ class VonBaeyerAnalyzer:
                 continue
             _consider_multiatom_bridges(
                 _find_all_simple_paths(mol, bh1, bh2, ring_atoms, adj=adj_list),
-                spend, best, bh1, bh2)
+                spend, best, bh1, bh2, len(ring_atoms - {bh1, bh2}))
 
         best_ring, best_bh_pair = best.ring, best.bh_pair
         # Fallback: use largest ring method (for bicyclo or unusual cases)

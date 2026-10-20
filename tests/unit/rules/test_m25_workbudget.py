@@ -15,17 +15,26 @@ Measured sizing (M2.5 Task 2B, `internal notes`):
   * hang witnesses: Ni/Fe-corrin ~7-12M inner ops; cob(III)yrinate 553 analyze
     calls; vancomycin/thiopeptide ~1000+ fused-matcher calls (all growing without
     bound) — every one blows past a budget in bounded, DETERMINISTIC work.
-  * nameable ceiling: Mg-chlorophyll (a genuine non-curated name) needs 7.29M
-    inner ops / 147 calls; a 200-row drug-like pubchem sweep peaks at 17,988 inner
-    ops / 138 calls. Both budgets clear all of these -> 0 nameable molecule abstains.
+  * a 200-row drug-like pubchem sweep peaks at 17,988 inner ops / 138 calls, far
+    under both budgets -> 0 nameable drug-like molecule abstains.
 
-⚠ The Ni/Fe corrins do LESS total inner work in their first ~14 s than chlorophyll
-does in its ENTIRE nameable run (both ~7M inner ops), so NO inner-op threshold that
-still names chlorophyll can abstain them in <10 s (inv 16 — target shown
-unsatisfiable). The guarantee this test pins is the categorical one: a >20-min
-compute-bound HANG becomes a bounded, deterministic abstain-or-name. The wall
-bound below (55 s) is generous headroom over the measured ~28 s worst case, NOT a
-performance target.
+⚠ Mg-chlorophyll is NOT under the inner-op budget. Task 2B quoted 7.29M inner ops /
+147 calls for it; measured 2026-10-20 (UN lane P) it exhausts the 12M budget at HEAD
+(12,000,644 units, 1 trip, 16 analysis calls; 78 calls and a trip again at 120M) and
+is still named, and with the Case-3 pair loop of the von Baeyer main-ring search
+pruned (``polycyclic._consider_multiatom_bridges``) its whole main path is 36.8M units /
+79 calls, so it still exhausts 12M and is still named. The figure was stale; what
+this file pins for it is the name, not a budget margin.
+
+⚠ The Ni/Fe corrins stop at the same 12M that the chlorophyll main path overruns, so
+NO inner-op threshold can both abstain them quickly and let chlorophyll finish on the
+main path (inv 16 — target shown unsatisfiable). The guarantee this test pins is the
+categorical one: a >20-min compute-bound HANG becomes a bounded, deterministic
+abstain-or-name. The wall bound below (55 s) is generous headroom over the measured
+~28 s worst case at HEAD, NOT a performance target. The Case-3 prune made each unit a
+more expensive one (the cheapest units, one bitmask AND per pair, left the count): a row
+that still abstains at 12M now takes 1.4-1.9x as long (measured 2026-10-20, shared box:
+Ni-corrin 14-15 s -> 21-25 s; 30 abstaining PubChem rows 689 s -> 977 s in all).
 """
 import subprocess
 import sys
@@ -159,6 +168,46 @@ def test_name_controls_unchanged(label, smiles, expected):
     catches ONLY the explosion class, never a nameable molecule."""
     out = _name_best_effort(smiles)
     assert out == expected, f"{label}: name changed.\n got: {out!r}\n exp: {expected!r}"
+
+
+# ── Rows the pruned Case-3 pair loop names inside the 12M budget (UN lane P). ──
+# At HEAD before the prune each abstained: the Case-3 loop of the von Baeyer main-ring
+# search charged one unit per path pair (59-93% of the row's units) and exhausted 12M.
+# Pinned: the best-effort name, byte-identical to the one the 120M budget gives, which
+# OPSIN 2.9.0 reads back to the input's full InChIKey (a fresh call, outside the engine).
+# These are best-effort names, not claimed PINs.
+_PRUNE_ROWS = {
+    "CID163924931": (
+        "C1=CC=C(C=C1)C2=C3C4=CC=CC5=C4C(=CC=C5)C3=CC6=C2C=CC7=C6C=CC8=CC9=C(C=C87)C1=CC=CC2=C1C9"
+        "=CC1=CC=CC=C21",
+        "9-phenylundecacyclo[27.11.1.1^11,15.0^2,28.0^4,26.0^5,23.0^8,22.0^10,20.0^31,36.0^37,41."
+        "0^19,42]dotetraconta-1(40),2,4,6,8(22),9,11,13,15,17,19(42),20,23,25,27,29,31,33,35,37(41),"
+        "38-henicosaene"),
+    "CID163757532": (
+        "C1=CC(=CC=C1C2=CC3=C4C=CC5=C6C=C7C8=C9C(=CC=C1C9=C(C=C8)C8=C1C=C(C=C8)C1=CC=C(C=C1)F)"
+        "C7=CC6=C1C5=C4C(=C3C=C2)C=C1)F",
+        "11,28-bis(4-fluorophenyl)undecacyclo[23.9.2.2^5,8.0^2,21.0^4,19.0^6,18.0^7,15.0^9,14.0^22,"
+        "35.0^26,31.0^32,36]octatriaconta-1(34),2,4,6,8,10,12,14,16,18,20,22,24,26(31),27,29,32,35,"
+        "37-nonadecaene"),
+    "CID162480633": (
+        "B12C3=CC(=CC4=C3N(C5=CC6=CC=CC=C6C=C54)C7=CC(=CC(=C71)N8C9=CC1=CC=CC=C1C=C9C1=C8C2=CC(=C1)"
+        "C)C1=CC=C(C=C1)C(C)(C)C)C",
+        "20-(4-tert-butylphenyl)-4,36-dimethyl-17,23-diaza-1-boraundecacyclo[20.16.1.1^2,6.1^23,34."
+        "0^7,16.0^9,14.0^18,39.0^24,33.0^26,31.0^17,41.0^38,40]hentetraconta-2(41),3,5,7,9,11,13,15,"
+        "18(39),19,21,24,26,28,30,32,34,36,38(40)-nonadecaene"),
+}
+
+
+@pytest.mark.parametrize("label,smiles,expected", sorted(
+    (k, v[0], v[1]) for k, v in _PRUNE_ROWS.items()))
+def test_rows_named_inside_the_budget_by_the_pruned_case3_loop(label, smiles, expected):
+    """Each row is named inside the default 12M budget, byte-identically to its 120M name,
+    and the name reads back to the input's full InChIKey (stereo, charge and isotope layers
+    included)."""
+    from tests.support.rt_assert import name_is_rt_exact
+    out = _name_best_effort(smiles)
+    assert out == expected, f"{label}: name changed.\n got: {out!r}\n exp: {expected!r}"
+    assert name_is_rt_exact(out, smiles), f"{label}: the name does not read back to the input"
 
 
 def test_guard_is_deterministic():

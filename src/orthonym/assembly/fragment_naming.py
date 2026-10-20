@@ -351,14 +351,24 @@ _WORK_BUDGET = 6000
 # No size / aromatic / path-count prefilter separates the hangs from the nameable
 # controls: the corrins are SMALLER and have FEWER paths per pair than the
 # nameable Mg-chlorophyll (measured). The two cumulative budgets do — every
-# nameable control (porphyrin analyze=2/match=4; steroid 5/15; chlorophyll
-# inner=7.3M, analyze=19, match=128) sits comfortably below both thresholds,
-# while every witness blows past one of them.
+# nameable control (porphyrin analyze=2/match=4; steroid 5/15) sits comfortably
+# below both thresholds, while every witness blows past one of them.
 #
-# ⚠ MEASURED LIMIT (inv 16): the Ni/Fe corrins do LESS total inner work in their
-# first ~14 s than the nameable chlorophyll does in its ENTIRE run (both ~7M
-# inner ops), so NO inner-op threshold that still names chlorophyll can abstain
-# them in <10 s — the honest bound for that class is ~20-30 s. That is already a
+# ⚠ CHLOROPHYLL IS NOT UNDER THE BUDGET (measured 2026-10-20, UN lane P; the "7.29M
+# inner / 147 calls" of M2.5 Task 2B no longer holds): at HEAD its main path
+# exhausts the 12M inner-op budget (12,000,644 units, 1 trip, 16 analysis calls)
+# and it is still named, and with the budget raised to 120M it trips again (78
+# calls). With the Case-3 pair loop of the main-ring search pruned
+# (``polycyclic._consider_multiatom_bridges``) its whole main path is 36.8M units /
+# 79 calls, so it still exhausts 12M and is still named.
+#
+# ⚠ MEASURED LIMIT (inv 16): the Ni/Fe corrins stop at the same 12M that the
+# chlorophyll main path overruns, so NO inner-op threshold can both abstain them
+# quickly and let chlorophyll finish on the main path — the honest bound for that
+# class is ~15-30 s of wall time at HEAD (1.4-1.9x that, measured 2026-10-20 on a
+# shared box: Ni-corrin 14-15 s -> 21-25 s, 30 abstaining PubChem rows 689 s -> 977 s,
+# once the Case-3 prune made each unit a more expensive one: the cheapest units,
+# one bitmask AND per pair, left the count). That is already a
 # categorical fix (a >20-min compute-bound hang -> a bounded, DETERMINISTIC
 # abstain); sub-10 s for that class would need a deeper root-cause change (dedup
 # the substituent recursion's redundant re-analysis of the giant symmetric ring).
@@ -376,10 +386,12 @@ import os as _os  # noqa: E402 (used for the budget-tuning env overrides below)
 # ORTHONYM_JVM_BUDGET): set to 0 to DISABLE that budget (never raises).
 # Measured selectivity (M2.5 Task 2B, 200 drug-like pubchem rows): max inner-op
 # 17,988 and max analysis-calls 138 — both hundreds/several-x below these — so
-# the guard abstains ZERO nameable molecules; the only nameable molecule near a
-# ceiling is Mg-chlorophyll (7.29M inner / 147 calls), which both budgets clear.
-_PERF_BUDGET = int(_os.environ.get("ORTHONYM_PERF_OP_BUDGET", 12_000_000))          # inner-op ceiling (chlorophyll 7.29M)
-_ANALYSIS_CALL_BUDGET = int(_os.environ.get("ORTHONYM_ANALYSIS_CALL_BUDGET", 500))  # analysis-call ceiling (chlorophyll 147)
+# the guard abstains ZERO nameable drug-like molecules. Mg-chlorophyll is the
+# nameable molecule that does not clear the inner-op ceiling (see the note above:
+# 12,000,644 units at its trip at HEAD, 36.8M for its whole main path with the
+# pruned Case-3 loop, 79 analysis calls, far under the 500 call budget).
+_PERF_BUDGET = int(_os.environ.get("ORTHONYM_PERF_OP_BUDGET", 12_000_000))          # inner-op ceiling (chlorophyll: 36.8M, see above)
+_ANALYSIS_CALL_BUDGET = int(_os.environ.get("ORTHONYM_ANALYSIS_CALL_BUDGET", 500))  # analysis-call ceiling (chlorophyll 79)
 
 
 class PerfBudgetExceeded(BaseException):

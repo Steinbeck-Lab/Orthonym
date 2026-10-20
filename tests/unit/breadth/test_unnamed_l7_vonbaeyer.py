@@ -10,7 +10,11 @@ ties or beats the incumbent on ring size, main bridge and balance,,
 * the result (main ring, bridgehead pair, every oriented tied candidate in order) equals the
   algorithm as it was, kept below as ``_reference_find_main_ring_impl`` (tests only);
 * the perf-budget units charged (``spend_perf_work``: one per (i, j) pair and one per DFS
-  expansion) are equal, so the deterministic budget decides every abstention as before;
+  expansion) are equal, so the deterministic budget decides every abstention as before --
+  except in Case 3, which UN lane P prunes (``_consider_multiatom_bridges`` charges one unit per
+  VISITED pair, never more than the loop it replaces; the result is unchanged, see
+  ``test_polycyclic_case3_prune.py``): there the pruned search charges at most as many units, and
+  exactly as many when the main-bridge preference is off;
 * the full name of three cluster-A rows (UN L7b, 20 rows whose solo time was dominated by this
   search) is the name the engine gave before the change.
 """
@@ -268,7 +272,8 @@ def _ring_systems(an, mol):
 
 
 def _same_on(mol, ring_atoms, bridgeheads, units, allow_multiatom_bridge=True, return_candidates=True):
-    """Run the reference and the new search on one system; assert equal result and equal units."""
+    """Run the reference and the new search on one system; assert equal result and units not above the reference's
+    (equal when the main-bridge preference, hence Case 3, is off)."""
     an = VonBaeyerAnalyzer()
     an._allow_multiatom_bridge = allow_multiatom_bridge
     units[0] = 0
@@ -278,7 +283,11 @@ def _same_on(mol, ring_atoms, bridgeheads, units, allow_multiatom_bridge=True, r
     new = an._find_main_ring_impl(mol, ring_atoms, bridgeheads, return_candidates=return_candidates)
     new_units = units[0]
     assert new == ref
-    assert new_units == ref_units
+    if allow_multiatom_bridge:
+        # Case 3 is pruned (UN lane P): one unit per visited pair, never more than the reference
+        assert new_units <= ref_units
+    else:
+        assert new_units == ref_units        # Case 3 does not run: Cases 1/2 and the DFS are as they were
     return ref, ref_units
 
 
@@ -490,7 +499,10 @@ def _random_paths(rng):
 
 @pytest.mark.parametrize("seed", range(300))
 def test_case3_pair_scan_equals_the_triple_loop_on_random_path_sets(seed):
-    """Same incumbent, same tied candidates in the same order, same units (one per (i, j) pair)."""
+    """Same incumbent, same tied candidates in the same order; units: the triple loop charges one per
+    (i, j) pair, the pruned scan one per visited pair (never more). ``room`` is the number of distinct
+    interior atoms of the path set, the tightest bound a real call can have (its ring atoms outside
+    the bridgeheads are a superset)."""
     rng = random.Random(seed)
     paths, rank_key = _random_paths(rng)
     ref_best, new_best = _ReferenceBest(rank_key), pc._MainRingBest(rank_key)
@@ -501,9 +513,11 @@ def test_case3_pair_scan_equals_the_triple_loop_on_random_path_sets(seed):
         new_best.consider(*args)
     spent = {"ref": 0, "new": 0}
     _reference_case3([list(p) for p in paths], lambda: spent.__setitem__("ref", spent["ref"] + 1), ref_best, 0, 1)
+    room = len({a for p in paths for a in p[1:-1]})
     pc._consider_multiatom_bridges([list(p) for p in paths], lambda: spent.__setitem__("new", spent["new"] + 1),
-                                   new_best, 0, 1)
-    assert spent["new"] == spent["ref"] == len(paths) * (len(paths) - 1) // 2
+                                   new_best, 0, 1, room)
+    assert spent["ref"] == len(paths) * (len(paths) - 1) // 2
+    assert spent["new"] <= spent["ref"]
     assert (new_best.score, new_best.ring, new_best.bh_pair, new_best.tied) == \
         (ref_best.score, ref_best.ring, ref_best.bh_pair, ref_best.tied)
 
@@ -563,13 +577,15 @@ def test_main_ring_search_is_identical_on_cluster_a_rows(cid, units):
 
 
 # ---------------------------------------------------------------------------
-# (a) the budget decides the same abstentions
+# (a) the budget decides the abstentions at the units the search charges
 # ---------------------------------------------------------------------------
 
-def test_budget_trips_at_the_same_unit_count(monkeypatch):
-    """With the real ``spend_perf_work`` armed, the old and the new search either both finish with the
-    same budget left or both raise ``PerfBudgetExceeded`` (the abstention), at a budget one unit
-    above and one unit below the units the search charges."""
+def test_budget_trips_at_the_units_the_pruned_search_charges(monkeypatch):
+    """With the real ``spend_perf_work`` armed, each search finishes with the same result when its own
+    unit count fits the budget and raises ``PerfBudgetExceeded`` (the abstention) when it does not.
+    The pruned search charges fewer units than the reference (UN lane P, Case 3), so a budget between
+    the two counts is one the reference abstains at and the pruned search finishes inside, with the
+    reference's result."""
     smiles = "C12C3C4CCC(CC(CCC1)CCC2)(CC4)C3"           # tetracyclo[6.3.3.2^3,6.1^2,6]heptadecane
     mol = Chem.MolFromSmiles(smiles)
     an = VonBaeyerAnalyzer()
@@ -577,8 +593,11 @@ def test_budget_trips_at_the_same_unit_count(monkeypatch):
     spent = [0]
     monkeypatch.setattr(pc, "spend_perf_work", lambda n=1: spent.__setitem__(0, spent[0] + n))
     _reference_find_main_ring_impl(an, mol, ring_atoms, bridgeheads, return_candidates=True)
-    total = spent[0]
-    assert total > 100
+    total_ref = spent[0]
+    spent[0] = 0
+    an._find_main_ring_impl(mol, ring_atoms, bridgeheads, return_candidates=True)
+    total_new = spent[0]
+    assert 100 < total_new < total_ref
     monkeypatch.undo()
 
     def run(impl, budget):
@@ -594,12 +613,18 @@ def test_budget_trips_at_the_same_unit_count(monkeypatch):
     def reference(*args, **kwargs):
         return _reference_find_main_ring_impl(an, *args, **kwargs)
 
-    for budget in (total + 1, total, total - 1, total // 2, 1):
-        old = run(reference, budget)
-        new = run(an._find_main_ring_impl, budget)
-        assert new == old, budget
-    assert run(an._find_main_ring_impl, total + 1)[1] == 1
-    assert run(an._find_main_ring_impl, total)[0] == "exceeded"
+    old_result, old_left = run(reference, total_ref + 1)
+    assert old_left == 1 and old_result != "exceeded"
+    assert run(reference, total_ref)[0] == "exceeded"
+    new_result, new_left = run(an._find_main_ring_impl, total_new + 1)
+    assert new_left == 1 and new_result == old_result
+    assert run(an._find_main_ring_impl, total_new)[0] == "exceeded"
+    for budget in (total_new // 2, 1):
+        assert run(an._find_main_ring_impl, budget)[0] == "exceeded"
+        assert run(reference, budget)[0] == "exceeded"
+    # between the two counts: the reference abstains, the pruned search names
+    assert run(reference, total_new + 1)[0] == "exceeded"
+    assert run(an._find_main_ring_impl, total_new + 1)[0] == old_result
 
 
 # ---------------------------------------------------------------------------
