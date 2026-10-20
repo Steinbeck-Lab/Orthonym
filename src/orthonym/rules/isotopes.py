@@ -1442,43 +1442,13 @@ def _front_hyphen_candidate(skel: str, desc: str) -> Optional[Tuple[int, str]]:
 
 
 def _distinct_hydroxyl_o_classes(original: Chem.Mol) -> int:
-    """Number of DISTINGUISHABLE hydroxyl oxygens in ``original``'s parent
-    skeleton -- the "possibility of isomers" quantity for an ``O-H ->
-    O-D`` hydroxyl label.
-
-    A hydroxyl oxygen is a single-bonded, one-heavy-neighbour (a carbon) oxygen
-    (an ``-OH``; the carbonyl ``=O`` is excluded by the double bond). Two such
-    oxygens are the SAME position -- deuterating either yields ONE molecule -- iff
-    they share a constitutional symmetry class. The count is taken on the
-    ISOTOPE-STRIPPED, hydrogen-normalised skeleton: isotopes are cleared and the
-    mol is round-tripped through canonical SMILES so the labelled O's now-plain
-    explicit H collapses to implicit and it ranks identically to an unlabelled
-    ``-OH`` (without this the residual explicit H would split an otherwise
-    symmetric diol into two classes). Returns 0 when there is no hydroxyl O.
-
-    ``ethane-1,2-diol`` -> 1 (the two ``-OH`` are one orbit, no isomer, bare
-    ``O``); ``propane-1,2-diol`` -> 2 (primary vs secondary ``-OH`` are distinct,
-    the numeral is required); a mono-ol or an ``-OD`` carboxylic acid -> 1.
-    """
-    skel = Chem.Mol(original)
-    for a in skel.GetAtoms():
-        a.SetIsotope(0)
-    skel = Chem.MolFromSmiles(Chem.MolToSmiles(skel))
-    if skel is None:
-        return 0
-    ranks = list(Chem.CanonicalRankAtoms(skel, breakTies=False))
-    classes = set()
-    for a in skel.GetAtoms():
-        if a.GetSymbol() != "O":
-            continue
-        heavy = [n for n in a.GetNeighbors() if n.GetSymbol() != "H"]
-        if len(heavy) != 1 or heavy[0].GetSymbol() != "C":
-            continue
-        bond = skel.GetBondBetweenAtoms(a.GetIdx(), heavy[0].GetIdx())
-        if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
-            continue
-        classes.add(ranks[a.GetIdx()])
-    return len(classes)
+    """Number of DISTINGUISHABLE hydroxyl oxygens in ``original``'s parent skeleton -- the
+    "possibility of isomers" quantity for an ``O-H -> O-D`` hydroxyl label (``ethane-1,2-diol`` -> 1,
+    ``propane-1,2-diol`` -> 2, a mono-ol or an ``-OD`` carboxylic acid -> 1; 0 when there is no hydroxyl
+    oxygen). ``rules.isotope_letters.distinct_classes`` counts the symmetry classes of the hydroxyl oxygens
+    of the structure without its isotopes and hydrogen atoms."""
+    from .isotope_letters import distinct_classes
+    return distinct_classes(original, "O")
 
 
 #: A parent that cites SEVERAL nitrogens of its own suffix groups: a multiplied
@@ -1576,7 +1546,13 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
     """
     n_count = sum(1 for a in original.GetAtoms() if a.GetSymbol() == "N")
     numbered = n_count > 1 and _parent_numbers_its_nitrogens(skeleton)
+    # A bare letter only where ``rules.isotope_letters`` allows it,,: the
+    # atoms it could denote are one symmetry class (a possibility of isomers otherwise); else the numbered form.
+    from .isotope_letters import bare_letter_allowed
+    bare_n = bare_letter_allowed(original, "N")
+    bare_o = bare_letter_allowed(original, "O")
     out: List[str] = []
+    labelled_o = False
     for idx in label_map:
         atom = original.GetAtomWithIdx(idx)
         if atom.GetSymbol() != "H":
@@ -1584,21 +1560,17 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
         nbrs = atom.GetNeighbors()
         if (nbrs and nbrs[0].GetSymbol() == "N" and not nbrs[0].GetIsAromatic()
                 and not nbrs[0].IsInRing()):
-            if not numbered:
-                #: a single nitrogen keeps the bare italic ``N``.
-                if "N" not in out:
-                    out.append("N")
-            else:
-                #: several nitrogens -> cite the numbered locant. Offer
-                # every numeral the parent could assign (1..n_pos), ascending, so
-                # the lowest round-tripping one wins; bare ``N`` last as the
-                # no-regression fallback (see docstring).
+            if numbered or not bare_n:
+                #: several nitrogens, or one the bare letter may not cite -> the numbered
+                # locant. Offer every numeral the parent could assign (1..n_pos), ascending, so the
+                # lowest round-tripping one wins.
                 for i in range(1, n_pos + 1):
                     tag = f"N{i}"
                     if tag not in out:
                         out.append(tag)
-                if "N" not in out:
-                    out.append("N")
+            if bare_n and "N" not in out:
+                #: a single nitrogen keeps the bare italic ``N`` (last where numbered).
+                out.append("N")
     # italic ``O`` locant: a labelled O on the HYDROXYL oxygen of a
     # carboxyl group (the single-bonded, degree-1 ``-OH``, NOT the ``=O``). It is
     # the same element as the carbonyl O in one suffix, so the bare descriptor is
@@ -1615,32 +1587,18 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
         if (bond is not None
                 and bond.GetBondType() == Chem.BondType.SINGLE
                 and _is_carboxyl_carbon(original, carbon)):
-            if "O" not in out:
-                out.append("O")
-    # italic ``O`` locant for a labelled HYDROGEN (D/T) on a HYDROXYL
-    # oxygen -- the ``O-H -> O-D`` case of a mono-ol / di-ol / poly-ol (and an
-    # ``-OD`` carboxylic acid). The labelled atom is the H (mass 2/3), whose sole
-    # neighbour is a hydroxyl-type O (single bond, one heavy neighbour = C). The
-    # bare front descriptor ``(2H)ethane-1,2-diol`` does NOT parse in OPSIN 2.9.0,
-    # and an integer locant ``(1-2H)`` places the D on a CARBON (a different
-    # isotopomer, discarded by the round-trip gate), so the position can only be
-    # cited by the italic ``O`` letter locant (the Blue Book ``(O-2H, 18O)acetic acid``
-    # -- "the O is a locant"). OPSIN parses ``(O-2H)`` / ``(O1-2H)`` to the O-D.
-    #
-    # Bare ``O`` vs numbered ``O1..Ok`` is chosen BY CONSTRUCTION, not by the RT
-    # gate: OPSIN resolves a bare ``O`` to the LOWEST-locant oxygen (O1), so on an
-    # asymmetric diol ``(O-2H)propane-1,2-diol`` round-trips to the O1 isotopomer
-    # and the gate cannot tell it from ``(O1-2H)`` -- exactly the ``N`` vs ``N1``
-    # situation above. (the Blue Book, "locants are not omitted when there is
-    # a possibility of isomers"): when the hydroxyl oxygens are DISTINGUISHABLE
-    # (propane-1,2-diol: primary vs secondary ``-OH``, 2 symmetry classes) the
-    # numeral is required -> offer ``O1..O(n_pos)`` ascending so the lowest
-    # round-tripping numeral wins (the parent's own numbering, treated as opaque),
-    # bare ``O`` LAST as a no-regression fallback. When the hydroxyl oxygens are
-    # EQUIVALENT or there is a single one (ethane-1,2-diol, a mono-ol, an ``-OD``
-    # acid) there is no isomer possibility /.4) -> bare ``O``. Every
-    # candidate stays OPSIN-RT gated (defence in depth); the numeral's VALUE is
-    # then RT-resolved (``O1`` vs ``O2`` denote different oxygens).
+            labelled_o = True
+    # italic ``O`` locant for a labelled HYDROGEN (D/T) on a HYDROXYL oxygen -- the ``O-H ->
+    # O-D`` case of a mono-ol / di-ol / poly-ol (and an ``-OD`` carboxylic acid). The bare front
+    # descriptor ``(2H)ethane-1,2-diol`` does NOT parse in OPSIN 2.9.0 and an integer locant ``(1-2H)``
+    # places the D on a CARBON, so the position is cited by the italic ``O`` letter locant (the Blue Book
+    # ``(O-2H, 18O)acetic acid`` -- "the O is a locant"). OPSIN resolves a bare ``O`` to the LOWEST-locant
+    # oxygen, so the round-trip gate cannot tell ``(O-2H)`` from ``(O1-2H)``: bare vs numbered is chosen
+    # BY CONSTRUCTION (``rules.isotope_letters``: the Blue Book, the Blue Book,
+    # the Blue Book). The bare letter when the hydroxyl oxygens are one symmetry class, the other labels kept
+    # (ethane-1,2-diol, a mono-ol, butanedioic acid); ``O1..O(n_pos)`` otherwise, ascending
+    # (propane-1,2-diol, pentanedioic acid with a 13C in the chain), the numeral's VALUE RT-resolved
+    # (``O1`` vs ``O2`` denote different oxygens).
     labelled_hydroxyl_h = False
     for idx in label_map:
         atom = original.GetAtomWithIdx(idx)
@@ -1657,8 +1615,8 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
         if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
             continue
         labelled_hydroxyl_h = True
-    if labelled_hydroxyl_h:
-        if _distinct_hydroxyl_o_classes(original) <= 1:
+    if labelled_hydroxyl_h or labelled_o:
+        if bare_o:
             if "O" not in out:
                 out.append("O")
         else:
@@ -1666,8 +1624,6 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
                 tag = f"O{i}"
                 if tag not in out:
                     out.append(tag)
-            if "O" not in out:
-                out.append("O")
     return out
 
 
@@ -2539,7 +2495,7 @@ def _forced_locant_skeleton(namer, stripped_smiles: Optional[str],
     if not _parent_carries_positional_isotope(original):
         return skeleton
     with _isotope_locant_scopes(original):
-        skel2 = _flagged_systematic_namer(namer).name(stripped_smiles)
+        skel2 = _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles)
     if skel2 and "unknown" not in skel2.lower():
         return skel2
     return skeleton
@@ -2596,23 +2552,14 @@ def _decorate_multi_position(
                  for (mass, el) in by_key),
                 key=lambda kv: (kv[0][1], kv[0][0]))
             masked = _mask_isotopes(original, group.keys())
-            # letter locants (italic ``O`` on a labelled hydroxyl/carboxyl
-            # oxygen, ``N`` on an amide/amine D) scoped to THIS group's own atoms, so
-            # the multi-descriptor composition can place a group whose only legal
-            # position is a letter locant -- e.g. an 18O on the carboxyl -OH beside a
-            # 34S inside a trisulfanyl substituent (``3-[ethyl(1-34S)trisulfanyl]
-            # (O-18O)propanoic acid``). The single-descriptor enumeration already
-            # passes these (``_enumerate``); the multi-position path did not, so such
-            # a group returned ``off is None`` and the whole row abstained. Computed
-            # per group (masked to that group's indices) so each group offers only the
-            # letter locants ITS atoms justify; still OPSIN-RT gated (0-wrong).
-            # ``complete_sub_omission`` stays False here (see ``_placement_unambiguous``:
-            # a multi-descriptor name must cite all locants once any is required), and
-            # ``multi_descriptor`` keeps the unit licence off, since it
-            # would read only this group's masked copy (a propanoyl whose CH3 and CH2
-            # are two groups: OPSIN reads the bumped '(3H4)propanoylamino' of the
-            # CH3 group as another constitution, the licence then placed that group
-            # locant-free, and the two groups could not be joined at their slot).
+            # letter locants (italic ``O`` on a labelled hydroxyl/carboxyl oxygen, ``N`` on an
+            # amide/amine D) scoped to THIS group's own atoms, so a group whose only legal position is a
+            # letter locant is placed -- an 18O on the carboxyl -OH beside a 34S inside a trisulfanyl
+            # substituent (``3-[ethyl(1-34S)trisulfanyl](O-18O)propanoic acid``). Each group offers only the
+            # letters ITS atoms justify (bare or numbered by ``rules.isotope_letters``, the structure's
+            # other labels kept). Still OPSIN-RT gated. ``complete_sub_omission`` stays False and ``multi_descriptor`` keeps the
+            # unit licence off (see ``_placement_unambiguous``: a multi-descriptor name must cite
+            # all locants once any is required; the licence would read only this group's masked copy).
             group_letter_locants = _letter_locant_candidates(
                 original, group, n_pos, skeleton=skel)
             _cand, off, desc, loc_rank = _find_best_placement(
@@ -2737,7 +2684,7 @@ def _decorate_multi_position(
     # keeps its licensed omissions.
     if any_positional and namer is not None and stripped_smiles is not None:
         with _isotope_locant_scopes(original):
-            skel_forced = _flagged_systematic_namer(namer).name(stripped_smiles)
+            skel_forced = _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles)
         if (skel_forced and "unknown" not in skel_forced.lower()
                 and skel_forced != skeleton):
             fplacements, _ = _place(skel_forced)
@@ -4029,7 +3976,7 @@ def _decorate_mixed_locant(skeleton: str, keys, original: Chem.Mol,
     # single-descriptor path does at the restoration block below; keep
     # the free-elided skeleton as a fallback if the re-render fails.
     with _isotope_locant_scopes(original):
-        skel_forced = _flagged_systematic_namer(namer).name(stripped_smiles)
+        skel_forced = _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles)
     if skel_forced and "unknown" not in skel_forced.lower():
         skeleton = skel_forced
 
@@ -4284,14 +4231,23 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
         _element_singleton_in(original, el) for el in _label_elements)
         else isotopic_naming_scope("isotope"))
     _shift_token = _BOND_SHIFT_PARSE_REFUSED.set(False)
+    _naming_token = _SKELETON_NAMINGS.set([0])
     from ..validation.thioperoxol_twin import embedded_name   # the skeleton is read by OPSIN, candidate by candidate
     try:
         with _scope, embedded_name():
+            sink: dict = {}
             result = _decorate_isotopic_name_inner(
-                smiles, style, namer, original, stripped, label_map)
+                smiles, style, namer, original, stripped, label_map, sink)
             if result is None:
                 result = _decorate_with_identical_prefixes_apart(
                     smiles, style, namer, original, stripped, label_map)
+            if result is None and sink and getattr(namer, "_general_fallback_unverified", False):
+                # Every strategy above declined: one descriptor per labelled part, read from OPSIN
+                # (rules/isotope_scopes.py). Only here, so no name built above changes, and only at the
+                # best-effort tier (the discriminator ``_flagged_systematic_namer`` reads): its names are
+                # below the PIN, which every other tier declines.
+                from .isotope_scopes import compose_last_resort
+                result = compose_last_resort(sink, original, label_map)
         if (result and _BOND_SHIFT_PARSE_REFUSED.get()
                 and _has_fused_localized_alternation(original)):
             # A fused mancude parent names no ene locants, so for the drawing
@@ -4307,6 +4263,7 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
         return result
     finally:
         _BOND_SHIFT_PARSE_REFUSED.reset(_shift_token)
+        _SKELETON_NAMINGS.reset(_naming_token)
 
 
 def _has_fused_localized_alternation(mol: Chem.Mol) -> bool:
@@ -4369,11 +4326,11 @@ def _decorate_with_identical_prefixes_apart(smiles, style, namer, original, stri
     from ..assembly.composition_primitives import identical_prefixes_cited_apart
     stripped_smiles = Chem.MolToSmiles(stripped)
     try:
-        grouped = (namer.name(stripped_smiles),
-                   _flagged_systematic_namer(namer).name(stripped_smiles))
+        grouped = (_name_skeleton(namer, stripped_smiles),
+                   _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles))
         with identical_prefixes_cited_apart():
-            apart = (namer.name(stripped_smiles),
-                     _flagged_systematic_namer(namer).name(stripped_smiles))
+            apart = (_name_skeleton(namer, stripped_smiles),
+                     _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles))
             if apart == grouped:
                 return None
             result = _decorate_isotopic_name_inner(
@@ -4384,6 +4341,39 @@ def _decorate_with_identical_prefixes_apart(smiles, style, namer, original, stri
         from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(result)
     return result
+
+
+#: The skeleton namings of one decorator call that were begun again under a fresh hang budget (a
+#: list holding the count, set by:func:`decorate_isotopic_name`; None outside a decorator call).
+_SKELETON_NAMINGS: "contextvars.ContextVar[Optional[list]]" = contextvars.ContextVar(
+    "isotope_skeleton_namings", default=None)
+_SKELETON_NAMING_CAP = 5
+
+
+def _name_skeleton(naming, smiles: str) -> str:
+    """``naming.name(smiles)`` for a skeleton of the decorator, begun again under a hang budget of
+    its own when it runs the shared one out.
+
+    The decorator names the isotope-stripped molecule several times (the PIN and the
+    systematic spelling, a forced-locant re-render, the spelling with identical prefixes
+    cited apart), all inside the one ``name`` budget of the labelled molecule; a parent that
+    spends half the ceiling in one naming left the next naming no room, and the
+    ``PerfBudgetExceeded`` of the second ended the molecule before a placement was tried. A
+    naming that runs out is begun again once with a fresh ceiling
+    (``assembly.fragment_naming.rearm_hang_budgets``), up to ``_SKELETON_NAMING_CAP`` times per
+    decorator call (one call names one labelled molecule or fragment), so a call still cannot spend
+    more than that many ceilings more than it did. A naming that stays within the shared budget
+    is not touched, so every name the decorator built before is the name it builds now."""
+    from ..assembly.fragment_naming import PerfBudgetExceeded, rearm_hang_budgets
+    try:
+        return naming.name(smiles)
+    except PerfBudgetExceeded:
+        count = _SKELETON_NAMINGS.get()
+        if count is None or count[0] >= _SKELETON_NAMING_CAP:
+            raise
+        count[0] += 1
+        rearm_hang_budgets()
+        return naming.name(smiles)
 
 
 def _flagged_systematic_namer(namer):
@@ -4495,7 +4485,7 @@ def _carry_skeleton_status(skeleton: str, decorated: str) -> None:
 
 
 def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
-                                  label_map) -> Optional[str]:
+                                  label_map, sink=None) -> Optional[str]:
     """Body of:func:`decorate_isotopic_name`, run inside the ambient isotopic scope."""
     stripped_smiles = Chem.MolToSmiles(stripped)
     from ..errors import is_failure_name
@@ -4521,15 +4511,15 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # best-effort tier and pin_verified at the PIN tier.
     from ..metrics.provenance import get_provenance, restore_provenance
     _prov_before = get_provenance()
-    systematic_name = (namer.name(stripped_smiles) if style == "systematic"
-                       else _flagged_systematic_namer(namer).name(stripped_smiles))
+    systematic_name = _name_skeleton(namer if style == "systematic"
+                                     else _flagged_systematic_namer(namer), stripped_smiles)
     _prov_systematic = get_provenance()
     if style == "systematic":
         pin_name = systematic_name
         _prov_pin = _prov_systematic
     else:
         restore_provenance(_prov_before)
-        pin_name = namer.name(stripped_smiles)
+        pin_name = _name_skeleton(namer, stripped_smiles)
         _prov_pin = get_provenance()
 
     def _usable(s: Optional[str]) -> bool:
@@ -4700,7 +4690,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
             # round-trips (the pattern of the single-descriptor placement below).
             _prov_skeleton = get_provenance()
             with _isotope_locant_scopes(original):
-                skel2 = _flagged_systematic_namer(namer).name(stripped_smiles)
+                skel2 = _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles)
             _prov_skel2 = get_provenance()
             restore_provenance(_prov_skeleton)
             if (skel2 and "unknown" not in skel2.lower() and skel2 != skeleton
@@ -4783,7 +4773,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
             # that record, a name kept on ``skeleton`` does not.
             _prov_skeleton = get_provenance()
             with _isotope_locant_scopes(original):
-                skel2 = _flagged_systematic_namer(namer).name(stripped_smiles)
+                skel2 = _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles)
             _prov_skel2 = get_provenance()
             restore_provenance(_prov_skeleton)
             # (converse): on the retained/PIN pass the systematic
@@ -4940,8 +4930,8 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
             namer=namer, stripped_smiles=stripped_smiles, merge_collisions=True)
         if merged is not None:
             return merged
-    # De-multiplication (single AND mixed nuclides) was already attempted
-    # ahead of this enumeration by _decorate_demultiplied; nothing else to
-    # try -> fail closed (never a wrong labeled name).
+    # Nothing left to try: the caller offers this skeleton to the scope composer after the other spelling.
+    if sink is not None:
+        sink.update(skeleton=skeleton, n_pos=n_pos, prov=get_provenance())
     return None
 

@@ -28,7 +28,7 @@ from orthonym.rules.isotopes import (
     _escalate_for_unit_descriptor,
     _multiplied_unit_slots,
 )
-from tests.support.rt_assert import _independent_parse
+from tests.support.rt_assert import _independent_parse, name_is_rt_exact
 
 DPPC_14C2 = (
     "CCCCCCCCCCCCCCC[14C](=O)OC[C@H](COP(=O)(O)OCC[N+](C)(C)C)O[14C](=O)CCCCCCCCCCCCCCC"
@@ -111,11 +111,24 @@ class TestPerUnitDescriptors:
         assert r["name"] == "di[(2H3)methyl] sulfoxide" and r["tier"] == "systematic_verified"
         assert Orthonym(style="pin").name_tiered(smi)["tier"] == "abstain"
 
-    def test_dmf_d7_stays_abstained(self):
-        # OPSIN cannot read 'N,N-di[(2H3)methyl](2H)formamide': no name that reads back
+    def test_dmf_d7_is_named_below_the_pin_with_the_count_shown(self):
+        # Was 'stays abstained': OPSIN 2.9.0 cannot read the Blue Book spelling
+        # 'N,N-di[(2H3)methyl](2H)formamide' (the count is omitted where one position holds one atom;
+        # NAMES,, the Blue Book: "When polysubstitution at a single position is
+        # possible, the number of atoms substituted is always specified as a right subscript...,
+        # even in case of monosubstitution"), and no strategy of the decorator built another name.
+        # The scope composer (rules/isotope_scopes.py) cites the count, '(2H1)formamide', which OPSIN
+        # reads: the name is below the PIN, never a PIN. UNVERIFIED as a spelling (it is not the
+        # Blue Book's); verified as a structure by a fresh OPSIN call to the full InChIKey (the check
+        # below), which the old assertion ("no name that reads back") could not survive, and a
+        # wrong count does not read back.
         smi = "[2H]C(=O)N(C([2H])([2H])[2H])C([2H])([2H])[2H]"
-        assert Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smi)[
-            "tier"] == "abstain"
+        name = "N,N-di[(2H3)methyl](2H1)formamide"
+        got = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smi)
+        assert (got["name"], got["tier"]) == (name, "systematic_verified"), got
+        assert name_is_rt_exact(name, smi)
+        assert not name_is_rt_exact("N,N-di[(2H2)methyl](2H1)formamide", smi)
+        assert Orthonym(style="pin").name_tiered(smi)["tier"] == "abstain"
 
 
 @pytest.mark.unit

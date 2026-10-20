@@ -151,6 +151,7 @@ def test_a_descriptor_of_several_nuclide_groups_is_read_as_a_descriptor(smiles, 
     ("2,2-2H2", True), ("N-2H1", True), ("O-18O", True), ("13C", True),
     ("1-13C,2,2-2H2", True), ("2,4-2H2,15N", True), ("O-2H,18O", True), ("18O-2H,18O", True),
     ("2-13C,O-18O", True), ("2,2-2H2,O-18O", True), ("N,2,2-2H3", True), ("2-2H1,O-2H", True),
+    ("2-13C,O1-18O", True), ("O1,6-2H2", True),
     ("4-chlorophenyl", False), ("2,2-dimethylpropyl", False), ("1-13C,chloro", False), ("2,3", False),
 ])
 def test_the_lexer_reads_repeated_nuclide_groups_only_as_an_isotope_descriptor(content, expected):
