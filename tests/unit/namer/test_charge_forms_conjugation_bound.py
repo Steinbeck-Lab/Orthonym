@@ -238,22 +238,23 @@ def test_a_carbene_ladder_has_no_second_form_on_either_side_of_the_bound(n):
 
 
 @pytest.mark.parametrize("n", [5, 6, 9])
-def test_n_azide_ladder_above_the_bound_has_its_form(n):
+def test_n_azide_ladder_above_the_bound_has_no_form(n):
+    # the +1 of an azido group does not move (``charge_shift.azide_atoms``,: the matching above the bound
+    # still builds its candidates and builds no supplier, and the filter takes none of them
     smiles = n_azide_ladder(n)
     assert pi_atoms(Chem.MolFromSmiles(smiles)) > BOUND
     with supplier_calls(forbid=True) as calls:
-        assert len(_forms(smiles)) == 2
+        assert _forms(smiles) is None
     assert calls == []
 
 
-def test_n_azide_ladder_jump_across_the_bound_is_pinned():
-    # Two engines, two answers: RDKit's 64-structure truncation gives one form at n = 1 and none at n = 3 and n = 4, the
-    # matching gives one form at every n above the bound. The jump belongs to the engines, not to the molecule.
+def test_n_azide_ladder_has_no_form_on_either_side_of_the_bound():
+    # Before the azide rule the two engines disagreed here: RDKit's 64-structure truncation gave one form at n = 1 and
+    # none at n = 3 and n = 4, the matching one form at every n above the bound. The +1 of the azide does not move, so
+    # no engine offers a form at any n and there is no jump left to pin.
     assert pi_atoms(Chem.MolFromSmiles(n_azide_ladder(4))) <= BOUND < pi_atoms(Chem.MolFromSmiles(n_azide_ladder(5)))
-    assert len(_forms(n_azide_ladder(1))) == 2
-    assert _forms(n_azide_ladder(3)) is None
-    assert _forms(n_azide_ladder(4)) is None
-    assert len(_forms(n_azide_ladder(5))) == 2
+    for n in (1, 3, 4, 5):
+        assert _forms(n_azide_ladder(n)) is None
 
 
 def test_the_ladders_cross_the_bound():
@@ -270,13 +271,18 @@ def test_rows_at_or_below_the_bound_still_use_rdkit():
 
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("row", rows("n_azides.tsv"), ids=lambda r: r["id"])
-def test_n_azide_keeps_its_forms_and_its_pin(row):
-    # an acyclic dipole on a tertiary N moves the charge: no rule "azide is fixed" removes its second form
+def test_n_azide_has_no_form_and_is_named_as_drawn(row):
+    # The +1 of an azido group does not move (``charge_shift.azide_atoms``): the input is named as it is drawn, with the
+    # prefix 'azido' "AZIDES", the Blue Book). It used to get a second form, 'C[N+](C)=NN=[N-]' (the +1 on
+    # the amine nitrogen), and the pin_verified name of THAT drawing, '4,4-dimethyltetraaz-1,3-dien-4-ium-1-ide', which a
+    # fresh OPSIN call reads to other atoms than the azide's (tests/unit/rules/test_n_azides.py). The PIN tier declines:
+    # the preferred N-azido amine name is not built.
     jar_or_skip()
-    forms = _forms(row["smiles"])
-    assert forms is not None and len(forms) == 2
-    named = Orthonym(style="pin").name_tiered(row["smiles"])
-    assert (named["tier"], named["name"]) == ("pin_verified", row["pin_tier_name_with_forms"])
+    assert _forms(row["smiles"]) is None
+    from tests.support.rt_assert import name_best_effort
+    named = name_best_effort(row["smiles"])
+    assert (named["tier"], named["name"]) == ("systematic_verified", row["best_effort_name"])
+    assert Orthonym(style="pin").name_tiered(row["smiles"])["tier"] != "pin_verified"
 
 
 def test_the_count_ignores_atom_order():

@@ -1907,6 +1907,86 @@ def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
     return name
 
 
+def _charge_sites_rt_ok(name: str, mol) -> bool:
+    """Strict 0-wrong read-back for a dipolar name: OPSIN reads ``name`` to the canonical isomeric SMILES of
+    ``mol`` itself, so the same atoms carry the same charges, and to its full InChIKey. The full key alone
+    does not tell the drawings of one dipole apart: ``CN(C)N=[N+]=[N-]`` and ``C[N+](C)=NN=[N-]`` share one, and
+    a ring N-imide read with its charges elsewhere shares the key of the input. Fails closed (False) on a name
+    OPSIN does not read, no OPSIN, or a structure that does not parse."""
+    if not name:
+        return False
+    from ..validation.opsin_roundtrip import opsin_parse
+    from ..validation.twin_spellings import opsin_spelling
+    try:
+        parsed = opsin_parse(opsin_spelling(name))
+        read = Chem.MolFromSmiles(parsed) if parsed else None
+        return (read is not None and Chem.MolToSmiles(read) == Chem.MolToSmiles(mol)
+                and Chem.MolToInchiKey(read) == Chem.MolToInchiKey(mol))
+    except Exception:  # noqa: BLE001 -- a failed read-back proves nothing, so the name is withheld
+        return False
+
+
+def emit_ring_cation_azanide(mol, cation_idx: int, anion_idx: int) -> str:
+    """ "Anionic and cationic centers on different parent structures" (the Blue Book): the ANION is
+    the parent and the cationic part is prefixed to it: a ring N+ with an exocyclic anionic nitrogen (the
+    N-imide ylides,:42499) is the azanide of its group, the ring cation a prefix:42290,
+    'pyridin-1-ium-1-yl (preferred prefix)'), with the group the nitrogen carries cited beside it
+    ,:7272: the first cited prefix of a mononuclear parent has no enclosing marks)::
+
+        C1=CC=[N+](C=C1)[NH-] -> (pyridin-1-ium-1-yl)azanide
+        C1(=CC=CC=C1)[N-][N+]1=CC=CC=C1 -> phenyl(pyridin-1-ium-1-yl)azanide
+        C1=CC=C[N+]1=[N-] -> (1H-pyrrol-1-ium-1-ylidene)azanide
+
+    The ring cation's prefix is ``substituent_naming.cation_to_prefix`` (``ring_cation_hydro.ring_cation_prefix``:
+    one numbering, free valence at the cation); the azanide of a primary amine anion is the book's alternative to
+    its 'aminide', see ``_azanide_of_substituent``), and the Blue Book gives no ring N-imide
+    example, so the name is recorded as no PIN. Read back to the canonical SMILES of ``mol`` (charges on the same
+    atoms, ``_charge_sites_rt_ok``); '' on any decline."""
+    from ..assembly.substituent_naming import (
+        _compose_n_substituent_prefix,
+        cation_to_prefix,
+        name_substituent_fragment,
+    )
+    from ..metrics.provenance import best_effort_ctx, record_non_pin_fragment
+    cat, an = mol.GetAtomWithIdx(cation_idx), mol.GetAtomWithIdx(anion_idx)
+    if (len([a for a in mol.GetAtoms() if a.GetFormalCharge()]) != 2 or an.GetSymbol() != 'N'
+            or an.GetFormalCharge() != -1 or an.IsInRing() or not cat.IsInRing()):
+        return ''
+    bond = mol.GetBondBetweenAtoms(cation_idx, anion_idx)
+    groups = [n.GetIdx() for n in an.GetNeighbors() if n.GetIdx() != cation_idx and n.GetAtomicNum() > 1]
+    if bond is None or len(groups) > 1:
+        return ''
+    # =N- holds neither a group nor a hydrogen; -N(-)- holds exactly one of them
+    if (bond.GetBondType() == Chem.BondType.DOUBLE and (groups or an.GetTotalNumHs())) or (
+            bond.GetBondType() == Chem.BondType.SINGLE and len(groups) + an.GetTotalNumHs() != 1):
+        return ''
+    if bond.GetBondType() not in (Chem.BondType.SINGLE, Chem.BondType.DOUBLE):
+        return ''
+    cation = cation_to_prefix(mol, cation_idx, anion_idx)
+    if not cation:
+        return ''
+    prefixes = [cation]
+    if groups:
+        rw = Chem.RWMol(mol)
+        rw.RemoveBond(anion_idx, groups[0])
+        group = next(list(c) for c in Chem.GetMolFrags(rw.GetMol(), asMols=False, sanitizeFrags=False)
+                     if groups[0] in c)
+        if cation_idx in group:
+            return ''
+        name = name_substituent_fragment(mol, group, groups[0], [anion_idx])
+        if not name and best_effort_ctx.get():
+            from ..assembly.universal_substituent import name_universal_substituent_prefix
+            name = name_universal_substituent_prefix(mol, group, groups[0])
+        if not name:
+            return ''
+        prefixes.append(name)
+    azanide = f"{_compose_n_substituent_prefix(prefixes)}azanide"
+    if not _charge_sites_rt_ok(azanide, mol):
+        return ''
+    record_non_pin_fragment(azanide)
+    return azanide
+
+
 def _azanide_of_substituent(mol, anion_idx: int) -> str:
     """ Anionic centers on other characteristic groups (the Blue Book): "named
     on the basis of the corresponding anionic parent hydrides" (``acetylazanide (PIN)``,:41079):

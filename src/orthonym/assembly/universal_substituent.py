@@ -3818,20 +3818,29 @@ def _azide_nitrogens(mol, alpha_idx: int):
     its three nitrogen indices ``{alpha, beta, gamma}``, else ``None``.
 
     The centre is defined by CONNECTIVITY + CHARGE, not one literal bond-order
-    pattern (so both drawings match): N_alpha has exactly one N neighbour
+    pattern (so both drawings match): N_alpha has exactly one azide N neighbour
     (N_beta, the central nitrogen, always ``+1`` in an azide); N_beta has exactly
     two N neighbours (alpha, gamma) and no other heavy neighbour and no H; the
     terminal N_gamma is heavy-degree 1 (only bonded to beta) and H-free; and the
     end nitrogens {alpha, gamma} carry ``{0, -1}`` so the group is net-neutral.
-    Nitro/nitrogen-hydride/azide-anion shapes fail one of these exactly."""
+    Nitro/nitrogen-hydride/azide-anion shapes fail one of these exactly.
+
+    The group may stand on a nitrogen: N_alpha then has a second N neighbour, a neutral host nitrogen
+    ('N-azido-N-methylmethanamine', '3-[4-(azidoamino)phenyl]propanoic acid'). "N-SUBSTITUTION OF
+    AMINES AND IMINES BY HETEROATOMS" (the Blue Book): "substitution on the nitrogen atom of amines
+    and imines was allowed for all characteristic groups cited as prefixes (see Table 5.1)"; "AZIDES"
+    (:25989): the group is the prefix 'azido'. Only the host is outside the group; ``_azide_shortcut``
+    takes it as the one outside neighbour."""
     a = mol.GetAtomWithIdx(alpha_idx)
     if a.GetSymbol() != "N" or a.GetTotalNumHs() != 0:
         return None
     a_n = [n for n in a.GetNeighbors() if n.GetSymbol() == "N"]
-    if len(a_n) != 1:
+    centres = [n for n in a_n if n.GetFormalCharge() == 1]
+    hosts = [n for n in a_n if n.GetFormalCharge() == 0]
+    if len(centres) != 1 or len(hosts) + 1 != len(a_n) or len(hosts) > 1:
         return None
-    beta = a_n[0]
-    if beta.GetFormalCharge() != 1 or beta.GetTotalNumHs() != 0:
+    beta = centres[0]
+    if beta.GetTotalNumHs() != 0:
         return None
     b_n = [n for n in beta.GetNeighbors() if n.GetSymbol() == "N"]
     b_heavy = [n for n in beta.GetNeighbors() if n.GetAtomicNum() > 1]

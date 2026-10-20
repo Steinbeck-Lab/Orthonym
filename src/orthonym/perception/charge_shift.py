@@ -72,6 +72,15 @@ _LONE_PAIR_Z = frozenset({7, 8, 15, 16, 33, 34, 52})
 #: N-oxide (the charge of those sits on the oxygen)
 MOBILE_N_CATION = Chem.MolFromSmarts('[#7+;!$([#7+]~[#8-]);!$([#7+]=[#8]);$([#7+]=*),$([#7+]:*)]')
 
+#: the atoms of an azido group in each of its three drawings: ``-N=[N+]=[N-]``, its charge-separated twin
+#: ``-[N-]-[N+]#N`` and, on a nitrogen host only, ``R2[N+]=N-N=[N-]`` (the +1 on the host; the host is part of the group
+#: there, as it is the atom that holds the +1). The group stands on a heavy atom (D2): hydrazoic acid itself, HN3, has no
+#: host for the prefix 'azido', so its zwitterionic name is the only name it has
+_AZIDE_DRAWINGS = tuple(Chem.MolFromSmarts(p) for p in (
+    '[#7;X2;D2;+0]=[#7+;X2]=[#7-;X1]',
+    '[#7;X2;D2;-1]-[#7+;X2]#[#7;X1;+0]',
+    '[#7+;X3;!R]=[#7;X2;+0]-[#7;X2;+0]=[#7-;X1]'))
+
 _BOND_OF_ORDER = {0: Chem.BondType.SINGLE, 1: Chem.BondType.DOUBLE, 2: Chem.BondType.TRIPLE}
 _PI_BONDS = {Chem.BondType.DOUBLE: 1, Chem.BondType.TRIPLE: 2}
 
@@ -176,7 +185,14 @@ def accepted_charge_forms(mol, smiles: str, candidates) -> Dict[str, Tuple[str, 
     changes places and goes onto a neutral nitrogen with three connections (a lone pair to give: amidinium, guanidinium,
     azolium), and the number of double bonds between an aromatic and a non-aromatic atom is the drawing's. It is read
     back from its written string and kept only when the standard InChIKey is the drawing's, so a form cannot describe
-    another molecule. The bounds on the number of forms are those of ``namer._charge_forms``, not this function's."""
+    another molecule. The bounds on the number of forms are those of ``namer._charge_forms``, not this function's.
+
+    The +1 of an azido group does not move (:func:`azide_atoms`): a form in which an atom of the group in either
+    drawing loses or gains the +1 is no form. ``namer._charge_forms`` says it: "A cumulated or dipolar nitrogen cation (an
+    azide, a diazo compound, a nitrilium) moves a -1, not a +1, between its resonance structures... such an input is named
+    as it is drawn". Without the rule RDKit's enumeration of ``CN(C)N=[N+]=[N-]`` offered ``C[N+](C)=NN=[N-]`` (the +1 on
+    the amine nitrogen, a neutral nitrogen with three connections) and the form choice shipped the name of that drawing,
+    read by OPSIN to other atoms than the azide the input draws."""
     from .centres_bridge import _smiles_output_order
     key = Chem.MolToInchiKey(mol)
     base_h = [a.GetTotalNumHs() for a in mol.GetAtoms()]
@@ -185,6 +201,7 @@ def accepted_charge_forms(mol, smiles: str, candidates) -> Dict[str, Tuple[str, 
     n_charges = sorted(c for k, c in enumerate(base_charge) if is_n[k])
     drawn = Chem.MolToSmiles(mol)
     exocyclic = exocyclic_double_bonds_to_aromatic(mol)
+    azide = azide_atoms(mol)
     found: Dict[str, Tuple[str, Optional[Tuple[int, ...]]]] = {drawn: (smiles, None)}
     for form in candidates:
         if form is None:
@@ -206,7 +223,8 @@ def accepted_charge_forms(mol, smiles: str, candidates) -> Dict[str, Tuple[str, 
                 or any(charge[k] != base_charge[k] and k not in lost and k not in gained
                        for k in range(len(charge)))
                 or any(mol.GetAtomWithIdx(k).GetTotalDegree() != 3 for k in gained)
-                or exocyclic_double_bonds_to_aromatic(form) != exocyclic):
+                or exocyclic_double_bonds_to_aromatic(form) != exocyclic
+                or (lost | gained) & (azide | azide_atoms(form))):
             continue
         written = Chem.MolToSmiles(form, canonical=False)
         order = _smiles_output_order(form)
@@ -216,6 +234,15 @@ def accepted_charge_forms(mol, smiles: str, candidates) -> Dict[str, Tuple[str, 
             continue
         found.setdefault(Chem.MolToSmiles(back), (written, tuple(order)))
     return found
+
+
+def azide_atoms(mol) -> frozenset:
+    """The atoms of the azido groups of ``mol``, in whichever of the three drawings of:data:`_AZIDE_DRAWINGS` it
+    has them. "AZIDES" (the Blue Book): the group -N3 (-N=N+=N-) is named by the prefix 'azido'; its
+    charges are the bonding of that prefix, not ionic centres that move."""
+    if not any(a.GetFormalCharge() == 1 for a in mol.GetAtoms()):
+        return frozenset()
+    return frozenset(i for drawing in _AZIDE_DRAWINGS for match in mol.GetSubstructMatches(drawing) for i in match)
 
 
 def charge_places(forms) -> int:

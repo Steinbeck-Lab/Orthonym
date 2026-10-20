@@ -1,3 +1,3 @@
-id	smiles	pin_tier_name_with_forms
-dimethylamino_azide	CN(C)N=[N+]=[N-]	4,4-dimethyltetraaz-1,3-dien-4-ium-1-ide
-diethylamino_azide	CCN(CC)N=[N+]=[N-]	4,4-diethyltetraaz-1,3-dien-4-ium-1-ide
+id	smiles	best_effort_name
+dimethylamino_azide	CN(C)N=[N+]=[N-]	[azido(methyl)amino]methane
+diethylamino_azide	CCN(CC)N=[N+]=[N-]	1-[azido(ethyl)amino]ethane

@@ -34,7 +34,6 @@ FORMS = {
     "C[n+]1c[nH]c2ccccc21": ["C[n+]1c[nH]c2ccccc21", "Cn1c[nH+]c2ccccc21"],
     "C[N+]1=CNc2ccccc21": ["C[n+]1c[nH]c2ccccc21", "Cn1c[nH+]c2ccccc21"],
     "Cc1ccnn2c(C)n[n+](C)c12": ["Cc1ccn[n+]2c(C)nn(C)c12", "Cc1ccnn2c(C)n[n+](C)c12"],
-    "CN(C)N=[N+]=[N-]": ["CN(C)N=[N+]=[N-]", "C[N+](C)=NN=[N-]"],
 }
 
 # pass the pre-checks and reach RDKit, but the drawing has no second charge-only form
@@ -43,6 +42,11 @@ NO_SECOND_FORM = [
     "C[n+]1ccccc1",                 # one nitrogen
     "Nc1cc[nH+]cc1",                # the charge would move through the ring to the amino group
     "[NH2+]=c1cc[nH]cc1",           # the iminium drawing of the same class
+    # an azide on N: its internal +1 is no mobile charge (perception/charge_shift.py); the drawing
+    # C[N+](C)=NN=[N-] places the charges on other atoms and is no form of this input. "AZIDES"
+    # (the Blue Book) names the group by the prefix 'azido', and (:43298) gives the
+    # zwitterion parent only as method (3), no PIN.
+    "CN(C)N=[N+]=[N-]",
 ]
 
 # named as drawn before any enumeration: no charge, no mobile N+, a CXSMILES string, a lone-pair

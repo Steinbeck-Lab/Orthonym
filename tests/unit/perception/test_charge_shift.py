@@ -87,7 +87,6 @@ FORMS = {
     "C[n+]1c[nH]c2ccccc21": {"Cn1c[nH+]c2ccccc21"},
     "C[N+]1=CNc2ccccc21": {"Cn1c[nH+]c2ccccc21"},
     "Cc1ccnn2c(C)n[n+](C)c12": {"Cc1ccn[n+]2c(C)nn(C)c12"},
-    "CN(C)N=[N+]=[N-]": {"C[N+](C)=NN=[N-]"},
     "C[n+]1cc[nH]c1C(=O)[O-]": {"Cn1cc[nH+]c1C(=O)[O-]"},
     "CNC(=[NH2+])c1ccc(cc1)C(N)=[NH+]C": {"CNC(=[NH2+])c1ccc(C(=[NH2+])NC)cc1", "C[NH+]=C(N)c1ccc(C(N)=[NH+]C)cc1"},
 }
@@ -170,6 +169,17 @@ def test_helper_never_misses_a_form_rdkit_gives(smiles):
 @pytest.mark.parametrize("smiles", sorted(FORMS))
 def test_form_sets_are_pinned(smiles):
     assert _helper(smiles) == FORMS[smiles]
+
+
+@pytest.mark.parametrize("smiles", ["CN(C)N=[N+]=[N-]", "C[N+](C)=NN=[N-]", "CCN(CC)N=[N+]=[N-]",
+                                    "O=C1NCCCN1c1ccc(N=[N+]=[N-])cc1"])
+def test_the_filter_takes_no_form_in_which_an_azido_group_loses_or_gains_the_plus(smiles):
+    # The +1 of an azido group does not move (``azide_atoms``, the Blue Book). The helper and RDKit's
+    # enumeration still offer the +1 on the neutral amine nitrogen ('C[N+](C)=NN=[N-]') as a candidate; the filter that
+    # decides which candidates are forms takes it from neither drawing, whichever of the two is the input.
+    mol = Chem.MolFromSmiles(smiles)
+    for candidates in (cs.charge_shift_forms(mol), namer._rdkit_charge_candidates(mol)):
+        assert set(namer._accepted_charge_forms(mol, smiles, candidates)) == {Chem.MolToSmiles(mol)}
 
 
 @pytest.mark.parametrize("smiles", NO_FORM)

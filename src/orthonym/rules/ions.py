@@ -7371,7 +7371,12 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
 
     Numbering: anionic suffixes get seniority for low locants (so the
     '-ide' locant is minimised before the '-ium' locant); the cationic suffix is
-    cited FIRST in the name ('<stem>-<ium>-ium-<ide>-ide'). Fail-closed (None)."""
+    cited FIRST in the name ('<stem>-<ium>-ium-<ide>-ide'). Fail-closed (None).
+
+    The charges of an azido group are the bonding of the prefix 'azido', the Blue Book), which
+    gives the preferred name,:43298): the azide drawing is declined above, and the zwitterion
+    name that is built for an input DRAWN with its +1 on the amine nitrogen ('C[N+](C)=NN=[N-]') names that
+    drawing and is recorded as no PIN."""
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
     if any(a.GetNumRadicalElectrons() for a in atoms_of(mol)):
@@ -7544,7 +7549,12 @@ def emit_cumulative_ium_ide(mol) -> Optional[str]:
     # ('2-ethyl-1,3-dimethyl'), but the last block attaches to the parent stem
     # directly ('...dimethyltriaz-...'); the trailing stem starts with a letter.
     prefix_str = '-'.join(p[2] for p in prefix_parts)
-    return f"{prefix_str}{core}"
+    name = f"{prefix_str}{core}"
+    from ..perception.charge_shift import azide_atoms
+    if azide_atoms(mol):   # method (3) names the azide; method (1), 'azido', gives the PIN
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
 
 
 # =============================================================================
@@ -7662,7 +7672,9 @@ def emit_ylide(mol) -> Optional[str]:
 
     The nitrogen PIN is the amine-based '2-(N,N-dimethylmethanaminiumyl)propan-2-
     ide', but that form is OPSIN-unparseable; the azane-based 'trimethylazaniumyl'
-    equivalent (which OPSIN accepts) is emitted instead (W4-I4). Fail-closed."""
+    equivalent (which OPSIN accepts) is emitted instead (W4-I4). A ring N+ with an
+    exocyclic N- (an N-imide) is the azanide of its group with the ring cation as a prefix
+    : ``charged_router.emit_ring_cation_azanide``. Fail-closed."""
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
     if any(a.GetNumRadicalElectrons() for a in atoms_of(mol)):
@@ -7674,8 +7686,11 @@ def emit_ylide(mol) -> Optional[str]:
     if len(cations) != 1 or len(anions) != 1:
         return None
     cat, an = cations[0], anions[0]
+    if cat.IsInRing() and an.GetSymbol() == 'N':   # a ring N-imide: the azanide is the parent
+        from .charged_router import emit_ring_cation_azanide
+        return emit_ring_cation_azanide(mol, cat.GetIdx(), an.GetIdx()) or None
     if an.GetSymbol() not in ('C', 'N') or an.IsInRing():
-        return None  # carbanion/aminide parent (acyclic); ring ylides out of scope
+        return None  # carbanion/aminide parent (acyclic); a ring anion is out of scope
     if cat.GetSymbol() not in _YLIDE_ONIUM_ELEMENTS or cat.GetTotalNumHs() != 0:
         return None  # onium must be a fully-substituted (no free H) closed-shell cation
     bond = mol.GetBondBetweenAtoms(cat.GetIdx(), an.GetIdx())

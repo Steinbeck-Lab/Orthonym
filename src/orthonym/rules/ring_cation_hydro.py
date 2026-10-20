@@ -36,6 +36,8 @@ prefixes (e). A ring nitrogen that holds no hydron to remove (``N+(CH3)=C``) is 
 hydron, then substituted above, example '1-methylpyridin-1-ium (PIN)',:41394): its
 substituent is a prefix at the locant of the 'ium' (``hydron_site_parent``). The descriptors of a ring name
 that carries its own numbering are cited by the ring's producer (``ring_stereo_prefix``).
+
+The same ring cation as the cationic PREFIX of a zwitterion ('pyridin-1-ium-1-yl', is ``ring_cation_prefix``.
 """
 import re
 
@@ -291,3 +293,71 @@ def _stem_is_in_numbering(stem: str, sel) -> bool:
         cited = ','.join(f"{loc[p]}H" for p in sorted(ih, key=lambda q: loc[q]))
         return rest.startswith(f"-{cited}-")
     return not re.match(r'-?\d+H', rest)
+
+
+#: a parent ring and nothing else: no hydro prefix, no fusion or bridge bracket, no lambda
+_PLAIN_RING_STEM = re.compile(r'^(?:\d+H-)?(?:\d+(?:,\d+)*-)?[a-z]+$')
+
+
+def ring_cation_prefix(mol, cation_idx: int, attach_idx: int) -> str:
+    """The prefix of a ring nitrogen cation that is bonded to the rest of the molecule at the cationic centre
+    itself, as the cationic part of a zwitterion: 'pyridin-1-ium-1-yl', '1H-pyrrol-1-ium-1-ylidene',
+    '1,2-thiazol-2-ium-2-yl'. '' where it is not built (no simple monocycle, a hydro or fused parent, an
+    exocyclic double bond or a charge elsewhere on the ring side, a substituent with no name).
+
+    ** "Anionic and cationic centers on different parent structures"** (the Blue Book): zwitterions
+    "may be named by prefixing the name of the cationic center or the parts of the structure containing the
+    cationic centers to the name of the anionic parent structure". ** "CATIONIC PREFIX NAMES"** (:42290),
+    method (1), "Method (1) leads to preferred IUPAC names": "all prefix names are formed by adding the suffixes
+    'yl', 'ylidene', etc. to the cation name", 'pyridin-1-ium-1-yl (preferred prefix)', 'the suffix 'yl' being
+    senior to 'ylidene''. The cation is the parent hydride plus a hydron,:41366): the ring is
+    numbered once (the heteroatoms, the 'ium' and its free valence at one atom, the prefixes of the ring in
+     order) by the numbering of ``ions._charged_ring_locants``. ``attach_idx`` is the anionic atom the free
+    valence goes to; the bond to it decides 'yl' (single) or 'ylidene' (double)."""
+    from ..perception.rings import get_ring_systems
+    from .ions import (
+        _charged_ring_locants,
+        _elide_terminal_e,
+        _join_prefix_stem,
+        _order_ring_cycle,
+        _p74_bare_ring_stem,
+        _p74_ring_substituent_groups,
+        _p74_ring_substituent_prefix,
+    )
+    cat = mol.GetAtomWithIdx(cation_idx)
+    bond = mol.GetBondBetweenAtoms(cation_idx, attach_idx)
+    if (bond is None or cat.GetSymbol() != 'N' or cat.GetFormalCharge() != 1 or cat.GetTotalNumHs()
+            or cat.GetDegree() != 3 or not cat.IsInRing()
+            or any(a.GetNumRadicalElectrons() for a in mol.GetAtoms())
+            or bond.GetBondType() not in (Chem.BondType.SINGLE, Chem.BondType.DOUBLE)):
+        return ''
+    ring_system = next((rs for rs in get_ring_systems(mol, include_spiro=True) if cation_idx in rs), None)
+    if ring_system is None or attach_idx in ring_system or _order_ring_cycle(mol, ring_system) is None:
+        return ''
+    ring = set(ring_system)
+    # the anion side: the free valence's atom and everything beyond it, which is no prefix of the ring
+    skip, stack = {attach_idx}, [attach_idx]
+    while stack:
+        for n in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+            if n.GetIdx() != cation_idx and n.GetIdx() not in skip:
+                skip.add(n.GetIdx())
+                stack.append(n.GetIdx())
+    if skip & ring:
+        return ''
+    # a bond that leaves the ring (other than the free valence) is a single bond to a substituent: an exocyclic
+    # double bond is a '-ylidene' that the ring-substituent namer would spell as a '-yl'
+    if any(b.GetBondType() != Chem.BondType.SINGLE for i in ring for b in mol.GetAtomWithIdx(i).GetBonds()
+           if b.GetOtherAtomIdx(i) not in ring and b.GetOtherAtomIdx(i) != attach_idx):
+        return ''
+    tie = ring_numbering_tie_key(mol, lambda: _p74_ring_substituent_groups(
+        mol, ring_system, {a: a for a in ring_system}, skip))
+    locants, indicated_h = _charged_ring_locants(mol, ring_system, cation_idx, tie_key=tie)
+    if not locants or indicated_h is not None:
+        return ''
+    prefix = _p74_ring_substituent_prefix(mol, ring_system, locants, skip)
+    stem = _p74_bare_ring_stem(mol, ring_system, cation_idx)
+    if prefix is None or not stem or not _PLAIN_RING_STEM.match(stem):
+        return ''
+    where = locants[cation_idx]
+    free_valence = 'ylidene' if bond.GetBondType() == Chem.BondType.DOUBLE else 'yl'
+    return f"{_join_prefix_stem(prefix, _elide_terminal_e(stem))}-{where}-ium-{where}-{free_valence}"

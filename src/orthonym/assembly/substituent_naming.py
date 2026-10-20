@@ -2394,17 +2394,12 @@ def _name_polyfunctional_acyclic_substituent_impl(
                 consumed.add(o_single.GetIdx())
                 _add_prefix(c_nbr[0], _POLYFUNC_CARBOXY_PREFIX)
 
-    # ---- Pass 1b (RISK 5 Class 2, /: a SUBSTITUTED
-    # amine -N(R)(R') on a backbone carbon -> a composed '(dialkylamino)' PREFIX,
-    # consuming the N and its alkyl branches so they never enter the backbone.
-    # Delegates every ordering/marking decision to the ONE amino-prefix assembler
-    # (`_assemble_amino_prefix_core`), the same one the PIN path uses -- so the
-    # general-engine substituent path stops fabricating the OPSIN-unparseable
-    # `amino-N,N-diethylethyl` string-surgery token. Primary -NH2 (no branch) is
-    # left for the Pass-2 'amino' branch below. Fail-closed (skip this N, leaving
-    # the fragment to decline as before) for anything outside the v1 envelope:
-    # charged / ring / imine-or-amide N, >1 carbon host, or a branch the composer
-    # cannot name (ring/hetero/complex). ----
+    # ---- Pass 1b (RISK 5 Class 2, /: a SUBSTITUTED amine -N(R)(R') on a
+    # backbone carbon -> a composed '(dialkylamino)' PREFIX, consuming the N and its alkyl branches. Every
+    # ordering/marking decision is the ONE amino-prefix assembler's (`_assemble_amino_prefix_core`), the PIN
+    # path's own. Primary -NH2 (no branch) is left for the Pass-2 'amino' branch. An azido branch is the
+    # prefix 'azido' on the amino N the Blue Book,:25989): '(azidoamino)', '[azido(methyl)amino]'.
+    # Fail-closed (skip this N) for charged/ring/imine-or-amide N, >1 carbon host, or a branch the composer cannot name. ----
     _amine_import_ok = True
     try:
         from .substituent_enumerator import (
@@ -2412,6 +2407,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
             carbon_free_valence_prefix,
             composed_prefix_organyl_name,
         )
+        from .universal_substituent import _azide_nitrogens
     except Exception:
         _amine_import_ok = False
     _ring_info_pf = mol.GetRingInfo()
@@ -2508,6 +2504,10 @@ def _name_polyfunctional_acyclic_substituent_impl(
             branch_atoms: Set[int] = set()
             ok = True
             for b0, visited in branch_seeds:
+                if _azide_nitrogens(mol, b0) == frozenset(visited):
+                    entries.append(('azido', False))
+                    branch_atoms |= visited
+                    continue
                 if any(mol.GetAtomWithIdx(v).GetSymbol() != 'C'
                        or _ring_info_pf.NumAtomRings(v) > 0
                        or mol.GetAtomWithIdx(v).GetFormalCharge() != 0
@@ -9256,14 +9256,14 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int,
          deferred, honest-fail).
     """
     cat = mol.GetAtomWithIdx(cation_idx)
+    if cat.IsInRing():      # a ring cation: 'pyridin-1-ium-1-yl':42290), numbered once with its ring
+        from ..rules.ring_cation_hydro import ring_cation_prefix
+        return ring_cation_prefix(mol, cation_idx, parent_attach_idx)
 
-    # SCOPE: the onium cation-substituent prefix is the parent-hydride cation stem
-    # + 'iumyl' / /. W4-I4 GENERALIZED from
-    # nitrogen-only (azaniumyl) to the P/O/S/Se/Te/As onium family:
-    # N -> azaniumyl P -> phosphaniumyl O -> oxidaniumyl S -> sulfaniumyl
-    # The nitrogen PIN is the amine-based '<...>methanaminiumyl', but that form is
-    # OPSIN-unparseable; 'azaniumyl' is the documented OPSIN-valid equivalent, so
-    # nitrogen keeps 'azaniumyl' here (W4-I4 note).
+    # SCOPE: the onium cation-substituent prefix is the parent-hydride cation stem + 'iumyl' /
+    # /: N -> azaniumyl, P -> phosphaniumyl, O -> oxidaniumyl, S -> sulfaniumyl. The
+    # nitrogen PIN is the amine-based '<...>methanaminiumyl', OPSIN-unparseable; 'azaniumyl' is the OPSIN-valid
+    # equivalent that nitrogen keeps here (W4-I4).
     stem = _ONIUM_PREFIX_STEM.get(cat.GetSymbol())
     if stem is None or cat.GetFormalCharge() <= 0:
         return ''
