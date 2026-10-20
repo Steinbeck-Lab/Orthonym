@@ -604,6 +604,14 @@ def innermost_name_input():
     return inputs[-1] if inputs else None
 
 
+def outermost_name_input():
+    """The input (SMILES string) of the OUTERMOST live ``name`` frame of this thread: the molecule
+    the caller asked about, not any structure a nested frame derives from it. None outside any
+    ``name`` call."""
+    inputs = getattr(_fragment_guard, 'name_inputs', None)
+    return inputs[0] if inputs else None
+
+
 def spend_fragment_work() -> bool:
     """Charge one fragment-naming unit against the top-level budget.
 

@@ -192,6 +192,7 @@ from .naming_utils import (
     format_substituent_prefix,
 )
 from .ring_ylidene_stereo import RingYlidene
+from .universal_halane import name_halane_component
 
 # ---------------------------------------------------------------------------
 # Work budget -- mandatory in-algorithm backstop (NOT a signal/timeout).
@@ -313,6 +314,11 @@ class _Ctx:
     # UN S1a: which scope cites the E/Z of which ring=ring double bonds (``ring_ylidene_stereo``);
     # set only by ``_ring_ylidene_candidates`` for its rebuilds.
     ring_ylidene: Optional["RingYlidene"] = None
+    # UN lane H: a hypervalent Cl/Br/I atom is named as a one-atom parent or substituent root
+    # (``universal_halane``). Off in every spelling the floor gave before; ``name_universal_substitutive``
+    # turns it on only after all of them have declined, so no earlier floor name changes (the fallbacks
+    # that follow the floor can be preceded by it, ``_halane_rung``).
+    halane_forms: bool = False
 
     def fire(self, kind: str) -> None:
         """A book spelling of ``kind`` ('ring': a single ring's name, 'other': every other
@@ -544,6 +550,11 @@ def name_universal_substitutive(
                     mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
                     acyloxy_leaf=acyloxy_leaf, prefix_order_fallback=prefix_order_fallback,
                     book_forms=False, keep_forms=keep_forms)
+        if res is None:
+            res = _halane_rung(
+                mol, atom_work_budget, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
+                acyloxy_leaf=acyloxy_leaf, prefix_order_fallback=prefix_order_fallback,
+                book_forms=book_forms, keep_forms=keep_forms)
         if res is not None:
             return res
         # M2 inc5: a charge-separated STANDARD-VALENCE chalcogenide the primary
@@ -574,10 +585,43 @@ def name_universal_substitutive(
         return None
 
 
+def _halane_rung(mol, atom_work_budget: int, **spelling) -> Optional[UniversalResult]:
+    """UN lane H, the last rung of the spelling ladder of ``name_universal_substitutive``: the
+    floor with a hypervalent Cl/Br/I atom named as a one-atom parent or substituent root
+    (``universal_halane``, ``_Ctx.halane_forms``), in the book's spelling and, when that declines,
+    the mechanical one. It runs only for a molecule that has such an atom and that no earlier rung
+    named, so a name the floor gave before is not changed; every shape it does not name still voids
+    at the spine allow-list guard of ``_chain_spine_from_path``. It comes before what follows the floor
+    (the neutral-form naming of a charge-separated chalcogenide below, and the producers the namer tries
+    when the floor gives nothing, ``outer:anion_small``), so a molecule one of those named can now get
+    the halane name instead (two ``[I-]`` rows of a 363-row set; both names read back).
+
+    Only for the molecule the caller asked about (``universal_halane.names_the_input``), not for a
+    structure a nested ``name`` derives from it (the charged router's re-entry on the neutral
+    skeleton of a cation, an acyloxy or glycoside cap). The outer frame builds its own name from that
+    one and its tier label reads what the name was built from: with the rung on for them, the
+    best-effort row of '[2-(4-methylphenyl)ethynyl](phenyl)iodanium' went from pin_verified (the
+    PIN-only pass, reached because the nested floor declined) to systematic_verified (a floor name of
+    the neutral iodane). A direct caller (no ``name`` frame) and the clean fall-through of the
+    outermost frame, which names the same molecule again, get the rung."""
+    from .universal_halane import has_halane_candidate, names_the_input
+    if not has_halane_candidate(mol) or not names_the_input(mol):
+        return None
+    try:
+        res = _name_universal_substitutive_unsafe(mol, atom_work_budget, halane=True, **spelling)
+        if res is None and spelling["book_forms"]:
+            res = _name_universal_substitutive_unsafe(
+                mol, atom_work_budget, halane=True, **{**spelling, "book_forms": False})
+        return res
+    except Exception:  # a rung that raises is a decline of this rung, not of the later fallbacks
+        return None
+
+
 def _name_universal_substitutive_unsafe(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True, prefix_order_fallback: bool = False,
     book_forms: bool = True, keep_forms: frozenset = frozenset(), no_chain: bool = False,
+    halane: bool = False,
 ) -> Optional[UniversalResult]:
     """The real body -- may raise; ``name_universal_substitutive`` is the
     only caller and converts every exception to ``None``."""
@@ -597,7 +641,7 @@ def _name_universal_substitutive_unsafe(
     built = _build_ctx(mol, atom_work_budget,
                        force_vonbaeyer_spiro=force_vonbaeyer_spiro,
                        acyloxy_leaf=acyloxy_leaf, book_forms=book_forms,
-                       keep_forms=keep_forms, no_chain=no_chain)
+                       keep_forms=keep_forms, no_chain=no_chain, halane=halane)
     if built is None:
         return None
     ctx, heavy = built
@@ -1187,7 +1231,7 @@ def _neutralize_semipolar_chalcogenides(mol):
 def _build_ctx(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True, book_forms: bool = True, keep_forms: frozenset = frozenset(),
-    no_chain: bool = False,
+    no_chain: bool = False, halane: bool = False,
 ) -> Optional[Tuple["_Ctx", FrozenSet[int]]]:
     """Shared whole-molecule perception + ``_Ctx`` setup for BOTH public
     entry points (``name_universal_substitutive`` on the whole graph and
@@ -1322,7 +1366,7 @@ def _build_ctx(
                budget=_Budget(atom_work_budget), canon_rank=canon_rank,
                cation_sites=cation_sites, anion_sites=anion_sites,
                force_vonbaeyer_spiro=force_vonbaeyer_spiro,
-               acyloxy_leaf=acyloxy_leaf,
+               acyloxy_leaf=acyloxy_leaf, halane_forms=halane,
                book_forms=book_forms and book_forms_enabled(),
                ring_forms=(book_forms or "ring" in keep_forms) and ring_forms_enabled(),
                chain_forms=(not no_chain and (book_forms or "chain" in keep_forms)
@@ -1486,6 +1530,15 @@ def _name_universal_substituent_prefix_unsafe(
 # The recursive core
 # ===========================================================================
 
+def _prefix_ready(token: str, covers: FrozenSet[int], charged: FrozenSet[int] = frozenset(),
+                  internal: FrozenSet[int] = frozenset()) -> "_ComponentResult":
+    """The result of a leaf that is already a complete substituent prefix: *token* spells all of
+    *covers* (``_ComponentResult.is_prefix_ready``), with the charges it consumed."""
+    return _ComponentResult(
+        name=token, bindings=[(token, covers)], covers=covers, attach_locant=None,
+        is_prefix_ready=True, charged=charged, internal_atoms=internal)
+
+
 def _name_component(
     ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[int], is_top: bool,
     emit_branch_stereo: bool = False,
@@ -1530,6 +1583,13 @@ def _name_component(
 
     mol = ctx.mol
 
+    # UN lane H: a hypervalent Cl/Br/I atom is the parent of the molecule class 39) or the root of
+    # a branch, named on its own hydride with the lambda convention (``universal_halane``)
+    halane = ctx.halane_forms and name_halane_component(
+        ctx, component, attach_hint, is_top, emit_branch_stereo, relative_ring_override)
+    if halane:
+        return halane
+
     # ---- direct functional-group / leaf shortcuts (branches only) --------
     # Mirrors the reference architecture's "heteroatom-start shortcut" +
     # "direct-functional-group shortcut": a handful of common small groups
@@ -1548,11 +1608,7 @@ def _name_component(
             # formal charge (the neutral leaves bail on any charged atom, and the
             # charged-terminal leaf uses its own ``charged`` field).
             internal_atoms = atoms if token in _INTERNAL_CHARGE_LEAF_TOKENS else frozenset()
-            return _ComponentResult(
-                name=token, bindings=[(token, atoms)], covers=atoms,
-                attach_locant=None, is_prefix_ready=True,
-                internal_atoms=internal_atoms,
-            )
+            return _prefix_ready(token, atoms, internal=internal_atoms)
 
         # (composed-charge): a lone charged TERMINAL atom -- the bare
         # ``[O-]``/``[S-]`` an FG anion (carboxylate/sulfonate/phosphonate/
@@ -1567,11 +1623,7 @@ def _name_component(
         charged_leaf = _charged_leaf_shortcut(mol, component, attach_hint)
         if charged_leaf is not None:
             token, atoms, charged_atoms = charged_leaf
-            return _ComponentResult(
-                name=token, bindings=[(token, atoms)], covers=atoms,
-                attach_locant=None, is_prefix_ready=True,
-                charged=charged_atoms,
-            )
+            return _prefix_ready(token, atoms, charged=charged_atoms)
 
         # NOABSTAIN class 3: a phosphinate P(=O)([O-])(H) unit (P-V, one
         # explicit P-H) -- see ``_phosphinate_oxide_leaf_shortcut``'s
@@ -1582,11 +1634,7 @@ def _name_component(
         phosphinate_leaf = _phosphinate_oxide_leaf_shortcut(mol, component, attach_hint)
         if phosphinate_leaf is not None:
             token, atoms, charged_atoms = phosphinate_leaf
-            return _ComponentResult(
-                name=token, bindings=[(token, atoms)], covers=atoms,
-                attach_locant=None, is_prefix_ready=True,
-                charged=charged_atoms,
-            )
+            return _prefix_ready(token, atoms, charged=charged_atoms)
 
         # / /: a P or S oxoacid group (or its O/NH
         # linker) is one substituent prefix read from the structure.
@@ -1596,11 +1644,7 @@ def _name_component(
         if oxo_leaf is not None:
             token, o_charged, o_internal = oxo_leaf
             ctx.fire('ps')
-            return _ComponentResult(
-                name=token, bindings=[(token, component)], covers=component,
-                attach_locant=None, is_prefix_ready=True,
-                charged=o_charged, internal_atoms=o_internal,
-            )
+            return _prefix_ready(token, component, charged=o_charged, internal=o_internal)
 
         # j7 (TRIAGE g8 C4): an acyloxy branch -O-C(=O)-R attached through its
         # ester O is the detachable prefix '<acyl>oxy' named by the
@@ -1613,10 +1657,7 @@ def _name_component(
                    if ctx.acyloxy_leaf else None)
         if acyloxy is not None:
             ctx.acyloxy_leaf_fired = True
-            return _ComponentResult(
-                name=acyloxy, bindings=[(acyloxy, component)], covers=component,
-                attach_locant=None, is_prefix_ready=True,
-            )
+            return _prefix_ready(acyloxy, component)
 
         # Roadmap item 12a: a branch that is an imino, hydrazinylidene, diazenyl,
         # hydrazinyl, peroxy or azaniumylidene group takes its book prefix
@@ -1628,11 +1669,7 @@ def _name_component(
         if group is not None:
             token, g_charged, g_internal = group
             ctx.fire('chain')
-            return _ComponentResult(
-                name=token, bindings=[(token, component)], covers=component,
-                attach_locant=None, is_prefix_ready=True,
-                charged=g_charged, internal_atoms=g_internal,
-            )
+            return _prefix_ready(token, component, charged=g_charged, internal=g_internal)
 
         # Roadmap N5c: a branch attached through O, S, Se, Te or N is 'R-oxy' /
         # 'methoxy', '(R)sulfanyl', '(R)amino' the Blue Book-27679,
@@ -1643,22 +1680,14 @@ def _name_component(
         if hetero is not None:
             token, h_charged, h_internal = hetero
             ctx.fire("other")
-            return _ComponentResult(
-                name=token, bindings=[(token, component)], covers=component,
-                attach_locant=None, is_prefix_ready=True,
-                charged=h_charged, internal_atoms=h_internal,
-            )
+            return _prefix_ready(token, component, charged=h_charged, internal=h_internal)
         group = (_hetero_group_leaf(ctx, component, attach_hint, emit_branch_stereo,
                                     relative_ring_override, late=True)
                  if ctx.chain_forms else None)
         if group is not None:
             token, g_charged, g_internal = group
             ctx.fire('chain')
-            return _ComponentResult(
-                name=token, bindings=[(token, component)], covers=component,
-                attach_locant=None, is_prefix_ready=True,
-                charged=g_charged, internal_atoms=g_internal,
-            )
+            return _prefix_ready(token, component, charged=g_charged, internal=g_internal)
 
         # Roadmap N5e: a branch attached through a carbonyl carbon is an acyl group
         # ('carbamoyl', '(R)carbamoyl', 'azetidine-1-carbonyl', 'methoxycarbonyl',
@@ -1667,19 +1696,13 @@ def _name_component(
         acyl = _acyl_leaf(ctx, component, attach_hint) if ctx.book_forms else None
         if acyl is not None:
             ctx.fire("other")
-            return _ComponentResult(
-                name=acyl, bindings=[(acyl, component)], covers=component,
-                attach_locant=None, is_prefix_ready=True,
-            )
+            return _prefix_ready(acyl, component)
 
         retained = (_retained_group_leaf(ctx, component, attach_hint)
                     if ctx.book_forms else None)
         if retained is not None:
             ctx.fire("other")
-            return _ComponentResult(
-                name=retained, bindings=[(retained, component)], covers=component,
-                attach_locant=None, is_prefix_ready=True,
-            )
+            return _prefix_ready(retained, component)
 
     # ---- parent (spine) selection -----------------------------------------
     ring_here = _ring_system_for_component(ctx, component, attach_hint, is_top)

@@ -38,6 +38,7 @@ from rdkit import Chem
 from orthonym.assembly.universal_substituent import (
     _SKELETAL_SPINE_ELEMENTS,
     _is_skeletal_spine_element,
+    _name_universal_substitutive_unsafe,
     name_universal_substitutive,
 )
 from orthonym.rules.skeletal_replacement import REPLACEMENT_TERMS
@@ -192,17 +193,16 @@ def test_hypervalent_halogen_never_ships_a_phantom_carbon_name():
     """A degree-3 iodine(III) -- which the OLD degree-1 terminal-halogen check
     never excluded -- must NOT yield a coverage-complete name that round-trips
     to a DIFFERENT constitution (the phantom-carbon hazard). The allow-list
-    keeps it off the spine; whatever the floor builds must FAIL the RT gate
-    (or void), so the caller abstains rather than shipping a wrong molecule."""
+    keeps it off the spine: with the lambda forms off (every spelling the floor
+    gave before UN lane H) the whole call voids. The floor now names it on its
+    OWN one-atom parent hydride (``universal_halane``, 'dichloro(methyl)-
+    lambda3-iodane (PIN)', the Blue Book), and that name round-trips."""
     smi = "c1ccccc1[I](Cl)Cl"
     m = Chem.MolFromSmiles(smi)
+    assert _name_universal_substitutive_unsafe(m, 20000) is None
     r = name_universal_substitutive(m)
-    # If a name is built at all, it must NOT round-trip (the I cannot be a
-    # skeletal carbon), so the offer RT gate voids it -> abstain, 0-wrong.
-    if r is not None:
-        assert verify_or_none(r.name, smi) != r.name, (
-            f"phantom-carbon name for a hypervalent halogen round-tripped: "
-            f"{r.name!r}")
+    assert r is not None and r.name == "dichloro(phenyl)-λ3-iodane"
+    assert verify_or_none(r.name, smi) == r.name
 
 
 def test_metal_center_fails_closed_not_phantom_carbon():
@@ -222,15 +222,17 @@ def test_ylidene_halogen_fails_closed_not_phantom_carbon():
     """A ``C=I`` iodine ylidene (double-bonded I, matched by no _LEAF_DOUBLE
     leaf) must NOT fall through to a 1-atom chain and render a phantom
     ``methane`` -- the builder-side allow-list guard voids it. (Was a
-    raw-core WRONG_CONSTITUTION on base HEAD; now a clean abstain.)"""
+    raw-core WRONG_CONSTITUTION on base HEAD; then a clean abstain.) UN lane H
+    names it on its own parent hydride, the ylide of:
+    'methylidene(phenyl)-lambda3-iodane'."""
     smi = "C=Ic1ccccc1"
     m = Chem.MolFromSmiles(smi)
     if m is None:
         return
+    assert _name_universal_substitutive_unsafe(m, 20000) is None
     r = name_universal_substitutive(m)
-    if r is not None:
-        assert verify_or_none(r.name, smi) != r.name, (
-            f"phantom-carbon name for a C=I ylidene round-tripped: {r.name!r}")
+    assert r is not None and r.name == "methylidene(phenyl)-λ3-iodane"
+    assert verify_or_none(r.name, smi) == r.name
 
 
 # ---------------------------------------------------------------------------
