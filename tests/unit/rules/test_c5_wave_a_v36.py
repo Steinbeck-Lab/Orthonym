@@ -57,25 +57,31 @@ def _run_bounded(smiles: str, inner_alarm_s: int = 20, hard_kill_s: int = 35) ->
     outside the process), so the wall-clock bound holds even if a busy RDKit C loop
     does not yield to the in-process signal handler. Returns
     ``{"hung": bool, "result": str|None, "stderr": str}``.
+
+    The PARENT holds the child's JVM slot (``orthonym.jvm_budget``) for the whole run, and
+    the child takes none: both bounds then time the naming only. The budget has one slot on
+    a 4-CPU CI runner (``cpu_count - 4``, floor 1), and a child that queued for it inside
+    its own alarm timed out with no naming done (CI on main, 2026-10-20: adamantane and the
+    mixed cage both 'TIMEOUT'; each names in under 10 s on a free slot).
     """
     script = textwrap.dedent(f"""
         from orthonym.wallclock import WallClockTimeout, wall_clock_limit
 
         try:
             with wall_clock_limit({inner_alarm_s}):
-                from orthonym.jvm_budget import jvm_slots
-                with jvm_slots(1, purpose="v36-c5-wave-a-fullerene-bound"):
-                    from orthonym.namer import name_compound
-                    out = name_compound({smiles!r})
+                from orthonym.namer import name_compound
+                out = name_compound({smiles!r})
             print("RESULT:" + repr(out))
         except WallClockTimeout:
             print("RESULT:TIMEOUT")
         """)
+    from orthonym.jvm_budget import jvm_slots
     try:
-        proc = subprocess.run(
-            [sys.executable, "-c", script],
-            capture_output=True, text=True, timeout=hard_kill_s,
-        )
+        with jvm_slots(1, purpose="v36-c5-wave-a-fullerene-bound"):
+            proc = subprocess.run(
+                [sys.executable, "-c", script],
+                capture_output=True, text=True, timeout=hard_kill_s,
+            )
     except subprocess.TimeoutExpired:
         return {"hung": True, "result": None, "stderr": ""}
     for line in proc.stdout.splitlines():
