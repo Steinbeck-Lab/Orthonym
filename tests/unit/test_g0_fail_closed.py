@@ -153,8 +153,16 @@ PARTIAL_FUSED_CORE_NAMED = [
 # Partial-core systems the fusion path still CANNOT name -> the G0 veto fires.
 # a phase fails closed at SOURCE when a substituent branch is unnameable
 # (exotic element), so the emitted name can never silently omit a substituent.
+#
+# UN lane R replaced the witness. The silyl radical '[Si](C)(C)c1cc2nc3ccoc3cc2o1' (a whole-molecule radical
+# centre) is now named by the radical namer, '[difuro[3,2-b:2',3'-e]pyridin-2-yl]di(methyl)silyl' (best-effort
+# tier, read back by a fresh OPSIN -r call: tests/unit/rules/test_radicals_substituted_centre.py), so its
+# premise 'the substituent branch is unnameable' no longer held. The selanyl branch below is a closed-shell
+# input no radical producer touches: the unsubstituted core is named (PARTIAL_FUSED_CORE_NAMED, 'difuro[3,2-b:
+# 2',3'-e]pyridine') and the branch is not, so the whole input refuses with UNNAMEABLE at the default tier, on
+# the tree before lane R and on the tree with it (measured on both).
 PARTIAL_FUSED_CORE_STILL_CLOSED = [
-    "[Si](C)(C)c1cc2nc3ccoc3cc2o1",  # silyl-difuropyridine: unnameable branch
+    "[SeH]c1cc2nc3ccoc3cc2o1",  # selanyl-difuropyridine: the core is named, the branch is unnameable
 ]
 
 
@@ -179,7 +187,7 @@ def test_partial_fused_core_fails_closed(smiles):
 def test_partial_fused_core_raises_named_limit(smiles):
     with pytest.raises(OrthonymLimitError) as ei:
         Orthonym().name(smiles, raise_on_limit=True)
-    # A classified fail-closed refusal (not a crash). The silyl-difuropyridine
+    # A classified fail-closed refusal (not a crash). The selanyl-difuropyridine
     # example fails via UNNAMEABLE (its substituent branch is unnameable —
     # a phase's source-level completeness check), a sibling of the
     # ring-coverage UNSUPPORTED_RING_SYSTEM veto; both are honest refusals.

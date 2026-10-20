@@ -92,13 +92,30 @@ def test_a_tin_piece_of_a_mixture_keeps_its_component_name(smiles):
 
 
 @pytest.mark.opsin_gate
-def test_the_tin_atom_of_a_phosphonate_is_not_a_hydride_radical():
-    """The tin atom is a substituent of a bisphosphonate: its neutral parent is the
-    phosphonate, not 'stannane', so the '-ylidene' replacement of does not apply."""
+def test_the_tin_atom_of_a_phosphonate_is_the_parent_of_its_radical_name():
+    """The free valence is the most senior class, so the phosphonate ester groups are prefixes of the tin radical
+    and the neutral compound's parent (the bisphosphonate) does not decide the name. This test asserted the
+    opposite until UN lane R ("its neutral parent is the phosphonate, not 'stannane', so the '-ylidene'
+    replacement of does not apply"); that premise reads the radical's parent off the neutral compound.
+
+     'SENIORITY OF RADICALS AND IONS' (the Blue Book): "As classes, radicals and ions are senior to
+    acids and other classes in the following order: (1) radicals; (2) anions; (3) cations.";
+    (:18162) "1 Radicals". A worked example of a radical that turns a suffix of the neutral compound into a prefix:
+    '2,5-dioxopyrrolidin-1-yl (PIN)' (:40645; the neutral compound is pyrrolidine-2,5-dione). The engine already
+    does it for a carboxylic acid: '[CH2]CC(=O)O' is '2-carboxyethyl' (pin_verified on main), and a phosphonic
+    ester ranks below an acid. 'Specific method and retained names' (:40474) names the divalent
+    radical of a Group 14 mononuclear parent hydride by 'ylidene', 'benzylsilylidene (PIN)' (:40490).
+
+    Verified: the new name reads back to the input (independent OPSIN call), and the old skeletal name
+    '3,3-di[bis(1-methylethoxy)phosphoryl]-1-chloro-1-stannapropan-1-ylidene' is a replacement ('a') name.
+    UNVERIFIED: the spelling of the phosphoryl prefix (the ligand namer's, not checked against the book) and that
+    the name is a PIN; it is labelled below the PIN here, and the default tier does not name the row."""
     smiles = "CC(C)OP(=O)(C(C[Sn]Cl)P(=O)(OC(C)C)OC(C)C)OC(C)C"
     res = name_breadth(smiles)
     name = res.get("name")
-    assert name and "stannylidene" not in name, res
+    assert name == "chloro(2,2-di{bis[(propan-2-yl)oxy]phosphoryl}ethyl)stannylidene", res
+    assert res.get("tier") != "pin_verified", res
+    assert "stanna" not in name, name
     assert name_is_rt_exact(name, smiles), name
 
 

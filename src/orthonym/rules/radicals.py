@@ -19,6 +19,7 @@ Key naming patterns:
 - Oxyl radicals: R-O. -> R-oxyl (methoxyl from methanol)
 """
 
+import re
 from typing import Any, Dict, List, Optional
 
 from rdkit import Chem
@@ -1874,6 +1875,125 @@ def _name_multiplicative_amine_radical(mol, radical_sites: List[Dict[str, Any]])
     return _ship(mol, f"({central}){mult}(aminyl)", False)
 
 
+# Elements whose substituted radical centre is named on its own mononuclear parent hydride radical
+# (boranyl, silyl, germyl, stannyl, plumbyl, alumanyl, gallanyl, phosphanyl, arsanyl, stibanyl), each with
+# its standard bonding number, which the centre's bonds, hydrogens and unpaired electrons must add up to.
+# 'Standard bonding numbers' (the Blue Book), Table 1.3 (:2746): 3 for B, Al, Ga, 4 for Si, Ge,
+# Sn, Pb, 3 for P, As, Sb. (RDKit's default valence is no substitute: it is 2 for Sn and Pb.)
+_STANDARD_BONDING_NUMBER = {
+    'B': 3, 'Al': 3, 'Ga': 3,
+    'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
+    'P': 3, 'As': 3, 'Sb': 3,
+}
+_CENTRE_RADICAL_ELEMENTS = frozenset(_STANDARD_BONDING_NUMBER)
+# The skeletal heteroatoms of a heterogeneous acyclic parent hydride of alternating atoms, "excluding
+# carbon atoms and the halogen atoms" (the Blue Book): the elements that can stand between two atoms of
+# the centre's own element in an a(ba)n chain ('disiloxane').
+_CHAIN_BRIDGE_ELEMENTS = frozenset({
+    'B', 'Al', 'Ga', 'In', 'Tl', 'Si', 'Ge', 'Sn', 'Pb', 'N', 'P', 'As', 'Sb', 'Bi', 'O', 'S', 'Se', 'Te',
+})
+# A stereodescriptor group of a prefix, with or without a locant (a letter, a prime: '4a', "4'a", "3'"):
+# '(2S)', '(4aR,8aS)', "(4'aR)", '(1E)', '(Z)', '(2RS,3SR)', '(1R*,2S*)', '(1r,4r)', '(Ra)', '(aS)', '(M)', '(P)'.
+_LIGAND_DESCRIPTOR = re.compile(
+    r"\((?:\d+'*[a-z]?'*)?(?:RS|SR|Ra|Sa|Rp|Sp|aR|aS|R|S|r|s|E|Z|M|P)\*?(?:,|\))")
+
+
+def _centre_extends_to_chain(atom) -> bool:
+    """True when the radical centre is a skeletal atom of an acyclic parent hydride of more than one atom of
+    its own element: a neighbour of the same element (Si-Si, B-B), or one atom of another skeletal heteroatom
+    between two of them (Si-O-Si, B-N-B). 'Heterogeneous parent hydrides composed of alternating
+    heteroatoms' (the Blue Book, paragraph:8016): "an unbranched chain of alternating atoms terminated
+    by two identical atoms", 'disiloxane (preselected name, ' (:7631); 'Mononuclear and
+    acyclic parent hydrides' (:38010): 'tridecastannane', 'docosasiloxane' (:38017-38023). The free valence
+    then sits on a chain parent ('disilanyl', 'trisilan-2-yl', 'disiloxanyl'), a name the mononuclear
+    construction would spell 'silylsilyl' and label as a preferred one. A neighbour of another element makes no
+    chain: 'Compounds with groups of higher seniority' (:37465), '(difluoroboranyl)tri(methyl)silane
+    (PIN) (Si is senior to B)' (:37520), the boron on one silicon."""
+    centre = atom.GetIdx()
+    element = atom.GetSymbol()
+    for nb in atom.GetNeighbors():
+        symbol = nb.GetSymbol()
+        if symbol == element:
+            return True
+        if symbol in _CHAIN_BRIDGE_ELEMENTS and any(
+                far.GetIdx() != centre and far.GetSymbol() == element for far in nb.GetNeighbors()):
+            return True
+    return False
+
+
+def _name_substituted_centre_radical(mol, site: Dict[str, Any]) -> str:
+    """A radical centre that is a substituted B, Al, Ga, Si, Ge, Sn, Pb, P, As or Sb is the PARENT of its own
+    name -- the mononuclear parent hydride radical ('boranyl', 'boranylidene', 'silyl', 'silylidyne',...)
+    -- and every heavy group on it is a detachable prefix: 'methyl(phenyl)boranyl',
+    '(oxolan-2-yl)boranylidene', '[(4E)-hex-4-en-1-yl][(9E)-undec-9-enoyl]boranyl'.
+
+    Group 14 (Si, Ge, Sn, Pb): (the Blue Book), "A radical formally derived by the removal of
+    one hydrogen atom from a mononuclear parent hydride of an element of Group 14... is named by replacing
+    the 'ane' ending of the systematic name of the parent hydride by 'yl'"; 'Specific method and
+    retained names' (:40474) is the same with '-ylidene' and '-ylidyne' ('benzylsilylidene (PIN)',:40490).
+    B, Al, Ga, P, As, Sb: 'Monovalent radicals' (:40426), "A radical formally derived by the removal
+    of one hydrogen atom from any position of a parent hydride, or a modified parent hydride other than those
+    described by... is named by adding the suffix 'yl' to the name of the parent hydride, eliding
+    the final letter 'e'"; its example 'tert-butoxytri(phenyl)-λ5-phosphanyl (PIN)' (:40442) is a substituted
+    mononuclear parent hydride radical; 'General method' (:40498) is the same with 'ylidene' and
+    'ylidyne'. The free valence is the most senior class: 'SENIORITY ORDER FOR CLASSES', Table 4.1
+    (:18162), "1 Radicals". A group a suffix would otherwise express (an acyl group, an oxo or carboxy group)
+    therefore stays a prefix, and the name is no longer a suffix on the name of the neutral compound, whose
+    parent is a ring or a chain and not the centre ('2-boranyloxolane' has no radical ending that fits).
+
+    The ligands are named as the -uide and -onium centres name theirs (``rules.centre_ligands``, the
+    substituent-prefix namer of the substitutive path) and cited as cites the groups of a
+    mononuclear hydride (``mononuclear_hydrides._build_mixed_substituent_string``). Scope: a neutral
+    centre in no ring with single bonds only, whose bonds, hydrogens and unpaired electrons make up its
+    standard bonding number (``_STANDARD_BONDING_NUMBER``); a ligand that is a radical or an ion declines (a multi-centre radical is another
+    class), and so does a ligand the namer cannot name, and a centre that is a skeletal atom of a longer
+    parent hydride (``_centre_extends_to_chain``). The names are tried in the order of
+    ``centre_ligands._candidate_ligand_lists`` (the ambient tier's, then the default tier's), and the
+    first one the strict radical read-back accepts is the name (``_ship``); a name no read-back
+    accepts is never returned, whatever tier asked for it. A ligand that states a stereodescriptor keeps
+    the name out of the PIN tier (``_ship``, brief item B10). It names only the radical molecule the outermost
+    ``name`` call was given, never a fragment a nested frame derives from another input
+    (``universal_halane.names_the_input``)."""
+    idx = site['atom_idx']
+    n_e = site['n_electrons']
+    atom = mol.GetAtomWithIdx(idx)
+    element = atom.GetSymbol()
+    if element not in _CENTRE_RADICAL_ELEMENTS or atom.GetFormalCharge() or atom.IsInRing():
+        return ''
+    parent = _parent_hydride_radical_name(element, n_e)
+    if not parent:
+        return ''
+    heavy = [nb for nb in atom.GetNeighbors() if nb.GetAtomicNum() > 1]
+    if (not heavy or any(b.GetBondType() != Chem.BondType.SINGLE for b in atom.GetBonds())
+            or atom.GetDegree() + atom.GetTotalNumHs() + n_e != _STANDARD_BONDING_NUMBER[element]
+            or any(nb.GetAtomicNum() == 1 and nb.GetIsotope() for nb in atom.GetNeighbors())
+            or _centre_extends_to_chain(atom)):
+        return ''
+    # The engine names a substituent group, or a capped fragment, by sending the fragment through this radical
+    # namer; the name of a nested frame is a prefix of the outer name, and its label would lift the whole name
+    # ('[dimethyl(nitro)silyl]methane' for trimethyl(nitro)silane). Only the molecule the outermost name call
+    # was asked to name is named here.
+    from ..assembly.universal_halane import names_the_input
+    if not names_the_input(mol):
+        return ''
+    from .centre_ligands import _candidate_ligand_lists
+    from .mononuclear_hydrides import _build_mixed_substituent_string
+    for names in _candidate_ligand_lists(mol, idx):
+        block = _build_mixed_substituent_string(names) if names else ''
+        if not block:
+            continue
+        candidate = f"{block}{parent}"
+        # A descriptor in a ligand (``_ship`` withholds it from the PIN tier and demotes it at a wider
+        # one) also with a letter locant or a prime, '(4aR,8aS)', which ``_ship``'s own test does not see.
+        descriptor = bool(_LIGAND_DESCRIPTOR.search(candidate))
+        if descriptor and not _tier_is_general():
+            continue
+        shipped = _ship(mol, candidate, descriptor)
+        if shipped:
+            return shipped
+    return ''
+
+
 def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
                             style: str = 'pin') -> str:
     """Heteroatom-centred radical PINs (called from the route_charged chokepoint
@@ -1885,6 +2005,9 @@ def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
       * amine / imine / amide compound-suffix radicals — methanaminyl,
         propan-1-iminyl, formamidyl.
       * multiplicative poly-amine radicals — (ethane-1,2-diyl)bis(aminyl).
+      * / substituted B / Al / Ga / Si / Ge / Sn / Pb / P / As / Sb centres —
+        methyl(phenyl)boranyl, (oxolan-2-yl)boranylidene, dimethylsilyl, whatever the rest of the
+        molecule holds (``_name_substituted_centre_radical``).
 
     Returns '' (fail-closed) for any carbon-centred or out-of-scope radical so the
     caller's existing carbon path / name_radical helpers run unchanged."""
@@ -1911,7 +2034,10 @@ def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
     # (B) Substituted nitrogen -> amine / imine / amide compound suffix.
     if element == 'N':
         return _name_amine_family_radical(mol, site)
-    # Substituted non-N heteroatom radical -> out of scope, fail closed.
+    # (C) Substituted B / Al / Ga / Si / Ge / Sn / Pb / P / As / Sb centre: its own parent hydride radical.
+    if element in _CENTRE_RADICAL_ELEMENTS:
+        return _name_substituted_centre_radical(mol, site)
+    # Any other substituted heteroatom radical (S/Se/Te have their producers) -> fail closed.
     return ''
 
 
