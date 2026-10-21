@@ -141,6 +141,12 @@ BUCKET_A = [
     ("173868686",
      r"CCC1=C(C=CC(=C1)NC(=NC)C2=NC=C(N2C)C(=C)C(C)[C@@H](C)/C(=C(\C)/F)/OC)"
      "C(=C)N(CC[C@H](C)C(=O)O)C=C"),
+    # 144005043 -- was bucket (c) (ring C=C E vs Z "conflict"). Since lane D (2026-10-21) the centres labels beside the
+    # non-mancude dihydropyrimidine ring follow ("Mancude rings and ring systems", the Blue Book:
+    # duplicate atoms are averaged only for mancude rings), the conflict is gone and the emitted name full-round-trips
+    # (independent check: the bucket-(c) test's own OPSIN iso-canonical comparison passed before its abstain assertion).
+    ("144005043",
+     r"C\1C/C(=C\2/C=NC(=N/C2=C/C=C1)NCC3=CCC(C=C3)O)/N4CCC(CC4)C(=O)NC5=CN=CC=C5"),
 ]
 
 
@@ -211,9 +217,6 @@ BUCKET_C = [
     # 169166535 — fusion-carbon R vs S conflict.
     ("169166535",
      "CC(C)(C)C1=NC=C(O1)C(=O)N2CCC3=C([C@@H]2C4=CC5=CC=CC=C5C=N4)N=CN3"),
-    # 144005043 — ring C=C E vs Z ("Stereo backstop" wrong sign).
-    ("144005043",
-     r"C\1C/C(=C\2/C=NC(=N/C2=C/C=C1)NCC3=CCC(C=C3)O)/N4CCC(CC4)C(=O)NC5=CN=CC=C5"),
 ]
 
 

@@ -158,6 +158,11 @@ def test_the_cli_default_tier_prints_the_decline():
 # 2026-10-20, ``assembly/default_tier_offer.py``): the best-effort clause and the exception to the round
 # trip; a documentation string, so there is no source to quote: it states what the code does, which
 # tests/unit/assembly/test_default_tier_offer.py pins; reverting ``cli.py`` fails this test.
+# Changed asserted value (lane UN-B1, 2026-10-21): "11 rings" -> "15 rings", the best-effort ring ceiling
+# ``vonbaeyer_universal.BEST_EFFORT_MAX_CAGE_RINGS``. Again a documentation string (the Blue Book sets no
+# upper size on von Baeyer systems,, so there is no source to quote); the value is the measured ceiling
+# (the sweep table above that constant) and tests/unit/rules/test_cage_caps_best_effort.py pins the constant
+# and what it admits, so a ceiling and a help text that disagree fail one of the two.
 EMIT_TIER_HELP = (
     "Which names to return. pin (the default): a name only when the pipeline can "
     "build the preferred IUPAC name (PIN), that is when the strict PIN path built "
@@ -173,7 +178,7 @@ EMIT_TIER_HELP = (
     "from the general "
     "engine. complete: also general names for aromatic and heterocyclic ring systems. "
     "best-effort: also the last-resort producers, von Baeyer and spiro names for "
-    "ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build "
+    "ring systems of up to 100 skeletal atoms and 15 rings (the other tiers build "
     "them up to 40 atoms and 8 rings), and adducts with a one-atom ion, and, for a molecule that has no other name, the name the default tier ships although OPSIN cannot read its stereodescriptors, with the label of the default tier (pin_unverified). full-coverage: "
     "also the "
     "coordination-name builder for metal tetrapyrrole and corrin complexes, which "

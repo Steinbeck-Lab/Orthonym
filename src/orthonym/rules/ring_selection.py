@@ -737,6 +737,10 @@ def _ylidene_linked_parent_ring(
     parent; the single-bonded ring + the methine carbon form the ylidene
     substituent benzylidene for a bare phenyl).
 
+    This is the choice between two ring systems that TIE on only
+    (``select_principal_ring_system`` consults it after the scoring, among the
+    tied systems): a linker never overrules ring seniority.
+
     Fail-closed: returns None (no override) unless there is exactly one such
     linking carbon connecting exactly two of the given ring systems, with the
     two rings distinct and the double/single sides unambiguous. Any other shape
@@ -933,25 +937,28 @@ def select_principal_ring_system(
             if len(bearing) == 1:
                 return tuple(sorted(bearing[0]))
 
-    # W2E-D2 /: a substituent attached to a ring by an
-    # exocyclic DOUBLE bond (ylidene) belongs to the ring on the double-bond
-    # side; the ring it is single-bonded to is cited as the ylidene substituent
-    # (e.g. benzylidenecyclohexane: the =CH-C6H5 methine double-bonds cyclohexane
-    # and single-bonds benzene, so cyclohexane is parent and 'benzylidene' the
-    # substituent). The ring_system_score below would otherwise pick the
-    # senior aromatic ring as parent and try to name the aliphatic ring as a
-    # (never-nameable) ylidene substituent, failing closed. Force the
-    # double-bonded ring here. Fail-closed (no override) on any shape but the
-    # single-methine-between-exactly-two-ring-systems case.
-    _ylidene_ring = _ylidene_linked_parent_ring(mol, ring_systems)
-    if _ylidene_ring is not None:
-        return tuple(sorted(_ylidene_ring))
-
     # Score each ring system and select the one with minimum score
     scores = [ring_system_score(mol, sy) for sy in ring_systems]
     best_score = min(scores)
     tied = [i for i, s in enumerate(scores) if s == best_score]
     if len(tied) > 1:
+        # W2E-D2 /: of ring systems that TIE on, the one
+        # on the double-bond side of a lone =CH- linker is the parent and the other
+        # ring + the methine is its ylidene substituent (benzylidene,
+        # '(cyclohexylmethylidene)cyclohexane'). Only a TIE is decided here: the
+        # linker never overrules ring seniority, which the Blue Book applies
+        # to the two rings alone -- '(cyclohexylidenemethyl)benzene (PIN) [not
+        # (phenylmethylidene)cyclohexane; benzene is senior to cyclohexane (see
+        # ]', "Unsymmetrical substituent groups having
+        # terminal atoms with different types of free valencies", the Blue Book).
+        # The override used to run BEFORE the scoring because the ring-ylidene
+        # substituent of the senior ring had no producer (now
+        # ``ring_ylidene_carrier.ring_on_chain_substituent_name``).
+        _ylidene_ring = _ylidene_linked_parent_ring(mol, ring_systems)
+        if _ylidene_ring is not None:
+            for i in tied:
+                if ring_systems[i] == _ylidene_ring:
+                    return tuple(sorted(_ylidene_ring))
         # A1: when >=2 candidate parent rings TIE on the
         # ring-system score, the senior parent is the one carrying the MAXIMUM
         # number of substituents cited as prefixes (the Blue Book, "

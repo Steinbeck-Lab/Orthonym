@@ -39,6 +39,8 @@ from ..assembly.memo import cache_or_compute  # R2(a): structure-keyed main-ring
 from ..perception.molcache import atoms_of, bonds_of, cached_by_key
 from ..data.chain_names import multiplying_prefix
 from .locants import compound_aware_multibond_set  # (1)/(2), shared w/ bicyclo.py
+from . import main_ring_paths  # the bounded main-ring path search (its LEVEL_* knobs are read live)
+from .main_ring_paths import RingGraph, enumerate_paths, longest_bridge, uses_bound
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
     spend_perf_work,
@@ -659,9 +661,15 @@ def _best_disjoint_path_pair(all_paths, spend, rank_key):
     return best_pair
 
 
-def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room):
+def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room, bridge_len=None):
     """Case 3 of the main-ring search: offer to ``best`` every pair of bh1->bh2 paths that
     forms a main ring with a 2+-atom main bridge /.
+
+    ``bridge_len`` (default None: scan ``all_paths``) is a callable from the atom bitmask the two
+    paths use to the interior size of the longest third path disjoint from both (-1 if none). It
+    is for a list ``all_paths`` that holds only the paths that can take part in a pair of the
+    incumbent's ring size or more (``main_ring_paths.enumerate_paths``): the third path of such a
+    pair need not be in it.
 
     For the pair (i, j) the main bridge is the longest remaining path that is interior-disjoint
     from both: with the candidates (interior >= 2 atoms) sorted once, longest first,
@@ -694,7 +702,8 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room):
         return
     npaths = len(all_paths)
     masks, plens = _interior_masks(all_paths)
-    bridge_order = sorted((k for k in range(npaths) if plens[k] >= 2), key=lambda k: -plens[k])
+    bridge_order = (sorted((k for k in range(npaths) if plens[k] >= 2), key=lambda k: -plens[k])
+                    if bridge_len is None else ())
     order = sorted(range(npaths), key=lambda k: -plens[k])
     neg_lens = [-plens[k] for k in order]  # ascending, for the bisect of the upper bound
     offered = []
@@ -715,11 +724,14 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room):
             if mask_i & mask_j:
                 continue
             used = mask_i | mask_j
-            best_mb_len = -1
-            for k in bridge_order:
-                if k != i and k != j and not (masks[k] & used):
-                    best_mb_len = plens[k]
-                    break
+            if bridge_len is not None:
+                best_mb_len = bridge_len(used)
+            else:
+                best_mb_len = -1
+                for k in bridge_order:
+                    if k != i and k != j and not (masks[k] & used):
+                        best_mb_len = plens[k]
+                        break
             if best_mb_len < 2:
                 # 0/1-atom main bridges are already covered by Cases 1/2.
                 continue
@@ -729,6 +741,145 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room):
     for lo, hi, best_mb_len in sorted(offered):
         best.consider(all_paths[lo] + all_paths[hi][1:-1][::-1], bh1, bh2,
                       plens[lo], plens[hi], best_mb_len)
+
+
+class _MainRingPairs:
+    """The body of the bridgehead-pair loop of the main-ring search (``_find_main_ring_impl``).
+
+    For one pair (bh1, bh2) of bridgeheads,:meth:`offer` offers to the incumbent ``best`` the
+    candidate main rings of Cases 1-3 below, over the pair of interior-disjoint bh1->bh2 paths of
+    the ring system:
+
+    Case 1: direct bond between the bridgeheads (0-atom main bridge). The main ring is the largest
+    pair of interior-disjoint paths that do NOT use the direct edge; the direct bond is the main
+    bridge. (Previously this greedily grabbed a single longest path, which on a dense cage
+    consumed every atom and left no second branch -- so a 0-atom-bridge main ring was never even
+    generated, e.g. prismane.)
+
+    Case 2: a 1-atom main bridge via a common neighbour, which is left out of the paths.
+
+    Case 3 /: a 2+-atom main bridge. Cases 1 and 2 only ever offer a 0- or
+    1-atom main bridge, so a bridgehead pair joined to the rest of the cage by a longer third path
+    never had its true, larger main bridge scored -- the ``main_bridge_len`` slot of the score
+    tuple could hold only 0 or 1, and Blue Book PINs such as tricyclo[9.3.3.1^1,11]
+    (the Blue Book) came out with a non-preferred main bicycle. The three primary segments
+    of the main bicycle are three mutually interior-disjoint bh1->bh2 paths: the two longest form
+    the main ring, largest ring), and the longest of the remaining disjoint paths is the
+    main bridge, largest bridge). The (ring_size, main_bridge_len, balance) score then
+    ranks this faithfully against Cases 1/2, and among equal main bridges prefers the more
+    symmetric main-ring division. Cases 1/2 are kept: this is a strict ADD, skipped
+    whenever the largest available main bridge is only 0 or 1 atom.
+
+    Case 3 is preference-only and can, on a cage whose secondary bridges cannot be numbered
+    consistently under the new main bicycle, yield a descriptor that fails the legality audit.
+    ``analyze`` runs the cascade with this enabled first and, only if the result is illegal,
+    re-runs it disabled -- so the preferred main bridge can never COST a legal (if non-preferred)
+    name (accurate-or-degrade, never a regression).
+
+    The paths of the pair are not all listed. ``best`` ends up holding only the candidates of the
+    largest ring size offered (``_MainRingBest.consider`` drops a candidate below the incumbent's
+    ring size, and clears the tied ones when a larger ring comes), so a candidate of a ring below
+    the incumbent's cannot change ``score``, ``ring``, ``bh_pair`` or ``tied``.:meth:`offer`
+    therefore asks:func:`main_ring_paths.enumerate_paths` for the paths that can take part in a
+    pair of the incumbent's ring size or more. Every candidate of that ring size or more is among
+    them, and the listing keeps the order of the full enumeration, so those candidates reach
+    ``consider`` as before, in the same order; a candidate of a smaller ring that the list happens
+    to hold (the pair chosen among a partial list is not the pair the full list gives) is dropped
+    by ``consider`` as the incumbent is larger. So ``best`` holds the same thing. The first pair of
+    a system has no incumbent and lists every path, as the pairs after it do while their incumbent
+    leaves out too many atoms for the bound to cut (``main_ring_paths.uses_bound``).
+
+    When the enumeration exceeds ``_MAX_DFS_EXPANSIONS`` frames its list is a prefix of a search
+    that has no counterpart in the full enumeration's own cut-off prefix, so the pair is searched
+    as it was before the bound: the full enumerations, each cut off where they always were.
+
+    One difference remains, by construction. A pair whose full enumeration exceeds the cap while
+    the bounded listing does not (the listing holds a fraction of the paths) is searched to the
+    end, where the full enumeration was cut off after ``_MAX_DFS_EXPANSIONS`` frames. That search
+    charged the budget at least that many units for one list, and its main ring was the best of an
+    arbitrary prefix of the paths; this is the one case in which the bounded search can return a
+    different main ring (a ring at least as large).
+
+    A system of fewer than ``main_ring_paths.LEVEL_MIN_RINGS`` rings is searched by the full
+    enumerations only, as it always was, with the one change that Cases 1 and 3 share the list.
+    """
+
+    def __init__(self, mol, ring_atoms, adj_list, spend, rank_key, allow_multiatom_bridge):
+        self.mol = mol
+        self.ring_atoms = ring_atoms
+        self.adj_list = adj_list
+        self.spend = spend
+        self.rank_key = rank_key
+        self.allow_multiatom_bridge = allow_multiatom_bridge
+        self.graph = RingGraph(adj_list, ring_atoms, mol.GetNumAtoms())
+        self.room = len(ring_atoms) - 2
+
+    def offer(self, best, bh1, bh2, common_neighbors, has_direct_bond):
+        """Offer the candidates of one bridgehead pair to ``best`` (see the class docstring)."""
+        graph = self.graph
+        if graph.rings < main_ring_paths.LEVEL_MIN_RINGS:
+            self._offer_from_full_enumerations(best, bh1, bh2, common_neighbors, has_direct_bond)
+            return
+        need = (best.score[0][0] if best.score is not None else 3) - 2   # interior atoms of the incumbent's ring
+        pruned = uses_bound(graph, need)            # asked before the search: it may switch the bound off
+        paths, capped = enumerate_paths(graph, bh1, bh2, need, self.spend, _MAX_DFS_EXPANSIONS)
+        if capped:
+            self._offer_from_full_enumerations(best, bh1, bh2, common_neighbors, has_direct_bond)
+            return
+        self._offer_cases(best, bh1, bh2, common_neighbors, has_direct_bond,
+                          lambda: paths, lambda b: [p for p in paths if b not in p],
+                          self._bridge_length(bh1, bh2) if pruned else None)
+
+    def _offer_from_full_enumerations(self, best, bh1, bh2, common_neighbors, has_direct_bond):
+        """The pair as the loop searched it before the bound: every path of the ring system."""
+        mol, ring_atoms, adj_list = self.mol, self.ring_atoms, self.adj_list
+        held = []
+
+        def full():
+            if not held:
+                held.append(_find_all_simple_paths(mol, bh1, bh2, ring_atoms, adj=adj_list))
+            return held[0]
+
+        def without(bridge_atom):
+            return _find_all_simple_paths(mol, bh1, bh2, ring_atoms - {bridge_atom}, adj=adj_list)
+
+        self._offer_cases(best, bh1, bh2, common_neighbors, has_direct_bond, full, without, None)
+
+    def _bridge_length(self, bh1, bh2):
+        """``bridge_len`` for ``_consider_multiatom_bridges`` over a pruned list of paths: the
+        longest third path in the ring atoms the two main-ring paths leave free."""
+        graph, spend = self.graph, self.spend
+        ends = (1 << bh1) | (1 << bh2)
+        known = {}
+
+        def length(used):
+            free = graph.mask & ~used & ~ends
+            if free not in known:
+                known[free] = longest_bridge(graph, bh1, bh2, free, spend)
+            return known[free]
+
+        return length
+
+    def _offer_cases(self, best, bh1, bh2, common_neighbors, has_direct_bond, full, without, bridge_len):
+        """Cases 1-3 over ``full`` (the bh1->bh2 paths) and ``without(b)`` (those that avoid the
+        atom b)."""
+        spend, rank_key = self.spend, self.rank_key
+
+        def offer_best_pair(paths, main_bridge_len):
+            if len(paths) < 2:
+                return
+            pair = _best_disjoint_path_pair(paths, spend, rank_key)
+            if pair:
+                p1, p2 = pair
+                ring = p1 + p2[1:-1][::-1]
+                best.consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, main_bridge_len)
+
+        if has_direct_bond:
+            offer_best_pair([p for p in full() if len(p) >= 3], 0)
+        for bridge_atom in sorted(common_neighbors):
+            offer_best_pair(without(bridge_atom), 1)
+        if self.allow_multiatom_bridge:
+            _consider_multiatom_bridges(full(), spend, best, bh1, bh2, self.room, bridge_len)
 
 
 # ============================================================================
@@ -1300,20 +1451,43 @@ class VonBaeyerAnalyzer:
         # repeat on the SAME object skips the ``_find_main_ring_impl`` work — but note
         # ``_struct_key`` still computes the canonical SMILES on EVERY non-RWMol call
         # (including same-object repeats); the inner memo saves the search, not the
-        # SMILES. RWMol (and a mol whose output order is unavailable) falls back to the
-        # per-object memo only.
+        # SMILES. A mol whose output order is unavailable falls back to the per-object memo only.
+        #
+        # An RWMol is keyed the same way, by the structure it has at the call (the per-object
+        # memo never holds one: it can be edited in place). The universal cage analysis passes a
+        # fresh RWMol of the same kekulized cage to every ``analyze`` and a ring system of 12 or
+        # more rings searched the same main ring 15 times in one request (8 analyses, two
+        # searches each). The key carries the main-bridge preference, which ``analyze`` switches
+        # off for its second pass over a cage whose preferred main bicycle cannot be numbered, and
+        # the value computed with it on is not the value with it off. (A plain Mol's key, left as
+        # it was, does not carry it: its first value serves both passes.)
+        #
+        # A hit replays the units of the search it replaces, as a plain Mol's always did: the budget
+        # trajectory (and any PerfBudgetExceeded) is what the recomputations charged, never more.
+        # Charging nothing for a hit would name more rows (measured on 64 rows with a 12+-ring system:
+        # 49 against 44) and abstain the others later (a hopeless row takes up to twice as long, and
+        # the Fe-corrin witness of ``test_m25_workbudget`` no longer returns inside its 55 s bound,
+        # the analysis-call budget replacing the inner-op budget as its limit).
         def _struct_key():
-            smi = Chem.MolToSmiles(mol, canonical=True)
-            if not mol.HasProp('_smilesAtomOutputOrder'):
+            # The SMILES of an RWMol is written from a copy: the caller's mol is not touched
+            keyed = Chem.Mol(mol) if isinstance(mol, Chem.RWMol) else mol
+            try:
+                smi = Chem.MolToSmiles(keyed, canonical=True)
+            except Exception:
                 return None
-            order = tuple(int(x) for x in _ORDER_INT_RE.findall(mol.GetProp('_smilesAtomOutputOrder')))
+            if not keyed.HasProp('_smilesAtomOutputOrder'):
+                return None
+            order = tuple(int(x) for x in _ORDER_INT_RE.findall(keyed.GetProp('_smilesAtomOutputOrder')))
             bonds = tuple((b.GetBeginAtomIdx(), b.GetEndAtomIdx(), b.GetBondTypeAsDouble()) for b in bonds_of(mol))
-            return (smi, order, bonds, frozenset(ring_atoms), frozenset(bridgeheads))
+            core = (smi, order, bonds, frozenset(ring_atoms), frozenset(bridgeheads))
+            if isinstance(mol, Chem.RWMol):
+                return core + ("rwmol", getattr(self, "_allow_multiatom_bridge", True))
+            return core
 
         def _by_object():
             return cached_by_key(mol, "polycyclic.main_ring", key, _fresh)
 
-        skey = None if isinstance(mol, Chem.RWMol) else _struct_key()
+        skey = _struct_key()
         if skey is None:
             val = _by_object()
         else:
@@ -1378,78 +1552,14 @@ class VonBaeyerAnalyzer:
             return tuple(sorted(_ranks[i] for i in atom_indices))
 
         best = _MainRingBest(_rank_key)
-        spend = spend_perf_work   # bound once: the pair loops charge it once per pair
-
-        def _best_disjoint_pair(allowed, exclude_direct):
-            """Largest, then most symmetric, pair of interior-disjoint bh1->bh2
-            paths through ``allowed``. ``exclude_direct`` drops the trivial
-            direct edge so a 0-atom main bridge keeps the rest as the main ring.
-            Deterministic: ties broken by the lowest canon-rank tuple.
-            """
-            all_paths = _find_all_simple_paths(mol, bh1, bh2, allowed, adj=adj_list)
-            if exclude_direct:
-                all_paths = [p for p in all_paths if len(p) >= 3]
-            if len(all_paths) < 2:
-                return None
-            return _best_disjoint_path_pair(all_paths, spend, _rank_key)
-
+        # spend_perf_work is bound here, once: the pair loops charge it once per pair
+        pairs = _MainRingPairs(mol, ring_atoms, adj_list, spend_perf_work, _rank_key,
+                               getattr(self, "_allow_multiatom_bridge", True))
         for bh1, bh2 in combinations(sorted(bridgeheads), 2):
-            # Find common neighbors (potential 1-atom main bridge atoms)
-            common_neighbors = adj.get(bh1, set()) & adj.get(bh2, set())
-
-            # Also consider direct connection (0-atom main bridge)
-            has_direct_bond = bh2 in adj.get(bh1, set())
-
-            # Case 1: Direct bond between bridgeheads (0-atom main bridge).
-            # The main ring is the largest pair of interior-disjoint paths that
-            # do NOT use the direct edge; the direct bond is the main bridge.
-            # (Previously this greedily grabbed a single longest path, which on
-            # a dense cage consumed every atom and left no second branch -- so a
-            # 0-atom-bridge main ring was never even generated, e.g. prismane.)
-            if has_direct_bond:
-                pair = _best_disjoint_pair(ring_atoms, exclude_direct=True)
-                if pair:
-                    p1, p2 = pair
-                    ring = p1 + p2[1:-1][::-1]
-                    best.consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 0)
-
-            # Case 2: 1-atom main bridge via a common neighbor.
-            for bridge_atom in sorted(common_neighbors):
-                pair = _best_disjoint_pair(ring_atoms - {bridge_atom},
-                                           exclude_direct=False)
-                if pair:
-                    p1, p2 = pair
-                    ring = p1 + p2[1:-1][::-1]
-                    best.consider(ring, bh1, bh2, len(p1) - 2, len(p2) - 2, 1)
-
-            # Case 3 /: a 2+-atom main bridge. Cases 1
-            # and 2 only ever offer a 0- or 1-atom main bridge, so a bridgehead
-            # pair joined to the rest of the cage by a longer third path never had
-            # its true, larger main bridge scored -- the ``main_bridge_len`` slot
-            # of the score tuple could hold only 0 or 1, and Blue Book PINs such
-            # as tricyclo[9.3.3.1^1,11] (the Blue Book) came out with a
-            # non-preferred main bicycle. The three primary segments of the main
-            # bicycle are three mutually interior-disjoint bh1->bh2 paths: the two
-            # longest form the main ring, largest ring), and the longest
-            # of the remaining disjoint paths is the main bridge, largest
-            # bridge). The (ring_size, main_bridge_len, balance) score then ranks
-            # this faithfully against Cases 1/2, and among equal main bridges
-            # prefers the more symmetric main-ring division. Cases
-            # 1/2 are kept: this is a strict ADD, skipped whenever the largest
-            # available main bridge is only 0 or 1 atom.
-            #
-            # Case 3 is preference-only and can, on a cage whose secondary
-            # bridges cannot be numbered consistently under the new main bicycle,
-            # yield a descriptor that fails the legality audit. ``analyze`` runs
-            # the cascade with this enabled first and, only if the result is
-            # illegal, re-runs it disabled -- so the preferred main bridge can
-            # never COST a legal (if non-preferred) name (accurate-or-degrade,
-            # never a regression).
-            if not getattr(self, "_allow_multiatom_bridge", True):
-                continue
-            _consider_multiatom_bridges(
-                _find_all_simple_paths(mol, bh1, bh2, ring_atoms, adj=adj_list),
-                spend, best, bh1, bh2, len(ring_atoms - {bh1, bh2}))
+            # Common neighbours (potential 1-atom main bridge atoms), and the direct bond
+            # (0-atom main bridge): Cases 1-3 of _MainRingPairs
+            pairs.offer(best, bh1, bh2, adj.get(bh1, set()) & adj.get(bh2, set()),
+                        bh2 in adj.get(bh1, set()))
 
         best_ring, best_bh_pair = best.ring, best.bh_pair
         # Fallback: use largest ring method (for bicyclo or unusual cases)

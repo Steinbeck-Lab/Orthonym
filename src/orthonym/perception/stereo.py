@@ -113,6 +113,8 @@ def assign_stereochemistry(mol) -> None:
             if centres_label_mol(mol):
                 # centres owns atoms + the bonds it labelled; fill only the
                 # exocyclic-ylidene double bonds it leaves unlabelled (M3).
+                #: the bridge has told centres which ring atoms are not
+                # part of a mancude system, so it labels beside them without the mean.)
                 _fill_missing_bond_cip_from_rdkit(mol)
                 _clear_nonexpressible_amine_n_cip(mol)
                 mol.SetProp(_CIP_ASSIGNED_PROP, '1')

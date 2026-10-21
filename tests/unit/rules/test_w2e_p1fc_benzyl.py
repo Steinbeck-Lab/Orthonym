@@ -20,14 +20,17 @@ class TestP2961Benzyl:
         assert name_compound("C(c1ccccc1)c1ccccn1") == "2-benzylpyridine"
 
     def test_benzylidene(self):
-        # -CH=C6H5 on a ring parent -> benzylidene. OPSIN-verified:
-        # benzylidenecyclohexane -> C(C1=CC=CC=C1)=C1CCCCC1. W2E-D2: the fix is
-        # in parent selection (ring_selection.select_principal_ring_system) — the
-        # =CH- methine double-bonds cyclohexane (parent) and single-bonds benzene,
-        # so benzene + methine are the retained 'benzylidene' ylidene substituent
-        # (existing _convert_yl_to_ylidene turns the 'benzyl' fragment name into
-        # 'benzylidene' for the exocyclic double bond).
-        assert name_compound("C(=C1CCCCC1)c1ccccc1") == "benzylidenecyclohexane"
+        # "Unsymmetrical substituent groups having terminal atoms with
+        # different types of free valencies" (the Blue Book): the =CH- methine
+        # double-bonds cyclohexane and single-bonds benzene, and the Blue Book names it
+        # '(cyclohexylidenemethyl)benzene (PIN) [not (phenylmethylidene)cyclohexane;
+        # benzene is senior to cyclohexane (see ]' (:6390-6392). Benzene is the
+        # parent, so the retained 'benzylidene' is not cited here. (W2E-D2 once
+        # asserted 'benzylidenecyclohexane': the senior ring was not allowed to be the
+        # parent because its ring-ylidene prefix had no producer; see
+        # test_ring_ylidene_parent.py.) OPSIN 2.9.0 reads both names to
+        # C(C1=CC=CC=C1)=C1CCCCC1.
+        assert name_compound("C(=C1CCCCC1)c1ccccc1") == "(cyclohexylidenemethyl)benzene"
 
     def test_chloromethylbenzene_unaffected(self):
         # benzene is the parent here; not a benzyl-substituent case.

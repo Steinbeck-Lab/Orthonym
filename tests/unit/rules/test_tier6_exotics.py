@@ -345,3 +345,26 @@ def test_phane_composer_machinery_intact():
     mol = Chem.MolFromSmiles("C1Cc2ccc(cc2)CCc2ccc1cc2")
     assert is_cyclophane(mol)
     assert name_cyclophane(mol) == "1,4(1,4)-dibenzenacyclohexaphane"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("smiles,expected", [
+    # (the Blue Book): '4H-thiopyran-4-ylidene (PIN)'; the ylidene atom is the
+    # indicated-hydrogen position of the mancude parent
+    ("C=C1C=CSC=C1", "4H-thiopyran-4-ylidene"),
+    ("C=C1C=COC=C1", "4H-pyran-4-ylidene"),
+    ("C=C1C=CC=CO1", "2H-pyran-2-ylidene"),
+    ("C=C1C=CC=N1", "2H-pyrrol-2-ylidene"),
+    # a hydro prefix is cited as in the '-yl' form
+    ("C=C1CCC=CO1", "3,4-dihydro-2H-pyran-2-ylidene"),
+    # the ylidene atom is a hydro position (added hydrogen,: not built
+    ("C=C1C=CC=NC1", None),
+    # a single parent bond is the '-yl' mode's and stays so
+    ("CC1OC=CCC1", None),
+])
+def test_het_ring_ylidene_mode(smiles, expected):
+    mol = Chem.MolFromSmiles(smiles)
+    ring = next(r for r in mol.GetRingInfo().AtomRings())
+    attach = next(i for i in ring if any(
+        n.GetIdx() not in ring for n in mol.GetAtomWithIdx(i).GetNeighbors()))
+    assert _unsaturated_heteromonocyclic_substituent(mol, ring, attach, ylidene=True) == expected

@@ -36,9 +36,11 @@ import logging
 import os
 import subprocess
 import tempfile
+import threading
+from collections import OrderedDict
 from functools import lru_cache
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
@@ -351,6 +353,75 @@ def _smiles_output_order(mol) -> Optional[List[int]]:
     return order or None
 
 
+#: ``centres_mancude.non_mancude_ring_atoms`` costs about a millisecond and ``centres_label_mol``
+#: runs up to some tens of times per molecule, so the held atoms are kept, as positions of
+#: RDKit's canonical SMILES, in a bounded LRU keyed by that string. The answer depends on the
+#: structure only (the same for every atom order, tested), so a hit is exact for any spelling.
+_HELD_CACHE: "OrderedDict[str, Tuple[int, ...]]" = OrderedDict()
+_HELD_CACHE_MAX = 4096
+_HELD_LOCK = threading.Lock()
+
+
+def _held_atoms(mol, smi: str, order: Optional[List[int]]) -> Tuple[int, ...]:
+    """``centres_mancude.non_mancude_ring_atoms(mol)``, served from ``_HELD_CACHE`` by the
+    canonical SMILES ``smi`` of ``mol`` (``order``: its atom output order)."""
+    from .centres_mancude import non_mancude_ring_atoms
+    if order is None:
+        return non_mancude_ring_atoms(mol)
+    with _HELD_LOCK:
+        hit = _HELD_CACHE.get(smi)
+        if hit is not None:
+            _HELD_CACHE.move_to_end(smi)
+    if hit is not None:
+        return tuple(sorted(order[pos] for pos in hit))
+    held = non_mancude_ring_atoms(mol)
+    where = {atom: pos for pos, atom in enumerate(order)}
+    with _HELD_LOCK:
+        _HELD_CACHE[smi] = tuple(sorted(where[atom] for atom in held))
+        while len(_HELD_CACHE) > _HELD_CACHE_MAX:
+            _HELD_CACHE.popitem(last=False)
+    return held
+
+
+def _centres_input(mol):
+    """``(the SMILES centres labels for mol, the atom output order of that SMILES)``.
+
+    Ordinarily RDKit's canonical SMILES of ``mol``. When ``mol`` has ring atoms that are
+    not part of a mancude ring system (``centres_mancude.non_mancude_ring_atoms``,
+     "Mancude rings and ring systems": the mean atomic number of the possible
+    double-bond positions is for mancude rings only), ``centres`` would still average
+    them, because its ``Mancude`` types an atom by element, valence and formal charge
+    alone. The string is then the Kekulé form of ``mol`` with a formal charge one higher
+    on each of those atoms, the one input ``Mancude`` reads that no sequence rule does;
+    ``mol`` keeps its own charges, and the labels are mapped back by the atom order of
+    the string written here. Any failure leaves the ordinary string.
+    """
+    smi = Chem.MolToSmiles(mol)
+    # Must read the output order from the SAME MolToSmiles call above.
+    order = _smiles_output_order(mol)
+    stereo = (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms())
+              or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()))
+    held = _held_atoms(mol, smi, order) if stereo else ()  # no label without a stereo unit
+    if held:
+        try:
+            work = Chem.RWMol(mol)
+            Chem.Kekulize(work, clearAromaticFlags=True)
+            for idx in held:
+                atom = work.GetAtomWithIdx(idx)
+                hydrogens = atom.GetTotalNumHs()
+                atom.SetNoImplicit(True)
+                atom.SetNumExplicitHs(hydrogens)
+                atom.SetFormalCharge(atom.GetFormalCharge() + 1)
+            work.UpdatePropertyCache(strict=False)
+            held_smi = Chem.MolToSmiles(work)
+            held_order = _smiles_output_order(work)
+            if held_order is not None:
+                return held_smi, held_order
+        except Exception:  # fail open to the ordinary string, never to no label
+            logger.debug("mancude-aware centres input failed; using the ordinary one")
+    return smi, order
+
+
 def centres_label_mol(mol) -> bool:
     """Label a single RDKit mol with centres (gated single-mol convenience).
 
@@ -359,7 +430,9 @@ def centres_label_mol(mol) -> bool:
     ``apply_centres_labels``.
 
     CRITICAL (/ Phase H): centres labels are 1-based atom indices keyed
-    to the CANONICAL SMILES string emitted by ``Chem.MolToSmiles``, whose atom
+    to the CANONICAL SMILES string emitted by ``Chem.MolToSmiles`` (``_centres_input``
+    writes it, in the Kekulé form of when ``mol`` has non-mancude ring
+    atoms), whose atom
     output order generally DIFFERS from ``mol``'s own atom indices. Applying the
     labels directly by ``idx-1`` (the pre-Phase-H behaviour) lands descriptors on
     the WRONG atoms whenever canonicalisation reorders (e.g. 4-hydroxyproline,
@@ -379,11 +452,9 @@ def centres_label_mol(mol) -> bool:
         still returns True: centres ran, there simply were no descriptors.
     """
     try:
-        smi = Chem.MolToSmiles(mol)
+        smi, order = _centres_input(mol)
     except (ValueError, RuntimeError):
         return False
-    # Must read the output order from the SAME MolToSmiles call above.
-    order = _smiles_output_order(mol)
     batch = centres_label_batch([smi])
     if batch is None:
         return False

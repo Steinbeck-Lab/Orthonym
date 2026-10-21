@@ -262,9 +262,19 @@ def _ring_systems(mol):
     return sorted(systems, key=lambda s: -len(s))
 
 
+def _reference_search_loop(all_paths, spend, best, bh1, bh2, room, bridge_len=None):
+    """``_reference_loop`` under the signature the pair search calls (the levelled search, UN
+    lane B2, adds ``bridge_len``; the full enumerations of a small system or of a capped pair do
+    not pass one)."""
+    assert bridge_len is None
+    _reference_loop(all_paths, spend, best, bh1, bh2, room)
+
+
 def _main_ring_search(smiles, loop, monkeypatch):
     """``_find_main_ring_impl`` (with the tied candidates) of every ring system of ``smiles``
-    with the given Case-3 loop, and the budget units the search charged."""
+    with the given Case-3 loop, and the budget units the search charged. The reference loop
+    runs in the search of every pair by full enumeration (the levelled search is switched off
+    for it); the pruned one runs in the search as it ships."""
     mol = Chem.MolFromSmiles(smiles)
     analyzer = pc.VonBaeyerAnalyzer()
     spent = [0]
@@ -272,6 +282,11 @@ def _main_ring_search(smiles, loop, monkeypatch):
     def spend(n=1):
         spent[0] += n
 
+    if loop is _reference_loop:
+        monkeypatch.setattr(pc.main_ring_paths, "LEVEL_MIN_RINGS", 10 ** 9)
+        loop = _reference_search_loop
+    else:
+        monkeypatch.setattr(pc.main_ring_paths, "LEVEL_MIN_RINGS", 9)
     monkeypatch.setattr(pc, "_consider_multiatom_bridges", loop)
     monkeypatch.setattr(pc, "spend_perf_work", spend)
     results = []

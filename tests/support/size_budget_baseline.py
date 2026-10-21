@@ -118,7 +118,6 @@ FUNCTIONS = {
     "src/orthonym/rules/partial_saturation.py::name_added_h_fused_carbocycle_suffix#1": 227,
     "src/orthonym/rules/partial_saturation.py::name_cyclic_oxo_compound#1": 537,
     "src/orthonym/rules/polycyclic.py::VonBaeyerAnalyzer._analyze_impl#1": 206,
-    "src/orthonym/rules/polycyclic.py::VonBaeyerAnalyzer._find_main_ring_impl#1": 215,
     "src/orthonym/rules/polycyclic.py::VonBaeyerAnalyzer._find_secondary_bridges#1": 212,
     "src/orthonym/rules/polycyclic.py::_detect_ring_functional_groups#1": 279,
     "src/orthonym/rules/polycyclic.py::get_polycyclic_substituents#1": 236,

@@ -872,6 +872,9 @@ def carbon_free_valence_prefix(mol, frag_atoms, attach_idx) -> FreeValencePrefix
             in_class=False)
 
     token = _carbon_ylidene_prefix(mol, frag, attach_idx, free_valence)
+    if token is None:  # an unsaturated monocycle: 'cyclohex-2-en-1-ylidene', '2H-pyrrol-2-ylidene'
+        from ..rules.ring_ylidene_prefix import unsaturated_monocycle_ylidene_prefix
+        token = unsaturated_monocycle_ylidene_prefix(mol, frag, attach_idx, free_valence)
     if token is None:
         token = _ylidene_from_substituent_name(
             mol, frag, attach_idx, free_valence)

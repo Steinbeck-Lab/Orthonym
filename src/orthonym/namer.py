@@ -1017,11 +1017,11 @@ def _validity_gate_name_to_smiles(name: str) -> Optional[str]:
 
 
 def _validity_gate_name_to_opsin_smiles(name: str) -> Optional[str]:
-    """OPSIN's own SMILES for ``name``, as OPSIN wrote it (not RDKit's canonical
-    form of it), via the shared singleton oracle (the same cached parse), or None
-    if OPSIN rejected it / could not be consulted. Used by
-    :func:`_lone_pair_configuration_verified`, which must read the name's
-    structure with another toolkit than RDKit."""
+    """OPSIN's own SMILES for ``name``, as OPSIN wrote it (not RDKit's canonical form of it), via the
+    shared singleton oracle (the same cached parse), or None if OPSIN rejected it / could not be
+    consulted. Read by the validity gate,:func:`_shipped_name_round_trip` and
+    :func:`_lone_pair_configuration_verified`: the metric keys this string, and RDKit's canonical
+    SMILES of it can denote the mirror image (CID101003382: R,R written, S,S read back)."""
     return _validity_oracle().name_to_opsin_smiles(name)
 
 
@@ -2506,17 +2506,17 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # the common parsed path.
     opsin_smiles = _validity_gate_name_to_smiles(name)
     if opsin_smiles is not None:
-        # BE-STRICT full-RT (2026-08-30, user-directed): at the general-fallback
-        # tiers (best-effort / complete) the contract is a FULL round-trip
-        # (constitution AND stereo AND charge), so a name that OPSIN parses to a
-        # DIFFERENT full InChIKey than the input — a wrong molecule, an
-        # OPSIN-valence artifact (e.g. an organo-tin `stanna`-replacement name
-        # whose re-parsed Sn valence differs), OR a stereo-INCOMPLETE name (a
-        # stereo-stripped/omitted descriptor is a WRONG name, not a lesser one) —
-        # MUST abstain, never ship. The PIN/default tier keeps the skeleton-based
-        # below (stereo-tolerant by design for the gold PINs), so the 1656
-        # gate is byte-identical (this branch is skipped when general_fallback_tier
-        # is False). Fail-OPEN only when the input key is uncomputable.
+        #, the polyacid carve-out and the stereo reclaim read OPSIN's own SMILES (see its lookup).
+        opsin_smiles = _validity_gate_name_to_opsin_smiles(name)
+        # BE-STRICT full-RT (2026-08-30, user-directed): at the general-fallback tiers (best-effort
+        # / complete) the contract is a FULL round-trip (constitution AND stereo AND charge), so a
+        # name that OPSIN parses to a DIFFERENT full InChIKey than the input — a wrong molecule, an
+        # OPSIN-valence artifact (e.g. an organo-tin `stanna`-replacement name whose re-parsed Sn
+        # valence differs), OR a stereo-INCOMPLETE name (a stereo-stripped/omitted descriptor is a
+        # WRONG name, not a lesser one) — MUST abstain, never ship. The PIN/default tier keeps the
+        # skeleton-based below (stereo-tolerant by design for the gold PINs), so the 1656
+        # gate is byte-identical (this branch is skipped when general_fallback_tier is False).
+        # Fail-OPEN only when the input key is uncomputable.
         if general_fallback_tier and smiles is not None:
             _in_key = _self_consistency_full_key(smiles)
             if _in_key is not None:
@@ -3028,17 +3028,16 @@ def _offer_rt_ok(name: str, input_smiles: Optional[str]) -> bool:
 
 
 def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
-    """Claims conformance (2026-09-27): the round trip of a name that is about to
-    ship at a general tier, with NO fail-open branch (unlike `_offer_rt_ok`).
+    """Claims conformance (2026-09-27): the round trip of a name that is about to ship at a general
+    tier, with NO fail-open branch (unlike `_offer_rt_ok`).
 
-    Returns ``"verified"`` when OPSIN reads ``name`` and the FULL standard
-    InChIKey of what it read equals the input's (for a radical input the radical
-    graph must agree too, as the key encodes no radical electrons); equal full
-    keys mean the name denotes the whole input, so every atom is covered.
-    ``"unavailable"`` when OPSIN could not be consulted after the oracle's retry
-    ladder; ``"failed"`` otherwise (OPSIN rejected the name, a key differs, or a
-    key could not be computed). The OPSIN call is memoized, so a name the gate or
-    the offer pool already read costs no new parse.
+    Returns ``"verified"`` when OPSIN reads ``name`` and the FULL standard InChIKey of what it read
+    equals the input's (for a radical input the radical graph must agree too, as the key encodes no
+    radical electrons); equal full keys mean the name denotes the whole input, so every atom is
+    covered. ``"unavailable"`` when OPSIN could not be consulted after the oracle's retry ladder;
+    ``"failed"`` otherwise (OPSIN rejected the name, a key differs, or a key could not be computed).
+    The OPSIN call is memoized, so a name the gate or the offer pool already read costs no new
+    parse.
     """
     if not name or not input_smiles:
         return "failed"
@@ -3046,6 +3045,7 @@ def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
     if opsin_smiles is None:
         return ("unavailable" if _validity_gate_status(name) == "unavailable"
                 else "failed")
+    opsin_smiles = _validity_gate_name_to_opsin_smiles(name)
     in_key = _self_consistency_full_key(input_smiles)
     if not in_key or _self_consistency_full_key(opsin_smiles) != in_key:
         return "failed"
@@ -11036,7 +11036,7 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
         parts of a molecule.
     general_fallback_unverified: bool or None, default None
         Also switch on the ``best-effort`` tier: the last-resort producers, von
-        Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11
+        Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 15
         rings (the other tiers build these names for ring systems of up to 40
         skeletal atoms and 8 rings), and adducts with a one-atom ion. Their names still have to pass the full-InChIKey round trip,
         with one exception: a molecule that has no other name gets the name the default tier gives it when OPSIN cannot read the

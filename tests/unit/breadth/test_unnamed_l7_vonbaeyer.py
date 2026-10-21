@@ -631,9 +631,23 @@ def test_budget_trips_at_the_units_the_pruned_search_charges(monkeypatch):
 # (b) the full name of three cluster-A rows
 # ---------------------------------------------------------------------------
 
-# cid: (SMILES, the name before part A). 143830930 is the re-check's name (rows74.tsv column 6);
-# for 157508500 and 136159023 the von Baeyer numbering of the re-check was superseded by earlier
-# engine changes, so the name is the one the engine gave at the base commit of this lane.
+# cid: (SMILES, the name before part A). 143830930 is the re-check's name (rows74.tsv column 6) except for
+# its phosphorus substituent (below); for 157508500 and 136159023 the von Baeyer numbering of the re-check
+# was superseded by earlier engine changes, so the name is the one the engine gave at the base commit of
+# this lane.
+#
+# 143830930, substituent of the ring system: "1-(benzyloxy)-1-oxo-3-phenyl-2-oxa-1-phosphapropyl" until UN
+# lane B2, "bis(benzyloxy)phosphoryl" since. The first was the engine's name only because the main-ring search
+# of the cage (above) spent the whole 12M perf budget (19.3M units, one PerfBudgetExceeded) and the substituent
+# was then named by the fallback; the search now charges 1.2M units and the budget does not trip.
+# Measured (VERIFIED): the base commit names the second form with ORTHONYM_PERF_OP_BUDGET=120000000, and with
+# ORTHONYM_PERF_BUDGET_MEASURE=1 (nothing trips); OPSIN reads both names back to the input's full standard
+# InChIKey, so the choice is the preferred form's: "Skeletal replacement ('a') nomenclature in acyclic
+# chains", (the Blue Book) "...must be used to generate preferred IUPAC names for acyclic
+# structures when four or more heterounits are present in an unbranched chain" -- the chain here has two (O, P)
+# -- and "Fundamental acyl groups for substituents derived from mononuclear noncarbon oxoacids"
+# (the Blue Book: 'phosphoryl', -P(O)<, "preselected prefixes"; its example in a PIN,:36335,
+# "3-[(dimethoxyphosphoryl)sulfanyl]propanoic acid"). The old name is not wrong, only not the preferred form.
 PINNED_NAMES = {
     '157508500': (
         'C1=CC=C2C(=C1)C3=C4N2C5=C6C7=C(C=C5)C8=CC=CC=C8N7C9=CC=CC=[N+]9C61C4=C(C=C3)OC2=CC=CC=[N+]12',
@@ -645,7 +659,7 @@ PINNED_NAMES = {
     ),
     '143830930': (
         'CC(C)C1C2=NC3=C(O2)C45C(NC6=C(C=CC=C64)C7=C8C(=CC=C7)N(C=C8C9=CN=C3O9)P(=O)(OCC2=CC=CC=C2)OCC2=CC=CC=C2)OC2=C5C=C(C[C@@H](C(=O)N1)NC(=O)[C@H](C(C)C)O)C=C2',
-        '(13S)-34-[1-(benzyloxy)-1-oxo-3-phenyl-2-oxa-1-phosphapropyl]-13-[(2S)-2-hydroxy-3-methylbutanamido]-12-oxo-10-(propan-2-yl)-8,37,40-trioxa-4,11,22,34,39-pentaazadecacyclo[27.6.1.1^2,5.1^6,9.1^15,19.1^18,21.0^7,20.0^20,24.0^23,28.0^33,36]tetraconta-1(35),2,4,6,9(39),15(38),16,18,23(28),24,26,29,31,33(36)-tetradecaene',
+        '(13S)-34-[bis(benzyloxy)phosphoryl]-13-[(2S)-2-hydroxy-3-methylbutanamido]-12-oxo-10-(propan-2-yl)-8,37,40-trioxa-4,11,22,34,39-pentaazadecacyclo[27.6.1.1^2,5.1^6,9.1^15,19.1^18,21.0^7,20.0^20,24.0^23,28.0^33,36]tetraconta-1(35),2,4,6,9(39),15(38),16,18,23(28),24,26,29,31,33(36)-tetradecaene',
     ),
 }
 

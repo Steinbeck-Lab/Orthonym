@@ -112,7 +112,7 @@ _HALO_ALKOXY_RE = re.compile(
 # knows ('methylidenemethoxy'); the enclosure and the multiplier now agree on all of them.
 _CONTRACTED_ALKOXY_STEMS = ("methoxy", "ethoxy", "propoxy", "butoxy", "phenoxy")
 _NOT_A_PREFIX_ROOT = frozenset(("iso", "cyclo", "mono"))
-_SUBSTITUENT_ROOT_ENDINGS = ("o", "oxy", "yl", ")", "]", "}")
+_SUBSTITUENT_ROOT_ENDINGS = ("o", "oxy", "yl", "ylidene", ")", "]", "}")
 
 
 def is_substituted_contracted_alkoxy(name_lower: str) -> bool:
@@ -194,9 +194,11 @@ _ALKYLAMINO_RE = re.compile(
 # 'piperidinylmethyl') is a compound prefix requiring enclosing marks
 # ('(cyclohexylmethyl)benzene',. The internal 'yl' before the terminal
 # alkyl marks the compound boundary; simple alkyls ('methyl') lack it, and FG
-# heads ('hydroxymethyl') do not end the head in 'yl'.
+# heads ('hydroxymethyl') do not end the head in 'yl'. A ring-YLIDENE head is the
+# same compound prefix ('(cyclohexylidenemethyl)benzene (PIN)',,
+# the Blue Book), hence the optional 'idene'.
 _RINGYL_ALKYL_RE = re.compile(
-    r'yl(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl)$'
+    r'yl(?:idene)?(?:methyl|ethyl|propyl|butyl|pentyl|hexyl|heptyl|octyl)$'
 )
 
 _COMPOUND_OXY_PREFIXES = frozenset((

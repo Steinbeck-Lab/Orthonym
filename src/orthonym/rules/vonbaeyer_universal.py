@@ -58,14 +58,73 @@ MAX_CAGE_RINGS = 8
 #: verified systematic name, so the main-bridge concern above does not
 #: apply there; the work of each analysis is bounded by the per-name budgets
 #: (``fragment_naming._PERF_BUDGET`` / ``_ANALYSIS_CALL_BUDGET``). The values are
-#: measured (TRIAGE 'Large molecules -- part 3'): with no ceiling at all, every
-#: ring system named in the large-molecule census, the large-polycycle ladder and
-#: its two corpora has at most 82 skeletal atoms and 11 rings; above 11 rings no
-#: system was named and the main-ring search of each one ran its perf budget out
-#: (census rows up to 210 s slower, the ladder's 15- to 21-ring rows 30-44 s).
+#: measured, in two rounds.
+#:
+#: a performance pass (TRIAGE 'Large molecules -- part 3'; the large-molecule census, the
+#: large-polycycle ladder and its two corpora): with no ceiling at all every ring
+#: system named has at most 82 skeletal atoms and 11 rings, and no system of more
+#: rings was named. That sample held no ring system of 12 or more rings that the
+#: engine could name, so 11 rings was the highest value it could show.
+#:
+#: a performance pass (lane UN-B1, 2026-10-21): the 477 PubChem rows of the census-2 unnamed
+#: panel that hold a ring system of 12 or more rings (circuit rank 8-43), run at
+#: the best-effort tier under six values of the ring ceiling, every name read back
+#: by an independent OPSIN call (full standard InChIKey):
+#:
+#: ring ceiling 11 15 20 30 40 100
+#: named 0 87 86 86 86 86
+#: read back - 87 86 86 86 86 (no name was wrong)
+#: median s 10.2 16.7 17.8 17.8 17.8 17.7
+#: p95 s 25.0 29.5 31.4 30.8 32.8 32.3
+#: TIMEOUT@120 0 2 2 2 2 2
+#:
+#: Every whole ring system that names has at most 15 rings (12: 33 rows, 13: 50,
+#: 14: 2, 15: 1); the one other name is a spiro union of two polycyclic parts that
+#: is 16 rings as one system. So a ceiling above 15 never names a row that 15 does
+#: not, and it costs: the 139 rows whose system has 16 or more rings run their
+#: whole-system analysis for 6-8 s more each and name nothing, and the spiro union
+#: (CID140891835) loses its name. Spied in fresh processes at 15 and at 20: at 20
+#: the whole system (16 rings) is analysed first and raises ``PerfBudgetExceeded``
+#: after 7.9 s, and its parts are never named; at 15 the whole system is refused at
+#: once and the parts are analysed and named. So 15 is the ceiling that names the
+#: most and costs the least. The two TIMEOUT rows are 15-ring systems
+#: (CID59886507, CID101381505) whose main-ring search runs past 120 s in
+#: ``polycyclic._find_main_ring_impl`` (CID59886507: 83 of 88 s in
+#: ``_consider_multiatom_bridges``) without the perf budget stopping it; they cost
+#: 2.5 s and 6.3 s at 11, and bounding that search is the search speed's work. A
+#: faster main-ring search can name systems of more rings: measure again then.
+#:
+#: The atom ceiling stays 100: of the 13 of those rows that hold a ring system of
+#: more than 100 skeletal atoms (102-124), a ceiling of 200 names one (an 8-ring
+#: macrocycle of 102 atoms, CID11147635) and costs up to 100 s more on another.
+#:
+#: a performance pass (the identity panels, the 2,000 named-control and 2,793 unnamed-panel
+#: PubChem rows at both tiers): the plain ceiling of 15 lost 21 names the ceiling
+#: of 11 gave (0 of the 2,000 control rows; 21 of the 5,586 panel rows). Each of the
+#: 21 hands the analysis a ring-atom set of 12 to 15 rings that is not one ring
+#: system: 14 are several ring systems joined by chains (the circuit rank sums over
+#: them, 2 to 9 separate systems, 46 to 74 atoms), and 7 are one system with a
+#: spiro union (a spiro atom joins two polycyclic parts, DEFINITIONS:
+#: "The following recommendations apply only to the naming of parent hydrides
+#: containing free spiro unions", and MONOSPIRO RING SYSTEMS WITH DIFFERENT
+#: RING COMPONENTS, AT LEAST ONE OF WHICH IS A POLYCYCLIC RING SYSTEM: such a
+#: system is named from its parts, not as one von Baeyer system). The ceiling of 11
+#: refused these at once and another producer named the parts; at 15 the
+#: whole-system analysis ran first, ended in ``PerfBudgetExceeded`` (traced in fresh
+#: processes) and the parts were never named. So above ``BEST_EFFORT_MAX_UNION_RINGS``
+#: the whole-system analysis is only for one biconnected ring system (connected
+#: through ring bonds, no atom whose removal splits it): ``within_ring_ceiling``.
+#: None of the 86 whole systems that name at 12 to 15 rings (a performance pass) has such an
+#: atom, so the rule costs no name there, and it spares the budget the parts need:
+#: the 477 rows of a performance pass under the ceiling of 15 with the rule name 92 (all read
+#: back, none wrong; median 15.0 s, p95 25.5 s, one TIMEOUT@120), and the 21 lost
+#: panel rows name again with their former names.
 #: The PIN tier keeps the two ceilings above.
 BEST_EFFORT_MAX_CAGE_ATOMS = 100
-BEST_EFFORT_MAX_CAGE_RINGS = 11
+BEST_EFFORT_MAX_CAGE_RINGS = 15
+#: The ceiling a best-effort ring-atom set keeps when it is not one biconnected ring
+#: system (several ring systems, or a spiro union of parts): the value of a performance pass.
+BEST_EFFORT_MAX_UNION_RINGS = 11
 
 
 def cage_caps() -> Tuple[int, int]:
@@ -81,6 +140,66 @@ def cage_caps() -> Tuple[int, int]:
     except Exception:  # a tier read must never widen the scope
         pass
     return MAX_CAGE_ATOMS, MAX_CAGE_RINGS
+
+
+def is_biconnected_ring_system(mol, atoms) -> bool:
+    """True iff ``atoms`` is ONE ring system with no free spiro union: connected
+    through ring bonds, and no atom whose removal splits it: a spiro atom is
+    "a single atom common to both rings", so it is such a cut atom). A set of several
+    ring systems, or a spiro union of polycyclic parts, is not a von Baeyer system
+     names the latter from its parts)."""
+    atoms = set(atoms)
+    if not atoms:
+        return False
+    adj = {a: [] for a in atoms}
+    for a in atoms:
+        for bond in mol.GetAtomWithIdx(a).GetBonds():
+            o = bond.GetOtherAtomIdx(a)
+            if o in atoms and bond.IsInRing():
+                adj[a].append(o)
+    root = min(atoms)
+    # Tarjan's articulation points, iterative: depth, low-link, children of the root.
+    depth = {root: 0}
+    low = {root: 0}
+    root_children = 0
+    stack = [(root, None, iter(sorted(adj[root])))]
+    while stack:
+        node, parent, nbrs = stack[-1]
+        advanced = False
+        for nxt in nbrs:
+            if nxt == parent:
+                continue
+            if nxt in depth:
+                low[node] = min(low[node], depth[nxt])
+                continue
+            depth[nxt] = low[nxt] = depth[node] + 1
+            if node == root:
+                root_children += 1
+            stack.append((nxt, node, iter(sorted(adj[nxt]))))
+            advanced = True
+            break
+        if advanced:
+            continue
+        stack.pop()
+        if stack:
+            up = stack[-1][0]
+            low[up] = min(low[up], low[node])
+            if up != root and low[node] >= depth[up]:
+                return False  # ``up`` is a cut atom
+    return len(depth) == len(atoms) and root_children <= 1
+
+
+def within_ring_ceiling(mol, atoms, n_rings: int, ceiling: int) -> bool:
+    """True iff a ring-atom set of ``n_rings`` rings is analysed under ``ceiling``
+    (``cage_caps[1]``). Up to ``BEST_EFFORT_MAX_UNION_RINGS`` (and at the PIN
+    tier, whose ceiling is below it) the count alone decides; above it only one
+    biconnected ring system is analysed (see the a performance pass note at
+    ``BEST_EFFORT_MAX_CAGE_RINGS``)."""
+    if n_rings > ceiling:
+        return False
+    if n_rings <= BEST_EFFORT_MAX_UNION_RINGS:
+        return True
+    return is_biconnected_ring_system(mol, atoms)
 
 
 def beyond_pin_caps(n_atoms: int, n_rings: Optional[int] = None) -> bool:
@@ -531,7 +650,7 @@ def analyze_cage_universal(
     # cages (adamantane 4 vs 3, cubane 6 vs 5), so this cap used to refuse
     # heptacyclo cages as "> 8 rings". See von_baeyer_ring_count.
     n_rings = von_baeyer_ring_count(kek, cage_canon)
-    if n_rings is None or n_rings < 2 or n_rings > max_rings:
+    if n_rings is None or n_rings < 2 or not within_ring_ceiling(kek, cage_canon, n_rings, max_rings):
         return None
     _beyond_pin = beyond_pin_caps(len(cage_canon), n_rings)
 
