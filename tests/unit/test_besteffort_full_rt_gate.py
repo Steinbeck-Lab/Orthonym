@@ -6,7 +6,12 @@ name is NOT a lesser name -- it is a WRONG name and must abstain (user-directed
 
 The PIN/default tier is UNCHANGED (its correct-by-construction OPSIN-unparseable
 carve-outs -- inositol / np-stereoparent / thioperoxol /... -- still ship), so
-the 1656 PIN gold gate is byte-identical. These tests run BEST-EFFORT only.
+the 1656 PIN gold gate is byte-identical. These tests run the COMPLETE tier
+(``general_fallback_unverified=False``), which keeps this contract in full. The
+BEST-EFFORT tier keeps it too, with one exception since 2026-10-20 (user decision):
+a molecule it leaves without a name gets the name the default tier ships when OPSIN
+cannot read its stereodescriptors (``pin_unverified``,
+``assembly/default_tier_offer.py``; tests/unit/assembly/test_default_tier_offer.py).
 """
 import ast
 import os
@@ -77,14 +82,15 @@ def test_opsin_unparseable_ring_stereo_abstains(smiles):
     assert _abstains(_be(smiles)), f"shipped an unverifiable name: {_be(smiles)!r}"
 
 
-# Claims conformance (2026-09-27): at the best-effort tier a name OPSIN rejects is
+# Claims conformance (2026-09-27): at the complete tier a name OPSIN rejects is
 # not emitted; the only exceptions are the exact-match list names. OPSIN 2.9.0
 # parses no lowercase pseudoasymmetric (r/s) descriptor, so the correct systematic
 # name '(1R,3s,5S)-tropan-3-ol' cannot pass the round trip (OPSIN returns no
-# structure for it) and best-effort abstains, as it did in the code the paper
+# structure for it) and this tier abstains, as it did in the code the paper
 # measured. 594f8a788 had shipped it as a last resort through a
 # stripped-form check; that last resort is gone. The stripped-form verifier
-# itself still tells the right code from the wrong one.
+# itself still tells the right code from the wrong one. The best-effort tier gives
+# the name the default tier gives (user decision 2026-10-20, default_tier_offer.py).
 def test_pseudoasymmetric_ring_stereo_abstains():
     from orthonym.namer import _pseudoasymmetric_name_verified
     smiles = "CN1[C@@H]2CC[C@H]1C[C@H](O)C2"  # tropan-3-ol

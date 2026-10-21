@@ -114,7 +114,8 @@ def test_ring_name_of_the_guanidine_arm_the_builder_cannot_spell_is_labelled_bel
     labelled systematic_verified, not pin_unverified (the inner dispatch label of a name that is
     not the guanidine parent, as for urea)."""
     smiles = "O=C1CCc2ccc(CCN=C(N)N)cc2N1"
-    ring_name = "7-[2-(diaminomethylideneamino)ethyl]-1,2,3,4-tetrahydroquinolin-2-one"
+    # the prefix is '(diaminomethylidene)amino (preferred prefix)', (the Blue Book)
+    ring_name = "7-{2-[(diaminomethylidene)amino]ethyl}-1,2,3,4-tetrahydroquinolin-2-one"
     b = name_breadth(smiles)
     assert (b.get("name"), b.get("tier")) == (ring_name, "systematic_verified"), b
     assert name_is_rt_exact(ring_name, smiles)

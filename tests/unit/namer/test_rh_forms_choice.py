@@ -114,8 +114,12 @@ KEPT = [
     ("27", "CN1c2cc3c(cc2C(CS(=O)(=O)O)=CC1(C)C)C(c1cc(C(=O)ON2C(=O)CCC2=O)ccc1C(=O)O)=c1cc2c(cc1O3)=[N+](C)C(C)(C)C=C2CS(=O)(=O)[O-]",
      "13-(2-carboxy-5-{[(2,5-dioxopyrrolidin-1-yl)oxy](oxo)methyl}phenyl)-6,7,7,19,19,20-hexamethyl-9-(sulfomethyl)-17-(sulfonatomethyl)-2-oxa-6,20-diazapentacyclo[12.8.0.0^3,12.0^5,10.0^16,21]docosa-1(22),3,5,8,10,12,14,16(21),17-nonaen-6-ium",
      "systematic_verified"),
+    # row 30: the hydrazinyl unit holds one ylidene, which can stand on the far nitrogen only, so the
+    # prefix cites no locant: "Omission of locants" (the Blue Book)
+    # 'ethylidenehydrazinyl (preferred prefix) (not 2-ethylidenehydrazin-1-yl)' (:2959); the name read
+    # '(2-{...}hydrazinyl)' before, a locant of the unit without the free valence's
     ("30", "C[N+]1=C2C=CC=CN2C=C1C3=CC=C(C=C3)/C=N/NC(=O)N/N=C\\C4=CC=C(C=C4)C5=CN6C=CC=CC6=[N+]5C",
-     "7-methyl-8-{4-[(1Z)-{[(2-{(1E)-[4-(7-methyl-1,7-diazabicyclo[4.3.0]nona-1,3,5,8-tetraen-1-ium-8-yl)phenyl]methylidene}hydrazinyl)(oxo)methyl]hydrazinylidene}methyl]phenyl}-1,7-diazabicyclo[4.3.0]nona-1,3,5,8-tetraen-1-ium",
+     "7-methyl-8-{4-[(1Z)-{[({(1E)-[4-(7-methyl-1,7-diazabicyclo[4.3.0]nona-1,3,5,8-tetraen-1-ium-8-yl)phenyl]methylidene}hydrazinyl)(oxo)methyl]hydrazinylidene}methyl]phenyl}-1,7-diazabicyclo[4.3.0]nona-1,3,5,8-tetraen-1-ium",
      "systematic_verified"),
     ("33", "C[N+]1=CC=C(C=C1)C2=C3C=CC(=C(C4=NC(=C(C5=CC=C(O5)C(=C6C=CC2=N6)C7=CC=CC=C7)C8=CC=CC=C8)C=C4)C9=CC=[N+](C=C9)C)N3",
      "12-(1-methyl-1,4-dihydropyridin-4-ylidene)-7-(1-methylpyridin-1-ium-4-yl)-2,17-diphenyl-21-oxa-22,23,24-triazapentacyclo[16.2.1.1^3,6.1^8,11.1^13,16]tetracosa-1(20),2,4,6(24),7,9,11(23),13(22),14,16,18-undecaen-23-ium",

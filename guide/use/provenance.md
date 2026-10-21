@@ -19,7 +19,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : `true` only for a certified Preferred IUPAC Name.
 
 `source`
-: Which part of the engine produced the name: `pin_path` (the strict path; at `best-effort` it also labels the `cis` or `trans` name of a monocycle's pair of stereocentres, which is made from a name with lowercase `r` and `s` that the engine built for the whole molecule and OPSIN cannot read, with the tier {tier}`systematic_verified`), `general_engine`, `trivial_retained` (a retained trivial name: from the last-resort table, or a trivial natural-product name such as `diamorphine`), `t4_floor` (a last-resort producer) or `abstain`. It is coarse; `producer` is the finer field.
+: Which part of the engine produced the name: `pin_path` (the strict path; at `best-effort` it also labels the `cis` or `trans` name of a monocycle's pair of stereocentres, which is made from a name with lowercase `r` and `s` that the engine built for the whole molecule and OPSIN cannot read, with the tier {tier}`systematic_verified`, and the name the default tier ships although OPSIN cannot read its stereodescriptors, for a molecule that has no other name, with the tier {tier}`pin_unverified`), `general_engine`, `trivial_retained` (a retained trivial name: from the last-resort table, or a trivial natural-product name such as `diamorphine`), `t4_floor` (a last-resort producer) or `abstain`. It is coarse; `producer` is the finer field.
 
 `opsin`
 : What the OPSIN check found: `verified`, `verified_constitution_only` (the constitution matched; the stereodescriptors were not compared), `verified_twin` (OPSIN has no grammar for the name and read a twin spelling of it back to your structure), `unverified`, or `n/a` when there is no name.

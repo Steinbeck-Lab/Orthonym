@@ -53,7 +53,9 @@ CIP label). `--provenance` marks each of them. The wider tiers ship none of them
 from the exact-match lists (a metal-complex name, and a natural-product parent name when no
 verified systematic name is found) and the twin-checked names for which the engine has no other
 spelling: halogen `-uide` anions (`diphenyliodanuide`), thioperoxols (`methane-SO-thioperoxol`) and
-organometallic names with halido ligands (`bromido(ethyl)nickel`).
+organometallic names with halido ligands (`bromido(ethyl)nickel`). The `best-effort` tier also ships, for a
+molecule that has no other name, a name whose stereodescriptors OPSIN cannot parse when the default tier ships
+it, with the label the default tier gives it (`pin_unverified`).
 
 **Honest.** A candidate that fails a check is withdrawn, and when no name is left Orthonym says so
 instead of guessing. `--provenance` reports the tier each name landed on and, in its `verified`
@@ -162,11 +164,12 @@ labelled `systematic_verified`. Otherwise it declines. This rule applies to the 
 | `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar, a PIN spelling that OPSIN reads back through its twin spelling, a poly-anhydride name whose acids OPSIN reads back or a PIN whose stereodescriptors OPSIN cannot read (with `--trivial`, also a retained trivial name); otherwise nothing (`NO_VERIFIED_PIN`) |
 | `valid` | also general names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
-| `best-effort` | also the names of the last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build these names for ring systems of up to 40 skeletal atoms and 8 rings), and adducts with a one-atom ion such as chloride, and, for a monocycle whose two stereocentres each carry one ligand and one hydrogen atom, the `cis` or `trans` name (`trans-cyclohexane-1,4-diol`) in place of a name with lowercase `r` and `s`, which OPSIN cannot read |
+| `best-effort` | also the names of the last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build these names for ring systems of up to 40 skeletal atoms and 8 rings), and adducts with a one-atom ion such as chloride, and, for a monocycle whose two stereocentres each carry one ligand and one hydrogen atom, the `cis` or `trans` name (`trans-cyclohexane-1,4-diol`) in place of a name with lowercase `r` and `s`, which OPSIN cannot read, and, for a molecule that has no other name, the name the default tier ships although OPSIN cannot read its stereodescriptors, with the label of the default tier (`pin_unverified`) |
 
 At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey OPSIN round trip (a
-name from the natural-product and metal-complex lists and the twin-checked names below excepted),
-so the name formats absent from
+name from the natural-product and metal-complex lists, the twin-checked names below and, at
+`best-effort`, the default tier's own name for a molecule that has no other name when OPSIN cannot read its
+stereodescriptors excepted), so the other name formats absent from
 OPSIN's grammar, which the default tier ships without a full read-back, are not shipped there, and
 a wider tier can, rarely, decline a molecule that a narrower tier names. A PIN spelling that the
 default tier ships through its twin is named there in a form OPSIN reads

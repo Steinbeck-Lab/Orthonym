@@ -37,7 +37,7 @@ omitted form ('(R)-chloro(hydroxy)(2-2H)acetic acid'); not read here.
 Controls: a unit with no heteroatom hydrogen ('(2H3)acetonitrile', 'methyl (2H3)acetate'), a descriptor
 that stands before a prefix and covers that prefix only ('(2H3)methoxybenzene',:43730,
 '4-[(2H3)methylamino]benzoic acid'), a group that a written-out suffix names ('(2H3)methanol',
-'phenyl(2H2)methanol', '(2H3)methanethiol') and a unit completely labelled ('(2H5)glycine') keep
+'phenyl(2H2)methanol', '(2H3)methanethiol') and a unit completely labelled keep
 their names. Not in this topic: a count-only descriptor on a unit whose unmodified name cites locants
 ('(2H2)ethan-1-ol'-like names, "as in"), an amine suffix ('(2H3)methanamine').
 """
@@ -105,8 +105,6 @@ CONTROLS = [
     ("[2H]C([2H])([2H])O", "(2H3)methanol"),
     ("OC([2H])([2H])c1ccccc1", "phenyl(2H2)methanol"),
     ("[2H]C([2H])([2H])C(=O)OC", "methyl (2H3)acetate"),
-    ("[2H]C([2H])(N([2H])[2H])C(=O)O[2H]", "(2H5)glycine"),
-    ("[2H]C([2H])(N)C(=O)O", "(2,2-2H2)glycine"),
     ("Nc1c([2H])c([2H])c([2H])c([2H])c1[2H]", "(2,3,4,5,6-2H5)aniline"),
     ("Oc1c([2H])c([2H])c([2H])c([2H])c1[2H]", "(2,3,4,5,6-2H5)phenol"),
     ("OC(=O)c1c([2H])c([2H])c([2H])c([2H])c1[2H]", "(2,3,4,5,6-2H5)benzoic acid"),
@@ -162,6 +160,21 @@ def test_the_lexer_reads_repeated_nuclide_groups_only_as_an_isotope_descriptor(c
 @pytest.mark.parametrize("smiles,name", CONTROLS)
 def test_controls_keep_their_names(smiles, name):
     assert_pin_at_both_tiers(smiles, name)
+
+
+# PS lane 1 a performance pass change-asserted-value (user decision 2026-10-20): the two completely labelled glycine
+# names left CONTROLS. They keep their NAMES (the strict path builds them, best-effort ships them, OPSIN
+# reads both back), but 'glycine' is a retained name of Table 10.4, the Blue Book
+# 'glycine / aminoacetic acid', no (PIN) tag; (:1978):2052 "Preferred IUPAC names (PINs) for the
+# natural products in Chapter are not identified."), so a name built on it is no PIN: the default
+# tier declines it and best-effort labels it systematic_verified.
+@pytest.mark.parametrize("smiles,name", [
+    ("[2H]C([2H])(N([2H])[2H])C(=O)O[2H]", "(2H5)glycine"),
+    ("[2H]C([2H])(N)C(=O)O", "(2,2-2H2)glycine"),
+])
+def test_labelled_glycine_keeps_its_name_below_pin(smiles, name):
+    from tests.support.default_tier import declined_at_default
+    declined_at_default(smiles, name)
 
 
 def test_the_ester_of_a_labelled_acid_keeps_its_omission_where_no_locant_is_needed():

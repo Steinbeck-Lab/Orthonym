@@ -73,8 +73,11 @@ class TestAmidineAsPrefix:
         ("N=C(N)CCC(=O)O", "4-amino-4-iminobutanoic acid"),
         # amido family unaffected (C=O branch)
         ("CC(=O)Nc1ccc(C(=O)O)cc1", "4-acetamidobenzoic acid"),
-        # Schiff base (imino N on ring) must NOT be captured as imidamido
-        ("CC=Nc1ccc(C(=O)O)cc1", "4-ethaniminylbenzoic acid"),
+        # Schiff base (imino N on ring) must NOT be captured as imidamido. R-CH=N- joined through
+        # nitrogen is '(R-ylidene)amino' "Substitutive names for imines",
+        # the Blue Book '4-{[(4-chlorophenyl)methylidene]amino}aniline (PIN)'); '-iminyl' is
+        # the suffix of a radical,:40620, Table 7.2:40622), so 'ethaniminyl' is not it
+        ("CC=Nc1ccc(C(=O)O)cc1", "4-(ethylideneamino)benzoic acid"),
         # guanidine must NOT be captured (aryl guanidino demoted to the PIN
         # prefix carbamimidoylamino per / BBv2 L1700; Wave-3 heal)
         ("N=C(N)Nc1ccc(C(=O)O)cc1", "4-(carbamimidoylamino)benzoic acid"),

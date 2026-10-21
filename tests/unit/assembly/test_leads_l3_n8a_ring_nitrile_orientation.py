@@ -65,26 +65,25 @@ def test_every_atom_order_gives_the_one_pin(smiles, pin):
 
 
 # The order that gave a wrong molecule: the substituent is on the carbon that carries the nitrile.
-# The numbering is the point of this row; the spelling of its hydrazine unit is not the PIN's.
-# "Hydrazine and derivatives" (the Blue Book): "For H2N-NH– 'hydrazinyl'";
-# a substituted unit cites its locants, '4-(1-acetyl-2-ethylhydrazin-1-yl)benzoic acid (PIN)'
-# (:34042), so the PIN of this group is '1-(2-tert-butylhydrazin-1-yl)cyclooctane-1-carbonitrile',
-# which no producer builds: the name stays '(tert-butylamino)amino' and is labelled below the PIN
-# (validation/spelling/checks_prefixes.py,. That PIN row is not asserted: the value
-# of the old assertion was the non-PIN spelling, and no worked example fixes the new one but
-#:34042 (the form is derived from it, so recorded as unverified).
-HYDRAZINE_ROW = ("CC(C)(C)NNC1(CCCCCCC1)C#N", "1-[(tert-butylamino)amino]cyclooctane-1-carbonitrile")
+# The numbering is the point of this row. The hydrazine unit is cited with its locants and the free
+# valence's: "Citation of locants" (the Blue Book), '4-(1-acetyl-2-ethylhydrazin-1-yl)
+# benzoic acid (PIN)' (:34042); the nitrile is senior to a hydrazine,:18197), so the
+# ring carries the suffix. This row used to assert '1-[(tert-butylamino)amino]cyclooctane-1-carbonitrile'
+# below the PIN, because no producer built the unit ('which no producer builds', as this comment said);
+# the PIN is now built. UNVERIFIED (recorded, not machine-confirmed): the spelling is derived from:34042
+# and the rule, no worked example has a nitrile parent; OPSIN 2.9.0 reads it back to the full key.
+HYDRAZINE_ROW = ("CC(C)(C)NNC1(CCCCCCC1)C#N", "1-(2-tert-butylhydrazin-1-yl)cyclooctane-1-carbonitrile")
 
 
-def test_every_atom_order_gives_the_one_name_below_the_pin():
-    smiles, name = HYDRAZINE_ROW
-    assert name_is_rt_exact(name, smiles), name
+def test_every_atom_order_gives_the_one_pin_with_the_hydrazine_unit_cited_by_its_locants():
+    smiles, pin = HYDRAZINE_ROW
+    assert name_is_rt_exact(pin, smiles), pin
     orders = _orders(smiles)
     assert len(orders) >= 10, orders
     for order in orders:
         d, b = name_default(order), name_breadth(order)
-        assert d["tier"] != "pin_verified", (order, d["name"], d["tier"])
-        assert (b["name"], b["tier"]) == (name, "systematic_verified"), (order, b["name"], b["tier"])
+        assert (d["name"], d["tier"]) == (pin, "pin_verified"), (order, d["name"], d["tier"])
+        assert (b["name"], b["tier"]) == (pin, "pin_verified"), (order, b["name"], b["tier"])
 
 
 def test_the_unoriented_ring_keeps_its_perception_order(monkeypatch):

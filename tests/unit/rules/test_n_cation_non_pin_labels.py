@@ -99,8 +99,13 @@ def test_unverifiable_pin_form_ships_demoted(smiles, expected):
 
 
 # Controls: nothing here cites a carbon-substituted N+ as azanium(yl).
+# PS lane 1 a performance pass change-asserted-value (user decision 2026-10-20): the glycine zwitterion left this
+# list. 'glycine' is a retained name of Table 10.4, the Blue Book 'glycine /
+# aminoacetic acid', no (PIN) tag) and (:1978),:2052 says "Preferred IUPAC names (PINs) for the
+# natural products in Chapter are not identified."; the name is kept at best-effort, labelled
+# systematic_verified, and the default tier declines it (tests/unit/data/
+# test_retained_names_kept_below_pin.py).
 @pytest.mark.parametrize("smiles,expected", [
-    ("[NH3+]CC(=O)[O-]", "glycine"),
     # wp7 change-asserted-value: (the Blue Book) '2-chloroethan-1-ol is the
     # PIN'; '2-aminoethan-1-aminium chloride (PIN)' (:43572). Was '...trimethylethanaminium'
     # (the elided locant). OPSIN 2.9.0 full-InChIKey exact.
@@ -169,7 +174,7 @@ def test_label_is_stable_in_one_warm_instance():
     namer = Orthonym(style="pin")
     seq = [(_PC, False), (_PLASMALOGEN, False), (_PLASMALOGEN, False),
            ("C[N+](C)(C)CC(=O)[O-]", False), ("C[N+](C)(C)CC(=O)[O-]", False),
-           ("[NH3+]CC(=O)[O-]", True), ("C[N+](C)(C)CCO", True), (_PC, False),
+           ("[NH3+]CC(=O)[O-]", False), ("C[N+](C)(C)CCO", True), (_PC, False),
            ("CCO", True)]
     for smiles, is_pin in seq:
         row = _row(smiles, namer)

@@ -170,7 +170,12 @@ class TestCoverageGateWhitelist:
         # PIN for the chapter, and (:7954) says "no PIN label will be
         # assigned in names including" water. The name is kept at the PIN tier by
         # decision (controller option A, like D-a): "no PIN identified, kept by
-        # decision D-a". The test id ('..._produces_adenine') is kept so the TRIAGE row
+        # decision D-a". SUPERSEDED for the label (PS lane 1 a performance pass, user decision 2026-10-20): the
+        # retained nucleotide names leave the PIN tier; this name is now recorded as not a PIN, the
+        # default tier declines it and best-effort ships it systematic_verified
+        # (tests/unit/data/test_retained_names_kept_below_pin.py, test_ci_benchmark.py ci-092). The
+        # assertion below (the NAME) is unchanged.
+        # The test id ('..._produces_adenine') is kept so the TRIAGE row
         # still joins; it no longer describes the test, which asserts that the bare
         # nucleobase is NOT the answer.
         assert name == "5'-adenylic acid—water (1/1)", (

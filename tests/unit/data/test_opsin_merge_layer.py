@@ -115,15 +115,18 @@ class TestMergeLayerBehavior:
                 )
 
     def test_merged_count_reasonable(self):
-        """ALL_RETAINED_NAMES has 300+ entries (hand-curated + evidence-backed OPSIN).
+        """ALL_RETAINED_NAMES has 290+ entries (hand-curated + evidence-backed OPSIN).
 
         2026-09-26 (wp7) change-asserted-value: was '>= 350'; 488 OPSIN-import
         trivial names without Blue Book PIN evidence left the PIN lookup (see
-        test_opsin_entries_accessible_via_merged)."""
+        test_opsin_entries_accessible_via_merged). PS lane 1 change-asserted-value: was
+        '>= 300'; twelve trivial names the Blue Book does not make PINs were denied (305 -> 293,
+        tests/unit/data/test_retained_trivial_names_not_pins.py, floor history in
+        test_retained_names_size_gate.py)."""
         from orthonym.data import ALL_RETAINED_NAMES, OPSIN_UNVERIFIED_RETAINED_NAMES
 
-        assert len(ALL_RETAINED_NAMES) >= 300, (
-            f"Expected >= 300 merged entries, got {len(ALL_RETAINED_NAMES)}"
+        assert len(ALL_RETAINED_NAMES) >= 290, (
+            f"Expected >= 290 merged entries, got {len(ALL_RETAINED_NAMES)}"
         )
         assert len(ALL_RETAINED_NAMES) + len(OPSIN_UNVERIFIED_RETAINED_NAMES) >= 800
 

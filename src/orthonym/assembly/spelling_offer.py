@@ -48,10 +48,13 @@ def note_amine_chain_parent(features) -> None:
 
 
 def name_tiered_with_offer(namer, smiles: str, run) -> dict:
-    """``run(smiles)``, the tiered naming of the molecule, then:func:`prefer_clean_name` on its row. The flag of
-    an earlier naming is cleared first, so what the row is offered never depends on what was named before it."""
+    """``run(smiles)``, the tiered naming of the molecule, then:func:`prefer_clean_name` on its row and, for a
+    best-effort abstention, ``default_tier_offer.offer_default_tier_row``. The flag and the held names of an
+    earlier naming are cleared first, so what the row is offered never depends on what was named before it."""
+    from .default_tier_offer import clear_held, offer_default_tier_row
     _AMINE_CHAIN_PARENT.set(None)
-    return prefer_clean_name(namer, smiles, run(smiles))
+    clear_held()
+    return offer_default_tier_row(namer, smiles, prefer_clean_name(namer, smiles, run(smiles)))
 
 
 def prefer_clean_name(namer, smiles: str, row: dict) -> dict:

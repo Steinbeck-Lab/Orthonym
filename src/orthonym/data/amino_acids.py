@@ -679,6 +679,7 @@ logger.debug(
 # among them. Each deny is adjudicated per row, with a citation and
 # a verified systematic replacement -- the granularity data/__init__.py:263
 # already identifies as the correct one.
+from .pin_policy import PIN_DENY as _PIN_DENY_ALL  # noqa: E402
 from .pin_policy import is_pin_denied as _is_pin_denied  # noqa: E402
 
 #: Canonical SMILES -> trivial name for amino acids withdrawn from the PIN path.
@@ -720,8 +721,17 @@ NON_PIN_AMINO_ACID_NAMES = frozenset({"carnitine", "l-carnitine", "d-carnitine"}
 
 def record_if_non_pin_amino_acid_name(name: Optional[str]) -> None:
     """Record ``name`` as a non-PIN fragment when it is a kept trivial amino-acid name
-    without Blue Book evidence (``NON_PIN_AMINO_ACID_NAMES``); no-op otherwise."""
-    if name and name.lower() in NON_PIN_AMINO_ACID_NAMES:
+    without Blue Book evidence (``NON_PIN_AMINO_ACID_NAMES``), or a name that the curated PIN
+    list denies and these tables keep (a ``pin: false`` row with ``hc_override`` in
+    ``data/iupac_2013_pin_list.json``: 'glycine', PS lane 1 a performance pass, user decision 2026-10-20;
+    the JSON stays the single home); no-op otherwise. A name the list denies WITHOUT
+    ``hc_override`` is withdrawn from the tables (``GENERAL_ONLY_AMINO_ACIDS``) and never
+    reaches this function."""
+    if not name:
+        return
+    low = name.lower().strip()
+    if (low in NON_PIN_AMINO_ACID_NAMES or low in _PIN_DENY_ALL
+            or _RETAINED_NAME_DESCRIPTOR.sub("", name.strip(), count=1).lower() in _PIN_DENY_ALL):
         from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(name)
 

@@ -947,9 +947,15 @@ CI_BENCHMARK = [
         _ships("3-dodecyl-1,4-dioxo-1,4-dihydronaphthalen-2-yl acetate"),
         marks=_GATE,
     ),
+    # PS lane 1 a performance pass change-asserted-value (user decision 2026-10-20): the retained nucleotide
+    # name is no PIN. "RETAINED NAMES" (the Blue Book) 'The following are traditional
+    # names for esters of nucleosides with phosphoric acid.' lists 5'-adenylic acid (:55007) with no
+    # (PIN) tag, and "PREFERRED IUPAC NAMES" (:1978),:2052, says "Preferred IUPAC names (PINs)
+    # for the natural products in Chapter are not identified." The strict path still builds the name, the default
+    # tier declines it, best-effort ships it labelled systematic_verified (read back by OPSIN).
     pytest.param(
         "Nc1ncnc2c1ncn2[C@@H]1O[C@H](COP(=O)(O)O)[C@@H](O)[C@H]1O.O",
-        _ships("5'-adenylic acid—water (1/1)"),
+        _declined_at_default("5'-adenylic acid—water (1/1)"),
         marks=_GATE,
     ),
     pytest.param(

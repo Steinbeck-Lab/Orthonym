@@ -5,7 +5,10 @@ lowercase r/s. A ring pair that only r/s expresses at the default tier is theref
 there with the general name of the Blue Book, ``trans-cyclohexane-1,4-diol``
 (the Blue Book, "Achiral cyclic compounds"), where one of its words,
 ``cis`` or ``trans``, is complete for the pair and OPSIN reads the name back to the input's
-full InChIKey. OPSIN reads every expected name below (checked with a fresh call).
+full InChIKey. OPSIN reads every expected cis/trans name below (checked with a fresh call). A molecule that has
+no such word (three stereo units, a geminal pair) is left without a name by the conversion and gets, since
+2026-10-20, the row the default tier gives it, a lowercase-descriptor name OPSIN cannot read
+(``assembly/default_tier_offer.py``; the last two tests).
 """
 import pytest
 from rdkit import Chem
@@ -48,14 +51,45 @@ def test_converted_prefix_marks(smiles, name):
     assert_full_rt(row["name"], smiles)
 
 
-def test_three_centres_decline_at_best_effort():
-    assert name_best_effort("C[C@H]1C[C@@H](O)C[C@@H](C)O1")["tier"] == "abstain"
+def _stripped_skeleton_is_the_inputs(name, smiles):
+    """OPSIN (a fresh call, not the engine's oracle) reads the name without its stereo layer to the
+    input's constitution: the one check of a name OPSIN 2.9.0 cannot read in full (no lowercase r/s)."""
+    from rdkit.Chem import inchi
+    from orthonym.rules.stereochemistry import strip_stereo
+    from tests.support.rt_assert import _independent_parse
+    assert _independent_parse(name, smiles) is None                  # OPSIN reads no r/s: no full read-back
+    read = _independent_parse(strip_stereo(name), smiles)
+    key = lambda s: inchi.MolToInchiKey(Chem.MolFromSmiles(s)).split("-")[0]
+    return read is not None and key(read) == key(smiles)
 
 
-@pytest.mark.parametrize("smiles", ["C[C@]1(Cl)CC[C@H](O)CC1", "C[C@@]1(Cl)CC[C@H](O)CC1"])
-def test_geminal_pair_ring_stays_abstained(smiles):
-    # the Blue Book names it 'trans-4-chloro-4-methylcyclohexan-1-ol'; OPSIN reads no structure for it
-    assert name_best_effort(smiles)["tier"] == "abstain"
+# Changed asserted values (user decision 2026-10-20, "ship it too": the best-effort tier does not name less than
+# the default tier names, ``assembly/default_tier_offer.py``). Before: tier 'abstain', because OPSIN reads no
+# lowercase r/s and the cis/trans conversion has no word for these molecules. After: the row the
+# default tier gives, name and label (pin_unverified). Evidence: the Blue Book, ``### Achiral
+# cyclic compounds``, '(1r,4r)-4-chloro-4-methylcyclohexan-1-ol (PIN)' verbatim for the geminal pair; the Blue
+# Book is silent on the (1s,4s) pair and on 2,6-dimethyloxan-4-ol (UNVERIFIED by the source, the same rule
+# (a) with. Independent check (not the engine's CIP labeller): RDKit's rdCIPLabeler gives r,r /
+# s,s / (S, r, R) for the three inputs, and OPSIN reads the stereo-stripped names to each input's constitution.
+# Not independently checked: which of 2 and 6 takes R and which S in '(2R,4r,6S)'.
+def test_three_centres_get_the_default_tier_row_at_best_effort():
+    smiles = "C[C@H]1C[C@@H](O)C[C@@H](C)O1"
+    row = name_best_effort(smiles)
+    assert row["name"] == "(2R,4r,6S)-2,6-dimethyloxan-4-ol" == default_tier_row(smiles)["name"], row
+    assert row["tier"] == "pin_unverified" and row["is_pin"] is False, row
+    assert _stripped_skeleton_is_the_inputs(row["name"], smiles)
+
+
+@pytest.mark.parametrize("smiles,name", [
+    ("C[C@]1(Cl)CC[C@H](O)CC1", "(1r,4r)-4-chloro-4-methylcyclohexan-1-ol"),    #:48115 (PIN), verbatim
+    ("C[C@@]1(Cl)CC[C@H](O)CC1", "(1s,4s)-4-chloro-4-methylcyclohexan-1-ol"),
+])
+def test_geminal_pair_ring_gets_the_default_tier_row_at_best_effort(smiles, name):
+    # the cis/trans name has no OPSIN reading ('trans-4-chloro-4-methylcyclohexan-1-ol',:48115)
+    row = name_best_effort(smiles)
+    assert row["name"] == name == default_tier_row(smiles)["name"], row
+    assert row["tier"] == "pin_unverified" and row["is_pin"] is False, row
+    assert _stripped_skeleton_is_the_inputs(row["name"], smiles)
 
 
 def test_chiral_pair_gets_no_relative_name():

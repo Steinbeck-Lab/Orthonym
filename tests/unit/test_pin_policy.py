@@ -264,7 +264,11 @@ class TestDemoteRegressionGuards:
         assert name_compound("OC(=O)c1ccccc1", style="pin") == "benzoic acid"
         # a review RISK 7: bare anisole IS the PIN (the Blue Book / the Blue Book).
         assert name_compound("COc1ccccc1", style="pin") == "anisole"
-        assert name_compound("O=Cc1ccco1", style="pin") == "furfural"
+        # PS lane 1: 'furfural' is not a PIN, the Blue Book: "Systematic names
+        # are the preferred IUPAC names"; the Blue Book '5-(hydroxymethyl)furan-2-carbaldehyde (PIN)...
+        # [not 5-(hydroxymethyl)furfural]'). The row was 'furfural'; OPSIN 2.9.0 reads the new name back
+        # to the same InChIKey. Only the Blue Book-listed bare parents stay retained here.
+        assert name_compound("O=Cc1ccco1", style="pin") == "furan-2-carbaldehyde"
 
     def test_purine_indicated_h_unchanged(self):
         """Purine catalog must not be re-keyed (9H->7H was the 1.5 regression). The

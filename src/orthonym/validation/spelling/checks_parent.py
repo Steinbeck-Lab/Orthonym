@@ -1,4 +1,4 @@
-"""Spelling checks of the parent choice,,,,,;
+"""Spelling checks of the parent choice,,,,,,;
 registered with:func:`orthonym.validation.pin_spelling.register`).
 
 The senior class present comes from RDKit SMARTS; the class, parent and prefixes the name cites
@@ -475,3 +475,98 @@ def principal_group_count_check(mol, name):
             return SpellingFailure('P-52.2.8', f"ring substituent '{show(p.unit.text)[:40]}' carries as many "
                                                f"'{cls}' groups ({k}) as the chain parent")
     return None
+
+
+# ------------------------------------------------------------------ the hydrazine as the parent
+_HYDRAZINYL_PREFIX = re.compile(r"hydrazin(?:yl(?!idene)|-1-yl)")
+_NN_UNIT = Chem.MolFromSmarts("[#7;!R]-[#7;!R]")
+_RING_N = Chem.MolFromSmarts("[#7;R]")
+_N_THREE = Chem.MolFromSmarts("[#7]~[#7]~[#7]")
+#: groups that are no characteristic group of the classes 1 to 20 of (:18162-:18219):
+#: the nitro group, which is a prefix only, and the sulfoxide and sulfone, which are classes 41 (:18228)
+_NO_CLASS_GROUPS = [Chem.MolFromSmarts(x) for x in (
+    "[#6][NX3](=O)=O", "[#6][N+](=O)[O-]", "[#6][SX3](=O)[#6]", "[#6][SX4](=O)(=O)[#6]")]
+#: B, Al, Si, P, Ga, Ge, As, In, Sn, Sb, Tl, Pb, Bi: the atoms of a parent hydride (a borane, a silane, a
+#: phosphane, a stannane, a ring of them), which the class of nitrogen outranks in: "N > P > As >
+#: Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O > S > Se > Te > C" (:18917), and (:18919)
+#: '1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine (PIN) (N > Si > O)' (:18950). They are no characteristic group
+#: while they have single (or aromatic) bonds to carbon, to hydrogen and to one another only
+_PARENT_HYDRIDE_ATOMS = frozenset({5, 13, 14, 15, 31, 32, 33, 49, 50, 51, 81, 82, 83})
+
+
+def _only_hydrazine_is_functional(mol) -> bool:
+    """True when every atom of the molecule belongs to a hydrocarbon skeleton, a halogen on carbon,
+    an ether or sulfide (class 41, with selenides and tellurides), a no-class group of
+    ``_NO_CLASS_GROUPS``, an atom of ``_PARENT_HYDRIDE_ATOMS`` (neutral, single or aromatic bonds to
+    carbon and to atoms of that set only, hydrogen for the rest), or an acyclic hydrazine unit: a
+    neutral nitrogen with three single bonds, one of them to another nitrogen, the rest to carbon or
+    hydrogen, in no ring. Then no characteristic group of the classes 1 to 20 of is
+    present: every one of them has a carbonyl, thiocarbonyl, imino, hydroxy, sulfanyl, peroxy,
+    nitrile, acid (P=O, B-OH, Si-OH included) or amino (an N-C bond without an N-N bond) atom, none
+    of which this allows. Stated by what is allowed, so a group the reader does not know can only
+    make it decline."""
+    claimed = {i for pat in _NO_CLASS_GROUPS for m in mol.GetSubstructMatches(pat) for i in m}
+    for a in mol.GetAtoms():
+        if a.GetIdx() in claimed:
+            continue
+        if a.GetFormalCharge() or a.GetNumRadicalElectrons() or a.GetAtomicNum() == 0:
+            return False
+        z, nbrs = a.GetAtomicNum(), a.GetNeighbors()
+        if z == 6:
+            continue
+        if z in (9, 17, 35, 53):
+            if any(n.GetAtomicNum() != 6 for n in nbrs):
+                return False
+        elif z in (8, 16, 34, 52):
+            if a.GetDegree() != 2 or any(n.GetAtomicNum() != 6 for n in nbrs):
+                return False
+        elif z in _PARENT_HYDRIDE_ATOMS:
+            if (any(b.GetBondType() not in (Chem.BondType.SINGLE, Chem.BondType.AROMATIC)
+                    for b in a.GetBonds())
+                    or any(n.GetAtomicNum() != 6 and n.GetAtomicNum() not in _PARENT_HYDRIDE_ATOMS
+                           for n in nbrs)):
+                return False
+        elif z == 7:
+            if (a.IsInRing() or a.GetDegree() + a.GetTotalNumHs() != 3
+                    or any(b.GetBondType() != Chem.BondType.SINGLE for b in a.GetBonds())
+                    or not any(n.GetAtomicNum() == 7 for n in nbrs)
+                    or any(n.GetAtomicNum() not in (6, 7) for n in nbrs)):
+                return False
+        else:
+            return False
+    return all(b.GetBondType() in (Chem.BondType.SINGLE, Chem.BondType.AROMATIC)
+               or {b.GetBeginAtom().GetAtomicNum(), b.GetEndAtom().GetAtomicNum()} == {6}
+               or {b.GetBeginAtomIdx(), b.GetEndAtomIdx()} <= claimed
+               for b in mol.GetBonds())
+
+
+@register('P-44.1.2')
+def hydrazine_parent_check(mol, name):
+    """ (:18917): "The senior parent structure, whether cyclic or acyclic, has the senior atom
+    in accordance with the seniority of classes (see expressed by the following decreasing
+    element order: N > P >... > O > S > Se > Te > C. This criterion is applied to select the senior
+    atom in parents and to choose between rings and chains"; (:18919): "A single senior
+    atom is sufficient to give seniority to the parent hydride." class 21 (:18197):
+    "Nitrogen compounds: heterocycles, polyazanes, hydrazines (except for hydrazides), diazenes,
+    hydroxylamines, azanes (except for amides, amines, and imines)". A hydrazine unit is therefore the
+    parent hydride of a molecule with no characteristic group of classes 1 to 20 and no nitrogen
+    ring (a heterocycle precedes it in class 21): 'phenylhydrazine (PIN)' (:38535), and its name cites
+    no 'hydrazinyl' prefix. A name that does is not the PIN of such a molecule
+    ('1-chloro-4-hydrazinylbenzene' for 4-chlorophenylhydrazine).
+
+    Structure side (RDKit only, ``_only_hydrazine_is_functional``): an acyclic N-N bond, no ring
+    nitrogen (a ring without nitrogen, whatever its other heteroatoms, cannot outrank the hydrazine,
+     :18950), no N-N-N chain (a polyazane precedes a hydrazine), and every atom a
+    hydrocarbon atom, a halogen, an ether or sulfide, a nitro, sulfoxide or sulfone group, an atom of
+    a parent hydride of ``_PARENT_HYDRIDE_ATOMS`` or part of a hydrazine unit, so that none of the
+    classes 1 to 20 is present. Name side: the prefix 'hydrazinyl' or
+    'hydrazin-1-yl' ('hydrazinylidene' is another prefix and is not read here)."""
+    n = normalise(name)
+    if not _HYDRAZINYL_PREFIX.search(n) or '.' in Chem.MolToSmiles(mol):
+        return None
+    if (not mol.HasSubstructMatch(_NN_UNIT) or mol.HasSubstructMatch(_RING_N)
+            or mol.HasSubstructMatch(_N_THREE) or not _only_hydrazine_is_functional(mol)):
+        return None
+    return SpellingFailure('P-44.1.2', "the name cites a 'hydrazinyl' prefix; the molecule has no "
+                                       "principal characteristic group and no nitrogen ring, so the "
+                                       "hydrazine is the parent hydride (N precedes C and O)")

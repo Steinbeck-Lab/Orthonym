@@ -75,6 +75,7 @@ _name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
 
 from .assembly.composer import assemble_name
 from .assembly.spelling_offer import name_tiered_with_offer as _name_tiered_with_offer
+from .assembly.default_tier_offer import default_tier_engine, default_tier_name_scope, is_offered
 from .assembly.offer_pool import (
     ABSTAIN,
     BEST_EFFORT,
@@ -2404,12 +2405,14 @@ def _ship_grammar_gap_carveout(name: str, slug: str) -> str:
 
 
 def _record_unparseable_general_fallback(name: str, smiles: Optional[str]) -> None:
-    """The best-effort tier withdraws ``name``, which OPSIN cannot read: record the
-    suppression, and keep a lowercase r/s name as the starting point of the cis/trans
-    offer, ``Orthonym._maybe_append_relative_stereo_offer``)."""
+    """The best-effort tier withdraws ``name``, which OPSIN cannot read: record the suppression, keep a
+    lowercase r/s name as the starting point of the cis/trans offer,
+    ``Orthonym._maybe_append_relative_stereo_offer``), hold one with a stereo layer for ``default_tier_offer``."""
+    from .assembly.default_tier_offer import hold_withdrawn
     from .metrics.abstention import AbstentionCode, record_suppression
     from .rules.relative_stereo import note_withdrawn_name
     note_withdrawn_name(name, smiles, _caller_input())
+    hold_withdrawn(name, smiles, _caller_input())
     record_suppression(
         AbstentionCode.GATE_SUPPRESSED,
         detail='opsin_unparseable_general_fallback', candidate=name)
@@ -2629,15 +2632,13 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # an OPSIN-ROUND-TRIP-VERIFIED name, so an OPSIN-DEFINITIVELY-REJECTED name
     # cannot be verified and MUST abstain rather than ship. This makes the
     # "ship-an-OPSIN-unparseable name" carve-outs below (thioperoxol / inositol /
-    # np_stereoparent / dianhydride / phane / the stereo-layer
-    # carve-out) PIN/DEFAULT-TIER ONLY: those names are the correct, gold-validated
-    # PIN and MUST still ship at the PIN tier (``general_fallback_tier`` False, so
-    # this branch is skipped and the 1656 PIN gold gate is byte-identical). At the
-    # RT-verified tiers a correct-but-OPSIN-unparseable name is an honest abstain,
-    # never a stereo-stripped or unparseable emission (accuracy #1: a name that
-    # does not round-trip is not a shippable name). Closes the precision leak that
-    # let 5/1435 OPSIN-unparseable names ship at best-effort (a review + the 1500-mol
-    # head-to-head). PIN path untouched.
+    # np_stereoparent / dianhydride / phane / the stereo-layer carve-out)
+    # PIN/DEFAULT-TIER ONLY (``general_fallback_tier`` False skips this branch, so the
+    # 1656 PIN gold gate is byte-identical). The one exception is an OFFER, not a
+    # return: a molecule the best-effort tier leaves unnamed gets the default tier's
+    # own row when it ships a name withdrawn here through the stereo-layer carve-out
+    # (user decision 2026-10-20, ``assembly/default_tier_offer.py``). Closes the
+    # precision leak that let 5/1435 OPSIN-unparseable names ship at best-effort.
     if general_fallback_tier:
         #: EXEMPT the construction-verified NP stereoparent carve-out
         # (germacrane, corynoxan,... -- the retained parent
@@ -2650,8 +2651,9 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         # dropping the retained PIN to the abstention sentinel instead of keeping it.
         # They ship via the ``np_stereoparent`` carve-out below. This is NARROW ON
         # PURPOSE: the other OPSIN-unparseable carve-outs stay best-effort-suppressed
-        # (the ``organometallic_additive`` one has a known atom-drop hole, and the
-        # stereo-layer carve-out is exactly the precision class BE-STRICT targets).
+        # (the ``organometallic_additive`` one has a known atom-drop hole). The stereo-layer
+        # carve-out is withheld here too and offered after every other path
+        # (``assembly/default_tier_offer.py``, which says why and how).
         try:
             from .data.natural_products import NAME_EXACT_NP_PARENTS as _NP_EXACT
             _np_exact_hit = name in _NP_EXACT
@@ -4752,6 +4754,7 @@ class Orthonym:
         return gated
 
     @_failure_mode.failure_mode_scope
+    @default_tier_name_scope
     @_metal_offer_scope
     @_form_choice_scope
     @_book_retry_scope
@@ -5469,21 +5472,7 @@ class Orthonym:
         """
         tw = getattr(self, "_pin_twin", None)
         if tw is None:
-            tw = Orthonym(
-                style=self.style,
-                _disable_grammar_validation=(self._grammar is None),
-                _disable_opsin_validity_gate=self._disable_opsin_validity_gate,
-                enable_triviality_controller=self._enable_triviality_controller,
-                enable_group_splitting=self._enable_group_splitting,
-                trivial_fallback=self._trivial_fallback,
-                general_fallback=False,
-                general_fallback_unverified=False,
-                allow_aromatic_general=False,
-                full_coverage=False,
-                _seed_excluded_dispatch_classes=self._seed_excluded_dispatch_classes,
-                binding_proof=self._binding_proof,
-            )
-            self._pin_twin = tw
+            tw = self._pin_twin = default_tier_engine(self)       # also the engine of assembly/default_tier_offer.py
         # The twin is the default tier's own run, promotion re-run included (PB lane R): a name every
         # piece of which a strict producer built is certified there and keeps pin_verified at a wider
         # tier. It runs WITH the default tier's emission rule: a string the default tier labels as not
@@ -7673,6 +7662,10 @@ class Orthonym:
         natural-product lookup gives way to the systematic name, which the gate verifies; when no
         verified name was found, the exact-match natural-product parent name of the whole input
         ('germacrane') is the last resort before a decline, as the metal-complex list name is (above).
+        The code differs from the submitted text for one more class at the best-effort tier (user decision
+        2026-10-20): the name the default tier ships because OPSIN cannot read its stereodescriptors
+        (``pin_unverified``, ``self_consistency_constitution_only``) is offered, with that label, to a molecule
+        left without a name (``assembly/default_tier_offer.py``, outside this method).
 
         At the best-effort tier the phane name of the whole input is the last resort after it (a
         ring system the general engine's limits leave unnamed, 27 nodes of nine benzene rings): OPSIN has no
@@ -8561,7 +8554,7 @@ class Orthonym:
             if self._general_fallback:
                 if (resolved in (_pv.GATE_OUTCOME_STEREO_RECOMPOSED,
                                  _pv.GATE_OUTCOME_FULL_KEY_VERIFIED)
-                        or uide_twin_outcome(resolved)):
+                        or uide_twin_outcome(resolved) or is_offered(self, name)):
                     return name
                 if _shipped_name_round_trip(name, smiles) == "verified":
                     if resolved != _pv.GATE_OUTCOME_SELF01:
@@ -11045,7 +11038,9 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
         Also switch on the ``best-effort`` tier: the last-resort producers, von
         Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 11
         rings (the other tiers build these names for ring systems of up to 40
-        skeletal atoms and 8 rings), and adducts with a one-atom ion. Their names still have to pass the full-InChIKey round trip. ``None`` as
+        skeletal atoms and 8 rings), and adducts with a one-atom ion. Their names still have to pass the full-InChIKey round trip,
+        with one exception: a molecule that has no other name gets the name the default tier gives it when OPSIN cannot read the
+        stereodescriptors of that name, with the label the default tier gives it (``pin_unverified``). ``None`` as
         for ``general_fallback``.
     allow_aromatic_general: bool or None, default None
         Let the general engine also name aromatic and heterocyclic ring systems

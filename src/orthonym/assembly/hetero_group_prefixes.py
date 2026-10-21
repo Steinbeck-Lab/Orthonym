@@ -20,9 +20,14 @@ substituent prefix:
   ,:24611);
 * ``-N=N-R`` '(R)diazenyl': "The prefix 'diazenyl' is a preselected prefix"
   Substitution of diazene,:38732), "(methyldiazenyl)acetic acid (PIN)" (:38740);
-* ``-NR-NR2`` '(locants)hydrazinyl': 'hydrazinyl (preselected prefix)',:16037,
-  :2911); a substituent on a hydrazine unit cites its locant,:2869); the far
-  nitrogen of a hydrazone is '2-[(E)-R-methylidene]hydrazinyl';
+* ``-NR-NR2`` '(locants)hydrazin-1-yl': 'hydrazinyl (preselected prefix)',:16037,
+  :2911); a substituent on a hydrazine unit cites its locant and the free valence's
+  ,:2869; '4-(1-acetyl-2-ethylhydrazin-1-yl)benzoic acid (PIN)',
+  "Substituent groups derived from hydrazides",:34042; '2-nitrohydrazin-1-yl (preselected
+  prefix)', "Substituent groups derived from the hydrazides of nitric acid and
+  nitrous acid",:36437), and the locants are left out only where no isomer can be generated
+  ,:2953: 'ethylidenehydrazinyl (preferred prefix) (not 2-ethylidenehydrazin-1-yl)',
+  :2959;,:3007, a unit in which every position holds the same substituent);
 * ``-OO-R`` '(R)peroxy' and ``-OOH`` 'hydroperoxy': "The prefix 'peroxy', not 'dioxy',
   is retained for the group -OO-" and "The prefix 'hydroperoxy' is formed by
   concatenation to describe the group -OOH as a substituent" Hydroperoxides,
@@ -89,6 +94,7 @@ class GroupShape:
     charged: FrozenSet[int] = frozenset()  # atoms whose (genuine ionic) charge the prefix spells
     internal: FrozenSet[int] = frozenset()  # atoms of a semipolar bond (N+-O-) the prefix spells
     stereo_bond: Optional[Tuple[int, int]] = None  # an internal double bond to cite (diazenyl)
+    acylhydrazide: bool = False     # hydrazinyl: R-CO- or R-SO2- on the far nitrogen
 
 
 def _plain(atom, charge: int = 0) -> bool:
@@ -136,6 +142,37 @@ def _parts_off(mol, host: int, group: FrozenSet[int], unit: FrozenSet[int],
         claimed |= atoms
         parts.append(GroupPart(attach=j, atoms=atoms, host=host, locant=locant, order=order))
     return parts
+
+
+def _hydrazide_acyl(mol, part: GroupPart) -> bool:
+    """True when ``part`` is an acyl group joined to a nitrogen of a hydrazine unit, so that the
+    group has a hydrazido prefix, which is the PIN form: R-CO-NH-NH- and R-SO2-NH-NH-
+     "When a group having priority for citation as a principal characteristic group is
+    present, a hydrazide group of the type R-CO-NH-NH- or R-SO2-NH-NH- (or the analogous selenium
+    or tellurium group) is named: (1)... 'acetohydrazido'... (2) as an acylhydrazinyl substituent
+    group... Method (1) generates preferred IUPAC names", the Blue Book, under
+    "Substituent groups derived from hydrazides"), R-C(=NH)-NH-NH-,:34548:
+    '3-(methanimidohydrazido)propanoic acid (PIN)',:34559), and the groups whose second atom on
+    the carbonyl is a hetero atom other than an amino nitrogen: '3-(hydrazinecarbohydrazido)
+    propanoic acid (PIN)' (:38712), 'diazenecarbohydrazido (preferred prefix)' (:38912), an
+    ester oxygen, '4-{[(hydrazinecarbonyl)oxy]formohydrazido}butanoic acid (PIN)' (:34129,
+    's analogy for the alkoxycarbonyl group, ASSUMED). The acylhydrazinyl form is valid,
+    never the PIN. The one acyl group whose hydrazinyl form is the PIN is carbamoyl, an amino
+    nitrogen with no N-N or N=N bond on the carbonyl: 'semicarbazido... 2-carbamoylhydrazin-1-yl
+    (preferred prefix)' "Semicarbazides",:38640; '3-(2-carbamoylhydrazin-1-yl)
+    propanoic acid (PIN)',:38644)."""
+    atom = mol.GetAtomWithIdx(part.attach)
+    if atom.GetSymbol() not in ("C", "S", "Se", "Te"):
+        return False
+    marks = [nb.GetIdx() for nb in atom.GetNeighbors()
+             if nb.GetSymbol() in ("O", "S", "Se", "Te", "N")
+             and mol.GetBondBetweenAtoms(atom.GetIdx(), nb.GetIdx()).GetBondType() == _DOUBLE]
+    if not marks:
+        return False
+    rest = [nb for nb in atom.GetNeighbors() if nb.GetIdx() != part.host and nb.GetIdx() not in marks]
+    return not any(nb.GetSymbol() == "N" and not any(
+        x.GetSymbol() == "N" for x in nb.GetNeighbors() if x.GetIdx() != atom.GetIdx())
+        for nb in rest)
 
 
 def group_shape(mol, root: int, group: FrozenSet[int], parent: int,
@@ -226,7 +263,8 @@ def group_shape(mol, root: int, group: FrozenSet[int], parent: int,
         parts = p1 + p2
         if sum(len(p.atoms) for p in parts) + 2 != len(group):
             return None
-        return GroupShape("hydrazinyl", tuple(parts), unit)
+        return GroupShape("hydrazinyl", tuple(parts), unit,
+                          acylhydrazide=any(_hydrazide_acyl(mol, p) for p in p2))
 
     if sym == "N" and atom.GetFormalCharge() == 1 and order == 1 and atom.GetTotalValence() == 4:
         # R2N+(-O-)-: 'dimethyl(oxido)azaniumyl', the Blue Book)
@@ -320,7 +358,12 @@ def compose_group(shape: GroupShape, names: Sequence[str]) -> Optional[str]:
         return built(f"{cited}oxy", substituted=True, enclosed=True) if cited else None
     if shape.kind == "hydrazinyl":
         token = _hydrazinyl(shape, names)
-        return built(token, substituted=bool(names), enclosed=bool(names))
+        if token and shape.acylhydrazide:
+            # (:34020): the hydrazido prefix is the PIN form of R-CO-NH-NH-, this
+            # acylhydrazinyl one is the book's second, non-preferred method
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(token)
+        return built(token, substituted=bool(names), enclosed=bool(names)) if token else None
     from .composer import _assemble_decorated_amino_prefix
     head = {"imino": "imino", "hydrazinylidene": "hydrazinylidene", "diazenyl": "diazenyl",
             "peroxy": "peroxy", "azaniumylidene": "azaniumylidene",
@@ -337,14 +380,38 @@ def compose_group(shape: GroupShape, names: Sequence[str]) -> Optional[str]:
 
 
 def _hydrazinyl(shape: GroupShape, names: Sequence[str]) -> Optional[str]:
-    """'2-phenylhydrazinyl', '1,2-dimethylhydrazinyl', 'hydrazinyl': the substituents of a
-    hydrazine unit cite their locants, the Blue Book: deny by default; the
-    '1' omitted by (b),:2903, is the one of the unsubstituted unit,
-    'hydrazinyl (not hydrazin-1-yl)',:2911)."""
+    """'2-phenylhydrazin-1-yl', '1,2-dimethylhydrazin-1-yl', 'ethylidenehydrazinyl',
+    'hydrazinyl'. "Citation of locants" (the Blue Book): "if any locants are
+    essential for defining the structure of the parent structure or of a unit of structure as
+    defined by its appropriate enclosing marks, then all locants must be cited", so a unit
+    that cites one locant cites the free valence's too: '4-(1-acetyl-2-ethylhydrazin-1-yl)
+    benzoic acid (PIN)' (:34042), '3-(2-carbamoylhydrazin-1-yl)propanoic acid (PIN)' (:38644),
+    '2-nitrohydrazin-1-yl (preselected prefix)' (:36437). (b) "The locant '1' is
+    omitted... in monosubstituted homogeneous chains consisting of only two identical atoms"
+    (:2903) is the unsubstituted unit alone, 'hydrazinyl (not hydrazin-1-yl)' (:2911): the
+    free valence is the one substituent. "Omission of locants" (:2871) leaves the
+    locants out in two cases here. "Locants are omitted when no isomer can be
+    generated by moving suffixes and/or prefixes (if any) from their position to another or
+    by interchanging them between two different positions" (:2953): an ylidene can stand on
+    the far nitrogen only, 'ethylidenehydrazinyl (preferred prefix) (not 2-ethylidenehydrazin-
+    1-yl)' (:2959). "All locants are omitted in compounds or substituent groups in
+    which all substitutable positions are completely substituted... in the same way" (:3007):
+    three identical substituents, 'trimethylhydrazinyl'."""
     if not names:
         return "hydrazinyl"
+    ylidene = any(part.order == 2 for part in shape.parts)
+    if ylidene and len(shape.parts) > 1:
+        # An ylidene on the far nitrogen with a substituent on the first leaves no isomer, so the
+        # book spelling cites no locant, 'ethylidene(methyl)hydrazinyl'. OPSIN 2.9.0 reads that
+        # as ethylidene joined to the methyl carbon, a name that does not read back to the
+        # group, so no prefix is built and the host keeps its other spelling.
+        return None
+    if ylidene or (len(shape.parts) == 3 and len(set(names)) == 1):
+        from .composer import _assemble_decorated_amino_prefix
+        return _assemble_decorated_amino_prefix([(n, False) for n in names], enclose=False,
+                                                head="hydrazinyl")
     return hydrazine_substituents(
-        [(part.locant, name) for part, name in zip(shape.parts, names)]) + "hydrazinyl"
+        [(part.locant, name) for part, name in zip(shape.parts, names)]) + "hydrazin-1-yl"
 
 
 def hydrazine_substituents(cited: Sequence[Tuple[Optional[int], str]]) -> str:

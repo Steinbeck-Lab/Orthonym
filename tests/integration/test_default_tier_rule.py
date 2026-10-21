@@ -154,7 +154,10 @@ def test_the_cli_default_tier_prints_the_decline():
 
 # The --help text of --emit-tier and --trivial, pinned word for word: the guide and the
 # README quote it (the paper's words, with the clause on the PIN spellings that OPSIN
-# reads back through a twin spelling; guide_sentences Part B).
+# reads back through a twin spelling; guide_sentences Part B). Changed asserted value (user decision
+# 2026-10-20, ``assembly/default_tier_offer.py``): the best-effort clause and the exception to the round
+# trip; a documentation string, so there is no source to quote: it states what the code does, which
+# tests/unit/assembly/test_default_tier_offer.py pins; reverting ``cli.py`` fails this test.
 EMIT_TIER_HELP = (
     "Which names to return. pin (the default): a name only when the pipeline can "
     "build the preferred IUPAC name (PIN), that is when the strict PIN path built "
@@ -171,13 +174,13 @@ EMIT_TIER_HELP = (
     "engine. complete: also general names for aromatic and heterocyclic ring systems. "
     "best-effort: also the last-resort producers, von Baeyer and spiro names for "
     "ring systems of up to 100 skeletal atoms and 11 rings (the other tiers build "
-    "them up to 40 atoms and 8 rings), and adducts with a one-atom ion. full-coverage: "
+    "them up to 40 atoms and 8 rings), and adducts with a one-atom ion, and, for a molecule that has no other name, the name the default tier ships although OPSIN cannot read its stereodescriptors, with the label of the default tier (pin_unverified). full-coverage: "
     "also the "
     "coordination-name builder for metal tetrapyrrole and corrin complexes, which "
     "builds a name or declines. The wider tiers also return the names the default "
     "tier declines, each labelled with its tier; there every name must pass a "
     "full-InChIKey OPSIN round trip, except a name from the natural-product and "
-    "metal-complex lists, so the name formats absent from OPSIN's grammar are "
+    "metal-complex lists and the best-effort name described above, so the other name formats absent from OPSIN's grammar are "
     "declined there. --provenance shows each name's tier.")
 TRIVIAL_HELP = (
     "When no preferred name can be built, also allow a retained trivial name that is "

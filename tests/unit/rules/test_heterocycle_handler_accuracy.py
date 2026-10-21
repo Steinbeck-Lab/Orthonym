@@ -32,8 +32,12 @@ HETEROCYCLE_ACCURACY_CASES = [
     # --- Purine (IUPAC retained name with indicated H) ---
     ("c1ncnc2[nH]cnc12", "9H-purine"),
 
-    # --- Orotic acid (pyrimidine derivative, IUPAC retained name) ---
-    ("OC(=O)c1cc(=O)[nH]c(=O)[nH]1", "orotic acid"),
+    # --- Orotic acid: NOT a Blue Book name (0 grep hits). (the Blue Book): "Only the
+    # following five carboxylic acids retained names and are also preferred IUPAC names." The carboxylic
+    # acid outranks the ketone, so the C=O groups are oxo prefixes. PS lane 1 changed the asserted name
+    # from 'orotic acid'; OPSIN 2.9.0 reads the new name back to the same InChIKey
+    # (tests/unit/data/test_retained_trivial_names_not_pins.py).
+    ("OC(=O)c1cc(=O)[nH]c(=O)[nH]1", "2,6-dioxo-1,2,3,6-tetrahydropyrimidine-4-carboxylic acid"),
 
     # --- Xanthine derivatives (systematic naming, NOT retained names) ---
     ("Cn1c(=O)c2c(ncn2C)n(C)c1=O", "1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione"),

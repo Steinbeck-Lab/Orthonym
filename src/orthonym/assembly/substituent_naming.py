@@ -34,7 +34,8 @@ from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import acyl_prefix_text, is_acyl_prefix
-from .capped_name import carries_capped_locants, chain_stem_ending, terminal_yl_prefix
+from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
+from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
 from .fragment_naming import name_fragment_recursively
 from .naming_utils import SIMPLE_MULTIPLIERS, alpha_sort_key, get_alkyl_name, has_structural_hyphen, multiplied_component, simple_multiplier_word
 from ..perception.smarts_cache import compiled as _compiled_smarts
@@ -5907,8 +5908,8 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # ending: the check is anchored to the literal italic-N token so it can
     # never capture an unrelated '...amine' parent, and 'amine' (not 'imine')
     # keeps this disjoint from the oxime N-hydroxy-imine substitutive PIN
-    # (oxime.py's '_substitutive_oxime_name'), which this converter DOES know
-    # how to express via the '-imine' suffix cascade below.
+    # (oxime.py's '_substitutive_oxime_name'), an imine name, which this converter
+    # declines below (an imine has no '-yl' form here).
     if name.startswith("N-hydroxy") and name_lower.endswith("amine"):
         logger.debug(
             "C3 fail-closed: %r is an N-hydroxy amine derivative with no "
@@ -6327,8 +6328,8 @@ def parent_to_prefix(parent_name: str, chain_length: int, *, attach_locant) -> s
     # ---- Heterocyclic -ine ending ---- (IUPAC
     # e.g., "pyridine" -> "pyridinyl", "piperidine" -> "piperidinyl"
     # Note: -ine must come BEFORE the generic -e fallback
-    if name.endswith('ine'):  # (2), the Blue Book: a ring name that cites locants numbers the capped molecule, not the prefix (an imine is no ring)
-        return None if carries_capped_locants(name) and not name.endswith('imine') else name[:-1] + "yl"  # pyridine -> pyridinyl
+    if name.endswith('ine'):  # (2), the Blue Book: a ring name that cites locants numbers the capped molecule, not the prefix; an imine or a substituted hydrazine is no ring (acyclic_n_parent)
+        return None if carries_capped_locants(name) or acyclic_n_parent(name) else name[:-1] + "yl"  # pyridine -> pyridinyl
 
     # ---- fail-closed guard  ----
     # A FUNCTIONAL-PARENT name that reaches the terminal fallbacks below has NO
@@ -8120,27 +8121,17 @@ def _diazenyl_prefix(mol, sub_atoms, attach_idx, parent_chain) -> Optional[str]:
     defined, is cited at the front as '(1E)-', the Blue Book: descriptors relating
     to a substituent group are cited at the front of its prefix), as ``rules.terminal_fragment``
     cites it for the same group."""
-    root = mol.GetAtomWithIdx(attach_idx)
-    if root.GetSymbol() != 'N' or root.GetFormalCharge() != 0 or root.IsInRing():
+    read = read_n_group(mol, sub_atoms, attach_idx)
+    if read is None or read[2].kind != 'diazenyl':
         return None
-    group = frozenset(sub_atoms)
-    parents = [nb.GetIdx() for nb in root.GetNeighbors()
-               if nb.GetIdx() not in group and nb.GetAtomicNum() > 1]
-    if len(parents) != 1:
-        return None
-    if mol.GetBondBetweenAtoms(attach_idx, parents[0]).GetBondType() != Chem.BondType.SINGLE:
-        return None
-    from .hetero_group_prefixes import compose_group, group_shape
-    shape = group_shape(mol, attach_idx, group, parents[0])
-    if shape is None or shape.kind != 'diazenyl':
-        return None
+    group, parent, shape = read
     # A RING parent only. A chain parent (the chain producers of ``rules.polyfunctional`` and the
     # chain handlers) cites the perceived 'azo' group as the bare prefix 'diazenyl' as well, so the
     # prefix composed here would be cited twice ('1-diazenyl-1-[(4-methylphenyl)diazenyl]methanamine'
     # for 'NCN=Nc1ccc(C)cc1', a different molecule the round trip rejects) and the rows those
     # producers name today ('1-[(4-methylphenyl)diazenyl]methanamine') would be lost at the pin
     # tier. The chain half of is written up as a separate item with its design.
-    if not mol.GetAtomWithIdx(parents[0]).IsInRing():
+    if not mol.GetAtomWithIdx(parent).IsInRing():
         return None
     # The principal characteristic group is R's, not R-prime's: 'Monoazo compounds... in which R is
     # substituted by a principal characteristic group are named on the basis of the parent hydride,
@@ -8151,28 +8142,14 @@ def _diazenyl_prefix(mol, sub_atoms, attach_idx, parent_chain) -> Optional[str]:
     # is not this producer's (the guard of ``_ring_branch_may_need_other_parent``, suite fix j6).
     # A ring producer given the prefix would otherwise name the ring as the parent and cite the
     # group of R-prime as a prefix ('1-{[2-(acetyloxy)ethyl]diazenyl}-4-methylbenzene', not the ester).
-    try:
-        from ..perception.functional_groups import detect_functional_groups
-        from ..rules.seniority import get_principal_group
-        _pg, _pg_matches = get_principal_group(mol, detect_functional_groups(mol))
-    except Exception:  # noqa: BLE001 -- fail closed
-        return None
-    if _pg and any(set(m) & group for m in (_pg_matches or ())):
+    if principal_group_in(mol, group):
         return None
     # An ORGANYL diazenyl group: R' is bonded to the second nitrogen through a carbon. A nitrogen
     # (a triazene, -N=N-NR2: 'triaz-1-en-1-yl',, an oxygen or a sulfur on that nitrogen
     # is another class with its own producers; 'diazenyl' with a hetero atom behind it is theirs.
     if any(mol.GetAtomWithIdx(part.attach).GetSymbol() != 'C' for part in shape.parts):
         return None
-    outer = list(parent_chain or []) + [attach_idx]
-    names = []
-    for part in shape.parts:
-        nm = name_substituent_fragment(mol, sorted(part.atoms), part.attach,
-                                       outer + [part.host])
-        if not nm or nm == 'substituent':
-            return None
-        names.append(nm)
-    token = compose_group(shape, names)
+    token = composed_group(mol, shape, attach_idx, parent_chain)
     if not token:
         return None
     if shape.stereo_bond is not None:
@@ -8344,8 +8321,8 @@ def _name_substituent_fragment_uncached(
     # tier) or, with the validity gate off, wrote 'diazenyl-N,N-diethylanamine'. The group is
     # composed from the names of its parts by the primitive the general engine and the terminal-
     # fragment writer already use (``hetero_group_prefixes``); any part this function cannot
-    # name fails the prefix closed.
-    _diaz = _diazenyl_prefix(mol, sub_atoms, attach_idx, parent_chain)
+    # name fails the prefix closed. The hydrazinyl unit and the imine nitrogen: ``n_unit_prefix``.
+    _diaz = _diazenyl_prefix(mol, sub_atoms, attach_idx, parent_chain) or n_unit_prefix(mol, sub_atoms, attach_idx, parent_chain)
     if _diaz is not None:
         return _diaz
 

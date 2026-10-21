@@ -30,6 +30,11 @@ Both checks read the RDKit structure and the name text only.
 * "Hydrazine and derivatives" (:38507): "For H2N-NH– 'hydrazinyl'"; an amino group
   cited on an amino group ('aminoamino', '(methylamino)amino') is the hydrazine unit and takes
   'hydrazinyl'. The structure side is a nitrogen-nitrogen single bond.
+* (:40620), Table 7.2 "Suffixes for Radicals of Amines, Imines and Amides" (:40622): '-iminyl'
+  is the suffix of the radical =N•. A closed-shell structure takes no '-iminyl' word: R-CH=N- joined
+  through nitrogen is '(R-ylidene)amino' "Substitutive names for imines",:26529), and
+  R-C(=NH)- joined through carbon is an acyl group,:26540). The structure side is a
+  molecule without a radical electron or a free valence.
 """
 from __future__ import annotations
 
@@ -213,10 +218,29 @@ _AMINO_ON_AMINO = re.compile(r"aminoamino|[a-z]amino\)amino|[a-z]amino\]amino|[a
 @register("P-68.3.1.2.1")
 def hydrazinyl_check(mol, name) -> Optional[SpellingFailure]:
     """ (:38507): H2N-NH- is 'hydrazinyl' and its substituted forms are cited from it
-    ('2-methylhydrazinyl'); 'aminoamino' and '(methylamino)amino' are not."""
+    ('2-methylhydrazin-1-yl',,:2869); 'aminoamino' and '(methylamino)amino' are not."""
     hit = _AMINO_ON_AMINO.search(normalise(name))
     if hit is None or not mol.HasSubstructMatch(_N_N):
         return None
     return SpellingFailure(
         "P-68.3.1.2.1", f"'{hit.group(0)}' cites an amino group on an amino group; the unit is "
                         f"'hydrazinyl'")
+
+
+# ------------------------------------------------------------------ iminyl,
+#: the suffix 'iminyl' ('methaniminyl', 'propan-2-iminyl'); 'iminylium' is a cation suffix
+_IMINYL = re.compile(r"[a-z0-9-]*iminyl(?!ium)")
+
+
+@register("P-71.3.2")
+def iminyl_word_check(mol, name) -> Optional[SpellingFailure]:
+    """ (:40620), Table 7.2 (:40622): '-iminyl' is the suffix of the radical =N•, so a
+    name of a structure with no radical electron and no free valence holds no such word."""
+    hit = _IMINYL.search(normalise(name))
+    if hit is None:
+        return None
+    if any(a.GetNumRadicalElectrons() or a.GetAtomicNum() == 0 for a in mol.GetAtoms()):
+        return None
+    return SpellingFailure(
+        "P-71.3.2", f"'{hit.group(0)}' is the suffix of a radical; a closed-shell structure takes "
+                    f"'(R-ylidene)amino' through nitrogen and an acyl group through carbon")

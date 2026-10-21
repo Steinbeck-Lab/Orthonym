@@ -14,13 +14,13 @@ import pytest
 @pytest.mark.unit
 def test_all_retained_names_at_least_900():
     """ + G5 hard gate: ALL_RETAINED_NAMES must not drop below its floor
-    (900 at a phase close, 305 now -- see the assertion message for the history).
+    (900 at a phase close, 293 now -- see the assertion message for the history).
 
     Source: https://iupac.qmul.ac.uk/BlueBook/P2.html retained-name PIN tier).
     Source: 150-internal notes + G5 +.
     """
     from orthonym.data import ALL_RETAINED_NAMES
-    assert len(ALL_RETAINED_NAMES) >= 305, (
+    assert len(ALL_RETAINED_NAMES) >= 293, (
         f"ALL_RETAINED_NAMES has {len(ALL_RETAINED_NAMES)} entries; "
         "C6 (homo-ring demotion) intentionally denied 6 non-PIN homo- names "
         "(homopiperidine/homomorpholine/homopiperazine/thiahomomorpholine/"
@@ -69,5 +69,12 @@ def test_all_retained_names_at_least_900():
         "substitution allowed) and OPSIN reads the token 'anis' as more than one structure "
         "(APPEARS_AMBIGUOUS); the substituted benzaldehyde is the name, pinned by "
         "tests/unit/opsin_ambiguity/test_amb6_parent_scope_locants.py. "
-        "New accurate floor: 305."
+        "PS lane 1 then denied 12 trivial names the Blue Book does not make PINs "
+        "(305 -> 293): propargyl alcohol, mesitol, furfural, 2-acetylfuran, "
+        "nicotinaldehyde, isonicotinaldehyde, 1,4-phenylenediamine, saccharin, orotic acid, "
+        "suberic acid, azelaic acid and sebacic acid (P-63.1 BlueBookV2.md:26750; P-66.6.1.2.2 "
+        ":34982 and P-66.6.1.2.3 :34994; P-64.2.1 :28295 and :28369; P-62.2.4 :26404; P-65.1.1.1 :29717; "
+        "P-66.1.5.2.1 :33252), each pinned by "
+        "tests/unit/data/test_retained_trivial_names_not_pins.py. "
+        "New accurate floor: 293."
     )

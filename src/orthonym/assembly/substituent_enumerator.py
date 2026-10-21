@@ -48,6 +48,7 @@ from ..rules.seniority import get_prefix
 from ..errors import CASCADE_REFUSAL
 from .engine_prefix_ordering import engine_orders_with_mancude
 from .naming_utils import SIMPLE_MULTIPLIERS, get_alkyl_name
+from .n_unit_prefix import n_unit_prefix
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
 from .substituent_prefix_forms import _check_substituent_prefix_form
 from ..perception.smarts_cache import compiled as _compiled_smarts
@@ -5846,17 +5847,13 @@ def _name_amino_branch(mol, frag_atoms, attach_idx, parent_atoms):
     from ..data.chain_names import get_chain_prefix
 
     frag_set = set(frag_atoms)
-    n_atom = mol.GetAtomWithIdx(attach_idx)
-
+    # A hydrazinyl unit (-NH-NH-R) and an imine nitrogen are composed from their parts, never as an
+    # amino group on an amino group: 'hydrazin-1-yl' with its locants,,
+    if (_hz := n_unit_prefix(mol, frag_atoms, attach_idx, list(parent_atoms))) is not None:
+        return _hz
     # Collect non-parent, non-N neighbors
-    branches = []
-    for nbr in n_atom.GetNeighbors():
-        nbr_idx = nbr.GetIdx()
-        if nbr_idx in parent_atoms:
-            continue
-        if nbr_idx in frag_set:
-            branches.append(nbr_idx)
-
+    branches = [nb.GetIdx() for nb in mol.GetAtomWithIdx(attach_idx).GetNeighbors()
+                if nb.GetIdx() not in parent_atoms and nb.GetIdx() in frag_set]
     if not branches:
         return None
 

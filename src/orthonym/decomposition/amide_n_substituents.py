@@ -7,7 +7,10 @@ amide, so each is cited with the locant N Substitution of primary amides,
 , the Blue Book: R' and R'' of R-CO-NR'R'' "are cited as prefixes preceded
 by the locant N"; examples ``N,N-diethylfuran-2-carboxamide (PIN)``:32797 and
 ``N-methyl-N-phenylbenzamide (PIN)``:32871), identical ones multiplied and different ones in
-alphanumerical order.
+alphanumerical order. The amine of an N-alkoxy amide is named the same way
+(``N-methoxymethanamine (PIN)``,,:38380), and its alkoxy substituent is cited
+as a prefix on the amide nitrogen like any other: "N-SUBSTITUTION OF AMINES AND IMINES BY
+HETEROATOMS" (:26588), "Substitution of amines is permitted by -OR... groups" (:26596).
 """
 
 import re
@@ -16,6 +19,7 @@ from typing import Callable, List, Optional, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import (
+    _RETAINED_CONTRACTED_ALKOXY,
     _is_fully_enclosed,
     _wrap_n_substituent,
     enclose_if_compound,
@@ -24,9 +28,17 @@ from ..assembly.naming_utils import (
     prefix_citation_sort_key,
 )
 
+# The retained contracted R-O- prefixes are simple prefixes cited bare, so an N-substituent
+# 'methoxy' stands in front of its parent amine unenclosed: 'N-methoxymethanamine (PIN)'
+# "N,O-Disubstitution of hydroxylamine", the Blue Book, example:38380).
+# "Retained names" (:27665) lists methoxy, ethoxy, propoxy, butoxy and phenoxy
+# (the vocabulary of naming_utils) and 'tert-butoxy' (:27679).
+_BARE_ALKOXY = "|".join(sorted(_RETAINED_CONTRACTED_ALKOXY | {"tert-butoxy"}, key=len, reverse=True))
+
 # the first substituent word of an unenclosed name: 'ethyl' of 'ethylethanamine',
-# 'tert-butyl' of 'tert-butyl-2-methylpropan-2-amine'
-_BARE_SUBSTITUENT = re.compile(r"(?:(?:tert|sec)-)?[a-z]+?yl(?=[-a-z])")
+# 'tert-butyl' of 'tert-butyl-2-methylpropan-2-amine', 'methoxy' of 'methoxymethanamine'
+_BARE_SUBSTITUENT = re.compile(
+    rf"(?:(?:tert|sec)-)?[a-z]+?yl(?=[-a-z])|(?:{_BARE_ALKOXY})(?=[-a-z])")
 
 
 def split_secondary_amine_name(amine_name: str) -> Optional[Tuple[str, str]]:

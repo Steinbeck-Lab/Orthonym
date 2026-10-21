@@ -1718,9 +1718,22 @@ def _handle_peptide(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_retained_name(mol, smiles, canonical_smiles, features=None, *,
                           style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:1086-1088 — direct dict lookup."""
+    """Mirrors namer.py:1086-1088 — direct dict lookup.
+
+    A table name that the curated PIN list denies and the hand-curated side keeps
+    (``pin: false`` with ``hc_override``: the three adenylic acids, glycine, the
+    nucleosides, pentazolidine, see ``data/iupac_2013_pin_list.json``) is a name the
+    project knows is not a PIN. It still ships at the wider tiers, so the hit is
+    recorded as a non-PIN fragment (name-scoped, ``record_non_pin_fragment``): the
+    shipped name is labelled below pin_verified and the default tier declines it.
+    """
     from orthonym.data import ALL_RETAINED_NAMES
-    return ALL_RETAINED_NAMES.get(canonical_smiles)
+    from orthonym.data.pin_policy import PIN_DENY
+    name = ALL_RETAINED_NAMES.get(canonical_smiles)
+    if name and name.lower().strip() in PIN_DENY:
+        from orthonym.metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
 
 
 def _handle_amino_acid(mol, smiles, canonical_smiles, features=None, *,

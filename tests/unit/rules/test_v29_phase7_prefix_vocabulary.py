@@ -186,8 +186,15 @@ UNCHANGED = [
     ("propane", 3, "propyl"),
     ("cyclohexane", 6, "cyclohexyl"),
     ("acetic acid", 2, "acetyl"),
-    # a legitimate parent hydride whose prefix IS '<name>yl' -- must survive
-    ("methylhydrazine", 1, "methylhydrazinyl"),
+    # the unit that has no substituent, and a hydrazine whose one substituent is an ylidene (it can
+    # stand on the far nitrogen only: "Omission of locants", the Blue Book,
+    # 'ethylidenehydrazinyl (preferred prefix) (not 2-ethylidenehydrazin-1-yl)',:2959) -- must survive
+    ("hydrazine", 0, "hydrazinyl"),
+    ("ethylidenehydrazine", 2, "ethylidenehydrazinyl"),
+    ("(propan-2-ylidene)hydrazine", 3, "(propan-2-ylidene)hydrazinyl"),
+    # the ring rule is for ring names
+    ("pyridine", 5, "pyridinyl"),
+    ("piperidine", 5, "piperidinyl"),
 ]
 
 
@@ -214,6 +221,26 @@ BORROWED_LOCANT = [
 def test_borrowed_locant_conversions_fail_closed(name, clen, _was):
     assert parent_to_prefix(
         name, clen, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
+
+
+# PS lane 2: the ring rule of ('-ine' to '-inyl') is for ring hydrides. An imine and a
+# substituted hydrazine are not, and the name of the capped molecule no longer says which nitrogen
+# a substituent is on. (the Blue Book), Table 7.2 "Suffixes for Radicals of Amines,
+# Imines and Amides" (:40622): '-iminyl' is the suffix of a radical, so 'methaniminyl' is not a
+# substituent group; R-CH=N- is '(R-ylidene)amino' "Substitutive names for imines",
+#:26529). "Citation of locants" (:2869) and "Omission of locants" (:2953):
+# 'methylhydrazinyl' omits a locant that tells two isomers apart ('4-(1-acetyl-2-ethylhydrazin-1-yl)
+# benzoic acid (PIN)',,:34042). ``n_unit_prefix`` builds these prefixes from the
+# structure (tests/unit/assembly/test_n_unit_prefix.py).
+NO_RING_RULE = [
+    "methylhydrazine", "phenylhydrazine", "tetramethylhydrazine",
+    "methanimine", "ethanimine", "N-methylmethanimine", "propan-2-imine", "cyclohexan-1-imine",
+]
+
+
+@pytest.mark.parametrize("name", NO_RING_RULE)
+def test_an_imine_or_a_substituted_hydrazine_has_no_ring_ine_prefix(name):
+    assert parent_to_prefix(name, 1, attach_locant=ATTACH_LOCANT_UNKNOWN) is None
 
 
 # --------------------------------------------------------------------------

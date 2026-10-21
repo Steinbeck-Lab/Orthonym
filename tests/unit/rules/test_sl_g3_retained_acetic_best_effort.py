@@ -31,12 +31,19 @@ ROWS = [
     ("COc1ccc2c(c1)C(CC(=O)O)=C(C)C2C(=O)c1ccc(Cl)cc1",
      "[1-(4-chlorobenzoyl)-5-methoxy-2-methyl-1H-inden-3-yl]acetic acid"),
     # a heteroatom or hydrazine-like substituent of the engine's own spelling
-    ("NNC(=O)NNCC(=O)O", "(hydrazinecarboxamidoamino)acetic acid"),
+    # the hydrazinyl unit cites its locants, the Blue Book; '3-[2-(hydrazinecarbonyl)hydrazin-1-yl]
+    # propanoic acid',:38712, is the book's second spelling of this group, the PIN prefix is
+    # 'hydrazinecarbohydrazido'): a non-PIN name, '(aminocarbamoyl)' is the fragment namer's spelling of
+    # H2N-NH-CO- (UNVERIFIED: not the book's 'hydrazinecarbonyl'); was '(hydrazinecarboxamidoamino)'
+    ("NNC(=O)NNCC(=O)O", "[2-(aminocarbamoyl)hydrazin-1-yl]acetic acid"),
     ("NNC=NNCC(=O)O", "({[(aminoamino)methylidene]amino}amino)acetic acid"),
     ("COS(=O)OS(=O)OS(=O)OCC(=O)O", "{[({[(methoxysulfinyl)oxy]sulfinyl}oxy)sulfinyl]oxy}acetic acid"),
     # dev2000 / rows
+    # '(diaminomethylidene)amino (preferred prefix)', (the Blue Book;
+    # '4-[(diaminomethylidene)amino]butanoic acid (PIN)',:34282): the group is a compound prefix,
+    # enclosed, so the enclosing marks of the name nest one level deeper
     ("CCc1c(O)cc([C@H](N=C(N)N)C(=O)NCC(=O)O)cc1O",
-     "{[(2S)-2-(diaminomethylideneamino)-2-(4-ethyl-3,5-dihydroxyphenyl)-1-oxoethyl]amino}acetic acid"),
+     "({(2S)-2-[(diaminomethylidene)amino]-2-(4-ethyl-3,5-dihydroxyphenyl)-1-oxoethyl}amino)acetic acid"),
     ("CC(C)N1C(CC2=C1C=C(C=C2)C(F)(F)F)CC(=O)O",
      "[1-(propan-2-yl)-6-(trifluoromethyl)-2,3-dihydro-1H-indol-2-yl]acetic acid"),
     # two prefixes: the first bare, the later one enclosed,:7312)

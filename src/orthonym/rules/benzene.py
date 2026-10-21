@@ -2205,19 +2205,17 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
                 # brackets on the senior parent -> '4-[(chloromethyl)amino]-
                 # benzoic acid'. A bare (already-simple) branch name that is not
                 # itself compound is left unwrapped inside (handled by
-                # is_complex_substituent).
-                from ..assembly.naming_utils import (
-                    apply_enclosing_marks,
-                    is_complex_substituent,
-                )
-                # Inner substituted prefix gets its own parens;
-                # 'chloromethyl' -> '(chloromethyl)'. Suite fix j6 (TRIAGE g5
-                # C11): the mark escalates past the inner name's own marks
-                #, the Blue Book) -- a stereo-prefixed
-                # '(2R)-3-oxobutan-2-yl' becomes '[(2R)-3-oxobutan-2-yl]', not
-                # '((2R)-...)' (which also failed the OPSIN grammar check).
-                _inner = (apply_enclosing_marks(_bname, -1)
-                          if is_complex_substituent(_bname) else _bname)
+                # enclose_if_compound).
+                from ..assembly.naming_utils import apply_enclosing_marks, enclose_if_compound
+                # The inner prefix is enclosed when compound: (the Blue Book)
+                # parentheses "around compound... prefixes", (:7416) "Brackets enclose
+                # substituent prefixes in which parentheses have already been used",
+                # (:7436) braces -- '4-{[(methylsulfanyl)methyl]amino}benzoic acid'. The mark
+                # escalates past the inner name's own marks,:7444; suite fix j6, TRIAGE
+                # g5 C11: '[(2R)-3-oxobutan-2-yl]'). enclose_if_compound is the union the
+                # monosubstituted-benzene branch uses; is_complex_substituent alone reads a name
+                # that opens with a mark ('(methylsulfanyl)methyl') as enclosed and left it bare.
+                _inner = enclose_if_compound(_bname)
                 _complex_prefix = f'{_inner}amino'
                 # Escalate the OUTER enclosing mark by nesting depth:
                 # '(chloromethyl)amino' -> '[(chloromethyl)amino]'. Passing the

@@ -4,7 +4,10 @@ only a name whose own round trip passed.
 The paper's claim (i): "Apart from the list names above, every shown name passed the
 engine's round-trip check", and (d): a name OPSIN rejects is not emitted at
 best-effort (exact-match list names excepted; the ten grammar carve-outs are
-default-tier only). ba4c1a58c put that check in ``name_tiered`` only. Plain
+default-tier only). Since 2026-10-20 (user decision) the code differs from that
+text for one class: a molecule the best-effort tier leaves without a name gets the
+name the default tier ships when OPSIN cannot read its stereodescriptors
+(``pin_unverified``, ``assembly/default_tier_offer.py``). ba4c1a58c put that check in ``name_tiered`` only. Plain
 ``Orthonym(...).name``, ``name_compound`` and ``name_with_confidence`` could still
 return a name that no round trip had passed: with OPSIN unavailable (a timeout on a
 loaded host, the jar present) the trivial last resort (``_apply_trivial_fallback``)

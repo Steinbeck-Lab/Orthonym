@@ -5,6 +5,7 @@ hydrogen. ``parent_to_prefix`` then edits that name into a prefix, and an edit o
 keep only what the name itself proves. The functions here decide what it proves.
 """
 
+import re
 from typing import Dict, Optional, Tuple
 
 #: chain stem -> carbon count, the whole range of ``get_chain_prefix`` (1-9999),
@@ -82,3 +83,28 @@ def terminal_yl_prefix(capped_name: str, candidate: str) -> Optional[str]:
     if found[1] == 2 and capped_name.endswith('yne'):
         return candidate
     return None
+
+
+def acyclic_n_parent(name: str) -> bool:
+    """True when the capped molecule's name is an imine or a substituted hydrazine, whose
+    '-ine' ending is not the ring ending that turns into '-inyl'.
+
+    'iminyl' is the suffix of a radical, never of a substituent group: (Table 7.2
+    "Suffixes for Radicals of Amines, Imines and Amides", the Blue Book); R-CH=N- joined
+    through nitrogen is '(R-ylidene)amino' "Substitutive names for imines",:26529)
+    and R-C(=NH)- an acyl group,:26540).
+
+    A substituent on the nitrogen of a hydrazine cites the locant that tells which nitrogen
+     "Citation of locants",:2869; "Omission of locants",:2953), and the
+    capped name no longer holds it: 'methylhydrazine' gives no 'methylhydrazinyl'. 'hydrazine'
+    itself ('hydrazinyl', (b),:2911) and a hydrazine whose one substituent is an
+    ylidene, which can stand on the far nitrogen only ('ethylidenehydrazinyl',:2959), keep the
+    conversion. ``n_unit_prefix`` builds the prefix of the units this declines, from the
+    structure."""
+    name = name.lower()
+    if name.endswith('imine'):
+        return True
+    if not name.endswith('hydrazine') or name == 'hydrazine':
+        return False
+    stem = re.sub(r'^\((?:\d+[ez](?:,\d+[ez])*|[ez])\)-', '', name[:-len('hydrazine')])
+    return not stem.rstrip(')]}').endswith('ylidene')

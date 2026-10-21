@@ -24,6 +24,7 @@ from ..assembly.naming_utils import (
     _SIMPLE_PREFIX_VOCABULARY,
     _wrap_n_substituent,
     enclose_if_compound,
+    is_fully_enclosed,
     matching_close,
     top_level_tokens,
 )
@@ -1847,7 +1848,7 @@ def _assemble_carbamate(
     if amine_name:
         amine_prefix = _amine_to_prefix(amine_name)
         if amine_prefix:
-            name = f"{alkyl_prefix} {amine_prefix}carbamate"
+            name = f"{alkyl_prefix} {enclose_if_compound(amine_prefix)}carbamate"
 
     if not _is_monovalent_group_word(alkyl_prefix):
         # The alcohol's name carries no single group (a polyol, a name whose hydroxy is a
@@ -1948,30 +1949,25 @@ def _assemble_thioether(fragment_names: Dict[str, str], style: str) -> Optional[
 
 
 def _assemble_sec_amine(fragment_names: Dict[str, str], style: str) -> Optional[str]:
-    """Assemble secondary amine name as 'alkylamino + parent' (IUPAC.
+    """Secondary amine split: no name is built (always None).
 
-    The smaller fragment (amine side) is converted to an alkylamino prefix.
-    The larger fragment (acid side) is the parent compound.
+    The amine side arrives as the name of the AMINE ('methylamine', 'hexa-2,4-dien-2-amine',
+    'O-methylhydroxylamine'), and ``_amine_to_prefix`` turns it into the group R alone. Joined to
+    the parent it names a molecule without the nitrogen ('methylbenzoic acid', 'methoxybenzoic
+    acid'), and without the position of the group. The 'amino' prefix of ("alkylamino +
+    parent") needs the locant of the parent atom the nitrogen is on, which the two fragment names
+    do not give, so no name can be built from them. A panel trace reached this assembler on real
+    inputs, and the read-back refused every name it built. The search goes on with the other
+    producers.
 
     Args:
         fragment_names: {"acid": parent_name, "amine": amine_name}
-            where amine_name is the N-bearing fragment.
         style: Naming style.
 
     Returns:
-        Secondary amine name like "methylaminobenzoic acid", or None.
+        None.
     """
-    parent_name = fragment_names.get("acid")
-    amine_name = fragment_names.get("amine") or fragment_names.get("alkyl")
-
-    if not parent_name or not amine_name:
-        return None
-
-    amino_prefix = _amine_to_prefix(amine_name)
-    if not amino_prefix:
-        return None
-
-    return _join_components(amino_prefix, parent_name)
+    return None
 
 
 def _assemble_thioester(fragment_names: Dict[str, str], style: str) -> Optional[str]:
@@ -2149,7 +2145,9 @@ def _assemble_sulfonamide(fragment_names: Dict[str, str], style: str) -> Optiona
 
     amine_prefix = _amine_to_prefix(amine_name)
     if amine_prefix:
-        wrapped = _wrap_n_substituent(amine_prefix)
+        # a compound N-substituent is enclosed, the Blue Book), as the amide
+        # assembler does: 'N-(benzyloxy)methanesulfonamide', not 'N-benzyloxy...'
+        wrapped = _wrap_n_substituent(enclose_if_compound(amine_prefix))
         front, sulfonamide_rest = split_front_stereo(sulfonamide_parent)
         result = f"{front}N-{_join_components(wrapped, sulfonamide_rest)}"
         _record_if_out_of_citation_order(result, [amine_prefix], sulfonamide_rest)
@@ -3203,6 +3201,50 @@ def _alcohol_to_alkyl(alcohol_name: str) -> str:
     return name
 
 
+#: One substituent word of a hydroxylamine name that is not enclosed: 'methyl', 'tert-butyl',
+#: 'cyclohexyl', 'benzyl'. A name with a locant, a hyphen inside the group or a second
+#: substituent ('O-methyl-N-phenyl') is not one word.
+_O_GROUP_WORD = _re.compile(r"(?:tert-)?[a-z]+yl")
+
+
+def _o_substituted_hydroxylamine_prefix(name: str) -> Optional[str]:
+    """The R-oxy prefix of an O-substituted hydroxylamine name, or None.
+
+    ``'O-methylhydroxylamine'`` (CH3-O-NH2) is the amine of an amide whose nitrogen carries
+    the group R-O-, and that group is the prefix ``methoxy``. The name cannot be turned into
+    a prefix by taking off 'amine': that leaves ``O-methylhydroxyl``, which is no prefix of the
+    Blue Book. "N-SUBSTITUTION OF AMINES AND IMINES BY HETEROATOMS" (the Blue Book):
+    "Substitution of amines is permitted by -OR, -SR, -SeR, and -TeR groups" (:26596),
+    ``N-methoxyethanamine (PIN)`` (:26600); "N,O-Disubstitution of
+    hydroxylamine" (:38372): ``N-methoxymethanamine (PIN)`` (:38380). A group on the nitrogen
+    of an amide is cited the same way: ``N-hydroxypropanamide (PIN)``,
+    "Hydroxamic acids" (:32825). No verbatim N-alkoxy amide PIN is in the book, so the amide
+    name is INFERRED from these rules.
+
+    The prefix is the one the Blue Book forms for every R-O- group, through the shared
+    alkoxy-prefix primitive: "Names of substituent groups R'-O-, R'-S-, R'-Se-, and
+    R'-Te-" (:27629), the retained contracted prefixes ``methoxy``.. ``butoxy``, ``phenoxy``,
+    ``tert-butoxy`` under "Retained names" (:27665), the concatenated
+    ``(propan-2-yl)oxy`` and ``benzyloxy`` under (:27633). None unless the name is
+    ``O-<one group>hydroxylamine``: a name that also carries an N-substituent, a second
+    O-group or a suffix is not converted, and ``_amine_to_prefix`` then gives it no prefix.
+    """
+    if not (name.startswith("O-") and name.endswith("hydroxylamine")):
+        return None
+    group = name[2:-len("hydroxylamine")]
+    if not group:
+        return None
+    if is_fully_enclosed(group):
+        group = group[1:-1]
+    elif not _O_GROUP_WORD.fullmatch(group):
+        return None
+    from ..assembly.substituent_enumerator import alkoxy_prefix_from_substituent
+    prefix = alkoxy_prefix_from_substituent(group)
+    if not prefix or prefix in ("oxy", "()oxy"):  # never bare "oxy"
+        return None
+    return prefix
+
+
 def _amine_to_prefix(amine_name: str) -> Optional[str]:
     """Convert amine name to substituent prefix for N-substitution.
 
@@ -3221,12 +3263,20 @@ def _amine_to_prefix(amine_name: str) -> Optional[str]:
         'phenyl'
         >>> _amine_to_prefix("glutamine")
         'glutaminyl'
+        >>> _amine_to_prefix("O-methylhydroxylamine")
+        'methoxy'
     """
     name = amine_name.strip()
 
     # Check trivial lookup first
     if name.lower() in _TRIVIAL_AMINE_TO_PREFIX:
         return _TRIVIAL_AMINE_TO_PREFIX[name.lower()]
+
+    # An O-substituted hydroxylamine is the amine of an N-alkoxy amide: its prefix is R-oxy. One
+    # that cannot be converted has no prefix: 'O-...hydroxyl' is no prefix of the Blue Book, so it
+    # must not fall through to the rule below that takes 'amine' off the name.
+    if name.startswith("O-") and name.endswith("hydroxylamine"):
+        return _o_substituted_hydroxylamine_prefix(name)
 
     # Systematic: ends with "amine" -> strip and convert
     if name.endswith("amine"):
