@@ -115,12 +115,18 @@ _PREFIX_ONLY_ELEMENTS = frozenset({'F', 'Cl', 'Br', 'I', 'At'})
 # mistaken for the definition. The sentinel families are now named in one place.
 
 
-def _fragment_atoms(mol, start_idx: int, exclude_idx: int) -> Optional[List[int]]:
+def _fragment_atoms(mol, start_idx: int, exclude_idx: int,
+                    any_element: bool = False) -> Optional[List[int]]:
     """The connected subtree rooted at ``start_idx`` with ``exclude_idx`` as its
     only boundary, or None when the fragment leaves the C/H/halogen class.
 
     Also fail-closes on a charged or radical atom: an ion and a radical are
     SENIOR classes in, so such a fragment is not a plain detachable prefix.
+
+    ``any_element`` lifts the element bound, for a caller that has shown on the whole
+    molecule that no group of the fragment outranks the hub (see ``organyl_prefix_name``).
+    A radical still declines; a charged atom is allowed only when the fragment as a whole
+    is neutral (a nitro group), as for the ligands of ``rules.centre_ligands``.
 
     Pure: no mol mutation.
     """
@@ -134,9 +140,11 @@ def _fragment_atoms(mol, start_idx: int, exclude_idx: int) -> Optional[List[int]
         seen.add(i)
         atom = mol.GetAtomWithIdx(i)
         sym = atom.GetSymbol()
-        if sym != 'C' and sym not in _PREFIX_ONLY_ELEMENTS:
+        if not any_element and sym != 'C' and sym not in _PREFIX_ONLY_ELEMENTS:
             return None
-        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+        if atom.GetNumRadicalElectrons() != 0:
+            return None
+        if atom.GetFormalCharge() != 0 and not any_element:
             return None
         subtree.append(i)
         for nbr in atom.GetNeighbors():
@@ -144,12 +152,23 @@ def _fragment_atoms(mol, start_idx: int, exclude_idx: int) -> Optional[List[int]
             if j == exclude_idx or nbr.GetSymbol() == 'H':
                 continue
             stack.append(j)
+    if any_element and sum(mol.GetAtomWithIdx(i).GetFormalCharge() for i in subtree) != 0:
+        return None
     return subtree or None
 
 
-def organyl_prefix_name(mol, start_idx: int, exclude_idx: int) -> Optional[str]:
+def organyl_prefix_name(mol, start_idx: int, exclude_idx: int,
+                        any_element: bool = False) -> Optional[str]:
     """Return the detachable prefix name for the organyl rooted at ``start_idx``
     and bonded to ``exclude_idx``, or None (fail-closed).
+
+    ``any_element`` names a fragment that holds atoms of other elements (an ether
+    oxygen, a ring of oxygen or silicon, a nitro group), which the bound of this
+    module's docstring declines. It is for the caller that has compared the classes
+    of the WHOLE molecule and shown that no group of the fragment outranks the hub:
+    ``rules.polyazane`` for a hydrazine that is the parent hydride
+    (``validation.spelling.polyazane_parent``,. The attachment atom is still a
+    carbon, and the stereo-expression obligation below still holds.
 
     ``start_idx`` is FRAGMENT-side and ``exclude_idx`` is its parent-side
     neighbour — the dominant ``attach_idx`` convention of the shared chokepoint.
@@ -175,7 +194,7 @@ def organyl_prefix_name(mol, start_idx: int, exclude_idx: int) -> Optional[str]:
     if mol.GetAtomWithIdx(start_idx).GetSymbol() != 'C':
         return None
 
-    frag = _fragment_atoms(mol, start_idx, exclude_idx)
+    frag = _fragment_atoms(mol, start_idx, exclude_idx, any_element)
     if frag is None:
         return None
     if start_idx not in frag:                    # unreachable by construction

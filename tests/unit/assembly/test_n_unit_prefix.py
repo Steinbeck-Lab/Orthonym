@@ -134,24 +134,41 @@ def test_the_acylhydrazinyl_form_is_not_a_pin(smiles, non_pin):
 # "A single senior atom is sufficient to give seniority to the parent hydride", class 21
 # (:18197) "Nitrogen compounds: heterocycles, polyazanes, hydrazines (except for hydrazides)...", and
 # 'phenylhydrazine (PIN)' (:38535). A molecule with no characteristic group of classes 1 to 20 and no
-# nitrogen ring is named on the hydrazine, so a name that cites 'hydrazinyl' for it is not the PIN: the
-# default tier declines it, the best-effort tier keeps it at systematic_verified. The rows below were
-# pin_verified at both tiers before (the first two with 'methylhydrazinyl', 'hydrazinyl').
+# nitrogen ring is named on the hydrazine, so a name that cites 'hydrazinyl' for it is not the PIN (the
+# spelling check, ``test_the_hydrazine_parent_check`` below) and neither tier labels it one. The hydrazine
+# producer (``rules/polyazane.py``, tests/unit/rules/test_hydrazine_parent.py) names these molecules: the
+# rows below were declined at the default tier and shipped at systematic_verified by the best-effort tier
+# before it did, and were pin_verified with the 'hydrazinyl' name (the first two with 'methylhydrazinyl',
+# 'hydrazinyl') before the check.
+# (smiles, the hydrazinyl name that is not a PIN, the PIN)
 NO_PRINCIPAL_GROUP = [
-    ("CNNC1=CC=C(C=C1)Cl", "1-chloro-4-(2-methylhydrazin-1-yl)benzene"),
-    ("CNNC1=C(C=C(C=C1Cl)Cl)Cl", "1,3,5-trichloro-2-(2-methylhydrazin-1-yl)benzene"),
-    ("Clc1ccc(NN(C)C)cc1", "1-chloro-4-(2,2-dimethylhydrazin-1-yl)benzene"),
-    ("COC1=CC=CC(=C1OC)NNC2CCCO2", "2-[2-(2,3-dimethoxyphenyl)hydrazin-1-yl]oxolane"),
+    ("CNNC1=CC=C(C=C1)Cl", "1-chloro-4-(2-methylhydrazin-1-yl)benzene", "1-(4-chlorophenyl)-2-methylhydrazine"),
+    ("CNNC1=C(C=C(C=C1Cl)Cl)Cl", "1,3,5-trichloro-2-(2-methylhydrazin-1-yl)benzene",
+     "1-methyl-2-(2,4,6-trichlorophenyl)hydrazine"),
+    ("Clc1ccc(NN(C)C)cc1", "1-chloro-4-(2,2-dimethylhydrazin-1-yl)benzene",
+     "2-(4-chlorophenyl)-1,1-dimethylhydrazine"),
+    ("COC1=CC=CC(=C1OC)NNC2CCCO2", "2-[2-(2,3-dimethoxyphenyl)hydrazin-1-yl]oxolane",
+     "1-(2,3-dimethoxyphenyl)-2-(oxolan-2-yl)hydrazine"),
     # BB (the Blue Book): "1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine (PIN) (N > Si > O)"
     # (:18950): a ring of silicon and a ring of oxygen are both junior to the nitrogen of the hydrazine
-    ("C1=COCC(NNC2CCC[SiH2]2)=C1", "3-[2-(silolan-2-yl)hydrazin-1-yl]-2H-pyran"),
+    ("C1=COCC(NNC2CCC[SiH2]2)=C1", "3-[2-(silolan-2-yl)hydrazin-1-yl]-2H-pyran",
+     "1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine"),
+    # the unit with no substituent: the same rule, '(4-chlorophenyl)hydrazine' beside 'phenylhydrazine (PIN)' (:38535)
+    ("NNc1ccc(Cl)cc1", "1-chloro-4-hydrazinylbenzene", "(4-chlorophenyl)hydrazine"),
 ]
 
-# The unit with no substituent: main's default tier says '1-chloro-4-hydrazinylbenzene' (pin_verified), which
-# the same rule declines; the best-effort tier spells the unit '(aminoamino)' at main and still does, with or
-# without the check (the BE-only path ``_located_fg_hetero_root``), so the check changes no best-effort name.
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,non_pin,pin", NO_PRINCIPAL_GROUP)
+def test_a_hydrazinyl_prefix_without_a_principal_group_or_a_nitrogen_ring_is_not_a_pin(smiles, non_pin, pin):
+    """The hydrazinyl name is no PIN at either tier, and the hydrazine-parent name is."""
+    assert_not_pin_labelled(smiles, non_pin)
+    assert_pin_at_both_tiers(smiles, pin)
+
+
+# Two hydrazine units are the multiplicative case, which no producer builds: the default tier
+# declines the hydrazinyl name and the best-effort tier spells the unit '(aminoamino)'
 BARE_UNIT = [
-    ("NNc1ccc(Cl)cc1", "1-chloro-4-hydrazinylbenzene"),
     ("NNc1ccccc1NN", "1,2-dihydrazinylbenzene"),
 ]
 
@@ -161,18 +178,6 @@ BARE_UNIT = [
 def test_the_bare_hydrazinyl_unit_without_a_principal_group_is_declined_at_the_default_tier(smiles, non_pin):
     assert_not_pin_labelled(smiles, non_pin)
     assert_declined_at_default(smiles)
-
-
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,non_pin", NO_PRINCIPAL_GROUP)
-def test_a_hydrazinyl_prefix_without_a_principal_group_or_a_nitrogen_ring_is_not_a_pin(smiles, non_pin):
-    """The label is lowered and the name is kept: the check (validation/spelling/checks_parent.py,
-     is a spelling check of the shipped name, so the best-effort tier ships the very name the
-    default tier declines, at systematic_verified, and no other candidate takes its place."""
-    assert_not_pin_labelled(smiles, non_pin)
-    assert_declined_at_default(smiles)
-    b = name_breadth(smiles)
-    assert (b["name"], b["tier"]) == (non_pin, "systematic_verified"), b
 
 
 @pytest.mark.parametrize("smiles,name,fails", [
@@ -216,6 +221,15 @@ def test_a_hydrazinyl_prefix_without_a_principal_group_or_a_nitrogen_ring_is_not
     ("CNNc1ccc(C(N)=O)cc1", "4-(2-methylhydrazin-1-yl)benzamide", False),              # 11 amide
     ("CNNc1ccc(C=NC)cc1", "N-methyl-1-[4-(2-methylhydrazin-1-yl)phenyl]methanimine", False),  # 20 imine
     ("CNNc1ccc([Si](C)(C)C)cc1", "[4-(2-methylhydrazin-1-yl)phenyl]trimethylsilane", True),   # N > Si (:18917)
+    # a nitroso group on carbon is a prefix only,:25933); a peroxide and its chalcogen analogues are
+    # class 42,:18218), below the nitrogen compounds (:18197); a hydroperoxide is class 18
+    ("NNc1ccc(N=O)cc1", "1-hydrazinyl-4-nitrosobenzene", True),
+    ("CC(C)(C)OOc1ccc(NN)cc1", "1-(tert-butylperoxy)-4-hydrazinylbenzene", True),
+    ("NNc1ccc(SSC)cc1", "1-hydrazinyl-4-(methyldisulfanyl)benzene", True),
+    ("NNc1ccc([Se][Se]C)cc1", "1-hydrazinyl-4-(methyldiselanyl)benzene", True),
+    ("NNc1ccc(SOC)cc1", "1-hydrazinyl-4-(methoxysulfanyl)benzene", True),
+    ("NNc1ccc(OO)cc1", "4-hydrazinylbenzene-1-peroxol", False),
+    ("NNc1ccc(ON=O)cc1", "4-hydrazinylphenyl nitrite", False),
     ("CNNc1ccc([Pt](C)C)cc1", "x(2-methylhydrazin-1-yl)", False),                         # an element not listed
     ("CNNc1ccc(Cl)cc1.O", "1-chloro-4-(2-methylhydrazin-1-yl)benzene", False),        # a second component
     ("CC(C)=NNc1ccc(Cl)cc1C(=O)O", "2-[(propan-2-ylidene)hydrazinyl]-4-chlorobenzoic acid", False),

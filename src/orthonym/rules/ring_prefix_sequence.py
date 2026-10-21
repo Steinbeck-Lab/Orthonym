@@ -72,6 +72,15 @@ def ring_prefix_sequence(mol, groups: Dict[str, List[int]], atom_prefixes: Dict[
         for _fg in _CFG:
             if _nml.startswith(_fg) and _nml[len(_fg):] in _ARF:
                 return True
+        # (the Blue Book): a compound prefix is enclosed, and the question has one
+        # home, ``naming_utils.enclose_if_compound`` (the union of ``needs_brackets`` and
+        # ``is_complex_substituent``). The family test above names only the functional prefixes of
+        # ``_COMPOUND_FG_PREFIXES``, so a compound prefix built on 'methoxy', 'dimethylamino',
+        # 'methylsulfanyl', 'phenoxymethyl'... was cited bare: '3-methoxymethyloxiran-2-yl' for
+        # '3-(methoxymethyl)oxiran-2-yl'. The shared primitive has the last word.
+        from ..assembly.naming_utils import enclose_if_compound as _eic
+        if _eic(nm) != nm:
+            return True
         return any(c in nm for c in '-()[]0123456789')
 
     # (the Blue Book): every substitutable position of the aromatic

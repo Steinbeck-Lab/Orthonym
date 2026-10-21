@@ -9,6 +9,14 @@ Acyclic chains of nitrogen atoms joined by N-N bonds:
     azo: R-N=N-R -> dimethyldiazene / diphenyldiazene
                         (diazene omits locants — each N is =N-;
     substituted hydrazine: CNN -> methylhydrazine (N-N keeps 1,1-/1,2- locants)
+    the hydrazine or the diazene as the parent, the Blue Book): when no
+                characteristic group of the classes 1 to 20 of and no ring nitrogen is present
+                (``validation.spelling.polyazane_parent``), the substituents of the unit may hold a halogen,
+                an ether or sulfide, a nitro group, or a ring or atom of an element that nitrogen
+                outranks (Si, P, B... O, S):
+                NNc1ccc(Cl)cc1 -> (4-chlorophenyl)hydrazine,
+                C1=COCC(NNC2CCC[SiH2]2)=C1 -> 1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine (:18950),
+                Clc1ccc(N=Nc2ccccc2)cc1 -> (4-chlorophenyl)(phenyl)diazene,:38778)
 
 ``hydrazine`` and ``diazene`` are retained / preselected PINs (NOT "diazane" /
 "diimide"); the longer members are systematic ``<multiplier>azane`` / ``…az-n-ene``
@@ -17,7 +25,8 @@ Acyclic chains of nitrogen atoms joined by N-N bonds:
 Graph classifier (NOT SMARTS — feedback_smarts_and_seniority). Fail-closed: an
 amine (no N-N bond), a diamine (N-C-C-N), hydroxylamine (N-O), a hydrazone
 (C=N-N: an ylidene substituent), an azide (N=N=N: two cumulated double bonds), or
-any charged / ring / radical species fails a guard and cascades onward.
+any charged / ring / radical species fails a guard and cascades onward (the neutral nitro group
+of a prefix of the hydrazine or diazene as the parent is no charge of the parent).
 """
 from typing import Dict, List, Optional, Tuple
 
@@ -76,9 +85,16 @@ def _ene_locant_is_unambiguous(n: int) -> bool:
     return len({min(b, n - b) for b in range(1, n)}) == 1
 
 
-def _nitrogen_chain(mol) -> Optional[List[int]]:
-    """Return the N atom indices ordered as a simple N-N path, else None."""
+def _nitrogen_chain(mol, only_bonded: bool = False) -> Optional[List[int]]:
+    """Return the N atom indices ordered as a simple N-N path, else None.
+
+    ``only_bonded`` leaves out the nitrogen atoms that have no nitrogen neighbour (the nitrogen of a
+    nitro group, which the hydrazine as the parent may carry), so that they are no part of the path.
+    """
     nitrogens = [a.GetIdx() for a in atoms_of(mol) if a.GetSymbol() == 'N']
+    if only_bonded:
+        nitrogens = [i for i in nitrogens
+                     if any(n.GetSymbol() == 'N' for n in mol.GetAtomWithIdx(i).GetNeighbors())]
     if len(nitrogens) < 2:
         return None
     nset = set(nitrogens)
@@ -123,11 +139,15 @@ def _chain_double_bond(mol, chain: List[int]) -> Optional[int]:
     return pos                                 # -1 if saturated
 
 
-def _collect_substituents(mol, chain: List[int]
+def _collect_substituents(mol, chain: List[int], any_element: bool = False
                           ) -> Optional[List[Tuple[int, str]]]:
     """Return ``(0-based chain position, organyl name)`` for every substituent on
     the N-chain, or None if any substituent is non-organyl or doubly bonded
-    (a hydrazone/azine ylidene)."""
+    (a hydrazone/azine ylidene).
+
+    ``any_element``: the hydrazine or the diazene is the parent hydride of the molecule
+    (``polyazane_is_senior_parent``), so no group of a substituent outranks it and a substituent
+    with atoms of other elements is an ordinary prefix."""
     chain_set = set(chain)
     subs: List[Tuple[int, str]] = []
     for pos, idx in enumerate(chain):
@@ -138,7 +158,7 @@ def _collect_substituents(mol, chain: List[int]
             bond = mol.GetBondBetweenAtoms(idx, nbr.GetIdx())
             if bond.GetBondType() != Chem.BondType.SINGLE:
                 return None                    # =CR2 ylidene (hydrazone) -> fail-closed
-            name = organyl_prefix_name(mol, nbr.GetIdx(), idx)
+            name = organyl_prefix_name(mol, nbr.GetIdx(), idx, any_element)
             if name is None:
                 return None
             subs.append((pos, name))
@@ -736,9 +756,18 @@ def name_polyazane(mol) -> Optional[str]:
     _formazan = name_formazan(mol)
     if _formazan is not None:
         return _formazan
-    for atom in atoms_of(mol):
-        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
-            return None
+    # (the Blue Book): when the hydrazine or the diazene is the parent hydride of the
+    # molecule (no characteristic group of the classes 1 to 20 of, no nitrogen ring: the one question
+    # of ``validation.spelling.polyazane_parent``, asked by the spelling check of the 'hydrazinyl' and 'diazenyl'
+    # prefixes as well), the substituents may hold the elements it outranks, a halogen, a nitro group, and
+    # the ring or the atom of O, S, Si, P...: 'N > Si > O' (:18950), '(3-chlorophenyl)(4-chlorophenyl)
+    # diazene (PIN)' (:38774). The neutral nitro group is no charge of the parent.
+    from ..validation.spelling.polyazane_parent import polyazane_is_senior_parent
+    senior_parent = polyazane_is_senior_parent(mol)
+    if not senior_parent:
+        for atom in atoms_of(mol):
+            if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+                return None
 
     # (BB 24896): a homogeneous heteroatom (N-N-N…) chain may be BROKEN
     # to express a senior characteristic group. H2N-(NH)k-COOH -> the carboxylic
@@ -752,7 +781,7 @@ def name_polyazane(mol) -> Optional[str]:
     if _peeled is not None:
         return _peeled
 
-    chain = _nitrogen_chain(mol)
+    chain = _nitrogen_chain(mol, only_bonded=senior_parent)
     if chain is None:
         return None
     # The N-chain itself must not be a ring member (a pyrazole / indazole N-N is a
@@ -761,16 +790,18 @@ def name_polyazane(mol) -> Optional[str]:
     if any(mol.GetAtomWithIdx(i).IsInRing() for i in chain):
         return None
     # Every heavy atom is an N of the chain or a carbon (organyl). Any other
-    # heteroatom (O -> hydroxylamine/oxime, etc.) -> decline.
-    if any(a.GetSymbol() not in ('N', 'C')
-           for a in atoms_of(mol) if a.GetSymbol() != 'H'):
+    # heteroatom (O -> hydroxylamine/oxime, etc.) -> decline, unless the hydrazine
+    # or the diazene is the parent hydride and the atom belongs to a prefix it outranks (above).
+    if (not senior_parent
+            and any(a.GetSymbol() not in ('N', 'C')
+                    for a in atoms_of(mol) if a.GetSymbol() != 'H')):
         return None
 
     dbpos = _chain_double_bond(mol, chain)
     if dbpos is None:
         return None
     n = len(chain)
-    subs = _collect_substituents(mol, chain)
+    subs = _collect_substituents(mol, chain, any_element=senior_parent)
     if subs is None:
         return None
 
