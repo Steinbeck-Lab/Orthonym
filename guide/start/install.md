@@ -12,9 +12,11 @@ Check the Java runtime with `java -version`. Any Java 11+ runtime works (for exa
 ## Install the package
 
 ```console
-$ pip install "git+https://github.com/Steinbeck-Lab/Orthonym.git"
+$ pip install orthonym
 $ orthonym --fetch-jars
 ```
+
+With conda, the first line is `conda install -c conda-forge orthonym`; the conda package also installs a Java runtime. To install the newest code from GitHub instead, use `pip install "git+https://github.com/Steinbeck-Lab/Orthonym.git"`.
 
 The first line installs Orthonym and the packages it needs, among them RDKit, which reads the structures. The second line downloads the two Java programs Orthonym uses, checks each against the SHA-256 checksum recorded in Orthonym, and prints where they are:
 
@@ -24,7 +26,7 @@ $ orthonym --fetch-jars
 [orthonym] centres 1.2.1: /home/you/.cache/orthonym/jars/centres-cli-1.2.1.jar
 ```
 
-`pip install` already tries this download for you. Run `orthonym --fetch-jars` once anyway: it also re-checks the files, and it tells you at once if something is missing.
+If you skip `orthonym --fetch-jars`, the first call that names a molecule downloads the two jars (about 17 MB) and says so; later calls are fast. An install from GitHub or from a clone already tries this download while pip builds the package. Run `orthonym --fetch-jars` once anyway: it also re-checks the files, and it tells you at once if something is missing. If your shell does not find `orthonym` right after the install, open a new terminal (or run `hash -r`); `python -m orthonym` works in any case.
 
 ## The two jars
 

@@ -22,77 +22,17 @@
 [![Web app: Orthonym-Web](https://img.shields.io/badge/web%20app-Orthonym--Web-1a1a1a?style=flat-square&logo=github)](https://github.com/Steinbeck-Lab/Orthonym-Web)
 [![Built with: orthonym-skills](https://img.shields.io/badge/built%20with-orthonym--skills-1a1a1a?style=flat-square&logo=github)](https://github.com/Kohulan/orthonym-skills)
 
-<sub>Part of the Orthonym project: <a href="https://github.com/Kohulan/orthonym-skills"><b>orthonym-skills</b></a>, the Claude Code skills that Orthonym was built with (<a href="#how-orthonym-was-built">how</a>).</sub>
-
 </div>
-
-## How names are checked
-
-<picture>
-  <source media="(max-width: 700px)" srcset="assets/readme-roundtrip-narrow.svg">
-  <img src="assets/readme-roundtrip.svg" alt="The round trip for caffeine. Orthonym writes the name 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione. OPSIN reads that name back into a structure. The InChIKey of your structure and the InChIKey of what OPSIN read are both RYYVLZVUVIJVGH-UHFFFAOYSA-N, so OPSIN confirms that the name describes your structure; the strict PIN path built and certified it, so it is labelled pin_verified. Below, the four tiers a name can land on: PIN, fallback, best effort and no name, with the engine's tier ids." width="100%">
-</picture>
-
-**Deterministic.** Orthonym builds its names from the nomenclature rules of the IUPAC 2013
-recommendations, the "Blue Book". Where those rules do not yet reach a molecule, a wider tier
-(`--emit-tier`) can give a general systematic name, a retained name from a table or a
-natural-product name instead, labelled as not the preferred name. The default tier declines these
-names; [Output tiers](#output-tiers) lists its exceptions. There is no neural network and no
-sampling: the same input always gives the same output.
-
-**Checked.** A name is handed to [OPSIN](https://github.com/dan2097/opsin), which never saw your
-structure, and parsed back. The structure OPSIN reads must match yours in constitution, charge and
-stereo, so a name that leaves out or adds an atom cannot pass. The default tier makes a few
-exceptions for names OPSIN cannot read in full: names from exact-match lists (metal-complex and
-natural-product parent names), a few name forms that OPSIN's grammar lacks or misreads (a phane
-name ships only when the engine's own phane builder turns the name back into your structure), PIN
-spellings that OPSIN's grammar lacks and that OPSIN reads back through a twin spelling of the same
-structure, poly-anhydride names whose acids OPSIN reads back, and names whose stereodescriptors
-OPSIN cannot parse (OPSIN confirms their constitution, and each descriptor is checked against its
-CIP label). `--provenance` marks each of them. The wider tiers ship none of them, except the names
-from the exact-match lists (a metal-complex name, and a natural-product parent name when no
-verified systematic name is found) and the twin-checked names for which the engine has no other
-spelling: halogen `-uide` anions (`diphenyliodanuide`), the anion of a thioperoxol
-(`methane(SO-thioperoxolate)`) and organometallic names with halido ligands (`bromido(ethyl)nickel`). The
-`best-effort` tier also ships, for a
-molecule that has no other name, a name whose stereodescriptors OPSIN cannot parse when the default tier ships
-it, with the label the default tier gives it (`pin_unverified`).
-
-**Honest.** A candidate that fails a check is withdrawn, and when no name is left Orthonym says so
-instead of guessing. `--provenance` reports the tier each name landed on and, in its `verified`
-field, how it was checked.
-
-## See it working
-
-<picture>
-  <source media="(max-width: 700px)" srcset="assets/readme-specimen-narrow.svg">
-  <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, pin_unverified. Uranium trioxide, with --on-failure label, prints inorganic compound (not supported), abstain." width="100%">
-</picture>
-
-<sub>Real output. The command line prints the plain line; the mark under it and the tier at its right
-come from the same command run with <code>--provenance</code>. The pictures are generated from the
-engine's own output, so they show what it prints.</sub>
-
-The same from Python:
-
-```python
->>> from orthonym import name_compound
->>> name_compound("CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O")
-'(2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid'
-```
 
 ## Quick start
 
-Needs Python 3.10+ and a Java 11+ runtime on your `PATH` (see [Installation](#installation)).
-
 ```bash
-pip install "git+https://github.com/Steinbeck-Lab/Orthonym.git"
-orthonym --fetch-jars          # one-time: downloads and checks the OPSIN and centres jars
+pip install orthonym                      # or: conda install -c conda-forge orthonym
+orthonym --fetch-jars                     # one time: downloads and checks the OPSIN and centres jars
 ```
 
-If you skip `--fetch-jars`, the first call that names a molecule downloads the two jars (about
-17 MB) and says so; later calls are fast. If your shell does not find `orthonym` right after the
-install, open a new terminal (or run `hash -r`); `python -m orthonym` works in any case.
+You need Python 3.10+ and a Java 11+ runtime on your `PATH` (the conda package brings Java with it).
+More in [Install](guide/start/install.md).
 
 ```python
 from orthonym import name_compound
@@ -104,180 +44,73 @@ name_compound("C/C=C/C")                      # '(2E)-but-2-ene'
 name_compound("C[C@H](O)CC")                  # '(2S)-butan-2-ol'
 ```
 
-`name_compound` and the other naming functions also take an RDKit `Chem.Mol` in place of the SMILES string, for example a molecule read from an SDF file. The Mol is named through RDKit's SMILES of it (`Chem.MolToSmiles(mol)`), after a check that this SMILES holds the same molecule and stereo; when it does not, the call raises `ValueError`. Your Mol is not changed.
-
-From the command line:
+`name_compound` also takes an RDKit `Chem.Mol`, for example a molecule read from an SDF file.
 
 ```bash
 orthonym "CCO"                                # ethanol
-orthonym "CC(=O)Oc1ccccc1C(=O)O" --provenance # the name plus tier, validation and source, as JSON
+orthonym "CC(=O)Oc1ccccc1C(=O)O" --provenance # the name plus its tier and how it was checked, as JSON
 orthonym --batch molecules.smi -o names.txt   # one SMILES per line
-python -m orthonym "c1ccccc1"                 # module form
 ```
 
-## Installation
+<picture>
+  <source media="(max-width: 700px)" srcset="assets/readme-specimen-narrow.svg">
+  <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, pin_unverified. Uranium trioxide, with --on-failure label, prints inorganic compound (not supported), abstain." width="100%">
+</picture>
 
-| Requirement | Why |
-|:--|:--|
-| **Python 3.10+** | the engine |
-| **Java runtime 11+** on your `PATH` | OPSIN round-trip validation and the CIP labeller are Java programs |
+<sub>Real output, generated from the engine. The tier at the right comes from <code>--provenance</code>.</sub>
 
-Install from GitHub as in [Quick start](#quick-start). For a development install from a clone,
-see [`CONTRIBUTING.md`](CONTRIBUTING.md).
+## How names are checked
 
-### The OPSIN and centres jars
+<picture>
+  <source media="(max-width: 700px)" srcset="assets/readme-roundtrip-narrow.svg">
+  <img src="assets/readme-roundtrip.svg" alt="The round trip for caffeine. Orthonym writes the name 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione. OPSIN reads that name back into a structure. The InChIKey of your structure and the InChIKey of what OPSIN read are both RYYVLZVUVIJVGH-UHFFFAOYSA-N, so OPSIN confirms that the name describes your structure; the strict PIN path built and certified it, so it is labelled pin_verified. Below, the four tiers a name can land on: PIN, fallback, best effort and no name, with the engine's tier ids." width="100%">
+</picture>
 
-Orthonym does **not** ship any Java jars. It uses two, and downloads them from their official
-releases, checking each download against a pinned SHA-256 checksum:
+- **Deterministic.** Names are built from the rules of the IUPAC 2013 recommendations (the "Blue
+  Book"). No neural network, no sampling: the same input always gives the same name.
+- **Checked.** [OPSIN](https://github.com/dan2097/opsin), which never saw your structure, reads
+  every name back. The result must match your structure in constitution, charge and stereo. A few
+  name forms OPSIN cannot read are checked another way, and `--provenance` marks them.
+- **Honest.** A name that fails a check is withdrawn. When no name is left, Orthonym says so and
+  gives the reason. It never guesses.
 
-| Jar | Version | Used for | Licence |
-|:--|:--|:--|:--|
-| [OPSIN](https://github.com/dan2097/opsin) `opsin-cli-2.9.0-jar-with-dependencies.jar` | 2.9.0 | round-trip validation of names | MIT (the jar bundles jna-inchi, LGPL-2.1, and others) |
-| [centres](https://github.com/SiMolecule/centres) `centres-cli-1.2.1.jar` (published as `centres.jar`) | 1.2.1 | CIP stereo descriptors (R/S, E/Z) | BSD-2-Clause (the jar bundles CDK, LGPL-2.1+) |
-
-`pip install` tries to fetch them for you, and a jar that is still missing is downloaded and
-checked the first time Orthonym needs it. To fetch them, or re-check the ones in the jar directory,
-run `orthonym --fetch-jars`. If a jar cannot be found or downloaded (or `ORTHONYM_NO_DOWNLOAD=1`
-forbids the download), Orthonym **stops with a clear error** rather than quietly naming with less
-validation; without a working Java runtime it declines every molecule rather than naming it
-unchecked. For offline machines, point Orthonym at jars you copied yourself (a jar given this way
-is used as given, without the checksum check):
-
-| Setting | Effect |
-|:--|:--|
-| `ORTHONYM_OPSIN_JAR=/path/to/opsin-cli-2.9.0-jar-with-dependencies.jar` | use this OPSIN jar |
-| `ORTHONYM_CENTRES_JAR=/path/to/centres-cli-1.2.1.jar` | use this centres jar |
-| `ORTHONYM_JAR_DIR=/path/to/dir` | where downloaded jars are kept (default: your user cache) |
-
-Licences and sources of the third-party components are listed in [`NOTICE`](NOTICE).
+More in [How every name is checked](guide/checking.md) and [Declines](guide/declines.md).
 
 ## Output tiers
 
-The default returns a name only when the strict PIN path built it and verified it, or when the name
-is one of the few exceptions: a name from the exact-match lists, a name format absent from OPSIN's
-grammar, a PIN spelling that OPSIN reads back through its twin spelling, a poly-anhydride name
-whose acids OPSIN reads back, or a PIN whose stereodescriptors OPSIN cannot read. With `--trivial` it also returns a retained trivial name,
-labelled `systematic_verified`. Otherwise it declines. This rule applies to the default
-`--style pin`. Wider tiers are opt-in with `--emit-tier`:
+By default Orthonym returns only the Preferred IUPAC Name (PIN), verified, or no name. Wider tiers
+are opt-in with `--emit-tier` (keyword switches of `Orthonym` in Python) and label every name
+they return.
 
 | `--emit-tier` | Returns |
 |:--|:--|
-| `pin` *(default)* | a name only when the strict PIN path built it and verified it, or a name from the exact-match lists, a name format absent from OPSIN's grammar, a PIN spelling that OPSIN reads back through its twin spelling, a poly-anhydride name whose acids OPSIN reads back or a PIN whose stereodescriptors OPSIN cannot read (with `--trivial`, also a retained trivial name); otherwise nothing (`NO_VERIFIED_PIN`) |
-| `valid` | also general names that OPSIN reads back to your structure |
+| `pin` *(default)* | the verified PIN (with a few listed exceptions), or no name |
+| `valid` | also other systematic names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
-| `best-effort` | also the names of the last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 15 rings (the other tiers build these names for ring systems of up to 40 skeletal atoms and 8 rings), and adducts with a one-atom ion such as chloride, and, for a monocycle whose two stereocentres each carry one ligand and one hydrogen atom, the `cis` or `trans` name (`trans-cyclohexane-1,4-diol`) in place of a name with lowercase `r` and `s`, which OPSIN cannot read, and, for a molecule that has no other name, the name the default tier ships although OPSIN cannot read its stereodescriptors, with the label of the default tier (`pin_unverified`) |
+| `best-effort` | also the last-resort names, such as von Baeyer and spiro names for ring systems of up to 15 rings |
+| `full-coverage` | also coordination names for metal tetrapyrrole and corrin complexes |
 
-At `valid`, `complete` and `best-effort` every name must pass a full-InChIKey OPSIN round trip (a
-name from the natural-product and metal-complex lists, the twin-checked names below and, at
-`best-effort`, the default tier's own name for a molecule that has no other name when OPSIN cannot read its
-stereodescriptors excepted), so the other name formats absent from
-OPSIN's grammar, which the default tier ships without a full read-back, are not shipped there, and
-a wider tier can, rarely, decline a molecule that a narrower tier names. A PIN spelling that the
-default tier ships through its twin is named there in a form OPSIN reads
-(`1,4-dihydro-1,4-epithionaphthalene` for `1,4-dihydro-1,4-sulfanonaphthalene`), and so is a
-poly-anhydride (`1,4-bis(acetyloxy)-1,4-dioxobutane` for `diacetic butanedioic dianhydride`). A
-name for which the engine has no other spelling (a halogen `-uide` anion, the anion of a thioperoxol, an
-organometallic name with halido ligands) ships there through its twin, with the same labels. A neutral
-thioperoxol is named there in the form OPSIN reads (`(hydroxysulfanyl)methane` for `methane-SO-thioperoxol`);
-its PIN spelling ships through its twin there only for a molecule for which the engine builds no such name.
+`--provenance` labels each name: `pin_verified` (the PIN, verified), `pin_unverified` (PIN form,
+preferred status not certified), `systematic_verified` (a correct name that is not the PIN),
+`best_effort` (a last-resort name) or `abstain` (no name). Metal compounds are admitted one metal
+at a time. The exceptions, the labels and the metals are in [Output tiers](guide/tiers.md).
 
-Whatever the tier, `--provenance` (one SMILES at a time) says what each name is: `pin_verified`
-(the strict PIN path built it and verified it, or OPSIN read back a twin spelling of it or the
-acids a poly-anhydride name cites),
-`pin_unverified` (a name in PIN form whose preferred status is not certified),
-`systematic_verified` (a correct systematic name that is not the PIN, for example from the general
-engine, from a table of retained names, a strict-path name with a part the engine records as not
-the preferred form, a natural-product name of a molecule whose bridged fused PIN the engine does
-not build yet, a natural-product parent name from the exact-match list (the recommendations
-identify no preferred names for natural products), a name reached through another drawing of the same compound, or a name of a class for which the Blue Book gives no PIN, such as Group 1-12
-organometallic compounds), `best_effort` (a last-resort producer's
-name, or one that no round trip confirmed) or `abstain` (no name). The tier says how a name was
-built.
-The `verified` field says how it was checked: `opsin` (OPSIN read the whole name back to your
-structure), `opsin_constitution` (OPSIN read it back without its stereodescriptors, and each
-descriptor was checked against its CIP label), `identity` (a name from an exact-match list: a
-metal-complex name found by your structure's exact InChIKey, or a natural-product parent name found
-by its exact structure; OPSIN cannot read these names), `opsin_split` (OPSIN read the name back
-to your structure drawn without its dative bonds, because RDKit gives a drawing with dative bonds no
-standard InChIKey to read a name back against; a count of atoms and charges ties the two drawings),
-`opsin_twin` (a PIN spelling OPSIN has no grammar for, read back through its twin spelling: the same
-structure in a spelling OPSIN reads), `opsin_acids` (a poly-anhydride name OPSIN has no grammar
-for: OPSIN read each acid the name cites, and the anhydride built from those acids is your
-structure) or `unverified`.
+## Documentation
 
-When Orthonym cannot name a molecule, the plain call returns the empty string and logs the reason
-(a limit code and a label) on the `orthonym` logger; the command line prints an empty name and the
-reason on the error stream. `on_failure="label"` (`--on-failure label`) returns the label instead, such
-as `inorganic compound (not supported)`, and `--provenance` marks the row `abstain` with a reason
-code. [More on declines](guide/declines.md).
-
-### Metal compounds
-
-Orthonym names a compound of a metal when OPSIN reads the name back to your structure. Zinc is
-admitted to every naming mechanism, and the tiers differ in how much of it they name.
-
-- `best-effort` names the widest range: a salt, the atom with its ions and isotopes, an
-  organozinc compound, a complex drawn with bonds to zinc or with dative bonds, a porphyrin or
-  phthalocyanine complex, and the adducts of zinc (the ammine, the aqua ion, a complex with a
-  neutral ligand such as pyridine, a porphyrin drawn beside a zinc ion). A compound of these
-  kinds can still be left unnamed.
-- `valid` names a salt, the atom with its ions and isotopes, most compounds drawn with bonds to
-  zinc or with dative bonds (`zinc diacetate` for the dative drawing of the acetate), the zinc
-  porphyrin complexes, and an organozinc compound whose organyl groups are hydrocarbon groups
-  (`diethylzinc`, `phenylzinc chloride`). It does not name the adducts: the ammine, the aqua ion,
-  a complex with a neutral ligand, a zincate anion drawn alone, a free porphyrin beside a zinc
-  ion. It does not name a phthalocyanine complex or an organozinc compound with a halogen or an
-  ester on its organyl group either. Those names come at `best-effort` only.
-
-A standard InChIKey does not record the bonds between a metal and its ligands, so the round
-trip cannot tell two drawings of one compound apart. Zinc chloride drawn with two zinc-chlorine
-bonds is named `zinc dichloride`, the name of its ionic drawing, after a separate count has
-confirmed that the two drawings hold the same atoms and differ in charge only by the charge that
-the broken bonds move. The name is `systematic_verified`, and the `spelling_failures` entry of
-`--provenance` says that it describes another drawing of the same compound. A drawing with dative
-bonds has no standard InChIKey in RDKit; its name is read back to the same drawing without the
-dative bonds, and `verified` is `opsin_split`.
-
-The default tier names a zinc salt drawn as ions when the strict PIN path builds a name that
-carries a PIN label: a salt of an acid, an alcohol or a thiol, or a carbon-free salt
-(`zinc diacetate`, `zinc dichloride`). It declines the zinc names that carry no PIN label:
-organozinc compounds, drawings with bonds to zinc, the atom and its ions, salts of carbanions,
-ammines and complexes.
-
-Other metals are admitted one at a time. A compound of a metal that is not admitted is named
-where the general producers can name it (`copper(II) sulfate`) and is otherwise declined, usually
-with `UNSUPPORTED_ELEMENT`.
-
-## More
-
-- [How it works](guide/how-it-works.md): the four parts of the engine and the source layout.
-- [Declines](guide/declines.md): what a "no" looks like, and how to tell one from a name in code.
-- [How accuracy is measured](guide/accuracy.md): the three measures the engine is judged by.
-- [Contributing](CONTRIBUTING.md): development install, tests, source layout, how to add a compound class.
-- [orthonym-skills](https://github.com/Kohulan/orthonym-skills): the Claude Code skills, hooks and agent Orthonym was built with.
-- [Changelog](CHANGELOG.md) · [Security](SECURITY.md) · [Code of conduct](CODE_OF_CONDUCT.md) ·
-  [Open an issue](https://github.com/Steinbeck-Lab/Orthonym/issues/new/choose)
+- [Docs site](https://steinbeck-lab.github.io/Orthonym/): install, use, tiers, provenance, reference.
+- [How it works](guide/how-it-works.md) · [How accuracy is measured](guide/accuracy.md) ·
+  [Contributing](CONTRIBUTING.md) · [Changelog](CHANGELOG.md) · [Security](SECURITY.md) ·
+  [Code of conduct](CODE_OF_CONDUCT.md)
+- Found a wrong name? [Open an issue](https://github.com/Steinbeck-Lab/Orthonym/issues/new/choose).
 
 ## How Orthonym was built
 
-Orthonym was built with [Claude Code](https://docs.claude.com/en/docs/claude-code), under a fixed
-set of working rules. The rules are published as
-[**orthonym-skills**](https://github.com/Kohulan/orthonym-skills), part of the Orthonym project:
-20 skills, 2 hooks and 1 agent. Each one makes a step rest on a measurement instead of a confident
-guess:
-
-- Measure on fixed, hashed test sets before and after each change
-  (`run-eval`, `cluster-failures`, `refusal-census`).
-- Prove that the code to change is on the execution path before editing it
-  (`spy-site`, `check-target`).
-- Change an expected value in a test only with a primary source, an independent check and a
-  mutation test (`change-asserted-value`, `verify-source`).
-- Run the regression gate before a merge (`run-gate`), and get a review from a second model
-  before a claim ships (`fable-review`).
-- Hand the work from one session to the next through a written note (`handoff`, `kickoff`).
-
-The skills were written for Orthonym and then made general, so that other chemistry and machine
-learning software projects can use them.
+Orthonym was built with [Claude Code](https://docs.claude.com/en/docs/claude-code) under a fixed
+set of working rules, published as [**orthonym-skills**](https://github.com/Kohulan/orthonym-skills)
+(20 skills, 2 hooks, 1 agent). Each rule makes a step rest on a measurement instead of a guess: fixed
+test sets before and after each change, proof that the code to change is on the execution path, a
+primary source before an expected value in a test changes, a regression gate before every merge,
+and a written handoff between sessions.
 
 ## How to cite
 
