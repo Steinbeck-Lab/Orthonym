@@ -8074,19 +8074,20 @@ def name_substituent_fragment(
 
     Only a call whose side effects a hit can repeat is stored: it charged no unit of
     the perf, analysis or work budget, the only provenance variable it wrote is the
-    name-scoped non-PIN record, and it read no provenance
-    (``metrics.provenance.PROVENANCE_READ``). A hit records each distinct fragment
-    the stored call recorded, once, in the order of its first record (the stored record
-    holds each fragment once, see the end of this function), and returns the stored value. The
-    repeat of such a call returns the same value: its nested namings are hits in
-    caches whose entries never change once written (the fragment cache is consulted
-    before the cycle and depth guards, and a miss there charges a work unit), so it
-    takes the same path. It records the same fragments or a subset (a nested memo
-    hit skips the records its computation made); either way they only re-add
-    fragments the stored call already added, because within one naming the record
-    only grows (the one exception, the NP-parent probe's ``restore_provenance``, can
-    at most leave a hit's name labelled non-PIN where the repeat would not). Any
-    other call is recomputed on every ask, as before. The key is
+    name-scoped non-PIN record, it read no provenance (``metrics.provenance.PROVENANCE_READ``;
+    ``record_derived_non_pin_fragment`` reads the record only to decide what it records, and is
+    logged as a call) and its compacted log holds at most ``NON_PIN_LOG_CAP`` items. A hit makes
+    the stored record calls again, in order (``metrics.provenance.replay_non_pin_log``), and
+    returns the stored value. The repeat of such a call returns the same value: its nested namings
+    are hits in caches whose entries never change once written (the fragment cache is consulted
+    before the cycle and depth guards, and a miss there charges a work unit), so it takes the same
+    path. It makes the same record calls or a subset (a nested memo hit skips the records its
+    computation made): a plain record only re-adds a fragment the stored call added, because within one
+    naming the record only grows, and a derived call decides again on the record it finds. Where the
+    record does not only grow (the NP-parent probe's ``restore_provenance``, a ``clear_provenance``
+    inside a shared scope) or the repeat skips a derived call that finds a fragment only now (inside a
+    runtime fragment-cache hit), the hit can at most leave its name labelled non-PIN where the repeat
+    would not. Any other call is recomputed on every ask, as before. The key is
     :func:`_nsf_memo_key`; an RWMol (mutable) is never memoised.
     """
     from . import memo as _memo
@@ -8103,8 +8104,7 @@ def name_substituent_fragment(
     if _memo._MODE == "on":
         hit = cache.get(ck)
         if hit is not None and hit[0] is mol:
-            for fragment in hit[2]:
-                _pv.record_non_pin_fragment(fragment)
+            _pv.replay_non_pin_log(hit[2])
             return hit[1]
     before = _nsf_budget_state()
     _pv.push_touched_log()
@@ -8114,18 +8114,18 @@ def name_substituent_fragment(
     finally:
         records = _pv.pop_non_pin_log()
         touched = _pv.pop_touched_log()
-    if (touched <= _NSF_REPLAYABLE and _nsf_budget_state() == before
-            and not any(r is _pv.PROVENANCE_READ for r in records)):
+    stored = (_pv.compact_non_pin_log(records)
+              if touched <= _NSF_REPLAYABLE and _nsf_budget_state() == before else None)
+    if stored is not None:
         prev = cache.get(ck)
         if (_memo._MODE == "verify" and prev is not None and prev[0] is mol
                 and prev[1] != value):
             _memo._VERIFY_MISMATCHES.append((_NSF_MEMO_NS, key))
             raise _memo.MemoMismatch(_NSF_MEMO_NS, key, prev[1], value)
-        # Each distinct fragment once, in order of first call: a hit replays the stored calls into every
-        # enclosing log, so a log that kept repeats doubled with each level of nested hits (2**24 replays
-        # for a 24-level branched peptide), while the record only adds a fragment not yet in it: the
-        # replay of the distinct fragments leaves the same record as the replay of every call.
-        cache[ck] = (mol, value, tuple(dict.fromkeys(records)))
+        # The compacted log (``compact_non_pin_log``): a hit replays the stored calls into every enclosing
+        # log, so a log that kept repeats doubled with each level of nested hits (2**24 replays for a
+        # 24-level branched peptide), while the replay of the compacted log leaves the same record.
+        cache[ck] = (mol, value, stored)
     return value
 
 

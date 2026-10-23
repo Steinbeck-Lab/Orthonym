@@ -336,11 +336,18 @@ def pop_touched_log() -> set:
 # ChEBI speed 2: a scope-bound log of the ``record_non_pin_fragment`` CALLS a
 # memoised substituent-fragment naming made (every call, also one whose fragment
 # was already recorded), so a memo hit can make the same calls again. A read of
-# the recorded fragments (``get_provenance``, ``name_carries_non_pin_part``,
-# ``record_derived_non_pin_fragment``) appends ``PROVENANCE_READ`` instead: a call
-# whose path read provenance is not memoised. A STACK of lists, like _TOUCHED.
+# the recorded fragments (``get_provenance``, ``name_carries_non_pin_part``)
+# appends ``PROVENANCE_READ`` instead: a call whose path read provenance is not
+# memoised. ``record_derived_non_pin_fragment`` reads the record only to decide
+# whether it records the derived form, and nothing it returns depends on that, so
+# it appends the typed item ``('D', source, derived)``: a hit makes the call again
+# and the record decides again. A STACK of lists, like _TOUCHED.
 _NON_PIN_LOG = contextvars.ContextVar("orthonym_prov_non_pin_log", default=None)
 PROVENANCE_READ = object()
+# The most items a stored log that holds a derived call may have after ``compact_non_pin_log``: a bound
+# on what a hit replays and on what a memo entry holds. A log of plain records only is not bounded, as
+# before. It decides only whether the call is stored, never a name.
+NON_PIN_LOG_CAP = 256
 
 
 def _log_non_pin(item) -> None:
@@ -683,6 +690,11 @@ def record_non_pin_fragment(fragment: str) -> None:
     if not fragment:
         return
     _log_non_pin(fragment)
+    _add_non_pin_fragment(fragment)
+
+
+def _add_non_pin_fragment(fragment: str) -> None:
+    """The write of:func:`record_non_pin_fragment`, without the log item."""
     cur = _NON_PIN_FRAGMENTS.get()
     if fragment not in cur:
         _NON_PIN_FRAGMENTS.set(cur + (fragment,))
@@ -759,16 +771,80 @@ def record_derived_uncertified_pin_name(source: str, derived: str) -> None:
         record_uncertified_pin_name(derived)
 
 
-def record_derived_non_pin_fragment(source: str, derived: str) -> None:
+def record_derived_non_pin_fragment(source: str, derived: str, _item=None) -> None:
     """Record ``derived`` as a non-PIN fragment when ``source`` contains a recorded one:
     a form built from a non-PIN name by a string conversion (an acid name turned into
     its acyl prefix) keeps the source's status, since the recorded substring does not
-    survive the conversion."""
+    survive the conversion.
+
+    The call is logged as it was made (``('D', source, derived)``), and the record it makes when it
+    fires is not: a replay of the call decides again against the record of the replay, where a replay
+    of the record would add ``derived`` also when the record holds no fragment of ``source``. A replay
+    passes the stored item as ``_item``, so the logs share it."""
     if not source or not derived:
         return
-    _log_non_pin(PROVENANCE_READ)
+    _log_non_pin(_item if _item is not None else ('D', source, derived))
     if any(f in source for f in _NON_PIN_FRAGMENTS.get()):
-        record_non_pin_fragment(derived)
+        _add_non_pin_fragment(derived)
+
+
+def compact_non_pin_log(items, cap: Optional[int] = None) -> Optional[tuple]:
+    """The record-call log ``items`` of a call, as an equivalent tuple with the no-op repeats removed: its replay
+    (:func:`replay_non_pin_log`) leaves any record as the replay of ``items`` leaves it; None when the
+    call read provenance (``PROVENANCE_READ``) or the result holds a derived call and more than ``cap``
+    items (``NON_PIN_LOG_CAP``; a log of plain items is stored whatever its length, as it always was).
+    The record only grows under a replay, so an item is left out when it changes nothing after the items
+    kept before it:
+
+    * a fragment recorded before (``record_non_pin_fragment`` adds it whatever the record holds);
+    * a derived call whose ``derived`` is such a fragment (it adds that or nothing);
+    * a repeat of a derived call, unless a kept item since its last kept occurrence adds a fragment
+      that is a substring of its ``source``: with none, the record holds a fragment of ``source`` at
+      the repeat only if it held one at the earlier call, which then added ``derived`` already.
+      Dropping every repeat would lose the ``derived`` of a call that found no fragment of ``source``
+      the first time and finds one that a later item recorded.
+
+    Each kept item is tested once against each derived call, and a log with a derived call stops at the
+    cap, so the cost is bounded by the square of the cap."""
+    limit = NON_PIN_LOG_CAP if cap is None else cap
+    kept: list = []
+    recorded: set = set()    # the fragments a kept plain item adds
+    checked: dict = {}       # (source, derived) -> the number of kept items up to its last kept call
+    derived_calls = False
+    for item in items:
+        if item is PROVENANCE_READ:
+            return None
+        if isinstance(item, str):
+            if item in recorded:
+                continue
+            recorded.add(item)
+        else:
+            _tag, source, derived = item
+            if derived in recorded:
+                continue
+            key = (source, derived)
+            seen = checked.get(key)
+            if seen is not None and not any(
+                    (other if isinstance(other, str) else other[2]) in source for other in kept[seen:]):
+                checked[key] = len(kept)
+                continue
+            checked[key] = len(kept) + 1
+            derived_calls = True
+        kept.append(item)
+        if derived_calls and len(kept) > limit:
+            return None
+    return tuple(kept)
+
+
+def replay_non_pin_log(items) -> None:
+    """Make the record calls of a stored log again, in order, into every armed log: a plain item
+    through:func:`record_non_pin_fragment`, a derived call through
+    :func:`record_derived_non_pin_fragment`."""
+    for item in items:
+        if isinstance(item, str):
+            record_non_pin_fragment(item)
+        else:
+            record_derived_non_pin_fragment(item[1], item[2], item)
 
 
 def name_carries_non_pin_part(prov: dict, name: Optional[str], *,
