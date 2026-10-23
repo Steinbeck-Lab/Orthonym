@@ -734,7 +734,9 @@ def _same_tautomer_as_radical(mol, name: str) -> bool:
     from ...validation.opsin_roundtrip import _find_opsin_jar
     from ...validation.protonation_identity import tautomer_verdict
     from ...validation.twin_spellings import opsin_spelling
-    jar = _find_opsin_jar("2.9.0")
+    # A read-back by the in-process OPSIN, which serves only the jar its JVM started with: the OPSIN
+    # in use (ORTHONYM_OPSIN), not a pinned version.
+    jar = _find_opsin_jar()
     text, served = opsin_stdout(opsin_spelling(name, radical=True), True, jar) if jar else (None, False)
     smiles = (text or "").strip()
     parsed = Chem.MolFromSmiles(smiles) if served and smiles else None

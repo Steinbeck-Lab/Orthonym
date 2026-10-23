@@ -504,7 +504,9 @@ def _radical_name_round_trips(mol, name: str) -> bool:
         from ..jvm_bridge import opsin_stdout
         from ..validation.opsin_roundtrip import _find_opsin_jar
         from ..validation.radical_identity import radical_identity_verdict
-        jar = _find_opsin_jar("2.9.0")
+        # A read-back by the in-process OPSIN, which serves only the jar its JVM started with: the OPSIN
+        # in use (ORTHONYM_OPSIN), not a pinned version.
+        jar = _find_opsin_jar()
         if not jar:
             return False
         txt, served = opsin_stdout(name, allow_radicals=True, jar_path=jar)
@@ -540,7 +542,8 @@ def _radical_identity_round_trips(mol, name: str) -> bool:
     try:
         from ..jvm_bridge import opsin_stdout
         from ..validation.opsin_roundtrip import _find_opsin_jar
-        jar = _find_opsin_jar("2.9.0")
+        # The OPSIN in use, as in ``_radical_name_round_trips`` above (a read-back, not a pinned version).
+        jar = _find_opsin_jar()
         if not jar:
             return False
         txt, served = opsin_stdout(name, allow_radicals=True, jar_path=jar)

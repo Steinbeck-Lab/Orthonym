@@ -31,7 +31,7 @@ def _canon(smi):
 
 
 def _independent_parse(name: str, smiles=None):
-    """OPSIN 2.9.0's SMILES for ``name`` (``-osmi``), from a FRESH call that does not
+    """The SMILES that the OPSIN in use gives ``name`` (``-osmi``), from a FRESH call that does not
     go through the engine: not its validity oracle, not its per-scope or process-wide
     name memo. The in-process JVM serves it when it can (``_opsin_stdout_uncached``, the
     un-memoised entry point, byte-identical to the CLI); otherwise a ``java -jar``
@@ -51,7 +51,7 @@ def _independent_parse(name: str, smiles=None):
     from orthonym.validation.read_back_policy import smiles_has_radical_electrons
     if not name:
         return None
-    jar = _find_opsin_jar("2.9.0")
+    jar = _find_opsin_jar()
     if not jar:
         return None
     allow_radicals = smiles is None or smiles_has_radical_electrons(smiles)

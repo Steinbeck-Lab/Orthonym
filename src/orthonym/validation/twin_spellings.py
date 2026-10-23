@@ -250,7 +250,10 @@ def _opsin_reads(name: str, radical: bool) -> bool:
         return _validity_gate_name_to_smiles(name) is not None
     from ..jvm_bridge import opsin_stdout
     from .opsin_roundtrip import _find_opsin_jar
-    jar = _find_opsin_jar("2.9.0")
+    # Like the plain branch above (the validity gate), this asks the OPSIN in use (ORTHONYM_OPSIN) whether it
+    # reads ``name``: the twin is the spelling for an OPSIN that does not, and the in-process OPSIN serves
+    # only the jar its JVM started with.
+    jar = _find_opsin_jar()
     text, served = opsin_stdout(name, True, jar) if jar else (None, False)
     return bool(served and (text or "").strip())
 

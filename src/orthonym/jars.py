@@ -14,6 +14,12 @@ Resolution order for each jar:
    ``~/.cache/orthonym``), if the file there has the pinned checksum.
 3. A download into the jar directory, unless ``ORTHONYM_NO_DOWNLOAD=1``.
 
+``ORTHONYM_OPSIN=main`` (or ``main@<commit>``) is an opt-in to OPSIN's main branch: instead of
+the release jar, step 2 and 3 give a jar built from that commit with the local JDK and cached
+in the jar directory (``opsin_build``). Everything that asks for the OPSIN jar gets that one jar,
+so one OPSIN serves a whole process. ``ORTHONYM_OPSIN_JAR`` still wins over it, and with the
+variable unset or ``2.9.0`` nothing of the opt-in runs.
+
 A jar that cannot be found is an error (:class:`JarUnavailable`): naming
 without it would silently change names (no OPSIN check, a different CIP
 labeller). ``ORTHONYM_ALLOW_REDUCED=1`` opts in to that reduced mode, in which
@@ -74,6 +80,11 @@ class JarUnavailable(RuntimeError):
     Deliberately NOT an ``OrthonymLimitError``: ``Orthonym.name`` turns those
     into 'unknown organic compound', and a missing jar must stop the run.
     """
+
+
+class OpsinChoiceError(JarUnavailable):
+    """``ORTHONYM_OPSIN`` holds a value that is none of 2.9.0, main or main@<commit>. Always an error:
+    reduced mode (``ORTHONYM_ALLOW_REDUCED=1``) is for a jar that cannot be found, not for a mistyped choice."""
 
 
 def _truthy(value: Optional[str]) -> bool:
@@ -201,6 +212,51 @@ _CACHE: Dict[str, object] = {}
 _CACHE_LOCK = threading.Lock()
 
 
+def _opsin_build():
+    """The module that builds a main-branch jar. Imported when the opt-in is used, never at
+    import: the install hook loads this file by path, before the package is installed."""
+    import importlib
+    return importlib.import_module("orthonym.opsin_build")
+
+
+def opsin_choice() -> Optional[str]:
+    """The git ref of OPSIN's main branch that ``ORTHONYM_OPSIN`` asks for; ``None`` for the
+    release jar (the variable unset, empty or ``2.9.0``).
+
+    Raises:class:`OpsinChoiceError` (a:class:`JarUnavailable`) for any other value."""
+    if os.environ.get("ORTHONYM_OPSIN", "").strip() in ("", "2.9.0"):
+        return None
+    opsin_build = _opsin_build()
+    try:
+        return opsin_build.parse_choice(os.environ.get("ORTHONYM_OPSIN"))
+    except opsin_build.OpsinBuildError as exc:
+        raise OpsinChoiceError(str(exc)) from exc
+
+
+#: path of a jar built from OPSIN's main branch -> the commit it was built from
+_BUILT_COMMITS: Dict[str, str] = {}
+
+
+def _resolve_built_opsin(spec: JarSpec, ref: str, download: bool, explicit: bool = False) -> str:
+    """The jar of OPSIN ``ref`` (built and checked on first use), or:class:`JarUnavailable`.
+
+    The release jar is resolved first: it supplies the libraries of the build. A failed fetch,
+    build or self-test is an error here, never a fall back to the release jar. ``explicit``: the
+    user asked for the build (``--fetch-jars``), so ``ORTHONYM_NO_DOWNLOAD`` does not apply."""
+    opsin_build = _opsin_build()
+    release = _resolve_release(spec, download)
+    allowed = download and (explicit or not _truthy(os.environ.get("ORTHONYM_NO_DOWNLOAD")))
+    try:  # ensure_jar locks (inside its private directory) only to build; the release jar's _DirLock is separate
+        built = opsin_build.ensure_jar(ref, jar_dir(), Path(release), allowed)
+    except opsin_build.OpsinBuildError as exc:
+        raise JarUnavailable(f"ORTHONYM_OPSIN={os.environ.get('ORTHONYM_OPSIN')}: {exc}") from exc
+    except Exception as exc:  # network, permissions, disk, a JDK that does not start
+        raise JarUnavailable(f"ORTHONYM_OPSIN={os.environ.get('ORTHONYM_OPSIN')}: could not build OPSIN "
+                             f"({type(exc).__name__}: {exc}); unset ORTHONYM_OPSIN to use the release jar") from exc
+    _BUILT_COMMITS[str(built.path)] = built.commit
+    return str(built.path)
+
+
 def _resolve(spec: JarSpec, download: bool) -> str:
     override = os.environ.get(spec.env_var)
     if override:
@@ -208,6 +264,15 @@ def _resolve(spec: JarSpec, download: bool) -> str:
         if not p.is_file():
             raise JarUnavailable(f"{spec.env_var}={override} is not a file")
         return str(p.resolve())
+    if spec.kind == "opsin":
+        ref = opsin_choice()
+        if ref is not None:
+            return _resolve_built_opsin(spec, ref, download)
+    return _resolve_release(spec, download)
+
+
+def _resolve_release(spec: JarSpec, download: bool) -> str:
+    """The pinned, checksummed release jar of ``spec``: in the jar directory, else downloaded."""
     target = jar_dir() / spec.filename
     if _verified(target, spec):
         return str(target)
@@ -224,19 +289,36 @@ def _resolve(spec: JarSpec, download: bool) -> str:
     return str(target)
 
 
+def _cache_key(kind: str, download: bool) -> str:
+    """Key of a resolved outcome. For OPSIN the choice is part of the key: the command line sets
+    ``ORTHONYM_OPSIN`` after the package was imported (and may have looked for a jar), and an
+    outcome found under another choice must not be reused."""
+    key = f"{kind}:{int(download)}"
+    if kind == "opsin":
+        key += f":{os.environ.get('ORTHONYM_OPSIN', '').strip()}:{os.environ.get(JARS[kind].env_var, '')}"
+    return key
+
+
 def find_jar(kind: str, version: Optional[str] = None, download: bool = True) -> Optional[str]:
     """Absolute path to the pinned ``kind`` jar ('opsin' or 'centres').
 
     A ``version`` other than the pinned one returns ``None`` (only pinned,
     checksummed jars are ever used). The outcome -- a path or a failure -- is
-    resolved once per process and then reused, so a run never switches mode
-    half-way. On failure: raises:class:`JarUnavailable`, or returns ``None``
-    when ``ORTHONYM_ALLOW_REDUCED=1``.
+    resolved once for the settings in force and then reused. For OPSIN the settings
+    ``ORTHONYM_OPSIN`` and ``ORTHONYM_OPSIN_JAR`` are part of what the outcome is kept
+    for (the command line sets ``ORTHONYM_OPSIN`` after the package was imported), so
+    a process that changes them gets a new outcome; the in-process JVM takes its jar
+    once, so choose before the first name. On failure: raises:class:`JarUnavailable`,
+    or returns ``None`` when ``ORTHONYM_ALLOW_REDUCED=1``; a malformed ``ORTHONYM_OPSIN``
+    (:class:`OpsinChoiceError`) is always raised.
+
+    With ``ORTHONYM_OPSIN`` set, ``find_jar("opsin")`` is the jar built from OPSIN's
+    main branch, for a caller that names the pinned version too.
     """
     spec = JARS[kind]
     if version is not None and version != spec.version:
         return None
-    key = f"{kind}:{int(download)}"
+    key = _cache_key(kind, download)
     with _CACHE_LOCK:
         if key not in _CACHE:
             try:
@@ -245,10 +327,25 @@ def find_jar(kind: str, version: Optional[str] = None, download: bool = True) ->
                 _CACHE[key] = exc
         outcome = _CACHE[key]
     if isinstance(outcome, JarUnavailable):
-        if allow_reduced():
+        if allow_reduced() and not isinstance(outcome, OpsinChoiceError):
             return None
         raise outcome
     return outcome  # type: ignore[return-value]
+
+
+def active_opsin(download: bool = True) -> Dict[str, Optional[str]]:
+    """Which OPSIN this process uses: ``label`` (``"2.9.0"``, ``"main"`` or ``"custom"``, a jar
+    given by ``ORTHONYM_OPSIN_JAR``), the ``commit`` it was built from (``None`` unless
+    ``"main"``) and its ``path`` (``None`` in reduced mode).
+
+    Resolves the jar like:func:`find_jar`, so it can raise:class:`JarUnavailable`."""
+    path = find_jar("opsin", download=download)
+    if path is None:
+        return {"label": "2.9.0", "commit": None, "path": None}
+    commit = _BUILT_COMMITS.get(path)
+    if commit is not None:
+        return {"label": "main", "commit": commit, "path": path}
+    return {"label": "custom" if os.environ.get(JARS["opsin"].env_var) else "2.9.0", "commit": None, "path": path}
 
 
 def require_all() -> None:
@@ -286,7 +383,28 @@ def fetch_all(verbose: bool = True) -> Dict[str, str]:
     return paths
 
 
+def fetch_opsin_choice(verbose: bool = True) -> Optional[str]:
+    """Build (if needed) and check the jar that ``ORTHONYM_OPSIN`` asks for, ahead of use.
+
+    Like:func:`fetch_all` it ignores ``ORTHONYM_NO_DOWNLOAD`` and reduced mode: this is the
+    explicit request. Returns the jar's path, or ``None`` when the release jar is in use (the
+    variable unset or ``2.9.0``, or a jar given by ``ORTHONYM_OPSIN_JAR``, which wins). Raises
+    :class:`JarUnavailable` on failure."""
+    if os.environ.get(JARS["opsin"].env_var):
+        return None
+    ref = opsin_choice()
+    if ref is None:
+        return None
+    with _CACHE_LOCK:
+        path = _resolve_built_opsin(JARS["opsin"], ref, True, explicit=True)
+        _CACHE[_cache_key("opsin", True)] = path
+    if verbose:
+        print(f"[orthonym] opsin main {_BUILT_COMMITS[path][:12]}: {path}", file=sys.stderr)
+    return path
+
+
 def _reset_cache() -> None:
     """Forget resolved outcomes (tests, and after an explicit fetch)."""
     with _CACHE_LOCK:
         _CACHE.clear()
+        _BUILT_COMMITS.clear()

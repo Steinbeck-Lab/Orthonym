@@ -157,7 +157,9 @@ stands for all versions and resolves to the newest one.
 Orthonym stands on the IUPAC 2013 recommendations and on open cheminformatics software:
 [RDKit](https://www.rdkit.org/) reads the structure, [OPSIN 2.9.0](https://github.com/dan2097/opsin)
 reads the names back to check them, and [centres 1.2.1](https://github.com/SiMolecule/centres)
-assigns the CIP descriptors. Without them there would be no Orthonym.
+assigns the CIP descriptors. Without them there would be no Orthonym. `orthonym --opsin main` reads
+the names back with OPSIN's main branch instead, built on your machine with a JDK
+([Install](guide/start/install.md#choosing-the-opsin-version)).
 
 > Favre, H. A.; Powell, W. H. *Nomenclature of Organic Chemistry: IUPAC Recommendations and
 > Preferred Names 2013*. Royal Society of Chemistry, **2013**.

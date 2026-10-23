@@ -113,6 +113,7 @@ markers = [
     "roundtrip: Round-trip validation with OPSIN",
     "slow: Nightly-run tests: the full validation suite (100k+ compounds) and single cases that take 20 s or more; the PR run skips them (-m \"not slow\")",
     "benchmark: Performance benchmark tests (pytest-benchmark)",
+    "network: needs GitHub and a JDK (run with ORTHONYM_NETWORK_TESTS=1)",
 ]
 addopts = "-v --tb=short"
 

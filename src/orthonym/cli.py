@@ -10,14 +10,108 @@ Usage:
 import argparse
 import functools
 import logging
+import os
 import sys
-from typing import List
+from typing import List, Optional
 
 from . import __version__, name_compound
 from .errors import LIMIT_CATALOG, OrthonymLimitError, is_failure_name
 from .failure_mode import DEFAULT_MODE as DEFAULT_ON_FAILURE
 from .failure_mode import MODES as ON_FAILURE_MODES
 from .rdkit_log import rdkit_logs_off, rdkit_logs_on
+
+_VERSION_HELP = ("Print the version, in the form 'orthonym X.Y.Z', and stop. When --opsin or ORTHONYM_OPSIN "
+                 "selects OPSIN's main branch, a second line names the OPSIN build.")
+
+
+def _opsin_choice_arg(value: str) -> str:
+    """``--opsin`` value: 2.9.0, main or main@<commit>."""
+    from orthonym.opsin_build import OpsinBuildError, parse_choice
+    try:
+        parse_choice(value)
+    except OpsinBuildError:
+        raise argparse.ArgumentTypeError(f"{value!r} is not one of 2.9.0, main or main@<commit>") from None
+    return value.strip()
+
+
+def _add_opsin_option(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--opsin",
+        type=_opsin_choice_arg,
+        metavar="{2.9.0,main,main@COMMIT}",
+        default=None,
+        help=(
+            "Which OPSIN reads every name back. 2.9.0 (the default) is the release "
+            "jar. main is the newest commit of OPSIN's main branch, which Orthonym "
+            "builds with your JDK on first use (about a minute, needs a JDK and "
+            "GitHub) and keeps in the jar directory. main@COMMIT is that one "
+            "commit of OPSIN's main branch (GitHub is asked once, when it is built, "
+            "whether the commit is on that branch), for a repeatable run. The same "
+            "as the environment variable "
+            "ORTHONYM_OPSIN. OPSIN 2.9.0 stays the default; a jar given by "
+            "ORTHONYM_OPSIN_JAR wins over this option. With --fetch-jars, a "
+            "main-branch OPSIN is built now instead of at first use."
+        ),
+    )
+
+
+def _opsin_option_applied(parsed: argparse.Namespace) -> bool:
+    """Make ``--opsin`` the choice of this process, before anything resolves a jar; True when
+    ``--version`` was asked for and has been printed."""
+    if parsed.opsin is not None:
+        os.environ["ORTHONYM_OPSIN"] = parsed.opsin
+    if parsed.version:
+        print(_version_text())
+    return parsed.version
+
+
+def _jars_ready(parsed: argparse.Namespace) -> Optional[int]:
+    """Fetch the jars (``--fetch-jars``, which also builds a main-branch OPSIN that was asked
+    for) or check that they are there. The exit status when the run ends here, else None."""
+    from orthonym.jars import (
+        JarUnavailable,
+        OpsinChoiceError,
+        fetch_all,
+        fetch_opsin_choice,
+        require_all,
+    )
+    if parsed.fetch_jars:
+        try:
+            fetch_all(verbose=True)
+            fetch_opsin_choice(verbose=True)
+        except JarUnavailable as exc:
+            print(f"orthonym: {exc}", file=sys.stderr)
+            return 1
+        return 0
+    try:
+        require_all()
+    except JarUnavailable as exc:
+        hint = "" if isinstance(exc, OpsinChoiceError) else (
+            "\northonym: to name without the jars (no OPSIN check, RDKit stereo labels), "
+            "set ORTHONYM_ALLOW_REDUCED=1")
+        print(f"orthonym: {exc}{hint}", file=sys.stderr)
+        return 2
+    return None
+
+
+def _version_text() -> str:
+    """``orthonym X.Y.Z``; with a main-branch OPSIN selected, a second line says which build.
+
+    Offline and cheap: it looks for the build in the jar directory and never builds or downloads."""
+    text = f"orthonym {__version__}"
+    from orthonym import jars
+    try:
+        if jars.opsin_choice() is None:
+            return text
+    except jars.JarUnavailable as exc:
+        return f"{text}\nOPSIN: {exc}"
+    try:
+        info = jars.active_opsin(download=False)
+    except jars.JarUnavailable:
+        return f"{text}\nOPSIN {os.environ.get('ORTHONYM_OPSIN', '').strip()} (not built yet; " \
+               f"`orthonym --fetch-jars` builds it)"
+    commit = f" {info['commit'][:12]}" if info["commit"] else ""
+    return f"{text}\nOPSIN {info['label']}{commit}"
 
 
 def _emit_tier_flags(emit_tier: str) -> dict:
@@ -228,8 +322,8 @@ def main(args: List[str] = None) -> int:
 
     parser.add_argument(
         "--version", "-V",
-        action="version",
-        version=f"%(prog)s {__version__}"
+        action="store_true",
+        help=_VERSION_HELP
     )
 
     parser.add_argument(
@@ -428,6 +522,7 @@ def main(args: List[str] = None) -> int:
             "the checksum check."
         ),
     )
+    _add_opsin_option(parser)
     parser.add_argument(
         "--binding-proof",
         dest="binding_proof",
@@ -444,27 +539,18 @@ def main(args: List[str] = None) -> int:
 
     parsed = parser.parse_args(args)
 
+    if _opsin_option_applied(parsed):
+        return 0
+
     # Nothing to name: the help needs no jars, so print it before the jar check (which
     # downloads a missing jar and makes a first call without arguments slow).
     if not parsed.smiles and not parsed.batch and not parsed.fetch_jars:
         parser.print_help()
         return 1
 
-    from orthonym.jars import JarUnavailable, fetch_all, require_all
-    if parsed.fetch_jars:
-        try:
-            fetch_all(verbose=True)
-        except JarUnavailable as exc:
-            print(f"orthonym: {exc}", file=sys.stderr)
-            return 1
-        return 0
-    try:
-        require_all()
-    except JarUnavailable as exc:
-        print(f"orthonym: {exc}\n"
-              "orthonym: to name without the jars (no OPSIN check, RDKit stereo labels), "
-              "set ORTHONYM_ALLOW_REDUCED=1", file=sys.stderr)
-        return 2
+    status = _jars_ready(parsed)
+    if status is not None:
+        return status
 
     # Batch processing mode
     if parsed.batch:

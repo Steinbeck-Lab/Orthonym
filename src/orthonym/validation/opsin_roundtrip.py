@@ -23,16 +23,18 @@ from ..jvm_bridge import REJECTED, opsin_extended_smiles  # Lever A: module-leve
 PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 
 
-def _find_opsin_jar(version: str = "2.9.0") -> Optional[str]:
-    """Find OPSIN JAR file for the specified version.
+def _find_opsin_jar(version: Optional[str] = None) -> Optional[str]:
+    """Find the OPSIN JAR file in use, or the one of the specified version.
 
     Args:
-        version: OPSIN version string (e.g., "2.9.0", "2.8.0").
+        version: OPSIN version string (e.g., "2.9.0", "2.8.0"); None for the OPSIN in use.
 
     Returns:
         Path to the pinned, checksummed jar (see ``orthonym.jars``); None for a
-        version other than the pinned one, or in opt-in reduced mode. Raises
-        ``orthonym.jars.JarUnavailable`` when the pinned jar is missing.
+        version other than the pinned one, or in opt-in reduced mode. With ``ORTHONYM_OPSIN``
+        set it is the jar built from OPSIN's main branch, for ``None`` and for the pinned
+        version alike: one OPSIN serves a process. Raises ``orthonym.jars.JarUnavailable``
+        when the jar is missing.
     """
     from ..jars import find_jar
     return find_jar("opsin", version)

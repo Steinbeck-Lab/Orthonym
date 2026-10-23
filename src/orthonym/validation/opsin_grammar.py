@@ -129,7 +129,10 @@ def _read_regex_tokens_xml() -> bytes:
     """regexTokens.xml bytes: the OPSIN source checkout if present, else the vendored copy.
 
     The vendored copy (data/opsin_imports/regex_tokens_xml.json, OPSIN 2.9.0, MIT) is
-    byte-identical to the jar entry, so importing this module never needs the jar.
+    byte-identical to the jar entry, so importing this module never needs the jar. With
+    ``ORTHONYM_OPSIN`` set the OPSIN in use is a newer one, and the tokens stay those of 2.9.0:
+    they only propose repairs for a name that fails the round trip, and a name the OPSIN in
+    use reads never reaches them.
     """
     if _REGEX_TOKENS_PATH.exists():
         return _REGEX_TOKENS_PATH.read_bytes()
@@ -240,7 +243,7 @@ def _check_jar_version_drift() -> None:
     """
     try:
         from ..jars import find_jar  # local import — see boundary
-        jar = find_jar("opsin", OPSIN_GRAMMAR_VERSION, download=False)  # never downloads at import
+        jar = find_jar("opsin", download=False)  # never downloads at import; the OPSIN in use
         if jar is None:
             logger.warning(
                 "OPSIN JAR version %s not found at project root; "

@@ -47,6 +47,35 @@ A missing jar is downloaded: when `pip` builds the package, on first use (unless
 | `ORTHONYM_CENTRES_JAR=/path/to/centres-cli-1.2.1.jar` | use this centres jar |
 | `ORTHONYM_JAR_DIR=/path/to/dir` | keep the downloaded jars here (the default is your user cache, `~/.cache/orthonym/jars`) |
 
+## Choosing the OPSIN version
+
+Orthonym reads every name back with OPSIN 2.9.0, the pinned release jar. You can use OPSIN's main branch instead, which reads some name forms that 2.9.0 does not (phane names, for example):
+
+```console
+$ orthonym --opsin main "CCO"
+ethanol
+$ ORTHONYM_OPSIN=main orthonym "CCO"       # the same, set in the environment
+$ orthonym --opsin main --fetch-jars       # build it before the first use
+```
+
+| Value | OPSIN |
+|:--|:--|
+| `2.9.0` (also: nothing set) | the release jar. This is the default. |
+| `main` | the newest commit of OPSIN's main branch |
+| `main@<commit>` | that one commit of OPSIN's main branch (a full or an abbreviated hash), for a run you want to repeat |
+
+The first use of a commit builds a jar on your machine: Orthonym fetches the source of that commit from GitHub, compiles it with `javac` against the libraries of the 2.9.0 jar, checks the result by reading three names, and keeps it in the subdirectory `opsin-main` of the jar directory as `opsin-main-<first 12 characters of the commit>.jar`, next to a `.json` file that says how it was built. The build usually takes under a minute. Later runs use that jar and need neither GitHub nor a JDK. `main` asks GitHub for the newest commit at most once a day; when GitHub cannot be reached, it uses the last commit it knows. The same commit, the same JDK and the same 2.9.0 jar always give the same jar.
+
+What to know before you choose `main`:
+
+- It needs a JDK (`javac`, version 11 or newer), not only a Java runtime, for the build.
+- The jar directory must be private to your user. A jar from it runs with your rights, so Orthonym creates `opsin-main` with mode 700 and uses a built jar only when `opsin-main`, the jar and its `.json` file are real files of yours that group and others cannot write, and the SHA-256 in the `.json` file is the jar's. Anything else stops Orthonym with an error that names the path, or counts as not built.
+- A commit named with `main@<commit>` must be on OPSIN's main branch: before it is built, Orthonym asks GitHub whether the commit is in the history of that branch (the source archive service also serves commits that exist only in forks), and it refuses when GitHub cannot say. A commit that is already built is used without asking.
+- One OPSIN serves the whole run, so choose it before the first name. A jar you give with `ORTHONYM_OPSIN_JAR` wins over this setting.
+- A build that fails (no JDK, no GitHub, a commit that does not compile, a jar that fails its check) stops Orthonym with an error that names the cause. Orthonym does not fall back to 2.9.0 in that case; unset `ORTHONYM_OPSIN` or use `--opsin 2.9.0` to get the release jar. With `ORTHONYM_ALLOW_REDUCED=1` a jar that cannot be built is handled like a missing jar: Orthonym names without OPSIN. A value that is none of `2.9.0`, `main` and `main@<commit>` is always an error, also then.
+- With `ORTHONYM_NO_DOWNLOAD=1`, a commit that is not built yet is not built when Orthonym names a structure; `orthonym --opsin main --fetch-jars` is the explicit request and still builds.
+- `orthonym --opsin main --version` adds a second line with the build in use.
+
 ## On a machine with no internet
 
 1. On a machine with internet, run `orthonym --fetch-jars` and copy the two files it prints.

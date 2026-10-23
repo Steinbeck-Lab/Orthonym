@@ -63,7 +63,10 @@ NameTree: cyclohexanol  (class_id=general_acyclic, cite=P-14+P-23+P-44)
 These are for looking inside the engine. None of them changes a name, except `--binding-proof enforce`, which can decline one.
 
 `--fetch-jars`
-: Download the OPSIN and centres jars if they are missing, check them, print where they are, and stop. See [Install](../start/install.md).
+: Download the OPSIN and centres jars if they are missing, check them, print where they are, and stop. With `--opsin main`, also build that OPSIN. See [Install](../start/install.md).
+
+`--opsin {2.9.0,main,main@COMMIT}`
+: Which OPSIN reads every name back: `2.9.0`, the release jar (the default), `main`, the newest commit of OPSIN's main branch, or `main@COMMIT`, one commit. A main-branch OPSIN is built with your JDK on first use and kept in the jar directory. `ORTHONYM_OPSIN` sets the same; a jar given by `ORTHONYM_OPSIN_JAR` wins over both. See [Choosing the OPSIN version](../start/install.md#choosing-the-opsin-version).
 
 `--validation-stats`
 : After the name, print on the error stream how often the OPSIN grammar pre-check passed or repaired a candidate name.
@@ -78,8 +81,8 @@ These are for looking inside the engine. None of them changes a name, except `--
 : An extra check that every part of a general-engine name still maps onto its atoms in the final name. `audit` records the result and never changes the name; `enforce` also declines when the check fails.
 
 `--version`, `-V`
-: Print the installed version, in the form `orthonym X.Y.Z`.
+: Print the installed version, in the form `orthonym X.Y.Z`. When `--opsin` or `ORTHONYM_OPSIN` selects OPSIN's main branch, a second line, `OPSIN main <commit>`, names the build.
 
 ## Exit status
 
-`0` when the name was printed, when an empty name or a label was printed for a decline (`--on-failure empty` and `label`), for `--help` and `--version`, and when `--fetch-jars` succeeded. `1` for a SMILES that RDKit cannot read, a batch with at least one such line, a decline with `--on-failure raise`, a call with neither a SMILES nor `--batch` (the help is printed), or a `--fetch-jars` that could not fetch or check a jar. `2` when a jar can be neither found nor downloaded; this is checked before the input is read, except with `--fetch-jars`.
+`0` when the name was printed, when an empty name or a label was printed for a decline (`--on-failure empty` and `label`), for `--help` and `--version`, and when `--fetch-jars` succeeded. `1` for a SMILES that RDKit cannot read, a batch with at least one such line, a decline with `--on-failure raise`, a call with neither a SMILES nor `--batch` (the help is printed), or a `--fetch-jars` that could not fetch, build or check a jar. `2` when a jar can be neither found nor downloaded; this is checked before the input is read, except with `--fetch-jars`.
