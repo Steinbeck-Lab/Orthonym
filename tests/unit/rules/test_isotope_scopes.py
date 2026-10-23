@@ -252,7 +252,10 @@ def test_model_records_the_atoms_of_each_position():
      [("3,4,5-tris(acetyloxy)", ("3-(acetyloxy)-4-(acetyloxy)-5-(acetyloxy)",))]),
     ("N,N-di([1,1'-biphenyl]-4-yl)-5-x",
      [("N,N-di([1,1'-biphenyl]-4-yl)", ("N-([1,1'-biphenyl]-4-yl)-N-([1,1'-biphenyl]-4-yl)",))]),
-    ("2-(dimethylamino)ethyl", [("dimethyl", ("methylmethyl", "(methyl)(methyl)"))]),
+    # (heading '', the Blue Book): "The second and further substituents are each
+    # enclosed with parentheses even for simple substituents"; a copy with a descriptor includes a locant and is
+    # enclosed too, so the enclosed spelling is the first and the bare one the second
+    ("2-(dimethylamino)ethyl", [("dimethyl", ("(methyl)(methyl)", "methylmethyl"))]),
     ("4,11,18-tri-tert-butyl-22-methyl",
      [("4,11,18-tri-tert-butyl", ("4-tert-butyl-11-tert-butyl-18-tert-butyl",))]),
     ("2,3-dihydro-1H-indene", []),            # hydro is not a prefix of a group

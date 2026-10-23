@@ -15,6 +15,8 @@ indices via GetSubstructMatch.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import itertools
 import logging
 import re
@@ -127,12 +129,36 @@ BEST_EFFORT_MAX_CAGE_RINGS = 15
 BEST_EFFORT_MAX_UNION_RINGS = 11
 
 
+#: True inside ``pin_ceilings_scope``: the analyses take the PIN ceilings at every tier.
+_PIN_CEILINGS_ONLY: "contextvars.ContextVar[bool]" = contextvars.ContextVar(
+    "orthonym_pin_ceilings_only", default=False)
+
+
+@contextlib.contextmanager
+def pin_ceilings_scope():
+    """Within the body every von Baeyer analysis takes the PIN-tier ceilings
+    (``MAX_CAGE_ATOMS`` / ``MAX_CAGE_RINGS``), whatever the tier of the request.
+
+    The degraded run of a part whose analysis under the best-effort ceilings ran
+    its hang budgets out: a ring system beyond the PIN ceilings is refused at once,
+    as before the best-effort ceilings existed, and another producer names the part
+    (``assembly.budget_rescue.pin_ceiling_name``, a component of an adduct or an ion of a salt)."""
+    token = _PIN_CEILINGS_ONLY.set(True)
+    try:
+        yield
+    finally:
+        _PIN_CEILINGS_ONLY.reset(token)
+
+
 def cage_caps() -> Tuple[int, int]:
     """``(atoms, rings)`` ceilings for the tier of the running request: the
     best-effort values in a best-effort request
     (``provenance.best_effort_request_ctx``), else ``MAX_CAGE_ATOMS`` /
     ``MAX_CAGE_RINGS`` -- in a PIN or complete request, on every path, the
-    best-effort recoveries such a request runs included, and outside a request."""
+    best-effort recoveries such a request runs included, and outside a request.
+    Always the PIN values inside ``pin_ceilings_scope``."""
+    if _PIN_CEILINGS_ONLY.get():
+        return MAX_CAGE_ATOMS, MAX_CAGE_RINGS
     try:
         from ..metrics.provenance import best_effort_request_ctx
         if best_effort_request_ctx.get() is True:

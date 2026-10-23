@@ -33,6 +33,7 @@ from ..assembly.naming_utils import (
     prefix_citation_sort_key,
     should_omit_locant_one,
 )
+from .benzene_prefix_forms import hydroxy_is_principal, pnictogen_oxoacid_prefix
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
 from ..perception.molcache import atoms_of, inchikey_of
@@ -259,6 +260,7 @@ def benzene_prefix_suffix_promotion(
     prefix_names,
     detected_fgs=None,
     has_amine_candidates: bool = False,
+    principal_group: Optional[str] = None,
 ) -> Tuple[Optional[str], frozenset]:
     """THE single authority on which detachable prefix becomes the ring suffix.
 
@@ -284,6 +286,12 @@ def benzene_prefix_suffix_promotion(
         detected_fgs: ``features.functional_groups``, for the functional-class guard.
         has_amine_candidates: whether any ring amine carries the
             ``amine_candidate`` payload ``_identify_nitrogen_group`` sets.
+        principal_group: the molecule's principal group (``features.principal_group``). Where
+            it is a hydroxy group the ring -OH is the suffix whatever suffix groups the ring
+            also holds: they are demoted to prefixes 'SENIORITY ORDER FOR CLASSES',
+            the Blue Book: 'Anions' are senior to 'Acids', so the carboxy group of
+            '2-carboxyphenolate' is a prefix of the anion's parent); where it is a group that
+            is a junior one ('thiol') that already holds the suffix slot it stays the suffix.
 
     Returns:
         ``(promoted_suffix, promoted_prefix_names)``. ``(None, frozenset)`` when
@@ -296,6 +304,13 @@ def benzene_prefix_suffix_promotion(
 
     suffix_names = set(suffix_names or ())
     prefix_names = set(prefix_names or ())
+
+    from .seniority import get_suffix
+    _own = get_suffix(principal_group, is_ring=True) if principal_group else None
+    if _own == 'ol' and 'hydroxy' in prefix_names:
+        return 'ol', frozenset({'hydroxy'})
+    if _own in _OL_JUNIOR_SUFFIXES and _own in suffix_names:
+        return _own, frozenset()       # a junior principal group already holds the suffix slot
 
     #: the guard is "no suffix SENIOR to -ol", not "no suffix at all" -- a
     # junior -thiol holding the slot is demoted to `sulfanyl` instead of blocking.
@@ -521,13 +536,17 @@ def get_benzene_ring(mol) -> Optional[Tuple[int, ...]]:
     return None
 
 
-def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List[Dict]]:
+def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...],
+                             principal_group: Optional[str] = None) -> Dict[int, List[Dict]]:
     """
     Find substituents attached to each benzene carbon.
 
     Args:
         mol: RDKit Mol object
         ring_atoms: Tuple of atom indices in the benzene ring
+        principal_group: the molecule's principal group; where it is a hydroxy or thiol group
+            a ketone or an ester of the ring is a prefix ('4-acetylphenol'), see
+            ``benzene_prefix_forms.hydroxy_is_principal``
 
     Returns:
         Dict mapping ring atom index to list of substituent info dicts.
@@ -551,7 +570,7 @@ def get_benzene_substituents(mol, ring_atoms: Tuple[int, ...]) -> Dict[int, List
                 continue
 
             # Identify the substituent
-            sub_info = _identify_substituent(mol, nbr_idx, ring_set)
+            sub_info = _identify_substituent(mol, nbr_idx, ring_set, principal_group)
             if sub_info:
                 substituents[ring_idx].append(sub_info)
             else:
@@ -1372,7 +1391,7 @@ def _chalcogen_linked_carbon_substituent(
     return {'name': enclosed, 'atoms': sub_atoms, 'is_complex': enclosed != name}
 
 
-def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional[Dict]:
+def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int], principal_group=None) -> Optional[Dict]:
     """
     Identify a substituent starting from an atom attached to the ring.
 
@@ -1525,7 +1544,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         # -As(=O)(OH)) is cited as the acyl prefix ('hydroxyarsoryl'),
         # not the trivalent 'arsanyl' — which would drop the =E'. Fail-closed; a
         # plain trivalent As/Sb (no =E') falls through to the arsanyl namer.
-        acyl_prefix = name_acyl_prefix_substituent(mol, sub_atoms, start_idx)
+        acyl_prefix = name_acyl_prefix_substituent(mol, sub_atoms, start_idx) or pnictogen_oxoacid_prefix(mol, sub_atoms, start_idx)
         if acyl_prefix:
             return {'name': acyl_prefix, 'atoms': sub_atoms}
         as_name = name_arsanyl_substituent(mol, sub_atoms, start_idx)
@@ -1554,7 +1573,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         # dimethyl phthalate); fail-closed via get_alkoxycarbonyl_prefix
         # (aryl/branched/hetero R -> None -> fall through unchanged).
         ester_prefix = _identify_ester_as_alkoxycarbonyl(
-            mol, start_idx, ring_atoms)
+            mol, start_idx, ring_atoms, principal_group)
         if ester_prefix is not None:
             return ester_prefix
 
@@ -1571,7 +1590,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
         # class) the gate is False and the chain-parent ketone PIN
         # (1-phenylethan-1-one) keeps ownership. Fail-closed: branched/
         # unsaturated/hetero acyls return None -> unnameable sentinel.
-        if _ring_bears_senior_suffix(mol, ring_atoms, start_idx):
+        if _ring_bears_senior_suffix(mol, ring_atoms, start_idx, principal_group):
             acyl_result = _identify_acyl_group(mol, start_idx, ring_atoms)
             if acyl_result:
                 return acyl_result
@@ -1646,19 +1665,23 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int]) -> Optional
 
 
 def _ring_bears_senior_suffix(
-    mol, ring_atoms: Set[int], exclude_branch_start: int
+    mol, ring_atoms: Set[int], exclude_branch_start: int, principal_group: Optional[str] = None
 ) -> bool:
     """True iff ANOTHER exocyclic branch of this ring is a suffix-forming FG
-    (carboxylic acid / carboxamide / carbonitrile / sulfonic acid ... — every
-    record `_identify_suffix_fg_on_benzene` emits is senior to ketone, P-41).
-    Gates the Wave2 T5c acyl-prefix demotion so a lone aryl ketone (the PCG
+    (carboxylic acid / carboxamide / carbonitrile / sulfonic acid... — every
+    record `_identify_suffix_fg_on_benzene` emits is senior to ketone,.
+    Gates the Wave2 acyl-prefix demotion so a lone aryl ketone (the PCG
     case, acetophenone class) never routes here.
 
     Scoped to C-ATTACHED suffix branches (carboxylic acid / carboxamide /
-    carbonitrile / carbaldehyde ...): the S-suffix assembly currently drops
+    carbonitrile / carbaldehyde...): the S-suffix assembly currently drops
     ring locants when combined with an acyl prefix ('acetylbenzenesulfonic
     acid', wrong constitution), so acetyl+sulfonic stays on its HEAD path
-    (fail-closed) until that assembly is fixed — documented deferral."""
+    (fail-closed) until that assembly is fixed — documented deferral.
+
+    Also True where the principal group is a hydroxy or thiol group (``benzene_prefix_forms.hydroxy_is_principal``)."""
+    if hydroxy_is_principal(principal_group):
+        return True
     for ra in ring_atoms:
         for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
             ni = nbr.GetIdx()
@@ -1675,7 +1698,7 @@ def _ring_bears_senior_suffix(
 
 
 def _ring_bears_acid_suffix(
-    mol, ring_atoms: Set[int], exclude_branch_start: int
+    mol, ring_atoms: Set[int], exclude_branch_start: int, principal_group: Optional[str] = None
 ) -> bool:
     """True iff ANOTHER exocyclic branch of this ring is a suffix-forming FG
     of the ACID class (carboxylic / sulfonic / sulfinic / phosphonic /
@@ -1690,7 +1713,10 @@ def _ring_bears_acid_suffix(
     SENIOR to amides (11), nitriles (12) and aldehydes (13) — it only demotes
     to a prefix when a class-7 ACID (:18170) owns the parent word ("an acid is
     senior to an ester",:36540). So the ester-demotion gate must see an acid
-    specifically, not merely any suffix."""
+    specifically, not merely any suffix. Also True where the principal group is a hydroxy
+    or thiol group (``benzene_prefix_forms.hydroxy_is_principal``)."""
+    if hydroxy_is_principal(principal_group):
+        return True
     for ra in ring_atoms:
         for nbr in mol.GetAtomWithIdx(ra).GetNeighbors():
             ni = nbr.GetIdx()
@@ -1708,7 +1734,7 @@ def _ring_bears_acid_suffix(
 
 
 def _identify_ester_as_alkoxycarbonyl(
-    mol, start_idx: int, ring_atoms: Set[int]
+    mol, start_idx: int, ring_atoms: Set[int], principal_group: Optional[str] = None
 ) -> Optional[Dict]:
     """Recognize a ring-attached ester branch -C(=O)-O-R and, when a senior
     ACID owns the ring's suffix word, return its alkoxycarbonyl PREFIX
@@ -1767,7 +1793,7 @@ def _identify_ester_as_alkoxycarbonyl(
 
     # gate: an ester demotes to a prefix ONLY when a senior ACID owns the
     # parent suffix word (see _ring_bears_acid_suffix docstring).
-    if not _ring_bears_acid_suffix(mol, ring_atoms, start_idx):
+    if not _ring_bears_acid_suffix(mol, ring_atoms, start_idx, principal_group):
         return None
 
     from ..assembly.naming_utils import needs_brackets
@@ -3638,7 +3664,7 @@ def principal_group_ring_atoms(
     # are now ONE decision instead of two that merely happened to agree for hydroxy.
     promoted_suffix, promoted_prefixes = benzene_prefix_suffix_promotion(
         set(suffix_atoms), set(prefix_atoms), detected_fgs,
-        has_amine_candidates=bool(amine_candidate_atoms),
+        has_amine_candidates=bool(amine_candidate_atoms), principal_group=principal_group,
     )
     if promoted_suffix != pg_ring_suffix:
         return legacy
@@ -3987,6 +4013,7 @@ def name_substituted_benzene(
     substituents: Dict[int, List[Dict]],
     detected_fgs: Optional[Dict] = None,
     assembly_label: bool = True,
+    principal_group: Optional[str] = None,
 ) -> str:
     """The name of ``_name_substituted_benzene``, recorded as a label-only non-PIN name
     when a group of the ring says that the benzene parent may not be the PIN
@@ -3997,7 +4024,7 @@ def name_substituted_benzene(
     flag (``record_general_ring_prefix``) for the names that later composers rewrite from it
     (ester, salt, anion), whose text no longer contains it."""
     name = _name_substituted_benzene(
-        mol, ring_atoms, oriented_ring, substituents, detected_fgs)
+        mol, ring_atoms, oriented_ring, substituents, detected_fgs, principal_group)
     if name and any(isinstance(s, dict) and s.get('parent_may_not_be_pin')
                     for subs in substituents.values() for s in subs):
         from ..metrics.provenance import (
@@ -4036,7 +4063,7 @@ def _name_substituted_benzene(
     ring_atoms: Tuple[int, ...],
     oriented_ring: List[int],
     substituents: Dict[int, List[Dict]],
-    detected_fgs: Optional[Dict] = None,
+    detected_fgs: Optional[Dict] = None, principal_group: Optional[str] = None,
 ) -> str:
     """
     Generate systematic name for substituted benzene.
@@ -4145,7 +4172,7 @@ def _name_substituted_benzene(
     # `internal notes`.
     _promoted_suffix, _promoted_prefixes = benzene_prefix_suffix_promotion(
         set(suffix_groups), set(prefix_groups), detected_fgs,
-        has_amine_candidates=bool(amine_candidates),
+        has_amine_candidates=bool(amine_candidates), principal_group=principal_group,
     )
     # ⚠ The guard is "no suffix SENIOR to -ol", not "no suffix at all".
     # Phase C tranche C REGRESSION, caught by an A/B against HEAD before shipping:
@@ -4222,7 +4249,7 @@ def _name_substituted_benzene(
     if suffix_groups:
         name = _assemble_benzene_with_suffix(
             mol, suffix_groups, prefix_groups, n_substituents_map,
-            atom_to_locant, oriented_ring, demoted_prefix_overrides,
+            atom_to_locant, oriented_ring, demoted_prefix_overrides, principal_suffix=_promoted_suffix,
             # Phase C tranche B: the licence is evaluated PER SCOPE, and a
             # stereodescriptor in this scope is an essential locant that restores every
             # other one, the Blue Book). The suffix assembler could not see them.
@@ -4358,6 +4385,7 @@ def _assemble_benzene_with_suffix(
     oriented_ring: List[int],
     demoted_prefix_overrides: Optional[Dict[str, str]] = None,
     stereo_descriptors: Optional[List] = None,
+    principal_suffix: Optional[str] = None,
 ) -> str:
     """
     Assemble benzene name with suffix functional groups.
@@ -4380,9 +4408,10 @@ def _assemble_benzene_with_suffix(
     Returns:
         IUPAC name string with suffix FG
     """
-    # Pick highest-priority suffix
+    # Pick highest-priority suffix (``principal_suffix``, the suffix the promotion of the
+    # molecule's principal group made, first: a hydroxy principal group over the acids)
     chosen_suffix = None
-    for sfx in _SUFFIX_PRIORITY:
+    for sfx in (principal_suffix, *_SUFFIX_PRIORITY):
         if sfx in suffix_groups:
             chosen_suffix = sfx
             break

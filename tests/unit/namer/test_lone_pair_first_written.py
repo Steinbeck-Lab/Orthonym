@@ -129,25 +129,34 @@ def test_an_input_rdkit_reads_the_standard_way_is_unchanged():
             assert spelled == REFERENCE["S"]
         else:
             assert spelled is spelling
-    # RDKit's CIP labels of its reading equal CDK's labels of the string as written --
-    # RDKit reads these the standard way (the P rows of test_prefix_order_fallback.py
-    # and the N-first aziridine of test_lone_pair_configuration.py, whose names are
-    # limited by RDKit's canonical SMILES, not by its reading): unchanged.
-    for smiles in ("C[C@H](O)CC", "CCO", "C[S@@](=O)c1ccccc1",
-                   "C1(=CC=CC=C1)N1[P@@](N2CCC[C@H]2C1)OC(C)C",
-                   "C1(=CC=CC=C1)N1[P@](N2CCC[C@H]2C1)OC(C)C",
-                   "[N@@]1(Cc2cc(-c3cccc4c3OC(F)(F)O4)ccc2F)[C@@H](C(OC)=O)C1"):
+    # RDKit's CIP labels of its reading equal CDK's labels of the string as written, and CDK reads
+    # RDKit's canonical SMILES of it the same way: unchanged.
+    for smiles in ("C[C@H](O)CC", "CCO", "C[S@@](=O)c1ccccc1"):
         if "@" in smiles:
             assert _rdkit_cip(smiles) == _centres(smiles), smiles
         assert namer._lone_pair_standard_spelling(smiles) is smiles
-    # RDKit misreads the ring-closure P / N of these rows, but its canonical SMILES of
-    # the inverted reading repeats the misreading, so CDK does not read it as the input
-    # and the input is kept; the engine's CIP labels (CDK's, of RDKit's canonical SMILES)
-    # are the standard reading's there already.
+    # RDKit misreads the ring-closure P / N of these rows, and its canonical SMILES of the reading
+    # repeats the misreading, so CDK reads that string as the input: the engine's labels are the
+    # standard reading's already, and the input is kept.
     for smiles in ("CO[P@@]1OC[C@H](C)O1", "CC(C)O[P@]1N(c2ccccc2)C[C@@H]2CCCN21",
                    "COC(=O)[C@H]1C[N@]1Cc1cc(-c2cccc3c2OC(F)(F)O3)ccc1F"):
         assert _rdkit_cip(smiles) != _centres(smiles), smiles
         assert namer._lone_pair_standard_spelling(smiles) is smiles
+
+
+def test_an_input_rdkit_reads_alike_but_writes_otherwise_is_spelled_the_standard_way():
+    # RDKit reads these the standard way (the P rows of test_prefix_order_fallback.py and the N-first
+    # aziridine of test_lone_pair_configuration.py), but the canonical SMILES it writes for the reading
+    # puts a ring-closure digit at the centre and CDK reads that string the other way, so the engine's
+    # label (CDK's, of RDKit's canonical SMILES) would be the other configuration. The engine names the
+    # string with that centre inverted, whose canonical SMILES CDK reads as the input
+    # (test_lone_pair_canonical_spelling.py names them).
+    for smiles in ("C1(=CC=CC=C1)N1[P@@](N2CCC[C@H]2C1)OC(C)C",
+                   "C1(=CC=CC=C1)N1[P@](N2CCC[C@H]2C1)OC(C)C",
+                   "[N@@]1(Cc2cc(-c3cccc4c3OC(F)(F)O4)ccc2F)[C@@H](C(OC)=O)C1"):
+        assert _rdkit_cip(smiles) == _centres(smiles), smiles
+        spelled = namer._lone_pair_standard_spelling(smiles)
+        assert spelled != smiles
 
 
 def test_the_exit_check_reads_the_callers_string():

@@ -699,7 +699,8 @@ def _name_organic_ion_best_effort(ion_smiles: str, *,
             or allow_aromatic_general):
         return ''
     try:
-        from orthonym.assembly.fragment_naming import own_hang_budgets
+        from orthonym.assembly.budget_rescue import name_after_budget_trip
+        from orthonym.assembly.fragment_naming import PerfBudgetExceeded, own_hang_budgets
         from orthonym.namer import Orthonym
 
         # Each ion is a compound of its own and is named with the hang budgets of one
@@ -709,13 +710,23 @@ def _name_organic_ion_best_effort(ion_smiles: str, *,
         # three zinc cations and three phthalocyanine anions)., "Neutral salts
         # of acids are named by citing the name of the cation(s) followed by the name of
         # the anion", names each ion as a separate word.
-        with own_hang_budgets():
-            name = Orthonym(
-                style=style,
-                general_fallback=general_fallback,
-                general_fallback_unverified=general_fallback_unverified,
-                allow_aromatic_general=allow_aromatic_general,
-            ).name(ion_smiles)
+        ion_namer = Orthonym(
+            style=style,
+            general_fallback=general_fallback,
+            general_fallback_unverified=general_fallback_unverified,
+            allow_aromatic_general=allow_aromatic_general,
+        )
+        try:
+            with own_hang_budgets():
+                name = ion_namer.name(ion_smiles)
+        except PerfBudgetExceeded:
+            # A budget trip (a ``BaseException``) in one ion word is not the end of the salt: the
+            # ion is offered what a compound named alone is offered (the rescue, then one run
+            # under the PIN ceilings of the von Baeyer analyses, ``assembly.budget_rescue``).
+            # An ion neither offer names leaves the trip to unwind as it did.
+            name = name_after_budget_trip(ion_namer, ion_smiles)
+            if name is None:
+                raise
     except Exception:  # never hard-fail a name (matches adducts._name_component)
         return ''
     if not name or is_failure_name(name):

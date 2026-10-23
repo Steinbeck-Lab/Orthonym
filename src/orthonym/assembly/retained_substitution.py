@@ -67,6 +67,7 @@ from .naming_utils import (
     get_multiplier_prefix,
     is_complex_substituent,
 )
+from ..perception.lone_pair_reading import canonical_smiles_keeping_the_reading
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # Lazy import of SEED_TABLE / SubstitutionType inside function bodies (Pattern S3)
@@ -325,7 +326,9 @@ class OpsinOracle:
         return (smi or None), True
 
     def name_to_smiles(self, name: str) -> Optional[str]:
-        """Path C reverse-OPSIN helper. Returns canonical SMILES or None on failure.
+        """Path C reverse-OPSIN helper. Returns RDKit's canonical SMILES of OPSIN's structure, or None on
+        failure; a string with a lone-pair stereocentre is returned as OPSIN wrote it, not canonicalised
+        (``perception.lone_pair_reading.canonical_smiles_keeping_the_reading``).
 
         A DEFINITIVE result (a real SMILES, OPSIN's rejection, or a
         canonicalisation failure on OPSIN's output) is cached; a transient
@@ -354,8 +357,10 @@ class OpsinOracle:
             # None (definitive, cached) -> the validity gate suppresses the
             # candidate -> fail-closed. Behaviour-preserving for parseable output
             # (MolToSmiles default isomericSmiles=True == CanonSmiles useChiral=1).
-            parsed = Chem.MolFromSmiles(raw) if raw else None
-            canon = Chem.MolToSmiles(parsed) if parsed is not None else None
+            # A string with a lone-pair stereocentre is kept as OPSIN wrote it: RDKit's canonical SMILES
+            # of its reading of it can be read as the other configuration by CDK and OPSIN
+            # (perception.lone_pair_reading), and the round trips read the standard way.
+            canon = canonical_smiles_keeping_the_reading(raw)
         except Exception as exc:  # noqa: BLE001 - any RDKit failure on OPSIN output => no structure
             logger.debug("OpsinOracle.name_to_smiles canonicalisation failed for %r: %s", name, exc)
             canon = None

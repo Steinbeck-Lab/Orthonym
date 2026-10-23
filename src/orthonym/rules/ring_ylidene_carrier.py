@@ -41,8 +41,9 @@ def ring_on_chain_substituent_name(
         allow_mancude=allow_mancude, pos_out=pos_out)
 
 
-def _ring_ylidene_bonds(mol, frag_set, ring_atoms):
-    """The plain C=C bonds of the fragment between a ring carbon and a non-ring carbon."""
+def _ring_ylidene_bonds(mol, frag_set, ring_atoms, allow_stereo: bool = False):
+    """The C=C bonds of the fragment between a ring carbon and a non-ring carbon; the plain ones, or
+    with ``allow_stereo`` the ones that carry an E/Z flag too (see ``ring_ylidene_on_chain_substituent``)."""
     found = []
     for b in mol.GetBonds():
         i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
@@ -55,7 +56,7 @@ def _ring_ylidene_bonds(mol, frag_set, ring_atoms):
             ring_c, chain_c = chain_c, ring_c
         if (ring_c.GetSymbol() != 'C' or chain_c.GetSymbol() != 'C' or ring_c.GetIsAromatic()
                 or chain_c.GetIsAromatic() or chain_c.IsInRing() or b.GetIsAromatic()
-                or b.GetStereo() != Chem.BondStereo.STEREONONE):
+                or (b.GetStereo() != Chem.BondStereo.STEREONONE and not allow_stereo)):
             continue
         found.append((chain_c.GetIdx(), ring_c.GetIdx()))
     return found
@@ -93,7 +94,12 @@ def ring_ylidene_on_chain_substituent(
     (the carrier numbering, free valence 1) when the name cites a carrier locant."""
     if attach_idx not in frag_set or attach_idx in frag_ring_atoms:
         return None
-    ylidene = _ring_ylidene_bonds(mol, frag_set, set(frag_ring_atoms))
+    # The prefix names the ring and the carrier; the configuration of the ylidene bond is not part of it. At
+    # the strict tiers a bond with a stereo flag is left to the other producers, which compose the descriptor
+    # onto the whole name. At the wide tiers (``allow_mancude``) no other producer builds the branch, and the
+    # name composed from it is read back to the input's full InChIKey, which a missing or a wrong descriptor
+    # cannot pass: the same bar every other name of those tiers meets.
+    ylidene = _ring_ylidene_bonds(mol, frag_set, set(frag_ring_atoms), allow_stereo=allow_mancude)
     if len(ylidene) != 1:
         return None
     from .ring_substituents import (
@@ -147,6 +153,13 @@ def ring_ylidene_on_chain_substituent(
     alkyl = get_alkyl_name(len(path))
     if not alkyl:
         return None
+    if mol.GetBondBetweenAtoms(chain_c, ring_c).GetStereo() != Chem.BondStereo.STEREONONE:
+        # "Specification by stereodescriptors 'E' and 'Z'" (the Blue Book): the descriptor of
+        # this bond cited at the front of the ylidene group, '[(4E)-...-4-ylidene]methyl', is method (b); "Method (a)
+        # generates preferred IUPAC names". Such a name is valid and is not the PIN. The group closes with a square or
+        # curly mark when it holds the descriptor, with the round one of its own enclosure when it does not.
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(f"{ring_name}]")
     #: the ring-ylidene prefix is enclosed only when it is itself complex.
     inner = apply_enclosing_marks(ring_name, -1) if is_complex_substituent(ring_name) else ring_name
     if len(path) == 1:

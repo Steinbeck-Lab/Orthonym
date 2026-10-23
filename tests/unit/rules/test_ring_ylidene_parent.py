@@ -25,6 +25,7 @@ lowest locants: free valence, then 'ene'; the indicated-hydrogen form is the Blu
 '4H-thiopyran-4-ylidene (PIN)',, the Blue Book).
 """
 import pytest
+from rdkit import Chem
 
 from tests.support.pin_tiers import (
     assert_pin_at_both_tiers,
@@ -216,3 +217,61 @@ def test_two_drawings_of_the_guanidine_prefix_are_two_prefixes():
     ylidene_drawing = "NC(N)=NCCCC(=O)O"      # (H2N)2C=N-R, the Blue Book's drawing
     assert_pin_at_both_tiers(amidino_drawing, "4-(carbamimidoylamino)butanoic acid")
     assert_pin_at_both_tiers(ylidene_drawing, "4-[(diaminomethylidene)amino]butanoic acid")
+
+
+# A ring-ylidene double bond with an E/Z flag: the senior ring is the parent and the ring-ylidene prefix of the
+# other ring is built without the descriptor, which the whole name takes at the front of that prefix with the
+# locant of its ylidene atom ('[(4E)-...-4-ylidene]methyl'). Specification by stereodescriptors 'E'
+# and 'Z' (the Blue Book): method (b), "the stereodescriptor is cited at the front of the name of the
+# substituent group of the 'ylidene' type; the name of the corresponding prefix is then placed in enclosing
+# marks", is the general form and "Method (a) generates preferred IUPAC names" (the double bond as part of the
+# parent, which a bond inside a prefix is not): such a name is never labelled pin_verified. The wide tiers had no
+# producer for that prefix, so a molecule with such a bond and a p-block metal (no strict-path name) abstained.
+STEREO_RING_YLIDENE = [
+    ("C\\1COC2=C(/C1=C/C3=CN(C=N3)[Tl])C=C(C=C2)Br",
+     "4-{[(4E)-6-bromo-3,4-dihydro-2H-1-benzopyran-4-ylidene]methyl}-1-(1λ1-thallamethyl)-1H-imidazole"),
+    ("C1=CC=C2C(=C1)C=CC(=N2)/C=C\\3/C4=CC=CC=C4S(=O)(=O)N3[Al]",
+     "2-{[(9Z)-8-(1λ1-aluminamethyl)-7,7-dioxo-7λ6-thia-8-azabicyclo[4.3.0]nona-1,3,5-trien-9-ylidene]methyl}quinoline"),
+]
+
+
+@pytest.mark.parametrize("smiles,best_effort", STEREO_RING_YLIDENE)
+def test_stereo_flagged_ring_ylidene_branch_is_named_at_best_effort(smiles, best_effort):
+    b = name_breadth(smiles)
+    assert b["name"] == best_effort and b["tier"] != "pin_verified", b
+    assert name_is_rt_exact(best_effort, smiles)
+
+
+# method (b) is valid and is not the PIN: the label is below pin_unverified, the descriptor cited in the prefix
+LABELLED_BELOW_THE_PIN = [
+    ("CC1=N/C(=C\\C2=CC=C(N2)C)/C=C1", "2-methyl-5-{[(2Z)-5-methyl-2H-pyrrol-2-ylidene]methyl}-1H-pyrrole"),
+    ("C\\1COC2=C(/C1=C/C3=CN(C=N3)C)C=C(C=C2)Br",
+     "4-{[(4E)-6-bromo-3,4-dihydro-2H-1-benzopyran-4-ylidene]methyl}-1-methyl-1H-imidazole"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", LABELLED_BELOW_THE_PIN)
+def test_the_descriptor_in_the_ylidene_prefix_is_labelled_below_the_pin(smiles, expected):
+    b = name_breadth(smiles)
+    assert b["name"] == expected and b["tier"] == "systematic_verified", b
+    assert name_is_rt_exact(expected, smiles)
+
+
+# A cation drawn with the charge on one ring: that ring is the cation parent, the other a ylidene prefix that keeps
+# the configuration of its bond. The names of its two charge forms are both read back to the input's key, and the
+# other form (the charge on the other nitrogen) drops the (2Z): it is the name of a less specific compound.
+# (the Blue Book): the suffix 'ium' sits on the atom that carries the charge.
+CYANINE = "CN\\1C2=CC=CC=C2S/C1=C\\C3=CC=[N+](C)C4=CC=CC=C34"
+CYANINE_NAME = "1-methyl-4-{[(2Z)-3-methyl-2,3-dihydro-1,3-benzothiazol-2-ylidene]methyl}quinolin-1-ium"
+
+
+def test_the_cation_parent_is_the_ring_that_carries_the_drawn_charge():
+    from tests.support.rt_assert import _independent_parse
+    b = name_breadth(CYANINE)
+    assert b["name"] == CYANINE_NAME and b["tier"] == "systematic_verified", b
+    assert name_is_rt_exact(CYANINE_NAME, CYANINE)
+    mol = Chem.MolFromSmiles(_independent_parse(CYANINE_NAME, CYANINE))
+    nitrogen = next(a for a in mol.GetAtoms() if a.GetSymbol() == "N" and a.GetFormalCharge() == 1)
+    ring = min((r for r in mol.GetRingInfo().AtomRings() if nitrogen.GetIdx() in r), key=len)
+    assert all(mol.GetAtomWithIdx(i).GetSymbol() != "S" for i in ring)    # the quinoline ring, as drawn
+

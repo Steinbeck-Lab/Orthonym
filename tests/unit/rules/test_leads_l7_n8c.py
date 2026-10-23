@@ -234,15 +234,14 @@ class TestArsenicRowIsNotACauseOfThisCheck:
     2053a316d (item 42, 'an oxoacid with a substitutable hydrogen is a functional parent'),
     whose nitro exemption in rules.phosphorus._organyl_or_junior_prefix lets the charged
     router name the neutralised skeleton '(4-hydroxy-3-nitrophenyl)arsonous acid', a name
-    from which it cannot rebuild the phenolate. The class is wider than the row: every
-    anion whose neutral skeleton has an acid senior to the ionised group abstains at the
-    default tier ('4-carboxyphenolate' too). Held here until the router names the ion as
-    the principal group: anions are senior to acids)."""
+    from which it cannot rebuild the phenolate. The class was wider than the row: every
+    mono-anion of a hydroxy or thiol group whose neutral skeleton has a senior acid, amide,
+    nitrile, aldehyde or ketone abstained at the default tier ('4-carboxyphenolate' too). The
+    router now names the anion on its own group: anions are senior to acids;
+    ``charged_router.olate_with_senior_neutral_group``): a benzene ring, a chain, an aliphatic
+    ring and a heteroaromatic ring, with the members it does not build pinned as strict
+    expected failures in ``tests/unit/rules/test_olate_senior_neutral_group.py``."""
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "charged_router re-enters the neutralised skeleton, whose principal group is the "
-        "arsonous acid, and cannot rebuild the phenolate (first bad commit 2053a316d; "
-        "not the N8c charge check)"))
     def test_nitrophenolate_with_arsonous_acid_prefix_is_named(self):
         smiles = "O=[N+]([O-])c1cc([As](O)O)ccc1[O-]"
         name = "4-(dihydroxyarsanyl)-2-nitrophenolate"

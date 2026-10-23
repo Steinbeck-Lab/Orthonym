@@ -130,6 +130,7 @@ from .substituent_enumerator import (
     classify_and_name_fragment,
     extract_ring_substituents,
 )
+from .n_substituent_stereo import cite_n_substituent_stereo
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -3726,7 +3727,8 @@ def _assemble_benzene_name(features: Any, style: str) -> str:
 
     # Generate systematic name (detected_fgs hoisted above the orientation call,
     # which now needs it for the shared functional-class promotion guard).
-    _bz_name = name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents, detected_fgs)
+    _bz_name = name_substituted_benzene(mol, ring_atoms, oriented_ring, substituents, detected_fgs,
+                                        principal_group=_pg)
 
     # ── M3 Task 2 (task-W2 extension): jar-independent whole-graph
     # atom-coverage close, mirroring the heterocycle close at
@@ -7535,6 +7537,7 @@ def _walk_amine_n_substituents(
                 if nn_i not in visited and nn_i != n_idx and nn_i not in stop_set:
                     queue.append(nn_i)
         if frag:
+            n_named = len(n_subs)
             cc = sum(1 for i in frag if mol.GetAtomWithIdx(i).GetSymbol() == 'C')
             ring_info = mol.GetRingInfo()
             frag_set_fused = set(frag)
@@ -7715,6 +7718,7 @@ def _walk_amine_n_substituents(
                                 "amine_n_substituent_unnameable substituent_skip: reason=amine_nsub_still_unnameable carbon_count=%d",
                                 cc,
                             )
+            n_subs[n_named:] = [cite_n_substituent_stereo(mol, frag, nbr_idx, s) for s in n_subs[n_named:]]
     return n_subs
 
 
@@ -8336,8 +8340,8 @@ def _assemble_polyamine_name(
 
     all_entries = n_prefix_entries + c_prefix_entries
     all_entries.sort(key=lambda e: e[0])
-    prefix_part = "-".join(rendered for _k, rendered in all_entries)
-    return f"{prefix_part}{base_name}"
+    from .composition_primitives import prefixes_after_front_stereo
+    return prefixes_after_front_stereo("-".join(rendered for _k, rendered in all_entries), base_name)
 
 
 def _assemble_aromatic_benzonitrile(mol, principal_ring, nitrile_atoms):
@@ -9164,7 +9168,6 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     # of as independent single rings.
     from ..rules.ring_assemblies import (
         _find_inter_system_bonds,
-        detect_ring_assembly,
         name_mixed_ring_prefix,
         name_ring_assembly_prefix,
     )
@@ -9205,8 +9208,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
             single_ring_groups.extend(fragment)
             continue
 
-        # Try ring assembly detection (identical rings)
-        assembly_info = detect_ring_assembly(features.mol, ring_systems)
+        from .ring_assembly_fragment import bare_ring_assembly_info  # identical rings, no group on them
+        assembly_info = bare_ring_assembly_info(features.mol, ring_systems, all_frag_atoms, chain_set)
         if assembly_info is not None:
             prefix = name_ring_assembly_prefix(
                 features.mol, assembly_info, attach_atom_idx
@@ -9397,7 +9400,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                     # so a plain decorated name ('2-methylcyclohexyl') still
                     # gets (...) — byte-identical for the undecorated-paren case.
                     from ..assembly.naming_utils import apply_enclosing_marks as _aem
-                    ring_sub_groups[_aem(_rc_name, -1)].append(locant)
+                    from .prefix_derivation import carried
+                    ring_sub_groups[carried(_aem(_rc_name, -1), like=_rc_name)].append(locant)
                     continue
 
         # Get base substituent name (phenyl, cyclohexyl, etc.)

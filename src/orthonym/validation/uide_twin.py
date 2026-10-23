@@ -48,13 +48,20 @@ _STEM_ELEMENT = {"iodan": "I", "broman": "Br", "chloran": "Cl"}
 
 
 def uide_twin_outcome(outcome: Optional[str]) -> bool:
-    """Whether ``outcome`` is the gate outcome of a name the best-effort tier ships although OPSIN cannot read it:
-    a halogen -uide name read back through its twin (``twin_verified:uide_lambda``), a thioperoxol name read back
-    through its twin (``validation.thioperoxol_twin``) -- no OPSIN grammar reads these names at any tier; the other
-    twin families spell the form OPSIN reads there -- or a phane name whose structure
-    ``validation.phane_read_back`` builds from the name and finds to be the input's (``carveout:phane``, recorded
-    by ``namer.Orthonym._last_resort_list_name`` for such a name only: at a general tier the gate withdraws a
-    phane name)."""
+    """Whether ``outcome`` is the gate outcome of a name a general tier ships although OPSIN cannot read it. Despite
+    its name the predicate is not the halogen -uide family's alone (a rename would touch three code lines of
+    ``namer``: the import and the two exit checks that read it): it answers for every family a general tier ships
+    without a full-key round trip of the name itself, and the exit checks of ``namer`` pass these outcomes:
+
+    * a halogen -uide name read back through its twin (``twin_verified:uide_lambda``) and an additive organometallic
+      name with halido ligands (``twin_verified:halido_o``): no OPSIN grammar reads these names at any tier, and the
+      other twin families spell the form OPSIN reads there;
+    * a thioperoxol name read back through its twin (``twin_verified:thioperoxol_...``, ``validation.thioperoxol_twin``):
+      the anion of -S-OH at every general tier, a neutral name only as the safety net of a molecule that only the PIN
+      path names (``assembly.default_tier_offer.twin_last_resort_row``);
+    * a phane name whose structure ``validation.phane_read_back`` builds from the name and finds to be the input's
+      (``carveout:phane``, recorded by ``namer.Orthonym._last_resort_list_name`` for such a name only: at a general
+      tier the gate withdraws a phane name)."""
     from ..metrics.provenance import carveout_outcome, twin_outcome
     from .thioperoxol_twin import thioperoxol_twin_outcome
     return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), carveout_outcome("phane"))

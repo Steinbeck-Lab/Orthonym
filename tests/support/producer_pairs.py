@@ -22,11 +22,13 @@ COB_I = ("CC1=C2[N]3[C@@H]4[C@H](CC(N)=O)[C@@]2(C)CCC(=O)NC[C@@H](C)OP(=O)(O)O[C
 COB_II = ("CC1=C2[N]3[C@@H]4[C@H](CC(N)=O)[C@@]2(C)CCC(=O)NC[C@@H](C)OP(=O)([O-])O[C@H]2[C@@H](O)"
           "[C@H](O[C@@H]2CO)n2c[n+](c5cc(C)c(C)cc52)[Co-3]325[N+]3=C1[C@@H](CCC(N)=O)C(C)(C)C3=CC1="
           "[N+]2C(=C(C)C2=[N+]5[C@]4(C)[C@@](C)(CC(N)=O)[C@@H]2CCC(N)=O)[C@@](C)(CC(N)=O)[C@@H]1CCC(N)=O")
-# a PubChem row whose floor name fails its round trip at the stereo layer in the order
-# (tests/unit/rules/test_prefix_order_fallback.py); with the mechanical spellings the best-effort
-# tier ships the floor's name with the prefixes in another order
-PREFIX_ORDER_ROW = ("Cc1cn([C@H]2CC(O[P@]3O[C@](C)(c4ccccc4)[C@@H]4CCCN43)[C@@H](CO)O2)"
-                    "c(=O)[nH]c1=O")
+# a PubChem row whose name fails its round trip at the stereo layer only: the best-effort tier ships
+# the floor's name with the prefixes in another order (tests/unit/rules/test_prefix_order_fallback.py).
+# Witness replaced 2026-10-23: the nucleoside phosphoramidite that stood here (PubChem 500k row 493267) is named
+# in the order now, since the read-back reads a lone-pair stereocentre the OpenSMILES way
+# (``perception.lone_pair_reading``); PubChem CID 173762620 (a bis-phosphine whose two P(III) centres are in
+# rings, a row of benchmarks/unnamed_panel) still reaches the floor, with the book spellings and without.
+PREFIX_ORDER_ROW = "CC(C)(C)[P@@]1COC2=CC=CC(=C21)C3=C4C(=CC=C3)OC[P@@]4C"
 
 # Rows whose shipped name is the string of a producer with the input's stereo composed onto it
 # (Orthonym._stereo_emit_decision): the general engine and omit the descriptor of an exocyclic double

@@ -183,7 +183,67 @@ def split_components(mol) -> Optional[List[Tuple[str, int]]]:
     return [(smi, counts[smi]) for smi in order]
 
 
+def _naming_context() -> tuple:
+    """The ambient state a nested naming of one component reads, for the key of a memo hit: the four
+    tier context variables, the tier of the request and the ceilings of the von Baeyer analyses
+    (``cage_caps``), the depth of the naming session, the N-acyl refusal scope of the decomposition
+    engine, the last-resort scope of the thioperoxol twin and whether the perf and analysis budgets
+    are armed (a disarmed budget never trips, so a naming under it can give a name that an armed one
+    does not). The memo itself is scoped to one
+    top-level naming (``assembly.memo``) and keys the PIN-promotion, book-form and isotope scopes
+    apart (``memo._ck``)."""
+    from orthonym.assembly.fragment_naming import _fragment_guard, _session_depth
+    from orthonym.decomposition.engine import nacyl_float_refusing
+    from orthonym.metrics.provenance import (
+        allow_aromatic_general_ctx,
+        best_effort_ctx,
+        best_effort_request_ctx,
+        full_coverage_ctx,
+        general_fallback_ctx,
+    )
+    from orthonym.validation.thioperoxol_twin import last_resort_active
+
+    from .vonbaeyer_universal import cage_caps
+    return (general_fallback_ctx.get(), best_effort_ctx.get(), allow_aromatic_general_ctx.get(),
+            full_coverage_ctx.get(), best_effort_request_ctx.get(), cage_caps(), _session_depth(),
+            nacyl_float_refusing(), last_resort_active(),
+            getattr(_fragment_guard, 'perf_budget', None) is not None,
+            getattr(_fragment_guard, 'analysis_budget', None) is not None)
+
+
 def _name_component(frag_smi: str, style: str, *,
+                    general_fallback: bool = False,
+                    allow_aromatic_general: bool = False,
+                    general_fallback_unverified: bool = False,
+                    charged_ok: bool = False,
+                    ions_ok: bool = False,
+                    single_atom_names: Optional[Dict[str, str]] = None,
+                    own_names: Optional[Dict[str, str]] = None) -> Optional[str]:
+    """Name ONE component fragment, or None (fail-closed): ``_name_component_once``, once per
+    top-level naming for the same component, flags and ambient state (``_naming_context``).
+
+    The late recovery, its clean fall-through and the namings of the sub-mixtures of a drawing build
+    the adduct of the same components again and again (340 namings of 9 distinct components for one
+    PubChem 1M drawing of seven, 27 s of its 55 s). A hit returns the name the first naming gave and
+    replays the provenance it recorded (``nested_memo``); a trip (``PerfBudgetExceeded``) is never
+    stored. A one-atom component, and one that ``own_names`` names, are not memoised (a table read).
+    """
+    def once():
+        return _name_component_once(
+            frag_smi, style, general_fallback=general_fallback,
+            allow_aromatic_general=allow_aromatic_general,
+            general_fallback_unverified=general_fallback_unverified, charged_ok=charged_ok,
+            ions_ok=ions_ok, single_atom_names=single_atom_names, own_names=own_names)
+
+    if (own_names or {}).get(frag_smi) or frag_smi.count(".") or len(frag_smi) < 4:
+        return once()
+    from orthonym.assembly.nested_memo import cached_nested_call
+    key = (frag_smi, style, general_fallback, allow_aromatic_general, general_fallback_unverified,
+           charged_ok, ions_ok, _naming_context())
+    return cached_nested_call("adduct_component", key, once, replay_budgets=False)
+
+
+def _name_component_once(frag_smi: str, style: str, *,
                     general_fallback: bool = False,
                     allow_aromatic_general: bool = False,
                     general_fallback_unverified: bool = False,
@@ -236,13 +296,32 @@ def _name_component(frag_smi: str, style: str, *,
         # Breadth Job 2: a metal halide / oxide the single-component pipeline
         # has no name for (it abstains on Cl[Pd]Cl, O=[V], [Cu]I).
         return _metal_halide_oxide_component_name(frag_mol)
+    from orthonym.assembly.fragment_naming import PerfBudgetExceeded
     from orthonym.validation.thioperoxol_twin import embedded_name
+    component_namer = None
     try:
         with embedded_name():
-            name = (own_names or {}).get(frag_smi) or Orthonym(
-                style=style, general_fallback=general_fallback,
-                allow_aromatic_general=allow_aromatic_general,
-                general_fallback_unverified=general_fallback_unverified).name(frag_smi)
+            name = (own_names or {}).get(frag_smi)
+            if not name:
+                component_namer = Orthonym(
+                    style=style, general_fallback=general_fallback,
+                    allow_aromatic_general=allow_aromatic_general,
+                    general_fallback_unverified=general_fallback_unverified)
+                name = component_namer.name(frag_smi)
+    except PerfBudgetExceeded:
+        # The caller gave this component the hang budgets of one compound
+        # (``own_hang_budgets``) and they ran out in its main path. It is offered what a compound
+        # named alone is offered (``assembly.budget_rescue``: the rescue, then one run under the
+        # PIN ceilings of the von Baeyer analyses), so one heavy component no longer ends the whole
+        # adduct. A component neither offer names leaves the trip to unwind to the frame that owns
+        # the assembly's budgets, as before.
+        name = None
+        if component_namer is not None:
+            from orthonym.assembly.budget_rescue import name_after_budget_trip
+            with embedded_name():
+                name = name_after_budget_trip(component_namer, frag_smi)
+        if name is None:
+            raise
     except Exception:
         return None
     if not name or not isinstance(name, str) or name.startswith("unknown"):
@@ -393,23 +472,41 @@ def _reads_back_as(name: str, expected_smiles: str) -> bool:
 
 
 def _component_spellings(frag_smi: str, primary: str, style: str, flags: dict):
+    """The other spellings of one adduct component (``_component_spellings_once``), once per
+    top-level naming for the same component, first name, flags and ambient state
+    (``_naming_context``); a hit replays the provenance the first run recorded."""
+    from orthonym.assembly.nested_memo import cached_nested_call
+    key = (frag_smi, primary, style, tuple(sorted(flags.items())), _naming_context())
+    return list(cached_nested_call(
+        "adduct_component_spellings", key,
+        lambda: tuple(_component_spellings_once(frag_smi, primary, style, flags)),
+        replay_budgets=False))
+
+
+def _component_spellings_once(frag_smi: str, primary: str, style: str, flags: dict):
     """The other spellings of one adduct component, best first, as (rank, name):
     1 -- the engine's late general-engine recovery name
     (``Orthonym._engine_recovery_spelling``), 2 -- the universal floor's verified
     spelling (``t4_coverage._verified_universal_floor``). Each reads back by
     itself to the component's full InChIKey (``verify_or_none``) and differs from
     ``primary`` and from the other. A one-atom component has no other spelling.
-    Best-effort tier only (the caller gates). Never raises an ``Exception``."""
+    Best-effort tier only (the caller gates). Never raises: a spelling that runs its hang
+    budgets out is left out."""
     frag = Chem.MolFromSmiles(frag_smi)
     if frag is None or frag.GetNumHeavyAtoms() < 2:
         return []
+    from orthonym.assembly.fragment_naming import PerfBudgetExceeded, own_hang_budgets
     from orthonym.namer import Orthonym
     from orthonym.validation.reconstruct import verify_or_none
     out: List[Tuple[int, str]] = []
     seen = {primary}
+    # Another spelling is an optional offer, and each one is built with the hang budgets of one
+    # compound: a spelling whose analysis runs them out is no spelling (the component keeps its
+    # first name), where the trip would end the whole adduct.
     try:
-        eng = Orthonym(style=style, **flags)._engine_recovery_spelling(frag_smi)
-    except Exception:
+        with own_hang_budgets():
+            eng = Orthonym(style=style, **flags)._engine_recovery_spelling(frag_smi)
+    except (Exception, PerfBudgetExceeded):
         eng = None
     try:
         if eng and eng not in seen and verify_or_none(eng, frag_smi) is not None:
@@ -419,8 +516,9 @@ def _component_spellings(frag_smi: str, primary: str, style: str, flags: dict):
         pass
     try:
         from orthonym.assembly.t4_coverage import _verified_universal_floor
-        floor = _verified_universal_floor(frag, Chem.MolToSmiles(frag))
-    except Exception:
+        with own_hang_budgets():
+            floor = _verified_universal_floor(frag, Chem.MolToSmiles(frag))
+    except (Exception, PerfBudgetExceeded):
         floor = None
     if floor and floor not in seen:
         out.append((2, floor))
@@ -436,6 +534,23 @@ _MAX_RESPELLED = 3
 
 
 def _readable_spellings(ordered: List[Tuple[str, int]],
+                        named: List[Tuple[str, int]], style: str,
+                        flags: dict) -> List[Tuple[str, int]]:
+    """Component spellings whose adduct name OPSIN reads back
+    (``_readable_spellings_once``), once per top-level naming for the same components, names, flags
+    and ambient state (``_naming_context``): an adduct that no spelling repairs spends its whole
+    read-back budget (``_READBACK_TRIALS``) on every build of it. A hit replays the provenance the
+    first run recorded."""
+    from orthonym.assembly.nested_memo import cached_nested_call
+    key = (tuple(ordered), tuple(named), style, tuple(sorted(flags.items())), _naming_context())
+    out = list(cached_nested_call(
+        "adduct_readable_spellings", key,
+        lambda: tuple(_readable_spellings_once(ordered, named, style, flags)),
+        replay_budgets=False))
+    return named if out == list(named) else out  # "unchanged" is the list the caller passed
+
+
+def _readable_spellings_once(ordered: List[Tuple[str, int]],
                         named: List[Tuple[str, int]], style: str,
                         flags: dict) -> List[Tuple[str, int]]:
     """Component spellings whose adduct name OPSIN reads back.

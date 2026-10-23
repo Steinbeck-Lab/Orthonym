@@ -501,7 +501,7 @@ _HYDRIDE_STEM_ROOTS = tuple(
 # letters are compared "unless used as locants"). Without the primes, the
 # rendered prefix "3',4,4'-trihydroxy" kept its locants and its multiplier, and
 # keyed at "t" (or, as a raw string, at the digit "3").
-_LOCANT_PREFIX_RE = re.compile(r"^\d+[a-z]?['\u2032\u2033]*(?:,\d+[a-z]?['\u2032\u2033]*)*-")
+_LOCANT_PREFIX_RE = re.compile(r"^\d+[a-z]?['\u2032\u2033]*(?:λ\d+)?(?:,\d+[a-z]?['\u2032\u2033]*(?:λ\d+)?)*-")
 # A leading locant set that holds an italic N: 'N-', 'N,N-', and a set that mixes the italic
 # letter with numerals ('N,2-dimethyl',, the Blue Book: the letters are cited first).
 _N_LOCANT_PREFIX_RE = re.compile(

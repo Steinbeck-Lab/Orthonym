@@ -93,6 +93,8 @@ AZIRIDINE_ROW = "COC(=O)[C@H]1C[N@]1Cc1cc(-c2cccc3c2OC(F)(F)O3)ccc1F"
 AZIRIDINE_FIRST = "[N@@]1(Cc2cc(-c3cccc4c3OC(F)(F)O4)ccc2F)[C@@H](C(OC)=O)C1"
 AZIRIDINE_NAME = ("methyl (1R,2R)-1-{[5-(8,8-difluoro-7,9-dioxabicyclo[4.3.0]"
                   "nona-1,3,5-trien-2-yl)-2-fluorophenyl]methyl}aziridine-2-carboxylate")
+AZIRIDINE_FIRST_NAME = ("methyl (1S,2R)-1-{[5-(8,8-difluoro-7,9-dioxabicyclo[4.3.0]"
+                        "nona-1,3,5-trien-2-yl)-2-fluorophenyl]methyl}aziridine-2-carboxylate")
 # A sulfinate ester (PubChem 500k) whose name is built from a nested name of the acid,
 # a SMILES RDKit wrote: only the caller's string is checked.
 SULFINATE_ROW = "CCCCCCC#CCO[S@](=O)c1ccc(C)cc1"
@@ -198,8 +200,15 @@ def test_aziridine_nitrogen():
     # strings alike, so the round trip of the same name passes for it too.
     assert _rdkit_key(AZIRIDINE_FIRST) == _rdkit_key(AZIRIDINE_ROW)
     assert namer._lone_pair_configuration_verified(AZIRIDINE_NAME, AZIRIDINE_FIRST) is False
+    # CDK's reading of the N-first string is the other N configuration; the engine names that one
+    # (before the standard spelling compared the labels the engine gives, it named none of it).
     first = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(AZIRIDINE_FIRST)
-    assert first.get("name") is None or is_failure_name(first.get("name")), first.get("name")
+    assert first.get("name") == AZIRIDINE_FIRST_NAME, first.get("name")
+    assert not is_failure_name(first.get("name"))
+    assert namer._lone_pair_configuration_verified(AZIRIDINE_FIRST_NAME, AZIRIDINE_FIRST) is True
+    # RDKit reads the string as CDK does, so OPSIN's own key of the name is RDKit's key of the input
+    assert _opsin_own_stdinchikey(AZIRIDINE_FIRST_NAME) == _rdkit_key(AZIRIDINE_FIRST)
+    assert _opsin_own_stdinchikey(AZIRIDINE_FIRST_NAME) != _opsin_own_stdinchikey(AZIRIDINE_NAME)
 
 
 def test_sulfinate_ester_is_checked_on_the_callers_string_only():

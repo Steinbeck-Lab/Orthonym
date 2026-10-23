@@ -141,11 +141,10 @@ def test_default_tier_twin_checked_pin_spelling_is_read_back_through_its_twin():
 
 # README "Checked." / "Output tiers": the twin families the engine has no other spelling for ship at
 # every tier (validation.twin_spellings.general_tier_twin_round_trip). (the Blue Book)
-# 'diphenyliodanuide (PIN)'; (:24318) 'methane-SO-thioperoxol (PIN)'; (:39785) the
-# halido ligand word of an additive organometallic name, a class gives no PIN.
+# 'diphenyliodanuide (PIN)'; (:39785) the halido ligand word of an additive organometallic name, a class
+# gives no PIN.
 TWIN_EVERY_TIER = [
     ("c1ccc(cc1)[I-]c1ccccc1", "diphenyliodanuide", "diphenyl-λ3-iodanide", "pin_verified"),
-    ("CSO", "methane-SO-thioperoxol", "methanesulfenic acid", "pin_verified"),
     ("C(C)[Ni]Br", "bromido(ethyl)nickel", "bromo(ethyl)nickel", "systematic_verified"),
 ]
 
@@ -161,6 +160,31 @@ def test_a_twin_family_with_no_other_spelling_ships_through_its_twin_at_every_ti
             continue
         assert row["name"] == name, row
         assert row["tier"] == tier_label and row["verified"] == "opsin_twin", row
+
+
+# README "Checked." / "Output tiers": a thioperoxol is named in the form OPSIN reads at a wider tier (user decision
+# 2026-10-22, "Best-effort ships readable"); its PIN spelling, THE SUFFIXES 'SO-THIOPEROXOL', AND CHALOGEN
+# ANALOGUES (the Blue Book) 'CH3-S-OH methane-SO-thioperoxol (PIN)' (:24326), ships through its twin at the
+# default tier, and at a wider tier only for a molecule that has no name OPSIN reads (the anion,,:41035).
+def test_a_thioperoxol_is_named_in_the_form_opsin_reads_at_a_wider_tier():
+    smiles, pin, readable = "CSO", "methane-SO-thioperoxol", "(hydroxysulfanyl)methane"
+    assert _independent_parse(pin, smiles) is None                    # OPSIN has no grammar for the PIN spelling
+    assert _key(_independent_parse(readable, smiles)) == _key(smiles)  # and reads the name by prefixes
+    row = _row(smiles, "pin")
+    assert row["name"] == pin and row["tier"] == "pin_verified" and row["verified"] == "opsin_twin", row
+    for tier in ("valid", "complete", "best-effort"):
+        row = _row(smiles, tier)
+        assert row["name"] == readable and row["verified"] == "opsin", row
+        assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
+
+
+def test_the_pin_spelling_of_the_thioperoxolate_anion_ships_through_its_twin_at_every_tier():
+    smiles, name = "CS[O-]", "methane(SO-thioperoxolate)"
+    assert _independent_parse(name, smiles) is None
+    for tier in ("pin", "valid", "complete", "best-effort"):
+        row = _row(smiles, tier)
+        assert row["name"] == name, row
+        assert row["tier"] == "pin_verified" and row["verified"] == "opsin_twin", row
 
 
 def _hydrolysed_keys(smiles):

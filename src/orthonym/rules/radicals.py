@@ -610,7 +610,7 @@ def _n_substituent_prefix(mol, frag: List[int], attach_idx: int, general: bool):
                                                allow_mancude=allow_mancude)
         else:
             got = name_substituent(mol, frag, attach_idx, allow_mancude=allow_mancude)
-        return got if got and got.endswith('yl') else None
+        return got if got and got.endswith(('yl', 'ylidene')) else None
 
     prefix = _one(False)
     if prefix and _indicated_h_kept(mol, frag, attach_idx, prefix):
@@ -843,20 +843,22 @@ def _enclose_acyl(mol, acyl: str, acyl_idx: int, exclude: set) -> str:
     return enclosed
 
 
-def _placeholder_prefix(mol, idx: int, general: bool):
+def _placeholder_prefix(mol, idx: int, general: bool, valence: int = 1):
     """(prefix, from_general_route) for the whole molecule named as a
     substituent group attached at the radical atom ``idx`` -- a
     radical formed by removing one H is named like the substituent prefix of
     the same group ('piperidin-1-yl', 'naphthalen-2-yl'). The substituent
     namers expect a satisfied valence at the attachment, so a methyl
     placeholder takes the radical electron's place and is left out of the
-    named fragment (the N-oxyl producer does the same with its O)."""
+    named fragment (the N-oxyl producer does the same with its O). A divalent
+    centre (``valence`` 2, a ring carbene) takes a doubly bonded placeholder, so the
+    group is named '-ylidene'."""
     work = Chem.RWMol(mol)
     try:
         a = work.GetAtomWithIdx(idx)
-        a.SetNumRadicalElectrons(a.GetNumRadicalElectrons() - 1)
+        a.SetNumRadicalElectrons(a.GetNumRadicalElectrons() - valence)
         c = work.AddAtom(Chem.Atom(6))
-        work.AddBond(idx, c, Chem.BondType.SINGLE)
+        work.AddBond(idx, c, Chem.BondType.DOUBLE if valence == 2 else Chem.BondType.SINGLE)
         a.SetNoImplicit(True)
         surrogate = work.GetMol()
         Chem.SanitizeMol(surrogate)
@@ -952,15 +954,31 @@ def _name_chalcogen_radical(mol, idx: int) -> str:
 
 
 def _name_ring_n_radical(mol, idx: int) -> str:
-    """A radical on a ring nitrogen that carries no H: named as the
+    """A radical on a ring nitrogen or boron that carries no H: named as the
     ring's N-yl substituent group, e.g. '2,5-dioxopyrrolidin-1-yl (PIN)'
-    (the Blue Book), piperidin-1-yl, 9H-carbazol-9-yl."""
+    (the Blue Book), piperidin-1-yl, 9H-carbazol-9-yl; a ring boron the same way
+    ('4H-1,2,4-diazaborol-4-yl'): the free valence is the senior class,
+    the Blue Book), so every group on the ring system is a prefix."""
     n = mol.GetAtomWithIdx(idx)
-    if (n.GetSymbol() != 'N' or n.GetNumRadicalElectrons() != 1 or n.GetFormalCharge()
+    if (n.GetSymbol() not in ('N', 'B') or n.GetNumRadicalElectrons() != 1 or n.GetFormalCharge()
             or not n.IsInRing() or n.GetTotalNumHs()):
         return ''
     prefix, wide = _placeholder_prefix(mol, idx, _tier_is_general())
     return _ship(mol, prefix or '', wide)
+
+
+def _name_ring_carbene(mol, idx: int) -> str:
+    """ "General method" (the Blue Book): a divalent ring carbon with no H --
+    the carbene of an N-heterocyclic ring, 'imidazolidin-2-ylidene' -- is named by '-ylidene'
+    on the parent hydride's name, and the free valence is senior to every other group, so the
+    groups on the rest of the molecule are all prefixes. Reached after the neutralise and
+    re-suffix route, which cannot take a ring that carries a principal group."""
+    c = mol.GetAtomWithIdx(idx)
+    if (c.GetSymbol() != 'C' or c.GetNumRadicalElectrons() != 2 or c.GetFormalCharge()
+            or not c.IsInRing() or c.GetTotalNumHs()):
+        return ''
+    prefix, wide = _placeholder_prefix(mol, idx, _tier_is_general(), 2)
+    return _ship(mol, prefix, wide) if prefix and prefix.endswith('ylidene') else ''
 
 
 # Contracted preferred prefixes that are NOT '<parent hydride>yl'. (1):
@@ -1515,9 +1533,18 @@ def _name_peroxyl_radical(mol, radical_idx: int, bridge_o_idx: int) -> str:
         return ''
     from ..assembly.substituent_naming import name_substituent_fragment
     parent = name_substituent_fragment(mol, frag, attach_idx, [bridge_o_idx]) or ''
+    wide = False
+    if not parent and _tier_is_general():
+        # a group the strict namer declines (a fused or hetero ring system): the wider substituent route, as
+        # every other radical producer takes it, and the name is demoted out of pin_verified
+        parent, wide = _n_substituent_prefix(mol, frag, attach_idx, True)
     if not parent:
         return ''
-    return _compose_oxyl_name(mol, parent, 'peroxyl', 'dioxidanyl')
+    name = _compose_oxyl_name(mol, parent, 'peroxyl', 'dioxidanyl')
+    if name and wide:
+        from ..metrics.provenance import record_general_ring_prefix
+        record_general_ring_prefix()
+    return name
 
 
 def name_oxyl_radical(mol, radical_site: Dict[str, Any]) -> str:
@@ -2134,7 +2161,7 @@ def name_radical(mol, style: str = 'pin') -> str:
         # the -yl/-ylidene/-ylidyne suffix. On '' fall through to '' (no
         # carbon-counted misname).
         from .charged_router import route_charged
-        return route_charged(mol, style)
+        return route_charged(mol, style) or _name_ring_carbene(mol, site['atom_idx'])
 
     # / / multi-centre producers first (strict round trip).
     multi = _name_multicentre_radical(mol, sites) or _name_homogeneous_chain_radical(mol, sites)

@@ -299,9 +299,7 @@ def test_restore_withdrawn_keeps_the_producer(monkeypatch):
 def test_the_prefix_order_floor_reports_t4():
     # the name that _maybe_prefix_order_fallback ships is built by the floor in another order of the
     # prefixes, which no other seam covers (the step is only ever given a failure name)
-    from orthonym.assembly.book_prefixes import mechanical_forms
-    with mechanical_forms():
-        r = row(PREFIX_ORDER_ROW, "best-effort")
+    r = row(PREFIX_ORDER_ROW, "best-effort")
     assert r["prefix_order_fallback"] is True and r["source"] == "t4_floor", r
     assert r["producer"] == "engine:t4", r
 

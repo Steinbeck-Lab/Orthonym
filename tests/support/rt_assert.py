@@ -10,6 +10,9 @@ a stale or wrong cached parse inside the engine cannot make a test pass. ``rt_ex
 it genuinely round-trips, else ``None``. That makes the RED baseline (``assert_not_rt_exact``)
 gate-independent too — "we do not yet produce a correct name for this molecule".
 """
+import functools
+import re
+
 from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
@@ -75,6 +78,8 @@ def rt_exact_name(smiles: str):
     opsin_smi = _independent_parse(name, smiles)
     if opsin_smi is None:
         return None
+    if _LONE_PAIR_BRACKET_RE.search(smiles):
+        return name if name_is_rt_exact(name, smiles) else None
     if _canon(opsin_smi) != _canon(smiles):
         return None
     return name
@@ -93,6 +98,106 @@ def _full_inchikey(smi):
     from rdkit.Chem import inchi
     m = Chem.MolFromSmiles(smi) if smi else None
     return inchi.MolToInchiKey(m) if m is not None else ""
+
+
+# A lone-pair stereocentre as the string writes it: the element and the tag of a bracket atom. RDKit reads such a
+# centre by its position in the string, so for these inputs the read-back goes through a reader that shares no code
+# with RDKit or with Orthonym (``tests/support/indep_oracle``).
+_LONE_PAIR_BRACKET_RE = re.compile(r"\[\d*(?:N|P|S|Se|As|Sb|Bi|Te|Po)@")
+_NO_KEY = ("", "NOPARSE", "ERR")
+
+
+@functools.lru_cache(maxsize=4096)
+def _opsin_own_key(name: str) -> str:
+    """OPSIN 2.9.0's own StdInChIKey of ``name`` (``-ostdinchikey``): no SMILES, no RDKit."""
+    import subprocess
+    from orthonym.jvm_flags import JVM_HYGIENE_FLAGS
+    from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+    jar = _find_opsin_jar("2.9.0")
+    if not jar or "\n" in name:
+        return ""
+    try:
+        proc = subprocess.run(["java", *JVM_HYGIENE_FLAGS, "-jar", jar, "-ostdinchikey"],
+                              input=name + "\n", capture_output=True, text=True, timeout=120)
+    except (OSError, subprocess.SubprocessError):
+        return ""
+    return proc.stdout.strip()
+
+
+def _stand_in_reference_key(smiles: str):
+    """RDKit's key of ``smiles`` read the standard way, for an As(III) centre ``centres`` gives no label and
+    the CDK reader of the oracle cannot hand over; None when that cannot be shown.
+
+    RDKit reads a lone-pair centre by its position in the string; the position, not the element, decides it. So
+    the string is read through its P analog (As written P), which the CDK reader reads: of the string and of the
+    string with the tags of any of its As atoms inverted, the one whose P analog RDKit reads to the key the CDK
+    reader gives the P analog of the string is read by RDKit as the standard reading, and RDKit's key of it is
+    the reference. Sb, Bi, Te and Po centres are dropped by RDKit, so no RDKit key holds them: None."""
+    from rdkit import Chem
+    from rdkit.Chem import inchi
+    if re.search(r"\[\d*(?:Sb|Bi|Te|Po)@", smiles):
+        return None
+    atoms = list(re.finditer(r"\[\d*As(@@?)", smiles))
+
+    def analog(text):
+        return re.sub(r"(\[\d*)As", r"\1P", text)
+
+    from tests.support import indep_oracle
+    got = indep_oracle.keys(analog(smiles))
+    if not got or got[0].startswith("ERR"):
+        return None
+    for mask in range(1 << len(atoms)):
+        pieces, last = [], 0
+        for n, found in enumerate(atoms):
+            tag = found.group(1)
+            if mask >> n & 1:
+                tag = "@" if tag == "@@" else "@@"
+            pieces += [smiles[last:found.start(1)], tag]
+            last = found.end(1)
+        candidate = "".join(pieces) + smiles[last:]
+        mol, held = Chem.MolFromSmiles(candidate), Chem.MolFromSmiles(analog(candidate))
+        if mol is None or held is None:
+            continue
+        kept = [a for a in mol.GetAtoms() if a.GetSymbol() == "As"
+                and a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED]
+        if len(kept) == len(atoms) and inchi.MolToInchiKey(held) == got[0]:
+            return inchi.MolToInchiKey(mol)
+    return None
+
+
+def _lone_pair_read_back(name: str, smiles: str) -> bool:
+    """Whether OPSIN reads ``name`` to the structure of ``smiles`` at its lone-pair stereocentres, by a reader
+    that does not read them by their position in the string: CDK's SMILES parser into the InChI library for
+    the input, OPSIN's own InChI for the name (``tests/support/indep_oracle``). An input the reader cannot
+    hand over, a centre it does not read (As is read through its P analog, Sb, Bi, Te and Po not at all) and an
+    unavailable reader (no javac) are decided without RDKit's reading and fail closed: a centre no label reads
+    is not confirmed."""
+    from orthonym.validation.read_back_policy import smiles_has_radical_electrons
+    from tests.support import indep_oracle
+    got = indep_oracle.keys(smiles, name, radicals=smiles_has_radical_electrons(smiles))
+    if got is not None:
+        key_in, key_name = got
+        if key_name in _NO_KEY:
+            return False
+        if re.search(r"\[\d*(?:As|Sb|Bi|Te|Po)@", smiles):
+            reference = _stand_in_reference_key(smiles)
+            return reference is not None and reference == key_name
+        if not key_in.startswith("ERR"):
+            return key_in == key_name
+    # the reader is not available: the stand-in reading of Orthonym, and no centre without a label
+    from orthonym.perception.lone_pair_reading import (
+        lone_pair_centres, raw_reading, standard_centres_labels, standard_reading_inchikey)
+    mol, labels = raw_reading(smiles), standard_centres_labels(smiles)
+    held = Chem.MolFromSmiles(smiles)
+    if mol is None or labels is None or held is None:
+        return False
+    if len(lone_pair_centres(held)) != len(lone_pair_centres(mol)):
+        return False             # a centre RDKit drops (Sb, the N of an N-aryl aziridine): no RDKit key holds it
+    if any(labels.get(mol.GetAtomWithIdx(i).GetIntProp("_lp_pos")) not in ("R", "S", "r", "s")
+           for i in lone_pair_centres(mol)):
+        return False
+    own = _opsin_own_key(name)
+    return own not in _NO_KEY and own == standard_reading_inchikey(smiles)
 
 
 _DATIVE_TYPES = (Chem.BondType.DATIVE, Chem.BondType.DATIVEONE,
@@ -126,7 +231,10 @@ def smiles_without_dative_bonds(smiles: str):
 
 def name_is_rt_exact(name: str, smiles: str) -> bool:
     """True iff OPSIN parses ``name`` back to the input's FULL standard InChIKey
-    (constitution + stereo + charge + isotope layers) AND to the same radical graph.
+    (constitution + stereo + charge + isotope layers) AND to the same radical graph. An input with a
+    lone-pair stereocentre (P(III), S(IV), N of an aziridine, As,...) is read back by a reader that does not
+    read the centre by its position in the string (``_lone_pair_read_back``): RDKit does, so its key of OPSIN's
+    SMILES of a right name can be the mirror image's.
     Independent of the pipeline's own validity gate and of its OPSIN caches.
 
     The full key encodes neither radical electrons nor bond order: 'ethane-1,2-diyl'
@@ -143,6 +251,12 @@ def name_is_rt_exact(name: str, smiles: str) -> bool:
     from orthonym.validation.radical_identity import radical_identity_verdict
     if not name:
         return False
+    if _LONE_PAIR_BRACKET_RE.search(smiles):
+        opsin_smi = _independent_parse(name, smiles)
+        if not (opsin_smi and _lone_pair_read_back(name, smiles)):
+            return False
+        return (radical_identity_verdict(smiles, opsin_smi) != "mismatch"
+                and protonation_site_verdict(smiles, opsin_smi, name) != "mismatch")
     key = _full_inchikey(smiles)
     if not key:
         # a drawing with dative bonds has no key: the drawing without them has (decision 1 of

@@ -52,8 +52,9 @@ OPSIN cannot parse (OPSIN confirms their constitution, and each descriptor is ch
 CIP label). `--provenance` marks each of them. The wider tiers ship none of them, except the names
 from the exact-match lists (a metal-complex name, and a natural-product parent name when no
 verified systematic name is found) and the twin-checked names for which the engine has no other
-spelling: halogen `-uide` anions (`diphenyliodanuide`), thioperoxols (`methane-SO-thioperoxol`) and
-organometallic names with halido ligands (`bromido(ethyl)nickel`). The `best-effort` tier also ships, for a
+spelling: halogen `-uide` anions (`diphenyliodanuide`), the anion of a thioperoxol
+(`methane(SO-thioperoxolate)`) and organometallic names with halido ligands (`bromido(ethyl)nickel`). The
+`best-effort` tier also ships, for a
 molecule that has no other name, a name whose stereodescriptors OPSIN cannot parse when the default tier ships
 it, with the label the default tier gives it (`pin_unverified`).
 
@@ -175,8 +176,10 @@ a wider tier can, rarely, decline a molecule that a narrower tier names. A PIN s
 default tier ships through its twin is named there in a form OPSIN reads
 (`1,4-dihydro-1,4-epithionaphthalene` for `1,4-dihydro-1,4-sulfanonaphthalene`), and so is a
 poly-anhydride (`1,4-bis(acetyloxy)-1,4-dioxobutane` for `diacetic butanedioic dianhydride`). A
-name for which the engine has no other spelling (a halogen `-uide` anion, a thioperoxol, an
-organometallic name with halido ligands) ships there through its twin, with the same labels.
+name for which the engine has no other spelling (a halogen `-uide` anion, the anion of a thioperoxol, an
+organometallic name with halido ligands) ships there through its twin, with the same labels. A neutral
+thioperoxol is named there in the form OPSIN reads (`(hydroxysulfanyl)methane` for `methane-SO-thioperoxol`);
+its PIN spelling ships through its twin there only for a molecule for which the engine builds no such name.
 
 Whatever the tier, `--provenance` (one SMILES at a time) says what each name is: `pin_verified`
 (the strict PIN path built it and verified it, or OPSIN read back a twin spelling of it or the

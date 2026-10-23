@@ -422,6 +422,45 @@ def _centres_input(mol):
     return smi, order
 
 
+_LP_TAGS = (Chem.ChiralType.CHI_TETRAHEDRAL_CW, Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+
+#: Bound on RDKit's CIP labeller for the centres below (about a second, the RDKit documentation's figure
+#: for 1,250,000 iterations).
+_LP_CIP_MAX_ITERATIONS = 1_250_000
+
+
+def _label_unlabelled_lone_pair_centres(mol, labelled: Dict[int, str]) -> None:
+    """Give a lone-pair stereocentre that ``centres`` leaves unlabelled the label of ``rdCIPLabeler``, not
+    the one RDKit set when it parsed the string.
+
+    ``centres`` labels N (in a three-membered ring), P, S and Se and gives no label to As, Sb, Bi, Te or
+    Po. RDKit sets a ``_CIPCode`` of its legacy labeller on such an atom at parsing, and
+    ``apply_centres_labels`` leaves it: for the As of 1,2-diphenylarsolane the legacy label is the other one
+    than ``rdCIPLabeler``'s and than the configuration InChI and OPSIN hold ((1S,2S) for the (1R,2S) input).
+    The legacy label is cleared and ``rdCIPLabeler``'s set, or none: a missing descriptor is caught by the
+    exit check (``namer._lone_pair_configuration_verified``, which reads the centre through a stand-in), a
+    wrong one is not. ``labelled`` are the 1-based atom indices ``centres`` labelled."""
+    cands = [a.GetIdx() for a in mol.GetAtoms()
+             if a.GetChiralTag() in _LP_TAGS and a.GetTotalDegree() == 3
+             and not (a.GetAtomicNum() == 7 and not a.IsInRingSize(3))
+             and (a.GetIdx() + 1) not in labelled]
+    if not cands:
+        return
+    for idx in cands:
+        mol.GetAtomWithIdx(idx).ClearProp('_CIPCode')
+    try:
+        from rdkit.Chem import rdCIPLabeler
+        held = Chem.Mol(mol)
+        rdCIPLabeler.AssignCIPLabels(held, atomsToLabel=cands, bondsToLabel=[],
+                                     maxRecursiveIterations=_LP_CIP_MAX_ITERATIONS)
+        for idx in cands:
+            atom = held.GetAtomWithIdx(idx)
+            if atom.HasProp('_CIPCode'):
+                mol.GetAtomWithIdx(idx).SetProp('_CIPCode', atom.GetProp('_CIPCode'))
+    except Exception:  # past the bound or any error: no label, and the exit check declines the name
+        logger.debug("rdCIPLabeler gave no label for a lone-pair centre centres leaves unlabelled")
+
+
 def centres_label_mol(mol) -> bool:
     """Label a single RDKit mol with centres (gated single-mol convenience).
 
@@ -472,4 +511,5 @@ def centres_label_mol(mol) -> bool:
         if 0 <= pos0 < len(order):
             remapped[order[pos0] + 1] = desc
     apply_centres_labels(mol, remapped)
+    _label_unlabelled_lone_pair_centres(mol, remapped)
     return True

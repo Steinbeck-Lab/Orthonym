@@ -376,7 +376,7 @@ def main(args: List[str] = None) -> int:
             "name or declines. The wider tiers also return the names the default "
             "tier declines, each labelled with its tier; there every name must "
             "pass a full-InChIKey OPSIN round trip, except a name from the "
-            "natural-product and metal-complex lists and the best-effort name described above, so the other name formats absent "
+            "natural-product and metal-complex lists, a twin-checked name for which the engine has no other spelling (a halogen -uide anion, the anion of a thioperoxol, an organometallic name with halido ligands) and the best-effort name described above, so the other name formats absent "
             "from OPSIN's grammar are declined there. --provenance shows each "
             "name's tier."
         ),

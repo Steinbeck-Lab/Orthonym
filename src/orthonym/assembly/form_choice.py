@@ -329,3 +329,18 @@ def beats(challenger: str, incumbent: str, challenger_provenance: Optional[dict]
     if lower:
         return lower < 0
     return mine[1] < theirs[1]
+
+
+def stereo_decides_below_pin(label: Tuple[int, int], incumbent_label: Tuple[int, int], kept: Optional[int],
+                             incumbent_kept: Optional[int], pin_rank: int) -> int:
+    """+1 when a name below the PIN that keeps more of the input's configured stereo elements (criterion 0 of the
+    module docstring) stands over an incumbent below the PIN that keeps fewer, -1 for the reverse, else 0 and the
+    labels decide. Both labels are those of a verified name below the PIN (a label rank of 2 up to ``pin_rank`` - 1,
+    not the last-resort floor's): a name of another drawing that has lost the configuration of the input is the name
+    of a less specific compound than the input,:44568), and such a label does not say that it is the better
+    name of the species, so it does not outrank the drawing's own name that keeps the configuration."""
+    if kept is None or incumbent_kept is None or kept == incumbent_kept:
+        return 0
+    if not (1 < label[0] < pin_rank and 1 < incumbent_label[0] < pin_rank):
+        return 0
+    return 1 if kept > incumbent_kept else -1

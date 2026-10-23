@@ -1445,14 +1445,26 @@ def p45_principal_chain(features, default_chain: Optional[List[int]]) -> Optiona
         return default_chain
     if getattr(features, 'principal_group', None) not in GIVEN_CHAIN_GROUPS:
         return default_chain
-    senior = principal_chain_with_ring_prefixes(features)
-    if not senior or len(senior) != len(default_chain):
-        return default_chain
     #: the chain carries the principal characteristic group before is reached.
     # The selector counts an instance for any chain that holds a carbon bearing it, so for
     # 'CC(=O)N[C@@H](Cc1ccccc1)c1cc(OC)cc(=O)o1' the CH-CH2 chain of the nitrogen's other
     # substituent ties with the acetyl chain and wins on its prefixes: a chain that does not
     # hold the atoms of the group the default chain holds is not taken.
+    held = _group_atoms_held(features)
+    if _comparison_cannot_change_the_chain(features, default_chain, held):
+        # the comparison names the whole branches of every chain it ties (28 s for the 87-atom
+        # branch of a peptide fragment) to pick a chain that is not taken: it is not made
+        return default_chain
+    senior = principal_chain_with_ring_prefixes(features)
+    if not senior or len(senior) != len(default_chain):
+        return default_chain
+    if held(senior) != held(default_chain):
+        return default_chain
+    return senior
+
+
+def _group_atoms_held(features):
+    """The function that gives the atoms of the principal group a chain holds."""
     from ..rules.parent_selection import bridging_group_reaches
     matches = getattr(features, 'principal_group_atoms', None) or ()
     group_atoms = {int(a) for match in matches for a in match}
@@ -1465,9 +1477,78 @@ def p45_principal_chain(features, default_chain: Optional[List[int]]) -> Optiona
                    if bridging_group_reaches(features.mol, features.principal_group, m, atoms)}
         return reached or atoms & group_atoms
 
-    if _held(senior) != _held(default_chain):
-        return default_chain
-    return senior
+    return _held
+
+
+def _rival_chain_holds_the_group(features, default_chain, held) -> bool:
+    """True when a chain other than ``default_chain`` (as a set of atoms) has its length and holds
+    the principal-group atoms it holds: the only chains:func:`p45_principal_chain` can take
+    instead of ``default_chain``.
+
+    The comparison picks one of the chains that tie in ``find_principal_chain`` with the ring
+    atoms left out (``exclude_atoms`` of:func:`principal_chain_with_ring_prefixes`), which are
+    chains of its enumeration (``find_maximal_carbon_chains`` with the same exclusions), and
+    ``p45_principal_chain`` takes the one it picks only when it has the length of the default
+    chain and holds the atoms the default chain holds. Where no such rival exists the answer is
+    ``default_chain`` whichever chain the comparison picks, and whether it can decide or not,
+    but for the direction of the chain it picks (:func:`_comparison_cannot_change_the_chain`).
+    True too where the answer cannot be given, so that the comparison is made."""
+    mol = getattr(features, 'mol', None)
+    ring_systems = getattr(features, 'ring_systems', None) or ()
+    if mol is None or not ring_systems:
+        return True
+    try:
+        ring_atoms: Set[int] = set()
+        for rs in ring_systems:
+            ring_atoms.update(int(a) for a in rs)
+        excluded = ring_atoms | _get_non_principal_terminal_carbons(
+            mol, getattr(features, 'functional_groups', None) or {},
+            getattr(features, 'principal_group', None))
+        default_set = {int(a) for a in default_chain}
+        default_held = held(default_chain)
+        for chain in find_maximal_carbon_chains(mol, exclude_atoms=excluded or None):
+            if (len(chain) == len(default_chain) and {int(a) for a in chain} != default_set
+                    and held(chain) == default_held):
+                return True
+        return False
+    except Exception:                            # fail closed: the comparison is made
+        return True
+
+
+def _comparison_cannot_change_the_chain(features, default_chain, held) -> bool:
+    """True when the comparison of:func:`p45_principal_chain` provably answers ``default_chain``
+    (the same list of atoms, in the same order), so that it need not be made.
+
+    Three conditions hold together. (1) The principal group is one whose atoms for the
+    selector's criteria and orientation (``fg_atoms`` of ``find_principal_chain``) are the atoms
+    of its matches: not a group of the alcohol or amine class (the bearing carbons of the
+    heteroatom are added), not a skeletal-suffix group (only the attachment atoms count) and not
+    a heteroatom acid (``_HETEROACID_CHARACTERISTIC_Z``). (2) No chain other than the default
+    chain has its length and holds its principal-group atoms (:func:`_rival_chain_holds_the_group`):
+    the comparison then answers the default chain or a chain that is not taken, or the atoms of
+    the default chain in some order. (3) The order is the same: ``find_principal_chain`` puts the
+    chain in the direction that gives its principal-group atoms the lower locants and, where the
+    two directions give the same locants, in the opposite direction to the one it was found in,
+    which the tie-breaks of the two selectors do not fix alike (a secondary alcohol in the middle
+    of a chain, a dicarboxylic acid chain). With the locants of the two directions different the
+    direction is the same for the chain found by either selector."""
+    group = getattr(features, 'principal_group', None)
+    fgs = getattr(features, 'functional_groups', None) or {}
+    try:
+        from ..rules.parent_selection import BRIDGING_HETEROATOM_PGS, SKELETAL_SUFFIX_PGS
+        from ..rules.seniority import _RC4_UNION_CLASSES, _SENIORITY_PARENT
+        if (group in SKELETAL_SUFFIX_PGS or group in BRIDGING_HETEROATOM_PGS
+                or group in _HETEROACID_CHARACTERISTIC_Z
+                or _SENIORITY_PARENT.get(group) in _RC4_UNION_CLASSES):
+            return False
+        anchors = {int(a) for match in fgs.get(group) or () for a in match}
+        forward = sorted(i + 1 for i, a in enumerate(default_chain) if int(a) in anchors)
+        backward = sorted(len(default_chain) - i for i, a in enumerate(default_chain) if int(a) in anchors)
+        if not forward or forward == backward:
+            return False
+        return not _rival_chain_holds_the_group(features, default_chain, held)
+    except Exception:                            # fail closed: the comparison is made
+        return False
 
 
 def p45_acid_chain(mol, acid_atoms, carbonyl_c: int) -> Optional[List[int]]:

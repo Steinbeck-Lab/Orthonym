@@ -1020,6 +1020,53 @@ def _handle_anion_small(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_poly_anion(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
+    """POLY_ANION: the ion pipeline of ``_name_poly_anion``, and at the best-effort tier the
+     adduct of the drawing's own ions for a drawing of several fragments.
+
+    A drawing of several fragments whose ions all carry one sign (the sulfonate anions of a
+    mixture of photoacid generators: net charge -2 to -16, no cation) is not one poly-anion: its
+    fragments are separate molecular entities, which (Organic adducts: "Names are formed
+    by citing the names of individual compounds in the order of the formula connected by long (em)
+    dashes") names one by one. The pipeline below neutralises the drawing and names the acids, a
+    name that reads back to other species, and its nested namings of drug-size components run the
+    hang budgets of the whole molecule out: ``PerfBudgetExceeded`` unwound to the outermost
+    ``name``, which abstained before the late recovery could offer the adduct of the ions as
+    drawn. At the best-effort tier the pipeline now runs with the budgets of one compound
+    (``own_hang_budgets``), a trip is a producer that names nothing, and when it names nothing the
+    adduct of the CHARGED drawing is offered (``rules.adducts.name_adduct``), read back to the
+    drawing's full InChIKey, radical graph and protonation site (``_shipped_name_round_trip``, the
+    rule of the exit) before it is returned. Every other tier, and a single-fragment drawing, run
+    the pipeline as before.
+    """
+    if not (kwargs.get("general_fallback_unverified") and "." in (canonical_smiles or "")):
+        return _name_poly_anion(mol, smiles, canonical_smiles, features, style=style, **kwargs)
+    from orthonym.assembly.fragment_naming import PerfBudgetExceeded, own_hang_budgets
+    try:
+        with own_hang_budgets():
+            named = _name_poly_anion(mol, smiles, canonical_smiles, features, style=style, **kwargs)
+    except PerfBudgetExceeded:
+        named = None
+    if named:
+        return named
+    from orthonym.namer import _shipped_name_round_trip
+    from orthonym.rules.adducts import name_adduct
+    try:
+        adduct = name_adduct(
+            mol, canonical_smiles, style=style,
+            general_fallback=kwargs.get("general_fallback", False),
+            allow_aromatic_general=kwargs.get("allow_aromatic_general", False),
+            general_fallback_unverified=True)
+    except PerfBudgetExceeded:
+        adduct = None  # an offer, not the molecule: a component no rescue names leaves it unnamed
+    if adduct and _shipped_name_round_trip(adduct, smiles) == "verified":
+        from orthonym.metrics.provenance import record_source
+        record_source("general_engine", opsin="verified")
+        return adduct
+    return named
+
+
+def _name_poly_anion(mol, smiles, canonical_smiles, features=None, *,
+                     style: str = "pin", **kwargs) -> Optional[str]:
     """Mirrors namer.py:921-955 — dianion neutralize-then-name.
 
     Per the audit fresh-instance pattern. Returns None on no-match;

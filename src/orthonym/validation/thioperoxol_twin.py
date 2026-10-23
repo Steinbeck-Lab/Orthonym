@@ -39,6 +39,23 @@ its twin when OPSIN reads the twin to the FULL InChIKey of the input
 (``namer._shipped_name_round_trip``) and gives no ``APPEARS_AMBIGUOUS`` warning for it, as the other
 twin families do (``validation.twin_spellings``). The twin is never shipped.
 
+The default tier ships the PIN spelling through its twin. A general tier (``valid``, ``complete``,
+``best-effort``) prefers a name OPSIN reads itself, as the other twin families do with
+``twin_spellings.pin_spellings_on`` (a wider tier spells the form OPSIN reads). The general engine names the
+neutral group by the prefixes the book gives it where it is not the principal characteristic group,
+'(hydroxysulfanyl)methane' for -S-OH and '(sulfanyloxy)methane' for -O-S-H: Chalcogen analogues of
+hydroperoxides (the Blue Book), "(1) by using prefixes such as 'hydroperoxy', –OOH; 'disulfanyl', –SSH, or by
+combining simple prefixes, 'hydroxy' –OH; 'oxy-', –O–; 'sulfanyl', –SH; etc." (:28005), the PIN examples
+'3-(sulfanyloxy)propanenitrile (PIN)' (:28027) and '4-[(hydroxysulfanyl)methyl]benzoic acid (PIN)' (:29962), the
+glossary entries 'hydroxysulfanyl (HO-S–)' (:1810) and 'sulfanyloxy (HS-O–)' (:1812). OPSIN reads those names in
+full, so such a name ships by the round trip of the name itself, and a neutral thioperoxol name that only its twin
+reads is withdrawn at a general tier. The anion of -S-OH is the exception,:func:`ships_at_general_tier`: the engine
+builds no name OPSIN reads for it (OPSIN reads '(ethylsulfanyl)oxidanide',,:41035, but the engine
+builds no such name), so a general tier ships it through its twin, in the one pass, as the default tier does. The PIN spelling
+of a neutral name is also the safety net of a general tier: for a molecule that only the PIN path names it ships
+through its twin inside:func:`last_resort_scope` (``assembly.default_tier_offer.twin_last_resort_row``), so that a
+wider tier never names less than the default tier does.
+
 A -O-S-H name is not read back when the input also holds a -OOH group: the peroxol twin reads the name that puts the
 suffix on the other group as well (``1-(hydroperoxy)propane-2-OS-thioperoxol`` for ``CC(OO)COS``), (:17460).
 An anion twin needs an [S-O-] in the input for each group the name cites: 'ethanesulfenate' is read for the ester
@@ -100,6 +117,36 @@ def embedded_name():
         yield
     finally:
         _EMBEDDED.reset(token)
+
+
+#: True while a general tier names a molecule it has left without a name, once more, with the twin of a neutral
+#: thioperoxol name admitted (:func:`last_resort_scope`)
+_LAST_RESORT = contextvars.ContextVar("orthonym_thioperoxol_last_resort", default=False)
+
+
+@contextlib.contextmanager
+def last_resort_scope():
+    """Scope of the safety net of a general tier (``assembly.default_tier_offer.twin_last_resort_row``): the twin
+    of a neutral thioperoxol name is admitted in the validity gate, as at the default tier, so a molecule for which
+    every other path of the tier found no name keeps the PIN spelling that its twin reads back."""
+    token = _LAST_RESORT.set(True)
+    try:
+        yield
+    finally:
+        _LAST_RESORT.reset(token)
+
+
+def last_resort_active() -> bool:
+    """Whether a call is inside:func:`last_resort_scope`."""
+    return _LAST_RESORT.get()
+
+
+def ships_at_general_tier(name: str) -> bool:
+    """Whether a general tier ships the thioperoxol name ``name`` through its twin: the anion of -S-OH
+    ('methane(SO-thioperoxolate)'), for which the engine has no other spelling, always, and a neutral name only
+    inside:func:`last_resort_scope`: it gives way to the name OPSIN reads."""
+    found = thioperoxol_twin(name)
+    return found is not None and (found.anion or last_resort_active())
 
 
 class ThioperoxolTwin(NamedTuple):

@@ -178,7 +178,8 @@ def _proven_smiles(given: Chem.Mol) -> str:
             f"Invalid molecule: its SMILES ({key}) has a lone-pair stereocentre whose "
             "configuration the check cannot confirm: RDKit reads it otherwise than the "
             "standard reading of SMILES, which the naming of a SMILES string follows, "
-            "or the standard reading gives it no label (an As(III) centre, for one).")
+            "or the Mol does not hold a centre the string writes (the N of an N-aryl aziridine, "
+            "Sb(III), for one).")
     return key
 
 
@@ -194,21 +195,24 @@ def _lone_pair_centres_read_alike(key: str) -> bool:
     if not namer._has_lone_pair_stereocentre(key):
         return True
     try:
-        from rdkit.Chem import rdCIPLabeler
-
-        from .perception.centres_bridge import centres_label_batch
+        from .perception.lone_pair_reading import geometry_labels, standard_centres_labels
         mol = namer._lp_heavy_mol(key)
-        batch = centres_label_batch([key])
-        if mol is None or batch is None or key not in batch:
+        standard_labels = standard_centres_labels(key)
+        if mol is None or standard_labels is None:
+            return False
+        # a centre RDKit dropped at parsing (raw_reading) is not one of the Mol: the string defines a
+        # configuration the Mol does not hold, so the string is not the Mol
+        raw = namer.raw_reading(key)
+        if raw is None or len(namer.lone_pair_centres(raw)) != len([
+                a for a in mol.GetAtoms()
+                if namer._lone_pair_compared_atom(a) and a.GetTotalDegree() == 3]):
             return False
         centres = [a.GetIdx() for a in mol.GetAtoms()
                    if namer._lone_pair_compared_atom(a) and a.GetTotalDegree() == 3]
-        rdCIPLabeler.AssignCIPLabels(mol, atomsToLabel=centres, bondsToLabel=[],
-                                     maxRecursiveIterations=namer._LP_CIP_MAX_ITERATIONS)
+        rdkit = geometry_labels(mol, centres)
         for index in centres:
-            atom = mol.GetAtomWithIdx(index)
-            standard = batch[key].get(atom.GetIntProp("_lp_pos"))
-            if not atom.HasProp("_CIPCode") or atom.GetProp("_CIPCode") != standard:
+            standard = standard_labels.get(mol.GetAtomWithIdx(index).GetIntProp("_lp_pos"))
+            if standard is None or rdkit.get(index) != standard:
                 return False
         return True
     except Exception:  # RDKit's CIP labeller past its bound, or any other error

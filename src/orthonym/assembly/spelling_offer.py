@@ -52,25 +52,36 @@ def name_tiered_with_offer(namer, smiles: str, run) -> dict:
     best-effort abstention, ``default_tier_offer.offer_default_tier_row``. The flag and the held names of an
     earlier naming are cleared first, so what the row is offered never depends on what was named before it."""
     from .default_tier_offer import clear_held, offer_default_tier_row
+    from .fragment_naming import hang_budget_trips
+    from .memo import recording_scopes
     _AMINE_CHAIN_PARENT.set(None)
     clear_held()
-    return offer_default_tier_row(namer, smiles, prefer_clean_name(namer, smiles, run(smiles)))
+    trips = hang_budget_trips()
+    with recording_scopes() as passes:
+        row = run(smiles)
+    if hang_budget_trips() != trips:
+        passes = ()                         # a naming that ran out of a hang budget hands on nothing
+    return offer_default_tier_row(namer, smiles, prefer_clean_name(namer, smiles, row, passes))
 
 
-def prefer_clean_name(namer, smiles: str, row: dict) -> dict:
+def prefer_clean_name(namer, smiles: str, row: dict, passes=()) -> dict:
     """``row`` of the best-effort tier, or the row of the junior parent whose name breaks no spelling rule
-    when the chain-parent name of ``row`` breaks one (see the module docstring)."""
+    when the chain-parent name of ``row`` breaks one (see the module docstring). ``passes`` are the memo
+    scopes of the namings that made ``row`` (``memo.recording_scopes``): the junior namings start with the
+    names of the nested calls those namings made."""
     try:
-        return _prefer_clean_name(namer, smiles, row)
+        return _prefer_clean_name(namer, smiles, row, passes)
     except Exception:                       # the offer must never break a naming: the row stands
         return row
 
 
-def _prefer_clean_name(namer, smiles: str, row: dict) -> dict:
+def _prefer_clean_name(namer, smiles: str, row: dict, passes=()) -> dict:
     from rdkit import Chem
     from ..errors import is_failure_name
     from ..namer import _LABEL_RANK, Orthonym
     from ..validation.pin_spelling import check_pin_spelling
+    from .fragment_naming import hang_budget_trips
+    from .memo import recording_scopes, seeded_scopes, shareable_entries
     if (_AMINE_CHAIN_PARENT.get() is None or row.get('tier') in ('abstain', 'pin_verified')
             or not getattr(namer, '_general_fallback_unverified', False)
             or getattr(namer, '_forced_parent_rank', 0) != 0
@@ -83,11 +94,19 @@ def _prefer_clean_name(namer, smiles: str, row: dict) -> dict:
     if not failures:
         return row
     pool = min(getattr(namer, '_top_parent_pool_size', 1), _MAX_OFFERS + 1)
+    # Every naming of the molecule names the same parts of it again (a junior parent changes the parent
+    # of the molecule, not the nested names of the groups on it): the names the namings so far gave to
+    # nested calls are handed to the next one, which keeps a memo scope of its own.
+    given = shareable_entries(passes)
     for rank in range(1, pool):
         inner = Orthonym(style=namer.style, general_fallback=True, general_fallback_unverified=True,
                          allow_aromatic_general=getattr(namer, '_allow_aromatic_general', False),
                          _forced_parent_rank=rank)
-        alt = inner.name_tiered(smiles)
+        trips = hang_budget_trips()
+        with seeded_scopes(given), recording_scopes() as made:
+            alt = inner.name_tiered(smiles)
+        if hang_budget_trips() == trips:    # the names of a naming that ran out of a hang budget are cut short
+            shareable_entries(made, into=given)
         name = alt.get('name')
         if (alt.get('tier') in ('abstain', 'pin_verified') or not name or is_failure_name(name)
                 or _LABEL_RANK.get(alt.get('tier'), 0) < _LABEL_RANK.get(row.get('tier'), 0)

@@ -86,6 +86,16 @@ from .assembly.offer_pool import (
 from .perception.chains import find_principal_chain
 from .perception.functional_groups import detect_functional_groups
 from .perception.ions import detect_species_type, get_ion_sites, get_radical_sites
+from .perception.lone_pair_reading import (
+    STAND_IN,
+    dropped_centres_invisible_to_inchi,
+    geometry_labels,
+    lone_pair_centres,
+    raw_reading,
+    standard_centres_labels,
+    standard_reading_flips,
+    standard_reading_mol,
+)
 from .perception.rings import (
     classify_ring,
     get_complete_ring_atom_set,
@@ -1081,7 +1091,7 @@ def _self_consistency_full_key_impl(smiles: str) -> Optional[str]:
     used to call them a mismatch. Equal full keys can only turn a spurious mismatch
     into ok, never the reverse (0-wrong preserved)."""
     try:
-        mol = Chem.MolFromSmiles(smiles)
+        mol = standard_reading_mol(smiles)
         if mol is None:
             return None
         from rdkit.Chem import inchi
@@ -1291,18 +1301,18 @@ def _lone_pair_compared_atom(atom) -> bool:
 
 
 def _has_lone_pair_stereocentre(smiles: Optional[str]) -> bool:
-    """True iff RDKit's reading of ``smiles`` keeps a compared tetrahedral
-    stereocentre with three ligands in all (heavy atoms and H), the fourth position
-    being the lone pair: P(III), As(III), S(IV) and Se(IV) (sulfoxides, sulfinyl,
-    sulfinates, sulfonium), N in a three-membered ring."""
+    """True iff ``smiles`` writes a compared tetrahedral stereocentre with three ligands in all (heavy
+    atoms and H), the fourth position being the lone pair: P(III), As(III), Sb(III), S(IV), Se(IV),
+    Te(IV) (sulfoxides, sulfinyl, sulfinates, sulfonium), N in a three-membered ring. The centres RDKit
+    drops when it parses (the N of an N-aryl aziridine, Sb, Bi, Te, Po) count: the string defines them
+    (``perception.lone_pair_reading.raw_reading``)."""
     if not smiles or '@' not in smiles:
         return False
     try:
-        mol = Chem.MolFromSmiles(smiles)
+        mol = raw_reading(smiles)
     except Exception:
         return False
-    return mol is not None and any(
-        _lone_pair_compared_atom(a) and a.GetTotalDegree() == 3 for a in mol.GetAtoms())
+    return mol is not None and bool(lone_pair_centres(mol))
 
 
 def _lp_heavy_mol(smiles: str):
@@ -1356,7 +1366,7 @@ def _lp_inchi_correspondence(mol):
     return std, out
 
 
-def _lone_pair_configuration_verified(name: str, smiles: Optional[str]) -> bool:
+def _lone_pair_configuration_verified(name: str, smiles: Optional[str], held_only: bool = False) -> bool:
     """Lone-pair stereocentres (TRIAGE.md 'Lone-pair stereocentres -- RDKit
     reading'): does ``name`` denote the configuration of ``smiles`` as a reader that
     treats the lone pair as an implicit hydrogen reads the string?
@@ -1384,8 +1394,12 @@ def _lone_pair_configuration_verified(name: str, smiles: Optional[str]) -> bool:
     isomorphism of the two structures -- the annotated canonical SMILES
     (``_lp_annotated_smiles``) are equal, or, for a name whose structure OPSIN writes
     as another tautomer or charge form, the centres agree position by position
-    through their shared standard InChI (``_lp_inchi_correspondence``). False when
-    OPSIN or centres is unavailable or anything fails (fail-closed); True without a
+    through their shared standard InChI (``_lp_inchi_correspondence``). The centres are those the string
+    writes, also the ones RDKit drops at parsing (``raw_reading``), and an element ``centres`` gives no label
+    (As, Sb, Bi, Te, Po) is read through its stand-in (``standard_centres_labels``): a compared centre of the
+    input that has no label is not confirmed, and a name that leaves out a centre of the input does not agree.
+    ``held_only`` leaves out the centres RDKit drops (the exit check asks it of a name that left only those
+    out). False when OPSIN or centres is unavailable or anything fails (fail-closed); True without a
     lone-pair stereocentre (nothing to check)."""
     if not _has_lone_pair_stereocentre(smiles):
         return True
@@ -1395,14 +1409,16 @@ def _lone_pair_configuration_verified(name: str, smiles: Optional[str]) -> bool:
         opsin_smiles = _validity_gate_name_to_opsin_smiles(name)
         if not opsin_smiles:
             return False
-        from .perception.centres_bridge import centres_label_batch
-        batch = centres_label_batch([smiles, opsin_smiles])
-        if batch is None or smiles not in batch or opsin_smiles not in batch:
+        lab_in, lab_out = standard_centres_labels(smiles), standard_centres_labels(opsin_smiles)
+        reading = _lp_heavy_mol if held_only else raw_reading
+        mol_in, mol_out = reading(smiles), reading(opsin_smiles)
+        if lab_in is None or lab_out is None or mol_in is None or mol_out is None:
             return False
-        lab_in, lab_out = batch[smiles], batch[opsin_smiles]
-        mol_in, mol_out = _lp_heavy_mol(smiles), _lp_heavy_mol(opsin_smiles)
-        if mol_in is None or mol_out is None:
-            return False
+        # a compared centre of the input that no label reads cannot be confirmed: fail closed (an element
+        # ``centres`` does not label is read through its stand-in, perception.lone_pair_reading)
+        for idx in lone_pair_centres(mol_in):
+            if lab_in.get(mol_in.GetAtomWithIdx(idx).GetIntProp('_lp_pos')) not in _LP_CIP_CODE:
+                return False
         if _lp_annotated_smiles(mol_in, lab_in) == _lp_annotated_smiles(mol_out, lab_out):
             return True
         corr_in, corr_out = _lp_inchi_correspondence(mol_in), _lp_inchi_correspondence(mol_out)
@@ -1426,8 +1442,9 @@ def _lp_labels_by_atom(labels: Dict[int, str], order: List[int]) -> Dict[int, st
     return {order[pos - 1]: lab for pos, lab in labels.items() if 0 < pos <= len(order)}
 
 
-#: Bound on RDKit's CIP labeller for the lone-pair reading check (about a second, the
-#: RDKit documentation's figure for 1,250,000 iterations); exceeding it keeps the input.
+#: Bound on RDKit's CIP labeller for the lone-pair reading checks (``input_mol``,
+#: ``perception.lone_pair_reading``: about a second, the RDKit documentation's figure for
+#: 1,250,000 iterations); exceeding it keeps RDKit's reading.
 _LP_CIP_MAX_ITERATIONS = 1_250_000
 
 
@@ -1440,48 +1457,95 @@ def _lone_pair_standard_spelling_and_order(
     if not _has_lone_pair_stereocentre(smiles):
         return smiles, None
     try:
-        from rdkit.Chem import rdCIPLabeler
-
-        from .perception.centres_bridge import _smiles_output_order, centres_label_batch
+        from .perception.centres_bridge import _smiles_output_order
         mol = _lp_heavy_mol(smiles)
-        if mol is None:
+        written = standard_centres_labels(smiles)
+        if mol is None or written is None:
             return smiles, None
-        batch = centres_label_batch([smiles])
-        if batch is None or smiles not in batch:
-            return smiles, None
-        written = batch[smiles]
-        as_written = {a.GetIdx(): written[a.GetIntProp('_lp_pos')]
-                      for a in mol.GetAtoms() if a.GetIntProp('_lp_pos') in written}
         centres = [a.GetIdx() for a in mol.GetAtoms()
                    if _lone_pair_compared_atom(a) and a.GetTotalDegree() == 3]
-        rdkit_read = Chem.Mol(mol)
-        rdCIPLabeler.AssignCIPLabels(rdkit_read, atomsToLabel=centres, bondsToLabel=[],
-                                     maxRecursiveIterations=_LP_CIP_MAX_ITERATIONS)
-        misread = []
-        for idx in centres:
-            atom = rdkit_read.GetAtomWithIdx(idx)
-            if (idx in as_written and atom.HasProp('_CIPCode')
-                    and atom.GetProp('_CIPCode') != as_written[idx]):
-                misread.append(idx)
+        # the centres RDKit dropped when it parsed (raw_reading) are not atoms of the Mol the engine
+        # names: the exit check, which reads the string, declines a name that leaves one out
+        raw = raw_reading(smiles)
+        dropped = ({raw.GetAtomWithIdx(i).GetIntProp('_lp_pos') for i in lone_pair_centres(raw)}
+                   - {mol.GetAtomWithIdx(i).GetIntProp('_lp_pos') for i in centres})
+        # the elements ``centres`` does not label (As, Sb, Bi, Te, Po): the engine labels them by the
+        # Mol (rdCIPLabeler, centres_bridge._label_unlabelled_lone_pair_centres), not by a string
+        stand_in = {a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() in STAND_IN}
+
+        def labels_of(reading, labels, order=None, engine_read_only=True):
+            """``centres`` labels keyed by atom of ``reading``; with ``engine_read_only`` the centres of the
+            elements the engine does not read from a string are left out."""
+            if order is None:
+                pairs = {a.GetIdx(): labels[a.GetIntProp('_lp_pos')]
+                         for a in reading.GetAtoms() if a.GetIntProp('_lp_pos') in labels}
+            else:
+                pairs = _lp_labels_by_atom(labels, order)
+            return {idx: lab for idx, lab in pairs.items()
+                    if not (engine_read_only and idx in stand_in)
+                    and reading.GetAtomWithIdx(idx).GetIntProp('_lp_pos') not in dropped}
+
+        as_written = labels_of(mol, written)
+        # the labels centres gives RDKit's canonical SMILES of this reading, which are the labels
+        # the naming path gives the Mol (centres_label_mol): a centre they give another label than
+        # the string as written is one the engine would name the other configuration at
+        canonical = Chem.MolToSmiles(mol)
+        canonical_order = _smiles_output_order(mol)
+        canonical_labels = standard_centres_labels(canonical)
+        if canonical_order is None or canonical_labels is None:
+            return smiles, None
+        given = labels_of(mol, canonical_labels, canonical_order)
+        misread = [idx for idx in centres
+                   if idx in as_written and idx in given and given[idx] != as_written[idx]]
+        flips = set(standard_reading_flips(smiles))
+        misread += [idx for idx in centres if idx in stand_in and idx in flips]
         if not misread:
             return smiles, None
         standard = Chem.RWMol(mol)
         for idx in misread:
             standard.GetAtomWithIdx(idx).InvertChirality()
         standard = standard.GetMol()
-        spelled = Chem.MolToSmiles(standard)
-        spelled_order = _smiles_output_order(standard)
-        batch = centres_label_batch([spelled])
-        if spelled_order is None or batch is None or spelled not in batch:
-            return smiles, None
-        if _lp_labels_by_atom(batch[spelled], spelled_order) != as_written:
-            return smiles, None
-        reread = Chem.MolFromSmiles(spelled)
-        if reread is None or Chem.MolToSmiles(reread) != spelled:
-            return smiles, None
-        return spelled, spelled_order
+        # the stand-in elements read as written by the Mol itself (no string in between)
+        wanted = [idx for idx in centres if idx in stand_in]
+        if wanted:
+            geometry = geometry_labels(standard, wanted)
+            if any(geometry.get(idx) != written.get(mol.GetAtomWithIdx(idx).GetIntProp('_lp_pos'))
+                   for idx in wanted):
+                return smiles, None
+        # the string to name: RDKit's canonical SMILES of the standard reading when CDK reads it as the input
+        # at every atom, else a spelling of it rooted at another atom (RDKit writes a lone-pair centre by its
+        # position, so a root that moves it reads as the input); the comparisons of the round trip read the
+        # string the standard way
+        wanted_labels = labels_of(mol, written, engine_read_only=False)
+        spelled_canonical = Chem.MolToSmiles(standard)
+
+        def writings():
+            yield spelled_canonical, _smiles_output_order(standard)
+            for root in range(min(standard.GetNumAtoms(), _LP_VEHICLE_ROOTS)):
+                text = Chem.MolToSmiles(standard, canonical=False, rootedAtAtom=root)
+                yield text, _smiles_output_order(standard)
+
+        seen = set()
+        for spelled, spelled_order in writings():
+            if spelled in seen or spelled_order is None:
+                continue
+            seen.add(spelled)
+            spelled_labels = standard_centres_labels(spelled)
+            if spelled_labels is None:
+                return smiles, None
+            if labels_of(mol, spelled_labels, spelled_order, engine_read_only=False) != wanted_labels:
+                continue
+            reread = Chem.MolFromSmiles(spelled)
+            if reread is None or Chem.MolToSmiles(reread) != spelled_canonical:
+                continue
+            return spelled, spelled_order
+        return smiles, None
     except Exception:
         return smiles, None
+
+
+#: The atoms a string of the standard reading may be rooted at (``_lone_pair_standard_spelling_and_order``).
+_LP_VEHICLE_ROOTS = 40
 
 
 def _lone_pair_standard_spelling(smiles: Optional[str]) -> Optional[str]:
@@ -1498,24 +1562,29 @@ def _lone_pair_standard_spelling(smiles: Optional[str]) -> Optional[str]:
     (:func:`_lone_pair_configuration_verified`) withdrew the (R) name, so such a
     string was not named at all.
 
-    RDKit reads ``smiles`` unlike the standard reading at a lone-pair stereocentre
-    when RDKit's CIP label of its reading there (``rdCIPLabeler``) differs from
-    CDK's label of the string as written. With no such centre ``smiles`` is
+    The engine's CIP labels are CDK's labels of RDKit's canonical SMILES of its
+    reading (``centres_label_mol``). A lone-pair stereocentre is labelled the other
+    configuration than the string as written gives when CDK reads that canonical
+    SMILES unlike the caller's string at the centre. That happens where RDKit reads
+    the string unlike the standard reading (the atom written first) and where
+    RDKit writes its canonical SMILES unlike it reads the standard reading (a
+    ring-closure digit at the centre of a string RDKit reads the standard way:
+    1,2-diphenylphospholane written 'C1C[C@H]([P@@](C1)C2=CC=CC=C2)C3=CC=CC=C3' is
+    (1R,2S) to RDKit, CDK and OPSIN, and its canonical SMILES puts a ring-closure
+    digit at the P, which CDK reads as (1S,2S)). With no such centre ``smiles`` is
     returned unchanged. Otherwise those centres are inverted in RDKit's reading and
     the result is RDKit's canonical SMILES of it, returned only when CDK's labels of
     that string equal CDK's labels of ``smiles`` as written at every atom
     (tetrahedral and double-bond labels alike) and RDKit writes it back unchanged.
-    The engine's CIP labels are CDK's labels of RDKit's canonical SMILES of its
-    reading (``centres_label_mol``), which for that string is the string itself, so
-    the engine then names the molecule the standard reading of ``smiles`` denotes.
-    When RDKit's canonical SMILES repeats a ring-closure misreading (the P(III) and
-    aziridine rows of test_lone_pair_configuration.py) that check fails and
-    ``smiles`` is returned: the two misreadings cancel there and those rows are
-    named right as they are. Anything that cannot be shown returns ``smiles`` (the
-    exit check then decides, as before). The exit check still compares CDK's
-    reading of the caller's string as written with OPSIN's own SMILES of the name
-    (:func:`_lone_pair_as_written`), so a name ships only when it denotes that
-    reading."""
+    The engine then names the molecule the standard reading of ``smiles`` denotes.
+    Where RDKit's canonical SMILES repeats RDKit's own ring-closure misreading of
+    the caller's string (CO[P@@]1OC[C@H](C)O1 in test_lone_pair_configuration.py)
+    CDK already reads it as the input, nothing is inverted and ``smiles`` is returned:
+    the two misreadings cancel and those rows are named right as they are. Anything
+    that cannot be shown returns ``smiles`` (the exit check then decides, as before).
+    The exit check still compares CDK's reading of the caller's string as written
+    with OPSIN's own SMILES of the name (:func:`_lone_pair_as_written`), so a name
+    ships only when it denotes that reading."""
     return _lone_pair_standard_spelling_and_order(smiles)[0]
 
 
@@ -2365,8 +2434,9 @@ def _grammar_gap_carveout(name: str, smiles: Optional[str] = None) -> Optional[s
     after a 'rejected' answer and on 'unavailable': the output of these classes does
     not depend on whether OPSIN could be reached (TRIAGE j12 finding 1).
 
-    NOT here: the thioperoxol names (no OPSIN grammar either; each ships through its twin
-    read-back, ``validation.thioperoxol_twin``), the organometallic additive carve-out
+    NOT here: the thioperoxol names (no OPSIN grammar either; the default tier ships each through
+    its twin read-back, ``validation.thioperoxol_twin``; a general tier ships the name OPSIN reads,
+    and the anion of -S-OH, which has none, through its twin), the organometallic additive carve-out
     (OPSIN parses some '-ido' ligand names, and the class has a known atom-drop hole, so a
     healthy run's on a parsed name is a real check), the stereo-layer carve-out (its
     licence is a parse of the stereo-stripped form) and the polyacid carve-out (reached only
@@ -2893,8 +2963,8 @@ def _full_inchikey_offer_match_impl(input_smiles: str, opsin_smiles: str,
     fail-open ``True`` for it without memoising it.
     """
     try:
-        mi = Chem.MolFromSmiles(input_smiles)
-        mo = Chem.MolFromSmiles(opsin_smiles)
+        mi = standard_reading_mol(input_smiles)
+        mo = standard_reading_mol(opsin_smiles)
         if mi is None or mo is None:
             return True
         from rdkit.Chem import inchi
@@ -3989,7 +4059,7 @@ def _charge_forms(smiles: str) -> Optional[Tuple[Tuple[str, Optional[Tuple[int, 
         return None
 
 
-from .assembly.form_choice import beats as _form_name_beats
+from .assembly.form_choice import beats as _form_name_beats, stereo_decides_below_pin as _stereo_below_pin
 
 
 def _form_choice_scope(fn):
@@ -4159,7 +4229,7 @@ def _budget_scope(fn):
             # (so an unparseable coordination name is rejected -- 0-wrong).
             # Best-effort only + only on this already-abstaining boundary, so
             # PIN/complete output is byte-identical (offer-not-return, inv 18).
-            _rescued = self._try_perf_budget_t4_rescue(smiles)
+            _rescued = self._try_perf_budget_t4_rescue(smiles) or self._try_pin_ceiling_rescue(smiles)
             if _rescued is not None and not is_failure_name(_rescued):
                 _result = self._finish(_rescued, smiles)
                 _record_stereo_group_non_pin(_result)
@@ -5403,7 +5473,7 @@ class Orthonym:
                 # ``_finish`` included, as for any other failure.
                 from .assembly.fragment_naming import rearm_hang_budgets
                 if is_failure_name(result):
-                    _pb = self._try_perf_budget_t4_rescue(smiles)
+                    _pb = self._try_perf_budget_t4_rescue(smiles) or self._try_pin_ceiling_rescue(smiles)
                     if _pb is not None and not is_failure_name(_pb):
                         result = _pb
                 rearm_hang_budgets()
@@ -5705,7 +5775,8 @@ class Orthonym:
             row["producer"] = None if row.get("tier") == "abstain" else lookup(row.get("name"))
             # LO10: a name of any producer that leaves out stereo the input configures (the row's own flag
             # covers the general engine alone); the name, tier and label are the row's, unchanged.
-            if row.get("tier") != "abstain" and name_states_fewer_stereo(smiles, row.get("name")):
+            if row.get("tier") != "abstain" and (name_states_fewer_stereo(smiles, row.get("name"))
+                                                 or get_provenance().get("stereo_unexpressed")):
                 row["stereo_unexpressed"] = True
             return row
         finally:
@@ -6316,8 +6387,11 @@ class Orthonym:
         # (the bis(...) multiplier doubles the DEFINED units on mol). Verify with the
         # EXACT-ISOMERIC gate (NOT the count, NOT a bare InChIKey): _rt_match(
         # flagged=False), whose CanonSmiles == CanonSmiles branch is InChI-STRONGER
-        # (catches C=N/ylidene the InChIKey is blind to — Adv3).
-        if cand_smi is not None and self._rt_match(smiles, cand_smi, False):
+        # (catches C=N/ylidene the InChIKey is blind to — Adv3). That comparison is for a single
+        # compound; a adduct of a multi-fragment input is judged by the exit rule,
+        # ``_shipped_name_round_trip`` (the full key, the radical graph and the protonation site),
+        # because OPSIN draws a delocalised cation on either resonance atom (``_candidate_rt_match``).
+        if cand_smi is not None and self._candidate_rt_match(cand, smiles, cand_smi, False):
             return (True, False, cand)         # e.g. CID 101644479
 
         # STEP 4b — OMISSION -> COMPOSE the input's stereo onto the flat/partial base
@@ -6334,6 +6408,46 @@ class Orthonym:
         # STEP 5 — genuine CONFLICT / unexpressible (axial, InChI-invisible tail that
         # composition cannot express) -> ABSTAIN all-or-nothing).
         return (False, False, None)
+
+    @classmethod
+    def _candidate_rt_match(cls, name: str, input_smiles: str, opsin_smiles: str,
+                            stereo_flagged: bool) -> bool:
+        """The round-trip check of a general-tier candidate ``name`` (``opsin_smiles`` is what OPSIN
+        read from it): ``_rt_match``; and, in the pass of ``default_tier_offer.relaxed_adduct_row``, for a
+         adduct of the whole multi-fragment molecule (a name that joins its components by long
+        dashes) also a reading that passes what every general tier asks of the name it ships
+        (``_shipped_name_round_trip``: the full InChIKey, the radical graph and the protonation site,
+        ``_exit_round_trip_check``).
+
+        OPSIN draws a delocalised cation on either resonance atom, and a neutral amidine or guanidine
+        on either nitrogen, so it can read an adduct component with the charge or the hydron on
+        another atom than the input has it ('4-ethyl-1-methyl-1H-imidazol-3-ium' for
+        ``CCC1=C[N+](=CN1)C``): the canonical SMILES differ, the species is one, and a name places
+        neither. A hydron or a charge on another site of a base or an acid is another species to
+        ``_shipped_name_round_trip``. The exact comparison decides in every other pass, so no name that
+        ships changes: where it rejects such an adduct the first pass notes it
+        (``note_relaxed_adduct``), and the molecule is offered the pass only when no other path named it.
+        A name that asserts less stereo than the input (``stereo_flagged``) is judged by ``_rt_match``
+        alone."""
+        if cls._rt_match(input_smiles, opsin_smiles, stereo_flagged):
+            return True
+        from .rules.adducts import EM_DASH
+        if stereo_flagged or "." not in input_smiles or EM_DASH not in name:
+            return False
+        from .assembly.default_tier_offer import note_relaxed_adduct, relaxed_adduct_active
+        from .assembly.fragment_naming import outermost_name_input
+        try:
+            outer = Chem.MolToSmiles(Chem.MolFromSmiles(outermost_name_input() or ""))
+            if outer != Chem.MolToSmiles(Chem.MolFromSmiles(input_smiles)):
+                return False                # a part of the molecule: the exact comparison decides
+        except Exception:
+            return False
+        if _shipped_name_round_trip(name, input_smiles) != "verified":
+            return False
+        if relaxed_adduct_active():
+            return True
+        note_relaxed_adduct()
+        return False
 
     @staticmethod
     def _rt_match(input_smiles: str, opsin_smiles: str,
@@ -6386,8 +6500,8 @@ class Orthonym:
         """
         try:
             if stereo_flagged:
-                _o = Chem.MolFromSmiles(opsin_smiles)
-                _i = Chem.MolFromSmiles(input_smiles)
+                _o = standard_reading_mol(opsin_smiles)
+                _i = standard_reading_mol(input_smiles)
                 if _o is None or _i is None:
                     return False
                 # constitution guard on COPIES (RemoveStereochemistry mutates; the
@@ -6418,7 +6532,8 @@ class Orthonym:
             # compare"; this makes the code match. Fall back to the CanonSmiles match
             # only when InChI is genuinely unavailable for a side (no regression).
             # Strictly tightening (NEW-accepts subset of OLD-accepts).
-            if Chem.CanonSmiles(opsin_smiles) != Chem.CanonSmiles(input_smiles):
+            if (Chem.MolToSmiles(standard_reading_mol(opsin_smiles))
+                    != Chem.MolToSmiles(standard_reading_mol(input_smiles))):
                 return False
             _ik_i = _self_consistency_full_key(input_smiles)
             _ik_o = _self_consistency_full_key(opsin_smiles)
@@ -6910,7 +7025,7 @@ class Orthonym:
                     # T6.3: compare at the granularity the name asserts
                     # -- constitution-only for a flagged emission, exact
                     # isomeric otherwise.
-                    if not self._rt_match(smiles, _opsin_smi, _stereo_flagged):
+                    if not self._candidate_rt_match(cand, smiles, _opsin_smi, _stereo_flagged):
                         # Phase1 B5 general lever: the recovery lane's own
                         # (rung-0) general name denotes a DIFFERENT molecule, but
                         # the PG-suppressed cascade may build a complete,
@@ -7146,6 +7261,49 @@ class Orthonym:
             return None
         finally:
             disarm_hang_budgets()  # keep the descriptive fallback below safe
+
+    def _try_pin_ceiling_rescue(self, smiles: str) -> Optional[str]:
+        """The second offer to a molecule whose MAIN naming path exhausted the macrocycle-hang
+        budget and whose rescue (``_try_perf_budget_t4_rescue``) found no name: the molecule named
+        once more under the PIN-tier ceilings of the von Baeyer analyses
+        (``assembly.budget_rescue.pin_ceiling_name``).
+
+        The best-effort ceilings (100 skeletal atoms, 15 rings) let the analysis of a large ring
+        system run the budget out, in the main path and again in the rescue; under the PIN ceilings
+        such a system is refused at once and another producer names the molecule, as before the
+        best-effort ceilings existed. The same checks as the rescue decide what ships: the stereo
+        decision, and an exact OPSIN read-back (``_rt_match``), so an unparseable or other name is
+        never shipped (0-wrong). The name is a general-engine name, never labelled a PIN. Best-effort
+        tier only, and only on a molecule that already abstains (or is about to ship a failure), so
+        no currently-shipping name can change. The budget is an operation count, so the offer is
+        deterministic. Never raises."""
+        if not self._general_fallback_unverified:
+            return None
+        if not (self._disable_opsin_validity_gate or _validity_gate_jar_present()):
+            return None
+        try:
+            mol = Chem.MolFromSmiles(smiles)
+            if mol is None:
+                return None
+            from .assembly.budget_rescue import pin_ceiling_name
+            cand = pin_ceiling_name(self, smiles)
+            if not cand or is_failure_name(cand):
+                return None
+            _permitted, _flagged, _name_out = self._stereo_emit_decision(mol, cand, smiles)
+            if not _permitted:
+                return None
+            cand = _name_out
+            if not self._disable_opsin_validity_gate:
+                _smi = _validity_gate_name_to_smiles(cand)
+                if _smi is None or not self._rt_match(smiles, _smi, _flagged):
+                    return None
+            from .metrics.provenance import record_non_pin_fragment, record_source
+            record_source("general_engine")
+            record_non_pin_fragment(cand)
+            return cand
+        except Exception as e:  # noqa: BLE001 - fail-closed
+            logger.info("PIN-ceiling rescue error (kept abstention): %s", e)
+            return None
 
     def _try_demote_senior_group_rescue(self, smiles: str):
         """ tail #7: best-effort rescue that re-picks the principal group with
@@ -8278,8 +8436,9 @@ class Orthonym:
             best = None
             for k in sorted(results):
                 result, label = results[k]
-                if best is None or label > best[2] or (
-                        label == best[2] and isinstance(result, str)
+                more = best and _stereo_below_pin(label, best[2], kept[k], kept[best[0]], _LABEL_RANK["pin_verified"])
+                if best is None or more > 0 or (not more and label > best[2]) or (
+                        not more and label == best[2] and isinstance(result, str)
                         and isinstance(best[1], str) and not is_failure_name(result)
                         and _form_name_beats(result, best[1], provenance[k], provenance[best[0]],
                                              kept[k], kept[best[0]])):
@@ -8486,6 +8645,18 @@ class Orthonym:
             if not _validity_gate_jar_present():
                 return name
             if _lone_pair_configuration_verified(name, _written):
+                return name
+            if (self._general_fallback_unverified and dropped_centres_invisible_to_inchi(_written)
+                    and _lone_pair_configuration_verified(name, _written, held_only=True)):
+                # the name holds every centre of the input the Mol holds and leaves out only centres RDKit
+                # drops that no InChI can tell apart (Sb, Bi, Te, Po): no round trip refutes it, and it is not
+                # the PIN, which cites each stereogenic unit. Shipped below the PIN, flagged, at the tier that
+                # takes names that leave a configuration out; the default tier declines.
+                from .metrics.provenance import record_non_pin_label, record_stereo_unexpressed
+                record_stereo_unexpressed(True)
+                record_non_pin_label(
+                    name, rule="P-91.2.1.2.1",
+                    detail="the configuration of a lone-pair centre of the input (Sb, Bi, Te, Po) is not cited")
                 return name
             return self._withdraw_at_exit(name, smiles, "exit_lone_pair_configuration")
         except Exception as _le:  # pragma: no cover - defensive, fails closed
@@ -10279,7 +10450,7 @@ class Orthonym:
                                 features.principal_ring = _bz
                     features.benzene_ring = features.principal_ring
                     features.benzene_substituents = get_benzene_substituents(
-                        features.mol, features.principal_ring
+                        features.mol, features.principal_ring, features.principal_group
                     )
                 elif features.ring_type and features.ring_type.startswith('heterocyclic'):
                     # Heterocyclic ring: classify, detect substituents, and orient

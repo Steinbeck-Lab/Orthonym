@@ -169,6 +169,8 @@ class _Model:
         self.keys: List[Key] = sorted({key for c in per_pos.values() for key in c},
                                       key=lambda k: (k[1], k[0]))
         self.base_key = Chem.MolToSmiles(self.heavy)
+        #: the symmetry class of each heavy atom (equal ranks are atoms the graph cannot tell apart)
+        self.cls = list(Chem.CanonicalRankAtoms(self.heavy, breakTies=False))
         ring_info = original.GetRingInfo()
         self.fusion = any(ring_info.NumAtomRings(heavy_atoms[p]) >= 2 for p in per_pos)
 
@@ -251,9 +253,15 @@ def _group_spans(skeleton: str) -> List[Tuple[int, int, Tuple[str, ...]]]:
         elif copies >= 3:
             # without locants, one copy and the others multiplied: '(13C)methylpentamethylbenzene'
             reduced = group + multiplying_prefix(copies - 1, kind) + group
-            texts = (reduced, group * copies, wrapped * copies)
+            texts = (reduced, wrapped * copies, group * copies)
         else:
-            texts = (group * copies, wrapped * copies)
+            # (heading '', the Blue Book): "For mononuclear parent hydrides with
+            # two or more substituents the first cited substituent never has enclosing marks unless it
+            # includes a locant. The second and further substituents are each enclosed with parentheses even
+            # for simple substituents." A copy that carries a descriptor includes a locant, and its marks
+            # step up: '[(4-2H)phenyl](phenyl)methanol', not '(4-2H)phenylphenylmethanol'.
+            # The copies enclosed come first; the bare spelling stays as the second one.
+            texts = (wrapped * copies, group * copies)
         spans.append((m.start(), end, tuple(dict.fromkeys(texts))))
     spans.sort(key=lambda sp: (sp[0], -sp[1]))
     kept: List[Tuple[int, int, Tuple[str, ...]]] = []
@@ -414,6 +422,16 @@ def _candidate_offsets(skeleton: str) -> List[int]:
 # ---------------------------------------------------------------------------
 
 
+def _other_alternation(a: Chem.Mol, b: Chem.Mol) -> bool:
+    """True iff the heavy-atom molecules ``a`` and ``b`` are one compound drawn in two Kekule alternations
+    (the same atoms and bonds without their orders, ``rules.isotopes._kekule_forms_of_one_compound``)."""
+    try:
+        return (_iso._bond_order_free_key(a) == _iso._bond_order_free_key(b)
+                and _iso._kekule_forms_of_one_compound(a, b))
+    except Exception:  # noqa: BLE001 - a frame that cannot be judged is no frame
+        return False
+
+
 class _Prober:
     """Parses the probe names of one spelling of the skeleton and reads the atoms each labels,
     counting the parses. ``ok`` is False when the skeleton itself does not give a frame."""
@@ -436,11 +454,21 @@ class _Prober:
         smi = self._parse(skeleton)
         mol = Chem.MolFromSmiles(smi) if smi else None
         view = _heavy_view(mol) if mol is not None else None
-        if view is None or view[1] or Chem.MolToSmiles(view[0]) != self.model.base_key:
+        if view is None or view[1]:
             return
         work = view[0]
-        match = (self.model.heavy.GetSubstructMatch(work, useChirality=True)
-                 or self.model.heavy.GetSubstructMatch(work))
+        if Chem.MolToSmiles(work) == self.model.base_key:
+            match = (self.model.heavy.GetSubstructMatch(work, useChirality=True)
+                     or self.model.heavy.GetSubstructMatch(work))
+        elif _other_alternation(work, self.model.heavy):
+            # OPSIN writes a conjugated ring RDKit does not perceive as aromatic in the other Kekule
+            # alternation than the input's (the periphery of '10b,10c-dihydropyren-1-yl', a 4n+2 circuit,
+            # ``rules.isotopes._same_fixed_h_inchi``): one compound, so the frame is the same, matched on
+            # the graphs without bond orders.
+            match = _iso._single_bond_graph(self.model.heavy).GetSubstructMatch(
+                _iso._single_bond_graph(work))
+        else:
+            return
         if len(match) != work.GetNumAtoms():
             return
         self._frame_key = Chem.MolToSmiles(work, canonical=False)
@@ -658,16 +686,28 @@ def _complete_unit(skeleton: str, slot: _Slot, key: Key, prober: _Prober, reach:
     labels (one position per atom, n atoms in every copy of a multiplied group) are the positions the
     piece covers. A unit that holds more than ``_COMPLETE_LIMIT`` atoms has none."""
     got, last = None, 0
+    per_n: Dict[int, Tuple[int, ...]] = {}
     for n in range(1, _COMPLETE_LIMIT + 1):
         desc = _iso.format_isotope_descriptor([(None, key[0], key[1], n)], force_show=True)
         cur = prober.positions(_splice(skeleton, slot.edits(desc)), key)
         if not cur:
             break
         got, last = cur, n
+        per_n[n] = cur
     else:
         return
     if got is not None:
         reach[(slot.idx, f"*{last}", key)] = got
+        # Fewer atoms than the unit holds, cited without locants, when the positions of the unit are one
+        # symmetry class: (the Blue Book) "if isotopic modification requires a locant to
+        # specify its position, then all locants must be specified and none are omitted", and none is
+        # required when every atom the unit could carry the label on is the same position of the molecule
+        #,:44202, "Locants are not omitted when there is a possibility of isomers": there is
+        # none): '(2H1)' on one phosphono group, which holds two equivalent hydroxyl oxygens.
+        if len({prober.model.cls[p] for p in got}) == 1:
+            for n, cur in per_n.items():
+                if n < last:
+                    reach[(slot.idx, f"*{n}", key)] = cur
 
 
 # ---------------------------------------------------------------------------
@@ -680,43 +720,102 @@ Chosen = Tuple[Piece, Tuple[int, ...]]  # a piece and the positions it labels
 Reach = Dict[Tuple[int, str, Key], Tuple[int, ...]]
 
 
-def _options(model: _Model, reach: Reach, slots: List[_Slot], position: int) -> List[Tuple[Piece, Tuple[int, ...]]]:
+def _class_positions(model: _Model, record_of, position: int,
+                     positions: Tuple[int, ...]) -> Optional[Tuple[int, ...]]:
+    """The labelled atoms of the input a piece that labels ``positions`` (read through the frame
+    isomorphism) labels modulo the symmetry of the molecule, with ``position`` among them: each
+    position takes a labelled atom of its own class that carries the record ``record_of`` asks of it,
+    ``position`` for the first atom of its class; None when the classes hold too few such atoms."""
+    wanted = model.cls[position]
+    taken: set = set()
+    chosen: List[int] = []
+    first_done = False
+    for p in positions:
+        record = record_of(p)
+        pool = [q for q in sorted(model.need)
+                if model.cls[q] == model.cls[p] and model.need[q] == record and q not in taken]
+        if not first_done and model.cls[p] == wanted and position in pool:
+            q, first_done = position, True
+        elif pool:
+            q = pool[0]
+        else:
+            return None
+        taken.add(q)
+        chosen.append(q)
+    return tuple(sorted(chosen)) if first_done else None
+
+
+def _options(model: _Model, reach: Reach, slots: List[_Slot], position: int,
+             extras: bool = False) -> List[Tuple[Piece, Tuple[int, ...]]]:
     """The pieces that label ``position`` with every nuclide it carries, innermost slot first and
     lowest locants first (a unit cited without locants first of all), each with the positions it
     labels (one per copy of a multiplied group). Every position a piece labels must be a labelled
     position of the input that carries the same record; a unit cited without locants
     (``*n``, n atoms of one nuclide in every copy) labels every position of the unit, each with
-    the atoms the unit puts there."""
+    the atoms the unit puts there.
+
+    After those come the pieces that label the position only modulo the symmetry of the molecule, and
+    the ``*n`` that cites fewer atoms than its unit holds (a unit of one symmetry class,
+    ``_complete_unit``): OPSIN puts a label cited once on one of several atoms the graph cannot tell
+    apart (the hydroxyl oxygens of one phosphono group, the two methyls of one atom), and the frame
+    isomorphism maps that atom onto another atom of its class than the input labels. The label sits
+    where the input has it modulo the symmetry, and the read-back of the whole name decides, so those
+    pieces take the input's atoms of the classes. They are offered only when ``extras`` (the composer's
+    second pass, after no spelling of the skeleton had a cover without them), so no name found without
+    them changes."""
     record = model.need[position]
     first = record[0][0]
     out: List[Tuple[tuple, Piece, Tuple[int, ...]]] = []
+    extra: List[Tuple[tuple, Piece, Tuple[int, ...]]] = []
+    holds: Dict[Tuple[int, Key], int] = {}      # the atoms a unit holds: its greatest ``*n``
+    for (slot_idx, token, key) in reach:
+        if token.startswith("*"):
+            holds[(slot_idx, key)] = max(holds.get((slot_idx, key), 0), int(token[1:]))
     for (slot_idx, token, key), positions in reach.items():
-        if key != first or position not in positions:
+        if key != first:
             continue
+        exact = position in positions
+        later = False
         if token.startswith("*"):
             counts: Dict[int, int] = {}
             for p in positions:
                 counts[p] = counts.get(p, 0) + 1
-            if any(model.need.get(p) != ((key, n),) for p, n in counts.items()):
-                continue
-            positions = tuple(sorted(counts))
+            later = int(token[1:]) < holds[(slot_idx, key)]
+            if exact and not later:
+                if any(model.need.get(p) != ((key, n),) for p, n in counts.items()):
+                    continue
+                positions = tuple(sorted(counts))
+            else:
+                positions = _class_positions(
+                    model, lambda p, counts=counts, key=key: ((key, counts[p]),), position,
+                    tuple(sorted(counts)))
+                if positions is None:
+                    continue
+                later = True
         else:
             if any(reach.get((slot_idx, token, other)) != positions for other, _n in record[1:]):
                 continue
-            if any(model.need.get(p) != record for p in positions):
-                continue
-        out.append(((slots[slot_idx].sort_key(), _token_key(token)),
-                    (slot_idx, token), positions))
+            if exact and all(model.need.get(p) == record for p in positions):
+                pass
+            else:
+                positions = _class_positions(model, lambda p, record=record: record, position, positions)
+                if positions is None:
+                    continue
+                later = True
+        (extra if later else out).append(((slots[slot_idx].sort_key(), _token_key(token)),
+                                          (slot_idx, token), positions))
     out.sort(key=lambda o: o[0])
-    return [(piece, positions) for _sk, piece, positions in out]
+    extra.sort(key=lambda o: o[0])
+    return [(piece, positions) for _sk, piece, positions in out + (extra if extras else [])]
 
 
-def _covers(model: _Model, reach: Reach, slots: List[_Slot], stats: Dict[str, int]) -> Iterator[Tuple[Chosen, ...]]:
+def _covers(model: _Model, reach: Reach, slots: List[_Slot], stats: Dict[str, int],
+            extras: bool = False) -> Iterator[Tuple[Chosen, ...]]:
     """Covers of the labelled atoms, nearest to the all-preferred cover first (limited
     discrepancy search: a cover that takes the k-th best piece for an atom costs k - 1), each
     cover once, in a fixed order."""
     items = sorted(model.need)
-    opts = {p: _options(model, reach, slots, p) for p in items}
+    opts = {p: _options(model, reach, slots, p, extras) for p in items}
     if any(not opts[p] for p in items):
         return
     yielded = set()
@@ -773,17 +872,20 @@ def _descriptor(model: _Model, pieces: Sequence[Tuple[str, Tuple[int, ...]]],
     in order, and the nuclides follow (alphabetical, then increasing mass)."""
     by_key: Dict[Key, List[str]] = {}
     capacity: Dict[Key, int] = {}
+    counted: Dict[Key, Tuple[int, int]] = {}      # a unit cited without locants: nuclide -> (atoms, capacity)
     groups = []
     for token, positions in pieces:
         if token.startswith("*"):
             key = model.need[positions[0]][0][0]
             cap = max(model.maxpos.get((p, key), 0) for p in positions)
-            groups.append((None, key[0], key[1], int(token[1:]), cap))
+            atoms, top = counted.get(key, (0, 0))
+            counted[key] = (atoms + int(token[1:]), max(top, cap))      # two pieces of one nuclide: '(2H6)'
             continue
         for key, count in model.need[positions[0]]:
             by_key.setdefault(key, []).extend([token] * count)
             for p in positions:
                 capacity[key] = max(capacity.get(key, 0), model.maxpos.get((p, key), 0))
+    groups.extend((None, key[0], key[1], atoms, cap) for key, (atoms, cap) in counted.items())
     for key, tokens in by_key.items():
         if omit_locants:
             groups.append((None, key[0], key[1], len(tokens), capacity.get(key)))
@@ -901,24 +1003,32 @@ def _compose(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_pos
             if text != respelled[0]:
                 variants.append((text, groups))
     stats["variants"] = len(variants)
-    for text, groups in variants:
-        prober = _Prober(model, text, left)
-        try:
-            if not prober.ok:
-                stats["outcome"] = "no-frame"
-                continue
-            found = _compose_on(text, original, label_map, n_pos, model, prober, stats)
-        finally:
-            left = prober.left
-            stats["parses"] = int(stats["parses"]) + prober.spent
-            stats["dropped"] = int(stats["dropped"]) + prober.dropped
-            stats["exhausted"] = bool(stats["exhausted"]) or prober.exhausted
-        if found is not None:
-            if groups is None:
-                stats["outcome"] = "named"
-                return found.name
-            stats["outcome"] = "named-apart"
-            return _merge_back((text, groups), found, model, original) or found.name
+    probers: Dict[str, _Prober] = {}
+    # Two passes over the spellings: the second offers the pieces that label an atom modulo the symmetry
+    # of the molecule (``_options``), so no name the first pass finds changes.
+    for extras in (False, True):
+        for text, groups in variants:
+            prober = probers.get(text)
+            if prober is None:
+                prober = probers[text] = _Prober(model, text, left)
+            else:
+                prober.left, prober.spent, prober.dropped = left, 0, 0
+            try:
+                if not prober.ok:
+                    stats["outcome"] = "no-frame"
+                    continue
+                found = _compose_on(text, original, label_map, n_pos, model, prober, stats, extras)
+            finally:
+                left = prober.left
+                stats["parses"] = int(stats["parses"]) + prober.spent
+                stats["dropped"] = int(stats["dropped"]) + prober.dropped
+                stats["exhausted"] = bool(stats["exhausted"]) or prober.exhausted
+            if found is not None:
+                if groups is None:
+                    stats["outcome"] = "named"
+                    return found.name
+                stats["outcome"] = "named-apart"
+                return _merge_back((text, groups), found, model, original) or found.name
     return None
 
 
@@ -965,7 +1075,8 @@ def _reads_back(name: str, original: Chem.Mol) -> bool:
 
 
 def _compose_on(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_pos: int,
-                model: _Model, prober: _Prober, stats: Dict[str, object]) -> Optional[_Found]:
+                model: _Model, prober: _Prober, stats: Dict[str, object],
+                extras: bool = False) -> Optional[_Found]:
     """The name of ``original`` on one spelling of the skeleton, or None."""
     slots = _slots_of(skeleton, prober)
     stats["slots"] = len(slots)
@@ -983,14 +1094,14 @@ def _compose_on(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_
                 for token, positions in _tokens_at(skeleton, slot, key, prober, letters, model.fusion,
                                                    depth, limit, deep).items():
                     reach[(slot.idx, token, key)] = positions
-        if all(_options(model, reach, slots, p) for p in model.need):
+        if all(_options(model, reach, slots, p, extras) for p in model.need):
             break
         stats["deep"] = True
     tried = set()
     cstats = {"nodes": 0}
     covers = 0
     try:
-        for cover in _covers(model, reach, slots, cstats):
+        for cover in _covers(model, reach, slots, cstats, extras):
             covers += 1
             complete = _complete_slots(skeleton, slots, model, cover, prober)
             for force_show, omit in ((False, complete), (False, frozenset()), (True, frozenset())):

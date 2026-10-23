@@ -75,11 +75,19 @@ def _name_fragment(smiles: Optional[str]) -> Optional[str]:
     if not smiles:
         return None
     from orthonym import name_compound  # lazy: re-entrant on a non-lipid fragment
+    from ..assembly.nested_memo import ambient_naming_state, cached_nested_call
     from ..metrics.provenance import (get_provenance, record_non_pin_fragment,
                                       restore_provenance)
     before = get_provenance()
     try:
-        name = name_compound(smiles)
+        # The same acid is asked for again by every site, classifier and enclosing candidate of one
+        # naming (a succinate half-ester dendrimer: 7,711 asks of 49 acids). The call is made outside
+        # any fragment recursion, so ``name_compound`` does not memoise it as it does a nested one;
+        # it is memoised here for the naming call, keyed by the state it ran in, a hit repeating the
+        # provenance the stored call wrote and charging no hang budget (the repeat is warm).
+        name = cached_nested_call(
+            "lipids_fragment_name", (smiles, ambient_naming_state()),
+            lambda: name_compound(smiles), replay_budgets=False)
     except Exception:
         name = None
     after = get_provenance()

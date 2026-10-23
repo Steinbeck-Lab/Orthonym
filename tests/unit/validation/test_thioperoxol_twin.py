@@ -33,14 +33,39 @@ The engine reads the name back through the spelling of the same structure that O
 ``X-sulfenic acid`` / ``X-sulfenate`` for -S-OH / -S-O-, ``X-peroxol`` (with the structure's -O-S-H made
 -O-O-H) for -O-S-H. The tests read it again through another one, ``X-thiol`` and ``X-ol`` with the S-O
 oxygen / O-S sulfur removed (the CO auditor's check), so no row passes by the same spelling twice.
+
+The tiers. The default tier ships the PIN spelling through its twin. User decision 2026-10-22 ("Best-effort ships
+readable": at best-effort, prefer the OPSIN-readable systematic name when the PIN is twin-only; the default tier
+keeps the PIN): a general tier (valid, complete, best-effort) ships the name OPSIN reads, the name by prefixes the
+book gives the group where it is not the principal characteristic group, Chalcogen analogues of
+hydroperoxides (the Blue Book), "(1) by using prefixes such as 'hydroperoxy', –OOH; 'disulfanyl', –SSH, or by
+combining simple prefixes, 'hydroxy' –OH; 'oxy-', –O–; 'sulfanyl', –SH; etc." (:28005), '3-(sulfanyloxy)propanenitrile
+(PIN)' (:28027), '4-[(hydroxysulfanyl)methyl]benzoic acid (PIN)' (:29962). The anion of -S-OH has no such name in the
+engine ('(ethylsulfanyl)oxidanide',,:41035, is not built), so its PIN spelling ships through the twin at
+every general tier, in the one pass (``twin_spellings.general_tier_twin_round_trip``). The PIN spelling of a neutral name
+is the safety net of a general tier, for a molecule that has no name OPSIN reads
+(``assembly.default_tier_offer.twin_last_resort_row``).
+
+Changed asserted values (the change-asserted-value record): the best-effort name of every neutral row of RIGHT,
+RING_MONOSUBSTITUTED, RING_DISUBSTITUTED and RING_CH2 was the PIN spelling shipped through the twin
+('methane-SO-thioperoxol', pin_verified, which OPSIN 2.9.0 cannot read) and is now the name by prefixes
+('(hydroxysulfanyl)methane', systematic_verified), asserted as a property (no thioperoxol suffix, not a PIN label, a
+fresh OPSIN call reads it to the input's full InChIKey: ``name_is_rt_exact``, independent of the pipeline) and, for a
+sample of rows, as the exact string; three of the sample names (1-(hydroxysulfanyl)icosane,
+2-[(hydroxysulfanyl)methyl]pyridine, 4-ethyl-5-methyl-1-(sulfanyloxy)hept-2-ene) are the names the 2026-10-09 run gave
+before the twin shipped at a general tier (`internal notes`). The anion rows keep the PIN
+spelling at every tier. The default-tier assertions are unchanged. Unverified: nothing here decides the preference
+itself, which is the user decision above; the Blue Book is silent on which of the two names a wider tier gives.
 """
 import re
 
 import pytest
 from rdkit import Chem
 
+from orthonym import Orthonym
+from orthonym.cli import _emit_tier_flags
 from tests.support.default_tier import default_tier_row
-from tests.support.rt_assert import _independent_parse, assert_full_rt, name_best_effort
+from tests.support.rt_assert import _independent_parse, assert_full_rt, name_best_effort, name_is_rt_exact
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -74,7 +99,8 @@ RIGHT = [
     ("SO[C@H](C)CC", "(2R)-butane-2-OS-thioperoxol"),
     ("C[C@H](SO)CC", "(2S)-butane-2-SO-thioperoxol"),
 ]
-# the anions of the -S-OH group: the best-effort tier gave no name for any of them while the default tier did.
+# the anions of the -S-OH group: the best-effort tier gave no name for any of them while the default tier did (before the
+# twin shipped at a general tier); the engine builds no name OPSIN reads for them, so the gate ships the PIN spelling.
 # Anions derived from hydroxy compounds (the Blue Book): 'CH3-CH2-S-O- ethane(SO-thioperoxolate)
 # (PIN) (ethylsulfanyl)oxidanide (not ethanesulfenate;...)' (:41035): the parent without a locant is followed by the
 # enclosed suffix; the producer spelled 'ethane-SO-thioperoxolate' and the name was labelled pin_verified.
@@ -280,14 +306,105 @@ def test_default_tier_ships_a_right_name_through_its_twin(smiles, name):
     assert row["spelling_failures"] == [], row
 
 
-@pytest.mark.parametrize("smiles,name", RIGHT + RIGHT_ANIONS + RING_MONOSUBSTITUTED + RING_DISUBSTITUTED)
-def test_best_effort_names_every_row_the_default_tier_names(smiles, name):
-    """The default tier named these rows; best-effort gave the systematic name of the neutral ones and no
-    name at all for the anions. The twin-verified Preferred IUPAC Name ships at both tiers."""
+NEUTRAL = RIGHT + RING_MONOSUBSTITUTED + RING_DISUBSTITUTED + RING_CH2
+
+# the name by prefixes the general engine gives (a sample of NEUTRAL, and three rows of the 2026-10-09 run)
+READABLE = [
+    ("CSO", "(hydroxysulfanyl)methane"),
+    ("CCCSO", "1-(hydroxysulfanyl)propane"),
+    ("C=CCOS", "1-(sulfanyloxy)prop-2-ene"),
+    ("N/C=C\\SO", "(1Z)-2-amino-1-(hydroxysulfanyl)eth-1-ene"),
+    ("SO[C@H](C)CC", "(2R)-2-(sulfanyloxy)butane"),
+    ("C1CCCCC1SO", "(hydroxysulfanyl)cyclohexane"),
+    ("C1CC1CSO", "[(hydroxysulfanyl)methyl]cyclopropane"),
+    ("c1ccccc1CSO", "[(hydroxysulfanyl)methyl]benzene"),
+    ("CCCCCCCCCCCCCCCCCCCCSO", "1-(hydroxysulfanyl)icosane"),
+    ("OSCc1ccccn1", "2-[(hydroxysulfanyl)methyl]pyridine"),
+    ("CCC(C)C(C=CCOS)CC", "4-ethyl-5-methyl-1-(sulfanyloxy)hept-2-ene"),
+]
+
+
+@pytest.mark.parametrize("smiles,pin", NEUTRAL)
+def test_best_effort_names_a_neutral_thioperoxol_in_the_form_opsin_reads(smiles, pin):
+    """User decision 2026-10-22: the best-effort tier ships the name OPSIN reads, not the PIN spelling only its
+    twin reads. (the Blue Book): the group named by prefixes,:28005. The label is not a PIN's: the
+    default tier gives the PIN spelling ('methane-SO-thioperoxol',,:24326), this name is not preferred."""
+    row = name_best_effort(smiles)
+    assert row["name"] and "thioperoxol" not in row["name"], row
+    assert row["tier"] in ("systematic_verified", "pin_unverified") and row["is_pin"] is False, row
+    assert row["verified"] == "opsin" and not row["gate_outcome"].startswith("twin_verified"), row
+    assert name_is_rt_exact(row["name"], smiles), row     # a fresh OPSIN call, to the input's full InChIKey
+
+
+@pytest.mark.parametrize("smiles,name", READABLE)
+def test_best_effort_gives_the_name_by_prefixes(smiles, name):
+    row = name_best_effort(smiles)
+    assert row["name"] == name, row
+    assert row["tier"] == "systematic_verified" and row["source"] == "general_engine", row
+
+
+@pytest.mark.parametrize("tier", ["valid", "complete", "best-effort"])
+@pytest.mark.parametrize("smiles,name", [("CSO", "(hydroxysulfanyl)methane"), ("OSCc1ccccn1", "2-[(hydroxysulfanyl)methyl]pyridine"),
+                                         ("C1CCCCC1OS", "(sulfanyloxy)cyclohexane")])
+def test_every_general_tier_prefers_the_name_opsin_reads(tier, smiles, name):
+    """The preference is the one of the other twin families: a wider tier spells the form OPSIN reads
+    (``twin_spellings.pin_spellings_on``), at every general tier and through every entry point."""
+    from orthonym import name_compound
+    from orthonym.cli import _emit_tier_flags
+    flags = {k: v for k, v in _emit_tier_flags(tier).items() if k != "full_coverage"}
+    engine = Orthonym(style="pin", **_emit_tier_flags(tier))
+    row = engine.name_tiered(smiles)
+    assert row["name"] == name and row["tier"] in ("systematic_verified", "pin_unverified"), row
+    assert engine.name(smiles) == name and name_compound(smiles, **flags) == name
+    assert name_is_rt_exact(name, smiles)
+
+
+@pytest.mark.parametrize("smiles,name", RIGHT_ANIONS + ANIONS_BELOW_PIN)
+def test_best_effort_ships_the_pin_spelling_of_an_anion_through_its_twin(smiles, name):
+    """The engine builds no name OPSIN reads for the anion of -S-OH: the gate ships the PIN spelling its twin reads
+    back (``twin_spellings.general_tier_twin_round_trip``, ``thioperoxol_twin.ships_at_general_tier``), as it did
+    when the twin shipped at every tier."""
     row = name_best_effort(smiles)
     assert row["name"] == name, row
     assert row["verified"] == "opsin_twin", row
     assert re.fullmatch(r"twin_verified:thioperoxol_(sulfenic|peroxol)", row["gate_outcome"]), row
+
+
+@pytest.mark.parametrize("smiles", [s for s, _ in RIGHT_ANIONS + ANIONS_BELOW_PIN])
+@pytest.mark.parametrize("tier", ["valid", "complete", "best-effort"])
+def test_every_general_tier_and_entry_point_gives_the_anion_its_pin_spelling(tier, smiles):
+    from orthonym import name_compound
+    from orthonym.cli import _emit_tier_flags
+    flags = {k: v for k, v in _emit_tier_flags(tier).items() if k != "full_coverage"}
+    engine = Orthonym(style="pin", **_emit_tier_flags(tier))
+    expected = engine.name_tiered(smiles)["name"]
+    assert expected and "SO-thioperoxolate" in expected
+    assert engine.name(smiles) == expected and name_compound(smiles, **flags) == expected
+    assert engine.name_with_confidence(smiles)["name"] == expected
+
+
+def test_the_anion_does_not_need_the_safety_net(monkeypatch):
+    """The anion is shipped by the gate in the one pass, not by a second pass of the tier: with the safety net
+    withdrawn it is named all the same (a second pass made it 6 to 45 times slower)."""
+    from orthonym.assembly import default_tier_offer
+    monkeypatch.setattr(default_tier_offer, "twin_last_resort_row", lambda namer, smiles, held: None)
+    for smiles, name in (("CS[O-]", "methane(SO-thioperoxolate)"),
+                         ("N/C=C\\S[O-]", "(1Z)-2-aminoeth-1-ene-1-SO-thioperoxolate")):
+        assert name_best_effort(smiles)["name"] == name
+
+
+def test_a_molecule_the_general_engine_leaves_unnamed_keeps_the_pin_spelling(monkeypatch):
+    """A neutral thioperoxol the engine cannot name by prefixes keeps the PIN spelling its twin reads back at
+    the valid tier (no systematic floor there): the tier names what it named when the twin shipped at every
+    tier. The late recovery of the general engine is withdrawn here."""
+    import orthonym.namer as namer
+    monkeypatch.setattr(namer.Orthonym, "_try_general_engine_recovery", lambda self, smiles: None)
+    engine = Orthonym(style="pin", **_emit_tier_flags("valid"))
+    for smiles, pin in (("CSO", "methane-SO-thioperoxol"), ("C1CCCCC1OS", "cyclohexane-OS-thioperoxol")):
+        row = engine.name_tiered(smiles)
+        assert row["name"] == pin and row["verified"] == "opsin_twin", row
+        assert row["gate_outcome"].startswith("twin_verified:thioperoxol_"), row
+        assert engine.name(smiles) == pin
 
 
 @pytest.mark.parametrize("smiles,name", ANIONS_BELOW_PIN)
@@ -402,8 +519,8 @@ def test_the_carbon_between_a_ring_and_the_suffix_is_the_parent(smiles, name):
     assert row["name"] == name, row
     assert row["tier"] == "pin_verified" and row["verified"] == "opsin_twin", row
     assert _independent_reads_back(name, smiles)
-    best = name_best_effort(smiles)
-    assert best["name"] == name and best["verified"] == "opsin_twin", best
+    best = name_best_effort(smiles)      # the name by prefixes at a general tier: test_best_effort_names_a_neutral_...
+    assert best["name"] != name and name_is_rt_exact(best["name"], smiles), best
 
 
 @pytest.mark.parametrize("smiles,name", RING_CH2_DITHIO)
@@ -457,6 +574,31 @@ def test_the_gate_ships_a_right_name_and_withholds_a_wrong_one():
     assert thioperoxol_twin_round_trip(name, "C1CC1CSO") is None
     assert _final_opsin_validity_gate(name, "C1CC1SO") == name
     assert _final_opsin_validity_gate(name, "C1CC1CSO") != name
+
+
+def test_a_general_tier_withdraws_a_neutral_name_only_its_twin_reads_unless_it_is_the_last_resort():
+    """At a general tier the gate withdraws the PIN spelling of a neutral group ('the name OPSIN reads ships
+    instead'), and admits it inside the last-resort scope, with the same read-back: the right structure ships, the
+    wrong one does not. The anion of -S-OH ships through its twin outside the scope, with the same read-back."""
+    from orthonym.namer import _final_opsin_validity_gate
+    from orthonym.validation.thioperoxol_twin import last_resort_active, last_resort_scope
+    from orthonym.validation.twin_spellings import twin_gate_ships
+    name = "cyclopropane-SO-thioperoxol"
+    assert twin_gate_ships(name, "C1CC1SO") is True                        # the default tier
+    assert twin_gate_ships(name, "C1CC1SO", True) is False                 # a general tier
+    assert _final_opsin_validity_gate(name, "C1CC1SO", general_fallback_tier=True) != name
+    assert not last_resort_active()
+    anion = "methane(SO-thioperoxolate)"
+    assert twin_gate_ships(anion, "CS[O-]", True) is True                  # a general tier: the engine has no other spelling
+    assert twin_gate_ships(anion, "CCS[O-]", True) is False                # the name of another molecule
+    assert twin_gate_ships(anion, "CSOC", True) is False                   # an ester is no anion,:27912)
+    assert _final_opsin_validity_gate(anion, "CS[O-]", general_fallback_tier=True) == anion
+    with last_resort_scope():
+        assert last_resort_active()
+        assert twin_gate_ships(name, "C1CC1SO", True) is True
+        assert twin_gate_ships(name, "C1CC1CSO", True) is False             # the name of another molecule
+        assert _final_opsin_validity_gate(name, "C1CC1SO", general_fallback_tier=True) == name
+    assert not last_resort_active()
 
 
 def test_the_peroxol_twin_names_the_group_that_carries_the_sulfur():

@@ -14,6 +14,10 @@ point agrees: ``name_tiered`` (the row), ``Orthonym.name``, ``name_compound`` an
 (the decorator of ``name``). Only the best-effort tier takes it: the valid and complete tiers keep the
 round-trip contract.
 
+A second class (user decision 2026-10-22, "Best-effort ships readable"): the PIN spelling of a thioperoxol, which a
+general tier withdraws in favour of the name OPSIN reads and holds, is the last resort of a general tier
+(``twin_last_resort_row``, every general tier, the tests at the end of this file).
+
 Changed asserted values: none, every row is new. The tests that assert the abstention of these molecules at
 the complete tier (tests/unit/test_besteffort_full_rt_gate.py) do not run the best-effort tier and are not
 changed; those through ``name_compound`` at best-effort
@@ -167,7 +171,11 @@ SMILES = "O[C@H]1CC[C@H](O)CC1"
 class _Namer:
     """The attributes of an engine that ``default_tier_engine`` reads."""
     style = "pin"
+    _general_fallback = True
     _general_fallback_unverified = True
+    _allow_aromatic_general = True
+    _full_coverage = False
+    _forced_parent_rank = 0
     _trivial_fallback = False
     _grammar = object()
     _disable_opsin_validity_gate = False
@@ -391,3 +399,112 @@ def test_the_decorator_runs_only_the_callers_own_call_of_the_best_effort_pin_eng
     finally:
         exit_name_scope()
     assert not built
+
+
+# --- the PIN spelling of a thioperoxol: the safety net of a general tier ---------------------------------------
+# THE SUFFIXES 'SO-THIOPEROXOL', AND CHALOGEN ANALOGUES (the Blue Book): 'CH3-S-OH
+# methane-SO-thioperoxol (PIN) (not methanesulfenic acid)' (:24326). OPSIN 2.9.0 has no grammar for it: a general tier
+# ships the name by prefixes ('(hydroxysulfanyl)methane',,:28005) and the PIN spelling of a neutral name only for
+# a molecule that has no name OPSIN reads (the safety net, a second pass). The anion of -S-OH has none, so the gate ships
+# it through its twin in the one pass,:41035 'ethane(SO-thioperoxolate) (PIN)').
+THIO = "CS[O-]"
+THIO_PIN = "methane(SO-thioperoxolate)"
+NEUTRAL_PIN = "methane-SO-thioperoxol"
+
+
+def test_a_neutral_thioperoxol_name_the_gate_withdraws_is_held_and_no_other_is():
+    hold = default_tier_offer.hold_withdrawn
+    default_tier_offer.clear_held()
+    hold(NEUTRAL_PIN, "CSO", "CSO")
+    assert default_tier_offer.held_names() == (NEUTRAL_PIN,)
+    for name, molecule in (("ethanedithioperoxol", "CSO"),                   # OPSIN reads it itself: no twin
+                           ("propane-1-SO-thioperoxolium", "CSO"),           # no spelling of the cation is read
+                           (THIO_PIN, "CS[O-]"),                             # an anion: the gate tried its twin in the one pass
+                           ("propane-1-SO-thioperoxolate", "CCCS[O-]"),
+                           ("(hydroxysulfanyl)methane", "CSO")):             # the name OPSIN reads
+        hold(name, molecule, molecule)
+    hold("methane-OS-thioperoxol", "COS", "CSO")                             # a fragment, not the whole input
+    assert default_tier_offer.held_names() == (NEUTRAL_PIN,)
+    default_tier_offer.clear_held()
+
+
+def test_the_two_classes_of_held_names_do_not_crowd_each_other_out():
+    """``_MAX_HELD`` counts each class apart: a name of one class is held however many names of the other the
+    gate withdrew first."""
+    hold, held_names, limit = default_tier_offer.hold_withdrawn, default_tier_offer.held_names, default_tier_offer._MAX_HELD
+    default_tier_offer.clear_held()
+    for n in range(2 * limit):
+        hold(f"({n}r)-x", "CSO", "CSO")                                      # names with a stereo layer
+    assert len(held_names()) == limit
+    hold(NEUTRAL_PIN, "CSO", "CSO")
+    assert held_names()[-1] == NEUTRAL_PIN and len(held_names()) == limit + 1
+    default_tier_offer.clear_held()
+    for n in range(2 * limit):
+        hold(f"{n}-methylpropane-{n}-SO-thioperoxol", "CSO", "CSO")          # neutral thioperoxol names
+    assert len(held_names()) == limit
+    hold("(1r,4r)-cyclohexane-1,4-diol", "CSO", "CSO")
+    assert held_names()[-1] == "(1r,4r)-cyclohexane-1,4-diol" and len(held_names()) == limit + 1
+    default_tier_offer.clear_held()
+
+
+def test_the_anion_ships_in_the_one_pass_and_the_safety_net_is_not_run(monkeypatch):
+    """The anion of -S-OH is named by the gate through its twin: no second pass. A neutral thioperoxol is named
+    by prefixes: no second pass either. No name that ships changes."""
+    built = []
+    real = default_tier_offer.general_tier_engine
+
+    def spy(namer):
+        built.append(namer)
+        return real(namer)
+
+    monkeypatch.setattr(default_tier_offer, "general_tier_engine", spy)
+    assert name_best_effort("CSO")["name"] == "(hydroxysulfanyl)methane"
+    assert name_best_effort(THIO)["name"] == THIO_PIN
+    assert name_best_effort("[O-]SC#N")["tier"] == "abstain"            # its twin does not verify: nothing is offered
+    assert not built
+
+
+def test_the_safety_net_is_a_pass_of_the_tier_for_a_neutral_name_only_when_no_other_name_is_found(monkeypatch):
+    import orthonym.namer as namer_module
+    built = []
+    real = default_tier_offer.general_tier_engine
+
+    def spy(namer):
+        built.append(namer)
+        return real(namer)
+
+    monkeypatch.setattr(default_tier_offer, "general_tier_engine", spy)
+    monkeypatch.setattr(namer_module.Orthonym, "_try_general_engine_recovery", lambda self, smiles: None)
+    row = Orthonym(style="pin", **_emit_tier_flags("valid")).name_tiered("CSO")      # no systematic floor at this tier
+    assert row["name"] == NEUTRAL_PIN and row["gate_outcome"] == "twin_verified:thioperoxol_sulfenic" and len(built) == 1, row
+
+
+def test_the_anion_keeps_the_row_the_twin_gave_before():
+    """Parity: the row, its label and its gate outcome are the ones the twin gave when it shipped at every tier."""
+    row = name_best_effort("N/C=C\\S[O-]")
+    assert (row["name"], row["tier"], row["is_pin"], row["source"], row["verified"], row["opsin"]) == (
+        "(1Z)-2-aminoeth-1-ene-1-SO-thioperoxolate", "pin_unverified", False, "pin_path", "opsin_twin", "verified_twin"), row
+    assert row["gate_outcome"] == "twin_verified:thioperoxol_sulfenic" and row["gates_passed"] == ["twin_round_trip"], row
+    pin = name_best_effort(THIO)
+    assert (pin["tier"], pin["is_pin"]) == ("pin_verified", True), pin
+
+
+def test_the_safety_net_is_made_once_and_not_for_a_junior_parent():
+    from orthonym.validation.thioperoxol_twin import last_resort_scope
+    held = (NEUTRAL_PIN,)
+    engine = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
+    assert default_tier_offer.twin_last_resort_row(engine, "CSO", held)["name"] == NEUTRAL_PIN
+    with last_resort_scope():                       # not again inside its own pass
+        assert default_tier_offer.twin_last_resort_row(engine, "CSO", held) is None
+    junior = Orthonym(style="pin", _forced_parent_rank=1, **_emit_tier_flags("best-effort"))
+    assert default_tier_offer.twin_last_resort_row(junior, "CSO", held) is None
+    assert default_tier_offer.twin_last_resort_row(engine, "CSO", ("ethanedithioperoxol",)) is None     # no twin name held
+    assert default_tier_offer.twin_last_resort_row(engine, THIO, (THIO_PIN,)) is None                  # an anion is never held
+    assert default_tier_offer.twin_last_resort_row(Orthonym(style="pin"), "CSO", held) is None          # the default tier
+
+
+def test_the_default_tier_keeps_the_pin_spelling_and_is_not_offered_anything():
+    default = default_tier_row("CSO")
+    assert default["name"] == NEUTRAL_PIN and default["tier"] == "pin_verified", default
+    assert default["verified"] == "opsin_twin", default
+    assert default_tier_offer.default_tier_row_for(Orthonym(style="pin"), "CSO") is None

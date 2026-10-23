@@ -129,7 +129,10 @@ KEPT = [
      "pin_unverified"),
     ("t1", "C[n+]1c(-c4ccc(cc4)-c4ccc(cc4)-c3c(N=[N+]=[N-])c(N=[N+]=[N-])c(N=[N+]=[N-])c(N=[N+]=[N-])c3)[nH]c2ccccc21",
      "1-methyl-2-[4-(2',3',4',5'-tetraazido[1,1'-biphenyl]-4-yl)phenyl]-1H-1,3-benzimidazol-3-ium",
-     "pin_verified"),
+     # three identical rings in a chain are one ring assembly "DEFINITIONS", the Blue Book: 'bi', 'ter',
+     # 'quater' count the rings of the assembly): the name by the nested biphenyl is valid, the PIN is the terphenyl
+     # form, so the label is below the PIN (the name is the one the choice ranks first, the label is not its subject)
+     "systematic_verified"),
 ]
 
 SLOW_ROW_29 = ("C[C@@H]1CN2C3=CC(=C(C4=C3N(CCCOCC5=C(C=[N+](N5)C)C6=C(C=CC7=C6N1C(=C7CCCOC8CC(=CC(=C8)C(F)F)C(F)F)C2=O)Cl)C(=C4)C(=NC=NC)N)OC)OC", "(4R)-24-(amino{[(methylimino)methyl]imino}methyl)-7-(3-{[3,5-bis(difluoromethyl)cyclohexa-2,4-dien-1-yl]oxy}propyl)-11-chloro-27,28-dimethoxy-4,15-dimethyl-32-oxo-19-oxa-2,5,15,16,23-pentaazaheptacyclo[21.6.1.1^2,6.1^5,8.0^13,17.0^26,30.0^12,31]dotriaconta-1(30),6,8(31),9,11,13(17),14,24,26,28-decaen-15-ium")

@@ -70,6 +70,8 @@ __all__ = [
     "forced_locant_reason",
     "isotopic_naming_scope",
     "scope_has_isotopic_modification",
+    "scope_cites_stereo_locants",
+    "ISOTOPIC_STEREO_LOCANTS",
     "isotope_parent_positional_scope",
     "parent_scope_has_positional_isotope",
     "parent_positional_scope",
@@ -978,6 +980,25 @@ def isotopic_naming_scope(reason: str = "isotope"):
         yield
     finally:
         _ISOTOPIC_NAMING_SCOPE.reset(token)
+
+
+#: The reason of the isotopic scope that a decorator re-runs a skeleton under when no descriptor reads back on
+#: the skeleton named without it: the stereodescriptor of a lone stereo bond of a chain prefix carries its
+#: locant (:func:`scope_cites_stereo_locants`).
+ISOTOPIC_STEREO_LOCANTS = "isotope+stereo-locants"
+
+
+def scope_cites_stereo_locants() -> bool:
+    """True inside the isotopic scope the decorator re-runs a skeleton under (``ISOTOPIC_STEREO_LOCANTS``).
+
+     Locants, Omission of locants (see also, (the Blue Book):
+    "if isotopic modification requires a locant to specify its position, then all locants must be
+    specified and none are omitted". A bare '(E)' of the one stereogenic bond of a chain prefix is read by
+    OPSIN onto another double bond of the chain once the labels make that bond stereogenic ('(1,2-2H2)' on
+    C1=C2), so the descriptor of such a prefix carries its locant, and only then: the labels are stripped
+    before the skeleton is named, so the decorator names the skeleton as the unmodified name has it first and
+    re-runs it under this scope when nothing reads back."""
+    return _ISOTOPIC_NAMING_SCOPE.get() == ISOTOPIC_STEREO_LOCANTS
 
 
 def scope_has_isotopic_modification() -> bool:

@@ -158,6 +158,11 @@ def test_the_cli_default_tier_prints_the_decline():
 # 2026-10-20, ``assembly/default_tier_offer.py``): the best-effort clause and the exception to the round
 # trip; a documentation string, so there is no source to quote: it states what the code does, which
 # tests/unit/assembly/test_default_tier_offer.py pins; reverting ``cli.py`` fails this test.
+# Changed asserted value (THIO lane fix a performance pass, 2026-10-22): the exception to the round trip at the wider tiers now
+# names the twin-checked names (a halogen -uide anion, the anion of a thioperoxol, an organometallic name with halido
+# ligands): they ship there through their twin, which ``tests/integration/test_readme_claims.py`` pins for each;
+# a documentation string, so there is no source to quote. A neutral thioperoxol is not among them: a wider tier gives
+# the name OPSIN reads (user decision 2026-10-22, "Best-effort ships readable").
 # Changed asserted value (lane UN-B1, 2026-10-21): "11 rings" -> "15 rings", the best-effort ring ceiling
 # ``vonbaeyer_universal.BEST_EFFORT_MAX_CAGE_RINGS``. Again a documentation string (the Blue Book sets no
 # upper size on von Baeyer systems,, so there is no source to quote); the value is the measured ceiling
@@ -185,7 +190,9 @@ EMIT_TIER_HELP = (
     "builds a name or declines. The wider tiers also return the names the default "
     "tier declines, each labelled with its tier; there every name must pass a "
     "full-InChIKey OPSIN round trip, except a name from the natural-product and "
-    "metal-complex lists and the best-effort name described above, so the other name formats absent from OPSIN's grammar are "
+    "metal-complex lists, a twin-checked name for which the engine has no other spelling (a halogen -uide anion, "
+    "the anion of a thioperoxol, an organometallic name with halido ligands) and the best-effort name described above, "
+    "so the other name formats absent from OPSIN's grammar are "
     "declined there. --provenance shows each name's tier.")
 TRIVIAL_HELP = (
     "When no preferred name can be built, also allow a retained trivial name that is "

@@ -361,6 +361,39 @@ def test_trail_is_in_the_idle_list():
     assert producer_trail._TRAIL.get() is None
 
 
+def test_pin_ceilings_flag_is_in_the_idle_list():
+    """The flag of ``vonbaeyer_universal.pin_ceilings_scope`` is idle (``False``) outside a naming
+    call: an alarm that lands inside the scope must not leave the next molecule on the PIN
+    ceilings, so the leak check reads it and ``reset_naming_state`` puts it back."""
+    from orthonym.rules import vonbaeyer_universal as vbu
+    from orthonym.wallclock import _IDLE_CONTEXTVARS
+
+    assert ("orthonym.rules.vonbaeyer_universal", "_PIN_CEILINGS_ONLY", False) in _IDLE_CONTEXTVARS
+    assert leaked_naming_state() == {}
+    with vbu.pin_ceilings_scope():
+        assert leaked_naming_state() == {"_PIN_CEILINGS_ONLY": True}
+        assert clear_leaked_naming_state() == {"_PIN_CEILINGS_ONLY": True}
+        assert leaked_naming_state() == {}
+    assert leaked_naming_state() == {}
+
+
+def test_relaxed_adduct_pass_flag_is_in_the_idle_list():
+    """The flag of the pass of ``default_tier_offer.relaxed_adduct_row`` is idle outside a naming call: an
+    alarm that lands inside the pass must not leave the next molecule on the relaxed comparison."""
+    from orthonym.assembly import default_tier_offer as dto
+    from orthonym.wallclock import _IDLE_CONTEXTVARS
+
+    assert ("orthonym.assembly.default_tier_offer", "_RELAXED_ON", False) in _IDLE_CONTEXTVARS
+    assert leaked_naming_state() == {}
+    token = dto._RELAXED_ON.set(True)
+    try:
+        assert leaked_naming_state() == {"_RELAXED_ON": True}
+        assert clear_leaked_naming_state() == {"_RELAXED_ON": True}
+        assert leaked_naming_state() == {}
+    finally:
+        dto._RELAXED_ON.reset(token)
+
+
 def test_trail_is_reset_after_a_timeout():
     """An alarm that lands while a record is open leaves no record behind: the limit
     puts the variable back to its value outside the call."""

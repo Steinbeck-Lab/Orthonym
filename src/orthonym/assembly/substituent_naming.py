@@ -304,7 +304,11 @@ def _name_aryl_vinyl_substituent(
             ez.append((loc, sb['stereo']))
     if ez:
         ez.sort()
-        if len(ez) == 1:
+        # (the Blue Book): in an isotopic name the locant of a lone stereodescriptor is
+        # cited where a bare one is read onto another double bond of the chain; the isotopic decorator
+        # re-runs a skeleton under this scope when nothing reads back (``scope_cites_stereo_locants``)
+        from .locant_omission import scope_cites_stereo_locants
+        if len(ez) == 1 and not (scope_cites_stereo_locants() and len(double_locs) > 1):
             name = f"({ez[0][1]})-{name}"
         else:
             name = "(" + ",".join(f"{l}{s}" for l, s in ez) + ")-" + name
@@ -7503,6 +7507,10 @@ def ring_yl_attachment_descriptor(mol, frag_atoms, attach_idx, ring_name=None):
                     or form.prefix(attach_idx) != ring_name):
                 return None
             locant = form.numbering[attach_idx]
+        from .book_prefixes import book_forms_enabled, note_book_form
+        if not book_forms_enabled():
+            return None  # the retry of a row no round trip confirmed: the bare '(R)' OPSIN reads in every context
+        note_book_form()
         return f"({locant}{mol.GetAtomWithIdx(attach_idx).GetProp('_CIPCode')})"
     except Exception:  # noqa: BLE001 -- not derivable: the caller keeps its form
         return None
@@ -8064,13 +8072,13 @@ def name_substituent_fragment(
     Only a call whose side effects a hit can repeat is stored: it charged no unit of
     the perf, analysis or work budget, the only provenance variable it wrote is the
     name-scoped non-PIN record, and it read no provenance
-    (``metrics.provenance.PROVENANCE_READ``). A hit makes the same
-    ``record_non_pin_fragment`` calls the stored call made (logged, in order, also
-    those whose fragment was already recorded) and returns the stored value. The
+    (``metrics.provenance.PROVENANCE_READ``). A hit records each distinct fragment
+    the stored call recorded, once, in the order of its first record (the stored record
+    holds each fragment once, see the end of this function), and returns the stored value. The
     repeat of such a call returns the same value: its nested namings are hits in
     caches whose entries never change once written (the fragment cache is consulted
     before the cycle and depth guards, and a miss there charges a work unit), so it
-    takes the same path. It makes the same record calls or a subset (a nested memo
+    takes the same path. It records the same fragments or a subset (a nested memo
     hit skips the records its computation made); either way they only re-add
     fragments the stored call already added, because within one naming the record
     only grows (the one exception, the NP-parent probe's ``restore_provenance``, can
@@ -8110,7 +8118,11 @@ def name_substituent_fragment(
                 and prev[1] != value):
             _memo._VERIFY_MISMATCHES.append((_NSF_MEMO_NS, key))
             raise _memo.MemoMismatch(_NSF_MEMO_NS, key, prev[1], value)
-        cache[ck] = (mol, value, tuple(records))
+        # Each distinct fragment once, in order of first call: a hit replays the stored calls into every
+        # enclosing log, so a log that kept repeats doubled with each level of nested hits (2**24 replays
+        # for a 24-level branched peptide), while the record only adds a fragment not yet in it: the
+        # replay of the distinct fragments leaves the same record as the replay of every call.
+        cache[ck] = (mol, value, tuple(dict.fromkeys(records)))
     return value
 
 

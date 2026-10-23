@@ -19,8 +19,10 @@ order... Two or more identical bridges are indicated by the numerical prefixes '
 colons." (:14181): the locants of a divalent symmetric bridge "are cited in
 numerical order".
 """
+import re
 from dataclasses import dataclass
-from typing import Any, List, Optional, Sequence, Tuple
+from functools import lru_cache
+from typing import Any, FrozenSet, List, Optional, Sequence, Tuple
 
 from ...data.multipliers import multiplier_table
 from ..bridged_fused import GENERAL_ONLY_BRIDGE_PREFIXES
@@ -169,3 +171,60 @@ def bridge_text(cited: Sequence[Tuple[str, Tuple[Any, Any]]]) -> Optional[str]:
         locs = ":".join(",".join(str(x) for x in p) for p in pairs)
         parts.append(f"{locs}-{mult}{prefix}")
     return "-".join(parts)
+
+
+#: Names of bridges (the Blue Book): the prefixes that no table of the producer or of the
+#: reader of names holds. (:14069) 'etheno', 'prop[1]eno', 'buta[1,3]dieno';
+#: (:14130) the polyvalent 'metheno' "by changing the ending 'ano'... into 'eno'"; (:14087)
+#: the cyclic hydrocarbon bridges 'benzeno', 'naphthaleno'; (:14095-:14118) the preselected
+#: prefixes of the acyclic heteroatom bridges ('sulfano', 'disulfano', 'selano', 'tellano', 'silano',
+#: 'stannano', 'azano', 'diazano', 'diazeno', 'epitriazano', 'phosphano', 'borano') and 'epitrioxy';
+#: (:14124) the heterocyclic bridges ('furano', 'epoxireno').
+_BRIDGE_WORDS_OF_THE_BOOK = frozenset({
+    "etheno", "propeno", "buteno", "butadieno", "metheno", "benzeno", "naphthaleno", "anthraceno", "furano",
+    "epoxireno", "sulfano", "disulfano", "selano", "tellano", "silano", "stannano", "azano", "diazano",
+    "diazeno", "epitriazano", "epitriazeno", "phosphano", "borano", "epitrioxy", "episeleno", "epitelluro"})
+
+#: the bridge prefixes of the book carry 'epi' (or 'ep' before 'i' or 'o') when they are built on a
+#: substitutive prefix or a fusion prefix: (:14075), (:14095), (:14124)
+_EPI_BRIDGE_RE = re.compile(r"ep[io][a-z]*")
+
+#: the end of a name that is a bridge prefix cited with its locants: at least two locants of the fused system
+#::14173 'The locant pairs of identical bridges are separated by colons'), the multiplier, the
+#: prefix, in parentheses when it is composite:14153); a prefix may carry its own locants in
+#: square brackets ('prop[1]eno', 'buta[1,3]dieno')
+_BRIDGE_TAIL_RE = re.compile(
+    r"(?:^|[-(\[\s])\d+[a-z]?'*(?:[,:]\d+[a-z]?'*)+-(?:(?:di|tri|tetra|penta|hexa)(?=\())?\(?"
+    r"([a-z]+(?:\[[\d,]+\][a-z]+)?)\)?\)?$")
+_MULTIPLIER_HEAD_RE = re.compile(r"(?:di|tri|tetra|penta|hexa)(?=[a-z])")
+
+
+@lru_cache(maxsize=1)
+def bridge_prefix_words() -> FrozenSet[str]:
+    """Every bridge prefix this package spells or reads: the producer's tables, the lexicon of the
+    reader of names (``validation/spelling/units.py``, which also holds the composite prefixes), the general
+    nomenclature prefixes and the prefixes of the book no table holds (``_BRIDGE_WORDS_OF_THE_BOOK``)."""
+    from ...validation.spelling.units import BRIDGE_RE
+    from ..bridged_fused import BRIDGE_PREFIXES
+    words = set(_ALKANO.values()) | set(_ONE_ATOM.values()) | set(_PRESELECTED) | set(_PRESELECTED.values())
+    words |= {re.sub(r"\[[\d,]+\]", "", w) for w in _ALKENO.values()}
+    words |= set(BRIDGE_PREFIXES.values()) | set(GENERAL_ONLY_BRIDGE_PREFIXES) | _BRIDGE_WORDS_OF_THE_BOOK
+    words |= set(re.findall(r"[a-z]+", BRIDGE_RE))
+    return frozenset(words)
+
+
+def ends_in_bridge_prefix(text: str) -> bool:
+    """True iff ``text`` ends in a bridge prefix cited with its locants ('...-7,14-methano',
+    '3,5-(epoxymethano)', '4a,8a-di(metheno)', '1,2-prop[1]eno'): a name part that opens at the end of
+    ``text`` is the fused system the bridge belongs to,:14046: the bridge prefixes are cited in
+    front of the fused system's name). A word that is a bridge prefix or built on 'epi'; 'dihydro',
+    'dimethyl' and the other substituent prefixes are not, and a single locant is not a bridge."""
+    m = _BRIDGE_TAIL_RE.search(text)
+    if not m:
+        return False
+    word = re.sub(r"\[[\d,]+\]", "", m.group(1))
+    words = bridge_prefix_words()
+    for name in (word, _MULTIPLIER_HEAD_RE.sub("", word, count=1)):       # 'diazeno' is a prefix, 'dimethano' two
+        if name in words or _EPI_BRIDGE_RE.fullmatch(name):
+            return True
+    return False

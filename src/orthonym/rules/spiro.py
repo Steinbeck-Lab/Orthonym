@@ -74,7 +74,7 @@ from ..rules.lambda_convention import (
 # permitted in this module. Imported at the top so the source-grep lock in
 # tests/unit/rules/test_mixed_spiro_fused.py and test_spiro_numbering.py
 # can verify the invariant without inspecting individual function bodies.
-from ..rules.locants import compare_locant_sets  # noqa: F401 — re-export lock
+from ..rules.locants import cascade_locant as _supplier_locant, compare_locant_sets  # noqa: F401 — re-export lock
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
 from .spiro_carbocycle import (  # the one namer of a carbocyclic monocycle component
     name_carbocyclic_monocycle_component as _name_carbocyclic_monocycle_component,
@@ -1895,7 +1895,7 @@ def get_spiro_iupac_locants(mol) -> Optional[Dict[int, _Locant]]:
     if not (set(numbering.keys()) >= ring_atoms):
         return None  # Pitfall 7: partial coverage -> None
     # Filter to ring atoms only (drop exocyclic side-chain locants if any)
-    return {k: v for k, v in numbering.items() if k in ring_atoms}
+    return {k: _supplier_locant(v) for k, v in numbering.items() if k in ring_atoms}
 
 
 # ============================================================================
@@ -7065,4 +7065,4 @@ def get_mixed_spiro_fused_iupac_locants(
     _name, ring_atoms, atom_to_locant, _subs_included = result
     if not (set(atom_to_locant.keys()) >= ring_atoms):
         return None
-    return {k: v for k, v in atom_to_locant.items() if k in ring_atoms}
+    return {k: _supplier_locant(v) for k, v in atom_to_locant.items() if k in ring_atoms}

@@ -27,6 +27,7 @@ from orthonym.assembly.form_choice import (
     locant_roles,
     lower_locants,
     non_pin_parts,
+    stereo_decides_below_pin,
 )
 
 pytestmark = pytest.mark.unit
@@ -336,3 +337,23 @@ RANKED = [
 def test_the_audit_names_are_ranked_as_the_audit_graded_them(better, worse):
     assert beats(better, worse), (better, worse)
     assert not beats(worse, better), (better, worse)
+
+
+# The label ranks the names of the charge forms first; below the PIN a form that has lost the configuration of the
+# input is the name of a less specific compound STEREODESCRIPTORS, the Blue Book), so the form that keeps
+# more of it stands over a higher label below the PIN (labels: pin_verified 4, pin_unverified 3, systematic_verified 2,
+# best_effort 1; a label is ``(rank, 0)``).
+@pytest.mark.parametrize("label, incumbent, kept, incumbent_kept, expected", [
+    ((2, 0), (3, 0), 1, 0, 1),        # systematic_verified keeping the configuration over pin_unverified without it
+    ((3, 0), (2, 0), 0, 1, -1),       # and the reverse
+    ((2, 0), (3, 0), 1, 1, 0),        # equal counts: the labels decide
+    ((2, 0), (3, 0), None, 0, 0),     # a count that is not known: the labels decide
+    ((2, 0), (4, 0), 1, 0, 0),        # the PIN label outranks, as before
+    ((4, 0), (3, 0), 1, 0, 0),        # a PIN label keeps its rank
+    ((2, 0), (1, 0), 0, 1, 0),        # the last-resort floor (best_effort) is not compared by it, either way
+    ((1, 0), (3, 0), 1, 0, 0),
+    ((0, 0), (3, 0), 1, 0, 0),        # a form that is not named never wins by it
+])
+def test_the_stereo_a_form_keeps_ranks_before_a_label_below_the_pin(label, incumbent, kept, incumbent_kept, expected):
+    assert stereo_decides_below_pin(label, incumbent, kept, incumbent_kept, 4) == expected
+

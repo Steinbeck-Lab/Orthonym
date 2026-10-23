@@ -59,12 +59,16 @@ def _java_available() -> bool:
         return False
 
 
-def opsin_parse(name: str, jar_version: str = "2.9.0") -> Optional[str]:
+def opsin_parse(name: str, jar_version: str = "2.9.0",
+                allow_radicals: bool = False) -> Optional[str]:
     """Parse an IUPAC name with OPSIN CLI JAR.
 
     Args:
         name: IUPAC name to parse.
         jar_version: OPSIN version to use (default "2.9.0").
+        allow_radicals: read with OPSIN's ``-r`` (a name with a free valence parses). Off
+            unless the caller reads for a structure that has radical electrons
+            (``validation/read_back_policy.py``).
 
     Returns:
         SMILES string if OPSIN successfully parsed the name,
@@ -89,7 +93,7 @@ def opsin_parse(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     served = False
     try:
         from ..jvm_bridge import opsin_stdout
-        stdout_text, served = opsin_stdout(name, allow_radicals=False,
+        stdout_text, served = opsin_stdout(name, allow_radicals=allow_radicals,
                                            jar_path=jar_path)
     except ImportError:  # pragma: no cover - jvm_bridge always present
         served = False
@@ -97,7 +101,8 @@ def opsin_parse(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     if not served:
         try:
             result = subprocess.run(
-                ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path, "-osmi"],
+                ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path,
+                 *(["-r"] if allow_radicals else []), "-osmi"],
                 input=name,
                 capture_output=True,
                 text=True,

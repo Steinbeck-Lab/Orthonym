@@ -25,6 +25,11 @@ without it, an input written without the ring-closure digit at P was given the
 other P configuration's descriptors. Every shipped name here is
 read back by an independent OPSIN call to the input's full InChIKey
 (tests/support/rt_assert).
+
+The round trip itself reads a lone-pair stereocentre the OpenSMILES way since the PubChem 1M lane S2
+(``perception.lone_pair_reading``): the -ordered spelling of the witness is read as the input, so
+the engine names the witness in the order and the fallback is not reached for it; the rule is
+pinned on the helpers (``name_prefix_order_fallback``) that build the paper spelling directly.
 """
 import pytest
 from rdkit import Chem
@@ -94,16 +99,26 @@ def test_the_book_spellings_name_the_witness_without_the_fallback(monkeypatch):
     assert calls == []
 
 
-def test_witness_ships_the_paper_spelling_at_best_effort():
+# The writers' spellings of the witness (``book_prefixes.mechanical_forms``) name it in the order,
+# with the pyrimidinedione as the parent: the read-back of the -ordered spelling now reads a
+# lone-pair stereocentre the OpenSMILES way (``perception.lone_pair_reading``), so it is no longer
+# rejected and the fallback below is not reached for the witness. OPSIN's own StdInChIKey of the name
+# is the input's key as CDK/OPSIN read it (``test_the_ordered_spelling_reads_back_as_the_input``).
+MECHANICAL_NAME = (
+    "1-[(2R,5R)-4-{1-[(2S,4R,5S)-4-(cyclohexa-1,3,5-trien-1-yl)-4-methyl-3-oxa-1-aza-"
+    "2-phosphabicyclo[3.3.0]octan-2-yl]-1-oxamethyl}-5-(hydroxymethyl)oxolan-2-yl]-5-methylpyrimidine-"
+    "2,4(1H,3H)-dione")
+
+
+def test_witness_is_named_in_the_p145_order_without_the_fallback():
     from orthonym.assembly.book_prefixes import mechanical_forms
     with mechanical_forms():
         res = name_best_effort(P_ROW)
-    assert res.get("name") == PAPER_NAME
+    assert res.get("name") == MECHANICAL_NAME
     assert_full_rt(res.get("name"), P_ROW)
-    assert res.get("tier") == "best_effort"
+    assert res.get("tier") == "systematic_verified"
     assert res.get("is_pin") is False
-    assert res.get("source") == "t4_floor"
-    assert res.get("prefix_order_fallback") is True
+    assert res.get("prefix_order_fallback") is False
     assert res.get("verified") == "opsin"
 
 
@@ -121,6 +136,15 @@ def test_p145_ordered_spelling_is_read_as_another_stereoisomer():
     assert back is not None
     assert _full_inchikey(back) != _full_inchikey(P_ROW)
     assert _full_inchikey(back)[:14] == _full_inchikey(P_ROW)[:14]
+
+
+def test_the_ordered_spelling_reads_back_as_the_input():
+    """The cause fixed: read the OpenSMILES way (as CDK and OPSIN read it), OPSIN's SMILES of the
+    -ordered spelling is the input, and OPSIN's own key of it is the paper spelling's."""
+    from tests.support.rt_assert import name_is_rt_exact
+    assert name_is_rt_exact(ORDERED_NAME, P_ROW)
+    assert name_is_rt_exact(PAPER_NAME, P_ROW)
+    assert _opsin_own_stdinchikey(ORDERED_NAME) == _opsin_own_stdinchikey(PAPER_NAME)
 
 
 @pytest.mark.parametrize("tier", ["pin", "complete"])
@@ -285,15 +309,20 @@ def test_corpus_p_row_labels_are_those_as_written_and_it_ships():
     assert _cip_labels_match_input_as_written(CORPUS_P_ROW) is True
     assert _cip_labels_match_input_as_written(P_ROW) is True
     # the fallback rule, with the book spellings switched off (the spellings it was
-    # built on)
+    # built on): the helper builds the paper spelling; the engine no longer reaches it, because the
+    # -ordered name now reads back (``perception.lone_pair_reading``) and is shipped
     from orthonym.assembly.book_prefixes import mechanical_forms
+    from orthonym.assembly.t4_coverage import name_prefix_order_fallback
     with mechanical_forms():
+        assert name_prefix_order_fallback(Chem.MolFromSmiles(CORPUS_P_ROW)) == (
+            "(2R,5S)-2-(2-methyl-1-oxapropan-1-yl)-3-(cyclohexa-1,3,5-trien-1-yl)"
+            "-1,3-diaza-2-phosphabicyclo[3.3.0]octane")
         res = name_best_effort(CORPUS_P_ROW)
     assert res.get("name") == (
-        "(2R,5S)-2-(2-methyl-1-oxapropan-1-yl)-3-(cyclohexa-1,3,5-trien-1-yl)"
-        "-1,3-diaza-2-phosphabicyclo[3.3.0]octane")
+        "2-{1-[(2R,5S)-3-(cyclohexa-1,3,5-trien-1-yl)-1,3-diaza-2-phosphabicyclo[3.3.0]octan-2-yl]"
+        "-1-oxamethyl}propane")
     assert_full_rt(res.get("name"), CORPUS_P_ROW)
-    assert res.get("prefix_order_fallback") is True
+    assert res.get("prefix_order_fallback") is False
     # roadmap N5 (name-quality lane L2): with the book spellings ('1-methylethoxy',
     # the Blue Book; 'phenyl',:16290) the order
     # round-trips and the general engine names the row without the fallback

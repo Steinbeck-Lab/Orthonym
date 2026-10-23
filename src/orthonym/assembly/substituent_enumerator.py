@@ -1056,18 +1056,24 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
        never a wrong-descriptor hit.
 
     Returns ``None`` to SKIP caching (fail-open -- a miss can never corrupt) when
-    the canonical atom output-order prop is unavailable, or when the fragment is
-    rooted at an atom of a molecule that has more than one fragment (RDKit
-    refuses that, "rootedAtAtom can only be used with molecules that have a single
-    fragment", and logs the refusal on every call: the question is asked here, so
-    it is not put to RDKit); the caller treats a raised exception the same way.
+    the canonical atom output-order prop is unavailable; the caller treats a raised
+    exception the same way. A fragment rooted at an atom of a molecule that has more
+    than one fragment is keyed by its unrooted SMILES and the attachment atom's place
+    in the canonical atom order (RDKit refuses a rooted SMILES there, "rootedAtAtom
+    can only be used with molecules that have a single fragment", and logs the refusal
+    on every call: the question is asked here, so it is not put to RDKit).
     """
     attach_in_frag = attach_idx in frag_atoms
-    if attach_in_frag and len(Chem.GetMolFrags(mol)) > 1:
-        return None
+    # RDKit refuses a fragment rooted at an atom of a molecule with more than one fragment ("rootedAtAtom
+    # can only be used with molecules that have a single fragment"), so such a molecule (a mixture named as
+    # one graph) gets the fragment SMILES unrooted and the attachment atom's place in its canonical atom
+    # order beside it: the same information as the rooted SMILES, and a key no single-fragment molecule
+    # shares. A key it cannot build skipped the cache, and a mixture re-asked for the same prefix tens of
+    # thousands of times inside one naming (the strict twin's promotion re-run).
+    multi_fragment = attach_in_frag and len(Chem.GetMolFrags(mol)) > 1
     smi = Chem.MolFragmentToSmiles(
         mol, atomsToUse=sorted(frag_atoms),
-        rootedAtAtom=(attach_idx if attach_in_frag else -1),
+        rootedAtAtom=(attach_idx if attach_in_frag and not multi_fragment else -1),
         isomericSmiles=True, canonical=True)
     frag_set = set(frag_atoms)
     _a = mol.GetAtomWithIdx(attach_idx)
@@ -1084,6 +1090,8 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
         (_atoms[i].GetProp('_CIPCode') if _atoms[i].HasProp('_CIPCode') else None)
         for i in _order)
     _rank = {idx: pos for pos, idx in enumerate(_order)}
+    if multi_fragment:
+        smi = ("multi-fragment", smi, _rank.get(attach_idx, -1))
     _bond_items = []
     for _b in bonds_of(mol):
         _bi, _ei = _b.GetBeginAtomIdx(), _b.GetEndAtomIdx()

@@ -766,6 +766,10 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
         from ..perception.ions import get_radical_sites
         radical_sites = get_radical_sites(mol)
         if len(radical_sites) == 1 and radical_sites[0]['n_electrons'] in (1, 2, 3):
+            from .radical_floor import skeletal_lambda_floor_name
+            _lambda_name = skeletal_lambda_floor_name(mol, radical_sites[0])
+            if _lambda_name:  # a ring Si/Ge/B atom of lowered valence: the lambda convention cites it
+                return _Candidate(name=_lambda_name, result_obj=None, final_floor=True)
             from .universal_substituent import name_universal_substituent_prefix
             all_heavy = [a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1]
             _prefix_name = name_universal_substituent_prefix(

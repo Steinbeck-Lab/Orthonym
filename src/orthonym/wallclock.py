@@ -273,6 +273,8 @@ _IDLE_CONTEXTVARS: Tuple[Tuple[str, str, object], ...] = (
     ("orthonym.assembly.memo", "_cache_var", None),
     ("orthonym.assembly.memo", "pin_promotion_var", False),
     ("orthonym.assembly.memo", "prefixes_apart_var", False),
+    ("orthonym.rules.vonbaeyer_universal", "_PIN_CEILINGS_ONLY", False),
+    ("orthonym.assembly.default_tier_offer", "_RELAXED_ON", False),
     ("orthonym.metrics.producer_trail", "_TRAIL", None),
     ("orthonym.validation.read_back_policy", "_FORCED", None),
     ("orthonym.validation.read_back_policy", "_BASE", None),

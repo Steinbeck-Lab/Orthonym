@@ -66,7 +66,10 @@ The families (the rules of:data:`TWIN_RULES`, in table order):
   (not methanesulfenic acid)' (:24326); Basic functional suffixes (:17456), "-OS-thioperoxol for
   -OSH" is 'peroxol' modified by functional replacement (:17460). The twin of '-SO-thioperoxol' is
   '-sulfenic acid', that of '-OS-thioperoxol' is '-peroxol' read against the structure with the sulfur an
-  oxygen; OPSIN has no grammar for either suffix at any tier.
+  oxygen; OPSIN has no grammar for either suffix at any tier. The default tier ships them through the twin; a
+  general tier ships the name OPSIN reads itself, '(hydroxysulfanyl)methane', and the twin only for the anion of
+  -S-OH, which has no such name, and as the safety net of a molecule that only the PIN path names
+  (``validation.thioperoxol_twin``).
 * ``anhydride_acids`` (``validation.anhydride_acids``): Di- and polyanhydrides (the Blue Book)
   'diacetic butanedioic dianhydride (PIN)' (:32386). No twin spelling of such a name exists (OPSIN reads a
   two-word anhydride only), so the check reads each acid word as ``<acid> acid`` and builds the poly-anhydride
@@ -80,7 +83,7 @@ from .anhydride_acids import ANHYDRIDE_ACIDS_RULE, anhydride_acids_round_trip
 from .halido_twin import halido_twin
 from .opsin_ambiguity import ambiguity_messages
 from .polyester_twin import polyester_has_free_acid, polyester_twin
-from .thioperoxol_twin import thioperoxol_twin_round_trip
+from .thioperoxol_twin import ships_at_general_tier, thioperoxol_twin_round_trip
 from .uide_twin import uide_twin_round_trip
 
 #: one locant pair, cited once before a bridge prefix ('1,4', '4a,8a'); not the second pair of a
@@ -206,11 +209,14 @@ def twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
     """The applied rule ids joined by ``+`` when the twin of ``name`` reads to the FULL
     InChIKey of ``smiles`` and OPSIN reads it once; else None (no twin, a twin of another
     structure, an unavailable OPSIN, an ambiguous reading). A halogen -uide name and a thioperoxol name
-    have a family of their own (:func:`general_tier_twin_round_trip`), and a poly-anhydride name is read
-    through its acids (``validation.anhydride_acids``)."""
+    have a family of their own (``validation.uide_twin``, ``validation.thioperoxol_twin``), and a poly-anhydride
+    name is read through its acids (``validation.anhydride_acids``). This is the check of the default tier: a
+    thioperoxol name ships through its twin there always, at a general tier only the anion does, and a neutral name
+    as the safety net (:func:`general_tier_twin_round_trip`)."""
     found = twin_of(name)
     if found is None:
-        return general_tier_twin_round_trip(name, smiles) or anhydride_acids_round_trip(name, smiles)
+        return (uide_twin_round_trip(name, smiles) or thioperoxol_twin_round_trip(name, smiles)
+                or anhydride_acids_round_trip(name, smiles))
     if not smiles:
         return None
     twin, rules = found
@@ -223,15 +229,19 @@ def twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
 
 
 def general_tier_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
-    """The twin families a general tier ships a name through: a name no OPSIN grammar reads at any tier (the
-    halogen -uide names, ``validation.uide_twin``; the thioperoxol names, ``validation.thioperoxol_twin``),
-    while the other families spell the form OPSIN reads there; and an additive organometallic name with
-    'chlorido' ligands, ``validation.halido_twin``, whose Blue Book ligand word no OPSIN grammar reads either). The
-    rule id, or None."""
+    """The twin families a general tier ships a name through: a name no OPSIN grammar reads at any tier and for
+    which the engine has no other spelling (the halogen -uide names, ``validation.uide_twin``), and an additive
+    organometallic name with 'chlorido' ligands, ``validation.halido_twin``, whose Blue Book ligand word no OPSIN
+    grammar reads either); the other families spell the form OPSIN reads there. The anion of -S-OH, a thioperoxolate
+    name, belongs here too: the engine has no other spelling for it (``validation.thioperoxol_twin``). A neutral
+    thioperoxol name has one, the name by prefixes that OPSIN reads ('(hydroxysulfanyl)methane'): it ships through
+    its twin only inside ``thioperoxol_twin.last_resort_scope``, for a molecule that has no other name. The rule
+    id, or None."""
     found = twin_of(name)
     if found is not None and found[1] == ("halido_o",):
         return twin_round_trip(name, smiles)
-    return uide_twin_round_trip(name, smiles) or thioperoxol_twin_round_trip(name, smiles)
+    return uide_twin_round_trip(name, smiles) or (
+        thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None)
 
 
 def _opsin_reads(name: str, radical: bool) -> bool:

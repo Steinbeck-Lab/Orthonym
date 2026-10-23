@@ -92,6 +92,40 @@ def _apply(replay: dict, units: tuple, replay_budgets: bool = True) -> None:
         _replay_budgets(units)
 
 
+def ambient_naming_state() -> tuple:
+    """The ambient state a re-entrant naming call branches on besides its SMILES: the fragments being
+    named up the stack (the recursion guard of ``name_fragment_recursively``), the tier flags of the
+    request, every context variable a naming path reads (the scopes of an N-acyl refusal, a peptide
+    attempt, a split probe, the gate's re-entry, a forced locant, an isotopic naming, the book-forms
+    switch) and whether an alternate-parent rescue is running. A memo of such a call keys on it, so a
+    hit is served only for the state the stored call ran in. They are the ambient components of the key
+    of ``substituent_naming.name_substituent_fragment`` (everything but the molecule, the fragment and
+    its stereo labels) with two left out and one added. Left out: the identity of the fragment memo
+    object (a best-effort clean fall-through opens a fresh one for every attempt) and the session depth
+    (a counter of the ``name`` frames; no naming path reads it to decide a name, the recursion guard
+    is the visited set above). Added: whether an alternate-parent rescue is running, which that key
+    lacks. ``ORTHONYM_MEMO=verify`` compares every hit with a fresh naming."""
+    from ..decomposition.engine import nacyl_float_refusing
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    from ..namer import _ALT_PARENT_RESCUE
+    from ..routing import dispatch_table as _dt
+    from .group_splitting import _IN_SPLIT_PROBE
+    from .locant_omission import (_ISOTOPE_PARENT_POSITIONAL, _ISOTOPIC_NAMING_SCOPE,
+                                  forced_locant_reason)
+    from .memo import book_forms_var
+    from .substituent_enumerator import _gate_is_reentrant
+    guard = _fn._fragment_guard
+    visited = getattr(guard, 'visited', None)
+    return (frozenset(visited) if visited else frozenset(),
+            best_effort_ctx.get(), general_fallback_ctx.get(),
+            allow_aromatic_general_ctx.get(), full_coverage_ctx.get(),
+            nacyl_float_refusing(), _dt._PEPTIDE_SUBST_ACTIVE, _dt._PEPTIDE_NAME_STANDS,
+            _gate_is_reentrant(), getattr(_IN_SPLIT_PROBE, 'active', False),
+            forced_locant_reason(), _ISOTOPIC_NAMING_SCOPE.get(), _ISOTOPE_PARENT_POSITIONAL.get(),
+            book_forms_var.get(), getattr(_ALT_PARENT_RESCUE, 'active', False))
+
+
 def cached_nested_call(namespace: str, key: tuple, fn: Callable[[], Any], *,
                        replay_budgets: bool = True) -> Any:
     """Return ``fn``'s result for ``(namespace, key)``; on a hit replay the EXACT

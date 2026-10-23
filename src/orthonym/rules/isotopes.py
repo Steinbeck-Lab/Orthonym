@@ -25,6 +25,8 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 from ..data.multipliers import multiplier_table
+from .isotope_compare import RADICAL_READING as _RADICAL_READING
+from .isotope_compare import radical_centres_agree, tautomer_accepted
 
 
 def has_isotopes(mol: Optional[Chem.Mol]) -> bool:
@@ -222,10 +224,11 @@ _ELEMENT_Z = {  # atomic numbers for tie-break
 def _opsin_parse(candidate_name: str) -> Optional[str]:
     """Parse ``candidate_name`` to SMILES via the repo's shared OPSIN CLI
     helper (validation.opsin_roundtrip.opsin_parse — the SAME loader the name
-    validity gate uses). Fail-closed (None) on any error / no JAR."""
+    validity gate uses), with ``-r`` when the decorator names a radical
+    (``_RADICAL_READING``). Fail-closed (None) on any error / no JAR."""
     try:
         from ..validation.opsin_roundtrip import opsin_parse
-        return opsin_parse(candidate_name)
+        return opsin_parse(candidate_name, allow_radicals=_RADICAL_READING.get())
     except Exception:
         return None
 
@@ -550,6 +553,8 @@ def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
     if parsed is None:
         return False
     try:
+        if _RADICAL_READING.get() and not radical_centres_agree(original_mol, smi):
+            return False
         if stereo_blind:
             a, b = Chem.Mol(parsed), Chem.Mol(original_mol)
             Chem.RemoveStereochemistry(a)
@@ -566,8 +571,9 @@ def _isotope_round_trips(candidate_name: str, original_mol: Chem.Mol,
         # carries a higher locant than the one of the same constitution.
         if Chem.MolToSmiles(parsed) != Chem.MolToSmiles(original_mol):
             if not _same_fixed_h_inchi(parsed, original_mol):
-                return False
-            if not _kekule_forms_of_one_compound(parsed, original_mol):
+                if _RADICAL_READING.get() or not tautomer_accepted(parsed, original_mol):
+                    return False
+            elif not _kekule_forms_of_one_compound(parsed, original_mol):
                 _BOND_SHIFT_PARSE_REFUSED.set(True)
                 return False
         # (a review P4 related note): RDKit CanonSmiles can call a charged /
@@ -627,6 +633,23 @@ _INTERIOR_LOCANT_STEM_RE = re.compile(r"-(?=[\d,]+-[a-z])")
 #: labelled ring of a biphenyl-yl prefix failed closed (PubChem 1M: five
 #: deuterated OLED hosts the paper named). Every candidate stays OPSIN-RT gated.
 _RING_ASSEMBLY_STEM_RE = re.compile(r"\[(?=\d+'*(?:[,:]\d+'*)+-[a-z])")
+
+#: The bracket of heteroatom locants that opens a fused parent after a letter ('7,14-methano[1,3]benzimidazolo
+#: [1,2-b]...', 'dihydro[1,2,4]triazolo...'): a slot OPSIN reads. After a hydro prefix it is the one the book
+#: prints ('2,3-dihydro(15N)-1H-indole (PIN)',, the Blue Book); after a bridge prefix
+#: the book prints no descriptor, so a name that uses the slot there is recorded below the PIN
+#: (``_unprinted_slot``, at the placement that uses it).
+_FUSED_SYSTEM_OPENING_RE = re.compile(r"(?<=[a-z])\[\d+(?:,\d+)*\](?=[a-z])")
+
+
+def _unprinted_slot(skel: str, off: int) -> bool:
+    """True when ``off`` is the opening bracket of a fused system right after its bridge prefix; what a
+    bridge prefix is is ``rules.bridged_fused_pin.prefixes.ends_in_bridge_prefix``."""
+    if skel[off:off + 1] != "[":
+        return False
+    from .bridged_fused_pin.prefixes import ends_in_bridge_prefix
+    return ends_in_bridge_prefix(skel[:off])
+
 
 #: A SUFFIX that names a labelled HETEROATOM whose nuclide is placed immediately
 #: BEFORE the suffix it modifies (``propane-1-(34S)thiol``), rather than floated to
@@ -860,32 +883,54 @@ def _insertion_offsets(skel: str) -> List[int]:
     # A bracketed ring-assembly stem ('[1,1'-biphenyl]-4-yl'): the slot is its
     # opening bracket (``_RING_ASSEMBLY_STEM_RE``). RT-gated.
     offsets.extend(m.start() for m in _RING_ASSEMBLY_STEM_RE.finditer(skel))
+    # A fused system after its bridge prefix: the slot is its opening bracket. RT-gated.
+    offsets.extend(m.start() for m in _FUSED_SYSTEM_OPENING_RE.finditer(skel))
     # A bracketed substituent ring opening with skeletal-replacement locants
-    # ('[9,24-dioxahexacyclo...'): the slot right after the mark
-    # (``_BRACKET_SKELETAL_LOCANT_RE``). RT-gated.
+    # ('[9,24-dioxahexacyclo...') or the heteroatom locants of a benzo-fused ring
+    # ('(1,2-benzoxazol-3-yl)'): the slot right after the mark
+    # (``_BRACKET_SKELETAL_LOCANT_RE``, ``_BRACKET_BENZO_LOCANT_RE``). RT-gated.
     offsets.extend(m.start() + 1
-                   for m in _BRACKET_SKELETAL_LOCANT_RE.finditer(skel))
+                   for regex in (_BRACKET_SKELETAL_LOCANT_RE, _BRACKET_BENZO_LOCANT_RE)
+                   for m in regex.finditer(skel))
     return sorted(set(offsets))
 
 
-def _p4542_p4543_key(groups) -> tuple:
-    """ then ordering key for a candidate placement.
+def _atomic_number(el: str) -> int:
+    """Atomic number of element symbol ``el`` (0 for a symbol that is none)."""
+    z = _ELEMENT_Z.get(el)
+    if z is None:
+        try:
+            z = Chem.GetPeriodicTable().GetAtomicNumber(el)
+        except Exception:  # noqa: BLE001 - not an element symbol
+            z = 0
+    return z
 
-    Prefer the placement giving the lowest locant to the HIGHER atomic number
-    , then to the HIGHER mass number. Implemented as: for
-    each group sorted by locant ascending, emit (-Z, -mass); the lexicographically
-    smallest key is the preferred placement. the Blue Book / the Blue Book / the Blue Book(i).
-    """
-    key = []
-    for group in sorted(
-        groups, key=lambda g: (g[0] if g[0] is not None else 1 << 30)
-    ):
-        # groups are (locant, mass, element, count[, max_at_pos]) -- index the
-        # first three so a 4- or 5-tuple both unpack.
-        _locant, mass, el = group[0], group[1], group[2]
-        z = _ELEMENT_Z.get(el, 0)
-        key.append((-z, -mass))
-    return tuple(key)
+
+def _p4542_p4543_key(groups) -> tuple:
+    """The nuclide order of NUMBERING criterion (i) (the Blue Book) for a candidate placement:
+    "When there is a choice between equivalent numberings in an isotopically unmodified compound, the
+    starting point and the direction of numbering of the analogous isotopically substituted compound are
+    chosen so as to give lowest locants to the modified atoms or groups considered together as a set in
+    increasing numerical order. If a choice still remains, the lower locant is given to the nuclide of
+    higher atomic number. In the case of different nuclides of the same element, the lower locant is
+    assigned to the nuclide of higher mass number" (the same in,:44172, and,:21516).
+
+    The first sentence is the set of the cited locants, which the callers compare; this is the rest: for each
+    atom taken in the order of its locant, ``(-Z, -mass)``, and the smallest key is the preferred numbering,
+    so the higher atomic number and then the higher mass number stand at the lower locant. A group is
+    ``(locant, mass, element, count[, max_at_pos])`` with a locant that is None (omitted), one token or a
+    tuple of tokens (one per atom); a group of ``count`` atoms at one token counts once, as before.
+    One home of the rule: every pass of the decorator that chooses among numberings orders its tied
+    candidates by this key."""
+    atoms = []
+    for group in groups:
+        # groups are (locant, mass, element, count[, max_at_pos]) -- index the first three so a 4- or
+        # 5-tuple both unpack.
+        locant, mass, el = group[0], group[1], group[2]
+        for token in (locant if isinstance(locant, tuple) else (locant,)):
+            atoms.append((_locant_sort_key(str(token)) if token is not None else (1 << 30,), mass, el))
+    atoms.sort(key=lambda a: a[0])
+    return tuple((-_atomic_number(el), -mass) for _loc, mass, el in atoms)
 
 
 def _bracket_depth(skel: str, off: int) -> int:
@@ -1425,6 +1470,19 @@ _LEADING_SKELETAL_LOCANT_RE = re.compile(
 _BRACKET_SKELETAL_LOCANT_RE = re.compile(
     r"[(\[{](?=\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"
     r"(?:" + _A_PREFIX_ALT + r"))")
+
+#: The heteroatom locants of a benzo-fused ring opening a SUBSTITUENT's name inside its enclosing marks,
+#: the ``1,2-`` of ``(1,2-benzoxazol-3-yl)`` or the ``1,3-`` of ``(1,3-benzodioxol-5-yl)``: the locant
+#: set belongs to the ring (a replacement or Hantzsch-Widman stem follows 'benz(o)',
+#: ``assembly.naming_utils._REPLACEMENT_FRONT_RE``), not to a detachable prefix of it
+#: ('(2,4-dimethylphenyl)', '(4-benzylphenyl)'). (the Blue Book): "when the name, or a part
+#: of a name, includes a preceding locant, a hyphen is inserted": the slot is the index after the mark,
+#: ``1-[(3a,4,5,6,7,7a-13C6)-1,2-benzoxazol-3-yl]methanesulfonamide``. No rule offered it, so a labelled
+#: benzo-fused heteroaryl prefix of a chain parent failed closed once ``496821116`` made the one-carbon
+#: sulfonamide the parent instead of the ring it bears. Every candidate stays OPSIN-RT gated.
+from ..assembly.naming_utils import _REPLACEMENT_FRONT_RE as _REPLACEMENT_STEM_RE  # noqa: E402
+_BRACKET_BENZO_LOCANT_RE = re.compile(
+    r"[(\[{](?=\d+(?:,\d+)*-benzo?" + _REPLACEMENT_STEM_RE.pattern[1:] + r")")
 
 
 def _front_hyphen_candidate(skel: str, desc: str) -> Optional[Tuple[int, str]]:
@@ -2260,7 +2318,7 @@ def _find_best_placement(
     #, the Blue Book) and '(18O-2H,18O)acetic acid (PIN)'
     # (:43810), a mixed form this search does not build (it shares one locant
     # across the descriptor).
-    if (below_pin or _sub_rank == 1
+    if (below_pin or _sub_rank == 1 or (desc and _unprinted_slot(skel, off))
             or (isinstance(loc_rank, str) and desc
                 and _letter_locant_on_its_own_element(loc_rank, keys))
             or (desc and _MULTIPLIED_XH_SUFFIX_RE.search(skel)
@@ -2652,6 +2710,9 @@ def _decorate_multi_position(
                 out = _escalate_marks_for_descriptor(out, off + shift)
                 shift += len(ins)
             if _isotope_round_trips(out, original):
+                if any(_unprinted_slot(skel, off) for off, _desc in placements):
+                    from ..metrics.provenance import record_non_pin_fragment
+                    record_non_pin_fragment(out)
                 # One merged descriptor for a completely labelled substituent group
                 # whose locant-free spelling, the Blue Book) OPSIN
                 # 2.9.0 misreads: the locanted name ships below the PIN
@@ -2876,6 +2937,9 @@ def _decorate_distinct_multi_locant(
                             from ..metrics.provenance import record_non_pin_fragment
                             record_non_pin_fragment(cand)
                             record_non_pin_fragment(_descriptor_fragment(cand, desc))
+                        elif _unprinted_slot(skeleton, off):
+                            from ..metrics.provenance import record_non_pin_fragment
+                            record_non_pin_fragment(cand)
                         return cand
     return None
 
@@ -3904,31 +3968,6 @@ def _decorate_uniform_multiplier(skeleton, keys, original, stripped,
         skeleton, keys, original, stripped, stereo_blind=stereo_blind)[0]
 
 
-# ---------------------------------------------------------------------------
-# (BB:~43855) -- isotope-INDUCED stereocentre
-# ---------------------------------------------------------------------------
-def _cip_labeled_count(mol: Chem.Mol) -> int:
-    """Number of atoms carrying an assigned CIP label under the project's
-    canonical stereo path (``perception.stereo.assign_stereochemistry`` -- the
-    ``centres`` engine reads isotope mass as CIP Rule 1b, confirmed by spike).
-
-    The mol is RE-PARSED from its canonical SMILES first: an isotope-stripped copy
-    keeps the ORIGINAL's chiral tag on a carbon that is no longer a stereocentre
-    (two H's now identical), and the canonical writer drops exactly those phantom
-    tags -- so the difference original-minus-stripped counts only the centres the
-    nuclide actually induces. Fail-soft to 0 (a missing JVM must never hard-fail a
-    name)."""
-    try:
-        m = Chem.MolFromSmiles(Chem.MolToSmiles(mol))
-        if m is None:
-            return 0
-        from ..perception.stereo import assign_stereochemistry
-        assign_stereochemistry(m)
-    except Exception:
-        return 0
-    return sum(1 for a in m.GetAtoms() if a.HasProp("_CIPCode"))
-
-
 _MIXED_LOCANT_COMBO_CAP = 256  # bound on the per-group locant-spec product; fail closed above
 
 
@@ -4015,144 +4054,48 @@ def _decorate_mixed_locant(skeleton: str, keys, original: Chem.Mol,
     def _combo_cited(combo):
         return sorted(L for spec in combo if spec is not None for L in spec)
 
-    #: try candidate locant SETS lowest-first; the first set that yields
-    # ANY round-tripper is the answer, and within it the best-placement (lowest
-    # placement_quality, then lowest offset) candidate is emitted.
+    #: try candidate locant SETS lowest-first; the first set that yields ANY round-tripper is the
+    # answer, and within it the best-placement (lowest placement_quality, then lowest offset) candidate is
+    # emitted. The combinations that cite the same set of locants are the equivalent numberings of
+    # criterion (i): all of them are tried, and the one that gives the lower locant to the nuclide of higher
+    # atomic number, then of higher mass number, wins (``_p4542_p4543_key``): '(1-14C,6-13C)hexane', not
+    # '(1-13C,6-14C)hexane'.
     combos = sorted(itertools.product(*per_group_specs), key=_combo_cited)
-    for combo in combos:
-        groups_desc = [(loc, mass, el, count, maxpos)
-                       for loc, ((mass, el), count, maxpos) in zip(combo, keys)]
-        # Subscript axis (as in _find_best_placement): the BB-preferred omitted-
-        # subscript form (sub_rank 0, `(2,4-2H2,15N)`) is tried first; the
-        # force-show form (sub_rank 1, `(2,4-2H2,15N1)`) is a parseability fallback.
-        desc_pref = format_isotope_descriptor(groups_desc)
-        desc_force = format_isotope_descriptor(groups_desc, force_show=True)
-        variants = [(0, desc_pref)]
-        if desc_force != desc_pref:
-            variants.append((1, desc_force))
+    for _cited, tied in itertools.groupby(combos, key=_combo_cited):
         winners = []
-        for sub_rank, desc in variants:
-            for off in offs:
-                before_digit = off < len(skeleton) and skeleton[off:off + 1].isdigit()
-                for join in (["-", ""] if before_digit else [""]):
-                    cand = skeleton[:off] + desc + join + skeleton[off:]
-                    if _isotope_round_trips(cand, original):
-                        winners.append(
-                            (sub_rank,
-                             _placement_quality(skeleton, off, locant_free=False),
-                             off, _escalate_marks_for_descriptor(cand, off)))
+        for combo in tied:
+            groups_desc = [(loc, mass, el, count, maxpos)
+                           for loc, ((mass, el), count, maxpos) in zip(combo, keys)]
+            order = _p4542_p4543_key(groups_desc)
+            # Subscript axis (as in _find_best_placement): the BB-preferred omitted-
+            # subscript form (sub_rank 0, `(2,4-2H2,15N)`) is tried first; the
+            # force-show form (sub_rank 1, `(2,4-2H2,15N1)`) is a parseability fallback.
+            desc_pref = format_isotope_descriptor(groups_desc)
+            desc_force = format_isotope_descriptor(groups_desc, force_show=True)
+            variants = [(0, desc_pref)]
+            if desc_force != desc_pref:
+                variants.append((1, desc_force))
+            for sub_rank, desc in variants:
+                for off in offs:
+                    before_digit = off < len(skeleton) and skeleton[off:off + 1].isdigit()
+                    for join in (["-", ""] if before_digit else [""]):
+                        cand = skeleton[:off] + desc + join + skeleton[off:]
+                        if _isotope_round_trips(cand, original):
+                            winners.append(
+                                (order, sub_rank,
+                                 _placement_quality(skeleton, off, locant_free=False),
+                                 off, _escalate_marks_for_descriptor(cand, off), desc_force))
         if winners:
-            winners.sort(key=lambda w: (w[0], w[1], w[2], w[3]))
-            if winners[0][0] == 1:
-                # The always-show subscript is the parse fallback, not the
-                # preferred spelling (see _find_best_placement).
+            winners.sort(key=lambda w: w[:5])
+            _order, sub_rank, _quality, off, cand, desc_force = winners[0]
+            if sub_rank == 1 or _unprinted_slot(skeleton, off):
+                # The always-show subscript is the parse fallback, not the preferred spelling (see
+                # _find_best_placement); a slot after a bridge prefix is none the book prints.
                 from ..metrics.provenance import record_non_pin_fragment
-                record_non_pin_fragment(winners[0][3])
-                record_non_pin_fragment(_descriptor_fragment(winners[0][3], desc_force))
-            return winners[0][3]
+                record_non_pin_fragment(cand)
+                record_non_pin_fragment(_descriptor_fragment(cand, desc_force))
+            return cand
     return None
-
-
-_STEREO_TOKEN_RE = re.compile(r"(\d*)([a-z]?)('{0,2})([RSrsEZez])$")
-
-
-def _stereo_token_key(tok: str):
-    """Total order over stereodescriptor tokens by ASCENDING locant
-    'cited according to the ascending order of their corresponding locants').
-    Key: (int locant, letter suffix e.g. 'a' in 7a, prime count, descriptor)."""
-    m = _STEREO_TOKEN_RE.match(tok)
-    if not m:
-        return (float("inf"), "", 0, tok)
-    num, letter, primes, desc = m.groups()
-    return (int(num) if num else 0, letter, len(primes), desc)
-
-
-def _merge_leading_stereo(induced, base: str) -> str:
-    """: merge the isotope-INDUCED stereodescriptors with any genuine
-    stereodescriptor group already leading ``base`` into ONE parenthesised group,
-    cited in ascending locant order — ``(1S)-`` + ``(2R)-…`` -> ``(1S,2R)-…``.
-    ``induced`` is a list of ``(int_locant, 'R'|'S')``. When ``base`` carries no
-    leading stereo group the result is byte-identical to the old ``prefix+base``,
-    so single-induced rows (``(1R)-(1-2H1)ethan-1-ol``) are unchanged. The isotope
-    descriptor ``(1-2H1)`` is NOT a stereodescriptor and never matches
-    ``_STEREO_PREFIX_RE``, so it is never swept into the merge."""
-    from .stereochemistry import _STEREO_PREFIX_RE  # lazy: avoid import cycle
-    m = _STEREO_PREFIX_RE.match(base)
-    base_tokens, rest = [], base
-    if m:
-        base_tokens = m.group(0)[1:-2].split(",")  # strip '(' and ')-'
-        rest = base[m.end():]
-    induced_tokens = [f"{loc}{cfg}" for loc, cfg in induced]
-    merged = sorted(base_tokens + induced_tokens, key=_stereo_token_key)
-    return "(" + ",".join(merged) + ")-" + rest
-
-
-def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
-                             extra_locants) -> Optional[str]:
-    """: an isotope-INDUCED stereocentre -- a centre that is a stereocentre
-    only because a nuclide breaks a local symmetry (``(1R)-(1-2H1)ethan-1-ol``,
-    achiral once the D is collapsed). The skeleton is named from the STRIPPED mol
-    and carries no such descriptor, and the isotope descriptor alone reproduces
-    the constitution but not the stereo, so the full-InChIKey oracle rejects it
-    and the row abstains.
-
-    Fully oracle-driven (no atom->locant map needed, consistent with the rest of
-    this module):
-      1. find the isotope-descriptor placement reproducing the CONSTITUTION
-         (``stereo_blind`` -- e.g. ``(1-2H1)ethan-1-ol``);
-      2. enumerate stereodescriptor prefixes over (locant-subset x R/S) for the
-         ``k`` induced centres, cost-capped;
-      3. accept the first (lowest-locant, deterministic) prefixed candidate whose
-         FULL InChIKey (stereo + isotope) reproduces the original.
-
-    : "the stereodescriptors are cited first" -- the prefix leads the name.
-    Every emission is FULL-oracle gated, so a wrong config/locant fails closed;
-    fails closed (None) when there is no induced centre, no constitution placement,
-    the enumeration would exceed the cap, or nothing round-trips.
-    """
-    k = _cip_labeled_count(original) - _cip_labeled_count(stripped)
-    if k < 1:
-        return None
-    base, _off, _desc, _lr = _find_best_placement(
-        skeleton, keys, original, n_pos, allow_front_hyphen=True,
-        extra_locants=extra_locants, stereo_blind=True)
-    if base is None:
-        # The single-descriptor placement above cannot SPLIT a symmetry-broken
-        # multiplied substituent -- e.g. the two iodomethyl arms of
-        # 1,3-diiodopropan-2-ol, made distinct by one heavy-iodine nuclide, which
-        # is exactly what induces the C2 centre. Obtain that de-multiplied
-        # constitution stereo-blind (connectivity only) from the demux helpers so
-        # it passes the constitution gate; the stereodescriptor prefix and the
-        # full-InChIKey acceptance below still apply, so 0-wrong is preserved.
-        for _demux_fn in (_decorate_demultiplied,
-                          _decorate_uniform_multiplier,
-                          _decorate_letter_multiplier):
-            base = _demux_fn(skeleton, keys, original, stripped, stereo_blind=True)
-            if base is not None:
-                break
-    if base is None:
-        return None
-    from itertools import combinations, product
-    from math import comb
-    # Cost cap (bounded oracle budget): C(n_pos, k) * 2**k fresh OPSIN parses.
-    # 24 covers the single-centre rows (2*n_pos) comfortably; a multi-centre
-    # symmetric parent that blows it up fails closed rather than spend minutes.
-    if comb(n_pos, k) * (2 ** k) > 24:
-        return None
-    winners = []
-    for locs in combinations(range(1, n_pos + 1), k):
-        for cfg in product("RS", repeat=k):
-            #: merge the induced descriptors with any genuine
-            # stereo group `base` already carries into ONE ascending-locant
-            # group (`(1S,2R)-`), not two adjacent `(1S)-(2R)-` groups.
-            cand = _merge_leading_stereo(list(zip(locs, cfg)), base)
-            if _isotope_round_trips(cand, original):  # FULL stereo + isotope
-                winners.append((locs, cfg, cand))
-    if not winners:
-        return None
-    # lowest-locant-first; deterministic tiebreak on the candidate string.
-    winners.sort(key=lambda w: (w[0], w[1], w[2]))
-    return winners[0][2]
 
 
 # ─────────────────────────────────────────────────────────────────────────────────────
@@ -4194,6 +4137,13 @@ def _decorate_isotope_stereo(skeleton, keys, original, stripped, n_pos,
 _ISOTOPE_NONSUBSTITUTABLE_RETAINED = frozenset({"toluene"})
 
 
+def _decorate_isotope_stereo(*args) -> Optional[str]:
+    """: the descriptors of an isotope-INDUCED stereocentre for one skeleton spelling
+    (``rules.isotope_induced.decorate_isotope_stereo``)."""
+    from .isotope_induced import decorate_isotope_stereo
+    return decorate_isotope_stereo(*args)
+
+
 def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     """Fail-closed isotopic-substitution PIN +.
 
@@ -4202,6 +4152,9 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     3. Enumerate candidate descriptors (lowest-locant-first, and
        accept the first whose OPSIN round-trip reproduces the original mol.
     4. None if nothing round-trips (never a wrong labeled name).
+
+    The passes (as drawn, the induced stereocentres unspecified, a tautomer read as the input) are
+    ``rules.isotope_passes``.
     """
     original = Chem.MolFromSmiles(smiles)
     if original is None or not has_isotopes(original):
@@ -4209,6 +4162,19 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     stripped, label_map = strip_isotopes(original)
     if not label_map:
         return None
+    from .isotope_passes import decorate_passes
+    return decorate_passes(smiles, style, namer, original, stripped, label_map)
+
+
+#: A lone stereodescriptor without its locant at the front of a chain prefix ('[(E)-6-phenylhexa-1,5-dien-3-yl]').
+_BARE_LONE_DESCRIPTOR_RE = re.compile(r"[\[(]\([EZ]\)-")
+
+
+def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
+                       composer: bool = True, finish=None) -> Optional[str]:
+    """The strategies of the decorator on ``original``: the name the first one that reads back builds.
+    ``finish`` completes that name inside the ambient scopes (None declines it); ``composer`` False leaves
+    out the scope composer."""
     # (``:44180``). Everything below names the isotope-STRIPPED molecule,
     # so no structural test further down can see that a label exists -- measured: at
     # the substituent licences every ``GetIsotope`` in scope reads 0 even
@@ -4232,6 +4198,8 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
         else isotopic_naming_scope("isotope"))
     _shift_token = _BOND_SHIFT_PARSE_REFUSED.set(False)
     _naming_token = _SKELETON_NAMINGS.set([0])
+    _radical_token = _RADICAL_READING.set(
+        any(a.GetNumRadicalElectrons() > 0 for a in original.GetAtoms()))
     from ..validation.thioperoxol_twin import embedded_name   # the skeleton is read by OPSIN, candidate by candidate
     try:
         with _scope, embedded_name():
@@ -4241,13 +4209,35 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
             if result is None:
                 result = _decorate_with_identical_prefixes_apart(
                     smiles, style, namer, original, stripped, label_map)
-            if result is None and sink and getattr(namer, "_general_fallback_unverified", False):
+            if (result is None and sink and not isinstance(_scope, contextlib.nullcontext)
+                    and _BARE_LONE_DESCRIPTOR_RE.search(sink.get("skeleton") or "")):
+                # (the Blue Book): a bare '(E)' opening a chain prefix is read by OPSIN onto
+                # the labelled bond; the skeleton is named again with the locant of the descriptor cited
+                # (assembly.locant_omission.scope_cites_stereo_locants). Only here, so no name built above
+                # changes, and only for a skeleton that has such a descriptor.
+                from ..assembly.locant_omission import ISOTOPIC_STEREO_LOCANTS
+                from ..assembly.memo import fresh_scope, pop_sandbox
+                _fresh = fresh_scope()      # the caches of the scope hold names made without the locants
+                try:
+                    with isotopic_naming_scope(ISOTOPIC_STEREO_LOCANTS):
+                        sink = {}
+                        result = _decorate_isotopic_name_inner(
+                            smiles, style, namer, original, stripped, label_map, sink)
+                        if result is None:
+                            result = _decorate_with_identical_prefixes_apart(
+                                smiles, style, namer, original, stripped, label_map)
+                finally:
+                    pop_sandbox(_fresh)
+            if (result is None and composer and sink
+                    and getattr(namer, "_general_fallback_unverified", False)):
                 # Every strategy above declined: one descriptor per labelled part, read from OPSIN
                 # (rules/isotope_scopes.py). Only here, so no name built above changes, and only at the
                 # best-effort tier (the discriminator ``_flagged_systematic_namer`` reads): its names are
                 # below the PIN, which every other tier declines.
                 from .isotope_scopes import compose_last_resort
                 result = compose_last_resort(sink, original, label_map)
+            if result is not None and finish is not None:
+                result = finish(result)
         if (result and _BOND_SHIFT_PARSE_REFUSED.get()
                 and _has_fused_localized_alternation(original)):
             # A fused mancude parent names no ene locants, so for the drawing
@@ -4264,6 +4254,7 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     finally:
         _BOND_SHIFT_PARSE_REFUSED.reset(_shift_token)
         _SKELETON_NAMINGS.reset(_naming_token)
+        _RADICAL_READING.reset(_radical_token)
 
 
 def _has_fused_localized_alternation(mol: Chem.Mol) -> bool:
@@ -4331,7 +4322,7 @@ def _decorate_with_identical_prefixes_apart(smiles, style, namer, original, stri
         with identical_prefixes_cited_apart():
             apart = (_name_skeleton(namer, stripped_smiles),
                      _name_skeleton(_flagged_systematic_namer(namer), stripped_smiles))
-            if apart == grouped:
+            if apart == grouped or not any(apart):
                 return None
             result = _decorate_isotopic_name_inner(
                 smiles, style, namer, original, stripped, label_map)
@@ -4359,21 +4350,28 @@ def _name_skeleton(naming, smiles: str) -> str:
     cited apart), all inside the one ``name`` budget of the labelled molecule; a parent that
     spends half the ceiling in one naming left the next naming no room, and the
     ``PerfBudgetExceeded`` of the second ended the molecule before a placement was tried. A
-    naming that runs out is begun again once with a fresh ceiling
+    naming that runs out is begun again with a fresh ceiling
     (``assembly.fragment_naming.rearm_hang_budgets``), up to ``_SKELETON_NAMING_CAP`` times per
     decorator call (one call names one labelled molecule or fragment), so a call still cannot spend
     more than that many ceilings more than it did. A naming that stays within the shared budget
-    is not touched, so every name the decorator built before is the name it builds now."""
+    is not touched, so every name the decorator built before is the name it builds now.
+
+    A parent whose analysis needs more than one ceiling (a cage of thirteen rings) finishes on the
+    second or third: what an attempt that ran out had analysed is kept by the memo of the call, so the
+    next attempt starts from it, and the naming is begun again as long as the pass has attempts left.
+    The cap is per pass (``_decorate_labelled`` sets the count): a decorator call makes up to four passes
+    (as drawn, the induced centres unspecified, each again with a tautomer reading,
+    ``rules.isotope_passes``), so up to four times five ceilings more than the first naming of each."""
     from ..assembly.fragment_naming import PerfBudgetExceeded, rearm_hang_budgets
-    try:
-        return naming.name(smiles)
-    except PerfBudgetExceeded:
-        count = _SKELETON_NAMINGS.get()
-        if count is None or count[0] >= _SKELETON_NAMING_CAP:
-            raise
-        count[0] += 1
-        rearm_hang_budgets()
-        return naming.name(smiles)
+    while True:
+        try:
+            return naming.name(smiles)
+        except PerfBudgetExceeded:
+            count = _SKELETON_NAMINGS.get()
+            if count is None or count[0] >= _SKELETON_NAMING_CAP:
+                raise
+            count[0] += 1
+            rearm_hang_budgets()
 
 
 def _flagged_systematic_namer(namer):

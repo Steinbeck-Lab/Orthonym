@@ -23,6 +23,7 @@ Design invariants (each is load-bearing for the 0-wrong / byte-identity contract
 
 Dependency-light on purpose (``contextvars`` + ``os`` and the provenance context variables).
 """
+import contextlib
 import contextvars
 import os
 from collections import OrderedDict
@@ -180,10 +181,20 @@ def push_scope():
     teardown and must pass the token to:func:`pop_scope`), or ``None`` when a
     scope already existed (a nested re-entry -- it shares the outer cache and must
     NOT reset it).
+
+    A scope opened inside:func:`seeded_scopes` starts with the entries it was given (see there), and
+    one opened inside:func:`recording_scopes` is handed to the recorder.
     """
     if _cache_var.get() is not None:
         return None
-    return _cache_var.set({})
+    scope = {}
+    seed = _seed_var.get()
+    if seed:
+        scope.update(seed)
+        scope[_SIDE_KEY] = dict(seed.get(_SIDE_KEY, ()))
+    for recorder in _recorders_var.get():
+        recorder.append(scope)
+    return _cache_var.set(scope)
 
 
 def pop_scope(token):
@@ -191,6 +202,64 @@ def pop_scope(token):
     token (nested re-entry) is a no-op, so only the outermost frame tears down."""
     if token is not None:
         _cache_var.reset(token)
+
+
+def fresh_scope():
+    """An EMPTY copy of the open scope for a computation whose ambient declarations differ from the
+    enclosing one's (a scope's caches are keyed on the assumption that they stay what they were when it
+    opened: ``locant_omission.isotopic_naming_scope``). Returns a token for:func:`pop_sandbox`; with no
+    scope open nothing changes (no caching, as before)."""
+    return _cache_var.set({} if _cache_var.get() is not None else None)
+
+
+# Entries one naming of a molecule hands to the next naming of the same molecule (the junior-parent
+# namings of ``spelling_offer``). Each naming keeps a memo scope of its own (nothing a naming computes in
+# its own context reaches another); only the entries of the namespaces below are given on, those whose
+# value is a pure function of the key: the name of a nested ``name_compound`` call and of a lipid acid
+# fragment, each keyed by the SMILES and the ambient state it ran in, whatever the molecule above asked.
+_SHAREABLE_NAMESPACES = frozenset({"name_compound_nested", "lipids_fragment_name"})
+
+#: the entries a scope opened here starts with (``seeded_scopes``)
+_seed_var = contextvars.ContextVar("orthonym_memo_seed", default=None)
+#: the lists that receive every scope opened here (``recording_scopes``), outermost first
+_recorders_var = contextvars.ContextVar("orthonym_memo_recorders", default=())
+
+
+@contextlib.contextmanager
+def recording_scopes():
+    """Collect every top-level memo scope (see:func:`push_scope`) opened in the body, in the order
+    opened, in the list it yields. The scopes stay readable after their naming has ended."""
+    recorded = []
+    token = _recorders_var.set(_recorders_var.get() + (recorded,))
+    try:
+        yield recorded
+    finally:
+        _recorders_var.reset(token)
+
+
+def shareable_entries(scopes, into=None) -> dict:
+    """The entries of ``scopes`` that another naming of the molecule may start with (see
+    ``_SHAREABLE_NAMESPACES``), added to ``into``: the stored values, and for each the side record the
+    nested-call memo replays on a hit (``side_put``)."""
+    out = {_SIDE_KEY: {}} if into is None else into
+    side = out.setdefault(_SIDE_KEY, {})
+    for scope in scopes:
+        for key, value in scope.items():
+            if isinstance(key, tuple) and key and key[0] in _SHAREABLE_NAMESPACES:
+                out[key] = value
+        side.update({k: v for k, v in scope.get(_SIDE_KEY, {}).items() if k[0] in _SHAREABLE_NAMESPACES})
+    return out
+
+
+@contextlib.contextmanager
+def seeded_scopes(entries):
+    """Every top-level memo scope opened in the body starts with a copy of ``entries``
+    (:func:`shareable_entries`)."""
+    token = _seed_var.set(entries)
+    try:
+        yield
+    finally:
+        _seed_var.reset(token)
 
 
 def push_sandbox():

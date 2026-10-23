@@ -100,6 +100,30 @@ def _coerce_bare_locant(v: object) -> _Locant:
     return (base, suffix) if suffix else base
 
 
+_LETTERED_LOCANT_RE = _re.compile(r"^(\d+)([a-z]*)$")
+
+
+def cascade_locant(loc) -> _Locant:
+    """One locant of a spiro component in the cascade-step-6 supplier shape (``_Locant``).
+
+    The spiro namers carry a lettered fusion locant as the string ``'7a'`` and cite its prime
+    beside it, ``('7a', "'")`` (``_locant_display`` renders that as ``7'a``). The cascade's
+    consumers (``p44_scorer``, ``_build_ring_pos``) take only ``int`` or ``(int, str)``, so the base
+    number moves to the int and the letter and prime to the str: ``('7a', "'") -> (7, "a'")``. The
+    numeric part orders as a number: 4, 4', 4a, 4'a, 10), which the string ``'10a'`` <
+    ``'7a'`` did not."""
+    prime = ""
+    if isinstance(loc, tuple) and len(loc) == 2 and isinstance(loc[0], str):
+        loc, prime = loc[0], loc[1]
+    if not isinstance(loc, str):
+        return loc
+    m = _LETTERED_LOCANT_RE.match(loc)
+    if m is None:
+        return (10 ** 9, loc + prime)  # unparseable: sorts after every numbered locant
+    base, letters = int(m.group(1)), m.group(2)
+    return (base, letters + prime) if (letters or prime) else base
+
+
 def _assert_homogeneous_locants(locants: List[_Locant]) -> None:
     """Raise ValueError if ``locants`` contains a mix of int and tuple types.
 

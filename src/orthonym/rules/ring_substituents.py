@@ -2033,7 +2033,11 @@ def _cage_core_numbering(mol, ring_atoms, attach, deco_carriers=()):
     if _retained is not None:
         tail = f'{_retained}-{loc}-yl'
     else:
-        tail = f'{cage.hetero_prefix}{cage.descriptor}{stem}-{loc}-yl'
+        from .cage_lambda import lambda_hetero_prefix
+        _hetero = lambda_hetero_prefix(mol, cage.hetero_prefix, cage.atom_to_locant, sub_to_orig)
+        if _hetero is None:
+            return None
+        tail = f'{_hetero}{cage.descriptor}{stem}-{loc}-yl'
     if ' ' in tail:
         return None
     pos: Dict[int, int] = {}
@@ -2248,7 +2252,15 @@ def _phthalimido_substituent_name(mol, frag_set: Set[int],
     return None
 
 
-def name_ring_system_substituent(
+def name_ring_system_substituent(mol, frag_atoms, attach_idx: int, *args, **kwargs) -> Optional[str]:
+    """``_name_ring_system_substituent``, the name of a decorated ring assembly marked
+    (``rules.nested_assembly.mark_decorated_assembly``)."""
+    from .nested_assembly import mark_decorated_assembly
+    return mark_decorated_assembly(
+        mol, frag_atoms, _name_ring_system_substituent(mol, frag_atoms, attach_idx, *args, **kwargs))
+
+
+def _name_ring_system_substituent(
     mol,
     frag_atoms,
     attach_idx: int,

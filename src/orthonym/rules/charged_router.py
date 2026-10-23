@@ -231,6 +231,86 @@ def classify_charged_pcg(mol, sites) -> Optional[str]:
     # Rule 4: cation-only (or charge-free) fragments are not this classifier's job.
     return None
 
+
+#: The functional groups (``perception.functional_groups`` keys) whose hydron the centre of an
+#: 'olate' anion lacks, and the neutral suffix that names the group. A hydroxy group's pattern
+#: starts with its chalcogen, so the first atom of a match is the centre of the group.
+_OLATE_GROUPS = {
+    'alkoxide': (('primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'alcohol'), 'ol'),
+    'phenolate': (('phenol',), 'ol'),
+    'thiolate': (('thiol',), 'thiol'),
+}
+_HYDROXY_CLASS_GROUPS = ('primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'alcohol',
+                         'phenol', 'enol', 'thiol')
+
+
+def olate_with_senior_neutral_group(mol, sites, neutral_smi: str, style: str) -> str:
+    """The name of a mono-anion whose centre is the oxygen or sulfur of a hydroxy or thiol group
+    and whose neutral form has a group of a class senior to the hydroxy compounds, or ''.
+
+     "SENIORITY ORDER FOR CLASSES" (the Blue Book), Table 4.1: class 4 'Anions' is
+    senior to class 7 'Acids' and to every class below it, so the anion is the parent and its
+    group is the principal characteristic group, as for '5-carboxypentanoate (PIN)' (:40997),
+    whose acid group is cited as a prefix. "Anions derived from hydroxy compounds"
+    (:41011): the centre is named by the suffix 'olate' or 'thiolate', and "Partial
+    salts of polyols and their chalcogen analogues are named substitutively on the basis of the
+    corresponding anion" (:28203): 'sodium 3-hydroxypropan-1-olate (PIN)'.
+
+    ``route_charged`` names the neutral form and gives its suffix the ending of the anion; that
+    fails where the neutral name does not end in the hydroxy suffix, because a senior neutral
+    group is its principal group (the arsonous acid of '4-(dihydroxyarsanyl)-2-nitrophenol' is the
+    parent of '(4-hydroxy-3-nitrophenyl)arsonous acid'). Here the neutral form is named again with
+    the hydroxy or thiol group forced as the principal group (the senior group becomes a prefix),
+    by the PIN tier's machinery alone (``_reenter_forced_at_pin_tier``), and that name takes the
+    ending. Only for one anion, no cation and no radical, and only when the anion's group is the
+    only hydroxy or thiol group of the molecule: another one would be a second suffix, or a
+    prefix of a name the two forms do not share, and it is left to the routes that name it. The
+    name is read back by its full InChIKey before it is returned.
+
+    Built, for a benzene ring, a chain, an aliphatic ring, a heteroaromatic ring and an amino
+    acid: the carboxylic, sulfonic, phosphonic, arsonic and stibonic acid groups, an amide, a
+    nitrile, an aldehyde, a ketone and an acid halide, and on a benzene ring an ester
+    ('4-(methoxycarbonyl)phenolate',,:31696). Declined, because the producer that
+    names the neutral form decides the principal group of its own: an ester on a chain
+    ('3-methoxy-3-oxopropan-1-olate' is the PIN shape,:31709, and no producer cites an ester
+    as 'alkoxy...oxo' on a chain whose principal group is a sulfonic acid, an aminium or an olate:
+    the neutral 'methyl 3-sulfopropanoate' is declined too), a lactone, a fused or
+    polycyclic ring system, and a selenium or tellurium centre (``classify_anion`` does not know
+    those anions). The caller then names the anion as it did before."""
+    anions = sites.get('anions') or []
+    if len(anions) != 1 or sites.get('cations') or Chem.GetFormalCharge(mol) != -1:
+        return ''
+    from ..perception.ions import get_radical_sites
+    if get_radical_sites(mol):
+        return ''
+    keys, suffix = _OLATE_GROUPS.get(classify_anion(mol, anions[0]), (None, None))
+    if keys is None:
+        return ''
+    centre = anions[0]['atom_idx']
+    neutral = Chem.RWMol(mol)
+    atom = neutral.GetAtomWithIdx(centre)
+    atom.SetFormalCharge(0)
+    atom.SetNumExplicitHs(atom.GetNumExplicitHs() + 1)
+    try:
+        Chem.SanitizeMol(neutral)
+    except Exception:  # noqa: BLE001 -- no neutral form, no name
+        return ''
+    from ..perception.functional_groups import detect_functional_groups
+    groups = detect_functional_groups(neutral)
+    if {m[0] for key in _HYDROXY_CLASS_GROUPS for m in groups.get(key) or ()} != {centre}:
+        return ''
+    own = [key for key in keys if any(m[0] == centre for m in groups.get(key) or ())]
+    if not own:
+        return ''
+    try:
+        forced = _reenter_forced_at_pin_tier(neutral_smi, style, own[0])
+    except (RecursionError, ValueError, RuntimeError):
+        return ''
+    if not forced or _is_malformed_parent(forced):
+        return ''
+    name = apply_ion_suffix_to_name(forced, -1, allowed_suffixes=frozenset({suffix}))
+    return name if name and _full_inchikey_rt_ok(mol, name) else ''
+
 # CATION class -> (cation_class arg for apply_ion_suffix_to_name, allowed_suffixes).
 # The class-keyed cation transforms (ylium/acylium/diazonium) are NOT plain suffix
 # swaps (Plan-02 _CLASS_KEYED_CATION_TRANSFORMS); they are passed via cation_class.
@@ -1851,6 +1931,17 @@ def _name_bis_acyl_azanide(mol, anion_indices, style: str) -> str:
     return name
 
 
+def _stereo_composed(name: str, mol) -> str:
+    """``name`` with the stereo of ``mol`` composed onto it (``namer._try_compose_input_stereo``, the
+    stereo-omission reclaim: OPSIN's own locants, read back to the full InChIKey), '' when it does not. The
+    producer that built ``name`` is the one of the composed name (``producer_trail.carried``)."""
+    from ..metrics.producer_trail import carried
+    from ..namer import _self_consistency_full_key, _try_compose_input_stereo
+    smiles = Chem.MolToSmiles(mol)
+    key = _self_consistency_full_key(smiles)
+    return (carried(name, _try_compose_input_stereo(name, smiles, key)) if key else None) or ''
+
+
 def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
     """ (the Blue Book, ``acetylazanide (PIN)``): a
     DISUBSTITUTED azanide R-[N-]-R' — a deprotonated secondary amide /
@@ -1873,6 +1964,8 @@ def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
     """
     from ..assembly.substituent_naming import name_substituent_fragment
     from ..assembly.naming_utils import apply_enclosing_marks, alpha_sort_key
+    from ..assembly.universal_substituent import name_universal_substituent_prefix
+    from ..metrics.provenance import best_effort_ctx
     a = mol.GetAtomWithIdx(anion_idx)
     if (a.GetSymbol() != 'N' or a.GetFormalCharge() != -1
             or a.GetTotalNumHs() != 0 or a.GetIsAromatic()):
@@ -1896,14 +1989,26 @@ def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
     for nb in neighbours:
         sub_atoms = list(comps[idx_to_comp[nb]])
         pref = name_substituent_fragment(mol, sub_atoms, nb, [anion_idx])
+        if not pref and best_effort_ctx.get():
+            pref = name_universal_substituent_prefix(mol, sub_atoms, nb)
         if not pref:
             return ''
         prefixes.append(pref)
     prefixes.sort(key=alpha_sort_key)
     enclosed = ''.join(apply_enclosing_marks(p, -1) for p in prefixes)
+    if prefixes[0] == prefixes[1]:  # one arm cited twice takes the multiplier, 'bis(2-aminoethyl)'
+        from ..assembly.naming_utils import enclose_if_compound, multiplied_component
+        enclosed = multiplied_component(2, prefixes[0], enclose_if_compound(prefixes[0]))
     name = f"{enclosed}azanide"
     if not _cation_name_rt_ok(name, mol):
-        return ''
+        # an arm that cites no E/Z descriptor of its own double bond: the input's stereo is composed onto the
+        # name by the stereo-omission reclaim , which returns it only when it reads back to the full key
+        composed = _stereo_composed(name, mol)
+        if not (composed and _cation_name_rt_ok(composed, mol)):
+            return ''
+        name = composed
+    from .amine_anion_label import record_non_pin_azanide
+    record_non_pin_azanide(mol, anion_idx, name)  # the azanide of an amine is not its PIN, the 'aminide'
     return name
 
 
@@ -2258,6 +2363,32 @@ def _reenter_forced(neutral_smi: str, style: str, principal_fg: str) -> str:
     return Orthonym(style=style, _disable_opsin_validity_gate=True,
                      _principal_group_override=principal_fg,
                      **_best_effort_reenter_kwargs()).name(neutral_smi)
+
+
+def _reenter_forced_at_pin_tier(neutral_smi: str, style: str, principal_fg: str) -> str:
+    """``_reenter_forced`` with the PIN tier's own machinery only: the best-effort contexts of an
+    outer wider-tier call are lowered for the re-entry (as ``namer.Orthonym.
+    _try_besteffort_clean_general_fallthrough`` lowers them) and the namer takes no best-effort
+    flag. A neutral name that the PIN tier cannot build is '' or a malformed parent, so the caller
+    keeps whatever the wider tier's producers name, and never a name those producers would have
+    spelled better (a fused ring system the general engine writes as a von Baeyer system).
+    The retained-name and amino-acid routes name a molecule on their own principal group ('L-serine',
+    '4-hydroxybenzaldehyde'), so they are left out, as for the forced amine
+    (``_reenter_amine_forced_no_retained``)."""
+    from ..metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
+                                      full_coverage_ctx, general_fallback_ctx)
+    from ..namer import Orthonym
+    from ..routing.dispatch_table import StoutClass
+    variables = (general_fallback_ctx, best_effort_ctx, allow_aromatic_general_ctx, full_coverage_ctx)
+    tokens = [var.set(False) for var in variables]
+    try:
+        return Orthonym(style=style, _disable_opsin_validity_gate=True,
+                        _principal_group_override=principal_fg,
+                        _seed_excluded_dispatch_classes=frozenset(
+                            {StoutClass.RETAINED_NAME, StoutClass.AMINO_ACID})).name(neutral_smi)
+    finally:
+        for var, token in zip(variables, tokens):
+            var.reset(token)
 
 
 def _reenter_gated(neutral_smi: str, style: str) -> str:
@@ -3764,6 +3895,12 @@ def route_charged(mol, style: str = 'pin') -> str:
             if full:
                 return full
             return ionized if _full_inchikey_rt_ok(mol, ionized) else ''
+        if (_single == {'aminide'} and len(sites['anions']) == 1
+                and not _full_inchikey_rt_ok(mol, ionized)):
+            # the suffix seam charged the nitrogen of the parent's own amine suffix; when the anion is
+            # another nitrogen of the molecule that name is a different molecule, and the anion is named
+            # on its own parent or as the azanide of its substituent group,
+            ionized = _aminide_alternative(mol, sites, style, demote=True) or ionized
         return ionized
 
     # M4: the suffix-swap above has no ``-amine``/``-imine``
@@ -3772,19 +3909,10 @@ def route_charged(mol, style: str = 'pin') -> str:
     # abstaining, try the disubstituted-azanide construction ``(A)(B)azanide``.
     # Placed AFTER the ionize seam declines (never before), so no currently-named
     # aminide changes name -- this only converts a would-be abstain, RT-gated.
-    if _single == {'aminide'} and len(sites['anions']) == 1:
-        az = emit_secondary_amine_azanide(
-            mol, sites['anions'][0]['atom_idx'], style)
-        if az:
-            return az
-        #: the ionize seam also declines for a PRIMARY aromatic/ring
-        # amine anion whose neutral is the RETAINED `aniline` (no `-amine` suffix
-        # token to convert). Build the systematic amine parent (`benzenamine`) and
-        # convert to `benzenaminide`, RT-gated. Only converts a would-be abstain.
-        pa = emit_primary_amine_anide(
-            mol, sites['anions'][0]['atom_idx'], style)
-        if pa:
-            return pa
+    if (_single == {'aminide'} or _single == {'iminide'}) and len(sites['anions']) == 1:
+        alt = _aminide_alternative(mol, sites, style)
+        if alt:
+            return alt
 
     # (a phase): the first re-entry let a SENIOR neutral acid (carboxylic,
     # take the principal slot, so the anion's S/P-oxoacid suffix never appeared
@@ -3803,7 +3931,31 @@ def route_charged(mol, style: str = 'pin') -> str:
                 allowed_suffixes=allowed_suffixes,
                 cation_class=cation_class,
             )
-    return ''
+    return olate_with_senior_neutral_group(mol, sites, neutral_smi, style)
+
+
+def _aminide_alternative(mol, sites, style: str, demote: bool = False) -> str:
+    """The name of a single amine anion the suffix seam did not give (or gave for another nitrogen)::
+
+    * the aminide of a secondary amine anion on a ring (``ring_aminide``,;
+    * the disubstituted azanide ``(A)(B)azanide``, ``emit_secondary_amine_azanide``);
+    *: the PRIMARY aromatic/ring amine anion whose neutral is the RETAINED `aniline` (no
+      `-amine` suffix token to convert) on the systematic amine parent (`benzenamine` -> `benzenaminide`),
+      or the azanide of its substituent group (``emit_primary_amine_anide``).
+
+    Each is read back to the full InChIKey; '' when neither is built."""
+    anion_idx = sites['anions'][0]['atom_idx']
+    from .amine_anion_symmetry import anion_equals_another_secondary_amine
+    if demote and anion_equals_another_secondary_amine(mol, anion_idx):
+        return ''  # the composer's aminide on the equivalent nitrogen is the name; the azanide must not pre-empt it
+    if classify_anion(mol, sites['anions'][0]) == 'iminide':
+        from .iminide_one_carbon import emit_one_carbon_iminide  # R2C=[N-] of an imidic ester
+        return emit_one_carbon_iminide(mol, anion_idx)
+    from .amine_anion_label import ring_aminide
+    # the PIN of a secondary amine anion on a ring of one kind of position, else the azanide of its groups
+    # (labelled below the PIN where it is the anion of an amine, ``record_non_pin_azanide``) or of its substituent
+    return (ring_aminide(mol, anion_idx, style) or emit_secondary_amine_azanide(mol, anion_idx, style)
+            or emit_primary_amine_anide(mol, anion_idx, style))
 
 
 def _is_simple_terminal_radical(mol, center_idx: int) -> bool:
