@@ -474,9 +474,30 @@ def test_analyze_spiro_universal_still_names_in_table():
 @pytest.fixture
 def no_opsin_jar(monkeypatch):
     import orthonym.validation.opsin_roundtrip as _rt
+    from orthonym.assembly import memo as _memo
     monkeypatch.setattr(_rt, "_find_opsin_jar", lambda *a, **k: None)
     monkeypatch.setattr(_namer_mod, "_DISABLE_VALIDITY_GATE", True)
+    # Hiding the jar must also hide the OPSIN parses an earlier test left in the process-wide
+    # cache (jvm_bridge stores them there across molecules); otherwise a parse made while the jar
+    # was present still verifies a name here, and the result depends on the tests that ran before.
+    _memo.clear_process_cache()
+    monkeypatch.setattr(_memo, "_PROCESS_MAX", 0)
+    # The same holds for the functools caches of the engine (e.g. the bridged-fused name tables): a
+    # value an earlier test computed with the jar present must not answer while the jar is hidden.
+    _clear_engine_lru_caches()
     yield
+    _memo.clear_process_cache()
+    _clear_engine_lru_caches()
+
+
+def _clear_engine_lru_caches():
+    import sys as _sys
+    for _name, _mod in list(_sys.modules.items()):
+        if not _name.startswith("orthonym") or _mod is None:
+            continue
+        for _obj in list(vars(_mod).values()):
+            if callable(getattr(_obj, "cache_clear", None)) and getattr(_obj, "__module__", "") == _name:
+                _obj.cache_clear()
 
 
 @pytest.mark.parametrize("smiles", OFF_TABLE_CAGES)
