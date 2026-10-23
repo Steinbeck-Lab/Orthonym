@@ -1,7 +1,7 @@
 """P2 -- public claims (2026-09-28): the README's examples and tier statements.
 
 Every name the README prints (the Python examples, the Quick start, the round-trip
-picture and the specimen picture that ``docs/readme/build.py`` draws from the engine's
+picture, the specimen picture and the gallery that ``docs/readme/build.py`` draws from the engine's
 own output) is pinned here, and each one is read back by a FRESH OPSIN call that does
 not go through the engine (``tests.support.rt_assert._independent_parse``) and compared
 by full standard InChIKey. The README's statements about the tiers are checked on
@@ -87,6 +87,30 @@ def test_specimen_row(smiles, tier, name, label):
     row = _row(smiles, tier)
     assert row["name"] == name, row
     assert row["tier"] == label and row["verified"] == "opsin", row
+    assert _key(_independent_parse(name)) == _key(smiles)
+
+
+# README gallery ("What it names"): the seven cards and the tier each one draws
+GALLERY = [
+    ("CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5", "pin",
+     "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro"
+     "[3,2-e]isoquinoline-7,9-diol", "pin_verified"),
+    ("c1ccc(cc1)I(=O)=O", "pin", "iodylbenzene", "pin_verified"),
+    ("c1ccc(cc1)[P@]1CCC[C@@H]1c1ccccc1", "pin", "(1S,2R)-1,2-diphenylphospholane", "pin_verified"),
+    ("[2H][C@@H](C)C[C@H]([3H])C", "pin", "(2R,4S)-(4-2H1,2-3H1)pentane", "pin_verified"),
+    ("CC(=O)[O-].CC(=O)[O-].[Zn+2]", "pin", "zinc diacetate", "pin_verified"),
+    ("C1CC2CC3CCC4CC5CC1C2C3C45", "best-effort",
+     "pentacyclo[9.3.1.0^3,14.0^6,13.0^8,12]pentadecane", "systematic_verified"),
+    ("C1CCC2(CC1)CCCC2", "pin", "spiro[4.5]decane", "pin_verified"),
+]
+
+
+@pytest.mark.parametrize("smiles,tier,name,label", GALLERY,
+                         ids=["morphine", "iodylbenzene", "phospholane", "isotopes", "zinc", "cage", "spiro"])
+def test_gallery_card(smiles, tier, name, label):
+    row = _row(smiles, tier)
+    assert row["name"] == name, row
+    assert row["tier"] == label, row
     assert _key(_independent_parse(name)) == _key(smiles)
 
 

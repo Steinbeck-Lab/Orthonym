@@ -1,8 +1,23 @@
 # How to cite
 
-A paper describing Orthonym is in preparation. Until it is published, please cite the software.
+Please cite the preprint:
 
-GitHub's **Cite this repository** button, built from [`CITATION.cff`](https://github.com/Steinbeck-Lab/Orthonym/blob/main/CITATION.cff), gives the entry in APA and BibTeX. In BibTeX:
+> Rajan, K.; Zielesny, A.; Steinbeck, C. Orthonym: verified IUPAC names for chemical structures in
+> the wild. *ChemRxiv* **2026**. [doi:10.26434/chemrxiv.15009769/v1](https://doi.org/10.26434/chemrxiv.15009769/v1)
+
+```bibtex
+@article{rajan2026orthonym,
+  author  = {Rajan, Kohulan and Zielesny, Achim and Steinbeck, Christoph},
+  title   = {{Orthonym}: verified {IUPAC} names for chemical structures in the wild},
+  journal = {ChemRxiv},
+  year    = {2026},
+  doi     = {10.26434/chemrxiv.15009769/v1}
+}
+```
+
+GitHub's **Cite this repository** button, built from [`CITATION.cff`](https://github.com/Steinbeck-Lab/Orthonym/blob/main/CITATION.cff), gives the same entry in APA and BibTeX.
+
+To cite the software version you used, cite its Zenodo archive. In BibTeX:
 
 <!-- x-release-please-start-version -->
 ```bibtex

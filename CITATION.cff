@@ -26,6 +26,24 @@ doi: 10.5281/zenodo.23044199
 license: MIT
 url: "https://github.com/Steinbeck-Lab/Orthonym"
 repository-code: "https://github.com/Steinbeck-Lab/Orthonym"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Rajan"
+      given-names: "Kohulan"
+      orcid: "https://orcid.org/0000-0003-1066-7792"
+    - family-names: "Zielesny"
+      given-names: "Achim"
+      orcid: "https://orcid.org/0000-0003-0722-4229"
+    - family-names: "Steinbeck"
+      given-names: "Christoph"
+      orcid: "https://orcid.org/0000-0001-6966-0814"
+  title: "Orthonym: verified IUPAC names for chemical structures in the wild"
+  journal: "ChemRxiv"
+  year: 2026
+  month: 10
+  doi: 10.26434/chemrxiv.15009769/v1
+  url: "https://doi.org/10.26434/chemrxiv.15009769/v1"
 keywords:
   - cheminformatics
   - IUPAC nomenclature
