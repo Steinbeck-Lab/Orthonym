@@ -69,6 +69,7 @@ def _jars_ready(parsed: argparse.Namespace) -> Optional[int]:
     """Fetch the jars (``--fetch-jars``, which also builds a main-branch OPSIN that was asked
     for) or check that they are there. The exit status when the run ends here, else None."""
     from orthonym.jars import (
+        JarDirUnsafe,
         JarUnavailable,
         OpsinChoiceError,
         fetch_all,
@@ -86,7 +87,8 @@ def _jars_ready(parsed: argparse.Namespace) -> Optional[int]:
     try:
         require_all()
     except JarUnavailable as exc:
-        hint = "" if isinstance(exc, OpsinChoiceError) else (
+        # a mistyped choice, and a jar directory that other users can write, are not met by reduced mode
+        hint = "" if isinstance(exc, (OpsinChoiceError, JarDirUnsafe)) else (
             "\northonym: to name without the jars (no OPSIN check, RDKit stereo labels), "
             "set ORTHONYM_ALLOW_REDUCED=1")
         print(f"orthonym: {exc}{hint}", file=sys.stderr)

@@ -44,6 +44,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from .jars import make_dirs
+
 REPO = "dan2097/opsin"
 DEFAULT_BRANCH = "master"
 _FIXED_TIME = (1980, 1, 1, 0, 0, 0)
@@ -335,7 +337,7 @@ def private_dir(jar_dir: Path, create: bool) -> Optional[Path]:
     or other write is refused (:class:`OpsinBuildError` naming it), never used."""
     directory = Path(jar_dir) / PRIVATE_DIR
     if create:
-        Path(jar_dir).mkdir(parents=True, exist_ok=True)
+        make_dirs(Path(jar_dir))  # 0755 whatever the umask: a group-writable jar directory is refused
         try:
             os.mkdir(directory, 0o700)
         except FileExistsError:

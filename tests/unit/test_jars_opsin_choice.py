@@ -19,6 +19,9 @@ RELEASE = "/fake/opsin-cli-2.9.0-jar-with-dependencies.jar"
 def fresh_cache(monkeypatch, tmp_path):
     monkeypatch.setattr(jars, "_CACHE", {})
     monkeypatch.setattr(jars, "_resolve_release", lambda spec, download: RELEASE)
+    # the build's step finds the release jar together with the checked jar directory (the main-branch build is made in it)
+    monkeypatch.setattr(jars, "_resolve_release_in",
+                        lambda spec, download: (RELEASE, Path(os.environ["ORTHONYM_JAR_DIR"])))
     for var in ("ORTHONYM_OPSIN", "ORTHONYM_OPSIN_JAR", "ORTHONYM_NO_DOWNLOAD", "ORTHONYM_ALLOW_REDUCED"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("ORTHONYM_JAR_DIR", str(tmp_path / "jars"))
