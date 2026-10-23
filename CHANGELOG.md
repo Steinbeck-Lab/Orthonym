@@ -5,6 +5,52 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.0.9](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.8...v1.0.9) (2026-10-23)
+
+
+### Features
+
+* best-effort names cite the E/Z configuration of double bonds between two rings ([#62](https://github.com/Steinbeck-Lab/Orthonym/issues/62)) ([c854728](https://github.com/Steinbeck-Lab/Orthonym/commit/c8547280dfa3dfa28413eae5c4fe4c1009f0043d))
+* fused ring systems with a hypervalent ring iodine get names ([#65](https://github.com/Steinbeck-Lab/Orthonym/issues/65)) ([beb5761](https://github.com/Steinbeck-Lab/Orthonym/commit/beb57613bbde2f3ee7e508dd3721152ed25cb43c))
+* large ring systems that ran out of the work budget get names ([#67](https://github.com/Steinbeck-Lab/Orthonym/issues/67)) ([52e8396](https://github.com/Steinbeck-Lab/Orthonym/commit/52e8396b7bc013be779f62d4554ac3d9f9293fe2))
+* larger ring systems, faster main-ring search, mancude-aware stereodescriptors and a stricter read-back ([#75](https://github.com/Steinbeck-Lab/Orthonym/issues/75)) ([110ed81](https://github.com/Steinbeck-Lab/Orthonym/commit/110ed8153b365973ad90c518a3ea96fbebb13c8b))
+* molecules with a hypervalent iodine, bromine or chlorine atom get names ([#68](https://github.com/Steinbeck-Lab/Orthonym/issues/68)) ([e2f221a](https://github.com/Steinbeck-Lab/Orthonym/commit/e2f221ab904327b2acc6194f07c85bd4e8d7501c))
+* molecules with isotope labels in several parts of one name get names ([#69](https://github.com/Steinbeck-Lab/Orthonym/issues/69)) ([0883679](https://github.com/Steinbeck-Lab/Orthonym/commit/088367924342bb07644ae5e6d6aed09481b53854))
+* names spell every multiplying count in words, and spiro ring components cite their double bonds ([#63](https://github.com/Steinbeck-Lab/Orthonym/issues/63)) ([4534ca0](https://github.com/Steinbeck-Lab/Orthonym/commit/4534ca01c0c3d878a184b4e9175a3694bb200c01))
+* nomenclature coverage and correctness updates ([ea5e2e7](https://github.com/Steinbeck-Lab/Orthonym/commit/ea5e2e78db803bbcac5d76a27baa8703e66453d8))
+* radicals on a substituted boron, silicon or other main-group atom get names ([#70](https://github.com/Steinbeck-Lab/Orthonym/issues/70)) ([48e3ee1](https://github.com/Steinbeck-Lab/Orthonym/commit/48e3ee1dad897f695fff865b6b58257fba76dfc0))
+* ring cations with an N=N+ bond get names ([#66](https://github.com/Steinbeck-Lab/Orthonym/issues/66)) ([8569bb7](https://github.com/Steinbeck-Lab/Orthonym/commit/8569bb74749c0ca21c2f428049d296809eb94a2a))
+* ring N-imide ylides and azido groups on a nitrogen atom get names ([#72](https://github.com/Steinbeck-Lab/Orthonym/issues/72)) ([0207674](https://github.com/Steinbeck-Lab/Orthonym/commit/0207674d0513163c69063e69148e637667841b41))
+* substituted spiro chains with a bridged ring component get names ([#64](https://github.com/Steinbeck-Lab/Orthonym/issues/64)) ([3a54444](https://github.com/Steinbeck-Lab/Orthonym/commit/3a5444458c668cd4fb50c0803fe24d276eeab4dc))
+
+
+### Bug Fixes
+
+* fewer wrong PIN labels, OPSIN read-back without the radical option for closed-shell input, quiet CLI, robust Zenodo upload ([#54](https://github.com/Steinbeck-Lab/Orthonym/issues/54)) ([c5f304b](https://github.com/Steinbeck-Lab/Orthonym/commit/c5f304b943400b39333ab02bf1afd93cc7334a53))
+* hydrazines and azo compounds take the hydrazine or diazene as their parent ([#74](https://github.com/Steinbeck-Lab/Orthonym/issues/74)) ([0ca778e](https://github.com/Steinbeck-Lab/Orthonym/commit/0ca778e69d9d8d4c562b606a66b07774e6f8ab2a))
+* identical prefixes grouped, amine parent chosen on the nitrogen, -O-P=O named as a heterone ([#55](https://github.com/Steinbeck-Lab/Orthonym/issues/55)) ([02430b1](https://github.com/Steinbeck-Lab/Orthonym/commit/02430b1636957ee8e95f6facb0ff339e8720e02c))
+* isotope labels on acetic acid, acetamide and similar names cite their locants ([#57](https://github.com/Steinbeck-Lab/Orthonym/issues/57)) ([e340f92](https://github.com/Steinbeck-Lab/Orthonym/commit/e340f92aba950c7f9ad9f78db03f9014e6ba7887))
+* isotope names, lone-pair stereocentres, mixtures, anions and speed of large molecules ([#76](https://github.com/Steinbeck-Lab/Orthonym/issues/76)) ([3658058](https://github.com/Steinbeck-Lab/Orthonym/commit/365805863a308992367b9b43a0ca7919e2d6a65e))
+* more molecules get a verified PIN at the default tier, and fewer non-PIN names carry the PIN label ([76ef142](https://github.com/Steinbeck-Lab/Orthonym/commit/76ef14293c62b7098f010814228b71e1c9ce5591))
+* more molecules get a verified PIN at the default tier, and fewer non-PIN names carry the PIN label ([2aee59a](https://github.com/Steinbeck-Lab/Orthonym/commit/2aee59a65c62cb1cb1dc297808fd6a38b8b8ace6))
+* name more fused ring systems and ring cations by their preferred names ([d5bc040](https://github.com/Steinbeck-Lab/Orthonym/commit/d5bc04022feb390b5e1292ccf592491474a27cff))
+* names of hydride-addition anions and halonium cations are read back before they ship ([#58](https://github.com/Steinbeck-Lab/Orthonym/issues/58)) ([df038ce](https://github.com/Steinbeck-Lab/Orthonym/commit/df038ce7f5700a7bdb4815e635bcedfdb400badd))
+* names OPSIN cannot read ship only after an independent check ([#59](https://github.com/Steinbeck-Lab/Orthonym/issues/59)) ([d136b71](https://github.com/Steinbeck-Lab/Orthonym/commit/d136b71c55a583ae99fdfb2e2f1b6e47ab3222bf))
+* preferred-name spellings and labels for hydrazinyl, imine, N-alkoxy amide and trivial names ([#73](https://github.com/Steinbeck-Lab/Orthonym/issues/73)) ([97c78f7](https://github.com/Steinbeck-Lab/Orthonym/commit/97c78f77b0b8bc0eacc13bf929b6c1d08b6dfc11))
+* **tests:** ship the source of the independent read-back oracle ([#77](https://github.com/Steinbeck-Lab/Orthonym/issues/77)) ([e9e93f3](https://github.com/Steinbeck-Lab/Orthonym/commit/e9e93f3d5a1afd8583f822528a7dcecbebf4ae50))
+* the default tier gives Blue Book PIN spellings that OPSIN cannot read, checked through a twin spelling ([#56](https://github.com/Steinbeck-Lab/Orthonym/issues/56)) ([32efb4c](https://github.com/Steinbeck-Lab/Orthonym/commit/32efb4cf9e0ccc17802a497fa6a527c984f52cf4))
+* two time-limit tests no longer fail while they wait for a free Java slot ([#71](https://github.com/Steinbeck-Lab/Orthonym/issues/71)) ([31167e8](https://github.com/Steinbeck-Lab/Orthonym/commit/31167e8c907b00f7d7c64919e52c1e076dad4ff0))
+
+
+### Performance Improvements
+
+* von Baeyer names of large cages come out faster, with the same names ([#61](https://github.com/Steinbeck-Lab/Orthonym/issues/61)) ([2b2dfb4](https://github.com/Steinbeck-Lab/Orthonym/commit/2b2dfb41ef14888aa1f25315e9fb4871beef19bf))
+
+
+### Documentation
+
+* the README and guide say how each name OPSIN cannot read is checked ([#60](https://github.com/Steinbeck-Lab/Orthonym/issues/60)) ([7b128e9](https://github.com/Steinbeck-Lab/Orthonym/commit/7b128e90c663b17e7a90313c2ec486d7d60b5a96))
+
 ## [1.0.8](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.7...v1.0.8) (2026-10-15)
 
 
