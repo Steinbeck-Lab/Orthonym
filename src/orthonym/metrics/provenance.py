@@ -397,6 +397,20 @@ def clear_provenance() -> None:
     _BREADTH_PROMOTED_NAMES.set(())
 
 
+def append_missing(base: tuple, extra: tuple) -> tuple:
+    """``base`` followed by the items of ``extra`` that ``base`` does not hold, in order: the merge
+    ``restore_provenance`` makes of a snapshot and the live value of an accumulating record, and
+    the merge a memo hit makes of the record its fresh call left. The records only grow within a
+    naming call, so a giant molecule's tuples hold thousands of names; the membership test is a
+    set lookup, not a scan of ``base`` for each item (that scan made every merge quadratic in the
+    length of the record)."""
+    try:
+        held = frozenset(base)
+        return base + tuple(f for f in extra if f not in held)
+    except TypeError:   # an unhashable item in either record: the scan the merge always made
+        return base + tuple(f for f in extra if f not in base)
+
+
 def restore_provenance(snapshot: dict) -> None:
     """Re-set every provenance ContextVar from a ``get_provenance`` dict.
 
@@ -427,25 +441,19 @@ def restore_provenance(snapshot: dict) -> None:
     _GATE_OUTCOME_NAME.set(snapshot.get("gate_outcome_name"))
     _GENERAL_RING_PREFIX.set(bool(snapshot.get("general_ring_prefix")))
     _SUFFIX_FREE_PREFIX_NAME.set(bool(snapshot.get("suffix_free_prefix_name")))
-    _kept = tuple(snapshot.get("non_pin_fragments") or ())
-    _NON_PIN_FRAGMENTS.set(_kept + tuple(
-        f for f in _NON_PIN_FRAGMENTS.get() if f not in _kept))
+    _NON_PIN_FRAGMENTS.set(append_missing(
+        tuple(snapshot.get("non_pin_fragments") or ()), _NON_PIN_FRAGMENTS.get()))
     _PIN_PROMOTION_RERUN.set(bool(snapshot.get("pin_promotion_rerun")))
-    _kept_labels = tuple(snapshot.get("non_pin_labels") or ())
-    _NON_PIN_LABELS.set(_kept_labels + tuple(
-        f for f in _NON_PIN_LABELS.get() if f not in _kept_labels))
-    _kept_rules = tuple(snapshot.get("non_pin_label_rules") or ())
-    _NON_PIN_LABEL_RULES.set(_kept_rules + tuple(
-        r for r in _NON_PIN_LABEL_RULES.get() if r not in _kept_rules))
-    _kept_unc = tuple(snapshot.get("uncertified_pin_names") or ())
-    _UNCERTIFIED_PIN_NAMES.set(_kept_unc + tuple(
-        f for f in _UNCERTIFIED_PIN_NAMES.get() if f not in _kept_unc))
-    _kept_split = tuple(snapshot.get("split_verified_names") or ())
-    _SPLIT_VERIFIED_NAMES.set(_kept_split + tuple(
-        f for f in _SPLIT_VERIFIED_NAMES.get() if f not in _kept_split))
-    _kept_breadth = tuple(snapshot.get("breadth_promoted_names") or ())
-    _BREADTH_PROMOTED_NAMES.set(_kept_breadth + tuple(
-        f for f in _BREADTH_PROMOTED_NAMES.get() if f not in _kept_breadth))
+    _NON_PIN_LABELS.set(append_missing(
+        tuple(snapshot.get("non_pin_labels") or ()), _NON_PIN_LABELS.get()))
+    _NON_PIN_LABEL_RULES.set(append_missing(
+        tuple(snapshot.get("non_pin_label_rules") or ()), _NON_PIN_LABEL_RULES.get()))
+    _UNCERTIFIED_PIN_NAMES.set(append_missing(
+        tuple(snapshot.get("uncertified_pin_names") or ()), _UNCERTIFIED_PIN_NAMES.get()))
+    _SPLIT_VERIFIED_NAMES.set(append_missing(
+        tuple(snapshot.get("split_verified_names") or ()), _SPLIT_VERIFIED_NAMES.get()))
+    _BREADTH_PROMOTED_NAMES.set(append_missing(
+        tuple(snapshot.get("breadth_promoted_names") or ()), _BREADTH_PROMOTED_NAMES.get()))
     _touch("source", "opsin", "stereo_unexpressed", "gate_outcome",
            "gate_outcome_name", "general_ring_prefix", "suffix_free_prefix_name",
            "non_pin_fragments", "pin_promotion_rerun", "non_pin_labels",

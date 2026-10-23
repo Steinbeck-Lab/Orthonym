@@ -832,9 +832,12 @@ def name_fragment_recursively(smiles: str, style: str = 'pin',
     Returns:
         IUPAC name if successful, None if cycle detected or naming fails.
     """
-    # Canonicalize early so cache lookup uses consistent keys
+    # Canonicalize early so cache lookup uses consistent keys. The canonical form is a pure
+    # function of the string, and a giant molecule's decomposition asks for the same
+    # fragment tens of thousands of times, so the process-wide memo of it is used.
     try:
-        canonical = Chem.CanonSmiles(smiles)
+        from ..perception.molcache import canon_smiles
+        canonical = canon_smiles(smiles)
     except Exception:
         return None
     if canonical is None:

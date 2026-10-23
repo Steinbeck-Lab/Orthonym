@@ -36,7 +36,36 @@ def _isolated_acid_smiles(mol, carbonyl_idx: int, ester_o_idx: int,
                           anionic: bool = False) -> Optional[str]:
     """SMILES of the acid fragment of an ``R-C(=O)-O-`` ester site: the ester bond is
     cut and the site carbonyl gets a fresh ``-OH`` (``-O(-)`` when ``anionic``).
-    None when the cut fragment does not sanitize."""
+    None when the cut fragment does not sanitize.
+
+    Memoised per molecule object for the naming call (``molcache.cached_by_key``): the
+    site classifier, the acyl namers and the acyloxy leaf each ask for the same site's acid,
+    some of them twice, and a polyester of many sites asks tens of thousands of times. The key
+    carries the fingerprint of everything the fragment SMILES reads (``_acid_cut_sig``: element,
+    charge, isotope, explicit hydrogens, chirality, atom map number, the no-implicit flag,
+    aromaticity and radical electrons per atom; bond order, stereo and aromaticity per bond), so
+    an in-place edit of the molecule is a miss. Outside a scope no key is built."""
+    from ..perception.molcache import cached_by_key, caches
+    if not caches(mol):
+        return _isolated_acid_smiles_uncached(mol, carbonyl_idx, ester_o_idx, anionic)
+    return cached_by_key(
+        mol, "lipids.isolated_acid_smiles",
+        (carbonyl_idx, ester_o_idx, bool(anionic), _acid_cut_sig(mol)),
+        lambda: _isolated_acid_smiles_uncached(mol, carbonyl_idx, ester_o_idx, anionic))
+
+
+def _acid_cut_sig(mol):
+    """``molcache._inchi_sig`` plus the atom and bond fields the SMILES of a cut fragment also
+    writes (map numbers, ``[CH2]``-style explicit valence, aromatic flags, radicals)."""
+    from ..perception.molcache import _inchi_sig, atoms_of, bonds_of
+    return (_inchi_sig(mol),
+            tuple((a.GetAtomMapNum(), a.GetNoImplicit(), a.GetIsAromatic(),
+                   a.GetNumRadicalElectrons()) for a in atoms_of(mol)),
+            tuple(b.GetIsAromatic() for b in bonds_of(mol)))
+
+
+def _isolated_acid_smiles_uncached(mol, carbonyl_idx: int, ester_o_idx: int,
+                                   anionic: bool = False) -> Optional[str]:
     rw = Chem.RWMol(mol)
     rw.RemoveBond(carbonyl_idx, ester_o_idx)
     new_o = rw.AddAtom(Chem.Atom(8))           # the acid -OH oxygen

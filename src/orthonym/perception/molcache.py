@@ -48,6 +48,7 @@ if _MODE not in ("on", "off", "verify"):
 _NS_ATOMS = "molcache.atoms"
 _NS_BONDS = "molcache.bonds"
 _NS_INCHIKEY = "molcache.inchikey"
+_NS_NEIGHBORS = "molcache.neighbors"
 
 
 class MolCacheMismatchError(AssertionError):
@@ -101,6 +102,19 @@ def bonds_of(mol) -> Tuple[Chem.Bond, ...]:
     return _cached(mol, _NS_BONDS, _fresh_bonds, Chem.Mol.GetNumBonds, _bond_sig)
 
 
+def _fresh_neighbors(mol) -> Tuple[Tuple[int, ...], ...]:
+    return tuple(tuple(n.GetIdx() for n in a.GetNeighbors()) for a in atoms_of(mol))
+
+
+def neighbors_of(mol) -> Tuple[Tuple[int, ...], ...]:
+    """``tuple(tuple(n.GetIdx for n in atom.GetNeighbors) for atom in mol.GetAtoms)``, cached per
+    naming call: the neighbour atom indices of every atom, in the order ``GetNeighbors`` gives them. A
+    walk of a fragment through these tuples costs plain list steps, where the same walk through
+    ``GetAtomWithIdx(i).GetNeighbors`` costs two RDKit calls and a generator per atom. The bonds of a
+    ``Chem.Mol`` cannot change (an RWMol is never cached), so the tuple is exact for the scope."""
+    return _cached(mol, _NS_NEIGHBORS, _fresh_neighbors, Chem.Mol.GetNumAtoms, lambda t: t)
+
+
 def _inchi_sig(mol):
     """Everything an in-place edit could change that the standard InChI reads: element, charge,
     isotope, explicit H count and chiral tag per atom; bond order and bond stereo per bond.
@@ -138,6 +152,12 @@ def inchikey_of(mol) -> str:
 def canon_smiles(smi: str) -> str:
     """``Chem.CanonSmiles(smi)``: a pure function of the string, so a process-wide LRU is exact."""
     return Chem.CanonSmiles(smi)
+
+
+def caches(mol) -> bool:
+    """True when:func:`cached_by_key` would store a value for ``mol`` (a naming scope is open, the
+    cache is on, and ``mol`` is not an RWMol): a caller skips building a costly key when it is False."""
+    return _MODE != "off" and not isinstance(mol, Chem.RWMol) and _cache_var.get() is not None
 
 
 def cached_by_key(mol, ns: str, key, fresh):

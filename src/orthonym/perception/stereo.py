@@ -216,7 +216,7 @@ def get_stereocenters(mol) -> List[Dict]:
     return centers
 
 
-def get_double_bond_stereo(mol) -> List[Dict]:
+def get_double_bond_stereo(mol, within=None) -> List[Dict]:
     """
     Get E/Z configuration of double bonds.
 
@@ -226,6 +226,11 @@ def get_double_bond_stereo(mol) -> List[Dict]:
     Args:
         mol: RDKit Mol object (stereochemistry should be assigned via
              rdCIPLabeler.AssignCIPLabels BEFORE calling this function)
+        within: optional collection of atom indices; only the double bonds with BOTH ends in it
+             are returned (the same entries, in the same bond-index order, that the whole
+             molecule's list holds for them). The walk then costs the size of ``within``, not of
+             the molecule: a substituent's own stereo block asks for its few atoms, once for each
+             of the tens of thousands of fragments a large peptide names.
 
     Returns:
         List of dicts with keys:
@@ -233,8 +238,17 @@ def get_double_bond_stereo(mol) -> List[Dict]:
         - stereo: 'E' or 'Z'
         - atoms: (begin_atom_idx, end_atom_idx)
     """
+    if within is None:
+        bonds = bonds_of(mol)
+    else:
+        found = {}
+        for i in within:
+            for bond in mol.GetAtomWithIdx(i).GetBonds():
+                if bond.GetOtherAtomIdx(i) in within:
+                    found[bond.GetIdx()] = bond
+        bonds = [found[k] for k in sorted(found)]
     stereo_bonds = []
-    for bond in bonds_of(mol):
+    for bond in bonds:
         if bond.GetBondType() == Chem.BondType.DOUBLE:
             if bond.HasProp('_CIPCode'):
                 cip_code = bond.GetProp('_CIPCode')

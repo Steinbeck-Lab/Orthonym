@@ -148,3 +148,36 @@ def test_key_identical_to_reference(smi):
     finally:
         memo.pop_scope(tok)
 
+
+
+# ---- the fragment SMILES of the key is handed the fragment's own bonds --------------------------------------
+# Left to find them, RDKit walks every bond of the molecule on each rooted call (1.7 ms for a 10-atom fragment of a
+# 404-atom molecule, 0.6 ms with the bonds given). The string, and the output-order properties the key's parts and
+# later callers read, must be those of the call without them.
+MIXED = SMILES + ["CC(=O)N[C@@H](C)C(=O)N[C@H](CC(C)C)C(=O)O.C/C=C/C(=O)[O-].[Na+]", "C/C=C\\C=C/CC(N)=O"]
+
+
+@pytest.mark.parametrize("smi", MIXED)
+def test_key_smiles_and_output_order_equal_the_unrestricted_call(smi):
+    mol = _prepared(smi)
+    n = mol.GetNumAtoms()
+    many = len(Chem.GetMolFrags(mol)) > 1
+    tok = memo.push_scope()
+    try:
+        for attach in range(min(n, 8)):
+            others = [i for i in range(n) if i != attach]
+            for frag in ([attach], [attach] + others[:1], others[: max(2, n // 2)], [attach] + others[:5], others):
+                for rooted in (True, False):
+                    att = attach if rooted else n - 1 if attach != n - 1 else 0
+                    in_frag = att in frag
+                    key = se._substituent_memo_key(mol, frag, att, False, False)
+                    got_order = (mol.GetProp('_smilesAtomOutputOrder'), mol.GetProp('_smilesBondOutputOrder'))
+                    root = att if in_frag and not (in_frag and many) else -1
+                    want = Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(frag), rootedAtAtom=root,
+                                                    isomericSmiles=True, canonical=True)
+                    want_order = (mol.GetProp('_smilesAtomOutputOrder'), mol.GetProp('_smilesBondOutputOrder'))
+                    smi_part = key[0][1] if isinstance(key[0], tuple) else key[0]
+                    assert smi_part == want
+                    assert got_order == want_order
+    finally:
+        memo.pop_scope(tok)

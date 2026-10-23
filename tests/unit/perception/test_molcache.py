@@ -102,3 +102,24 @@ def test_verify_mode_passes_when_nothing_changed(scope, monkeypatch):
     monkeypatch.setattr(molcache, "_MODE", "verify")
     mol = Chem.MolFromSmiles("CCO")
     assert molcache.atoms_of(mol) is molcache.atoms_of(mol)
+
+
+def test_neighbors_of_matches_GetNeighbors_in_order(scope):
+    mol = Chem.MolFromSmiles("CC(C)CC(N)C(=O)OC1CCCC1.[Na+]")
+    want = tuple(tuple(n.GetIdx() for n in a.GetNeighbors()) for a in mol.GetAtoms())
+    assert molcache.neighbors_of(mol) == want
+    assert molcache.neighbors_of(mol) is molcache.neighbors_of(mol)
+
+
+def test_neighbors_of_is_not_cached_without_a_scope_or_for_an_rwmol(scope):
+    rw = Chem.RWMol(Chem.MolFromSmiles("CCCC"))
+    a = molcache.neighbors_of(rw)
+    rw.RemoveAtom(0)
+    b = molcache.neighbors_of(rw)
+    assert a is not b and len(b) == 3 == rw.GetNumAtoms()
+    assert b == tuple(tuple(n.GetIdx() for n in at.GetNeighbors()) for at in rw.GetAtoms())
+
+
+def test_neighbors_of_without_a_scope_is_still_exact():
+    mol = Chem.MolFromSmiles("c1ccccc1O")
+    assert molcache.neighbors_of(mol) == tuple(tuple(n.GetIdx() for n in a.GetNeighbors()) for a in mol.GetAtoms())

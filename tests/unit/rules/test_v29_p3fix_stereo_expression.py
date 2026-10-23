@@ -280,6 +280,18 @@ def test_saturated_halogenated_chain_is_unchanged(smiles, start, excl, expected)
     assert _name_saturated_substituted_chain(mol, frag, start, set()) == expected
 
 
+@pytest.mark.parametrize("smiles,frag,start", [
+    # the double bond LEAVES the fragment (atom 2 to atom 3): it is the attachment bond, which the gate
+    # reads; the saturation guard looks at the bonds between the fragment's own atoms only
+    ("ClCC=CC", [0, 1, 2], 2),
+    ("ClCCC=CC", [0, 1, 2], 2),
+])
+def test_a_double_bond_that_leaves_the_fragment_is_not_the_guard_s_business(smiles, frag, start):
+    from orthonym.assembly.substituent_naming import _name_saturated_substituted_chain
+    mol = Chem.MolFromSmiles(smiles)
+    assert _name_saturated_substituted_chain(mol, frag, start, set()) == "2-chloroethyl"
+
+
 def test_removing_the_saturation_guard_really_does_delete_the_double_bond():
     """MUTATION PROOF of the guard above — the reproduction nobody had done.
 
@@ -308,11 +320,10 @@ def test_removing_the_saturation_guard_really_does_delete_the_double_bond():
 
     src = inspect.getsource(sn._name_saturated_substituted_chain)
     decline = (
-        "    # SATURATED is in this function's name and contract: decline otherwise.\n"
-        "    for _b in mol.GetBonds():\n"
-        "        if (_b.GetBeginAtomIdx() in sub_set and _b.GetEndAtomIdx() in sub_set\n"
-        "                and _b.GetBondTypeAsDouble() != 1.0):\n"
-        "            return None\n"
+        "    for _i in sub_atoms:\n"
+        "        for _b in mol.GetAtomWithIdx(_i).GetBonds():\n"
+        "            if _b.GetOtherAtomIdx(_i) in sub_set and _b.GetBondTypeAsDouble() != 1.0:\n"
+        "                return None\n"
     )
     assert decline in src, (
         "the saturation decline is not where this test expects it; re-derive the "

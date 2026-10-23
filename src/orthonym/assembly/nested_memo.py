@@ -74,7 +74,7 @@ def _apply(replay: dict, units: tuple, replay_budgets: bool = True) -> None:
     for k, v in replay.items():
         if k in _ACCUMULATORS:
             cur = _VARS[k].get()
-            _VARS[k].set(cur + tuple(x for x in (v or ()) if x not in cur))
+            _VARS[k].set(_pv.append_missing(cur, tuple(v or ())))
             # An enclosing memoised substituent-fragment naming logs the fragments
             # this hit merges, as it logs every record_non_pin_fragment call (the
             # label-only records are not logged: a call that makes them is never

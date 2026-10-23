@@ -8,6 +8,7 @@ import re
 from rdkit import Chem
 
 from ..errors import is_failure_name
+from ..perception import charge_shift
 from .ions import (
     _charged_ring_locants,
     _elide_terminal_e,
@@ -19,16 +20,37 @@ from .ions import (
 )
 
 
+def _charge_structures(mol):
+    """The structures of ``mol`` that ``azolium_hydron_centres`` reads, or None when none can be had.
+
+    RDKit builds every bond-order arrangement of each group that carries charge or N=X bonds and its C++ call
+    cannot be interrupted (a 66-atom azolium took 94 s in one call, and the Python alarm of the naming run waited
+    for it), so it is asked only when ``charge_shift.rdkit_flags0_affordable(mol)``. Above that count the
+    structures are the placements of the +1 onto the other three-connected nitrogens of its pi system
+    (``charge_shift.charge_placements``, a matching of the pi bonds that counts its own work). An undecided
+    matching, and an error in either route, give None: RDKit is never asked in the matching's place. The matching
+    leaves a fragment with a radical or a bonded metal anywhere in it undecided, so above the count such a cation
+    keeps only its drawn centre (``[center_idx]``); every name built from the centres is still read back."""
+    if charge_shift.rdkit_flags0_affordable(mol):
+        try:
+            sup = Chem.ResonanceMolSupplier(mol, 0, 64)
+            return [sup[i] for i in range(len(sup))]
+        except Exception:
+            return None
+    try:
+        return charge_shift.charge_placements(mol)
+    except Exception:
+        return None
+
+
 def azolium_hydron_centres(mol, ring_system, center_idx):
     """The ring nitrogens at which the charge of the azolium ``mol`` can be drawn, ``center_idx``
     first: an aromatic ring N bearing an exocyclic substituent and no hydrogen, with the positive
     charge on it in a resonance structure of ``mol`` and none elsewhere. In 1,3-dimethylimidazolium
     both nitrogens are such centres; the cation is one species and the name cannot depend on which
     nitrogen the drawing charges."""
-    try:
-        sup = Chem.ResonanceMolSupplier(mol, 0, 64)
-        structs = [sup[i] for i in range(len(sup))]
-    except Exception:
+    structs = _charge_structures(mol)
+    if structs is None:
         return [center_idx]
     found = {center_idx}
     for r in structs:

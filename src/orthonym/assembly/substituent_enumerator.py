@@ -1071,11 +1071,20 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     # shares. A key it cannot build skipped the cache, and a mixture re-asked for the same prefix tens of
     # thousands of times inside one naming (the strict twin's promotion re-run).
     multi_fragment = attach_in_frag and len(Chem.GetMolFrags(mol)) > 1
+    frag_set = set(frag_atoms)
+    _atoms = atoms_of(mol)
+    # Own bonds go to RDKit as ``bondsToUse`` (left to find them, a rooted call walks every bond: 1.7 vs 0.6 ms at
+    # 404 atoms, same string); the bond CIP stamp below takes them in bond-index order. With them RDKit skips its
+    # single-fragment check of a rooted call, so ``multi_fragment`` must keep a mixture unrooted (-1).
+    _frag_bonds = {}
+    for _i in frag_set:
+        for _b in _atoms[_i].GetBonds():
+            if _b.GetOtherAtomIdx(_i) in frag_set:
+                _frag_bonds[_b.GetIdx()] = _b
     smi = Chem.MolFragmentToSmiles(
-        mol, atomsToUse=sorted(frag_atoms),
+        mol, atomsToUse=sorted(frag_atoms), bondsToUse=sorted(_frag_bonds),
         rootedAtAtom=(attach_idx if attach_in_frag and not multi_fragment else -1),
         isomericSmiles=True, canonical=True)
-    frag_set = set(frag_atoms)
     _a = mol.GetAtomWithIdx(attach_idx)
     ext_free_valence = sum(
         int(b.GetBondTypeAsDouble()) for b in _a.GetBonds()
@@ -1085,19 +1094,15 @@ def _substituent_memo_key(mol, frag_atoms, attach_idx, allow_mancude,
     _order = [int(x) for x in _ORDER_INT_RE.findall(mol.GetProp('_smilesAtomOutputOrder'))]
     # Lever G (2026-09-12): one materialised atom tuple instead of two GetAtomWithIdx calls per
     # atom here and two per external bond below. Same atoms, same values, same tuple.
-    _atoms = atoms_of(mol)
     atom_cips = tuple(
         (_atoms[i].GetProp('_CIPCode') if _atoms[i].HasProp('_CIPCode') else None)
         for i in _order)
     _rank = {idx: pos for pos, idx in enumerate(_order)}
     if multi_fragment:
         smi = ("multi-fragment", smi, _rank.get(attach_idx, -1))
-    _bond_items = []
-    for _b in bonds_of(mol):
-        _bi, _ei = _b.GetBeginAtomIdx(), _b.GetEndAtomIdx()
-        if _bi in frag_set and _ei in frag_set:
-            _cip = _b.GetProp('_CIPCode') if _b.HasProp('_CIPCode') else None
-            _bond_items.append(((_rank.get(_bi, -1), _rank.get(_ei, -1)), _cip))
+    _bond_items = [((_rank.get(_b.GetBeginAtomIdx(), -1), _rank.get(_b.GetEndAtomIdx(), -1)),
+                    _b.GetProp('_CIPCode') if _b.HasProp('_CIPCode') else None)
+                   for _b in map(_frag_bonds.get, sorted(_frag_bonds))]
     _bond_items.sort(key=lambda t: t[0])
     bond_cips = tuple(c for _, c in _bond_items)
     # Item-1 fix : MolFragmentToSmiles drops each fragment atom's bonds to

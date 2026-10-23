@@ -32,6 +32,7 @@ from rdkit import Chem
 
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
+from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import acyl_prefix_text, is_acyl_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
@@ -532,7 +533,7 @@ def _located_stereo_block(mol, locant_of: Dict[int, int]) -> str:
         atom = mol.GetAtomWithIdx(idx)
         if atom.HasProp('_CIPCode'):
             terms.append((loc, atom.GetProp('_CIPCode')))
-    for sb in get_double_bond_stereo(mol):
+    for sb in get_double_bond_stereo(mol, within=locant_of):
         a, b = sb['atoms']
         if a in locant_of and b in locant_of:
             terms.append((min(locant_of[a], locant_of[b]), sb['stereo']))
@@ -1324,10 +1325,12 @@ def _name_saturated_substituted_chain(
     ring_info = mol.GetRingInfo()
 
     # SATURATED is in this function's name and contract: decline otherwise.
-    for _b in mol.GetBonds():
-        if (_b.GetBeginAtomIdx() in sub_set and _b.GetEndAtomIdx() in sub_set
-                and _b.GetBondTypeAsDouble() != 1.0):
-            return None
+    # The bonds of the fragment's atoms are every bond with both ends in it (a scan of the whole molecule's
+    # bonds cost the size of the molecule on every one of the tens of thousands of fragments a peptide asks).
+    for _i in sub_atoms:
+        for _b in mol.GetAtomWithIdx(_i).GetBonds():
+            if _b.GetOtherAtomIdx(_i) in sub_set and _b.GetBondTypeAsDouble() != 1.0:
+                return None
 
     backbone = []                # carbon backbone atom indices
     halogens = []                # (halogen_idx, attached_carbon_idx)
@@ -2416,6 +2419,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
     except Exception:
         _amine_import_ok = False
     _ring_info_pf = mol.GetRingInfo()
+    _neighbor_ids = neighbors_of(mol)   # the walks below step through plain tuples, not RDKit atoms
     if _amine_import_ok:
         for idx in list(sub_set):
             if idx in consumed:
@@ -2439,8 +2443,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
                     if x in comp or x == idx or x not in sub_set:
                         continue
                     comp.add(x)
-                    for n in mol.GetAtomWithIdx(x).GetNeighbors():
-                        nj = n.GetIdx()
+                    for nj in _neighbor_ids[x]:
                         if nj != idx and nj not in comp:
                             st.append(nj)
                 return comp
@@ -2633,8 +2636,7 @@ def _name_polyfunctional_acyclic_substituent_impl(
                     if x in comp or x == _block or x not in sub_set:
                         continue
                     comp.add(x)
-                    for n in mol.GetAtomWithIdx(x).GetNeighbors():
-                        nj = n.GetIdx()
+                    for nj in _neighbor_ids[x]:
                         if nj != _block and nj not in comp:
                             st.append(nj)
                 return comp
@@ -7166,15 +7168,16 @@ def _fg_branch_atoms(mol, start, block, sub_set):
     br = []
     seen = {block}
     stk = [start]
+    neighbor_ids = neighbors_of(mol)
     while stk:
         cur = stk.pop()
         if cur in seen or cur not in sub_set:
             continue
         seen.add(cur)
         br.append(cur)
-        for nn in mol.GetAtomWithIdx(cur).GetNeighbors():
-            if nn.GetIdx() != block and nn.GetIdx() in sub_set and nn.GetIdx() not in seen:
-                stk.append(nn.GetIdx())
+        for nn in neighbor_ids[cur]:
+            if nn != block and nn in sub_set and nn not in seen:
+                stk.append(nn)
     return br
 
 

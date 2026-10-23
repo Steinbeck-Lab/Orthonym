@@ -43,17 +43,26 @@ def ring_on_chain_substituent_name(
 
 def _ring_ylidene_bonds(mol, frag_set, ring_atoms, allow_stereo: bool = False):
     """The C=C bonds of the fragment between a ring carbon and a non-ring carbon; the plain ones, or
-    with ``allow_stereo`` the ones that carry an E/Z flag too (see ``ring_ylidene_on_chain_substituent``)."""
+    with ``allow_stereo`` the ones that carry an E/Z flag too (see ``ring_ylidene_on_chain_substituent``).
+
+    Every such bond has exactly one end in ``ring_atoms``, so the bonds of the ring atoms are the
+    whole candidate set: the walk costs the size of the ring system, not of the molecule (it was a
+    scan of every bond of the molecule per fragment). The bonds come back in bond-index order, the
+    order the whole-molecule scan produced them in."""
+    candidates = {}
+    for i in ring_atoms:
+        if i not in frag_set:
+            continue
+        for b in mol.GetAtomWithIdx(i).GetBonds():
+            if b.GetBondType() != Chem.BondType.DOUBLE:
+                continue
+            j = b.GetOtherAtomIdx(i)
+            if j not in frag_set or j in ring_atoms:
+                continue
+            candidates[b.GetIdx()] = (b, i, j)
     found = []
-    for b in mol.GetBonds():
-        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
-        if i not in frag_set or j not in frag_set or b.GetBondType() != Chem.BondType.DOUBLE:
-            continue
-        if (i in ring_atoms) == (j in ring_atoms):
-            continue
-        ring_c, chain_c = (mol.GetAtomWithIdx(i), mol.GetAtomWithIdx(j))
-        if i not in ring_atoms:
-            ring_c, chain_c = chain_c, ring_c
+    for _, (b, i, j) in sorted(candidates.items()):
+        ring_c, chain_c = mol.GetAtomWithIdx(i), mol.GetAtomWithIdx(j)
         if (ring_c.GetSymbol() != 'C' or chain_c.GetSymbol() != 'C' or ring_c.GetIsAromatic()
                 or chain_c.GetIsAromatic() or chain_c.IsInRing() or b.GetIsAromatic()
                 or (b.GetStereo() != Chem.BondStereo.STEREONONE and not allow_stereo)):
