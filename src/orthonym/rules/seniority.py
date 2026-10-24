@@ -8,6 +8,8 @@ all other groups become prefixes.
 
 from typing import Dict, List, Optional, Tuple
 
+from .hydroximic_acids import hydroximic_at_rank, suffix_group
+
 # (2026-04-25): per-FG SMARTS attachment atom override.
 #
 # Most functional-group SMARTS lead with the locant-bearing atom (the C of
@@ -117,6 +119,14 @@ SENIORITY_ORDER = [
     # Imidic acid -- N-replacement ranks after the O/S/Se/Te
     # chalcogen-replacement block
     "imidic_acid",
+    # Hydroximic acid, the Blue Book): the N-hydroxy derivative of the imidic
+    # acid, so it has the imidic acid's rank class 7a,:18172: acids "each followed
+    # in turn by the corresponding peroxy, imidic, and hydrazonic acids. Chalcogen analogues follow
+    # each of the corresponding oxygen acids"). The rank of one with an S, Se or Te acid group is that
+    # of the imidothioic, imidoselenoic or imidotelluroic acid: ``_head_principal_group`` ranks the
+    # group by the chalcogen, this entry is the O acid's place and the one the rankers that read the
+    # index see. (It stood below the hydrazonic acids, a place the group has no claim to.)
+    "hydroximic_acid",
     # (the Blue Book-:18540): the carboximidic acids
     # modified by S, Se, Te follow the imidic acid, in that order, and come before
     # the hydrazonic acid; the hydrazonic acids modified by S, Se, Te follow it.
@@ -129,11 +139,6 @@ SENIORITY_ORDER = [
     "hydrazonothioic_acid",
     "hydrazonoselenoic_acid",
     "hydrazonotelluroic_acid",
-    # Hydroximic acid: =O -> =N-OH replacement acid; ranks below
-    # hydrazonic acid. PIN is the N-hydroxy derivative of the imidic
-    # acid, emitted by the dedicated hydroximic_acid handler
-    # (SUFFIX_FORMS None, like hydroxamic_acid).
-    "hydroximic_acid",
     # Carbamic acid (IUPAC -- retained acid name, rank with carboxylic acids
     "carbamic_acid",
     "sulfonic_acid",
@@ -1232,6 +1237,11 @@ def _head_principal_group(
     """The first group of ``SENIORITY_ORDER`` that is present and suffix-capable (the answer
     before the phosphate esters are offered; see ``get_principal_group``)."""
     for fg_name in SENIORITY_ORDER:
+        if fg_name == "hydroximic_acid":
+            continue                  # ranked by its chalcogen, with the imidic acids (below)
+        _hydroximic = hydroximic_at_rank(mol, functional_groups, fg_name)
+        if _hydroximic and not functional_groups.get(fg_name):
+            return "hydroximic_acid", _hydroximic    # the rank of its imidic acid, class 7a (:18172)
         if fg_name in functional_groups and functional_groups[fg_name]:
             # functional-group perception fix/ (169.7): a principal characteristic group MUST be
             # suffix-capable. The pseudohalide / special prefix-only groups
@@ -1390,6 +1400,19 @@ def get_prefix(fg_name: str) -> Optional[str]:
     return PREFIX_FORMS.get(fg_name)
 
 
+def seniority_index(fg_name: str, mol=None, matches=None) -> int:
+    """The place of ``fg_name`` in ``SENIORITY_ORDER`` (ValueError for a name that is not in it).
+
+    THE one reader of the order for a group's rank: a hydroximic acid has the rank of the imidic acid
+    of its acid chalcogen class 7a, the Blue Book; ``hydroximic_acid`` in the
+    order is the O acid's place), so ``mol`` and the group's ``matches`` give it the place of its
+    imidic, imidothioic, imidoselenoic or imidotelluroic acid, and two groups of one rank share an
+    index. Without them the group is the O acid's. Every other name is its own place."""
+    if fg_name == "hydroximic_acid":
+        fg_name = (suffix_group(mol, fg_name, matches) if mol is not None and matches else "imidic_acid")
+    return SENIORITY_ORDER.index(fg_name)
+
+
 def compare_seniority(fg1: str, fg2: str) -> int:
     """
     Compare seniority of two functional groups.
@@ -1403,12 +1426,12 @@ def compare_seniority(fg1: str, fg2: str) -> int:
          1 if fg2 is higher seniority
     """
     try:
-        idx1 = SENIORITY_ORDER.index(fg1)
+        idx1 = seniority_index(fg1)
     except ValueError:
         idx1 = len(SENIORITY_ORDER)  # Not in list = lowest priority
 
     try:
-        idx2 = SENIORITY_ORDER.index(fg2)
+        idx2 = seniority_index(fg2)
     except ValueError:
         idx2 = len(SENIORITY_ORDER)
 

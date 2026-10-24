@@ -49,6 +49,7 @@ from .seniority import (
     get_prefix,
     get_principal_group,
 )
+from .hydroximic_acids import chain_end_prefixes, hydroximic_principal, ring_acyl_prefixes, ring_stereodescriptors
 
 
 def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
@@ -954,7 +955,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         Complete IUPAC name, or None if ring parent cannot be determined.
     """
     mol = features.mol
-    principal_group = features.principal_group
+    principal_group, _n_hydroxy = hydroximic_principal(features)   #, the Blue Book
     non_principal = getattr(features, 'non_principal_groups', {})
     # audit fix 2026-06-22: drop same-union-class subtypes already in the
     # multiplied suffix (parity with the chain path; ring polyols too).
@@ -1121,18 +1122,11 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         # (1) (the Blue Book): a -C(=NH)-OH bonded to the ring
         # is the compound prefix 'C-hydroxycarbonimidoyl',
         # '2-(C-hydroxycarbonimidoyl)cyclopentane-1-carboxylic acid (PIN)' (:30029).
-        if fg_name == 'imidic_acid':
-            _ia_locs = []
-            for match in matches:
-                _ia_c = match[0]
-                _ia_ring = [nb.GetIdx() for nb in mol.GetAtomWithIdx(_ia_c).GetNeighbors()
-                            if nb.GetIdx() in ring_set and nb.GetIdx() in atom_to_locant]
-                if _ia_c in ring_set or len(_ia_ring) != 1:
-                    return None
-                _ia_locs.append(atom_to_locant[_ia_ring[0]])
-            _ia_locs.sort()
-            all_prefixes.append(format_fg_prefix(
-                'C-hydroxycarbonimidoyl', _ia_locs, len(_ia_locs)))
+        if fg_name in ('imidic_acid', 'hydroximic_acid'):   # the N-hydroxy one: (1),:30131
+            _ring_acyl = ring_acyl_prefixes(features, fg_name, matches, ring_set, atom_to_locant, principal_group)
+            if _ring_acyl is None:
+                return None
+            all_prefixes.extend(_ring_acyl)
             _step5_named_matches.update(tuple(_m) for _m in matches)
             continue
         if fg_name in NO_SENIORITY_GROUPS and fg_name not in ('alkene', 'alkyne'):
@@ -1306,7 +1300,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
 
     # Identical prefixes of the sources are one multiplied prefix, then sorted
     # alphabetically with the lowest-locant tie-break (RENDERED strings).
-    all_prefixes = group_identical_prefixes(all_prefixes)
+    all_prefixes = group_identical_prefixes(all_prefixes + _n_hydroxy)
 
     # --- Step 7: Assemble the complete name ---
     # Format: [prefixes]-[ring_parent]-[suffix_locants]-[multiplier][suffix]
@@ -1325,7 +1319,9 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
     # Add stereodescriptors if present
     if features.stereocenters or getattr(features, 'double_bond_stereo', None):
         from .stereochemistry import collect_stereodescriptors, format_stereodescriptor_string
-        descriptors = collect_stereodescriptors(mol, atom_to_locant)
+        descriptors = ring_stereodescriptors(features, collect_stereodescriptors(mol, atom_to_locant))
+        if descriptors is None:
+            return None
         if descriptors:
             stereo_prefix = format_stereodescriptor_string(descriptors)
             name = f"{stereo_prefix}{name}"
@@ -1800,7 +1796,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     mol = features.mol
     principal_chain = features.principal_chain
     atom_to_locant = features.atom_to_locant
-    principal_group = features.principal_group
+    principal_group, _n_hydroxy = hydroximic_principal(features)   #, the Blue Book
     # (the Blue Book): an oxoacid with a substitutable hydrogen on its central
     # atom is a functional parent, never a suffix ('(2-hydroxyethyl)phosphonic acid', not
     # '2-hydroxyethane-1-phosphonic acid'; Note:35457 rejects 'benzenephosphonic acid'). The
@@ -3102,43 +3098,18 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                         _amidine_excluded_n.update({_nim, _nam, _o})
                     continue
 
-        # W3-P02-6, BB 30140): a hydroximic acid C(=N-OH)(OH)
-        # DEMOTED by a senior group (COOH) whose geminal carbon sits on the
-        # parent chain splits into 'hydroxy' (the geminal C-OH) + '(hydroxyimino)'
-        # (the =N-OH) prefixes on that carbon's locant — PIN
-        # '5-hydroxy-5-(hydroxyimino)pentanoic acid'. 'hydroxyimino' is a compound
-        # prefix (hydroxy + imino) and is parenthesised per; scoped here
-        # to the hydroximic_acid class (the general demoted-oxime path is a
-        # separate class, out of scope). SMARTS match tuple
-        # (C, imino-N, O-on-N, hydroxyl-O). Fires only when every match's C is a
-        # chain member; else falls through (fail closed).
+        # W3-P02-6 (2), BB 30132, 30140): a hydroximic acid C(=N-OH)(OH) JUNIOR to the
+        # principal group (:30129, "When another group is present that has seniority for citation as
+        # principal group": a COOH, not an imidic acid of its rank) whose geminal carbon sits on the parent
+        # chain splits into 'hydroxy' + '(hydroxyimino)' prefixes on that carbon's locant: PIN
+        # '5-hydroxy-5-(hydroxyimino)pentanoic acid' (``hydroximic_acids.chain_end_prefixes``). Not at a
+        # chain end: falls through, as before; not junior: the prefixes are cited and the name is recorded non-PIN.
         if fg_name == 'hydroximic_acid' and chain_set:
-            _hxc_ok = True
-            _hxc_units = {}
-            for _m in matches:
-                if len(_m) < 4:
-                    _hxc_ok = False
-                    break
-                _c, _nim, _on, _oc = _m[0], _m[1], _m[2], _m[3]
-                if _c not in chain_set:
-                    _hxc_ok = False
-                    break
-                _hxc_units[_c] = (_nim, _on, _oc)
-            if _hxc_ok and _hxc_units:
-                _hxc_prefixes = []
-                for _c, (_nim, _on, _oc) in _hxc_units.items():
-                    _loc = atom_to_locant.get(_c)
-                    if _loc is None:
-                        _hxc_ok = False
-                        break
-                    _hxc_prefixes.append(format_fg_prefix(_acid_chalcogen_prefix(mol, _oc), [_loc], 1))
-                    _hxc_prefixes.append(
-                        format_fg_prefix('(hydroxyimino)', [_loc], 1))
-                if _hxc_ok:
-                    all_prefixes.extend(_hxc_prefixes)
-                    for _c, (_nim, _on, _oc) in _hxc_units.items():
-                        _amidine_excluded_n.update({_nim, _on, _oc})
-                    continue
+            _hxc = chain_end_prefixes(mol, matches, chain_set, atom_to_locant, principal_group)
+            if _hxc:
+                all_prefixes.extend(_hxc[0])
+                _amidine_excluded_n.update(_hxc[1])
+                continue
 
         #: an amidrazone attached to the chain via its AMINO
         # nitrogen (chain-N(H)-C(=N-NH2)-R) is expressed by _check_for_acylamino
@@ -3527,7 +3498,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # both produce the same bare prefix form ("hydroxy"), merge into one entry
     # with the correct multiplier ("dihydroxy"). Only bare (no-locant) prefixes
     # are merged; locanted prefixes represent distinct chain positions.
-    all_prefixes = group_identical_prefixes(_merge_bare_duplicate_prefixes(all_prefixes))
+    all_prefixes = group_identical_prefixes(_merge_bare_duplicate_prefixes(all_prefixes + _n_hydroxy))
 
     # Sort all prefixes alphabetically, with lowest-locant
     # tie-break for identical-letter prefixes.
@@ -3811,7 +3782,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     # the located prefixes, before any locant-free re-render below: the systematic
     # spelling recorded for the acetic arm must keep its locants
     _located_prefixes = list(all_prefixes)
-    if (_l3_render_from is not None and len(all_prefixes) == 1
+    if (_l3_render_from is not None and len(all_prefixes) == 1 and not _n_hydroxy
             and not suffix_locants
             and not double_locants and not triple_locants):
         all_prefixes = [format_fg_prefix(_l3_render_from[0], [], _l3_render_from[1])]
@@ -3870,7 +3841,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
         # alpha stereodescriptor (skip the generic stereo block below).
         _ald_name, _ald_bare_stereo = _ald_result
         name = f"{_ald_bare_stereo}{_ald_name}"
-    elif (not (suffix == 'nitrile' and chain_length == 2)
+    elif (not _n_hydroxy and not (suffix == 'nitrile' and chain_length == 2)   # an italic N locant:
           and _single_substitutable_atom_parent(mol, features, principal_chain,
                                                 all_prefixes, double_locants,
                                                 triple_locants, _chain_ez)):

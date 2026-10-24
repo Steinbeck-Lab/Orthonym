@@ -2236,6 +2236,11 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     from .validation.protonation_identity import protonation_site_verdict
     if protonation_site_verdict(input_smiles, opsin_smiles, name) == "mismatch":
         return "mismatch"
+    # The configuration of the C=N of a hydroximic acid is in no layer of the key (its mobile hydrogen):
+    # a descriptor the name states is read back against the input's (rules/hydroximic_acids.py).
+    from .rules.hydroximic_acids import cn_configuration_verdict
+    if not ignore_stereo and cn_configuration_verdict(input_smiles, opsin_smiles) == "mismatch":
+        return "mismatch"
     ka = _self_consistency_full_key(input_smiles)
     kb = _self_consistency_full_key(opsin_smiles)
     if ka is not None and kb is not None and ka == kb:

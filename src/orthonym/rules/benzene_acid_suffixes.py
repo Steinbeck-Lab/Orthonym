@@ -16,6 +16,8 @@ acid (PIN) (not tetrathiophthalic acid)' (:30313).
 """
 from rdkit import Chem
 
+from . import hydroximic_acids as _hydroximic
+
 #: (functional group, suffix), in the order the groups are looked for. =[NX2H1] (an unsubstituted imino N,
 #: as the perception FG requires) keeps an N-substituted imidate or imine out, and the -XH keeps the
 #: imidate ester (O-alkyl) and the amidine out; the =N- and the -XH make every one of these disjoint from
@@ -29,6 +31,9 @@ ACID_SUFFIX_FGS = (
     ('hydrazonoselenoic_acid', 'carbohydrazonoselenoic acid'),
     ('hydrazonotelluroic_acid', 'carbohydrazonotelluroic acid'),
     ('dithio_acid', 'carbodithioic acid'),
+    # the N-hydroxy derivatives, the Blue Book), after the plain acids: the =N-OH of
+    # their SMARTS is not the =NH of those
+    *_hydroximic.ACID_SUFFIX_FGS,
 )
 
 ACID_SUFFIX_SMARTS = {
@@ -41,6 +46,7 @@ ACID_SUFFIX_SMARTS = {
     'hydrazonotelluroic_acid': Chem.MolFromSmarts('[CX3](=[NX2][NX3H2])[TeX2H1]'),
     # -C(=S)-SH has no tautomer, so no italic letter locant
     'dithio_acid': Chem.MolFromSmarts('[CX3](=[SX1])[SX2H1]'),
+    **_hydroximic.ACID_SUFFIX_SMARTS,
 }
 
 

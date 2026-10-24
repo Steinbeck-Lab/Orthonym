@@ -662,8 +662,13 @@ TERMINAL_GROUPS = {
     # `CNN=C(O)C1CCCCC1`) simply does not match either FG at all -- perception routes
     # it to a different principal_group entirely (`imine` / `carboxylic_acid`), which
     # is independently self-consistency-gated. The N-hydroxy sibling (hydroximic acid)
-    # is its OWN FG (`hydroximic_acid`, SUFFIX_FORMS -> None) built by a dedicated
-    # handler that never reaches TERMINAL_GROUPS, so it cannot hit this branch either.
+    # is its OWN FG (`hydroximic_acid`, SUFFIX_FORMS -> None) and is written with the
+    # suffix of its imidic acid (`hydroximic_acids.suffix_group`), so it takes this branch AS
+    # that acid; its N-hydroxy is a prefix cited beside the ring's
+    # (`hydroximic_acids.with_n_hydroxy_fragments`). The branch withholds the ring
+    # locant when the ring has no prefix of its own, which is the Blue Book spelling
+    # with the N-hydroxy alone ('N-hydroxycyclohexanecarboximidoselenoic acid (PIN)',
+    # the Blue Book), and restores it beside a ring prefix.
     # The suffix-N hole is therefore structurally unreachable for these two classes.
     # Without this membership, ring-attached imidic/hydrazonic acid fell through to
     # the NON-terminal branch's `_ring_suffix_locant_is_trivial`, whose own allowlist

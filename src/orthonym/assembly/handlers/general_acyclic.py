@@ -91,19 +91,11 @@ def name_general_acyclic(
     # composer.py <-> general_acyclic.py cycle that the inner_dispatch
     # registration will create at module load time.
     from ..candidate_pool import get_current_pool
-    from ..composer import (
-        HandlerResult,
-        NameFragment,
-        _get_parent_atom_count,
-    )
+    from ..composer import HandlerResult, NameFragment, _get_parent_atom_count
+    from ...rules.hydroximic_acids import with_hydroximic_fragments
     from ._handler_shared import (
-        _assemble_fragments,
-        _generate_chain_parent,
-        _generate_prefixes,
-        _generate_ring_parent,
-        _generate_stereodescriptors,
-        _generate_suffix,
-        _w2_atom_coverage_declines,
+        _assemble_fragments, _generate_chain_parent, _generate_prefixes, _generate_ring_parent,
+        _generate_stereodescriptors, _generate_suffix, _w2_atom_coverage_declines,
         _w2_atom_coverage_verdict,
     )
 
@@ -176,6 +168,10 @@ def name_general_acyclic(
         stereo = _generate_stereodescriptors(features)
         if stereo:
             fragments.append(stereo)
+    # a hydroximic acid cites its N-hydroxy among the prefixes and, on a ring, its C=N's descriptor
+    fragments = with_hydroximic_fragments(features, fragments)
+    if fragments is None:
+        return None
 
     # (the Blue Book) at PARENT scope -- `heptafluorobutanoic acid` (the Blue Book,
     # verbatim (PIN)). Decided HERE for the same reason as the mononuclear rule and

@@ -74,7 +74,7 @@ _BENZ_FUNC = {'benzoic': 1, 'benzoate': 1, 'benzaldehyde': 1, 'benzonitrile': 1,
 UNSAT = re.compile(r"^(?:(?:" + MULT_RE + r")?(?:en|ene|yn|yne))$")
 _UNSAT_SUFFIX = re.compile(r"^((?:" + MULT_RE + r")?(?:en|yn))(e?)(di)?(oic|oate|oyl|oyloxy|al|amide|amido|nitrile|"
                            r"ohydrazide|hydrazide|oyl chloride|imidamide|imidothioate|imidate|hydrazonate|ethioic|oxamide|"
-                           r"thioamide|ohydroxamic)?$")
+                           r"thioamide|ohydroxamic|imidic|imidothioic|imidoselenoic|imidotelluroic)?$")
 
 
 def _ring_perms(n):

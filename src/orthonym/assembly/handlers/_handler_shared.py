@@ -80,6 +80,7 @@ from ...data.chain_names import get_chain_prefix, multiplying_prefix
 from ...data.multipliers import multiplier_table
 from .prefix_claims import reconcile_prefix_claims
 from ...rules.locants import get_bond_locants, get_functional_group_locants
+from ...rules.hydroximic_acids import fragments_cite_italic_locant, suffix_group, suffix_group_atoms
 from ...rules.seniority import get_prefix, get_suffix
 from ..composition_primitives import RETAINED_C2_ACYL_BY_SUFFIX, RETAINED_C2_PARENT_BY_SUFFIX
 from ..naming_utils import (
@@ -876,7 +877,8 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
     """
     from ..composer import TERMINAL_GROUPS, NameFragment
 
-    fg_name = features.principal_group
+    # a hydroximic acid is written with the suffix of its imidic acid, the Blue Book)
+    fg_name = suffix_group(features.mol, features.principal_group, features.principal_group_atoms)
     if not fg_name:
         return None
 
@@ -1267,9 +1269,7 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
     # default) rather than claim an empty set, which would UNDER-claim.
     _suffix_atoms = None
     if features.principal_group_atoms:
-        _suffix_atoms = frozenset().union(
-            *(set(_m) for _m in features.principal_group_atoms)
-        )
+        _suffix_atoms = suffix_group_atoms(features.principal_group, features.principal_group_atoms)
 
     return NameFragment(
         text=suffix_text,
@@ -2002,8 +2002,8 @@ def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) ->
     # (the Blue Book is the Blue Book saying so about that very shape). The sibling
     # licence below has consulted it since Task 5b; this one was wired
     # before the observation existed, and it is the same class.
-    if _naming_call_produces_a_name_component():
-        return False
+    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+        return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
 
     prefixes = [f for f in fragments if f.fragment_type == "prefix"]
     suffixes = [f for f in fragments if f.fragment_type == "suffix"]
@@ -2222,8 +2222,8 @@ def _l4_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:
     # result IS the whole compound -- never a sub-fragment being spliced into a
     # multiplicative name, where restores every locant (the Blue Book keeps the
     # trisulfane component's `3-`).
-    if _naming_call_produces_a_name_component():
-        return False
+    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+        return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
 
     parents = [f for f in fragments if f.fragment_type == "parent"]
     prefixes = [f for f in fragments if f.fragment_type == "prefix"]
@@ -2471,8 +2471,8 @@ def _l6_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     observation here), and False when anything else in the scope cites a locant (a
     stereodescriptor, a stem that is not purely alphabetic, an unsaturation or a
     suffix locant)."""
-    if _naming_call_produces_a_name_component():
-        return False
+    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+        return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
     if features is None or not fragments:
         return False
     mol = getattr(features, "mol", None)
@@ -2602,8 +2602,8 @@ def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     # so it may only fire when the scope's boundary IS the molecule being named. See
     #:func:`_naming_call_produces_a_name_component` -- without it, the Blue Book's own
     # explicit negative lost its locants.
-    if _naming_call_produces_a_name_component():
-        return False
+    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+        return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
 
     if features is None or not fragments:
         return False

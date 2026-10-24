@@ -1357,24 +1357,6 @@ _register_inner(
     side_effect_inventory=(),
 )
 
-# --- W3-P02: hydroximic_acid handler.
-# Hydroximic acid (R-C(=N-OH)-OH) is named as the N-hydroxy derivative of
-# the corresponding imidic acid (PIN 'N-hydroxyethanimidic acid'), NOT with
-# the general-only '-hydroximic acid' suffix. Priority 5211 — after
-# hydroxamic (different principal_group mutex), before amine.
-# Fail-safe: returns None so general_acyclic stays the backstop.
-from .handlers.hydroximic_acid import _is_hydroximic_acid, name_hydroximic_acid  # noqa: E402
-
-_register_inner(
-    handler_id="hydroximic_acid",
-    priority=5211,
-    predicate=_is_hydroximic_acid,
-    handler=name_hydroximic_acid,
-    iupac_section="P-65.1.3.3.1",
-    description="Hydroximic acid -> N-hydroxy<imidic acid> PIN (W3-P02; P-65.1.3.3.1)",
-    side_effect_inventory=(),
-)
-
 # --- W3-P04: N-hydroxy sulfonimidic (hydroximic-of-sulfonic) handler.
 # R-S(=O)(=N-OH)-OH is named as the N-hydroxy derivative of the corresponding
 # sulfonimidic acid (PIN 'N-hydroxymethanesulfonimidic acid'). Priority 5212 —

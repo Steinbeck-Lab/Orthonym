@@ -19,7 +19,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 from ..perception.functional_groups import detect_functional_groups
-from ..rules.seniority import SENIORITY_ORDER, get_principal_group
+from ..rules.seniority import SENIORITY_ORDER, get_principal_group, seniority_index
 from ..perception.molcache import atoms_of
 
 # Sentinel rank for fragments with no detectable principal group
@@ -67,7 +67,7 @@ def _score_fragment_seniority_impl(frag_smiles: Optional[str]) -> Tuple[int, int
     if pg_name is not None:
         pg_count = len(pg_matches)
         try:
-            pg_rank = SENIORITY_ORDER.index(pg_name)
+            pg_rank = seniority_index(pg_name, mol, pg_matches)
         except ValueError:
             pg_rank = _NO_FG_RANK
     else:

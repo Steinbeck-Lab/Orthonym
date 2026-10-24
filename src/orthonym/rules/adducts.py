@@ -384,13 +384,13 @@ def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
         return (3, 0, 0, frag_smi)
     bucket = _component_bucket(frag_mol, frag_smi)
     from orthonym.perception.functional_groups import detect_functional_groups
-    from orthonym.rules.seniority import SENIORITY_ORDER, get_principal_group
+    from orthonym.rules.seniority import SENIORITY_ORDER, get_principal_group, seniority_index
     seniority = len(SENIORITY_ORDER)
     if bucket == 0:
         try:
-            pg, _ = get_principal_group(frag_mol, detect_functional_groups(frag_mol))
+            pg, pg_matches = get_principal_group(frag_mol, detect_functional_groups(frag_mol))
             if pg is not None and pg in SENIORITY_ORDER:
-                seniority = SENIORITY_ORDER.index(pg)
+                seniority = seniority_index(pg, frag_mol, pg_matches)
         except Exception:
             pass  # no PCG -> ranks after PCG-bearing organics
     return (bucket, seniority, -frag_mol.GetNumHeavyAtoms(), frag_smi)

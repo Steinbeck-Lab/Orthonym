@@ -1,6 +1,6 @@
 """N-substituted sulfonamide handler —.
 
-Mirrors ``handlers/hydroximic_acid.py``: a thin dispatch shim over a rule module
+Mirrors ``handlers/sulfonimidic_n_hydroxy.py``: a thin dispatch shim over a rule module
 that builds the COMPLETE name and refuses rather than skipping any part of it.
 The rule, the Blue Book derivation and the measured class boundary all live in
 ``rules/sulfonamides.py``.

@@ -193,13 +193,10 @@ def test_chalcogen_imidic_acid_not_pin(smiles, non_pin):
     assert_not_pin_labelled(smiles, non_pin)
 
 
-# (:30273) applies to an acyl group with no prefix of its own; with one,
-# 'N-hydroxy' belongs among the prefixes, which the hydroximic handler does not
-# build, so it declines and the PIN tier names nothing (the thiol-suffix name the tip
-# shipped is not the PIN: the acid outranks the thiol, Table 4.3:18537).
-def test_substituted_thiohydroximic_acid_is_declined_at_default():
-    from tests.support.pin_tiers import assert_declined_at_default
-    assert_declined_at_default("O/N=C(/S)Cc1c[nH]c2ccccc12")
+# (:30273) 'N-hydroxycyclohexanecarboximidoselenoic acid (PIN)': with an acyl group that
+# has a prefix of its own the 'N-hydroxy' is cited among the prefixes. That is built now:
+# ``tests/unit/rules/test_pin_hydroximic_acids.py`` (the indole row, which this file used to pin as
+# declined at the default tier, is its ``test_the_indole_row_is_the_pin_not_a_thiol``).
 
 
 THIOACID_ROWS = [

@@ -35,6 +35,10 @@ from ..assembly.naming_utils import (
 )
 from .benzene_prefix_forms import hydroxy_is_principal, pnictogen_oxoacid_prefix
 from .benzene_acid_suffixes import ACID_SUFFIX_FGS, ACID_SUFFIX_SMARTS
+from .hydroximic_acids import (
+    BENZENE_SUFFIX_NAMES, DEMOTED_PREFIX, IMIDIC_DEMOTED_PREFIX, UNHANDLED, acid_suffix_extra, claims_benzene_group,
+    name_imidic_on_benzene,
+)
 from .benzene_acid_suffixes import identify_chalcogen_acyl_group as _thioacyl  #: -C(=S)-R prefix
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
@@ -70,7 +74,7 @@ _SUFFIX_PRIORITY = [
     # follows the carbothioic O-/S-acids and precedes the carboximidic acid (the
     # S-acid is handed the suffix in _assemble_benzene_with_suffix, as above).
     'carbodithioic acid',
-    'carboximidic acid',
+    'carboximidic acid', *BENZENE_SUFFIX_NAMES,   # the N-hydroxy imidic acids rank with the imidic acid
     'sulfonic acid',
     # D-FOLLOWON item 5: P/Se/Te + sulfinic ring oxoacids, junior to carboxylic
     # acid and sulfonic acid acid seniority C-acids > S > Se/Te/P oxoacids) so
@@ -178,7 +182,7 @@ _SUFFIX_TO_PREFIX = {
     'carboximidamide': 'carbamimidoyl',  # C2
     # Suite fix j6: '4-(C-hydroxycarbonimidoyl)benzoic acid (PIN)',
     # the Blue Book).
-    'carboximidic acid': 'C-hydroxycarbonimidoyl',
+    'carboximidic acid': IMIDIC_DEMOTED_PREFIX, **DEMOTED_PREFIX,   # (1), the Blue Book
     #: 'HS-CS- dithiocarboxy (preferred prefix) sulfanylcarbonothioyl'
     # (the Blue Book), enclosed "to avoid the possibility of ambiguity"
     #,:30217) as in '5-(thiocarboxy)pentanoic acid (PIN)' (:30248)
@@ -697,10 +701,10 @@ def _identify_suffix_fg_on_benzene(
         # from the hydrazonic acid above (=N-NH2, not =NH); the table adds the -SH/-SeH/-TeH analogues.
         for _fg, _sfx in ACID_SUFFIX_FGS:
             for match in mol.GetSubstructMatches(ACID_SUFFIX_SMARTS[_fg]):
-                if match[0] == start_idx:
+                if match[0] == start_idx and claims_benzene_group(_fg, mol):
                     return {
                         'name': _sfx, 'suffix_name': _sfx,
-                        'is_suffix': True, 'atoms': sub_atoms,
+                        'is_suffix': True, 'atoms': sub_atoms, **acid_suffix_extra(_fg, mol, match),
                     }
 
         # Hydroxamic acid: C(=O)(NH-OH) — checked BEFORE primary/secondary amide
@@ -4660,22 +4664,11 @@ def _assemble_benzene_with_suffix(
         )
         return f"{prefix_part}benzene{chosen_suffix}"
 
-    # Suite fix j6 (TRIAGE g8 C23): single imidic acid on benzene ->
-    # '-carboximidic acid'. (the Blue Book) 'benzene-
-    # carboximidic acid (PIN)' (bare, no locant); with other substituents the
-    # PIN cites '-1-' on the group: '2-(propanimidoylselanyl)benzene-1-
-    # carboximidic acid (PIN)' (:32013). Several imidic acids fall through to
-    # the general assembler ('benzene-1,4-dicarboximidic acid').
-    if chosen_suffix == 'carboximidic acid' and chosen_count == 1:
-        if not remaining_prefix_groups:
-            return "benzenecarboximidic acid"
-        renumbered_groups = _renumber_relative_to(
-            remaining_prefix_groups, chosen_locants[0]
-        )
-        prefix_part = _build_prefix_string_with_locants(
-            renumbered_groups, mono_needs_locant=True
-        )
-        return f"{prefix_part}benzene-1-carboximidic acid"
+    # A single imidic acid, plain or N-hydroxy (``hydroximic_acids.name_imidic_on_benzene``).
+    _imidic = name_imidic_on_benzene(chosen_suffix, suffix_groups, n_substituents_map,
+                                     remaining_prefix_groups, chosen_locants, stereo_descriptors)
+    if _imidic is not UNHANDLED:
+        return _imidic
 
     # C2: single amidine on benzene -> '-carboximidamide' suffix.
     # Bare -> 'benzenecarboximidamide' (no locant). With other substituents the

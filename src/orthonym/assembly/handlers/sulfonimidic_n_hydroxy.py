@@ -3,9 +3,9 @@
 
 A hydroximic acid derived from a sulfonic acid, R-S(=O)(=N-OH)-OH, is named per
  as the *N-hydroxy derivative of the corresponding sulfonimidic acid*
- example: 'N-hydroxymethanesulfonimidic acid (PIN)'). This mirrors the
-hydroximic-acid handler ('N-hydroxy<imidic acid>', exactly one
-sulfur-acid class over.
+ example: 'N-hydroxymethanesulfonimidic acid (PIN)'). It is the sulfur-acid
+counterpart of the hydroximic acids of the carboxylic acids ('N-hydroxy<imidic acid>',
+, which the fragment assembly and the benzene namer build.
 
 Example:
 - CS(=O)(O)=NO -> 'N-hydroxymethanesulfonimidic acid'
