@@ -117,6 +117,8 @@ from .naming_utils import (
     _join_multiplied_suffix,
     _wrap_n_substituent,
     alpha_sort_key,
+    alpha_sort_key_total,
+    alpha_sort_key_with_locants,
     cip_descriptor_rank_key,
     enclose_if_compound,
     format_substituent_prefix,
@@ -2882,8 +2884,8 @@ def _try_name_urea(features: Any) -> Optional[str]:
         # The alphanumerical key is 's (alpha_sort_key), as in the thiourea and
         # guanidine siblings: a raw string sort put '1-[...]propyl' before 'butyl'
         # and 'methyl' before 'tert-butyl'.
-        key1 = (-len(n1_subs), sorted(alpha_sort_key(s) for s in n1_subs))
-        key2 = (-len(n2_subs), sorted(alpha_sort_key(s) for s in n2_subs))
+        key1 = (-len(n1_subs), sorted(alpha_sort_key_total(s) for s in n1_subs))
+        key2 = (-len(n2_subs), sorted(alpha_sort_key_total(s) for s in n2_subs))
         if key1 <= key2:
             first_subs, second_subs = n1_subs, n2_subs
         else:
@@ -2991,8 +2993,8 @@ def _try_name_thiourea(features: Any) -> Optional[str]:
         # alphanumerically-first substituent set takes it:6273).
         # Keying on alpha_sort_key (not the raw string) also makes this
         # independent of SMILES atom order.
-        key1 = (-len(n1_subs), sorted(alpha_sort_key(s) for s in n1_subs))
-        key2 = (-len(n2_subs), sorted(alpha_sort_key(s) for s in n2_subs))
+        key1 = (-len(n1_subs), sorted(alpha_sort_key_total(s) for s in n1_subs))
+        key2 = (-len(n2_subs), sorted(alpha_sort_key_total(s) for s in n2_subs))
         first_subs, second_subs = (
             (n1_subs, n2_subs) if key1 <= key2 else (n2_subs, n1_subs)
         )
@@ -3423,10 +3425,20 @@ def _build_n_substituted_name(
             sub_locants[name] = []
         sub_locants[name].append(locant)
 
-    # Build prefix parts, sorted alphabetically by substituent name
+    # Build prefix parts, sorted alphabetically by substituent name. Two names that differ only in
+    # configuration tie in; the locants they are cited with decide first,:21791),
+    # then the configuration,:22603): N-[(1R)-..]-N'-[(1S)-..]urea, and with both on one N
+    # N-[(1R)-..]-N-[(1S)-..]. ``alpha_sort_key_with_locants`` is the one home of that order.
+    from .composition_primitives import prefix_locant_order_key
     from .naming_utils import apply_enclosing_marks, needs_brackets
+
+    def _cited(name):
+        return alpha_sort_key_with_locants(
+            name, tuple(sorted(prefix_locant_order_key(loc) for loc in sub_locants[name])),
+            primary=sort_key(name))
+
     prefix_parts = []
-    for name in sorted(sub_locants.keys(), key=sort_key) if sort_key \
+    for name in sorted(sub_locants.keys(), key=_cited) if sort_key \
             else sorted(sub_locants.keys()):
         locants = sub_locants[name]
         count = len(locants)
@@ -8055,6 +8067,145 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     return prefixes_after_front_stereo(out, base_name)
 
 
+def _polyamine_label_keys(mol, chain_set, chain_n, principal_n_set, atom_to_locant, chain_len,
+                          orig, rev):
+    """ (i) (:3336) for the two numberings of a polyamine chain: the keys ``(key under orig, key under
+    rev)``, or None when the label cannot be read. "...lowest locants to the modified atoms or groups
+    considered together as a set in increasing numerical order. If a choice still remains, the lower locant
+    is given to the nuclide of higher atomic number... of higher mass number": the key is the sorted locants
+    of the modified atoms, then the sorted (locant, -atomic number, -mass number). The labels are stripped
+    before the skeleton is named; the labelled molecule is read from the ambient scope of the isotope decorator
+    (``locant_omission.skeleton_label_maps``) with the configurations kept, so a label on the (R) side of a
+    symmetric diamine is not read on the (S) side. An atom of a nitrogen's substituent is cited at that
+    nitrogen's locant. ``((, ), (, ))`` for a skeleton with no label."""
+    from .locant_omission import skeleton_label_maps
+    maps = skeleton_label_maps(mol, use_chirality=True)
+    if maps is None:
+        return None
+    owner = {}
+    for n in chain_n:                       # the branches of each nitrogen, as _walk_amine_n_substituents walks
+        stack = [n]
+        while stack:
+            a = stack.pop()
+            if a in owner:
+                continue
+            owner[a] = n
+            stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                         if nb.GetIdx() not in chain_set and nb.GetIdx() not in principal_n_set - {n})
+    pairs = set()
+    for labels in maps:
+        keys = []
+        for assign in (0, 1):
+            found = []
+            for atom, nuclides in labels.items():
+                if atom in chain_set and isinstance(atom_to_locant.get(atom), int):
+                    loc = atom_to_locant[atom] if assign == 0 else chain_len + 1 - atom_to_locant[atom]
+                elif atom in owner:
+                    loc = (orig if assign == 0 else rev)[owner[atom]]
+                else:
+                    return None
+                found.extend((loc, -z, -mass) for z, mass in nuclides)
+            found.sort()
+            keys.append((tuple(f[0] for f in found), tuple(found)))
+        pairs.add(tuple(keys))
+    return next(iter(pairs)) if len(pairs) == 1 else None
+
+
+def _polyamine_carbon_locant_of(features, mol, chain_set, chain_n, per_n_subs,
+                                principal_n_set, demoted_n, amine_carbon_locant):
+    """The chain locant each substituted nitrogen of a polyamine is cited at: ``amine_carbon_locant``, or
+    its end-to-end reversal where that gives the cited N-substituents the lower locants (g)) or,
+    with the same locants and names, the configuration the lower locant (j),:3346)."""
+    atom_to_locant = getattr(features, 'atom_to_locant', {}) or {}
+    # (f)/(g) / (low-locant tie-break, plan P1AM Task 9 +
+    # Task 6A2): after the principal characteristic group (the -diamine suffix)
+    # has fixed its locant SET, a remaining choice of chain-numbering direction
+    # goes to the assignment that gives the lowest locants to the detachable
+    # prefixes. SCOPE LIMIT: this block minimizes only the cited N-SUBSTITUENT
+    # locant set (compared as a sorted (locant, alpha-name) set at first point
+    # of difference, so at a shared locant the alphabetically-first prefix wins
+    # the lower number -- ethyl before methyl, the Blue Book
+    # 'N1-ethyl-N3-methylpropane-1,3-diamine'); it does NOT jointly minimize the
+    # C-substituent prefixes. That coincides with the true all-detachable-prefix
+    # minimum for every realizable molecule reaching here today (no live defect:
+    # any case where the two criteria could disagree abstains). The full
+    # all-prefix generalization is a Phase-7 follow-up (the comparator
+    # cluster).
+    #
+    # Runs for BOTH the simple and the complex (demoted) branch, and for chains
+    # longer than two carbons. The only legal alternative numbering is the
+    # END-TO-END reversal of the parent-hydride locants (locant L -> chain_len
+    # + 1 - L over the contiguous 1..N chain); it is applied ONLY when it
+    # PRESERVES the amine-suffix locant SET (invariant for a terminal diamine:
+    # ethane {1,2}, propane {1,3}, butane {1,4} are all symmetric under the
+    # reversal), because otherwise the reversal would move the suffix and is not
+    # a permitted tie-break -> fail safe to the original numbering. (This
+    # generalises the former demoted-only, exactly-two-carbon block, which the
+    # SIMPLE branch never reached -- so CNCCN emitted the non-lowest N2-methyl.)
+    carbon_locant_of = amine_carbon_locant
+    _chain_locs = [atom_to_locant[i] for i in chain_set
+                   if isinstance(atom_to_locant.get(i), int)]
+    if _chain_locs:
+        _chain_len = max(_chain_locs)
+        _orig = {ni: amine_carbon_locant(ni) for ni in chain_n}
+        # end-to-end reversal of every parent-hydride locant.
+        _rev = {ni: _chain_len + 1 - loc for ni, loc in _orig.items()}
+        # Legal tie-break only if the reversal keeps the amine-suffix locant
+        # MULTISET (a multiset, so a geminal pair at one carbon is preserved).
+        if sorted(_orig.values()) == sorted(_rev.values()):
+            _n_names = {ni: sorted(cnt.elements())
+                        for ni, cnt in per_n_subs}
+            # (j) (:3346): "the lower locant is assigned to CIP stereodescriptors Z, R, M, and r
+            #... preferred to E, S, P, and s". When the two numberings give the N-substituents the same
+            # locants and the same names (a symmetric chain with an (R)- and an (S)-butan-2-yl on its two
+            # nitrogens) the original numbering was kept, that is the order the atoms were written in; the
+            # configuration decides it. Only for a chain that is nothing but the amines' carbon skeleton
+            # (unbranched, saturated, no centre, no ring, no demoted branch), where the reversal renumbers
+            # nothing else: another prefix or descriptor of the parent is numbered by the orientation of
+            # ``atom_to_locant``, which this block does not reverse.
+            from rdkit import Chem
+            _plain_chain = (
+                bool(features.principal_chain) and not features.principal_ring and not demoted_n
+                and all(nb.GetIdx() in chain_set or nb.GetIdx() in principal_n_set
+                        for c in chain_set for nb in mol.GetAtomWithIdx(c).GetNeighbors())
+                and all(b.GetBondType() == Chem.BondType.SINGLE
+                        for c in chain_set for b in mol.GetAtomWithIdx(c).GetBonds())
+                and all(mol.GetAtomWithIdx(c).GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED
+                        for c in chain_set))
+
+            def _locset_for(assign, configured=False):
+                # assign: dict n_idx -> chain locant; produce the sorted list of
+                # (locant, alpha_name[, configuration]) over every cited N-substituent.
+                pairs = []
+                for ni in chain_n:
+                    for nm in _n_names.get(ni, []):
+                        pairs.append((assign[ni], alpha_sort_key(nm))
+                                     + ((cip_descriptor_rank_key(nm),) if configured else ()))
+                return sorted(pairs)
+
+            # Deterministic total order: the reversal wins ONLY on a strict first-point-of-difference
+            # and a tie keeps the original numbering, in the order of the criteria of: the locants
+            # of the cited prefixes (g), the isotopic modifications (i,:3336; "isotopic modifications have
+            # seniority for low locants over stereodescriptors described in (j)",:3346), the configuration
+            # (j). (i) and (j) only for the plain chain above; a label that cannot be read leaves the
+            # original numbering.
+            _g_orig, _g_rev = _locset_for(_orig), _locset_for(_rev)
+            if _g_orig != _g_rev or not _plain_chain:
+                _chosen = _orig if _g_orig <= _g_rev else _rev
+            else:
+                _i = _polyamine_label_keys(mol, chain_set, chain_n, principal_n_set, atom_to_locant,
+                                           _chain_len, _orig, _rev)
+                if _i is None:
+                    _chosen = _orig
+                elif _i[0] != _i[1]:
+                    _chosen = _orig if _i[0] <= _i[1] else _rev
+                else:
+                    _chosen = _orig if _locset_for(_orig, True) <= _locset_for(_rev, True) else _rev
+            carbon_locant_of = lambda ni, _c=_chosen, _f=amine_carbon_locant: (
+                _c.get(ni, _f(ni)))
+    return carbon_locant_of
+
+
 def _assemble_polyamine_name(
     features: Any, style: str, principal_n: list, chain_set: set
 ) -> Optional[str]:
@@ -8127,59 +8278,9 @@ def _assemble_polyamine_name(
             return None  # un-nameable hetero branch -> fail closed
         per_n_subs.append((n_idx, Counter(subs)))
 
-    # (f)/(g) / (low-locant tie-break, plan P1AM Task 9 +
-    # Task 6A2): after the principal characteristic group (the -diamine suffix)
-    # has fixed its locant SET, a remaining choice of chain-numbering direction
-    # goes to the assignment that gives the lowest locants to the detachable
-    # prefixes. SCOPE LIMIT: this block minimizes only the cited N-SUBSTITUENT
-    # locant set (compared as a sorted (locant, alpha-name) set at first point
-    # of difference, so at a shared locant the alphabetically-first prefix wins
-    # the lower number -- ethyl before methyl, the Blue Book
-    # 'N1-ethyl-N3-methylpropane-1,3-diamine'); it does NOT jointly minimize the
-    # C-substituent prefixes. That coincides with the true all-detachable-prefix
-    # minimum for every realizable molecule reaching here today (no live defect:
-    # any case where the two criteria could disagree abstains). The full
-    # all-prefix generalization is a Phase-7 follow-up (the comparator
-    # cluster).
-    #
-    # Runs for BOTH the simple and the complex (demoted) branch, and for chains
-    # longer than two carbons. The only legal alternative numbering is the
-    # END-TO-END reversal of the parent-hydride locants (locant L -> chain_len
-    # + 1 - L over the contiguous 1..N chain); it is applied ONLY when it
-    # PRESERVES the amine-suffix locant SET (invariant for a terminal diamine:
-    # ethane {1,2}, propane {1,3}, butane {1,4} are all symmetric under the
-    # reversal), because otherwise the reversal would move the suffix and is not
-    # a permitted tie-break -> fail safe to the original numbering. (This
-    # generalises the former demoted-only, exactly-two-carbon block, which the
-    # SIMPLE branch never reached -- so CNCCN emitted the non-lowest N2-methyl.)
-    carbon_locant_of = amine_carbon_locant
-    _chain_locs = [atom_to_locant[i] for i in chain_set
-                   if isinstance(atom_to_locant.get(i), int)]
-    if _chain_locs:
-        _chain_len = max(_chain_locs)
-        _orig = {ni: amine_carbon_locant(ni) for ni in chain_n}
-        # end-to-end reversal of every parent-hydride locant.
-        _rev = {ni: _chain_len + 1 - loc for ni, loc in _orig.items()}
-        # Legal tie-break only if the reversal keeps the amine-suffix locant
-        # MULTISET (a multiset, so a geminal pair at one carbon is preserved).
-        if sorted(_orig.values()) == sorted(_rev.values()):
-            _n_names = {ni: sorted(cnt.elements())
-                        for ni, cnt in per_n_subs}
-
-            def _locset_for(assign):
-                # assign: dict n_idx -> chain locant; produce the sorted list of
-                # (locant, alpha_name) pairs over every cited N-substituent.
-                pairs = []
-                for ni in chain_n:
-                    for nm in _n_names.get(ni, []):
-                        pairs.append((assign[ni], alpha_sort_key(nm)))
-                return sorted(pairs)
-
-            # Deterministic total order: the reversal wins ONLY on a strict
-            # first-point-of-difference; a tie keeps the original numbering.
-            _chosen = _orig if _locset_for(_orig) <= _locset_for(_rev) else _rev
-            carbon_locant_of = lambda ni, _c=_chosen, _f=amine_carbon_locant: (
-                _c.get(ni, _f(ni)))
+    carbon_locant_of = _polyamine_carbon_locant_of(
+        features, mol, chain_set, chain_n, per_n_subs, principal_n_set, demoted_n,
+        amine_carbon_locant)
 
     # Assign italic-N tags: only SUBSTITUTED nitrogens receive a tag. Order the
     # substituted nitrogens by the (chosen) carbon locant then atom index so the
@@ -8276,7 +8377,10 @@ def _assemble_polyamine_name(
         else:
             from .naming_utils import multiplied_component
             rendered = f"{loc_str}-{multiplied_component(count, name, _wrapped)}"
-        n_prefix_entries.append((alpha_sort_key(name), rendered))
+        # an N-entry is cited before a C-entry of the same name (italic locants lead,,:3193),
+        # then by its first tag; the configuration decides only between names with the same locants
+        n_prefix_entries.append((alpha_sort_key_with_locants(
+            name, (0, tag_sort_key(tags_sorted[0]))), rendered))
 
     # Base name: parent + '-diamine' suffix (+ stereo). Built from the SUFFIX
     # nitrogens by _generate_suffix/_generate_chain_parent. In the complex-
@@ -8338,6 +8442,7 @@ def _assemble_polyamine_name(
     finally:
         features.substituents = _subs_backup
 
+    from .composition_primitives import prefix_locant_order_key
     c_prefix_entries = []  # (alpha_key, rendered)
     for p in _gen_prefixes:
         if p.locants and not str(p.text)[:1].isdigit():
@@ -8345,7 +8450,8 @@ def _assemble_polyamine_name(
             rendered = f"{_loc}-{p.text}"
         else:
             rendered = p.text
-        c_prefix_entries.append((alpha_sort_key(p.text), rendered))
+        c_prefix_entries.append((alpha_sort_key_with_locants(
+            p.text, (1, tuple(sorted(prefix_locant_order_key(_l) for _l in (p.locants or ()))))), rendered))
 
     all_entries = n_prefix_entries + c_prefix_entries
     all_entries.sort(key=lambda e: e[0])
@@ -10721,7 +10827,7 @@ def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True,
     # None for a count it cannot spell). The block re-derives the marks from the bare name and would
     # double or drop them there. The later-group rule it applies is the same: ``f"({bname})"`` after the
     # first group, the multiplier outside,:7272).
-    ordered = sorted(counts.items(), key=lambda kv: alpha_sort_key(kv[0][0]))
+    ordered = sorted(counts.items(), key=lambda kv: alpha_sort_key_total(kv[0][0]))
     for i, ((bname, _decorated), k) in enumerate(ordered):
         marked = cite_organyl_in_composed_prefix(bname)
         if marked is None:
@@ -12413,7 +12519,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
         ))
 
     # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)
-    prefixes.sort(key=lambda f: alpha_sort_key(f.text))
+    prefixes.sort(key=lambda f: alpha_sort_key_total(f.text))
 
     return prefixes, frozenset(handled_ring_fg_atoms)
 

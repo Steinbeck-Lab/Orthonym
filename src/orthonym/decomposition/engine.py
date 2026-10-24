@@ -1505,6 +1505,52 @@ def _name_sugar_fragment(smiles: str) -> Optional[str]:
     return None
 
 
+def _split_balance(mol, bond_info: Dict) -> int:
+    """Estimate how balanced a split would be.
+
+    Uses a BFS from each side of the bond to count atoms
+    reachable without crossing the bond.
+    """
+    bond_idx = bond_info["bond_idx"]
+    rdkit_bond = mol.GetBondWithIdx(bond_idx)
+    a1 = rdkit_bond.GetBeginAtomIdx()
+    a2 = rdkit_bond.GetEndAtomIdx()
+
+    # BFS from a1 without crossing the bond
+    visited1 = set()
+    queue = deque([a1])
+    while queue:
+        curr = queue.popleft()
+        if curr in visited1:
+            continue
+        visited1.add(curr)
+        atom = mol.GetAtomWithIdx(curr)
+        for nbr in atom.GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx not in visited1:
+                # Don't cross the cleavage bond
+                if (curr == a1 and nidx == a2) or (curr == a2 and nidx == a1):
+                    continue
+                queue.append(nidx)
+
+    visited2 = set()
+    queue = deque([a2])
+    while queue:
+        curr = queue.popleft()
+        if curr in visited2:
+            continue
+        visited2.add(curr)
+        atom = mol.GetAtomWithIdx(curr)
+        for nbr in atom.GetNeighbors():
+            nidx = nbr.GetIdx()
+            if nidx not in visited2:
+                if (curr == a1 and nidx == a2) or (curr == a2 and nidx == a1):
+                    continue
+                queue.append(nidx)
+
+    return abs(len(visited1) - len(visited2))
+
+
 def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
     """Select the single best bond to cleave.
 
@@ -1525,49 +1571,7 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
         return bonds[0]
 
     def _balance_score(bond_info: Dict) -> int:
-        """Estimate how balanced a split would be.
-
-        Uses a BFS from each side of the bond to count atoms
-        reachable without crossing the bond.
-        """
-        bond_idx = bond_info["bond_idx"]
-        rdkit_bond = mol.GetBondWithIdx(bond_idx)
-        a1 = rdkit_bond.GetBeginAtomIdx()
-        a2 = rdkit_bond.GetEndAtomIdx()
-
-        # BFS from a1 without crossing the bond
-        visited1 = set()
-        queue = deque([a1])
-        while queue:
-            curr = queue.popleft()
-            if curr in visited1:
-                continue
-            visited1.add(curr)
-            atom = mol.GetAtomWithIdx(curr)
-            for nbr in atom.GetNeighbors():
-                nidx = nbr.GetIdx()
-                if nidx not in visited1:
-                    # Don't cross the cleavage bond
-                    if (curr == a1 and nidx == a2) or (curr == a2 and nidx == a1):
-                        continue
-                    queue.append(nidx)
-
-        visited2 = set()
-        queue = deque([a2])
-        while queue:
-            curr = queue.popleft()
-            if curr in visited2:
-                continue
-            visited2.add(curr)
-            atom = mol.GetAtomWithIdx(curr)
-            for nbr in atom.GetNeighbors():
-                nidx = nbr.GetIdx()
-                if nidx not in visited2:
-                    if (curr == a1 and nidx == a2) or (curr == a2 and nidx == a1):
-                        continue
-                    queue.append(nidx)
-
-        return abs(len(visited1) - len(visited2))
+        return _split_balance(mol, bond_info)
 
     # Sugar-detection bypass: if any glycosidic bond leads to a known sugar,
     # prefer it. Sugar fragments get retained names (beta-D-glucopyranosyloxy)
@@ -1634,6 +1638,21 @@ def _select_best_bond(mol, bonds: List[Dict]) -> Dict:
             best = min(peers, key=_balance_score)
 
     return best
+
+
+def _tied_single_split(mol, bonds: List[Dict], style: str):
+    """``(bond, name)`` of the single split the molecule is named from: ``_select_best_bond``'s, or,
+    among the ester bonds that rank with it, the one whose name the criteria of
+    ``tied_splits`` put first."""
+    from .tied_splits import choose_split, tied_ester_splits
+    best = _select_best_bond(mol, bonds)
+    group = tied_ester_splits(mol, bonds, best, _split_balance)
+    if len(group) == 1:
+        return best, _try_single_bond_decompose(mol, best, style)
+    return choose_split(
+        mol, group, best, style, _try_single_bond_decompose,
+        lambda name, m, bond: _coverage_is_adequate(name, m, bond_type=bond["type"]),
+        _exploration_exhausted)
 
 
 def _ester_acyl_ring(mol, acyl_c: int):
@@ -2630,11 +2649,9 @@ def try_decompose(mol, style: str = "pin") -> Optional[str]:
                 pass
         return None  # Existing name is good enough
 
-    # Step 4: Choose ONE bond to cleave (the most significant one)
-    best_bond = _select_best_bond(mol, bonds)
-
-    # Steps 4-8: Single-bond attempt via helper
-    single_result = _try_single_bond_decompose(mol, best_bond, style)
+    # Steps 4-8: choose ONE bond to cleave (the most significant one) and name from it; ester bonds
+    # that tie are told apart by the Blue Book's criteria (``tied_splits``), not by atom order
+    best_bond, single_result = _tied_single_split(mol, bonds, style)
 
     # Coverage gate: reject decomposition results that don't cover enough
     # of the molecule's heavy atoms (applied only to decomposition output).

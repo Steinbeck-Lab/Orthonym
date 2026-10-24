@@ -1511,19 +1511,22 @@ def skeleton_label_on_atoms(mol, atoms) -> bool:
     return isotope_label_on_atoms(mol, atoms, _ISOTOPIC_SKELETON_ORIGINAL.get())
 
 
-def skeleton_label_maps(mol) -> Optional[List[Dict[int, List[Tuple[int, int]]]]]:
+def skeleton_label_maps(mol, use_chirality: bool = False) -> Optional[List[Dict[int, List[Tuple[int, int]]]]]:
     """The isotopic modifications of the labelled molecule whose skeleton is being named
     (:func:`isotopic_skeleton_scope`), read onto the atoms of ``mol``: one map per way ``mol`` fits the
     labelled molecule (a symmetric skeleton fits it more than once), each ``{atom of mol: [(atomic number,
     mass number),...]}`` with the labelled atom itself and each of its isotopic hydrogens. ``[{}]`` when no
-    labelled molecule is declared; None when ``mol`` does not map onto it."""
+    labelled molecule is declared; None when ``mol`` does not map onto it. With ``use_chirality`` a fit must
+    keep the configurations of ``mol``: the label of a skeleton whose two ends differ only in configuration
+    (an (R)- and an (S)-butan-2-yl on the two nitrogens of a symmetric diamine) is read at the one end."""
     original = _ISOTOPIC_SKELETON_ORIGINAL.get()
     if original is None:
         return [{}]
     try:
         heavy = _heavy_with_label_counts(original)
         maps = []
-        for match in heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64):
+        for match in heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64,
+                                               useChirality=use_chirality):
             here: Dict[int, List[Tuple[int, int]]] = {}
             for i, j in enumerate(match):
                 atom = heavy.GetAtomWithIdx(j)

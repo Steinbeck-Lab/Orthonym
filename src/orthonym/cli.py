@@ -160,7 +160,11 @@ def _emit_tier_flags(emit_tier: str) -> dict:
 
 
 def _engine_only(parsed) -> int:
-    """``--engine-only``: the general engine's own name, as JSON, or that it declined."""
+    """``--engine-only``: the general engine's own name, as JSON, or that it declined.
+
+    A diagnostic, not a public naming entry: it perceives and classifies the string as written, with
+    no input scope (``namer._lone_pair_input_enter``), so it does not name the canonical spelling a
+    public call names. Left so on purpose: it shows the engine on the structure as it was drawn."""
     import json as _json
 
     from rdkit import Chem as _Chem

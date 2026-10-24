@@ -7,7 +7,7 @@ PIN-default-byte-identical constraint):
   BUILT (authoritative locant available -> expressed):
     * parent-chain E/Z -> (3E)-pent-3-enoic acid
     * near-parent one-hop subst. -> (4E)-4-(prop-1-en-1-yl)benzoic acid
-    * functional-class oxime C=N -> (E)-acetophenone oxime
+    * oxime C=N -> (1E)-N-hydroxy-1-phenylethan-1-imine
     * ring-substituent in-map E/Z -> via collect_stereodescriptors bond handling
 
   FAIL-CLOSED (no authoritative substituent-local numbering threaded — naming
@@ -49,9 +49,20 @@ def test_near_parent_one_hop_subst_ez_expressed():
     assert "E" in name and "prop-1-en" in name
 
 
-def test_functional_class_oxime_ez_expressed():
-    name = _mk().name("O/N=C(\\C)c1ccccc1")
-    assert name.startswith("(E)") or name.startswith("(Z)")
+def test_oxime_ez_expressed():
+    """The C=N of an oxime is expressed at the front of its name, now of the PIN, the N-hydroxy imine
+    , the Blue Book), where the functional class name was '(E)-...one oxime' (CHANGED: the
+    assertion read 'startswith (E) or (Z)', the form of that name; the PIN cites the locant of the carbon,
+    '(1E)-N-hydroxy-1-phenylethan-1-imine',:44643). Independent check: OPSIN's isomeric reading of the name
+    is the input, and the other configuration's is not; mutation: the old builder gives the functional class
+    name, which has no locant, and the pattern below fails."""
+    import re
+    from orthonym.namer import _validity_gate_name_to_smiles
+    for smiles, other in (("O/N=C(\\C)c1ccccc1", "O/N=C(/C)c1ccccc1"),):
+        name = _mk().name(smiles)
+        assert re.match(r"\(1[EZ]\)-N-hydroxy", name), name
+        assert Chem.CanonSmiles(_validity_gate_name_to_smiles(name)) == Chem.CanonSmiles(smiles)
+        assert Chem.CanonSmiles(_validity_gate_name_to_smiles(name)) != Chem.CanonSmiles(other)
 
 
 # --- Internal acyclic-substituent E/Z now FULLY expressed  --------------

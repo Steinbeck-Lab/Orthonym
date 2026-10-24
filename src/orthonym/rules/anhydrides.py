@@ -226,10 +226,11 @@ def name_anhydride(features) -> Optional[str]:
         return f"{acid1_name} anhydride"
     else:
         # Mixed/asymmetric anhydride: alphabetical order /.
-        from ..assembly.naming_utils import alpha_sort_key
+        from ..assembly.naming_utils import alpha_sort_key_total
         #: alphabetical order of the acid names, locants not counted
-        # ('chloroacetic 4-nitrobenzene-1-sulfonic anhydride (PIN)', the Blue Book)
-        acids = sorted([acid1_name, acid2_name], key=alpha_sort_key)
+        # ('chloroacetic 4-nitrobenzene-1-sulfonic anhydride (PIN)', the Blue Book);
+        # two acids that differ only in configuration: the descriptor order
+        acids = sorted([acid1_name, acid2_name], key=alpha_sort_key_total)
         return f"{acids[0]} {acids[1]} anhydride"
 
 
@@ -300,8 +301,8 @@ def _name_sulfonic_anhydride(mol) -> Optional[str]:
         if sub1:
             return f"bis({a1}) anhydride"
         return f"{a1} anhydride"
-    from ..assembly.naming_utils import alpha_sort_key
-    acids = sorted([a1, a2], key=alpha_sort_key)   #,:32270
+    from ..assembly.naming_utils import alpha_sort_key_total
+    acids = sorted([a1, a2], key=alpha_sort_key_total)   #,:32270
     return f"{acids[0]} {acids[1]} anhydride"
 
 
@@ -762,8 +763,8 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
         if sub1:
             return f"bis({acid1}) {class_term}"
         return f"{acid1} {class_term}"
-    from ..assembly.naming_utils import alpha_sort_key
-    acids = sorted([acid1, acid2], key=alpha_sort_key)   #,:32270
+    from ..assembly.naming_utils import alpha_sort_key_total
+    acids = sorted([acid1, acid2], key=alpha_sort_key_total)   #,:32270
     return f"{acids[0]} {acids[1]} {class_term}"
 
 
@@ -909,8 +910,8 @@ def _name_thioacyl_anhydride(mol) -> Optional[str]:
         if sub1:
             return f"bis({acid1}) {class_word}"
         return f"{acid1} {class_word}"
-    from ..assembly.naming_utils import alpha_sort_key
-    acids = sorted([acid1, acid2], key=alpha_sort_key)
+    from ..assembly.naming_utils import alpha_sort_key_total
+    acids = sorted([acid1, acid2], key=alpha_sort_key_total)
     return f"{acids[0]} {acids[1]} {class_word}"
 
 

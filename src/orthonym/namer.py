@@ -1793,7 +1793,13 @@ def _lone_pair_input_enter(smiles: Optional[str]) -> Tuple[Optional[str], bool]:
        anything writes a plain SMILES, which keeps no group;
     2. brackets RDKit does not need are dropped (:func:`_redundant_bracket_spelling`);
     3. a lone-pair stereocentre RDKit reads unlike the standard reading is spelled
-       the standard way (:func:`_lone_pair_standard_spelling`).
+       the standard way (:func:`_lone_pair_standard_spelling`);
+    4. any other string is replaced by RDKit's canonical SMILES of the molecule it
+       draws, where that is proven to draw the same molecule
+       (:func:`orthonym.input_mol.canonical_spelling`): one molecule is named from one
+       atom and bond order, whatever order its SMILES wrote (core principle 4). The
+       lone-pair centres of the string are read as written by the exit check
+       (:func:`_lone_pair_as_written`), whichever string is named.
 
     Close with:func:`_lone_pair_input_exit`."""
     if getattr(_LP_INPUT, 'open', False):
@@ -1808,6 +1814,12 @@ def _lone_pair_input_enter(smiles: Optional[str]) -> Tuple[Optional[str], bool]:
         named, stage_order = stage
         order = _compose_atom_orders(order, stage_order)
     spelled, stage_order = _lone_pair_standard_spelling_and_order(named)
+    if stage_order is None:
+        stage = _input_mol.canonical_spelling(named)
+        if stage is not None:
+            spelled, stage_order = stage
+            if cleared:                 # the cleared structure, in its canonical spelling
+                as_written = spelled
     if stage_order is not None:
         named = spelled
         order = _compose_atom_orders(order, stage_order)
@@ -1830,6 +1842,23 @@ def _record_stereo_group_non_pin(name) -> None:
     record_non_pin_label(
         name, rule=_STEREO_GROUP_RULE,
         detail="the AND/OR stereo group of the input is not named (rac-/rel-/R*,S*)")
+
+
+def _record_ylide_pin_uncertain(name) -> None:
+    """The name of an uncharged Group 15 ylide drawn R3P=CR2 is recorded as a PIN-form name whose preferred
+    status is not certified (:mod:`orthonym.perception.ylides`): (the Blue Book) makes the
+    zwitterion the preferred name, and the names built from the double-bond drawing are not that. It is
+    labelled pin_unverified and the default tier declines it; the wider tiers keep it."""
+    if not isinstance(name, str) or not name or is_failure_name(name):
+        return
+    try:
+        from .perception.ylides import is_uncharged_group15_ylide
+        smiles = _caller_input()
+        if smiles and is_uncharged_group15_ylide(Chem.MolFromSmiles(smiles)):
+            from .metrics.provenance import record_uncertified_pin_name
+            record_uncertified_pin_name(name)
+    except Exception:
+        return
 
 
 def _lone_pair_input_exit(opened: bool) -> None:
@@ -4130,6 +4159,37 @@ def _book_retry_scope(fn):
     return _wrapper
 
 
+def _input_scope(fn):
+    """Open the input scope of the caller's own ``name`` call (:func:`_lone_pair_input_enter`)
+    before any other scope of it sees the string, so the scopes outside ``_budget_scope`` (the
+    default tier's offer, the metal offer, the charge forms, the book-spelling retry) work on the
+    string that is named, spelled one way for one molecule, as ``name_tiered``,
+    ``name_with_tree`` and ``name_with_confidence`` have always opened it. Directly under
+    ``failure_mode_scope``, which keeps the caller's own text for its log line. A nested call, and a
+    call inside a scope an entry already opened, name the string they are given."""
+    @_functools.wraps(fn)
+    def _wrapper(self, *args, **kwargs):
+        from .assembly.fragment_naming import name_scope_depth
+        given = args[0] if args else kwargs.get('smiles')
+        if name_scope_depth() > 0:
+            return fn(self, *args, **kwargs)
+        if not isinstance(given, str):
+            if given is None or not _input_mol.handles(given):
+                return fn(self, *args, **kwargs)
+            try:
+                given = _input_mol.smiles_for(given)
+            except Exception:                      # fn raises it as it always did
+                return fn(self, *args, **kwargs)
+        spelled, opened = _lone_pair_input_enter(given)
+        args, kwargs = ((spelled,) + tuple(args[1:]), kwargs) if args else (
+            args, {**kwargs, 'smiles': spelled})
+        try:
+            return fn(self, *args, **kwargs)
+        finally:
+            _lone_pair_input_exit(opened)
+    return _wrapper
+
+
 def _budget_scope(fn):
     """ giant-molecule hang fix: bracket a top-level ``name`` with the
     per-top-level fragment work budget.
@@ -4200,6 +4260,7 @@ def _budget_scope(fn):
             if depth == 1:
                 _record_stereo_group_non_pin(_result)
                 _record_metal_rewrite_non_pin(_result)
+                _record_ylide_pin_uncertain(_result)
             if _policy:
                 _result = self._default_tier_decision(
                     _result, args[0] if args else kwargs.get('smiles'),
@@ -4239,6 +4300,7 @@ def _budget_scope(fn):
                 _result = self._finish(_rescued, smiles)
                 _record_stereo_group_non_pin(_result)
                 _record_metal_rewrite_non_pin(_result)
+                _record_ylide_pin_uncertain(_result)
                 if _policy:
                     _result = self._default_tier_decision(_result, smiles, False)
                 return _result
@@ -4829,6 +4891,7 @@ class Orthonym:
         return gated
 
     @_failure_mode.failure_mode_scope
+    @_input_scope
     @default_tier_name_scope
     @_metal_offer_scope
     @_form_choice_scope

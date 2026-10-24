@@ -5,9 +5,10 @@ chain prefix.
 (1) generates preferred IUPAC names but names formed by using method (2) are acceptable in general
 nomenclature" (:31836); '(1) methylene acetate formate (PIN) (2) (formyloxy)methyl acetate'
 (:31840). Esters of noncarbon acids "are named in the same way",:35918). The method
-(1) names are not read by OPSIN 2.9.0, so they are not built; the method (2) names ('(acetyloxy)
-methyl formate', '2-(nitrosooxy)ethyl acetate') shipped pin_verified and now ship at best-effort
-labelled systematic_verified, the default tier declining.
+(1) names are not read by OPSIN 2.9.0, so they are not built; the method (2) names ('(formyloxy)
+methyl acetate', the book's own, with the acetate as the parent whichever way the atoms are written;
+'2-(nitrosooxy)ethyl acetate') shipped pin_verified and now ship at best-effort labelled
+systematic_verified, the default tier declining.
 
 The string converter parent_to_prefix turned the capped name '(nitrooxy)ethane' into
 '(nitrooxy)ethyl' (no locant for the 2-position) and '1-(nitrooxy)propane' into '1-(nitrooxy)propyl'
@@ -29,7 +30,12 @@ pytestmark = pytest.mark.opsin_gate
     ("CC(=O)OCCO[N+](=O)[O-]", "2-(nitrooxy)ethyl acetate"),
     ("CC(=O)OCCCO[N+](=O)[O-]", "3-(nitrooxy)propyl acetate"),
     ("CC(=O)OCCON=O", "2-(nitrosooxy)ethyl acetate"),
-    ("O=COCOC(C)=O", "(acetyloxy)methyl formate"),
+    # "When anions are different, two methods are used" (the Blue Book): the book's
+    # own example of method (2) is 'HCO-O-CH2-O-CO-CH3... (2) (formyloxy)methyl acetate' (:31840). The
+    # molecule has two names that read back (acetate or formate as the parent); the engine named it by
+    # the order its atoms were written in ('(acetyloxy)methyl formate' for this string, '(formyloxy)methyl
+    # acetate' for its canonical spelling) and now names it as the book does, for every spelling.
+    ("O=COCOC(C)=O", "(formyloxy)methyl acetate"),
     ("O=NOCCO[N+](=O)[O-]", "2-(nitrooxy)ethyl nitrite"),
     ("O=C(OCCO[N+](=O)[O-])c1ccccc1", "2-(nitrooxy)ethyl benzoate"),
 ])

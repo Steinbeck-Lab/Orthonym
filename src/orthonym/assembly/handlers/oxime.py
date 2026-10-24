@@ -122,6 +122,19 @@ def name_oxime(
     final_name = _inject_stereo_if_missing(
         features, cand.name, atom_to_locant=None,
     )
+    # 'Oximes' (the Blue Book, the paragraph after the hydroxylamine examples): "For
+    # general nomenclature they are named according to the principles of functional class nomenclature by
+    # placing the class name 'oxime' as a separate word... Preferred IUPAC names are formed substitutively
+    # as N-hydroxy derivatives of imines";:38462 "In these recommendations preferred IUPAC names for oximes
+    # are generated substitutively as N-hydroxy derivatives of imines rather than by functional class
+    # nomenclature as in previous recommendations" ('N-hydroxypentan-2-imine (PIN)... pentan-2-one oxime',
+    #:38468). The name built here is the functional class one, which the substitutive builder above leaves
+    # to the bounded cases (no stereo, a plain parent): it is read back and kept for the wider tiers, and it
+    # is not the PIN, so the default tier declines it.
+    from ...metrics.provenance import record_non_pin_label
+    record_non_pin_label(final_name, rule="P-68.3.1.1.2",
+                         detail="an oxime is named substitutively as an N-hydroxy imine; the 'oxime' of "
+                                "functional class nomenclature is a general nomenclature name")
     return NamingResult(
         name=final_name,
         tree=NameTreeNode(parent_stem=final_name, class_id="oxime", iupac_section_cite="P-68.3.1.2", fragment_legacy=final_name),
@@ -143,8 +156,12 @@ _ALKANE_STEM_ALT = "|".join(
 )
 _SUBST_IMINE_RE = _re.compile(
     r"^(?P<pre>\d.*?)(?P<par>(?:cyclo)?(?:" + _ALKANE_STEM_ALT
-    + r")an(?:-\d+-)?imine)$"
+    + r")an(?:-\d+-)?imine|(?:cyclo)?(?:" + _ALKANE_STEM_ALT + r")ane-\d+(?:,\d+)+-diimine)$"
 )
+#: the suffix of a plain di-imine parent: 'butane-2,3-diimine'
+_PLAIN_DIIMINE_NAME_RE = _re.compile(r"^(?:cyclo)?[a-z]+ane-(\d+(?:,\d+)+)-diimine$")
+#: the locants of the suffix of a substituted di-imine parent
+_DIIMINE_SUFFIX_RE = _re.compile(r"ane-(\d+(?:,\d+)+)-diimine$")
 _OPEN_MARKS, _CLOSE_MARKS = "([{", ")]}"
 
 
@@ -188,7 +205,7 @@ def _split_prefix_block(pre: str) -> Optional[list]:
     return tokens
 
 
-def _insert_n_hydroxy(sub: str) -> Optional[str]:
+def _insert_n_hydroxy(sub: str, token: str = "N-hydroxy") -> Optional[str]:
     """Insert the italic-N prefix 'N-hydroxy' alphanumerically among the
     detachable prefixes of a substituted alkane-imine name,:
     '1-nitropropan-1-imine' -> 'N-hydroxy-1-nitropropan-1-imine';
@@ -237,47 +254,107 @@ def _insert_n_hydroxy(sub: str) -> Optional[str]:
         if key == "hydroxy":
             return None                        # one 'hydroxy' set: the cited locants merge
         entries.append((key, tok))
-    entries.append((alpha_sort_key("hydroxy"), "N-hydroxy"))
+    entries.append((alpha_sort_key("hydroxy"), token))
     entries.sort(key=lambda e: e[0])
     return _join([e[1] for e in entries]) + par
 
 
-def _substitutive_oxime_name(features: Any) -> Optional[str]:
-    """Bounded substitutive-oxime builder: R2C=N-OH -> 'N-hydroxy<imine PIN>'.
+_DESCRIPTOR_BLOCK_RE = _re.compile(r"^\((\d*[RSEZrsez*](?:,\d*[RSEZrsez*])*)\)-")
 
-    Derives the imine parent by deleting the oxime O (RWMol surgery) and
-    re-entering the full namer — the route_charged / acyl-amido re-entry
-    pattern — then prefixes 'N-hydroxy'.
 
-    FAIL-CLOSED scope (returns None -> functional-class fallback, today's
-    RT-valid behavior): exactly one oxime; no stereocenters / double-bond
-    stereo (the surgered imine would mis-derive the descriptor: the C=N-OH
-    E/Z priorities differ from C=N-H); and the recursive imine name must be
-    a PLAIN unsubstituted parent ('ethanimine', 'propan-1-imine',
-    'cyclohexan-1-imine') — a substituted imine name would need N-hydroxy
-    alphabetized among its prefixes, deferred with the oxime-ether class.
-    """
-    mol = getattr(features, 'mol', None)
-    matches = (getattr(features, 'functional_groups', None) or {}).get('oxime', [])
-    if mol is None or len(matches) != 1:
-        return None
-    if getattr(features, 'stereocenters', None) or \
-            getattr(features, 'double_bond_stereo', None):
-        return None
-    match = matches[0]  # SMARTS [CX3]=[NX2][OX2H] -> (C, N, O)
-    if len(match) != 3:
-        return None
-    o_idx = match[2]
-    if mol.GetAtomWithIdx(o_idx).GetSymbol() != 'O':
-        return None
+def _split_descriptor_block(name: str):
+    """``(descriptors, rest)``: the stereodescriptors of the block at the front of ``name`` and the
+    name without it."""
+    found = _DESCRIPTOR_BLOCK_RE.match(name)
+    if not found:
+        return [], name
+    return found.group(1).split(","), name[found.end():]
+
+
+def _cites_a_locant(text: str) -> bool:
+    """True when ``text`` cites a numerical locant outside every enclosing mark (the '4' of
+    '(4-chlorophenyl)' is the locant of a substituent, not of the parent)."""
+    depth = 0
+    for ch in text:
+        if ch in _OPEN_MARKS:
+            depth += 1
+        elif ch in _CLOSE_MARKS:
+            depth -= 1
+        elif depth == 0 and ch.isdigit():
+            return True
+    return False
+
+
+def _oxime_imine_smiles(mol, matches, configured: bool):
+    """SMILES of the imine each oxime ``(C, N, O)`` of ``matches`` gives when its hydroxy group is
+    taken off: the oxygen is deleted, or, when a C=N is configured, becomes the explicit hydrogen
+    that keeps the configuration (a nitrogen with no neighbour but its carbon carries none)."""
     from rdkit import Chem
     try:
         em = Chem.RWMol(mol)
-        em.RemoveAtom(o_idx)
+        for _c, _n, o_idx in sorted(matches, key=lambda m: -m[2]):
+            if configured:
+                atom = em.GetAtomWithIdx(o_idx)
+                atom.SetAtomicNum(1)
+                atom.SetNoImplicit(True)
+                atom.SetNumExplicitHs(0)
+            else:
+                em.RemoveAtom(o_idx)
         imine_mol = em.GetMol()
         Chem.SanitizeMol(imine_mol)
-        imine_smiles = Chem.MolToSmiles(imine_mol)
+        return Chem.MolToSmiles(imine_mol), imine_mol
     except Exception:
+        return None
+
+
+def _cn_configuration_labels(mol, pairs):
+    """The CIP label ('E', 'Z' or None) of the C=N bond of each ``(C, N)`` of ``pairs``."""
+    from ...perception.stereo import assign_stereochemistry, get_double_bond_stereo
+    assign_stereochemistry(mol)
+    labelled = {frozenset(d["atoms"]): d["stereo"] for d in get_double_bond_stereo(mol)}
+    return [labelled.get(frozenset(pair)) for pair in pairs]
+
+
+def _substitutive_oxime_name(features: Any) -> Optional[str]:
+    """Substitutive oxime builder: R2C=N-OH -> '<descriptors>N-hydroxy<imine PIN>'.
+
+     'Oximes' (the Blue Book,:38462): "preferred IUPAC names for oximes are generated
+    substitutively as N-hydroxy derivatives of imines" ('N-hydroxypentan-2-imine (PIN)',:38468;
+    'N2,N3-dihydroxybutane-2,3-diimine (PIN)',:38472; '(2E,3Z)-N2,N3-dihydroxypentane-2,3-diimine
+    (PIN)',:47668; '(Z)-N-hydroxy(4-chlorophenyl)(phenyl)methanimine (PIN)',:47666).
+
+    Derives the imine parent by taking the oxime O off (RWMol surgery) and re-entering the full namer --
+    the route_charged / acyl-amido re-entry pattern -- then cites 'N-hydroxy' among the prefixes. Where a
+    C=N is configured the oxygen becomes the explicit hydrogen of the imine nitrogen, which keeps the
+    configuration: the descriptors of the imine are the oxime's: the hydroxy and the hydrogen
+    both rank above the lone pair, so the CIP label of the bond is the same; it is compared before the
+    name is used) and the namer places them with the rest of the stereodescriptors. A descriptor of the
+    C=N alone is cited without a locant when the name cites none for the carbon: (:44643)
+    "preceded by a numerical or letter locant... when such locants are present"
+    ('(E)-N-hydroxyethanimine'; '(Z)-N-hydroxy(4-chlorophenyl)(phenyl)methanimine',:47666).
+
+    FAIL-CLOSED scope (returns None -> functional-class fallback, which is not the PIN): one oxime or
+    two, all the imine groups of the parent being these; an imine parent that is a block of
+    numeric-locant prefixes on an '<stem>an-imine' ('<stem>ane-N,N-diimine') parent, the name the namer
+    gives it carrying nothing that is not a descriptor in front, no hydroxy prefix already, and a C=N
+    label of the imine that is the oxime's.
+    """
+    mol = getattr(features, 'mol', None)
+    matches = (getattr(features, 'functional_groups', None) or {}).get('oxime', [])
+    if mol is None or not 1 <= len(matches) <= 2:
+        return None
+    if any(len(m) != 3 or mol.GetAtomWithIdx(m[2]).GetSymbol() != 'O' for m in matches):
+        return None
+    from rdkit import Chem
+    pairs = [(m[0], m[1]) for m in matches]
+    configured = any(mol.GetBondBetweenAtoms(c, n).GetStereo() != Chem.BondStereo.STEREONONE
+                     for c, n in pairs)
+    built = _oxime_imine_smiles(mol, matches, configured)
+    if built is None:
+        return None
+    imine_smiles, imine_mol = built
+    if configured and (_cn_configuration_labels(mol, pairs)
+                       != _cn_configuration_labels(imine_mol, pairs)):
         return None
     from ...namer import name_compound as _name_compound
     from ..locant_omission import suffix_nitrogen_hydrogens_are_caps
@@ -294,13 +371,33 @@ def _substitutive_oxime_name(features: Any) -> Optional[str]:
         return None
     if not sub:
         return None
-    if _PLAIN_IMINE_NAME_RE.match(sub):
-        joiner = "-" if sub[:1].isdigit() else ""
-        return f"N-hydroxy{joiner}{sub}"
-    # W3-P15: a SUBSTITUTED imine parent (nitrolic/nitrosolic
-    # acids -> '1-nitropropan-1-imine' etc.) — insert 'N-hydroxy' alphanumerically
-    # among its prefixes. Fail-closed to the functional-class oxime otherwise.
-    return _insert_n_hydroxy(sub)
+    descriptors, rest = _split_descriptor_block(sub)
+    named = _n_hydroxy_imine(rest, len(matches))
+    if not named:
+        return None
+    if len(descriptors) == 1 and descriptors[0][-1] in "EZ" and not _cites_a_locant(named):
+        descriptors = [descriptors[0][-1]]
+    return f"({','.join(descriptors)})-{named}" if descriptors else named
+
+
+def _n_hydroxy_imine(sub: str, groups: int) -> Optional[str]:
+    """'N-hydroxy' (or 'N2,N3-dihydroxy') cited with the prefixes of the imine name ``sub`` (no
+    stereodescriptors at its front), or None when ``sub`` is not a shape this builder cites it in."""
+    if groups == 1:
+        if _PLAIN_IMINE_NAME_RE.match(sub):
+            return f"N-hydroxy{'-' if sub[:1].isdigit() else ''}{sub}"
+        # W3-P15: a SUBSTITUTED imine parent (nitrolic/nitrosolic
+        # acids -> '1-nitropropan-1-imine' etc.) -- insert 'N-hydroxy' alphanumerically
+        # among its prefixes. Fail-closed to the functional-class oxime otherwise.
+        return _insert_n_hydroxy(sub)
+    # two oximes: the nitrogens carry the locants of the suffix; ':38472 N2,N3-dihydroxy')
+    found = _DIIMINE_SUFFIX_RE.search(sub)
+    if not found:
+        return None
+    token = ",".join(f"N{loc}" for loc in found.group(1).split(",")) + "-dihydroxy"
+    if _PLAIN_DIIMINE_NAME_RE.match(sub):
+        return f"{token}{sub}"
+    return _insert_n_hydroxy(sub, token)
 
 
 __all__ = ["name_oxime", "_is_oxime", "_substitutive_oxime_name"]
