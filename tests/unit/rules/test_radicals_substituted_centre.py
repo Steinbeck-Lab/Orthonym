@@ -235,7 +235,9 @@ def test_a_nested_frame_is_not_named_by_the_construction(monkeypatch):
     # BB 61.5.1: the book PIN is 'trimethyl(nitro)silane'; 68.1.5.2.3: '(difluoroboranyl)tri(methyl)silane'
     ("C[Si](C)(C)[N+](=O)[O-]", "[dimethyl(nitro)silyl]methane", "systematic_verified"),
     ("C[Si](C)(C)B(F)F", "[(difluoroboranyl)di(methyl)silyl]methane", "systematic_verified"),
-    ("CC(Cl)[AsH]CCCl", "1-chloro-2-[(1-chloroethyl)arsanyl]ethane", "systematic_verified"),
+    # (the arsane row is the PIN now, BB 68.3.2.3.2.1: '(1-chloroethyl)(2-chloroethyl)arsane (PIN)',:39169; the senior
+    # atom decides the parent,,:18917, and the producer of the senior-atom parent names it)
+    ("CC(Cl)[AsH]CCCl", "(1-chloroethyl)(2-chloroethyl)arsane", "pin_verified"),
     ("CCS(=O)(=O)[S][Ge]([CH3])([CH3])[CH3]",
      "1-(3,3-dimethyl-1,1-dioxo-1λ6,2-dithia-3-germabutyl)ethane", "systematic_verified"),
     ("CCO[Si](SC)(SC)SC", "1-{[tris(methylsulfanyl)silyl]oxy}ethane", "systematic_verified"),

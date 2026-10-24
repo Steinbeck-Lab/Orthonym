@@ -209,6 +209,10 @@ def build_frn_acid_name(base_stem: str, infix: str, count: int = 1) -> Optional[
 # a vowel (carbono+imido -> carbonimido). Infix set is CLOSED. ---
 _CARBONIC_NX_INFIX = {"imido": ("imido", "imid"),      # (medial, final-before-ic)
                       "hydrazono": ("hydrazono", "hydrazon")}
+# (the Blue Book): the halide infixes of carbonic acid,
+# 'Cl-C(=NH)-OH carbonochloridimidic acid (PIN)' (:30881); the final 'o' of a
+# medial infix is elided before a vowel ('chlorid' + 'imid').
+_CARBONIC_HALIDE_INFIX = {"fluorido", "chlorido", "bromido", "iodido"}
 
 
 def build_carbonic_mono_frn(base_stem: str,
@@ -230,6 +234,8 @@ def build_carbonic_mono_frn(base_stem: str,
             -> "carbamimidoselenoic acid"
         build_carbonic_mono_frn("carbon", {"hydrazono": 1, "seleno": 2})
             -> "carbonohydrazonodiselenoic acid"
+        build_carbonic_mono_frn("carbon", {"chlorido": 1, "imido": 1})
+            -> "carbonochloridimidic acid"
     """
     if base_stem not in ("carbon", "carbam") or not infix_counts:
         return None
@@ -246,6 +252,9 @@ def build_carbonic_mono_frn(base_stem: str,
         elif infix in _CARBONIC_NX_INFIX:
             medial, final = _CARBONIC_NX_INFIX[infix]
             tokens.append(f"{mult}{final if is_last else medial}")
+        elif infix in _CARBONIC_HALIDE_INFIX and cnt == 1:
+            nxt = None if is_last else order[i + 1]
+            tokens.append(infix[:-1] if (is_last or nxt[0] in "aeiou") else infix)
         else:
             return None
     body = "".join(tokens)

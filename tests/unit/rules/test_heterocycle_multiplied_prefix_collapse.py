@@ -217,7 +217,7 @@ def test_italic_n_fallback_is_untouched():
 @pytest.mark.unit
 @pytest.mark.parametrize("smiles,expected", [
     # carbocyclic producer (rules/benzene.py) -- the reference implementation
-    ("Cc1ccc(C)cc1",         "1,4-dimethylbenzene"),
+    ("CCc1ccc(CC)cc1",       "1,4-diethylbenzene"),
     ("Clc1ccc(Cl)cc1",       "1,4-dichlorobenzene"),
     ("CC(C)c1ccc(C(C)C)cc1", "1,4-di(propan-2-yl)benzene"),
     # fused producer (rules/fused_rings.py) -- already collapses ring-N + ring-C

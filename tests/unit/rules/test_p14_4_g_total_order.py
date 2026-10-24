@@ -564,8 +564,8 @@ def test_production_reaches_the_canonical_last_resort(monkeypatch):
     assert name_compound("Clc1ccc(Cl)cc1") == "1,4-dichlorobenzene"
     assert calls, "the last resort was never reached for para-dichlorobenzene"
     calls.clear()
-    assert name_compound("Cc1ccc(C)cc1") == "1,4-dimethylbenzene"
-    assert calls, "the last resort was never reached for para-xylene"
+    assert name_compound("CCc1ccc(CC)cc1") == "1,4-diethylbenzene"
+    assert calls, "the last resort was never reached for para-diethylbenzene"
     calls.clear()
     assert name_compound("Clc1ccccc1") == "chlorobenzene"
     assert not calls, calls

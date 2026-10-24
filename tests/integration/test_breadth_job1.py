@@ -154,9 +154,11 @@ def test_m01_best_effort_label_stays_below_the_pin_when_a_breadth_piece_builds_i
     # (PB lane R, T6) 'NCc1csc(-c2cccs2)n1' left this test: its ring-yl is built by
     # ``assembly.strict_ring_prefix``, the twin ships the same name, and both tiers label it pin_verified.
     # (PB lane P) the sulfinylbenzimidazole used here before is named by the strict first run now
-    # ('methanesulfinyl',; the Blue Book row of stands in: its re-run name
-    # '4-(1-sulfanylideneethyl)benzoic acid' is not the PIN ('4-(ethanethioyl)benzoic acid',:30246).
-    smi = "CC(=S)c1ccc(C(=O)O)cc1"
+    # ('methanesulfinyl',; the Blue Book row of stood in ('CC(=S)c1ccc(C(=O)O)cc1': its
+    # re-run name '4-(1-sulfanylideneethyl)benzoic acid' was not the PIN '4-(ethanethioyl)benzoic acid',:30246)
+    # until the thioacyl prefix was built from its acid (test_pin_class_t12_acid_suffixes.py); the dev2000 row
+    # whose re-run name cites '(sulfooxy)',:35916) stands in now.
+    smi = "O=S(=O)(O)OC/C=C/c1ccc(O)cc1"
     row = _be(smi)
     assert not is_failure_name(row["name"]), row
     assert row["tier"] != "pin_verified" and not row["is_pin"], row

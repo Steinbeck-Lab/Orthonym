@@ -39,7 +39,7 @@ def test_cluster_e_stereo_differing_bis_fails_closed():
 @pytest.mark.parametrize("smiles,expected", [
     # Genuinely-identical / achiral multiplicative names MUST still ship (no over-veto).
     ("OC(CC1CCCCC1)CC1CCCCC1", "1,3-dicyclohexylpropan-2-ol"),
-    ("Cc1cccc(C)c1", "1,3-dimethylbenzene"),
+    ("CCc1cccc(CC)c1", "1,3-diethylbenzene"),
     ("ClCCCl", "1,2-dichloroethane"),
     ("CC(C)C(C)C", "2,3-dimethylbutane"),
     ("Cc1cc(C)cc(C)c1", "1,3,5-trimethylbenzene"),

@@ -266,6 +266,13 @@ class TestTerminalFGTypes:
             # suffix locant elides (cyclohexanecarboximidohydrazide,
             # ethanediimidohydrazide).
             "imidohydrazide",
+            # PIN class program Task 12, the Blue Book): the
+            # S/Se/Te analogues of the imidic and hydrazonic acids, whose acid
+            # carbon is likewise chain-terminal ('propanimidothioic acid (PIN)',
+            #:30267; 'butanehydrazonoselenoic acid (PIN)',:30269).
+            "imidothioic_acid", "imidoselenoic_acid", "imidotelluroic_acid",
+            "hydrazonothioic_acid", "hydrazonoselenoic_acid",
+            "hydrazonotelluroic_acid",
         }
         assert TERMINAL_FG_TYPES == expected
 
@@ -279,8 +286,9 @@ class TestTerminalFGTypes:
         (hydrazonamide/hydrazidine/thiohydrazide) + 2 Wave2-completion-B4
         (peroxy_acid/imidic_acid, / + 1 W3-P02
         (hydrazonic_acid, + 1 -Phase-11
-        (imidohydrazide, = 34 entries."""
-        assert len(TERMINAL_FG_TYPES) == 34
+        (imidohydrazide, + 6 PIN-class-program Task 12 (the S/Se/Te
+        imidic and hydrazonic acids, = 40 entries."""
+        assert len(TERMINAL_FG_TYPES) == 40
 
 
 # ============================================================================

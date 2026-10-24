@@ -664,7 +664,7 @@ P82_N9_NO_LEAK_GUARDS = [
     ("Cc1cc(C)cc(C)c1", "1,3,5-trimethylbenzene"),
     ("Cc1ccc(C)cc1C", "1,2,4-trimethylbenzene"),
     ("Cc1ccccc1", "toluene"),
-    ("Cc1ccccc1C", "1,2-dimethylbenzene"),
+    ("Cc1ccccc1C", "1,2-xylene"),   # the retained PIN, (the Blue Book)
 ]
 
 

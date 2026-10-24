@@ -125,7 +125,7 @@ def _merge_leading_stereo(induced, base: str) -> str:
     if m:
         base_tokens = m.group(0)[1:-2].split(",")  # strip '(' and ')-'
         rest = base[m.end():]
-    induced_tokens = [f"{loc}{cfg}" for loc, cfg in induced]
+    induced_tokens = [cfg if loc is None else f"{loc}{cfg}" for loc, cfg in induced]
     merged = sorted(base_tokens + induced_tokens, key=_stereo_token_key)
     return "(" + ",".join(merged) + ")-" + rest
 
@@ -354,20 +354,60 @@ def complete_stereo(base: str, original: Chem.Mol, induced: List[int], n_pos: in
     return None
 
 
+#: the parent hydrides of one carbon a stereodescriptor can lead (the first word of a name)
+_ONE_CARBON_PARENTS = ("methane", "methanol", "methanamine", "methanethiol")
+
+
+def _one_carbon_root(name: str, off: int) -> bool:
+    """True when the group or the word whose front ``off`` is has a one-carbon root ('methyl' of a group, a
+    methane / methanol parent): its only locant is 1. "Sphere I." (the Blue Book), Example 3:
+    '[(R)-germyl(methoxy)(methylsulfanyl)methyl]silane (PIN) (the locant '1' is related to the digraph; it is
+    not required in the name)'; '(R)-bromo(chloro)fluoromethane (PIN)' (:45012), '(S)-cyclobutyl(cyclopropyl)
+    methanol (PIN)' (:45247)."""
+    if off and name[off - 1] in "([{":
+        return any(o == off - 1 and name[off:c].endswith("methyl") for o, c in _iso._enclosing_pairs(name))
+    word, depth = name[off:], 0
+    for i, ch in enumerate(word):
+        depth += (ch in "([{") - (ch in ")]}")
+        if ch == " " and depth == 0:
+            word = word[:i]
+            break
+    return word.endswith(_ONE_CARBON_PARENTS)
+
+
+def _root_locant_left_out(tokens: List[Tuple[object, str]], base: str, off: int) -> List[Tuple[object, str]]:
+    """``tokens`` with the locant 1 of a one-carbon root left out, for a lone descriptor."""
+    if len(tokens) == 1 and tokens[0][0] == 1 and _one_carbon_root(base, off):
+        return [(None, tokens[0][1])]
+    return list(tokens)
+
+
 def cite_where_it_belongs(base: str, original: Chem.Mol, tokens: List[Tuple[object, str]],
                           front: str) -> str:
     """The name ``front`` -- ``base`` with the stereodescriptors ``tokens`` cited at the front of the complete
     name, read back as ``original`` -- with them cited at the front of the part their centre belongs to, when
     that reads back: the innermost scope of ``_scopes`` at which all of ``tokens`` read back whole. ``front``
-    when none does; it is then below the PIN if the centre is not in the first word or inside marks."""
+    when none does; it is then below the PIN if the centre is not in the first word or inside marks. The
+    locant 1 of a one-carbon root is left out (:func:`_one_carbon_root`); the located spelling is the fallback,
+    below the PIN."""
+    from ..metrics.provenance import record_non_pin_fragment
+    wanted = list(tokens)
     for off in _scopes(base):
+        shown = _root_locant_left_out(wanted, base, off)
         if off == 0:
+            if shown != wanted:
+                out = _cited(base, {0: shown})
+                if _iso._isotope_round_trips(out, original):
+                    return out
+                record_non_pin_fragment(front)      # the located spelling of a one-carbon root
             break
-        out = _cited(base, {off: list(tokens)})
-        if _iso._isotope_round_trips(out, original):
-            return out
+        for spelling in ([shown] if shown == wanted else [shown, wanted]):
+            out = _cited(base, {off: spelling})
+            if _iso._isotope_round_trips(out, original):
+                if spelling is wanted and shown != wanted:
+                    record_non_pin_fragment(out)    # the located spelling of a one-carbon root
+                return out
     if _front_is_misplaced(base):
-        from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(front)
     return front
 

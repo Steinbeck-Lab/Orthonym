@@ -430,6 +430,33 @@ def dispatch_inner(
                 if _junior:
                     from ..metrics.provenance import record_non_pin_label
                     record_non_pin_label(_junior)
+        # (the Blue Book): the ester of an imidic or hydrazonic acid is class 9, senior to the
+        # imine, so a name that cites its group as an imine is correct and is not the PIN,
+        #:31983); the handler that builds the ester name returns it as the PIN. A molecule whose ester it does
+        # not build ('1-(methylsulfanyl)-1-(pyridin-4-yl)methanimine') is labelled below the PIN, the name is kept.
+        if entry.handler_id not in ("imidic_ester", "imidate"):
+            from .handlers.imidic_ester import imidic_ester_parent_expected
+            _imine = getattr(result, "name", None)
+            if _imine and isinstance(_imine, str) and imidic_ester_parent_expected(features):
+                from ..metrics.provenance import record_non_pin_label
+                record_non_pin_label(
+                    _imine, rule="P-65.6.3.3.7.1",
+                    detail="the PIN is the ester of the imidic or hydrazonic acid, not an imine")
+        # "The senior parent structure, whether cyclic or acyclic, has the senior atom..."
+        # (the Blue Book, N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O > S >
+        # Se > Te > C): with no principal characteristic group the PIN of a molecule with a P/As/Sb/Bi/Si/
+        # Ge/Sn/Pb hub is named on the hub's parent hydride. A handler's name for it is built on a carbon
+        # parent -- correct, not the PIN -- so it is labelled below the PIN and kept
+        # ('1-(methylselanyl)-2-(trimethylsilyl)ethane' for trimethyl[2-(methylselanyl)ethyl]silane).
+        _carbon_parent = getattr(result, "name", None)
+        if _carbon_parent and isinstance(_carbon_parent, str):
+            from ..rules.mononuclear_hydrides import senior_hub_parent_expected
+            if senior_hub_parent_expected(_mol):
+                from ..metrics.provenance import record_non_pin_label
+                record_non_pin_label(
+                    _carbon_parent, rule="P-44.1.2",
+                    detail="the PIN is named on the parent hydride of the senior atom "
+                           "(a mononuclear hub, not carbon)")
         from ..metrics.producer_trail import noted
         noted(f"inner:{entry.handler_id}", result, _mol)
         return InnerDispatchResult(

@@ -89,10 +89,9 @@ def test_sulfamoylphenyl_phosphonic_acid_at_default_tier():
                              "[4-(dimethylsulfamoyl)phenyl]phosphonic acid")
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "BB P-67.1.4.1 'arsono' is not a prefix of the substituent namer: the organyl "
-    "'4-arsonobutyl' cannot be spelled; the book name is '(4-arsonobutyl)phosphonic acid'"))
 def test_arsonobutyl_phosphonic_acid_book_name():
+    # (the Blue Book), '(4-arsonobutyl)phosphonic acid (PIN)' (:36542); 'arsono' is a preselected
+    # prefix,:36030) that the fragment namer spells (rules/phosphorus.carbon_free_phospho_prefix)
     assert_pin_at_both_tiers("O=P(O)(O)CCCC[As](=O)(O)O", "(4-arsonobutyl)phosphonic acid")
 
 

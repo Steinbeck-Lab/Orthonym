@@ -4134,7 +4134,12 @@ def _decorate_mixed_locant(skeleton: str, keys, original: Chem.Mol,
 #: (PIN)`` with ``(α,2-13C2)-toluene`` shown only as the GENERAL-nomenclature form.
 #: This gate is consulted ONLY by the isotope decorator (a label is always present),
 #: so the non-isotope namer that emits plain ``toluene`` is untouched.
-_ISOTOPE_NONSUBSTITUTABLE_RETAINED = frozenset({"toluene"})
+#: The xylenes are the same case, the Blue Book "xylene (1,2-, 1,3-, and
+#: 1,4-isomers, PINs) (no substitution)"): their methyl positions are not numbered, so the systematic
+#: spelling is the PIN spelling of a labelled xylene ('1,2-di[(13C)methyl]benzene (PIN)',:43734) and is not
+#: recorded as a non-PIN fragment of the uniform-multiplier pass (``drop_retained``).
+_ISOTOPE_NONSUBSTITUTABLE_RETAINED = frozenset({
+    "toluene", "1,2-xylene", "1,3-xylene", "1,4-xylene"})
 
 
 def _decorate_isotope_stereo(*args) -> Optional[str]:
@@ -4673,7 +4678,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
             # skeleton is not the PIN either: 'dimethyl sulfoxide' (the systematic
             # engine's functional-class name) against the PIN '(methanesulfinyl)methane'
             #, so 'di[(2H3)methyl] sulfoxide' is a valid name below the PIN.
-            _pin_spelling = skeleton == pin_name or not _usable(pin_name)
+            _pin_spelling = skeleton == pin_name or not _usable(pin_name) or drop_retained
             if not _pin_spelling:
                 record_non_pin_fragment(uniform)
             if not uniform_needs_locant:

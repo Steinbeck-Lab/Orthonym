@@ -57,6 +57,7 @@ chalcogens, di-/poly-nuclear hydrides (diphosphane), ions and rings all fail a
 guard and cascade onward — zero false positives.
 """
 
+from collections import Counter
 from typing import List, Optional
 
 from rdkit import Chem
@@ -521,8 +522,21 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
     """Return the substitutive PIN for a mononuclear parent hydride /
     , else ``None`` (fail-closed cascade-continuation).
 
+    The regimes below run first; a molecule none of them names may still have a
+    mononuclear senior-atom parent whose organyl groups carry prefix-only
+    substituents (``_name_senior_atom_hub``).
+
     Pure: no mol mutation, no global state.
     """
+    name = _name_mononuclear_hydride_regimes(mol)
+    if name is not None:
+        return name
+    return _name_senior_atom_hub(mol)
+
+
+def _name_mononuclear_hydride_regimes(mol) -> Optional[str]:
+    """The fixed regimes of ``name_mononuclear_hydride`` (all-halogen, pure organyl,
+    mixed halogen + pure organyl, phosphane, iodane diester)."""
     if mol is None:
         return None
 
@@ -644,6 +658,283 @@ def name_mononuclear_hydride(mol) -> Optional[str]:
     return None
 
 
+# ===: the senior atom's mononuclear hydride is the parent ===========
+# (the Blue Book): "The senior parent structure, whether cyclic or
+# acyclic, has the senior atom in accordance with the seniority of classes (see
+# expressed by the following decreasing element order: N > P > As > Sb > Bi >
+# Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O > S > Se > Te > C. This criterion is
+# applied to select the senior atom in parents and to choose between rings and
+# chains." (:18919): "A single senior atom is sufficient to give
+# seniority to the parent hydride." So with no principal characteristic group, a
+# mononuclear P/As/Sb/Bi/Si/Ge/Sn/Pb hub is the parent even when its organyl groups
+# carry halogen, ether or junior parent-hydride substituents:
+# 'chloro(2-silylethyl)silane (PIN)' (:6245, the silane with more substituents,
+#, '(1-chloro-2-methylpropan-2-yl)silane (PIN)' (:16288),
+# 'trichloro(iodomethyl)silane (PIN)' (:25870),
+# 'methoxydi(methyl)[2-(trimethylgermyl)phenyl]silane (PIN) (Si is senior to Ge)'
+# (:38258), '(4-stibanylphenyl)arsane (PIN)' (:39268),
+# 'bis(4,5-dihydrothiophen-2-yl)di(methyl)germane (PIN) (Ge is senior to S)'
+# (:38232).
+# The regimes above name the pure-organyl hubs; this one names only what they leave:
+# a hub whose carbon-attached organyl holds a heteroatom, or a molecule with more
+# than one hub atom.
+_SENIOR_HUB_RANK = {'P': 1, 'As': 2, 'Sb': 3, 'Bi': 4,
+                    'Si': 5, 'Ge': 6, 'Sn': 7, 'Pb': 8}
+# (:25860): "The prefixes 'bromo', 'chloro', 'fluoro', and 'iodo' are
+# used to name halogen compounds when the halogen atoms are attached to B, Al, In,
+# Ga, Tl, Si, Ge, Sn, Pb, and Bi" -- the hubs of this producer that take a halogen
+# prefix.
+_SENIOR_HUB_HALO = frozenset({'Si', 'Ge', 'Sn', 'Pb', 'Bi'})
+# Group 14 hubs take an alkoxy prefix ('methoxydi(methyl)...silane'); on P/As/Sb/Bi
+# an -O-R group makes an ester of a noncarbon oxoacid, not this class.
+_SENIOR_HUB_ALKOXY = frozenset({'Si', 'Ge', 'Sn', 'Pb'})
+_CHALCOGEN_ETHER = frozenset({'O', 'S', 'Se', 'Te'})
+
+
+def _senior_hub_fragment(mol, start: int, hub_idx: int):
+    frag, stack = set(), [start]
+    while stack:
+        x = stack.pop()
+        if x in frag:
+            continue
+        frag.add(x)
+        for n in mol.GetAtomWithIdx(x).GetNeighbors():
+            ni = n.GetIdx()
+            if ni == hub_idx:
+                if x != start:
+                    return None          # a ring through the hub
+                continue
+            if ni not in frag:
+                stack.append(ni)
+    return frag
+
+
+def _senior_hub_ligand(mol, hub, nbr) -> Optional[tuple]:
+    """``(prefix, has_heteroatom)`` for one heavy hub neighbour, else None."""
+    from ..assembly.hetero_chain_prefix import unbranched_hetero_chain_prefix
+    from ..assembly.substituent_naming import name_substituent_fragment
+    hub_idx, sym = hub.GetIdx(), nbr.GetSymbol()
+    bond = mol.GetBondBetweenAtoms(hub_idx, nbr.GetIdx())
+    if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+        return None
+    if sym in _HALOGENS:
+        if hub.GetSymbol() not in _SENIOR_HUB_HALO or nbr.GetDegree() != 1:
+            return None
+        return _HALO_PREFIX[sym], False
+    frag = _senior_hub_fragment(mol, nbr.GetIdx(), hub_idx)
+    if not frag:
+        return None
+    hetero = any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in frag)
+    if sym == 'O':
+        if hub.GetSymbol() not in _SENIOR_HUB_ALKOXY:
+            return None
+        name = name_substituent_fragment(mol, sorted(frag), nbr.GetIdx(), [hub_idx])
+        if not name or not name.endswith('oxy'):
+            return None
+        return name, any(mol.GetAtomWithIdx(i).GetSymbol() not in ('C', 'O')
+                         for i in frag)
+    if sym != 'C':
+        return None
+    ring_info = mol.GetRingInfo()
+    in_ring = any(ring_info.NumAtomRings(i) > 0 for i in frag)
+    has_hub = any(mol.GetAtomWithIdx(i).GetSymbol() in _SENIOR_HUB_RANK for i in frag)
+    if not hetero:
+        name = organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+    elif not in_ring and has_hub:
+        # 'ethylsilyl' would be the capped fragment's name; the chain through the
+        # free valence is named from the structure ('2-silylethyl').
+        name = unbranched_hetero_chain_prefix(mol, sorted(frag), nbr.GetIdx())
+    else:
+        name = (organyl_prefix_name(mol, nbr.GetIdx(), hub_idx)
+                or name_substituent_fragment(mol, sorted(frag), nbr.GetIdx(),
+                                             [hub_idx]))
+    if not name or name == 'substituent' or ' ' in name:
+        return None
+    return name, hetero
+
+
+#: the elements that rank below every hub in and above O (B > Al > Ga > In > Tl): a ring or chain of them
+#: is junior to the hub, so the label of a name on a carbon or ring parent can ignore them
+_BELOW_HUB = frozenset({'B', 'Al', 'Ga', 'In', 'Tl'})
+
+
+def _scan_senior_hubs(mol, junior=frozenset()) -> Optional[list]:
+    """The mononuclear hub atoms (acyclic, singly bonded P/As/Sb/Bi/Si/Ge/Sn/Pb) of a neutral
+    one-component molecule whose every other atom is carbon, hydrogen, a terminal halogen, an
+    ether-type chalcogen link or an atom of ``junior``; None for any other shape."""
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    hubs = []
+    for a in atoms_of(mol):
+        sym = a.GetSymbol()
+        if a.GetFormalCharge() != 0 or a.GetNumRadicalElectrons() != 0:
+            return None
+        if sym in ('C', 'H'):
+            continue
+        if sym in _HALOGENS:
+            if a.GetDegree() != 1:
+                return None
+            continue
+        if sym in _CHALCOGEN_ETHER:
+            # an ether / sulfide link (open-chain or in a ring): two single or
+            # aromatic bonds, no hydrogen; the neighbours are checked below
+            if (a.GetDegree() != 2 or a.GetTotalNumHs() != 0
+                    or any(b.GetBondType() not in (Chem.BondType.SINGLE,
+                                                   Chem.BondType.AROMATIC)
+                           for b in a.GetBonds())):
+                return None
+            continue
+        if sym in _SENIOR_HUB_RANK:
+            if a.IsInRing() or any(b.GetBondType() != Chem.BondType.SINGLE
+                                   for b in a.GetBonds()):
+                return None
+            hubs.append(a)
+            continue
+        if sym in junior:
+            continue
+        return None
+    return hubs
+
+
+def senior_hub_parent_expected(mol) -> bool:
+    """True when the PIN of ``mol`` is named on a senior mononuclear hub, the Blue Book):
+    no principal characteristic group, and a P/As/Sb/Bi/Si/Ge/Sn/Pb atom that outranks carbon and every
+    other atom of the molecule, in the shapes:func:`_name_senior_atom_hub` and the regimes ahead of it
+    name. A name of such a molecule on a carbon parent ('1-(methylselanyl)-2-(trimethylsilyl)ethane')
+    is correct but is not the PIN. Not these molecules: a skeletal replacement name owns four or more
+    heterounits,:23348), a catenated hydride is another parent, and a hub bonded to a
+    chalcogen other than the alkoxy oxygen of a Group 14 hub or to a halogen it does not take is a
+    class the producers leave. The elements below the hubs (B, Al, Ga, In, Tl) anywhere else in the molecule
+    leave the hub the senior atom: 'trimethyl[4-(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)phenyl]silane' is the
+    PIN, as the book's 'trimethyl[(4,4,5,5-tetramethyl-1,3,2-dioxaborolan-2-yl)methyl]stannane (PIN) (Sn is senior
+    to B)',:37479)."""
+    try:
+        hubs = _scan_senior_hubs(mol, _BELOW_HUB)
+        if not hubs:
+            return False
+        hub_ids = {h.GetIdx() for h in hubs}
+        rank = min(_SENIOR_HUB_RANK[h.GetSymbol()] for h in hubs)
+        for h in hubs:
+            for n in h.GetNeighbors():
+                if n.GetIdx() in hub_ids or n.GetSymbol() in _BELOW_HUB:
+                    return False
+                if n.GetSymbol() in _HALOGENS and h.GetSymbol() not in _SENIOR_HUB_HALO:
+                    return False
+                if n.GetSymbol() in _CHALCOGEN_ETHER and not (
+                        n.GetSymbol() == 'O' and h.GetSymbol() in _SENIOR_HUB_ALKOXY
+                        and _SENIOR_HUB_RANK[h.GetSymbol()] == rank):
+                    return False
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        pg, _m = get_principal_group(mol, detect_functional_groups(mol))
+        if pg and 'phosphine' not in str(pg):
+            return False
+        from .skeletal_replacement import try_skeletal_replacement_name
+        return try_skeletal_replacement_name(mol) is None
+    except Exception:  # noqa: BLE001 -- an unreadable molecule is not in the class
+        return False
+
+
+def _name_senior_atom_hub(mol) -> Optional[str]:
+    """: name a molecule on its senior mononuclear P/As/Sb/Bi/Si/Ge/Sn/Pb
+    hub when no principal characteristic group is present and every other atom is
+    prefix-only. Fail-closed: None for any other shape."""
+    try:
+        hubs = _scan_senior_hubs(mol, _BELOW_HUB)
+        if not hubs:
+            return None
+        hub_ids = {h.GetIdx() for h in hubs}
+        for h in hubs:
+            # a catenated hydride (disilane,...) is a different parent
+            if any(n.GetIdx() in hub_ids for n in h.GetNeighbors()):
+                return None
+        rank = min(_SENIOR_HUB_RANK[h.GetSymbol()] for h in hubs)
+        senior = [h for h in hubs if _SENIOR_HUB_RANK[h.GetSymbol()] == rank]
+        # comes before: identical parent hydrides that can be
+        # multiplied give the PIN ('[silanediyldi(ethane-2,1-diyl)]bis(silane)',
+        # '(1,4-phenylene)bis(dimethylsilane) (PIN)':38260). Two symmetry-
+        # equivalent senior hubs leave the molecule to the multiplicative namer.
+        sym_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+        if len({sym_rank[h.GetIdx()] for h in senior}) != len(senior):
+            return None
+
+        def _n_prefixes(h):
+            return sum(1 for n in h.GetNeighbors() if n.GetAtomicNum() > 1)
+        # (:21600) among hubs of the senior element; a tie (a symmetric
+        # assembly, whose PIN may be multiplicative, declines.
+        top = max(_n_prefixes(h) for h in senior)
+        best = [h for h in senior if _n_prefixes(h) == top]
+        if len(best) != 1 or top == 0:
+            return None
+        hub = best[0]
+        hub_idx = hub.GetIdx()
+        # Chalcogen links: between two carbons, or an alkoxy O on a Group 14 hub.
+        for a in atoms_of(mol):
+            if a.GetSymbol() in _CHALCOGEN_ETHER:
+                for n in a.GetNeighbors():
+                    if n.GetSymbol() == 'C' or n.GetSymbol() in _BELOW_HUB:
+                        continue
+                    if (n.GetIdx() == hub_idx and a.GetSymbol() == 'O'
+                            and hub.GetSymbol() in _SENIOR_HUB_ALKOXY):
+                        continue
+                    return None
+        # A junior hub inside an organyl is a parent-hydride '-yl' prefix bonded
+        # to carbon, hydrogen and halogen only ('silyl', 'chlorosilyl',
+        # 'trimethylgermyl', 'stibanyl').
+        for h in hubs:
+            if h.GetIdx() == hub_idx:
+                continue
+            if any(n.GetSymbol() not in ('C',) and n.GetSymbol() not in _HALOGENS
+                   for n in h.GetNeighbors()):
+                return None
+            if (any(n.GetSymbol() in _HALOGENS for n in h.GetNeighbors())
+                    and h.GetSymbol() not in _SENIOR_HUB_HALO):
+                return None
+        from ..perception.functional_groups import detect_functional_groups
+        from .seniority import get_principal_group
+        pg, _m = get_principal_group(mol, detect_functional_groups(mol))
+        if pg and 'phosphine' not in str(pg):
+            return None
+        # "Skeletal replacement ('a') nomenclature in acyclic chains" (the Blue Book): the
+        # 'a' name, not a substitutive one, is the PIN of an unbranched chain with a carbon and four or more
+        # heterounits ('7,10-dioxa-2-thia-4-silaundecane (PIN)',,:8026; '3-phospha-2,5,7-
+        # trisilaoctane [PIN]... (methylsilyl)({[(methylsilyl)methyl]silyl}methyl)phosphane (a substitutive
+        # name)',:23358): the skeletal replacement namer owns those molecules.
+        from .skeletal_replacement import try_skeletal_replacement_name
+        if try_skeletal_replacement_name(mol) is not None:
+            return None
+        names: List[str] = []
+        new_class = len(hubs) > 1
+        for nbr in hub.GetNeighbors():
+            if nbr.GetAtomicNum() == 1:
+                continue
+            lig = _senior_hub_ligand(mol, hub, nbr)
+            if lig is None:
+                return None
+            names.append(lig[0])
+            if lig[1] and nbr.GetSymbol() == 'C':
+                new_class = True
+        # The pure-organyl / alkoxy / halogen hubs belong to the regimes above and
+        # to the organometallic namer; this producer adds only the shapes they leave.
+        if not new_class:
+            return None
+        # (a) (the Blue Book) multiplies a substituted prefix with
+        # 'bis', and the Blue Book counts a hydro prefix there:
+        # 'bis(4,5-dihydrothiophen-2-yl)di(methyl)germane (PIN)' (:38232). The
+        # shared multiplier primitive gives 'di' for such a prefix, so a repeated
+        # hydro-prefixed ligand declines here rather than ship that spelling.
+        if any(n_count > 1 and 'hydro' in lig_name
+               for lig_name, n_count in Counter(names).items()):
+            return None
+        block = _build_mixed_substituent_string(names)
+        if block is None:
+            return None
+        return _assemble(block, nonstandard_bonding_number(mol, hub_idx),
+                         _HUB_STEMS[hub.GetSymbol()])
+    except Exception:  # noqa: BLE001 -- a producer bug must never crash naming
+        return None
+
+
 # --- (BB:34941) / (BB:34720) / +
 # (BB 39117): an added-carbon -carbaldehyde/-carbonitrile/
 # -carboxylic acid suffix on a Group-14/-15 parent hydride hub is named on the
@@ -727,7 +1018,135 @@ def _added_carbon_group(mol, atom) -> Optional[tuple]:
     return None
 
 
+# "Substitution of diazene" (the Blue Book): "Diazene is a
+# modified parent hydride derived from the parent hydride diazane": 'diazene-
+# dicarbaldehyde (PIN)', 'phenyldiazenecarbonitrile (PIN)' (:38738).
+# (:38896): "The hydrazide of 'diazenecarboxylic acid', HN=N-CO-NH-NH2, is named
+# systematically 'diazenecarbohydrazide'... Chalcogen analogues are named by
+# using the infixes and the prefixes 'thio', 'seleno', and 'telluro'" (:38898):
+# 'diazenecarbothiohydrazide (PIN)' (:38902). N is senior to C,:18917),
+# so the diazene, not a one-carbon chain, carries the added-carbon suffix.
+_ADDED_CARBON_CHALCOGEN_INFIX = {'O': '', 'S': 'thio', 'Se': 'seleno', 'Te': 'telluro'}
+
+
+def _diazene_added_carbon_suffix(mol, carbon, n_idx: int) -> Optional[tuple]:
+    """``(suffix, atoms)`` for a bare added-carbon group on diazene N ``n_idx``:
+    carbaldehyde, carbonitrile, carboxylic acid (via ``_added_carbon_group``), and
+    -C(=X)-NH2 / -C(=X)-NH-NH2 with X = O, S, Se, Te ('carboxamide',
+    'carbothioamide', 'carbohydrazide', 'carbothiohydrazide',...). None for any
+    substituted or other shape."""
+    if (carbon.GetSymbol() != 'C' or carbon.IsInRing()
+            or mol.GetBondBetweenAtoms(carbon.GetIdx(), n_idx).GetBondType()
+            != Chem.BondType.SINGLE):
+        return None
+    group = {carbon.GetIdx()} | {n.GetIdx() for n in carbon.GetNeighbors()
+                                 if n.GetIdx() != n_idx}
+    found = _added_carbon_group(mol, carbon)
+    if found is not None:
+        return (found[1], group) if found[0].GetIdx() == n_idx else None
+    if carbon.GetDegree() != 3 or carbon.GetTotalNumHs() != 0:
+        return None
+    others = [n for n in carbon.GetNeighbors() if n.GetIdx() != n_idx]
+    chalc = [n for n in others
+             if n.GetSymbol() in _ADDED_CARBON_CHALCOGEN_INFIX and n.GetDegree() == 1
+             and mol.GetBondBetweenAtoms(carbon.GetIdx(), n.GetIdx()).GetBondType()
+             == Chem.BondType.DOUBLE]
+    amino = [n for n in others
+             if n.GetSymbol() == 'N'
+             and mol.GetBondBetweenAtoms(carbon.GetIdx(), n.GetIdx()).GetBondType()
+             == Chem.BondType.SINGLE]
+    if len(chalc) != 1 or len(amino) != 1:
+        return None
+    infix = _ADDED_CARBON_CHALCOGEN_INFIX[chalc[0].GetSymbol()]
+    n1 = amino[0]
+    if n1.GetDegree() == 1 and n1.GetTotalNumHs() == 2:
+        return ("carboxamide" if not infix else f"carbo{infix}amide"), group
+    if n1.GetDegree() == 2 and n1.GetTotalNumHs() == 1:
+        n2 = [n for n in n1.GetNeighbors() if n.GetIdx() != carbon.GetIdx()][0]
+        if (n2.GetSymbol() == 'N' and n2.GetDegree() == 1 and n2.GetTotalNumHs() == 2
+                and mol.GetBondBetweenAtoms(n1.GetIdx(), n2.GetIdx()).GetBondType()
+                == Chem.BondType.SINGLE):
+            return f"carbo{infix}hydrazide", group | {n2.GetIdx()}
+    return None
+
+
+def name_diazene_added_carbon(mol) -> Optional[str]:
+    """Diazene HN=NH as the parent of one, or two identical, bare added-carbon
+    suffix groups: 'diazenecarbothiohydrazide', 'diazenedicarbaldehyde'. The other
+    nitrogen bears H, or a pure organyl when the suffix has no substitutable
+    position of its own (carbaldehyde, carbonitrile: 'phenyldiazenecarbonitrile',
+    no locant). Fail-closed graph classifier: one acyclic neutral N=N, no other
+    heavy atom. Pure: no mol mutation."""
+    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+        return None
+    for atom in atoms_of(mol):
+        if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
+            return None
+    pairs = []
+    for b in mol.GetBonds():
+        a1, a2 = b.GetBeginAtom(), b.GetEndAtom()
+        if (b.GetBondType() == Chem.BondType.DOUBLE and a1.GetSymbol() == 'N'
+                and a2.GetSymbol() == 'N'):
+            pairs.append((a1, a2))
+    if len(pairs) != 1:
+        return None
+    na, nb = pairs[0]
+    if na.IsInRing() or nb.IsInRing():
+        return None
+    groups = []          # (n_atom, other heavy neighbour or None)
+    for n, partner in ((na, nb), (nb, na)):
+        heavy = [x for x in n.GetNeighbors()
+                 if x.GetAtomicNum() > 1 and x.GetIdx() != partner.GetIdx()]
+        if len(heavy) > 1:
+            return None
+        groups.append((n, heavy[0] if heavy else None))
+    covered = {na.GetIdx(), nb.GetIdx()}
+    suffixes = []
+    organyl = None
+    for n, x in groups:
+        if x is None:
+            continue
+        found = _diazene_added_carbon_suffix(mol, x, n.GetIdx())
+        if found is not None:
+            suffixes.append(found[0])
+            covered |= found[1]
+            continue
+        organyl = (n, x)
+    if not suffixes:
+        return None
+    if organyl is not None:
+        n, x = organyl
+        if len(suffixes) != 1 or suffixes[0] not in ('carbaldehyde', 'carbonitrile'):
+            return None
+        pref = organyl_prefix_name(mol, x.GetIdx(), n.GetIdx())
+        frag = _fragment_atoms(mol, x.GetIdx(), n.GetIdx())
+        if pref is None or frag is None:
+            return None
+        covered |= set(frag)
+        from ..assembly.naming_utils import enclose_if_compound
+        prefix = enclose_if_compound(pref)
+    else:
+        prefix = ''
+    for atom in atoms_of(mol):
+        if atom.GetSymbol() != 'H' and atom.GetIdx() not in covered:
+            return None
+    if len(suffixes) == 2:
+        if suffixes[0] != suffixes[1]:
+            return None
+        return f"{prefix}diazenedi{suffixes[0]}"
+    return f"{prefix}diazene{suffixes[0]}"
+
+
 def name_mononuclear_hydride_added_carbon(mol) -> Optional[str]:
+    """The added-carbon suffix on a mononuclear Group-14/-15 hub (below) or on a
+    diazene (``name_diazene_added_carbon``)."""
+    name = _name_mononuclear_hub_added_carbon(mol)
+    if name is not None:
+        return name
+    return name_diazene_added_carbon(mol)
+
+
+def _name_mononuclear_hub_added_carbon(mol) -> Optional[str]:
     """ / /: added-carbon
     -carbaldehyde/-carbonitrile/-carboxylic acid on a Group-14/-15 parent
     hydride (see module comment above the lookup tables for the worked examples,

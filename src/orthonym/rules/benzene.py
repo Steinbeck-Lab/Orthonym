@@ -34,6 +34,8 @@ from ..assembly.naming_utils import (
     should_omit_locant_one,
 )
 from .benzene_prefix_forms import hydroxy_is_principal, pnictogen_oxoacid_prefix
+from .benzene_acid_suffixes import ACID_SUFFIX_FGS, ACID_SUFFIX_SMARTS
+from .benzene_acid_suffixes import identify_chalcogen_acyl_group as _thioacyl  #: -C(=S)-R prefix
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
 from ..perception.molcache import atoms_of, inchikey_of
@@ -64,6 +66,10 @@ _SUFFIX_PRIORITY = [
     # (rank 15), so it sits here. 'carbothioic S-acid' (rank 2) is not in this
     # list; _assemble_benzene_with_suffix hands the suffix to a co-occurring
     # thioic S-acid rather than let the junior imidic acid win.
+    # (the Blue Book-:18523): '-CS-SH carbodithioic acid'
+    # follows the carbothioic O-/S-acids and precedes the carboximidic acid (the
+    # S-acid is handed the suffix in _assemble_benzene_with_suffix, as above).
+    'carbodithioic acid',
     'carboximidic acid',
     'sulfonic acid',
     # D-FOLLOWON item 5: P/Se/Te + sulfinic ring oxoacids, junior to carboxylic
@@ -173,6 +179,10 @@ _SUFFIX_TO_PREFIX = {
     # Suite fix j6: '4-(C-hydroxycarbonimidoyl)benzoic acid (PIN)',
     # the Blue Book).
     'carboximidic acid': 'C-hydroxycarbonimidoyl',
+    #: 'HS-CS- dithiocarboxy (preferred prefix) sulfanylcarbonothioyl'
+    # (the Blue Book), enclosed "to avoid the possibility of ambiguity"
+    #,:30217) as in '5-(thiocarboxy)pentanoic acid (PIN)' (:30248)
+    'carbodithioic acid': '(dithiocarboxy)',
     'carbohydrazonamide': 'carbamohydrazonoyl',  # Wave2
     'carbonitrile': 'cyano',
     'carbaldehyde': 'formyl',
@@ -386,12 +396,6 @@ _BENZENE_FG_SMARTS = {
     # disjoint from amide/hydrazide/amidine here. No italic chalcogen locant
     # (hydrazonic acid has a single acid oxygen).
     'hydrazonic_acid': Chem.MolFromSmarts('[CX3](=[NX2][NX3H2])[OX2H1]'),
-    # Suite fix j6 (TRIAGE g8 C23;, the Blue Book 'benzene-
-    # carboximidic acid (PIN)'): ring-attached imidic acid -C(=NH)-OH ->
-    # '-carboximidic acid'. =[NX2H1] (an UNSUBSTITUTED imino N, as perception's
-    # `imidic_acid` FG requires) keeps an N-substituted imidate/imine out; the
-    # -OH (OX2H1) keeps the imidate ester (O-alkyl) and the amidine out.
-    'imidic_acid': Chem.MolFromSmarts('[CX3](=[NX2H1])[OX2H1]'),
     'sulfonamide': Chem.MolFromSmarts('[SX4](=O)(=O)[NX3H2]'),
     # F-B: N-substituted ring sulfonamide -S(=O)(=O)-NR'R''. The
     # NX3 has fewer than two H, so it is disjoint from the primary 'sulfonamide'
@@ -690,14 +694,14 @@ def _identify_suffix_fg_on_benzene(
 
         # Imidic acid: C(=NH)(OH) -> '-carboximidic acid'. An
         # ACID (senior to amide/amidine); disjoint from their =O / -N SMARTS and
-        # from the hydrazonic acid above (=N-NH2, not =NH).
-        for match in mol.GetSubstructMatches(_BENZENE_FG_SMARTS['imidic_acid']):
-            if match[0] == start_idx:
-                return {
-                    'name': 'carboximidic acid',
-                    'suffix_name': 'carboximidic acid',
-                    'is_suffix': True, 'atoms': sub_atoms,
-                }
+        # from the hydrazonic acid above (=N-NH2, not =NH); the table adds the -SH/-SeH/-TeH analogues.
+        for _fg, _sfx in ACID_SUFFIX_FGS:
+            for match in mol.GetSubstructMatches(ACID_SUFFIX_SMARTS[_fg]):
+                if match[0] == start_idx:
+                    return {
+                        'name': _sfx, 'suffix_name': _sfx,
+                        'is_suffix': True, 'atoms': sub_atoms,
+                    }
 
         # Hydroxamic acid: C(=O)(NH-OH) — checked BEFORE primary/secondary amide
         # because N has H1 bonded to O (not H2 or NHC), so neither 'amide' nor
@@ -1591,7 +1595,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int], principal_g
         # (1-phenylethan-1-one) keeps ownership. Fail-closed: branched/
         # unsaturated/hetero acyls return None -> unnameable sentinel.
         if _ring_bears_senior_suffix(mol, ring_atoms, start_idx, principal_group):
-            acyl_result = _identify_acyl_group(mol, start_idx, ring_atoms)
+            acyl_result = _identify_acyl_group(mol, start_idx, ring_atoms) or _thioacyl(mol, start_idx, ring_atoms)
             if acyl_result:
                 return acyl_result
 
@@ -4423,7 +4427,7 @@ def _assemble_benzene_with_suffix(
     # imidic acid (rank 11) but is not in _SUFFIX_PRIORITY; keep it the suffix
     # (the imidic acid demotes to 'C-hydroxycarbonimidoyl'), as before the
     # imidic acid had a suffix form here.
-    if (chosen_suffix == 'carboximidic acid'
+    if (chosen_suffix in ('carboximidic acid', 'carbodithioic acid')
             and 'carbothioic S-acid' in suffix_groups):
         chosen_suffix = 'carbothioic S-acid'
 

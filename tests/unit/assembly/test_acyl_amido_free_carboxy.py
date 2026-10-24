@@ -124,7 +124,8 @@ def test_default_tier_names_the_peptide_by_its_pin(smiles, pin):
 @pytest.mark.opsin_gate
 @pytest.mark.roundtrip
 @pytest.mark.parametrize("smiles", [
-    "CC(=S)c1ccc(C(=O)O)cc1",
+    # ('CC(=S)c1ccc(C(=O)O)cc1' left this list: its PIN '4-(ethanethioyl)benzoic acid', the Blue Book, is
+    # built by the strict path, test_pin_class_t12_acid_suffixes.py)
     "O=[N+]([O-])c1cnc2cc(Sc3ccc4c([N+](=O)[O-])c(Cl)cnc4c3)ccc2c1Cl",
     "N#CS(=O)(=O)C1CCCCC1C(=O)O",
     "CCC(=O)C1CCCCPC1=O",

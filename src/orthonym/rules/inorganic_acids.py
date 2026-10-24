@@ -1575,6 +1575,9 @@ def name_polyacid_anion(frag_mol) -> Optional[str]:
 # these differ from the mononuclear STEM infixes (poly 'peroxy' vs mono 'peroxo').
 _CARB_CHALC_PREFIX = {"S": "thio", "Se": "seleno", "Te": "telluro"}
 _CARB_HALO_PREFIX = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
+# the matching carbonic acid infixes, the Blue Book)
+_CARB_HALO_INFIX = {"fluoro": "fluorido", "chloro": "chlorido",
+                    "bromo": "bromido", "iodo": "iodido"}
 # Terminal-only prefixes (cannot sit at a bridge): a lone one on a symmetric parent
 # omits its locant; 'chlorodicarbonic acid', not '1-chloro...').
 _CARB_TERMINAL_ONLY = set(_CARB_HALO_PREFIX.values()) | {"amido", "hydrazido"}
@@ -1673,6 +1676,21 @@ def _carb_bridge(mol, c, nb, acid_cs):
         if len(far) == 1 and far[0].GetIdx() in acid_cs:  # -NH- imido bridge
             return (far[0].GetIdx(), "imido", {nb.GetIdx()})
     return None
+
+
+def _bump_halide_infix(bump, kind, stem, acyl_kind):
+    """Count the halide infix of a mononuclear carbonic acid whose acyl group is replaced by =NH or =N-NH2;
+    False when ``kind`` is not such a halide (the caller then declines).
+
+     "Carbonic acid" (the Blue Book), (:30814): "Functional replacement of one of the
+    -OH groups of carbonic acid by various atoms or groups is expressed by the following infixes: fluorido, -F;
+    chlorido, -Cl; bromido, -Br; iodido, -I": 'carbonochloridimidic acid (PIN)' (:30881). With
+    =NH / =N-NH2 the one chalcogen left is the acid -YH, so no italic letter locant is needed; a halide beside
+    =O / =S (the tabled 'carbonochloridic acid', or the O/S-acid pair) stays out of scope."""
+    if kind in _CARB_HALO_INFIX and stem == "carbon" and acyl_kind in ("imido", "hydrazono"):
+        bump(_CARB_HALO_INFIX[kind])
+        return True
+    return False
 
 
 def name_carbonic_frn_family(mol):
@@ -1784,7 +1802,7 @@ def name_carbonic_frn_family(mol):
                 _bump(kind)
             elif kind == "peroxy":
                 _bump("peroxo")           # mononuclear STEM infix is 'peroxo'
-            else:
+            elif not _bump_halide_infix(_bump, kind, stem, acyl_kind):
                 return None               # amido#2 / halide / hydrazido -> out of scope
         if not infixes:
             return None                   # plain carbonic/carbamic acid -> tabled

@@ -73,9 +73,9 @@ class TestBenzeneStereo:
     @pytest.mark.unit
     def test_plain_benzene_no_stereo_regression(self):
         """Plain substituted benzene without stereo should not get stereo prefix."""
-        smiles = 'Cc1ccc(C)cc1'
+        smiles = 'CCc1ccc(CC)cc1'
         name = name_compound(smiles)
-        assert name == '1,4-dimethylbenzene', f"Expected '1,4-dimethylbenzene', got: {name}"
+        assert name == '1,4-diethylbenzene', f"Expected '1,4-diethylbenzene', got: {name}"
         assert not _has_stereo_in_name(name), (
             f"Plain benzene should not have stereo prefix, got: {name}"
         )

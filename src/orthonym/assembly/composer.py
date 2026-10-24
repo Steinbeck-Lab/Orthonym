@@ -675,6 +675,9 @@ TERMINAL_GROUPS = {
     # verbatim: no locant -- (c), the Blue Book).
     "imidic_acid",       # Always at chain end: ethanimidic acid)
     "hydrazonic_acid",   # Always at chain end: methanehydrazonic acid)
+    #: their S / Se / Te analogues ('cyclohexanecarboximidoselenoic acid')
+    "imidothioic_acid", "imidoselenoic_acid", "imidotelluroic_acid",
+    "hydrazonothioic_acid", "hydrazonoselenoic_acid", "hydrazonotelluroic_acid",
     "carbamic_acid",    # Retained name, terminal (locant 1)
     # D-FOLLOWON item 8: amidine/imidamide characteristic C is terminal.
     "amidine",          # Always at chain end (locant 1)

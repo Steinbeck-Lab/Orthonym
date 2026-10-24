@@ -128,10 +128,14 @@ def test_senior_double_bonded_ring_stays_the_parent(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
 
 
-def test_tie_on_p44_2_keeps_the_double_bond_side_ring():
-    """Two rings that tie on (cyclohexane, cyclohexane): the linker decides, as before."""
-    smiles = "C(=C1CCCCC1)C1CCCCC1"
-    assert name_default(smiles)["name"] == "(cyclohexylmethylidene)cyclohexane"
+def test_tie_on_p44_2_with_the_same_group_on_both_sides_is_decided_by_alphanumerical_order():
+    """Two rings that tie on (cyclohexane, cyclohexane) and carry the same group: "Criteria
+    related to alphanumerical order of names" (the Blue Book), "The preferred IUPAC name is the name
+    that is earlier in alphanumerical order": '-ylidenemethyl' is earlier than '-ylmethylidene', as in
+     example (2) (:6398). The single-bonded ring is the parent.
+    change-asserted-value: above; read back by assert_pin_at_both_tiers (OPSIN, fresh call);
+    mutation = tests/unit/rules/test_pin_class_t14_parent_seniority.py (RING_ROWS fails on the old source)."""
+    assert_pin_at_both_tiers("C(=C1CCCCC1)C1CCCCC1", "(cyclohexylidenemethyl)cyclohexane")
 
 
 # Shapes with no strict ring-ylidene prefix decline at the default tier: the junior ring used to be the

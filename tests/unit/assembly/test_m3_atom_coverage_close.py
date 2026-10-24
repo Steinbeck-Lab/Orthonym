@@ -230,7 +230,7 @@ BENZENE_OVERCLAIM_WRONG = "3-(trifluoromethyl)benzamide"  # drops 4 atoms
 # EMPIRICALLY-VERIFIED-FULL-COVERAGE set from the pre-implementation trace
 # (0/20 under-counts across this exact family).
 _BENZENE_GUARD = {
-    "Cc1cccc(C)c1": "1,3-dimethylbenzene",
+    "CCc1cccc(CC)c1": "1,3-diethylbenzene",
     "NC(=O)c1ccc(Cl)cc1": "4-chlorobenzamide",
     "CNC(=O)c1ccc(Cl)cc1": "4-chloro-N-methylbenzamide",
     "OC(=O)c1cc(Cl)cc(Cl)c1": "3,5-dichlorobenzoic acid",

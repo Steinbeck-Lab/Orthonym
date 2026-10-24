@@ -112,22 +112,38 @@ class TestMonosubstitutedBenzene:
 # =============================================================================
 
 class TestDisubstitutedBenzene:
-    """Test disubstituted benzenes - all three isomers."""
+    """Test disubstituted benzenes - all three isomers.
+
+    The xylenes are retained PINs with no substitution, the Blue Book, 'xylene
+    (1,2-, 1,3-, and 1,4-isomers, PINs)'); the multiplied-prefix path of a disubstituted benzene
+    is pinned on the diethylbenzenes."""
 
     @pytest.mark.unit
-    def test_dimethylbenzene_1_2(self):
-        """ortho-xylene should be named 1,2-dimethylbenzene."""
-        assert name_compound("Cc1ccccc1C") == "1,2-dimethylbenzene"
+    def test_xylene_1_2(self):
+        """ortho-xylene is the retained PIN 1,2-xylene, the Blue Book)."""
+        assert name_compound("Cc1ccccc1C") == "1,2-xylene"
 
     @pytest.mark.unit
-    def test_dimethylbenzene_1_3(self):
-        """meta-xylene should be named 1,3-dimethylbenzene."""
-        assert name_compound("Cc1cccc(C)c1") == "1,3-dimethylbenzene"
+    def test_xylene_1_3(self):
+        """meta-xylene is the retained PIN 1,3-xylene, the Blue Book)."""
+        assert name_compound("Cc1cccc(C)c1") == "1,3-xylene"
 
     @pytest.mark.unit
-    def test_dimethylbenzene_1_4(self):
-        """para-xylene should be named 1,4-dimethylbenzene."""
-        assert name_compound("Cc1ccc(C)cc1") == "1,4-dimethylbenzene"
+    def test_xylene_1_4(self):
+        """para-xylene is the retained PIN 1,4-xylene, the Blue Book)."""
+        assert name_compound("Cc1ccc(C)cc1") == "1,4-xylene"
+
+    @pytest.mark.unit
+    def test_diethylbenzene_1_2(self):
+        assert name_compound("CCc1ccccc1CC") == "1,2-diethylbenzene"
+
+    @pytest.mark.unit
+    def test_diethylbenzene_1_3(self):
+        assert name_compound("CCc1cccc(CC)c1") == "1,3-diethylbenzene"
+
+    @pytest.mark.unit
+    def test_diethylbenzene_1_4(self):
+        assert name_compound("CCc1ccc(CC)cc1") == "1,4-diethylbenzene"
 
     @pytest.mark.unit
     def test_dichlorobenzene_1_2(self):

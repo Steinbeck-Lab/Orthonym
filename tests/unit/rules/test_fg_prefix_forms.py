@@ -50,6 +50,12 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     'hydroximic_acid',
     'sulfinohydrazonohydrazide',  #: demoted case fails closed
     'iminoester',        #: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
+    # PIN class program Task 12: the S/Se/Te imidic and hydrazonic acids
+    # have no single static prefix -- demoted at a chain end they split into
+    # '<X>yl' + 'imino' / 'hydrazinylidene' in name_polyfunctional's chain-end
+    # block, as the imidic acid does.
+    'imidothioic_acid', 'imidoselenoic_acid', 'imidotelluroic_acid',
+    'hydrazonothioic_acid', 'hydrazonoselenoic_acid', 'hydrazonotelluroic_acid',
     'selenoester',       #: functional class (Se-alkyl alkaneselenoate); chalcogen analog of ester
     'telluroester',      #: functional class (Te-alkyl alkanetelluroate); chalcogen analog of ester
     # W3-P07: non-carbon esters — functional-class only, named by the shared

@@ -35,6 +35,8 @@ from ..data.multipliers import multiplier_table
 from ..perception.molcache import neighbors_of
 from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import acyl_prefix_text, is_acyl_prefix
+from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
+from .hetero_chain_prefix import fragment_parent_to_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
 from .fragment_naming import name_fragment_recursively
@@ -540,6 +542,11 @@ def _located_stereo_block(mol, locant_of: Dict[int, int]) -> str:
     if not terms:
         return ''
     terms.sort()
+    if len(locant_of) == 1:
+        # a ONE-carbon chain cites no locant, and its descriptor none: "Sphere I."
+        # (the Blue Book), '[(R)-germyl(methoxy)(methylsulfanyl)methyl]silane (PIN) (the locant '1'
+        # is related to the digraph; it is not required in the name)' (:45031)
+        return '(' + ','.join(code for _loc, code in terms) + ')-'
     return '(' + ','.join(f'{loc}{code}' for loc, code in terms) + ')-'
 
 
@@ -3974,9 +3981,9 @@ def _name_ether_substituted_chain(
     Returns ``None`` (fall through to the richer recursive path — fail-closed)
     for anything that is not a LINEAR all-carbon backbone with a TERMINAL
     (primary) attachment whose only heteroatoms are neutral, divalent, acyclic
-    ether oxygens, each bridging exactly one backbone carbon to a nameable R
-    group (no other functional groups, no branches, no unsaturation, no rings on
-    the backbone).
+    ether oxygens or sulfide/selenide/telluride links (cited '(R)sulfanyl', '(R)selanyl',
+    '(R)tellanyl'), each bridging exactly one backbone carbon to a nameable R
+    group (no other functional groups, no branches, no unsaturation, no rings on the backbone).
     """
     if not sub_atoms:
         return None
@@ -4021,8 +4028,8 @@ def _name_ether_substituted_chain(
     backbone_set = set(backbone)
 
     # Identify ether-type links: neutral, divalent, acyclic, both neighbours in
-    # the fragment, both bonds single. /: O -> (R)oxy prefix, S
-    # -> (R)sulfanyl prefix (W2E-P1FC Task 8, the -CH2-S-R concatenation). Any
+    # the fragment, both bonds single. (the Blue Book,:27808): O -> (R)oxy,
+    # S/Se/Te -> (R)sulfanyl/(R)selanyl/(R)tellanyl (W2E-P1FC Task 8, the -CH2-S-R concatenation). Any
     # other decoration (charged, =O, -OH, ring, peroxide -O-O-/-S-S-) directly
     # ON THE BACKBONE disqualifies the whole fragment (fail-closed) -- a richer
     # producer owns it.
@@ -4048,7 +4055,7 @@ def _name_ether_substituted_chain(
     for idx in link_candidates:
         atom = mol.GetAtomWithIdx(idx)
         sym = atom.GetSymbol()
-        if sym not in ('O', 'S'):
+        if sym not in ('O', 'S', 'Se', 'Te'):
             return None  # non-ether functional group directly on the backbone
         if (atom.GetFormalCharge() != 0 or atom.GetTotalNumHs() != 0
                 or atom.GetDegree() != 2 or ring_info.NumAtomRings(idx) > 0):
@@ -4063,7 +4070,7 @@ def _name_ether_substituted_chain(
         # producer -- except one disulfide link -S-S-R, cited as the prefix
         # '(R)disulfanyl', the Blue Book; '(methyldisulfanyl)methane (PIN)':27874; the
         # chain numbered from the free valence: '2-(methyldisulfanyl)ethyl').
-        _chalc = [n for n in nbrs if mol.GetAtomWithIdx(n).GetSymbol() in ('O', 'S')]
+        _chalc = [n for n in nbrs if mol.GetAtomWithIdx(n).GetSymbol() in ('O', 'S', 'Se', 'Te')]
         if _chalc:
             if not (sym == 'S' and len(_chalc) == 1
                     and _is_clean_disulfide_partner(mol, _chalc[0], idx, sub_set)):
@@ -4244,7 +4251,7 @@ def _name_ether_substituted_chain(
                     and (('(' in oxy or '[' in oxy) or starts_with_locant(oxy)
                          or is_substituted_substituent(oxy))):
                 oxy = apply_enclosing_marks(oxy, -1)
-        else:  # S -> (R)sulfanyl concatenation)
+        else:  # S / Se / Te -> (R)sulfanyl / (R)selanyl / (R)tellanyl concatenation)
             # Name the R side with the proper substituent namer so a RING-bearing
             # R (benzyl -> 'benzyl') is not flattened to a carbon count
             # (get_sulfanyl_prefix mis-counts benzyl's 7 carbons as 'heptyl').
@@ -4286,9 +4293,9 @@ def _name_ether_substituted_chain(
             # ALWAYS enclosed (escalating when it already carries brackets):
             # '(benzylsulfanyl)', '[(methoxymethyl)sulfanyl]'. The outer mark
             # escalates again on the parent.
-            _r_enclosed = (apply_enclosing_marks(_r_name, -1)
-                           if is_complex_substituent(_r_name) else _r_name)
-            oxy = apply_enclosing_marks(f"{_r_enclosed}sulfanyl", -1)
+            _r_enclosed = apply_enclosing_marks(_r_name, -1) if is_complex_substituent(_r_name) else _r_name
+            _sfx = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}[mol.GetAtomWithIdx(o_idx).GetSymbol()]
+            oxy = apply_enclosing_marks(f"{_r_enclosed}{_sfx}", -1)
         groups[oxy].append(pos[bb_c])
 
     # ---- multiplier + locant licence, both DELEGATED. ----
@@ -4738,6 +4745,8 @@ def acid_name_to_acyl_prefix(acid_name: str) -> Optional[str]:
     retained = _ACID_TO_ACYL_RETAINED.get(low)
     if retained:
         return retained
+    if is_chalcogen_o_acid(low):  #: '-thioic O-acid' -> '-thioyl'
+        return chalcogen_o_acid_to_acyl(name)
     if low.endswith(('thioic acid', 'selenoic acid', 'telluroic acid',
                      'peroxoic acid', 'imidic acid', 'ohydroximic acid',
                      'thioacetic acid', 'selenoacetic acid', 'telluroacetic acid',
@@ -4787,7 +4796,7 @@ def acyl_prefix_from_branch(mol, carbonyl_c: int, attach_idx: int,
         return None
     oxo = [
         nb.GetIdx() for nb in c_atom.GetNeighbors()
-        if nb.GetSymbol() == 'O' and nb.GetIdx() in acyl_set
+        if nb.GetSymbol() in ('O', 'S', 'Se', 'Te') and nb.GetIdx() in acyl_set  #
         and mol.GetBondBetweenAtoms(
             carbonyl_c, nb.GetIdx()).GetBondTypeAsDouble() == 2.0
     ]
@@ -8427,7 +8436,7 @@ def _name_substituent_fragment_uncached(
     # charge guard below. Fail-closed on any other
     # P-oxo shape (see carbon_free_phospho_prefix); the top-level /OPSIN
     # gate voids any non-RT composed name, so 0-wrong holds.
-    if attach_idx is not None and mol.GetAtomWithIdx(attach_idx).GetSymbol() == 'P':
+    if attach_idx is not None and mol.GetAtomWithIdx(attach_idx).GetSymbol() in ('P', 'As', 'Sb'):  #
         from ..rules.phosphorus import carbon_free_phospho_prefix
         _pp = carbon_free_phospho_prefix(mol, sub_atoms, attach_idx)
         if _pp is not None:
@@ -9161,9 +9170,7 @@ def _name_substituent_fragment_uncached(
         1 for i in sub_atoms
         if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
     )
-    prefix_name = parent_to_prefix(
-        parent_name, chain_length=carbon_count,
-        attach_locant=ATTACH_LOCANT_UNKNOWN)
+    prefix_name = fragment_parent_to_prefix(mol, sub_atoms, attach_idx, parent_name, carbon_count)
 
     return _add_substituent_stereo(mol, sub_atoms, prefix_name, attach_idx=attach_idx)
 

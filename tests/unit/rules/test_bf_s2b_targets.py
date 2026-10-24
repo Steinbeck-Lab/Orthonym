@@ -73,8 +73,6 @@ CLASS_TARGETS = [
                  '(1R,3aR,4Z,8S,12aR,13S)-1,4,8,12-tetramethyl-1,2,3,3a,6,7,8,9,10,12a-decahydro-1,11-ethanocyclopenta[11]annulen-13-ol'),
     pytest.param('CC(C)[C@H]1CC[C@]([C@H]2[C@@H]1[C@@H]3[C@]4(CCC[C@](O4)(C[C@H]2O3)C)C)(C)O',
                  '(1S,4R,4aR,5R,6R,10S,12R,12aS)-1,6,10-trimethyl-4-(propan-2-yl)tetradecahydro-5,12:6,10-diepoxybenzo[10]annulen-1-ol'),
-    pytest.param('C[Si](C)(C)C1=C[C@@H]2C=C[C@H]3[C@H]4C3(C1[C@H]2C4)[Si](C)(C)C',
-                 '(1S,4R,4aS,5aS)-1a,2-bis(trimethylsilyl)-1a,1b,4,4a,5,5a-hexahydro-1H-1,4-ethenocyclopropa[a]pentalene'),
     pytest.param('CCOC(=O)C1([C@@H]2[C@H]1[C@H]3C4=CC=CC=C4[C@@H]2O3)CC(=O)C',
                  'ethyl (1aR,2S,7R,7aS)-1-(2-oxopropyl)-1a,2,7,7a-tetrahydro-1H-2,7-epoxycyclopropa[b]naphthalene-1-carboxylate'),
     pytest.param('CC(C)C[C@@H]1CCC2CC[C@H](C[C@H]1C(=O)O)C3=CC(=C(C=C3CC2)OC)OC',
@@ -83,6 +81,20 @@ CLASS_TARGETS = [
                  '(2aS,3S,5aR,6R,9S,10aS,10bS)-3,6,10b,11,11-pentamethyldodecahydro-2H-5a,9-methanocyclobuta[a]heptalen-3-ol'),
 ]
 ALL_TARGETS = BB_TARGETS + DEV_TARGETS + CLASS_TARGETS
+
+# A dev row of the bridged fused names whose two trimethylsilyl groups decide the parent: with no principal group
+# the senior atom gives the parent, (the Blue Book, "The senior parent structure, whether cyclic or
+# acyclic, has the senior atom in accordance with the seniority of classes... N > P > As > Sb > Bi > Si > Ge > Sn
+# > Pb > B >... > C. This criterion is applied to select the senior atom in parents and to choose between rings and
+# chains", and:18919 "A single senior atom is sufficient to give seniority to the parent hydride"), so
+# the PIN is the multiplicative name of the silanes, as in the book's '(1,4-phenylene)bis(dimethylsilane) (PIN)'
+# (:38260) and '(thiophene-2,5-diyl)bis(trimethylstannane) (PIN) (Sn preferred to S, see ' (:38264), both
+# under "Substituted parent hydrides" (:38218). The fused name below is the correct systematic name of the
+# molecule (read back to it), the part of this slice that the row tests, and it is not the PIN: this test used to
+# assert pin_verified. UNVERIFIED for this skeleton: the worked examples are monocyclic diyl groups, the rule text
+# is general; the multiplicative name of a bridged fused diyl is not built.
+SILYL_ROW = ('C[Si](C)(C)C1=C[C@@H]2C=C[C@H]3[C@H]4C3(C1[C@H]2C4)[Si](C)(C)C',
+             '(1S,4R,4aS,5aS)-1a,2-bis(trimethylsilyl)-1a,1b,4,4a,5,5a-hexahydro-1H-1,4-ethenocyclopropa[a]pentalene')
 
 
 def _row(smiles, tier):
@@ -99,3 +111,15 @@ def test_s2b_target_is_the_verified_pin(smiles, name, tier):
     row = _row(smiles, tier)
     assert (row.get("name"), row["tier"]) == (name, "pin_verified"), (row.get("name"), row["tier"])
     assert name_is_rt_exact(name, smiles)
+
+
+@pytest.mark.opsin_gate
+def test_s2b_bridged_fused_name_of_a_molecule_whose_pin_is_on_its_silanes():
+    smiles, name = SILYL_ROW
+    assert name_is_rt_exact(name, smiles)
+    default = _row(smiles, "pin")
+    assert default["tier"] != "pin_verified" and not default["is_pin"], default
+    breadth = _row(smiles, "best-effort")
+    assert breadth.get("name") == name and breadth["tier"] != "pin_verified" and not breadth["is_pin"], breadth
+    assert any(f.get("rule") == "P-44.1.2" for f in breadth.get("spelling_failures") or []), breadth
+

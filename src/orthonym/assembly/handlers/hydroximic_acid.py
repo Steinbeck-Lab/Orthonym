@@ -79,6 +79,16 @@ def name_hydroximic_acid(
     if _mol.GetAtomWithIdx(o_on_n).GetDegree() != 1:
         return None
 
+    # An -SH / -SeH / -TeH acid ('N-hydroxycyclohexanecarboximidoselenoic acid
+    # (PIN)',, the Blue Book): 'N-hydroxy' is put in front of the
+    # core name, which is right only when the core cites no prefix of its own
+    # (otherwise 'N-hydroxy' belongs among them,. So the acyl group must
+    # be a bare unbranched carbon chain or a bare monocycle; else decline.
+    acid_x = _mol.GetAtomWithIdx(match[3])
+    if acid_x.GetSymbol() != 'O' and not _bare_acyl_group(_mol, match[0], n_idx,
+                                                          match[3]):
+        return None
+
     # Build the imidic-acid core: strip the imino-N -OH (=N-OH -> =NH).
     try:
         rw = Chem.RWMol(_mol)
@@ -110,6 +120,34 @@ def name_hydroximic_acid(
         ),
         atom_to_locant_hint=None,
     )
+
+
+def _bare_acyl_group(mol: Any, c_idx: int, n_idx: int, x_idx: int) -> bool:
+    """True when the group on the acid carbon (all atoms reached from it without
+    passing its =N- and -XH) is nothing, an unbranched acyclic carbon chain bonded
+    by its end, or the atoms of one ring and nothing else -- a parent that cites no
+    substituent prefix."""
+    seen, stack = set(), [nb.GetIdx() for nb in mol.GetAtomWithIdx(c_idx).GetNeighbors()
+                          if nb.GetIdx() not in (n_idx, x_idx)]
+    while stack:
+        i = stack.pop()
+        if i in seen or i in (c_idx, n_idx, x_idx):
+            continue
+        seen.add(i)
+        stack.extend(nb.GetIdx() for nb in mol.GetAtomWithIdx(i).GetNeighbors())
+    if not seen:
+        return True
+    ring_info = mol.GetRingInfo()
+    if any(mol.GetAtomWithIdx(i).IsInRing() for i in seen):
+        return any(set(r) == seen for r in ring_info.AtomRings())
+    if any(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in seen):
+        return False
+    deg = {i: sum(1 for nb in mol.GetAtomWithIdx(i).GetNeighbors() if nb.GetIdx() in seen)
+           for i in seen}
+    attach = [nb.GetIdx() for nb in mol.GetAtomWithIdx(c_idx).GetNeighbors()
+              if nb.GetIdx() in seen]
+    return (len(attach) == 1 and deg[attach[0]] <= 1
+            and all(d <= 2 for d in deg.values()))
 
 
 __all__ = ["name_hydroximic_acid", "_is_hydroximic_acid"]

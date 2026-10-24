@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from rdkit import Chem
+
 from ..name_tree import NameTreeNode, NamingResult
 
 # Map principal-group FG name -> ("X" prefix token, suffix token).
@@ -85,6 +87,22 @@ def name_chalcogen_ester(
     matches = features.functional_groups.get(pg, [])
     if not matches:
         return None
+    if mol is None:
+        mol = getattr(features, "mol", None)
+    if len(matches) == 2 and mol is not None:
+        name = _name_bis_chalcogen_diester(features, mol, matches, x_prefix, x_suffix)
+        if name is not None:
+            pool = get_current_pool()
+            cand = pool.add(name, "chalcogen_ester", features)
+            if cand is None:
+                return None
+            return NamingResult(
+                name=cand.name,
+                tree=NameTreeNode(parent_stem=cand.name, class_id="chalcogen_ester",
+                                  iupac_section_cite="P-65.6.3.3.7.1",
+                                  fragment_legacy=cand.name),
+                atom_to_locant_hint=None,
+            )
     match = matches[0]
     if len(match) < 4:
         return None
@@ -167,6 +185,61 @@ def name_chalcogen_ester(
         tree=NameTreeNode(parent_stem=final_name, class_id="chalcogen_ester", iupac_section_cite="P-65.6", fragment_legacy=final_name),
         atom_to_locant_hint=None,
     )
+
+
+def _name_bis_chalcogen_diester(features: Any, mol: Any, matches: list,
+                                x_prefix: str, x_suffix: str) -> Optional[str]:
+    """The diester of an unbranched alkanedicarbothioic (-seleno, -telluro) S-acid
+    with two identical organyl groups: (the Blue Book)
+    'CH3-S-CO-CO-S-CH3 S,S-dimethyl ethanebis(thioate) (PIN)' (:32005). The acid
+    is 'ethanebis(thioic S-acid)': (b) (:7106) cites 'thioic acid' and its
+    Se and Te analogues with 'bis', as in 'butanebis(thioic acid) (PIN)' (:30237).
+
+    Fail closed (None, the single-ester path then runs) unless: the two ester
+    carbons end one unbranched saturated acyclic carbon chain, the two organyl
+    groups are separate branches with the same name, every heavy atom is one of
+    those, and the molecule has no stereo element."""
+    from ..naming_utils import enclose_if_compound, multiplied_component
+
+    if getattr(features, 'stereocenters', None) or getattr(
+            features, 'double_bond_stereo', None):
+        return None
+    (c1, o1, x1, a1), (c2, o2, x2, a2) = (tuple(m[:4]) for m in matches)
+    alk1 = set(_collect_subgraph(mol, a1, exclude={x1}))
+    alk2 = set(_collect_subgraph(mol, a2, exclude={x2}))
+    if c1 in alk1 or c2 in alk2 or alk1 & alk2:
+        return None
+    acid = set(_collect_subgraph(mol, c1, exclude={o1, x1, o2, x2}))
+    if c2 not in acid or acid & (alk1 | alk2):
+        return None
+    heavy = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() > 1}
+    if heavy != acid | alk1 | alk2 | {o1, x1, o2, x2}:
+        return None
+    # one unbranched saturated carbon chain from c1 to c2
+    for idx in acid:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetSymbol() != 'C' or atom.IsInRing() or atom.GetFormalCharge():
+            return None
+        n_in = sum(1 for nb in atom.GetNeighbors() if nb.GetIdx() in acid)
+        if n_in != (1 if idx in (c1, c2) else 2):
+            return None
+    for bond in mol.GetBonds():
+        if (bond.GetBeginAtomIdx() in acid and bond.GetEndAtomIdx() in acid
+                and bond.GetBondType() != Chem.BondType.SINGLE):
+            return None
+    w1 = _name_alkyl_side(mol, tuple(sorted(alk1)), anchor=a1)
+    w2 = _name_alkyl_side(mol, tuple(sorted(alk2)), anchor=a2)
+    if not w1 or w1 != w2:
+        return None
+    try:
+        from ...data.chain_names import get_chain_prefix
+        stem = get_chain_prefix(len(acid))
+    except (ValueError, KeyError, ImportError):
+        return None
+    if not stem:
+        return None
+    organyl = multiplied_component(2, w1, enclose_if_compound(w1))
+    return f"{x_prefix},{x_prefix}-{organyl} {stem}anebis({x_suffix})"
 
 
 def _collect_subgraph(

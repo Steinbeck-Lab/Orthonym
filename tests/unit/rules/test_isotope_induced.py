@@ -14,6 +14,10 @@ Cited rules (the Blue Book, with their section headings):
   Examples that put a descriptor of the acid part of an ester after the alkyl word: 'ethyl (R)-4-nitrobenzene-
   1-sulfinate (PIN)' The chirality symbols 'R/S',:46268) and 'methyl (S)-[methyl(phenyl)
   phosphinate] (PIN)' Phosphates, phosphonates, and related compounds,:46022).
+* Sphere I. (:45002), Example 3: '[(R)-germyl(methoxy)(methylsulfanyl)methyl]silane (PIN) (the locant
+  '1' is related to the digraph; it is not required in the name)'; '(R)-bromo(chloro)fluoromethane (PIN)'
+  (:45012): the descriptor of a one-carbon root (a 'methyl' group, a methane or methanol parent) is cited
+  without the locant 1: '4-[(R)-fluoro(2H1)methyl]benzoic acid', '(R)-fluoro(2H1)methanol'.
 *: the descriptors of one group are cited in ascending order of their locants
   ('(2R,3R)-' and a centre at 5 give '(2R,3R,5S)-').
 * Multiple types of enclosing marks,: the parentheses of a descriptor count in the
@@ -94,6 +98,19 @@ def test_a_front_descriptor_is_misplaced_when_the_centre_is_in_a_later_word_or_i
     assert not II._front_is_misplaced("(1-2H1)propan-2-yl 4-bromobenzene-1-sulfonate")
 
 
+def test_the_locant_1_of_a_one_carbon_root_is_left_out():
+    group = "4-[fluoro(2H1)methyl]benzoic acid"
+    off = group.index("[") + 1
+    assert II._one_carbon_root(group, off) and not II._one_carbon_root(group, 0)
+    assert II._cited(group, {off: II._root_locant_left_out([(1, "R")], group, off)}) == (
+        "4-[(R)-fluoro(2H1)methyl]benzoic acid")
+    assert II._one_carbon_root("fluoro(2H1)methanol", 0) and not II._one_carbon_root("(2-2H1)ethan-1-ol", 0)
+    # a root of two carbons keeps its locant; so do two descriptors
+    ethyl = "4-[1-fluoro(1-2H1)ethyl]benzoic acid"
+    assert not II._one_carbon_root(ethyl, ethyl.index("[") + 1)
+    assert II._root_locant_left_out([(1, "R"), (2, "S")], group, off) == [(1, "R"), (2, "S")]
+
+
 def test_a_descriptor_joins_the_group_the_scope_opens_with_in_locant_order():
     name = "[(2R,3R)-2-ethyl(5-3H1)oxolan-3-yl]oxy"
     off = name.index("(2R")
@@ -146,6 +163,30 @@ def test_the_stereodescriptors_of_the_induced_centres_are_cited(smiles, expected
     res = name_best_effort(smiles)
     assert res["name"] == expected, rule
     assert name_is_rt_exact(res["name"], smiles)
+
+
+#: (:45002): the one-carbon root cites its descriptor without the locant; pin_verified at both tiers
+ONE_CARBON = [
+    ("OC(=O)c1ccc(cc1)[C@H](F)[2H]", "4-[(R)-fluoro(2H1)methyl]benzoic acid"),
+    ("OC(=O)c1ccc(cc1)[C@@H](F)[2H]", "4-[(S)-fluoro(2H1)methyl]benzoic acid"),
+    ("C1CCCCC1[C@H](F)[2H]", "[(R)-fluoro(2H1)methyl]cyclohexane"),
+    ("O[C@H](F)[2H]", "(R)-fluoro(2H1)methanol"),
+    ("F[C@H](Cl)[2H]", "(R)-chloro(fluoro)(2H1)methane"),
+    # a root of two or more carbons keeps the locant of its centre
+    ("OC[C@H](F)[2H]", "(2R)-2-fluoro(2-2H1)ethan-1-ol"),
+    ("C[C@@H](O)[2H]", "(1S)-(1-2H1)ethan-1-ol"),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,expected", ONE_CARBON, ids=[e[1][:40] for e in ONE_CARBON])
+def test_a_one_carbon_root_cites_its_descriptor_without_the_locant(smiles, expected):
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
+    for flags in ({}, _emit_tier_flags("best-effort")):
+        row = Orthonym(style="pin", **flags).name_tiered(smiles)
+        assert (row["name"], row["tier"]) == (expected, "pin_verified"), row
+        assert name_is_rt_exact(row["name"], smiles)
 
 
 @pytest.mark.opsin_gate

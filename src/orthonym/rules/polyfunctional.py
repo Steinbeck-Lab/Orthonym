@@ -3131,7 +3131,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
                     if _loc is None:
                         _hxc_ok = False
                         break
-                    _hxc_prefixes.append(format_fg_prefix('hydroxy', [_loc], 1))
+                    _hxc_prefixes.append(format_fg_prefix(_acid_chalcogen_prefix(mol, _oc), [_loc], 1))
                     _hxc_prefixes.append(
                         format_fg_prefix('(hydroxyimino)', [_loc], 1))
                 if _hxc_ok:
@@ -3988,13 +3988,32 @@ _CHALCOGEN_YLIDENE_PREFIX = {
 _CHALCOGEN_YL_PREFIX = {
     'O': 'hydroxy', 'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl',
 }
+
+
+def _acid_chalcogen_prefix(mol, atom_idx):
+    """The prefix of the acid chalcogen of a hydroximic acid demoted at a chain end: 'hydroxy', or 'sulfanyl',
+    'selanyl', 'tellanyl' where the acid is the S, Se or Te analogue, the Blue Book). The
+    hydroximic_acid pattern admits no other element."""
+    return _CHALCOGEN_YL_PREFIX[mol.GetAtomWithIdx(atom_idx).GetSymbol()]
+
+
 _CHAIN_END_CHALCOGEN_ACID_FGS = frozenset({
     'thioic_S_acid', 'thioic_O_acid', 'dithioic_acid',
     'selenoic_Se_acid', 'selenoic_O_acid', 'diselenoic_acid',
     'telluroic_Te_acid', 'telluroic_O_acid', 'ditelluroic_acid',
 })
+#:: the -SH / -SeH / -TeH analogues of the imidic and hydrazonic acids
+#: (C, =N, [N,] -XH); demoted at a chain end they become '<X>yl' + 'imino' or
+#: 'hydrazinylidene', as the imidic acid becomes 'hydroxy' + 'imino'.
+_CHAIN_END_IMIDO_CHALCOGEN_ACID_FGS = frozenset({
+    'imidothioic_acid', 'imidoselenoic_acid', 'imidotelluroic_acid',
+})
+_CHAIN_END_HYDRAZONO_CHALCOGEN_ACID_FGS = frozenset({
+    'hydrazonothioic_acid', 'hydrazonoselenoic_acid', 'hydrazonotelluroic_acid',
+})
 _CHAIN_END_ACID_DERIVATIVE_FGS = (
-    frozenset({'imidic_acid', 'hydrazide'}) | _CHAIN_END_CHALCOGEN_ACID_FGS)
+    frozenset({'imidic_acid', 'hydrazide'}) | _CHAIN_END_CHALCOGEN_ACID_FGS
+    | _CHAIN_END_IMIDO_CHALCOGEN_ACID_FGS | _CHAIN_END_HYDRAZONO_CHALCOGEN_ACID_FGS)
 
 
 def _chain_end_acid_derivative_prefixes(mol, fg_name, matches, chain_set,
@@ -4042,6 +4061,22 @@ def _chain_end_acid_derivative_prefixes(mol, fg_name, matches, chain_set,
         if fg_name == 'imidic_acid':
             _pair = ('hydroxy', 'imino')
             _used = (_m[1], _m[2])
+        elif fg_name in _CHAIN_END_IMIDO_CHALCOGEN_ACID_FGS:
+            # (C, =NH, -XH) -> '<X>yl' + 'imino'
+            _yl = _CHALCOGEN_YL_PREFIX.get(_atoms[2].GetSymbol())
+            if _yl is None:
+                return None
+            _pair = (_yl, 'imino')
+            _used = (_m[1], _m[2])
+        elif fg_name in _CHAIN_END_HYDRAZONO_CHALCOGEN_ACID_FGS:
+            # (C, =N-, -NH2, -XH) -> '<X>yl' + 'hydrazinylidene'
+            if len(_m) < 4:
+                return None
+            _yl = _CHALCOGEN_YL_PREFIX.get(_atoms[3].GetSymbol())
+            if _yl is None:
+                return None
+            _pair = (_yl, 'hydrazinylidene')
+            _used = (_m[1], _m[2], _m[3])
         elif fg_name == 'hydrazide':
             if len(_m) < 4:
                 return None

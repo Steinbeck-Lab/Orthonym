@@ -512,6 +512,12 @@ def _organyl_or_junior_prefix(mol, c_idx: int, central_idx: int) -> Optional[str
         token = name_substituent(mol, frozenset(frag), c_idx, allow_mancude=False)
     except Exception:  # noqa: BLE001 - a producer bug must degrade, not crash
         return None
+    if not token or token == 'substituent':
+        # An unbranched chain carrying an acid group of its own: the free-valence-
+        # numbered chain namer cites it as a prefix, (the Blue Book):
+        # '(4-arsonobutyl)phosphonic acid (PIN)' (:36542).
+        from ..assembly.hetero_chain_prefix import unbranched_hetero_chain_prefix
+        token = unbranched_hetero_chain_prefix(mol, sorted(frag), c_idx)
     if (not token or not isinstance(token, str)
             or is_refusal_sentinel(token) or ' ' in token):
         return None
@@ -2147,6 +2153,10 @@ def get_phosphorus_prefix(fg_name: str) -> Optional[str]:
     return PHOSPHORUS_PREFIXES.get(fg_name)
 
 
+_ONO_PREFIX = {'P': get_phosphorus_prefix("phosphonic_acid"),   # 'phosphono'
+               'As': 'arsono', 'Sb': 'stibono'}
+
+
 def carbon_free_phospho_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]:
     """A CARBON-FREE ``-P(=O)(OH)2`` / ``-P(=O)(O-)2`` substituent fragment ->
     its RETAINED detachable prefix.
@@ -2176,15 +2186,19 @@ def carbon_free_phospho_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]
         return None
     sub_set = set(sub_atoms)
     p_atom = mol.GetAtomWithIdx(attach_idx)
-    if p_atom.GetSymbol() != 'P':
+    centre = p_atom.GetSymbol()
+    # "Retained names for substituent groups derived from mononuclear
+    # noncarbon oxoacids" (the Blue Book): '-P(O)(OH)2 phosphono', '-As(O)(OH)2
+    # arsono', '-Sb(O)(OH)2 stibono (preselected prefix)' (:36029-:36031).
+    if centre not in _ONO_PREFIX:
         return None
-    # Carbon-free, single-P fragment.
+    # Carbon-free, single-centre fragment.
     for i in sub_set:
         sym = mol.GetAtomWithIdx(i).GetSymbol()
         if sym == 'C':
             return None
-        if sym == 'P' and i != attach_idx:
-            return None            # a second P (anhydride/chain) -> not this shape
+        if sym in _ONO_PREFIX and i != attach_idx:
+            return None            # a second centre (anhydride/chain) -> not this shape
     if p_atom.GetTotalNumHs() != 0:
         return None                # P-H present (phosphinic family) -> decline
     # The P's oxygen neighbours WITHIN the fragment: exactly one =O + two -O.
@@ -2219,7 +2233,9 @@ def carbon_free_phospho_prefix(mol, sub_atoms, attach_idx: int) -> Optional[str]
         if heavy:
             return None            # an -O-R ester bridge, not a bare acid/anion
     if all(c == 0 and h >= 1 for c, h in zip(charges, hcounts)):
-        return get_phosphorus_prefix("phosphonic_acid")          # 'phosphono'
+        return _ONO_PREFIX[centre]          # 'phosphono' / 'arsono' / 'stibono'
+    if centre != 'P':
+        return None
     if all(c == -1 and h == 0 for c, h in zip(charges, hcounts)):
         # preselected anionic prefix (matches rules/ions.py usage).
         return "phosphonato"

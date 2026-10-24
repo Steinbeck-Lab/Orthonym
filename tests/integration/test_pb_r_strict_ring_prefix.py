@@ -110,8 +110,8 @@ def test_t1_mutation_without_the_producer_the_row_is_declined(monkeypatch, rid, 
 # ---------------------------------------------------------------------------------------------
 
 NEGATIVE = [
-    # BB '4-(ethanethioyl)benzoic acid':30246); the re-run builds '(1-sulfanylideneethyl)'
-    ("thioyl acyl prefix", "CC(=S)c1ccc(C(=O)O)cc1"),
+    # (the thioyl acyl prefix row, BB '4-(ethanethioyl)benzoic acid':30246, left this list: the strict
+    # path builds its PIN, asserted at both tiers in test_pin_class_t12_acid_suffixes.py)
     # BB '3-chloro-7-[(4-chloro-3-nitroquinolin-7-yl)sulfanyl]-4-nitroquinoline' (:22088)
     ("identical ring halves", "O=[N+]([O-])c1cnc2cc(Sc3ccc4c([N+](=O)[O-])c(Cl)cnc4c3)ccc2c1Cl"),
     # BB '2-sulfurocyanidoylcyclohexane-1-carboxylic acid'

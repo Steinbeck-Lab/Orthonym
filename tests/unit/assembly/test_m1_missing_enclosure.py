@@ -24,8 +24,9 @@ def test_w3_methanesulfonyl_quinazolinyl_enclosed(eng):
 
 # NEGATIVE — a simple ring substituent must stay bare (no over-enclosure)
 def test_simple_substituent_stays_bare(eng):
-    # 1,3-dimethyl on a ring: 'methyl' is simple, must NOT gain parens
-    name = eng.name("Cc1cccc(C)c1")
+    # a methyl on a ring: 'methyl' is simple, must NOT gain parens. (1,3-dimethylbenzene is no
+    # witness: its PIN is the retained name 1,3-xylene,, the Blue Book)
+    name = eng.name("Cc1cccc(Cl)c1")
     assert name is not None
     assert "(methyl)" not in name
     assert "methyl" in name

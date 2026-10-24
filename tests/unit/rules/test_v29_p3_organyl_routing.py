@@ -525,22 +525,27 @@ def test_f2_catenated_aba_existing_names_are_byte_identical(smiles, expected):
 
 
 @pytest.mark.parametrize("smiles,why", [
-    ("c1ccccc1SOS",   "ring: the handler's own whole-molecule ring guard"),
-    ("C1CCCCC1SOS",   "ring: the handler's own whole-molecule ring guard"),
-    ("c1ccccc1CSOS",  "ring: the handler's own whole-molecule ring guard"),
-    ("BrCSOS",        "halogen: the handler's own C-or-chalcogen-only scan"),
     ("OCCSOS",        "heteroatom organyl: P-41 seniority, guard keeps it closed"),
 ])
 def test_f2_catenated_aba_other_guards_still_fail_closed(smiles, why):
-    """TRIPWIRE. The migration widens ONE guard, not the handler's scope.
-
-    ``name_heterochalcogen_aba`` carries two further whole-molecule guards --
-    ``NumRings > 0`` and "every heavy atom is a chalcogen or a carbon" -- that
-    independently refuse ring-bearing and halogenated organyls. They are NOT in
-    this task's scope, so those classes must still fail closed here; if one of
-    them starts emitting, the migration reached further than the call site.
-    """
+    """TRIPWIRE. An organyl carrying a suffix-capable group stays closed."""
     assert _aba(smiles) is None, why
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("c1ccccc1SOS",   "phenyldithioxane"),
+    ("C1CCCCC1SOS",   "cyclohexyldithioxane"),
+    ("c1ccccc1CSOS",  "benzyldithioxane"),
+    ("BrCSOS",        "(bromomethyl)dithioxane"),
+])
+def test_f2_catenated_aba_ring_and_halogen_organyls_are_named(smiles, expected):
+    """PIN class program Task 14. The whole-molecule ring guard and the
+    C-or-chalcogen-only scan used to refuse ring-bearing and halogenated organyl
+    groups. (the Blue Book) "Compounds of the type a[ba]n are
+    parent hydrides": 'C6H5-S-O-S-CH3 methyl(phenyl)dithioxane (PIN)' (:39417) has a
+    ring organyl, so the guards now refuse only a chalcogen ring atom and a
+    halogen not on an organyl carbon; the organyl guard names the rest."""
+    assert _aba(smiles) == expected
 
 
 # ==========================================================================

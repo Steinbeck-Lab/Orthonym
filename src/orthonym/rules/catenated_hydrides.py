@@ -408,8 +408,9 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
     one H or one pure organyl; neutral, non-radical, acyclic, single fragment; the
     only non-chalcogen heavy atoms are terminal organyl carbons. A homogeneous
     chalcogen chain (-> chalcogen_chain), a carbon-in-backbone chain
-    (-> skeletal_replacement), a Group-14 a[ba]n (-> catenated_hydride), a ring,
-    an ion, or a radical fails a guard and cascades onward.
+    (-> skeletal_replacement), a Group-14 a[ba]n (-> catenated_hydride), a
+    chalcogen ring atom, an ion, or a radical fails a guard and cascades onward;
+    a carbocyclic terminal organyl (phenyl) is named like any other organyl.
 
     The ``-ol`` suffix fires only for a BARE parent (no organyl
     substituent anywhere) with exactly one terminal ``-OH`` and no other
@@ -425,13 +426,21 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    if mol.GetRingInfo().NumRings() > 0:
+    # The chalcogen chain itself is acyclic; a terminal organyl may be a ring
+    # ('C6H5-S-O-S-CH3 methyl(phenyl)dithioxane (PIN)',,
+    # the Blue Book), named by the organyl guard of _try_aba_parent. A
+    # chalcogen ring atom (a thiophene or oxolane organyl) declines here.
+    _ring_info = mol.GetRingInfo()
+    if any(_ring_info.NumAtomRings(a.GetIdx()) > 0
+           for a in mol.GetAtoms() if a.GetSymbol() in _CHALCOGEN_ATERM):
         return None
     for atom in mol.GetAtoms():
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
-    # Every heavy atom is a chalcogen or a carbon (organyl); collect chalcogens.
+    # Every heavy atom is a chalcogen, a carbon (organyl) or a halogen on an
+    # organyl carbon (a prefix-only group the organyl guard names: '4-chlorophenyl');
+    # collect chalcogens.
     chal = []
     for atom in mol.GetAtoms():
         sym = atom.GetSymbol()
@@ -439,6 +448,10 @@ def name_heterochalcogen_aba(mol) -> Optional[str]:
             continue
         if sym in _CHALCOGEN_ATERM:
             chal.append(atom.GetIdx())
+        elif sym in ('F', 'Cl', 'Br', 'I'):
+            if (atom.GetDegree() != 1
+                    or atom.GetNeighbors()[0].GetSymbol() != 'C'):
+                return None
         elif sym != 'C':
             return None                          # stray heteroatom -> not this class
     if len(chal) < 3:

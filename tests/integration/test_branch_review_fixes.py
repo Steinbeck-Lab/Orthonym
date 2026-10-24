@@ -28,7 +28,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     "c12c(C/C=C(/CO)C)c(cc(O)c2C(=O)C[C@@H](c2cc(c(cc2)O)O)O1)O",
     "C/C(=C(/CC(=O)OC)\\C(=O)OC)/NC1CCCCC1",
     "C/C(=C\\Cc1c(O)cc(O)c2c1O[C@H](c1ccc(O)c(O)c1)CC2=O)CO",
-    "CC(=S)c1ccc(C(=O)O)cc1",
     "COC(=O)CC(=C(C)N)C(=O)OC",
     # (the two sulfinylbenzimidazoles left this set: the first run names them, RERUN_NOW_FIRST_RUN below)
     # PIN class program Task 2: the two spellings of '(3Z,6Z)-3-benzylidene-6-[(4-
@@ -61,7 +60,6 @@ BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
     "c12c(C/C=C(/CO)C)c(cc(O)c2C(=O)C[C@@H](c2cc(c(cc2)O)O)O1)O",
     "C/C(=C(/CC(=O)OC)\\C(=O)OC)/NC1CCCCC1",
     "C/C(=C\\Cc1c(O)cc(O)c2c1O[C@H](c1ccc(O)c(O)c1)CC2=O)CO",
-    "CC(=S)c1ccc(C(=O)O)cc1",
     "COC(=O)CC(=C(C)N)C(=O)OC",
     "C[C@@H](CN(C[C@@H]1CCC=CC1)C)O",
     "O=S(=O)(O)OC/C=C/c1ccc(O)cc1",
@@ -103,8 +101,9 @@ RERUN_ONLY = [
     # dev2000 ('N[C@@H](Cn1ccc(=O)[nH]c1=O)C(=O)O' left this list in PB lane R, T5: the azine ring-yl is the
     # strict path's own name)
     "O=S(=O)(O)OC/C=C/c1ccc(O)cc1",
-    # Blue Book row and a minimal analogue
-    "CC(=S)c1ccc(C(=O)O)cc1",
+    # (the Blue Book row 'CC(=S)c1ccc(C(=O)O)cc1' left this list: the strict first run builds
+    # '4-(ethanethioyl)benzoic acid (PIN)', the Blue Book, asserted at both tiers in
+    # tests/unit/rules/test_pin_class_t12_acid_suffixes.py)
     # (PB lane R) 'O=C1CC(C2CCC(=O)O2)Oc2ccccc21' left this list: the re-run's ketone-parent name
     # holds no breadth piece (test J below), so it is the strict path's own name
 ]
@@ -154,10 +153,11 @@ def test_a_rerun_name_is_labelled_below_the_pin(smiles):
 
 
 def test_a_best_effort_twin_does_not_certify_a_name_a_breadth_piece_built():
-    # the Blue Book row of: the re-run's '4-(1-sulfanylideneethyl)benzoic acid' is built with a
-    # breadth piece and is not the PIN ('4-(ethanethioyl)benzoic acid', the Blue Book); the sulfinyl-
-    # benzimidazole used before is named by the strict first run since PB lane P
-    smiles = "CC(=S)c1ccc(C(=O)O)cc1"
+    # the re-run name that cites '(sulfooxy)', a part the code records as not the PIN (_RERUN_KNOWN_NON_PIN);
+    # the rows used before are named by the strict first run: the sulfinylbenzimidazoles since PB lane P,
+    # the Blue Book row of ('4-(ethanethioyl)benzoic acid (PIN)', the Blue Book) since the
+    # thioacyl prefix is built from its acid
+    smiles = "O=S(=O)(O)OC/C=C/c1ccc(O)cc1"
     row = _row(smiles, "best-effort")
     assert not is_failure_name(row["name"]), row
     assert row["tier"] != "pin_verified" and not row["is_pin"], row

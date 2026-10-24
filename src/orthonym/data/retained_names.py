@@ -24,8 +24,15 @@ RETAINED_NAMES = {
     "CCc1ccccc1": "ethylbenzene",
     "C=Cc1ccccc1": "styrene",  # ethenylbenzene
     "CC(C)c1ccccc1": "cumene",  # isopropylbenzene
-    # NOTE: xylene isomers are NOT retained names in IUPAC 2013 PIN
-    # Use systematic: 1,2-dimethylbenzene, 1,3-dimethylbenzene, 1,4-dimethylbenzene
+    # "Parent hydrocarbons having retained names" (the Blue Book):
+    # "Toluene and xylene are preferred IUPAC names, but are not freely
+    # substitutable" (:8089); "xylene (1,2-, 1,3-, and 1,4-isomers, PINs) (no
+    # substitution)" (:8097); "Cyclic hydrocarbons" (:25669): '1,2-xylene (PIN)'
+    # (:25699). The three unsubstituted isomers are exact-SMILES keys like toluene, so a
+    # substituted xylene keeps its benzene parent ('1-chloro-2,3-dimethylbenzene').
+    "Cc1ccccc1C": "1,2-xylene",
+    "Cc1cccc(C)c1": "1,3-xylene",
+    "Cc1ccc(C)cc1": "1,4-xylene",
     "c1ccc2ccccc2c1": "naphthalene",
     # a phase: pentalene (PIN per Blue Book line 11459; bicyclo[3.3.0] fully
     # mancude non-benzenoid). HEAD dropped one ring -> 'cyclopenta-1,3-diene'

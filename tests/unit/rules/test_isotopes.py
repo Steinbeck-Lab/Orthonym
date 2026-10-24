@@ -574,6 +574,7 @@ class TestUniformMultiplierBracketStepUp:
         # Invariant 9: the demux path (no isotope) and a single (13C)methyl prefix
         # (count 1) are untouched by the new branch.
         from orthonym.namer import name_compound
-        assert name_compound("Cc1ccccc1C", style="pin") == "1,2-dimethylbenzene"
+        # (o-xylene is the retained PIN,, the Blue Book; change-asserted-value as in test_benzene.py)
+        assert name_compound("Cc1ccccc1C", style="pin") == "1,2-xylene"
         assert name_compound("Cc1cccnc1[13CH3]", style="pin") == \
             "2-(13C)methyl-3-methylpyridine"

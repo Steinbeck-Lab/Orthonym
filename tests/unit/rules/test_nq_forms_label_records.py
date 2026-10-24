@@ -88,11 +88,14 @@ def test_the_writer_records_the_general_spelling_it_ships(monkeypatch, smiles, f
 # groups, and the two acetic-acid rows / name as the
 # PIN already) must stay pin_verified -- the demotion is scoped to the
 # chalcogen-acyl case, not every acyl-substituted benzoic/acetic acid.
-MC2_ABSTAIN_ROWS = [
-    ("S=C(S)c1ccccc1C(=S)S", "1,2-bis[sulfanyl(sulfanylidene)methyl]benzene"),
-    ("OC(=O)c1ccccc1C(=S)S", "2-[sulfanyl(sulfanylidene)methyl]benzoic acid"),
-]
+# (The two rows that used to be here, 'S=C(S)c1ccccc1C(=S)S' and 'OC(=O)c1ccccc1C(=S)S', left the abstain rows: the
+# ring takes the suffix 'carbodithioic acid' and, under a carboxylic acid, the prefix 'dithiocarboxy' --
+# (the Blue Book) 'benzene-1,2-dicarbodithioic acid (PIN)' (:30313), (:30893)
+# 'dithiocarboxy (preferred prefix)' (:30907); both are PIN controls below, and every spelling of the old rows
+# would now be a name of the strict path.)
 MC2_PIN_CONTROL_ROWS = [
+    ("S=C(S)c1ccccc1C(=S)S", "benzene-1,2-dicarbodithioic acid"),
+    ("OC(=O)c1ccccc1C(=S)S", "2-(dithiocarboxy)benzoic acid"),
     ("O=Cc1ccc(C(=O)O)cc1", "4-formylbenzoic acid"),
     ("NC(=O)c1ccc(C(=O)O)cc1", "4-carbamoylbenzoic acid"),
     ("NC(=S)c1ccc(C(=O)O)cc1", "4-carbamothioylbenzoic acid"),
@@ -101,20 +104,6 @@ MC2_PIN_CONTROL_ROWS = [
     ("O=C(C(=O)O)c1ccccc1", "oxo(phenyl)acetic acid"),
     ("OC(C(=O)O)=S", "hydroxy(sulfanylidene)acetic acid"),
 ]
-
-
-@pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,systematic_name", MC2_ABSTAIN_ROWS,
-                          ids=[r[1] for r in MC2_ABSTAIN_ROWS])
-def test_the_chalcogen_acyl_general_spelling_is_never_labelled_pin(
-    smiles, systematic_name,
-):
-    pin_row = Orthonym().name_tiered(smiles)
-    assert pin_row.get("tier") == "abstain", pin_row
-    be_row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert be_row.get("name") == systematic_name, be_row
-    assert be_row.get("tier") == "systematic_verified", be_row
-    assert name_is_rt_exact(systematic_name, smiles)
 
 
 @pytest.mark.opsin_gate

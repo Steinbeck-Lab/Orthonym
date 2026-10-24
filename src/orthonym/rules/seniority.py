@@ -117,9 +117,18 @@ SENIORITY_ORDER = [
     # Imidic acid -- N-replacement ranks after the O/S/Se/Te
     # chalcogen-replacement block
     "imidic_acid",
+    # (the Blue Book-:18540): the carboximidic acids
+    # modified by S, Se, Te follow the imidic acid, in that order, and come before
+    # the hydrazonic acid; the hydrazonic acids modified by S, Se, Te follow it.
+    "imidothioic_acid",
+    "imidoselenoic_acid",
+    "imidotelluroic_acid",
     # Hydrazonic acid: =O -> =N-NH2 replacement acid; ranks
     # immediately below imidic acid per the sub-order.
     "hydrazonic_acid",
+    "hydrazonothioic_acid",
+    "hydrazonoselenoic_acid",
+    "hydrazonotelluroic_acid",
     # Hydroximic acid: =O -> =N-OH replacement acid; ranks below
     # hydrazonic acid. PIN is the N-hydroxy derivative of the imidic
     # acid, emitted by the dedicated hydroximic_acid handler
@@ -575,6 +584,15 @@ SUFFIX_FORMS = {
     # imidic acid. Chain 'hydrazonic acid' (methanehydrazonic acid); ring/appended-C
     # 'carbohydrazonic acid'. The C is always chain-terminal (see TERMINAL_FG_TYPES).
     "hydrazonic_acid": ("hydrazonic acid", "carbohydrazonic acid"),
+    # (the Blue Book): 'propanimidothioic acid (PIN)' (:30267),
+    # 'butanehydrazonoselenoic acid (PIN)' (:30269), 'N-hydroxycyclohexane-
+    # carboximidoselenoic acid (PIN)' (:30273); Table 4.3 (:18537-:18538).
+    "imidothioic_acid": ("imidothioic acid", "carboximidothioic acid"),
+    "imidoselenoic_acid": ("imidoselenoic acid", "carboximidoselenoic acid"),
+    "imidotelluroic_acid": ("imidotelluroic acid", "carboximidotelluroic acid"),
+    "hydrazonothioic_acid": ("hydrazonothioic acid", "carbohydrazonothioic acid"),
+    "hydrazonoselenoic_acid": ("hydrazonoselenoic acid", "carbohydrazonoselenoic acid"),
+    "hydrazonotelluroic_acid": ("hydrazonotelluroic acid", "carbohydrazonotelluroic acid"),
     # W3-P02-5 Note): the '-hydroximic acid' suffix is general-only.
     # The PIN is the N-hydroxy derivative of the imidic acid (N-hydroxyethanimidic
     # acid), built by the dedicated hydroximic_acid handler — so NO substitutive
@@ -1071,6 +1089,15 @@ PREFIX_FORMS = {
     # 'hydroxy' + 'hydroxyimino' prefixes on the geminal locant (two-prefix
     # decomposition emitted by name_polyfunctional's chain-end block). None here.
     "hydroximic_acid": None,
+    #: a demoted chalcogen imidic / hydrazonic acid ending a chain
+    # splits into its simple prefix pair ('imino' + 'sulfanyl',...) in
+    # name_polyfunctional's chain-end block; no single static prefix.
+    "imidothioic_acid": None,
+    "imidoselenoic_acid": None,
+    "imidotelluroic_acid": None,
+    "hydrazonothioic_acid": None,
+    "hydrazonoselenoic_acid": None,
+    "hydrazonotelluroic_acid": None,
     "sulfinohydrazonohydrazide": None,  # demoted case fails closed
     "selenonimidamide": None,   # demoted case fails closed
     "seleninimidamide": None,   # demoted case fails closed

@@ -140,7 +140,8 @@ def test_a_shape_without_a_producer_is_declined_at_the_default_tier(smiles):
 
 # (smiles, the name a breadth producer builds, from the PB census trace 4): never pin_verified
 NEGATIVE_CONTROLS = [
-    ("CC(=S)c1ccc(C(=O)O)cc1", "4-(1-sulfanylideneethyl)benzoic acid"),
+    # ('CC(=S)c1ccc(C(=O)O)cc1' left this list: its PIN '4-(ethanethioyl)benzoic acid', the Blue Book, is
+    # built by the strict path, test_pin_class_t12_acid_suffixes.py)
     ("O=[N+]([O-])c1cnc2cc(Sc3ccc4c([N+](=O)[O-])c(Cl)cnc4c3)ccc2c1Cl",
      "4-chloro-7-[(3-chloro-4-nitroquinolin-7-yl)sulfanyl]-3-nitroquinoline"),
     ("N#CS(=O)(=O)C1CCCCC1C(=O)O", "2-(cyanosulfonyl)cyclohexane-1-carboxylic acid"),

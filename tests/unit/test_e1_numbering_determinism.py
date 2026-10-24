@@ -334,7 +334,7 @@ class TestBenzenePcgTier:
         ("Cc1ccccc1O", "2-methylphenol"),
         ("Oc1ccccc1C", "2-methylphenol"),
         ("OC(=O)c1ccccc1Cl", "2-chlorobenzoic acid"),
-        ("Cc1ccc(C)cc1", "1,4-dimethylbenzene"),
+        ("CCc1ccc(CC)cc1", "1,4-diethylbenzene"),
     ])
     def test_protect_rows_byte_identical(self, namer, smiles, expected):
         assert _name(namer, smiles) == expected

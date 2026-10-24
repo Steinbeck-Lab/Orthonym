@@ -203,7 +203,28 @@ FUNCTIONAL_GROUP_SMARTS = {
     # tuple (C, imino-N, O-on-N, hydroxyl-O). The `!$([CX3]([#7,#8])...)` guard
     # keeps the third C neighbour H or carbon (excludes amidoxime CC(=NO)N and
     # any hydroxyimino-carbonic hybrid).
-    "hydroximic_acid": "[CX3;!$([CX3]([#7,#8])(=[NX2][OX2H1])[OX2H1])](=[NX2][OX2H1])[OX2H1]",
+    # The acid chalcogen may also be S, Se or Te: the PIN is then the N-hydroxy
+    # derivative of the imidothioic / imidoselenoic / imidotelluroic acid,
+    # 'N-hydroxycyclohexanecarboximidoselenoic acid (PIN)',
+    # the Blue Book); for those the third C neighbour is H or carbon only.
+    "hydroximic_acid": ("[CX3;!$([CX3]([#7,#8])(=[NX2][OX2H1])[OX2H1]);"
+                        "!$([CX3]([!#6;!#1])(=[NX2][OX2H1])[#16,#34,#52;X2H1])]"
+                        "(=[NX2][OX2H1])[#8,#16,#34,#52;X2H1]"),
+    # Imidic and hydrazonic acids whose -OH is replaced by -SH, -SeH or -TeH
+    #, the Blue Book;,:18537-:18538
+    # '-C(=NH)-SH carboximidothioic acid', '-C(=NH)-SeH carboximidoselenoic acid'):
+    # 'propanimidothioic acid (PIN)' (:30267), 'butanehydrazonoselenoic acid (PIN)'
+    # (:30269). Without these the -SH / -SeH reads as a thiol / selenol suffix and
+    # the =NH as an 'imino' prefix. The third C neighbour is H or carbon, as for
+    # imidic_acid (a heteroatom there makes a carbonic acid derivative,
+    # 'carbamimidothioic acid',. Match tuples (C, imino-N, chalcogen)
+    # and (C, imino-N, amino-N, chalcogen).
+    "imidothioic_acid": "[CX3;!$([CX3]([!#6;!#1])(=[NX2H1])[SX2H1])](=[NX2H1])[SX2H1]",
+    "imidoselenoic_acid": "[CX3;!$([CX3]([!#6;!#1])(=[NX2H1])[SeX2H1])](=[NX2H1])[SeX2H1]",
+    "imidotelluroic_acid": "[CX3;!$([CX3]([!#6;!#1])(=[NX2H1])[TeX2H1])](=[NX2H1])[TeX2H1]",
+    "hydrazonothioic_acid": "[CX3;!$([CX3]([!#6;!#1])(=[NX2][NX3])[SX2H1])](=[NX2][NX3H2])[SX2H1]",
+    "hydrazonoselenoic_acid": "[CX3;!$([CX3]([!#6;!#1])(=[NX2][NX3])[SeX2H1])](=[NX2][NX3H2])[SeX2H1]",
+    "hydrazonotelluroic_acid": "[CX3;!$([CX3]([!#6;!#1])(=[NX2][NX3])[TeX2H1])](=[NX2][NX3H2])[TeX2H1]",
     "thioester": "[CX3](=O)[SX2][#6]",
     # a phase Tier FRN-E: chalcogen-ester ester extension) -- additive per internal notes
     "selenoester": "[CX3](=O)[SeX2][#6]",         # R-C(=O)-Se-R'; Se-alkyl alkaneselenoate)
@@ -1312,6 +1333,20 @@ _SUPPRESS_ATOM_SLICE = {
 }
 
 
+# (the Blue Book): the chalcogen analogues of the imidic and hydrazonic acids own their
+# geminal C(=NH)(XH) / C(=N-NH2)(XH) unit; the -XH matches thiol / selenol / tellurol and the =N- the imine /
+# hydrazone patterns. A hydroximic acid whose acid chalcogen is S, Se or Te owns its -XH the same way.
+_CHALCOGEN_IMIDIC_COLLISIONS = [
+    ('imidothioic_acid', ['imine', 'thiol']),
+    ('imidoselenoic_acid', ['imine', 'selenol']),
+    ('imidotelluroic_acid', ['imine', 'tellurol']),
+    ('hydrazonothioic_acid', ['hydrazone', 'imine', 'thiol']),
+    ('hydrazonoselenoic_acid', ['hydrazone', 'imine', 'selenol']),
+    ('hydrazonotelluroic_acid', ['hydrazone', 'imine', 'tellurol']),
+    ('hydroximic_acid', ['thiol', 'selenol', 'tellurol']),
+]
+
+
 def _resolve_fg_collisions(results):
     """Remove generic FG matches that overlap with more-specific FGs.
 
@@ -1622,7 +1657,7 @@ def _resolve_fg_collisions(results):
         # `nitroso` on its atoms — makes the O-vs-C precedence explicit/robust on
         # top of the [#6] guard above.
         ('nitrite', ['nitroso']),
-    ]:
+    ] + _CHALCOGEN_IMIDIC_COLLISIONS:
         if fg_specific in results:
             specific_atoms = set()
             _slice = _SUPPRESS_ATOM_SLICE.get(fg_specific)
