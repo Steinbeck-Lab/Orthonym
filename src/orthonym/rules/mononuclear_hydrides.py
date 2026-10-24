@@ -322,55 +322,17 @@ def _classify_mixed_halo_organyl(mol, hub) -> Optional[List[str]]:
 
 
 def _build_mixed_substituent_string(names: List[str]) -> Optional[str]:
-    """Compose the halogen+organyl prefix block per /, exactly
-    as the Blue Book cites the substitutive halides of B/Si/... parent hydrides:
-    sort ALL substituent base-names alphanumerically; the FIRST unique group takes
-    no enclosing marks, each SUBSEQUENT unique group is enclosed in parentheses
-    with its multiplying prefix OUTSIDE the marks.
+    """The halogen+organyl prefix block of a B/Si/... hub, /: the citation is
+    :func:`assembly.prefix_marks.mononuclear_substituent_block` (its one home), with this hub's bound of eight
+    equal groups (None beyond it).
 
         ['chloro','chloro','chloro','methyl'] -> 'trichloro(methyl)' (BB 35754)
         ['chloro','chloro','methyl'] -> 'dichloro(methyl)' (BB 39668)
         ['chloro','methyl','methyl'] -> 'chlorodi(methyl)' (BB 25866)
         ['bromo','chloro','phenyl'] -> 'bromo(chloro)(phenyl)' (BB 35750)
-
-    Returns None if a multiplicity exceeds the supported multiplier table."""
-    from collections import Counter
-
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks,
-        enclose_if_compound,
-        multiplied_component,
-        prefix_citation_sort_key,
-    )
-    # -CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
-    # it), but the multiplier WORD now comes from the shared primitive, which
-    # knows (a). This table could only ever say `di`/`tri`, so a
-    # SUBSTITUTED prefix here emitted `tri(2-methylpropyl)arsane` where the
-    # Blue Book requires `tris(...)`.
-    _SUPPORTED_COUNTS = frozenset(range(1, 9))
-    counts = Counter(names)
-    parts = []
-    #: the organyl guard feeding this is the shared chokepoint, so a prefix
-    # may now carry a locant, a retained italicized prefix, or its own marks. Raw
-    # `sorted` keyed `tert-butyl` on its 't'; / keys on the
-    # letters ('butyl'), which is also what decides whether the compound prefix
-    # lands in the unmarked FIRST slot.
-    for i, name in enumerate(sorted(counts, key=prefix_citation_sort_key)):
-        if counts[name] not in _SUPPORTED_COUNTS:
-            return None
-        if i == 0:
-            # First unique: withholds only the marks that SEPARATE
-            # the groups, so a compound prefix still takes its own marks
-            # (`(cyclohexylmethyl)di(methyl)silane`), and the (b)/(d) italicized
-            # carve-out keeps `di-tert-butyl` hyphenated rather than `ditert-`.
-            marked = enclose_if_compound(name)
-            parts.append(multiplied_component(counts[name], name, marked))
-        else:
-            # Subsequent: marks always, multiplier OUTSIDE them (BB 25866
-            # 'chlorodi(methyl)'), escalating (-> [ over an inner pair.
-            parts.append(multiplied_component(
-                counts[name], name, apply_enclosing_marks(name, -1)))
-    return ''.join(parts)
+    """
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    return mononuclear_substituent_block(names, max_count=8)
 
 
 def _assemble(prefix_block: str, lam: Optional[int], stem: str) -> str:
@@ -1657,40 +1619,13 @@ def _compose_io_prefixes(items) -> Optional[str]:
         [('phenyl',False),('phenyl',False)] -> 'diphenyl'
         [('ethyl',False),('methyl',False)] -> 'ethyl(methyl)'
     """
-    from collections import Counter
-
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks,
-        enclose_if_compound,
-        multiplier_needs_hyphen,
-        prefix_citation_sort_key,
-    )
-    names = [n for n, _ in items]
-    complex_names = {n for n, c in items if c}
-    counts = Counter(names)
-    parts = []
-    #: the S-organyls now come from the shared chokepoint, so a prefix here
-    # may carry a locant or a retained italicized prefix. Two consequences:
-    # * order by /, not raw string order;
-    # * the multiplier goes OUTSIDE the marks. BB 7272 verbatim:
-    # "When the simple substituent groups are accompanied by multiplicative
-    # prefixes such as 'di' and 'tri', the multiplicative prefixes are NOT
-    # included in the parentheses" -- BB 16286 spells the resulting shape,
-    # `tert-butyldi(methyl)phosphane` (PIN). The old `f"({mult}{name})"` put
-    # them inside and produced `imino(dimethyl)` and, once widened, the
-    # ambiguous `imino(dipropan-2-yl)`.
-    for i, name in enumerate(sorted(counts, key=prefix_citation_sort_key)):
-        mult = _IO_PREFIX_MULT.get(counts[name])
-        if mult is None:
-            return None
-        marked = enclose_if_compound(name)
-        if marked == name and ((i > 0) or (name in complex_names)):
-            marked = apply_enclosing_marks(name, -1)
-        if mult and marked == name and multiplier_needs_hyphen(name):
-            parts.append(f"{mult}-{marked}")          # (b)/(d) di-tert-butyl
-        else:
-            parts.append(f"{mult}{marked}")
-    return ''.join(parts)
+    # The citation is the one block (``prefix_marks``): / order, the multiplier outside
+    # the marks (BB 7272; 'tert-butyldi(methyl)phosphane (PIN)',:16286), 'bis' for a compound
+    # group; a group the caller knows to be complex ('methylimino') takes marks as the first too.
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    return mononuclear_substituent_block(
+        [n for n, _ in items], max_count=max(_IO_PREFIX_MULT),
+        enclosed=frozenset(n for n, c in items if c))
 
 
 def name_lambda_sulfane_imine_oxide(mol) -> Optional[str]:

@@ -1921,7 +1921,7 @@ def is_complex_substituent(name: str) -> bool:
     if _RINGYL_ALKYL_RE.search(name_lower):
         return True
     # a phase: a Group-14 silyl/germyl substituent carrying its OWN
-    # prefixes ('trihydroxysilyl', 'hydroxydimethylsilyl', 'aminodimethylsilyl') is
+    # prefixes ('trihydroxysilyl', 'hydroxydi(methyl)silyl', 'aminodi(methyl)silyl') is
     # a compound prefix taking enclosing marks. The bare 'silyl'/'germyl' stems
     # stay simple; 'trimethylsilyl'/'triethylsilyl' are already caught by the
     # alkyl-multiplier regex above. (These prefixed silyl names are all new in
@@ -3703,6 +3703,28 @@ def _strip_leading_marks_and_locants(text: str) -> str:
         text = new
 
 
+def _multiplier_is_structural(text: str, prefix: str, remainder: str) -> bool:
+    """True when the leading 'multiplier' ``prefix`` of ``text`` is part of the name's own stem, so that
+    ``alpha_sort_key`` keeps it, ``the Blue Book``: "The name of a prefix for a substituent
+    is considered to begin with the first letter of its complete name";,:3448, lets only the
+    multiplier of identical SEPARATE prefixes drop out).
+
+    * 'diazenyl' (HN=N-, and 'diazo': the leading 'di' is structural (the two
+      nitrogens of diazene/diazo), never a multiplier; the book multiplies them with bis ('bis(diazenyl)',
+      not 'didiazenyl'). Exact-remainder match so 'diazido' (a genuine 2x azido) still strips to 'azido'.
+    * 'diphosphanyl', 'disilanyl', 'trisulfanyl': a multiplier in front of a hydride group whose
+      multiplication the book spells 'bis(phosphanyl)',:7188; ``CATENATION_AMBIGUOUS_PREFIXES``)
+      is the chain of the hydride, not a multiplier: '3-disilanyl-2-silylhexasilane' (:21681) cites
+      'disilanyl' at 'd'. 'trisulfanyl' also reads as 'tris' + 'ulfanyl'; 'bis', 'tris' and 'tetrakis'
+      multiply an enclosed unit,:7368), so the reading 'tri' + 'sulfanyl' is the one tried."""
+    if remainder in ('azenyl', 'azo'):
+        return True
+    if remainder in _CATENATED_HYDRIDE_GROUP_STEMS:
+        return True
+    return (prefix.endswith('is') and prefix[:-2] + 'i' in _SORTED_ALPHA_PREFIXES
+            and text[len(prefix) - 1:] in _CATENATED_HYDRIDE_GROUP_STEMS)
+
+
 def _alpha_sort_key_core(substituent_name: str) -> str:
     """Generate an alphabetization sort key for IUPAC prefix ordering.
 
@@ -3825,6 +3847,8 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
             remainder = text[len(prefix):]
             # Only strip if there is a remainder (avoid stripping entire word)
             if remainder:
+                if _multiplier_is_structural(text, prefix, remainder):
+                    return text
                 # 'di-tert-butyl': a multiplier on an italicized-prefix name. Both
                 # are ignored -- (:3448) the multiplier, /
                 # (:3477/:3495) the italic 'tert' -- so it keys at
@@ -3881,14 +3905,6 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
                 if remainder.startswith(
                         ('dec', 'cos', 'cont', 'acont', 'nam', 'noyl')):
                     return text
-                # Wave2 T2b: 'diazenyl' (HN=N-, and 'diazo'
-                # — the leading 'di' is structural (the two
-                # nitrogens of diazene/diazo), never a multiplier; the BB
-                # multiplies them with bis ('bis(diazenyl)', not
-                # 'didiazenyl'). Exact-remainder match so 'diazido'
-                # (a genuine 2x azido) still strips to 'azido'.
-                if remainder in ('azenyl', 'azo'):
-                    return text
                 # vs, decided STRUCTURALLY rather than by
                 # whether the caller happened to wrap the string.
                 #
@@ -3930,6 +3946,13 @@ def _alpha_sort_key_core(substituent_name: str) -> str:
                 return remainder
 
     return text
+
+
+# The groups of a hydride whose multiplication takes 'bis' (CATENATION_AMBIGUOUS_PREFIXES, the
+# parents of /: 'di' + one of these is a chain of the hydride ('disilanyl'), not two groups.
+_CATENATED_HYDRIDE_GROUP_STEMS = frozenset(CATENATION_AMBIGUOUS_PREFIXES - {
+    p for p in CATENATION_AMBIGUOUS_PREFIXES if p.startswith(('di', 'tri'))
+}) | frozenset({'silanyl', 'germanyl', 'stannanyl', 'plumbanyl', 'boranyl', 'bismuthanyl'})
 
 
 # Enclosing marks are TYPOGRAPHY, not alphanumerical content.
@@ -4001,8 +4024,15 @@ class AlphaKey(str):
        'tert-butyl' is 'butyl' for both, so without this tier ``sorted``
        kept the input order and one molecule got both spellings;
     3. the key text, which carries the locants when the letters tie
-       ,:3517);
-    4. the original name -- not a rule, it only keeps the order total.
+       ,:3517), and then the prefix's OWN locants in order of appearance
+       (``_own_locants``, the tier ``prefix_citation_sort_key`` reads too; the key text has
+       dropped a leading one);
+    4. the lambda convention (``_lambda_key``) and then the original name, as
+       ``**** NONALPHANUMERICAL ORDER`` (``:3537``) orders its
+       characters ("Letters or numbers are always preferred to any other character"; its
+       example ``3-[amino(methyl)silyl]-3-[(aminomethyl)silyl]cyclopentan-1-ol (PIN)``,:3545:
+       'amino(methyl)silyl' before '(aminomethyl)silyl') -- where the Blue Book says nothing
+       it only keeps the order total.
 
     ``prefix_citation_sort_key`` tier 1 is the same letters string. Python gives
     a subclass's reflected comparison priority, so a plain-string sentinel on
@@ -4011,21 +4041,33 @@ class AlphaKey(str):
     two keys are equal only when every tier is.
     """
 
-    def __new__(cls, text: str, original: str = ''):
+    def __new__(cls, text: str, original: str = '', lam: tuple = None, raw: str = None):
         obj = super().__new__(cls, text)
         obj._original = original
+        obj._lam = _NO_LAMBDA if lam is None else lam
+        obj._raw = raw
+        obj._locs = None
         return obj
+
+    def _own_locs(self) -> tuple:
+        """The prefix's own locants, read from the name as it was given (the key text has
+        dropped its leading ones) and kept after the first read."""
+        if self._locs is None:
+            self._locs = _own_locants(self._raw) if self._raw else ()
+        return self._locs
 
     def _order(self):
         orig = self._original
-        return (_key_letters(self), _italic_prefixes(orig), str(self), orig)
+        return (_key_letters(self), _italic_prefixes(orig), str(self), self._own_locs(), self._lam,
+                _P146Text(orig))
 
     @staticmethod
     def _other_order(other):
         if isinstance(other, AlphaKey):
             return other._order()
         if isinstance(other, str):
-            return (_key_letters(other), (), other, other)
+            return (_key_letters(other), (), other, _own_locants(other), _lambda_key(other),
+                    _P146Text(other))
         return None
 
     def __lt__(self, other):
@@ -4101,7 +4143,8 @@ def alpha_sort_key(substituent_name: str) -> str:
         True
     """
     return AlphaKey(_ENCLOSING_MARKS_RE.sub('', _alpha_sort_key_core(substituent_name)),
-                    strip_alphanumerical_noise(substituent_name.lower()))
+                    strip_alphanumerical_noise(substituent_name.lower()),
+                    _lambda_key(substituent_name), substituent_name)
 
 
 # ---------------------------------------------------------------------------
@@ -4249,6 +4292,94 @@ cip_locant_rank_key([(2, 'E'), (4, 'R'), (8, 'S'), (9, 'Z')])
             tuple(kind for _loc, _rank, kind in rows))
 
 
+# (the Blue Book): the priority of the characters that are not letters or numbers, "listed
+# in decreasing priority order: braces > square brackets > parentheses (round brackets) > periods >
+# commas > semi-colons > colons > hyphens"; "Letters or numbers are always preferred to any other
+# character". The lower rank is the preferred character.
+_P146_RANK = {'{': 1, '}': 1, '[': 2, ']': 2, '(': 3, ')': 3, '.': 4, ',': 5, ';': 6, ':': 7, '-': 8}
+
+
+def _nonalphanumerical_key(text: str) -> tuple:
+    """``text`` as a sort key that orders its characters as does: a letter or number before any
+    other character, the other characters in the Blue Book's priority order, equal characters by
+    their code (so the key stays a total order of the strings)."""
+    return tuple((0 if c.isalnum() else _P146_RANK.get(c, 9), c) for c in text)
+
+
+_NO_LAMBDA = (1, ())
+_LAMBDA_BONDING_RE = re.compile(r"(?:λ|lambda)(\d+)")
+
+
+def _lambda_key(text: str) -> tuple:
+    """The lambda-convention tier of a prefix key: a prefix that names an atom in a nonstandard
+    valence state ('λ5-phosphanyl') is cited before the same prefix without one.
+
+     (h) (``the Blue Book``): "When a choice is needed between the same skeletal atom in different
+    valence states, the one in a nonstandard valence state is assigned the lower locant. If a further
+    choice is needed between the same skeletal atom in two or more nonstandard valence states, the one in
+    the higher valence state is assigned the lower locant", with its example (:3334) "1-(λ5-phosphanyl)-3-
+    phosphanylpropan-2-ol (PIN) (λ5-phosphanyl is cited before phosphanyl and is given the lower
+    locant)". The book states the citation order in that example only: (:3442-3446) leaves Greek
+    letters out of the alphanumerical order, so the two prefixes tie on every tier before this one, and
+    the tier before puts the group with the nonstandard bonding number first (the higher bonding
+    number first between two such groups, as (h) numbers them). The tier sits after the tiers and
+    before, which would otherwise put the plain name first ("Letters or numbers are always
+    preferred to any other character")."""
+    ns = [int(n) for n in _LAMBDA_BONDING_RE.findall(text)]
+    return (0, tuple(sorted((-n for n in ns)))) if ns else _NO_LAMBDA
+
+
+class _P146Text(str):
+    """A name that is ordered as orders characters (``_nonalphanumerical_key``), the key built
+    only when two names tie on everything before it (the comparison of a tuple reaches this element last);
+    equality and hash are the string's."""
+    __slots__ = ()
+
+    def __lt__(self, other):
+        return _nonalphanumerical_key(str(self)) < _nonalphanumerical_key(str(other))
+
+    def __le__(self, other):
+        return _nonalphanumerical_key(str(self)) <= _nonalphanumerical_key(str(other))
+
+    def __gt__(self, other):
+        return _nonalphanumerical_key(str(self)) > _nonalphanumerical_key(str(other))
+
+    def __ge__(self, other):
+        return _nonalphanumerical_key(str(self)) >= _nonalphanumerical_key(str(other))
+
+    __eq__ = str.__eq__
+    __ne__ = str.__ne__
+    __hash__ = str.__hash__
+
+
+def _own_locants(prefix: str, parent_locants: bool = False) -> tuple:
+    """The locants a prefix carries, in ORDER OF APPEARANCE, as sort keys: the tier.
+
+    ``****`` (``the Blue Book``): "*When two or more prefixes consist of identical Roman
+    letters, priority for order of citation is given to the group that contains the lowest locant(s) at
+    the first point of difference*" (``4-(2-methylbutyl)-N-(3-methylbutyl)aniline (PIN)``,:3523); the
+     preamble (:3442) puts the absence of locants first. The one implementation of that tier: the
+    prefix key and ``AlphaKey`` both read it here, so neither can compare a later tier (the lambda
+    convention, ahead of a locant. ``parent_locants`` is as in ``prefix_citation_sort_key``.
+
+    A descriptor's numbers are not locants of the prefix. ``### **** ALPHANUMERICAL ORDER``
+    (:3446): "In these subsections the principles of alphanumerical order do not include Greek letters
+    (except in conjunctive names) or isotopic or stereochemical descriptors". So the '2' of '(2R)' in
+    '(2R)-2,3-dihydroxypropyl' and the '13' of '[1-13C]' are read past (``strip_alphanumerical_noise``,
+    and the parenthesized nuclide of, '(2H3)methoxy',:43718); configuration is the later
+    ``cip_descriptor_rank_key`` tier (j))."""
+    from .name_comparison import _LOCANT_TOKEN_FINDER, locant_sort_key
+    body = _NUCLIDE_DESCRIPTOR_RE.sub('', strip_alphanumerical_noise(prefix))
+    body = _PARENT_LOCANT_SET_RE.sub('', body) if parent_locants else body
+    return tuple(locant_sort_key(t) for t in _LOCANT_TOKEN_FINDER.findall(body))
+
+
+#: An isotopically substituted unit's nuclide descriptor,:43718): in parentheses, juxtaposed to
+#: the name it modifies, element symbols capitalized ('(2H3)methoxy', '(1-2H1)ethyl', '(13C,2H3)methyl').
+_NUCLIDE = r"(?:\d+(?:,\d+)*-)?\d+[A-Z][a-z]?\d*"
+_NUCLIDE_DESCRIPTOR_RE = re.compile(r"\(" + _NUCLIDE + r"(?:," + _NUCLIDE + r")*\)(?=[a-z])")
+
+
 def prefix_citation_sort_key(prefix: str, *,
                              parent_locants: bool = False) -> tuple:
     """ alphanumerical order for citation, as a TOTAL order.
@@ -4280,16 +4411,23 @@ def prefix_citation_sort_key(prefix: str, *,
         (``:3446``) forbids -- and:44601 says outright that capitalized
        CIP descriptors "are written in italics to indicate that they are not
        involved in the primary stage of alphanumerical order".
-    4. the full string. NOT a nomenclature rule -- an engineering requirement.
-       Tiers 1-2 are not injective (``cyclohexylmethyl`` vs a differently-spelled
-       prefix with the same letters and no locants), and a tie in a ``sorted``
-       whose input order came from a ``Counter`` over RDKit neighbours resolves to
-       HOW THE SMILES WAS WRITTEN. That is how one molecule got two names:
-       ``CCC(C)CSSSCCC(C)C`` and its own re-spelling gave
-       ``1-(2-methylbutyl)-3-(3-methylbutyl)trisulfane`` and
-       ``1-(3-methylbutyl)-3-(2-methylbutyl)trisulfane``. This tier can only ever
-       be reached once has been exhausted, so it decides nothing the Blue
-       Book decides -- it only stops atom order from deciding.
+    4. the full string, compared as ``**** NONALPHANUMERICAL ORDER``
+       (``the Blue Book``) orders characters: "Letters or numbers are always
+       preferred to any other character. When necessary the order of priority for
+       other characters is as follows, listed in decreasing priority order: braces >
+       square brackets > parentheses (round brackets) > periods > commas > semi-colons
+       > colons > hyphens", whose example (:3545) is ``3-[amino(methyl)silyl]-3-
+       [(aminomethyl)silyl]cyclopentan-1-ol (PIN)`` {not ``3-[(aminomethyl)silyl]-
+       3-[amino(methyl)silyl]...``; "at the fourth character of the name, the letter
+       'a' is preferred to an open parenthesis"}. Tiers 1-2 are not injective
+       (``cyclohexylmethyl`` vs a differently-spelled prefix with the same letters
+       and no locants), and a tie in a ``sorted`` whose input order came from a
+       ``Counter`` over RDKit neighbours resolves to HOW THE SMILES WAS WRITTEN. That
+       is how one molecule got two names: ``CCC(C)CSSSCCC(C)C`` and its own
+       re-spelling gave ``1-(2-methylbutyl)-3-(3-methylbutyl)trisulfane`` and
+       ``1-(3-methylbutyl)-3-(2-methylbutyl)trisulfane``. This tier is reached only
+       once has been exhausted; the Blue Book decides it where it
+       says how, and the string itself keeps it total where it does not.
 
     ``parent_locants`` selects which of the TWO input conventions this function is
     being handed, because the callers genuinely differ and the leading locant means
@@ -4307,12 +4445,9 @@ def prefix_citation_sort_key(prefix: str, *,
     the bare names lost the locant needs and keyed to ``('methylbutyl',
     )`` apiece.
     """
-    from .name_comparison import _LOCANT_TOKEN_FINDER, locant_sort_key
     alpha_letters = _key_letters(alpha_sort_key(prefix))
-    body = _PARENT_LOCANT_SET_RE.sub('', prefix) if parent_locants else prefix
-    locs = tuple(locant_sort_key(t)
-                 for t in _LOCANT_TOKEN_FINDER.findall(body))
-    return (alpha_letters, locs, cip_descriptor_rank_key(prefix), prefix)
+    locs = _own_locants(prefix, parent_locants)
+    return (alpha_letters, locs, cip_descriptor_rank_key(prefix), _lambda_key(prefix), _P146Text(prefix))
 
 
 # ============================================================================

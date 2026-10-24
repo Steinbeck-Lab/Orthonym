@@ -248,19 +248,12 @@ def _format_n2_substituents(subs: List[Tuple[int, str]],
             first, second = sorted(counts, key=prefix_citation_sort_key)
             return (f"1-{enclose_if_compound(first)}"
                     f"-2-{enclose_if_compound(second)}")
-        if len(counts) == 1:                       # symmetric: dimethyldiazene
-            name, count = next(iter(counts.items()))
-            if count not in _SUB_MULTIPLIER:
-                return None
-            return multiplied_component(count, name, enclose_if_compound(name))
-        parts = []                                 # unsymmetric: ethenyl(methyl)
-        for i, name in enumerate(
-                sorted(counts, key=prefix_citation_sort_key)):
-            marked = enclose_if_compound(name)
-            if i > 0 and marked == name:           # set a simple, non-first prefix off
-                marked = f"({name})"
-            parts.append(marked)
-        return ''.join(parts)
+        # symmetric 'dimethyldiazene' and unsymmetric 'ethenyl(methyl)diazene', the Blue Book)
+        # are the one block of ``prefix_marks``; more than four equal groups cannot be spelled here
+        from ..assembly.prefix_marks import mononuclear_substituent_block
+        return mononuclear_substituent_block(
+            [name for name, count in counts.items() for _ in range(count)],
+            max_count=max(_SUB_MULTIPLIER))
 
     # hydrazine (N–N): 1,1- vs 1,2- is a real distinction -> cite locants.
     # Lowest locant set, then the (g) tie-break (BB 3307): "lowest locants

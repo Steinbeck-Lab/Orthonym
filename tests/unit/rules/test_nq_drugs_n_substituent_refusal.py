@@ -28,7 +28,8 @@ REFUSED = [
 NAMED = [
     ("O=C(Nc1ccccn1)c1ccccc1", "N-(pyridin-2-yl)benzamide"),
     ("Cc1ccc(C(=O)Nc2cccnc2)cc1", "4-methyl-N-(pyridin-3-yl)benzamide"),
-    ("O=C(NC[Si](C)(C)c1ccccc1)c1ccccc1", "N-[(dimethylphenylsilyl)methyl]benzamide"),
+    # the second group of the silyl is enclosed, (the Blue Book; 'amino(methyl)silyl',:3545)
+    ("O=C(NC[Si](C)(C)c1ccccc1)c1ccccc1", "N-{[dimethyl(phenyl)silyl]methyl}benzamide"),
 ]
 
 

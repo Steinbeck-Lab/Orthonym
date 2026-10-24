@@ -24,7 +24,12 @@ def _oxy_frag(smi):
 
 @pytest.mark.parametrize("smi,expected", [
     ("CO[Si](C)(C)C", "(trimethylsilyl)oxy"),
-    ("CO[Si](C)(C)C(C)(C)C", "(tert-butyldimethylsilyl)oxy"),
+    # (the Blue Book): the second cited group is enclosed, its multiplier outside the marks
+    # ('tert-butyldi(methyl)(oxiranylmethoxy)silane (PIN)',:18929); a compound group takes its own marks.
+    # ASSUMED-book-inconsistency (coordinator ruling 2026-10-24): '(tert-butylperoxy)dimethylsilyl propanoate (PIN)'
+    # (:23389), 'aminodichlorosilyl (preselected prefix)' (:36385) and the alternative 'acetyldimethylsilyl' (:3553)
+    # cite a multiplied later group of a silyl bare; the rule text is followed.
+    ("CO[Si](C)(C)C(C)(C)C", "[tert-butyldi(methyl)silyl]oxy"),
 ])
 def test_silyloxy_prefix(smi, expected):
     mol, frag, attach = _oxy_frag(smi)

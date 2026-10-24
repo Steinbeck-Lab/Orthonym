@@ -359,11 +359,11 @@ def test_sever_path_declines_an_arm_or_a_prefixed_parent(smi):
 
 @pytest.mark.opsin_gate
 def test_amidinium_arm_is_named_below_the_pin():
-    """An amidinium N+ on an arm: the onium composer writes the compound
-    N-substituent without marks ('diaminomethylideneazaniumyl';,
-    the Blue Book "(chloromethyl)(methyl)silane (PIN)"), so the name ships
-    labelled below the PIN, with the arm enclosed and the chain atom's locant
-    (base: '3-diaminomethylideneazaniumylmethylbutanedioate')."""
+    """An amidinium N+ on an arm: the onium composer encloses the compound
+    N-substituent ('(diaminomethylidene)azaniumyl',, the Blue Book "Parentheses are used
+    around compound... prefixes"; '(diaminomethylidene)amino (preferred prefix)',:17838, and
+    '4-[(diaminomethylidene)amino]butanoic acid (PIN)',:34282) and the arm with it, so the name ships
+    labelled below the PIN, with the arm enclosed and the chain atom's locant."""
     from rdkit import Chem
     from rdkit.Chem import inchi
     from orthonym import Orthonym
@@ -375,7 +375,7 @@ def test_amidinium_arm_is_named_below_the_pin():
     # best-effort name, labelled systematic_verified: a name the code records as not
     # the PIN (the paper, Methods, "Tiers", L73; user decision 2026-09-30)
     r = _dt_row(smi)
-    assert r["name"] == "2-[(diaminomethylideneazaniumyl)methyl]butanedioate", r
+    assert r["name"] == "2-{[(diaminomethylidene)azaniumyl]methyl}butanedioate", r
     assert r["tier"] == "systematic_verified", r
     parsed = _independent_parse(r["name"])
     fixed_h = lambda s: inchi.MolToInchi(Chem.MolFromSmiles(s), options="/FixedH /SNon")

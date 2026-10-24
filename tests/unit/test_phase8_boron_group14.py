@@ -103,7 +103,12 @@ class TestGroup14SubstituentNamer:
         ("C[SiH3]", "Si", "silyl"),
         ("C[Si](C)(C)C", "Si", "trimethylsilyl"),
         ("C[Si](O)(O)O", "Si", "trihydroxysilyl"),
-        ("C[Si](C)(C)O", "Si", "hydroxydimethylsilyl"),
+        # (the Blue Book): the second group is enclosed, the multiplier outside the marks
+        # ('hydroxytri(methyl)silane',:27234; 'chlorodi(methyl)borane (PIN)',:25866).
+        # ASSUMED-book-inconsistency (coordinator ruling 2026-10-24): 'aminodichlorosilyl (preselected prefix)'
+        # (:36385), '(tert-butylperoxy)dimethylsilyl propanoate (PIN)' (:23389) and the alternative
+        # 'acetyldimethylsilyl' (:3553) cite a multiplied later group of a silyl bare; the rule text is followed.
+        ("C[Si](C)(C)O", "Si", "hydroxydi(methyl)silyl"),
         ("C[GeH3]", "Ge", "germyl"),
     ])
     def test_detached_fragment(self, smiles, attach_sym, expected):

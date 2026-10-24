@@ -37,7 +37,7 @@ FUNCTIONS = {
     "src/orthonym/assembly/handlers/ester_family.py::name_ester_family#1": 231,
     "src/orthonym/assembly/handlers/general_acyclic.py::name_general_acyclic#1": 270,
     "src/orthonym/assembly/handlers/tier_a_ring.py::name_tier_a_ring#1": 525,
-    "src/orthonym/assembly/naming_utils.py::_alpha_sort_key_core#1": 227,
+    "src/orthonym/assembly/naming_utils.py::_alpha_sort_key_core#1": 221,
     "src/orthonym/assembly/naming_utils.py::needs_brackets#1": 237,
     "src/orthonym/assembly/substituent_enumerator.py::_name_amino_branch#1": 311,
     "src/orthonym/assembly/substituent_enumerator.py::_name_compound_substituent#1": 228,

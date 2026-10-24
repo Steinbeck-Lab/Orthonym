@@ -10713,6 +10713,13 @@ def _assemble_decorated_amino_prefix(branch_entries, enclose: bool = True,
         return built("hydrazinyl", substituted=False, enclosed=False)
     counts = Counter(branch_entries)
     cited = []
+    # This citation stays its own loop, not ``prefix_marks.mononuclear_substituent_block`` (the
+    # home): its input is a branch ENTRY ``(name, decorated)`` whose marks the composed-prefix citation
+    # (``cite_organyl_in_composed_prefix``) has already decided -- an already-enclosed branch text, a
+    # decorated branch -- and whose multiplier is the composed-prefix one (``composed_prefix_multiplier``,
+    # None for a count it cannot spell). The block re-derives the marks from the bare name and would
+    # double or drop them there. The later-group rule it applies is the same: ``f"({bname})"`` after the
+    # first group, the multiplier outside,:7272).
     ordered = sorted(counts.items(), key=lambda kv: alpha_sort_key(kv[0][0]))
     for i, ((bname, _decorated), k) in enumerate(ordered):
         marked = cite_organyl_in_composed_prefix(bname)

@@ -779,25 +779,43 @@ def test_f4_prefix_citation_order_follows_p1452(ungated_namer, smiles, before, a
 
 @pytest.mark.parametrize("smiles,expected", [
     ("C[Si](C)(C)CC(=O)O",          "trimethylsilyl"),
-    ("Cl[Si](C)(C)CC(=O)O",         "chlorodimethylsilyl"),
-    ("O[Si](C)(C)CC(=O)O",          "hydroxydimethylsilyl"),
-    ("N[Si](C)(C)CC(=O)O",          "aminodimethylsilyl"),
+    ("Cl[Si](C)(C)CC(=O)O",         "chlorodi(methyl)silyl"),
+    ("O[Si](C)(C)CC(=O)O",          "hydroxydi(methyl)silyl"),
+    ("N[Si](C)(C)CC(=O)O",          "aminodi(methyl)silyl"),
     ("CCO[Si](OCC)(OCC)CC(=O)O",    "triethoxysilyl"),
     ("C[Ge](C)(C)CC(=O)O",          "trimethylgermyl"),
-    ("CC(C)(C)[Si](C)(C)CC(=O)O",   "tert-butyldimethylsilyl"),
-    ("C1CCCCC1[Si](C)(C)CC(=O)O",   "cyclohexyldimethylsilyl"),
-    ("C=C[Si](C)(C)CC(=O)O",        "ethenyldimethylsilyl"),
-    ("c1ccccc1[Si](C)(C)CC(=O)O",   "dimethylphenylsilyl"),
-    ("CCCCCCCCCCCC[Si](C)(C)CC(=O)O", "dodecyldimethylsilyl"),
+    ("CC(C)(C)[Si](C)(C)CC(=O)O",   "tert-butyldi(methyl)silyl"),
+    ("C1CCCCC1[Si](C)(C)CC(=O)O",   "cyclohexyldi(methyl)silyl"),
+    ("C=C[Si](C)(C)CC(=O)O",        "ethenyldi(methyl)silyl"),
+    ("c1ccccc1[Si](C)(C)CC(=O)O",   "dimethyl(phenyl)silyl"),
+    ("CCCCCCCCCCCC[Si](C)(C)CC(=O)O", "dodecyldi(methyl)silyl"),
 ])
-def test_f4_group14_existing_prefixes_are_byte_identical(smiles, expected):
-    """PROTECT rows.
+def test_f4_group14_prefix_block_is_the_parent_hydride_block(smiles, expected):
+    """The substituents of a silyl / germyl are cited as those of the silane are.
 
-    `tert-butyldimethylsilyl` is the one that pins the ORDER primitive: raw
-    `sorted` keys `tert-butyl` on its 't' and would emit
-    `dimethyltert-butylsilyl`. `chlorodimethylsilyl` and `hydroxydimethylsilyl`
-    pin that the leg was deliberately NOT applied here -- this
-    producer competes with a sibling that emits the bare form for that shape.
+    `tert-butyldi(methyl)silyl` also pins the ORDER primitive: raw `sorted` keys
+    `tert-butyl` on its 't' and would emit `dimethyltert-butylsilyl`.
+
+     'Enclosing marks... mononuclear parent hydrides' (the Blue Book): "The second
+    and further substituents are each enclosed with parentheses even for simple substituents. When the
+    simple substituent groups are accompanied by multiplicative prefixes such as 'di' and 'tri', the
+    multiplicative prefixes are not included in the parentheses." Its parent-hydride PINs:
+    'ethyldi(methyl)phosphane' (:7290), 'tert-butyldi(methyl)phosphane' (:16286),
+    'tert-butyldi(methyl)(oxiranylmethoxy)silane' (:18929), 'chlorodi(methyl)borane' (:25866),
+    'hydroxytri(methyl)silane' (:27234); and the same block on a group: '4-[ethyl(methyl)phosphanyl]-1H-
+    imidazole' (:39228), '3-[amino(methyl)silyl]...cyclopentan-1-ol' (:3545), 'tert-butoxytri(phenyl)-
+    lambda5-phosphanyl' (:40442). The bare forms this test used to pin ('chlorodimethylsilyl',...) were
+    written on the ground that the rule is stated for parent hydrides; the book applies it to the groups.
+    Independent check: every name reads back to its structure through OPSIN in a call outside the engine
+    (the full names '[chlorodi(methyl)silyl]acetic acid',...); the first group of three ('trimethylsilyl',
+    'triethoxysilyl',:36389) stays bare. The 'trimethylsilyl' and 'trimethylgermyl' rows are unchanged.
+
+    RULING (coordinator, 2026-10-24; ASSUMED-book-inconsistency) for a multiplied later group of a silyl or germyl
+    group: the book cites it bare in 'aminodichlorosilyl (preselected prefix)' (the Blue Book), in
+    '(tert-butylperoxy)dimethylsilyl propanoate (PIN)' (:23389) and in the alternative name
+    'N1-{2-[(acetyldimethylsilyl)methoxy]ethyl}-...' under (:3553), and encloses it in the rule text
+     (:7272, maintained with an erratum in the online edition), in the parents above and in
+    'tert-butoxytri(phenyl)-lambda5-phosphanyl (PIN)' (:40442). The rule text is followed.
     """
     assert _g14_name(smiles) == expected
 

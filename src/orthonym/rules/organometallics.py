@@ -774,23 +774,12 @@ def _ligand_token(count: int, name: str, first: bool) -> str:
     the parentheses" -- 'ethyldi(methyl)phosphane (PIN)',
     'ethyldi(propan-2-yl)silane (PIN)', '*tert*-butyldi(methyl)
     phosphane (PIN)' (:16286)."""
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks,
-        enclose_if_compound,
-        has_structural_hyphen,
-        multiplied_component,
-    )
+    from ..assembly.naming_utils import has_structural_hyphen
+    from ..assembly.prefix_marks import mononuclear_group_token
 
-    def _compound_ligand(nm):
-        return (has_structural_hyphen(nm) or '(' in nm
-                or _is_complex_ligand_oxy(nm))
-
-    marked = enclose_if_compound(name)
-    if marked == name and _compound_ligand(name):
-        marked = apply_enclosing_marks(name, -1)
-    if not first and marked == name:
-        marked = apply_enclosing_marks(name, -1)
-    return multiplied_component(count, name, marked) if count > 1 else marked
+    # a compound ligand (a structural hyphen, an inner mark, a compound R-oxy) takes marks as the first ligand too
+    compound = (has_structural_hyphen(name) or '(' in name or _is_complex_ligand_oxy(name))
+    return mononuclear_group_token(count, name, first=first, enclosed=compound)
 
 
 def _terminal_ligand_prefix(mol: Any, metal_idx: int, lg: Any) -> Optional[str]:

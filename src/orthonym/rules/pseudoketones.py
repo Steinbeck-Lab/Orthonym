@@ -480,17 +480,10 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
             # `3-[amino(methyl)silyl]...` (PIN)), which is why the bare-concatenated
             # `ethylmethylphosphanyl` this block used to emit was non-PIN.
             #
-            # Every decision below is a shared primitive: citation order
-            # /, the compound test, the italicized
-            # carve-out and the mark escalation.
-            from collections import Counter
-
-            from ..assembly.naming_utils import (
-                apply_enclosing_marks,
-                enclose_if_compound,
-                multiplied_component,
-                prefix_citation_sort_key,
-            )
+            # The block is the shared primitive (``prefix_marks.mononuclear_substituent_block``):
+            # citation order, the compound test, the italicized carve-out and the mark escalation
+            # are its decisions, the arity bound (three groups on a hub) this site's.
+            from ..assembly.prefix_marks import mononuclear_substituent_block
             from .substituent_purity import organyl_prefix_name
             names = []
             for n in organyls:
@@ -498,19 +491,10 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
                 if nm is None:
                     return None
                 names.append(nm)
-            counts = Counter(names)
-            # -CLOSEOUT Item A: arity bound local, multiplier word from
-            # the shared primitive (a) bis/tris when SUBSTITUTED).
-            _SUPPORTED_COUNTS = frozenset((1, 2, 3))
-            parts = []
-            for i, nm in enumerate(sorted(counts, key=prefix_citation_sort_key)):
-                if counts[nm] not in _SUPPORTED_COUNTS:
-                    return None
-                marked = enclose_if_compound(nm)
-                if i > 0 and marked == nm:
-                    marked = apply_enclosing_marks(nm, -1)   #
-                parts.append(multiplied_component(counts[nm], nm, marked))
-            hubyl = ''.join(parts) + base
+            block = mononuclear_substituent_block(names, max_count=3)
+            if block is None:
+                return None
+            hubyl = block + base
     if not hubyl:
         return None
     # Compound hub names take enclosing marks (1-(trimethylsilyl)propan-2-one

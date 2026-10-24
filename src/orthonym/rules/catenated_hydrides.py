@@ -366,31 +366,9 @@ def _try_aba_parent(mol, order, chal_set) -> Optional[str]:
     # * BB 16286 `*tert*-butyldi(methyl)phosphane` (PIN) + — a retained
     # italicized prefix is cited bare and keeps its hyphen under a multiplier
     # ('di-tert-butyl', never 'ditert-butyl').
-    from collections import Counter
-
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks,
-        enclose_if_compound,
-        multiplier_needs_hyphen,
-        prefix_citation_sort_key,
-    )
-    counts = Counter(subs)
-    uniq = sorted(counts, key=prefix_citation_sort_key)
-    parts = []
-    for i, nm in enumerate(uniq):
-        m = _SUB_MULT_ABA.get(counts[nm])
-        if m is None:
-            return None
-        # Both mark rules are "enclose unless already enclosed", so ask the
-        # shared compound test first and only force marks when it
-        # declined and still needs a separator.
-        marked = enclose_if_compound(nm)
-        if len(uniq) >= 2 and i > 0 and marked == nm:
-            marked = apply_enclosing_marks(nm, -1)
-        from ..assembly.naming_utils import multiplied_component as _mc
-        token = _mc(counts[nm], nm, marked)     # (b)/(d) di-tert-butyl
-        parts.append(token)
-    return f"{''.join(parts)}{parent}"
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    block = mononuclear_substituent_block(subs, max_count=max(_SUB_MULT_ABA))
+    return None if block is None else f"{block}{parent}"
 
 
 def name_heterochalcogen_aba(mol) -> Optional[str]:

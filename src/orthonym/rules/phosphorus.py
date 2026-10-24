@@ -10,7 +10,7 @@ Handles:
 - Phosphanyl prefix for P as substituent (e.g., diphenylphosphanyl)
 """
 
-from collections import Counter, deque
+from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
 from rdkit import Chem
@@ -207,96 +207,19 @@ def _count_alkyl_carbons(mol, start_idx: int, exclude: set) -> int:
     return count
 
 
-def _build_substituent_string(names: List[str]) -> str:
-    """
-    Build a substituent prefix string from a list of substituent names.
+def _build_substituent_string(names: List[str]) -> Optional[str]:
+    """The prefix block of a mononuclear phosphorus-family centre,: the citation is
+    :func:`assembly.prefix_marks.mononuclear_substituent_block` (its one home), with this centre's bound of four
+    equal groups (None beyond it, so the caller fails closed).
 
-    Handles multipliers (di-, tri-) for identical groups, and alphabetical ordering.
-
-    Per (May 2021 errata): For mononuclear parent hydrides with
-    2+ DIFFERENT substituent groups, the first alphabetically-sorted unique
-    substituent gets NO enclosing marks, and subsequent unique substituents
-    are wrapped in parentheses.
-
-    Examples:
         ["methyl", "methyl", "methyl"] -> "trimethyl"
+        ["ethyl", "methyl", "methyl"] -> "ethyldi(methyl)" (BB 7290 'ethyldi(methyl)phosphane')
         ["butyl", "ethyl", "methyl", "propyl"] -> "butyl(ethyl)(methyl)(propyl)"
-        ["ethyl", "methyl", "methyl"] -> "ethyl(dimethyl)"
-        ["ethyl", "phenyl", "phenyl"] -> "ethyl(diphenyl)"
-        ["phenyl", "phenyl"] -> "diphenyl"
-        ["methyl", "phenyl", "phenyl"] -> "methyl(diphenyl)"
-
-    Note: IUPAC alphabetical ordering ignores multiplicative prefixes (di, tri).
-
-    : two corrections that only became REACHABLE when the organyl guard
-    started admitting compound prefixes (``benzyl``, ``cyclohexylmethyl``,
-    ``(4-bromophenyl)methyl``):
-
-    * the order is the alphanumerical one (letters only, sec-/tert-
-      excluded), not raw string order -- raw order sorts ``(4-bromophenyl)methyl``
-      on its leading ``(``;
-    * the enclosing marks escalate (-> [ -> { for a name that already carries
-      brackets, and the FIRST cited group is enclosed too when it is
-      itself a compound prefix, since 's "first group bare"
-      only removes the marks that separate the groups from each other.
+        ["methyl", "phenyl", "phenyl"] -> "methyldi(phenyl)"
+        ["tert-butyl", "methyl", "methyl"] -> "tert-butyldi(methyl)" (BB 16286)
     """
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks,
-        enclose_if_compound,
-        multiplied_component,
-        prefix_citation_sort_key,
-    )
-
-    counts = Counter(names)
-    # -CLOSEOUT Item A: the arity BOUND stays local (fail closed beyond
-    # it); the multiplier WORD comes from the shared primitive, which knows
-    # (a). This table could only say di/tri/tetra, so a SUBSTITUTED
-    # organyl on a phosphane could never take bis/tris.
-    _SUPPORTED_COUNTS = frozenset((1, 2, 3, 4))
-
-    # -FIX Item 2: this held a THIRD private copy of the citation key --
-    # `_alnum_key = re.sub(r"[^a-z]", "", alpha_sort_key(name))` -- which is
-    # exactly the shared key's letters-only TIER 1 and nothing else. With no
-    # locant tier it could not tell `2-methylbutyl` from `3-methylbutyl`, and
-    # `sorted` being stable, the tie resolved to Counter insertion order =
-    # RDKit neighbour order = how the SMILES was written. One molecule, two
-    # names: `CCC(C)C[As](C)CCC(C)C` gave `methyl(2-methylbutyl)(3-methylbutyl)-
-    # arsane` and its own re-spelling gave `methyl(3-methylbutyl)(2-methylbutyl)-
-    # arsane`. The shared key keeps tier 1 byte-identical and adds the
-    # `****` locant tier (`the Blue Book`) plus a total-order
-    # backstop, so it can only change an order that was previously UNDEFINED.
-    sorted_unique = sorted(counts.keys(), key=prefix_citation_sort_key)
-
-    parts = []
-    for i, name in enumerate(sorted_unique):
-        count = counts[name]
-        if count not in _SUPPORTED_COUNTS:
-            return None
-        #: with the widened organyl class these three branches began
-        # receiving locanted and italicized prefixes, exposing three defects that
-        # BB 7272 settles verbatim -- "the second and further
-        # substituents are each enclosed with parentheses even for simple
-        # substituents. When the simple substituent groups are accompanied by
-        # multiplicative prefixes such as 'di' and 'tri', the multiplicative
-        # prefixes are NOT included in the parentheses."
-        marked = enclose_if_compound(name)
-        if len(sorted_unique) >= 2 and i > 0:
-            # Was `apply_enclosing_marks(f"{multiplier}{name}")`, which put the
-            # multiplier INSIDE the marks: 'tert-butyl(dimethyl)phosphane'. BB
-            # 16286 writes 'tert-butyldi(methyl)phosphane' (PIN).
-            if marked == name:
-                marked = apply_enclosing_marks(name, -1)
-            parts.append(multiplied_component(count, name, marked))
-        elif count > 1:
-            # BB 25721 '1,4-di(propan-2-yl)cyclohexane' (PIN) keeps the marks
-            # with the SIMPLE multiplier outside; (d) keeps the
-            # italicized hyphen. Both now come from `multiplied_component`.
-            parts.append(multiplied_component(count, name, marked))
-        else:
-            # First (or only) group: bare unless it is itself compound/complex.
-            parts.append(marked)
-
-    return "".join(parts)
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    return mononuclear_substituent_block(names, max_count=4)
 
 
 def _build_locanted_substituent_string(names: List[str], locant: str) -> Optional[str]:

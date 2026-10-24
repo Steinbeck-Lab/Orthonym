@@ -9445,128 +9445,31 @@ def _name_group14_substituent(mol, frag_atoms, attach_idx) -> Optional[str]:
         if p is None:
             return None
         prefixes.append(p)
-    if not prefixes:
-        return stem  # bare -SiH3 -> 'silyl'
-    return _compose_group14_prefixes(prefixes) + stem
-
-
-def _compose_group14_prefixes(prefixes: List[str]) -> str:
-    """Compose the prefix block of a Group-14 substituent centre.
-
-    Split out of ``_compose_n_substituent_prefix`` (which stays with its ONE
-    remaining caller, the onium cation-prefix path) because widened the
-    organyl guard feeding it: a prefix here may now carry locants
-    (``propan-2-yl``), a retained italicized prefix (``tert-butyl``) or its own
-    enclosing marks (``(4-methylphenyl)methyl``), none of which the shared
-    N-substituent composer handled.
-
-    Two shared primitives replace raw string work, and BOTH are no-ops on the
-    letters-only class the retired narrow walker could return -- which is what
-    keeps every previously-emitted Group-14 prefix byte-identical:
-
-    * ``prefix_citation_sort_key`` -- / citation order. Raw
-      ``sorted`` ordered ``tert-butyl`` on its 't' and would have emitted
-      ``dimethyltert-butylsilyl`` for the compound that is spelled
-      ``tert-butyldimethylsilyl``.
-    * ``enclose_if_compound`` -- marks for a compound prefix, so
-      ``propan-2-yl`` is cited ``(propan-2-yl)`` and cannot run into the
-      neighbouring token.
-
-    NOT applied here, and -FIX Item 9 replaces the reason. The
-     (BB 7272) "second and further substituents are each enclosed even
-    for simple substituents" leg would respell ``chlorodimethylsilyl`` as
-    ``chlorodi(methyl)silyl``. The old justification -- "a sibling Group-14
-    producer emits the BARE form for that shape" -- could not be substantiated: no
-    such sibling was found in this module (only this composer and
-    ``_compose_n_substituent_prefix``, the latter documented as onium-only).
-
-    The rule genuinely does not reach here, for a reason the rule states itself:
-    its scope sentence is "*For mononuclear parent HYDRIDES with two or more
-    substituents...*", and what is being built here is a substituent PREFIX, not a
-    parent hydride. The Blue Book spells the prefix bare in exactly this shape and
-    contrasts it with the marked parent form:
-    ``1-(trimethylsilyl)ethan-1-one (PIN)`` against the alternative
-    ``acetyltri(methyl)silane`` (the Blue Book);
-    ``[2-(1,3-dioxolan-2-yl)ethyl]tri(methyl)silane (PIN)`` (:35326);
-    ``(tert-butylperoxy)dimethylsilyl propanoate (PIN)`` (:23389), a bare
-    ``dimethyl`` on a silyl PREFIX; ``3-(trimethoxysilyl)propane-1-thiol (PIN)``
-    (:28164). So the bare form is BB-supported here and the parenthesised form is
-    what the rule requires of the parent-hydride name.
-    """
-    from collections import Counter
-
-    from .naming_utils import (
-        enclose_if_compound,
-        get_multiplier_prefix,
-        is_complex_substituent,
-        prefix_citation_sort_key,
-    )
-
-    counts = Counter(prefixes)
-    parts = []
-    for name in sorted(counts.keys(), key=prefix_citation_sort_key):
-        count = counts[name]
-        mult = get_multiplier_prefix(count, name)
-        from .naming_utils import multiplied_component as _mc
-        if is_complex_substituent(name) and count > 1:
-            parts.append(_mc(count, name, f"({name})"))
-        else:
-            # -FIX Item 4: a SIMPLE multiplier joined to a name that leads
-            # with an ITALICIZED structural prefix keeps the hyphen boundary.
-            # `**** Hyphens` -> `**** Hyphens are used in
-            # substitutive names:` -> clause `(d) to separate italic letters from
-            # Roman letters` (the Blue Book) gives the verbatim example
-            # `di-tert-butyl ` (:6964), and `### **** Cyclic
-            # hydrocarbons` gives `1,2-di-tert-butylbenzene (PIN)` (:25717).
-            # `tert-butyl` is SIMPLE, so the multiplier is `di` and not `bis`:
-            # `**** General methodology` clause (a) (:7033) names it
-            # explicitly -- "Simple components are... unsubstituted prefixes,
-            # such as ethyl or tert-butyl... multiplied by... 'di', 'tri'".
-            # Without this the composer emitted `ditert-butyl`, which appears
-            # ZERO times in the Blue Book, while a SIBLING Group-14 producer
-            # spelled the same fragment `di-tert-butyl` -- one fragment, two
-            # spellings, both OPSIN-clean, so the gate could not see it.
-            # `multiplier_needs_hyphen` is the shared primitive the six other
-            # composers in this class already use; this was the site that
-            # open-coded around it.
-            parts.append(_mc(count, name, enclose_if_compound(name)))
-    return ''.join(parts)
+    # The substituents of the centre are cited as those of the silane are, (the Blue Book):
+    # "For mononuclear parent hydrides with two or more substituents the first cited substituent never has
+    # enclosing marks unless it includes a locant. The second and further substituents are each enclosed
+    # with parentheses even for simple substituents. When the simple substituent groups are accompanied by
+    # multiplicative prefixes such as 'di' and 'tri', the multiplicative prefixes are not included in the
+    # parentheses". The silyl group is the substituent group of the silane parent hydride, so
+    # it takes the parent's block: 'tert-butyldi(methyl)silane (PIN)' (:18929) and, on a group,
+    # '4-[ethyl(methyl)phosphanyl]-1H-imidazole (PIN)' (:39228), '3-[amino(methyl)silyl]...cyclopentan-1-ol
+    # (PIN)' (:3545) give '[dimethyl(propyl)silyl]', '[ethyldi(methyl)silyl]', '[chlorodi(methyl)silyl]'. The
+    # first group stands bare ('1-(trimethylsilyl)ethan-1-one (PIN)',:29380; 'trimethoxysilyl',:36389).
+    from .prefix_marks import mononuclear_group_name
+    return mononuclear_group_name(prefixes, stem)  # bare -SiH3 -> 'silyl'
 
 
 def _compose_n_substituent_prefix(sub_prefixes: List[str]) -> str:
-    """Compose the substituents of a mononuclear onium centre (azanium,
-    phosphanium, sulfanium,...) into one prefix string.
-
-     alphanumerical order (``alpha_sort_key``: an italic 'tert-' is
-    ignored, so 'tert-butyl' sorts at 'butyl'), multiplied names, and
-     (the Blue Book) for a mononuclear parent: "the first cited
-    substituent never has enclosing marks unless it includes a locant. The second
-    and further substituents are each enclosed with parentheses even for simple
-    substituents. When the simple substituent groups are accompanied by
-    multiplicative prefixes such as 'di' and 'tri', the multiplicative prefixes
-    are not included in the parentheses" -- 'ethyldi(methyl)phosphane (PIN)'
-    (:7290), 'methyldi(phenyl)phosphaniumyl' inside a PIN (:42468),
-    '*tert*-butyldi(methyl)(oxiranylmethoxy)silane (PIN)' (:18929).
+    """Compose the substituents of a mononuclear onium centre (azanium, phosphanium, sulfanium,...) into one
+    prefix string: (the Blue Book), the block of
+    :func:`prefix_marks.mononuclear_substituent_block` -- 'ethyldi(methyl)phosphane (PIN)' (:7290),
+    'methyldi(phenyl)phosphaniumyl' inside a PIN (:42468), '*tert*-butyldi(methyl)(oxiranylmethoxy)silane
+    (PIN)' (:18929).
 
     e.g. ['methyl','methyl','methyl'] -> 'trimethyl';
          ['ethyl','methyl','methyl'] -> 'ethyldi(methyl)';
          ['methyl','phenyl','phenyl'] -> 'methyldi(phenyl)';
          ['methyl','tert-butyl'] -> 'tert-butyl(methyl)'.
     """
-    from collections import Counter
-
-    from .naming_utils import apply_enclosing_marks, get_multiplier_prefix, is_complex_substituent
-
-    counts = Counter(sub_prefixes)
-    parts = []
-    for i, name in enumerate(sorted(counts, key=lambda n: (alpha_sort_key(n), n))):
-        mult = get_multiplier_prefix(counts[name], name)
-        # A compound name (locant, hyphen) is enclosed wherever it stands
-        #; e.g. '(propan-2-yl)azaniumyl'); every name after the first
-        # is enclosed too, with the multiplier outside.
-        from .naming_utils import multiplied_component as _mc
-        if i > 0 or is_complex_substituent(name):
-            parts.append(_mc(counts[name], name, apply_enclosing_marks(name, -1)))
-        else:
-            parts.append(_mc(counts[name], name, name))
-    return ''.join(parts)
+    from .prefix_marks import mononuclear_substituent_block
+    return mononuclear_substituent_block(sub_prefixes)

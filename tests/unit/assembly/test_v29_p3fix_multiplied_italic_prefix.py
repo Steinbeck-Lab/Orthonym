@@ -106,9 +106,12 @@ def namer():
 @pytest.mark.parametrize("smiles,expected", [
     # BB 25717 verbatim PIN.
     ('CC(C)(C)c1ccccc1C(C)(C)C', '1,2-di-tert-butylbenzene'),
-    # The migrated Group-14 path -- was `(ditert-butylmethylsilyl)acetic acid`.
+    # The migrated Group-14 path -- was `(ditert-butylmethylsilyl)acetic acid`, then the bare
+    # `(di-tert-butylmethylsilyl)acetic acid`. The second group is enclosed,
+    # the Blue Book; '4-[ethyl(methyl)phosphanyl]-1H-imidazole (PIN)':39228), the first
+    # keeps the italic hyphen (d),:6964).
     ('CC(C)(C)[Si](C(C)(C)C)(C)CC(=O)O',
-     '(di-tert-butylmethylsilyl)acetic acid'),
+     '[di-tert-butyl(methyl)silyl]acetic acid'),
     #...and its SIBLING producer on the same fragment: these two disagreeing was
     # the defect, so they are asserted together.
     # (the Blue Book): the second cited prefix of a mononuclear

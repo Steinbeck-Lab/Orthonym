@@ -3373,15 +3373,6 @@ def emit_onium_hydride_parent(mol, center_idx: int) -> str:
             and mol.GetBondBetweenAtoms(center_idx, heavy[0].GetIdx()).GetBondType()
                 == Chem.BondType.SINGLE):
         return ''
-    from collections import Counter
-
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks,
-        enclose_if_compound,
-        get_multiplier_prefix,
-        multiplier_needs_hyphen,
-        prefix_citation_sort_key,
-    )
     from ..assembly.substituent_enumerator import (
         name_ylidene_substituent,
         name_ylidyne_substituent,
@@ -3426,22 +3417,8 @@ def emit_onium_hydride_parent(mol, center_idx: int) -> str:
     suffix = f"{_elide_terminal_e(stem)}ium"
     if not subs:
         return suffix
-    counts = Counter(subs)
-    uniq = sorted(counts, key=prefix_citation_sort_key)
-    parts = []
-    for i, nm in enumerate(uniq):
-        mult = get_multiplier_prefix(counts[nm], nm)
-        marked = enclose_if_compound(nm)
-        # (BB 16286 '*tert*-butyldi(methyl)phosphane' (PIN)): in a name
-        # with >= 2 prefix types, a multiplied SIMPLE prefix that is not cited
-        # first takes enclosing marks -> 'benzoyldi(methyl)sulfanium', never
-        # 'benzoyldimethylsulfanium'. Same rule as catenated_hydrides._try_aba_parent.
-        if len(uniq) >= 2 and i > 0 and marked == nm:
-            marked = apply_enclosing_marks(nm, -1)
-        from ..assembly.naming_utils import multiplied_component as _mc
-        token = _mc(counts[nm], nm, marked)     # (b) di-tert-butyl
-        parts.append(token)
-    return f"{''.join(parts)}{suffix}"
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    return f"{mononuclear_substituent_block(subs)}{suffix}"
 
 
 # (the Blue Book-41390): a CATENATED homonuclear parent-hydride cation
@@ -3556,33 +3533,14 @@ def _catenated_ium_substituent(mol, chain_atom: int, nb, covered: set) -> str:
 
 def _assemble_unlocanted_ium(subs: List[str], parent: str) -> str:
     """No-locant substituent-prefix assembly for a MONONUCLEAR parent-hydride
-    cation chlorotri(methyl)phosphanium). Byte-for-byte the assembly
-    loop of ``emit_onium_hydride_parent`` enclosing marks: a multiplied
-    simple prefix not cited first takes marks -> 'tri(methyl)')."""
-    from collections import Counter
-
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks,
-        enclose_if_compound,
-        get_multiplier_prefix,
-        multiplier_needs_hyphen,
-        prefix_citation_sort_key,
-    )
+    cation chlorotri(methyl)phosphanium): the block of
+    ``prefix_marks.mononuclear_substituent_block``, the one ``emit_onium_hydride_parent``
+    uses ('tri(methyl)' when a multiplied simple prefix is not cited first)."""
+    from ..assembly.prefix_marks import mononuclear_substituent_block
     suffix = f"{_elide_terminal_e(parent)}ium"
     if not subs:
         return suffix
-    counts = Counter(subs)
-    uniq = sorted(counts, key=prefix_citation_sort_key)
-    parts = []
-    for i, nm in enumerate(uniq):
-        mult = get_multiplier_prefix(counts[nm], nm)
-        marked = enclose_if_compound(nm)
-        if len(uniq) >= 2 and i > 0 and marked == nm:
-            marked = apply_enclosing_marks(nm, -1)
-        from ..assembly.naming_utils import multiplied_component as _mc
-        token = _mc(counts[nm], nm, marked)
-        parts.append(token)
-    return f"{''.join(parts)}{suffix}"
+    return f"{mononuclear_substituent_block(subs)}{suffix}"
 
 
 def emit_catenated_hydride_cation(mol, center_idx: int) -> str:

@@ -149,19 +149,8 @@ def _name_single_nitramide(mol, amide_n: int, nitro_n: int, style: str) -> Optio
     # (unless compound/complex,, the second and further are each
     # parenthesised even when simple -> 'methyl(nitro)nitramide'. Multiplied
     # identical simple substituents keep the multiplier outside the marks.
-    from collections import Counter
-    from ..assembly.naming_utils import (
-        apply_enclosing_marks, enclose_if_compound, multiplied_component,
-        prefix_citation_sort_key,
-    )
-    counts = Counter(names)
-    parts = []
-    for i, nm in enumerate(sorted(counts, key=prefix_citation_sort_key)):
-        marked = enclose_if_compound(nm)          # compound/complex
-        if i > 0 and marked == nm:                # second+ simple
-            marked = apply_enclosing_marks(nm, -1)
-        parts.append(multiplied_component(counts[nm], nm, marked))
-    prefix = ''.join(parts)
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    prefix = mononuclear_substituent_block(names)
     if not prefix:
         return None
     return f"{prefix}nitramide"
