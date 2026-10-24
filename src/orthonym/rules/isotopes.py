@@ -4211,7 +4211,7 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
     # keeps the omissions of its unmodified name -- ``(13C)methyltrisulfane``, not
     # ``1-(13C)methyltrisulfane`` (the lone carbon is the methyl; the trisulfane's
     # ``1-`` is omitted in the unmodified PIN,. No ambient declaration then.
-    from ..assembly.locant_omission import isotopic_naming_scope
+    from ..assembly.locant_omission import isotopic_naming_scope, isotopic_skeleton_scope
     _label_elements = {original.GetAtomWithIdx(i).GetSymbol() for i in label_map}
     _scope = (contextlib.nullcontext() if all(
         _element_singleton_in(original, el) for el in _label_elements)
@@ -4222,7 +4222,7 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
         any(a.GetNumRadicalElectrons() > 0 for a in original.GetAtoms()))
     from ..validation.thioperoxol_twin import embedded_name   # the skeleton is read by OPSIN, candidate by candidate
     try:
-        with _scope, embedded_name():
+        with _scope, embedded_name(), isotopic_skeleton_scope(original):
             sink: dict = {}
             result = _decorate_isotopic_name_inner(
                 smiles, style, namer, original, stripped, label_map, sink)

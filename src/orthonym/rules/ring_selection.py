@@ -12,6 +12,7 @@ These are pure functions that can be tested independently before integration.
 Reference: IUPAC 2013 Blue Book, (Selection of Preferred Ring System)
 """
 
+import contextvars
 from enum import IntEnum
 from typing import List, Optional, Set, Tuple
 
@@ -879,6 +880,61 @@ def _suffix_attachment(mol: Chem.Mol, match: Tuple[int, ...], rings: List[Set[in
     return -1, -1
 
 
+def _carbocyclic_monocycle(mol: Chem.Mol, ring_atoms: Set[int]) -> Optional[List[int]]:
+    """The atoms of ``ring_atoms`` in the order round the ring when it is one ring of carbon atoms (any bond
+    orders, not fused or bridged, no heteroatom), else None. Its numbering is free but for the groups it
+    carries: gives the lowest locants to the principal characteristic groups before any 'ene'."""
+    ring_info = mol.GetRingInfo()
+    rings = [r for r in ring_info.AtomRings() if set(r) <= ring_atoms]
+    if len(rings) != 1 or set(rings[0]) != ring_atoms:
+        return None
+    cyc = list(rings[0])
+    if any(mol.GetAtomWithIdx(a).GetSymbol() != 'C' for a in cyc):
+        return None
+    return cyc
+
+
+def _saturated_monocycle(mol: Chem.Mol, ring_atoms: Set[int]) -> Optional[List[int]]:
+    """The atoms of ``ring_atoms`` in the order round the ring when it is a saturated carbocyclic monocycle (no
+    ring double bond, no heteroatom, not aromatic, not fused or bridged), else None."""
+    cyc = _carbocyclic_monocycle(mol, ring_atoms)
+    if cyc is None:
+        return None
+    n = len(cyc)
+    if any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in cyc):
+        return None
+    for k in range(n):
+        bond = mol.GetBondBetweenAtoms(cyc[k], cyc[(k + 1) % n])
+        if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
+            return None
+    return cyc
+
+
+def _suffix_locants(mol: Chem.Mol, ring_atoms: Set[int], suffix_atoms: List[int]) -> Optional[Tuple[int, ...]]:
+    """The lowest set of locants a carbocyclic monocycle gives to the ring atoms its principal groups are cited at
+     first, "Lowest set of locants", the Blue Book: the sets compare term by term in
+    increasing order), or None when the ring is not one ring of carbon atoms (fused, bridged, a heteroatom)."""
+    cyc = _carbocyclic_monocycle(mol, ring_atoms)
+    if cyc is None:
+        return None
+    n = len(cyc)
+    where = [cyc.index(a) for a in suffix_atoms]
+    return min(tuple(sorted(((j - start) * step) % n + 1 for j in where))
+               for start in range(n) for step in (1, -1))
+
+
+def _ring_stereo_specified(mol: Chem.Mol, ring_atoms: Set[int]) -> bool:
+    """True when a ring atom has a specified configuration or a ring bond a specified E/Z or cis/trans one
+    , criterion (l): the senior ring has one or more stereogenic centres, and the criteria of
+     and the CIP rules 4 and 5 compare their configurations)."""
+    if any(mol.GetAtomWithIdx(a).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in ring_atoms):
+        return True
+    specified = (Chem.BondStereo.STEREOE, Chem.BondStereo.STEREOZ, Chem.BondStereo.STEREOCIS,
+                 Chem.BondStereo.STEREOTRANS)
+    return any(b.GetStereo() in specified for b in mol.GetBonds()
+               if b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms)
+
+
 def _numbered_locants(mol: Chem.Mol, ring_atoms: Set[int], suffix_atoms: List[int],
                       group_atoms: Set[int]) -> Optional[Tuple[Tuple[int, ...], Tuple[int, ...]]]:
     """``(suffix locants, prefix locants)`` of a saturated carbocyclic monocycle under its lowest numbering, or None.
@@ -890,20 +946,10 @@ def _numbered_locants(mol: Chem.Mol, ring_atoms: Set[int], suffix_atoms: List[in
     heavy neighbour outside the ring is one prefix group, a gem pair counts twice; the atoms of the principal
     groups (``group_atoms``) are the suffix, not prefixes. None when the ring is not such a monocycle (fused,
     bridged, aromatic, a heteroatom, a ring double bond), which this function cannot number."""
-    ring_info = mol.GetRingInfo()
-    rings = [r for r in ring_info.AtomRings() if set(r) <= ring_atoms]
-    if len(rings) != 1 or set(rings[0]) != ring_atoms:
+    cyc = _saturated_monocycle(mol, ring_atoms)
+    if cyc is None:
         return None
-    cyc = list(rings[0])
     n = len(cyc)
-    for a in cyc:
-        at = mol.GetAtomWithIdx(a)
-        if at.GetSymbol() != 'C' or at.GetIsAromatic():
-            return None
-    for k in range(n):
-        bond = mol.GetBondBetweenAtoms(cyc[k], cyc[(k + 1) % n])
-        if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
-            return None
     groups = [sum(1 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
                   if nb.GetIdx() not in ring_atoms and nb.GetIdx() not in group_atoms)
               for a in cyc]
@@ -920,16 +966,59 @@ def _numbered_locants(mol: Chem.Mol, ring_atoms: Set[int], suffix_atoms: List[in
     return best
 
 
+#: 0, or while the OTHER ring of a ring=CH-ring tie is offered as the parent (``Orthonym._try_other_tie_ring_rescue``):
+#: 1 below the PIN (``decided`` False: the tie is not decided by the criteria of the book), 2 as the name that builds
+#: without that record (the label of the tier lowers what it cannot verify in full)
+OFFER_OTHER_TIE_RING: "contextvars.ContextVar[int]" = contextvars.ContextVar("orthonym_offer_other_tie_ring", default=0)
+
+
 def _ylidene_tie_parent(mol: Chem.Mol, ring_systems: List[Set[int]], tied: List[int]):
+    """:func:`_ylidene_tie_choice`, or, while the other ring is offered, the other ring."""
+    chosen = _ylidene_tie_choice(mol, ring_systems, tied)
+    offer = OFFER_OTHER_TIE_RING.get()
+    if chosen is None:
+        return None
+    if not offer:
+        from ..assembly.default_tier_offer import note_tie_ring
+        note_tie_ring()
+        return chosen
+    link = _ylidene_linked_parent_ring(mol, ring_systems)
+    dbl, sgl = (tuple(sorted(ring_systems[i])) for i in link[:2])
+    return (sgl if chosen[0] == dbl else dbl), offer == 2
+
+
+def _ylidene_tie_choice(mol: Chem.Mol, ring_systems: List[Set[int]], tied: List[int]):
     """``(parent ring, decided)`` for two ring systems that tie on and are joined by one =CH- linker;
     None when there is no such linker.
 
      "Unsymmetrical substituent groups having terminal atoms with different types of free
     valencies" (the Blue Book): the two rings are the parent structure of the name; ring seniority
-     has already tied, so decides, criterion by criterion (each one only if the earlier ones tie):
+     has already tied, so the criteria that follow decide, in the order the book applies them (each
+    one only if the earlier ones tie):
 
     * (:18875): the parent has the maximum number of principal characteristic groups (the suffix of
-      the name), so the ring that carries more of them is the parent, before any criterion of;
+      the name), so the ring that carries more of them is the parent, before any criterion of or;
+    * the two sides being the same group (the same atoms, groups and configurations, and the same labels on the
+      parents, if any), every criterion below ties and "Criteria related to alphanumerical
+      order of names" (:22234) decides: "The preferred IUPAC name is the name that is earlier in alphanumerical
+      order": '-ylidenemethyl' is earlier than '-ylmethylidene' ('i' before 'm' after the common 'cyclohexyl'),
+      so the single-bonded ring is the parent: '(cyclohexylidenemethyl)cyclohexane'. This is the criterion that
+       example (2) (:6398) applies to '(hydroxycyclohexyl)ethylidene' and
+      '(hydroxycyclohexylidene)ethyl'; there the order falls the other way round ('e' of 'ethylidene' before
+      'i' of 'ylidene'), so the parent is not the same ring;
+    * "SENIORITY CRITERIA APPLICABLE TO RINGS, RING SYSTEMS, OR ACYCLIC CHAINS" (:21014),
+      (:21016), criterion (h),:21305): "The senior ring, ring system, or principal chain has the
+      lower locants for characteristic groups cited as a suffix": 'cyclohexane-1,2-diol' is senior to
+      'cyclohexane-1,3-diol' (the book's 'octane-1,7-diol (PIN) is senior to octane-1,8-diol (PIN)',:21327),
+      so the ring whose principal groups take the lower locants under its own numbering is the parent, before
+      ; worked out for rings of carbon atoms in one ring (:func:`_suffix_locants`), the criteria below
+      deciding other rings (fused, bridged, hetero) as they always have;
+    * criterion (k),:21473) comes before as well: the senior parent structure (the
+      ring with its principal groups) has the greater number of isotopically modified atoms (.1,:21477: 'two 2H
+      atoms are senior to one 14C'), then the greater number of nuclides of higher atomic number (.2), of higher
+      mass number (.3), then the lowest locants for the modified atoms (.4), for the nuclides of higher atomic
+      number (.5) and of higher mass number (.6);:func:`ring_tie_isotopes.senior_ring_by_isotopes`. Parents with
+      the same labels go on to the criteria below;
     * (:21600) "The preferred IUPAC name is based on the senior parent structure that has the maximum
       number of substituents cited as prefixes": the ring with more exocyclic groups, not counting the atoms of
       the principal groups, which are the suffix, is the parent
@@ -941,17 +1030,21 @@ def _ylidene_tie_parent(mol: Chem.Mol, ring_systems: List[Set[int]], tied: List[
       the ring numbered suffix first (:func:`_numbered_locants`): '4-[(2-hydroxy-3-methylcyclohexyl)
       methylidene]-2-methylcyclohexan-1-ol' (2,4), not '2-[(4-hydroxy-3-methylcyclohexylidene)methyl]-6-
       methylcyclohexan-1-ol' (2,6); worked out for saturated carbocyclic monocycles;
-    * with the same group on both sides, "Criteria related to alphanumerical order of names" (:22234):
-      "The preferred IUPAC name is the name that is earlier in alphanumerical order": '-ylidenemethyl' is earlier
-      than '-ylmethylidene' ('i' before 'm' after the common 'cyclohexyl'), so the single-bonded ring is the
-      parent: '(cyclohexylidenemethyl)cyclohexane'. This is the criterion that example (2) (:6398)
-      applies to '(hydroxycyclohexyl)ethylidene' and '(hydroxycyclohexylidene)ethyl'; there the order falls the
-      other way round ('e' of 'ethylidene' before 'i' of 'ylidene'), so the parent is not the same ring.
+    * with equal locant sets and different groups, (:21791) on the locants in the order of citation of
+      the two names and then on their letters, which:func:`ring_tie_names.senior_ring_by_names` works
+      out from the names of the prefixes of each ring ('1-[(4-ethylcyclohexyl)methylidene]-4-methylcyclohexane',
+      'ethylc' before 'ethylm', not '1-ethyl-4-[(4-methylcyclohexylidene)methyl]cyclohexane'); and
+      (nonstandard bonding numbers and isotopic modification of substituents), which come between the two,
+      leave it undecided where a prefix has one, and so does criterion (l) of,:21529,
+      "has one or more stereogenic centers") where a ring has a specified configuration (not worked out;
+       and count and locate the groups and decide such rings as they always have);
 
     ``decided`` is False where a criterion that this function does not work out would decide (a ring that is
-    not a saturated carbocyclic monocycle, a principal group on two ring atoms, equal locants,
-    then, the order of citation, and on different groups); the double-bonded ring is returned,
-    as before, and the caller keeps the name below the PIN."""
+    not a saturated carbocyclic monocycle, a principal group on two ring atoms, labels (k) cannot compare: on a
+    principal group, or on a ring that is not such a monocycle, or a labelled molecule that cannot be read; a
+    stereo-specified ring for the names step, a prefix without a name, names that tie down to the numerals of
+    , or a string of letters that is the start of the other); the double-bonded ring is returned, as
+    before, and the caller keeps the name below the PIN."""
     link = _ylidene_linked_parent_ring(mol, ring_systems)
     if link is None or link[0] not in tied:
         return None
@@ -973,6 +1066,26 @@ def _ylidene_tie_parent(mol: Chem.Mol, ring_systems: List[Set[int]], tied: List[
     group_atoms = {a for m, at in zip(matches, atts) for a in m if at[0] >= 0}
     if len(suffix[0]) != len(suffix[1]):
         return (dbl if len(suffix[0]) > len(suffix[1]) else sgl), True
+    parents = [rings[k] | {a for m, at in zip(matches, atts) if at[0] == k for a in m} for k in (0, 1)]
+    from .ring_tie_isotopes import senior_ring_by_isotopes
+
+    def _by_isotopes():
+        return senior_ring_by_isotopes(mol, rings, parents, [_saturated_monocycle(mol, r) for r in rings],
+                                       suffix, group_atoms)
+    if _ylidene_sides_identical(mol, linker, dbl_atom, sgl_atom):
+        verdict, senior = _by_isotopes()           # the sides are alike but for the labels, if any
+        if verdict == "unknown":
+            return dbl, False
+        return (sgl, True) if verdict == "tie" else ((dbl, sgl)[senior], True)
+    if suffix[0]:
+        where = [_suffix_locants(mol, rings[k], suffix[k]) for k in (0, 1)]
+        if None not in where and where[0] != where[1]:
+            return (dbl if where[0] < where[1] else sgl), True
+    verdict, senior = _by_isotopes()
+    if verdict == "unknown":
+        return dbl, False
+    if verdict == "decided":
+        return (dbl, sgl)[senior], True
     def _exo(sy):
         rset = set(sy)
         return sum(1 for a in rset for nb in mol.GetAtomWithIdx(a).GetNeighbors()
@@ -980,12 +1093,18 @@ def _ylidene_tie_parent(mol: Chem.Mol, ring_systems: List[Set[int]], tied: List[
     exo_d, exo_s = _exo(ring_systems[dbl_i]), _exo(ring_systems[sgl_i])
     if exo_s != exo_d:
         return (sgl if exo_s > exo_d else dbl), True
-    if _ylidene_sides_identical(mol, linker, dbl_atom, sgl_atom):
-        return sgl, True
     num_d = _numbered_locants(mol, rings[0], suffix[0], group_atoms)
     num_s = _numbered_locants(mol, rings[1], suffix[1], group_atoms)
     if num_d is not None and num_s is not None and num_d[1] != num_s[1]:
         return (sgl if num_s[1] < num_d[1] else dbl), True
+    if num_d is not None and num_s is not None:
+        if any(_ring_stereo_specified(mol, r) for r in rings):
+            return dbl, False
+        from .ring_tie_names import senior_ring_by_names
+        cycles = [_saturated_monocycle(mol, r) for r in rings]
+        senior = senior_ring_by_names(mol, rings, cycles, suffix, group_atoms)
+        if senior is not None:
+            return (dbl, sgl)[senior], True
     return dbl, False
 
 

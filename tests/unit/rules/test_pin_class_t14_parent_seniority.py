@@ -28,8 +28,15 @@ sufficient to give seniority to the parent hydride."
     GROUPS" (:21596), the locant sets compared as "Lowest set of locants" (:3189)
     defines: '1-methyl-3-[(4-methylcyclohexylidene)methyl]cyclohexane' ({1,3}), not
     '1-methyl-4-[(3-methylcyclohexyl)methylidene]cyclohexane' ({1,4}). Where the sets tie and
-    the groups differ, the criteria beyond are not worked out and the name is labelled
-    below the PIN. The compound prefix is enclosed.
+    the groups differ, (:21791) compares the locants in the order of citation of the two
+    names and (:22234) their letters ('1-[(4-ethylcyclohexyl)methylidene]-4-methylcyclohexane':
+    'ethylc' before 'ethylm', ``rules/ring_tie_names.py``, tests in ``test_ring_tie_names.py``); a ring
+    that is not a saturated monocycle, or names that tie, are not decided and the name is labelled
+    below the PIN. The criteria of that come before are applied first: (h) the lower
+    locants of the suffix,:21305; '4-[(2,4-dihydroxycyclohexyl)methylidene]cyclohexane-1,2-diol',
+    the ring with the 1,2 locants, not the one with 1,3) and (k) the isotopically modified atoms of the
+    parents to.6,:21477-:21523), rows in ``test_ring_tie_names.py``. The compound prefix is enclosed
+    .
     ``rules/ring_selection.py:select_principal_ring_system``, ``assembly/substituent_naming.py:
     _name_polyfunctional_acyclic_substituent_impl`` (the '-ylidene' ring branch),
     ``assembly/naming_utils.py`` (enclosing marks).
@@ -119,6 +126,11 @@ RING_ROWS = [
     ("CC1CCC(CC1)=CC1CCCC(C)C1C", "1,2-dimethyl-3-[(4-methylcyclohexylidene)methyl]cyclohexane"),
     # the two sides alike: the ylidene is cited ('-ylidenemethyl' before '-ylmethylidene',
     ("CC1CCC(CC1)=CC1CCC(C)CC1", "1-methyl-4-[(4-methylcyclohexylidene)methyl]cyclohexane"),
+    # the sides differ and the locants tie: the letters of the two whole names decide,:22234)
+    ("CC1CCC(CC1)=CC1CCC(CC)CC1", "1-[(4-ethylcyclohexyl)methylidene]-4-methylcyclohexane"),
+    ("CC1CCC(CC1)=CC1CCC(OC)CC1", "1-[(4-methoxycyclohexyl)methylidene]-4-methylcyclohexane"),
+    # (:21791): the prefix sets are 2,3 and 2,3 and the locants in the order of citation, 2,3 and 3,2, decide
+    ("C1(=CC2C(C)C(O)CCC2)C(O)CCCC(C)1", "2-[(3-hydroxy-2-methylcyclohexyl)methylidene]-3-methylcyclohexan-1-ol"),
     # compares the locants of the PREFIXES: a ring that carries the principal group is numbered suffix
     # first, so the prefix sets are 2,4 and 2,6, not the free 1,2,4 and 1,2,3 of the groups with
     # the suffix counted; the -ol, -carboxylic acid and -amine alike
@@ -134,12 +146,12 @@ RING_ROWS = [
     # a group on a chain ('-CH2-OH' makes the chain the parent) is no suffix of the ring
     ("OCC1CCC(CC1)=CC1CCCCC1", "[4-(cyclohexylmethylidene)cyclohexyl]methanol"),
 ]
-# two rings of equal substituent counts and locant sets whose groups differ: the criteria after are not
-# worked out and on compound prefixes), so the name is labelled below the PIN
+# two rings of equal substituent counts and locant sets whose groups differ: and decide on the two
+# names (test_ring_tie_names.py); the rings that are not saturated monocycles are not worked out, so the name is
+# labelled below the PIN
 RING_UNDECIDED_ROWS = [
-    "CC1CCC(CC1)=CC1CCC(CC)CC1",
-    "CC1CCC(CC1)=CC1CCC(OC)CC1",
-    "C1(=CC2C(C)C(O)CCC2)C(O)CCCC(C)1",      # the same with the principal group: the prefix sets 2,3 and 2,3
+    "CC1=CCC(CC1)=CC1CCC(CC)C=C1",
+    "CC1=CCC(CC1)=CC1CCC(C)C=C1",
 ]
 RING_NOT_PIN_ROWS = [
     ("C(=C1CCCCC1)c1ccccc1", "benzylidenecyclohexane"),

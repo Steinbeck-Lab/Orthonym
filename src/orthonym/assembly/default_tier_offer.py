@@ -53,6 +53,11 @@ only the PIN path names (the valid and complete tiers have no systematic floor, 
 would otherwise be named by the default tier and declined by a wider one. No molecule of the measured sets needs it
 (141 rows with an S-O group, three tiers, none lost without it). The pass is the tier's own engine, so the row, its
 label and its gate outcome are the ones the twin gave before.
+
+A fourth class, two rings of one seniority joined by =CH- whose parent the criteria of the book choose (h) and
+(k), and whose name the producers cannot build with a specified E/Z link (:func:`other_tie_ring_row`): the
+molecule is named once more with the other ring as the parent, below the PIN, with the row the tier gives it. The
+best-effort tier named such a molecule with that ring before the criteria chose the other one.
 """
 import contextvars
 import functools
@@ -84,6 +89,18 @@ def clear_held() -> None:
     _HELD.set(())
     _OFFERED.set(None)
     _RELAXED_SEEN.set(False)
+    _TIE_RING_SEEN.set(False)
+
+
+#: True once the running naming has chosen the parent of two rings of one seniority joined by =CH- (``ring_selection.
+#: _ylidene_tie_parent``,:func:`note_tie_ring`); read by:func:`other_tie_ring_row`, cleared with the held names
+_TIE_RING_SEEN: contextvars.ContextVar = contextvars.ContextVar("orthonym_tie_ring_seen", default=False)
+
+
+def note_tie_ring() -> None:
+    """The running naming chose the parent of a ring=CH-ring tie: the molecule is offered the other ring
+    (:func:`other_tie_ring_row`) if no other path names it."""
+    _TIE_RING_SEEN.set(True)
 
 
 def note_relaxed_adduct() -> None:
@@ -192,7 +209,46 @@ def default_tier_row_for(namer, smiles) -> Optional[Dict]:
         return None
     held = held_names()
     row = (stereo_layer_row(namer, smiles, held) or twin_last_resort_row(namer, smiles, held)) if held else None
-    return row or relaxed_adduct_row(namer, smiles)
+    return row or relaxed_adduct_row(namer, smiles) or other_tie_ring_row(namer, smiles)
+
+
+def other_tie_ring_row(namer, smiles) -> Optional[Dict]:
+    """The row of ``namer`` for ``smiles`` named with the OTHER ring of a ring=CH-ring tie as the parent, when the
+    complete or best-effort tier left the molecule without a name; else None.
+
+    The ring the criteria of the book choose, (h) and (k),; ``ring_selection.
+    _ylidene_tie_parent``) may be one whose name the producers cannot build with the stereodescriptors of the link (a
+    specified E/Z link that no ring-ylidene prefix carries), where the name of the other ring builds (and the tier
+    named the molecule with it before the criteria chose the ring). The molecule is named again on an engine of the
+    same tier (:func:`general_tier_engine`) with the other ring offered (``ring_selection.OFFER_OTHER_TIE_RING``):
+    first as a name below the PIN (offer 1: the tie is not decided by the book's criteria; a verified name is
+    ``pin_unverified`` or ``systematic_verified``), then, for a name the tier cannot verify in full (OPSIN reads no
+    ring-ylidene stereodescriptor), as the name that builds without that record (offer 2), whose row the tier gives its
+    own label (``pin_unverified``, ``opsin`` ``verified_constitution_only``: the constitution read back, the descriptors
+    checked against the CIP labels). The row of a name that earns ``pin_verified`` is never offered: the ring is not the
+    one the book chooses. No pass inside the pass, none for a junior parent of the pool (``spelling_offer``); the
+    PIN tier never runs this (``_general_fallback``)."""
+    from ..rules.ring_selection import OFFER_OTHER_TIE_RING
+    if (not _TIE_RING_SEEN.get() or not getattr(namer, "_general_fallback", False)
+            or getattr(namer, "_forced_parent_rank", 0) or OFFER_OTHER_TIE_RING.get()):
+        return None
+    try:
+        from ..errors import is_failure_name
+        from ..input_mol import handles, smiles_for
+        if not isinstance(smiles, str) and handles(smiles):
+            smiles = smiles_for(smiles)
+        for offer in (1, 2):
+            token = OFFER_OTHER_TIE_RING.set(offer)
+            try:
+                alt = general_tier_engine(namer).name_tiered(smiles)
+            finally:
+                OFFER_OTHER_TIE_RING.reset(token)
+            name = alt.get("name")
+            if name and not is_failure_name(name) and alt.get("tier") not in ("abstain", "pin_verified"):
+                return alt
+    except Exception:                       # the offer must never break a naming: the abstention stands
+        return None
+    return None
 
 
 def relaxed_adduct_row(namer, smiles) -> Optional[Dict]:

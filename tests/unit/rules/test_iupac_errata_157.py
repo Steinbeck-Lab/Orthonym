@@ -558,6 +558,9 @@ _DEHYDRO_SITES = {
     # the spiro component namer quotes (e) in its docstring (UN U2, 2026-10-19);
     # it numbers ring double bonds, it builds no dehydro prefix
     "rules/spiro_carbocycle.py",
+    # the =CH- ring-tie names step quotes "(other than 'hydro/dehydro' prefixes)" in its
+    # docstring (P45, 2026-10-24); it compares names already built, it builds no dehydro prefix
+    "rules/ring_tie_names.py",
 }
 
 

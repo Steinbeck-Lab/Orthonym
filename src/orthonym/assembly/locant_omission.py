@@ -77,6 +77,9 @@ __all__ = [
     "parent_positional_scope",
     "isotope_labelled_original_scope",
     "isotope_label_on_atoms",
+    "isotopic_skeleton_scope",
+    "skeleton_label_on_atoms",
+    "skeleton_label_maps",
     "isotope_retained_c2_unit_scope",
     "retained_c2_unit_has_isotope_label",
 ]
@@ -1087,29 +1090,39 @@ def isotope_labelled_original_scope(original):
         _ISOTOPE_LABELLED_ORIGINAL.reset(token)
 
 
-def isotope_label_on_atoms(mol, atoms) -> bool:
+def _heavy_with_label_counts(original):
+    """``original`` without its hydrogens and isotopes, each heavy atom carrying the number of isotopically
+    modified atoms it stands for (itself and its isotopic hydrogens) as the property ``_orthonym_labelled``
+    and their nuclides as ``_orthonym_nuclides`` ('6:13;1:2', atomic number and mass number)."""
+    tagged = Chem.RWMol(original)
+    for atom in tagged.GetAtoms():
+        if atom.GetAtomicNum() == 1:
+            continue
+        nuclides = ([(atom.GetAtomicNum(), atom.GetIsotope())] if atom.GetIsotope() else []) + [
+            (1, nb.GetIsotope()) for nb in atom.GetNeighbors() if nb.GetAtomicNum() == 1 and nb.GetIsotope()]
+        if nuclides:
+            atom.SetIntProp("_orthonym_labelled", len(nuclides))
+            atom.SetProp("_orthonym_nuclides", ";".join("%d:%d" % nz for nz in nuclides))
+    for atom in tagged.GetAtoms():
+        atom.SetIsotope(0)
+    params = Chem.RemoveHsParameters()
+    params.removeIsotopes = True
+    return Chem.RemoveHs(tagged.GetMol(), params)
+
+
+def isotope_label_on_atoms(mol, atoms, original=None) -> bool:
     """True when a label of the declared labelled molecule sits on one of ``atoms``
     of ``mol`` (the isotope-stripped molecule being named): a labelled atom, or a
     labelled hydrogen bonded to it. ``mol`` is mapped onto the labelled molecule by
     substructure match (every match, so a symmetric parent is read the same either
-    way). False when no labelled molecule is declared or ``mol`` does not map."""
-    original = _ISOTOPE_LABELLED_ORIGINAL.get()
+    way). False when no labelled molecule is declared or ``mol`` does not map.
+    ``original`` is the labelled molecule to read when the caller has it (the
+    ambient one is the forced re-render's,:func:`isotope_labelled_original_scope`)."""
+    original = original if original is not None else _ISOTOPE_LABELLED_ORIGINAL.get()
     if original is None or mol is None or not atoms:
         return False
     try:
-        tagged = Chem.RWMol(original)
-        for atom in tagged.GetAtoms():
-            if atom.GetAtomicNum() == 1:
-                continue
-            if atom.GetIsotope() or any(
-                    nb.GetAtomicNum() == 1 and nb.GetIsotope()
-                    for nb in atom.GetNeighbors()):
-                atom.SetIntProp("_orthonym_labelled", 1)
-        for atom in tagged.GetAtoms():
-            atom.SetIsotope(0)
-        params = Chem.RemoveHsParameters()
-        params.removeIsotopes = True
-        heavy = Chem.RemoveHs(tagged.GetMol(), params)
+        heavy = _heavy_with_label_counts(original)
         wanted = [int(a) for a in atoms]
         for match in heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64):
             if any(heavy.GetAtomWithIdx(match[i]).HasProp("_orthonym_labelled")
@@ -1468,3 +1481,56 @@ def l3_locant_omitted_for_parent_atoms(
         is_ring_assembly=is_ring_assembly,
         has_skeletal_replacement=has_skeletal_replacement,
     )
+
+
+# The labelled molecule whose isotope-stripped skeleton is being named, declared by ``rules/isotopes.py``
+# around EVERY naming of the skeleton, the first one included (the scope above is the forced re-render's,
+# and only when the parent carries the label). A criterion that is decided by where a label sits (the
+# criteria of and that come before and after the isotopic ones) asks it here, since the
+# labels are stripped before the skeleton is perceived.
+_ISOTOPIC_SKELETON_ORIGINAL: "contextvars.ContextVar[Optional[Chem.Mol]]" = (
+    contextvars.ContextVar("orthonym_isotopic_skeleton_original", default=None))
+
+
+@contextlib.contextmanager
+def isotopic_skeleton_scope(original):
+    """Declare the labelled molecule whose isotope-stripped skeleton is being named
+    (entered by ``rules/isotopes.py`` around its skeleton namings)."""
+    token = _ISOTOPIC_SKELETON_ORIGINAL.set(original)
+    try:
+        yield
+    finally:
+        _ISOTOPIC_SKELETON_ORIGINAL.reset(token)
+
+
+def skeleton_label_on_atoms(mol, atoms) -> bool:
+    """True when a label of the labelled molecule whose skeleton is being named
+    (:func:`isotopic_skeleton_scope`) sits on one of ``atoms`` of ``mol``, a labelled
+    atom or a labelled hydrogen bonded to it (:func:`isotope_label_on_atoms`). False
+    when no labelled molecule is declared."""
+    return isotope_label_on_atoms(mol, atoms, _ISOTOPIC_SKELETON_ORIGINAL.get())
+
+
+def skeleton_label_maps(mol) -> Optional[List[Dict[int, List[Tuple[int, int]]]]]:
+    """The isotopic modifications of the labelled molecule whose skeleton is being named
+    (:func:`isotopic_skeleton_scope`), read onto the atoms of ``mol``: one map per way ``mol`` fits the
+    labelled molecule (a symmetric skeleton fits it more than once), each ``{atom of mol: [(atomic number,
+    mass number),...]}`` with the labelled atom itself and each of its isotopic hydrogens. ``[{}]`` when no
+    labelled molecule is declared; None when ``mol`` does not map onto it."""
+    original = _ISOTOPIC_SKELETON_ORIGINAL.get()
+    if original is None:
+        return [{}]
+    try:
+        heavy = _heavy_with_label_counts(original)
+        maps = []
+        for match in heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64):
+            here: Dict[int, List[Tuple[int, int]]] = {}
+            for i, j in enumerate(match):
+                atom = heavy.GetAtomWithIdx(j)
+                if atom.HasProp("_orthonym_nuclides"):
+                    here[i] = [tuple(int(x) for x in nz.split(":"))
+                               for nz in atom.GetProp("_orthonym_nuclides").split(";")]
+            maps.append(here)
+        return maps or None
+    except Exception:  # noqa: BLE001 -- no answer
+        return None
