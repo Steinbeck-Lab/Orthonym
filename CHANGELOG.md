@@ -5,6 +5,34 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.9...v1.1.0) (2026-10-24)
+
+
+### Features
+
+* opt in to OPSIN's main branch for every name check ([#84](https://github.com/Steinbeck-Lab/Orthonym/issues/84)) ([81ba930](https://github.com/Steinbeck-Lab/Orthonym/commit/81ba93034d9cf2acf4491cedd1546d3b8019ba26))
+* phane names (cyclophanes and linear phanes) as preferred IUPAC names ([#94](https://github.com/Steinbeck-Lab/Orthonym/issues/94)) ([13e0ed7](https://github.com/Steinbeck-Lab/Orthonym/commit/13e0ed7f058f50b3ce3b869362b1c513898d94c3))
+
+
+### Bug Fixes
+
+* enclosing marks of mononuclear-hydride substituent groups and the order of prefixes whose letters tie ([#89](https://github.com/Steinbeck-Lab/Orthonym/issues/89)) ([d1bcac5](https://github.com/Steinbeck-Lab/Orthonym/commit/d1bcac5bac421874c7faa51c027f7204262256ba))
+* isotope names of large molecules no longer time out ([#87](https://github.com/Steinbeck-Lab/Orthonym/issues/87)) ([4ac436f](https://github.com/Steinbeck-Lab/Orthonym/commit/4ac436f2313faf4830f40f5bd12d0902295bd134))
+* large peptides whose substituent names reuse an acid name are named in seconds ([#83](https://github.com/Steinbeck-Lab/Orthonym/issues/83)) ([91790a7](https://github.com/Steinbeck-Lab/Orthonym/commit/91790a75c79e1d343cc1c709b47b10e9ae54b86e))
+* large ring cations no longer hang, and large molecules are named faster ([#82](https://github.com/Steinbeck-Lab/Orthonym/issues/82)) ([6b29958](https://github.com/Steinbeck-Lab/Orthonym/commit/6b29958fe4e8b3a8d7215802bf361af4596ca995))
+* PIN names for N-substituted imidic, sulfonimidic and hydroxamic acids ([#93](https://github.com/Steinbeck-Lab/Orthonym/issues/93)) ([8100817](https://github.com/Steinbeck-Lab/Orthonym/commit/8100817b0f83ac24c73eb967792ec697660b4ae2))
+* PIN names for senior-atom hydrides, chalcogen acids and imidic esters; false PIN labels removed ([#86](https://github.com/Steinbeck-Lab/Orthonym/issues/86)) ([e8af665](https://github.com/Steinbeck-Lab/Orthonym/commit/e8af6657c0a689af974c2660f5f9b9424f2a686e))
+* PIN names for substituted hydroximic and thiohydroximic acids, with their C=N configuration ([#88](https://github.com/Steinbeck-Lab/Orthonym/issues/88)) ([a961250](https://github.com/Steinbeck-Lab/Orthonym/commit/a9612505cc2f62252a3c80bd2faf073c1ba40355))
+* **tests:** a test that hides the OPSIN jar also clears the engine's function caches ([#78](https://github.com/Steinbeck-Lab/Orthonym/issues/78)) ([5840104](https://github.com/Steinbeck-Lab/Orthonym/commit/5840104f5a7cc780ffc493675c0375680954eef7))
+* the parent ring of two rings joined by =CH- follows the seniority criteria in the order the recommendations give ([#92](https://github.com/Steinbeck-Lab/Orthonym/issues/92)) ([b118d9f](https://github.com/Steinbeck-Lab/Orthonym/commit/b118d9f77aa182d682dfb8791d8b73b4d4217774))
+* use a jar only from a directory that no other user can write ([#85](https://github.com/Steinbeck-Lab/Orthonym/issues/85)) ([2532f0c](https://github.com/Steinbeck-Lab/Orthonym/commit/2532f0c056a249b0e4f54a1d39848c708f9cd492))
+* von Baeyer cage numbering follows the numbering criteria in full and never the input atom order ([#91](https://github.com/Steinbeck-Lab/Orthonym/issues/91)) ([d37d50a](https://github.com/Steinbeck-Lab/Orthonym/commit/d37d50a463fcb808f0a4da667ee5b7888486f444))
+
+
+### Documentation
+
+* a shorter README with a gallery, and the preprint to cite ([#81](https://github.com/Steinbeck-Lab/Orthonym/issues/81)) ([51c251b](https://github.com/Steinbeck-Lab/Orthonym/commit/51c251bf21d8c28baa5e106061426c73eb1c923a))
+
 ## [1.0.9](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.8...v1.0.9) (2026-10-23)
 
 
