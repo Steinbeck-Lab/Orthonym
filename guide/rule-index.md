@@ -331,7 +331,8 @@ A class handler is a short shim in `routing/dispatch_table.py` that calls the co
 | 1300 | `RETAINED_NAME` | Whole molecules that have a retained name (naphthalene) | `data/` |
 | 1400 | `AMINO_ACID` | Amino acids | `rules/amino_acids.py` |
 | 1500 | `SKELETAL_REPLACEMENT` | Chains with heteroatoms in the skeleton ('a' nomenclature) | `rules/skeletal_replacement.py` |
-| 1600 | `CYCLOPHANE` | Cyclophanes | `rules/phane.py` |
+| 1600 | `CYCLOPHANE` | Cyclophanes | `rules/phane.py`, `rules/phane_pin/` |
+| 1650 | `LINEAR_PHANE` | Linear phanes (four or more rings or ring systems, two terminal, seven or more nodes) | `rules/phane_pin/` |
 | 1700 | `INOSITOL` | Inositols (cyclitols) | `rules/inositols.py` |
 | 1800 | `NUCLEOSIDE` | Nucleosides and nucleotides with a decoration (phosphates, acyl esters) | `rules/nucleosides.py` |
 | 99000 | `DECOMPOSITION_PRE_GENERAL` | Naming a large molecule from its fragments; may decline, and the pipeline goes on | `decomposition/` |
@@ -430,7 +431,7 @@ The number of times the code (comments, docstrings and strings) mentions a secti
 | P-23 | Polyalicyclic Parent Hydrides (Extended von Baeyer System) | 199 | `rules/polycyclic.py` (82), `rules/ring_replacement.py` (25), `rules/vonbaeyer_universal.py` (22) |
 | P-24 | Spiro Ring Systems | 262 | `rules/spiro.py` (196), `assembly/composer.py` (31), `data/fused_heterocycles.py` (7) |
 | P-25 | Fused and Bridged Fused Ring Systems | 635 | `rules/fused_rings.py` (96), `data/fused_heterocycles.py` (62), `rules/bridged_fused_pin/fusion_components.py` (30) |
-| P-26 | Phane Nomenclature | 60 | `rules/phane.py` (50), `routing/dispatch_table.py` (3), `rules/linear_phane_screen.py` (3) |
+| P-26 | Phane Nomenclature | 128 | `rules/phane.py` (51), `rules/phane_pin/naming.py` (18), `rules/phane_pin/numbering.py` (17) |
 | P-28 | Ring Assemblies | 140 | `rules/ring_assemblies.py` (101), `rules/ring_substituents.py` (13), `rules/ring_assembly_screen.py` (6) |
 | P-29 | Prefixes Denoting Substituent Groups Derived from Parent Hydrides | 359 | `assembly/substituent_naming.py` (65), `assembly/substituent_enumerator.py` (59), `rules/ring_substituents.py` (38) |
 | P-31 | Modification of the Degree of Hydrogenation of Parent Hydrides | 416 | `rules/spiro.py` (41), `rules/polycyclic.py` (27), `rules/heterocycles.py` (26) |
@@ -440,7 +441,7 @@ The number of times the code (comments, docstrings and strings) mentions a secti
 | P-45 | Selection of the Preferred IUPAC Name | 175 | `perception/chains.py` (36), `rules/isotopes.py` (30), `rules/benzene.py` (20) |
 | P-46 | The Principal Chain in Substituent Groups | 70 | `assembly/substituent_naming.py` (61), `assembly/capped_name.py` (2), `assembly/substituent_enumerator.py` (2) |
 | P-51 | Selecting the Preferred Type of IUPAC Nomenclature | 104 | `rules/multiplicative.py` (29), `rules/skeletal_replacement.py` (23), `rules/pin_vocabulary.py` (13) |
-| P-52 | Selecting Preferred IUPAC Names and Preselected Names for Parent Hydrides | 100 | `rules/bridged_fused_pin/selection.py` (11), `rules/phane.py` (9), `namer.py` (6) |
+| P-52 | Selecting Preferred IUPAC Names and Preselected Names for Parent Hydrides | 127 | `routing/dispatch_table.py` (12), `rules/bridged_fused_pin/selection.py` (11), `rules/phane.py` (9) |
 | P-54 | Selecting the Preferred Method for Modifying the Degree of Hydrogenation | 44 | `rules/ring_assembly_screen.py` (10), `data/fused_heterocycles.py` (8), `rules/heterocycles.py` (8) |
 | P-58 | Selecting Preferred IUPAC Names | 139 | `rules/partial_saturation.py` (27), `rules/fused_rings.py` (24), `rules/bridged_fused_pin/hydro.py` (17) |
 | P-59 | Name Construction | 91 | `assembly/universal_substituent.py` (23), `rules/fused_rings.py` (9), `perception/ions.py` (8) |

@@ -1,5 +1,5 @@
-"""Spelling check: a name of a structure whose PIN is a linear phane name (registered
-with:func:`orthonym.validation.pin_spelling.register`).
+"""Spelling checks: a name of a structure whose PIN is a linear or a cyclic phane name
+(registered with:func:`orthonym.validation.pin_spelling.register`).
 
  (2) (the Blue Book) "linear phanes consist of four or more rings or ring systems,
 two of which must be terminal, and together with acyclic atoms or chains must consist of at least
@@ -16,7 +16,17 @@ of the principal characteristic group but the qualifying chain stays whole in on
 substituents: the PIN may cite that substituent as a linear phane prefix (:19325
 'trimethyl[1^2H-1(6)-pyrana-3,5(1,4),7(1)-tribenzenaheptaphan-7^4-yl]silane (PIN)';,
 :16148), which no printed row decides for such a parent, so the name is not certified (fail
-closed). No naming code, no OPSIN.
+closed).
+
+The cyclic half: (1) (:23828) "cyclophanes are cyclic phane structures containing one or more rings
+or ring systems, at least one ring or ring system of which must be a mancude system attached to adjacent
+atoms or chains at nonadjacent ring positions" and (:23831) "When the conditions given in
+ for cyclic phane systems are not fulfilled, names of fused ring systems, bridged fused systems, or
+von Baeyer systems are preferred IUPAC names": when the conditions are met, a fused, bridged fused, von Baeyer
+or spiro name is not the PIN. The structure test is:mod:`.cyclophane`; it judges only where the book prints a
+phane PIN, and abstains elsewhere. The same holds where a parent hydride with a senior atom "The senior parent
+structure, whether cyclic or acyclic, has the senior atom...",:18917;,:18919) outranks the
+phane: ``trimethyl[...heptaphan-7^4-yl]silane (PIN) (Si is senior to O)`` (:19325). No naming code, no OPSIN.
 """
 from __future__ import annotations
 
@@ -25,6 +35,7 @@ from typing import Optional
 from rdkit import Chem
 
 from ..pin_spelling import SpellingFailure, register
+from .cyclophane import is_phane_name, p52_cyclophane_systems
 from .linear_phane import is_linear_phane_name, linear_phane_pin_expected
 
 
@@ -42,8 +53,21 @@ def linear_phane_pin_check(mol: Chem.Mol, name: str) -> Optional[SpellingFailure
     chain = (f"{verdict.ring_systems} rings or ring systems on an unbranched chain of "
              f"{verdict.nodes} nodes with ring systems at both ends")
     if verdict.as_prefix:
+        outside = ("the parent that has the senior atom (P-44.1.2)" if verdict.criterion == "P-44.1.2"
+                   else "the parent that cites the most of the principal characteristic group")
         return SpellingFailure(
             "P-52.2.5.1",
-            f"the PIN may cite a linear phane substituent prefix (P-29.3.6): {chain}, outside "
-            f"the parent that cites the most of the principal characteristic group")
+            f"the PIN may cite a linear phane substituent prefix (P-29.3.6): {chain}, outside {outside}")
     return SpellingFailure("P-52.2.5.1", f"the PIN is a linear phane name: {chain}")
+
+
+@register("P-52.2.5.1")
+def cyclic_phane_pin_check(mol: Chem.Mol, name: str) -> Optional[SpellingFailure]:
+    """ (1) with: a name of a structure whose PIN is a cyclic phane name must be a phane
+    name; any other name (von Baeyer, spiro, fused, bridged fused) is not the PIN. A structure the test does not
+    judge is not decided here."""
+    if is_phane_name(name):
+        return None
+    if not p52_cyclophane_systems(mol):
+        return None
+    return SpellingFailure("P-52.2.5.1", "the PIN is a cyclic phane name: the structure meets P-52.2.5.1 (1)")

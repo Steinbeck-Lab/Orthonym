@@ -1,5 +1,6 @@
 import pytest
 from orthonym.namer import name_compound
+from tests.support.opsin_marks import release_opsin_only
 
 
 @pytest.mark.unit
@@ -153,6 +154,7 @@ class TestP28RingAssemblyBeyondSix:
                      "-c9ccc(-c%10ccc(-c%11ccccc%11)cc%10)cc9)cc8)cc7)cc6)cc5)"
                      "cc4)cc3)cc2)cc1")
 
+    @release_opsin_only
     def test_undeciphenyl_names(self):
         from orthonym.namer import name_compound
         name = name_compound(self.UNDECI_SMILES)

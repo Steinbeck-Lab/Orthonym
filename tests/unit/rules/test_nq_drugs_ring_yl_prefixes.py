@@ -23,6 +23,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules import linear_phane_screen, ring_substituents
+from tests.support.opsin_marks import release_opsin_only
 from tests.support.pin_tiers import assert_not_pin_labelled, assert_pin_at_both_tiers, name_default
 from tests.support.rt_assert import assert_full_rt, name_best_effort
 from tests.support.spelling_checks import disable_spelling_rule
@@ -198,6 +199,7 @@ def test_the_ketone_keeps_its_suffix_at_best_effort():
     assert_full_rt(name, smiles)
 
 
+@release_opsin_only
 def test_a_phane_class_molecule_gets_no_pin_through_these_prefixes(monkeypatch):
     # four benzene rings and three NH on one chain, the carboxylic acid off it: a phane name
     # may be the PIN (the acid can be its suffix), so the PIN tier declines

@@ -25,6 +25,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.rules import benzene, linear_phane_screen
+from tests.support.opsin_marks import release_opsin_only
 from tests.support.pin_tiers import assert_not_pin_labelled, assert_pin_at_both_tiers, name_default
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
 from tests.support.spelling_checks import disable_spelling_rule
@@ -204,6 +205,7 @@ def test_a_hydro_ring_assembly_is_not_taken_apart_in_a_pin(smiles, non_pin):
     assert_not_pin_labelled(smiles, non_pin)
 
 
+@release_opsin_only
 def test_a_phane_class_molecule_gets_no_pin_through_a_ring_yl_ether(monkeypatch):
     # four ring systems and seven nodes on one chain, the acid off it: a phane name may be the
     # PIN (2),:23829), so no tier certifies the substitutive name
@@ -235,7 +237,14 @@ O_RING_BELOW_THE_PIN_ROWS = [
 ]
 
 
-@pytest.mark.parametrize("smiles,name", O_RING_BELOW_THE_PIN_ROWS)
+#: the two rows with four ring systems on one chain are linear phanes (2),:23829): an OPSIN that reads
+#: phane names gets their phane PIN, so the test of the name below the PIN describes OPSIN 2.9.0 for them
+_LINEAR_PHANE_ROWS = {O_RING_BELOW_THE_PIN_ROWS[1][0], O_RING_BELOW_THE_PIN_ROWS[3][0]}
+
+
+@pytest.mark.parametrize("smiles,name", [
+    pytest.param(s, n, marks=release_opsin_only) if s in _LINEAR_PHANE_ROWS else (s, n)
+    for s, n in O_RING_BELOW_THE_PIN_ROWS])
 @pytest.mark.parametrize("tier", ["pin", "valid", "complete", "best-effort"])
 def test_an_o_ring_ether_keeps_its_name_below_the_pin(tier, smiles, name):
     row = _tier_row(tier, smiles)

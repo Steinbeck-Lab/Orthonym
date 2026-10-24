@@ -263,6 +263,12 @@ _VON_BAEYER = re.compile(
     r"(?:bi|tri|tetra|penta|hexa|hepta|octa|nona|deca|undeca|dodeca)cyclo"
     r"\[(\d+)\.(\d+)\.(\d+)((?:\.\d+\^\d+,\d+)*)\]")
 _VB_SECONDARY = re.compile(r"\.(\d+)\^(\d+),(\d+)")
+# The descriptor in front of the node count and 'phane' ('bicyclo[6.6.0]tetradecaphane (PIN)',:15065) numbers
+# the nodes of a simplified skeleton, whose superatoms stand for whole rings. (:14878) names such a
+# skeleton by von Baeyer nomenclature, and fusion nomenclature, which (:23831) prefers only when the
+# conditions of are not fulfilled, cannot name it. The node count is a multiplier that ends in 'a'
+# ('octa', 'tetradeca'), which 'phosphane' and 'decylphane' do not have in front of 'phan'.
+_PHANE_SKELETON_WORD = re.compile(r"[a-z]+aphan(?:e|-)")
 
 
 def _ortho_fused_von_baeyer(m) -> bool:
@@ -731,6 +737,8 @@ def non_pin_vocabulary(name: Optional[str], *, label_forms: bool = True) -> Opti
         if m:
             return m.group(0)
     for m in _VON_BAEYER.finditer(name):
+        if _PHANE_SKELETON_WORD.match(name, m.end()):
+            continue
         if _ortho_fused_von_baeyer(m) or _bridged_fused_von_baeyer(m):
             return m.group(0)
     for m in _ACYCLIC_A_NAME.finditer(name):

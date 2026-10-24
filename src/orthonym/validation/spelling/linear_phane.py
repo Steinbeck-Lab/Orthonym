@@ -113,9 +113,10 @@ class LinearPhaneVerdict:
     """The chain that makes a phane name the PIN. ``principal_class`` is the compound's senior
     suffix class (None: no suffix class; 'ion': an uncompensated charge or radical, not
     modelled); ``expressed`` of its ``occurrences`` are cited by the phane parent.
-    ``as_prefix``: another parent cites more of them than the phane, and the chain
-    (``ring_systems``, ``nodes``) stays whole outside that parent, so the PIN may cite it as a
-    linear phane substituent prefix (:19325;,:16148)."""
+    ``as_prefix``: another parent cites more of them than the phane, or a parent with a
+    senior atom outranks it, ``criterion``), and the chain (``ring_systems``, ``nodes``)
+    stays whole outside that parent, so the PIN may cite it as a linear phane substituent prefix
+    (:19325;,:16148)."""
 
     ring_systems: int
     nodes: int
@@ -123,6 +124,7 @@ class LinearPhaneVerdict:
     expressed: int
     occurrences: int
     as_prefix: bool = False
+    criterion: str = "P-44.1.1"          # the criterion that makes the phane no parent: for a senior atom
 
 
 @dataclass(frozen=True)
@@ -512,10 +514,11 @@ def _expressed(mol: Chem.Mol, chain: Tuple[Node, ...], systems: Sequence[_RingSy
     return count
 
 
-def _identical_parent(mol: Chem.Mol, atoms: FrozenSet[int]) -> Optional[str]:
-    """The ring system ``atoms`` with every bond to an outside atom replaced by hydrogen, as a
-    canonical SMILES 'identical cyclic systems'), or None when that hydride cannot be
-    written (the system then joins no ring assembly)."""
+def ring_system_hydride(mol: Chem.Mol,
+                        atoms: FrozenSet[int]) -> Optional[Tuple[Chem.Mol, Dict[int, int]]]:
+    """The ring system ``atoms`` with every bond to an outside atom replaced by hydrogen, and the map
+    from an atom index in ``mol`` to its index in the hydride; None when that hydride cannot be
+    sanitized. Isotopes are dropped 'identical cyclic systems')."""
     rw = Chem.RWMol(mol)
     for idx in atoms:
         atom = rw.GetAtomWithIdx(idx)
@@ -529,9 +532,17 @@ def _identical_parent(mol: Chem.Mol, atoms: FrozenSet[int]) -> Optional[str]:
     try:
         frag = rw.GetMol()
         Chem.SanitizeMol(frag)
-        return Chem.MolToSmiles(frag, isomericSmiles=False)
     except Exception:  # noqa: BLE001 -- RDKit raises several types for an impossible hydride
         return None
+    return frag, {atom: i for i, atom in enumerate(sorted(atoms))}
+
+
+def _identical_parent(mol: Chem.Mol, atoms: FrozenSet[int]) -> Optional[str]:
+    """The ring system ``atoms`` as its hydride, a canonical SMILES 'identical cyclic
+    systems'), or None when that hydride cannot be written (the system then joins no ring
+    assembly)."""
+    got = ring_system_hydride(mol, atoms)
+    return None if got is None else Chem.MolToSmiles(got[0], isomericSmiles=False)
 
 
 def _assemblies(mol: Chem.Mol, systems: Sequence[_RingSystem],
@@ -624,22 +635,81 @@ def _node_atoms(chain: Tuple[Node, ...], systems: Sequence[_RingSystem]) -> Set[
     return out
 
 
-def _component_verdict(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_RingSystem],
-                       chains: Sequence[Tuple[Node, ...]],
-                       occurrences: Sequence[_Occurrence]) -> Optional[LinearPhaneVerdict]:
+#: (:18917): "N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl > O > S > Se > Te > C", the
+#: senior atom first
+_SENIOR_ATOM_ORDER = ("N", "P", "As", "Sb", "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga", "In", "Tl",
+                      "O", "S", "Se", "Te", "C")
+#: the elements of the order that head a parent hydride of their own (the book's rows:19325 silane,:19327
+#: phosphane); a single N is decided by, where the amines, amides and nitriles that the reader models
+#: are principal characteristic groups, a nitro group heads no parent hydride (ASSUMED; the sample's outside
+#: nitrogen atoms are a nitro group, an azo group and an isocyanide), an acyclic N-N unit heads hydrazine or diazene
+_PARENT_HYDRIDE_HEADS = frozenset({"P", "As", "Sb", "Bi", "Si", "Ge", "Sn", "Pb", "B", "Al", "Ga", "In", "Tl"})
+
+
+def _senior_atoms_outside(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_RingSystem],
+                          chain: Tuple[Node, ...]) -> FrozenSet[int]:
+    """ and (:18919) "A single senior atom is sufficient to give seniority to the parent
+    hydride": the acyclic atoms of the component outside the chain whose element heads a parent hydride and
+    ranks above every element of the phane (its chain atoms and the atoms of its ring systems; the
+    skeletal heteroatoms of a phane are 'a' replacement, to which the criterion is not applied,:18917).
+    A ring outside the chain is not counted: the criterion "is not used to choose between rings"."""
+    inside = _node_atoms(chain, systems)
+    rank = {e: i for i, e in enumerate(_SENIOR_ATOM_ORDER)}
+    best = min(rank.get(mol.GetAtomWithIdx(a).GetSymbol(), len(rank)) for a in inside)
+
+    def heads_parent(atom: Chem.Atom) -> bool:
+        if atom.IsInRing():
+            return False
+        if atom.GetSymbol() in _PARENT_HYDRIDE_HEADS:
+            return rank[atom.GetSymbol()] < best
+        # an acyclic N-N unit heads hydrazine or diazene: (:18950) '1-(2H-pyran-3-yl)-2-(silolan-2-yl)hydrazine (PIN) (N > Si > O)'
+        return (atom.GetSymbol() == "N" and rank["N"] < best
+                and any(n.GetSymbol() == "N" and not n.IsInRing() for n in atom.GetNeighbors()))
+    return frozenset(a for a in atoms - inside if heads_parent(mol.GetAtomWithIdx(a)))
+
+
+def _cited_by_senior_parent(mol: Chem.Mol, principal: Sequence[_Occurrence], senior: FrozenSet[int]) -> int:
+    """How many of the ``principal`` groups sit on a senior atom (a group bonded to it is cited by the parent
+    hydride it heads)."""
+    return sum(any(n.GetIdx() in senior for n in mol.GetAtomWithIdx(o[3]).GetNeighbors()) for o in principal)
+
+
+def _component_result(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_RingSystem],
+                      chains: Sequence[Tuple[Node, ...]], occurrences: Sequence[_Occurrence]
+                      ) -> Optional[Tuple[LinearPhaneVerdict, List[Tuple[Node, ...]]]]:
+    """The verdict of one component and the chains that make its phane the parent (the longest of the usable ones)."""
     sizes = [(sum(p[0] == "R" for p in c), len(c)) for c in chains]
     if _charged(mol, atoms):
-        return LinearPhaneVerdict(*max(sizes), "ion", 0, 0)
+        best = max(sizes)
+        return LinearPhaneVerdict(*best, "ion", 0, 0), [c for c, z in zip(chains, sizes) if z == best]
     mine = [o for o in occurrences if o[3] in atoms]
     if not mine:
-        return LinearPhaneVerdict(*max(sizes), None, 0, 0)
+        # has nothing to count; decides between the phane and a parent with a senior atom
+        usable = [(c, z) for c, z in zip(chains, sizes) if not _senior_atoms_outside(mol, atoms, systems, c)]
+        if not usable:
+            return LinearPhaneVerdict(*max(sizes), None, 0, 0, as_prefix=True, criterion="P-44.1.2"), []
+        best = max(z for _, z in usable)
+        return LinearPhaneVerdict(*best, None, 0, 0), [c for c, z in usable if z == best]
     senior = min(o[0] for o in mine)
     principal = [o for o in mine if o[0] == senior]
-    expressed, n_rings, n_nodes = max(
-        (_expressed(mol, c, systems, principal),) + size for c, size in zip(chains, sizes))
+    triples = [(_expressed(mol, c, systems, principal),) + z for c, z in zip(chains, sizes)]
     rivals, winners = _rival_parents(mol, atoms, systems, principal)
+    # counts the groups of the parents; one that is a parent hydride with a senior atom and cites at
+    # least as many as the phane takes the structure from it decides a tie, a lead)
+    usable = []
+    for c, z, t in zip(chains, sizes, triples):
+        outside = _senior_atoms_outside(mol, atoms, systems, c)
+        if outside and t[0] >= rivals and _cited_by_senior_parent(mol, principal, outside) >= t[0]:
+            continue
+        usable.append((c, z, t))
+    if not usable:
+        best = max(triples)
+        return (LinearPhaneVerdict(best[1], best[2], principal[0][1], best[0], len(principal),
+                                   as_prefix=True, criterion="P-44.1.2"), [])
+    expressed, n_rings, n_nodes = max(t for _, _, t in usable)
+    best_chains = [c for c, _, t in usable if t == (expressed, n_rings, n_nodes)]
     if expressed >= rivals:
-        return LinearPhaneVerdict(n_rings, n_nodes, principal[0][1], expressed, len(principal))
+        return LinearPhaneVerdict(n_rings, n_nodes, principal[0][1], expressed, len(principal)), best_chains
     #: another parent cites more of the principal characteristic group, so the phane is
     # no parent. A qualifying chain that stays whole outside one of the winning parents (any of
     # them: the criteria that choose between tied parents are not read here) is one substituent
@@ -651,8 +721,60 @@ def _component_verdict(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_
              if parent.isdisjoint(_node_atoms(c, systems))]
     if not whole:
         return None
-    return LinearPhaneVerdict(*max(whole), principal[0][1], expressed, len(principal),
-                              as_prefix=True)
+    return (LinearPhaneVerdict(*max(whole), principal[0][1], expressed, len(principal), as_prefix=True), [])
+
+
+def _component_verdict(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_RingSystem],
+                       chains: Sequence[Tuple[Node, ...]],
+                       occurrences: Sequence[_Occurrence]) -> Optional[LinearPhaneVerdict]:
+    got = _component_result(mol, atoms, systems, chains, occurrences)
+    return None if got is None else got[0]
+
+
+def principal_groups(mol: Chem.Mol) -> Tuple[Optional[str], Tuple[_Occurrence, ...]]:
+    """The senior suffix class of ``mol`` and the occurrences of that class: the principal
+    characteristic groups), read as ``_component_verdict`` reads them; ``(None, )`` when ``mol`` has no
+    group of a suffix class. One occurrence is ``(seniority, class, key, centre, where, attach)``."""
+    occurrences = _occurrences(mol)
+    if not occurrences:
+        return None, ()
+    senior = min(o[0] for o in occurrences)
+    principal = tuple(o for o in occurrences if o[0] == senior)
+    return principal[0][1], principal
+
+
+def _results(mol: Chem.Mol):
+    """(verdict, chains of the phane) of each component of ``mol`` whose chains qualify, and the ring systems."""
+    if mol is None:
+        return [], []
+    try:
+        n_rings = mol.GetRingInfo().NumRings()
+    except RuntimeError:  # an unsanitized molecule: find its rings first
+        Chem.FastFindRings(mol)
+        n_rings = mol.GetRingInfo().NumRings()
+    if n_rings < 4:
+        return [], []
+    systems = _ring_systems(mol)
+    if len(systems) < 4:
+        return [], systems
+    chains = _chains(mol, systems)
+    if not chains:
+        return [], systems
+    occurrences = _occurrences(mol)
+    results = []
+    for component in Chem.GetMolFrags(mol):
+        atoms = frozenset(component)
+        mine = [c for c in chains if systems[c[0][1]].atoms <= atoms]
+        if mine:
+            got = _component_result(mol, atoms, systems, mine, occurrences)
+            if got is not None:
+                results.append(got)
+    return results, systems
+
+
+def _winner(results):
+    return max(results, key=lambda r: (not r[0].as_prefix, r[0].expressed, r[0].ring_systems, r[0].nodes,
+                                       r[0].principal_class or "", r[0].occurrences))
 
 
 def linear_phane_pin_expected(mol: Chem.Mol) -> Optional[LinearPhaneVerdict]:
@@ -660,31 +782,27 @@ def linear_phane_pin_expected(mol: Chem.Mol) -> Optional[LinearPhaneVerdict]:
     a linear phane name, or may cite one as a substituent prefix (``as_prefix``) -- each
     component read alone, the largest verdict wins, a phane parent before a prefix -- or None
     when no component's PIN is or may cite one."""
-    if mol is None:
-        return None
-    try:
-        n_rings = mol.GetRingInfo().NumRings()
-    except RuntimeError:  # an unsanitized molecule: find its rings first
-        Chem.FastFindRings(mol)
-        n_rings = mol.GetRingInfo().NumRings()
-    if n_rings < 4:
-        return None
-    systems = _ring_systems(mol)
-    if len(systems) < 4:
-        return None
-    chains = _chains(mol, systems)
-    if not chains:
-        return None
-    occurrences = _occurrences(mol)
-    verdicts = []
-    for component in Chem.GetMolFrags(mol):
-        atoms = frozenset(component)
-        mine = [c for c in chains if systems[c[0][1]].atoms <= atoms]
-        if mine:
-            verdict = _component_verdict(mol, atoms, systems, mine, occurrences)
-            if verdict is not None:
-                verdicts.append(verdict)
-    if not verdicts:
-        return None
-    return max(verdicts, key=lambda v: (not v.as_prefix, v.expressed, v.ring_systems, v.nodes,
-                                        v.principal_class or "", v.occurrences))
+    results, _ = _results(mol)
+    return _winner(results)[0] if results else None
+
+
+def linear_phane_chains(mol: Chem.Mol) -> List[Tuple[Node, ...]]:
+    """The chains that make the phane the parent of the winning component: every chain that ties on what the
+    verdict counts (principal groups, rings, nodes), in no particular order; empty when the verdict is None
+    or only a prefix. A ring-system node is ``("R", k)``, an acyclic atom ``("A", i)``; ``k`` indexes
+    :func:`ring_system_atoms`."""
+    results, _ = _results(mol)
+    if not results:
+        return []
+    return list(_winner(results)[1])
+
+
+def linear_phane_chain(mol: Chem.Mol) -> Optional[Tuple[Node, ...]]:
+    """One of:func:`linear_phane_chains` (the first by node ids), or None."""
+    chains = linear_phane_chains(mol)
+    return min(chains) if chains else None
+
+
+def ring_system_atoms(mol: Chem.Mol, k: int) -> FrozenSet[int]:
+    """The atoms of the ``k``-th ring system of the reader (the ``("R", k)`` nodes of a chain)."""
+    return _ring_systems(mol)[k].atoms

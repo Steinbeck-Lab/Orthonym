@@ -66,6 +66,8 @@ $ orthonym --opsin main --fetch-jars       # build it before the first use
 
 The first use of a commit builds a jar on your machine: Orthonym fetches the source of that commit from GitHub, compiles it with `javac` against the libraries of the 2.9.0 jar, checks the result by reading three names, and keeps it in the subdirectory `opsin-main` of the jar directory as `opsin-main-<first 12 characters of the commit>.jar`, next to a `.json` file that says how it was built. The build usually takes under a minute. Later runs use that jar and need neither GitHub nor a JDK. `main` asks GitHub for the newest commit at most once a day; when GitHub cannot be reached, it uses the last commit it knows. The same commit, the same JDK and the same 2.9.0 jar always give the same jar.
 
+Phane names need `main`. OPSIN 2.9.0 has no grammar for them, so with the default Orthonym builds no new phane name: it still ships the monocyclic cyclophane of benzene rings (`1,4(1,4)-dibenzenacyclohexaphane`), checked by building the structure back from the name, and it declines the structures that the recommendations name as phanes. It no longer returns a fusion, bridged fused, von Baeyer or spiro name for a cyclophane as a preferred name; the wider tiers still return such a name, labelled below the preferred name. With `--opsin main`, cyclophanes and linear phanes get their phane names, each read back by OPSIN to your full InChIKey. See [Phane names](../use/phane-names.md).
+
 What to know before you choose `main`:
 
 - It needs a JDK (`javac`, version 11 or newer), not only a Java runtime, for the build.

@@ -38,6 +38,7 @@ import pytest
 from rdkit import Chem
 
 import orthonym.rules.phane as phane
+from tests.support.opsin_marks import release_opsin_only
 from orthonym.rules.phane import build_phane_pin
 from orthonym.validation import phane_read_back as reader
 from orthonym.validation.phane_read_back import phane_name_shape, phane_read_back
@@ -249,6 +250,7 @@ def test_the_carve_out_ships_a_name_only_when_the_read_back_agrees():
 
 
 @pytest.mark.opsin_gate
+@release_opsin_only
 @pytest.mark.parametrize("smiles,name", [
     ("C1CC2=CC=C(C=C2)C#CC3=CC=C1C=C3", "1,4(1,4)-dibenzenacyclohexaphan-2-yne"),
     ("C1=Cc2ccc(cc2)C=Cc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane-2,5-diene"),
@@ -262,7 +264,7 @@ def test_the_default_tier_gives_the_name_that_reads_back(smiles, name):
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", [TRANS_SMALL, CUMULENE])
+@pytest.mark.parametrize("smiles", [TRANS_SMALL, pytest.param(CUMULENE, marks=release_opsin_only)])
 def test_the_default_tier_declines_a_phane_it_cannot_name(smiles):
     """The producer names neither (a trans bond up to seven nodes, a cumulated bridge): the strict path has
     no name, and no phane name of another molecule stands in."""
@@ -272,6 +274,7 @@ def test_the_default_tier_declines_a_phane_it_cannot_name(smiles):
     assert row["tier"] == "abstain" and is_failure_name(row["name"]) and not phane_name_shape(row["name"]), row
 
 
+@release_opsin_only
 @pytest.mark.opsin_gate
 def test_a_name_of_another_molecule_is_declined_at_the_default_tier(monkeypatch):
     """The producer that names the alkyne as the saturated phane (the old defect) is not shipped."""
@@ -307,6 +310,7 @@ LAST_RESORT_ROWS = [
 
 
 @pytest.mark.opsin_gate
+@release_opsin_only
 @pytest.mark.parametrize("name,smiles", LAST_RESORT_ROWS)
 def test_default_tier_names_the_phane_rows_with_the_phane_name(name, smiles):
     from tests.support.default_tier import default_tier_row
@@ -316,6 +320,7 @@ def test_default_tier_names_the_phane_rows_with_the_phane_name(name, smiles):
 
 
 @pytest.mark.opsin_gate
+@release_opsin_only
 @pytest.mark.parametrize("name,smiles", LAST_RESORT_ROWS)
 def test_best_effort_gives_the_phane_rows_the_general_engine_name_opsin_reads(name, smiles):
     from tests.support.rt_assert import assert_full_rt, name_best_effort
@@ -326,6 +331,7 @@ def test_best_effort_gives_the_phane_rows_the_general_engine_name_opsin_reads(na
 
 
 @pytest.mark.opsin_gate
+@release_opsin_only
 @pytest.mark.parametrize("tier", ["valid", "complete"])
 def test_the_valid_and_complete_tiers_still_read_back_every_name_with_opsin(tier):
     """The phane builder is an exception of best-effort only (README: 'every name must pass a full-InChIKey OPSIN
@@ -336,6 +342,7 @@ def test_the_valid_and_complete_tiers_still_read_back_every_name_with_opsin(tier
     assert row["tier"] == "abstain", row
 
 
+@release_opsin_only
 @pytest.mark.opsin_gate
 def test_a_phane_name_never_replaces_a_name_opsin_reads_back_at_best_effort():
     """A one-line pass of the gate would have given every phane its phane name at best-effort and replaced 59 of

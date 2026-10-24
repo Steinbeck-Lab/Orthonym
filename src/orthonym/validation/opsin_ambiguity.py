@@ -25,6 +25,7 @@ Two things keep a withdrawn name from being lost.
   verified PIN), so the record is what makes it decline there.
 """
 import logging
+import re
 from typing import Dict, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,15 @@ AMBIGUITY_WARNING = "APPEARS_AMBIGUOUS"
 
 #: the reason of the ``forced_locant_scope`` of the retry
 FORCED_LOCANT_REASON = "opsin_ambiguity"
+
+#: (:15111) "locants for amplificant atoms are constructed by citing the actual locants of the amplificant
+#: as superscripts to the locant of the superatom": in a phane name a plain number is a skeleton locant. For a plain
+#: locant of 10 or more OPSIN main warns that it could also be a composite locant written without its superscript
+#: ("The locant 12 could refer to an atom of the simplified skeleton or to an atom of an amplificant (superscript locants
+#: should be written e.g. 1^4)"); Orthonym writes every composite locant with ``^``, so the warning describes no
+#: ambiguity of the name.
+_SKELETON_LOCANT = re.compile(
+    r"^The locant \d+ could refer to an atom of the simplified skeleton or to an atom of an amplificant")
 
 #: the names of the per-call side store (``assembly.memo.side_put``): the name withdrawn for a
 #: structure with the provenance it had, and the name kept as the last resort
@@ -53,7 +63,8 @@ def ambiguity_messages(name: str) -> Tuple[str, ...]:
         warnings = opsin_warnings(name, allow_radicals=True)
     except OpsinUnavailable:
         return ()
-    return tuple(message for kind, message in warnings if kind == AMBIGUITY_WARNING)
+    return tuple(message for kind, message in warnings
+                 if kind == AMBIGUITY_WARNING and not _SKELETON_LOCANT.match(message))
 
 
 def licensed_ambiguity(name: str, smiles: Optional[str]) -> Optional[str]:

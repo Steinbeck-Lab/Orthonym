@@ -46,6 +46,7 @@ from orthonym.rules.phane import (
     build_phane_pin,
     name_cyclophane,
 )
+from tests.support.opsin_marks import release_opsin_only
 
 
 # ---------------------------------------------------------------------------
@@ -403,15 +404,23 @@ def test_dispatch_gated_matches_raw_for_all_homophane_golds():
         assert namer_off.name(smi) == expected
 
 
+@release_opsin_only
 @pytest.mark.unit
-def test_dispatch_still_fails_closed_for_heteroatom_bridge_and_controls():
-    """Non-emittable phane topologies (heteroatom bridge, heterocyclic
-    linker) and ordinary non-cyclophane controls must be unaffected."""
+def test_dispatch_still_fails_closed_for_heteroatom_bridge():
+    """Non-emittable phane topologies (heteroatom bridge, heterocyclic linker) are declined while no OPSIN reads a
+    phane name: with one, the producers of ``rules.phane_pin`` name them."""
     from orthonym import Orthonym
 
     namer_on = Orthonym(style="pin")
     assert namer_on.name("c1cc2ccc1CNc1ccc(cc1)CN2", on_failure="label") == "unknown organic compound"
     assert namer_on.name("c1cc2ccc1COc1ccc(cc1)CO2", on_failure="label") == "unknown organic compound"
     assert namer_on.name("c1cc2ncc1CCc1ccc(cn1)CC2", on_failure="label") == "unknown organic compound"
+
+
+@pytest.mark.unit
+def test_dispatch_leaves_ordinary_non_cyclophane_controls_alone():
+    from orthonym import Orthonym
+
+    namer_on = Orthonym(style="pin")
     assert namer_on.name("c1ccc(-c2ccccc2)cc1", on_failure="label") == "1,1'-biphenyl"
     assert namer_on.name("c1ccc2ccccc2c1", on_failure="label") == "naphthalene"

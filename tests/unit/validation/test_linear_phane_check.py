@@ -27,6 +27,7 @@ from orthonym.validation import pin_spelling
 from orthonym.validation.opsin_roundtrip import opsin_parse
 from orthonym.validation.pin_spelling import check_pin_spelling
 from tests.support.rt_assert import assert_full_rt
+from tests.support.opsin_marks import release_opsin_only
 
 #: the labels are the production ones only with the OPSIN validity gate on (tests/conftest.py)
 pytestmark = pytest.mark.opsin_gate
@@ -184,6 +185,7 @@ def _decline_reason_ok(smiles, row):
     return RULE in rules
 
 
+@release_opsin_only
 @pytest.mark.parametrize("smiles,name", LOWERED, ids=LOWERED_IDS)
 def test_the_default_tier_declines_a_linear_phane_structure(smiles, name):
     row = _row(smiles, "pin")
@@ -193,6 +195,7 @@ def test_the_default_tier_declines_a_linear_phane_structure(smiles, name):
 
 
 @pytest.mark.parametrize("smiles,name", LOWERED, ids=LOWERED_IDS)
+@release_opsin_only
 @pytest.mark.parametrize("tier", ["valid", "best-effort"])
 def test_the_wider_tiers_keep_the_name_as_a_verified_non_pin(smiles, name, tier):
     row = _row(smiles, tier)
@@ -256,6 +259,7 @@ PHANE_NAMES = [
 ]
 
 
+@release_opsin_only
 @pytest.mark.parametrize("name", PHANE_NAMES)
 def test_opsin_reads_no_linear_phane_name(name):
     assert opsin_parse(name) is None

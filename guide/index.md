@@ -93,7 +93,7 @@ orthonym --fetch-jars</code></pre>
     </nav>
     <nav aria-label="Use" class="ot-path">
       <h3>Use</h3>
-      <ul><li><a href="use/command-line.html">Command line</a></li><li><a href="use/python.html">Python</a></li><li><a href="use/batch.html">Batch files</a></li><li><a href="use/provenance.html">The provenance row</a></li><li><a href="use/browser.html">In the browser</a></li></ul>
+      <ul><li><a href="use/command-line.html">Command line</a></li><li><a href="use/python.html">Python</a></li><li><a href="use/batch.html">Batch files</a></li><li><a href="use/provenance.html">The provenance row</a></li><li><a href="use/phane-names.html">Phane names</a></li><li><a href="use/browser.html">In the browser</a></li></ul>
     </nav>
     <nav aria-label="Understand" class="ot-path">
       <h3>Understand</h3>
@@ -129,6 +129,7 @@ use/command-line
 use/python
 use/batch
 use/provenance
+use/phane-names
 use/browser
 ```
 

@@ -114,6 +114,7 @@ class StoutClass(_StrEnumBase):
     AMINO_ACID = "amino_acid"                 # row 14; namer.py:1090-1094;
     SKELETAL_REPLACEMENT = "skeletal_replacement"  # row 15; namer.py:1099-1102;
     CYCLOPHANE = "cyclophane"                 # row 16; namer.py:1110-1113;
+    LINEAR_PHANE = "linear_phane"             # linear phane PINs (priority 1650, tier 2, only when the OPSIN in use reads phane names; after CYCLOPHANE, before INOSITOL)
 
     # --- Decomposition + general catch-all (the audit rows 17-18 + GENERAL) ---
     DECOMPOSITION_PRE_GENERAL = "decomposition_pre_general"  # row 17; namer.py:1118-1122
@@ -672,9 +673,29 @@ def _is_skeletal_replacement(mol, smiles, canonical_smiles, features=None, **kwa
 
 
 def _is_cyclophane(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
-    """Tier-2; predicate IS handler (audit § 1 row 16; § 2.16 purity proof)."""
+    """Tier-2; predicate IS handler (the audit row 16; purity proof). With an OPSIN that reads phane names the
+    predicate also holds for a structure the producer of ``rules.phane_pin`` names (1))."""
     from orthonym.rules.phane import name_cyclophane
-    return name_cyclophane(mol) is not None
+    if name_cyclophane(mol) is not None:
+        return True
+    from orthonym.opsin_capabilities import phane_enabled
+    if not phane_enabled():
+        return False
+    from orthonym.rules.phane_pin import general_phane_name
+    return general_phane_name(mol) is not None
+
+
+def _is_linear_phane(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Tier-2; the linear phane is the parent of the structure (2),, read from the structure
+    by ``validation.spelling.linear_phane``, and the OPSIN in use reads phane names."""
+    if mol.GetRingInfo().NumRings() < 4:
+        return False
+    from orthonym.opsin_capabilities import phane_enabled
+    if not phane_enabled():
+        return False
+    from orthonym.validation.spelling.linear_phane import linear_phane_pin_expected
+    verdict = linear_phane_pin_expected(mol)
+    return verdict is not None and not verdict.as_prefix and verdict.principal_class != "ion"
 
 
 def _is_inositol(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
@@ -1819,6 +1840,13 @@ def _handle_cyclophane(mol, smiles, canonical_smiles, features=None, *,
     UNSUPPORTED_RING_SYSTEM signal (jar-independent 'unknown') rather than
     emit it. Only a genuine `build_phane_pin` PIN is emitted.
     """
+    from orthonym.opsin_capabilities import phane_enabled
+    if phane_enabled():
+        # the producer of offers a name; the round trip keeps or voids it (a void goes on to the code below)
+        from orthonym.rules.phane_pin import general_phane_name, verified_or_none
+        name = verified_or_none(general_phane_name(mol), smiles)
+        if name is not None:
+            return name
     from orthonym.rules.phane import build_phane_pin, name_cyclophane
     pin = build_phane_pin(mol)
     if pin is not None:
@@ -1827,6 +1855,14 @@ def _handle_cyclophane(mol, smiles, canonical_smiles, features=None, *,
         from orthonym.errors import unsupported_ring_system
         raise unsupported_ring_system()
     return None
+
+
+def _handle_linear_phane(mol, smiles, canonical_smiles, features=None, *,
+                         style: str = "pin", **kwargs) -> Optional[str]:
+    """: the linear phane name of ``rules.phane_pin``, kept only when OPSIN reads it back to the input. A
+    structure the producer cannot name, or whose name the round trip voids, goes on to the next class."""
+    from orthonym.rules.phane_pin import linear_phane_name, verified_or_none
+    return verified_or_none(linear_phane_name(mol), smiles)
 
 
 def _handle_inositol(mol, smiles, canonical_smiles, features=None, *,
@@ -2959,7 +2995,22 @@ _register_dispatch(
     class_id=StoutClass.CYCLOPHANE, priority=1600, tier=2,
     predicate=_is_cyclophane, handler=_handle_cyclophane,
     iupac_section="Blue Book P-26.4 phane nomenclature",
-    description="Cyclophane topology; routes to rules.phane.name_cyclophane",
+    description="Cyclophane topology; routes to rules.phane_pin.general_phane_name when OPSIN reads phane names, "
+                "else to rules.phane.name_cyclophane",
+    side_effect_inventory=(),
+)
+
+# --- LINEAR_PHANE at priority 1650: after the P10 classes (1000-1400: carbohydrates, natural products, peptides, ---
+# retained names, amino acids), which name a structure first and keep the spelling-check skip, and after
+# CYCLOPHANE; before INOSITOL. VERIFIED: no class of priority 1650 or below names the linear phane gold rows
+# today (their winning class is GENERAL or DECOMPOSITION_PRE_GENERAL), and the class is silent unless the OPSIN in use
+# reads phane names.
+_register_dispatch(
+    class_id=StoutClass.LINEAR_PHANE, priority=1650, tier=2,
+    predicate=_is_linear_phane, handler=_handle_linear_phane,
+    iupac_section="Blue Book P-52.2.5.3 linear phane names",
+    description="Linear phane parent (four or more rings or ring systems, two terminal, seven or more nodes); routes "
+                "to rules.phane_pin.linear_phane_name, verified by the round trip",
     side_effect_inventory=(),
 )
 

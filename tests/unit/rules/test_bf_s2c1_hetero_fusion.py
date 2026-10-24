@@ -15,6 +15,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.rules.bridged_fused_pin import hetero_fusion, parents
+from tests.support.opsin_marks import release_opsin_only
 
 
 def _skeleton(smiles):
@@ -393,6 +394,7 @@ def test_a_cyclophane_shaped_reading_on_a_produced_parent_is_declined(smiles, wh
     assert bfp.build(mol) is not None, why
 
 
+@release_opsin_only
 @pytest.mark.opsin_gate
 def test_a_cyclophane_shaped_compound_keeps_its_best_effort_name():
     from orthonym import Orthonym

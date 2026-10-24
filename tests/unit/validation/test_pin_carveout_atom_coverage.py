@@ -65,6 +65,7 @@ import pytest
 
 from orthonym.errors import is_failure_name
 from orthonym.namer import Orthonym
+from tests.support.opsin_marks import release_opsin_only
 
 # This whole module is ABOUT the OPSIN validity gate's carve-out branches, so
 # it must run gate-ON (tests/conftest.py defaults the gate OFF for speed and
@@ -158,10 +159,16 @@ CASES = [
     ),
 ]
 
-_IDS = [c["carveout"] for c in CASES]
+#: the phane carve-out ships the phane names OPSIN 2.9.0 cannot read; an OPSIN that reads them (main) ships the same
+#: name through the self-consistency read-back, so the carve-out representative describes 2.9.0 only.
+_PARAMS = [
+    pytest.param(c, marks=release_opsin_only, id=c["carveout"]) if c["carveout"] == "phane"
+    else pytest.param(c, id=c["carveout"])
+    for c in CASES
+]
 
 
-@pytest.mark.parametrize("case", CASES, ids=_IDS)
+@pytest.mark.parametrize("case", _PARAMS)
 def test_carveout_baseline_ships_expected_pin(namer, case):
     """Locks the carve-out still fires: the representative ships its exact
     expected PIN, and the gate outcome is the carve-out itself (not some
@@ -178,7 +185,7 @@ def test_carveout_baseline_ships_expected_pin(namer, case):
     )
 
 
-@pytest.mark.parametrize("case", CASES, ids=_IDS)
+@pytest.mark.parametrize("case", _PARAMS)
 def test_carveout_decoration_mutation_no_atom_drop(namer, case):
     """The real test: a decorated (core + extra atoms) variant must NEVER
     reproduce the bare-core carve-out name -- that would mean the recogniser

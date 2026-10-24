@@ -40,6 +40,7 @@ import pytest
 from rdkit import Chem
 
 from tests.support.default_tier import default_tier_row
+from tests.support.opsin_marks import release_uide_only
 from tests.support.rt_assert import _canon, _independent_parse, name_best_effort
 
 pytestmark = pytest.mark.opsin_gate
@@ -156,6 +157,7 @@ def _neutral_twin_reads_back(name, smiles):
     return Chem.MolToInchiKey(rw) == Chem.MolToInchiKey(Chem.MolFromSmiles(parsed))
 
 
+@release_uide_only
 @pytest.mark.parametrize("smiles,name", ALL_ROWS)
 def test_default_tier_gives_the_name_and_reads_it_back_through_its_twin(smiles, name):
     row = default_tier_row(smiles)
@@ -165,6 +167,7 @@ def test_default_tier_gives_the_name_and_reads_it_back_through_its_twin(smiles, 
     assert row["spelling_failures"] == [], row
 
 
+@release_uide_only
 @pytest.mark.parametrize("smiles,name", ALL_ROWS)
 def test_best_effort_names_every_row_the_default_tier_names(smiles, name):
     """A tier inversion: the default tier named these rows and best-effort abstained (suppressed)."""

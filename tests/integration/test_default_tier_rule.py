@@ -30,6 +30,7 @@ from tests.support.default_tier import (
     assert_default_tier_declines,
     strict_path_row,
 )
+from tests.support.opsin_marks import release_opsin_only
 from tests.support.rt_assert import assert_full_rt, name_best_effort
 from tests.unit.rules.test_d1_coordination_v36 import HEME_B
 
@@ -87,7 +88,8 @@ def test_a_name_only_a_breadth_producer_built_is_declined():
 
 @pytest.mark.parametrize("smiles,expected", [
     ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "scyllo-inositol"),
-    ("C1Cc2ccc(cc2)CCc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane"),
+    # a carve-out only while the active OPSIN reads no phane name; an OPSIN that does ships it through its read-back
+    pytest.param("C1Cc2ccc(cc2)CCc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane", marks=release_opsin_only),
     ("CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO", "(4E)-sphing-4-enine"),  # NP list
 ])
 def test_the_exact_construction_exceptions_are_emitted(smiles, expected):

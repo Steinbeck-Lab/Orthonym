@@ -23,6 +23,7 @@ from orthonym.errors import is_failure_name
 from orthonym.jvm_budget import jvm_slots
 from orthonym.metrics.provenance import best_effort_ctx, best_effort_request_ctx
 from orthonym.rules import vonbaeyer_universal as vbu
+from tests.support.opsin_marks import release_opsin_only
 from tests.support.rt_assert import name_is_rt_exact
 
 #: calix[6]arene: one ring system of 42 skeletal atoms and 7 rings.
@@ -139,6 +140,7 @@ def test_a_best_effort_recovery_inside_a_pin_request_keeps_the_pin_ceilings():
         assert _name_fragment_t4_rescue_fresh(CALIX6) is None
 
 
+@release_opsin_only
 @pytest.mark.opsin_gate
 def test_best_effort_names_the_calixarene_and_the_pin_tier_refuses():
     row = _row(CALIX6, "best-effort")

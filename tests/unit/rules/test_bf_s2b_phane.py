@@ -24,6 +24,7 @@ from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from orthonym.rules.bridged_fused_pin import selection
+from tests.support.opsin_marks import release_opsin_only
 from tests.support.rt_assert import name_is_rt_exact
 
 #::23895: the one fused reading's parent, dibenzo[c,j][1,8]dithiacyclotetradecine, is printed
@@ -107,8 +108,13 @@ def test_a_naphthalene_cut_into_an_etheno_bridge_beside_a_chain_is_a_phane_readi
     assert bfp.build(mol) is None
 
 
+#: the 9- and 10-carbon chains close a macrocycle of 13 and 14 atoms: an OPSIN that reads phane names gets their phane
+#: PIN (tests/unit/phane_pins/test_pn8_phane_rows.py), so the decline describes OPSIN 2.9.0 for them
+_ENGINE_ROWS = [pytest.param(s, n, marks=release_opsin_only) if n is None else (s, n) for s, n in CHAIN_LINKED]
+
+
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles,base_name", CHAIN_LINKED)
+@pytest.mark.parametrize("smiles,base_name", _ENGINE_ROWS)
 def test_the_engine_ships_no_bridged_fused_name_for_a_cyclophane(smiles, base_name):
     pin = _row(smiles, "pin")
     assert pin["tier"] == "abstain", (pin.get("name"), pin["tier"])
