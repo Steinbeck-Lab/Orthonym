@@ -52,8 +52,7 @@ DESIGN — no count stands in for a structure proof
 Per `internal notes` the parent is
 never derived from an atom count. Instead the N-substituent branches are
 EXCISED from the real molecule and the residual R-SO2-NH2 is named by
-re-entering the naming pipeline, exactly as ``handlers/sulfonimidic_n_hydroxy.py``
-does. That has three consequences worth stating:
+re-entering the naming pipeline. That has three consequences worth stating:
 
 * the parent spelling is whatever the already-verified PRIMARY sulfonamide path
   produces — ``methanesulfonamide``, ``benzenesulfonamide``,

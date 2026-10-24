@@ -92,7 +92,7 @@ def name_general_acyclic(
     # registration will create at module load time.
     from ..candidate_pool import get_current_pool
     from ..composer import HandlerResult, NameFragment, _get_parent_atom_count
-    from ...rules.hydroximic_acids import with_hydroximic_fragments
+    from ...rules.hydroximic_acids import with_n_group_fragments
     from ._handler_shared import (
         _assemble_fragments, _generate_chain_parent, _generate_prefixes, _generate_ring_parent,
         _generate_stereodescriptors, _generate_suffix, _w2_atom_coverage_declines,
@@ -168,8 +168,9 @@ def name_general_acyclic(
         stereo = _generate_stereodescriptors(features)
         if stereo:
             fragments.append(stereo)
-    # a hydroximic acid cites its N-hydroxy among the prefixes and, on a ring, its C=N's descriptor
-    fragments = with_hydroximic_fragments(features, fragments)
+    # an imidic, sulfonimidic or hydroxamic acid cites the substituent of its N among the prefixes and, on a ring, the
+    # descriptor of its C=N; ``rules/n_substituted_acids.py``)
+    fragments = with_n_group_fragments(features, fragments)
     if fragments is None:
         return None
 

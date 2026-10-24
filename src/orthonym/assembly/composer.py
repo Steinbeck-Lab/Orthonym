@@ -57,6 +57,7 @@ from ..errors import (  # G0 fail-closed refusal (DD7 S1); a voided candidate (T
 # These are imported inside functions that need them
 # Complex ring system imports
 from ..rules.bicyclo import is_bicyclo_system
+from ..rules.n_substituted_acids import N_PREFIX_GROUPS, ring_anchored_atoms as ring_anchored_n_group_atoms
 from ..rules.bridged_fused import detect_bridged_fused, name_bridged_fused_system
 from ..rules.fused_rings import (
     classify_fused_system,
@@ -658,16 +659,16 @@ TERMINAL_GROUPS = {
     # to add despite the caution above -- their perception SMARTS
     # (`perception/functional_groups.py`: `imidic_acid` requires `=[NX2H1]`,
     # `hydrazonic_acid` requires the terminal amino N to be `[NX3H2]`) both demand an
-    # UNSUBSTITUTED suffix nitrogen; a substituted variant (`CN=C(O)C1CCCCC1`,
-    # `CNN=C(O)C1CCCCC1`) simply does not match either FG at all -- perception routes
-    # it to a different principal_group entirely (`imine` / `carboxylic_acid`), which
-    # is independently self-consistency-gated. The N-hydroxy sibling (hydroximic acid)
-    # is its OWN FG (`hydroximic_acid`, SUFFIX_FORMS -> None) and is written with the
-    # suffix of its imidic acid (`hydroximic_acids.suffix_group`), so it takes this branch AS
-    # that acid; its N-hydroxy is a prefix cited beside the ring's
-    # (`hydroximic_acids.with_n_hydroxy_fragments`). The branch withholds the ring
+    # UNSUBSTITUTED suffix nitrogen; `CNN=C(O)C1CCCCC1` simply does not match either FG at all
+    # -- perception routes it to a different principal_group entirely (`imine` /
+    # `carboxylic_acid`), which is independently self-consistency-gated. The N-hydroxy and
+    # N-carbon siblings (the hydroximic and N-substituted imidic acids) are their OWN FGs
+    # (`hydroximic_acid`, `n_substituted_imidic_acid`, SUFFIX_FORMS -> None) and are written with
+    # the suffix of their imidic acid (`n_substituted_acids.suffix_group`), so they take this
+    # branch AS that acid; the N-substituent is a prefix cited beside the ring's
+    # (`n_substituted_acids.with_n_prefix_fragments`). The branch withholds the ring
     # locant when the ring has no prefix of its own, which is the Blue Book spelling
-    # with the N-hydroxy alone ('N-hydroxycyclohexanecarboximidoselenoic acid (PIN)',
+    # with the N-substituent alone ('N-hydroxycyclohexanecarboximidoselenoic acid (PIN)',
     # the Blue Book), and restores it beside a ring prefix.
     # The suffix-N hole is therefore structurally unreachable for these two classes.
     # Without this membership, ring-attached imidic/hydrazonic acid fell through to
@@ -10239,7 +10240,7 @@ def _generate_alkyl_prefixes(features: Any) -> List[NameFragment]:
             # this skip the walker re-names it as a phantom '(methylamino)'
             # co-substituent ('1-(methylamino)ethanimine' for CC=NC).
             'imine',
-        ):
+        ) or features.principal_group in N_PREFIX_GROUPS:     # the group cites the substituent of its N itself
             # For chalcogen amides extend pg_atom_set with all atoms reachable from
             # the principal-group N (excluding the carbonyl C) so the N-bonded
             # carbons (methyl / ethyl / etc.) overlap correctly.
@@ -12142,7 +12143,7 @@ def _detect_fg_only_prefix(mol, frag_atoms, attach_mol_idx):
     return None
 
 
-def ring_anchored_pg_atoms(mol, pg_matches, ring_atom_set: set) -> set:
+def ring_anchored_pg_atoms(mol, pg_matches, ring_atom_set: set, principal_group=None) -> set:
     """Atoms of principal-group matches ANCHORED to the parent ring.
 
     A match is ring-anchored when it contains a ring atom (inline suffixes:
@@ -12168,7 +12169,7 @@ def ring_anchored_pg_atoms(mol, pg_matches, ring_atom_set: set) -> set:
             if any(nbr.GetIdx() in ring_atom_set for nbr in atom.GetNeighbors()):
                 anchored.update(match_set)
                 break
-    return anchored
+    return anchored | ring_anchored_n_group_atoms(mol, principal_group, pg_matches, ring_atom_set)
 
 
 def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
@@ -12208,7 +12209,7 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
     # dropped the whole chain: 'cyclopentanedicarbaldehyde' bug).
     ring_set = set(oriented_ring)
     pg_atom_set = ring_anchored_pg_atoms(
-        mol, features.principal_group_atoms, ring_set
+        mol, features.principal_group_atoms, ring_set, features.principal_group
     )
 
     # Group substituents by name: {name: [locants]}

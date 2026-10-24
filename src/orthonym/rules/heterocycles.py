@@ -3468,8 +3468,10 @@ def ring_principal_suffix_atoms(
                 anchors.add(a)
 
     # ---- B. exocyclic sulfur-oxoacid / sulfonamide suffix on a ring atom ----
+    # The imidic acids of sulfur are the same S-rooted suffix, the Blue Book), and the suffix takes
+    # the lowest locant before the prefixes (c),:3256): '4-chlorocyclohexane-1-sulfonimidic acid'.
     _S_SUFFIX_PGS = {
-        'sulfonic_acid', 'sulfinic_acid',
+        'sulfonic_acid', 'sulfinic_acid', 'sulfonimidic_acid', 'sulfinimidic_acid',
         'primary_sulfonamide', 'secondary_sulfonamide', 'tertiary_sulfonamide',
     }
     if principal_group in _S_SUFFIX_PGS and functional_groups:

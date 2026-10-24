@@ -243,11 +243,17 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
     sub_set = set(sub_atoms)
     ring_info = mol.GetRingInfo()
 
-    # Find the first ring whose atoms are entirely within the fragment
+    # The ring stem is the ring that holds the attachment atom (``sub_atoms[0]``, bonded to the N): the enrichment
+    # rebuilds the name as '<prefixes>cyclo<stem>yl', a ring that is the point of attachment. A fragment attached
+    # through a chain atom ('(1-phenylcyclopentyl)methyl') is a chain stem that name_substituent names whole, so it
+    # has no ring stem to enrich. (Reading the first ring of RDKit's ring list instead made the answer depend on the
+    # atom order of the input: the cyclopentane of '(1-phenylcyclopentyl)methyl', written before its phenyl, was
+    # taken for the stem and the name lost its CH2, '1-phenylcyclopentyl'.)
+    attach_atom = sub_atoms[0]
     frag_ring_atoms = None
     for ring in ring_info.AtomRings():
         ring_set = set(ring)
-        if ring_set.issubset(sub_set):
+        if attach_atom in ring_set and ring_set.issubset(sub_set):
             frag_ring_atoms = ring_set
             break
 
@@ -284,7 +290,6 @@ def _enrich_ring_n_substituent(mol, base_name: str, sub_atoms: List[int]) -> str
     # Orient the ring starting from the attachment atom (sub_atoms[0], bonded
     # to nitrogen) as locant 1. Choose the traversal direction that yields
     # the lowest locant set for sub-substituents (IUPAC.
-    attach_atom = sub_atoms[0]  # first atom in BFS = bonded to N
     oriented_ring = _orient_ring_from_attachment(mol, frag_ring_atoms, attach_atom)
 
     if not oriented_ring:

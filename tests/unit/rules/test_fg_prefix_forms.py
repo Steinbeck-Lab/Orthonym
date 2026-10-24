@@ -48,6 +48,10 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     # (dedicated handler, no static suffix); demoted it splits into 'hydroxy' +
     # 'hydroxyimino', emitted by name_polyfunctional's chain-end block.
     'hydroximic_acid',
+    # HXL, the Blue Book): the imidic acid with a carbon group on its N is perceived only where it is
+    # the principal group (``n_substituted_acids.scope_n_substituted_imidic_acids``); demoted, the molecule is read as
+    # the imine and the thiol / alcohol, so this entry is never asked for a prefix. No prefix is printed for it.
+    'n_substituted_imidic_acid',
     'sulfinohydrazonohydrazide',  #: demoted case fails closed
     'iminoester',        #: functional class (alkyl alkanimidate); imidate handler @ INNER_DISPATCH 2900
     # PIN class program Task 12: the S/Se/Te imidic and hydrazonic acids

@@ -1,13 +1,12 @@
 """N-substituted sulfonamide handler —.
 
-Mirrors ``handlers/sulfonimidic_n_hydroxy.py``: a thin dispatch shim over a rule module
-that builds the COMPLETE name and refuses rather than skipping any part of it.
+A thin dispatch shim over a rule module that builds the COMPLETE name and refuses rather than
+skipping any part of it.
 The rule, the Blue Book derivation and the measured class boundary all live in
 ``rules/sulfonamides.py``.
 
-Priority 5213 — immediately after ``sulfonimidic_n_hydroxy`` and before
-``amine``, so an N-substituted sulfonamide is claimed before the amine
-path can treat its nitrogen as an amine parent. Fail-safe: returns None, so
+Priority 5213 — before ``amine``, so an N-substituted sulfonamide is claimed
+before the amine path can treat its nitrogen as an amine parent. Fail-safe: returns None, so
 ``general_acyclic`` remains the backstop.
 
 Why this is NOT enriched: ``n_substituted_sulfonamide_name`` already spells the

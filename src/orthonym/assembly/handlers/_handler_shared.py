@@ -80,9 +80,9 @@ from ...data.chain_names import get_chain_prefix, multiplying_prefix
 from ...data.multipliers import multiplier_table
 from .prefix_claims import reconcile_prefix_claims
 from ...rules.locants import get_bond_locants, get_functional_group_locants
-from ...rules.hydroximic_acids import fragments_cite_italic_locant, suffix_group, suffix_group_atoms
+from ...rules.n_substituted_acids import n_italic_locant_cited, suffix_group, suffix_group_atoms
 from ...rules.seniority import get_prefix, get_suffix
-from ..composition_primitives import RETAINED_C2_ACYL_BY_SUFFIX, RETAINED_C2_PARENT_BY_SUFFIX
+from ..composition_primitives import RETAINED_C2_PARENT_BY_SUFFIX, retained_amide_word
 from ..naming_utils import (
     BRANCH_HANDLED_FGS,
     SIMPLE_MULTIPLIERS,
@@ -754,9 +754,11 @@ def _sulfur_oxoacid_ring_suffix_locant_is_trivial(
     DENY-BY-DEFAULT, the Blue Book), same discipline as the sibling
     function — every clause below must hold, and each is independently
     load-bearing (mirrors the sibling's documented over-determination):
-      * `features.principal_group` is exactly 'sulfonic_acid' or
-        'sulfinic_acid' — narrow class list, nothing wider (a sulfonamide or
-        sulfonate ester is a different suffix shape and is NOT covered);
+      * `features.principal_group` is exactly 'sulfonic_acid', 'sulfinic_acid'
+        or their imidic acids 'sulfonimidic_acid', 'sulfinimidic_acid' (whose
+        N-substituent, cited with the italic locant N, counts with the group)
+        — narrow class list, nothing wider (a sulfonamide or sulfonate ester
+        is a different suffix shape and is NOT covered);
       * the ring is monocyclic, all-carbon, non-aromatic, uncharged, and every
         ring bond is SINGLE — any ring unsaturation makes positions distinct
         and denies (D3's 'cyclohex-3-ene-1-sulfonic acid' keeps its locant);
@@ -775,13 +777,25 @@ def _sulfur_oxoacid_ring_suffix_locant_is_trivial(
     from ..locant_omission import locants_are_forced
     if locants_are_forced():
         return False
-    if getattr(features, 'principal_group', None) not in (
-            'sulfonic_acid', 'sulfinic_acid'):
+    group = getattr(features, 'principal_group', None)
+    if group not in ('sulfonic_acid', 'sulfinic_acid', 'sulfonimidic_acid', 'sulfinimidic_acid'):
         return False
     pg_atoms = getattr(features, 'principal_group_atoms', None)
     if not pg_atoms or len(pg_atoms) != 1:
         return False
     match_set = set(pg_atoms[0])
+    if group in ('sulfonimidic_acid', 'sulfinimidic_acid'):
+        # The imidic acids of sulfur, the Blue Book 'methanesulfinimidic acid (PIN)'): the
+        # substituent on the N of the group is cited with the italic locant N, outside the ring's locants, so the
+        # ring stays monosubstituted, as the book prints for the carboxylic acid of the same shape
+        # ('N-hydroxycyclohexanecarboxamide (PIN)',,:32827; 'N-sulfanylcyclopentanecarboximidic acid
+        # (PIN)',,:30271) and for the ring amine ('N-butylcyclopropanamine (PIN)',:26292).
+        from ...rules.n_substituted_acids import n_plan
+        plan = n_plan(features)
+        if plan is None:
+            return False
+        for _name, sub_atoms in plan:
+            match_set |= set(sub_atoms)
 
     ring = list(oriented_ring)
     ring_set = set(ring)
@@ -1089,7 +1103,7 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
             other_subs_exist = False
             ring_subs = getattr(features, 'ring_substituents', None) or {}
             anchored_atoms = ring_anchored_pg_atoms(
-                mol, features.principal_group_atoms, ring_set_local
+                mol, features.principal_group_atoms, ring_set_local, features.principal_group
             )
             for _pos, sub_list in ring_subs.items():
                 for sub_atoms in sub_list:
@@ -2002,7 +2016,7 @@ def _l3_prefix_locant_omitted(features: Any, fragments: List["NameFragment"]) ->
     # (the Blue Book is the Blue Book saying so about that very shape). The sibling
     # licence below has consulted it since Task 5b; this one was wired
     # before the observation existed, and it is the same class.
-    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+    if _naming_call_produces_a_name_component() or n_italic_locant_cited(features, fragments):
         return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
 
     prefixes = [f for f in fragments if f.fragment_type == "prefix"]
@@ -2222,7 +2236,7 @@ def _l4_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:
     # result IS the whole compound -- never a sub-fragment being spliced into a
     # multiplicative name, where restores every locant (the Blue Book keeps the
     # trisulfane component's `3-`).
-    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+    if _naming_call_produces_a_name_component() or n_italic_locant_cited(features, fragments):
         return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
 
     parents = [f for f in fragments if f.fragment_type == "parent"]
@@ -2471,7 +2485,7 @@ def _l6_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     observation here), and False when anything else in the scope cites a locant (a
     stereodescriptor, a stem that is not purely alphabetic, an unsaturation or a
     suffix locant)."""
-    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+    if _naming_call_produces_a_name_component() or n_italic_locant_cited(features, fragments):
         return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
     if features is None or not fragments:
         return False
@@ -2602,7 +2616,7 @@ def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     # so it may only fire when the scope's boundary IS the molecule being named. See
     #:func:`_naming_call_produces_a_name_component` -- without it, the Blue Book's own
     # explicit negative lost its locants.
-    if _naming_call_produces_a_name_component() or fragments_cite_italic_locant(features, fragments):
+    if _naming_call_produces_a_name_component() or n_italic_locant_cited(features, fragments):
         return False   # an italic N locant in the scope is essential: keeps every locant (:2869)
 
     if features is None or not fragments:
@@ -3225,13 +3239,13 @@ def _assemble_fragments(
         # Build unsaturation infix with locants for compounds with functional groups
         unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)
 
-        if (stem == "eth" and suffix_text in RETAINED_C2_ACYL_BY_SUFFIX and count == 1
-                and not double_locants and not triple_locants):
+        _retained = retained_amide_word(stem, suffix_text, count, bool(double_locants or triple_locants), prefix_texts)
+        if _retained:
             # (the Blue Book-32693): 'acetamide' is the
             # retained PIN of the two-carbon monoamide and can be substituted
             # ('N-phenylacetamide (PIN)',:32859); 'ethanamide' never is. Its
             # locants stay: N and C-2 are both substitutable ('acetohydrazide',:33944).
-            name = RETAINED_C2_ACYL_BY_SUFFIX[suffix_text]
+            name = _retained     # (and 'formamide',,:32699: ``retained_amide_word``)
         else:
             name = format_suffix_with_locants(
                 stem,

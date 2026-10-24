@@ -511,6 +511,25 @@ RETAINED_C2_PARENT_BY_SUFFIX = {"oic acid": "acetic acid", "nitrile": "acetonitr
 # (_handler_shared) and by the polyfunctional producer.
 RETAINED_C2_ACYL_BY_SUFFIX = {"amide": "acetamide", "hydrazide": "acetohydrazide"}
 
+# (the Blue Book) "The traditional name 'formamide' is retained for HCO-NH2 and is the
+# preferred IUPAC name. Substitution is permitted on the -NH2 group" "Amide names formed by
+# modifying retained names of acids"; 'N-phenylformamide (PIN)',:32855): the one-carbon amide is named on the
+# retained word, never 'methanamide'. Its carbon holds only hydrogen, so a prefix on it takes another parent
+# ('carbonochloridic amide (PIN) (not 1-chloroformamide)',:32707): only the italic-N prefixes keep the word.
+RETAINED_C1_ACYL_BY_SUFFIX = {"amide": "formamide"}
+
+
+def retained_amide_word(stem: str, suffix_text: str, count: int, unsaturated: bool, prefix_texts) -> Optional[str]:
+    """'acetamide' / 'acetohydrazide' for the two-carbon chain, 'formamide' for the one-carbon chain with only italic-N
+    prefixes (``RETAINED_C2_ACYL_BY_SUFFIX``, ``RETAINED_C1_ACYL_BY_SUFFIX``), or None: one suffix group, no unsaturation."""
+    if count != 1 or unsaturated:
+        return None
+    if stem == "eth":
+        return RETAINED_C2_ACYL_BY_SUFFIX.get(suffix_text)
+    if stem == "meth" and all(re.match(r"N(?:[,'\d]|-)", t) for t in prefix_texts):
+        return RETAINED_C1_ACYL_BY_SUFFIX.get(suffix_text)
+    return None
+
 
 def retained_acetic_from_prefixes(
     prefix_texts: List[str],

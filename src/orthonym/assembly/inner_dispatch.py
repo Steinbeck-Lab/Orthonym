@@ -1339,44 +1339,10 @@ _register_inner(
     side_effect_inventory=(),
 )
 
-# --- R8c /: hydroxamic_acid handler.
-# Hydroxamic acid (-C(=O)-NH-OH) is an amide with N-hydroxy substituent.
-# PIN = 'N-hydroxy<stem>amide', not the retained 'hydroxamic acid' suffix.
-# Priority 5210 — fires after amide (different principal_group mutex)
-# and before amine. Handler is fail-safe: returns None on failure so
-# general_acyclic continues as backstop.
-from .handlers.hydroxamic_acid import _is_hydroxamic_acid, name_hydroxamic_acid  # noqa: E402
-
-_register_inner(
-    handler_id="hydroxamic_acid",
-    priority=5210,
-    predicate=_is_hydroxamic_acid,
-    handler=name_hydroxamic_acid,
-    iupac_section="P-66.1.1.3.2",
-    description="Hydroxamic acid -> N-hydroxy<stem>amide PIN (R8c; P-66.1.1.3.2 / P-65.1.3.4)",
-    side_effect_inventory=(),
-)
-
-# --- W3-P04: N-hydroxy sulfonimidic (hydroximic-of-sulfonic) handler.
-# R-S(=O)(=N-OH)-OH is named as the N-hydroxy derivative of the corresponding
-# sulfonimidic acid (PIN 'N-hydroxymethanesulfonimidic acid'). Priority 5212 —
-# after hydroximic. Predicate ALSO gates on a terminal -OH on the imino N,
-# so the plain =NH parent (CS(=O)(=N)O) falls through to the suffix path.
-# Fail-safe: returns None so general_acyclic stays the backstop.
-from .handlers.sulfonimidic_n_hydroxy import (  # noqa: E402
-    _is_sulfonimidic_n_hydroxy,
-    name_sulfonimidic_n_hydroxy,
-)
-
-_register_inner(
-    handler_id="sulfonimidic_n_hydroxy",
-    priority=5212,
-    predicate=_is_sulfonimidic_n_hydroxy,
-    handler=name_sulfonimidic_n_hydroxy,
-    iupac_section="P-65.3.1.5",
-    description="N-hydroxy sulfonimidic acid -> N-hydroxy<sulfonimidic acid> PIN (W3-P04; P-65.3.1.5)",
-    side_effect_inventory=(),
-)
+# The hydroxamic acid (-C(=O)-NH-OH, / and the N-substituted sulfonimidic acid
+# have no handler of their own: the substituent on the N of the group is a prefix like the others
+# and is built where the other prefixes are (``rules/n_substituted_acids.py``, read by ``general_acyclic`` and
+# ``polyfunctional``).
 
 # --- Task V: N-substituted sulfonamide handler.
 # secondary/tertiary_sulfonamide were PERCEIVED and carried a SUFFIX_FORMS

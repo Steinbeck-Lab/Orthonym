@@ -27,11 +27,21 @@ from orthonym.errors import _DESCRIPTIVE_FALLBACK_NAMES
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-# The canary. With the gate off its naming path produces `N-hydroxyacetamide`,
-# which OPSIN parses to CC(=O)NO -- a DIFFERENT molecule than the input (the
-# 4-butoxyphenyl carrier is dropped: C2H5NO2 for C12H17NO3). Only catches
+# The canary. With the gate off its naming path produces
+# `3-(2-methylpropyl)-4-[4-(pentyloxy)phenyl]-1H-pyrrole-2,5-dione`, which OPSIN
+# parses to a DIFFERENT molecule than the input (the prenyloxy group of the input is
+# a pentyloxy group in the name: C17H21NO3 for C17H19NO3). Only catches
 # that; with the gate on the PIN tier abstains. So this molecule's output is a
 # direct readout of whether the gate is live.
+#
+# HXL (the hydroxamic acids named by the fragment assembly,: the
+# previous canary, bufexamac CCCCOc1ccc(CC(=O)NO)cc1 (canary call 678, its ungated
+# name `N-hydroxyacetamide` dropped the 4-butoxyphenyl carrier), is named correctly
+# with the gate off now ('2-(4-butoxyphenyl)-N-hydroxyacetamide', OPSIN full-InChIKey
+# exact), so the pair stopped disagreeing, as designed. The new one is canary call
+# 172 of tests/support/canary_rt75_data.py (DK-NOTEXACT, `CANARY_KNOWN_DEFECTS` of
+# tests/unit/rules/test_opsin_format_compliance.py: a gate-off wrong-molecule producer that
+# the gate voids). When it is fixed, pick another row whose ungated name is a wrong molecule.
 #
 # Task 12 fix a performance pass (wp6-tests; TRIAGE.md ' outcome'): the previous canary,
 # CC(=O)N(CC1CO1)C(C)C ('(5-carbamoylpentyl)oxirane' ungated), is now named
@@ -40,8 +50,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 # canary call 678 of tests/support/canary_rt75_data.py (DK-NOTEXACT, a known
 # gate-off 0-wrong producer that the gate voids; probe 2026-09-26). When it is
 # fixed, pick another row whose ungated name is a wrong molecule.
-CANARY = "CCCCOc1ccc(CC(=O)NO)cc1"
-CANARY_UNGATED_NAME = "N-hydroxyacetamide"
+CANARY = "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1"
+CANARY_UNGATED_NAME = "3-(2-methylpropyl)-4-[4-(pentyloxy)phenyl]-1H-pyrrole-2,5-dione"
 
 
 # ---------------------------------------------------------------------------

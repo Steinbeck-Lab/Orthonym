@@ -798,7 +798,12 @@ def test_canary_not_rt_exact_rows_ship_no_wrong_name(smiles):
 #: '4-(acetyloxy)heptadec-16-yne-1,2-diol', OPSIN 2.9.0 full-InChIKey exact (fresh java run outside the
 #: engine); valid but not the PIN (the PIN is the functional-class ester,:18158 class 9 over class
 #: 17, which name_substituent cannot spell for an unsaturated hydroxylated alkyl).
+#: HXL: bufexamac (canary call 678), a hydroxamic acid, is named by the fragment assembly now
+#: "Hydroxamic acids", the Blue Book; the substituent on the N is a prefix,,:3436): the raw name is
+#: '2-(4-butoxyphenyl)-N-hydroxyacetamide' (was 'N-hydroxyacetamide', the carrier dropped), OPSIN 2.9.0
+#: full-InChIKey exact and isomeric-SMILES exact (fresh java run outside the engine).
 _NOW_RT_EXACT = frozenset({
+    "CCCCOc1ccc(CC(=O)NO)cc1",
     "COC1OC2(OC)CC3CCC(O)C(C)C3(C)C(OC)C2=C1C",
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O",
     "C#CCCCCCCCCCCCC(CC(O)CO)OC(C)=O",

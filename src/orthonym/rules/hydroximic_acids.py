@@ -9,7 +9,7 @@ The acid chalcogen may be S, Se or Te, (:30208): 'N-hydroxycyclohexanecarboximid
 the same chalcogen (:func:`suffix_group`) and the N-hydroxy is a PREFIX, cited with the others in one
 alphanumerical series 'ALPHANUMERICAL ORDER',:3436,:3440; 'N,4-dimethyl-N-(3-methylphenyl)benzamide (PIN)',:32879, puts the
 italic N and the numbers in one list). Its italic locant is essential "Citation of locants",
-:2869), so no licence withholds a locant beside it (:func:`fragments_cite_italic_locant`), and a
+:2869), so no licence withholds a locant beside it (``n_substituted_acids.n_italic_locant_cited``), and a
 'hydroxy' the parent also carries is one multiplied prefix with it (b),:7067): 'N,2-dihydroxy-
 propanimidic acid'. The group demoted by a senior one is the compound prefix 'C,N-dihydroxycarbonimidoyl'
 on a ring (1),:30131; '4-(C,N-dihydroxycarbonimidoyl)benzoic acid (PIN)',:30138) and
@@ -35,51 +35,16 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
-#: the imidic acid whose N-hydroxy derivative a hydroximic acid is, by the chalcogen of its acid group
-_IMIDIC_GROUP = {
-    "O": "imidic_acid", "S": "imidothioic_acid", "Se": "imidoselenoic_acid", "Te": "imidotelluroic_acid",
-}
-
-
-def suffix_group(mol, fg_name: Optional[str], matches) -> Optional[str]:
-    """The group whose suffix ``fg_name`` is written with ('hydroximic_acid' -> 'imidic_acid',...).
-
-    The group's own table row has no suffix (``SUFFIX_FORMS['hydroximic_acid']`` is None: the
-    '-hydroximic acid' suffix is general nomenclature only,:30100). ``matches`` are the group's atom
-    tuples, (C, imino N, O on N, acid X), of the first of which the chalcogen is read. Every other
-    group is its own."""
-    if fg_name != "hydroximic_acid":
-        return fg_name
-    match = (matches or [None])[0]
-    if mol is None or match is None or len(match) < 4:
-        return fg_name
-    return _IMIDIC_GROUP.get(mol.GetAtomWithIdx(match[3]).GetSymbol(), fg_name)
-
-
-def suffix_group_atoms(fg_name: Optional[str], matches) -> frozenset:
-    """The atoms the suffix of a principal group accounts for: its matches, less the oxygen on the nitrogen
-    of a hydroximic acid, which is the atom of the N-hydroxy prefix."""
-    atoms = frozenset().union(*(set(m) for m in matches))
-    if fg_name == "hydroximic_acid":
-        atoms -= {m[2] for m in matches if len(m) >= 4}
-    return atoms
-
-
-def hydroximic_at_rank(mol, functional_groups, fg_name: str) -> list:
-    """The hydroximic acids of ``functional_groups`` whose rank is ``fg_name``'s: those whose imidic acid it is.
-
-     class 7a (the Blue Book): the 'Suffix' acids are "each followed in turn by the
-    corresponding peroxy, imidic, and hydrazonic acids. Chalcogen analogues follow each of the
-    corresponding oxygen acids". The N-hydroxy derivative of an imidic acid is that acid for the order
-    of citation as principal group,:30129: the prefix forms are for the case "When another
-    group is present that has seniority for citation as principal group"), so it ranks as the imidic
-    acid of its acid chalcogen: with the imidic acid for the O acid, with the imidothioic, imidoselenoic
-    or imidotelluroic acid for the S, Se or Te acid, and above the hydrazonic acids.  for a ``fg_name``
-    that is not one of those four."""
-    if fg_name not in _IMIDIC_GROUP.values():
-        return []
-    return [m for m in (functional_groups.get("hydroximic_acid") or ())
-            if suffix_group(mol, "hydroximic_acid", [m]) == fg_name]
+# the N-substituent of the group, its suffix and its rank are the one rule of ``n_substituted_acids``; these
+# names stay here for the callers that read the hydroximic acid through this module
+from .n_substituted_acids import (  # noqa: E402,F401
+    CN_GROUPS,
+    IMIDIC_GROUP as _IMIDIC_GROUP,
+    group_at_rank,
+    suffix_group,
+    suffix_group_atoms,
+    with_n_prefix_fragments,
+)
 
 
 def junior_to(principal_group: Optional[str], mol, match) -> bool:
@@ -98,96 +63,25 @@ def junior_to(principal_group: Optional[str], mol, match) -> bool:
         return False
 
 
-def hydroximic_principal(features: Any) -> Tuple[Optional[str], List[str]]:
-    """``(group the suffix is written with, rendered prefixes the group adds)`` of a molecule's principal group.
-
-    For one hydroximic acid: its imidic acid ('imidic_acid',...) and ['N-hydroxy']. For every other principal
-    group, and for a molecule with more than one hydroximic group (:30112: their N locants are numbered,
-    which is not built), the group itself and nothing: the caller finds no suffix for 'hydroximic_acid'
-    and declines."""
-    group = features.principal_group
-    matches = features.principal_group_atoms or []
-    if group != "hydroximic_acid" or len(matches) != 1 or len(matches[0]) < 4:
-        return group, []
-    return suffix_group(features.mol, group, matches), ["N-hydroxy"]
-
-
-def fragments_cite_italic_locant(features: Any, fragments) -> bool:
-    """True when ``features`` is a hydroximic acid whose name cites an italic locant ('N-hydroxy', 'N,2-dihydroxy').
-
-     "Citation of locants" (the Blue Book): when any locant is essential all are cited, and an
-    italic N says which atom of the parent carries the group, so no position of that parent compound can be
-    left without its locant. Every licence that empties a scope of its locants to
-     declines on it: the isomer a group on N would make is not the one on the carbon, whatever the
-    rest of the scope looks like. (The licences read the molecule's hydrogens, and the N of this group holds
-    none: its substituent is a position of the parent compound, not a decoration of the group.)"""
-    import re
-    return getattr(features, "principal_group", None) == "hydroximic_acid" and any(
-        f.fragment_type == "prefix" and re.match(r"N(?:[,'\d]|-)", f.text or "") for f in (fragments or ()))
-
-
-def with_n_hydroxy_fragments(features: Any, prefixes: list) -> Optional[list]:
-    """``prefixes`` (name fragments) with the 'N-hydroxy' of a hydroximic acid cited among them, or None.
-
-    The fragment carries its own locant in its text, as ``_generate_alkyl_prefixes`` does ('2-methyl'),
-    and ``text_without_locants`` is the same text: an N locant is essential and no licence withholds it.
-    A 'hydroxy' prefix the chain or ring already carries is one multiplied prefix with it; the existing
-    fragment is re-rendered from its own locants, and only when that re-rendering reproduces what the
-    assembler would have printed for it (a fragment this cannot read back is refused, never edited).
-    Unchanged for every other group; None (the caller declines) for a molecule with more than one
-    hydroximic group (see:func:`hydroximic_principal`)."""
-    from ..assembly.composer import NameFragment
-    from ..assembly.naming_utils import alpha_sort_key
-    from .locanted_prefixes import locanted_prefix_block
-
-    if features.principal_group != "hydroximic_acid":
-        return prefixes
-    matches = features.principal_group_atoms or []
-    if len(matches) != 1 or len(matches[0]) < 4:
-        return None
-    o_on_n = matches[0][2]
-    hydroxy = [f for f in prefixes if alpha_sort_key(f.text) == "hydroxy"]
-    if len(hydroxy) > 1:
-        return None
-    if not hydroxy:
-        return list(prefixes) + [NameFragment(
-            text="N-hydroxy", fragment_type="prefix", text_without_locants="N-hydroxy",
-            atoms=frozenset({o_on_n}))]
-    old = hydroxy[0]
-    if (not old.locants or old.atoms is None
-            or not all(isinstance(loc, int) and not isinstance(loc, bool) for loc in old.locants)):
-        return None
-    pieces = [("hydroxy", str(loc)) for loc in old.locants]
-    printed = old.text if (old.text or "")[:1].isdigit() else f"{','.join(map(str, old.locants))}-{old.text}"
-    if locanted_prefix_block(pieces) != printed:
-        return None
-    merged = locanted_prefix_block(pieces + [("hydroxy", "N")])
-    if not merged:
-        return None
-    return [
-        NameFragment(text=merged, fragment_type="prefix", text_without_locants=merged,
-                     atoms=old.atoms | {o_on_n}) if f is old else f
-        for f in prefixes
-    ]
-
-
 # ---------------------------------------------------------------------------------------------------------
 # The configuration of the C=N of a ring-parent group: a descriptor with no locant
 # ---------------------------------------------------------------------------------------------------------
 
 def cn_labels(mol) -> Dict[frozenset, str]:
-    """``{frozenset({C, N}): 'E' | 'Z'}`` for the configured C=N bonds of the hydroximic acids of ``mol``."""
+    """``{frozenset({C, N}): 'E' | 'Z'}`` for the configured C=N bonds of the hydroximic and N-substituted imidic acids of ``mol``."""
     from ..perception.stereo import assign_stereochemistry, get_double_bond_stereo
     assign_stereochemistry(mol)
-    groups = {frozenset(m[:2]) for m in mol.GetSubstructMatches(_HYDROXIMIC_GROUP)}
+    groups = {frozenset(m[:2]) for m in mol.GetSubstructMatches(_CN_GROUP)}
     return {frozenset(d["atoms"]): d["stereo"] for d in get_double_bond_stereo(mol)
             if frozenset(d["atoms"]) in groups}
 
 
-def with_hydroximic_fragments(features: Any, fragments: list) -> Optional[list]:
-    """``fragments`` (parent, suffix, prefix and stereo fragments of a general-acyclic name) with the N-hydroxy
-    of a hydroximic acid cited among the prefixes (:func:`with_n_hydroxy_fragments`) and, for a ring parent, the
-    configuration of its C=N in the stereo fragment; None where the name cannot be built.
+def with_n_group_fragments(features: Any, fragments: list) -> Optional[list]:
+    """``fragments`` (parent, suffix, prefix and stereo fragments of a general-acyclic name) with the N-substituent
+    of the principal group cited among the prefixes (:func:`with_n_prefix_fragments`: the N-hydroxy of a hydroximic,
+    hydroxamic or sulfonimidic acid, the carbon group on the N of an imidic acid) and, for a hydroximic or
+    N-substituted imidic acid on a ring parent, the configuration of its C=N in the stereo fragment; None where
+    the name cannot be built.
 
     A descriptor that relates to the parent structure is "placed at the front of the complete name", "preceded by
     a numerical or letter locant... when such locants are present", the Blue Book). The carbon of
@@ -197,14 +91,15 @@ def with_hydroximic_fragments(features: Any, fragments: list) -> Optional[list]:
     cites '(1E)-'.) Another descriptor at the front would need one block with a bare member, which the book does
     not print: the name is not built. Unchanged for every other group."""
     from ..assembly.composer import NameFragment
-    if features.principal_group != "hydroximic_acid":
+    from .n_substituted_acids import N_PREFIX_GROUPS
+    if features.principal_group not in N_PREFIX_GROUPS:
         return fragments
-    prefixes = with_n_hydroxy_fragments(features, [f for f in fragments if f.fragment_type == "prefix"])
+    prefixes = with_n_prefix_fragments(features, [f for f in fragments if f.fragment_type == "prefix"])
     if prefixes is None:
         return None
     stereo = [f for f in fragments if f.fragment_type == "stereo"]
-    label = None if features.principal_chain else cn_labels(features.mol).get(
-        frozenset(features.principal_group_atoms[0][:2]))
+    label = None if features.principal_chain or features.principal_group not in CN_GROUPS else cn_labels(
+        features.mol).get(frozenset(features.principal_group_atoms[0][:2]))
     if label:
         if stereo:
             return None
@@ -214,10 +109,10 @@ def with_hydroximic_fragments(features: Any, fragments: list) -> Optional[list]:
 
 def ring_stereodescriptors(features: Any, descriptors: list) -> Optional[list]:
     """``descriptors`` (``(locant, label)`` of the parent's stereogenic units) with the bare descriptor of the C=N of
-    a principal hydroximic acid on a ring parent (see:func:`with_hydroximic_fragments`), or None where another
+    a principal hydroximic acid on a ring parent (see:func:`with_n_group_fragments`), or None where another
     descriptor stands at the front too. Unchanged for every other group."""
     matches = features.principal_group_atoms or []
-    if features.principal_group != "hydroximic_acid" or len(matches) != 1:
+    if features.principal_group not in CN_GROUPS or len(matches) != 1:
         return descriptors
     label = cn_labels(features.mol).get(frozenset(matches[0][:2]))
     if not label:
@@ -333,9 +228,13 @@ def chain_end_prefixes(mol, matches, chain_set, atom_to_locant, principal_group:
 #: order is the order of seniority (``benzene._SUFFIX_PRIORITY``).
 _CHALCOGEN_ACIDS = ("carboximidic acid", "carboximidothioic acid", "carboximidoselenoic acid",
                     "carboximidotelluroic acid")
+#: The N-substituted imidic acids (``n_substituted_acids``) are the same classes with a carbon group on the N in
+#: place of the OH: 'N-substituted' stands for the group in the suffix name, the name of the group is the
+#: record's ``n_substituents``. They have no prefix on the ring (the book prints none for a carbon group on the N,
+#: (1),:30020), so they are claimed only as the principal group (:func:`claims_benzene_group`).
 BENZENE_SUFFIX_NAMES = {
-    f"{descriptor}N-hydroxy{imidic}": imidic
-    for imidic in _CHALCOGEN_ACIDS for descriptor in ("", "(E)-", "(Z)-")
+    f"{descriptor}N-{kind}{imidic}": imidic
+    for kind in ("hydroxy", "substituted ") for imidic in _CHALCOGEN_ACIDS for descriptor in ("", "(E)-", "(Z)-")
 }
 #: (group key, ring suffix name, SMARTS). The =N-OH (a bonded O with its H) keeps the oxime ether and the
 #: amidoxime out, the -XH the imidate ester
@@ -345,10 +244,16 @@ _HYDROXIMIC_BENZENE_ROWS = (
     ("hydroximic_selenoic_acid", "N-hydroxycarboximidoselenoic acid", "[CX3](=[NX2][OX2H1])[SeX2H1]"),
     ("hydroximic_telluroic_acid", "N-hydroxycarboximidotelluroic acid", "[CX3](=[NX2][OX2H1])[TeX2H1]"),
 )
+_N_SUBSTITUTED_BENZENE_ROWS = tuple(
+    (f"n_substituted_imidic_{x}", f"N-substituted {imidic}",
+     f"[CX3](=[NX2;!R;$([NX2][#6,$([SX2H1,SeX2H1,TeX2H1])])])[{x}X2H1]")
+    for imidic, x in zip(_CHALCOGEN_ACIDS, ("O", "S", "Se", "Te")))
+_BENZENE_ROWS = _HYDROXIMIC_BENZENE_ROWS + _N_SUBSTITUTED_BENZENE_ROWS
 #: (key, imidic suffix) in the order the groups are looked for, as ``benzene_acid_suffixes.ACID_SUFFIX_FGS``
-ACID_SUFFIX_FGS = tuple((key, BENZENE_SUFFIX_NAMES[name]) for key, name, _ in _HYDROXIMIC_BENZENE_ROWS)
-ACID_SUFFIX_SMARTS = {key: Chem.MolFromSmarts(smarts) for key, _, smarts in _HYDROXIMIC_BENZENE_ROWS}
-_SUFFIX_OF_KEY = {key: name for key, name, _ in _HYDROXIMIC_BENZENE_ROWS}
+ACID_SUFFIX_FGS = tuple((key, BENZENE_SUFFIX_NAMES[name]) for key, name, _ in _BENZENE_ROWS)
+ACID_SUFFIX_SMARTS = {key: Chem.MolFromSmarts(smarts) for key, _, smarts in _BENZENE_ROWS}
+_SUFFIX_OF_KEY = {key: name for key, name, _ in _BENZENE_ROWS}
+_N_SUBSTITUTED_KEYS = frozenset(key for key, _, _ in _N_SUBSTITUTED_BENZENE_ROWS)
 IMIDIC_DEMOTED_PREFIX = _RING_ACYL_PREFIX["imidic_acid"]
 #: (1) (:30138); the S, Se and Te analogues have no prefix and are claimed only as the suffix. The prefix
 #: of a configured group carries its descriptor at its front,:44639; ``ring_acyl_prefixes``).
@@ -362,19 +267,27 @@ def acid_suffix_extra(key: str, mol, match) -> Dict[str, Any]:
     if key not in _SUFFIX_OF_KEY:
         return {}
     label = cn_labels(mol).get(frozenset(match[:2]))
+    n_substituents = ["hydroxy"]
+    if key in _N_SUBSTITUTED_KEYS:
+        from ..perception.functional_groups import detect_functional_groups
+        from .n_substituted_acids import n_substituents as _n_substituents
+        found = _n_substituents(mol, "n_substituted_imidic_acid", match, detect_functional_groups(mol)) or []
+        n_substituents = [name for name, _ in found]
     return {"suffix_name": f"({label})-{_SUFFIX_OF_KEY[key]}" if label else _SUFFIX_OF_KEY[key],
-            "n_substituents": ["hydroxy"]}
+            "n_substituents": n_substituents}
 
 
 def claims_benzene_group(key: str, mol) -> bool:
     """True when the benzene namer takes the group ``key`` it matched: every group but a hydroximic acid with
-    an S, Se or Te acid group (no prefix form in the book: it is the suffix or it is not named here) that is
-    not the principal group of the molecule."""
-    if key not in ("hydroximic_thioic_acid", "hydroximic_selenoic_acid", "hydroximic_telluroic_acid"):
+    an S, Se or Te acid group (no prefix form in the book: it is the suffix or it is not named here) and an
+    N-substituted imidic acid (none either), that is not the principal group of the molecule."""
+    if key not in ("hydroximic_thioic_acid", "hydroximic_selenoic_acid", "hydroximic_telluroic_acid",
+                   *_N_SUBSTITUTED_KEYS):
         return True
     from ..perception.functional_groups import detect_functional_groups
     from .seniority import get_principal_group
-    return get_principal_group(mol, detect_functional_groups(mol))[0] == "hydroximic_acid"
+    return get_principal_group(mol, detect_functional_groups(mol))[0] == (
+        "n_substituted_imidic_acid" if key in _N_SUBSTITUTED_KEYS else "hydroximic_acid")
 
 
 #: what ``name_imidic_on_benzene`` returns for a ring the general suffix assembly names
@@ -399,7 +312,7 @@ def name_imidic_on_benzene(chosen_suffix: str, suffix_groups: Dict[str, List[int
     of the group. The N-hydroxy and a ring 'hydroxy' are ONE multiplied prefix, (b) ('N,2-dihydroxy-
     benzene-1-carboximidic acid'), and the whole set is alphanumerically ordered,:3440), as
     ``_name_substituted_benzamide`` does for the italic N of an amide. The configuration of its C=N is the
-    descriptor at the front of the name ('(E)-N-hydroxybenzenecarboximidic acid'; ``with_hydroximic_fragments``),
+    descriptor at the front of the name ('(E)-N-hydroxybenzenecarboximidic acid'; ``with_n_group_fragments``),
     in the one block with no other: ring ``stereo_descriptors`` (none, or not established) are not built beside it.
     One group only: two would need the N locants to carry the ring numbers of their groups ('N1,N4-dihydroxy-
     benzene-1,4-dicarboximidic acid',:30125), and so would a plain imidic acid or a hydroximic acid of another
@@ -414,7 +327,7 @@ def name_imidic_on_benzene(chosen_suffix: str, suffix_groups: Dict[str, List[int
     front = ""
     if hydroximic:
         imidic = BENZENE_SUFFIX_NAMES[chosen_suffix]
-        if (len(locants) != 1 or n_substituents_map.get(chosen_suffix) != ["hydroxy"]
+        if (len(locants) != 1 or len(n_substituents_map.get(chosen_suffix) or []) != 1
                 or "carboximidic acid" in suffix_groups
                 or any(sfx not in _SUFFIX_TO_PREFIX or BENZENE_SUFFIX_NAMES.get(sfx) == imidic
                        for sfx in suffix_groups if sfx != chosen_suffix)):
@@ -434,7 +347,7 @@ def name_imidic_on_benzene(chosen_suffix: str, suffix_groups: Dict[str, List[int
     renumbered_groups = _renumber_relative_to(remaining_prefix_groups, locants[0])
     merged: Dict[str, List] = {name: list(locs) for name, locs in renumbered_groups.items()}
     if hydroximic:
-        merged.setdefault("hydroxy", []).append("N")
+        merged.setdefault(n_substituents_map[chosen_suffix][0], []).append("N")
     parent = f"benzene-1-{imidic}" if renumbered_groups else f"benzene{imidic}"
     return f"{front}{_build_prefix_string_with_locants(merged, mono_needs_locant=True)}{parent}"
 
@@ -443,7 +356,10 @@ def name_imidic_on_benzene(chosen_suffix: str, suffix_groups: Dict[str, List[int
 # The configuration of the C=N, which the standard InChIKey does not see
 # ---------------------------------------------------------------------------------------------------------
 
-_HYDROXIMIC_GROUP = Chem.MolFromSmarts("[CX3](=[NX2][OX2H1])[#8,#16,#34,#52;X2H1]")
+#: C(=N-OH)(XH) and C(=N-R)(XH), R a carbon: the groups whose C=N has a mobile hydrogen (the group is a tautomer of
+#: the amide, thioamide... of the same atoms, so the key is one for both, and for both configurations)
+_CN_GROUP = Chem.MolFromSmarts(
+    "[CX3](=[NX2;!R;$([NX2][#6,$([OX2H1,SX2H1,SeX2H1,TeX2H1])])])[#8,#16,#34,#52;X2H1]")
 
 
 def _cn_configurations(mol) -> Dict[Any, List[str]]:
@@ -451,7 +367,7 @@ def _cn_configurations(mol) -> Dict[Any, List[str]]:
     ... for a configured C=N and '-' for one that is not. The place is the canonical class of the group's
     C and N (constitution only), so two readings of one molecule key a group alike; groups of one class
     (equivalent groups) share a place and a list."""
-    matches = mol.GetSubstructMatches(_HYDROXIMIC_GROUP)
+    matches = mol.GetSubstructMatches(_CN_GROUP)
     if not matches:
         return {}
     ranks = (list(Chem.CanonicalRankAtoms(mol, breakTies=False, includeChirality=False))

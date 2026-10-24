@@ -8,7 +8,7 @@ all other groups become prefixes.
 
 from typing import Dict, List, Optional, Tuple
 
-from .hydroximic_acids import hydroximic_at_rank, suffix_group
+from .n_substituted_acids import CN_GROUPS, group_at_rank, rank_group
 
 # (2026-04-25): per-FG SMARTS attachment atom override.
 #
@@ -127,6 +127,10 @@ SENIORITY_ORDER = [
     # group by the chalcogen, this entry is the O acid's place and the one the rankers that read the
     # index see. (It stood below the hydrazonic acids, a place the group has no claim to.)
     "hydroximic_acid",
+    # The N-substituted imidic acid, the Blue Book; 'N-sulfanylcyclopentanecarboximidic acid
+    # (PIN)',:30271) has the rank of its imidic acid, as the hydroximic acid does: the O acid's place here,
+    # ``_head_principal_group`` ranks it by its chalcogen.
+    "n_substituted_imidic_acid",
     # (the Blue Book-:18540): the carboximidic acids
     # modified by S, Se, Te follow the imidic acid, in that order, and come before
     # the hydrazonic acid; the hydrazonic acids modified by S, Se, Te follow it.
@@ -603,6 +607,7 @@ SUFFIX_FORMS = {
     # acid), built by the dedicated hydroximic_acid handler — so NO substitutive
     # suffix here (None, exactly like hydroxamic_acid).
     "hydroximic_acid": None,
+    "n_substituted_imidic_acid": None,    # written with the suffix of its imidic acid (n_substituted_acids.suffix_group)
     "carbamic_acid": ("carbamic acid", "carbamic acid"),  # Retained name, same for chain/ring
     "sulfonic_acid": ("sulfonic acid", "sulfonic acid"),
     # W3-P04): FRN peroxy-modified sulfonic acid suffix; chain
@@ -1094,6 +1099,8 @@ PREFIX_FORMS = {
     # 'hydroxy' + 'hydroxyimino' prefixes on the geminal locant (two-prefix
     # decomposition emitted by name_polyfunctional's chain-end block). None here.
     "hydroximic_acid": None,
+    # The demoted N-substituted imidic acid has no prefix the book prints for a carbon group on the N: fails closed.
+    "n_substituted_imidic_acid": None,
     #: a demoted chalcogen imidic / hydrazonic acid ending a chain
     # splits into its simple prefix pair ('imino' + 'sulfanyl',...) in
     # name_polyfunctional's chain-end block; no single static prefix.
@@ -1237,11 +1244,11 @@ def _head_principal_group(
     """The first group of ``SENIORITY_ORDER`` that is present and suffix-capable (the answer
     before the phosphate esters are offered; see ``get_principal_group``)."""
     for fg_name in SENIORITY_ORDER:
-        if fg_name == "hydroximic_acid":
+        if fg_name in CN_GROUPS:
             continue                  # ranked by its chalcogen, with the imidic acids (below)
-        _hydroximic = hydroximic_at_rank(mol, functional_groups, fg_name)
-        if _hydroximic and not functional_groups.get(fg_name):
-            return "hydroximic_acid", _hydroximic    # the rank of its imidic acid, class 7a (:18172)
+        _n_group, _n_matches = group_at_rank(mol, functional_groups, fg_name)
+        if _n_matches and not functional_groups.get(fg_name):
+            return _n_group, _n_matches    # the rank of its imidic acid, class 7a (:18172)
         if fg_name in functional_groups and functional_groups[fg_name]:
             # functional-group perception fix/ (169.7): a principal characteristic group MUST be
             # suffix-capable. The pseudohalide / special prefix-only groups
@@ -1403,14 +1410,12 @@ def get_prefix(fg_name: str) -> Optional[str]:
 def seniority_index(fg_name: str, mol=None, matches=None) -> int:
     """The place of ``fg_name`` in ``SENIORITY_ORDER`` (ValueError for a name that is not in it).
 
-    THE one reader of the order for a group's rank: a hydroximic acid has the rank of the imidic acid
-    of its acid chalcogen class 7a, the Blue Book; ``hydroximic_acid`` in the
-    order is the O acid's place), so ``mol`` and the group's ``matches`` give it the place of its
+    THE one reader of the order for a group's rank: a hydroximic or N-substituted imidic acid has the rank of
+    the imidic acid of its acid chalcogen class 7a, the Blue Book; ``hydroximic_acid`` in
+    the order is the O acid's place), so ``mol`` and the group's ``matches`` give it the place of its
     imidic, imidothioic, imidoselenoic or imidotelluroic acid, and two groups of one rank share an
     index. Without them the group is the O acid's. Every other name is its own place."""
-    if fg_name == "hydroximic_acid":
-        fg_name = (suffix_group(mol, fg_name, matches) if mol is not None and matches else "imidic_acid")
-    return SENIORITY_ORDER.index(fg_name)
+    return SENIORITY_ORDER.index(rank_group(mol, fg_name, matches))
 
 
 def compare_seniority(fg1: str, fg2: str) -> int:

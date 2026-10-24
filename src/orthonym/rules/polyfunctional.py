@@ -49,7 +49,8 @@ from .seniority import (
     get_prefix,
     get_principal_group,
 )
-from .hydroximic_acids import chain_end_prefixes, hydroximic_principal, ring_acyl_prefixes, ring_stereodescriptors
+from .hydroximic_acids import chain_end_prefixes, ring_acyl_prefixes, ring_stereodescriptors
+from .n_substituted_acids import group_nitrogens, n_prefix_strings
 
 
 def _ring_stem_with_unsaturation(stem, ene_locants, yne_locants):
@@ -955,7 +956,7 @@ def _name_ring_as_parent_polyfunctional(features: Any) -> Optional[str]:
         Complete IUPAC name, or None if ring parent cannot be determined.
     """
     mol = features.mol
-    principal_group, _n_hydroxy = hydroximic_principal(features)   #, the Blue Book
+    principal_group, _n_hydroxy = n_prefix_strings(features)   #, the Blue Book
     non_principal = getattr(features, 'non_principal_groups', {})
     # audit fix 2026-06-22: drop same-union-class subtypes already in the
     # multiplied suffix (parity with the chain path; ring polyols too).
@@ -1796,7 +1797,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     mol = features.mol
     principal_chain = features.principal_chain
     atom_to_locant = features.atom_to_locant
-    principal_group, _n_hydroxy = hydroximic_principal(features)   #, the Blue Book
+    principal_group, _n_hydroxy = n_prefix_strings(features)   #, the Blue Book
     # (the Blue Book): an oxoacid with a substitutable hydrogen on its central
     # atom is a functional parent, never a suffix ('(2-hydroxyethyl)phosphonic acid', not
     # '2-hydroxyethane-1-phosphonic acid'; Note:35457 rejects 'benzenephosphonic acid'). The
@@ -2165,7 +2166,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     #: N atoms of chain-terminal amidines whose 'amino'/'imino' prefixes
     # are emitted below — their substituent branches must be skipped by the
     # alkyl-substituent walk (else double-counted as (ethylamino)/(dimethylamino)).
-    _amidine_excluded_n: Set[int] = set()
+    _amidine_excluded_n: Set[int] = group_nitrogens(features)   # (the N of an N-substituted principal group: its own)
 
     # W2E-P1FG Task 10: pre-pass to suppress the primary_amide
     # FG whose H2N-CO-CO- unit is consumed by an '(oxamoylimino)' prefix on a

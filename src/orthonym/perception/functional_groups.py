@@ -210,6 +210,19 @@ FUNCTIONAL_GROUP_SMARTS = {
     "hydroximic_acid": ("[CX3;!$([CX3]([#7,#8])(=[NX2][OX2H1])[OX2H1]);"
                         "!$([CX3]([!#6;!#1])(=[NX2][OX2H1])[#16,#34,#52;X2H1])]"
                         "(=[NX2][OX2H1])[#8,#16,#34,#52;X2H1]"),
+    # An imidic acid whose N carries a carbon group, R-C(=N-R')-XH (X = O, S, Se, Te;,
+    # the Blue Book; 'N-sulfanylcyclopentanecarboximidic acid (PIN)',,:30271;
+    # 'N-ethyl-N-methylcarbamimidic acid (PIN)',,:30764): the N-substituted derivative of the
+    # imidic, imidothioic, imidoselenoic or imidotelluroic acid of the chalcogen X, as the hydroximic acid is
+    # the N-hydroxy one. Without it the -XH reads as a thiol / selenol and the =N-R as an imine, so the
+    # acid is named as a thiol ('1-(methylimino)ethane-1-thiol'), which the acid outranks
+    # class 7a,:18172,:18190). The acid carbon has H or carbon beside the group (a heteroatom there is a
+    # carbonic acid derivative); the N is not a ring atom (a ring N is a lactim, named as a ring) and has a
+    # carbon or a terminal SH, SeH, TeH on it ('N-sulfanylcyclopentanecarboximidic acid (PIN)',:30271; the
+    # N-OH is the hydroximic acid, the N-NH2 the hydrazonic acid). Match tuple (C, imino N, XH): the group
+    # on the N is not an atom of the match.
+    "n_substituted_imidic_acid": ("[CX3;H1,$([CX3][#6])](=[NX2;!R;$([NX2][#6,$([SX2H1,SeX2H1,TeX2H1])])])"
+                                  "[#8,#16,#34,#52;X2H1]"),
     # Imidic and hydrazonic acids whose -OH is replaced by -SH, -SeH or -TeH
     #, the Blue Book;,:18537-:18538
     # '-C(=NH)-SH carboximidothioic acid', '-C(=NH)-SeH carboximidoselenoic acid'):
@@ -896,6 +909,15 @@ def _add_resonance_twin_matches(mol, results: Dict[str, List[Tuple[int, ...]]]) 
         already[cls].add(key)
 
 
+def scope_n_substituted_imidic_acids(mol, results):
+    """``results`` with the ``n_substituted_imidic_acid`` matches kept only where the group is built
+    (``rules.n_substituted_acids``, imported late: the rules read this module)."""
+    if not results.get("n_substituted_imidic_acid"):
+        return results
+    from ..rules.n_substituted_acids import scope_n_substituted_imidic_acids as _scope
+    return _scope(mol, results)
+
+
 def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
     """
     Detect all functional groups in a molecule.
@@ -1028,8 +1050,8 @@ def _detect_functional_groups_impl(mol) -> Dict[str, List[Tuple[int, ...]]]:
         else:
             del results["anhydride"]
 
-    # Post-processing: remove generic FG matches that overlap with more-specific FGs
-    results = _resolve_fg_collisions(results)
+    # Post-processing: remove generic FG matches that overlap with more-specific FGs (N-imidic acid: scoped)
+    results = _resolve_fg_collisions(scope_n_substituted_imidic_acids(mol, results))
 
     # +: a ring-carbon exocyclic =O on a MANCUDE ring
     # (residual unsaturation) is a heterone — the senior principal-characteristic
@@ -1344,6 +1366,11 @@ _CHALCOGEN_IMIDIC_COLLISIONS = [
     ('hydrazonoselenoic_acid', ['hydrazone', 'imine', 'selenol']),
     ('hydrazonotelluroic_acid', ['hydrazone', 'imine', 'tellurol']),
     ('hydroximic_acid', ['thiol', 'selenol', 'tellurol']),
+    # (:29980): the C=N-R of an N-substituted imidic acid matches the imine SMARTS and its -XH the alcohol,
+    # enol, thiol... patterns; the group owns the whole geminal C(=N-R)(XH) unit (the carbon group on the N is not an
+    # atom of the match and keeps its own groups)
+    ('n_substituted_imidic_acid', ['imine', 'alcohol', 'primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol',
+                                   'enol', 'thiol', 'selenol', 'tellurol']),
 ]
 
 
@@ -1611,7 +1638,7 @@ def _resolve_fg_collisions(results):
         ('phenol', ['alcohol']),
         ('enol', ['alcohol']),
         #: hydroxamic acid suppresses generic alcohol too
-        ('hydroxamic_acid', ['alcohol']),
+        ('hydroxamic_acid', ['alcohol', 'aldehyde']),    # the formyl of an N-hydroxyformamide is its acyl carbon
         # functional-group perception fix (169.7): hydroxylamine (R-NH-OH) suppresses amine + alcohol on its
         # N/O atoms (the N is an amine-N and the O an -OH to the generic patterns).
         ('hydroxylamine', ['primary_amine', 'secondary_amine', 'tertiary_amine',

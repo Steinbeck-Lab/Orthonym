@@ -406,9 +406,6 @@ A class handler is a short shim in `routing/dispatch_table.py` that calls the co
 | 4500 | `tier_a_ring` | The ring cascade: complex rings, polycycles, partly saturated rings, heterocycles, benzene, then a chain; picks among the candidates | `assembly/handlers/tier_a_ring.py` |
 | 5100 | `ring_nitrile` | Nitriles on a ring | `assembly/handlers/ring_nitrile.py` |
 | 5200 | `amide` | Amides with one amide group | `assembly/handlers/amide.py` |
-| 5210 | `hydroxamic_acid` | Hydroxamic acids | `assembly/handlers/hydroxamic_acid.py` |
-| 5211 | `hydroximic_acid` | Hydroximic acids | `assembly/handlers/hydroximic_acid.py` |
-| 5212 | `sulfonimidic_n_hydroxy` | N-hydroxy sulfonimidic acids | `assembly/handlers/sulfonimidic_n_hydroxy.py` |
 | 5240 | `azine` | Azines | `assembly/handlers/azine.py` |
 | 5250 | `hydroxylamine` | Substituted hydroxylamines | `assembly/handlers/hydroxylamine.py` |
 | 5290 | `imine` | N-substituted acyclic imines | `assembly/handlers/imine.py` |
