@@ -27,6 +27,7 @@ from rdkit import Chem
 from ..data.multipliers import multiplier_table
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
+from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
 
 
 def has_isotopes(mol: Optional[Chem.Mol]) -> bool:
@@ -277,9 +278,8 @@ def _same_fixed_h_inchi(a: Chem.Mol, b: Chem.Mol) -> bool:
     InChI), which is what the SMILES compare guards. The caller still requires
     the full standard InChIKey to match as well."""
     try:
-        from rdkit.Chem import inchi as _inchi
-        ia = _inchi.MolToInchi(a, options="/FixedH")
-        ib = _inchi.MolToInchi(b, options="/FixedH")
+        ia = fixed_h_inchi(a)
+        ib = fixed_h_inchi(b)
     except Exception:
         return False
     return bool(ia) and ia == ib
@@ -2146,13 +2146,7 @@ def _find_best_placement(
     every locant once any is required, the Blue Book); the
     licence is not consulted then.
     """
-    offs_raw = [0] + _insertion_offsets(skel)
-    seen: set = set()
-    offs: List[int] = []
-    for x in offs_raw:
-        if x not in seen:
-            seen.add(x)
-            offs.append(x)
+    offs = list(dict.fromkeys([0] + _insertion_offsets(skel)))
     won = []
     # letter locants (e.g. amide ``N``) are tried after the locant-free
     # form and before the integer locants -- an amide/amine D belongs on ``N``,
@@ -2179,6 +2173,9 @@ def _find_best_placement(
     # other candidate round-trips (then labelled below the PIN), so no name is
     # lost.
     held = []
+    # The (offset, locant) pairs OPSIN has been shown unable to read are not built (rules.isotope_search)
+    reach = LocantReach(skel, n_pos, lambda locant: format_isotope_descriptor(
+        [(locant, mass, el, count, maxpos) for (mass, el), count, maxpos in keys], letter_once=_pin_spellings()))
     for locant in _locants:
         groups_desc = [(locant, mass, el, count, maxpos)
                        for (mass, el), count, maxpos in keys]
@@ -2196,6 +2193,8 @@ def _find_best_placement(
             variants.append((1, desc_force))
         for sub_rank, desc in variants:
             for off in offs:
+                if reach.beyond(off, locant):
+                    continue
                 candidate = skel[:off] + desc + skel[off:]
                 if _isotope_round_trips(candidate, original, stereo_blind=stereo_blind):
                     #: a locant-free descriptor may only be OMITTED when
@@ -2236,6 +2235,8 @@ def _find_best_placement(
                                 _placement_quality(skel, off,
                                                    locant_free=(locant is None)),
                                 off, desc, candidate))
+                else:
+                    reach.learn(off, locant, candidate, sub_rank)
             # front placement: a REQUIRED locant on a parent that opens
             # with a skeletal-replacement locant belongs at the front, hyphen-
             # joined, not spliced mid-parent. Offer that candidate (RT-gated) with
@@ -2866,11 +2867,25 @@ def _decorate_distinct_multi_locant(
     # ('2-(2,3,4,5,6-2H5)phenyl-1-benzofuran', not '(2,3,4,5,6-2H5)-2-phenyl-1-
     # benzofuran'); a molecule whose only round-tripper is such a slot still names.
     offs.sort(key=lambda o: _slot_precedes_substituent_locant(skeleton, o))
+
+    def probe_of(tok):
+        return f"({tok}-{sym}1)"
+
     for off in offs:
+        # What OPSIN reads at this offset (rules.isotope_search): no place for a descriptor, or a part with the
+        # locants 1..cap (and the primed series 1'..cap', 1''..cap''); a token OPSIN is shown to refuse is not asked.
+        dead, cap = integer_locant_reach(skeleton, off, probe_of, n)
+        if dead:
+            continue
+        prime_caps = {p: integer_locant_reach(skeleton, off, probe_of, n, "'" * p)[1]
+                      for p in range(1, maxprime + 1)}
         # locant token -> single-label isotopomer at this offset
         loc_canons: Tuple[Dict[str, str], Dict[str, str]] = ({}, {})
         for tok in loc_tokens:
-            probe = f"({tok}-{sym}1)"
+            tok_cap = prime_caps.get(tok.count("'")) if "'" in tok else cap
+            if tok_cap is not None and int(tok.rstrip("'a")) > tok_cap:
+                continue
+            probe = probe_of(tok)
             s = _opsin_parse(skeleton[:off] + probe + skeleton[off:])
             if not s:
                 continue

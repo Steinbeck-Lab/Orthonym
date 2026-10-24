@@ -75,9 +75,11 @@ SAFETY
 """
 from __future__ import annotations
 
+import collections
 import gc
 import logging
 import os
+import re
 import threading
 from typing import Optional, Sequence, Tuple
 
@@ -447,11 +449,109 @@ def _opsin_stdout_uncached(name: str, allow_radicals: bool,
             _attach_thread()
             result = _n2s().parseChemicalName(name, _cfg(allow_radicals))
             smiles = result.getSmiles()
+            if smiles is None:
+                _note_refusal(name, allow_radicals, result)
     except Exception as exc:  # a Java-side failure is transient, like a crashed CLI
         logger.debug("in-process OPSIN failed for %r: %s", name, exc)
         return None, False
     # The CLI writes the SMILES only when non-null, then always a newline.
     return ("\n" if smiles is None else str(smiles) + "\n"), True
+
+
+#: How OPSIN refused a name, by ``(name, allow_radicals)``: ``(kind, locant)`` (:func:`refusal_kind`,
+#::func:`refusal_locant`). Filled by:func:`_opsin_stdout_uncached` from the message of the parse it makes,
+#: so a caller that asks after a read-back that found no structure costs no second parse.
+_REFUSALS: "collections.OrderedDict[tuple, Tuple[str, Optional[str]]]" = collections.OrderedDict()
+_REFUSALS_MAX = 20000
+
+#: ``Fragment.getAtomByLocantOrThrow``: "Could not find the atom with locant X." The polycyclic spiro
+#: message of ``ComponentProcessor`` starts with the same words and goes on ("... for use in polycyclic
+#: spiro system"), which is a refusal of another part of the name.
+_LOCANT_REFUSAL_RE = re.compile(r"Could not find the atom with locant (\S+)\.")
+
+
+def refusal_locant(message: Optional[str]) -> Optional[str]:
+    """The locant ``X`` of an OPSIN 2.9.0 refusal "Could not find the atom with locant X." (the first one
+    the structure builder did not find, as it spells it, primes and letters included); None for any other
+    message."""
+    found = _LOCANT_REFUSAL_RE.fullmatch(message or "")
+    return found.group(1) if found else None
+
+
+def refusal_kind(message: Optional[str]) -> str:
+    """The kind of an OPSIN 2.9.0 refusal, from the message of ``OpsinResult.getMessage``.
+
+    ``"grammar"``: no tokenisation of the name exists (``Parser.parse``: "<name> is unparsable due to the
+    following being uninterpretable:..."); ``"locant"``: the name tokenised and the structure builder asked
+    for a locant the fragment does not have (``Fragment.getAtomByLocantOrThrow``: "Could not find the atom
+    with locant X.",:func:`refusal_locant`); ``"other"``: any other message (a valency, an assignment of
+    double bonds, a polycyclic spiro system's locant, a name that is a substituent,...), which says nothing
+    about where the name was refused."""
+    text = message or ""
+    if " is unparsable due to the following being uninterpretable" in text:
+        return "grammar"
+    return "locant" if refusal_locant(text) is not None else "other"
+
+
+def _note_refusal(name: str, allow_radicals: bool, result) -> None:
+    """Remember how OPSIN refused ``name``, from its ``OpsinResult`` (never raises: it runs inside the
+    parse of a caller)."""
+    try:
+        raw = result.getMessage()
+        message = str(raw) if raw is not None else ""
+        _REFUSALS[(name, bool(allow_radicals))] = (refusal_kind(message), refusal_locant(message))
+        if len(_REFUSALS) > _REFUSALS_MAX:
+            _REFUSALS.popitem(last=False)
+    except Exception:  # pragma: no cover - a bookkeeping failure must not cost a parse
+        pass
+
+
+def _read_back_jar_is_the_jvms() -> bool:
+    """Is the jar the read-backs use (``validation.opsin_roundtrip.opsin_parse``: ``find_jar("opsin", "2.9.0")``)
+    the jar this process's JVM started with? Only then does the in-process parse here say how that read-back
+    was refused."""
+    try:
+        from .jars import find_jar
+        jar = find_jar("opsin", "2.9.0")
+    except Exception:  # a missing jar: the read-back had none either
+        return False
+    return bool(jar) and _same_jar(jar)
+
+
+def opsin_refusal(name: str, allow_radicals: bool = False) -> Optional[Tuple[str, Optional[str]]]:
+    """How the in-process OPSIN refused ``name``: ``(kind, locant)`` (:func:`refusal_kind`,
+    :func:`refusal_locant`); None when OPSIN reads the name, when the in-process path cannot answer (no
+    JVM, an embedded newline), or when the jar of the JVM is not the one the read-backs use. A name that
+    :func:`opsin_stdout` parsed already is answered from the record of that parse; otherwise it is parsed
+    once here."""
+    if not name or "\n" in name or "\r" in name:
+        return None
+    tab = name.find("\t")
+    if tab >= 0:
+        name = name[:tab]
+    if not _ensure_jvm() or _N2S_CLS is None or not _read_back_jar_is_the_jvms():
+        return None
+    key = (name, bool(allow_radicals))
+    hit = _REFUSALS.get(key)
+    if hit is not None:
+        return hit
+    try:
+        with _LOCK:
+            _attach_thread()
+            result = _n2s().parseChemicalName(name, _cfg(allow_radicals))
+            if result.getSmiles() is not None:
+                return None
+            _note_refusal(name, allow_radicals, result)
+    except Exception as exc:  # a Java-side failure is transient
+        logger.debug("in-process OPSIN failed for %r: %s", name, exc)
+        return None
+    return _REFUSALS.get(key)
+
+
+def opsin_refusal_kind(name: str, allow_radicals: bool = False) -> Optional[str]:
+    """The kind of:func:`opsin_refusal`: ``"grammar"``, ``"locant"`` or ``"other"``; None where that is None."""
+    refusal = opsin_refusal(name, allow_radicals)
+    return refusal[0] if refusal else None
 
 
 class OpsinUnavailable(RuntimeError):
