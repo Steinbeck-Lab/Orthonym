@@ -141,7 +141,7 @@ To cite the software version you used, cite its Zenodo archive:
 @software{orthonym,
   author  = {Rajan, Kohulan and Zielesny, Achim and Steinbeck, Christoph},
   title   = {{Orthonym}},
-  version = {1.0.9},
+  version = {1.1.0},
   year    = {2026},
   doi     = {10.5281/zenodo.23044199},
   url     = {https://github.com/Steinbeck-Lab/Orthonym}
