@@ -4241,7 +4241,9 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # ---- Step 4: name each decoration by recursion -------------------------
     from collections import defaultdict
 
-    from .naming_utils import alpha_sort_key, enclose_if_compound, get_multiplier_prefix
+    from .naming_utils import alpha_sort_key, enclose_if_compound
+    from .naming_utils import multiplied_component as _mc
+    from .ring_prefix_numbering import prefix_order_numbering
     groups = defaultdict(list)
     named = []
     for ra, ni, branch in decorations:
@@ -4254,10 +4256,10 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
                 or 'unknown' in dname.lower()):
             return None  # unnameable decoration -> fail closed
         named.append((ra, dname))
-    if policy is not None:
-        pos = policy.renumber(mol, core, attach_idx, pos, named)
-        if pos is None:
-            return None
+    renumber = policy.renumber if policy is not None else prefix_order_numbering
+    pos = renumber(mol, core, attach_idx, pos, named)
+    if pos is None:
+        return None
     for ra, dname in named:
         groups[dname].append(pos[ra])
 
@@ -4266,7 +4268,6 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     for dname, locs in groups.items():
         locs = sorted(locs)
         token = enclose_if_compound(dname)
-        from .naming_utils import multiplied_component as _mc
         text = f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
         parts.append((alpha_sort_key(dname), text))
     parts.sort(key=lambda x: x[0])
@@ -4566,7 +4567,7 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # ---- name each decoration by recursion ---------------------------------
     from collections import defaultdict
 
-    from .naming_utils import alpha_sort_key, enclose_if_compound, get_multiplier_prefix
+    from .naming_utils import alpha_sort_key, enclose_if_compound, multiplied_component as _mc
     if in_pin_promotion():
         # Breadth Job 1: the ring-branch guard of the strict producers (suite fix
         # j6, ``substituent_naming._ring_branch_may_need_other_parent``) holds in
@@ -4595,7 +4596,6 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     for dname, locs in groups.items():
         locs = sorted(locs)
         token = enclose_if_compound(dname)
-        from .naming_utils import multiplied_component as _mc
         text = f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
         parts.append((alpha_sort_key(dname), text))
     parts.sort(key=lambda x: x[0])

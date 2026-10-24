@@ -2996,8 +2996,8 @@ def _name_ring_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
     # (the Blue Book): "different organyl groups are cited in
     # alphanumerical order (see " -- 'butyl 2-ethylhexyl', never the plain
     # string order that put the locant first ('2-ethylhexyl butyl').
-    from ..assembly.naming_utils import alpha_sort_key
-    first, second = sorted(alkyl_names, key=alpha_sort_key)
+    from ..assembly.naming_utils import alpha_sort_key_total
+    first, second = sorted(alkyl_names, key=alpha_sort_key_total)
     return f"{first} {second} {ate}"
 
 
@@ -3429,8 +3429,8 @@ def name_dicarboxylic_diester(mol, ester_matches: list) -> Optional[str]:
         # Different alkyl groups: alphanumerical order "different
         # organyl groups are cited in alphanumerical order (see ",
         # the Blue Book)
-        from ..assembly.naming_utils import alpha_sort_key
-        sorted_names = sorted(alkyl_names, key=alpha_sort_key)
+        from ..assembly.naming_utils import alpha_sort_key_total
+        sorted_names = sorted(alkyl_names, key=alpha_sort_key_total)
         return f"{sorted_names[0]} {sorted_names[1]} {dioate_name}"
 
 

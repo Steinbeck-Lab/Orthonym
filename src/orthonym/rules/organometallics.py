@@ -1697,11 +1697,11 @@ def _alphabetize_simple_ligands(
     # locants ignored, as the shared key does ('(propan-2-yl)oxy' at 'p',
     # '2-methylpropoxy' at 'm'); the remainder alone sorted '(' and digits ahead of
     # every letter.
-    from ..assembly.naming_utils import alpha_sort_key
+    from ..assembly.naming_utils import alpha_sort_key_total
 
     def _alpha_key(entry):
         remainder, _ = strip_italicized_structural_prefix(entry[1])
-        return alpha_sort_key(remainder)
+        return alpha_sort_key_total(remainder)
 
     return sorted(grouped, key=_alpha_key)
 

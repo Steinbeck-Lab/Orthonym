@@ -11,8 +11,8 @@ U3 N-substituted imines: broadened imine SMARTS ([CX3]=[NX2] with !R and
    citing the lone N-substituent as an italic-N prefix
    (composer._assemble_imine_name).
 U4 oximes named substitutively as N-hydroxy imines (BB VERBATIM (f)
-   + 'N-hydroxypropan-1-imine (PIN)'); bounded surgery builder, stereo /
-   substituted forms keep the functional-class fallback.
+   + 'N-hydroxypropan-1-imine (PIN)'); bounded surgery builder (the configured C=N,
+   a second oxime group and the substituted forms followed: test_oxime_substitutive_pin).
 U5 isocyanato/isothiocyanato substitutive parents (BB VERBATIM
    'isocyanatocyclohexane (PIN) cyclohexyl isocyanate'): handlers decline
    under PIN style; claimed-atom mask extended to the general-acyclic
@@ -79,11 +79,19 @@ class TestSubstitutiveOximes:
     def test_substitutive_pins(self, smiles, expected):
         assert name_compound(smiles) == expected
 
-    def test_stereo_oxime_keeps_fallback(self):
-        # E/Z priorities differ between C=N-OH and the surgered C=N-H, so
-        # the bounded builder declines; the functional-class name (RT-valid)
-        # remains until the stereo-aware substitutive builder lands.
-        assert name_compound("C/C=N/O") == "(E)-acetaldehyde oxime"
+    def test_stereo_oxime_has_the_substitutive_pin(self):
+        # CHANGED from test_stereo_oxime_keeps_fallback, "(E)-acetaldehyde oxime" -> "(E)-N-hydroxyethanimine";
+        # the old comment said the functional-class name "remains until the stereo-aware substitutive builder
+        # lands": it has landed. Source: "Oximes" (the Blue Book): "In these recommendations
+        # preferred IUPAC names for oximes are generated substitutively as N-hydroxy derivatives of imines
+        # rather than by functional class nomenclature as in previous recommendations"; the descriptor of the
+        # C=N stands at the front,:44643, a locant "when such locants are present": ethanimine cites
+        # none). Independent check: OPSIN 2.9.0 reads this name to the isomeric SMILES of the input and the
+        # name of the other configuration to the other one (test_oxime_substitutive_pin.py). Mutation: with the
+        # builder as it was, the name is not built (the same file's gold row, STEREO-04, fails). Would make it
+        # wrong: a Blue Book licence for the functional class name of a configured oxime (none::38462 is
+        # unconditional).
+        assert name_compound("C/C=N/O") == "(E)-N-hydroxyethanimine"
 
     def test_oxime_prefix_on_senior_parent_unchanged(self):
         assert name_compound("ON=CCCC(=O)O") == "4-(hydroxyimino)butanoic acid"

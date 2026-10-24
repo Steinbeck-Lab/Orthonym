@@ -26,6 +26,8 @@ Every function and method here that names a structure takes a SMILES string or a
 '(2S)-butan-2-ol'
 ```
 
+A SMILES string is named as RDKit's canonical SMILES of the molecule it draws: Orthonym reads the string, writes that SMILES and names it, so two strings that write the atoms of one molecule in another order get one name. Where the rules rank two parts alike (two rings of one seniority, two prefixes that differ only in configuration), the choice no longer follows the order a string happened to write. It does this only where the checks listed below for a Mol hold for the string's own reading (the same InChI, the same atoms, bonds and stereo atom for atom, the same configuration at a lone-pair stereocentre); where one fails, and for a CXSMILES string, the string is named as written. Atom indices in a result (`atom_to_locant_hint`, `atom_to_locant`) are those of your own string, as RDKit reads it.
+
 A Mol is named through RDKit's SMILES of it. Orthonym writes `Chem.MolToSmiles(mol)` from a copy of your Mol (your Mol is not changed), checks that this SMILES holds the same molecule and the same stereo as the Mol, and then names the SMILES exactly as it names a string you pass. So a Mol gets the result that `Chem.MolToSmiles(mol)` gets: the same name, the same provenance row, the same label when there is no name.
 
 The check reads the Mol as RDKit reads it, and the call raises `ValueError` when RDKit's SMILES of the Mol holds something else:

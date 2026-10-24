@@ -49,7 +49,7 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
+from typing import FrozenSet, List, Optional, Set
 
 from rdkit import Chem
 
@@ -475,71 +475,6 @@ def poly_branch(mol, core, attach_idx, carriers, core_tail) -> Optional[str]:
 
 
 # ---------------------------------------------------------------------------
-# (g): lowest locants for the prefix cited first (the Blue Book)
-# ---------------------------------------------------------------------------
-
-def core_automorphisms(mol, core, attach_idx) -> List[Dict[int, int]]:
-    """The automorphisms of the ring core that fix the attach atom and keep each atom's element, charge,
-    hydrogen count, aromaticity and number of exocyclic double bonds (an automorphism then keeps every
-    locant set of the core name: indicated hydrogen, hydro, ene, oxo positions)."""
-    core = set(core)
-    colour = {}
-    for a in core:
-        atom = mol.GetAtomWithIdx(a)
-        exo = sum(1 for b in atom.GetBonds()
-                  if b.GetOtherAtomIdx(a) not in core and b.GetBondTypeAsDouble() >= 2.0)
-        colour[a] = (atom.GetAtomicNum(), atom.GetFormalCharge(), atom.GetTotalNumHs(),
-                     atom.GetIsAromatic(), exo, a == attach_idx)
-    ids = {c: i + 1 for i, c in enumerate(sorted(set(colour.values())))}
-    rw = Chem.RWMol(mol)
-    for a in sorted(set(range(mol.GetNumAtoms())) - core, reverse=True):
-        rw.RemoveAtom(a)
-    order = sorted(core)
-    sub = rw.GetMol()
-    for k, a in enumerate(order):
-        atom = sub.GetAtomWithIdx(k)
-        atom.SetIsotope(ids[colour[a]])
-        atom.SetNoImplicit(True)
-        atom.SetNumExplicitHs(0)
-    sub.UpdatePropertyCache(strict=False)
-    matches = sub.GetSubstructMatches(sub, uniquify=False, useChirality=False, maxMatches=5000)
-    return [{order[i]: order[m[i]] for i in range(len(order))} for m in matches]
-
-
-def _tied_numberings(mol, core, attach_idx, pos, carriers) -> List[Dict[int, int]]:
-    """Numberings equal to ``pos`` on every criterion before (g): ``pos`` composed with an automorphism
-    of the core that maps the set of carrier atoms onto itself."""
-    carrier_set = set(carriers)
-    out = []
-    for aut in core_automorphisms(mol, core, attach_idx):
-        if {aut[c] for c in carrier_set} == carrier_set:
-            out.append({a: pos[aut[a]] for a in pos})
-    return out
-
-
-def _stereo_atoms(mol, core) -> List[int]:
-    """The core atoms whose locant a stereodescriptor cites: stereocentres and the ends of a stereogenic
-    ring double bond."""
-    atoms = set()
-    for a in core:
-        atom = mol.GetAtomWithIdx(a)
-        if atom.HasProp('_CIPCode') or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
-            atoms.add(a)
-    for bond in mol.GetBonds():
-        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-        if i in core and j in core and bond.GetStereo() != Chem.BondStereo.STEREONONE:
-            atoms.update((i, j))
-    return sorted(atoms)
-
-
-def _g_key(numbering, named):
-    """ (g): the locants of the prefixes in the order they are cited (alphanumerical order)."""
-    from .naming_utils import alpha_sort_key
-    names = sorted({nm for _, nm in named}, key=alpha_sort_key)
-    return tuple(tuple(sorted(numbering[ra] for ra, nm in named if nm == n)) for n in names)
-
-
-# ---------------------------------------------------------------------------
 # the policy handed to the composer
 # ---------------------------------------------------------------------------
 
@@ -581,14 +516,11 @@ class StrictRingPolicy:
         first as a prefix in the name") among the numberings that tie on (a)-(f), or None when the tie
         cannot be resolved by it (the descriptors of a stereocentre would take their locants from the
         input atom order)."""
-        carriers = [ra for ra, _ in named]
-        tied = _tied_numberings(mol, core, attach_idx, pos, carriers)
-        if len(tied) <= 1:
-            return pos
-        keys = [_g_key(numbering, named) for numbering in tied]
-        best = min(keys)
-        winners = [numbering for numbering, key in zip(tied, keys) if key == best]
-        stereo = _stereo_atoms(mol, core)
+        from .ring_prefix_numbering import g_winners, stereo_atoms
+        winners = g_winners(mol, core, attach_idx, pos, named)
+        if len(winners) <= 1:
+            return winners[0]
+        stereo = stereo_atoms(mol, core)
         if len({tuple(numbering[a] for a in stereo) for numbering in winners}) > 1:
             return None
         return winners[0]

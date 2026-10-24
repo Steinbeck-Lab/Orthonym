@@ -18,6 +18,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import (
     alpha_sort_key,
+    alpha_sort_key_total,
     enclose_if_compound,
     get_multiplier_prefix,
     is_complex_substituent,
@@ -496,7 +497,7 @@ def format_n_substitution(substituents: List[Dict]) -> Optional[str]:
 
     # Build prefix parts
     parts = []
-    for name in sorted(groups.keys(), key=alpha_sort_key):
+    for name in sorted(groups.keys(), key=alpha_sort_key_total):
         count = groups[name]
         # IUPAC / (a phase assembly/parenthesisation fix,): a complex
         # (substituted/compound) substituent is enclosed in parentheses whenever

@@ -447,13 +447,21 @@ def test_unlocanted_ring_prefix_vocabulary():
 # the slot of '(15N)-1H-indole (PIN)',:43790), never between the locants and
 # the 'a' prefix ('2-(2H8)azatricyclo'); the hyphen after a stereodescriptor
 # block stays.
+# The prefix '{3-[...]-5-phenylphenyl}' (free valence at C-1, the two decorations at C-3 and C-5 either way
+# round): (g), "lowest locants for the substituent cited first as a prefix in the name"
+# (the Blue Book), gives the lower locant to the prefix cited first in alphanumerical order, here
+# 'carbazolyl' (the mechanical spelling: 'azatricyclo...yl'; the isotope descriptor and the indicated hydrogen
+# are not letters of the order,:3446) before 'phenyl'. The Blue Book's own prefix of this shape:
+# '2-(3-carbamoyl-5-carboxyphenyl)ethan-1-amine N-oxide (PIN)' (:26636). These strings read '5-[...]-3-phenyl'
+# until the ring-prefix numbering applied (g) (``assembly/ring_prefix_numbering.py``); the atom order of the
+# input had decided it.
 DEUTERATED_CARBAZOLE = (
     '[2H]C1=C(C(=C2C(=C1[2H])C3=C(C(=C(C(=C3N2C4=CC(=CC(=C4)C5=CC(=CC=C5)[Si]6(C7=C(C8=C6C=CC=N8)N=CC=C7)C9=CC=CC=C9)C1=CC=CC=C1)[2H])[2H])[2H])[2H])[2H])[2H]')
 # quick-wins F-Q1: '0^2,7' before '0^3,8', the Blue Book); the heteroatoms
 # follow the fixed numbering,:9765). The replacement-part spelling the descriptor
 # rule is about; the writers give it with the book spellings switched off.
 DEUTERATED_CARBAZOLE_REPLACEMENT = (
-    '8-(3-{5-[(2H8)-8-azatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaen-8-yl]-3-phenylphenyl}phenyl)-8-phenyl-3,13-diaza-8-silatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaene')
+    '8-(3-{3-[(2H8)-8-azatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaen-8-yl]-5-phenylphenyl}phenyl)-8-phenyl-3,13-diaza-8-silatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaene')
 
 
 def test_descriptor_before_a_replacement_part_locant_mechanical_spelling():
@@ -468,7 +476,7 @@ def test_descriptor_before_a_replacement_part_locant_mechanical_spelling():
     #, the Blue Book); the descriptor keeps its slot before the part
     #,:43718; '(15N)-1H-indole (PIN)',:43790)
     (DEUTERATED_CARBAZOLE,
-     '8-(3-{5-[(2H8)-9H-carbazol-9-yl]-3-phenylphenyl}phenyl)-8-phenyl-3,13-diaza-8-silatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaene'),
+     '8-(3-{3-[(2H8)-9H-carbazol-9-yl]-5-phenylphenyl}phenyl)-8-phenyl-3,13-diaza-8-silatricyclo[7.4.0.0^2,7]trideca-1(13),2,4,6,9,11-hexaene'),
     ("[2H][C@@]12[C@@H](O1)CCC3=CC=CC=C23",
      "(2R,4S)-(2-2H)-3-oxatricyclo[5.4.0.0^2,4]undeca-1(11),7,9-triene"),
 ])

@@ -4147,6 +4147,77 @@ def alpha_sort_key(substituent_name: str) -> str:
                     _lambda_key(substituent_name), substituent_name)
 
 
+def alpha_sort_key_with_locants(name: str, locants_key: tuple = (), primary=None) -> tuple:
+    """:func:`alpha_sort_key` of ``name``, then the locants the item is cited with (``locants_key``, from
+    the site), then its configuration and its name as given: the order of citation of names that
+    differ only in what leaves out, as a TOTAL order.
+
+    ``### **** ALPHANUMERICAL ORDER`` (``the Blue Book``) leaves stereochemical, isotopic and
+    Greek-letter descriptors out of the order, so ``(1R)-1-chloroethyl`` and ``(1S)-1-chloroethyl`` tie in
+    ``alpha_sort_key``, and a ``sorted`` of the two kept the order the molecule's atoms were written in:
+    one molecule, two names (``2,3-dihydroxypropyl (2R)-2,3-dihydroxypropyl phosphate`` or the reverse; the
+    same for the N-substituents of an amide, the two acids of an anhydride, the esters of a diester, the
+    groups of a silane). The tiers after, in this order:
+
+    1. the locants (``locants_key``): the locants of the names come before the configuration.
+       (``:21791``, under ``### **** CRITERIA RELATED TO NUMBER AND LOCATION OF SUBSTITUENT GROUPS``)
+       prefers "the lower locant or set of locants for substituents cited as prefixes... in their order of
+       citation in the name", and the example of ``****`` (``:22601``) gives that as the reason the
+       order of the locants wins: "'1,2,4' is senior to '4,2,1'". ``N1-[(2S)-butan-2-yl]-N3-[(2R)-butan-2-yl]
+       butane-1,3-diamine`` is the name, not ``N3-[(2R)-...]-N1-[(2S)-...]``. A site whose items carry
+       locants MUST pass them here; ```` is for a site whose items carry none (an owner list, the acids
+       of an anhydride, the groups on one atom). An item whose text already starts with its locants
+       (``2-[(1S)-1-chloroethyl]``) needs none: ``alpha_sort_key`` reads them (its own-locants tier);
+    2. the configurational symbols (:func:`cip_descriptor_rank_key`): clause (j) of ``### ****
+       NUMBERING`` (``:3346``) puts ``Z``, ``R``, ``M``, ``r`` before ``E``, ``S``, ``P``, ``s``, and
+       ``****`` (``:22603``, under ``### **** CRITERIA RELATED ONLY TO CONFIGURATION``) says
+       it for the citation order: "When names based on alphanumerical order and isotopic descriptors are
+       the same, further choice depends on the alphabetic order of the stereochemical descriptors 'R' and
+       'S'" (``1-[(1R)-1-bromoethyl]-1-[(1S)-1-bromoethyl]cyclopentane (PIN)``, ``:22609``). 'R' before
+       'S' is the book's. ``Z`` before ``E`` is ASSUMED to carry over from the numbering rule: (j) ranks
+       ``Z`` over ``E`` for the lower locant, and Sequence Rule 3 (``### ****``, ``:44859``) has
+       ``seqcis`` = ``Z`` precede ``seqtrans`` = ``E`` ("irrespective of the alphabetical order", ``:45363``),
+       but the book states no citation order for a ``Z`` and an ``E`` prefix. A name with no descriptor is
+       cited before one with a descriptor (the empty rank tuple sorts first): ASSUMED. The book does not rule
+       on that pair; puts the absence of locants first (``:3442``), and:func:`prefix_citation_sort_key`
+       has this order. The counter-analogy points the other way: Sequence Rule 4 (a) (``### ****``,
+       ``:44863``) ranks "chiral stereogenic units" before "nonstereogenic units", but that orders ligands
+       by CIP priority, not names for citation, and it is not applied here;
+    3. the name as given in order (``:3537``), which keeps the order total where the book says nothing.
+
+    ``primary`` is the key of the first tier when a site has its own (default: ``alpha_sort_key(name)``).
+
+    Examples:
+        >>> sorted(['(2S)-butan-2-yl', '(2R)-butan-2-yl'], key=alpha_sort_key_with_locants)
+        ['(2R)-butan-2-yl', '(2S)-butan-2-yl']
+        >>> rows = [('(2R)-butan-2-yl', 3), ('(2S)-butan-2-yl', 1)]
+        >>> [n for n, _ in sorted(rows, key=lambda r: alpha_sort_key_with_locants(r[0], (r[1],)))]
+        ['(2S)-butan-2-yl', '(2R)-butan-2-yl']
+    """
+    return (alpha_sort_key(name) if primary is None else primary, locants_key,
+            cip_descriptor_rank_key(name), _P146Text(name))
+
+
+def alpha_sort_key_total(name: str) -> tuple:
+    """:func:`alpha_sort_key_with_locants` for items that carry no locant: a sort of names that no locant
+    orders (the owners of a phosphate, the acids of an anhydride, the groups on one atom, the
+    N-substituents of one nitrogen). The tiers and their sources are those of that function.
+
+    NOT for a site whose items carry locants and arrive in their order (the prefix groups of a ring, the
+    N-substituents of a polyamine): the locants of the names come first, ``:21791``), so such a
+    site passes them to:func:`alpha_sort_key_with_locants`, or keeps ``alpha_sort_key`` and its stable sort.
+
+    Examples:
+        >>> sorted(['(2S)-butan-2-yl', '(2R)-butan-2-yl'], key=alpha_sort_key_total)
+        ['(2R)-butan-2-yl', '(2S)-butan-2-yl']
+        >>> sorted(['(1E)-prop-1-en-1-yl', '(1Z)-prop-1-en-1-yl'], key=alpha_sort_key_total)
+        ['(1Z)-prop-1-en-1-yl', '(1E)-prop-1-en-1-yl']
+        >>> sorted(['(2R)-2,3-dihydroxypropyl', '2,3-dihydroxypropyl'], key=alpha_sort_key_total)
+        ['2,3-dihydroxypropyl', '(2R)-2,3-dihydroxypropyl']
+    """
+    return alpha_sort_key_with_locants(name)
+
+
 # ---------------------------------------------------------------------------
 # (j) / -- the CIP tie-break.
 #

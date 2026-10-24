@@ -1016,13 +1016,13 @@ def _assemble_p_owner_text(owner_tokens: List[str]) -> str:
     from collections import Counter
 
     from ..assembly.naming_utils import (
-        alpha_sort_key,
+        alpha_sort_key_total,
         enclose_if_compound,
         multiplied_component,
     )
     counts = Counter(owner_tokens)
     parts = []
-    for token in sorted(counts, key=alpha_sort_key):
+    for token in sorted(counts, key=alpha_sort_key_total):
         k = counts[token]
         if k == 1:
             parts.append(token)
@@ -1837,13 +1837,13 @@ def name_phosphoanhydride_oxy_substituent(
     # each enclosed with parentheses even for simple substituents." A bare 'hydroxy' after an
     # enclosed branch stays unenclosed, the Blue Book's own lipid spelling
     # '(2-aminoethoxy)hydroxyphosphoryl' (:55180).
-    from ..assembly.naming_utils import (_is_fully_enclosed, alpha_sort_key,
+    from ..assembly.naming_utils import (_is_fully_enclosed, alpha_sort_key_total,
                                          apply_enclosing_marks, enclose_if_compound,
                                          multiplied_component)
     counts: Dict[str, int] = {}
     for t in branches:
         counts[t] = counts.get(t, 0) + 1
-    ordered = sorted(counts, key=alpha_sort_key)
+    ordered = sorted(counts, key=alpha_sort_key_total)
 
     # The marks ESCALATE past any inside the branch and inside the body
     #, the Blue Book: nesting '{[({})]}'). A raw '(...)' /

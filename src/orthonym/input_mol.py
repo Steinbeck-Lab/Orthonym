@@ -42,6 +42,12 @@ them, so the Mol gets the result of its SMILES.
 Only a caller's own call (outside any naming) hands ``None`` or another type to
 :func:`smiles_for`, where it raises; a non-str the engine itself passed to one of
 its entries keeps the path it had before Mol input existed (:func:`handles`).
+
+A SMILES string is the Mol RDKit reads from it, so the same proof serves it:
+:func:`canonical_spelling` writes the canonical SMILES of the molecule a string draws
+and hands it to a public call to name in place of the string, so one molecule is named
+from one atom and bond order whatever order its SMILES wrote (the contributor guide core principle
+4). Where the proof does not hold the string is named as written.
 """
 from __future__ import annotations
 
@@ -90,6 +96,53 @@ def smiles_for(arg) -> str:
         raise InvalidInputError("Invalid molecule: " + " ".join(str(exc).split())) from None
 
 
+def canonical_spelling(smiles: Optional[str]) -> Optional[tuple]:
+    """``(the string to name, the atom order)`` for a SMILES string that is not RDKit's
+    canonical SMILES of the molecule it draws, else None (name the string as written).
+
+    The engine names the atoms in the order a string writes them, and a choice between
+    two parts the rules rank alike (the ring that is the parent of two of one seniority,
+    the order of two prefixes of one name) falls to that order: one molecule got a name
+    for each spelling that put its parts in another order. RDKit's canonical SMILES is a
+    function of the molecule, so naming it names every spelling alike. A string that
+    already is that SMILES is returned unchanged (no proof is needed to leave it as it
+    is, and every corpus row of the evaluation splits is one).
+
+    The string drawn is the Mol RDKit reads from it, and the proof of:func:`smiles_for`
+    holds for that Mol (the same InChI, the same atoms, bonds and stereo atom for atom,
+    the same configuration at every lone-pair centre), and the canonical SMILES reads
+    back as itself with as many atoms as the Mol has. ``order[k]`` is the atom of
+    RDKit's reading of ``smiles`` (hydrogens removed) that is atom ``k`` of the string,
+    as for the other spellings of ``namer._lone_pair_input_enter``. None, with the string
+    left as written, where any of it fails, for a CXSMILES string (its extensions are not
+    held by a plain SMILES; stereo groups and the brackets RDKit does not need are
+    handled before), for a string RDKit cannot read, and where the canonical SMILES would
+    write more atoms in brackets than the string does. A bracket atom carries its hydrogen
+    count and no implicit hydrogens, which a producer that cuts a bond reads as a radical
+    (``namer._redundant_bracket_spelling``), and RDKit's writer brackets every atom that
+    binds a metal or a dative bond ('CC[S][Zn][S]CC' for 'CCS[Zn]SCC'), so such a molecule
+    is named from the string as it was written: a molecule of the evaluation splits that
+    named from the plain spelling named nothing from the bracketed one."""
+    if not smiles or "|" in smiles:
+        return None
+    try:
+        given = Chem.MolFromSmiles(smiles)
+        if given is None or given.GetNumAtoms() == 0 or Chem.MolToSmiles(given) == smiles:
+            return None
+        given.RemoveAllConformers()
+        _decline_stereo_it_cannot_compare(given)
+        key, order = _proven_smiles_and_order(given)
+        back = Chem.MolFromSmiles(key)
+        if back is None or back.GetNumAtoms() != given.GetNumAtoms() or Chem.MolToSmiles(back) != key:
+            return None
+        if (sum(a.GetNoImplicit() for a in back.GetAtoms())
+                > sum(a.GetNoImplicit() for a in given.GetAtoms())):
+            return None
+        return key, order
+    except Exception:  # InvalidInputError, or an RDKit error the string causes
+        return None
+
+
 _TETRAHEDRAL = (Chem.ChiralType.CHI_TETRAHEDRAL_CW, Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
 _ST = Chem.BondStereo
 _DOUBLE_BOND_TAGS = (_ST.STEREOE, _ST.STEREOZ, _ST.STEREOCIS, _ST.STEREOTRANS)
@@ -134,6 +187,12 @@ def _inchi(mol: Chem.Mol) -> str:
 
 def _proven_smiles(given: Chem.Mol) -> str:
     """:func:`smiles_for` for ``given``, a conformer-free copy with atoms."""
+    return _proven_smiles_and_order(given)[0]
+
+
+def _proven_smiles_and_order(given: Chem.Mol) -> tuple:
+    """(:func:`_proven_smiles` of ``given``, the atom order of that write): ``order[k]`` is
+    the atom of ``given`` that is atom ``k`` of the SMILES."""
     reference = _inchi(given)                 # before any sanitization
     sanitized = Chem.Mol(given)
     try:
@@ -180,7 +239,7 @@ def _proven_smiles(given: Chem.Mol) -> str:
             "standard reading of SMILES, which the naming of a SMILES string follows, "
             "or the Mol does not hold a centre the string writes (the N of an N-aryl aziridine, "
             "Sb(III), for one).")
-    return key
+    return key, order
 
 
 def _lone_pair_centres_read_alike(key: str) -> bool:
