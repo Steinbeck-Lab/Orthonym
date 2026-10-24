@@ -284,22 +284,6 @@ _CANARY_DEFECT_REASONS = {
         "(hydro/bridged) fusion name is the PIN (P-52.2.4.1 :23710; P-44.2.2.2 :19532 "
         "fused > bridged fused > von Baeyer); R22 class, large-polycycle Task 6a"
     ),
-    "DK-VBNUM": (
-        # fix a performance pass (wp6-tests; whole-branch review F5, F15b): rows 536 and 599
-        # ('RT-exact, no BB ruling' re-baselines) and 661 (was DK-VBFUSED).
-        # quick-wins F-Q1 ranks the superscripts first: 599 and 661 now name as the
-        # fixture; 536 (the (g) tie) stays.
-        "von Baeyer numbering: the secondary-bridge superscripts are not the lowest "
-        "(P-23.2.6.2.4 :9685 'The superscript locants for the secondary bridges must be as "
-        "low as possible'; 599 {14,17} for {5,8}, 661 0^3,7 for 0^1,5), or every ring "
-        "criterion ties and P-14.4 (g) (:3307) is skipped (536: ethyl 32, not 5). Producer: "
-        "polycyclic.VonBaeyerAnalyzer._choose_lowest_locant_numbering drops the "
-        "lower-superscript candidate by descriptor-string equality; _locant_criteria_key "
-        "has no (g) tier. The fixture holds the BB-derived name for 536/599. Open: whether "
-        "661 (a 4-ring shared by a 5- and a 6-ring meeting in one atom) is fusion-named is "
-        "not settled by any Blue Book example (P-25.3.1.1.2 :11871; :23747 and :23767 do not "
-        "cover it), and 599 may be a phane (P-52.2.5.1 (1) :23828, ASSUMED)"
-    ),
 }
 
 # Suite fix j6-breadth (2026-09-27): canary calls 135/142/323 (the prenylated-phenol trienoic
@@ -680,11 +664,10 @@ CANARY_KNOWN_DEFECTS = {
     # 661 left (quick-wins F-Q1: the lowest superscripts,:9685, give the
     # fixture's '(1R,2S,5R,7R)-2,6,6,9-tetramethyltricyclo[5.4.0.0^1,5]undec-8-ene').
     # fix a performance pass (wp6-tests): 536 and 599 moved here from the re-baseline.
-    "CCC1CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)O1": (
-        "32-ethyl-2,5,11,14,20,23,29-heptamethyl-4,13,22,31,37,38,39,40-octaoxapentacyclo"
-        "[32.2.1.1^7,10.1^16,19.1^25,28]tetracontane-3,12,21,30-tetrone",
-        "DK-VBNUM", (536,),
-    ),
+    # 536 left (large-polycycle fix a performance pass): the cage numbering ranks (g) (:3307, "lowest
+    # locants for the substituent cited first as a prefix in the name"): the ethyl is cited first and
+    # takes locant 5 where it took 32, the fixture's name (both read back exactly; the locant sets of
+    # the prefixes tie, {2,5,11,14,20,23,29,32}).
     # 599 left (quick-wins F-Q1, as 661 above): the fixture's '...trioxatricyclo[19.3.1.1^5,8]...'.
     "CC/C=C\\C/C=C\\C/C=C\\C/C=C\\C/C=C\\CCCCCC(=O)OC[C@H](O)COC(=O)CCCCCCCCC/C=C\\C/C=C\\CCCCC": (
         "(2R)-2-hydroxy-3-[(11Z,14Z)-icosa-11,14-dienoyloxy]propyl (7Z,10Z,13Z,16Z,19Z)-docosa-7,10,13,16,19-pentaenoate",
@@ -768,10 +751,7 @@ _KNOWN_DEFECT_PIN_TARGETS = {
     # N,N-diethylethanamine (PIN)' (:26235). The row predates the branch (Task 1 name,
     # CANARY.csv changed_since_task1 = no).
     "CCN(CC)Cc1ccccc1": "N-benzyl-N-ethylethanamine",
-    # 536: DK-VBNUM (reason above). 599 and 661 left the table (quick-wins F-Q1).
-    "CCC1CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)OC(C)CC2CCC(O2)C(C)C(=O)O1":
-        "5-ethyl-2,11,14,20,23,29,32-heptamethyl-4,13,22,31,37,38,39,40-octaoxapentacyclo"
-        "[32.2.1.1^7,10.1^16,19.1^25,28]tetracontane-3,12,21,30-tetrone",
+    # 536, 599 and 661 left the table (quick-wins F-Q1; large-polycycle fix a performance pass).
 }
 
 

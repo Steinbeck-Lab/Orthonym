@@ -445,14 +445,21 @@ _BENZENE_FG_SMARTS = {
 
 def is_benzene_ring(mol, ring_atoms: Tuple[int, ...]) -> bool:
     """
-    Check if a ring is a benzene ring (6-membered aromatic carbocycle).
+    Check if a ring is a benzene ring (6-membered aromatic carbocycle on its own).
+
+     "MONOCYCLIC HYDROCARBONS", (the Blue Book,:8073): "Benzene is the
+    retained name for C6H6". A six-membered aromatic carbocycle that shares an atom with another
+    ring is a ring of a polycyclic system (a fused or bridged ring system, a peri-fused one such
+    as corannulene), never the monocyclic parent hydride, so a ring whose atoms lie in a second
+    ring is not a benzene ring here. (A benzene ring of a ring assembly such as biphenyl is
+    isolated: the bond between the rings is not a ring bond.) Every caller selects a benzene PARENT.
 
     Args:
         mol: RDKit Mol object
         ring_atoms: Tuple of atom indices in the ring
 
     Returns:
-        True if ring is benzene (6 aromatic carbons)
+        True if ring is benzene (6 aromatic carbons, each in no other ring)
     """
     if len(ring_atoms) != 6:
         return False
@@ -466,7 +473,8 @@ def is_benzene_ring(mol, ring_atoms: Tuple[int, ...]) -> bool:
         if not atom.GetIsAromatic():
             return False
 
-    return True
+    ring_info = mol.GetRingInfo()
+    return all(ring_info.NumAtomRings(idx) == 1 for idx in ring_atoms)
 
 
 def didehydro_benzene_name(mol, ring_atoms) -> Optional[str]:

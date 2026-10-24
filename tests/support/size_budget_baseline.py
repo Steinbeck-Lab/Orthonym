@@ -120,8 +120,8 @@ FUNCTIONS = {
     "src/orthonym/rules/polycyclic.py::VonBaeyerAnalyzer._analyze_impl#1": 206,
     "src/orthonym/rules/polycyclic.py::VonBaeyerAnalyzer._find_secondary_bridges#1": 212,
     "src/orthonym/rules/polycyclic.py::_detect_ring_functional_groups#1": 279,
-    "src/orthonym/rules/polycyclic.py::get_polycyclic_substituents#1": 236,
-    "src/orthonym/rules/polycyclic.py::name_polycyclic_complete#1": 267,
+    "src/orthonym/rules/polycyclic.py::get_polycyclic_substituents#1": 209,
+    "src/orthonym/rules/polycyclic.py::name_polycyclic_complete#1": 232,
     "src/orthonym/rules/polycyclics.py::name_substituted_polycyclic#1": 414,
     "src/orthonym/rules/polyfunctional.py::_generate_alkyl_prefixes_for_polyfunctional#1": 521,
     "src/orthonym/rules/polyfunctional.py::_name_ring_as_parent_polyfunctional#1": 404,
@@ -143,7 +143,7 @@ FUNCTIONS = {
     "src/orthonym/rules/spiro.py::name_mixed_spiro_fused#1": 207,
     "src/orthonym/rules/stereochemistry.py::collect_stereodescriptors#1": 232,
     "src/orthonym/rules/terminal_fragment.py::_terminal_fragment_name_impl#1": 295,
-    "src/orthonym/rules/vonbaeyer_universal.py::analyze_cage_universal#1": 249,
+    "src/orthonym/rules/vonbaeyer_universal.py::analyze_cage_universal#1": 201,
 }
 
 FILES = {

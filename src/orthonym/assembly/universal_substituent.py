@@ -2901,8 +2901,10 @@ def _name_ring_spine(
         fused = _book_fused_spine(ctx, component, ring_atoms, attach_hint)
         if fused is not None:
             return fused
+        # ``component`` is the group being named: the cage's neighbour outside it is the parent
+        # its free valence is bonded to (c)), not a prefix to rank at (f) and (g).
         cage = analyze_cage_universal(mol, cage_atoms=set(ring_atoms),
-                                      allow_mancude=True)
+                                      allow_mancude=True, substituent_atoms=set(component))
         if cage is None:
             # Spiro ring systems are not von-Baeyer cages, so
             # ``analyze_cage_universal`` voids on them -- yet a spiro ring is a

@@ -546,42 +546,28 @@ def audit_von_baeyer_descriptor(
     return False
 
 
-def analyze_cage_universal(
-    mol, cage_atoms=None, allow_mancude: bool = False,
-    spiro_atom: Optional[int] = None,
-) -> Optional[UniversalCage]:
-    """Deterministic universal cage analysis; None on any refusal.
+def _stereo_aware_match(mol, canon):
+    """The atom mapping of ``mol`` onto its canonical re-parse, stereo-consistent when the structure
+    allows it.
 
-    ``spiro_atom`` (default None, original-mol atom index) is the spiro-junction
-    atom when this cage is a COMPONENT of a spiro ring system. When passed, the
-    von-Baeyer numbering selection gives that atom the lowest locant,
-    above the heteroatom criteria; it is mapped into the canonical index space
-    used internally before being threaded to ``VonBaeyerAnalyzer.analyze``. Every
-    whole-molecule caller leaves it None, and the result is byte-identical.
-
-    : when ``allow_mancude`` is True the aromatic/mancude-cage refusal
-    below is LIFTED -- the cage is kekulized (already done above) and every
-    former-aromatic bond is emitted as an explicit von-Baeyer polyene ene
-    locant unsaturation). When False (the default / PIN path) the
-    refusal fires exactly as before, so that path is byte-identical.
-
-    Every returned descriptor is put through ``audit_von_baeyer_descriptor``
-    (a Java-free skeleton edge-audit): the descriptor+numbering must assert
-    exactly the molecular-graph ring/bridge bond set or the cage is discarded
-    (fail-closed). This floor holds for the saturated/valid tier too and is
-    what makes the mancude polyene emission trustworthy independent of OPSIN.
+    A match that ignores stereo may map the two symmetric halves of a molecule the wrong way round:
+    the E double bond of ``mol`` onto the Z bond of ``canon``, so that a stereodescriptor is cited at
+    the locant of the other half (``(3E,7Z)`` for ``(3Z,7E)``, by the SMILES spelling, (j)
+    wants the Z at the lower locant). With ``useChirality`` the mapping keeps stereo; when no such
+    match exists the plain one stands, as before.
     """
-    from .polycyclic import (
-        VonBaeyerAnalyzer,
-        _get_largest_connected_ring_component,
-        von_baeyer_ring_count,
-    )
-    from .ring_replacement import build_replacement_prefix
-    from .ring_unsaturation import render_ring_unsaturation
+    match = mol.GetSubstructMatch(canon, useChirality=True)
+    if len(match) != mol.GetNumAtoms():
+        match = mol.GetSubstructMatch(canon)
+    return match
 
-    if mol is None:
-        return None
 
+def _canonical_copy_and_match(mol):
+    """``(canon, match, mol_for_match)``: the canonical re-parse of ``mol``, the atom mapping onto it
+    and the molecule the match was made against, or ``None``.
+
+    Moved unchanged out of:func:`analyze_cage_universal`, which may not grow.
+    """
     # The self-consistency check below round-trips `mol` through a canonical
     # SMILES and re-parses it, purely to obtain a canonical atom-order
     # mapping (`orig_to_canon`). Try it UNCHANGED first -- this is the
@@ -591,7 +577,7 @@ def analyze_cage_universal(
     mol_for_match = mol
     canon_smiles = Chem.MolToSmiles(mol_for_match, canonical=True)
     canon = Chem.MolFromSmiles(canon_smiles)
-    match = mol_for_match.GetSubstructMatch(canon) if canon is not None else ()
+    match = _stereo_aware_match(mol_for_match, canon) if canon is not None else ()
 
     if canon is None or len(match) != mol.GetNumAtoms():
         # NOABSTAIN fallback (only reached when the original check above
@@ -639,10 +625,58 @@ def analyze_cage_universal(
         canon = Chem.MolFromSmiles(canon_smiles)
         if canon is None:
             return None
-        match = mol_for_match.GetSubstructMatch(canon)
+        match = _stereo_aware_match(mol_for_match, canon)
         if len(match) != mol.GetNumAtoms():
             logger.info("vonbaeyer_universal: no whole-mol canon match; refuse")
             return None
+    return canon, match, mol_for_match
+
+
+def analyze_cage_universal(
+    mol, cage_atoms=None, allow_mancude: bool = False,
+    spiro_atom: Optional[int] = None,
+    substituent_atoms=None,
+) -> Optional[UniversalCage]:
+    """Deterministic universal cage analysis; None on any refusal.
+
+    ``spiro_atom`` (default None, original-mol atom index) is the spiro-junction
+    atom when this cage is a COMPONENT of a spiro ring system. When passed, the
+    von-Baeyer numbering selection gives that atom the lowest locant,
+    above the heteroatom criteria; it is mapped into the canonical index space
+    used internally before being threaded to ``VonBaeyerAnalyzer.analyze``. Every
+    whole-molecule caller leaves it None, and the result is byte-identical.
+
+    : when ``allow_mancude`` is True the aromatic/mancude-cage refusal
+    below is LIFTED -- the cage is kekulized (already done above) and every
+    former-aromatic bond is emitted as an explicit von-Baeyer polyene ene
+    locant unsaturation). When False (the default / PIN path) the
+    refusal fires exactly as before, so that path is byte-identical.
+
+    ``substituent_atoms`` (default None, original-mol atom indices) is the atom set of the group
+    being named when the cage is a SUBSTITUENT of the rest of ``mol`` (``VonBaeyerAnalyzer.analyze``):
+    the neighbour outside it is the parent its free valence is bonded to.
+
+    Every returned descriptor is put through ``audit_von_baeyer_descriptor``
+    (a Java-free skeleton edge-audit): the descriptor+numbering must assert
+    exactly the molecular-graph ring/bridge bond set or the cage is discarded
+    (fail-closed). This floor holds for the saturated/valid tier too and is
+    what makes the mancude polyene emission trustworthy independent of OPSIN.
+    """
+    from .polycyclic import (
+        VonBaeyerAnalyzer,
+        _get_largest_connected_ring_component,
+        von_baeyer_ring_count,
+    )
+    from .ring_replacement import build_replacement_prefix
+    from .ring_unsaturation import render_ring_unsaturation
+
+    if mol is None:
+        return None
+
+    pair = _canonical_copy_and_match(mol)
+    if pair is None:
+        return None
+    canon, match, mol_for_match = pair
 
     orig_to_canon = {orig: c for c, orig in enumerate(match)}
 
@@ -689,8 +723,12 @@ def analyze_cage_universal(
     spiro_canon = (
         orig_to_canon.get(spiro_atom) if spiro_atom is not None else None
     )
+    substituent_canon = (
+        {orig_to_canon[i] for i in substituent_atoms if i in orig_to_canon}
+        if substituent_atoms is not None else None)
     try:
-        desc = analyzer.analyze(kek, cage_canon, spiro_atom=spiro_canon)
+        desc = analyzer.analyze(kek, cage_canon, spiro_atom=spiro_canon,
+                                substituent_atoms=substituent_canon)
     except Exception as e:
         logger.info("vonbaeyer_universal: analyze failed: %s", e)
         return None
