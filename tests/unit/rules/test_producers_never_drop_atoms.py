@@ -213,8 +213,6 @@ def test_unnameable_branch_voids_the_candidate_not_the_branch():
     "CC(=O)OC12CC3CC(CC(C3)C1)C2",        # acetyloxy was 'ethoxy' (C=O lost)
     "CC(C)OC12CC3CC(CC(C3)C1)C2",         # propan-2-yloxy was 'propoxy'
     "OOC12CC3CC(CC(C3)C1)C2",             # hydroperoxy vanished
-    "ClC12CC3CC(CC(C3)C1)C2",             # chloro vanished
-    "O=[N+]([O-])C12CC3CC(CC(C3)C1)C2",   # nitro vanished
 ])
 def test_cage_producer_declines_a_branch_it_cannot_spell(smiles):
     from orthonym.rules.polycyclic import name_polycyclic_complete
@@ -225,6 +223,13 @@ def test_cage_producer_declines_a_branch_it_cannot_spell(smiles):
     ("CCOC12CC3CC(CC(C3)C1)C2", "1-ethoxytricyclo[3.3.1.1^3,7]decane"),
     ("NC12CC3CC(CC(C3)C1)C2", "tricyclo[3.3.1.1^3,7]decan-1-amine"),
     ("C=CC12CC3CC(CC(C3)C1)C2", "1-ethenyltricyclo[3.3.1.1^3,7]decane"),
+    # chloro and nitro vanished once and were declined; the cage collector now names a
+    # heteroatom-bearing branch through the shared cascade, the Blue Book, section
+    # " HALOGEN COMPOUNDS": "named in two ways: (1) by substitutive nomenclature, using the
+    # prefixes 'bromo', 'chloro', 'fluoro', and 'iodo'";,:25935, section " NITRO AND
+    # NITROSO COMPOUNDS": "named by means of the prefixes 'nitro' and 'nitroso'")
+    ("ClC12CC3CC(CC(C3)C1)C2", "1-chlorotricyclo[3.3.1.1^3,7]decane"),
+    ("O=[N+]([O-])C12CC3CC(CC(C3)C1)C2", "1-nitrotricyclo[3.3.1.1^3,7]decane"),
 ])
 def test_cage_producer_keeps_naming_the_branches_it_can_spell(smiles, expected):
     from orthonym.rules.polycyclic import name_polycyclic_complete

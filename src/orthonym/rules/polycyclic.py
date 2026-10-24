@@ -249,6 +249,24 @@ def _record_if_fusion_nameable(mol, ring_atoms, result) -> None:
         logger.debug("fusion_nomenclature_applies failed", exc_info=True)
 
 
+def _record_if_numbering_uncertified(result) -> None:
+    """Mark a legal von Baeyer descriptor as a non-PIN fragment when its numbering was chosen with a
+    criterion of unknown (``cage_numbering``: a branch too large to name, a spiro component, no CIP
+    labels, or more tied decompositions than are ranked). Name-scoped like ``_record_if_fusion_nameable``:
+    a shipped name that carries this descriptor is demoted from pin_verified and the default tier declines
+    it as NO_VERIFIED_PIN; the name itself is unchanged."""
+    if result is None or result.legality is not True or getattr(result, "numbering_certified", True):
+        return
+    descriptor = getattr(result, "descriptor_string", None)
+    if not descriptor:
+        return
+    try:
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(descriptor)
+    except Exception:  # a label helper must never break naming
+        logger.debug("numbering record failed", exc_info=True)
+
+
 def von_baeyer_ring_count(mol, cage_atoms) -> Optional[int]:
     """The number of rings counts over ``cage_atoms``, or ``None``.
 
@@ -425,6 +443,11 @@ class PolycyclicDescriptor:
     #: require ``legality is True``** -- a descriptor that fails is not a worse
     #: name, it is a name for a different molecule.
     legality: Optional[bool] = None
+    #: False when the numbering was chosen with a criterion of that could not be evaluated for a
+    #: tie between numberings that are not an automorphism apart (``cage_numbering``): the choice does
+    #: not depend on the input atom order, but the Blue Book may prefer the other numbering, so a name
+    #: that carries this descriptor is not a preferred name (``_record_if_numbering_uncertified``).
+    numbering_certified: bool = True
 
 
 # ============================================================================
@@ -934,6 +957,68 @@ class VonBaeyerAnalyzer:
         return None
 
     @staticmethod
+    def _canonical_copy(mol, order: List[int]):
+        """``mol`` with its atoms in ``order`` AND its bonds in the order of their atoms, or ``None``.
+
+        ``Chem.RenumberAtoms`` gives the atoms of every spelling one index each, but it keeps the bonds
+        in the order the input listed them, so the neighbours of an atom come in the order of the
+        input and a search that walks them is not spelling-independent. This copy adds the bonds
+        low atom to high atom, so the same molecule is the same labelled graph, with the same
+        neighbour order, for every spelling. Tetrahedral tags are turned with the permutation of the
+        bonds around their atom, double-bond stereo keeps its stereo atoms, and ``None`` is
+        returned unless the copy writes the same canonical SMILES as ``mol`` (stereo included).
+        """
+        try:
+            new_of = {old: new for new, old in enumerate(order)}
+            out = Chem.RWMol()
+            for old in order:
+                out.AddAtom(mol.GetAtomWithIdx(old))
+            ends = {}
+            for bond in mol.GetBonds():
+                i, j = new_of[bond.GetBeginAtomIdx()], new_of[bond.GetEndAtomIdx()]
+                if bond.GetBondType() != Chem.BondType.DATIVE and i > j:
+                    i, j = j, i            # a dative bond keeps its direction, any other is written low-high
+                ends[bond.GetIdx()] = (i, j)
+            for bond in sorted(mol.GetBonds(), key=lambda b: sorted(ends[b.GetIdx()])):
+                i, j = ends[bond.GetIdx()]
+                out.AddBond(i, j, bond.GetBondType())
+                written = out.GetBondBetweenAtoms(i, j)
+                written.SetIsAromatic(bond.GetIsAromatic())
+                written.SetIsConjugated(bond.GetIsConjugated())
+            for bond in mol.GetBonds():
+                stereo_atoms = list(bond.GetStereoAtoms())
+                if bond.GetStereo() != Chem.BondStereo.STEREONONE and len(stereo_atoms) == 2:
+                    written = out.GetBondBetweenAtoms(*ends[bond.GetIdx()])
+                    first, second = stereo_atoms
+                    if (new_of[bond.GetBeginAtomIdx()], new_of[bond.GetEndAtomIdx()]) != (
+                            written.GetBeginAtomIdx(), written.GetEndAtomIdx()):
+                        first, second = second, first      # each stereo atom stays on its end of the bond
+                    written.SetStereoAtoms(new_of[first], new_of[second])
+                    written.SetStereo(bond.GetStereo())
+            tetrahedral = (Chem.ChiralType.CHI_TETRAHEDRAL_CW, Chem.ChiralType.CHI_TETRAHEDRAL_CCW)
+            for old in order:
+                atom = mol.GetAtomWithIdx(old)
+                if atom.GetChiralTag() not in tetrahedral:
+                    continue
+                around = [new_of[b.GetOtherAtom(atom).GetIdx()] for b in atom.GetBonds()]
+                # the bonds around an atom are now in ascending order of their other atom
+                inversions = sum(1 for a in range(len(around)) for b in range(a + 1, len(around))
+                                 if around[a] > around[b])
+                if inversions % 2:
+                    out.GetAtomWithIdx(new_of[old]).InvertChirality()
+            copy = out.GetMol()
+            copy.UpdatePropertyCache(strict=False)
+            Chem.GetSymmSSSR(copy)
+            Chem.SetDoubleBondNeighborDirections(copy)
+            Chem.AssignStereochemistry(copy, cleanIt=True, force=True)
+            if Chem.MolToSmiles(copy) != Chem.MolToSmiles(mol):
+                return None
+            return copy
+        except Exception:  # noqa: BLE001 -- the atoms then keep the order of the renumbered molecule
+            logger.debug("canonical copy failed", exc_info=True)
+            return None
+
+    @staticmethod
     def _descriptor_is_valid(result: "PolycyclicDescriptor",
                              ring_atoms: Set[int]) -> bool:
         """Well-formed iff bridge lengths are all non-negative, the atom-count
@@ -1021,7 +1106,8 @@ class VonBaeyerAnalyzer:
         return True
 
     def analyze(self, mol, ring_atoms: Set[int],
-                spiro_atom: Optional[int] = None) -> PolycyclicDescriptor:
+                spiro_atom: Optional[int] = None,
+                substituent_atoms: Optional[Set[int]] = None) -> PolycyclicDescriptor:
         """
         Main entry point: analyze a polycyclic system and produce its descriptor.
 
@@ -1057,6 +1143,13 @@ class VonBaeyerAnalyzer:
         callers that only inspect the cage -- so **every caller that SPELLS A
         NAME must require ``legality is True``** and fail closed otherwise.
 
+        ``substituent_atoms`` (default None: the cage is the parent of ``mol``) is the atom set of
+        the substituent group when the cage is NAMED AS a substituent of the rest of ``mol``: a
+        non-ring neighbour outside it is the parent the free valence is bonded to, not a detachable
+        prefix. The ring atoms that bear one take the lowest locants together with the other
+        suffixes (c) "principal characteristic groups and free valences (suffixes)",
+        the Blue Book), and the connection is no prefix at (f) and (g).
+
         Args:
             mol: RDKit Mol object
             ring_atoms: Set of atom indices in the ring system
@@ -1071,7 +1164,7 @@ class VonBaeyerAnalyzer:
         # call budget (armed at the outermost name, shared with the fused
         # matcher) exhausts on that explosion and abstains the whole molecule.
         spend_analysis_call()
-        result = self._analyze_once(mol, ring_atoms, spiro_atom)
+        result = self._analyze_once(mol, ring_atoms, spiro_atom, substituent_atoms)
         # / main-bridge PREFERENCE (Case 3 in _find_main_ring
         # + the largest-main-bridge selection in _find_main_bridge) is applied
         # first. It is preference-only: on a cage whose secondary bridges cannot
@@ -1085,17 +1178,19 @@ class VonBaeyerAnalyzer:
                 and getattr(self, "_allow_multiatom_bridge", True)):
             self._allow_multiatom_bridge = False
             try:
-                legacy = self._analyze_once(mol, ring_atoms, spiro_atom)
+                legacy = self._analyze_once(mol, ring_atoms, spiro_atom, substituent_atoms)
             finally:
                 self._allow_multiatom_bridge = True
             if legacy is not None and legacy.legality:
                 _record_if_fusion_nameable(mol, ring_atoms, legacy)
+                _record_if_numbering_uncertified(legacy)
                 return legacy
         _record_if_fusion_nameable(mol, ring_atoms, result)
+        _record_if_numbering_uncertified(result)
         return result
 
-    def _analyze_once(self, mol, ring_atoms: Set[int],
-                      spiro_atom: Optional[int] = None) -> "PolycyclicDescriptor":
+    def _analyze_once(self, mol, ring_atoms: Set[int], spiro_atom: Optional[int] = None,
+                      substituent_atoms: Optional[Set[int]] = None) -> "PolycyclicDescriptor":
         """One pass of the von Baeyer cascade (both the pure-cage and the
         substituted/heteroatom branches). Factored out of:meth:`analyze` so the
          main-bridge preference can be retried-then-degraded without
@@ -1118,27 +1213,49 @@ class VonBaeyerAnalyzer:
                 except Exception:
                     canon_result = None
                 if self._descriptor_is_valid(canon_result, canon_ring):
-                    canon_result.numbering = {
-                        new_to_old[k]: v
-                        for k, v in canon_result.numbering.items()
-                        if k in new_to_old
-                    }
-                    for bridge in canon_result.bridge_info_list:
-                        bridge.atoms = [new_to_old.get(a, a) for a in bridge.atoms]
-                        bridge.start_bh = new_to_old.get(bridge.start_bh, bridge.start_bh)
-                        bridge.end_bh = new_to_old.get(bridge.end_bh, bridge.end_bh)
+                    self._to_input_atoms(canon_result, new_to_old)
                     # Adjudicated against the ORIGINAL mol/ring_atoms, i.e. the
                     # indices the caller will use, not the canonical copy.
                     canon_result.legality = self._legality_verified(
                         mol, ring_atoms, canon_result)
                     return canon_result
 
-        # Substituted / heteroatom cages: the canonical renumber above is unsafe
-        # here (it shifts substituent locants), but the numbering freedom that
+        # Substituted / heteroatom cages: the numbering freedom that
         # leaves open is still governed -- (:9777) and
         # (:3219). Rank the legal alternatives on locants instead of leaving the
         # arbitrary canonical-rank backstop to decide.
-        incumbent = self._analyze_impl(mol, ring_atoms)
+        #
+        # The search runs on a copy of the molecule with its atoms in the order of its canonical
+        # SMILES and its bonds in the order of their atoms (``_canonical_copy``), and the numbering
+        # it finds is carried back to the input atoms (``_to_input_atoms``): what the search leaves
+        # to the order of the atoms (the incumbent, the order of the tied decompositions, the
+        # numberings that no criterion ranks, the cap on the candidates) is then the same for every
+        # spelling of the molecule, which ``Chem.RenumberAtoms`` alone does not give (it keeps the
+        # order of the bonds). ``numbering`` maps atoms to locants, so the substituents keep theirs.
+        order = self._canonical_atom_order(mol)
+        work, work_ring, work_spiro, work_group, new_to_old = mol, ring_atoms, spiro_atom, substituent_atoms, None
+        if order is not None:
+            try:
+                old_to_new = {old: new for new, old in enumerate(order)}
+                work = self._canonical_copy(mol, order)
+                if work is None:
+                    work = Chem.RenumberAtoms(mol, order)
+                    Chem.GetSymmSSSR(work)  # a renumbered copy has no ring perception until asked
+                if isinstance(mol, Chem.RWMol):
+                    # the main-ring memo keeps an RWMol's two passes apart (``_find_main_ring``: the
+                    # main-bridge preference is in its key) and a plain Mol's together
+                    work = Chem.RWMol(work)
+                # sets built in sorted order: a set of ints iterates in an order that depends on how it
+                # was filled, and the search iterates them
+                work_ring = set(sorted(old_to_new[i] for i in ring_atoms))
+                work_spiro = None if spiro_atom is None else old_to_new[spiro_atom]
+                work_group = (None if substituent_atoms is None
+                              else set(sorted(old_to_new[i] for i in substituent_atoms)))
+                new_to_old = dict(enumerate(order))
+            except Exception:  # noqa: BLE001 -- the atoms keep the order they were given
+                work, work_ring, work_spiro, work_group, new_to_old = (
+                    mol, ring_atoms, spiro_atom, substituent_atoms, None)
+        incumbent = self._analyze_impl(work, work_ring)
         if incumbent is None:
             return None
         if not incumbent.numbering:
@@ -1146,13 +1263,25 @@ class VonBaeyerAnalyzer:
             # audit cannot even be evaluated. Not adjudicable == not legal.
             incumbent.legality = False
             return incumbent
-        bridgeheads = self._find_all_bridgeheads(mol, ring_atoms)
+        bridgeheads = self._find_all_bridgeheads(work, work_ring)
         chosen = self._choose_lowest_locant_numbering(
-            mol, ring_atoms, bridgeheads, incumbent, spiro_atom
+            work, work_ring, bridgeheads, incumbent, work_spiro, work_group
         )
+        if new_to_old is not None:
+            self._to_input_atoms(chosen, new_to_old)
         # This branch previously returned UNCHECKED -- the whole of site 2.
         chosen.legality = self._legality_verified(mol, ring_atoms, chosen)
         return chosen
+
+    @staticmethod
+    def _to_input_atoms(result: "PolycyclicDescriptor", new_to_old: Dict[int, int]) -> None:
+        """Carry the atom indices of a descriptor analysed on the canonically ordered copy of a molecule
+        back to the atoms of the molecule it was made from."""
+        result.numbering = {new_to_old[k]: v for k, v in result.numbering.items() if k in new_to_old}
+        for bridge in result.bridge_info_list:
+            bridge.atoms = [new_to_old.get(a, a) for a in bridge.atoms]
+            bridge.start_bh = new_to_old.get(bridge.start_bh, bridge.start_bh)
+            bridge.end_bh = new_to_old.get(bridge.end_bh, bridge.end_bh)
 
     def _analyze_impl(self, mol, ring_atoms: Set[int],
                       optimize_orientation: bool = False,
@@ -1868,6 +1997,10 @@ class VonBaeyerAnalyzer:
     #: be order-dependent).
     _MAX_LOCANT_CANDIDATES = 64
 
+    #: Cap on the automorphisms of a cage's skeleton enumerated to complete the numberings of a
+    #: descriptor (``_numberings_by_automorphism``); a skeleton with more is not completed.
+    _MAX_SKELETON_AUTOMORPHISMS = 5000
+
     #: (:9765) heteroatom citation order, used by as the
     #: "decreasing seniority order of heteroatoms" tie-break.
     _HETERO_SENIORITY = {
@@ -1879,6 +2012,19 @@ class VonBaeyerAnalyzer:
 
     def _principal_group_ring_atoms(self, mol, ring_atoms) -> Set[int]:
         """Cage atoms that bear the principal characteristic group (c)).
+        See:meth:`_principal_group_info`, which also gives the multiplicity and the
+        atoms of the groups."""
+        return set(self._principal_group_info(mol, ring_atoms)[0])
+
+    def _principal_group_info(self, mol, ring_atoms) -> Tuple[List[int], Set[Tuple[int, int]]]:
+        """``(cage atom of each principal-group instance, {(cage atom, first atom of the group)})``.
+
+        The first holds one entry per instance of the principal characteristic group
+        (c)), so two groups on one cage atom count twice. The second names the branch
+        atoms that are the suffix itself (the hydroxy O of an ``-ol``, the carboxy C of a
+        carboxylic acid), which is what tells a suffix from a detachable prefix on a cage atom:
+        a halogen beside an ``-ol`` on one carbon is a prefix, and so is an atom that only
+        happens to lie in the SMARTS match of the group (the carbon beside a ketone).
 
         Sourced from the existing seniority primitives -- ``detect_functional_groups``
         -> ``get_principal_group`` seniority) -> ``_pg_attachment_atoms``
@@ -1899,21 +2045,26 @@ class VonBaeyerAnalyzer:
             from .parent_selection import _pg_attachment_atoms
             from .seniority import get_principal_group
         except Exception:
-            return set()
+            return [], set()
         try:
             fgs = detect_functional_groups(mol)
             pg_name, pg_matches = get_principal_group(mol, fgs)
         except Exception:
-            return set()
+            return [], set()
         if not pg_name or not pg_matches:
-            return set()
+            return [], set()
 
-        out: Set[int] = set()
+        out: List[int] = []
+        suffix_pairs: Set[Tuple[int, int]] = set()
         for match in pg_matches:
+            group = set(match)
             attachments = _pg_attachment_atoms(pg_name, tuple(match))
             for a in attachments:
                 if a in ring_atoms:
-                    out.add(a)
+                    out.append(a)
+                    for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
+                        if nbr.GetIdx() not in ring_atoms and nbr.GetIdx() in group:
+                            suffix_pairs.add((a, nbr.GetIdx()))
                 else:
                     # Table gap / heteroatom-leading SMARTS: walk the one bond
                     # back onto the cage.
@@ -1923,10 +2074,12 @@ class VonBaeyerAnalyzer:
                         continue
                     for nbr in nbrs:
                         if nbr.GetIdx() in ring_atoms:
-                            out.add(nbr.GetIdx())
-        return out
+                            out.append(nbr.GetIdx())
+                            suffix_pairs.add((nbr.GetIdx(), a))
+        return out, suffix_pairs
 
-    def _locant_criteria_key(self, mol, ring_atoms, desc, spiro_atom=None):
+    def _locant_criteria_key(self, mol, ring_atoms, desc, spiro_atom=None,
+                             substituent_atoms=None, group_info=None):
         """The -> numbering cascade, as a sort key (lower wins).
 
         Applied ONLY among numberings that produce an identical von Baeyer
@@ -1941,13 +2094,18 @@ class VonBaeyerAnalyzer:
              locant, ABOVE the heteroatom criteria. This criterion is present
              ONLY when ``spiro_atom`` is passed (the tricyclo+ spiro-component
              path threads it); for every whole-molecule cage caller
-             ``spiro_atom`` is None and the returned key is byte-identical to the
-             pre-spiro 5-tuple, so no whole-molecule numbering can change.
+             ``spiro_atom`` is None and the key has no spiro entry.
           1. (:9777) "Low locants are assigned to the heteroatoms
              considered together as a set compared in increasing numerical
              order." Skeletal heteroatoms are part of the parent hydride and so
              precede suffixes -- preamble (1) (:3226).
           2. (:9789) heteroatoms in decreasing seniority order.
+          2a. (:42417) ionic centers in the same parent structure: "Where there is a choice, lowest locants
+             are given to the ionic centers in the following order, listed in
+             decreasing order of seniority: 'uide' ('uida'), 'ide' ('ida'), 'ylium'
+             ('ylia'), and 'ium' ('onia')" -- the anionic centres of the ring atoms as
+             a set, then the cationic ones. Ionic centres are suffixes (3.) and the
+             ion suffixes are senior to every other suffix.
           3. (c) (:3256) "principal characteristic groups and free
              valences (suffixes)".
           4. (e) (:3286) saturation/unsaturation.
@@ -1958,32 +2116,41 @@ class VonBaeyerAnalyzer:
         which sorts on ``(spiro_loc, het, sen, ene)``).
         """
         numbering = desc.numbering
-        pg_ring_atoms = self._principal_group_ring_atoms(mol, ring_atoms)
+        pg_instances, suffix_pairs = group_info or self._principal_group_info(mol, ring_atoms)
 
         hetero, hetero_rank, pg, unsat, prefixes = [], [], [], [], []
+        anionic, cationic = [], []
+        # (c): the PRINCIPAL characteristic group only, one locant per instance
+        # (1,1-diol is lower than 1,2-diol). Every other substituent is a detachable
+        # prefix and is ranked at (f) -- the two must not be pooled, or an -amino
+        # prefix ties with an -ol suffix and the arbitrary backstop decides between them.
+        pg.extend(numbering[a] for a in pg_instances if numbering.get(a))
         for idx in ring_atoms:
             loc = numbering.get(idx)
             if not loc:
                 continue
             atom = mol.GetAtomWithIdx(idx)
             sym = atom.GetSymbol()
+            if atom.GetFormalCharge() < 0:
+                anionic.append(loc)
+            elif atom.GetFormalCharge() > 0:
+                cationic.append(loc)
             if sym != "C":
                 hetero.append(loc)
                 hetero_rank.append((loc, self._HETERO_SENIORITY.get(sym, 99)))
-            if idx in pg_ring_atoms:
-                # (c): the PRINCIPAL characteristic group only. Every other
-                # substituent is a detachable prefix and is ranked at (f) -- the
-                # two must not be pooled, or an -amino prefix ties with an -ol
-                # suffix and the arbitrary backstop decides between them.
-                pg.append(loc)
-                continue
+            # (f): "all considered together in a series of increasing numerical
+            # order" -- one locant per prefix, so 7,7-dichloro counts 7 twice, and a prefix
+            # on an atom that also bears the suffix counts (a branch is a suffix only when it
+            # is an atom of the principal group).
             for nbr in atom.GetNeighbors():
-                if nbr.GetIdx() in ring_atoms:
+                if nbr.GetIdx() in ring_atoms or nbr.GetAtomicNum() <= 1:
                     continue
-                if nbr.GetAtomicNum() <= 1:
+                if (idx, nbr.GetIdx()) in suffix_pairs:
+                    continue
+                if substituent_atoms is not None and nbr.GetIdx() not in substituent_atoms:
+                    pg.append(loc)      # the free valence of a cage named as a substituent: (c)
                     continue
                 prefixes.append(loc)
-                break
         for bond in bonds_of(mol):
             a, b = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
             if a in ring_atoms and b in ring_atoms and \
@@ -1995,6 +2162,7 @@ class VonBaeyerAnalyzer:
         rest = (
             tuple(sorted(hetero)),
             tuple(r for _, r in sorted(hetero_rank)),
+            (tuple(sorted(anionic)), tuple(sorted(cationic))),
             tuple(sorted(pg)),
             tuple(sorted(unsat)),
             tuple(sorted(prefixes)),
@@ -2009,7 +2177,7 @@ class VonBaeyerAnalyzer:
         return (spiro_loc,) + rest
 
     def _choose_lowest_locant_numbering(self, mol, ring_atoms, bridgeheads,
-                                        incumbent, spiro_atom=None):
+                                        incumbent, spiro_atom=None, substituent_atoms=None):
         """Pick the lowest-locant numbering among the legal alternatives.
 
          fixes the descriptor but frequently leaves several numberings
@@ -2043,7 +2211,10 @@ class VonBaeyerAnalyzer:
             )
         except Exception:
             return incumbent
-        if not candidates or len(candidates) > self._MAX_LOCANT_CANDIDATES:
+        if not candidates:
+            return incumbent
+        if len(candidates) > self._MAX_LOCANT_CANDIDATES:
+            incumbent.numbering_certified = False       # no criterion ranked the numberings
             return incumbent
 
         # Expand each tied decomposition over its legal orientations: either
@@ -2059,12 +2230,17 @@ class VonBaeyerAnalyzer:
                     seen.add(k)
                     expanded.append((cand_ring, cand_bhp))
         if len(expanded) > self._MAX_LOCANT_CANDIDATES:
+            incumbent.numbering_certified = False       # no criterion ranked the numberings
             return incumbent
 
         inc_shape, inc_rank = _superscript_shape_and_rank(incumbent.descriptor_string)
+        group_info = self._principal_group_info(mol, ring_atoms)
         best = incumbent
         best_key = (inc_rank,
-                    self._locant_criteria_key(mol, ring_atoms, incumbent, spiro_atom))
+                    self._locant_criteria_key(mol, ring_atoms, incumbent, spiro_atom,
+                                              substituent_atoms, group_info))
+        tied = [incumbent]
+        by_descriptor = {incumbent.descriptor_string: (inc_rank, incumbent)}
         for cand in expanded:
             try:
                 desc = self._analyze_impl(mol, ring_atoms, forced=cand)
@@ -2082,15 +2258,85 @@ class VonBaeyerAnalyzer:
             locs = [desc.numbering.get(i) for i in ring_atoms]
             if any(l is None for l in locs) or len(set(locs)) != len(ring_atoms):
                 continue
-            key = (rank, self._locant_criteria_key(mol, ring_atoms, desc, spiro_atom))
-            if key >= best_key:
+            by_descriptor.setdefault(desc.descriptor_string, (rank, desc))
+            key = (rank, self._locant_criteria_key(mol, ring_atoms, desc, spiro_atom,
+                                                   substituent_atoms, group_info))
+            if key > best_key:
                 continue
             if (desc.descriptor_string != incumbent.descriptor_string
                     and not self._legality_verified(mol, ring_atoms, desc)):
                 continue
-            best_key = key
-            best = desc
+            if key < best_key:
+                best_key, best, tied = key, desc, [desc]
+            else:
+                tied.append(desc)
+        # The decompositions reach some of the numberings a descriptor allows, not all (the 24 of the
+        # 48 of a cube); the rest are the same cage numbered through an automorphism of its skeleton.
+        best_key, best, tied, completed = self._numberings_by_automorphism(
+            mol, ring_atoms, by_descriptor, incumbent, best_key, best, tied, spiro_atom,
+            substituent_atoms, group_info)
+        # Several numberings tie on and on (c)-(f): (g), (j) and the canonical atom
+        # ranks decide, never the order the input listed its atoms in (``cage_numbering``).
+        if len(tied) > 1:
+            from .cage_numbering import choose_numbering
+            best = choose_numbering(mol, ring_atoms, tied, group_info[1], substituent_atoms) or best
+        if not completed:
+            best.numbering_certified = False        # a numbering of the descriptor may be unranked
         return best
+
+    def _numberings_by_automorphism(self, mol, ring_atoms, by_descriptor, incumbent, best_key, best,
+                                    tied, spiro_atom, substituent_atoms, group_info):
+        """Rank the numberings of the best descriptors that the decompositions do not reach.
+
+        A von Baeyer descriptor fixes the labelled skeleton, so every numbering that spells it is the
+        numbering of one of them composed with an automorphism of the cage's bare skeleton (an
+        element-blind graph automorphism;, the Blue Book, lets either bridgehead
+        start and, on equal segments, either direction). The decompositions tried by
+        :meth:`_choose_lowest_locant_numbering` give part of them: a cube has 48 numberings for
+        ``pentacyclo[4.2.0.0^2,5.0^3,8.0^4,7]octane`` and its decompositions give 24, so the prefix
+        criteria of were applied to half of them and the lowest numbering of a cube with
+        several prefixes was out of reach. The numberings of one representative of every descriptor
+        of the best superscript rank, composed with every automorphism, are ranked with the same
+        key. Returns ``(best_key, best, tied, completed)``; ``completed`` is False when the skeleton
+        has more automorphisms than ``_MAX_SKELETON_AUTOMORPHISMS``.
+        """
+        import dataclasses
+        from ..perception.automorphisms import skeleton_automorphisms
+        try:
+            automorphisms, exhaustive = skeleton_automorphisms(
+                mol, ring_atoms, element_blind=True, cap=self._MAX_SKELETON_AUTOMORPHISMS)
+        except Exception:  # noqa: BLE001 -- no automorphisms: the numberings stay as the decompositions give them
+            logger.debug("skeleton automorphisms failed", exc_info=True)
+            return best_key, best, tied, False
+        if not exhaustive:
+            return best_key, best, tied, False
+        if len(automorphisms) < 2:
+            return best_key, best, tied, True
+        for descriptor, (rank, rep) in by_descriptor.items():
+            if rank != best_key[0]:
+                continue
+            if descriptor != incumbent.descriptor_string and not self._legality_verified(mol, ring_atoms, rep):
+                continue
+            for sigma in automorphisms:
+                if all(sigma[a] == a for a in sigma):
+                    continue                                        # the representative itself
+                inverse = {v: k for k, v in sigma.items()}
+                numbering = {a: rep.numbering[sigma.get(a, a)] for a in rep.numbering}
+                image = dataclasses.replace(
+                    rep, numbering=numbering,
+                    bridge_info_list=[dataclasses.replace(
+                        b, atoms=[inverse.get(x, x) for x in b.atoms],
+                        start_bh=inverse.get(b.start_bh, b.start_bh), end_bh=inverse.get(b.end_bh, b.end_bh))
+                        for b in rep.bridge_info_list])
+                key = (rank, self._locant_criteria_key(mol, ring_atoms, image, spiro_atom,
+                                                       substituent_atoms, group_info))
+                if key > best_key:
+                    continue
+                if key < best_key:
+                    best_key, best, tied = key, image, [image]
+                else:
+                    tied.append(image)
+        return best_key, best, tied, True
 
     def _orientation_variants(self, main_ring, bh_pair):
         """Legal (ring, bh_pair) orientations of one fixed decomposition.
@@ -3422,54 +3668,27 @@ def get_polycyclic_substituents(
                 if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
             )
 
-            # macrocycle F3: an OXYGEN-attached ACYLOXY (-O-C(=O)-, an ester) or
-            # PEROXY (-O-O-, a hydroperoxy) branch is named by the GENERAL CASCADE, which
-            # produces the correct token (acetyloxy / hydroperoxy). The naive _ALKOXY_NAMES
-            # path below is a drifted detector that mis-named these by carbon count alone
-            # (acetate -O-C(=O)-CH3 -> 'ethoxy', dropping the carbonyl O; -OOH -> dropped) --
-            # a WRONG CONSTITUTION that then abstained on.
-            #
-            # SCOPE (a review 5.1): fires ONLY at the BEST-EFFORT tier and ONLY on O-attached
-            # acyloxy/peroxy branches, so it can NEVER change a default/PIN-tier name.
-            # - best-effort gate: at the PIN tier these cages correctly ABSTAIN (a
-            # substituent-prefix form of an ester/hydroperoxy is not the PIN); F3 must
-            # not emit a non-PIN prefix at the PIN tier ("non-PIN forms are best-effort
-            # only"). A carbon-attached ester (-C(=O)OMe) is NOT diverted -- it keeps its
-            # functional-class ester PIN ('methyl...carboxylate'), which F3 must not
-            # displace with '(methoxycarbonyl)'.
-            # - O-attached acyloxy/peroxy only: simple alkoxy (-O-alkyl) and every
-            # carbon-attached branch keep the existing paths (byte-identical).
-            # Fail-open: a cascade None/refusal falls through to the legacy paths.
-            from ..metrics.provenance import best_effort_ctx as _f3_be_ctx
-            _first = mol.GetAtomWithIdx(nbr_idx)
-            _f3_route = False
-            if bool(_f3_be_ctx.get()) and _first.GetSymbol() == 'O':
-                _sub_set = set(sub_atoms)
-                for _n in _first.GetNeighbors():
-                    if _n.GetIdx() not in _sub_set:
-                        continue
-                    if _n.GetSymbol() == 'O':           # peroxy -O-O-
-                        _f3_route = True
-                    elif _n.GetSymbol() == 'C' and any(
-                            b.GetBondTypeAsDouble() == 2.0
-                            and b.GetOtherAtom(_n).GetSymbol() in ('O', 'S', 'N')
-                            for b in _n.GetBonds()):     # acyloxy -O-C(=O)-
-                        _f3_route = True
-            if _f3_route:
-                from ..assembly.substituent_enumerator import name_substituent
-                _tok = None
-                try:
-                    _tok = name_substituent(mol, list(sub_atoms), nbr_idx)
-                except Exception:  # noqa: BLE001 -- cascade decline is not a crash
-                    _tok = None
-                if _tok and _tok != 'substituent' and not _tok.startswith('C'):
-                    substituents.append({
-                        'locant': locant,
-                        'name': _tok,
-                        'atom_indices': sub_atoms,
-                    })
-                    continue
-                # else fall through to the legacy paths (fail-open)
+            # A branch that holds a heteroatom is not an alkyl group, and its carbon count
+            # names a different molecule ('1-methyl...' for a bromomethyl branch, a bare
+            # parent for a bromo branch): it is named by the shared substituent cascade, or
+            # the cage is declined (``cage_substituents``). This includes the macrocycle
+            # F3 route, an O-attached acyloxy or peroxy branch, which only the best-effort
+            # tier names (a substituent-prefix form of an ester is not the PIN). A plain
+            # alkoxy branch and every pure C/H branch keep the paths below.
+            from .cage_substituents import DECLINE, cage_branch_token
+            _tok = cage_branch_token(mol, nbr_idx, sub_atoms)
+            if _tok is DECLINE:
+                logger.debug(
+                    "polycyclic substituent at locant %s has no honest name "
+                    "(atoms=%s): declining the cage", locant, sorted(sub_atoms))
+                return None
+            if _tok is not None:
+                substituents.append({
+                    'locant': locant,
+                    'name': _tok,
+                    'atom_indices': sub_atoms,
+                })
+                continue
 
             # Check for alkoxy substituent: starts with O, followed by alkyl
             # e.g., -O-CH3 (methoxy), -O-C2H5 (ethoxy)
@@ -3984,6 +4203,69 @@ def _detect_ring_functional_groups(
 # Complete Name Assembly (Plan 16-03)
 # ============================================================================
 
+def _vb_delegations_and_g0(mol, cage_atoms):
+    """The steps of ``name_polycyclic_complete`` that never read the von Baeyer descriptor:
+    the bridged fused and fused producers, then the G0 aromaticity refusal on ``cage_atoms``.
+    Returns a producer's result tuple, or ``None`` to go on; raises the named limit on the
+    refusal. Run before the main-ring search at the PIN tier and after it at best-effort."""
+    # G0 fail-closed safety (DD7 S1): von Baeyer cannot represent aromaticity.
+    # Check the cage atoms: the descriptor's numbering at best-effort, the ring system
+    # itself at the PIN tier (: a pendant aromatic ring joined by a single non-ring
+    # bond is in neither, so it never trips the guard). If the cage carries an aromatic
+    # atom, naming it here would silently de-aromatise it into a WRONG saturated cage;
+    # refuse instead (raise the named limit, caught at Orthonym.name). Raising (not
+    # returning None) is required so the molecule fails closed rather than cascading to a fragment
+    # namer that would name a single sub-ring ('cyclopentene' for benzonorbornadiene).
+    # Phase G1 (DD7): a fused-aromatic core + bridge
+    # (benzonorbornadiene-type) has a CORRECT bridged-fused PIN
+    # (1,4-dihydro-1,4-methanonaphthalene); von Baeyer would de-aromatise it.
+    # Try the constructor whenever the cage carries RDKit aromaticity OR
+    # is a MANCUDE bridged cage whose aromaticity RDKit fails to perceive
+    # (Wave-2 P5: 1,4:5,8-dimethanonaphthalene — the two bridges warp the
+    # naphthalene out of plane, so RDKit marks nothing aromatic and von Baeyer
+    # would emit a WRONG -polyene cage). name_bridged_fused_pin returns a name
+    # only for the class it can name correctly (kekulizing + validating its own
+    # aromatic residual), and None otherwise -> we then fail closed (G0).
+    from .bridged_fused import name_bridged_fused_pin
+    bridged = name_bridged_fused_pin(mol)
+    if bridged is not None:
+        return bridged
+    # (the Blue Book): an ortho- and peri-fused system (an atom
+    # common to three rings counts as a bridgehead here) is named by fusion nomenclature,
+    # never by a von Baeyer descriptor
+    from .bridged_fused import name_fused_carbocycle_pin
+    fused = name_fused_carbocycle_pin(mol)
+    if fused is not None:
+        return fused
+    if vonbaeyer_cage_has_aromaticity(mol, cage_atoms):
+        # (a phase): a partially-saturated PAH (e.g. 9,10-dihydro-
+        # anthracene) reaches this von-Baeyer path because its cage still
+        # carries the intact aromatic ring(s); von Baeyer would de-aromatise
+        # it into a WRONG saturated cage. The carbocyclic partial-saturation
+        # constructor names it correctly (hydro prefix on the mancude parent,
+        # automorphism-min numbering) and fails closed otherwise — try it
+        # before refusing, exactly as the bridged-fused delegation above.
+        from .partial_saturation import detect_carbocyclic_partial_saturation
+        _sat_ring_atoms = set()
+        for _r in mol.GetRingInfo().AtomRings():
+            _sat_ring_atoms.update(_r)
+        _sat = detect_carbocyclic_partial_saturation(mol, _sat_ring_atoms)
+        if _sat is not None:
+            from .polycyclics import _assemble_partially_saturated_carbocycle_name
+            _sat_name = _assemble_partially_saturated_carbocycle_name(mol, _sat)
+            if _sat_name:
+                # substituents_included=True: the partial-saturation assembler
+                # is now the SINGLE speller of every ring substituent prefix
+                # multiplicity cannot be split across two formatters)
+                # and it fails closed on any it cannot name, so there is nothing
+                # left for the caller to enrich and enriching would double-cite.
+                return (_sat_name, _sat_ring_atoms, _sat['atom_to_locant'], True)
+        #: no smiles arg — Orthonym.name back-fills the original input SMILES.
+        from ..errors import unsupported_ring_system
+        raise unsupported_ring_system()
+    return None
+
+
 def name_polycyclic_complete(mol, features=None):
     """
     Generate the complete IUPAC name for a polycyclic bridged system.
@@ -4060,64 +4342,29 @@ def name_polycyclic_complete(mol, features=None):
     if len(bridgeheads) < 2:
         return None
 
-    # Analyze the system
-    desc = analyzer.analyze(mol, ring_atoms)
-
-    # G0 fail-closed safety (DD7 S1): von Baeyer cannot represent aromaticity.
-    # Check the EXACT cage atoms the descriptor numbers (: NOT the largest
-    # ring component — a pendant aromatic ring never enters desc.numbering). If
-    # the cage carries an aromatic atom, naming it here would silently
-    # de-aromatise it into a WRONG saturated cage; refuse instead (raise the
-    # named limit, caught at Orthonym.name). Raising (not returning None) is
-    # required so the molecule fails closed rather than cascading to a fragment
-    # namer that would name a single sub-ring ('cyclopentene' for benzonorbornadiene).
-    # Phase G1 (DD7): a fused-aromatic core + bridge
-    # (benzonorbornadiene-type) has a CORRECT bridged-fused PIN
-    # (1,4-dihydro-1,4-methanonaphthalene); von Baeyer would de-aromatise it.
-    # Try the constructor whenever the cage carries RDKit aromaticity OR
-    # is a MANCUDE bridged cage whose aromaticity RDKit fails to perceive
-    # (Wave-2 P5: 1,4:5,8-dimethanonaphthalene — the two bridges warp the
-    # naphthalene out of plane, so RDKit marks nothing aromatic and von Baeyer
-    # would emit a WRONG -polyene cage). name_bridged_fused_pin returns a name
-    # only for the class it can name correctly (kekulizing + validating its own
-    # aromatic residual), and None otherwise -> we then fail closed (G0).
-    from .bridged_fused import name_bridged_fused_pin
-    bridged = name_bridged_fused_pin(mol)
-    if bridged is not None:
-        return bridged
-    # (the Blue Book): an ortho- and peri-fused system (an atom
-    # common to three rings counts as a bridgehead here) is named by fusion nomenclature,
-    # never by a von Baeyer descriptor
-    from .bridged_fused import name_fused_carbocycle_pin
-    fused = name_fused_carbocycle_pin(mol)
-    if fused is not None:
-        return fused
-    if vonbaeyer_cage_has_aromaticity(mol, desc.numbering):
-        # (a phase): a partially-saturated PAH (e.g. 9,10-dihydro-
-        # anthracene) reaches this von-Baeyer path because its cage still
-        # carries the intact aromatic ring(s); von Baeyer would de-aromatise
-        # it into a WRONG saturated cage. The carbocyclic partial-saturation
-        # constructor names it correctly (hydro prefix on the mancude parent,
-        # automorphism-min numbering) and fails closed otherwise — try it
-        # before refusing, exactly as the bridged-fused delegation above.
-        from .partial_saturation import detect_carbocyclic_partial_saturation
-        _sat_ring_atoms = set()
-        for _r in ri.AtomRings():
-            _sat_ring_atoms.update(_r)
-        _sat = detect_carbocyclic_partial_saturation(mol, _sat_ring_atoms)
-        if _sat is not None:
-            from .polycyclics import _assemble_partially_saturated_carbocycle_name
-            _sat_name = _assemble_partially_saturated_carbocycle_name(mol, _sat)
-            if _sat_name:
-                # substituents_included=True: the partial-saturation assembler
-                # is now the SINGLE speller of every ring substituent prefix
-                # multiplicity cannot be split across two formatters)
-                # and it fails closed on any it cannot name, so there is nothing
-                # left for the caller to enrich and enriching would double-cite.
-                return (_sat_name, _sat_ring_atoms, _sat['atom_to_locant'], True)
-        #: no smiles arg — Orthonym.name back-fills the original input SMILES.
-        from ..errors import unsupported_ring_system
-        raise unsupported_ring_system()
+    # None of the delegations and the G0 refusal of `_vb_delegations_and_g0` reads the
+    # descriptor, so at the PIN tier -- every tier but best-effort -- they run BEFORE the
+    # main-ring search, the costly step (the aromatic cages of the large polycycle class
+    # spent the whole budget before being refused); the cage is then the ring system itself
+    # (the two tests agree on all 1913 rows of the von Baeyer corpus and the ladder whose
+    # analysis ends). The best-effort tier keeps the original order (analysis first): a
+    # search that exhausts the budget there reaches `_try_perf_budget_t4_rescue`.
+    #
+    # No refusal (the Blue Book, "Fusion nomenclature gives preferred
+    # IUPAC names only to compounds having at least two rings of at least five or more
+    # members") is added here for a mancude cage with an ortho-fused pair: the von Baeyer
+    # name that the analysis then builds is already recorded as a non-PIN fragment
+    # (`_record_if_fusion_nameable`) and the default tier declines it as NO_VERIFIED_PIN,
+    # the code that says a wider tier returns a name. A refusal here would end the PIN tier
+    # without a name and report UNNAMEABLE for molecules the best-effort tier names.
+    from ..metrics.provenance import best_effort_ctx
+    _best_effort = bool(best_effort_ctx.get())
+    desc = analyzer.analyze(mol, ring_atoms) if _best_effort else None
+    _early = _vb_delegations_and_g0(mol, ring_atoms if desc is None else desc.numbering)
+    if _early is not None:
+        return _early
+    if desc is None:
+        desc = analyzer.analyze(mol, ring_atoms)
 
     # LEGALITY GATE . Everything below SPELLS `desc`: its
     # descriptor string, its numbering (stereo, substituent and heteroatom
@@ -4270,7 +4517,7 @@ def _assemble_substituent_prefix(
     Returns:
         Formatted prefix like "5-hydroxy-3-ethyl-2,4-dimethyl-" or empty string
     """
-    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix
+    from ..assembly.naming_utils import alpha_sort_key, get_multiplier_prefix, prefix_citation_sort_key
 
     if not substituents and not fg_prefixes:
         return ""
@@ -4299,8 +4546,10 @@ def _assemble_substituent_prefix(
     for name in grouped:
         grouped[name].sort()
 
-    # Sort groups alphabetically by substituent name
-    sorted_names = sorted(grouped.keys(), key=alpha_sort_key)
+    # Sort groups alphabetically by substituent name. Prefixes that read alike in alphanumerical order
+    # are ranked by their own locants and then by their stereodescriptors, ``(1Z)-prop-1-en-1-yl`` before
+    # ``(1E)-prop-1-en-1-yl`` and (j)), never by the order in which the cage's atoms were met.
+    sorted_names = sorted(grouped.keys(), key=lambda n: (alpha_sort_key(n), prefix_citation_sort_key(n)))
 
     # Build prefix parts
     # macrocycle F1 /: a COMPOUND substituent prefix (one that

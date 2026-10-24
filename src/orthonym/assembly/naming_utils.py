@@ -4226,13 +4226,30 @@ def cip_descriptor_rank_key(prefix: str) -> tuple:
         >>> cip_descriptor_rank_key('methyl')
         
     """
-    ranks = []
+    return tuple(_CIP_DESCRIPTOR_RANK[code.lower()] for code in cip_descriptor_codes(prefix))
+
+
+def cip_descriptor_codes(prefix: str) -> tuple:
+    """The configurational symbols of a prefix as written, in order of appearance.
+
+    The symbols:func:`cip_descriptor_rank_key` ranks, before they are ranked: the
+    letters of each ``(2R,3S)`` or ``(1Z)`` block and a bare ``cis-``/``trans-``,
+    so that a numbering key can pair each one with the locant the name cites it at.
+
+    Examples:
+        >>> cip_descriptor_codes('(2R,3S)-3-hydroxybutan-2-yl')
+        ('R', 'S')
+        >>> cip_descriptor_codes('[(1Z)-prop-1-en-1-yl]')
+        ('Z',)
+        >>> cip_descriptor_codes('methyl')
+        
+    """
+    codes = []
     for block in _CIP_BLOCK_RE.findall(prefix or ''):
         for tok in _CIP_TOKEN_RE.findall(block):
-            rank = _CIP_DESCRIPTOR_RANK.get(tok.lower())
-            if rank is not None:
-                ranks.append(rank)
-    return tuple(ranks)
+            if tok.lower() in _CIP_DESCRIPTOR_RANK:
+                codes.append(tok)
+    return tuple(codes)
 
 
 def cip_locant_rank_key(items) -> tuple:

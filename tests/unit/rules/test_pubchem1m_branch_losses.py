@@ -259,11 +259,39 @@ DIHYDROPYRENE_ROW = ("[2H]C1=C(C(=C(C(=C1[2H])[2H])C2=C3C4=C(C=CC5=C4C(=C(C=C5)C
                      "C=C2)[2H])[2H]")
 
 
+# The two numberings of the oxatetracyclo parent that tie on the descriptor, the ``15-oxa`` locant, the
+# ``ene`` locants and the prefix locant set {2,11}; they differ only in which of the two prefixes takes 2.
+_DIHYDROPYRENE_FLUORENYL = "[7-(10b,10c-dihydropyren-1-yl)-9,9-dimethyl-9H-fluoren-3-yl]"
+_DIHYDROPYRENE_TAIL = "15-oxatetracyclo[10.2.1.0^5,14.0^8,13]pentadeca-1,3,5,7,9,11,13-heptaene"
+DIHYDROPYRENE_FLUORENYL_FIRST = f"2-{_DIHYDROPYRENE_FLUORENYL}-11-(2H5)phenyl-{_DIHYDROPYRENE_TAIL}"
+DIHYDROPYRENE_PHENYL_FIRST = f"11-{_DIHYDROPYRENE_FLUORENYL}-2-(2H5)phenyl-{_DIHYDROPYRENE_TAIL}"
+
+
 def test_dihydropyrene_row_names_rt_exact():
+    """The fluorenyl prefix takes locant 2 and the (2H5)phenyl one 11.
+
+     NUMBERING (the Blue Book), (g) (:3307): "lowest locants for the substituent cited first as a prefix
+    in the name". Citation is alphanumerical,:3436), where "The name of a prefix for a substituent is considered
+    to begin with the first letter of its complete name",:3477) and "the principles of alphanumerical order do
+    not include... isotopic or stereochemical descriptors",:3446). The fluorenyl prefix begins with the 'd' of
+    ``dihydropyrenyl`` and the labelled phenyl with the 'p' of ``phenyl`` (``(2H5)`` is not a letter of the order), so
+    the fluorenyl prefix is cited first and takes the lower locant, 2.
+
+    Independent check (no code under test): the two names below describe the same descriptor, the same heteroatom
+    locant, the same ``ene`` locants and the same prefix locant set {2,11}, so (c) to (f) tie, both read back
+    to the input (OPSIN, a fresh call), and only (g) separates them. A completely labelled phenyl cites no locants
+    inside its own name,:44196)."""
+    import re
     res = name_best_effort(DIHYDROPYRENE_ROW)
     name = assert_full_rt(res.get("name"), DIHYDROPYRENE_ROW)
-    # a completely labelled phenyl cites no locants,:44196)
-    assert "2-(2H5)phenyl" in name and "dihydropyren" in name, name
+    assert_full_rt(DIHYDROPYRENE_PHENYL_FIRST, DIHYDROPYRENE_ROW)         # the other numbering is a legal name too
+    shape = re.compile(r"(\d+)-(\[.+\]|\(2H5\)phenyl)-(\d+)-(\[.+\]|\(2H5\)phenyl)-(15-oxa.*)")
+    first = {n: shape.fullmatch(n).groups() for n in (DIHYDROPYRENE_FLUORENYL_FIRST, DIHYDROPYRENE_PHENYL_FIRST)}
+    assert len({g[4] for g in first.values()}) == 1                     # one descriptor, one heteroatom, one ene string
+    assert len({frozenset((g[0], g[2])) for g in first.values()}) == 1  # one prefix locant set
+    initial = lambda prefix: re.sub(r"[^a-z]", "", re.sub(r"\(2H5\)", "", prefix))[0]
+    assert initial(_DIHYDROPYRENE_FLUORENYL) < initial("(2H5)phenyl")      # 'd' is cited before 'p'
+    assert name == DIHYDROPYRENE_FLUORENYL_FIRST, name
 
 
 # --------------------------------------------------------------------------

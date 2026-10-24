@@ -10928,7 +10928,8 @@ class Orthonym:
                 and features.principal_group_atoms):
             from .rules.parent_selection import _pg_attachment_atoms as _pgaa
             _sub_atoms: set = set()
-            for _subdict in (getattr(features, 'ring_substituents', None),
+            for _subdict in (None if getattr(features, 'chain_is_parent', False)
+                             else getattr(features, 'ring_substituents', None),
                              getattr(features, 'substituents', None)):
                 if not _subdict:
                     continue

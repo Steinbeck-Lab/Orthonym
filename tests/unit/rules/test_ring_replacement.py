@@ -128,8 +128,12 @@ BASELINE = [
     ("[SH]12CCC(CC1)C2", "1-thia"),
     ("[SnH]12CCC(CC1)C2", "1-stanna"),
     # --- suppressed on one atom, cited on others, in one prefix ---
+    # The two cited lambda atoms are bonded to each other, and all seven atoms are tellurium, so only
+    # (h) (the Blue Book, section `` NUMBERING``) chooses between the numberings:
+    # "the one in a nonstandard valence state is assigned the lower locant", which is {1,2}, not {3,4}.
+    # Recorded 1,2,3lambda3,4lambda3 before the cage numbering carried (h); it took the input atom order.
     ("[TeH]1[Te][TeH]2[Te][Te][Te]1[Te]2",
-     "1,2,3λ3,4λ3,5,6,7-heptatellura"),
+     "1λ3,2λ3,3,4,5,6,7-heptatellura"),
     # --- no heteroatoms ---
     ("C1CC2CCC1C2", ""),
 ]
