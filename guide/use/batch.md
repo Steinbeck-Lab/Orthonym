@@ -1,6 +1,6 @@
 # Batch files
 
-Put one SMILES per line in a text file. Empty lines are skipped.
+Put one SMILES per line in a text file. An empty line gets an empty output line, so line N of the output belongs to line N of the input.
 
 ```console
 $ cat molecules.smi
@@ -36,7 +36,33 @@ not-a-smiles	ERROR: Invalid SMILES: not-a-smiles
 CC(=O)O	acetic acid
 ```
 
-Batch runs use the default tier. `--emit-tier` and `--provenance` do not apply to `--batch` yet. For tiers or provenance rows over many molecules, loop in Python with one `Orthonym` instance:
+## Tiers and provenance rows
+
+Batch runs use the default tier, unless you give `--emit-tier`. It works as it does for one SMILES. The second molecule here gets no name at the default tier and a name at `best-effort`:
+
+```console
+$ cat wide.smi
+CCO
+CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1
+O=[U](=O)=O
+$ orthonym --batch wide.smi --emit-tier best-effort
+CCO	ethanol
+CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1	2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}-N-(3-fluorophenyl)-2-methylpropanamide
+O=[U](=O)=O	
+```
+
+A line that gets no name at the tier you chose follows `--on-failure`, as it does at the default tier. The whole file is named with one `Orthonym` instance, as in the Python loop below.
+
+`--provenance` puts the row of [The provenance row](provenance.md) in the second column, on one line, in place of the name. It has the same keys as the row for one SMILES, and `--on-failure` does not change it: a line with no name has `limit_code` and, with `--emit-tier` other than `pin`, `null` as its `name`.
+
+```console
+$ orthonym --batch wide.smi --provenance
+CCO	{"name": "ethanol", "tier": "pin_verified", "is_pin": true, ...}
+```
+
+`--confidence` cannot be combined with `--provenance` or with an `--emit-tier` other than `pin`, because a row has no coverage score. `orthonym` stops with a usage error and status `2`.
+
+For rows with more keys, or to make the choices of the `Orthonym` constructor that the command line does not offer, loop in Python with one `Orthonym` instance:
 
 ```python
 import json

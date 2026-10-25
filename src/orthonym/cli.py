@@ -12,7 +12,7 @@ import functools
 import logging
 import os
 import sys
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 from . import __version__, name_compound
 from .errors import LIMIT_CATALOG, OrthonymLimitError, is_failure_name
@@ -265,28 +265,70 @@ def _add_on_failure_option(parser: argparse.ArgumentParser) -> None:
               "reason, '<SMILES><tab><CODE>: <reason>'. label: the reason as the name, "
               "'unknown organic compound' for example. raise: stop with an error (status 1; "
               "with --batch the line gets ERROR: and the run ends with status 1). It applies "
-              "to a name, --confidence and --batch; --provenance, --dump-tree and "
-              "--engine-only report the structure as it is. With --batch --verbose the "
-              "count of lines without a name is printed.")
+              "to a name, --confidence and --batch; --provenance (with --batch too), "
+              "--dump-tree and --engine-only report the structure as it is. With --batch "
+              "--verbose the count of lines without a name is printed.")
     )
 
 
-def _print_tiered_name(row: dict, smiles: str, mode: str) -> None:
+def _wants_tier_row(emit_tier: str, provenance: bool) -> bool:
+    """Whether a run names through ``Orthonym.name_tiered`` (a tier row) and not ``name_compound``.
+
+    One question for one SMILES and for ``--batch``: a tier other than ``pin``, or ``--provenance``."""
+    return emit_tier != "pin" or provenance
+
+
+def _tiered_namer(style: str, emit_tier: str, *, enable_triviality_controller: bool = False,
+                  trivial_fallback: bool = False, binding_proof: str = "off"):
+    """The ``Orthonym`` that names the rows of ``--emit-tier``, ``--provenance`` and
+    ``--binding-proof``. One home for one SMILES and for ``--batch``, which builds it once and
+    names every line with it."""
+    from orthonym.namer import Orthonym
+    tier_flags = _emit_tier_flags(emit_tier)
+    return Orthonym(
+        style=style,
+        enable_triviality_controller=enable_triviality_controller,
+        trivial_fallback=trivial_fallback,
+        general_fallback=tier_flags["general_fallback"],
+        general_fallback_unverified=tier_flags["general_fallback_unverified"],
+        allow_aromatic_general=tier_flags["allow_aromatic_general"],
+        full_coverage=tier_flags.get("full_coverage", False),
+        binding_proof=binding_proof,
+    )
+
+
+def _provenance_json(row: dict) -> str:
+    """The row of ``--provenance``, as the one line of JSON that both paths print."""
+    import json
+    return json.dumps(row)
+
+
+def _tiered_row_is_named(row: dict) -> bool:
+    """Whether a tier row has a name: a clean abstain has none (``name_tiered``, T5)."""
+    return bool(row["name"]) and row["tier"] != "abstain"
+
+
+def _tiered_name_text(row: dict, smiles: str, mode: str) -> Tuple[str, Optional[str]]:
     """The bare name of a tiered row (``--emit-tier``) or, for a structure with no name, what
-    ``--on-failure`` says: with ``label`` the row's label or '(no name - <code>)' as always."""
+    ``--on-failure`` says: with ``label`` the row's label or '(no name - <code>)' as always.
+
+    Returns the text for the name column and the reason line for the error stream (None when
+    there is nothing to say); ``raise`` raises the limit. One decision for one SMILES and for
+    ``--batch``."""
     if mode == "label":
-        print(row["name"] if row["name"]
-              else f"(no name — {row['limit_code'] or row['tier']})")
-        return
-    if row["name"] and row["tier"] != "abstain":
-        print(row["name"])
-        return
+        return (row["name"] if row["name"]
+                else f"(no name — {row['limit_code'] or row['tier']})"), None
+    if _tiered_row_is_named(row):
+        return row["name"], None
     code = row["limit_code"] or "UNNAMEABLE"
     label = row["name"] or LIMIT_CATALOG.get(code, {}).get("message", "")
     if mode == "raise":
         raise OrthonymLimitError(code, label, smiles=smiles)
-    print("")
-    print(_unnamed_line(smiles, code, label), file=sys.stderr)
+    return "", _unnamed_line(smiles, code, label)
+
+
+_CONFIDENCE_NEEDS_PIN = ("--confidence cannot be combined with --provenance or with an --emit-tier other "
+                         "than pin: a tier row has no coverage score")
 
 
 @_reports_unnamed
@@ -344,7 +386,8 @@ def main(args: List[str] = None) -> int:
         type=str,
         help=("Name every SMILES in this file, one per line, and print one "
               "'SMILES<tab>name' line each; the name is empty for a line that gets no name "
-              "(--on-failure). --emit-tier and --provenance do not apply to batch runs yet.")
+              "(--on-failure). --emit-tier gives the names of that tier, and --provenance "
+              "prints the JSON row of each line in place of the name, as for one SMILES.")
     )
 
     parser.add_argument(
@@ -357,7 +400,8 @@ def main(args: List[str] = None) -> int:
         "--confidence",
         action="store_true",
         help=("Print the name with a coverage score, the part of the engine that "
-              "built it, and the parts of the score.")
+              "built it, and the parts of the score. Not with --provenance or an "
+              "--emit-tier other than pin.")
     )
 
     # a phase Plan-03 Task 4 (internal notes telemetry):
@@ -501,8 +545,8 @@ def main(args: List[str] = None) -> int:
             "self_consistency_verified, suppressed, not_run, carveout:<class>, twin_verified:<rules> or acid_split_verified:<rule>. "
             "'spelling_failures' lists the spelling rules of the PIN (rule id and detail) that a "
             "name in PIN form breaks, and the rule of a recorded non-PIN part that lowered the "
-            "name; such a name is not labelled pin_verified, and pin declines it. One SMILES at a "
-            "time; not with --batch."
+            "name; such a name is not labelled pin_verified, and pin declines it. With --batch, "
+            "each line is the SMILES, a tab and the row, on one line. Not with --confidence."
         ),
     )
     parser.add_argument(
@@ -548,6 +592,11 @@ def main(args: List[str] = None) -> int:
     if _opsin_option_applied(parsed):
         return 0
 
+    # A tier row has no coverage score, so the two cannot be asked for together (one SMILES
+    # used to drop --confidence without a word).
+    if parsed.confidence and _wants_tier_row(parsed.emit_tier, parsed.provenance):
+        parser.error(_CONFIDENCE_NEEDS_PIN)
+
     # Nothing to name: the help needs no jars, so print it before the jar check (which
     # downloads a missing jar and makes a first call without arguments slow).
     if not parsed.smiles and not parsed.batch and not parsed.fetch_jars:
@@ -564,7 +613,11 @@ def main(args: List[str] = None) -> int:
                               parsed.verbose, parsed.confidence,
                               getattr(parsed, 'trivial_fallback', False),
                               getattr(parsed, 'binding_proof', 'off'),
-                              parsed.on_failure)
+                              parsed.on_failure,
+                              emit_tier=parsed.emit_tier,
+                              provenance=parsed.provenance,
+                              enable_triviality_controller=getattr(
+                                  parsed, 'enable_triviality_controller', False))
 
     # Single SMILES mode (parsed.smiles is set: without it and without --batch the help check
     # above returned)
@@ -674,38 +727,35 @@ def main(args: List[str] = None) -> int:
         # only single-SMILES surface that constructs the namer directly (the
         # default path goes through name_compound). Without it the flag would
         # parse and then silently do nothing -- the same failure mode the
-        # ValueError in Orthonym.__init__ exists to prevent.
+        # ValueError in Orthonym.__init__ exists to prevent. With --confidence it stays on
+        # name_compound, as in --batch: a tier row has no coverage score to print.
         _binding_proof = getattr(parsed, "binding_proof", "off")
-        if _emit_tier != "pin" or parsed.provenance or _binding_proof != "off":
-            import json as _json
-
-            from orthonym.namer import Orthonym
-            _tier_flags = _emit_tier_flags(_emit_tier)
-            namer = Orthonym(
-                style=parsed.style,
+        if (_wants_tier_row(_emit_tier, parsed.provenance)
+                or (_binding_proof != "off" and not parsed.confidence)):
+            namer = _tiered_namer(
+                parsed.style, _emit_tier,
                 enable_triviality_controller=name_kwargs[
                     "enable_triviality_controller"],
                 trivial_fallback=name_kwargs["trivial_fallback"],
-                general_fallback=_tier_flags["general_fallback"],
-                general_fallback_unverified=_tier_flags[
-                    "general_fallback_unverified"],
-                allow_aromatic_general=_tier_flags["allow_aromatic_general"],
-                full_coverage=_tier_flags.get("full_coverage", False),
                 binding_proof=_binding_proof,
             )
             row = namer.name_tiered(parsed.smiles)
             if parsed.provenance:
-                print(_json.dumps(row))
+                print(_provenance_json(row))
             else:
                 # Composer1 Task 5 fix: a clean abstain has name=None by design
                 # (honest "no name" contract, see name_tiered), so the print of a
                 # row with no name is a function of its own (never a bare `None`).
-                _print_tiered_name(row, parsed.smiles, parsed.on_failure)
+                text, reason = _tiered_name_text(row, parsed.smiles, parsed.on_failure)
+                print(text)
+                if reason is not None:
+                    print(reason, file=sys.stderr)
             return 0
 
         if parsed.confidence:
             result = name_compound(parsed.smiles, style=parsed.style,
-                                   include_confidence=True, **name_kwargs)
+                                   include_confidence=True,
+                                   binding_proof=_binding_proof, **name_kwargs)
             print(f"Name:       {result['name']}")
             # C4-D: an UNMEASURED candidate reports confidence None /
             # factors {} rather than a fabricated 1.0 (the old behaviour scored
@@ -749,7 +799,10 @@ def _process_batch(input_file: str, output_file: str, style: str,
                     verbose: bool, confidence: bool = False,
                     trivial_fallback: bool = False,
                     binding_proof: str = "off",
-                    on_failure: str = DEFAULT_ON_FAILURE) -> int:
+                    on_failure: str = DEFAULT_ON_FAILURE,
+                    emit_tier: str = "pin",
+                    provenance: bool = False,
+                    enable_triviality_controller: bool = False) -> int:
     """Process multiple SMILES from a file.
 
     ``binding_proof`` is honoured here exactly as on the single-SMILES path:
@@ -758,6 +811,14 @@ def _process_batch(input_file: str, output_file: str, style: str,
     not have. Validated ONCE up front rather than per row -- the per-row
     ``except Exception`` below would otherwise turn a typo'd mode into a
     silent "ERROR:" line and a zero-proof run.
+
+    ``emit_tier`` (other than ``pin``) and ``provenance`` are honoured the same way: the lines
+    are named through one ``Orthonym`` (:func:`_tiered_namer`, built once for the whole file)
+    and its ``name_tiered``, as one SMILES is. The second column is then the name of that
+    tier (a line with no name follows ``on_failure`` as one SMILES does) or, with
+    ``provenance``, the JSON row of ``--provenance``. ``confidence`` has no row to go with
+    and raises ValueError with them, once, up front. With neither the lines are named by
+    ``name_compound``, as they always were.
 
     The output has exactly one line per input line, in input order, so line N
     of the output belongs to line N of the input: a blank input line gives a
@@ -768,6 +829,9 @@ def _process_batch(input_file: str, output_file: str, style: str,
     """
     from .namer import validate_binding_proof
     validate_binding_proof(binding_proof)
+    tiered = _wants_tier_row(emit_tier, provenance)
+    if tiered and confidence:
+        raise ValueError(_CONFIDENCE_NEEDS_PIN)
     try:
         with open(input_file, 'r') as f:
             input_lines = [line.strip() for line in f]
@@ -777,6 +841,12 @@ def _process_batch(input_file: str, output_file: str, style: str,
     except IOError as e:
         print(f"Error reading input file: {e}", file=sys.stderr)
         return 1
+
+    namer = None
+    if tiered:
+        namer = _tiered_namer(style, emit_tier,
+                              enable_triviality_controller=enable_triviality_controller,
+                              trivial_fallback=trivial_fallback, binding_proof=binding_proof)
 
     results = []
     errors = 0
@@ -790,9 +860,20 @@ def _process_batch(input_file: str, output_file: str, style: str,
         named += 1
         _readable(smiles)       # RDKit's reason and the reason line; the ERROR row follows
         try:
-            if confidence:
+            if tiered:
+                row = namer.name_tiered(smiles)
+                if provenance:
+                    text = _provenance_json(row)
+                else:
+                    text, reason = _tiered_name_text(row, smiles, on_failure)
+                    if reason is not None:
+                        print(reason, file=sys.stderr)
+                unnamed += not _tiered_row_is_named(row)
+                results.append(f"{smiles}\t{text}")
+            elif confidence:
                 result = name_compound(smiles, style=style,
                                        include_confidence=True,
+                                       enable_triviality_controller=enable_triviality_controller,
                                        trivial_fallback=trivial_fallback,
                                        binding_proof=binding_proof,
                                        on_failure=on_failure)
@@ -808,6 +889,7 @@ def _process_batch(input_file: str, output_file: str, style: str,
                 )
             else:
                 nm = name_compound(smiles, style=style,
+                                   enable_triviality_controller=enable_triviality_controller,
                                    trivial_fallback=trivial_fallback,
                                    binding_proof=binding_proof,
                                    on_failure=on_failure)

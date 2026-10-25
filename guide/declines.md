@@ -94,4 +94,4 @@ False
 
 `orthonym.classify_limit` returns the reason without raising, and `on_failure="raise"` (or `raise_on_limit=True`) turns a decline into an `OrthonymLimitError` ([Python](use/python.md)). For a molecule the default tier declines with `NO_VERIFIED_PIN`, `classify_limit` returns that code and `on_failure="raise"` raises `OrthonymLimitError` with it.
 
-A decline is never silent: a molecule that gets no name gets a logged reason (the limit code and a label), and `--provenance` gives a reason code. `--batch` leaves the name column of that line empty, prints the reason on the error stream, and counts such lines with `--verbose`.
+A decline is never silent: a molecule that gets no name gets a logged reason (the limit code and a label), and `--provenance` gives a reason code. `--batch` leaves the name column of that line empty, prints the reason on the error stream, and counts such lines with `--verbose`; with `--batch --provenance` the row of that line holds the reason code.

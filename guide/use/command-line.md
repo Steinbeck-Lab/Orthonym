@@ -29,13 +29,13 @@ benzene
 ## Output
 
 `--provenance`
-: Print a JSON row instead of the bare name: the name, its tier, and how it was checked. One SMILES at a time. See [The provenance row](provenance.md).
+: Print a JSON row instead of the bare name: the name, its tier, and how it was checked. With `--batch`, each line is the SMILES, a tab and the row. Not with `--confidence`. See [The provenance row](provenance.md).
 
 `--confidence`
-: Print the name with a coverage score, the part of the engine that built it, and the parts of the score. When no measurement was taken it says so: `Confidence: unverified (no coverage measurement was taken)`.
+: Print the name with a coverage score, the part of the engine that built it, and the parts of the score. When no measurement was taken it says so: `Confidence: unverified (no coverage measurement was taken)`. Not with `--provenance` or an `--emit-tier` other than `pin`: a tier row has no coverage score, and the call stops with a usage error.
 
 `--on-failure {empty,label,raise}`
-: What to give for a structure that gets no name. `empty` (the default) prints an empty name and, on the error stream, one line `SMILES<tab>CODE: reason` with the limit code and the label. `label` prints the label in place of a name, as earlier versions did. `raise` stops with an error: the same line on the error stream and exit status `1` (with `--batch` the line gets `ERROR:` and the run ends with status `1`). It applies to a name, to `--confidence` and to `--batch`; `--provenance`, `--dump-tree` and `--engine-only` report the structure as it is. The codes are the stable part (see [Declines](../declines.md)); the label texts can change.
+: What to give for a structure that gets no name. `empty` (the default) prints an empty name and, on the error stream, one line `SMILES<tab>CODE: reason` with the limit code and the label. `label` prints the label in place of a name, as earlier versions did. `raise` stops with an error: the same line on the error stream and exit status `1` (with `--batch` the line gets `ERROR:` and the run ends with status `1`). It applies to a name, to `--confidence` and to `--batch` (with `--emit-tier` too); `--provenance` (with `--batch` too), `--dump-tree` and `--engine-only` report the structure as it is: in a `--provenance` row, `limit_code` says why there is no name. The codes are the stable part (see [Declines](../declines.md)); the label texts can change.
 
 `--verbose`, `-v`
 : Also print the SMILES and the style. With `--batch`, also say how many lines were read, how many failed and how many got no name.
@@ -53,7 +53,7 @@ NameTree: cyclohexanol  (class_id=general_acyclic, cite=P-14+P-23+P-44)
 ## Batch
 
 `--batch FILE`, `-b FILE`
-: Name every SMILES in the file, one per line. See [Batch files](batch.md).
+: Name every SMILES in the file, one per line. `--emit-tier`, `--provenance`, `--trivial`, `--enable-triviality-controller` and `--binding-proof` work as they do for one SMILES. See [Batch files](batch.md).
 
 `--output FILE`, `-o FILE`
 : With `--batch`, write the lines to this file instead of the screen.
@@ -85,4 +85,4 @@ These are for looking inside the engine. None of them changes a name, except `--
 
 ## Exit status
 
-`0` when the name was printed, when an empty name or a label was printed for a decline (`--on-failure empty` and `label`), for `--help` and `--version`, and when `--fetch-jars` succeeded. `1` for a SMILES that RDKit cannot read, a batch with at least one such line, a decline with `--on-failure raise`, a call with neither a SMILES nor `--batch` (the help is printed), or a `--fetch-jars` that could not fetch, build or check a jar. `2` when a jar can be neither found nor downloaded; this is checked before the input is read, except with `--fetch-jars`.
+`0` when the name was printed, when an empty name or a label was printed for a decline (`--on-failure empty` and `label`), for `--help` and `--version`, and when `--fetch-jars` succeeded. `1` for a SMILES that RDKit cannot read, a batch with at least one such line, a decline with `--on-failure raise`, a call with neither a SMILES nor `--batch` (the help is printed), or a `--fetch-jars` that could not fetch, build or check a jar. `2` for a usage error (an option the parser does not accept, or `--confidence` together with `--provenance` or an `--emit-tier` other than `pin`), and when a jar can be neither found nor downloaded; the jar check is made before the input is read, except with `--fetch-jars`.

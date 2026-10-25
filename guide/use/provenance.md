@@ -96,4 +96,4 @@ $ orthonym "C1CC[C@H]2CCCC[C@H]2C1" --provenance
 {"name": "(4as,8as)-decahydronaphthalene", "tier": "pin_unverified", "is_pin": false, "source": "pin_path", "opsin": "verified_constitution_only", "gates_passed": ["self_consistency_constitution_only"], "gate_outcome": "self_consistency_constitution_only", "formula": null, "limit_code": null, "stereo_unexpressed": false, "suffix_free_prefix_name": false, "prefix_order_fallback": false, "verified": "opsin_constitution", "spelling_failures": [], "producer": "inner:tier_a_ring"}
 ```
 
-`--provenance` works for one SMILES at a time; `--batch` ignores it. For many molecules, loop over `Orthonym.name_tiered` as shown on [Batch files](batch.md).
+`--provenance` works for one SMILES and for `--batch`, where each line is the SMILES, a tab and the row on one line ([Batch files](batch.md)). It cannot be combined with `--confidence`. In Python, loop over `Orthonym.name_tiered` with one instance for many molecules.
