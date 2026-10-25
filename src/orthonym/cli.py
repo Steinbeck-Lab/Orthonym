@@ -330,6 +330,24 @@ def _tiered_name_text(row: dict, smiles: str, mode: str) -> Tuple[str, Optional[
 _CONFIDENCE_NEEDS_PIN = ("--confidence cannot be combined with --provenance or with an --emit-tier other "
                          "than pin: a tier row has no coverage score")
 
+#: The flags that look inside the naming of ONE structure (``--format`` only sets the layout of
+#: ``--dump-tree``): a file of SMILES has no such single run to show, and ``--batch`` used to ignore them.
+_ONE_SMILES_ONLY = (("validation_stats", "--validation-stats"), ("dispatch_stats", "--dispatch-stats"),
+                    ("engine_only", "--engine-only"), ("dump_tree", "--dump-tree"), ("format", "--format"))
+
+
+def _check_flag_combinations(parser: argparse.ArgumentParser, parsed: argparse.Namespace) -> None:
+    """Usage error (status 2) for flags that cannot be asked for together, before anything is read
+    or any jar is checked."""
+    # A tier row has no coverage score, so the two cannot be asked for together (one SMILES
+    # used to drop --confidence without a word).
+    if parsed.confidence and _wants_tier_row(parsed.emit_tier, parsed.provenance):
+        parser.error(_CONFIDENCE_NEEDS_PIN)
+    one_only = [flag for dest, flag in _ONE_SMILES_ONLY if getattr(parsed, dest)] if parsed.batch else []
+    if one_only:
+        parser.error(f"{', '.join(one_only)} cannot be combined with --batch "
+                     "(for one SMILES, not for a file of them)")
+
 
 @_reports_unnamed
 def main(args: List[str] = None) -> int:
@@ -387,7 +405,9 @@ def main(args: List[str] = None) -> int:
         help=("Name every SMILES in this file, one per line, and print one "
               "'SMILES<tab>name' line each; the name is empty for a line that gets no name "
               "(--on-failure). --emit-tier gives the names of that tier, and --provenance "
-              "prints the JSON row of each line in place of the name, as for one SMILES.")
+              "prints the JSON row of each line in place of the name, as for one SMILES. "
+              "--validation-stats, --dispatch-stats, --engine-only, --dump-tree and --format "
+              "look inside one SMILES and stop with a usage error here.")
     )
 
     parser.add_argument(
@@ -413,7 +433,7 @@ def main(args: List[str] = None) -> int:
         "--validation-stats",
         action="store_true",
         help=("After the name, print on the error stream how often the OPSIN grammar "
-              "pre-check passed or repaired a candidate name.")
+              "pre-check passed or repaired a candidate name. Not with --batch.")
     )
 
     # a phase Plan-03 Task 9 (internal notes telemetry):
@@ -426,7 +446,7 @@ def main(args: List[str] = None) -> int:
         "--dispatch-stats",
         action="store_true",
         help=("After the name, print on the error stream which compound-class routes "
-              "the engine took.")
+              "the engine took. Not with --batch.")
     )
 
     # a phase Plan-04 (internal notes) + a phase: --dump-tree emits the
@@ -439,14 +459,14 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--dump-tree",
         action="store_true",
-        help="Print the parts of the name as a tree instead of the name."
+        help="Print the parts of the name as a tree instead of the name. Not with --batch."
     )
 
     parser.add_argument(
         "--format",
         choices=["text", "json"],
-        default="text",
-        help="Layout for --dump-tree: text (an indented tree; the default) or json."
+        default=None,       # None, not "text": --batch can tell that it was given
+        help="Layout for --dump-tree: text (an indented tree; the default) or json. Not with --batch."
     )
 
     # a phase Triviality Controller (/02/03 + internal notes).
@@ -557,7 +577,8 @@ def main(args: List[str] = None) -> int:
         help=(
             "For inspection only: skip the strict path and print, as JSON, the "
             "general engine's own name (checked for atom coverage, not by OPSIN) or"
-            " that it declined. Never a preferred name; do not use it as a name."
+            " that it declined. Never a preferred name; do not use it as a name. "
+            "Not with --batch."
         ),
     )
 
@@ -592,10 +613,7 @@ def main(args: List[str] = None) -> int:
     if _opsin_option_applied(parsed):
         return 0
 
-    # A tier row has no coverage score, so the two cannot be asked for together (one SMILES
-    # used to drop --confidence without a word).
-    if parsed.confidence and _wants_tier_row(parsed.emit_tier, parsed.provenance):
-        parser.error(_CONFIDENCE_NEEDS_PIN)
+    _check_flag_combinations(parser, parsed)
 
     # Nothing to name: the help needs no jars, so print it before the jar check (which
     # downloads a missing jar and makes a first call without arguments slow).

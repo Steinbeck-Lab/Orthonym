@@ -23,7 +23,21 @@ The marks are the ones the [web app](use/browser.md) uses. It shows the five tie
 
 ## Choosing a tier: `--emit-tier`
 
-The default is `pin`. Wider tiers are opt-in:
+The default is `pin`: a verified PIN, or no name. That is a rule about which names to return, not a limit of the engine, and `best-effort` names many more molecules ([Accuracy](accuracy.md#the-two-tiers) has both tiers side by side). Ask for the `best-effort` tier for one SMILES, for a file, or from Python:
+
+```console
+$ orthonym "SMILES" --emit-tier best-effort
+$ orthonym --batch molecules.smi --emit-tier best-effort
+```
+
+```python
+from orthonym import Orthonym
+
+namer = Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)
+namer.name("SMILES")
+```
+
+Wider tiers are opt-in:
 
 | `--emit-tier` | What it adds |
 |:--|:--|

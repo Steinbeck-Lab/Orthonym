@@ -3,9 +3,12 @@
 - ``{tier}`` and ``{lamp}`` roles: a tier id or a tier name with its mark. The
   four marks are the ones drawn in docs/readme/build.py: the SHAPE carries the
   tier and the colour only agrees, so they stay distinct in greyscale.
-- the accuracy table: every percentage is recomputed here from the counts in
+- the accuracy tables: every percentage is recomputed here from the counts in
   _data/accuracy.json, the rule "the columns other than Molecules add up to
-  Molecules" is checked, and the build stops if the page's table differs.
+  Molecules" is checked, and the build stops if the page's table differs. The
+  page has two tables: the paper's (rows) and the two-tier table (tiers). The
+  held-out figures that the README and three pages quote in prose are checked
+  against the same file.
 - the internals pages: one page per module of the package, written at build
   time into reference/internals/generated/ (not kept in git).
 - ``<!-- include: FILE -->``: puts a repository file (CONTRIBUTING.md,
@@ -109,18 +112,91 @@ def expected_accuracy_rows():
     return out
 
 
+def _tier_declined(cell: dict) -> str:
+    """The Declined cell of one tier: a timeout is a miss and is shown beside the count."""
+    out = _fmt(cell["declined"])
+    return f"{out} (+{_fmt(cell['timed_out'])} timeout)" if cell["timed_out"] else out
+
+
+def expected_tier_rows():
+    """The two-tier table rows as they must read, recomputed from _data/accuracy.json."""
+    data = json.loads((GUIDE / "_data" / "accuracy.json").read_text())["tiers"]
+    out = []
+    for row in data["rows"]:
+        n = row["molecules"]
+        for tier in ("pin", "best_effort"):
+            c = row[tier]
+            parts = [c["named"], c["declined"], c["unreadable"], c["timed_out"]]
+            if sum(parts) != n:
+                raise RuntimeError(f"accuracy tiers row {row['set']!r} ({tier}): {parts} add up to {sum(parts)}, not {n}")
+        if row.get("wrong", 0) != 0:
+            raise RuntimeError(f"accuracy tiers row {row['set']!r}: the source reports wrong structures")
+        p, b = row["pin"], row["best_effort"]
+        out.append([row["set"], _fmt(n),
+                    f"{_fmt(p['named'])} ({100 * p['named'] / n:.2f} %)",
+                    f"{_fmt(b['named'])} ({100 * b['named'] / n:.2f} %)",
+                    _tier_declined(p), _tier_declined(b),
+                    _fmt(p["unreadable"]), _fmt(b["unreadable"])])
+    return out
+
+
+def held_out_figures():
+    """The held-out figures that prose pages quote, as they must read (one home: _data/accuracy.json)."""
+    data = json.loads((GUIDE / "_data" / "accuracy.json").read_text())["tiers"]
+    row = next(r for r in data["rows"] if r["set"].startswith("Held-out"))
+    n, p, b = row["molecules"], row["pin"], row["best_effort"]
+    return {
+        "default_named": f"{_fmt(p['named'])} ({100 * p['named'] / n:.2f} %)",
+        "best_effort_named": f"{_fmt(b['named'])} ({100 * b['named'] / n:.2f} %)",
+        "default_declined": f"declines {_fmt(p['declined'])}",
+        "best_effort_declined": f"declines {_fmt(b['declined'])}",
+        "default_declined_of": f"declines {_fmt(p['declined'])} of {_fmt(n)}",
+    }
+
+
+# The held-out figures each page quotes: docname -> keys of held_out_figures.
+PROSE_FIGURES = {
+    "accuracy": ("default_named", "best_effort_named", "default_declined", "best_effort_declined"),
+    "start/first-name": ("default_named", "best_effort_named"),
+    "declines": ("default_declined_of",),
+}
+# The README is not a page of the site; the build checks it with the page "index".
+README_FIGURES = ("default_named", "best_effort_named", "default_declined")
+
+
+def check_prose_figures(page, keys, text):
+    """A page that quotes the held-out figures must quote the ones in _data/accuracy.json."""
+    want = held_out_figures()
+    for key in keys:
+        if want[key] not in text:
+            raise RuntimeError(f"{page}: the held-out figure {want[key]!r} ({key}) is missing or differs "
+                               "from guide/_data/accuracy.json")
+
+
 def check_accuracy_page(app, text):
-    """The table in accuracy.md must equal the recomputed rows, cell for cell."""
+    """The tables in accuracy.md must equal the recomputed rows, cell for cell.
+
+    The paper's table has six columns, the two-tier table eight; a row is told
+    apart by its cell count (the header and the alignment row are skipped).
+    """
     app.env.note_dependency(str(GUIDE / "_data" / "accuracy.json"))
-    got = []
+    got, got_tiers = [], []
     for line in text.splitlines():
         cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if line.startswith("|") and len(cells) == 6 and cells[0] not in ("Set",) and not cells[0].startswith(":"):
+        if not line.startswith("|") or cells[0] in ("Set",) or cells[0].startswith(":"):
+            continue
+        if len(cells) == 6:
             got.append(cells)
+        elif len(cells) == 8:
+            got_tiers.append(cells)
     want = expected_accuracy_rows()
     if got != want:
         raise RuntimeError("guide/accuracy.md: the table does not match _data/accuracy.json:\n"
                            f"page: {got}\nwant: {want}")
+    want_tiers = expected_tier_rows()
+    if got_tiers != want_tiers:
+        raise RuntimeError("guide/accuracy.md: the two-tier table does not match _data/accuracy.json:\n"
+                           f"page: {got_tiers}\nwant: {want_tiers}")
 
 
 # ------------------------------------------------------------------ internals
@@ -285,6 +361,14 @@ def source_read(app, docname, source):
     source[0] = _INCLUDE.sub(repl, text)
     if docname == "accuracy":
         check_accuracy_page(app, source[0])
+    if docname in PROSE_FIGURES:
+        app.env.note_dependency(str(GUIDE / "_data" / "accuracy.json"))
+        check_prose_figures(f"guide/{docname}.md", PROSE_FIGURES[docname], source[0])
+    if docname == "index":
+        readme = REPO / "README.md"
+        app.env.note_dependency(str(readme))
+        app.env.note_dependency(str(GUIDE / "_data" / "accuracy.json"))
+        check_prose_figures("README.md", README_FIGURES, readme.read_text())
 
 
 # ------------------------------------------------------------------ llms.txt

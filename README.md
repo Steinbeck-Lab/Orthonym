@@ -57,6 +57,11 @@ orthonym "CC(=O)Oc1ccccc1C(=O)O" --provenance # the name plus its tier and how i
 orthonym --batch molecules.smi -o names.txt   # one SMILES per line
 ```
 
+These commands use the default tier, which returns a verified Preferred IUPAC Name (PIN) or no name.
+For the wider tier, add `--emit-tier best-effort` (one SMILES or `--batch`), or in Python
+`Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)`.
+See [Output tiers](#output-tiers).
+
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-specimen-narrow.svg">
   <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, pin_unverified. Uranium trioxide, with --on-failure label, prints inorganic compound (not supported), abstain." width="100%">
@@ -85,7 +90,10 @@ More in [How every name is checked](guide/checking.md) and [Declines](guide/decl
 
 By default Orthonym returns only the Preferred IUPAC Name (PIN), verified, or no name. Wider tiers
 are opt-in with `--emit-tier` (keyword switches of `Orthonym` in Python) and label every name
-they return.
+they return. The default is a rule about which names to return, not a limit of the engine. On 2,000
+held-out ChEBI molecules the default tier names 1,106 (55.30 %) and declines 891, and
+`--emit-tier best-effort` names 1,994 (99.70 %). A name counts only when OPSIN 2.9.0 reads it back
+to the molecule ([both tiers on three sets](guide/accuracy.md#the-two-tiers)).
 
 | `--emit-tier` | Returns |
 |:--|:--|

@@ -62,6 +62,8 @@ CCO	{"name": "ethanol", "tier": "pin_verified", "is_pin": true, ...}
 
 `--confidence` cannot be combined with `--provenance` or with an `--emit-tier` other than `pin`, because a row has no coverage score. `orthonym` stops with a usage error and status `2`.
 
+The flags that look inside the naming of one structure cannot be combined with `--batch`: `--validation-stats`, `--dispatch-stats`, `--engine-only`, `--dump-tree` and `--format` (which only sets the layout of `--dump-tree`). `orthonym` stops with a usage error and status `2`, before the file is read, and names the flags it refused. To look inside the naming of one line, run `orthonym` on that SMILES with the flag.
+
 For rows with more keys, or to make the choices of the `Orthonym` constructor that the command line does not offer, loop in Python with one `Orthonym` instance:
 
 ```python

@@ -409,3 +409,10 @@ html.dark .ot-credit-logo--dark { display: block; }
   .ot-try { padding: .4rem .65rem; letter-spacing: .05rem; font-size: .6875rem; }
 }
 @media (max-width: 360px) { .ot-wordmark { display: none; } }
+
+/* accuracy: the two-tier table has the same look as the paper's table */
+#the-two-tiers table + p { font-size: .88rem; color: var(--ot-muted); line-height: 1.6; }
+#the-two-tiers table td:not(:first-child), #the-two-tiers table th:not(:first-child) { text-align: right; white-space: nowrap; }
+#the-two-tiers table th { white-space: normal; letter-spacing: .04rem; }
+.yue #the-two-tiers table { font-size: .84rem; }
+.yue #the-two-tiers table td { padding-left: .6rem; padding-right: .6rem; }

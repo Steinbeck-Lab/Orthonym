@@ -41,7 +41,7 @@ benzene
 : Also print the SMILES and the style. With `--batch`, also say how many lines were read, how many failed and how many got no name.
 
 `--dump-tree`, `--format {text,json}`
-: Print the parts of the name as a tree instead of the name.
+: Print the parts of the name as a tree instead of the name. `--format` sets the layout: `text` (an indented tree; the default) or `json`. One SMILES only: not with `--batch`.
 
 ```console
 $ orthonym --dump-tree "OC1CCCCC1"
@@ -53,7 +53,7 @@ NameTree: cyclohexanol  (class_id=general_acyclic, cite=P-14+P-23+P-44)
 ## Batch
 
 `--batch FILE`, `-b FILE`
-: Name every SMILES in the file, one per line. `--emit-tier`, `--provenance`, `--trivial`, `--enable-triviality-controller` and `--binding-proof` work as they do for one SMILES. See [Batch files](batch.md).
+: Name every SMILES in the file, one per line. `--emit-tier`, `--provenance`, `--trivial`, `--enable-triviality-controller` and `--binding-proof` work as they do for one SMILES. `--validation-stats`, `--dispatch-stats`, `--engine-only`, `--dump-tree` and `--format` look inside the naming of one structure, so with `--batch` they stop with a usage error. See [Batch files](batch.md).
 
 `--output FILE`, `-o FILE`
 : With `--batch`, write the lines to this file instead of the screen.
@@ -69,13 +69,13 @@ These are for looking inside the engine. None of them changes a name, except `--
 : Which OPSIN reads every name back: `2.9.0`, the release jar (the default), `main`, the newest commit of OPSIN's main branch, or `main@COMMIT`, one commit. A main-branch OPSIN is built with your JDK on first use and kept in the jar directory. `ORTHONYM_OPSIN` sets the same; a jar given by `ORTHONYM_OPSIN_JAR` wins over both. See [Choosing the OPSIN version](../start/install.md#choosing-the-opsin-version).
 
 `--validation-stats`
-: After the name, print on the error stream how often the OPSIN grammar pre-check passed or repaired a candidate name.
+: After the name, print on the error stream how often the OPSIN grammar pre-check passed or repaired a candidate name. One SMILES only: not with `--batch`.
 
 `--dispatch-stats`
-: After the name, print on the error stream which compound-class routes the engine took.
+: After the name, print on the error stream which compound-class routes the engine took. One SMILES only: not with `--batch`.
 
 `--engine-only`
-: Skip the strict path and print, as JSON, the general engine's own name, checked for atom coverage but not by OPSIN. Never a preferred name; do not use it as a name.
+: Skip the strict path and print, as JSON, the general engine's own name, checked for atom coverage but not by OPSIN. Never a preferred name; do not use it as a name. One SMILES only: not with `--batch`.
 
 `--binding-proof {off,audit,enforce}`
 : An extra check that every part of a general-engine name still maps onto its atoms in the final name. `audit` records the result and never changes the name; `enforce` also declines when the check fails.
@@ -85,4 +85,4 @@ These are for looking inside the engine. None of them changes a name, except `--
 
 ## Exit status
 
-`0` when the name was printed, when an empty name or a label was printed for a decline (`--on-failure empty` and `label`), for `--help` and `--version`, and when `--fetch-jars` succeeded. `1` for a SMILES that RDKit cannot read, a batch with at least one such line, a decline with `--on-failure raise`, a call with neither a SMILES nor `--batch` (the help is printed), or a `--fetch-jars` that could not fetch, build or check a jar. `2` for a usage error (an option the parser does not accept, or `--confidence` together with `--provenance` or an `--emit-tier` other than `pin`), and when a jar can be neither found nor downloaded; the jar check is made before the input is read, except with `--fetch-jars`.
+`0` when the name was printed, when an empty name or a label was printed for a decline (`--on-failure empty` and `label`), for `--help` and `--version`, and when `--fetch-jars` succeeded. `1` for a SMILES that RDKit cannot read, a batch with at least one such line, a decline with `--on-failure raise`, a call with neither a SMILES nor `--batch` (the help is printed), or a `--fetch-jars` that could not fetch, build or check a jar. `2` for a usage error (an option the parser does not accept, `--confidence` together with `--provenance` or an `--emit-tier` other than `pin`, or `--batch` together with `--validation-stats`, `--dispatch-stats`, `--engine-only`, `--dump-tree` or `--format`), and when a jar can be neither found nor downloaded; the jar check is made before the input is read, except with `--fetch-jars`.

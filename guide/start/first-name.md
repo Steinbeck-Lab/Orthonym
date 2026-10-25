@@ -89,3 +89,21 @@ O=[U](=O)=O	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
 ```
 
 More on [declines](../declines.md).
+
+## Which names you get: default tier and `best-effort`
+
+Everything above uses the default tier. It returns a verified Preferred IUPAC Name (PIN), or no name and the reason. That is a rule about which names to return, not a limit of the engine. For a molecule with no verified PIN, ask for the `best-effort` tier, which also returns systematic names that are not the PIN, each labelled with its tier:
+
+```console
+$ orthonym "SMILES" --emit-tier best-effort
+$ orthonym --batch molecules.smi --emit-tier best-effort
+```
+
+```python
+from orthonym import Orthonym
+
+namer = Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)
+namer.name("SMILES")
+```
+
+On 2,000 held-out ChEBI molecules the default tier names 1,106 (55.30 %) and `best-effort` names 1,994 (99.70 %); [Accuracy](../accuracy.md#the-two-tiers) has the numbers for both tiers on three sets, and [Output tiers](../tiers.md) says what each tier adds.

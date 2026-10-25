@@ -8,5 +8,20 @@
     {"set": "PubChem 500,000", "molecules": 500000, "named": 499171, "declined": 829, "unreadable": 0, "other_layers": 0, "wrong": 0},
     {"set": "ZINC22 500,000", "molecules": 500000, "named": 488407, "declined": 11593, "unreadable": 0, "other_layers": 0, "wrong": 0},
     {"set": "PubChem 1,000,000", "molecules": 1000000, "named": 957523, "declined": 42468, "unreadable": 1, "other_layers": 8, "wrong": 0}
-  ]
+  ],
+  "tiers": {
+    "source": "Orthonym 1.0.9 with the changes merged after it; the evaluation harness at --emit-tier pin and --emit-tier best-effort, every name read back by OPSIN 2.9.0 and compared by full InChIKey; a declined molecule, a name OPSIN cannot read and a timeout are all misses",
+    "columns": ["Set", "Molecules", "Named, default tier", "Named, best-effort", "Declined, default tier", "Declined, best-effort", "Unreadable, default tier", "Unreadable, best-effort"],
+    "rows": [
+      {"set": "Held-out ChEBI 2,000", "molecules": 2000,
+       "pin": {"named": 1106, "declined": 891, "unreadable": 3, "timed_out": 0},
+       "best_effort": {"named": 1994, "declined": 5, "unreadable": 1, "timed_out": 0}, "wrong": 0},
+      {"set": "ChEBI development 2,000", "molecules": 2000,
+       "pin": {"named": 1108, "declined": 888, "unreadable": 4, "timed_out": 0},
+       "best_effort": {"named": 1993, "declined": 4, "unreadable": 3, "timed_out": 0}, "wrong": 0},
+      {"set": "Drug-like PubChem 2,000", "molecules": 2000,
+       "pin": {"named": 860, "declined": 1127, "unreadable": 12, "timed_out": 1},
+       "best_effort": {"named": 1937, "declined": 63, "unreadable": 0, "timed_out": 0}, "wrong": 0}
+    ]
+  }
 }

@@ -48,7 +48,7 @@ The first line is a log message on the error stream: the engine withdrew a candi
 
 The codes are the stable part: the keys of `orthonym.errors.LIMIT_CATALOG`. The texts of the labels can change, so match a code, never a label.
 
-Most organic declines carry the general `UNNAMEABLE` (no candidate name passed the checks) or, at the default tier, `NO_VERIFIED_PIN` (a checked name exists, but not the PIN).
+Most organic declines carry the general `UNNAMEABLE` (no candidate name passed the checks) or, at the default tier, `NO_VERIFIED_PIN` (a checked name exists, but not the PIN). The default tier also declines molecules that a wider tier names, because it returns only a verified PIN: on the held-out ChEBI set it declines 891 of 2,000 molecules, and `--emit-tier best-effort` names nearly all of them ([Accuracy](accuracy.md#the-two-tiers)).
 
 Betaine shows the second case. Its strict-path name contains a part the engine records as not the preferred form, so the default tier declines, and a wider tier returns the name labelled {tier}`systematic_verified`:
 

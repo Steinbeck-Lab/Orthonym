@@ -12,9 +12,20 @@ Reference: internal notes
 """
 import logging
 
-logging.disable(logging.CRITICAL)
+import pytest
 
 from orthonym.namer import Orthonym
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _quiet_logging():
+    """Logging off for this module's tests only. A module-level ``logging.disable`` ran at
+    collection and stayed on for every later test in the process, so a test that reads the
+    command line's reason lines (printed from a logged warning) saw none."""
+    previous = logging.root.manager.disable
+    logging.disable(logging.CRITICAL)
+    yield
+    logging.disable(previous)
 
 
 def test_flat_cholesterol_not_fabricated_default():
