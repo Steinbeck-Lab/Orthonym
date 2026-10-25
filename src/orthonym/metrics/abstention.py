@@ -106,6 +106,22 @@ def record_abstention(code: AbstentionCode, detail: Optional[str] = None) -> Non
         pass
 
 
+def ring_system_unnameable(log, why: str) -> None:
+    """Log ``why`` (debug) and record that no ring namer names this ring system; returns None.
+
+    The fused-ring composer refusing a ring system is the refusal itself. The census used to read
+    it only by accident: the catalogue's tie-break between embeddings names the rest of the ring
+    system as a substituent (``match_fused_heterocycle_core``), and that discarded probe wrote the
+    ``enumerator_ring_fallback`` record into the first-writer-wins slot. A system with one
+    embedding, or none that spans the system, ran no probe and ended as ``OTHER``. The record is
+    made here so it no longer depends on the probe; it is speculative like every generation-stage
+    record (a name found by a later tier never surfaces it) and the detail keeps the label the
+    census already carried for "a ring the ladders have no name for".
+    """
+    log.debug(why)
+    record_abstention(AbstentionCode.BRANCH_UNNAMEABLE, detail="enumerator_ring_fallback")
+
+
 def record_suppression(code: AbstentionCode, detail: Optional[str] = None,
                        candidate: Optional[str] = None) -> None:
     """Tag from a POST-GENERATION site (downgrade gate / correctness gate)

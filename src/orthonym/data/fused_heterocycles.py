@@ -2561,6 +2561,19 @@ def _key_ring_bond_count(key: str) -> Optional[int]:
     return sum(1 for b in pat.GetBonds() if b.IsInRing())
 
 
+def _any_match_spans_ring_system(mol, matches) -> bool:
+    """True iff some embedding of a catalog core covers every atom of each fused ring system
+    it touches (the test of ``_match_covers_ring_systems``, applied to every embedding at
+    once with the ring systems found once)."""
+    from ..perception.rings import get_ring_systems
+    systems = [set(rs) for rs in get_ring_systems(mol)]
+    for m in matches:
+        core = set(m)
+        if all(not (core & rs) or rs.issubset(core) for rs in systems):
+            return True
+    return False
+
+
 def _match_adds_no_ring_bond(mol, atom_mapping, key) -> bool:
     """Does the matched ring system carry exactly the ring bonds of the pattern?
 
@@ -2982,7 +2995,18 @@ def _match_fused_heterocycle_core_compute(
                     # locants (was matches[0]). Byte-identical when only one
                     # match (asymmetric core) or no substituent.
                     rec_iul = FUSED_HETEROCYCLE_DATA[rec.smiles].get('iupac_locants') or {}
-                    match = _select_lowest_locant_match(mol, matches, rec_iul)
+                    if _any_match_spans_ring_system(mol, matches):
+                        match = _select_lowest_locant_match(mol, matches, rec_iul)
+                    else:
+                        # No embedding of this core spans the fused ring system it sits in
+                        # (the 4-ring tetracene pattern inside a 16-ring polyacene), so
+                        # ``match_fused_heterocycle_core`` declines the core whichever
+                        # numbering is picked (``_match_covers_ring_systems``). The pick
+                        # names every substituent of the core to break ties between
+                        # numberings, and here the 'substituents' are the rest of the ring
+                        # system: that naming is the work that exhausts the budget of a big
+                        # polyacene, for a result that is thrown away.
+                        match = matches[0]
                     best_match = (rec.name, list(match), core_size, rec.smiles)
 
     if best_match is None:

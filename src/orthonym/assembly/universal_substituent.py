@@ -2517,6 +2517,8 @@ def _render_as_substituent(sub: _ComponentResult, bond_order: int) -> str:
         if n >= 1 and name == get_chain_name(n):
             return get_alkyl_name(n)
     stem = name[:-1] if name.endswith("e") else name
+    if name.endswith("e]") and "-spirobi[" in name:
+        stem = name[:-2] + "]"      # the final 'e' of the component is elided before a suffix:10146)
     suffix = {1: "yl", 2: "ylidene", 3: "ylidyne"}.get(bond_order, "yl")
     loc = sub.attach_locant if sub.attach_locant is not None else 1
     return f"{stem}-{loc}-{suffix}"

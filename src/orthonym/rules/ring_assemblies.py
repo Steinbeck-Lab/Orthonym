@@ -206,10 +206,15 @@ def _compute_per_ring_ih_locants(
     result: List[Optional[List[int]]] = []
     for sys_idx, sys_atoms in enumerate(ring_systems):
         sys_rings = [r for r in ri.AtomRings() if set(r) <= sys_atoms]
-        if len(sys_rings) != 1:
-            result.append(None)  # fused component: keep front-replicate
+        if not sys_rings or (len(sys_rings) > 1 and not all(
+                mol.GetAtomWithIdx(i).GetIsAromatic() for i in sys_atoms)):
+            result.append(None)  # a fused component that is not mancude: keep front-replicate
             continue
-        ring = sys_rings[0]
+        # a fused mancude component reads its indicated-hydrogen atoms off the whole system, at the locants
+        # of its one numbering (``_get_connection_locant``): (the Blue Book) "taking
+        # into account the junction positions", so the nitrogen of carbazole that is a junction
+        # holds none ('9H-3,9'-bicarbazole': 9H for the N-H of the other unit only)
+        ring = sys_rings[0] if len(sys_rings) == 1 else sorted(sys_atoms)
         ih_atoms = _ring_indicated_h_atoms(mol, ring)
         if (per_system_locants is None
                 or sys_idx >= len(per_system_locants)
@@ -1829,6 +1834,19 @@ def _get_connection_locant(
         mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_list
     )
 
+    # A ring of a MULTI-RING fused mancude system with a heteroatom (carbazole, indole, acridine) is
+    # numbered with the whole system, the heteroatom at its place in the fixed numbering,
+    #: the junction takes the locant it has in the numbering of the component): the walk of
+    # the single ring below would give the nitrogen of carbazole locant 1 instead of 9 and name
+    # ``9H,9'H-1,3'-bicarbazole`` for ``3,9'-bicarbazole``. The one numbering of the component that
+    # the carbocyclic systems below use (``_fused_component_locant_map``) is read here as well; where
+    # it gives no locant (it declines the system, or the atom is a fusion atom) the walk stands.
+    if has_heteroatom and all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in system_atoms) and sum(
+            1 for r in ri.AtomRings() if set(r) <= system_atoms) > 1:
+        joint = _fused_component_connection_locant(mol, connecting_atom, system_atoms)
+        if joint is not None:
+            return joint
+
     if has_heteroatom:
         # For heterocyclic assemblies: apply standard IUPAC numbering
         # (heteroatom at position 1), then try both numbering directions
@@ -1956,6 +1974,13 @@ def _fused_component_locant_map(
     s_sorted = sorted(substituent_atoms)
 
     perms = _ring_system_automorphisms(mol, system_atoms)
+    if len(perms) == 1 and all(mol.GetAtomWithIdx(i).GetIsAromatic() for i in system_atoms):
+        # the bare skeleton of a mancude ring system with a substituted ring nitrogen (N-bonded
+        # benzimidazole) does not sanitise, which leaves the identity as the only numbering: the
+        # symmetry of the mancude parent (N1 and N3 of 1,3-benzimidazole) is read off the topology and
+        # the elements, so the junction takes the lowest locant its numberings allow "Lowest
+        # possible locants must be used to denote the positions of attachment", the Blue Book)
+        perms = _ring_system_automorphisms(mol, system_atoms, ignore_bond_order=True)
     best_key: Optional[Tuple[List[int], List[int]]] = None
     best_map: Optional[Dict[int, int]] = None
     for perm in perms:

@@ -11,6 +11,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
+from orthonym.tiers import emit_tier_flags
 from orthonym.data.polycyclic_data import POLYCYCLIC_DATA
 from tests.support.rt_assert import _independent_parse
 
@@ -30,21 +31,25 @@ def _key(smiles):
     ("Cc1ccc2c(c1)ccc1ccc3ccc4ccc5ccc6ccccc6c5c4c3c12", "3-methylheptahelicene"),
 ])
 def test_polyhelicene(smiles, expected):
-    row = Orthonym().name_tiered(smiles)
+    row = Orthonym(**emit_tier_flags("pin")).name_tiered(smiles)
     assert row["name"] == expected, row
     assert row["tier"] == "pin_verified", row
     assert _key(_independent_parse(expected)) == _key(smiles)
 
 
-def test_generated_hexahelicene_numbering_is_the_catalogued_one():
-    # the generator reproduces the hand-verified hexahelicene entry atom for atom
-    from orthonym.data.polycyclic_data import _helicene_entry, _HELICENE_PREFIX
-    _HELICENE_PREFIX[6] = 'hexa'
-    try:
-        name, data = _helicene_entry(6)
-    finally:
-        del _HELICENE_PREFIX[6]
-    assert name == 'hexahelicene'
+def test_class_numbering_is_the_catalogued_hexahelicene_one():
+    # the class of rules/hydrocarbon_series.py numbers hexahelicene as the
+    # hand-entered row does, atom for atom up to the symmetry of the skeleton; heptahelicene
+    # and the longer members have no row, the class serves them
+    from orthonym.rules.hydrocarbon_series import series_entry
     cat = POLYCYCLIC_DATA['hexahelicene']
-    assert data['canonical_smiles'] == cat['canonical_smiles']
-    assert data['iupac_numbering'] == cat['iupac_numbering']
+    mine = series_entry('hexahelicene')
+    a, b = Chem.MolFromSmiles(cat['canonical_smiles']), Chem.MolFromSmiles(mine['canonical_smiles'])
+    params = Chem.AdjustQueryParameters.NoAdjustments()
+    params.makeBondsGeneric = True
+    query = Chem.AdjustQueryProperties(a, params)
+    la = {i: str(v) for i, v in cat['iupac_numbering'].items()}
+    lb = {i: str(v) for i, v in mine['iupac_numbering'].items()}
+    assert any(all(la[i] == lb[m[i]] for i in la)
+               for m in b.GetSubstructMatches(query, uniquify=False, maxMatches=1000))
+    assert all(f'{n}helicene' not in POLYCYCLIC_DATA for n in ('hepta', 'octa', 'nona', 'deca', 'undeca', 'dodeca'))

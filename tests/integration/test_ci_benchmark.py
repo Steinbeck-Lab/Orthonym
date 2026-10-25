@@ -266,10 +266,14 @@ CI_BENCHMARK = [
         _ships("2-{[(8-methylnonyl)oxy]carbonyl}benzoic acid"),
         marks=_GATE,
     ),
+    # The arsenic dye: the acid owns the suffix, the xanthenone is the substituent, and each
+    # 1,3,2-dithiarsolane is a Hantzsch-Widman ring prefix; arsanes are named at the default
+    # tier ('dimethyl(phenyl)arsane'). The old row asserted a decline (UNSUPPORTED_ELEMENT), a limit of the
+    # ring-substituent writers, not of the scope; OPSIN 2.9.0 reads the name back to the full InChIKey.
     pytest.param(
         "O=C(O)c1ccccc1-c1c2ccc(=O)c([As]3SCCS3)c-2oc2c([As]3SCCS3)"
         "c(O)ccc12",
-        _declined("UNSUPPORTED_ELEMENT"),
+        _ships("2-[4,5-bis(1,3,2-dithiarsolan-2-yl)-6-hydroxy-3-oxo-3H-xanthen-9-yl]benzoic acid"),
         marks=_GATE,
     ),
     pytest.param(

@@ -4275,8 +4275,8 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # Adds only descriptors the token lacks -> can only make a stereo-bearing
     # decorated ring MORE correct (a stereo-stripped token was a wrong molecule the
     # RT gate suppressed); backstops a wrong label.
-    result = _prepend_ring_substituent_stereo(mol, pos, result, frag_set)
-    return result
+    from .prefix_derivation import substituted_prefix
+    return substituted_prefix(result, lambda tok: _prepend_ring_substituent_stereo(mol, pos, tok, frag_set))
 
 
 def _prepend_ring_substituent_stereo(mol, pos, token, frag_set=None):

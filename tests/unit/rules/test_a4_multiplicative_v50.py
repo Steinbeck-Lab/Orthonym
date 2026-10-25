@@ -58,7 +58,11 @@ class TestP6461ThioneKetoneParent:
         smi = "S=C(c1nccn1C)c1nccn1C"
         # 2026-09-25 (pre-existing-failures plan, Task 5) change-asserted-value:
         # cites indicated hydrogen for the mancude parent whatever sits on the pyrrole-type atom; a substituent group keeps it: "(1H-indol-1-yl)acetic acid (PIN)" (the Blue Book). OPSIN RT exact.
-        assert name_compound(smi) == "di(1-methyl-1H-imidazol-2-yl)methanethione"
+        # (c) "any component which is substituted automatically requires use of the
+        # multiplicative forms 'bis', 'tris', etc." (the Blue Book): '1-methyl-1H-imidazol-2-yl'
+        # is a substituted prefix, so 'bis' (the book's PIN '(2,2-dimethylpropyl)bis(2-methylprop-2-en-1-yl)azane',
+        # the Blue Book). OPSIN 2.9.0 reads this name to the input InChIKey.
+        assert name_compound(smi) == "bis(1-methyl-1H-imidazol-2-yl)methanethione"
 
     def test_di_imidazol_1_yl_methanethione(self):
         # (the Blue Book) 'di(1H-imidazol-1-yl)methanethione (PIN)';

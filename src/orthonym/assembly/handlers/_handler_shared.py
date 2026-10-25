@@ -2913,6 +2913,27 @@ def _l5_prefix_locants_omitted(features: Any, fragments: List["NameFragment"]) -
     return l5_uniform_complete(parent, decoration_of=decoration_of, counts=counts)
 
 
+def pool_polycyclic_candidate(features: Any, style: str) -> str:
+    """Add the polycyclic producer's name to the candidate pool and return the pool's best name.
+
+    The producer measures what the pool's character-count RATIO_REJECT_FLOOR only estimates
+    (``CandidatePool.add``, ``coverage_measured``): when the PAH it named is every heavy atom of
+    the molecule, the E1 partition of that ring system says the name accounts for every atom. A
+    name of the open series of is short for the molecule it names by design
+     spells an icosacene of 82 atoms 'icosacene': ratio 0.073)."""
+    from ...rules.polycyclics import get_polycyclic_core_atoms
+    from ...validation.e1_certificate import verify_atom_coverage
+    from ..candidate_pool import get_current_pool
+    from ..composer import _assemble_polycyclic_name
+
+    name = _assemble_polycyclic_name(features, style)
+    core = get_polycyclic_core_atoms(features.mol, features.polycyclic_name)
+    measured = bool(core) and verify_atom_coverage(features.mol, name, [core]).ok
+    pool = get_current_pool()
+    pool.add(name, "polycyclic", features, coverage_measured=measured)
+    return pool.best().name
+
+
 def _w2_atom_coverage_verdict(features, fragments, assembled: str):
     """The E1 atom-coverage verdict of a general-acyclic name's fragments, or None
     when it cannot be measured (a covered fragment did not report its atoms).

@@ -1,20 +1,23 @@
 """A multiplied fused-ring prefix is named the same whatever order the input SMILES lists
-its atoms in. The (d) 'bis before an attached-component fusion name' feature was
-taken out of lane L2 (a side record keyed by the name text made di/bis depend on input
-order); these rows pin main's single, order-independent spelling until that feature is
-rebuilt keyed by structure. Each molecule: 8 fixed re-spellings, one name and one tier
-(best-effort flags, the tier the 5-methyl row is only reachable at)."""
+its atoms in. The record that a prefix is substituted (so it takes 'bis', (c)) is
+written from the atoms of the prefix (``prefix_derivation``), not keyed by the name text (a side
+record keyed by the name text made di/bis depend on input order and was taken out of lane L2);
+these rows pin the single, order-independent spelling. Each molecule: 8 fixed re-spellings, one
+name and one tier (best-effort flags, the tier the 5-methyl row is only reachable at)."""
 import pytest
 
 from orthonym import Orthonym
 
 ROWS = [
-    # systematic_verified: the name breaks the PIN spelling rule ('di' before the
-    # substituted component '5-methyl-1-benzofuran-2-yl'; 'bis', 'tris'... are the numerical
-    # prefixes there, the Blue Book), which ``check_pin_spelling`` reports. The label used
-    # to read pin_unverified because the strict-twin demotion ran before the spelling check
-    # and hid it; the name is unchanged.
-    ("di(5-methyl-1-benzofuran-2-yl)methanol", "systematic_verified", [
+    # pin_verified: "General methodology" (c) "any component which is substituted
+    # automatically requires use of the multiplicative forms 'bis', 'tris', etc."
+    # (the Blue Book), so the substituted prefix '5-methyl-1-benzofuran-2-yl' takes 'bis'
+    # (the book's own PIN carries it: '(2,2-dimethylpropyl)bis(2-methylprop-2-en-1-yl)azane',
+    # the Blue Book). The name used to read 'di(...)' at systematic_verified because the
+    # record that a prefix is substituted was lost at the ring-yl writer; it is now written
+    # there, from the atoms of the prefix, so the spelling does not depend on the input order
+    # (OPSIN 2.9.0 reads the 'bis' name to the input InChIKey).
+    ("bis(5-methyl-1-benzofuran-2-yl)methanol", "pin_verified", [
         "OC(c1cc2cc(C)ccc2o1)c1cc2cc(C)ccc2o1",
         'c1(C)ccc2oc(cc2c1)C(c1cc2c(o1)ccc(C)c2)O',
         'c1c2cc(C)ccc2oc1C(c1cc2c(o1)ccc(c2)C)O',

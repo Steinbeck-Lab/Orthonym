@@ -1415,6 +1415,20 @@ def _fused_carbocycle_substituent_name(sub, attach_sub) -> Optional[str]:
     return builder_declining_on_error(build_fused_substituent, sub, attach_sub)
 
 
+def _series_substituent_name(sub, attach_sub) -> Optional[str]:
+    """'-yl' prefix of a member of the open hydrocarbon series of (``octacen-2-yl``,
+    ``hexaphenylen-1-yl``, ``tridecahelicen-3-yl``): the series name without its final 'e', the
+    lowest locant the numbering gives the free valence, and '-yl'; the
+    ring system must be the whole of ``sub``)."""
+    from .hydrocarbon_series import identify_series
+    from .polycyclics import series_attachment_locant
+    hit = identify_series(sub)
+    if hit is None or len(hit.atoms) != sub.GetNumAtoms() or hit.spec.series == 'alene':
+        return None   # a polyalene's substituent locant depends on its drawing
+    locant = series_attachment_locant(sub, hit.name, attach_sub)
+    return f'{hit.name[:-1]}-{locant}-yl' if locant is not None else None
+
+
 def _vonbaeyer_substituent_name(sub, attach_sub) -> Optional[str]:
     """``bicyclo[2.2.1]heptan-2-yl`` etc. for a detached carbocyclic von-Baeyer
     ring system, reusing the bicyclo parent namer with the free valence
@@ -1859,10 +1873,13 @@ def _polycyclic_substituent_name(
     if sub is None:
         return None
     from .bridged_fused import joins_identical_hetero_ring_systems
+    from .spirobi_substituent import spirobi_substituent_name
     assembly = joins_identical_hetero_ring_systems(mol, ring_atoms)
-    for namer in (_bridged_fused_substituent_name,
+    for namer in (_series_substituent_name,
+                  _bridged_fused_substituent_name,
                   _vonbaeyer_substituent_name,
                   _spiro_substituent_name,
+                  spirobi_substituent_name,
                   _fused_hydro_substituent_name,
                   _fused_carbocycle_substituent_name):
         if assembly and namer is _fused_carbocycle_substituent_name:
@@ -2261,8 +2278,29 @@ def name_ring_system_substituent(mol, frag_atoms, attach_idx: int, *args, **kwar
     phane = phane_prefix(mol, frag_atoms, attach_idx)
     if phane is not None:
         return phane
-    return mark_decorated_assembly(
+    name = mark_decorated_assembly(
         mol, frag_atoms, _name_ring_system_substituent(mol, frag_atoms, attach_idx, *args, **kwargs))
+    return _recorded_as_substituted(mol, frag_atoms, attach_idx, name)
+
+
+def _recorded_as_substituted(mol, frag_atoms, attach_idx: int, name):
+    """``name`` with the record that its writer attached substituent prefixes (c),
+    the Blue Book: "any component which is substituted automatically requires use of the
+    multiplicative forms 'bis', 'tris', etc."), for a ring rooted at the free valence that carries
+    atoms of its own beyond the ring: the decorated writers do not record it, and a multiplier read
+    off the spelling takes 'di' for a stem it does not know ('9,9-dioctyl-9H-fluoren-2-yl')."""
+    from ..assembly.prefix_derivation import built, derivation_of
+    if not name or derivation_of(name) is not None:
+        return name
+    info = mol.GetRingInfo()
+    atoms = set(frag_atoms)
+    start = attach_idx if attach_idx in atoms else next(
+        (n.GetIdx() for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors() if n.GetIdx() in atoms), None)
+    if start is None or info.NumAtomRings(start) == 0:
+        return name
+    if all(info.NumAtomRings(a) > 0 for a in atoms):
+        return name
+    return built(name, substituted=True)
 
 
 def _name_ring_system_substituent(
@@ -3729,34 +3767,19 @@ def _get_polycyclic_attachment_locant(
     except ImportError:
         pass
 
-    # task 9: carbocyclic polycyclic aromatics (naphthalene, anthracene,
-    #...) have authoritative IUPAC numbering in the PAH machinery.:
-    # the free valence takes the LOWEST locant the numbering allows, so
-    # minimize over ALL automorphic substructure matches of THIS ring system
-    # (naphthalen-2-yl, never the symmetry-equivalent -6-yl).
+    # task 9: carbocyclic polycyclic aromatics (naphthalene, anthracene,...) have
+    # authoritative IUPAC numbering in the PAH machinery.: the free valence takes the
+    # LOWEST locant the numbering allows over every automorphism of THIS ring system
+    # (naphthalen-2-yl, never the symmetry-equivalent -6-yl): ``rules.pah_attachment``.
     if ring_name is not None:
-        try:
-            from .polycyclics import POLYCYCLIC_DATA, _map_pah_atoms_to_iupac
-            pah_data = POLYCYCLIC_DATA.get(ring_name)
-            if pah_data:
-                pattern = _compiled_smarts(pah_data['smarts'])
-                if pattern is not None:
-                    ring_atom_set = set(ring_atoms)
-                    best_locant: Optional[int] = None
-                    for match in mol.GetSubstructMatches(pattern, uniquify=False):
-                        if set(match) != ring_atom_set:
-                            continue
-                        mapping = _map_pah_atoms_to_iupac(
-                            mol, ring_name, list(match)
-                        )
-                        loc = mapping.get(attachment_atom) if mapping else None
-                        if isinstance(loc, int) and (
-                                best_locant is None or loc < best_locant):
-                            best_locant = loc
-                    if best_locant is not None:
-                        return best_locant
-        except ImportError:
-            pass
+        from .polycyclics import series_attachment_locant
+        _series_loc = series_attachment_locant(mol, ring_name, attachment_atom)
+        if _series_loc is not None:   # series: the rule's numbering
+            return _series_loc
+        from .pah_attachment import pah_attachment_locant
+        loc = pah_attachment_locant(mol, ring_atoms, attachment_atom, ring_name)
+        if loc is not None:
+            return loc
 
     # For monocyclic heterocycles with retained names (e.g. 1,3-dioxolane),
     # use proper IUPAC numbering: start from highest-priority heteroatom,

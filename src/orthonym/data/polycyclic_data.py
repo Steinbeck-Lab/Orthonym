@@ -362,11 +362,16 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
     # Hexacyclic+ (6+ rings)
     # ==========================================================================
     'coronene': {
-        # 7 rings, hexagonal symmetry
+        # 7 rings, hexagonal symmetry. Numbering: OPSIN 2.9.0 `coronene -o extendedsmi`
+        # ($_AV: 1;2;2a;3;4;4a;5;6;6a;7;8;8a;9;10;10a;11;12;12a;12g;12f;12e;12d;12c;12b), mapped
+        # onto this SMILES by GetSubstructMatch. The periphery is; the six interior
+        # atoms keep OPSIN's lettering after 12a as pyrene's 10b, 10c do. Without a numbering a
+        # substituted coronene fell to the naphthalene-only peripheral guess, which numbers by
+        # the order the atoms are listed in.
         'canonical_smiles': 'c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61',
         'smarts': 'c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61',
         'num_atoms': 24,
-        'iupac_numbering': {},
+        'iupac_numbering': {0: 1, 1: 2, 2: '2a', 3: 3, 4: 4, 5: '4a', 6: 5, 7: 6, 8: '6a', 9: 7, 10: 8, 11: '8a', 12: 9, 13: 10, 14: '10a', 15: 11, 16: 12, 17: '12a', 18: '12g', 19: '12b', 20: '12c', 21: '12d', 22: '12e', 23: '12f'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 7,
     },
@@ -488,56 +493,13 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
 }
 
 
-# "Polyhelicenes" (the Blue Book): "A hydrocarbon parent component
-# of six or more rings that consists of a benzene ring ortho-fused to the
-# 3,4-position of phenanthrene and further benzene rings fused in a similar way is
-# named by citing a numerical prefix ('hexa', 'hepta', etc.) denoting the total
-# number of benzene rings... followed by the term 'helicene'"; 'hexahelicene (PIN)'
-# (:11483) with the orientation and numbering. The series is one
-# pattern, so it is generated rather than tabulated: the n rings run 1-4 and 4a,
-# then (2k-1, 2k, 2ka) for each further ring k = 3..n, the far terminal ring's four
-# CH positions 2n+1..2n+4, then the n-1 interior atoms (2n+4)a, (2n+4)b,... in the
-# order of the SMILES below. hexahelicene keeps its hand-verified entry above; the
-# generator reproduces it atom for atom, and every member 7-12 reproduces OPSIN
-# 2.9.0's own locant labels for its name (checked when this was written).
-_HELICENE_PREFIX = {7: 'hepta', 8: 'octa', 9: 'nona', 10: 'deca',
-                    11: 'undeca', 12: 'dodeca'}
-
-
-def _helicene_entry(n: int) -> Tuple[str, Dict[str, Any]]:
-    from rdkit import Chem
-
-    def _rb(k: int) -> str:
-        return str(k) if k < 10 else f'%{k}'
-
-    smiles = ('c1cccc2' + ''.join(f'ccc{_rb(k)}' for k in range(3, n + 1))
-              + f'ccccc{_rb(n)}'
-              + ''.join(f'c{_rb(k)}' for k in range(n - 1, 2, -1)) + 'c12')
-    locants: List[Any] = [1, 2, 3, 4, '4a']
-    for k in range(3, n + 1):
-        locants += [2 * k - 1, 2 * k, f'{2 * k}a']
-    locants += [2 * n + 1, 2 * n + 2, 2 * n + 3, 2 * n + 4]
-    locants += [f'{2 * n + 4}{chr(97 + i)}' for i in range(n - 1)]
-    mol = Chem.MolFromSmiles(smiles)
-    canonical = Chem.MolToSmiles(mol)
-    order = [int(x) for x in
-             mol.GetProp('_smilesAtomOutputOrder').strip('[],').split(',')]
-    numbering = {can_idx: locants[atom_idx]
-                 for can_idx, atom_idx in enumerate(order)}
-    return f'{_HELICENE_PREFIX[n]}helicene', {
-        'canonical_smiles': canonical,
-        'smarts': canonical,
-        'num_atoms': mol.GetNumAtoms(),
-        'iupac_numbering': numbering,
-        'substituent_positions': list(range(1, 2 * n + 5)),
-        'num_rings': n,
-    }
-
-
-for _n in _HELICENE_PREFIX:
-    _hname, _hdata = _helicene_entry(_n)
-    POLYCYCLIC_DATA.setdefault(_hname, _hdata)
-del _n, _hname, _hdata
+# "Polyhelicenes" (the Blue Book) is one rule for every member from six
+# rings on, and so are the rest of (acenes, aphenes, alenes, phenylenes,
+# naphthylenes): ``rules/hydrocarbon_series.py`` reads, spells and numbers a member from the
+# ring graph, and ``rules/polycyclics._pah_entry`` serves its entry for any name this table
+# does not list. The rows above (pentacene.. hexahelicene) are the members whose numbering was
+# entered by hand from OPSIN's labels; ``tests/unit/rules/test_hydrocarbon_series.py`` holds
+# the class to reproduce each of them.
 
 
 # Reverse lookup: canonical SMILES -> PAH name

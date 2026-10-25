@@ -3289,9 +3289,8 @@ def _assemble_monospiro_from_sides(
     else:
         first_name, first_loc, second_name, second_loc = b_name, b_loc, a_name, a_loc
         unprimed_map, primed_map = b_map, a_map
-    first_name = _strip_consumed_indicated_h(first_name, first_loc)
-    second_name = _strip_consumed_indicated_h(second_name, second_loc)
-    name = f"spiro[{first_name}-{first_loc},{second_loc}'-{second_name}]"
+    from .spirobi_name import monospiro_name
+    name = monospiro_name(first_name, first_loc, second_name, second_loc, _strip_consumed_indicated_h)
 
     combined_locants: Dict[int, _Locant] = {}
     for atom_idx, locant in unprimed_map.items():

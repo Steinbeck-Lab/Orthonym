@@ -396,6 +396,8 @@ def _fused_system_name(mol: Chem.Mol, system_atoms: Set[int]) -> Optional[str]:
     rings_in = [set(r) for r in ri.AtomRings() if set(r) <= set(system_atoms)]
     if len(rings_in) < 2:
         return None  # monocyclic / non-fused -> no fusion descriptor
+    if get_spiro_atoms(mol) & set(system_atoms):
+        return None  # a spiro system has no fusion descriptor (its components are named by
     try:
         from .spiro import _name_fused_component
         rings = [list(r) for r in rings_in]

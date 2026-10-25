@@ -67,8 +67,7 @@ def name_polycyclic(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:
     """Direct-return polycyclic handler — wraps _assemble_polycyclic_name."""
-    from ..candidate_pool import get_current_pool
-    from ..composer import _assemble_polycyclic_name
+    from ._handler_shared import pool_polycyclic_candidate
 
     polycyclic_name = getattr(features, 'polycyclic_name', None)
     if polycyclic_name is None:
@@ -81,11 +80,8 @@ def name_polycyclic(
             "polycyclic", _ha, (polycyclic_name or "")[:60],
         )
 
-    poly_assembled = _assemble_polycyclic_name(features, style)
-    pool = get_current_pool()
-    pool.add(poly_assembled, "polycyclic", features)
     # composer.py:1114 inline: return pool.best.name (NO _inject_stereo wrap)
-    _nm = pool.best().name
+    _nm = pool_polycyclic_candidate(features, style)
     return NamingResult(
         name=_nm,
         tree=NameTreeNode(parent_stem=_nm, class_id="polycyclic", iupac_section_cite="P-25", fragment_legacy=_nm),

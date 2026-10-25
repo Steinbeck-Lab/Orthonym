@@ -376,13 +376,40 @@ def _assemble(mol, system: Set[int], parent: BridgedParent, suffix, added=frozen
         extra = f"({hydro.ih_text(added, a2l)})" if added else ""
         suffix_text = f"-{','.join(str(x) for x in locs)}{extra}-{mult}{stem}"
         elide = elides and not mult
-    sub_prefix = _partial_sat_substituent_prefix(mol, a2l, exclude_atoms=set(exo))
+    assign_stereochemistry(mol)
+    descriptors = collect_stereodescriptors(mol, a2l)
+    omit = not descriptors and _single_prefix_locant_is_omitted(
+        mol, system, parent, bool(suffix_text), set(exo))
+    sub_prefix = _partial_sat_substituent_prefix(
+        mol, a2l, exclude_atoms=set(exo), omit_locants=omit)
     if sub_prefix is None and (_offring_substituent_atoms(mol, a2l) - set(exo)):
         return None
     stem = f"{parent.text(elide=elide)}{suffix_text}"
     name = _join_prefix_to_name((sub_prefix or "").rstrip("-"), stem)
-    assign_stereochemistry(mol)
-    return collect_stereodescriptors(mol, a2l), name
+    return descriptors, name
+
+
+def _single_prefix_locant_is_omitted(mol, system: Set[int], parent: BridgedParent,
+                                     has_suffix: bool, exo: Set[int]) -> bool:
+    """ (the Blue Book, 'chlorocoronene (PIN)':2947): the one locant of the one
+    prefix of a parent hydride whose substitutable positions are all alike is not cited. The
+    decision is ``assembly.locant_omission.l3_locant_omitted_for_parent_atoms``, which measures
+    the symmetry classes of the parent's atoms; it is asked only for a plain mancude parent (no
+    hydro prefix, indicated hydrogen or bridge), no suffix, exactly one substituent, and a
+    scope that is the whole molecule named,:2869, denies unless all that holds)."""
+    if has_suffix or parent.hydro or parent.indicated_hydrogen or parent.bridges:
+        return False
+    attached = [(a, nb.GetIdx()) for a in system for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                if nb.GetIdx() not in system and nb.GetIdx() not in exo]
+    if len(attached) != 1:
+        return False
+    from ...assembly.handlers._handler_shared import locant_scope_is_a_name_component
+    if locant_scope_is_a_name_component():
+        return False
+    from ...assembly.locant_omission import l3_locant_omitted_for_parent_atoms
+    return l3_locant_omitted_for_parent_atoms(
+        mol, system, prefix_locants=[parent.atom_to_locant[attached[0][0]]], suffix_locants=[],
+        parent_cites_locants=False, stereo_text="")
 
 
 def _other_ring_systems_are_junior(mol, system: Set[int]) -> bool:

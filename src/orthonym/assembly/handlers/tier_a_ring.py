@@ -50,8 +50,10 @@ import logging
 import re
 from typing import Any, Optional
 
+from ..complex_ring_group import assemble_complex_ring_by_group, is_complex_ring_system_by_group
 from ..name_tree import NameTreeNode, NamingResult
 from ..naming_utils import bracket_depths, top_level_text
+from ._handler_shared import pool_polycyclic_candidate
 
 logger = logging.getLogger(__name__)
 
@@ -269,7 +271,6 @@ def name_tier_a_ring(
         _assemble_benzene_name,
         _assemble_complex_ring_name,
         _assemble_heterocycle_name,
-        _assemble_polycyclic_name,
         _complex_ring_parent_atom_indices,
         _enrich_complex_ring_with_subs,
         _enrich_handler_name,
@@ -449,9 +450,9 @@ def name_tier_a_ring(
         features.is_cyclic
         and not getattr(features, 'chain_is_parent', False)
         and not _skip_complex_non_senior
-        and _is_complex_ring_system(features.mol)
+        and is_complex_ring_system_by_group(features.mol, features)
     ):
-        complex_result = _assemble_complex_ring_name(features.mol, features)
+        complex_result = assemble_complex_ring_by_group(features.mol, features)
         if complex_result:
             complex_name = complex_result.name
             if (not complex_result.substituents_included
@@ -538,10 +539,7 @@ def name_tier_a_ring(
                     "HANDLER_COVERAGE: handler=%s coverage=NA accounted=NA/%d name=%s",
                     "polycyclic", _ha, (polycyclic_name or "")[:60],
                 )
-            poly_assembled = _assemble_polycyclic_name(features, style)
-            pool = get_current_pool()
-            pool.add(poly_assembled, "polycyclic", features)
-            _nm = pool.best().name
+            _nm = pool_polycyclic_candidate(features, style)
             return NamingResult(
                 name=_nm,
                 tree=NameTreeNode(parent_stem=_nm, class_id="tier_a_ring", iupac_section_cite="P-25", fragment_legacy=_nm),

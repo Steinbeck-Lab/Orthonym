@@ -42,6 +42,7 @@ from .hydroximic_acids import (
 from .benzene_acid_suffixes import identify_chalcogen_acyl_group as _thioacyl  #: -C(=S)-R prefix
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
+from .ring_nitrogen_yl import n_in_substituent_ring, ring_yl_in_scope
 from ..perception.molcache import atoms_of, inchikey_of
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -1651,7 +1652,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int], principal_g
 
             if not _is_carbonyl:
                 _MAX_FALLBACK_ATOMS = 10
-                if len(sub_atoms) <= _MAX_FALLBACK_ATOMS:
+                if len(sub_atoms) <= _MAX_FALLBACK_ATOMS or ring_yl_in_scope(mol, start_idx, sub_atoms):
                     from ..assembly.naming_utils import needs_brackets
                     from ..assembly.substituent_enumerator import name_substituent
                     prefix_name = name_substituent(mol, set(sub_atoms), start_idx)
@@ -2345,7 +2346,7 @@ def _identify_nitrogen_group(mol, n_idx: int, ring_atoms: Set[int]) -> Optional[
 
     # N,N-dialkyl amino (-NR2): 0 H, 2 carbon neighbors -> '(dimethylamino)',
     # '[ethyl(methyl)amino]' (no italic N locants on an amino prefix).
-    if h_count == 0 and len(neighbors) == 2:
+    if h_count == 0 and len(neighbors) == 2 and not n_in_substituent_ring(mol, n_idx, ring_atoms):
         c_neighbors = [n for n in neighbors if n.GetSymbol() == 'C']
         if len(c_neighbors) == 2:
             alkyl_names_list = []

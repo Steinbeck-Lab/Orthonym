@@ -130,7 +130,7 @@ def strict_ring_substituent_name(mol, frag_atoms, attach_idx) -> Optional[str]:
         return None
     if pg is None:
         classes = functional_group_classes(mol)
-        if (classes is None or skeleton_twin(mol, fset, attach_idx)
+        if (classes is None or (skeleton_twin(mol, fset, attach_idx) and not parent_ring_outside(mol, fset))
                 or (classes & _PARENT_NAMING and classes <= _SUBSTITUENT_ONLY | _PARENT_NAMING)
                 or (classes <= _SUBSTITUENT_ONLY and not parent_ring_outside(mol, fset))):
             return None

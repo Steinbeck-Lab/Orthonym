@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from typing import Optional
 
 __all__ = ["PrefixDerivation", "PrefixName", "built", "carried", "derivation_of",
-           "with_derivation"]
+           "substituted_prefix", "with_derivation"]
 
 
 @dataclass(frozen=True)
@@ -73,3 +73,12 @@ def carried(text: Optional[str], like) -> Optional[str]:
     if rec is None or text is None or derivation_of(text) is not None:
         return text
     return PrefixName(text, rec)
+
+
+def substituted_prefix(text: Optional[str], step) -> Optional[str]:
+    """``step(token)`` for ``text`` recorded as substituted: a ring prefix with decorations is a
+    substituted component whatever stem its spelling ends in (c), the Blue Book), and
+    the multiplier of a repeated copy reads this record and not the spelling; the record is kept
+    through ``step`` (a stereodescriptor prepended, marks added)."""
+    token = built(text, substituted=True)
+    return carried(step(token), token)

@@ -99,6 +99,8 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
     5. Mutual exclusion: NOT pure single-bond ring assembly (a phase
        territory; canonical helper reuse via
        ``multiplicative._is_pure_single_bond_assembly``).
+    6. At least one of the two rings meets the macrocycle along more than one bond
+       (is attached at nonadjacent positions): (1), see the loop below.
 
     Returns False for None input.
 
@@ -147,6 +149,12 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
     if len(small_rings) < 2 or not macro_rings:
         return False
 
+    # The ring SYSTEM each small ring belongs to: (1) speaks of "a mancude
+    # system attached... at nonadjacent ring positions", and a naphthalene joined at its
+    # peri positions 1 and 8 meets the macrocycle in three atoms of the system, though in
+    # two of each of its rings.
+    systems = _fused_systems(small_rings)
+
     # Find at least one disjoint pair of small rings whose linker chain has
     # >= 2 intermediate atoms AND the chain belongs to a macro ring.
     for i in range(len(small_rings)):
@@ -175,8 +183,49 @@ def is_cyclophane(mol: Optional[Chem.Mol]) -> bool:
             # non-cyclophane topologies (internal notes).
             for macro in macro_rings:
                 if chain_atoms <= macro:
-                    return True
+                    # (1) (the Blue Book): a cyclophane has "at least one
+                    # ring or ring system of which must be a mancude system attached to
+                    # adjacent atoms or chains at NONADJACENT ring positions". A macrocycle
+                    # that meets a mancude ring system along one bond only (two atoms) is
+                    # ortho-fused to it, and "Mancude systems attached to
+                    # adjacent atoms of an alicyclic large ring" (:23833) names such a system
+                    # by fusion nomenclature: "A cyclophane name is not allowed". A
+                    # polyphenylene of five or more benzene rings (decaphenylene,...) is that
+                    # case. A macrocycle whose joined rings are not mancude keeps the reading
+                    # this gate always gave it.
+                    ends = [(systems[k], len(macro & systems[k])) for k in (i, j)]
+                    mancude = [(sys_, n) for sys_, n in ends if _is_mancude_system(mol, sys_)]
+                    if any(n > 2 for _s, n in mancude) or not mancude:
+                        return True
     return False
+
+
+def _is_mancude_system(mol: Chem.Mol, atoms: Set[int]) -> bool:
+    """Every atom of the ring system is aromatic or has a double bond inside it."""
+    for idx in atoms:
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetIsAromatic():
+            continue
+        if not any(b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtomIdx(idx) in atoms
+                   for b in atom.GetBonds()):
+            return False
+    return True
+
+
+def _fused_systems(rings: List[Set[int]]) -> List[Set[int]]:
+    """For each ring, the atoms of the fused ring system it is in (rings that share two or
+    more atoms, transitively)."""
+    systems = [set(r) for r in rings]
+    merged = True
+    while merged:
+        merged = False
+        for a in range(len(systems)):
+            for b in range(a + 1, len(systems)):
+                if len(systems[a] & systems[b]) >= 2 and systems[a] != systems[b]:
+                    union = systems[a] | systems[b]
+                    systems[a] = systems[b] = union
+                    merged = True
+    return systems
 
 
 def _shortest_chain_atoms(

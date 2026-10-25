@@ -37,7 +37,7 @@ rules/polycyclic_von_baeyer.py as a thin wrapper around its VonBaeyerAnalyzer.
 
 import weakref
 from collections import defaultdict, deque
-from typing import Any, Dict, List, NamedTuple, Optional, Set
+from typing import Any, Dict, List, NamedTuple, Optional, Set, Tuple
 
 from rdkit import Chem
 
@@ -52,8 +52,22 @@ from ..data.polycyclic_data import (
     get_polycyclic_by_smiles,
     is_polycyclic_aromatic,
 )
+from .hydrocarbon_series import (
+    identify_series as _identify_series,
+    parse_series_name,
+    series_entry as _series_entry,
+    series_ring_system_atoms as _series_ring_system_atoms,
+)
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from ..perception.smarts_cache import compiled as _compiled_smarts
+
+
+def _pah_entry(pah_name: str) -> Optional[Dict[str, Any]]:
+    """The entry of a PAH: its ``POLYCYCLIC_DATA`` row, or, for a member of the open
+    hydrocarbon series of that no row lists (octacene, a pentadecaphenylene),
+    the entry ``rules/hydrocarbon_series.py`` builds from the rule."""
+    entry = POLYCYCLIC_DATA.get(pah_name)
+    return entry if entry is not None else _series_entry(pah_name)
 
 # C5 giant-cage scope guard (identify_polycyclic): no entry in POLYCYCLIC_DATA
 # exceeds ~10 fused rings (max cataloged num_atoms is 40, a cata-fused chain -- see
@@ -120,11 +134,15 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
     """
     # C5: an all-carbon giant cage (fullerene) is out-of-scope and would spin
     # in the substructure-matching loop below -- decline fast (see module docstring
-    # on _GIANT_CAGE_RING_THRESHOLD above).
+    # on _GIANT_CAGE_RING_THRESHOLD above). A member of the open series of
+    # (rules/hydrocarbon_series.py) is read from the ring graph, never matched with a
+    # pattern, and no atom of one lies in three rings, so it is not a cage: an
+    # icosacene has 20 rings and is named.
     if mol.GetRingInfo().NumRings() >= _GIANT_CAGE_RING_THRESHOLD and all(
         atom.GetSymbol() == 'C' for atom in mol.GetAtoms()
     ):
-        return None
+        giant_series = _identify_series(mol)
+        return giant_series.name if giant_series is not None else None
 
     # First, try exact canonical match (unsubstituted PAH)
     canonical_smiles = Chem.MolToSmiles(mol, canonical=True)
@@ -136,6 +154,7 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
     # Try substructure matching for substituted PAHs. Patterns are pre-compiled
     # and pre-sorted largest-first at import (see _COMPILED_PAH); this loop used to
     # re-sort + Chem.MolFromSmarts all ~34 patterns on every call.
+    table_hit: Optional[str] = None
     for pah_name, pah_data, pattern in _COMPILED_PAH:
         # C5: only matches[0] is ever read below -- bound the search so a
         # highly-symmetric giant cage cannot enumerate a combinatorial number of
@@ -177,9 +196,38 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
                         covered |= c
                 if covered != match_atoms:
                     continue  # Skip, try smaller PAH or return None
-                return pah_name
+                table_hit = pah_name
+                break
 
-    return None
+    # The open series of (rules/hydrocarbon_series.py): a member no table row lists
+    # is recognised from the ring graph. The senior parent ring system wins: (d) "has
+    # the greater number of rings", then (e) "the greater number of skeletal atoms"
+    # (the Blue Book); one equal in both keeps the table's name, which the series spells
+    # the same way.
+    series_hit = _identify_series(mol)
+    if series_hit is None:
+        return table_hit
+    if table_hit is None:
+        return series_hit.name
+    table_size = (POLYCYCLIC_DATA[table_hit]['num_rings'], POLYCYCLIC_DATA[table_hit]['num_atoms'])
+    return series_hit.name if (series_hit.rings, len(series_hit.atoms)) > table_size else table_hit
+
+
+def series_attachment_locant(mol, pah_name: str, attachment_atom: int) -> Optional[int]:
+    """The locant of a free valence on a member of the open hydrocarbon series of
+    (``rules/hydrocarbon_series.py``), or ``None`` for any other ring system.
+
+     gives the free valence the lowest locant the numbering allows, so every numbering
+    the series' symmetry offers is tried (``get_polycyclic_iupac_locants`` with the attachment
+    atom as the substituent). The numbering is the rule's, not a peripheral-order guess
+    (``_map_pah_atoms_to_iupac``), which cannot number a polyacene past naphthalene."""
+    spec = parse_series_name(pah_name)
+    if spec is None or spec.series == 'alene':
+        return None     # a polyalene's locants depend on its drawing, see hydrocarbon_series
+    numbering = get_polycyclic_iupac_locants(
+        mol, pah_name, substituent_atoms={attachment_atom})
+    locant = numbering.get(attachment_atom) if numbering else None
+    return locant if isinstance(locant, int) else None
 
 
 def get_polycyclic_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
@@ -194,7 +242,8 @@ def get_polycyclic_core_atoms(mol, pah_name: str) -> Optional[Set[int]]:
         Set of atom indices forming the PAH core, or None if no match
     """
     if pah_name not in POLYCYCLIC_DATA:
-        return None
+        # a member of the open series of: its ring system is the core
+        return _series_ring_system_atoms(mol, pah_name)
 
     pah_data = POLYCYCLIC_DATA[pah_name]
     smarts = pah_data['smarts']
@@ -245,6 +294,38 @@ _PAH_AMINE_PRINCIPAL_KEYS = frozenset({
 _PAH_OL_PRINCIPAL_KEYS = frozenset({'phenol'})
 
 
+def _promoted_amine_anchor(mol, core_atoms: Set[int], principal_group: Optional[str]) -> Set[int]:
+    """The ring atom of the one N-substituted amine that ``name_substituted_polycyclic`` promotes
+    to the '-amine' suffix (its second pass,: ``N-methylnaphthalen-2-amine``, not
+    ``2-(methylamino)naphthalene``), or an empty set.
+
+    The numbering is chosen before that promotion, and a principal characteristic group takes
+    the lowest locant before any prefix does (c)), so the ring atom must be anchored
+    as the suffix's. The conditions are those of the promotion: the principal group is an
+    amine, no substituent is a suffix, and exactly one substituent starts with a nitrogen
+    atom (``amino`` itself is anchored by the caller) and is an amine."""
+    if principal_group not in _PAH_AMINE_PRINCIPAL_KEYS:
+        return set()
+    candidates = []
+    for idx in core_atoms:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() in core_atoms:
+                continue
+            sub = _identify_pah_substituent(mol, nb.GetIdx(), core_atoms)
+            if not sub:
+                continue
+            if sub.get('is_suffix'):
+                return set()
+            atoms = sub.get('atoms') or ()
+            if sub['name'] != 'amino' and atoms and mol.GetAtomWithIdx(atoms[0]).GetSymbol() == 'N':
+                candidates.append((idx, atoms[0]))
+    if len(candidates) != 1:
+        return set()
+    from .fused_rings import _exocyclic_amine_n_substituents
+    detected = _exocyclic_amine_n_substituents(mol, candidates[0][1], core_atoms)
+    return {candidates[0][0]} if detected and detected[0] else set()
+
+
 def get_polycyclic_substituents(mol, pah_name: str,
                                 principal_group: Optional[str] = None
                                 ) -> Dict[int, List[Dict]]:
@@ -271,7 +352,7 @@ def get_polycyclic_substituents(mol, pah_name: str,
     if core_atoms is None:
         return {}
 
-    pah_data = POLYCYCLIC_DATA.get(pah_name, {})
+    pah_data = _pah_entry(pah_name) or {}
     allowed_positions = pah_data.get('substituent_positions', [])
 
     # Get the SMARTS match for atom ordering
@@ -326,6 +407,7 @@ def get_polycyclic_substituents(mol, pah_name: str,
             attach_atoms.add(idx)
         if is_pcg:
             suffix_atoms.add(idx)
+    suffix_atoms |= _promoted_amine_anchor(mol, core_atoms, principal_group)
 
     # Phase E1 / DD4 (H1): use the authoritative stored ``iupac_numbering``
     # with automorphism-minimization (covers naphthalene/anthracene/phenanthrene/
@@ -593,7 +675,7 @@ def get_polycyclic_iupac_locants(
     """
     import re
 
-    entry = POLYCYCLIC_DATA.get(pah_name)
+    entry = _pah_entry(pah_name)
     if entry is None:
         return None
 
@@ -603,6 +685,14 @@ def get_polycyclic_iupac_locants(
     canonical_mol = Chem.MolFromSmiles(canonical_smiles)
     if canonical_mol is None:
         return None
+    # A member of the open series of is matched with its bond orders ignored: a
+    # ring system with localized double bonds (octalene) has more than one drawing and one
+    # numbering "Localized double bonds", the Blue Book).
+    matcher = canonical_mol
+    if entry.get('generic_bonds'):
+        params = Chem.AdjustQueryParameters.NoAdjustments()
+        params.makeBondsGeneric = True
+        matcher = Chem.AdjustQueryProperties(canonical_mol, params)
 
     canonical_numbering = entry.get('iupac_numbering') or {}
     if not canonical_numbering:
@@ -655,7 +745,7 @@ def get_polycyclic_iupac_locants(
     if substituent_atoms:
         from .locants import compare_numbering
 
-        matches = mol.GetSubstructMatches(canonical_mol, uniquify=False)
+        matches = mol.GetSubstructMatches(matcher, uniquify=False)
         sub_set = set(substituent_atoms)
         # (c) (fix): the principal-characteristic-group atoms (the
         # suffix-bearing carbons) get the lowest locant BEFORE detachable prefix
@@ -668,22 +758,79 @@ def get_polycyclic_iupac_locants(
         best_map: Optional[Dict[int, Any]] = None
         best_locs: Optional[List[Any]] = None
         best_pcg: Optional[List[Any]] = None
+        prefix_atoms = sub_set - pcg_set
+        best_key: Optional[Tuple[Any, ...]] = None     # the tie key of ``best_map``, once asked for
         for match in matches:
             if len(match) != n_canonical:
                 continue
             mp = _build_map(match)
             locs = [mp[a] for a in sub_set if a in mp]
             pcg_locs = [mp[a] for a in pcg_set if a in mp]
-            if best_map is None or compare_numbering(
-                    {'pcg': pcg_locs, 'substituents': locs},
-                    {'pcg': best_pcg, 'substituents': best_locs}) < 0:
+            if best_map is None:
+                best_map, best_locs, best_pcg = mp, locs, pcg_locs
+                continue
+            order = compare_numbering(
+                {'pcg': pcg_locs, 'substituents': locs},
+                {'pcg': best_pcg, 'substituents': best_locs})
+            if order == 0 and prefix_atoms:
+                # the numberings agree on every locant set: (g), then the canonical rank
+                if best_key is None:
+                    best_key = _prefix_tie_key(mol, best_map, prefix_atoms)
+                key = _prefix_tie_key(mol, mp, prefix_atoms)
+                order = -1 if key < best_key else (1 if key > best_key else 0)
+                if order < 0:
+                    best_key = key
+            elif order < 0:
+                best_key = None
+            if order < 0:
                 best_map, best_locs, best_pcg = mp, locs, pcg_locs
         return best_map
 
-    match = mol.GetSubstructMatch(canonical_mol)
+    match = mol.GetSubstructMatch(matcher)
     if not match or len(match) != canonical_mol.GetNumAtoms():
         return None
     return _build_map(match)
+
+
+def _locant_order(locant) -> Tuple[int, str]:
+    return (locant, '') if isinstance(locant, int) else (locant[0], locant[1])
+
+
+def _prefix_tie_key(mol, numbering: Dict[int, Any], prefix_atoms: Set[int]) -> Tuple[Any, ...]:
+    """The key that settles a tie between two numberings of a ring system that give every
+    locant set the same: (g) (the Blue Book) "lowest locants for the substituent
+    cited first as a prefix in the name", the prefixes cited by their real names in the
+    alphanumerical order of (``locants._alphabetical_tiebreaker``), and then, for two
+    numberings that name every prefix alike, the canonical rank of the atoms in locant order,
+    so that the choice never depends on the order the atoms were listed in.
+
+    ``prefix_atoms`` are the ring atoms that carry a detachable prefix (a substituent that
+    is the suffix is not cited in front of the name)."""
+    from .locants import _alphabetical_tiebreaker
+    core = set(numbering)
+    positions: Dict[int, List[List[int]]] = {}
+    for atom in prefix_atoms & core:
+        branches = []
+        for nbr in mol.GetAtomWithIdx(atom).GetNeighbors():
+            if nbr.GetIdx() in core:
+                continue
+            seen, stack = set(core), [nbr.GetIdx()]
+            branch: List[int] = []
+            while stack:
+                a = stack.pop()
+                if a in seen:
+                    continue
+                seen.add(a)
+                branch.append(a)
+                stack.extend(x.GetIdx() for x in mol.GetAtomWithIdx(a).GetNeighbors()
+                             if x.GetIdx() not in seen)
+            branches.append(sorted(branch))
+        positions[atom] = branches
+    int_numbering = {a: loc for a, loc in numbering.items() if isinstance(loc, int)}
+    alpha = _alphabetical_tiebreaker(sorted(core), int_numbering, positions, mol)
+    rank = Chem.CanonicalRankAtoms(mol, breakTies=True)
+    by_locant = sorted(numbering, key=lambda a: _locant_order(numbering[a]))
+    return (alpha, tuple(rank[a] for a in by_locant))
 
 
 def _build_peripheral_order(
@@ -1279,7 +1426,7 @@ def name_substituted_polycyclic(
     # automorphism-min over substituent-bearing atoms (consistent with
     # get_polycyclic_substituents); fall back to the SMARTS + naphthalene
     # heuristic only when the PAH has no populated iupac_numbering.
-    pah_data = POLYCYCLIC_DATA.get(pah_name, {})
+    pah_data = _pah_entry(pah_name) or {}
     smarts = pah_data.get('smarts', '')
     pattern = _compiled_smarts(smarts) if smarts else None
     atom_to_locant = {}
@@ -1314,8 +1461,8 @@ def name_substituted_polycyclic(
                 if is_pcg:
                     suffix_atoms.add(idx)
             atom_to_locant = get_polycyclic_iupac_locants(
-                mol, pah_name, substituent_atoms=attach_atoms, pcg_atoms=suffix_atoms,
-            )
+                mol, pah_name, substituent_atoms=attach_atoms,
+                pcg_atoms=suffix_atoms | _promoted_amine_anchor(mol, core_set, principal_group))
             if atom_to_locant is None:
                 atom_to_locant = _map_pah_atoms_to_iupac(mol, pah_name, match_atoms)
 
@@ -2089,6 +2236,7 @@ def _partial_sat_substituent_prefix(
     mol, atom_to_locant: Dict[int, Any],
     exclude_atoms: Optional[Set[int]] = None,
     spelled_out: Optional[Set[int]] = None,
+    omit_locants: bool = False,
 ) -> Optional[str]:
     """Build the alphanumerically-sorted detachable-substituent prefix string
     (with trailing hyphen) for EVERY substituent on a partially-saturated fused
@@ -2115,7 +2263,10 @@ def _partial_sat_substituent_prefix(
     this prefix string spells (whole fragments, not just the attachment
     neighbour), so a downstream decorator can exclude them instead of citing
     them twice. It is an out-parameter rather than a recomputation so there is
-    exactly one answer to "what does this name already account for"."""
+    exactly one answer to "what does this name already account for".
+
+    ``omit_locants``: the caller has established that the one locant of the one prefix is
+    omitted by (the Blue Book, 'chlorocoronene (PIN)':2947)."""
     from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
 
     exclude = exclude_atoms or set()
@@ -2171,7 +2322,7 @@ def _partial_sat_substituent_prefix(
         # (the Blue Book): a letter locant follows its bare number
         # (4 < 4a < 5), so '4a,5,8a-trimethyl', never '5,4a,8a-'.
         locs = sorted(grouped[name], key=_locant_key)
-        parts.append(format_substituent_prefix(name, locs, len(locs)))
+        parts.append(format_substituent_prefix(name, [] if omit_locants else locs, len(locs)))
     if not parts:
         return None
     from .benzene import _join_benzene_prefixes

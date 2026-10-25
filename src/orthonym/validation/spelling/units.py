@@ -83,6 +83,21 @@ _ENDING_START = re.compile(r"(?:l|xyl)$|(?:idene|idyne|ylidene|ylidyne|ylium|ium
 _HW_TAIL = re.compile(r"(?:cin|can|lan|lidin|nin|nan|l)e?$")
 
 
+#: a parent component of the open series of (the Blue Book) that the lexicon below would split
+#: into a multiplied prefix: a simple numerical prefix of three or more and 'phenylene' ('tetraphenylene'; the
+#: other endings of the series begin with no word of the lexicon). The reader keeps its own copy of the rule, since a check
+#: must not import the writer (``tests/unit/validation/test_pin_spelling_interface.py``); a test holds
+#: it equal to ``rules.hydrocarbon_series.parse_series_name``.
+_SERIES_PARENT_RE = re.compile(
+    r"(?:" + '|'.join(sorted((w for w in MULT if w != 'di' and not w.endswith(('is', 'kis'))),
+                             key=len, reverse=True))
+    + r")(?:phenylene|naphthylene)")
+
+
+def _is_series_parent(word: str) -> bool:
+    return _SERIES_PARENT_RE.fullmatch(word) is not None
+
+
 def split_simple(txt: str, nlocs=None):
     """Greedy split of the leading simple prefixes of ``txt``: ([(multiplier, prefix)], rest).
     ``nlocs`` (the locants in front) prefers a reading whose multiplier matches their count."""
@@ -106,6 +121,10 @@ def split_simple(txt: str, nlocs=None):
             after = r[len(p):]
             g = _PARENT_GUARD.get(p)
             if g and any(after.startswith(x) for x in g):
+                continue
+            if mult and not after and _is_series_parent(mult + p):
+                # 'triphenylene', 'tetraphenylene'...: a parent component of the open series of
+                # (the Blue Book), not a multiplied divalent prefix
                 continue
             if _ENDING_START.match(after) or (p.endswith('o') and _HW_TAIL.match(after)):
                 continue
