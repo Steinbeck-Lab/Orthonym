@@ -63,7 +63,7 @@ def _reasons(stderr):
 def test_the_default_tier_declines_the_molecule_the_tests_use(capsys, tmp_path):
     """The control: without a tier the molecule has no name and a reason, so the next test
     cannot pass by naming it at the default tier."""
-    status, out, err = _batch(capsys, tmp_path, [NAMED, WIDE])
+    status, out, err = _batch(capsys, tmp_path, [NAMED, WIDE], "--emit-tier", "pin")
     assert status == 0
     assert out == [f"{NAMED}\tethanol", f"{WIDE}\t"]
     assert [line.split("\t")[1].split(":")[0] for line in _reasons(err)] == ["NO_VERIFIED_PIN"]
@@ -97,14 +97,15 @@ def test_the_namer_is_built_once_for_the_whole_file(capsys, tmp_path):
     assert built[0]._general_fallback_unverified is True
 
 
-def test_a_default_batch_does_not_build_a_tiered_namer(capsys, tmp_path):
-    """No tier flag: the lines go through ``name_compound`` as they always did."""
+def test_a_pin_only_batch_does_not_build_a_tiered_namer(capsys, tmp_path):
+    """``--emit-tier pin``, the default of releases up to 1.0.x: the lines go through ``name_compound`` as
+    they always did. (The default is the best-effort tier since lane DF, named through a tiered namer.)"""
     with mock.patch.object(cli, "_tiered_namer", side_effect=AssertionError("tiered namer built")):
-        status, out, err = _batch(capsys, tmp_path, [NAMED, "", NO_NAME])
+        status, out, err = _batch(capsys, tmp_path, [NAMED, "", NO_NAME], "--emit-tier", "pin")
         assert (status, out) == (0, [f"{NAMED}\tethanol", "", f"{NO_NAME}\t"])
-        # --emit-tier pin is the default tier, and --binding-proof alone stays on name_compound
+        # --binding-proof alone stays on name_compound with the PIN-only tier too
         assert _batch(capsys, tmp_path, [NAMED], "--emit-tier", "pin")[:2] == (0, [f"{NAMED}\tethanol"])
-        assert _batch(capsys, tmp_path, [NAMED], "--binding-proof", "audit")[:2] == (
+        assert _batch(capsys, tmp_path, [NAMED], "--emit-tier", "pin", "--binding-proof", "audit")[:2] == (
             0, [f"{NAMED}\tethanol"])
 
 
@@ -249,9 +250,12 @@ def test_verbose_counts_the_lines_without_a_name_for_a_tier_row(capsys, tmp_path
     assert "Processed 3 SMILES, 0 errors, 1 unnamed" in err
     _, _, err = _batch(capsys, tmp_path, lines, "--emit-tier", "best-effort", "--provenance", "--verbose")
     assert "Processed 3 SMILES, 0 errors, 1 unnamed" in err
-    #... and the default tier declines it too
-    _, _, err = _batch(capsys, tmp_path, lines, "--provenance", "--verbose")
+    #... the PIN-only tier declines it too...
+    _, _, err = _batch(capsys, tmp_path, lines, "--emit-tier", "pin", "--provenance", "--verbose")
     assert "Processed 3 SMILES, 0 errors, 2 unnamed" in err
+    #... and the default (the best-effort tier) names it, as best-effort does
+    _, _, err = _batch(capsys, tmp_path, lines, "--provenance", "--verbose")
+    assert "Processed 3 SMILES, 0 errors, 1 unnamed" in err
     _, _, err = _batch(capsys, tmp_path, lines, "--emit-tier", "best-effort", "--on-failure", "label",
                        "--verbose")
     assert "Processed 3 SMILES, 0 errors, 1 unnamed" in err
@@ -264,7 +268,6 @@ def test_verbose_counts_the_lines_without_a_name_for_a_tier_row(capsys, tmp_path
 
 @pytest.mark.parametrize("flags", [
     ("--provenance",),
-    ("--emit-tier", "valid"),
     ("--emit-tier", "best-effort", "--provenance"),
 ])
 def test_confidence_with_a_tier_row_is_a_usage_error_for_one_smiles_and_for_a_batch(
@@ -280,11 +283,22 @@ def test_confidence_with_a_tier_row_is_a_usage_error_for_one_smiles_and_for_a_ba
         assert captured.out == ""
 
 
-def test_confidence_stays_for_the_default_tier(capsys, tmp_path):
+def test_confidence_works_with_the_default_and_with_a_tier(capsys, tmp_path):
+    """Lane DF: ``--confidence`` takes the default (the best-effort tier) and any tier named with
+    ``--emit-tier``; only ``--provenance`` (a tier row has no coverage score) is a usage error."""
+    status, out, _ = _batch(capsys, tmp_path, [NAMED], "--confidence")
+    assert status == 0 and out[0].split("\t")[:2] == [NAMED, "ethanol"] and len(out[0].split("\t")) == 4
+    status, out, _ = _batch(capsys, tmp_path, [NAMED], "--confidence", "--emit-tier", "valid")
+    assert status == 0 and out[0].split("\t")[:2] == [NAMED, "ethanol"]
+    assert cli.main([NAMED, "--confidence", "--emit-tier", "valid"]) == 0
+    assert capsys.readouterr().out.startswith("Name:       ethanol")
+
+
+def test_confidence_stays_for_the_pin_only_tier(capsys, tmp_path):
     status, out, _ = _batch(capsys, tmp_path, [NAMED], "--confidence", "--emit-tier", "pin")
     assert status == 0
     assert out[0].split("\t")[:2] == [NAMED, "ethanol"] and len(out[0].split("\t")) == 4
-    assert cli.main([NAMED, "--confidence"]) == 0
+    assert cli.main([NAMED, "--confidence", "--emit-tier", "pin"]) == 0
     assert capsys.readouterr().out.startswith("Name:       ethanol")
 
 
@@ -316,9 +330,8 @@ def test_confidence_with_binding_proof_is_kept_for_one_smiles_as_for_a_batch(cap
 def test_process_batch_refuses_confidence_with_a_tier_row_up_front(tmp_path):
     src = tmp_path / "in.smi"
     src.write_text(f"{NAMED}\n")
-    for kwargs in ({"provenance": True}, {"emit_tier": "best-effort"}):
-        with pytest.raises(ValueError, match="--confidence cannot be combined"):
-            cli._process_batch(str(src), None, "pin", False, True, **kwargs)
+    with pytest.raises(ValueError, match="--confidence cannot be combined"):
+        cli._process_batch(str(src), None, "pin", False, True, provenance=True)
 
 
 # --------------------------------------------------------------------------------------------
@@ -336,8 +349,8 @@ def test_batch_threads_the_triviality_controller_flag(capsys, tmp_path):
     src = tmp_path / "in.smi"
     src.write_text(f"{NAMED}\n{NAMED}\n")
     with mock.patch.object(cli, "name_compound", _fake):
-        assert cli.main(["--batch", str(src), "--enable-triviality-controller"]) == 0
-        assert cli.main(["--batch", str(src)]) == 0
+        assert cli.main(["--batch", str(src), "--emit-tier", "pin", "--enable-triviality-controller"]) == 0
+        assert cli.main(["--batch", str(src), "--emit-tier", "pin"]) == 0
     assert seen == [True, True, False, False]
 
 

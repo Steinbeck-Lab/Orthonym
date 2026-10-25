@@ -96,8 +96,8 @@ for smi in sys.argv[2:]:
     for tier in ("pin", "best-effort"):
         flags = {} if tier == "pin" else _emit_tier_flags(tier)
         out[f"{smi}|{tier}|name"] = N.Orthonym(style="pin", **flags).name(smi)
-        out[f"{smi}|{tier}|name_compound"] = N.name_compound(
-            smi, **{k: v for k, v in flags.items() if k != "full_coverage"})
+        out[f"{smi}|{tier}|name_compound"] = N.name_compound(      # the default is the best-effort tier: name the PIN-only tier by name
+            smi, **({"emit_tier": "pin"} if tier == "pin" else {k: v for k, v in flags.items() if k != "full_coverage"}))
         out[f"{smi}|{tier}|name_with_confidence"] = N.Orthonym(
             style="pin", **flags).name_with_confidence(smi)["name"]
         out[f"{smi}|{tier}|name_tiered"] = N.Orthonym(

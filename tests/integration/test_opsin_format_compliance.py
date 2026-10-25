@@ -337,7 +337,7 @@ class TestNBracketWrapping:
     def test_hexanoylamino_phenylpropanoyl_gets_brackets(self):
         """N-[(2S)-2-(hexanoylamino)-3-phenylpropanoyl]-... gets square brackets."""
         smiles = r"CC(=O)N[C@@H](CC(C)C)C(=O)N(C)[C@@H](Cc1ccccc1)C(=O)N/C=C\c1c[nH]c2ccccc12"
-        name = name_compound(smiles)
+        name = name_compound(smiles, emit_tier="pin")
         assert "N-[" in name, (
             f"Expected N-[...] bracket wrapping: {name}"
         )

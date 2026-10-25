@@ -184,7 +184,7 @@ class TestAdductDispatch:
     @staticmethod
     def _nc(smi, style="pin"):
         from orthonym.namer import name_compound
-        return name_compound(smi, style=style, on_failure="label")
+        return name_compound(smi, style=style, on_failure="label", emit_tier="pin")
 
     def test_oxalic_monohydrate_pin(self):
         # was 'unknown organic compound' at HEAD (predicate required >=2
@@ -256,7 +256,7 @@ class TestHydrateWordForms:
     @staticmethod
     def _nc(smi, style="general"):
         from orthonym.namer import name_compound
-        return name_compound(smi, style=style, on_failure="label")
+        return name_compound(smi, style=style, on_failure="label", emit_tier="pin")
 
     def test_monohydrate(self):
         assert self._nc("O.OC(=O)C(=O)O") == "oxalic acid monohydrate"

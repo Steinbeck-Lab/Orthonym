@@ -210,7 +210,7 @@ class TestNarrowDefaultOnP6563:
         # production fail-closed path.
         import orthonym.namer as _namer
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-        out = name_compound("O=C(OCc1ccc(O)cc1)CCCCCCCC(=O)O", on_failure="label")
+        out = name_compound("O=C(OCc1ccc(O)cc1)CCCCCCCC(=O)O", on_failure="label", emit_tier="pin")
         assert out == "unknown organic compound"
 
 
@@ -286,7 +286,7 @@ class TestAcylSulfanylWholeMolecule:
         # refusal instead of a gate-off raw leak.
         import orthonym.namer as _namer
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-        assert name_compound(smiles, on_failure="label") == "unknown organic compound"
+        assert name_compound(smiles, on_failure="label", emit_tier="pin") == "unknown organic compound"
 
     @_opsin_rt
     @pytest.mark.roundtrip
@@ -339,4 +339,4 @@ class TestW2FP2Determinism:
         # instead of a gate-off raw leak.
         import orthonym.namer as _namer
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-        assert name_compound("COC(=O)CC(CC(=O)OCC)CC(=O)O", on_failure="label") == "unknown organic compound"
+        assert name_compound("COC(=O)CC(CC(=O)OCC)CC(=O)O", on_failure="label", emit_tier="pin") == "unknown organic compound"

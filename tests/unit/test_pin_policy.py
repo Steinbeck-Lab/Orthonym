@@ -467,7 +467,7 @@ class TestC8TrivialThreading:
         batch_file.write_text("CCO\n[Se]=[Se]\n")
         result = subprocess.run(
             [sys.executable, "-m", "orthonym",
-             "--batch", str(batch_file)],
+             "--batch", str(batch_file), "--emit-tier", "pin"],
             capture_output=True, text=True,
         )
         assert result.returncode == 0, (

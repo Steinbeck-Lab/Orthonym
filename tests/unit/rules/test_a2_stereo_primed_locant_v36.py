@@ -51,7 +51,7 @@ def _dt_name_compound(smiles):
     from orthonym import Orthonym, name_compound  # noqa: F811
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
         return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
+    return name_compound(smiles, on_failure="label", emit_tier="pin")
 
 
 def _dt_name(smiles):

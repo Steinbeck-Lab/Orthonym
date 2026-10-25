@@ -94,7 +94,7 @@ def ik(smi):
 
 smi = sys.argv[1]
 try:
-    name = name_compound(smi)
+    name = name_compound(smi, emit_tier="pin")    # the PIN-only tier: the default is the best-effort tier since lane DF
 except Exception as e:
     name = None
 emits = bool(name) and not errors.is_failure_name(name)

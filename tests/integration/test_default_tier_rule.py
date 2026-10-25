@@ -58,11 +58,15 @@ def test_a_name_the_code_records_as_not_the_pin_is_declined_everywhere():
     assert row["formula"] == "C5H11NO2", row
     # the plain call, name_compound, raise_on_limit, classify_limit, confidence
     assert is_failure_name(Orthonym().name(BETAINE, on_failure="label"))
-    assert name_compound(BETAINE, on_failure="label") == row["name"]
+    assert name_compound(BETAINE, emit_tier="pin", on_failure="label") == row["name"]
     with pytest.raises(OrthonymLimitError) as err:
         Orthonym().name(BETAINE, raise_on_limit=True)
     assert err.value.code == "NO_VERIFIED_PIN"
-    assert classify_limit(BETAINE).code == "NO_VERIFIED_PIN"
+    with pytest.raises(OrthonymLimitError) as err:
+        name_compound(BETAINE, emit_tier="pin", raise_on_limit=True)
+    assert err.value.code == "NO_VERIFIED_PIN"
+    # the default is the best-effort tier, which names what the PIN-only tier declines
+    assert classify_limit(BETAINE) is None and name_compound(BETAINE) == BETAINE_NAME
     conf = Orthonym().name_with_confidence(BETAINE)
     assert is_failure_name(conf["name"]) and conf["limit"]["code"] == "NO_VERIFIED_PIN"
     # the strict path still builds it, labelled below the PIN, and best-effort keeps it
@@ -148,7 +152,7 @@ def test_the_rule_is_off_when_the_gate_is_disabled(monkeypatch):
 
 def test_the_cli_default_tier_prints_the_decline():
     env = dict(os.environ)
-    out = subprocess.run([sys.executable, "-m", "orthonym", BETAINE, "--provenance"],
+    out = subprocess.run([sys.executable, "-m", "orthonym", BETAINE, "--emit-tier", "pin", "--provenance"],
                          capture_output=True, text=True, env=env, timeout=300)
     assert out.returncode == 0, out.stderr[-500:]
     assert '"limit_code": "NO_VERIFIED_PIN"' in out.stdout, out.stdout
@@ -170,43 +174,46 @@ def test_the_cli_default_tier_prints_the_decline():
 # upper size on von Baeyer systems,, so there is no source to quote); the value is the measured ceiling
 # (the sweep table above that constant) and tests/unit/rules/test_cage_caps_best_effort.py pins the constant
 # and what it admits, so a ceiling and a help text that disagree fail one of the two.
+# Changed asserted value (lane DF, user decision 2026-10-25: the default is the best-effort tier): both constants
+# now state the default tier and call the old default the PIN-only tier (``--emit-tier pin``); documentation
+# strings, so there is no source to quote, and reverting ``cli.py`` fails this test.
 EMIT_TIER_HELP = (
-    "Which names to return. pin (the default): a name only when the pipeline can "
-    "build the preferred IUPAC name (PIN), that is when the strict PIN path built "
-    "the name and verified it (tier pin_verified). The exceptions are names from "
-    "the natural-product and metal-complex lists, the name formats absent from "
-    "OPSIN's grammar (inositols; phanes, checked by building their structure), PIN "
-    "spellings that OPSIN reads back through a twin spelling of the same structure "
-    "(ethan(2H)ol, diphenyliodanuide, methane-SO-thioperoxol) or through their acids (dianhydrides), PINs whose "
-    "stereodescriptors OPSIN cannot read, for which the default tier compares the "
-    "constitution, and, with --trivial, a retained trivial name. Otherwise it "
-    "declines, with the reason code NO_VERIFIED_PIN when it built a name that is not "
-    "a verified PIN. The rule applies to the default --style pin. valid: also names "
-    "from the general "
-    "engine. complete: also general names for aromatic and heterocyclic ring systems. "
-    "best-effort: also the last-resort producers, von Baeyer and spiro names for "
-    "ring systems of up to 100 skeletal atoms and 15 rings (the other tiers build "
-    "them up to 40 atoms and 8 rings), and adducts with a one-atom ion, and, for a molecule that has no other name, the name the default tier ships although OPSIN cannot read its stereodescriptors, with the label of the default tier (pin_unverified). full-coverage: "
-    "also the "
-    "coordination-name builder for metal tetrapyrrole and corrin complexes, which "
-    "builds a name or declines. The wider tiers also return the names the default "
-    "tier declines, each labelled with its tier; there every name must pass a "
-    "full-InChIKey OPSIN round trip, except a name from the natural-product and "
-    "metal-complex lists, a twin-checked name for which the engine has no other spelling (a halogen -uide anion, "
-    "the anion of a thioperoxol, an organometallic name with halido ligands) and the best-effort name described above, "
-    "so the other name formats absent from OPSIN's grammar are "
-    "declined there. --provenance shows each name's tier.")
+    'Which names to return. Without this option: the best-effort tier (the preferred IUPAC name (PIN) '
+    'when the strict PIN path builds one, otherwise a systematic name that is not the PIN; the run says '
+    'so once on the error stream, and --provenance shows the tier of each name), and the pin tier for '
+    '--style general and cas and when no OPSIN reads the names back. pin: a name only when the pipeline '
+    'can build the preferred IUPAC name (PIN), that is when the strict PIN path built the name and '
+    'verified it (tier pin_verified); this was the default up to release 1.0.x. The exceptions are names '
+    "from the natural-product and metal-complex lists, the name formats absent from OPSIN's grammar "
+    '(inositols; phanes, checked by building their structure), PIN spellings that OPSIN reads back '
+    'through a twin spelling of the same structure (ethan(2H)ol, diphenyliodanuide, '
+    'methane-SO-thioperoxol) or through their acids (dianhydrides), PINs whose stereodescriptors OPSIN '
+    'cannot read, for which the PIN-only tier compares the constitution, and, with --trivial, a retained '
+    'trivial name. Otherwise it declines, with the reason code NO_VERIFIED_PIN when it built a name that '
+    'is not a verified PIN. The rule applies to --style pin. valid: also names from the general engine. '
+    'complete: also general names for aromatic and heterocyclic ring systems. best-effort: also the '
+    'last-resort producers, von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and '
+    '15 rings (the other tiers build them up to 40 atoms and 8 rings), and adducts with a one-atom ion, '
+    'and, for a molecule that has no other name, the name the PIN-only tier ships although OPSIN cannot '
+    'read its stereodescriptors, with the label of the PIN-only tier (pin_unverified). full-coverage: '
+    'also the coordination-name builder for metal tetrapyrrole and corrin complexes, which builds a name '
+    'or declines. The tiers above pin also return the names the PIN-only tier declines, each labelled '
+    'with its tier; there every name must pass a full-InChIKey OPSIN round trip, except a name from the '
+    'natural-product and metal-complex lists, a twin-checked name for which the engine has no other '
+    'spelling (a halogen -uide anion, the anion of a thioperoxol, an organometallic name with halido '
+    "ligands) and the best-effort name described above, so the other name formats absent from OPSIN's "
+    "grammar are declined there. --provenance shows each name's tier."
+)
 TRIVIAL_HELP = (
-    "When no preferred name can be built, also allow a retained trivial name that is "
-    "not a preferred name. A preferred name that can be built is never replaced "
-    "(glycerol stays propane-1,2,3-triol). Without this option, two kinds of retained "
-    "trivial name are still used at the wider tiers, and the default tier declines "
-    "them: names from a small last-resort table, and the trivial natural-product names "
-    "of molecules whose preferred bridged fused name the engine does not build yet "
-    "(diamorphine). --provenance labels both systematic_verified, source "
-    "trivial_retained. A natural-product name built on a parent, such as "
-    "'(9R,13S,14S)-3-methoxy-17-methylmorphinan', is not a trivial name, and "
-    "--trivial does not return it at the default tier.")
+    'When no preferred name can be built, also allow a retained trivial name that is not a preferred '
+    'name. A preferred name that can be built is never replaced (glycerol stays propane-1,2,3-triol). '
+    'Without this option, two kinds of retained trivial name are still used at the wider tiers, and the '
+    'PIN-only tier declines them: names from a small last-resort table, and the trivial natural-product '
+    'names of molecules whose preferred bridged fused name the engine does not build yet (diamorphine). '
+    '--provenance labels both systematic_verified, source trivial_retained. A natural-product name built '
+    "on a parent, such as '(9R,13S,14S)-3-methoxy-17-methylmorphinan', is not a trivial name, and "
+    '--trivial does not return it at the PIN-only tier.'
+)
 
 
 def test_the_help_text_says_what_the_default_tier_does(capsys, monkeypatch):
@@ -234,15 +241,15 @@ def test_a_declined_metal_compound_does_not_say_its_element_is_unsupported(capsy
     row = assert_default_tier_declines(ETHENYLSODIUM)
     assert row["name"] == label, row
     assert Orthonym().name(ETHENYLSODIUM, on_failure="label") == label
-    assert name_compound(ETHENYLSODIUM, on_failure="label") == label
-    assert name_compound(ETHENYLSODIUM, include_confidence=True, on_failure="label")["name"] == label
-    assert name_with_tree(ETHENYLSODIUM).name == label
+    assert name_compound(ETHENYLSODIUM, emit_tier="pin", on_failure="label") == label
+    assert name_compound(ETHENYLSODIUM, emit_tier="pin", include_confidence=True,
+                         on_failure="label")["name"] == label
+    assert Orthonym().name_with_tree(ETHENYLSODIUM).name == label
     with pytest.raises(OrthonymLimitError) as err:
         Orthonym().name(ETHENYLSODIUM, raise_on_limit=True)
     assert (err.value.code, err.value.message) == ("NO_VERIFIED_PIN", label)
-    lim = classify_limit(ETHENYLSODIUM)
-    assert (lim.code, lim.message) == ("NO_VERIFIED_PIN", label)
-    assert main([ETHENYLSODIUM, "--on-failure", "label"]) == 0
+    assert classify_limit(ETHENYLSODIUM) is None            # the default names it, as the wider tiers do
+    assert main([ETHENYLSODIUM, "--emit-tier", "pin", "--on-failure", "label"]) == 0
     assert capsys.readouterr().out.strip() == label
     # the wider tiers keep the name
     assert_best_effort_gives(ETHENYLSODIUM, "ethenylsodium")

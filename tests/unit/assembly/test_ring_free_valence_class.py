@@ -79,7 +79,7 @@ def _dt_name_compound(smiles):
     from orthonym import Orthonym, name_compound  # noqa: F811
     if smiles in DEFAULT_TIER_DECLINES and default_tier_rule_applies():
         return _declined_pin_row(smiles)["name"]
-    return name_compound(smiles, on_failure="label")
+    return name_compound(smiles, on_failure="label", emit_tier="pin")
 
 
 def _dt_name(smiles):
@@ -177,7 +177,7 @@ def _name_under(mode, smiles, monkeypatch):
         assert_default_tier_declines(smiles)
         return strict_path_name(smiles)
     try:
-        return orthonym.name_compound(smiles, style="pin")
+        return orthonym.name_compound(smiles, style="pin", emit_tier="pin")
     except Exception:  # noqa: BLE001 - an exception is an abstention, not a wrong name
         return None
 

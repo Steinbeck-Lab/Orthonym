@@ -95,7 +95,7 @@ class TestPinNoRegress:
         """At the PIN/default tier the offer-retry never fires (it is
         best-effort-gated), so these still abstain — fail-closed, not a wrong
         or non-PIN name."""
-        name = name_compound(smi)
+        name = name_compound(smi, emit_tier="pin")
         assert name is None or errors.is_failure_name(name), (
             f"PIN tier must fail closed on {smi}, got {name!r}")
 

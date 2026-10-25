@@ -49,11 +49,11 @@ When `name_compound` is called while another naming is already running, which is
 | `_metal_offer_scope` | For the caller's own call only. When the input is a metal drawing that has another drawing with the same standard InChIKey (the ionic drawing of a covalent one, the bonded drawing of an organometal cation drawn beside its anion, or the drawing without the dative bonds), names the drawing as written and the other drawing, each as a call of its own, and keeps the better name (`assembly/metal_offer.py`). The name of the other drawing is recorded as not the PIN. |
 | `_form_choice_scope` | Names the charge forms of your input (`_charge_forms`) and keeps the best one. |
 | `_book_retry_scope` | When a name written in the book's spelling leaves the molecule unnamed at a wider tier, names it again with the older spelling (`mechanical_forms`). |
-| `_budget_scope` | Counts how deep the naming is (`enter_name_scope`), arms the work budgets that stop a runaway molecule, and applies the default tier's emission rule (`_default_tier_decision`) to the caller's own call. |
+| `_budget_scope` | Counts how deep the naming is (`enter_name_scope`), arms the work budgets that stop a runaway molecule, and applies the PIN-only tier's emission rule (`_default_tier_decision`) to the caller's own call. |
 
 The body then runs, in this order: the isotope decorator (`decorate_isotopic_name` in `rules/isotopes.py`, for an input with isotopes), a check for a wildcard atom, `_name_impl`, the checks, the rescues and `_finish`.
 
-At the default tier `name` has one more step in front. `_name_with_pin_promotion` runs `name` once; when that returns no name, and only then, it runs it a second time with the best-effort ring-substituent producers allowed, and keeps the second name only if it passes the same gates. A name from the second run is labelled `pin_unverified`, because a breadth producer built it.
+At the PIN-only tier `name` has one more step in front. `_name_with_pin_promotion` runs `name` once; when that returns no name, and only then, it runs it a second time with the best-effort ring-substituent producers allowed, and keeps the second name only if it passes the same gates. A name from the second run is labelled `pin_unverified`, because a breadth producer built it.
 
 ### 3. Class routing: the outer table
 
@@ -84,7 +84,7 @@ Still inside `name`, and only at the top level of the call, the name goes throug
 
 - `_final_stereo_check` adds stereodescriptors that a producer left out, for the few producers whose numbering it can trust. For the others it only logs: a missing descriptor is better than one at a guessed locant.
 - `_final_grammar_check` checks the name against a model of OPSIN's grammar and repairs it only when the repaired name reads back.
-- `_final_opsin_validity_gate` has OPSIN read the name back and compares the structure with the input (called SELF-01 in comments). Some name classes that OPSIN cannot read are let through by named carve-outs, and the provenance row says so (`gate_outcome`, `carveout:<class>`). At the default tier it also lets through a PIN spelling OPSIN rejects when a twin spelling of the same structure reads back to the input's full InChIKey (`validation/twin_spellings.py`, `gate_outcome` `twin_verified:<rules>`), and a poly-anhydride name when the acids it cites, read by OPSIN, build the input (`validation/anhydride_acids.py`, `gate_outcome` `acid_split_verified:<rule>`). The gate also reads OPSIN's warnings: a name that OPSIN reads as ambiguous (`APPEARS_AMBIGUOUS`) is withdrawn, after one retry with every locant cited (`validation/opsin_ambiguity.py`, `gate_retry.py`).
+- `_final_opsin_validity_gate` has OPSIN read the name back and compares the structure with the input (called SELF-01 in comments). Some name classes that OPSIN cannot read are let through by named carve-outs, and the provenance row says so (`gate_outcome`, `carveout:<class>`). At the PIN-only tier it also lets through a PIN spelling OPSIN rejects when a twin spelling of the same structure reads back to the input's full InChIKey (`validation/twin_spellings.py`, `gate_outcome` `twin_verified:<rules>`), and a poly-anhydride name when the acids it cites, read by OPSIN, build the input (`validation/anhydride_acids.py`, `gate_outcome` `acid_split_verified:<rule>`). The gate also reads OPSIN's warnings: a name that OPSIN reads as ambiguous (`APPEARS_AMBIGUOUS`) is withdrawn, after one retry with every locant cited (`validation/opsin_ambiguity.py`, `gate_retry.py`).
 
 When the gate rejects a name, `_retry_cascade_on_gate_rejection` excludes the class that produced it and dispatches again. The atom-coverage check of the [checking page](checking.md) is a separate certificate (E1, `validation/e1_certificate.py`). It decides for names of the general engine.
 
@@ -121,13 +121,13 @@ The pool of offers holds the winner and at most two more names, the floor and th
 
 ### 8. The row: `name_tiered`
 
-`name_tiered` calls `name`, then `_tier_row_and_pin_form` combines what the producers and gates recorded into the row of the [provenance page](use/provenance.md). The recording is done with context variables in `metrics/provenance.py`; `record_source` sets the `source` value. At the default tier the emission rule (`_default_tier_emits`) is applied inside `name` itself, so that `name_compound` and `name_tiered` agree: the row derived for that decision is the row `name_tiered` returns.
+`name_tiered` calls `name`, then `_tier_row_and_pin_form` combines what the producers and gates recorded into the row of the [provenance page](use/provenance.md). The recording is done with context variables in `metrics/provenance.py`; `record_source` sets the `source` value. At the PIN-only tier the emission rule (`_default_tier_emits`) is applied inside `name` itself, so that `name_compound` and `name_tiered` agree: the row derived for that decision is the row `name_tiered` returns.
 
 `producer` is recorded another way, on purpose. `metrics/producer_trail.py` keeps, for the length of one `name_tiered` call, a map from each string a producer returned to the id of that producer. A call site passes its result through `noted("<id>", result, mol)`, a step that turns one name into another passes the label on with `carried(name_in, name_out)`, and the row reads the entry of the name that ships. The map is not a provenance variable: a write there is replayed by the memos and can make a call unstorable, so the record stays out of reach of the memos and the work budgets. Each helper returns its argument unchanged and cannot raise. The first producer to return a string keeps it, which is the innermost one, and the strict twin of the best-effort tier records nothing. `tests/unit/metrics/test_producer_trail_static.py` fails on a call of a producer or a rewriting step that is neither wrapped nor on its list of reasoned exceptions.
 
 ## Tiers are flags
 
-`--emit-tier` becomes constructor arguments of `Orthonym` (`_emit_tier_flags` in `cli.py` is the one table that maps one to the other):
+`--emit-tier` becomes constructor arguments of `Orthonym` (`emit_tier_flags` in `tiers.py` is the one table that maps one to the other):
 
 | Tier | `general_fallback` | `allow_aromatic_general` | `general_fallback_unverified` | `full_coverage` |
 |:--|:-:|:-:|:-:|:-:|
@@ -141,8 +141,8 @@ The top-level `name` publishes each flag in a context variable (`general_fallbac
 
 What this means for a change:
 
-- A producer that is used by every tier can write a different name at each. The `source` value `pin_path` names a code path, not a result: at the default tier cis-decalin gets `(4as,8as)-decahydronaphthalene` from the `pin_path` with tier `pin_unverified`.
-- Test a change at the tiers it can reach. `pin` is the byte-identical default, and a change that is meant for the wider tiers must leave it as it was.
+- A producer that is used by every tier can write a different name at each. The `source` value `pin_path` names a code path, not a result: at the PIN-only tier cis-decalin gets `(4as,8as)-decahydronaphthalene` from the `pin_path` with tier `pin_unverified`.
+- Test a change at the tiers it can reach. `pin` is the PIN-only tier, byte-identical to the default of releases up to 1.0.x, and a change that is meant for the wider tiers must leave it as it was.
 - There is no `if tier == ...` to search for. Search for the context variables and for the instance attributes `_general_fallback`, `_general_fallback_unverified`, `_allow_aromatic_general` and `_full_coverage`.
 
 ## The producer families
@@ -154,7 +154,7 @@ What this means for a change:
 | Decomposition | `decomposition/engine.py`, `try_decompose` | As the class `decomposition_pre_general` before the general pipeline, and as a last resort |
 | General engine | `assembly/general_engine.py`, `name_general` | For the whole molecule at `valid` and wider, when the strict path has no name. Every part of its name is bound to atoms, and the E1 certificate checks that no atom is lost. `tier_a_ring` also calls it at every tier, to prefer the suffix form for a spiro parent |
 | Universal namer ("T4") | `assembly/t4_coverage.py`, `name_t4_complete`, with `assembly/universal_substituent.py` | For the whole molecule at `best-effort` only: as a rescue, and as the "floor" offer in `_finish`. For a part of a molecule it can run at any tier, because the fragment rescue builds a fresh best-effort engine (`best_effort_request_ctx` records the tier of the outer request) |
-| Promotion re-run | `_name_with_pin_promotion` | Default tier, when the first run has no name |
+| Promotion re-run | `_name_with_pin_promotion` | PIN-only tier, when the first run has no name |
 | Substituent namers | `assembly/substituent_enumerator.py`, `assembly/substituent_naming.py`, `assembly/universal_substituent.py`, `rules/ring_substituents.py`, `rules/terminal_fragment.py`, and prefix writers inside `composer.py` | In every family, for every part of a molecule that becomes a prefix |
 
 Because the families do not partition the molecules, a molecule can be named by two of them, and the spelling can differ. Two examples, each from a direct call of the producers:
@@ -247,6 +247,6 @@ The naming tables are Python modules in `src/orthonym/data/`, not JSON files. Th
 `tests/unit/` mirrors the packages (`rules/`, `assembly/`, `perception/`, `routing/`, `namer/`), with many older tests directly in `tests/unit/`. Two things to know before you write one:
 
 - The suite turns the OPSIN validity gate **off** by default. A plain `name_compound` call in a test shows what the strict path builds, which is not always what a user gets. A test that depends on the gate carries `@pytest.mark.opsin_gate`.
-- `tests/support/` holds helpers that check the round trip independently of the engine (`rt_assert.py`), and helpers for the default tier and the best-effort tier (`default_tier.py`, `pin_tiers.py`).
+- `tests/support/` holds helpers that check the round trip independently of the engine (`rt_assert.py`), and helpers for the PIN-only tier and the best-effort tier (`default_tier.py`, `pin_tiers.py`).
 
 Some tests read the text of source files, for example to check that a function is not called from a module. If you rename or move a function, find them with `git grep -l -E "getsource|read_text" -- tests` and run them.

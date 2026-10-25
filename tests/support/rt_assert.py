@@ -296,8 +296,8 @@ def assert_tier_contract(smiles: str) -> tuple:
     """The tier contract for a molecule whose PIN the PIN tier cannot build.
 
     Best-effort must name it, and the name must round-trip to the input's full
-    InChIKey (breadth never drops). The PIN tier (``name_compound``, the
-    default) may fail closed, but whatever it ships must be RT-exact too: it
+    InChIKey (breadth never drops). The PIN tier (``name_compound`` with
+    ``emit_tier="pin"``, the default of releases up to 1.0.x) may fail closed, but whatever it ships must be RT-exact too: it
     may never describe a different molecule. Returns ``(pin_name, be_name)``.
 
     It checks in whatever OPSIN-validity-gate state the caller runs. A test of
@@ -312,7 +312,7 @@ def assert_tier_contract(smiles: str) -> tuple:
     assert be and res.get("source") != "abstain" and name_is_rt_exact(be, smiles), (
         f"best-effort name is not RT-exact for {smiles}\n"
         f"  name: {be!r} (tier={res.get('tier')}, source={res.get('source')})")
-    pin = name_compound(smiles)
+    pin = name_compound(smiles, emit_tier="pin")          # the PIN-only tier: the default is the best-effort tier
     assert is_failure_name(pin) or name_reads_back(pin, smiles), (
         f"PIN tier shipped a name that is not RT-exact for {smiles}: {pin!r}")
     return pin, be

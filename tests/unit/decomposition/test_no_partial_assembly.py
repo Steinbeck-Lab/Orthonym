@@ -278,7 +278,9 @@ class TestT4RescueMechanism:
             assert _full_rt(HYDRO_FUSED_FRAGMENT, got), (rung.__name__, got)
 
         # (b) a fragment that fails both PIN rungs; the rung names it.
-        assert not name_fragment_recursively(PIN_TIER_FAILING_FRAGMENT)
+        from tests.support.default_tier import pin_only_default
+        with pin_only_default():            # the rung names at depth 0 with the default of name_compound
+            assert not name_fragment_recursively(PIN_TIER_FAILING_FRAGMENT)
         pin_only = name_pipeline_only(PIN_TIER_FAILING_FRAGMENT)
         assert not pin_only or is_failure_name(pin_only), pin_only
         rescued = _name_fragment_t4_rescue(PIN_TIER_FAILING_FRAGMENT)
@@ -378,7 +380,7 @@ class TestHonestAbstainWhenGenuinelyUnnameable:
         this session: `name_compound` returns the failure sentinel, never a
         malformed or partial name).
         """
-        result = name_compound(LIPOPEPTIDE)
+        result = name_compound(LIPOPEPTIDE, emit_tier="pin")
         assert is_failure_name(result), (
             f"expected an honest abstention for the lipopeptide, got: "
             f"{result!r}"

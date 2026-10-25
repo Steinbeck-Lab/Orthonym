@@ -139,7 +139,7 @@ class TestNearMissStereoCompounds:
     ])
     def test_individual_near_miss_has_stereo(self, smiles, expected_stereo_pattern):
         """Individual near-miss compounds produce expected stereo patterns."""
-        name = name_compound(smiles)
+        name = name_compound(smiles, emit_tier="pin")
         assert re.search(expected_stereo_pattern, name), (
             f"Expected stereo pattern {expected_stereo_pattern} not found in: {name}"
         )

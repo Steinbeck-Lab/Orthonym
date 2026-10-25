@@ -96,5 +96,5 @@ def test_blocker2_gold_row_byte_identical():
 
     BB 48117 cites ``bis[(1r,4r)-4-methylcyclohexyl]phosphane``; this gold row
     exercises the identical ``(1r,4r)-4-methylcyclohexyl`` construction."""
-    assert name_compound("C[C@@H]1CC[C@H](CC1)c1ccccc1") == \
+    assert name_compound("C[C@@H]1CC[C@H](CC1)c1ccccc1", emit_tier="pin") == \
         "[(1r,4r)-4-methylcyclohexyl]benzene"

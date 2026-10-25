@@ -14,7 +14,7 @@ Each result lands on one of five states. The mark carries the state by its shape
 : The Preferred IUPAC Name. The engine's tier {tier}`pin_verified`: the strict PIN path built the name and verified it (OPSIN read it back to your structure; a PIN spelling OPSIN has no grammar for is read back through a twin spelling of it; a name from the natural-product and metal-complex lists is matched to your exact structure instead).
 
 {lamp}`fallback`
-: A checked name whose preferred status is not certified. The engine's tiers {tier}`pin_unverified` and {tier}`systematic_verified`. Most of these names were read back by OPSIN to your structure; at the default tier a name that OPSIN read back with its constitution only, or could not read, lands here too. The app's own read-back verdict under the name says which.
+: A checked name whose preferred status is not certified. The engine's tiers {tier}`pin_unverified` and {tier}`systematic_verified`. Most of these names were read back by OPSIN to your structure; at the PIN-only tier a name that OPSIN read back with its constitution only, or could not read, lands here too. The app's own read-back verdict under the name says which.
 
 {lamp}`best_effort`
 : A name from a last-resort producer, not from the strict rules or the general engine. The engine's tier {tier}`best_effort`. The app prints its own read-back verdict under the name.

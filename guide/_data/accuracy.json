@@ -10,8 +10,8 @@
     {"set": "PubChem 1,000,000", "molecules": 1000000, "named": 957523, "declined": 42468, "unreadable": 1, "other_layers": 8, "wrong": 0}
   ],
   "tiers": {
-    "source": "Orthonym 1.0.9 with the changes merged after it; the evaluation harness at --emit-tier pin and --emit-tier best-effort, every name read back by OPSIN 2.9.0 and compared by full InChIKey; a declined molecule, a name OPSIN cannot read and a timeout are all misses",
-    "columns": ["Set", "Molecules", "Named, default tier", "Named, best-effort", "Declined, default tier", "Declined, best-effort", "Unreadable, default tier", "Unreadable, best-effort"],
+    "source": "Orthonym 1.0.9 with the changes merged after it; the evaluation harness at --emit-tier pin (the PIN-only tier) and --emit-tier best-effort (the default), every name read back by OPSIN 2.9.0 and compared by full InChIKey; a declined molecule, a name OPSIN cannot read and a timeout are all misses",
+    "columns": ["Set", "Molecules", "Named, default", "Named, PIN-only tier", "Declined, default", "Declined, PIN-only tier", "Unreadable, default", "Unreadable, PIN-only tier"],
     "rows": [
       {"set": "Held-out ChEBI 2,000", "molecules": 2000,
        "pin": {"named": 1106, "declined": 891, "unreadable": 3, "timed_out": 0},

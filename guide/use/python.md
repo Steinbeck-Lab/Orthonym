@@ -10,7 +10,16 @@ Everything the command line does is one import away. The full parameter lists ar
 '(2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid'
 ```
 
-`name_compound` returns a string: the name, or the empty string when there is none:
+`name_compound` returns a string: the name, or the empty string when there is none. The default is the `best-effort` tier: the verified PIN when the strict PIN path builds one, and otherwise a systematic name that is not the PIN. `emit_tier="pin"` returns the verified PIN or nothing, which was the default up to release 1.0.x, and the other tiers of `--emit-tier` are values of the same argument. The call logs nothing about it; the command line prints a note, and `Orthonym.name_tiered` or `include_confidence=True` (for a tier above `pin`) tells the tier of a name:
+
+```pycon
+>>> name_compound("OCCNCc1ccccc1")
+'2-(benzylamino)ethan-1-ol'
+>>> name_compound("OCCNCc1ccccc1", emit_tier="pin")
+''
+>>> name_compound("OCCNCc1ccccc1", include_confidence=True)["tier"]
+'pin_unverified'
+```
 
 ```pycon
 >>> name_compound("O=[U](=O)=O")
@@ -55,14 +64,14 @@ ValueError: Invalid SMILES: C1CC
 
 ## Many molecules, one set of options: `Orthonym`
 
-`name_compound` sets up a fresh engine for every call. For a loop, or for the wider tiers, build one `Orthonym` and reuse it. The keyword switches are the ones behind `--emit-tier`:
+`name_compound` sets up a fresh engine for every call. For a loop, or for the wider tiers, build one `Orthonym` and reuse it. `Orthonym()` with no argument is the engine of the `pin` tier, as before; the default of `name_compound` is the `best-effort` row. The keyword switches are the ones behind `--emit-tier`:
 
 | `--emit-tier` | `Orthonym(...)` |
 |:--|:--|
-| `pin` (default) | `Orthonym()` |
+| `pin` | `Orthonym()` |
 | `valid` | `Orthonym(general_fallback=True)` |
 | `complete` | `Orthonym(general_fallback=True, allow_aromatic_general=True)` |
-| `best-effort` | `Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)` |
+| `best-effort` (the default of `name_compound`) | `Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)` |
 | `full-coverage` | as `best-effort`, plus `full_coverage=True` |
 
 ```pycon

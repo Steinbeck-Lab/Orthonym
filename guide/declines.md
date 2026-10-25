@@ -44,16 +44,16 @@ The first line is a log message on the error stream: the engine withdrew a candi
 | `ISOLATED_ATOM` | `unknown organic compound` | a single heavy atom |
 | `UNSUPPORTED_RING_SYSTEM` | `unknown organic compound` | a ring system the engine recognises but cannot name correctly yet (with `raise_on_limit=True`) |
 | `UNNAMEABLE` | `unknown organic compound` | an organic structure no candidate name passed the checks for |
-| `NO_VERIFIED_PIN` | `unknown organic compound` | the default tier built and checked a name, but not a verified PIN and not one of its exceptions; `--emit-tier best-effort` returns that name with its tier |
+| `NO_VERIFIED_PIN` | `unknown organic compound` | with `--emit-tier pin`: the strict path built and checked a name, but not a verified PIN and not one of its exceptions; the default returns a name with its tier |
 
 The codes are the stable part: the keys of `orthonym.errors.LIMIT_CATALOG`. The texts of the labels can change, so match a code, never a label.
 
-Most organic declines carry the general `UNNAMEABLE` (no candidate name passed the checks) or, at the default tier, `NO_VERIFIED_PIN` (a checked name exists, but not the PIN). The default tier also declines molecules that a wider tier names, because it returns only a verified PIN: on the held-out ChEBI set it declines 891 of 2,000 molecules, and `--emit-tier best-effort` names nearly all of them ([Accuracy](accuracy.md#the-two-tiers)).
+Most organic declines carry the general `UNNAMEABLE` (no candidate name passed the checks). `NO_VERIFIED_PIN` (a checked name exists, but not the PIN) is the reason of `--emit-tier pin`, the PIN-only tier, which also declines molecules that the default names, because it returns only a verified PIN: on the held-out ChEBI set it declines 891 of 2,000 molecules, and the default names nearly all of them ([Accuracy](accuracy.md#the-two-tiers)).
 
-Betaine shows the second case. Its strict-path name contains a part the engine records as not the preferred form, so the default tier declines, and a wider tier returns the name labelled {tier}`systematic_verified`:
+Betaine shows the second case. Its strict-path name contains a part the engine records as not the preferred form, so the PIN-only tier declines, and the default and the wider tiers return the name labelled {tier}`systematic_verified`:
 
 ```console
-$ orthonym "C[N+](C)(C)CC(=O)[O-]" --provenance
+$ orthonym "C[N+](C)(C)CC(=O)[O-]" --emit-tier pin --provenance
 {"name": "unknown organic compound", "tier": "abstain", "is_pin": false, "source": "abstain", "opsin": "n/a", "gates_passed": [], "gate_outcome": "suppressed", "formula": "C5H11NO2", "limit_code": "NO_VERIFIED_PIN", "stereo_unexpressed": false, "suffix_free_prefix_name": false, "prefix_order_fallback": false, "verified": "unverified", "spelling_failures": [], "producer": null}
 $ orthonym "C[N+](C)(C)CC(=O)[O-]" --emit-tier valid
 (trimethylazaniumyl)acetate
@@ -61,7 +61,7 @@ $ orthonym "C[N+](C)(C)CC(=O)[O-]" --emit-tier valid
 
 The default-tier row has `"producer": null` although the engine built a name, because nothing ships. With `--provenance` the `valid` row names the code that built it.
 
-Natural-product names are a second case. Where a molecule's preferred name is a bridged fused name that the engine does not build yet, its natural-product name (`diamorphine`, `(9R,13S,14S)-3-methoxy-17-methylmorphinan`) is not the PIN. The default tier declines it with `NO_VERIFIED_PIN`, and a wider tier returns it labelled {tier}`systematic_verified`. `--trivial` also returns the trivial ones, such as `diamorphine`, at the default tier.
+Natural-product names are a second case. Where a molecule's preferred name is a bridged fused name that the engine does not build yet, its natural-product name (`diamorphine`, `(9R,13S,14S)-3-methoxy-17-methylmorphinan`) is not the PIN. The PIN-only tier declines it with `NO_VERIFIED_PIN`, and a wider tier returns it labelled {tier}`systematic_verified`. `--trivial` also returns the trivial ones, such as `diamorphine`, at the PIN-only tier.
 
 At a tier other than `pin`, the provenance row has no label for the name (`null`), and `--on-failure label` prints `(no name — CODE)` for it:
 
@@ -92,6 +92,6 @@ True
 False
 ```
 
-`orthonym.classify_limit` returns the reason without raising, and `on_failure="raise"` (or `raise_on_limit=True`) turns a decline into an `OrthonymLimitError` ([Python](use/python.md)). For a molecule the default tier declines with `NO_VERIFIED_PIN`, `classify_limit` returns that code and `on_failure="raise"` raises `OrthonymLimitError` with it.
+`orthonym.classify_limit` returns the reason without raising, and `on_failure="raise"` (or `raise_on_limit=True`) turns a decline into an `OrthonymLimitError` ([Python](use/python.md)). Both follow the default, so a molecule that the default names has no limit. For a molecule the PIN-only tier declines with `NO_VERIFIED_PIN`, `name_compound(smiles, emit_tier="pin", on_failure="raise")` raises `OrthonymLimitError` with that code.
 
 A decline is never silent: a molecule that gets no name gets a logged reason (the limit code and a label), and `--provenance` gives a reason code. `--batch` leaves the name column of that line empty, prints the reason on the error stream, and counts such lines with `--verbose`; with `--batch --provenance` the row of that line holds the reason code.

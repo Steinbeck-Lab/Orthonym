@@ -50,7 +50,7 @@ def test_default_tier_declines_with_the_rule(smiles, members, expected):
     # the label of the plain call is the decline, on every public entry
     o = Orthonym(style="pin")
     assert o.name(smiles, on_failure="label") == row["name"]
-    assert name_compound(smiles, on_failure="label") == row["name"]
+    assert name_compound(smiles, on_failure="label", emit_tier="pin") == row["name"]
     assert o.name_with_confidence(smiles)["name"] == row["name"]
     assert o.name_with_tree(smiles).name == row["name"]
 

@@ -429,7 +429,7 @@ def test_descriptor_in_a_prefix_numbers_and_orders(smiles, expected):
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected", CYCLOALKANE_FIRST_CITED)
 def test_carbocycle_first_cited_prefix_takes_the_lower_locant(smiles, expected):
-    assert name_compound(smiles) == expected
+    assert name_compound(smiles, emit_tier="pin") == expected
 
 
 @pytest.mark.opsin_gate

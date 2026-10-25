@@ -38,29 +38,33 @@ CC(=O)O	acetic acid
 
 ## Tiers and provenance rows
 
-Batch runs use the default tier, unless you give `--emit-tier`. It works as it does for one SMILES. The second molecule here gets no name at the default tier and a name at `best-effort`:
+A batch run has the same default as one SMILES: the `best-effort` tier, that is the verified PIN when the strict path builds one and otherwise a systematic name. The default prints one note on the error stream at the end of the run, once however many lines got a name below `pin_verified`, and none when no line did. `--emit-tier` works as it does for one SMILES. This file has a molecule with no PIN, which `--emit-tier pin` leaves without a name:
 
 ```console
 $ cat wide.smi
 CCO
 CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1
 O=[U](=O)=O
-$ orthonym --batch wide.smi --emit-tier best-effort
+$ orthonym --batch wide.smi
 CCO	ethanol
 CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1	2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}-N-(3-fluorophenyl)-2-methylpropanamide
 O=[U](=O)=O	
+$ orthonym --batch wide.smi --emit-tier pin
+CCO	ethanol
+CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1	
+O=[U](=O)=O	
 ```
 
-A line that gets no name at the tier you chose follows `--on-failure`, as it does at the default tier. The whole file is named with one `Orthonym` instance, as in the Python loop below.
+A line that gets no name at the tier you chose follows `--on-failure`. The whole file is named with one `Orthonym` instance, as in the Python loop below.
 
-`--provenance` puts the row of [The provenance row](provenance.md) in the second column, on one line, in place of the name. It has the same keys as the row for one SMILES, and `--on-failure` does not change it: a line with no name has `limit_code` and, with `--emit-tier` other than `pin`, `null` as its `name`.
+`--provenance` puts the row of [The provenance row](provenance.md) in the second column, on one line, in place of the name. It has the same keys as the row for one SMILES, and `--on-failure` does not change it: a line with no name has `limit_code` and, with `--emit-tier` other than `pin`, `null` as its `name`. The row carries the tier, so the note is not printed.
 
 ```console
 $ orthonym --batch wide.smi --provenance
 CCO	{"name": "ethanol", "tier": "pin_verified", "is_pin": true, ...}
 ```
 
-`--confidence` cannot be combined with `--provenance` or with an `--emit-tier` other than `pin`, because a row has no coverage score. `orthonym` stops with a usage error and status `2`.
+`--confidence` works with every tier; the line has the name, the score and the handler (without `--emit-tier` the note is printed when a name is below `pin_verified`). It cannot be combined with `--provenance`, because a row has no coverage score. `orthonym` stops with a usage error and status `2`.
 
 The flags that look inside the naming of one structure cannot be combined with `--batch`: `--validation-stats`, `--dispatch-stats`, `--engine-only`, `--dump-tree` and `--format` (which only sets the layout of `--dump-tree`). `orthonym` stops with a usage error and status `2`, before the file is read, and names the flags it refused. To look inside the naming of one line, run `orthonym` on that SMILES with the flag.
 

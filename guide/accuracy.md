@@ -14,21 +14,21 @@ Orthonym is judged by what it gets **exactly right** and by what it gets **wrong
 
 Orthonym answers at two tiers, and they name different numbers of molecules.
 
-The **default tier** returns a verified Preferred IUPAC Name (PIN), or no name and the reason. It declines a molecule when it cannot verify a PIN, even when a correct name that is not the PIN exists. The **`best-effort` tier** returns those systematic names as well, each checked by the same round trip and labelled with its tier. Ask for it with `--emit-tier best-effort`, with `--batch FILE --emit-tier best-effort` for a file of SMILES, or in Python with `Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)` ([Output tiers](tiers.md)). The default is a rule about which names to return. It is not a limit of what the engine can name.
+The **default** is the `best-effort` tier. It returns the verified Preferred IUPAC Name (PIN) when the strict PIN path builds it, and otherwise a systematic name that is not the PIN, checked by the same round trip and labelled with its tier. The **PIN-only tier** (`--emit-tier pin`, the default of releases up to 1.0.x) returns a verified PIN, or no name and the reason. It declines a molecule when it cannot verify a PIN, even when a correct name that is not the PIN exists. Ask for it with `--emit-tier pin`, with `--batch FILE --emit-tier pin` for a file of SMILES, or in Python with `name_compound(smiles, emit_tier="pin")` ([Output tiers](tiers.md)). The PIN-only tier is a rule about which names to return. It is not a limit of what the engine can name.
 
-The table gives both tiers for the same molecules. It is Orthonym 1.0.9 with the changes merged after it. OPSIN 2.9.0 read each name back, and a name counts as named only when it read back to the input's molecule.
+The table gives both for the same molecules. It is Orthonym 1.0.9 with the changes merged after it. OPSIN 2.9.0 read each name back, and a name counts as named only when it read back to the input's molecule.
 
-| Set | Molecules | Named, default tier | Named, best-effort | Declined, default tier | Declined, best-effort | Unreadable, default tier | Unreadable, best-effort |
+| Set | Molecules | Named, default | Named, PIN-only tier | Declined, default | Declined, PIN-only tier | Unreadable, default | Unreadable, PIN-only tier |
 |:--|--:|--:|--:|--:|--:|--:|--:|
-| Held-out ChEBI 2,000 | 2,000 | 1,106 (55.30 %) | 1,994 (99.70 %) | 891 | 5 | 3 | 1 |
-| ChEBI development 2,000 | 2,000 | 1,108 (55.40 %) | 1,993 (99.65 %) | 888 | 4 | 4 | 3 |
-| Drug-like PubChem 2,000 | 2,000 | 860 (43.00 %) | 1,937 (96.85 %) | 1,127 (+1 timeout) | 63 | 12 | 0 |
+| Held-out ChEBI 2,000 | 2,000 | 1,994 (99.70 %) | 1,106 (55.30 %) | 5 | 891 | 1 | 3 |
+| ChEBI development 2,000 | 2,000 | 1,993 (99.65 %) | 1,108 (55.40 %) | 4 | 888 | 3 | 4 |
+| Drug-like PubChem 2,000 | 2,000 | 1,937 (96.85 %) | 860 (43.00 %) | 63 | 1,127 (+1 timeout) | 0 | 12 |
 
-Each tier's columns add up to Molecules. Named: the name read back to the input's full InChIKey; the percentage is of Molecules. Declined: no name, with a reason. A timeout (naming one molecule did not finish within the 60 seconds the harness allows) is also no name and counts as a miss. Unreadable: the engine emitted a name that OPSIN 2.9.0 cannot read, so it does not count as named. These are the documented exceptions of [Output tiers](tiers.md): at the default tier, for example, a PIN spelling that OPSIN's grammar lacks or a PIN with stereodescriptors OPSIN cannot read; at `best-effort`, a name with stereodescriptors OPSIN cannot read for a molecule that has no other name. Wrong structures, a name that reads back to a different molecule: none in any cell.
+Each tier's columns add up to Molecules. Named: the name read back to the input's full InChIKey; the percentage is of Molecules. Declined: no name, with a reason. A timeout (naming one molecule did not finish within the 60 seconds the harness allows) is also no name and counts as a miss. Unreadable: the engine emitted a name that OPSIN 2.9.0 cannot read, so it does not count as named. These are the documented exceptions of [Output tiers](tiers.md): at the PIN-only tier, for example, a PIN spelling that OPSIN's grammar lacks or a PIN with stereodescriptors OPSIN cannot read; at the default, a name with stereodescriptors OPSIN cannot read for a molecule that has no other name. Wrong structures, a name that reads back to a different molecule: none in any cell.
 
 The two ChEBI sets are samples of ChEBI structures that have at most 50 heavy atoms, one fragment, carbon, no radicals, no isotopes and no element other than C, H, N, O, P, S, F, Cl, Br and I. The held-out set is a split that no development run had read. The development set is a sample that development runs did read, so it is not an independent test. The drug-like set is 2,000 drug-like PubChem structures.
 
-On the held-out set the default tier names 1,106 of 2,000 molecules (55.30 %) and declines 891, and the `best-effort` tier names 1,994 (99.70 %) and declines 5.
+On the held-out set the default names 1,994 of 2,000 molecules (99.70 %) and declines 5, and the PIN-only tier names 1,106 (55.30 %) and declines 891.
 
 ## Measured results
 

@@ -75,6 +75,7 @@ _name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
 
 from .assembly.composer import assemble_name
 from .assembly.spelling_offer import name_tiered_with_offer as _name_tiered_with_offer
+from .tiers import is_wider, tier_label_of
 from .assembly.default_tier_offer import default_tier_engine, default_tier_name_scope, is_offered
 from .assembly.offer_pool import (
     ABSTAIN,
@@ -8900,6 +8901,8 @@ class Orthonym:
             ``name`` (the name), ``confidence`` (a score from 0 to 1, or ``None``
             when no measurement was taken), ``verification``, ``factors`` (the parts
             of the score), ``handler`` (the part of the engine that built the name),
+            ``tier`` (for a tier above ``pin`` only: the label the name earned, as in
+            :meth:`name_tiered`, ``None`` when there is no name),
             and further keys for the atom-to-locant map and the reason for a decline
             (``limit``, ``abstention``, and ``spelling_failures``: the spelling rules of
             the PIN that the declined name breaks).
@@ -8944,6 +8947,8 @@ class Orthonym:
                     _DEFAULT_TIER_POLICY_OFF.reset(_policy_off)
             if _policy and isinstance(metadata, dict):
                 metadata = self._default_tier_confidence(metadata, spelled)
+            if isinstance(metadata, dict) and is_wider(self):
+                metadata['tier'] = self._confidence_tier
             if ((spelled != smiles or getattr(_LP_INPUT, 'rewrite', None) is not None)
                     and isinstance(metadata, dict) and metadata.get('atom_to_locant')):
                 metadata['atom_to_locant'] = _lone_pair_caller_atoms(metadata['atom_to_locant'])
@@ -8999,7 +9004,11 @@ class Orthonym:
         )
         from .metrics.abstention import abstention_code_for, peek_abstention
         try:
+            if is_wider(self):
+                from .metrics.provenance import clear_provenance
+                clear_provenance()
             name = self.name(smiles, on_failure="label")
+            self._confidence_tier = tier_label_of(self, name, smiles) if is_wider(self) else None  # row of the call
             _probe = Chem.MolFromSmiles(smiles)
             # Wave-0 D1: a wildcard input is declined before any producer runs, and
             # its record says so (the honest unmeasured record, handler 'fallback',
@@ -11165,7 +11174,8 @@ def _filter_consumed_fg_atoms(functional_groups: dict) -> dict:
 def name_with_tree(smiles: Union[str, Chem.Mol], style: str = "pin"):
     """Name one molecule and return the parts of the name.
 
-    A shortcut for ``Orthonym(style=style).name_with_tree(smiles)``.
+    A shortcut for ``Orthonym(style=style,...).name_with_tree(smiles)`` with the switches of the default of
+    :func:`name_compound`.
 
     Parameters
     ----------
@@ -11203,7 +11213,8 @@ def name_with_tree(smiles: Union[str, Chem.Mol], style: str = "pin"):
     >>> result.tree.suffix
     'ol'
     """
-    return Orthonym(style=style).name_with_tree(smiles)
+    from .tiers import default_flags
+    return Orthonym(style=style, **default_flags(style)).name_with_tree(smiles)
 
 
 def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
@@ -11212,6 +11223,7 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
                    enable_triviality_controller: bool = False,
                    enable_group_splitting: bool = False,
                    trivial_fallback: bool = False,
+                   emit_tier: Optional[str] = None,
                    general_fallback: Optional[bool] = None,
                    general_fallback_unverified: Optional[bool] = None,
                    allow_aromatic_general: Optional[bool] = None,
@@ -11223,13 +11235,14 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
 
     Reads a structure, written as SMILES or given as an RDKit molecule, and returns
     its IUPAC name as a string.
-    At the default settings a name is returned only when the strict path for the
-    Preferred IUPAC Name built it and verified it, or when it is one of the default
-    tier's exceptions (the exact-match list names, the few name formats OPSIN cannot
-    read, a PIN whose stereodescriptors OPSIN cannot read). Where no name passes, the
-    result is the empty string, and one warning on the logger ``orthonym`` says why
-    (``on_failure`` below). The wider tiers (``general_fallback`` and the options
-    below) also return names that are not the preferred name. Use
+    The default is the ``best-effort`` tier: the strict path for the Preferred IUPAC
+    Name first, and its name is returned when it built one and OPSIN read it back
+    (tier ``pin_verified``), and otherwise a systematic name that is not the preferred
+    name. ``emit_tier="pin"`` returns only the preferred names of the strict path (and
+    its exceptions: the exact-match list names, the few name formats OPSIN cannot read,
+    a PIN whose stereodescriptors OPSIN cannot read), which was the default up to
+    release 1.0.x. Where no name passes, the result is the empty string, and one
+    warning on the logger ``orthonym`` says why (``on_failure`` below). Use
     :meth:`Orthonym.name_tiered` to learn which tier a name earned.
 
     Parameters
@@ -11268,6 +11281,10 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
         When no preferred name can be built, also allow a retained trivial name
         that is not a preferred name. A molecule whose preferred name can be built
         keeps it. Turns on ``enable_triviality_controller``.
+    emit_tier: {"pin", "valid", "complete", "best-effort", "full-coverage"} or None
+        The tier, by the name of ``--emit-tier``. ``None`` is the default described
+        above (``best-effort`` for ``style="pin"`` when OPSIN reads the names back,
+        else ``"pin"``). Not with the four switches below (``ValueError``).
     general_fallback: bool or None, default None
         When the strict path declines, try the general naming engine (the
         ``valid`` tier of the command line). Its names must pass an atom-coverage
@@ -11338,6 +11355,12 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
     if not isinstance(smiles, str) and _input_mol.handles(smiles):
         # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
         smiles = _input_mol.smiles_for(smiles)
+    from .assembly.fragment_naming import name_scope_depth
+    from .tiers import resolve_switches
+    # a nested call (name_scope_depth > 0) inherits the tier of its caller; the caller's own call is the default
+    general_fallback, general_fallback_unverified, allow_aromatic_general, full_coverage = resolve_switches(
+        style, emit_tier, general_fallback, general_fallback_unverified, allow_aromatic_general, full_coverage,
+        own_call=name_scope_depth() == 0)
     if not include_confidence:
         from .assembly.fragment_naming import is_top_level_naming
         if not is_top_level_naming():
@@ -11628,8 +11651,8 @@ def classify_limit(smiles: Union[str, Chem.Mol]) -> Optional[OrthonymLimitError]
     """Say whether a structure is out of scope, without raising.
 
     A wildcard atom (``*``) is refused at once. Any other structure is named with
-    the default settings; if that gives a label instead of a name, the reason is
-    returned.
+    the default settings (:func:`name_compound`); if that gives a label instead of
+    a name, the reason is returned.
 
     Parameters
     ----------
@@ -11641,9 +11664,8 @@ def classify_limit(smiles: Union[str, Chem.Mol]) -> Optional[OrthonymLimitError]
     Returns
     -------
     OrthonymLimitError or None
-        The reason, with its code (for example ``UNSUPPORTED_ELEMENT``,
-        ``WILDCARD_ATOMS``, or ``NO_VERIFIED_PIN`` when the default settings built
-        a name that is not a verified preferred IUPAC name) and message. ``None``
+        The reason, with its code (for example ``UNSUPPORTED_ELEMENT`` or
+        ``WILDCARD_ATOMS``) and message. ``None``
         when the structure gets a name, and also when RDKit cannot read the SMILES
         at all, ``smiles`` is ``None``, or a Mol fails the check described under
         :func:`name_compound` (that is a reading error, not a scope limit).
@@ -11681,13 +11703,14 @@ def classify_limit(smiles: Union[str, Chem.Mol]) -> Optional[OrthonymLimitError]
     if scope is not None:
         scope.smiles = smiles
         return scope
-    namer = Orthonym()
+    from .tiers import default_flags
+    namer = Orthonym(**default_flags())
     try:
         produced = namer.name(smiles, on_failure="label")
     except Exception:
         produced = None
     if is_failure_name(produced):
-        # The default tier built a name but declined it (not a verified PIN).
+        # With the PIN-only default of a host without OPSIN: the strict path built a name and declined it.
         stash = getattr(namer, "_default_tier_row", None)
         if (stash is not None and stash[0] == produced
                 and stash[1].get("limit_code") == "NO_VERIFIED_PIN"):

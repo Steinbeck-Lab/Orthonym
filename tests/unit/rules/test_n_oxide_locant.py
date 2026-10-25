@@ -156,7 +156,7 @@ class TestAsymmetricRingNOxideNowNamesCorrectly:
 class TestVoidGuardAmbiguousMultiOxide:
     def test_pyrazine_1_4_dioxide_abstains_honestly(self):
         smi = "[O-][n+]1cc[n+]([O-])cc1"
-        name = name_compound(smi, on_failure="label")
+        name = name_compound(smi, on_failure="label", emit_tier="pin")
         # Never emit a mono-oxide name that silently drops the second oxide,
         # and never a bare "pyrazine oxide" (ambiguous which N).
         assert name is None or "unknown" in name.lower(), (

@@ -85,7 +85,7 @@ class TestGlycosideNaming:
     ])
     def test_complex_ether_abstains_in_production(self, smiles, test_id):
         """Gate-ON: suppresses the RT-WRONG best-effort name."""
-        assert name_compound(smiles, on_failure="label") == "unknown organic compound", test_id
+        assert name_compound(smiles, on_failure="label", emit_tier="pin") == "unknown organic compound", test_id
 
     # Task 12 fix a performance pass (wp6-tests; t12-research rest-of-suite item 35), D-b: B3
     # (trigalloyl ester) moved out of the abstain list -- the gate-on PIN tier now ships

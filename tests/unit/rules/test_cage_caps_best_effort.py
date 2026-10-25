@@ -179,6 +179,10 @@ def test_name_with_confidence_sets_the_request_tier_for_its_call():
     raised = (vbu.BEST_EFFORT_MAX_CAGE_ATOMS, vbu.BEST_EFFORT_MAX_CAGE_RINGS)
     with pytest.MonkeyPatch.context() as mp:
         mp.setattr(Orthonym, "_name_impl", fake_impl)
+        # the tier label of a wider tier's confidence record runs the strict path again (a call of its own, at the
+        # PIN ceilings); the request tier of the call is the subject here
+        import orthonym.namer as namer_module
+        mp.setattr(namer_module, "tier_label_of", lambda namer, name, smiles: None)
         Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_with_confidence("C")
         Orthonym().name_with_confidence("C")
         # inside a request (an enclosing name scope) the call keeps that

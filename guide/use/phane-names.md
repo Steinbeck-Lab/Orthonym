@@ -14,14 +14,14 @@ $ orthonym --opsin main "O(c1ccccc1)c1ccc(Oc2ccc(Oc3ccccc3)cc2)cc1"
 2,4,6-trioxa-1,7(1),3,5(1,4)-tetrabenzenaheptaphane
 ```
 
-With the default OPSIN 2.9.0, Orthonym does not build phane names, with one exception. The exception is the monocyclic cyclophane of benzene rings (`1,4(1,4)-dibenzenacyclohexaphane`), which it still ships, checked by building the structure back from the name itself; the row says `carveout:phane` and the tier is {tier}`pin_unverified`. A linear phane, a cyclophane with any other skeleton and a cyclophane with substituents are not named as phanes; at the default tier they are declined (for the large rings described below).
+With the default OPSIN 2.9.0, Orthonym does not build phane names, with one exception. The exception is the monocyclic cyclophane of benzene rings (`1,4(1,4)-dibenzenacyclohexaphane`), which it still ships, checked by building the structure back from the name itself; the row says `carveout:phane` and the tier is {tier}`pin_unverified`. A linear phane, a cyclophane with any other skeleton and a cyclophane with substituents are not named as phanes; at the PIN-only tier they are declined (for the large rings described below).
 
 ## A non-phane name of a cyclophane is not a preferred name
 
-For a cyclophane the preferred name is the phane name, so Orthonym never gives another name for it as a preferred name. This holds for the large rings the rules describe (ten atoms or more) with either OPSIN. Where it cannot build the phane name, the default tier declines the structure, and the wider tiers still return the fusion, bridged fused, von Baeyer or spiro name, labelled {tier}`systematic_verified`:
+For a cyclophane the preferred name is the phane name, so Orthonym never gives another name for it as a preferred name. This holds for the large rings the rules describe (ten atoms or more) with either OPSIN. Where it cannot build the phane name, the PIN-only tier declines the structure, and the wider tiers still return the fusion, bridged fused, von Baeyer or spiro name, labelled {tier}`systematic_verified`:
 
 ```console
-$ orthonym "C1CCC2=CC(=CC=C2)CCCC12CCCC1=CC(=CC=C1)CCC2"
+$ orthonym --emit-tier pin "C1CCC2=CC(=CC=C2)CCCC12CCCC1=CC(=CC=C1)CCC2"
 
 C1CCC2=CC(=CC=C2)CCCC12CCCC1=CC(=CC=C1)CCC2	NO_VERIFIED_PIN: unknown organic compound
 $ orthonym --emit-tier best-effort "C1CCC2=CC(=CC=C2)CCCC12CCCC1=CC(=CC=C1)CCC2"
@@ -38,7 +38,7 @@ The CIP descriptors of the atoms of a phane skeleton are cited at the front of t
 
 ## Hydro prefixes and indicated hydrogen
 
-A ring that is a hydro derivative of a mancude ring system, or that needs indicated hydrogen, is cited by its mancude parent, and the hydrogen atoms are written before the parent hydride name with the composite locants of the ring atoms: `1^4H-1(3,5)-pyrana-4(1,3)-benzenacyclohexaphane`, `1^1,1^2-dihydro-1(2)-quinolina-3,5(1,4),7(1)-tribenzenaheptaphane`, `1^1H,2^1H,3^1H,4^1H,5^1H,6^1H,7^1H-1,7(2),2,3,4,5,6(2,5)-heptapyrrolaheptaphane`. The indicated hydrogen of a ring is numbered before its attachment locants, as the name of its parent hydride is: `1^2H-1(6)-pyrana-...`, not `1^6H-1(2)-pyrana-...`. A cyclophane of more than seven nodes whose hydro ring keeps a double bond has no certified name: the recommendations cite a descriptor for that bond (`1^2Z`, in `(1^2Z,2E)-1^1,1^4,1^5,1^6-tetrahydro-1(2,6)-pyridina-7(1,3)-benzenacyclododecaphan-2-ene`), and OPSIN does not read it. The default tier declines such a structure; the wider tiers return the name without the descriptor, labelled below the preferred name.
+A ring that is a hydro derivative of a mancude ring system, or that needs indicated hydrogen, is cited by its mancude parent, and the hydrogen atoms are written before the parent hydride name with the composite locants of the ring atoms: `1^4H-1(3,5)-pyrana-4(1,3)-benzenacyclohexaphane`, `1^1,1^2-dihydro-1(2)-quinolina-3,5(1,4),7(1)-tribenzenaheptaphane`, `1^1H,2^1H,3^1H,4^1H,5^1H,6^1H,7^1H-1,7(2),2,3,4,5,6(2,5)-heptapyrrolaheptaphane`. The indicated hydrogen of a ring is numbered before its attachment locants, as the name of its parent hydride is: `1^2H-1(6)-pyrana-...`, not `1^6H-1(2)-pyrana-...`. A cyclophane of more than seven nodes whose hydro ring keeps a double bond has no certified name: the recommendations cite a descriptor for that bond (`1^2Z`, in `(1^2Z,2E)-1^1,1^4,1^5,1^6-tetrahydro-1(2,6)-pyridina-7(1,3)-benzenacyclododecaphan-2-ene`), and OPSIN does not read it. The PIN-only tier declines such a structure; the wider tiers return the name without the descriptor, labelled below the preferred name.
 
 ## A phane as a substituent
 
@@ -49,7 +49,7 @@ $ orthonym --opsin main "C[Si](C)(C)c1ccc(Oc2ccc(Oc3ccc(Oc4ccccc4)cc3)cc2)cc1"
 trimethyl[2,4,6-trioxa-1,7(1),3,5(1,4)-tetrabenzenaheptaphan-1^4-yl]silane
 ```
 
-With the default OPSIN 2.9.0 such a structure is declined at the default tier, as before. When two identical parents hold every principal characteristic group, the recommendations prefer the multiplicative name that cites the phane as its central group (`3,3'-[1,7(1),3,5(1,4)-tetrabenzenaheptaphane-1^4,7^4-diyl]dipropanoic acid`); that name is not built, and the name that cites the phane in the prefix of one parent is not given as a preferred name.
+With the default OPSIN 2.9.0 such a structure is declined at the PIN-only tier, as before. When two identical parents hold every principal characteristic group, the recommendations prefer the multiplicative name that cites the phane as its central group (`3,3'-[1,7(1),3,5(1,4)-tetrabenzenaheptaphane-1^4,7^4-diyl]dipropanoic acid`); that name is not built, and the name that cites the phane in the prefix of one parent is not given as a preferred name.
 
 ## Examples
 
@@ -67,4 +67,4 @@ The last example is a ring assembly of seven rings. The recommendations name rin
 
 ## What is not built yet
 
-Orthonym does not build a phane name for a structure whose rings carry a double bond to an outside atom (the oxo group of a quinolone), for a ring that is a cycloalkene, or for a peri-fused ring system. Such a structure is declined at the default tier, even with `--opsin main`; the wider tiers return a name that is not a phane name, labelled below the preferred name. A cyclophane whose large ring has nine atoms or fewer is outside what the recommendations decide here, and it keeps the name and the label the engine gives it.
+Orthonym does not build a phane name for a structure whose rings carry a double bond to an outside atom (the oxo group of a quinolone), for a ring that is a cycloalkene, or for a peri-fused ring system. Such a structure is declined at the PIN-only tier, even with `--opsin main`; the wider tiers return a name that is not a phane name, labelled below the preferred name. A cyclophane whose large ring has nine atoms or fewer is outside what the recommendations decide here, and it keeps the name and the label the engine gives it.

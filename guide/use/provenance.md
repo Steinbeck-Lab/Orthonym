@@ -19,7 +19,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : `true` only for a certified Preferred IUPAC Name.
 
 `source`
-: Which part of the engine produced the name: `pin_path` (the strict path; at `best-effort` it also labels the `cis` or `trans` name of a monocycle's pair of stereocentres, which is made from a name with lowercase `r` and `s` that the engine built for the whole molecule and OPSIN cannot read, with the tier {tier}`systematic_verified`, and the name the default tier ships although OPSIN cannot read its stereodescriptors, for a molecule that has no other name, with the tier {tier}`pin_unverified`), `general_engine`, `trivial_retained` (a retained trivial name: from the last-resort table, or a trivial natural-product name such as `diamorphine`), `t4_floor` (a last-resort producer) or `abstain`. It is coarse; `producer` is the finer field.
+: Which part of the engine produced the name: `pin_path` (the strict path; at `best-effort` it also labels the `cis` or `trans` name of a monocycle's pair of stereocentres, which is made from a name with lowercase `r` and `s` that the engine built for the whole molecule and OPSIN cannot read, with the tier {tier}`systematic_verified`, and the name the PIN-only tier ships although OPSIN cannot read its stereodescriptors, for a molecule that has no other name, with the tier {tier}`pin_unverified`), `general_engine`, `trivial_retained` (a retained trivial name: from the last-resort table, or a trivial natural-product name such as `diamorphine`), `t4_floor` (a last-resort producer) or `abstain`. It is coarse; `producer` is the finer field.
 
 `opsin`
 : What the OPSIN check found: `verified`, `verified_constitution_only` (the constitution matched; the stereodescriptors were not compared), `verified_twin` (OPSIN has no grammar for the name and read a twin spelling of it back to your structure), `unverified`, or `n/a` when there is no name.
@@ -34,7 +34,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : The molecular formula, given when there is no name, so a decline still tells you what came in.
 
 `limit_code`
-: The reason code of a decline, for example `UNSUPPORTED_ELEMENT` or, at the default tier, `NO_VERIFIED_PIN` (the engine built a checked name that is not a verified PIN). See [Declines](../declines.md).
+: The reason code of a decline, for example `UNSUPPORTED_ELEMENT` or, at the PIN-only tier, `NO_VERIFIED_PIN` (the engine built a checked name that is not a verified PIN). See [Declines](../declines.md).
 
 `stereo_unexpressed`
 : `true` when your structure configures a stereo element (a stereocentre, or a double bond drawn with `/` and `\`) that the name does not state. The check counts the stereo elements that OPSIN's read-back of the name configures (the read-back the final check keeps, so a name it has read is not read again): fewer than your structure configures sets the flag. It is for a name of any producer, and it changes nothing else: not the name, not the tier, not `is_pin`. A Preferred IUPAC Name can carry it. `C[N+](C)=C/C=C/C=C/N1CCCC1` gives `1-[5-(dimethylamino)penta-2,4-dien-1-ylidene]pyrrolidin-1-ium`, {tier}`pin_verified`, with the flag `true`: the two double bonds you configured are single bonds in this form of the cation, so the name cannot state them, and the standard InChIKey does not see them, so the read-back still matches. The flag is `false` when the read-back states every element, and when there is no read-back, because OPSIN cannot read the name (a name with lowercase `r` and `s`, a name from an exact-match list): the flag does not guess from the text of the name.
@@ -43,7 +43,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : `true` when the name states the principal characteristic group as a prefix with no suffix, a form the recommendations do not allow.
 
 `prefix_order_fallback`
-: `true` when a {tier}`best_effort` name cites its substituent prefixes in an order other than the alphanumerical one, because the name in the standard order did not pass its round trip for its stereodescriptors alone. Such a name is never a Preferred IUPAC Name; the default tier does not use it.
+: `true` when a {tier}`best_effort` name cites its substituent prefixes in an order other than the alphanumerical one, because the name in the standard order did not pass its round trip for its stereodescriptors alone. Such a name is never a Preferred IUPAC Name; the PIN-only tier does not use it.
 
 `verified`
 : Whether the name was read back, in one word:
@@ -55,7 +55,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
   or `unverified` (no read-back recorded).
 
 `spelling_failures`
-: The spelling rules of the Preferred IUPAC Name that a name in preferred-name form breaks, as a list of `{"rule": ..., "detail": ...}` entries, and the rule of a part of the name that the engine records as not the preferred form. A name reached through another drawing of the same compound is listed here too, and the `detail` says so. OPSIN cannot see these: a name can read back to your structure and still break one. Such a name is {tier}`systematic_verified` at most; the default tier declines it with `NO_VERIFIED_PIN` and keeps the entries as the reason. The list is empty otherwise.
+: The spelling rules of the Preferred IUPAC Name that a name in preferred-name form breaks, as a list of `{"rule": ..., "detail": ...}` entries, and the rule of a part of the name that the engine records as not the preferred form. A name reached through another drawing of the same compound is listed here too, and the `detail` says so. OPSIN cannot see these: a name can read back to your structure and still break one. Such a name is {tier}`systematic_verified` at most; the PIN-only tier declines it with `NO_VERIFIED_PIN` and keeps the entries as the reason. The list is empty otherwise.
 
 `producer`
 : The code that built the name that ships, for example `inner:tier_a_ring` or `engine:general`; `null` when no name ships, a default-tier `NO_VERIFIED_PIN` decline included. See [Which code built the name](#which-code-built-the-name).
@@ -66,8 +66,8 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 
 - **The deepest builder.** `producer` names the code that built the string, not the class that passed the molecule on. A peptide whose name an inner handler composed shows that handler, not `outer:peptide`. When two codes return the same name, the first one to return it is reported, which is the innermost.
 - **Another drawing of a metal compound.** A metal compound that is named through another drawing of it ([Metal compounds](../tiers.md#metal-compounds)) shows the code that built the name of that drawing: `Cl[Zn]Cl` is named through its ionic drawing and gives `outer:salt`, a bare zinc atom gives `outer:metal_atom`.
-- **The `cis` or `trans` name of a ring pair.** At `best-effort`, a name with `cis` or `trans` is made from the name with lowercase `r` and `s` that a code built for the whole molecule ([Tiers](../tiers.md)). The row names that code: `trans-cyclohexane-1,4-diol` gives `inner:general_acyclic`, the code that built `(1r,4r)-cyclohexane-1,4-diol` at the default tier.
-- **`null` when no name ships.** The default tier can build a name and withhold it (`NO_VERIFIED_PIN`, see [Declines](../declines.md)). Nothing ships then, so no code is named; a wider tier returns the name, and its row names the code.
+- **The `cis` or `trans` name of a ring pair.** At `best-effort`, a name with `cis` or `trans` is made from the name with lowercase `r` and `s` that a code built for the whole molecule ([Tiers](../tiers.md)). The row names that code: `trans-cyclohexane-1,4-diol` gives `inner:general_acyclic`, the code that built `(1r,4r)-cyclohexane-1,4-diol` at the PIN-only tier.
+- **`null` when no name ships.** The PIN-only tier can build a name and withhold it (`NO_VERIFIED_PIN`, see [Declines](../declines.md)). Nothing ships then, so no code is named; a wider tier returns the name, and its row names the code.
 - **A diagnostic, not a contract.** The ids follow the code's class and handler ids and can change in any release: count with them, do not parse them.
 - **Only the row has it.** `Orthonym.name_tiered` and `--provenance` return the key; `name_compound` returns the bare name.
 
@@ -89,10 +89,10 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 
 ## Read `tier` and `verified` together
 
-The tier says how a name was built. The `verified` field says whether OPSIN read it back. The two can differ: at the default tier, *cis*-decalin gets a name in preferred-name form that OPSIN read back with the right constitution only.
+The tier says how a name was built. The `verified` field says whether OPSIN read it back. The two can differ: at the PIN-only tier, *cis*-decalin gets a name in preferred-name form that OPSIN read back with the right constitution only.
 
 ```console
-$ orthonym "C1CC[C@H]2CCCC[C@H]2C1" --provenance
+$ orthonym "C1CC[C@H]2CCCC[C@H]2C1" --emit-tier pin --provenance
 {"name": "(4as,8as)-decahydronaphthalene", "tier": "pin_unverified", "is_pin": false, "source": "pin_path", "opsin": "verified_constitution_only", "gates_passed": ["self_consistency_constitution_only"], "gate_outcome": "self_consistency_constitution_only", "formula": null, "limit_code": null, "stereo_unexpressed": false, "suffix_free_prefix_name": false, "prefix_order_fallback": false, "verified": "opsin_constitution", "spelling_failures": [], "producer": "inner:tier_a_ring"}
 ```
 

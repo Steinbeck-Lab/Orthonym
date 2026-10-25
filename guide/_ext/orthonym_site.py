@@ -131,12 +131,12 @@ def expected_tier_rows():
                 raise RuntimeError(f"accuracy tiers row {row['set']!r} ({tier}): {parts} add up to {sum(parts)}, not {n}")
         if row.get("wrong", 0) != 0:
             raise RuntimeError(f"accuracy tiers row {row['set']!r}: the source reports wrong structures")
-        p, b = row["pin"], row["best_effort"]
+        p, b = row["pin"], row["best_effort"]       # the default is the best-effort tier; the table shows it first
         out.append([row["set"], _fmt(n),
-                    f"{_fmt(p['named'])} ({100 * p['named'] / n:.2f} %)",
                     f"{_fmt(b['named'])} ({100 * b['named'] / n:.2f} %)",
-                    _tier_declined(p), _tier_declined(b),
-                    _fmt(p["unreadable"]), _fmt(b["unreadable"])])
+                    f"{_fmt(p['named'])} ({100 * p['named'] / n:.2f} %)",
+                    _tier_declined(b), _tier_declined(p),
+                    _fmt(b["unreadable"]), _fmt(p["unreadable"])])
     return out
 
 
@@ -146,22 +146,22 @@ def held_out_figures():
     row = next(r for r in data["rows"] if r["set"].startswith("Held-out"))
     n, p, b = row["molecules"], row["pin"], row["best_effort"]
     return {
-        "default_named": f"{_fmt(p['named'])} ({100 * p['named'] / n:.2f} %)",
-        "best_effort_named": f"{_fmt(b['named'])} ({100 * b['named'] / n:.2f} %)",
-        "default_declined": f"declines {_fmt(p['declined'])}",
-        "best_effort_declined": f"declines {_fmt(b['declined'])}",
-        "default_declined_of": f"declines {_fmt(p['declined'])} of {_fmt(n)}",
+        "default_named": f"{_fmt(b['named'])} ({100 * b['named'] / n:.2f} %)",
+        "pin_only_named": f"{_fmt(p['named'])} ({100 * p['named'] / n:.2f} %)",
+        "default_declined": f"declines {_fmt(b['declined'])}",
+        "pin_only_declined": f"declines {_fmt(p['declined'])}",
+        "pin_only_declined_of": f"declines {_fmt(p['declined'])} of {_fmt(n)}",
     }
 
 
 # The held-out figures each page quotes: docname -> keys of held_out_figures.
 PROSE_FIGURES = {
-    "accuracy": ("default_named", "best_effort_named", "default_declined", "best_effort_declined"),
-    "start/first-name": ("default_named", "best_effort_named"),
-    "declines": ("default_declined_of",),
+    "accuracy": ("default_named", "pin_only_named", "pin_only_declined", "default_declined"),
+    "start/first-name": ("default_named", "pin_only_named"),
+    "declines": ("pin_only_declined_of",),
 }
 # The README is not a page of the site; the build checks it with the page "index".
-README_FIGURES = ("default_named", "best_effort_named", "default_declined")
+README_FIGURES = ("default_named", "pin_only_named", "pin_only_declined")
 
 
 def check_prose_figures(page, keys, text):

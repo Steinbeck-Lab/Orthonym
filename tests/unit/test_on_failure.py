@@ -38,7 +38,7 @@ NAMED = "CCO"
 def _label_of(smiles: str) -> str:
     """The label of a structure with no name, from the error the ``"raise"`` mode gives."""
     with pytest.raises(OrthonymLimitError) as err:
-        name_compound(smiles, on_failure="raise")
+        name_compound(smiles, on_failure="raise", emit_tier="pin")
     return err.value.message
 
 
@@ -56,15 +56,15 @@ def test_a_name_is_the_same_in_every_mode():
 
 @pytest.mark.parametrize("smiles,code", UNNAMED)
 def test_the_default_is_the_empty_string(smiles, code):
-    assert name_compound(smiles) == ""
-    assert name_compound(smiles, on_failure="empty") == ""
+    assert name_compound(smiles, emit_tier="pin") == ""
+    assert name_compound(smiles, on_failure="empty", emit_tier="pin") == ""
     assert Orthonym().name(smiles) == ""
-    assert is_failure_name(name_compound(smiles))
+    assert is_failure_name(name_compound(smiles, emit_tier="pin"))
 
 
 @pytest.mark.parametrize("smiles,code", UNNAMED)
 def test_label_mode_gives_the_label_of_the_limit(smiles, code):
-    label = name_compound(smiles, on_failure="label")
+    label = name_compound(smiles, on_failure="label", emit_tier="pin")
     assert label and is_failure_name(label)
     assert label == _label_of(smiles)
     assert Orthonym().name(smiles, on_failure="label") == label
@@ -123,7 +123,7 @@ def test_one_warning_with_the_code_and_the_label(caplog, smiles, code):
     label = _label_of(smiles)
     caplog.clear()
     with caplog.at_level(logging.WARNING, logger="orthonym"):
-        assert name_compound(smiles) == ""
+        assert name_compound(smiles, emit_tier="pin") == ""
     records = _unnamed_records(caplog)
     assert len(records) == 1
     record = records[0]
@@ -245,7 +245,7 @@ def test_the_engines_own_nested_calls_get_labels(monkeypatch, caplog):
     # a glycoside: its aglycone and sugar parts are named through nested calls
     smiles = "N#C[C@]1(O[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)C=C[C@H](O)C1"
     with caplog.at_level(logging.WARNING, logger="orthonym"):
-        assert namer_module.name_compound(smiles) == ""
+        assert namer_module.name_compound(smiles, emit_tier="pin") == ""
     assert nested, "the molecule is expected to be named through nested calls"
     assert any(is_failure_name(r) for r in nested), "a nested call with no name is the point"
     assert "" not in nested

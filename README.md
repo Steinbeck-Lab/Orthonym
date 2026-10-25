@@ -57,10 +57,11 @@ orthonym "CC(=O)Oc1ccccc1C(=O)O" --provenance # the name plus its tier and how i
 orthonym --batch molecules.smi -o names.txt   # one SMILES per line
 ```
 
-These commands use the default tier, which returns a verified Preferred IUPAC Name (PIN) or no name.
-For the wider tier, add `--emit-tier best-effort` (one SMILES or `--batch`), or in Python
-`Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)`.
-See [Output tiers](#output-tiers).
+These commands use the default, the `best-effort` tier: the verified Preferred IUPAC Name (PIN) when the
+strict PIN path builds one, and otherwise a systematic name that OPSIN read back to your structure. When a name
+is not the PIN, `orthonym` says so once on the error stream, and `--provenance` shows the tier of each name. For
+the PIN only, add `--emit-tier pin` (one SMILES or `--batch`), or in Python `name_compound(smiles,
+emit_tier="pin")`. See [Output tiers](#output-tiers).
 
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-specimen-narrow.svg">
@@ -88,20 +89,25 @@ More in [How every name is checked](guide/checking.md) and [Declines](guide/decl
 
 ## Output tiers
 
-By default Orthonym returns only the Preferred IUPAC Name (PIN), verified, or no name. Wider tiers
-are opt-in with `--emit-tier` (keyword switches of `Orthonym` in Python) and label every name
-they return. The default is a rule about which names to return, not a limit of the engine. On 2,000
-held-out ChEBI molecules the default tier names 1,106 (55.30 %) and declines 891, and
-`--emit-tier best-effort` names 1,994 (99.70 %). A name counts only when OPSIN 2.9.0 reads it back
-to the molecule ([both tiers on three sets](guide/accuracy.md#the-two-tiers)).
+By default Orthonym returns the name of the `best-effort` tier: the Preferred IUPAC Name (PIN) when the strict
+PIN path builds it and OPSIN reads it back, and otherwise a systematic name that is not the PIN, labelled with
+its tier. `--emit-tier pin` returns only the verified PIN, or no name, as releases up to 1.0.x did by default.
+The other tiers are asked for by name with `--emit-tier` (`name_compound(..., emit_tier=...)` in Python) and
+label every name they return. On 2,000 held-out ChEBI molecules the default names 1,994 (99.70 %) and declines 5,
+and `--emit-tier pin` names 1,106 (55.30 %) and declines 891. A name counts only when OPSIN 2.9.0 reads it back to
+the molecule ([both on three sets](guide/accuracy.md#the-two-tiers)).
 
 | `--emit-tier` | Returns |
 |:--|:--|
-| `pin` *(default)* | the verified PIN (with a few listed exceptions), or no name |
+| *(none)*, the default | the `best-effort` tier |
+| `pin` | the verified PIN (with a few listed exceptions), or no name: the default of releases up to 1.0.x |
 | `valid` | also other systematic names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
 | `best-effort` | also the last-resort names, such as von Baeyer and spiro names for ring systems of up to 15 rings |
 | `full-coverage` | also coordination names for metal tetrapyrrole and corrin complexes |
+
+Without OPSIN to read the names back (a host without Java, in the reduced mode), and for `--style general` and
+`cas`, the default is the `pin` tier, as it was.
 
 `--provenance` labels each name: `pin_verified` (the PIN, verified), `pin_unverified` (PIN form,
 preferred status not certified), `systematic_verified` (a correct name that is not the PIN),

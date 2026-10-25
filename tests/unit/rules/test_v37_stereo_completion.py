@@ -160,7 +160,7 @@ class TestST1NeverWrongAndPinPreserved:
         # gold V36-VB-PSEUDOASYM-01: PIN tier must NOT ship a non-RT (1r,5s);
         # default tier abstains (suppresses the flat form at PIN).
         with wall_clock_limit(90):
-            name = name_compound("C1C[C@H]2C[C@H](C2)O1")
+            name = name_compound("C1C[C@H]2C[C@H](C2)O1", emit_tier="pin")
         assert errors.is_failure_name(name)
 
 

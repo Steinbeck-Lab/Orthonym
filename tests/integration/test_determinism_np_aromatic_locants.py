@@ -156,7 +156,7 @@ def _named_in_subprocess(smi, env, timeout=60):
         "strict = Orthonym().name(smi)\n"
         "nm._DEFAULT_TIER_POLICY_OFF.reset(tok)\n"
         "be = Orthonym(**_emit_tier_flags('best-effort')).name_tiered(smi)['name']\n"
-        "print(json.dumps([name_compound(smi), row['limit_code'], strict, be]))\n"
+        "print(json.dumps([name_compound(smi, emit_tier='pin'), row['limit_code'], strict, be]))\n"
     )
     result = subprocess.run([sys.executable, "-c", code], capture_output=True,
                             text=True, env=env, timeout=timeout)

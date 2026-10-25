@@ -45,7 +45,7 @@ def test_sodium_hydrogen_carbonate_is_not_the_name_of_the_imbalanced_input():
     # 'sodium hydrogen carbonate' is NaHCO3 (net 0); the input is Na+ beside
     # neutral carbonic acid (net +1). The default tier has no PIN for a mixed
     # adduct and abstains; the best-effort tier names the adduct.
-    pin = name_compound(NAHCO3_IMBALANCED)
+    pin = name_compound(NAHCO3_IMBALANCED, emit_tier="pin")
     assert pin != "sodium hydrogen carbonate"
     assert is_failure_name(pin), pin
     be = name_best_effort(NAHCO3_IMBALANCED)["name"]

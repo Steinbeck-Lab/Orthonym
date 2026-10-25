@@ -187,7 +187,7 @@ class TestFailClosedBoundary:
     gate-off default, so these assert TRUE production fail-closed behavior."""
 
     def test_boronic_branch_stays_unknown(self):
-        assert name_compound("OB(O)CNCCCCCCCC(=O)O", on_failure="label") == UNKNOWN
+        assert name_compound("OB(O)CNCCCCCCCC(=O)O", on_failure="label", emit_tier="pin") == UNKNOWN
 
     def test_selanyl_branch_refuses_or_exact_heal(self):
         # HEAD producer emits structure-corrupt 'hydroxymethaneselenyl'
@@ -205,7 +205,7 @@ class TestFailClosedBoundary:
         # 'inorganic' wording was factually wrong; 'As' was the only p-block
         # metalloid missing from errors._METAL_NAMES. The REFUSAL itself (the
         # point of this test -- 'propynyl' must never surface) is unchanged.
-        out = name_compound("[AsH2]C#CCNCCCCCCCC(=O)O", on_failure="label")
+        out = name_compound("[AsH2]C#CCNCCCCCCCC(=O)O", on_failure="label", emit_tier="pin")
         assert out in (UNKNOWN, "arsenic compound (not supported)")
 
 

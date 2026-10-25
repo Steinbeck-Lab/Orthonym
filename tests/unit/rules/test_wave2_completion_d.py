@@ -48,7 +48,7 @@ class TestAM6Sulfonamido:
 
     def test_n_alkyl_sulfonamido_fails_closed(self, _validity_gate_on):
         # N-alkylated sulfonamido is out of scope -> fail closed (unknown).
-        assert "unknown" in name_compound("CS(=O)(=O)N(C)CCC(=O)O", on_failure="label")
+        assert "unknown" in name_compound("CS(=O)(=O)N(C)CCC(=O)O", on_failure="label", emit_tier="pin")
 
 
 @pytest.mark.unit
@@ -176,4 +176,4 @@ class TestFailClosed:
         "CC(=N)NCCC(=O)O",  # N-attached amidine sibling (separate row)
     ])
     def test_stays_unknown(self, _validity_gate_on, smiles):
-        assert "unknown" in name_compound(smiles, on_failure="label")
+        assert "unknown" in name_compound(smiles, on_failure="label", emit_tier="pin")

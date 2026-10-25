@@ -109,7 +109,7 @@ a listed producer or step is not wrapped, so add the function of a new one to it
    paragraph: the sentence that decides is often the last one. Note the section number, its
    heading and the criterion inside it. A rule number copied from a comment in the code may be
    wrong, so look it up. The book's examples marked `(PIN)` are the best test inputs.
-2. **Reproduce the name** with the commands above, at the default tier and at
+2. **Reproduce the name** with the commands above, at the default, at `--emit-tier pin` and at
    `--emit-tier best-effort`. Note the `tier`, `source` and `producer` of the row.
 3. **Find the producer and the rule's home.** The `producer` of the row says which code built the
    name. The rule index lists the canonical helper of a
@@ -135,7 +135,7 @@ a listed producer or step is not wrapped, so add the function of a new one to it
 - Check the round trip independently of the engine. `tests/support/rt_assert.py` has
   `assert_full_rt(name, smiles)`, which has OPSIN read the name and compares the full InChIKey.
   `tests/support/default_tier.py` and `tests/support/pin_tiers.py` hold the assertions for the
-  default tier and the best-effort tier.
+  PIN-only tier and the best-effort tier.
 - Name the molecule from two different SMILES spellings of it. The names must be equal: the
   same input always gives the same output.
 - Keep history out of the test. Do not write "was X, now Y" notes or a dated log of earlier
@@ -153,7 +153,7 @@ A change to a shared rule can move names far from the one you set out to fix.
   text of source files (to check that a function is not called from some module); if you renamed
   or moved a function, find them with `git grep -l -E "getsource|read_text" -- tests` and run them.
 - Keep a list of a few dozen SMILES from the same class as your molecule, and compare the names
-  before and after your change, at the default tier and at the tier you changed. This script
+  before and after your change, at the PIN-only tier and at the tier you changed. This script
   prints one line per molecule; run it on the unchanged code and on your branch, and compare the
   two outputs with `diff`:
 
@@ -184,7 +184,7 @@ A change to a shared rule can move names far from the one you set out to fix.
   Save it as `snapshot.py` and run `python snapshot.py best-effort molecules.smi > before.jsonl` (the first
   argument is the tier, the second a file with one SMILES per line), then again after your change
   into `after.jsonl`, and run `diff before.jsonl after.jsonl`. Every difference must be one you
-  intended. The default tier must not change unless the change is meant for it.
+  intended. The PIN-only tier must not change unless the change is meant for it.
 
 ## Contribution guidelines
 

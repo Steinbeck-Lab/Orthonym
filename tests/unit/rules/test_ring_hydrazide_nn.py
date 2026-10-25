@@ -178,7 +178,7 @@ def _validity_gate_on(monkeypatch):
     ],
 )
 def test_ring_hydrazide_fail_closed(smiles, _validity_gate_on):
-    assert "unknown" in name_compound(smiles, on_failure="label")
+    assert "unknown" in name_compound(smiles, on_failure="label", emit_tier="pin")
 
 
 @pytest.mark.unit

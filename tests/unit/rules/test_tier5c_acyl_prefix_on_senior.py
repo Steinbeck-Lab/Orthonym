@@ -59,7 +59,7 @@ def _validity_gate_on(monkeypatch):
 )
 def test_tier5c_fail_closed(_validity_gate_on, smiles, why):
     # production (validity gate ON) must not emit a name for these shapes
-    assert "unknown" in name_compound(smiles, on_failure="label"), why
+    assert "unknown" in name_compound(smiles, on_failure="label", emit_tier="pin"), why
 
 
 @pytest.mark.unit

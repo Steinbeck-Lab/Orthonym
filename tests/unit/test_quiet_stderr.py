@@ -59,7 +59,7 @@ def _engine_records(caplog):
 @pytest.mark.parametrize("smiles,message", INTERNAL)
 def test_internal_telemetry_is_logged_at_debug_not_warning(smiles, message, caplog):
     with caplog.at_level(logging.DEBUG):
-        name_compound(smiles)
+        name_compound(smiles, emit_tier="pin")
     records = _engine_records(caplog)
     said = [r for r in records if r.getMessage().startswith(message)]
     assert said, f"the census tools lost the line {message!r}: {[r.getMessage()[:60] for r in records][:8]}"
@@ -86,7 +86,7 @@ def test_a_terminal_fragment_refusal_is_debug_not_error(caplog):
 def test_the_reason_line_of_an_unnamed_structure_stays_a_warning(caplog):
     smiles = "OC(O)c1ccc(Br)c(C(O)O)c1"
     with caplog.at_level(logging.DEBUG):
-        assert name_compound(smiles) == ""
+        assert name_compound(smiles, emit_tier="pin") == ""
     reasons = [r for r in _engine_records(caplog) if getattr(r, "orthonym_code", None)]
     assert [(r.name, r.levelno, r.orthonym_smiles) for r in reasons] == [
         ("orthonym", logging.WARNING, smiles)]
@@ -107,7 +107,7 @@ def _cli(*args):
 
 def test_cli_prints_only_the_reason_line_for_an_unnamed_structure():
     smiles = "OC(O)c1ccc(Br)c(C(O)O)c1"
-    code, out, err = _cli(smiles)
+    code, out, err = _cli(smiles, "--emit-tier", "pin")      # the default is the best-effort tier and names it (lane DF)
     assert code == 0 and out == "\n"
     lines = err.splitlines()
     assert len(lines) == 1 and lines[0].startswith(f"{smiles}\tUNNAMEABLE: "), err

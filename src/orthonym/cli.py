@@ -19,6 +19,7 @@ from .errors import LIMIT_CATALOG, OrthonymLimitError, is_failure_name
 from .failure_mode import DEFAULT_MODE as DEFAULT_ON_FAILURE
 from .failure_mode import MODES as ON_FAILURE_MODES
 from .rdkit_log import rdkit_logs_off, rdkit_logs_on
+from .tiers import EMIT_TIERS, default_tier
 
 _VERSION_HELP = ("Print the version, in the form 'orthonym X.Y.Z', and stop. When --opsin or ORTHONYM_OPSIN "
                  "selects OPSIN's main branch, a second line names the OPSIN build.")
@@ -117,46 +118,10 @@ def _version_text() -> str:
 
 
 def _emit_tier_flags(emit_tier: str) -> dict:
-    """Map a ``--emit-tier`` value to the Orthonym general-engine flag triple.
-
-    Single source of truth for the tier -> namer-flag contract (a phase
-    T6.1). Both the CLI (``main``) and ``tests/unit/test_emit_tier_flags.py``
-    read this so the invariant table cannot silently drift.
-
-    Invariant table (0-wrong-critical):
-      pin -> gf=F, gfu=F, aag=F (PIN-or-abstain; byte-identical default)
-      valid -> gf=T, gfu=F, aag=F (RT-verified general-engine names)
-      complete -> gf=T, gfu=F, aag=T (RT-verified aggressive aromatic/hetero)
-      best-effort -> gf=T, gfu=T, aag=T (complete's production PLUS the T4
-                                           OPSIN-unverified opt-in)
-
-    ``general_fallback_unverified`` (gfu) is the UNIQUE best-effort
-    discriminator; ``allow_aromatic_general`` (aag) is True for BOTH complete
-    and best-effort so best-effort candidate production is a superset of
-    complete's (the T6.1 fix — previously aag was complete-only, making
-    best-effort under-cover the P1 cage machinery).
-
-     adds a fifth tier, ``full-coverage`` (the opt-in flag tier that
-    arms the D2 general coordination-additive namer):
-
-      full-coverage -> gf=T, gfu=T, aag=T, full_coverage=T
-
-    It is best-effort's production superset (identical gf/gfu/aag triple) PLUS
-    its OWN ``full_coverage`` marker bit -- deliberately NOT aliased to
-    best-effort's triple, so D2's dispatch point downstream can distinguish
-    "best-effort tier" from "full-coverage tier". The ``full_coverage`` key is
-    present (``False``) on every other tier, so a consumer can always read it.
-    With the flag off (every non-full-coverage tier) D2 is never reached and
-    output is byte-identical -- the SP5.4 isolation property.
-    """
-    _be_or_fc = emit_tier in ("best-effort", "full-coverage")
-    return {
-        "general_fallback": emit_tier != "pin",
-        "general_fallback_unverified": _be_or_fc,
-        "allow_aromatic_general": emit_tier in (
-            "complete", "best-effort", "full-coverage"),
-        "full_coverage": emit_tier == "full-coverage",
-    }
+    """Map a ``--emit-tier`` value to the Orthonym general-engine flag set (``orthonym.tiers.emit_tier_flags``,
+    the one home of the invariant table)."""
+    from .tiers import emit_tier_flags
+    return emit_tier_flags(emit_tier)
 
 
 def _engine_only(parsed) -> int:
@@ -308,27 +273,54 @@ def _tiered_row_is_named(row: dict) -> bool:
     return bool(row["name"]) and row["tier"] != "abstain"
 
 
-def _tiered_name_text(row: dict, smiles: str, mode: str) -> Tuple[str, Optional[str]]:
+def _decline_label(row: dict, smiles: str, code: str, default: bool) -> str:
+    """The label of a structure with no name: for the default the label ``name_compound`` gives it
+    ('platinum compound (not supported)', 'unknown organic compound'), as the default gave it before it was
+    the ``best-effort`` tier; for a tier named with ``--emit-tier`` the row's label or the catalogued message of
+    the code."""
+    if default:
+        from .namer import _descriptive_fallback
+        return _descriptive_fallback(smiles)
+    return row["name"] or LIMIT_CATALOG.get(code, {}).get("message", "")
+
+
+def _tiered_name_text(row: dict, smiles: str, mode: str,
+                      default: bool = False) -> Tuple[str, Optional[str]]:
     """The bare name of a tiered row (``--emit-tier``) or, for a structure with no name, what
-    ``--on-failure`` says: with ``label`` the row's label or '(no name - <code>)' as always.
+    ``--on-failure`` says: with ``label`` the row's label or '(no name - <code>)' as always, and for the
+    default (``default``: no ``--emit-tier`` given) the label and the reason line of ``name_compound``
+    (:func:`_decline_label`).
 
     Returns the text for the name column and the reason line for the error stream (None when
     there is nothing to say); ``raise`` raises the limit. One decision for one SMILES and for
     ``--batch``."""
     if mode == "label":
-        return (row["name"] if row["name"]
-                else f"(no name — {row['limit_code'] or row['tier']})"), None
+        if row["name"]:
+            return row["name"], None
+        code = row["limit_code"] or row["tier"]
+        return (_decline_label(row, smiles, code, True) if default else f"(no name — {code})"), None
     if _tiered_row_is_named(row):
         return row["name"], None
     code = row["limit_code"] or "UNNAMEABLE"
-    label = row["name"] or LIMIT_CATALOG.get(code, {}).get("message", "")
+    label = _decline_label(row, smiles, code, default)
     if mode == "raise":
         raise OrthonymLimitError(code, label, smiles=smiles)
     return "", _unnamed_line(smiles, code, label)
 
 
-_CONFIDENCE_NEEDS_PIN = ("--confidence cannot be combined with --provenance or with an --emit-tier other "
-                         "than pin: a tier row has no coverage score")
+#: The one note of a run on the error stream: printed only when the default (no ``--emit-tier``) returned a name
+#: below ``pin_verified`` (a name that is not certified as the preferred name; its tier says how it was checked).
+_BELOW_PIN_NOTE = ("orthonym: note: the default returns the PIN when it can, else a systematic name that is not "
+                   "the PIN; --provenance shows the tier and the check of each name, --emit-tier pin gives PIN only")
+
+
+def _is_below_pin(tier: Optional[str]) -> bool:
+    """Whether a returned name earned a tier below ``pin_verified`` (None: no name)."""
+    return tier is not None and tier not in ("pin_verified", "abstain")
+
+
+_CONFIDENCE_NEEDS_PIN = ("--confidence cannot be combined with --provenance: a tier row has no coverage "
+                         "score")
 
 #: The flags that look inside the naming of ONE structure (``--format`` only sets the layout of
 #: ``--dump-tree``): a file of SMILES has no such single run to show, and ``--batch`` used to ignore them.
@@ -341,7 +333,7 @@ def _check_flag_combinations(parser: argparse.ArgumentParser, parsed: argparse.N
     or any jar is checked."""
     # A tier row has no coverage score, so the two cannot be asked for together (one SMILES
     # used to drop --confidence without a word).
-    if parsed.confidence and _wants_tier_row(parsed.emit_tier, parsed.provenance):
+    if parsed.confidence and parsed.provenance:
         parser.error(_CONFIDENCE_NEEDS_PIN)
     one_only = [flag for dest, flag in _ONE_SMILES_ONLY if getattr(parsed, dest)] if parsed.batch else []
     if one_only:
@@ -358,10 +350,12 @@ def main(args: List[str] = None) -> int:
     enable_crash_traceback()
     parser = argparse.ArgumentParser(
         description=("Orthonym: IUPAC names for chemical structures. Give a SMILES string "
-                     "and get its IUPAC name, checked by reading it back with OPSIN. A "
-                     "structure that gets no name has an empty name and a reason on the error "
-                     "stream (--on-failure). The few names OPSIN cannot read in full are "
-                     "marked by --provenance."),
+                     "and get its IUPAC name, checked by reading it back with OPSIN. The default "
+                     "returns the preferred IUPAC name (PIN) when the strict path builds one, and "
+                     "otherwise a systematic name that is not the PIN (--emit-tier pin gives PINs "
+                     "only). A structure that gets no name has an empty name and a reason on the "
+                     "error stream (--on-failure). --provenance shows how each name was built and "
+                     "checked."),
         prog="orthonym"
     )
 
@@ -379,9 +373,10 @@ def main(args: List[str] = None) -> int:
               "general or cas. general allows general IUPAC forms where the "
               "recommendations offer one, for example functional class names "
               "('dimethyl sulfoxide', 'methyl isocyanate'), hydrate names ('oxalic "
-              "acid dihydrate') and the axial descriptors Ra and Sa. The default "
-              "tier's PIN-only rule applies to pin only, so with general or cas a "
-              "name that pin declines with NO_VERIFIED_PIN is returned. cas is "
+              "acid dihydrate') and the axial descriptors Ra and Sa. The PIN-only "
+              "rule (--emit-tier pin) applies to pin only, so with general or cas a "
+              "name that pin declines with NO_VERIFIED_PIN is returned; the default "
+              "tier of general and cas is not widened. cas is "
               "accepted and at present gives the names of general, except that "
               "hydrate names and axial descriptors keep their pin form.")
     )
@@ -404,8 +399,9 @@ def main(args: List[str] = None) -> int:
         type=str,
         help=("Name every SMILES in this file, one per line, and print one "
               "'SMILES<tab>name' line each; the name is empty for a line that gets no name "
-              "(--on-failure). --emit-tier gives the names of that tier, and --provenance "
-              "prints the JSON row of each line in place of the name, as for one SMILES. "
+              "(--on-failure). It names each line as one SMILES is named: the default, or "
+              "the names of the --emit-tier given, and --provenance "
+              "prints the JSON row of each line in place of the name. "
               "--validation-stats, --dispatch-stats, --engine-only, --dump-tree and --format "
               "look inside one SMILES and stop with a usage error here.")
     )
@@ -419,9 +415,9 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--confidence",
         action="store_true",
-        help=("Print the name with a coverage score, the part of the engine that "
-              "built it, and the parts of the score. Not with --provenance or an "
-              "--emit-tier other than pin.")
+        help=("Print the name with a coverage score, the tier the name earned (for a "
+              "tier above pin), the part of the engine that built it, and the parts of "
+              "the score. Not with --provenance.")
     )
 
     # a phase Plan-03 Task 4 (internal notes telemetry):
@@ -499,13 +495,13 @@ def main(args: List[str] = None) -> int:
             "name that is not a preferred name. A preferred name that can be built "
             "is never replaced (glycerol stays propane-1,2,3-triol). Without this "
             "option, two kinds of retained trivial name are still used at the wider"
-            " tiers, and the default tier declines them: names from a small "
+            " tiers, and the PIN-only tier declines them: names from a small "
             "last-resort table, and the trivial natural-product names of molecules "
             "whose preferred bridged fused name the engine does not build yet "
             "(diamorphine). --provenance labels both systematic_verified, source "
             "trivial_retained. A natural-product name built on a parent, such as "
             "'(9R,13S,14S)-3-methoxy-17-methylmorphinan', is not a trivial name, "
-            "and --trivial does not return it at the default tier."
+            "and --trivial does not return it at the PIN-only tier."
         ),
     )
 
@@ -517,27 +513,32 @@ def main(args: List[str] = None) -> int:
     parser.add_argument(
         "--emit-tier",
         dest="emit_tier",
-        choices=["pin", "valid", "complete", "best-effort", "full-coverage"],
-        default="pin",
+        choices=list(EMIT_TIERS),
+        default=None,
         help=(
-            "Which names to return. pin (the default): a name only when the pipeline can "
+            "Which names to return. Without this option: the best-effort tier (the preferred "
+            "IUPAC name (PIN) when the strict PIN path builds one, otherwise a systematic name "
+            "that is not the PIN; the run says so once on the error stream, and --provenance "
+            "shows the tier of each name), and the pin tier for --style general and cas and "
+            "when no OPSIN reads the names back. pin: a name only when the pipeline can "
             "build the preferred IUPAC name (PIN), that is when the strict PIN path built "
-            "the name and verified it (tier pin_verified). The exceptions are names from "
+            "the name and verified it (tier pin_verified); this was the default up to "
+            "release 1.0.x. The exceptions are names from "
             "the natural-product and metal-complex lists, the name formats absent from "
             "OPSIN's grammar (inositols; phanes, checked by building their structure), PIN "
             "spellings that OPSIN reads back through a twin spelling of the same structure "
             "(ethan(2H)ol, diphenyliodanuide, methane-SO-thioperoxol) or through their acids (dianhydrides), PINs whose "
-            "stereodescriptors OPSIN cannot read, for which the default tier compares the "
+            "stereodescriptors OPSIN cannot read, for which the PIN-only tier compares the "
             "constitution, and, with --trivial, a retained trivial name. Otherwise it "
             "declines, with the reason code NO_VERIFIED_PIN when it built a name that is "
-            "not a verified PIN. The rule applies to the default --style pin. "
+            "not a verified PIN. The rule applies to --style pin. "
             "valid: also names from the general engine. complete: also general "
             "names for aromatic and heterocyclic ring systems. best-effort: also "
             "the last-resort producers, von Baeyer and spiro names for ring systems "
             "of up to 100 skeletal atoms and 15 rings (the other tiers build them up to "
-            "40 atoms and 8 rings), and adducts with a one-atom ion, and, for a molecule that has no other name, the name the default tier ships although OPSIN cannot read its stereodescriptors, with the label of the default tier (pin_unverified). full-coverage: also the coordination-name "
+            "40 atoms and 8 rings), and adducts with a one-atom ion, and, for a molecule that has no other name, the name the PIN-only tier ships although OPSIN cannot read its stereodescriptors, with the label of the PIN-only tier (pin_unverified). full-coverage: also the coordination-name "
             "builder for metal tetrapyrrole and corrin complexes, which builds a "
-            "name or declines. The wider tiers also return the names the default "
+            "name or declines. The tiers above pin also return the names the PIN-only "
             "tier declines, each labelled with its tier; there every name must "
             "pass a full-InChIKey OPSIN round trip, except a name from the "
             "natural-product and metal-complex lists, a twin-checked name for which the engine has no other spelling (a halogen -uide anion, the anion of a thioperoxol, an organometallic name with halido ligands) and the best-effort name described above, so the other name formats absent "
@@ -625,6 +626,10 @@ def main(args: List[str] = None) -> int:
     if status is not None:
         return status
 
+    # the tier: the one asked for, else the default (best-effort when OPSIN reads the names back)
+    emit_tier_given = parsed.emit_tier is not None
+    parsed.emit_tier = parsed.emit_tier or default_tier(parsed.style)
+
     # Batch processing mode
     if parsed.batch:
         return _process_batch(parsed.batch, parsed.output, parsed.style,
@@ -633,6 +638,7 @@ def main(args: List[str] = None) -> int:
                               getattr(parsed, 'binding_proof', 'off'),
                               parsed.on_failure,
                               emit_tier=parsed.emit_tier,
+                              emit_tier_given=emit_tier_given,
                               provenance=parsed.provenance,
                               enable_triviality_controller=getattr(
                                   parsed, 'enable_triviality_controller', False))
@@ -650,7 +656,7 @@ def main(args: List[str] = None) -> int:
         # only stderr output path when the flag is on.
         if parsed.validation_stats:
             from orthonym.namer import Orthonym
-            namer = Orthonym(style=parsed.style)
+            namer = Orthonym(style=parsed.style, **_emit_tier_flags(parsed.emit_tier))
             name = namer.name(parsed.smiles, on_failure=parsed.on_failure)
             print(name)
             stats = namer.get_validation_stats()
@@ -667,7 +673,7 @@ def main(args: List[str] = None) -> int:
         if parsed.dispatch_stats:
             from orthonym.namer import Orthonym
             from orthonym.routing.dispatch_table import StoutClass
-            namer = Orthonym(style=parsed.style)
+            namer = Orthonym(style=parsed.style, **_emit_tier_flags(parsed.emit_tier))
             name = namer.name(parsed.smiles, on_failure=parsed.on_failure)
             print(name)
             stats = namer.get_dispatch_stats()
@@ -701,7 +707,7 @@ def main(args: List[str] = None) -> int:
         # tree); --format json emits dataclasses.asdict JSON.
         if parsed.dump_tree:
             from orthonym.namer import Orthonym
-            namer = Orthonym(style=parsed.style)
+            namer = Orthonym(style=parsed.style, **_emit_tier_flags(parsed.emit_tier))
             result = namer.name_with_tree(parsed.smiles)
             if parsed.format == "json":
                 import dataclasses
@@ -735,11 +741,11 @@ def main(args: List[str] = None) -> int:
         if getattr(parsed, "engine_only", False):
             return _engine_only(parsed)
 
-        #: tiered-output branch. Constructs the namer directly (the
-        # tier flags are namer-level), prints JSON with --provenance or the
-        # bare name otherwise. Dispatches before the legacy branches so the
-        # default (--emit-tier pin, no --provenance) path below stays
-        # byte-identical.
+        # Tiered-output branch: a tier above pin (the default is the best-effort tier, whose names below
+        # pin_verified earn the one note on the error stream) and --provenance. Constructs the namer directly
+        # (the tier flags are namer-level), prints JSON with --provenance or the bare name otherwise.
+        # --emit-tier pin without --provenance stays on the name_compound path below, which is byte-identical
+        # to the default of releases up to 1.0.x.
         _emit_tier = getattr(parsed, "emit_tier", "pin")
         #: --binding-proof also selects this branch, because it is the
         # only single-SMILES surface that constructs the namer directly (the
@@ -748,48 +754,18 @@ def main(args: List[str] = None) -> int:
         # ValueError in Orthonym.__init__ exists to prevent. With --confidence it stays on
         # name_compound, as in --batch: a tier row has no coverage score to print.
         _binding_proof = getattr(parsed, "binding_proof", "off")
-        if (_wants_tier_row(_emit_tier, parsed.provenance)
+        if (_wants_tier_row(_emit_tier, parsed.provenance) and not parsed.confidence
                 or (_binding_proof != "off" and not parsed.confidence)):
-            namer = _tiered_namer(
-                parsed.style, _emit_tier,
-                enable_triviality_controller=name_kwargs[
-                    "enable_triviality_controller"],
-                trivial_fallback=name_kwargs["trivial_fallback"],
-                binding_proof=_binding_proof,
-            )
-            row = namer.name_tiered(parsed.smiles)
-            if parsed.provenance:
-                print(_provenance_json(row))
-            else:
-                # Composer1 Task 5 fix: a clean abstain has name=None by design
-                # (honest "no name" contract, see name_tiered), so the print of a
-                # row with no name is a function of its own (never a bare `None`).
-                text, reason = _tiered_name_text(row, parsed.smiles, parsed.on_failure)
-                print(text)
-                if reason is not None:
-                    print(reason, file=sys.stderr)
-            return 0
+            return _print_tier_row(parsed, name_kwargs, _emit_tier, emit_tier_given, _binding_proof)
 
+        name_kwargs["emit_tier"] = _emit_tier
         if parsed.confidence:
             result = name_compound(parsed.smiles, style=parsed.style,
                                    include_confidence=True,
                                    binding_proof=_binding_proof, **name_kwargs)
-            print(f"Name:       {result['name']}")
-            # C4-D: an UNMEASURED candidate reports confidence None /
-            # factors {} rather than a fabricated 1.0 (the old behaviour scored
-            # a name that dropped two thirds of the molecule as perfect). Print
-            # the honest verdict; never format None as a number.
-            _conf = result.get('confidence')
-            if _conf is None:
-                print("Confidence: unverified (no coverage measurement was taken)")
-            else:
-                print(f"Confidence: {_conf:.4f}")
-            print(f"Handler:    {result['handler']}")
-            if result.get('factors'):
-                print("Factors:")
-                for k, v in result['factors'].items():
-                    print(f"  {k}: {v:.4f}" if isinstance(v, (int, float))
-                          else f"  {k}: {v}")
+            _print_confidence(result)
+            if not emit_tier_given and _is_below_pin(result.get('tier')):
+                print(_BELOW_PIN_NOTE, file=sys.stderr)
         elif parsed.verbose:
             name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
             print(f"SMILES: {parsed.smiles}")
@@ -813,6 +789,54 @@ def main(args: List[str] = None) -> int:
         return 1
 
 
+def _print_tier_row(parsed, name_kwargs: dict, emit_tier: str, emit_tier_given: bool, binding_proof: str) -> int:
+    """One SMILES through ``Orthonym.name_tiered``: a tier above pin and ``--provenance``. Prints the JSON row
+    with ``--provenance``, else the bare name; without ``--emit-tier`` a name below pin_verified earns the one
+    note on the error stream, and a structure with no name the label of ``name_compound``."""
+    namer = _tiered_namer(
+        parsed.style, emit_tier,
+        enable_triviality_controller=name_kwargs["enable_triviality_controller"],
+        trivial_fallback=name_kwargs["trivial_fallback"],
+        binding_proof=binding_proof,
+    )
+    row = namer.name_tiered(parsed.smiles)
+    if parsed.provenance:
+        print(_provenance_json(row))
+        return 0
+    # Composer1 Task 5 fix: a clean abstain has name=None by design (honest "no name" contract, see
+    # name_tiered), so the print of a row with no name is a function of its own (never a bare `None`).
+    text, reason = _tiered_name_text(row, parsed.smiles, parsed.on_failure, not emit_tier_given)
+    if parsed.verbose:
+        print(f"SMILES: {parsed.smiles}\nStyle:  {parsed.style}\nName:   {text}")
+    else:
+        print(text)
+    if reason is not None:
+        print(reason, file=sys.stderr)
+    if not emit_tier_given and _is_below_pin(row.get("tier")):
+        print(_BELOW_PIN_NOTE, file=sys.stderr)
+    return 0
+
+
+def _print_confidence(result: dict) -> None:
+    """The lines of ``--confidence`` for one record of ``name_compound(..., include_confidence=True)``."""
+    print(f"Name:       {result['name']}")
+    # C4-D: an UNMEASURED candidate reports confidence None / factors {} rather than a fabricated 1.0 (the
+    # old behaviour scored a name that dropped two thirds of the molecule as perfect). Print the honest
+    # verdict; never format None as a number.
+    _conf = result.get('confidence')
+    if _conf is None:
+        print("Confidence: unverified (no coverage measurement was taken)")
+    else:
+        print(f"Confidence: {_conf:.4f}")
+    if result.get('tier'):
+        print(f"Tier:       {result['tier']}")
+    print(f"Handler:    {result['handler']}")
+    if result.get('factors'):
+        print("Factors:")
+        for k, v in result['factors'].items():
+            print(f"  {k}: {v:.4f}" if isinstance(v, (int, float)) else f"  {k}: {v}")
+
+
 def _process_batch(input_file: str, output_file: str, style: str,
                     verbose: bool, confidence: bool = False,
                     trivial_fallback: bool = False,
@@ -820,7 +844,8 @@ def _process_batch(input_file: str, output_file: str, style: str,
                     on_failure: str = DEFAULT_ON_FAILURE,
                     emit_tier: str = "pin",
                     provenance: bool = False,
-                    enable_triviality_controller: bool = False) -> int:
+                    enable_triviality_controller: bool = False,
+                    emit_tier_given: bool = True) -> int:
     """Process multiple SMILES from a file.
 
     ``binding_proof`` is honoured here exactly as on the single-SMILES path:
@@ -830,13 +855,15 @@ def _process_batch(input_file: str, output_file: str, style: str,
     ``except Exception`` below would otherwise turn a typo'd mode into a
     silent "ERROR:" line and a zero-proof run.
 
-    ``emit_tier`` (other than ``pin``) and ``provenance`` are honoured the same way: the lines
-    are named through one ``Orthonym`` (:func:`_tiered_namer`, built once for the whole file)
-    and its ``name_tiered``, as one SMILES is. The second column is then the name of that
-    tier (a line with no name follows ``on_failure`` as one SMILES does) or, with
-    ``provenance``, the JSON row of ``--provenance``. ``confidence`` has no row to go with
-    and raises ValueError with them, once, up front. With neither the lines are named by
-    ``name_compound``, as they always were.
+    The default (``emit_tier`` the best-effort tier, ``emit_tier_given`` False), a tier named with
+    ``emit_tier`` (other than ``pin``) and ``provenance`` name the lines as one SMILES is named: through one
+    ``Orthonym`` (:func:`_tiered_namer`, built once for the whole file) and its ``name_tiered``. The second
+    column is then the name of that tier (a line with no name follows ``on_failure`` as one SMILES does) or,
+    with ``provenance``, the JSON row of ``--provenance``. For the default, one note on the error stream at
+    the end of the run says that a name below ``pin_verified`` is not the PIN (once, however many lines got
+    such a name, and none when no line did). ``confidence`` names the lines through ``name_compound`` and its
+    record, which carries the tier for a tier above pin; with ``provenance`` it raises ValueError, once, up
+    front. ``--emit-tier pin`` names the lines by ``name_compound``, as releases up to 1.0.x did.
 
     The output has exactly one line per input line, in input order, so line N
     of the output belongs to line N of the input: a blank input line gives a
@@ -847,9 +874,10 @@ def _process_batch(input_file: str, output_file: str, style: str,
     """
     from .namer import validate_binding_proof
     validate_binding_proof(binding_proof)
-    tiered = _wants_tier_row(emit_tier, provenance)
-    if tiered and confidence:
+    tiered = _wants_tier_row(emit_tier, provenance) and not confidence
+    if confidence and provenance:
         raise ValueError(_CONFIDENCE_NEEDS_PIN)
+    below_pin = False
     try:
         with open(input_file, 'r') as f:
             input_lines = [line.strip() for line in f]
@@ -883,19 +911,22 @@ def _process_batch(input_file: str, output_file: str, style: str,
                 if provenance:
                     text = _provenance_json(row)
                 else:
-                    text, reason = _tiered_name_text(row, smiles, on_failure)
+                    text, reason = _tiered_name_text(row, smiles, on_failure, not emit_tier_given)
                     if reason is not None:
                         print(reason, file=sys.stderr)
                 unnamed += not _tiered_row_is_named(row)
+                below_pin = below_pin or _is_below_pin(row.get("tier"))
                 results.append(f"{smiles}\t{text}")
             elif confidence:
                 result = name_compound(smiles, style=style,
                                        include_confidence=True,
                                        enable_triviality_controller=enable_triviality_controller,
                                        trivial_fallback=trivial_fallback,
+                                       emit_tier=emit_tier,
                                        binding_proof=binding_proof,
                                        on_failure=on_failure)
                 unnamed += is_failure_name(result['name'])
+                below_pin = below_pin or _is_below_pin(result.get('tier'))
                 # C4-D: None means UNMEASURED, not zero — emit the token
                 # 'unverified' rather than formatting None or implying 0.0000.
                 _conf = result.get('confidence')
@@ -909,6 +940,7 @@ def _process_batch(input_file: str, output_file: str, style: str,
                 nm = name_compound(smiles, style=style,
                                    enable_triviality_controller=enable_triviality_controller,
                                    trivial_fallback=trivial_fallback,
+                                   emit_tier=emit_tier,
                                    binding_proof=binding_proof,
                                    on_failure=on_failure)
                 unnamed += is_failure_name(nm)
@@ -934,6 +966,8 @@ def _process_batch(input_file: str, output_file: str, style: str,
         if verbose:
             print(f"\nProcessed {named} SMILES, {errors} errors, {unnamed} unnamed",
                   file=sys.stderr)
+    if below_pin and not emit_tier_given and not provenance:
+        print(_BELOW_PIN_NOTE, file=sys.stderr)
 
     return 0 if errors == 0 else 1
 

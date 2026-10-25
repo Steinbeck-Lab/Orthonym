@@ -90,20 +90,27 @@ O=[U](=O)=O	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
 
 More on [declines](../declines.md).
 
-## Which names you get: default tier and `best-effort`
+## Which names you get: the default and `--emit-tier pin`
 
-Everything above uses the default tier. It returns a verified Preferred IUPAC Name (PIN), or no name and the reason. That is a rule about which names to return, not a limit of the engine. For a molecule with no verified PIN, ask for the `best-effort` tier, which also returns systematic names that are not the PIN, each labelled with its tier:
+Everything above uses the default, the `best-effort` tier. It returns the verified Preferred IUPAC Name (PIN) when the strict PIN path builds one, and otherwise a systematic name that is not the PIN, labelled with its tier. When a name is below {tier}`pin_verified`, `orthonym` says so once on the error stream, and `--provenance` shows its tier:
 
 ```console
-$ orthonym "SMILES" --emit-tier best-effort
-$ orthonym --batch molecules.smi --emit-tier best-effort
+$ orthonym "OCCNCc1ccccc1"
+2-(benzylamino)ethan-1-ol
+orthonym: note: the default returns the PIN when it can, else a systematic name that is not the PIN; --provenance shows the tier and the check of each name, --emit-tier pin gives PIN only
+```
+
+For the PIN only, a name or no name, ask for `--emit-tier pin`; this was the default up to release 1.0.x:
+
+```console
+$ orthonym "SMILES" --emit-tier pin
+$ orthonym --batch molecules.smi --emit-tier pin
 ```
 
 ```python
-from orthonym import Orthonym
+from orthonym import name_compound
 
-namer = Orthonym(general_fallback=True, allow_aromatic_general=True, general_fallback_unverified=True)
-namer.name("SMILES")
+name_compound("SMILES", emit_tier="pin")
 ```
 
-On 2,000 held-out ChEBI molecules the default tier names 1,106 (55.30 %) and `best-effort` names 1,994 (99.70 %); [Accuracy](../accuracy.md#the-two-tiers) has the numbers for both tiers on three sets, and [Output tiers](../tiers.md) says what each tier adds.
+On 2,000 held-out ChEBI molecules the default names 1,994 (99.70 %) and `--emit-tier pin` names 1,106 (55.30 %); [Accuracy](../accuracy.md#the-two-tiers) has the numbers for both on three sets, and [Output tiers](../tiers.md) says what each tier adds.

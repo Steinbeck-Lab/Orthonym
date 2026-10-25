@@ -109,3 +109,21 @@ def default_tier_rule_applies() -> bool:
     PIN."""
     import orthonym.namer as namer
     return not namer._DISABLE_VALIDITY_GATE
+
+
+import contextlib
+
+
+@contextlib.contextmanager
+def pin_only_default():
+    """The default of ``name_compound`` as it was up to release 1.0.x (the PIN-only tier), for a test that
+    calls an internal which names at depth 0 and reads the default of the engine's nested calls
+    (``fragment_naming.name_fragment_recursively``): since lane DF a ``name_compound`` call that no ``name``
+    runs above is the best-effort tier."""
+    import orthonym.tiers as tiers
+    real = tiers.verification_active
+    tiers.verification_active = lambda: False
+    try:
+        yield
+    finally:
+        tiers.verification_active = real

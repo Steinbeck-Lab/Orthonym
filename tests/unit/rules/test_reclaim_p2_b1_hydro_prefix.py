@@ -120,7 +120,7 @@ def _declined_strict_name(smiles):
     tier names it, read back exactly (``tests/support/default_tier.py``)."""
     from tests.support.default_tier import declined_pin_row
     if smiles not in DEFAULT_TIER_DECLINES:
-        return name_compound(smiles)
+        return name_compound(smiles, emit_tier="pin")
     return declined_pin_row(smiles, best_effort_same=False)["name"]
 
 
@@ -224,7 +224,7 @@ def test_other_hetero_fused_systems_reclaim(cid, smiles, tag):
     from tests.support.rt_assert import name_best_effort
     name = _declined_strict_name(smiles)
     if "oxazolo" in tag:
-        assert is_failure_name(name_compound(smiles))
+        assert is_failure_name(name_compound(smiles, emit_tier="pin"))
     best_effort = name_best_effort(smiles).get("name")
     for got in (name, best_effort):
         assert not is_failure_name(got), f"{tag} CID {cid} still abstains: {got!r}"

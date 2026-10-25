@@ -126,8 +126,8 @@ class _TierRow:
         assert (row["name"], row["tier"], row["limit_code"]) == (
             self.name, "abstain", self.code,
         ), row
-        assert name_compound(smiles, on_failure="label") == self.name, self._regression(
-            smiles, name_compound(smiles, on_failure="label"))
+        assert name_compound(smiles, on_failure="label", emit_tier="pin") == self.name, self._regression(
+            smiles, name_compound(smiles, on_failure="label", emit_tier="pin"))
         # no tier names it; a wider tier that ever does must not be wrong
         be = name_best_effort(smiles)
         if be.get("name") and be.get("source") != "abstain":
@@ -142,7 +142,7 @@ class _TierRow:
     )
 
     def _check_constitution_only(self, smiles):
-        name = name_compound(smiles)
+        name = name_compound(smiles, emit_tier="pin")
         assert name == self.name, self._regression(smiles, name)
         # OPSIN 2.9.0 reports "Failed to assign CIP stereochemistry... limitation in
         # OPSIN" for this name, so the full-key read-back is not available. Check the two
@@ -1052,7 +1052,7 @@ class TestCIBenchmark:
         if isinstance(expected_name, _TierRow):
             expected_name.check(smiles)
             return
-        name = name_compound(smiles)
+        name = name_compound(smiles, emit_tier="pin")
         assert name is not None, f"name_compound returned None for {smiles}"
         assert isinstance(name, str), f"Expected string, got {type(name)}"
         assert len(name) > 0, f"Empty name for {smiles}"
