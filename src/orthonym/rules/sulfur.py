@@ -20,6 +20,12 @@ from typing import Optional, Tuple
 from rdkit import Chem
 
 from ..assembly.naming_utils import get_alkyl_name
+from ..data.multipliers import SIMPLE_MULTIPLIERS
+from ..data.oxoacid_cyanides import (
+    ACID_ACYL_ENDINGS,
+    ACYL_ENDING_OF_ACID_ENDING,
+    OXOACID_CYANIDE_ENDINGS,
+)
 
 
 def name_sulfide(mol, sulfur_idx: int) -> Optional[str]:
@@ -213,6 +219,35 @@ def name_sulfone(mol, sulfone_atoms: Tuple[int, ...]) -> Optional[str]:
         return f"{sub_names[0]} {sub_names[1]} {class_word}"
 
 
+def _enclose_acyl(acyl: str) -> Optional[str]:
+    """The acyl name in the enclosing marks of (the preferred acyl prefixes are enclosed
+    "even though they are simple prefixes", the Blue Book), escalating (-> [ -> { when the
+    name already carries marks; None when the name has braces already."""
+    if "{" in acyl:
+        return None
+    if "[" in acyl:
+        return "{" + acyl + "}"
+    if "(" in acyl:
+        return "[" + acyl + "]"
+    return "(" + acyl + ")"
+
+
+def _cyanide_unit_is_labelled(mol, matches) -> bool:
+    """True when the isotope-stripped skeleton being named (``rules.isotopes``) stands for a molecule
+    with a nuclide on the chalcogen E, the cyanide carbon or the cyanide nitrogen of one of
+    ``matches``. The decorator names the stripped molecule, so ``mol`` has no isotope of its own; the
+    labelled molecule is the ambient one (``assembly.locant_omission.skeleton_label_on_atoms``).
+
+    A nuclide descriptor stands in front of the part of the name it modifies,
+    the Blue Book: "before the part of the compound that is isotopically substituted";
+    '1-(aminomethyl)cyclopentan-1-(18O)ol (PIN)',:43744), and the class word 'cyanide' is no part
+    of a name that can take one: the labelled cyanide carbon or nitrogen has no place in
+    'methanesulfinyl cyanide', and a nuclide of E belongs in front of its 'sulfinyl' and not at the
+    front of the acyl name."""
+    from ..assembly.locant_omission import skeleton_label_on_atoms
+    return any(skeleton_label_on_atoms(mol, (m[0], m[-2], m[-1])) for m in matches)
+
+
 def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     """ / /: the acid halide of a sulfonic /
     sulfinic acid, named by the two-word functional-class grammar
@@ -220,7 +255,9 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
 
     BB-verbatim targets: 'ethanesulfonyl chloride' (, PIN),
     'propane-1-sulfonyl chloride', '4-isocyanatobenzene-1-sulfonyl chloride
-    (PIN)' .
+    (PIN)' , and, for the cyanides of the sulfonic, sulfinic, selenonic,
+    seleninic, telluronic and tellurinic acids, 'methanesulfonyl
+    cyanide (PIN)'  and 'benzeneseleninyl cyanide (PIN)' .
 
     Implementation (root-cause reuse, not a band-aid): cap the S-bonded halogen
     with -OH to form the parent sulfonic/sulfinic acid, name that acid with the
@@ -230,40 +267,67 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     {halide}' functional-class word. Fail-closed (None) unless the capped
     molecule names cleanly as a sulfonic/sulfinic acid, so a wrong name is never
     emitted.
+
+    A cyanide group may occur several times, the Blue Book, "preceded by a
+    multiplicative prefix, as needed"): every one is capped, and the acid must then end in the
+    multiplied suffix ('benzene-1,4-disulfinic acid' -> 'benzene-1,4-disulfinyl dicyanide'). A halide
+    group is named only alone.
+
+    A nuclide on E, the cyanide carbon or the cyanide nitrogen cannot be cited in the functional-class
+    name (:func:`_cyanide_unit_is_labelled`); the name offered then is the substitutive
+    '(acyl)methanenitrile', which has a place for it and is below the PIN
+    (``validation.spelling.checks_acid_cyanide``).
     """
     mol = features.mol
     pg = features.principal_group
-    if pg not in ("sulfonyl_halide", "sulfinyl_halide", "sulfonyl_cyanide"):
+    endings = ACID_ACYL_ENDINGS.get(pg)
+    if endings is None:
         return None
-    matches = features.functional_groups.get(pg, [])
-    # Poly-sulfonyl-halide (>1) deferred: the two-word grammar would need a
-    # multiplied acyl word — fail closed until that class is built.
-    if len(matches) != 1:
+    acid_ending, acyl_ending = endings
+    is_cyanide = pg in OXOACID_CYANIDE_ENDINGS
+    matches = list(features.functional_groups.get(pg, []))
+    count = len(matches)
+    # A halide is named alone: the two-word grammar would need a multiplied acyl word for several.
+    if count < 1 or (count > 1 and (not is_cyanide or count not in SIMPLE_MULTIPLIERS)):
         return None
-    match = matches[0]
 
     # Cap the S-bonded leaving group -> -OH, forming the parent sulfonic/sulfinic
     # acid; ``halide_word`` is the functional-class word ('chloride'... or
     # 'cyanide' for the sulfonyl cyanide).
     rw = Chem.RWMol(mol)
-    if pg == "sulfonyl_cyanide":
+    if is_cyanide:
         # -3, the Blue Book 'CH3-SO2-CN methanesulfonyl cyanide
-        # (PIN)'). Match tuple (S, =O, =O, cyanide-C, N): drop the -C#N and cap S
-        # with -OH by converting the cyanide carbon to O and deleting the N.
+        # (PIN)', the Blue Book 'C6H5-SeO-CN benzeneseleninyl cyanide (PIN)'). Match
+        # tuple (E, =O, [=O,] cyanide-C, N), the cyanide carbon and the nitrogen
+        # last: drop the -C#N and cap E with -OH by converting the cyanide carbon
+        # to O and deleting the N.
         halide_word = "cyanide"
-        cyanide_c = match[3]
-        nitrogen = match[4]
-        c_atom = rw.GetAtomWithIdx(cyanide_c)
-        c_atom.SetAtomicNum(8)
-        c_atom.SetFormalCharge(0)
-        c_atom.SetNumExplicitHs(0)
-        c_atom.SetNoImplicit(False)
-        rw.RemoveBond(cyanide_c, nitrogen)
-        rw.RemoveAtom(nitrogen)
+        removed = []
+        for match in matches:
+            # A stereogenic E (sulfinyl, seleninyl, tellurinyl) keeps no chirality in the
+            # capped acid: the CIP descriptor of E depends on the ligand that takes the
+            # place of the cyanide group (measured: ``C[S@](=O)O`` is R, ``C[S@](=O)C#N``
+            # is S), so the acid's descriptor must not be carried over to the cyanide. The
+            # handler cites the descriptor from the molecule itself; where it cannot, the
+            # name stays without it and the read-back gate declines it. Several stereogenic
+            # E in one name are not cited at all: declined here.
+            if count > 1 and rw.GetAtomWithIdx(match[0]).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED:
+                return None
+            rw.GetAtomWithIdx(match[0]).SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)
+            c_atom = rw.GetAtomWithIdx(match[-2])
+            c_atom.SetAtomicNum(8)
+            c_atom.SetFormalCharge(0)
+            c_atom.SetIsotope(0)
+            c_atom.SetNumExplicitHs(0)
+            c_atom.SetNoImplicit(False)
+            rw.RemoveBond(match[-2], match[-1])
+            removed.append(match[-1])
+        for n_idx in sorted(removed, reverse=True):
+            rw.RemoveAtom(n_idx)
     else:
         # Match tuples: sulfonyl (S, =O, =O, X); sulfinyl (S, =O, X) — S first,
         # halide last.
-        halide_idx = match[-1]
+        halide_idx = matches[0][-1]
         halide_sym = mol.GetAtomWithIdx(halide_idx).GetSymbol()
         from .acid_halides import _HALIDE_WORD
         halide_word = _HALIDE_WORD.get(halide_sym)
@@ -288,34 +352,37 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     if not acid_name or not isinstance(acid_name, str):
         return None
 
-    if acid_name.endswith("sulfonic acid"):
-        acyl = acid_name[: -len("sulfonic acid")] + "sulfonyl"
-    elif acid_name.endswith("sulfinic acid"):
-        acyl = acid_name[: -len("sulfinic acid")] + "sulfinyl"
-    else:
-        # Not a clean sulfonic/sulfinic acid (e.g. retained/complex parent the
-        # rewrite cannot safely handle) -> fail closed.
+    # (the Blue Book): the acyl group is the name of the acid with its 'ic acid' ending
+    # changed to 'yl'. The ending is the one of the group (sulfonic / selenonic / telluronic for
+    # E(=O)2, sulfinic / seleninic / tellurinic for E(=O)), multiplied for several groups; a name
+    # that does not end so (a retained or complex parent the rewrite cannot safely handle, another
+    # acid group left in the molecule) fails closed.
+    multiplier = SIMPLE_MULTIPLIERS[count] if count > 1 else ""
+    if not acid_name.endswith(multiplier + acid_ending):
         return None
+    acyl = acid_name[: -len(acid_ending)] + acyl_ending
 
-    # v52 P1 Task 2 (c), SP1): the two lines below used to
-    # UNCONDITIONALLY insert '-1-' for the bare-benzene stem, on the theory that the
-    # acyl (halide) form always needs the locant the acid form omits. That is
-    # backwards: `acid_name` already applies (c) correctly (monosubstituted
-    # 'benzenesulfonic acid' / 'benzenesulfinic acid' omit '1'; a disubstituted ring
-    # like '4-isocyanatobenzene-1-sulfonic acid' already keeps it, per
-    # deny-default), and `acyl` is derived from `acid_name` by a pure suffix swap, so
-    # it always inherits the SAME locant presence/absence -- there is no shape where
-    # the acyl form needs a locant the acid form lacks. The BB verbatim monosubstituted
-    # PIN is 'benzenesulfinyl chloride' (the Blue Book), NOT
-    # 'benzene-1-sulfinyl chloride'; the '-1-' form (the Blue Book,
-    # '4-isocyanatobenzene-1-sulfonyl chloride') only occurs already-disubstituted,
-    # which this rewrite never touches (its `acyl == "benzenesulfonyl"` string match
-    # only fires on the bare, monosubstituted stem in the first place).
+    # v52 P1 Task 2 (c), SP1): the lines that used to UNCONDITIONALLY insert '-1-' for
+    # the bare-benzene stem were removed: `acid_name` already applies (c) correctly
+    # (monosubstituted 'benzenesulfonic acid' / 'benzenesulfinic acid' omit '1'; a disubstituted
+    # ring like '4-isocyanatobenzene-1-sulfonic acid' already keeps it, per deny-default),
+    # and `acyl` is derived from `acid_name` by a pure suffix swap, so it always inherits the SAME
+    # locant presence/absence. The BB verbatim monosubstituted PIN is 'benzenesulfinyl chloride'
+    # (the Blue Book), NOT 'benzene-1-sulfinyl chloride'; the '-1-' form
+    # (the Blue Book, '4-isocyanatobenzene-1-sulfonyl chloride') only occurs
+    # already-disubstituted.
 
-    return f"{acyl} {halide_word}"
+    if is_cyanide and _cyanide_unit_is_labelled(mol, matches):
+        enclosed = _enclose_acyl(acyl) if count == 1 else None
+        return f"{enclosed}methanenitrile" if enclosed else None
+    return f"{acyl} {multiplier}{halide_word}"
 
 
-_OXIDE_ACID_SUFFIX = {"sulfinyl": "sulfinic acid", "sulfonyl": "sulfonic acid"}
+# acyl ending -> acid ending of the sulfur groups of the substituent-prefix route below (the Se and Te
+# kinds of ``chalcogen_oxide.py`` are not built there: they decline)
+_OXIDE_ACID_SUFFIX = {
+    acyl: acid for acid, acyl in ACYL_ENDING_OF_ACID_ENDING.items() if acid.startswith("sulf")
+}
 
 
 def _acid_stem_unsaturated_oxide_prefix(

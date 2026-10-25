@@ -134,6 +134,7 @@ class StoutClass(_StrEnumBase):
     HYDRO_FUSED_PEROXOL = "hydro_fused_peroxol"     # W2E-P1FG 1,2,3,4-tetrahydronaphthalene-1-peroxol; priority 49.6)
     THIOIMIDE = "thioimide"                          # W2E-D3 acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' -> N-(ethanethioyl)ethanethioamide; priority 49.7 — after HYDRO_FUSED_PEROXOL@49.6, before ORGM@50)
     NITRAMIDE_SUBSTITUTED = "nitramide_substituted"  # B3 substitutive nitramide/N-nitro: N-(hydroxymethyl)nitramide / N,N-bis(hydroxymethyl)nitramide / N,N'-dinitromethanediamine; priority 49.75 — after THIOIMIDE@49.7, before CYCLIC_POLYESTER@49.8)
+    N_HETERO_AMINE = "n_hetero_amine"  # NAZ N-substitution of amines, carboxamides and sulfonamides by azido, alkoxy/sulfanyl and, on an amide, the nitro/nitroso/halogen groups: N-azido-N-methylmethanamine / N-chloro-N-methylacetamide; priority 98000, tier 1 -- after every class-routed namer, before DECOMPOSITION_PRE_GENERAL; the amides of the acids stay NITRAMIDE_SUBSTITUTED@49.75)
     CYCLIC_POLYESTER = "cyclic_polyester"            # W3-P08 lactide / cyclic di-/polyester -> 1,4-dioxane-2,5-dione; priority 49.8 — after THIOIMIDE@49.7, before ORGM@50)
     AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C ethylideneazinic acid; priority 48.3)
     HETERONE = "heterone"                            # Wave-2 completion C dimethylsilanone/phosphanone; priority 48.4)
@@ -2327,6 +2328,24 @@ def _handle_nitramide_substituted(mol, smiles, canonical_smiles, features=None, 
     return name_substituted_nitramide(mol, style=style)
 
 
+def _is_n_hetero_amine(mol, smiles, canonical_smiles, features=None,
+                       *, _style: str = "pin", **kwargs) -> bool:
+    """; priority 98000. An amine, carboxamide or sulfonamide whose nitrogen carries one
+    azido, alkoxy/sulfanyl-type or (on an amide) nitro, nitroso or halogen group. Predicate-IS-handler:
+    it asks the namer the handler asks, so it is True only for a shape the handler names."""
+    if mol is None:
+        return False
+    from orthonym.rules.n_hetero_amines import name_n_hetero_substituted
+    return name_n_hetero_substituted(mol, style=_style) is not None
+
+
+def _handle_n_hetero_amine(mol, smiles, canonical_smiles, features=None, *,
+                           style: str = "pin", **kwargs) -> Optional[str]:
+    """Return the N-substituted amine / carboxamide / sulfonamide PIN, else None."""
+    from orthonym.rules.n_hetero_amines import name_n_hetero_substituted
+    return name_n_hetero_substituted(mol, style=style)
+
+
 def _is_catenated_hydride(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
     """Wave-2 completion /; priority 47.5. An alternating
     homonuclear Group-14 OR Group-15 hub + bridge catenated hydride
@@ -2805,14 +2824,16 @@ _register_dispatch(
 # the table entirely, and fell through to GENERAL/decomposition (which named
 # a fragment, dropping the nitro-amide unit -- 'unknown organic compound'
 # after). Mirrors THIOIMIDE's excise/N-substituent-cascade pattern
-#. Fail-closed; cascade-continuation on None. ---
+#. NAZ: the same route names the amides of every other
+# acid -- nitrous amide and the amides of the halogen acids,.
+# Fail-closed; cascade-continuation on None. ---
 _register_dispatch(
     class_id=StoutClass.NITRAMIDE_SUBSTITUTED, priority=49.75, tier=1,
     predicate=_is_nitramide_substituted, handler=_handle_nitramide_substituted,
     iupac_section="Blue Book P-66.1.1.3.1.1",
-    description="Substitutive N-nitro/nitramide naming: nitramide parent + "
-                "N-substituent prefix(es), or N,N'-dinitromethanediamine; "
-                "fail-closed",
+    description="Amides of the nitrogen and halogen oxoacids: nitramide, nitrous amide, "
+                "hypochlorous amide ... + the N-substituent prefixes (P-62.4, P-67.1.2.6.3, "
+                "P-68.5.3), or N,N'-dinitromethanediamine; fail-closed",
 )
 # --- W3-P08: CYCLIC_POLYESTER at priority 49.8 (after THIOIMIDE@49.7, before
 # ORGM@50). A lactide / cyclic di-/polyester -- a saturated monocyclic C/O ring
@@ -3046,6 +3067,22 @@ _register_dispatch(
     description="Decorated nucleoside/nucleotide (5'-mono/di/tri-phosphate + O-acyl "
                 "ester); strip-and-recognise; routes to rules.nucleosides.name_nucleoside",
     side_effect_inventory=(),
+)
+
+# --- NAZ: N_HETERO_AMINE at priority 98000 (after the class-routed namers, before
+# DECOMPOSITION_PRE_GENERAL). An N with one azido / alkoxy / sulfanyl-type group (or, on a
+# carboxamide or sulfonamide, a nitro / nitroso / halogen group) has no perceived amine or amide for
+# the inner handlers to claim, so the whole molecule fell to the general catch-all and the default
+# tier declined it. The producer names the HOST (the molecule without the group) with the engine and
+# cites the group among its N-prefixes (rules/n_hetero_amines.py). Fail-closed; cascade-continuation
+# on None. ---
+_register_dispatch(
+    class_id=StoutClass.N_HETERO_AMINE, priority=98000, tier=1,
+    predicate=_is_n_hetero_amine, handler=_handle_n_hetero_amine,
+    iupac_section="Blue Book P-62.4",
+    description="N-substitution of amines, carboxamides and sulfonamides by azido, alkoxy/sulfanyl "
+                "and (on an amide) nitro, nitroso, halogen groups: N-prefixes on the host's name; "
+                "fail-closed",
 )
 
 # --- Decomposition + GENERAL catch-all (the audit rows 17-18) ---

@@ -62,9 +62,12 @@ oxidanylidene sulfanidyl aminooxy hydroxyamino azanylidyne tert sec""".split()
 _SIMPLE_ALTS = sorted(set(SIMPLE), key=len, reverse=True)
 _SIMPLE_RE = re.compile(r"(" + '|'.join(_SIMPLE_ALTS) + r")")
 _ALKYL_RE = re.compile(r"((?:cyclo)?(?:" + STEM_RE + r")(?:ylidyne|ylidene|yl|oxy|anoyloxy|anoyl|anamido))")
-#: a parent name may begin with these prefix strings ('oxolane', 'aminium', 'phenylene')
+#: a parent name may begin with these prefix strings ('oxolane', 'aminium', 'phenylene'); the
+#: acids of the class 7e of are the words 'nitrous', 'fluorous', 'chlorous', 'bromous' and
+#: 'iodous',: 'phenylnitrous amide', 'methyl(phenyl)iodous amide')
 _PARENT_GUARD = {'oxo': ('lan', 'can', 'nan', 'lane', 'cane', 'nane'), 'hydroxy': ('l',),
                  'diazo': ('xan', 'l', 'n', 't'), 'diazenyl': (), 'azido': (), 'nitro': ('us',),
+                 'fluoro': ('us',), 'chloro': ('us',), 'bromo': ('us',), 'iodo': ('us',),
                  'amino': ('xide', 'ium'), 'phenyl': ('ene',), 'methyl': ('ene', 'ium'), 'oxy': ('gen',),
                  'carbonyl': (), 'benzyl': ('idene',)}
 #: a rest that begins with an ending belongs to the parent's own name, so the string before it is

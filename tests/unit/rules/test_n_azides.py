@@ -17,9 +17,11 @@ the name of THAT drawing, '4,4-dimethyltetraaz-1,3-dien-4-ium-1-ide', as pin_ver
 (1). ``charge_shift.accepted_charge_forms`` now takes no form in which an atom of an azido group (in any drawing,
 ``azide_atoms``) loses or gains the +1.
 
-The names asserted are the best-effort names, read back by a FRESH OPSIN call to the canonical SMILES of the input.
-The preferred names ('N-azido-N-methylmethanamine', '3-[4-(azidoamino)phenyl]propanoic acid') are not built: the
-amine, amide and polyfunctional assemblers of ``composer`` carry the carbon-only N-substituent walk.
+The N-azido amine, amide and sulfonamide have their preferred names ('N-azido-N-methylmethanamine',
+'N-azidoacetamide', ``rules/n_hetero_amines.py``; ASSUMED reading, the book prints no N-azido amine: and
+ above). The names asserted for the rows that remain are the best-effort names, read back by a FRESH OPSIN call
+to the canonical SMILES of the input. The preferred name of the others ('3-[4-(azidoamino)phenyl]propanoic acid') is
+not built: the polyfunctional assembler of ``composer`` carries the carbon-only N-substituent walk.
 """
 import pytest
 from rdkit import Chem, RDLogger
@@ -31,12 +33,21 @@ RDLogger.DisableLog("rdApp.*")
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
+# the preferred names (PIN): the amine, the carboxamide and the sulfonamide are the class, the azido group a prefix of
+# the N:26588,:25989,:18184 amides,:18192 amines).
+# UNVERIFIED against the book: it prints no N-azido amine, amide or sulfonamide, so these names rest on the
+# reading of 's general sentence ("all characteristic groups cited as prefixes (see Table 5.1)", azido is in
+# Table 5.1:24990) and on the docstring above, which named 'N-azido-N-methylmethanamine' as the PIN before the
+# producer existed. What would make them wrong: a Blue Book ruling that a nitrogen chain is the parent.
+PIN_ROWS = [
+    ("CNN=[N+]=[N-]", "N-azidomethanamine"),
+    ("CN(C)N=[N+]=[N-]", "N-azido-N-methylmethanamine"),
+    ("CCN(CC)N=[N+]=[N-]", "N-azido-N-ethylethanamine"),
+    ("CC(=O)NN=[N+]=[N-]", "N-azidoacetamide"),
+    ("CS(=O)(=O)N(C)N=[N+]=[N-]", "N-azido-N-methylmethanesulfonamide"),
+]
+
 ROWS = [
-    ("CNN=[N+]=[N-]", "(azidoamino)methane"),
-    ("CN(C)N=[N+]=[N-]", "[azido(methyl)amino]methane"),
-    ("CCN(CC)N=[N+]=[N-]", "1-[azido(ethyl)amino]ethane"),
-    ("CC(=O)NN=[N+]=[N-]", "1-(azidoamino)-1-oxoethane"),
-    ("CS(=O)(=O)N(C)N=[N+]=[N-]", "[azido(methanesulfonyl)amino]methane"),
     ("C1=CC=CC=C1N(CC[N+](=O)[O-])N=[N+]=[N-]", "[azido(2-nitroethyl)amino]benzene"),
     ("OC(=O)CCc1ccc(NN=[N+]=[N-])cc1", "4-(azidoamino)-1-(3-hydroxy-3-oxopropyl)benzene"),
     ("CC(C)(C)OC(=O)N[C@@H](CCCCNN=[N+]=[N-])C(=O)O",
@@ -44,6 +55,16 @@ ROWS = [
     ("C(CSSCCNN=[N+]=[N-])NN=[N+]=[N-]",
      "1-(azidoamino)-2-({[2-(azidoamino)ethyl]sulfanyl}sulfanyl)ethane"),
 ]
+
+
+@pytest.mark.parametrize("smiles,name", PIN_ROWS)
+def test_an_azide_on_the_nitrogen_of_an_amine_or_amide_is_a_prefix_of_its_preferred_name(smiles, name):
+    from orthonym import Orthonym
+    jar_or_skip()
+    for res in (Orthonym(style="pin").name_tiered(smiles), name_best_effort(smiles)):
+        assert (res["name"], res["tier"], res["is_pin"]) == (name, "pin_verified", True), res
+    # an independent read: the azide drawing of the input, charges on the same atoms
+    assert _canon(_independent_parse(name, smiles)) == _canon(smiles)
 
 
 @pytest.mark.parametrize("smiles,name", ROWS)
@@ -58,7 +79,7 @@ def test_an_azide_on_nitrogen_is_named_with_the_prefix_azido(smiles, name):
 
 @pytest.mark.parametrize("smiles", [r[0] for r in ROWS])
 def test_the_default_tier_does_not_call_it_a_pin(smiles):
-    """The PIN is the N-azido amine, amide or acid with the prefix azido, which the engine does not build: the
+    """The PIN of these is the N-azido acid or arene with the prefix azido, which the engine does not build: the
     PIN tier declines instead of labelling a name that is no PIN."""
     from orthonym import Orthonym
     jar_or_skip()

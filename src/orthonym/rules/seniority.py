@@ -236,13 +236,28 @@ SENIORITY_ORDER = [
     # sulfinic acids. Acid-halide tier class 8), below the carbon acyl
     # halides (S oxoacid-derivatives named after their C analogues) and above
     # amides. Functional-class handler-emitted ('ethanesulfonyl chloride').
+    #
+    # "Seniority order for classes" class 10 (the Blue Book): "Acid halides and
+    # pseudohalides [first in the order of the corresponding acid given above, then in the order of
+    # the halogen atoms...; then in the following order of pseudohalogen groups". The order of the
+    # acids is class 7a (:18172): "carboxylic..., sulfonic, sulfinic, selenonic, seleninic,
+    # telluronic, tellurinic". So the halide and the cyanide of one acid are adjacent (halide first)
+    # and the acids follow in that order: sulfonic, sulfinic, selenonic, seleninic, telluronic,
+    # tellurinic.
     "sulfonyl_halide",
-    "sulfinyl_halide",
     # -3: the cyanide of a sulfonic acid (R-SO2-C#N ->
     # 'methanesulfonyl cyanide'). Cyanide/pseudohalide functional class, ranked in
     # the acid-halide tier beside sulfonyl_halide and above the plain nitrile, so
     # the functional-class handler wins over the substitutive '-methanenitrile'.
     "sulfonyl_cyanide",
+    "sulfinyl_halide",
+    # (the Blue Book): the same functional-class cyanide for the sulfinic,
+    # selenonic, seleninic, telluronic and tellurinic acids ('benzeneseleninyl cyanide',:34813).
+    "sulfinyl_cyanide",
+    "selenonyl_cyanide",
+    "seleninyl_cyanide",
+    "telluronyl_cyanide",
+    "tellurinyl_cyanide",
     # a phase: acyl halides of the imido / chalcogeno analogues of
     # carboxylic acid — R-C(=NH)-X / R-C(=S)-X / R-C(=Se)-X. Acid-halide tier
     # class 8), functional-class handler-emitted ('cyclohexanecarboximidoyl
@@ -662,6 +677,12 @@ SUFFIX_FORMS = {
     # -3: sulfonyl cyanide is functional-class handler-emitted
     # ('methanesulfonyl cyanide'); the generic get_suffix path is never reached.
     "sulfonyl_cyanide": None,
+    #: the cyanides of the other S / Se / Te oxoacids, handler-emitted the same way.
+    "sulfinyl_cyanide": None,
+    "seleninyl_cyanide": None,
+    "selenonyl_cyanide": None,
+    "tellurinyl_cyanide": None,
+    "telluronyl_cyanide": None,
     # a phase: imidoyl / carbothioyl / carboselenoyl halides are functional-
     # class handler-emitted (name_imidoyl_thioyl_halide builds the two-word name);
     # None -> the generic get_suffix path is never used, and a demoted case fails
@@ -991,6 +1012,12 @@ PREFIX_FORMS = {
     # -3: demoted sulfonyl cyanide prefix fails closed (None) — the target
     # compounds are mono-functional (always the principal group).
     "sulfonyl_cyanide": None,
+    #: the demoted prefix of the other S / Se / Te oxoacid cyanides fails closed too.
+    "sulfinyl_cyanide": None,
+    "seleninyl_cyanide": None,
+    "selenonyl_cyanide": None,
+    "tellurinyl_cyanide": None,
+    "telluronyl_cyanide": None,
     # a phase: demoted imidoyl / carbothioyl / carboselenoyl halide prefix
     # fails closed (None) — the target compounds are mono-functional (the halide is
     # always the principal group), and a halide-dependent prefix is not derived here.

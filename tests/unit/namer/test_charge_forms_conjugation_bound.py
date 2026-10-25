@@ -275,14 +275,17 @@ def test_n_azide_has_no_form_and_is_named_as_drawn(row):
     # The +1 of an azido group does not move (``charge_shift.azide_atoms``): the input is named as it is drawn, with the
     # prefix 'azido' "AZIDES", the Blue Book). It used to get a second form, 'C[N+](C)=NN=[N-]' (the +1 on
     # the amine nitrogen), and the pin_verified name of THAT drawing, '4,4-dimethyltetraaz-1,3-dien-4-ium-1-ide', which a
-    # fresh OPSIN call reads to other atoms than the azide's (tests/unit/rules/test_n_azides.py). The PIN tier declines:
-    # the preferred N-azido amine name is not built.
+    # fresh OPSIN call reads to other atoms than the azide's (tests/unit/rules/test_n_azides.py). The name is the
+    # preferred N-azido amine name, ``rules/n_hetero_amines.py``), at both tiers. ASSUMED, not verified
+    # against the book: it prints no N-azido amine (the ``basis`` column of the fixture says so); the assertion
+    # of the form (none) and of the 'azido' reading is the one this test is about.
     jar_or_skip()
     assert _forms(row["smiles"]) is None
     from tests.support.rt_assert import name_best_effort
     named = name_best_effort(row["smiles"])
-    assert (named["tier"], named["name"]) == ("systematic_verified", row["best_effort_name"])
-    assert Orthonym(style="pin").name_tiered(row["smiles"])["tier"] != "pin_verified"
+    assert (named["tier"], named["name"]) == ("pin_verified", row["name"])
+    default = Orthonym(style="pin").name_tiered(row["smiles"])
+    assert (default["tier"], default["name"]) == ("pin_verified", row["name"])
 
 
 def test_the_count_ignores_atom_order():

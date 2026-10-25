@@ -278,11 +278,32 @@ FUNCTIONAL_GROUP_SMARTS = {
     "sulfinyl_halide": "[SX3;$([SX3][#6])](=[OX1])[F,Cl,Br,I]",
     # -3, the Blue Book 'CH3-SO2-CN methanesulfonyl cyanide
     # (PIN)'): the cyanide of a sulfonic acid, named by functional class because
-    # a nitrile cannot be expressed substitutively over a sulfonyl centre. The
-    # $([SX4][#6]) guard requires a C-S (a genuine C-sulfonic acid), matching the
-    # sulfonyl_halide pattern; the -C#N replaces the -OH. Match tuple
-    # (S, =O, =O, cyanide-C, N).
-    "sulfonyl_cyanide": "[SX4;$([SX4][#6])](=[OX1])(=[OX1])[CX2]#[NX1]",
+    # a nitrile cannot be expressed substitutively over a sulfonyl centre. The -C#N
+    # replaces the -OH. Match tuple (S, =O, =O, cyanide-C, N).
+    #
+    # The same cyanide of the sulfinic, selenonic, seleninic, telluronic and tellurinic
+    # acids, the Blue Book "Cyanides corresponding to the sulfur, selenium, and
+    # tellurium acids";:34813 'C6H5-SeO-CN benzeneseleninyl cyanide (PIN)'). Without a group of its
+    # own the -E(=O)-C#N unit was read as a nitrile on a sulfoxide / selenoxide / selenone /
+    # telluroxide / tellurone, named '(benzenesulfinyl)methanenitrile', which is not the PIN. Match
+    # tuples: (E, =O, cyanide-C, N) for the -inyl groups, (E, =O, =O, cyanide-C, N) for the -onyl
+    # groups; the code reads the cyanide carbon and the nitrogen from the END of the tuple.
+    #
+    # The guard of every group needs, besides the cyanide carbon, a SECOND neighbour of E that is a
+    # carbon (the organyl R of R-EOx-CN) or a ring nitrogen: the acid is then named by its suffix on a
+    # parent hydride, (:31160 "Sulfonic, sulfinic, etc., acids are named substitutively by
+    # adding an appropriate suffix... to the name of a parent hydride"), and a ring nitrogen is a
+    # position of a parent hydride that takes it: 'pyrrolidine-1-sulfonamide (PIN)',
+    # "Sulfonamides, sulfinamides, and related selenium and tellurium amides" (:32744,:32758). (The
+    # cyanide carbon alone satisfied the old $([SX4][#6]) guard of 'sulfonyl_cyanide', so a sulfamoyl,
+    # sulfonate or thiosulfonate cyanide was claimed too and left to fail at the acid name.) An E on
+    # an acyclic N, O or S is another class: sulfamic, sulfonic ester ('sulfurocyanidic acid',:35650).
+    "sulfonyl_cyanide": "[SX4;$([SX4]([#6,$([#7;R])])[#6])](=[OX1])(=[OX1])[CX2]#[NX1]",
+    "sulfinyl_cyanide": "[SX3;$([SX3]([#6,$([#7;R])])[#6])](=[OX1])[CX2]#[NX1]",
+    "seleninyl_cyanide": "[SeX3;$([SeX3]([#6,$([#7;R])])[#6])](=[OX1])[CX2]#[NX1]",
+    "selenonyl_cyanide": "[SeX4;$([SeX4]([#6,$([#7;R])])[#6])](=[OX1])(=[OX1])[CX2]#[NX1]",
+    "tellurinyl_cyanide": "[TeX3;$([TeX3]([#6,$([#7;R])])[#6])](=[OX1])[CX2]#[NX1]",
+    "telluronyl_cyanide": "[TeX4;$([TeX4]([#6,$([#7;R])])[#6])](=[OX1])(=[OX1])[CX2]#[NX1]",
     # a phase: acyl halides of the CHALCOGEN / IMIDO analogues of
     # carboxylic acid — R-C(=NH)-X (imidoyl), R-C(=S)-X (carbothioyl), R-C(=Se)-X
     # (carboselenoyl). Named by the two-word functional class '{parent}carbo{imidoyl
@@ -1358,6 +1379,18 @@ _SUPPRESS_ATOM_SLICE = {
 # (the Blue Book): the chalcogen analogues of the imidic and hydrazonic acids own their
 # geminal C(=NH)(XH) / C(=N-NH2)(XH) unit; the -XH matches thiol / selenol / tellurol and the =N- the imine /
 # hydrazone patterns. A hydroximic acid whose acid chalcogen is S, Se or Te owns its -XH the same way.
+# (the Blue Book): the cyanide of a sulfinic, selenonic, seleninic, telluronic or tellurinic
+# acid owns its whole E(=O)x-C#N unit, so the nitrile read on the -C#N and the sulfoxide / selenone / selenoxide /
+# tellurone / telluroxide read on the E are suppressed (the sibling of the 'sulfonyl_cyanide' row, whose sulfone
+# read is suppressed in _resolve_fg_collisions). Atom-scoped: a separate nitrile or sulfoxide elsewhere is untouched.
+_OXOACID_CYANIDE_COLLISIONS = [
+    ('sulfinyl_cyanide', ['nitrile', 'sulfoxide']),
+    ('seleninyl_cyanide', ['nitrile', 'selenoxide']),
+    ('selenonyl_cyanide', ['nitrile', 'selenone']),
+    ('tellurinyl_cyanide', ['nitrile', 'telluroxide']),
+    ('telluronyl_cyanide', ['nitrile', 'tellurone']),
+]
+
 _CHALCOGEN_IMIDIC_COLLISIONS = [
     ('imidothioic_acid', ['imine', 'thiol']),
     ('imidoselenoic_acid', ['imine', 'selenol']),
@@ -1684,7 +1717,7 @@ def _resolve_fg_collisions(results):
         # `nitroso` on its atoms — makes the O-vs-C precedence explicit/robust on
         # top of the [#6] guard above.
         ('nitrite', ['nitroso']),
-    ] + _CHALCOGEN_IMIDIC_COLLISIONS:
+    ] + _CHALCOGEN_IMIDIC_COLLISIONS + _OXOACID_CYANIDE_COLLISIONS:
         if fg_specific in results:
             specific_atoms = set()
             _slice = _SUPPRESS_ATOM_SLICE.get(fg_specific)

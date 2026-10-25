@@ -147,16 +147,18 @@ def test_gate_disabled_never_reports_verified():
 
 # The leak-sensitive probe PAIR, measured at. Both ship the exact
 # same string, and that collision is the point — see the test below.
-# `CN(C=O)Br` the gate SUPPRESSES the candidate to the descriptive fallback
-# and records `suppressed` FOR 'unknown organic compound'. (Replaces `[C-]#[O+]`,
-# which the default tier now declines before the gate runs, so it records
-# `not_run`; re-measured 2026-10-09 with the gate on.)
+# `CN(C)[Cl+][O-]` the gate SUPPRESSES the candidate to the descriptive fallback
+# and records `suppressed` FOR 'unknown organic compound'. The producer of the amides of the
+# halogen acids names it 'dimethylchlorous amide', which OPSIN reads to the hypervalent drawing
+# 'CN(C)Cl=O' that RDKit cannot read, so the name cannot be verified. (Replaces `CN(C=O)Br`,
+# which is now named 'N-bromo-N-methylformamide', and before it `[C-]#[O+]`, which the default
+# tier declines before the gate runs, so it records `not_run`; re-measured with the gate on.)
 # the C16H8 PAH ships 'unknown organic compound' having reached NO
 # gate-recording branch at all, so its honest outcome is
 # `not_run`. (5 of 60 pubchem_2000 rows land here; no EMITTED
 # row does — a descriptive-fallback abstain is the realistic
 # shape of "the gate was never invoked".)
-LEAK_PROBE_RECORDS = "CN(C=O)Br"
+LEAK_PROBE_RECORDS = "CN(C)[Cl+][O-]"
 LEAK_PROBE_NO_GATE = "C1=CC2=CC3=CC4=CC=CC5=C4C3=C2C1=C5"
 
 

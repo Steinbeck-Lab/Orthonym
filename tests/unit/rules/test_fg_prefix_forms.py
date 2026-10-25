@@ -136,6 +136,14 @@ KNOWN_NONE_PREFIX_FGS = frozenset({
     # "Cyanides corresponding to the sulfur, selenium, and tellurium acids" (the Blue Book;
     #:34811 'CH3-SO2-CN methanesulfonyl cyanide (PIN)').
     'sulfonyl_cyanide',
+    # (the Blue Book): the cyanides of the sulfinic, selenonic, seleninic, telluronic
+    # and tellurinic acids are the same class as 'sulfonyl_cyanide' above (handler-emitted, always the
+    # principal group), so a demoted occurrence fails closed the same way.
+    'sulfinyl_cyanide',
+    'selenonyl_cyanide',
+    'seleninyl_cyanide',
+    'telluronyl_cyanide',
+    'tellurinyl_cyanide',
     # a phase: demoted imidoyl / carbothioyl / carboselenoyl halide prefix
     # fails closed -- the halide is always the principal group and a halide-dependent prefix
     # is not derived here (the sibling of 'sulfonyl_halide' above).

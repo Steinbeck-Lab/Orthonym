@@ -927,8 +927,27 @@ def _name_senior_atom_hub(mol) -> Optional[str]:
 # (thio-acid, acid halide, thiocyanate, cyanamide/carbamic respectively), so
 # folding them in here would silently mis-name a different class rather than
 # degrade.
+#
+# Boron joins for the -carbonitrile suffix ALONE: "Suffix nomenclature" (the Blue Book):
+# "Suffixes, when available, are used to denote characteristic groups; prefixes are not recommended.
+# Suffixes containing a carbon atom generate preferred IUPAC names." -- 'H2B-CN boranecarbonitrile
+# (PIN)' (:37393) -- and "Acid halides and pseudohalides" (:35706), which takes the boron
+# acids out of the functional-class names of the acids' pseudohalides: "Preferred IUPAC names of acid
+# halides and pseudohalides derived from the boron acids and silicic acid are formed on the basis of the
+# parent hydride names borane and silane". The book prints the one suffix; the aldehyde and the
+# carboxylic acid on a borane are not built.
 _ADDED_CARBON_HUB_STEMS = {sym: _HUB_STEMS[sym]
-                           for sym in ('P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb')}
+                           for sym in ('P', 'As', 'Sb', 'Bi', 'Si', 'Ge', 'Sn', 'Pb', 'B')}
+
+#: the added-carbon suffixes a hub is limited to (every other hub takes all three)
+_ADDED_CARBON_HUB_SUFFIXES = {'B': ('carbonitrile',)}
+
+#: hubs whose -carbonitrile takes organyl substituents that hold a ring ('dimethyl(phenyl)silanecarbonitrile'):
+#: "The suffix 'carbonitrile' is always used to name nitriles having the -CN group attached to a
+#: ring or ring system or to an acyclic heteroatom" (the Blue Book; 'silanecarbonitrile (PIN)',:34722).
+#: A P, As, Sb or Bi hub is the centre of an acid and its cyanide is the functional-class name of the acid
+#:,:35706), named elsewhere. The hub itself is no ring atom.
+_RING_ORGANYL_NITRILE_HUBS = ('B', 'Si', 'Ge', 'Sn', 'Pb')
 
 
 def _added_carbon_group(mol, atom) -> Optional[tuple]:
@@ -1136,8 +1155,7 @@ def _name_mononuclear_hub_added_carbon(mol) -> Optional[str]:
     for atom in atoms_of(mol):
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
-    if mol.GetRingInfo().NumRings() > 0:
-        return None
+    has_ring = mol.GetRingInfo().NumRings() > 0
 
     carbon_idx = hub_idx = suffix = None
     for atom in atoms_of(mol):
@@ -1147,6 +1165,8 @@ def _name_mononuclear_hub_added_carbon(mol) -> Optional[str]:
         other, this_suffix = found
         if other.GetSymbol() not in _ADDED_CARBON_HUB_STEMS:
             continue
+        if this_suffix not in _ADDED_CARBON_HUB_SUFFIXES.get(other.GetSymbol(), (this_suffix,)):
+            continue
         if carbon_idx is not None:
             return None  # more than one candidate -- ambiguous, cascade onward
         carbon_idx, hub_idx, suffix = atom.GetIdx(), other.GetIdx(), this_suffix
@@ -1155,6 +1175,9 @@ def _name_mononuclear_hub_added_carbon(mol) -> Optional[str]:
         return None
 
     hub = mol.GetAtomWithIdx(hub_idx)
+    if has_ring and not (suffix == 'carbonitrile' and hub.GetSymbol() in _RING_ORGANYL_NITRILE_HUBS
+                         and not hub.IsInRing()):
+        return None  # a ring: only the nitrile of a Group-13/14 hub takes ring organyls (below)
     if nonstandard_bonding_number(mol, hub_idx) is not None:
         return None  # lambda hub -- out of scope, cascade onward
 

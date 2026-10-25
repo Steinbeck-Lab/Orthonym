@@ -148,7 +148,12 @@ CLASS_ROWS = [
     ("OC(=O)C1CCC(CN)CC1", "4-(aminomethyl)cyclohexane-1-carboxylic acid"),
     ("OC1(CNC)CCCC1", "1-[(methylamino)methyl]cyclopentan-1-ol"),
     ("OC1(CN(C)C)CCCC1", "1-[(dimethylamino)methyl]cyclopentan-1-ol"),
-    ("OC1(CNCl)CCCC1", "1-[(chloroamino)methyl]cyclopentan-1-ol"),
+    # "N-SUBSTITUTION OF AMINES AND IMINES BY HETEROATOMS" (the Blue Book): "In accordance with the
+    # seniority of classes (see, compounds such as R-NH-Cl, R-NH-NO, and R-NH-NO2 are now named as derivatives
+    # of amides (see ";: class 11 amides (:18184) are senior to class 17 hydroxy compounds
+    # (:18190), so the amide of hypochlorous acid is the class and the hydroxy group a prefix of its substituent
+    # (the row said '1-[(chloroamino)methyl]cyclopentan-1-ol': the alcohol as the class, the order of the 1993 rules)
+    ("OC1(CNCl)CCCC1", "[(1-hydroxycyclopentyl)methyl]hypochlorous amide"),
     ("OC1(CS)CCCC1", "1-(sulfanylmethyl)cyclopentan-1-ol"),
     ("OC(=O)C1CCC(CS)CC1", "4-(sulfanylmethyl)cyclohexane-1-carboxylic acid"),
     ("OC1(CP)CCCC1", "1-(phosphanylmethyl)cyclopentan-1-ol"),

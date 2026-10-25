@@ -75,8 +75,18 @@ def test_n_alkoxy_sulfonamide_default_tier(smiles, pin):
 @pytest.mark.parametrize("smiles,pin", [
     ("C1CC1N2C(=NN=N2)SCC(=O)NOCC3=CC=CC=C3",
      "N-(benzyloxy)-2-[(1-cyclopropyl-1H-tetrazol-5-yl)sulfanyl]acetamide"),
-] + SULFONAMIDE_DEFAULT_TIER)
+])
+def test_best_effort_is_not_below_the_default_tier_polyfunctional(smiles, pin):
+    _best_effort_is_not_below_the_default_tier(smiles, pin)
+
+
+# the sulfonamides are named by ``rules/n_hetero_amines.py`` at both tiers (the xfail of these rows flipped)
+@pytest.mark.parametrize("smiles,pin", SULFONAMIDE_DEFAULT_TIER)
 def test_best_effort_is_not_below_the_default_tier(smiles, pin):
+    _best_effort_is_not_below_the_default_tier(smiles, pin)
+
+
+def _best_effort_is_not_below_the_default_tier(smiles, pin):
     b = name_breadth(smiles)
     assert (b.get("name"), b.get("tier")) == (pin, "pin_verified"), b
 

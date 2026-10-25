@@ -308,7 +308,7 @@ A class handler is a short shim in `routing/dispatch_table.py` that calls the co
 | 49.5 | `RING_CHALCOGEN_OXIDE` | Oxides of ring chalcogens (dibenzo[b,d]thiophene 5-oxide) | `rules/ring_chalcogen_oxide.py` |
 | 49.6 | `HYDRO_FUSED_PEROXOL` | Peroxols on partly hydrogenated fused carbocycles | `rules/partial_saturation.py` |
 | 49.7 | `THIOIMIDE` | Acyclic thioimides | `rules/thioimides.py` |
-| 49.75 | `NITRAMIDE_SUBSTITUTED` | Nitramides with N-substituents | `rules/nitramide.py` |
+| 49.75 | `NITRAMIDE_SUBSTITUTED` | Amides of the nitrogen and halogen oxoacids (nitramides, nitrous amide, hypochlorous amide) | `rules/nitramide.py` |
 | 49.8 | `CYCLIC_POLYESTER` | Lactides and other cyclic di- or polyesters (glycolide) | `rules/lactones.py` |
 | 50 | `ORGANOMETALLIC` | Metal-carbon compounds and sandwich complexes | `assembly/handlers/organometallic.py` |
 | 100 | `SALT` | Salts of several components | `rules/salts.py` |
@@ -335,6 +335,7 @@ A class handler is a short shim in `routing/dispatch_table.py` that calls the co
 | 1650 | `LINEAR_PHANE` | Linear phanes (four or more rings or ring systems, two terminal, seven or more nodes) | `rules/phane_pin/` |
 | 1700 | `INOSITOL` | Inositols (cyclitols) | `rules/inositols.py` |
 | 1800 | `NUCLEOSIDE` | Nucleosides and nucleotides with a decoration (phosphates, acyl esters) | `rules/nucleosides.py` |
+| 98000 | `N_HETERO_AMINE` | Amines, carboxamides and sulfonamides with an azido, alkoxy, sulfanyl, nitro, nitroso or halogen group on N (N-azido-N-methylmethanamine) | `rules/n_hetero_amines.py` |
 | 99000 | `DECOMPOSITION_PRE_GENERAL` | Naming a large molecule from its fragments; may decline, and the pipeline goes on | `decomposition/` |
 | 99999 | `GENERAL` | Catch-all. It returns nothing on purpose, and `_name_impl` runs the general pipeline | `namer.py`, `_name_impl` |
 

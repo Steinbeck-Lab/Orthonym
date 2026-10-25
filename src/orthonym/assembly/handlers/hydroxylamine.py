@@ -367,6 +367,31 @@ def _name_no_disub_hydroxylamine(features: Any) -> Optional[NamingResult]:
     )
 
 
+def _n_hydroxy_among_n_prefixes(mol, n_idx: int, o_idx: int, base: str) -> Optional[str]:
+    """``base`` starts with the italic-N prefix of a carbon substituent of the nitrogen ('N-methyl...',
+    'N-ethyl...'): 'N-hydroxy' is cited among the N-prefixes in the order of -- before it
+    ('N-hydroxy-N-methylmethanamine') or after it ('N-ethyl-N-hydroxymethanesulfonamide') -- and, cited
+    after it, before the first prefix that the rest of the name has ('N-ethyl-N-hydroxy-4-methylbenzene-
+    1-sulfonamide'). The token of the base is re-anchored against the independently named substituent.
+    None where no substituent's token starts the base, or 'N-hydroxy' belongs after a prefix of the rest."""
+    import re
+
+    from ..naming_utils import _wrap_n_substituent, alpha_sort_key, enclose_if_compound
+
+    for cand in dict.fromkeys(_named_substituents(mol, n_idx, o_idx)):
+        token = f"N-{_wrap_n_substituent(enclose_if_compound(cand))}"
+        if not base.startswith(token):
+            continue
+        parent = base[len(token):]
+        if alpha_sort_key("hydroxy") <= alpha_sort_key(cand):
+            return f"N-hydroxy-{token}{parent}"
+        following = re.match(r"-(?:\d[\w,']*-)?[(\[{]*([A-Za-z]+)", parent)
+        if parent.startswith("-") and (following is None or alpha_sort_key("hydroxy") > alpha_sort_key(following.group(1))):
+            return None
+        return f"{token}-N-hydroxy{parent}"
+    return None
+
+
 def _name_n_carbon_hydroxylamine_as_amine(features: Any):
     """ (BB:38308): R-NH-OH or RR'N-OH (the N bears >=1 carbon --
     the perceived 'hydroxylamine' FG SMARTS [OX2H1][NX3...][#6] guarantees this
@@ -505,21 +530,16 @@ def _name_n_carbon_hydroxylamine_as_amine(features: Any):
                 name = f"N-hydroxy{cprefix}{_PARENT}"
         elif base[:1].isdigit():
             return None  # leading locant (longer chain / ring) -- ordering deferred
+        elif base.startswith("N-"):
+            # the N bears an acyl or sulfonyl group besides its carbon: the base is an N-substituted
+            # amide ('N-ethylmethanesulfonamide') and 'N-hydroxy' is one more N-prefix of it
+            name = _n_hydroxy_among_n_prefixes(mol, n_idx, o_idx, base)
+            if name is None:
+                return None
         else:
             name = f"N-hydroxy{base}"
     else:
-        from ..naming_utils import _wrap_n_substituent, alpha_sort_key, enclose_if_compound
-
-        name = None
-        for cand in dict.fromkeys(_named_substituents(mol, n_idx, o_idx)):
-            token = f"N-{_wrap_n_substituent(enclose_if_compound(cand))}"
-            if base.startswith(token):
-                parent = base[len(token):]
-                if alpha_sort_key("hydroxy") <= alpha_sort_key(cand):
-                    name = f"N-hydroxy-{token}{parent}"
-                else:
-                    name = f"{token}-N-hydroxy{parent}"
-                break
+        name = _n_hydroxy_among_n_prefixes(mol, n_idx, o_idx, base)
         if name is None:
             return None
 

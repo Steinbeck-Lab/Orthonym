@@ -61,6 +61,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_thioperoxol",
     "orthonym.validation.spelling.checks_amine_parent",
     "orthonym.validation.spelling.checks_group_count",
+    "orthonym.validation.spelling.checks_acid_cyanide",
 )
 
 _loaded = False

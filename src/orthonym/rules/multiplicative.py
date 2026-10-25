@@ -13,6 +13,7 @@ Uses the recursion depth guard from fragment_naming.py to prevent infinite
 loops when naming fragment halves.
 """
 
+import functools
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -3251,6 +3252,36 @@ def _try_central_arene_pnictogen_arms(mol) -> Optional[str]:
     return f"({central}){multiplier}({unit_name})"
 
 
+def _has_new_acid_cyanide(mol) -> bool:
+    """True when ``mol`` has a sulfinyl, selenonyl, seleninyl, telluronyl or tellurinyl cyanide group
+    (``data.oxoacid_cyanides``; the sulfonyl cyanide predates them and is not in the set)."""
+    from ..data.oxoacid_cyanides import OXOACID_CYANIDE_GROUPS
+    from ..perception.functional_groups import detect_functional_groups
+    groups = detect_functional_groups(mol)
+    return any(g in groups for g in OXOACID_CYANIDE_GROUPS if g != "sulfonyl_cyanide")
+
+
+def _declines_new_acid_cyanide(fn):
+    """Decorator of:func:`name_multiplicative`: a molecule with the cyanide of a sulfinic, selenonic,
+    seleninic, telluronic or tellurinic acid is not named by this producer.
+
+    The units of a bridge are named by their parent ('benzenesulfinyl') and the class word stays single:
+    '4,4'-oxydibenzenesulfinyl cyanide'. (the Blue Book) multiplies the class word with the
+    acyl group ("preceded by a multiplicative prefix, as needed"; 'ethane-1,2-disulfonyl dibromide (PIN)',
+    :31452) and a multiplied unit of a suffix acid is enclosed, '4,4'-oxydi(benzene-1-sulfonic acid) (PIN)'
+    (:5827). This producer builds neither, so it declines such a molecule: it is named by the cyanide route
+    (``rules.sulfur.name_sulfonyl_halide``) or at a wider tier. The sulfonyl cyanide and the halides were named
+    here before and are not changed. A decorator, because ``name_multiplicative`` is a baselined function that
+    may not grow (``tests/support/size_budget_baseline.py``)."""
+    @functools.wraps(fn)
+    def wrapper(mol):
+        if mol is not None and _has_new_acid_cyanide(mol):
+            return None
+        return fn(mol)
+    return wrapper
+
+
+@_declines_new_acid_cyanide
 def name_multiplicative(mol) -> Optional[str]:
     """Detect and name multiplicative nomenclature cases.
 

@@ -42,7 +42,8 @@ INTERNAL = [
     ("Cc1ccc2cc(N3CC[C@H](NC(=O)Cn4cnc(C#N)n4)C3)ccc2n1", "Stereo backstop"),
     ("NC(CO)C(=O)NNCc1ccc(O)c(O)c1O", "Could not name compound substituent at locant"),
     ("NC(CO)C(=O)NNCc1ccc(O)c(O)c1O", "universal_pipeline_unnameable_substituent substituent_skip"),
-    ("CCN(CC)N=O", "substituent_recursion_depth_exceeded substituent_skip"),
+    ("CCCCCCCC/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)([O-])OCC[N+](C)(C)C)OC(=O)CCCC(=O)/C=C/C(=O)O",
+     "substituent_recursion_depth_exceeded substituent_skip"),
     # these two were logged through the ROOT logger (bare ``logging.warning``), outside the
     # ``orthonym`` logger the census tools read
     ("CC(=O)OC/C(C)=C\\C1CCC(C)C2CCC(C)=C12", "Fused ring naming failed for ortho-fused system"),

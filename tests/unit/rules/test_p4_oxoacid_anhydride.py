@@ -95,8 +95,10 @@ class TestAtomDropSafetyFloor:
     identical at pre-v52 cb2f3807f, Phase-2-end 35bd65ec9 and HEAD; both rows
     were still fail-closed at the floor's birth a469b6b80). They are handled in
     dedicated methods below and removed from the source-level veto lists:
-      * O=[N+]([O-])NCC(=O)O -> now correctly named '(carboxymethyl)nitramide'
-        (RT-verified, no atom drop) -> see test_nitramido_acetic_acid_named.
+      * O=[N+]([O-])NCC(=O)O -> the PIN tier does not name it (the carboxylic acid is the
+        class,; the nitramide route had named it '(carboxymethyl)nitramide'), the
+        best-effort tier names it '(nitroamino)acetic acid' (RT-verified, no atom drop) -> see
+        test_nitramido_acetic_acid_named.
       * OC(=O)CCOP(=O)(O)OP(=O)(O)O -> GATED namer abstains (0-wrong holds);
         only the RAW gate-OFF path emits a benign mixture-split the gate rejects
         -> see test_carboxypropyl_diphosphate_gated_abstains.
@@ -139,24 +141,35 @@ class TestAtomDropSafetyFloor:
 
     @pytest.mark.opsin_gate
     def test_nitramido_acetic_acid_named(self):
-        """B1 (was a fail-closed floor row, raw+gated): the substitutive
-        nitramide producer now names O2N-NH-CH2-COOH in FULL. The floor no
-        longer applies -- it existed for when this could ONLY leak the atom-
-        dropped 'ethanoic acid'. The producer change predates v52 (routing was
-        already live by; the N- locant was dropped at caa7fd7b1 under
-        , giving the current bare '(carboxymethyl)nitramide').
+        """B1 (was a fail-closed floor row, raw+gated; then named '(carboxymethyl)nitramide' by the nitramide
+        route, whose name this test pinned as "the current gate-approved emission").
 
-        Runs under the PRODUCTION gate (opsin_gate): the gate ACCEPTS this valid
-        name, so production ships it. Load-bearing safety property: RT-match
-        proves the name denotes the EXACT input structure -- no atom drop. The
-        exact string is the current gate-approved emission (also emitted raw)."""
+        VALUE MOVED, with its three artifacts. (1) The source: "SENIORITY ORDER FOR CLASSES" Table 4.1
+        (the Blue Book) ranks the acids (class 7, 7a carboxylic acids first) above the amides (class 11),
+        so the carboxylic acid is the principal characteristic group and the nitro group a prefix of its
+        N: "Nitro attached to heteroatoms" (:25957) "In the presence of a characteristic group having
+        seniority to be named as a suffix or a parent structure, nitro and nitroso groups can be attached to any
+        atom" (example 'N-methyl-N-nitrosourea (PIN)',:25965). '(carboxymethyl)nitramide' names the amide of
+        nitric acid as the class: not the PIN. (2) The independent check: the old name violates that necessary
+        condition; the same read-back (OPSIN, a fresh call) holds for the old and the new name, so it does
+        not decide between them. (3) The mutation: ``scripts/mutation_check.py`` with the old name injected
+        for this molecule fails this test.
+
+        The PIN is 'N-nitroglycine' (retained glycine with substitution on N), which the engine does not build;
+        the PIN tier declines (no atom drop, never 'ethanoic acid') and the best-effort tier names the compound
+        '(nitroamino)acetic acid', a name that reads back to the input's full InChIKey."""
+        from orthonym.errors import is_failure_name
+        from tests.support.rt_assert import assert_full_rt, name_best_effort
+
         smi = "O=[N+]([O-])NCC(=O)O"
-        result = name_compound(smi)
+        result = name_compound(smi, on_failure="label", emit_tier="pin")
         assert result != "ethanoic acid"          # never the old atom-dropped leak
-        assert result == "(carboxymethyl)nitramide"
-        assert RAW.name(smi) == "(carboxymethyl)nitramide"
-        rt = opsin_roundtrip_check(smi, result)
-        assert rt["passed"], f"round-trip failed (atom-drop guard): {rt}"
+        assert result != "(carboxymethyl)nitramide"
+        assert is_failure_name(result), result
+        assert RAW.name(smi) != "ethanoic acid"
+        best = name_best_effort(smi)
+        assert (best["name"], best["tier"]) == ("(nitroamino)acetic acid", "systematic_verified"), best
+        assert_full_rt(best["name"], smi)
 
     @pytest.mark.opsin_gate
     def test_carboxypropyl_diphosphate_gated_names_the_pin(self):

@@ -104,7 +104,7 @@ def test_all_the_writers_are_the_one_block():
                      (mononuclear_hydrides._build_mixed_substituent_string, "mononuclear_substituent_block"),
                      (mononuclear_hydrides._compose_io_prefixes, "mononuclear_substituent_block"),
                      (catenated_hydrides._try_aba_parent, "mononuclear_substituent_block"),
-                     (nitramide._name_single_nitramide, "mononuclear_substituent_block"),
+                     (nitramide._name_oxoacid_amide, "mononuclear_substituent_block"),
                      (polyazane._format_n2_substituents, "mononuclear_substituent_block"),
                      (organometallics._ligand_token, "mononuclear_group_token"),
                      (pseudoketones.name_acyl_hetero_pseudoketone, "mononuclear_substituent_block"),
