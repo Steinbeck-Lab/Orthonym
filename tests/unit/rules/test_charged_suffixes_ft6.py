@@ -169,7 +169,7 @@ def test_neutral_parents_unchanged(namer, smiles, expected):
     # an InChIKey; the Sn anion NALGFIPSECPFJF vs VXKWYPOMXBVZSJ.
     # (With the OPSIN validity gate on, this input was already suppressed to a
     # decline; the charge-conservation veto makes the gate-off path agree.)
-    ("C[Si-](C)(C)C", "tetramethylsilane"),
+    # (The silicon row moved to test_overcoordinated_silicon_has_no_uide: method (2) names it.)
     ("C[Sn-](C)(C)C", "tetramethylstannane"),
 ])
 def test_overcoordinated_heteroatom_anion_not_regressed(namer, smiles, neutral_name):
@@ -267,16 +267,26 @@ def test_group13_uide_borate(namer, smiles, expected):
     assert namer.name(smiles) == expected
 
 
+@pytest.mark.opsin_gate
 def test_overcoordinated_silicon_has_no_uide(namer):
     """`C[Si-](C)(C)C` (4-coordinate Si, 0 H) is NOT silanuide (that name adds an H:
-    C[SiH-](C)(C)C). It has no clean PIN, so it is declined rather than named by a
-    wrong -uide or by the neutral organometallic name 'tetramethylsilane', which states
-    no charge for a net -1 input (leads L7 / N8c; 'GENERAL METHODOLOGY',
-    the Blue Book,:40860)."""
+    C[SiH-](C)(C)C), and not the neutral organometallic name 'tetramethylsilane', which
+    states no charge for a net -1 input (leads L7 / N8c; 'GENERAL METHODOLOGY',
+    the Blue Book,:40860). It has no PIN here, so the PIN tier declines it. The wider
+    tiers name it by 'ANIONS FORMED BY ADDITION OF HYDRIDE IONS' (the Blue Book),
+    method (2) (:41094): "by adding the suffix 'ide' to a parent hydride in which the bonding
+    number at the anionic site is higher than the standard bonding number and is expressed by
+    the λ-convention" -- 'tetramethyl-λ5-silanide', as 'tetramethyl-λ5-phosphanide' (:41106).
+    Independent check (OPSIN 2.9.0 ``-osmi``, no RDKit of the engine's): the name reads
+    C[Si-](C)(C)C, the input, an InChIKey (/q-1); 'tetramethylsilane' reads
+    an InChIKey and 'tetramethylsilanuide' C[SiH-](C)(C)C."""
+    from tests.support.rt_assert import assert_full_rt, name_best_effort
     out = namer.name("C[Si-](C)(C)C")
-    assert out != "tetramethylsilane"
-    assert not out.endswith(("ide", "uide"))
-    assert namer.name_tiered("C[Si-](C)(C)C")["tier"] == "abstain"
+    assert out != "tetramethylsilane" and not out.endswith("uide")
+    assert namer.name_tiered("C[Si-](C)(C)C")["tier"] == "abstain"  # no PIN
+    row = name_best_effort("C[Si-](C)(C)C")
+    assert row["name"] == "tetramethyl-\u03bb5-silanide" and not row["is_pin"], row
+    assert_full_rt(row["name"], "C[Si-](C)(C)C")
 
 
 def test_fg_substituted_ring_cation_fails_closed():

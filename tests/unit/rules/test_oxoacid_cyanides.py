@@ -426,15 +426,13 @@ def test_ring_carbonitrile_keeps_its_pin_label(smiles, ring_pin):
 @pytest.mark.unit
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles", [
-    "N#CS(=O)c1ccc(cc1)Oc1ccc(cc1)S(=O)C#N",
     "N#C[Se](=O)c1ccc(cc1)Oc1ccc(cc1)[Se](=O)C#N",
     "N#C[Te](=O)(=O)c1ccc(cc1)Oc1ccc(cc1)[Te](=O)(=O)C#N",
 ])
-def test_multiplicative_producer_declines_units_with_an_acid_cyanide(smiles):
-    """ (the Blue Book) multiplies the class word with the acyl group ('ethane-1,2-disulfonyl
-    dibromide (PIN)',:31452) and a multiplied unit of a suffix acid is enclosed ('4,4'-oxydi(benzene-1-sulfonic
-    acid) (PIN)',:5827). The producer builds neither: '4,4'-oxydibenzenesulfinyl cyanide' has a single class
-    word, so it declines these units and no name of it is labelled a PIN."""
+def test_multiplicative_producer_names_no_selenium_or_tellurium_cyanide_unit(smiles):
+    """The unit namer builds no name for the selenonyl, seleninyl, telluronyl and tellurinyl cyanides, so the
+    multiplicative producer has no unit to multiply and declines; no name of the molecule is labelled a PIN.
+    (The sulfinyl cyanide unit is multiplied with its class word: ``test_multiplied_class_words.py``.)"""
     from rdkit import Chem
     from orthonym.rules.multiplicative import name_multiplicative
     assert name_multiplicative(Chem.MolFromSmiles(smiles)) is None

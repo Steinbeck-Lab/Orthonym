@@ -71,13 +71,14 @@ def _is_ion_or_radical(mol, atoms) -> bool:
             or any(mol.GetAtomWithIdx(i).GetNumRadicalElectrons() for i in atoms))
 
 
-def centre_ligand_prefixes(mol, center_idx: int, ring_first: bool = True) -> Optional[List[str]]:
+def centre_ligand_prefixes(mol, center_idx: int, ring_first: bool = True, skip=()) -> Optional[List[str]]:
     """The prefix name of each ligand of the centre ``center_idx``, in the order of its neighbours, or None.
 
     None when a ligand has no name, when a ligand has a net charge or a radical, when a ligand is a ring
     through the centre, and when the heavy atoms of the centre and its ligands are not every heavy atom of
     ``mol`` (an atom a name does not cover is never shipped). An empty list is a centre with no ligand
-    (``[IH2-]``).
+    (``[IH2-]``). A neighbour in ``skip`` is no ligand of the name: it is a single atom the caller names
+    itself (the radical centre a multiplied parent radical stands on), and counts as covered.
     """
     from .ions import _acyl_on_chalcogen_prefix, _collect_substituent_atoms, _is_acyl_on_chalcogen
     center = mol.GetAtomWithIdx(center_idx)
@@ -85,6 +86,9 @@ def centre_ligand_prefixes(mol, center_idx: int, ring_first: bool = True) -> Opt
     covered = {center_idx}
     for nb in center.GetNeighbors():
         if nb.GetSymbol() == 'H':
+            continue
+        if nb.GetIdx() in skip:
+            covered.add(nb.GetIdx())
             continue
         if nb.GetSymbol() in _HALOGEN_PREFIX and nb.GetDegree() == 1:
             names.append(_HALOGEN_PREFIX[nb.GetSymbol()])
@@ -111,7 +115,7 @@ def _breadth_contexts():
     return (general_fallback_ctx, best_effort_ctx, allow_aromatic_general_ctx, full_coverage_ctx)
 
 
-def _candidate_ligand_lists(mol, center_idx: int):
+def _candidate_ligand_lists(mol, center_idx: int, skip=()):
     """The ligand prefix lists of the centre to try, lazily: the ambient tier's, then, in a call of a wider
     tier, the default tier's, each with the ring-substituent chokepoint first and then with the five-tier
     chokepoint alone (the lists that differ). No namer is right for every ligand: the best-effort namer gave
@@ -121,7 +125,7 @@ def _candidate_ligand_lists(mol, center_idx: int):
     phenyl (the five-tier chokepoint gives the right prefix)."""
     seen = []
     for ring_first in (True, False):
-        names = centre_ligand_prefixes(mol, center_idx, ring_first)
+        names = centre_ligand_prefixes(mol, center_idx, ring_first, skip)
         if names is not None and names not in seen:
             seen.append(names)
             yield names
@@ -130,7 +134,7 @@ def _candidate_ligand_lists(mol, center_idx: int):
         for ring_first in (True, False):
             tokens = [ctx.set(False) for ctx in breadth]
             try:
-                names = centre_ligand_prefixes(mol, center_idx, ring_first)
+                names = centre_ligand_prefixes(mol, center_idx, ring_first, skip)
             finally:
                 for ctx, token in zip(breadth, tokens):
                     ctx.reset(token)

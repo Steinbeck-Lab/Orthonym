@@ -13,7 +13,6 @@ Uses the recursion depth guard from fragment_naming.py to prevent infinite
 loops when naming fragment halves.
 """
 
-import functools
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -32,6 +31,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
 )
 from ..perception.molcache import atoms_of, canon_smiles
 from .multiplicative_general import name_general_multiplicative
+from .multiplied_class_word_units import ACYL_UNIT_SUFFIXES, multiply_class_word_unit
 
 # ---------------------------------------------------------------------------
 # Saturation/modification prefixes that must not be preceded by "di"
@@ -3252,36 +3252,6 @@ def _try_central_arene_pnictogen_arms(mol) -> Optional[str]:
     return f"({central}){multiplier}({unit_name})"
 
 
-def _has_new_acid_cyanide(mol) -> bool:
-    """True when ``mol`` has a sulfinyl, selenonyl, seleninyl, telluronyl or tellurinyl cyanide group
-    (``data.oxoacid_cyanides``; the sulfonyl cyanide predates them and is not in the set)."""
-    from ..data.oxoacid_cyanides import OXOACID_CYANIDE_GROUPS
-    from ..perception.functional_groups import detect_functional_groups
-    groups = detect_functional_groups(mol)
-    return any(g in groups for g in OXOACID_CYANIDE_GROUPS if g != "sulfonyl_cyanide")
-
-
-def _declines_new_acid_cyanide(fn):
-    """Decorator of:func:`name_multiplicative`: a molecule with the cyanide of a sulfinic, selenonic,
-    seleninic, telluronic or tellurinic acid is not named by this producer.
-
-    The units of a bridge are named by their parent ('benzenesulfinyl') and the class word stays single:
-    '4,4'-oxydibenzenesulfinyl cyanide'. (the Blue Book) multiplies the class word with the
-    acyl group ("preceded by a multiplicative prefix, as needed"; 'ethane-1,2-disulfonyl dibromide (PIN)',
-    :31452) and a multiplied unit of a suffix acid is enclosed, '4,4'-oxydi(benzene-1-sulfonic acid) (PIN)'
-    (:5827). This producer builds neither, so it declines such a molecule: it is named by the cyanide route
-    (``rules.sulfur.name_sulfonyl_halide``) or at a wider tier. The sulfonyl cyanide and the halides were named
-    here before and are not changed. A decorator, because ``name_multiplicative`` is a baselined function that
-    may not grow (``tests/support/size_budget_baseline.py``)."""
-    @functools.wraps(fn)
-    def wrapper(mol):
-        if mol is not None and _has_new_acid_cyanide(mol):
-            return None
-        return fn(mol)
-    return wrapper
-
-
-@_declines_new_acid_cyanide
 def name_multiplicative(mol) -> Optional[str]:
     """Detect and name multiplicative nomenclature cases.
 
@@ -5066,7 +5036,7 @@ def _select_multiplier(parent_name: str, unit_count: int) -> Optional[str]:
 _P1634_PARENS_SUFFIXES = (
     'carboxylic acid', 'sulfonic acid', 'sulfinic acid',
     'phosphonic acid', 'phosphinic acid', 'carbaldehyde', 'carbonitrile',
-)
+) + ACYL_UNIT_SUFFIXES  # the acyl group of a unit that is an acid halide, multiplied with its class word
 
 
 # The same rule for the suffixes whose locant the free fragment name omits on a
@@ -5218,6 +5188,13 @@ def _assemble_multiplicative_name(
     # ('azacyclododecane') gets its heteroatom locant so the leading-digit
     # tests below route it to 'bis'/'tris' + parentheses ('1-azacyclododecane').
     parent_name = _normalize_replacement_monocycle_unit(parent_name)
+
+    # /: a unit named 'acyl group + class word' is multiplied as its acyl group, and
+    # the class word follows with its own multiplicative prefix ('4,4'-oxydibenzoyl dichloride').
+    handled, class_word_name = multiply_class_word_unit(
+        _assemble_multiplicative_name, locant, bridge_name, parent_name, unit_count)
+    if handled:
+        return class_word_name
 
     # Check for saturation/modification prefixes in the parent name
     # that would produce unparseable "di+prefix" concatenation

@@ -91,13 +91,14 @@ def test_charged_controls(namer, smiles, expected):
 # the anion-only branch) from the shared tail, so a pure cation with a falsy
 # `ionized` hit an UnboundLocalError — caught upstream as an abstain, so 0-wrong
 # held, but a caught crash is a latent robustness defect. These stay ABSTAINING
-# (blocked residuals: silylium / N-onium-ylidene producers, see -ions.md);
+# (blocked residuals: the silicon-chain ylium and the N-onium-ylidene producers, see
+# -ions.md; a mononuclear silylium such as triphenylsilylium is built,,
+# the Blue Book, tests/unit/rules/test_l2_group14_centres.py);
 # the assertion is only that route_charged TERMINATES without an exception and never
 # ships a name (name_tiered would MASK a regression by catching the exception, so
 # this asserts on route_charged directly).
 _FALLTHROUGH_CATIONS = [
     "C[Si+]([Si](C)(C)C)[Si](C)(C)C",     # heptamethyltrisilan-2-ylium (blocked)
-    "c1ccc([Si+](c2ccccc2)c2ccccc2)cc1",  # triphenylsilylium (blocked)
     "CC(O)=[N+](C)C",                     # (1-hydroxyethylidene)di(methyl)azanium (blocked)
 ]
 

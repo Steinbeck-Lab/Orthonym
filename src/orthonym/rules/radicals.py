@@ -1314,6 +1314,10 @@ _IONIC_PARENT = {
     ('S', 1): 'sulfanium', ('Se', 1): 'selanium', ('B', -1): 'boranuide',
     ('P', 1): 'phosphanium', ('P', -1): 'phosphanide', ('As', 1): 'arsanium',
     ('C', 1): 'methylium', ('C', -1): 'methanide',
+    # Silicon and germanium anions of (silanide, germanide); "Examples of radical anions"
+    # (:43424) names the radical anion by 'yl' on the anion's name, as it does 'azanidyl' (:43426) and
+    # 'trimethylboranuidyl (PIN)' (:43430). Tin and lead are metals of data/metal_scope.py, handed on first.
+    ('Si', -1): 'silanide', ('Ge', -1): 'germanide',
 }
 
 
@@ -1328,6 +1332,10 @@ def _name_mononuclear_radical_ion(mol) -> str:
     plain carbon group (a carbon chain would be the parent instead)."""
     if len(Chem.GetMolFrags(mol)) != 1:
         return ''
+    from .group14_centres import name_lambda_ide_anion
+    lambda_ide = name_lambda_ide_anion(mol)   # R4Si-: a radical anion RDKit counts no radical on (method 2)
+    if lambda_ide:
+        return lambda_ide
     charged = [a for a in mol.GetAtoms() if a.GetFormalCharge()]
     radical = [a for a in mol.GetAtoms() if a.GetNumRadicalElectrons()]
     if len(charged) != 1 or len(radical) != 1 or charged[0].GetIdx() != radical[0].GetIdx():
@@ -1345,6 +1353,7 @@ def _name_mononuclear_radical_ion(mol) -> str:
     suffix = {1: 'yl', 2: 'ylidene'}.get(x.GetNumRadicalElectrons())
     if parent is None or suffix is None:
         return ''
+    from .mononuclear_hydrides import _build_mixed_substituent_string
     general = _tier_is_general()
     prefixes = []
     for sub in x.GetNeighbors():
@@ -1366,8 +1375,13 @@ def _name_mononuclear_radical_ion(mol) -> str:
         if not prefix or wide:
             return ''
         prefixes.append(prefix)
-    name = _aminoxyl_prefix_string(prefixes) + parent[:-1] + suffix if parent.endswith('e') \
-        else _aminoxyl_prefix_string(prefixes) + parent + suffix
+    # The prefixes are assembled as the mononuclear hydrides assemble theirs, the Blue Book),
+    # which alone nests the enclosing marks of a compound prefix: '[(5R)-5-(methoxymethyl)pyrrolidin-3-yl]
+    # (methyl)silanidyl', not '((5R)-5-...)(methyl)...'.
+    block = _build_mixed_substituent_string(prefixes) if prefixes else ''
+    if prefixes and not block:
+        return ''
+    name = block + parent[:-1] + suffix if parent.endswith('e') else block + parent + suffix
     return _ship(mol, name, _n_radical_ion_has_suffix_parent(mol, x))
 
 
@@ -2024,6 +2038,75 @@ def _name_substituted_centre_radical(mol, site: Dict[str, Any]) -> str:
     return ''
 
 
+def _name_gem_centre_radicals(mol, sites: List[Dict[str, Any]]) -> str:
+    """Two identical one-bond parent radicals on ONE carbon -- ``[B]C([B])(R)R'``, each a boranylidene (or
+    silylidyne, phosphanylidene,...) whose only bond is to that carbon -- are an assembly of parent
+    radicals joined by a divalent group: "ASSEMBLIES OF PARENT RADICALS" (the Blue Book),
+    "Polyradicals with radical centers identically derived from the same parent hydride... but located in
+    different parts of the structure are named, if possible, according to the principles for nomenclature of
+    assemblies of identical units linked by multivalent substituents (see ": '(naphthalene-2,6-diyl)
+    bis(disulfanyl) (PIN)' (:40747). The linking group here is one carbon with two free valences, which is
+    'methylene' and not 'methanediyl' "Retained prefixes that are preferred prefixes",:16270:
+    "The names 'methanediyl' and 'benzene-1,2-diyl' are not recommended in place of 'methylene'",:16282;
+    ,:5207: 'chloromethylene (preferred prefix; a compound multiplicative group)',:5214), and
+    its groups are cited as the groups of a mononuclear hydride are,:7272). The multiplied
+    unit is the parent radical itself, '(hydroxymethylene)bis(boranylidene)'.
+
+    Scope (fail closed): exactly two centres of one element and one radical count, each neutral, in no ring,
+    with no other bond and no hydrogen, on the same neutral carbon of no ring whose bonds are all single
+    and whose groups each name by a ring or a heteroatom. A group that is a carbon of an acyclic chain
+    declines: the chain would be the parent of the linking group ('2,2-difluoro-1-hydroxyethane-1,1-diyl'),
+    which this construction does not build. The ligands come from ``rules.centre_ligands`` (the
+    substituent-prefix namer; the two centres are skipped as the multiplied parents), and the name ships
+    only if the strict radical read-back accepts it (``_ship``). Only the molecule the outermost ``name``
+    call was given is named (``universal_halane.names_the_input``)."""
+    if len(sites) != 2 or len({s['element'] for s in sites}) != 1 or len({s['n_electrons'] for s in sites}) != 1:
+        return ''
+    element = sites[0]['element']
+    n_e = sites[0]['n_electrons']
+    parent = _parent_hydride_radical_name(element, n_e) if element in _CENTRE_RADICAL_ELEMENTS else ''
+    if not parent:
+        return ''
+    idxs = tuple(s['atom_idx'] for s in sites)
+    hubs = set()
+    for idx in idxs:
+        atom = mol.GetAtomWithIdx(idx)
+        if (atom.GetFormalCharge() or atom.IsInRing() or atom.GetDegree() != 1 or atom.GetTotalNumHs()
+                or atom.GetIsotope() or atom.GetBonds()[0].GetBondType() != Chem.BondType.SINGLE
+                or atom.GetDegree() + n_e != _STANDARD_BONDING_NUMBER[element]):
+            return ''
+        hubs.add(atom.GetNeighbors()[0].GetIdx())
+    if len(hubs) != 1:
+        return ''
+    hub = mol.GetAtomWithIdx(hubs.pop())
+    if (hub.GetSymbol() != 'C' or hub.GetFormalCharge() or hub.IsInRing() or hub.GetNumRadicalElectrons()
+            or hub.GetIsotope() or any(b.GetBondType() != Chem.BondType.SINGLE for b in hub.GetBonds())):
+        return ''
+    if any(nb.GetSymbol() == 'C' and not nb.IsInRing() for nb in hub.GetNeighbors()):
+        return ''
+    from ..assembly.universal_halane import names_the_input
+    if not names_the_input(mol):
+        return ''
+    from ..assembly.naming_utils import enclose_if_compound
+    from .centre_ligands import _candidate_ligand_lists
+    from .mononuclear_hydrides import _build_mixed_substituent_string
+    for names in _candidate_ligand_lists(mol, hub.GetIdx(), skip=idxs):
+        block = _build_mixed_substituent_string(names) if names else ''
+        if names and not block:
+            continue
+        candidate = f"{enclose_if_compound(block + 'methylene')}bis({parent})"
+        descriptor = bool(_LIGAND_DESCRIPTOR.search(candidate))
+        if descriptor and not _tier_is_general():
+            continue
+        # Labelled below pin_verified: the book's assemblies of parent radicals (:40747) join units through a
+        # ring or a chain, and none of its examples is a methylene-linked pair, so the name is in the form the
+        # rule gives but its preferred status is not certified here.
+        shipped = _ship(mol, candidate, True)
+        if shipped:
+            return shipped
+    return ''
+
+
 def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
                             style: str = 'pin') -> str:
     """Heteroatom-centred radical PINs (called from the route_charged chokepoint
@@ -2046,7 +2129,8 @@ def name_heteroatom_radical(mol, radical_sites: List[Dict[str, Any]],
     # Multi-centre: only the multiplicative poly-amine class is in scope
     # here; every other multi-radical is the carbon polyvalent primitive's job.
     if len(radical_sites) >= 2:
-        return _name_multiplicative_amine_radical(mol, radical_sites)
+        return (_name_multiplicative_amine_radical(mol, radical_sites)
+                or _name_gem_centre_radicals(mol, radical_sites))
 
     site = radical_sites[0]
     atom = mol.GetAtomWithIdx(site['atom_idx'])

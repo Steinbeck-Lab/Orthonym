@@ -3101,10 +3101,13 @@ def route_charged(mol, style: str = 'pin') -> str:
     # generic neutralize path cannot build it (drop-charge -> invalid neutral halogen
     # radical; add-H -> the wrong λ-parent), so emit_halogen_onium owns it directly.
     # RT-gated (0-wrong): a mis-built name fails CLOSED. Tightly scoped (halogen, +1,
-    # degree>=2) so no other cation class is disturbed.
+    # degree>=2) so no other cation class is disturbed. Likewise a silicon, germanium or boron centre that lost
+    # a hydride ion, the Blue Book: 'triphenylsilylium (PIN)'): emit_group_ylium.
     if n_cations == 1 and not n_anions:
+        from .group14_centres import emit_group_ylium
         from .ions import emit_halogen_onium
-        ho = emit_halogen_onium(mol, sites['cations'][0]['atom_idx'])
+        ho = (emit_halogen_onium(mol, sites['cations'][0]['atom_idx'])
+              or emit_group_ylium(mol, sites['cations'][0]['atom_idx']))
         if ho and _cation_name_rt_ok(ho, mol):
             return ho
 
