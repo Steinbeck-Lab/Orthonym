@@ -18,8 +18,8 @@ GOLD_COUNTS = {
     ("cycle", False, False): 19, ("cycle", False, True): 4, ("cycle", True, False): 6,
     ("path", False, False): 32, ("path", False, True): 6, ("path", True, False): 17,
 }
-SUBSTITUTED_COUNTS = {"prefix": 4, "suffix": 1, "compound_prefix": 3, "stereo": 1, "indicated_hydrogen": 2,
-                      "hydro": 3, "skeleton": 4}
+SUBSTITUTED_COUNTS = {"prefix": 4, "suffix": 1, "compound_prefix": 3, "stereo": 2, "indicated_hydrogen": 3,
+                      "hydro": 3, "skeleton": 4, "phane_as_prefix": 1}
 
 
 def test_gold_smiles_parse():

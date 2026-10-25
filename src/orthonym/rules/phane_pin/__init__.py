@@ -19,15 +19,12 @@ _LINEAR_MEMO: dict = {}
 
 
 def _plain(mol: Chem.Mol) -> bool:
-    """One component, neutral, no radical, no isotope, no specified stereo (a name of such a structure is
-    built from its constitution alone)."""
+    """One component, neutral, no radical, no isotope. Specified stereo is read by ``stereo`` (a structure with a
+    unit the name cannot cite is declined there)."""
     if len(Chem.GetMolFrags(mol)) != 1:
         return False
-    for atom in mol.GetAtoms():
-        if (atom.GetFormalCharge() or atom.GetNumRadicalElectrons() or atom.GetIsotope()
-                or atom.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED):
-            return False
-    return all(b.GetStereo() == Chem.BondStereo.STEREONONE for b in mol.GetBonds())
+    return not any(atom.GetFormalCharge() or atom.GetNumRadicalElectrons() or atom.GetIsotope()
+                   for atom in mol.GetAtoms())
 
 
 def _kekule(mol: Chem.Mol) -> Chem.Mol:
@@ -113,12 +110,38 @@ def linear_phane_name(mol: Optional[Chem.Mol]) -> Optional[str]:
     return _LINEAR_MEMO["v"]
 
 
+def _has_stereo(mol: Chem.Mol) -> bool:
+    Chem.AssignStereochemistry(mol, cleanIt=True, force=True)
+    return (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED and a.HasProp("_CIPCode") for a in mol.GetAtoms())
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()))
+
+
+def _isomeric_read_back(name: str, smiles: str) -> bool:
+    """The structure OPSIN reads from ``name`` has the canonical isomeric SMILES of ``smiles``. The standard InChIKey
+    leaves out the configuration of a double bond in a ring of fewer than eight atoms, of some ring centres and of every
+    unit it does not see as stereogenic, so a name of a structure with specified stereo is also compared as an
+    isomeric SMILES."""
+    from ...validation.opsin_roundtrip import opsin_parse
+    parsed = opsin_parse(name)
+    if not parsed:
+        return False
+    given, read = Chem.MolFromSmiles(smiles), Chem.MolFromSmiles(parsed)
+    if given is None or read is None:
+        return False
+    return Chem.MolToSmiles(given) == Chem.MolToSmiles(read)
+
+
 def verified_or_none(name: Optional[str], smiles: Optional[str]) -> Optional[str]:
     """``name`` when OPSIN reads it back to the full InChIKey of ``smiles`` (and agrees on radicals and on the place
     of a hydron), else None: the producers offer a name and the round trip keeps or voids it. The read is the engine's
     own (``namer._shipped_name_round_trip``, memoised, no fail-open branch), so an OPSIN that cannot be asked voids
-    the name too."""
+    the name too. For a structure with specified stereo the read must also give its isomeric SMILES."""
     if not name or not smiles:
         return None
     from ... import namer
-    return name if namer._shipped_name_round_trip(name, smiles) == "verified" else None
+    if namer._shipped_name_round_trip(name, smiles) != "verified":
+        return None
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is not None and _has_stereo(mol) and not _isomeric_read_back(name, smiles):
+        return None
+    return name

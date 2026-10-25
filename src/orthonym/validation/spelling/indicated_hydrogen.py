@@ -228,7 +228,10 @@ def kekule_ring_double(mol, atoms) -> int:
 
 # ---------------------------------------------------------------- name side
 _LOC = r"\d+(?:'|′)*[a-z]?(?:'|′)*"
-_FRONT_IH = re.compile(r"(?:(?<=^)|(?<=[\s\-\(\[\{,—–/]))((?:" + _LOC + r"H,)*" + _LOC
+#: the locant of an atom of an amplificant of a phane name is composite: the locant of its superatom with the locant of the
+#: atom in the amplificant as superscript ('1^1H-2,4,6-trioxa-1(5)-indola-...',, the Blue Book)
+_FRONT_LOC = _LOC + r"(?:\^\d+[a-z]?(?:'|′)*)?"
+_FRONT_IH = re.compile(r"(?:(?<=^)|(?<=[\s\-\(\[\{,—–/]))((?:" + _FRONT_LOC + r"H,)*" + _FRONT_LOC
                        + r"H)-(?=[A-Za-z\[\(λ\{0-9])")
 _ADDED_IH = re.compile(r"(?<=[\d'a-z′])\(((?:" + _LOC + r"H,)*" + _LOC + r"H)\)")
 _VB = re.compile(r"((?:undeca|dodeca|trideca|tetradeca|bi|tri|tetra|penta|hexa|hepta|octa|nona|deca)cyclo|"

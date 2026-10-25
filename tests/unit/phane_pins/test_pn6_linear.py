@@ -2,6 +2,7 @@ import pytest
 
 from orthonym.rules.phane_pin import linear_phane_name
 from orthonym.validation.spelling.linear_phane import linear_phane_chain, linear_phane_pin_expected
+from tests.support.opsin_marks import release_opsin_only
 
 from ._helpers import gold, mol, substituted
 
@@ -86,6 +87,7 @@ def test_no_book_phane_pin_is_outranked():
         assert not linear_phane_pin_expected(mol(smiles)).as_prefix, name
 
 
+@release_opsin_only
 @pytest.mark.opsin_gate
 def test_the_default_tier_still_declines_the_silane_and_best_effort_keeps_its_name():
     # the label is lowered before and after the change; only the detail of the failure names now

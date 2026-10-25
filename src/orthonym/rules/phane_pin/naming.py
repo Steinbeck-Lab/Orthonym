@@ -18,10 +18,12 @@ from __future__ import annotations
 import logging
 from typing import List, Optional, Sequence, Tuple
 
+from .amplificants import hydro_split
 from .numbering import (
     Numbered,
     Placed,
     UndecidableTiesError,
+    atom_locant,
     best_numberings,
     render_locant,
     skeleton_heteroatoms,
@@ -123,18 +125,39 @@ def with_suffix(ending: str, locants: Sequence[str], core: str) -> Optional[str]
 def prefix_block(plan: Plan, numbered: Numbered, skel: PhaneSkeleton) -> Optional[str]:
     """The detachable prefixes in alphanumerical order, each name with the locants of its atoms in the order
     of (never contracted,,:15113)."""
-    from ...assembly.general_engine import _alpha_key, _mult_prefix
-    from .numbering import atom_locant
+    from ...assembly.general_engine import _mult_prefix
+    from .numbering import atom_locant, citation_key
     groups = {}
     for prefix in plan.prefixes:
         groups.setdefault(prefix.name, []).append(atom_locant(skel, numbered.pos, numbered.chosen, prefix.atom))
     parts: List[str] = []
-    for name in sorted(groups, key=lambda n: (_alpha_key(n), n)):
+    for name in sorted(groups, key=citation_key):
         text = _mult_prefix(len(groups[name]), name)
         if text is None:
             return None
         parts.append(",".join(render_locant(loc) for loc in sorted(groups[name])) + "-" + text)
     return "-".join(parts)
+
+
+def hydro_block(skel: PhaneSkeleton, numbered: Numbered) -> Optional[str]:
+    """ (:15173) and (:16872,:16874): the hydro prefixes and then the indicated hydrogen of the amplificants,
+    directly before the parent hydride name: ``1^1,1^2-dihydro-``, ``1^4H-``, ``3^1,3^2-dihydro-1^1H-``. Empty for amplificants
+    without added hydrogen; None when a count has no multiplier."""
+    from ...assembly.naming_utils import SIMPLE_MULTIPLIERS
+    indicated, hydro = [], []
+    for placed in numbered.placed:
+        ind, hyd = hydro_split(placed.amp.hydride, numbered.chosen[placed.amp.k])
+        indicated += [atom_locant(skel, numbered.pos, numbered.chosen, a) for a in ind]
+        hydro += [atom_locant(skel, numbered.pos, numbered.chosen, a) for a in hyd]
+    text = ""
+    if hydro:
+        multiplier = "" if len(hydro) == 1 else SIMPLE_MULTIPLIERS.get(len(hydro))
+        if multiplier is None:
+            return None
+        text += ",".join(render_locant(loc) for loc in sorted(hydro)) + f"-{multiplier}hydro-"
+    if indicated:
+        text += ",".join(f"{render_locant(loc)}H" for loc in sorted(indicated)) + "-"
+    return text
 
 
 def build_name(skel: PhaneSkeleton, numbered: Numbered, plan: Optional[Plan] = None) -> Optional[str]:
@@ -159,12 +182,17 @@ def build_name(skel: PhaneSkeleton, numbered: Numbered, plan: Optional[Plan] = N
     if hetero:
         from ..phane import _apply_skeletal_replacement
         name = _apply_skeletal_replacement(hetero, name)
+    hydro = hydro_block(skel, numbered)
+    if hydro is None:
+        return None
+    name = hydro + name
     if plan.prefixes:
         prefixes = prefix_block(plan, numbered, skel)
         if prefixes is None:
             return None
         name = f"{prefixes}-{name}"
-    return name
+    from .stereo import block, units_of
+    return block(skel, numbered.pos, numbered.chosen, units_of(skel) or ()) + name
 
 
 def phane_candidate(skel: PhaneSkeleton, plan: Optional[Plan] = None) -> Optional[Tuple[tuple, str]]:
@@ -184,7 +212,7 @@ def phane_candidate(skel: PhaneSkeleton, plan: Optional[Plan] = None) -> Optiona
         _LOG.warning("phane numberings with one key give different names: %s", sorted(names))
     name = min(names)
     key = names[name].key
-    return (-len(plan.prefixes) if plan else 0, key[-2], key[-1]), name
+    return (-len(plan.prefixes) if plan else 0, key[-4], key[-3] + key[-1]), name
 
 
 def phane_name(skel: PhaneSkeleton, plan: Optional[Plan] = None) -> Optional[str]:

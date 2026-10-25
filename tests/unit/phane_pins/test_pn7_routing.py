@@ -56,9 +56,16 @@ def test_a_phane_name_that_round_trips_to_another_molecule_is_voided(monkeypatch
 
 
 def test_a_senior_atom_parent_stays_the_parent():
-    #: the book's silane (:19325) is not renamed by a phane: the structure is declined at the default tier and
-    # keeps its substitutive name at best-effort, as without the producers
+    #: the book's silane (:19325, 'trimethyl[1^2H-1(6)-pyrana-3,5(1,4),7(1)-tribenzenaheptaphan-7^4-yl]silane
+    # (PIN)') is not renamed by a phane: the silane is the parent and cites the phane as its prefix
     silane = "C[Si](C)(C)c1ccc(Oc2ccc(Oc3ccc(Oc4ccccc4)cc3)cc2)cc1"
-    row = name_best_effort(silane)
-    assert row["name"].startswith("trimethyl{4-[4-(4-phenoxyphenoxy)phenoxy]phenyl}silane"), row
-    assert default_tier_row(silane)["tier"] == "abstain"
+    name = "trimethyl[2,4,6-trioxa-1,7(1),3,5(1,4)-tetrabenzenaheptaphan-1^4-yl]silane"
+    for row in (name_best_effort(silane), default_tier_row(silane)):
+        assert row["name"] == name and row["tier"] == "pin_verified" and row["spelling_failures"] == [], row
+
+
+@pytest.mark.parametrize("line,name,smiles", substituted("stereo"), ids=lambda v: str(v)[:30])
+def test_the_stereo_rows_get_their_pin_at_the_default_tier(line, name, smiles):
+    #: the descriptors are at the front of the name; the read-back compares the isomeric SMILES as well
+    row = default_tier_row(smiles)
+    assert row["name"] == name and row["tier"] == "pin_verified" and row["spelling_failures"] == [], row

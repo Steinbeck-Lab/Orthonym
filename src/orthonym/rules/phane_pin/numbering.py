@@ -16,21 +16,29 @@ Blue Book (the Blue Book, each line read with ``sed -n``):
 * K5 (:15232): the set of locants of the skeleton heteroatoms, whatever the element;
 * K6 (:15246) "Lowest locants are assigned to heteroatoms considered in the order of their
   seniority: O > S > Se > Te > N > P > As > Sb > Bi > Si > Ge > Sn > Pb > B > Al > Ga > In > Tl";
+* K6b (b) (:3246): the locants of the indicated hydrogen of the amplificants, before the principal groups;
 * K7 (c) (:3256): the locants of the principal characteristic groups (heteroatoms of the parent
   come first,:3225: "heteroatoms in chains are now considered to be a part of the parent hydride; as
   such, they have seniority over suffixes for numbering");
-* K8 (e)(ii) (:3290) and (:16489): "Locants as low as possible are given to multiple
+* K8 (e)(i) (:3289): the hydro prefixes of the amplificants and the 'ene' and 'yne' endings as one set, by
+  their primary locants first, then by the composite locants;
+  (e)(ii) (:3290) and (:16489): "Locants as low as possible are given to multiple
   bonds as a set, even though this may at times give 'yne' endings lower locants than 'ene' endings. If
   a choice remains, preference for low locants is given to the double bonds";
 * K9 (:15115): the locants of the detachable prefixes as one set, first by their primary
   locants and, if these are identical, by the complete composite locants (f),:3301);
-* K10 (g) (:3307) "lowest locants for the substituent cited first as a prefix in the name"; the
-  book states no rule for the prefixes cited after the first, so the same comparison goes on in the order
-  of citation (ASSUMED reading: it is what leaves one name for one structure).
+* K10 (g) (:3307) "lowest locants for the substituent cited first as a prefix in the name";
+* K11 (j) (:3346): the CIP descriptors Z, R before E, S at the lower locants (``stereo.rank_key``), those of the
+  skeleton and those inside the prefixes, each at the locant of the atom its prefix is attached to;
+  (h) and (i), the valence states and the isotopes, take no part in a name built here;
+* K12 the book states no rule for the prefixes cited after the first, so the comparison of K10 goes on in
+  the order of citation (ASSUMED reading: it is what leaves one name for one structure). It stands after
+  K11: a decision that (j) takes is never taken by the citation order of the later prefixes.
 
-Numbering of an amplificant is that of its hydride,:14967): every valid numbering is kept
-(``AmplificantHydride.numberings``) and the one with the lowest attachment locants is taken; among those,
-the one that gives the suffix groups and then the prefixes the lowest composite locants.
+Numbering of an amplificant is that of its hydride,:14967): of the valid numberings
+(``AmplificantHydride.numberings``) the ones that give its indicated hydrogen the lowest locants stay (the indicated
+hydrogen belongs to the parent name, ``indicated_numberings``), then the one with the lowest attachment locants is
+taken; among those, the one that gives the suffix groups and then the prefixes the lowest composite locants.
 
 A locant is ``(primary, number, letter)``: ``(4, 0, "")`` for a skeletal atom or a superatom, ``(1, 4, "")``
 for atom 4 of the amplificant at superatom 1 (written ``1^4``,,:15111).
@@ -43,8 +51,10 @@ from typing import Dict, Iterator, List, Mapping, Optional, Tuple
 
 from rdkit import Chem
 
-from .amplificants import HETERO_ORDER
+from .amplificants import HETERO_ORDER, hydro_split, indicated_numberings
 from .skeleton import Amplificant, Node, PhaneSkeleton, SkeletonKind, bridges_between, spiro_rings
+from .stereo import prefix_codes, stereo_atoms, units_of
+from .stereo import rank_key as stereo_rank_key
 from .substituents import Plan
 
 _Locant = Tuple[int, str]
@@ -130,11 +140,12 @@ def _spiro_numberings(skel: PhaneSkeleton) -> Iterator[Dict[Node, int]]:
 
 
 def best_attachment(skel: PhaneSkeleton, amp: Amplificant, neighbours: List[Node]):
-    """,,: the numbering of the amplificant with the lowest attachment set,
-    cited in the order of the skeleton locants of its neighbours; the tied numberings are kept."""
+    """,,: the numbering of the amplificant with the lowest attachment set, among the
+    numberings its parent name allows (the lowest indicated hydrogen first, ``indicated_numberings``), cited in the order
+    of the skeleton locants of its neighbours; the tied numberings are kept."""
     atoms = [skel.edge[(("amp", amp.k), nb)][0] for nb in neighbours]
     best = None
-    for numbering in amp.hydride.numberings:
+    for numbering in indicated_numberings(amp.hydride):
         cited = tuple(numbering[a] for a in atoms)
         key = (tuple(sorted(cited)), cited)
         if best is None or key < best[0]:
@@ -187,22 +198,25 @@ class UndecidableTiesError(Exception):
     """Too many ways to give the amplificants their locants for one name to be chosen by comparison."""
 
 
-def _options(plan: Optional[Plan], placed: Placed) -> List[Mapping[int, _Locant]]:
+def _options(plan: Optional[Plan], placed: Placed, units=()) -> List[Mapping[int, _Locant]]:
     """The numberings of an amplificant that tie on everything the amplificant alone decides: the lowest
     composite locants for its suffix groups, then for its prefixes (K7, K9: the primary locants are the
-    same for every one of them), one per distinct way of giving those groups their locants. Which of them
-    the name uses is decided by K10, over the whole skeleton."""
+    same for every one of them), one per distinct way of giving those groups and its stereogenic atoms
+    their locants. Which of them the name uses is decided by K10 to K12, over the whole skeleton."""
     if plan is None or len(placed.tied) == 1:
         return [placed.tied[0]]
     suffix_atoms = [s.atom for s in plan.suffixes if s.atom in placed.amp.atoms]
     prefix_atoms = [p.atom for p in plan.prefixes if p.atom in placed.amp.atoms]
-    if not suffix_atoms and not prefix_atoms:
+    unit_atoms = [a for a in stereo_atoms(units) if a in placed.amp.atoms]
+    if not suffix_atoms and not prefix_atoms and not unit_atoms and not placed.amp.hydride.saturated:
         return [placed.tied[0]]
 
     def sets(t):
-        return sorted(t[a] for a in suffix_atoms), sorted(t[a] for a in prefix_atoms)
+        indicated, hydro = hydro_split(placed.amp.hydride, t)
+        return (sorted(t[a] for a in indicated), sorted(t[a] for a in suffix_atoms),
+                sorted(t[a] for a in hydro), sorted(t[a] for a in prefix_atoms))
     best = min(sets(t) for t in placed.tied)
-    atoms = sorted(set(suffix_atoms) | set(prefix_atoms))
+    atoms = sorted(set(suffix_atoms) | set(prefix_atoms) | set(unit_atoms))
     distinct: Dict[tuple, Mapping[int, _Locant]] = {}
     for t in placed.tied:
         if sets(t) == best:
@@ -219,16 +233,32 @@ def atom_locant(skel: PhaneSkeleton, pos: Dict[Node, int], chosen: Mapping[int, 
     return (pos[node], number, letter)
 
 
+def citation_key(name: str) -> tuple:
+    """The order in which prefix names are cited: alphanumerical, descriptors ignored); names that differ only in
+    their descriptors by the CIP rank of the descriptors, Z before E and R before S (j): the prefix cited first takes
+    the lower locant, ``cip_descriptor_rank_key``); then the string."""
+    from ...assembly.general_engine import _alpha_key
+    from ...assembly.naming_utils import cip_descriptor_rank_key
+    return (_alpha_key(name), cip_descriptor_rank_key(name), name)
+
+
 def _prefix_sequence(skel: PhaneSkeleton, pos: Dict[Node, int], chosen: Mapping[int, Mapping[int, _Locant]],
                      plan: Optional[Plan]) -> tuple:
     """K10: for each prefix name in the order of citation, the locants of its atoms."""
     if plan is None or not plan.prefixes:
         return ()
-    from ...assembly.general_engine import _alpha_key
     groups: Dict[str, list] = {}
     for p in plan.prefixes:
         groups.setdefault(p.name, []).append(atom_locant(skel, pos, chosen, p.atom))
-    return tuple(tuple(sorted(groups[name])) for name in sorted(groups, key=lambda n: (_alpha_key(n), n)))
+    return tuple(tuple(sorted(groups[name])) for name in sorted(groups, key=citation_key))
+
+
+def _prefix_descriptors(skel: PhaneSkeleton, pos: Dict[Node, int], chosen: Mapping[int, Mapping[int, _Locant]],
+                        plan: Optional[Plan]) -> list:
+    """K11 for the prefixes: ``(locant, code)`` of every descriptor inside a prefix, at the locant of its attachment atom."""
+    if plan is None:
+        return []
+    return [(atom_locant(skel, pos, chosen, p.atom), code) for p in plan.prefixes for code in prefix_codes(p.name)]
 
 
 def numbering_key(skel: PhaneSkeleton, pos: Dict[Node, int], plan: Optional[Plan] = None) -> Numbered:
@@ -245,25 +275,40 @@ def numbering_key(skel: PhaneSkeleton, pos: Dict[Node, int], plan: Optional[Plan
     k2 = tuple(scores)
     k3 = tuple(tuple(key[0] for p, key in placed if p.amp.hydride.score == c) for c in classes)
     k4 = tuple(tuple(p.cited for p, _ in placed if p.amp.hydride.score == c) for c in classes)
-    options = [_options(plan, p) for p, _ in placed]
+    units = (units_of(skel) or ()) if plan is not None else ()
+    options = [_options(plan, p, units) for p, _ in placed]
     combinations = 1
     for o in options:
         combinations *= len(o)
     if combinations > _MAX_TIED_COMBINATIONS:
         raise UndecidableTiesError(combinations)
-    best_sequence, chosen = None, None
+    best, chosen = None, None
     for combo in itertools.product(*options):
         candidate = {p.amp.k: numbering for (p, _), numbering in zip(placed, combo)}
         sequence = _prefix_sequence(skel, pos, candidate, plan)
-        if best_sequence is None or sequence < best_sequence:
-            best_sequence, chosen = sequence, candidate
+        ranking = (sequence[:1], stereo_rank_key(skel, pos, candidate, units, _prefix_descriptors(skel, pos, candidate, plan)),
+                   sequence[1:])
+        if best is None or ranking < best:
+            best, chosen = ranking, candidate
     enes, ynes, wraps = multiple_bonds(skel, pos)
     suffixes = tuple(sorted(atom_locant(skel, pos, chosen, s.atom) for s in plan.suffixes)) if plan else ()
     prefixes = sorted(atom_locant(skel, pos, chosen, p.atom) for p in plan.prefixes) if plan else []
+    indicated, hydro = [], []
+    for p, _ in placed:
+        ind, hyd = hydro_split(p.amp.hydride, chosen[p.amp.k])
+        indicated += [atom_locant(skel, pos, chosen, a) for a in ind]
+        hydro += [atom_locant(skel, pos, chosen, a) for a in hyd]
+    k6b = tuple(sorted(indicated))
     k7 = suffixes
-    k8 = (tuple(sorted(enes + ynes)), tuple(enes))
+    multiple = [(n, 0, "") for n in enes + ynes]
+    together = hydro + multiple
+    # as for the prefixes (K9): the primary locants of the set first, then the composite locants (the example of
+    #:49696 numbers the pyridine ring so that the 'ene' has locant 2 and not 11, though the hydro prefixes of the
+    # other numbering have lower superscripts)
+    k8 = ((tuple(sorted(loc[0] for loc in together)), tuple(sorted(together))), tuple(sorted(multiple)),
+          tuple((n, 0, "") for n in enes))
     k9 = (tuple(loc[0] for loc in prefixes), tuple(prefixes))
-    key = (k1, k2, k3, k4) + _heteroatom_key(skel, pos) + (k7, k8, k9, best_sequence)
+    key = (k1, k2, k3, k4) + _heteroatom_key(skel, pos) + (k6b, k7, k8, k9) + best
     return Numbered(pos, tuple(p for p, _ in placed), key, chosen, tuple(enes), tuple(ynes), wraps)
 
 

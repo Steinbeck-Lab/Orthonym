@@ -1305,30 +1305,14 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
         # declines to CONSTRUCT for those), so the heteroatom guard further down is
         # unchanged.
         frag_atoms_set = set(frag_atoms)
-        # ⚠ NORMALIZE the attachment, so the documented contract is self-enforcing.
-        #
-        # This function's contract is that ``attach_idx`` is the atom WITHIN
-        # ``frag_atoms`` that bonds to the parent, but nothing enforced it, and TWO
-        # conventions circulate in this tree: ``SubstituentInfo.attach_mol_idx`` is the
-        # PARENT-side atom. Production callers each normalize on their own -- explicitly
-        # at ``rules/ring_substituents.py:1869-1879``, implicitly at
-        # ``assembly/general_engine.py:760`` (neighbours of ``attach_mol_idx``
-        # restricted to the fragment) -- so this is a NO-OP for them, verified by an
-        # unchanged a dev split.
-        #
-        # It is here because an unenforced convention silently returns a WRONG or None
-        # token instead of failing, and it already cost real work twice in one session:
-        # a `carboxy` guard that was green in a unit test and dead in production, and a
-        # measurement that overstated the substituent-coverage bucket by 34 rows
-        # (109 real vs 143 reported) because probe scripts passed the raw parent-side
-        # atom. Measured on 8 probes with the raw value: only 2 named; after
-        # normalising, 8 named -- `2-oxoethyl`, `2-carboxyethyl`, `8-oxooctyl` and
-        # `1-hydroxyethyl` (locant present) among them.
-        # Wrapped, because `attach_idx` is not guaranteed to be a valid atom index:
-        # `test_invalid_attach_idx_does_not_crash` passes an out-of-range one on
-        # purpose, and `GetAtomWithIdx` raises `RuntimeError: Range Error` rather than
-        # returning None. Leaving it to raise turned a documented degradation contract
-        # into a crash -- caught by that test, which is exactly why it exists.
+        # ⚠ NORMALIZE the attachment, so the documented contract is self-enforcing: ``attach_idx`` is the atom WITHIN
+        # ``frag_atoms`` that bonds to the parent, but ``SubstituentInfo.attach_mol_idx`` is the PARENT-side atom. The
+        # production callers normalize on their own (``rules/ring_substituents.py:1869-1879``,
+        # ``assembly/general_engine.py:760``), so this is a no-op for them (a dev split unchanged); an unenforced convention
+        # silently returns a WRONG or None token (a `carboxy` guard green in a unit test and dead in production; a
+        # substituent-coverage count overstated by 34 rows; on 8 probes 2 named with the raw value, 8 after normalising).
+        # Wrapped, because `attach_idx` may be an invalid atom index: `test_invalid_attach_idx_does_not_crash` passes
+        # an out-of-range one, and `GetAtomWithIdx` raises `RuntimeError: Range Error` instead of returning None.
         if attach_idx is not None and attach_idx not in frag_atoms_set:
             try:
                 _fs = next(
@@ -1340,6 +1324,12 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 _fs = None
             if _fs is not None:
                 attach_idx = _fs
+        # (:16148): a fragment that holds a linear phane the PIN cites as a substituent prefix is named
+        # as that phane group, with an OPSIN that reads phane names (``rules.phane_pin.prefix``)
+        from ..rules.phane_pin.prefix import phane_prefix
+        _phane_group = phane_prefix(mol, frag_atoms_set, attach_idx)
+        if _phane_group is not None:
+            return _phane_group
         verdict = carbon_free_valence_prefix(mol, frag_atoms_set, attach_idx)
         if verdict.prefix is not None:
             return verdict.prefix

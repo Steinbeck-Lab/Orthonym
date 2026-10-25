@@ -159,18 +159,33 @@ def _heteroatom_groups_junior(mol: Chem.Mol, skeleton: Set[int], senior_class: O
     return True
 
 
-def plan_substituents(skel: PhaneSkeleton) -> Optional[Plan]:
+def plan_substituents(skel: PhaneSkeleton, free_valence: Optional[int] = None) -> Optional[Plan]:
     """The suffix groups and the named prefixes of ``skel``, or None when a group or a prefix is not built
-    or an atom is left over."""
+    or an atom is left over.
+
+    ``free_valence`` is the dummy atom that stands for the parent of a substituent group,:16148 "Substituent
+    groups derived from cyclophanes are formed by applying the principles described above"): the group has the suffix
+    'yl' at the skeleton atom the dummy atom is bonded to, and every characteristic group in it is a prefix (the
+    suffix of a substituent group is its free valence,."""
     from ...assembly.substituent_enumerator import discover_substituents, name_substituent
     from ...errors import is_failure_name, is_refusal_sentinel
+    from .stereo import units_of
+    if units_of(skel) is None:
+        return None                     # a stereogenic unit the name cannot cite (stereo.py)
     mol = skel.mol
     skeleton = {a for amp in skel.amplificants for a in amp.atoms} | {n[1] for n in skel.nodes if n[0] == "atom"}
     chain = {n[1] for n in skel.nodes if n[0] == "atom"}
     suffixes: List[Suffix] = []
-    cls, occurrences = principal_groups(mol)
-    if not _heteroatom_groups_junior(mol, skeleton, occurrences[0][0][0] if occurrences else None):
-        return None
+    if free_valence is not None:
+        hold = [n.GetIdx() for n in mol.GetAtomWithIdx(free_valence).GetNeighbors()]
+        if len(hold) != 1 or hold[0] not in skeleton:
+            return None
+        suffixes.append(Suffix("yl", hold[0], frozenset({free_valence})))
+        cls, occurrences = None, ()
+    else:
+        cls, occurrences = principal_groups(mol)
+        if not _heteroatom_groups_junior(mol, skeleton, occurrences[0][0][0] if occurrences else None):
+            return None
     if cls is not None:
         for occurrence in occurrences:
             suffix = _suffix_of(mol, cls, occurrence[3], skeleton, chain)

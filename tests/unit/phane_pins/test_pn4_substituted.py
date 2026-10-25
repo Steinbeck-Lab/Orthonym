@@ -58,8 +58,12 @@ def test_round_trip(line, name, smiles):
 @pytest.mark.parametrize("line,name,smiles",
                          substituted("indicated_hydrogen") + substituted("hydro"),
                          ids=lambda v: str(v)[:30])
-def test_hydro_and_indicated_hydrogen_decline_until_pn4c(line, name, smiles):
-    assert general_phane_name(mol(smiles)) is None
+def test_hydro_and_indicated_hydrogen_rows(line, name, smiles):
+    # (:15173) and (b), (e)(i): indicated hydrogen and hydro prefixes with composite locants, before the
+    # parent hydride name; the cyclic rows by the cyclic producer, the linear rows by the linear one
+    from orthonym.rules.phane_pin import linear_phane_name
+    m = mol(smiles)
+    assert (general_phane_name(m) or linear_phane_name(mol(smiles))) == name
 
 
 @pytest.mark.parametrize("smiles", [

@@ -178,3 +178,23 @@ def test_a_book_cyclophane_with_one_polycyclic_amplificant_is_a_cyclophane(line,
 def test_a_chain_across_the_2_6_positions_of_naphthalene_is_a_cyclophane():
     # the same shape as:15039 on naphthalene joined at the nonadjacent positions 2 and 6 by a macrocycle of 12 atoms
     assert is_p52_cyclophane(mol("C1CCCc2ccc3cc(ccc3c2)CC1"))
+
+
+@pytest.mark.parametrize("smiles,mancude", [
+    ("C1C=Cc2ccccc12", True),                       # 1H-indene: the indicated hydrogen is the atom left over,:3557)
+    ("c1ccc2c(c1)Cc1ccccc12", True),                # 9H-fluorene
+    ("C1=COC=CC1", True),                           # 4H-pyran
+    ("c1ccc2c(c1)OCO2", True),                      # 2H-1,3-benzodioxole
+    ("c1ccc2CCCCc2c1", False),                      # tetralin: a hydro derivative has fewer double bonds than its parent
+    ("C1CCC2CCCCC2C1", False),                      # a saturated ring system
+    ("C1=CC2=C3N=Cc4cc5ccc6cc5cc4C(=CC3=C1C2)CCCCC6", False),   # bridged fused (:19904): listed apart from the mancude ones
+    ("C1=CC2(C=C1)C=CC=C2", False),                 # spiro
+])
+def test_a_ring_system_with_the_maximum_number_of_double_bonds_is_mancude(smiles, mancude):
+    from orthonym.validation.spelling.cyclophane import is_mancude_system
+    m = mol(smiles)
+    assert is_mancude_system(m, frozenset(range(m.GetNumAtoms()))) is mancude
+
+
+def test_a_macrocycle_across_fluorene_is_a_cyclophane():
+    assert is_p52_cyclophane(mol("C1CCCCCCCCCc2ccc3c(c2)Cc2cc1ccc2-3"))

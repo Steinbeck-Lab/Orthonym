@@ -7,9 +7,11 @@ bb_line	class	name	smiles
 21631	compound_prefix	1^3-chloro-2-(naphthalen-2-yl)-1(2)-naphthalena-3,5(1,4),7(1)-tribenzenaheptaphane	ClC=1C(=CC2=CC=CC=C2C1)C(C1=CC=C(C=C1)CC1=CC=C(C=C1)CC1=CC=CC=C1)C1=CC2=CC=CC=C2C=C1
 21717	compound_prefix	1^1-bromo-2-(4-chloronaphthalen-2-yl)-1(2)-naphthalena-3,5(1,4),7(1)-tribenzenaheptaphane	BrC1=C(C=CC2=CC=CC=C12)C(C1=CC=C(C=C1)CC1=CC=C(C=C1)CC1=CC=CC=C1)C1=CC2=CC=CC=C2C(=C1)Cl
 22255	compound_prefix	1^3-bromo-1^4-chloro-2-(3,4-dibromonaphthalen-2-yl)-1(2)-naphthalena-3,5(1,4),7(1)-tribenzenaheptaphane	BrC=1C(=CC2=CC=CC=C2C1Cl)C(C1=CC=C(C=C1)CC1=CC=C(C=C1)CC1=CC=CC=C1)C1=CC2=CC=CC=C2C(=C1Br)Br
--	stereo	(1^1R,1^2S)-1^2-methyl-1(1,4)-cyclohexana-4(1,4)-benzenacyclohexaphane	C[C@@H]1[C@@H]2CCC(C1)CCC1=CC=C(C=C1)CC2
+-	stereo	(4^1R,4^2S)-4^2-methyl-1(1,4)-benzena-4(1,4)-cyclohexanacyclohexaphane	C[C@@H]1[C@@H]2CCC(C1)CCC1=CC=C(C=C1)CC2
+50791	stereo	(2E,5^1R,5^2S,5^5R,8Z,11E,15^1R,15^2S,15^4S,17E)-4,6,10,14,16-pentaoxa-1,19(1),7,13(1,4)-tetrabenzena-5,15(1,2)-dicyclohexananonadecaphane-2,8,11,17-tetraene-5^5,15^4-dicarboxylic acid	C(=C\O[C@H]1[C@H](CC[C@H](C1)C(=O)O)OC1=CC=C(C=C1)\C=C/O\C=C\C1=CC=C(C=C1)O[C@H]1[C@H](C[C@H](CC1)C(=O)O)O\C=C\C1=CC=CC=C1)/C1=CC=CC=C1
 15181	indicated_hydrogen	1^4H-1(3,5)-pyrana-4(1,3)-benzenacyclohexaphane	C1CC2=CC(=CC=C2)CCC=2CC1=COC2
 20058	indicated_hydrogen	1^1H-1(2)-azepina-7(4)-pyridina-3,5(1,4)-dibenzenaheptaphane	C(C=1NC=CC=CC1)C1=CC=C(C=C1)CC1=CC=C(C=C1)CC1=CC=NC=C1
+15713	indicated_hydrogen	1^1H,2^1H,3^1H,4^1H,5^1H,6^1H,7^1H-1,7(2),2,3,4,5,6(2,5)-heptapyrrolaheptaphane	N1C(=CC=C1)C=1NC(=CC1)C=1NC(=CC1)C=1NC(=CC1)C=1NC(=CC1)C=1NC(=CC1)C=1NC=CC1
 21442	hydro	1^1,1^2-dihydro-1(2)-quinolina-3,5(1,4),7(1)-tribenzenaheptaphane	C(C1NC2=CC=CC=C2C=C1)C1=CC=C(C=C1)CC1=CC=C(C=C1)CC1=CC=CC=C1
 17067	hydro	1^1,1^4-dihydro-1,7(2,6)-dipyridinacyclododecaphane	C1CCCCC2=NC(=CC=C2)CCCCCC2=CCC=C1N2
 17063	hydro	1^1,1^2,1^3,1^4,1^4a,1^5,1^6,1^7,1^8,1^8a-decahydro-1(2,7)-naphthalena-5(1,4)-benzenacyclooctaphane	C1CCC2=CC=C(C=C2)CCCC2CCC3CCC1CC3C2
@@ -17,3 +19,4 @@ bb_line	class	name	smiles
 19659	skeleton	4,12(1,3)-dibenzenaspiro[7.7]pentadecaphane	C1CCC2=CC(=CC=C2)CCCC12CCCC1=CC(=CC=C1)CCC2
 -	skeleton	1,4(1,3,5)-dibenzenabicyclo[2.2.2]octaphane	C1CC2=CC3=CC(=C2)CCC=2C=C(C=C1C2)CC3
 -	skeleton	1,8(1,3,5)-dibenzenabicyclo[6.6.0]tetradecaphane	C1CCCCCC=2C=C3C=C(C2)CCCCCCC=2C=C3C=C1C2
+19325	phane_as_prefix	trimethyl[1^2H-1(6)-pyrana-3,5(1,4),7(1)-tribenzenaheptaphan-7^4-yl]silane	C[Si](C1=CC=C(C=C1)CC1=CC=C(C=C1)CC1=CC=C(C=C1)CC1=CC=CCO1)(C)C

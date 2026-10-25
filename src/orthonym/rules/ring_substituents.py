@@ -2254,8 +2254,13 @@ def _phthalimido_substituent_name(mol, frag_set: Set[int],
 
 def name_ring_system_substituent(mol, frag_atoms, attach_idx: int, *args, **kwargs) -> Optional[str]:
     """``_name_ring_system_substituent``, the name of a decorated ring assembly marked
-    (``rules.nested_assembly.mark_decorated_assembly``)."""
+    (``rules.nested_assembly.mark_decorated_assembly``). A fragment that holds a linear phane the PIN cites as a
+    substituent prefix is named as that phane group first, with an OPSIN that reads phane names."""
     from .nested_assembly import mark_decorated_assembly
+    from .phane_pin.prefix import phane_prefix
+    phane = phane_prefix(mol, frag_atoms, attach_idx)
+    if phane is not None:
+        return phane
     return mark_decorated_assembly(
         mol, frag_atoms, _name_ring_system_substituent(mol, frag_atoms, attach_idx, *args, **kwargs))
 

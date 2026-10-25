@@ -27,7 +27,7 @@ from orthonym.validation import pin_spelling
 from orthonym.validation.opsin_roundtrip import opsin_parse
 from orthonym.validation.pin_spelling import check_pin_spelling
 from tests.support.rt_assert import assert_full_rt
-from tests.support.opsin_marks import release_opsin_only
+from tests.support.opsin_marks import needs_phane_opsin, release_opsin_only
 
 #: the labels are the production ones only with the OPSIN validity gate on (tests/conftest.py)
 pytestmark = pytest.mark.opsin_gate
@@ -225,6 +225,7 @@ def test_names_the_check_does_not_lower_keep_pin_verified(smiles, name):
     assert not row.get("spelling_failures"), row
 
 
+@release_opsin_only
 @pytest.mark.parametrize("smiles,name", PREFIX_LOWERED, ids=PREFIX_LOWERED_IDS)
 def test_the_default_tier_declines_a_name_whose_pin_may_cite_a_phane_prefix(smiles, name):
     row = _row(smiles, "pin")
@@ -232,6 +233,7 @@ def test_the_default_tier_declines_a_name_whose_pin_may_cite_a_phane_prefix(smil
     assert RULE in _row_rules(row), row
 
 
+@release_opsin_only
 @pytest.mark.parametrize("smiles,name", PREFIX_LOWERED, ids=PREFIX_LOWERED_IDS)
 def test_best_effort_keeps_the_name_whose_pin_may_cite_a_phane_prefix(smiles, name):
     # the label is lowered, never the name: best-effort keeps it as a verified non-PIN, and a
@@ -271,3 +273,42 @@ def test_opsin_reads_the_books_substitutive_name_of_the_same_compound():
     assert smiles is not None
     assert Chem.MolToInchiKey(Chem.MolFromSmiles(smiles)) == \
         Chem.MolToInchiKey(Chem.MolFromSmiles(BOOK_23959))
+
+
+# ------------------------------------------------------------------: two identical parents, the phane as the central group
+#: propanoic acid twice, on the two terminal rings of a phane of four rings: the PIN is the multiplicative name
+TWO_ACIDS = "OC(=O)CCc1ccc(Cc2ccc(Cc3ccc(Cc4ccc(CCC(O)=O)cc4)cc3)cc2)cc1"
+TWO_AMINES = "NCCc1ccc(Cc2ccc(Cc3ccc(Cc4ccc(CCN)cc4)cc3)cc2)cc1"
+ONE_ACID = "OC(=O)CCc1ccc(Cc2ccc(Cc3ccc(Cc4ccccc4)cc3)cc2)cc1"
+ACID_AND_AMINE = "OC(=O)CCc1ccc(Cc2ccc(Cc3ccc(Cc4ccc(CCN)cc4)cc3)cc2)cc1"
+MULTIPLICATIVE = [
+    (TWO_ACIDS, "3,3'-[1,7(1),3,5(1,4)-tetrabenzenaheptaphane-1^4,7^4-diyl]dipropanoic acid",
+     "3-[7^4-(2-carboxyethyl)-1,7(1),3,5(1,4)-tetrabenzenaheptaphan-1^4-yl]propanoic acid"),
+    (TWO_AMINES, "2,2'-[1,7(1),3,5(1,4)-tetrabenzenaheptaphane-1^4,7^4-diyl]di(ethan-1-amine)",
+     "2-[7^4-(2-aminoethyl)-1,7(1),3,5(1,4)-tetrabenzenaheptaphan-1^4-yl]ethan-1-amine"),
+]
+
+
+@pytest.mark.parametrize("smiles,multiplicative,prefixed", MULTIPLICATIVE, ids=["acids", "amines"])
+def test_two_identical_parents_make_the_multiplicative_name_the_pin(smiles, multiplicative, prefixed):
+    # (:23178): conditions (1) to (3) hold (single linking bonds, the same locants on both parents); the name that
+    # cites the phane in a prefix of one parent is substitutive nomenclature and is not the PIN
+    from orthonym.validation.spelling.linear_phane import linear_phane_pin_expected
+    verdict = linear_phane_pin_expected(Chem.MolFromSmiles(smiles))
+    assert verdict.as_prefix and verdict.criterion == "P-51.3.1"
+    assert _rules(smiles, multiplicative) == []
+    assert _rules(smiles, prefixed) == [RULE]
+
+
+@needs_phane_opsin
+@pytest.mark.parametrize("smiles,multiplicative,prefixed", MULTIPLICATIVE, ids=["acids", "amines"])
+def test_the_multiplicative_names_read_back(smiles, multiplicative, prefixed):
+    with jvm_slots(1, purpose="pn-multiplicative"):
+        assert_full_rt(multiplicative, smiles)
+
+
+@pytest.mark.parametrize("smiles", [ONE_ACID, ACID_AND_AMINE], ids=["one_parent", "two_different_parents"])
+def test_one_parent_or_two_different_parents_keep_the_phane_prefix(smiles):
+    from orthonym.validation.spelling.linear_phane import linear_phane_pin_expected
+    verdict = linear_phane_pin_expected(Chem.MolFromSmiles(smiles))
+    assert verdict.as_prefix and verdict.criterion == "P-44.1.1"

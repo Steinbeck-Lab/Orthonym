@@ -18,6 +18,7 @@ def _ring_atoms(m):
     ("Cc1cnoc1", "1,2-oxazole", "[1,2]oxazola", 1),      # (:14794): brackets round heteroatom locants
     ("Cc1ccc2ccccc2c1", "naphthalene", "naphthalena", 4),
     ("Cc1cnccn1", "pyrazine", "pyrazina", 4),
+    ("Cc1cc[nH]c1", "pyrrole", "pyrrola", 2),            # (:15173): the indicated hydrogen is cited apart
 ])
 def test_amplificant_hydride(smiles, name, prefix, n_numberings):
     # the number of numberings is the order of the automorphism group of the hydride (RDKit, VERIFIED 2026-10-13)
@@ -27,8 +28,7 @@ def test_amplificant_hydride(smiles, name, prefix, n_numberings):
 
 
 @pytest.mark.parametrize("smiles", [
-    "Cc1cc[nH]c1",            # indicated hydrogen: 1H-pyrrole:15173), PN4c
-    "CC1=CCCCC1",             # a partial hydro ring
+    "CC1=CCCCC1",             # a cycloalkene: the engine names it with an 'ene' ending, not as a hydro derivative of benzene
     "O=C1CCCCC1",             # an exocyclic double bond on the ring
     "C1=CC2=CC=CC3=C2C(=C1)C=C3",   # peri-fused: no cata-fused numbering
 ])

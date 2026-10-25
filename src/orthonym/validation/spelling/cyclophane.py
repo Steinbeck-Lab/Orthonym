@@ -21,8 +21,9 @@ one node, every other atom is one node. A cyclophane has a cycle in that node gr
 cycle a mancude system is entered and left at two atoms that are not bonded to each other.
 Mancude "Indicated hydrogen",:3557: "a mancude ring or ring system, i.e., one that
 contains the maximum number of noncumulative double bonds") is read on the system alone: its
-hydride (every bond to an outside atom replaced by hydrogen) has every atom aromatic, or is a
-monocycle of up to eight atoms with the maximum number of noncumulative double bonds. RDKit leaves
+hydride (every bond to an outside atom replaced by hydrogen) has every atom aromatic, or has the
+maximum number of noncumulative double bonds that its ring bonds allow (the indicated hydrogen of
+1H-indene or 9H-fluorene is the atom left over). RDKit leaves
 the furans of a conjugated macrocycle non-aromatic; the isolated ring is read instead. The
 porphyrin core is a retained parent (:51723 "porphyrin (fundamental parent structure)"), and the
 tetrapyrrole macrocycles of its class (the reduced ones, the corrole, and those with nitrogen at the
@@ -35,10 +36,10 @@ where the book prints a phane PIN for it: its macrocycle has at least ten atoms 
 the book's cyclophane PIN rows is the ten-atom ring of the [2.2]metacyclophane name,:15021). Every other
 structure is unjudged, so a check built on the test abstains on it: a macrocycle of nine atoms or fewer
 ([5]metacyclophane, [6]metacyclophane, [1.1]metacyclophane, which the rings of up to eight atoms swallow or
-which fall under the minimum), a mancude system that needs indicated hydrogen (1H-indene, 9H-fluorene) or is
-partly hydrogenated (a tetralin), a ring system that RDKit cannot read as a hydride, and the tetrapyrrole
-class. A structure of these kinds keeps whatever name and label the engine gives it. A macrocycle of ten atoms
-or more closed across one polycyclic system by a chain is judged like any other: (:15033) prints
+which fall under the minimum), a macrocycle whose only candidate ring system is partly hydrogenated (a tetralin: a hydro
+derivative is no mancude system), a ring system that RDKit cannot read as a hydride, and the tetrapyrrole class. A
+structure of these kinds keeps whatever name and label the engine gives it. A macrocycle of ten atoms or more closed
+across one polycyclic system by a chain is judged like any other: (:15033) prints
 '1(3,10)-fluoranthenacyclononaphane (I) (PIN)' (:15039), a phane PIN with one polycyclic amplificant and no other ring.
 """
 from __future__ import annotations
@@ -163,8 +164,33 @@ def _max_ring_double_bonds(mol: Chem.Mol, ring: Sequence[int]) -> int:
     return best
 
 
+def maximum_matching_size(graph: Dict[int, List[int]], atoms: List[int]) -> int:
+    """The largest number of bonds of ``graph`` (atom -> neighbours) that no two share an atom, among the ``atoms``: the
+    maximum number of noncumulative double bonds of a ring system,:3557)."""
+    best = 0
+
+    def grow(todo: List[int], used: Set[int], size: int) -> None:
+        nonlocal best
+        best = max(best, size)
+        if not todo or size + len(todo) // 2 <= best:
+            return
+        a, rest = todo[0], todo[1:]
+        for b in graph[a]:
+            if b in rest and b not in used:
+                grow([x for x in rest if x != b], used | {a, b}, size + 1)
+        grow(rest, used, size)
+    grow(sorted(atoms), set(), 0)
+    return best
+
+
+#: the ring systems of up to this many atoms are read for their maximum number of double bonds
+_MAX_MANCUDE_ATOMS = 30
+
+
 def is_mancude_system(mol: Chem.Mol, atoms: FrozenSet[int]) -> bool:
-    """ (1) 'a mancude system': the ring system ``atoms`` on its own, as its hydride."""
+    """ (1) 'a mancude system': the ring system ``atoms`` on its own, as its hydride, with the maximum number
+    of noncumulative double bonds,:3557); a ring system that needs indicated hydrogen (1H-indene, 9H-fluorene)
+    has it, a partly hydrogenated one (tetralin) does not."""
     got = ring_system_hydride(mol, atoms)
     if got is None:
         return False
@@ -172,10 +198,27 @@ def is_mancude_system(mol: Chem.Mol, atoms: FrozenSet[int]) -> bool:
     if all(a.GetIsAromatic() for a in hydride.GetAtoms()):
         return True
     rings = hydride.GetRingInfo().AtomRings()
-    if len(rings) != 1 or len(rings[0]) > _SMALL_RING or len(rings[0]) != hydride.GetNumAtoms():
+    if len(rings) == 1 and len(rings[0]) <= _SMALL_RING and len(rings[0]) == hydride.GetNumAtoms():
+        doubles = sum(1 for b in hydride.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE)
+        return doubles == _max_ring_double_bonds(hydride, list(rings[0]))
+    if not 5 <= hydride.GetNumAtoms() <= _MAX_MANCUDE_ATOMS:
         return False
-    doubles = sum(1 for b in hydride.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE)
-    return doubles == _max_ring_double_bonds(hydride, list(rings[0]))
+    # a fused ring system only: two rings share a bond or nothing (a bridged system, the book lists apart from the mancude
+    # ones,:14902, shares more atoms; a spiro system shares one)
+    atom_rings = [set(r) for r in rings]
+    if any(len(a & b) not in (0, 2) for i, a in enumerate(atom_rings) for b in atom_rings[i + 1:]):
+        return False
+    kekule = Chem.Mol(hydride)
+    try:
+        Chem.Kekulize(kekule, clearAromaticFlags=True)
+    except Exception:  # noqa: BLE001 -- RDKit raises several types for a molecule it cannot kekulize
+        return False
+    matchable = [a.GetIdx() for a in kekule.GetAtoms()
+                 if not (a.GetSymbol() in _DIVALENT and a.GetTotalValence() == 2)]
+    graph = {a: [n.GetIdx() for n in kekule.GetAtomWithIdx(a).GetNeighbors() if n.GetIdx() in matchable]
+             for a in matchable}
+    doubled = sum(1 for b in kekule.GetBonds() if b.GetBondType() == Chem.BondType.DOUBLE)
+    return bool(doubled) and doubled == maximum_matching_size(graph, matchable)
 
 
 def small_ring_systems(mol: Chem.Mol) -> List[FrozenSet[int]]:
@@ -269,6 +312,43 @@ def _tetrapyrrole_atoms(mol: Chem.Mol) -> Set[int]:
         for match in mol.GetSubstructMatches(pattern):
             core.update(match)
     return core
+
+
+#: "Specification of double bonds" (:49684): "When more than seven nodes are present, all descriptors must be
+#: cited"; (:49237) says the same of a spiro system with a ring of eight members or more: the double bonds of its
+#: small rings are cited as well ('(2Z,6Z)-spiro[4.7]dodeca-2,6-diene (PIN)')
+_MIN_NODES_ALL_DESCRIPTORS = 8
+
+
+def large_cyclophane_ring_double_bonds(mol: Optional[Chem.Mol]) -> List[Tuple[int, int]]:
+    """The double bonds inside a ring system of the skeleton of a cyclophane of more than seven nodes that are not aromatic in
+    the isolated ring system, as atom index pairs (a hydro derivative or an indicated hydrogen ring: the double bond of
+    ``1^2Z`` in ``(1^2Z,2E)-1^1,1^4,1^5,1^6-tetrahydro-1(2,6)-pyridina-7(1,3)-benzenacyclododecaphan-2-ene (PIN)``,:49696).
+    The PIN cites a descriptor for each; a double bond of a mancude ring that is aromatic (benzene, furan, pyrrole) is cited by
+    no name. The isolated ring system is read, not the molecule: RDKit leaves the furans of a conjugated macrocycle without
+    aromaticity. Empty when ``mol`` is no cyclophane in the sense of (1) (:mod:`.cyclophane` judges it); a ring system
+    that is no hydride RDKit can read is not decided."""
+    if not p52_cyclophane_systems(mol):
+        return []
+    systems = small_ring_systems(mol)
+    n_sys, edges = _skeleton_graph(mol, systems)
+    nodes_of: Dict[int, Set[int]] = {}
+    for i, block in _cycle_blocks(n_sys + mol.GetNumAtoms(), [(u, v) for u, v, _, _ in edges]).items():
+        nodes_of.setdefault(block, set()).update(edges[i][:2])
+    large = set()
+    for nodes in nodes_of.values():
+        if len(nodes) >= _MIN_NODES_ALL_DESCRIPTORS:
+            large.update(k for k in nodes if k < n_sys)
+    found = []
+    for k in sorted(large):
+        got = ring_system_hydride(mol, systems[k])
+        if got is None:
+            continue
+        hydride, index = got
+        atom_of = {i: atom for atom, i in index.items()}
+        found.extend((atom_of[b.GetBeginAtomIdx()], atom_of[b.GetEndAtomIdx()]) for b in hydride.GetBonds()
+                     if b.GetBondType() == Chem.BondType.DOUBLE and not b.GetIsAromatic() and b.IsInRing())
+    return found
 
 
 _PHANE_NAME = re.compile(r"(?<!phos)phan(?:e|-)")

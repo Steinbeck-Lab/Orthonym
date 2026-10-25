@@ -116,7 +116,9 @@ class LinearPhaneVerdict:
     ``as_prefix``: another parent cites more of them than the phane, or a parent with a
     senior atom outranks it, ``criterion``), and the chain (``ring_systems``, ``nodes``)
     stays whole outside that parent, so the PIN may cite it as a linear phane substituent prefix
-    (:19325;,:16148)."""
+    (:19325;,:16148). ``criterion`` is '' when the two other parents are identical and hold every
+    principal group: the PIN is then a multiplicative name that cites the phane as its central group
+    ('3,3'-[...phane-1^4,7^4-diyl]dipropanoic acid'), not a name with the phane in a prefix."""
 
     ring_systems: int
     nodes: int
@@ -674,6 +676,50 @@ def _cited_by_senior_parent(mol: Chem.Mol, principal: Sequence[_Occurrence], sen
     return sum(any(n.GetIdx() in senior for n in mol.GetAtomWithIdx(o[3]).GetNeighbors()) for o in principal)
 
 
+def _unit_key(mol: Chem.Mol, unit: Set[int], link: Tuple[int, int]) -> str:
+    """The unit as a canonical SMILES with a dummy atom where it is attached to the phane."""
+    rw = Chem.RWMol(mol)
+    dummy = rw.AddAtom(Chem.Atom(0))
+    rw.AddBond(link[0], dummy, Chem.BondType.SINGLE)
+    for index in sorted((a.GetIdx() for a in rw.GetAtoms() if a.GetIdx() not in unit and a.GetIdx() != dummy), reverse=True):
+        rw.RemoveAtom(index)
+    return Chem.MolToSmiles(rw.GetMol())
+
+
+def _multiplicative(mol: Chem.Mol, skeleton: Set[int], principal: Sequence[_Occurrence]) -> bool:
+    """ (:23178) "Multiplicative nomenclature is preferred to substitutive nomenclature for generating preferred
+    IUPAC names to express multiple occurrences of identical parent structures... when (1) the linking bonds between the
+    central substituent group of the multiplicative group and all subsequent structural units are identical...; and (3) the
+    locants of all substituent groups on the identical parent structures, including suffix groups, are identical": the
+    structure outside the phane ``skeleton`` is two units, each attached by one single bond, identical (the same SMILES
+    with the attachment marked) and holding every one of the ``principal`` groups. Two units: with more identical parents
+    the book sends the choice to phane nomenclature,:23242), which is not decided here."""
+    centres = {o[3] for o in principal}
+    units: List[Set[int]] = []
+    seen: Set[int] = set(skeleton)
+    for start in range(mol.GetNumAtoms()):
+        if start in seen:
+            continue
+        unit, stack = {start}, [start]
+        while stack:
+            for n in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+                if n.GetIdx() not in seen and n.GetIdx() not in unit:
+                    unit.add(n.GetIdx())
+                    stack.append(n.GetIdx())
+        seen |= unit
+        if unit & centres:
+            units.append(unit)
+    if len(units) != 2 or sum(len(u & centres) for u in units) != len(centres):
+        return False
+    keys = []
+    for unit in units:
+        links = [(a, n.GetIdx()) for a in unit for n in mol.GetAtomWithIdx(a).GetNeighbors() if n.GetIdx() in skeleton]
+        if len(links) != 1 or mol.GetBondBetweenAtoms(*links[0]).GetBondType() != Chem.BondType.SINGLE:
+            return False
+        keys.append(_unit_key(mol, unit, links[0]))
+    return keys[0] == keys[1]
+
+
 def _component_result(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_RingSystem],
                       chains: Sequence[Tuple[Node, ...]], occurrences: Sequence[_Occurrence]
                       ) -> Optional[Tuple[LinearPhaneVerdict, List[Tuple[Node, ...]]]]:
@@ -721,7 +767,9 @@ def _component_result(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_R
              if parent.isdisjoint(_node_atoms(c, systems))]
     if not whole:
         return None
-    return (LinearPhaneVerdict(*max(whole), principal[0][1], expressed, len(principal), as_prefix=True), [])
+    criterion = "P-51.3.1" if any(_multiplicative(mol, _node_atoms(c, systems), principal) for c in chains) else "P-44.1.1"
+    return (LinearPhaneVerdict(*max(whole), principal[0][1], expressed, len(principal), as_prefix=True,
+                               criterion=criterion), [])
 
 
 def _component_verdict(mol: Chem.Mol, atoms: FrozenSet[int], systems: Sequence[_RingSystem],
@@ -801,6 +849,30 @@ def linear_phane_chain(mol: Chem.Mol) -> Optional[Tuple[Node, ...]]:
     """One of:func:`linear_phane_chains` (the first by node ids), or None."""
     chains = linear_phane_chains(mol)
     return min(chains) if chains else None
+
+
+def linear_phane_candidate_chains(mol: Chem.Mol) -> List[Tuple[Node, ...]]:
+    """The chains of the longest kind that meet (2) in ``mol`` (most ring systems, then most nodes), whichever
+    parent the PIN has: the chains a substituent group derived from a linear phane is built on,:16148).
+    Empty when the structure has none."""
+    if mol is None:
+        return []
+    try:
+        n_rings = mol.GetRingInfo().NumRings()
+    except RuntimeError:
+        Chem.FastFindRings(mol)
+        n_rings = mol.GetRingInfo().NumRings()
+    if n_rings < 4:
+        return []
+    systems = _ring_systems(mol)
+    if len(systems) < 4:
+        return []
+    chains = _chains(mol, systems)
+    if not chains:
+        return []
+    sizes = [(sum(p[0] == "R" for p in c), len(c)) for c in chains]
+    best = max(sizes)
+    return [c for c, z in zip(chains, sizes) if z == best]
 
 
 def ring_system_atoms(mol: Chem.Mol, k: int) -> FrozenSet[int]:
