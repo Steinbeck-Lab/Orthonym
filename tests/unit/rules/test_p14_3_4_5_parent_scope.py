@@ -385,12 +385,19 @@ class TestOtherCitedLocantsRestoreEverything:
         assert namer.name(smiles) == expected
 
     def test_an_unsaturation_locant_in_the_parent_keeps(self, namer):
-        """RECORDED BOUNDARY, taken on the deny-by-default side. Ethene's own name
-        cites no locant (``(d)`` omits it for unsubstituted dinuclear
-        alkenes), so the elided ``tetrafluoroethene`` is arguably licensed -- but the
-        Blue Book prints no example either way, and the parent fragment DOES carry an
-        unsaturation locant, so is applied."""
-        assert namer.name("FC(F)=C(F)F") == "1,1,2,2-tetrafluoroethene"
+        """A parent whose name cites an unsaturation locant keeps every substitution locant
+        , ``:2869``): ``prop-2-enoic acid`` with fluorine on it is not completely
+        substituted by one kind of prefix, so the locants stay."""
+        assert namer.name("FC(F)=C(F)C(=O)O") == "2,3,3-trifluoroprop-2-enoic acid"
+
+    def test_the_two_carbon_chain_cites_no_unsaturation_locant_so_it_forces_none(self, namer):
+        """RECORDED BOUNDARY, moved by the two-carbon chain rule. Ethene's own name cites no locant
+         (d), ``:2921``), so nothing in the parent forces the substitution locants, and
+         (``:3007``, "All locants are omitted... completely substituted... in the same
+        way") applies as it does to ``dichloroethyne``: ``tetrafluoroethene``. A partly substituted
+        chain keeps them, ``1,1-dichloroethene`` (1,2- is an isomer, ``:2953``)."""
+        assert namer.name("FC(F)=C(F)F") == "tetrafluoroethene"
+        assert namer.name("ClC(Cl)=C") == "1,1-dichloroethene"
 
     def test_a_stereodescriptor_in_the_scope_denies(self):
         stub = _acid_stub()

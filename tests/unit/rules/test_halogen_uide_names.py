@@ -117,7 +117,7 @@ ONIUM_ROWS = [
     ("c1ccccc1[I+]c1ccccc1", "diphenyliodanium"),
     ("C[Cl+]C(C)=O", "acetyl(methyl)chloranium"),
     # best-effort kept the name of these and lowered its label (pin_verified at the default tier): the general
-    # engine named the cation capped with a stand-in -OH, '(2-hydroxyeth-1-yn-1-yl)(phenyl)iodanium', and its
+    # engine named the cation capped with a stand-in -OH, '(hydroxyethynyl)(phenyl)iodanium', and its
     # string won; the stand-in is no ligand of the cation
     ("CC1=CC=C(C=C1)C#C[I+]C2=CC=CC=C2", "[2-(4-methylphenyl)ethynyl](phenyl)iodanium"),
     ("C1=CC=C(C=C1)[I+]C#CC2=CSC=C2", "phenyl[2-(thiophen-3-yl)ethynyl]iodanium"),
@@ -256,8 +256,7 @@ def _breadth_contexts():
 
 def test_a_stand_in_cap_is_no_ligand_of_an_ion_centre():
     """The capped-fragment probe (``substituent_enumerator._route_fragment_to_general_engine``) caps a free
-    valence with -OH and names the capped molecule with the contexts of a best-effort call (the default tier
-    has no name for the enol ligand -C#C-OH). Under the probe a chain ligand with an atom that is no carbon
+    valence with -OH and names the capped molecule with the contexts of a best-effort call. Under the probe a chain ligand with an atom that is no carbon
     declines (the ion outranks the cap,, the Blue Book, so the capped name cannot become
     a prefix: the string the general engine built from it won at best-effort, at a lower label); a ring
     ligand and a real molecule keep their names."""
@@ -268,9 +267,12 @@ def test_a_stand_in_cap_is_no_ligand_of_an_ion_centre():
     def named(mol):
         return emit_halogen_onium(mol, next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == "I"))
 
-    assert named(capped) == ""                                  # the default tier has no name for the enol
+    # (the Blue Book): the hydroxy group can only be on C2 of an ethynyl ligand, so the
+    # group cites no locant ('chlorodiazenyl (preferred prefix)',:2987); the default tier names the
+    # ligand ('(2-hydroxyethyn-1-yl)' was not a spelling it could ship before, and abstained here)
+    assert named(capped) == "(hydroxyethynyl)(phenyl)iodanium"
     with _breadth_contexts():
-        assert named(capped) == "(2-hydroxyeth-1-yn-1-yl)(phenyl)iodanium"
+        assert named(capped) == "(hydroxyethynyl)(phenyl)iodanium"
         token = capped_probe_ctx.set(True)
         try:
             assert named(capped) == ""

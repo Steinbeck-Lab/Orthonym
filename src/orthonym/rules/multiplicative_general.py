@@ -840,13 +840,16 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
             locs = outward + inward
         else:
             locs = sorted(num[a] for a, c in fv.items() for _ in range(c))
+        from ..assembly.composition_primitives import bond_locant_omitted_on_dinuclear_chain
         stem = get_chain_prefix(n)
         dbl = sorted(min(num[order[i]], num[order[j]]) for i, j, o in unsat if o == 2.0)
         tpl = sorted(min(num[order[i]], num[order[j]]) for i, j, o in unsat if o == 3.0)
         if not unsat:
             hyd = f"{stem}ane"
-        elif n == 2:
-            hyd = "ethene" if dbl else "ethyne"
+        elif bond_locant_omitted_on_dinuclear_chain(stem, dbl, tpl):
+            # (d) (the Blue Book): 'ethene-1,2-diyl' (:16615), the one multiple
+            # bond of a two-carbon chain takes no locant; the shared primitive decides it.
+            hyd = stem + ("ene" if dbl else "yne")
         elif dbl:
             hyd = f"{stem}-{dbl[0]}-ene"
         else:

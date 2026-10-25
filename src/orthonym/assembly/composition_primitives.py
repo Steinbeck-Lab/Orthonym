@@ -88,15 +88,55 @@ def _estimate_parent_size_from_name(parent_name: str) -> int:
     return 100
 
 
+#: The carbon stem of a two-atom homogeneous chain (ethane, ethene, ethyne). A stem that
+#: carries a replacement prefix ('2-oxaeth') is a different parent and never equals it.
+_DINUCLEAR_CARBON_STEM = "eth"
+
+
+def dinuclear_chain_length(stem: str) -> int:
+    """2 when ``stem`` is the bare two-carbon stem, else 0 (no claim about any other chain).
+
+    The one place that says which stem is a dinuclear homogeneous chain, so the hydrocarbon
+    writer (:func:`_build_hydrocarbon_name`), the suffix-name writer
+    (:func:`_build_unsaturation_infix`) and the general engine's stem writer
+    (``general_engine._stem_block``) agree on it."""
+    return 2 if stem == _DINUCLEAR_CARBON_STEM else 0
+
+
+def bond_locant_omitted_on_dinuclear_chain(
+    stem: str, double_locants: List[int], triple_locants: List[int],
+) -> bool:
+    """ (d) (the Blue Book, heading " The locant '1' is omitted:"):
+    "in unsubstituted dinuclear and trinuclear alkenes and alkynes" -- 'CH2=CH2 ethene (PIN)'
+    (:2925). The one multiple bond of a two-carbon chain is between C1 and C2, whatever else
+    the chain carries, so the book writes it without a locant on a substituted chain too:
+    '2-chloroethen-1-yl (preferred prefix)' (:3003,, '(1Z)-1,2-dibromo-1-chloro-2-
+    iodoethene (PIN)' (:46763), '2-bromoethen-1-ylidene' (:45805), 'ethene-1,2-diyl'
+    (:16615), 'ethenone (PIN)' (:28314). The book prints no 'eth-1-en'. True for a stem 'eth'
+    with exactly one multiple bond; the decision itself stays in
+    :func:`naming_utils.should_omit_locant_one` (its 'bond' rule for two-atom chains)."""
+    return (
+        dinuclear_chain_length(stem) == 2
+        and len(double_locants) + len(triple_locants) == 1
+        and should_omit_locant_one(context="bond", chain_length=2)
+    )
+
+
 def _build_unsaturation_infix(
     double_locants: List[int],
-    triple_locants: List[int]
+    triple_locants: List[int],
+    stem: str = "",
 ) -> str:
     """
     Build the unsaturation infix (e.g., 'an', '-1-en', '-1-en-4-yn').
 
     This is used when there's a functional group suffix. The unsaturation
     part is inserted between the stem and the suffix locants.
+
+    ``stem`` is the chain stem the infix will follow. Given, it lets the infix of a
+    two-carbon chain drop the locant of its one multiple bond (d),
+    :func:`bond_locant_omitted_on_dinuclear_chain`): 'en', 'yn' for 'eth'. Left out, the
+    infix is written for a chain of unknown length and always cites its locants.
 
     The infix is assembled structurally so that hyphens are inserted only
     where needed -- no post-hoc band-aid cleanup required.
@@ -124,12 +164,21 @@ def _build_unsaturation_infix(
         'a-1,3-diyn'
         >>> _build_unsaturation_infix([1, 3], [5])
         'a-1,3-dien-5-yn'
+        >>> _build_unsaturation_infix([1], , "eth")
+        'en'
+        >>> _build_unsaturation_infix(, [1], "eth")
+        'yn'
+        >>> _build_unsaturation_infix([1], , "prop")
+        '-1-en'
     """
     num_double = len(double_locants)
     num_triple = len(triple_locants)
 
     if num_double == 0 and num_triple == 0:
         return "an"  # Saturated
+
+    if bond_locant_omitted_on_dinuclear_chain(stem, double_locants, triple_locants):
+        return "en" if num_double else "yn"
 
     # Determine if the 'a' euphonic connector is needed (IUPAC:
     # used when total unsaturation locants >= 2 (diene, diyne, enyne etc.)
@@ -254,7 +303,7 @@ def _build_hydrocarbon_name(
     # certifies the parent is unsubstituted via chain_bond_locant_omittable —
     # a substituent makes the position distinctive (3-chloroprop-1-ene). A
     # single terminal multiple bond is implied (a 3-chain 2-ene cannot exist).
-    if stem == "eth":
+    if dinuclear_chain_length(stem) == 2:
         _chain_len = 2
     elif (
         stem == "prop"
@@ -927,6 +976,8 @@ __all__ = [
     "identical_prefixes_cited_apart",
     "_estimate_parent_size_from_name",
     "_build_unsaturation_infix",
+    "dinuclear_chain_length",
+    "bond_locant_omitted_on_dinuclear_chain",
     "_build_hydrocarbon_name",
     "multiple_bond_endings_spellable",
     "_join_prefixes",

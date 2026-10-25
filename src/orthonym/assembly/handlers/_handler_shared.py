@@ -82,11 +82,16 @@ from .prefix_claims import reconcile_prefix_claims
 from ...rules.locants import get_bond_locants, get_functional_group_locants
 from ...rules.n_substituted_acids import n_italic_locant_cited, suffix_group, suffix_group_atoms
 from ...rules.seniority import get_prefix, get_suffix
-from ..composition_primitives import RETAINED_C2_PARENT_BY_SUFFIX, retained_amide_word
+from ..composition_primitives import (
+    RETAINED_C2_PARENT_BY_SUFFIX,
+    bond_locant_omitted_on_dinuclear_chain,
+    retained_amide_word,
+)
 from ..naming_utils import (
     BRANCH_HANDLED_FGS,
     SIMPLE_MULTIPLIERS,
     alpha_sort_key,
+    chain_has_multiple_bond,
     cip_descriptor_rank_key,
     enclose_if_compound,
     format_suffix_with_locants,
@@ -1043,6 +1048,7 @@ def _generate_suffix(features: Any) -> Optional["NameFragment"]:
             fg_type=fg_name,
             chain_length=_suffix_chain_len,
             is_monosubstituted=(fg_count == 1 and _other_subs == 0),
+            unsaturated_chain=chain_has_multiple_bond(features.mol, features.principal_chain),
         ):
             locants = ()
         else:
@@ -2251,6 +2257,11 @@ def _l4_locants_omitted(features: Any, fragments: List["NameFragment"]) -> bool:
     # prop-2-enoic-acid exception). Deny here rather than relocate a bond, mirroring
     # `_l3`'s parent-unsaturation guard (:1655).
     for pf in parents:
+        # the one multiple bond of a two-carbon chain is cited without a locant (d),
+        # ``bond_locant_omitted_on_dinuclear_chain``), so it forces nothing: 'dichloroethyne'
+        _bonds = [list(b) if b else [] for b in (list(pf.locants or ()) + [(), ()])[:2]]
+        if bond_locant_omitted_on_dinuclear_chain(pf.text or "", _bonds[0], _bonds[1]):
+            continue
         for bond_locants in (pf.locants or ()):
             if bond_locants:
                 return False
@@ -3237,7 +3248,7 @@ def _assemble_fragments(
         multiplier = get_suffix_multiplier_prefix(count, suffix_text) if count > 1 else ""
 
         # Build unsaturation infix with locants for compounds with functional groups
-        unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)
+        unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants, stem)
 
         _retained = retained_amide_word(stem, suffix_text, count, bool(double_locants or triple_locants), prefix_texts)
         if _retained:

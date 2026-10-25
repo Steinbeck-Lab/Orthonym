@@ -4541,16 +4541,21 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     _base, _hydride = _stem
     if _hydride == _base + "ane":
         core_tail = get_alkyl_name(len(chain))  # 'pentyl' (fv=1, elided)
-    elif _hydride == "eth-1-ene":
-        # (d) (the Blue Book): the one double bond of a two-carbon
-        # chain takes no locant, '2-chloroethen-1-yl (preferred prefix)' (:3003).
-        core_tail = "ethen-1-yl"
     elif _hydride.endswith("e"):
-        core_tail = _hydride[:-1] + "-1-yl"      # 'pent-2-ene' -> 'pent-2-en-1-yl'
+        # 'pent-2-ene' -> 'pent-2-en-1-yl'; 'ethene' -> 'ethen-1-yl' (the two-carbon chain's
+        # one multiple bond takes no locant, (d) the Blue Book, as
+        # '2-chloroethen-1-yl (preferred prefix)':3003; ``_stem_block`` spells it).
+        core_tail = _hydride[:-1] + "-1-yl"
     else:
         return None
     if not core_tail:
         return None
+    # (the Blue Book): a two-carbon group whose decorations cannot be moved to make
+    # an isomer cites no locant -- 'ethenyl', 'oxoethenyl (preferred prefix)' (:2983), 'chloroethynyl';
+    # '2-chloroethen-1-yl' (:3003) keeps them ('1-chloroethen-1-yl' is an isomer).
+    from .locant_omission import two_carbon_chain_locants_omitted
+    _dinuclear_omit = _hydride in ("ethene", "ethyne") and two_carbon_chain_locants_omitted(mol, chain)
+    core_tail = _hydride[:-1] + "yl" if _dinuclear_omit else core_tail
     if not decorations:
         return core_tail
 
@@ -4586,10 +4591,15 @@ def _recursive_chain_fragment_substituent_name(mol, frag_atoms, attach_idx,
     for dname, locs in groups.items():
         locs = sorted(locs)
         token = enclose_if_compound(dname)
-        text = f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
+        text = _mc(len(locs), dname, token) if _dinuclear_omit else \
+            f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
         parts.append((alpha_sort_key(dname), text))
     parts.sort(key=lambda x: x[0])
-    body = '-'.join(p[1] for p in parts)
+    if _dinuclear_omit and len(parts) >= 2:
+        from .composition_primitives import apply_mononuclear_enclosing
+        body = ''.join(apply_mononuclear_enclosing([p[1] for p in parts], is_mononuclear=True))
+    else:
+        body = ('' if _dinuclear_omit else '-').join(p[1] for p in parts)
     # elide before a letter-initial stem ('...5-oxopentyl'); keep the hyphen only
     # before a digit-initial tail (mirrors the ring composer's separator rule).
     sep = '-' if core_tail[0].isdigit() else ''

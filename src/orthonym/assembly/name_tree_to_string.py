@@ -289,7 +289,7 @@ def _assemble_explicit_fields(node: NameTreeNode, style: str) -> str:
                 count = len(suffix_locants)
                 multiplier = get_suffix_multiplier_prefix(count, suffix_text) if count > 1 else ""
             # gap #6: unsaturation infix (en/yn + euphonic-a) feeds the grammar.
-            unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants)
+            unsaturation_infix = _build_unsaturation_infix(double_locants, triple_locants, stem)
             # gap #5: full suffix grammar (multiplier + vowel elision).
             name = format_suffix_with_locants(
                 stem, unsaturation_infix, suffix_text, suffix_locants, multiplier,

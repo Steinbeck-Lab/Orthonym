@@ -1987,14 +1987,36 @@ def _book_spelling(ctx: _Ctx, spine_atoms, spine_core: str, attach_locant,
             return parent, (yl or None)
     elif (ring_form is None and carbon_spine and attach_locant == 1 and len(spine) == 2
             and mol.GetBondBetweenAtoms(spine[0], spine[1]).GetBondType()
-            == Chem.BondType.DOUBLE):
-        # (the Blue Book): one place for the double bond, so no
-        # ene locant; the free-valence locant only with a prefix ('ethenyl'
-        #:24547, '2-chloroethen-1-yl':3003, '2-bromoethen-1-ylidene':45805).
-        # Unconditional (review I4): no charge exception, same as the (b) leg above.
-        yl[1] = block + ("ethen-1-yl" if block else "ethenyl")
-        yl[2] = block + ("ethen-1-ylidene" if block else "ethenylidene")
-        applied = True
+            in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)):
+        # (d) (the Blue Book) with (:2953): one place for the
+        # multiple bond, so no ene/yne locant; the free-valence locant only with a prefix
+        # ('ethenyl':24547, '2-chloroethen-1-yl':3003, '2-bromoethen-1-ylidene':45805).
+        # Unconditional (review I4): no charge exception, same as the (b) leg above. The
+        # omission is the shared primitive's decision; a triple bond has no -ylidene.
+        _double = (mol.GetBondBetweenAtoms(spine[0], spine[1]).GetBondType()
+                   == Chem.BondType.DOUBLE)
+        from .composition_primitives import bond_locant_omitted_on_dinuclear_chain
+        if bond_locant_omitted_on_dinuclear_chain(
+                "eth", [1] if _double else [], [] if _double else [1]):
+            _root = "ethen" if _double else "ethyn"
+            yl[1] = block + (f"{_root}-1-yl" if block else f"{_root}yl")
+            if _double:
+                yl[2] = block + ("ethen-1-ylidene" if block else "ethenylidene")
+            applied = True
+            from .locant_omission import two_carbon_chain_locants_omitted
+            if flat and two_carbon_chain_locants_omitted(mol, spine):
+                # (:2953): the decorations cannot be moved to make an isomer, so the
+                # group cites no locant -- 'oxoethenyl (preferred prefix)' (:2983), 'chloroethynyl'.
+                # The -yl only: the printed '2-bromoethen-1-ylidene' (:45805) keeps its locants.
+                from collections import Counter
+                from .naming_utils import alpha_sort_key, enclose_if_compound, multiplied_component
+                kinds = Counter(flat)
+                parts = [multiplied_component(kinds[n], n, enclose_if_compound(n))
+                         for n in sorted(kinds, key=alpha_sort_key)]
+                if len(parts) >= 2:
+                    from .composition_primitives import apply_mononuclear_enclosing
+                    parts = apply_mononuclear_enclosing(parts, is_mononuclear=True)
+                yl[1] = "".join(parts) + f"{_root}yl"
     elif (carbon_spine and attach_locant == 1 and len(spine) > 1
             and all(plain(a) for a in spine)
             and not any(mol.GetAtomWithIdx(a).IsInRing() for a in spine)
@@ -3190,6 +3212,20 @@ def _pick_chain_path(ctx: _Ctx, component: FrozenSet[int],
     return path
 
 
+def _dinuclear_carbon_parent(n: int, unsaturation: Dict) -> Optional[str]:
+    """'ethene' / 'ethyne' for a skeleton of two carbon atoms with its one multiple bond, else None:
+     (d) (the Blue Book), the bond takes no locant; the decision is
+    ``composition_primitives.bond_locant_omitted_on_dinuclear_chain``. The caller has checked that
+    no replacement ('a') prefix follows, so the count is a count of carbon atoms."""
+    from ..data.chain_names import get_chain_prefix
+    from .composition_primitives import bond_locant_omitted_on_dinuclear_chain
+    double, triple = unsaturation.get("double_bonds", []), unsaturation.get("triple_bonds", [])
+    stem = get_chain_prefix(n)
+    if not bond_locant_omitted_on_dinuclear_chain(stem, double, triple):
+        return None
+    return stem + ("ene" if double else "yne")
+
+
 def _chain_spine_from_path(ctx: _Ctx, component: FrozenSet[int],
                            attach_hint: Optional[int], path):
     mol = ctx.mol
@@ -3228,6 +3264,8 @@ def _chain_spine_from_path(ctx: _Ctx, component: FrozenSet[int],
 
     hetero_prefix = _build_hetero_prefix(mol, path, atom_to_locant)
     parent_block = _build_parent_with_unsaturation(n, unsaturation, fg_suffix=None)
+    if not hetero_prefix:
+        parent_block = _dinuclear_carbon_parent(n, unsaturation) or parent_block
     core = hetero_prefix + parent_block
     if hetero_prefix and not a_chain_licensed(mol, path):
         # (the Blue Book), (:23348): an 'a' chain the book does

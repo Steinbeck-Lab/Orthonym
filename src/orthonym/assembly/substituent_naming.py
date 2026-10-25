@@ -2113,7 +2113,7 @@ def _name_branched_unsaturated_substituent(
         joined = ''.join(_joined_prefix_parts(parts))
         name = _unsaturated_substituent_name(
             mol, chain, pos, sub_set, core_double_bonds, joined,
-            get_chain_prefix(len(chain)),
+            get_chain_prefix(len(chain)), groups,
         )
         if name is None:
             return None
@@ -3555,12 +3555,12 @@ def _name_polyfunctional_acyclic_substituent_impl(
     # from the free valence (locant 1, -- NOT the references' longest-chain
     # OPSIN-optimisation, which mis-roots the free valence: refconsult-b2 Q4.2).
     return _unsaturated_substituent_name(
-        mol, ordered, pos, sub_set, core_double_bonds, joined, stem,
+        mol, ordered, pos, sub_set, core_double_bonds, joined, stem, groups,
     )
 
 
 def _unsaturated_substituent_name(
-    mol, ordered, pos, sub_set, core_double_bonds, joined, stem,
+    mol, ordered, pos, sub_set, core_double_bonds, joined, stem, groups=None,
 ):
     """Finish an UNSATURATED acyclic-chain substituent prefix (B2).
 
@@ -3649,11 +3649,21 @@ def _unsaturated_substituent_name(
 
     # Build the ene stem: mono -> 'prop-1-en'; poly -> euphonic-'a' 'penta-1,3-dien'.
     eloc_str = ",".join(str(x) for x in ene_locs)
-    if len(ene_locs) == 1 and stem == "eth":
+    from .composition_primitives import bond_locant_omitted_on_dinuclear_chain
+    if bond_locant_omitted_on_dinuclear_chain(stem, ene_locs, []):
         # (d) (the Blue Book): a two-carbon chain has one place for
         # its double bond, so the 'ene' locant is omitted: '2-chloroethen-1-yl
         # (preferred prefix)' (:3003), never '2-chloroeth-1-en-1-yl'.
         ene_stem = "ethen"
+        if groups is not None and not descriptor and _two_carbon_group_locants_omitted(mol, ordered):
+            # (:2953): no isomer by moving the prefixes -- 'oxoethenyl (preferred
+            # prefix)' (:2983, the oxo group can only be on C2), no locant at all
+            parts = [_located_prefix_part(p, groups[p], cite_locants=False)
+                     for p in sorted(groups, key=alpha_sort_key)]
+            if len(parts) >= 2:
+                from .composition_primitives import apply_mononuclear_enclosing
+                parts = apply_mononuclear_enclosing(parts, is_mononuclear=True)
+            return f"{''.join(parts)}ethenyl"
     elif len(ene_locs) == 1:
         ene_stem = f"{stem}-{eloc_str}-en"
     else:
@@ -3750,6 +3760,12 @@ def _joined_prefix_parts(parts: List[str]) -> List[str]:
             out.append("-")
         out.append(p)
     return out
+
+
+def _two_carbon_group_locants_omitted(mol, backbone) -> bool:
+    """ for a two-carbon substituent group (``locant_omission.two_carbon_chain_locants_omitted``)."""
+    from .locant_omission import two_carbon_chain_locants_omitted
+    return len(backbone) == 2 and two_carbon_chain_locants_omitted(mol, list(backbone))
 
 
 def _located_prefix_part(prefix: str, locants, *, cite_locants: bool = True) -> str:

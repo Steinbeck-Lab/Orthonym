@@ -106,7 +106,7 @@ KEPT = [
      "7-[4-(2-{3,5-bis[2-(1,4-dimethyl-6-phenylpyridin-1-ium-3-yl)phenyl]phenyl}phenyl)phenyl]-9-methyl-2,5,7,9-tetraazabicyclo[4.3.0]nona-1,3,5,7-tetraen-7-ium",
      "systematic_verified"),
     ("20", "CCN(CC)CCNC(=O)C1=CC(=CC=C1)S(=NC(=O)C2=CN=CC(=C2)C#CC3=CC(=CC=C3)NC(=O)C4=C[N+](=CN4C)C)(=O)C",
-     "4-{[3-(2-{5-[3-(3-{[2-(diethylamino)ethyl]carbamoyl}phenyl)-3-methyl-1-oxo-4-oxa-3λ6-thia-2-azabuta-2,3-dien-1-yl]pyridin-3-yl}eth-1-yn-1-yl)phenyl]carbamoyl}-1,3-dimethyl-1H-imidazol-3-ium",
+     "4-{[3-({5-[3-(3-{[2-(diethylamino)ethyl]carbamoyl}phenyl)-3-methyl-1-oxo-4-oxa-3λ6-thia-2-azabuta-2,3-dien-1-yl]pyridin-3-yl}ethynyl)phenyl]carbamoyl}-1,3-dimethyl-1H-imidazol-3-ium",
      "systematic_verified"),
     ("24", "CN1C=CC(=C2C3=NC(=C(C4=NC(=C(C5=CC=C([N-]5)C(=C6C=CC2=N6)C7=CC=CC=C7)C8=CC=[N+](C=C8)C)C=C4)C9=CC=CC=C9)C=C3)C=C1",
      "17-(1-methyl-1,4-dihydropyridin-4-ylidene)-7-(1-methylpyridin-1-ium-4-yl)-2,12-diphenyl-21,22,23,24-tetraazapentacyclo[16.2.1.1^3,6.1^8,11.1^13,16]tetracosa-1(20),2,4,6(24),7,9,11(23),12,14,16(22),18-undecaen-21-ide",

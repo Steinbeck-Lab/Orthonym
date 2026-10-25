@@ -311,11 +311,12 @@ def test_diazonium_neighbours_unchanged(smiles, expected):
 
 def test_diazonium_dev_set_witness_names_at_best_effort():
     # milestone1500 M15 row: named RT-exact at best-effort, labelled below PIN
-    # ('eth-1-ene' cites a locant the PIN omits); it abstained before.
+    # ('ethene' takes no locant for its one double bond, (d) the Blue Book, as
+    # '2-chloroethen-1-yl':3003; the row was spelled 'eth-1-ene' before); it abstained before that.
     from tests.support.rt_assert import name_best_effort
     smi = "CCOC(=O)CN/C(=C\\[N+]#N)/O"
     row = name_best_effort(smi)
-    assert row["name"] == ("(1E)-2-[(2-ethoxy-2-oxoethyl)amino]-2-hydroxyeth-1-ene-"
+    assert row["name"] == ("(1E)-2-[(2-ethoxy-2-oxoethyl)amino]-2-hydroxyethene-"
                            "1-diazonium"), row
     assert row["tier"] == "pin_unverified", row
     assert _key(_independent_parse(row["name"])) == _key(smi)

@@ -803,6 +803,27 @@ _ETHANE_SUFFIX_ELIDE_FGS = frozenset({
     "selenol", "tellurol",
 })
 
+# (b) (the Blue Book, heading " The locant '1' is omitted:"):
+# "in monosubstituted homogeneous chains consisting of only two identical atoms...
+# CH3-CH2-OH ethanol (PIN)" (:2907). The same licence reaches the two-carbon chain that holds a
+# multiple bond, whose carbons are as equivalent as ethane's: 'ethenol' for the 'enol'
+# (-CH=CH2 on the hydroxy group's carbon) and 'ethenethiol' for the thiol, not 'ethen-1-ol' /
+# 'ethene-1-thiol'. Kept apart from ``_ETHANE_SUFFIX_ELIDE_FGS`` because ethane's own -ol / -thiol
+# are written by their dedicated handlers and the spelling of ethane's isotopologues is pinned
+# elsewhere ('ethane-1-(2H1)thiol'): only the unsaturated chain is reached through here. A
+# substituent on the chain makes ``is_monosubstituted`` False and keeps the locant:2869,
+# '2-chloroethan-1-ol').
+_DINUCLEAR_UNSATURATED_SUFFIX_ELIDE_FGS = frozenset({"enol", "thiol"})
+
+
+def chain_has_multiple_bond(mol, chain) -> bool:
+    """True when a bond between two consecutive atoms of ``chain`` is double or triple."""
+    for a, b in zip(chain, chain[1:]):
+        bond = mol.GetBondBetweenAtoms(a, b)
+        if bond is not None and bond.GetBondTypeAsDouble() > 1.0:
+            return True
+    return False
+
 
 def should_omit_locant_one(
     *,
@@ -812,6 +833,7 @@ def should_omit_locant_one(
     is_heterocyclic: bool = False,
     is_monosubstituted: bool = False,
     fg_type: str = "",
+    unsaturated_chain: bool = False,
 ) -> bool:
     """Determine whether locant-1 should be omitted per IUPAC.
 
@@ -826,6 +848,8 @@ def should_omit_locant_one(
         is_heterocyclic: True if the ring contains heteroatoms.
         is_monosubstituted: True if only one substituent/FG is present.
         fg_type: Functional group type string (e.g., "carboxylic_acid").
+        unsaturated_chain: True if the chain holds a double or triple bond (only the
+            two-carbon suffix rule below reads it).
 
     Returns:
         True if locant-1 should be omitted from the name.
@@ -869,7 +893,8 @@ def should_omit_locant_one(
     # descriptor is itself locant-free — (15N)ethanamine — still elides.
     if (context == "suffix" and not is_ring
             and chain_length == 2 and is_monosubstituted
-            and fg_type in _ETHANE_SUFFIX_ELIDE_FGS):
+            and (fg_type in _ETHANE_SUFFIX_ELIDE_FGS
+                 or (unsaturated_chain and fg_type in _DINUCLEAR_UNSATURATED_SUFFIX_ELIDE_FGS))):
         from .locant_omission import locants_are_forced  # local: avoid import cycle
         if not locants_are_forced():
             return True

@@ -2129,6 +2129,34 @@ def _is_chain_oxo(mol, sub_atoms, chain_idx: int) -> bool:
     return bond is not None and bond.GetBondType() == Chem.BondType.DOUBLE
 
 
+def _cumulative_unsaturation_endings(stem: str, double_bonds, triple_bonds, loc_map) -> Tuple[str, bool]:
+    """The 'en' / 'yn' endings (with their locants) a cumulative-suffix name cites before its
+    'ide' / 'yl' ending, and whether the chain is a two-carbon one whose lone multiple bond takes
+    no locant: (d) (the Blue Book), as 'ethene-1,2-diyl' (:16615) and
+    'ethen-1-ylidene' (:45805). The omission is the decision of
+    ``composition_primitives.bond_locant_omitted_on_dinuclear_chain``."""
+    if not (double_bonds or triple_bonds):
+        return '', False
+
+    def _bond_locant(pair):
+        return min(loc_map[pair[0]], loc_map[pair[1]])
+    d_locs = sorted(_bond_locant(b) for b in double_bonds)
+    t_locs = sorted(_bond_locant(b) for b in triple_bonds)
+    from ..assembly.composition_primitives import bond_locant_omitted_on_dinuclear_chain
+    if bond_locant_omitted_on_dinuclear_chain(stem, d_locs, t_locs):
+        return ('en' if d_locs else 'yn'), True
+    endings = ''
+    if d_locs:
+        dmult = get_suffix_multiplier_prefix(len(d_locs), 'ene') or ''
+        joiner = 'a' if dmult else ''
+        endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
+    if t_locs:
+        tmult = get_suffix_multiplier_prefix(len(t_locs), 'yne') or ''
+        joiner = 'a' if tmult else ''
+        endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
+    return endings, False
+
+
 def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str,
                                           oxo_prefixes: bool = False) -> str:
     """Name a parent hydride with a cumulative anionic / radical / cationic suffix
@@ -2336,20 +2364,8 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str,
     # 5b. Unsaturation endings (en/yn) come BEFORE the cumulative -ide/-yl ending
     # (Table 3.4 cumulative-ending order; RESEARCH (d): but-3-en-2-ide, not
     # 2-id-3-ene). Build the saturated/unsaturated parent stem 'hexan'/'but-3-en'.
-    unsat_endings = ''
-    if double_bonds or triple_bonds:
-        def _bond_locant(pair):
-            return min(loc_map[pair[0]], loc_map[pair[1]])
-        d_locs = sorted(_bond_locant(b) for b in double_bonds)
-        t_locs = sorted(_bond_locant(b) for b in triple_bonds)
-        if d_locs:
-            dmult = get_suffix_multiplier_prefix(len(d_locs), 'ene') or ''
-            joiner = 'a' if dmult else ''
-            unsat_endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
-        if t_locs:
-            tmult = get_suffix_multiplier_prefix(len(t_locs), 'yne') or ''
-            joiner = 'a' if tmult else ''
-            unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
+    unsat_endings, dinuclear_chain = _cumulative_unsaturation_endings(
+        stem, double_bonds, triple_bonds, loc_map)
 
     # 5c. Stem + 'an' + (unsaturation) + cumulative-suffix locant + suffix.
     # Single-carbon special case (methanide): one-atom chain -> NO locant
@@ -2357,6 +2373,11 @@ def emit_parent_hydride_cumulative_suffix(mol, center_idx: int, suffix: str,
     if chain_len == 1:
         # methane -> methanide / methyl / methylidene...
         core = f"{stem}an{suffix}"
+    elif dinuclear_chain and not prefix_parts:
+        # (b) (the Blue Book): the lone centre of a two-carbon chain takes no
+        # locant either -- 'ethenide' (:40171), 'ethenylidene (PIN)' (:24547) -- while a
+        # substituent makes it essential, '2-bromoethen-1-ylidene' (:45805;:2869).
+        core = f"{stem}{unsat_endings}{suffix}"
     elif unsat_endings:
         # 'but-3-en' already carries its own trailing locant on the unsaturation;
         # append '-{center_locant}-{suffix}' (but-3-en-2-ide).
@@ -2685,20 +2706,7 @@ def emit_parent_hydride_polyvalent_suffixes(mol, centers: List[Tuple[int, int]])
     prefix_parts.sort(key=lambda t: (t[0], t[1]))
     prefix_str = ''.join(p[2] for p in prefix_parts)
 
-    unsat_endings = ''
-    if double_bonds or triple_bonds:
-        def _bond_locant(pair):
-            return min(loc_map[pair[0]], loc_map[pair[1]])
-        d_locs = sorted(_bond_locant(b) for b in double_bonds)
-        t_locs = sorted(_bond_locant(b) for b in triple_bonds)
-        if d_locs:
-            dmult = get_suffix_multiplier_prefix(len(d_locs), 'ene') or ''
-            joiner = 'a' if dmult else ''
-            unsat_endings += f"{joiner}-{','.join(map(str, d_locs))}-{dmult}en"
-        if t_locs:
-            tmult = get_suffix_multiplier_prefix(len(t_locs), 'yne') or ''
-            joiner = 'a' if tmult else ''
-            unsat_endings += f"{joiner}-{','.join(map(str, t_locs))}-{tmult}yn"
+    unsat_endings, _ = _cumulative_unsaturation_endings(stem, double_bonds, triple_bonds, loc_map)
 
     # --- 6. Free-valence suffix synthesis (yl -> ylidene -> ylidyne) ---------
     # Citation order is ALWAYS yl -> ylidene -> ylidyne, each with

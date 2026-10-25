@@ -325,8 +325,8 @@ def _skeletal_anion_base(mol, acls, atom_idx) -> Optional[str]:
     return None
 
 
-def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
-                        ) -> Optional[Tuple[str, Tuple[int, ...]]]:
+def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False,
+                        omit_locant: bool = False) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """ (BB cations / anions): the charge-suffix string for
     skeletal charge(s) on the ALREADY-NUMBERED general parent --
     ``-1-ium`` / ``-2-ylium`` / ``-1-ide`` / ``-1-uide`` (or the multiplied
@@ -423,13 +423,15 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False
         mult = _MULT_SIMPLE.get(n)
         if mult is None:
             return None
-    text = '-' + ','.join(map(str, locants)) + '-' + mult + base
+    # ``omit_locant``: (the Blue Book) for a two-carbon chain, 'chloroethynide'
+    text = (mult + base if omit_locant and n == 1
+            else '-' + ','.join(map(str, locants)) + '-' + mult + base)
     charged_atom_ids = tuple(sorted(site['atom_idx'] for site in charged))
     return text, charged_atom_ids
 
 
 def _append_charge_suffix(name: str, mol, atom_to_locant,
-                          has_fg_suffix: bool
+                          has_fg_suffix: bool, omit_locant: bool = False
                           ) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """Splice the P5 charge suffix onto an assembled parent ``name`` (pre-stereo).
 
@@ -447,7 +449,7 @@ def _append_charge_suffix(name: str, mol, atom_to_locant,
     FG suffix -- the cumulative FG+charge construction is out of P5 scope)."""
     if has_fg_suffix:
         return None  # FG suffix + skeletal charge (cumulative) -> out of P5 scope
-    result = _charge_suffix_text(mol, atom_to_locant)
+    result = _charge_suffix_text(mol, atom_to_locant, omit_locant=omit_locant)
     if result is None:
         return None
     cs, charged_atom_ids = result
@@ -1102,6 +1104,7 @@ def _stem_block(mol, chain, atom_to_locant) -> Optional[Tuple[str, str]]:
     """(parent_token, hydride_block) e.g. ('but', 'but-2-ene') or
     ('hex', 'hexane'). None on an unsupported bond pattern."""
     from ..data.chain_names import get_chain_prefix
+    from .composition_primitives import bond_locant_omitted_on_dinuclear_chain
 
     base = get_chain_prefix(len(chain))
     if not base:
@@ -1124,6 +1127,10 @@ def _stem_block(mol, chain, atom_to_locant) -> Optional[Tuple[str, str]]:
     yne.sort()
     if not ene and not yne:
         return base, base + "ane"
+    # (d) (the Blue Book): the one multiple bond of a two-carbon chain takes no
+    # locant -- 'ethene', 'ethyne', never 'eth-1-ene' (the shared primitive says when).
+    if bond_locant_omitted_on_dinuclear_chain(base, ene, yne):
+        return base, base + ("ene" if ene else "yne")
     block = base
     if ene:
         mult = multiplying_prefix(len(ene)) if len(ene) > 1 else ''
@@ -1210,6 +1217,12 @@ def _assemble(mol, features, chain, part,
     # propanamide (PIN)', the Blue Book).
     n_counts = part.get('n_sub_counts') or {}
     prefix_parts = []
+    # (the Blue Book): a two-carbon chain with its one multiple bond whose
+    # decorations cannot be moved to make an isomer cites no locant: 'hydroxyethyne',
+    # '(ethenyloxy)ethene', 'chloroethynide'
+    from .locant_omission import two_carbon_chain_locants_omitted
+    omit_2c = bool(len(chain) == 2 and not part['suffix_core'] and not n_counts
+                   and two_carbon_chain_locants_omitted(mol, chain))
     names = list(groups) + [nm for nm in n_counts if nm not in groups]
     for prefix in sorted(names, key=_alpha_key):
         locs = ['N'] * n_counts.get(prefix, 0) + [
@@ -1217,7 +1230,10 @@ def _assemble(mol, features, chain, part,
         text = _mult_prefix(len(locs), prefix)
         if text is None:
             return _refuse("multiplicity beyond table")
-        prefix_parts.append(','.join(locs) + '-' + text)
+        prefix_parts.append(text if omit_2c else ','.join(locs) + '-' + text)
+    if omit_2c and len(prefix_parts) >= 2:
+        from .composition_primitives import apply_mononuclear_enclosing
+        prefix_parts = apply_mononuclear_enclosing(prefix_parts, is_mononuclear=True)
 
     # --- suffix ---
     bindings = frag_bindings + list(part.get('n_sub_bindings') or ())
@@ -1241,7 +1257,7 @@ def _assemble(mol, features, chain, part,
         body += suffix_text
 
     # Prefix text abuts the stem directly ('3-ethyl-2,2-dimethylhexane').
-    name = ('-'.join(prefix_parts) + body) if prefix_parts else body
+    name = (('' if omit_2c else '-').join(prefix_parts) + body) if prefix_parts else body
     # (the Blue Book)... a substituted two-carbon acid, nitrile, amide or aldehyde
     # is named on its retained word ('[2-(3-hydroxypropyl)quinolin-3-yl]acetic acid'), never
     # 'ethanoic acid'; the one parent binding then spells the retained word.
@@ -1259,7 +1275,7 @@ def _assemble(mol, features, chain, part,
     if allow_charged and Chem.GetFormalCharge(mol) != 0:
         charge_result = _append_charge_suffix(
             name, mol, {a: atom_to_locant[a] for a in chain},
-            has_fg_suffix=bool(part['suffix_core']))
+            has_fg_suffix=bool(part['suffix_core']), omit_locant=omit_2c)
         if charge_result is None:
             return _refuse("charge not expressible as a chain-parent suffix")
         name, charge_atom_ids = charge_result

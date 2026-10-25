@@ -199,15 +199,15 @@ _PORPHYRIN_TAIL = ("-21,22,23,24-tetraazapentacyclo[16.2.1.1^3,6.1^8,11.1^13,16]
 @pytest.mark.unit
 def test_a_prefix_cited_after_phenyl_takes_the_higher_locant_of_the_tied_numberings():
     """ (the Blue Book, section `` ALPHANUMERICAL ORDER``): "The name of a prefix for a substituent is
-    considered to begin with the first letter of its complete name", so ``[2-(trimethylsilyl)eth-1-yn-1-yl]`` is cited under
+    considered to begin with the first letter of its complete name", so ``[(trimethylsilyl)ethynyl]`` is cited under
     ``t``, after ``phenyl``; (g) (:3307, section `` NUMBERING``): "lowest locants for the substituent cited first as
     a prefix in the name". The two numberings below carry the same descriptor, the same hetero locants, the same ``ene``
     locants and the same prefix locant set {2,7,12,17} (both read back to the input, OPSIN), so (c) to (f) tie and (g)
     decides: phenyl is cited first and ``2,7,17`` is lower than ``2,12,17`` at its second locant. The older name
     ``2,12,17-triphenyl-7-[...]`` was ranked with the branch named ``ethynyltri(methyl)silyl`` (cited under ``e``), which the
     composed name does not use."""
-    lower = "2,7,17-triphenyl-12-[2-(trimethylsilyl)eth-1-yn-1-yl]" + _PORPHYRIN_TAIL
-    higher = "2,12,17-triphenyl-7-[2-(trimethylsilyl)eth-1-yn-1-yl]" + _PORPHYRIN_TAIL
+    lower = "2,7,17-triphenyl-12-[(trimethylsilyl)ethynyl]" + _PORPHYRIN_TAIL
+    higher = "2,12,17-triphenyl-7-[(trimethylsilyl)ethynyl]" + _PORPHYRIN_TAIL
     assert_full_rt(lower, TMS_ETHYNYL_PORPHYRIN)
     assert_full_rt(higher, TMS_ETHYNYL_PORPHYRIN)
     phenyl = lambda name: [int(x) for x in name.split("-triphenyl")[0].split(",")]

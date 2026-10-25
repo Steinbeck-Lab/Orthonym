@@ -46,7 +46,7 @@ from ..assembly.book_prefixes import (
     hetero_roots_composable,
     forms_enabled,
 )
-from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_alkyl_name
+from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, get_alkyl_name, multiplied_component
 from .ring_replacement import build_replacement_prefix
 
 # Monovalent halogens (F/Cl/Br/I/At) are NEVER skeletal replacement-chain atoms
@@ -345,6 +345,46 @@ def _chain_stem_with_unsaturation(n: int, ene: List[int],
 
     needs_a = ene_part[0] or yne_part[0]
     return stem + ("a" if needs_a else "") + ene_part[1] + yne_part[1] + "-1-yl"
+
+
+def _dinuclear_locants_omitted(mol, backbone, ene, yne, has_replacement: bool, book: bool) -> bool:
+    """ (the Blue Book) for a two-carbon backbone with its one multiple bond: no
+    isomer by moving the decorations, so the group cites no locant (``locant_omission``)."""
+    from ..assembly.locant_omission import two_carbon_chain_locants_omitted
+    return bool(book and not has_replacement and len(backbone) == 2 and (ene or yne)
+                and two_carbon_chain_locants_omitted(mol, backbone))
+
+
+def _locantless_prefix_block(raw_names) -> str:
+    """The prefixes of a group that cites no locant, alphabetised, the second and further kinds
+    enclosed: 'oxo', '(trimethylsilyl)', 'chloro(oxo)'."""
+    from collections import Counter
+    kinds = Counter(raw_names)
+    parts = [multiplied_component(kinds[n], n, enclose_if_compound(n))
+             for n in sorted(kinds, key=alpha_sort_key)]
+    if len(parts) >= 2:
+        from ..assembly.composition_primitives import apply_mononuclear_enclosing
+        parts = apply_mononuclear_enclosing(parts, is_mononuclear=True)
+    return "".join(parts)
+
+
+def _dinuclear_chain_stem(n: int, ene: List[int], yne: List[int], has_replacement: bool,
+                          has_branches: bool, book: bool, omit_locants: bool = False) -> Optional[str]:
+    """The free-valence stem of a bare two-carbon chain with its one multiple bond, or ``None``.
+
+     (d) (the Blue Book) with the printed '2-chloroethen-1-yl' (:3003): the one
+    multiple bond of a two-carbon chain takes no locant ('ethen', 'ethyn'); the free-valence
+    locant only with a branch prefix, the bare group in the book's spelling ('ethenyl':24547).
+    The omission is one decision, made by ``composition_primitives``. A chain with replacement
+    ('a') atoms is another parent and is left to the caller. ``omit_locants`` is
+    (:2953), the decorations cannot be moved to make an isomer: no locant at all, 'ethynyl',
+    'oxoethenyl' (:2983)."""
+    from ..assembly.composition_primitives import bond_locant_omitted_on_dinuclear_chain
+    from ..data.chain_names import get_chain_prefix
+    if has_replacement or not bond_locant_omitted_on_dinuclear_chain(get_chain_prefix(n), ene, yne):
+        return None
+    root = "ethen" if ene else "ethyn"
+    return f"{root}-1-yl" if ((has_branches and not (omit_locants and book)) or not book) else f"{root}yl"
 
 
 def _book_chain_name(mol, backbone: Sequence[int], replacement_prefix: str,
@@ -1300,11 +1340,8 @@ def _terminal_fragment_name_impl(
             "multiplier; refuse rather than emit an unparseable name",
             len(ene), len(yne))
         return None
-    if book and not rp.prefix and len(backbone) == 2 and ene == [1] and not yne:
-        # (the Blue Book): one place for the double bond, so no
-        # ene locant; the free-valence locant only with a branch prefix
-        # ('ethenyl':24547, '2-chloroethen-1-yl':3003)
-        stem = "ethen-1-yl" if branches else "ethenyl"
+    _omit = _dinuclear_locants_omitted(mol, backbone, ene, yne, bool(rp.prefix), book)
+    stem = _dinuclear_chain_stem(len(backbone), ene, yne, bool(rp.prefix), bool(branches), book, _omit) or stem
     name = f"{rp.prefix}{stem}" if rp.prefix else stem
     if rp.prefix and not a_chain_licensed(mol, backbone):
         # (the Blue Book), (:23348): an 'a' chain the book does
@@ -1373,7 +1410,9 @@ def _terminal_fragment_name_impl(
         prefix_tokens.append((alpha_sort_key(sub.name), locant, token))
         raw_names.append(sub.name)
 
-    if prefix_tokens:
+    if prefix_tokens and _omit:
+        name = _locantless_prefix_block(raw_names) + name
+    elif prefix_tokens:
         book = _book_chain_name(mol, backbone, rp.prefix, name, raw_names,
                                 unit_cites_locant=bool(ene or yne))
         name = book if book is not None else _join_prefix_block(

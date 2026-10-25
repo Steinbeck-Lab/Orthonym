@@ -73,18 +73,18 @@ pytestmark = pytest.mark.opsin_gate
 RIGHT = [
     ("CSO", "methane-SO-thioperoxol"),  #:24326 verbatim
     ("ClCCSO", "2-chloroethane-1-SO-thioperoxol"),  # the decorated mutant of the carve-out certificate
-    ("C=COS", "eth-1-ene-OS-thioperoxol"),
+    ("C=COS", "ethene-OS-thioperoxol"),
     ("CCCSO", "propane-1-SO-thioperoxol"),
     ("C=CCOS", "prop-2-ene-1-OS-thioperoxol"),
     ("CC#COS", "prop-1-yne-1-OS-thioperoxol"),
-    ("NC=CSO", "2-aminoeth-1-ene-1-SO-thioperoxol"),
+    ("NC=CSO", "2-aminoethene-1-SO-thioperoxol"),
     ("C(CSO)N", "2-aminoethane-1-SO-thioperoxol"),
     ("CCNCCOS", "2-(ethylamino)ethane-1-OS-thioperoxol"),
     ("C(SO)Cl", "chloromethane-SO-thioperoxol"),
     ("C1CC1SO", "cyclopropane-SO-thioperoxol"),      # (c), see RING_MONOSUBSTITUTED
     ("CC(N)SO", "1-aminoethane-1-SO-thioperoxol"),
     ("CCC(C)SO", "butane-2-SO-thioperoxol"),
-    ("N/C=C\\SO", "(1Z)-2-aminoeth-1-ene-1-SO-thioperoxol"),
+    ("N/C=C\\SO", "(1Z)-2-aminoethene-1-SO-thioperoxol"),
     ("C/C=C/SO", "(1E)-prop-1-ene-1-SO-thioperoxol"),
     ("CCC(C)OS", "butane-2-OS-thioperoxol"),
     ("CCOC(C)OS", "1-ethoxyethane-1-OS-thioperoxol"),
@@ -113,8 +113,8 @@ RIGHT_ANIONS = [
 # names them, a verified twin read-back, below the PIN (pin_unverified: the default tier declines them)
 ANIONS_BELOW_PIN = [
     ("CCCS[O-]", "propane-1-SO-thioperoxolate"),
-    ("N/C=C\\S[O-]", "(1Z)-2-aminoeth-1-ene-1-SO-thioperoxolate"),
-    ("C=CS[O-]", "eth-1-ene-SO-thioperoxolate"),
+    ("N/C=C\\S[O-]", "(1Z)-2-aminoethene-1-SO-thioperoxolate"),
+    ("C=CS[O-]", "ethene-SO-thioperoxolate"),
 ]
 # (c) (the Blue Book) "The locant '1' is omitted:... (c) in monosubstituted homogeneous monocyclic
 # rings", 'cyclohexanethiol (PIN)' (:2917 examples): the ring carries the suffix and nothing else
@@ -313,7 +313,7 @@ READABLE = [
     ("CSO", "(hydroxysulfanyl)methane"),
     ("CCCSO", "1-(hydroxysulfanyl)propane"),
     ("C=CCOS", "1-(sulfanyloxy)prop-2-ene"),
-    ("N/C=C\\SO", "(1Z)-2-amino-1-(hydroxysulfanyl)eth-1-ene"),
+    ("N/C=C\\SO", "(1Z)-2-amino-1-(hydroxysulfanyl)ethene"),
     ("SO[C@H](C)CC", "(2R)-2-(sulfanyloxy)butane"),
     ("C1CCCCC1SO", "(hydroxysulfanyl)cyclohexane"),
     ("C1CC1CSO", "[(hydroxysulfanyl)methyl]cyclopropane"),
@@ -389,7 +389,7 @@ def test_the_anion_does_not_need_the_safety_net(monkeypatch):
     from orthonym.assembly import default_tier_offer
     monkeypatch.setattr(default_tier_offer, "twin_last_resort_row", lambda namer, smiles, held: None)
     for smiles, name in (("CS[O-]", "methane(SO-thioperoxolate)"),
-                         ("N/C=C\\S[O-]", "(1Z)-2-aminoeth-1-ene-1-SO-thioperoxolate")):
+                         ("N/C=C\\S[O-]", "(1Z)-2-aminoethene-1-SO-thioperoxolate")):
         assert name_best_effort(smiles)["name"] == name
 
 

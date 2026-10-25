@@ -246,7 +246,7 @@ def test_a_nested_frame_is_not_named_by_the_construction(monkeypatch):
     ("CSC[SiH2]CSC[SiH2]CCN",
      "2-({[({[(methylsulfanyl)methyl]silyl}methyl)sulfanyl]methyl}silyl)ethan-1-amine", "systematic_verified"),
     ("C=C[Si](C)(N(C)C(C)=O)N(C)C(C)=O",
-     "N-acetyl-1-{[acetyl(methyl)amino](methyl)(methylamino)silyl}eth-1-ene", "systematic_verified"),
+     "N-acetyl{[acetyl(methyl)amino](methyl)(methylamino)silyl}ethene", "systematic_verified"),
     ("CCC(=O)O[Si](C)(C)OOC(C)(C)C", "(tert-butylperoxy)di(methyl)silyl propanoate", "pin_unverified"),
     ("C[SiH2]C[SiH2]C[SiH2]C[SiH2]CCCl",
      "1-chloro-2-({[({[(methylsilyl)methyl]silyl}methyl)silyl]methyl}silyl)ethane", "systematic_verified"),

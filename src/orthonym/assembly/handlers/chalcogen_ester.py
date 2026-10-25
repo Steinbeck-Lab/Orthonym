@@ -332,7 +332,7 @@ def _name_chalcogen_chain(
         elif bond.GetBondType() != Chem.BondType.SINGLE:
             return None  # aromatic / other: not an acyclic chain
     from ..composition_primitives import _build_unsaturation_infix
-    infix = _build_unsaturation_infix(double_locants, triple_locants)
+    infix = _build_unsaturation_infix(double_locants, triple_locants, chain_prefix)
 
     # IUPAC: 'e' of '{prefix}ane' / '-ene' / '-yne' preserved because
     # '-thioate' / '-selenoate' / '-telluroate' start with consonants.

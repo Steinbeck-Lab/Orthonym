@@ -109,7 +109,7 @@ DEFAULT_ONLY_ROWS = [
     # (the Blue Book "'sulfonamide' to 'sulfonamido'";:33019 '3-(methanesulfonamido)propanoic
     # acid (PIN)'). The best-effort tier still spells '{[...sulfonyl]amino}' (pin_unverified): a lead.
     ("CC(C(=O)NC1=CC(=CC=C1)Cl)OC(=O)CNS(=O)(=O)/C=C/C2=CC=CC=C2",
-     "1-(3-chloroanilino)-1-oxopropan-2-yl [(1E)-2-phenyleth-1-ene-1-sulfonamido]acetate"),
+     "1-(3-chloroanilino)-1-oxopropan-2-yl [(1E)-2-phenylethene-1-sulfonamido]acetate"),
 ]
 
 

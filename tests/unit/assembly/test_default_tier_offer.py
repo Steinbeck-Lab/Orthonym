@@ -483,7 +483,7 @@ def test_the_anion_keeps_the_row_the_twin_gave_before():
     """Parity: the row, its label and its gate outcome are the ones the twin gave when it shipped at every tier."""
     row = name_best_effort("N/C=C\\S[O-]")
     assert (row["name"], row["tier"], row["is_pin"], row["source"], row["verified"], row["opsin"]) == (
-        "(1Z)-2-aminoeth-1-ene-1-SO-thioperoxolate", "pin_unverified", False, "pin_path", "opsin_twin", "verified_twin"), row
+        "(1Z)-2-aminoethene-1-SO-thioperoxolate", "pin_unverified", False, "pin_path", "opsin_twin", "verified_twin"), row
     assert row["gate_outcome"] == "twin_verified:thioperoxol_sulfenic" and row["gates_passed"] == ["twin_round_trip"], row
     pin = name_best_effort(THIO)
     assert (pin["tier"], pin["is_pin"]) == ("pin_verified", True), pin

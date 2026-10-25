@@ -404,11 +404,11 @@ def name_added_carbon_parent(features: Any, style: str = "pin") -> Optional[str]
         if emult is None:
             return None
         eloc_str = ",".join(str(x) for x in elocs)
-        if length == 2:
-            # Dinuclear chain: the double bond can only be 1-2, so its locant is
-            # structurally redundant (deny-by-default omits an unnecessary
-            # locant). BB writes ethene-1,1,2-triyl / ethene-1,2-diyl even when
-            # substituted, and `eth-1-ene` 0 times -> "ethene" (never "eth-1-ene").
+        from ..assembly.composition_primitives import bond_locant_omitted_on_dinuclear_chain
+        if bond_locant_omitted_on_dinuclear_chain(stem, elocs, []):
+            # Dinuclear chain: the double bond can only be 1-2, so its locant is omitted
+            # (d), the shared primitive's decision). BB writes ethene-1,1,2-triyl /
+            # ethene-1,2-diyl even when substituted, and `eth-1-ene` 0 times -> "ethene".
             # A stereogenic dinuclear C=C keeps its DESCRIPTOR locant, e.g. BB
             # `(1E)-...ethene-1,2-diyl`, which stereo_prefix already carries.
             parent_core = f"{stem}ene"

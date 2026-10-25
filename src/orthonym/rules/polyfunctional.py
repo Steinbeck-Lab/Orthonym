@@ -3644,7 +3644,7 @@ def name_polyfunctional(features: Any) -> Optional[str]:
     triple_locants = get_bond_locants(
         principal_chain, features.triple_bonds, atom_to_locant
     )
-    unsaturation = _build_unsaturation_infix(double_locants, triple_locants)
+    unsaturation = _build_unsaturation_infix(double_locants, triple_locants, stem)
 
     # Detect suffix-prefix locant collisions (safety net for ring parents)
     if suffix_locants and all_prefixes:

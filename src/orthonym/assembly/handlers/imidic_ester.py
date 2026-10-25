@@ -371,7 +371,8 @@ def build_imidic_ester_name(mol: Any) -> Optional[str]:
         from ..substituent_enumerator import name_substituent
         chain, dbl, trp = _chain(mol, c)
         try:
-            stem = format_suffix_with_locants(get_chain_prefix(len(chain)), _build_unsaturation_infix(dbl, trp),
+            _chain_stem = get_chain_prefix(len(chain))
+            stem = format_suffix_with_locants(_chain_stem, _build_unsaturation_infix(dbl, trp, _chain_stem),
                                               suffix, [])
         except (ValueError, KeyError):
             return None
