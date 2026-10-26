@@ -220,8 +220,14 @@ def test_a_string_the_engine_already_labels_as_written_is_kept(smiles):
 
 
 @pytest.mark.parametrize("smiles,name", [
-    (N_RING_P, "(2R,5S)-2-(1-methylethoxy)-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"),
-    (N_RING_P_OTHER, "(2S,5S)-2-(1-methylethoxy)-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"),
+    # '[(propan-2-yl)oxy]' for '(1-methylethoxy)': "Retained names" (:27665), '(CH3)2CH-O- isopropoxy
+    # 1-methylethoxy (propan-2-yl)oxy (preferred prefix)' (:27683). 'phenyl' precedes 'propan-2-yl' in the order
+    # (:3436), but OPSIN's SMILES of that spelling puts a ring-closure digit on the P, which RDKit reads the other way
+    # (``universal_substituent._prefix_order_fallback``): the name that reads back cites the P-substituent first. It is
+    # a valid name, not the PIN; the mechanical '2-methyl-1-oxapropan-1-yl' it replaces is the worse spelling.
+    # change-asserted-value: the quote; the read-back below; HEAD spells '1-methylethoxy'.
+    (N_RING_P, "(2R,5S)-2-[(propan-2-yl)oxy]-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"),
+    (N_RING_P_OTHER, "(2S,5S)-2-[(propan-2-yl)oxy]-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"),
     (AZIRIDINE_FIRST,
      "methyl (1S,2R)-1-{[5-(8,8-difluoro-7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-2-yl)-2-fluorophenyl]"
      "methyl}aziridine-2-carboxylate"),

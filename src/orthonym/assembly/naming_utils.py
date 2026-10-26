@@ -2743,6 +2743,17 @@ def _set_aside_italicized_prefix(body: str) -> Tuple[str, bool]:
     return body, False
 
 
+# The -yl groups of the cationic mononuclear parent hydrides, and of borane,
+# 'boranyl', no longer 'boryl'). As the TAIL of a split they make 'trimethylazaniumyl' two units, 'trimethyl' on
+# 'azaniumyl': a compound prefix, "considered to begin with the first letter of its complete name",
+# the Blue Book; 'dimethyl[6-(trimethylazaniumyl)hexyl]sulfanium',:42360), so it is cited at 't' and
+# not at 'm'. Not in ``_SIMPLE_PREFIX_VOCABULARY``: a bare 'azaniumyl' keeps the multiplier it has.
+_CATIONIC_HYDRIDE_YLS: frozenset = frozenset({
+    'azaniumyl', 'phosphaniumyl', 'arsaniumyl', 'stibaniumyl', 'bismuthaniumyl',
+    'oxidaniumyl', 'sulfaniumyl', 'selaniumyl', 'tellaniumyl', 'boranyl',
+})
+
+
 def _is_recognised_prefix_component(token: str) -> bool:
     """One complete substituent-prefix component of any recognised kind.
 
@@ -2767,6 +2778,8 @@ def _is_recognised_prefix_component(token: str) -> bool:
     # -NH-CO-R and -NH-SO2-R` (`:32991`) and its `bis(cyanomethyl)oxamide (PIN)`
     # (`:33087`).
     if len(token) > 5 and token.endswith('amido'):
+        return True
+    if token in _CATIONIC_HYDRIDE_YLS:
         return True
     return _is_replacement_named_hydride_yl(token)
 

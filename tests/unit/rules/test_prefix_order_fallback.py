@@ -297,11 +297,16 @@ def test_fallback_never_ships_descriptors_the_input_does_not_have(smiles):
     from orthonym.namer import _cip_labels_match_input_as_written
     assert _cip_labels_match_input_as_written(smiles) is False
     res = name_best_effort(smiles)
-    assert res.get("prefix_order_fallback") is False
     name = res.get("name")
-    if name:
-        assert_full_rt(name, smiles)
-        assert _opsin_own_stdinchikey(name) == _full_inchikey(smiles)
+    # the floor's book name '2-[(propan-2-yl)oxy]-3-phenyl-...' cites the P-substituent before 'phenyl', out of the
+    # order (the Blue Book), because the order does not read back (``universal_substituent.
+    # _prefix_order_fallback``); the row says so with what the last-resort fallback's rows carry. What this test pins is
+    # the descriptors: the name is the input's configuration by OPSIN's own key, and the exit check of the lone-pair
+    # centre (CDK) has passed it.
+    assert (res.get("prefix_order_fallback"), res.get("tier"), res.get("source")) == (True, "best_effort", "t4_floor")
+    assert name
+    assert_full_rt(name, smiles)
+    assert _opsin_own_stdinchikey(name) == _full_inchikey(smiles)
 
 
 def test_corpus_p_row_labels_are_those_as_written_and_it_ships():
@@ -323,11 +328,16 @@ def test_corpus_p_row_labels_are_those_as_written_and_it_ships():
         "-1-oxamethyl}propane")
     assert_full_rt(res.get("name"), CORPUS_P_ROW)
     assert res.get("prefix_order_fallback") is False
-    # roadmap N5 (name-quality lane L2): with the book spellings ('1-methylethoxy',
-    # the Blue Book; 'phenyl',:16290) the order
-    # round-trips and the general engine names the row without the fallback
+    # roadmap N5 (name-quality lane L2): with the book spellings ('(propan-2-yl)oxy', the Blue Book,
+    # '(CH3)2CH-O- isopropoxy 1-methylethoxy (propan-2-yl)oxy (preferred prefix)'; 'phenyl',:16290) the
+    # general engine names the row. With '1-methylethoxy' the order ('2-(1-methylethoxy)' before '3-phenyl')
+    # read back; 'phenyl' now precedes 'propan-2-yl',:3436), that order does not (RDKit's reading of OPSIN's
+    # SMILES of the lone-pair centre, this module's rung), and the name that reads back cites the P-substituent first.
+    # change-asserted-value: the quote; the read-back below; HEAD spells '1-methylethoxy'.
     res = name_best_effort(CORPUS_P_ROW)
     assert res.get("name") == (
-        "(2R,5S)-2-(1-methylethoxy)-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane")
+        "(2R,5S)-2-[(propan-2-yl)oxy]-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane")
     assert_full_rt(res.get("name"), CORPUS_P_ROW)
-    assert res.get("prefix_order_fallback") is False
+    # '2-[...]' before '3-phenyl' is out of the order: the row says so, as the last-resort fallback's rows do
+    assert res.get("prefix_order_fallback") is True
+    assert res.get("tier") == "best_effort" and res.get("source") == "t4_floor", res

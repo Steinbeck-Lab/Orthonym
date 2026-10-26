@@ -761,6 +761,33 @@ def record_non_pin_label(fragment: str, rule: Optional[str] = None,
         _touch("non_pin_label_rules")
 
 
+#: The rule and the reason of the label-only record of a name whose parent prefixes are cited out of the
+#: order (:func:`record_prefix_order_name`).
+PREFIX_ORDER_RULE = "P-14.5"
+PREFIX_ORDER_DETAIL = "the prefixes of the parent are cited out of alphanumerical order"
+
+
+def record_prefix_order_name(name: str) -> None:
+    """Record ``name`` as one the floor built with the parent's prefixes cited out of the order
+    (the Blue Book "Alphanumerical order is used to establish the order of citation of detachable
+    substituent prefixes"), because the order fails its round trip at the stereo layer only
+    (``universal_substituent._prefix_order_fallback``). A label-only record (:func:`record_non_pin_label`);
+    ``name_tiered`` reads it (:func:`carries_prefix_order_name`) and reports what the last-resort
+    prefix-order fallback reports: ``prefix_order_fallback``, the best_effort tier, the source t4_floor."""
+    record_non_pin_label(name, rule=PREFIX_ORDER_RULE, detail=PREFIX_ORDER_DETAIL)
+
+
+def carries_prefix_order_name(prov: dict, name: Optional[str], fallback_name: Optional[str] = None) -> bool:
+    """True when ``name`` is ``fallback_name`` (the name the last-resort prefix-order fallback shipped) or
+    contains a name recorded by:func:`record_prefix_order_name`."""
+    _log_non_pin(PROVENANCE_READ)
+    if not name:
+        return False
+    return name == fallback_name or any(
+        rule == PREFIX_ORDER_RULE and detail == PREFIX_ORDER_DETAIL and fragment in name
+        for fragment, rule, detail in (prov.get("non_pin_label_rules") or ()))
+
+
 def record_uncertified_pin_name(name: str) -> None:
     """Record ``name`` as a PIN-form name whose preferred status the Blue Book leaves
     open (see ``_UNCERTIFIED_PIN_NAMES``): a shipped name that contains it is labelled

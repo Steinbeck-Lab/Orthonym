@@ -91,6 +91,16 @@ _CLASS_2_METALLOIDS: FrozenSet[str] = frozenset({
 _CLASS_1_METALS: FrozenSet[str] = METAL_ELEMENT_SYMBOLS - _CLASS_2_METALLOIDS
 
 
+def has_only_class_2_metals(mol: "Chem.Mol") -> bool:
+    """True when the molecule has at least one metal atom and every one is of Groups 13 through 16
+    (class (2) of, the Blue Book): Si, Ge, Sn, Pb, B, As, Sb, Bi... (:39737)
+    "Organometallic compounds involving the elements of Groups 13 through 16 are named
+    substitutively by prefixing the appropriate substituent names to the name of a parent hydride",
+    so the seniority of classes, Table 4.1,:18158) decides the parent."""
+    symbols = {a.GetSymbol() for a in atoms_of(mol) if is_metal_element(a.GetSymbol())}
+    return bool(symbols) and symbols <= _CLASS_2_METALLOIDS
+
+
 @dataclass(frozen=True)
 class LigandGroup:
     """A contiguous set of ligand atoms coordinated to a single metal."""

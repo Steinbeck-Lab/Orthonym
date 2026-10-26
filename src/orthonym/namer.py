@@ -5799,7 +5799,7 @@ class Orthonym:
         label is strictly higher. The wider tiers only, and not after a hang guard
         fired, as in ``name`` (``_book_retry_applies``)."""
         from .assembly.book_prefixes import (
-            mechanical_forms, retry_rungs, retry_spelling, watch_book_forms)
+            book_retry_row_wanted, mechanical_forms, retry_rungs, retry_spelling, watch_book_forms)
         from .assembly.fragment_naming import hang_budget_trips
         owned = _BOOK_RETRY_OWNED.set(True)
         try:
@@ -5807,7 +5807,7 @@ class Orthonym:
             with watch_book_forms() as fired:
                 row = self._name_tiered_scoped(smiles)
             if (fired[0] and hang_budget_trips() == trips and self._book_retry_applies()
-                    and row.get("tier") in ("abstain", "best_effort")):
+                    and book_retry_row_wanted(row)):
                 # Ladder order: book -> the keep-forms rungs (``RETRY_KEEP_ORDER``: ring-only,
                 # then the other lanes' kinds) -> mechanical. One chain or acyl spelling that
                 # no round trip confirmed must not take every ring name of the molecule
@@ -6299,9 +6299,9 @@ class Orthonym:
         # order (``_maybe_prefix_order_fallback``): never a PIN, best_effort.
         prefix_order_fallback = bool(
             name and not is_failure_name(name)
-            and getattr(self, "_prefix_order_fallback_name", None) == name)
+            and _pv.carries_prefix_order_name(prov, name, getattr(self, "_prefix_order_fallback_name", None)))
         if prefix_order_fallback:
-            tier, is_pin = BEST_EFFORT, False
+            tier, is_pin, source = BEST_EFFORT, False, "t4_floor"
             _pin_form = False
         return ({"name": name, "tier": tier, "is_pin": is_pin,
                  "source": source, "opsin": opsin, "gates_passed": gates,

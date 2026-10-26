@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
+from .ring_ketone_forms import decorated_ketone_fused_name, ketone_core_numbering
 
 # IUPAC: Standard substituent names for rings
 # Maps ring system name to substituent prefix name
@@ -557,7 +558,6 @@ def pin_heteroaryl_substituent_name(
 
 
 _DECO_MULT: Dict[int, str] = multiplier_table(6, one='')
-
 
 
 # Prefix forms of the groups a ring expresses by an appended SUFFIX when it is the
@@ -1188,6 +1188,8 @@ def _decorated_fused_substituent_name(
     # Enumerate symmetry-equivalent numberings; pick lowest FREE VALENCE first
     #, then lowest decoration set, then the alpha tie.
     deco_atoms = [ra for ra, _ in decorations]
+    if ketone := decorated_ketone_fused_name(mol, ring_atoms, attachment_atom, decorations):
+        return ketone
     best_key = None
     best_pos = None
     for perm in perms:
@@ -1245,7 +1247,6 @@ def _decorated_fused_substituent_name(
     from ..assembly.naming_utils import begins_with_italic_designator
     sep = '-' if (stem[:1].isdigit() or begins_with_italic_designator(stem)) else ''
     return f"{body}{sep}{stem}-{attach_locant}-yl"
-
 
 
 def _fmt_locant(loc) -> str:
@@ -2206,7 +2207,8 @@ def polycyclic_core_numbering(
     if attachment_atom not in set(ring_atoms):
         return None
     if allow_mancude:
-        res = _pah_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
+        res = (ketone_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers)
+               or _pah_core_numbering(mol, ring_atoms, attachment_atom, deco_carriers))
         if res is not None:
             return res
         #: retained fused-HETEROCYCLE core (indole / quinoline /

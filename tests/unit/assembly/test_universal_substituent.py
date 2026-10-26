@@ -201,7 +201,12 @@ def test_hard_branch_witness_perindopril_fragment():
     # "four or more heterounits";:6465, the chain ends on C): the spine is
     # the carbon chain, the N roots '(R)amino' and the ester O 'ethoxy'
     #:27667). The name covers every atom and reads back to the input.
-    assert result.name == "1-ethoxy-2-[(1-formylethyl)amino]-1-oxopentane"
+    # (the Blue Book): a free valence that does not end the longest chain takes a locant of that
+    # chain, so the group is '(1-oxopropan-2-yl)', as the book writes its own '(1-ethoxy-1-oxo-4-phenylbutan-2-yl)amino'
+    # (:7512, section ```` "Multiple types of enclosing marks", the PIN at:7490); it was '1-formylethyl'.
+    # change-asserted-value: the quote above; the read-back of the name by OPSIN (``verified == result.name``);
+    # mutation: HEAD names the group '(1-formylethyl)', so the new value fails there.
+    assert result.name == "1-ethoxy-1-oxo-2-[(1-oxopropan-2-yl)amino]pentane"
 
 
 # ===========================================================================
@@ -249,7 +254,9 @@ def test_stereo_bearing_perindopril_now_full_ws_stereo_win():
     # In, Tl) ends, the Blue Book;:23348); otherwise the
     # spine is the carbon chain and each heteroatom roots a prefix ('methoxy',
     # '(R)amino', 'azaniumyl';:27633,:27667).
-    assert result.name == "(2S)-1-ethoxy-2-{[(1R)-1-formylethyl]amino}-1-oxopentane"
+    # the group is '(2R)-1-oxopropan-2-yl':15935; the book's '[(2S)-1-ethoxy-1-oxo-4-phenylbutan-2-yl]amino',
+    #:7490,:7514), it was '(1R)-1-formylethyl'; the read-back below is the independent check
+    assert result.name == "(2S)-1-ethoxy-1-oxo-2-{[(2R)-1-oxopropan-2-yl]amino}pentane"
     cov = validate_atom_coverage(mol, result.name)
     assert cov.constitution_match is True
     assert verify_or_none(result.name, smi) == result.name  # full: stereo now expressed

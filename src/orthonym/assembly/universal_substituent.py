@@ -174,6 +174,7 @@ from ..rules.vonbaeyer_universal import (
 # module spells charge the SAME way as the rest of the codebase (never
 # reinvented) -- see the module docstring's charge-scope paragraph.
 from .book_prefixes import (
+    A_CHAIN_ENDS,
     CHALCOGEN_HEAD,
     HETERO_ROOT_VALENCE,
     MONONUCLEAR_HEAD,
@@ -1812,22 +1813,17 @@ def _name_component(
         charged_accum |= sub.charged
         internal_accum |= sub.internal_atoms
 
-    prefix_parts = []
-    for name, locs in prefix_entries.items():
-        # Prime-aware sort: a mixed-spiro-fused leaf hands us display-string
-        # locants (``"5'"``) whose natural order is (prime_rank, number), not
-        # lexicographic; ordinary int locants sort identically under this key.
-        locs = sorted(locs, key=_locant_sort_key)
-        prefix_parts.append((alpha_sort_key(name),
-                              format_substituent_prefix(name, locs, len(locs)),
-                              tuple(sorted(prefix_entry_atoms[name]))))
-    prefix_parts.sort(key=lambda t: t[0])
-    # ``_prefix_order_fallback`` only (top level): cite one prefix first, the
-    # others in their order.
-    if (is_top and top_prefix_front is not None
-            and 0 < top_prefix_front < len(prefix_parts)):
-        prefix_parts.insert(0, prefix_parts.pop(top_prefix_front))
-    joined = "-".join(p for _k, p, _a in prefix_parts)
+    renumbered = (None if ring_form is None or needs_charge or oxide_suffix_text is not None
+                  else _renumber_ring_by_cited_first(ctx, component, spine_atoms, attach_hint, ring_form,
+                                                     prefix_entry_atoms))
+    if renumbered is not None:
+        ring_form = renumbered
+        spine_atom_to_locant = dict(renumbered.numbering)
+        attach_locant = spine_atom_to_locant.get(attach_hint) if attach_hint is not None else None
+        prefix_entries = {name: [spine_atom_to_locant[a] for a in atoms]
+                          for name, atoms in prefix_entry_atoms.items()}
+    prefix_parts, joined = _cite_prefixes(prefix_entries, prefix_entry_atoms,
+                                          top_prefix_front if is_top else None)
 
     ionic_suffix = charge_suffix_text if needs_charge else oxide_suffix_text
     # Roadmap N5: the book's spelling of this level -- a one-carbon spine as a methyl
@@ -3102,6 +3098,54 @@ def _name_ring_spine(
 # Chain spine construction (acyclic; own tree-diameter / rooted walk)
 # ===========================================================================
 
+def _cite_prefixes(prefix_entries, prefix_entry_atoms, front):
+    """``(parts, joined)``: the prefixes of one level in order, as ``(alphanumerical key, text,
+    atoms)`` and as the joined text. ``front`` (``_prefix_order_fallback`` only, top level): the index
+    of the prefix to cite first, the others keeping their order."""
+    prefix_parts = []
+    for name, locs in prefix_entries.items():
+        # Prime-aware sort: a mixed-spiro-fused leaf hands us display-string
+        # locants (``"5'"``) whose natural order is (prime_rank, number), not
+        # lexicographic; ordinary int locants sort identically under this key.
+        locs = sorted(locs, key=_locant_sort_key)
+        prefix_parts.append((alpha_sort_key(name),
+                              format_substituent_prefix(name, locs, len(locs)),
+                              tuple(sorted(prefix_entry_atoms[name]))))
+    prefix_parts.sort(key=lambda t: t[0])
+    if front is not None and 0 < front < len(prefix_parts):
+        prefix_parts.insert(0, prefix_parts.pop(front))
+    return prefix_parts, "-".join(p for _k, p, _a in prefix_parts)
+
+
+def _renumber_ring_by_cited_first(ctx: _Ctx, component: FrozenSet[int], ring_atoms,
+                                  attach_hint: Optional[int], form, prefix_entry_atoms):
+    """The monocycle form of the ring numbered again with its prefixes named: (g)
+    (the Blue Book, section " NUMBERING":3219) "lowest locants for the substituent
+    cited first as a prefix in the name" decides between numberings that every earlier criterion
+    leaves equal ('3,4-dimethyl-5-(propan-2-yl)-4H-1,2,4-triazole', not '4,5-dimethyl-3-(propan-2-yl)').
+    The names exist only after the branches are named, so the ring is asked again with them. None
+    when the ring is not a single-ring form, or the numbering does not change."""
+    from ..rules.monocycle_forms import MonocycleForm, branch_carriers, monocycle_form
+    if (not isinstance(form, MonocycleForm) or ctx.aromatic_mol in (None, False)
+            or len(prefix_entry_atoms) < 2):
+        return None
+    view = ctx.aromatic_mol
+    ring = sorted(ring_atoms)
+    carriers = branch_carriers(view, ring, attach_hint, within=component)
+    carried = sorted(a for atoms in prefix_entry_atoms.values() for a in atoms)
+    if carried != sorted(carriers):
+        return None            # a prefix the carriers do not count the same way: keep the numbering
+    atoms, names = [], []
+    for name, entry_atoms in prefix_entry_atoms.items():
+        for a in entry_atoms:
+            atoms.append(a)
+            names.append(name)
+    again = monocycle_form(view, ring, attach_hint, atoms, allow_cation=True, branch_names=names)
+    if again is None or again.numbering == form.numbering or again.parent != form.parent:
+        return None
+    return again
+
+
 def _book_fused_spine(ctx: _Ctx, component: FrozenSet[int], ring_atoms: FrozenSet[int],
                       attach_hint: Optional[int]):
     """Roadmap N5b: a fusable ring system of the floor spelled by its fusion name
@@ -3200,6 +3244,8 @@ def _pick_chain_path(ctx: _Ctx, component: FrozenSet[int],
     mol = ctx.mol
     if attach_hint is not None:
         path = _farthest_path_from(ctx, attach_hint, component)
+        if ctx.book_forms:
+            path = _longest_chain_through(ctx, attach_hint, component, path)
     else:
         # Two-BFS tree-diameter technique: BFS from an arbitrary atom finds
         # one end (u) of a longest path; BFS from u finds the other end and,
@@ -3241,6 +3287,41 @@ def _pick_chain_path(ctx: _Ctx, component: FrozenSet[int],
         if _chain_score(ctx, rev, component) < _chain_score(ctx, path, component):
             path = rev
     return path
+
+
+def _longest_chain_through(ctx: _Ctx, start: int, component: FrozenSet[int],
+                           path_from_start: List[int]) -> List[int]:
+    """The chain of a substituent group whose free valence is on ``start``, an atom that does not end
+    the longest chain: "Names for simple substituent groups other than those described in
+     are formed according to method (2) of " (the Blue Book), the free valence
+    taking a locant of the chain ('propan-2-yl (preferred prefix)', not '1-methylethyl',:15830; the
+    section is "GENERAL METHODOLOGY FOR NAMING SUBSTITUENT GROUPS",:15800). The chain is the
+    longest through ``start``: its two longest arms, numbered so that the free valence (with the
+    other suffix-like sites, as ``_chain_score`` orders them) and then the heteroatoms, the multiple
+    bonds and the branches take the lowest locants. ``path_from_start`` (the longest chain that
+    ENDS at ``start``) is the answer when ``start`` has one arm only, the alkyl groups).
+
+    A chain ends on carbon or on P, As, Sb, Bi, Si, Ge, Sn, Pb, B, Al, Ga, In, Tl,
+    :6465), so an arm that would end on O, S or N (a carbonyl oxygen, an imine nitrogen) is cut back
+    to its last such atom; and the chain of ``path_from_start`` is kept when it is licensed ('a'
+    chains:,:23348) and the longer one is not."""
+    mol = ctx.mol
+    arms = []
+    for nb in _tree_neighbors(ctx, start, component):
+        arm = _farthest_path_from(ctx, nb, component, avoid=frozenset((start,)))
+        while arm and mol.GetAtomWithIdx(arm[-1]).GetSymbol() not in A_CHAIN_ENDS:
+            arm = arm[:-1]
+        if arm:
+            arms.append(arm)
+    if len(arms) < 2:
+        return path_from_start
+    arms.sort(key=lambda a: (-len(a), ctx.canon_rank[a[-1]], ctx.canon_rank[a[0]]))
+    forward = list(reversed(arms[1])) + [start] + arms[0]
+    through = min((forward, list(reversed(forward))),
+                  key=lambda p: _chain_score(ctx, p, component, free_valence=start))
+    if a_chain_licensed(mol, path_from_start) and not a_chain_licensed(mol, through):
+        return path_from_start
+    return through
 
 
 def _dinuclear_carbon_parent(n: int, unsaturation: Dict) -> Optional[str]:
@@ -3309,7 +3390,8 @@ def _chain_spine_from_path(ctx: _Ctx, component: FrozenSet[int],
     return frozenset(path), core, atom_to_locant, attach_locant
 
 
-def _chain_score(ctx: _Ctx, order: List[int], component: Optional[FrozenSet[int]] = None):
+def _chain_score(ctx: _Ctx, order: List[int], component: Optional[FrozenSet[int]] = None,
+                 free_valence: Optional[int] = None):
     mol = ctx.mol
     hetero = [i + 1 for i, a in enumerate(order)
               if mol.GetAtomWithIdx(a).GetAtomicNum() != 6]
@@ -3317,6 +3399,8 @@ def _chain_score(ctx: _Ctx, order: List[int], component: Optional[FrozenSet[int]
     # free valences (suffixes)" (:3256): a cumulative ionic suffix ('-ylium', '-ium', '-ide',
     # (2),:4777) is decided before unsaturation (e) and the detachable prefixes (f)
     ionic_atoms = {s['atom_idx'] for s in ctx.cation_sites + ctx.anion_sites}
+    if free_valence is not None:
+        ionic_atoms = ionic_atoms | {free_valence}    # the free valence is a suffix of the same criterion (c)
     ionic = [i + 1 for i, a in enumerate(order) if a in ionic_atoms]
     unsat = []
     for i in range(len(order) - 1):
@@ -3472,9 +3556,11 @@ def _farthest_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> int:
     return best
 
 
-def _farthest_path_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> List[int]:
+def _farthest_path_from(ctx: _Ctx, start: int, component: FrozenSet[int],
+                        avoid: FrozenSet[int] = frozenset()) -> List[int]:
     """The longest chain-tree path STARTING at *start* (forced root -- this
-    is how a branch's attachment atom always becomes its own locant 1)."""
+    is how a branch's attachment atom always becomes its own locant 1), never
+    through an atom of *avoid* (the other arms of ``_longest_chain_through``)."""
     parent: Dict[int, Optional[int]] = {start: None}
     dist = {start: 0}
     order_seen = [start]
@@ -3482,7 +3568,7 @@ def _farthest_path_from(ctx: _Ctx, start: int, component: FrozenSet[int]) -> Lis
     while stack:
         cur = stack.pop(0)
         for nb in _tree_neighbors(ctx, cur, component):
-            if nb not in dist:
+            if nb not in dist and nb not in avoid:
                 dist[nb] = dist[cur] + 1
                 parent[nb] = cur
                 order_seen.append(nb)

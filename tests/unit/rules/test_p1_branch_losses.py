@@ -267,14 +267,18 @@ def test_nested_frame_keeps_the_stand_in_without_a_clean_run(monkeypatch):
 
 # ChEBI 105698: its best-effort naming ran the offer in a nested name (trace at
 # 6a78ea183: 1 nested run); name unchanged by the fix. Roadmap N5 (name-quality lane
-# L2): 'hexyl', 'methylidene', 'methylethyl' (1), the Blue Book) and
-# 'methoxy',:27667); was '...-8-[(1R,3S)-1,3-dimethylhexan-1-yl]-12-
-# (methan-1-ylidene)-5-(1-methylethan-1-yl)-9-(1-oxaethan-1-yl)-...'.
+# L2): 'methylidene' (1), the Blue Book) and 'methoxy',:27667); was
+# '...-8-[(1R,3S)-1,3-dimethylhexan-1-yl]-12-(methan-1-ylidene)-5-(1-methylethan-1-yl)-9-(1-oxaethan-1-yl)-...'.
+# PREC2: a free valence inside the longest chain takes a locant of it, (the Blue Book;,
+#:15830, 'propan-2-yl (preferred prefix) 1-methylethyl'): '(4-methylheptan-2-yl)' (7 carbons, the longest chain
+# through the free valence) for '(1,3-dimethylhexyl)', '(propan-2-yl)' for '(1-methylethyl)', and the prefixes in
+# the order that follows ('methoxy', '(4-methylheptan-2-yl)', 'methylidene', 'oxo', '(propan-2-yl)').
+# change-asserted-value: the quote; the read-back of the name below (``assert_full_rt``); HEAD has the old name.
 NESTED_OFFER_ROW = (
     "C=C1C=CC(=O)NCC(=O)N[C@@H](C(C)C)C(=O)O[C@@H]([C@H](C)C[C@@H](C)CCC)"
     "[C@H](OC)C(=O)N1",
-    "(5S,8S,9S)-8-[(1R,3S)-1,3-dimethylhexyl]-9-methoxy-5-(1-methylethyl)-"
-    "12-methylidene-3,6,10,15-tetraoxo-7-oxa-1,4,11-triazacyclopentadec-13-ene")
+    "(5S,8S,9S)-9-methoxy-8-[(2R,4S)-4-methylheptan-2-yl]-12-methylidene-3,6,10,15-"
+    "tetraoxo-5-(propan-2-yl)-7-oxa-1,4,11-triazacyclopentadec-13-ene")
 
 
 def test_no_clean_run_in_a_nested_frame(monkeypatch):
@@ -463,15 +467,20 @@ CHEBI_18872 = (
 #:16290), '(aminoacetyl)amino' with its enclosing marks:7232).
 # Was '3-{(2S,5S,11S,14S)-18-{(2S)-2-[(3S,9S,12S,13R)-3-(5-azapentan-1-yl)-...-19-oxa-
 # 4,7,10,13,16-pentaazanonadec-18-en-1-yl}-1-methylcyclohexa-1,3,5-triene'.
+# PREC2: the chain through the free valence of the aryl-propyl branch is the longest chain through it and is licensed
+# ('3,6,9,12-tetraazaoctadecan-14-yl': four heterounits in an unbranched chain with carbon ends,,
+# the Blue Book, section ``## ****``:23346), so the 'a' name is built where the chain from the free
+# valence was not ('...-4-{[...]oxy}pentyl'); (a) (:20916) ranks the chain with the more heteroatoms first.
+# The prefixes of the ring then take the (g) numbering (:3307): the aryl-propyl prefix, cited first, has
+# locant 1 ('1-{...}-3-methylbenzene', was '3-[...]-1-methylbenzene'). change-asserted-value: the quotes, and
+# ``assert_full_rt`` below reads the name back to the input's full InChIKey; HEAD has the old name.
 CHEBI_18872_NAME = (
-    "3-[(2S)-2-[(2-{[(2S)-2-({(2S)-2-[(aminoacetyl)amino]-2-cyclohexyl-1-oxoethyl}"
-    "amino)-1-oxopropyl]amino}-1-oxoethyl)amino]-3-{[(1S,4R)-5-amino-1-{[(2-{[(1S)-1-"
-    "({[(1S)-4-amino-1-{[(2-{(2S)-2-[(3S,9S,12S,13R)-3-(4-aminobutyl)-12-carboxy-13-"
-    "hydroxy-9-(3-hydroxy-3-oxopropyl)-1,4,7,10-tetraoxo-2,5,8,11-tetraazatetradecan-"
-    "1-yl]pyrrolidin-1-yl}-2-oxoethyl)amino](oxo)methyl}-4-oxobutyl]amino}(oxo)methyl)"
-    "-4-hydroxy-4-oxobutyl]amino}-2-oxoethyl)amino](oxo)methyl}-4-{[(2R,3R,4S,5R,6R)-"
-    "3,4,5-trihydroxy-6-(hydroxymethyl)oxan-2-yl]oxy}pentyl]amino}-3-oxopropyl]-1-"
-    "methylbenzene")
+    "1-{(2S)-2-[(2-{[(2S)-2-({(2S)-2-[(aminoacetyl)amino]-2-cyclohexyl-1-oxoethyl}amino)-1-ox"
+    "opropyl]amino}-1-oxoethyl)amino]-3-{[(5S,8S,14S,17R)-18-amino-1-{(2S)-2-[(3S,9S,12S,13R)"
+    "-3-(4-aminobutyl)-12-carboxy-13-hydroxy-9-(3-hydroxy-3-oxopropyl)-1,4,7,10-tetraoxo-2,5,"
+    "8,11-tetraazatetradecan-1-yl]pyrrolidin-1-yl}-5-(3-amino-3-oxopropyl)-8-(3-hydroxy-3-oxo"
+    "propyl)-1,4,7,10,13-pentaoxo-17-{[(2R,3R,4S,5R,6R)-3,4,5-trihydroxy-6-(hydroxymethyl)oxa"
+    "n-2-yl]oxy}-3,6,9,12-tetraazaoctadecan-14-yl]amino}-3-oxopropyl}-3-methylbenzene")
 
 
 @pytest.mark.slow  # one 322 s molecule: nightly run only

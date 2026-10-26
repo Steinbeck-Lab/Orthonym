@@ -49,7 +49,9 @@ PIN_ROWS = [
 
 ROWS = [
     ("C1=CC=CC=C1N(CC[N+](=O)[O-])N=[N+]=[N-]", "[azido(2-nitroethyl)amino]benzene"),
-    ("OC(=O)CCc1ccc(NN=[N+]=[N-])cc1", "4-(azidoamino)-1-(3-hydroxy-3-oxopropyl)benzene"),
+    # (g) (the Blue Book, section " NUMBERING":3219): the locants {1,4} are equal either way and the
+    # prefix cited first ('azidoamino' before 'hydroxy...') takes the lower one, 1 (it was 4); read back below
+    ("OC(=O)CCc1ccc(NN=[N+]=[N-])cc1", "1-(azidoamino)-4-(3-hydroxy-3-oxopropyl)benzene"),
     ("CC(C)(C)OC(=O)N[C@@H](CCCCNN=[N+]=[N-])C(=O)O",
      "(2S)-6-(azidoamino)-2-[(tert-butoxycarbonyl)amino]-1-hydroxy-1-oxohexane"),
     ("C(CSSCCNN=[N+]=[N-])NN=[N+]=[N-]",

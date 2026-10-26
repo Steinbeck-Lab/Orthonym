@@ -212,6 +212,13 @@ def test_a_lone_pair_stereocentre_in_the_ring_system_keeps_the_older_producers()
     assert build_fused(Chem.MolFromSmiles(smiles)) is None
     be = name_best_effort(smiles)
     assert "cyclohexa-1,3,5-trien-1-yl" not in be["name"] and "oxapropan" not in be["name"], be
-    assert be["name"] == "(2R,5S)-2-(1-methylethoxy)-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"
-    assert be.get("prefix_order_fallback") is False
+    # the book-spelled name of the older route, '[(propan-2-yl)oxy]' for '(1-methylethoxy)', the Blue Book,
+    # '(CH3)2CH-O- isopropoxy 1-methylethoxy (propan-2-yl)oxy (preferred prefix)'), the P-substituent cited first
+    # because the order ('3-phenyl' first) does not read back (RDKit's reading of OPSIN's SMILES of a lone-pair
+    # centre, ``universal_substituent._prefix_order_fallback``); read back below. HEAD spells '1-methylethoxy'.
+    assert be["name"] == "(2R,5S)-2-[(propan-2-yl)oxy]-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"
+    # the P-substituent is cited before '3-phenyl': out of the order, so the row carries what the last-resort
+    # prefix-order fallback carries (``provenance.record_prefix_order_name``): the flag, best_effort, source t4_floor
+    assert be.get("prefix_order_fallback") is True
+    assert be["tier"] == "best_effort" and be["source"] == "t4_floor" and not be["is_pin"], be
     assert_full_rt(be["name"], smiles)

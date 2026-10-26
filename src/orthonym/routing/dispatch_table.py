@@ -2442,9 +2442,22 @@ def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
     returns None (compound not actually ORGM or cannot be named), the CFR
     cascade falls through to SALT@100 →... → GENERAL.
     """
-    from orthonym.assembly.default_tier_offer import default_tier_first
+    from orthonym.assembly.default_tier_offer import default_tier_first, defer_handler, handler_admitted
+    from orthonym.assembly.default_tier_scope import wider_tier_running
     from orthonym.assembly.handlers.organometallic import name_organometallic
     from orthonym.assembly.strict_ring_prefix import principal_group
+    from orthonym.perception.metals import has_only_class_2_metals
+    # (the Blue Book): a compound of the elements of Groups 13 through 16 is named substitutively, and
+    # (Table 4.1,:18158) puts a principal characteristic group (a suffix: classes 1-20) above the compound
+    # classes of those elements (classes 22-34): '3-[(trimethylsilyl)oxy]propan-1-amine', not
+    # '(3-aminopropoxy)tri(methyl)silane'. The routes after this handler name the molecule on the carbon parent; where
+    # the wider tier runs, the organometallic reading stays the last offer (:func:`defer_handler`).
+    if has_only_class_2_metals(mol) and principal_group(mol)[0] is not None:
+        if wider_tier_running() and not handler_admitted("organometallic"):
+            defer_handler("organometallic")
+            return None
+        if not handler_admitted("organometallic"):
+            return None
     # a principal characteristic group (a ketone, an acid, an ester) is senior to a parent hydride, so the
     # molecule is not named on its hub where the default tier's cascade declines a ligand of the hub: the routes
     # after this handler are asked first. Without such a group the hub is the parent and the wider reading

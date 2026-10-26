@@ -176,6 +176,17 @@ RETRY_KEEP_ORDER = (frozenset({"ring"}), frozenset({"chain"}))
 RETRY_DROP_ORDER = (frozenset({"chain"}), frozenset({"ps"}))
 
 
+def book_retry_row_wanted(row) -> bool:
+    """Whether the row of a run that used a book spelling is run again with the mechanical spellings
+    (``Orthonym._name_tiered_with_book_retry``): it is ``abstain`` or ``best_effort``, and its name is not one
+    the floor cited in the order that reads back (``t4_coverage._book_checked_floor``,
+    ``provenance.record_prefix_order_name``). That name is the book ladder's own rung, labelled best_effort
+    for the order it cites its prefixes in; the mechanical spellings are not offered in its place."""
+    from ..metrics import provenance as pv
+    return (row.get("tier") in ("abstain", "best_effort")
+            and not pv.carries_prefix_order_name(pv.get_provenance(), row.get("name")))
+
+
 def retry_rungs(fired_kinds):
     """The rungs between the book run and the mechanical one, in order, as ``(how, kinds)``:
     first ``('drop', kinds)`` for every kind of ``RETRY_DROP_ORDER`` that was given together with

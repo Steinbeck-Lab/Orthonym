@@ -224,6 +224,13 @@ for sma in _PRIORITY_FG_SMARTS:
 _ACID_PATTERN = Chem.MolFromSmarts('[CX3](=[OX1])[OX2H1]')
 
 
+# The atoms that, bonded to the carbon of -CO-OH / -CO-X, make it a carbonic acid derivative (an ester,
+# a carbamic acid or a thiocarbonic acid), not the end of a heterochain: the group is named from carbonic acid
+#. A chain carbon bonded to Si, Ge, B, P... is the end of an 'a' chain, the Blue Book;
+# '2,5,8,11-tetraoxa-14-silapentadecan-15-oic acid').
+_CARBONIC_NEIGHBOURS = frozenset({'O', 'N', 'S', 'Se', 'Te'})
+
+
 def _detect_terminal_acid_groups(mol: Chem.Mol) -> Optional[List[Dict]]:
     """Detect -C(=O)OH groups eligible for suffix integration.
 
@@ -247,8 +254,10 @@ def _detect_terminal_acid_groups(mol: Chem.Mol) -> Optional[List[Dict]]:
             return None
         chain_nbrs = [n for n in c_atom.GetNeighbors()
                       if n.GetIdx() not in (oxo, oh)]
-        if len(chain_nbrs) != 1:
-            return None  # formic acid / exotic substitution on the acid carbon
+        if len(chain_nbrs) != 1 or chain_nbrs[0].GetSymbol() in _CARBONIC_NEIGHBOURS:
+            # formic acid / exotic substitution on the acid carbon; R-O-CO-OH and
+            # R-NH-CO-OH are the mono-ester and the carbamic acid of carbonic acid
+            return None
         for o_idx in (oxo, oh):
             o_atom = mol.GetAtomWithIdx(o_idx)
             if o_atom.GetFormalCharge() != 0 or o_atom.GetDegree() != 1:
@@ -257,6 +266,80 @@ def _detect_terminal_acid_groups(mol: Chem.Mol) -> Optional[List[Dict]]:
     if len(groups) > 2:
         return None
     return groups
+
+
+def _detect_terminal_acyl_halide_groups(mol: Chem.Mol) -> Optional[List[Dict]]:
+    """Detect acyl halide / acyl pseudohalide groups eligible for the same suffix
+    integration as the carboxylic acid,.
+
+     "Acyl halides from suffix acids" (the Blue Book): the name of the
+    acyl group "followed by the name(s) of the specific class(es) as a separate
+    word(s), in alphabetical order, each preceded by a multiplicative prefix, as
+    needed"; (:31460) says the same for the pseudohalides. The acyl group
+    of the heterochain is the acid's ending turned into '-oyl' / '-dioyl',
+    :23352: "Suffixes, endings, and prefixes are added in accordance with this fixed
+    numbering").
+
+    The groups are read from perception's own acyl matches (the tuple is the acyl
+    carbon, its =O, then the atoms of the halide or pseudohalide). Returns ````
+    when the molecule has none, a list of ``{'c', 'rest', 'word'}`` for 1-2 clean
+    chain-terminal groups (``rest`` = every atom of the group but the acyl carbon),
+    or ``None`` when one exists in a shape this builder does not name: a carbon with
+    no single chain neighbour (formyl, carbonic), a charged acyl carbon, more than
+    two groups, or a halide beside a pseudohalide (neither section prints the
+    mixed name, so the substitutive namer keeps it).
+    """
+    from ..perception.functional_groups import detect_functional_groups
+    from .acid_halides import HALIDE_WORDS
+    found = detect_functional_groups(mol)
+    groups: List[Dict] = []
+    kinds = set()
+    used_c = set()
+    for fg_name, word in HALIDE_WORDS.items():
+        for match in found.get(fg_name, []):
+            c = match[0]
+            if c in used_c:
+                return None
+            used_c.add(c)
+            if mol.GetAtomWithIdx(c).GetFormalCharge() != 0:
+                return None
+            rest = set(match[1:])
+            chain_nbrs = [n for n in mol.GetAtomWithIdx(c).GetNeighbors()
+                          if n.GetIdx() not in rest]
+            if len(chain_nbrs) != 1 or chain_nbrs[0].GetSymbol() in _CARBONIC_NEIGHBOURS:
+                return None    # R-O-CO-X / R-NH-CO-X are esters / amides of carbonic acid
+            groups.append({'c': c, 'rest': rest, 'word': word})
+            kinds.add(fg_name.startswith('acid_'))
+    if len(groups) > 2 or len(kinds) > 1:
+        return None
+    return groups
+
+
+def _terminal_suffix_groups(mol: Chem.Mol):
+    """``(groups, atoms, suffix atoms, class words)`` of the chain-terminal ends that are the suffix of
+    the heterochain, or None when they are not a shape built here.
+
+    The carboxylic acid ends (``_detect_terminal_acid_groups``;,:23352, "Suffixes, endings,
+    and prefixes are added in accordance with this fixed numbering") or, with the same integration, the
+    acyl halide / pseudohalide ends of the acid, the Blue Book):
+    the acyl carbon ends the chain and the atoms of the group are suffix atoms ('3,6,9,12-tetraoxa-
+    tetradecanedioyl dichloride'; ``class_words`` are the class words of the groups, empty for an acid).
+    No ends gives ``(, set, set, )``. A chain with an acid and an acyl halide has the acid as
+    its principal group, Table 4.1,:18158, class 7 over class 10) and is not built here."""
+    acid_groups = _detect_terminal_acid_groups(mol)
+    acyl_groups = _detect_terminal_acyl_halide_groups(mol)
+    if acid_groups is None or acyl_groups is None or (acyl_groups and acid_groups):
+        return None
+    atoms: set = set()
+    suffix_atoms: set = set()
+    for g in acid_groups:
+        atoms.update((g['c'], g['oxo'], g['oh']))
+        suffix_atoms.update((g['oxo'], g['oh']))
+    for g in acyl_groups:
+        atoms.add(g['c'])
+        atoms.update(g['rest'])
+        suffix_atoms.update(g['rest'])
+    return acid_groups or acyl_groups, atoms, suffix_atoms, [g['word'] for g in acyl_groups]
 
 
 def _strict_heterounit_chain_ok(mol: Chem.Mol, backbone: List[int]) -> bool:
@@ -517,15 +600,11 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # (classic path, byte-identical); None = malformed acid (fail closed,
     # exactly what Gate 2 did for every acid before this branch existed).
     # ----------------------------------------------------------------
-    acid_groups = _detect_terminal_acid_groups(mol)
-    if acid_groups is None:
+    suffix_ends = _terminal_suffix_groups(mol)
+    if suffix_ends is None:
         return None
-    acid_mode = bool(acid_groups)
-    acid_atoms: set = set()
-    acid_oxygens: set = set()
-    for _g in acid_groups:
-        acid_atoms.update((_g['c'], _g['oxo'], _g['oh']))
-        acid_oxygens.update((_g['oxo'], _g['oh']))
+    suffix_groups, acid_atoms, acid_oxygens, class_words = suffix_ends
+    acid_mode = bool(suffix_groups)
 
     # ----------------------------------------------------------------
     # Gate 2: No priority functional groups. In acid mode the acid's own
@@ -579,8 +658,8 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # _PRIORITY_FG_SMARTS blocklist above.
     # ----------------------------------------------------------------
     from ..perception.functional_groups import get_chain_excluded_atoms
-    if get_chain_excluded_atoms(mol):
-        return None
+    if get_chain_excluded_atoms(mol) - acid_oxygens:
+        return None     # the N/O of an acyl azide are the suffix's own atoms
 
     # ----------------------------------------------------------------
     # Gate 3: Check terminal functional groups
@@ -630,12 +709,12 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # Acid carbons must be the chain terminals (a mid-chain carboxyl would be
     # a -carboxylic acid on a branch point, a different class — fail closed).
     # ----------------------------------------------------------------
-    acid_carbons = {g['c'] for g in acid_groups}
+    acid_carbons = {g['c'] for g in suffix_groups}
     if acid_mode:
         ends = {backbone[0], backbone[-1]}
         if not acid_carbons <= ends:
             return None
-        if len(acid_groups) == 2 and ends != acid_carbons:
+        if len(suffix_groups) == 2 and ends != acid_carbons:
             return None
 
     # ----------------------------------------------------------------
@@ -801,11 +880,11 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         # The OH-bearing carbon should be at position 0 (locant 1) after orient
         suffix = ('ol', 1)
     elif acid_mode:
-        if len(acid_groups) == 2:
-            suffix = ('dioic acid', None)
+        if len(suffix_groups) == 2:
+            suffix = ('dioyl' if class_words else 'dioic acid', None)
         else:
             pos_by_idx = {idx: i for i, idx in enumerate(backbone)}
-            suffix = ('oic acid',
+            suffix = ('oyl' if class_words else 'oic acid',
                       pos_by_idx[next(iter(acid_carbons))] + 1)
 
     # ----------------------------------------------------------------
@@ -816,12 +895,42 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         len(backbone), heteroatom_positions, suffix=suffix,
         lambda_by_locant=lambda_by_locant,
         ene_locants=ene_locants, yne_locants=yne_locants,
+        acyl_class=_acyl_class_words(class_words),
     )
     if name is not None and substituents:
         pos_by_idx = {idx: i for i, idx in enumerate(backbone)}
         placed = [(pos_by_idx[b] + 1, s) for b, s in substituents]
         name = f'{_format_substituent_prefix(placed)}-{name}'
     return name
+
+
+# (the Blue Book): "the senior pseudohalide group is chosen in accordance with the decreasing
+# order of seniority: N3 > CN > NC > NCO > NCS > NCSe > NCTe". The paragraph gives no order of citation for
+# the class words of one name; the halides are cited "in alphabetical order",:31414).
+_PSEUDOHALIDE_SENIORITY = ('azide', 'cyanide', 'isocyanide', 'isocyanate', 'isothiocyanate',
+                           'isoselenocyanate', 'isotellurocyanate')
+
+
+def _acyl_class_words(words: List[str]) -> str:
+    """The class word(s) of the acyl halide / pseudohalide groups of one name:
+    'chloride', 'dichloride', 'bromide chloride' -- in alphabetical order, each
+    preceded by a multiplicative prefix as needed, the Blue Book;
+    'butanedioyl bromide chloride (PIN)':31454, 'butanedioyl isocyanide
+    isothiocyanate (PIN)':31470). '' for no group.
+
+    Two pseudohalide words whose alphabetical order is not the order of seniority ('isocyanate'
+    and 'isocyanide', 'isothiocyanate' and 'isoselenocyanate') have no printed order: the name is
+    kept and labelled pin_unverified."""
+    from ..assembly.naming_utils import get_multiplier_prefix
+    words = sorted(words)
+    if len(words) == 2 and words[0] == words[1]:
+        return f'{get_multiplier_prefix(2, words[0])}{words[0]}'
+    text = ' '.join(words)
+    if (len(words) == 2 and all(w in _PSEUDOHALIDE_SENIORITY for w in words)
+            and words != sorted(words, key=_PSEUDOHALIDE_SENIORITY.index)):
+        from ..metrics.provenance import record_uncertified_pin_name
+        record_uncertified_pin_name(text)
+    return text
 
 
 def _detect_terminal_oh(mol: Chem.Mol) -> Optional[Dict]:
@@ -1439,6 +1548,7 @@ def _build_replacement_name(
     lambda_by_locant: Optional[Dict[int, int]] = None,
     ene_locants: Optional[List[int]] = None,
     yne_locants: Optional[List[int]] = None,
+    acyl_class: str = '',
 ) -> str:
     """Build the skeletal replacement name from chain length and heteroatom info.
 
@@ -1513,6 +1623,13 @@ def _build_replacement_name(
         if suffix_name == 'oic acid':
             return (f'{replacement_prefix}{chain_prefix}an'
                     f'-{suffix_locant}-oic acid')
+        # / (the Blue Book,:31460): the acyl group of
+        # the acid followed by the class word(s) of the acyl halide / pseudohalide.
+        if suffix_name == 'dioyl':
+            return f'{replacement_prefix}{chain_prefix}anedioyl {acyl_class}'
+        if suffix_name == 'oyl':
+            return (f'{replacement_prefix}{chain_prefix}an'
+                    f'-{suffix_locant}-oyl {acyl_class}')
         # Vowel elision: remove terminal 'e' before suffix starting with vowel
         # "octane" -> "octan" before "-1-ol"
         stem = f'{chain_prefix}an'

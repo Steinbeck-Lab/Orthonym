@@ -424,7 +424,11 @@ def test_ws_stereo_branch_buried_stereocentre_still_omits_not_wrong():
     # (2),:29451), 'acetyl' (:30442 'acetyl (preferred prefix) ethanoyl
     # 1-oxoethyl'), not '1-oxoethyl'.
     name, verified = _floor_name_and_verify(smi)
-    assert name == ("(5S)-3-acetyl-5-[(1S)-1-methylpropyl]-2,4-dioxo-"
+    # PREC2: '[(2S)-butan-2-yl]' for '[(1S)-1-methylpropyl]': (the Blue Book), the free valence of a
+    # group that does not end its longest chain takes a locant of that chain ('propan-2-yl (preferred prefix)
+    # 1-methylethyl',:15830, section "GENERAL METHODOLOGY FOR NAMING SUBSTITUENT GROUPS"). Read back below
+    # (``verified == name``, ``assert_full_rt``); HEAD spells '(1S)-1-methylpropyl'.
+    assert name == ("(5S)-3-acetyl-5-[(2S)-butan-2-yl]-2,4-dioxo-"
                      "1-azacyclopentan-3-ide")
     assert verified == name               # verified, with every stereocentre cited
     jar_or_skip()
@@ -623,8 +627,11 @@ def test_ws_stereo_long_chain_phosphocholine_thioester_converts_block1_to_full()
     # (the Blue Book, "Compound and complex substituent groups"),
     # '{[hydroxy(R-oxy)phosphoryl]oxy}', not the 'a' chain '3-oxo-2,4-dioxa-3-phosphaoctan-1-yl'
     #,:6465: a chain is not terminated by O).
-    assert name == ("(5Z,8Z,11Z,14Z)-1-({(1R)-2-(hexadecyloxy)-1-[({hydroxy[2-"
-                    "(trimethylazaniumyl)ethoxy]phosphoryl}oxy)methyl]ethyl}sulfanyl)-"
+    # PREC2: the glycerol group is '[(2R)-1-(hexadecyloxy)-3-(...)propan-2-yl]sulfanyl': a free valence inside the
+    # longest chain takes a locant of it, (the Blue Book;:15830), not the chain from the
+    # free valence '1-[(...)methyl]-2-(hexadecyloxy)ethyl' of HEAD. Read back below (``verified == name``).
+    assert name == ("(5Z,8Z,11Z,14Z)-1-{[(2R)-1-(hexadecyloxy)-3-({hydroxy[2-"
+                    "(trimethylazaniumyl)ethoxy]phosphoryl}oxy)propan-2-yl]sulfanyl}-"
                     "1-oxoicosa-5,8,11,14-tetraene")
     assert verified == name
 

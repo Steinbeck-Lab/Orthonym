@@ -129,8 +129,11 @@ def test_acyclic_n_plus_double_bonded_to_n_is_not_diazonium_unless_terminal(smil
     ("C1=CC(=CC(=C1)[N+]2=NOC(=N2)[O-])C(F)(F)F",
      "1-(5-oxido-1,2,3,4-oxatriazol-3-ium-3-yl)-3-(trifluoromethyl)benzene"),
     # tetrazolium, no anion: a single-sign ring cation
+    # (g) (the Blue Book, section " NUMBERING":3219): the prefix cited first takes the lower locant
+    # of the two equal sets; '[5-cyano-3-(4-methoxyphenyl)-2H-tetrazol-3-ium-2-yl]' is cited at 'c', before 'methoxy',
+    # so it is 1 (it was 4); read back by ``test_ring_n2_cation_is_named_and_reads_back_exact``
     ("COC1=CC=C(C=C1)N2N=C(N=[N+]2C3=CC=C(C=C3)OC)C#N",
-     "4-[5-cyano-3-(4-methoxyphenyl)-2H-tetrazol-3-ium-2-yl]-1-methoxybenzene"),
+     "1-[5-cyano-3-(4-methoxyphenyl)-2H-tetrazol-3-ium-2-yl]-4-methoxybenzene"),
     # 1,2,3-oxadiazol-3-ium as a substituent parent, no anion
     ("CC(C1=C(ON=[N+]1C2CCCCCC2)NC(=O)C)O",
      "[5-acetamido-4-(1-hydroxyethyl)-1,2,3-oxadiazol-3-ium-3-yl]cycloheptane"),

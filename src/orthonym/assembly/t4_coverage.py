@@ -516,6 +516,13 @@ def _book_checked_floor(mol, uni):
             return uni
     except Exception:  # an unverifiable book name: prefer the mechanical one
         pass
+    # the book's spelling fails its round trip at the stereo layer only because of the ORDER its
+    # prefixes are cited in (OPSIN's SMILES of a lone-pair centre with a ring-closure digit is read by
+    # RDKit the other way, ``universal_substituent._prefix_order_fallback``): the same spelling with
+    # the parent's prefixes cited in the order that reads back comes before the mechanical spellings
+    ordered = _book_name_in_the_order_that_reads_back(mol)
+    if ordered is not None:
+        return ordered
     # the kept kinds stay the book's when the name that keeps only them verifies: one
     # failing chain or acyl spelling does not cost the molecule its ring names. Same rung
     # order as ``_verified_universal_floor``.
@@ -533,6 +540,24 @@ def _book_checked_floor(mol, uni):
             pass
     alt = name_universal_substitutive(mol, book_forms=False)
     return alt if alt is not None and alt.name else uni
+
+
+def _book_name_in_the_order_that_reads_back(mol):
+    """The universal floor's book-spelled name of ``mol`` whose parent prefixes are cited out of the
+    order (the Blue Book "Alphanumerical order is used to establish the order of citation of detachable
+    substituent prefixes") because the alphanumerical order fails its round trip at the stereo layer only, or
+    ``None``. Such a name breaks on purpose: it is recorded (``record_prefix_order_name``) and reported as
+    the last-resort prefix-order fallback reports its names."""
+    from .universal_substituent import name_universal_substitutive
+    try:
+        uni = name_universal_substitutive(mol, prefix_order_fallback=True)
+    except Exception:  # an order that cannot be built is a decline
+        return None
+    if uni is None or not uni.name or not uni.prefix_order_fallback or not uni.book_forms_fired:
+        return None
+    from ..metrics.provenance import record_prefix_order_name
+    record_prefix_order_name(uni.name)
+    return uni
 
 
 def _leaf_checked_floor(mol, uni):

@@ -66,7 +66,11 @@ WORSE = [
      "1-({[4-(1-methylpyridin-1-ium-4-yl)phenyl]amino}diazenyl)-4-({[4-(1-methylpyridin-1-ium-4-yl)phenyl]amino}(oxo)methyl)benzene",
      "fewer non-PIN parts: 1-methylpyridin-1-ium-4-yl, not 1-azamethan-1-ium-1-yl and 1,4-dihydropyridin-4-ylidene (P-73.1.1.2)"),
     ("35", "C[N+]1=CC=C(C=C1)C=CC2=CC=C(C=C2)NC3=NC(=NC(=N3)N(CCO)CCO)NC4=CC=C(C=C4)C=CC5=CC=[N+](C=C5)C.[Cl-].[Cl-]",
-     "4-{[4-[bis(2-hydroxyethyl)amino]-6-({4-[2-(1-methylpyridin-1-ium-4-yl)ethen-1-yl]phenyl}amino)-1,3,5-triazin-2-yl]amino}-1-[2-(1-methylpyridin-1-ium-4-yl)ethen-1-yl]benzene dichloride",
+     # (g) (the Blue Book, section " NUMBERING":3219): "lowest locants for the substituent cited first as
+     # a prefix in the name"; (:3477): a compound prefix "is considered to begin with the first letter of its
+     # complete name", so '{[4-[bis(2-hydroxyethyl)amino]...' is cited at 'b', before '[2-(1-methylpyridin-1-ium...' at
+     # 'm', and takes locant 1 (it was 4); read back by ``opsin_key(name) == rdkit_key(smiles)`` below
+     "1-{[4-[bis(2-hydroxyethyl)amino]-6-({4-[2-(1-methylpyridin-1-ium-4-yl)ethen-1-yl]phenyl}amino)-1,3,5-triazin-2-yl]amino}-4-[2-(1-methylpyridin-1-ium-4-yl)ethen-1-yl]benzene dichloride",
      "fewer non-PIN parts, as row 34"),
 ]
 
