@@ -13,6 +13,7 @@ All functions are pure: they accept locants as integers (not atom indices).
 The mapping from atom indices to locants is handled elsewhere.
 """
 
+import functools
 import re
 from typing import List, Optional, Tuple
 
@@ -2800,9 +2801,14 @@ def _is_replacement_named_hydride_yl(token: str) -> bool:
             or _is_bare_hydride_yl(core, require_known_stem=True))
 
 
+@functools.lru_cache(maxsize=65536)
 def _splits_at_a_unit_boundary(body: str, allow_multiplier: bool = True,
                                _depth: int = 0) -> bool:
     """Does ``body`` need TWO OR MORE units of the producers' vocabulary?
+
+    A pure function of its arguments and of the vocabulary tables, which never change after import, so the
+    answer is kept for the life of the process: the scan of every unit at every offset is run once per body
+    (500 sampled molecules asked 29,148 times for 376 distinct arguments).
 
     That is the operative form of (c) / (a): a compound prefix is
     one built by concatenating units, and **both** sides of the split must be

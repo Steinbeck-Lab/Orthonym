@@ -3790,6 +3790,26 @@ def _unit_locant_choices(el: str, u: int, k_max: int):
             yield combo
 
 
+def _unit_combo_pool(unit_keys, k_max: int):
+    """The locant specifications of one multiplier slot that are tried, fewest cited locants first, then
+    the lowest locants: the first ``_UNIT_LOCANT_COMBO_CAP * 40`` tuples of the product of every nuclide's
+    :func:`_unit_locant_choices`, sorted.
+
+    Only that many tuples of the product are read, and the t-th tuple of ``product`` holds, in every
+    position, an element of index at most t of its list: a list cut to its first ``pool`` items gives the
+    same tuples. The full list of a nuclide with u labels per unit is every u-combination of ``k_max``
+    positions (142,506 for u=5 at k_max=30), built for each multiplier slot of the name."""
+    from itertools import islice, product
+    pool = _UNIT_LOCANT_COMBO_CAP * 40
+    choices = [list(islice(_unit_locant_choices(el, c, k_max), pool))
+               for (_mass, el), c, _maxpos in unit_keys]
+    return sorted(
+        islice(product(*choices), pool),
+        key=lambda combo: (sum(1 for x in combo if x is not None),
+                           [(x if isinstance(x, tuple) else (x,))
+                            if x is not None else () for x in combo]))
+
+
 def _unit_descriptor_offsets(base: str) -> List[int]:
     """Offsets in the substituent word ``base`` at which the unit's descriptor may be
     spliced, latest first. (the Blue Book): "before the part of the
@@ -3817,8 +3837,6 @@ def _decorate_uniform_multiplier_ex(skeleton, keys, original, stripped,
                                     stereo_blind: bool = False):
     """:func:`_decorate_uniform_multiplier` returning ``(name, needs_locant)``;
     ``(None, False)`` when it places nothing."""
-    from itertools import islice, product
-
     from ..metrics.provenance import record_non_pin_fragment
 
     if original is None:
@@ -3883,14 +3901,7 @@ def _decorate_uniform_multiplier_ex(skeleton, keys, original, stripped,
             return constitution(build(format_isotope_descriptor(
                 groups_with(1), force_show=True), off)) != want
 
-        choices = [list(_unit_locant_choices(el, c, k_max))
-                   for (_mass, el), c, _maxpos in unit_keys]
-        # fewest cited locants first, then the lowest locants
-        combos = sorted(
-            islice(product(*choices), _UNIT_LOCANT_COMBO_CAP * 40),
-            key=lambda combo: (sum(1 for x in combo if x is not None),
-                               [(x if isinstance(x, tuple) else (x,))
-                                if x is not None else () for x in combo]))
+        combos = _unit_combo_pool(unit_keys, k_max)
         # the always-shown count subscript is only a fallback for the one spelling OPSIN
         # refuses without it, a lone deuterium on a CH ('(2H)')
         force_passes = (False, True) if any(

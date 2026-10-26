@@ -6,6 +6,7 @@ Key change in IUPAC 2013: Chain length takes priority over unsaturation!
 """
 
 import contextvars as _contextvars
+import functools as _functools
 import os as _os
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
@@ -13,7 +14,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..rules.lambda_convention import nonstandard_bonding_number
-from .molcache import atoms_of
+from .molcache import atoms_of, neighbors_of
 from ..rules.locants import compare_locant_sets  # perf lever A10 (2026-09-13): hoisted (23,785 executions per 300 molecules)
 
 # a phase (heteroatom-only-suffix acids): characteristic-heteroatom
@@ -290,36 +291,43 @@ def find_longest_skeletal_chain(
     Returns:
         List of atom indices forming the longest skeletal chain
     """
-    exclude = exclude_atoms or set()
+    return list(_longest_skeletal_path(
+        tuple(a.GetAtomicNum() for a in atoms_of(mol)), neighbors_of(mol), frozenset(exclude_atoms or ())))
 
-    def dfs(atom_idx: int, visited: Set[int], path: List[int], results: List[List[int]]):
-        if atom_idx in exclude:
-            return
 
-        atom = mol.GetAtomWithIdx(atom_idx)
-        if atom.GetAtomicNum() not in _SKELETAL_ATOMS:
-            return
+# The bound counts entries, not bytes: a key of a 600-atom structure is about 70 KB, so the worst case is about
+# 140 MB per process; at drug-like sizes it is about 15 MB. The key is content (atomic numbers, neighbours,
+# exclusion), never an object identity, so an entry can only answer for the same graph.
+@_functools.lru_cache(maxsize=2048)
+def _longest_skeletal_path(atomic_nums: Tuple[int, ...], neighbours: Tuple[Tuple[int, ...], ...],
+                           exclude: frozenset) -> Tuple[int, ...]:
+    """The first longest simple path of skeletal atoms, in the depth-first order of the start atoms in
+    atom order and the neighbours in RDKit neighbour order, a path replacing the longest so far only when
+    it is longer. A function of the atoms' elements, their neighbour lists and the excluded atoms, so
+    the answer is kept for the life of the process (a structure is asked for again by every pass that
+    names it: 858 calls for 307 distinct arguments over 400 sampled molecules)."""
+    usable = [z in _SKELETAL_ATOMS and i not in exclude for i, z in enumerate(atomic_nums)]
+    steps = [tuple(j for j in nbrs if usable[j]) if usable[i] else () for i, nbrs in enumerate(neighbours)]
+    visited: Set[int] = set()
+    path: List[int] = []
+    longest: List[int] = []
 
+    def dfs(atom_idx: int) -> None:
+        nonlocal longest
         visited.add(atom_idx)
         path.append(atom_idx)
-
-        if len(path) > len(results[0]):
-            results[0] = path.copy()
-
-        for neighbor in atom.GetNeighbors():
-            nbr_idx = neighbor.GetIdx()
+        if len(path) > len(longest):
+            longest = path.copy()
+        for nbr_idx in steps[atom_idx]:
             if nbr_idx not in visited:
-                dfs(nbr_idx, visited, path, results)
-
+                dfs(nbr_idx)
         path.pop()
         visited.discard(atom_idx)
 
-    results: List[List[int]] = [[]]
-    for atom in atoms_of(mol):
-        if atom.GetAtomicNum() in _SKELETAL_ATOMS and atom.GetIdx() not in exclude:
-            dfs(atom.GetIdx(), set(), [], results)
-
-    return results[0]
+    for idx, ok in enumerate(usable):
+        if ok:
+            dfs(idx)
+    return tuple(longest)
 
 
 def _get_non_principal_terminal_carbons(

@@ -30,6 +30,7 @@ from ..perception.molcache import (  # audit 2026-09-03 (S2): per-call atom/bond
     bonds_of,
 )
 from ..perception.molcache import atoms_of, canon_smiles
+from .bridge_arms import arm_sizes_differ
 from .multiplicative_general import name_general_multiplicative
 from .multiplied_class_word_units import ACYL_UNIT_SUFFIXES, multiply_class_word_unit
 
@@ -570,9 +571,7 @@ def _try_acyclic_heteroatom_bridge(mol) -> Optional[str]:
     substitutive names are the PINs (BB: diethylenetriamine is a
     diamine parent, "not 2,2'-azanediyldi(ethan-1-amine)").
     """
-    ring_atoms = set()
-    for ring in mol.GetRingInfo().AtomRings():
-        ring_atoms.update(ring)
+    ring_atoms = {a for ring in mol.GetRingInfo().AtomRings() for a in ring}
 
     for atom in atoms_of(mol):
         idx = atom.GetIdx()
@@ -595,7 +594,7 @@ def _try_acyclic_heteroatom_bridge(mol) -> Optional[str]:
             continue
 
         nbr_indices = [n.GetIdx() for n in heavy_nbrs]
-        fragments = _split_at_bridge(mol, idx, nbr_indices)
+        fragments = None if arm_sizes_differ(mol, idx, nbr_indices) else _split_at_bridge(mol, idx, nbr_indices)
         if fragments is None:
             continue
         smi_a, smi_b, _conn_a, _conn_b = fragments
