@@ -260,8 +260,10 @@ class TestCOMPLEX06_PentacyclicAndHigher:
 
     @pytest.mark.integration
     @pytest.mark.parametrize("smiles,expected", [
-        # Perylene - peri-fused pentacyclic
-        ("c1ccc2cccc3cc4c(c1)cc1cccc4c1c23", "perylene"),
+        # Perylene - peri-fused pentacyclic: OPSIN 2.9.0's `perylene`, '(5) perylene
+        # (PIN)' (the Blue Book); the SMILES here before, c1ccc2cccc3cc4c(c1)cc1cccc4c1c23,
+        # is another C20 skeleton with six rings
+        ("c1cc2cccc3c4cccc5cccc(c(c1)c23)c54", "perylene"),
         # Coronene - hexagonal 7-ring
         ("c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61", "coronene"),
     ])

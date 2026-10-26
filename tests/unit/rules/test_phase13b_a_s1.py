@@ -1,11 +1,9 @@
 """ a phase(a) S1 — fusion-numbering engine wired into the PAH consumer.
 
 Covers:
-* ``get_polycyclic_iupac_locants`` derives numbering from the deterministic
-  fusion engine for cataloged PAH whose ``iupac_numbering`` was never tabulated
-  (tetracene/chrysene/triphenylene/tetraphene/pentacene/picene), and
-  returns None (fail-closed) for systems the engine declines (fluorene: sp3 + a
-  5-membered ring);
+* ``get_polycyclic_iupac_locants`` numbers tetracene/chrysene/triphenylene/tetraphene/
+  pentacene/picene from their stored rows, which agree with the deterministic fusion
+  engine, and from the engine for a row left empty (fluorene);
 * the fused-catalog coverage guard rejects subset-hallucinations
   (pentacene contains a naphthacene substructure, picene contains chrysene) while
   every real catalog entry still self-matches;
@@ -28,24 +26,31 @@ RDLogger.DisableLog("rdApp.*")
 
 @pytest.mark.unit
 class TestEngineWiringIntoConsumer:
-    """get_polycyclic_iupac_locants derives numbering via the engine when the
-    tabulated map is empty; fail-closed when the engine declines."""
+    """get_polycyclic_iupac_locants numbers a cataloged PAH from its stored row, and the stored row
+    (OPSIN's labels) is the numbering the deterministic fusion engine derives; the engine
+    stays the source of a row that is empty (fluorene) and fails closed for systems it declines."""
 
     @pytest.mark.parametrize("name", [
         "tetracene", "chrysene", "triphenylene",
         "tetraphene", "benzo[c]phenanthrene", "pentacene", "picene",
     ])
-    def test_empty_catalog_numbering_supplied_by_engine(self, name):
+    def test_catalog_numbering_is_the_engine_numbering(self, name):
+        from orthonym.rules.polycyclics import _engine_canonical_numbering
         entry = POLYCYCLIC_DATA[name]
-        assert not entry.get("iupac_numbering"), f"{name} unexpectedly tabulated"
+        assert entry.get("iupac_numbering"), f"{name}: no stored numbering"
         mol = Chem.MolFromSmiles(entry["canonical_smiles"])
         locants = get_polycyclic_iupac_locants(mol, name)
-        assert locants is not None, f"{name}: engine numbering not wired"
+        assert locants is not None, f"{name}: numbering not wired"
         # covers every ring atom; peripheral atoms get int locants, fusion (n,'a')
         ring_atoms = {a.GetIdx() for a in mol.GetAtoms() if a.IsInRing()}
         assert set(locants) == ring_atoms
         assert any(isinstance(v, int) for v in locants.values())
         assert any(isinstance(v, tuple) for v in locants.values())
+        # the stored row and the engine's walk are two derivations of one numbering
+        engine = _engine_canonical_numbering(mol)
+        row = entry["iupac_numbering"]
+        assert any(all(str(engine[m[i]]) == str(row[i]) for i in row)
+                   for m in mol.GetSubstructMatches(mol, uniquify=False))
 
     def test_fluorene_numbered_via_fixed_special_numbering(self):
         # 13B(a) S2b: fluorene (5,6,6, sp3 C9) is now numbered by the engine

@@ -93,8 +93,10 @@ class TestLookupFunctions:
         assert result['num_atoms'] == 16
 
     def test_get_polycyclic_by_smiles_perylene(self):
-        """Test perylene lookup by SMILES."""
-        result = get_polycyclic_by_smiles('c1ccc2cccc3cc4c(c1)cc1cccc4c1c23')
+        """Test perylene lookup by SMILES: OPSIN 2.9.0's `perylene`, '(5) perylene
+        (PIN)' (the Blue Book). The SMILES this test held, c1ccc2cccc3cc4c(c1)cc1cccc4c1c23, is
+        another C20 skeleton with six rings."""
+        result = get_polycyclic_by_smiles('c1cc2cccc3c4cccc5cccc(c(c1)c23)c54')
         assert result is not None
         assert result['name'] == 'perylene'
         assert result['num_atoms'] == 20

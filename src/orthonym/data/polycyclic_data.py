@@ -242,7 +242,10 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2c(c1)Cc1ccccc1-2',  # Has sp3 carbon (position 9)
         'smarts': 'c1ccc2c(c1)Cc1ccccc1-2',
         'num_atoms': 13,
-        # IUPAC numbering for fluorene (with methylene bridge at position 9)
+        # iupac_numbering is empty ON PURPOSE: partial_saturation reads every row with a numbering as a
+        # mancude parent (_carbocyclic_mancude_parents_by_size, _resolve_oxo_parent), and this row has an
+        # indicated hydrogen the hydro path does not spell. With OPSIN's numbering filled in, 1,2-dihydro-
+        # 9H-fluorene came out as 1,2-dihydrofluorene. The fusion engine numbers it as OPSIN does.
         'iupac_numbering': {},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9],  # 9 is the sp3 carbon
         'num_rings': 3,
@@ -251,7 +254,10 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1cc2c3c(cccc3c1)CC2',  # Has two sp3 carbons
         'smarts': 'c1cc2c3c(cccc3c1)CC2',
         'num_atoms': 12,
-        # IUPAC numbering for acenaphthene
+        # iupac_numbering is empty ON PURPOSE: partial_saturation reads every row with a numbering as a
+        # mancude parent (_carbocyclic_mancude_parents_by_size, _resolve_oxo_parent), and this row is the
+        # hydro form of acenaphthylene, not one. With OPSIN's numbering filled in, 1,2,4,5-tetrahydro-
+        # acenaphthylene came out as 4,5-dihydroacenaphthene.
         'iupac_numbering': {},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],  # Excluding the ethylene bridge
         'num_rings': 3,
@@ -260,8 +266,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'C1=Cc2cccc3cccc1c23',  # Fully unsaturated
         'smarts': 'C1=Cc2cccc3cccc1c23',
         'num_atoms': 12,
-        # IUPAC numbering for acenaphthylene
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `acenaphthylene -o extendedsmi`
+        # ($_AV: 1;2;2a;3;4;5;5a;6;7;8;8a;8b),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 1, 1: 2, 2: '2a', 3: 3, 4: 4, 5: 5, 6: '5a', 7: 6, 8: 7, 9: 8, 10: '8a', 11: '8b'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],
         'num_rings': 3,
     },
@@ -269,8 +278,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2c(c1)ccc1c3ccccc3ccc21',
         'smarts': 'c1ccc2c(c1)ccc1c3ccccc3ccc21',
         'num_atoms': 18,
-        # IUPAC numbering for chrysene
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `chrysene -o extendedsmi`
+        # ($_AV: 1;2;3;4;4a;4b;5;6;6a;7;8;9;10;10a;10b;11;12;12a),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '12a', 5: 1, 6: 12, 7: 11, 8: '10b', 9: '10a', 10: 10, 11: 9, 12: 8, 13: 7, 14: '6a', 15: 6, 16: 5, 17: '4b'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 4,
     },
@@ -282,7 +294,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2cc3cc4ccccc4cc3cc2c1',
         'smarts': 'c1ccc2cc3cc4ccccc4cc3cc2c1',
         'num_atoms': 18,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `tetracene -o extendedsmi`
+        # ($_AV: 1;2;3;4;4a;5;5a;6;6a;7;8;9;10;10a;11;11a;12;12a),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: '5a', 6: 6, 7: '6a', 8: 7, 9: 8, 10: 9, 11: 10, 12: '10a', 13: 11, 14: '11a', 15: 12, 16: '12a', 17: 1},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 4,
     },
@@ -291,7 +307,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2c(c1)c1ccccc1c1ccccc21',
         'smarts': 'c1ccc2c(c1)c1ccccc1c1ccccc21',
         'num_atoms': 18,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `triphenylene -o extendedsmi`
+        # ($_AV: 1;2;3;4;4a;4b;5;6;7;8;8a;8b;9;10;11;12;12a;12b),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 2, 1: 3, 2: 4, 3: '4a', 4: '12b', 5: 1, 6: '12a', 7: 12, 8: 11, 9: 10, 10: 9, 11: '8b', 12: '8a', 13: 8, 14: 7, 15: 6, 16: 5, 17: '4b'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 4,
     },
@@ -301,7 +321,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2cc3c(ccc4ccccc43)cc2c1',
         'smarts': 'c1ccc2cc3c(ccc4ccccc43)cc2c1',
         'num_atoms': 18,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `tetraphene -o extendedsmi`
+        # ($_AV: 1;2;3;4;4a;5;6;6a;7;7a;8;9;10;11;11a;12;12a;12b),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 9, 1: 10, 2: 11, 3: '11a', 4: 12, 5: '12a', 6: '6a', 7: 6, 8: 5, 9: '4a', 10: 4, 11: 3, 12: 2, 13: 1, 14: '12b', 15: 7, 16: '7a', 17: 8},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 4,
     },
@@ -310,7 +334,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2c(c1)ccc1ccc3ccccc3c12',
         'smarts': 'c1ccc2c(c1)ccc1ccc3ccccc3c12',
         'num_atoms': 18,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `benzo[c]phenanthrene -o extendedsmi`
+        # ($_AV: 1;2;3;4;4a;5;6;6a;7;8;8a;9;10;11;12;12a;12b;12c),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '12c', 4: '4a', 5: 4, 6: 5, 7: 6, 8: '6a', 9: 7, 10: 8, 11: '8a', 12: 9, 13: 10, 14: 11, 15: 12, 16: '12a', 17: '12b'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 4,
     },
@@ -322,31 +350,45 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2cc3cc4cc5ccccc5cc4cc3cc2c1',
         'smarts': 'c1ccc2cc3cc4cc5ccccc5cc4cc3cc2c1',
         'num_atoms': 22,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `pentacene -o extendedsmi`
+        # ($_AV: 1;2;3;4;4a;5;5a;6;6a;7;7a;8;9;10;11;11a;12;12a;13;13a;14;14a),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 2, 1: 3, 2: 4, 3: '4a', 4: 5, 5: '5a', 6: 6, 7: '6a', 8: 7, 9: '7a', 10: 8, 11: 9, 12: 10, 13: 11, 14: '11a', 15: 12, 16: '12a', 17: 13, 18: '13a', 19: 14, 20: '14a', 21: 1},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
         'num_rings': 5,
     },
     'picene': {
-        # Angular 5-ring cata-fused PAH (fancene). 13B(a) S1: numbering is
-        # supplied by the deterministic fusion-numbering engine (iupac_numbering
-        # left empty); recognition added here so identify_polycyclic resolves it
-        # (it contains a chrysene substructure, so it must be checked before
-        # chrysene — the largest-first scan handles that).
+        # Angular 5-ring cata-fused PAH (fancene). Recognition added here so
+        # identify_polycyclic resolves it (it contains a chrysene substructure, so it
+        # must be checked before chrysene — the largest-first scan handles that).
         'canonical_smiles': 'c1ccc2c(c1)ccc1c2ccc2c3ccccc3ccc21',
         'smarts': 'c1ccc2c(c1)ccc1c2ccc2c3ccccc3ccc21',
         'num_atoms': 22,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `picene -o extendedsmi`
+        # ($_AV: 1;2;3;4;4a;5;6;6a;6b;7;8;8a;9;10;11;12;12a;12b;13;14;14a;14b),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 3, 1: 2, 2: 1, 3: '14b', 4: '4a', 5: 4, 6: 5, 7: 6, 8: '6a', 9: '14a', 10: 14, 11: 13, 12: '12b', 13: '12a', 14: 12, 15: 11, 16: 10, 17: 9, 18: '8a', 19: 8, 20: 7, 21: '6b'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
         'num_rings': 5,
     },
     'perylene': {
-        # Peri-condensed PAH (two naphthalene units joined peri)
-        'canonical_smiles': 'c1ccc2cccc3cc4c(c1)cc1cccc4c1c23',
-        'smarts': 'c1ccc2cccc3cc4c(c1)cc1cccc4c1c23',
+        # Peri-condensed PAH: two naphthalene units joined peri., Table 2.7 'Retained names
+        # for hydrocarbon parent ring components in descending order of seniority': '(5) perylene
+        # (PIN)' (the Blue Book). The SMILES is OPSIN 2.9.0's `perylene`; the one this row
+        # carried before was a different C20 skeleton (six rings), so a substituted perylene
+        # never matched it.
+        'canonical_smiles': 'c1cc2cccc3c4cccc5cccc(c(c1)c23)c54',
+        'smarts': 'c1cc2cccc3c4cccc5cccc(c(c1)c23)c54',
         'num_atoms': 20,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `perylene -o extendedsmi`
+        # ($_AV: 1;2;3;3a;4;5;6;6a;6b;7;8;9;9a;10;11;12;12a;12b;12c;12d),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 2, 1: 3, 2: '3a', 3: 4, 4: 5, 5: 6, 6: '6a', 7: '6b', 8: 7, 9: 8, 10: 9, 11: '9a', 12: 10, 13: 11, 14: 12, 15: '12a', 16: '12b', 17: 1, 18: '12c', 19: '12d'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
-        'num_rings': 6,  # RDKit counts 6 rings due to perception
+        'num_rings': 5,
     },
     'benzo[pqr]tetraphene': {
         # benzo[a]pyrene; (the Blue Book) 'benzo[pqr]tetraphene (PIN) [tetraphene (3 rings in
@@ -354,7 +396,11 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34',
         'smarts': 'c1ccc2c(c1)cc1ccc3cccc4ccc2c1c34',
         'num_atoms': 20,
-        'iupac_numbering': {},
+        # Numbering: OPSIN 2.9.0 `benzo[pqr]tetraphene -o extendedsmi`
+        # ($_AV: 1;12a;12c;12b;10b;10a;10;9;8;7;6a;6;5a;5;4;3a;3;2;11;12),
+        # mapped onto this SMILES by GetSubstructMatch; the periphery is and the interior
+        # atoms keep OPSIN's letters, as pyrene's 10b, 10c do.
+        'iupac_numbering': {0: 8, 1: 9, 2: 10, 3: '10a', 4: '6a', 5: 7, 6: 6, 7: '5a', 8: 5, 9: 4, 10: '3a', 11: 3, 12: 2, 13: 1, 14: '12a', 15: 12, 16: 11, 17: '10b', 18: '12b', 19: '12c'},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 5,
     },
@@ -408,6 +454,10 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'c1ccc2c(c1)Cc1ccccc1C2',
         'smarts': 'c1ccc2c(c1)Cc1ccccc1C2',
         'num_atoms': 14,
+        # iupac_numbering is empty ON PURPOSE: partial_saturation reads every row with a numbering as a
+        # mancude parent (_carbocyclic_mancude_parents_by_size, _resolve_oxo_parent), and this row is the
+        # hydro form of anthracene, not one. With OPSIN's numbering filled in, a tetrahydroanthracene came out
+        # as a dihydro-9,10-dihydroanthracene.
         'iupac_numbering': {},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
         'num_rings': 3,
@@ -417,6 +467,10 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'canonical_smiles': 'C1=Cc2ccccc2CC1',
         'smarts': 'C1=Cc2ccccc2CC1',
         'num_atoms': 10,
+        # iupac_numbering is empty ON PURPOSE: partial_saturation reads every row with a numbering as a
+        # mancude parent (_carbocyclic_mancude_parents_by_size, _resolve_oxo_parent), and this row is the
+        # hydro form of naphthalene, not one. With OPSIN's numbering filled in, a tetrahydronaphthalene came out
+        # as a dihydro-1,2-dihydronaphthalene.
         'iupac_numbering': {},
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],
         'num_rings': 2,
