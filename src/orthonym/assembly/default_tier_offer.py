@@ -68,6 +68,9 @@ route was asked. The default tier declines such a ligand and the molecule is nam
 best-effort tier asks the handler the default tier's way (:func:`default_tier_scope`); where that declines, the
 handler is deferred (:func:`defer_handler`) and the other routes are asked, and a molecule they leave without a name
 is named once more with the wider reading admitted (:func:`handler_admitted`), so no molecule loses its name.
+
+The last offer, for a molecule with stereo that every path above leaves without a name, is the name of its
+stereo-free structure with the stereo of the input composed on it (``assembly/stereo_composed_offer.py``).
 """
 import contextvars
 import functools
@@ -279,13 +282,18 @@ def default_tier_row_for(namer, smiles) -> Optional[Dict]:
     The default tier's row when ``namer`` is a best-effort engine of the PIN style, the gate withdrew names for
     the molecule, and the default tier ships one of them through its stereo-layer carve-out
     (:func:`stereo_layer_row`); else, at any general tier, the row of the twin last resort
-    (:func:`twin_last_resort_row`)."""
+    (:func:`twin_last_resort_row`); the last offer, for a molecule with stereo, is the name of its stereo-free
+    structure with the stereo composed on it (``stereo_composed_offer.stereo_composed_row``)."""
     if getattr(namer, "style", None) != "pin":
         return None
     held = held_names()
     row = (stereo_layer_row(namer, smiles, held) or twin_last_resort_row(namer, smiles, held)) if held else None
-    return (row or relaxed_adduct_row(namer, smiles) or other_tie_ring_row(namer, smiles)
-            or deferred_handler_row(namer, smiles))
+    row = (row or relaxed_adduct_row(namer, smiles) or other_tie_ring_row(namer, smiles)
+           or deferred_handler_row(namer, smiles))
+    if row is None:
+        from .stereo_composed_offer import stereo_composed_row
+        row = stereo_composed_row(namer, smiles)
+    return row
 
 
 def deferred_handler_row(namer, smiles) -> Optional[Dict]:

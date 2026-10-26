@@ -196,10 +196,19 @@ def _stub_default(monkeypatch, row, built=None):
 
     class Default:
         def __init__(self, **kwargs):
-            if built is not None:
+            # The last offer of the chain (``stereo_composed_offer``) is made to any molecule with stereo that
+            # nothing names, whatever the gate held, and it names the stereo-free structure with an engine of the
+            # caller's tier (``general_fallback`` on). That engine is not the default tier's: this stub names nothing
+            # for it, and ``built`` lists the default tier's engines only, which is what these tests are about
+            # (what the default tier is asked and when). The stereo-free structure it is given is asserted in
+            # tests/unit/test_stereo_composed_offer.py.
+            self.same_tier = bool(kwargs.get("general_fallback"))
+            if built is not None and not self.same_tier:
                 built.append(kwargs)
 
         def name_tiered(self, smiles):
+            if self.same_tier:
+                return ABSTAIN
             assert smiles == SMILES
             if isinstance(row, Exception):
                 raise row

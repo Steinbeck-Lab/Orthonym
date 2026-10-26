@@ -164,6 +164,14 @@ def peek_abstention() -> Optional[AbstentionRecord]:
     return getattr(_slot, "record", None)
 
 
+def restore_abstention(record: Optional[AbstentionRecord]) -> None:
+    """Put back the slot contents that:func:`peek_abstention` returned. For a caller that names the
+    molecule (or a structure derived from it) in a naming of its own after its abstention was recorded
+    (``assembly.stereo_composed_offer``): that naming clears the slot, and the abstention of the call that
+    declined the molecule is what its caller reads (``failure_mode``)."""
+    _slot.record = record
+
+
 def abstention_code_for(result_name: Optional[str]) -> Optional[AbstentionCode]:
     """The abstention code for the naming call that produced ``result_name``.
 
