@@ -10,6 +10,7 @@ No JVM and no OPSIN is involved -- these are pure lock-semantics tests.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import signal
@@ -83,7 +84,7 @@ def test_over_budget_request_is_capped_not_refused(slots):
 
 def test_timeout_proceeds_by_default(slots):
     """A caller must never LOSE work to the budget -- default is fail-open."""
-    with jb.jvm_slots(4, purpose="unit-hog"):
+    with _peer_holds_all(slots):
         t0 = time.monotonic()
         with jb.jvm_slots(1, purpose="unit-late", timeout=0.5) as h2:
             assert h2.enforced is False  # proceeded without a reservation
@@ -91,11 +92,35 @@ def test_timeout_proceeds_by_default(slots):
 
 
 def test_timeout_can_raise_when_caller_prefers_refusing(slots):
-    with jb.jvm_slots(4, purpose="unit-hog"):
+    with _peer_holds_all(slots):
         with pytest.raises(jb.BudgetTimeout):
             with jb.jvm_slots(1, purpose="unit-strict", timeout=0.3,
                               on_timeout="raise"):
                 pass
+
+
+def test_a_nested_block_in_the_same_process_does_not_wait_on_itself(slots, monkeypatch):
+    """One process runs one in-process JVM: a block nested in a reservation it holds starts no new one.
+
+    With a budget of one slot (a 4-core machine), a module fixture holding the slot and a test that
+    asks again used to wait on the fixture's own lock until the test timeout killed the worker.
+    """
+    monkeypatch.setenv("ORTHONYM_JVM_SLOTS", "1")
+    with jb.jvm_slots(1, purpose="unit-fixture"):
+        t0 = time.monotonic()
+        with jb.jvm_slots(1, purpose="unit-test", timeout=2.0) as inner:
+            assert inner.enforced is True
+        assert time.monotonic() - t0 < 1.0
+        assert jb.status()["free"] == 0, "the outer reservation is still held"
+    assert jb.status()["free"] == 1
+
+
+def test_a_nested_block_wanting_more_than_is_held_still_reserves(slots):
+    with jb.jvm_slots(1, purpose="unit-outer"):
+        with jb.jvm_slots(3, purpose="unit-pool") as inner:
+            assert inner.enforced is True
+            assert jb.status()["free"] == 0
+        assert jb.status()["free"] == 3
 
 
 def test_disabled_by_env_is_a_noop(slots, monkeypatch):
@@ -132,6 +157,22 @@ _HOLDER = textwrap.dedent(
         time.sleep(300)
     """
 )
+
+
+@contextlib.contextmanager
+def _peer_holds_all(slots):
+    """Another process holds every slot for the duration of the block."""
+    src = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.dirname(os.path.abspath(jb.__file__)))))
+    proc = subprocess.Popen([sys.executable, "-c", _HOLDER.format(src=src, d=str(slots))],
+                            stdout=subprocess.PIPE, text=True)
+    try:
+        line = proc.stdout.readline().strip()
+        assert line == "HELD", f"holder did not start: {line!r}"
+        yield
+    finally:
+        proc.kill()
+        proc.wait(timeout=10)
 
 
 def test_sigkilled_holder_releases_its_slot(slots, tmp_path):

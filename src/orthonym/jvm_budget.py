@@ -76,6 +76,9 @@ _ENV_TOTAL = "ORTHONYM_JVM_SLOTS"
 _ENV_DIR = "ORTHONYM_JVM_SLOT_DIR"
 _ENV_OFF = "ORTHONYM_JVM_BUDGET"
 
+#: Slots this process holds now (``pid`` tells a forked child from its parent).
+_process_held = {"pid": None, "count": 0}
+
 
 class BudgetTimeout(RuntimeError):
     """Raised by:func:`jvm_slots` when ``on_timeout='raise'`` and the wait expired."""
@@ -246,6 +249,16 @@ def jvm_slots(count: int = 1, *, purpose: str = "unnamed",
         yield _Held([], purpose, count, 0.0)
         return
 
+    # A block nested inside one this process already holds starts no new JVM when it fits
+    # in that reservation (one process runs one in-process JPype JVM). Waiting for another
+    # slot there waits on our own lock: with a budget of one slot (a 4-core machine), a
+    # module fixture holding the slot and a test that asks again would hang forever.
+    if _process_held["pid"] == os.getpid() and min(count, total_slots()) <= _process_held["count"]:
+        nested = _Held([], purpose, count, 0.0)
+        nested.enforced = True
+        yield nested
+        return
+
     held = _acquire(count, purpose, timeout)
     if not held.enforced:
         if timeout is not None and on_timeout == "raise":
@@ -258,9 +271,14 @@ def jvm_slots(count: int = 1, *, purpose: str = "unnamed",
     elif held.waited_s > 1.0:
         logger.info("JVM budget: %r acquired %d slots after %.1fs",
                     purpose, count, held.waited_s)
+    taken = len(held._fds)
+    if _process_held["pid"] != os.getpid():   # a forked child holds none of its parent's slots
+        _process_held.update(pid=os.getpid(), count=0)
+    _process_held["count"] += taken
     try:
         yield held
     finally:
+        _process_held["count"] -= taken
         held.release()
 
 
