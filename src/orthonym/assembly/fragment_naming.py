@@ -525,7 +525,26 @@ def enter_name_scope(smiles=None):
         # The molecule's naming passes (``count_naming_pass``) start from 0.
         _fragment_guard.naming_passes = 0
         _fragment_guard.naming_pass_cap = None
+        _fragment_guard.offers_made = set()
     return d
+
+
+def first_whole_molecule_offer(kind: str, smiles: str) -> bool:
+    """True the first time an offer of ``kind`` is made for ``smiles`` during the current outermost
+    ``name``, when ``smiles`` is the input of that ``name``; False for any other input and for
+    every later offer. An offer that costs a hang budget of its own is made at most once per molecule,
+    however many of the recoveries that run after one another ask for it. True outside any
+    ``name`` scope (a direct call of the producer)."""
+    if getattr(_fragment_guard, 'name_call_depth', 0) <= 0:
+        return True
+    inputs = getattr(_fragment_guard, 'name_inputs', None) or [None]
+    made = getattr(_fragment_guard, 'offers_made', None)
+    if made is None:
+        made = _fragment_guard.offers_made = set()
+    if inputs[0] not in (None, smiles) or (kind, smiles) in made:
+        return False
+    made.add((kind, smiles))
+    return True
 
 
 class OptionalNamingCapExceeded(BaseException):

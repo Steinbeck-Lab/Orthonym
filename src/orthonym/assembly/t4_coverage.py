@@ -265,7 +265,7 @@ def _clone_features_with(features, **overrides):
         return None
 
 
-def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
+def _prefer_verified_floor(mol, candidate: "_Candidate", features=None) -> "_Candidate":
     """ Track A #2 -- verify-before-commit for every best-effort cascade rung.
 
     Each early rung here (``_run_general_e1`` rung 0, the polyol rung, the
@@ -326,6 +326,11 @@ def _prefer_verified_floor(mol, candidate: "_Candidate") -> "_Candidate":
         floor_name = _verified_universal_floor(mol, smi)  # now with the ring=ring rung
         if floor_name is not None:
             return _Candidate(name=floor_name, result_obj=None, floor_substitute=True)
+    if features is not None:
+        # neither the rung nor the floor reads back: the spiro parent of another ring cluster
+        spiro = _spiro_alternative_candidate(mol, features)
+        if spiro is not None and verify_or_none(spiro.name, smi) is not None:
+            return spiro
     return candidate
 
 
@@ -675,7 +680,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # Rung 0: the full engine with the perceived principal group (Task 3).
     candidate = _run_general_e1(mol, features)
     if candidate is not None:
-        return _prefer_verified_floor(mol, candidate)  #: verify-before-commit
+        return _prefer_verified_floor(mol, candidate, features)  #: verify-before-commit
 
     # Rung 0.5 (tail #21): the acyclic polyol / polyether / POLYESTER class.
     # name_general is a ring/von-Baeyer engine and returns None for an acyclic
@@ -719,7 +724,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
             continue
         candidate = _run_general_e1(mol, alt_features)
         if candidate is not None:
-            return _prefer_verified_floor(mol, candidate)  #: verify-before-commit
+            return _prefer_verified_floor(mol, candidate, features)  #: verify-before-commit
 
     # Final rung (Phase B4): the UNCONDITIONAL recursive substitutive namer.
     # Every feature-override rung above declined -- the remaining abstentions
@@ -744,6 +749,7 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
     # honest abstention below. Reachable ONLY on the best-effort path (this
     # whole module is `_general_fallback`-gated in namer.py), so PIN is
     # untouched.
+    floor = None
     try:
         # A2 (C2): a SINGLE free-valence centre that the dedicated
         # radicals.py/route_charged path already declined (this whole rung is
@@ -779,11 +785,37 @@ def _best_effort_candidate(mol, features) -> Optional[_Candidate]:
                 return _Candidate(name=_prefix_name, result_obj=None,
                                   final_floor=True)
         else:
-            return _final_floor_with_ring_ylidene(mol)
+            floor = _final_floor_with_ring_ylidene(mol)
+            if floor is not None and _reads_back_as_constitution(mol, floor.name):
+                return floor
     except Exception as exc:  # fail-closed: a producer bug keeps the abstention
         logger.info("t4 universal-substitutive rung raised: %s", exc)
 
-    return None  # every applicable strategy tried -> honest abstain
+    # a floor that does not read back as the input is kept only when this rung names nothing
+    return _spiro_alternative_candidate(mol, features) or floor  # else: every strategy tried -> abstain
+
+
+def _spiro_alternative_candidate(mol, features) -> Optional["_Candidate"]:
+    """The last rung (offer-not-return): the spiro parent of a ring cluster other than the one that
+    holds the senior ring system (``general_engine.name_general_spiro_alternative``), run at the
+    T4-permissive setting and E1-audited like the engine rung. It names the molecule from a ring
+    that is not the senior one, so it comes after the floor, which names it from the
+    senior ring: no name that exists is displaced. ``None`` when it names nothing."""
+    from rdkit import Chem
+
+    from ..metrics.producer_trail import noted
+    from .general_engine import name_general_spiro_alternative
+    try:
+        if Chem.GetFormalCharge(mol) != 0:
+            return None
+        result = noted("engine:general", name_general_spiro_alternative(
+            mol, features, allow_aromatic_general=True, allow_charged=True), mol)
+    except Exception as exc:  # fail-closed: an engine error is a clean abstain
+        logger.info("t4 spiro-alternative rung raised: %s", exc)
+        return None
+    if result is None or not certify_general_result(mol, result, allow_charged=False):
+        return None
+    return _Candidate(name=result.name, result_obj=result)
 
 
 def _final_floor_with_ring_ylidene(mol) -> Optional["_Candidate"]:

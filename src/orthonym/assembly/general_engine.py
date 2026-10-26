@@ -2773,9 +2773,6 @@ def name_general_spiro(
     ``_emit_ring_from_analysis`` tail as the cage path. Fail-closed (None) on any
     non-spiro / unaudited system; the round-trip is the downstream gate.
     """
-    from ..rules.ring_selection import select_principal_ring_system
-    from ..rules.vonbaeyer_universal import analyze_spiro_universal
-
     reason = _common_refusal(mol, allow_charged=allow_charged)
     if reason:
         return _refuse(reason)
@@ -2791,12 +2788,24 @@ def name_general_spiro(
     # grow the senior component across shared-atom junctions, then hand the full
     # cluster to analyze_spiro_universal (which fail-closes if it is not pure
     # spiro — e.g. a fused/bridged cluster).
+    clusters, cage_seed = _spiro_clusters(mol, features)
+    if cage_seed is None:
+        return _refuse("no senior ring system in a spiro cluster")
+    # the whole molecule first, as always; then the ring system alone: the rings of the molecule
+    # that are not in it, and a spiro atom with more than four ring bonds, are not in the way
+    # (``rules.ring_cluster``)
+    _result = _name_spiro_cluster(mol, features, cage_seed, (None, cage_seed),
+                                  allow_aromatic_general, allow_charged)
+    return _result if _result is not None else _refuse("not an analyzable spiro ring system")
+
+
+def _spiro_clusters(mol, features):
+    """``(clusters, senior)``: the rings of ``mol`` joined through shared atoms into clusters (a spiro
+    parent is the whole cluster of rings joined through spiro atoms), and the cluster that holds the
+    senior ring system, or ``None`` when there is none."""
+    from ..rules.ring_selection import select_principal_ring_system
     ring_systems = list(getattr(features, 'ring_systems', None) or [])
-    if not ring_systems:
-        return _refuse("no ring systems perceived")
-    senior = select_principal_ring_system(mol, ring_systems)
-    if not senior:
-        return _refuse("no senior ring system")
+    senior = select_principal_ring_system(mol, ring_systems) if ring_systems else None
     clusters = [set(s) for s in ring_systems]
     _merged = True
     while _merged:
@@ -2810,47 +2819,104 @@ def name_general_spiro(
                     break
             if _merged:
                 break
-    cage_seed = next((c for c in clusters if set(senior) <= c), None)
-    if cage_seed is None:
-        return _refuse("senior ring system not in any cluster")
+    return clusters, next((c for c in clusters if senior and set(senior) <= c), None)
 
+
+def _name_spiro_cluster(mol, features, seed, scopes, allow_aromatic_general, allow_charged):
+    """The spiro parent of the ring-atom cluster ``seed``: the audited spiro analysis, then the
+    component-name method (``_spiro_vonbaeyer_component_fallback``) for each of ``scopes``."""
+    from ..rules.vonbaeyer_universal import analyze_spiro_universal
     # NUMBERING (the Blue Book): after indicated hydrogen comes "(c)
     # principal characteristic groups and free valences (suffixes)" (:3256), before
     # the 'ene'/'yne' endings of (e). The monospiro numbering ranks heteroatoms, then
     # its suffix-atom tier, then ring multiple bonds (spiro.get_spiro_numbering), so
     # hand it the ring atoms that carry the principal characteristic group; without
     # them 'spiro[4.5]dec-1-en-3-one' was chosen over 'spiro[4.5]dec-3-en-2-one'.
-    _pg_ring = _principal_group_ring_atoms(mol, features, cage_seed)
+    _pg_ring = _principal_group_ring_atoms(mol, features, seed)
     spiro = analyze_spiro_universal(
-        mol, cage_atoms=cage_seed, allow_mancude=allow_aromatic_general,
+        mol, cage_atoms=seed, allow_mancude=allow_aromatic_general,
         free_valence_atoms=_pg_ring,
-        prefix_atoms=_prefix_ring_atoms(mol, features, cage_seed))
-    if spiro is None:
-        # fallback: analyze_spiro_universal handles a PURE spiro system;
-        # a MIXED fused+spiro one (a fused/tricyclic cage spiro-joined to a
-        # monocycle -- a spiro terpenoid lactone / alkaloid) is named by the
-        # component-name method instead. name_spiro_vonbaeyer builds the two-
-        # component spiro parent; the enrich path adds every FG (incl. a demoted
-        # ester -> acetyloxy) as a prefix, and ring stereo is cited on the same
-        # numbering. Best-effort only; round-trip is the correctness gate.
-        _vb = _spiro_vonbaeyer_component_fallback(mol)
+        prefix_atoms=_prefix_ring_atoms(mol, features, seed))
+    if spiro is not None:
+        return _emit_ring_from_analysis(
+            mol, features, spiro, allow_aromatic_general, allow_charged)
+    # fallback: analyze_spiro_universal handles a PURE spiro system;
+    # a MIXED fused+spiro one (a fused/tricyclic cage spiro-joined to a
+    # monocycle -- a spiro terpenoid lactone / alkaloid) is named by the
+    # component-name method instead. name_spiro_vonbaeyer builds the two-
+    # component spiro parent; the enrich path adds every FG (incl. a demoted
+    # ester -> acetyloxy) as a prefix, and ring stereo is cited on the same
+    # numbering. Best-effort only; round-trip is the correctness gate.
+    for scope in scopes:
+        _vb = _spiro_vonbaeyer_component_fallback(mol, scope)
         if _vb is not None:
             return _vb
-        return _refuse("not an analyzable spiro ring system")
-
-    return _emit_ring_from_analysis(
-        mol, features, spiro, allow_aromatic_general, allow_charged)
+    return None
 
 
-def _spiro_vonbaeyer_component_fallback(mol) -> Optional[GeneralEngineResult]:
+def name_general_spiro_alternative(
+    mol, features, allow_aromatic_general: bool = False, allow_charged: bool = False,
+) -> Optional[GeneralEngineResult]:
+    """The spiro parent of a ring cluster other than the one that holds the senior ring system: the
+    LAST rung of the producer (``t4_coverage._spiro_alternative_candidate``), after the engine
+    and the universal floor, so after every producer that names the molecule from its senior ring
+    system declined.
+
+    The senior ring system of a molecule that carries a monocycle of its own (a morpholine, a
+    pyridine, a piperidine) is that monocycle "General criteria for determining ring
+    seniority", the Blue Book: "(b) has at least one nitrogen atom"), which no spiro analysis
+    names, and the monocycle producer names the molecule from it. Where that and every later rung
+    declined, the clusters of more than one ring, other than the senior one, are offered in a fixed
+    order (rings, atoms, lowest atom index) and each is named alone (``rules.ring_cluster``). The
+    name it gives has a less senior ring as its parent: it is offered only where no other rung
+    names the molecule."""
+    reason = _common_refusal(mol, allow_charged=allow_charged)
+    if reason:
+        return _refuse(reason)
+    clusters, senior = _spiro_clusters(mol, features)
+    if senior is None:
+        return None
+    rings = [set(r) for r in mol.GetRingInfo().AtomRings()]
+    count = {id(c): sum(1 for r in rings if r <= c) for c in clusters}
+    for seed in sorted((c for c in clusters if c is not senior and count[id(c)] > 1),
+                       key=lambda c: (-count[id(c)], -len(c), min(c))):
+        result = _name_spiro_cluster(mol, features, seed, (seed,), allow_aromatic_general,
+                                     allow_charged)
+        if result is not None:
+            return result
+    return None
+
+
+def _ring_needs_added_hydrogen(mol, cluster) -> bool:
+    """True iff a ring outside the ring system ``cluster`` holds an aromatic atom with an exocyclic
+    double bond (a pyridone-type ring: ``c(=O)n``, ``c(=S)``).
+
+    The substituent speller of the engine (``ring_substituents._decorated_fused_substituent_name``) cites
+    no added hydrogen where the universal speller of the producer does: ``4-oxoquinazolin-3-yl`` for
+    ``4-oxoquinazolin-3(4H)-yl``, "'Added indicated hydrogen'" (the Blue Book),
+    (:16071). A name that the cluster-scoped spiro attempt builds for such a molecule would be spelled
+    worse than the name it displaces, so that attempt declines and names the molecule as before."""
+    cluster = set(cluster)
+    return any(
+        a.GetIdx() not in cluster and a.IsInRing() and a.GetIsAromatic()
+        and any(b.GetBondType() == Chem.BondType.DOUBLE and not b.IsInRing() for b in a.GetBonds())
+        for a in atoms_of(mol))
+
+
+def _spiro_vonbaeyer_component_fallback(mol, cluster=None) -> Optional[GeneralEngineResult]:
     """ component-name spiro (mixed fused+spiro) as a best-effort ring
     parent: ``name_spiro_vonbaeyer`` core + ``_enrich_complex_ring_with_subs``
     prefixes + ring stereo. Returns a GeneralEngineResult or None (fail-closed).
     A single whole-molecule parent binding certifies atom coverage (E1);
-    proves the name denotes the right structure."""
+    proves the name denotes the right structure. ``cluster``: the ring atoms of the spiro
+    system to name, when the molecule has other rings (``rules.ring_cluster``)."""
+    from ..rules.ring_cluster import ring_cluster_scope
     from ..rules.spiro import name_spiro_vonbaeyer
     from .composer import _enrich_complex_ring_with_subs
-    r = name_spiro_vonbaeyer(mol)
+    if cluster is not None and _ring_needs_added_hydrogen(mol, cluster):
+        return None
+    with ring_cluster_scope(cluster):
+        r = name_spiro_vonbaeyer(mol)
     if not r:
         return None
     core_name, ring_atoms, a2l, _ = r
@@ -2874,6 +2940,27 @@ def _spiro_vonbaeyer_component_fallback(mol) -> Optional[GeneralEngineResult]:
     # routed). Completing THESE to full stereo is the ST.3 / binding-spine
     # follow-on, not stereo-site routing.
     int_a2l = {a: l for a, l in a2l.items() if isinstance(l, int)}
+    # Offered first (a project rule), for the ring system alone (``cluster``: the attempt that gave no
+    # name before) where a stereocentre sits on a primed locant: the block that states every
+    # stereocentre, kept only when the whole name reads back to the input's full key; otherwise the
+    # unprimed block below, which is what this fallback always shipped.
+    from .fragment_naming import is_top_level_naming
+    if cluster is not None and len(int_a2l) < len(a2l) and is_top_level_naming():
+        _full = _stereo_prefix(mol, a2l)
+        if _full and _full != _stereo_prefix(mol, int_a2l):
+            try:
+                from ..validation.opsin_roundtrip import opsin_roundtrip_check
+                if opsin_roundtrip_check(Chem.MolToSmiles(mol), _full + name)["passed"]:
+                    # the map stays the unprimed one: the binding spine cannot place a primed
+                    # locant, and the full-key read-back it defers to has just passed
+                    all_heavy = tuple(sorted(
+                        a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1))
+                    return GeneralEngineResult(
+                        name=_full + name,
+                        bindings=(TokenBinding(all_heavy, core_name, 'parent'),),
+                        stereo_atom_to_locant=int_a2l)
+            except Exception:
+                pass
     name = _stereo_prefix(mol, int_a2l) + name
     all_heavy = tuple(sorted(
         a.GetIdx() for a in atoms_of(mol) if a.GetAtomicNum() > 1))

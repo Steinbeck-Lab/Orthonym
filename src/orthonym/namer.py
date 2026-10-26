@@ -6617,15 +6617,15 @@ class Orthonym:
             return False
 
     def _try_general_engine_recovery(self, smiles: str) -> Optional[str]:
-        """The late engine recovery (``_try_general_engine_recovery_impl``).
-
-        Also records, in ``self._last_recovery_floor_substitute``, whether the
-        name it returns is the universal floor standing in for a rung candidate
-        that failed its round trip (``t4_coverage.last_t4_was_floor_substitute``),
-        so the caller can let a clean-context recovery offer the engine's own name
-        first (``_prefer_clean_over_floor_substitute``)."""
+        """The late engine recovery (``_try_general_engine_recovery_impl``), offered the lifted
+        ring ceiling when it names nothing (``recover_beyond_ring_ceiling``). Also records, in
+        ``self._last_recovery_floor_substitute``, whether the name it returns is the universal
+        floor standing in for a rung candidate that failed its round trip
+        (``t4_coverage.last_t4_was_floor_substitute``), so the caller can let a clean-context
+        recovery offer the engine's own name first (``_prefer_clean_over_floor_substitute``)."""
+        from .assembly.budget_rescue import recover_beyond_ring_ceiling
         origin: dict = {}
-        rec = self._try_general_engine_recovery_impl(smiles, origin)
+        rec = recover_beyond_ring_ceiling(self, smiles, origin)
         self._last_recovery_floor_substitute = bool(
             rec is not None and origin.get("floor_substitute"))
         # P1: the name is the final rung's universal floor (every engine rung

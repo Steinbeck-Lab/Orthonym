@@ -69,6 +69,14 @@ def _composite_locant_sort_key(
     if isinstance(locant, tuple):
         num = locant[0] if locant and isinstance(locant[0], int) else 0
         return (num, ''.join(str(x) for x in locant[1:]))
+    # A primed locant as a string ('4\'', '4a\''), as the book-checked spiro spelling of the floor
+    # (universal_substituent) renders it: the key of the tuple, with the letter before the primes, so
+    # that 4 < 4' < 4a < 4a' < 5, the Blue Book: "Primed locants are placed immediately
+    # after the corresponding unprimed locants in a set arranged in ascending order").
+    if isinstance(locant, str) and "'" in locant:
+        m = re.fullmatch(r"(\d+)('*)([a-z]?)('*)", locant)
+        if m:
+            return (int(m.group(1)), m.group(3) + m.group(2) + m.group(4))
     # str path -- '3a' / '7a' / '12b'
     if isinstance(locant, str) and locant and locant[-1].isalpha():
         return (int(locant[:-1]), locant[-1])

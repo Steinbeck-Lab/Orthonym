@@ -107,3 +107,37 @@ def name_after_budget_trip(namer, smiles: str) -> Optional[str]:
     from .fragment_naming import own_hang_budgets
     with own_hang_budgets():
         return t4_rescue_name(namer, smiles) or pin_ceiling_name(namer, smiles)
+
+
+def recover_beyond_ring_ceiling(namer, smiles: str, origin: dict) -> Optional[str]:
+    """The late engine recovery of ``namer`` (``_try_general_engine_recovery_impl``), run once more
+    with the lifted ceilings of the von Baeyer analyses
+    (``rules.vonbaeyer_universal.lifted_ring_ceiling_scope``) when it names nothing and the
+    molecule holds a ring system that the ceilings of 100 atoms and 15 rings refuse
+    (``ring_system_beyond_ceiling``).
+
+    A fused aromatic macrocycle of 16 to 22 rings, or of 102 atoms, is analysed in a few seconds
+    once the ceilings are lifted, but at the first attempt a larger ring system costs the budget that
+    its parts need (``rules.vonbaeyer_universal``, a performance pass and 3), so the lift is an offer made after
+    the ordinary attempt found no name: a name that exists is never replaced, and a molecule with no
+    such ring system costs nothing. The offer has hang budgets of its own and is made once for the
+    molecule that ``name`` was called with (``first_whole_molecule_offer``), not for each of the
+    recoveries that run one after the other. The name is the one the recovery ships, its round trip
+    decides. Best-effort tier only. ``origin`` is the recovery's own record of the name it ships."""
+    rec = namer._try_general_engine_recovery_impl(smiles, origin)
+    if rec is not None or not namer._general_fallback_unverified:
+        return rec
+    from rdkit import Chem
+
+    from ..rules.vonbaeyer_universal import lifted_ring_ceiling_scope, ring_system_beyond_ceiling
+    from .fragment_naming import PerfBudgetExceeded, first_whole_molecule_offer, own_hang_budgets
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        if (mol is None or not ring_system_beyond_ceiling(mol)
+                or not first_whole_molecule_offer("lifted_ring_ceiling", smiles)):
+            return None
+        # hang budgets of its own: the enclosing ones are back as they were when the offer leaves
+        with lifted_ring_ceiling_scope(), own_hang_budgets():
+            return namer._try_general_engine_recovery_impl(smiles, origin)
+    except (Exception, PerfBudgetExceeded):  # an offer, never a failure of the molecule
+        return None

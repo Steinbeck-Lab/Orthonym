@@ -103,7 +103,7 @@ the molecule ([both on three sets](guide/accuracy.md#the-two-tiers)).
 | `pin` | the verified PIN (with a few listed exceptions), or no name: the default of releases up to 1.0.x |
 | `valid` | also other systematic names that OPSIN reads back to your structure |
 | `complete` | also general names for aromatic and heterocyclic ring systems |
-| `best-effort` | also the last-resort names, such as von Baeyer and spiro names for ring systems of up to 15 rings |
+| `best-effort` | also the last-resort names, such as von Baeyer and spiro names for ring systems of up to 100 skeletal atoms and 15 rings (200 and 30 where no other producer names the structure) |
 | `full-coverage` | also coordination names for metal tetrapyrrole and corrin complexes |
 
 Without OPSIN to read the names back (a host without Java, in the reduced mode), and for `--style general` and

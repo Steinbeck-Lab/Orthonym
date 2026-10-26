@@ -723,6 +723,11 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room, bridge_l
     incumbent = best.score[0][0] if best.score is not None else -1
     if incumbent > room:
         return
+    # inside the late offer of the lifted ceilings the scan for the bridge is charged too, one unit
+    # for four candidates: it is a loop of its own in each pair, which the charge of one unit per
+    # pair does not see (a ring of 20 benzene rings joined by single bonds ran 1,400 s unbounded)
+    from .vonbaeyer_universal import lifted_ceilings_active
+    charge_scan = lifted_ceilings_active()
     npaths = len(all_paths)
     masks, plens = _interior_masks(all_paths)
     bridge_order = (sorted((k for k in range(npaths) if plens[k] >= 2), key=lambda k: -plens[k])
@@ -755,6 +760,8 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room, bridge_l
                     if k != i and k != j and not (masks[k] & used):
                         best_mb_len = plens[k]
                         break
+                if charge_scan and bridge_order:
+                    spend(((bridge_order.index(k) + 1 if best_mb_len >= 0 else len(bridge_order)) + 3) // 4)
             if best_mb_len < 2:
                 # 0/1-atom main bridges are already covered by Cases 1/2.
                 continue

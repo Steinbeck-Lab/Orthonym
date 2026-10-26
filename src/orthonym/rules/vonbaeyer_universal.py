@@ -133,6 +133,72 @@ BEST_EFFORT_MAX_UNION_RINGS = 11
 _PIN_CEILINGS_ONLY: "contextvars.ContextVar[bool]" = contextvars.ContextVar(
     "orthonym_pin_ceilings_only", default=False)
 
+#: The ceilings of the late offer made inside ``lifted_ring_ceiling_scope``, to a best-effort
+#: molecule that every other producer left without a name. The ceilings above stay for the first
+#: attempt, where a larger ring system costs the budget that its parts need (a performance pass and 3), and the
+#: rows of the ceiling table above hold no ring system between the two pairs of ceilings. The values
+#: are measured on the 101 rows of the BR study panel (PubChem rows that no tier named) that hold one
+#: biconnected ring system above 100 atoms or 15 rings and within 200 atoms and 30 rings (16 to 22
+#: rings, 102 atoms): the first attempt names 2, the offer 28 (read back by a fresh OPSIN call to the
+#: full InChIKey, none wrong, the 2 kept), the 26 new names in 0.2 to 11.7 s each; the 101 rows cost
+#: 1,234 s against 1,137 s, and the two rows that ran over 60 s without the offer (91 s, 140 s) run
+#: 84 s and 79 s with it. The scan for the main bridge is charged in the offer (``polycyclic.
+#: _consider_multiatom_bridges``): a ring of 20 benzene rings joined by single bonds ran 1,405 s
+#: without that charge and declines in 9 s with it. The lifted ceilings are not a PIN ceiling: a name
+#: built on such a system is recorded as not a PIN (``beyond_pin_caps``).
+LIFTED_MAX_CAGE_ATOMS = 200
+LIFTED_MAX_CAGE_RINGS = 30
+_LIFTED_CEILINGS: "contextvars.ContextVar[bool]" = contextvars.ContextVar(
+    "orthonym_lifted_ceilings", default=False)
+
+
+@contextlib.contextmanager
+def lifted_ring_ceiling_scope():
+    """Within the body a best-effort request analyses a ring system of up to
+    ``LIFTED_MAX_CAGE_ATOMS`` skeletal atoms and ``LIFTED_MAX_CAGE_RINGS`` rings (``cage_caps``).
+    The PIN ceilings stay as they are."""
+    token = _LIFTED_CEILINGS.set(True)
+    try:
+        yield
+    finally:
+        _LIFTED_CEILINGS.reset(token)
+
+
+def lifted_ceilings_active() -> bool:
+    """True inside ``lifted_ring_ceiling_scope``."""
+    return _LIFTED_CEILINGS.get()
+
+
+def ring_system_beyond_ceiling(mol) -> bool:
+    """True iff a connected ring system of ``mol`` is refused by the best-effort ceilings and
+    analysable under the lifted ones: more than ``BEST_EFFORT_MAX_CAGE_ATOMS`` atoms or
+    ``BEST_EFFORT_MAX_CAGE_RINGS`` rings, and within ``LIFTED_MAX_CAGE_ATOMS`` and
+    ``LIFTED_MAX_CAGE_RINGS``, one biconnected ring system above ``BEST_EFFORT_MAX_UNION_RINGS``
+    rings (``within_ring_ceiling``)."""
+    ring_atoms = {a for r in mol.GetRingInfo().AtomRings() for a in r}
+    seen: set = set()
+    for start in sorted(ring_atoms):
+        if start in seen:
+            continue
+        comp, stack, n_bonds = {start}, [start], 0
+        while stack:
+            atom = stack.pop()
+            for bond in mol.GetAtomWithIdx(atom).GetBonds():
+                if not bond.IsInRing():
+                    continue
+                n_bonds += 1  # each ring bond is met from both ends
+                other = bond.GetOtherAtomIdx(atom)
+                if other not in comp:
+                    comp.add(other)
+                    stack.append(other)
+        seen |= comp
+        rings = n_bonds // 2 - len(comp) + 1
+        if ((rings > BEST_EFFORT_MAX_CAGE_RINGS or len(comp) > BEST_EFFORT_MAX_CAGE_ATOMS)
+                and rings <= LIFTED_MAX_CAGE_RINGS and len(comp) <= LIFTED_MAX_CAGE_ATOMS
+                and (rings <= BEST_EFFORT_MAX_UNION_RINGS or is_biconnected_ring_system(mol, comp))):
+            return True
+    return False
+
 
 @contextlib.contextmanager
 def pin_ceilings_scope():
@@ -162,6 +228,8 @@ def cage_caps() -> Tuple[int, int]:
     try:
         from ..metrics.provenance import best_effort_request_ctx
         if best_effort_request_ctx.get() is True:
+            if _LIFTED_CEILINGS.get():
+                return LIFTED_MAX_CAGE_ATOMS, LIFTED_MAX_CAGE_RINGS
             return BEST_EFFORT_MAX_CAGE_ATOMS, BEST_EFFORT_MAX_CAGE_RINGS
     except Exception:  # a tier read must never widen the scope
         pass
@@ -627,9 +695,74 @@ def _canonical_copy_and_match(mol):
             return None
         match = _stereo_aware_match(mol_for_match, canon)
         if len(match) != mol.GetNumAtoms():
+            # RDKit's aromaticity perception is not idempotent over a SMILES round trip for
+            # some ring systems (a porphyrin-type or bridged system whose perceived aromatic
+            # atoms depend on the Kekule form the SMILES was read from), so the re-parse is
+            # the same molecule perceived differently and no aromatic-bond-strict match exists.
+            match = _graph_match(mol, canon)
+        if len(match) != mol.GetNumAtoms():
             logger.info("vonbaeyer_universal: no whole-mol canon match; refuse")
             return None
     return canon, match, mol_for_match
+
+
+def _graph_match(mol, canon):
+    """The atom mapping of ``mol`` onto ``canon`` that holds for the graph and for the element, charge,
+    isotope, radical electrons and hydrogen count of every atom and for the chirality of every
+    stereocentre, and ignores the bond orders and the aromatic flags, which are the part of the two
+    perceptions that differ; ```` when none exists. Only the atom order of ``canon`` is used from it
+    (its own Kekule structure is the one analysed).
+
+    A molecule with defined stereo is matched with its chirality or not at all (the match that ignores
+    it could map a centre onto its mirror image in a symmetric ring system), and each stereo double
+    bond of ``mol`` must keep its E/Z label on the bond it is mapped to. The name built on this
+    mapping is also read back to the input's full InChIKey at every tier that ships it, so a mapping
+    that were wrong in a way these checks do not see is declined there, never shipped."""
+    labels = {}
+    for m in (mol, canon):
+        for a in m.GetAtoms():
+            labels.setdefault((a.GetFormalCharge(), a.GetIsotope(), a.GetNumRadicalElectrons(),
+                               a.GetTotalNumHs()), 0)
+    labels = {k: i + 1 for i, k in enumerate(sorted(labels))}
+    flat = []
+    for m in (mol, canon):
+        w = Chem.RWMol(m)
+        for a in w.GetAtoms():
+            a.SetIsotope(labels[(a.GetFormalCharge(), a.GetIsotope(), a.GetNumRadicalElectrons(),
+                                 a.GetTotalNumHs())])
+            a.SetIsAromatic(False)
+        for b in w.GetBonds():
+            b.SetIsAromatic(False)
+            b.SetBondType(Chem.BondType.SINGLE)
+            b.SetStereo(Chem.BondStereo.STEREONONE)
+        flat.append(w.GetMol())
+    flat_mol, flat_canon = flat
+    match = flat_mol.GetSubstructMatch(flat_canon, useChirality=True)
+    if len(match) != mol.GetNumAtoms():
+        if _has_defined_stereo(mol) or _has_defined_stereo(canon):
+            return ()
+        match = flat_mol.GetSubstructMatch(flat_canon)
+    if len(match) != mol.GetNumAtoms() or not _double_bond_labels_agree(mol, canon, match):
+        return ()
+    return match
+
+
+def _has_defined_stereo(mol) -> bool:
+    return (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms())
+            or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()))
+
+
+def _double_bond_labels_agree(mol, canon, match) -> bool:
+    """True iff every stereo double bond of ``mol`` has the same E/Z label on the bond of ``canon`` it
+    is mapped to (``match[canon atom] = mol atom``)."""
+    to_canon = {o: c for c, o in enumerate(match)}
+    for b in mol.GetBonds():
+        if b.GetStereo() == Chem.BondStereo.STEREONONE:
+            continue
+        twin = canon.GetBondBetweenAtoms(to_canon[b.GetBeginAtomIdx()], to_canon[b.GetEndAtomIdx()])
+        if twin is None or twin.GetStereo() != b.GetStereo():
+            return False
+    return True
 
 
 def analyze_cage_universal(

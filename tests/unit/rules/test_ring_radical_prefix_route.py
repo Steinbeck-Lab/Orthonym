@@ -62,10 +62,8 @@ def test_spiro_borirane_radical_with_a_stereocentre():
 
 @pytest.mark.opsin_gate
 @pytest.mark.slow
-@pytest.mark.xfail(strict=True, reason=(
-    "two spiro systems in a 46-atom molecule: the spiro assemblies are named only as separate parts and the "
-    "parts never join into one name that reads back"))
 def test_two_spiro_dioxanedione_and_dioxine_amide():
+    # named since L4: the cluster-scoped spiro fallback joins both spiro systems into one name that reads back
     _declined("CC(C)(C)OC(=O)N1CCC2(CC1)OC(=O)C(C(=O)O2)C(=O)NCC(=O)OC3=C(C(=O)OC4(O3)C5CC6CC(C5)CC4C6)"
               "C(=O)NCC(=O)O")
 

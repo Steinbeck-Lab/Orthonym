@@ -151,7 +151,11 @@ _GATE_SUPPRESSED_SMI = "C1=CC=C(C=C1)O[13C](=O)OC2=CC=CC=C2"  # oxoacid/anhydrid
 # full read-back); PubChem CID 142408528 (a 12-ring polycyclic cage) still abstains with NO_PARENT
 # Replacement witness 2026-10-21: the former 12-ring fixture is now named at best-effort (lanes B1 ring ceiling 15 +
 # B2 main-ring search); CID163728282 still refuses its parent at the top level (UNSUPPORTED_RING_SYSTEM -> NO_PARENT).
-_NO_PARENT_SMI = "C1=CC2=C3C=CC2C3=C1"  # unsupported polycyclic parent
+# Replacement witness 2026-10-26 (lane L4): the former fixture, the 9-atom m-bridged benzene
+# C1=CC2=C3C=CC2C3=C1, is named now (best-effort `tricyclo[4.3.0.0^2,7]nona-1(6),2,4,8-tetraene`, full read-back:
+# the canonical re-parse of its aromatic perception is matched on the graph). Two norbornadienes spiro-joined to one
+# cyclopentane (a polyspiro system with polycyclic parts) still refuse their parent at the top level.
+_NO_PARENT_SMI = "C1CCC2(C3=CC=C2C=C3)C4(C1)C5=CC=C4C=C5"  # unsupported polycyclic parent
 
 
 class TestEndToEndCodes:

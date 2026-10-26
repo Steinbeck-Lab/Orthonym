@@ -54,6 +54,8 @@ from ..data.hw_heteroatoms import (
 )
 from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): per-call atom/bond tuples
 from ..perception.rings import get_spiro_atoms
+from ..rules.ring_cluster import (is_carbon_von_baeyer_name, ring_atom_graph,
+                                  ring_cluster_scope_active, spiro_ring_bond_count)
 from ..rules.lambda_convention import (
     LAMBDA as _LAMBDA,
 )
@@ -5804,17 +5806,8 @@ def name_unbranched_polyspiro_different(
 
 
 def _ring_atom_graph(mol) -> Tuple[Set[int], Dict[int, Set[int]]]:
-    """Ring-atom set + adjacency limited to ring-ring bonds."""
-    ring_atoms: Set[int] = set()
-    for r in mol.GetRingInfo().AtomRings():
-        ring_atoms.update(r)
-    adj: Dict[int, Set[int]] = {a: set() for a in ring_atoms}
-    for bond in bonds_of(mol):
-        i, j = bond.GetBeginAtomIdx(), bond.GetEndAtomIdx()
-        if i in ring_atoms and j in ring_atoms:
-            adj[i].add(j)
-            adj[j].add(i)
-    return ring_atoms, adj
+    """Ring-atom set + adjacency limited to ring-ring bonds (``rules.ring_cluster``)."""
+    return ring_atom_graph(mol)
 
 
 def _ring_components_excluding(
@@ -5855,7 +5848,7 @@ def find_monospiro_separation_atom(
     ring_atoms, adj = _ring_atom_graph(mol)
     candidates: List[Tuple[int, List[Set[int]]]] = []
     for atom in ring_atoms:
-        if len(adj[atom]) != 4:
+        if not spiro_ring_bond_count(len(adj[atom])):
             continue
         comps = _ring_components_excluding(adj, atom)
         if len(comps) == 2 and all(adj[atom] & c for c in comps):
@@ -5902,6 +5895,11 @@ def _tricyclo_plus_spiro_component(
     if not audit_von_baeyer_descriptor(
             kek.GetMol(), set(res.cage_atoms), res.atom_to_locant, res.descriptor):
         return None
+    if (ring_cluster_scope_active() and res.hetero_prefix and spiro_atom is not None
+            and mol.GetAtomWithIdx(spiro_atom).GetAtomicNum() == 6):
+        #: its heteroatoms are cited before 'spiro' (``_name_spiro_vonbaeyer_core``)
+        from dataclasses import replace
+        res = replace(res, hetero_prefix='')
     name = _spell_ring_analysis(res, None)  # full parent hydride (keeps the 'e')
     if not name or ' ' in name:
         return None
@@ -6851,9 +6849,9 @@ def _name_spiro_vonbaeyer_core(mol):
     # component's retained name and must NOT be double-cited. Only the atoms of
     # bicyclo-cage-named components are 'a'-expressible here.
     a_expressible: Set[int] = set()
-    if name_a.startswith('bicyclo'):
+    if is_carbon_von_baeyer_name(name_a):
         a_expressible |= atoms_a
-    if name_b.startswith('bicyclo'):
+    if is_carbon_von_baeyer_name(name_b):
         a_expressible |= atoms_b
 
     #: a large saturated heteromonocycle component named as its carbon
