@@ -338,6 +338,11 @@ def opsin_roundtrip_check(
         if inchi_orig and inchi_opsin and inchi_orig == inchi_opsin:
             result["inchi_match"] = True
             result["passed"] = True
+            # the InChI drops the hydrogens of a hypervalent halogen (validation/key_blind_hydrogens.py)
+            from .key_blind_hydrogens import key_blind_hydrogen_verdict
+            if key_blind_hydrogen_verdict(smiles, opsin_smiles) == "mismatch":
+                result["passed"] = False
+                result["error"] = "hydrogen_mismatch"
         else:
             result["error"] = "inchi_mismatch"
 

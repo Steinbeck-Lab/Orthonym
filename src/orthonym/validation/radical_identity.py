@@ -21,6 +21,13 @@ whenever the input or the parse carries a chemical radical:
      identity over element, charge, hydrogen count, isotope, bond order and
      radical placement. Stereo is left to the caller's own stereo logic.
 
+The verdict also answers for the other thing the standard key cannot see, the hydrogens of a
+hypervalent halogen (``key_blind_hydrogens``): every gate that asks this module about a name
+asks that too, so a name that adds or loses a hydrogen on an iodine is a ``"mismatch"`` here whatever its
+radical profile. It is asked from this one function because this is the verdict every full-key
+gate already consults (the validity gate, the self-consistency verdict, the shipped-name round trip,
+``verify_or_none`` and the rule-level read-backs), so no gate needs a second call.
+
 Radical electrons on most METAL atoms are not counted: RDKit's valence model
 assigns them to bare cations such as [Pb+2] or [Sn+2] and to covalent metal
 centres, and they are not chemical radicals in the sense of. The p-block
@@ -110,7 +117,12 @@ def radical_identity_verdict(input_smiles: str, parsed_smiles: str) -> str:
 def _radical_identity_verdict_impl(input_smiles: str, parsed_smiles: str) -> str:
     """``"n/a"`` when neither side carries a chemical radical (the caller's own
     checks decide), else ``"ok"`` or ``"mismatch"``. A radical input whose parse
-    RDKit cannot read is a ``"mismatch"`` (fail closed)."""
+    RDKit cannot read is a ``"mismatch"`` (fail closed). A parse whose hydrogens on a
+    hypervalent halogen are not the input's is a ``"mismatch"`` too
+    (``key_blind_hydrogens``)."""
+    from .key_blind_hydrogens import key_blind_hydrogen_verdict
+    if key_blind_hydrogen_verdict(input_smiles, parsed_smiles) == "mismatch":
+        return "mismatch"
     mi = Chem.MolFromSmiles(input_smiles) if input_smiles else None
     if mi is None:
         return "n/a"
