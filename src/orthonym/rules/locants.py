@@ -431,6 +431,42 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
     return 0
 
 
+def suffix_heteroatoms(features) -> Set[int]:
+    """The heteroatoms of the principal characteristic group of ``features`` (the N of an amine, the O of an alcohol):
+    the groups they stand in are the suffix, and no prefix of criterion (d) of:func:`orient_chain`."""
+    matches = getattr(features, 'principal_group_atoms', None) or \
+        (getattr(features, 'functional_groups', None) or {}).get(features.principal_group) or ()
+    return {a for m in matches for a in m if features.mol.GetAtomWithIdx(a).GetAtomicNum() not in (1, 6)}
+
+
+def _detachable_prefix_locants(mol, atom_to_locant, substituent_positions, principal_group_heteroatoms) -> list:
+    """The sorted locants of the detachable prefixes of a numbered chain, each a ``(kind, locant)`` pair.
+
+     "Numbering", criterion (f) (the Blue Book): "detachable alphabetized prefixes, all considered together
+    in a series of increasing numerical order". Every prefix counts, so a chain atom with two of them gives its
+    locant twice ({1,1,2} is lower than {1,2,2}). The principal characteristic group is the suffix, decided by
+    criterion (c), and is no prefix (its heteroatom is the atom of the group bonded to the chain; a group that holds
+    one deeper in a substituent is a prefix); the substituents of the nitrogen of a principal amine are prefixes cited with the
+    italic locant N and the locant of the chain atom of the nitrogen ('N1', 'N2'), and "Italic capital... letter
+    locants are lower than... numerals",:3195): kind 0 for an N-substituent, kind 1 for a numbered one."""
+    keys = []
+    for atom, groups in substituent_positions.items():
+        locant = atom_to_locant.get(atom)
+        if locant is None:
+            continue
+        for group in groups:
+            held = [m for m in group if m in principal_group_heteroatoms and mol.GetBondBetweenAtoms(m, atom) is not None]
+            if not held:
+                keys.append((1, locant))
+                continue
+            for member in held:                    # the suffix is no prefix; the N-substituents of an amine are
+                nitrogen = mol.GetAtomWithIdx(member)
+                if nitrogen.GetSymbol() == 'N':
+                    keys.extend((0, locant) for nb in nitrogen.GetNeighbors()
+                                if nb.GetIdx() != atom and nb.GetAtomicNum() > 1)
+    return sorted(keys)
+
+
 def orient_chain(
     chain: List[int],
     mol,
@@ -438,6 +474,7 @@ def orient_chain(
     double_bonds: List[Tuple[int, int]],
     triple_bonds: List[Tuple[int, int]],
     substituent_positions: Optional[Dict[int, List]] = None,
+    principal_group_heteroatoms: Optional[Set[int]] = None,
 ) -> List[int]:
     """
     Orient the principal chain to produce the lowest IUPAC locant set.
@@ -539,13 +576,10 @@ def orient_chain(
         # Substituent positions are already keyed by atom index
         sub_atoms = set(substituent_positions.keys()) & chain_set
         if sub_atoms:
-            fwd_locants = sorted(fwd_map[a] for a in sub_atoms)
-            rev_locants = sorted(rev_map[a] for a in sub_atoms)
-            result = compare_locant_sets(fwd_locants, rev_locants)
-            if result == -1:
-                return forward
-            if result == 1:
-                return reverse
+            fwd_locants = _detachable_prefix_locants(mol, fwd_map, substituent_positions, principal_group_heteroatoms or set())
+            rev_locants = _detachable_prefix_locants(mol, rev_map, substituent_positions, principal_group_heteroatoms or set())
+            if fwd_locants != rev_locants:
+                return forward if fwd_locants < rev_locants else reverse
 
     # --- Criterion (d.5): (h) nonstandard-valence atom lower locant ---
     # When the substituent locant SETS tie, the chain position bearing a

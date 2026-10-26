@@ -232,6 +232,7 @@ SENIORITY_ORDER = [
     "acyl_azide",
     "acyl_cyanide",
     "acyl_isocyanate",
+    "acyl_isothiocyanate",
     # W3-P11 / /: acid halides of sulfonic /
     # sulfinic acids. Acid-halide tier class 8), below the carbon acyl
     # halides (S oxoacid-derivatives named after their C analogues) and above
@@ -693,6 +694,7 @@ SUFFIX_FORMS = {
     "acyl_azide": ("oyl azide", "carbonyl azide"),
     "acyl_cyanide": ("oyl cyanide", "carbonyl cyanide"),
     "acyl_isocyanate": ("oyl isocyanate", "carbonyl isocyanate"),
+    "acyl_isothiocyanate": ("oyl isothiocyanate", "carbonyl isothiocyanate"),
     "primary_amide": ("amide", "carboxamide"),
     "secondary_amide": ("amide", "carboxamide"),
     "tertiary_amide": ("amide", "carboxamide"),
@@ -1027,6 +1029,7 @@ PREFIX_FORMS = {
     "acyl_azide": "azidocarbonyl",
     "acyl_cyanide": "cyanocarbonyl",
     "acyl_isocyanate": "isocyanatocarbonyl",
+    "acyl_isothiocyanate": "isothiocyanatocarbonyl",
     # Esters (handled specially in polyfunctional.py as acyloxy prefixes)
     "ester": None,  # Esters use alkoxycarbonyl prefix (generated in polyfunctional.py get_fg_prefix_form)
     "pseudoester": None,  # W3-P07: functional-class only (no principal-group prefix)

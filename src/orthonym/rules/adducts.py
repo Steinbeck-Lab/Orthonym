@@ -367,33 +367,70 @@ def _component_bucket(frag_mol, frag_smi: str) -> int:
     return 1
 
 
-def component_sort_key(frag_smi: str) -> Tuple[int, int, int, str]:
+def _ring_systems(mol) -> List[set]:
+    """The ring systems of ``mol`` as atom sets: rings that share an atom are one system."""
+    systems: List[set] = []
+    for ring in mol.GetRingInfo().AtomRings():
+        merged = set(ring)
+        rest = []
+        for system in systems:
+            if system & merged:
+                merged |= system
+            else:
+                rest.append(system)
+        systems = rest + [merged]
+    return systems
+
+
+def _principal_group_parent_key(frag_mol, pg_matches) -> tuple:
+    """The key of the parent structure that carries the principal characteristic group of a component
+    (smaller = more senior): a ring system before a chain, the Blue Book), the rings
+    by (a)-(g) (:19408, ``bridged_fused_pin.selection.p44_2_1_key``: a heterocycle, one with
+    nitrogen, more rings, more atoms...). A principal group on a chain, or on none, is ``(1,)``."""
+    from orthonym.rules.bridged_fused_pin.selection import p44_2_1_key
+    touched = set()
+    for match in pg_matches:
+        for idx in match:
+            touched.add(idx)
+            touched.update(nb.GetIdx() for nb in frag_mol.GetAtomWithIdx(idx).GetNeighbors())
+    bearing = [system for system in _ring_systems(frag_mol) if system & touched]
+    if not bearing:
+        return (1,)
+    return (0, min(p44_2_1_key(frag_mol, system) for system in bearing))
+
+
+def component_sort_key(frag_smi: str) -> tuple:
     """Deterministic citation order for one component.
 
-    (bucket, seniority index, -heavy_atoms, canonical_smiles):
-    organic components ordered by the seniority of the class of their
-    principal characteristic group: "cited in the order of
-    seniority of classes (see "); components without a suffix-capable
-    PCG (hydrocarbons, N-heterocycles-as-π-bases) rank after all
-    PCG-bearing organics; ties by descending size then canonical SMILES —
-    reproduces every Blue Book example (coronene—trinitrobenzene
-    big-first; benzene—pyridine resolved form).
+    (bucket, seniority index, -number of principal groups, parent key, -heavy_atoms,
+    canonical_smiles): organic components ordered by the seniority of the class of their
+    principal characteristic group: "cited in the order of seniority of classes (see
+    "); within a class the component with more principal groups and then the
+    senior parent ring system (:func:`_principal_group_parent_key`) comes first, which is how
+    'benzene-1,2,3-triol—quinolin-8-ol (1/2)' and '1H-indole-2-carboxylic acid—3,5-dinitrobenzoic
+    acid (1/1)' are cited (:3769, "in the order of seniority of classes"); components without a
+    suffix-capable PCG (hydrocarbons, N-heterocycles-as-π-bases) rank after all PCG-bearing
+    organics, ties by descending size then canonical SMILES -- reproduces every Blue Book
+    example (coronene—trinitrobenzene big-first; benzene—pyridine resolved form).
     """
     frag_mol = Chem.MolFromSmiles(frag_smi)
     if frag_mol is None:  # unreachable behind split_components; belt+braces
-        return (3, 0, 0, frag_smi)
+        return (3, 0, 0, (2,), 0, frag_smi)
     bucket = _component_bucket(frag_mol, frag_smi)
     from orthonym.perception.functional_groups import detect_functional_groups
     from orthonym.rules.seniority import SENIORITY_ORDER, get_principal_group, seniority_index
     seniority = len(SENIORITY_ORDER)
+    n_groups, parent_key = 0, (2,)
     if bucket == 0:
         try:
             pg, pg_matches = get_principal_group(frag_mol, detect_functional_groups(frag_mol))
             if pg is not None and pg in SENIORITY_ORDER:
                 seniority = seniority_index(pg, frag_mol, pg_matches)
+                n_groups = len(pg_matches)
+                parent_key = _principal_group_parent_key(frag_mol, pg_matches)
         except Exception:
             pass  # no PCG -> ranks after PCG-bearing organics
-    return (bucket, seniority, -frag_mol.GetNumHeavyAtoms(), frag_smi)
+    return (bucket, seniority, -n_groups, parent_key, -frag_mol.GetNumHeavyAtoms(), frag_smi)
 
 
 #: "an appropriate numerical prefix, such as 'mono','di', 'tri'"
@@ -679,6 +716,26 @@ def _readable_spellings_once(ordered: List[Tuple[str, int]],
     return list(zip(chosen, counts))
 
 
+def _label_mixed_adduct(name: str, ordered: List[Tuple[str, int]]) -> None:
+    """Record that the name of an adduct of an organic component with an inorganic one or with water is no PIN.
+
+     "Mixed organic - inorganic adducts" (the Blue Book): "Although organic components are preferred
+    IUPAC names, preferred IUPAC names cannot be assigned to mixed adducts because preferred IUPAC names have not yet
+    been determined for inorganic components." "Retained names" (:7952): the names 'water', 'hydrogen
+    chloride' and the like "are used in these recommendations but their use as preferred IUPAC names is deferred
+    pending publication of recommendations for the selection of preferred inorganic names; thus, no PIN label will be
+    assigned in names including them (see ": a hydrate carries no PIN label either."""
+    buckets = {_component_bucket(Chem.MolFromSmiles(smi), smi) for smi, _count in ordered}
+    if 0 in buckets and (1 in buckets or 2 in buckets):
+        from orthonym.metrics.provenance import record_non_pin_label
+        if 1 in buckets:
+            record_non_pin_label(name, rule="P-14.8.2",
+                                 detail="a mixed organic - inorganic adduct has no preferred IUPAC name")
+        else:
+            record_non_pin_label(name, rule="P-21.1.1.2",
+                                 detail="the name 'water' carries no PIN label (its use as a preferred name is deferred)")
+
+
 def name_adduct(mol, canonical_smiles: Optional[str] = None,
                 style: str = "pin", *,
                 general_fallback: bool = False,
@@ -797,7 +854,10 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
             general_fallback_unverified=general_fallback_unverified))
     if _widened:
         _name = _assemble_adduct_name(named)
-        return _name if _parse_reproduces_depiction(_name, mol) else None
+        if not _parse_reproduces_depiction(_name, mol):
+            return None
+        _label_mixed_adduct(_name, ordered)
+        return _name
     if style == "general":
         water_indices = [i for i, (smi, _c) in enumerate(ordered)
                          if smi == "O"]
@@ -805,4 +865,6 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
             word = _hydrate_word_form(named, water_indices[0])
             if word is not None:
                 return word
-    return _assemble_adduct_name(named)
+    _name = _assemble_adduct_name(named)
+    _label_mixed_adduct(_name, ordered)
+    return _name

@@ -86,9 +86,18 @@ COVERAGE_CASES = [
 # the frozen space-join on identical-component input); complete MUST equal
 # pin EXACTLY -- P4 must be a strict no-op whenever the PIN path succeeds.
 BYTE_IDENTICAL_CASES = [
+    ("CC(=O)[O-].[Na+]", "sodium acetate"),
+]
+
+# 2026-10-26 (PINB lane), change-asserted-value: 'benzene—water (1/1)' and 'ethanol—water (1/1)' were BYTE_IDENTICAL_CASES
+# rows (shipped by both the PIN tier and complete). "Retained names" (the Blue Book): the name 'water'
+# "is used in these recommendations but its use as a preferred IUPAC name is deferred pending publication of
+# recommendations for the selection of preferred inorganic names; thus, no PIN label will be assigned in names including
+# them (see ". The PIN tier declines the hydrate; the complete tier gives the same name, read back by OPSIN
+# (``test_emitted_names_roundtrip``).
+HYDRATE_CASES = [
     ("c1ccccc1.O", "benzene—water (1/1)"),
     ("CCO.O", "ethanol—water (1/1)"),
-    ("CC(=O)[O-].[Na+]", "sodium acetate"),
 ]
 
 # FAIL-CLOSED: neither pin nor complete emits a name -- P4 must NEVER ship a
@@ -124,7 +133,7 @@ SINGLE_FRAGMENT_UNCHANGED_CASES = [
 ]
 
 # Names emitted under complete that must OPSIN-round-trip to their input.
-_RT_NAMES = dict(COVERAGE_CASES + BYTE_IDENTICAL_CASES)
+_RT_NAMES = dict(COVERAGE_CASES + BYTE_IDENTICAL_CASES + HYDRATE_CASES)
 
 
 # --------------------------------------------------------------------------
@@ -219,6 +228,13 @@ def test_identical_components_are_named_only_below_the_pin(production_gate):
     smi = Chem.CanonSmiles("OCCO.OCCO")
     assert _pin().name(smi, on_failure="label") == "unknown organic compound"
     assert _complete().name(smi, on_failure="label") == "ethane-1,2-diol ethane-1,2-diol"
+
+
+@pytest.mark.parametrize("smiles,expected", HYDRATE_CASES)
+def test_a_hydrate_is_named_below_the_pin(smiles, expected, production_gate):
+    smi = Chem.CanonSmiles(smiles)
+    assert _pin().name(smi, on_failure="label") == "unknown organic compound"
+    assert _complete().name(smi, on_failure="label") == expected
 
 
 @pytest.mark.parametrize("smiles,expected", BYTE_IDENTICAL_CASES)

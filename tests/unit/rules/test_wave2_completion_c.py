@@ -109,7 +109,10 @@ class TestNewParentNamers:
     @pytest.mark.parametrize("smiles,expected", [
         ("CS(C)=O", "(methanesulfinyl)methane"),   # sulfoxide untouched
         ("CC[N+](=O)[O-]", "nitroethane"),          # nitro tautomer untouched
-        ("O=S1CCCC1", "thiolane 1-oxide"),          # ring S-oxide untouched
+        # 2026-10-26 (PINB lane), change-asserted-value: was 'thiolane 1-oxide'. (the Blue Book)
+        # names a ring -SO- by the suffix '-one' on the lambda4 heterocycle (the PIN), the class name 'oxide'
+        # is the name the book does not prefer; OPSIN read-back in test_pin_class_t21_lambda_ones.py.
+        ("O=S1CCCC1", "1λ4-thiolan-1-one"),
         ("CC(C)=O", "propan-2-one"),                # plain ketone untouched
     ])
     def test_protections(self, smiles, expected):

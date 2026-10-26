@@ -270,8 +270,10 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
 
     A cyanide group may occur several times, the Blue Book, "preceded by a
     multiplicative prefix, as needed"): every one is capped, and the acid must then end in the
-    multiplied suffix ('benzene-1,4-disulfinic acid' -> 'benzene-1,4-disulfinyl dicyanide'). A halide
-    group is named only alone.
+    multiplied suffix ('benzene-1,4-disulfinic acid' -> 'benzene-1,4-disulfinyl dicyanide'). So may a
+    halide group, when every one is the same halide ('ethane-1,2-disulfonyl dibromide (PIN)',
+    the Blue Book, "Acyl halides from suffix acids":31412: the class word "preceded by a
+    multiplicative prefix, as needed"); two different halides on one acid ('bromide chloride') are not built.
 
     A nuclide on E, the cyanide carbon or the cyanide nitrogen cannot be cited in the functional-class
     name (:func:`_cyanide_unit_is_labelled`); the name offered then is the substitutive
@@ -287,8 +289,8 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
     is_cyanide = pg in OXOACID_CYANIDE_ENDINGS
     matches = list(features.functional_groups.get(pg, []))
     count = len(matches)
-    # A halide is named alone: the two-word grammar would need a multiplied acyl word for several.
-    if count < 1 or (count > 1 and (not is_cyanide or count not in SIMPLE_MULTIPLIERS)):
+    # Several groups need the multiplied acyl word and the multiplied class word ('disulfonyl dibromide').
+    if count < 1 or (count > 1 and count not in SIMPLE_MULTIPLIERS):
         return None
 
     # Cap the S-bonded leaving group -> -OH, forming the parent sulfonic/sulfinic
@@ -326,18 +328,25 @@ def name_sulfonyl_halide(features, style: str = "pin") -> Optional[str]:
             rw.RemoveAtom(n_idx)
     else:
         # Match tuples: sulfonyl (S, =O, =O, X); sulfinyl (S, =O, X) — S first,
-        # halide last.
-        halide_idx = matches[0][-1]
-        halide_sym = mol.GetAtomWithIdx(halide_idx).GetSymbol()
+        # halide last. Several groups must be of one halide ('disulfonyl dibromide'); a stereogenic
+        # S of a sulfinyl halide takes the descriptor of the acid it is capped to only when it is alone
+        # (the cyanide branch above).
         from .acid_halides import _HALIDE_WORD
-        halide_word = _HALIDE_WORD.get(halide_sym)
+        halide_syms = {mol.GetAtomWithIdx(m[-1]).GetSymbol() for m in matches}
+        if len(halide_syms) != 1:
+            return None
+        halide_word = _HALIDE_WORD.get(next(iter(halide_syms)))
         if halide_word is None:
             return None
-        o_atom = rw.GetAtomWithIdx(halide_idx)
-        o_atom.SetAtomicNum(8)
-        o_atom.SetFormalCharge(0)
-        o_atom.SetNumExplicitHs(0)
-        o_atom.SetNoImplicit(False)
+        if count > 1 and any(rw.GetAtomWithIdx(m[0]).GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
+                             for m in matches):
+            return None
+        for match in matches:
+            o_atom = rw.GetAtomWithIdx(match[-1])
+            o_atom.SetAtomicNum(8)
+            o_atom.SetFormalCharge(0)
+            o_atom.SetNumExplicitHs(0)
+            o_atom.SetNoImplicit(False)
     try:
         capped = rw.GetMol()
         Chem.SanitizeMol(capped)

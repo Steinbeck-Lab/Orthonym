@@ -329,8 +329,6 @@ def test_d_carnitine_from_the_amino_acid_table_is_labelled_below_the_pin_tier(na
     # ('carbamimidoylamino (preferred prefix)':34268;:7272). Was
     # 'creatine' (pin_verified).
     ("CN(CC(=O)O)C(=N)N", "[carbamimidoyl(methyl)amino]acetic acid"),
-    ("CN(CC(=O)O)C(=N)N.Cl",
-     "[carbamimidoyl(methyl)amino]acetic acid—hydrogen chloride (1/1)"),
     # (4) lysopine: the located substituent descriptor:44624,
     # '[(1R)-1-chloropropyl]benzene (PIN)':44668) and no extra mark level
     #:7444). Was 'lysopine' (pin_verified).
@@ -342,6 +340,18 @@ def test_part2_systematic_name_at_the_pin_tier(namer, smiles, expected):
     assert res["name"] == expected, res
     assert res["tier"] == "pin_verified" and res["is_pin"] is True, res
     assert_full_rt(res["name"], smiles)
+
+
+@pytest.mark.opsin_gate
+def test_part2_creatine_hydrochloride_is_a_mixed_adduct_without_a_pin():
+    """The adduct of creatine with hydrogen chloride (it was a row of the test above). "Mixed
+    organic - inorganic adducts" (the Blue Book): "preferred IUPAC names cannot be assigned to mixed
+    adducts because preferred IUPAC names have not yet been determined for inorganic components". The
+    organic component is the PIN of the row above; the name is declined at the PIN tier and best-effort
+    gives it."""
+    from tests.support.default_tier import declined_pin_row
+    row = declined_pin_row("CN(CC(=O)O)C(=N)N.Cl")
+    assert row["name"] == "[carbamimidoyl(methyl)amino]acetic acid—hydrogen chloride (1/1)"
 
 
 @pytest.mark.opsin_gate

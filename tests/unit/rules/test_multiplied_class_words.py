@@ -162,3 +162,39 @@ def test_the_sulfinyl_cyanide_unit_is_multiplied_not_declined():
     from orthonym.rules.multiplicative import name_multiplicative
     smiles = "N#CS(=O)c1ccc(cc1)Oc1ccc(cc1)S(=O)C#N"
     assert name_multiplicative(Chem.MolFromSmiles(smiles)) == "4,4'-oxydi(benzene-1-sulfinyl) dicyanide"
+
+
+# --- an acyclic arm: the acyl halide of a multiplied acid ---------------------------------------------------
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,expected", [
+    ("ClC(=O)COCC(=O)Cl", "2,2'-oxydiacetyl dichloride"),
+    ("ClC(=O)CCOCCC(=O)Cl", "3,3'-oxydipropanoyl dichloride"),
+    ("BrC(=O)COCC(=O)Br", "2,2'-oxydiacetyl dibromide"),
+    ("FC(=O)CCCOCCCC(F)=O", "4,4'-oxydibutanoyl difluoride"),
+    ("ClC(=O)CSCC(=O)Cl", "2,2'-sulfanediyldiacetyl dichloride"),
+    ("ClC(=O)CNCC(=O)Cl", "2,2'-azanediyldiacetyl dichloride"),
+])
+def test_the_acyclic_acid_halide_of_a_multiplied_acid_is_multiplied_like_the_ring_one(smiles, expected):
+    """ "Acyl halides from suffix acids" (:31412): the acyl group of the acid, then the class word
+    "each preceded by a multiplicative prefix, as needed"; the acid is the multiplicative PIN '2,2'-oxydiacetic
+    acid',:5848), so its acyl group is '2,2'-oxydiacetyl',:30608), as the ring
+    acid '4,4'-oxydibenzoic acid' gives '4,4'-oxydibenzoyl dichloride'. Before, the arm was an acid or an
+    alcohol only, and the halide was named by the substitutive '(2-chloro-2-oxoethoxy)acetyl chloride'."""
+    row = _tiered_namer("pin", "pin").name_tiered(smiles)
+    assert row["name"] == expected and row["tier"] == "pin_verified"
+    assert opsin_roundtrip_check(smiles, row["name"])["passed"], row["name"]
+
+
+@pytest.mark.unit
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles", [
+    "ClC(=O)COCC(=O)Br",        # two halides: the arms are not identical, 'bromide chloride' is not built
+    "ClC(=O)COC",               # one acyl halide: the substitutive name
+    "ClC(=O)COCC(=O)O",         # an acid and its halide
+])
+def test_a_unit_that_is_not_two_identical_acyl_halides_keeps_its_name(smiles):
+    name = Orthonym().name_tiered(smiles)["name"]
+    assert "oxydi" not in name, name

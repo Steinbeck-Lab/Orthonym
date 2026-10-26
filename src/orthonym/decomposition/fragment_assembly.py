@@ -1331,6 +1331,10 @@ def _assemble_amide(fragment_names: Dict[str, str], style: str,
             from .engine import _amine_acyl_ambiguous
             if _amine_acyl_ambiguous(_amine_smi):
                 return None
+        # a ring heterone holds the suffix, the amine is cited as the prefix 'amino': no N to float
+        from .amine_suffix import amine_is_on_ring_heterone
+        if amine_is_on_ring_heterone(amine_name, _amine_smi):
+            return None
         acyl_prefix = _acid_to_acyl(acid_name)
         if acyl_prefix and amine_name:
             acyl_float = True

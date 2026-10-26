@@ -8,9 +8,10 @@ are equivalent). With the corrected phenoxathiine map (b),:12541: O before S, so
 and S10) the oxide is 'phenoxathiine 10-oxide'.
 Every name reads back to the input's full InChIKey with OPSIN 2.9.0.
 
-The label of the additive names is not decided here: (:29436) expresses a ring -SO-/-SO2-
-with the '-one' suffix on a lambda-6 heterocycle ('5H-λ6-thianthrene-5,5-dione (PIN)
-thianthrene 5,5-dioxide',:29444), which is PIN class program Task 21 (lambda ring oxides).
+ (:29436) expresses a ring -SO-/-SO2- with the '-one' suffix on a lambda-6 heterocycle
+('5H-λ6-thianthrene-5,5-dione (PIN) thianthrene 5,5-dioxide',:29444): the additive names of the rows here are
+not PINs (the producer records them below the PIN, ``test_pin_class_t21_lambda_ones.py``), and the saturated
+monocycle, 'thiolane 1-oxide', has its heterone name ('1λ4-thiolan-1-one', the same test module).
 """
 import pytest
 
@@ -26,7 +27,6 @@ pytestmark = pytest.mark.opsin_gate
     ("C1=CC=CC=2OC3=CC=CC=C3S(C12)=O", "phenoxathiine 10-oxide"),
     ("C1=CC=CC=2OC3=CC=CC=C3S(C12)(=O)=O", "phenoxathiine 10,10-dioxide"),
     ("O=S1c2ccccc2-c2ccccc21", "dibenzo[b,d]thiophene 5-oxide"),
-    ("O=S1CCCC1", "thiolane 1-oxide"),
 ])
 def test_ring_sulfur_oxide_locant(smiles, name):
     b = name_breadth(smiles)

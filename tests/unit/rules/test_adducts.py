@@ -189,7 +189,11 @@ class TestAdductDispatch:
     def test_oxalic_monohydrate_pin(self):
         # was 'unknown organic compound' at HEAD (predicate required >=2
         # multi-atom fragments; water has 1 heavy atom)
-        assert self._nc("O.OC(=O)C(=O)O") == "oxalic acid—water (1/1)"
+        # 2026-10-26 (PINB lane), change-asserted-value: was asserted as the PIN. "Retained names"
+        # (the Blue Book): the name 'water' "is used in these recommendations but its use as a preferred IUPAC
+        # name is deferred...; thus, no PIN label will be assigned in names including them (see ".
+        from tests.support.default_tier import declined_pin_row
+        assert declined_pin_row("O.OC(=O)C(=O)O")["name"] == "oxalic acid—water (1/1)"
 
     def test_benzene_pyridine_flips_to_adduct_pin(self):
         # was the space-join 'benzene pyridine' at HEAD
@@ -203,18 +207,30 @@ class TestAdductDispatch:
         # stereo). 'nicotine' is an OPSIN-import trivial name without PIN evidence and
         # left the PIN lookup. Was 'nicotine—hydrogen chloride (1/1)'. OPSIN 2.9.0
         # full-InChIKey exact.
-        assert self._nc("Cl.CN1CCCC1c1cccnc1") == (
-            "3-(1-methylpyrrolidin-2-yl)pyridine—hydrogen chloride (1/1)")
+        #
+        # "Mixed organic - inorganic adducts" (the Blue Book): "preferred
+        # IUPAC names cannot be assigned to mixed adducts because preferred IUPAC names
+        # have not yet been determined for inorganic components". The name is the strict
+        # path's, labelled below the PIN: the PIN tier declines it, best-effort gives it.
+        from tests.support.default_tier import declined_pin_row
+        row = declined_pin_row("Cl.CN1CCCC1c1cccnc1")
+        assert row["name"] == "3-(1-methylpyrrolidin-2-yl)pyridine—hydrogen chloride (1/1)"
 
     def test_mixed_phosphoric_1_2(self):
         # -a/-b (the Blue Book pattern; OPSIN verified)
-        assert self._nc("OP(=O)(O)O.OP(=O)(O)O.NCCN") == (
-            "ethane-1,2-diamine—phosphoric acid (1/2)")
+        # (the Blue Book): no PIN for a mixed adduct, so the PIN tier declines
+        # the name and best-effort keeps it (the quote is under test_mixed_hydrochloride).
+        from tests.support.default_tier import declined_pin_row
+        row = declined_pin_row("OP(=O)(O)O.OP(=O)(O)O.NCCN")
+        assert row["name"] == "ethane-1,2-diamine—phosphoric acid (1/2)"
 
     def test_mixed_three_buckets_water_last(self):
         # organic -> inorganic -> water -a; OPSIN verified)
-        assert self._nc("O.Cl.CCO") == (
-            "ethanol—hydrogen chloride—water (1/1/1)")
+        # (the Blue Book): a mixed adduct has no PIN; declined at the PIN tier,
+        # kept by best-effort (the quote is under test_mixed_hydrochloride).
+        from tests.support.default_tier import declined_pin_row
+        row = declined_pin_row("O.Cl.CCO")
+        assert row["name"] == "ethanol—hydrogen chloride—water (1/1/1)"
 
     def test_salt_routing_protected(self):
         # charged multi-fragment stays with the ions/salt router

@@ -31,7 +31,7 @@ def _is_acid_halide(features: Any) -> bool:
     """
     return getattr(features, 'principal_group', None) in (
         'acid_chloride', 'acid_bromide', 'acid_fluoride',
-        'acyl_azide', 'acyl_cyanide', 'acyl_isocyanate',
+        'acyl_azide', 'acyl_cyanide', 'acyl_isocyanate', 'acyl_isothiocyanate',
     )
 
 

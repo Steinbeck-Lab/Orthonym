@@ -26,8 +26,14 @@ class TestRingChalcogenOxide:
     @pytest.mark.parametrize("smiles,expected", [
         ("O=S1c2ccccc2-c2ccccc21", "dibenzo[b,d]thiophene 5-oxide"),
         ("O=S1(=O)c2ccccc2-c2ccccc21", "dibenzo[b,d]thiophene 5,5-dioxide"),
-        ("O=S1CCCC1", "thiolane 1-oxide"),
-        ("O=S1(=O)CCCC1", "thiolane 1,1-dioxide"),
+        # 2026-10-26 (PINB lane), change-asserted-value: were 'thiolane 1-oxide' and 'thiolane 1,1-dioxide'.
+        # (the Blue Book): "When a group -SO- or -SO2- is part of a ring system, oxygen
+        # atom(s) are expressed substitutively by the suffix '-one'... This method generates preferred
+        # IUPAC names rather than those based on functional class nomenclature, in which the class name
+        # 'oxide' follows the name of the heterocycle"; the OPSIN read-back is in
+        # test_pin_class_t21_lambda_ones.py.
+        ("O=S1CCCC1", "1λ4-thiolan-1-one"),
+        ("O=S1(=O)CCCC1", "1λ6-thiolane-1,1-dione"),
     ])
     def test_heals(self, smiles, expected):
         assert name_compound(smiles) == expected

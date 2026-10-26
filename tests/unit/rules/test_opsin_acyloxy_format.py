@@ -53,21 +53,26 @@ class TestAcyloxyBracketFormat:
         )
 
     def test_polyol_ester_acyloxy_brackets(self):
-        """Non-glycerol polyol ester keeps the multiplicative (acyloxy) prefix form.
+        """A non-glycerol polyol ester whose anions differ keeps the multiplicative (acyloxy) prefix form.
 
         a phase update: glycerol triacetate (triacetin) is a triacylglycerol and
         now routes through the lipid assembler to the Form B systematic ester
-        name ``propane-1,2,3-triyl triacetate`` (OPSIN-RT-verified). The general
-        multiplicative-(acyloxy) formatting is unchanged for NON-glycerol polyols,
-        verified here on erythritol tetraacetate (the lipid detector hard-gates it
-        out: not a propane-1,2,3-triol core → returns None → general pipeline).
+        name ``propane-1,2,3-triyl triacetate`` (OPSIN-RT-verified).
+
+        Changed asserted value (PREC): the erythritol tetraacetate this test used is a polyol of IDENTICAL
+        anions, so (the Blue Book, heading Polyesters formed from a single
+        'alcoholic' component) names it by functional class multiplicative nomenclature,
+        ``butane-1,2,3,4-tetrayl tetraacetate`` (tests/unit/rules/test_polyol_esters_identical_anions.py); the
+        prefix form is the name of a polyol whose anions are different, for which method (1) of
+         (:31831) is not built: the acyloxy formatting is verified on that one.
         """
         # glycerol triacetate is now the lipid Form B (intended Phase-180 behavior)
         assert name_compound("CC(=O)OCC(OC(C)=O)COC(C)=O") == "propane-1,2,3-triyl triacetate"
-        # erythritol tetraacetate: NOT a glyceride -> general (acyloxy) multiplier form retained
-        name = name_compound("CC(=O)OCC(OC(C)=O)C(OC(C)=O)COC(C)=O")
+        assert name_compound("CC(=O)OCC(OC(C)=O)C(OC(C)=O)COC(C)=O") == "butane-1,2,3,4-tetrayl tetraacetate"
+        # two acids on one tetraol: general (acyloxy) multiplier form retained
+        name = name_compound("CC(=O)OCC(OC(C)=O)C(OC(C)=O)COC(=O)CC")
         assert "(acetyloxy)" in name, f"Expected '(acetyloxy)' in '{name}'"
-        assert "tetrakis" in name.lower(), f"Expected 'tetrakis' in '{name}'"
+        assert "tris" in name.lower(), f"Expected 'tris' in '{name}'"
 
 
 @pytest.mark.unit

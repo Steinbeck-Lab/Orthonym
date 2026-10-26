@@ -91,7 +91,7 @@ BEST_EFFORT = {
     "[2H]OP(=O)(O)O": "(2H1)phosphoric acid",
     "[2H]OS(=O)(=O)O": "(2H1)sulfuric acid",
     "[2H]OC(=O)C(=O)O": "(2H1)oxalic acid",
-    "FC(F)(F)C([2H])(F)Cl": "1-chloro-1,2,2,2-tetrafluoro(2H1)ethane",
+    "FC(F)(F)C([2H])(F)Cl": "2-chloro-1,1,1,2-tetrafluoro(2H1)ethane",
     "FC(F)(F)C(F)([2H])c1ccccc1": "[1,2,2,2-tetrafluoro(2H1)ethyl]benzene",
     "OC([2H])(C(F)(F)F)C(F)(F)F": "1,1,1,3,3,3-hexafluoro(2H1)propan-2-ol",
 }
@@ -180,7 +180,14 @@ LOCANTED_ROWS = [
     # acid' keeps its word and shows the locants of its substituents,:3031, omits them otherwise)
     ("OC(=O)C([2H])(Cl)Cl", "2,2-dichloro(2-2H)acetic acid"),
     ("[2H]CC(F)(F)F", "1,1,1-trifluoro(2-2H1)ethane"),         # the printed control,:44155
-    ("FC(F)(F)C([2H])(F)Cl", "1-chloro-1,2,2,2-tetrafluoro(1-2H)ethane"),    #:44180,:44210
+    # 2026-10-26 (PINB lane), change-asserted-value: was '1-chloro-1,2,2,2-tetrafluoro(1-2H)ethane'. "Priority
+    # between isotopically substituted and unmodified atoms or groups" (the Blue Book) and (i) (:3336): "When
+    # there is a choice between equivalent numberings in an isotopically unmodified compound, the starting point and the
+    # direction of numbering of the analogous isotopically substituted compound are chosen so as to give lowest locants to
+    # the modified atoms": the unmodified compound is numbered first, and (f) (:3301) "detachable alphabetized
+    # prefixes, all considered together" gives '2-chloro-1,1,1,2-tetrafluoroethane' ({1,1,1,2,2} is lower than
+    # {1,1,2,2,2}); the isotope decides between equivalent numberings only. The descriptor cites its locant::44180.
+    ("FC(F)(F)C([2H])(F)Cl", "2-chloro-1,1,1,2-tetrafluoro(2-2H)ethane"),
     ("FC(F)(F)C(F)([2H])c1ccccc1", "[1,2,2,2-tetrafluoro(1-2H)ethyl]benzene"),
     NESTED_ROW[:2],
     ("OC([2H])(C(F)(F)F)C(F)(F)F", "1,1,1,3,3,3-hexafluoro(2-2H)propan-2-ol"),
@@ -189,7 +196,7 @@ LOCANTED_ROWS = [
 DECLINED_ROWS = ["[2H]OP(=O)(O)O", "[2H]OS(=O)(=O)O", "[2H]OC(=O)C(=O)O",    # three and two equivalent OH,:43720
                  "[2H]c1ccccc1"]                                              # six equivalent CH
 REFUSED_NAMES = ["(2H)formic acid", "dichloro(2H)acetic acid", "(2H)phosphoric acid", "(2H)sulfuric acid",
-                 "(2H)oxalic acid", "1-chloro-1,2,2,2-tetrafluoro(2H)ethane",
+                 "(2H)oxalic acid", "2-chloro-1,1,1,2-tetrafluoro(2H)ethane",
                  "[1,2,2,2-tetrafluoro(2H)ethyl]cyclohexane", "[1,2,2,2-tetrafluoro(2H)ethyl]benzene",
                  "1,1,1,3,3,3-hexafluoro(2H)propan-2-ol"]
 
@@ -217,7 +224,7 @@ def test_the_refused_spellings_have_a_twin_but_are_not_licensed(name):
 @pytest.mark.parametrize("name,smiles,expected", [
     ("(2H)formic acid", "[2H]C(=O)O", False), ("dichloro(2H)acetic acid", "OC(=O)C([2H])(Cl)Cl", False),
     ("(2H)phosphoric acid", "[2H]OP(=O)(O)O", False), ("(2H)oxalic acid", "[2H]OC(=O)C(=O)O", False),
-    ("1-chloro-1,2,2,2-tetrafluoro(2H)ethane", "FC(F)(F)C([2H])(F)Cl", False),
+    ("2-chloro-1,1,1,2-tetrafluoro(2H)ethane", "FC(F)(F)C([2H])(F)Cl", False),
     ("[1,2,2,2-tetrafluoro(2H)ethyl]benzene", "FC(F)(F)C(F)([2H])c1ccccc1", False),
     ("trichloro(2H)methane", "[2H]C(Cl)(Cl)Cl", True), ("(2H)formonitrile", "[2H]C#N", True),
     ("pentafluoro(2H)ethane", "[2H]C(F)(F)C(F)(F)F", True),

@@ -1925,6 +1925,11 @@ def name_noncarbon_ester(mol, match: tuple) -> Optional[str]:
             or "unknown" in acid_name.lower()
             or "not supported" in acid_name.lower()):
         return None
+    # (:32049): anhydrides come before esters in the seniority of classes
+    from .noncarbon_acid_anhydrides import mixed_noncarbon_anhydride
+    anhydride = mixed_noncarbon_anhydride(mol, ester_o, organyl, acid_name)
+    if anhydride:
+        return anhydride
     anion = _acid_name_to_ate(acid_name)
     if anion is None:
         return None
@@ -3665,12 +3670,18 @@ def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str
     multiplicative PIN '<diol-diyl> di<acid>oate' (ethane-1,2-diyl diacetate),
     NOT the substitutive bis(acyloxy) form.
 
-    Fail-closed scope: exactly two esters, identical acyl fragments, a clean
-    acyclic diol backbone whose two attachment carbons are the two chain ends,
+     "Polyesters formed from a single 'alcoholic' component", (the Blue Book):
+    "When anions are identical functional class multiplicative nomenclature is used... Multiplicative prefixes
+    'di', 'tri', etc. are used when anions are unsubstituted; when substituted, prefixes 'bis', 'tris', etc." --
+    'propane-1,2,3-triyl triacetate (PIN)' (:31827), so the polyol of three to six identical esters is named the same way
+    ('butane-1,2,3,4-tetrayl tetraacetate'; the book prints no example above three, the rule has no limit).
+
+    Fail-closed scope: two to six esters, identical acyl fragments, a clean
+    acyclic polyol backbone (unbranched, the attachment carbons carrying the ester oxygens),
     carrying no other substituents. Returns the PIN or None (fall through).
     """
 
-    if len(ester_matches) != 2:
+    if len(ester_matches) not in _POLYOL_VALENCE:
         return None
 
     ester_oxygens = set()
@@ -3709,13 +3720,15 @@ def _try_functional_class_diol_diester(mol, ester_matches: list) -> Optional[str
     # 'di' before a consonant, no elision); a substituted anion takes 'bis'
     #, the Blue Book; 'propane-1,3-diyl
     # bis(chloroacetate) (PIN)',:31825).
+    count = len(ester_matches)
     if substituted:
-        return f"{diyl} bis({anions[0]})"
-    return f"{diyl} di{anions[0]}"
+        return f"{diyl} {_POLYOL_COMPLEX_MULTIPLIER[count]}({anions[0]})"
+    return f"{diyl} {_POLYOL_MULTIPLIER[count]}{anions[0]}"
 
 
-_POLYOL_VALENCE = {2: "diyl", 3: "triyl", 4: "tetrayl"}
-_POLYOL_MULTIPLIER = multiplier_table(4)
+_POLYOL_VALENCE = {2: "diyl", 3: "triyl", 4: "tetrayl", 5: "pentayl", 6: "hexayl"}
+_POLYOL_MULTIPLIER = multiplier_table(6)
+_POLYOL_COMPLEX_MULTIPLIER = multiplier_table(6, kind="complex")
 
 
 def _polyol_organyl_name(mol, attach_atoms: list, ester_oxygens: set,

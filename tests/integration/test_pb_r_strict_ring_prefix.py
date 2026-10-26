@@ -427,12 +427,25 @@ def test_fix1_an_n_yl_takes_added_hydrogen():
     ("F2 tied pyridines", "CN1C(=C(C(=N1)Br)[N+](=O)[O-])N2CCC(CC2)N(C3=CN=C(C=C3)OC(F)F)C4=C(C=CN=C4)OC"),
     # the PIN of an azo compound with no senior group is a diazene (:38829)
     ("F5 azo", "c1ccc(N=Nc2ccc3ccc(N=Nc4ccc5cc6ccccc6cc5c4)cc3c2)cc1"),
-    # a ring sulfone written '1,1-dioxothiolan',:2756: the lambda is cited)
-    ("F4 sulfolane", "CC1C(SCCN1C2CS(=O)(=O)CC2O)C"),
 ])
 def test_fix1_the_default_tier_declines(label, smiles):
     row = _row(smiles)
     assert row["tier"] != "pin_verified" and not row["is_pin"], row
+
+
+def test_fix1_the_sulfolane_row_is_named_by_its_ring_heterone():
+    """2026-10-26 (PINB lane), change-asserted-value: row 'F4 sulfolane' was a decline (the ring sulfone written
+    '1,1-dioxothiolan' lacks the lambda,,:2756). The ring producer of (the Blue Book: "When
+    a group -SO- or -SO2- is part of a ring system, oxygen atom(s) are expressed substitutively by the suffix '-one'
+    added to the name of the heterocycle in which the sulfur atoms are designated as lambda4 or lambda6 atoms...
+    This method generates preferred IUPAC names") names it with the heterone as the suffix, which stands above the
+    alcohol and the amine in (Table 4.1,:18158); the prefix cited first, '(2,3-dimethylthiomorpholin-4-yl)'
+    ('d'), takes the lower locant (g),:3307;,:3477 "first letter of its complete name")."""
+    smiles = "CC1C(SCCN1C2CS(=O)(=O)CC2O)C"
+    row = _row(smiles)
+    assert row["name"] == "3-(2,3-dimethylthiomorpholin-4-yl)-4-hydroxy-1λ6-thiolane-1,1-dione", row
+    assert row["tier"] == "pin_verified" and row["is_pin"], row
+    assert_full_rt(row["name"], smiles)
 
 
 def test_fix1_an_azo_compound_with_a_principal_group_keeps_its_ring_parent():

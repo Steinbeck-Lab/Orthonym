@@ -1154,6 +1154,61 @@ def _is_monosaccharide_ring(mol, atoms: Set[int]) -> bool:
     return oh >= 2
 
 
+def ring_assembly_outranks(mol: Chem.Mol, chosen_system: Set[int]) -> bool:
+    """True when a ring assembly of ``mol`` is senior, as one ring system, to ``chosen_system``.
+
+     (the Blue Book): "Seniority criteria for ring assemblies are based on the
+    appropriate criteria for rings and ring systems given in ", so an assembly stands in the seniority of
+    ring systems as one system whose rings and skeletal atoms are the sums of its components
+    (``assembly.complex_ring_group.assembly_units``); with equal criteria the type order of
+     (:19536) puts the fused ring system before the ring assembly, as the printed pair
+    'benzo[8]annulene (PIN) > 1,1'-biphenyl (PIN) [fused ring system (c) > ring assembly (g)]' (:19563)
+    shows. '[1,1'-biphenyl]' (2 rings, 12 skeletal atoms) is senior to naphthalene (2 rings, 10 skeletal atoms)
+    by " The senior ring or ring system has the greater number of skeletal atoms" (:19469), so the
+    parent of a naphthalene with a biphenylyl group is the biphenyl and not the naphthalene. The score of each
+    assembly is compared with the score of the chosen system; a tie is not senior.
+
+    The caller decides whether (a principal characteristic group, a chain) leaves the choice to."""
+    from ..assembly.complex_ring_group import assembly_units, ring_groups
+    groups = ring_groups(mol)
+    if len(groups) < 3:                       # an assembly of two rings has no other ring system beside it
+        return False
+    chosen_score = ring_system_score(mol, set(chosen_system))
+    for unit in assembly_units(mol, groups):
+        members = [g for g in groups if g <= unit]
+        # an assembly with a ring system outside it to compete with (a molecule that is one assembly is named
+        # as such before this is asked)
+        if len(members) > 1 and len(members) < len(groups) and ring_system_score(mol, set(unit)) < chosen_score:
+            return True
+    return False
+
+
+def record_junior_ring_parent(features, name: str) -> None:
+    """Take the PIN label away from ``name``, a name the ring cascade built on the principal ring system of ``features``,
+    when a ring assembly that the name cites as a prefix is senior to that parent.
+
+    : a ring assembly is one ring system in the seniority of ring systems, and the parent of a molecule with
+    no principal characteristic group (and no chain as the parent) is the senior ring or ring system:
+    '[1,1'-biphenyl]' (2 rings, 12 atoms) is senior to naphthalene (2 rings, 10 atoms). The cascade takes no assembly as
+    one unit, so '2-([1,1'-biphenyl]-4-yl)naphthalene' is a valid systematic name and not the PIN (:func:`ring_assembly_outranks`).
+    Only the molecule that is named, not a part of it, and only a name that cites an assembly: a name that splits an
+    assembly into its parts is the case of the spelling check (``validation.spelling.checks_assembly``), which
+    already decides it."""
+    if (len(features.ring_systems) < 2 or features.principal_group or features.principal_group_atoms
+            or features.chain_is_parent):
+        return
+    from ..assembly.fragment_naming import is_top_level_naming
+    from ..validation.spelling.checks_assembly import count_assembly_texts
+    if not is_top_level_naming() or not count_assembly_texts(name):
+        return
+    chosen = select_principal_ring_system(features.mol, features.ring_systems)
+    if chosen and ring_assembly_outranks(features.mol, set(chosen)):
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(
+            name, rule="P-44.2.2.2.7",
+            detail="a ring assembly of the molecule is senior to the ring system the name is built on (P-44.2.1.6)")
+
+
 def select_principal_ring_system(
     mol: Chem.Mol,
     ring_systems: List[Set[int]],

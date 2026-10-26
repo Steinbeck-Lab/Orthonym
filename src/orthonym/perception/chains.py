@@ -846,8 +846,7 @@ def find_principal_chain(
                 for nbr in mol.GetAtomWithIdx(a).GetNeighbors():
                     ni = nbr.GetIdx()
                     if ni not in cset and ni not in not_prefix and nbr.GetSymbol() != 'H':
-                        out.append(i + 1)
-                        break
+                        out.append(i + 1)      # every prefix counts (f),:3301)
             return sorted(out)
 
         for setf in (_fg, _mb, _db, _sub):
@@ -879,10 +878,10 @@ def find_principal_chain(
             for nbr in atom.GetNeighbors():
                 nbr_idx = nbr.GetIdx()
                 if nbr_idx not in chain_set and nbr_idx not in not_prefix and nbr.GetSymbol() != 'H':
+                    # ring_prefixes mode: (the Blue Book) counts every prefix ('2,2,3' is not '2,3').
+                    # Else an atom counts once: its neighbours hold the suffix atoms, no prefix, and counting each made the
+                    # acid chain win for 'CC(=O)OCCN=Nc1ccc(C)cc1'; the orientation counts all (``_sub``, orient_chain).
                     positions.append(i)
-                    # ring_prefixes mode: compares the locant of every
-                    # prefix ('2,2,3' is not '2,3'), so a carbon with two
-                    # prefixes gives its locant twice.
                     if not ring_prefixes:
                         break
         if not positions:

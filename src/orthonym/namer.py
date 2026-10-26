@@ -119,7 +119,7 @@ from .perception.stereo import (
 # `orthonym.rules.*` and `orthonym.namer.Orthonym` per
 # PATTERNS + namer.py:853 lazy-import precedent.
 from .routing.dispatch_table import ClassDispatchResult, StoutClass
-from .rules.locants import build_atom_to_locant, orient_chain
+from .rules.locants import build_atom_to_locant, orient_chain, suffix_heteroatoms
 from .rules.seniority import get_principal_group
 
 # ---------------------------------------------------------------------------
@@ -10962,7 +10962,7 @@ class Orthonym:
                     principal_group_atoms=pg_atom_set,
                     double_bonds=features.double_bonds,
                     triple_bonds=features.triple_bonds,
-                    substituent_positions=initial_subs,
+                    substituent_positions=initial_subs, principal_group_heteroatoms=suffix_heteroatoms(features),
                 )
 
                 # Build atom-to-locant mapping from oriented chain

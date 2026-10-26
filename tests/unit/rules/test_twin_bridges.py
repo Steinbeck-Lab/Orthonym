@@ -33,13 +33,20 @@ PIN_ROWS = [
     # the component and cation checks of the adduct and salt routes read the twin of a component name
     # adducts; cations: the bridge atom is 9, 'Bridge atoms are numbered
     # continuing from the highest locant of the fused ring system', so the 'ium' locant is 9)
-    ("OC(=O)C1=CC2NC1c1ccccc12.Cl", "1,4-dihydro-1,4-azanonaphthalene-2-carboxylic acid\u2014hydrogen chloride (1/1)"),
-    ("CN1C2C=CC1c1ccccc12.Cl", "9-methyl-1,4-dihydro-1,4-azanonaphthalene\u2014hydrogen chloride (1/1)"),
     ("C1=CC2SC1c1ccccc12.C1=CC2NC1c1ccccc12",
      "1,4-dihydro-1,4-azanonaphthalene\u20141,4-dihydro-1,4-sulfanonaphthalene (1/1)"),
     ("C[NH+]1C2C=CC1c1ccccc12", "9-methyl-1,4-dihydro-1,4-azanonaphthalen-9-ium"),
     ("C[NH+]1C2C=CC1c1ccccc12.[Cl-]", "9-methyl-1,4-dihydro-1,4-azanonaphthalen-9-ium chloride"),
     ("C[NH+]1C2CCC1c1ccccc12.[Br-]", "9-methyl-1,2,3,4-tetrahydro-1,4-azanonaphthalen-9-ium bromide"),
+]
+# "Mixed organic - inorganic adducts" (the Blue Book): "preferred IUPAC names cannot be
+# assigned to mixed adducts because preferred IUPAC names have not yet been determined for inorganic
+# components". These two were PIN_ROWS (the default tier shipped them pin_verified through the twin of the
+# component); the name is labelled below the PIN now, so the default tier declines it and best-effort
+# gives the twin spelling of the component, which OPSIN reads.
+MIXED_ADDUCT_ROWS = [
+    ("OC(=O)C1=CC2NC1c1ccccc12.Cl", "1,4-dihydro-1,4-azanonaphthalene-2-carboxylic acid\u2014hydrogen chloride (1/1)"),
+    ("CN1C2C=CC1c1ccccc12.Cl", "9-methyl-1,4-dihydro-1,4-azanonaphthalene\u2014hydrogen chloride (1/1)"),
 ]
 TWIN_ROWS = {
     "1,4-dihydro-1,4-sulfanonaphthalene": "1,4-dihydro-1,4-epithionaphthalene",
@@ -81,7 +88,17 @@ def test_default_tier_gives_the_preselected_prefix(smiles, name):
     assert row["spelling_failures"] == [], row
 
 
-@pytest.mark.parametrize("smiles,name", PIN_ROWS)
+@pytest.mark.parametrize("smiles,name", MIXED_ADDUCT_ROWS)
+def test_a_mixed_adduct_with_a_preselected_prefix_is_declined_at_the_default_tier(smiles, name):
+    from tests.support.default_tier import assert_default_tier_declines
+    assert_default_tier_declines(smiles)
+    twin = TWIN_ROWS[name]
+    row = name_best_effort(smiles)
+    assert row["name"] == twin and row["is_pin"] is False, row
+    assert_full_rt(twin, smiles)
+
+
+@pytest.mark.parametrize("smiles,name", PIN_ROWS + MIXED_ADDUCT_ROWS)
 def test_the_twin_of_the_default_name_is_the_structure_of_the_input(smiles, name):
     """An independent OPSIN read of the twin gives the input; OPSIN rejects the name itself."""
     twin = TWIN_ROWS[name]

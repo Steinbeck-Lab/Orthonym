@@ -235,8 +235,14 @@ def test_a_junior_naming_that_ran_out_of_a_hang_budget_adds_nothing_to_the_seed(
 
 
 #: heavy-atom carbamate and sulfolane amine rows whose best-effort names are built from a chain parent with a
-#: spelling failure, so the offer names them again with a junior parent (1 and 2 junior namings)
-OFFERED_ROWS = ["CN(C)CCCNC(=O)OCC1(CCCCC1)COC(=O)NC2CCCCC2", "CCN(CC)CCCC(C)NC1CCS(=O)(=O)C1"]
+#: spelling failure, so the offer names them again with a junior parent (1 and 2 junior namings). 2026-10-26 (PINB
+#: lane): the sulfolane row is the 2-oxo one: 'CCN(CC)CCCC(C)NC1CCS(=O)(=O)C1' (3-{[5-(diethylamino)pentan-2-yl]amino}-
+#: 1,1-dioxothiolane) is named '3-{[5-(diethylamino)pentan-2-yl]amino}-1λ6-thiolane-1,1-dione' by the ring heterone
+#: producer now, the Blue Book: the ring -SO2- is the suffix 'dione' of the lambda heterocycle, senior to
+#: the amine of,:18158), a name with no spelling failure, so the offer has no junior naming to make; the
+#: ring ketone keeps the '1,1-dioxo' prefix (a ketone beside the heterone is not a case of it) and the row reaches the
+#: junior namings (1 and 2) as the replaced row did
+OFFERED_ROWS = ["CN(C)CCCNC(=O)OCC1(CCCCC1)COC(=O)NC2CCCCC2", "CCN(CC)CCCC(C)NC1CCS(=O)(=O)C1=O"]
 
 
 @pytest.mark.parametrize("smiles", OFFERED_ROWS)

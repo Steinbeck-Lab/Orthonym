@@ -4089,7 +4089,11 @@ class AlphaKey(str):
 
     def _order(self):
         orig = self._original
-        return (_key_letters(self), _italic_prefixes(orig), str(self), self._own_locs(), self._lam,
+        # The own locants, in order of appearance, come before the key text: that text has
+        # dropped a leading locant, so it compares the LAST locants only ('methylpentan-2-yl' before
+        # 'methylpentan-3-yl') and would decide before the set compares, in which
+        # '2-methylpentan-3-yl' (2,3) precedes '3-methylpentan-2-yl' (3,2) (the Blue Book).
+        return (_key_letters(self), _italic_prefixes(orig), self._own_locs(), str(self), self._lam,
                 _P146Text(orig))
 
     @staticmethod
@@ -4097,7 +4101,7 @@ class AlphaKey(str):
         if isinstance(other, AlphaKey):
             return other._order()
         if isinstance(other, str):
-            return (_key_letters(other), (), other, _own_locants(other), _lambda_key(other),
+            return (_key_letters(other), (), _own_locants(other), other, _lambda_key(other),
                     _P146Text(other))
         return None
 

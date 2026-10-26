@@ -33,6 +33,7 @@ from ..perception.molcache import atoms_of, canon_smiles
 from .bridge_arms import arm_sizes_differ
 from .multiplicative_general import name_general_multiplicative
 from .multiplied_class_word_units import ACYL_UNIT_SUFFIXES, multiply_class_word_unit
+from .multiplicative_arms import find_arm_pcg
 
 # ---------------------------------------------------------------------------
 # Saturation/modification prefixes that must not be preceded by "di"
@@ -466,54 +467,11 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int,
     if any(d > 2 for d in deg.values()):
         return None  # branched -> out of scope
 
-    # Identify the single PCG: carboxylic acid (=O + -OH on one C) or alcohol.
-    pcg_carbon = None
-    pcg = None
-    pcg_oxygens = set()
-    for c in arm_carbons:
-        has_carbonyl_o = None
-        has_hydroxyl_o = None
-        for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
-            if nbr.GetSymbol() != 'O' or nbr.GetIdx() not in arm:
-                continue
-            bond = mol.GetBondBetweenAtoms(c, nbr.GetIdx())
-            if bond.GetBondTypeAsDouble() == 2.0:
-                has_carbonyl_o = nbr.GetIdx()
-            elif nbr.GetTotalNumHs() >= 1 and nbr.GetDegree() == 1:
-                has_hydroxyl_o = nbr.GetIdx()
-        if has_carbonyl_o is not None and has_hydroxyl_o is not None:
-            pcg_carbon, pcg = c, 'acid'
-            pcg_oxygens = {has_carbonyl_o, has_hydroxyl_o}
-            break
-    if pcg_carbon is None:
-        for c in arm_carbons:
-            if any(mol.GetBondBetweenAtoms(c, nbr.GetIdx()).GetBondTypeAsDouble() == 2.0
-                   for nbr in mol.GetAtomWithIdx(c).GetNeighbors()
-                   if nbr.GetSymbol() == 'O' and nbr.GetIdx() in arm):
-                continue  # carbonyl present -> not a plain alcohol carbon
-            for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
-                if (nbr.GetSymbol() == 'O' and nbr.GetIdx() in arm
-                        and nbr.GetTotalNumHs() >= 1 and nbr.GetDegree() == 1):
-                    pcg_carbon, pcg = c, 'ol'
-                    pcg_oxygens = {nbr.GetIdx()}
-                    break
-            if pcg_carbon is not None:
-                break
-    if pcg_carbon is None and allow_amine:
-        # Terminal primary amine -NH2 (BB "2,2'-oxydi(ethan-1-amine)" (PIN)).
-        for c in arm_carbons:
-            for nbr in mol.GetAtomWithIdx(c).GetNeighbors():
-                if (nbr.GetSymbol() == 'N' and nbr.GetIdx() in arm
-                        and nbr.GetTotalNumHs() == 2 and nbr.GetDegree() == 1
-                        and mol.GetBondBetweenAtoms(
-                            c, nbr.GetIdx()).GetBondTypeAsDouble() == 1.0):
-                    pcg_carbon, pcg = c, 'amine'
-                    pcg_oxygens = {nbr.GetIdx()}
-                    break
-            if pcg_carbon is not None:
-                break
-    if pcg_carbon is None:
+    # Identify the single PCG: carboxylic acid (or its acyl halide), alcohol, with allow_amine an amine.
+    found = find_arm_pcg(mol, arm, arm_carbons, allow_amine)
+    if found is None:
         return None
+    pcg_carbon, pcg, pcg_oxygens, halide_word = found
 
     # The arm may carry ONLY its chain carbons + the PCG heteroatoms (no stray
     # heteroatoms / extra FGs that the name would silently drop).
@@ -526,7 +484,7 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int,
     if n == 1:
         if pcg_carbon != attach_carbon:
             return None
-        if pcg == 'acid':
+        if pcg in ('acid', 'acyl_halide'):
             # A 1-carbon acid arm is the COOH carbon itself attached to the
             # bridge — carboxy-on-parent territory (benzoic/carbonic class),
             # never a 'methanoic acid' multiplicative unit. Fail closed.
@@ -544,6 +502,8 @@ def _acyclic_arm_parent_and_locant(mol, attach_carbon: int, bridge_idx: int,
     stem = get_chain_prefix(n)
     if pcg == 'acid':
         parent_name = "acetic acid" if n == 2 else f"{stem}anoic acid"
+    elif pcg == 'acyl_halide':
+        parent_name = (f"acetyl {halide_word}" if n == 2 else f"{stem}anoyl {halide_word}")
     elif pcg == 'ol':
         parent_name = f"{stem}an-1-ol"
     else:  # 'amine'

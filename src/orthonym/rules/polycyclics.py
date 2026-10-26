@@ -326,6 +326,86 @@ def _promoted_amine_anchor(mol, core_atoms: Set[int], principal_group: Optional[
     return {candidates[0][0]} if detected and detected[0] else set()
 
 
+#: The suffix-type substituents of a polycyclic parent, senior first "Classes", the order
+#: of ``_SUFFIX_PRIORITY`` in:func:`name_substituted_polycyclic`, whose first five entries these
+#: are): acid, sulfonic acid, amide, nitrile, aldehyde.
+_PAH_SUFFIX_KINDS = ('carboxylic acid', 'sulfonic acid', 'carboxamide', 'carbonitrile', 'carbaldehyde')
+
+
+def _senior_suffix_anchors(suffix_atoms: Set[int], suffix_kinds: Dict[int, Set[str]]) -> Set[int]:
+    """The ring atoms of ``suffix_atoms`` that bear the senior suffix kind and so claim the lowest
+    locants first.
+
+    Only the principal characteristic group is cited as the suffix; a junior group beside it is a
+    prefix ('carbamoyl', 'cyano'), and a prefix takes no part in the choice that (c)
+    (the Blue Book, "principal characteristic groups and free valences (suffixes)") makes
+    before the prefixes are considered: '3-carbamoylnaphthalene-2-carboxylic acid (PIN)'
+    (:32944), not '2-carbamoylnaphthalene-3-carboxylic acid'. ``suffix_kinds`` maps a ring atom to
+    the names of its suffix-type substituents; a ring atom anchored for another reason (the
+    amine or the hydroxy that is the principal group) is not in it and stays."""
+    kinds = {k for ks in suffix_kinds.values() for k in ks}
+    if len(kinds) < 2:
+        return suffix_atoms
+
+    def rank(kind: str) -> int:
+        return _PAH_SUFFIX_KINDS.index(kind) if kind in _PAH_SUFFIX_KINDS else len(_PAH_SUFFIX_KINDS)
+
+    senior = min(kinds, key=rank)
+    return {a for a in suffix_atoms if a not in suffix_kinds or senior in suffix_kinds[a]}
+
+
+def _pah_numbering_anchors(mol, core_atoms: Set[int], principal_group: Optional[str]) -> Tuple[Set[int], Set[int]]:
+    """``(attach_atoms, suffix_atoms)`` of a polycyclic parent: the ring atoms that bear a substituent,
+    and the subset that claims the lowest locants first. The one reading of both numberings, that of
+    the substituent locants (:func:`get_polycyclic_substituents`) and that of the stereodescriptors
+    (:func:`name_substituted_polycyclic`)."""
+    # Identify the substituent attachment atoms (core atoms bearing a non-core
+    # neighbour) so the numbering can be resolved by the automorphism that gives
+    # THEM the lowest locants. The subset whose substituent is a
+    # principal-characteristic-group suffix (carboxylic acid/aldehyde/amide/
+    # nitrile) is tracked separately so it can claim the lowest locant FIRST
+    # (c)) — the PCG-anchor.
+    _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
+    _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
+    attach_atoms = set()
+    suffix_atoms = set()
+    suffix_kinds: Dict[int, Set[str]] = {}
+    for idx in core_atoms:
+        is_attach = False
+        is_pcg = False
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() in core_atoms:
+                continue
+            is_attach = True
+            sub = _identify_pah_substituent(mol, nb.GetIdx(), core_atoms)
+            if sub and sub.get('is_suffix'):
+                is_pcg = True
+                suffix_kinds.setdefault(idx, set()).add(sub['name'])
+            # Fix 2: a bare -NH2 that IS the molecular principal group is the
+            # PCG -> its ring carbon takes the lowest locant (c)) even
+            # though it is not tagged is_suffix (kept a prefix candidate so the
+            # senior-group cases stay byte-identical).
+            elif _amine_pcg and sub and sub.get('name') == 'amino':
+                is_pcg = True
+            #: a ring -OH that IS the molecular principal group (phenol,
+            # class 17 -- senior to amine class 19, the Blue Book) is the
+            # PCG, so its ring carbon must claim the lowest locant (c),
+            # the Blue Book; naphthalene example:3262) BEFORE a junior prefix (amino)
+            # is considered. `hydroxy` is not tagged is_suffix here (the `-ol`
+            # suffix-word promotion runs later, ~:1266), so anchor it explicitly
+            # -- mirrors the Fix 2 amine carve-out. Whole-class: any senior ring
+            # `-ol` on a fused polycyclic bearing a junior prefix.
+            elif _ol_pcg and sub and sub.get('name') == 'hydroxy':
+                is_pcg = True
+        if is_attach:
+            attach_atoms.add(idx)
+        if is_pcg:
+            suffix_atoms.add(idx)
+    suffix_atoms = _senior_suffix_anchors(suffix_atoms, suffix_kinds)
+    suffix_atoms |= _promoted_amine_anchor(mol, core_atoms, principal_group)
+    return attach_atoms, suffix_atoms
+
+
 def get_polycyclic_substituents(mol, pah_name: str,
                                 principal_group: Optional[str] = None
                                 ) -> Dict[int, List[Dict]]:
@@ -367,47 +447,7 @@ def get_polycyclic_substituents(mol, pah_name: str,
 
     match_atoms = list(matches[0])
 
-    # Identify the substituent attachment atoms (core atoms bearing a non-core
-    # neighbour) so the numbering can be resolved by the automorphism that gives
-    # THEM the lowest locants. The subset whose substituent is a
-    # principal-characteristic-group suffix (carboxylic acid/aldehyde/amide/
-    # nitrile) is tracked separately so it can claim the lowest locant FIRST
-    # (c)) — the PCG-anchor.
-    _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
-    _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
-    attach_atoms = set()
-    suffix_atoms = set()
-    for idx in core_atoms:
-        is_attach = False
-        is_pcg = False
-        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
-            if nb.GetIdx() in core_atoms:
-                continue
-            is_attach = True
-            sub = _identify_pah_substituent(mol, nb.GetIdx(), core_atoms)
-            if sub and sub.get('is_suffix'):
-                is_pcg = True
-            # Fix 2: a bare -NH2 that IS the molecular principal group is the
-            # PCG -> its ring carbon takes the lowest locant (c)) even
-            # though it is not tagged is_suffix (kept a prefix candidate so the
-            # senior-group cases stay byte-identical).
-            elif _amine_pcg and sub and sub.get('name') == 'amino':
-                is_pcg = True
-            #: a ring -OH that IS the molecular principal group (phenol,
-            # class 17 -- senior to amine class 19, the Blue Book) is the
-            # PCG, so its ring carbon must claim the lowest locant (c),
-            # the Blue Book; naphthalene example:3262) BEFORE a junior prefix (amino)
-            # is considered. `hydroxy` is not tagged is_suffix here (the `-ol`
-            # suffix-word promotion runs later, ~:1266), so anchor it explicitly
-            # -- mirrors the Fix 2 amine carve-out. Whole-class: any senior ring
-            # `-ol` on a fused polycyclic bearing a junior prefix.
-            elif _ol_pcg and sub and sub.get('name') == 'hydroxy':
-                is_pcg = True
-        if is_attach:
-            attach_atoms.add(idx)
-        if is_pcg:
-            suffix_atoms.add(idx)
-    suffix_atoms |= _promoted_amine_anchor(mol, core_atoms, principal_group)
+    attach_atoms, suffix_atoms = _pah_numbering_anchors(mol, core_atoms, principal_group)
 
     # Phase E1 / DD4 (H1): use the authoritative stored ``iupac_numbering``
     # with automorphism-minimization (covers naphthalene/anthracene/phenanthrene/
@@ -1435,34 +1475,9 @@ def name_substituted_polycyclic(
         if matches:
             match_atoms = list(matches[0])
             core_set = set(match_atoms)
-            # Mirror get_polycyclic_substituents EXACTLY (incl. the PCG
-            # subset) so the stereodescriptor numbering cannot desync from the
-            # substituent numbering .
-            _amine_pcg = principal_group in _PAH_AMINE_PRINCIPAL_KEYS
-            _ol_pcg = principal_group in _PAH_OL_PRINCIPAL_KEYS
-            attach_atoms = set()
-            suffix_atoms = set()
-            for idx in core_set:
-                is_attach = False
-                is_pcg = False
-                for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
-                    if nb.GetIdx() in core_set:
-                        continue
-                    is_attach = True
-                    sub = _identify_pah_substituent(mol, nb.GetIdx(), core_set)
-                    if sub and sub.get('is_suffix'):
-                        is_pcg = True
-                    elif _amine_pcg and sub and sub.get('name') == 'amino':
-                        is_pcg = True  # Fix 2: amine-as-principal PCG anchor (mirror)
-                    elif _ol_pcg and sub and sub.get('name') == 'hydroxy':
-                        is_pcg = True  #: phenol-as-principal PCG anchor (mirror)
-                if is_attach:
-                    attach_atoms.add(idx)
-                if is_pcg:
-                    suffix_atoms.add(idx)
+            attach_atoms, suffix_atoms = _pah_numbering_anchors(mol, core_set, principal_group)
             atom_to_locant = get_polycyclic_iupac_locants(
-                mol, pah_name, substituent_atoms=attach_atoms,
-                pcg_atoms=suffix_atoms | _promoted_amine_anchor(mol, core_set, principal_group))
+                mol, pah_name, substituent_atoms=attach_atoms, pcg_atoms=suffix_atoms)
             if atom_to_locant is None:
                 atom_to_locant = _map_pah_atoms_to_iupac(mol, pah_name, match_atoms)
 

@@ -19,12 +19,14 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import functools
 import re
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
 from ..data.multipliers import multiplier_table
+from . import isotope_oxoacid as _oxoacid
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
@@ -746,7 +748,6 @@ _CARBO_AFFIX_SUFFIX_RE = re.compile(
     r"(?:carboxylic|carbonitrile|carbaldehyde)(?![a-z])"
 )
 
-
 #: A locant set as it opens a name part: numerals with an optional letter / primes
 #: (``2``, ``3a``, ``4'``) or an italic element locant (``N``, ``N1``), comma-joined,
 #: closed by the hyphen that introduces what it locates.
@@ -999,7 +1000,8 @@ def _replacement_locant_follows(rest: str) -> bool:
     return bool(m) and bool(_REPLACEMENT_PART_RE.match(rest[m.end():]))
 
 
-def _placement_quality(skel: str, off: int, locant_free: bool = False) -> int:
+def _placement_quality(skel: str, off: int, locant_free: bool = False,
+                       oxoacid_centre: bool = False) -> int:
     """ placement rank for an isotope descriptor spliced at ``off``:
     ``-1`` when the descriptor is a locant-free label sitting directly before the
     heteroatom SUFFIX it modifies (``cyclopentan-1-(18O)ol``); ``0`` when it sits
@@ -1027,8 +1029,12 @@ def _placement_quality(skel: str, off: int, locant_free: bool = False) -> int:
     suffix begins with a letter), so both ``…-1-(18O)ol`` and the front-detached
     ``(18O)…-1-ol`` round-trip; the front splice used to win only because it has the
     lower offset. It is gated on ``locant_free`` so a LOCANTED carbon label keeps
-    its front placement (``(2-13C)ethan-1-ol``, not ``ethan-1-(2-13C)ol``)."""
-    if locant_free and _is_heteroatom_suffix_slot(skel, off):
+    its front placement (``(2-13C)ethan-1-ol``, not ``ethan-1-(2-13C)ol``).
+
+    ``oxoacid_centre`` is True when the labelled atom is an S, Se or Te: the slot directly before an oxoacid
+    suffix that holds it ranks -1 as well ('methane(34S)sulfonic acid', ``_OXOACID_CENTRE_SUFFIX_RE``)."""
+    if locant_free and (_is_heteroatom_suffix_slot(skel, off)
+                        or (oxoacid_centre and _oxoacid.is_centre_slot(skel, off))):
         return -1
     rest = skel[off:]
     # A replacement ('a') prefix or Hantzsch-Widman stem carries its heteroatom
@@ -2147,7 +2153,7 @@ def _find_best_placement(
     licence is not consulted then.
     """
     offs = list(dict.fromkeys([0] + _insertion_offsets(skel)))
-    won = []
+    won, quality = [], functools.partial(_placement_quality, oxoacid_centre=_oxoacid.labels_an_element_of_the_centre(keys))
     # letter locants (e.g. amide ``N``) are tried after the locant-free
     # form and before the integer locants -- an amide/amine D belongs on ``N``,
     # which no integer locant can express. RT-gated like every other candidate.
@@ -2222,18 +2228,17 @@ def _find_best_placement(
                         continue
                     if locant is None and _is_held_locant_free(original, skel, off, candidate):
                         held.append((p4542, loc_rank, sub_rank,
-                                     _placement_quality(skel, off, locant_free=True),
+                                     quality(skel, off, locant_free=True),
                                      off, desc, candidate))
                         continue
                     if not _locant_names_the_labelled_position(
                             skel, off, locant, keys, original):
                         held.append((p4542, loc_rank, sub_rank,
-                                     _placement_quality(skel, off, locant_free=False),
+                                     quality(skel, off, locant_free=False),
                                      off, desc, candidate))
                         continue
                     won.append((p4542, loc_rank, sub_rank,
-                                _placement_quality(skel, off,
-                                                   locant_free=(locant is None)),
+                                quality(skel, off, locant_free=(locant is None)),
                                 off, desc, candidate))
                 else:
                     reach.learn(off, locant, candidate, sub_rank)
@@ -2319,6 +2324,7 @@ def _find_best_placement(
     #, the Blue Book) and '(18O-2H,18O)acetic acid (PIN)'
     # (:43810), a mixed form this search does not build (it shares one locant
     # across the descriptor).
+    # And a nuclide of an oxoacid centre cited anywhere but before its suffix (``rules.isotope_oxoacid``).
     if (below_pin or _sub_rank == 1 or (desc and _unprinted_slot(skel, off))
             or (isinstance(loc_rank, str) and desc
                 and _letter_locant_on_its_own_element(loc_rank, keys))
@@ -2328,8 +2334,8 @@ def _find_best_placement(
             or re.match(r"(?:D|L|DL)-", candidate[off + len(desc):] if desc else "")
             or (isinstance(loc_rank, int) and loc_rank >= 1
                 and _complete_unit_spelling_unreadable(skel, off, keys, original))
-            or (isinstance(loc_rank, str) and desc
-                and f"{loc_rank},{loc_rank}-" in desc)):
+            or (isinstance(loc_rank, str) and desc and f"{loc_rank},{loc_rank}-" in desc)
+            or _oxoacid.off_slot_below_pin(skel, off, desc, keys, original)):
         from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(candidate)
         record_non_pin_fragment(_descriptor_fragment(candidate, desc))

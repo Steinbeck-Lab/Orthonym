@@ -45,6 +45,7 @@ HALIDE_WORDS = {
     "acyl_azide": "azide",
     "acyl_cyanide": "cyanide",
     "acyl_isocyanate": "isocyanate",
+    "acyl_isothiocyanate": "isothiocyanate",   #,:31468 'oxalyl diisothiocyanate (PIN)'
 }
 
 # Halogen prefix names (for substituent halogens that are NOT part of acid halide)
@@ -100,31 +101,37 @@ def _name_carbonyl_dihalide(mol, combined) -> Optional[str]:
 
 def _name_oxamoyl_halide(mol, acid_halide_matches, halide_word) -> Optional[str]:
     """ (retained acyl 'oxamoyl'): H2N-CO-CO-X -> 'oxamoyl <halide>'
-    (BB 31456 'H2N-CO-CO-Br oxamoyl bromide (PIN)').
+    (BB 31456 'H2N-CO-CO-Br oxamoyl bromide (PIN)'); (:31460-:31462): "The names formyl,
+    acetyl, benzoyl, oxalyl, and oxamoyl are retained to generate preferred IUPAC names" for the
+    pseudohalides too, so H2N-CO-CO-NCS is 'oxamoyl isothiocyanate' and not 'amino(oxo)acetyl
+    isothiocyanate'.
 
     'oxamoyl' is the retained acyl group of oxamic acid (H2N-CO-COOH); the -OH
-    of its carboxylic end is replaced by a halogen. Recognised by total heavy-
-    atom accounting on the exact 6-atom skeleton (acyl C + =O + halide; amide C
-    + =O + primary N-H2), so any extra decoration fails closed. Returns None
-    unless there is exactly ONE halide group and the amide carbon carries a bare
+    of its carboxylic end is replaced by a halogen or a pseudohalogen group (azide, cyanide,
+    isocyanate, isothiocyanate; the atoms of the group are the match of the class after the acyl
+    carbon and its =O). Recognised by total heavy-atom accounting on the exact skeleton (acyl C +
+    =O + the class group; amide C + =O + primary N-H2), so any extra decoration fails closed.
+    Returns None unless there is exactly ONE group of the class and the amide carbon carries a bare
     primary amide."""
     if len(acid_halide_matches) != 1:
         return None
-    acyl_c = acid_halide_matches[0][0]
+    match = acid_halide_matches[0]
+    acyl_c = match[0]
     a = mol.GetAtomWithIdx(acyl_c)
-    o_dbl = halide = c2 = None
+    o_dbl = next((i for i in match[1:]
+                  if mol.GetAtomWithIdx(i).GetSymbol() == 'O' and mol.GetBondBetweenAtoms(acyl_c, i) is not None
+                  and mol.GetBondBetweenAtoms(acyl_c, i).GetBondTypeAsDouble() == 2.0), None)
+    if o_dbl is None:
+        return None
+    class_atoms = set(match) - {acyl_c, o_dbl}
+    c2 = None
     for nb in a.GetNeighbors():
-        bt = mol.GetBondBetweenAtoms(acyl_c, nb.GetIdx()).GetBondTypeAsDouble()
-        sym = nb.GetSymbol()
-        if sym == 'O' and bt == 2.0:
-            o_dbl = nb.GetIdx()
-        elif sym in ('F', 'Cl', 'Br', 'I') and bt == 1.0:
-            halide = nb.GetIdx()
-        elif sym == 'C':
-            c2 = nb.GetIdx()
-        else:
+        if nb.GetIdx() == o_dbl or nb.GetIdx() in class_atoms:
+            continue
+        if nb.GetSymbol() != 'C' or c2 is not None:
             return None
-    if o_dbl is None or halide is None or c2 is None:
+        c2 = nb.GetIdx()
+    if c2 is None or not class_atoms:
         return None
     # c2 is the amide carbon: exactly one =O, one primary-amide N (NH2), and the
     # bond back to the acyl carbon. Nothing else.
@@ -145,8 +152,8 @@ def _name_oxamoyl_halide(mol, acid_halide_matches, halide_word) -> Optional[str]
             return None
     if o2 is None or n_amide is None:
         return None
-    # Total heavy-atom accounting: exactly {acyl_c, =O, halide, c2, =O2, N}.
-    accounted = {acyl_c, o_dbl, halide, c2, o2, n_amide}
+    # Total heavy-atom accounting: exactly {acyl_c, =O, class group, c2, =O2, N}.
+    accounted = {acyl_c, o_dbl, c2, o2, n_amide} | class_atoms
     heavy = {at.GetIdx() for at in mol.GetAtoms() if at.GetAtomicNum() > 1}
     if accounted != heavy:
         return None
@@ -521,7 +528,7 @@ def name_acid_halide(features, scope_out: Optional[dict] = None) -> Optional[str
     # -> 'oxalyl dicyanide'). The pseudohalide contributes its own carbon, so the
     # real-halide-only ``_combined`` list is empty and the diacyl-halide path
     # below cannot see it; handle same-type acyl di-pseudohalides here.
-    if (pg in ("acyl_azide", "acyl_cyanide", "acyl_isocyanate")
+    if (pg in ("acyl_azide", "acyl_cyanide", "acyl_isocyanate", "acyl_isothiocyanate")
             and num_halide_groups == 2):
         _dps = _name_diacyl_pseudohalide(mol, features, pg, halide_word)
         if _dps is not None:

@@ -46,6 +46,7 @@ it is kept.
 """
 from __future__ import annotations
 
+import functools
 import logging
 import re
 from typing import Any, Optional
@@ -228,6 +229,20 @@ def _complex_ring_hydrogen_unspelled(features: Any, complex_result: Any,
         return False
 
 
+def _junior_ring_parent_is_not_a_pin(handler):
+    """The ring cascade, with the label of a name it builds on a ring system that a ring assembly of the molecule
+    outranks taken away (``rules.ring_selection.record_junior_ring_parent``)."""
+    @functools.wraps(handler)
+    def wrapped(features: Any, mol: Any = None, style: str = "pin") -> Optional[NamingResult]:
+        result = handler(features, mol, style)
+        if result is not None and result.name:
+            from ...rules.ring_selection import record_junior_ring_parent
+            record_junior_ring_parent(features, result.name)
+        return result
+    return wrapped
+
+
+@_junior_ring_parent_is_not_a_pin
 def name_tier_a_ring(
     features: Any, mol: Any = None, style: str = "pin",
 ) -> Optional[NamingResult]:

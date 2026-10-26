@@ -324,7 +324,11 @@ FUNCTIONAL_GROUP_SMARTS = {
     # constitution). class-10 pseudohalogen seniority: N3 > CN > NCO.
     "acyl_azide": "[CX3](=[OX1])[NX2]=[NX2,NX3+]=[NX1-]",
     "acyl_cyanide": "[CX3;!$([CX3][OX2]);!$([CX3][NX3])](=[OX1])[CX2]#[NX1]",
-    "acyl_isocyanate": "[CX3](=[OX1])[NX2]=[CX2]=[OX1]",
+    # the acyl carbon of an ester, an anhydride, an acid or a thioester ([OX2], [SX2]...) is no acyl carbon of
+    # a pseudohalide, as in acyl_cyanide: 'ethyl isothiocyanatomethanoate' is an ester, and (:31474)
+    # keeps the carbamoyl groups (a carbon with N) as the class
+    "acyl_isocyanate": "[CX3;!$([CX3][OX2,SX2,SeX2,TeX2])](=[OX1])[NX2]=[CX2]=[OX1]",
+    "acyl_isothiocyanate": "[CX3;!$([CX3][OX2,SX2,SeX2,TeX2])](=[OX1])[NX2]=[CX2]=[SX1]",
 
     # === NITROGEN ACID DERIVATIVES ===
     "primary_amide": "[CX3](=O)[NX3H2]",
@@ -1454,8 +1458,8 @@ def _resolve_fg_collisions(results):
         # on the S(=O)2 (S bears methyl + cyanide C) so the sulfonyl_cyanide
         # handler names it 'methanesulfonyl cyanide'. Atom-scoped.
         ('sulfonyl_cyanide', ['nitrile', 'sulfone']),
-        ('acyl_isocyanate', ['isocyanate', 'ketone', 'aldehyde', 'imine',
-                             'nitrile', 'primary_amide', 'secondary_amide']),
+        *((g, [p, 'ketone', 'aldehyde', 'imine', 'nitrile', 'primary_amide', 'secondary_amide'])
+          for g, p in (('acyl_isocyanate', 'isocyanate'), ('acyl_isothiocyanate', 'isothiocyanate'))),
         # Carbamic acid: N-C(=O)-OH must NOT also match carboxylic_acid or amide
         ('carbamic_acid', ['carboxylic_acid', 'primary_amide', 'secondary_amide', 'tertiary_amide']),
         # Thiocarboxylic acids: SH in C(=O)SH or C(=S)SH must NOT match thiol
