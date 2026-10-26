@@ -15,11 +15,13 @@ import sys
 from typing import List, Optional, Tuple
 
 from . import __version__, name_compound
+from . import cli_time_limit as _tl
 from .errors import LIMIT_CATALOG, OrthonymLimitError, is_failure_name
 from .failure_mode import DEFAULT_MODE as DEFAULT_ON_FAILURE
 from .failure_mode import MODES as ON_FAILURE_MODES
 from .rdkit_log import rdkit_logs_off, rdkit_logs_on
 from .tiers import EMIT_TIERS, default_tier
+from .wallclock import WallClockTimeout, clear_leaked_naming_state
 
 _VERSION_HELP = ("Print the version, in the form 'orthonym X.Y.Z', and stop. When --opsin or ORTHONYM_OPSIN "
                  "selects OPSIN's main branch, a second line names the OPSIN build.")
@@ -143,10 +145,11 @@ def _engine_only(parsed) -> int:
     if mol is None:
         print("Error: invalid SMILES", file=sys.stderr)
         return 1
-    feats = namer._perceive(
-        mol, parsed.smiles, _Chem.MolToSmiles(mol, canonical=True))
-    namer._classify(feats)
-    res = name_general(mol, feats)
+    with _tl.limit(parsed.time_limit):
+        feats = namer._perceive(
+            mol, parsed.smiles, _Chem.MolToSmiles(mol, canonical=True))
+        namer._classify(feats)
+        res = name_general(mol, feats)
     if res is None:
         print(_json.dumps({
             "engine": "refused",
@@ -306,6 +309,41 @@ def _tiered_name_text(row: dict, smiles: str, mode: str,
     if mode == "raise":
         raise OrthonymLimitError(code, label, smiles=smiles)
     return "", _unnamed_line(smiles, code, label)
+
+
+def _timeout_text(smiles: str, seconds: float, mode: str, provenance: bool) -> Tuple[str, Optional[str]]:
+    """What a structure that ran out of ``--time-limit`` gets, decided as:func:`_tiered_name_text` decides
+    for a structure with no name: ``--provenance`` its row, ``label`` the label, ``raise`` raises the limit
+    (code ``TIME_LIMIT``), ``empty`` an empty name and the reason line for the error stream."""
+    if provenance:
+        return _provenance_json(_tl.row(smiles, seconds)), None
+    if mode == "label":
+        return _tl.label(seconds), None
+    if mode == "raise":
+        raise _tl.error(smiles, seconds)
+    return "", _unnamed_line(smiles, _tl.CODE, _tl.label(seconds))
+
+
+def _single_timed_out(parsed: argparse.Namespace) -> int:
+    """The end of a one-SMILES run whose naming ran out of ``--time-limit``: the same output as for a
+    structure that gets no name, and the status of that case (``raise`` exits 1)."""
+    clear_leaked_naming_state()     # ``wall_clock_limit`` put it back already; empty unless the limit has a bug
+    if parsed.engine_only:          # the JSON of its other declines (the structure as it is, whatever --on-failure says)
+        import json
+        print(json.dumps({"engine": "refused", "limit_code": _tl.CODE, "note": _tl.label(parsed.time_limit)}))
+        return 0
+    try:
+        text, reason = _timeout_text(parsed.smiles, parsed.time_limit, parsed.on_failure, parsed.provenance)
+    except OrthonymLimitError as e:
+        print(_unnamed_line(parsed.smiles, e.code, e.message), file=sys.stderr)
+        return 1
+    if parsed.verbose and not parsed.provenance:
+        print(f"SMILES: {parsed.smiles}\nStyle:  {parsed.style}\nName:   {text}")
+    else:
+        print(text)
+    if reason is not None:
+        print(reason, file=sys.stderr)
+    return 0
 
 
 #: The one note of a run on the error stream: printed only when the default (no ``--emit-tier``) returned a name
@@ -608,6 +646,7 @@ def main(args: List[str] = None) -> int:
         ),
     )
     _add_on_failure_option(parser)
+    _tl.add_option(parser)
 
     parsed = parser.parse_args(args)
 
@@ -629,6 +668,7 @@ def main(args: List[str] = None) -> int:
     # the tier: the one asked for, else the default (best-effort when OPSIN reads the names back)
     emit_tier_given = parsed.emit_tier is not None
     parsed.emit_tier = parsed.emit_tier or default_tier(parsed.style)
+    parsed.time_limit = _tl.prepare(parsed.time_limit, parsed.style, parsed.emit_tier)
 
     # Batch processing mode
     if parsed.batch:
@@ -641,7 +681,8 @@ def main(args: List[str] = None) -> int:
                               emit_tier_given=emit_tier_given,
                               provenance=parsed.provenance,
                               enable_triviality_controller=getattr(
-                                  parsed, 'enable_triviality_controller', False))
+                                  parsed, 'enable_triviality_controller', False),
+                              time_limit=parsed.time_limit)
 
     # Single SMILES mode (parsed.smiles is set: without it and without --batch the help check
     # above returned)
@@ -657,7 +698,7 @@ def main(args: List[str] = None) -> int:
         if parsed.validation_stats:
             from orthonym.namer import Orthonym
             namer = Orthonym(style=parsed.style, **_emit_tier_flags(parsed.emit_tier))
-            name = namer.name(parsed.smiles, on_failure=parsed.on_failure)
+            name = _tl.timed(parsed.time_limit, namer.name, parsed.smiles, on_failure=parsed.on_failure)
             print(name)
             stats = namer.get_validation_stats()
             print(f"Validation stats: {stats}", file=sys.stderr)
@@ -674,7 +715,7 @@ def main(args: List[str] = None) -> int:
             from orthonym.namer import Orthonym
             from orthonym.routing.dispatch_table import StoutClass
             namer = Orthonym(style=parsed.style, **_emit_tier_flags(parsed.emit_tier))
-            name = namer.name(parsed.smiles, on_failure=parsed.on_failure)
+            name = _tl.timed(parsed.time_limit, namer.name, parsed.smiles, on_failure=parsed.on_failure)
             print(name)
             stats = namer.get_dispatch_stats()
             print("\n--- CFR Dispatch Stats (Phase 158 outer) ---", file=sys.stderr)
@@ -708,7 +749,7 @@ def main(args: List[str] = None) -> int:
         if parsed.dump_tree:
             from orthonym.namer import Orthonym
             namer = Orthonym(style=parsed.style, **_emit_tier_flags(parsed.emit_tier))
-            result = namer.name_with_tree(parsed.smiles)
+            result = _tl.timed(parsed.time_limit, namer.name_with_tree, parsed.smiles)
             if parsed.format == "json":
                 import dataclasses
                 import json
@@ -760,23 +801,25 @@ def main(args: List[str] = None) -> int:
 
         name_kwargs["emit_tier"] = _emit_tier
         if parsed.confidence:
-            result = name_compound(parsed.smiles, style=parsed.style,
-                                   include_confidence=True,
-                                   binding_proof=_binding_proof, **name_kwargs)
+            result = _tl.timed(parsed.time_limit, name_compound, parsed.smiles, style=parsed.style,
+                               include_confidence=True,
+                               binding_proof=_binding_proof, **name_kwargs)
             _print_confidence(result)
             if not emit_tier_given and _is_below_pin(result.get('tier')):
                 print(_BELOW_PIN_NOTE, file=sys.stderr)
         elif parsed.verbose:
-            name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
+            name = _tl.timed(parsed.time_limit, name_compound, parsed.smiles, style=parsed.style, **name_kwargs)
             print(f"SMILES: {parsed.smiles}")
             print(f"Style:  {parsed.style}")
             print(f"Name:   {name}")
         else:
-            name = name_compound(parsed.smiles, style=parsed.style, **name_kwargs)
+            name = _tl.timed(parsed.time_limit, name_compound, parsed.smiles, style=parsed.style, **name_kwargs)
             print(name)
 
         return 0
 
+    except WallClockTimeout:
+        return _single_timed_out(parsed)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         return 1
@@ -799,7 +842,7 @@ def _print_tier_row(parsed, name_kwargs: dict, emit_tier: str, emit_tier_given: 
         trivial_fallback=name_kwargs["trivial_fallback"],
         binding_proof=binding_proof,
     )
-    row = namer.name_tiered(parsed.smiles)
+    row = _tl.timed(parsed.time_limit, namer.name_tiered, parsed.smiles)
     if parsed.provenance:
         print(_provenance_json(row))
         return 0
@@ -845,7 +888,8 @@ def _process_batch(input_file: str, output_file: str, style: str,
                     emit_tier: str = "pin",
                     provenance: bool = False,
                     enable_triviality_controller: bool = False,
-                    emit_tier_given: bool = True) -> int:
+                    emit_tier_given: bool = True,
+                    time_limit: Optional[float] = None) -> int:
     """Process multiple SMILES from a file.
 
     ``binding_proof`` is honoured here exactly as on the single-SMILES path:
@@ -871,6 +915,11 @@ def _process_batch(input_file: str, output_file: str, style: str,
     gets no name keeps its place: ``on_failure`` ("empty" by default) says whether
     its name column is empty (the reason is printed on the error stream), the label,
     or an ``ERROR:`` row.
+
+    ``time_limit`` (seconds, None for none: ``--time-limit``, after:func:`cli_time_limit.prepare`) is the
+    wall-clock limit of each line. A line that runs out of it is a line with no name, with the code
+    ``TIME_LIMIT`` (:func:`_timeout_text`), and the next line is named as in a fresh process: the limit
+    puts the process-global naming state back, and the namer of the run is built anew.
     """
     from .namer import validate_binding_proof
     validate_binding_proof(binding_proof)
@@ -888,16 +937,18 @@ def _process_batch(input_file: str, output_file: str, style: str,
         print(f"Error reading input file: {e}", file=sys.stderr)
         return 1
 
-    namer = None
-    if tiered:
-        namer = _tiered_namer(style, emit_tier,
-                              enable_triviality_controller=enable_triviality_controller,
-                              trivial_fallback=trivial_fallback, binding_proof=binding_proof)
+    def _new_namer():
+        return _tiered_namer(style, emit_tier,
+                             enable_triviality_controller=enable_triviality_controller,
+                             trivial_fallback=trivial_fallback, binding_proof=binding_proof)
+
+    namer = _new_namer() if tiered else None
 
     results = []
     errors = 0
     named = 0
     unnamed = 0
+    timed_out = 0
 
     for smiles in input_lines:
         if not smiles:
@@ -907,7 +958,7 @@ def _process_batch(input_file: str, output_file: str, style: str,
         _readable(smiles)       # RDKit's reason and the reason line; the ERROR row follows
         try:
             if tiered:
-                row = namer.name_tiered(smiles)
+                row = _tl.timed(time_limit, namer.name_tiered, smiles)
                 if provenance:
                     text = _provenance_json(row)
                 else:
@@ -918,13 +969,13 @@ def _process_batch(input_file: str, output_file: str, style: str,
                 below_pin = below_pin or _is_below_pin(row.get("tier"))
                 results.append(f"{smiles}\t{text}")
             elif confidence:
-                result = name_compound(smiles, style=style,
-                                       include_confidence=True,
-                                       enable_triviality_controller=enable_triviality_controller,
-                                       trivial_fallback=trivial_fallback,
-                                       emit_tier=emit_tier,
-                                       binding_proof=binding_proof,
-                                       on_failure=on_failure)
+                result = _tl.timed(time_limit, name_compound, smiles, style=style,
+                                   include_confidence=True,
+                                   enable_triviality_controller=enable_triviality_controller,
+                                   trivial_fallback=trivial_fallback,
+                                   emit_tier=emit_tier,
+                                   binding_proof=binding_proof,
+                                   on_failure=on_failure)
                 unnamed += is_failure_name(result['name'])
                 below_pin = below_pin or _is_below_pin(result.get('tier'))
                 # C4-D: None means UNMEASURED, not zero — emit the token
@@ -937,26 +988,44 @@ def _process_batch(input_file: str, output_file: str, style: str,
                     f"{_conf_col}\t{result['handler']}"
                 )
             else:
-                nm = name_compound(smiles, style=style,
-                                   enable_triviality_controller=enable_triviality_controller,
-                                   trivial_fallback=trivial_fallback,
-                                   emit_tier=emit_tier,
-                                   binding_proof=binding_proof,
-                                   on_failure=on_failure)
+                nm = _tl.timed(time_limit, name_compound, smiles, style=style,
+                               enable_triviality_controller=enable_triviality_controller,
+                               trivial_fallback=trivial_fallback,
+                               emit_tier=emit_tier,
+                               binding_proof=binding_proof,
+                               on_failure=on_failure)
                 unnamed += is_failure_name(nm)
                 results.append(f"{smiles}\t{nm}")
+        except WallClockTimeout:
+            timed_out += 1
+            clear_leaked_naming_state()
+            namer = _new_namer() if tiered else None
+            try:
+                text, reason = _timeout_text(smiles, time_limit, on_failure, provenance)
+            except OrthonymLimitError as e:     # --on-failure raise: the ERROR row of any other limit
+                results.append(f"{smiles}\tERROR: {e}")
+                errors += 1
+            else:
+                if reason is not None:
+                    print(reason, file=sys.stderr)
+                unnamed += 1
+                # --confidence has three more columns: the score of a name that was not built is unverified
+                results.append(f"{smiles}\t{text}\tunverified\t{_tl.CODE}" if confidence else f"{smiles}\t{text}")
         except Exception as e:
             results.append(f"{smiles}\tERROR: {e}")
             errors += 1
 
     output_text = "".join(line + "\n" for line in results)
+    counts = f"Processed {named} SMILES, {errors} errors, {unnamed} unnamed"
+    if time_limit:      # the lines that ran out of time are among the unnamed (the errors with --on-failure raise)
+        counts += f", {timed_out} timed out"
 
     if output_file:
         try:
             with open(output_file, 'w') as f:
                 f.write(output_text)
             if verbose:
-                print(f"Processed {named} SMILES, {errors} errors, {unnamed} unnamed")
+                print(counts)
                 print(f"Output written to: {output_file}")
         except IOError as e:
             print(f"Error writing output file: {e}", file=sys.stderr)
@@ -964,8 +1033,7 @@ def _process_batch(input_file: str, output_file: str, style: str,
     else:
         sys.stdout.write(output_text)
         if verbose:
-            print(f"\nProcessed {named} SMILES, {errors} errors, {unnamed} unnamed",
-                  file=sys.stderr)
+            print(f"\n{counts}", file=sys.stderr)
     if below_pin and not emit_tier_given and not provenance:
         print(_BELOW_PIN_NOTE, file=sys.stderr)
 

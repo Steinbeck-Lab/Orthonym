@@ -76,10 +76,12 @@ SAFETY
 from __future__ import annotations
 
 import collections
+import contextlib
 import gc
 import logging
 import os
 import re
+import signal
 import threading
 from typing import Optional, Sequence, Tuple
 
@@ -175,9 +177,50 @@ def _register_fork_hook_once() -> None:
         os.register_at_fork(after_in_child=_drop_jpype_gc_callback_in_child)
 
 
+@contextlib.contextmanager
+def _alarm_held():
+    """Hold a ``SIGALRM`` that comes in during the block back, and raise it when the block is left.
+
+    ``jpype.startJVM`` is the one call of this module that cannot be interrupted at its end. The alarm of
+    a wall-clock limit (``orthonym.wallclock``) that comes in while it is inside the JVM is raised as soon
+    as it returns, and that is in JPype's own Python code, which finishes the set-up of its classes: the
+    exception tears that set-up, ``_start`` then fails to bind the classes, and the in-process JVM is off
+    for the rest of the run, so that every later call spawns ``java`` (measured: a limit of 0.3 s or 0.5 s
+    on the first structure of a process). Held back, the alarm is raised when the block is left, with the
+    JVM up and its pid recorded, and the next call binds the classes. Every other call into the JVM is
+    safe to interrupt: a retry repeats it.
+
+    The handler is the Python one installed for ``SIGALRM`` (none: nothing to hold). A signal mask would not
+    do: the kernel may hand the signal to a thread of the JVM, and the Python handler then runs on the
+    main thread all the same.
+
+    The alarm is handed to the handler as the signal gave it (the frame that was running when it came in).
+    An exception that ends the block (a Ctrl-C, ``SystemExit``) wins over the held alarm, which is dropped:
+    the limit raises its alarm again at its refire interval, and the interrupt must not be replaced by a
+    timeout that a batch then carries on from."""
+    try:
+        handler = signal.getsignal(signal.SIGALRM)
+    except (AttributeError, ValueError):    # no SIGALRM on this platform
+        handler = None
+    held = []
+    completed = False
+    try:
+        if callable(handler) and threading.current_thread() is threading.main_thread():
+            signal.signal(signal.SIGALRM, lambda signum, frame: held.append((signum, frame)))
+        else:
+            handler = None
+        yield
+        completed = True
+    finally:
+        if handler is not None:
+            signal.signal(signal.SIGALRM, handler)
+            if held and completed:
+                handler(*held[0])
+
+
 def _start(pid: int) -> bool:
     """Resolve jars, boot the JVM, bind the classes. Caller holds _LOCK."""
-    global _STARTED_PID, _N2S_CLS, _CFG_CLS, _LABELCIP
+    global _STARTED_PID, _STATE, _N2S_CLS, _CFG_CLS, _LABELCIP
     global _JSYSTEM, _BAOS, _PRINTSTREAM, _JSTRARR, _OPSIN_JAR, _CENTRES_JAR
 
     if os.environ.get("ORTHONYM_DISABLE_JPYPE"):
@@ -233,20 +276,29 @@ def _start(pid: int) -> bool:
         # would emit it, so silence it where supported. The flag is UNKNOWN to
         # JDK < 24 and would abort start-up there, hence the retry without it --
         # a cosmetic flag must never be the reason the JVM fails to come up.
-        for opts in ([*base, "--enable-native-access=ALL-UNNAMED"], base,
-                     [*base_core, "--enable-native-access=ALL-UNNAMED"], base_core):
-            try:
-                jpype.startJVM(*opts, classpath=classpath)
-                break
-            except Exception as exc:  # JVMNotFound / OSError / bad option
-                # Deliberately NOT BaseException: a KeyboardInterrupt or SystemExit
-                # during start-up must propagate, not be recorded as "no JVM".
-                last = exc
-        else:
-            _log_unavailable_once(f"startJVM failed: {last}")
+        started = False
+        with _alarm_held():
+            for opts in ([*base, "--enable-native-access=ALL-UNNAMED"], base,
+                         [*base_core, "--enable-native-access=ALL-UNNAMED"], base_core):
+                try:
+                    jpype.startJVM(*opts, classpath=classpath)
+                    started = True
+                    break
+                except Exception as exc:  # JVMNotFound / OSError / bad option
+                    # Deliberately NOT BaseException: a KeyboardInterrupt or SystemExit
+                    # during start-up must propagate, not be recorded as "no JVM".
+                    last = exc
+            if started:
+                _STARTED_PID = pid
+                _register_fork_hook_once()
+            else:
+                # Recorded here, inside the block: a held alarm is raised when the block is left, and
+                # ``_ensure_jvm`` would not get to record the failed start (it would be tried again by
+                # every call) as it does for a start that no alarm met.
+                _log_unavailable_once(f"startJVM failed: {last}")
+                _STATE = False
+        if not started:
             return False
-        _STARTED_PID = pid
-        _register_fork_hook_once()
         # The thread that calls startJVM becomes the JVM's creating thread, a
         # USER thread. When that is a worker thread (first use from a
         # per-molecule ThreadPoolExecutor timeout thread), it exits without

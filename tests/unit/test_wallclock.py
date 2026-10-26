@@ -146,6 +146,21 @@ def test_a_dropped_timeout_is_raised_again_while_the_body_runs():
     assert _timer_disarmed()
 
 
+def test_a_dropped_timeout_is_raised_again_after_the_refire_interval_of_the_limit():
+    """``refire`` is per limit; the default stays ``REFIRE_INTERVAL_S``."""
+    t0 = time.monotonic()
+    with pytest.raises(WallClockTimeout):
+        with wall_clock_limit(0.05, refire=0.1):
+            try:
+                time.sleep(2)
+            except BaseException:  # noqa: BLE001 - stands in for the dropped raise
+                pass
+            time.sleep(10)
+    assert time.monotonic() - t0 < 0.05 + 0.1 + 0.4        # the default would take 1.05 s
+    assert _timer_disarmed()
+    assert wall_clock_limit(1).refire == REFIRE_INTERVAL_S
+
+
 def test_a_timeout_converted_to_another_exception_still_reads_as_a_timeout():
     with pytest.raises(WallClockTimeout) as info:
         with wall_clock_limit(0.05):

@@ -38,7 +38,7 @@ benzene
 : What to give for a structure that gets no name. `empty` (the default) prints an empty name and, on the error stream, one line `SMILES<tab>CODE: reason` with the limit code and the label. `label` prints the label in place of a name, as earlier versions did. `raise` stops with an error: the same line on the error stream and exit status `1` (with `--batch` the line gets `ERROR:` and the run ends with status `1`). It applies to a name, to `--confidence` and to `--batch` (with `--emit-tier` too); `--provenance` (with `--batch` too), `--dump-tree` and `--engine-only` report the structure as it is: in a `--provenance` row, `limit_code` says why there is no name. The codes are the stable part (see [Declines](../declines.md)); the label texts can change.
 
 `--verbose`, `-v`
-: Also print the SMILES and the style. With `--batch`, also say how many lines were read, how many failed and how many got no name.
+: Also print the SMILES and the style. With `--batch`, also say how many lines were read, how many failed and how many got no name (with `--time-limit`, how many of them ran out of time).
 
 `--dump-tree`, `--format {text,json}`
 : Print the parts of the name as a tree instead of the name. `--format` sets the layout: `text` (an indented tree; the default) or `json`. One SMILES only: not with `--batch`.
@@ -57,6 +57,9 @@ NameTree: cyclohexanol  (class_id=general_acyclic, cite=P-14+P-23+P-44)
 
 `--output FILE`, `-o FILE`
 : With `--batch`, write the lines to this file instead of the screen.
+
+`--time-limit SECONDS`
+: Give each structure at most this many seconds: one SMILES, or each line of `--batch`. A structure that is not named in time has no name, as any structure that gets none (`--on-failure`), with the reason code `TIME_LIMIT`; with `--provenance` its row has the tier `abstain` and `limit_code` `TIME_LIMIT`. A batch goes on with the next line, which is named as in a run without the limit, and `--verbose` counts the lines that ran out of time. Off by default. A call into the JVM that is already running finishes before the limit stops the naming, and where no alarm can be set (Windows, a thread other than the main one) the run says so once and has no limit: see [A time limit for each structure](batch.md#a-time-limit-for-each-structure).
 
 ## Diagnostics
 

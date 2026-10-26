@@ -2,10 +2,10 @@
 
 The engine bounds its own work with deterministic operation budgets
 (``assembly.fragment_naming.PerfBudgetExceeded``) and never reads a clock; nothing
-under ``src/orthonym`` arms an alarm. The measurement tools (``eval/harness.py``,
-``scripts/pin_conformance_eval.py``, the naming-scale shard workers,...) add a
-per-molecule wall-clock limit on top, so that one slow molecule costs one row and
-not the run.
+in the naming path arms an alarm. The callers add a per-molecule wall-clock limit on
+top, so that one slow molecule costs one row and not the run: the measurement tools
+(``eval/harness.py``, ``scripts/pin_conformance_eval.py``, the naming-scale shard
+workers,...) and the command line's ``--time-limit`` (``orthonym.cli_time_limit``).
 
 That limit must be a ``BaseException``. The naming path holds hundreds of
 ``except Exception`` handlers. An ``Exception`` raised from a ``SIGALRM`` handler is
@@ -57,7 +57,11 @@ __all__ = [
 #: has left the ``with``. The first ``WallClockTimeout`` can be lost: an alarm that
 #: lands in a garbage-collector callback (a ``WeakKeyDictionary`` entry removal, a
 #: ``__del__``) is printed as "Exception ignored" and dropped. Seen in this
-#: module's own tests.
+#: module's own tests, and in 2 of 228 timeouts of the command line's limit, both in
+#: the removal callback of a ``WeakKeyDictionary``: the naming then runs on until
+#: the next alarm or its own end (one timeout of 176 in an earlier run was 1.006 s
+#: past a limit of 0.25 s, which is this interval). A caller that cannot afford that
+#: second sets ``refire`` of:class:`wall_clock_limit`.
 REFIRE_INTERVAL_S = 1.0
 
 
@@ -91,7 +95,7 @@ class wall_clock_limit:  # noqa: N801 - used as a function-style context manager
     body once ``seconds`` of wall-clock time have passed.
 
     * Arms ``ITIMER_REAL`` with a ``SIGALRM`` handler that raises the timeout, and
-      fires again every:data:`REFIRE_INTERVAL_S` until the body has left.
+      fires again every ``refire`` seconds until the body has left.
     * If the alarm fired, the ``with`` statement raises ``WallClockTimeout``, even
       when the body went on to return normally or to raise something else (the first
       timeout was dropped or converted on the way): a limit that was exceeded always
@@ -111,10 +115,16 @@ class wall_clock_limit:  # noqa: N801 - used as a function-style context manager
     ``seconds`` of ``None`` or ``<= 0`` means no limit. Off the main thread, or on a
     platform without ``SIGALRM``, the body runs without a limit (a signal cannot be
     delivered there), as the tools did before this helper.
+
+    ``refire`` is the interval of the repeated alarm (:data:`REFIRE_INTERVAL_S`). A
+    shorter one bounds the time a lost first alarm costs, and is safe as long as the
+    unwinding of the body takes less than it: a second alarm that lands in a cleanup
+    block is handled as the first one is, by the restore of the naming state above.
     """
 
-    def __init__(self, seconds: Optional[float]):
+    def __init__(self, seconds: Optional[float], refire: float = REFIRE_INTERVAL_S):
         self.seconds = seconds
+        self.refire = refire
         self.fired = False
         self.restored: List[str] = []
         self._active = False
@@ -129,7 +139,7 @@ class wall_clock_limit:  # noqa: N801 - used as a function-style context manager
         self._previous_handler = signal.signal(signal.SIGALRM, self._on_alarm)
         self._started = time.monotonic()
         self._previous_timer = signal.setitimer(
-            signal.ITIMER_REAL, self.seconds, REFIRE_INTERVAL_S)
+            signal.ITIMER_REAL, self.seconds, self.refire)
         self._active = True
         return self
 

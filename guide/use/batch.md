@@ -36,6 +36,40 @@ not-a-smiles	ERROR: Invalid SMILES: not-a-smiles
 CC(=O)O	acetic acid
 ```
 
+## A time limit for each structure
+
+A few structures take a long time (a large molecule, a cage ring system: some need half a minute or more), and in a long file they hold up everything behind them. `--time-limit SECONDS` gives each line at most that long. A line that is not named in time is a line with no name, in its own place, and the run goes on with the next one:
+
+```console
+$ cat slow.smi
+CCO
+CC1C(C=CC(C2CCC2CN3CC4(CCCC5=C4C=CC(=C5)Cl)COC6=C3C=C(C=C6)C(=O)N=[S-](=O)C1C(=O)N(C)OC7=NN(C=C7C(=O)N)C)OC)OC(=O)N(C)C
+c1ccccc1
+$ orthonym --batch slow.smi --time-limit 5
+CCO	ethanol
+CC1C(C=CC(C2CCC2CN3CC4(CCCC5=C4C=CC(=C5)Cl)COC6=C3C=C(C=C6)C(=O)N=[S-](=O)C1C(=O)N(C)OC7=NN(C=C7C(=O)N)C)OC)OC(=O)N(C)C	
+c1ccccc1	benzene
+```
+
+The error stream has the reason of the second line, with the code `TIME_LIMIT`:
+
+```console
+CC1C(C=CC(C2CCC2CN3CC4(CCCC5=C4C=CC(=C5)Cl)COC6=C3C=C(C=C6)C(=O)N=[S-](=O)C1C(=O)N(C)OC7=NN(C=C7C(=O)N)C)OC)OC(=O)N(C)C	TIME_LIMIT: no name within the time limit of 5 s
+```
+
+The limit follows the other options for a structure that gets no name:
+
+* `--on-failure empty` (the default): an empty name, and the reason `<SMILES><tab>TIME_LIMIT: no name within the time limit of 5 s` on the error stream.
+* `--on-failure label`: the label `no name within the time limit of 5 s` in the name column.
+* `--on-failure raise`: the line gets `ERROR: [TIME_LIMIT] no name within the time limit of 5 s`, the run goes on, and it ends with status `1`, as for any other limit.
+* `--provenance`: the row has `"name": null`, `"tier": "abstain"` and `"limit_code": "TIME_LIMIT"`, and `--on-failure` does not change it. With `--confidence` the score column is `unverified` and the engine column `TIME_LIMIT`.
+
+`--verbose` adds the number of lines that ran out of time, which are also counted as unnamed (as errors with `--on-failure raise`). `--output` writes the same lines to the file. The limit is for naming: the start-up of the run (the Java machine, OPSIN's tables, about 1.5 s) is paid before the first limit begins and is not counted against the first line.
+
+The next line is named exactly as it is named without the limit: the limit puts back everything a cut-off naming had set, and the run builds a new namer. A limit that never expires changes nothing; a 50-line file gives the same output with `--time-limit 600` as without it. The limit also works for one SMILES (`orthonym "SMILES" --time-limit 30`), with the output of a structure that gets no name and, with `--on-failure raise`, status `1`.
+
+How the limit stops a naming. It is a timer signal (`SIGALRM`) whose handler stops the naming at the next Python statement, and a lost signal is raised again every 0.1 s. A call that is already running inside the Java machine (OPSIN, the stereo labeller) or inside RDKit cannot be stopped from Python and finishes first, so a line can take a little longer than the limit. Measured on 168 structures (150 random drug-like molecules from PubChem, 6 large oligosaccharides, 12 macrocycles and cage ring systems) at limits of 0.05, 0.1, 0.25, 0.5 and 1 s, 268 of 840 runs ran out of time. They stopped 1.1 ms after the limit in the middle, within 10 ms for 99 in 100, and within 57 ms at worst. In 12 of them a call into the Java machine was running when the limit expired, and the extra time was at most 11 ms. The calls into the Java machine in the naming of a 90-second peptide (389 of them) lasted 0.42 s at most (the first call of the process, which starts the Java machine and which the start-up makes before the first limit) and 1.7 s together. A single call that lasts much longer is not covered by these numbers: OPSIN needs about 2 s to read a made-up name of 3,600 characters, and the limit of that line is exceeded by what is left of the call. Where no timer signal exists (Windows) or `orthonym` is called from a thread other than the main one, the run says so once on the error stream and names every line without a limit.
+
 ## Tiers and provenance rows
 
 A batch run has the same default as one SMILES: the `best-effort` tier, that is the verified PIN when the strict path builds one and otherwise a systematic name. The default prints one note on the error stream at the end of the run, once however many lines got a name below `pin_verified`, and none when no line did. `--emit-tier` works as it does for one SMILES. This file has a molecule with no PIN, which `--emit-tier pin` leaves without a name:

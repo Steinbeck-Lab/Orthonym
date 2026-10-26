@@ -48,6 +48,8 @@ The first line is a log message on the error stream: the engine withdrew a candi
 
 The codes are the stable part: the keys of `orthonym.errors.LIMIT_CATALOG`. The texts of the labels can change, so match a code, never a label.
 
+The command line has one more reason, which is about the run and not about the structure: `TIME_LIMIT`, for a structure that was not named within the `--time-limit` of the run ([A time limit for each structure](use/batch.md#a-time-limit-for-each-structure)). It is not a key of `LIMIT_CATALOG`, as `INVALID_SMILES`, the reason of a SMILES that RDKit cannot read, is not.
+
 Most organic declines carry the general `UNNAMEABLE` (no candidate name passed the checks). `NO_VERIFIED_PIN` (a checked name exists, but not the PIN) is the reason of `--emit-tier pin`, the PIN-only tier, which also declines molecules that the default names, because it returns only a verified PIN: on the held-out ChEBI set it declines 891 of 2,000 molecules, and the default names nearly all of them ([Accuracy](accuracy.md#the-two-tiers)).
 
 Betaine shows the second case. Its strict-path name contains a part the engine records as not the preferred form, so the PIN-only tier declines, and the default and the wider tiers return the name labelled {tier}`systematic_verified`:
