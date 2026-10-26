@@ -249,17 +249,18 @@ def test_skeletal_hetero_rings_take_their_hantzsch_widman_or_retained_names():
         assert _names_and_roundtrips(smi).name == name
 
 
-def test_iodinane_ring_fails_closed_not_phantom_carbocycle():
-    """An iodinane / λ-halane ring (a non-skeletal HALOGEN as a ring atom,
-    ``I1CCCCC1``) has no REPLACEMENT_TERMS morpheme, so _build_hetero_prefix
-    would SILENTLY drop it and render a phantom carbocycle. The ring-builder
-    allow-list guard voids instead -> abstain, never a wrong constitution."""
+def test_iodinane_ring_is_spelled_with_its_morpheme_not_a_phantom_carbocycle():
+    """An iodinane / λ-halane ring (a non-skeletal HALOGEN as a ring atom, ``I1CCCCC1``) has no
+    ``REPLACEMENT_TERMS`` morpheme, so ``_build_hetero_prefix`` would SILENTLY drop it and render a phantom
+    carbocycle; the ring-builder allow-list guard kept it out. Lane L3 admitted ring iodine to the ring 'a'
+    table (``ring_replacement``): the floor now spells it 'ioda' with its lambda through
+    ``build_replacement_prefix``, the Blue Book;,:6448), so the name counts and
+    spells the atom and reads back."""
     smi = "C1CCC[IH]C1"
     m = Chem.MolFromSmiles(smi)
-    if m is None:
-        return  # RDKit rejected the hypervalent iodine; nothing to name
+    assert m is not None
     r = name_universal_substitutive(m)
-    if r is not None:
-        assert verify_or_none(r.name, smi) != r.name, (
-            f"phantom-carbocycle name for an iodinane ring round-tripped: "
-            f"{r.name!r}")
+    assert r is not None
+    assert "ioda" in r.name and "\u03bb3" in r.name, r.name
+    assert verify_or_none(r.name, smi) == r.name, (
+        f"the iodinane ring name does not read back: {r.name!r}")

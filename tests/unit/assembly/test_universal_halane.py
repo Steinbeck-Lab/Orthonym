@@ -215,12 +215,22 @@ def test_spine_builder_refuses_a_path_through_a_halogen():
 
 
 @pytest.mark.parametrize("smiles", [
-    "C1CCC[IH]C1",        # a halogen in a ring: no 'ioda' morpheme, the ring builder guard voids
+    "C1CCC[Br+]C1",       # a halogen in a ring that ``ring_replacement`` does not admit (bromine): voids
     "C[I+](C)(C)C",       # a charged halogen of bonding number 4: no -ium of bonding number 2
 ])
 def test_halogen_shapes_not_named_still_void_never_a_phantom_carbon(smiles):
     r = name_universal_substitutive(Chem.MolFromSmiles(smiles))
     assert r is None, f"{smiles!r} was named {r.name!r}"
+
+
+def test_a_ring_iodine_is_named_with_its_morpheme_and_never_as_a_phantom_carbocycle():
+    """Lane L3 admitted ring iodine to the ring 'a' table (``ring_replacement``): the floor's ring spine spells
+    it 'ioda' with its lambda, the Blue Book;:9765), so the name counts and
+    spells the atom (this SMILES used to void)."""
+    smiles = "C1CCC[IH]C1"
+    name = _floor(smiles)
+    assert "ioda" in name and "\u03bb3" in name, name
+    assert verify_or_none(name, smiles) == name
 
 
 def test_halane_rung_is_not_reached_by_a_molecule_without_a_halogen_unit(monkeypatch):

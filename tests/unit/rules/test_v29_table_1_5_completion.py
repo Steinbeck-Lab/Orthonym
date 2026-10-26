@@ -30,8 +30,15 @@ What actually changed, and what it deliberately did not
 * **7 refused, with a reason each**: At/Po/C (ranked by neither von Baeyer rule)
   and F/Cl/Br/I (ranked for citation but NOT for numbering -- and a skeletal RING
   halogen always has a nonstandard bonding number, so makes its lambda
-  mandatory while the ring lambda helper suppresses exactly that
-  connectivity-forced case). The halogens are marked NOT ESTABLISHED in-code.
+  mandatory while the ring lambda helper suppressed exactly that
+  connectivity-forced case). The halogens were marked NOT ESTABLISHED in-code.
+* **Lane L3 (ring iodine) then admitted iodine** -- and only iodine, by listing it in
+  ``lambda_convention.FUSED_RING_LAMBDA_HALOGENS``. It takes the numbering rank of the
+  citation order (ahead of oxygen, the keys the halogens carry in
+  ``hw_heteroatoms.HETEROATOM_PRIORITY``), ``vb_lambda_for_atom`` always cites its lambda,
+  and a name that carries ``ioda`` is recorded as not the PIN. F/Cl/Br stay refused here
+  for the reason above; ``ADMITTED_HALOGENS`` below is the one list that moves when a
+  panel admits another.
 * **Zn/Cd/Hg unchanged**: in NO replacement table, so still off Table 1.5 itself.
 * **The Table 1.5 / Table 2.4 divergence is now LIVE**, not latent: both tables
   carry Al and In, and they disagree on purpose (``aluma`` "(not alumina)"
@@ -92,6 +99,10 @@ BB_P_23_3_2_2 = (
 T2B_ADDED = ('Al', 'Ga', 'In', 'Tl')
 NO_VON_BAEYER_RULE = ('At', 'Po', 'C')
 HALOGENS = ('F', 'Cl', 'Br', 'I')
+#: the halogens ``lambda_convention.FUSED_RING_LAMBDA_HALOGENS`` admits as ring 'a' atoms
+#: (lane L3), and the others, which stay refused; written here, not read from the code
+ADMITTED_HALOGENS = ('I',)
+REFUSED_HALOGENS = ('F', 'Cl', 'Br')
 NO_REPLACEMENT_TABLE_AT_ALL = ('Zn', 'Cd', 'Hg', 'Fe', 'U')
 
 
@@ -192,16 +203,29 @@ def test_numbering_order_is_a_subsequence_of_the_citation_order():
 # 3. The emittable set = the intersection, and the pre- keys did not move.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
-def test_emittable_set_is_citation_intersect_numbering():
+def test_emittable_set_is_citation_intersect_numbering_plus_the_admitted_halogens():
+    """ ranks 22 elements, eighteen; the emittable set is the eighteen and
+    the halogens of ``ADMITTED_HALOGENS`` (iodine), whose rank is the one of the citation order."""
     assert (set(HETEROATOM_PREFIXES)
-            == set(VB_CITATION_ORDER) & set(VB_NUMBERING_SENIORITY))
-    assert len(HETEROATOM_PREFIXES) == 18
+            == (set(VB_CITATION_ORDER) & set(VB_NUMBERING_SENIORITY)) | set(ADMITTED_HALOGENS))
+    assert len(HETEROATOM_PREFIXES) == 18 + len(ADMITTED_HALOGENS)
 
 
 @pytest.mark.unit
-def test_ranks_follow_the_numbering_seniority_order():
+def test_ranks_follow_the_numbering_seniority_order_after_the_admitted_halogens():
     ordered = sorted(HETEROATOM_PREFIXES, key=lambda e: HETEROATOM_PREFIXES[e][1])
-    assert tuple(ordered) == VB_NUMBERING_SENIORITY
+    assert tuple(ordered) == ADMITTED_HALOGENS + VB_NUMBERING_SENIORITY
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('symbol', ADMITTED_HALOGENS)
+def test_an_admitted_halogen_is_emittable_with_the_table_1_5_spelling(symbol):
+    """Iodine: the book's morpheme, the citation position of, a rank before oxygen, no refusal
+    to explain, and the prefix of every consumer site (``get_heteroatom_prefix``)."""
+    assert HETEROATOM_PREFIXES[symbol][0] == BB_TABLE_1_5[symbol][0]
+    assert HETEROATOM_PREFIXES[symbol][1] < HETEROATOM_PREFIXES['O'][1]
+    assert symbol not in VB_INADMISSIBLE
+    assert get_heteroatom_prefix(symbol) == BB_TABLE_1_5[symbol][0]
 
 
 @pytest.mark.unit
@@ -225,7 +249,7 @@ def test_t2b_added_rows_carry_the_table_1_5_spelling(symbol, expected):
 # 4. The refusals, by reason.
 # ---------------------------------------------------------------------------
 @pytest.mark.unit
-@pytest.mark.parametrize('symbol', NO_VON_BAEYER_RULE + HALOGENS)
+@pytest.mark.parametrize('symbol', NO_VON_BAEYER_RULE + REFUSED_HALOGENS)
 def test_inadmissible_rows_are_not_emittable(symbol):
     """A Table 1.5 morpheme exists, but no ring context may spell it."""
     assert symbol in TABLE_1_5
@@ -247,7 +271,7 @@ def test_carba_is_ruled_out_by_the_book_not_just_by_the_orders():
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize('symbol', HALOGENS)
+@pytest.mark.parametrize('symbol', REFUSED_HALOGENS)
 def test_halogen_refusal_reason_records_both_blockers(symbol):
     """NOT ESTABLISHED, not merely unimplemented -- and the record must say why.
 
@@ -457,11 +481,28 @@ def test_the_tricyclo_speller_also_reaches_the_added_rows(symbol, morpheme):
 
 
 @pytest.mark.unit
-def test_primitive_reports_a_ring_halogen_as_unexpressed():
-    """Never a name: the ring stem would count an atom no morpheme spells."""
+def test_primitive_spells_the_admitted_ring_iodine_with_its_lambda():
+    """ (the Blue Book): the lambda follows the locant; (:9867): "The symbol is
+    placed before the appropriate 'a' prefix". A ring iodine has two or more ring bonds, so the bonding
+    number is never the standard 1 and the symbol is cited whatever the degree forces."""
     result = _ring_prefix('C1CC2CC[IH]C2C1')
-    assert len(result.unexpressed) == 1, result
-    assert 'ioda' not in result.prefix
+    assert result.unexpressed == (), result
+    assert result.prefix.endswith('\u03bb3-ioda'), result
+    assert result.prefix.count('ioda') == 1
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('smiles,lam', [('C1CC[I-]CC1', 3), ('C1CC[I+]CC1', 3)])
+def test_primitive_cites_the_lambda_of_the_hydride_an_iodine_ion_is_named_from(smiles, lam):
+    """An iodanuide centre is named 'ide' from the lambda3 hydride method (2), the Blue Book:
+    "the suffix 'ide' to a parent hydride in which the bonding number at the anionic site is higher than the
+    standard bonding number and is expressed by the lambda-convention"), an iodonium centre 'ylium' from the same
+    hydride "Application of the lambda-convention with the suffix 'ylium'",:41694): both cite the
+    lambda of the hydride, 3 for the two ring bonds."""
+    from orthonym.rules.ring_replacement import vb_lambda_for_atom
+    mol = Chem.MolFromSmiles(smiles)
+    idx = next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == 'I')
+    assert vb_lambda_for_atom(mol, idx) == lam
 
 
 @pytest.mark.unit
@@ -578,15 +619,26 @@ def test_multi_heteroatom_macrocycle_still_cites_every_locant():
 
 @pytest.mark.unit
 @pytest.mark.parametrize('smiles', [
-    'C1CC2CC[IH]C2C1', 'C1C[IH]CC2(C1)CCCCC2',
     'C1CC2CC[AtH]C2C1', 'C1CC2CC[PoH]C2C1',
     'C1CC2CC[ZnH]C2C1', 'C1CC2CC[CdH]C2C1', 'C1CC2CC[Hg]C2C1',
 ])
 def test_inadmissible_and_off_table_ring_atoms_still_refuse(smiles, namer):
     name = namer.name(smiles)
     assert _refused(name), f"expected a refusal, got {name!r}"
-    for morpheme in ('ioda', 'astata', 'polona', 'carba', 'mercura'):
+    for morpheme in ('astata', 'polona', 'carba', 'mercura'):
         assert morpheme not in (name or '')
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize('smiles,expected', [
+    ('C1CC2CC[IH]C2C1', '2\u03bb3-iodabicyclo[3.3.0]octane'),
+    ('C1C[IH]CC2(C1)CCCCC2', '2\u03bb3-iodaspiro[5.5]undecane'),
+])
+def test_admitted_ring_iodine_names_with_no_jar_and_never_as_a_hydrocarbon(smiles, expected, namer):
+    """The cages the refusal tests used to hold for iodine, now with the 'ioda' morpheme and its lambda;
+    OPSIN reads each name back to the cage (checked by hand with a fresh OPSIN 2.9.0 call, as for
+    the added rows above), and a name with no 'ioda' for them would be the phantom hydrocarbon."""
+    assert namer.name(smiles) == expected
 
 
 @pytest.mark.unit

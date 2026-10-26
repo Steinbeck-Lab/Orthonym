@@ -64,6 +64,16 @@ def _rings_of_system(mol) -> Optional[Tuple[Set[int], Set[int]]]:
     return None
 
 
+def _rings_of_ring_system(mol, ring_atoms: Set[int]) -> Optional[Tuple[Set[int], Set[int]]]:
+    """``_rings_of_system`` for the ring system ``ring_atoms`` of a molecule that holds other
+    rings and substituents: the pair (benzene ring, heteromonocycle) whose union is exactly
+    ``ring_atoms``, else None."""
+    pair = _rings_of_system(mol)
+    if pair is None or (pair[0] | pair[1]) != set(ring_atoms):
+        return None
+    return pair
+
+
 def _plain_atoms(mol, ring_atoms: Set[int]) -> bool:
     """No charged, radical or isotope-labelled ring atom, and no lambda atom but an admitted
     ring halogen: the atoms this producer's parent describes as they are."""
@@ -152,3 +162,63 @@ def name_halogen_benzo_system(mol) -> Optional[str]:
     return fr._assemble_fused_heterocycle_name(
         mol, fr._join_hydrogen_prefix(front, parent),
         fr._hydrogen_marked_substituents(subs, rh, atom_to_locant), atom_to_locant)
+
+
+def halogen_benzo_candidates(mol, ring_atoms: Set[int]):
+    """The parents of a benzene ring fused to a heteromonocycle with a halogen ring atom in the lambda
+    state, in the shape ``partial_saturation._resolve_oxo_parent`` gives the catalogue's parents to
+    ``fused_forms.fused_system_form``: ``[(parent name, [(atom -> locant, None)], None),...]``, one per
+    numbering of the system's symmetry (the locants are inside the name, so each numbering spells its own
+    parent), or None when ``ring_atoms`` is not such a system, and none of the writers of a ring system
+    as a substituent or a parent hydride has a name for it.
+
+    The parent is the one ``name_halogen_benzo_system`` builds, 'Heteromonocyclic components
+    fused to a benzene ring' (the Blue Book): ``1λ3,2-benziodoxole``. The hydrogen, hydro prefixes
+    and substituent locants come from the shared rule of ``fused_forms``, as for the catalogue's parents."""
+    from . import fused_rings as fr
+    from .fusion_numbering import compute_fused_numbering
+    pair = _rings_of_ring_system(mol, ring_atoms)
+    if pair is None:
+        return None
+    ring = set(ring_atoms)
+    if not _plain_atoms(mol, ring):
+        return None
+    canonical = compute_fused_numbering(mol, ring)
+    if not canonical:
+        return None
+    from ..data.halogen_ring_parents import PRINTED_PIN_PARENTS
+    out = []
+    seen = set()
+    for perm in fr._ring_system_automorphisms(mol, ring, ignore_bond_order=True):
+        try:
+            a2l = {a: fr._fused_locant_to_output(canonical[perm[a]]) for a in ring}
+        except KeyError:
+            return None
+        parent = benzo_hw_name(mol, pair[1], a2l)
+        if parent is None:
+            continue
+        key = (parent, tuple(sorted((a, str(l)) for a, l in a2l.items())))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append((parent, [(a2l, None)], None))
+        if parent not in PRINTED_PIN_PARENTS:
+            # valid, but the book prints no PIN on this ring system (name-scoped record)
+            fr._record_non_pin_spelling(parent[:-1])
+    return out or None
+
+
+def halogen_benzo_substituent_name(sub, attach_sub, allow_mancude: bool = False) -> Optional[str]:
+    """``1H-1λ3-benziodol-1-yl`` for a detached benzene ring fused to a heteromonocycle with a halogen ring atom
+    in the lambda state, the free valence numbered per (2) (the Blue Book: the final 'e' of the
+    parent is elided before 'yl' and the locant is cited; added hydrogen when the free valence is on
+    the atom with no hydrogen, ``fused_forms``); ``None`` for every other ring system, whose name this function
+    does not change. Offered by ``ring_substituents._polycyclic_substituent_name`` before the von Baeyer
+    polyene of the universal cage namer: a benzoheterocycle is named by fusion nomenclature,
+    :11813), never as a von Baeyer system, where the fusion name is built."""
+    from .fused_forms import _halogen_benzo_parents, fused_system_form
+    ring = set(range(sub.GetNumAtoms()))
+    if _halogen_benzo_parents(sub, ring) is None:
+        return None
+    form = fused_system_form(sub, ring, attach_sub, ())
+    return form.prefix(attach_sub, 1) if form is not None else None

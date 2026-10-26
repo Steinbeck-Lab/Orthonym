@@ -1686,10 +1686,9 @@ def name_substituent(mol, frag_atoms, attach_idx, allow_mancude: bool = False):
                 and (token is None or is_refusal_sentinel(token))
                 and free_valence in (1, 2, 3)):
             try:
-                from .universal_substituent import name_universal_substituent_prefix
-                _uni = name_universal_substituent_prefix(
-                    mol, frag_atoms_set, attach_idx, bond_order=free_valence,
-                    cap_attachment=True)
+                from .halogen_ring_fragments import name_fragment_floor
+                _uni = name_fragment_floor(mol, frag_atoms, frag_atoms_set, attach_idx,
+                                           free_valence, _route_fragment_to_general_engine)
             except Exception:  # a producer bug must never crash branch naming
                 _uni = None
             if _uni and not is_refusal_sentinel(_uni) and ' ' not in _uni:

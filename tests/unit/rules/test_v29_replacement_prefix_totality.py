@@ -234,13 +234,14 @@ def test_root_fabricator_returns_none_off_table(symbol):
 
 # Elements ``get_heteroatom_prefix`` must refuse, for TWO different reasons:
 # * Fe/U/Xx/Zn/Cd/Hg -- in NO replacement table at all.
-# * At/Po/C/F/Cl/Br/I -- Table 1.5 rows that and/or do not
+# * At/Po/C/F/Cl/Br -- Table 1.5 rows that and/or do not
 # rank, so there is no sanctioned von Baeyer citation position or numbering
 # rank for them (-T2b; see ``ring_replacement.VB_INADMISSIBLE``).
 # ``Al`` was in this list until T2b: it is now spelled (``alumina``), because
-# AND both rank it.
+# AND both rank it. ``I`` was in it until lane L3 admitted ring
+# iodine (``lambda_convention.FUSED_RING_LAMBDA_HALOGENS``); it is spelled ``ioda``.
 @pytest.mark.parametrize('symbol', ['Fe', 'U', 'Xx', 'Zn', 'Cd', 'Hg',
-                                    'At', 'Po', 'C', 'F', 'Cl', 'Br', 'I'])
+                                    'At', 'Po', 'C', 'F', 'Cl', 'Br'])
 def test_root_fabricator_fails_closed_for_everything_off_table(symbol):
     from orthonym.rules.polycyclic_bridged import get_heteroatom_prefix
     assert get_heteroatom_prefix(symbol) is None
@@ -353,9 +354,9 @@ def test_spiro_prefix_builder_fails_closed_at_function_level():
     from orthonym.perception.rings import get_spiro_atoms
     # ``Al`` was here until - made it emittable (``alumina``). Replaced
     # by elements that are still unspellable for BOTH reasons: Zn/Hg/Fe are in no
-    # replacement table, while I/At/Po are Table 1.5 rows the von Baeyer rules do
-    # not rank (``ring_replacement.VB_INADMISSIBLE``).
-    for symbol in ('Zn', 'Hg', 'Fe', 'I', 'At', 'Po'):
+    # replacement table, while At/Po are Table 1.5 rows the von Baeyer rules do
+    # not rank (``ring_replacement.VB_INADMISSIBLE``). ``I`` moved out with lane L3.
+    for symbol in ('Zn', 'Hg', 'Fe', 'At', 'Po'):
         mol = Chem.MolFromSmiles(f'C1C[{symbol}H]CC2(C1)CCCCC2')
         assert mol is not None
         spiro_atoms = set(get_spiro_atoms(mol))
@@ -537,10 +538,10 @@ def test_polycyclic_wrapper_returns_empty_string_for_a_carbocycle():
 # ---------------------------------------------------------------------------
 # 8. The higher-polycyclo (von Baeyer) speller, site 3.
 # ---------------------------------------------------------------------------
-# ``Al`` moved out of this list in - (now spelled ``alumina``); I/At/Po
+# ``Al`` moved out of this list in - (now spelled ``alumina``); At/Po
 # replace it and additionally cover the new "has a morpheme, has no von Baeyer
-# rank" refusal class.
-@pytest.mark.parametrize('symbol', ['Zn', 'Hg', 'Fe', 'I', 'At', 'Po'])
+# rank" refusal class (``I`` moved out with lane L3, which admitted ring iodine).
+@pytest.mark.parametrize('symbol', ['Zn', 'Hg', 'Fe', 'At', 'Po'])
 def test_tricyclo_prefix_generator_fails_closed_off_table(symbol):
     """``tricyclo._generate_heteroatom_prefix`` was a third implementation.
 

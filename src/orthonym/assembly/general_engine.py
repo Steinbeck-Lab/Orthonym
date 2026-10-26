@@ -313,6 +313,12 @@ def _skeletal_anion_base(mol, acls, atom_idx) -> Optional[str]:
     and ``_zwitterion_suffix_plan`` (net-neutral both-skeletal) so the two never
     disagree about what a ring-N anion spells. References: IUPAC 2013.
     """
+    from ..rules.lambda_convention import ring_halogen_ion
+    if ring_halogen_ion(mol, atom_idx) == 'anion':
+        # a ring iodanuide centre (whatever ``classify_anion`` calls it: 'uide_anion' for two ring bonds,
+        # 'unknown' with substituents on the iodine) is the removal of the hydron of the ring atom of
+        # the lambda hydride, method (2): '1H-1lambda3-iodepin-1-ide'
+        return 'ide'
     if acls in ('carbanion', 'heteroatom_hydride_anion'):
         return 'ide'
     if acls == 'uide_anion':
@@ -403,6 +409,9 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False,
                 return None
         else:
             ccls = classify_cation(mol, site)
+            from ..rules.lambda_convention import ring_halogen_ion
+            if ring_halogen_ion(mol, idx) == 'cation':
+                ccls = 'ylium'        # a ring iodonium centre: the lambda hydride less a hydride,
             if ccls == 'ylium':
                 base = 'ylium'        #: loss of H- from a skeletal C
             elif ccls in ('aminium', 'onium', 'quaternary'):
@@ -1633,7 +1642,8 @@ def name_general_ring(
     # Baeyer polyene the Blue Book,:24221).
     if allow_aromatic_general and cage_seed:
         try:
-            fused = _emit_fused_ring(mol, features, cage_seed, allow_aromatic_general)
+            fused = _emit_fused_ring(mol, features, cage_seed, allow_aromatic_general,
+                                     allow_charged=allow_charged)
         except Exception as e:  # noqa: BLE001 - the von Baeyer route stays the answer
             logger.info("fused ring tail raised %s; von Baeyer route", type(e).__name__)
             fused = None
@@ -1954,7 +1964,7 @@ def _emit_ring_from_analysis(
 
 
 def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
-                     suppress_principal_group: bool = False
+                     suppress_principal_group: bool = False, allow_charged: bool = False
                      ) -> Optional[GeneralEngineResult]:
     """Roadmap N5b: the ring-parent tail for a fusable ring system spelled by its
     fusion name (``rules.fused_forms.fused_system_form``) instead of the von Baeyer
@@ -1969,8 +1979,10 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
     Scope: a parent with no principal-group suffix -- the molecule has none, or the
     caller (the assembly tier, ``suppress_principal_group``) cites every group as a
     prefix; a neutral molecule (a charge suffix on a fused parent is the ring-ion
-    producers'); every substituted ring atom takes a numbered locant. Substituents,
-    their order and marks, and the parent-scope stereo come from the same
+    producers'), or under ``allow_charged`` one whose only charge is a ring iodanuide or
+    iodonium of the parent (``halogen_ring_ions``: the fusion name of its lambda hydride and
+    the ending 'ide' or 'ylium',, '1lambda3-benziodol-1-ylium (PIN)'); every
+    substituted ring atom takes a numbered locant. Substituents, their order and marks, and the parent-scope stereo come from the same
     helpers as ``_emit_ring_from_analysis``.
 
     The one suffix the assembly tier does cite: the ring C=O groups of the fusion parent
@@ -1988,9 +2000,11 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
 
     if getattr(features, 'principal_group', None) and not suppress_principal_group:
         return _refuse("fused parent with a suffix (the fusion producers' scope)")
-    if Chem.GetFormalCharge(mol) != 0 or _has_ionic_centres(mol):
-        return _refuse("fused parent with a charge")
     ring_set = set(ring_atoms)
+    from .halogen_ring_ions import fused_ring_ion_view, fused_ring_ion_parent
+    ion_view = fused_ring_ion_view(mol, ring_set) if allow_charged else None
+    if ion_view is None and (Chem.GetFormalCharge(mol) != 0 or _has_ionic_centres(mol)):
+        return _refuse("fused parent with a charge")
     carriers = [a for a in sorted(ring_set)
                 for nb in mol.GetAtomWithIdx(a).GetNeighbors()
                 if nb.GetIdx() not in ring_set and nb.GetAtomicNum() > 1]
@@ -2005,7 +2019,7 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
             [a for a in carriers if a not in suffix_atoms])
     form = None
     if ketone_form is None:
-        form = fused_system_form(mol, sorted(ring_set), None, carriers)
+        form = fused_system_form(ion_view or mol, sorted(ring_set), None, carriers)
         if form is None:
             return None
     a2l = dict((ketone_form or form).numbering)
@@ -2058,6 +2072,13 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
     else:
         parent = form.parent
         bindings.append(TokenBinding(tuple(sorted(ring_set)), parent, 'parent'))
+    if ion_view is not None:
+        ionic = fused_ring_ion_parent(parent, mol, ring_set, a2l, _append_charge_suffix)
+        if ionic is None:
+            return _refuse("ring halogen ion of a fused parent: charge not expressible")
+        parent, charge_atom_ids = ionic
+        bindings[-1] = TokenBinding(tuple(sorted(ring_set)), parent, 'parent')
+        bindings.append(TokenBinding((), '', 'charge', charge_atom_ids=charge_atom_ids))
     name = (joined + ('-' if parent[:1].isdigit() else '') + parent) if joined else parent
     name = _apply_parent_stereo(name, mol, a2l)
     return GeneralEngineResult(name=name, bindings=tuple(bindings),
@@ -2365,12 +2386,10 @@ def name_general_monocycle(
     if not allow_aromatic_general:
         return None
 
-    from ..rules.heterocycles import (
-        name_heterocycle,
-        orient_heterocycle_with_substituents,
-    )
+    from ..rules.heterocycles import orient_heterocycle_with_substituents
     from ..rules.ring_selection import select_principal_ring_system
     from ..rules.seniority import get_suffix
+    from .halogen_ring_ions import ring_ion_parent_name
     from .substituent_enumerator import discover_substituents, name_substituent
 
     reason = _common_refusal(mol, allow_charged=allow_charged)
@@ -2484,7 +2503,7 @@ def name_general_monocycle(
     if has_hetero:
         oriented, atom_to_locant = orient_heterocycle_with_substituents(
             mol, parent_ring, sub_positions, pg_ring_atoms)
-        parent_name = name_heterocycle(mol, parent_ring)
+        parent_name = ring_ion_parent_name(mol, ring_set, parent_ring, atom_to_locant)
     else:
         oriented, atom_to_locant = _orient_carbocycle(
             mol, parent_ring, sub_positions, pg_ring_atoms, ionic=allow_charged and not pg)

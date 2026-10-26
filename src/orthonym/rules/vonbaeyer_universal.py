@@ -966,7 +966,33 @@ def _extract_spiro_submol(mol, cage_set):
         Chem.SanitizeMol(sub)
     except Exception:
         return None, None
+    if not _halogen_valences_survive(mol, sub, order):
+        return None, None
     return sub, order
+
+
+def _halogen_valences_survive(mol, sub, order) -> bool:
+    """The submol is a NEUTRAL view of the ring (atoms of atomic number only; the bonds to the rest
+    are implicit hydrogens), which gives a ring halogen the bonding number its ring bonds and hydrogens
+    make: right for a neutral iodine whose cut bonds were single (the hydrogen stands in for the
+    substituent) and for an iodanuide or an iodonium with only ring bonds (the view is the lambda3 hydride
+    their names are built on, by 'ide' and by 'ylium'), wrong for a hypervalent iodine or an ion with several
+    substituents, whose view is a lambda3 atom. The spiro name cites the lambda of the view, and the InChI key
+    cannot tell the [IH2+] of a name that cites the wrong one from the [I+] of the molecule, so these are
+    refused here (``lambda_convention.ring_halogen_ion``, ``ring_halogen_ion_lambda``)."""
+    from .lambda_convention import (
+        FUSED_RING_LAMBDA_HALOGENS, ring_halogen_ion, ring_halogen_ion_lambda)
+    for k, m in enumerate(order):
+        atom = mol.GetAtomWithIdx(m)
+        if atom.GetSymbol() not in FUSED_RING_LAMBDA_HALOGENS:
+            continue
+        seen = sub.GetAtomWithIdx(k).GetTotalValence()
+        if atom.GetFormalCharge():
+            if not (ring_halogen_ion(mol, m) is not None and seen == ring_halogen_ion_lambda(mol, m)):
+                return False
+        elif atom.GetTotalValence() != seen:
+            return False
+    return True
 
 
 def analyze_spiro_universal(

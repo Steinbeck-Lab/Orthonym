@@ -69,11 +69,20 @@ rule governs elements citation
  drops ``At``, ``Po`` and ``C``; drops those three **and** the
 four halogens. Emitting a replacement prefix needs BOTH a citation position and a
 numbering rank, so the set this module may spell is the intersection --
-'s 18 elements, which is exactly ``HETEROATOM_PREFIXES`` below. The
-remaining seven rows of Table 1.5 stay in ``TABLE_1_5`` (the book's table is
-recorded whole) but are listed in ``VB_INADMISSIBLE`` with the reason, and they
-fail closed through the ordinary ``unexpressed`` contract. Borrowing a
-position for an element the von Baeyer rules never rank would be inventing a rule.
+'s 18 elements -- and the ring halogens admitted by
+``lambda_convention.FUSED_RING_LAMBDA_HALOGENS`` (iodine, since lane L3: its citation
+position is 's, its numbering rank the one of that order, ahead of oxygen -- the order the
+book itself gives for a numbering choice among heteroatoms with the halogens first, (b)
+(the Blue Book: "low locants are assigned in accord with the following decreasing seniority order
+of heteroatoms: F > Cl > Br > I > O > S >...") and (:8806: "the locant '1' is given to the
+heteroatom first cited in the order of seniority given above" -- and a name that carries it is recorded
+as not the PIN, since itself gives the halogens no rank), which together are exactly
+``HETEROATOM_PREFIXES`` below. The remaining rows of Table 1.5 (six) stay in
+``TABLE_1_5`` (the book's table is recorded whole) but are listed in ``VB_INADMISSIBLE``
+with the reason, and they fail closed through the ordinary ``unexpressed`` contract.
+Borrowing a position for an element the von Baeyer rules never rank would be
+inventing a rule; a halogen is admitted by a measurement (a panel whose names read back),
+not by a reading.
 
 Relationship to ``rules/skeletal_replacement.py``: that module is the ACYCLIC
  chain namer (``2,5,8-trioxanonane``). Same nomenclature family, different
@@ -97,7 +106,10 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Set, Tuple
 
 from ..data.chain_names import multiplying_prefix
-from .lambda_convention import format_lambda_token, nonstandard_bonding_number
+from .lambda_convention import (
+    FUSED_RING_LAMBDA_HALOGENS, format_lambda_token, nonstandard_bonding_number,
+    ring_halogen_ion, ring_halogen_ion_lambda,
+)
 
 # ---------------------------------------------------------------------------
 # Blue Book Table 1.5, COMPLETE -- element -> (prefix, STANDARD bonding number).
@@ -170,25 +182,23 @@ VB_INADMISSIBLE: Dict[str, str] = {
          "recommended.\" Replacing a skeletal carbon by carbon is also a no-op "
          "in a hydrocarbon ring; 'carba' belongs to carbaborane nomenclature",
     'F': "P-23.3.1 gives a citation position but P-23.3.2.2 gives NO numbering "
-         "rank, so a numbering choice between a halogen and anything else is "
-         "unsanctioned. Independently, a skeletal RING halogen always has a "
-         "nonstandard bonding number (standard is 1, ring degree is >= 2), so "
-         "P-15.4.1.3 makes its lambda mandatory -- and the ring lambda helper "
-         "below suppresses exactly that connectivity-forced case, so every "
-         "emission would misstate the bonding number. See NOT ESTABLISHED below",
+         "rank, and this module has not been measured for the element: a halogen "
+         "is admitted by listing it in ``lambda_convention.FUSED_RING_LAMBDA_HALOGENS`` "
+         "(iodine is), after a panel showing its names read back. A skeletal RING "
+         "halogen always has a nonstandard bonding number (standard is 1, ring "
+         "degree is >= 2), so P-15.4.1.3 makes its lambda mandatory and "
+         "``vb_lambda_for_atom`` cites it for an admitted halogen",
     'Cl': "see 'F'", 'Br': "see 'F'", 'I': "see 'F'",
 }
+# iodine is admitted (HETEROATOM_PREFIXES below), so it has no refusal to explain
+VB_INADMISSIBLE = {element: reason for element, reason in VB_INADMISSIBLE.items()
+                   if element not in FUSED_RING_LAMBDA_HALOGENS}
 
-# NOT ESTABLISHED (do not paper over): the four halogens are a genuine PARTIAL
-# gap, not an absence. We know WHERE to cite them ranks them ahead of
-# O, and ``VB_CITATION_ORDER`` records that) but not how to number them against
-# another heteroatom, and we cannot currently spell their mandatory lambda. The
-# Blue Book's only skeletal-halogen replacement examples are lambda-convention
-# monocycles and fused systems -- ``lambda3-iodane`` [BBv2:7968,:23561] and
-# ``3H-3lambda3,2,4-benziodadioxepine`` (PIN) [BBv2:14557] -- both outside this
-# builder. Closing this needs (a) a sanctioned numbering rule for halogens and
-# (b) the ring lambda question resolved; until then they fail closed like any
-# off-table element, through ``unexpressed``.
+# The halogens that are not admitted: ranks them for citation, gives no numbering rank
+# (an admitted halogen takes the rank of the citation order, below), the book prints no ring replacement
+# name with one (its halogen ring examples are Hantzsch-Widman and fusion names: ``1H-1lambda3-iodole``,
+# ``3H-3lambda3,2,4-benziodadioxepine`` (PIN) [BBv2:14557], ``lambda3-iodane`` [BBv2:7968]), and a
+# panel has to show the element's names read back before it is listed.
 
 # The elements this module MAY spell: (citation) INTERSECT
 # (numbering) = 's eighteen. The integer is a relative sort key that
@@ -198,9 +208,25 @@ VB_INADMISSIBLE: Dict[str, str] = {
 # could not reorder -- any citation that already shipped. Stems are OPSIN
 # round-trip verified (heptasilabicyclo[2.2.1]heptane,
 # heptagermabicyclo[2.2.1]heptane, 2-aluminaspiro[5.5]undecane).
+#
+# THE ADMITTED RING HALOGENS (iodine; ``lambda_convention.FUSED_RING_LAMBDA_HALOGENS`` is the one home
+# of the admission, read by the benzoheterocycle producer and the mancude-parent valence as well). The
+# book gives a halogen its citation position, "Heterogeneous heterocyclic von Baeyer systems"
+# (the Blue Book): the 'a' prefixes are "cited in the order: F > Cl > Br > I > O > S >...", and
+# the same sequence heads Table 2.4 (:8236) and the heteroatom order of (:12139). Its
+# numbering tie-break, (:9789), lists eighteen elements and no halogen, so an admitted
+# halogen takes the rank of the citation order: ahead of oxygen, the keys -4 (F) to -1 (I) that
+# ``hw_heteroatoms.HETEROATOM_PRIORITY`` gives the halogens, so no key of the other elements moves.
+# The rank decides a numbering only where the locant SET of ties, and a name that rests on
+# it is recorded as not the PIN (``build_replacement_prefix``): the book prints no von Baeyer, spiro or
+# monocyclic replacement name with a halogen.
+_HALOGEN_RANK_OFFSET = len(VB_CITATION_ORDER) - len(VB_NUMBERING_SENIORITY)
 HETEROATOM_PREFIXES: Dict[str, Tuple[str, int]] = {
-    element: (TABLE_1_5[element][0], rank)
-    for rank, element in enumerate(VB_NUMBERING_SENIORITY, start=1)
+    **{element: (TABLE_1_5[element][0], VB_CITATION_ORDER.index(element) - _HALOGEN_RANK_OFFSET)
+       for element in VB_CITATION_ORDER[:_HALOGEN_RANK_OFFSET]
+       if element in FUSED_RING_LAMBDA_HALOGENS},
+    **{element: (TABLE_1_5[element][0], rank)
+       for rank, element in enumerate(VB_NUMBERING_SENIORITY, start=1)},
 }
 
 
@@ -282,11 +308,24 @@ def vb_lambda_for_atom(mol, atom_idx: int) -> Optional[int]:
     the parent-hydride/chain namers (SF6 -> lambda6-sulfane needs λ even though
     its degree forces valence 6).
     """
+    if ring_halogen_ion(mol, atom_idx) is not None:
+        # an ion is named from the hydride whose ring atom has one hydrogen more than it has bonds, the
+        # anion 'ide', the cation 'ylium': the lambda of that hydride, 3 for two ring bonds
+        # (``lambda_convention.ring_halogen_ion_lambda``)
+        return ring_halogen_ion_lambda(mol, atom_idx)
     lam = nonstandard_bonding_number(mol, atom_idx)
     if lam is None:
         return None
     from rdkit.Chem import GetPeriodicTable
     atom = mol.GetAtomWithIdx(atom_idx)
+    if atom.GetSymbol() in FUSED_RING_LAMBDA_HALOGENS:
+        # a ring halogen has the standard bonding number 1 and a ring degree of two or more, so its
+        # bonding number is never the standard one and (the Blue Book: "The symbol
+        # lambda-n is used to describe heteroatoms having nonstandard bonding numbers... placed
+        # immediately after the locant") has it cited whatever the degree forces: '1lambda3-iodane'
+        # (:7968), '1lambda3-iodinane (PIN)',:9158), '2lambda3-iodabicyclo[2.2.1]heptane'
+        # read by OPSIN as the name without the symbol, the same structure
+        return lam
     valences = [v for v in GetPeriodicTable().GetValenceList(atom.GetAtomicNum())
                 if v > 0]
     degree = atom.GetDegree()
@@ -324,6 +363,21 @@ def build_replacement_prefix(
     for atom_idx in sorted(ring_atoms):
         symbol = mol.GetAtomWithIdx(atom_idx).GetSymbol()
         if symbol == 'C':
+            continue
+        if symbol in FUSED_RING_LAMBDA_HALOGENS and not mol.GetAtomWithIdx(atom_idx).IsInRing():
+            # a halogen is a RING 'a' atom here (the module is the ring one): in a chain its
+            # hypervalent state is the parent hydride 'lambda3-iodane' of (the Blue Book),
+            # which ``assembly/universal_halane`` builds
+            unexpressed.append(atom_idx)
+            continue
+        if (symbol in FUSED_RING_LAMBDA_HALOGENS and mol.GetAtomWithIdx(atom_idx).GetFormalCharge()
+                and ring_halogen_ion(mol, atom_idx) is None):
+            # a ring halogen ion that is not the simple iodonium or iodanuide centre of
+            # ``ring_halogen_ion`` has no name this builder can spell; the neutral 'ioda' name would
+            # denote a different species. The simple ions are spelled here as their ring atom, with the
+            # lambda of their hydride, and carry their charge in the ending of the caller
+            # ('ylium', 'ide'
+            unexpressed.append(atom_idx)
             continue
         if symbol not in HETEROATOM_PREFIXES:
             # Not spellable in a ring context: either genuinely off Table 1.5 (no
@@ -365,6 +419,13 @@ def build_replacement_prefix(
         else:
             parts.append(f"{locant_str}-{stem}")
         per_atom.extend((idx, stem) for _loc, _lam, idx in entries)
+
+    if any(element in FUSED_RING_LAMBDA_HALOGENS for element in by_element):
+        # valid, read back by the callers, never labelled the PIN: the numbering rank of a halogen is
+        # the book's citation order and not a rule of, and the book prints no replacement
+        # name of a von Baeyer, spiro or monocyclic system with a halogen (name-scoped record)
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment('-'.join(parts))
 
     # (the Blue Book): a skeleton of one noncarbon element has a
     # preselected name this module does not build; see ``preselected_only``.

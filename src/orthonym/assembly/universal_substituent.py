@@ -2887,6 +2887,18 @@ def _polyspiro_component_leaf(ctx: _Ctx, ring_atoms: FrozenSet[int], attach_hint
     return _spiro_leaf_result(res, ring_atoms, attach_hint)
 
 
+def _ring_spine_hetero_prefix(mol, ring_order, atom_to_locant, ring_atoms, ring_halogens) -> Optional[str]:
+    """The 'a' prefix of a monocyclic ring spine under ``atom_to_locant``, or ``None`` when an atom has no morpheme.
+    A ring with a halogen goes through the one total builder of the von Baeyer and spiro names, the ring halogen
+    and every other heteroatom, whose ``unexpressed`` is the refusal of a skeletal atom no morpheme spells (and of
+    a halogen ion that is not the simple iodonium or iodanuide centre)."""
+    if not ring_halogens:
+        return _build_hetero_prefix(mol, ring_order, atom_to_locant)
+    from ..rules.ring_replacement import build_replacement_prefix
+    repl = build_replacement_prefix(mol, atom_to_locant, set(ring_atoms))
+    return None if repl.unexpressed or repl.preselected_only else repl.prefix
+
+
 def _name_ring_spine(
     ctx: _Ctx, component: FrozenSet[int], ring_atoms: FrozenSet[int],
     attach_hint: Optional[int],
@@ -2976,7 +2988,16 @@ def _name_ring_spine(
     # chain walker/builder guards -- such a ring is unnameable by this floor
     # anyway (no 'ioda'/metal morpheme), so voiding only converts a
     # phantom-carbon name into a clean abstention, never loses a correct name.
-    if any(not _is_skeletal_spine_element(mol, a) for a in ring_tuple):
+    # An admitted ring halogen (iodine, ``lambda_convention.FUSED_RING_LAMBDA_HALOGENS``) is spelled
+    # by ``ring_replacement.build_replacement_prefix`` below -- its 'ioda' morpheme, its lambda and
+    # its charge-free ring name are that module's, ``REPLACEMENT_TERMS`` has none -- so it is no
+    # phantom carbon. A halogen the table does not admit still voids here.
+    from ..rules.lambda_convention import FUSED_RING_LAMBDA_HALOGENS
+    ring_halogens = any(mol.GetAtomWithIdx(a).GetSymbol() in FUSED_RING_LAMBDA_HALOGENS
+                        for a in ring_tuple)
+    if any(not _is_skeletal_spine_element(mol, a)
+           and mol.GetAtomWithIdx(a).GetSymbol() not in FUSED_RING_LAMBDA_HALOGENS
+           for a in ring_tuple):
         return None
     n = len(ring_tuple)
     base = list(ring_tuple)
@@ -2992,7 +3013,12 @@ def _name_ring_spine(
             cands.append([rotated[0]] + list(reversed(rotated[1:])))
         return cands
 
-    if attach_hint is not None:
+    # (the Blue Book): "In rings modified by skeletal replacement ('a') nomenclature, low
+    # locants are assigned first to heteroatoms and then to unsaturated sites"; the free valence of a
+    # substituent group comes after the heteroatoms (b), (d)). A ring with a ring halogen is numbered
+    # so; the other rings keep the numbering from the attachment atom (the spelling of the mechanical forms the
+    # paper pins, ``test_prefix_order_fallback``), the same departure from, open for them.
+    if attach_hint is not None and not ring_halogens:
         cands = candidates_for(attach_hint)
     else:
         cands = candidates_for(None)
@@ -3043,7 +3069,8 @@ def _name_ring_spine(
         # remaining tie (a genuinely symmetric ring) the SAME way regardless
         # of how the input SMILES happened to number its atoms.
         canon_tie = tuple(ctx.canon_rank[a] for a in order)
-        return (hetero, unsat, branch_locants, canon_tie)
+        attach_locant_key = order.index(attach_hint) + 1 if attach_hint is not None else 0
+        return (hetero, attach_locant_key, unsat, branch_locants, canon_tie)
 
     best = min(cands, key=score)
     atom_to_locant = {a: i + 1 for i, a in enumerate(best)}
@@ -3061,7 +3088,9 @@ def _name_ring_spine(
             triple_bonds.append(i + 1)
     unsaturation = {"double_bonds": double_bonds, "triple_bonds": triple_bonds}
 
-    hetero_prefix = _build_hetero_prefix(mol, best, atom_to_locant)
+    hetero_prefix = _ring_spine_hetero_prefix(mol, best, atom_to_locant, ring_atoms, ring_halogens)
+    if hetero_prefix is None:
+        return None
     parent_block = _build_parent_with_unsaturation(n, unsaturation, fg_suffix=None)
     core = hetero_prefix + "cyclo" + parent_block
 

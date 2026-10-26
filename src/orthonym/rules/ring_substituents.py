@@ -1894,7 +1894,8 @@ def _polycyclic_substituent_name(
         # /P3: the universal cage + spiro engines (tricyclo+/adamantane +
         # mancude cages; hetero/poly/unsaturated spiro), complete-tier only.
         # Fail-closed (None) on any refusal.
-        for _uni in (_universal_cage_substituent_name,
+        from .halogen_ring_fusion import halogen_benzo_substituent_name  # lane L3: fusion name first
+        for _uni in (halogen_benzo_substituent_name, _universal_cage_substituent_name,
                      _universal_spiro_substituent_name):
             try:
                 name = _uni(sub, attach_sub, allow_mancude=allow_mancude)

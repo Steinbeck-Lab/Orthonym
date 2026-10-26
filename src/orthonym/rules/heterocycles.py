@@ -3099,8 +3099,10 @@ def _table_1_5_prefix(element: str) -> Optional[str]:
 
     The single Table-1.5 source, for the ring sizes that are NOT Hantzsch-Widman.
     """
+    from .lambda_convention import FUSED_RING_LAMBDA_HALOGENS
     from .ring_replacement import HETEROATOM_PREFIXES
-    entry = HETEROATOM_PREFIXES.get(element)
+    # a ring halogen needs a lambda this macrocycle builder does not cite: terminal_ring names that ring
+    entry = None if element in FUSED_RING_LAMBDA_HALOGENS else HETEROATOM_PREFIXES.get(element)
     return entry[0] if entry is not None else None
 
 

@@ -33,9 +33,10 @@ the molecular graph under the emitted numbering.
 
 Scope (stated explicitly, per the task contract)
 ------------------------------------------------
-* **Elements** -- carbon plus the 18 ring 'a'-prefix rows this project admits
+* **Elements** -- carbon plus the ring 'a'-prefix rows this project admits
   (``ring_replacement.HETEROATOM_PREFIXES``: O S Se Te N P As Sb Bi Si Ge Sn Pb
-  B Al Ga In Tl). The Blue Book's replacement set is Table 1.5,
+  B Al Ga In Tl, and the ring halogens of ``lambda_convention.FUSED_RING_LAMBDA_HALOGENS``,
+  iodine). The Blue Book's replacement set is Table 1.5,
   which is a CLOSED list, so an off-table skeletal element (Zn/Cd/Hg/Fe/…) has no
   morpheme and MUST refuse -- see the ``ring_replacement`` module docstring.
 * **Cycle rank** -- 1 (this module's monocycle branch) and 2..8 (delegated to the
@@ -247,6 +248,11 @@ def monocycle_numbering(
 # monocycle name construction
 # --------------------------------------------------------------------------
 
+def _locant_key(token: str) -> int:
+    """The leading number of a ring-bond locant: '3' -> 3, the closure bond '1(7)' -> 1."""
+    return int(token.split('(', 1)[0])
+
+
 def _unsaturation_block(double_locs: Sequence[str], triple_locs: Sequence[str],
                         ) -> str:
     """``''`` (saturated -> caller appends ``an``), ``'-1-en'``,
@@ -294,6 +300,11 @@ def build_monocycle_replacement_name(
     n = len(ring_set)
     if n < 3 or n > cage_caps()[0]:
         return None
+    _fv_atom = (next((a for a, loc in numbering.items() if loc == free_valence_locant), None)
+                if free_valence_locant is not None else None)
+    if _hantzsch_widman_names_halogen_ring(mol, ring_set, _fv_atom):
+        logger.info("terminal_ring: a ring halogen the Hantzsch-Widman namers name; leave it")
+        return None
     try:
         stem = get_chain_prefix(n)
     except (ValueError, KeyError):
@@ -315,32 +326,31 @@ def build_monocycle_replacement_name(
         logger.info("terminal_ring: ring unsaturation not citable; refuse")
         return None
     # A monocycle is numbered consecutively around the ring, so every multiple
-    # bond joins locants n and n+1 (or N and 1). A COMPOSITE locant here means
-    # the numbering is not a walk of the cycle -- refuse rather than emit a
-    # citation the grammar below cannot audit.
-    if any('(' in t for t in unsat.double_locants + unsat.triple_locants):
-        logger.info("terminal_ring: composite ring-bond locant on a monocycle "
-                    "(numbering is not a cycle walk); refuse")
-        return None
-    # The N->1 ring-closure bond. ``_locant`` renders it ``1(N)`` (non-
-    # consecutive), so the composite refusal above ALREADY catches it and this is
-    # a second, explicit statement of the same decision.
-    #
-    # It is deliberately a REFUSAL rather than a citation. Citing it as locant
-    # ``N`` is the usual reading of, but the audit would then have to
-    # apply that same convention to parse it back -- speller and parser sharing an
-    # assumption is exactly the shape the audit exists to rule out, so the
-    # convention would be unproven rather than verified. Extending the audit to
-    # prove it independently (e.g. against OPSIN's reading) is the follow-up; a
-    # refusal is the correct interim state, not a permanent one.
-    for lo, hi in list(unsat.double_pairs) + list(unsat.triple_pairs):
-        if (lo, hi) == (1, n):
-            logger.info("terminal_ring: ring-closure multiple bond (1,%d) is "
-                        "not independently auditable; refuse", n)
+    # bond joins locants n and n+1, except the ring-closure bond between locant n and
+    # locant 1, which is cited with the compound locant '1(n)' criterion (1),
+    # the Blue Book: "A compound locant is used for a double bond if the locants of the atoms at each
+    # end of the bond do not differ by a value of one. When a compound locant is required, the higher locant
+    # is cited in parentheses", the way the von Baeyer sibling cites a bond between atoms that are not
+    # consecutive: ``ring_unsaturation._locant``). Any other composite locant means the
+    # numbering is not a walk of the cycle -- refuse rather than emit a citation the
+    # grammar below cannot audit. A ring numbered from its iodine, whose double bond points
+    # at the neighbour that is numbered last, has the bond that closes the ring double:
+    # '1lambda3-ioda-2-azacyclohepta-1(7),2,4,6-tetraene' (OPSIN reads it).
+    # Only for a ring with a ring halogen (lane L3): the citation was refused for every ring before, and
+    # lifting it for the rings of other elements moved the substituent locants of a 4H-1,2,4-triazol-4-yl
+    # (maraviroc's, ``test_breadth_job1::test_m03_pin_spelling``), a change this lane does not own.
+    from .lambda_convention import FUSED_RING_LAMBDA_HALOGENS
+    closure = (f"1({n})" if any(mol.GetAtomWithIdx(a).GetSymbol() in FUSED_RING_LAMBDA_HALOGENS
+                                 for a in ring_set) else None)
+    for tok, pair in (list(zip(unsat.double_locants, unsat.double_pairs))
+                      + list(zip(unsat.triple_locants, unsat.triple_pairs))):
+        if '(' in tok and not (tok == closure and pair == (1, n)):
+            logger.info("terminal_ring: composite ring-bond locant %s on a monocycle "
+                        "(numbering is not a cycle walk); refuse", tok)
             return None
 
-    d_locs = sorted(unsat.double_locants, key=int)
-    t_locs = sorted(unsat.triple_locants, key=int)
+    d_locs = sorted(unsat.double_locants, key=_locant_key)
+    t_locs = sorted(unsat.triple_locants, key=_locant_key)
 
     # /: the 'a'-prefix block attaches DIRECTLY to the ring
     # stem, no hyphen ('1-thiacyclohexane', never '1-thia-cyclohexane').
@@ -361,7 +371,7 @@ def build_monocycle_replacement_name(
 #: else. Anything this does not match is refused rather than assumed correct.
 _MONO_RE = re.compile(
     r'^(?P<repl>.*?)cyclo(?P<stem>[a-z]+?)'
-    r'(?P<unsat>an|a?(?:-\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|'
+    r'(?P<unsat>an|a?(?:-\d+(?:\(\d+\))?(?:,\d+(?:\(\d+\))?)*-(?:di|tri|tetra|penta|hexa|hepta|octa|'
     r'nona)?(?:en|yn))+)'
     r'(?:-(?P<fv>\d+)-yl|e)$'
 )
@@ -376,7 +386,7 @@ _REPL_TERM_RE = re.compile(
     r'(?P<morph>' + _MORPHEME_ALT + r')'
 )
 _UNSAT_TERM_RE = re.compile(
-    r'-(?P<locs>\d+(?:,\d+)*)-'
+    r'-(?P<locs>\d+(?:\(\d+\))?(?:,\d+(?:\(\d+\))?)*)-'
     r'(?P<mult>di|tri|tetra|penta|hexa|hepta|octa|nona)?(?P<ending>en|yn)')
 
 
@@ -448,15 +458,22 @@ def parse_monocycle_replacement_name(name: str):
             consumed = 1
         m2c = _multiplier_to_count()
         for tm in _UNSAT_TERM_RE.finditer(unsat, consumed):
-            locs = [int(x) for x in tm.group('locs').split(',')]
+            toks = tm.group('locs').split(',')
             expected = m2c.get(tm.group('mult')) if tm.group('mult') else 1
-            if expected != len(locs):
+            if expected != len(toks):
                 return None
             target = doubles if tm.group('ending') == 'en' else triples
-            for loc in locs:
+            for tok in toks:
+                loc = int(tok.split('(', 1)[0])
                 if not (1 <= loc <= n):
                     return None
-                hi = 1 if loc == n else loc + 1
+                if '(' in tok:
+                    # the compound locant of the ring-closure bond: '1(n)' and no other
+                    if loc != 1 or int(tok[tok.index('(') + 1:-1]) != n:
+                        return None
+                    hi = n
+                else:
+                    hi = 1 if loc == n else loc + 1
                 edge = (min(loc, hi), max(loc, hi))
                 if edge in doubles or edge in triples:
                     return None
@@ -667,6 +684,32 @@ def terminal_ring_name(
     # reconstruction audits internally (audit_von_baeyer_descriptor /
     # audit_spiro_descriptor) and return None on any mismatch.
     return _polycyclic_terminal_name(mol, ring, free_valence_atom)
+
+
+def _hantzsch_widman_names_halogen_ring(mol, ring, attach: Optional[int] = None) -> bool:
+    """A monocycle of ten or fewer members with an admitted ring halogen that the lambda
+    Hantzsch-Widman namer names ('1lambda3-iodinane', '1H-1lambda3-iodepine').
+    (the Blue Book): "heteromonocycles with up to and including ten ring members are named by
+    the extended Hantzsch-Widman system", and (:9158) gives its lambda form. The namers
+    of ``heterocycles`` and the general engine's route build that name, as a parent and as a
+    substituent; this module's 'a' replacement name is for the rings they cannot name (a cumulated
+    ring, two atoms of one halogen), so it stands aside where they can."""
+    from .lambda_convention import FUSED_RING_LAMBDA_HALOGENS
+    if len(ring) > 10 or not any(mol.GetAtomWithIdx(a).GetSymbol() in FUSED_RING_LAMBDA_HALOGENS
+                                 for a in ring):
+        return False
+    if any(mol.GetAtomWithIdx(a).GetFormalCharge() for a in ring):
+        return False        # a ring ion is named from its hydride by the caller's ending, not here
+    if attach is not None and mol.GetAtomWithIdx(attach).GetSymbol() != 'C':
+        # the general engine's route builds a substituent by naming the ring with a hydroxy group on
+        # the attachment atom and reading the '-yl' off the '-ol'; a ring heteroatom has no such name
+        # ('1lambda3-iodinan-1-ol' is no Hantzsch-Widman name), so the 'a' name is the one there is
+        return False
+    from .heterocycles import name_heterocycle
+    try:
+        return bool(name_heterocycle(mol, tuple(sorted(ring))))
+    except Exception:  # noqa: BLE001 - a namer that raises is a decline
+        return False
 
 
 def _book_monocycle(mol, ring, free_valence_atom) -> Optional[TerminalRingName]:

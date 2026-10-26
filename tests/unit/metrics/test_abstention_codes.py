@@ -175,7 +175,15 @@ class TestEndToEndCodes:
     # prefix). The replacement is a row of the frozen unnamed panel (benchmarks/unnamed_panel) with the same
     # abstention code and detail under this config: a tricyclic with a trivalent iodine ring atom, a ring
     # system the substituent ladder has no name for.
-    _RING_FALLBACK_SMI = "CC1=IN=C2N1C3=CC=CC=C3NC2"   # PubChem CID 141796581
+    # Replacement witness 2026-10-26 (UN lane L3): that tricyclic (CID 141796581) is named now, as every ring
+    # system with an iodine ring atom is: the ring 'a' table spells 'ioda' with its lambda
+    # ('3-methyl-4lambda3-ioda-2,5,8-triazatricyclo[7.4.0.0^2,6]trideca-1(13),3,5,9,11-pentaene', read back to the
+    # full InChIKey; under this config, gate off, the general engine's cage path offers a name that cites a
+    # ring amidine as a '-carboximidamide' suffix, which the read-back refuses). The replacement is a row of the
+    # frozen unnamed panel (benchmarks/unnamed_panel) with the same abstention code and detail under this
+    # config: a bicyclo[4.1.0] ring system with a cyclopropane ring fused to a bicyclo[3.1.0] one, a skeleton no
+    # ring-substituent namer has a name for.
+    _RING_FALLBACK_SMI = "C1[C@H]2[C@@H]1CC3CC3C2"   # PubChem CID 10887849
     # The same ladder exhaustion on a ring whose numbering has no tie. ``_RING_FALLBACK_SMI`` still
     # abstains with BRANCH_UNNAMEABLE (asserted above), but its phenyl ring has two equivalent
     # orientations, and the (g) tie-break of ``general_engine._orient_carbocycle`` names the
@@ -308,12 +316,12 @@ class TestConfidenceSurface:
         assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
 
     def test_confidence_dict_carries_abstention_on_failure_ring_witness(self):
-        # A frozen unnamed-panel row (PubChem CID 141796581) whose decline is not served from a seeded memo
+        # A frozen unnamed-panel row (PubChem CID 10887849) whose decline is not served from a seeded memo
         # entry: name_with_confidence carries its BRANCH_UNNAMEABLE code.
         meta = Orthonym(
             general_fallback=True, general_fallback_unverified=True,
             allow_aromatic_general=True).name_with_confidence(
-                "CC1=IN=C2N1C3=CC=CC=C3NC2")
+                "C1[C@H]2[C@@H]1CC3CC3C2")
         assert is_failure_name(meta["name"])
         assert meta.get("abstention") == "BRANCH_UNNAMEABLE"
 

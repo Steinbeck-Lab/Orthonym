@@ -2331,6 +2331,16 @@ def _reenter(neutral_smi: str, style: str) -> str:
 def _reenter_for_cation(neutral_smi: str, style: str, cation) -> str:
     """``_reenter`` for the neutral amine of ``cation``: a protonated amine is named as if its
     suffix nitrogen held the hydron (``_hydron_scope``)."""
+    from .lambda_convention import FUSED_RING_LAMBDA_HALOGENS, ring_halogen_ion
+    if any(ring_halogen_ion(cation, a.GetIdx()) == 'cation'
+           or (a.GetSymbol() in FUSED_RING_LAMBDA_HALOGENS and a.IsInRing() and a.GetNumRadicalElectrons())
+           for a in cation.GetAtoms()):
+        # A ring iodonium centre (or the radical this route makes of it) has no hydron to lose: this route
+        # names the neutral skeleton and adds 'ium', the [IH2+] of one more hydrogen pair, which the InChI
+        # key cannot tell from the [I+] (it drops them). The cation is the lambda3 hydride less a hydride
+        # ion, 'ylium', the Blue Book), which the general engine builds
+        # (``lambda_convention.ring_halogen_ion``): decline here.
+        return ''
     with _hydron_scope(cation):
         return _reenter(neutral_smi, style)
 

@@ -161,9 +161,27 @@ def test_a_parent_the_book_does_not_print_is_best_effort_only(smiles, name):
 # structure carries "the principal characteristic group (suffix)... in accord with the seniority of classes
 # ". The PIN is '4-(3-oxo-...-1(3H)-yl)benzoic acid' and '2-(...-1-yl)ethan-1-amine'; the engine
 # spells the acid as 'carboxy' and the amine as 'aminoethyl' on the ring system, a valid name, never the PIN.
+#
+# Lane L3 changed both best-effort names (ring iodine was admitted to the ring 'a' table, so the floor
+# and the substituent writers now name the ring system, and their names come before the senior-group
+# rescue that gave the old ones):
+# acid: '1-(4-carboxyphenyl)-1λ3,2-benziodoxol-3(1H)-one'
+# -> '1-(4-carboxyphenyl)-3-oxo-1,3-dihydro-1λ3,2-benziodoxole'
+# UNVERIFIED as an improvement: both are valid names of the same structure, neither the PIN
+# (the acid is a prefix in both); machine-confirmed only that the new one reads back to the full
+# InChIKey (a fresh OPSIN 2.9.0 call). Open item: the PIN '4-(3-oxo-...-1-yl)benzoic acid' wants a
+# benzoic-acid parent for a benzoyl-bearing floor, which no producer builds yet.
+# amine: '1-(2-aminoethyl)-3,3-dimethyl-1,3-dihydro-1λ3,2-benziodoxole'
+# -> '2-(3,3-dimethyl-1λ3,2-benziodoxol-1(3H)-yl)ethan-1-amine'
+# machine-confirmed: the new name has the parent the book requires (Table 4.1 'General compound
+# classes listed in decreasing order of seniority' (the Blue Book): "19 Amines" (:18192) are
+# senior to the heterocycle, so the amine is the suffix of ethane) and the ring as a substituent with
+# the free valence on the ring heteroatom in the added-hydrogen form the book prints for
+# '1-(3,4-dihydroquinolin-1(2H)-yl)ethan-1-one (PIN)' (:7467); it reads back to the full InChIKey; and
+# the base tree gives the old name, so this assertion fails without the lane.
 PRINCIPAL_GROUP_ELSEWHERE = [
-    ("OC(=O)c1ccc(cc1)I1OC(=O)c2ccccc12", "1-(4-carboxyphenyl)-1λ3,2-benziodoxol-3(1H)-one"),
-    ("NCCI1OC(C)(C)c2ccccc12", "1-(2-aminoethyl)-3,3-dimethyl-1,3-dihydro-1λ3,2-benziodoxole"),
+    ("OC(=O)c1ccc(cc1)I1OC(=O)c2ccccc12", "1-(4-carboxyphenyl)-3-oxo-1,3-dihydro-1λ3,2-benziodoxole"),
+    ("NCCI1OC(C)(C)c2ccccc12", "2-(3,3-dimethyl-1λ3,2-benziodoxol-1(3H)-yl)ethan-1-amine"),
 ]
 
 

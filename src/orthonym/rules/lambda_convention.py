@@ -103,9 +103,10 @@ def format_lambda_token(locant, lam: Optional[int]) -> str:
 # Ring halogens admitted to the lambda-convention of a fused ring system, the Blue Book,
 # and,:39660: "For cyclic and acyclic parent hydrides the lambda convention is used to
 # indicate nonstandard bonding numbers"). One home for the admission, read by the benzo-heterocycle
-# producer (``rules/halogen_ring_fusion.py``) and by the mancude-parent valence of the ring-hydrogen
-# rule (``rules/bridged_fused_pin/hydro.py``). A halogen is admitted when a measurement showed its
-# names read back; an element not listed keeps its old behaviour in both places.
+# producer (``rules/halogen_ring_fusion.py``), by the mancude-parent valence of the ring-hydrogen
+# rule (``rules/bridged_fused_pin/hydro.py``) and by the ring 'a' table of the von Baeyer, spiro and
+# replacement-monocycle names (``rules/ring_replacement.py``, lane L3). A halogen is admitted when a
+# measurement showed its names read back; an element not listed keeps its old behaviour in all three.
 FUSED_RING_LAMBDA_HALOGENS = frozenset({'I'})
 
 
@@ -121,6 +122,49 @@ def ring_lambda_valence(mol, atom_idx: int) -> Optional[int]:
     if atom.GetSymbol() not in FUSED_RING_LAMBDA_HALOGENS or not atom.IsInRing():
         return None
     return nonstandard_bonding_number(mol, atom_idx)
+
+
+def ring_halogen_ion(mol, atom_idx: int) -> Optional[str]:
+    """``'anion'`` or ``'cation'`` for an admitted ring halogen that is an ion of the simplest
+    kind, else ``None``: a ring atom of ``FUSED_RING_LAMBDA_HALOGENS`` whose bonds are all single, with
+    no hydrogen, a formal charge of -1 or +1 and an even number of bonds, the two of the ring and the
+    substituents of the centre (the iodanuide ``[I-]1CCCCC1``, ``F[I-]1(F)CCCCC1``; the iodonium
+    ``c1ccc2c(c1)[I+]c1ccccc1-2``, ``C[I+]1(C)CCCCC1``).
+
+    Both ions are named from the same ring hydride, the one whose atom has one hydrogen more than the ion has
+    bonds, so its bonding number is the number of bonds plus one (3 for two ring bonds, 5 for four), cited
+    with the lambda convention. The anion is that hydride less a hydron: the suffix 'ide'
+     method (2), the Blue Book, ``diphenyl-lambda3-iodanide``:41110: "the suffix 'ide' to a parent
+    hydride in which the bonding number at the anionic site is higher than the standard bonding number and is
+    expressed by the lambda-convention"; '1lambda3-iodinan-1-ide' and '1,1-difluoro-1lambda5-iodinan-1-ide'
+    are read by OPSIN as the ring anions). The cation is that hydride less a hydride ion: the suffix 'ylium'
+     "Application of the lambda-convention with the suffix 'ylium'",:41694: "Cationic heterocycle
+    having a cationic center on a heteroatom that has one more skeletal bonds than it has in the corresponding
+    neutral heterocycle is named by adding the suffix 'ylium' to the name of the neutral parent hydride for which
+    the lambda-convention has been used to describe a nonstandard bonding state of the heteroatom, and that
+    heteroatom has at least one hydrogen atom in the neutral heterocycle on which the 'ylium' suffix can
+    operate"; the book prints '1lambda3-benziodol-1-ylium (PIN)',:41708; OPSIN reads '1lambda3-iodinan-1-ylium'
+    as the ring cation). ``nonstandard_bonding_number`` is ``None`` for both, as it is for every ion; see
+    ``ring_halogen_ion_lambda`` for the symbol the name cites."""
+    atom = mol.GetAtomWithIdx(atom_idx)
+    if (atom.GetSymbol() not in FUSED_RING_LAMBDA_HALOGENS or not atom.IsInRing()
+            or atom.GetFormalCharge() not in (-1, 1) or atom.GetTotalNumHs()
+            or atom.GetNumRadicalElectrons()):
+        return None
+    if any(b.GetBondTypeAsDouble() != 1.0 for b in atom.GetBonds()):
+        return None
+    if atom.GetDegree() not in (2, 4, 6):
+        return None
+    return 'anion' if atom.GetFormalCharge() < 0 else 'cation'
+
+
+def ring_halogen_ion_lambda(mol, atom_idx: int) -> Optional[int]:
+    """The bonding number the lambda symbol cites in the name of a ring halogen ion
+    (``ring_halogen_ion``): that of the hydride the ion is named from, its bonds and one hydrogen
+    (3 for the two ring bonds of ``[I-]1CCCCC1`` and of ``[I+]1CCCCC1`` alike)."""
+    if ring_halogen_ion(mol, atom_idx) is None:
+        return None
+    return mol.GetAtomWithIdx(atom_idx).GetDegree() + 1
 
 
 def fused_lambda_entries(mol, ring_atoms, atom_to_locant):

@@ -159,6 +159,18 @@ def _plain_ring_atoms(mol, ring) -> bool:
     return True
 
 
+def _halogen_benzo_parents(mol, ring):
+    """The parents of a benzene ring fused to a heteromonocycle with a halogen ring atom in the lambda
+    state (``halogen_ring_fusion``: the benziodoxoles, the benziodoles, the lambda5 states), which
+    the catalogue has no entry for, or None when ``ring`` is no such system. The catalogue's parent
+    name carries no lambda descriptor, so it never describes such a ring (``_plain_ring_atoms``)."""
+    from .lambda_convention import ring_lambda_valence
+    if not any(ring_lambda_valence(mol, a) is not None for a in ring):
+        return None
+    from .halogen_ring_fusion import halogen_benzo_candidates
+    return halogen_benzo_candidates(mol, ring)
+
+
 def fused_system_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[int] = None,
                       branch_atoms: Sequence[int] = ()) -> Optional[FusedForm]:
     """The fusion name and numbering of the ring system ``ring_atoms``, or ``None``.
@@ -175,14 +187,16 @@ def fused_system_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optiona
         return None
     if not is_fusable_system(mol, ring):
         return None
-    if not _plain_ring_atoms(mol, ring):
-        return None
-    try:
-        from .partial_saturation import _resolve_oxo_parent
-        candidates = _resolve_oxo_parent(mol, ring, monocyclic=False)
-    except Exception:  # noqa: BLE001 - a resolver that raises is a decline
-        logger.info("fused_forms: the parent resolver raised; decline")
-        return None
+    candidates = _halogen_benzo_parents(mol, ring)
+    if candidates is None:
+        if not _plain_ring_atoms(mol, ring):
+            return None
+        try:
+            from .partial_saturation import _resolve_oxo_parent
+            candidates = _resolve_oxo_parent(mol, ring, monocyclic=False)
+        except Exception:  # noqa: BLE001 - a resolver that raises is a decline
+            logger.info("fused_forms: the parent resolver raised; decline")
+            return None
     from . import ring_hydrogen as rh_rule
     from .bridged_fused_pin import hydro
     from .monocycle_forms import free_valence_carries_indicated_hydrogen
