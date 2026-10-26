@@ -91,8 +91,16 @@ def _row(smiles, tier):
     ("NC(=O)NCNC(N)=O", "pin", "N-[(carbamoylamino)methyl]urea"),
     # acyl-oxy and acyl-amino positives of the deleted vocabulary test (study-audit G)
     ("OC(=O)CCCCOC(=O)CCl", "best-effort", "5-[(chloroacetyl)oxy]pentanoic acid"),
+    # lane TI2: an N-acyl group beside a thioester, the principal group, is the amido prefix, method (1) of
+    # "Substituents of the types -NH-CO-R and -NH-SO2-R" (the Blue Book, "Method (1) generates preferred IUPAC
+    # names", '4-formamidobenzoic acid (PIN)':33000); the best-effort tier gave method (2), '(acetylamino)', which
+    # the engine itself recorded as never the PIN (``_located_fg_hetero_root``). Read back to the input by OPSIN 2.9.0
+    # below. The compound acylamino prefix of an N,N-disubstituted amide, which has no amido form, keeps the marks
+    # this test is for.
     ("CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O", "best-effort",
-     "S-[2-(acetylamino)ethyl] (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate"),
+     "S-(2-acetamidoethyl) (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate"),
+    ("CC(=O)N(C)CCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O", "best-effort",
+     "S-{2-[acetyl(methyl)amino]ethyl} (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate"),
 ])
 def test_engine_names_keep_their_marks(smiles, tier, name):
     row = _row(smiles, tier)

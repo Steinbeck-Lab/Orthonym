@@ -2442,8 +2442,15 @@ def _handle_organometallic(mol, smiles, canonical_smiles, features=None, *,
     returns None (compound not actually ORGM or cannot be named), the CFR
     cascade falls through to SALT@100 →... → GENERAL.
     """
+    from orthonym.assembly.default_tier_offer import default_tier_first
     from orthonym.assembly.handlers.organometallic import name_organometallic
-    result = name_organometallic(features, mol, style=style)
+    from orthonym.assembly.strict_ring_prefix import principal_group
+    # a principal characteristic group (a ketone, an acid, an ester) is senior to a parent hydride, so the
+    # molecule is not named on its hub where the default tier's cascade declines a ligand of the hub: the routes
+    # after this handler are asked first. Without such a group the hub is the parent and the wider reading
+    # of the ligand is asked now.
+    result = default_tier_first(lambda: name_organometallic(features, mol, style=style), "organometallic", "ligand",
+                                lambda: principal_group(mol)[0] is not None)
     return result.name if result is not None else None
 
 

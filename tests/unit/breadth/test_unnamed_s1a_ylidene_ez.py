@@ -75,19 +75,24 @@ def test_default_tier_never_claims_a_pin_without_a_citation(cid, smiles):
 # ---------------------------------------------------------------------------------------------
 
 # 'General criteria (other than phanes)' (the Blue Book-19413): the senior ring or
-# ring system "(a) is a heterocycle; (b) has at least one nitrogen atom". These names (the base
-# names, verified by a fresh read-back) keep the heterocycle as the parent; the floor's name of the
-# same molecule has a benzene (CID 21937604) or a pyran (the XCHEBI rows) parent.
+# ring system "(a) is a heterocycle; (b) has at least one nitrogen atom". These names (verified by a
+# fresh read-back) keep the senior parent; the floor's name of the same molecule has a benzene
+# (CID 21937604) or a pyran (the XCHEBI rows) parent. The XCHEBI rows hold an amide, class 11 of
+# 'SENIORITY ORDER FOR CLASSES' (the Blue Book), senior to the ketones (class 16) and the
+# nitrogen heterocycles (class 21), so their parent is the acetamide,:18875: "the maximum
+# number of substituents corresponding to the principal characteristic group (suffix)"), with the
+# pyrrolidine ring as its substituent; the earlier '2-(2-amino-2-oxoethyl)-...-3,5-dioxopyrrolidine'
+# cited the amide as a prefix (lane TI2: the 3,5-dioxopyrrolidin-2-yl prefix is now the strict one).
 SENIOR_PARENT_ROWS = [
     ("CID21937604", "CCNC1=C(C=C(C=C1)C#N)N=C2N(C(=O)/C(=C/3\\N(C(=C(S3)C)CC4=CC=CC=C4)C)/S2)CC5=CC=CC=C5",
      "(2Z)-4-benzyl-2-(3-benzyl-2-{[5-cyano-2-(ethylamino)phenyl]imino}-4-oxo-1,3-thiazolidin-5-ylidene)"
      "-3,5-dimethyl-2,3-dihydro-1,3-thiazole"),
     ("XCHEBIb3", "CC(C)C1O/C(=C2\\C(=O)NC(CC(N)=O)C2=O)C=CC1C",
-     "(2Z)-2-(2-amino-2-oxoethyl)-4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]"
-     "-3,5-dioxopyrrolidine"),
+     "(2Z)-2-{4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]-3,5-dioxopyrrolidin-2-yl}"
+     "acetamide"),
     ("XCHEBIb9", "CC(C)C1O/C(=C2/C(=O)NC(CC(N)=O)C2=O)C=CC1C",
-     "(2E)-2-(2-amino-2-oxoethyl)-4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]"
-     "-3,5-dioxopyrrolidine"),
+     "(2E)-2-{4-[5-methyl-6-(propan-2-yl)-5,6-dihydro-2H-pyran-2-ylidene]-3,5-dioxopyrrolidin-2-yl}"
+     "acetamide"),
 ]
 
 # A squaraine dye: its InChIKey ends -UHFFFAOYSA-O, no stereo layer, so the key cannot tell the E and

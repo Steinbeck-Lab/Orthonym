@@ -32,11 +32,6 @@ from rdkit import Chem
 #: the attributes of the first run that ``Orthonym._tier_row_and_pin_form`` reads after the run
 _STATE = ("_last_dispatch_class", "_last_selected_offer", "_prefix_order_fallback_name", "_offers")
 
-#: two alpha-aminoacyl units joined by an amide, N-CH(R)-C(=O)-NH-CH(R)-C(=O)-N/O: a dipeptide unit, whether or
-#: not the amino groups and the carboxyl end are free (a Boc-protected tripeptide ester has two of them)
-_DIPEPTIDE_UNIT = Chem.MolFromSmarts("[NX3][CX4;H1,H2][CX3](=O)[NX3;H1][CX4;H1,H2][CX3](=O)[#7,#8]")
-
-
 def first_run_declined(namer, smiles: str, name: str) -> bool:
     """True when the default tier's emission rule declines ``name``, the first run's name of ``smiles``.
 
@@ -79,7 +74,7 @@ def rerun_class_guard(mol, name: str) -> Optional[str]:
       sphingoid): the same sentence of, and a glyceride named by prefixes is the method (2) name
       of "When anions are different, two methods are used" (:31831), whose PIN is the
       method (1) name (:31846);
-    * a dipeptide unit (``_DIPEPTIDE_UNIT``): "AMINO ACIDS AND PEPTIDES" (:54150) is a chapter whose
+    * a dipeptide unit (``rules.peptides.peptide_like``): "AMINO ACIDS AND PEPTIDES" (:54150) is a chapter whose
       compounds (:50943) gives no PIN, and the substitutive name of a peptide-like molecule is not promoted
       (DT3 lead decision 1);
     * a spelling failure of the PIN (``validation.pin_spelling.check_pin_spelling``), for example the
@@ -98,7 +93,8 @@ def rerun_class_guard(mol, name: str) -> Optional[str]:
             return f"natural-product class {natural_product} (P-101)"
         if detect_lipid_backbone(mol) is not None:
             return "lipid backbone (P-100)"
-        if mol.HasSubstructMatch(_DIPEPTIDE_UNIT):
+        from ..rules.peptides import peptide_like
+        if peptide_like(mol):
             return "peptide-like (P-103)"
         failures = check_pin_spelling(mol, name)
     except Exception as exc:  # noqa: BLE001 - a guard that cannot read the molecule lets nothing through

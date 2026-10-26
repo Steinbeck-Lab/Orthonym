@@ -5775,8 +5775,8 @@ def _name_thio_ring_branch(mol, frag_set, root_idx):
     """
     root = mol.GetAtomWithIdx(root_idx)
     branches = [n.GetIdx() for n in root.GetNeighbors() if n.GetIdx() in frag_set]
-    if len(branches) != 1:
-        return None  # -S- must bridge exactly one in-fragment R and the parent
+    if len(branches) != 1 or mol.GetAtomWithIdx(branches[0]).GetSymbol() == 'S':
+        return None  # -S- bridges one in-fragment R and the parent; -S-S-R is 'disulfanyl'
     b = branches[0]
     batoms = set()
     stack = [b]

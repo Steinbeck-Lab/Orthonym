@@ -33,9 +33,9 @@
 </g><g class="rise" style="animation-delay:1.20s">
   <text class="mono" x="48" y="792.0" font-size="22" fill="#000000" xml:space="preserve"><tspan fill="#666666">$</tspan> orthonym --emit-tier valid \</text><text class="mono" x="48" y="824.0" font-size="22" fill="#000000" xml:space="preserve"><tspan fill="#666666"></tspan>  "CC1=C(C(CCC1)(C)C)/C=C/C(=C/C=C/C(=C/CO)/C)/C"</text>
   <text class="body" x="48" y="882" font-size="34" fill="#000000">(2E,4E,6E,8E)-3,7-dimethyl-</text><text class="body" x="48" y="928" font-size="34" fill="#000000">9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-</text><text class="body" x="48" y="974" font-size="34" fill="#000000">2,4,6,8-tetraen-1-ol</text>
-  <line x1="48" y1="996" x2="718.9" y2="996" stroke="#000000" stroke-width="2" stroke-dasharray="13 9"/>
-  <g transform="translate(48.0,1020.0) scale(1.556)"><g class=""><circle fill="none" stroke="#556b2f" cx="9" cy="9" r="7" stroke-width="1.75" stroke-dasharray="3.23 2.27"/><circle cx="9" cy="9" r="3" fill="#556b2f"/></g></g>
-  <text class="mono" x="90" y="1042" font-size="22" fill="#666666">pin_unverified</text>
+  <line x1="48" y1="992.5" x2="718.9" y2="992.5" stroke="#000000" stroke-width="2"/><line x1="48" y1="999.5" x2="718.9" y2="999.5" stroke="#000000" stroke-width="2"/>
+  <g transform="translate(48.0,1020.0) scale(1.556)"><g class=""><defs><radialGradient id="gpinsn3"><stop offset="0" stop-color="#3dff8f" stop-opacity=".88"/><stop offset=".3" stop-color="#3dff8f" stop-opacity=".4"/><stop offset=".64" stop-color="#3dff8f" stop-opacity="0"/></radialGradient></defs><circle class="breath" cx="9" cy="9" r="16" fill="url(#gpinsn3)" opacity="1.0"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="8" stroke-width="1.25"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="5.5" stroke-width="1.25"/><circle cx="9" cy="9" r="3" fill="#2f6b28"/></g></g>
+  <text class="mono" x="90" y="1042" font-size="22" fill="#000000">pin_verified</text>
 </g><g class="rise" style="animation-delay:1.55s">
   <text class="mono" x="48" y="1126.0" font-size="22" fill="#000000" xml:space="preserve"><tspan fill="#666666">$</tspan> orthonym --on-failure label "O=[U](=O)=O"</text>
   <text class="body" x="48" y="1184" font-size="34" fill="#666666">inorganic compound (not supported)</text>

@@ -77,7 +77,7 @@ SPECIMEN = [
      "(2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol", "pin_unverified"),
     ("CC1=C(C(CCC1)(C)C)/C=C/C(=C/C=C/C(=C/CO)/C)/C", "valid",
      "(2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)"
-     "nona-2,4,6,8-tetraen-1-ol", "pin_unverified"),
+     "nona-2,4,6,8-tetraen-1-ol", "pin_verified"),
 ]
 
 

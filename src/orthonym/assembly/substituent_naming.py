@@ -7349,6 +7349,13 @@ def _located_fg_hetero_root(mol, sub_atoms, attach_idx):
         if not subs:
             return 'amino'
         from .prefix_derivation import built
+        from ..rules.peptides import peptide_like
+        if len(heavy) == 1 and _is_amide_acyl_carbon(mol, heavy[0], attach_idx) and not peptide_like(mol):
+            # -NH-CO-R: method (1), the amido prefix, is the PIN, the Blue Book); a peptide has no
+            # PIN, and its acyl groups are not named twice
+            _amido = acyl_amido_prefix_from_branch(mol, attach_idx, heavy[0], sub_set, verify_acid=True)
+            if _amido:
+                return _amido
         from ..rules.anilino_nitrogen import anilino_for_branches
         _anilino = anilino_for_branches(mol, attach_idx, [
             (sorted(_fg_branch_atoms(mol, h, attach_idx, sub_set)), r)

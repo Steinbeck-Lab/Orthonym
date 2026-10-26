@@ -58,6 +58,16 @@ A fourth class, two rings of one seniority joined by =CH- whose parent the crite
 (k), and whose name the producers cannot build with a specified E/Z link (:func:`other_tie_ring_row`): the
 molecule is named once more with the other ring as the parent, below the PIN, with the row the tier gives it. The
 best-effort tier named such a molecule with that ring before the criteria chose the other one.
+
+A fifth class, a handler of the dispatch table that names a molecule with a part only the wider vocabulary names
+(:func:`deferred_handler_row`): the organometallic handler reads an organyl ligand through the substituent namer,
+which at the best-effort tier gives a name where the default tier's cascade declines ('tert-butyl[(6-formyl-1,2-dithiin-
+3-yl)methoxy]di(methyl)silane'), and the handler, the first of the table, named the molecule as a silane before any other
+route was asked. The default tier declines such a ligand and the molecule is named by the routes after the handler
+(6-({[tert-butyldi(methyl)silyl]oxy}methyl)-1,2-dithiine-3-carbaldehyde: a ring parent with the silyloxy prefix). The
+best-effort tier asks the handler the default tier's way (:func:`default_tier_scope`); where that declines, the
+handler is deferred (:func:`defer_handler`) and the other routes are asked, and a molecule they leave without a name
+is named once more with the wider reading admitted (:func:`handler_admitted`), so no molecule loses its name.
 """
 import contextvars
 import functools
@@ -90,6 +100,71 @@ def clear_held() -> None:
     _OFFERED.set(None)
     _RELAXED_SEEN.set(False)
     _TIE_RING_SEEN.set(False)
+    _DEFERRED_HANDLERS.set(())
+
+
+#: The handlers of the dispatch table that declined the molecule being named when asked the default tier's way and
+#: are offered again with the wider reading (:func:`defer_handler`), in the order deferred; cleared with the held names
+_DEFERRED_HANDLERS: contextvars.ContextVar = contextvars.ContextVar("orthonym_deferred_handlers", default=())
+#: The handlers that read the wider reading in the running pass of:func:`deferred_handler_row`
+_ADMITTED_HANDLERS: contextvars.ContextVar = contextvars.ContextVar("orthonym_admitted_handlers", default=())
+
+
+#: The parts a producer declined (``note_declined_part``) while a handler was asked the default tier's way
+_DECLINED_PARTS: contextvars.ContextVar = contextvars.ContextVar("orthonym_declined_parts", default=())
+
+
+def note_declined_part(part: str) -> None:
+    """A producer declined a part of the molecule (an organyl group, a ligand) that the wider reading may name:
+    :func:`default_tier_first` defers its handler only then, since otherwise the wider reading is the same decline."""
+    declined = _DECLINED_PARTS.get()
+    if part not in declined:
+        _DECLINED_PARTS.set(declined + (part,))
+
+
+def defer_handler(handler_id: str) -> None:
+    """The handler ``handler_id`` declined the molecule when asked the default tier's way: it is offered
+    again with the wider reading (:func:`deferred_handler_row`) if no other route names the molecule."""
+    deferred = _DEFERRED_HANDLERS.get()
+    if handler_id not in deferred:
+        _DEFERRED_HANDLERS.set(deferred + (handler_id,))
+
+
+def default_tier_first(produce, handler_id: str, part: Optional[str] = None, defer_when=None):
+    """``produce`` the default tier's way when a wider tier runs; else ``produce`` as it is asked.
+
+    The producers of a handler of the dispatch table read the tier from the context variables, so a wider tier's
+    producer can name a part that the default tier's cascade declines (an organyl group, a ligand) and the handler
+    then names the molecule with it before the routes the default tier takes after the decline are asked. The
+    default tier's reading is asked first (:func:`default_tier_scope`) and is the result when it names the molecule.
+
+    Where it names nothing:
+
+    * the handler ``handler_id`` is deferred (:func:`defer_handler`) when the producers noted that they declined the
+      part ``part`` (:func:`note_declined_part`; any decline when ``part`` is None) and ``defer_when`` holds (when
+      given): the result is nothing, the other routes are asked, and the wider reading is the last
+      (:func:`deferred_handler_row`);
+    * otherwise the wider reading is asked now, as it always was.
+
+    In the pass that admits the handler the wider reading is asked as it always was."""
+    from .default_tier_scope import default_tier_scope, wider_tier_running
+    if not wider_tier_running() or handler_admitted(handler_id):
+        return produce()
+    _DECLINED_PARTS.set(())
+    with default_tier_scope():
+        result = produce()
+    if result:
+        return result
+    if (part is None or part in _DECLINED_PARTS.get()) and (defer_when is None or defer_when()):
+        defer_handler(handler_id)
+        return result
+    return produce()
+
+
+def handler_admitted(handler_id: str) -> bool:
+    """Whether the running naming is the pass of:func:`deferred_handler_row` that admits the wider reading of
+    ``handler_id``."""
+    return handler_id in _ADMITTED_HANDLERS.get()
 
 
 #: True once the running naming has chosen the parent of two rings of one seniority joined by =CH- (``ring_selection.
@@ -209,7 +284,37 @@ def default_tier_row_for(namer, smiles) -> Optional[Dict]:
         return None
     held = held_names()
     row = (stereo_layer_row(namer, smiles, held) or twin_last_resort_row(namer, smiles, held)) if held else None
-    return row or relaxed_adduct_row(namer, smiles) or other_tie_ring_row(namer, smiles)
+    return (row or relaxed_adduct_row(namer, smiles) or other_tie_ring_row(namer, smiles)
+            or deferred_handler_row(namer, smiles))
+
+
+def deferred_handler_row(namer, smiles) -> Optional[Dict]:
+    """The row of ``namer`` for ``smiles`` named once more with the handlers it deferred (:func:`defer_handler`)
+    admitted to their wider reading, when the first pass left the molecule without a name; else None.
+
+    The pass is the tier's own engine (:func:`general_tier_engine`), so the row, its label and its gate outcome are
+    the tier's; the handlers are asked in the pass as the tier always asked them. No pass inside the pass
+    (``handler_admitted``), none for a junior parent of the pool."""
+    deferred = _DEFERRED_HANDLERS.get()
+    if (not deferred or _ADMITTED_HANDLERS.get() or not getattr(namer, "_general_fallback_unverified", False)
+            or getattr(namer, "_forced_parent_rank", 0)):
+        return None
+    token = _ADMITTED_HANDLERS.set(deferred)
+    try:
+        from ..errors import is_failure_name
+        from ..input_mol import handles, smiles_for
+        if not isinstance(smiles, str) and handles(smiles):
+            smiles = smiles_for(smiles)
+        alt = general_tier_engine(namer).name_tiered(smiles)
+    except Exception:                       # the offer must never break a naming: the abstention stands
+        return None
+    finally:
+        _ADMITTED_HANDLERS.reset(token)
+        _DEFERRED_HANDLERS.set(deferred)    # the pass named the molecule again, and cleared what it held
+    name = alt.get("name")
+    if name and not is_failure_name(name) and alt.get("tier") != "abstain":
+        return alt
+    return None
 
 
 def other_tie_ring_row(namer, smiles) -> Optional[Dict]:

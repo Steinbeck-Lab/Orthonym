@@ -1160,6 +1160,12 @@ def _alcohol_part_has_another_ester(mol, alkyl_c: int, ester_o: int) -> bool:
         o = mol.GetAtomWithIdx(idx)
         if o.GetSymbol() != 'O' or o.GetDegree() != 2 or o.GetFormalCharge():
             continue
+        if o.IsInRing():
+            # a ring oxygen is an ester bond of a ring of the alcohol component (a lactone such as a pyranone or
+            # a benzopyranone, a cyclic phosphate or sulfate ester): it belongs to that ring system, not another
+            # ester cited as an acyloxy prefix
+            # "When anions are different, two methods are used", the Blue Book)
+            continue
         nbrs = list(o.GetNeighbors())
         if not any(n.GetSymbol() == 'C' and not _is_acid_centre(mol, n) for n in nbrs):
             continue

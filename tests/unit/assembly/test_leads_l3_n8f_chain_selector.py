@@ -107,8 +107,10 @@ def test_the_pantoyl_chain_goes_through_the_arm_with_more_substituents():
            "OP(=O)(O)OC[C@H]1O[C@@H](n2cnc3c(N)ncnc32)[C@H](O)[C@@H]1OP(=O)(O)O")
     res = name_best_effort(coa)
     name = res["name"]
-    assert "(2R)-4-[" in name and "-2-hydroxy-3,3-dimethyl-1-oxobutyl" in name, name
-    assert "3-methyl-1-oxobutyl" not in name, name
+    # lane TI2: the N-acyl group is the amido prefix method (1), the Blue Book), so the chain
+    # through the CH2-O is '(2R)-4-[...]-2-hydroxy-3,3-dimethylbutanamido', not '...-1-oxobutyl}amino'
+    assert "(2R)-4-[" in name and "-2-hydroxy-3,3-dimethylbutanamido" in name, name
+    assert "3-methylbutanamido" not in name and "3-methyl-1-oxobutyl" not in name, name
     assert name_is_rt_exact(name, coa), name
 
 

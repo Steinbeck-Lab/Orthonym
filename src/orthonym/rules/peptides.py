@@ -106,6 +106,16 @@ _TERMINAL_COOH_SMARTS = "[CX3](=O)[OX2H1]"
 # Alpha amino acid core: NH2-CH(R)-C(=O)
 _ALPHA_AA_CORE_SMARTS = "[NX3;H2,H1][CX4][CX3](=O)"
 
+#: two alpha-aminoacyl units joined by an amide, N-CH(R)-C(=O)-NH-CH(R)-C(=O)-N/O: a dipeptide unit, whether or
+#: not the amino groups and the carboxyl end are free (a Boc-protected tripeptide ester has two of them)
+_DIPEPTIDE_UNIT = Chem.MolFromSmarts("[NX3][CX4;H1,H2][CX3](=O)[NX3;H1][CX4;H1,H2][CX3](=O)[#7,#8]")
+
+
+def peptide_like(mol) -> bool:
+    """True when the molecule holds a dipeptide unit (``_DIPEPTIDE_UNIT``): "AMINO ACIDS AND PEPTIDES"
+    (the Blue Book) is a chapter whose compounds (:50943) gives no PIN."""
+    return mol.HasSubstructMatch(_DIPEPTIDE_UNIT)
+
 
 # The retained names of Table 10.4 ('common' alpha-amino acids, the Blue Book).
 # STANDARD_AMINO_ACIDS holds exactly the Table 10.4 set; NON_STANDARD_AMINO_ACIDS and

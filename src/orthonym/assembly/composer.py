@@ -9246,9 +9246,7 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     from ..metrics.provenance import (
         general_fallback_ctx,
     )
-    from ..metrics.provenance import (
-        record_general_ring_prefix as _pv_general_ring_prefix,
-    )
+    from .strict_ring_prefix import general_tier_ring_prefix as _general_ring_prefix
     try:
         _tier_general = bool(general_fallback_ctx.get())
     except Exception:  # noqa: BLE001 - a tier read must never break naming
@@ -9489,12 +9487,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                     features.mol, sorted(_rc_frag), _ring_attach_atom,
                 )
                 if not _rc_name and _tier_general:
-                    _rc_name = _rc_nrss(
-                        features.mol, sorted(_rc_frag), _ring_attach_atom,
-                        allow_mancude=True,
-                    )
-                    if _rc_name:
-                        _pv_general_ring_prefix()
+                    _rc_name = _general_ring_prefix(features.mol, sorted(_rc_frag), _ring_attach_atom, lambda: (
+                        _rc_nrss(features.mol, sorted(_rc_frag), _ring_attach_atom, allow_mancude=True)))
                 elif not _rc_name:
                     # Breadth Job 1 (M01): in the PIN tier's re-run the same
                     # decorated-ring producers run, and a name is kept only when
@@ -9529,11 +9523,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
             _full_name = get_ring_substituent_name(
                 features.mol, _full_ring, _ring_attach_atom)
             if _full_name is None and _tier_general:
-                _full_name = get_ring_substituent_name(
-                    features.mol, _full_ring, _ring_attach_atom,
-                    allow_mancude=True)
-                if _full_name is not None:
-                    _pv_general_ring_prefix()
+                _full_name = _general_ring_prefix(features.mol, _full_ring, _ring_attach_atom, lambda: (
+                    get_ring_substituent_name(features.mol, _full_ring, _ring_attach_atom, allow_mancude=True)))
             # Accept the full-system name only if it produced a retained / routed
             # name (not a generic cyclo-name). a phase SUBST-01: get_ring_substituent_name
             # may now return None (fail-closed for an unnameable polycyclic) — fall
@@ -9550,11 +9541,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # ADDITIVE-ONLY general-tier retry, same contract as the decorated-ring
         # branch above: only where the PIN route named nothing.
         if base_name is None and _tier_general:
-            base_name = get_ring_substituent_name(
-                features.mol, ring_atoms, _ring_attach_atom,
-                allow_mancude=True)
-            if base_name is not None:
-                _pv_general_ring_prefix()
+            base_name = _general_ring_prefix(features.mol, ring_atoms, _ring_attach_atom, lambda: (
+                get_ring_substituent_name(features.mol, ring_atoms, _ring_attach_atom, allow_mancude=True)))
         # a phase SUBST-01: a None base_name (unnameable ring) must not reach the
         # string assembly below, and must not drop the ring either.
         #

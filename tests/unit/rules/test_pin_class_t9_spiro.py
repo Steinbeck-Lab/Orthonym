@@ -221,7 +221,11 @@ CONTROL_ROWS = [
 ENCLOSURE_ROWS = [
     ("C1CCC12CCC1(CCC1)CC2CC(=O)O", "(dispiro[3.2.3^7.2^4]dodecan-5-yl)acetic acid"),
     ("OC(=O)CC1CC2CC1C1CC21", "(tricyclo[3.2.1.0^2,4]octan-6-yl)acetic acid"),
-    ("OC(=O)CC1CC2CCC1C1CCC21", "(tricyclo[4.2.2.0^2,5]decan-8-yl)acetic acid"),
+    # the two-atom bridges of the bicyclo[2.2.2] core are interchangeable in the fixed numbering, so the free
+    # valence can take 7, 8, 9 or 10 (OPSIN reads each back to the input); 'Substituent prefixes derived
+    # from saturated cyclic parent hydrides' (the Blue Book): "Low locants are assigned to free valences
+    # 'yl'... in accordance with the numbering of the parent hydride" -> 7 (c),:3256)
+    ("OC(=O)CC1CC2CCC1C1CCC21", "(tricyclo[4.2.2.0^2,5]decan-7-yl)acetic acid"),
 ]
 
 

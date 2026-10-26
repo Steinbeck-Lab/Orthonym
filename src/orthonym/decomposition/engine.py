@@ -11,6 +11,7 @@ suspiciously short, etc.) are decomposed.
 """
 
 import contextvars
+import functools
 import re
 from collections import deque
 from typing import Dict, List, Optional
@@ -2544,6 +2545,28 @@ def _try_iterative_mixed_decompose(
 # Main decomposition entry point
 # ---------------------------------------------------------------------------
 
+def _declined_leaves_no_provenance(fn):
+    """A decomposition that names nothing leaves the provenance of the molecule as it found it.
+
+    A decomposition that declines has still named fragments, and a fragment the PIN tiers could not name is
+    rescued by the general engine (``_name_fragment_t4_rescue``), which records the source of the name
+    (``general_engine``) and the OPSIN verdict of the fragment. Those records belong to a route that is not
+    taken: the name that ships next, from the assembly pipeline, was labelled by the source of a fragment it
+    does not contain ('[(5Z)-4-oxo-...-1,3-thiazolidin-3-yl]acetic acid': ``pin_verified`` at the default tier,
+    ``systematic_verified`` at the best-effort tier). ``metrics.provenance.restore_provenance`` keeps the
+    name-scoped non-PIN record, which only demotes a name that contains the recorded spelling."""
+    @functools.wraps(fn)
+    def _wrapper(mol, style: str = "pin"):
+        from ..metrics import provenance as _pv
+        snapshot = _pv.get_provenance()
+        name = fn(mol, style)
+        if name is None:
+            _pv.restore_provenance(snapshot)
+        return name
+    return _wrapper
+
+
+@_declined_leaves_no_provenance
 def try_decompose(mol, style: str = "pin") -> Optional[str]:
     """Attempt decomposition of a molecule into named fragments.
 

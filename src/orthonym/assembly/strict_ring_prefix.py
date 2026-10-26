@@ -87,6 +87,24 @@ def pin_tier_ring_prefix(mol, frag_atoms, attach_idx, breadth):
     return promote_at_pin_tier(breadth)
 
 
+def general_tier_ring_prefix(mol, frag_atoms, attach_idx, wider):
+    """The ring-yl prefix a general tier (``complete``, ``best-effort``) gives a ring the strict cascade declined.
+
+    The default tier names such a ring in its promotion re-run with the strict producer above, and the name is a
+    certified PIN ('adamantan-2-yl', the retained 'adamantane'). A general tier called the wider producer
+    (``wider``, the call with the composition switch) and labelled the name, which is the same string, as a prefix
+    only a general tier builds (``record_general_ring_prefix``): the name came out ``pin_unverified`` where the
+    default tier gives ``pin_verified``. The strict producer is asked first; the wider producer, and the label, are for
+    a ring it declines."""
+    name = _cached_strict_name(mol, frag_atoms, attach_idx)
+    if name is None:
+        name = wider()
+        if name is not None:
+            from ..metrics.provenance import record_general_ring_prefix
+            record_general_ring_prefix()
+    return name
+
+
 def _cached_strict_name(mol, frag_atoms, attach_idx):
     if not _KINDS:
         return None

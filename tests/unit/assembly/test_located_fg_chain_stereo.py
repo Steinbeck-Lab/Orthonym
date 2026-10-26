@@ -56,8 +56,14 @@ def test_pantetheine_3_hydroxy_descriptor_is_emitted():
     # The thioester is named by its chalcogen-ester handler since breadth job 3
     # (review finding 8): each word carries its own stereodescriptors, "at the front of
     # the corresponding prefix" "NAMING OF STEREOISOMERS", the Blue Book),
-    # so the pantetheine centre is C-2 of its acyl prefix, '[(2R)-4-{...}-2-hydroxy-3,3-
-    # dimethyl-1-oxobutyl]', and the acid's own is '(2R)-2-hydroxyhexadecanethioate'.
+    # so the pantetheine centre is C-2 of its amido prefix, '{(2R)-4-[...]-2-hydroxy-3,3-
+    # dimethylbutanamido}', and the acid's own is '(2R)-2-hydroxyhexadecanethioate'.
+    # Lane TI2: the N-acyl groups beside the thioester, the principal group, are amido prefixes, method (1) of
+    # "Substituents of the types -NH-CO-R and -NH-SO2-R" (the Blue Book: "Method (1) generates
+    # preferred IUPAC names"; '4-formamidobenzoic acid (PIN)':33000), where the best-effort tier gave method (2),
+    # '{...-2-hydroxy-3,3-dimethyl-1-oxobutyl}amino' and '[3-(...)-1-oxopropyl]amino'. The descriptor, its
+    # locant and the chain selected below are unchanged; the new string reads back to the input in
+    # ``test_full_stereo_acyl_coa_round_trips_full_inchikey`` (OPSIN 2.9.0, full InChIKey).
     # It was '(3R)-3-hydroxy-...-4-oxobutoxy' under the purine amine. Both read back to
     # the input's full InChIKey (independent OPSIN 2.9.0 call); best-effort label
     # pin_unverified.
@@ -73,10 +79,10 @@ def test_pantetheine_3_hydroxy_descriptor_is_emitted():
     # in test_leads_l3_n8f_chain_selector.py.
     name = _be_name(HYDROXYACYL_COA)
     assert name == (
-        "S-(2-{[3-({(2R)-4-[(3-{[(2R,3S,4R,5R)-5-(6-amino-9H-purin-9-yl)-4-hydroxy-"
+        "S-[2-(3-{(2R)-4-[(3-{[(2R,3S,4R,5R)-5-(6-amino-9H-purin-9-yl)-4-hydroxy-"
         "3-(phosphonooxy)oxolan-2-yl]methoxy}-1,3-dihydroxy-1,3-dioxo-1λ5,3λ5-"
-        "diphosphoxan-1-yl)oxy]-2-hydroxy-3,3-dimethyl-1-oxobutyl}amino)-1-"
-        "oxopropyl]amino}ethyl) (2R)-2-hydroxyhexadecanethioate"), name
+        "diphosphoxan-1-yl)oxy]-2-hydroxy-3,3-dimethylbutanamido}propanamido)ethyl] "
+        "(2R)-2-hydroxyhexadecanethioate"), name
 
 
 def test_pantetheine_3_hydroxy_descriptor_is_emitted_on_the_butoxy_chain():

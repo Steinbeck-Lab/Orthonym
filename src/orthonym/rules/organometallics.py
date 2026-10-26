@@ -688,6 +688,8 @@ def _extended_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: 
             return None
         nm = name_substituent(mol, set(inner), c_start[0])
         if not nm or nm == 'substituent' or not nm.endswith('yl'):
+            from ..assembly.default_tier_offer import note_declined_part
+            note_declined_part("ligand")
             return None
         # (the Blue Book): only methoxy, ethoxy, propoxy,
         # butoxy, phenoxy and tert-butoxy contract; every other R-O- keeps
@@ -736,6 +738,8 @@ def _extended_ligand_name(mol: Any, metal_complex: Any, lg: Any, *, is_group14: 
                                   or _g12_functional_ok):
         nm = name_substituent(mol, set(atoms), attach_idx)
         if not nm or nm == 'substituent':
+            from ..assembly.default_tier_offer import note_declined_part
+            note_declined_part("ligand")
             return None
         return nm
     return None

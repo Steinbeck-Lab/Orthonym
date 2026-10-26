@@ -33,9 +33,9 @@
 </g><g class="rise" style="animation-delay:1.20s">
   <text class="mono" x="80" y="606.0" font-size="22" fill="#000000" xml:space="preserve"><tspan fill="#666666">$</tspan> orthonym --emit-tier valid "CC1=C(C(CCC1)(C)C)/C=C/C(=C/C=C/C(=C/CO)/C)/C"</text>
   <text class="body" x="80" y="666" font-size="34" fill="#000000">(2E,4E,6E,8E)-3,7-dimethyl-</text><text class="body" x="80" y="712" font-size="34" fill="#000000">9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol</text>
-  <line x1="80" y1="734" x2="1058.9" y2="734" stroke="#000000" stroke-width="2" stroke-dasharray="13 9"/>
-  <g transform="translate(1311.0,640.0) scale(1.667)"><g class=""><circle fill="none" stroke="#556b2f" cx="9" cy="9" r="7" stroke-width="1.75" stroke-dasharray="3.23 2.27"/><circle cx="9" cy="9" r="3" fill="#556b2f"/></g></g>
-  <text class="mono" x="1520" y="662" font-size="20" text-anchor="end" fill="#666666">pin_unverified</text>
+  <line x1="80" y1="730.5" x2="1058.9" y2="730.5" stroke="#000000" stroke-width="2"/><line x1="80" y1="737.5" x2="1058.9" y2="737.5" stroke="#000000" stroke-width="2"/>
+  <g transform="translate(1335.0,640.0) scale(1.667)"><g class=""><defs><radialGradient id="gpins3"><stop offset="0" stop-color="#3dff8f" stop-opacity=".88"/><stop offset=".3" stop-color="#3dff8f" stop-opacity=".4"/><stop offset=".64" stop-color="#3dff8f" stop-opacity="0"/></radialGradient></defs><circle class="breath" cx="9" cy="9" r="16" fill="url(#gpins3)" opacity="1.0"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="8" stroke-width="1.25"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="5.5" stroke-width="1.25"/><circle cx="9" cy="9" r="3" fill="#2f6b28"/></g></g>
+  <text class="mono" x="1520" y="662" font-size="20" text-anchor="end" fill="#000000">pin_verified</text>
 </g><g class="rise" style="animation-delay:1.55s">
   <text class="mono" x="80" y="822.0" font-size="22" fill="#000000" xml:space="preserve"><tspan fill="#666666">$</tspan> orthonym --on-failure label "O=[U](=O)=O"</text>
   <text class="body" x="80" y="882" font-size="34" fill="#666666">inorganic compound (not supported)</text>
