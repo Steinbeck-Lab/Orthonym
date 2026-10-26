@@ -78,6 +78,14 @@ ENGINE_SPLIT = [row for row in SPLIT
                 if not row[0].startswith("bicyclo") and not (WIRED and row[0] in HYDRO_NAMED)]
 ENGINE_IDS = [row[0] for row in ENGINE_SPLIT]
 
+#: DT3 step A (``assembly/pin_rerun.py``): the default tier's first run of this row is the split name above, which
+#: the check declines; the promotion re-run then builds the PIN of the row (the construction of
+#: "Substituent prefixes derived from ring assemblies", the Blue Book, example:16118
+#: '[1,1'-biphenyl]-4-yl (preferred prefix)'), so the default tier no longer declines the row but ships the PIN
+RERUN_NAMED = {"assembly-in-a-prefix"}
+DECLINED_SPLIT = [row for row in ENGINE_SPLIT if row[0] not in RERUN_NAMED]
+DECLINED_IDS = [row[0] for row in DECLINED_SPLIT]
+
 #: names of the same structures that cite their assembly, or that are no assembly at all
 CONTROLS = [
     ("COc1ccc(-c2ccccn2)nc1", "5-methoxy-2,2'-bipyridine"),
@@ -188,11 +196,27 @@ def namers():
         yield {"pin": Orthonym(), "best-effort": Orthonym(style="pin", **_emit_tier_flags("best-effort"))}
 
 
-@pytest.mark.parametrize("_id,smiles,split,pin,_why", ENGINE_SPLIT, ids=ENGINE_IDS)
+@pytest.mark.parametrize("_id,smiles,split,pin,_why", DECLINED_SPLIT, ids=DECLINED_IDS)
 def test_the_default_tier_declines_the_split_name_with_its_reason(namers, _id, smiles, split, pin, _why):
     row = namers["pin"].name_tiered(smiles)
     assert (row["tier"], row["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), row
     assert RULE in [f["rule"] for f in row.get("spelling_failures") or []], row
+
+
+@pytest.mark.parametrize("_id,smiles,split,pin,_why", [r for r in ENGINE_SPLIT if r[0] in RERUN_NAMED],
+                         ids=sorted(RERUN_NAMED))
+def test_the_default_tier_ships_the_pin_the_promotion_rerun_builds(namers, _id, smiles, split, pin, _why):
+    """Changed asserted value (DT3 step A): the row was declined with the split name and its reason; the
+    re-run now answers with the PIN. Rests on the book's construction,:16118), on the check that
+    flags the split name and passes the PIN (reads the name and the structure only), and on OPSIN reading the
+    PIN back to the input."""
+    row = namers["pin"].name_tiered(smiles)
+    assert (row["name"], row["tier"], row["is_pin"]) == (pin, "pin_verified", True), row
+    assert not row.get("spelling_failures"), row
+    assert row["opsin"] == "verified", row
+    mol = Chem.MolFromSmiles(smiles)
+    assert RULE in [f.rule for f in check_pin_spelling(mol, split)]
+    assert RULE not in [f.rule for f in check_pin_spelling(mol, pin)]
 
 
 @pytest.mark.parametrize("_id,smiles,split,pin,_why", ENGINE_SPLIT, ids=ENGINE_IDS)

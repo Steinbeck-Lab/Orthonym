@@ -75,3 +75,30 @@ def test_a_prefix_with_its_own_locant_after_an_n_locant_needs_enclosing_marks(na
 ])
 def test_an_enclosed_or_simple_n_prefix_is_not_flagged(name):
     assert "P-16.5.1.1" not in _rules(name)
+
+
+#, a parent of one atom has no numbered position (DT3 step B; the check reads the name only)
+
+@pytest.mark.parametrize("name", [
+    "(1E,4S)-(4-hydroxypent-1-en-1-yl)boronic acid",         # the engine's name of a boronic acid before the fix
+    "(1R)-1-phenylethyl(methyl)silane",
+    "diethyl (1R)-(1-hydroxyethyl)phosphonate",
+    "(2R,3S)-2,3-dihydroxybutylphosphane",
+])
+def test_a_locanted_descriptor_at_a_parent_without_positions_is_flagged(name):
+    from orthonym.validation.spelling.checks_placement import descriptor_locant_at_a_parent_without_positions
+    verdict = descriptor_locant_at_a_parent_without_positions(MOL, name)
+    assert getattr(verdict, "rule", None) == "P-91.3", name
+
+
+@pytest.mark.parametrize("name, expected", [
+    ("[(1E,4S)-4-hydroxypent-1-en-1-yl]boronic acid", "abstain"),   # the descriptors are inside the prefix
+    ("[(1R)-1-phenylethyl](methyl)silane", "pass"),
+    ("(R)-methyl(phenyl)phosphane", "pass"),                         # no locant: the descriptor is the parent's
+    ("ethylphosphonic acid", "pass"),
+    ("(2S)-2-methylbutan-1-ol", "pass"),                             # a parent whose positions it counts
+    ("(3S)-3-methyl-2,3-dihydro-1H-indole", "abstain"),              # a parent whose positions it does not count
+])
+def test_a_descriptor_that_is_the_parents_or_is_in_its_prefix_is_not_flagged(name, expected):
+    from orthonym.validation.spelling.checks_placement import descriptor_locant_at_a_parent_without_positions
+    assert descriptor_locant_at_a_parent_without_positions(MOL, name) == expected

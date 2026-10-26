@@ -18,12 +18,14 @@ from orthonym import cli
 # The gate is ON: the default-tier decline below is a decision of the OPSIN-checked PIN path.
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
-# The default tier declines this molecule (NO_VERIFIED_PIN) and best-effort names it. The name is
-# the one tests/unit/test_emit_tier_flags.py pins for the single-SMILES path nesting,
-# alphanumerical order of the prefixes).
-WIDE = "CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1"
-WIDE_NAME = ("2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}"
-             "-N-(3-fluorophenyl)-2-methylpropanamide")
+# The default tier declines this molecule (NO_VERIFIED_PIN) and best-effort names it. Atropine: an alkaloid
+#, "NOMENCLATURE FOR NATURAL PRODUCTS BASED ON PARENT HYDRIDES", the Blue Book), so under
+# (:50943) no PIN is identified and the promotion re-run keeps the decline (assembly/pin_rerun.py; the decline
+# is pinned by tests/unit/assembly/test_pin_rerun.py); the name is the engine's own best-effort name. Before DT3
+# step A the control was a drug-like amide, and after it the benzylamino alcohol of test_default_tier.py
+# was a candidate: both can have a PIN, and a later PIN fix would break the control.
+WIDE = "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1"
+WIDE_NAME = "8-methyl-8-azabicyclo[3.2.1]octan-3-yl 3-hydroxy-2-phenylpropanoate"
 # No name at any tier (UNSUPPORTED_ELEMENT), so every tier has a decline to report.
 NO_NAME = "O=[U](=O)=O"
 NAMED = "CCO"

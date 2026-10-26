@@ -6260,24 +6260,24 @@ class Orthonym:
                 logger.info("name_tiered lowered %r: %s", name,
                             "; ".join(f"{f['rule']} {f['detail']}" for f in _checked))
             spelling_failures += _checked
-        # The strict-twin demotion runs LAST among the demotions that read
-        # ``tier == PIN_VERIFIED``, the no-PIN elements, the spelling check): a
-        # pin_verified name those lower to systematic_verified must keep that label, not be
-        # caught first by the twin and stay pin_unverified.
+        # The strict-twin demotion runs LAST among the demotions that read ``tier == PIN_VERIFIED``
+        #, the no-PIN elements, the spelling check): a pin_verified name those lower to
+        # systematic_verified keeps that label. A zwitterion drawing named as the neutral compound,
+        # which the strict path does not build, is the name of another drawing.
         if (tier == PIN_VERIFIED
                 and (self._general_fallback or self._general_fallback_unverified
                      or self._allow_aromatic_general or self._full_coverage)):
             _strict_name = self._strict_pin_twin_name(smiles)
             if _strict_name != name:
-                tier = PIN_UNVERIFIED
+                from .validation.zwitterion_drawing import named_as_neutral
+                tier = SYSTEMATIC_VERIFIED if named_as_neutral(smiles, name) else PIN_UNVERIFIED
                 is_pin = False
         # A name from the exact-match coordination list (D1: heme, chlorophyll,
         # cobalamin, siroheme, coenzyme F430; checked by exact InChIKey identity,
         # 'identity') keeps the label its naming path gives it (user decision
         # 2026-09-30, the paper's measured labels: 35 pin_verified and 3
         # best_effort on ChEBI).
-        # (a strict-path name lowered only because OPSIN could not be consulted, the
-        # opt-in reduced mode, is still in PIN form)
+        # (a strict-path name lowered only for lack of OPSIN, the opt-in reduced mode, is in PIN form)
         _pin_form = tier == PIN_VERIFIED or (tier == PIN_UNVERIFIED and _unavailable_demoted)
         # R63 / R68 (claims conformance, 2026-09-27): a tier whose name says
         # 'verified' is earned only by a full round trip (verified 'opsin') or the
@@ -8553,18 +8553,21 @@ class Orthonym:
 
     def _name_with_pin_promotion(self, smiles: str, *, raise_on_limit: bool) -> str:
         """Breadth Job 1 (M01): the PIN tier names the molecule as before; only when
-        that run returns no name does it name it again with the best-effort ring-
+        that run returns no name, or a name the default tier will decline
+        (``assembly.pin_rerun``), does it name it again with the best-effort ring-
         substituent producers admitted, each name kept only when its vocabulary is
         all PIN vocabulary (``rules.pin_vocabulary.promote_at_pin_tier``) -- e.g.
         '[2-(thiophen-2-yl)-1,3-thiazol-4-yl]methanamine',
         the Blue Book), '(4-methylcyclohex-3-en-1-yl)' (e),:3288).
 
-        A molecule the first run names keeps that name byte for byte, so a route
-        that becomes reachable only through a promoted prefix can never pre-empt
-        the route that names it today. The second run goes through every gate the
-        first does (the round trip included) and its memo entries are keyed apart
-        (``assembly.memo.pin_promotion_var``). When it also returns no name, the
-        first run's result and provenance are what the caller sees.
+        A molecule the first run names, and the default tier emits, keeps that name
+        byte for byte, so a route that becomes reachable only through a promoted
+        prefix can never pre-empt the route that names it today. The second run goes
+        through every gate the first does (the round trip included) and its memo
+        entries are keyed apart (``assembly.memo.pin_promotion_var``). When it also
+        returns no name, or over a declined first name no name that
+        ``assembly.pin_rerun.rerun_class_guard`` lets through, the first run's
+        result and provenance are what the caller sees.
 
         A kept second-run name is labelled pin_unverified with ``is_pin`` False by
         ``name_tiered`` (``metrics.provenance.record_pin_promotion_rerun``): a
@@ -8575,6 +8578,7 @@ class Orthonym:
         wrapped = _PIN_PROMOTION_WRAPPED.set(True)
         try:
             from .assembly.fragment_naming import PerfBudgetExceeded
+            from .assembly.pin_rerun import first_run_declined, first_run_state, rerun_class_guard
             from .rules.pin_vocabulary import promotion_could_change, promotion_site_probe
             limit_error = None
             with promotion_site_probe() as _sites:
@@ -8584,7 +8588,8 @@ class Orthonym:
                     # raise_on_limit: the first run found no name. The re-run gets
                     # its chance; the limit is raised only when it finds none either.
                     first, limit_error = None, _le
-            if first and not is_failure_name(first):
+            _named = bool(first) and not is_failure_name(first)
+            if _named and (not _sites or not first_run_declined(self, smiles, first)):
                 return first
             if not promotion_could_change(_sites):
                 # Branch review fixes (perf): the re-run would repeat the first run
@@ -8598,6 +8603,7 @@ class Orthonym:
                     raise limit_error
                 return first
             snap = _pv.get_provenance()
+            _restore_first = first_run_state(self, _named)
             promoted = pin_promotion_var.set(True)
             second = None
             try:
@@ -8636,7 +8642,8 @@ class Orthonym:
                         and not _pv.name_carries_non_pin_part(
                             _prov, second, label_forms=False)
                         and _mol_mc is not None
-                        and not multiplicative_candidate(_mol_mc)):
+                        and not multiplicative_candidate(_mol_mc)
+                        and not (_named and rerun_class_guard(_mol_mc, second))):
                     # Branch review fixes: a kept re-run name is NOT certified as the
                     # PIN. The promoted producers are the best-effort composition
                     # branches (``allow_mancude``), and the vocabulary guard is a
@@ -8654,6 +8661,7 @@ class Orthonym:
                 logger.info("PIN promotion re-run name %r is not a verified PIN form; "
                             "first result kept", second)
             _pv.restore_provenance(snap)
+            _restore_first()
             if limit_error is not None:
                 raise limit_error
             return first

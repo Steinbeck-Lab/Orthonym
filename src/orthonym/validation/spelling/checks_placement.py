@@ -15,6 +15,11 @@ naphthalene, anthracene::func:`.models.ring_or_chain_model`) and abstains on any
 a reader that does not know a parent can only pass it. It does not decide which prefix a descriptor
 belongs to, only that it is not the unit's own.
 
+A mononuclear parent of a heteroatom (borane, silane, phosphane, the boronic and phosphonic acids and
+the like) has no numbered position at all, so a descriptor with a numerical locant at the front of its
+unit relates to a substituent whatever the parent: '(1E,4S)-(4-hydroxypent-1-en-1-yl)boronic acid' is
+'[(1E,4S)-4-hydroxypent-1-en-1-yl]boronic acid' (:func:`descriptor_locant_at_a_parent_without_positions`).
+
  "Parentheses" (the Blue Book): "Parentheses are used around compound and complex
 prefixes". A prefix cited with an N-locant that begins with a numerical locant is such a prefix:
 'N-(2-methoxyethyl)', never 'N-2-methoxyethyl' (the reading of that spelling is 'N-2' of a
@@ -24,7 +29,7 @@ from __future__ import annotations
 
 import re
 
-from ..pin_spelling import SpellingFailure, register
+from ..pin_spelling import ABSTAIN, PASS, SpellingFailure, register
 from .models import P10, read_units, ring_or_chain_model, show
 
 #: the numerical locant of one descriptor of a set: '4S' of '(1R,4S)', '4aR', '2E'
@@ -57,6 +62,46 @@ def descriptor_locants_fit_their_unit(mol, name):
                         'P-91.3', f"descriptor '{item.strip()}' at the front of '{show(p.parent or '')}', "
                                   f"a parent of {positions} position(s): it relates to a substituent")
     return None
+
+
+#: the parent tokens of the mononuclear parent hydrides of Groups 13-15 and of their acids, anions and
+#: esters: the names 'borane', 'silane', 'phosphane'... /, the mononuclear parent hydrides,
+#: and / the oxoacids of boron, phosphorus, arsenic and antimony with the endings
+#: 'onic', 'inic', 'onous', 'inous' and their 'ate' and 'ite' forms). A parent of one skeletal atom has no
+#: position to cite. 'disilane', 'diphosphane' (two atoms, positions 1 and 2) are not in the set.
+_NO_POSITION_PARENT = re.compile(
+    r"(?:(?:bor|silan|german|stannan|plumban|phosphan|arsan|stiban|bismuthan|aluman|gallan|indigan|thallan)e"
+    r"|(?:bor|phosph|ars|stib)(?:on|in)(?:ic|ous|ate|ite))")
+
+
+@register('P-91.3')
+def descriptor_locant_at_a_parent_without_positions(mol, name):
+    """A stereodescriptor with a numerical locant set at the front of a unit whose parent is a mononuclear
+    heteroatom parent,:44643): "stereodescriptors are placed immediately at the front of the part
+    of the name to which they relate", and a parent of one atom has no position for a numerical locant, so
+    the descriptor relates to a substituent and is cited at the front of that prefix. PASS when every unit
+    with a locanted descriptor has a parent whose positions are known (a mononuclear parent, or one
+    :func:`descriptor_locants_fit_their_unit` counts); ABSTAIN on another parent, on a name of the
+     classes and on a name whose marks do not pair."""
+    if P10.search(name):
+        return ABSTAIN
+    parsed = read_units(name)
+    if parsed is None:
+        return ABSTAIN
+    _s, _encs, ps = parsed
+    decided = True
+    for p in ps:
+        items = [item.strip() for token in p.stereo for item in token.split(',')]
+        locanted = [item for item in items if _NUMERIC_LOCANT.match(item)]
+        if not locanted:
+            continue
+        if _NO_POSITION_PARENT.fullmatch(p.parent or ''):
+            return SpellingFailure(
+                'P-91.3', f"descriptor '{locanted[0]}' at the front of '{show(p.parent)}', a parent with no "
+                          f"numbered position: it relates to a substituent")
+        if ring_or_chain_model(p, p.unit.encl is not None) is None:
+            decided = False
+    return PASS if decided else ABSTAIN
 
 
 #: an italic N locant (or a set 'N,N', "N,N'") joined by a hyphen to a prefix that begins with its own
