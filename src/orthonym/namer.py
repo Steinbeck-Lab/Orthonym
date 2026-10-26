@@ -795,7 +795,7 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
     if (resolved in (_pv.GATE_OUTCOME_SELF01,
                      _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
                      _pv.GATE_OUTCOME_STEREO_RECOMPOSED)
-            or resolved.startswith((_pv.GATE_OUTCOME_TWIN_PREFIX, _pv.GATE_OUTCOME_ACID_SPLIT_PREFIX))):
+            or resolved.startswith(_pv.NAME_READ_BACK_PREFIXES)):
         # STEREO_RECOMPOSED is full-InChIKey verified (a review -P2 F3) — a
         # stronger proof than, so it takes the same "verdict ok, no
         # reanchor needed" path (the name is already the reanchored, verified form).
@@ -5674,7 +5674,9 @@ class Orthonym:
                 grammar for the name and read a twin spelling of it back to your
                 structure), ``verified_acid_split`` (OPSIN has no grammar for a
                 poly-anhydride name and read each of its acids; the structure built
-                from them is your structure), ``unverified`` or ``n/a``.
+                from them is your structure), ``verified_reconstructor`` (OPSIN has no
+                numerical term for the name; the structure built from its text is your
+                structure), ``unverified`` or ``n/a``.
             ``gates_passed``
                 The checks this name passed, for example ``self_consistency``
                 (OPSIN read the name back to your structure) and ``atom_coverage``.
@@ -5683,7 +5685,8 @@ class Orthonym:
                 ``self_consistency_verified``, ``suppressed`` or ``not_run``, or
                 ``carveout:<class>`` for a class OPSIN cannot read, or
                 ``twin_verified:<rules>`` for a name read back through its twin, or
-                ``acid_split_verified:<rule>`` for a poly-anhydride read through its acids.
+                ``acid_split_verified:<rule>`` for a poly-anhydride read through its acids, or
+                ``reconstructed:<rule>`` for a name with a count word above 50.
             ``formula``
                 The molecular formula, given when there is no name.
             ``limit_code``
@@ -5719,8 +5722,9 @@ class Orthonym:
                 grammar for; OPSIN read a twin spelling of the same structure back
                 to the same molecule), ``opsin_acids`` (a di- or poly-anhydride name
                 OPSIN has no grammar for; OPSIN read each acid the name cites and the
-                structure built from those acids is the same molecule) or
-                ``unverified`` (no read-back recorded).
+                structure built from those acids is the same molecule), ``reconstructor``
+                (a name with a count word above 50, which OPSIN cannot read: the structure
+                built from its text is the same molecule) or ``unverified`` (no read-back).
             ``spelling_failures``
                 The spelling rules of the PIN a name in PIN form breaks, as
                 ``{"rule": "", "detail":...}`` entries
@@ -5994,8 +5998,8 @@ class Orthonym:
             is_pin = False
             _label_rule_failures = _pv.non_pin_label_rule_failures(prov, _non_pin_scope)
         else:
-            tier, is_pin = PIN_VERIFIED, True
             opsin = gate_opsin_label
+            tier, is_pin = _pv.pin_path_tier(opsin)
         # a phase cleanup T1: the branches above derive tier/is_pin/
         # source from the provenance CONTEXTVAR, which reflects whichever
         # producer ran LAST -- correct when `self._offers` holds a single
@@ -6219,7 +6223,7 @@ class Orthonym:
         # "opsin" although OPSIN rejects the full name)
         # "opsin_twin" -> OPSIN read a twin spelling of the name (a PIN spelling it
         # has no grammar for) back to the input's full key
-        # "reconstructor" -> (SP5.6, if built) structurally reconstructed
+        # "reconstructor" -> the structure rebuilt from the TEXT of a name OPSIN cannot read (long_count_read_back)
         # "unverified" -> emitted with no passing oracle (/ D2 additive,
         # a grammar carve-out), or an abstain row. Never
         # claims a verification the emission did not earn
@@ -6287,7 +6291,7 @@ class Orthonym:
         # pin_verified -> pin_unverified (not a certified PIN, as for the other
         # pin_unverified demotions), systematic_verified -> best_effort. Labels
         # only: the name and the gate outcome are unchanged.
-        if tier == PIN_VERIFIED and verified not in _pv.VERIFIED_FIELD_FOR_TIER:
+        if tier == PIN_VERIFIED and verified not in _pv.VERIFIED_FIELD_FOR_PIN_TIER:
             tier, is_pin = PIN_UNVERIFIED, False
         elif tier == SYSTEMATIC_VERIFIED and verified not in _pv.VERIFIED_FIELD_FOR_TIER:
             tier = BEST_EFFORT
@@ -8815,13 +8819,9 @@ class Orthonym:
                                     _pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY,
                                     _pv.GATE_OUTCOME_STEREO_RECOMPOSED,
                                     _pv.GATE_OUTCOME_FULL_KEY_VERIFIED)
-                        or outcome.startswith((_pv.GATE_OUTCOME_CARVEOUT_PREFIX,
-                                               _pv.GATE_OUTCOME_TWIN_PREFIX,
-                                               _pv.GATE_OUTCOME_ACID_SPLIT_PREFIX))
-                        or (outcome == _pv.GATE_OUTCOME_SELF01_SKIPPED
-                            and _SC_MODE == "off")
-                        or (outcome == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH
-                            and _SC_MODE == "warn"))
+                        or outcome.startswith((_pv.GATE_OUTCOME_CARVEOUT_PREFIX, *_pv.NAME_READ_BACK_PREFIXES))
+                        or (outcome == _pv.GATE_OUTCOME_SELF01_SKIPPED and _SC_MODE == "off")
+                        or (outcome == _pv.GATE_OUTCOME_SELF01_WARN_MISMATCH and _SC_MODE == "warn"))
 
             if _passes_default_tier(resolved):
                 return name

@@ -205,7 +205,7 @@ def _apply_principal_group(rw, idx_by_locant, pg):
 # Fixed table (never derived from the input graph) so the substituent compare is a
 # genuine independent rebuild. Later waves extend it; an unknown name ABSTAINs.
 _SUBSTITUENT_TABLE = {
-    "methyl": "C", "ethyl": "CC", "propyl": "CCC", "butyl": "CCCC",
+    "methyl": "C", "ethyl": "CC", "propyl": "CCC", "butyl": "CCCC", "propan-2-yl": "C(C)C",
     "fluoro": "F", "chloro": "Cl", "bromo": "Br", "iodo": "I",
     "hydroxy": "O", "amino": "N", "nitro": "[N+](=O)[O-]", "cyano": "C#N",
 }
@@ -251,19 +251,24 @@ def verify_or_none(name, input_smiles, name_facts: Optional["NameFacts"] = None)
             return None   # parsed to a DIFFERENT (or stereo/charge-different) molecule
     except Exception:
         pass   # OPSIN unavailable / errored -> try the reconstructor
-    if name_facts is not None:
-        # The reconstructor is constitution-only (Wave-0 NameFacts has no stereo
-        # fields and _normalize strips stereo). If the input asserts stereo, the
-        # reconstructor cannot verify it -- abstain rather than CONFIRM a name whose
-        # stereo we did not check (0-wrong: never confirm what we cannot verify).
-        _m2 = Chem.Mol(mol)
-        Chem.RemoveStereochemistry(_m2)
-        _input_has_stereo = Chem.MolToSmiles(_m2) != Chem.MolToSmiles(mol)
-        if _input_has_stereo:
-            return None
-        if reconstruct_and_verify(name_facts, mol).verdict == Verdict.CONFIRMED:
-            return name
+    if name_facts is not None and verify_from_name_facts(name_facts, mol):
+        return name
     return None
+
+
+def verify_from_name_facts(name_facts: "NameFacts", mol) -> bool:
+    """True iff the structure rebuilt from ``name_facts`` alone is the constitution of ``mol``.
+
+    The reconstructor is constitution-only (Wave-0 NameFacts has no stereo fields and _normalize
+    strips stereo). If the input asserts stereo, the reconstructor cannot verify it -- abstain
+    rather than CONFIRM a name whose stereo we did not check (0-wrong: never confirm what we
+    cannot verify). ``verify_or_none`` branch (2) and the readers of ``validation/
+    long_count_read_back.py`` (which have no OPSIN to ask) both end here."""
+    _m2 = Chem.Mol(mol)
+    Chem.RemoveStereochemistry(_m2)
+    if Chem.MolToSmiles(_m2) != Chem.MolToSmiles(mol):
+        return False
+    return reconstruct_and_verify(name_facts, mol).verdict == Verdict.CONFIRMED
 
 
 def _graft_substituent(rw, base_idx, frag_smiles):

@@ -22,13 +22,13 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 : Which part of the engine produced the name: `pin_path` (the strict path; at `best-effort` it also labels the `cis` or `trans` name of a monocycle's pair of stereocentres, which is made from a name with lowercase `r` and `s` that the engine built for the whole molecule and OPSIN cannot read, with the tier {tier}`systematic_verified`, and the name the PIN-only tier ships although OPSIN cannot read its stereodescriptors, for a molecule that has no other name, with the tier {tier}`pin_unverified`), `general_engine`, `trivial_retained` (a retained trivial name: from the last-resort table, or a trivial natural-product name such as `diamorphine`), `t4_floor` (a last-resort producer) or `abstain`. It is coarse; `producer` is the finer field.
 
 `opsin`
-: What the OPSIN check found: `verified`, `verified_constitution_only` (the constitution matched; the stereodescriptors were not compared), `verified_twin` (OPSIN has no grammar for the name and read a twin spelling of it back to your structure), `unverified`, or `n/a` when there is no name.
+: What the OPSIN check found: `verified`, `verified_constitution_only` (the constitution matched; the stereodescriptors were not compared), `verified_twin` (OPSIN has no grammar for the name and read a twin spelling of it back to your structure), `verified_reconstructor` (OPSIN has no numerical term for the name, a count word above 50, and the structure built from its text is your structure), `unverified`, or `n/a` when there is no name.
 
 `gates_passed`
-: The checks this name passed, for example `self_consistency` (OPSIN read the name back to your structure), `atom_coverage` (every atom is named), `full_key_round_trip` or `twin_round_trip` (OPSIN read a twin spelling of the name back to your structure).
+: The checks this name passed, for example `self_consistency` (OPSIN read the name back to your structure), `atom_coverage` (every atom is named), `full_key_round_trip` or `twin_round_trip` (OPSIN read a twin spelling of the name back to your structure) or `name_reconstruction` (the structure built from the text of the name is your structure).
 
 `gate_outcome`
-: What the final OPSIN check did for this name: `self_consistency_verified`, `full_key_round_trip_verified`, `self_consistency_constitution_only`, `suppressed` (a candidate failed and was withdrawn), `not_run`, `unavailable` (no OPSIN check ran: the opt-in reduced mode without the jars), `carveout:<class>` for a name class that OPSIN cannot read, or `twin_verified:<rules>` for a name read back through its twin spelling (the ids of the rewrites that made the twin, joined by `+`).
+: What the final OPSIN check did for this name: `self_consistency_verified`, `full_key_round_trip_verified`, `self_consistency_constitution_only`, `suppressed` (a candidate failed and was withdrawn), `not_run`, `unavailable` (no OPSIN check ran: the opt-in reduced mode without the jars), `carveout:<class>` for a name class that OPSIN cannot read, `twin_verified:<rules>` for a name read back through its twin spelling (the ids of the rewrites that made the twin, joined by `+`), or `reconstructed:<rule>` for a name with a count word above 50, read back by building its structure from its text.
 
 `formula`
 : The molecular formula, given when there is no name, so a decline still tells you what came in.
@@ -52,6 +52,7 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
   `identity` (a name from an exact-match list: a metal-complex name found by your structure's exact InChIKey, or a natural-product parent name found by its exact structure; OPSIN cannot read these names),
   `opsin_split` (OPSIN read the name back to your structure drawn without its dative bonds, because RDKit gives a drawing with dative bonds no standard InChIKey to read a name back against; a count of atoms and charges ties the two drawings),
   `opsin_twin` (a PIN spelling OPSIN has no grammar for: OPSIN read a twin spelling of the same structure back to your structure; [How every name is checked](../checking.md#where-opsin-cannot-read-the-name)),
+  `reconstructor` (a name with a count word above 50, which OPSIN cannot read: the structure built from the text of the name is your structure; the tier is {tier}`systematic_verified`),
   or `unverified` (no read-back recorded).
 
 `spelling_failures`

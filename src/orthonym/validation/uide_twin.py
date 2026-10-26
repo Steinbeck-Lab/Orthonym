@@ -59,13 +59,17 @@ def uide_twin_outcome(outcome: Optional[str]) -> bool:
     * a thioperoxol name read back through its twin (``twin_verified:thioperoxol_...``, ``validation.thioperoxol_twin``):
       the anion of -S-OH at every general tier, a neutral name only as the safety net of a molecule that only the PIN
       path names (``assembly.default_tier_offer.twin_last_resort_row``);
+    * a name with a count word above 50, whose structure the reconstructor builds from the text of the name and
+      finds to be the input's (``reconstructed:<rule>``, ``validation.long_count_read_back``): OPSIN has no
+      numerical term for it at any tier;
     * a phane name whose structure ``validation.phane_read_back`` builds from the name and finds to be the input's
       (``carveout:phane``, recorded by ``namer.Orthonym._last_resort_list_name`` for such a name only: at a general
       tier the gate withdraws a phane name)."""
-    from ..metrics.provenance import carveout_outcome, twin_outcome
+    from ..metrics.provenance import GATE_OUTCOME_RECONSTRUCTED_PREFIX, carveout_outcome, twin_outcome
     from .thioperoxol_twin import thioperoxol_twin_outcome
     return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), carveout_outcome("phane"))
-            or thioperoxol_twin_outcome(outcome))
+            or thioperoxol_twin_outcome(outcome)
+            or bool(outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX)))
 
 
 def uide_twin(name: str) -> Optional[str]:

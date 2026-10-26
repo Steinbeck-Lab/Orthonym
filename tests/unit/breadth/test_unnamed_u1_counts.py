@@ -285,17 +285,39 @@ def test_best_effort_names_row_with_full_read_back(cid, smiles):
     assert not re.search(DIGIT_MULTIPLIER, name), name
 
 
+def _pairs(*args):
+    return ",".join(f"{i},{i}" for i in range(*args))
+
+
+# Names OPSIN 2.9.0 cannot read (no count word from 51 up) that ship because the reconstructor reads their
+# structure from the name text. Each is built here from the rules, not copied from the engine: count words
+# (:2794; 'heptaheptaconta' 77, 'tetrapentaconta' 54, 'nonapentaconta' 59), chain stems
+# (:7984, a numerical term followed by 'ane'), 'a' kept before 'ene' (:16497).
+RECONSTRUCTED = {
+    # 80 C chain from the CH2= end, 77 cumulated double bonds; C78 carries the second propan-2-yl
+    "123257338": f"79-methyl-78-(propan-2-yl)octaconta-{_locants(1, 78)}-heptaheptacontaene",
+    # 42 C, iodine at 15 and 28, fluorine on every other hydrogen position: 3 + 2*12 + 2*12 + 3 = 54
+    "165366016": f"15,28-diiodo-1,1,1,{_pairs(2, 14)},{_pairs(30, 42)},42,42,42-tetrapentacontafluorodotetracontane",
+    # 29 C, one hydrogen left on C29: 3 + 2*28 = 59 fluorine
+    "17970089": f"1,1,1,{_pairs(2, 30)}-nonapentacontafluorononacosane",
+}
+
+
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("cid,smiles", LIMIT_ROWS, ids=[c for c, _ in LIMIT_ROWS])
 def test_row_past_the_opsin_multiplier_range_ships_no_unreadable_name(cid, smiles):
-    """Either no name, or a name that reads back exactly (a newer OPSIN may read it); never a name
-    that spells the count as digits."""
+    """Either no name, or a name that reads back exactly (a newer OPSIN may read it), or the rule-built name
+    that the reconstructor reads back; never a name that spells the count as digits."""
     from orthonym.errors import is_failure_name
     res = name_best_effort(smiles)
     name = res.get("name")
     if name and not is_failure_name(name) and res.get("source") != "abstain":
-        assert_full_rt(name, smiles, what=f"CID {cid}: ")
         assert not re.search(DIGIT_MULTIPLIER, name), name
+        if res.get("verified") == "reconstructor":
+            assert name == RECONSTRUCTED.get(cid), f"CID {cid}: {name}"
+            assert res.get("tier") == "systematic_verified", res.get("tier")
+        else:
+            assert_full_rt(name, smiles, what=f"CID {cid}: ")
 
 
 @pytest.mark.opsin_gate

@@ -74,6 +74,11 @@ The families (the rules of:data:`TWIN_RULES`, in table order):
   'diacetic butanedioic dianhydride (PIN)' (:32386). No twin spelling of such a name exists (OPSIN reads a
   two-word anhydride only), so the check reads each acid word as ``<acid> acid`` and builds the poly-anhydride
   from those acids; it ships a name at the default tier only.
+* ``long_count`` (``validation.long_count_read_back``): Basic multiplicative prefixes (the Blue Book),
+   Derivation of basic numerical terms (:2811), Hydrocarbons (:7984) 'heptacontane (PIN)'. OPSIN
+  has a numerical term up to 50 and none above, so a name with a count word of 51 and more has no OPSIN reading and
+  no twin spelling. The reconstructor builds the structure from the text of the name (the parent chain, its multiple
+  bonds, its prefixes) and the constitution must be the input's, at every tier that ships a name OPSIN cannot read.
 """
 import re
 from typing import Callable, Optional, Tuple
@@ -81,6 +86,7 @@ from typing import Callable, Optional, Tuple
 from ..metrics.provenance import wider_tier_ctx
 from .anhydride_acids import ANHYDRIDE_ACIDS_RULE, anhydride_acids_round_trip
 from .halido_twin import halido_twin
+from .long_count_read_back import LONG_COUNT_RULE, long_count_round_trip
 from .opsin_ambiguity import ambiguity_messages
 from .polyester_twin import polyester_has_free_acid, polyester_twin
 from .thioperoxol_twin import ships_at_general_tier, thioperoxol_twin_round_trip
@@ -209,14 +215,15 @@ def twin_round_trip(name: str, smiles: Optional[str]) -> Optional[str]:
     """The applied rule ids joined by ``+`` when the twin of ``name`` reads to the FULL
     InChIKey of ``smiles`` and OPSIN reads it once; else None (no twin, a twin of another
     structure, an unavailable OPSIN, an ambiguous reading). A halogen -uide name and a thioperoxol name
-    have a family of their own (``validation.uide_twin``, ``validation.thioperoxol_twin``), and a poly-anhydride
-    name is read through its acids (``validation.anhydride_acids``). This is the check of the default tier: a
+    have a family of their own (``validation.uide_twin``, ``validation.thioperoxol_twin``), a poly-anhydride
+    name is read through its acids (``validation.anhydride_acids``) and a name with a count word above 50 is
+    read by the reconstructor (``validation.long_count_read_back``). This is the check of the default tier: a
     thioperoxol name ships through its twin there always, at a general tier only the anion does, and a neutral name
     as the safety net (:func:`general_tier_twin_round_trip`)."""
     found = twin_of(name)
     if found is None:
         return (uide_twin_round_trip(name, smiles) or thioperoxol_twin_round_trip(name, smiles)
-                or anhydride_acids_round_trip(name, smiles))
+                or anhydride_acids_round_trip(name, smiles) or long_count_round_trip(name, smiles))
     if not smiles:
         return None
     twin, rules = found
@@ -236,12 +243,13 @@ def general_tier_twin_round_trip(name: str, smiles: Optional[str]) -> Optional[s
     name, belongs here too: the engine has no other spelling for it (``validation.thioperoxol_twin``). A neutral
     thioperoxol name has one, the name by prefixes that OPSIN reads ('(hydroxysulfanyl)methane'): it ships through
     its twin only inside ``thioperoxol_twin.last_resort_scope``, for a molecule that has no other name. The rule
-    id, or None."""
+    id, or None. A name with a count word above 50 has no other spelling either, and OPSIN has no numerical term
+    for it: the reconstructor reads it (``validation.long_count_read_back``)."""
     found = twin_of(name)
     if found is not None and found[1] == ("halido_o",):
         return twin_round_trip(name, smiles)
-    return uide_twin_round_trip(name, smiles) or (
-        thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None)
+    return (uide_twin_round_trip(name, smiles) or long_count_round_trip(name, smiles)
+            or (thioperoxol_twin_round_trip(name, smiles) if ships_at_general_tier(name) else None))
 
 
 def _opsin_reads(name: str, radical: bool) -> bool:
@@ -286,15 +294,17 @@ def twin_opsin_parse(name: str) -> Optional[str]:
 
 def twin_gate_ships(name: str, smiles: Optional[str], general_tier: bool = False) -> bool:
     """The twin branch of the validity gate: True, with the outcome ``twin_verified:<rules>``
-    recorded for ``name``, when:func:`twin_round_trip` verifies the twin of ``name``. A general
+    (``acid_split_verified:<rule>`` for a poly-anhydride, ``reconstructed:<rule>`` for a name the reconstructor
+    reads) recorded for ``name``, when:func:`twin_round_trip` verifies the twin of ``name``. A general
     tier (``general_tier``) ships only a name of:func:`general_tier_twin_round_trip` through its twin."""
     rules = general_tier_twin_round_trip(name, smiles) if general_tier else twin_round_trip(name, smiles)
     if rules is None:
         return False
     from ..metrics import provenance as pv
     # the acids of a poly-anhydride are read one by one: no OPSIN reading of the name or of a spelling of it
-    pv.record_gate_outcome(pv.acid_split_outcome(rules) if rules == ANHYDRIDE_ACIDS_RULE else pv.twin_outcome(rules),
-                           name)
+    pv.record_gate_outcome(
+        pv.acid_split_outcome(rules) if rules == ANHYDRIDE_ACIDS_RULE
+        else pv.reconstructed_outcome(rules) if rules == LONG_COUNT_RULE else pv.twin_outcome(rules), name)
     return True
 
 
@@ -304,7 +314,7 @@ def twin_outcome_holds(name: str, smiles: Optional[str]) -> Optional[bool]:
     from ..metrics import provenance as pv
     prov = pv.get_provenance()
     outcome = pv.resolve_gate_outcome(prov["gate_outcome"], prov["gate_outcome_name"], name)
-    if not outcome.startswith((pv.GATE_OUTCOME_TWIN_PREFIX, pv.GATE_OUTCOME_ACID_SPLIT_PREFIX)):
+    if not outcome.startswith(pv.NAME_READ_BACK_PREFIXES):
         return None
     return True if not smiles else twin_round_trip(name, smiles) is not None
 

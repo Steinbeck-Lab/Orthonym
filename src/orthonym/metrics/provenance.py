@@ -83,6 +83,15 @@ GATE_OUTCOME_TWIN_PREFIX = "twin_verified:"
 #: reads each acid the name cites, to the structures a poly-anhydride built from those acids has the input's FULL
 #: InChIKey and descriptors of (``validation.anhydride_acids``). OPSIN never reads the name, or a spelling of it.
 GATE_OUTCOME_ACID_SPLIT_PREFIX = "acid_split_verified:"
+#: prefix of ``reconstructed:<rule>``: OPSIN has no grammar for the name (a numerical term above 50), and the
+#: reconstructor builds the structure from the facts the TEXT of the name states; it is the input's constitution
+#: (``validation.long_count_read_back``). OPSIN never reads the name, or a spelling of it, and the key of the
+#: input is not used: the compare is the full canonical SMILES, with no stereo.
+GATE_OUTCOME_RECONSTRUCTED_PREFIX = "reconstructed:"
+#: the outcome prefixes of the names read back some other way than by OPSIN reading the name itself: through a
+#: twin spelling, through the acids a name cites, or by the reconstructor
+NAME_READ_BACK_PREFIXES = (GATE_OUTCOME_TWIN_PREFIX, GATE_OUTCOME_ACID_SPLIT_PREFIX,
+                           GATE_OUTCOME_RECONSTRUCTED_PREFIX)
 
 #: The ONLY outcomes that may report anything other than "unverified".
 #: An allowlist, never a blocklist — an outcome string this code has never
@@ -111,10 +120,13 @@ _GATE_TOKENS = {
 _TWIN_LABEL, _TWIN_TOKEN = "verified_twin", "twin_round_trip"
 #: the same of the acid-split outcome
 _ACID_SPLIT_LABEL, _ACID_SPLIT_TOKEN = "verified_acid_split", "acid_split_round_trip"
+#: the same of the reconstructed outcome
+_RECONSTRUCTED_LABEL, _RECONSTRUCTED_TOKEN = "verified_reconstructor", "name_reconstruction"
 
 #: the ``opsin`` labels of a name that was read back to the input's full structure: the name
-#: itself, its twin spelling, or the acids of a poly-anhydride name
-VERIFIED_OPSIN_LABELS = ("verified", _TWIN_LABEL, _ACID_SPLIT_LABEL)
+#: itself, its twin spelling, the acids of a poly-anhydride name, or the structure the reconstructor
+#: builds from the text of the name
+VERIFIED_OPSIN_LABELS = ("verified", _TWIN_LABEL, _ACID_SPLIT_LABEL, _RECONSTRUCTED_LABEL)
 
 #: the ``verified`` field of a row by the ``opsin`` label of its gate outcome
 VERIFIED_FIELD_BY_OPSIN_LABEL = {
@@ -122,11 +134,26 @@ VERIFIED_FIELD_BY_OPSIN_LABEL = {
     "verified_constitution_only": "opsin_constitution",
     _TWIN_LABEL: "opsin_twin",
     _ACID_SPLIT_LABEL: "opsin_acids",
+    _RECONSTRUCTED_LABEL: "reconstructor",
 }
 
-#: the values of ``verified`` that earn a tier named "verified": a read-back of the name, or of
+#: the values of ``verified`` that earn the tier pin_verified: a read-back of the name, or of
 #: its twin spelling, of the acids of a poly-anhydride name, or the exact-match list identity
-VERIFIED_FIELD_FOR_TIER = ("opsin", "opsin_twin", "opsin_acids", "identity")
+VERIFIED_FIELD_FOR_PIN_TIER = ("opsin", "opsin_twin", "opsin_acids", "identity")
+#: the values of ``verified`` that earn a tier named "verified": those of the PIN tier, and the
+#: reconstructor's read-back of the text of the name, which does not certify a preferred name
+VERIFIED_FIELD_FOR_TIER = VERIFIED_FIELD_FOR_PIN_TIER + ("reconstructor",)
+
+
+def pin_path_tier(opsin_label: str) -> tuple:
+    """``(tier, is_pin)`` of a name the strict PIN path built, before any later label change: pin_verified, and
+    a PIN, except for a name only the reconstructor read back (``validation.long_count_read_back``), which proves
+    the constitution of the name and never its spelling and so is systematic_verified, not a PIN."""
+    from ..assembly.offer_pool import PIN_VERIFIED, SYSTEMATIC_VERIFIED
+    if opsin_label == _RECONSTRUCTED_LABEL:
+        return SYSTEMATIC_VERIFIED, False
+    return PIN_VERIFIED, True
+
 
 _SOURCE = contextvars.ContextVar("orthonym_prov_source", default=None)
 _OPSIN = contextvars.ContextVar("orthonym_prov_opsin", default=None)
@@ -589,6 +616,12 @@ def acid_split_outcome(rule: str) -> str:
     return GATE_OUTCOME_ACID_SPLIT_PREFIX + rule
 
 
+def reconstructed_outcome(rule: str) -> str:
+    """``reconstructed:<rule>`` — the name ships on its construction, and the structure the reconstructor builds
+    from the text of the name is the input's (see:data:`GATE_OUTCOME_RECONSTRUCTED_PREFIX`)."""
+    return GATE_OUTCOME_RECONSTRUCTED_PREFIX + rule
+
+
 def resolve_gate_outcome(outcome: Optional[str], outcome_name: Optional[str],
                          shipped_name: Optional[str]) -> str:
     """The outcome that applies to ``shipped_name`` — deny-by-default.
@@ -608,7 +641,7 @@ def resolve_gate_outcome(outcome: Optional[str], outcome_name: Optional[str],
 
 def opsin_label_for_gate_outcome(outcome: Optional[str]) -> str:
     """``verified`` / ``verified_constitution_only`` / ``verified_twin`` / ``verified_acid_split`` /
-    ``unverified``.
+    ``verified_reconstructor`` / ``unverified``.
 
     Allowlist, so it fails closed: any outcome not explicitly listed —
     including a state that does not exist yet — reports ``unverified``.
@@ -617,6 +650,8 @@ def opsin_label_for_gate_outcome(outcome: Optional[str]) -> str:
         return _TWIN_LABEL
     if outcome and outcome.startswith(GATE_OUTCOME_ACID_SPLIT_PREFIX):
         return _ACID_SPLIT_LABEL
+    if outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX):
+        return _RECONSTRUCTED_LABEL
     return _VERIFIED_GATE_OUTCOMES.get(outcome, "unverified")
 
 
@@ -626,6 +661,8 @@ def gate_token_for_gate_outcome(outcome: Optional[str]) -> Optional[str]:
         return _TWIN_TOKEN
     if outcome and outcome.startswith(GATE_OUTCOME_ACID_SPLIT_PREFIX):
         return _ACID_SPLIT_TOKEN
+    if outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX):
+        return _RECONSTRUCTED_TOKEN
     return _GATE_TOKENS.get(outcome)
 
 
