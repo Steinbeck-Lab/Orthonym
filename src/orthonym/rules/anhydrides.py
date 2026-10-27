@@ -715,6 +715,25 @@ def _name_mixed_inorganic_anhydride(mol) -> Optional[str]:
     return None
 
 
+_SENIOR_LINK_SMARTS = {
+    "S": [ANHYDRIDE_SMARTS],
+    "Se": [ANHYDRIDE_SMARTS, "[CX3](=O)[SX2][CX3](=O)"],
+    "Te": [ANHYDRIDE_SMARTS, "[CX3](=O)[SX2][CX3](=O)", "[CX3](=O)[SeX2][CX3](=O)"],
+}
+
+
+def _senior_anhydride_link(mol, symbol: str) -> bool:
+    """True when ``mol`` has an anhydride linkage -CO-Y-CO- of a chalcogen senior to ``symbol`` (O > S > Se > Te).
+
+     (the Blue Book), "When different chalcogen atoms are present in the anhydride linkages, the
+    usual order of seniority established for chalcogen atoms, O > S > Se > Te, is used to choose the senior
+    anhydride. The senior anhydride chosen as the basis for the name can be an anhydride (see through
+     or a di- or polyanhydride. Other anhydride linkages are named substitutively":
+    'acetic 5-(acetylsulfanyl)-5-oxopentanoic anhydride (PIN)' (:32455)."""
+    return any(mol.HasSubstructMatch(pat) for pat in
+               (_compiled_smarts(smarts) for smarts in _SENIOR_LINK_SMARTS.get(symbol, ())) if pat is not None)
+
+
 def _name_chalcogen_anhydride(mol) -> Optional[str]:
     """: R-CO-X-CO-R' (X = S/Se/Te) -> '<acid stem(s)> {class}anhydride'.
 
@@ -743,6 +762,8 @@ def _name_chalcogen_anhydride(mol) -> Optional[str]:
     class_term = _CHALCOGEN_CLASS_TERM.get(mol.GetAtomWithIdx(x).GetSymbol())
     if class_term is None:
         return None
+    if _senior_anhydride_link(mol, mol.GetAtomWithIdx(x).GetSymbol()):
+        return None   #: the senior anhydride is the basis, this linkage is named substitutively
     # W8-P4 / atom-drop safety floor): a CYCLIC -CO-X-CO- core
     # (c1 reaches c2 through the ring WITHOUT crossing the bridge X) is a
     # chalcogen analogue of a CYCLIC anhydride (e.g. the thio analogue of

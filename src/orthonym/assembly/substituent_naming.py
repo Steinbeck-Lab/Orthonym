@@ -573,6 +573,14 @@ def _build_alkenyl_name(
     double_locants = sorted(double_locants)
     triple_locants = sorted(triple_locants)
 
+    if not double_locants and not triple_locants:
+        # A saturated chain (its multiple bonds, if any, are ylidene prefixes of the group): General
+        # methodology for naming substituent groups (the Blue Book), method (1), "The atom with the free
+        # valence terminates a chain and always has the locant '1', which is omitted from the name" (:15813),
+        # '(5-methyl-2,3-dimethylidenehexyl)cyclohexane (PIN)' (:25723, under; method (2) otherwise,
+        # 'propan-2-yl'
+        return f"{stem}yl" if attach_locant == 1 else f"{stem}an-{attach_locant}-yl"
+
     # For 2-carbon chains: no locants needed for unsaturation
     if carbon_count == 2:
         if double_locants:
@@ -7910,9 +7918,12 @@ def _lambda5_azanyl_prefix(mol, sub_atoms, attach_idx):
     alkyl = get_alkyl_name(chain_len)  # 'methyl', 'ethyl',...
     if alkyl is None:
         return None
-    if chain_len == 1:
-        return f"{core}{alkyl}"
-    return f"{chain_len}-{core}{alkyl}"
+    from ..rules.amine_oxide_label import record_neutral_method_two_prefix
+    name = f"{core}{alkyl}" if chain_len == 1 else f"{chain_len}-{core}{alkyl}"
+    outside = [a for a in mol.GetAtoms() if a.GetIdx() not in sub_set]
+    if len(outside) == 1 and outside[0].GetSymbol() == 'C' and [n.GetIdx() for n in outside[0].GetNeighbors()] == [attach_idx]:
+        return name    # the group is the whole molecule: a radical group, whose radical electron a methyl placeholder holds
+    return record_neutral_method_two_prefix(mol, name)
 
 
 def fragment_is_linear_terminal_alkyl(mol, sub_atoms, attach_idx: int) -> bool:

@@ -32,6 +32,7 @@ from typing import Dict, List, Optional, Tuple
 from rdkit import Chem
 
 from ..data.multipliers import multiplier_table
+from .adduct_class import component_class_key
 # The names of the atom, the ions and the isotopes of a metal are the producer of
 # ``rules/metal_atoms.py`` (one home); the adduct components read them from there.
 from .metal_atoms import METAL_ELEMENT_NAMES as _METAL_ELEMENT_NAMES
@@ -428,6 +429,8 @@ def component_sort_key(frag_smi: str) -> tuple:
                 seniority = seniority_index(pg, frag_mol, pg_matches)
                 n_groups = len(pg_matches)
                 parent_key = _principal_group_parent_key(frag_mol, pg_matches)
+            else:
+                parent_key = component_class_key(frag_mol)
         except Exception:
             pass  # no PCG -> ranks after PCG-bearing organics
     return (bucket, seniority, -n_groups, parent_key, -frag_mol.GetNumHeavyAtoms(), frag_smi)

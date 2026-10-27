@@ -1352,7 +1352,10 @@ def select_principal_ring_system(
         if len(elig) > 1 and len(elig) == len(tied):
             best_idx = max(elig, key=lambda i: _exo_count(ring_systems[i]))
         else:
-            best_idx = tied[0]
+            from .ring_tie_locants import senior_by_prefix_locants    #, (heteroaromatic monocycles)
+            best_idx = senior_by_prefix_locants(mol, ring_systems, tied)
+            if best_idx is None:
+                best_idx = tied[0]
     else:
         best_idx = tied[0]
 

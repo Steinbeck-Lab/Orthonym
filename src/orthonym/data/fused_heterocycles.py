@@ -932,6 +932,18 @@ FUSED_HETEROCYCLE_DATA: Dict[str, Dict[str, Any]] = {
         'parent_atoms': 12,
         'iupac_locants': {0: 6, 1: 7, 2: '7a', 3: 8, 4: '8a', 5: 1, 6: 2, 7: 3, 8: '3a', 9: 4, 10: '4a', 11: 5},
     },
+    # "Multiparent systems with one interparent component" (the Blue Book): 'furo[3,2-b:4,5-b']difuran
+    # (PIN, a multiparent name) [not difuro[3,2-b:2',3'-d]furan (a multiplicative prefix name); the multiparent method
+    # applies to situations in which there are three identical fused rings or ring systems according to the principle
+    # that a maximum of parent components is preferred to a maximum of attached components]' (:13592). Numbering from
+    # OPSIN 2.9.0 `furo[3,2-b:4,5-b']difuran -o extendedsmi` (O at 1, 4 and 7).
+    'c1cc2oc3ccoc3c2o1': {
+        'name': "furo[3,2-b:4,5-b']difuran",
+        'tautomer_locant': None,
+        'ring_system': 'furodifuran',
+        'parent_atoms': 11,
+        'iupac_locants': {0: 2, 1: 3, 2: '3a', 3: 4, 4: '4a', 5: 5, 6: 6, 7: 7, 8: '7a', 9: '7b', 10: 1},
+    },
     # three+-interparent multiparent (BB-verbatim PIN,
     # the Blue Book): double-primed benzo interparent, dicyclobuta
     # first-order interparent, difuran parents. Numbering derived 2026-07-09

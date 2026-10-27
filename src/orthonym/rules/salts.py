@@ -34,6 +34,7 @@ from ..perception.ions import get_ion_sites, parse_salt_fragments
 from ..perception.metals import assembly_has_out_of_scope_metal
 from .ions import name_anion, name_cation
 from .metal_atoms import inorganic_anion_word
+from .salt_multiplier import is_unsubstituted_locanted_word
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # B2: basic (protonatable) amine nitrogen -- an sp3 N that is not an amide,
@@ -1218,8 +1219,8 @@ def name_salt(mol, style: str = 'pin', *,
     if systematic_anion_words and not hydrogen_prefix:
         result = _binary_salt_name_read_back(
             mol, result, formatted_cations, anion_counts, systematic_anion_words)
-    if not hydrogen_prefix:
-        result = _charge_fixed_ratio_name(mol, result, cation_counts, anion_counts)
+    result = _charge_fixed_ratio_name(mol, result, cation_counts, anion_counts, hydrogen_prefix, frags,
+                                      organic_cation_names)
     return result + solvate_suffix
 
 
@@ -1228,7 +1229,71 @@ def name_salt(mol, style: str = 'pin', *,
 _STATED_CHARGE_RE = re.compile(r'\((?:[IVX]+|\d+\+)\)$')
 
 
-def _charge_fixed_ratio_name(mol, result: str, cation_counts, anion_counts) -> str:
+def _anions_of_organic_acids(frags) -> bool:
+    """True when every anion of the salt holds carbon and none carries its charge on a carbon: the
+    anions of acids, alcohols, thiols and their analogues,, not a carbanion
+    (an organometallic assembly, and not cyanide."""
+    anions = (frags or {}).get('anions') or []
+    carbon = False
+    for frag in anions:
+        for atom in frag['mol'].GetAtoms():
+            if atom.GetSymbol() == 'C':
+                carbon = True
+                if atom.GetFormalCharge() < 0:
+                    return False
+    return carbon
+
+
+def _name_without_stated_charges(mol, cation_counts, anion_counts, hydrogen_prefix: str, organic_cations):
+    """The salt name with each cation cited by its element name and the anions multiplied, when OPSIN
+    reads it back to the input's full InChIKey; else ``None``."""
+    bare_counts = {}
+    for name, count in cation_counts.items():
+        bare = _STATED_CHARGE_RE.sub('', name)
+        if bare in bare_counts:
+            return None  # two charges of one element: the word would not tell them apart
+        bare_counts[bare] = count
+    parts = [_apply_stoichiometric_prefix(bare, bare_counts[bare], organic_cation=bare in organic_cations)
+             for bare in sorted(bare_counts)]
+    if hydrogen_prefix:
+        parts.append(hydrogen_prefix)
+    parts += [_apply_stoichiometric_prefix(name, anion_counts[name]) for name in sorted(anion_counts)]
+    candidate = ' '.join(parts)
+    try:
+        from ..validation.opsin_roundtrip import opsin_roundtrip_check
+        if opsin_roundtrip_check(Chem.MolToSmiles(mol), candidate).get("passed") is True:
+            return candidate
+    except Exception:  # noqa: BLE001 - keep today's name
+        return None
+    return None
+
+
+def _charge_fixed_ratio_name(mol, result: str, cation_counts, anion_counts, hydrogen_prefix: str = '',
+                             frags=None, organic_cations=frozenset()) -> str:
+    """The name of the salt with the cation words that state a charge handled by the rule of its anions.
+
+    A salt of an acid, an alcohol or a thiol cites the cation by its element name and multiplies the
+    anion: Salts, 'germanium tetraacetate (PIN)' (the Blue Book); Neutral salts of
+    hydroxy compounds..., 'lead tetraphenoxide (PIN)' (:28196). The book writes no oxidation number or
+    charge number in the name of such a salt, so a name that states one ('cobalt(II) octadecanoate') is
+    not the PIN: the name without it is shipped when OPSIN 2.9.0 reads it back to the input's full
+    InChIKey, and the name with it is recorded as not the PIN when it does not. The salts of an anion
+    without carbon keep the name of ``_fixed_ratio_name``."""
+    if frags is not None and any(_STATED_CHARGE_RE.search(c) for c in cation_counts) \
+            and _anions_of_organic_acids(frags):
+        plain = _name_without_stated_charges(mol, cation_counts, anion_counts, hydrogen_prefix, organic_cations)
+        if plain is not None:
+            return plain
+        name = result if hydrogen_prefix else _fixed_ratio_name(mol, result, cation_counts, anion_counts)
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(name, rule="P-65.6.2.1",
+                             detail="the Blue Book names a salt of an acid, an alcohol or a thiol with the element "
+                                    "name of the cation and the multiplied anion, with no oxidation number")
+        return name
+    return result if hydrogen_prefix else _fixed_ratio_name(mol, result, cation_counts, anion_counts)
+
+
+def _fixed_ratio_name(mol, result: str, cation_counts, anion_counts) -> str:
     """The binary name without stoichiometric prefixes, when the cation word states
     its charge and OPSIN reads that name back to the input's full InChIKey; else
     ``result``.
@@ -1338,13 +1403,16 @@ def _apply_stoichiometric_prefix(name: str, count: int, *,
         >>> _apply_stoichiometric_prefix('methanaminium', 2, organic_cation=True)
         'bis(methanaminium)'
         >>> _apply_stoichiometric_prefix('(2E,4E)-hexa-2,4-dienoate', 3)
-        'tris[(2E,4E)-hexa-2,4-dienoate]'
+        'tri[(2E,4E)-hexa-2,4-dienoate]'
     """
     if count == 1:
         return name
 
     if _ion_needs_enclosing_multiplier(name, organic_cation=organic_cation):
-        word = multiplying_prefix(count, "complex", table=COMPLEX_STOICHIOMETRIC_PREFIXES)
+        if not organic_cation and is_unsubstituted_locanted_word(name):      # (:7029), (e) (:7104)
+            word = multiplying_prefix(count, table=STOICHIOMETRIC_PREFIXES)
+        else:
+            word = multiplying_prefix(count, "complex", table=COMPLEX_STOICHIOMETRIC_PREFIXES)
         # (the Blue Book) nesting order {[({})]}: the mark
         # around the multiplied ion is the next one after the marks the ion name
         # already carries -.5: indicated hydrogen and fusion / ring

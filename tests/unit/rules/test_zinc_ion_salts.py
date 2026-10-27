@@ -347,12 +347,24 @@ def test_other_metals_are_not_moved():            # reads the baseline fixture (
     declared = baseline_path("zinc").parent / "declared_demotions_75b4ba386.tsv"
     with open(declared, newline="") as f:
         declared_keys = {(r["smiles"], r["tier_req"]) for r in csv.DictReader(f, delimiter="\t")}
+    # The salts of an acid, an alcohol or a thiol take the element name of the cation and the multiplied anion, with no
+    # oxidation number: Salts (the Blue Book), 'germanium tetraacetate (PIN)' (:31581); (:28178),
+    # '(C6H5-O-)4 Pb4+ lead tetraphenoxide (PIN)' (:28196). The rows below are respelled so, with the label they had
+    # (``declared_respellings_pinc.tsv``): the rule is the book's, not a change of the metals the table admits.
+    with open(baseline_path("zinc").parent / "declared_respellings_pinc.tsv", newline="") as f:
+        respelled = {(r["smiles"], r["tier_req"]): (r["from_name"], r["to_name"])
+                     for r in csv.DictReader(f, delimiter="\t")}
     moved = []
     namers = {tier: Orthonym(style="pin", **_emit_tier_flags(tier)) for tier in ("pin", "best-effort")}
     for row in rows:
         if (row["smiles"], row["tier_req"]) in declared_keys:
             continue
         now = namers[row["tier_req"]].name_tiered(row["smiles"])
+        key = (row["smiles"], row["tier_req"])
+        if key in respelled:
+            assert respelled[key][0] == row["name"], key
+            assert identity_view(now) == (respelled[key][1],) + tuple(identity_view(row))[1:], (key, identity_view(now))
+            continue
         if identity_view(now) != identity_view(row):
             moved.append((row["smiles"][:60], row["tier_req"], identity_view(row), identity_view(now)))
     assert moved == []

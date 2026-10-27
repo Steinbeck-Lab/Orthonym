@@ -941,6 +941,16 @@ _build_nonstereo_fallback()
 # Public API
 # ============================================================================
 
+#: The retained carbohydrate name that stands beside a PIN. "Double and triple bonds"
+#: (the Blue Book) prints '(2R)-2,3-dihydroxypropanal (PIN)' (:45194) for D-glyceraldehyde, and
+#: Table 10.2 of PARENT MONOSACCHARIDES (:52737) lists the retained name 'D-glyceraldehyde' after it,
+#: with (:52733): "These retained names are customarily used when the acyclic aldose or ketose has
+#: a carbon chain consisting of four, five, or six carbon atoms"; INTRODUCTION (:50943), "Preferred IUPAC
+#: names (PINs) are not identified for the compounds in this Chapter". The retained name is no PIN, so the
+#: lookup does not offer it: the structure is named systematically.
+_TRIOSE_WITH_SYSTEMATIC_PIN = frozenset({"glyceraldehyde"})
+
+
 def lookup_sugar(canonical_smiles: str) -> Optional[Tuple[str, str, str]]:
     """Look up a sugar retained name by canonical SMILES.
 
@@ -972,14 +982,12 @@ def lookup_sugar(canonical_smiles: str) -> Optional[Tuple[str, str, str]]:
     """
     # Try exact stereo match first
     result = ALL_SUGAR_NAMES.get(canonical_smiles)
-    if result is not None:
-        return result
-
-    # If SMILES has no stereo, try non-stereo fallback
-    if "@" not in canonical_smiles:
-        return _NON_STEREO_SUGAR_FALLBACK.get(canonical_smiles)
-
-    return None
+    if result is None and "@" not in canonical_smiles:
+        # no stereo: the non-stereo fallback
+        result = _NON_STEREO_SUGAR_FALLBACK.get(canonical_smiles)
+    if result is not None and result[2].rsplit("-", 1)[-1] in _TRIOSE_WITH_SYSTEMATIC_PIN:
+        return None
+    return result
 
 
 def sugar_to_glycosyloxy_prefix(

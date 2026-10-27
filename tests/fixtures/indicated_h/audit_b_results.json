@@ -828,6 +828,15 @@
     "ring_system": "benzodifuran"
   },
   {
+    "smiles": "c1cc2oc3ccoc3c2o1",
+    "name": "furo[3,2-b:4,5-b']difuran",
+    "classification": "CORRECT-None",
+    "tautomer_locant_catalog": null,
+    "expected_locant": null,
+    "opsin_rt_inchi_match": true,
+    "ring_system": "furodifuran"
+  },
+  {
     "smiles": "c1cc2c3cc4c5cocc5c4cc3c2o1",
     "name": "benzo[1'',2'':3,4;4'',5'':3',4']dicyclobuta[1,2-b:1',2'-c']difuran",
     "classification": "CORRECT-None",

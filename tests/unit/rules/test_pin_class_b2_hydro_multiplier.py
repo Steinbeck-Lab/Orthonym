@@ -38,8 +38,6 @@ pytestmark = pytest.mark.opsin_gate
 PIN_ROWS = [
     # the ketone parent of a C=O bridge between ring nitrogens (rules/multiplicative.py)
     ("O=C(N1CCc2ccccc21)N1CCc2ccccc21", "bis(2,3-dihydro-1H-indol-1-yl)methanone"),
-    ("O=C(N1CCc2ccccc2C1)N1CCc2ccccc2C1", "bis(1,2,3,4-tetrahydroisoquinolin-2-yl)methanone"),
-    ("O=C(N1CCCc2ccccc21)N1CCCc2ccccc21", "bis(1,2,3,4-tetrahydroquinolin-1-yl)methanone"),
     # the prefix of:38232 on a ketone (the shared multiplier)
     ("O=C(C1=CCCS1)C1=CCCS1", "bis(4,5-dihydrothiophen-2-yl)methanone"),
     ("OC(C1CCc2ccccc2C1)C1CCc2ccccc2C1", "bis(1,2,3,4-tetrahydronaphthalen-2-yl)methanol"),
@@ -99,6 +97,21 @@ def test_pin(smiles, pin):
 @pytest.mark.parametrize("smiles,pin", CONTROL_ROWS)
 def test_control(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)
+
+
+# The multiplier of a hydro-prefixed prefix is 'bis' where the free valence is on the nitrogen of a hydro-azine too,
+# but those two names are no PINs: the nitrogen of quinoline and isoquinoline has no hydrogen to give, so the
+# attachment is expressed by added hydrogen, (the Blue Book), '1-(3,4-dihydroquinolin-1(2H)-yl)ethan-1-one
+# (PIN)' (:29376), 'bis(3,4-dihydroquinolin-1(2H)-yl)methanone'. They were pin_verified rows of this test before; the
+# PIN tier declines them now and the best-effort tier keeps them (the spelling check, checks_hydrogen.py).
+@pytest.mark.parametrize("smiles,name", [
+    ("O=C(N1CCc2ccccc2C1)N1CCc2ccccc2C1", "bis(1,2,3,4-tetrahydroisoquinolin-2-yl)methanone"),
+    ("O=C(N1CCCc2ccccc21)N1CCCc2ccccc21", "bis(1,2,3,4-tetrahydroquinolin-1-yl)methanone"),
+])
+def test_bis_below_the_pin_where_the_attachment_needs_added_hydrogen(smiles, name):
+    from tests.support.pin_tiers import assert_declined_at_default, name_breadth
+    assert_declined_at_default(smiles)
+    assert name_breadth(smiles)["name"] == name
 
 
 @pytest.mark.parametrize("prefix,hydro,mult", HELPER_ROWS)

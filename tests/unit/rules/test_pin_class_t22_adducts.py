@@ -19,9 +19,10 @@ PIN tier declines it and the default tier keeps it (a name that reads back to th
 (:7952) settles water: the name 'water' "is used in these recommendations but its use as a preferred IUPAC name is
 deferred...; thus, no PIN label will be assigned in names including them (see ": a hydrate has no PIN label either.
 
-Not built here (internal notes): the order of two components that have no principal
-group beyond the size rule ('1H-pyrrole' before '2H-1-benzopyran',,:19449, which is no adduct
-of the book; 'benzene—pyridine' is a project decision that other tests pin).
+Two components with no principal characteristic group (PINC lane, 2026-10-26) are ordered by the classes of (:18158), "Nitrogen compounds: heterocycles..." (21) before "Oxygen compounds: heterocycles..." (35) before
+"Carbon compounds: rings, chains" (40), then by the rings of (:19408): '1H-pyrrole—2H-1-benzopyran (1/1)'
+,:19449, '1H-pyrrole (PIN) > 2H-1-benzopyran (PIN)'), 'pyridine—benzene (1/1)'. The size rule that put
+'benzene' first (decision 2 of WAVE2-SCOPE-DECISIONS-RESOLVED) is no rule of the book; the gold row W2E-P0A-03 moved with it.
 """
 import pytest
 
@@ -42,7 +43,7 @@ CONTROL_ROWS = [
      "coronene—1,3,5-trinitrobenzene (1/1)"),
     ("C1c2ccccc2-c2ccccc12.Cc1cccc2ccccc12", "9H-fluorene—1-methylnaphthalene (1/1)"),
     ("CCO.c1ccncc1", "ethanol—pyridine (1/1)"),
-    ("c1ccccc1.c1ccncc1", "benzene—pyridine (1/1)"),
+    ("c1ccccc1.c1ccncc1", "pyridine—benzene (1/1)"),      # PINC lane: class 21 before class 40 (see the header)
 ]
 
 #: an organic component with an inorganic one (not water) has no PIN.

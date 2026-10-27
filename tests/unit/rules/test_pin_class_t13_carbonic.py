@@ -281,7 +281,7 @@ def test_carbamoyl_pseudohalides_keep_the_pin(smiles, pin):
 # benzoic acid namer once the bare 'amino' of the hetero root needed its hydrogens.
 @pytest.mark.parametrize("smiles,pin", [
     ("OC(=O)c1ccc(N=N)c(N=N)c1", "3,4-bis(diazenyl)benzoic acid"),
-    ("SSc1ccc(SS)cc1", "1,4-bis(disulfanyl)benzene"),
+    ("NC(=O)c1ccc(SS)c(SS)c1", "3,4-bis(disulfanyl)benzamide"),   #:28021; the amide is senior to the -S-SH groups
 ])
 def test_bis_before_a_di_initial_prefix(smiles, pin):
     assert_pin_at_both_tiers(smiles, pin)

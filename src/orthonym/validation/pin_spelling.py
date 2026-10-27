@@ -82,6 +82,8 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_group_count",
     "orthonym.validation.spelling.checks_acid_cyanide",
     "orthonym.validation.spelling.checks_polyol_ester",
+    "orthonym.validation.spelling.checks_chalcone",
+    "orthonym.validation.spelling.checks_amide_chains",
 )
 
 _loaded = False

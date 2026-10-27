@@ -29,6 +29,7 @@ from ..data.multipliers import multiplier_table
 from . import isotope_oxoacid as _oxoacid
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
+from .isotope_placement import nuclide_has_equivalent_site, placement_order
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
 
 
@@ -2263,10 +2264,9 @@ def _find_best_placement(
         won, below_pin = held, True
     if not won:
         return None, None, None, None
-    # Tie-break order: /.3 (w[0]) -> locant (w[1]) -> subscript form
-    # (w[2]) -> placement quality (w[3], adjacent-to-affix beats
-    # front-detached) -> insertion offset (w[4], deterministic final key).
-    won.sort(key=lambda w: (w[0], w[1], w[2], w[3], w[4]))
+    # Tie-break order: /.3 (w[0]) -> locant (w[1]) -> subscript form (w[2]) -> placement quality
+    # (w[3], adjacent-to-affix beats front-detached) -> locant of the modified group -> insertion offset.
+    won.sort(key=functools.partial(placement_order, equivalent_site=nuclide_has_equivalent_site(original)))
     _, loc_rank, _sub_rank, _q, off, desc, candidate = won[0]
     # (the Blue Book "1,2-di[(13C)methyl]benzene"): a descriptor spliced
     # INSIDE a substituent's own enclosing marks makes that substituent compound,

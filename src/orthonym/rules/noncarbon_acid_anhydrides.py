@@ -46,6 +46,25 @@ def _free_acid_of_the_noncarbon_side(mol, ester_o: int, e_idx: int) -> Optional[
     return Chem.MolFragmentToSmiles(cut, atomsToUse=list(side), canonical=True, isomericSmiles=True)
 
 
+def _borinic_acid_name(mol, ester_o: int, e_idx: int) -> Optional[str]:
+    """'dimethylborinic acid' for the boron of R2B-O-(acyl): two carbon ligands and the bridging oxygen on the boron.
+
+     (the Blue Book): "The names boric acid, boronic acid, and borinic acid are preselected retained
+    names for the compounds B(OH)3, HB(OH)2, and H2B(OH), respectively. They are preferred IUPAC names for deriving
+    the names of the corresponding salts, esters, or anhydrides; or when the hydrogen atom(s) attached to the boron
+    atom is (are) substituted, for example methylboronic acid for CH3-B(OH)2"; 'dimethylborinothioic acid (PIN)'
+    for (CH3)2B(SH) (:37325). The organyl groups are cited as the substituents of a mononuclear centre,
+    (:7272): 'dimethyl', 'ethyl(methyl)'."""
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    from .substituent_purity import organyl_prefix_name
+    ligands = [nb.GetIdx() for nb in mol.GetAtomWithIdx(e_idx).GetNeighbors() if nb.GetIdx() != ester_o]
+    if len(ligands) != 2 or any(mol.GetAtomWithIdx(i).GetSymbol() != "C" for i in ligands):
+        return None
+    names = [organyl_prefix_name(mol, i, e_idx) for i in ligands]
+    block = None if None in names else mononuclear_substituent_block(names, max_count=3)
+    return f"{block}borinic acid" if block else None
+
+
 def mixed_noncarbon_anhydride(mol, ester_o: int, e_idx: int, acid_name: str) -> Optional[str]:
     """'<acid> <acid> anhydride' for R-CO-O-E (or R-SO2-O-E...) with E the acid centre of a monobasic noncarbon
     oxoacid, else None. ``acid_name`` is the name of the acyl side as a free acid ('acetic acid')."""
@@ -81,6 +100,8 @@ def mixed_noncarbon_anhydride(mol, ester_o: int, e_idx: int, acid_name: str) -> 
         return None
     finally:
         restore_provenance(before)     # the label of the call is the name that ships, not a probe of its acid
+    if e.GetSymbol() == "B" and not (other or "").endswith(_ACID):
+        other, not_a_pin = _borinic_acid_name(mol, ester_o, e_idx), False
     if (not other or not_a_pin or not other.endswith(_ACID) or " " in other[:-len(_ACID)]):
         return None
     from ..assembly.naming_utils import cip_descriptor_rank_key

@@ -86,7 +86,10 @@ PAIRS = [
     ("c1ccccc1", "pin", "outer:retained_name"),
     ("O=C([O-])[C@@H]1CCC=N1", "pin", "outer:anion_small"),
     ("C[C@H](N)C(=O)O", "pin", "outer:amino_acid"),
-    ("O=C[C@H](O)CO", "pin", "outer:carbohydrate_lookup"),
+    # PINC lane: glyceraldehyde has a systematic PIN, '(2R)-2,3-dihydroxypropanal', the Blue Book), so
+    # 'O=C[C@H](O)CO' ships from inner:ester_family now; a hexopyranose still ships from the lookup, at the default tier
+    #,:50943, names no PIN in the carbohydrate chapter, so the PIN label of the lookup names may go)
+    ("OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "best-effort", "outer:carbohydrate_lookup"),
     ("C[C@@]12C(CC[C@H]1[C@@H]1CCC3=CC(CC[C@]3(C)[C@H]1CC2)=O)=O", "pin", "outer:natural_product"),
     ("NCCOCCN", "pin", "outer:multiplicative"),
     ("S=C(S)S", "pin", "outer:inorganic_acid"),

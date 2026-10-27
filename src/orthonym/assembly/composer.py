@@ -1809,7 +1809,8 @@ def _name_aliphatic_n_oxide(mol, matches) -> Optional[str]:
     if not base_name:
         return None
 
-    return f"{base_name} N-oxide"
+    from ..rules.amine_oxide_label import record_unless_sole_amine_suffix
+    return record_unless_sole_amine_suffix(f"{base_name} N-oxide", modified_mol)
 
 
 def _name_imine_n_oxide(mol, matches) -> Optional[str]:

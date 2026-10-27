@@ -1,0 +1,9 @@
+smiles	tier_req	from_name	to_name
+CC(=O)[O-].CC(=O)[O-].[Fe+2]	pin	iron(II) acetate	iron diacetate
+CC(=O)[O-].CC(=O)[O-].[Fe+2]	best-effort	iron(II) acetate	iron diacetate
+CC(=O)[O-].CC(=O)[O-].[Cu+2]	pin	copper(II) acetate	copper diacetate
+CC(=O)[O-].CC(=O)[O-].[Cu+2]	best-effort	copper(II) acetate	copper diacetate
+[Cu+2].NCC(=O)[O-].NCC(=O)[O-]	pin	copper(II) glycinate	copper diglycinate
+[Cu+2].NCC(=O)[O-].NCC(=O)[O-]	best-effort	copper(II) glycinate	copper diglycinate
+CC(=O)[O-].CC(=O)[O-].[Pd+2]	pin	palladium(II) acetate	palladium diacetate
+CC(=O)[O-].CC(=O)[O-].[Pd+2]	best-effort	palladium(II) acetate	palladium diacetate

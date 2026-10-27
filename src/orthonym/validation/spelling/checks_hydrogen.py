@@ -60,3 +60,41 @@ def assembly_indicated_hydrogen_check(mol, name):
         return SpellingFailure('P-28.2.3', "indicated hydrogen cited with the component after the "
                                            "assembly multiplier, not at the front of the assembly name")
     return None
+
+
+# ------------------------------------------------------------------ added hydrogen at a ring nitrogen
+#: the locants of the ring nitrogens of the benzo-fused azines whose mancude parent has no hydrogen on them
+_AZINE_NITROGEN_LOCANTS = {
+    'quinolin': {1}, 'isoquinolin': {2}, 'quinoxalin': {1, 4}, 'acridin': {10}, 'phenanthridin': {5},
+    'phthalazin': {2, 3}, 'cinnolin': {1, 2}, 'quinazolin': {1, 3},
+}
+#: 'hydro' prefixes, the azine stem and the locant after it: '1,2,3,4-tetrahydroquinolin-1-yl',
+#: '1,2,3,4-tetrahydroquinoline-1-carboxylic acid'
+_HYDRO_AZINE_SITE = re.compile(
+    r"(?P<hydro>\d+(?:,\d+)*)-(?:di|tri|tetra|penta|hexa|hepta|octa)hydro-?(?:\d+H-)?"
+    r"(?P<stem>" + "|".join(_AZINE_NITROGEN_LOCANTS) + r")e?-(?P<site>\d+)-(?!ium)")
+
+
+@register('P-14.7.2')
+def added_hydrogen_at_ring_nitrogen_check(mol, name):
+    """A free valence or a suffix at the ring nitrogen of a hydro-azine that 'hydro' prefixes cover:
+    "'Added indicated hydrogen'" (the Blue Book), "used to introduce a free valence, a radical or an ionic
+    center, or a principal characteristic group into a fully unsaturated heteromonocyclic compound or fused polycyclic
+    system in the absence of, or lack of, sufficient hydrogen atoms to accommodate the operation at the site of the
+    operation... or on equivalent heteroatoms such as -N="; the nitrogen of quinoline and its analogues has no
+    hydrogen to give, so the attachment is expressed by added hydrogen and 'hydro' prefixes cover the other positions:
+    '1-(3,4-dihydroquinolin-1(2H)-yl)ethan-1-one (PIN)' (:29376, under, '3,4-dihydroisoquinoline-2(1H)-
+    carbonyl' (:29619), 'quinoline-1(2H)-carboxylic acid (PIN)' (:24701, under, not '1,2,3,4-tetrahydro
+    quinolin-1-yl'. Lexical: the name cites the nitrogen locant of the azine both in its 'hydro' prefix and as the site
+    of the free valence or the suffix. A hydro-azine that is substituted on its nitrogen as a prefix
+    ('1-methyl-1,2,3,4-tetrahydroquinoline') cites no such site and passes, and so does a cation at the nitrogen,
+    '-1-ium': "Azanium (ammonium) and phosphanium (phosphonium) compounds" (:45978) prints the 'hydro' prefix
+    of the site itself, '(2S)-2-(4-hydroxyphenyl)-2-phenyl-1,2,3,4-tetrahydroisophosphinolin-2-ium bromide (PIN)'
+    (:45994), and the same form is the name of '1,1-dimethyl-1,2,3,4-tetrahydroquinolin-1-ium'."""
+    for m in _HYDRO_AZINE_SITE.finditer(normalise(name)):
+        nitrogen = _AZINE_NITROGEN_LOCANTS[m.group('stem')]
+        site = int(m.group('site'))
+        if site in nitrogen and str(site) in m.group('hydro').split(','):
+            return SpellingFailure('P-14.7.2', f"'hydro' at the locant {site} of the ring nitrogen that bears the "
+                                               f"free valence or the suffix: added hydrogen, '(2H)', is cited there")
+    return None

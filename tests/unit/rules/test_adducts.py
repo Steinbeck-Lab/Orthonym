@@ -86,10 +86,14 @@ class TestComponentOrdering:
         assert self._ordered(["NCCN", "OC(=O)C(=O)O"]) == [
             Chem.CanonSmiles("OC(=O)C(=O)O"), Chem.CanonSmiles("NCCN")]
 
-    def test_no_pcg_tie_break_benzene_before_pyridine(self):
-        # WAVE2-SCOPE-DECISIONS-RESOLVED decision 2: 'benzene—pyridine (1/1)'
+    def test_no_pcg_ring_seniority_pyridine_before_benzene(self):
+        # 2026-10-26 (PINC lane), change-asserted-value: was 'benzene' before 'pyridine' (decision 2 of
+        # WAVE2-SCOPE-DECISIONS-RESOLVED, components with no principal group by size). (the Blue Book):
+        # "the individual components are cited in the order of seniority of classes (see ";
+        # (:18158) ranks the nitrogen compounds, heterocycles among them (class 21), before the carbon compounds
+        # (class 40); (a)-(b) (:19408) and (:19449) '1H-pyrrole (PIN) > 2H-1-benzopyran (PIN)'.
         assert self._ordered(["c1ccncc1", "c1ccccc1"]) == [
-            Chem.CanonSmiles("c1ccccc1"), Chem.CanonSmiles("c1ccncc1")]
+            Chem.CanonSmiles("c1ccncc1"), Chem.CanonSmiles("c1ccccc1")]
 
     def test_organic_before_inorganic_acid(self):
         # the Blue Book: '...pentane-1,4-diamine—phosphoric acid (1/2)':
@@ -129,7 +133,7 @@ class TestNameAdduct:
     def test_organic_pair_em_dash(self):
         # -b: em-dash U+2014, never hyphen
         name = self._name("c1ccccc1.c1ccncc1")
-        assert name == "benzene—pyridine (1/1)"
+        assert name == "pyridine—benzene (1/1)"       # PINC lane: the nitrogen heterocycle first, class 21
         assert "—" in name and " (1/1)" in name
 
     def test_bb_ethanol_pyridine(self):
@@ -196,8 +200,8 @@ class TestAdductDispatch:
         assert declined_pin_row("O.OC(=O)C(=O)O")["name"] == "oxalic acid—water (1/1)"
 
     def test_benzene_pyridine_flips_to_adduct_pin(self):
-        # was the space-join 'benzene pyridine' at HEAD
-        assert self._nc("c1ccccc1.c1ccncc1") == "benzene—pyridine (1/1)"
+        # was the space-join 'benzene pyridine' at HEAD; the order is the seniority of the classes (PINC lane)
+        assert self._nc("c1ccccc1.c1ccncc1") == "pyridine—benzene (1/1)"
 
     def test_mixed_hydrochloride(self):
         # pattern (the Blue Book).

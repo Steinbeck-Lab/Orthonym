@@ -1052,6 +1052,31 @@ _HYDROGEN_MULT = {0: "", 1: "hydrogen", 2: "dihydrogen"}
 _PNICTOGEN_INATE_ESTER_STEM = {"P": "phosphinate", "As": "arsinate", "Sb": "stibinate"}
 
 
+def _acid_word_with_descriptor(mol, centre_idx: int, acid_word: str) -> str:
+    """``acid_word`` of a functional-class ester name, with the descriptor of the stereogenic acid centre
+    ``centre_idx`` in front of it in enclosing marks.
+
+     Phosphates, phosphonates, and related compounds (the Blue Book): "As the stereodescriptors
+    'R' and 'S' describe the entire structure, either a salt or an ester, the full name is placed in parentheses
+    to denote the global configuration", 'methyl (S)-[methyl(phenyl)phosphinate] (PIN)' (:46022): the ester
+    groups stand before the descriptor and the acid word after it. ``acid_word`` unchanged when the centre has
+    no R/S label."""
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(mol)
+    atom = mol.GetAtomWithIdx(centre_idx)
+    cip = atom.GetProp('_CIPCode') if atom.HasProp('_CIPCode') else None
+    if cip not in ('R', 'S'):
+        return acid_word
+    from ..assembly.naming_utils import apply_enclosing_marks
+    word = f"({cip})-{apply_enclosing_marks(acid_word, -1)}"
+    if atom.GetSymbol() != 'P':
+        # the rule sentence and its examples are those of the phosphates, phosphonates and related compounds
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(word, rule="P-93.2.4", detail="the book places the descriptor of an ester of a phosphorus "
+                             "acid only; no rule sentence or example covers an arsinate or a stibinate")
+    return word
+
+
 def _name_pnictogen_inate_ester(mol, match_atoms, symbol) -> Optional[str]:
     """R2E(=O)(O-R') -> ``{owner} {di-organyl}{stem}`` for E in {P, As, Sb}.
 
@@ -1141,7 +1166,7 @@ def _name_pnictogen_inate_ester(mol, match_atoms, symbol) -> Optional[str]:
 
     if accounted != set(range(mol.GetNumAtoms())):
         return None                             # not a whole-molecule name
-    return f"{owner_text} {stem_prefix}{stem}"
+    return f"{owner_text} {_acid_word_with_descriptor(mol, e_idx, stem_prefix + stem)}"
 
 
 def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
@@ -1271,7 +1296,8 @@ def name_phosphate_ester(mol, phosphorus_idx: int) -> Optional[str]:
     pieces = [owner_text]
     if hyd:
         pieces.append(hyd)
-    pieces.append(f"{stem_prefix}{stem}")
+    acid_word = f"{stem_prefix}{stem}"
+    pieces.append(_acid_word_with_descriptor(mol, phosphorus_idx, acid_word) if c_ligands and not hyd else acid_word)
     return " ".join(pieces)
 
 

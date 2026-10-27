@@ -424,6 +424,35 @@ def pseudoester_book_name(mol) -> Optional[str]:
     return _group16_pseudoketone_name(mol, catom, hub, hub_frag, chain)
 
 
+def _below_pin_if_other_acyl_is_longer(mol, name: Optional[str], catom, chain_length: int) -> Optional[str]:
+    """``name`` of a diacyl chalcogen chain, recorded as not the PIN when its parent is not the senior acyl chain.
+
+     Diacyl derivatives of trioxidane and chalcogen analogues (the Blue Book): the compound is
+    "named substitutively as a pseudoketone", and each acyl group is a candidate parent: the parent is the senior
+    chain SENIORITY OF ACYCLIC CHAINS (THE PRINCIPAL CHAIN),:20916, "(b) has the greater number of
+    skeletal atoms"), so 'CH3-CH2-CO-OO-S-CO-CH3' is '1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)' (:39499,
+    under and not the name on the acetyl group, whose hub (the sulfur) is the only one this producer
+    names. Where the two chains are equally long the book decides by alphanumerical order (:32368), which the
+    name built keeps."""
+    if not name:
+        return name
+    for other in atoms_of(mol):
+        if other.GetIdx() == catom.GetIdx() or not _acyl_carbon(other) or other.IsInRing():
+            continue
+        # the acyl carbon of the other end: the carbons that hang on it, counted as its chain
+        seen = {other.GetIdx()}
+        stack = [other.GetIdx()]
+        while stack:
+            for nb in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+                if nb.GetSymbol() == 'C' and nb.GetIdx() not in seen:
+                    seen.add(nb.GetIdx())
+                    stack.append(nb.GetIdx())
+        if len(seen) > chain_length:
+            from ..metrics.provenance import record_non_pin_label
+            record_non_pin_label(name, rule="P-44.3", detail="the parent of a diacyl chalcogen chain is its longer acyl chain")
+    return name
+
+
 def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
     """(b) / acyl on Si/Ge/P/As (Wave-2 completion C):
     CC(=O)[SiH3] -> 1-silylethan-1-one, [PH2]C(=O)CCC -> 1-phosphanylbutan-1-one
@@ -443,7 +472,8 @@ def name_acyl_hetero_pseudoketone(mol) -> Optional[str]:
         return None
     catom, hub, hub_frag, chain = parts
     if hub.GetSymbol() in _CHALCOGEN_HUBS:
-        return _group16_pseudoketone_name(mol, catom, hub, hub_frag, chain)
+        return _below_pin_if_other_acyl_is_longer(
+            mol, _group16_pseudoketone_name(mol, catom, hub, hub_frag, chain), catom, len(chain))
 
     # Hub scope (fail-closed): the hub carries only H or pure ORGANYL
     # substituents — a heteroatom on the hub (Si-OH: silanol territory,

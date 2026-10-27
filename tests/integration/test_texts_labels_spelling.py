@@ -155,12 +155,18 @@ def test_b_milestone1500_aluminium_salt_takes_brackets():
     # milestone1500 row; (:7478) stereodescriptor parentheses count,
     # (:7509) consecutive marks of one level take the next. Aluminium:
     # no PIN status (the Blue Book), so systematic_verified.
+    # PINC lane (fix a performance pass): an anion word of an unsubstituted parent with locants and stereodescriptors takes 'tri'
+    # and the enclosing marks, not 'tris': General methodology (:7029) (a) "simple components... functionalized
+    # parent hydrides... are multiplied by... 'di', 'tri'", (c) "any component which is substituted automatically
+    # requires use of the multiplicative forms 'bis', 'tris'" (:7035); (e) (:7104) "functionalized parent
+    # hydrides with locants"; (2R)-3-hydroxypropane-1,2-diyl di[(3E,5E)-hepta-3,5-dienoate] (PIN) (:47993). OPSIN 2.9.0
+    # reads 'aluminium tri[(2E,4E)-hexa-2,4-dienoate]' to the full key.
     smiles = "C/C=C/C=C/C(=O)[O-].C/C=C/C=C/C(=O)[O-].C/C=C/C=C/C(=O)[O-].[Al+3]"
     for tier in ("pin", "best-effort"):
         row = _row(smiles, tier)
-        assert row["name"] == "aluminium tris[(2E,4E)-hexa-2,4-dienoate]", (tier, row)
+        assert row["name"] == "aluminium tri[(2E,4E)-hexa-2,4-dienoate]", (tier, row)
         assert row["tier"] == "systematic_verified", (tier, row)
-    assert_full_rt("aluminium tris[(2E,4E)-hexa-2,4-dienoate]", smiles)
+    assert_full_rt("aluminium tri[(2E,4E)-hexa-2,4-dienoate]", smiles)
 
 
 @pytest.mark.parametrize("smiles,expected", [
