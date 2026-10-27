@@ -40,6 +40,7 @@ from ..perception.molcache import inchikey_of
 from .ion_locants import cites_a_locant, name_neutral_ring_for_ion
 from .ring_cation_hydro import (hydro_ring_cation_name, hydro_ring_zwitterion_name, neutralized_cation,
                                 ring_cation_locants, ring_numbering_tie_key, ring_stereo_prefix)
+from .uide_lambda import UIDE_STD_VALENCE, double_bonded_ligand, lambda_uide_name, uide_bonding_number, uide_lambda
 
 # F- (DD3,: skeletal heteroatom-hydride anions named with the
 # -anide ending on the parent hydride. element -> the neutral parent-hydride
@@ -87,15 +88,12 @@ _UIDE_STEMS = {
     'P': 'phosphane', 'As': 'arsane', 'Sb': 'stibane',
     # Group 17 (standard 1 -> -uide centre has degree+H == 2; e.g. diphenyliodanuide)
     'I': 'iodane', 'Br': 'bromane', 'Cl': 'chlorane',
+    # Group 16 (standard 2 -> -uide centre has 3 bonds; 'sulfanuida (preselected name)', the Blue Book)
+    'S': 'sulfane', 'Se': 'selane', 'Te': 'tellane',
 }
 
-# Standard bonding number for the -uide valence gate (degree + H == std + 1).
-_UIDE_STD_VALENCE = {
-    'B': 3, 'Al': 3, 'Ga': 3, 'In': 3, 'Tl': 3,
-    'Si': 4, 'Ge': 4, 'Sn': 4, 'Pb': 4,
-    'P': 3, 'As': 3, 'Sb': 3,
-    'I': 1, 'Br': 1, 'Cl': 1,
-}
+# Standard bonding number for the -uide valence gate (degree + H == std + 1); lambda hydrides: uide_lambda.py
+_UIDE_STD_VALENCE = UIDE_STD_VALENCE
 
 # Backward-compat alias (Group-13 subset was the original name).
 _GROUP13_UIDE_STEMS = {k: _UIDE_STEMS[k] for k in ('B', 'Al', 'Ga', 'In', 'Tl')}
@@ -283,15 +281,15 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
         return 'carbanion'
 
     elif element == 'S':
-        # (dithioate anion): an [S-] bonded to a carbon that itself bears
-        # a DOUBLE-bonded chalcogen (=O/=S/=Se) — a carbo(di)thioate acid carbon
-        # R-C(=S)-S(-) / R-C(=O)-S(-) — is the CARBOXYLATE-ANALOG acid anion, NOT a
-        # thiolate (R-S(-)). Its neutral form is a (di)thioic acid ending in
-        # '-oic acid' ("propanedithioic acid"), so it must take the acid-anion
-        # -oate seam ("propanedithioate"), not the thiol->thiolate seam (which
-        # would restrict allowed_suffixes to {'thiol'} and block the dithioate).
-        # Discriminator = an adjacent carbon bearing a double-bonded chalcogen; a
-        # genuine thiolate CH3-S(-) / CH3CH2-S(-) has none and stays 'thiolate'.
+        if uide_lambda('S', _occupied_valence(atom)) is not None:  #: 3, 5 or 7 bonds, 'λ4-sulfanuide'
+            return 'uide_anion'
+        # (dithioate anion): an [S-] bonded to a carbon that itself bears a DOUBLE-bonded chalcogen
+        # (=O/=S/=Se) — a carbo(di)thioate acid carbon R-C(=S)-S(-) / R-C(=O)-S(-) — is the CARBOXYLATE-ANALOG
+        # acid anion, NOT a thiolate (R-S(-)). Its neutral form is a (di)thioic acid ending in '-oic acid'
+        # ("propanedithioic acid"), so it must take the acid-anion -oate seam ("propanedithioate"), not the
+        # thiol->thiolate seam (which would restrict allowed_suffixes to {'thiol'} and block the dithioate).
+        # Discriminator = an adjacent carbon bearing a double-bonded chalcogen; a genuine thiolate
+        # CH3-S(-) / CH3CH2-S(-) has none and stays 'thiolate'.
         for neighbor in atom.GetNeighbors():
             if neighbor.GetSymbol() == 'C':
                 for second_neighbor in neighbor.GetNeighbors():
@@ -340,7 +338,7 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
         # / (W4-I2): -uide (H- ADDITION) — one bond ABOVE standard
         # valence. Generalizes the old Group-13-only -uide detection to Group-14/15
         # metalloids: (CH3)4P- -> tetramethylphosphanuide, C[SiH4-] -> methylsilanuide.
-        if element in _UIDE_STD_VALENCE and dh == _UIDE_STD_VALENCE[element] + 1:
+        if element in _UIDE_STD_VALENCE and uide_lambda(element, dh) is not None:
             return 'uide_anion'
 
     # /: the -uide (hydride-ADDITION) anion for elements NOT in the
@@ -348,7 +346,7 @@ def classify_anion(mol, anion_site: Dict[str, Any]) -> str:
     # B(CH3)4- -> tetramethylboranuide) and the halogens (diphenyliodanuide). A
     # centre ONE bond above its standard bonding number carrying the -1 charge.
     elif element in _UIDE_STD_VALENCE:
-        if atom.GetDegree() + atom.GetTotalNumHs() == _UIDE_STD_VALENCE[element] + 1:
+        if uide_lambda(element, uide_bonding_number(atom)) is not None:
             return 'uide_anion'
 
     return 'unknown'
@@ -1877,6 +1875,7 @@ def _try_neutralize_and_name_systematic(mol) -> str:
 _OXOACID_NEUTRAL_SUFFIXES = frozenset({
     'sulfonic acid', 'sulfinic acid',
     'phosphonic acid', 'phosphinic acid', 'phosphoric acid',
+    'ous acid',  #: 'ous acid' -> 'ite' ('ethylphosphonite' from 'ethylphosphonous acid')
 })
 
 #: '<linking group>bis(<oxoacid>)': a multiplicative name of identical oxoacid units.
@@ -3188,6 +3187,9 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
         return ''
     from .centre_ligands import centre_name
     suffix = f"{_elide_terminal_e(stem)}uide"
+    lam = uide_lambda(center.GetSymbol(), uide_bonding_number(center))
+    if lam is not None and (lam != _UIDE_STD_VALENCE[center.GetSymbol()] or (double_bonded_ligand(center) and center.GetSymbol() in ('S', 'Se', 'Te'))):  # 'amino(imino)(oxo)-λ4-sulfanuide', 'oxo(phenyl)-λ4-sulfanide'
+        return lambda_uide_name(mol, center_idx, lam, suffix)
     return centre_name(mol, center_idx, suffix, suffix)  # bare boranuide (BH4-)
 
 

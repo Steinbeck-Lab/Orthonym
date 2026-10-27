@@ -155,7 +155,7 @@ _ANION_ALLOWED_SUFFIXES = {
     'sulfonate': frozenset({'sulfonic acid'}),
     'sulfinate': frozenset({'sulfinic acid'}),
     'phosphonate': frozenset({'phosphonic acid', 'phosphinic acid',
-                              'phosphoric acid'}),
+                              'phosphoric acid', 'ous acid'}),   #: -ous acid -> -ite
     'carboxylate': frozenset({'oic acid', 'carboxylic acid'}),
     #: the carbo(di)thioate acid anion (R-C(=S)-S- / R-C(=O)-S-). Its
     # neutral form is a (di)thioic acid ending '-oic acid' (propanedithioic acid),
@@ -1224,6 +1224,29 @@ def _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style) -> str
     return composed
 
 
+def _zwitterion_azanide_parent(mol, sites, style: str) -> str:
+    """ INTRODUCTION (the Blue Book): "in zwitterionic compounds anionic centers... become the
+    parent structure, into which the cationic part is substituted". A zwitterion whose ONE anion is a nitrogen
+    centre of an amide, sulfonamide or amine (``-[N-]-``, ``=[N-]``) is the azanide / aminide of its groups, and
+    every cation sits in one of them as an 'azaniumyl' / '-ium-yl' prefix (``cation_to_prefix``, CATIONIC
+    PREFIX NAMES,:42290): the sulfonamide anion with an ammonium on its other arm is
+    ``[2-(azaniumyl)ethyl](methanesulfonyl)azanide``. The azanide of the groups is what builds the single amine
+    anion (``_aminide_alternative``); GUARD 4 declines every anion that is no carboxylate, so this builds only
+    what was a decline, and its name is read back to the full InChIKey, charges included. '' on any decline."""
+    anions, cations = sites['anions'], sites['cations']
+    if len(anions) != 1 or not cations:
+        return ''
+    if classify_anion(mol, anions[0]) not in ('aminide', 'acyl_azanide', 'iminide'):
+        return ''
+    if mol.GetAtomWithIdx(anions[0]['atom_idx']).GetSymbol() != 'N':
+        return ''
+    name = _aminide_alternative(mol, sites, style)
+    if name:   # the Blue Book gives no zwitterion of an amide or sulfonamide anion: the name is valid, no PIN
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
+
+
 def _route_zwitterion(mol, sites, style: str) -> str:
     """GUARD 4: zwitterion anion-is-parent override.
 
@@ -1635,6 +1658,9 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
     if parts is None:
         return ''
     proximal_n, terminal_n, parent_attach = parts
+    if mol.GetAtomWithIdx(parent_attach).GetSymbol() == 'N':   # the parent hydride of an amino group is azane
+        from .azanediazonium import name_azanediazonium
+        return name_azanediazonium(mol, proximal_n, parent_attach)
     rw = Chem.RWMol(mol)
     rw.RemoveBond(proximal_n, parent_attach)
     pa = rw.GetAtomWithIdx(parent_attach)
@@ -1952,7 +1978,7 @@ def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
     , and this azanide form is then a correct RT-verified
     best-effort — either way the emitted structure is exactly the input.
 
-    Names each N-arm as a substituent prefix (``name_substituent_fragment``),
+    Names each N-arm as a substituent prefix (the candidates of ``group_prefixes``),
     alphabetises, escalates the enclosing marks via
     ``apply_enclosing_marks``), and appends ``azanide``. RT-gated on the FULL
     InChIKey (``_cation_name_rt_ok``) — fail closed to '' (never a wrong or
@@ -1962,10 +1988,8 @@ def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
     bridging both arms back to N is an in-ring N-anion, a different class).
     A trisubstituted N- (azanediide) is out of scope here.
     """
-    from ..assembly.substituent_naming import name_substituent_fragment
-    from ..assembly.naming_utils import apply_enclosing_marks, alpha_sort_key
-    from ..assembly.universal_substituent import name_universal_substituent_prefix
-    from ..metrics.provenance import best_effort_ctx
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    from .group_prefixes import combinations, group_prefix_candidates
     a = mol.GetAtomWithIdx(anion_idx)
     if (a.GetSymbol() != 'N' or a.GetFormalCharge() != -1
             or a.GetTotalNumHs() != 0 or a.GetIsAromatic()):
@@ -1985,31 +2009,33 @@ def emit_secondary_amine_azanide(mol, anion_idx: int, style: str) -> str:
             idx_to_comp[at] = ci
     if idx_to_comp[neighbours[0]] == idx_to_comp[neighbours[1]]:
         return ''  # arms share a ring back to N -> in-ring N-anion, not azanide
-    prefixes = []
+    # each arm: the prefix names the substitutive path offers for it (``group_prefixes``); the name that reads back
+    # to the full InChIKey is the one that ships, so a namer that gives a wrong group cannot ship it
+    candidates = []
     for nb in neighbours:
-        sub_atoms = list(comps[idx_to_comp[nb]])
-        pref = name_substituent_fragment(mol, sub_atoms, nb, [anion_idx])
-        if not pref and best_effort_ctx.get():
-            pref = name_universal_substituent_prefix(mol, sub_atoms, nb)
-        if not pref:
+        names = group_prefix_candidates(mol, list(comps[idx_to_comp[nb]]), nb, 'yl', [anion_idx], ligand_first=False)
+        if not names:
             return ''
-        prefixes.append(pref)
-    prefixes.sort(key=alpha_sort_key)
-    enclosed = ''.join(apply_enclosing_marks(p, -1) for p in prefixes)
-    if prefixes[0] == prefixes[1]:  # one arm cited twice takes the multiplier, 'bis(2-aminoethyl)'
-        from ..assembly.naming_utils import enclose_if_compound, multiplied_component
-        enclosed = multiplied_component(2, prefixes[0], enclose_if_compound(prefixes[0]))
-    name = f"{enclosed}azanide"
-    if not _cation_name_rt_ok(name, mol):
-        # an arm that cites no E/Z descriptor of its own double bond: the input's stereo is composed onto the
-        # name by the stereo-omission reclaim , which returns it only when it reads back to the full key
-        composed = _stereo_composed(name, mol)
-        if not (composed and _cation_name_rt_ok(composed, mol)):
-            return ''
-        name = composed
-    from .amine_anion_label import record_non_pin_azanide
-    record_non_pin_azanide(mol, anion_idx, name)  # the azanide of an amine is not its PIN, the 'aminide'
-    return name
+        candidates.append(names)
+    for prefixes in combinations(candidates):
+        # (the Blue Book): on a mononuclear parent the first cited group has no enclosing marks
+        # unless it includes a locant, the second and further groups are enclosed, and a group cited twice takes
+        # the multiplier ('acetyl(methyl)azanide', 'bis(2-aminoethyl)azanide'): the block of the mononuclear hydrides
+        enclosed = mononuclear_substituent_block(list(prefixes), max_count=8)
+        if enclosed is None:
+            continue
+        name = f"{enclosed}azanide"
+        if not _cation_name_rt_ok(name, mol):
+            # an arm that cites no E/Z descriptor of its own double bond: the input's stereo is composed onto the
+            # name by the stereo-omission reclaim , which returns it only when it reads back to the full key
+            composed = _stereo_composed(name, mol)
+            if not (composed and _cation_name_rt_ok(composed, mol)):
+                continue
+            name = composed
+        from .amine_anion_label import record_non_pin_azanide
+        record_non_pin_azanide(mol, anion_idx, name)  # the azanide of an amine is not its PIN, the 'aminide'
+        return name
+    return ''
 
 
 def _charge_sites_rt_ok(name: str, mol) -> bool:
@@ -2100,7 +2126,6 @@ def _azanide_of_substituent(mol, anion_idx: int) -> str:
     groups,:15814: "the locant '1' must be cited"). The alternative to ``-aminide`` when the
     amine locant is needed and the parent name does not carry it. RT-gated on the full
     InChIKey: '' on any decline."""
-    from ..assembly.naming_utils import apply_enclosing_marks
     from ..assembly.substituent_naming import name_substituent_fragment
     from ..metrics.provenance import best_effort_ctx
     neighbours = [nb.GetIdx() for nb in mol.GetAtomWithIdx(anion_idx).GetNeighbors()
@@ -2115,7 +2140,9 @@ def _azanide_of_substituent(mol, anion_idx: int) -> str:
     if sub_atoms and not prefix and best_effort_ctx.get():
         from ..assembly.universal_substituent import name_universal_substituent_prefix
         prefix = name_universal_substituent_prefix(mol, sub_atoms, neighbours[0]) or ''
-    name = f"{apply_enclosing_marks(prefix, -1)}azanide" if prefix else ''
+    from ..assembly.prefix_marks import mononuclear_substituent_block
+    block = mononuclear_substituent_block([prefix], max_count=8) if prefix else None   #,:7272
+    name = f"{block}azanide" if block else ''
     if not name or not _cation_name_rt_ok(name, mol):
         return ''
     # valid, but the preferred name of a primary amine anion is the 'aminide',:41047)
@@ -3083,7 +3110,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     # substituent prefix; a skeletal cation is deferred to the legacy
     # path. 169.6-04 (was a Plan-03 detect-and-defer seam).
     if _is_zwitterion(sites):
-        return _route_zwitterion(mol, sites, style)
+        return _route_zwitterion(mol, sites, style) or _zwitterion_azanide_parent(mol, sites, style)
 
     # W4-I3: R-S+ / R-Se+ sulfanylium/selanylium. RDKit assigns a
     # 1-coordinate chalcogen cation SPURIOUS radical electrons (a valence-model
@@ -3962,13 +3989,18 @@ def _aminide_alternative(mol, sites, style: str, demote: bool = False) -> str:
     if demote and anion_equals_another_secondary_amine(mol, anion_idx):
         return ''  # the composer's aminide on the equivalent nitrogen is the name; the azanide must not pre-empt it
     if classify_anion(mol, sites['anions'][0]) == 'iminide':
+        from .diazenide import emit_diazenide  # R-N=[N-] of a diazene
+        from .iminide_ketene import emit_ketene_iminide  # R2C=C=[N-] of a ketene imine
         from .iminide_one_carbon import emit_one_carbon_iminide  # R2C=[N-] of an imidic ester
-        return emit_one_carbon_iminide(mol, anion_idx)
+        from .ylidene_azanide import emit_ylidene_azanide  # R2C=[N-] as the azanide of the ylidene
+        return (emit_one_carbon_iminide(mol, anion_idx) or emit_ketene_iminide(mol, anion_idx)
+                or emit_diazenide(mol, anion_idx) or emit_ylidene_azanide(mol, anion_idx))
     from .amine_anion_label import ring_aminide
     # the PIN of a secondary amine anion on a ring of one kind of position, else the azanide of its groups
     # (labelled below the PIN where it is the anion of an amine, ``record_non_pin_azanide``) or of its substituent
+    from .hydrazinide import emit_hydrazinide  # R2N-[NH-] of a hydrazine
     return (ring_aminide(mol, anion_idx, style) or emit_secondary_amine_azanide(mol, anion_idx, style)
-            or emit_primary_amine_anide(mol, anion_idx, style))
+            or emit_primary_amine_anide(mol, anion_idx, style) or emit_hydrazinide(mol, anion_idx))
 
 
 def _is_simple_terminal_radical(mol, center_idx: int) -> bool:

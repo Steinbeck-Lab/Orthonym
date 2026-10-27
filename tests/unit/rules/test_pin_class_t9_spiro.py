@@ -101,7 +101,11 @@ DISPIRO_CLASS_ROWS = [
     ("C1CC11COC11CCC1", "8-oxadispiro[2.0.3^4.2^3]nonane"),
     ("O=C1CC2(CC2)C11CO1", "1-oxadispiro[2.0.2^4.2^3]octan-8-one"),
     ("CC1CC11OCC11CN1", "5-methyl-7-oxa-1-azadispiro[2.0.2^4.2^3]octane"),
-    ("C1CCCCC12[N+]1(CCCCC1)CCC2", "6-azadispiro[5.0.5^7.3^6]pentadecan-6-ium"),
+    # (the Blue Book): the cation at a spiro junction has four ring bonds, one above the valence of 3 of
+    # the nitrogen of the parent hydride, so it is the ylium of the lambda5 hydride, '5λ5-arsaspiro[4.4]nonan-5-ylium
+    # (PIN)' (:41802); the name asserted here before, '6-azadispiro[...]-6-ium', cited a hydride OPSIN has no parent
+    # for. The row and its reading are those of test_charged_spiro.py (the molecule is the same one).
+    ("C1CCCCC12[N+]1(CCCCC1)CCC2", "6λ5-azadispiro[5.0.5^7.3^6]pentadecan-6-ylium"),
 ]
 
 # Build D: numbering of a spiro parent with prefixes. "(f) detachable alphabetized

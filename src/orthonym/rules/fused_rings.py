@@ -25,6 +25,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import (
     alpha_sort_key,
+    begins_with_italic_designator,
     get_alkyl_name,
 )
 from ..data import get_retained_name as _get_global_retained_name
@@ -573,7 +574,8 @@ def _join_hydrogen_prefix(prefix: str, stem: str) -> str:
     fusion bracket it does not ('3,4-dihydro[1,3]dioxolo',:32498 class)."""
     if not prefix or prefix.endswith('-'):
         return f"{prefix}{stem}"
-    return f"{prefix}-{stem}" if stem[:1].isdigit() else f"{prefix}{stem}"
+    # the italic designator of 's-indacene' is set off by a hyphen too: (d),:6960
+    return f"{prefix}-{stem}" if stem[:1].isdigit() or begins_with_italic_designator(stem) else f"{prefix}{stem}"
 
 
 def _ring_double_bond(atom, ring_set) -> bool:
@@ -1079,7 +1081,7 @@ def _try_partial_saturation_name(mol, ring_atom_set: Set[int], mancude_parent: s
             for a in sorted(cited_ih, key=lambda a: _fused_locant_num(cand[a]))
         )
         parent = f"{hydro_prefix}-{ih_prefix}-{mancude_parent}"
-    elif mancude_parent[0].isalpha() or mancude_parent.startswith('['):
+    elif (mancude_parent[0].isalpha() and not begins_with_italic_designator(mancude_parent)) or mancude_parent.startswith('['):
         # no hyphen before a letter, nor before a component's bracketed heteroatom
         # locants,:6936-6966; '3,4-dihydro[1,3]dioxolo...':52586,
         # 'octahydro[1,4]dioxocino[2,3-c][1,6]dioxecine-2,5,9,12-tetrone (PIN)':32191)

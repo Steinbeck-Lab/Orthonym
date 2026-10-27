@@ -31,6 +31,11 @@ from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
 from .isotope_placement import nuclide_has_equivalent_site, placement_order
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
+from .lambda_convention import LAMBDA as _LAMBDA
+
+#: One locant of a replacement or Hantzsch-Widman stem: a number, a letter, and the lambda number the
+#: lambda convention attaches to it: '5λ5-azaspiro', '1λ6,2λ4-disulfane').
+_LOCANT_TOKEN = r"\d+[a-z]?(?:" + _LAMBDA + r"\d+)?'*"
 
 
 def has_isotopes(mol: Optional[Chem.Mol]) -> bool:
@@ -621,7 +626,7 @@ _BRACKET_INDICATED_H_RE = re.compile(r"[(\[{]\d+H-")
 #: hyphen and a stem letter (``[\d,]+-[a-z]``), so a plain substituent locant like
 #: the ``-2-`` of ``prop-2-en`` is not offered. Every candidate stays OPSIN-RT
 #: gated by the caller, so any surplus offset can only be discarded, never shipped.
-_INTERIOR_LOCANT_STEM_RE = re.compile(r"-(?=[\d,]+-[a-z])")
+_INTERIOR_LOCANT_STEM_RE = re.compile(r"-(?=[\d," + _LAMBDA + r"]+-[a-z])")
 
 #: The opening bracket of a ring-assembly name inside a name, e.g. the ``[`` of
 #: ``([1,1'-biphenyl]-4-yl)`` or ``[2,2'-bipyridin]-3-yl``.
@@ -872,7 +877,7 @@ def _insertion_offsets(skel: str) -> List[int]:
     Every candidate built from these offsets is still OPSIN-round-trip gated by
     the caller, so a surplus offset can only ever be discarded, never shipped.
     """
-    offsets = [i for i in range(1, len(skel)) if skel[i].isalpha()]
+    offsets = [i for i in range(1, len(skel)) if skel[i].isalpha() and skel[i] != _LAMBDA]
     offsets.extend(m.start() for m in _INDICATED_H_PREFIX_RE.finditer(skel))
     # A bracketed indicated-H opening: offer the slot right AFTER the bracket
     # (before the digit), so '(1H-indol-2-yl)…' can take '((desc)-1H-indol-2-yl)…'
@@ -997,7 +1002,7 @@ def _replacement_locant_follows(rest: str) -> bool:
     """Does ``rest`` open with a numeral locant set (after an optional hyphen)
     that introduces a replacement prefix or Hantzsch-Widman stem ('-1,4-dioxane',
     '2-azatricyclo')?"""
-    m = re.match(r"-?((?:\d+[a-z]?'*)(?:,\d+[a-z]?'*)*)-", rest)
+    m = re.match(r"-?(" + _LOCANT_TOKEN + r"(?:," + _LOCANT_TOKEN + r")*)-", rest)
     return bool(m) and bool(_REPLACEMENT_PART_RE.match(rest[m.end():]))
 
 
@@ -1051,7 +1056,7 @@ def _placement_quality(skel: str, off: int, locant_free: bool = False,
             rest.startswith("-") and _STEREO_BLOCK_END_RE.search(skel[:off])):
         return 0
     if off > 0 and _REPLACEMENT_PART_RE.match(rest) and re.search(
-            r"(?:^|[-(\[{])(?:\d+[a-z]?'*)(?:,\d+[a-z]?'*)*-$", skel[:off]):
+            r"(?:^|[-(\[{])" + _LOCANT_TOKEN + r"(?:," + _LOCANT_TOKEN + r")*-$", skel[:off]):
         return 2
     rest = skel[off:]
     if rest[:1].isupper() and _LEADING_LOCANT_SET_RE.match(rest):
@@ -1462,7 +1467,7 @@ from ..data.hw_heteroatoms import HW_PREFIXES as _HW_PREFIXES
 from ..perception.molcache import atoms_of, inchikey_of
 _A_PREFIX_ALT = "|".join(sorted(set(_HW_PREFIXES.values()), key=len, reverse=True))
 _LEADING_SKELETAL_LOCANT_RE = re.compile(
-    r"^\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"
+    r"^" + _LOCANT_TOKEN + r"(?:," + _LOCANT_TOKEN + r")*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"
     r"(?:" + _A_PREFIX_ALT + r")")
 
 #: The same skeletal-replacement locant opening a SUBSTITUENT's ring name inside
@@ -1475,7 +1480,7 @@ _LEADING_SKELETAL_LOCANT_RE = re.compile(
 #: a deuterated dibenzofuran-fused OLED host). Used by ``_insertion_offsets``
 #: (the slot is the index after the mark); every candidate stays OPSIN-RT gated.
 _BRACKET_SKELETAL_LOCANT_RE = re.compile(
-    r"[(\[{](?=\d+(?:,\d+)*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"
+    r"[(\[{](?=" + _LOCANT_TOKEN + r"(?:," + _LOCANT_TOKEN + r")*-(?:di|tri|tetra|penta|hexa|hepta|octa|nona|deca)?"
     r"(?:" + _A_PREFIX_ALT + r"))")
 
 #: The heteroatom locants of a benzo-fused ring opening a SUBSTITUENT's name inside its enclosing marks,

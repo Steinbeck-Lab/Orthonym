@@ -78,6 +78,7 @@ from ..rules.lambda_convention import (
 # can verify the invariant without inspecting individual function bodies.
 from ..rules.locants import cascade_locant as _supplier_locant, compare_locant_sets  # noqa: F401 — re-export lock
 from ..rules.polycyclic_bridged import get_heteroatom_prefix
+from .charged_spiro import name_charged_spiro
 from .spiro_carbocycle import (  # the one namer of a carbocyclic monocycle component
     name_carbocyclic_monocycle_component as _name_carbocyclic_monocycle_component,
     name_unsaturated_carbocyclic_side_ring as _name_unsaturated_carbocyclic_side_ring,
@@ -1457,93 +1458,28 @@ def name_spiro_system(mol):
 
 
 def name_charged_spiro_system(mol, cation_idx: int) -> str:
-    """ method (1): name a spiro system carrying a single cationic
-    ring HETEROATOM (a quaternary onium at a spiro junction, e.g. a quaternary
-    ring N+) as the neutral skeletal-replacement ('a') spiro PARENT plus the
-    parent-hydride '-ium' suffix cited at the cation's spiro locant.
+    """ SKELETAL REPLACEMENT ('a') NOMENCLATURE FOR CATIONS (the Blue Book), method (1): the name of a
+    spiro system carrying a single cationic ring HETEROATOM at its junction (a quaternary onium whose four bonds are
+    all ring bonds, e.g. a ring N+) as the skeletal-replacement spiro parent with the suffix 'ylium'.
 
-    A spiro-junction onium -- a ring N+ whose four bonds are ALL ring bonds --
-    cannot be named by the neutralize -> re-enter route the rest of the charged
-    router uses: removing the charge leaves an over-valent neutral heteroatom
-    (a 4-bonded neutral N) that RDKit ``SanitizeMol`` rejects, so no neutral
-    parent name is ever produced and the molecule abstains. ``name_spiro_system``
-    however already names the aza-/thia-/phospha-... spiro PARENT directly off
-    the CHARGED mol -- the cation reads as an ordinary skeletal heteroatom for
-    the replacement prefix and the spiro numbering -- so the cation name is that
-    parent with ``-<locant>-ium`` appended at the same locant.
+    ``5λ5-arsaspiro[4.4]nonan-5-ylium (PIN)`` (:41802) is the book's example: the junction has four bonds, one above
+    the standard bonding number of N, P, As and Sb, and no neutral parent hydride has it, so the cation is the
+    hydride ion lost from the λ5 hydride, and "names that do not require designation of the skeletal atom in a
+    nonstandard valence state by the λ-convention are preferred" (:41769) is of no use to it. The builder is
+    ``charged_spiro.name_charged_spiro``; the groups on the rings are cited by the helper of the neutral spiro
+    route. Any other junction cation keeps the suffix 'ium'.
 
-    Method (1) (neutral 'a' parent + '-ium'/'-ylium' suffix) gives the PREFERRED
-    IUPAC name; it is preferred to the 'azonia' cationic skeletal-replacement
-    alternative, "Method (1) gives preferred IUPAC names", the Blue Book;
-    ``1-methyl-1-azabicyclo[2.2.1]heptan-1-ium`` (PIN) vs the ``azonia`` form,
-    the Blue Book). So this builder emits ``...azaspiro...-ium``, never ``...azonia-
-    spiro...``.
+    Returns the candidate name, or '' when the shape is out of scope. This builder does NO OPSIN validation -- the
+    CALLER MUST OPSIN-round-trip the returned name against ``mol`` and abstain on any mismatch (0-wrong absolute).
 
-    The cation reference-set spellings ``7-azoniadispiro[5.0.5.3]pentadecane``
-    etc. are the non-PIN method-(2) alternative; the PIN this returns is
-    ``6-azadispiro[5.0.5.3]pentadecan-6-ium`` (the heteroatom takes the lowest
-    spiro locant, (a)). Both spellings OPSIN-round-trip to the same
-    structure, so the caller's RT gate accepts the emission and 0-wrong holds.
-
-    Returns the candidate '-ium' name, or '' when the shape is out of scope
-    (not a spiro system; the cation is not a ring heteroatom of charge +1; or
-    the spiro parent cannot be named). This builder does NO OPSIN validation --
-    the CALLER MUST OPSIN-round-trip the returned name against ``mol`` and
-    abstain on any mismatch (0-wrong absolute).
-
-    Examples (each OPSIN-round-trips to the input on the caller's RT gate):
+    Example (round-trips on the caller's RT gate):
         >>> from rdkit import Chem
         >>> m = Chem.MolFromSmiles('C1CCCC[N+]12CCCCC2')
-        >>> cat = next(a.GetIdx for a in m.GetAtoms
-        ... if a.GetFormalCharge == 1)
+        >>> cat = next(a.GetIdx for a in m.GetAtoms if a.GetFormalCharge == 1)
         >>> name_charged_spiro_system(m, cat)
-        '6-azaspiro[5.5]undecan-6-ium'
+        '6λ5-azaspiro[5.5]undecan-6-ylium'
     """
-    try:
-        atom = mol.GetAtomWithIdx(cation_idx)
-    except (RuntimeError, IndexError, OverflowError):
-        return ''
-    # Scope: a single cationic (+1) ring HETEROATOM. A spiro ring CARBON is
-    # already 4-coordinate, so a spiro-carbon cation is an over-valent (invalid)
-    # centre -- and only a skeletal heteroatom takes the replacement 'a' prefix
-    # this construction depends on. Both non-cases fall out here rather than
-    # producing a hydrocarbon name that mis-spells the charged atom.
-    if (atom.GetFormalCharge() != 1
-            or not atom.IsInRing()
-            or atom.GetSymbol() == 'C'):
-        return ''
-    if not is_spiro_system(mol):
-        return ''
-    # Scope to a charged SPIRO ATOM (the junction). A spiro-junction onium has
-    # all four bonds in rings, so it cannot be neutralized in place (the neutral
-    # atom is over-valent) and has no exocyclic substituent to sever -- exactly
-    # the case the in-place / DEMOTE ring emitters decline and this builder owns.
-    # A charged ring atom that is NOT a spiro junction has an in-scope degree and
-    # is already named by the in-place ring-cation path, so restricting here
-    # cannot override a working emission (0 regression by construction).
-    if cation_idx not in get_spiro_atoms(mol):
-        return ''
-
-    result = name_spiro_system(mol)
-    if result is None:
-        return ''
-    parent_name, ring_atoms, atom_to_locant, _subs = result
-    # The cation must be a skeletal atom of the numbered spiro ring set; a cation
-    # off it has no spiro locant to cite the '-ium' at.
-    if cation_idx not in ring_atoms:
-        return ''
-    locant = atom_to_locant.get(cation_idx)
-    if locant is None:
-        return ''
-
-    #: the parent-hydride '-ium' cation suffix cited at the cation's
-    # skeletal locant, with elision of the parent's terminal 'e'
-    # (pentadecane -> pentadecan-6-ium). An unsaturated parent already carries a
-    # trailing locant on its ene/yne ending and the same elide-then-append rule
-    # holds; the caller RT-gates, so any shape this simple rule spells wrongly is
-    # rejected there rather than shipped.
-    stem = parent_name[:-1] if parent_name.endswith('e') else parent_name
-    return f"{stem}-{locant}-ium"
+    return name_charged_spiro(mol, cation_idx)
 
 
 def _build_hetero_prefix(

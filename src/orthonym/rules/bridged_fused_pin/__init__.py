@@ -52,8 +52,12 @@ class BridgedParent:
         if not self.bridges and not self.indicated_hydrogen and self.hydro:
             # (the Blue Book): hydro prefixes stand "immediately at the front of
             # the name of the parent hydride"; a stem that begins with a letter follows them
-            # without a hyphen ('decahydronaphthalene'), one that begins with a locant needs it
-            return self.hydro + ("-" if stem[:1].isdigit() or stem[:1] == "[" else "") + stem
+            # without a hyphen ('decahydronaphthalene'), one that begins with a locant needs it, and so does
+            # the italic designator of 's-indacene' ("to separate italic letters from Roman letters",
+            # (d),:6960): '1,2,3,5,6,7-hexahydro-s-indacene'
+            from ...assembly.naming_utils import begins_with_italic_designator
+            return self.hydro + ("-" if stem[:1].isdigit() or stem[:1] == "[" or begins_with_italic_designator(stem)
+                                 else "") + stem
         return "-".join(head + [stem])
 
 

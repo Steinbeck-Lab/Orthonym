@@ -134,7 +134,7 @@ CONTROL_ROWS = [
     ("C1CCCCC[NH2+]CCOCCCC1", "1-oxa-4-azacyclotetradecan-4-ium"),
     ("C[Si-]1CCCC1", "1-methylsilolan-1-ide"),
     ("C1CC[NH2+]CC1", "piperidin-1-ium"),
-    ("C1CCCC[N+]12CCCC2", "5-azaspiro[4.5]decan-5-ium"),
+    ("C1CCCC[N+]12CCCC2", "5λ5-azaspiro[4.5]decan-5-ylium"),
     ("CCC(C)[CH-]C(C)C", "2,4-dimethylhexan-3-ide"),
 ]
 

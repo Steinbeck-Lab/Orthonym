@@ -1,4 +1,4 @@
-""" method (1) — a cationic (onium) SPIRO-JUNCTION atom.
+""" method (1) -- a cationic (onium) SPIRO-JUNCTION atom.
 
 A quaternary onium at a spiro junction -- a ring N+ (or P+/...) whose four
 bonds are ALL ring bonds -- used to abstain (``unknown organic compound``).
@@ -8,20 +8,25 @@ that RDKit ``SanitizeMol`` rejects, so no neutral parent name is ever produced
 (``_emit_ring_cumulative_suffix``'s DEMOTE branch also declines: a spiro
 junction has no exocyclic substituent to sever, so ``exo == ``).
 
-Fix: ``rules/spiro.py::name_charged_spiro_system`` names the neutral
-skeletal-replacement ('a') spiro PARENT directly off the CHARGED mol
-(``name_spiro_system`` reads the cation as an ordinary skeletal heteroatom for
-the replacement prefix and the spiro numbering) and appends the parent-hydride
-``-<locant>-ium`` suffix at the cation's spiro locant. ``route_charged`` calls
-it (quaternary + onium single-cation ring branches) and RT-gates the result
-via ``_cation_name_rt_ok`` -- ship only on a full-InChIKey match, else abstain.
+Fix: ``rules/charged_spiro.py::name_charged_spiro`` (``rules/spiro.py::
+name_charged_spiro_system`` delegates to it) names the skeletal-replacement ('a') spiro
+PARENT off the lambda5 hydride of the cation and appends the suffix
+``-<locant>-ylium`` at the cation's spiro locant. ``route_charged`` calls it
+(quaternary + onium single-cation ring branches) and RT-gates the result via
+``_cation_name_rt_ok`` -- ship only on a full-InChIKey match, else abstain.
 
-Method (1) (neutral 'a' parent + '-ium' suffix) gives the PREFERRED IUPAC name
-and is preferred to the ``azonia`` cationic skeletal-replacement alternative
-, "Method (1) gives preferred IUPAC names", the Blue Book the Blue Book;
-``1-methyl-1-azabicyclo[2.2.1]heptan-1-ium`` (PIN) vs the ``azonia`` form,
-the Blue Book). So the emitted PIN is ``...azaspiro...-ium``, NEVER
-``...azoniaspiro...``.
+ SKELETAL REPLACEMENT ('a') NOMENCLATURE FOR CATIONS (the Blue Book),
+method (1): the neutral 'a' parent and the suffix 'ium' or 'ylium'. The
+junction has four bonds, one above the standard bonding number of N, P, As and
+Sb, and the book's name of that cation is the ylium of the lambda5 hydride:
+``5λ5-arsaspiro[4.4]nonan-5-ylium (PIN)`` (the Blue Book), ``5H-5λ5,5'-spirobi[benzo[b]
+phosphindol]-5-ylium (PIN)`` (:41804), ``1H-2λ5-spiro[isoquinoline-2,2'-pyrido[1,2-a]
+pyrazin]-2-ylium (PIN)`` (:41808). The old value ``...-azaspiro...-ium`` was the 'ium' of
+a parent hydride that does not exist: OPSIN does not read ``6-azaspiro[5.5]undecane``
+(a four-bonded neutral nitrogen) and does read ``6λ5-azaspiro[5.5]undecane``;
+the 'ium' of a parent with the standard valence is the name of the cation that a
+hydron makes (``1-methyl-1-azabicyclo[2.2.1]heptan-1-ium (PIN)``, the Blue Book), which a
+junction cation is not. The ``azonia`` method (2) alternative is not the PIN.
 
 Every RT-verified row below round-trips through OPSIN 2.9.0 to the identical
 structure (full-InChIKey match) -- not merely to *a* valid molecule.
@@ -52,12 +57,12 @@ def namer():
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     # Monospiro junction: the N+ IS the spiro atom (all 4 bonds in rings).
-    ("C1CCCC[N+]12CCCCC2", "6-azaspiro[5.5]undecan-6-ium"),
+    ("C1CCCC[N+]12CCCCC2", "6λ5-azaspiro[5.5]undecan-6-ylium"),
     # Dispiro junction: the N+ is one of two adjacent spiro atoms.
-    ("C1CCCCC12[N+]1(CCCCC1)CCC2", "6-azadispiro[5.0.5^7.3^6]pentadecan-6-ium"),
+    ("C1CCCCC12[N+]1(CCCCC1)CCC2", "6λ5-azadispiro[5.0.5^7.3^6]pentadecan-6-ylium"),
     # A phosphonium at a spiro junction -- the same class, one heteroatom over
     # (classified 'onium', so the onium single-cation branch reaches the fix).
-    ("C1CCCC[P+]12CCCCC2", "6-phosphaspiro[5.5]undecan-6-ium"),
+    ("C1CCCC[P+]12CCCCC2", "6λ5-phosphaspiro[5.5]undecan-6-ylium"),
 ])
 @pytest.mark.unit
 def test_charged_spiro_junction_names(namer, smiles, expected):
@@ -72,9 +77,9 @@ def test_charged_spiro_junction_names(namer, smiles, expected):
 # ---------------------------------------------------------------------------
 @pytest.mark.parametrize("smiles,expected", [
     ("[Cl-].C1CCCC[N+]12CCCCC2",
-     "6-azaspiro[5.5]undecan-6-ium chloride"),
+     "6λ5-azaspiro[5.5]undecan-6-ylium chloride"),
     ("[Br-].C1CCCCC12[N+]1(CCCCC1)CCC2",
-     "6-azadispiro[5.0.5^7.3^6]pentadecan-6-ium bromide"),
+     "6λ5-azadispiro[5.0.5^7.3^6]pentadecan-6-ylium bromide"),
 ])
 @pytest.mark.unit
 def test_charged_spiro_junction_salts(namer, smiles, expected):
@@ -98,13 +103,13 @@ class TestNameChargedSpiroSystem:
     def test_monospiro_junction(self):
         mol = Chem.MolFromSmiles("C1CCCC[N+]12CCCCC2")
         assert (name_charged_spiro_system(mol, self._cation_idx(mol))
-                == "6-azaspiro[5.5]undecan-6-ium")
+                == "6λ5-azaspiro[5.5]undecan-6-ylium")
 
     @pytest.mark.unit
     def test_dispiro_junction(self):
         mol = Chem.MolFromSmiles("C1CCCCC12[N+]1(CCCCC1)CCC2")
         assert (name_charged_spiro_system(mol, self._cation_idx(mol))
-                == "6-azadispiro[5.0.5^7.3^6]pentadecan-6-ium")
+                == "6λ5-azadispiro[5.0.5^7.3^6]pentadecan-6-ylium")
 
     @pytest.mark.unit
     def test_declines_non_spiro_ring_cation(self):

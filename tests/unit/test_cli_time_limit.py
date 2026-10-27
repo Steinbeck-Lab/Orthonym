@@ -400,8 +400,8 @@ def test_the_help_describes_the_limit(capsys):
 @pytest.mark.slow
 def test_a_real_structure_that_takes_more_than_twenty_seconds_gets_no_name_and_the_run_goes_on(capsys, tmp_path):
     """A 60-heavy-atom macrocycle with a spiro centre and an N=[S-](=O) group, which the engine needs about
-    21 s to decline (20.7 s in an unloaded process, of which 0.7 s are calls into the JVM). The limit is 1 s,
-    so the margin is twenty-fold."""
+    4.5 s to name (an unloaded process, as the -uide anion of a lambda hydride,; it needed 20.7 s to
+    decline before that anion had a class). The limit is 1 s, so the margin is four-fold."""
     cage = ("CC1C(C=CC(C2CCC2CN3CC4(CCCC5=C4C=CC(=C5)Cl)COC6=C3C=C(C=C6)C(=O)N=[S-](=O)C1C(=O)N(C)"
             "OC7=NN(C=C7C(=O)N)C)OC)OC(=O)N(C)C")
     started = time.monotonic()

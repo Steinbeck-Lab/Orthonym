@@ -158,7 +158,7 @@ FILES = {
     "src/orthonym/rules/benzene.py": 6095,
     "src/orthonym/rules/fused_rings.py": 5802,
     "src/orthonym/rules/heterocycles.py": 5793,
-    "src/orthonym/rules/ions.py": 7741,
+    "src/orthonym/rules/ions.py": 7690,
     "src/orthonym/rules/multiplicative.py": 5290,
-    "src/orthonym/rules/spiro.py": 7068,
+    "src/orthonym/rules/spiro.py": 7001,
 }

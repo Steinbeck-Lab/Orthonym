@@ -884,7 +884,9 @@ def name_phosphinic_acid(mol, phosphinic_atoms: Tuple[int, ...]) -> Optional[str
 
 
 #: Organo-oxoacids with a substitutable hydrogen on the central atom: the principal
-#: group name -> the namer of ``{organyl}{stem} acid``.
+#: group name -> the namer of ``{organyl}{stem} acid``. The trivalent '-ous' acids are in it too: the Note
+#: (:35457) rejects the suffix method for them as for the '-ic' ones, and 'diphenylarsinous acid (PIN)',
+#: 'phenylstibonous acid (PIN)' (:35465,:35467) are the substituent-prefix names.
 _ONIC_ACID_NAMERS = {
     "phosphonic_acid": name_phosphonic_acid,
     "phosphinic_acid": name_phosphinic_acid,
@@ -892,12 +894,19 @@ _ONIC_ACID_NAMERS = {
     "arsinic_acid": name_arsinic_acid,
     "stibonic_acid": name_stibonic_acid,
     "stibinic_acid": name_stibinic_acid,
+    "phosphonous_acid": name_phosphonous_acid,
+    "phosphinous_acid": name_phosphinous_acid,
+    "arsonous_acid": name_arsonous_acid,
+    "arsinous_acid": name_arsinous_acid,
+    "stibonous_acid": name_stibonous_acid,
+    "stibinous_acid": name_stibinous_acid,
 }
 
 
 def name_oxoacid_functional_parent(mol, group_name: str, matches) -> Optional[str]:
     """The substituent-prefix name of a molecule whose principal group is a phosphonic,
-    phosphinic, arsonic, arsinic, stibonic or stibinic acid, or None.
+    phosphinic, arsonic, arsinic, stibonic or stibinic acid or the trivalent phosphonous, phosphinous,
+    arsonous, arsinous, stibonous or stibinous one, or None.
 
      "Substitution of mononuclear noncarbon oxoacids with hydrogen atoms attached to
     the central atom (substitutable hydrogen)" (the Blue Book): the acid is a functional
@@ -922,11 +931,25 @@ def name_oxoacid_functional_parent(mol, group_name: str, matches) -> Optional[st
         # skeletal-replacement or similar non-PIN form ('5-hydroxy-5-oxo-6-oxa-5-arsahexyl') is
         # worse than the suffix form it would replace, so the suffix assembly keeps that row.
         from .pin_vocabulary import non_pin_vocabulary
-        if non_pin_vocabulary(name):
+        if non_pin_vocabulary(name) or _misses_the_constitution(mol, name):
             return None
         return name
     except Exception:  # noqa: BLE001 - an offer that cannot be built is not made
         return None
+
+
+def _misses_the_constitution(mol, name: str) -> bool:
+    """True when OPSIN reads ``name`` to another constitution than ``mol`` (the stereo-free first block of the
+    InChIKey) or does not read it. The organyl prefix of the offer is a substituent name the substituent namers
+    can get wrong ('[(2-amino-2-oxoethyl)methyl]phosphonic acid' for '-CH2-NH-C(=O)CH3', an isomer), and the
+    suffix assembly that runs when the offer is declined names the molecule. Without OPSIN nothing can be read
+    back and the offer stands."""
+    from ..namer import _validity_gate_name_to_smiles, _validity_gate_status
+    smiles = _validity_gate_name_to_smiles(name)
+    if smiles is None:
+        return _validity_gate_status(name) != "unavailable"
+    read = Chem.MolFromSmiles(smiles)
+    return read is None or Chem.MolToInchiKey(read)[:14] != Chem.MolToInchiKey(mol)[:14]
 
 
 def _p_ester_owner_group(mol, o_idx: int, p_idx: int) -> Optional[str]:

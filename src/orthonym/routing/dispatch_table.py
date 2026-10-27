@@ -136,7 +136,8 @@ class StoutClass(_StrEnumBase):
     NITRAMIDE_SUBSTITUTED = "nitramide_substituted"  # B3 substitutive nitramide/N-nitro: N-(hydroxymethyl)nitramide / N,N-bis(hydroxymethyl)nitramide / N,N'-dinitromethanediamine; priority 49.75 — after THIOIMIDE@49.7, before CYCLIC_POLYESTER@49.8)
     N_HETERO_AMINE = "n_hetero_amine"  # NAZ N-substitution of amines, carboxamides and sulfonamides by azido, alkoxy/sulfanyl and, on an amide, the nitro/nitroso/halogen groups: N-azido-N-methylmethanamine / N-chloro-N-methylacetamide; priority 98000, tier 1 -- after every class-routed namer, before DECOMPOSITION_PRE_GENERAL; the amides of the acids stay NITRAMIDE_SUBSTITUTED@49.75)
     CYCLIC_POLYESTER = "cyclic_polyester"            # W3-P08 lactide / cyclic di-/polyester -> 1,4-dioxane-2,5-dione; priority 49.8 — after THIOIMIDE@49.7, before ORGM@50)
-    AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C ethylideneazinic acid; priority 48.3)
+    DIAZENIUM_IDE = "diazenium_ide"                  # the 1,2-dipole R2N(+)=N(-) of a diazene '1-phenyldiazen-1-ium-2-ide'; priority 48.37, after CUMULATIVE_ZWITTERION@48.35 and YLIDE@48.36, whose names are the PIN of the unbroken nitrogen chain,; the species is 'neutral' to the perception of the ions, so no handler of the ions sees it). Predicate-IS-handler: rules.diazenium_ide.emit_diazenium_ide.
+    AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C ethylideneazinic acid; priority 48.3), and its anion the azinate (rules.azinate)
     HETERONE = "heterone"                            # Wave-2 completion C dimethylsilanone/phosphanone; priority 48.4)
     SULFINE = "sulfine"                              # Wave-2 completion C propylidene-lambda4-sulfanone; priority 48.5)
     CUMULATIVE_ZWITTERION = "cumulative_zwitterion"  # W4-I4 same-parent -ium-...-ide on a homogeneous heteroatom chain: 1,2,2,2-tetramethylhydrazin-2-ium-1-ide / triaz-2-en-2-ium-1-ide / dioxidan-2-ium-1-ide; priority 48.35 — before HETERONE@48.4)
@@ -2069,14 +2070,27 @@ def _is_azinic_derivative(mol, smiles, canonical_smiles, features=None,
     (aci-nitro) parents. PURE graph classifier, fail-closed."""
     if mol is None:
         return False
+    from orthonym.rules.azinate import emit_azinate
     from orthonym.rules.inorganic_acids import name_azinic_derivative
-    return name_azinic_derivative(mol) is not None
+    return name_azinic_derivative(mol) is not None or bool(emit_azinate(mol))
 
 
 def _handle_azinic_derivative(mol, smiles, canonical_smiles, features=None,
                               **kwargs) -> Optional[str]:
+    from orthonym.rules.azinate import emit_azinate
     from orthonym.rules.inorganic_acids import name_azinic_derivative
-    return name_azinic_derivative(mol)
+    return name_azinic_derivative(mol) or emit_azinate(mol) or None
+
+
+def _is_diazenium_ide(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """Priority 48.37: the diazene zwitterion R2N(+)=N(-). Predicate-IS-handler, fail-closed."""
+    from orthonym.rules.diazenium_ide import emit_diazenium_ide
+    return bool(emit_diazenium_ide(mol))
+
+
+def _handle_diazenium_ide(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    from orthonym.rules.diazenium_ide import emit_diazenium_ide
+    return emit_diazenium_ide(mol) or None
 
 
 def _is_cumulative_zwitterion(mol, smiles, canonical_smiles, features=None,
@@ -2695,6 +2709,12 @@ _register_dispatch(
     iupac_section="Blue Book P-61.5.3",
     description="Ylidene azinic acid (aci-nitro) parents "
                 "(ethylideneazinic acid); graph classifier, fail-closed",
+)
+_register_dispatch(
+    class_id=StoutClass.DIAZENIUM_IDE, priority=48.37, tier=1,
+    predicate=_is_diazenium_ide, handler=_handle_diazenium_ide,
+    iupac_section="Blue Book P-74.1.1",
+    description="The diazene zwitterion R2N(+)=N(-) (1-phenyldiazen-1-ium-2-ide); graph classifier, fail-closed",
 )
 _register_dispatch(
     class_id=StoutClass.CUMULATIVE_ZWITTERION, priority=48.35, tier=1,

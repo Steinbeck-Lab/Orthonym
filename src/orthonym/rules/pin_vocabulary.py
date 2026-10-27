@@ -573,10 +573,13 @@ _CARBAMOYL_ON_METHYL = re.compile(r"carbamoyl[)\]}]*methyl")
 # anion or ester) cited as a suffix on a parent hydride after a locant ('benzene-1-
 # phosphonic acid', 'ethane-1,1-diphosphonic acid') is that rejected form; the multiplied
 # parent ('benzene-1,4-diylbis(phosphonic acid)') has 'diylbis(' after the locants and is
-# not matched. Label-only: the name stays (it round-trips), it is not the PIN.
+# not matched. The trivalent acids are the same (:35465 'diphenylarsinous acid (PIN)',:35467 'phenylstibonous
+# acid (PIN)'; the anion takes 'ite' for 'ous acid',,:40955) and so is a parent hydride that
+# the acid follows without a locant ('diethoxy(trimethylsilyl)methanephosphonous acid'). Label-only: the name
+# stays (it round-trips), it is not the PIN.
 _OXOACID_AS_SUFFIX = re.compile(
-    r"-\d+[a-z]?(?:,\d+[a-z]?)*-(?:di|tri|tetra)?"
-    r"(?:phosphon|phosphin|arson|arsin|stibon|stibin|boron)(?:ic acid|ate)(?![a-z])")
+    r"(?:-\d+[a-z]?(?:,\d+[a-z]?)*-|(?<=ane))(?:di|tri|tetra)?"
+    r"(?:phosphon|phosphin|arson|arsin|stibon|stibin|boron)(?:ic acid|ate|ous acid|ite)(?![a-z])")
 
 # (the Blue Book, "if any locants are essential for defining the
 # structure of the parent structure... then all locants must be cited") with

@@ -90,11 +90,14 @@ def test_secondary_amine_anion_on_a_ring_is_the_aminide(smiles, expected):
     assert name_is_rt_exact(expected, smiles)
 
 
-# (the Blue Book): 'acetylazanide (PIN)', the anion of an amide: its azanide stays the PIN
+# (the Blue Book): 'acetylazanide (PIN)', the anion of an amide: its azanide stays the PIN.
+# (:7272): on a mononuclear parent "the first cited substituent never has enclosing marks unless it includes
+# a locant", the later ones are enclosed: 'acetyl(methyl)chloranium (PIN)' (:41488), so 'acetyl(methyl)azanide' and not
+# '(acetyl)(methyl)azanide' (the value of this row before the fix round of lane ION; it fails on that code)
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected", [
     ("[Na+].CC(=O)[N-]C(C)=O", "sodium diacetylazanide"),
-    ("CC(=O)[N-]C", "(acetyl)(methyl)azanide"),
+    ("CC(=O)[N-]C", "acetyl(methyl)azanide"),
 ])
 def test_the_azanide_of_an_amide_is_still_a_pin(smiles, expected):
     for res in (name_best_effort(smiles), name_default(smiles)):
