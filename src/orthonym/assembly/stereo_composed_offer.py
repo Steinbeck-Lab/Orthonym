@@ -170,7 +170,9 @@ def _composed_row(namer, smiles: str, flat: str) -> Optional[Dict]:
     row = None
     try:
         engine = general_tier_engine(namer)
-        flat_row = engine.name_tiered(flat)
+        from .radical_offer import suspended
+        with suspended():                   # the radical offer is made for the input, after this offer
+            flat_row = engine.name_tiered(flat)
         flat_name = flat_row.get("name")
         if not flat_name or is_failure_name(flat_name) or flat_row.get("tier") == "abstain":
             return None

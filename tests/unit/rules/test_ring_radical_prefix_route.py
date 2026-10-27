@@ -52,11 +52,11 @@ def _declined(smiles):
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.xfail(strict=True, reason=(
-    "a spiro ring system with a fused component and a stereocentre has no substituent name: "
-    "name_ring_system_substituent returns None for the radical boron (the same molecule without the "
-    "stereocentre is named), so only a stereo-less offer exists and the read-back refuses it"))
 def test_spiro_borirane_radical_with_a_stereocentre():
+    # the stereo-less name of the radical (name_ring_system_substituent gives none for the stereo drawing, the same
+    # molecule without the stereocentre is named) takes the stereo of the input: the re-anchoring of the stereo
+    # descriptors reads the name of a radical with OPSIN's -r (validation/read_back_policy.py), and the composed
+    # name reads back to the input (this test, with the radical graph)
     _declined("[B]1C([C@@]12C3=C(C=CC(=C3)C4=CSC=C4)C(=O)N(C2=O)C)NC5=CC=C(C=C5)CN6CCCCC6")
 
 

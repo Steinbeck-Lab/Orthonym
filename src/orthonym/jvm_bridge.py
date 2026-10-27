@@ -653,7 +653,8 @@ REJECTED = "__opsin_rejected__"   # sentinel: OPSIN parsed the request and defin
 
 
 def opsin_extended_smiles(name: str,
-                          jar_path: Optional[str] = None) -> Tuple[Optional[str], bool]:
+                          jar_path: Optional[str] = None,
+                          allow_radicals: bool = False) -> Tuple[Optional[str], bool]:
     """Exactly what ``java -jar opsin -o extendedsmi`` writes for ONE name.
 
     Returns ``(extended_smiles, True)`` on success — the ``"<smiles> |$_AV:...$|"``
@@ -664,7 +665,8 @@ def opsin_extended_smiles(name: str,
     embedded newline, or a Java-side error), so the caller MUST fall back to its
     subprocess path. Never raises. Mirrors ``opsin_stdout`` but for
     the extended-SMILES output mode; used by the stereo-locant re-anchor
-    (``validation.opsin_roundtrip.opsin_atom_locant_map``)."""
+    (``validation.opsin_roundtrip.opsin_atom_locant_map``). ``allow_radicals`` is OPSIN's ``-r``, for the
+    name of a structure that has radical electrons (``validation/read_back_policy.py``)."""
     if not name:
         return None, False
     if "\n" in name or "\r" in name:
@@ -679,7 +681,7 @@ def opsin_extended_smiles(name: str,
     try:
         with _LOCK:
             _attach_thread()
-            result = _n2s().parseChemicalName(name, _cfg(False))
+            result = _n2s().parseChemicalName(name, _cfg(allow_radicals))
             ext = result.getExtendedSmiles()
     except Exception as exc:  # a Java-side failure is transient, like a crashed CLI
         logger.debug("in-process OPSIN extendedsmi failed for %r: %s", name, exc)

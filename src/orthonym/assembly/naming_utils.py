@@ -2754,6 +2754,14 @@ _CATIONIC_HYDRIDE_YLS: frozenset = frozenset({
 })
 
 
+# The retained acyl groups 'acetyl', 'benzoyl' and 'formyl' "Definitions and name formation", the Blue Book). As the TAIL of a split
+# they make 'trifluoroacetyl' two units, 'trifluoro' on 'acetyl': a compound prefix, "considered to begin with the first
+# letter of its complete name", the Blue Book), so it is cited at 't' and not at 'f'
+# ('fluoroacetyl' with a multiplier read as a separate one). Not in ``_SIMPLE_PREFIX_VOCABULARY``: a bare 'acetyl'
+# keeps the multiplier it has.
+_RETAINED_ACYL_GROUPS: frozenset = frozenset({'acetyl', 'benzoyl', 'formyl'})
+
+
 def _is_recognised_prefix_component(token: str) -> bool:
     """One complete substituent-prefix component of any recognised kind.
 
@@ -2779,7 +2787,7 @@ def _is_recognised_prefix_component(token: str) -> bool:
     # (`:33087`).
     if len(token) > 5 and token.endswith('amido'):
         return True
-    if token in _CATIONIC_HYDRIDE_YLS:
+    if token in _CATIONIC_HYDRIDE_YLS or token in _RETAINED_ACYL_GROUPS:
         return True
     return _is_replacement_named_hydride_yl(token)
 

@@ -43,15 +43,21 @@ for the parent TEXT only -- NOT ``general_engine``'s substituent-recursion
 tail, which is exactly the declining machinery this module replaces).
 Isotopes, wildcard atoms and multi-fragment inputs are OUT OF SCOPE and void
 the whole call (``None``). Radicals are OUT OF SCOPE for MORE than one
-free-valence centre multi-site / diradicals / radical ions); a
-SINGLE monovalent/divalent/trivalent centre is IN SCOPE for ``_build_ctx``
-(A2, C2) so ``name_universal_substituent_prefix`` can cite it as a
+free-valence centre that the lambda convention does not describe and that no one
+parent carries (radical ions); a SINGLE monovalent/divalent/trivalent centre is IN SCOPE
+for ``_build_ctx`` (A2, C2) so ``name_universal_substituent_prefix`` can cite it as a
 ``-yl``/``-ylidene``/``-ylidyne`` substituent prefix -- see that function's
-docstring and ``t4_coverage._best_effort_candidate``'s radical branch, the
-only wired caller. ``name_universal_substitutive`` (the whole-molecule entry
-point) still has NO suffix logic for that centre and will name the
+docstring and ``t4_coverage._radical_rung``, the only wired caller.
+``name_universal_substitutive`` (the whole-molecule entry
+point) has NO suffix logic for a free valence and will name the
 constitution as if it were fully saturated -- harmless (the caller's OPSIN
-``-r`` gate rejects the mismatch) but never a rescue on its own. Indicated
+``-r`` gate rejects the mismatch) but never a rescue on its own. In the radical offer
+(``assembly/radical_offer.py``, the last resort of the best-effort tier,
+``read_back_policy.radical_last_resort``) and nowhere else every other
+radical centre of such a molecule is cited inside the name: a divalent or trivalent one by
+the lambda convention, the Blue Book; ``_Ctx.lambda_atoms``), the monovalent
+ones of a molecule that has several as the free valences of the one parent that carries them
+, the Blue Book; ``name_universal_polyradical``). Indicated
 hydrogen is also OUT OF SCOPE for this task (deferred -- no witness in the
 B2b brief requires it) and voids nothing on its own: this module simply does
 not special-case it, which is a pre-existing gap (unrelated to charge), not
@@ -283,6 +289,16 @@ class _Ctx:
     acyloxy_leaf: bool = True
     # Set True the first time the leaf names a branch in this call.
     acyloxy_leaf_fired: bool = False
+    # (the Blue Book): the divalent and trivalent radical centres of the molecule that the
+    # lambda convention describes, ``{atom index: bonding number}`` (``_radical_lambda_atoms``). The
+    # producers of one-atom roots and of skeletal heteroatoms cite the symbol of an atom listed here; empty
+    # for every molecule without such a centre, so no other name changes.
+    lambda_atoms: Dict[int, int] = field(default_factory=dict)
+    # (the Blue Book) "CHOICE OF PARENT RADICAL" / (:40524): the monovalent radical
+    # centres that the parent of the name carries as its free valences, 'cyclopentane-1,2,3-triyl'. Set
+    # only by ``name_universal_polyradical`` (the parent then holds every one of them, or the call voids);
+    # empty for every other call, so no other name changes.
+    poly_radical_atoms: FrozenSet[int] = frozenset()
     # Roadmap N5: spell each spine and branch in the book's form (``book_prefixes``,
     # ``rules.monocycle_forms``) instead of the mechanical one. ``t4_coverage`` sets
     # it False only to RETRY a floor name that failed the full-InChIKey round trip,
@@ -586,6 +602,34 @@ def name_universal_substitutive(
         return None
 
 
+def name_universal_polyradical(
+    mol, atom_work_budget: int = DEFAULT_ATOM_WORK_BUDGET, book_forms: bool = True, acyloxy_leaf: bool = True,
+) -> Optional[UniversalResult]:
+    """Name a molecule with two or more monovalent radical centres as the radical of one parent that
+    carries every one of them, or return ``None`` (void -- never partial).
+
+     "CHOICE OF PARENT RADICAL" (the Blue Book) puts the radical centres on the parent that
+    holds the most of them, and "Multiple radical centers (polyradicals)" (:40524) cites them
+    "by adding to the name of the parent hydride combinations of the suffix 'yl' for a monovalent radical
+    center... together with the appropriate numerical prefixes": 'ethane-1,2-diyl', 'propane-1,2,3-triyl',
+    '1-phenyldodecane-1,12-diyl'. The parent here is the one ring system, or the one acyclic chain between
+    the two outermost centres, that holds every monovalent centre of the molecule (``_poly_radical_host``);
+    every other atom is a substituent of it. The divalent and trivalent centres of the molecule are cited by
+    the lambda convention inside the name (``_radical_lambda_atoms``). Inside the radical offer only
+    (``read_back_policy.radical_last_resort``): ``None`` anywhere else. The name keeps the mechanical spelling
+    of the parent, and the locants of the free valences are those of the parent's own numbering: a name
+    that reads back to the molecule is the bar (a name of the general nomenclature, never a preferred name),
+    and the caller's read-back, which sees the radical graph, decides it. ``book_forms`` is the spelling of
+    the substituents, as for ``name_universal_substitutive``; the parent keeps its mechanical spelling."""
+    if mol is None:
+        return None
+    try:
+        return _name_universal_substitutive_unsafe(
+            mol, atom_work_budget, acyloxy_leaf=acyloxy_leaf, book_forms=book_forms, poly_radical=True)
+    except Exception:
+        return None
+
+
 def _halane_rung(mol, atom_work_budget: int, **spelling) -> Optional[UniversalResult]:
     """UN lane H, the last rung of the spelling ladder of ``name_universal_substitutive``: the
     floor with a hypervalent Cl/Br/I atom named as a one-atom parent or substituent root
@@ -622,10 +666,10 @@ def _name_universal_substitutive_unsafe(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True, prefix_order_fallback: bool = False,
     book_forms: bool = True, keep_forms: frozenset = frozenset(), no_chain: bool = False,
-    halane: bool = False,
+    halane: bool = False, poly_radical: bool = False,
 ) -> Optional[UniversalResult]:
-    """The real body -- may raise; ``name_universal_substitutive`` is the
-    only caller and converts every exception to ``None``."""
+    """The real body -- may raise; ``name_universal_substitutive`` and ``name_universal_polyradical`` are the
+    only callers and convert every exception to ``None``."""
     # Cheap size guard BEFORE any perception work. This is not redundant with
     # the per-call recursive charging below: kekulization, CIP assignment and
     # ring-system perception all run UNCONDITIONALLY on the whole molecule,
@@ -642,7 +686,8 @@ def _name_universal_substitutive_unsafe(
     built = _build_ctx(mol, atom_work_budget,
                        force_vonbaeyer_spiro=force_vonbaeyer_spiro,
                        acyloxy_leaf=acyloxy_leaf, book_forms=book_forms,
-                       keep_forms=keep_forms, no_chain=no_chain, halane=halane)
+                       keep_forms=keep_forms, no_chain=no_chain, halane=halane,
+                       poly_radical=poly_radical)
     if built is None:
         return None
     ctx, heavy = built
@@ -1229,10 +1274,62 @@ def _neutralize_semipolar_chalcogenides(mol):
     return m2
 
 
+def _radical_lambda_atoms(mol, attach_idx: Optional[int] = None) -> Dict[int, int]:
+    """``{atom index: bonding number}`` of the divalent and trivalent radical centres of ``mol`` that the
+    lambda convention describes, ``rules.lambda_convention.radical_lambda_bonding_number``),
+    the attachment atom ``attach_idx`` of a prefix excepted: its free valence is cited by the suffix. Empty
+    outside the radical offer (``read_back_policy.radical_last_resort``): no other producer cites a radical centre
+    this way."""
+    from ..validation.read_back_policy import radical_last_resort_active
+    if not radical_last_resort_active():
+        return {}
+    from ..rules.lambda_convention import radical_lambda_bonding_number
+    found = {}
+    for atom in mol.GetAtoms():
+        if atom.GetNumRadicalElectrons() and atom.GetIdx() != attach_idx:
+            bonding_number = radical_lambda_bonding_number(mol, atom.GetIdx())
+            if bonding_number is not None:
+                found[atom.GetIdx()] = bonding_number
+    return found
+
+
+def _close_ring_free_valences(work, poly_radical_atoms: FrozenSet[int], attach_idx: Optional[int]) -> None:
+    """In the radical offer, the free valence of a ring atom that the name cites as '-yl' (a monovalent centre of a
+    polyradical parent, the attachment atom of a prefix) is closed by hydrogens in the working copy of the molecule,
+    ``work``, while the ring is named. The ring names of the floor (von Baeyer, spiro, replacement) cite a bonding number
+    for an atom that holds fewer bonds than its standard valence, which would cite the free valence a second time:
+     licenses a lambda for a divalent or trivalent centre only, and a monovalent one is the group of
+    (the Blue Book). A no-op outside the offer, and for an atom that is not in a ring system of two rings or
+    more: the name of a single ring cites no bonding number by valence."""
+    from ..validation.read_back_policy import radical_last_resort_active
+    if not radical_last_resort_active():
+        return
+    ring_atoms = work.GetRingInfo().AtomRings()
+    polycyclic = set()
+    for system in get_ring_systems(work, include_spiro=True):
+        if sum(1 for ring in ring_atoms if set(ring) <= set(system)) >= 2:
+            polycyclic |= set(system)
+    for idx in set(poly_radical_atoms) | ({attach_idx} if attach_idx is not None else set()):
+        atom = work.GetAtomWithIdx(idx)
+        electrons = atom.GetNumRadicalElectrons()
+        if electrons and idx in polycyclic and not atom.GetFormalCharge():
+            atom.SetNumRadicalElectrons(0)
+            atom.SetNumExplicitHs(atom.GetNumExplicitHs() + electrons)
+            atom.SetNoImplicit(True)
+    work.UpdatePropertyCache(strict=False)
+
+
+def radical_lambda_site_ids(mol) -> FrozenSet[int]:
+    """The atoms of ``mol`` whose divalent or trivalent radical centre the lambda convention describes
+    (``_radical_lambda_atoms``,: the radical centres of a molecule that need no attachment atom."""
+    return frozenset(_radical_lambda_atoms(mol))
+
+
 def _build_ctx(
     mol, atom_work_budget: int, force_vonbaeyer_spiro: bool = False,
     acyloxy_leaf: bool = True, book_forms: bool = True, keep_forms: frozenset = frozenset(),
-    no_chain: bool = False, halane: bool = False,
+    no_chain: bool = False, halane: bool = False, attach_idx: Optional[int] = None,
+    poly_radical: bool = False,
 ) -> Optional[Tuple["_Ctx", FrozenSet[int]]]:
     """Shared whole-molecule perception + ``_Ctx`` setup for BOTH public
     entry points (``name_universal_substitutive`` on the whole graph and
@@ -1305,12 +1402,12 @@ def _build_ctx(
     # SINGLE monovalent/divalent/trivalent free-valence centre -- the
     # one shape ``name_universal_substituent_prefix``'s ``bond_order``
     # parameter (below) knows how to cite as a ``-yl``/``-ylidene``/
-    # ``-ylidyne`` suffix at its own attachment locant. A SECOND radical
-    # centre multi-site, diradicals, radical ions,...) stays out
-    # of scope -- this floor's ``_render_as_substituent`` only ever cites ONE
-    # attachment/bond-order pair, so a second centre would need a citation
-    # this primitive cannot express; fail closed rather than silently drop
-    # it. (``name_universal_substitutive``, the WHOLE-molecule entry point,
+    # ``-ylidyne`` suffix at its own attachment locant. A SECOND centre that
+    # is not one the lambda convention describes stays out of scope of that
+    # entry point -- this floor's ``_render_as_substituent`` only ever cites
+    # ONE attachment/bond-order pair, so a second centre would need a
+    # citation this primitive cannot express; fail closed rather than
+    # silently drop it (``name_universal_polyradical`` carries several). (``name_universal_substitutive``, the WHOLE-molecule entry point,
     # has NO such suffix logic at all and would name the radical as if it
     # were the fully saturated neutral species -- measured: '1-oxapropane'
     # for '[CH2]CO', which the caller's own OPSIN -r gate then rejects, so
@@ -1319,10 +1416,28 @@ def _build_ctx(
     # wired at the caller, ``t4_coverage._best_effort_candidate``, which
     # routes a single free-valence centre through the substituent-prefix
     # entry point instead.)
+    # Radical centres that are not the attachment atom of a prefix (``attach_idx``) are each cited by the
+    # lambda convention, which licenses for a divalent or trivalent centre only
+    # (``_radical_lambda_atoms``); a monovalent one has no citation here, and so does a second attachment
+    # atom, and the call voids. The one centre that no lambda describes is the attachment atom of the
+    # prefix entry point, or, for the whole-molecule entry point, a single centre (which that entry
+    # point names as if saturated, and the caller's read-back then rejects).
+    # Only the radical offer (``read_back_policy.radical_last_resort``) cites the other centres: every other call
+    # keeps the one-centre scope this entry point always had.
     radical_atoms = [a for a in work.GetAtoms() if a.GetNumRadicalElectrons()]
-    if len(radical_atoms) > 1:
+    if any(a.GetNumRadicalElectrons() not in (1, 2, 3) for a in radical_atoms):
         return None
-    if radical_atoms and radical_atoms[0].GetNumRadicalElectrons() not in (1, 2, 3):
+    lambda_atoms = _radical_lambda_atoms(work, attach_idx)
+    free_valences = [a for a in radical_atoms if a.GetIdx() not in lambda_atoms]
+    poly_radical_atoms: FrozenSet[int] = frozenset()
+    if poly_radical:
+        # the monovalent centres the lambda convention does not describe are all carried by the parent
+        from ..validation.read_back_policy import radical_last_resort_active
+        if (not radical_last_resort_active() or len(free_valences) < 2 or attach_idx is not None
+                or any(a.GetNumRadicalElectrons() != 1 for a in free_valences)):
+            return None
+        poly_radical_atoms = frozenset(a.GetIdx() for a in free_valences)
+    elif len(free_valences) > 1:
         return None
     if any(a.GetAtomicNum() == 0 for a in work.GetAtoms()):
         return None  # wildcard atom: unverifiable, never claim to name it
@@ -1331,6 +1446,8 @@ def _build_ctx(
         Chem.Kekulize(work, clearAromaticFlags=True)
     except Exception:
         return None  # fail closed rather than guess a bond order
+
+    _close_ring_free_valences(work, poly_radical_atoms, attach_idx)
 
     assign_stereochemistry(work)  # canonical CIP path (never raw rdCIPLabeler)
 
@@ -1365,8 +1482,8 @@ def _build_ctx(
     from .book_prefixes import book_forms_enabled, forms_enabled, ring_forms_enabled
     ctx = _Ctx(mol=work, ring_systems=ring_systems, ring_system_of=ring_system_of,
                budget=_Budget(atom_work_budget), canon_rank=canon_rank,
-               cation_sites=cation_sites, anion_sites=anion_sites,
-               force_vonbaeyer_spiro=force_vonbaeyer_spiro,
+               cation_sites=cation_sites, anion_sites=anion_sites, lambda_atoms=lambda_atoms,
+               poly_radical_atoms=poly_radical_atoms, force_vonbaeyer_spiro=force_vonbaeyer_spiro,
                acyloxy_leaf=acyloxy_leaf, halane_forms=halane,
                book_forms=book_forms and book_forms_enabled(),
                ring_forms=(book_forms or "ring" in keep_forms) and ring_forms_enabled(),
@@ -1383,7 +1500,7 @@ def _build_ctx(
 def name_universal_substituent_prefix(
     mol, frag_atoms, attach_idx: int, bond_order: int = 1,
     atom_work_budget: int = DEFAULT_ATOM_WORK_BUDGET,
-    cap_attachment: bool = False,
+    cap_attachment: bool = False, acyloxy_leaf: bool = True,
 ) -> Optional[str]:
     """Name a BRANCH subgraph as a ``-yl``/``-ylidene``/``-ylidyne`` substituent
     prefix over the WHOLE-molecule perception context, or ``None`` (void).
@@ -1427,14 +1544,14 @@ def name_universal_substituent_prefix(
                 capped = _cap_attachment(mol, frag_atoms, attach_idx, bond_order)
                 named = (_name_universal_substituent_prefix_unsafe(
                     capped, frag_atoms, attach_idx, bond_order, atom_work_budget,
-                    capped=True) if capped is not mol else None)
+                    capped=True, acyloxy_leaf=acyloxy_leaf) if capped is not mol else None)
             except Exception:
                 named = None
             if named is not None:
                 return named
             # the capped fragment voids or raises: the detached fragment, as before
         return _name_universal_substituent_prefix_unsafe(
-            mol, frag_atoms, attach_idx, bond_order, atom_work_budget)
+            mol, frag_atoms, attach_idx, bond_order, atom_work_budget, acyloxy_leaf=acyloxy_leaf)
     except Exception:
         return None
 
@@ -1443,16 +1560,22 @@ def _cap_attachment(mol, frag_atoms, attach_idx: int, bond_order: int):
     """``mol`` with the free valence of the detached fragment ``frag_atoms`` closed by a
     carbon atom bonded to ``attach_idx`` by ``bond_order`` (1 or 2), or ``mol`` itself when
     the fragment is not of that shape: the attachment atom must be a non-ring atom carrying
-    exactly ``bond_order`` radical electrons, no other atom a radical, and the attachment atom
-    have no neighbour outside the fragment. The cap is not part of the fragment, so no
-    name covers it."""
+    exactly ``bond_order`` radical electrons, no other atom a radical but the centres the lambda
+    convention cites (``_radical_lambda_atoms``), and the attachment atom have no neighbour outside
+    the fragment. The cap is not part of the fragment, so no name covers it."""
     if bond_order not in (1, 2):
         return mol
     frag = {int(a) for a in frag_atoms}
     atom = mol.GetAtomWithIdx(attach_idx)
-    if (atom.GetIsAromatic() or atom.IsInRing()
+    others = _radical_lambda_atoms(mol, attach_idx)    # the centres the lambda convention cites stay in the fragment
+    # a ring atom is capped only in the radical offer: its ring names cite a bonding number for an atom that holds
+    # fewer bonds than its standard valence, which would cite the free valence a second time licenses a
+    # lambda for a divalent or trivalent centre only), and the cap gives the atom the valence it has in the molecule
+    from ..validation.read_back_policy import radical_last_resort_active
+    if (atom.GetIsAromatic() or (atom.IsInRing() and not radical_last_resort_active())
             or atom.GetNumRadicalElectrons() != bond_order
-            or any(a.GetNumRadicalElectrons() for a in mol.GetAtoms() if a.GetIdx() != attach_idx)
+            or any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()
+                   if a.GetIdx() != attach_idx and a.GetIdx() not in others)
             or any(nb.GetIdx() not in frag for nb in atom.GetNeighbors())
             or any(a.GetIdx() not in frag for a in mol.GetAtoms() if a.GetAtomicNum() > 1)):
         return mol
@@ -1470,9 +1593,9 @@ def _cap_attachment(mol, frag_atoms, attach_idx: int, bond_order: int):
 
 def _name_universal_substituent_prefix_unsafe(
     mol, frag_atoms, attach_idx: int, bond_order: int, atom_work_budget: int,
-    capped: bool = False,
+    capped: bool = False, acyloxy_leaf: bool = True,
 ) -> Optional[str]:
-    built = _build_ctx(mol, atom_work_budget)
+    built = _build_ctx(mol, atom_work_budget, acyloxy_leaf=acyloxy_leaf, attach_idx=attach_idx)
     if built is None:
         return None
     ctx, heavy = built
@@ -1597,7 +1720,7 @@ def _name_component(
     # get their standard prefix directly rather than an ugly generic
     # skeletal-replacement rendering of a 1-3 atom "chain".
     if not is_top and attach_hint is not None:
-        shortcut = _leaf_shortcut(mol, component, attach_hint)
+        shortcut = _leaf_shortcut(mol, component, attach_hint, ctx.lambda_atoms)
         if shortcut is not None:
             token, atoms = shortcut
             # Task B2b fix a performance pass + M2: record an internal-charge leaf's atoms
@@ -1706,12 +1829,9 @@ def _name_component(
             return _prefix_ready(retained, component)
 
     # ---- parent (spine) selection -----------------------------------------
-    ring_here = _ring_system_for_component(ctx, component, attach_hint, is_top)
+    poly = ctx.poly_radical_atoms if is_top else frozenset()
     ring_form = None
-    if ring_here is not None:
-        spine_result = _name_ring_spine(ctx, component, ring_here, attach_hint)
-    else:
-        spine_result = _name_chain_spine(ctx, component, attach_hint)
+    spine_result = _select_spine(ctx, component, attach_hint, is_top, poly)
     if spine_result is None:
         return None
     if len(spine_result) == 5:
@@ -1831,7 +1951,7 @@ def _name_component(
     # of (1) /. ``None`` keeps the mechanical spelling below.
     book = None
     if ((ctx.book_forms or ctx.chain_forms or (ctx.ring_forms and ring_form is not None))
-            and ionic_suffix is None and top_prefix_front is None
+            and ionic_suffix is None and top_prefix_front is None and not poly
             and spine_core is not None):
         book = _book_spelling(ctx, spine_atoms, spine_core, attach_locant,
                               prefix_entries, joined, ring_form,
@@ -1859,6 +1979,11 @@ def _name_component(
     # never truncates a substituent prefix.
     if ionic_suffix is not None:
         full_name = _elide_before_ionic_suffix(full_name, ionic_suffix)
+
+    if poly:
+        if ionic_suffix is not None:
+            return None  # a cumulative ionic suffix beside the free valences is not built
+        full_name = _polyradical_name(full_name, poly, spine_atom_to_locant)
 
     covers = frozenset(a for _t, ids in bindings for a in ids)
     return _ComponentResult(
@@ -2211,7 +2336,12 @@ def _hetero_root_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
                 and any(s["atom_idx"] == attach_hint for s in ctx.cation_sites))
     if root.GetFormalCharge() and not ammonium:
         return None
-    if not ammonium and root.GetTotalValence() != HETERO_ROOT_VALENCE[sym]:
+    # a divalent or trivalent radical centre of a mononuclear hydride roots the prefix with its bonding
+    # number cited by the lambda convention, 'methyl-λ2-silyl', the Blue Book)
+    lam = ctx.lambda_atoms.get(attach_hint)
+    if lam is not None and sym not in MONONUCLEAR_HEAD:
+        return None
+    if not ammonium and lam is None and root.GetTotalValence() != HETERO_ROOT_VALENCE[sym]:
         return None
     # an imine nitrogen joined to its one part by a double bond: '(R-ylidene)amino'
     double = [b for b in root.GetBonds() if b.GetBondType() != Chem.BondType.SINGLE]
@@ -2297,8 +2427,10 @@ def _hetero_root_leaf(ctx: _Ctx, component: FrozenSet[int], attach_hint: int,
         # a mononuclear parent hydride: its prefixes without locants, the second and
         # further enclosed:7272): 'trimethylsilyl', 'dimethylphosphanyl'
         from .composer import _assemble_decorated_amino_prefix
+        from ..rules.lambda_convention import LAMBDA
         token = _assemble_decorated_amino_prefix(
-            [(n, False) for n, _ in names], enclose=False, head=MONONUCLEAR_HEAD[sym])
+            [(n, False) for n, _ in names], enclose=False,
+            head=(f"-{LAMBDA}{lam}-" if lam is not None else "") + MONONUCLEAR_HEAD[sym])
     elif sym == "N":
         token = None
         if len(names) == 1 and names[0][1] and root.GetTotalNumHs() == 1:
@@ -2614,6 +2746,9 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             continue
         if ctx.carbon_walk and nb.GetAtomicNum() != 6:
             continue  # roadmap N5c: a substitutive spine is a carbon chain
+        if nb.GetAtomicNum() == 6 and nb.GetDegree() == 1 and j in ctx.lambda_atoms:
+            continue  # a carbon end that is a radical centre is the branch 'λ2-methyl', not a chain atom:
+            # the chain spine cites no lambda on a carbon atom
         if not _is_skeletal_spine_element(ctx.mol, j):
             continue  # ALLOW-LIST (M1): only carbon + a REPLACEMENT_TERMS-
             # spellable heteroatom MAY thread the chain spine. Every
@@ -2670,6 +2805,59 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
 # ===========================================================================
 # Ring-system selection
 # ===========================================================================
+
+def _select_spine(ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[int], is_top: bool,
+                  poly: FrozenSet[int]):
+    """The spine of ``component`` as ``_name_ring_spine`` / ``_chain_spine_from_path`` return it, or ``None``.
+    A call with ``poly`` (the monovalent radical centres of ``ctx.poly_radical_atoms``, top level only) takes
+    as its parent the one that holds them all (``_poly_radical_host``), and voids when the spine does not."""
+    if not poly:
+        ring_here = _ring_system_for_component(ctx, component, attach_hint, is_top)
+        if ring_here is not None:
+            return _name_ring_spine(ctx, component, ring_here, attach_hint)
+        return _name_chain_spine(ctx, component, attach_hint)
+    host = _poly_radical_host(ctx, component)
+    if host is None:
+        return None
+    if host[0] == "ring":
+        spine = _name_ring_spine(ctx, component, host[1], None)
+    else:
+        spine = _chain_spine_from_path(ctx, component, None, host[1])
+    return spine if spine is not None and poly <= frozenset(spine[0]) else None
+
+
+def _polyradical_name(parent_name: str, centres: FrozenSet[int], atom_to_locant: Dict[int, object]) -> str:
+    """``parent_name`` with the free valences of ``centres`` cited as "Multiple radical centers
+    (polyradicals)" (the Blue Book) cites them: the multiplied suffix 'yl' after the parent hydride
+    name with locants ('ethane-1,2-diyl'); the final 'e' stays before the consonant of the multiplier."""
+    locants = sorted((atom_to_locant[a] for a in centres), key=_locant_sort_key)
+    return f"{parent_name}-{','.join(_locant_display(loc) for loc in locants)}-{multiplying_prefix(len(locants))}yl"
+
+
+def _poly_radical_host(ctx: _Ctx, component: FrozenSet[int]):
+    """The parent that carries every monovalent radical centre of ``ctx.poly_radical_atoms``,
+    the Blue Book): ``("ring", ring system atoms)`` when one ring system holds them all,
+    ``("chain", path)`` when none is in a ring and they lie on one acyclic path, whose ends are the two
+    outermost centres and whose atoms are all skeletal; ``None`` otherwise (a centre in a ring and one
+    outside it, centres in two ring systems, centres on no one path)."""
+    mol = ctx.mol
+    centres = ctx.poly_radical_atoms
+    holders = [atoms for atoms in ctx.ring_systems if centres <= atoms and atoms <= component]
+    if holders:
+        return "ring", min(holders, key=lambda atoms: min(ctx.canon_rank[a] for a in atoms))
+    if any(ctx.ring_system_of.get(a) is not None for a in centres):
+        return None
+    ordered = sorted(centres, key=lambda a: ctx.canon_rank[a])
+    ends = max(((len(Chem.GetShortestPath(mol, a, b)), a, b) for a in ordered for b in ordered if a != b))
+    path = list(Chem.GetShortestPath(mol, ends[1], ends[2]))
+    if (not centres <= set(path) or not set(path) <= component
+            or any(mol.GetAtomWithIdx(a).IsInRing() or not _is_skeletal_spine_element(mol, a) for a in path)):
+        return None
+    rev = list(reversed(path))
+    if _chain_score(ctx, rev, component) < _chain_score(ctx, path, component):
+        path = rev
+    return "chain", path
+
 
 def _ring_system_for_component(
     ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[int], is_top: bool,
@@ -2883,13 +3071,14 @@ def _polyspiro_component_leaf(ctx: _Ctx, ring_atoms: FrozenSet[int], attach_hint
     return _spiro_leaf_result(res, ring_atoms, attach_hint)
 
 
-def _ring_spine_hetero_prefix(mol, ring_order, atom_to_locant, ring_atoms, ring_halogens) -> Optional[str]:
+def _ring_spine_hetero_prefix(mol, ring_order, atom_to_locant, ring_atoms, ring_halogens,
+                              lambda_atoms: Optional[Dict[int, int]] = None) -> Optional[str]:
     """The 'a' prefix of a monocyclic ring spine under ``atom_to_locant``, or ``None`` when an atom has no morpheme.
     A ring with a halogen goes through the one total builder of the von Baeyer and spiro names, the ring halogen
     and every other heteroatom, whose ``unexpressed`` is the refusal of a skeletal atom no morpheme spells (and of
     a halogen ion that is not the simple iodonium or iodanuide centre)."""
     if not ring_halogens:
-        return _build_hetero_prefix(mol, ring_order, atom_to_locant)
+        return _build_hetero_prefix(mol, ring_order, atom_to_locant, lambda_atoms)
     from ..rules.ring_replacement import build_replacement_prefix
     repl = build_replacement_prefix(mol, atom_to_locant, set(ring_atoms))
     return None if repl.unexpressed or repl.preselected_only else repl.prefix
@@ -3066,7 +3255,10 @@ def _name_ring_spine(
         # of how the input SMILES happened to number its atoms.
         canon_tie = tuple(ctx.canon_rank[a] for a in order)
         attach_locant_key = order.index(attach_hint) + 1 if attach_hint is not None else 0
-        return (hetero, attach_locant_key, unsat, branch_locants, canon_tie)
+        # NUMBERING (the Blue Book) (c) (:3256): the free valences of a polyradical parent come before
+        # unsaturation
+        valences = sorted(i + 1 for i, a in enumerate(order) if a in ctx.poly_radical_atoms)
+        return (hetero, attach_locant_key, valences, unsat, branch_locants, canon_tie)
 
     best = min(cands, key=score)
     atom_to_locant = {a: i + 1 for i, a in enumerate(best)}
@@ -3084,7 +3276,7 @@ def _name_ring_spine(
             triple_bonds.append(i + 1)
     unsaturation = {"double_bonds": double_bonds, "triple_bonds": triple_bonds}
 
-    hetero_prefix = _ring_spine_hetero_prefix(mol, best, atom_to_locant, ring_atoms, ring_halogens)
+    hetero_prefix = _ring_spine_hetero_prefix(mol, best, atom_to_locant, ring_atoms, ring_halogens, ctx.lambda_atoms)
     if hetero_prefix is None:
         return None
     parent_block = _build_parent_with_unsaturation(n, unsaturation, fg_suffix=None)
@@ -3223,7 +3415,8 @@ def _name_chain_spine(
     # the book allows it; otherwise the spine is the carbon chain and each heteroatom
     # roots a substituent prefix (``_hetero_root_leaf``: 'methoxy', '(R)amino',...).
     if (ctx.book_forms and path and not a_chain_licensed(mol, path)
-            and hetero_roots_composable(mol, path, group_leaves=ctx.chain_forms)
+            and hetero_roots_composable(mol, path, group_leaves=ctx.chain_forms,
+                                        lambda_atoms=ctx.lambda_atoms)
             and (attach_hint is None or mol.GetAtomWithIdx(attach_hint).GetAtomicNum() == 6)
             and any(mol.GetAtomWithIdx(a).GetAtomicNum() == 6 for a in component)):
         ctx.carbon_walk = True
@@ -3374,7 +3567,7 @@ def _chain_spine_from_path(ctx: _Ctx, component: FrozenSet[int],
             triple_bonds.append(i + 1)
     unsaturation = {"double_bonds": double_bonds, "triple_bonds": triple_bonds}
 
-    hetero_prefix = _build_hetero_prefix(mol, path, atom_to_locant)
+    hetero_prefix = _build_hetero_prefix(mol, path, atom_to_locant, ctx.lambda_atoms)
     parent_block = _build_parent_with_unsaturation(n, unsaturation, fg_suffix=None)
     if not hetero_prefix:
         parent_block = _dinuclear_carbon_parent(n, unsaturation) or parent_block
@@ -3398,7 +3591,7 @@ def _chain_score(ctx: _Ctx, order: List[int], component: Optional[FrozenSet[int]
     # NUMBERING (the Blue Book), criterion (c) "principal characteristic groups and
     # free valences (suffixes)" (:3256): a cumulative ionic suffix ('-ylium', '-ium', '-ide',
     # (2),:4777) is decided before unsaturation (e) and the detachable prefixes (f)
-    ionic_atoms = {s['atom_idx'] for s in ctx.cation_sites + ctx.anion_sites}
+    ionic_atoms = {s['atom_idx'] for s in ctx.cation_sites + ctx.anion_sites} | ctx.poly_radical_atoms
     if free_valence is not None:
         ionic_atoms = ionic_atoms | {free_valence}    # the free valence is a suffix of the same criterion (c)
     ionic = [i + 1 for i, a in enumerate(order) if a in ionic_atoms]
@@ -3588,7 +3781,8 @@ def _farthest_path_from(ctx: _Ctx, start: int, component: FrozenSet[int],
 # Skeletal ('a') replacement prefix citation order)
 # ===========================================================================
 
-def _build_hetero_prefix(mol, spine_order: List[int], atom_to_locant: Dict[int, int]) -> str:
+def _build_hetero_prefix(mol, spine_order: List[int], atom_to_locant: Dict[int, int],
+                         lambda_atoms: Optional[Dict[int, int]] = None) -> str:
     # NOTE (NOABSTAIN class 3): a lambda-convention citation was tried
     # here first (a skeletal P/S atom whose actual bonding number exceeds
     # its standard one, e.g. a phosphinate's P or a sulfonic-acid-in-chain
@@ -3603,22 +3797,29 @@ def _build_hetero_prefix(mol, spine_order: List[int], atom_to_locant: Dict[int, 
     # ``_phosphinate_oxide_leaf_shortcut`` + ``_is_phosphinate_oxide_root``,
     # which divert the ONE shape that genuinely needed different handling
     # (a phosphinate P) OUT of this chain-threading path entirely before it
-    # ever reaches here -- so this function stays exactly as it always was.
-    by_element: Dict[str, List[int]] = {}
+    # ever reaches here -- so this function stays as it was for every atom but a radical centre.
+    # A skeletal atom that is a divalent or trivalent radical centre cites its bonding number after its
+    # locant, the Blue Book; the form is that of "Homogeneous acyclic parent
+    # hydrides other than hydrocarbons and boron hydrides", the Blue Book, '2,5λ4,8,11-tetrathiadodecane
+    # (PIN)',:8056: the symbol follows the locant, an atom of standard valence cites none); ``lambda_atoms``
+    # is ``_Ctx.lambda_atoms`` and an atom it does not list is cited as it always was.
+    from ..rules.lambda_convention import format_lambda_token
+    by_element: Dict[str, List[Tuple[int, Optional[int]]]] = {}
     for a in spine_order:
         sym = mol.GetAtomWithIdx(a).GetSymbol()
         if sym in REPLACEMENT_TERMS:
-            by_element.setdefault(sym, []).append(atom_to_locant[a])
+            by_element.setdefault(sym, []).append(
+                (atom_to_locant[a], lambda_atoms.get(a) if lambda_atoms else None))
     if not by_element:
         return ""
     elements = sorted(by_element, key=lambda e: _A_CITATION_INDEX_SAFE(e))
     parts = []
     for el in elements:
-        locs = sorted(by_element[el])
+        entries = sorted(by_element[el], key=lambda e: e[0])
         term = REPLACEMENT_TERMS[el]
-        count = len(locs)
+        count = len(entries)
         mult = multiplying_prefix(count) if count > 1 else ""
-        locant_str = ",".join(str(x) for x in locs)
+        locant_str = ",".join(format_lambda_token(loc, lam) for loc, lam in entries)
         parts.append(f"{locant_str}-{mult}{term}")
     return "-".join(parts)
 
@@ -3658,10 +3859,23 @@ _INTERNAL_CHARGE_LEAF_TOKENS = frozenset(
     {"nitro", "azido", "diazo", "nitrooxy", "isocyano", "oxido"})
 
 
-def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
+#: The substituent prefix of the mononuclear parent hydride of an element that has a divalent or trivalent
+#: radical centre "Mononuclear and acyclic parent hydrides", the Blue Book: 'boranyl',
+#: 'silyl', 'azanyl', 'methyl'), which the lambda convention cites with the bonding number of the
+#: centre: 'λ1-boranyl'.
+_LAMBDA_LEAF_STEM = {
+    "B": "boranyl", "C": "methyl", "N": "azanyl", "Si": "silyl", "Ge": "germyl", "Sn": "stannyl",
+    "Pb": "plumbyl", "P": "phosphanyl", "As": "arsanyl", "Sb": "stibanyl",
+}
+
+
+def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int,
+                   lambda_atoms: Optional[Dict[int, int]] = None):
     """A handful of common small groups named directly rather than via the
     generic chain/replacement machinery. Returns ``(token, atom_ids)`` or
-    ``None`` (fall through to generic construction)."""
+    ``None`` (fall through to generic construction). ``lambda_atoms`` is ``_Ctx.lambda_atoms``: a
+    one-atom group whose atom is a divalent or trivalent radical centre cites its bonding number
+    (P-71.2.5, ``rules.lambda_convention.radical_lambda_bonding_number``): 'λ1-boranyl'."""
     # Task B2b: nitro is checked FIRST, before the generic charge guard just
     # below -- its charges are INTERNAL (excluded from
     # ``perception.ions.get_ion_sites``'s genuine-ion-site perception), so
@@ -3730,6 +3944,15 @@ def _leaf_shortcut(mol, component: FrozenSet[int], attach_hint: int):
         if len(outside) == 1:
             bond = mol.GetBondBetweenAtoms(attach_hint, outside[0])
             order = round(bond.GetBondTypeAsDouble()) if bond is not None else 1
+            lam = lambda_atoms.get(attach_hint) if lambda_atoms else None
+            if lam is not None:
+                from ..rules.lambda_convention import LAMBDA
+                stem = _LAMBDA_LEAF_STEM.get(sym)
+                if order == 1 and stem is not None:
+                    return f"{LAMBDA}{lam}-{stem}", frozenset(component)
+                if order == 2 and stem is not None:   # '=[Si]': the group 'λ2-silylidene',
+                    return f"{LAMBDA}{lam}-{stem[:-2]}ylidene", frozenset(component)
+                return None
             if order == 1 and sym in _LEAF_SINGLE:
                 return _LEAF_SINGLE[sym], frozenset(component)
             if order == 2 and sym in _LEAF_DOUBLE:

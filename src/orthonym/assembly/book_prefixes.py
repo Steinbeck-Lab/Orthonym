@@ -700,7 +700,7 @@ MONONUCLEAR_HEAD = {"Si": "silyl", "Ge": "germyl", "Sn": "stannyl", "Pb": "plumb
 
 
 def hetero_roots_composable(mol, path, group_leaves: bool = True,
-                            ps_groups: bool = False) -> bool:
+                            ps_groups: bool = False, lambda_atoms=None) -> bool:
     """True when every heteroatom of the atom ``path`` can root a composed substituent
     prefix ('methoxy', '(R)amino', 'azaniumyl', 'trimethylsilyl'): an element of
     ``HETERO_ROOT_VALENCE`` at its standard bonding number with no charge and no isotope
@@ -710,17 +710,22 @@ def hetero_roots_composable(mol, path, group_leaves: bool = True,
     than cut the chain into a branch it can only spell as another 'a' chain. An -OO- link
     is cut at its first oxygen (``group_leaves``; without it the chain stays): that oxygen roots
     the group '(R)peroxy' / 'hydroperoxy'
-    (``hetero_group_prefixes``; the Blue Book "'R′-peroxy' (not R′-dioxy)",
-    '(methylperoxy)ethane (PIN)',:27870;:27944). (An -SS- link is cut:
+    (``hetero_group_prefixes``; P-63.3.1 BlueBookV2.md:27858 "'R′-peroxy' (not R′-dioxy)",
+    '(methylperoxy)ethane (PIN)', :27870; P-63.4.1 :27944). (An -SS- link is cut:
     '[(R)sulfanyl]sulfanyl' reads back, the book's 'R-disulfanyl' of the same rule is not
     built either; residual.) With ``ps_groups`` the centre of a phosphorus or sulfur oxoacid
     group and the O or NH that links one to the path root a prefix of their own
     (``rules.oxoacid_group_prefix``: 'sulfamoyl', '(methoxysulfonyl)', 'sulfooxy'), as the
-    standard-valence heteroatoms do."""
+    standard-valence heteroatoms do. ``lambda_atoms`` (``universal_substituent._Ctx.lambda_atoms``): a
+    divalent or trivalent radical centre of an element of ``HETERO_ROOT_VALENCE`` roots a prefix that cites
+    its bonding number with the lambda convention (P-71.2.5, BlueBookV2.md:40560): 'λ1-boranyl',
+    'methyl-λ2-silyl'."""
     on_path = set(path)
     for a in path:
         atom = mol.GetAtomWithIdx(a)
         if atom.GetAtomicNum() == 6:
+            continue
+        if lambda_atoms and a in lambda_atoms and atom.GetSymbol() in HETERO_ROOT_VALENCE:
             continue
         if ps_groups:
             from ..rules.oxoacid_group_prefix import is_oxoacid_centre, is_oxoacid_linker

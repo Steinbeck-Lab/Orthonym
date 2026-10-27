@@ -129,10 +129,21 @@ def test_two_boranylidene_on_one_carbon_are_an_assembly_of_parent_radicals(smile
     assert default_tier_row(smiles)["tier"] == "abstain"
 
 
-@pytest.mark.parametrize("smiles", [
-    "[B]C([B])C",       # a carbon chain would be the parent of the linking group (ethane-1,1-diyl)
-    "[B]CC[B]",         # two carbons: ethane-1,2-diylbis(boranylidene), built by no producer here
-    "[B]C1(CCCC1)[B]",  # the carbon is a ring atom
+@pytest.mark.parametrize("smiles,expected", [
+    ("[B]C([B])C", "1,1-di(λ1-boranyl)ethane"),         # a carbon chain would be the parent of the linking group
+    ("[B]CC[B]", "1,2-di(λ1-boranyl)ethane"),           # two carbons: no producer builds ethane-1,2-diylbis(boranylidene)
+    ("[B]C1(CCCC1)[B]", "1,1-di(λ1-boranyl)cyclopentane"),   # the carbon is a ring atom
 ])
-def test_other_radical_pairs_stay_declined(smiles):
-    assert name_best_effort(smiles)["tier"] == "abstain"
+def test_other_radical_pairs_are_named_only_by_the_last_resort(smiles, expected):
+    """No producer of the assembly of parent radicals names these pairs (they were declined here), and the radical
+    offer, the last resort of the best-effort tier (``assembly/radical_offer.py``), names them with each boron cited by
+    the lambda convention. Each boron has one bond and two radical electrons: a divalent radical centre, which
+    "The λ-convention" (the Blue Book, sentence:40562) says "may be described by the λ-convention... This method
+    is only for general nomenclature", with 'phenyl-λ1-azane' (:40570) as its own example of a lambda of one: so the
+    name is a verified systematic name and never a PIN. Read back by a fresh OPSIN call with ``-r`` to the input's full
+    InChIKey and its radical graph (``assert_full_rt``); the default tier, which never makes this offer, still declines
+    them."""
+    row = name_best_effort(smiles)
+    assert row["name"] == expected and row["tier"] == "systematic_verified" and not row["is_pin"], row
+    assert_full_rt(expected, smiles)
+    assert default_tier_row(smiles)["tier"] == "abstain"

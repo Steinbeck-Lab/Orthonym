@@ -89,6 +89,34 @@ def nonstandard_bonding_number(mol, atom_idx: int) -> Optional[int]:
     return bonding_number if bonding_number != standard else None
 
 
+#: Elements whose divalent or trivalent radical centre the lambda convention describes
+#: (``radical_lambda_bonding_number``): those of ``STANDARD_BONDING_NUMBER`` that can lose two or three
+#: hydrogens from one atom, and carbon (standard bonding number 4).
+_RADICAL_LAMBDA_STANDARD = {**{sym: n for sym, n in STANDARD_BONDING_NUMBER.items() if n >= 3}, 'C': 4}
+
+
+def radical_lambda_bonding_number(mol, atom_idx: int) -> Optional[int]:
+    """The bonding number ``n`` of the ``λn`` that describes the radical centre at ``atom_idx``, or None.
+
+     "The λ-convention" (the Blue Book, sentence:40562): "Divalent and trivalent radical centers in a parent
+    hydride formally derived by the removal of two or three hydrogen atoms from the same skeletal atom in its
+    standard valence state may be described by the λ-convention (see. Locants for the radical centers
+    are followed by the symbol λ^n, where 'n' is the bonding number of the skeletal atom (see. This
+    method is only for general nomenclature." (dichloro-λ2-methane, fluoro-λ1-methane, phenyl-λ1-azane).
+    The sentence licenses two and three removed hydrogens only: a monovalent radical centre (one electron)
+    has no lambda here and returns None, as does a charged, aromatic or non-listed atom, and an atom whose
+    bonds, hydrogens and unpaired electrons do not make up its standard bonding number (the atom is then not
+    "in its standard valence state" less the hydrogens removed)."""
+    atom = mol.GetAtomWithIdx(atom_idx)
+    n_e = atom.GetNumRadicalElectrons()
+    standard = _RADICAL_LAMBDA_STANDARD.get(atom.GetSymbol())
+    if (n_e not in (2, 3) or standard is None or atom.GetFormalCharge() or atom.GetIsAromatic()
+            or atom.GetIsotope()):
+        return None
+    bonding_number = atom.GetTotalValence()
+    return bonding_number if bonding_number + n_e == standard and bonding_number >= 1 else None
+
+
 def format_lambda_token(locant, lam: Optional[int]) -> str:
     """Format a locant (+ optional lambda) into the citation token.
 

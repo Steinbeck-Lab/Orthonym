@@ -103,3 +103,29 @@ def reading_base_for(smiles):
         yield
     finally:
         _BASE.reset(token)
+
+
+# Set by ``radical_last_resort``: the radical offer (``assembly/radical_offer.py``) is naming the molecule.
+_RADICAL_LAST_RESORT = contextvars.ContextVar("orthonym_radical_last_resort", default=False)
+
+
+@contextlib.contextmanager
+def radical_last_resort():
+    """The block is the last resort of the best-effort tier for a molecule with radical centres: every other
+    producer has left it without a name, and the radical offer names it (``assembly/radical_offer.py``).
+
+    Inside the block the floor cites the radical centres of the molecule in the name (``assembly/
+    universal_substituent.py``: the lambda convention for a divalent or trivalent centre, the free valences of one
+    parent for several monovalent ones), and the stereo re-anchoring reads the name of a radical with OPSIN's ``-r``
+    (``validation/opsin_roundtrip.py``). Outside it none of that runs, so the name of no molecule that is named
+    without the offer depends on it."""
+    token = _RADICAL_LAST_RESORT.set(True)
+    try:
+        yield
+    finally:
+        _RADICAL_LAST_RESORT.reset(token)
+
+
+def radical_last_resort_active() -> bool:
+    """True inside:func:`radical_last_resort`."""
+    return _RADICAL_LAST_RESORT.get()

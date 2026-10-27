@@ -167,7 +167,7 @@ class OpsinUnavailable(Exception):
     the key determines the value, ``assembly.memo.pure_cache_or_compute``)."""
 
 
-def _extended_smiles(name: str, jar_version: str = "2.9.0") -> Optional[str]:
+def _extended_smiles(name: str, jar_version: str = "2.9.0", allow_radicals: bool = False) -> Optional[str]:
     """OPSIN ``-o extendedsmi`` output line for *name* (in-process fast path;
     subprocess fallback only when the in-process path cannot serve the call), or
     None if OPSIN rejected the name / was unavailable. Memoised per name inside the
@@ -175,35 +175,42 @@ def _extended_smiles(name: str, jar_version: str = "2.9.0") -> Optional[str]:
     several times per molecule, and a definitive rejection used to start a fresh
     3.5 s Java process that printed the same empty line. A call OPSIN could not
     answer (``OpsinUnavailable``) also gives None but is not memoised, so the next
-    call for the name asks OPSIN again."""
+    call for the name asks OPSIN again. ``allow_radicals`` reads with OPSIN's ``-r``,
+    for the name of a structure with radical electrons (``validation/read_back_policy.py``)."""
     try:
-        return extended_smiles_or_unavailable(name, jar_version)
+        return extended_smiles_or_unavailable(name, jar_version, allow_radicals)
     except OpsinUnavailable:
         return None
 
 
-def extended_smiles_or_unavailable(name: str, jar_version: str = "2.9.0") -> Optional[str]:
+def extended_smiles_or_unavailable(name: str, jar_version: str = "2.9.0",
+                                   allow_radicals: bool = False) -> Optional[str]:
     """``_extended_smiles``, except that a call OPSIN could not answer raises
     ``OpsinUnavailable`` instead of returning None: for a caller that keeps its own memo
     of what it builds from the answer (``rules.bridged_fused_pin.fusion_names``), which
     must not remember a transient failure either. The answers (a line, or None for a
     rejected name or an absent jar) are memoised as in ``_extended_smiles``."""
-    # Perf lever A8: a pure function of (name, jar_version) -> process-wide.
+    # Perf lever A8: a pure function of (name, jar_version, allow_radicals) -> process-wide. The key of
+    # the closed-shell reading is the one it always had.
     from ..assembly.memo import pure_cache_or_compute
-    return pure_cache_or_compute("opsin_extended_smiles", (name, jar_version),
-                                 lambda: _extended_smiles_uncached(name, jar_version))
+    key = (name, jar_version, True) if allow_radicals else (name, jar_version)
+    return pure_cache_or_compute("opsin_extended_smiles", key,
+                                 lambda: _extended_smiles_uncached(name, jar_version, allow_radicals))
 
 
-def _extended_smiles_uncached(name: str, jar_version: str = "2.9.0") -> Optional[str]:
+def _extended_smiles_uncached(name: str, jar_version: str = "2.9.0", allow_radicals: bool = False) -> Optional[str]:
     jar_path = _find_opsin_jar(jar_version)
     if jar_path is None:
         return None
-    text, served = opsin_extended_smiles(name, jar_path=jar_path)   # module-level import (monkeypatchable)
+    if allow_radicals:
+        text, served = opsin_extended_smiles(name, jar_path=jar_path, allow_radicals=True)
+    else:
+        text, served = opsin_extended_smiles(name, jar_path=jar_path)   # module-level import (monkeypatchable)
     if served:
         return None if text == REJECTED else text
     try:
         result = subprocess.run(
-            ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path, "-o", "extendedsmi"],
+            ["java", *JVM_HYGIENE_FLAGS, "-jar", jar_path, *(["-r"] if allow_radicals else []), "-o", "extendedsmi"],
             input=name, capture_output=True, text=True, timeout=15,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as exc:
@@ -218,6 +225,14 @@ def _extended_smiles_uncached(name: str, jar_version: str = "2.9.0") -> Optional
     if not out or "could not be interpreted" in out.lower():
         return None
     return out
+
+
+def _reads_radicals(mol) -> bool:
+    """True when the name of ``mol`` is read with OPSIN's ``-r``: inside the radical offer
+    (``read_back_policy.radical_last_resort``) and for a structure with radical electrons. A name with a free
+    valence does not parse without it, and every other caller reads as it always did."""
+    from .read_back_policy import radical_last_resort_active
+    return radical_last_resort_active() and any(a.GetNumRadicalElectrons() > 0 for a in mol.GetAtoms())
 
 
 def opsin_atom_locant_map(
@@ -238,7 +253,10 @@ def opsin_atom_locant_map(
     """
     if mol is None:
         return None
-    ext = _extended_smiles(name, jar_version=jar_version)
+    # a structure with radical electrons is read with OPSIN's -r (validation/read_back_policy.py), in the radical offer
+    allow_radicals = _reads_radicals(mol)
+    ext = (_extended_smiles(name, jar_version=jar_version, allow_radicals=True) if allow_radicals
+           else _extended_smiles(name, jar_version=jar_version))
     if not ext:
         return None
     m = _AV_LINE_RE.match(ext.strip())
@@ -307,8 +325,15 @@ def opsin_roundtrip_check(
         "error": None,
     }
 
-    # 1. Parse name with OPSIN
-    opsin_smiles = opsin_parse(name, jar_version=jar_version)
+    # 1. Parse name with OPSIN (in the radical offer, a structure with radical electrons is read with -r:
+    # validation/read_back_policy.py)
+    from rdkit import Chem
+    input_mol = Chem.MolFromSmiles(smiles)
+    radical_reading = input_mol is not None and _reads_radicals(input_mol)
+    if radical_reading:
+        opsin_smiles = opsin_parse(name, jar_version=jar_version, allow_radicals=True)
+    else:
+        opsin_smiles = opsin_parse(name, jar_version=jar_version)
     if opsin_smiles is None:
         result["error"] = "opsin_parse_failed"
         return result
@@ -343,6 +368,13 @@ def opsin_roundtrip_check(
             if key_blind_hydrogen_verdict(smiles, opsin_smiles) == "mismatch":
                 result["passed"] = False
                 result["error"] = "hydrogen_mismatch"
+            # nor does it see the radical graph: 'but-3-en-2-yl' parses to C[CH]C=C, which has the key of [CH2]C=CC
+            # (validation/radical_identity.py, which includes the check above)
+            elif radical_reading:
+                from .radical_identity import radical_identity_verdict
+                if radical_identity_verdict(smiles, opsin_smiles) == "mismatch":
+                    result["passed"] = False
+                    result["error"] = "radical_graph_mismatch"
         else:
             result["error"] = "inchi_mismatch"
 

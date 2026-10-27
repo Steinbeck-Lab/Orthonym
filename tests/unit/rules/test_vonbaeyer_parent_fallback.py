@@ -198,7 +198,18 @@ def test_a_parent_hydride_that_denotes_a_different_molecule_is_suppressed(
     """0-wrong. ``terminal_ring_name`` emits ``1-stannacyclohexane`` /
     ``1-plumbacyclohexane`` here and OPSIN parses BOTH to a different species,
     so the tier must let suppress them rather than shipping a name its
-    own reconstruction audit was happy with."""
+    own reconstruction audit was happy with.
+
+    The molecule is a radical (RDKit gives the tin and lead atom two radical
+    electrons: two ring bonds against a valence of four), and the radical offer,
+    the last resort of the best-effort tier (``assembly/radical_offer.py``), names
+    it as the divalent radical it is: ``stanninan-1-ylidene`` (the Hantzsch-Widman
+    name of the ring, as the strict tier gives ``silinan-1-ylidene`` for the silicon
+    ring), "General method" (the Blue Book), the suffix
+    '-ylidene' on the name of the parent hydride 'with elision of the final
+    letter e'. OPSIN reads it with
+    ``-r`` to the input's full InChIKey and radical graph, so that name may ship;
+    ``1-stannacyclohexane`` (SnH2, a different molecule) must still never ship."""
     from orthonym.rules.terminal_ring import terminal_ring_name
     mol = Chem.MolFromSmiles(smiles)
     generated = terminal_ring_name(mol, list(range(mol.GetNumAtoms())), None)
@@ -209,9 +220,15 @@ def test_a_parent_hydride_that_denotes_a_different_molecule_is_suppressed(
         "premise broken: this name now round-trips, so it is no longer a "
         "wrong-molecule case")
 
-    assert _abstains(_namer("best-effort").name(smiles)), (
+    emitted = _namer("best-effort").name(smiles)
+    assert emitted != generated.name, (
         f"{smiles} shipped {generated.name!r}, which denotes a different "
         f"molecule -- SELF-01 was bypassed")
+    if not _abstains(emitted):
+        from tests.support.rt_assert import name_is_rt_exact
+        assert emitted == {"Sn": "stanninan-1-ylidene", "Pb": "plumbinan-1-ylidene"}["Sn" if "Sn" in smiles else "Pb"], emitted
+        assert name_is_rt_exact(emitted, smiles), (
+            f"{smiles} shipped {emitted!r}, which OPSIN does not read back to the radical")
 
 
 # --------------------------------------------------------------------------
