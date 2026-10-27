@@ -331,12 +331,29 @@ def _skeletal_anion_base(mol, acls, atom_idx) -> Optional[str]:
     return None
 
 
+def _multiplied_ionic_suffix(kind: str, n: int) -> Optional[str]:
+    """The ionic suffix ``kind`` ('ium', 'ylium', 'ide', 'uide') cited ``n`` times, or None beyond the tables.
+
+     "General methodology" (the Blue Book), (c) "before suffixes that are composed of two or more cumulative
+    suffixes" (:7110), example:7114: 'bis(ylium)' (multiple preferred suffix, describes two 'ylium' suffixes, see
+    ; whereas 'diylium' could describe a cation radical suffix), 'ethane-1,2-bis(ylium) (PIN)' (:41539). The
+    'ylium' suffix is composed of 'yl' and 'ium', so it takes 'bis', 'tris',...; 'ium', 'ide' and 'uide' are simple suffixes
+    and keep 'di', 'tri' ('1,4-dioxane-1,4-diium (PIN)':41409, '1,3-dithiocane-1,3-diide (PIN)':41313)."""
+    if n == 1:
+        return kind
+    if kind == 'ylium':
+        mult = _MULT_COMPLEX.get(n)
+        return f"{mult}({kind})" if mult else None
+    mult = _MULT_SIMPLE.get(n)
+    return mult + kind if mult else None
+
+
 def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False,
                         omit_locant: bool = False) -> Optional[Tuple[str, Tuple[int, ...]]]:
     """ (BB cations / anions): the charge-suffix string for
     skeletal charge(s) on the ALREADY-NUMBERED general parent --
     ``-1-ium`` / ``-2-ylium`` / ``-1-ide`` / ``-1-uide`` (or the multiplied
-    ``-1,4-diium`` / ``-1,2-diylium`` / ``-1,4-diide`` forms).
+    ``-1,4-diium`` / ``-1,2-bis(ylium)`` / ``-1,4-diide`` forms: ``_multiplied_ionic_suffix``).
 
       ``parent_only``: the DEFAULT (False) keeps the GLOBAL scope --
     the whole molecule must be single-sign (a plain cation OR anion), which is
@@ -426,17 +443,69 @@ def _charge_suffix_text(mol, atom_to_locant, parent_only: bool = False,
     base = next(iter(bases))
     locants = sorted(loc for loc, _ in per_locant_base)
     n = len(locants)
-    if n == 1:
-        mult = ''
-    else:
-        mult = _MULT_SIMPLE.get(n)
-        if mult is None:
-            return None
+    ending = _multiplied_ionic_suffix(base, n)
+    if ending is None:
+        return None
     # ``omit_locant``: (the Blue Book) for a two-carbon chain, 'chloroethynide'
-    text = (mult + base if omit_locant and n == 1
-            else '-' + ','.join(map(str, locants)) + '-' + mult + base)
+    text = ending if omit_locant and n == 1 else '-' + ','.join(map(str, locants)) + '-' + ending
     charged_atom_ids = tuple(sorted(site['atom_idx'] for site in charged))
     return text, charged_atom_ids
+
+
+#: The order of the cumulative ionic suffixes of one parent hydride, "Ionic centers in the same parent
+#: structure" (the Blue Book), sentence:42417: "combining appropriate cumulative suffixes at the end of the name of a
+#: parent hydride in the order 'ium', 'ylium', 'ide', 'uide'".
+_CUMULATIVE_SUFFIX_ORDER = ('ium', 'ylium', 'ide', 'uide')
+
+
+def _cumulative_charge_suffix_text(mol, atom_to_locant) -> Optional[Tuple[str, Tuple[int, ...]]]:
+    """The cumulative ionic suffix of the skeletal centres of ONE numbered parent, however many of each kind it holds:
+    ``-1-ium-2-uide``, ``-1,3-diium``, ``-1,3-diium-2-ide``; the ionic centres off the parent are the caller's.
+
+     (the Blue Book): "Zwitterionic compounds with the ionic centers in the same parent structure may be
+    named by combining appropriate cumulative suffixes at the end of the name of a parent hydride in the order 'ium',
+    'ylium', 'ide', 'uide'" (:42417) and "Multiplying prefixes 'di-', 'tri-', etc.... are added to specify the number of
+    each kind of ionic center" (:42419); the locants of one kind are cited together before its suffix, as in
+    '5lambda5,7lambda5-spiro[...]-5,7-bis(ylium)-6-uide (PIN)'. The kinds are those of ``_charge_suffix_text`` (the same
+    perception and classifiers, so the two never disagree about what a centre spells), here any mixture of them on the
+    parent. None (the caller refuses) for a parent with no ionic centre of its own, a multiply charged atom, a centre
+    that is no skeletal one (an FG anion or cation), or a multiplicity beyond the table."""
+    from ..perception.ions import get_ion_sites
+    from ..rules.ions import classify_anion, classify_cation
+    from ..rules.lambda_convention import ring_halogen_ion
+
+    sites = get_ion_sites(mol)
+    parent_atoms = set(atom_to_locant)
+    by_kind: Dict[str, List[int]] = {}
+    charged_ids: List[int] = []
+    for negative, group in ((False, list(sites.get('cations') or [])), (True, list(sites.get('anions') or []))):
+        for site in group:
+            idx = site['atom_idx']
+            if idx not in parent_atoms:
+                continue
+            if abs(int(site.get('charge', 0))) != 1:
+                return None
+            if negative:
+                base = _skeletal_anion_base(mol, classify_anion(mol, site), idx)
+            else:
+                ccls = 'ylium' if ring_halogen_ion(mol, idx) == 'cation' else classify_cation(mol, site)
+                base = {'ylium': 'ylium', 'aminium': 'ium', 'onium': 'ium', 'quaternary': 'ium'}.get(ccls)
+            if base is None:
+                return None
+            by_kind.setdefault(base, []).append(atom_to_locant[idx])
+            charged_ids.append(idx)
+    if not by_kind:
+        return None
+    text = ''
+    for kind in _CUMULATIVE_SUFFIX_ORDER:
+        locants = sorted(by_kind.get(kind, ()))
+        if not locants:
+            continue
+        ending = _multiplied_ionic_suffix(kind, len(locants))
+        if ending is None:
+            return None
+        text += '-' + ','.join(map(str, locants)) + '-' + ending
+    return text, tuple(sorted(charged_ids))
 
 
 def _append_charge_suffix(name: str, mol, atom_to_locant,
@@ -706,13 +775,50 @@ def _prefix_spells_charge(token: str, negative: bool) -> bool:
 
     A cationic substituent carries ``-ium`` (``...prop-1-en-1-ium-1-yl``,
     ``iminium``, ``ylium`` -- all contain ``ium``). An anionic substituent
-    carries ``-ide``/``-uide``/``-olate``. This is a necessary-condition boundary
+    carries ``-ide``/``-uide``/``-olate``, or is cited as an anionic prefix ('oxido',
+    'sulfonato', 'carboxylato': ``-ido``/``-ato``). This is a necessary-condition boundary
     check, not the constitution authority: the whole-name round-trip is
     what proves the charge lands on the right atom, so a token that passes here
     but mis-places the charge is caught downstream and abstains (0-wrong)."""
     if negative:
-        return any(m in token for m in ('ide', 'uide', 'olate'))
+        return any(m in token for m in ('ide', 'uide', 'olate', 'ido', 'ato'))
     return 'ium' in token
+
+
+def _charge_tail(name, mol, atom_to_locant, frag_bindings, has_fg_suffix: bool, allow_charged: bool, scope: str,
+                 omit_locant: bool = False):
+    """The ionic part of an assembled chain or cage parent name: ``(name, charge bindings)``, or ``None`` after the
+    refusal that says what was not expressible. A neutral molecule with no ionic centre passes unchanged.
+
+    A net-charged molecule takes the one skeletal suffix of its parent (``_append_charge_suffix``) and no other: where
+    that does not hold, the producers after this one name it, as they did (they name a charged group better than the
+    parent that holds it does, and a ring ion of a group is theirs). A net-neutral molecule whose parent holds ionic
+    centres has those take their cumulative suffixes and those of its groups their own names
+    (``_distribute_ring_zwitterion_charges``, "Ionic centers in the same parent structure",
+    the Blue Book, and "CATIONIC PREFIX NAMES",:42290), every charged atom claimed by a binding. A
+    parent with a suffix of its own has no cumulative ionic suffix (the scope of ``_append_charge_suffix``), a two-carbon
+    chain that omits its locants has none either, and neither has a parent that holds no ionic centre itself: those
+    refuse, as they did."""
+    net = Chem.GetFormalCharge(mol) != 0
+    if not (allow_charged and net) and not _has_ionic_centres(mol):
+        return name, []
+    if not _ionic_centre_atoms(mol, atom_to_locant):
+        # every ionic centre is in a group of the parent: the producers of the groups, not this suffix, name it (the
+        # parent of a charged group is the molecule's, and the producer that names the ion's own parent is the better one)
+        return _refuse(f"no ionic centre on the {scope} parent")
+    if allow_charged and net:
+        charge_result = _append_charge_suffix(name, mol, atom_to_locant, has_fg_suffix=has_fg_suffix,
+                                              omit_locant=omit_locant)
+        if charge_result is not None:
+            # a role='charge' binding with EMPTY atom_ids (see TokenBinding's docstring): it claims no atoms of its
+            # own, only the charge_atom_ids the P3 proof reads
+            return charge_result[0], [TokenBinding((), '', 'charge', charge_atom_ids=charge_result[1])]
+        return _refuse(f"charge not expressible as a {scope}-parent suffix")
+    dist = (_distribute_ring_zwitterion_charges(name, mol, atom_to_locant, frag_bindings, has_fg_suffix=False)
+            if (allow_charged and not has_fg_suffix and not omit_locant) else None)
+    if dist is None:
+        return _refuse(f"ionic centres not expressible as a {scope}-parent suffix")
+    return dist
 
 
 def _distribute_ring_zwitterion_charges(
@@ -764,13 +870,19 @@ def _distribute_ring_zwitterion_charges(
         # suffix. An -olate held-out is the cage producer's job, not this
         # substituent-discovering path, so decline it (allow_fg_anion False).
         plan = _zwitterion_suffix_plan(mol, atom_to_locant, allow_fg_anion=False)
-        if plan is None:
-            return None
-        held, ztext = plan
-        if held:
-            return None
+        if plan is not None:
+            held, ztext = plan
+            if held:
+                return None
+            pids = tuple(sorted(s['atom_idx'] for s, _ in parent_sites))
+        else:
+            # more centres than one of each sign on the parent, or some in the substituents: the cumulative suffixes of
+            # the parent's own centres,
+            cumulative = _cumulative_charge_suffix_text(mol, atom_to_locant)
+            if cumulative is None:
+                return None
+            ztext, pids = cumulative
         name = _elide_before_ionic_suffix(name, ztext)
-        pids = tuple(sorted(s['atom_idx'] for s, _ in parent_sites))
         claimed.update(pids)
         charge_bindings.append(TokenBinding((), '', 'charge', charge_atom_ids=pids))
     elif parent_sites:
@@ -1281,24 +1393,12 @@ def _assemble(mol, features, chain, part,
         bindings = [b for b in bindings if b.role != 'suffix']
         parent_atoms += tuple(sorted(part['suffix_atoms']))
     #: charge suffix on a chain skeletal atom (fail closed otherwise).
-    if allow_charged and Chem.GetFormalCharge(mol) != 0:
-        charge_result = _append_charge_suffix(
-            name, mol, {a: atom_to_locant[a] for a in chain},
-            has_fg_suffix=bool(part['suffix_core']), omit_locant=omit_2c)
-        if charge_result is None:
-            return _refuse("charge not expressible as a chain-parent suffix")
-        name, charge_atom_ids = charge_result
-        # a phase Task 2: a role='charge' binding with EMPTY atom_ids (see
-        # TokenBinding's docstring) -- it claims no atoms of its own, only the
-        # charge_atom_ids the P3 proof reads.
-        bindings.append(TokenBinding((), '', 'charge',
-                                     charge_atom_ids=charge_atom_ids))
-    elif _has_ionic_centres(mol):
-        # (:42419): a zwitterion is "not considered as a neutral
-        # compound". The chain producer holds no atom out of discovery, so it
-        # cannot build the cumulative suffix without double-counting an FG
-        # anion -> fail closed rather than ship a neutral (wrong) structure.
-        return _refuse("ionic centres not expressible as a chain-parent suffix")
+    tail = _charge_tail(name, mol, {a: atom_to_locant[a] for a in chain}, frag_bindings,
+                        bool(part['suffix_core']), allow_charged, 'chain', omit_locant=omit_2c)
+    if tail is None:
+        return None
+    name = tail[0]
+    bindings.extend(tail[1])
     #: parent-scope stereo from structure (substituent-internal
     # stereo is already handled inside name_substituent's stereo route).
     # ST.1 : RT-gated at top level (see _apply_parent_stereo).
@@ -1721,6 +1821,8 @@ def _emit_ring_from_analysis(
 
     # --- suffix (ring forms; every PG instance must touch the cage) ---
     pg = getattr(features, 'principal_group', None)
+    if pg and allow_charged and _ionic_centre_atoms(mol, cage_set):
+        pg = None   #: an ion ranks above the groups, cited as prefixes:42445 keeps an anionic one a suffix: not built)
     pg_matches = list(getattr(features, 'principal_group_atoms', None) or [])
     suffix_core = None
     suffix_atoms: set = set()
@@ -1927,16 +2029,12 @@ def _emit_ring_from_analysis(
         if zwit_held:
             bindings.append(TokenBinding(tuple(sorted(zwit_held)),
                                          zwit_plan[1].lstrip('-'), 'suffix'))
-    elif allow_charged and Chem.GetFormalCharge(mol) != 0:
-        charge_result = _append_charge_suffix(name, mol, atom_to_locant,
-                                              has_fg_suffix=bool(suffix_core))
-        if charge_result is None:
-            return _refuse("charge not expressible as a cage-parent suffix")
-        name, charge_atom_ids = charge_result
-        bindings.append(TokenBinding((), '', 'charge',
-                                     charge_atom_ids=charge_atom_ids))
-    elif _has_ionic_centres(mol):
-        return _refuse("ionic centres not expressible as a cage-parent suffix")
+    else:
+        tail = _charge_tail(name, mol, atom_to_locant, frag_bindings, bool(suffix_core), allow_charged, 'cage')
+        if tail is None:
+            return None
+        name = tail[0]
+        bindings.extend(tail[1])
 
     # / ST.1 : parent-scope stereo from structure (VB locants),
     # routed through the RT-gated reanchor at TOP LEVEL so an OPSIN-unverifiable
@@ -2688,13 +2786,11 @@ def name_general_monocycle(
     # amidinium class), or BOTH centres are skeletal to the ring parent
     # (triazin-1-ide-5-ium). Every charged atom is CLAIMED; verifies.
     if allow_charged and Chem.GetFormalCharge(mol) != 0:
-        charge_result = _append_charge_suffix(name, mol, atom_to_locant,
-                                              has_fg_suffix=bool(suffix_core))
-        if charge_result is None:
-            return _refuse("charge not expressible as a monocycle-parent suffix")
-        name, charge_atom_ids = charge_result
-        bindings.append(TokenBinding((), '', 'charge',
-                                     charge_atom_ids=charge_atom_ids))
+        tail = _charge_tail(name, mol, atom_to_locant, frag_bindings, bool(suffix_core), allow_charged, 'monocycle')
+        if tail is None:
+            return None
+        name = tail[0]
+        bindings.extend(tail[1])
     elif allow_charged and _has_ionic_centres(mol):
         dist = _distribute_ring_zwitterion_charges(
             name, mol, atom_to_locant, frag_bindings,

@@ -361,3 +361,61 @@ def ring_cation_prefix(mol, cation_idx: int, attach_idx: int) -> str:
     where = locants[cation_idx]
     free_valence = 'ylidene' if bond.GetBondType() == Chem.BondType.DOUBLE else 'yl'
     return f"{_join_prefix_stem(prefix, _elide_terminal_e(stem))}-{where}-ium-{where}-{free_valence}"
+
+
+def ring_cation_prefix_by_reentry(mol, cation_idx: int, attach_idx: int) -> str:
+    """The prefix of a ring nitrogen cation that ``ring_cation_prefix`` does not build (a fused, bridged or hydro ring,
+    an exocyclic double bond on the ring side) from the name of the cation itself, as its parent hydride plus a hydron
+    carries it: '2-methylisoquinolin-2-ium-2-yl', '1-azabicyclo[2.2.2]octan-1-ium-1-yl'. '' where it is not built.
+
+    ** "CATIONIC PREFIX NAMES"** (the Blue Book), method (1), "Method (1) leads to preferred IUPAC names":
+    "all prefix names are formed by adding the suffixes 'yl', 'ylidene', etc. to the cation name". The cation name is
+    that of the ring side of the molecule with the bond to ``attach_idx`` replaced by hydrogen (one hydrogen for a
+    single bond, two for a double bond: the '-ium' of **** (:41366) is the position of the added hydron),
+    named by the pipeline, and its ending '-<k>-ium' (k the locant of the nitrogen, the one charged atom of the ring
+    side) takes the suffix: the free valence is on the atom of the '-ium', the numbering of the cation is the numbering
+    of the prefix. The caller reads the name it builds back to the full InChIKey of the molecule, so a numbering
+    that moves the valence is withheld there."""
+    from ..errors import is_failure_name
+    from .charged_router import _reenter
+    cat = mol.GetAtomWithIdx(cation_idx)
+    bond = mol.GetBondBetweenAtoms(cation_idx, attach_idx)
+    if (bond is None or cat.GetSymbol() != 'N' or cat.GetFormalCharge() != 1 or cat.GetTotalNumHs()
+            or cat.GetDegree() != 3 or not cat.IsInRing() or cat.GetNumRadicalElectrons()
+            or bond.GetBondType() not in (Chem.BondType.SINGLE, Chem.BondType.DOUBLE)):
+        return ''
+    side, stack = {cation_idx}, [cation_idx]
+    while stack:
+        for n in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+            if n.GetIdx() not in side and n.GetIdx() != attach_idx:
+                side.add(n.GetIdx())
+                stack.append(n.GetIdx())
+    # a ring that closes through the anion side is no cation with a prefix
+    if any(n.GetIdx() != cation_idx and n.GetIdx() in side
+           for n in mol.GetAtomWithIdx(attach_idx).GetNeighbors()):
+        return ''
+    if any(a.GetFormalCharge() for a in mol.GetAtoms() if a.GetIdx() in side and a.GetIdx() != cation_idx):
+        return ''
+    keep = sorted(side)
+    rw = Chem.RWMol(mol)
+    for idx in sorted((a.GetIdx() for a in mol.GetAtoms() if a.GetIdx() not in side), reverse=True):
+        rw.RemoveAtom(idx)
+    new_idx = keep.index(cation_idx)
+    capped = rw.GetMol()
+    atom = capped.GetAtomWithIdx(new_idx)
+    atom.SetNoImplicit(True)
+    atom.SetNumExplicitHs(int(bond.GetBondTypeAsDouble()))
+    try:
+        Chem.SanitizeMol(capped)
+        smiles = Chem.MolToSmiles(capped)
+        name = _reenter(smiles, 'pin')
+    except (ValueError, RuntimeError, RecursionError):
+        return ''
+    if not name or is_failure_name(name):
+        return ''
+    found = re.fullmatch(r'(.+?)-(\d+)-ium', name)
+    if found is None or 'ium' in found.group(1):
+        return ''
+    free_valence = 'ylidene' if bond.GetBondType() == Chem.BondType.DOUBLE else 'yl'
+    return f"{name}-{found.group(2)}-{free_valence}"
+

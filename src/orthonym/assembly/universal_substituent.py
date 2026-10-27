@@ -190,6 +190,7 @@ from .book_prefixes import (
 from .general_engine import (
     _MULT_SIMPLE,
     _charge_suffix_text,
+    _cumulative_charge_suffix_text,
     _elide_before_ionic_suffix,
     _stereo_prefix,
     _zwitterion_suffix_plan,
@@ -2277,6 +2278,13 @@ def _resolve_spine_charge(
                 if s['atom_idx'] in spine_atoms
             )
             return True, text, resolved
+
+    # a spine with several ionic centres of one or both signs beside the one cation and one anion of the plan above:
+    # the cumulative suffixes of (the Blue Book), the centres off the spine are expressed by their own
+    # levels (the charge-coverage assertion proves every one is)
+    cumulative = _cumulative_charge_suffix_text(ctx.mol, spine_atom_to_locant)
+    if cumulative is not None:
+        return True, cumulative[0], frozenset(cumulative[1])
 
     return True, None, frozenset()  # touches, but not expressible -> void
 
@@ -4401,23 +4409,35 @@ def _nitrooxy_atoms(mol, ester_o_idx: int):
 
     The centre is defined by CONNECTIVITY + CHARGE (mirroring ``_nitro_shortcut``
     but anchored at the ESTER oxygen, one atom further out): the ester O is a
-    neutral, H-free, degree-2 oxygen bonded to exactly one nitrogen (the nitrate
-    N) and one other heavy atom (the parent R); that nitrogen is a genuine nitro
-    nitrogen -- ``+1``, degree 3, its other two neighbours both terminal oxygens,
-    one ``=O`` neutral and one single-bonded ``[O-]``. A plain nitro (no ester O),
-    a nitrite ester ``-O-N=O``, or an orthonitrate fail one of these exactly."""
+    neutral, H-free, degree-2 oxygen bonded to exactly one nitrate nitrogen and
+    one other heavy atom (the parent R, a nitrogen too in an O-nitro hydroxylamine);
+    the nitrate nitrogen is a genuine nitro nitrogen -- ``+1``, degree 3, its other
+    two neighbours both terminal oxygens, one ``=O`` neutral and one single-bonded
+    ``[O-]``. A plain nitro (no ester O), a nitrite ester ``-O-N=O``, a dinitrogen
+    pentoxide or an orthonitrate fail one of these exactly."""
     o = mol.GetAtomWithIdx(ester_o_idx)
     if o.GetSymbol() != "O" or o.GetFormalCharge() != 0 or o.GetTotalNumHs() != 0:
         return None
     heavy = [n for n in o.GetNeighbors() if n.GetAtomicNum() > 1]
     if len(heavy) != 2:
         return None
-    n_nbrs = [n for n in heavy if n.GetSymbol() == "N"]
-    r_nbrs = [n for n in heavy if n.GetSymbol() != "N"]
-    if len(n_nbrs) != 1 or len(r_nbrs) != 1:
+    # The nitrate nitrogen is the one neighbour that is a nitro nitrogen; the other is the parent R, which
+    # may be a nitrogen itself (an O-nitro hydroxylamine, R2N-O-NO2). Two nitro nitrogens are an anhydride.
+    found = [(n, _nitro_nitrogen_oxides(mol, ester_o_idx, n)) for n in heavy if n.GetSymbol() == "N"]
+    found = [(n, oxides) for n, oxides in found if oxides is not None]
+    if len(found) != 1:
         return None
-    n = n_nbrs[0]
-    # the ester O -> N bond must be a single bond (an ester linkage)
+    n, other_o = found[0]
+    parent = next(nb for nb in heavy if nb.GetIdx() != n.GetIdx())
+    if parent.GetSymbol() == "N" and not any(a.GetAtomicNum() == 6 for a in mol.GetAtoms()):
+        return None   # a carbon-free O-nitro hydroxylamine is a parent of its own (the inorganic route), no substituent
+    return frozenset({ester_o_idx, n.GetIdx()} | {oa.GetIdx() for oa in other_o})
+
+
+def _nitro_nitrogen_oxides(mol, ester_o_idx: int, n):
+    """The two terminal oxygens of ``n`` when it is the nitro nitrogen of a nitrate ester whose ester oxygen is
+    ``ester_o_idx`` (``+1``, no hydrogen, degree 3, the ester linkage a single bond, one ``=O`` and one ``[O-]``
+    that bond to nothing else), else None."""
     bond_on = mol.GetBondBetweenAtoms(ester_o_idx, n.GetIdx())
     if bond_on is None or round(bond_on.GetBondTypeAsDouble()) != 1:
         return None
@@ -4435,7 +4455,7 @@ def _nitrooxy_atoms(mol, ester_o_idx: int):
         kinds.append((bt, oa.GetFormalCharge(), oa.GetTotalNumHs()))
     if sorted(kinds) != sorted([(2, 0, 0), (1, -1, 0)]):
         return None
-    return frozenset({ester_o_idx, n.GetIdx()} | {oa.GetIdx() for oa in other_o})
+    return other_o
 
 
 def _is_nitrooxy_root(mol, j: int) -> bool:

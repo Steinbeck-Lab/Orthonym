@@ -1658,6 +1658,20 @@ def _name_diazonium(mol, cation_idx: int, style: str) -> str:
     if parts is None:
         return ''
     proximal_n, terminal_n, parent_attach = parts
+    return (_name_diazonium_on_parent(mol, cation_idx, style, parts)
+            or _name_group_diazonium(mol, cation_idx, proximal_n, terminal_n, parent_attach))
+
+
+def _name_group_diazonium(mol, cation_idx: int, proximal_n: int, terminal_n: int, parent_attach: int) -> str:
+    """The name of the diazonium ion as '<group>diazonium' where the parent hydride does not carry it
+    (``group_diazonium.name_group_diazonium``): on a heteroatom or a heteroring."""
+    from .group_diazonium import name_group_diazonium
+    return name_group_diazonium(mol, cation_idx, proximal_n, terminal_n, parent_attach)
+
+
+def _name_diazonium_on_parent(mol, cation_idx: int, style: str, parts) -> str:
+    """The name of the diazonium ion on a parent hydride: azane for a nitrogen, else the parent of the carbon group."""
+    proximal_n, terminal_n, parent_attach = parts
     if mol.GetAtomWithIdx(parent_attach).GetSymbol() == 'N':   # the parent hydride of an amino group is azane
         from .azanediazonium import name_azanediazonium
         return name_azanediazonium(mol, proximal_n, parent_attach)
@@ -2094,6 +2108,9 @@ def emit_ring_cation_azanide(mol, cation_idx: int, anion_idx: int) -> str:
     if bond.GetBondType() not in (Chem.BondType.SINGLE, Chem.BondType.DOUBLE):
         return ''
     cation = cation_to_prefix(mol, cation_idx, anion_idx)
+    if not cation:
+        from .ring_cation_hydro import ring_cation_prefix_by_reentry   # a fused, bridged or hydro ring cation
+        cation = ring_cation_prefix_by_reentry(mol, cation_idx, anion_idx)
     if not cation:
         return ''
     prefixes = [cation]
@@ -3662,11 +3679,9 @@ def route_charged(mol, style: str = 'pin') -> str:
             # name abstains (the mononuclear emitter below declines ring centres).
             _uide_idx = sites['anions'][0]['atom_idx']
             if mol.GetAtomWithIdx(_uide_idx).IsInRing():
-                from .ions import emit_parent_hydride_cumulative_suffix
-                ring_uide = emit_parent_hydride_cumulative_suffix(mol, _uide_idx, 'uide')
-                if ring_uide and _full_inchikey_rt_ok(mol, ring_uide):
-                    return ring_uide
-                return ''
+                from .charged_spiro import ring_uide_name
+                ring_uide = ring_uide_name(mol, _uide_idx)   # a spiro junction's parent, else the ring hydride's
+                return ring_uide if ring_uide and _full_inchikey_rt_ok(mol, ring_uide) else ''
             from .ions import _emit_group13_uide
             uide = _emit_group13_uide(mol, sites['anions'][0]['atom_idx'])
             if uide:
@@ -4000,7 +4015,28 @@ def _aminide_alternative(mol, sites, style: str, demote: bool = False) -> str:
     # (labelled below the PIN where it is the anion of an amine, ``record_non_pin_azanide``) or of its substituent
     from .hydrazinide import emit_hydrazinide  # R2N-[NH-] of a hydrazine
     return (ring_aminide(mol, anion_idx, style) or emit_secondary_amine_azanide(mol, anion_idx, style)
-            or emit_primary_amine_anide(mol, anion_idx, style) or emit_hydrazinide(mol, anion_idx))
+            or emit_primary_amine_anide(mol, anion_idx, style) or emit_hydrazinide(mol, anion_idx)
+            or emit_hetero_group_azanide(mol, anion_idx))
+
+
+def emit_hetero_group_azanide(mol, anion_idx: int) -> str:
+    """The azanide of a group on a heteroatom: a primary amine anion R-[NH-] whose R is no carbon group
+    ('(methanesulfonyl)azanide', '(methylsulfanyl)azanide', '(dimethylphosphanyl)azanide').
+
+     "Anionic centers on other characteristic groups" (the Blue Book): "named on the basis of the
+    corresponding anionic parent hydrides" (:41079, 'acetylazanide (PIN)'). 'Amine' is the suffix of a carbon parent
+    and an NH- on a sulfur, a phosphorus or an oxygen has none, so the anion is the azanide of the group, which
+    ``_azanide_of_substituent`` names and reads back to the full InChIKey ('' on any decline, and when R is a carbon
+    group or a nitrogen: the hydrazine anion is ``emit_hydrazinide``'s). The Blue Book gives no example of such an anion
+    beside the acyl one, so the name is recorded as no PIN."""
+    a = mol.GetAtomWithIdx(anion_idx)
+    if (a.GetSymbol() != 'N' or a.GetFormalCharge() != -1 or a.GetTotalNumHs() != 1 or a.IsInRing()
+            or a.GetIsAromatic()):
+        return ''
+    heavy = [nb for nb in a.GetNeighbors() if nb.GetSymbol() != 'H']
+    if len(heavy) != 1 or heavy[0].GetSymbol() in ('C', 'N'):
+        return ''
+    return _azanide_of_substituent(mol, anion_idx)
 
 
 def _is_simple_terminal_radical(mol, center_idx: int) -> bool:

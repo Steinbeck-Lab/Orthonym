@@ -35,11 +35,25 @@ def group_prefix_candidates(mol, atoms: Sequence[int], attach: int, free_valence
         if not name or name in out:
             continue
         if free_valence_suffix == 'ylidene' and not name.endswith('ylidene'):
-            continue
+            name = _as_ylidene(name)
+            if not name or name in out:
+                continue
         if free_valence_suffix == 'yl' and name.endswith(('ylidene', 'ylidyne')):
             continue
         out.append(name)
     return out
+
+
+def _as_ylidene(name: str) -> str:
+    """The '-ylidene' of a group that a namer spelled '-yl' for want of the double bond to its parent, else ''.
+
+    The universal namer names a ring group by its own atoms and counts the bond to the parent as a single one: the group
+    '1,4-dihydroquinolin-4-yl' (C4 with one hydrogen) of a ring carbon that is double bonded to its parent has no
+    hydrogen, and its hydro prefixes are those of the ylidene: "General methodology for naming substituent groups"
+    (the Blue Book) forms '-ylidene' on the same stem and the same hydro prefixes, the free valence of two taking the
+    two hydrogens that 'yl' leaves one of ('cyclohexa-2,5-dien-1-ylidene' beside 'cyclohexa-2,5-dien-1-yl'). The caller reads
+    the name that it builds back to the full InChIKey, so a stem for which the form is another group is withheld there."""
+    return name[:-2] + 'ylidene' if name.endswith('yl') else ''
 
 
 def combinations(candidates: Sequence[Sequence[str]], limit: int = 12) -> Iterator[tuple]:

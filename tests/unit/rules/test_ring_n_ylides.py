@@ -43,6 +43,15 @@ ROWS = [
     ("CC1=CC=C(C=C1)S(=O)(=O)[N-][N+]2=CC=C(S2)C3=CC=CC=C3",
      "(4-methylbenzene-1-sulfonyl)(5-phenyl-1,2-thiazol-2-ium-2-yl)azanide"),
     ("C1=CN=C[N+](=C1)[NH-]", "(pyrimidin-1-ium-1-yl)azanide"),
+    # The two shapes that this builder declined before lane ION2 (a ring with an exocyclic double bond, an azole whose
+    # other nitrogen carries a group). method (1), the Blue Book: "all prefix names are formed by adding
+    # the suffixes 'yl', 'ylidene', etc. to the cation name", the cation name being the parent hydride and a hydron
+    #,:41366), here '3H-pyrrol-1-ium' and '1-methyl-1H-imidazol-3-ium'; the source gives no ring N-imide
+    # example. Independent check: the fresh OPSIN read below (2.9.0 and the dev pin both read these names) puts the
+    # charges on the atoms of the input. Mutation: ``test_the_fused_cation_fallback_is_what_names_them``.
+    ("CCCCC=C1C(CCCC)=C(c2ccccc2)[N+]([NH-])=C1c1ccccc1",
+     "(4-butyl-3-pentylidene-2,5-diphenyl-3H-pyrrol-1-ium-1-yl)azanide"),
+    ("[NH-][n+]1ccn(C)c1", "(1-methyl-1H-imidazol-3-ium-3-yl)azanide"),
 ]
 
 
@@ -82,12 +91,20 @@ def test_the_ring_cation_prefix_is_numbered_once_with_its_ring():
     "[CH2][N-][N+]1=CC=CC=C1",                              # a radical
     "CC(=O)C1=C2C(=C([N+]2=[N-])C=C1)[N+](=O)[O-]",         # a fused ring cation and a nitro group
     "CCCCCCCCCCCCCCCCCCOC1=CC=C(C=C1)CC23CCCC4([N+]2=[N-])CC[N+](=C4)CCC3",   # a second cation
-    "CCCCC=C1C(CCCC)=C(c2ccccc2)[N+]([NH-])=C1c1ccccc1",    # an exocyclic double bond on the ring
-    "[NH-][n+]1ccn(C)c1",                                    # an azole whose other nitrogen is substituted
     "C1=CC=C[N+]1=[N-].[Na+]",                               # more than one fragment
 ])
 def test_other_shapes_are_not_named_here(smiles):
     from orthonym.rules.ions import emit_ylide
+    assert emit_ylide(Chem.MolFromSmiles(smiles)) is None
+
+
+@pytest.mark.parametrize("smiles", ["CCCCC=C1C(CCCC)=C(c2ccccc2)[N+]([NH-])=C1c1ccccc1", "[NH-][n+]1ccn(C)c1"])
+def test_the_fused_cation_fallback_is_what_names_them(monkeypatch, smiles):
+    """The mutation of the two rows above: without the name of the cation itself (``ring_cation_prefix_by_reentry``) the
+    prefix of these shapes is not built and the builder names nothing, as before."""
+    from orthonym.rules import ring_cation_hydro
+    from orthonym.rules.ions import emit_ylide
+    monkeypatch.setattr(ring_cation_hydro, "ring_cation_prefix_by_reentry", lambda *a, **k: "")
     assert emit_ylide(Chem.MolFromSmiles(smiles)) is None
 
 

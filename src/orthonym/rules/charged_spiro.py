@@ -1,4 +1,4 @@
-"""The name of a spiro cation: the spiro parent, its groups and the suffix 'ylium' or 'ium'.
+"""The name of a spiro cation or boron anion: the spiro parent, its groups and the suffix 'ylium', 'ium' or 'uide'.
 
  SKELETAL REPLACEMENT ('a') NOMENCLATURE FOR CATIONS (the Blue Book), method (1): the compound is named
 with the neutral 'a' prefixes and the cationic centre by the suffix 'ium' or 'ylium'. A quaternary onium at a spiro
@@ -20,6 +20,11 @@ from rdkit import Chem, rdBase
 
 #: the elements whose standard bonding number is three: a junction cation with four bonds is the ylium of the λ5 hydride
 _YLIUM_ELEMENTS = frozenset({'N', 'P', 'As', 'Sb'})
+
+#: the elements of standard bonding number three whose junction anion has four ring bonds: the hydride ion added to the
+#: spiro hydride, the suffix 'uide' text, the Blue Book, its heading is missing from the OCR; example
+#: '2,2-dimethyl-2-boraspiro[4.5]decan-2-uide (PIN)',:41143)
+_UIDE_ELEMENTS = frozenset({'B', 'P', 'As', 'Sb'})
 
 
 def lambda_hydride(mol, cation_idx: int) -> Optional[Chem.Mol]:
@@ -51,15 +56,16 @@ def name_charged_spiro(mol, cation_idx: int) -> str:
     except (RuntimeError, IndexError, OverflowError):
         return ''
     # a single cationic (+1) ring HETEROATOM: a spiro ring carbon is already four-coordinate, and only a skeletal
-    # heteroatom takes the replacement 'a' prefix
-    if atom.GetFormalCharge() != 1 or not atom.IsInRing() or atom.GetSymbol() == 'C':
+    # heteroatom takes the replacement 'a' prefix; or the anion (-1) of a boron or pnictogen junction, 'uide'
+    uide = atom.GetFormalCharge() == -1 and atom.GetSymbol() in _UIDE_ELEMENTS and not atom.GetTotalNumHs()
+    if (atom.GetFormalCharge() != 1 and not uide) or not atom.IsInRing() or atom.GetSymbol() == 'C':
         return ''
     if not ring_system_is_pure_spiro(mol, cation_idx):
         return ''
     # the junction: all four bonds in rings, so the neutral atom is over-valent and has no group to sever
     if cation_idx not in get_spiro_atoms(mol):
         return ''
-    ylium = atom.GetSymbol() in _YLIUM_ELEMENTS and atom.GetTotalValence() == 4
+    ylium = not uide and atom.GetSymbol() in _YLIUM_ELEMENTS and atom.GetTotalValence() == 4
     named = lambda_hydride(mol, cation_idx) if ylium else mol
     result = name_spiro_system(named) if named is not None else None
     if result is None:
@@ -69,7 +75,7 @@ def name_charged_spiro(mol, cation_idx: int) -> str:
     if cation_idx not in ring_atoms or locant is None:
         return ''
     return ium_with_ring_groups(mol, parent_name, locant, ring_atoms, atom_to_locant,
-                                'ylium' if ylium else 'ium')
+                                'uide' if uide else 'ylium' if ylium else 'ium')
 
 
 def ring_system_is_pure_spiro(mol, cation_idx: int) -> bool:
@@ -101,3 +107,26 @@ def ium_with_ring_groups(mol, parent_name: str, locant, ring_atoms, atom_to_loca
     from ..assembly.composer import _enrich_complex_ring_with_subs
     stem = parent_name[:-1] if parent_name.endswith('e') else parent_name
     return _enrich_complex_ring_with_subs(mol, f"{stem}-{locant}-{suffix}", ring_atoms, atom_to_locant) or ''
+
+
+def ring_uide_name(mol, center_idx: int) -> str:
+    """The name of a ring centre with the charge -1 that is the hydride adduct of its ring hydride: the spiro parent of a
+    boron or pnictogen at a spiro junction, '5-boraspiro[4.4]nonan-5-uide', else the ring hydride and 'uide' at the centre
+    (``ions.emit_parent_hydride_cumulative_suffix``, '1,1-dimethylborinan-1-uide (PIN)', an example of "ANIONS FORMED
+    BY ADDITION OF HYDRIDE IONS", the Blue Book). '' when
+    there is none; the caller reads the name back to the full InChIKey.
+
+    The junction has four ring bonds, so the spiro hydride whose hydride ion is added has no standard bonding number there:
+    the book's 'uide' examples of a ring (the text of "Skeletal replacement ('a') nomenclature", the Blue Book,
+    whose heading is missing from the OCR: "Anionic centers in parent hydrides are named by two methods", with
+    '2,2-dimethyl-2-boraspiro[4.5]decan-2-uide (PIN)',:41143) have the centre off the junction, so the name of the junction
+    is valid and no PIN."""
+    atom = mol.GetAtomWithIdx(center_idx)
+    if atom.GetFormalCharge() == -1 and atom.GetSymbol() in _UIDE_ELEMENTS:
+        name = name_charged_spiro(mol, center_idx)
+        if name:
+            from ..metrics.provenance import record_non_pin_fragment
+            record_non_pin_fragment(name)
+            return name
+    from .ions import emit_parent_hydride_cumulative_suffix
+    return emit_parent_hydride_cumulative_suffix(mol, center_idx, 'uide')
