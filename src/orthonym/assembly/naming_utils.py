@@ -4215,15 +4215,15 @@ def alpha_sort_key_with_locants(name: str, locants_key: tuple = (), primary=None
     same for the N-substituents of an amide, the two acids of an anhydride, the esters of a diester, the
     groups of a silane). The tiers after, in this order:
 
-    1. the locants (``locants_key``): the locants of the names come before the configuration.
-       (``:21791``, under ``### **** CRITERIA RELATED TO NUMBER AND LOCATION OF SUBSTITUENT GROUPS``)
-       prefers "the lower locant or set of locants for substituents cited as prefixes... in their order of
-       citation in the name", and the example of ``****`` (``:22601``) gives that as the reason the
-       order of the locants wins: "'1,2,4' is senior to '4,2,1'". ``N1-[(2S)-butan-2-yl]-N3-[(2R)-butan-2-yl]
-       butane-1,3-diamine`` is the name, not ``N3-[(2R)-...]-N1-[(2S)-...]``. A site whose items carry
-       locants MUST pass them here; ```` is for a site whose items carry none (an owner list, the acids
-       of an anhydride, the groups on one atom). An item whose text already starts with its locants
-       (``2-[(1S)-1-chloroethyl]``) needs none: ``alpha_sort_key`` reads them (its own-locants tier);
+    1. the locants (``locants_key``) a site passes, ahead of the configuration: the callers' convention, not the book's.
+       ``****`` (``:3517``, under ``### **** ALPHANUMERICAL ORDER``) orders prefixes of identical letters by
+       the lowest locants INSIDE the prefix names ('2' before '3' in ``1-(pentan-2-yl)-4-(pentan-3-yl)benzene``; "the fact
+       that 'N' is lower than '4' is irrelevant", ``:3527``), which ``alpha_sort_key`` reads (own locants).
+       (``:21791``, under ``### **** CRITERIA RELATED TO NUMBER AND LOCATION OF SUBSTITUENT GROUPS``) takes the order of
+       citation as given. On a tie configuration decides: ``**** General principles`` (``:22272``, under ``###
+       **** CRITERIA RELATED ONLY TO CONFIGURATION``), ``4-{3,4-bis[(1R)-...]phenoxy}-1,2-bis[(1S)-...]benzene (PIN)``
+       (``:22597``): R first, at the higher locant 4; ``:22601`` is a rejected name that applies to a numbering.
+       The book's order is ```` (:func:`alpha_sort_key_total`); the ``N1-[(2S)...]-N3-[(2R)...]`` example once given: ASSUMED;
     2. the configurational symbols (:func:`cip_descriptor_rank_key`): clause (j) of ``### ****
        NUMBERING`` (``:3346``) puts ``Z``, ``R``, ``M``, ``r`` before ``E``, ``S``, ``P``, ``s``, and
        ``****`` (``:22603``, under ``### **** CRITERIA RELATED ONLY TO CONFIGURATION``) says
@@ -4259,9 +4259,9 @@ def alpha_sort_key_total(name: str) -> tuple:
     orders (the owners of a phosphate, the acids of an anhydride, the groups on one atom, the
     N-substituents of one nitrogen). The tiers and their sources are those of that function.
 
-    NOT for a site whose items carry locants and arrive in their order (the prefix groups of a ring, the
-    N-substituents of a polyamine): the locants of the names come first, ``:21791``), so such a
-    site passes them to:func:`alpha_sort_key_with_locants`, or keeps ``alpha_sort_key`` and its stable sort.
+    The key of the groups of a ring prefix too (``ring_prefix_numbering.citation_key``): the ring is numbered by it, so
+    the locants follow the citation (R first, ``:22597``). NOT for a site that cites by the locants it passes (the
+    N-substituents of a polyamine): it passes them to:func:`alpha_sort_key_with_locants`, or keeps ``alpha_sort_key``.
 
     Examples:
         >>> sorted(['(2S)-butan-2-yl', '(2R)-butan-2-yl'], key=alpha_sort_key_total)

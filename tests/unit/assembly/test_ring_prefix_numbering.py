@@ -33,6 +33,12 @@ CASES = [
     ("oxo cited after chloro and methyl",
      "CS(=O)(=O)OC1C(Cl)C(=O)CCC1C",
      "2-chloro-6-methyl-3-oxocyclohexyl methanesulfonate"),
+    # (:22603, under ``### **** CRITERIA RELATED ONLY TO CONFIGURATION``): the groups tie on,
+    # and 'R' precedes 'S' in the citation, so the R group takes locant 1 and is cited first
+    # (``1-[(1R)-1-bromoethyl]-1-[(1S)-1-bromoethyl]cyclopentane (PIN)``,:22609)
+    ("R cited before S: the two N-(1-chloroethyl) groups of an imidazolidine",
+     "OCC1N([C@H](C)Cl)CCN1[C@@H](C)Cl",
+     "{1-[(1R)-1-chloroethyl]-3-[(1S)-1-chloroethyl]imidazolidin-2-yl}methanol"),
 ]
 
 

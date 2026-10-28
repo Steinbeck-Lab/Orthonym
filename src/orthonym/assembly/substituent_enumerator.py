@@ -4230,9 +4230,9 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
     # ---- Step 4: name each decoration by recursion -------------------------
     from collections import defaultdict
 
-    from .naming_utils import alpha_sort_key, enclose_if_compound
+    from .naming_utils import enclose_if_compound
     from .naming_utils import multiplied_component as _mc
-    from .ring_prefix_numbering import prefix_order_numbering
+    from .ring_prefix_numbering import citation_key, prefix_order_numbering
     groups = defaultdict(list)
     named = []
     for ra, ni, branch in decorations:
@@ -4253,12 +4253,12 @@ def _recursive_fragment_substituent_name(mol, frag_atoms, attach_idx,
         groups[dname].append(pos[ra])
 
     # ---- Step 5: assemble one hyphenated token -----------------------------
-    parts = []  # (alpha_key, text)
+    parts = []  # (citation_key, text): the order the ring was numbered by, not the order of the atoms
     for dname, locs in groups.items():
         locs = sorted(locs)
         token = enclose_if_compound(dname)
         text = f"{','.join(str(l) for l in locs)}-{_mc(len(locs), dname, token)}"
-        parts.append((alpha_sort_key(dname), text))
+        parts.append((citation_key(dname), text))
     parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in parts)
     # Hyphen before the tail only when the tail is digit-initial (indicated H,

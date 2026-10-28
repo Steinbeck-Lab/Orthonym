@@ -3426,10 +3426,10 @@ def _build_n_substituted_name(
             sub_locants[name] = []
         sub_locants[name].append(locant)
 
-    # Build prefix parts, sorted alphabetically by substituent name. Two names that differ only in
-    # configuration tie in; the locants they are cited with decide first,:21791),
-    # then the configuration,:22603): N-[(1R)-..]-N'-[(1S)-..]urea, and with both on one N
-    # N-[(1R)-..]-N-[(1S)-..]. ``alpha_sort_key_with_locants`` is the one home of that order.
+    # Build prefix parts, sorted alphabetically by substituent name. Two names that differ only in configuration
+    # tie in; here the locants this site passes come first (its convention:,:3517, under, compares the
+    # locants inside the names), then R before S (``**** General principles``:22272, under; PIN:22597).
+    # ``alpha_sort_key_with_locants`` is the one home of that order: N-[(1R)-..]-N'-[(1S)-..]urea, N-[(1R)-..]-N-[(1S)-..].
     from .composition_primitives import prefix_locant_order_key
     from .naming_utils import apply_enclosing_marks, needs_brackets
 

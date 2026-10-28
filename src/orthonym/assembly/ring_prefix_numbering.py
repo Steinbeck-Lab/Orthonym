@@ -82,10 +82,20 @@ def stereo_atoms(mol, core) -> List[int]:
     return sorted(atoms)
 
 
+def citation_key(name):
+    """The order in which the groups of a ring prefix are cited: (alphanumerical order) and then, for
+    groups that tie on it because leaves the descriptors out (``(6R)-...`` and ``(6S)-...``), R before S
+    , ``:22603``, under ``### **** CRITERIA RELATED ONLY TO CONFIGURATION``; see
+    ``naming_utils.alpha_sort_key_total``). The order is a total one: a ``sorted`` that stops at the
+    alphanumerical key keeps the order its input had, which for a set of names is the order of their hashes
+    (the hash seed's) and for the groups of a prefix the order of the atoms of the input."""
+    from .naming_utils import alpha_sort_key_total
+    return alpha_sort_key_total(name)
+
+
 def g_key(numbering, named):
-    """ (g): the locants of the prefixes in the order they are cited (alphanumerical order)."""
-    from .naming_utils import alpha_sort_key
-    names = sorted({nm for _, nm in named}, key=alpha_sort_key)
+    """ (g): the locants of the prefixes in the order they are cited (``citation_key``)."""
+    names = sorted({nm for _, nm in named}, key=citation_key)
     return tuple(tuple(sorted(numbering[ra] for ra, nm in named if nm == n)) for n in names)
 
 
