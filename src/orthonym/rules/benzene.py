@@ -3747,53 +3747,8 @@ def benzene_prefix_citation_locants(
     Returns:
         Tuple of locant tuples, ordered by the prefix's citation position.
     """
-    pcg_set = set(principal_group_positions or ())
-    by_name: Dict[str, List[int]] = defaultdict(list)
-
-    def _n_substituent_names(sub):
-        """The italic-N prefixes this suffix instance will cite, if any."""
-        names = sub.get('n_substituents')
-        if not names:
-            candidate = sub.get('amine_candidate')
-            if isinstance(candidate, dict):
-                names = candidate.get('n_substituents')
-        return names or ()
-
-    for i, atom_idx in enumerate(oriented):
-        for sub in substituents.get(atom_idx) or ():
-            if not isinstance(sub, dict):
-                continue
-            if atom_idx in pcg_set:
-                for n_name in _n_substituent_names(sub):
-                    if n_name:
-                        by_name[n_name].append(i + 1)
-                continue
-            if sub.get('is_suffix'):
-                if not pcg_set:
-                    continue
-                suffix_name = sub.get('suffix_name')
-                name = _SUFFIX_TO_PREFIX.get(suffix_name, suffix_name)
-            else:
-                name = sub.get('name')
-            if name:
-                by_name[name].append(i + 1)
-
-    # Ordered by the SHARED total order, not by the raw ``alpha_sort_key``
-    # string. 's preamble (:3442) makes this a two-stage comparison --
-    # "Nonitalic Roman letters are considered first... When all the Roman
-    # letters are identical, the set of locants... are compared" -- and a single
-    # key string conflates the stages, because it still carries digits and,
-    # before the enclosing-mark strip, brackets. `4-[(1R)-1-chloroethyl]phenoxy`
-    # keyed as `1-chloroethylphenoxy`, whose leading '1' (ASCII 49) sorts under
-    # every letter, so it was cited ahead of `chloroethyl` and took locant 1 --
-    # the wrong numbering for gold row W2F-P8-01. `prefix_citation_sort_key`
-    # separates the stages (letters, then locants, then (j) configuration)
-    # and is the same authority the rest of the cascade consults.
-    from ..assembly.naming_utils import prefix_citation_sort_key
-    return tuple(
-        tuple(sorted(by_name[name]))
-        for name in sorted(by_name, key=prefix_citation_sort_key)
-    )
+    from .benzene_prefix_ties import prefix_citation_locants
+    return prefix_citation_locants(oriented, substituents, principal_group_positions)
 
 
 def _canonical_orbit_key(mol, oriented: List[int]) -> Tuple[int, ...]:
@@ -3961,6 +3916,15 @@ def orient_benzene(
     best_g = min(_g_key(o) for o in best_candidates)
     best_candidates = [o for o in best_candidates if _g_key(o) == best_g]
 
+    if len(best_candidates) == 1:
+        return best_candidates[0]
+
+    # --- (i) (the Blue Book) the lowest locants to the isotopically modified atoms, then (j) (the Blue Book) the CIP
+    # stereodescriptors cited inside the prefixes: (g) leaves R and S out, the Blue Book), and "isotopic
+    # modifications have seniority for low locants over stereodescriptors described in (j) below" (the Blue Book).
+    from .benzene_prefix_ties import narrow_by_isotopes_and_descriptors
+    best_candidates = narrow_by_isotopes_and_descriptors(
+        mol, best_candidates, substituents, principal_group_positions)
     if len(best_candidates) == 1:
         return best_candidates[0]
 

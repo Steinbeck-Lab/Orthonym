@@ -680,19 +680,56 @@ def _cip_key(descriptors):
     return tuple(out)
 
 
+def _isotope_then_cip(mol, tied, exo):
+    """The numberings of ``tied`` that stand after (i) (:3336), the lowest locants to the isotopically
+    modified atoms, and (j) (:3346), the CIP stereodescriptors of the parent and those cited inside its
+    prefixes, together, at their locants (``### **** NUMBERING``,:3219). "Isotopic modifications have
+    seniority for low locants over stereodescriptors described in (j) below" (:3346)."""
+    from ...assembly.locant_omission import isotope_locant_key
+    from ...assembly.naming_utils import numbering_cip_key
+    from ...perception.stereo import assign_stereochemistry
+    from ..stereochemistry import collect_stereodescriptors
+
+    def i_key(s):
+        return isotope_locant_key(mol, {a: numbering.loc_key(loc) for a, loc in s[4].atom_to_locant.items()})
+
+    best = min(i_key(s) for s in tied)
+    tied = [s for s in tied if i_key(s) == best]
+    if len(tied) == 1:
+        return tied
+
+    def j_key(s):
+        a2l = s[4].atom_to_locant
+        assign_stereochemistry(mol)
+        parent = [(numbering.loc_key(loc), code) for loc, code in collect_stereodescriptors(mol, a2l)]
+        return numbering_cip_key(parent, [(numbering.loc_key(a2l[a]), name)
+                                          for name, atoms in _prefix_groups(mol, a2l, set(exo)) for a in atoms])
+
+    best = min(j_key(s) for s in tied)
+    return [s for s in tied if j_key(s) == best]
+
+
 def _choose(mol, system, scored, suffix, exo, kind, pcg_atoms):
     """(name, parent, bridge prefixes) of the numbering and (b)-(g), (j)
     choose, or None."""
     best = min(s[0] for s in scored)
     tied = [s for s in scored if s[0] == best]
     if len(tied) > 1:
-        # (g) (:3307) "lowest locants for the substituent cited first as a prefix"
+        # (g) (:3307) "lowest locants for the substituent cited first as a prefix". leaves the
+        # stereodescriptors out (:3446), so the prefixes that tie with the first-cited one on it (its R and S
+        # twins) are that one prefix here; the choice between them is (j)'s, after (i) (:3336,:3346).
+        from ...assembly.naming_utils import alpha_sort_key
+
         def first_cited(s):
             groups = _prefix_groups(mol, s[4].atom_to_locant, set(exo))
-            return (numbering.locant_tuple(s[4].atom_to_locant[a] for a in groups[0][1])
-                    if groups else ())
+            if not groups:
+                return ()
+            k0 = alpha_sort_key(groups[0][0])
+            return numbering.locant_tuple(s[4].atom_to_locant[a] for name, atoms in groups
+                                          if alpha_sort_key(name) == k0 for a in atoms)
         g = min(first_cited(s) for s in tied)
         tied = [s for s in tied if first_cited(s) == g]
+        tied = _isotope_then_cip(mol, tied, exo)
     results = {}
     for key, sp, bps, state, nb, ih, hydro_atoms, added, need in tied:
         a2l = nb.atom_to_locant

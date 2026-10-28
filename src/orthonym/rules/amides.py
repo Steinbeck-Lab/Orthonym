@@ -18,6 +18,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import (
     alpha_sort_key,
+    alpha_sort_key_rs,
     alpha_sort_key_total,
     enclose_if_compound,
     get_multiplier_prefix,
@@ -1015,9 +1016,27 @@ def name_chain_diamide(
                 out.append(eff)
         return sorted(out)
 
-    fwd = _n_locants_for(False)
-    rev = _n_locants_for(True)
-    reverse = rev < fwd
+    def _tiers(reverse: bool):
+        """The numbering criteria that remain once the carbonyls are at the ends (``### ****
+        NUMBERING``, the Blue Book): (f) the locants of the N-prefixes together (:3301), (g) the prefix
+        cited first at the lowest locant (:3307), (i) the lowest locants to the isotopically modified atoms
+        (:3336), (j) the CIP stereodescriptors cited inside the prefixes at their locants (:3346). leaves
+        R and S out (:3446), so two N-prefixes that differ only in them tie on (g) and "isotopic modifications
+        have seniority for low locants over stereodescriptors described in (j)" (:3346)."""
+        from ..assembly.locant_omission import isotope_locant_key
+        from ..assembly.naming_utils import numbering_cip_key
+        eff_of = {}
+        for locant, match in positioned:
+            eff = (chain_len + 1 - locant) if reverse else locant
+            eff_of.update({a: eff for a in match})
+        eff_of.update({a: ((chain_len + 1 - atom_to_locant[a]) if reverse else atom_to_locant[a])
+                       for a in chain})
+        cited = [(((chain_len + 1 - locant) if reverse else locant), name)
+                 for locant, names in per_end for name in names]
+        return (_n_locants_for(reverse), sorted((alpha_sort_key(name), eff) for eff, name in cited),
+                isotope_locant_key(mol, eff_of), numbering_cip_key((), cited))
+
+    reverse = _tiers(True) < _tiers(False)
 
     # Build (effective_locant, name) pairs across both ends.
     placed = []  # (eff_locant, name)
@@ -1058,7 +1077,7 @@ def name_chain_diamide(
             from ..assembly.naming_utils import multiplied_component
             prefix = (f"{n_locant_str}-"
                       f"{multiplied_component(len(locants), name, display_name)}")
-        parts.append((alpha_sort_key(name), prefix))
+        parts.append((alpha_sort_key_rs(name), prefix))     # R before S: (the Blue Book)
 
     parts.sort(key=lambda p: p[0])
     n_prefix_string = "-".join(p[1] for p in parts)

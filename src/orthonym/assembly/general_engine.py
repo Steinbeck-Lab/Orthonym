@@ -2371,6 +2371,8 @@ def _orient_carbocycle(mol, ring_order, sub_positions, pg_ring_atoms, ionic=Fals
     The canonical-rank final tier is a deterministic symmetry-breaker; among
     orientations that tie on every IUPAC criterion the choice is round-trip
     equivalent (is the downstream authority for the emitted string)."""
+    from ..rules.heterocycles import _ring_prefix_names
+    from ..rules.ring_numbering_ties import ring_numbering_tie_key
     ring_list = list(ring_order)
     n = len(ring_list)
     if ionic:
@@ -2412,14 +2414,12 @@ def _orient_carbocycle(mol, ring_order, sub_positions, pg_ring_atoms, ionic=Fals
                 tied.append(oriented)
     names = None
     if len(tied) > 1:
-        from ..rules.heterocycles import _ring_prefix_names
         names = _ring_prefix_names(mol, set(ring_list), sub_positions, pg_ring_atoms)
 
     def _tie_key(oriented):
         loc = {a: i + 1 for i, a in enumerate(oriented)}
-        g_key = tuple(sorted((name, loc[a]) for a, lst in (names or {}).items()
-                             if a in loc for name in lst))
-        return (g_key, [canon[a] for a in oriented])
+        return (ring_numbering_tie_key(mol, names, loc, oriented) if names is not None else (),
+                [canon[a] for a in oriented])
 
     best_oriented = min(tied, key=_tie_key)
     return best_oriented, {a: i + 1 for i, a in enumerate(best_oriented)}

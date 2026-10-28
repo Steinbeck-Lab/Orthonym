@@ -237,6 +237,9 @@ def ring_or_chain_model(p, is_subst_unit):  # noqa: C901 -- one reading per pare
             return None
         feats['prefix'].append((pr.key, il))
         feats['prefix_src'].append(pr)
+    feats['stereo'] = _parent_stereo(p.stereo)
+    feats['prefix_cip'] = [(il, pr.raw) for pr, (_key, il) in zip(feats['prefix_src'], feats['prefix'])]
+    feats['prefix_class'] = [(pr.key, _own_locants(pr.raw)) for pr in feats['prefix_src']]
     allpos = feats['suffix'] + feats['unsat_b'] + feats['hydro'] + feats['ih'] + feats['addedH'] + \
         [x for _, lst in feats['prefix'] for x in lst] + list(feats['hetero'])
     if kind == 'fused':
@@ -248,6 +251,92 @@ def ring_or_chain_model(p, is_subst_unit):  # noqa: C901 -- one reading per pare
         return None
     perms = _chain_perms(n) if kind == 'chain' else _ring_perms(n)
     return kind, n, perms, feats
+
+
+_STEREO_TOKEN = re.compile(r"(\d+)([A-Za-z]+)")
+_CIP_CODES = ('R', 'S', 'r', 's', 'Z', 'E', 'M', 'P')
+
+
+def _parent_stereo(blocks):
+    """``[(locant, code)]`` of the stereo blocks of a unit ('2R,6S', '2Z,9E'), or None when a descriptor is
+    one the (j) term of:func:`vector` cannot place (a primed or lettered locant, 'rel', 'cis')."""
+    out = []
+    for block in blocks:
+        for tok in block.split(','):
+            m = _STEREO_TOKEN.fullmatch(tok.strip())
+            if m is None or m.group(2) not in _CIP_CODES:
+                return None
+            out.append((int(m.group(1)), m.group(2)))
+    return out
+
+
+#: the rank of a CIP descriptor for (j) (the Blue Book): "Z, R, M, and r (pseudoasymmetry) that are
+#: preferred to E, S, P, and s". The same table and the same key as ``naming_utils.cip_locant_rank_key``, which the
+#: numbering of the names reads; the checks import no naming code (test_pin_spelling_interface), so it is held here
+#: and ``tests/unit/validation/test_pin_spelling_numbering_stereo.py`` holds the two together.
+_J_RANK = {'z': 0, 'r': 0, 'm': 0, 'e': 1, 's': 1, 'p': 1}
+_DESCRIPTOR_BLOCK = re.compile(r"\(([^()]*)\)")
+_DESCRIPTOR_TOKEN = re.compile(r"(?:\d+[a-z]?)?([rsRSEZMP])")
+
+
+def _prefix_codes(raw):
+    """The CIP descriptors a prefix cites, in the order it cites them: ``['R', 'S']`` for
+    '(2R,3S)-3-chlorobutan-2-yl', ``['R']`` for '[(1R)-1-chloroethyl]sulfanyl'."""
+    out = []
+    for block in _DESCRIPTOR_BLOCK.findall(raw):
+        toks = block.split(',')
+        if all(_DESCRIPTOR_TOKEN.fullmatch(t) for t in toks):
+            out += [_DESCRIPTOR_TOKEN.fullmatch(t).group(1) for t in toks]
+    return out
+
+
+def _own_locants(raw):
+    """The locants a prefix cites inside its own name, in order, its stereodescriptors left out: ('1',) for
+    '(1S)-1-chloropropoxy', ('3', '2') for '(2R,3S)-3-chlorobutan-2-yl'. (the Blue Book) orders
+    prefixes of identical letters by them, so two prefixes are one to (g) only when these are the same too."""
+    text = _DESCRIPTOR_BLOCK.sub(
+        lambda m: '' if all(_DESCRIPTOR_TOKEN.fullmatch(t) for t in m.group(1).split(',')) else m.group(0), raw)
+    return tuple(re.findall(r"\d+[a-z]?", text))
+
+
+def _stereo_key(items):
+    """The (j) key of one numbering: ``(locant, code)`` pairs ranked in order of locant, the first point of
+    difference deciding; at one locant the preferred member of its pair, then (Sequence Rule 4a,:45465) a chiral
+    before a pseudoasymmetric one.  without a descriptor."""
+    rows = sorted((loc, _J_RANK[code.lower()], 0 if code.isupper() else 1) for loc, code in items)
+    return (tuple((loc, rank) for loc, rank, _kind in rows), tuple(kind for _loc, _rank, kind in rows)) if rows else ()
+
+
+def _cip_term(feats, mp, n, kind):
+    """The (j) term of:func:`vector`: the descriptors of the parent and of the prefixes, together, at the
+    locants numbering ``mp`` gives them (``### **** NUMBERING``, the Blue Book; ``(2Z,4S,8R,9E)-undeca-
+    2,9-diene-4,8-diol (PIN)``,:3403; ``1-[(2R)-butan-2-yl]-3-[(2S)-butan-2-yl]benzene (PIN)``,:3399). A prefix's
+    descriptors stand at the locant it is attached at, after those of the parent at that locant.  when the
+    descriptors of the unit cannot all be placed. A unit with an isotopic descriptor has no model
+    (``ring_or_chain_model``): (i), which comes before (j) (:3336,:3346), is not modelled here."""
+    if feats.get('stereo') is None:
+        return ()
+    items = []
+    for loc, code in feats['stereo']:
+        if code in ('Z', 'E'):
+            if loc not in feats['double_b']:
+                return ()
+            items.append(((bond_loc(mp[loc], mp[loc % n + 1 if kind == 'ring' else loc + 1], n, kind), 0), code))
+        elif loc in mp:
+            items.append(((mp[loc], 0), code))
+        else:
+            return ()
+    for il, raw in feats['prefix_cip']:
+        for x in il:
+            if x in mp:
+                items += [((mp[x], k), code) for k, code in enumerate(_prefix_codes(raw), 1)]
+    return _stereo_key(items)
+
+
+def prefix_labels(feats):
+    """The labels of the terms of:func:`vector` after:data:`LABELS`: one per prefix (the prefixes of one
+    alphanumerical key and own locants are one), then the stereodescriptors."""
+    return [f'prefix {k}' for k, _own in dict.fromkeys(feats['prefix_class'])] + ['stereodescriptors (j)']
 
 
 def bond_loc(a, b, n, kind):
@@ -285,8 +374,15 @@ def vector(feats, mp, n, kind, letters_first=True):
          tr(feats['ih']), tr(feats['suffix']), tr(feats['addedH']),
          sorted(tr(feats['hydro']) + trb(feats['unsat_b'])), trb(feats['double_b']),
          sorted(letters_ + numerals)]
-    for _, lst in feats['prefix']:
+    # (g) (:3307) compares the prefix cited first: prefixes with one alphanumerical key and the same own locants
+    #,:3517) are one prefix to it. leaves the stereodescriptors out (:3446), so two prefixes that
+    # differ only in R and S are one and their locants one set; the choice between them is (j)'s (:3346), after (i) (:3336), not this vector's.
+    by_class = {}
+    for cls, (_key, lst) in zip(feats['prefix_class'], feats['prefix']):
+        by_class.setdefault(cls, []).extend(lst)
+    for lst in by_class.values():
         v.append(tr(lst))
+    v.append(_cip_term(feats, mp, n, kind))
     return v
 
 

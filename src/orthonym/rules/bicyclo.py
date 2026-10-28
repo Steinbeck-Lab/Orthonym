@@ -767,21 +767,24 @@ def _bicyclo_tie_key(mol, ring_atoms, sub_bearing, suffix_set, ring_double_bonds
         if prefix_names is None:
             # A prefix could not be named: (g) is unknown, so (j) must not decide
             # a tie (g) might break; the canonical ranks alone keep determinism.
-            return ((), (), canon)
-        g_key = tuple(sorted((name, a2l[idx])
-                             for idx, names in prefix_names.items()
-                             if idx in a2l for name in names))
+            return ((), (), (), canon)
+        # (g) by, which leaves the stereodescriptors out (the Blue Book), so two prefixes that differ
+        # only in R and S, or Z and E, tie; then (i) (:3336), the lowest locants to the isotopically modified
+        # atoms, and only then (j) (:3346), the descriptors of the ring and of its prefixes together at their locants
+        here = [(idx, alpha, nm) for idx, lst in prefix_names.items() if idx in a2l for alpha, nm in lst]
+        g_key = tuple(sorted((alpha, a2l[idx]) for idx, alpha, _nm in here))
         j_key = ()
         if has_stereo:
-            from ..assembly.naming_utils import cip_locant_rank_key
+            from ..assembly.naming_utils import numbering_cip_key
             items = [(a2l[i], mol.GetAtomWithIdx(i).GetProp('_CIPCode'))
                      for i in a2l if mol.GetAtomWithIdx(i).HasProp('_CIPCode')]
             for a, b in ring_double_bonds:
                 bond = mol.GetBondBetweenAtoms(a, b)
                 if a in a2l and b in a2l and bond is not None and bond.HasProp('_CIPCode'):
                     items.append((min(a2l[a], a2l[b]), bond.GetProp('_CIPCode')))
-            j_key = cip_locant_rank_key(items)
-        return (g_key, j_key, canon)
+            j_key = numbering_cip_key(items, [(a2l[idx], nm) for idx, _alpha, nm in here])
+        from ..assembly.locant_omission import isotope_locant_key
+        return (g_key, isotope_locant_key(mol, a2l), j_key, canon)
 
     return key
 

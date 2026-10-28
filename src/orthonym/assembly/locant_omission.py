@@ -81,6 +81,7 @@ __all__ = [
     "isotopic_skeleton_scope",
     "skeleton_label_on_atoms",
     "skeleton_label_maps",
+    "isotope_locant_key",
     "isotope_retained_c2_unit_scope",
     "retained_c2_unit_has_isotope_label",
 ]
@@ -1601,3 +1602,45 @@ def skeleton_label_maps(mol, use_chirality: bool = False) -> Optional[List[Dict[
         return maps or None
     except Exception:  # noqa: BLE001 -- no answer
         return None
+
+
+def isotope_locant_key(mol, atom_to_locant) -> tuple:
+    """ (i) key of ONE numbering of the isotope-stripped skeleton ``mol`` being named
+    (:func:`isotopic_skeleton_scope`): "the starting point and the direction of numbering of the analogous
+    isotopically substituted compound are chosen so as to give lowest locants to the modified atoms or groups
+    considered together as a set in increasing numerical order. If a choice still remains, the lower locant
+    is given to the nuclide of higher atomic number. In the case of different nuclides of the same element,
+    the lower locant is assigned to the nuclide of higher mass number"
+    (``### **** NUMBERING``, ``the Blue Book``, criterion (i), ``:3336``). It stands before (j):
+    "isotopic modifications have seniority for low locants over stereodescriptors described in (j) below"
+    (``:3346``), so a numbering a stereodescriptor would choose is not chosen when a label says otherwise.
+
+    ``atom_to_locant`` numbers the parent; a label on an atom of a branch is cited at the parent atom the
+    branch hangs on (a modified group is cited with its attachment locant), as the polyamine numbering does
+    (``composer._polyamine_label_keys``). The labelled molecule is read with the configurations kept, so a
+    label on the (R) side of a skeleton whose two ends differ only in configuration is not read on the (S)
+    side; where the skeleton fits more than one way the lowest key of the fits stands. ```` when no
+    labelled molecule is declared, a skeleton has no label, or the skeleton does not map onto it: such a
+    numbering ties on (i). Lower sorts first."""
+    maps = skeleton_label_maps(mol, use_chirality=True)
+    if not maps or not any(maps):
+        return ()
+    owner = dict(atom_to_locant)
+    frontier = list(atom_to_locant)
+    while frontier:
+        nxt = []
+        for a in frontier:
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                b = nb.GetIdx()
+                if b not in owner:
+                    owner[b] = owner[a]
+                    nxt.append(b)
+        frontier = nxt
+    best = None
+    for labels in maps:
+        found = sorted((owner[a], -z, -mass) for a, nuclides in labels.items() if a in owner
+                       for z, mass in nuclides)
+        key = (tuple(f[0] for f in found), tuple(found))
+        if best is None or key < best:
+            best = key
+    return best if best and best[0] else ()

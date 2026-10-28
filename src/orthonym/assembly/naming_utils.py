@@ -4535,6 +4535,42 @@ cip_locant_rank_key([(2, 'E'), (4, 'R'), (8, 'S'), (9, 'Z')])
             tuple(kind for _loc, _rank, kind in rows))
 
 
+def numbering_cip_key(parent_items, prefixes=()) -> tuple:
+    """ (j) NUMBERING key of ONE candidate numbering: the stereodescriptors of the parent and those
+    cited inside its prefixes, compared TOGETHER at their locants, at the first point of difference.
+
+    ``### **** NUMBERING`` (``the Blue Book``) criterion (g) (``:3307``) orders the prefixes by
+    , which leaves the stereodescriptors out (``:3446``), so two prefixes that differ only in R and S
+    TIE under (g); (h) (``:3320``) and (i) (``:3336``, "isotopic modifications have seniority for low locants
+    over stereodescriptors described in (j)", ``:3346``) come before (j), and (j) (``:3346``) then gives "the
+    lower locant... to CIP stereodescriptors Z, R, M, and r... preferred to E, S, P, and s". Its own row,
+    ``1-[(2R)-butan-2-yl]-3-[(2S)-butan-2-yl]benzene (PIN)`` (``:3399``), is two prefixes; the next,
+    ``(2Z,4S,8R,9E)-undeca-2,9-diene-4,8-diol (PIN)`` (``:3403``), "(the choice is between 'E' and 'Z' for
+    position '2', not between 'R' and 'S' for position '4')" (``:3405``), compares the descriptors of the
+    parent in order of locant. A prefix's descriptors stand at the locant it is attached at; a prefix with
+    several ('(2R,3S)-3-chlorobutan-2-yl') cites them in the order of its own name, after the parent's own
+    at that locant.
+
+    ``parent_items`` are ``(locant, code)`` pairs of the parent (what:func:`cip_locant_rank_key` takes);
+    ``prefixes`` are ``(attachment locant, prefix name)`` pairs, the name as it is cited with its descriptors.
+    Empty when nothing cites a descriptor, so achiral numberings tie.
+
+    Examples:
+        >>> numbering_cip_key(, [(1, '(1R)-1-chloroethyl'), (3, '(1S)-1-chloroethyl')]) < \
+numbering_cip_key(, [(1, '(1S)-1-chloroethyl'), (3, '(1R)-1-chloroethyl')])
+        True
+        >>> numbering_cip_key([(2, 'Z'), (4, 'S')], ) < numbering_cip_key([(2, 'E'), (4, 'R')], )
+        True
+        >>> numbering_cip_key([(2, 'R'), (6, 'S')], [(3, '(1S)-1-chloroethyl')]) < \
+numbering_cip_key([(2, 'S'), (6, 'R')], [(3, '(1R)-1-chloroethyl')])
+        True
+    """
+    items = [((loc, 0), code) for loc, code in parent_items]
+    for loc, name in prefixes:
+        items.extend(((loc, k), code) for k, code in enumerate(cip_descriptor_codes(name), 1))
+    return cip_locant_rank_key(items)
+
+
 # (the Blue Book): the priority of the characters that are not letters or numbers, "listed
 # in decreasing priority order: braces > square brackets > parentheses (round brackets) > periods >
 # commas > semi-colons > colons > hyphens"; "Letters or numbers are always preferred to any other

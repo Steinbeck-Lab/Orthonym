@@ -963,17 +963,18 @@ def _spiro_exocyclic_prefix_atoms(mol, ring_atoms: Set[int]) -> List[int]:
     return out
 
 
-def _spiro_cip_locant_key(mol, mapping: Dict[int, int]) -> tuple:
-    """ (j) key (``naming_utils.cip_locant_rank_key``) of one spiro
+def _spiro_cip_locant_key(mol, mapping: Dict[int, int], prefixes=()) -> tuple:
+    """ (j) key (``naming_utils.numbering_cip_key``) of one spiro
     numbering: each numbered ring atom's R/S/r/s and each ring double bond's
-    Z/E, at its locant (the lower locant of the bond)."""
+    Z/E, at its locant (the lower locant of the bond), and the descriptors cited
+    inside the ``prefixes`` (``(locant, prefix name)``), together."""
     if not (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
                 for a in mol.GetAtoms())
             or any(b.GetStereo() != Chem.BondStereo.STEREONONE
                    for b in mol.GetBonds())):
         return ()
     try:
-        from ..assembly.naming_utils import cip_locant_rank_key
+        from ..assembly.naming_utils import numbering_cip_key
         from ..perception.stereo import assign_stereochemistry
         assign_stereochemistry(mol)
         items = []
@@ -987,7 +988,7 @@ def _spiro_cip_locant_key(mol, mapping: Dict[int, int]) -> tuple:
                     and b.GetBondType() == Chem.BondType.DOUBLE
                     and b.HasProp('_CIPCode')):
                 items.append((min(mapping[i], mapping[j]), b.GetProp('_CIPCode')))
-        return cip_locant_rank_key(items)
+        return numbering_cip_key(items, prefixes)
     except Exception:
         return ()
 
@@ -1028,6 +1029,7 @@ def _select_spiro_numbering(
 
         try:
             from .heterocycles import _ring_prefix_names
+            from .ring_numbering_ties import spiro_tie_key
             names = _ring_prefix_names(
                 full, {_at(a) for a in ring_set}, {_at(a) for a in prefix_atoms},
                 {_at(a) for a in suffix_set})
@@ -1037,14 +1039,9 @@ def _select_spiro_numbering(
             isotopic = any(a.GetIsotope() for a in mol.GetAtoms())
 
             def _g_j(mapping: Dict[int, int]):
-                at = {_at(a): loc for a, loc in mapping.items()}
-                g_key = tuple(sorted(
-                    (name, at[idx])
-                    for idx, lst in names.items() if idx in at
-                    for name in lst))
-                j_key = (() if isotopic or whole_molecule is not None
-                         else _spiro_cip_locant_key(mol, mapping))
-                return (g_key, j_key)
+                # (g) by, which leaves R and S out (the Blue Book); then (i) (:3336), then (j) (:3346)
+                return spiro_tie_key(mol, mapping, names, {_at(a): loc for a, loc in mapping.items()},
+                                     whole_molecule is not None, isotopic)
 
             return min(tied, key=lambda m: (_g_j(m), canon_key(m)))
     return min(tied, key=canon_key)

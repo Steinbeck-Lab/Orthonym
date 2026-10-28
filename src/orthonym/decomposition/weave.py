@@ -453,8 +453,28 @@ def _classify_attachment(mol, core_atom: int, core_set: Set[int], first_o,
 # Numbering + assembly
 # ---------------------------------------------------------------------------
 
+def _isotope_cip_key(mol, pos: Dict[int, int], prefix_on: Dict[int, List[str]]) -> tuple:
+    """ (i) then (j) (the Blue Book,:3346, under '### **** NUMBERING') for one numbering
+    ``pos`` of the core: the lowest locants to the isotopically modified atoms, then the CIP
+    stereodescriptors of the core and those cited inside its prefixes, together, at their locants. (g)
+    leaves the descriptors out,:3446), so two prefixes that differ only in R and S tie there, and
+    "isotopic modifications have seniority for low locants over stereodescriptors described in (j)" (:3346)."""
+    from ..assembly.locant_omission import isotope_locant_key
+    from ..assembly.naming_utils import numbering_cip_key
+    parent: list = []
+    try:
+        from ..perception.stereo import assign_stereochemistry
+        from ..rules.stereochemistry import collect_stereodescriptors
+        assign_stereochemistry(mol)
+        parent = list(collect_stereodescriptors(mol, pos, include_near_parent_ez=False))
+    except Exception:
+        pass
+    return (isotope_locant_key(mol, pos),
+            numbering_cip_key(parent, [(pos[a], t) for a, toks in prefix_on.items() for t in toks]))
+
+
 def _number_parent(parent: List[int], suffix_carbons: Set[int],
-                    prefix_on: Dict[int, List[str]]) -> Optional[Dict[int, int]]:
+                    prefix_on: Dict[int, List[str]], mol=None) -> Optional[Dict[int, int]]:
     def score(order):
         pos = {a: i + 1 for i, a in enumerate(order)}
         suf = sorted(pos[a] for a in suffix_carbons)
@@ -464,7 +484,7 @@ def _number_parent(parent: List[int], suffix_carbons: Set[int],
         # citation order) -- without it a tie kept the input's chain direction.
         alpha = sorted((alpha_sort_key(t), pos[a])
                        for a, toks in prefix_on.items() for t in toks)
-        return (suf, pre, alpha)
+        return (suf, pre, alpha) + (_isotope_cip_key(mol, pos, prefix_on) if mol is not None else ())
     fwd = parent
     rev = list(reversed(parent))
     best = min((fwd, rev), key=score)
@@ -745,7 +765,7 @@ def _build_from_core(mol, core_set: Set[int], acyl_carbons: Set[int]) -> Optiona
                      # polyol is already named correctly by the ordinary
                      # composer without decomposition)
 
-    numbering = _number_parent(core_order, suffix_carbons, prefix_on)
+    numbering = _number_parent(core_order, suffix_carbons, prefix_on, mol)
     if numbering is None:
         return None
 

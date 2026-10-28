@@ -3216,13 +3216,21 @@ def _condensed_guanidine_name(mol) -> tuple:
 
     from collections import defaultdict
     from .naming_utils import enclose_if_compound as _enc
+    from .locant_omission import isotope_locant_key
+    from .naming_utils import numbering_cip_key
     best = None
     for first, third in ((c1, c3), (c3, c1)):
         labels = {ends[first][0]: (1, 0), ends[first][1]: (1, 1),
                   ends[third][0]: (3, 0), ends[third][1]: (3, 1)}
         cited = sorted((labels[n], alpha_sort_key(nm))
                        for n, nms in subs_on.items() for nm in nms)
-        key = (tuple(c[0] for c in cited), tuple(cited))
+        # (f), (g), then the criteria of ``### **** NUMBERING`` (the Blue Book) that leaves
+        # open for two prefixes that differ only in R and S (:3446): (i) the lowest locants to the
+        # isotopically modified atoms (:3336), then (j) the CIP stereodescriptors cited inside the prefixes
+        # at their locants (:3346; N1-[(1R)-..]-N3-[(1S)-..], R at the lower locant).
+        core_loc = {first: (1, -1), n2: (2, -1), third: (3, -1), **labels}
+        key = (tuple(c[0] for c in cited), tuple(cited), isotope_locant_key(mol, core_loc),
+               numbering_cip_key((), [(labels[n], nm) for n, nms in subs_on.items() for nm in nms]))
         if best is None or key < best[0]:
             best = (key, labels)
     labels = best[1]
@@ -3235,7 +3243,8 @@ def _condensed_guanidine_name(mol) -> tuple:
         for nm in nms:
             groups[nm].append(labels[n_idx])
     parts = []
-    for nm in sorted(groups, key=lambda x: (alpha_sort_key(x), x)):
+    # R before S whatever the locants: (the Blue Book), (:45465)
+    for nm in sorted(groups, key=lambda x: (alpha_sort_key_rs(x), x)):
         locs = ",".join(_txt(l) for l in sorted(groups[nm]))
         from .naming_utils import multiplied_component as _mc
         parts.append(f"{locs}-{_mc(len(groups[nm]), nm, _enc(nm))}")
@@ -3317,7 +3326,26 @@ def _try_name_guanidine_core(features: Any, matches) -> Optional[str]:
                             for s in sorted(subs, key=alpha_sort_key))
             return (-len(subs), ordered, _n_idx)
 
-        subbed.sort(key=_assign_key)
+        # Two nitrogens whose substituents are alike on (it leaves R and S out,:3446) tie above; the
+        # tags N, N', N'' are then a choice of ``### **** NUMBERING`` (the Blue Book): (i) the lowest
+        # tags to the isotopically modified groups (:3336), then (j) the lower tag to the R prefix (:3346;
+        # N-[(1R)-..]-N'-[(1S)-..]). Taken over the orders of the substituted nitrogens, which are two or three.
+        from itertools import permutations
+
+        from .locant_omission import isotope_locant_key
+        from .naming_utils import numbering_cip_key
+
+        def _tag_key(order):
+            tag = {n: i + 1 for i, (n, _subs) in enumerate(order)}
+            tag.update({c_idx: 0, **{n: 0 for n in (n_single1_idx, n_single2_idx, n_double_idx)
+                                     if n not in tag}})
+            first = tuple(_assign_key(item) for item in order)
+            return (tuple(k[:2] for k in first), isotope_locant_key(mol, tag),
+                    numbering_cip_key((), [(i, s) for i, (_n, subs) in enumerate(order)
+                                           for s in sorted(subs, key=alpha_sort_key_rs)]),
+                    tuple(k[2] for k in first))
+
+        subbed = list(min(permutations(subbed), key=_tag_key))
         locant_labels = ["N", "N'", "N''"]
         tagged_subs = []
         for i, (_n_idx, subs) in enumerate(subbed):

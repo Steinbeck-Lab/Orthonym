@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 
 from ..pin_spelling import SpellingFailure, register
-from .models import LABELS, P10, UNSAT, read_units, ring_or_chain_model, show, vector
+from .models import LABELS, P10, UNSAT, prefix_labels, read_units, ring_or_chain_model, show, vector
 from .units import MULT, STEM_RE, STEMS, split_simple
 
 
@@ -51,7 +51,7 @@ def numbering_check(mol, name):
                 break
         if first.get(True) and first.get(False):
             v0, v = first[True]
-            labels = LABELS + [f'prefix {k}' for k, _ in feats['prefix']]
+            labels = LABELS + prefix_labels(feats)
             for lab, a, b in zip(labels, v0, v):
                 if a != b:
                     return SpellingFailure('P-14.4', f"{kind} '{p.parent}' in '{show(p.unit.text)[:60]}': "

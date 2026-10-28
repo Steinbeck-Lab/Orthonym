@@ -27,6 +27,7 @@ from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
 from .pyrrole_type import is_pyrrole_type
+from .ring_numbering_ties import ring_numbering_tie_key as _ring_tie_key
 
 logger = logging.getLogger(__name__)
 
@@ -494,11 +495,7 @@ def orient_heterocycle_with_substituents(
     if prefix_names is not None:
         def _tie_key(oriented_r):
             loc_map = {atom_idx: pos for pos, atom_idx in enumerate(oriented_r, 1)}
-            g_key = tuple(sorted(
-                (name, loc_map[idx])
-                for idx, names in prefix_names.items() if idx in loc_map
-                for name in names))
-            return (g_key, _ring_cip_locant_key(mol, oriented_r),
+            return (_ring_tie_key(mol, prefix_names, loc_map, oriented_r),
                     [_canon_rank[a] for a in oriented_r])
 
         tied.sort(key=_tie_key)
@@ -600,8 +597,8 @@ def _cascade_models_every_earlier_tier(mol, ring_list: List[int], heteroatoms) -
     return True
 
 
-def _ring_prefix_names(mol, ring_set: Set[int], positions, pg_set) -> Optional[Dict[int, List[str]]]:
-    """Alphanumerical sort keys of the prefix(es) on each substituted ring atom.
+def _ring_prefix_names(mol, ring_set: Set[int], positions, pg_set) -> Optional[Dict[int, List[Tuple[str, str]]]]:
+    """``(alphanumerical sort key, name)`` of the prefix(es) on each substituted ring atom.
 
     For the (g) tier of ``orient_heterocycle_with_substituents``. At a
     principal-group ring atom a HETEROATOM-rooted branch is the suffix (C-OH,
@@ -644,21 +641,22 @@ def _ring_prefix_names(mol, ring_set: Set[int], positions, pg_set) -> Optional[D
             nm = name_substituent_for_ordering(mol, sorted(frag), j)
             if not nm:
                 return None
-            lst.append(alpha_sort_key(nm))
+            lst.append((alpha_sort_key(nm), nm))
         names[idx] = lst
     return names
 
 
-def _ring_cip_locant_key(mol, oriented_r: List[int]) -> tuple:
-    """ (j) key (``naming_utils.cip_locant_rank_key``) of one ring numbering:
-    each ring atom's R/S/r/s and each ring double bond's Z/E at its locant."""
+def _ring_cip_locant_key(mol, oriented_r: List[int], prefixes=()) -> tuple:
+    """ (j) key (``naming_utils.numbering_cip_key``) of one ring numbering:
+    each ring atom's R/S/r/s and each ring double bond's Z/E at its locant, and the descriptors cited inside
+    the ring's ``prefixes`` (``(attachment locant, prefix name)`` pairs), together."""
     if not (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
                 for a in mol.GetAtoms())
             or any(b.GetStereo() != Chem.BondStereo.STEREONONE
                    for b in mol.GetBonds())):
         return ()
     try:
-        from ..assembly.naming_utils import cip_locant_rank_key
+        from ..assembly.naming_utils import numbering_cip_key
         from ..perception.stereo import assign_stereochemistry
         assign_stereochemistry(mol)
         n = len(oriented_r)
@@ -676,7 +674,7 @@ def _ring_cip_locant_key(mol, oriented_r: List[int]) -> tuple:
                 lo, hi = sorted((pos_of[a], pos_of[b_idx]))
                 items.append((n if (lo == 0 and hi == n - 1) else lo + 1,
                               bond.GetProp('_CIPCode')))
-        return cip_locant_rank_key(items)
+        return numbering_cip_key(items, prefixes)
     except Exception:
         return ()
 
@@ -2066,9 +2064,7 @@ def _ring_hydrogen_numbering(mol, ring_set: Set[int],
                     if len(tied) > 1 else None)
     if prefix_names is not None:
         def _tie_key(a2l):
-            g_key = tuple(sorted((name, a2l[idx]) for idx, names in prefix_names.items()
-                                 for name in names))
-            return (g_key, _ring_cip_locant_key(mol, _oriented(a2l)),
+            return (_ring_tie_key(mol, prefix_names, a2l, _oriented(a2l)),
                     [canon[a] for a in _oriented(a2l)])
         tied.sort(key=_tie_key)
     else:

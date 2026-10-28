@@ -40,7 +40,7 @@ from .hetero_chain_prefix import fragment_parent_to_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
 from .fragment_naming import name_fragment_recursively
-from .naming_utils import SIMPLE_MULTIPLIERS, alpha_sort_key, get_alkyl_name, has_structural_hyphen, multiplied_component, simple_multiplier_word
+from .naming_utils import SIMPLE_MULTIPLIERS, alpha_sort_key, alpha_sort_key_rs, get_alkyl_name, has_structural_hyphen, multiplied_component, simple_multiplier_word
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 logger = logging.getLogger(__name__)
@@ -3980,6 +3980,146 @@ def _is_clean_disulfide_partner(mol, s2: int, s1: int, sub_set) -> bool:
             and all(b.GetBondType() == Chem.BondType.SINGLE for b in a.GetBonds()))
 
 
+def _ether_link_groups(mol, sub_set, backbone, ether_links, _disulfide_partner, pos):
+    """The (R-oxy)/(R-sulfanyl) prefixes of the links, ``{prefix: [backbone locants]}``, under the
+    numbering ``pos``; None when a link cannot be named (the caller falls through)."""
+    from collections import defaultdict
+
+    from .naming_utils import (
+        _is_fully_enclosed,
+        apply_enclosing_marks,
+        is_complex_substituent,
+        is_substituted_substituent,
+        starts_with_locant,
+    )
+    from .substituent_prefix_forms import get_alkoxy_prefix
+
+    groups: dict = defaultdict(list)
+    for bb_c, o_idx, r_side in ether_links:
+        if mol.GetAtomWithIdx(o_idx).GetSymbol() == 'O':
+            oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
+            if not oxy or oxy == "alkoxy":
+                return None  # un-nameable R -> fall through (fail-closed)
+            # /: a CITED-LOCANT oxy prefix -- whether it already
+            # carries marks from a nested recursion ('(4-methoxyphenyl)methoxy')
+            # OR is a bare-but-substituted retained contraction ('4-nitrophenoxy',
+            # '4-methylphenoxy' -- keeps the CONTRACTED spelling even
+            # substituted, e.g. BB verbatim '(4-chlorophenoxy)benzene',
+            # '(2-nitrophenoxy)borane') -- must be enclosed AS A UNIT before
+            # concatenating the backbone stem: '(4-nitrophenoxy)methyl', mirroring
+            # the BB-verbatim sub-component pattern for the analogous (X-phenyl)
+            # case ('[(3-chlorophenyl)methyl]benzene', '2-[(4-bromophenyl)methyl]
+            # pyridine', '4-[(4-hydroxyphenyl)methyl]phenol' -- the retained
+            # contraction changes the SPELLING of the atomic unit, not whether a
+            # decorated, LOCANTED version of it needs its own marks as a
+            # sub-component).
+            #
+            # A RETAINED oxy prefix that carries NO locant of its own must stay
+            # bare, even though it is structurally a fused two-part compound:
+            # 'phenoxy', 'methoxy', 'benzyloxy', 'cyclohexyloxy' /
+            #, BB '2-benzylpyridine (PIN)' -- the retained-ROOT-word
+            # test, not a general compound-substituent test). ``is_complex_
+            # substituent``/``enclose_if_compound`` are the wrong primitive
+            # here -- a FIRST ATTEMPT used ``enclose_if_compound`` and it
+            # regressed a gold row: 'benzyloxy' and 'cyclohexyloxy' trip
+            # ``is_complex_substituent`` as a two-morpheme compound (like
+            # 'cyclohexylmethyl') even though they carry no substituent locant,
+            # over-nesting 'Oc1ccc(COCc2ccccc2)cc1' from the gold
+            # '4-(benzyloxymethyl)phenol' to a wrong '4-[(benzyloxy)methyl]
+            # phenol'. The decision this call site needs is narrower than
+            # "is this compound" -- it is "does this oxy prefix CITE A LOCANT" --
+            # so use ``starts_with_locant`` (the shared primitive for exactly
+            # that test, e.g. distinguishing 'chloro' from '4-chloro') instead.
+            #
+            # CORRECTED (TRIAGE g6 C15, j5): the bare-case half of the comment
+            # above does not hold. Only the contracted prefixes are
+            # SIMPLE ("considered as simple prefixes", the Blue Book:
+            # methoxy, ethoxy, propoxy, butoxy, phenoxy, tert-butoxy); every
+            # other '<R>yloxy' is a concatenation and therefore a
+            # COMPOUND prefix, which (:7232) encloses -- the Blue
+            # Book's own rows cite 'benzyloxy' inside another prefix as
+            # '(benzyloxy)carbonyl (preferred prefix)' (:18116) and
+            # '(chloromethyl)(methyl)silane (PIN)' (:7286) encloses a compound
+            # first-cited prefix. 'N-(decyloxymethyl)' shipped at pin_verified;
+            # now '[(decyloxy)methyl]'. The predicate is the shared
+            # ``is_substituted_substituent`` (False exactly for the contracted
+            # set, True for 'decyloxy', 'benzyloxy', 'cyclohexyloxy').
+            if (not _is_fully_enclosed(oxy)
+                    and (('(' in oxy or '[' in oxy) or starts_with_locant(oxy)
+                         or is_substituted_substituent(oxy))):
+                oxy = apply_enclosing_marks(oxy, -1)
+        else:  # S / Se / Te -> (R)sulfanyl / (R)selanyl / (R)tellanyl concatenation)
+            # Name the R side with the proper substituent namer so a RING-bearing
+            # R (benzyl -> 'benzyl') is not flattened to a carbon count
+            # (get_sulfanyl_prefix mis-counts benzyl's 7 carbons as 'heptyl').
+            # Collect R's atoms (everything on the far side of the S link).
+            _r_atoms: List[int] = []
+            _r_seen = {o_idx}
+            _stack = [r_side]
+            while _stack:
+                _cur = _stack.pop()
+                if _cur in _r_seen:
+                    continue
+                _r_seen.add(_cur)
+                _r_atoms.append(_cur)
+                for _n in mol.GetAtomWithIdx(_cur).GetNeighbors():
+                    if _n.GetIdx() in sub_set and _n.GetIdx() not in _r_seen:
+                        _stack.append(_n.GetIdx())
+            _ss = _disulfide_partner.get(o_idx)
+            if _ss is not None:
+                # -S-S-R: R is beyond the second sulfur
+                _r_c = [n.GetIdx() for n in mol.GetAtomWithIdx(_ss).GetNeighbors()
+                        if n.GetIdx() != o_idx]
+                if len(_r_c) != 1:
+                    return None
+                _r_atoms = [a for a in _r_atoms if a != _ss]
+                _r_name = name_substituent_fragment(mol, _r_atoms, _r_c[0], [_ss])
+                if not _r_name or ' ' in _r_name:
+                    return None
+                _r_enclosed = (apply_enclosing_marks(_r_name, -1)
+                               if is_complex_substituent(_r_name) else _r_name)
+                groups[apply_enclosing_marks(f"{_r_enclosed}disulfanyl", -1)].append(pos[bb_c])
+                continue
+            _r_name = name_substituent_fragment(mol, _r_atoms, r_side, [o_idx])
+            if not _r_name or ' ' in _r_name:
+                return None  # un-nameable R -> fall through (fail-closed)
+            # /: a COMPOUND R ('methoxymethyl') must itself be
+            # enclosed before concatenating 'sulfanyl' -> '(methoxymethyl)
+            # sulfanyl'; a simple/retained R ('benzyl','methyl') stays bare ->
+            # 'benzylsulfanyl'. Then '{R}sulfanyl' is a compound prefix and is
+            # ALWAYS enclosed (escalating when it already carries brackets):
+            # '(benzylsulfanyl)', '[(methoxymethyl)sulfanyl]'. The outer mark
+            # escalates again on the parent.
+            _r_enclosed = apply_enclosing_marks(_r_name, -1) if is_complex_substituent(_r_name) else _r_name
+            _sfx = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}[mol.GetAtomWithIdx(o_idx).GetSymbol()]
+            oxy = apply_enclosing_marks(f"{_r_enclosed}{_sfx}", -1)
+        groups[oxy].append(pos[bb_c])
+    return groups
+
+
+def _free_ether_numbering(mol, sub_set, backbone, ether_links, _disulfide_partner, walk, rev_walk):
+    """The two ends of the backbone tie on the free valence and on the locants of the links: the
+    criteria of NUMBERING that remain (the Blue Book): (g) the prefix cited first at the
+    lowest locant (:3307), (i) the lowest locants to the isotopically modified atoms (:3336), (j) the CIP
+    stereodescriptors cited inside the prefixes at their locants (:3346; leaves the descriptors
+    out,:3446, so two links that differ only in R and S tie on (g) and "isotopic modifications have
+    seniority for low locants over stereodescriptors described in (j) below",:3346)."""
+    from .locant_omission import isotope_locant_key
+    from .naming_utils import alpha_sort_key as _ask
+    from .naming_utils import numbering_cip_key
+
+    def keyed(order):
+        p = {a: i + 1 for i, a in enumerate(order)}
+        g = _ether_link_groups(mol, sub_set, backbone, ether_links, _disulfide_partner, p)
+        if g is None:
+            return None
+        links = [(loc, name) for name, locs in g.items() for loc in locs]
+        return (sorted((_ask(name), loc) for loc, name in links), isotope_locant_key(mol, p),
+                numbering_cip_key((), links))
+    a, b = keyed(walk), keyed(rev_walk)
+    return rev_walk if a is not None and b is not None and b < a else walk
+
+
 def _name_ether_substituted_chain(
     mol,
     sub_atoms: List[int],
@@ -4152,6 +4292,13 @@ def _name_ether_substituted_chain(
     if accounted != sub_set:
         return None  # unaccounted atoms -> richer case, fall through
 
+    from ..data.chain_names import get_chain_prefix
+    from .naming_utils import (
+        _is_fully_enclosed,
+        apply_enclosing_marks,
+        is_complex_substituent,
+    )
+
     # Number the linear backbone. For a TERMINAL attachment the walk starting
     # at attach_idx already gives it locant 1 (byte-identical to the prior
     # behaviour). For an INTERNAL attachment, walk the path from either end
@@ -4203,124 +4350,16 @@ def _name_ether_substituted_chain(
             rev_walk = list(reversed(walk))
             ordered = rev_walk if _ether_locs(rev_walk) < _ether_locs(walk) \
                 else walk
+            if _ether_locs(rev_walk) == _ether_locs(walk):
+                ordered = _free_ether_numbering(mol, sub_set, backbone, ether_links, _disulfide_partner,
+                                                walk, rev_walk)
     if len(ordered) != len(backbone):
         return None  # disconnected backbone -> fall through
     pos = {idx: i + 1 for i, idx in enumerate(ordered)}
     k_attach = pos[attach_idx]
-
-    # Name each ether-type link as an (R-oxy)/(R-sulfanyl) prefix at its
-    # backbone-carbon locant.
-    from collections import defaultdict
-
-    from ..data.chain_names import get_chain_prefix
-    from .naming_utils import (
-        _is_fully_enclosed,
-        apply_enclosing_marks,
-        is_complex_substituent,
-        is_substituted_substituent,
-        starts_with_locant,
-    )
-    from .substituent_prefix_forms import get_alkoxy_prefix
-    groups: dict = defaultdict(list)
-    for bb_c, o_idx, r_side in ether_links:
-        if mol.GetAtomWithIdx(o_idx).GetSymbol() == 'O':
-            oxy = get_alkoxy_prefix(mol, (o_idx, bb_c, r_side), backbone)
-            if not oxy or oxy == "alkoxy":
-                return None  # un-nameable R -> fall through (fail-closed)
-            # /: a CITED-LOCANT oxy prefix -- whether it already
-            # carries marks from a nested recursion ('(4-methoxyphenyl)methoxy')
-            # OR is a bare-but-substituted retained contraction ('4-nitrophenoxy',
-            # '4-methylphenoxy' -- keeps the CONTRACTED spelling even
-            # substituted, e.g. BB verbatim '(4-chlorophenoxy)benzene',
-            # '(2-nitrophenoxy)borane') -- must be enclosed AS A UNIT before
-            # concatenating the backbone stem: '(4-nitrophenoxy)methyl', mirroring
-            # the BB-verbatim sub-component pattern for the analogous (X-phenyl)
-            # case ('[(3-chlorophenyl)methyl]benzene', '2-[(4-bromophenyl)methyl]
-            # pyridine', '4-[(4-hydroxyphenyl)methyl]phenol' -- the retained
-            # contraction changes the SPELLING of the atomic unit, not whether a
-            # decorated, LOCANTED version of it needs its own marks as a
-            # sub-component).
-            #
-            # A RETAINED oxy prefix that carries NO locant of its own must stay
-            # bare, even though it is structurally a fused two-part compound:
-            # 'phenoxy', 'methoxy', 'benzyloxy', 'cyclohexyloxy' /
-            #, BB '2-benzylpyridine (PIN)' -- the retained-ROOT-word
-            # test, not a general compound-substituent test). ``is_complex_
-            # substituent``/``enclose_if_compound`` are the wrong primitive
-            # here -- a FIRST ATTEMPT used ``enclose_if_compound`` and it
-            # regressed a gold row: 'benzyloxy' and 'cyclohexyloxy' trip
-            # ``is_complex_substituent`` as a two-morpheme compound (like
-            # 'cyclohexylmethyl') even though they carry no substituent locant,
-            # over-nesting 'Oc1ccc(COCc2ccccc2)cc1' from the gold
-            # '4-(benzyloxymethyl)phenol' to a wrong '4-[(benzyloxy)methyl]
-            # phenol'. The decision this call site needs is narrower than
-            # "is this compound" -- it is "does this oxy prefix CITE A LOCANT" --
-            # so use ``starts_with_locant`` (the shared primitive for exactly
-            # that test, e.g. distinguishing 'chloro' from '4-chloro') instead.
-            #
-            # CORRECTED (TRIAGE g6 C15, j5): the bare-case half of the comment
-            # above does not hold. Only the contracted prefixes are
-            # SIMPLE ("considered as simple prefixes", the Blue Book:
-            # methoxy, ethoxy, propoxy, butoxy, phenoxy, tert-butoxy); every
-            # other '<R>yloxy' is a concatenation and therefore a
-            # COMPOUND prefix, which (:7232) encloses -- the Blue
-            # Book's own rows cite 'benzyloxy' inside another prefix as
-            # '(benzyloxy)carbonyl (preferred prefix)' (:18116) and
-            # '(chloromethyl)(methyl)silane (PIN)' (:7286) encloses a compound
-            # first-cited prefix. 'N-(decyloxymethyl)' shipped at pin_verified;
-            # now '[(decyloxy)methyl]'. The predicate is the shared
-            # ``is_substituted_substituent`` (False exactly for the contracted
-            # set, True for 'decyloxy', 'benzyloxy', 'cyclohexyloxy').
-            if (not _is_fully_enclosed(oxy)
-                    and (('(' in oxy or '[' in oxy) or starts_with_locant(oxy)
-                         or is_substituted_substituent(oxy))):
-                oxy = apply_enclosing_marks(oxy, -1)
-        else:  # S / Se / Te -> (R)sulfanyl / (R)selanyl / (R)tellanyl concatenation)
-            # Name the R side with the proper substituent namer so a RING-bearing
-            # R (benzyl -> 'benzyl') is not flattened to a carbon count
-            # (get_sulfanyl_prefix mis-counts benzyl's 7 carbons as 'heptyl').
-            # Collect R's atoms (everything on the far side of the S link).
-            _r_atoms: List[int] = []
-            _r_seen = {o_idx}
-            _stack = [r_side]
-            while _stack:
-                _cur = _stack.pop()
-                if _cur in _r_seen:
-                    continue
-                _r_seen.add(_cur)
-                _r_atoms.append(_cur)
-                for _n in mol.GetAtomWithIdx(_cur).GetNeighbors():
-                    if _n.GetIdx() in sub_set and _n.GetIdx() not in _r_seen:
-                        _stack.append(_n.GetIdx())
-            _ss = _disulfide_partner.get(o_idx)
-            if _ss is not None:
-                # -S-S-R: R is beyond the second sulfur
-                _r_c = [n.GetIdx() for n in mol.GetAtomWithIdx(_ss).GetNeighbors()
-                        if n.GetIdx() != o_idx]
-                if len(_r_c) != 1:
-                    return None
-                _r_atoms = [a for a in _r_atoms if a != _ss]
-                _r_name = name_substituent_fragment(mol, _r_atoms, _r_c[0], [_ss])
-                if not _r_name or ' ' in _r_name:
-                    return None
-                _r_enclosed = (apply_enclosing_marks(_r_name, -1)
-                               if is_complex_substituent(_r_name) else _r_name)
-                groups[apply_enclosing_marks(f"{_r_enclosed}disulfanyl", -1)].append(pos[bb_c])
-                continue
-            _r_name = name_substituent_fragment(mol, _r_atoms, r_side, [o_idx])
-            if not _r_name or ' ' in _r_name:
-                return None  # un-nameable R -> fall through (fail-closed)
-            # /: a COMPOUND R ('methoxymethyl') must itself be
-            # enclosed before concatenating 'sulfanyl' -> '(methoxymethyl)
-            # sulfanyl'; a simple/retained R ('benzyl','methyl') stays bare ->
-            # 'benzylsulfanyl'. Then '{R}sulfanyl' is a compound prefix and is
-            # ALWAYS enclosed (escalating when it already carries brackets):
-            # '(benzylsulfanyl)', '[(methoxymethyl)sulfanyl]'. The outer mark
-            # escalates again on the parent.
-            _r_enclosed = apply_enclosing_marks(_r_name, -1) if is_complex_substituent(_r_name) else _r_name
-            _sfx = {'S': 'sulfanyl', 'Se': 'selanyl', 'Te': 'tellanyl'}[mol.GetAtomWithIdx(o_idx).GetSymbol()]
-            oxy = apply_enclosing_marks(f"{_r_enclosed}{_sfx}", -1)
-        groups[oxy].append(pos[bb_c])
+    groups = _ether_link_groups(mol, sub_set, backbone, ether_links, _disulfide_partner, pos)
+    if groups is None:
+        return None
 
     # ---- multiplier + locant licence, both DELEGATED. ----
     # This block used to carry a private ``_MULT = {2: 'bis', 3: 'tris',...}`` (one
@@ -4337,7 +4376,8 @@ def _name_ether_substituted_chain(
         mol, sub_atoms, backbone, groups, attach_locant=k_attach)
     part_strings = []
     # Alphanumerical order by the (compound) oxy prefix name.
-    for prefix in sorted(groups.keys(), key=alpha_sort_key):
+    # R before S whatever the locants: (the Blue Book), (:45465)
+    for prefix in sorted(groups.keys(), key=alpha_sort_key_rs):
         locs = sorted(groups[prefix])
         n_occ = len(locs)
         # `****` (the Blue Book) "The numerical prefixes 'bis', 'tris',

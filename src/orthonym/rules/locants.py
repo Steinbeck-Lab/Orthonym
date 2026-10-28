@@ -380,6 +380,8 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
       'substituents' detachable-prefix locant set (f))
       'alpha' sortable key giving the alphabetically-first (g))
                      prefix the lowest locant
+      'isotopes' ``locant_omission.isotope_locant_key`` (i))
+      'cip' ``naming_utils.numbering_cip_key`` (j))
 
     Returns -1 if ``candidate_a`` is preferred, +1 if ``candidate_b``, 0 if
     every active tier ties. ``compare_locant_sets`` is reused unchanged as the
@@ -427,6 +429,16 @@ def compare_numbering(candidate_a: Dict, candidate_b: Dict) -> int:
             return -1
         if a_alpha > b_alpha:
             return 1
+
+    # Tiers 6 and 7 -- (i) the lowest locants to the isotopically modified atoms (the Blue Book), then
+    # (j) the CIP stereodescriptors of the parent and those cited inside its prefixes, together, at their
+    # locants (:3346), as ``assembly.locant_omission.isotope_locant_key`` and ``naming_utils.numbering_cip_key``
+    # build them; (g) leaves R and S out,:3446) and "isotopic modifications have seniority for low
+    # locants over stereodescriptors described in (j) below" (:3346).
+    for tier in ('isotopes', 'cip'):
+        a_key, b_key = candidate_a.get(tier), candidate_b.get(tier)
+        if (a_key or ()) != (b_key or ()):
+            return -1 if (a_key or ()) < (b_key or ()) else 1
 
     return 0
 
@@ -609,6 +621,8 @@ def orient_chain(
             if result == 1:
                 return reverse
 
+    prefix_names = _lazy_prefix_names(chain, substituent_positions, mol)
+
     # --- Criterion (e): Lowest locant for alphabetically first substituent ---
     # (g): when substituent locant sets are identical in both directions,
     # prefer the orientation giving the lowest locant to the first-cited prefix
@@ -616,12 +630,17 @@ def orient_chain(
     if substituent_positions:
         sub_atoms = set(substituent_positions.keys()) & chain_set
         if len(sub_atoms) >= 2:  # Need 2+ substituent positions for this to matter
-            fwd_alpha = _alphabetical_tiebreaker(forward, fwd_map, substituent_positions, mol)
-            rev_alpha = _alphabetical_tiebreaker(reverse, rev_map, substituent_positions, mol)
+            fwd_alpha = _alphabetical_tiebreaker(forward, fwd_map, substituent_positions, mol, prefix_names())
+            rev_alpha = _alphabetical_tiebreaker(reverse, rev_map, substituent_positions, mol, prefix_names())
             if fwd_alpha < rev_alpha:
                 return forward
             if rev_alpha < fwd_alpha:
                 return reverse
+
+    # --- Criterion (i): the lowest locants to the isotopically modified atoms, before (j) ---
+    iso = _isotope_choice(mol, fwd_map, rev_map)
+    if iso:
+        return forward if iso < 0 else reverse
 
     # --- Criterion (f): (j) CIP-stereodescriptor lowest-locant tie-break ---
     # Reached only when (a)-(e) all tie: the two orientations differ only in the
@@ -650,9 +669,9 @@ def orient_chain(
             from ..perception.stereo import assign_stereochemistry
             assign_stereochemistry(mol)
             fwd_key = _cip_numbering_key(forward, fwd_map, double_bonds,
-                                        chain_set, mol)
+                                        chain_set, mol, prefix_names())
             rev_key = _cip_numbering_key(reverse, rev_map, double_bonds,
-                                        chain_set, mol)
+                                        chain_set, mol, prefix_names())
             if fwd_key != rev_key:
                 return forward if fwd_key < rev_key else reverse
         except Exception:
@@ -824,41 +843,41 @@ def get_bond_locants(
 # ---------------------------------------------------------------------------
 
 
-def _alphabetical_tiebreaker(
+def _lazy_prefix_names(chain: List[int], substituent_positions: Dict[int, List], mol):
+    """A call that gives:func:`_chain_prefix_names` of the chain, made once and only when a tie asks."""
+    made: List[List[Tuple[int, str]]] = []
+
+    def names() -> List[Tuple[int, str]]:
+        if not made:
+            made.append(_chain_prefix_names(chain, substituent_positions, mol) if substituent_positions else [])
+        return made[0]
+    return names
+
+
+def _isotope_choice(mol, fwd_map: Dict[int, int], rev_map: Dict[int, int]) -> int:
+    """-1 when the forward numbering, +1 when the reverse one gives the lower locants to the isotopically modified
+    atoms or groups, 0 when they tie: (i) (the Blue Book, under '### **** NUMBERING'), which comes
+    before (j) (:3346): "isotopic modifications have seniority for low locants over stereodescriptors described in
+    (j) below"."""
+    from ..assembly.locant_omission import isotope_locant_key
+    fwd, rev = isotope_locant_key(mol, fwd_map), isotope_locant_key(mol, rev_map)
+    return 0 if fwd == rev else (-1 if fwd < rev else 1)
+
+
+def _chain_prefix_names(
     chain: List[int],
-    atom_to_locant: Dict[int, int],
     substituent_positions: Dict[int, List],
     mol,
-) -> tuple:
-    """Build a comparison key for the alphabetical tiebreaker (criterion e).
-
-    For each substituent attachment point on the chain, determine the
-    substituent name (based on carbon count for simple alkyl groups) and
-    its locant. Return a tuple of (alpha_sort_key, locant) pairs sorted
-    by alpha_sort_key first, so that lexicographic comparison of tuples
-    selects the orientation giving the lowest locant to the
-    alphabetically first substituent.
-
-    Args:
-        chain: Ordered chain atom indices.
-        atom_to_locant: Mapping from atom index to 1-indexed locant.
-        substituent_positions: Dict mapping chain atom index to list of
-            substituent atom groups.
-        mol: RDKit Mol object.
-
-    Returns:
-        Tuple for lexicographic comparison. Lower = preferred.
-    """
-    from ..assembly.naming_utils import alpha_sort_key, get_alkyl_name
+) -> List[Tuple[int, str]]:
+    """``(chain atom, name of the prefix it carries)`` for every substituent of the chain, the prefix
+    named as it is cited (with its stereodescriptors) -- what (g) orders and (j) reads."""
+    from ..assembly.naming_utils import get_alkyl_name
 
     chain_set = set(chain)
-    entries = []
+    named: List[Tuple[int, str]] = []
 
     for atom_idx, sub_groups in substituent_positions.items():
         if atom_idx not in chain_set:
-            continue
-        locant = atom_to_locant.get(atom_idx)
-        if locant is None:
             continue
 
         # Count carbon atoms in the first substituent group at this position
@@ -914,7 +933,42 @@ def _alphabetical_tiebreaker(
                         name = mol.GetAtomWithIdx(sub_atoms[0]).GetSymbol().lower()
                     else:
                         name = "zzz"
-            entries.append((alpha_sort_key(name), locant))
+            named.append((atom_idx, name))
+    return named
+
+
+def _alphabetical_tiebreaker(
+    chain: List[int],
+    atom_to_locant: Dict[int, int],
+    substituent_positions: Dict[int, List],
+    mol,
+    names: Optional[List[Tuple[int, str]]] = None,
+) -> tuple:
+    """Build a comparison key for the alphabetical tiebreaker (criterion e).
+
+    For each substituent attachment point on the chain, determine the
+    substituent name (based on carbon count for simple alkyl groups) and
+    its locant. Return a tuple of (alpha_sort_key, locant) pairs sorted
+    by alpha_sort_key first, so that lexicographic comparison of tuples
+    selects the orientation giving the lowest locant to the
+    alphabetically first substituent.
+
+    Args:
+        chain: Ordered chain atom indices.
+        atom_to_locant: Mapping from atom index to 1-indexed locant.
+        substituent_positions: Dict mapping chain atom index to list of
+            substituent atom groups.
+        mol: RDKit Mol object.
+
+    Returns:
+        Tuple for lexicographic comparison. Lower = preferred.
+    """
+    from ..assembly.naming_utils import alpha_sort_key
+
+    if names is None:
+        names = _chain_prefix_names(chain, substituent_positions, mol)
+    entries = [(alpha_sort_key(name), atom_to_locant[atom_idx])
+               for atom_idx, name in names if atom_to_locant.get(atom_idx) is not None]
 
     # Sort by alpha key first, then by locant
     entries.sort()
@@ -960,14 +1014,15 @@ def _get_bond_locant_atoms(
 
 def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
                        double_bonds: List[Tuple[int, int]],
-                       chain_set: Set[int], mol) -> tuple:
+                       chain_set: Set[int], mol,
+                       prefix_names: Optional[List[Tuple[int, str]]] = None) -> tuple:
     """(j) key of a chain's CIP stereodescriptors WITH their locants.
 
     Collects every stereodescriptor the assembled name would cite for this
     orientation -- atom stereocentres (R/S/r/s/M/P) and stereogenic double bonds
     (Z/E) -- as (locant, code) pairs and ranks them with
     :func:`orthonym.assembly.naming_utils.cip_locant_rank_key`, the key the ring
-    numbering (``cycloalkanes._cip_orientation_key``) shares. It shares the rank
+    numbering (``cycloalkanes._isotope_cip_key``) shares. It shares the rank
     TABLE with the citation tie-break (``prefix_citation_sort_key`` tier 3), so the
     two never disagree -- and a plain string comparison silently gets Z-vs-E
     backwards, because 'Z' is senior to 'E' although 'E' < 'Z' alphabetically
@@ -979,8 +1034,13 @@ def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
     achiral chains tie and fall through. Lower key sorts first, i.e. takes the
     lower locant. ``mol`` must already carry CIP labels (the caller routes them
     through ``perception.stereo.assign_stereochemistry``).
+
+    ``prefix_names`` are the ``(chain atom, prefix name)`` pairs of the substituents: the descriptors cited
+    inside them are ranked together with the chain's own, at the locant of the atom each hangs on
+    (:func:`naming_utils.numbering_cip_key`; ``(2Z,4S,8R,9E)-undeca-2,9-diene-4,8-diol (PIN)``,:3403,
+    "the choice is between 'E' and 'Z' for position '2', not between 'R' and 'S' for position '4'",:3405).
     """
-    from ..assembly.naming_utils import cip_locant_rank_key
+    from ..assembly.naming_utils import numbering_cip_key
     items: List[Tuple[int, str]] = []
     for a in chain:
         atom = mol.GetAtomWithIdx(a)
@@ -1005,4 +1065,5 @@ def _cip_numbering_key(chain: List[int], atom_to_locant: Dict[int, int],
             c = i if i in chain_set else j
             if c in atom_to_locant:
                 items.append((atom_to_locant[c], bond.GetProp('_CIPCode')))
-    return cip_locant_rank_key(items)
+    return numbering_cip_key(items, [(atom_to_locant[a], name) for a, name in (prefix_names or ())
+                                     if a in atom_to_locant])
