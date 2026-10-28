@@ -328,11 +328,25 @@ def indicated_numberings(hydride: AmplificantHydride) -> Tuple[Mapping[int, _Loc
     return cached
 
 
+_HYDRIDES_MOL: Optional[Chem.Mol] = None
+_HYDRIDES: Dict[FrozenSet[int], Optional[AmplificantHydride]] = {}
+
+
 def amplificant_hydride(mol: Chem.Mol, atoms: FrozenSet[int]) -> Optional[AmplificantHydride]:
     """The amplificant hydride of the ring system ``atoms`` of ``mol``, or None when it is no parent the
     plain case builds (a charge, a radical, an isotope, a multiple bond to the outside, indicated hydrogen,
     hydro prefixes, a ring system that is neither mancude nor a saturated monocycle, and a system with no
-    fusion numbering)."""
+    fusion numbering). Memoised for the last molecule: a molecule with many chains that tie (a polyphenylene
+    dendrimer of 37 rings has 720 of them) asks for the same ring system once for each chain."""
+    global _HYDRIDES_MOL, _HYDRIDES
+    if _HYDRIDES_MOL is not mol:
+        _HYDRIDES_MOL, _HYDRIDES = mol, {}
+    if atoms not in _HYDRIDES:
+        _HYDRIDES[atoms] = _amplificant_hydride(mol, atoms)
+    return _HYDRIDES[atoms]
+
+
+def _amplificant_hydride(mol: Chem.Mol, atoms: FrozenSet[int]) -> Optional[AmplificantHydride]:
     from ...assembly.fragment_naming import name_fragment_recursively
     from ...errors import is_failure_name
     from ..ring_selection import ring_system_score

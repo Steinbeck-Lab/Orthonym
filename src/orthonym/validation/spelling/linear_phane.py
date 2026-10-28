@@ -875,6 +875,14 @@ def linear_phane_candidate_chains(mol: Chem.Mol) -> List[Tuple[Node, ...]]:
     return [c for c, z in zip(chains, sizes) if z == best]
 
 
+_SYSTEMS_MOL: Optional[Chem.Mol] = None
+_SYSTEMS: List[_RingSystem] = []
+
+
 def ring_system_atoms(mol: Chem.Mol, k: int) -> FrozenSet[int]:
-    """The atoms of the ``k``-th ring system of the reader (the ``("R", k)`` nodes of a chain)."""
-    return _ring_systems(mol)[k].atoms
+    """The atoms of the ``k``-th ring system of the reader (the ``("R", k)`` nodes of a chain). The ring systems
+    of the last molecule are kept: the skeleton of each of many tied chains asks for them again."""
+    global _SYSTEMS_MOL, _SYSTEMS
+    if _SYSTEMS_MOL is not mol:
+        _SYSTEMS_MOL, _SYSTEMS = mol, _ring_systems(mol)
+    return _SYSTEMS[k].atoms

@@ -1,5 +1,4 @@
-"""
-Ring-as-substituent naming according to IUPAC 2013 (Blue Book).
+"""Ring-as-substituent naming according to IUPAC 2013 (Blue Book).
 
 Implements IUPAC: Standard substituent names for rings when they
 become substituents on a chain parent structure.
@@ -17,6 +16,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
+from .ring_cluster import is_one_ring_cluster
 from .ring_ketone_forms import decorated_ketone_fused_name, ketone_core_numbering
 
 # IUPAC: Standard substituent names for rings
@@ -1366,10 +1366,10 @@ def _extract_ring_submol(mol, ring_atoms, attachment_atom):
     """Return ``(submol, attach_idx_in_submol)`` for the ring system as a
     standalone molecule, the broken parent bond at the attachment atom left as an
     implicit hydrogen (so the fragment is a valid neutral ring the parent namers
-    can perceive). Returns ``(None, None)`` on failure."""
+    can perceive). ``(None, None)`` on failure, or for rings that share no atom (``is_one_ring_cluster``)."""
     from rdkit import Chem
     keep = set(ring_atoms)
-    if attachment_atom not in keep:
+    if attachment_atom not in keep or not is_one_ring_cluster(mol, keep):
         return None, None
     try:
         rw = Chem.RWMol(mol)

@@ -779,6 +779,9 @@ def _polycyclic_terminal_name(mol, ring, free_valence_atom):
     book = _book_fused(mol, ring, free_valence_atom)
     if book is not None:
         return book
+    from .ring_cluster import is_one_ring_cluster
+    if not is_one_ring_cluster(mol, ring):
+        return None     # rings joined by bonds are a ring assembly, no cage and no spiro system
     from .vonbaeyer_universal import (
         analyze_cage_universal,
         analyze_spiro_universal,

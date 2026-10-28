@@ -10208,8 +10208,8 @@ class Orthonym:
             # Must come before fused/polycyclic classification because ring assemblies
             # have 2+ separate ring systems that would otherwise be misrouted
             if len(features.ring_systems) >= 2:
-                from .rules.ring_assemblies import detect_ring_assembly
-                assembly_info = detect_ring_assembly(features.mol, features.ring_systems)
+                from .rules.branched_assembly import detect_assembly_or_branched
+                assembly_info = detect_assembly_or_branched(features.mol, features.ring_systems)
                 if not assembly_info and not features.chain_is_parent:
                     # / (the Blue Book,:24153): two ring systems of
                     # one skeleton that differ in hydrogenation are a ring assembly named with

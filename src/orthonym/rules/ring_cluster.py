@@ -68,3 +68,37 @@ def is_carbon_von_baeyer_name(name: str) -> bool:
     if name.startswith('bicyclo'):
         return True
     return _CLUSTER.get() is not None and re.match(r'^[a-z]+cyclo\[', name) is not None
+
+
+def is_one_ring_cluster(mol, ring_atoms) -> bool:
+    """True iff the rings of ``mol`` that lie inside ``ring_atoms`` are one cluster, each reached from the others through
+    shared atoms (fused, bridged or spiro: one polycyclic ring system, / /. False for rings that are only
+    joined by bonds: a ring assembly (``### **** DEFINITIONS``, the Blue Book,:15542: "directly joined to each
+    other by single or double bonds"), N ring systems and not the one that the von Baeyer and spiro analyses of a ring
+    system describe.
+
+    ``ring_substituents._extract_ring_submol`` takes the ring atoms of a fragment as one ring system, and the cage analysis
+    of that submolecule (``vonbaeyer_universal.analyze_cage_universal``) starts by matching it onto its canonical re-parse,
+    a substructure search that grows with the symmetry of the branches and refuses the molecule only after it: a fragment
+    of 60 atoms of polyphenylene takes 0.4 s, one of 222 atoms (37 benzene rings, GitHub issue 121) more than ten minutes
+    in that one call, in which the alarm of ``--time-limit`` (``wallclock``) cannot be handled."""
+    inside = set(ring_atoms)
+    rings = [r for r in mol.GetRingInfo().AtomRings() if inside.issuperset(r)]
+    if len(rings) < 2:
+        return True
+    parent = list(range(len(rings)))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    owner: Dict[int, int] = {}
+    for k, ring in enumerate(rings):
+        for atom in ring:
+            if atom in owner:
+                parent[find(k)] = find(owner[atom])
+            else:
+                owner[atom] = k
+    return len({find(k) for k in range(len(rings))}) == 1

@@ -689,6 +689,8 @@ def main(args: List[str] = None) -> int:
     if not _readable(parsed.smiles):
         return 1
 
+    # a call that outlasts the alarm ends the run (cli_time_limit); --on-failure raise exits 1, as _single_timed_out does
+    _tl.on_hard_stop(lambda: _single_timed_out(parsed), int(parsed.on_failure == "raise" and not parsed.provenance))
     try:
         # a phase Plan-03 Task 4: --validation-stats branch goes
         # through Orthonym(...).get_validation_stats per
@@ -830,6 +832,8 @@ def main(args: List[str] = None) -> int:
     except Exception as e:
         print(f"Unexpected error: {e}", file=sys.stderr)
         return 1
+    finally:
+        _tl.on_hard_stop(None)
 
 
 def _print_tier_row(parsed, name_kwargs: dict, emit_tier: str, emit_tier_given: bool, binding_proof: str) -> int:

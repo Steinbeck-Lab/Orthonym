@@ -2575,7 +2575,8 @@ def _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents):
 
 
 def _get_substituent_info(
-    mol, ring_systems: List[Set[int]], connections: List[Tuple[int, int, int, int]]
+    mol, ring_systems: List[Set[int]], connections: List[Tuple[int, int, int, int]],
+    numbering: Optional[List[Dict[int, int]]] = None,
 ) -> List[Dict]:
     """
     Find substituents on ring assembly systems and determine their locants.
@@ -2584,6 +2585,9 @@ def _get_substituent_info(
         mol: RDKit Mol object
         ring_systems: List of ring system atom sets
         connections: Inter-system bonds
+        numbering: the atom -> locant map of each ring system, when the assembly is a branched one
+            (``rules.branched_assembly``): the locants of the substituents are read off it, the same
+            numbering that gives the junction locants
 
     Returns:
         List of dicts with:
@@ -2660,6 +2664,8 @@ def _get_substituent_info(
             ]
             _locant_cands = [x for x in _locant_cands if x is not None]
             locant = min(_locant_cands) if _locant_cands else None
+            if numbering is not None:
+                locant = numbering[sys_idx].get(atom_idx)
 
             substituents.append({
                 'system_idx': sys_idx,
@@ -2671,7 +2677,8 @@ def _get_substituent_info(
 
     # set-lowest numbering for rings bearing >=2 substituents (fixes the
     # per-substituent min collision, e.g. 3,5-disubstituted -> '3,3').
-    _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents)
+    if numbering is None:
+        _reassign_carbocyclic_locants(mol, ring_systems, connections, substituents)
     return substituents
 
 
@@ -2713,6 +2720,13 @@ def _name_substituent(mol, sub_atoms: List[int],
         Substituent name (prefix form, e.g., "chloro", "methyl")
     """
     from ..assembly.naming_utils import get_alkyl_name
+
+    # A branch that holds rings (a branched assembly, ``rules.branched_assembly``) is a compound
+    # prefix: the substituent namer reads its rings, the routes below read atom counts.
+    if any(mol.GetAtomWithIdx(i).IsInRing() for i in sub_atoms):
+        from ..assembly.substituent_enumerator import name_substituent
+        token = name_substituent(mol, sub_atoms, attachment_atom)
+        return token if token and token != 'substituent' else None
 
     # free-valence gate. Every route below names the fragment from its
     # ATOM COUNT, which cannot distinguish -CH3 from =CH2:
@@ -3253,7 +3267,7 @@ def name_ring_assembly(
     """
     # /: a hydro-modified assembly of two identical skeletons was named, and
     # certified, when it was detected (``detect_hydro_ring_assembly``).
-    if assembly_info.get('hydro'):
+    if assembly_info.get('hydro') or assembly_info.get('branched') and assembly_info.get('name'):
         return assembly_info.get('name')
 
     #: skeletal-replacement ring assembly (mixed/single-heteroatom
@@ -3291,7 +3305,7 @@ def name_ring_assembly(
     # The pre-151-03 path called _get_connection_locant per pair, which
     # always returned 1 for carbocyclic atoms — yielding the buggy
     # "1,1':1',1''-terphenyl" output captured in internal notes-C.md.
-    per_system_locants = _compute_per_system_ring_locants(mol, assembly_info)
+    per_system_locants = assembly_info.get('numbering') or _compute_per_system_ring_locants(mol, assembly_info)
 
     def _lookup_locant(per_system, sys_idx, atom_idx, sys_atoms):
         """Locant lookup with safe fallback to legacy single-bond helper."""
@@ -3321,7 +3335,7 @@ def name_ring_assembly(
 
     # Substituents on the assembly, computed once and reused below (the ylidene
     # branch, the citation-order tiebreak, and the prefix builder).
-    substituent_list = _get_substituent_info(mol, ring_systems, connections)
+    substituent_list = _get_substituent_info(mol, ring_systems, connections, assembly_info.get('numbering'))
 
     # v52 P4 T3: a fused-component substituent whose locant the fixed-numbering
     # engine could not resolve carries locant None (see _get_substituent_info).
@@ -3813,6 +3827,27 @@ def _locant_key(loc):
     return (int(digits) if digits else 0, text)
 
 
+def _middle_ring_free_valence(per_system_locants, connections, sys_idx: int, atom: int) -> Optional[int]:
+    """The locant of the free valence ``atom`` on the carbocyclic ring ``sys_idx`` that is joined to two rings of the
+    assembly, read off the numbering that gives the junctions their locants, or None (a ring joined to one ring keeps
+    ``_get_substituent_locant``, which walks from its only junction). ``### ****`` (the Blue Book),:16109:
+    "Low locants are assigned to ring junctions, then to free valences": the free valence of '[1,1':3',1''-terphenyl]-5'-yl'
+    is at 5', not at 3' (the lowest locant it has when the ring is walked from one junction alone, which is the other
+    junction's). Where the other junction is para to the first (4') the two walking directions tie on the junctions, and
+    the lower of the two locants of the free valence is kept."""
+    numbering = per_system_locants[sys_idx] if per_system_locants and sys_idx < len(per_system_locants) else None
+    junctions = [a for a1, a2, s1, s2 in connections for a, s in ((a1, s1), (a2, s2)) if s == sys_idx]
+    if not numbering or len(junctions) != 2 or len(numbering) != 6 or atom not in numbering:
+        return None
+    if any(a not in numbering for a in junctions):
+        return None
+    locant = numbering[atom]
+    other = max(numbering[a] for a in junctions)       # the junction that is not locant 1
+    if numbering.get(atom) in (numbering[a] for a in junctions):
+        return None                                    # the free valence is on a junction atom: not an assembly prefix
+    return min(locant, (8 - locant) % 6 or 6) if other == 4 else locant
+
+
 def _name_ring_assembly_prefix_oriented(
     mol, assembly_info: Dict, attachment_atom_idx: int
 ):
@@ -3947,10 +3982,10 @@ def _name_ring_assembly_prefix_oriented(
             return None  # heteroatom ring not numbered -> fail closed (BLOCKER 1)
         attach_locant = per_system_locants[attach_system_idx][attachment_atom_idx]
     elif inter_ring_conn_atom is not None:
-        attach_locant = _get_substituent_locant(
+        attach_locant = _middle_ring_free_valence(per_system_locants, connections, attach_system_idx,
+                                                  attachment_atom_idx) or _get_substituent_locant(
             mol, attachment_atom_idx, attachment_atom_idx,
-            ring_systems[attach_system_idx], inter_ring_conn_atom
-        )
+            ring_systems[attach_system_idx], inter_ring_conn_atom)
     else:
         attach_locant = _get_connection_locant(
             mol, attachment_atom_idx, ring_systems[attach_system_idx]
