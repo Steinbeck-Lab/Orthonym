@@ -41,6 +41,8 @@ from ..data.chain_names import multiplying_prefix
 from .locants import compound_aware_multibond_set  # (1)/(2), shared w/ bicyclo.py
 from . import main_ring_paths  # the bounded main-ring path search (its LEVEL_* knobs are read live)
 from .main_ring_paths import RingGraph, enumerate_paths, longest_bridge, uses_bound
+from . import main_ring_pairs  # the pair searches of the main-ring search (its PAIR_SCAN_MAX_PATHS is read live)
+from .main_ring_pairs import best_disjoint_pair, interior_masks, offered_multiatom_pairs
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
     spend_analysis_call,
     spend_perf_work,
@@ -598,19 +600,7 @@ def _find_all_simple_paths_impl(mol, start: int, end: int, allowed_atoms: Set[in
     return all_paths
 
 
-def _interior_masks(paths):
-    """Per path, its interior atoms (``p[1:-1]``) as one int bitmask (atom index -> bit)
-    and the interior size. An ``&`` of two masks is the interior-disjointness test of two
-    bh1->bh2 paths, in place of a ``set`` intersection per pair."""
-    masks = []
-    sizes = []
-    for p in paths:
-        m = 0
-        for a in p[1:-1]:
-            m |= 1 << a
-        masks.append(m)
-        sizes.append(m.bit_count())
-    return masks, sizes
+_interior_masks = interior_masks   # the bitmask view of the path interiors (kept here for the callers of this module)
 
 
 class _MainRingBest:
@@ -656,32 +646,11 @@ class _MainRingBest:
 
 
 def _best_disjoint_path_pair(all_paths, spend, rank_key):
-    """Largest, then most symmetric, pair of interior-disjoint paths of ``all_paths``
-    (the bh1->bh2 paths). Deterministic: ties broken by the lowest canon-rank tuple.
-    ``spend`` is charged once per (i, j) pair of the O(paths^2) pairing loop (M2.5)."""
-    npaths = len(all_paths)
-    masks, plens = _interior_masks(all_paths)
-    best_local = None
-    best_pair = None
-    for i in range(npaths - 1):
-        mask_i = masks[i]
-        len_i = plens[i]
-        for j in range(i + 1, npaths):
-            spend()
-            if mask_i & masks[j]:
-                continue
-            len_j = plens[j]
-            ring_size = len_i + len_j + 2  # shared endpoints
-            balance = len_i if len_i < len_j else len_j
-            if best_local is not None and (ring_size, balance) < best_local[:2]:
-                continue  # the rank key only decides a tie of (ring_size, balance)
-            p1 = all_paths[i]
-            p2 = all_paths[j]
-            key = (ring_size, balance, tuple(-r for r in rank_key(set(p1) | set(p2))))
-            if best_local is None or key > best_local:
-                best_local = key
-                best_pair = (p1, p2)
-    return best_pair
+    """Largest, then most symmetric, pair of interior-disjoint paths of ``all_paths`` (the bh1->bh2
+    paths): ``main_ring_pairs.best_disjoint_pair``, which the pair loop of this function used to be
+    (M2.5: charged one unit per (i, j) pair of the O(paths^2) loop; now one per operation of the
+    search, never more)."""
+    return best_disjoint_pair(all_paths, spend, rank_key)
 
 
 def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room, bridge_len=None):
@@ -719,17 +688,31 @@ def _consider_multiatom_bridges(all_paths, spend, best, bh1, bh2, room, bridge_l
       size early and the window closes; the survivors are then offered to ``consider`` in the
       original (i, j) order, ring built from the lower index, so ties between candidates
       (``tied``, the first of equal keys) resolve exactly as before.
+
+    A list of ``main_ring_pairs.PAIR_SCAN_MAX_PATHS`` paths or more (thousands, for a ring system of
+    13 or more rings) is not scanned pair by pair: ``main_ring_pairs.offered_multiatom_pairs`` finds
+    the pairs this loop offers among the disjoint ones by set arithmetic, in the same order, with the
+    same calls of ``bridge_len``, and charges the perf budget what it does, never more than the loop.
     """
     incumbent = best.score[0][0] if best.score is not None else -1
     if incumbent > room:
         return
-    # inside the late offer of the lifted ceilings the scan for the bridge is charged too, one unit
+    npaths = len(all_paths)
+    masks, plens = _interior_masks(all_paths)
+    if npaths >= main_ring_pairs.PAIR_SCAN_MAX_PATHS:
+        # a long list: the pairs that reach the main bridge are the disjoint ones, found by set
+        # arithmetic, in the order of the loop below (``main_ring_pairs.offered_multiatom_pairs``). It
+        # charges the operations it makes on the sets, the scan for the bridge among the paths of the list
+        # included (a pair is one ``&`` of sets), so the extra charge of the loop's scan below is not made
+        for lo, hi, best_mb_len in offered_multiatom_pairs(all_paths, masks, plens, spend, incumbent, room, bridge_len):
+            best.consider(all_paths[lo] + all_paths[hi][1:-1][::-1], bh1, bh2,
+                          plens[lo], plens[hi], best_mb_len)
+        return
+    # the loop: inside the late offer of the lifted ceilings the scan for the bridge is charged too, one unit
     # for four candidates: it is a loop of its own in each pair, which the charge of one unit per
     # pair does not see (a ring of 20 benzene rings joined by single bonds ran 1,400 s unbounded)
     from .vonbaeyer_universal import lifted_ceilings_active
     charge_scan = lifted_ceilings_active()
-    npaths = len(all_paths)
-    masks, plens = _interior_masks(all_paths)
     bridge_order = (sorted((k for k in range(npaths) if plens[k] >= 2), key=lambda k: -plens[k])
                     if bridge_len is None else ())
     order = sorted(range(npaths), key=lambda k: -plens[k])
@@ -4273,6 +4256,45 @@ def _vb_delegations_and_g0(mol, cage_atoms):
     return None
 
 
+def _require_legal_descriptor(desc) -> None:
+    """LEGALITY GATE : refuse (``unsupported_ring_system``) unless ``desc`` rebuilds the cage.
+
+    Everything below it in ``name_polycyclic_complete`` SPELLS `desc`: its
+    descriptor string, its numbering (stereo, substituent and heteroatom
+    locants) and its atom count all feed the name. A descriptor that does not
+    rebuild this cage names a DIFFERENT molecule, so refuse rather than emit.
+
+    Called after the bridged-fused and aromatic delegations on purpose:
+    neither of those spells `desc`, and 15 corpus cages with an unverifiable
+    descriptor are named correctly by the partial-saturation constructor.
+
+    Raising rather than returning None, for the same reason as the G0 refusal
+    before it: None cascades to a fragment namer that would name one
+    sub-ring of the cage.
+    """
+    if desc is None or desc.legality is not True:
+        from ..errors import unsupported_ring_system
+        raise unsupported_ring_system()
+
+
+def _record_if_beyond_pin_caps(mol, ring_atoms, desc) -> None:
+    """Record the descriptor of a cage above the PIN ceilings as not a PIN.
+
+    A cage above the PIN ceilings (``vonbaeyer_universal.beyond_pin_caps``: 40 skeletal atoms, 8 rings)
+    is analysed only because the best-effort tier lifts them, and its descriptor is not known to be the
+    PIN: the main ring search keeps one decomposition per bridgehead pair and the numbering is chosen
+    among the decompositions it kept, so "Selection of the main bridge and secondary
+    bridges", rule (the Blue Book, "The superscript locants for the secondary bridges
+    must be as low as possible when considered as a set in ascending numerical order, the decision
+    being made at the first point of difference") is not applied to every numbering the cage allows. The
+    name is built as it was; it is recorded as not a PIN, the same way the universal cage path labels such a system (a name that carries the descriptor is
+    labelled below the PIN and the default tier declines it as NO_VERIFIED_PIN).
+    """
+    from .vonbaeyer_universal import beyond_pin_caps, record_beyond_pin_caps
+    if beyond_pin_caps(len(ring_atoms), von_baeyer_ring_count(mol, ring_atoms)):
+        record_beyond_pin_caps(desc.descriptor_string)
+
+
 def name_polycyclic_complete(mol, features=None):
     """
     Generate the complete IUPAC name for a polycyclic bridged system.
@@ -4373,21 +4395,8 @@ def name_polycyclic_complete(mol, features=None):
     if desc is None:
         desc = analyzer.analyze(mol, ring_atoms)
 
-    # LEGALITY GATE . Everything below SPELLS `desc`: its
-    # descriptor string, its numbering (stereo, substituent and heteroatom
-    # locants) and its atom count all feed the name. A descriptor that does not
-    # rebuild this cage names a DIFFERENT molecule, so refuse rather than emit.
-    #
-    # Placed after the bridged-fused and aromatic delegations above on purpose:
-    # neither of those spells `desc`, and 15 corpus cages with an unverifiable
-    # descriptor are named correctly by the partial-saturation constructor.
-    #
-    # Raising rather than returning None, for the same reason as the G0 refusal
-    # directly above: None cascades to a fragment namer that would name one
-    # sub-ring of the cage.
-    if desc is None or desc.legality is not True:
-        from ..errors import unsupported_ring_system
-        raise unsupported_ring_system()
+    _require_legal_descriptor(desc)
+    _record_if_beyond_pin_caps(mol, ring_atoms, desc)
 
     # Use total_atoms from VB analysis (sum(bridge_lengths) + 2) rather than
     # len(ring_atoms), which may miss non-ring atoms in the VB framework.
