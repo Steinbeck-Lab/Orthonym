@@ -64,6 +64,7 @@ from ..assembly.naming_utils import (
     COMPLEX_MULTIPLIERS,
     SIMPLE_MULTIPLIERS,
     alpha_sort_key,
+    alpha_sort_key_rs,
     enclose_if_compound,
 )
 from ..assembly.substituent_enumerator import name_substituent
@@ -476,7 +477,8 @@ def _prefix_string(groups: Dict[str, List[int]]) -> Optional[str]:
     multiplier."""
     parts: List[str] = []
     from ..assembly.naming_utils import _is_fully_enclosed, apply_enclosing_marks
-    for tok in sorted(groups, key=alpha_sort_key):
+    # R before S whatever the locants: (the Blue Book), (:45465)
+    for tok in sorted(groups, key=alpha_sort_key_rs):
         locs = sorted(groups[tok])
         compound = tok[:1] in '([{'
         # A composed prefix whose marks do not cover it whole ('[(...)

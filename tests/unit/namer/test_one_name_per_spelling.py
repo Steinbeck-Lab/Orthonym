@@ -11,8 +11,8 @@ rules rank alike fell to that order. Two causes, one fix each:
   descriptors out of the order, and a ``sorted`` of them kept the input order at the sites that
   sort a Counter or a dict of names (esters, amides, anhydrides, ureas, silanes, gem-ring prefixes).
   ``alpha_sort_key_total`` (assembly/naming_utils.py) adds the CIP rank (j), ``****``
-  'R' before 'S') and the name as given, and those sites use it. The key stays ``alpha_sort_key``
-  where the items arrive in the order of their locants and a stable sort keeps it.
+  'R' before 'S') and the name as given, and those sites use it. A site whose items carry locants cites
+  'R' before 'S' whatever the locants (``****``, ``:45465``): ``alpha_sort_key_with_locants``.
 
 The spellings below are rows that gave two names before the change (a dev split, the best-effort
 tier; the phosphate at both tiers); the names themselves are not pinned here, only that every
@@ -347,38 +347,44 @@ def test_configuration_decides_the_citation_of_names_that_tie_in_every_spelling(
     assert set(names.values()) == {expected}, names
 
 
-# ---- a site whose items carry locants: the locants of the names come before the configuration -----
+# ---- a site whose items carry locants: the configuration comes before the locants of the names -----
 
-def test_the_locants_a_site_passes_come_before_the_configuration():
-    """ (``:21791``) and the example of (``:22601``, "'1,2,4' is senior to '4,2,1'"): the
-    names tie in, the locants decide, the configuration only between names with the same locants."""
+def test_the_configuration_comes_before_the_locants_a_site_passes():
+    """``### **** Sequence Rule **4a**`` (``the Blue Book``), its example (``:45465``): ``(2R,3s,4S,6R)-
+    2,6-dichloro-5-[(1R)-1-chloroethyl]-3-[(1S)-1-chloroethyl]heptan-4-ol (PIN)`` cites R first at the HIGHER locant
+    5; ``****`` (``:22603``, under ``### **** CRITERIA RELATED ONLY TO CONFIGURATION``) has the order of
+    'R' and 'S' decide when the names tie in. ``****`` (``:3517``) compares the locants INSIDE the names
+    ("the fact that 'N' is lower than '4' is irrelevant", ``:3527``); (``:21791``) is a criterion of the
+    numbering, and ``:22601`` a rejected name that applies it to one. The locants a site passes order only
+    what the book leaves."""
     s, r = "(2S)-butan-2-yl", "(2R)-butan-2-yl"
     rows = [(r, 3), (s, 1)]
-    assert [n for n, _ in sorted(rows, key=lambda x: alpha_sort_key_with_locants(x[0], (x[1],)))] == [s, r]
+    assert [n for n, _ in sorted(rows, key=lambda x: alpha_sort_key_with_locants(x[0], (x[1],)))] == [r, s]
     assert [n for n, _ in sorted(rows, key=lambda x: alpha_sort_key_total(x[0]))] == [r, s]   # no locant: R first
     same = [(s, 2), (r, 2)]
     assert [n for n, _ in sorted(same, key=lambda x: alpha_sort_key_with_locants(x[0], (x[1],)))] == [r, s]
 
 
-def test_the_n_substituents_of_a_urea_are_cited_by_locant_then_configuration():
+def test_the_n_substituents_of_a_urea_are_cited_r_first_whatever_their_locants():
+    """The tags are given here (N for the S group, N' for the R group): R is cited first, at N' (:45465)."""
     from orthonym.assembly.composer import _build_n_substituted_name
     s, r = "(1S)-1-chloroethyl", "(1R)-1-chloroethyl"
     for tagged in ([("N", s), ("N'", r)], [("N'", r), ("N", s)]):
         assert _build_n_substituted_name(tagged, "urea", sort_key=alpha_sort_key) == (
-            "N-[(1S)-1-chloroethyl]-N'-[(1R)-1-chloroethyl]urea")
+            "N'-[(1R)-1-chloroethyl]-N-[(1S)-1-chloroethyl]urea")
     for tagged in ([("N", s), ("N", r)], [("N", r), ("N", s)]):
         assert _build_n_substituted_name(tagged, "guanidine", sort_key=alpha_sort_key) == (
             "N-[(1R)-1-chloroethyl]-N-[(1S)-1-chloroethyl]guanidine")
 
 
 #: (what, SMILES as written, the name). A diamine whose two nitrogens carry a (2R)- and a (2S)-butan-2-yl:
-#: on butane-1,3-diamine the numbering is fixed, so the prefixes follow their locants, N1 then N3;
-#: on the symmetric propane-1,3-diamine the numbering is a choice and (j) (:3346) gives the lower
-#: locant to R, so N1 is the (2R) side. The configuration came before the locants at the polyamine's
-#: sort (N3-[(2R)]-N1-[(2S)]) and the numbering of the symmetric chain was the order the atoms were written in.
+#: on butane-1,3-diamine the numbering is fixed, so the (2R) group stands at N3 and is cited first, before the
+#: (2S) group at N1,:45465: R cited first at the higher locant;,:22603); on the symmetric
+#: propane-1,3-diamine the numbering is a choice and (j) (:3346) gives the lower locant to R, so N1 is
+#: the (2R) side. The numbering of the symmetric chain was the order the atoms were written in.
 POLYAMINES = [
     ("numbering fixed by the suffix", "CC[C@@H](C)NC(C)CCN[C@@H](C)CC",
-     "N1-[(2S)-butan-2-yl]-N3-[(2R)-butan-2-yl]butane-1,3-diamine"),
+     "N3-[(2R)-butan-2-yl]-N1-[(2S)-butan-2-yl]butane-1,3-diamine"),
     ("symmetric chain, R at the lower locant", "C[C@@H](CC)NCCCN[C@H](C)CC",
      "N1-[(2R)-butan-2-yl]-N3-[(2S)-butan-2-yl]propane-1,3-diamine"),
     ("the same chain written the other way", "CC[C@@H](C)NCCCN[C@@H](C)CC",
@@ -388,7 +394,7 @@ POLYAMINES = [
 
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 @pytest.mark.parametrize("label, smiles, expected", POLYAMINES, ids=[p[0] for p in POLYAMINES])
-def test_polyamine_prefixes_follow_their_locants_in_every_spelling(label, smiles, expected, tier):
+def test_polyamine_prefixes_cite_r_first_in_every_spelling(label, smiles, expected, tier):
     engine = _engine(tier)
     names = {s: engine.name(s) for s in _spellings(smiles, n=6)}
     assert set(names.values()) == {expected}, names
@@ -403,12 +409,12 @@ def test_polyamine_prefixes_follow_their_locants_in_every_spelling(label, smiles
 #: the (j) tie-break renumbered a chain whose label then took the higher locant ((3-13C), (3,3-2H2)).
 LABELLED_POLYAMINES = [
     ("13C at C1, on the (S) side: (i) puts it at 1", "C[C@@H](CC)N[13CH2]CCN[C@H](C)CC",
-     "N1-[(2S)-butan-2-yl]-N3-[(2R)-butan-2-yl](1-13C)propane-1,3-diamine"),
+     "N3-[(2R)-butan-2-yl]-N1-[(2S)-butan-2-yl](1-13C)propane-1,3-diamine"),
     ("13C at C3: (i) puts it at 1, R follows it to N1 only by luck of the structure",
      "C[C@@H](CC)NCC[13CH2]N[C@H](C)CC",
      "N1-[(2R)-butan-2-yl]-N3-[(2S)-butan-2-yl](1-13C)propane-1,3-diamine"),
     ("2H2 at C1: the deuterium path names the unlabelled skeleton", "C[C@@H](CC)NC([2H])([2H])CCN[C@H](C)CC",
-     "N1-[(2S)-butan-2-yl]-N3-[(2R)-butan-2-yl](1,1-2H2)propane-1,3-diamine"),
+     "N3-[(2R)-butan-2-yl]-N1-[(2S)-butan-2-yl](1,1-2H2)propane-1,3-diamine"),
     ("13C in the middle: (i) ties, (j) gives R the lower locant", "C[C@@H](CC)NC[13CH2]CN[C@H](C)CC",
      "N1-[(2R)-butan-2-yl]-N3-[(2S)-butan-2-yl](2-13C)propane-1,3-diamine"),
     ("13C on both ends: (i) ties, (j) gives R the lower locant", "C[C@@H](CC)N[13CH2]C[13CH2]N[C@H](C)CC",

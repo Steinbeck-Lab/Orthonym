@@ -25,6 +25,7 @@ from rdkit import Chem
 
 from ..assembly.naming_utils import (
     alpha_sort_key,
+    alpha_sort_key_rs,
     begins_with_italic_designator,
     get_alkyl_name,
 )
@@ -4821,8 +4822,8 @@ def _assemble_fused_heterocycle_name(
             prefix = _format_c_prefix(name, [str(l) for l in locants], len(locants))
         prefix_parts.append((prefix, name))
 
-    # Sort alphabetically by base name
-    prefix_parts.sort(key=lambda x: alpha_sort_key(x[1]))
+    # Sort alphabetically by base name; R before S whatever the locants,:22603;,:45465)
+    prefix_parts.sort(key=lambda x: alpha_sort_key_rs(x[1]))
 
     # Join prefixes
     prefix_str = _join_fused_prefixes([p[0] for p in prefix_parts])
@@ -4875,7 +4876,7 @@ def _assemble_fused_heterocycle_name(
             prefix_parts.append((extra_prefix, prefix_name))
 
         # Re-sort and re-join prefixes
-        prefix_parts.sort(key=lambda x: alpha_sort_key(x[1]))
+        prefix_parts.sort(key=lambda x: alpha_sort_key_rs(x[1]))
         prefix_str = _join_fused_prefixes([p[0] for p in prefix_parts])
 
         # oxo and amino never reach here (routed above): the suffix group is the

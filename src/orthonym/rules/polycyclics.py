@@ -2282,7 +2282,7 @@ def _partial_sat_substituent_prefix(
 
     ``omit_locants``: the caller has established that the one locant of the one prefix is
     omitted by (the Blue Book, 'chlorocoronene (PIN)':2947)."""
-    from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
+    from ..assembly.naming_utils import alpha_sort_key_rs, format_substituent_prefix
 
     exclude = exclude_atoms or set()
     ring_set = set(atom_to_locant)
@@ -2333,7 +2333,9 @@ def _partial_sat_substituent_prefix(
         return None
     parts = []
     from .partial_saturation import _locant_key
-    for name in sorted(grouped.keys(), key=alpha_sort_key):
+    # R before S whatever the locants: names that tie in differ only in configuration,
+    # the Blue Book;,:45465)
+    for name in sorted(grouped.keys(), key=alpha_sort_key_rs):
         # (the Blue Book): a letter locant follows its bare number
         # (4 < 4a < 5), so '4a,5,8a-trimethyl', never '5,4a,8a-'.
         locs = sorted(grouped[name], key=_locant_key)

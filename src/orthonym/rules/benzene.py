@@ -26,6 +26,7 @@ from rdkit import Chem
 from ..data.chain_names import multiplying_prefix
 from ..assembly.naming_utils import (
     alpha_sort_key,
+    alpha_sort_key_rs,
     format_substituent_prefix,
     get_alkyl_name,
     get_multiplier_prefix,
@@ -5715,7 +5716,9 @@ def _build_prefix_string_with_locants(
     from ..assembly.naming_utils import locant_sort_key
 
     prefixes = []
-    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
+    # Names that tie in (they differ only in configuration) are cited R before S whatever the locants
+    # they are attached at: (:22603), (:45465), alpha_sort_key_rs.
+    for name in sorted(prefix_groups.keys(), key=alpha_sort_key_rs):
         # (:2869): the whole locant set of the group is cited, in order.
         # A MERGED group may hold italic ('N') and numeric locants together, and
         # sorted(['N', 4]) raises TypeError -- locant_sort_key puts the italic
@@ -5798,7 +5801,7 @@ def _name_substituted_benzonitrile(
     # `4-(1E)-3-hydroxyprop-1-en-1-ylbenzonitrile`; siblings via
     # format_substituent_prefix bracketed correctly.)
     prefixes = []
-    for name in sorted(best_groups.keys(), key=alpha_sort_key):
+    for name in sorted(best_groups.keys(), key=alpha_sort_key_rs):  # R before S, (:22603)
         locants = best_groups[name]
         count = len(locants)
         prefixes.append(format_substituent_prefix(name, locants, count))

@@ -117,6 +117,7 @@ from .naming_utils import (
     _join_multiplied_suffix,
     _wrap_n_substituent,
     alpha_sort_key,
+    alpha_sort_key_rs,
     alpha_sort_key_total,
     alpha_sort_key_with_locants,
     cip_descriptor_rank_key,
@@ -126,6 +127,7 @@ from .naming_utils import (
     get_multiplier_prefix,
     is_complex_substituent,
     multiplied_component,
+    rendered_prefix_citation_key,
     should_omit_locant_one,
 )
 from .chain_prefix_positions import chain_prefix_positions
@@ -276,7 +278,7 @@ def _integrate_universal_prefixes(
         # The same per-group texts ``_format_prefix_groups`` joins, for a caller
         # that assembles them itself (the retained 'acetate' of an ester's acid
         # part, whose locants are omitted, ``retained_acetic_from_prefixes``).
-        for _pname in sorted(prefix_groups.keys(), key=alpha_sort_key):
+        for _pname in sorted(prefix_groups.keys(), key=alpha_sort_key_rs):
             _plocs = sorted(prefix_groups[_pname])
             prefix_texts_out.append(
                 format_substituent_prefix(_pname, _plocs, len(_plocs)))
@@ -292,7 +294,7 @@ def _integrate_universal_prefixes(
                 mol, principal_chain or parent_set, exclude_atoms or ()):
             from .composition_primitives import unlocanted_prefix_block
             _texts = []
-            for _pname in sorted(prefix_groups.keys(), key=alpha_sort_key):
+            for _pname in sorted(prefix_groups.keys(), key=alpha_sort_key_rs):
                 _plocs = sorted(prefix_groups[_pname])
                 _texts.append(format_substituent_prefix(_pname, _plocs, len(_plocs)))
             return unlocanted_prefix_block(_texts, enclose_subsequent=True)
@@ -527,7 +529,9 @@ def _format_prefix_groups(prefix_groups):
         Trailing hyphen is NOT included.
     """
     parts = []
-    for name in sorted(prefix_groups.keys(), key=alpha_sort_key):
+    # R before S whatever the locants (names that tie in differ only in configuration:
+    #, the Blue Book;,:45465)
+    for name in sorted(prefix_groups.keys(), key=alpha_sort_key_rs):
         locants = sorted(prefix_groups[name])
         count = len(locants)
         prefix_str = format_substituent_prefix(name, locants, count)
@@ -3427,9 +3431,9 @@ def _build_n_substituted_name(
         sub_locants[name].append(locant)
 
     # Build prefix parts, sorted alphabetically by substituent name. Two names that differ only in configuration
-    # tie in; here the locants this site passes come first (its convention:,:3517, under, compares the
-    # locants inside the names), then R before S (``**** General principles``:22272, under; PIN:22597).
-    # ``alpha_sort_key_with_locants`` is the one home of that order: N-[(1R)-..]-N'-[(1S)-..]urea, N-[(1R)-..]-N-[(1S)-..].
+    # tie in; R is cited before S whatever the locants this site passes,:45465, under;
+    #,:22603, under, and the locants only order what the book leaves. ``alpha_sort_key_with_locants``
+    # is the one home of that order: N'-[(1R)-..]-N-[(1S)-..]urea, N-[(1R)-..]-N-[(1S)-..].
     from .composition_primitives import prefix_locant_order_key
     from .naming_utils import apply_enclosing_marks, needs_brackets
 
@@ -4812,8 +4816,8 @@ def _enrich_complex_ring_with_subs(mol, ring_name, ring_atoms, atom_to_locant):
             # multiplicative prefix (bis/tris) is cited outside them.
             prefix_parts.append(f"{locant_str}-{_mc(count, name, enclose_if_compound(name))}")
 
-    # Alphabetize prefixes per IUPAC
-    prefix_parts.sort(key=lambda x: alpha_sort_key(x))
+    # Alphabetize prefixes; rendered parts: (:3527), R before S,:22603)
+    prefix_parts.sort(key=lambda x: rendered_prefix_citation_key(x))
 
     # Join prefix parts and prepend to ring name
     prefix_str = "-".join(prefix_parts)
@@ -5070,8 +5074,8 @@ def _assemble_ring_with_ester_prefixes(features, exocyclic_esters) -> Optional[s
                     f"{locant_str}-{_mc(count, prefix_name, enclose_if_compound(prefix_name))}"
                 )
 
-    # Sort alphabetically per IUPAC
-    prefix_parts.sort(key=lambda x: alpha_sort_key(x))
+    # Sort alphabetically per IUPAC; R before S whatever the locants,:22603)
+    prefix_parts.sort(key=lambda x: rendered_prefix_citation_key(x))
 
     # Join prefixes with hyphens
     prefix_str = "-".join(prefix_parts)
@@ -5587,8 +5591,8 @@ def _build_bicyclo_substituent_prefix(
         formatted = format_substituent_prefix(name, sorted_locants, count)
         prefixes.append((name, formatted))
 
-    # Sort alphabetically by base name (ignoring multipliers)
-    prefixes.sort(key=lambda x: alpha_sort_key(x[1]))
+    # Sort alphabetically by base name (ignoring multipliers); R before S whatever the locants (:22603,:45465)
+    prefixes.sort(key=lambda x: rendered_prefix_citation_key(x[1]))
 
     # Join with hyphens
     prefix_texts = [p[1] for p in prefixes]
@@ -7948,13 +7952,13 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
         # N,N-dimethyl and N-ethyl... stay byte-identical.
         wrapped = _wrap_n_substituent(enclose_if_compound(name))
         if count == 1:
-            n_prefix_items.append((alpha_sort_key(name), f"N-{wrapped}"))
+            n_prefix_items.append((alpha_sort_key_total(name), f"N-{wrapped}"))
         else:
             # The shared primitive joins the multiplier (and the
             # (c)/(d) marks of 'N,N-di(decyl)', the Blue Book).
             from .naming_utils import multiplied_component
             n_locants = ",".join(["N"] * count)
-            n_prefix_items.append((alpha_sort_key(name),
+            n_prefix_items.append((alpha_sort_key_total(name),
                                    f"{n_locants}-{multiplied_component(count, name, wrapped)}"))
 
     # Get base amine name from the general assembly
@@ -8006,16 +8010,16 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
     other_prefixes = _generate_prefixes(features)
     c_prefix_items = []
     _c_prefix_locants = []
-    for p in sorted(other_prefixes, key=lambda x: alpha_sort_key(x.text)):
+    for p in sorted(other_prefixes, key=lambda x: rendered_prefix_citation_key(x.text)):
         # (a phase assembly/parenthesisation fix,): _generate_prefixes is inconsistent —
         # alkyl prefixes embed the locant in.text ('3-methyl') while FG prefixes
         # keep it separate ('hydroxy', locants=(2,)). Prepend.locants only when the
         # text lacks a leading digit (same shape as amide handler composer.py:3713).
         if p.locants and not str(p.text)[:1].isdigit():
             _loc = ",".join(str(_l) for _l in p.locants)
-            c_prefix_items.append((alpha_sort_key(p.text), f"{_loc}-{p.text}"))
+            c_prefix_items.append((rendered_prefix_citation_key(p.text), f"{_loc}-{p.text}"))
         else:
-            c_prefix_items.append((alpha_sort_key(p.text), p.text))
+            c_prefix_items.append((rendered_prefix_citation_key(p.text), p.text))
         _c_prefix_locants.append(list(p.locants or ()))
 
     # (b) (the Blue Book) / (a) (:7104): an N-substituent
@@ -8036,7 +8040,7 @@ def _assemble_amine_name(features: Any, style: str) -> Optional[str]:
                     name, all_locs, len(all_locs)))
                 _c_prefix_locants[j] = all_locs
                 n_prefix_items = [it for it in n_prefix_items
-                                  if it[0] != alpha_sort_key(name)
+                                  if it[0] != alpha_sort_key_total(name)
                                   or not it[1].startswith("N")]
                 break
 
@@ -8378,8 +8382,8 @@ def _assemble_polyamine_name(
         else:
             from .naming_utils import multiplied_component
             rendered = f"{loc_str}-{multiplied_component(count, name, _wrapped)}"
-        # an N-entry is cited before a C-entry of the same name (italic locants lead,,:3193),
-        # then by its first tag; the configuration decides only between names with the same locants
+        # R before S first,:45465); an N-entry before a C-entry of the same name, then by its first tag:
+        # the callers' convention, ASSUMED,:3193, is about the lowest locant set, not the citation)
         n_prefix_entries.append((alpha_sort_key_with_locants(
             name, (0, tag_sort_key(tags_sorted[0]))), rendered))
 
@@ -8443,7 +8447,6 @@ def _assemble_polyamine_name(
     finally:
         features.substituents = _subs_backup
 
-    from .composition_primitives import prefix_locant_order_key
     c_prefix_entries = []  # (alpha_key, rendered)
     for p in _gen_prefixes:
         if p.locants and not str(p.text)[:1].isdigit():
@@ -8451,8 +8454,7 @@ def _assemble_polyamine_name(
             rendered = f"{_loc}-{p.text}"
         else:
             rendered = p.text
-        c_prefix_entries.append((alpha_sort_key_with_locants(
-            p.text, (1, tuple(sorted(prefix_locant_order_key(_l) for _l in (p.locants or ()))))), rendered))
+        c_prefix_entries.append((rendered_prefix_citation_key(p.text, marker=1, locants=p.locants), rendered))
 
     all_entries = n_prefix_entries + c_prefix_entries
     all_entries.sort(key=lambda e: e[0])
@@ -12507,8 +12509,8 @@ def _generate_ring_alkyl_prefixes(features: Any) -> tuple:
             fragment_type="prefix"
         ))
 
-    # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.)
-    prefixes.sort(key=lambda f: alpha_sort_key_total(f.text))
+    # Sort by IUPAC alphabetization rules (ignoring di-, tri-, etc.); R before S whatever the locants (:22603,:45465)
+    prefixes.sort(key=lambda f: rendered_prefix_citation_key(f.text))
 
     return prefixes, frozenset(handled_ring_fg_atoms)
 

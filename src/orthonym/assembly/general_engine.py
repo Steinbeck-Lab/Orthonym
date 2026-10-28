@@ -1091,6 +1091,20 @@ def _alpha_key(prefix: str) -> str:
     return _key_letters(strip_alphanumerical_noise(remainder).lower())
 
 
+def _citation_key(prefix: str) -> tuple:
+    """The order of citation of a substituent prefix: its letters (``_alpha_key``), the locants inside its name
+    (``****``, ``the Blue Book``, under ``### **** ALPHANUMERICAL ORDER``: "the lowest
+    locant(s) at the first point of difference"), then its R/S configuration. Prefixes that differ only in
+    configuration tie in (``:3446`` leaves the descriptors out); ``****`` (``:22603``, under
+    ``### **** CRITERIA RELATED ONLY TO CONFIGURATION``) applies "when names based on alphanumerical
+    order... are the same" and cites R before S, whatever locant each is attached at (``**** Sequence
+    Rule 4a``, ``:45465``: ``5-[(1R)-1-chloroethyl]-3-[(1S)-1-chloroethyl]``). Without these tiers the order the
+    substituents were met decided it. The book gives no order for a Z and an E prefix: those keep the order
+    they were met in."""
+    from .naming_utils import _own_locants, rs_descriptor_rank_key
+    return (_alpha_key(prefix), _own_locants(prefix), rs_descriptor_rank_key(prefix))
+
+
 def _is_complex_prefix(name: str) -> bool:
     """Does ``name`` need bis/tris + enclosure (as opposed to di/tri, bare)?
 
@@ -1345,7 +1359,7 @@ def _assemble(mol, features, chain, part,
     omit_2c = bool(len(chain) == 2 and not part['suffix_core'] and not n_counts
                    and two_carbon_chain_locants_omitted(mol, chain))
     names = list(groups) + [nm for nm in n_counts if nm not in groups]
-    for prefix in sorted(names, key=_alpha_key):
+    for prefix in sorted(names, key=_citation_key):
         locs = ['N'] * n_counts.get(prefix, 0) + [
             str(loc) for loc in sorted(groups.get(prefix, ()))]
         text = _mult_prefix(len(locs), prefix)
@@ -1694,7 +1708,7 @@ def _ring_amide_n_prefixes(mol, pg_matches, allow_mancude):
             if multiplier_needs_hyphen(disp):
                 mult += "-"
             token = f"{','.join(['N'] * cnt)}-{mult}{disp}"
-        entries.append((_alpha_key(nm), token))
+        entries.append((_citation_key(nm), token))
     return n_sub_atoms, entries, bindings
 
 
@@ -1994,7 +2008,7 @@ def _emit_ring_from_analysis(
         if text is None:
             return _refuse("multiplicity beyond table")
         prefix_entries.append(
-            (_alpha_key(prefix), ','.join(map(str, locs)) + '-' + text))
+            (_citation_key(prefix), ','.join(map(str, locs)) + '-' + text))
     prefix_entries.sort(key=lambda t: t[0])
     prefix_parts = [tok for _, tok in prefix_entries]
 
@@ -2159,7 +2173,7 @@ def _emit_fused_ring(mol, features, ring_atoms, allow_aromatic_general: bool,
         text = _mult_prefix(len(locs), prefix)
         if text is None:
             return _refuse("multiplicity beyond table")
-        entries.append((_alpha_key(prefix), ','.join(map(str, locs)) + '-' + text))
+        entries.append((_citation_key(prefix), ','.join(map(str, locs)) + '-' + text))
     entries.sort(key=lambda t: t[0])
     joined = '-'.join(tok for _k, tok in entries)
     if ketone_form is not None:
@@ -2733,7 +2747,7 @@ def name_general_monocycle(
             is_monosubstituted=is_only_one_substitutable_position(_hydride))
 
     prefix_parts = []
-    for prefix in sorted(groups, key=_alpha_key):
+    for prefix in sorted(groups, key=_citation_key):
         locs = sorted(groups[prefix])
         text = _mult_prefix(len(locs), prefix)
         if text is None:

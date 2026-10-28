@@ -166,11 +166,13 @@ def _alphabetize_prefixes(
     # Lazy import to avoid an import cycle if naming_utils imports back from
     # name_tree (unlikely today, but mirrors the lazy-import pattern in
     # composer.py:146 + handlers/* per PATTERNS § Lazy Import).
-    from .naming_utils import alpha_sort_key, cip_descriptor_rank_key
-    # (the Blue Book): prefixes that differ only in configuration
-    # tie on alpha_sort_key and are then ordered by their descriptors, R before S.
-    return tuple(sorted(prefixes, key=lambda p: (alpha_sort_key(p.parent_stem),
-                                                 cip_descriptor_rank_key(p.parent_stem))))
+    from .naming_utils import rendered_prefix_citation_key
+    # A prefix node's text may carry its attachment locant ('2-[(2S)-butan-2-yl]'); that locant is no tier of
+    # the order of citation,:3517, "the fact that 'N' is lower than '4' is irrelevant",:3527).
+    # Prefixes that differ only in configuration tie on alpha_sort_key excludes the descriptors,
+    # the Blue Book) and are then ordered by their descriptors, R before S, at whatever locant:
+    # (:22603), '4-{3,4-bis[(1R)-1-chloroethyl]phenoxy}-1,2-bis[(1S)-1-chloroethyl]benzene (PIN)' (:22597).
+    return tuple(sorted(prefixes, key=lambda p: rendered_prefix_citation_key(p.parent_stem)))
 
 
 def is_coarse_node(node: NameTreeNode) -> bool:

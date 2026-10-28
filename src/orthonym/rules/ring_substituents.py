@@ -714,7 +714,7 @@ def _decorated_biphenylyl_substituent_name(
             out.append({atom: p + 1 for p, atom in enumerate(seq)})
         return out
 
-    from ..assembly.naming_utils import alpha_sort_key as _alpha
+    from ..assembly.naming_utils import alpha_sort_key as _alpha, alpha_sort_key_rs as _cited
     best = None
     for pos_a in _orders(ring_a, a_conn):
         for pos_b in _orders(ring_b, b_conn):
@@ -742,7 +742,7 @@ def _decorated_biphenylyl_substituent_name(
     for nm, ras in groups.items():
         ras = sorted(ras, key=lambda r: ((pos_a[r], 0) if r in ring_a else (pos_b[r], 1)))
         locs = ",".join(_text(r) for r in ras)
-        parts.append((_alpha(nm), f"{locs}-{_mult(len(ras), nm)}{_enc(nm)}"))
+        parts.append((_cited(nm), f"{locs}-{_mult(len(ras), nm)}{_enc(nm)}"))   # R before S::22603
     parts.sort(key=lambda p: p[0])
     body = "-".join(p[1] for p in parts)
     return f"{body}[1,1'-biphenyl]-{pos_a[attachment_atom]}-yl"
@@ -935,7 +935,7 @@ def _decorated_heteroaryl_substituent_name(
         return None
 
     from ..assembly.naming_utils import (
-        alpha_sort_key as _alpha,
+        alpha_sort_key as _alpha, alpha_sort_key_rs as _cited,
     )
     from ..assembly.naming_utils import (
         enclose_if_compound as _enclose_if_compound,
@@ -1027,7 +1027,7 @@ def _decorated_heteroaryl_substituent_name(
             return None
         if _complete:
             prefix_parts.append(
-                (_alpha(nm), _multiplied_component(len(locs), nm, _enclose_if_compound(nm))))
+                (_cited(nm), _multiplied_component(len(locs), nm, _enclose_if_compound(nm))))
             continue
         # Enclosing marks. "Parentheses (round brackets)... are used
         # to enclose multiplied components that are:... (c) simple substituent
@@ -1048,7 +1048,7 @@ def _decorated_heteroaryl_substituent_name(
         # 'bis'.
         text = (f"{','.join(str(l) for l in locs)}-"
                 f"{_multiplied_component(len(locs), nm, _enclose_if_compound(nm))}")
-        prefix_parts.append((_alpha(nm), text))
+        prefix_parts.append((_cited(nm), text))   # R before S::22603,:45465
     prefix_parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in prefix_parts)
     ih = f"{ih_locant}H-" if indicated_h_atom is not None else ""
@@ -1106,7 +1106,7 @@ def _decorated_fused_substituent_name(
     from rdkit import Chem
 
     from ..assembly.naming_utils import (
-        alpha_sort_key as _alpha,
+        alpha_sort_key as _alpha, alpha_sort_key_rs as _cited,
     )
     from ..assembly.naming_utils import (
         enclose_if_compound as _enclose_if_compound,
@@ -1231,7 +1231,7 @@ def _decorated_fused_substituent_name(
         # The multiplier as on the monocyclic path (``multiplied_component``).
         text = (f"{','.join(str(l) for l in locs)}-"
                 f"{_multiplied_component(len(locs), nm, _enclose_if_compound(nm))}")
-        prefix_parts.append((_alpha(nm), text))
+        prefix_parts.append((_cited(nm), text))   # R before S::22603,:45465
     prefix_parts.sort(key=lambda x: x[0])
     body = '-'.join(p[1] for p in prefix_parts)
     # The prefix body ends in a letter (or a closing bracket). A letter-initial

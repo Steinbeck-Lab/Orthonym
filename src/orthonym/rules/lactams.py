@@ -358,7 +358,7 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     # Name each substituent and track N-substitution
     from collections import defaultdict
 
-    from ..assembly.naming_utils import alpha_sort_key, format_substituent_prefix
+    from ..assembly.naming_utils import alpha_sort_key_rs, format_substituent_prefix
 
     # ------------------------------------------------------------------ #
     # A lactam's ring nitrogen is NUMBERED, so its substituent takes the #
@@ -474,7 +474,7 @@ def name_monocyclic_lactam(mol) -> Optional[str]:
     prefix_parts = [
         prefix_str
         for _sub_name, prefix_str in sorted(
-            formatted, key=lambda x: alpha_sort_key(x[0])
+            formatted, key=lambda x: alpha_sort_key_rs(x[0])  # R before S whatever the locants::22603,:45465
         )
     ]
 

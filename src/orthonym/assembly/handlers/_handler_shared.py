@@ -96,6 +96,7 @@ from ..naming_utils import (
     enclose_if_compound,
     format_suffix_with_locants,
     get_suffix_multiplier_prefix,
+    rendered_prefix_citation_key,
     should_omit_locant_one,
 )
 
@@ -3125,11 +3126,11 @@ def _assemble_fragments(
     # Alkyl prefixes are already sorted by _generate_alkyl_prefixes.
     # For non-alkyl prefixes added later, sort all together. Two prefixes that
     # differ only in configuration tie on alpha_sort_key excludes the
-    # descriptors, the Blue Book); (:22606) then orders them by the
-    # descriptors, R before S -- '1-[(2R)-butan-2-yl]-3-[(2S)-butan-2-yl]benzene
-    # (PIN)' (:3390ff). Without that tier the input order decided.
-    prefixes.sort(key=lambda f: (alpha_sort_key(f.text),
-                                 cip_descriptor_rank_key(f.text)))
+    # descriptors, the Blue Book); (:22603) then orders them by the
+    # descriptors, R before S, at whatever locant they are attached at,:45465;
+    # '4-{3,4-bis[(1R)-...]phenoxy}-1,2-bis[(1S)-...]benzene (PIN)',:22597). The text can carry
+    # its attachment locant ('2-[(2S)-butan-2-yl]'), no tier of the order,:3527).
+    prefixes.sort(key=lambda f: rendered_prefix_citation_key(f.text))
 
     # Build prefix strings with locants
     # IUPAC rule: hyphens separate locants from names, and are needed
