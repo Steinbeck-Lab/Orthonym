@@ -129,3 +129,26 @@ def radical_last_resort():
 def radical_last_resort_active() -> bool:
     """True inside:func:`radical_last_resort`."""
     return _RADICAL_LAST_RESORT.get()
+
+
+# Set by ``radical_floor_stereo``: the floor's stereo cascade is reading the names of a radical.
+_RADICAL_FLOOR_STEREO = contextvars.ContextVar("orthonym_radical_floor_stereo", default=False)
+
+
+@contextlib.contextmanager
+def radical_floor_stereo():
+    """The block is the stereo pass of the radical offer (``assembly/radical_floor._further_names``): the floor's stereo
+    cascade (``universal_substituent._resolve_floor_stereo``) builds the names of a radical with the descriptors of
+    every branch, in the locants of that branch, and verifies each by reading it with OPSIN's ``-r``
+    (``validation/atom_coverage.py``). The cascade reads without ``-r`` everywhere else, where a name with a free
+    valence does not parse, and the floor's name of a radical keeps the descriptors of none of its branches."""
+    token = _RADICAL_FLOOR_STEREO.set(True)
+    try:
+        yield
+    finally:
+        _RADICAL_FLOOR_STEREO.reset(token)
+
+
+def radical_floor_stereo_active() -> bool:
+    """True inside:func:`radical_floor_stereo`."""
+    return _RADICAL_FLOOR_STEREO.get()

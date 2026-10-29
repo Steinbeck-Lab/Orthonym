@@ -81,6 +81,23 @@ def test_carbon_free_radical_ion_is_a_preselected_name():
     assert _strict_rt("azanidyl", "[NH-]")
 
 
+# A sulfonium or selenonium radical cation with four bonds: the producer names the ion of its centre ('sulfanium', 'selanium', the
+# ``_PIN_RADICAL_ION_CENTRES`` table), not of the bonds the atom holds, and these names ship as pin_verified on main. They are pinned as main gives
+# them. OPEN QUESTION, not settled here: the four-bond ion is probably a 'lambda-4' sulfanium ('tetramethyl-lambda4-sulfaniumyl'; the book's
+# 'tetrafluoro(methyl)-lambda4-sulfanium (PIN)', the Blue Book under, in which case the label is wrong; that is a separate item.
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[S+](C)(C)C", "tetramethylsulfaniumyl"),
+    ("C[Se+](C)(C)C", "tetramethylselaniumyl"),
+    ("CC[S+](CC)(CC)CC", "tetraethylsulfaniumyl"),
+    ("OC(=O)C[S+](C)(C)C", "(carboxymethyl)tri(methyl)sulfaniumyl"),
+])
+def test_a_four_bond_chalcogenium_radical_cation_keeps_the_name_main_gives(smiles, expected):
+    row = _name(smiles)
+    assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"], row
+    assert _strict_rt(expected, smiles)
+
+
 # "Radical ions on ionic suffix groups" (the Blue Book): "When ions
 # may be named by using modified suffixes (see and, the
 # suffixes denoting radical centers are added to the name of the cationic or anionic

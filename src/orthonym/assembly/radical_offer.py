@@ -15,8 +15,13 @@ else (``radical_floor.radical_floor_names``):
   .... This method is only for general nomenclature." The row is ``systematic_verified``, never a PIN;
 * several monovalent centres as the free valences of the one ring system or acyclic chain that holds them all,
   "CHOICE OF PARENT RADICAL" (the Blue Book) with "Multiple radical centers (polyradicals)" (:40524);
-* a monovalent centre that no parent carries has no citation: the molecule keeps its abstention (never a lambda on a
-  monovalent centre, and the book's 'ylo' of,:40753, is not read by OPSIN).
+* centres in separate identical parts of the molecule as an assembly of parent radicals, "ASSEMBLIES OF PARENT
+  RADICALS" (the Blue Book): ``(<linker>-diyl)bis(<unit>)`` (``assembly/radical_assembly.py``);
+* one centre that is a charged atom as a radical ion of a one-atom parent, "RADICAL IONS DERIVED FROM PARENT
+  HYDRIDES" (the Blue Book): ``ethylboranuidylidyne`` (``assembly/radical_ion.py``). These two classes are built
+  after every name of the routes above, so a name that ships without them does not change;
+* a monovalent centre that no parent carries and that is in no such assembly has no citation: the molecule keeps its
+  abstention (never a lambda on a monovalent centre, and the book's 'ylo' of,:40753, is not read by OPSIN).
 
 The stereo of the input is composed on the name of the floor as the stereo-composed offer does it
 (``stereo_composed_offer._verified_composed_name``), with the name read by OPSIN's ``-r``

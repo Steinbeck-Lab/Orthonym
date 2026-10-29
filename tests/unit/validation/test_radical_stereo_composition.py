@@ -82,3 +82,52 @@ def test_a_closed_shell_structure_is_still_read_without_the_radical_flag():
         # a name with a free valence is not the name of a closed-shell molecule, whatever the offer reads
         assert opsin_roundtrip_check("CCO", "ethyl")["passed"] is False
         assert opsin_atom_locant_map("ethyl", Chem.MolFromSmiles("CC")) is None
+
+
+# --- the stereo cascade of the floor reads a radical with -r, in the stereo pass of the radical offer ----------------
+
+NESTED_STEREO_ROWS = [
+    # three stereocentres in three nested substituents: the composition at the front of the name cites '(1S,2R,1R)'
+    # with repeated locants (declined), and each descriptor belongs in the bracket of its own group
+    ("C[C@H](C1=CC=CC=C1)N2C[C@@H]2[C@H]([C]3[CH][CH][CH][CH]3)O",
+     "1-[(1S)-hydroxy{(2R)-1-[(1R)-1-phenylethyl]aziridin-2-yl}methyl]cyclopentane-1,2,3,4,5-pentayl"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", NESTED_STEREO_ROWS)
+def test_the_descriptors_of_every_branch_are_cited_in_the_bracket_of_the_branch(smiles, expected):
+    """``### **** NAMING OF STEREOISOMERS`` (the Blue Book), sentence:44643: "In preferred IUPAC names,
+    stereodescriptors are placed immediately at the front of the part of the name to which they relate". The floor's stereo
+    cascade (``universal_substituent._resolve_floor_stereo``) builds that name and verifies it with OPSIN's ``-r`` in the
+    stereo pass of the radical offer (``read_back_policy.radical_floor_stereo``)."""
+    _assert_named(smiles, expected)
+
+
+def test_the_stereo_pass_does_not_change_a_name_that_the_composition_gives():
+    """The stereo pass is the last class of the offer: a molecule whose plain name takes the stereo at the front keeps it."""
+    _assert_named("C[C@@H](O)[C]1[CH][CH][CH][CH]1", "(1R)-1-(1-hydroxyethyl)cyclopentane-1,2,3,4,5-pentayl")
+
+
+def test_the_atom_coverage_reads_a_radical_name_with_its_flag_only_in_the_stereo_pass():
+    from orthonym.validation.atom_coverage import find_opsin_jar, validate_atom_coverage
+    from orthonym.validation.read_back_policy import radical_floor_stereo
+    mol = Chem.MolFromSmiles("C[C@@H](O)[C]1[CH][CH][CH][CH]1")
+    name = "1-[(1R)-1-hydroxyethyl]cyclopentane-1,2,3,4,5-pentayl"
+    if find_opsin_jar() is None:
+        pytest.skip("no OPSIN")
+    assert validate_atom_coverage(mol, name).method != "parse_back"      # read without -r: a free valence does not parse
+    with radical_floor_stereo():
+        assert validate_atom_coverage(mol, name).method == "parse_back"
+
+
+def test_the_stereo_pass_is_not_active_while_the_offer_reads_a_name():
+    """The pass builds its names inside the ``radical_floor_stereo`` block and yields them after it, so the offer's own checks
+    of a name (the exit check, the composition) read a radical as they always read."""
+    from orthonym.assembly.radical_floor import _further_names
+    from orthonym.validation.read_back_policy import radical_floor_stereo_active
+    mol = Chem.MolFromSmiles("C[C@@H](O)[C]1[CH][CH][CH][CH]1")
+    seen = []
+    with radical_last_resort():
+        for _name in _further_names(mol):
+            seen.append(radical_floor_stereo_active())
+    assert seen and not any(seen)

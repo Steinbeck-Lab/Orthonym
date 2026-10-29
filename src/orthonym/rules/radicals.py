@@ -1308,17 +1308,54 @@ def _acid_name_with_oh_at_nitrene(mol, idx: int) -> str:
     return name if name.endswith('acid') else ''
 
 
-# ionic parent hydrides (mononuclear) that a radical centre can sit on.
-_IONIC_PARENT = {
-    ('N', -1): 'azanide', ('N', 1): 'azanium', ('O', 1): 'oxidanium',
-    ('S', 1): 'sulfanium', ('Se', 1): 'selanium', ('B', -1): 'boranuide',
-    ('P', 1): 'phosphanium', ('P', -1): 'phosphanide', ('As', 1): 'arsanium',
-    ('C', 1): 'methylium', ('C', -1): 'methanide',
-    # Silicon and germanium anions of (silanide, germanide); "Examples of radical anions"
-    # (:43424) names the radical anion by 'yl' on the anion's name, as it does 'azanidyl' (:43426) and
-    # 'trimethylboranuidyl (PIN)' (:43430). Tin and lead are metals of data/metal_scope.py, handed on first.
-    ('Si', -1): 'silanide', ('Ge', -1): 'germanide',
-}
+# ionic parent hydrides (mononuclear) that a radical centre can sit on: the parent hydrides of one atom of
+# ``_GROUP14_HYDRIDE_RADICAL`` and ``_ELIDE_E_HYDRIDE_RADICAL``, and the three more that only an ion needs (oxidane,
+# the halogen hydrides).
+_IONIC_ONLY_HYDRIDES = {'O': 'oxidane', 'Cl': 'chlorane', 'Br': 'bromane', 'I': 'iodane'}
+
+
+#: the centres (element, charge) whose radical ions this producer names at the PIN tiers,; silicon and
+#: germanium anions of,:43424-:43430), each with the bonding number it names its ion for, against the standard
+#: bonding number of the hydride (+1: the 'uide' or 'ium' of the hydride, -1: its 'ide' or 'ylium'). The name does not follow
+#: the bonds the atom holds: a sulfur with four bonds and a radical electron is 'tetramethylsulfaniumyl' (pin_verified on main),
+#: as one with two bonds is 'propyloxidaniumyl'; whether the four-bond ion is a 'lambda-4' sulfanium,
+#: 'tetrafluoro(methyl)-lambda4-sulfanium (PIN)', the Blue Book) is an open question of its own, not of this table. Tin and lead are
+#: metals of data/metal_scope.py, handed on first. The radical offer (``assembly/radical_ion.py``) names more centres by the
+#: same ``ionic_parent_hydride``, at a general tier only, and by the bonds the atom holds.
+_PIN_RADICAL_ION_CENTRES = {
+    ('N', -1): -1, ('N', 1): +1, ('O', 1): +1, ('S', 1): +1, ('Se', 1): +1, ('B', -1): +1, ('P', 1): +1, ('P', -1): -1,
+    ('As', 1): +1, ('C', 1): -1, ('C', -1): -1, ('Si', -1): -1, ('Ge', -1): -1}
+
+
+def ionic_parent_hydride(atom, bonding_number: int) -> str:
+    """The ionic parent hydride, the Blue Book-43422,, that the charged ``atom`` is a
+    radical centre of, or ''. ``bonding_number`` is the bonds the atom holds, its hydrogens and its radical electrons
+    together, against the standard bonding number of its hydride: an anion that holds one more is the 'uide' of the
+    hydride ('boranuide', 'iodanuide'), one that holds one less its 'ide' ('azanide', 'silanide'); a cation that holds
+    one more is its 'ium' ('azanium', 'oxidanium'), one that holds one less its 'ylium' ('methylium', 'silylium',
+    'azanylium'). The name keeps the final 'e' of an 'ide' or 'uide' (the caller elides it before 'yl',."""
+    symbol, charge = atom.GetSymbol(), atom.GetFormalCharge()
+    hydride = (_GROUP14_HYDRIDE_RADICAL.get(symbol) or _ELIDE_E_HYDRIDE_RADICAL.get(symbol)
+               or _IONIC_ONLY_HYDRIDES.get(symbol))
+    if not hydride or charge not in (-1, 1) or atom.GetAtomicNum() > 53:
+        return ''
+    standard = Chem.GetPeriodicTable().GetDefaultValence(atom.GetAtomicNum())
+    stem = hydride[:-1]                           # 'borane' -> 'boran'
+    if charge < 0:
+        suffix = {standard + 1: 'uide', standard - 1: 'ide'}.get(bonding_number)
+        return stem + suffix if suffix else ''
+    if bonding_number == standard + 1:
+        return stem + 'ium'
+    if bonding_number == standard - 1:
+        # the group 14 hydrides drop the whole 'ane' ('silylium'), the others elide the 'e' ('azanylium')
+        return (hydride[:-3] if symbol in _GROUP14_HYDRIDE_RADICAL else stem) + 'yl' + 'ium'
+    return ''
+
+
+def radical_ion_is_empty_orbital_cation(atom) -> bool:
+    """True for a cation that RDKit counts two radical electrons on: the EMPTY orbital of an '-ylium' cation (C[O+],
+    [NH2+], c1ccccc1[S+]), a cation and not a radical ion, which no read-back can tell apart from one."""
+    return atom.GetFormalCharge() > 0 and atom.GetNumRadicalElectrons() == 2
 
 
 def _name_mononuclear_radical_ion(mol) -> str:
@@ -1341,17 +1378,16 @@ def _name_mononuclear_radical_ion(mol) -> str:
     if len(charged) != 1 or len(radical) != 1 or charged[0].GetIdx() != radical[0].GetIdx():
         return ''
     x = charged[0]
-    if x.GetFormalCharge() > 0 and x.GetNumRadicalElectrons() == 2:
-        # RDKit counts the EMPTY orbital of an '-ylium' cation (C[O+], [NH2+],
-        # c1ccccc1[S+]) as two radical electrons. Those are cations --
-        # 'methoxylium (PIN)', 'azanylium', '1H-pyrrole-2-carboxamidylium (PIN)'
-        # -- not radical ions, and the SMILES cannot tell the two readings
-        # apart, so no round trip can either. They belong to the separate
-        # build (user decision Q2 = A); this producer leaves them alone.
+    if radical_ion_is_empty_orbital_cation(x):
+        # Those are cations -- 'methoxylium (PIN)', 'azanylium', '1H-pyrrole-2-carboxamidylium (PIN)' -- not
+        # radical ions, and the SMILES cannot tell the two readings apart, so no round trip can either. They
+        # belong to the separate build (user decision Q2 = A); this producer leaves them alone.
         return ''
-    parent = _IONIC_PARENT.get((x.GetSymbol(), x.GetFormalCharge()))
+    offset = _PIN_RADICAL_ION_CENTRES.get((x.GetSymbol(), x.GetFormalCharge()))
+    parent = '' if offset is None else ionic_parent_hydride(
+        x, Chem.GetPeriodicTable().GetDefaultValence(x.GetAtomicNum()) + offset)
     suffix = {1: 'yl', 2: 'ylidene'}.get(x.GetNumRadicalElectrons())
-    if parent is None or suffix is None:
+    if not parent or suffix is None:
         return ''
     from .mononuclear_hydrides import _build_mixed_substituent_string
     general = _tier_is_general()

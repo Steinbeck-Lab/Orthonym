@@ -157,6 +157,7 @@ never calls verify_or_none" — that was true before the stereo floor gained run
 """
 from __future__ import annotations
 
+import contextvars
 import itertools
 from dataclasses import dataclass, field
 from typing import Dict, FrozenSet, Iterator, List, Optional, Tuple
@@ -2834,11 +2835,36 @@ def _select_spine(ctx: _Ctx, component: FrozenSet[int], attach_hint: Optional[in
     return spine if spine is not None and poly <= frozenset(spine[0]) else None
 
 
+#: the atom whose free valence a polyradical name cites first, set by the unit of an assembly of parent radicals
+#: (``assembly/radical_assembly.py``): in a multiplicative name the first locant of a divalent group is the one
+#: bonded to the group cited before it, 'piperidine-4,1-diyl')
+_FIRST_VALENCE: contextvars.ContextVar = contextvars.ContextVar("orthonym_polyradical_first_valence", default=None)
+
+
+#: set by the assembly of parent radicals (``assembly/radical_assembly.py``) while it names a group with free valences:
+#: a single ring that carries them is spelled by its book name ('benzene-1,2-diyl', 'piperidine-4,1-diyl'), numbered
+#: with the free valences as a set (c)), where every other call keeps the mechanical spelling of the ring
+_BOOK_RING_FREE_VALENCES: contextvars.ContextVar = contextvars.ContextVar(
+    "orthonym_book_ring_free_valences", default=False)
+
+
+def _ring_free_valences(ctx: "_Ctx", ring_atoms) -> Tuple[int, ...]:
+    """The atoms of ``ring_atoms`` that hold a free valence of the polyradical parent, when the book spelling of a ring
+    with free valences is asked for (``_BOOK_RING_FREE_VALENCES``); else ."""
+    if not _BOOK_RING_FREE_VALENCES.get():
+        return ()
+    return tuple(sorted(a for a in ring_atoms if a in ctx.poly_radical_atoms))
+
+
 def _polyradical_name(parent_name: str, centres: FrozenSet[int], atom_to_locant: Dict[int, object]) -> str:
     """``parent_name`` with the free valences of ``centres`` cited as "Multiple radical centers
     (polyradicals)" (the Blue Book) cites them: the multiplied suffix 'yl' after the parent hydride
     name with locants ('ethane-1,2-diyl'); the final 'e' stays before the consonant of the multiplier."""
     locants = sorted((atom_to_locant[a] for a in centres), key=_locant_sort_key)
+    first = _FIRST_VALENCE.get()
+    if first in centres and atom_to_locant[first] in locants:   # the valence of ``first`` is cited first
+        locants.remove(atom_to_locant[first])
+        locants.insert(0, atom_to_locant[first])
     return f"{parent_name}-{','.join(_locant_display(loc) for loc in locants)}-{multiplying_prefix(len(locants))}yl"
 
 
@@ -3340,7 +3366,8 @@ def _renumber_ring_by_cited_first(ctx: _Ctx, component: FrozenSet[int], ring_ato
         for a in entry_atoms:
             atoms.append(a)
             names.append(name)
-    again = monocycle_form(view, ring, attach_hint, atoms, allow_cation=True, branch_names=names)
+    again = monocycle_form(view, ring, attach_hint, atoms, allow_cation=True, branch_names=names,
+                           free_valences=_ring_free_valences(ctx, ring))
     if again is None or again.numbering == form.numbering or again.parent != form.parent:
         return None
     return again
@@ -3397,7 +3424,7 @@ def _book_ring_spine(ctx: _Ctx, component: FrozenSet[int], ring_atoms: FrozenSet
     ring = sorted(ring_atoms)
     form = monocycle_form(view, ring, attach_hint,
                           branch_carriers(view, ring, attach_hint, within=component),
-                          allow_cation=True)
+                          allow_cation=True, free_valences=_ring_free_valences(ctx, ring))
     if form is None:
         return None
     if any(view.GetAtomWithIdx(a).GetFormalCharge() for a in ring):

@@ -214,7 +214,7 @@ def free_valence_carries_indicated_hydrogen(state, free_valence_atom) -> bool:
 
 
 def _numbering(mol, order, hetero, sp3_atoms, free_valence_atom, branch_atoms,
-               ih_atom=None, cationic=(), branch_names=None) -> Dict[int, int]:
+               ih_atom=None, cationic=(), branch_names=None, free_valences=()) -> Dict[int, int]:
     n = len(order)
     ranks = _canonical_ranks(mol)
     senior = min((_RANK[mol.GetAtomWithIdx(a).GetSymbol()] for a in hetero), default=None)
@@ -237,6 +237,8 @@ def _numbering(mol, order, hetero, sp3_atoms, free_valence_atom, branch_atoms,
             # Then (:42219): low locants for the skeletal cationic centres.
             chg = tuple(sorted(a2p[a] for a in cationic))
             fv = a2p[free_valence_atom] if free_valence_atom in a2p else 0
+            # (c): the free valences of a polyvalent group as a SET get the lowest locants
+            fvs = tuple(sorted(a2p[a] for a in free_valences if a in a2p))
             br = tuple(sorted(a2p[a] for a in branch_atoms if a in a2p))
             tie = tuple(ranks[order[(start + direction * p) % n]] for p in range(n))
             # (g) (the Blue Book, section:3219 " NUMBERING"): "lowest locants for
@@ -253,7 +255,7 @@ def _numbering(mol, order, hetero, sp3_atoms, free_valence_atom, branch_atoms,
                           for nm in sorted(by_name, key=alpha_sort_key))
             # (a) heteroatoms, (b) indicated hydrogen, (c) free valence,
             # (e) hydro prefixes, (f) detachable prefixes, (g) the prefix cited first
-            key = (first_ok, het_set, sen, ih, fv, chg, hydro, br, g, tie)
+            key = (first_ok, het_set, sen, ih, fv, fvs, chg, hydro, br, g, tie)
             if best_key is None or key < best_key:
                 best_key, best = key, a2p
     return best
@@ -265,11 +267,12 @@ _HYDRO_MULT = {2: "di", 4: "tetra", 6: "hexa", 8: "octa"}
 def monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[int] = None,
                    branch_atoms: Sequence[int] = (),
                    allow_cation: bool = False,
-                   branch_names: Optional[Sequence[str]] = None) -> Optional[MonocycleForm]:
+                   branch_names: Optional[Sequence[str]] = None,
+                   free_valences: Sequence[int] = ()) -> Optional[MonocycleForm]:
     """The book's name and numbering of one ring (``_monocycle_form``), recorded with
     ``assembly.book_prefixes.note_book_form`` when one is given."""
     form = _monocycle_form(mol, ring_atoms, free_valence_atom, branch_atoms, allow_cation,
-                           branch_names)
+                           branch_names, free_valences)
     if form is not None:
         from ..assembly.book_prefixes import note_book_form
         note_book_form("ring")
@@ -279,17 +282,23 @@ def monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[i
 def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[int] = None,
                     branch_atoms: Sequence[int] = (),
                     allow_cation: bool = False,
-                    branch_names: Optional[Sequence[str]] = None) -> Optional[MonocycleForm]:
+                    branch_names: Optional[Sequence[str]] = None,
+                    free_valences: Sequence[int] = ()) -> Optional[MonocycleForm]:
     """The book's name and numbering of the single ring ``ring_atoms``, or ``None``.
 
     ``branch_atoms`` lists the ring atoms that carry a substituent prefix, once per prefix
      (f) lowest locants). ``free_valence_atom`` is the ring atom of the free valence
-    of a substituent prefix, ``None`` for a parent."""
+    of a substituent prefix, ``None`` for a parent. ``free_valences`` are the ring atoms that
+    hold a free valence of a polyvalent group ('benzene-1,4-diyl',: each carries one
+    radical electron in ``mol`` and the locants of the set are the lowest (c))."""
     ring = list(ring_atoms)
     ring_set = set(ring)
+    valences = set(free_valences)
     if not 3 <= len(ring) <= 10:
         return None
     if free_valence_atom is not None and free_valence_atom not in ring_set:
+        return None
+    if not valences <= ring_set or (valences and free_valence_atom is not None):
         return None
     ri = mol.GetRingInfo()
     if any(ri.NumAtomRings(a) != 1 for a in ring):
@@ -300,7 +309,7 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
     cationic = []
     for a in ring:
         atom = mol.GetAtomWithIdx(a)
-        if atom.GetIsotope() or atom.GetNumRadicalElectrons():
+        if atom.GetIsotope() or atom.GetNumRadicalElectrons() != (1 if a in valences else 0):
             return None
         if atom.GetFormalCharge():
             # an 'ium' ring nitrogen: only for a caller that expresses the charge
@@ -312,7 +321,7 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
         return None
     for a in hetero:
         atom = mol.GetAtomWithIdx(a)
-        if atom.GetTotalValence() != _BONDING[atom.GetSymbol()] + (a in cationic):
+        if atom.GetTotalValence() + (a in valences) != _BONDING[atom.GetSymbol()] + (a in cationic):
             return None
     aromatic = all(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring)
     if not aromatic and any(mol.GetAtomWithIdx(a).GetIsAromatic() for a in ring):
@@ -338,7 +347,7 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
         else:
             return None  # 'cyclohex-2-en-1-yl' etc.: the caller's spelling is the book's
         numbering = _numbering(mol, order, [], [], free_valence_atom, list(branch_atoms),
-                               branch_names=branch_names)
+                               branch_names=branch_names, free_valences=valences)
         if free_valence_atom is not None and numbering.get(free_valence_atom) != 1:
             return None
         return MonocycleForm(parent=parent, numbering=numbering, kind=kind)
@@ -360,7 +369,7 @@ def _monocycle_form(mol, ring_atoms: Iterable[int], free_valence_atom: Optional[
         return None  # an 'ium' nitrogen with hydro prefixes or indicated hydrogen is not built
     ih_atom = _free_valence_ih_atom(mol, ring, order, sp3, free_valence_atom)
     numbering = _numbering(mol, order, hetero, sp3, free_valence_atom, list(branch_atoms),
-                           ih_atom, cationic, branch_names)
+                           ih_atom, cationic, branch_names, valences)
     het = {numbering[a]: mol.GetAtomWithIdx(a).GetSymbol() for a in hetero}
     from .heterocycles import (_apply_retained_stem, _mancude_retained_stem,
                                _saturated_ring_retained_name, build_hw_name)

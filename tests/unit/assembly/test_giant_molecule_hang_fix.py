@@ -145,7 +145,7 @@ def test_opsin_parse_is_memoized(monkeypatch):
     ac._OPSIN_PARSE_CACHE.clear()
     calls = {'n': 0}
 
-    def fake_uncached(name, jar):
+    def fake_uncached(name, jar, allow_radicals=False):
         calls['n'] += 1
         return 'C' if name == 'methane' else None
 
@@ -158,6 +158,30 @@ def test_opsin_parse_is_memoized(monkeypatch):
         assert ac._parse_name_with_opsin('bogus-name', '/fake.jar') is None
         assert ac._parse_name_with_opsin('bogus-name', '/fake.jar') is None
         assert calls['n'] == 2
+    finally:
+        ac._OPSIN_PARSE_CACHE.clear()
+
+
+def test_opsin_memo_key_includes_the_radical_flag(monkeypatch):
+    """A name read without -r and with -r are two entries: a name with a free valence parses with the flag only, so the answer
+    of one reading must never be served for the other (``atom_coverage._parse_name_with_opsin``, ``allow_radicals``)."""
+    from orthonym.validation import atom_coverage as ac
+    ac._OPSIN_PARSE_CACHE.clear()
+    seen = []
+
+    def fake_uncached(name, jar, allow_radicals=False):
+        seen.append(allow_radicals)
+        return '[CH3]' if allow_radicals else None          # a free valence parses with -r only
+
+    monkeypatch.setattr(ac, '_parse_name_with_opsin_uncached', fake_uncached)
+    try:
+        assert ac._parse_name_with_opsin('methyl', '/fake.jar') is None
+        assert ac._parse_name_with_opsin('methyl', '/fake.jar', allow_radicals=True) == '[CH3]'
+        assert seen == [False, True]                          # two readings, two entries
+        assert ac._parse_name_with_opsin('methyl', '/fake.jar') is None
+        assert ac._parse_name_with_opsin('methyl', '/fake.jar', allow_radicals=True) == '[CH3]'
+        assert seen == [False, True]                          # each served from its own entry
+        assert len(ac._OPSIN_PARSE_CACHE) == 2
     finally:
         ac._OPSIN_PARSE_CACHE.clear()
 

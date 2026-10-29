@@ -10,12 +10,17 @@ attachment atom, which gave ``spiro[2λ2-sila...]-2-ylidene``, a name OPSIN read
 the molecule itself, with the lambda convention and no ylidene, is the name of the species.
 
 ``radical_floor_names`` is the floor's candidates for any molecule with radical centres, for the radical offer
-(``assembly/radical_offer.py``), the last resort of the best-effort tier.
+(``assembly/radical_offer.py``), the last resort of the best-effort tier: the names of the routes first, then the names of
+the assembly of identical parent radicals (``assembly/radical_assembly.py``) and of the radical ion of a one-atom parent
+(``assembly/radical_ion.py``).
 """
 import contextlib
+import logging
 from typing import Optional
 
 from rdkit import Chem
+
+logger = logging.getLogger(__name__)
 
 #: skeletal heteroatoms whose lowered valence the floor writes with the lambda convention
 _LAMBDA_ELEMENTS = frozenset({"Si", "Ge", "B"})
@@ -52,14 +57,68 @@ def radical_floor_names(mol):
         for name in _route_names(mol, True):
             seen.add(name)
             yield name
-    if not fired[0]:
+    if fired[0]:
+        for acyloxy_leaf, mechanical in ((False, False), (False, True)):
+            with mechanical_forms() if mechanical else contextlib.nullcontext():
+                for name in _route_names(mol, acyloxy_leaf):
+                    if name not in seen:
+                        seen.add(name)
+                        yield name
+    # the names of the classes below come after every name the routes above build, so a molecule that one of those names
+    # reads back for keeps it
+    for name in _further_names(mol):
+        if name not in seen:
+            seen.add(name)
+            yield name
+
+
+def _further_names(mol):
+    """The names that the routes do not build, once those have given every name they have:
+
+    * the routes again with the stereo cascade of the floor reading the names of a radical (``read_back_policy.
+      radical_floor_stereo``), for a molecule with stereo;
+    * centres in separate identical parts of the molecule, an assembly of parent radicals, "ASSEMBLIES OF PARENT
+      RADICALS" (the Blue Book): ``(<linker>-diyl)bis(<unit>)`` (``assembly/radical_assembly.py``);
+    * one centre that is a charged atom, a radical ion, "RADICAL IONS DERIVED FROM PARENT HYDRIDES"
+      (the Blue Book): ``<prefixes>boranuidylidyne`` (``assembly/radical_ion.py``)."""
+    from ..perception.ions import get_radical_sites
+    from ..validation.read_back_policy import radical_floor_stereo
+    from .book_prefixes import mechanical_forms
+    from .radical_assembly import radical_assembly_names
+    from .radical_ion import radical_ion_names
+    sites = get_radical_sites(mol)
+    ion = len(sites) == 1 and mol.GetAtomWithIdx(sites[0]['atom_idx']).GetFormalCharge()
+    stereo = (any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED for a in mol.GetAtoms())
+              or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in mol.GetBonds()))
+    try:
+        if stereo:
+            # the routes again with the stereo cascade of the floor reading the names of the radical (-r): the descriptors
+            # of every branch, in the locants of the branch, where the plain names above carry none. The cascade
+            # reads with -r only while the next name is built: the offer's own checks of a name read as they always read
+            routes = _route_names(mol, True)
+            while True:
+                with radical_floor_stereo():
+                    name = next(routes, None)
+                if name is None:
+                    break
+                yield name
+        if not ion and len(sites) < 2:
+            return
+        if ion:
+            for mechanical in (False, True):    # the book's spelling of the substituents, then the mechanical one
+                with mechanical_forms() if mechanical else contextlib.nullcontext():
+                    for acyloxy_leaf in (True, False):
+                        yield from radical_ion_names(mol, acyloxy_leaf=acyloxy_leaf)
+            return
+        # the book's spelling, then the mechanical one of the groups of the unit with the linker still in the book's
+        # spelling of its ring, then the mechanical one of both
+        for linker_book, mechanical_units in ((True, False), (True, True), (False, True)):
+            for acyloxy_leaf in (True, False):
+                yield from radical_assembly_names(
+                    mol, book_forms=linker_book, acyloxy_leaf=acyloxy_leaf, mechanical_units=mechanical_units)
+    except Exception:   # a class that fails to build a name has none: the names before it stand
+        logger.debug("radical floor: the further classes gave up on %s", Chem.MolToSmiles(mol), exc_info=True)
         return
-    for acyloxy_leaf, mechanical in ((False, False), (False, True)):
-        with mechanical_forms() if mechanical else contextlib.nullcontext():
-            for name in _route_names(mol, acyloxy_leaf):
-                if name not in seen:
-                    seen.add(name)
-                    yield name
 
 
 def _route_names(mol, acyloxy_leaf: bool):

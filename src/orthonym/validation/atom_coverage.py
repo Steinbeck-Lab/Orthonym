@@ -129,20 +129,21 @@ _OPSIN_PARSE_CACHE = {}
 _OPSIN_PARSE_CACHE_MAX = 16384
 
 
-def _parse_name_with_opsin(name: str, opsin_jar: str) -> Optional[str]:
+def _parse_name_with_opsin(name: str, opsin_jar: str, allow_radicals: bool = False) -> Optional[str]:
     """Memoizing wrapper over:func:`_parse_name_with_opsin_uncached`.
 
     See the note above ``_OPSIN_PARSE_CACHE`` for why a process-global memo is
     sound. Bounded to ``_OPSIN_PARSE_CACHE_MAX`` distinct names; once full it stops
     inserting (never evicts) so a pathological batch cannot grow it without bound.
+    ``allow_radicals`` (OPSIN's ``-r``) is part of the key: a name with a free valence parses with it only.
     """
     if not name or not opsin_jar:
         return None
-    key = (name, opsin_jar)
+    key = (name, opsin_jar, True) if allow_radicals else (name, opsin_jar)
     cached = _OPSIN_PARSE_CACHE.get(key, _CACHE_MISS)
     if cached is not _CACHE_MISS:
         return cached
-    result = _parse_name_with_opsin_uncached(name, opsin_jar)
+    result = _parse_name_with_opsin_uncached(name, opsin_jar, allow_radicals)
     if len(_OPSIN_PARSE_CACHE) < _OPSIN_PARSE_CACHE_MAX:
         _OPSIN_PARSE_CACHE[key] = result
     return result
@@ -151,7 +152,7 @@ def _parse_name_with_opsin(name: str, opsin_jar: str) -> Optional[str]:
 _CACHE_MISS = object()
 
 
-def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
+def _parse_name_with_opsin_uncached(name: str, opsin_jar: str, allow_radicals: bool = False) -> Optional[str]:
     """Parse a single IUPAC name to SMILES using OPSIN JAR.
 
     Mirrors the batch approach from ``scripts/benchmark_chebi500.py``
@@ -183,12 +184,14 @@ def _parse_name_with_opsin_uncached(name: str, opsin_jar: str) -> Optional[str]:
     served = False
     try:
         from ..jvm_bridge import opsin_stdout
-        stdout_text, served = opsin_stdout(name, allow_radicals=False,
+        stdout_text, served = opsin_stdout(name, allow_radicals=allow_radicals,
                                            jar_path=opsin_jar)
     except ImportError:  # pragma: no cover - jvm_bridge always present
         served = False
 
     if not served:
+        if allow_radicals:
+            return None     # the subprocess reads without -r: a name with a free valence is not read
         stdout_text = _opsin_cli_stdout(name, opsin_jar)
         if stdout_text is None:
             return None
@@ -326,7 +329,10 @@ def validate_atom_coverage(
 
     # Parse-back approach
     if opsin_jar is not None and name:
-        parsed_smiles = _parse_name_with_opsin(name, opsin_jar)
+        from .read_back_policy import radical_floor_stereo_active
+        parsed_smiles = _parse_name_with_opsin(
+            name, opsin_jar,
+            allow_radicals=radical_floor_stereo_active() and any(a.GetNumRadicalElectrons() for a in mol.GetAtoms()))
         if parsed_smiles is not None:
             parsed_mol = Chem.MolFromSmiles(parsed_smiles)
             if parsed_mol is not None:

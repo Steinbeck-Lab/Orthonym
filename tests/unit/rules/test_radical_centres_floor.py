@@ -16,7 +16,11 @@ OPSIN (``-r``) reads it back to the same graph, radical placement included
   centers (polyradicals)" (:40524): the suffix 'yl' for each monovalent centre with the numerical prefixes
   ('propane-1,2,3-triyl').
 * A monovalent centre that no one parent carries has no name here (the book's 'ylo',, the Blue Book, is
-  not read by OPSIN), and the molecule keeps its abstention: never 'λ3-silyl' for a monovalent centre.
+  not read by OPSIN), and the molecule keeps its abstention: never 'λ3-silyl' for a monovalent centre. Centres in
+  separate identical parts of a molecule are the exception, ``assembly/radical_assembly.py`` "ASSEMBLIES OF
+  PARENT RADICALS", the Blue Book): two dimethylsilyl radicals on one benzene ring are '(benzene-1,2-diyl)bis(dimethylsilyl)',
+  which this test used to list as declined (the ring atoms between the two centres are not a chain,
+  and puts the centres on ONE parent; covers radical centres "located in different parts of the structure").
 """
 import pytest
 from rdkit import Chem
@@ -97,9 +101,9 @@ def test_an_earlier_candidate_that_loses_the_radical_does_not_end_the_search():
 # --- what stays declined ------------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("smiles", [
-    # two monovalent silicon centres on a ring: no parent carries both (the ring atoms between them are not a chain)
-    "C[Si](C)c1ccccc1[Si](C)C",
-    # two monovalent centres in two ring systems
+    # two monovalent centres in two ring systems (two cyclopentane-pentayl units): an assembly of multi-centre units is not
+    # offered, because OPSIN reads '(<linker>)bis(cyclopentane-1,2,3,4,5-pentayl)' with the radical of the atom bonded to
+    # the linker lost
     "CN(C)C[C]1[CH][CH][CH][C]1CN(CCCCCCO)C[C]2[CH][CH][CH][C]2CN(C)C",
 ])
 def test_a_monovalent_centre_no_parent_carries_is_not_named_with_a_lambda(smiles):
