@@ -84,6 +84,7 @@ BUILTIN_CHECK_MODULES = (
     "orthonym.validation.spelling.checks_polyol_ester",
     "orthonym.validation.spelling.checks_chalcone",
     "orthonym.validation.spelling.checks_amide_chains",
+    "orthonym.validation.spelling.checks_skeletal_chain",
 )
 
 _loaded = False

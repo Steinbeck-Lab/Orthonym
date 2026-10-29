@@ -21,6 +21,13 @@ classes slipped through and shipped a substitutive name at ``pin_verified``:
 
 The label is withdrawn (the PIN tier declines, the wider tiers keep the correct
 substitutive name); the multiplicative producer for these classes is a separate item.
+
+The one row whose preferred name is a skeletal replacement ('a') name, the hexaoxa diol, is no longer
+declined: "Skeletal replacement ('a') nomenclature in acyclic chains" (:23348) "must be used to
+generate preferred IUPAC names for acyclic structures when four or more heterounits are present in a
+unbranched chain containing at least one carbon atom and when none of the heteroatoms constitute all or part of
+the principal characteristic group", and the chain builder (``rules/skeletal_chain.py``) now produces that name.
+It keeps its label with the other own-route PINs (``KEEP_PIN_ROWS``), and its read-back stays below.
 """
 import inspect
 
@@ -98,7 +105,11 @@ def test_expected_pin_reads_back(smiles, pin):
     assert name_is_rt_exact(pin, smiles), pin
 
 
-@pytest.mark.parametrize("smiles", [s for s, _ in CHAIN_UNIT_ROWS])
+# The chain-unit rows whose preferred name is the 'a' name the chain builder produces,:23348).
+A_CHAIN_PIN_ROWS = {"OCCOCCOCCOCCOCCOCCOCCO"}
+
+
+@pytest.mark.parametrize("smiles", [s for s, _ in CHAIN_UNIT_ROWS if s not in A_CHAIN_PIN_ROWS])
 def test_default_tier_declines_the_substitutive_name(smiles):
     """The PIN tier no longer ships the substitutive name as a PIN; the wider tier keeps a
     correct name (round-tripped by ``assert_declined_at_default``)."""
@@ -128,6 +139,10 @@ KEEP_PIN_ROWS = [
                  id="homocystine-amino-acid-route"),
     pytest.param("O=C(O)CSCCSCCCSCCSCC(=O)O", "3,6,10,13-tetrathiapentadecanedioic acid",
                  marks=NEEDS_NAMER_SKIP, id="tetrathia-diacid-skeletal-replacement"),
+    # (:23348): six ether oxygens in an unbranched chain, none in the principal group (-ol);
+    # (:23405): the two -ol groups are suffixes of the 'a' name, as the diacid of:23212
+    pytest.param("OCCOCCOCCOCCOCCOCCOCCO", "3,6,9,12,15,18-hexaoxaicosane-1,20-diol",
+                 marks=NEEDS_NAMER_SKIP, id="hexaoxa-diol-skeletal-replacement"),
     # a retained name: the L-cystine PIN is a retained amino-acid name, not a substitutive diacid
     pytest.param("N[C@@H](CSSC[C@H](N)C(=O)O)C(=O)O", "L-cystine", marks=NEEDS_NAMER_SKIP,
                  id="cystine-retained-name"),

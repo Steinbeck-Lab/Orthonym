@@ -137,7 +137,7 @@ FUNCTIONS = {
     "src/orthonym/rules/ring_substituents.py::get_ring_substituent_name#1": 329,
     "src/orthonym/rules/salts.py::name_salt#1": 441,
     "src/orthonym/rules/skeletal_replacement.py::_try_cyclic_replacement_name#1": 248,
-    "src/orthonym/rules/skeletal_replacement.py::try_skeletal_replacement_name#1": 437,
+    "src/orthonym/rules/skeletal_replacement.py::try_skeletal_replacement_name#1": 316,
     "src/orthonym/rules/spiro.py::_name_fused_component#1": 201,
     "src/orthonym/rules/spiro.py::_name_spiro_vonbaeyer_core#1": 294,
     "src/orthonym/rules/spiro.py::name_mixed_spiro_fused#1": 207,

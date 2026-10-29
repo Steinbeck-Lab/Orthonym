@@ -583,6 +583,12 @@ def _name_mononuclear_hydride_regimes(mol) -> Optional[str]:
     # phosphanes stay with name_phosphine (no double-path). ---
     if hub.GetSymbol() == 'P':
         subs = _classify_phosphane_subs(mol, hub)
+        # (:23348), as in ``_name_senior_atom_hub``: a chain with four or more heterounits has the
+        # 'a' name, and (:23352-23358) gives the phosphane name of such a chain as the substitutive one.
+        if subs is not None:
+            from .skeletal_replacement import try_skeletal_replacement_name
+            if try_skeletal_replacement_name(mol) is not None:
+                return None
         if subs is not None and 'silyl' in subs:
             prefix_block = _build_substituent_string(subs)
             return _assemble(prefix_block, lam, stem)

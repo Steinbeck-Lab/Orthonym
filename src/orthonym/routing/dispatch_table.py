@@ -796,7 +796,20 @@ def _is_organometallic(mol, smiles, canonical_smiles, features=None, **kwargs) -
     if name_mononuclear_hydride(mol) is not None:
         return False
     from orthonym.perception.metals import detect_metal_complex
-    return detect_metal_complex(mol) is not None
+    if detect_metal_complex(mol) is None:
+        return False
+    # (`## ****`, the Blue Book): an acyclic chain of four or more
+    # heterounits has an 'a' PIN, and the heteroatom hub (Si, B,...) is one of the heterounits.
+    # `## ****` (:39737) names the organometallic parent hydrides substitutively, and the 'a'
+    # rule overrides that name, so the skeletal route (priority 1500) must be reached. Only the
+    # PIN is asked for: asked the default tier's way, with the provenance of the probe dropped, the
+    # general tier's non-PIN fallback name of a lambda chain ('C[Si]C' -> '2λ2-silapropane') neither
+    # takes the molecule from this route nor marks the name of a molecule that contains it.
+    from orthonym.assembly.default_tier_scope import default_tier_scope
+    from orthonym.metrics.provenance import isolated_provenance
+    from orthonym.rules.skeletal_replacement import try_skeletal_replacement_name
+    with default_tier_scope(), isolated_provenance():
+        return try_skeletal_replacement_name(mol) is None
 
 
 # ---------------------------------------------------------------------------

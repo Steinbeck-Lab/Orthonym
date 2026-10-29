@@ -756,3 +756,27 @@ class TestSameElementDichalcogenHeterounit:
         name = name_compound(smiles)
         assert name == expected
         assert_full_rt(name, smiles)
+
+
+@pytest.mark.unit
+class TestOlChainsAreNumberedFromTheHeteroatoms:
+    """ /: an 'a' chain is numbered from the heteroatoms; the
+    -ol suffix decides only when the heteroatom locant sets tie (a)
+    before (c), the Blue Book; 'a' heterounit count:23352)."""
+
+    @pytest.mark.parametrize("smiles,expected", [
+        # (a) before (c),:3219;:23352
+        ("OCCOCCOCCOCCOC", "2,5,8,11-tetraoxatridecan-13-ol"),
+        ("COCCOCCOCCOCCOCCOCCO", "2,5,8,11,14,17-hexaoxanonadecan-19-ol"),
+        # sets tie: suffix decides (unchanged)
+        ("OCCOCCOCCOCCOCC", "3,6,9,12-tetraoxatetradecan-1-ol"),
+    ])
+    @pytest.mark.opsin_gate
+    def test_legacy_ol_orientation(self, smiles, expected, monkeypatch):
+        """The builder runs first (the hook of ``try_skeletal_replacement_name``) and names these rows itself, so it is
+        switched off here: the legacy orientation is what is tested."""
+        from tests.support.rt_assert import assert_full_rt
+        monkeypatch.setattr("orthonym.rules.skeletal_chain.name_a_chain", lambda mol: None)
+        name = try_skeletal_replacement_name(Chem.MolFromSmiles(smiles))
+        assert name == expected
+        assert_full_rt(name, smiles)

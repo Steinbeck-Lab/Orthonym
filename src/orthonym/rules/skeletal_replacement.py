@@ -26,7 +26,9 @@ from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
-from ..assembly.naming_utils import SIMPLE_MULTIPLIERS
+from ..assembly.naming_utils import (
+    SIMPLE_MULTIPLIERS, format_suffix_with_locants, get_suffix_multiplier_prefix,
+)
 from ..data.chain_names import get_chain_prefix, multiplying_prefix
 
 # a phase : shared / λ-convention. A non-standard-valence
@@ -468,6 +470,150 @@ def _format_substituent_prefix(placed: List[Tuple[int, str]]) -> str:
     return '-'.join(parts)
 
 
+def _large_ring_replacement_name(mol: Chem.Mol, ring_info) -> Optional[str]:
+    """Gate 1 of ``try_skeletal_replacement_name`` for a molecule with rings:
+    the name of a large heteromonocycle by cyclic replacement, or ``None``.
+    """
+    # ----------------------------------------------------------------
+    # Gate 1: Rings gate (IUPAC /
+    # Chain replacement requires no rings, EXCEPT for large heterocyclic
+    # rings (>= 7 members with heteroatoms) where skeletal replacement
+    # naming may be simpler than substitutive naming.
+    # Small rings (<= 6 members) are handled by Hantzsch-Widman naming.
+    # ----------------------------------------------------------------
+    # Check if ALL rings are large (>= 7) and contain heteroatoms
+    all_rings_large_hetero = True
+    for ring in ring_info.AtomRings():
+        if len(ring) < 7:
+            all_rings_large_hetero = False
+            break
+        # Check ring has at least one heteroatom
+        has_hetero = any(
+            mol.GetAtomWithIdx(idx).GetSymbol() in REPLACEMENT_TERMS
+            for idx in ring
+        )
+        if not has_hetero:
+            all_rings_large_hetero = False
+            break
+    if not all_rings_large_hetero:
+        return None
+    # "Heteromonocyclic hydrides named by skeletal replacement
+    # ('a') nomenclature" opens by fixing this boundary, and it is RING
+    # SIZE ALONE -- saturation plays no part:
+    #
+    # "Mancude and saturated heteromonocyclic compounds with up to and
+    # including ten ring members are named by the extended
+    # Hantzsch-Widman system (see. For monocyclic rings with
+    # eleven and more ring members, skeletal replacement ('a')
+    # nomenclature (see is used for the fully saturated or
+    # fully unsaturated compounds ([n]annulenes)."
+    #
+    # Confirmed independently by ("...for heteromonocyclic
+    # compounds having more than ten ring atoms") and by
+    # ("Preferred IUPAC names for heteromonocyclic rings with no more than
+    # ten ring members are Hantzsch-Widman names").
+    #
+    # So every single heteromonocycle of ten atoms or fewer goes back to
+    # the HW namer, which owns both the mancude parent (1H-azepine,
+    # azocine, 2H-oxocine) and the partially saturated forms, expressed as
+    # hydro prefixes on that parent per (2,3-dihydro-1H-azepine,
+    # 4,5,6,7-tetrahydro-1,4-thiazepine). Only rings of ELEVEN or more
+    # fall through to cyclic replacement.
+    #
+    # This test used to also require every ring bond to be single, which
+    # let unsaturated 7- and 8-membered rings reach replacement naming and
+    # emit non-PIN forms such as "1-azacyclohepta-2,4,6-triene" for
+    # 1H-azepine. Unsaturated 9- and 10-rings escaped only by accident,
+    # via the separate has_aromatic gate in _try_cyclic_replacement_name.
+    #
+    # Redirecting the 7-10 rings here left a residue of producer-level
+    # abstentions. puts lambda rings on the Hantzsch-Widman side
+    # of this same boundary ("1H-1<lambda>4-thiepine (PIN)" at:9496,
+    # against the 14-membered "1-oxa-4<lambda>4-thiacyclotetradecane (PIN)"
+    # at:9486, which is replacement), so the replacement names those rings
+    # used to get were not PINs and withdrawing them was right.
+    #
+    # ⚠ The figures once recorded here -- "82 abstain, split into two
+    # unbuilt gaps of 78 + 4" -- were WRONG, and wrong in a way worth
+    # keeping visible. They came from an enumeration of 1,274 bare
+    # heteromonocycles; the real enumeration is 27,687 (sizes 3-14 x
+    # N/O/S/O+N/S+N/N+N at EVERY heteroatom position x EVERY independent
+    # edge set of the ring), a ~22x superset. Measured against that:
+    #
+    # * the residue was 707 abstentions, not 82, and it spanned sizes
+    # 3-10 (2/4/13/24/53/96/185/330) -- so it was never a boundary
+    # effect at all. This edit only made sizes 7-10 VISIBLE; sizes 3-6
+    # were abstaining before it and were untouched by it;
+    # * there was no "4-row second gap". Those 9-membered 2-N rings were
+    # never producer abstentions -- they EMITTED a malformed name that
+    # only the OPSIN validity gate suppressed downstream. Counting a
+    # gate-suppressed emission as a producer abstention merged a
+    # coverage gap with a correctness bug. Fixed separately in
+    # _aromatizable_hydro_name.
+    #
+    # All 707 are now named: the mancude lambda parents whose indicated
+    # hydrogen sits on a CARBON (3H-1<lambda>4-thiophene (PIN),:9171) and
+    # the genuine hydro forms (3,4,5,6-tetrahydro-1<lambda>4,2-thiazin-1-ol
+    # (PIN),:33292). See _name_lambda_heteromonocycle.
+    #
+    # Real-corpus impact of the redirect itself was measured as zero at the
+    # time (0 router diffs over pubchem_2000 + chebi_5000) -- inherited,
+    # not re-run here.
+    # A Hantzsch-Widman parent takes no 'yne' ending,
+    # the Blue Book "[except for parents with Hantzsch-Widman names]"),
+    # so a ring of ten or fewer atoms with a ring triple bond is named by
+    # replacement whatever its size: '1,2,5,6-tetrasilacyclooct-3-en-7-yne
+    # (PIN)' and '1,2,5,6-tetrasilacycloocta-3,7-diyne (PIN)',
+    #:21091).
+    if len(ring_info.AtomRings()) == 1:
+        if (len(ring_info.AtomRings()[0]) <= 10
+                and not _ring_triple_bonds(mol, ring_info.AtomRings()[0])):
+            return None
+    # For large heterocyclic rings (>= 11, or unsaturated/multi-heteroatom
+    # 7-10-rings), try cyclic replacement naming per IUPAC.
+    # Keep the "no priority FGs" gate.
+    for pat in _PRIORITY_FG_PATTERNS:
+        if mol.HasSubstructMatch(pat):
+            return None
+    return _try_cyclic_replacement_name(mol, ring_info)
+
+
+def _hetero_terminal_mode(
+    mol: Chem.Mol, backbone: List[int], suffix_mode: bool,
+) -> Optional[bool]:
+    """Gate 3b / terminator rule): the chain must be
+    terminated by C or by P/As/Sb/Bi/Si/Ge/Sn/Pb/B (BB verbatim example:
+    2-oxa-4-thia-1,5-disilapentane). An allowed heteroatom terminator is
+    admitted ONLY into the strict >=4-heterounit class validated below —
+    everything else (terminal F/Cl, λ-bearing terminals, Al/Ga/In/Tl with
+    no 'a' term, O/S/N terminals) fails closed rather than being silently
+    counted as a carbon of the alkane stem (the old structure-loss hazard:
+    trisiloxane [SiH3]O[SiH2]O[SiH3] -> '2,4-dioxa-3-silapentane' RTs to
+    dimethoxysilane, a DIFFERENT molecule — carbon-less chains still exit
+    here to the catenated-hydride namer).
+
+    Returns True when an end of ``backbone`` is such a heteroatom, False when
+    both ends are carbon, None (fail closed) otherwise. ``suffix_mode`` is an
+    acid or -ol suffix, which a heteroatom terminal never combines with.
+    """
+    hetero_terminal_mode = False
+    for end_pos in (0, len(backbone) - 1):
+        end_sym = mol.GetAtomWithIdx(backbone[end_pos]).GetSymbol()
+        if end_sym == 'C':
+            continue
+        if end_sym not in _ALLOWED_HETERO_TERMINATORS:
+            return None
+        if end_sym not in REPLACEMENT_TERMS:
+            return None
+        if suffix_mode:
+            return None
+        # λ-bearing terminal parents territory) are not built here.
+        if nonstandard_bonding_number(mol, backbone[end_pos]) is not None:
+            return None
+        hetero_terminal_mode = True
+    return hetero_terminal_mode
+
+
 def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     """Try to name a molecule using skeletal replacement nomenclature.
 
@@ -488,110 +634,16 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     if mol is None:
         return None
 
-    # ----------------------------------------------------------------
-    # Gate 1: Rings gate (IUPAC /
-    # Chain replacement requires no rings, EXCEPT for large heterocyclic
-    # rings (>= 7 members with heteroatoms) where skeletal replacement
-    # naming may be simpler than substitutive naming.
-    # Small rings (<= 6 members) are handled by Hantzsch-Widman naming.
-    # ----------------------------------------------------------------
+    # Gate 1: rings gate (IUPAC /, see _large_ring_replacement_name.
     ring_info = mol.GetRingInfo()
     if ring_info.NumRings() > 0:
-        # Check if ALL rings are large (>= 7) and contain heteroatoms
-        all_rings_large_hetero = True
-        for ring in ring_info.AtomRings():
-            if len(ring) < 7:
-                all_rings_large_hetero = False
-                break
-            # Check ring has at least one heteroatom
-            has_hetero = any(
-                mol.GetAtomWithIdx(idx).GetSymbol() in REPLACEMENT_TERMS
-                for idx in ring
-            )
-            if not has_hetero:
-                all_rings_large_hetero = False
-                break
-        if not all_rings_large_hetero:
-            return None
-        # "Heteromonocyclic hydrides named by skeletal replacement
-        # ('a') nomenclature" opens by fixing this boundary, and it is RING
-        # SIZE ALONE -- saturation plays no part:
-        #
-        # "Mancude and saturated heteromonocyclic compounds with up to and
-        # including ten ring members are named by the extended
-        # Hantzsch-Widman system (see. For monocyclic rings with
-        # eleven and more ring members, skeletal replacement ('a')
-        # nomenclature (see is used for the fully saturated or
-        # fully unsaturated compounds ([n]annulenes)."
-        #
-        # Confirmed independently by ("...for heteromonocyclic
-        # compounds having more than ten ring atoms") and by
-        # ("Preferred IUPAC names for heteromonocyclic rings with no more than
-        # ten ring members are Hantzsch-Widman names").
-        #
-        # So every single heteromonocycle of ten atoms or fewer goes back to
-        # the HW namer, which owns both the mancude parent (1H-azepine,
-        # azocine, 2H-oxocine) and the partially saturated forms, expressed as
-        # hydro prefixes on that parent per (2,3-dihydro-1H-azepine,
-        # 4,5,6,7-tetrahydro-1,4-thiazepine). Only rings of ELEVEN or more
-        # fall through to cyclic replacement.
-        #
-        # This test used to also require every ring bond to be single, which
-        # let unsaturated 7- and 8-membered rings reach replacement naming and
-        # emit non-PIN forms such as "1-azacyclohepta-2,4,6-triene" for
-        # 1H-azepine. Unsaturated 9- and 10-rings escaped only by accident,
-        # via the separate has_aromatic gate in _try_cyclic_replacement_name.
-        #
-        # Redirecting the 7-10 rings here left a residue of producer-level
-        # abstentions. puts lambda rings on the Hantzsch-Widman side
-        # of this same boundary ("1H-1<lambda>4-thiepine (PIN)" at:9496,
-        # against the 14-membered "1-oxa-4<lambda>4-thiacyclotetradecane (PIN)"
-        # at:9486, which is replacement), so the replacement names those rings
-        # used to get were not PINs and withdrawing them was right.
-        #
-        # ⚠ The figures once recorded here -- "82 abstain, split into two
-        # unbuilt gaps of 78 + 4" -- were WRONG, and wrong in a way worth
-        # keeping visible. They came from an enumeration of 1,274 bare
-        # heteromonocycles; the real enumeration is 27,687 (sizes 3-14 x
-        # N/O/S/O+N/S+N/N+N at EVERY heteroatom position x EVERY independent
-        # edge set of the ring), a ~22x superset. Measured against that:
-        #
-        # * the residue was 707 abstentions, not 82, and it spanned sizes
-        # 3-10 (2/4/13/24/53/96/185/330) -- so it was never a boundary
-        # effect at all. This edit only made sizes 7-10 VISIBLE; sizes 3-6
-        # were abstaining before it and were untouched by it;
-        # * there was no "4-row second gap". Those 9-membered 2-N rings were
-        # never producer abstentions -- they EMITTED a malformed name that
-        # only the OPSIN validity gate suppressed downstream. Counting a
-        # gate-suppressed emission as a producer abstention merged a
-        # coverage gap with a correctness bug. Fixed separately in
-        # _aromatizable_hydro_name.
-        #
-        # All 707 are now named: the mancude lambda parents whose indicated
-        # hydrogen sits on a CARBON (3H-1<lambda>4-thiophene (PIN),:9171) and
-        # the genuine hydro forms (3,4,5,6-tetrahydro-1<lambda>4,2-thiazin-1-ol
-        # (PIN),:33292). See _name_lambda_heteromonocycle.
-        #
-        # Real-corpus impact of the redirect itself was measured as zero at the
-        # time (0 router diffs over pubchem_2000 + chebi_5000) -- inherited,
-        # not re-run here.
-        # A Hantzsch-Widman parent takes no 'yne' ending,
-        # the Blue Book "[except for parents with Hantzsch-Widman names]"),
-        # so a ring of ten or fewer atoms with a ring triple bond is named by
-        # replacement whatever its size: '1,2,5,6-tetrasilacyclooct-3-en-7-yne
-        # (PIN)' and '1,2,5,6-tetrasilacycloocta-3,7-diyne (PIN)',
-        #:21091).
-        if len(ring_info.AtomRings()) == 1:
-            if (len(ring_info.AtomRings()[0]) <= 10
-                    and not _ring_triple_bonds(mol, ring_info.AtomRings()[0])):
-                return None
-        # For large heterocyclic rings (>= 11, or unsaturated/multi-heteroatom
-        # 7-10-rings), try cyclic replacement naming per IUPAC.
-        # Keep the "no priority FGs" gate.
-        for pat in _PRIORITY_FG_PATTERNS:
-            if mol.HasSubstructMatch(pat):
-                return None
-        return _try_cyclic_replacement_name(mol, ring_info)
+        return _large_ring_replacement_name(mol, ring_info)
+
+    #: the 'a' PIN of a chain without a principal group, see skeletal_chain.
+    from .skeletal_chain import name_a_chain
+    a_name = name_a_chain(mol)
+    if a_name is not None:
+        return a_name
 
     # ----------------------------------------------------------------
     # acid-suffix integration: a clean chain-terminal -C(=O)OH
@@ -717,33 +769,11 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         if len(suffix_groups) == 2 and ends != acid_carbons:
             return None
 
-    # ----------------------------------------------------------------
-    # Gate 3b / terminator rule): the chain must be
-    # terminated by C or by P/As/Sb/Bi/Si/Ge/Sn/Pb/B (BB verbatim example:
-    # 2-oxa-4-thia-1,5-disilapentane). An allowed heteroatom terminator is
-    # admitted ONLY into the strict >=4-heterounit class validated below —
-    # everything else (terminal F/Cl, λ-bearing terminals, Al/Ga/In/Tl with
-    # no 'a' term, O/S/N terminals) fails closed rather than being silently
-    # counted as a carbon of the alkane stem (the old structure-loss hazard:
-    # trisiloxane [SiH3]O[SiH2]O[SiH3] -> '2,4-dioxa-3-silapentane' RTs to
-    # dimethoxysilane, a DIFFERENT molecule — carbon-less chains still exit
-    # here to the catenated-hydride namer).
-    # ----------------------------------------------------------------
-    hetero_terminal_mode = False
-    for end_pos in (0, len(backbone) - 1):
-        end_sym = mol.GetAtomWithIdx(backbone[end_pos]).GetSymbol()
-        if end_sym == 'C':
-            continue
-        if end_sym not in _ALLOWED_HETERO_TERMINATORS:
-            return None
-        if end_sym not in REPLACEMENT_TERMS:
-            return None
-        if acid_mode or has_terminal_oh:
-            return None
-        # λ-bearing terminal parents territory) are not built here.
-        if nonstandard_bonding_number(mol, backbone[end_pos]) is not None:
-            return None
-        hetero_terminal_mode = True
+    # Gate 3b / terminator rule), see _hetero_terminal_mode.
+    hetero_terminal_mode = _hetero_terminal_mode(
+        mol, backbone, suffix_mode=acid_mode or has_terminal_oh)
+    if hetero_terminal_mode is None:
+        return None
 
     # ----------------------------------------------------------------
     # Gate 4: atom coverage. Every heavy atom must be a backbone atom, a
@@ -817,20 +847,19 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
             record_general_ring_prefix()
 
     # ----------------------------------------------------------------
-    # Number the chain: for -ol suffix, the OH end gets locant 1.
-    # For plain replacement chains, give lowest locants to heteroatoms.
+    # Number the chain from the heteroatoms, "Skeletal replacement
+    # ('a') nomenclature generates new acyclic parent hydrides whose numbering
+    # is fixed"): lowest locants to the heteroatoms first, the -ol / -oic acid
+    # suffix decides only a heteroatom tie (a) before (c)).
     # ----------------------------------------------------------------
-    if has_terminal_oh:
-        backbone = _orient_oh_end_first(
-            backbone, mol, terminal_oh_info['carbon_idx']
-        )
-    else:
-        backbone = _orient_for_lowest_locants(
-            backbone, mol,
-            suffix_atoms=acid_carbons if acid_mode else None,
-            substituent_atoms=(
-                {b for b, _ in substituents} if substituents else None),
-        )
+    suffix_carbons = (
+        {terminal_oh_info['carbon_idx']} if has_terminal_oh
+        else acid_carbons if acid_mode else None)
+    backbone = _orient_for_lowest_locants(
+        backbone, mol, suffix_atoms=suffix_carbons,
+        substituent_atoms=(
+            {b for b, _ in substituents} if substituents else None),
+    )
 
     # ----------------------------------------------------------------
     #: double/triple bonds get locants per the FIXED heterochain
@@ -876,14 +905,14 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
     # locant — 3,6,9,12-tetraoxapentadecan-15-oic acid,.
     # ----------------------------------------------------------------
     suffix = None
+    pos_by_idx = {idx: i for i, idx in enumerate(backbone)}
     if has_terminal_oh:
-        # The OH-bearing carbon should be at position 0 (locant 1) after orient
-        suffix = ('ol', 1)
+        # the -ol locant is the OH carbon's place on the heteroatom numbering
+        suffix = ('ol', pos_by_idx[terminal_oh_info['carbon_idx']] + 1)
     elif acid_mode:
         if len(suffix_groups) == 2:
             suffix = ('dioyl' if class_words else 'dioic acid', None)
         else:
-            pos_by_idx = {idx: i for i, idx in enumerate(backbone)}
             suffix = ('oyl' if class_words else 'oic acid',
                       pos_by_idx[next(iter(acid_carbons))] + 1)
 
@@ -898,7 +927,6 @@ def try_skeletal_replacement_name(mol: Chem.Mol) -> Optional[str]:
         acyl_class=_acyl_class_words(class_words),
     )
     if name is not None and substituents:
-        pos_by_idx = {idx: i for i, idx in enumerate(backbone)}
         placed = [(pos_by_idx[b] + 1, s) for b, s in substituents]
         name = f'{_format_substituent_prefix(placed)}-{name}'
     return name
@@ -1330,35 +1358,6 @@ def _find_path_bfs(
     return None
 
 
-def _orient_oh_end_first(
-    backbone: List[int], mol: Chem.Mol, carbon_idx: int
-) -> List[int]:
-    """Orient backbone so the carbon bearing the terminal OH gets locant 1.
-
-    For replacement chains with terminal -ol suffix, the principal group
-    (OH) must receive the lowest possible locant per IUPAC.
-
-    The OH oxygen has already been stripped from the backbone. This function
-    ensures the carbon that was bonded to the OH is at position 0 (locant 1).
-
-    Args:
-        backbone: List of atom indices forming the backbone (OH oxygen excluded).
-        mol: RDKit molecule object.
-        carbon_idx: Atom index of the carbon bearing the -OH group.
-
-    Returns:
-        Reoriented backbone list with OH-bearing carbon at position 0.
-    """
-    if backbone[0] == carbon_idx:
-        return backbone
-    elif backbone[-1] == carbon_idx:
-        return list(reversed(backbone))
-    else:
-        # Carbon not at either end -- shouldn't happen for unbranched chain
-        # Fall back to lowest heteroatom locants
-        return _orient_for_lowest_locants(backbone, mol)
-
-
 def _backbone_unsaturation(
     mol: Chem.Mol, backbone: List[int],
     ignore_atoms: Optional[set] = None,
@@ -1549,6 +1548,7 @@ def _build_replacement_name(
     ene_locants: Optional[List[int]] = None,
     yne_locants: Optional[List[int]] = None,
     acyl_class: str = '',
+    suffix_locants: Optional[List[int]] = None,
 ) -> str:
     """Build the skeletal replacement name from chain length and heteroatom info.
 
@@ -1565,6 +1565,9 @@ def _build_replacement_name(
                 heteroatoms whose valence is non-standard /.
                 The λ is cited after the locant (``2lambda4-thia...``); absent /
                 standard locants emit the bare number (byte-identical default).
+        suffix_locants: Optional locants of the suffix groups, with ``suffix``
+                (``suffix[0]`` is the name): the groups are cited on the fixed
+                numbering and multiplied, ``tetradecane-1,14-diol``.
 
     Returns:
         Complete replacement name string.
@@ -1614,6 +1617,13 @@ def _build_replacement_name(
         # Build name with functional group suffix
         # e.g., "3,6-dioxaoctan-1-ol"
         suffix_name, suffix_locant = suffix
+        # (the Blue Book): the same number of suffix groups as
+        # the substitutive name, on the heteroatoms' numbering: -ol, -thiol, -amine.
+        if suffix_locants:
+            multiplier = ('' if len(suffix_locants) == 1
+                          else get_suffix_multiplier_prefix(len(suffix_locants), suffix_name))
+            return replacement_prefix + format_suffix_with_locants(
+                chain_prefix, 'an', suffix_name, suffix_locants, multiplier)
         # acid suffixes on the fixed heterochain numbering:
         # "3,6,9,12-tetraoxatetradecanedioic acid" (terminal diacid — no
         # locants needed) / "3,6,9,12-tetraoxapentadecan-15-oic acid"

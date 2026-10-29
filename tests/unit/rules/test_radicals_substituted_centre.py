@@ -39,6 +39,7 @@ from rdkit import Chem
 
 import orthonym.rules.radicals as rad
 from orthonym.perception.ions import get_radical_sites
+from orthonym.validation.pin_spelling import check_pin_spelling
 from tests.support.pin_tiers import (assert_not_pin_labelled, assert_pin_at_both_tiers, name_breadth,
                                      name_default)
 from tests.support.rt_assert import name_is_rt_exact
@@ -243,27 +244,46 @@ def test_a_nested_frame_is_not_named_by_the_construction(monkeypatch):
     ("CCO[Si](SC)(SC)SC", "1-{[tris(methylsulfanyl)silyl]oxy}ethane", "systematic_verified"),
     ("CCN(CC)C(=S)[S][Sb]([CH](C)C)[CH](C)C",
      "2-[4-ethyl-1-(propan-2-yl)-3-sulfanylidene-2-thia-4-aza-1-stibahexyl]propane", "systematic_verified"),
-    ("CSC[SiH2]CSC[SiH2]CCN",
-     "2-({[({[(methylsulfanyl)methyl]silyl}methyl)sulfanyl]methyl}silyl)ethan-1-amine", "systematic_verified"),
     ("C=C[Si](C)(N(C)C(C)=O)N(C)C(C)=O",
      "N-acetyl{[acetyl(methyl)amino](methyl)(methylamino)silyl}ethene", "systematic_verified"),
     ("CCC(=O)O[Si](C)(C)OOC(C)(C)C", "(tert-butylperoxy)di(methyl)silyl propanoate", "pin_unverified"),
-    ("C[SiH2]C[SiH2]C[SiH2]C[SiH2]CCCl",
-     "1-chloro-2-({[({[(methylsilyl)methyl]silyl}methyl)silyl]methyl}silyl)ethane", "systematic_verified"),
     ("C[SiH2]C[SiH2]C[SiH2]C[SiH2]CC(C)=O",
      "1-({[({[(methylsilyl)methyl]silyl}methyl)silyl]methyl}silyl)propan-2-one",
      "systematic_verified"),
-], ids=["nitrosilane", "boranylsilane", "arsane", "germane", "silane", "stibane", "sulfanyl-chain", "acetamido",
-        "silyl-ester", "chloro-chain", "oxo-chain"])
+], ids=["nitrosilane", "boranylsilane", "arsane", "germane", "silane", "stibane", "acetamido",
+        "silyl-ester", "oxo-chain"])
 def test_a_closed_shell_name_built_from_radical_fragments_is_the_name_before_lane_r(smiles, name, label):
     """These closed-shell molecules are named through capped fragments with a radical centre (a silyl, a germyl,
     an arsanyl group). Before the outermost-input gate, the construction named those fragments, its label lifted
     the whole name to pin_verified for names the book says are not the PIN (BB 61.5.1, 68.1.5.2.3, 68.3.2.3.2.1,
     51.4.1.2), and several names changed. The name and label are those of the tree before lane R (a
-    characterisation, not a claim that they are the PIN), and the name reads back."""
+    characterisation, not a claim that they are the PIN), and the name reads back.
+
+    The two unbranched chains of this family that carry four or more heterounits left it when the skeletal
+    replacement ('a') chain builder came: their name is the 'a' PIN, asserted in
+    ``test_a_chain_of_four_heterounits_is_named_by_skeletal_replacement`` below."""
     res = name_breadth(smiles)
     assert (res.get("name"), res.get("tier")) == (name, label), res
     assert name_is_rt_exact(name, smiles), res
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,pin", [
+    # "Primary amines" (the Blue Book): '2,6-dithia-4,8-disiladecan-10-amine (PIN)',:26205
+    ("CSC[SiH2]CSC[SiH2]CCN", "2,6-dithia-4,8-disiladecan-10-amine"),
+    # "HALOGEN COMPOUNDS" (:25764): '10-chloro-2,4,6,8-tetrasiladecane (PIN)',:25840
+    ("C[SiH2]C[SiH2]C[SiH2]C[SiH2]CCCl", "10-chloro-2,4,6,8-tetrasiladecane"),
+], ids=["sulfanyl-chain", "chloro-chain"])
+def test_a_chain_of_four_heterounits_is_named_by_skeletal_replacement(smiles, pin):
+    """ "Skeletal replacement ('a') nomenclature in acyclic chains" (:23348): the 'a' name "must be used
+    to generate preferred IUPAC names for acyclic structures when four or more heterounits are present in a
+    unbranched chain containing at least one carbon atom and when none of the heteroatoms constitute all or part of
+    the principal characteristic group". These two chains were named through capped silyl fragments (the
+    substitutive '1-chloro-2-(...)ethane' and '2-(...)ethan-1-amine', which that rule makes a non-PIN name); the
+    chain builder now gives the 'a' name at both tiers, the one the book prints with (PIN), it reads back to the
+    input's full key, and no registered spelling check fails it."""
+    assert_pin_at_both_tiers(smiles, pin)
+    assert check_pin_spelling(Chem.MolFromSmiles(smiles), pin, strict=True) == []
 
 
 @pytest.mark.opsin_gate
