@@ -355,6 +355,8 @@ def f(self, name):
 FIXED_IDS = frozenset({
     "composer", "engine:general", "engine:t4", "decomposition", "multifragment", "retained_fused",
     "isotope", "table:coordination", "table:trivial", "table:np_parent", "table:retained",
+    "charged_leftovers:thiophosphate_ester_anion", "charged_leftovers:hetero_group_chalcogenide",
+    "charged_leftovers:carbon_group_azanide", "charged_leftovers:multiply_charged_centre",
 })
 
 

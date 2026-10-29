@@ -137,9 +137,18 @@ def format_lambda_token(locant, lam: Optional[int]) -> str:
 # measurement showed its names read back; an element not listed keeps its old behaviour in all three.
 FUSED_RING_LAMBDA_HALOGENS = frozenset({'I'})
 
+# The ring elements whose ion of the simplest kind (``ring_halogen_ion``) is named from the lambda hydride of its
+# ring atom: the admitted ring halogens, and silicon for the anion R4Si- of a ring ('1,1-dimethyl-1lambda5-silolan-1-ide'
+# is the 'ide' of the lambda5 hydride, method (2), the Blue Book; the book prints
+# 'tetramethyl-λ5-phosphanide' for the phosphorus analogue,:41106, and 'diphenyl-λ3-iodanide',:41110). Silicon is
+# no halogen: the rest of the admission (the ring 'a' table, the mancude valence, the non-PIN record of a halogen
+# name) is the halogens' and stays theirs.
+RING_ION_LAMBDA_ELEMENTS = FUSED_RING_LAMBDA_HALOGENS | frozenset({'Si'})
+
 
 def ring_lambda_valence(mol, atom_idx: int) -> Optional[int]:
-    """The bonding number of an admitted ring halogen in the lambda state, else None.
+    """The bonding number of an admitted ring halogen, or of a ring silicon (``RING_ION_LAMBDA_ELEMENTS``), in the lambda
+    state, else None.
 
     The mancude parent of a ring with a lambda halogen counts the atom as a ring atom with its
     own bonding number (``1H-1lambda3-iodole``,, the Blue Book ``1H-1λ3-benziodole
@@ -147,7 +156,7 @@ def ring_lambda_valence(mol, atom_idx: int) -> Optional[int]:
     ``None`` for every other atom (an acyclic halogen too), so a caller keeps the default valence of the periodic table
     there."""
     atom = mol.GetAtomWithIdx(atom_idx)
-    if atom.GetSymbol() not in FUSED_RING_LAMBDA_HALOGENS or not atom.IsInRing():
+    if atom.GetSymbol() not in RING_ION_LAMBDA_ELEMENTS or not atom.IsInRing():
         return None
     return nonstandard_bonding_number(mol, atom_idx)
 
@@ -175,13 +184,14 @@ def ring_halogen_ion(mol, atom_idx: int) -> Optional[str]:
     as the ring cation). ``nonstandard_bonding_number`` is ``None`` for both, as it is for every ion; see
     ``ring_halogen_ion_lambda`` for the symbol the name cites."""
     atom = mol.GetAtomWithIdx(atom_idx)
-    if (atom.GetSymbol() not in FUSED_RING_LAMBDA_HALOGENS or not atom.IsInRing()
+    if (atom.GetSymbol() not in RING_ION_LAMBDA_ELEMENTS or not atom.IsInRing()
             or atom.GetFormalCharge() not in (-1, 1) or atom.GetTotalNumHs()
             or atom.GetNumRadicalElectrons()):
         return None
     if any(b.GetBondTypeAsDouble() != 1.0 for b in atom.GetBonds()):
         return None
-    if atom.GetDegree() not in (2, 4, 6):
+    if atom.GetDegree() not in (2, 4, 6) or (atom.GetSymbol() == 'Si' and (atom.GetDegree() != 4
+                                                                           or atom.GetFormalCharge() != -1)):
         return None
     return 'anion' if atom.GetFormalCharge() < 0 else 'cation'
 

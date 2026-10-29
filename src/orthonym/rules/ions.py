@@ -40,7 +40,7 @@ from ..perception.molcache import inchikey_of
 from .ion_locants import cites_a_locant, name_neutral_ring_for_ion
 from .ring_cation_hydro import (hydro_ring_cation_name, hydro_ring_zwitterion_name, neutralized_cation,
                                 ring_cation_locants, ring_numbering_tie_key, ring_stereo_prefix)
-from .uide_lambda import UIDE_STD_VALENCE, double_bonded_ligand, lambda_uide_name, uide_bonding_number, uide_lambda
+from .uide_lambda import (UIDE_STD_VALENCE, double_bonded_ligand, doubled_ligand_not_pin, lambda_uide_name, uide_bonding_number, uide_lambda)
 
 # F- (DD3,: skeletal heteroatom-hydride anions named with the
 # -anide ending on the parent hydride. element -> the neutral parent-hydride
@@ -3190,7 +3190,7 @@ def _emit_group13_uide(mol, center_idx: int) -> str:
     lam = uide_lambda(center.GetSymbol(), uide_bonding_number(center))
     if lam is not None and (lam != _UIDE_STD_VALENCE[center.GetSymbol()] or (double_bonded_ligand(center) and center.GetSymbol() in ('S', 'Se', 'Te'))):  # 'amino(imino)(oxo)-λ4-sulfanuide', 'oxo(phenyl)-λ4-sulfanide'
         return lambda_uide_name(mol, center_idx, lam, suffix)
-    return centre_name(mol, center_idx, suffix, suffix)  # bare boranuide (BH4-)
+    return doubled_ligand_not_pin(center, centre_name(mol, center_idx, suffix, suffix))  # bare boranuide (BH4-)
 
 
 # (the Blue Book, 41368): the diorganyl halogen(III) CATION R2X+ named on the

@@ -23,12 +23,30 @@ UIDE_STD_VALENCE = {
 UIDE_LAMBDA_STEPS = {'S': 2, 'Se': 2, 'Te': 2, 'P': 1, 'As': 1, 'Sb': 1, 'I': 3, 'Br': 3, 'Cl': 3}
 
 
+#: the property of the carbon that closes the free valence of a radical's stand-in (``universal_substituent._cap_attachment``)
+ATTACHMENT_CAP_PROP = 'orthonym_attachment_cap'
+
+
 def uide_bonding_number(atom) -> int:
     """The bonding number of the centre: the bond orders and hydrogens for an element of lambda hydrides, the
-    neighbours and hydrogens for the others (a multiple bond on boron or silicon is no -uide centre)."""
+    neighbours, hydrogens and double bonds for the others: the ring atom of 'borinine' has the bonds of its Kekule
+    drawing, so its adduct ``[B-]1(=CC=CC=C1)X`` ('1-X-borinin-1-uide') has four, one above the standard bonding number of
+    boron, and so has ``[B-](=NC#C)(C)C``, the 'imino' group of '(ethynylimino)dimethylboranuide'. A double bond to a
+    charged atom is no ligand (``[B-]=[N+]`` is the drawing of the neutral aminoborane, two atoms of one bond), and neither
+    is the bond to the cap of a radical's stand-in: the universal namer closes the two free valences of the radical
+    ``[B-](F)CN(C)C`` with a carbon (``C=[B-](F)CN(C)C``, the carbon tagged ``ATTACHMENT_CAP_PROP``), which names as
+    a radical ion ('boranuidylidene'). A methylidene ligand (``C=[B-](C)C``) is a ligand."""
     if atom.GetSymbol() in UIDE_LAMBDA_STEPS:
         return sum(int(b.GetBondTypeAsDouble()) for b in atom.GetBonds()) + atom.GetTotalNumHs()
-    return atom.GetDegree() + atom.GetTotalNumHs()
+    doubled = 1 if atom.GetIsAromatic() else sum(1 for b in atom.GetBonds() if _doubled_ligand_bond(b, atom))
+    return atom.GetDegree() + atom.GetTotalNumHs() + doubled
+
+
+def _doubled_ligand_bond(bond, atom) -> bool:
+    """A double bond that holds a ligand to ``atom``: to a neutral atom that is not the cap of a radical's stand-in."""
+    other = bond.GetOtherAtom(atom)
+    return (bond.GetBondTypeAsDouble() == 2.0 and other.GetFormalCharge() == 0
+            and not other.HasProp(ATTACHMENT_CAP_PROP))
 
 
 def uide_lambda(symbol: str, bonding_number: int) -> Optional[int]:
@@ -49,6 +67,17 @@ def uide_lambda(symbol: str, bonding_number: int) -> Optional[int]:
 def double_bonded_ligand(atom) -> bool:
     """True when a ligand of the centre holds a multiple bond to it ('oxo', 'imino', 'methylidene' groups)."""
     return any(b.GetBondTypeAsDouble() > 1 for b in atom.GetBonds())
+
+
+def doubled_ligand_not_pin(center, name: str) -> str:
+    """``name`` of the -uide centre ``center``, recorded as not the PIN when a ligand is held by a multiple bond
+    ('(ethynylimino)di(methyl)boranuide'): the book's boranuides and sulfanuides carry single-bonded groups
+    ('tetramethylboranuide (PIN)', 'difluoro(phenyl)sulfanuide (PIN)',, the Blue Book-41108) and gives no
+    example of an 'imino', 'oxo' or 'methylidene' group on one. The name is the same string."""
+    if name and double_bonded_ligand(center):
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
 
 
 def _is_sulfinyl_anion(mol, center_idx: int) -> bool:

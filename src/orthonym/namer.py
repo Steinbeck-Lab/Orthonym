@@ -39,6 +39,7 @@ from .errors import (
 )
 from .gate_retry import gate_candidate, name_with_forced_locants
 from .metrics.producer_trail import carried as _carried, noted as _noted, suspended as _suspended
+from .rules.charged_fallback import late_charged_name as _late_charged_name
 from .validation.opsin_ambiguity import reject_ambiguous, restore_withdrawn, withdrawn_name
 from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
                                         twin_outcome_holds, wider_tier_ctx)
@@ -5531,6 +5532,7 @@ class Orthonym:
                     and self._general_fallback_unverified
                     and not self._disable_opsin_validity_gate):
                 _ft = _rescues.run(self._try_besteffort_clean_general_fallthrough, smiles)
+                _ft = _ft or _rescues.run(_late_charged_name, smiles, self.style)
                 if _ft is not None and not is_failure_name(_ft):
                     result = _ft
             if _rescues.exhausted:

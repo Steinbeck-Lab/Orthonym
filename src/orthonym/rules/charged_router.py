@@ -539,15 +539,40 @@ def _reenter_anion_parent(parent_smi: str, style: str, cite_every_locant: bool) 
         return _reenter(parent_smi, style)
 
 
+def _amine_on_unbranched_chain(parent_smi: str) -> bool:
+    """True if the neutral anion parent is a primary amine on the end of an unbranched, saturated, acyclic chain of
+    two or more carbons and nothing else (``CCN``, ``CCCN``). The amine carbon is C1 of such a chain whatever it is
+    called, so the bond distance from it is the locant of a group on the chain, and the amine cites its own locant
+    once a group stands on the chain, the Blue Book: 'ethan-1-amine'). Read from the structure of the
+    parent, not from its name."""
+    parent = Chem.MolFromSmiles(parent_smi) if parent_smi else None
+    if parent is None or len(Chem.GetMolFrags(parent)) != 1 or parent.GetRingInfo().NumRings():
+        return False
+    carbons = [a for a in parent.GetAtoms() if a.GetSymbol() == 'C']
+    nitrogens = [a for a in parent.GetAtoms() if a.GetSymbol() == 'N']
+    if len(carbons) < 2 or len(nitrogens) != 1 or len(carbons) + 1 != parent.GetNumAtoms():
+        return False
+    amine = nitrogens[0]
+    if amine.GetFormalCharge() or amine.GetDegree() != 1 or amine.GetTotalNumHs() != 2:
+        return False
+    if any(b.GetBondType() != Chem.BondType.SINGLE for b in parent.GetBonds()):
+        return False
+    carbon_neighbours = {c.GetIdx(): sum(1 for n in c.GetNeighbors() if n.GetSymbol() == 'C') for c in carbons}
+    amine_carbon = amine.GetNeighbors()[0]
+    return max(carbon_neighbours.values()) <= 2 and carbon_neighbours.get(amine_carbon.GetIdx()) == 1
+
+
 def _zwitterion_locant_prefix(mol, anion_idx: int, parent_attach_idx: int, parent_anion_name: str,
-                              ring_attach_locant) -> str:
+                              ring_attach_locant, parent_smi: str = '') -> str:
     """``'2-'`` for the cation prefix on the anion parent, or ''. A ring parent cites the locant
     that ``_ring_attachment_locant_on_anion_parent`` gives; a chain parent the distance from the
-    carboxyl carbon, when its name admits a chain locant."""
+    carboxyl carbon, when its name admits a chain locant, or from the amine carbon of an amine on the
+    end of an unbranched chain (``_amine_on_unbranched_chain``)."""
     if ring_attach_locant is not None:
         return f'{ring_attach_locant}-'
     attach_locant = _attachment_locant_on_anion_parent(mol, anion_idx, parent_attach_idx)
-    if attach_locant is not None and attach_locant >= 2 and _parent_has_chain_locants(parent_anion_name):
+    if attach_locant is not None and attach_locant >= 2 and (
+            _parent_has_chain_locants(parent_anion_name) or _amine_on_unbranched_chain(parent_smi)):
         return f'{attach_locant}-'
     return ''
 
@@ -1224,6 +1249,18 @@ def _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style) -> str
     return composed
 
 
+def _zwitterion_name(mol, sites, style: str) -> str:
+    """The name of a zwitterion: the route's (anion as the parent, the cation a prefix, while it reads back,
+    else the azanide parent's where the anion is a nitrogen centre (``_zwitterion_azanide_parent``), else the route's
+    name, which the gate then judges as it always did. The route spells the composed name of a chain amine anion that
+    already carries prefixes ('N-methylethan-1-aminide') without the merged citation of both prefix lists, and the
+    azanide of the groups names that anion by the groups."""
+    name = _route_zwitterion(mol, sites, style)
+    if name and _full_inchikey_rt_ok(mol, name):
+        return name
+    return _zwitterion_azanide_parent(mol, sites, style) or name
+
+
 def _zwitterion_azanide_parent(mol, sites, style: str) -> str:
     """ INTRODUCTION (the Blue Book): "in zwitterionic compounds anionic centers... become the
     parent structure, into which the cationic part is substituted". A zwitterion whose ONE anion is a nitrogen
@@ -1419,7 +1456,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     ring_attach_locant = _ring_attachment_locant_on_anion_parent(
         mol, anion_idx, cation_idx, parent_attach_idx)
     try:
-        neutral_name = _reenter_anion_parent(parent_smi, style, ring_attach_locant is not None)
+        neutral_name = _reenter_anion_parent(parent_smi, style, ring_attach_locant is not None or acls == 'aminide')
     except (RecursionError, ValueError, RuntimeError):
         return ''
     if not neutral_name or _is_malformed_parent(neutral_name):
@@ -1450,7 +1487,7 @@ def _route_zwitterion(mol, sites, style: str) -> str:
     # ambiguity (a 1-carbon attach on a 2-carbon acetate, where OPSIN's default
     # is already correct and the retained 'acetate' carries no chain locant).
     locant_prefix = _zwitterion_locant_prefix(
-        mol, anion_idx, parent_attach_idx, parent_anion_name, ring_attach_locant)
+        mol, anion_idx, parent_attach_idx, parent_anion_name, ring_attach_locant, parent_smi)
 
     # 4. Compose: {locant}-(cation-prefix)anion-parent — prefix the
     # cation to the anionic parent). Enclosing marks per (complex
@@ -3127,7 +3164,7 @@ def route_charged(mol, style: str = 'pin') -> str:
     # substituent prefix; a skeletal cation is deferred to the legacy
     # path. 169.6-04 (was a Plan-03 detect-and-defer seam).
     if _is_zwitterion(sites):
-        return _route_zwitterion(mol, sites, style) or _zwitterion_azanide_parent(mol, sites, style)
+        return _zwitterion_name(mol, sites, style)
 
     # W4-I3: R-S+ / R-Se+ sulfanylium/selanylium. RDKit assigns a
     # 1-coordinate chalcogen cation SPURIOUS radical electrons (a valence-model

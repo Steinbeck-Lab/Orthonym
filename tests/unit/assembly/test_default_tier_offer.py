@@ -31,7 +31,7 @@ from orthonym.assembly import default_tier_offer
 from orthonym.cli import _emit_tier_flags
 from orthonym.metrics import provenance as pv
 from tests.support.default_tier import default_tier_row
-from tests.support.rt_assert import name_best_effort
+from tests.support.rt_assert import name_best_effort, name_is_rt_exact
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -469,7 +469,16 @@ def test_the_anion_ships_in_the_one_pass_and_the_safety_net_is_not_run(monkeypat
     monkeypatch.setattr(default_tier_offer, "general_tier_engine", spy)
     assert name_best_effort("CSO")["name"] == "(hydroxysulfanyl)methane"
     assert name_best_effort(THIO)["name"] == THIO_PIN
-    assert name_best_effort("[O-]SC#N")["tier"] == "abstain"            # its twin does not verify: nothing is offered
+    # The twin of this anion does not verify, so nothing is offered by the safety net (the point of the test: ``built`` stays
+    # empty). It no longer abstains: the last rescue of the best-effort cascade (``rules/charged_fallback.py``, the emitter of the
+    # chalcogen anions of a heteroatom group) names it by the anionic parent hydride, "Anionic centers on other
+    # characteristic groups" (the Blue Book, sentence:41071: "named on the basis of the corresponding anionic parent
+    # hydrides"), with the preferred prefix 'thiocyanato' for -S-CN "Cyanic acid",:30981, '3-(thiocyanato)propanoic acid
+    # (PIN)':31013). The book has no example of the combination, so the name is below the PIN. OPSIN 2.9.0 reads it back to the
+    # input (fresh parse, ``name_is_rt_exact``), and reads '(isothiocyanato)oxidanide' to the other constitution, N(=C=S)[O-].
+    row = name_best_effort("[O-]SC#N")
+    assert (row["name"], row["tier"]) == ("(thiocyanato)oxidanide", "systematic_verified"), row
+    assert name_is_rt_exact(row["name"], "[O-]SC#N")
     assert not built
 
 

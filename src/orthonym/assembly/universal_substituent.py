@@ -1565,6 +1565,7 @@ def _cap_attachment(mol, frag_atoms, attach_idx: int, bond_order: int):
     exactly ``bond_order`` radical electrons, no other atom a radical but the centres the lambda
     convention cites (``_radical_lambda_atoms``), and the attachment atom have no neighbour outside
     the fragment. The cap is not part of the fragment, so no name covers it."""
+    from ..rules.uide_lambda import ATTACHMENT_CAP_PROP
     if bond_order not in (1, 2):
         return mol
     frag = {int(a) for a in frag_atoms}
@@ -1583,6 +1584,8 @@ def _cap_attachment(mol, frag_atoms, attach_idx: int, bond_order: int):
         return mol
     rw = Chem.RWMol(mol)
     cap = rw.AddAtom(Chem.Atom(6))
+    # tagged: a -uide centre does not count its bond to the cap as a ligand (rules.uide_lambda.uide_bonding_number)
+    rw.GetAtomWithIdx(cap).SetBoolProp(ATTACHMENT_CAP_PROP, True)
     rw.AddBond(attach_idx, cap, Chem.BondType.DOUBLE if bond_order == 2 else Chem.BondType.SINGLE)
     rw.GetAtomWithIdx(attach_idx).SetNumRadicalElectrons(0)
     capped = rw.GetMol()

@@ -87,6 +87,10 @@ $ orthonym "Cn1cnc2c1c(=O)n(C)c(=O)n2C" --provenance
 | `table:trivial` | The last-resort table of retained trivial names. |
 | `table:np_parent` | The list of natural-product parent names, matched by the exact structure, used as a fallback. |
 | `table:retained` | A retained or fused-ring name for a molecule that is exactly such a structure, which the late recovery prefers to the engine's own name when it reads back. |
+| `charged_leftovers:thiophosphate_ester_anion` | The last rescue of the `best-effort` tier, for a charged molecule that no other code named: the ester anion of a phosphorothioic acid, with the locant `O` of each ester word (`O,O-diethyl phosphorothioate`). |
+| `charged_leftovers:hetero_group_chalcogenide` | The same rescue: the oxygen, sulfur or selenium anion of a group on a heteroatom, as the oxidanide, sulfanide or selanide of the group (`[methoxy(phenyl)phosphanyl]oxidanide`). |
+| `charged_leftovers:carbon_group_azanide` | The same rescue: the azanide of a primary amine anion on a carbon group that has no amine name (`cyanoazanide`). |
+| `charged_leftovers:multiply_charged_centre` | The same rescue: a phosphorus, arsenic, antimony, silicon or germanium centre that holds a charge of two or three (`ethylphosphanediide`, `ethynylsilanetris(ylium)`). |
 
 ## Read `tier` and `verified` together
 

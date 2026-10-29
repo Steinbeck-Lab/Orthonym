@@ -154,7 +154,8 @@ FILES = {
     "src/orthonym/data/opsin_imports/carboxylic_acids_opsin.py": 5346,
     "src/orthonym/data/opsin_imports/simple_groups.py": 8895,
     "src/orthonym/data/opsin_imports/substituent_names_opsin.py": 8496,
-    "src/orthonym/namer.py": 11727,
+    # ION3: +2 lines, the import and the call of the last charged rescue (rules/charged_fallback.py).
+    "src/orthonym/namer.py": 11729,
     "src/orthonym/rules/benzene.py": 6095,
     "src/orthonym/rules/fused_rings.py": 5802,
     "src/orthonym/rules/heterocycles.py": 5793,
