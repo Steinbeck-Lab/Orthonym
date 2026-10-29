@@ -39,6 +39,7 @@ from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import fragment_parent_to_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
+from .prefix_derivation import retained_benzyl
 from .fragment_naming import name_fragment_recursively
 from .naming_utils import SIMPLE_MULTIPLIERS, alpha_sort_key, alpha_sort_key_rs, get_alkyl_name, has_structural_hyphen, multiplied_component, simple_multiplier_word
 from ..perception.smarts_cache import compiled as _compiled_smarts
@@ -6568,6 +6569,8 @@ def _name_aryl_methyl_ether(mol, central_c_idx: int, oxygen_idx: int) -> Optiona
     if len(arom_nbrs) == 1:
         aryl_idx = arom_nbrs[0].GetIdx()
         if _is_plain_phenyl(mol, aryl_idx, central_c_idx):
+            if not retained_benzyl(mol, 'phenyl', [central_c_idx]):
+                return "phenylmethoxy"      #: 'benzyloxy' numbers no position of its methylene
             return "benzyloxy"  # retained preferred prefix (bare ring)
         # w2f p1, BB 16274): ring substitution is not allowed on
         # retained benzyl(oxy) in PINs -> systematic '(4-methoxyphenyl)methoxy'
@@ -6647,7 +6650,9 @@ def _check_retained_substituent(
                     ]
                     if (len(non_ring_atoms) == 1
                             and mol.GetAtomWithIdx(non_ring_atoms[0]).GetSymbol() == 'C'
-                            and attach_idx not in ring_set):
+                            and attach_idx not in ring_set
+                            #: 'benzyl' numbers no position of its methylene
+                            and retained_benzyl(mol, 'phenyl', non_ring_atoms)):
                         return "benzyl"
 
     # --- Cycloalkyl detection (IUPAC ---

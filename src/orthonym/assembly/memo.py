@@ -29,7 +29,7 @@ import os
 from collections import OrderedDict
 
 from ..metrics.provenance import wider_tier_ctx
-from .locant_omission import retained_c2_unit_has_isotope_label
+from .locant_omission import retained_c2_unit_has_isotope_label, unnumbered_label_scope_active
 
 #: verify-mode mismatch log (process-global, across scopes). A ``MemoMismatch`` is
 #: RAISED as a loud failure, but the recursive naming cascade wraps the hot loops in
@@ -146,6 +146,11 @@ def _ck(namespace, key):
         # that scope differs from the plain one for the same key; the isotope path renames the skeleton
         # in that scope inside the call that named it without
         tag = tag + ("retained-c2-label",)
+    if unnumbered_label_scope_active():
+        # the producers of retained names spell the systematic name where a label sits on a position the
+        # retained name does not number (``locant_omission.label_on_unnumbered_position``); the isotope path
+        # renames the skeleton in that scope inside the call that named it without
+        tag = tag + ("systematic-unnumbered",)
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
             return (namespace, key, "pin-promotion", "prefixes-apart") + tag

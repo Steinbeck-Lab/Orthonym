@@ -269,8 +269,14 @@ def opsin_atom_locant_map(
         omol = Chem.MolFromSmiles(smi_part)
     except ImportError:  # pragma: no cover
         return None
-    if omol is None or omol.GetNumAtoms() != len(tokens):
+    if omol is None or len(tokens) > omol.GetNumAtoms():
         return None
+    # The atom-value list ends at the last atom that has a label: the explicit isotopic hydrogens that
+    # OPSIN writes after the atom they stand on ('[2H]' of '(2-2H)', '(2H3)methyl') have none, so a name
+    # with an isotope descriptor has a list shorter than its atom count, and the atoms past the end have
+    # no locant. Read as a length mismatch it left every labelled name without a map, and with it without
+    # the stereo that is composed onto it (``rules.stereochemistry.inject_stereo_reanchored_rt_gated``).
+    tokens = tokens + [""] * (omol.GetNumAtoms() - len(tokens))
     # Constitutional isomorphism onto the input graph (chirality ignored — the
     # locants are constitutional; the stereo layer is what we are re-deriving).
     #

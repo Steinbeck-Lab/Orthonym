@@ -432,6 +432,12 @@ def _other_alternation(a: Chem.Mol, b: Chem.Mol) -> bool:
         return False
 
 
+#: Isomorphisms of the frame (the skeleton as OPSIN writes it) onto the input that are enumerated, and the
+#: distinct ones (by what they say about the labels) that are tried, the first one found first.
+_FRAME_MATCHES = 4096
+_FRAME_LIMIT = 16
+
+
 class _Prober:
     """Parses the probe names of one spelling of the skeleton and reads the atoms each labels,
     counting the parses. ``ok`` is False when the skeleton itself does not give a frame."""
@@ -446,6 +452,7 @@ class _Prober:
         self._memo: Dict[Tuple[str, Key], Optional[Tuple[int, ...]]] = {}
         self._frame_key = ""
         self._phi: Tuple[int, ...] = ()
+        self.frames: List[Tuple[int, ...]] = []
         self._frame_of(skeleton)
 
     def _frame_of(self, skeleton: str) -> None:
@@ -458,22 +465,37 @@ class _Prober:
             return
         work = view[0]
         if Chem.MolToSmiles(work) == self.model.base_key:
-            match = (self.model.heavy.GetSubstructMatch(work, useChirality=True)
-                     or self.model.heavy.GetSubstructMatch(work))
+            matches = (self.model.heavy.GetSubstructMatches(work, useChirality=True, uniquify=False,
+                                                            maxMatches=_FRAME_MATCHES)
+                       or self.model.heavy.GetSubstructMatches(work, uniquify=False, maxMatches=_FRAME_MATCHES))
         elif _other_alternation(work, self.model.heavy):
             # OPSIN writes a conjugated ring RDKit does not perceive as aromatic in the other Kekule
             # alternation than the input's (the periphery of '10b,10c-dihydropyren-1-yl', a 4n+2 circuit,
             # ``rules.isotopes._same_fixed_h_inchi``): one compound, so the frame is the same, matched on
             # the graphs without bond orders.
-            match = _iso._single_bond_graph(self.model.heavy).GetSubstructMatch(
-                _iso._single_bond_graph(work))
+            matches = _iso._single_bond_graph(self.model.heavy).GetSubstructMatches(
+                _iso._single_bond_graph(work), uniquify=False, maxMatches=_FRAME_MATCHES)
         else:
             return
-        if len(match) != work.GetNumAtoms():
+        frames = {}
+        for match in matches:
+            if len(match) != work.GetNumAtoms():
+                continue
+            # what a frame says about the labels is which atoms of the skeleton the labelled atoms of the
+            # input are: two isomorphisms that agree on it give one name
+            where = {atom: a for a, atom in enumerate(match)}
+            pattern = tuple(sorted((where[p], record) for p, record in self.model.need.items()))
+            frames.setdefault(pattern, tuple(match))
+        if not frames:
             return
         self._frame_key = Chem.MolToSmiles(work, canonical=False)
-        self._phi = tuple(match)
+        self.frames = list(frames.values())[:_FRAME_LIMIT]
+        self.use_frame(0)
         self.ok = True
+
+    def use_frame(self, index: int) -> None:
+        """Read the labels through the ``index``-th isomorphism of the frame onto the input."""
+        self._phi = self.frames[index]
 
     def _parse(self, text: str) -> Optional[str]:
         if self.left <= 0:
@@ -487,22 +509,22 @@ class _Prober:
         """The sorted positions (heavy indices of the input) the labels of ``text`` sit on, or None
         when OPSIN does not read ``text`` as the skeleton with labels of nuclide ``key`` only."""
         ident = (text, key)
-        if ident in self._memo:
-            return self._memo[ident]
-        if self.left <= 0:
-            self.exhausted = True
-            return None
-        result: Optional[Tuple[int, ...]] = None
-        smi = self._parse(text)
-        mol = Chem.MolFromSmiles(smi) if smi else None
-        view = _heavy_view(mol) if mol is not None else None
-        if view is not None and view[1] and all(k == key for k, _p in view[1]):
-            if Chem.MolToSmiles(view[0], canonical=False) == self._frame_key:
-                result = tuple(sorted(self._phi[p] for _k, p in view[1]))
-            else:
-                self.dropped += 1
-        self._memo[ident] = result
-        return result
+        if ident not in self._memo:
+            if self.left <= 0:
+                self.exhausted = True
+                return None
+            read: Optional[Tuple[int, ...]] = None      # the atoms of the frame the labels sit on
+            smi = self._parse(text)
+            mol = Chem.MolFromSmiles(smi) if smi else None
+            view = _heavy_view(mol) if mol is not None else None
+            if view is not None and view[1] and all(k == key for k, _p in view[1]):
+                if Chem.MolToSmiles(view[0], canonical=False) == self._frame_key:
+                    read = tuple(p for _k, p in view[1])
+                else:
+                    self.dropped += 1
+            self._memo[ident] = read
+        read = self._memo[ident]
+        return None if read is None else tuple(sorted(self._phi[p] for p in read))
 
 
 def _probe_descriptor(key: Key, token: Optional[str]) -> str:
@@ -810,7 +832,7 @@ def _options(model: _Model, reach: Reach, slots: List[_Slot], position: int,
 
 
 def _covers(model: _Model, reach: Reach, slots: List[_Slot], stats: Dict[str, int],
-            extras: bool = False) -> Iterator[Tuple[Chosen, ...]]:
+            extras: bool = False, mixed: bool = False) -> Iterator[Tuple[Chosen, ...]]:
     """Covers of the labelled atoms, nearest to the all-preferred cover first (limited
     discrepancy search: a cover that takes the k-th best piece for an atom costs k - 1), each
     cover once, in a fixed order."""
@@ -827,9 +849,14 @@ def _covers(model: _Model, reach: Reach, slots: List[_Slot], stats: Dict[str, in
         item = next((p for p in items if p not in done), None)
         if item is None:
             sig = tuple(sorted(chosen))
-            kinds: Dict[int, set] = {}
-            for (slot_idx, token), _positions in sig:
-                kinds.setdefault(slot_idx, set()).add(token.startswith("*"))
+            kinds: Dict[Tuple[int, Key], set] = {}
+            for (slot_idx, token), positions in sig:
+                # One nuclide is cited with its locants or without them in a slot, not both. With ``mixed`` a
+                # slot may cite one nuclide with locants and another without ('(2-13C,15N)acetamido': the one
+                # nitrogen of the unit needs no locant,, the carbon of it does); without it a slot
+                # holds one form of citation for every nuclide, as before.
+                for key, _n in (model.need[positions[0]] if mixed else ((None, 0),)):
+                    kinds.setdefault((slot_idx, key), set()).add(token.startswith("*"))
             if sig not in yielded and not any(len(k) > 1 for k in kinds.values()):
                 yielded.add(sig)
                 yield sig
@@ -963,8 +990,9 @@ class _Found:
     """A name that reads back, with what built it (to spell it again on a shorter skeleton)."""
 
     def __init__(self, name: str, slots: List[_Slot], cover: Sequence[Chosen],
-                 force_show: bool, omit: frozenset):
+                 force_show: bool, omit: frozenset, locants: tuple = ()):
         self.name, self.slots, self.cover, self.force_show, self.omit = name, slots, cover, force_show, omit
+        self.locants = locants      # the locants cited, one per labelled atom, in increasing order
 
 
 def compose_scopes(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_pos: int,
@@ -990,7 +1018,6 @@ def compose_scopes(skeleton: str, original: Chem.Mol, label_map: Dict[int, int],
 def _compose(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_pos: int,
              budget: int, stats: Dict[str, object]) -> Optional[str]:
     model = _Model(original)
-    left = budget
     variants: List[Tuple[str, Optional[List[Tuple[int, int, str]]]]] = [(skeleton, None)]
     stripped = _iso.strip_isotopes(original)[0]
     for text, groups in _apart_variants(skeleton, stripped):
@@ -1004,32 +1031,38 @@ def _compose(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_pos
                 variants.append((text, groups))
     stats["variants"] = len(variants)
     probers: Dict[str, _Prober] = {}
-    # Two passes over the spellings: the second offers the pieces that label an atom modulo the symmetry
-    # of the molecule (``_options``), so no name the first pass finds changes.
-    for extras in (False, True):
-        for text, groups in variants:
-            prober = probers.get(text)
-            if prober is None:
-                prober = probers[text] = _Prober(model, text, left)
-            else:
-                prober.left, prober.spent, prober.dropped = left, 0, 0
-            try:
-                if not prober.ok:
-                    stats["outcome"] = "no-frame"
-                    continue
-                found = _compose_on(text, original, label_map, n_pos, model, prober, stats, extras)
-            finally:
-                left = prober.left
-                stats["parses"] = int(stats["parses"]) + prober.spent
-                stats["dropped"] = int(stats["dropped"]) + prober.dropped
-                stats["exhausted"] = bool(stats["exhausted"]) or prober.exhausted
-            if found is not None:
-                if groups is None:
-                    stats["outcome"] = "named"
-                    return found.name
-                stats["outcome"] = "named-apart"
-                return _merge_back((text, groups), found, model, original) or found.name
-    return None
+    spent = [budget]
+
+    def search(spellings) -> Optional[str]:
+        # Passes over the spellings: the second offers the pieces that label an atom modulo the symmetry of
+        # the molecule (``_options``), the third and fourth the covers that cite one nuclide of a slot with
+        # locants and another without, so no name an earlier pass finds changes.
+        for mixed, extras in ((False, False), (False, True), (True, False), (True, True)):
+            for text, groups in spellings:
+                prober = probers.get(text)
+                if prober is None:
+                    prober = probers[text] = _Prober(model, text, spent[0])
+                else:
+                    prober.left, prober.spent, prober.dropped = spent[0], 0, 0
+                try:
+                    if not prober.ok:
+                        stats["outcome"] = "no-frame"
+                        continue
+                    found = _lowest_locants(text, original, label_map, n_pos, model, prober, stats, extras, mixed)
+                finally:
+                    spent[0] = prober.left
+                    stats["parses"] = int(stats["parses"]) + prober.spent
+                    stats["dropped"] = int(stats["dropped"]) + prober.dropped
+                    stats["exhausted"] = bool(stats["exhausted"]) or prober.exhausted
+                if found is not None:
+                    if groups is None:
+                        stats["outcome"] = "named"
+                        return found.name
+                    stats["outcome"] = "named-apart"
+                    return _merge_back((text, groups), found, model, original) or found.name
+        return None
+
+    return search(variants)
 
 
 def _merge_back(apart: Tuple[str, List[Tuple[int, int, str]]], found: _Found, model: _Model,
@@ -1074,9 +1107,48 @@ def _reads_back(name: str, original: Chem.Mol) -> bool:
     return _iso._opsin_parse(name) is not None and _iso._isotope_round_trips(name, original)
 
 
+def _lowest_locants(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_pos: int,
+                    model: _Model, prober: _Prober, stats: Dict[str, object], extras: bool,
+                    mixed: bool) -> Optional[_Found]:
+    """The name of ``original`` on one spelling of the skeleton, under the isomorphism of its frame onto the
+    input that cites the lowest locants.
+
+     NUMBERING criterion (i) (the Blue Book): "the starting point and the direction of numbering
+    of the analogous isotopically substituted compound are chosen so as to give lowest locants to the modified
+    atoms or groups considered together as a set in increasing numerical order". A skeleton with a symmetry
+    (a phenyl ring, two equivalent substituents) can be read onto the input in several ways, each citing other
+    locants; the first isomorphism the name is found for is the lowest only by chance, so the others are tried
+    when the first has a name, and a name replaces it only when it cites a strictly lower set of as many locants
+    (a unit cited without locants because it holds every position of its nuclide is another spelling, not
+    another numbering): a name found on the first isomorphism is never changed otherwise."""
+    best = None
+    for index in range(len(prober.frames)):
+        prober.use_frame(index)
+        found = _compose_on(skeleton, original, label_map, n_pos, model, prober, stats, extras, mixed)
+        if found is None and index == 0:
+            return None             # the labels have no cover on this spelling; the symmetric readings have none either
+        if found is not None and (best is None or (len(found.locants) == len(best.locants)
+                                                    and found.locants < best.locants)):
+            best = found
+    prober.use_frame(0)
+    return best
+
+
+def _locants_cited(model: _Model, cover: Sequence[Chosen]) -> tuple:
+    """The locants a cover cites, one per labelled atom, in increasing numerical order (a unit cited without
+    locants cites none): the set NUMBERING criterion (i) (the Blue Book) compares, "the modified
+    atoms or groups considered together as a set in increasing numerical order"."""
+    cited = []
+    for (_slot_idx, token), positions in cover:
+        if not token.startswith("*"):
+            atoms = sum(n for p in positions for _k, n in model.need[p])
+            cited.extend([_token_key(token)] * atoms)
+    return tuple(sorted(cited))
+
+
 def _compose_on(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_pos: int,
                 model: _Model, prober: _Prober, stats: Dict[str, object],
-                extras: bool = False) -> Optional[_Found]:
+                extras: bool = False, mixed: bool = False) -> Optional[_Found]:
     """The name of ``original`` on one spelling of the skeleton, or None."""
     slots = _slots_of(skeleton, prober)
     stats["slots"] = len(slots)
@@ -1101,7 +1173,7 @@ def _compose_on(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_
     cstats = {"nodes": 0}
     covers = 0
     try:
-        for cover in _covers(model, reach, slots, cstats, extras):
+        for cover in _covers(model, reach, slots, cstats, extras, mixed):
             covers += 1
             complete = _complete_slots(skeleton, slots, model, cover, prober)
             for force_show, omit in ((False, complete), (False, frozenset()), (True, frozenset())):
@@ -1113,7 +1185,7 @@ def _compose_on(skeleton: str, original: Chem.Mol, label_map: Dict[int, int], n_
                 if len(tried) <= 3:
                     stats.setdefault("tried", []).append(name[:160])
                 if _reads_back(name, original):
-                    return _Found(name, slots, cover, force_show, omit)
+                    return _Found(name, slots, cover, force_show, omit, _locants_cited(model, cover))
             if covers >= COVER_CAP:
                 break
         stats["outcome"] = "unread" if covers else "no-cover"

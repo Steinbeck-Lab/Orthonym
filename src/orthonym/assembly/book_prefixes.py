@@ -286,6 +286,9 @@ def retained_group_prefix(mol, group_atoms, attach_idx: int, bond_order: int) ->
             return None
         if not _is_unsubstituted_benzene(mol, group - {attach_idx}, inside[0]):
             return None
+        from .prefix_derivation import retained_benzyl
+        if bond_order == 1 and not retained_benzyl(mol, 'phenyl', [attach_idx]):
+            return None     #: 'benzyl' numbers no position of its methylene
         return _BENZYL_BY_BOND_ORDER[bond_order]
     return None
 

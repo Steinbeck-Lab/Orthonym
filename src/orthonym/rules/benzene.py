@@ -4411,10 +4411,12 @@ def _assemble_benzene_with_suffix(
 
     chosen_locants = suffix_groups[chosen_suffix]
     chosen_count = len(chosen_locants)
+    from .benzene_unnumbered import label_on_unnumbered_group, systematic_group_name
+    retained = not label_on_unnumbered_group(mol, oriented_ring, chosen_suffix, chosen_locants)  #
 
     # Single carbonitrile: delegate to existing benzonitrile path
     # (which uses the retained name "benzonitrile" and proper renumbering)
-    if chosen_suffix == 'carbonitrile' and chosen_count == 1:
+    if retained and chosen_suffix == 'carbonitrile' and chosen_count == 1:
         # Convert suffix+prefix groups back to prefix-only for benzonitrile path
         nitrile_locant = chosen_locants[0]
         all_prefix = dict(prefix_groups)
@@ -4473,6 +4475,8 @@ def _assemble_benzene_with_suffix(
                 return None
         if prefix_form:
             remaining_prefix_groups[prefix_form] = sfx_locants
+    if not retained:
+        return systematic_group_name(remaining_prefix_groups, chosen_locants[0], chosen_suffix)
 
     #: Handle hydroxyl suffix -- phenol retained name for benzene
     if chosen_suffix == 'ol':

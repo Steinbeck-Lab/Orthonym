@@ -79,8 +79,12 @@ __all__ = [
     "isotope_labelled_original_scope",
     "isotope_label_on_atoms",
     "isotopic_skeleton_scope",
+    "scoped_skeleton_memo",
     "skeleton_label_on_atoms",
     "skeleton_label_maps",
+    "systematic_names_for_unnumbered_labels",
+    "unnumbered_label_scope_active",
+    "label_on_unnumbered_position",
     "isotope_locant_key",
     "isotope_retained_c2_unit_scope",
     "retained_c2_unit_has_isotope_label",
@@ -1175,21 +1179,39 @@ def _heavy_with_label_counts(original):
     return Chem.RemoveHs(tagged.GetMol(), params)
 
 
-def isotope_label_on_atoms(mol, atoms, original=None) -> bool:
+def _without_bond_orders(mol):
+    """``mol`` with every bond single and no atom aromatic: the graph of the compound, whatever the Kekule
+    alternation or aromaticity perception of the drawing it came from."""
+    plain = Chem.RWMol(mol)
+    for bond in plain.GetBonds():
+        bond.SetBondType(Chem.BondType.SINGLE)
+        bond.SetIsAromatic(False)
+    for atom in plain.GetAtoms():
+        atom.SetIsAromatic(False)
+    return plain.GetMol()
+
+
+def isotope_label_on_atoms(mol, atoms, original=None, any_drawing: bool = False) -> bool:
     """True when a label of the declared labelled molecule sits on one of ``atoms``
     of ``mol`` (the isotope-stripped molecule being named): a labelled atom, or a
     labelled hydrogen bonded to it. ``mol`` is mapped onto the labelled molecule by
     substructure match (every match, so a symmetric parent is read the same either
     way). False when no labelled molecule is declared or ``mol`` does not map.
     ``original`` is the labelled molecule to read when the caller has it (the
-    ambient one is the forced re-render's,:func:`isotope_labelled_original_scope`)."""
+    ambient one is the forced re-render's,:func:`isotope_labelled_original_scope`).
+    With ``any_drawing`` a ``mol`` that does not map as drawn (a producer that hands on a Kekule form of an
+    aromatic ring) is mapped again on the graphs of both without bond orders."""
     original = original if original is not None else _ISOTOPE_LABELLED_ORIGINAL.get()
     if original is None or mol is None or not atoms:
         return False
     try:
         heavy = _heavy_with_label_counts(original)
         wanted = [int(a) for a in atoms]
-        for match in heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64):
+        matches = heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64)
+        if not matches and any_drawing:
+            heavy = _without_bond_orders(heavy)
+            matches = heavy.GetSubstructMatches(_without_bond_orders(mol), uniquify=False, maxMatches=64)
+        for match in matches:
             if any(heavy.GetAtomWithIdx(match[i]).HasProp("_orthonym_labelled")
                    for i in wanted if i < len(match)):
                 return True
@@ -1562,18 +1584,32 @@ def isotopic_skeleton_scope(original):
     """Declare the labelled molecule whose isotope-stripped skeleton is being named
     (entered by ``rules/isotopes.py`` around its skeleton namings)."""
     token = _ISOTOPIC_SKELETON_ORIGINAL.set(original)
+    memo_token = _SCOPED_SKELETONS.set({})
     try:
         yield
     finally:
+        _SCOPED_SKELETONS.reset(memo_token)
         _ISOTOPIC_SKELETON_ORIGINAL.reset(token)
 
 
-def skeleton_label_on_atoms(mol, atoms) -> bool:
+#: The names of the isotope-stripped skeleton inside the scope of that the decorator pass of the labelled
+#: molecule in hand has made, by (kind of namer, SMILES): a pass names it once, wherever it asks (``rules.
+#: isotope_unnumbered``). A dict per:func:`isotopic_skeleton_scope`, so a pass with another labelled molecule starts empty.
+_SCOPED_SKELETONS: "contextvars.ContextVar[Optional[dict]]" = contextvars.ContextVar(
+    "orthonym_scoped_skeletons", default=None)
+
+
+def scoped_skeleton_memo() -> Optional[dict]:
+    """The memo of:data:`_SCOPED_SKELETONS`, None outside:func:`isotopic_skeleton_scope`."""
+    return _SCOPED_SKELETONS.get()
+
+
+def skeleton_label_on_atoms(mol, atoms, any_drawing: bool = False) -> bool:
     """True when a label of the labelled molecule whose skeleton is being named
     (:func:`isotopic_skeleton_scope`) sits on one of ``atoms`` of ``mol``, a labelled
     atom or a labelled hydrogen bonded to it (:func:`isotope_label_on_atoms`). False
     when no labelled molecule is declared."""
-    return isotope_label_on_atoms(mol, atoms, _ISOTOPIC_SKELETON_ORIGINAL.get())
+    return isotope_label_on_atoms(mol, atoms, _ISOTOPIC_SKELETON_ORIGINAL.get(), any_drawing)
 
 
 def skeleton_label_maps(mol, use_chirality: bool = False) -> Optional[List[Dict[int, List[Tuple[int, int]]]]]:
@@ -1602,6 +1638,46 @@ def skeleton_label_maps(mol, use_chirality: bool = False) -> Optional[List[Dict[
         return maps or None
     except Exception:  # noqa: BLE001 -- no answer
         return None
+
+
+# --------------------------------------------------------------------------------- #
+# "A RETAINED NAME THAT DOES NOT NUMBER THE POSITION A NUCLIDE SITS ON" #
+# --------------------------------------------------------------------------------- #
+# "Location of nuclides on positions not normally denoted by locants" (the Blue Book),
+#: "When the nuclide is located at a position in a retained name that is not numbered a
+# systematic name that identifies separately the relevant atom is used for the IUPAC preferred name."
+# ('benzene(13C)carbonitrile (PIN)', 'benzene(13C)carboxylic acid (PIN)'.) The isotope decorator names the
+# isotope-stripped molecule first, with the retained names; when no descriptor placement reads back on that
+# skeleton it names the molecule again inside this scope (``rules.isotopes.
+# _decorate_with_systematic_unnumbered_parents``), and a producer of a retained name that has an unnumbered
+# position asks:func:`label_on_unnumbered_position` whether a label sits on it, and spells the systematic
+# name then. Entered only after every strategy on the retained spelling has declined, so no name built on
+# it changes.
+_SYSTEMATIC_FOR_UNNUMBERED: "contextvars.ContextVar[bool]" = (
+    contextvars.ContextVar("orthonym_systematic_for_unnumbered", default=False))
+
+
+@contextlib.contextmanager
+def systematic_names_for_unnumbered_labels():
+    """Name the isotope-stripped skeleton of the labelled molecule (:func:`isotopic_skeleton_scope`) with the
+    systematic spelling wherever a retained name does not number the position of a label."""
+    token = _SYSTEMATIC_FOR_UNNUMBERED.set(True)
+    try:
+        yield
+    finally:
+        _SYSTEMATIC_FOR_UNNUMBERED.reset(token)
+
+
+def unnumbered_label_scope_active() -> bool:
+    """True inside:func:`systematic_names_for_unnumbered_labels` (the memo keys its caches apart on it)."""
+    return _SYSTEMATIC_FOR_UNNUMBERED.get()
+
+
+def label_on_unnumbered_position(mol, atoms) -> bool:
+    """True inside:func:`systematic_names_for_unnumbered_labels` when a label of the labelled molecule being
+    named sits on one of ``atoms`` of ``mol``, the atoms of a retained name that its numbering does not
+    reach (:func:`skeleton_label_on_atoms`). False outside the scope: the retained name stands."""
+    return _SYSTEMATIC_FOR_UNNUMBERED.get() and skeleton_label_on_atoms(mol, atoms, any_drawing=True)
 
 
 def isotope_locant_key(mol, atom_to_locant) -> tuple:

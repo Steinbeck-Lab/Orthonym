@@ -12,7 +12,8 @@ Numbering in relation to the unmodified compound), 'ethan(2H)ol (PIN) (as in eth
 '(1-14C)pentan(3H)oic acid (PIN)' (:43812), 'cyclohexane(2H)carboxylic acid (PIN)' (:43816),
 '(2H3)acetonitrile (PIN) (as in trichloroacetonitrile)' (:44182).
 
-A descriptor that cites one hydrogen, count-less and locant-free, is the Blue Book spelling in two places.
+A descriptor that cites one hydrogen, count-less and locant-free, is the Blue Book spelling in two places (and in front of the
+'methylidene' of a labelled methine, ``stands_before_a_one_hydrogen_group``).
 
 * A slot of a group that holds one hydrogen: the nuclide stands directly before the suffix or prefix that
   names the group ('ethan(2H)ol', 'pentan(3H)oic acid', 'cyclohexane(2H)carboxylic acid',
@@ -56,6 +57,28 @@ from rdkit import Chem
 _GROUP_SLOT = re.compile(r"(?:(?:ol|thiol|selenol|tellurol|oic acid|carboxylic acid|sulfonic acid|"
                          r"sulfinic acid|carbaldehyde)(?![a-z])|hydroxy|sulfanyl|selanyl|tellanyl)")
 _INDICATED_HYDROGEN = re.compile(r"\d+[a-z]?'*H-")
+#: the word of a one-carbon substituent group that holds one hydrogen when its carbon is a methine ('benzylidene':
+#: 'phenylmethylidene'); a descriptor directly before it labels that carbon and no other place
+_ONE_HYDROGEN_GROUP_WORD = re.compile(r"methylidene(?![a-z])")
+
+
+def stands_before_a_one_hydrogen_group(original: Chem.Mol, skel: str, off: int) -> bool:
+    """True when ``off`` of ``skel`` is the front of the word 'methylidene' and the one labelled hydrogen of ``original``
+    is on a carbon that bears no other hydrogen ('phenyl(2H)methylidene' for a labelled benzylidene).
+
+     (the Blue Book): the descriptor stands "before the part of the compound that is isotopically
+    substituted", and the part is the one-carbon group the word names; (:44180) omits a locant that the
+    unmodified name does not need, and 'methylidene' cites none ('[phenyl(13C)methyl]hydrazine (PIN)',:44259, is the
+    book's spelling of the same one-carbon unit). The group is the unit of (:44210): its carbon is the only
+    place of the nuclide, so there is no isomer to tell apart,:44202)."""
+    if not _ONE_HYDROGEN_GROUP_WORD.match(skel, off):
+        return False
+    labelled = [a for a in Chem.AddHs(original).GetAtoms() if a.GetAtomicNum() == 1 and a.GetIsotope()]
+    if len(labelled) != 1:
+        return False
+    carrier = labelled[0].GetNeighbors()[0]
+    return (carrier.GetSymbol() == "C" and not carrier.IsInRing()
+            and sum(nb.GetAtomicNum() == 1 for nb in carrier.GetNeighbors()) == 1)
 
 
 def _outside_marks(name: str, pairs) -> str:
@@ -184,7 +207,7 @@ def licensed(skel: str, off: int, original: Chem.Mol) -> bool:
     """Whether a count-less, locant-free hydrogen nuclide may stand at ``off`` of the unmodified name
     ``skel`` of the structure ``original`` (see the module text)."""
     from . import isotopes as iso
-    if _GROUP_SLOT.match(skel, off):
+    if _GROUP_SLOT.match(skel, off) or stands_before_a_one_hydrogen_group(original, skel, off):
         return True
     pairs = iso._enclosing_pairs(skel)
     hydrogens = Chem.AddHs(original)
@@ -212,7 +235,8 @@ def needs_locant(original: Chem.Mol, skel: str, off: int) -> bool:
         return False
     from . import isotopes as iso
     labelled = [a for a in original.GetAtoms() if a.GetAtomicNum() == 1 and a.GetIsotope()]
-    if len(labelled) != 1 or iso._max_atoms_at_position(labelled[0]) != 1 or _GROUP_SLOT.match(skel, off):
+    if (len(labelled) != 1 or iso._max_atoms_at_position(labelled[0]) != 1 or _GROUP_SLOT.match(skel, off)
+            or stands_before_a_one_hydrogen_group(original, skel, off)):
         return False
     pairs = iso._enclosing_pairs(skel)
     parent = Chem.Mol(original)
@@ -248,3 +272,84 @@ def twin_licensed(candidate: str, original: Optional[Chem.Mol]) -> bool:
         if not licensed(skel, start - sum(e - s for s, e in spans if e <= start), original):
             return False
     return True
+
+
+def unit_has_no_free_position(skel: str, off: int, keys, original: Chem.Mol) -> bool:
+    """ (the Blue Book): does the unit that a locant-free descriptor spliced at ``off`` of ``skel``
+    modifies hold no further position for any of its nuclides? OPSIN is asked: the same slot with ONE more nuclide of a
+    kind ('(13C2)' where the candidate has '(13C)') must not describe the constitution of ``original``; when it does the unit
+    had a free position and a possibility of isomers remains,:44202). ``skel`` is the name as far as it is
+    built, descriptors of other parts included, and ``original`` the labelled molecule whose constitution the name has:
+    the check sees every descriptor of the name, not the labels of one group (``rules.isotopes._unit_completely_labelled``
+    adds its guards for the single-descriptor placement). A control parse of the candidate's own count, with its
+    subscript shown, must succeed, so an OPSIN refusal of the spelling itself is never read as a full unit."""
+    from . import isotopes as iso
+    try:
+        want = Chem.MolToInchiKey(original).split('-')[0]
+    except Exception:
+        return False
+    if not want:
+        return False
+
+    def constitution(name: str) -> Optional[str]:
+        smi = iso._opsin_parse(name)
+        mol = Chem.MolFromSmiles(smi) if smi else None
+        if mol is None:
+            return None
+        try:
+            return Chem.MolToInchiKey(mol).split('-')[0] or None
+        except Exception:
+            return None
+
+    control = [(None, mass, el, count, maxpos) for (mass, el), count, maxpos in keys]
+    if constitution(skel[:off] + iso.format_isotope_descriptor(control, force_show=True) + skel[off:]) != want:
+        return False
+    for i in range(len(keys)):
+        bumped = [(None, mass, el, count + (1 if j == i else 0), maxpos)
+                  for j, ((mass, el), count, maxpos) in enumerate(keys)]
+        if constitution(skel[:off] + iso.format_isotope_descriptor(bumped, force_show=True) + skel[off:]) == want:
+            return False            # room for one more -> isomers possible
+    return True
+
+
+def apply_unit_licences(skel: str, placements: list, original: Chem.Mol) -> tuple:
+    """``(placements, any_positional)`` of the groups of ``_decorate_multi_position``: ``placements`` holds
+    ``(offset, descriptor, locant rank, keys)``. (the Blue Book): "all locants must be cited for the
+    parent structure or that structural unit" that needs them. A group that cites a locant inside the enclosing marks of
+    a substituent keeps none when no other descriptor stands in those marks and the name with its descriptor locant-free
+    and every other descriptor as placed (a) holds no free position for its nuclide in that unit
+    (:func:`unit_has_no_free_position`) and (b) reads back as ``original`` (``[phenyl(13C)methylidene](4-13C)but-3-enoate``,
+    the parent citing its 4). The name is judged whole, with every descriptor in it, not on the masked copy of one group."""
+    from . import isotopes as iso
+    out = list(placements)
+    for i, (off, desc, rank, keys) in enumerate(placements):
+        if not (isinstance(rank, int) and rank >= 1):
+            continue
+        around = [(o, c) for o, c in iso._enclosing_pairs(skel) if o < off <= c]
+        if not around:
+            continue
+        opening, closing = max(around, key=lambda oc: oc[0])
+        others = [(o2, d2) for j, (o2, d2, _r, _k) in enumerate(placements) if j != i]
+        if any(opening < o2 <= closing for o2, _d in others):
+            continue
+        own = iso.format_isotope_descriptor([(None, mass, el, count, maxpos) for (mass, el), count, maxpos in keys],
+                                            letter_once=iso._pin_spellings())
+        if not own or own == desc:
+            continue
+        built = skel
+        for o2, d2 in sorted(others, key=lambda p: -p[0]):
+            built = built[:o2] + d2 + built[o2:]
+        shifted = off + sum(len(d2) for o2, d2 in others if o2 < off)
+        if not iso._slot_opens_substituent_prefix(built, shifted) or not unit_has_no_free_position(built, shifted, keys, original):
+            continue
+        inserts = sorted(others + [(off, own)])
+        full = skel
+        for o2, d2 in sorted(inserts, key=lambda p: -p[0]):
+            full = full[:o2] + d2 + full[o2:]
+        shift = 0
+        for o2, d2 in inserts:
+            full = iso._escalate_marks_for_descriptor(full, o2 + shift)
+            shift += len(d2)
+        if iso._isotope_round_trips(full, original):
+            out[i] = (off, own, -1, keys)
+    return out, any(isinstance(p[2], int) and p[2] >= 1 for p in out)

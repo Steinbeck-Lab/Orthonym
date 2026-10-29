@@ -29,6 +29,7 @@ from ..data.multipliers import multiplier_table
 from . import isotope_oxoacid as _oxoacid
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
+from .isotope_licence import apply_unit_licences, unit_has_no_free_position
 from .isotope_placement import nuclide_has_equivalent_site, placement_order
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
 from .lambda_convention import LAMBDA as _LAMBDA
@@ -896,8 +897,9 @@ def _insertion_offsets(skel: str) -> List[int]:
     # ('[9,24-dioxahexacyclo...') or the heteroatom locants of a benzo-fused ring
     # ('(1,2-benzoxazol-3-yl)'): the slot right after the mark
     # (``_BRACKET_SKELETAL_LOCANT_RE``, ``_BRACKET_BENZO_LOCANT_RE``). RT-gated.
+    from .isotope_slots import BRACKET_HW_LOCANT_RE
     offsets.extend(m.start() + 1
-                   for regex in (_BRACKET_SKELETAL_LOCANT_RE, _BRACKET_BENZO_LOCANT_RE)
+                   for regex in (_BRACKET_SKELETAL_LOCANT_RE, _BRACKET_BENZO_LOCANT_RE, BRACKET_HW_LOCANT_RE)
                    for m in regex.finditer(skel))
     return sorted(set(offsets))
 
@@ -1618,7 +1620,7 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
     numbered = n_count > 1 and _parent_numbers_its_nitrogens(skeleton)
     # A bare letter only where ``rules.isotope_letters`` allows it,,: the
     # atoms it could denote are one symmetry class (a possibility of isomers otherwise); else the numbered form.
-    from .isotope_letters import bare_letter_allowed
+    from .isotope_letters import acid_hydroxyl_takes_letter, bare_letter_allowed, geminal_nitrogen_letters
     bare_n = bare_letter_allowed(original, "N")
     bare_o = bare_letter_allowed(original, "O")
     out: List[str] = []
@@ -1641,6 +1643,7 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
             if bare_n and "N" not in out:
                 #: a single nitrogen keeps the bare italic ``N`` (last where numbered).
                 out.append("N")
+    out.extend(geminal_nitrogen_letters(skeleton, out))     # N, N' of a geminal parent,
     # italic ``O`` locant: a labelled O on the HYDROXYL oxygen of a
     # carboxyl group (the single-bonded, degree-1 ``-OH``, NOT the ``=O``). It is
     # the same element as the carbonyl O in one suffix, so the bare descriptor is
@@ -1679,7 +1682,7 @@ def _letter_locant_candidates(original: Chem.Mol, label_map: Dict[int, int],
             continue
         o_atom = nbrs[0]
         heavy = [n for n in o_atom.GetNeighbors() if n.GetSymbol() != "H"]
-        if len(heavy) != 1 or heavy[0].GetSymbol() != "C":
+        if len(heavy) != 1 or not acid_hydroxyl_takes_letter(heavy[0], skeleton):
             continue
         bond = original.GetBondBetweenAtoms(o_atom.GetIdx(), heavy[0].GetIdx())
         if bond is None or bond.GetBondType() != Chem.BondType.SINGLE:
@@ -2050,36 +2053,7 @@ def _unit_completely_labelled(skel: str, off: int, keys,
     if not (_slot_opens_substituent_prefix(skel, off)
             or _whole_compound_labelled(keys, original)):
         return False
-    try:
-        want = Chem.MolToInchiKey(original).split('-')[0]
-    except Exception:
-        return False
-    if not want:
-        return False
-
-    def _constitution(name: str) -> Optional[str]:
-        smi = _opsin_parse(name)
-        mol = Chem.MolFromSmiles(smi) if smi else None
-        if mol is None:
-            return None
-        try:
-            return Chem.MolToInchiKey(mol).split('-')[0] or None
-        except Exception:
-            return None
-
-    control = [(None, mass, el, count, maxpos)
-               for (mass, el), count, maxpos in keys]
-    if _constitution(skel[:off] + format_isotope_descriptor(control, force_show=True)
-                     + skel[off:]) != want:
-        return False
-    for i in range(len(keys)):
-        bumped = [(None, mass, el, count + (1 if j == i else 0), maxpos)
-                  for j, ((mass, el), count, maxpos) in enumerate(keys)]
-        name = (skel[:off] + format_isotope_descriptor(bumped, force_show=True)
-                + skel[off:])
-        if _constitution(name) == want:
-            return False            # room for one more -> isomers possible
-    return True
+    return unit_has_no_free_position(skel, off, keys, original)
 
 
 def _is_held_locant_free(original: Chem.Mol, skel: str, off: int, candidate: str) -> bool:
@@ -2607,7 +2581,6 @@ def _decorate_multi_position(
 
         Returns ``(None, False)`` if any group cannot be placed on ``skel``."""
         placements: List[Tuple[int, str]] = []
-        any_positional = False
         for group in groups:
             by_key: Dict[Tuple[int, str], int] = {}
             maxpos_by_key: Dict[Tuple[int, str], int] = {}
@@ -2637,10 +2610,8 @@ def _decorate_multi_position(
                 extra_locants=group_letter_locants, multi_descriptor=True)
             if off is None:
                 return None, False
-            if isinstance(loc_rank, int) and loc_rank >= 1:
-                any_positional = True
             placements.append((off, desc, loc_rank, group_keys))
-        return placements, any_positional
+        return apply_unit_licences(skel, placements, original)
 
     def _merged(placements) -> Optional[List[Tuple[int, str]]]:
         """One descriptor per insertion offset. Groups whose descriptors land at the
@@ -3025,7 +2996,7 @@ def _systematic_parent_fallback(
         stripped: Chem.Mol,
         original: Optional[Chem.Mol] = None,
         label_map: Optional[Dict[int, int]] = None,
-        retained_name: Optional[str] = None) -> Optional[str]:
+        retained_name: Optional[str] = None, namer=None) -> Optional[str]:
     """An alternate, more fully systematic parent name for ``stripped``.
 
     Two modes, selected by whether the isotope-label context is supplied:
@@ -3042,7 +3013,7 @@ def _systematic_parent_fallback(
       skeleton loop. Returns None when inapplicable.
     """
     if original is not None and label_map is not None:
-        return _ring_carbon_systematic_parent(original, label_map, retained_name)
+        return _ring_carbon_systematic_parent(original, label_map, retained_name, namer)
     try:
         from .amino_acids import _name_amino_acid_systematic, detect_amino_acid
     except Exception:
@@ -3151,7 +3122,7 @@ def _aldehyde_carbon_for_label(
 
 def _ring_carbon_systematic_parent(
         original: Chem.Mol, label_map: Dict[int, int],
-        retained_name: Optional[str]) -> Optional[str]:
+        retained_name: Optional[str], namer=None) -> Optional[str]:
     """ (the Blue Book): the systematic ring-carbon parent spelling for a
     nuclide that sits on a position a RETAINED name does not number.
 
@@ -3177,7 +3148,8 @@ def _ring_carbon_systematic_parent(
 
     Covers exactly the skeleton classes on the isotope target set:
     monosubstituted benzene + carbonitrile / + carboxylic acid / + carbaldehyde,
-    a labelled benzyl substituent (respelled ``benzyl`` -> ``(phenylmethyl)``),
+    a labelled benzyl substituent; the systematic spelling is the skeleton named in the scope of
+    ``rules.isotope_unnumbered`` (:func:`_scoped_parent`),
     and a cyclohexane-1,1-diyl gem-diacid (one -COOH becomes the suffix, the
     other a ``carboxy`` prefix). A cyclohexane gem-diacid bearing TWO DISTINCT
     nuclides (one per carboxyl) is beyond the single-combined-descriptor
@@ -3205,10 +3177,10 @@ def _ring_carbon_systematic_parent(
             if ring_nb is not None:
                 ring = _aromatic_benzene(original, ring_nb.GetIdx())
                 if ring and _ring_monosubstituted(original, ring):
-                    return "benzenecarbaldehyde"
+                    return _scoped_parent(original, retained_name, namer)
 
         if atom.GetSymbol() == "H" and atom.GetDegree() == 1:
-            respelled = _benzyl_respelled(original, atom.GetNeighbors()[0], retained_name)
+            respelled = _benzyl_scoped_skeleton(original, atom.GetNeighbors()[0], retained_name, namer)
             if respelled:
                 return respelled
         if atom.GetSymbol() != "C":
@@ -3230,7 +3202,7 @@ def _ring_carbon_systematic_parent(
         if nit_n is not None and ar_c is not None and others == 0:
             ring = _aromatic_benzene(original, ar_c.GetIdx())
             if ring and _ring_monosubstituted(original, ring):
-                return "benzenecarbonitrile"
+                return _scoped_parent(original, retained_name, namer)
 
         # (2)/(4) carboxyl carbon: on a benzene ring -> benzene(13C)carboxylic
         # acid (the Blue Book); on a cyclohexane gem-diacid ring carbon ->
@@ -3240,7 +3212,7 @@ def _ring_carbon_systematic_parent(
             if ring_nb is not None and ring_nb.GetIsAromatic():
                 ring = _aromatic_benzene(original, ring_nb.GetIdx())
                 if ring and _ring_monosubstituted(original, ring):
-                    return "benzenecarboxylic acid"
+                    return _scoped_parent(original, retained_name, namer)
             elif ring_nb is not None:
                 ring = _saturated_carbocycle(original, ring_nb.GetIdx(), 6)
                 gem = sum(1 for nb in ring_nb.GetNeighbors()
@@ -3248,44 +3220,34 @@ def _ring_carbon_systematic_parent(
                 if ring and gem == 2:
                     return "1-carboxycyclohexane-1-carboxylic acid"
 
-        respelled = _benzyl_respelled(original, atom, retained_name)
+        respelled = _benzyl_scoped_skeleton(original, atom, retained_name, namer)
         if respelled:
             return respelled
     return None
 
 
-def _benzyl_respelled(original: Chem.Mol, carbon, retained_name: Optional[str]) -> Optional[str]:
-    """(3) benzyl: labelled CH2 bonded to a phenyl (a monosubstituted benzene ring) and to one
-    other heavy atom -> respell the retained substituent benzyl -> (phenylmethyl), giving
-    [phenyl(13C)methyl]... (the Blue Book), and benzyloxy -> (phenylmethoxy). A re-anchored
-    (structurally gated), OPSIN-RT-audited respell, not a blind rewrite: the negative
-    lookahead keeps benzylidene/benzylamino/... intact. The two hydrogens of the CH2 count
-    whatever their nuclide: a D or T is an atom of ``original``, not an implicit hydrogen."""
-    if not retained_name:
-        return None
+def _benzyl_scoped_skeleton(original: Chem.Mol, carbon, retained_name: Optional[str], namer) -> Optional[str]:
+    """(3) benzyl: labelled CH2 bonded to a phenyl (a monosubstituted benzene ring) and to one other heavy atom -> the
+    skeleton named in the scope, where the producers of the retained prefix spell ``(phenylmethyl)`` and
+    ``phenylmethoxy`` ('[phenyl(13C)methyl]hydrazine', the Blue Book). The two hydrogens of the CH2 count whatever their
+    nuclide: a D or T is an atom of ``original``, not an implicit hydrogen."""
     nbrs = [nb for nb in carbon.GetNeighbors() if nb.GetAtomicNum() > 1]
-    if carbon.GetTotalNumHs(includeNeighbors=True) != 2 or len(nbrs) != 2:
+    if not retained_name or carbon.GetTotalNumHs(includeNeighbors=True) != 2 or len(nbrs) != 2:
         return None
-    phenyls = []
-    for nb in nbrs:
-        if nb.GetSymbol() == "C" and nb.GetIsAromatic():
-            ring = _aromatic_benzene(original, nb.GetIdx())
-            if ring and _ring_monosubstituted(original, ring):
-                phenyls.append(nb)
-    if len(phenyls) != 1:
+    phenyls = [nb for nb in nbrs if nb.GetSymbol() == "C" and nb.GetIsAromatic()
+               and (ring := _aromatic_benzene(original, nb.GetIdx())) and _ring_monosubstituted(original, ring)]
+    return _scoped_parent(original, retained_name, namer) if len(phenyls) == 1 else None
+
+
+def _scoped_parent(original: Chem.Mol, retained_name: Optional[str], namer) -> Optional[str]:
+    """The isotope-stripped skeleton named in the scope of (``rules.isotope_unnumbered``), where a retained
+    name that numbers no labelled position is spelled systematically ('benzenecarbonitrile' for 'benzonitrile'); None
+    when it is spelled as ``retained_name`` is."""
+    if namer is None:
         return None
-    for retained, systematic in (("benzyloxy", "phenylmethoxy"),
-                                 ("benzyl(?!oxy|idene|sulfan|amino|thio|carbon)",
-                                  "phenylmethyl")):
-        found = re.search(retained, retained_name)
-        if found is None:
-            continue
-        start, end = found.span()
-        enclosed = (start > 0 and retained_name[start - 1] in "([{"
-                    and retained_name[end:end + 1] in ")]}")
-        return (retained_name[:start] + (systematic if enclosed else f"({systematic})")
-                + retained_name[end:])
-    return None
+    from .isotope_unnumbered import skeleton_in_unnumbered_scope
+    scoped = skeleton_in_unnumbered_scope(namer, strip_isotopes(original)[0])
+    return scoped if scoped and scoped != retained_name else None
 
 
 _MULT_TO_COUNT = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}
@@ -4278,6 +4240,13 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
                 # below the PIN, which every other tier declines.
                 from .isotope_scopes import compose_last_resort
                 result = compose_last_resort(sink, original, label_map)
+            if result is None and sink:
+                # every strategy on the retained spellings declined: name the skeleton again with the systematic
+                # spelling where a retained name does not number a label, ``rules.isotope_unnumbered``)
+                from .isotope_unnumbered import decorate_with_systematic_unnumbered_parents
+                result = decorate_with_systematic_unnumbered_parents(
+                    smiles, style, namer, original, stripped, label_map, sink,
+                    composer and getattr(namer, "_general_fallback_unverified", False))
             if result is not None and finish is not None:
                 result = finish(result)
         if (result and _BOND_SHIFT_PARSE_REFUSED.get()
@@ -4850,7 +4819,7 @@ def _decorate_isotopic_name_inner(smiles, style, namer, original, stripped,
     # and fired ONLY when a label is on that unnumbered functional carbon, so the
     # specs loop is byte-for-byte unchanged whenever does not apply.
     ring_c_parent = _systematic_parent_fallback(
-        stripped, original, label_map, pin_name)
+        stripped, original, label_map, pin_name, namer)
     if (ring_c_parent and _usable(ring_c_parent)
             and ring_c_parent not in (pin_name, systematic_name)):
         rc_best, _rc_loc = _enumerate(ring_c_parent)

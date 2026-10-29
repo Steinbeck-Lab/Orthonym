@@ -54,6 +54,17 @@ def built(text: Optional[str], *, substituted: bool,
     return PrefixName(text, PrefixDerivation(substituted=substituted, enclosed=enclosed))
 
 
+def retained_benzyl(mol, ring_name: str, methylene_atoms) -> bool:
+    """True when a group of ``ring_name`` on the carbons ``methylene_atoms`` is written with the retained prefix
+    'benzyl': the bare phenyl ring, and no label on the methylene. under ' Location of nuclides
+    on positions not normally denoted by locants' (the Blue Book): "When the nuclide is located at a position
+    in a retained name that is not numbered a systematic name that identifies separately the relevant atom is used
+    for the IUPAC preferred name" ('[phenyl(13C)methyl]hydrazine (PIN)',:44259); the retained 'benzyl' numbers no
+    position of its methylene, so a label there takes 'phenylmethyl'."""
+    from .locant_omission import label_on_unnumbered_position
+    return ring_name == 'phenyl' and not label_on_unnumbered_position(mol, methylene_atoms)
+
+
 def with_derivation(text: Optional[str], rec: Optional[PrefixDerivation]) -> Optional[str]:
     """``text`` with the record ``rec`` (unchanged when either is ``None``)."""
     if text is None or rec is None:

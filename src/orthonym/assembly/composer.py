@@ -136,7 +136,7 @@ from .substituent_enumerator import (
     extract_ring_substituents,
 )
 from .n_substituent_stereo import cite_n_substituent_stereo
-from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
+from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment, retained_benzyl
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
 # _coverage_gate_threshold removed in a phase: replaced by
@@ -1991,7 +1991,7 @@ def _name_r_group(mol, start_idx: int, exclude_atoms: set) -> Optional[str]:
                     if (len(non_ring_atoms) == 1
                             and mol.GetAtomWithIdx(non_ring_atoms[0]).GetSymbol() == 'C'
                             and non_ring_atoms[0] == start_idx):
-                        return "benzyl"
+                        return "benzyl" if retained_benzyl(mol, 'phenyl', non_ring_atoms) else "(phenylmethyl)"
                 # Fragment has ring substituents or complex structure:
                 # jump directly to name_substituent universal fallback,
                 # bypassing the alkyl chain code which would miscount

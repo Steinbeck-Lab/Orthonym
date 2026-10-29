@@ -3179,8 +3179,8 @@ def _compound_ring_on_chain_substituent(
         # the saturated/undecorated carrier guards above.
         # Lane L2 (R2): 'benzyl' is a retained name, a simple component (a),
         # the Blue Book); a ring on the carrier makes a compound prefix (:7035)
-        from ..assembly.prefix_derivation import built
-        if ring_name == 'phenyl':
+        from ..assembly.prefix_derivation import built, retained_benzyl
+        if retained_benzyl(mol, ring_name, path):
             return built('benzyl', substituted=False)
         return built(f'{inner}methyl', substituted=True)
     if pos_out is not None:

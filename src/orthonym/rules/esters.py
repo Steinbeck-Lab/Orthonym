@@ -18,7 +18,7 @@ SMARTS: "[CX3](=O)[OX2][#6]"
 import logging
 import re
 from collections import deque
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
 
@@ -181,6 +181,28 @@ def acid_is_ring_acid(mol, acid_atoms: List[int]) -> bool:
     return False
 
 
+def _carbonyl_of_ring_acid_is_labelled(mol, ring, acid_set) -> bool:
+    """True inside ``assembly.locant_omission.systematic_names_for_unnumbered_labels`` when a nuclide sits
+    on a carbonyl carbon bonded to the ring of the acid portion of the ester. under '
+    Location of nuclides on positions not normally denoted by locants' (the Blue Book): "When the
+    nuclide is located at a position in a retained name that is not numbered a systematic name that
+    identifies separately the relevant atom is used for the IUPAC preferred name"; the retained 'benzoic
+    acid' numbers no position of its carboxyl carbon ('benzene(13C)carboxylic acid (PIN)',:44255)."""
+    from ..assembly.locant_omission import label_on_unnumbered_position, unnumbered_label_scope_active
+    if not unnumbered_label_scope_active():
+        return False
+    ring_set = set(ring)
+    carbonyls = []
+    for idx in ring:
+        for nb in mol.GetAtomWithIdx(idx).GetNeighbors():
+            if nb.GetIdx() in ring_set or nb.GetIdx() not in acid_set or nb.GetSymbol() != 'C':
+                continue
+            if any(mol.GetBondBetweenAtoms(nb.GetIdx(), o.GetIdx()).GetBondTypeAsDouble() == 2.0
+                   and o.GetSymbol() == 'O' for o in nb.GetNeighbors()):
+                carbonyls.append(nb.GetIdx())
+    return label_on_unnumbered_position(mol, carbonyls)
+
+
 def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
     """
     Name the acid portion of an ester when it contains a ring.
@@ -228,6 +250,10 @@ def get_ring_acid_name(mol, acid_atoms: List[int]) -> Optional[str]:
                 mol.GetAtomWithIdx(idx).GetIsAromatic() for idx in ring
             )
             if all_carbon and all_aromatic:
+                if _carbonyl_of_ring_acid_is_labelled(mol, ring, acid_set):
+                    #: 'benzoic' numbers no position of its carboxyl carbon, so a nuclide
+                    # there takes the systematic 'benzene(13C)carboxylate'
+                    return "benzenecarboxylic"
                 return "benzoic"
 
         # Check for heterocyclic single ring
@@ -822,6 +848,11 @@ def get_alkyl_fragment_name(mol, alkyl_atoms: List[int]) -> str:
                         return "phenyl"
                     # e.g., benzyl = phenyl + CH2
                     if chain_carbons == 1:
+                        from ..assembly.prefix_derivation import retained_benzyl
+                        if not retained_benzyl(mol, 'phenyl', [
+                                idx for idx in alkyl_atoms
+                                if mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and idx not in set(ring)]):
+                            return "(phenylmethyl)"     #: 'benzyl' numbers no position of its methylene
                         return "benzyl"
                     if chain_carbons == 2:
                         return "2-phenylethyl"
@@ -1045,6 +1076,72 @@ def _find_acid_principal_chain(mol, acid_atoms: List[int]) -> Optional[List[int]
     return best_path
 
 
+def _unnumbered_side_chain_atoms(mol, acid_atoms, carbonyl_c: int) -> List[int]:
+    """The atoms of the acyclic side chain of the amino acid ``acid_atoms`` that its retained name does
+    not number: the branches of the side chain other than its one longest chain. The retained name
+    numbers the chain of the systematic name (2-amino-3-methylbutanoic acid for valine: 1 to 4, and the
+    methyl of C-3 is a substituent of it), so of the two methyls of valine, or of leucine's C-4, and of
+    isoleucine's C-3 methyl, no more than the one on the chain has a number. Where branches tie for the
+    chain every one of them counts: a label on two tied branches has no numbering in the retained name.
+    A side chain with a ring has none (its ring is numbered as the ring), and neither has a bare one.
+
+     under ' Location of nuclides on positions not normally denoted by locants'
+    (the Blue Book): "When the nuclide is located at a position in a retained name that is not
+    numbered a systematic name that identifies separately the relevant atom is used for the IUPAC
+    preferred name." """
+    acid = set(acid_atoms)
+    carbonyl = mol.GetAtomWithIdx(carbonyl_c)
+    alphas = [n for n in carbonyl.GetNeighbors() if n.GetSymbol() == 'C' and n.GetIdx() in acid]
+    if len(alphas) != 1:
+        return []
+    alpha = alphas[0].GetIdx()
+    root = [n.GetIdx() for n in alphas[0].GetNeighbors()
+            if n.GetIdx() in acid and n.GetIdx() != carbonyl_c and n.GetSymbol() == 'C']
+    if not root:
+        return []
+    children: Dict[int, List[int]] = {}
+    seen = {alpha, carbonyl_c}
+    stack = list(root)
+    parent = {r: alpha for r in root}
+    while stack:
+        a = stack.pop()
+        if a in seen:
+            return []                       # a ring (or a second path): numbered as a ring
+        seen.add(a)
+        atom = mol.GetAtomWithIdx(a)
+        if atom.GetSymbol() != 'C':
+            return []
+        kids = [n.GetIdx() for n in atom.GetNeighbors()
+                if n.GetIdx() in acid and n.GetIdx() != parent[a]]
+        children[a] = kids
+        for k in kids:
+            parent[k] = a
+            stack.append(k)
+    height: Dict[int, int] = {}
+
+    def h(a: int) -> int:
+        if a not in height:
+            height[a] = 1 + max((h(k) for k in children[a]), default=0)
+        return height[a]
+
+    unnumbered: List[int] = []
+
+    def collect(a: int) -> None:
+        unnumbered.append(a)
+        for k in children[a]:
+            collect(k)
+
+    for a, kids in children.items():
+        if len(kids) < 2:
+            continue
+        tallest = max(h(k) for k in kids)
+        chain = [k for k in kids if h(k) == tallest]
+        for k in kids:
+            if k not in chain or len(chain) > 1:
+                collect(k)
+    return sorted(set(unnumbered))
+
+
 def _name_amino_acid_ester(
     mol, acid_atoms: List[int], alkyl_atoms: List[int], ester_match: tuple,
 ) -> Optional[str]:
@@ -1096,6 +1193,14 @@ def _name_amino_acid_ester(
     ate_stem = get_amino_acid_ate_stem(aa_name)
     if ate_stem is None:
         return None  # out of scope (diacid / 2-stereocentre / non-standard AA)
+
+    #: a nuclide on a position of the side chain that 'valinate' ('leucinate',...) does not
+    # number takes the systematic ester name, '(2S)-2-amino-3-(2H3)methylbutanoate' (the scope is entered
+    # by the isotope decorator only after the retained spelling could not carry the labels).
+    from ..assembly.locant_omission import label_on_unnumbered_position, unnumbered_label_scope_active
+    if (unnumbered_label_scope_active()
+            and label_on_unnumbered_position(mol, _unnumbered_side_chain_atoms(mol, acid_atoms, carbonyl_c))):
+        return None
 
     # a phase (stereo honesty, mirrors L3-2e + the amino_acids.py
     # standalone-AA fix): `_get_stereo_prefix` falls back to "" both for TRUE

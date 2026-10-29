@@ -1800,6 +1800,9 @@ def _handle_retained_name(mol, smiles, canonical_smiles, features=None, *,
     from orthonym.data import ALL_RETAINED_NAMES
     from orthonym.data.pin_policy import PIN_DENY
     name = ALL_RETAINED_NAMES.get(canonical_smiles)
+    from orthonym.rules.benzene_unnumbered import retained_benzene_group_is_labelled
+    if name and retained_benzene_group_is_labelled(mol, name):      #: 'benzonitrile' numbers no group carbon
+        return None
     if name and name.lower().strip() in PIN_DENY:
         from orthonym.metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(name)

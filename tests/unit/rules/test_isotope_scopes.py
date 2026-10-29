@@ -152,8 +152,9 @@ CASES = [
     ("numbered-oxygen-locant-in-a-diol",
      "[2H]Oc1ccc(O)cc1[2H]",
      "benzene-1,4-diol",
-     "(O1,6-2H2)benzene-1,4-diol",
-     "P-82.6.1.1, P-82.6.1.4: two oxygens that can hold the label, so the oxygen is cited by its number"),
+     "(O1,2-2H2)benzene-1,4-diol",
+     "P-82.6.1.1, P-82.6.1.4: two oxygens that can hold the label, so the oxygen is cited by its number; "
+     "P-14.4 NUMBERING (i) (BlueBookV2.md:3336): the lowest locants to the modified atoms, 2 and not 6"),
     ("numbered-oxygen-locant-in-a-diacid",
      "[2H]OC(=O)CC[13CH2]C(=O)O",
      "pentanedioic acid",
@@ -307,8 +308,10 @@ def test_decorator_reaches_the_composer_and_labels_the_name_below_the_pin(best_e
 @pytest.mark.roundtrip
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected", [
-    ("[2H]Oc1ccc(O)cc1[2H]", "(O1,6-2H2)benzene-1,4-diol"),
-    ("[2H]Oc1ccc(O)c([2H])c1", "(O1,5-2H2)benzene-1,4-diol"),
+    # NUMBERING (i) (the Blue Book): the lowest locants to the modified atoms as a set, whichever way
+    # the ring is read onto the input
+    ("[2H]Oc1ccc(O)cc1[2H]", "(O1,2-2H2)benzene-1,4-diol"),
+    ("[2H]Oc1ccc(O)c([2H])c1", "(O1,3-2H2)benzene-1,4-diol"),
     ("[2H]OC(=O)CC[13CH2]C(=O)O", "(4-13C,O1-2H)pentanedioic acid"),
 ])
 def test_numbered_oxygen_locant_through_the_decorator(best_effort, smiles, expected):

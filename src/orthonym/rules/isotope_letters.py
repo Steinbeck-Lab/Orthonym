@@ -27,9 +27,45 @@ and the scope composer (``rules.isotope_scopes``).
 """
 from __future__ import annotations
 
+import re
 from typing import Dict, Iterable, List, Optional
 
 from rdkit import Chem
+
+
+def acid_hydroxyl_takes_letter(heavy: Chem.Atom, skeleton: Optional[str]) -> bool:
+    """Whether the labelled hydroxyl hydrogen on the oxygen bonded to ``heavy`` is cited by the italic locant
+    ``O``, the Blue Book, '(O-2H, 18O)acetic acid'): ``heavy`` is a carbon, or the boron or
+    phosphorus (that bears a carbon of its own) of a boronic or a phosphonic acid that is the PARENT of the
+    skeleton ('phenyl(O-2H)boronic acid', 'methyl(O-2H)phosphonic acid'; OPSIN reads the letter on them).
+    The 'borono' and 'phosphono' of a prefix and the phosphorus of an ester are no parent: their
+    hydroxyls are not oxygens of the parent, and the letter is not the book's spelling there."""
+    symbol = heavy.GetSymbol()
+    if symbol == "C":
+        return True
+    return (symbol in ("B", "P") and skeleton is not None
+            and skeleton.endswith(("boronic acid", "phosphonic acid"))
+            and any(n.GetSymbol() == "C" for n in heavy.GetNeighbors()))
+
+
+#: A multiplied nitrogen suffix whose groups share one atom ('methanediamine', 'ethane-1,1-diamine'):
+#: (the Blue Book) numbers the nitrogens of di- and polyamines "except for geminal amines, imines, and
+#: amides".
+_GEMINAL_NITROGENS_RE = re.compile(
+    r"(?:methane|(?<![\d,])(\d+),\1-)(?:di|tri)(?:amine|imine|amide|carboxamide)")
+
+
+def geminal_nitrogen_letters(skeleton: Optional[str], offered: List[str]) -> List[str]:
+    """The letter locants ``N``, ``N'``, ``N''`` a skeleton with a geminal nitrogen suffix cites its nitrogens
+    by, for a caller that offers letters already (``offered``): those of them it does not offer yet. Offered
+    after every other locant, so no name that reads back with one of them changes.
+
+     under ' PRIMES' (the Blue Book, sentence:7739): the numbers of the parent differentiate "the
+    nitrogen atoms of di- and polyamines, di- and polyimines, di- and polyamides, except for geminal amines,
+    imines, and amides"; the nitrogens of those are told apart by primes, N and N' ('methanediamine')."""
+    if not offered or skeleton is None or not _GEMINAL_NITROGENS_RE.search(skeleton):
+        return []
+    return [tag for tag in ("N", "N'", "N''") if tag not in offered]
 
 
 def letter_ranks(original: Chem.Mol, element: str) -> Dict[int, int]:
