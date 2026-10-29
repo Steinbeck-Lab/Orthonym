@@ -412,7 +412,9 @@ class PerfBudgetExceeded(BaseException):
 # spend_* functions count into these process-globals (readable from a monitor
 # thread — the per-molecule thread-locals are not) and NEVER raise, so the exact
 # per-molecule counts can be sized empirically. Off in production: one boolean
-# test per charge, negligible.
+# test per charge, negligible. The main-ring path searches hand over their units
+# once per search, so a monitor sampling mid-search sees a coarser count; the
+# total after naming is the same.
 _PERF_MEASURE = bool(_os.environ.get("ORTHONYM_PERF_BUDGET_MEASURE"))
 _PERF_SPENT_TOTAL = [0]
 _ANALYSIS_SPENT_TOTAL = [0]
@@ -438,6 +440,18 @@ def spend_perf_work(n: int = 1) -> None:
         _count_hang_budget_trip()
         raise PerfBudgetExceeded()
     _fragment_guard.perf_budget = pb
+
+
+def perf_units_headroom():
+    """How many units ``spend_perf_work`` takes, in all, before it raises ``PerfBudgetExceeded``:
+    one less than the budget left (it raises when a charge brings the budget to 0 or below).
+    ``None`` when it cannot raise: no budget armed, or measurement mode. A loop that charges
+    thousands of units can count them itself and hand ``spend_perf_work`` the total when it would
+    pass this, and at its end: the budget ends as the charges one at a time would have left it."""
+    if _PERF_MEASURE:
+        return None
+    pb = getattr(_fragment_guard, 'perf_budget', None)
+    return None if pb is None else pb - 1
 
 
 def spend_analysis_call(n: int = 1) -> None:

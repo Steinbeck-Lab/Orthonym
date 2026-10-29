@@ -38,22 +38,19 @@ it replaces charged for the same list (one unit per pair of the list; in Case 3,
 ring-size window the loop visits). A list of fewer than ``PAIR_SCAN_MAX_PATHS`` paths is searched by the
 loops, as it always was, with the units they charged.
 """
+from functools import reduce
+from operator import or_
 from typing import Callable, Dict, List, Optional, Sequence, Tuple
+
+_SHIFT = (1).__lshift__             # atom index -> its bit
 
 
 def interior_masks(paths):
     """Per path, its interior atoms (``p[1:-1]``) as one int bitmask (atom index -> bit)
     and the interior size. An ``&`` of two masks is the interior-disjointness test of two
     bh1->bh2 paths, in place of a ``set`` intersection per pair."""
-    masks = []
-    sizes = []
-    for p in paths:
-        m = 0
-        for a in p[1:-1]:
-            m |= 1 << a
-        masks.append(m)
-        sizes.append(m.bit_count())
-    return masks, sizes
+    masks = [reduce(or_, map(_SHIFT, p[1:-1]), 0) for p in paths]
+    return masks, [m.bit_count() for m in masks]
 
 
 #: A list of fewer paths than this is searched by the loops: it is at most
@@ -155,32 +152,43 @@ def _best_disjoint_pair_loop(all_paths, spend, rank_key):
     return best_pair
 
 
+#: ``_COLUMN[b]`` maps a byte to the character ``1`` where its bit ``b`` is set and ``0`` where it
+#: is not.
+_COLUMN = [bytes(0x31 if (value >> bit) & 1 else 0x30 for value in range(256)) for bit in range(8)]
+
+
 class PathSets:
     """The paths of one bridgehead pair as sets of paths, numbered by position in ``order`` (longest
     interior first, equal lengths in list order). ``through[a]`` has bit p set when the path at position
     p has atom a in its interior; ``runs`` are the (length, first position, last position + 1) of each
-    length, longest first; ``atoms[p]`` are the interior atoms of the path at position p."""
+    length, longest first; ``atoms[p]`` are the interior atoms of the path at position p.
+
+    ``masks`` are the interior bitmasks of the paths in list order (``interior_masks``), when the
+    caller has them. The sets through the atoms are the columns of the table of the interiors, one
+    row of bytes a path: the byte of an atom in every row is one slice, and its bit one
+    ``translate`` and ``int`` away."""
 
     __slots__ = ("n", "order", "lens", "atoms", "through", "runs", "by_len", "everything")
 
-    def __init__(self, paths: Sequence[Sequence[int]], plens: Sequence[int]):
+    def __init__(self, paths: Sequence[Sequence[int]], plens: Sequence[int],
+                 masks: Optional[Sequence[int]] = None):
         n = len(paths)
         self.n = n
         self.order = order = sorted(range(n), key=lambda k: -plens[k])
         self.lens = [plens[k] for k in order]
-        self.atoms = atoms = []
-        rows: Dict[int, bytearray] = {}
-        nbytes = (n + 7) >> 3
-        for p, k in enumerate(order):
-            interior = paths[k][1:-1]
-            atoms.append(interior)
-            byte, bit = p >> 3, 1 << (p & 7)
-            for a in interior:
-                row = rows.get(a)
-                if row is None:
-                    row = rows[a] = bytearray(nbytes)
-                row[byte] |= bit
-        self.through = {a: int.from_bytes(row, "little") for a, row in rows.items()}
+        self.atoms = [paths[k][1:-1] for k in order]
+        if masks is None:
+            masks = interior_masks(paths)[0]
+        by_position = [masks[k] for k in order]
+        used = reduce(or_, by_position, 0)                       # the atoms in any interior
+        width = max((used.bit_length() + 7) >> 3, 1)
+        table = b"".join([m.to_bytes(width, "little") for m in by_position])
+        self.through = through = {}
+        while used:
+            low = used & -used
+            used ^= low
+            a = low.bit_length() - 1
+            through[a] = int(table[a >> 3::width].translate(_COLUMN[a & 7])[::-1], 2)
         self.runs = runs = []
         for p, length in enumerate(self.lens):
             if runs and runs[-1][0] == length:
@@ -193,11 +201,7 @@ class PathSets:
     def blocked(self, p: int) -> int:
         """The paths that share an interior atom with the path at position p (p itself, unless its
         interior is empty)."""
-        through = self.through
-        out = 0
-        for a in self.atoms[p]:
-            out |= through[a]
-        return out
+        return reduce(or_, map(self.through.__getitem__, self.atoms[p]), 0)
 
     def after(self, p: int) -> int:
         """The positions after p."""
@@ -283,7 +287,7 @@ def offered_multiatom_pairs(all_paths: Sequence[Sequence[int]], masks: Sequence[
     npaths = len(masks)
     if npaths < 2:
         return []
-    sets = PathSets(all_paths, plens)
+    sets = PathSets(all_paths, plens, masks)
     lens, runs, by_len, order = sets.lens, sets.runs, sets.by_len, sets.order
     through = sets.through
     cand2 = (1 << sum(1 for length in lens if length >= 2)) - 1      # the positions of a path of 2+ atoms
@@ -298,9 +302,9 @@ def offered_multiatom_pairs(all_paths: Sequence[Sequence[int]], masks: Sequence[
         len_p = lens[p]
         if len_p + lens[p + 1] + 2 < incumbent:
             break                                  # the largest ring left is below the incumbent
-        block_p = sets.blocked(p)
-        later = sets.after(p) & ~block_p            # the paths after p that are disjoint from p
+        # the sets of p are made when a length of the window needs them
         meter.ops += len(sets.atoms[p]) + 3
+        block_p = None
         i = order[p]
         for length, start, stop in runs:           # the loop's window: ring size from ``incumbent`` to ``room``
             ring_size = len_p + length + 2
@@ -310,6 +314,9 @@ def offered_multiatom_pairs(all_paths: Sequence[Sequence[int]], masks: Sequence[
                 break
             visits += stop - max(start, p + 1)     # each of these partners was a pair the loop visited
             meter.ops += 2
+            if block_p is None:
+                block_p = sets.blocked(p)
+                later = sets.after(p) & ~block_p    # the paths after p that are disjoint from p
             partners = later & by_len[length]
             for q in (_positions(partners, npaths) if partners else ()):
                 j = order[q]

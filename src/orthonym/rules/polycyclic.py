@@ -44,6 +44,7 @@ from .main_ring_paths import RingGraph, enumerate_paths, longest_bridge, uses_bo
 from . import main_ring_pairs  # the pair searches of the main-ring search (its PAIR_SCAN_MAX_PATHS is read live)
 from .main_ring_pairs import best_disjoint_pair, interior_masks, offered_multiatom_pairs
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
+    perf_units_headroom,
     spend_analysis_call,
     spend_perf_work,
 )
@@ -566,37 +567,86 @@ def _find_all_simple_paths_impl(mol, start: int, end: int, allowed_atoms: Set[in
     neighbour indices in ``GetNeighbors`` order, keyed by every atom this
     DFS may visit. When given, the DFS walks it instead of re-calling
     ``GetNeighbors`` live on every step -- order-identical, just cheaper.
+
+    The DFS runs on an explicit stack (the ways on of a frame with a choice are kept, a frame with
+    one way on continues in place), over the atoms not yet on the path as one bitmask. One
+    perf-budget unit is charged per frame (M2.5), counted here and handed to ``spend_perf_work`` in
+    one call when they would pass what the budget holds and at the end: the budget ends as the
+    charges one at a time would have left it, and ``PerfBudgetExceeded`` is raised by the call that
+    passes it (``fragment_naming.perf_units_headroom``).
     """
     if start == end:
         return [[start]]
 
-    all_paths = []
-    expansions = 0
-
-    def dfs(current, visited, path):
-        nonlocal expansions
-        expansions += 1
-        spend_perf_work()  # M2.5: charge the per-molecule op budget (raises to abstain)
-        if expansions > _MAX_DFS_EXPANSIONS:
-            return  # cap: abort enumeration, keep paths-so-far
-        if current == end:
-            all_paths.append(path[:])
-            return
-
+    spend = spend_perf_work
+    room = perf_units_headroom()
+    if room is None:
+        room = main_ring_paths.UNLIMITED_ROOM
+    cap = _MAX_DFS_EXPANSIONS
+    left = room                                   # frames free before ``spend`` raises
+    limit = cap if cap < left else left
+    allowed_mask = 0
+    for a in allowed_atoms:
+        allowed_mask |= 1 << a
+    nbrs_of = {}                                  # atom -> its neighbours, in order
+    mask_of = {}                                  # atom -> their bitmask
+    for a in (allowed_atoms if start in allowed_atoms else [*allowed_atoms, start]):
         if adj is not None:
-            nbrs = adj[current]                      # GetNeighbors order, precomputed (a lever)
+            nbrs = adj.get(a)
         else:
-            nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(current).GetNeighbors()]
-        for nbr_idx in nbrs:
-            if nbr_idx in allowed_atoms and nbr_idx not in visited:
-                visited.add(nbr_idx)
-                path.append(nbr_idx)
-                dfs(nbr_idx, visited, path)
-                path.pop()
-                visited.remove(nbr_idx)
-
-    visited = {start}
-    dfs(start, visited, [start])
+            nbrs = [n.GetIdx() for n in mol.GetAtomWithIdx(a).GetNeighbors()]
+        if nbrs is not None:
+            # an atom ``adj`` does not hold fails when the DFS reaches it, as it did
+            nbrs_of[a] = nbrs
+            mask = 0
+            for n in nbrs:
+                mask |= 1 << n
+            mask_of[a] = mask
+    all_paths = []
+    frames = 0
+    path = [start]
+    v = start
+    rest = allowed_mask & ~(1 << start)           # the allowed atoms not on the path
+    # the ways on of the frames with a choice: (atom, path length, rest)
+    stack = []
+    push = stack.append
+    pop = stack.pop
+    while True:
+        frames += 1
+        if frames > limit:
+            if frames > left:
+                spend(frames + room - left)
+                # ``spend`` did not raise: it is charged each frame from here
+                room = 0
+                left = frames
+                limit = cap if cap < left else left
+                frames -= 1
+                continue                          # this frame again
+            # cap: abort exploration of this frame, keep paths-so-far
+        elif v == end:
+            all_paths.append(path[:])
+        else:
+            free = mask_of[v] & rest
+            if free:
+                if free & (free - 1):             # two ways on or more: keep the others
+                    ways = [n for n in nbrs_of[v] if (free >> n) & 1]
+                    plen = len(path)
+                    for n in ways[:0:-1]:
+                        push((n, plen, rest))
+                    v = ways[0]
+                else:                             # one way on: continue in place
+                    v = free.bit_length() - 1
+                rest ^= 1 << v
+                path.append(v)
+                continue
+        if not stack:
+            break
+        v, plen, rest = pop()
+        path[plen:] = (v,)
+        rest ^= 1 << v
+    pending = frames + room - left
+    if pending:
+        spend(pending)
     return all_paths
 
 
@@ -817,11 +867,14 @@ class _MainRingPairs:
     enumerations only, as it always was, with the one change that Cases 1 and 3 share the list.
     """
 
-    def __init__(self, mol, ring_atoms, adj_list, spend, rank_key, allow_multiatom_bridge):
+    def __init__(self, mol, ring_atoms, adj_list, spend, rank_key, allow_multiatom_bridge,
+                 headroom=None):
         self.mol = mol
         self.ring_atoms = ring_atoms
         self.adj_list = adj_list
         self.spend = spend
+        # units ``spend`` takes before it raises (``perf_units_headroom``); None: charge each unit
+        self.headroom = headroom
         self.rank_key = rank_key
         self.allow_multiatom_bridge = allow_multiatom_bridge
         self.graph = RingGraph(adj_list, ring_atoms, mol.GetNumAtoms())
@@ -835,7 +888,8 @@ class _MainRingPairs:
             return
         need = (best.score[0][0] if best.score is not None else 3) - 2   # interior atoms of the incumbent's ring
         pruned = uses_bound(graph, need)            # asked before the search: it may switch the bound off
-        paths, capped = enumerate_paths(graph, bh1, bh2, need, self.spend, _MAX_DFS_EXPANSIONS)
+        paths, capped = enumerate_paths(graph, bh1, bh2, need, self.spend, _MAX_DFS_EXPANSIONS,
+                                        self.headroom() if self.headroom is not None else 0)
         if capped:
             self._offer_from_full_enumerations(best, bh1, bh2, common_neighbors, has_direct_bond)
             return
@@ -868,7 +922,8 @@ class _MainRingPairs:
         def length(used):
             free = graph.mask & ~used & ~ends
             if free not in known:
-                known[free] = longest_bridge(graph, bh1, bh2, free, spend)
+                known[free] = longest_bridge(graph, bh1, bh2, free, spend,
+                                             self.headroom() if self.headroom is not None else 0)
             return known[free]
 
         return length
@@ -1671,9 +1726,11 @@ class VonBaeyerAnalyzer:
             return tuple(sorted(_ranks[i] for i in atom_indices))
 
         best = _MainRingBest(_rank_key)
-        # spend_perf_work is bound here, once: the pair loops charge it once per pair
+        # spend_perf_work is bound here, once: the pair loops charge it once per pair; the DFS
+        # searches count their units and hand it the total (``perf_units_headroom`` is how many it
+        # takes before it raises)
         pairs = _MainRingPairs(mol, ring_atoms, adj_list, spend_perf_work, _rank_key,
-                               getattr(self, "_allow_multiatom_bridge", True))
+                               getattr(self, "_allow_multiatom_bridge", True), perf_units_headroom)
         for bh1, bh2 in combinations(sorted(bridgeheads), 2):
             # Common neighbours (potential 1-atom main bridge atoms), and the direct bond
             # (0-atom main bridge): Cases 1-3 of _MainRingPairs

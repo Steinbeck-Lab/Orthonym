@@ -39,8 +39,14 @@ subtrees, so no path moves relative to another.
 The components of the atoms outside V depend on V alone, not on the pair or on v: the DFS of every
 pair that starts at one bridgehead walks the same prefixes, so they are kept per ring system
 (``RingGraph``) and a flood fill is paid once per set V, not once per evaluation.
+
+The searches run on an explicit stack and count the perf-budget units themselves (one per frame,
+and the units of a flood fill): ``spend`` is called with the total when it would pass what the
+budget holds and at the end of the search, not once per frame. The budget ends as the charges one
+at a time would have left it, and ``PerfBudgetExceeded`` is raised exactly when they would have
+raised it (``fragment_naming.perf_units_headroom``, ``enumerate_paths``'s ``room``).
 """
-from typing import Callable, List, Tuple
+from typing import Callable, List, Optional, Tuple
 
 #: The bound is evaluated only for a ring size that leaves out at most this many ring atoms (ring
 #: atoms - ring size) and at most ``LEVEL_PRUNE_MAX_FRACTION`` of them. Measured (UN lane B2) on the
@@ -74,19 +80,26 @@ FLOOD_ATOMS_PER_UNIT = 2
 #: computed and not kept, which bounds the memory of a search that visits very many.
 COMPONENT_CACHE_MAX = 150_000
 
+#: A ``room`` that no search reaches: the budget cannot raise (see ``enumerate_paths``).
+UNLIMITED_ROOM = 1 << 62
+
 
 class RingGraph:
     """Bitmask view of one ring system: its atoms, each atom's neighbours inside it in the
     ``GetNeighbors`` order of the molecule (the order the DFS visits them in), and the components
-    of the ring atoms outside a set of atoms, kept as the DFS asks for them."""
+    of the ring atoms outside a set of atoms (``outside``, kept by the set of those atoms as the DFS
+    asks for them)."""
 
-    __slots__ = ("size", "rings", "mask", "nbrs", "nbr_mask", "outside", "bound_checks", "bound_cuts")
+    __slots__ = ("size", "rings", "mask", "nbrs", "nbr_mask", "n_atoms", "tables", "outside",
+                 "bound_checks", "bound_cuts")
 
     def __init__(self, adj_list, ring_atoms, n_atoms):
         self.size = len(ring_atoms)
         self.mask = 0
         self.nbrs = [()] * n_atoms
         self.nbr_mask = [0] * n_atoms
+        self.n_atoms = n_atoms
+        self.tables = None
         self.outside = {}
         self.bound_checks = 0
         self.bound_cuts = 0
@@ -102,21 +115,30 @@ class RingGraph:
         bonds = sum(self.nbr_mask[a].bit_count() for a in ring_atoms) // 2
         self.rings = bonds - self.size + 1
 
+    def search_tables(self):
+        """The tables of ``enumerate_paths``, made on its first use: the bit of each atom, the atom
+        of each bit of a ring atom, and, per atom, the neighbours that are free as a list in the
+        order the DFS takes them, kept by the bitmask of the free neighbours as the DFS meets
+        them."""
+        if self.tables is None:
+            self.tables = ([1 << a for a in range(self.n_atoms)],
+                           {1 << a: a for a in range(self.n_atoms) if (self.mask >> a) & 1},
+                           [{} for _ in range(self.n_atoms)])
+        return self.tables
+
     def bound_is_useless(self) -> bool:
         """True once the bound has been evaluated ``BOUND_MIN_CHECKS`` times on this ring system and
         has cut less than one evaluation in ``BOUND_USELESS_PER``."""
         return (self.bound_checks >= BOUND_MIN_CHECKS
                 and self.bound_cuts * BOUND_USELESS_PER < self.bound_checks)
 
-    def components_outside(self, visited: int, spend: Callable[..., None]) -> Tuple[int, ...]:
-        """The connected components (atom bitmasks) of the ring atoms outside ``visited``. A set not
-        seen before costs a flood fill over its atoms, charged as one perf-budget unit per
-        ``FLOOD_ATOMS_PER_UNIT`` atoms (and one more)."""
-        known = self.outside.get(visited)
-        if known is not None:
-            return known
-        rest = self.mask & ~visited
-        spend(1 + rest.bit_count() // FLOOD_ATOMS_PER_UNIT)
+    def flood(self, rest: int) -> Tuple[Tuple[int, ...], int]:
+        """The connected components (atom bitmasks) of ``rest``, a set of ring atoms, and the
+        perf-budget units a set not seen before is charged: one per ``FLOOD_ATOMS_PER_UNIT`` atoms
+        (and one more). Nothing is kept or charged here: ``enumerate_paths`` charges the units
+        when ``outside`` does not hold the set, and keeps it while ``COMPONENT_CACHE_MAX``
+        allows."""
+        units = 1 + rest.bit_count() // FLOOD_ATOMS_PER_UNIT
         nmask = self.nbr_mask
         comps = []
         while rest:
@@ -132,10 +154,7 @@ class RingGraph:
                     comp |= new
                     frontier |= new
             comps.append(comp)
-        comps = tuple(comps)
-        if len(self.outside) < COMPONENT_CACHE_MAX:
-            self.outside[visited] = comps
-        return comps
+        return tuple(comps), units
 
 
 def uses_bound(graph: RingGraph, need: int) -> bool:
@@ -149,99 +168,200 @@ def uses_bound(graph: RingGraph, need: int) -> bool:
 
 
 def enumerate_paths(graph: RingGraph, bh1: int, bh2: int, need: int,
-                    spend: Callable[..., None], cap: int) -> Tuple[List[List[int]], bool]:
-    """Simple bh1->bh2 paths through the ring system that can take part in a pair of interior-disjoint
-    paths covering ``need`` interior atoms, in DFS order; ``(paths, capped)``.
+                    spend: Callable[..., None], cap: int,
+                    room: Optional[int] = 0) -> Tuple[List[List[int]], bool]:
+    """Simple bh1->bh2 paths through the ring system that can take part in a pair of
+    interior-disjoint paths covering ``need`` interior atoms, in DFS order; ``(paths, capped)``.
 
     ``need <= 0`` (or a ring size that ``uses_bound`` does not bound) lists every path:
-    the DFS of ``polycyclic._find_all_simple_paths_impl``, frame for frame. One perf-budget unit is
-    charged per frame, and ``FLOOD_ATOMS_PER_UNIT`` atoms per unit for each set of visited atoms whose
-    components are computed (``RingGraph.components_outside``). ``capped`` is True when ``cap`` frames were exceeded: the
-    list is then a prefix of a search no longer comparable with the full enumeration's own prefix,
-    and the caller falls back to that enumeration."""
-    nbrs = graph.nbrs
-    nmask = graph.nbr_mask
+    the DFS of ``polycyclic._find_all_simple_paths_impl``, frame for frame. One perf-budget unit
+    is charged per frame, and ``FLOOD_ATOMS_PER_UNIT`` atoms per unit for each set of atoms
+    outside the path whose components are computed (``RingGraph.flood``; a set the cache
+    ``RingGraph.outside`` holds is not charged again). ``capped`` is True when ``cap`` frames
+    were exceeded: the list is then a prefix of a search no longer comparable with the full
+    enumeration's own prefix, and the caller falls back to that enumeration.
+
+    ``room`` is how many units ``spend`` takes in all before it raises (``None``: it never
+    does). The units are counted here and handed to ``spend`` in one call when they would exceed
+    ``room``, and at the end of the search, instead of one call per frame (a call of
+    ``spend_perf_work`` cost as much as the frame it charged): ``spend`` has been charged the same
+    total at the end of the search, and it raises when that total reaches what the budget holds,
+    as it did one unit at a time. With a ``room`` of 0 (the default) every frame is handed to
+    ``spend`` as it is searched, and the units of a flood fill with the next frame.
+
+    The DFS is the recursion of ``polycyclic._find_all_simple_paths_impl`` on an explicit stack:
+    a frame with one way on continues in place, and a frame with more leaves its other ways on
+    the stack."""
+    nbr_mask = graph.nbr_mask
+    outside = graph.outside
+    outside_get = outside.get
+    flood = graph.flood
+    bits, bit_atom, ways_on = graph.search_tables()
+    cache_max = COMPONENT_CACHE_MAX
     bit2 = 1 << bh2
-    n1 = nmask[bh1]
-    n2 = nmask[bh2]
+    n1 = nbr_mask[bh1]
+    n2 = nbr_mask[bh2]
     prune = uses_bound(graph, need)
-    components_outside = graph.components_outside
+    if room is None:
+        room = UNLIMITED_ROOM
+    # The units charged so far are ``frames`` and the units of the flood fills: ``spend`` raises
+    # when they pass ``room``, that is when ``frames`` passes ``left`` = ``room`` less the units
+    # of the floods, and the search stops at ``cap`` frames. ``limit`` is the first of the two.
+    left = room
+    limit = cap if cap < left else left
     paths: List[List[int]] = []
-    frames = 0
-    checks = cuts = 0
+    frames = checks = cuts = 0
     capped = False
-
-    def reachable(visited, v):
-        """Atoms outside ``visited`` that p's rest or q can still use: the component of bh2 outside
-        ``visited`` less bh2, if it touches v or bh1."""
-        for comp in components_outside(visited, spend):
-            if comp & bit2:
-                return comp.bit_count() - 1 if comp & (nmask[v] | n1) & ~bit2 else 0
-        return 0
-
-    def partner_room(visited):
-        """The most interior atoms a path q disjoint from the complete path ``visited`` can have."""
-        room = 0
-        for comp in components_outside(visited, spend):
-            if comp & n1 and comp & n2:
-                size = comp.bit_count()
-                if size > room:
-                    room = size
-        return room
-
-    def dfs(v, visited, path, evaluate):
-        nonlocal frames, capped, checks, cuts
+    path = [bh1]
+    v = bh1
+    rest = graph.mask & ~bits[bh1]           # the ring atoms not on the path
+    # the bound is evaluated at the frames that follow a choice, and at the first
+    evaluate = True
+    # the ways on of the frames with a choice: (atom, path length at the frame, rest at the frame)
+    stack = []
+    push = stack.append
+    pop = stack.pop
+    while True:
         frames += 1
-        spend()
-        if frames > cap:
+        if frames > limit:
+            if frames > left:                # the units of the search so far pass ``room``
+                spend(frames + room - left)
+                # ``spend`` did not raise: it is charged each frame from here
+                room = 0
+                left = frames
+                limit = cap if cap < left else left
+                frames -= 1
+                continue                     # this frame again
             capped = True
-            return
-        if v == bh2:
+        elif v == bh2:
             if prune:
                 checks += 1
-                if len(path) - 2 + partner_room(visited) < need:
+                comps = outside_get(rest)
+                if comps is None:
+                    comps, units = flood(rest)
+                    left -= units
+                    if left < limit:
+                        limit = left
+                    if len(outside) < cache_max:
+                        outside[rest] = comps
+                # the most interior atoms a path q disjoint from the complete path can have
+                partner_room = 0
+                for comp in comps:
+                    if comp & n1 and comp & n2:
+                        size = comp.bit_count()
+                        if size > partner_room:
+                            partner_room = size
+                if len(path) - 2 + partner_room < need:
                     cuts += 1
-                    return
-            paths.append(path[:])
-            return
-        if prune and evaluate:
-            checks += 1
-            if visited.bit_count() - 1 + reachable(visited, v) < need:
-                cuts += 1
-                return
-        options = [y for y in nbrs[v] if not (visited >> y) & 1]
-        evaluate_next = len(options) > 1
-        for y in options:
-            path.append(y)
-            dfs(y, visited | (1 << y), path, evaluate_next)
-            path.pop()
-
-    dfs(bh1, 1 << bh1, [bh1], True)
+                else:
+                    paths.append(path[:])
+            else:
+                paths.append(path[:])
+        else:
+            if prune and evaluate:
+                checks += 1
+                comps = outside_get(rest)
+                if comps is None:
+                    comps, units = flood(rest)
+                    left -= units
+                    if left < limit:
+                        limit = left
+                    if len(outside) < cache_max:
+                        outside[rest] = comps
+                # atoms outside the path that p's rest or q can still use: the component of bh2
+                # less bh2, if it touches v or bh1
+                reach = 0
+                for comp in comps:
+                    if comp & bit2:
+                        if (comp ^ bit2) & (nbr_mask[v] | n1):
+                            reach = comp.bit_count() - 1
+                        break
+                if len(path) - 1 + reach < need:
+                    cuts += 1
+                    free = 0
+                else:
+                    free = nbr_mask[v] & rest
+            else:
+                free = nbr_mask[v] & rest
+            if free:
+                if free & (free - 1):        # two ways on or more: keep the others
+                    table = ways_on[v]
+                    ways = table.get(free)
+                    if ways is None:
+                        ways = table[free] = tuple(y for y in graph.nbrs[v] if free & bits[y])
+                    plen = len(path)
+                    if len(ways) == 2:
+                        push((ways[1], plen, rest))
+                    else:
+                        for y in ways[:0:-1]:
+                            push((y, plen, rest))
+                    v = ways[0]
+                    rest ^= bits[v]
+                    evaluate = True
+                else:                        # one way on: continue in place
+                    v = bit_atom[free]
+                    rest ^= free
+                    evaluate = False
+                path.append(v)
+                continue
+        # this frame is done: the next way on of the nearest frame that has one
+        if not stack:
+            break
+        v, plen, rest = pop()
+        path[plen:] = (v,)
+        rest ^= bits[v]
+        evaluate = True
+    pending = frames + room - left
+    if pending:
+        spend(pending)
     graph.bound_checks += checks
     graph.bound_cuts += cuts
     return paths, capped
 
 
-def longest_bridge(graph: RingGraph, bh1: int, bh2: int, free: int, spend: Callable[..., None]) -> int:
-    """Interior size of the longest simple bh1->bh2 path whose interior atoms all lie in ``free`` (an
-    atom bitmask), or -1 when there is none: the main bridge of a pair whose two paths use the other
-    ring atoms, "includes as many of the atoms... not included in the main ring as
-    possible"). One perf-budget unit per frame."""
+def longest_bridge(graph: RingGraph, bh1: int, bh2: int, free: int, spend: Callable[..., None],
+                   room: Optional[int] = 0) -> int:
+    """Interior size of the longest simple bh1->bh2 path whose interior atoms all lie in ``free``
+    (an atom bitmask), or -1 when there is none: the main bridge of a pair whose two paths use
+    the other ring atoms, "includes as many of the atoms... not included in the main
+    ring as possible"). One perf-budget unit per frame; ``room`` is as for
+    :func:`enumerate_paths`.
+
+    The DFS is on an explicit stack: the neighbours of a frame are kept in the order it takes
+    them, the bridgehead bh2 among them (reaching it records the length of the frame), and the
+    search ends as soon as the bridge cannot be longer than the atoms in ``free``."""
     nbrs = graph.nbrs
     limit = free.bit_count()
     best = -1
-
-    def dfs(v, used, length):
-        nonlocal best
-        spend()
-        for y in nbrs[v]:
-            if best == limit:
-                return
+    if room is None:
+        room = UNLIMITED_ROOM
+    left = room
+    frames = 0
+    # (atom, atoms used, length), or (-1, 0, length) for bh2 reached from a frame of that length
+    stack = [(bh1, 0, 0)]
+    push = stack.append
+    pop = stack.pop
+    while stack:
+        v, used, length = pop()
+        if v < 0:
+            if length > best:
+                best = length
+                if best == limit:
+                    break
+            continue
+        frames += 1
+        if frames > left:
+            spend(frames + room - left)
+            # ``spend`` did not raise: it is charged each frame from here
+            room = 0
+            left = frames
+        usable = free & ~used
+        for y in reversed(nbrs[v]):
             if y == bh2:
-                if length > best:
-                    best = length
-            elif (free >> y) & 1 and not (used >> y) & 1:
-                dfs(y, used | (1 << y), length + 1)
-
-    dfs(bh1, 0, 0)
+                push((-1, 0, length))
+            elif (usable >> y) & 1:
+                push((y, used | (1 << y), length + 1))
+    pending = frames + room - left
+    if pending:
+        spend(pending)
     return best
