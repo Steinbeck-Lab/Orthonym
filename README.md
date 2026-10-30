@@ -24,6 +24,16 @@
 
 </div>
 
+## How it works, visualized as a machine
+
+<p align="right"><a href="#quick-start"><b>Go straight to the Quick start ↓</b></a></p>
+
+<picture>
+  <img src="assets/readme-anatomy.svg" alt="An animated isometric drawing of a typesetting bench that shows how Orthonym names a molecule, with six coloured parts numbered to match a legend. 1, blue: the input structure on a plate under four dial gauges, next to a card holding its SMILES. 2, amber: a cabinet of type drawers sets the name, one block per part, in a small tray called a galley. 3, violet: a separate machine, OPSIN, reads only the type, draws the structure it reads and cuts a key from it. 4, green: a lock of 25 pins set by the input's InChIKey; for caffeine's name, 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione, every pin sits level and the gate is open. 5, teal: trays for PIN, fallback and best-effort names. 6, red: a bin for withdrawn names and a flag that rises when no name can be built." width="100%">
+</picture>
+
+<sub>Orthonym as a machine: RDKit reads the structure (1), the IUPAC 2013 rules set the name (2), and OPSIN, which never sees the input, reads it back (3). A name ships only when the InChIKey of what OPSIN read matches the input's in every letter (4); it then lands on its tier (5), or is withdrawn or declined (6). More in <a href="guide/how-it-works.md">How it works</a>.</sub>
+
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-gallery-narrow.svg">
   <img src="assets/readme-gallery.svg" alt="What it names: seven cards, each with a drawing, the name the engine prints and its tier. Bridged fused rings: (4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol, pin_verified. Hypervalent iodine: iodylbenzene, pin_verified. Stereocentre at phosphorus: (1S,2R)-1,2-diphenylphospholane, pin_verified. Isotope labels: (2R,4S)-(4-2H1,2-3H1)pentane, pin_verified. Metal salt: zinc diacetate, pin_verified. Cage, with --emit-tier best-effort: pentacyclo[9.3.1.0^3,14.0^6,13.0^8,12]pentadecane, systematic_verified. Spiro: spiro[4.5]decane, pin_verified." width="100%">
@@ -86,16 +96,6 @@ emit_tier="pin")`. See [Output tiers](#output-tiers).
   gives the reason. It never guesses.
 
 More in [How every name is checked](guide/checking.md) and [Declines](guide/declines.md).
-
-## How it works
-
-<picture>
-  <img src="assets/readme-anatomy.svg" alt="An isometric drawing of a typesetting bench that shows how Orthonym names a molecule, with six coloured parts numbered to match a legend. 1, blue: the input structure on a plate under four dial gauges, next to a card holding its SMILES. 2, amber: a cabinet of type drawers sets the name, one block per part, in a small tray called a galley. 3, violet: a separate machine, OPSIN, reads only the type, draws the structure it reads and cuts a key from it. 4, green: a lock of 25 pins set by the input's InChIKey; for caffeine's name, 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione, every pin sits level and the gate is open. 5, teal: trays for PIN, fallback and best-effort names. 6, red: a bin for withdrawn names and a flag that rises when no name can be built." width="100%">
-</picture>
-
-<sub>Orthonym as a machine: RDKit reads the structure (1), the IUPAC 2013 rules set the name (2), and OPSIN, which never sees the input, reads it back (3). A name ships only when the InChIKey of what OPSIN read matches the input's in every letter (4); it then lands on its tier (5), or is withdrawn or declined (6).</sub>
-
-More in [How it works](guide/how-it-works.md).
 
 ## Output tiers
 
