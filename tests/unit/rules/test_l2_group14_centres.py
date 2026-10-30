@@ -52,9 +52,36 @@ def test_silylium_is_the_parent_even_with_a_carboxylic_acid_in_a_ligand():
     assert_full_rt(row["name"], smiles)
 
 
-def test_tin_cation_is_not_named_here():
-    # tin is a metal of data/metal_scope.py, admitted to no cation mechanism: route_charged hands it on
-    assert name_best_effort("C[Sn+](C)C")["tier"] == "abstain"
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[Sn+](C)C", "trimethylstannylium"),
+    ("CCCC[Sn+](CCCC)CCCC", "tributylstannylium"),
+    ("c1ccccc1[Sn+](c1ccccc1)c1ccccc1", "triphenylstannylium"),
+    ("CC[Pb+](CC)CC", "triethylplumbylium"),
+    ("C[Sn+](C)CC(=O)O", "(carboxymethyl)di(methyl)stannylium"),
+])
+def test_tin_and_lead_cations_are_named_on_their_parent_hydrides(smiles, expected):
+    """Tin and lead are admitted to ``PARENT_HYDRIDE_IONS`` in data/metal_scope.py (2026-10-30): "stannane, SnH4, and
+    plumbane, PbH4... by replacing the 'ane' ending... by the suffix 'ylium'" Cationic centers in parent
+    hydrides, the Blue Book; 'triphenylsilylium (PIN)',:41557). The Blue Book names the organic compounds of tin
+    and lead substitutively and gives them PINs, so the name is a PIN at the default tier too."""
+    row = default_tier_row(smiles)
+    assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"], row
+    best = name_best_effort(smiles)
+    assert (best["name"], best["tier"], best["is_pin"]) == (expected, "pin_verified", True), best
+    assert_full_rt(expected, smiles)
+
+
+@pytest.mark.parametrize("smiles", [
+    "C[Sn+]C",            # +1 and two bonds: not the cation of the mononuclear hydride (3 bonds at +1)
+    "C[Sn+2]C",
+    "[Sn+]",              # no bond at all
+    "C1CC[Sn+]C1",        # a ring atom is a skeletal atom of a ring parent hydride, not of this one
+])
+def test_a_tin_cation_that_is_not_the_ylium_of_the_parent_hydride_is_declined(smiles):
+    """The producer keeps its checks for a metal (bonds plus hydrogens one less than the standard bonding number, no
+    ring, no radical): a cation that fails them gets no name from it, and never a wrong one."""
+    for row in (default_tier_row(smiles), name_best_effort(smiles)):
+        assert row["tier"] == "abstain" and not row["is_pin"], row
 
 
 @pytest.mark.parametrize("smiles", [

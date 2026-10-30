@@ -28,11 +28,14 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data import metal_scope
-from orthonym.data.metal_scope import AMMINE, BONDED_METAL_VALENCES, ELEMENT, METAL_SCOPE, MetalScope
+from orthonym.data.metal_scope import AMMINE, ELEMENT, METAL_SCOPE, MetalScope
 from orthonym.rules import adducts, metal_atoms
 from orthonym.rules.adducts import SINGLE_ATOM_COMPONENT_NAMES
 from orthonym.rules.metal_atoms import ammine_component_names
+from tests.support.metal_baselines import bonded_metal_symbols
 from tests.support.rt_assert import assert_full_rt
+
+BONDED_METALS = bonded_metal_symbols()          # lanes B1 and B2
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -105,10 +108,13 @@ def test_the_ammonia_component_is_cited_as_ammonia():
     ("N.N.O", {}),                                      # no metal
     ("[NH4+].[Cl-]", {}),
     ("[Na+].[Cl-].N", {}),                              # a metal that the table does not admit to AMMINE
-    ("N.N.Cl[Cd]Cl", {}),
+    ("N.N.Cl[Tc]Cl", {}),                               # technetium: no mechanism
     ("N.N.Cl[Pt]Cl", {"N": "ammonia"}),                 # platinum is admitted since 2026-10-30
-    ("N.N.N.N.[Cu+2]", {}),
-    ("[Zn+2].[Cu+2].N", {}),                            # one metal outside: the whole assembly is outside
+    ("N.N.Cl[Cd]Cl", {"N": "ammonia"}),                 # and cadmium, copper and the rest of lane B2
+    ("N.N.N.N.[Cu+2]", {"N": "ammonia"}),
+    ("N.N.N.N.[Tc+2]", {}),
+    ("[Zn+2].[Cu+2].N", {"N": "ammonia"}),
+    ("[Zn+2].[Tc+2].N", {}),                            # one metal outside: the whole assembly is outside
     ("[Zn+2].[Na+].N", {}),
     ("[Si].N", {}),                                     # a metalloid is no true metal
 ])
@@ -117,11 +123,11 @@ def test_the_guard_reads_the_table_for_every_metal_of_the_assembly(smiles, expec
 
 
 def test_the_guard_follows_the_scope_table(monkeypatch):
-    """Admitting a metal to AMMINE is an edit of the table: copper alone, then copper with zinc."""
-    mol = Chem.MolFromSmiles("N.N.N.N.[Cu+2]")
-    both = Chem.MolFromSmiles("N.N.[Cu+2].[Zn+2]")
+    """Admitting a metal to AMMINE is an edit of the table: technetium alone, then technetium with zinc."""
+    mol = Chem.MolFromSmiles("N.N.N.N.[Tc+2]")
+    both = Chem.MolFromSmiles("N.N.[Tc+2].[Zn+2]")
     assert ammine_component_names(mol) == {} and ammine_component_names(both) == {}
-    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu", MetalScope(frozenset({ELEMENT, AMMINE}), frozenset({2})))
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Tc", MetalScope(frozenset({ELEMENT, AMMINE}), frozenset({2})))
     assert ammine_component_names(mol) == {"N": "ammonia"}
     assert ammine_component_names(both) == {"N": "ammonia"}
     monkeypatch.setitem(metal_scope.METAL_SCOPE, "Zn", MetalScope(frozenset({ELEMENT}), frozenset({2})))
@@ -209,39 +215,41 @@ START_ROWS = {
     "[Na+].[Cl-].N": (
         ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    # the platinum rows of the start commit are admitted since 2026-10-30 (``ADMITTED_PLATINUM_AMMINES``): cadmium
-    "N.N.Cl[Cd]Cl": (
-        ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    # the platinum rows of the start commit are admitted since 2026-10-30 (``ADMITTED_PLATINUM_AMMINES``), those of
+    # cadmium, copper, nickel and cobalt since lane B2 (``ADMITTED_B2_AMMINES``): technetium, plutonium and thorium
+    # take their places; the label text of an element without an entry in ``errors._METAL_NAMES`` is the generic one
+    "N.N.Cl[Tc]Cl": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "N.N.[Cl-].[Cl-].[Cd+2]": (
-        ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "N.N.[Cl-].[Cl-].[Tc+2]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "N.N.N.N.[Cu+2]": (
-        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "N.N.N.N.[Tc+2]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "N.N.N.N.[Ni+2]": (
-        ('nickel compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "N.N.N.N.[Pu+2]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "N.N.N.N.N.N.[Co+3]": (
-        ('cobalt compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "N.N.N.N.N.N.[Pu+3]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Mg+2].N.N.N.N.N.N.[Cl-].[Cl-]": (
         ('magnesium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "N.N.N.N.[Cu+2].[O-]S(=O)(=O)[O-]": (
-        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "N.N.N.N.[Tc+2].[O-]S(=O)(=O)[O-]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "CC(=O)O.N.[Cu]": (
-        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "CC(=O)O.N.[Tc]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "CC(=O)O.N.[Na]": (
         ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     # zinc beside a metal that the table does not admit to AMMINE: the ammonia is not cited
-    "[Zn+2].[Cu+2].N.N.N.N.N.N.N.N": (
-        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "[Zn+2].[Tc+2].N.N.N.N.N.N.N.N": (
+        ('zinc compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Zn+2].[Cd+2].N.N": (
+    "[Zn+2].[Th+2].N.N": (
         ('zinc compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
 }
@@ -260,6 +268,48 @@ ADMITTED_PLATINUM_AMMINES = {
         ('zinc compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
         ('ammonia—platinum(2+)—zinc(2+) (2/1/1)', 'systematic_verified', False, None)),
 }
+
+
+#: the rows of ``START_ROWS`` of the start commit that lane B2 admits to AMMINE (``MORE_BONDED_METAL_VALENCES``): the
+#: best-effort adduct of their components, read back below; the default tier keeps the label of the start commit, and
+#: an assembly of admitted metals with zinc (complete) is UNNAMEABLE there
+ADMITTED_B2_AMMINES = {
+    "N.N.Cl[Cd]Cl": (
+        ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('ammonia—cadmium(2+)—chloride (2/1/2)', 'systematic_verified', False, None)),
+    "N.N.[Cl-].[Cl-].[Cd+2]": (
+        ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('ammonia—cadmium(2+)—chloride (2/1/2)', 'systematic_verified', False, None)),
+    "N.N.N.N.[Cu+2]": (
+        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('ammonia—copper(2+) (4/1)', 'systematic_verified', False, None)),
+    "N.N.N.N.[Ni+2]": (
+        ('nickel compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('ammonia—nickel(2+) (4/1)', 'systematic_verified', False, None)),
+    "N.N.N.N.N.N.[Co+3]": (
+        ('cobalt compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('ammonia—cobalt(3+) (6/1)', 'systematic_verified', False, None)),
+    "N.N.N.N.[Cu+2].[O-]S(=O)(=O)[O-]": (
+        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('sulfate—ammonia—copper(2+) (1/4/1)', 'systematic_verified', False, None)),
+    "CC(=O)O.N.[Cu]": (
+        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('acetic acid—ammonia—copper (1/1/1)', 'systematic_verified', False, None)),
+    "[Zn+2].[Cu+2].N.N.N.N.N.N.N.N": (
+        ('copper compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
+        ('ammonia—copper(2+)—zinc(2+) (8/1/1)', 'systematic_verified', False, None)),
+    "[Zn+2].[Cd+2].N.N": (
+        ('zinc compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
+        ('ammonia—cadmium(2+)—zinc(2+) (2/1/1)', 'systematic_verified', False, None)),
+}
+
+
+@pytest.mark.parametrize("smiles", sorted(ADMITTED_B2_AMMINES))
+def test_the_ammines_of_the_metals_of_lane_b2_are_named(smiles):
+    default_view, best_effort_view = ADMITTED_B2_AMMINES[smiles]
+    assert _view(_row(smiles, "pin")) == default_view, smiles
+    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert_full_rt(best_effort_view[0], smiles)
 
 
 @pytest.mark.parametrize("smiles", sorted(ADMITTED_PLATINUM_AMMINES))
@@ -286,10 +336,10 @@ def test_the_other_metals_panel_holds_no_row_the_guard_could_reach():
     from tests.support.metal_baselines import baseline_path, read_rows
     for row in read_rows(baseline_path("other")):
         mol = Chem.MolFromSmiles(row["smiles"])
-        if any(a.GetSymbol() in BONDED_METAL_VALENCES for a in mol.GetAtoms()):
+        if any(a.GetSymbol() in BONDED_METALS for a in mol.GetAtoms()):
             continue
         assert ammine_component_names(mol) == {}, row["smiles"]
 
 
 def test_zinc_and_the_bonded_metals_alone_are_admitted_to_ammine():
-    assert sorted(s for s, sc in METAL_SCOPE.items() if AMMINE in sc.mechanisms) == sorted(["Zn", *BONDED_METAL_VALENCES])
+    assert sorted(s for s, sc in METAL_SCOPE.items() if AMMINE in sc.mechanisms) == sorted(["Zn", *BONDED_METALS])

@@ -18,10 +18,12 @@ from rdkit import Chem
 
 from orthonym.data import metal_scope
 from orthonym.data.metal_scope import (AMMINE, BONDED_METAL_VALENCES, BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION,
-                                       DATIVE, DISCONNECT, ELEMENT, ION_SALTS, MACROCYCLE, METAL_SCOPE, ZERO_VALENT,
+                                       DATIVE, DISCONNECT, ELEMENT, ION_SALTS, MACROCYCLE, METAL_SCOPE,
+                                       MORE_BONDED_METAL_VALENCES, PARENT_HYDRIDE_IONS, ZERO_VALENT,
                                        ZERO_VALENT_METALS, MetalScope, has_mechanism, has_valence,
                                        is_named_metal)
 from orthonym.perception.metals import METAL_ELEMENT_SYMBOLS, assembly_has_out_of_scope_metal
+from tests.support.metal_baselines import bonded_metal_symbols
 
 ACETATE = ".CC(=O)[O-]"
 METHANIDE = ".[CH3-]"
@@ -31,6 +33,11 @@ GROUP_1 = ("Li", "Na", "K", "Rb", "Cs", "Fr")
 GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
 #: Groups 13-16 elements that the engine treats as metalloids names them substitutively)
 METALLOIDS = ("B", "Al", "Ga", "In", "Tl", "Si", "Ge", "Sn", "Pb", "As", "Sb", "Bi", "Te", "Po")
+#: the metals admitted to every mechanism since 2026-10-30 (lanes B1 and B2)
+BONDED_METALS = bonded_metal_symbols()
+#: true metals that the table does not admit to any mechanism after lane B2: the guards of "the others are not moved"
+#: use them (the actinides without an entry; the superheavy elements are the rest of ``_TRUE_METAL_SYMBOLS_FOR_VETO``)
+NOT_ADMITTED = ("Tc", "Th", "Pu")
 
 
 def _out(smiles):
@@ -56,19 +63,34 @@ def test_scope_table_reproduces_the_old_set(symbol):
 
 @pytest.mark.parametrize("smiles, expected", [
     # a true metal outside Groups 1-2 that the table does not admit: out of scope with any anion
-    ("[Cu+2].CC(=O)[O-].CC(=O)[O-]", True),
-    ("[Ni+2].CC(=O)[O-].CC(=O)[O-]", True),
-    ("[Fe+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
-    ("[La+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
-    ("[Cu+2].[Cl-].[Cl-]", True),
-    ("[Cu+2].[CH3-].[CH3-]", True),
-    ("[Cu+2].[H-].[H-]", True),
-    ("[Cu]", True),
-    ("[Cl-].[Cl-].[Ni+2].N.N", True),
-    ("[Mg+2].[Cu+2].[Cl-].[Cl-].[Cl-].[Cl-]", True),                       # one metal in scope, one not
-    ("[Na+].[Cu+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
-    ("[Zn+2].[Cu+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),    # zinc is in scope, copper is not
-    ("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Cu+2]", True),
+    # (copper, nickel, iron and lanthanum were the witnesses on the start commit; the table admits them since lane B2)
+    ("[Tc+2].CC(=O)[O-].CC(=O)[O-]", True),
+    ("[Pu+2].CC(=O)[O-].CC(=O)[O-]", True),
+    ("[Th+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
+    ("[Pu+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
+    ("[Tc+2].[Cl-].[Cl-]", True),
+    ("[Tc+2].[CH3-].[CH3-]", True),
+    ("[Tc+2].[H-].[H-]", True),
+    ("[Tc]", True),
+    ("[Cl-].[Cl-].[Pu+2].N.N", True),
+    ("[Mg+2].[Tc+2].[Cl-].[Cl-].[Cl-].[Cl-]", True),                       # one metal in scope, one not
+    ("[Na+].[Tc+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
+    ("[Zn+2].[Tc+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),    # zinc is in scope, technetium is not
+    ("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Tc+2]", True),
+    # the metals admitted to every mechanism since 2026-10-30 (BONDED_METAL_VALENCES, MORE_BONDED_METAL_VALENCES)
+    ("[Cu+2].CC(=O)[O-].CC(=O)[O-]", False),
+    ("[Ni+2].CC(=O)[O-].CC(=O)[O-]", False),
+    ("[Fe+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", False),
+    ("[La+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", False),
+    ("[Cu+2].[Cl-].[Cl-]", False),
+    ("[Cu+2].[CH3-].[CH3-]", False),
+    ("[Cu+2].[H-].[H-]", False),
+    ("[Cu]", False),
+    ("[Cl-].[Cl-].[Ni+2].N.N", False),
+    ("[Mg+2].[Cu+2].[Cl-].[Cl-].[Cl-].[Cl-]", False),
+    ("[Na+].[Cu+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", False),
+    ("[Zn+2].[Cu+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", False),
+    ("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Cu+2]", False),
     # zinc is admitted to ION_SALTS and CARBANION_SALTS: in scope with an organic anion, a carbanion or a hydride
     ("[Zn+2].CC(=O)[O-].CC(=O)[O-]", False),
     ("[Pt+2].CC(=O)[O-].CC(=O)[O-]", False),                                # the bonded metals since 2026-10-30
@@ -97,10 +119,13 @@ def test_the_function_gives_the_answers_of_the_start_commit(smiles, expected):
 
 
 def test_the_two_positives_and_the_control_of_the_spy():
-    """Copper sulfate and the ionic copper porphyrin are out of scope; sodium acetate and, since the
-    table admits zinc, zinc diacetate and the ionic zinc porphyrin are not."""
-    assert _out("[Cu+2].[O-]S(=O)(=O)[O-]") is True
-    assert _out("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Cu+2]") is True
+    """Technetium sulfate and the ionic technetium porphyrin are out of scope (the table admits no entry of
+    technetium); sodium acetate and, since the table admits zinc, zinc diacetate and the ionic zinc porphyrin are
+    not, and neither are the copper salt and the ionic copper porphyrin since lane B2."""
+    assert _out("[Tc+2].[O-]S(=O)(=O)[O-]") is True
+    assert _out("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Tc+2]") is True
+    assert _out("[Cu+2].[O-]S(=O)(=O)[O-]") is False
+    assert _out("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Cu+2]") is False
     assert _out("[Na+].CC(=O)[O-]") is False
     assert _out("[Zn+2].CC(=O)[O-].CC(=O)[O-]") is False
 
@@ -108,10 +133,11 @@ def test_the_two_positives_and_the_control_of_the_spy():
 def test_every_element_of_the_allow_list_gives_the_old_answer():
     """Over all of ``METAL_ELEMENT_SYMBOLS``, with an acetate pair, a methanide pair and a hydride
     pair beside the dication: Groups 1-2 are out only beside a carbanion or a hydride, the
-    metalloids never, zinc (admitted to both mechanisms) never, every other true metal always."""
+    metalloids never, zinc and the bonded metals (admitted to both mechanisms) never, every other true metal
+    always."""
     for symbol in sorted(METAL_ELEMENT_SYMBOLS):
         cation = f"[{symbol}+2]"
-        if symbol in METALLOIDS or symbol == "Zn" or symbol in BONDED_METAL_VALENCES:
+        if symbol in METALLOIDS or symbol == "Zn" or symbol in BONDED_METALS:
             expected = (False, False, False)                               # the bonded metals since 2026-10-30
         elif symbol in GROUP_1 + GROUP_2:
             expected = (False, False, False)                               # CARBANION_SALTS since 2026-10-30
@@ -138,22 +164,22 @@ def test_zinc_has_its_mechanisms():
         frozenset({2}),
         complete=True)
     assert has_mechanism("Zn", MACROCYCLE) is True
-    assert all(has_mechanism(s, MACROCYCLE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe", "Mg"))
+    assert all(has_mechanism(s, MACROCYCLE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", DATIVE) is True
-    assert all(has_mechanism(s, DATIVE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
+    assert all(has_mechanism(s, DATIVE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", AMMINE) is True
-    assert all(has_mechanism(s, AMMINE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
+    assert all(has_mechanism(s, AMMINE) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", ELEMENT) is True
-    assert all(has_mechanism(s, ELEMENT) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
+    assert all(has_mechanism(s, ELEMENT) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", BONDED_NAMES) is True
-    assert all(has_mechanism(s, BONDED_NAMES) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
+    assert all(has_mechanism(s, BONDED_NAMES) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", DISCONNECT) is True
     assert has_mechanism("Zn", CONNECT_ANION) is True
-    assert all(has_mechanism(s, CONNECT_ANION) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
+    assert all(has_mechanism(s, CONNECT_ANION) is False for s in GROUP_1 + GROUP_2 + NOT_ADMITTED)
     assert has_mechanism("Zn", ION_SALTS) is True
     assert has_mechanism("Zn", CARBANION_SALTS) is True
     assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_1 + GROUP_2)
-    assert has_mechanism("Cu", DISCONNECT) is False and has_mechanism("Cd", DISCONNECT) is False
+    assert all(has_mechanism(s, DISCONNECT) is False for s in NOT_ADMITTED)
 
 
 def test_only_zinc_is_complete():
@@ -189,29 +215,76 @@ def test_valence_field():
 
 
 def test_the_function_follows_the_table(monkeypatch):
-    """A later phase admits a metal by editing the table: here copper is admitted to ``ION_SALTS``
+    """A later phase admits a metal by editing the table: here technetium is admitted to ``ION_SALTS``
     only, then to both mechanisms; the assemblies move out of the out-of-scope set accordingly."""
-    copper_acetate = "[Cu+2].CC(=O)[O-].CC(=O)[O-]"
-    copper_methanide = "[Cu+2].[CH3-].[CH3-]"
-    assert _out(copper_acetate) is True                                    # copper has no entry
-    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu", MetalScope(frozenset({DISCONNECT}), frozenset({2})))
-    assert _out(copper_acetate) is True                                    # DISCONNECT is no salt mechanism
-    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu", MetalScope(frozenset({ION_SALTS}), frozenset({2})))
-    assert is_named_metal("Cu") is True and has_valence("Cu", 2) is True
-    assert _out(copper_acetate) is False
-    assert _out(copper_methanide) is True                                  # no carbanion mechanism yet
-    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu",
+    tc_acetate = "[Tc+2].CC(=O)[O-].CC(=O)[O-]"
+    tc_methanide = "[Tc+2].[CH3-].[CH3-]"
+    assert _out(tc_acetate) is True                                        # technetium has no entry
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Tc", MetalScope(frozenset({DISCONNECT}), frozenset({2})))
+    assert _out(tc_acetate) is True                                        # DISCONNECT is no salt mechanism
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Tc", MetalScope(frozenset({ION_SALTS}), frozenset({2})))
+    assert is_named_metal("Tc") is True and has_valence("Tc", 2) is True
+    assert _out(tc_acetate) is False
+    assert _out(tc_methanide) is True                                      # no carbanion mechanism yet
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Tc",
                         MetalScope(frozenset({ION_SALTS, CARBANION_SALTS}), frozenset({2})))
-    assert _out(copper_methanide) is False
-    assert _out("[Cu+2].[Fe+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]") is True    # iron is still out
+    assert _out(tc_methanide) is False
+    assert _out("[Tc+2].[Pu+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]") is True    # plutonium is still out
+
+
+def test_the_metals_of_the_two_bonded_lanes_have_every_mechanism_of_zinc():
+    """The 45 metals of ``BONDED_METAL_VALENCES`` and ``MORE_BONDED_METAL_VALENCES`` (lanes B1 and B2) are admitted to
+    every mechanism of zinc with the charges listed, and none is complete; the metals whose ions have a retained name
+    ('copper(II)', 'iron(III)') are not admitted to ``ELEMENT``, so that the retained name keeps its label."""
+    from orthonym.data.metal_scope import ALL_MECHANISMS, RETAINED_ION_METALS
+    assert len(BONDED_METALS) == 45 and not set(BONDED_METAL_VALENCES) & set(MORE_BONDED_METAL_VALENCES)
+    assert sorted(RETAINED_ION_METALS) == ["Ag", "Au", "Co", "Cr", "Cu", "Fe", "Mn", "Ni"]
+    assert RETAINED_ION_METALS <= set(MORE_BONDED_METAL_VALENCES)
+    for symbol in BONDED_METALS:
+        valences = {**BONDED_METAL_VALENCES, **MORE_BONDED_METAL_VALENCES}[symbol]
+        expected = ALL_MECHANISMS - ({ELEMENT} if symbol in RETAINED_ION_METALS else frozenset())
+        assert METAL_SCOPE[symbol] == MetalScope(expected, frozenset(valences)), symbol
+        assert is_named_metal(symbol) is True, symbol
+    assert has_valence("Cu", 1) is True and has_valence("Cu", 2) is True and has_valence("Cu", 3) is False
+    assert has_mechanism("Cu", ELEMENT) is False and has_mechanism("Hf", ELEMENT) is True
+
+
+def test_tin_and_lead_are_admitted_to_the_parent_hydride_cation_the_connection_and_the_atom_beside_ions():
+    """Tin and lead are named on their parent hydrides, 'stannane' and 'plumbane': the cation 'stannylium'
+     Cationic centers in parent hydrides, the Blue Book), the bonded drawing of an organotin cation
+    beside its anion (``CONNECT_ANION``), and the neutral atom beside ions (``ZERO_VALENT``); never ``DISCONNECT``,
+    ``BONDED_NAMES`` or any other coordination mechanism."""
+    for symbol in ("Sn", "Pb"):
+        assert METAL_SCOPE[symbol] == MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT}),
+                                                 frozenset({4})), symbol
+        assert is_named_metal(symbol) is True and metal_scope.is_complete_metal(symbol) is False
+        assert has_mechanism(symbol, DISCONNECT) is False and has_mechanism(symbol, BONDED_NAMES) is False
+        assert has_mechanism(symbol, ION_SALTS) is False and has_mechanism(symbol, ELEMENT) is False
+    assert not any(has_mechanism(s, PARENT_HYDRIDE_IONS) for s in set(METAL_SCOPE) - {"Sn", "Pb"})
+
+
+def test_the_true_metals_that_no_mechanism_admits():
+    """After lane B2 the elements of the veto set without an entry are the actinides without one (Th, Pa, Np, Pu, Am,
+    Cm, Bk, Cf, Es, Md, No, Lr), technetium, promethium and the superheavy elements: the witnesses of the guards that
+    say 'a metal that the table does not admit is not moved' are drawn from them."""
+    from orthonym.perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
+    outside = sorted(set(_TRUE_METAL_SYMBOLS_FOR_VETO) - set(METAL_SCOPE))
+    assert outside == ["Am", "Bh", "Bk", "Cf", "Cm", "Cn", "Db", "Ds", "Es", "Hs", "Lr", "Md", "Mt", "No", "Np", "Pa",
+                       "Pm", "Pu", "Rg", "Sg", "Tc", "Th"]
+    assert set(NOT_ADMITTED) <= set(outside)
 
 
 def test_zero_valent_metals_are_admitted_to_that_alone():
     """The metals of the 2026-10-30 panel are admitted to ``ZERO_VALENT`` only: they cite a neutral atom beside
-    ions as 'metal(0)' and nothing else; their failures keep the label UNSUPPORTED_ELEMENT (``is_named_metal``)."""
+    ions as 'metal(0)' and nothing else; their failures keep the label UNSUPPORTED_ELEMENT (``is_named_metal``). The
+    bonded metals (every mechanism since lanes B1 and B2) and tin and lead (``PARENT_HYDRIDE_IONS``) have more."""
+    alone = []
     for symbol in ZERO_VALENT_METALS:
-        if symbol in BONDED_METAL_VALENCES:                                # every mechanism since 2026-10-30
+        if symbol in BONDED_METALS or symbol in ("Sn", "Pb"):
+            assert ZERO_VALENT in METAL_SCOPE[symbol].mechanisms, symbol
             continue
         assert METAL_SCOPE[symbol] == MetalScope(frozenset({ZERO_VALENT}), frozenset()), symbol
         assert is_named_metal(symbol) is False, symbol
-    assert _out("[Cu+2].CC(=O)[O-].CC(=O)[O-]") is True                     # no salt mechanism for copper
+        alone.append(symbol)
+    assert alone == ["U", "Rf", "Ac", "Fm"], alone          # no other lane admitted these (uranium: the README specimen)
+    assert _out("[Tc+2].CC(=O)[O-].CC(=O)[O-]") is True                     # no salt mechanism for technetium

@@ -70,13 +70,14 @@ def test_organic_ion_salts_of_zinc_are_composed_as_salts(smiles):
 
 
 def test_other_metals_keep_the_adduct_form_of_organic_ion_salts():
-    """Copper and nickel are not in the table: the names of the start commit, byte for byte (platinum, the other
-    metal of the start commit, is admitted since 2026-10-30: ``test_bonded_metal_admissions.py``)."""
+    """Technetium and plutonium are not in the table: the adduct form of the start commit, byte for byte (platinum,
+    the other metal of the start commit, is admitted since 2026-10-30, copper and nickel since lane B2: their salts are
+    named from their ions, ``test_bonded_metal_admissions.py``)."""
     for smiles, name in [
-        ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Cu+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}copper(2+) (2/1)"),
-        ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Ni+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}nickel(2+) (2/1)"),
-        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Cu+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}copper(2+) (2/1)"),
-        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Ni+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}nickel(2+) (2/1)"),
+        ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Tc+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}technetium(2+) (2/1)"),
+        ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Pu+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}plutonium(2+) (2/1)"),
+        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Tc+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}technetium(2+) (2/1)"),
+        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pu+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}plutonium(2+) (2/1)"),
     ]:
         row = _row(smiles, "best-effort")
         assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), smiles

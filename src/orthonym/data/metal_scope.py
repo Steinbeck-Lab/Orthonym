@@ -124,6 +124,17 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     does not read back to the drawing; the name is never a PIN, the Blue Book). The metals
     admitted are the ones the panel of the lane measured (`internal notes`).
 
+``PARENT_HYDRIDE_IONS``
+    a cation of the metal whose bonds and hydrogens make up one less than its standard bonding number is named on
+    the mononuclear parent hydride of the metal, as a silicon or germanium centre is: "silane, SiH4, germane, GeH4,
+    stannane, SnH4, and plumbane, PbH4... by replacing the 'ane' ending... by the suffix 'ylium'"
+    Cationic centers in parent hydrides, the Blue Book; 'triphenylsilylium (PIN)',:41557). The Blue Book
+    names the organic compounds of tin and lead substitutively, on 'stannane' and 'plumbane', and gives them
+    PINs, so such a metal is admitted to the mechanisms that keep the substitutive name: this one,
+    ``CONNECT_ANION`` (the bonded drawing of an organotin cation beside its anions is a substituted stannane) and
+    ``ZERO_VALENT``; never to ``DISCONNECT`` or ``BONDED_NAMES``, whose coordination names the book does not use for
+    these elements. The producer is ``rules.group14_centres.emit_group_ylium``.
+
 A metal is ``complete`` when the plan of its phase is done: every drawing of its compounds (ionic,
 bonded, dative, an atom or an ion) is attempted by the mechanisms above, so an input of it that no
 producer names fails for want of a name and not for want of support of the element. The failure
@@ -136,8 +147,9 @@ The valences are the charges of the cation that a rewrite of the structure may g
 (a heterolytic disconnection of a metal-ligand bond adds one positive charge to the metal; the
 cation that a metal with its bonds would give if every one of them were broken is its formal
 charge plus its number of bonds). The Group 1 elements carry +1 and the Group 2 elements +2; zinc
-carries +2. The metals of ``BONDED_METAL_VALENCES`` (Al, Hg, Pd, Pt, Ru, Ti, V, W) are admitted to every
-mechanism zinc has, with the charges listed there, and are not complete.
+carries +2. The metals of ``BONDED_METAL_VALENCES`` (Al, Hg, Pd, Pt, Ru, Ti, V, W) and of
+``MORE_BONDED_METAL_VALENCES`` (38 more) are admitted to every mechanism zinc has, with the charges listed there,
+and are not complete; those of ``RETAINED_ION_METALS`` not to ``ELEMENT``.
 """
 from dataclasses import dataclass
 from typing import Dict, FrozenSet, Iterable
@@ -152,6 +164,7 @@ AMMINE = "ammine"
 MACROCYCLE = "macrocycle"
 DATIVE = "dative"
 ZERO_VALENT = "zero_valent"
+PARENT_HYDRIDE_IONS = "parent_hydride_ions"
 
 
 @dataclass(frozen=True)
@@ -183,6 +196,21 @@ ALL_MECHANISMS = frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AM
 BONDED_METAL_VALENCES = {"Al": (3,), "Hg": (1, 2), "Pd": (2,), "Pt": (2, 4), "Ru": (2, 3), "Ti": (3, 4),
                          "V": (3, 4, 5), "W": (4, 6)}
 
+#: the metals of the second panel of the lane (2026-10-30, 38 metals of PubChem's unnamed metal drawings, no wrong
+#: name): every mechanism zinc has, with the charges of their cations. Not complete. Uranium is left out: its
+#: trioxide is the README's specimen of an element the engine does not name.
+MORE_BONDED_METAL_VALENCES = {"Zr": (4,), "Hf": (4,), "Fe": (2, 3), "Co": (2, 3), "Ni": (2,), "Cu": (1, 2),
+                              "Mo": (2, 3, 4, 5, 6), "Cr": (2, 3, 6), "Rh": (1, 3), "Re": (1, 3, 5, 7),
+                              "Mn": (2, 3), "Ir": (1, 3), "Y": (3,), "Os": (2, 3, 4), "Ag": (1,),
+                              "Au": (1, 3), "Cd": (2,), "Ga": (3,), "In": (3,), "Tl": (1, 3), "Nb": (5,),
+                              "Ta": (5,), "Sc": (3,), "La": (3,), "Ce": (3, 4), "Sm": (3,), "Eu": (2, 3),
+                              "Gd": (3,), "Nd": (3,), "Yb": (2, 3), "Lu": (3,), "Er": (3,), "Dy": (3,), "Tb": (3,),
+                              "Pr": (3,), "Ho": (3,), "Tm": (3,)}
+
+#: metals whose ions have a retained name of their own ('copper(II)', 'iron(III)': ``data.ion_retained_names``,
+#: INORGANIC_CATIONS) are not admitted to ``ELEMENT``: its 'copper(2+)' would replace the retained name and its label
+RETAINED_ION_METALS = frozenset({"Ag", "Au", "Co", "Cr", "Cu", "Fe", "Mn", "Ni"})
+
 METAL_SCOPE: Dict[str, MetalScope] = {
     # the hydride of a Group 1 or 2 salt (``[Na+].[H-]``), its carbanions and the neutral atom beside ions
     # ('potassium(0)'): the lane of 2026-10-30
@@ -190,7 +218,13 @@ METAL_SCOPE: Dict[str, MetalScope] = {
     **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({2})) for symbol in GROUP_2},
     **{symbol: MetalScope(frozenset({ZERO_VALENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
     **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in BONDED_METAL_VALENCES.items()},
+    **{symbol: MetalScope(ALL_MECHANISMS - ({ELEMENT} if symbol in RETAINED_ION_METALS else frozenset()),
+                          frozenset(valences))
+       for symbol, valences in MORE_BONDED_METAL_VALENCES.items()},
     "Zn": MetalScope(ALL_MECHANISMS, frozenset({2}), complete=True),
+    # Group 14 metals named on their parent hydrides: the lane of 2026-10-30
+    **{symbol: MetalScope(frozenset({PARENT_HYDRIDE_IONS, CONNECT_ANION, ZERO_VALENT}), frozenset({4}))
+       for symbol in ("Sn", "Pb")},
 }
 
 

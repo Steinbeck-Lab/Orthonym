@@ -120,8 +120,10 @@ def test_the_tin_atom_of_a_phosphonate_is_the_parent_of_its_radical_name():
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", ["CC[Sn+](CC)CC", "[Sn]", "[Pb]"])
+@pytest.mark.parametrize("smiles", ["[Sn]", "[Pb]"])
 def test_ionic_and_bare_atoms_stay_out_of_scope(smiles):
+    # The cation 'CC[Sn+](CC)CC' is named 'triethylstannylium' since tin is admitted to PARENT_HYDRIDE_IONS
+    # (``test_l2_group14_centres.py``); the bare atoms are not named by this route.
     res = name_default(smiles)
     assert res.get("tier") == "abstain", res
 

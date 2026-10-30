@@ -44,7 +44,7 @@ _ORGANIC_ELEMENTS = {
 # Metal element -> name mapping for descriptive messages.
 _METAL_NAMES = {
     'Li': 'lithium', 'Na': 'sodium', 'K': 'potassium', 'Rb': 'rubidium',
-    'Cs': 'cesium', 'Be': 'beryllium', 'Mg': 'magnesium', 'Ca': 'calcium',
+    'Cs': 'caesium', 'Be': 'beryllium', 'Mg': 'magnesium', 'Ca': 'calcium',
     'Sr': 'strontium', 'Ba': 'barium', 'Al': 'aluminium', 'Ga': 'gallium',
     'In': 'indium', 'Tl': 'thallium', 'Sn': 'tin', 'Pb': 'lead',
     'Bi': 'bismuth', 'Ti': 'titanium', 'V': 'vanadium', 'Cr': 'chromium',
@@ -61,6 +61,9 @@ _METAL_NAMES = {
     # correctly and arsenic did not. Affects FAILURE DIAGNOSTICS only: this table
     # is consulted after naming has already failed, so no successful name moves.
     'As': 'arsenic', 'Ge': 'germanium',
+    # the metals admitted to the scope table on 2026-10-30 (data/metal_scope.py)
+    'Fr': 'francium', 'Hf': 'hafnium', 'Nb': 'niobium', 'Pr': 'praseodymium', 'Ra': 'radium',
+    'Ta': 'tantalum',
     'Sb': 'antimony', 'Te': 'tellurium', 'Yb': 'ytterbium', 'La': 'lanthanum',
     'Ce': 'cerium', 'Nd': 'neodymium', 'Sm': 'samarium', 'Eu': 'europium',
     'Gd': 'gadolinium', 'Tb': 'terbium', 'Dy': 'dysprosium', 'Ho': 'holmium',

@@ -44,8 +44,8 @@ DATIVE_BIPYRIDINE = "Cl[Zn]1(Cl)<-[n]2ccccc2-c2cccc[n]->12"
 SPLIT_BIPYRIDINE = "Cl[Zn]Cl.c1ccc(nc1)-c1ccccn1"
 DATIVE_PYRITHIONE = "c1cc[n+]2[O-]->[Zn]3(<-[O-][n+]4ccccc4[S]3)[S]c2c1"
 IONIC_PYRITHIONE = "[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Zn+2]"
-DATIVE_CU = "N->[Cu+2](<-N)(<-N)<-N"
-DATIVE_NI = "Cl[Ni](Cl)(<-N)<-N"                   # (platinum is admitted since 2026-10-30)
+DATIVE_TC = "N->[Tc+2](<-N)(<-N)<-N"               # technetium, thorium and plutonium are not admitted to any mechanism
+DATIVE_PU = "Cl[Pu](Cl)(<-N)<-N"                   # (copper, nickel and platinum are admitted since 2026-10-30)
 
 
 def _row(smiles, tier):
@@ -123,9 +123,9 @@ def test_the_drawing_as_written_is_run_only_when_no_other_drawing_names(monkeypa
     assert row["limit_code"] == "UNNAMEABLE" and DATIVE_WATER in calls
 
 
-@pytest.mark.parametrize("dative", [DATIVE_CU, DATIVE_NI])
+@pytest.mark.parametrize("dative", [DATIVE_TC, DATIVE_PU])
 def test_a_dative_drawing_of_a_metal_not_admitted_is_declined(dative):
-    """Copper and nickel are not admitted to ``DATIVE``: no split, no name, at either tier, as before."""
+    """Technetium and plutonium are not admitted to ``DATIVE``: no split, no name, at either tier, as before."""
     assert metal_offer.metal_dative_split_spelling_and_order(dative) is None
     assert metal_offer.metal_offer_for(dative) is None
     for tier in ("best-effort", "pin"):
@@ -251,9 +251,9 @@ def test_the_split_is_idempotent_and_an_ionic_drawing_has_none():
 
 @pytest.mark.parametrize("smiles", [
     "[Zn]->N",                                                  # the metal is the donor
-    DATIVE_CU, DATIVE_NI,                                       # metals that are not admitted
+    DATIVE_TC, DATIVE_PU,                                       # metals that are not admitted
     "C[P@](CC)(c1ccccc1)->[Zn+2]<-[O-]C(C)=O",                  # a stereocentre at the donor
-    "N->[Zn+2].N->[Fe+2]",                                      # one metal admitted, one not
+    "N->[Zn+2].N->[Th+2]",                                      # one metal admitted, one not
     "C/C=N(/C)->[Zn+2]",                                        # a stereo double bond at the donor
 ])
 def test_the_sites_are_left_alone_when_the_split_is_not_safe(smiles):

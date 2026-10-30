@@ -29,6 +29,8 @@ def _sites(smiles):
     ("[Na+].[Na+].Cl[Zn-2](Cl)(Cl)Cl", [(3, 2), (3, 4), (3, 5), (3, 6)]),   # a counter-ion with no bond does not matter
     ("[NH3+][Zn-2]([NH3+])([NH3+])[NH3+]", [(1, 0), (1, 2), (1, 3), (1, 4)]),
     ("CC(=O)O[Zn]OC(C)=O", [(4, 3), (4, 5)]),
+    ("CC(=O)O[Cu]OC(C)=O", [(4, 3), (4, 5)]),                           # copper: admitted since 2026-10-30
+    ("Cl[Zn]O[Cu]Cl", [(1, 0), (1, 2), (3, 2), (3, 4)]),                # two bonded metals, both admitted
 ])
 def test_sites_of_a_drawing_that_the_disconnection_covers(smiles, expected):
     assert _sites(smiles) == expected
@@ -43,8 +45,9 @@ def test_sites_of_a_drawing_that_the_disconnection_covers(smiles, expected):
     "N->[Zn](Cl)Cl<-N",                           # a dative bond
     "Cl[Zn](Cl)N",                                # three bonds: [Zn+3] is no valence of zinc
     "Cl[Zn]",                                     # one bond: [Zn+1] is no valence of zinc
-    "CC(=O)O[Cu]OC(C)=O",                         # copper is not admitted to DISCONNECT
-    "Cl[Zn]O[Cu]Cl",                              # one bonded metal that is not admitted
+    "CC(=O)O[Tc]OC(C)=O",                         # technetium is not admitted to DISCONNECT
+    "Cl[Zn]O[Th]Cl",                              # one bonded metal that is not admitted
+    "CC(=O)O[Sn]OC(C)=O",                         # tin: PARENT_HYDRIDE_IONS and CONNECT_ANION only, no DISCONNECT
     "[Zn]1[Zn]Cl1",                               # a bond between two metals
     "C[Si](C)(C)[Zn]Cl",                          # a bond to a metalloid
     "[Cl-].[Cl-].[Zn+2]",                         # no bond at all

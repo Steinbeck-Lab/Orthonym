@@ -31,7 +31,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data import metal_scope
-from orthonym.data.metal_scope import BONDED_METAL_VALENCES, ELEMENT, MACROCYCLE, METAL_SCOPE, MetalScope
+from orthonym.data.metal_scope import ELEMENT, MACROCYCLE, METAL_SCOPE, MetalScope
 from orthonym.rules import adducts, metal_labels, metal_macrocycles
 from orthonym.rules.metal_labels import is_macrocycle_complex_name_without_pin
 from orthonym.rules.metal_macrocycles import (
@@ -41,9 +41,12 @@ from orthonym.rules.metal_macrocycles import (
 )
 from orthonym.rules.porphyrin import decline_reason, name_porphyrin_dianion
 from tests.support.jars import jar_or_skip
+from tests.support.metal_baselines import bonded_metal_symbols
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
+
+BONDED_METALS = bonded_metal_symbols()          # lanes B1 and B2
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "porphyrin"
 
@@ -287,7 +290,8 @@ def test_the_predicate_is_what_lowers_the_label(monkeypatch):
     (TPP_WITH_STEREOCENTRE + ".[Zn+2]", True),    # the producer declines a stereo descriptor: the structure decides
     (TPP_WITH_ACID + ".[Zn+2]", True),            # a suffix group: another parent, the ion is still a porphyrin ion
     (TPP_BONDED_2, False),                       # one fragment: the label of a rewritten drawing is the rewrite's
-    (TPP_DIANION + ".[Cu+2]", False),
+    (TPP_DIANION + ".[Cu+2]", True),             # copper is admitted to MACROCYCLE since lane B2
+    (TPP_DIANION + ".[Tc+2]", False),            # technetium is not
     (TPP_DIANION + ".[Mg+2]", False),
     (TPP_DIANION, False),                        # no metal
     (TPP_FREE_BASE + ".[Zn+2]", False),          # the free base is no ion; the adduct predicate labels its name
@@ -326,8 +330,8 @@ def test_the_ion_fragments_are_the_porphyrin_ions_of_an_admitted_assembly():
     from orthonym.rules.metal_macrocycles import macrocycle_ion_fragments
     zinc = Chem.MolFromSmiles(TPP_DIANION + ".[Zn+2].c1ccncc1")
     assert [Chem.MolToSmiles(f) for f in macrocycle_ion_fragments(zinc)] == [Chem.MolToSmiles(Chem.MolFromSmiles(TPP_DIANION))]
-    for smiles in (TPP_DIANION + ".[Cu+2]", TPP_DIANION, TPP_FREE_BASE + ".[Zn+2]", "[Zn+2].[Cl-].[Cl-]",
-                   TPP_DIANION + ".[Zn+2].[Cu+2]"):
+    for smiles in (TPP_DIANION + ".[Tc+2]", TPP_DIANION, TPP_FREE_BASE + ".[Zn+2]", "[Zn+2].[Cl-].[Cl-]",
+                   TPP_DIANION + ".[Zn+2].[Tc+2]"):
         assert macrocycle_ion_fragments(Chem.MolFromSmiles(smiles)) == [], smiles
 
 
@@ -338,8 +342,10 @@ def test_the_ion_fragments_are_the_porphyrin_ions_of_an_admitted_assembly():
     (TPP_DIANION + ".[Zn+2].c1ccncc1", True),
     (TPP_DIANION + ".[Zn+2].[Zn+2]", True),
     (TPP_DIANION, False),                        # no metal
-    (TPP_DIANION + ".[Cu+2]", False),
-    (TPP_DIANION + ".[Zn+2].[Cu+2]", False),     # one metal outside: the whole assembly is outside
+    (TPP_DIANION + ".[Cu+2]", True),             # admitted since lane B2
+    (TPP_DIANION + ".[Zn+2].[Cu+2]", True),
+    (TPP_DIANION + ".[Tc+2]", False),
+    (TPP_DIANION + ".[Zn+2].[Tc+2]", False),     # one metal outside: the whole assembly is outside
     (TPP_DIANION + ".[Na+].[Na+]", False),
     (TPP_DIANION + ".[Mg+2]", False),
     ("[Zn+2].[Cl-].[Cl-]", True),                # the guard reads the metals; the producer reads the fragments
@@ -352,20 +358,21 @@ def test_the_component_names_of_an_assembly():
     mol = Chem.MolFromSmiles(TPP_DIANION + ".[Zn+2].c1ccncc1")
     names = macrocycle_component_names(mol)
     assert list(names.values()) == ["5,10,15,20-tetraphenylporphyrin-21,23-diide"]
-    assert macrocycle_component_names(Chem.MolFromSmiles(TPP_DIANION + ".[Cu+2]")) == {}
+    assert macrocycle_component_names(Chem.MolFromSmiles(TPP_DIANION + ".[Tc+2]")) == {}
     assert macrocycle_component_names(Chem.MolFromSmiles("[Zn+2].[Cl-].[Cl-]")) == {}
     ion = Chem.MolFromSmiles(TPP_DIANION)
     assert macrocycle_anion_name(ion, Chem.MolFromSmiles("[Zn+2]")) == "5,10,15,20-tetraphenylporphyrin-21,23-diide"
-    assert macrocycle_anion_name(ion, Chem.MolFromSmiles("[Cu+2]")) is None
+    assert macrocycle_anion_name(ion, Chem.MolFromSmiles("[Cu+2]")) == "5,10,15,20-tetraphenylporphyrin-21,23-diide"
+    assert macrocycle_anion_name(ion, Chem.MolFromSmiles("[Tc+2]")) is None
     assert macrocycle_anion_name(None, Chem.MolFromSmiles("[Zn+2]")) is None
 
 
 def test_the_guard_follows_the_scope_table(monkeypatch):
-    """Admitting a metal to MACROCYCLE is an edit of the table: copper alone, then copper with zinc."""
-    cu = Chem.MolFromSmiles(TPP_DIANION + ".[Cu+2]")
-    both = Chem.MolFromSmiles(TPP_DIANION + ".[Cu+2].[Zn+2]")
+    """Admitting a metal to MACROCYCLE is an edit of the table: technetium alone, then technetium with zinc."""
+    cu = Chem.MolFromSmiles(TPP_DIANION + ".[Tc+2]")
+    both = Chem.MolFromSmiles(TPP_DIANION + ".[Tc+2].[Zn+2]")
     assert assembly_admits_macrocycle(cu) is False and assembly_admits_macrocycle(both) is False
-    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu", MetalScope(frozenset({ELEMENT, MACROCYCLE}), frozenset({2})))
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Tc", MetalScope(frozenset({ELEMENT, MACROCYCLE}), frozenset({2})))
     assert assembly_admits_macrocycle(cu) is True and assembly_admits_macrocycle(both) is True
     monkeypatch.setitem(metal_scope.METAL_SCOPE, "Zn", MetalScope(frozenset({ELEMENT}), frozenset({2})))
     assert assembly_admits_macrocycle(Chem.MolFromSmiles(TPP_DIANION + ".[Zn+2]")) is False
@@ -373,7 +380,7 @@ def test_the_guard_follows_the_scope_table(monkeypatch):
 
 def test_zinc_and_the_bonded_metals_alone_are_admitted_to_macrocycle():
     assert sorted(s for s, sc in METAL_SCOPE.items() if MACROCYCLE in sc.mechanisms) == sorted(
-        ["Zn", *BONDED_METAL_VALENCES])
+        ["Zn", *BONDED_METALS])
 
 
 def test_the_adduct_reads_the_names_in_the_unverified_call_only():
@@ -398,23 +405,22 @@ _VB = ("2,7,12,17-tetraphenyl-21,22,23,24-tetraazapentacyclo[16.2.1.1^3,6.1^8,11
        "tetracosa-1(20),2,4,6(24),7,9,11,13(22),14,16,18-undecaene-21,23-diide")
 _VB_PORPHINE = ("21,22,23,24-tetraazapentacyclo[16.2.1.1^3,6.1^8,11.1^13,16]"
                 "tetracosa-1(20),2,4,6(24),7,9,11,13(22),14,16,18-undecaene-21,23-diide")
-_ABSTAIN_PIN = {"Cu": "copper compound (not supported)", "Fe": "iron compound (not supported)",
+_ABSTAIN_PIN = {"Tc": "inorganic compound (not supported)", "Cu": "copper compound (not supported)", "Fe": "iron compound (not supported)",
                 "Ni": "nickel compound (not supported)", "Mg": "magnesium compound (not supported)",
                 "Na": "sodium compound (not supported)", "Ca": "calcium compound (not supported)"}
 
 START_ROWS = {
-    TPP_DIANION + ".[Cu+2]": (
-        (_ABSTAIN_PIN["Cu"], "abstain", False, "UNSUPPORTED_ELEMENT"),
-        (_VB + "—copper(2+) (1/1)", "systematic_verified", False, None)),
-    PORPHINE_DIANION + ".[Cu+2]": (
-        (_ABSTAIN_PIN["Cu"], "abstain", False, "UNSUPPORTED_ELEMENT"),
-        (_VB_PORPHINE + "—copper(2+) (1/1)", "systematic_verified", False, None)),
-    PORPHINE_DIANION + ".[Fe+2]": (
-        (_ABSTAIN_PIN["Fe"], "abstain", False, "UNSUPPORTED_ELEMENT"),
-        (_VB_PORPHINE + "—iron(2+) (1/1)", "systematic_verified", False, None)),
-    TPP_DIANION + ".[Ni+2]": (
-        (_ABSTAIN_PIN["Ni"], "abstain", False, "UNSUPPORTED_ELEMENT"),
-        (_VB + "—nickel(2+) (1/1)", "systematic_verified", False, None)),
+    # technetium and plutonium: no mechanism (copper, iron and nickel, the witnesses of the start commit, are admitted
+    # to MACROCYCLE since lane B2: ``ADMITTED_B2_PORPHYRINS``)
+    TPP_DIANION + ".[Tc+2]": (
+        (_ABSTAIN_PIN["Tc"], "abstain", False, "UNSUPPORTED_ELEMENT"),
+        (_VB + "—technetium(2+) (1/1)", "systematic_verified", False, None)),
+    PORPHINE_DIANION + ".[Tc+2]": (
+        (_ABSTAIN_PIN["Tc"], "abstain", False, "UNSUPPORTED_ELEMENT"),
+        (_VB_PORPHINE + "—technetium(2+) (1/1)", "systematic_verified", False, None)),
+    PORPHINE_DIANION + ".[Pu+2]": (
+        (_ABSTAIN_PIN["Tc"], "abstain", False, "UNSUPPORTED_ELEMENT"),
+        (_VB_PORPHINE + "—plutonium(2+) (1/1)", "systematic_verified", False, None)),
     # the salts of Groups 1 and 2 are named from their ions; the table does not admit them to MACROCYCLE
     TPP_DIANION + ".[Mg+2]": (
         (_ABSTAIN_PIN["Mg"], "abstain", False, "UNSUPPORTED_ELEMENT"),
@@ -426,9 +432,9 @@ START_ROWS = {
         (_ABSTAIN_PIN["Na"], "abstain", False, "UNSUPPORTED_ELEMENT"),
         ("disodium " + _VB, "systematic_verified", False, None)),
     # zinc beside a metal that the table does not admit: the ligand keeps the name of the general engine
-    TPP_DIANION + ".[Zn+2].[Cu+2]": (
-        (_ABSTAIN_PIN["Cu"], "abstain", False, "UNSUPPORTED_ELEMENT"),
-        (_VB + "—copper(2+)—zinc(2+) (1/1/1)", "systematic_verified", False, None)),
+    TPP_DIANION + ".[Zn+2].[Tc+2]": (
+        ("zinc compound (not supported)", "abstain", False, "UNSUPPORTED_ELEMENT"),
+        (_VB + "—technetium(2+)—zinc(2+) (1/1/1)", "systematic_verified", False, None)),
     # the dianions alone: no metal in the assembly, the general engine's name
     TPP_DIANION: (
         ("unknown organic compound", "abstain", False, "UNNAMEABLE"),
@@ -437,6 +443,35 @@ START_ROWS = {
         ("unknown organic compound", "abstain", False, "UNNAMEABLE"),
         (_VB_PORPHINE, "systematic_verified", False, None)),
 }
+
+#: the rows of ``START_ROWS`` of the start commit that lane B2 admits to MACROCYCLE (``MORE_BONDED_METAL_VALENCES``):
+#: the metal is cited with the porphyrin dianion as a salt, as the zinc complex is (the default tier keeps its label;
+#: an assembly of admitted metals with zinc, a complete metal, is UNNAMEABLE there); each name is read back
+ADMITTED_B2_PORPHYRINS = {
+    TPP_DIANION + ".[Cu+2]": (
+        (_ABSTAIN_PIN["Cu"], "abstain", False, "UNSUPPORTED_ELEMENT"),
+        ("copper 5,10,15,20-tetraphenylporphyrin-21,23-diide", "systematic_verified", False, None)),
+    PORPHINE_DIANION + ".[Cu+2]": (
+        (_ABSTAIN_PIN["Cu"], "abstain", False, "UNSUPPORTED_ELEMENT"),
+        ("copper porphyrin-21,23-diide", "systematic_verified", False, None)),
+    PORPHINE_DIANION + ".[Fe+2]": (
+        (_ABSTAIN_PIN["Fe"], "abstain", False, "UNSUPPORTED_ELEMENT"),
+        ("iron porphyrin-21,23-diide", "systematic_verified", False, None)),
+    TPP_DIANION + ".[Ni+2]": (
+        (_ABSTAIN_PIN["Ni"], "abstain", False, "UNSUPPORTED_ELEMENT"),
+        ("nickel 5,10,15,20-tetraphenylporphyrin-21,23-diide", "systematic_verified", False, None)),
+    TPP_DIANION + ".[Zn+2].[Cu+2]": (
+        (_ABSTAIN_PIN["Cu"], "abstain", False, "UNNAMEABLE"),
+        ("5,10,15,20-tetraphenylporphyrin-21,23-diide—copper(2+)—zinc(2+) (1/1/1)", "systematic_verified", False, None)),
+}
+
+
+@pytest.mark.parametrize("smiles", sorted(ADMITTED_B2_PORPHYRINS), ids=lambda s: s[-28:])
+def test_the_porphyrin_complexes_of_the_metals_of_lane_b2_are_named(smiles):
+    default_view, best_effort_view = ADMITTED_B2_PORPHYRINS[smiles]
+    assert _view(_row(smiles, "pin")) == default_view, smiles
+    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert_full_rt(best_effort_view[0], smiles)
 
 
 @pytest.mark.parametrize("smiles", sorted(START_ROWS), ids=lambda s: s[-28:])
@@ -448,10 +483,22 @@ def test_other_metals_and_unscoped_ions_are_not_moved(smiles):
 
 def test_the_other_metals_panel_holds_no_row_the_guard_could_reach():
     """The 73-drawing panel of the other metals is untouched by construction: no assembly of it is admitted to
-    MACROCYCLE (every one holds a metal other than zinc, or none)."""
-    from tests.support.metal_baselines import baseline_path, read_rows
+    MACROCYCLE (every one holds a metal other than zinc, or none), but the iron and copper porphyrin rows of the metals
+    that lane B2 admits: they are named as declared (``declared_moves_bonded_b2.tsv``)."""
+    from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, read_rows
+    declared = declared_bonded_metal_moves()
+    reached = []
     for row in read_rows(baseline_path("other")):
-        assert macrocycle_component_names(Chem.MolFromSmiles(row["smiles"])) == {}, row["smiles"]
+        mol = Chem.MolFromSmiles(row["smiles"])
+        if any(a.GetSymbol() in BONDED_METALS for a in mol.GetAtoms()):
+            if macrocycle_component_names(mol):
+                reached.append(row["smiles"])
+                assert (row["smiles"], "best-effort") in declared, row["smiles"]    # the default tier keeps its label
+            continue
+        assert macrocycle_component_names(mol) == {}, row["smiles"]
+    assert sorted(set(reached)) == sorted([
+        "C1=Cc2cc3ccc(cc4nc(cc5ccc(cc1n2)[n-]5)C=C4)[n-]3.[Fe+2]",
+        "C1=Cc2cc3ccc(cc4nc(cc5ccc(cc1n2)[n-]5)C=C4)[n-]3.[Cu+2]"]), reached
 
 
 def test_the_default_tier_is_not_moved_for_zinc():

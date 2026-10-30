@@ -33,6 +33,13 @@ def _sites(smiles):
     ("CC[Zn+].[S-]CC", [(2, 3)]),
     ("C[Zn+].c1ccccc1[N-]c1ccccc1", [(1, 8)]),
     ("C[Zn+].[O-]C(C)=O.O", [(1, 2)]),                    # a neutral fragment beside them does not matter
+    ("C[Hg+].[Cl-]", [(1, 2)]),                           # the metals admitted to CONNECT_ANION since 2026-10-30
+    ("C[Cd+].[Cl-]", [(1, 2)]),
+    ("C[Ni+].[Cl-]", [(1, 2)]),
+    ("C[Cu+].[Cl-]", [(1, 2)]),
+    # tin and lead are admitted to CONNECT_ANION (the bonded drawing is a substituted stannane or plumbane,
+    ("CCCC[Sn+](CCCC)CCCC.[Cl-]", [(4, 13)]),
+    ("CC[Pb+](CC)CC.[Br-]", [(2, 7)]),
 ])
 def test_sites_of_a_drawing_that_the_connection_covers(smiles, expected):
     assert _sites(smiles) == expected
@@ -50,9 +57,9 @@ def test_sites_of_a_drawing_that_the_connection_covers(smiles, expected):
     "C[Zn+2].[Cl-].[Cl-]",                                # +2 and one bond: +3, no valence of zinc
     "C[Zn+]Cl",                                           # +1 and two bonds: +3
     "[Zn+]1CCCC1.[Cl-]",
-    "C[Cd+].[Cl-]",                                       # a metal that the table does not admit
-    "C[Ni+].[Cl-]",                                       # (mercury is admitted since 2026-10-30)
-    "C[Cu+].[Cl-]",
+    "C[Tc+].[Cl-]",                                       # metals that the table does not admit
+    "C[Pu+].[Cl-]",                                       # (mercury, cadmium, nickel, copper are admitted since
+    "C[Th+].[Cl-]",                                       # 2026-10-30)
     "C[Mg+].[Br-]",                                       # Group 2: admitted to ION_SALTS only
     "C[Zn+].[Na+].[Cl-]",                                 # two cations
     "C[Zn+].[O-]C(=O)C[Zn+]",

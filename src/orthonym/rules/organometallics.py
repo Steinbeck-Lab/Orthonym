@@ -806,6 +806,53 @@ def _terminal_ligand_prefix(mol: Any, metal_idx: int, lg: Any) -> Optional[str]:
     return TERMINAL_LIGAND_PREFIXES.get((atom.GetSymbol(), order, atom.GetTotalNumHs()))
 
 
+#: the prefix of a halide ligand beside a multiply bonded one: the substituent prefix that (the Blue Book)
+#: allows as a ligand name; OPSIN reads 'dichloro(methylidene)titanium' and not the 'chlorido' of the inorganic name
+_HALIDE_LIGAND_PREFIXES = {'[F-]': 'fluoro', '[Cl-]': 'chloro', '[Br-]': 'bromo', '[I-]': 'iodo'}
+
+#: the endings of a substituent prefix of a group joined by a double or a triple bond, 'ylidene',
+#: 'ylidyne', the imino prefixes of
+_MULTIPLE_BOND_ENDINGS = {2: ('ylidene', 'imino'), 3: ('ylidyne',)}
+
+
+def _multiply_bonded_ligand_name(mol: Any, metal_idx: int, lg: Any, bond: Any) -> Optional[str]:
+    """The prefix of an organic ligand joined to the metal by one double or triple bond from a carbon or a nitrogen
+    atom ('methylidene', 'benzylidene', 'ethylidyne', 'phenylimino'), or ``None``.
+
+     Definitions of terms (the Blue Book): "names for substituent groups as defined in Section
+    can also be used as ligand names"; gives the prefix of a group with a double bond at its free valence the
+    ending 'ylidene' and with a triple bond 'ylidyne'. The prefix is the one the substitutive path names the group
+    (``assembly.substituent_enumerator.name_substituent``, accepted as one prefix token by
+    ``rules.substituent_purity``), and its ending must state the order of the bond: the ring-substituent namer counts
+    a benzylidene group as 'benzyl', so it is not asked. A charged or radical ligand, or one with an isotope, has
+    no prefix here; the exit gate reads the whole name back."""
+    from rdkit import Chem
+    from ..assembly import substituent_enumerator
+    from .substituent_purity import _accepted_prefix_token
+    order = {Chem.BondType.DOUBLE: 2, Chem.BondType.TRIPLE: 3}.get(bond.GetBondType())
+    attach = bond.GetOtherAtomIdx(metal_idx)
+    atom = mol.GetAtomWithIdx(attach)
+    frag = sorted(lg.ligand_atom_indices)
+    # "Exceptionally, the molecules H2O, NH3, CO, and NO are named 'aqua', 'ammine', 'carbonyl', and 'nitrosyl' when
+    # used as ligands" Definitions of terms, the Blue Book): a C=O group on a carbon doubly bonded
+    # to the metal is 'carbonyl', not the prefix 'formylidene' of.
+    if (order == 2 and atom.GetSymbol() == 'C' and len(frag) == 2 and atom.GetTotalNumHs() == 0
+            and any(b.GetBondType() == Chem.BondType.DOUBLE and b.GetOtherAtom(atom).GetSymbol() == 'O'
+                    and b.GetOtherAtom(atom).GetDegree() == 1 and not b.GetOtherAtom(atom).GetFormalCharge()
+                    and not b.GetOtherAtom(atom).GetIsotope() and not atom.GetIsotope()
+                    for b in atom.GetBonds())):
+        return 'carbonyl'
+    if (order is None or atom.GetSymbol() not in ('C', 'N')
+            or any(mol.GetAtomWithIdx(i).GetFormalCharge() or mol.GetAtomWithIdx(i).GetNumRadicalElectrons()
+                   or mol.GetAtomWithIdx(i).GetIsotope() for i in frag)):
+        return None
+    name = _accepted_prefix_token(mol, frag, substituent_enumerator.name_substituent(
+        mol, frag, attach, allow_mancude=False))
+    if not name or not name.endswith(_MULTIPLE_BOND_ENDINGS[order]):
+        return None
+    return name
+
+
 def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
                                 ) -> Optional[Tuple[str, str, List[Any]]]:
     """The name of a mononuclear complex of a metal admitted to ``BONDED_NAMES`` (zinc) that the
@@ -824,9 +871,9 @@ def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
     multiplier stays outside the parentheses: ``_ligand_token``. A complex that carries a charge
     ends in its charge number, as 'pentaammine(ethyl)osmium(1+)' does; the ligand atoms are
     neutral then, so that the charge is the metal's. Ligands: the terminal ligands, and organyl
-    groups bonded by one single bond that the neutral branch names (``_extended_ligand_name``); a
-    halide, a pi-ligand or a ligand of more than one bond to the metal is left to the other
-    branches. No PIN: (:39753) and ``rules.metal_labels``."""
+    groups bonded by one single bond that the neutral branch names (``_extended_ligand_name``), and
+    organic groups bonded by one double or triple bond (``_multiply_bonded_ligand_name``); a halide, a
+    pi-ligand or a ligand of more than one bond to the metal is left to the other branches. No PIN: (:39753) and ``rules.metal_labels``."""
     from rdkit import Chem
     if metal_complex.is_multimetal or len(metal_complex.metal_atom_indices) != 1:
         return None
@@ -840,9 +887,23 @@ def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
     charge = metal.GetFormalCharge()
     names: List[str] = ['hydrido'] * metal.GetTotalNumHs()
     novel = bool(names) or charge != 0
+    # A halide beside a ligand joined by a multiple bond (an organic group, or a terminal =O or =S) is a ligand of
+    # the name ('dichloro(methylidene)titanium', 'dichloro(oxo)vanadium'): the ionic drawing of such a complex
+    # breaks only the single bonds, so the charge it gives the metal is not the metal's. Elsewhere the halides stay
+    # with the other branches.
+    multiply_bonded = any(
+        lg.ligand_smarts_key is None and any(
+            mol.GetBondBetweenAtoms(i, metal_idx) is not None
+            and mol.GetBondBetweenAtoms(i, metal_idx).GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
+            and mol.GetAtomWithIdx(i).GetSymbol() in ('C', 'N', 'O', 'S')
+            for i in lg.ligand_atom_indices)
+        for lg in metal_complex.ligand_groups)
     for lg in metal_complex.ligand_groups:
         if lg.hapticity_n != 1:
             return None
+        if multiply_bonded and lg.ligand_smarts_key in _HALIDE_LIGAND_PREFIXES:
+            names.append(_HALIDE_LIGAND_PREFIXES[lg.ligand_smarts_key])
+            continue
         if charge != 0 and any(
                 mol.GetAtomWithIdx(i).GetFormalCharge() != 0
                 or mol.GetAtomWithIdx(i).GetNumRadicalElectrons() != 0
@@ -856,6 +917,13 @@ def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
         bonds_to_metal = [mol.GetBondBetweenAtoms(i, metal_idx) for i in lg.ligand_atom_indices
                           if mol.GetBondBetweenAtoms(i, metal_idx) is not None]
         single = len(bonds_to_metal) == 1 and bonds_to_metal[0].GetBondType() == Chem.BondType.SINGLE
+        if lg.ligand_smarts_key is None and len(bonds_to_metal) == 1 and not single:
+            name = _multiply_bonded_ligand_name(mol, metal_idx, lg, bonds_to_metal[0])
+            if name is None:
+                return None
+            names.append(name)
+            novel = True
+            continue
         name = None if lg.ligand_smarts_key is not None or not single else (
             _extended_ligand_name(mol, metal_complex, lg, is_group14=False,
                                   naming_system='metal_direct', metal_symbol=symbol))

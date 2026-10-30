@@ -106,10 +106,13 @@ def test_the_isotope_and_the_charge_are_in_the_name():
 def test_the_class_of_the_dispatch_table_names_zinc_before_the_retained_cation_word():
     assert _class_of("[Zn]") == StoutClass.METAL_ATOM
     assert _class_of("[Zn+2]") == StoutClass.METAL_ATOM         # not CATION_RETAINED, whose word is 'zinc'
-    assert _class_of("[Cu+2]") == StoutClass.CATION_RETAINED    # a metal that is not admitted
+    assert _class_of("[Cu+2]") == StoutClass.CATION_RETAINED    # admitted, but not to ELEMENT: the retained name stands
+    assert _class_of("[Tc+2]") != StoutClass.METAL_ATOM         # a metal that is not admitted
     assert _class_of("[Na+]") == StoutClass.CATION_RETAINED
-    assert _class_of("[Cd]") != StoutClass.METAL_ATOM          # a metal that is not admitted
+    assert _class_of("[Tc]") != StoutClass.METAL_ATOM          # a metal that is not admitted
     assert _class_of("[Hg]") == StoutClass.METAL_ATOM          # admitted to ELEMENT since 2026-10-30
+    assert _class_of("[Cd]") == StoutClass.METAL_ATOM          # and since lane B2
+    assert _class_of("[Hf+4]") == StoutClass.METAL_ATOM
     assert _class_of("[Zn-]") != StoutClass.METAL_ATOM
     assert _class_of("[ZnH]") != StoutClass.METAL_ATOM
     priorities = {c: e.priority for c, e in DISPATCH_TABLE.items()}
@@ -135,8 +138,13 @@ def test_the_class_of_the_dispatch_table_names_zinc_before_the_retained_cation_w
     ("[Cu]", None),                   # a metal that the table does not admit to ELEMENT
     ("[Cu+2]", None),
     ("[Na+]", None),
-    ("[Cd+2]", None),
+    ("[Tc+2]", None),                 # a metal that no mechanism admits
     ("[Hg+2]", "mercury(2+)"),       # admitted to ELEMENT since 2026-10-30 (BONDED_METAL_VALENCES)
+    ("[Cd+2]", "cadmium(2+)"),       # and since lane B2 (MORE_BONDED_METAL_VALENCES), but not the metals of
+    ("[Hf+4]", "hafnium(4+)"),       # RETAINED_ION_METALS (Ag, Au, Co, Cr, Cu, Fe, Mn, Ni): their ion words are retained
+    ("[U]", None),                    # uranium stays out (the README specimen of an element no tier names)
+    ("[Fe+2]", None),
+    ("[Ni+2]", None),
     ("[Cl-]", None),
     ("[Si]", None),                   # a metalloid is named substitutively, not by this mechanism
     ("C", None),
@@ -209,10 +217,12 @@ def test_the_hydride_word_is_for_the_metals_the_table_admits():
     zinc = parse_salt_fragments(Chem.MolFromSmiles("[H-].[H-].[Zn+2]"))
     sodium = parse_salt_fragments(Chem.MolFromSmiles("[Na+].[H-]"))
     copper = parse_salt_fragments(Chem.MolFromSmiles("[Cu+2].[H-].[H-]"))
-    both = parse_salt_fragments(Chem.MolFromSmiles("[Cu+2].[Zn+2].[H-].[H-].[H-].[H-]"))
+    technetium = parse_salt_fragments(Chem.MolFromSmiles("[Tc+2].[H-].[H-]"))
+    both = parse_salt_fragments(Chem.MolFromSmiles("[Tc+2].[Zn+2].[H-].[H-].[H-].[H-]"))
     assert inorganic_anion_word("[H-]", zinc["cations"]) == "hydride"
     assert inorganic_anion_word("[H-]", sodium["cations"]) == "hydride"  # Groups 1-2: CARBANION_SALTS since 2026-10-30
-    assert inorganic_anion_word("[H-]", copper["cations"]) is None
+    assert inorganic_anion_word("[H-]", copper["cations"]) == "hydride"   # CARBANION_SALTS since 2026-10-30 (lane B2)
+    assert inorganic_anion_word("[H-]", technetium["cations"]) is None
     assert inorganic_anion_word("[H-]", both["cations"]) is None          # one cation outside the table
     assert inorganic_anion_word("[H-]", []) is None
     assert inorganic_anion_word("[Cl-]", sodium["cations"]) == "chloride"  # the table of retained anions
@@ -274,8 +284,8 @@ START_ROWS = {
     "[Ca+2]": (
         ('calcium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Cd+2]": (
-        ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "[Tc+2]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Sn+4]": (
         ('tin(IV)', 'pin_verified', True, None),
@@ -283,10 +293,40 @@ START_ROWS = {
     "[Ag+]": (
         ('silver compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Cu+2].[H-].[H-]": (
-        ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "[Tc+2].[H-].[H-]": (
+        ('inorganic compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
 }
+
+#: the rows of the start commit that lane B2 moves (``MORE_BONDED_METAL_VALENCES``): the name now, with the label of its
+#: tier; each name is read back to the input's full InChIKey. The ion of a metal of ``RETAINED_ION_METALS`` keeps its
+#: retained name ('copper(II)': START_ROWS above); the hydride salt of copper is named from its ions at the best-effort
+#: tier only (a carbanion or hydride beside a metal is organometallic for it, INTRODUCTION)
+MOVED_ROWS = {
+    "[Cd+2]": (('unknown organic compound', 'abstain', False, 'NO_VERIFIED_PIN'),
+               ('cadmium(2+)', 'systematic_verified', False, None)),
+    "[Cu+2].[H-].[H-]": (('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+                         ('copper(2+)—hydride (1/2)', 'systematic_verified', False, None)),
+}
+
+
+def _opsin_reads(name) -> bool:
+    """OPSIN main reads a hydride component of a mixture; the release 2.9.0 does not, and there the name fails closed
+    (the read-back cannot confirm it)."""
+    from orthonym.namer import _validity_gate_name_to_smiles
+    return bool(_validity_gate_name_to_smiles(name))
+
+
+@pytest.mark.parametrize("smiles", sorted(MOVED_ROWS))
+def test_the_rows_that_lane_b2_moves(smiles):
+    default_view, best_effort_view = MOVED_ROWS[smiles]
+    assert _view(_row(smiles, "pin")) == default_view, smiles
+    best_effort = _row(smiles, "best-effort")
+    if not _opsin_reads(best_effort_view[0]):
+        assert best_effort["name"] is None and best_effort["tier"] == "abstain", best_effort   # no name, never a wrong one
+        return
+    assert _view(best_effort) == best_effort_view, smiles
+    assert_full_rt(best_effort["name"], smiles)
 
 #: zinc beside a cation that the table does not admit to ``CARBANION_SALTS`` (no hydride word), and a
 #: charge-unbalanced assembly (no salt): no producer names them. The failure label is the engine's, UNNAMEABLE

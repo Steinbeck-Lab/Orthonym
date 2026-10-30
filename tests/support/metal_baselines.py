@@ -72,19 +72,35 @@ def identity_diff(base_rows: Iterable[dict], new_rows: Iterable[dict]) -> List[T
             if base.get(key) != new.get(key)]
 
 
+#: the two files of declared moves: lane B1 (Al, Hg, Pd, Pt, Ru, Ti, V, W) and lane B2 (38 more metals, tin and lead,
+#: ligands joined by a multiple bond)
+DECLARED_BONDED_MOVE_FILES = ("declared_moves_bonded_b1.tsv", "declared_moves_bonded_b2.tsv")
+
+
 def declared_bonded_metal_moves() -> Dict[Key, Tuple]:
-    """The rows of the other-metals baseline that the admission of the bonded metals moves (Al, Hg, Pd, Pt, Ru, Ti,
-    V, W to every mechanism of zinc, 2026-10-30, ``data.metal_scope.BONDED_METAL_VALENCES``):
-    ``{(smiles, tier_req): identity_view}`` of each row as it is named now. A guard of the metals the table does not
-    admit compares such a row with this file, and reads a name of it back to the full key."""
-    path = _KINDS["zinc"][0] / "declared_moves_bonded_b1.tsv"
+    """The rows of the other-metals baseline that the admission of the bonded metals moves (lane B1, 2026-10-30: Al,
+    Hg, Pd, Pt, Ru, Ti, V, W to every mechanism of zinc, ``data.metal_scope.BONDED_METAL_VALENCES``; lane B2: 38 more
+    metals, ``MORE_BONDED_METAL_VALENCES``, tin and lead to ``PARENT_HYDRIDE_IONS``, and the ligands joined by a
+    multiple bond): ``{(smiles, tier_req): identity_view}`` of each row as it is named now, read from
+    ``DECLARED_BONDED_MOVE_FILES``. A guard of the metals the table does not admit compares such a row with these
+    files, and reads a name of it back to the full key; a row is declared in one file only."""
     out: Dict[Key, Tuple] = {}
-    with open(path, encoding="utf-8") as f:
-        header = f.readline().rstrip("\n").split("\t")
-        for line in f:
-            if not line.strip():
-                continue
-            row = dict(zip(header, line.rstrip("\n").split("\t")))
-            out[(row["smiles"], row["tier_req"])] = (row["name"] or None, row["tier"], row["is_pin"] == "true",
-                                                     row["limit_code"] or None)
+    for file_name in DECLARED_BONDED_MOVE_FILES:
+        with open(_KINDS["zinc"][0] / file_name, encoding="utf-8") as f:
+            header = f.readline().rstrip("\n").split("\t")
+            for line in f:
+                if not line.strip():
+                    continue
+                row = dict(zip(header, line.rstrip("\n").split("\t")))
+                key = (row["smiles"], row["tier_req"])
+                if key in out:
+                    raise AssertionError(f"two declared moves for {key}")
+                out[key] = (row["name"] or None, row["tier"], row["is_pin"] == "true", row["limit_code"] or None)
     return out
+
+
+def bonded_metal_symbols() -> Tuple[str, ...]:
+    """The metals admitted to every mechanism of zinc by lane B1 (``BONDED_METAL_VALENCES``) and lane B2
+    (``MORE_BONDED_METAL_VALENCES``), sorted: the metals whose rows a guard of "the other metals are not moved" skips."""
+    from orthonym.data.metal_scope import BONDED_METAL_VALENCES, MORE_BONDED_METAL_VALENCES
+    return tuple(sorted({*BONDED_METAL_VALENCES, *MORE_BONDED_METAL_VALENCES}))
