@@ -646,8 +646,12 @@ _RING_ASSEMBLY_STEM_RE = re.compile(r"\[(?=\d+'*(?:[,:]\d+'*)+-[a-z])")
 #: [1,2-b]...', 'dihydro[1,2,4]triazolo...'): a slot OPSIN reads. After a hydro prefix it is the one the book
 #: prints ('2,3-dihydro(15N)-1H-indole (PIN)',, the Blue Book); after a bridge prefix
 #: the book prints no descriptor, so a name that uses the slot there is recorded below the PIN
-#: (``_unprinted_slot``, at the placement that uses it).
-_FUSED_SYSTEM_OPENING_RE = re.compile(r"(?<=[a-z])\[\d+(?:,\d+)*\](?=[a-z])")
+#: (``_unprinted_slot``, at the placement that uses it). After the closing mark of a prefix
+#: ('2-(propan-2-yl)[1,3]thiazolo[4,5-c]pyridine') the slot is the one before the parent, where
+#: puts the descriptor ("before the part of the compound that is isotopically substituted",
+#: the Blue Book): '2-(propan-2-yl)(7-3H1)[1,3]thiazolo[4,5-c]pyridine'.
+#: Not after a square bracket: '[1,2-b][2,5]benzodiazocin' is a fusion descriptor, not a parent.
+_FUSED_SYSTEM_OPENING_RE = re.compile(r"(?<=[a-z)}])\[\d+(?:,\d+)*\](?=[a-z])")
 
 
 def _unprinted_slot(skel: str, off: int) -> bool:
@@ -3469,6 +3473,42 @@ def _decorate_demultiplied(skeleton, keys, original, stripped,
     return winners[0][3]
 
 
+#: The multiplied first word of a functional-class name ('dimethyl sulfate', 'triethyl phosphate',
+#:: a multiplier, a simple alkyl or aryl word, then the next word.
+_FC_MULTIPLIED_WORD_RE = re.compile(r"^(?P<mult>di|tri)(?P<unit>[a-z]+yl) (?P<rest>[a-z(].*)$")
+_FC_MULTIPLIER = {1: "", 2: "di", 3: "tri"}
+
+
+def _decorate_functional_class_multiplier(skeleton, keys, original) -> Optional[str]:
+    """ on the multiplied first word of a functional-class name: one copy labelled.
+
+    'Different isotopic modifications on otherwise identical substituents' (the Blue Book):
+    "When two substituent groups are isotopically modified in different ways so that they cannot be
+    combined together using multiplicative terms such as 'di-', 'bis-', etc., they are cited
+    separately. The isotopically modified substituent is preferred alphabetically to the unmodified
+    substituent" (:43758). The de-multiplication paths above split a locanted multiplier that opens a
+    substitutive name ('1,2-dimethoxyethane'); the words of a functional-class name carry no locants,
+    so 'dimethyl sulfate' with one CH2D group had no place for its label. The labelled copy is cited
+    first and the bare copies keep their multiplier: '(2H1)methyl methyl sulfate'. Only a methyl copy
+    takes a descriptor without a locant (one carbon); every candidate is OPSIN-read-back gated. Called
+    from:func:`_decorate_reduced_multiplier`, whose reduction this is for a word that cites no locants."""
+    m = _FC_MULTIPLIED_WORD_RE.match(skeleton)
+    if not m:
+        return None
+    copies = {"di": 2, "tri": 3}[m.group("mult")]
+    unit = m.group("unit")
+    tail = f"{unit} {_FC_MULTIPLIER[copies - 1]}{unit} {m.group('rest')}"
+    # a locant of the labelled copy is at most its chain length, below the molecule's heavy-atom count
+    locants = ([None] if unit == "methyl" else []) + list(range(1, original.GetNumHeavyAtoms() + 1))
+    for locant in locants:
+        groups = [(locant, mass, el, count, maxpos) for (mass, el), count, maxpos in keys]
+        for force in (False, True):
+            candidate = format_isotope_descriptor(groups, force_show=force) + tail
+            if _isotope_round_trips(candidate, original):
+                return candidate
+    return None
+
+
 def _decorate_reduced_multiplier(skeleton, keys, original, stripped,
                                  stereo_blind: bool = False) -> Optional[str]:
     """ de-multiplication that RE-COLLECTS the unlabelled copies under a
@@ -3513,7 +3553,8 @@ def _decorate_reduced_multiplier(skeleton, keys, original, stripped,
         skeleton,
     )
     if not m:
-        return None
+        # the unlocanted word of a functional-class name: '(2H1)methyl methyl sulfate'
+        return _decorate_functional_class_multiplier(skeleton, keys, original)
     mult_count = {"di": 2, "tri": 3, "tetra": 4, "penta": 5, "hexa": 6}[m.group("mult")]
     locs = sorted(int(x) for x in m.group("locs").split(","))
     if len(locs) != mult_count or len(set(locs)) != len(locs):
