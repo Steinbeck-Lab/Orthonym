@@ -4019,16 +4019,16 @@ _FORMS_MAX_WORK = 160
 
 
 def _rdkit_charge_candidates(mol) -> List[Optional[Chem.Mol]]:
-    """Every resonance drawing of ``mol`` that RDKit enumerates, in RDKit's order (``None`` where
-    RDKit gives none): ``UNCONSTRAINED_CATIONS`` structures, at most ``_FORMS_MAX_STRUCTURES`` of
-    them. This is the one place the form enumeration of:func:`_charge_forms` asks RDKit, and only
-    for a pi system that:func:`charge_drawings` finds small;:func:`_accepted_charge_forms`
-    decides which of the drawings are forms of the species."""
+    """Every resonance drawing of ``mol`` RDKit enumerates, in its order (``None`` where it gives none):
+    ``UNCONSTRAINED_CATIONS`` structures, at most ``_FORMS_MAX_STRUCTURES`` (a full list: ``perception.charge_shift.
+    forms_past_the_cap``). The one place:func:`_charge_forms` asks RDKit, only for a pi system:func:`charge_drawings`
+    finds small;:func:`_accepted_charge_forms` decides which of the drawings are forms of the species."""
     from rdkit.Chem import rdchem
-    supplier = rdchem.ResonanceMolSupplier(
-        mol, rdchem.ResonanceFlags.UNCONSTRAINED_CATIONS, _FORMS_MAX_STRUCTURES)
+
+    from .perception.charge_shift import forms_past_the_cap
+    supplier = rdchem.ResonanceMolSupplier(mol, rdchem.ResonanceFlags.UNCONSTRAINED_CATIONS, _FORMS_MAX_STRUCTURES)
     supplier.SetNumThreads(1)
-    return [supplier[i] for i in range(len(supplier))]
+    return forms_past_the_cap(mol, [supplier[i] for i in range(len(supplier))], _FORMS_MAX_STRUCTURES)
 
 
 @_functools.lru_cache(maxsize=512)

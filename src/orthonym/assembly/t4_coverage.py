@@ -519,10 +519,15 @@ def _book_checked_floor(mol, uni):
     # the book's spelling fails its round trip at the stereo layer only because of the ORDER its
     # prefixes are cited in (OPSIN's SMILES of a lone-pair centre with a ring-closure digit is read by
     # RDKit the other way, ``universal_substituent._prefix_order_fallback``): the same spelling with
-    # the parent's prefixes cited in the order that reads back comes before the mechanical spellings
-    ordered = _book_name_in_the_order_that_reads_back(mol)
-    if ordered is not None:
-        return ordered
+    # the parent's prefixes cited in the order that reads back comes before the mechanical spellings.
+    # Only where that misreading can happen, a molecule with a lone-pair stereocentre: rebuilding the whole
+    # floor for any other repeats the costly analyses of the molecule for nothing (a von Baeyer cage with a
+    # carbon stereocentre ran past the hang budget, and the charge forms after it were never tried)
+    from ..perception.lone_pair_reading import lone_pair_centres
+    if lone_pair_centres(mol):
+        ordered = _book_name_in_the_order_that_reads_back(mol)
+        if ordered is not None:
+            return ordered
     # the kept kinds stay the book's when the name that keeps only them verifies: one
     # failing chain or acyl spelling does not cost the molecule its ring names. Same rung
     # order as ``_verified_universal_floor``.

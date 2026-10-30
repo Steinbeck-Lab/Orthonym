@@ -376,7 +376,11 @@ def identify_series(mol: Chem.Mol) -> Optional[SeriesHit]:
 
     The systems are the fused ring systems of the molecule. Substituents are free to be
     anything attached by a single bond; a ring system that is saturated in part, bears a
-    double bond to a substituent, or carries an atom that is not carbon is never a member."""
+    double bond to a substituent, or carries an atom that is not carbon is never a member. No member is
+    found inside ``isotope_alternative.alternative_skeleton``."""
+    from .isotope_alternative import alternative_skeleton_active
+    if alternative_skeleton_active():
+        return None
     rings = mol.GetRingInfo().AtomRings()
     if len(rings) < 2:
         return None

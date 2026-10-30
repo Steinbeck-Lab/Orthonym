@@ -473,9 +473,8 @@ def _kekule_forms_of_one_compound(a: Chem.Mol, b: Chem.Mol) -> bool:
         return False
     double = Chem.BondType.DOUBLE
     try:
-        matches = qa.GetSubstructMatches(
-            qb, uniquify=False, useChirality=False,
-            maxMatches=_KEKULE_MAPPING_CAP)
+        from ..perception.substructure import ordered_matches
+        matches = ordered_matches(qa, qb, uniquify=False, max_matches=_KEKULE_MAPPING_CAP)
     except Exception:
         return False
     for match in matches:
@@ -4158,7 +4157,9 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     4. None if nothing round-trips (never a wrong labeled name).
 
     The passes (as drawn, the induced stereocentres unspecified, a tautomer read as the input) are
-    ``rules.isotope_passes``.
+    ``rules.isotope_passes``. When none reads back, they run once more on the skeleton name the next
+    producer gives (``rules.isotope_alternative``: a series member OPSIN draws in the other Kekule set, a
+    senior hub whose like substituents the labels make unlike).
     """
     original = Chem.MolFromSmiles(smiles)
     if original is None or not has_isotopes(original):
@@ -4166,8 +4167,13 @@ def decorate_isotopic_name(smiles: str, style: str, namer) -> Optional[str]:
     stripped, label_map = strip_isotopes(original)
     if not label_map:
         return None
+    from .isotope_alternative import alternative_skeleton, alternative_skeleton_active, has_alternative
     from .isotope_passes import decorate_passes
-    return decorate_passes(smiles, style, namer, original, stripped, label_map)
+    name = decorate_passes(smiles, style, namer, original, stripped, label_map)
+    if name is None and not alternative_skeleton_active() and has_alternative(stripped):
+        with alternative_skeleton():
+            name = decorate_passes(smiles, style, namer, original, stripped, label_map)
+    return name
 
 
 #: A lone stereodescriptor without its locant at the front of a chain prefix ('[(E)-6-phenylhexa-1,5-dien-3-yl]').

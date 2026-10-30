@@ -73,9 +73,20 @@ def ring_systems(mol) -> List[Set[int]]:
 
 
 def ring_system(mol) -> Set[int]:
-    """The largest ring system."""
+    """The largest ring system; of two or more of that size, the one senior by (``p44_2_1_key``), so that
+    the order of the input atoms does not choose it (it chose an indazole over a dihydrofuropyridine of the same
+    size for one spelling of a molecule and the other for another). Systems the criteria leave tied keep the
+    first, as before."""
     systems = ring_systems(mol)
-    return systems[0] if systems else set()
+    if not systems:
+        return set()
+    largest = [s for s in systems if len(s) == len(systems[0])]
+    if len(largest) > 1:
+        keys = [p44_2_1_key(mol, s) for s in largest]
+        best = min(keys)
+        if keys.count(best) == 1:
+            return largest[keys.index(best)]
+    return systems[0]
 
 
 def cycle_rank(mol, atoms: Set[int]) -> int:

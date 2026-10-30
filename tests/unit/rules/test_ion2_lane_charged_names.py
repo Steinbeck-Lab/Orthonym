@@ -195,11 +195,15 @@ def test_as_ylidene(name, expected):
     assert _as_ylidene(name) == expected
 
 
-# -- the multiplied ionic suffixes, without a JVM (c), the Blue Book, example:7114)
+# -- the multiplied ionic suffixes, without a JVM (c), the Blue Book, example:7114).
+# "Numerical terms for compound or complex features" (the Blue Book): the prefixes are "formed by adding the
+# ending 'kis' to the basic multiplicative prefix ending in 'a'", so 'heptakis' and 'octakis' follow 'hexakis'
+# (eight ylium centres: '...-octakis(ylium)', which OPSIN reads back); the tables end at ten.
 @pytest.mark.parametrize("kind,n,expected", [
     ("ylium", 1, "ylium"), ("ylium", 2, "bis(ylium)"), ("ylium", 3, "tris(ylium)"), ("ylium", 4, "tetrakis(ylium)"),
     ("ium", 1, "ium"), ("ium", 2, "diium"), ("ium", 3, "triium"),
-    ("ide", 2, "diide"), ("uide", 2, "diuide"), ("ylium", 7, None), ("ide", 11, None),
+    ("ide", 2, "diide"), ("uide", 2, "diuide"), ("ylium", 7, "heptakis(ylium)"), ("ylium", 8, "octakis(ylium)"),
+    ("ylium", 11, None), ("ide", 11, None),
 ])
 def test_multiplied_ionic_suffix(kind, n, expected):
     from orthonym.assembly.general_engine import _multiplied_ionic_suffix

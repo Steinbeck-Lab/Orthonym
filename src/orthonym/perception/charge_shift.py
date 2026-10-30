@@ -823,3 +823,15 @@ def _charge_placements(mol, max_moves, max_configurations) -> List[Chem.Mol]:
     budget = _Budget(max_configurations)
     return [structure for _lost, _gained, structure
             in _shifts(drawing, drawing.cations(), drawing.donors(), max_moves, budget)]
+
+
+def forms_past_the_cap(mol, drawings: List, cap: int) -> List:
+    """``drawings``, the resonance drawings RDKit gave for ``mol``, or the forms of:func:`charge_shift_forms` when
+    RDKit stopped at ``cap``: which drawings a full list holds then depends on the order of the input atoms (an
+    azide beside an azolium cation fills it, and one spelling kept the form the name needs while another lost it),
+    and those forms are found for every spelling."""
+    if len(drawings) >= cap:
+        forms = charge_shift_forms(mol)
+        if forms:
+            return list(forms)
+    return drawings

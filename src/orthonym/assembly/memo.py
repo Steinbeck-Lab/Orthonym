@@ -29,6 +29,7 @@ import os
 from collections import OrderedDict
 
 from ..metrics.provenance import wider_tier_ctx
+from ..rules.isotope_alternative import alternative_skeleton_active
 from .locant_omission import retained_c2_unit_has_isotope_label, unnumbered_label_scope_active
 
 #: verify-mode mismatch log (process-global, across scopes). A ``MemoMismatch`` is
@@ -151,6 +152,10 @@ def _ck(namespace, key):
         # retained name does not number (``locant_omission.label_on_unnumbered_position``); the isotope path
         # renames the skeleton in that scope inside the call that named it without
         tag = tag + ("systematic-unnumbered",)
+    if alternative_skeleton_active():
+        # the series and senior-hub producers make no offer in that scope (``rules.isotope_alternative``); the
+        # namer renames a labelled skeleton in it inside the call that named it without
+        tag = tag + ("isotope-alternative",)
     if prefixes_apart_var.get():
         if pin_promotion_var.get():
             return (namespace, key, "pin-promotion", "prefixes-apart") + tag

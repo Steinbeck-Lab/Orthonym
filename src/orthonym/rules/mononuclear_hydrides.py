@@ -806,7 +806,11 @@ def senior_hub_parent_expected(mol) -> bool:
 def _name_senior_atom_hub(mol) -> Optional[str]:
     """: name a molecule on its senior mononuclear P/As/Sb/Bi/Si/Ge/Sn/Pb
     hub when no principal characteristic group is present and every other atom is
-    prefix-only. Fail-closed: None for any other shape."""
+    prefix-only. Fail-closed: None for any other shape, and None inside
+    ``isotope_alternative.alternative_skeleton``."""
+    from .isotope_alternative import alternative_skeleton_active
+    if alternative_skeleton_active():
+        return None
     try:
         hubs = _scan_senior_hubs(mol, _BELOW_HUB)
         if not hubs:

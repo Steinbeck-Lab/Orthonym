@@ -327,6 +327,10 @@ class _Ctx:
     # An aromaticity-perceived view of ``mol`` (same atom indices) for the ring
     # names of ``rules.monocycle_forms``; built on first use, False if unbuildable.
     aromatic_mol: object = None
+    # ``_tree_neighbors`` answers, keyed by the atom, the component and the flags it reads (the
+    # chain walks ask the same atom of the same component hundreds of thousands of times in a large
+    # molecule); each with whether it fired the 'chain' spelling, which a hit fires again
+    tree_neighbor_memo: Dict = field(default_factory=dict)
     # Roadmap N5c: while True, a chain spine walks carbon atoms only
     # (``_tree_neighbors``); set by ``_name_chain_spine`` for one spine choice.
     carbon_walk: bool = False
@@ -2719,6 +2723,18 @@ def _bfs_component(mol, start: int, exclude: FrozenSet[int]) -> FrozenSet[int]:
 
 
 def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int]:
+    """:func:`_tree_neighbors_of`, memoized on ``ctx`` (``_Ctx.tree_neighbor_memo``)."""
+    key = (atom, component, ctx.carbon_walk, ctx.chain_forms, ctx.ps_forms)
+    hit = ctx.tree_neighbor_memo.get(key)
+    if hit is None:
+        hit = ctx.tree_neighbor_memo[key] = _tree_neighbors_of(ctx, atom, component)
+    out, fired = hit
+    if fired:
+        ctx.fire('chain')
+    return list(out)
+
+
+def _tree_neighbors_of(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> Tuple[Tuple[int, ...], bool]:
     """Neighbors of *atom* usable for CHAIN-spine walking: heavy, in
     *component*, NOT a ring atom (rings are branch ports, not chain
     continuations -- see module docstring on chain/ring composition), an
@@ -2750,6 +2766,7 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
     chain as a skeletal ``phospha`` atom (measured: even WITH the correct
      lambda citation, OPSIN does not validate that shape)."""
     out = []
+    fired = False           # the 'chain' spelling fired (a nitrile carbon left to the 'cyano' branch)
     for nb in ctx.mol.GetAtomWithIdx(atom).GetNeighbors():
         j = nb.GetIdx()
         if nb.GetAtomicNum() <= 1 or j not in component:
@@ -2799,7 +2816,7 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
         if _is_phosphinate_oxide_root(ctx.mol, j):
             continue
         if ctx.chain_forms and _is_cyano_root(ctx.mol, j):
-            ctx.fire('chain')
+            fired = True
             continue  # roadmap item 12a: a nitrile carbon is the anchor of the 'cyano'
             # prefix the Blue Book), never a chain member
             # with its nitrogen threaded as '1-azamethan-1-ylidyne'
@@ -2811,7 +2828,7 @@ def _tree_neighbors(ctx: _Ctx, atom: int, component: FrozenSet[int]) -> List[int
             # spine (a carbanion / heteroatom-hydride anion this leaf
             # does NOT own stays threadable -> skeletal -ide/-uide)
         out.append(j)
-    return out
+    return tuple(out), fired
 
 
 # ===========================================================================

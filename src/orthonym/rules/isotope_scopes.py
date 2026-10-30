@@ -69,6 +69,7 @@ from typing import Dict, Iterator, List, Optional, Sequence, Tuple
 from rdkit import Chem
 
 from ..data.chain_names import multiplying_prefix
+from ..perception.substructure import ordered_matches
 from . import isotopes as _iso
 
 #: OPSIN parses the probes of one composer call may spend. Beyond it the probing stops and the
@@ -99,6 +100,12 @@ Record = Tuple[Tuple[Key, int], ...]        # the nuclides, each with its atom c
 #: that labels the assembly. ``_iso._INTERIOR_LOCANT_STEM_RE`` admits neither primes nor
 #: colons.
 _ASSEMBLY_STEM_RE = re.compile(r"-(?=[\d,':]+-[a-z])")
+#: The same locant set right after an opening mark, where it opens a substituent prefix:
+#: '(9,9'-spirobi[fluoren]-4-yl)'. A descriptor that labels the primed component goes before the
+#: set, '[(3',4'-2H2)-9,9'-spirobi[fluoren]-4-yl]', as for a parent, the Blue Book: "before the
+#: part of the compound that is isotopically substituted"); the unprimed
+#: component's own slot inside 'spirobi[...]' reads only unprimed locants.
+_PRIMED_STEM_AFTER_MARK_RE = re.compile(r"(?<=[(\[{])(?=\d+[a-z]?'*(?:,\d+[a-z]?'*)*'(?:,\d+[a-z]?'*)*-[a-z])")
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +419,7 @@ def _candidate_offsets(skeleton: str) -> List[int]:
     offs = {0}
     offs.update(_iso._insertion_offsets(skeleton))
     offs.update(m.start() for m in _ASSEMBLY_STEM_RE.finditer(skeleton))
+    offs.update(m.start() for m in _PRIMED_STEM_AFTER_MARK_RE.finditer(skeleton))
     offs.update(i for i in range(1, len(skeleton))
                 if skeleton[i - 1] == " " and skeleton[i] != " ")
     return sorted(offs)
@@ -465,16 +473,18 @@ class _Prober:
             return
         work = view[0]
         if Chem.MolToSmiles(work) == self.model.base_key:
-            matches = (self.model.heavy.GetSubstructMatches(work, useChirality=True, uniquify=False,
-                                                            maxMatches=_FRAME_MATCHES)
-                       or self.model.heavy.GetSubstructMatches(work, uniquify=False, maxMatches=_FRAME_MATCHES))
+            # ``work`` comes in OPSIN's atom order: matched in its canonical order (``ordered_matches``), or a
+            # molecule with many symmetric leaf groups never returns
+            matches = (ordered_matches(self.model.heavy, work, use_chirality=True, uniquify=False,
+                                       max_matches=_FRAME_MATCHES)
+                       or ordered_matches(self.model.heavy, work, uniquify=False, max_matches=_FRAME_MATCHES))
         elif _other_alternation(work, self.model.heavy):
             # OPSIN writes a conjugated ring RDKit does not perceive as aromatic in the other Kekule
             # alternation than the input's (the periphery of '10b,10c-dihydropyren-1-yl', a 4n+2 circuit,
             # ``rules.isotopes._same_fixed_h_inchi``): one compound, so the frame is the same, matched on
             # the graphs without bond orders.
-            matches = _iso._single_bond_graph(self.model.heavy).GetSubstructMatches(
-                _iso._single_bond_graph(work), uniquify=False, maxMatches=_FRAME_MATCHES)
+            matches = ordered_matches(_iso._single_bond_graph(self.model.heavy), _iso._single_bond_graph(work),
+                                      uniquify=False, max_matches=_FRAME_MATCHES)
         else:
             return
         frames = {}
@@ -1120,18 +1130,66 @@ def _lowest_locants(skeleton: str, original: Chem.Mol, label_map: Dict[int, int]
     locants; the first isomorphism the name is found for is the lowest only by chance, so the others are tried
     when the first has a name, and a name replaces it only when it cites a strictly lower set of as many locants
     (a unit cited without locants because it holds every position of its nuclide is another spelling, not
-    another numbering): a name found on the first isomorphism is never changed otherwise."""
+    another numbering). Of readings with the same locants, the one whose senior nuclides sit in the prefixes of
+    the lowest parent locants wins, (the Blue Book, "the senior parent structure that has the
+    lowest locant(s) for nuclides of higher mass number": '4-(2-13C)ethyl-2-[2-(2-14C)ethylpentyl]heptan-1-ol',
+    not the reading that puts 14C at 4), then the one with its descriptors earlier in the name: of two identical
+    groups the modified one is cited first, (the Blue Book, "The isotopically modified
+    substituent is preferred alphabetically to the unmodified substituent"). A name found on the first
+    isomorphism is never changed otherwise."""
     best = None
     for index in range(len(prober.frames)):
         prober.use_frame(index)
+        # every reading is tried: which one the matcher gives first is no property of the molecule, and a
+        # reading of a symmetric skeleton can have a cover the first one has not (the two equally labelled
+        # phenyls of '(2,3,4,5-2H4)phenyldi(2H5)phenylsilyl' fall into the 'di' unit under some readings only)
         found = _compose_on(skeleton, original, label_map, n_pos, model, prober, stats, extras, mixed)
-        if found is None and index == 0:
-            return None             # the labels have no cover on this spelling; the symmetric readings have none either
         if found is not None and (best is None or (len(found.locants) == len(best.locants)
-                                                    and found.locants < best.locants)):
+                                                    and _reading_key(found, model, skeleton)
+                                                    < _reading_key(best, model, skeleton))):
             best = found
     prober.use_frame(0)
     return best
+
+
+def _reading_key(found: _Found, model: _Model, skeleton: str) -> tuple:
+    """What ``_lowest_locants`` compares two readings by: the locants cited, the parent locants of the nuclides
+    from the senior one down, the offsets of the descriptors."""
+    held = []
+    for (slot_idx, _token), positions in found.cover:
+        top = _parent_locants(skeleton, found.slots[slot_idx].pos)
+        for p in positions:
+            for (mass, symbol), _n in model.need[p]:
+                held.append((-Chem.GetPeriodicTable().GetAtomicNumber(symbol), -mass, top))
+    return found.locants, tuple(top for _z, _a, top in sorted(held)), _descriptor_offsets(found)
+
+
+def _parent_locants(skeleton: str, pos: int) -> tuple:
+    """The locants of the prefix of the parent (outside every enclosing mark) that ``pos`` lies in: (2,) for a
+    slot of '2-[2-(...)ethylpentyl]',  for a prefix cited without locants."""
+    depth, last, i = 0, (), 0
+    while i < pos:
+        c = skeleton[i]
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+        elif depth == 0 and c.isdigit() and (i == 0 or skeleton[i - 1] in "-,)]} "):
+            m = _PARENT_LOCANTS_RE.match(skeleton, i)
+            if m:
+                last = tuple(int(x) for x in re.findall(r"\d+", m.group(0)))
+                i = m.end()
+                continue
+        i += 1
+    return last
+
+
+_PARENT_LOCANTS_RE = re.compile(r"\d+[a-z]?'*(?:,\d+[a-z]?'*)*-")
+
+
+def _descriptor_offsets(found: _Found) -> tuple:
+    """The offsets in the skeleton of the slots that hold the descriptors of ``found``, in increasing order."""
+    return tuple(sorted(found.slots[slot_idx].pos for (slot_idx, _token), _positions in found.cover))
 
 
 def _locants_cited(model: _Model, cover: Sequence[Chosen]) -> tuple:

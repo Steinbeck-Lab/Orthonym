@@ -250,9 +250,23 @@ def opsin_atom_locant_map(
     This is the ``re-anchor + audit`` primitive (the contributor guide a project rule): the
     map is derived FROM the name+structure, never trusted from a builder's
     internal numbering, and the caller RT-verifies any name decorated with it.
+
+    Memoised for the naming call (``assembly.memo``) on the name and the indexed graph of *mol*: one naming
+    asks for the map of one name on one molecule many times, and each answer ranks up to 100,000 matches.
     """
     if mol is None:
         return None
+    from ..assembly.memo import cache_or_compute
+    graph = (tuple((a.GetAtomicNum(), a.GetFormalCharge(), a.GetIsotope(), int(a.GetChiralTag()),
+                    a.GetTotalNumHs(), a.GetNumRadicalElectrons()) for a in mol.GetAtoms()),
+             tuple((b.GetBeginAtomIdx(), b.GetEndAtomIdx(), int(b.GetBondType()), int(b.GetStereo()),
+                    tuple(b.GetStereoAtoms())) for b in mol.GetBonds()))
+    return cache_or_compute("opsin_atom_locant_map", (name, jar_version, graph),
+                            lambda: _opsin_atom_locant_map(name, mol, jar_version))
+
+
+def _opsin_atom_locant_map(name: str, mol, jar_version: str) -> Optional[Dict[int, Locant]]:
+    """:func:`opsin_atom_locant_map` computed."""
     # a structure with radical electrons is read with OPSIN's -r (validation/read_back_policy.py), in the radical offer
     allow_radicals = _reads_radicals(mol)
     ext = (_extended_smiles(name, jar_version=jar_version, allow_radicals=True) if allow_radicals
@@ -289,16 +303,20 @@ def opsin_atom_locant_map(
     # canonical under ``CanonicalRankAtoms`` (an atom-order-INVARIANT total order),
     # so the same molecule always yields the same locant map regardless of how its
     # SMILES was written.
-    matches = mol.GetSubstructMatches(
-        omol, useChirality=False, uniquify=False, maxMatches=100_000)
-    matches = [m for m in matches if len(m) == omol.GetNumAtoms()]
-    if not matches:
+    # ``omol`` comes in OPSIN's atom order: matched in its canonical order, or a molecule with many symmetric leaf
+    # groups never returns (``perception.substructure``)
+    import numpy as np
+
+    from ..perception.substructure import ordered_match_array
+    matches = ordered_match_array(mol, omol, uniquify=False, max_matches=100_000)
+    if not len(matches):
         return None
     if len(matches) == 1:
-        match = matches[0]
+        match = tuple(matches[0].tolist())
     else:
-        ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
-        match = min(matches, key=lambda mm: tuple(ranks[i] for i in mm))
+        # the match whose ranks, read in the atom order of ``omol``, are lowest (lexicographically)
+        ranks = np.asarray(list(Chem.CanonicalRankAtoms(mol, breakTies=True)), dtype=np.intp)[matches]
+        match = tuple(matches[np.lexsort(ranks.T[::-1])[0]].tolist())
     result: Dict[int, Locant] = {}
     for opsin_idx, mol_idx in enumerate(match):
         loc = _parse_av_token(tokens[opsin_idx].strip())

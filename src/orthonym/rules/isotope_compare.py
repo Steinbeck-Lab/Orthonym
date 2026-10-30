@@ -22,6 +22,8 @@ from typing import Dict, Iterator, List, Optional, Tuple
 
 from rdkit import Chem
 
+from ..perception.substructure import ordered_matches
+
 #: Set by ``rules.isotopes._decorate_labelled`` while it names a molecule that has radical electrons: the
 #: candidates of the decorator are then read with OPSIN's ``-r``, and not otherwise
 #: (``validation/read_back_policy.py``: a name is read back with ``-r`` only when the input structure has
@@ -97,7 +99,7 @@ def _moved_atoms(parsed: Chem.Mol, original: Chem.Mol, key: Optional[str] = None
     if ga is None or gb is None or (key is not None and Chem.MolToSmiles(ga) != key):
         return None
     best = None
-    for match in gb.GetSubstructMatches(ga, uniquify=False, maxMatches=_MAPPING_CAP):
+    for match in ordered_matches(gb, ga, uniquify=False, max_matches=_MAPPING_CAP):
         moved = []
         for i, j in enumerate(match):
             a = parsed.GetAtomWithIdx(ga.GetAtomWithIdx(i).GetIntProp("_t"))

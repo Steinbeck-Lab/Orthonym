@@ -1209,6 +1209,32 @@ def record_junior_ring_parent(features, name: str) -> None:
             detail="a ring assembly of the molecule is senior to the ring system the name is built on (P-44.2.1.6)")
 
 
+def _aromatic_heterocycle(mol, system) -> bool:
+    atoms = [mol.GetAtomWithIdx(a) for a in system]
+    return all(a.GetIsAromatic() for a in atoms) and any(a.GetAtomicNum() != 6 for a in atoms)
+
+
+def _most_prefixes_then_canonical(mol, ring_systems, tied, exo_count) -> int:
+    """Of tied aromatic heterocycles that ``ring_tie_locants`` leaves tied, the one with the most substituent
+    groups cited as prefixes, "the maximum number of substituent groups cited as prefixes",
+    the Blue Book), then the one whose atoms come first in the canonical ranking. The tie used to fall to
+    ``tied[0]``, the order of the input atoms, so the parent changed with the SMILES spelling (two pyridines,
+    one of which carries four prefixes); ranks without broken ties are the same for every spelling. When every
+    tied system carries as many prefixes the criterion does not decide and ``tied[0]`` stays (another parent of
+    the same count names the molecule alike, but at up to twice the cost: two pyrroles of a peptide dimer). The exocyclic bonds of a
+    carbocycle or a saturated heterocycle are not its prefixes alone (the ring of an anilide, a glycoside's
+    pyranose), so those keep ``tied[0]``."""
+    counts = {i: exo_count(ring_systems[i]) for i in tied}
+    most = max(counts.values())
+    if min(counts.values()) == most:
+        return tied[0]      # equal counts: does not decide, and the choice stays as it was
+    cands = [i for i in tied if counts[i] == most]
+    if len(cands) == 1:
+        return cands[0]
+    ranks = list(Chem.CanonicalRankAtoms(mol, breakTies=False))
+    return min(cands, key=lambda i: (sorted(ranks[a] for a in ring_systems[i]), i))
+
+
 def select_principal_ring_system(
     mol: Chem.Mol,
     ring_systems: List[Set[int]],
@@ -1355,7 +1381,8 @@ def select_principal_ring_system(
             from .ring_tie_locants import senior_by_prefix_locants    #, (heteroaromatic monocycles)
             best_idx = senior_by_prefix_locants(mol, ring_systems, tied)
             if best_idx is None:
-                best_idx = tied[0]
+                best_idx = (_most_prefixes_then_canonical(mol, ring_systems, tied, _exo_count)
+                            if all(_aromatic_heterocycle(mol, ring_systems[i]) for i in tied) else tied[0])
     else:
         best_idx = tied[0]
 

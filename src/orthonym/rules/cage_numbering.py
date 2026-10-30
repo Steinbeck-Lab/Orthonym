@@ -94,8 +94,8 @@ def cage_branches(mol, ring_atoms: Set[int], suffix_pairs: Set[Tuple[int, int]],
     is named as a substituent and that is its parent). ``signature`` identifies the branch without
     naming it: ``(order of the bond to the cage, canonical SMILES, stereo)``, so equal signatures are
     equal branches and two branches that differ only by stereo are two. ``None`` when a branch loops back
-    into the ring or a second bond joins it to its cage atom, so that the caller never ranks a partial
-    set of prefixes.
+    into the ring, a second bond joins it to its cage atom or RDKit cannot write it, so that the caller
+    never ranks a partial set of prefixes.
     """
     branches: Dict[int, list] = {}
     for idx in sorted(ring_atoms):
@@ -119,10 +119,13 @@ def cage_branches(mol, ring_atoms: Set[int], suffix_pairs: Set[Tuple[int, int]],
                         branch.add(k)
                         stack.append(k)
             order = mol.GetBondBetweenAtoms(idx, first).GetBondTypeAsDouble()
-            signature = (order,
-                         Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(branch), rootedAtAtom=first,
-                                                  isomericSmiles=False, canonical=True),
-                         _stereo_signature(mol, branch, idx))
+            try:
+                signature = (order,
+                             Chem.MolFragmentToSmiles(mol, atomsToUse=sorted(branch), rootedAtAtom=first,
+                                                      isomericSmiles=False, canonical=True),
+                             _stereo_signature(mol, branch, idx))
+            except Exception:  # noqa: BLE001 -- a branch RDKit cannot write (a kekulization it refuses):
+                return None    # the prefixes are not compared, as for a branch that loops back
             branches.setdefault(idx, []).append((signature, frozenset(branch), first))
     return branches
 

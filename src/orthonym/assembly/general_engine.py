@@ -218,7 +218,7 @@ def _urea_ring_carboxamide_match(mol, functional_groups, ring_set):
 
 
 _MULT_SIMPLE = multiplier_table(10)
-_MULT_COMPLEX = multiplier_table(6, kind='complex')
+_MULT_COMPLEX = multiplier_table(10, kind='complex')
 # Complex prefix (needs bis/tris + enclosure): contains locants, hyphens,
 # brackets, or an internal multiplying prefix.
 _COMPLEX_PREFIX_RE = re.compile(r"[0-9\-\(\)\[\]]")
