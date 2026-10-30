@@ -155,7 +155,23 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
     # and pre-sorted largest-first at import (see _COMPILED_PAH); this loop used to
     # re-sort + Chem.MolFromSmarts all ~34 patterns on every call.
     table_hit: Optional[str] = None
+    # The fused ring components (rings merged on shared atoms). Every atom of a PAH pattern
+    # lies on one of its rings and the rings are fused, so a match lies inside ONE
+    # component; the coverage veto below accepts it only when that component is exactly
+    # the core. A pattern whose size no component has is therefore never accepted, and is
+    # skipped unmatched: a fullerene derivative (a 60+ atom component) made every pattern
+    # search its cage, minutes per call, for a veto that was certain.
+    components = []
+    for ring in mol.GetRingInfo().AtomRings():
+        rs = set(ring)
+        merged = [c for c in components if c & rs]
+        for c in merged:
+            components.remove(c)
+        components.append(rs.union(*merged) if merged else rs)
+    component_sizes = {len(c) for c in components}
     for pah_name, pah_data, pattern in _COMPILED_PAH:
+        if pah_data['num_atoms'] not in component_sizes:
+            continue
         # C5: only matches[0] is ever read below -- bound the search so a
         # highly-symmetric giant cage cannot enumerate a combinatorial number of
         # automorphic matches (measured 63.1s on a C70 fullerene before the scope
@@ -183,13 +199,6 @@ def _identify_polycyclic_impl(mol) -> Optional[str]:
                 # Ring systems connected only by single bonds
                 # (1-phenylnaphthalene) are separate components and pass.
                 # IUPAC (e): greater number of skeletal ring atoms.
-                components = []
-                for ring in mol.GetRingInfo().AtomRings():
-                    rs = set(ring)
-                    merged = [c for c in components if c & rs]
-                    for c in merged:
-                        components.remove(c)
-                    components.append(rs.union(*merged) if merged else rs)
                 covered = set()
                 for c in components:
                     if c & match_atoms:
