@@ -3783,6 +3783,52 @@ def name_ring_assembly_prefix(
     primed), is kept."""
     if assembly_info.get('hydro'):
         return None  # a hydro assembly is named as a whole molecule only (``_hydro_name``)
+    best = None
+    for info in _ring_chain_orientations(assembly_info):
+        built = _name_ring_assembly_prefix_oriented(mol, info, attachment_atom_idx)
+        if built is None:
+            continue
+        if best is None or built[1] < best[1]:
+            best = built
+    return best[0] if best is not None else None
+
+
+def name_ring_assembly_polyvalent_prefix(
+    mol, assembly_info: Dict, attachment_atoms: List[int]
+) -> Optional[str]:
+    """The ring-assembly prefix with a free valence on each atom of ``attachment_atoms``, one per ring system
+    ('[1,1'-biphenyl]-4,4'-diyl'), numbered per whatever the input atom order, or None.
+
+    ``### ****`` "Substituent prefixes derived from ring assemblies" (the Blue Book),:16109: "Low locants
+    are assigned to ring junctions, then to free valences". Both directions of the ring chain are numbered, as for the
+    monovalent prefix (:func:`name_ring_assembly_prefix`), and the one with the lower junction locants, then the lower set
+    of free-valence locants (unprimed before primed at equal numbers), is kept. The locants are cited in increasing order
+    ,:5297: "When there is no choice the locants are cited in increasing numerical order"). The ring name
+    keeps its final 'e' before 'diyl' ('[2,2'-bipyridine]-5,5'-diyl', as 'pyridine-2,6-diyl')."""
+    word = _POLYVALENT_WORD.get(len(attachment_atoms))
+    if assembly_info.get('hydro') or word is None or len(set(attachment_atoms)) != len(attachment_atoms):
+        return None
+    best = None
+    for info in _ring_chain_orientations(assembly_info):
+        parts = _ring_assembly_prefix_parts(mol, info, list(attachment_atoms), elide=False)
+        if parts is None:
+            continue
+        assembly_base, junction_key, free_valences = parts
+        located = sorted((_locant_key(loc), system, loc) for loc, system in free_valences)
+        key = (junction_key, tuple((number, system) for number, system, _loc in located))
+        locants = ",".join(f"{loc}{_format_prime(system)}" for _number, system, loc in located)
+        if best is None or key < best[1]:
+            best = (f"[{assembly_base}]-{locants}-{word}", key)
+    return best[0] if best is not None else None
+
+
+#: the free-valence word of a polyvalent ring-assembly prefix, by the number of free valences
+_POLYVALENT_WORD = {2: "diyl", 3: "triyl", 4: "tetrayl"}
+
+
+def _ring_chain_orientations(assembly_info: Dict) -> List[Dict]:
+    """``assembly_info`` in both directions of its ring chain compares the numberings), or alone when its ring
+    systems are not one unbranched chain."""
     orientations = [assembly_info]
     try:
         n = len(assembly_info['ring_systems'])
@@ -3811,14 +3857,7 @@ def name_ring_assembly_prefix(
                     orientations.append(info)
     except Exception:  # noqa: BLE001 -- keep the input orientation
         orientations = [assembly_info]
-    best = None
-    for info in orientations:
-        built = _name_ring_assembly_prefix_oriented(mol, info, attachment_atom_idx)
-        if built is None:
-            continue
-        if best is None or built[1] < best[1]:
-            best = built
-    return best[0] if best is not None else None
+    return orientations
 
 
 def _locant_key(loc):
@@ -3851,10 +3890,24 @@ def _middle_ring_free_valence(per_system_locants, connections, sys_idx: int, ato
 def _name_ring_assembly_prefix_oriented(
     mol, assembly_info: Dict, attachment_atom_idx: int
 ):
+    """The monovalent prefix in the ring order ``assembly_info`` gives: ``(prefix, key)``, the key being the
+    order of this numbering (junction locants, then the free valence: its primes, then its locant), or None."""
+    parts = _ring_assembly_prefix_parts(mol, assembly_info, [attachment_atom_idx])
+    if parts is None:
+        return None
+    assembly_base, junction_key, ((attach_locant, attach_system_idx),) = parts
+    return (f"[{assembly_base}]-{attach_locant}{_format_prime(attach_system_idx)}-yl",
+            (junction_key, attach_system_idx, _locant_key(attach_locant)))
+
+
+def _ring_assembly_prefix_parts(
+    mol, assembly_info: Dict, attachment_atoms: List[int], elide: bool = True
+):
     """Generate ring assembly substituent prefix per IUPAC, in the ring order
-    ``assembly_info`` gives; returns ``(prefix, key)``, the key being the
-    order of this numbering (junction locants, then the free valence: its primes,
-    then its locant), or None.
+    ``assembly_info`` gives; returns ``(assembly base, junction key, [(free-valence
+    locant, ring system),...])`` for the free valences ``attachment_atoms`` (one per
+    ring system), or None. ``elide`` drops the final 'e' of the ring name (before
+    '-yl'; 'diyl' keeps it).
 
     When a ring assembly (identical rings joined by single bonds) appears as
     a substituent on a parent chain, the prefix uses square-bracket notation
@@ -3866,10 +3919,10 @@ def _name_ring_assembly_prefix_oriented(
         mol: RDKit Mol object
         assembly_info: Dict from detect_ring_assembly with keys:
             ring_systems, connections, count, ring_type
-        attachment_atom_idx: Atom index where assembly connects to parent chain
+        attachment_atoms: the atoms where the assembly connects to the rest
 
     Returns:
-        Prefix string like ``[1,1'-biphenyl]-4-yl`` or None on failure.
+        The parts of a prefix like ``[1,1'-biphenyl]-4-yl`` or None on failure.
 
     Examples:
         biphenyl attached at para position -> "[1,1'-biphenyl]-4-yl"
@@ -3901,7 +3954,7 @@ def _name_ring_assembly_prefix_oriented(
     # the parent path (151-03 /) but the substituent-prefix path kept
     # the old code; a biphenyl (single junction) is unaffected either way.
     per_system_locants = _compute_per_system_ring_locants(
-        mol, assembly_info, free_valence_atoms=[attachment_atom_idx])
+        mol, assembly_info, free_valence_atoms=list(attachment_atoms))
 
     def _lookup_locant(sys_idx, atom_idx, sys_atoms):
         if (per_system_locants is not None
@@ -3932,6 +3985,87 @@ def _name_ring_assembly_prefix_oriented(
             f"{loc1}{_format_prime(s1)},{loc2}{_format_prime(s2)}")
     connection_str = ":".join(connection_parts)
 
+    free_valences = []
+    for attachment_atom_idx in attachment_atoms:
+        located = _free_valence_locant(mol, ring_systems, connections, per_system_locants, attachment_atom_idx)
+        if located is None:
+            return None
+        free_valences.append(located)
+    if len({system for _locant, system in free_valences}) != len(free_valences):
+        return None  # two free valences on one ring system: their locants are not minimised together
+
+    # a phase.B: indicated-H placement subset for ring-assembly
+    # SUBSTITUENT prefix path. Mirrors the parent-path replication in
+    # `name_ring_assembly` (line 1201-1212) so a biindole-bearing
+    # substituent emits `[1H,1'H-2,2'-biindol]-5-yl` instead of the pre-fix
+    # buggy form `[2,2'-bi1H-indol]-5-yl`. Both call sites now agree on
+    # the replication contract -- a biindole-bearing molecule names
+    # consistently whether the assembly is parent or substituent.
+    # Source: internal notes; AUTONOM-followups.md Follow-up 12
+    # placement subset; IUPAC. Reuses _format_prime
+    # and _INDICATED_H_RE.
+    indicated_h_match = _INDICATED_H_RE.match(ring_name)
+    if indicated_h_match:
+        locant_int, ring_stem = (
+            indicated_h_match.group(1),
+            indicated_h_match.group(2),
+        )
+        # Vowel elision for the -yl form: "indole" -> "indol".
+        display_stem = ring_stem[:-1] if elide and ring_stem.endswith('e') else ring_stem
+        # (the Blue Book), the same rule as the parent path: the indicated
+        # hydrogen of each component ring is cited at ITS OWN position, in front of the
+        # assembly name, ignoring the descriptor of the isolated component name ('1H-pyrrole')
+        # -- the junction atom holds no indicated hydrogen ('1,1'-bipyrrole (PIN)':15603, so
+        # '[1,1'-bipyrrol]-3-yl', never '[1H,1'H-1,1'-bipyrrol]-3-yl'). Copying the first
+        # ring's descriptor onto every ring put it on a junction atom. A component whose
+        # per-ring locants are not known (fused: the biindole class) keeps the copy.
+        per_ring_ih_locants = _compute_per_ring_ih_locants(
+            mol, ring_systems, per_system_locants)
+        if all(locs is not None for locs in per_ring_ih_locants):
+            indicated_h_prefix = ",".join(
+                f"{loc}{_format_prime(sys_idx)}H"
+                for loc, sys_idx in sorted(
+                    (loc, sys_idx)
+                    for sys_idx, locs in enumerate(per_ring_ih_locants)
+                    for loc in locs)
+            )
+            indicated_h_replicated = indicated_h_prefix + "-" if indicated_h_prefix else ""
+        else:
+            indicated_h_replicated = ",".join(
+                f"{locant_int}{_format_prime(i)}H" for i in range(count)
+            ) + "-"
+        # Assembly base: "1H,1'H-2,2'-biindol"
+        assembly_base = indicated_h_replicated + _multiplied_assembly(
+            connection_str, multiplier, display_stem, count)
+    else:
+        # For heterocyclic rings, apply vowel elision: "pyridine" -> "pyridin" before -yl
+        # (IUPAC: terminal 'e' dropped before '-yl')
+        display_name = ring_name
+        if elide and display_name.endswith('e'):
+            display_name = display_name[:-1]
+
+        #: a NON-retained component (cycloalkane / von Baeyer / spiro)
+        # is enclosed in parentheses to disambiguate from a von Baeyer name,
+        # EXACTLY as the parent path does via _enclose_component (line ~2168) —
+        # 'cyclohexan' -> '(cyclohexan)', so '[1,1'-bi(cyclohexan)]-2-yl'
+        # (the Blue Book preferred prefix), not the buggy '[1,1'-bicyclohexan]-2-yl'.
+        # Retained mancude stems (phenyl/pyridin/thiophen) never match and stay
+        # bare -> '[1,1'-biphenyl]-4-yl' byte-identical. The decision keys off the
+        # ORIGINAL ring_name (the predicate matches 'cyclohexane', not the elided
+        # stem); the marks wrap the elided display_name.
+        if _needs_von_baeyer_parens(ring_name):
+            display_name = f"({display_name})"
+
+        # Assembly base: "1,1'-biphenyl", "2,2'-bipyridin", "1,1'-bi(cyclohexan)"
+        assembly_base = _multiplied_assembly(connection_str, multiplier,
+                                             display_name, count)
+
+    # the base of "[1,1'-biphenyl]-4-yl" or "[1H,1'H-2,2'-biindol]-5-yl"
+    return assembly_base, tuple(junction_key), free_valences
+
+
+def _free_valence_locant(mol, ring_systems, connections, per_system_locants, attachment_atom_idx):
+    """The locant of the free valence on ``attachment_atom_idx`` and the index of its ring system, or None."""
     # Find which ring system the attachment atom belongs to
     attach_system_idx = None
     for i, sys_atoms in enumerate(ring_systems):
@@ -3990,77 +4124,7 @@ def _name_ring_assembly_prefix_oriented(
         attach_locant = _get_connection_locant(
             mol, attachment_atom_idx, ring_systems[attach_system_idx]
         )
-    attach_prime = _format_prime(attach_system_idx)
-
-    # a phase.B: indicated-H placement subset for ring-assembly
-    # SUBSTITUENT prefix path. Mirrors the parent-path replication in
-    # `name_ring_assembly` (line 1201-1212) so a biindole-bearing
-    # substituent emits `[1H,1'H-2,2'-biindol]-5-yl` instead of the pre-fix
-    # buggy form `[2,2'-bi1H-indol]-5-yl`. Both call sites now agree on
-    # the replication contract -- a biindole-bearing molecule names
-    # consistently whether the assembly is parent or substituent.
-    # Source: internal notes; AUTONOM-followups.md Follow-up 12
-    # placement subset; IUPAC. Reuses _format_prime
-    # and _INDICATED_H_RE.
-    indicated_h_match = _INDICATED_H_RE.match(ring_name)
-    if indicated_h_match:
-        locant_int, ring_stem = (
-            indicated_h_match.group(1),
-            indicated_h_match.group(2),
-        )
-        # Vowel elision for the -yl form: "indole" -> "indol".
-        display_stem = ring_stem[:-1] if ring_stem.endswith('e') else ring_stem
-        # (the Blue Book), the same rule as the parent path: the indicated
-        # hydrogen of each component ring is cited at ITS OWN position, in front of the
-        # assembly name, ignoring the descriptor of the isolated component name ('1H-pyrrole')
-        # -- the junction atom holds no indicated hydrogen ('1,1'-bipyrrole (PIN)':15603, so
-        # '[1,1'-bipyrrol]-3-yl', never '[1H,1'H-1,1'-bipyrrol]-3-yl'). Copying the first
-        # ring's descriptor onto every ring put it on a junction atom. A component whose
-        # per-ring locants are not known (fused: the biindole class) keeps the copy.
-        per_ring_ih_locants = _compute_per_ring_ih_locants(
-            mol, ring_systems, per_system_locants)
-        if all(locs is not None for locs in per_ring_ih_locants):
-            indicated_h_prefix = ",".join(
-                f"{loc}{_format_prime(sys_idx)}H"
-                for loc, sys_idx in sorted(
-                    (loc, sys_idx)
-                    for sys_idx, locs in enumerate(per_ring_ih_locants)
-                    for loc in locs)
-            )
-            indicated_h_replicated = indicated_h_prefix + "-" if indicated_h_prefix else ""
-        else:
-            indicated_h_replicated = ",".join(
-                f"{locant_int}{_format_prime(i)}H" for i in range(count)
-            ) + "-"
-        # Assembly base: "1H,1'H-2,2'-biindol"
-        assembly_base = indicated_h_replicated + _multiplied_assembly(
-            connection_str, multiplier, display_stem, count)
-    else:
-        # For heterocyclic rings, apply vowel elision: "pyridine" -> "pyridin" before -yl
-        # (IUPAC: terminal 'e' dropped before '-yl')
-        display_name = ring_name
-        if display_name.endswith('e'):
-            display_name = display_name[:-1]
-
-        #: a NON-retained component (cycloalkane / von Baeyer / spiro)
-        # is enclosed in parentheses to disambiguate from a von Baeyer name,
-        # EXACTLY as the parent path does via _enclose_component (line ~2168) —
-        # 'cyclohexan' -> '(cyclohexan)', so '[1,1'-bi(cyclohexan)]-2-yl'
-        # (the Blue Book preferred prefix), not the buggy '[1,1'-bicyclohexan]-2-yl'.
-        # Retained mancude stems (phenyl/pyridin/thiophen) never match and stay
-        # bare -> '[1,1'-biphenyl]-4-yl' byte-identical. The decision keys off the
-        # ORIGINAL ring_name (the predicate matches 'cyclohexane', not the elided
-        # stem); the marks wrap the elided display_name.
-        if _needs_von_baeyer_parens(ring_name):
-            display_name = f"({display_name})"
-
-        # Assembly base: "1,1'-biphenyl", "2,2'-bipyridin", "1,1'-bi(cyclohexan)"
-        assembly_base = _multiplied_assembly(connection_str, multiplier,
-                                             display_name, count)
-
-    # Full prefix: "[1,1'-biphenyl]-4-yl" or "[1H,1'H-2,2'-biindol]-5-yl"
-    return (f"[{assembly_base}]-{attach_locant}{attach_prime}-yl",
-            (tuple(junction_key), attach_system_idx, _locant_key(attach_locant)))
+    return attach_locant, attach_system_idx
 
 
 def _heteromonocycle_prefix_locants(

@@ -384,6 +384,22 @@ def _spacers(mol, split: UnitSplit) -> Optional[Tuple[str, List[int]]]:
     return (name, host) if name and len(set(host)) == len(host) and not anchors & set(host) else None
 
 
+def _assembly_linker_name(mol, atoms: FrozenSet[int], sites: List[int]) -> Optional[str]:
+    """The name of the linker ``atoms`` when it is one ring assembly and nothing else (identical ring systems joined
+    directly by single bonds, with one free valence on each ring system at ``sites``: '[1,1'-biphenyl]-3,3'-diyl'
+    (``rules.ring_assemblies.name_ring_assembly_polyvalent_prefix``, numbered by ``### ****``, the Blue Book),
+    or None. The parent that ``_holds`` asks for is one ring system; an assembly is several."""
+    from ..rules.multiplicative_general import _ring_systems
+    from ..rules.ring_assemblies import detect_ring_assembly, name_ring_assembly_polyvalent_prefix
+    systems = sorted((rs for rs in _ring_systems(mol) if rs <= atoms), key=min)
+    if len(systems) < 2 or frozenset().union(*systems) != atoms:
+        return None
+    info = detect_ring_assembly(mol, [set(rs) for rs in systems])
+    if info is None or info.get('hydro') or len(info['ring_systems']) != len(systems):
+        return None
+    return name_ring_assembly_polyvalent_prefix(mol, info, sites)
+
+
 def _linker_name(mol, split: UnitSplit, book_forms: bool, acyloxy_leaf: bool) -> Iterator[str]:
     """The names of the linker, the book's spelling of its parent first: when the units are bonded through one-atom divalent
     groups, the host named with the free valences on the atoms of the groups, the groups cited after it
@@ -398,6 +414,9 @@ def _linker_name(mol, split: UnitSplit, book_forms: bool, acyloxy_leaf: bool) ->
     plans.append((split.linker, anchors, ""))
     for atoms, sites, tail in plans:
         if not _holds(mol, sites):
+            assembly = _assembly_linker_name(mol, atoms, sites)
+            if assembly:
+                yield assembly + tail
             continue
         linker, _new = _with_free_valences(mol, atoms, sites)
         named = None if linker is None else _name_polyvalent(linker, None, book_forms, acyloxy_leaf)

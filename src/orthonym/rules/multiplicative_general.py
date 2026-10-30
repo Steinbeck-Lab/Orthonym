@@ -707,19 +707,60 @@ def _name_unit(mol, k: _Kernel, attach: int, decos: List[Tuple[Set[int], int, in
 # ---------------------------------------------------------------------------
 
 class _Comp:
-    __slots__ = ("kind", "atoms", "order", "name", "ring_name")
+    __slots__ = ("kind", "atoms", "order", "name", "ring_name", "assembly")
 
     def __init__(self, kind, atoms, order=None, name=None):
-        self.kind = kind      # 'ring' | 'chain' | 'chalc' | 'NH' | 'N3' | 'NN'
+        self.kind = kind      # 'ring' | 'assembly' | 'chain' | 'chalc' | 'NH' | 'N3' | 'NN'
         self.atoms = frozenset(atoms)
         self.order = order
         self.name = name
         self.ring_name = None
+        self.assembly = None  # the ring assembly of an 'assembly' (detect_ring_assembly)
+
+
+def _assembly_comps(mol, rings) -> Optional[List[_Comp]]:
+    """The ring assemblies among ``rings`` (identical ring systems joined
+    directly by single bonds, as 'assembly' components, or None when a
+    group of bonded same-skeleton systems is not one."""
+    from .ring_assemblies import detect_ring_assembly
+    keys = {rs: _canonical_fragment(mol, rs, isomeric=False) for rs in rings}
+    ring_of = {a: rs for rs in rings for a in rs}
+    groups = {rs: {rs} for rs in rings}
+    for bd in mol.GetBonds():
+        a, b = bd.GetBeginAtomIdx(), bd.GetEndAtomIdx()
+        ra, rb = ring_of.get(a), ring_of.get(b)
+        if ra is None or rb is None or ra == rb or keys[ra] != keys[rb]:
+            continue
+        if bd.GetBondTypeAsDouble() != 1.0:
+            return None
+        merged = groups[ra] | groups[rb]
+        for rs in merged:
+            groups[rs] = merged
+    comps = []
+    for group in {frozenset(g) for g in groups.values() if len(g) > 1}:
+        if any(not _ring_kernel_ok(mol, rs) for rs in group):
+            return None
+        info = detect_ring_assembly(mol, [set(rs) for rs in sorted(group, key=min)])
+        if info is None or info.get('hydro') or len(info['ring_systems']) != len(group):
+            return None
+        c = _Comp("assembly", frozenset().union(*group))
+        c.assembly = info
+        comps.append(c)
+    return comps
 
 
 def _linker_components(mol, link: Set[int], rings) -> Optional[List[_Comp]]:
     comps: List[_Comp] = []
     left = set(link)
+    linked = [rs for rs in rings if rs & left]
+    assemblies = _assembly_comps(mol, linked)
+    if assemblies is None:
+        return None
+    for c in assemblies:
+        if not c.atoms <= left:
+            return None
+        comps.append(c)
+        left -= c.atoms
     for rs in rings:
         if rs & left:
             if not rs <= left or not _ring_kernel_ok(mol, rs):
@@ -1087,7 +1128,24 @@ def _name_component(mol, comps, adj, edges, where, node, parent):
         return _chain_name(mol, c, fv, toward)
     if c.kind == "ring":
         return _ring_comp_name(mol, c, fv, toward)
+    if c.kind == "assembly":
+        return _assembly_comp_name(mol, c, fv, parent)
     return None
+
+
+def _assembly_comp_name(mol, comp: _Comp, fv: Dict[int, int], parent):
+    """Name a ring-assembly component, the central multiplicative group only
+    ('[1,1'-biphenyl]-4,4'-diyl'): ``### ****`` (the Blue Book)
+    numbers its free valences, (:5238) cites it first. As a later
+    component of a branch, its locants toward the parent units
+    are not ordered here, so it declines. Two ring systems only: for three or more
+     prefers the superscript locants (:16134,:16138) that the prefix
+    builder does not write."""
+    from .ring_assemblies import name_ring_assembly_polyvalent_prefix
+    if parent is not None or comp.assembly['count'] != 2 or any(n != 1 for n in fv.values()):
+        return None
+    name = name_ring_assembly_polyvalent_prefix(mol, comp.assembly, sorted(fv))
+    return (name, True) if name else None
 
 
 def _multiplying_group(mol, units, comps, edges, adj, where):
@@ -1189,7 +1247,7 @@ def _aba_chain_in(mol, comps) -> bool:
     """An a(ba)n chain of alternating heteroatoms ending in two atoms of the
     later element is a parent hydride of its own: 'dithioxane'
     (HS-O-SH), 'diselenoxane'; '-O-S-O-' is not one ('sulfanediylbis(oxy)')."""
-    het = {a for c in comps if c.kind != "ring" for a in c.atoms
+    het = {a for c in comps if c.kind not in ("ring", "assembly") for a in c.atoms
            if mol.GetAtomWithIdx(a).GetAtomicNum() != 6}
     rank = {zz: i for i, zz in enumerate(_ABA_ORDER)}
     for mid in het:
@@ -1430,34 +1488,41 @@ def name_general_multiplicative(mol) -> Optional[str]:
         return None
 
 
-def _same_skeleton_rings_bonded(mol, rings) -> bool:
-    """Two ring systems of one skeleton joined by a bond form a ring assembly
-    , a parent of its own."""
+def _assembled_rings(mol, rings) -> Set[FrozenSet[int]]:
+    """The ring systems bonded to a ring system of the same skeleton: two such
+    systems joined by a bond form a ring assembly, a parent of its own."""
     ring_of = {}
     for i, rs in enumerate(rings):
         for a in rs:
             ring_of[a] = i
     keys = [_canonical_fragment(mol, rs, isomeric=False) for rs in rings]
+    out: Set[FrozenSet[int]] = set()
     for bd in mol.GetBonds():
         a, b = bd.GetBeginAtomIdx(), bd.GetEndAtomIdx()
         if a in ring_of and b in ring_of and ring_of[a] != ring_of[b] \
                 and keys[ring_of[a]] == keys[ring_of[b]]:
-            return True
-    return False
+            out |= {rings[ring_of[a]], rings[ring_of[b]]}
+    return out
 
 
 def _name_general_multiplicative(mol) -> Optional[str]:
     if mol is None or not _scope_ok(mol):
         return None
     rings = _ring_systems(mol)
-    if _same_skeleton_rings_bonded(mol, rings):
-        return None
+    assembled = _assembled_rings(mol, rings)
     from ..perception.functional_groups import detect_functional_groups
     from .seniority import get_principal_group
     pg, matches = get_principal_group(mol, detect_functional_groups(mol))
     if pg is not None and pg not in _HYDRIDE_PG:
         kernels = _pcg_kernels(mol, pg, matches, rings)
         if not kernels or len(kernels) < 2:
+            return None
+        # A ring assembly is a parent of its own: a unit ring in one
+        # declines. One that holds no principal characteristic group lies in the
+        # linker, where it is the central multiplicative group,
+        # '10,10'-[[1,1'-biphenyl]-4,4'-diylbis(oxy)]di(decanoic acid) (PIN)',
+        # the Blue Book).
+        if any(k.skel in assembled for k in kernels):
             return None
         groups: Dict[str, List[_Kernel]] = {}
         for k in kernels:
@@ -1470,7 +1535,10 @@ def _name_general_multiplicative(mol) -> Optional[str]:
         if len(groups) != 1:
             return None
         return _try_unit_set(mol, kernels, rings, kernels)
-    # no principal characteristic group: the senior parent hydride
+    # no principal characteristic group: the senior parent hydride;
+    # a ring assembly there competes as a parent, which is not decided here
+    if assembled:
+        return None
     from .p44_scorer import P44_CLASS_RANK
     for at in mol.GetAtoms():
         if at.GetAtomicNum() == 7 and not at.IsInRing() and not _is_nitro_n(at):
