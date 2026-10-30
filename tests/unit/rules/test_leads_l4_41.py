@@ -107,13 +107,24 @@ def test_expected_pin_reads_back(smiles, pin):
 
 # The chain-unit rows whose preferred name is the 'a' name the chain builder produces,:23348).
 A_CHAIN_PIN_ROWS = {"OCCOCCOCCOCCOCCOCCOCCO"}
+# The chain-unit rows whose multiplicative PIN the general detector builds: a ring assembly in the
+# linker is the central multiplicative group,:5238), the book's own
+# '10,10'-[[1,1'-biphenyl]-4,4'-diylbis(oxy)]di(decanoic acid) (PIN)' (:6126).
+BUILT_PIN_ROWS = {"O=C(O)CCCCCCCCCOc1ccc(-c2ccc(OCCCCCCCCCC(=O)O)cc2)cc1"}
 
 
-@pytest.mark.parametrize("smiles", [s for s, _ in CHAIN_UNIT_ROWS if s not in A_CHAIN_PIN_ROWS])
+@pytest.mark.parametrize("smiles", [s for s, _ in CHAIN_UNIT_ROWS
+                                    if s not in A_CHAIN_PIN_ROWS | BUILT_PIN_ROWS])
 def test_default_tier_declines_the_substitutive_name(smiles):
     """The PIN tier no longer ships the substitutive name as a PIN; the wider tier keeps a
     correct name (round-tripped by ``assert_declined_at_default``)."""
     assert_declined_at_default(smiles)
+
+
+@pytest.mark.parametrize("smiles,pin", [(s, p) for s, p in CHAIN_UNIT_ROWS if s in BUILT_PIN_ROWS])
+def test_default_tier_ships_the_built_multiplicative_pin(smiles, pin):
+    res = name_default(smiles)
+    assert res.get("name") == pin and res.get("tier") == "pin_verified", res
 
 
 # The label rule must not lower the names of the multiplicative, skeletal-replacement,

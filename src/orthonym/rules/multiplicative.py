@@ -3349,8 +3349,8 @@ def name_multiplicative(mol) -> Optional[str]:
     # regression test: tests/integration/test_assembly_vs_multiplicative_dispatch.py.
     #
     # Source: 154-internal notes; ring_assemblies.py:_find_inter_system_bonds:77.
-    if _is_pure_single_bond_assembly(mol):
-        return None  # ring_assemblies.py owns this case
+    if _is_pure_single_bond_assembly(mol):  # an assembly in the linker only (multiplicative_general._assembled_rings)
+        return name_general_multiplicative(mol)
 
     # Collect ring atom indices
     ring_atoms = set()
