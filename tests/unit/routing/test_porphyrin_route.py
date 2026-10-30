@@ -83,7 +83,29 @@ CHANGES = {
 }
 
 
-@pytest.mark.parametrize("row", [r for r in DECLINED_TODAY if r["id"] not in CHANGES], ids=lambda r: r["id"])
+# The palladium rows: palladium is admitted to every mechanism of zinc since 2026-10-30
+# (``data.metal_scope.BONDED_METAL_VALENCES``), so the best-effort tier names the dichloropalladium pyridyl
+# porphyrin through its ionic drawing (and the dative drawing through its split drawing); the default tier
+# keeps its output.
+PALLADIUM_ROWS = {
+    "TPP_pyridyl_PdCl2_covalent": "5,10,15-triphenyl-20-(pyridin-4-yl)porphyrin\u2014chloride\u2014palladium(2+) (1/2/1)",
+    "TPP_pyridyl_PdCl2_dative": "5,10,15-triphenyl-20-(pyridin-4-yl)porphyrin\u2014chloride\u2014palladium(2+) (1/2/1)",
+}
+
+
+@pytest.mark.parametrize("row", [r for r in DECLINED_TODAY if r["id"] in PALLADIUM_ROWS], ids=lambda r: r["id"])
+def test_the_palladium_rows_are_named_at_best_effort(row):
+    from tests.support.rt_assert import smiles_without_dative_bonds
+    default = name_default(row["smiles"])
+    assert (default.get("tier"), default.get("limit_code") or "", default.get("name") or "") == (
+        row["default_tier"], row["default_limit_code"], row["default_name"]), default
+    breadth = name_breadth(row["smiles"])
+    assert (breadth.get("name"), breadth.get("tier")) == (PALLADIUM_ROWS[row["id"]], "systematic_verified"), breadth
+    assert name_is_rt_exact(breadth["name"], smiles_without_dative_bonds(row["smiles"]) or row["smiles"]), breadth
+
+
+@pytest.mark.parametrize("row", [r for r in DECLINED_TODAY if r["id"] not in CHANGES and r["id"] not in PALLADIUM_ROWS],
+                         ids=lambda r: r["id"])
 def test_declined_rows_keep_todays_output(row):
     """Every class the producer declines keeps the output it had before this route change: the label and
     the limit code at the default tier, the name byte for byte at best-effort. The two rows that change are

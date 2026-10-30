@@ -26,7 +26,7 @@ PINS = [("CCO", "ethanol"), ("CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O", "(2R)-2-[4-(2-me
 #: best-effort tier (the label names the element)
 UNNAMED = [
     ("O=[U](=O)=O", "UNSUPPORTED_ELEMENT", "inorganic compound (not supported)"),
-    ("N.N.Cl[Pt]Cl", "UNSUPPORTED_ELEMENT", "platinum compound (not supported)"),
+    ("N.N.Cl[Ni]Cl", "UNSUPPORTED_ELEMENT", "nickel compound (not supported)"),   # (platinum: named since 2026-10-30)
     ("*CC", "WILDCARD_ATOMS", "compound with wildcard atoms (not supported)"),
 ]
 

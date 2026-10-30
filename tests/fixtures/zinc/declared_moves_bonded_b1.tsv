@@ -1,0 +1,16 @@
+smiles	tier_req	name	tier	is_pin	limit_code
+N.N.Cl[Pt]Cl	best-effort	ammonia—chloride—platinum(2+) (2/2/1)	systematic_verified	false	
+[NH3+][Pt-2]([NH3+])(Cl)Cl	best-effort	ammonia—chloride—platinum(2+) (2/2/1)	systematic_verified	false	
+[K+].[K+].Cl[Pt-2](Cl)(Cl)Cl	pin	unknown organic compound	abstain	false	NO_VERIFIED_PIN
+[K+].[K+].Cl[Pt-2](Cl)(Cl)Cl	best-effort	platinum(II) dipotassium tetrachloride	systematic_verified	false	
+Cl[Pd]Cl	pin	unknown organic compound	abstain	false	NO_VERIFIED_PIN
+Cl[Pd]Cl	best-effort	palladium(II) chloride	systematic_verified	false	
+CC(=O)[O-].CC(=O)[O-].[Pd+2]	pin	palladium diacetate	pin_verified	true	
+CC(=O)[O-].CC(=O)[O-].[Pd+2]	best-effort	palladium diacetate	pin_verified	true	
+CC(=O)O[Pd]OC(C)=O	pin	unknown organic compound	abstain	false	NO_VERIFIED_PIN
+CC(=O)O[Pd]OC(C)=O	best-effort	palladium diacetate	systematic_verified	false	
+Cl[Pd]Cl.c1ccccc1P(c1ccccc1)c1ccccc1.c1ccccc1P(c1ccccc1)c1ccccc1	best-effort	triphenylphosphane—chloride—palladium(2+) (2/2/1)	systematic_verified	false	
+Cl[Pd-2](Cl)([P+](c1ccccc1)(c1ccccc1)c1ccccc1)[P+](c1ccccc1)(c1ccccc1)c1ccccc1	best-effort	triphenylphosphane—chloride—palladium(2+) (2/2/1)	systematic_verified	false	
+[Na+].[Na+].Cl[Pd-2](Cl)(Cl)Cl	pin	unknown organic compound	abstain	false	NO_VERIFIED_PIN
+[Na+].[Na+].Cl[Pd-2](Cl)(Cl)Cl	best-effort	palladium(II) disodium tetrachloride	systematic_verified	false	
+CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pd+2]	best-effort	palladium bis(2-oxido-4-oxopent-2-ene)	systematic_verified	false	

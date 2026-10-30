@@ -28,7 +28,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.rules.metal_labels import is_carbanion_salt_of_group_3_12_metal
-from tests.support.metal_baselines import baseline_path, identity_view, read_rows
+from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, identity_view, read_rows
 from tests.support.rt_assert import assert_full_rt, name_is_rt_exact
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
@@ -70,12 +70,13 @@ def test_organic_ion_salts_of_zinc_are_composed_as_salts(smiles):
 
 
 def test_other_metals_keep_the_adduct_form_of_organic_ion_salts():
-    """Copper and platinum are not in the table: the names of the start commit, byte for byte."""
+    """Copper and nickel are not in the table: the names of the start commit, byte for byte (platinum, the other
+    metal of the start commit, is admitted since 2026-10-30: ``test_bonded_metal_admissions.py``)."""
     for smiles, name in [
         ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Cu+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}copper(2+) (2/1)"),
-        ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Pt+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}platinum(2+) (2/1)"),
+        ("[O-][n+]1ccccc1[S-].[O-][n+]1ccccc1[S-].[Ni+2]", f"1-oxido-2-sulfidopyridin-1-ium{EM_DASH}nickel(2+) (2/1)"),
         ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Cu+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}copper(2+) (2/1)"),
-        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Pt+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}platinum(2+) (2/1)"),
+        ("CC(=CC(C)=O)[O-].CC(=CC(C)=O)[O-].[Ni+2]", f"2-oxido-4-oxopent-2-ene{EM_DASH}nickel(2+) (2/1)"),
     ]:
         row = _row(smiles, "best-effort")
         assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), smiles
@@ -358,10 +359,18 @@ def test_other_metals_are_not_moved():            # reads the baseline fixture (
     # at the best-effort tier with the oxidation number zero ('iridium(0)'): the rows below gain that name.
     with open(baseline_path("zinc").parent / "declared_gains_zero_valent.tsv", newline="") as f:
         gains = {(r["smiles"], r["tier_req"]): (r["to_name"], r["to_tier"]) for r in csv.DictReader(f, delimiter="\t")}
+    # The metals admitted to every mechanism since 2026-10-30 (``BONDED_METAL_VALENCES``) move as declared there.
+    bonded_moves = declared_bonded_metal_moves()
     moved = []
     namers = {tier: Orthonym(style="pin", **_emit_tier_flags(tier)) for tier in ("pin", "best-effort")}
     for row in rows:
         if (row["smiles"], row["tier_req"]) in declared_keys:
+            continue
+        if (row["smiles"], row["tier_req"]) in bonded_moves:
+            now = namers[row["tier_req"]].name_tiered(row["smiles"])
+            assert identity_view(now) == bonded_moves[(row["smiles"], row["tier_req"])], row["smiles"]
+            if now["name"] and now["tier"] != "abstain":
+                assert_full_rt(now["name"], row["smiles"])
             continue
         if (row["smiles"], row["tier_req"]) in gains:
             now = namers[row["tier_req"]].name_tiered(row["smiles"])

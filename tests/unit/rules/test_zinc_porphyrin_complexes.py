@@ -31,7 +31,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data import metal_scope
-from orthonym.data.metal_scope import ELEMENT, MACROCYCLE, METAL_SCOPE, MetalScope
+from orthonym.data.metal_scope import BONDED_METAL_VALENCES, ELEMENT, MACROCYCLE, METAL_SCOPE, MetalScope
 from orthonym.rules import adducts, metal_labels, metal_macrocycles
 from orthonym.rules.metal_labels import is_macrocycle_complex_name_without_pin
 from orthonym.rules.metal_macrocycles import (
@@ -371,8 +371,9 @@ def test_the_guard_follows_the_scope_table(monkeypatch):
     assert assembly_admits_macrocycle(Chem.MolFromSmiles(TPP_DIANION + ".[Zn+2]")) is False
 
 
-def test_zinc_alone_is_admitted_to_macrocycle():
-    assert [s for s, sc in METAL_SCOPE.items() if MACROCYCLE in sc.mechanisms] == ["Zn"]
+def test_zinc_and_the_bonded_metals_alone_are_admitted_to_macrocycle():
+    assert sorted(s for s, sc in METAL_SCOPE.items() if MACROCYCLE in sc.mechanisms) == sorted(
+        ["Zn", *BONDED_METAL_VALENCES])
 
 
 def test_the_adduct_reads_the_names_in_the_unverified_call_only():

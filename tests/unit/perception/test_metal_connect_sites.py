@@ -51,7 +51,7 @@ def test_sites_of_a_drawing_that_the_connection_covers(smiles, expected):
     "C[Zn+]Cl",                                           # +1 and two bonds: +3
     "[Zn+]1CCCC1.[Cl-]",
     "C[Cd+].[Cl-]",                                       # a metal that the table does not admit
-    "C[Hg+].[Cl-]",
+    "C[Ni+].[Cl-]",                                       # (mercury is admitted since 2026-10-30)
     "C[Cu+].[Cl-]",
     "C[Mg+].[Br-]",                                       # Group 2: admitted to ION_SALTS only
     "C[Zn+].[Na+].[Cl-]",                                 # two cations

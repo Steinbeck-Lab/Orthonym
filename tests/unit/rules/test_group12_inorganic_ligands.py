@@ -253,8 +253,9 @@ def test_the_producer_reads_the_scope_table(monkeypatch):
     assert _assembled("CC[Zn]O") is None and _assembled("C[Zn-](C)C") is None
 
 
-OTHER_METALS = ["O=[Cd]", "[CdH2]", "CC[Cd]O", "C[Cd]O", "CC[Hg]O", "O=[Hg]", "O=[Cu]", "[CuH]", "O=[Fe]", "C[Mg-](C)C",
-                "CC[Mg]O", "[Pt]=O", "CC[Sn](C)(C)O", "O=[Mn]=O", "[Ti]=O"]
+#: Hg, Pt and Ti are admitted to BONDED_NAMES since 2026-10-30 (``BONDED_METAL_VALENCES``): Ni, Co and Cr take their places
+OTHER_METALS = ["O=[Cd]", "[CdH2]", "CC[Cd]O", "C[Cd]O", "CC[Ni]O", "O=[Ni]", "O=[Cu]", "[CuH]", "O=[Fe]", "C[Mg-](C)C",
+                "CC[Mg]O", "[Co]=O", "CC[Sn](C)(C)O", "O=[Mn]=O", "[Cr]=O"]
 
 
 @pytest.mark.parametrize("smiles", OTHER_METALS)
@@ -265,7 +266,7 @@ def test_other_metals_are_not_moved_by_the_ligand_producer(smiles):
     mol = Chem.MolFromSmiles(smiles)
     complex_ = detect_metal_complex(mol)
     assert complex_ is None or _assemble_bonded_metal_name(complex_, mol) is None
-    if any(a.GetSymbol() in ("Cd", "Hg", "Cu", "Fe", "Pt", "Mn", "Ti") and
+    if any(a.GetSymbol() in ("Cd", "Ni", "Cu", "Fe", "Co", "Mn", "Cr") and
            (a.GetTotalNumHs() > 0 or any(b.GetBondTypeAsDouble() == 2.0 for b in a.GetBonds()))
            for a in mol.GetAtoms()):
         assert complex_ is None
@@ -274,7 +275,7 @@ def test_other_metals_are_not_moved_by_the_ligand_producer(smiles):
 def test_other_metals_are_named_as_they_are_without_the_mechanism(monkeypatch):
     """A drawing of a metal that the table does not admit gets the same row with the mechanism of zinc
     removed from the table: the baseline of the other-metals panel holds no zinc, and the constructed
-    drawings of Cd, Hg and Cu give one answer either way."""
+    drawings of Cd, Ni and Cu give one answer either way."""
     rows = read_rows(baseline_path("other"))
     assert len(rows) >= 100, len(rows)
     for row in rows:
@@ -282,7 +283,7 @@ def test_other_metals_are_named_as_they_are_without_the_mechanism(monkeypatch):
         complex_ = detect_metal_complex(mol)
         assert complex_ is None or _assemble_bonded_metal_name(complex_, mol) is None, row["smiles"]
     namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
-    constructed = ["O=[Cd]", "CC[Cd]O", "CC[Hg]O", "O=[Cu]", "C[Mg-](C)C", "[Na+].C[Mg-](C)C"]
+    constructed = ["O=[Cd]", "CC[Cd]O", "CC[Ni]O", "O=[Cu]", "C[Mg-](C)C", "[Na+].C[Mg-](C)C"]
     with_scope = [identity_view(namer.name_tiered(s)) for s in constructed]
     reduced = MetalScope(METAL_SCOPE["Zn"].mechanisms - {BONDED_NAMES}, METAL_SCOPE["Zn"].valences)
     monkeypatch.setitem(METAL_SCOPE, "Zn", reduced)

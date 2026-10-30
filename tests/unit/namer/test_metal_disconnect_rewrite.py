@@ -23,7 +23,7 @@ from rdkit import Chem
 from orthonym import Orthonym, OrthonymLimitError
 from orthonym.assembly import metal_offer
 from orthonym.cli import _emit_tier_flags
-from tests.support.metal_baselines import baseline_path, identity_view, read_rows
+from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, identity_view, read_rows
 from tests.support.rt_assert import assert_full_rt
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
@@ -291,9 +291,16 @@ def test_other_metals_are_not_moved():            # reads the baseline fixture (
     rows = _bonded_non_zinc_rows()
     assert len(rows) >= 10, len(rows)
     namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
+    declared = declared_bonded_metal_moves()      # the metals admitted since 2026-10-30 move as declared there
     moved = []
     for row in rows:
         now = namer.name_tiered(row["smiles"])
+        key = (row["smiles"], row["tier_req"])
+        if key in declared:
+            assert identity_view(now) == declared[key], key
+            if now["name"] and now["tier"] != "abstain":
+                assert_full_rt(now["name"], row["smiles"])
+            continue
         if identity_view(now) != identity_view(row):
             moved.append((row["smiles"][:60], identity_view(row), identity_view(now)))
     assert moved == []

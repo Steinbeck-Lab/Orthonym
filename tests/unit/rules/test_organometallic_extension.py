@@ -51,7 +51,8 @@ _CONTROLS = [
     ("C[Zn]C", "dimethylzinc"),
     ("CC[Zn]CC", "diethylzinc"),
     ("C[Mg]Cl", "methylmagnesium chloride"),
-    ("C[Al](C)C", "trimethylaluminum"),
+    # SPELLING (the Blue Book): "aluminium not aluminum"
+    ("C[Al](C)C", "trimethylaluminium"),
     ("C[Na]", "methylsodium"),
     ("C[Hg]C", "dimethylmercury"),
     ("O=O", "dioxygen"),

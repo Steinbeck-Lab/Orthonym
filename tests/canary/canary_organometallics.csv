@@ -25,7 +25,7 @@ ORG-T3-06,[CH3][Pb]([CH3])([CH3])[CH3],C[Pb](C)(C)C,tetramethylplumbane,tetramet
 ORG-T3-07,C[Si](C)(C)C,C[Si](C)(C)C,tetramethylsilane,tetramethylsilane,tier3,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
 ORG-T3-08,[CH3][Ge]([CH3])([CH3])[CH3],C[Ge](C)(C)C,tetramethylgermane,tetramethylgermane,tier3,sigma_main_group_hydride_parent,1,parse_ok,parse_ok,rt_ok,P-69.2
 ORG-T3-09,c1cc[c]([Hg][c]2ccccc2)cc1,c1ccc([Hg]c2ccccc2)cc1,diphenylmercury,diphenylmercury,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
-ORG-T3-10,[CH3][Al]([CH3])[CH3],C[Al](C)C,trimethylaluminum,trimethylaluminum,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
+ORG-T3-10,[CH3][Al]([CH3])[CH3],C[Al](C)C,trimethylaluminium,trimethylaluminium,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
 ORG-T3-11,[CH3][Cd][CH3],C[Cd]C,dimethylcadmium,dimethylcadmium,tier3,sigma_main_group,1,parse_ok,parse_ok,rt_ok,P-69.3
 ORG-T4-01,[Cr].c1ccccc1.c1ccccc1,[Cr].c1ccccc1.c1ccccc1,bis(η⁶-benzene)chromium,bis(η⁶-benzene)chromium(0),tier4,bis_arene,6,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5.4
 ORG-T4-02,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Cr].c1ccccc1,[C-]#[O+].[C-]#[O+].[C-]#[O+].[Cr].c1ccccc1,tricarbonyl(η⁶-benzene)chromium,tricarbonyl(η⁶-benzene)chromium(0),tier4,half_sandwich,6,parse_unsupported,parse_unsupported,tier_c_cite,Salzer §5+§6

@@ -61,7 +61,7 @@ METAL_NAMES: Dict[str, Dict[str, Optional[str]]] = {
     'Ra': {'direct': 'radium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
     # Group 13 (metal-direct except B which uses hydride-parent 'borane')
     'B':  {'direct': 'boron',     'hydride_parent': 'borane',    'naming_system': 'hydride_parent'},
-    'Al': {'direct': 'aluminum',  'hydride_parent': None, 'naming_system': 'metal_direct'},
+    'Al': {'direct': 'aluminium', 'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Ga': {'direct': 'gallium',   'hydride_parent': None, 'naming_system': 'metal_direct'},
     'In': {'direct': 'indium',    'hydride_parent': None, 'naming_system': 'metal_direct'},
     'Tl': {'direct': 'thallium',  'hydride_parent': None, 'naming_system': 'metal_direct'},

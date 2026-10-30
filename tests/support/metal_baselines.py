@@ -70,3 +70,21 @@ def identity_diff(base_rows: Iterable[dict], new_rows: Iterable[dict]) -> List[T
     base, new = identity_rows(base_rows), identity_rows(new_rows)
     return [(key, base.get(key), new.get(key)) for key in sorted(set(base) | set(new))
             if base.get(key) != new.get(key)]
+
+
+def declared_bonded_metal_moves() -> Dict[Key, Tuple]:
+    """The rows of the other-metals baseline that the admission of the bonded metals moves (Al, Hg, Pd, Pt, Ru, Ti,
+    V, W to every mechanism of zinc, 2026-10-30, ``data.metal_scope.BONDED_METAL_VALENCES``):
+    ``{(smiles, tier_req): identity_view}`` of each row as it is named now. A guard of the metals the table does not
+    admit compares such a row with this file, and reads a name of it back to the full key."""
+    path = _KINDS["zinc"][0] / "declared_moves_bonded_b1.tsv"
+    out: Dict[Key, Tuple] = {}
+    with open(path, encoding="utf-8") as f:
+        header = f.readline().rstrip("\n").split("\t")
+        for line in f:
+            if not line.strip():
+                continue
+            row = dict(zip(header, line.rstrip("\n").split("\t")))
+            out[(row["smiles"], row["tier_req"])] = (row["name"] or None, row["tier"], row["is_pin"] == "true",
+                                                     row["limit_code"] or None)
+    return out
