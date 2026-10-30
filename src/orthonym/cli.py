@@ -180,8 +180,13 @@ _UNREADABLE = ("INVALID_SMILES", "RDKit cannot read this SMILES")
 def _readable(smiles: str) -> bool:
     """Whether RDKit reads the user's SMILES. When it does not, RDKit says why on the error
     stream (the one RDKit message the command line shows: it is about the user's input) and
-    the reason line follows."""
+    the reason line follows. A chlorine or bromine RDKit cannot read is named through its iodine
+    drawing (``assembly/halogen_drawing.py``)."""
     from rdkit import Chem
+
+    from .assembly.halogen_drawing import halogen_drawing
+    if halogen_drawing(smiles) is not None:
+        return True
     with rdkit_logs_on("rdApp.error"):
         if Chem.MolFromSmiles(smiles) is not None:
             return True

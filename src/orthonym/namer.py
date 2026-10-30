@@ -4134,6 +4134,7 @@ from .assembly.metal_offer import (
 from .rules.metal_labels import (
     is_metal_name_without_pin as _is_metal_name_without_pin,
 )
+from .assembly.halogen_drawing import halogen_drawing_scope
 
 #: the decorator of ``Orthonym.name`` that offers the ionic drawing of a metal drawing
 #: (``assembly/metal_offer.py``); the strings of the two scopes named here are named as given
@@ -4893,6 +4894,7 @@ class Orthonym:
         return gated
 
     @_failure_mode.failure_mode_scope
+    @halogen_drawing_scope
     @_input_scope
     @default_tier_name_scope
     @_metal_offer_scope
@@ -4946,14 +4948,10 @@ class Orthonym:
             is_top_level_naming,
             start_naming_session,
         )
-        # An unparseable SMILES raises ValueError (the documented contract,
-        # "Raises: ValueError: If SMILES is invalid"), checked BEFORE the session
-        # opens and before the producer try below. That try's catch-all exists so
-        # a VALID input never crashes (Phase1 B5); it turned _name_impl's own
-        # "Invalid SMILES" ValueError into the descriptive fallback 'unknown', and
-        # the CLI's --dump-tree then exited 0 on garbage. Top level only: a
-        # recursive fragment call keeps its fail-soft return. The empty string
-        # parses to an empty molecule and keeps its 'unknown'.
+        # An unparseable SMILES raises ValueError (the documented contract), checked BEFORE the session opens and
+        # before the producer try below, whose catch-all (Phase1 B5) turned _name_impl's own "Invalid SMILES" into
+        # 'unknown' and let the CLI's --dump-tree exit 0 on garbage. Top level only: a recursive fragment call keeps its
+        # fail-soft return; '' parses to an empty molecule. halogen_drawing_scope names a hypervalent Cl or Br first.
         if smiles and is_top_level_naming() and Chem.MolFromSmiles(smiles) is None:
             raise ValueError(f"Invalid SMILES: {smiles}")
         start_naming_session()
@@ -5632,6 +5630,7 @@ class Orthonym:
         finally:
             METAL_OFFER_OWNED.reset(_owned)
 
+    @halogen_drawing_scope
     def name_tiered(self, smiles: Union[str, Chem.Mol]) -> dict:
         """Name one molecule and say how the name was made and checked.
 
@@ -5761,9 +5760,8 @@ class Orthonym:
         if not isinstance(smiles, str) and _input_mol.handles(smiles):
             # A Mol is named as RDKit's SMILES of it (orthonym.input_mol).
             smiles = _input_mol.smiles_for(smiles)
-        # Lone-pair centre written first: the row names (and derives its tier and
-        # formula from) the standard spelling of the input when RDKit reads a
-        # lone-pair centre of it unlike the standard reading; see
+        # Lone-pair centre written first: the row names (and derives its tier and formula from) the standard spelling
+        # of the input when RDKit reads a lone-pair centre of it unlike the standard reading; see
         # _lone_pair_standard_spelling. Any other input is unchanged.
         smiles, _lp_opened = _lone_pair_input_enter(smiles)
         try:
@@ -8895,6 +8893,7 @@ class Orthonym:
             return _noted("table:trivial", trivial, mol)
         return result
 
+    @halogen_drawing_scope
     def name_with_confidence(self, smiles: Union[str, Chem.Mol]) -> dict:
         """Name one molecule and return a coverage score with it.
 
