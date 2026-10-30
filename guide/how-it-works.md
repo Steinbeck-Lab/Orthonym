@@ -2,6 +2,10 @@
 
 A SMILES string goes in. The engine reads the structure, applies the nomenclature rules, assembles a name and, for nearly every name, checks it with an OPSIN round trip before it leaves ([How every name is checked](checking.md)). A few name classes that OPSIN cannot read leave on their construction alone; `--provenance` marks them.
 
+![An isometric drawing of a typesetting bench that shows how Orthonym names a molecule, with six coloured parts numbered to match a legend. 1, blue: the input structure on a plate under four dial gauges, next to a card holding its SMILES. 2, amber: a cabinet of type drawers sets the name, one block per part, in a small tray called a galley. 3, violet: a separate machine, OPSIN, reads only the type, draws the structure it reads and cuts a key from it. 4, green: a lock of 25 pins set by the input's InChIKey; for caffeine's name, 1,3,7-trimethyl-3,7-dihydro-1H-purine-2,6-dione, every pin sits level and the gate is open. 5, teal: trays for PIN, fallback and best-effort names. 6, red: a bin for withdrawn names and a flag that rises when no name can be built.](_static/orthonym-anatomy.svg)
+
+*Orthonym as a machine: RDKit reads the structure (1), the IUPAC 2013 rules set the name (2), and OPSIN, which never sees the input, reads it back (3). A name ships only when the InChIKey of what OPSIN read matches the input's in every letter (4); it then lands on its tier (5), or is withdrawn or declined (6).*
+
 Four stages do the work. The orchestrator, `namer.py`, runs them and holds the final OPSIN check.
 
 | Stage | What it does |
