@@ -113,12 +113,24 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     drawing is then treated as any drawing (``DISCONNECT`` applies to its metal-heteroatom single
     bonds). The row says how the name was checked: ``verified`` is ``opsin_split``.
 
+``ZERO_VALENT``
+    an assembly in which a neutral atom of the metal stands beside charged components (``[Ir]`` beside
+    three carbanions, ``[Zn].[Cl-].[Cl-]``) is named as a adduct of its components with the atom
+    cited with the oxidation number zero ('iridium(0)'), at the best-effort tier only: a reader of
+    'zinc—chloride (1/2)' balances the charges itself and reads zinc(2+), 'zinc(0)—chloride (1/2)'
+    reads the neutral atom drawn. User decision 2026-10-30: such literal names are wanted for PubChem's
+    neutral-metal drawings (it replaces decision 2 of 2026-10-13, no producer for a neutral atom beside
+    anions). The producer is ``rules.adducts._zero_metal_name``, tried only when the name without the zero
+    does not read back to the drawing; the name is never a PIN, the Blue Book). The metals
+    admitted are the ones the panel of the lane measured (`internal notes`).
+
 A metal is ``complete`` when the plan of its phase is done: every drawing of its compounds (ionic,
 bonded, dative, an atom or an ion) is attempted by the mechanisms above, so an input of it that no
 producer names fails for want of a name and not for want of support of the element. The failure
 label of such an input is ``UNNAMEABLE`` and not ``UNSUPPORTED_ELEMENT``
 (``errors.classify_failure_limit``, through ``has_complete_scope``). The elements of Groups 1 and 2
-are admitted to ``ION_SALTS`` alone and are not complete: their failures keep their label.
+are admitted to ``ION_SALTS``, ``CARBANION_SALTS`` and ``ZERO_VALENT`` and are not complete: their failures keep
+their label.
 
 The valences are the charges of the cation that a rewrite of the structure may give the metal
 (a heterolytic disconnection of a metal-ligand bond adds one positive charge to the metal; the
@@ -138,6 +150,7 @@ ELEMENT = "element"
 AMMINE = "ammine"
 MACROCYCLE = "macrocycle"
 DATIVE = "dative"
+ZERO_VALENT = "zero_valent"
 
 
 @dataclass(frozen=True)
@@ -153,12 +166,20 @@ class MetalScope:
 GROUP_1 = ("Li", "Na", "K", "Rb", "Cs", "Fr")
 GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
 
+#: the metals admitted to ``ZERO_VALENT`` alone: the 28 of the 30 most frequent metals of PubChem's
+#: neutral-atom drawings that the panel of the lane named with no wrong name (Ar and Bi named none)
+ZERO_VALENT_METALS = ("Ir", "Y", "Pt", "Fe", "W", "Zr", "Ti", "V", "Pd", "Hf", "Co", "U", "Ni", "Al", "Cu",
+                      "Ru", "Re", "Rh", "Sn", "Mn", "Mo", "Cr", "Rf", "Au", "Pb", "Ac", "Ag", "Fm")
+
 METAL_SCOPE: Dict[str, MetalScope] = {
-    **{symbol: MetalScope(frozenset({ION_SALTS}), frozenset({1})) for symbol in GROUP_1},
-    **{symbol: MetalScope(frozenset({ION_SALTS}), frozenset({2})) for symbol in GROUP_2},
+    # the hydride of a Group 1 or 2 salt (``[Na+].[H-]``), its carbanions and the neutral atom beside ions
+    # ('potassium(0)'): the lane of 2026-10-30
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({1})) for symbol in GROUP_1},
+    **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({2})) for symbol in GROUP_2},
+    **{symbol: MetalScope(frozenset({ZERO_VALENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
     "Zn": MetalScope(
         frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AMMINE, MACROCYCLE, DATIVE, ION_SALTS,
-                   CARBANION_SALTS}),
+                   CARBANION_SALTS, ZERO_VALENT}),
         frozenset({2}),
         complete=True),
 }
@@ -177,9 +198,11 @@ def has_valence(symbol: str, charge: int) -> bool:
 
 
 def is_named_metal(symbol: str) -> bool:
-    """True when the metal ``symbol`` is admitted to at least one mechanism."""
+    """True when the metal ``symbol`` is admitted to at least one mechanism other than ``ZERO_VALENT`` (a
+    metal admitted to that one alone has no name for its ions, atoms or complexes: its failures keep the
+    label ``UNSUPPORTED_ELEMENT``)."""
     scope = METAL_SCOPE.get(symbol)
-    return scope is not None and bool(scope.mechanisms)
+    return scope is not None and bool(scope.mechanisms - {ZERO_VALENT})
 
 
 def is_complete_metal(symbol: str) -> bool:

@@ -206,9 +206,11 @@ def test_zinc_dihydride_is_named_and_read_back():
 def test_the_hydride_word_is_for_the_metals_the_table_admits():
     zinc = parse_salt_fragments(Chem.MolFromSmiles("[H-].[H-].[Zn+2]"))
     sodium = parse_salt_fragments(Chem.MolFromSmiles("[Na+].[H-]"))
-    both = parse_salt_fragments(Chem.MolFromSmiles("[Na+].[Zn+2].[H-].[H-].[H-]"))
+    copper = parse_salt_fragments(Chem.MolFromSmiles("[Cu+2].[H-].[H-]"))
+    both = parse_salt_fragments(Chem.MolFromSmiles("[Cu+2].[Zn+2].[H-].[H-].[H-].[H-]"))
     assert inorganic_anion_word("[H-]", zinc["cations"]) == "hydride"
-    assert inorganic_anion_word("[H-]", sodium["cations"]) is None
+    assert inorganic_anion_word("[H-]", sodium["cations"]) == "hydride"  # Groups 1-2: CARBANION_SALTS since 2026-10-30
+    assert inorganic_anion_word("[H-]", copper["cations"]) is None
     assert inorganic_anion_word("[H-]", both["cations"]) is None          # one cation outside the table
     assert inorganic_anion_word("[H-]", []) is None
     assert inorganic_anion_word("[Cl-]", sodium["cations"]) == "chloride"  # the table of retained anions
@@ -228,11 +230,15 @@ def test_neutral_atom_with_neutral_components_is_unchanged():
     assert_full_rt(row["name"], smiles)
 
 
-def test_a_neutral_atom_beside_anions_gets_no_new_producer():
-    """Decision 2 of the user (2026-10-13): fragment lists and neutral metal atoms beside anions are
-    named only if free. ``[Zn].[Cl-].[Cl-]`` is not: no producer names it, and none is added."""
+def test_a_neutral_atom_beside_anions_is_cited_with_zero():
+    """Decision 2 of the user (2026-10-13) declined a producer for a neutral metal atom beside anions;
+    User decision 2026-10-30 (breadth lane, levers B and C) replaces it: the atom is cited with the oxidation number zero, at the best-effort tier only
+    (``ZERO_VALENT`` of ``data/metal_scope.py``), and the name reads back to the neutral atom drawn."""
     row = _row("[Zn].[Cl-].[Cl-]", "best-effort")
-    assert row["name"] is None and row["tier"] == "abstain", row
+    assert row["name"] == "chloride—zinc(0) (2/1)" and row["tier"] == "systematic_verified", row
+    assert row["is_pin"] is False
+    assert_full_rt(row["name"], "[Zn].[Cl-].[Cl-]")
+    assert _row("[Zn].[Cl-].[Cl-]", "pin")["tier"] == "abstain"
 
 
 # ---- the other metals and the other assemblies are not moved (START literals, computed on the start tree)
@@ -284,18 +290,6 @@ START_ROWS = {
     "[Pt]": (
         ('platinum compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Na+].[H-]": (
-        ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Li+].[H-]": (
-        ('lithium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Mg+2].[H-].[H-]": (
-        ('magnesium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Ca+2].[H-].[H-]": (
-        ('calcium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Cu+2].[H-].[H-]": (
         ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
@@ -305,19 +299,30 @@ START_ROWS = {
 #: charge-unbalanced assembly (no salt): no producer names them. The failure label is the engine's, UNNAMEABLE
 #: (zinc is a complete metal and every metal of the assembly is admitted to the table); the text of the plain
 #: call is the descriptive fallback of the metal of lowest atomic number
+#: the hydride salts of Groups 1-2 and of zinc: User decision 2026-10-30 (breadth lane, levers B and C) admits Groups 1-2 to ``CARBANION_SALTS``,
+#: so these are binary salts, carbon-free: kept pin_verified by the maintainers' decision)
+ADMITTED_HYDRIDE_ROWS = {
+    "[Na+].[H-]": "sodium hydride",
+    "[Li+].[H-]": "lithium hydride",
+    "[Mg+2].[H-].[H-]": "magnesium dihydride",
+    "[Ca+2].[H-].[H-]": "calcium dihydride",
+    "[Li+].[Zn+2].[H-].[H-].[H-]": "lithium zinc trihydride",
+    "[Na+].[Zn+2].[H-].[H-].[H-]": "sodium zinc trihydride",
+    "[H-].[H-].[H-].[Zn+2].[Li+]": "lithium zinc trihydride",
+}
+
+
+@pytest.mark.parametrize("smiles", sorted(ADMITTED_HYDRIDE_ROWS))
+def test_admitted_hydride_salts(smiles):
+    for tier in ("pin", "best-effort"):
+        assert _view(_row(smiles, tier)) == (ADMITTED_HYDRIDE_ROWS[smiles], "pin_verified", True, None), (smiles, tier)
+
+
 UNNAMED_ZINC_ASSEMBLIES = {
-    "[Li+].[Zn+2].[H-].[H-].[H-]": (
-        ('lithium compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
-        (None, 'abstain', False, 'UNNAMEABLE')),
-    "[Na+].[Zn+2].[H-].[H-].[H-]": (
-        ('sodium compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
-        (None, 'abstain', False, 'UNNAMEABLE')),
-    "[H-].[H-].[H-].[Zn+2].[Li+]": (
-        ('lithium compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
-        (None, 'abstain', False, 'UNNAMEABLE')),
     "[Zn+2].[H-]": (
         ('zinc compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
-        (None, 'abstain', False, 'UNNAMEABLE')),
+        # a charged assembly: the best-effort adduct of its ions (the hydride component, 2026-10-30)
+        ('zinc(2+)—hydride (1/1)', 'systematic_verified', False, None)),
 }
 
 
