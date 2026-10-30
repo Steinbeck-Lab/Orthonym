@@ -104,7 +104,7 @@ def test_confidence_has_no_row_to_go_with_a_provenance_row(capsys, flags):
     assert "--confidence cannot be combined" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("smiles, label", [("N.N.Cl[Pt]Cl", "platinum compound (not supported)"),
+@pytest.mark.parametrize("smiles, label", [("N.N.Cl[Ni]Cl", "nickel compound (not supported)"),
                                           ("*CC", "compound with wildcard atoms (not supported)"),
                                           ("O=[U](=O)=O", "inorganic compound (not supported)")])
 def test_a_structure_with_no_name_keeps_its_decline_text(capsys, smiles, label):

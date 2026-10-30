@@ -114,7 +114,8 @@ def test_the_connection_is_the_bonded_drawing_with_every_atom_kept():
 
 def test_the_connection_needs_an_admitted_metal_and_an_allowed_valence_and_no_choice():
     connect = metal_offer.metal_connected_spelling_and_order
-    assert connect("C[Cd+].[Cl-]") is None and connect("C[Hg+].[Cl-]") is None       # not admitted
+    assert connect("C[Cd+].[Cl-]") is None and connect("C[Ni+].[Cl-]") is None       # not admitted
+    assert connect("C[Hg+].[Cl-]") == ("[CH3][Hg][Cl]", (0, 1, 2))                    # admitted since 2026-10-30
     assert connect("C[Mg+].[Br-]") is None                                             # Group 2: ION_SALTS only
     assert connect("C[Zn+2].[Cl-].[Cl-]") is None                                      # [Zn+3] is no valence of zinc
     assert connect("C[Zn+].[Cl-].[Br-]") is None                                       # which anion: a choice
@@ -268,7 +269,7 @@ def _constructed_other_metal_rows():
     """Cations of metals that the table does not admit to ``CONNECT_ANION``, each with an anion: the
     drawings the connection could reach if it were not bound to the table; and a zinc cation whose
     charge is no valence after the connection."""
-    return ["C[Cd+].[Cl-]", "C[Hg+].[Cl-]", "C[Mg+].[Br-]", "C[Cu+].[Cl-]", "CC[Zn+2].[Cl-].[Cl-]",
+    return ["C[Cd+].[Cl-]", "C[Ni+].[Cl-]", "C[Mg+].[Br-]", "C[Cu+].[Cl-]", "CC[Zn+2].[Cl-].[Cl-]",
             "C[Sn+3].[Cl-].[Cl-].[Cl-]"]
 
 

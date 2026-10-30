@@ -136,7 +136,8 @@ The valences are the charges of the cation that a rewrite of the structure may g
 (a heterolytic disconnection of a metal-ligand bond adds one positive charge to the metal; the
 cation that a metal with its bonds would give if every one of them were broken is its formal
 charge plus its number of bonds). The Group 1 elements carry +1 and the Group 2 elements +2; zinc
-carries +2.
+carries +2. The metals of ``BONDED_METAL_VALENCES`` (Al, Hg, Pd, Pt, Ru, Ti, V, W) are admitted to every
+mechanism zinc has, with the charges listed there, and are not complete.
 """
 from dataclasses import dataclass
 from typing import Dict, FrozenSet, Iterable
@@ -171,17 +172,25 @@ GROUP_2 = ("Be", "Mg", "Ca", "Sr", "Ba", "Ra")
 ZERO_VALENT_METALS = ("Ir", "Y", "Pt", "Fe", "W", "Zr", "Ti", "V", "Pd", "Hf", "Co", "U", "Ni", "Al", "Cu",
                       "Ru", "Re", "Rh", "Sn", "Mn", "Mo", "Cr", "Rf", "Au", "Pb", "Ac", "Ag", "Fm")
 
+#: every mechanism above: the ones zinc is admitted to
+ALL_MECHANISMS = frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AMMINE, MACROCYCLE, DATIVE, ION_SALTS,
+                            CARBANION_SALTS, ZERO_VALENT})
+
+#: the metals of PubChem's bonded drawings admitted to every mechanism, with the charges of their cations: the
+#: lane of 2026-10-30 measured them on a panel of their bonded, dative and ionic drawings (`internal notes
+#: metal-bonded/``) with no wrong name. They are not ``complete``: their eta and multiply bonded ligands have no
+#: producer yet, so their failures keep their label.
+BONDED_METAL_VALENCES = {"Al": (3,), "Hg": (1, 2), "Pd": (2,), "Pt": (2, 4), "Ru": (2, 3), "Ti": (3, 4),
+                         "V": (3, 4, 5), "W": (4, 6)}
+
 METAL_SCOPE: Dict[str, MetalScope] = {
     # the hydride of a Group 1 or 2 salt (``[Na+].[H-]``), its carbanions and the neutral atom beside ions
     # ('potassium(0)'): the lane of 2026-10-30
     **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({1})) for symbol in GROUP_1},
     **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({2})) for symbol in GROUP_2},
     **{symbol: MetalScope(frozenset({ZERO_VALENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
-    "Zn": MetalScope(
-        frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AMMINE, MACROCYCLE, DATIVE, ION_SALTS,
-                   CARBANION_SALTS, ZERO_VALENT}),
-        frozenset({2}),
-        complete=True),
+    **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in BONDED_METAL_VALENCES.items()},
+    "Zn": MetalScope(ALL_MECHANISMS, frozenset({2}), complete=True),
 }
 
 

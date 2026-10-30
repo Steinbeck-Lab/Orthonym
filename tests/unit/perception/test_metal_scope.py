@@ -17,8 +17,8 @@ import pytest
 from rdkit import Chem
 
 from orthonym.data import metal_scope
-from orthonym.data.metal_scope import (AMMINE, BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION, DATIVE, DISCONNECT,
-                                       ELEMENT, ION_SALTS, MACROCYCLE, METAL_SCOPE, ZERO_VALENT,
+from orthonym.data.metal_scope import (AMMINE, BONDED_METAL_VALENCES, BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION,
+                                       DATIVE, DISCONNECT, ELEMENT, ION_SALTS, MACROCYCLE, METAL_SCOPE, ZERO_VALENT,
                                        ZERO_VALENT_METALS, MetalScope, has_mechanism, has_valence,
                                        is_named_metal)
 from orthonym.perception.metals import METAL_ELEMENT_SYMBOLS, assembly_has_out_of_scope_metal
@@ -57,20 +57,22 @@ def test_scope_table_reproduces_the_old_set(symbol):
 @pytest.mark.parametrize("smiles, expected", [
     # a true metal outside Groups 1-2 that the table does not admit: out of scope with any anion
     ("[Cu+2].CC(=O)[O-].CC(=O)[O-]", True),
-    ("[Pt+2].CC(=O)[O-].CC(=O)[O-]", True),
+    ("[Ni+2].CC(=O)[O-].CC(=O)[O-]", True),
     ("[Fe+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
     ("[La+3].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
     ("[Cu+2].[Cl-].[Cl-]", True),
     ("[Cu+2].[CH3-].[CH3-]", True),
     ("[Cu+2].[H-].[H-]", True),
     ("[Cu]", True),
-    ("[Cl-].[Cl-].[Pt+2].N.N", True),
+    ("[Cl-].[Cl-].[Ni+2].N.N", True),
     ("[Mg+2].[Cu+2].[Cl-].[Cl-].[Cl-].[Cl-]", True),                       # one metal in scope, one not
     ("[Na+].[Cu+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),
     ("[Zn+2].[Cu+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", True),    # zinc is in scope, copper is not
     ("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Cu+2]", True),
     # zinc is admitted to ION_SALTS and CARBANION_SALTS: in scope with an organic anion, a carbanion or a hydride
     ("[Zn+2].CC(=O)[O-].CC(=O)[O-]", False),
+    ("[Pt+2].CC(=O)[O-].CC(=O)[O-]", False),                                # the bonded metals since 2026-10-30
+    ("[Cl-].[Cl-].[Pt+2].N.N", False),
     ("[Zn+2].[Cl-].[Cl-]", False),
     ("[Zn+2].[CH3-].[CH3-]", False),
     ("[Zn+2].[H-].[H-]", False),
@@ -109,8 +111,8 @@ def test_every_element_of_the_allow_list_gives_the_old_answer():
     metalloids never, zinc (admitted to both mechanisms) never, every other true metal always."""
     for symbol in sorted(METAL_ELEMENT_SYMBOLS):
         cation = f"[{symbol}+2]"
-        if symbol in METALLOIDS or symbol == "Zn":
-            expected = (False, False, False)
+        if symbol in METALLOIDS or symbol == "Zn" or symbol in BONDED_METAL_VALENCES:
+            expected = (False, False, False)                               # the bonded metals since 2026-10-30
         elif symbol in GROUP_1 + GROUP_2:
             expected = (False, False, False)                               # CARBANION_SALTS since 2026-10-30
         else:
@@ -136,18 +138,18 @@ def test_zinc_has_its_mechanisms():
         frozenset({2}),
         complete=True)
     assert has_mechanism("Zn", MACROCYCLE) is True
-    assert all(has_mechanism(s, MACROCYCLE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Hg", "Pt", "Fe", "Mg"))
+    assert all(has_mechanism(s, MACROCYCLE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe", "Mg"))
     assert has_mechanism("Zn", DATIVE) is True
-    assert all(has_mechanism(s, DATIVE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Hg", "Pt", "Fe"))
+    assert all(has_mechanism(s, DATIVE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
     assert has_mechanism("Zn", AMMINE) is True
-    assert all(has_mechanism(s, AMMINE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Hg", "Pt", "Fe"))
+    assert all(has_mechanism(s, AMMINE) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
     assert has_mechanism("Zn", ELEMENT) is True
-    assert all(has_mechanism(s, ELEMENT) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Hg", "Pt", "Fe"))
+    assert all(has_mechanism(s, ELEMENT) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
     assert has_mechanism("Zn", BONDED_NAMES) is True
-    assert all(has_mechanism(s, BONDED_NAMES) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Hg", "Pt"))
+    assert all(has_mechanism(s, BONDED_NAMES) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
     assert has_mechanism("Zn", DISCONNECT) is True
     assert has_mechanism("Zn", CONNECT_ANION) is True
-    assert all(has_mechanism(s, CONNECT_ANION) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Hg", "Pt"))
+    assert all(has_mechanism(s, CONNECT_ANION) is False for s in GROUP_1 + GROUP_2 + ("Cu", "Cd", "Ni", "Fe"))
     assert has_mechanism("Zn", ION_SALTS) is True
     assert has_mechanism("Zn", CARBANION_SALTS) is True
     assert all(has_mechanism(s, DISCONNECT) is False for s in GROUP_1 + GROUP_2)
@@ -201,13 +203,15 @@ def test_the_function_follows_the_table(monkeypatch):
     monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu",
                         MetalScope(frozenset({ION_SALTS, CARBANION_SALTS}), frozenset({2})))
     assert _out(copper_methanide) is False
-    assert _out("[Cu+2].[Pt+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]") is True    # platinum is still out
+    assert _out("[Cu+2].[Fe+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]") is True    # iron is still out
 
 
 def test_zero_valent_metals_are_admitted_to_that_alone():
     """The metals of the 2026-10-30 panel are admitted to ``ZERO_VALENT`` only: they cite a neutral atom beside
     ions as 'metal(0)' and nothing else; their failures keep the label UNSUPPORTED_ELEMENT (``is_named_metal``)."""
     for symbol in ZERO_VALENT_METALS:
+        if symbol in BONDED_METAL_VALENCES:                                # every mechanism since 2026-10-30
+            continue
         assert METAL_SCOPE[symbol] == MetalScope(frozenset({ZERO_VALENT}), frozenset()), symbol
         assert is_named_metal(symbol) is False, symbol
     assert _out("[Cu+2].CC(=O)[O-].CC(=O)[O-]") is True                     # no salt mechanism for copper

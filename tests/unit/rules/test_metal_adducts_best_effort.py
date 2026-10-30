@@ -78,8 +78,11 @@ M16 = [
     ("C(C(=O)[O-])S.[Ca+2]", "sulfanylacetate—calcium(2+) (1/1)"),
 ]
 # M17b: a metal halide component (the Hg row: test_group12_organometallic_ligands.py).
+# The palladium row of the start commit, 'cycloocta-1,5-diene—dichloropalladium (1/1)', is named through its ionic
+# drawing since palladium is admitted to DISCONNECT (2026-10-30, ``test_bonded_metal_admissions.py``): nickel, a
+# metal the table does not admit, keeps the drawn metal halide.
 M17B = [
-    ("C1CC=CCCC=C1.Cl[Pd]Cl", "cycloocta-1,5-diene—dichloropalladium (1/1)"),
+    ("C1CC=CCCC=C1.Cl[Ni]Cl", "cycloocta-1,5-diene—dichloronickel (1/1)"),
 ]
 
 

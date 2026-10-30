@@ -108,7 +108,8 @@ def test_the_class_of_the_dispatch_table_names_zinc_before_the_retained_cation_w
     assert _class_of("[Zn+2]") == StoutClass.METAL_ATOM         # not CATION_RETAINED, whose word is 'zinc'
     assert _class_of("[Cu+2]") == StoutClass.CATION_RETAINED    # a metal that is not admitted
     assert _class_of("[Na+]") == StoutClass.CATION_RETAINED
-    assert _class_of("[Hg]") != StoutClass.METAL_ATOM
+    assert _class_of("[Cd]") != StoutClass.METAL_ATOM          # a metal that is not admitted
+    assert _class_of("[Hg]") == StoutClass.METAL_ATOM          # admitted to ELEMENT since 2026-10-30
     assert _class_of("[Zn-]") != StoutClass.METAL_ATOM
     assert _class_of("[ZnH]") != StoutClass.METAL_ATOM
     priorities = {c: e.priority for c, e in DISPATCH_TABLE.items()}
@@ -134,7 +135,8 @@ def test_the_class_of_the_dispatch_table_names_zinc_before_the_retained_cation_w
     ("[Cu]", None),                   # a metal that the table does not admit to ELEMENT
     ("[Cu+2]", None),
     ("[Na+]", None),
-    ("[Hg+2]", None),
+    ("[Cd+2]", None),
+    ("[Hg+2]", "mercury(2+)"),       # admitted to ELEMENT since 2026-10-30 (BONDED_METAL_VALENCES)
     ("[Cl-]", None),
     ("[Si]", None),                   # a metalloid is named substitutively, not by this mechanism
     ("C", None),
@@ -272,12 +274,6 @@ START_ROWS = {
     "[Ca+2]": (
         ('calcium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Hg]": (
-        ('mercury compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Hg+2]": (
-        ('mercury compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Cd+2]": (
         ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
@@ -286,9 +282,6 @@ START_ROWS = {
         ('tin(IV)', 'pin_verified', True, None)),
     "[Ag+]": (
         ('silver compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
-        (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Pt]": (
-        ('platinum compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "[Cu+2].[H-].[H-]": (
         ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),

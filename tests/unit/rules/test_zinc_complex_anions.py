@@ -28,7 +28,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data import metal_scope
-from orthonym.data.metal_scope import AMMINE, ELEMENT, METAL_SCOPE, MetalScope
+from orthonym.data.metal_scope import AMMINE, BONDED_METAL_VALENCES, ELEMENT, METAL_SCOPE, MetalScope
 from orthonym.rules import adducts, metal_atoms
 from orthonym.rules.adducts import SINGLE_ATOM_COMPONENT_NAMES
 from orthonym.rules.metal_atoms import ammine_component_names
@@ -105,7 +105,8 @@ def test_the_ammonia_component_is_cited_as_ammonia():
     ("N.N.O", {}),                                      # no metal
     ("[NH4+].[Cl-]", {}),
     ("[Na+].[Cl-].N", {}),                              # a metal that the table does not admit to AMMINE
-    ("N.N.Cl[Pt]Cl", {}),
+    ("N.N.Cl[Cd]Cl", {}),
+    ("N.N.Cl[Pt]Cl", {"N": "ammonia"}),                 # platinum is admitted since 2026-10-30
     ("N.N.N.N.[Cu+2]", {}),
     ("[Zn+2].[Cu+2].N", {}),                            # one metal outside: the whole assembly is outside
     ("[Zn+2].[Na+].N", {}),
@@ -208,11 +209,12 @@ START_ROWS = {
     "[Na+].[Cl-].N": (
         ('sodium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "N.N.Cl[Pt]Cl": (
-        ('platinum compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    # the platinum rows of the start commit are admitted since 2026-10-30 (``ADMITTED_PLATINUM_AMMINES``): cadmium
+    "N.N.Cl[Cd]Cl": (
+        ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "N.N.[Cl-].[Cl-].[Pt+2]": (
-        ('platinum compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+    "N.N.[Cl-].[Cl-].[Cd+2]": (
+        ('cadmium compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
     "N.N.N.N.[Cu+2]": (
         ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
@@ -239,10 +241,33 @@ START_ROWS = {
     "[Zn+2].[Cu+2].N.N.N.N.N.N.N.N": (
         ('copper compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
-    "[Zn+2].[Pt+2].N.N": (
+    "[Zn+2].[Cd+2].N.N": (
         ('zinc compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
         (None, 'abstain', False, 'UNSUPPORTED_ELEMENT')),
 }
+
+#: the platinum rows of ``START_ROWS`` at the start commit, admitted to AMMINE since 2026-10-30
+#: (``data.metal_scope.BONDED_METAL_VALENCES``): the best-effort adduct of their components, and at the default
+#: tier the label of an assembly whose every metal is admitted and one complete (zinc) is UNNAMEABLE
+ADMITTED_PLATINUM_AMMINES = {
+    "N.N.Cl[Pt]Cl": (
+        ('platinum compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('ammonia—chloride—platinum(2+) (2/2/1)', 'systematic_verified', False, None)),
+    "N.N.[Cl-].[Cl-].[Pt+2]": (
+        ('platinum compound (not supported)', 'abstain', False, 'UNSUPPORTED_ELEMENT'),
+        ('ammonia—chloride—platinum(2+) (2/2/1)', 'systematic_verified', False, None)),
+    "[Zn+2].[Pt+2].N.N": (
+        ('zinc compound (not supported)', 'abstain', False, 'UNNAMEABLE'),
+        ('ammonia—platinum(2+)—zinc(2+) (2/1/1)', 'systematic_verified', False, None)),
+}
+
+
+@pytest.mark.parametrize("smiles", sorted(ADMITTED_PLATINUM_AMMINES))
+def test_the_platinum_ammines_are_named(smiles):
+    default_view, best_effort_view = ADMITTED_PLATINUM_AMMINES[smiles]
+    assert _view(_row(smiles, "pin")) == default_view, smiles
+    assert _view(_row(smiles, "best-effort")) == best_effort_view, smiles
+    assert_full_rt(best_effort_view[0], smiles)
 
 
 @pytest.mark.parametrize("smiles", sorted(START_ROWS))
@@ -256,12 +281,15 @@ def test_other_metals_are_not_moved(smiles):
 
 def test_the_other_metals_panel_holds_no_row_the_guard_could_reach():
     """The 73-drawing panel of the other metals is untouched by construction: no assembly of it is
-    admitted to AMMINE (every one holds a metal other than zinc, or none)."""
+    admitted to AMMINE (every one holds a metal other than zinc and the metals admitted since 2026-10-30, or
+    none)."""
     from tests.support.metal_baselines import baseline_path, read_rows
     for row in read_rows(baseline_path("other")):
         mol = Chem.MolFromSmiles(row["smiles"])
+        if any(a.GetSymbol() in BONDED_METAL_VALENCES for a in mol.GetAtoms()):
+            continue
         assert ammine_component_names(mol) == {}, row["smiles"]
 
 
-def test_zinc_alone_is_admitted_to_ammine():
-    assert [s for s, sc in METAL_SCOPE.items() if AMMINE in sc.mechanisms] == ["Zn"]
+def test_zinc_and_the_bonded_metals_alone_are_admitted_to_ammine():
+    assert sorted(s for s, sc in METAL_SCOPE.items() if AMMINE in sc.mechanisms) == sorted(["Zn", *BONDED_METAL_VALENCES])
