@@ -18,6 +18,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import cli_time_limit
+from orthonym.opsin_capabilities import phane_enabled
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -87,28 +88,40 @@ def test_the_cage_analysis_is_never_asked_about_rings_joined_by_bonds(monkeypatc
     assert all(asked), "the cage analysis was asked about rings that are joined by bonds"
 
 
+def _assert_named_in_seconds_with_a_full_read_back(smiles, ring_assembly_name, phane_ending):
+    """The row is named in the time of the harness and the name is read back to the input's full InChIKey. With an OPSIN
+    that has no phane grammar (2.9.0) the name is the ring assembly's, of general nomenclature. With one that reads
+    phane names the engine names the phane that the Blue Book prefers: "Preferred IUPAC names for assemblies
+    containing seven and more rings or ring systems" (the Blue Book), "Phane names are preferred IUPAC names
+    rather than ring assembly names when seven or more rings or ring systems are present". The nodes of that phane are
+    the rings of the ring assembly's chain (seven benzene rings, nine), and the strict path does not build it for
+    these rows, so the label is the one of a PIN form that only a breadth producer built."""
+    seconds, row, status = _row(smiles)
+    assert status == 0
+    if phane_enabled():
+        assert row["name"].endswith(phane_ending), row
+        assert (row["producer"], row["opsin"]) == ("outer:linear_phane", "verified")
+        assert row["tier"] in ("pin_verified", "pin_unverified") and row["is_pin"] == (row["tier"] == "pin_verified"), row
+    else:
+        assert (row["name"], row["tier"], row["producer"], row["opsin"]) == (
+            ring_assembly_name, "systematic_verified", "inner:ring_assembly", "verified")
+    # the limit of the harness; measured 4 s and 6 s for the ring assembly, 20 s and 29 s for the phane (a search over
+    # the nodes of 37 and 43 rings), against the ten minutes and more of the issue
+    assert seconds < (90 if phane_enabled() else 60), f"{seconds:.0f} s"
+    from orthonym.validation.opsin_roundtrip import opsin_parse
+    assert _key(opsin_parse(row["name"])) == _key(smiles)
+
+
 def test_row_1_is_named_in_seconds_with_a_full_read_back():
     """C222H150: 37 rings. The chain of the tree is a septiphenyl (its longest path, ``****`` criterion 1), the
     four 4-(2,3,4,5-tetraphenylphenyl)phenyl arms and six phenyl groups are its substituents. Above six rings the PIN is a
     phane name (``****``,:15705), which OPSIN 2.9.0 does not read: the name is of general nomenclature."""
-    seconds, row, status = _row(ROW1)
-    assert status == 0
-    assert (row["name"], row["tier"], row["producer"], row["opsin"]) == (
-        ROW1_NAME, "systematic_verified", "inner:ring_assembly", "verified")
-    assert seconds < 60, f"{seconds:.0f} s"          # the limit of the harness; measured 4 s
-    from orthonym.validation.opsin_roundtrip import opsin_parse
-    assert _key(opsin_parse(row["name"])) == _key(ROW1)
+    _assert_named_in_seconds_with_a_full_read_back(ROW1, ROW1_NAME, "-heptabenzenaheptaphane")
 
 
 def test_row_2_is_named_in_seconds_with_a_full_read_back():
     """C258H174: 43 rings, a chain of nine (``noviphenyl``, ``ASSEMBLY_MULTIPLIERS``): the same four arms, one ring longer."""
-    seconds, row, status = _row(ROW2)
-    assert status == 0
-    assert (row["name"], row["tier"], row["producer"], row["opsin"]) == (
-        ROW2_NAME, "systematic_verified", "inner:ring_assembly", "verified")
-    assert seconds < 60, f"{seconds:.0f} s"          # measured 6 s
-    from orthonym.validation.opsin_roundtrip import opsin_parse
-    assert _key(opsin_parse(row["name"])) == _key(ROW2)
+    _assert_named_in_seconds_with_a_full_read_back(ROW2, ROW2_NAME, "-nonabenzenanonaphane")
 
 
 def test_row_1_returns_within_the_limit_and_its_slack():

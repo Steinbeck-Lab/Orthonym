@@ -47,6 +47,7 @@ from orthonym.metrics.provenance import best_effort_request_ctx
 from orthonym.rules import ring_cluster
 from orthonym.rules import spiro as _spiro
 from orthonym.rules import vonbaeyer_universal as vbu
+from tests.support.opsin_marks import needs_phane_opsin, release_capabilities
 from tests.support.rt_assert import assert_full_rt
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
@@ -210,14 +211,33 @@ CYCLOPARAPHENYLENE = (
     "C1=CC=C(C=C1)C1=CC=C2C=C1")
 
 
-def test_a_ring_system_the_lifted_ceilings_cannot_analyse_in_time_is_declined_in_time():
-    """The late offer is bounded by the hang budgets, which count the scan for the main bridge in it."""
+def test_a_ring_system_the_lifted_ceilings_cannot_analyse_in_time_is_declined_in_time(monkeypatch):
+    """The late offer is bounded by the hang budgets, which count the scan for the main bridge in it. The engine is
+    the one of OPSIN 2.9.0 whichever OPSIN is in use (``release_capabilities``): with an OPSIN that reads phane names
+    the ring of 20 rings is a cyclophane and no von Baeyer analysis is asked (the next test)."""
     import time
+    release_capabilities(monkeypatch)
     assert vbu.ring_system_beyond_ceiling(Chem.MolFromSmiles(CYCLOPARAPHENYLENE))
     start = time.monotonic()
     with jvm_slots(1, purpose="l4-aromatic-cages"):
         assert name_compound(CYCLOPARAPHENYLENE) == ""
     assert time.monotonic() - start < 60
+
+
+@needs_phane_opsin
+def test_the_ring_of_twenty_rings_is_named_as_a_cyclophane_where_opsin_reads_phane_in_time():
+    """The ring of the test above, with an OPSIN that reads phane names: "Preferred IUPAC names in phane
+    nomenclature", (1) (the Blue Book): a cyclic phane structure with mancude rings attached at nonadjacent
+    positions is a cyclophane, so the name is a phane name and no cage is analysed. It is read back to the input's
+    full InChIKey and comes in the time the hang budgets give."""
+    import time
+    from orthonym.validation.spelling.cyclophane import is_phane_name
+    start = time.monotonic()
+    with jvm_slots(1, purpose="l4-aromatic-cages"):
+        name = name_compound(CYCLOPARAPHENYLENE)
+    assert time.monotonic() - start < 60
+    assert is_phane_name(name), name
+    assert_full_rt(name, CYCLOPARAPHENYLENE)
 
 
 # --- the pieces -------------------------------------------------------------------------------------------------

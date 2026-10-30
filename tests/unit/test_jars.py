@@ -46,7 +46,9 @@ def fake_spec(monkeypatch, tmp_path, server):
     spec = jars.JarSpec(kind="opsin", version="9.9.9", filename="fake-opsin.jar",
                         url=f"{base}/good.jar", sha256=PAYLOAD_SHA, env_var="ORTHONYM_OPSIN_JAR")
     monkeypatch.setitem(jars.JARS, "opsin", spec)
-    for var in ("ORTHONYM_OPSIN_JAR", "ORTHONYM_CENTRES_JAR", "ORTHONYM_NO_DOWNLOAD",
+    # ORTHONYM_OPSIN too: a main-branch choice would send find_jar("opsin") to the build of OPSIN's main branch
+    # instead of the spec under test (a run with ORTHONYM_OPSIN=main failed all four download tests)
+    for var in ("ORTHONYM_OPSIN", "ORTHONYM_OPSIN_JAR", "ORTHONYM_CENTRES_JAR", "ORTHONYM_NO_DOWNLOAD",
                 "ORTHONYM_ALLOW_REDUCED", "ORTHONYM_CACHE_DIR"):
         monkeypatch.delenv(var, raising=False)
     monkeypatch.setenv("ORTHONYM_JAR_DIR", str(tmp_path / "jars"))

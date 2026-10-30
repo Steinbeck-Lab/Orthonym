@@ -40,6 +40,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly import fragment_naming as fn
+from tests.support.opsin_marks import release_opsin_in_use
 from tests.support.rt_assert import (
     _independent_parse,
     assert_full_rt,
@@ -56,10 +57,17 @@ EM = "—"
 # --------------------------------------------------------------------------
 
 def test_fused_join_is_unreadable_and_the_suffix_form_is_not():
-    """Why the adduct failed: OPSIN reads 'benzene—2-aminopyridine' as
+    """Why the adduct failed: OPSIN 2.9.0 reads 'benzene—2-aminopyridine' as
     'benzene-2-amin...' and cannot place 'opyridine'; the same compounds with the
-    amine as a suffix read back as the two components."""
-    assert _independent_parse(f"benzene{EM}2-aminopyridine (1/1)") is None
+    amine as a suffix read back as the two components. An OPSIN that does split the
+    join (OPSIN's main branch) reads it as the two components, never as another
+    molecule."""
+    fused = _independent_parse(f"benzene{EM}2-aminopyridine (1/1)")
+    if release_opsin_in_use():
+        assert fused is None
+    elif fused is not None:
+        assert Chem.MolToSmiles(Chem.MolFromSmiles(fused)) == Chem.MolToSmiles(
+            Chem.MolFromSmiles("c1ccccc1.Nc1ccccn1"))
     back = _independent_parse(f"benzene{EM}pyridin-2-amine (1/1)")
     assert back is not None
     assert Chem.MolToSmiles(Chem.MolFromSmiles(back)) == Chem.MolToSmiles(

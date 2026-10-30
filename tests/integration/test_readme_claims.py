@@ -24,6 +24,7 @@ from rdkit.Chem import inchi
 
 from orthonym import Orthonym, name_compound
 from orthonym.cli import _emit_tier_flags
+from orthonym.opsin_capabilities import opsin_capabilities
 from orthonym.validation.twin_spellings import twin_of
 from tests.support.rt_assert import _independent_parse
 
@@ -166,16 +167,24 @@ def test_default_tier_twin_checked_pin_spelling_is_read_back_through_its_twin():
 # README "Checked." / "Output tiers": the twin families the engine has no other spelling for ship at
 # every tier (validation.twin_spellings.general_tier_twin_round_trip). (the Blue Book)
 # 'diphenyliodanuide (PIN)'; (:39785) the halido ligand word of an additive organometallic name, a class
-# gives no PIN.
+# gives no PIN. The last column is the capability of the OPSIN in use (``opsin_capabilities``) that reads the
+# name itself: OPSIN's main branch reads a halogen -uide name, so the name needs no twin there and its label is
+# ``opsin``; no OPSIN reads the halido ligand word.
 TWIN_EVERY_TIER = [
-    ("c1ccc(cc1)[I-]c1ccccc1", "diphenyliodanuide", "diphenyl-λ3-iodanide", "pin_verified"),
-    ("C(C)[Ni]Br", "bromido(ethyl)nickel", "bromo(ethyl)nickel", "systematic_verified"),
+    ("c1ccc(cc1)[I-]c1ccccc1", "diphenyliodanuide", "diphenyl-λ3-iodanide", "pin_verified", "halogen_uide"),
+    ("C(C)[Ni]Br", "bromido(ethyl)nickel", "bromo(ethyl)nickel", "systematic_verified", None),
 ]
 
 
-@pytest.mark.parametrize("smiles,name,twin,tier_label", TWIN_EVERY_TIER, ids=[n for _, n, _, _ in TWIN_EVERY_TIER])
-def test_a_twin_family_with_no_other_spelling_ships_through_its_twin_at_every_tier(smiles, name, twin, tier_label):
-    assert _independent_parse(name, smiles) is None                   # OPSIN has no grammar for the name
+@pytest.mark.parametrize("smiles,name,twin,tier_label,capability", TWIN_EVERY_TIER,
+                         ids=[n for _, n, _, _, _ in TWIN_EVERY_TIER])
+def test_a_twin_family_with_no_other_spelling_ships_through_its_twin_at_every_tier(
+        smiles, name, twin, tier_label, capability):
+    reads_itself = bool(capability and opsin_capabilities()[capability])
+    if reads_itself:
+        assert _key(_independent_parse(name, smiles)) == _key(smiles)   # the OPSIN in use has a grammar for the name
+    else:
+        assert _independent_parse(name, smiles) is None                 # OPSIN has no grammar for the name
     assert _key(_independent_parse(twin, smiles)) == _key(smiles)     # and reads its twin to the input
     for tier in ("pin", "valid", "best-effort"):
         row = _row(smiles, tier)
@@ -183,7 +192,7 @@ def test_a_twin_family_with_no_other_spelling_ships_through_its_twin_at_every_ti
             assert row["tier"] == "abstain", row                     # the default tier ships PINs only
             continue
         assert row["name"] == name, row
-        assert row["tier"] == tier_label and row["verified"] == "opsin_twin", row
+        assert row["tier"] == tier_label and row["verified"] == ("opsin" if reads_itself else "opsin_twin"), row
 
 
 # README "Checked." / "Output tiers": a thioperoxol is named in the form OPSIN reads at a wider tier (user decision

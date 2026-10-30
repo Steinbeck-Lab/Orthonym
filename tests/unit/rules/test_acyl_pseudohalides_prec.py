@@ -9,7 +9,9 @@ ethane-1,2-disulfonyl dibromide (PIN)' (:31452).
 import pytest
 
 from orthonym.cli import _tiered_namer
+from orthonym.opsin_capabilities import opsin_capabilities
 from orthonym.validation.opsin_roundtrip import opsin_roundtrip_check
+from tests.support.rt_assert import assert_full_rt
 
 
 @pytest.mark.unit
@@ -65,10 +67,15 @@ def test_a_name_checked_against_the_book_keeps_its_label(smiles, expected, why):
 def test_dimethyliodanuide_is_the_printed_spelling_read_through_its_twin():
     """ "Anions formed by addition of hydride ions", method (1) leads to PINs: 'diphenyliodanuide (PIN)'
     (:41110). OPSIN 2.9.0 does not read 'uide'; the name is read through the twin 'dimethyl-lambda3-iodanide'
-    (``validation.uide_twin``), which is its label's ``opsin_twin``."""
+    (``validation.uide_twin``), which is its label's ``opsin_twin``. An OPSIN that reads the name itself (OPSIN's
+    main branch) reads it to the input, and the label is ``opsin``."""
     row = _tiered_namer("pin", "pin").name_tiered("C[I-]C")
     assert row["name"] == "dimethyliodanuide" and row["tier"] == "pin_verified"
-    assert row["verified"] == "opsin_twin"
+    if opsin_capabilities()["halogen_uide"]:
+        assert row["verified"] == "opsin"
+        assert_full_rt(row["name"], "C[I-]C")
+    else:
+        assert row["verified"] == "opsin_twin"
 
 
 # --- the retained acyl groups of and the carbonic esters --------------------------------------------------

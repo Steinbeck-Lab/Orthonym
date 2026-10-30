@@ -59,10 +59,12 @@ from pathlib import Path
 import pytest
 
 from orthonym import Orthonym
+from tests.support.opsin_marks import needs_phane_opsin, release_capabilities
 from tests.support.rt_assert import assert_full_rt
 from tests.support.default_tier import (  # noqa: E402
     declined_at_default,
     declined_pin_row,
+    default_tier_row,
     default_tier_rule_applies,
     strict_path_row,
 )
@@ -354,8 +356,12 @@ def test_part2_creatine_hydrochloride_is_a_mixed_adduct_without_a_pin():
     assert row["name"] == "[carbamimidoyl(methyl)amino]acetic acid—hydrogen chloride (1/1)"
 
 
+AMIDO_PHANE_SMILES = ("CCOC(=O)C1=C(SC=C1C2=CC=CC=C2)NC(=O)[C@H](C3=CC=CC=C3)"
+                      "SC4=NN=NN4C5=C(C=C(C=C5)C)C")
+
+
 @pytest.mark.opsin_gate
-def test_amido_prefix_of_a_substituted_acetic_acid_is_the_acetamido_name():
+def test_amido_prefix_of_a_substituted_acetic_acid_is_the_acetamido_name(monkeypatch):
     """The acid producer used to spell this substituted acetic acid '...-2-phenyl
     ethanoic acid' (the general-nomenclature alternative, the Blue Book:
     29725), so the name carried '...ethanamido'. The acid now takes the retained parent
@@ -374,15 +380,32 @@ def test_amido_prefix_of_a_substituted_acetic_acid_is_the_acetamido_name():
     junior amide on the chain is cited as 'oxo' + 'aza'. OPSIN 2.9.0 reads no phane
     name, so the spelling check lowers the label: the default tier declines,
     the strict path's name is systematic_verified, and the best-effort tier gives the
-    same name, read back exactly."""
-    smiles = ("CCOC(=O)C1=C(SC=C1C2=CC=CC=C2)NC(=O)[C@H](C3=CC=CC=C3)"
-              "SC4=NN=NN4C5=C(C=C(C=C5)C)C")
+    same name, read back exactly. The engine is the one of OPSIN 2.9.0 whichever OPSIN
+    is in use (``release_capabilities``); with an OPSIN that reads phane names the PIN
+    is built (the next test)."""
+    release_capabilities(monkeypatch)
+    smiles = AMIDO_PHANE_SMILES
     name = ("ethyl 2-[(2S)-2-{[1-(2,4-dimethylphenyl)-1H-tetrazol-5-yl]sulfanyl}-2-"
             "phenylacetamido]-4-phenylthiophene-3-carboxylate")
     declined_at_default(smiles, name)
     row = strict_path_row(smiles)
     assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), row
     assert "P-52.2.5.1" in [f["rule"] for f in row.get("spelling_failures") or []], row
+
+
+@needs_phane_opsin
+@pytest.mark.opsin_gate
+def test_the_substituted_acetamide_with_four_ring_systems_is_a_phane_pin_where_opsin_reads_phane():
+    """The structure of the test above, with an OPSIN that reads phane names: the phane parent of (2)
+    (:23829) and (:23901), on the terms the docstring above gives, is built and read back, so the default
+    tier ships it as the PIN (the spelling check has nothing to lower) and the read-back reaches the input's full
+    InChIKey."""
+    from orthonym.validation.spelling.cyclophane import is_phane_name
+    row = default_tier_row(AMIDO_PHANE_SMILES)
+    assert is_phane_name(row["name"]), row
+    assert row["tier"] == "pin_verified" and row["is_pin"] is True and row["verified"] == "opsin", row
+    assert row["spelling_failures"] == [], row
+    assert_full_rt(row["name"], AMIDO_PHANE_SMILES)
 
 
 @pytest.mark.unit
