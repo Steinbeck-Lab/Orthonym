@@ -7,8 +7,12 @@ following being uninterpretable"), and the part the descriptor modifies has no a
 (``Fragment.getAtomByLocantOrThrow``: "Could not find the atom with locant N."), a part being numbered
 1..n. The search leaves out the pairs those refusals cover; it must give the name it gave when it asked
 for all of them. Some fragments of OPSIN's data are not numbered 1..n (``TestGapsInOpsinNumbering``), and the
-rules of the module hold for the pinned 2.9.0 release only.
+rules of the module hold for the pinned 2.9.0 release only: the tests of what the search learns from a refusal
+run with that release (``release_refusals_only``), and with another OPSIN one test asks the search of the OPSIN
+in use and finds that it prunes nothing (``TestPinnedRelease``).
 """
+import os
+
 import pytest
 from rdkit import Chem
 
@@ -17,6 +21,7 @@ from orthonym.rules import isotope_search, isotopes
 from orthonym.rules.isotope_search import (
     GAP_WINDOW, LocantReach, direct_refusal_kind, fixed_h_inchi, integer_locant_reach, pinned_opsin)
 from orthonym.validation.opsin_roundtrip import opsin_parse
+from tests.support.opsin_marks import release_opsin_in_use, release_refusals_only
 
 pytestmark = pytest.mark.unit
 
@@ -68,8 +73,9 @@ class TestRefusalKind:
     def test_a_name_with_a_twin_spelling_is_not_classified(self):
         """The read-back asks the twin spelling when OPSIN refuses the name (``validation.twin_spellings``),
         so OPSIN's refusal of the name as written does not say the candidate cannot be read."""
-        assert direct_refusal_kind("(1-2H1)1,4-dihydro-1,4-sulfanonaphthalene") is None
-        assert direct_refusal_kind("(7-2H1)methylbenzene") == "locant"
+        assert direct_refusal_kind("(1-2H1)1,4-dihydro-1,4-sulfanonaphthalene") is None   # any OPSIN
+        if release_opsin_in_use():
+            assert direct_refusal_kind("(7-2H1)methylbenzene") == "locant"
 
     @pytest.mark.parametrize("message,locant", [
         ("Could not find the atom with locant 7.", "7"),
@@ -91,6 +97,7 @@ class TestRefusalKind:
     def test_opsin_names_the_locant_it_did_not_find(self, name, refusal):
         assert jvm_bridge.opsin_refusal(name, False) == refusal
 
+    @release_refusals_only
     def test_a_refusal_of_another_locant_than_the_one_asked_is_not_classified(self):
         """(1,9-2H2)methylbenzene is refused for its 9, not for the 1 the search asked."""
         assert direct_refusal_kind("(1,9-2H2)methylbenzene") == "locant"
@@ -114,7 +121,24 @@ class TestPinnedRelease:
         isotope_search._pinned_release.cache_clear()
 
     def test_the_release_jar_is_pinned(self):
-        assert pinned_opsin()
+        """The release jar is the one OPSIN the rules hold for; a build of OPSIN's main branch or a jar of the user's
+        is not (``ORTHONYM_OPSIN=main`` floats with its branch)."""
+        if not (os.environ.get("ORTHONYM_OPSIN") or os.environ.get("ORTHONYM_OPSIN_JAR")):
+            assert pinned_opsin()            # the default jar is the release: the rules prune with it
+        assert pinned_opsin() is release_opsin_in_use()
+
+    @pytest.mark.skipif(release_opsin_in_use(), reason="the pruning is on: the tests of the rules run with this OPSIN")
+    def test_the_opsin_in_use_prunes_nothing_of_its_refusals(self):
+        """The OPSIN in use, not a stand-in (``test_another_opsin_prunes_nothing`` replaces the jar): it refuses a
+        locant its part lacks, as 2.9.0 does, and the search does not learn from that."""
+        assert jvm_bridge.opsin_refusal_kind("(7-2H1)methylbenzene", False) == "locant"
+        assert not pinned_opsin()
+        assert direct_refusal_kind("(7-2H1)methylbenzene") is None
+        assert direct_refusal_kind("(1,9-2H2)methylbenzene", 9) is None
+        reach = LocantReach("methylbenzene", 60, _locanted)
+        built = _search(reach, "methylbenzene", 0, range(1, 61))
+        assert built == list(range(1, 61)) and not reach.caps and not reach.dead and not reach.absent
+        assert integer_locant_reach("methylbenzene", 6, _locanted, 40) == (False, None)
 
     @pytest.mark.parametrize("found", [
         {"label": "main", "commit": "abc", "path": "/jars/opsin-main.jar"},
@@ -142,6 +166,7 @@ class TestPinnedRelease:
 
 
 class TestIntegerLocantReach:
+    @release_refusals_only
     def test_the_numbering_of_the_part_a_descriptor_modifies(self):
         skel = "methylbenzene"
         assert integer_locant_reach(skel, 0, _locanted, 40) == (False, 1)    # (n-2H1)methyl: methyl has C1
@@ -151,6 +176,7 @@ class TestIntegerLocantReach:
     def test_the_limit_bounds_the_series(self):
         assert integer_locant_reach("methylbenzene", 6, _locanted, 3) == (False, 3)
 
+    @release_refusals_only
     def test_the_primed_series_of_a_ring_assembly(self):
         skel = "1,1'-biphenyl"
         assert integer_locant_reach(skel, 0, _locanted, 40, "'") == (False, 6)
@@ -180,6 +206,7 @@ class TestLocantReach:
         reach = self._reach("methylbenzene")
         assert [reach.beyond(2, locant) for locant in (None, "N", "O")] == [False, False, False]
 
+    @release_refusals_only
     def test_an_offset_where_the_grammar_has_no_place_is_dead_for_every_locant(self):
         reach = self._reach("methylbenzene")
         offset = 2
@@ -187,6 +214,7 @@ class TestLocantReach:
         reach.learn(offset, 1, candidate)
         assert reach.beyond(offset, 1) and reach.beyond(offset, 5) and reach.beyond(offset, "N3")
 
+    @release_refusals_only
     def test_the_first_locant_a_part_lacks_is_refused_in_the_next_spelling(self):
         reach = self._reach("methylbenzene")
         reach.learn(0, 2, _locanted(2) + "methylbenzene")
@@ -194,6 +222,7 @@ class TestLocantReach:
         assert reach.beyond(0, 2)
         assert not reach.beyond(0, 3)          # nothing is known above it until the window has been asked
 
+    @release_refusals_only
     def test_the_locants_above_are_refused_once_the_window_and_the_limit_were(self):
         """methylbenzene at offset 0 modifies 'methyl', which has the locant 1 only."""
         reach = self._reach("methylbenzene", limit=60)
@@ -202,6 +231,7 @@ class TestLocantReach:
         assert reach.caps == {0: 1}
         assert reach.beyond(0, 60) and not reach.beyond(0, 1)
 
+    @release_refusals_only
     def test_another_offset_is_another_part(self):
         reach = self._reach("methylbenzene")
         _search(reach, "methylbenzene", 0, range(1, 41))
@@ -235,12 +265,14 @@ class TestLocantReach:
         reach.learn(0, 1, "(1,9-2H2)methylbenzene")
         assert not reach.absent and not reach.dead
 
+    @release_refusals_only
     def test_a_numbered_letter_reads_the_integers_of_its_offset_first(self):
         reach = self._reach("methylbenzene")
         assert reach.beyond(0, "N7") and not reach.beyond(0, "N1")
         assert reach.caps[0] == 1
         assert reach.beyond(2, "O1") and 2 in reach.dead
 
+    @release_refusals_only
     def test_a_locant_read_above_the_first_absent_one_leaves_the_offset_uncapped(self):
         reach = self._reach("methylbenzene", limit=60)
         reach.learn(0, 2, _locanted(2) + "methylbenzene")
@@ -274,6 +306,7 @@ class TestGapsInOpsinNumbering:
         assert 0 not in reach.caps
         assert integer_locant_reach(parent, 0, _locanted, 45) == (False, None)
 
+    @release_refusals_only
     def test_arginines_far_locant_is_the_exception_the_window_does_not_see(self):
         """Arginine reads (99-13C) (its guanidino carbon) and not (6-13C): the search of a molecule of 99 heavy
         atoms or more caps arginine at 5 and does not build it. That loses a name and never makes a wrong one,

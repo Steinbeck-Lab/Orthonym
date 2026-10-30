@@ -25,6 +25,7 @@ from orthonym.assembly import fragment_naming
 from orthonym.metrics.provenance import (allow_aromatic_general_ctx, best_effort_ctx,
                                          best_effort_request_ctx, full_coverage_ctx,
                                          general_fallback_ctx)
+from tests.support.opsin_marks import needs_phane_opsin, release_capabilities
 
 _CTX = (general_fallback_ctx, best_effort_ctx, allow_aromatic_general_ctx, full_coverage_ctx)
 N_HYDROXY = "ON[C@@H](C)CC"
@@ -102,16 +103,21 @@ def test_reset_helper_is_lifo_and_idempotent():
     assert general_fallback_ctx.get() is False
 
 
+CALIX6 = ("Oc1c2cccc1Cc1cccc(c1O)Cc1cccc(c1O)Cc1cccc(c1O)Cc1cccc(c1O)"
+          "Cc1cccc(c1O)C2")                              # a 42-atom ring system
+
+
 def test_the_request_tier_is_set_for_the_call_and_unset_after_every_exit():
     """``best_effort_request_ctx`` holds the tier of the outermost request for the
     length of the call -- in every nested naming and at every read of the von Baeyer
     ceilings -- and is None again after it, on the normal exit, after the isotope
-    re-entry of the same engine and on an exception in the prelude."""
+    re-entry of the same engine and on an exception in the prelude. The ring system is
+    named by von Baeyer nomenclature as it is with OPSIN 2.9.0: an OPSIN that reads
+    phane names names it as a cyclophane, which reads no ceiling (the next test)."""
     import orthonym.rules.isotopes as isotopes
     from orthonym.rules import terminal_ring
     from orthonym.rules import vonbaeyer_universal as vbu
-    calix6 = ("Oc1c2cccc1Cc1cccc(c1O)Cc1cccc(c1O)Cc1cccc(c1O)Cc1cccc(c1O)"
-              "Cc1cccc(c1O)C2")                          # a 42-atom ring system
+    calix6 = CALIX6
     impl_seen, caps_seen = [], []
     real_caps, real_impl = vbu.cage_caps, _namer.Orthonym._name_impl
 
@@ -123,6 +129,7 @@ def test_the_request_tier_is_set_for_the_call_and_unset_after_every_exit():
         impl_seen.append(best_effort_request_ctx.get())
         return real_impl(self, *args, **kwargs)
     with pytest.MonkeyPatch.context() as mp:
+        release_capabilities(mp)
         mp.setattr(vbu, "cage_caps", _caps)
         mp.setattr(terminal_ring, "cage_caps", _caps)
         mp.setattr(_namer.Orthonym, "_name_impl", _impl)
@@ -144,6 +151,29 @@ def test_the_request_tier_is_set_for_the_call_and_unset_after_every_exit():
         mp.setattr(isotopes, "has_isotopes", _boom)
         with pytest.raises(RuntimeError, match="injected"):
             _best_effort_engine().name("CCCO")
+    assert best_effort_request_ctx.get() is None
+
+
+@needs_phane_opsin
+def test_the_request_tier_holds_for_the_call_that_names_a_ring_system_as_a_phane():
+    """With an OPSIN that reads phane names the 42-atom ring system is named as a cyclophane "Preferred
+    IUPAC names in phane nomenclature", (1), the Blue Book: a cyclic phane structure with a mancude ring
+    attached at nonadjacent ring positions); the request tier holds for every nested naming of that route too, and is
+    None again after the call. The name is read back to the input's full InChIKey."""
+    from orthonym.validation.spelling.cyclophane import is_phane_name
+    from tests.support.rt_assert import assert_full_rt
+    seen = []
+    real_impl = _namer.Orthonym._name_impl
+
+    def _impl(self, *args, **kwargs):
+        seen.append(best_effort_request_ctx.get())
+        return real_impl(self, *args, **kwargs)
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(_namer.Orthonym, "_name_impl", _impl)
+        name = _best_effort_engine().name(CALIX6)
+    assert is_phane_name(name), name
+    assert_full_rt(name, CALIX6)
+    assert seen and set(seen) == {True}, seen
     assert best_effort_request_ctx.get() is None
 
 

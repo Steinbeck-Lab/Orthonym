@@ -29,6 +29,7 @@ from rdkit import Chem
 from orthonym.assembly import fragment_naming as fn
 from orthonym.rules import polycyclic as pc
 from orthonym.rules.polycyclic import VonBaeyerAnalyzer
+from tests.support.opsin_marks import needs_phane_opsin, release_capabilities
 
 pytestmark = pytest.mark.unit
 
@@ -667,14 +668,39 @@ PINNED_NAMES = {
 @pytest.mark.integration
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("cid", list(PINNED_NAMES))
-def test_cluster_a_row_keeps_its_name(cid):
+def test_cluster_a_row_keeps_its_name(cid, monkeypatch):
+    """The von Baeyer name of the row is the one of the engine as it is with OPSIN 2.9.0 whichever OPSIN is in use
+    (``release_capabilities``): with an OPSIN that reads phane names 136159023 is named as a phane, which is no
+    von Baeyer name (the next test)."""
     from orthonym.namer import Orthonym
     from tests.support.jars import jar_or_skip
 
     jar_or_skip("opsin")
+    release_capabilities(monkeypatch)
     smiles, expected = PINNED_NAMES[cid]
     namer = Orthonym(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
     namer.name_tiered("CCO")      # as the run tool does: the JVM is up before the molecule is named
     result = namer.name_tiered(smiles)
     assert result["name"] == expected
     assert result["tier"] == "systematic_verified"
+
+
+@needs_phane_opsin
+@pytest.mark.integration
+@pytest.mark.opsin_gate
+def test_cluster_a_row_136159023_is_named_as_a_phane_where_opsin_reads_phane():
+    """Row 136159023 is a macrocycle of four benzene and four cyclohexane rings joined by chains, the benzene rings
+    attached at nonadjacent positions: a cyclophane "Preferred IUPAC names in phane nomenclature", (1),
+    the Blue Book), a name which OPSIN's main branch reads. The name is a phane name, read back to the input's
+    full InChIKey."""
+    from orthonym.namer import Orthonym
+    from orthonym.validation.spelling.cyclophane import is_phane_name
+    from tests.support.rt_assert import assert_full_rt
+
+    smiles, _ = PINNED_NAMES["136159023"]
+    namer = Orthonym(general_fallback=True, general_fallback_unverified=True, allow_aromatic_general=True)
+    namer.name_tiered("CCO")
+    result = namer.name_tiered(smiles)
+    assert is_phane_name(result["name"]), result
+    assert result["tier"] == "pin_verified" and result["is_pin"] is True, result     # the PIN, read back by OPSIN
+    assert_full_rt(result["name"], smiles)
