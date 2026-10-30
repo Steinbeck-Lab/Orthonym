@@ -5,7 +5,8 @@ for a multi-fragment assembly. It reads the table, so admitting a metal is an ed
 These tests pin three things: the function gives, for every element of the allow-list and for the
 constructed assemblies below, the answers the engine gave before the table existed (the literals
 were computed on the start commit of the zinc work) except for zinc, which the table admits to
-``ION_SALTS`` and ``CARBANION_SALTS``; the table answers its lookups; and the function follows the
+``ION_SALTS`` and ``CARBANION_SALTS``, and Groups 1-2, which it admits to ``CARBANION_SALTS`` since 2026-10-30
+(user decision, breadth lane); the table answers its lookups; and the function follows the
 table (a metal added to it, here by a monkeypatch, changes the answer).
 
 Blue Book: INTRODUCTION, "Organometallic compounds are compounds having at least one bond
@@ -17,8 +18,9 @@ from rdkit import Chem
 
 from orthonym.data import metal_scope
 from orthonym.data.metal_scope import (AMMINE, BONDED_NAMES, CARBANION_SALTS, CONNECT_ANION, DATIVE, DISCONNECT,
-                                       ELEMENT, ION_SALTS, MACROCYCLE, METAL_SCOPE, MetalScope,
-                                       has_mechanism, has_valence, is_named_metal)
+                                       ELEMENT, ION_SALTS, MACROCYCLE, METAL_SCOPE, ZERO_VALENT,
+                                       ZERO_VALENT_METALS, MetalScope, has_mechanism, has_valence,
+                                       is_named_metal)
 from orthonym.perception.metals import METAL_ELEMENT_SYMBOLS, assembly_has_out_of_scope_metal
 
 ACETATE = ".CC(=O)[O-]"
@@ -44,12 +46,12 @@ def _cation(symbol, charge):
 @pytest.mark.parametrize("symbol", GROUP_1 + GROUP_2)
 def test_scope_table_reproduces_the_old_set(symbol):
     """The 12 alkali and alkaline-earth elements, with their usual charge: a salt of an organic
-    anion is in scope, a carbanion or a hydride beside the metal is organometallic."""
+    anion is in scope, and since 2026-10-30 (``CARBANION_SALTS``) so is a carbanion or a hydride beside the metal."""
     charge = 1 if symbol in GROUP_1 else 2
     cation = _cation(symbol, charge)
     assert _out(cation + ACETATE * charge) is False
-    assert _out(cation + METHANIDE * charge) is True
-    assert _out(cation + HYDRIDE * charge) is True
+    assert _out(cation + METHANIDE * charge) is False
+    assert _out(cation + HYDRIDE * charge) is False
 
 
 @pytest.mark.parametrize("smiles, expected", [
@@ -76,7 +78,7 @@ def test_scope_table_reproduces_the_old_set(symbol):
     ("[Mg+2].[Zn+2].[Cl-].[Cl-].[Cl-].[Cl-]", False),
     ("[Na+].[Zn+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", False),
     ("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1nc(c(-c3ccccc3)c3ccc([n-]3)c2-c2ccccc2)C=C1.[Zn+2]", False),
-    ("[Ca+2].[CH3-].[CH3-]", True),                                        # Group 2 with a carbanion
+    ("[Ca+2].[CH3-].[CH3-]", False),                                       # Group 2 with a carbanion (since 2026-10-30)
     # a metalloid is named substitutively: never out of scope, with or without a carbanion
     ("[Sn+2].CC(=O)[O-].CC(=O)[O-]", False),
     ("[Sn+4].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]", False),
@@ -110,7 +112,7 @@ def test_every_element_of_the_allow_list_gives_the_old_answer():
         if symbol in METALLOIDS or symbol == "Zn":
             expected = (False, False, False)
         elif symbol in GROUP_1 + GROUP_2:
-            expected = (False, True, True)
+            expected = (False, False, False)                               # CARBANION_SALTS since 2026-10-30
         else:
             expected = (True, True, True)
         got = tuple(_out(cation + tail * 2) for tail in (ACETATE, METHANIDE, HYDRIDE))
@@ -130,7 +132,7 @@ def test_zinc_has_its_mechanisms():
     assert is_named_metal("Zn") is True
     assert METAL_SCOPE["Zn"] == MetalScope(
         frozenset({DISCONNECT, CONNECT_ANION, BONDED_NAMES, ELEMENT, AMMINE, MACROCYCLE, DATIVE, ION_SALTS,
-                   CARBANION_SALTS}),
+                   CARBANION_SALTS, ZERO_VALENT}),
         frozenset({2}),
         complete=True)
     assert has_mechanism("Zn", MACROCYCLE) is True
@@ -164,11 +166,11 @@ def test_only_zinc_is_complete():
 
 def test_mechanism_lookup():
     assert has_mechanism("Na", ION_SALTS) is True
-    assert has_mechanism("Na", CARBANION_SALTS) is False
+    assert has_mechanism("Na", CARBANION_SALTS) is True
     assert has_mechanism("Xx", ION_SALTS) is False                         # an unknown symbol
     assert has_mechanism("Na", "no_such_mechanism") is False
     for symbol in GROUP_1 + GROUP_2:
-        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS}), symbol
+        assert METAL_SCOPE[symbol].mechanisms == frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), symbol
         assert is_named_metal(symbol) is True, symbol
     assert is_named_metal("Xx") is False
 
@@ -200,3 +202,12 @@ def test_the_function_follows_the_table(monkeypatch):
                         MetalScope(frozenset({ION_SALTS, CARBANION_SALTS}), frozenset({2})))
     assert _out(copper_methanide) is False
     assert _out("[Cu+2].[Pt+2].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-].CC(=O)[O-]") is True    # platinum is still out
+
+
+def test_zero_valent_metals_are_admitted_to_that_alone():
+    """The metals of the 2026-10-30 panel are admitted to ``ZERO_VALENT`` only: they cite a neutral atom beside
+    ions as 'metal(0)' and nothing else; their failures keep the label UNSUPPORTED_ELEMENT (``is_named_metal``)."""
+    for symbol in ZERO_VALENT_METALS:
+        assert METAL_SCOPE[symbol] == MetalScope(frozenset({ZERO_VALENT}), frozenset()), symbol
+        assert is_named_metal(symbol) is False, symbol
+    assert _out("[Cu+2].CC(=O)[O-].CC(=O)[O-]") is True                     # no salt mechanism for copper

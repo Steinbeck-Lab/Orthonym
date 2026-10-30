@@ -354,10 +354,19 @@ def test_other_metals_are_not_moved():            # reads the baseline fixture (
     with open(baseline_path("zinc").parent / "declared_respellings_pinc.tsv", newline="") as f:
         respelled = {(r["smiles"], r["tier_req"]): (r["from_name"], r["to_name"])
                      for r in csv.DictReader(f, delimiter="\t")}
+    # The neutral metal atoms beside ions that the table admits to ZERO_VALENT (user decision 2026-10-30) are named
+    # at the best-effort tier with the oxidation number zero ('iridium(0)'): the rows below gain that name.
+    with open(baseline_path("zinc").parent / "declared_gains_zero_valent.tsv", newline="") as f:
+        gains = {(r["smiles"], r["tier_req"]): (r["to_name"], r["to_tier"]) for r in csv.DictReader(f, delimiter="\t")}
     moved = []
     namers = {tier: Orthonym(style="pin", **_emit_tier_flags(tier)) for tier in ("pin", "best-effort")}
     for row in rows:
         if (row["smiles"], row["tier_req"]) in declared_keys:
+            continue
+        if (row["smiles"], row["tier_req"]) in gains:
+            now = namers[row["tier_req"]].name_tiered(row["smiles"])
+            assert (now["name"], now["tier"]) == gains[(row["smiles"], row["tier_req"])], row["smiles"]
+            assert_full_rt(now["name"], row["smiles"])
             continue
         now = namers[row["tier_req"]].name_tiered(row["smiles"])
         key = (row["smiles"], row["tier_req"])

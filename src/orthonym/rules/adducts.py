@@ -74,6 +74,23 @@ SINGLE_ATOM_COMPONENT_NAMES: Dict[str, str] = {
     "P": "phosphane",         # -1a: PH3 (phosphane is the PIN, not phosphine)
 }
 
+# The hydrogen components of a mixture and its ammonia, named at the best-effort tier only (the
+# call with ``general_fallback_unverified``): dihydrogen and the hydride ion have no heavy atom and
+# no name from the single-component pipeline, and bare nitrogen stays out of the PIN table above.
+# PubChem holds ~207,000 mixtures with one of them ('[HH].CCO', 'N.CCO', '[Na+].[H-].CCO'). OPSIN
+# reads each name back ('ethanol—dihydrogen (1/1)', 'ethanol—sodium(1+)—hydride (1/1/1)'), and the
+# whole name ships only when it reproduces the drawn structure (``_parse_reproduces_depiction``).
+# gives a mixed organic-inorganic adduct no PIN (the Blue Book).
+#: Beside a metal, ammonia is the ammonia of an ammine complex (the ``AMMINE`` mechanism of
+#: ``data/metal_scope.py``, ``metal_atoms.ammine_component_names``) and the hydride ion that of a
+#: hydride salt (``CARBANION_SALTS``): those two are taken from this table only when every true metal
+#: of the assembly is admitted to that mechanism (``_hydrogen_components``).
+HYDROGEN_COMPONENT_NAMES: Dict[str, str] = {
+    "[HH]": "dihydrogen",
+    "[H-]": "hydride",
+    "N": "ammonia",
+}
+
 
 # Terminal ligands of a mononuclear metal halide / oxide component, keyed by
 # (atomic number, bond order to the metal) -> ligand prefix. The prefixes are the
@@ -154,7 +171,17 @@ def _parse_reproduces_depiction(name: str, mol) -> bool:
     from orthonym.namer import _same_canonical_smiles, _validity_gate_name_to_smiles
     try:
         parsed = _validity_gate_name_to_smiles(name)
-        return bool(parsed) and _same_canonical_smiles(parsed, Chem.MolToSmiles(mol))
+        if not parsed:
+            return False
+        if _same_canonical_smiles(parsed, Chem.MolToSmiles(mol)):
+            return True
+        # Dihydrogen is written '[HH]' (one atom with one hydrogen) by RDKit and '[H][H]' by OPSIN:
+        # the two graphs are compared with every hydrogen an atom.
+        if not any(fm.GetNumHeavyAtoms() == 0 for fm in Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=False)):
+            return False
+        reread = Chem.MolFromSmiles(parsed)
+        return reread is not None and (Chem.MolToSmiles(Chem.AddHs(reread))
+                                       == Chem.MolToSmiles(Chem.AddHs(mol)))
     except Exception:
         return False
 
@@ -286,6 +313,10 @@ def _name_component_once(frag_smi: str, style: str, *,
     # component takes its element name ('nickel', 'iron(2+)'), and a one-atom
     # charged non-metal ('[NH2-]' -> 'azanide') is named by the fresh instance
     # below like any other ion.
+    if frag_mol.GetNumHeavyAtoms() == 0 and (single_atom_names or {}).get(frag_smi):
+        # a hydrogen-only fragment of the table ('[HH]'); any other one goes to the pipeline below as
+        # before ('[H][H]' is 'molecular hydrogen' there)
+        return single_atom_names[frag_smi]
     if frag_mol.GetNumHeavyAtoms() == 1:
         if ions_ok and _is_metal_atom_fragment(frag_mol):
             return _metal_atom_component_name(frag_mol)
@@ -473,6 +504,41 @@ def _hydrate_word_form(named: List[Tuple[str, int]],
         return None
     base = EM_DASH.join(name for name, _count in others)
     return f"{base} {prefix}hydrate"
+
+
+def _hydrogen_components(mol) -> Dict[str, str]:
+    """The entries of ``HYDROGEN_COMPONENT_NAMES`` that ``mol`` may take: dihydrogen always; ammonia
+    when the assembly holds no true metal; the hydride ion when every true metal is admitted to
+    ``CARBANION_SALTS`` (a metal the table does not admit is never composed with a hydride)."""
+    from ..data.metal_scope import CARBANION_SALTS, has_mechanism
+    from ..perception.metals import _TRUE_METAL_SYMBOLS_FOR_VETO
+    metals = {a.GetSymbol() for a in mol.GetAtoms() if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO}
+    names = {"[HH]": HYDROGEN_COMPONENT_NAMES["[HH]"]}
+    if not metals:
+        names["N"] = HYDROGEN_COMPONENT_NAMES["N"]
+    if all(has_mechanism(m, CARBANION_SALTS) for m in metals):
+        names["[H-]"] = HYDROGEN_COMPONENT_NAMES["[H-]"]
+    return names
+
+
+def _zero_metal_name(ordered, named, frag_mols) -> Optional[str]:
+    """The adduct name with each neutral metal atom cited with the oxidation number zero ('iridium(0)'),
+    or None when the assembly has no charged component or no neutral metal atom. A reader balances the
+    charges of the components itself: OPSIN reads 'zinc—benzenide (1/2)' as zinc(2+) and 'zinc(0)—benzenide
+    (1/2)' as the neutral atom that is drawn. Tried only after the name without it fails to reproduce the
+    drawing, so a name that ships today keeps its spelling. Only the metals that ``data/metal_scope.py``
+    admits to ``ZERO_VALENT``."""
+    if not any(Chem.GetFormalCharge(fm) != 0 for fm in frag_mols.values()):
+        return None
+    from ..data.metal_scope import ZERO_VALENT, has_mechanism
+    zeroed, changed = [], False
+    for (smi, _count), (name, count) in zip(ordered, named):
+        fm = frag_mols[smi]
+        if (_is_metal_atom_fragment(fm) and fm.GetAtomWithIdx(0).GetFormalCharge() == 0 and name.isalpha()
+                and has_mechanism(fm.GetAtomWithIdx(0).GetSymbol(), ZERO_VALENT)):
+            name, changed = f"{name}(0)", True
+        zeroed.append((name, count))
+    return _assemble_adduct_name(zeroed) if changed else None
 
 
 def _assemble_adduct_name(named: List[Tuple[str, int]]) -> str:
@@ -785,7 +851,8 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
                for fm in frag_mols.values()))
     # The ammonia of an ammine complex of a metal that the scope table admits (an unverified call only).
     _ammine = ammine_component_names(mol) if _ions_ok else {}
-    _single_atoms = {**SINGLE_ATOM_COMPONENT_NAMES, **_ammine}
+    _hydrogens = _hydrogen_components(mol) if general_fallback_unverified else {}
+    _single_atoms = {**SINGLE_ATOM_COMPONENT_NAMES, **_hydrogens, **_ammine}
     # The macrocyclic anion of a complex of a metal that the scope table admits (an unverified call only).
     _macrocycles = macrocycle_component_names(mol) if _ions_ok else {}
     _has_metal_atom = _ions_ok and any(
@@ -824,7 +891,7 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
             if not (_ions_ok and (_charged or _is_metal_atom_fragment(fm))):
                 return None
             _widened = True
-        if smi in _ammine:
+        if smi in _ammine or smi in _hydrogens:
             _widened = True  # the name must reproduce the drawn structure exactly
         if _ions_ok and _metal_halide_oxide_component_name(fm) is not None:
             _widened = True
@@ -858,7 +925,9 @@ def name_adduct(mol, canonical_smiles: Optional[str] = None,
     if _widened:
         _name = _assemble_adduct_name(named)
         if not _parse_reproduces_depiction(_name, mol):
-            return None
+            _name = _zero_metal_name(ordered, named, frag_mols)
+            if _name is None or not _parse_reproduces_depiction(_name, mol):
+                return None
         _label_mixed_adduct(_name, ordered)
         return _name
     if style == "general":
