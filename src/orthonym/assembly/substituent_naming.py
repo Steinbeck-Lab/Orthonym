@@ -9346,6 +9346,7 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int,
     if stem is None or cat.GetFormalCharge() <= 0:
         return ''
     _onium_suffix = (stem + 'ium') if as_free_ion else (stem + 'iumyl')
+    from ..rules.lambda_convention import lambda_ion_name
 
     # Collect each N-substituent branch (every neighbour except the one leading
     # to the anionic parent). Each branch is named as a substituent prefix.
@@ -9365,9 +9366,10 @@ def cation_to_prefix(mol, cation_idx: int, parent_attach_idx: int,
         # the `<stem>iumyl` group itself: e.g. glycine zwitterion's
         # cation is `azaniumyl`. The caller decides whether to use this or keep the
         # amino-acid neutral/retained form (sequenced first,).
-        return _onium_suffix
+        return lambda_ion_name(cat, '', _onium_suffix)
 
-    prefix = _compose_n_substituent_prefix(sub_prefixes) + _onium_suffix
+    # a five-bond S+ is a λ4-sulfanium: '(tetramethyl-λ4-sulfaniumyl)'
+    prefix = lambda_ion_name(cat, _compose_n_substituent_prefix(sub_prefixes), _onium_suffix)
     if cat.GetSymbol() == 'N' and any(
             nb.GetSymbol() == 'C' for nb in cat.GetNeighbors()
             if nb.GetIdx() != parent_attach_idx):

@@ -3424,11 +3424,10 @@ def emit_onium_hydride_parent(mol, center_idx: int) -> str:
         subs.append(sub_name)
     if len(covered) != mol.GetNumHeavyAtoms():
         return ''   # atom-drop veto
-    suffix = f"{_elide_terminal_e(stem)}ium"
-    if not subs:
-        return suffix
     from ..assembly.prefix_marks import mononuclear_substituent_block
-    return f"{mononuclear_substituent_block(subs)}{suffix}"
+    from .lambda_convention import lambda_ion_name      # a five-bond S+ is a λ4-sulfanium
+    block = mononuclear_substituent_block(subs) if subs else ''
+    return lambda_ion_name(center, block, f"{_elide_terminal_e(stem)}ium")
 
 
 # (the Blue Book-41390): a CATENATED homonuclear parent-hydride cation

@@ -26,6 +26,7 @@ from rdkit import Chem
 
 from ..data.multipliers import multiplier_table
 from ..perception.ions import get_radical_sites
+from .lambda_convention import ionic_lambda, lambda_ion_name
 
 # === SUFFIX MAPPINGS ===
 
@@ -1315,16 +1316,12 @@ _IONIC_ONLY_HYDRIDES = {'O': 'oxidane', 'Cl': 'chlorane', 'Br': 'bromane', 'I': 
 
 
 #: the centres (element, charge) whose radical ions this producer names at the PIN tiers,; silicon and
-#: germanium anions of,:43424-:43430), each with the bonding number it names its ion for, against the standard
-#: bonding number of the hydride (+1: the 'uide' or 'ium' of the hydride, -1: its 'ide' or 'ylium'). The name does not follow
-#: the bonds the atom holds: a sulfur with four bonds and a radical electron is 'tetramethylsulfaniumyl' (pin_verified on main),
-#: as one with two bonds is 'propyloxidaniumyl'; whether the four-bond ion is a 'lambda-4' sulfanium,
-#: 'tetrafluoro(methyl)-lambda4-sulfanium (PIN)', the Blue Book) is an open question of its own, not of this table. Tin and lead are
-#: metals of data/metal_scope.py, handed on first. The radical offer (``assembly/radical_ion.py``) names more centres by the
-#: same ``ionic_parent_hydride``, at a general tier only, and by the bonds the atom holds.
-_PIN_RADICAL_ION_CENTRES = {
-    ('N', -1): -1, ('N', 1): +1, ('O', 1): +1, ('S', 1): +1, ('Se', 1): +1, ('B', -1): +1, ('P', 1): +1, ('P', -1): -1,
-    ('As', 1): +1, ('C', 1): -1, ('C', -1): -1, ('Si', -1): -1, ('Ge', -1): -1}
+#: germanium anions of,:43424-:43430), each by the ionic parent hydride of the bonds it holds
+#: (``radical_ion_parent_hydride``). Tin and lead are metals of data/metal_scope.py, handed on first. The radical offer
+#: (``assembly/radical_ion.py``) names more centres by the same ``ionic_parent_hydride``, at a general tier only.
+_PIN_RADICAL_ION_CENTRES = frozenset({
+    ('N', -1), ('N', 1), ('O', 1), ('S', 1), ('Se', 1), ('B', -1), ('P', 1), ('P', -1), ('As', 1), ('C', 1), ('C', -1),
+    ('Si', -1), ('Ge', -1)})
 
 
 def ionic_parent_hydride(atom, bonding_number: int) -> str:
@@ -1350,6 +1347,23 @@ def ionic_parent_hydride(atom, bonding_number: int) -> str:
         # the group 14 hydrides drop the whole 'ane' ('silylium'), the others elide the 'e' ('azanylium')
         return (hydride[:-3] if symbol in _GROUP14_HYDRIDE_RADICAL else stem) + 'yl' + 'ium'
     return ''
+
+
+def radical_ion_parent_hydride(atom) -> str:
+    """The ionic parent hydride of the radical ion ``atom`` (P-75.2 "RADICAL IONS DERIVED FROM PARENT HYDRIDES",
+    BlueBookV2.md:43422: the radical ion is named by adding 'yl' to the name of its ionic parent hydride), or ''.
+    The λ of a hydride with a nonstandard bonding number is not part of it (``lambda_ion_name`` cites it).
+
+    The hydride holds the atom's bonds, hydrogens and radical electrons together (``ionic_parent_hydride``): a
+    phosphorus anion with three bonds and a radical electron is the 'yl' of phosphanuide ('tetramethylphosphanuide
+    (PIN)', P-72.3 "Anions formed by addition of hydride ions", :41106), not of phosphanide, which has one hydrogen
+    left to substitute. An atom that holds more than any ion of its standard hydride is the 'ium' or 'uide' of the
+    λn hydride (``lambda_convention.ionic_lambda``): a sulfur cation with four bonds and a radical electron is the
+    'yl' of λ4-sulfanium, 'tetramethyl-λ4-sulfaniumyl'."""
+    parent = ionic_parent_hydride(atom, atom.GetTotalValence() + atom.GetNumRadicalElectrons())
+    if parent or ionic_lambda(atom) is None:
+        return parent
+    return ionic_parent_hydride(atom, Chem.GetPeriodicTable().GetDefaultValence(atom.GetAtomicNum()) + 1)
 
 
 def radical_ion_is_empty_orbital_cation(atom) -> bool:
@@ -1383,9 +1397,8 @@ def _name_mononuclear_radical_ion(mol) -> str:
         # radical ions, and the SMILES cannot tell the two readings apart, so no round trip can either. They
         # belong to the separate build (user decision Q2 = A); this producer leaves them alone.
         return ''
-    offset = _PIN_RADICAL_ION_CENTRES.get((x.GetSymbol(), x.GetFormalCharge()))
-    parent = '' if offset is None else ionic_parent_hydride(
-        x, Chem.GetPeriodicTable().GetDefaultValence(x.GetAtomicNum()) + offset)
+    parent = (radical_ion_parent_hydride(x) if (x.GetSymbol(), x.GetFormalCharge()) in _PIN_RADICAL_ION_CENTRES
+              else '')
     suffix = {1: 'yl', 2: 'ylidene'}.get(x.GetNumRadicalElectrons())
     if not parent or suffix is None:
         return ''
@@ -1417,7 +1430,7 @@ def _name_mononuclear_radical_ion(mol) -> str:
     block = _build_mixed_substituent_string(prefixes) if prefixes else ''
     if prefixes and not block:
         return ''
-    name = block + parent[:-1] + suffix if parent.endswith('e') else block + parent + suffix
+    name = lambda_ion_name(x, block, parent[:-1] + suffix if parent.endswith('e') else parent + suffix)
     return _ship(mol, name, _n_radical_ion_has_suffix_parent(mol, x))
 
 

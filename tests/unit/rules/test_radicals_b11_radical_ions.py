@@ -81,21 +81,45 @@ def test_carbon_free_radical_ion_is_a_preselected_name():
     assert _strict_rt("azanidyl", "[NH-]")
 
 
-# A sulfonium or selenonium radical cation with four bonds: the producer names the ion of its centre ('sulfanium', 'selanium', the
-# ``_PIN_RADICAL_ION_CENTRES`` table), not of the bonds the atom holds, and these names ship as pin_verified on main. They are pinned as main gives
-# them. OPEN QUESTION, not settled here: the four-bond ion is probably a 'lambda-4' sulfanium ('tetramethyl-lambda4-sulfaniumyl'; the book's
-# 'tetrafluoro(methyl)-lambda4-sulfanium (PIN)', the Blue Book under, in which case the label is wrong; that is a separate item.
+# "RADICAL IONS DERIVED FROM PARENT HYDRIDES" (the Blue Book): a radical ion is the 'yl' of its ionic
+# parent hydride, which holds the atom's bonds, hydrogens and radical electrons together. A sulfur or selenium cation
+# with four bonds and a radical electron is the 'yl' of λ4-sulfanium "Nonstandard bonding numbers",:2756;
+# "General rule for systematically naming cationic centers in parent hydrides", 'tetrafluoro(methyl)-
+# λ4-sulfanium (PIN)',:41384); 'tetramethylsulfaniumyl' is the 'yl' of
+# sulfanium, which has two hydrogens to substitute. A phosphorus anion with three bonds and a radical electron is the
+# 'yl' of phosphanuide "Anions formed by addition of hydride ions", '(CH3)4P- tetramethylphosphanuide (PIN)
+# tetramethyl-λ5-phosphanide',:41106), not of phosphanide.
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected", [
-    ("C[S+](C)(C)C", "tetramethylsulfaniumyl"),
-    ("C[Se+](C)(C)C", "tetramethylselaniumyl"),
-    ("CC[S+](CC)(CC)CC", "tetraethylsulfaniumyl"),
-    ("OC(=O)C[S+](C)(C)C", "(carboxymethyl)tri(methyl)sulfaniumyl"),
+    ("C[S+](C)(C)C", "tetramethyl-λ4-sulfaniumyl"),
+    ("C[Se+](C)(C)C", "tetramethyl-λ4-selaniumyl"),
+    ("CC[S+](CC)(CC)CC", "tetraethyl-λ4-sulfaniumyl"),
+    ("OC(=O)C[S+](C)(C)C", "(carboxymethyl)tri(methyl)-λ4-sulfaniumyl"),
+    ("C[SH+](C)C", "trimethyl-λ4-sulfaniumyl"),
+    ("[SH4+]", "λ4-sulfaniumyl"),
+    ("C[P-](C)C", "trimethylphosphanuidyl"),
+    ("CC(C)[P-](C)C", "dimethyl(propan-2-yl)phosphanuidyl"),
+    ("[PH3-]", "phosphanuidyl"),
 ])
-def test_a_four_bond_chalcogenium_radical_cation_keeps_the_name_main_gives(smiles, expected):
+def test_the_ionic_parent_hydride_holds_the_bonds_of_the_radical_ion(smiles, expected):
     row = _name(smiles)
     assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"], row
     assert _strict_rt(expected, smiles)
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[S+]C", "sulfanium"),                 # two bonds + one radical electron: the standard 'ium'
+    ("C[S+](C)(C)C", "sulfanium"),           # the 'ium' of λ4-sulfane; lambda_ion_name cites the λ
+    ("C[P-]", "phosphanide"),
+    ("C[P-](C)C", "phosphanuide"),
+    ("C[O+]C", "oxidanium"),
+    ("C[B-](C)C", "boranuide"),
+])
+def test_radical_ion_parent_hydride(smiles, expected):
+    from orthonym.rules.radicals import radical_ion_parent_hydride
+    mol = Chem.MolFromSmiles(smiles)
+    centre = next(a for a in mol.GetAtoms() if a.GetFormalCharge())
+    assert radical_ion_parent_hydride(centre) == expected
 
 
 # "Radical ions on ionic suffix groups" (the Blue Book): "When ions

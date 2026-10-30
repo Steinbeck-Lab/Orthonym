@@ -27,6 +27,8 @@ value. Charged atoms and elements absent from the table are treated as standard
 
 from typing import Optional
 
+from rdkit import Chem
+
 # Greek small letter lambda (IUPAC. The Blue Book spells the
 # lambda-convention descriptor with the Greek letter (533 occurrences in the
 # 2013 Blue Book text), never the ASCII word "lambda" (0 occurrences inside a
@@ -239,3 +241,40 @@ def fused_lambda_prefix(mol, ring_atoms, atom_to_locant) -> Optional[str]:
         return ''
     return ','.join(format_lambda_token(loc, lam) for loc, lam in entries) + '-'
 
+
+
+def ionic_lambda(atom) -> Optional[int]:
+    """The ``n`` of the λn hydride whose 'ium' or 'uide' ion the charged ``atom`` is, or None when an ion of its
+    standard hydride holds its bonds or no λ hydride does.
+
+    The ion holds the atom's bonds, hydrogens and radical electrons together; the hydron or hydride ion of 'ium'
+    or 'uide' adds one to the hydride's bonding number, so ``n`` is that count less one. P-14.1.3 "Nonstandard
+    bonding numbers" (BlueBookV2.md:2756) cites a nonstandard ``n`` as λn, and the ion keeps it: P-73.1.1.2
+    "General rule for systematically naming cationic centers in parent hydrides", 'tetrafluoro(methyl)-
+    λ4-sulfanium (PIN)' (:41384). An anion is the 'uide' of its standard hydride where that holds its bonds
+    (P-72.3 "Anions formed by addition of hydride ions", 'tetramethylphosphanuide (PIN)
+    tetramethyl-λ5-phosphanide', :41106), so ``n`` is above the standard bonding number, by an even count."""
+    if not atom.GetFormalCharge():
+        return None
+    standard = STANDARD_BONDING_NUMBER.get(atom.GetSymbol())
+    n = atom.GetTotalValence() + atom.GetNumRadicalElectrons() - 1
+    if standard is None or n <= standard or (n - standard) % 2:
+        return None
+    return n
+
+
+def lambda_ion_name(atom, block: str, ion: str) -> str:
+    """The name ``block`` + ``ion`` of a mononuclear ion (``ion`` 'sulfanium', 'sulfaniumyl', the substituent
+    prefixes ``block``), with the λ of:func:`ionic_lambda` when the atom has one: 'tetramethyl-λ4-sulfaniumyl',
+    the hyphen before the λ as in 'methyl-λ6-sulfane (PIN)',:2761). The book's λ ions have single bonds
+    only ('tetrafluoro(methyl)-λ4-sulfanium (PIN)'); with a double bond the cation of a characteristic group takes
+    another hydride ('(1,4-phenylene)bis(dioxo-λ6-sulfanylium) (PIN)',,:42174), so a λ ion with a
+    multiple bond is recorded as not the PIN."""
+    n = ionic_lambda(atom)
+    if n is None:
+        return block + ion
+    name = f"{block}-{LAMBDA}{n}-{ion}" if block else f"{LAMBDA}{n}-{ion}"
+    if any(bond.GetBondType() != Chem.BondType.SINGLE for bond in atom.GetBonds()):
+        from ..metrics.provenance import record_non_pin_fragment
+        record_non_pin_fragment(name)
+    return name
