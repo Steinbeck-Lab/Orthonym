@@ -4294,6 +4294,11 @@ def _decorate_labelled(smiles, style, namer, original, stripped, label_map,
                 result = decorate_with_systematic_unnumbered_parents(
                     smiles, style, namer, original, stripped, label_map, sink,
                     composer and getattr(namer, "_general_fallback_unverified", False))
+            if result is None and sink and composer and getattr(namer, "_general_fallback_unverified", False):
+                # carboxy groups labelled in different ways: one suffix, the rest prefixes,
+                # ``rules.isotope_suffix_split``); best-effort tier only, below the PIN
+                from .isotope_suffix_split import decorate_with_one_suffix
+                result = decorate_with_one_suffix(namer, original, sink.get("skeleton"))
             if result is not None and finish is not None:
                 result = finish(result)
         if (result and _BOND_SHIFT_PARSE_REFUSED.get()
