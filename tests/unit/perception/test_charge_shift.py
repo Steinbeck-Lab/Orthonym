@@ -506,7 +506,7 @@ def test_the_exocyclic_double_bond_count_counts_double_bonds_between_aromatic_an
 
 
 def test_the_namer_uses_the_definitions_of_this_module():
-    assert namer._CHARGE_MOBILE_N is cs.MOBILE_N_CATION
+    assert namer._has_mobile_cation is cs.has_mobile_cation     # the gate on MOBILE_N_CATION, azido groups left out
     assert namer._accepted_charge_forms is cs.accepted_charge_forms
 
 

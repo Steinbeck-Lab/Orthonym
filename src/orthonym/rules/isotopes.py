@@ -30,6 +30,7 @@ from . import isotope_oxoacid as _oxoacid
 from .isotope_compare import RADICAL_READING as _RADICAL_READING
 from .isotope_compare import radical_centres_agree, tautomer_accepted
 from .isotope_licence import apply_unit_licences, unit_has_no_free_position
+from .isotope_offsets import restrict_offsets, search_space
 from .isotope_placement import nuclide_has_equivalent_site, placement_order
 from .isotope_search import LocantReach, fixed_h_inchi, integer_locant_reach
 from .lambda_convention import LAMBDA as _LAMBDA
@@ -2135,7 +2136,7 @@ def _find_best_placement(
     every locant once any is required, the Blue Book); the
     licence is not consulted then.
     """
-    offs = list(dict.fromkeys([0] + _insertion_offsets(skel)))
+    offs, n_pos = search_space(skel, original, _insertion_offsets(skel), n_pos)
     won, quality = [], functools.partial(_placement_quality, oxoacid_centre=_oxoacid.labels_an_element_of_the_centre(keys))
     # letter locants (e.g. amide ``N``) are tried after the locant-free
     # form and before the integer locants -- an amide/amine D belongs on ``N``,
@@ -2825,6 +2826,7 @@ def _decorate_distinct_multi_locant(
     except Exception:
         return None
     sym = nuclide_symbol(mass, el)
+    offs, n_pos = search_space(skeleton, original, _insertion_offsets(skeleton), n_pos)
     n = min(n_pos, _MULTI_LOCANT_SWEEP_CAP)
     # Prime depth: 0 when the skeleton carries no prime (then the token set is the
     # identical integer sweep as before -> no behaviour change). A ring assembly /
@@ -2841,9 +2843,6 @@ def _decorate_distinct_multi_locant(
     ri = original.GetRingInfo()
     if any(ri.NumAtomRings(a) >= 2 for a in range(original.GetNumAtoms())):
         loc_tokens += [f"{base}a" for base in range(1, n + 1)]
-    seen: set = set()
-    offs = [o for o in ([0] + _insertion_offsets(skeleton))
-            if not (o in seen or seen.add(o))]
     #: a slot in front of a substituent prefix's attachment locant is not
     # a place the Blue Book puts a descriptor (``_slot_precedes_substituent_
     # locant``), but OPSIN reads it back, and the first offset that round-trips
@@ -4071,6 +4070,8 @@ def _decorate_mixed_locant(skeleton: str, keys, original: Chem.Mol,
         else:
             # distinct positions first (2,4-2H2), then one shared position
             # (2,2-2H2) as a fallback for a genuinely co-located group.
+            if _n_choose_k(len(positions), count) > _MIXED_LOCANT_COMBO_CAP:
+                return None             # the bound below, before the list of C(n, count) tuples is built
             specs = [tuple(c) for c in itertools.combinations(positions, count)]
             specs += [(L,) * count for L in positions]
             per_group_specs.append(specs)
@@ -4087,7 +4088,7 @@ def _decorate_mixed_locant(skeleton: str, keys, original: Chem.Mol,
             return None
 
     seen_off: set = set()
-    offs = [o for o in ([0] + _insertion_offsets(skeleton))
+    offs = [o for o in ([0] + restrict_offsets(_insertion_offsets(skeleton), skeleton, original))
             if not (o in seen_off or seen_off.add(o))]
 
     def _combo_cited(combo):

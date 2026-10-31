@@ -245,6 +245,23 @@ def azide_atoms(mol) -> frozenset:
     return frozenset(i for drawing in _AZIDE_DRAWINGS for match in mol.GetSubstructMatches(drawing) for i in match)
 
 
+def has_mobile_cation(mol) -> bool:
+    """True when ``mol`` has a cationic nitrogen (:data:`MOBILE_N_CATION`) that is no atom of an azido group.
+
+    The +1 of an azido group does not move (:func:`azide_atoms`), so a molecule whose only such nitrogens are
+    azide atoms is not enumerated::func:`accepted_charge_forms` rejects every candidate that moves the azide's charge.
+    A cation the pattern does not match (a nitrilium beside an amine) then gets no charge form either, as it gets none
+    in a molecule without an azide, where the pattern finds nothing and the enumeration is not asked. Asked
+    before RDKit's resonance enumeration, which a long chain of azo and azido nitrogens costs 4 times more for each
+    two nitrogens (measured: 14 s at 21 pi atoms, no return at 27, in a call that cannot be interrupted), so the
+    enumeration is not asked for a molecule that cannot have a form."""
+    matches = mol.GetSubstructMatches(MOBILE_N_CATION)
+    if not matches:
+        return False
+    azide = azide_atoms(mol)
+    return any(match[0] not in azide for match in matches)
+
+
 def charge_places(forms) -> int:
     """How many different places the +1 takes among ``forms`` (the values of:func:`accepted_charge_forms`):
     the set of atoms of the input that carry a +1 in the form, read from its string through its atom order. Two

@@ -49,6 +49,8 @@ from typing import Dict, FrozenSet, Iterable, List, Mapping, Optional, Tuple
 
 from rdkit import Chem
 
+from ..perception.substructure import same_graph_matches
+
 __all__ = [
     "CHALCOGENS",
     "substitutable_h_count",
@@ -1207,10 +1209,10 @@ def isotope_label_on_atoms(mol, atoms, original=None, any_drawing: bool = False)
     try:
         heavy = _heavy_with_label_counts(original)
         wanted = [int(a) for a in atoms]
-        matches = heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64)
+        matches = same_graph_matches(heavy, mol)
         if not matches and any_drawing:
             heavy = _without_bond_orders(heavy)
-            matches = heavy.GetSubstructMatches(_without_bond_orders(mol), uniquify=False, maxMatches=64)
+            matches = same_graph_matches(heavy, _without_bond_orders(mol))
         for match in matches:
             if any(heavy.GetAtomWithIdx(match[i]).HasProp("_orthonym_labelled")
                    for i in wanted if i < len(match)):
@@ -1626,8 +1628,7 @@ def skeleton_label_maps(mol, use_chirality: bool = False) -> Optional[List[Dict[
     try:
         heavy = _heavy_with_label_counts(original)
         maps = []
-        for match in heavy.GetSubstructMatches(mol, uniquify=False, maxMatches=64,
-                                               useChirality=use_chirality):
+        for match in same_graph_matches(heavy, mol, use_chirality=use_chirality):
             here: Dict[int, List[Tuple[int, int]]] = {}
             for i, j in enumerate(match):
                 atom = heavy.GetAtomWithIdx(j)
