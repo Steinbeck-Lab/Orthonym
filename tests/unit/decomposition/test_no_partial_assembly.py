@@ -128,8 +128,16 @@ GPI_FAILING_FRAGMENT = (
 # NO_VERIFIED_PIN). The anchor is re-pointed to the stereo-free 3-hydroxy-pregnan-20-one
 # skeleton, which both PIN rungs still decline and the rung names '14-acetyl-5-hydroxy-
 # 2,15-dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecane', RT-exact (measured 2026-10-09).
+# DT4 F2b (2026-11-01): a fused ring system with its own substituents is now a '-yl' prefix
+# (``bridged_fused_pin.build_fused_decorated_substituent``;,, so both PIN
+# rungs name that skeleton (STEROID_PREFIX_FRAGMENT below, RT-exact). The anchor is re-pointed
+# to its 3-[(2S)-butan-2-yl]oxy ether: a stereocentre on the substituent side outside the ring
+# system, which that builder declines, so both PIN rungs decline and the rung names it
+# '1-(5-{[(2S)-butan-2-yl]oxy}-2,15-dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecan-14-yl)
+# ethan-1-one', RT-exact (measured 2026-11-01).
 HYDRO_FUSED_FRAGMENT = "C=C(C)C1CC=C2C(C)=CCCC2(C)C1"
-PIN_TIER_FAILING_FRAGMENT = "CC(=O)C1CCC2C3CCC4CC(O)CCC4(C)C3CCC12C"
+STEROID_PREFIX_FRAGMENT = "CC(=O)C1CCC2C3CCC4CC(O)CCC4(C)C3CCC12C"
+PIN_TIER_FAILING_FRAGMENT = "CC(=O)C1CCC2C3CCC4CC(O[C@@H](C)CC)CCC4(C)C3CCC12C"
 
 # 74-heavy-atom lipopeptide (fatty-acyl N-cap + 6 amide-linked residues,
 # non-standard/branched residues). VERIFIED (this session, monkeypatch trace):
@@ -258,7 +266,7 @@ class TestT4RescueMechanism:
         to the fragment's full InChIKey (TRIAGE got_rt=exact; re-measured
         2026-09-25). So the test now asserts (a) that measured truth for
         GPI_FAILING_FRAGMENT, and (b) the anchor's original claim on
-        PIN_TIER_FAILING_FRAGMENT (re-pointed 2026-10-08 to a steroid, again 2026-10-09), which
+        PIN_TIER_FAILING_FRAGMENT (re-pointed 2026-10-08 to a steroid, again 2026-10-09 and 2026-11-01), which
         still fails both PIN rungs and which the rung names RT-exact. The GPI fragment's spelling
         '(6-sulfanylhexyloxy)' (an enclosing-mark defect) is Task 5's, so no
         spelling is pinned here -- only round-trip identity.
@@ -266,8 +274,9 @@ class TestT4RescueMechanism:
         from orthonym.assembly.fragment_naming import name_fragment_recursively
         from orthonym.namer import name_pipeline_only
 
-        # (a) the GPI fragment and the hydro-naphthalene are now PIN-nameable on
-        # both rungs, RT-exact (the latter by fusion nomenclature,.
+        # (a) the GPI fragment, the hydro-naphthalene and the steroid ketone are now
+        # PIN-nameable on both rungs, RT-exact (the last two by fusion nomenclature,
+        #.
         for rung in (name_fragment_recursively, name_pipeline_only):
             got = rung(GPI_FAILING_FRAGMENT)
             assert got and not is_failure_name(got), (rung.__name__, got)
@@ -276,6 +285,10 @@ class TestT4RescueMechanism:
             assert got == ("5,8a-dimethyl-2-(prop-1-en-2-yl)-1,2,3,7,8,8a-"
                            "hexahydronaphthalene"), (rung.__name__, got)
             assert _full_rt(HYDRO_FUSED_FRAGMENT, got), (rung.__name__, got)
+            got = rung(STEROID_PREFIX_FRAGMENT)
+            assert got == ("1-(3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]"
+                           "phenanthren-17-yl)ethan-1-one"), (rung.__name__, got)
+            assert _full_rt(STEROID_PREFIX_FRAGMENT, got), (rung.__name__, got)
 
         # (b) a fragment that fails both PIN rungs; the rung names it.
         from tests.support.default_tier import pin_only_default

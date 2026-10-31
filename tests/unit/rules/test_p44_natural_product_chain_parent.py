@@ -51,13 +51,27 @@ def test_parent_selection_follows_p44_1_1_for_a_natural_product_skeleton():
     assert sel.parent_type == "chain"
 
 
-def test_a_failed_chain_assembly_leaves_no_locant_map_for_the_stereo_check():
+_DIOXOCHOLANOATE = "COC(=O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC(=O)[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C"
+
+
+def test_a_failed_chain_assembly_leaves_no_locant_map_for_the_stereo_check(monkeypatch):
     # The chain route names nothing here and the decomposition fallback names the ester; the chain's map put a
-    # '(4R)-' (the chain's C-4, which the stereoparent name implies) in front of it.
-    smiles = "COC(=O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC(=O)[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C"
-    row = _pin(smiles)
+    # '(4R)-' (the chain's C-4, which the stereoparent name implies) in front of it. The chain route fails only
+    # without the decorated fused '-yl' prefix (DT4 F2b), so that prefix is withheld here.
+    from orthonym.assembly import composer
+    monkeypatch.setattr(composer, "_fused_decorated_prefix", lambda *a, **k: None)
+    row = _pin(_DIOXOCHOLANOATE)
     assert row["name"] == "methyl 3,6-dioxo-5β-cholan-24-oate"
-    assert name_is_rt_exact(row["name"], smiles)
+    assert name_is_rt_exact(row["name"], _DIOXOCHOLANOATE)
+
+
+def test_the_chain_route_names_the_ester_with_a_decorated_steroid_prefix():
+    # DT4 F2b: the steroid ring system with its oxo groups is the '-yl' prefix of the ester chain, its
+    # descriptors cited at the front of the prefix, the Blue Book).
+    row = _pin(_DIOXOCHOLANOATE)
+    assert row["name"] == ("methyl (4R)-4-[(5R,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-3,6-dioxohexadecahydro-"
+                           "1H-cyclopenta[a]phenanthren-17-yl]pentanoate")
+    assert name_is_rt_exact(row["name"], _DIOXOCHOLANOATE)
 
 
 def test_greek_letters_of_a_locant_are_not_letters_of_the_order():

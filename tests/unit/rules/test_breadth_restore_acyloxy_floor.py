@@ -67,7 +67,6 @@ SPIRO_H_SUCCINATE = (
 # 'tetracyclo[8.7.0.0^2,7.0^11,15]', the Blue Book), so the
 # ester oxygen of the steroid 3-position is locant 5.
 CARBOXY_ACYL_WITNESSES = [
-    (CHOLENIC_ACID_H_SUCCINATE, "5-[(3-carboxypropanoyl)oxy]"),
     (SPIRO_H_SUCCINATE, "4'-[(3-carboxypropanoyl)oxy]"),
 ]
 
@@ -219,3 +218,21 @@ def test_verify_before_commit_rung_retries_the_floor_without_the_leaf(monkeypatc
     assert got.name != "methane"
     assert "hexanedioyloxy" not in got.name, got.name
     assert name_is_rt_exact(got.name, CHOLESTANYL_H_ADIPATE), got.name
+
+
+def test_a_steroid_acid_half_ester_takes_the_fusion_prefix_at_both_tiers():
+    """Changed asserted value (DT4 F2b): the cholenic acid row was a floor witness above
+    ('5-[(3-carboxypropanoyl)oxy]' on the von Baeyer form). The ring system with its own prefixes is
+    now the fusion '-yl' prefix of the acid chain, the Blue Book;,:44643),
+    the same name and label at the PIN tier and at best-effort."""
+    from orthonym import Orthonym
+    from orthonym.jvm_budget import jvm_slots
+    name = ("(4R)-4-{(3S,8S,9S,10R,13R,14S,17R)-3-[(3-carboxypropanoyl)oxy]-10,13-dimethyl-"
+            "2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl}"
+            "pentanoic acid")
+    with jvm_slots(1, purpose="test-acyloxy-floor"):
+        pin = Orthonym(style="pin").name_tiered(CHOLENIC_ACID_H_SUCCINATE)
+    res = name_best_effort(CHOLENIC_ACID_H_SUCCINATE)
+    assert (pin["name"], pin["tier"]) == (name, "pin_verified"), pin
+    assert (res.get("name"), res.get("tier")) == (name, "pin_verified"), res
+    assert name_is_rt_exact(name, CHOLENIC_ACID_H_SUCCINATE)

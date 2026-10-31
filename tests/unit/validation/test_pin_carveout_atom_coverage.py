@@ -33,10 +33,10 @@ Three honest outcomes for the decorated mutant, all acceptable:
       (regex / exact-SMILES / exact-atom-count match), the molecule routed to
       an ordinary producer, and OPSIN's round-trip independently
       proved the emitted name's skeleton matches the input -- the strongest
-      possible proof, and observed for inositol + dianhydride below.
+      possible proof, and observed for inositol, dianhydride + np_stereoparent below.
   (b) HONEST ABSTAIN -- the decorated molecule correctly fails closed
       (``errors.is_failure_name`` true: 'unknown...' / '...(not supported)')
-      rather than guessing -- observed for np_stereoparent, chalcogen_dianhydride,
+      rather than guessing -- observed for chalcogen_dianhydride,
       organometallic_additive, phane below.
   (c) SAME-CARVEOUT, ATOM-COMPLETE -- the decorated molecule still matches the
       carve-out's own regex (polyol_polyester below), because
@@ -109,13 +109,13 @@ CASES = [
         # get_natural_product_name keys on EXACT canonical SMILES; a
         # hydroxymethyl in place of one terminal methyl cannot match the
         # abietane entry, so name_inositol-style exact lookup structurally
-        # cannot fire either -> exercises the "falls through, general engine
-        # cannot handle this fused polycyclic substituent, fails closed"
-        # path (the general-engine gap that surfaces is unrelated to this
-        # carve-out and is NOT this test's concern -- what matters is it
-        # never re-emits the bare "abietane").
+        # cannot fire either. The chain is then the parent and the decorated
+        # fused ring system its '-yl' prefix (DT4 F2b): '2-[(2S,4aS,4bR,8aS,
+        # 10aS)-4b,8,8-trimethyltetradecahydrophenanthren-2-yl]propan-1-ol',
+        # which OPSIN reads back to the full input InChIKey -- what matters is
+        # it never re-emits the bare "abietane".
         decorated_smiles="OCC(C)[C@H]1CC[C@H]2[C@@H](CC[C@H]3C(C)(C)CCC[C@]23C)C1",
-        outcome_kind="abstain",
+        outcome_kind="self01",
     ),
     dict(
         carveout="polyol_polyester",
