@@ -18,6 +18,8 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 
+from tests.support.opsin_marks import composite_or_primed
+
 
 # The exact substituted-terphenyl SMILES from test_canary_name_stability.py:1191
 SUBSTITUTED_TERPHENYL_SMI = "COc1cc(-c2ccc(O)c(CC=C(C)C)c2)c(OC)c(O)c1-c1ccc(O)c(O)c1"
@@ -57,7 +59,8 @@ class TestSubstitutedTerphenylRoundTrip:
         # primed form. This is a fast-fail before round-trip — if the engine
         # drops the prime, surface it immediately rather than waiting for
         # OPSIN to disagree.
-        assert "1,1':4',1''-terphenyl" in name, (
+        #, the Blue Book: the composite form 1^1,2^1:2^4,3^1-terphenyl where OPSIN reads it)
+        assert composite_or_primed("1,1':4',1''-terphenyl", "1^1,2^1:2^4,3^1-terphenyl") in name, (
             f"BLK-02 regression: emitted name lacks the primed-4 form "
             f"required by IUPAC P-28.2.1. Got: {name!r}"
         )
@@ -99,9 +102,10 @@ class TestSubstitutedTerphenylRoundTrip:
         from tests.support.canary_rt75_data import _opsin_parse_batch
 
         name = name_compound(UNSUBSTITUTED_TERPHENYL_SMI)
-        assert name == "1,1':4',1''-terphenyl", (
+        expected = composite_or_primed("1,1':4',1''-terphenyl", "1^1,2^1:2^4,3^1-terphenyl")   #,:24078
+        assert name == expected, (
             f"Unsubstituted terphenyl path regressed: got {name!r}, "
-            f"expected '1,1':4',1''-terphenyl'"
+            f"expected {expected!r}"
         )
         parsed = _opsin_parse_batch([name]).get(name)
         assert parsed is not None, f"OPSIN cannot parse {name!r}"

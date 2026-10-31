@@ -1188,6 +1188,61 @@ def _name_multi_acyl_radical(mol, sites) -> str:
     return _ship(mol, acyl, False)
 
 
+#: an unsubstituted chain polyacyl group ('butanedioyl', 'propanedithioyl'): a chain stem directly before 'ane', no prefix
+#: in front of it, or the retained 'oxalyl'
+_PLAIN_POLYACYL = re.compile(
+    r"^(?:oxalyl|(?:%s)ane[a-z]*oyl)$" % "|".join(
+        sorted({_get_chain_prefix(k) for k in range(2, 31)}, key=len, reverse=True)))
+
+
+def _central_acyl(acyl: str) -> str:
+    """The central polyacyl group of a multiplied acyloxyl radical as it is cited before 'bis(oxyl)': enclosed
+    (``enclose_if_compound``) when it is a compound prefix, and also when it carries a substituent prefix that
+    ``enclose_if_compound`` leaves bare ('methylbutanedioyl'); an unsubstituted chain polyacyl group stays bare."""
+    from ..assembly.naming_utils import enclose_if_compound
+    head = enclose_if_compound(acyl)
+    if head == acyl and not _PLAIN_POLYACYL.match(acyl):
+        return f"({acyl})"
+    return head
+
+
+def _name_multiplied_acyloxyl_radicals(mol, sites) -> str:
+    """ "ASSEMBLIES OF PARENT RADICALS" (the Blue Book) for acyloxyl centres, R(-CO-O.)n: the units are
+    'oxyl' as in 'butanoyloxyl (PIN)',:40718), the central group is the polyacyl group of the polyacid,
+    'benzene-1,4-dicarbonyl (PIN)',:40618): '(benzene-1,4-dicarbonyl)bis(oxyl)', 'butanedioylbis(oxyl)'.
+    The central group is enclosed when it is a compound prefix or carries a substituent prefix, as the book encloses
+    '(chloroacetyl)oxyl (PIN)',:40677; the example is:40694, in the section ``### **** Polyamine,
+    polyimine and polyamide radicals`` of the OCR): '(dimethylpropanedioyl)bis(oxyl)'. An unsubstituted chain polyacyl
+    group stays bare, as 'butanedioylbis(oxy-2,1-phenylene)' (:31805, ``## **** Polyester names formed by
+    multiplicative nomenclature``): 'butanedioylbis(oxyl)'."""
+    idxs = [s['atom_idx'] for s in sites]
+    for i in idxs:
+        atom = mol.GetAtomWithIdx(i)
+        if (atom.GetSymbol() != 'O' or atom.GetNumRadicalElectrons() != 1 or atom.GetFormalCharge()
+                or atom.GetDegree() != 1):
+            return ''
+        carbon = atom.GetNeighbors()[0]
+        if carbon.GetSymbol() != 'C' or not _is_acyl_atom(mol, carbon.GetIdx(), exclude=i):
+            return ''
+    work = Chem.RWMol(mol)
+    try:
+        for i in idxs:
+            atom = work.GetAtomWithIdx(i)
+            atom.SetNumRadicalElectrons(0)
+            atom.SetNoImplicit(True)
+            atom.SetNumExplicitHs(1)
+        acid = work.GetMol()
+        Chem.SanitizeMol(acid)
+    except (RuntimeError, ValueError):
+        return ''
+    acid_name = _reenter_neutral_name(acid)
+    acyl = _acyl_from_acid_name(acid_name) if acid_name.endswith('acid') else ''
+    mult = _COMPOUND_MULTIPLIER.get(len(idxs))
+    if not acyl or not mult:
+        return ''
+    return _ship(mol, f"{_central_acyl(acyl)}{mult}(oxyl)", False)
+
+
 def _name_multiplied_amidyl_iminyl(mol, sites) -> str:
     """: compound suffixes on a polyamide / polyimine parent take 'bis'
     and enclosing marks: 'methanebis(iminyl) (PIN)', 'benzene-1,2-bis(carbox-
@@ -1223,7 +1278,7 @@ def _name_multiplied_amidyl_iminyl(mol, sites) -> str:
 
 def _name_multicentre_radical(mol, sites) -> str:
     for producer in (_name_multi_acyl_radical, _name_multiplied_amidyl_iminyl,
-                     _name_multiplied_terminal_radicals):
+                     _name_multiplied_acyloxyl_radicals, _name_multiplied_terminal_radicals):
         named = producer(mol, sites)
         if named:
             return named

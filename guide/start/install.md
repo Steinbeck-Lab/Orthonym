@@ -68,6 +68,8 @@ The first use of a commit builds a jar on your machine: Orthonym fetches the sou
 
 Phane names need `main`. OPSIN 2.9.0 has no grammar for them, so with the default Orthonym builds no new phane name: it still ships the monocyclic cyclophane of benzene rings (`1,4(1,4)-dibenzenacyclohexaphane`), checked by building the structure back from the name, and it declines the structures that the recommendations name as phanes. It no longer returns a fusion, bridged fused, von Baeyer or spiro name for a cyclophane as a preferred name; the wider tiers still return such a name, labelled below the preferred name. With `--opsin main`, cyclophanes and linear phanes get their phane names, each read back by OPSIN to your full InChIKey. See [Phane names](../use/phane-names.md).
 
+Ring assemblies of three to six identical rings need `main` for their preferred names. The recommendations number them with composite locants (`1^1,2^1:2^4,3^1-terphenyl`, `[1^1,2^1:2^4,3^1-terphenyl]-2^2-ol`), which OPSIN 2.9.0 does not read. With `main`, an unbranched assembly without stereo or isotope labels, whose groups are among `-ol`, `-amine`, `-carboxylic acid`, `-carbaldehyde`, `-carbonitrile` (the most senior is the suffix, the others prefixes) and halogen, nitro, alkyl and alkoxy (methoxy to butoxy), gets that name, read back by OPSIN to your full InChIKey, as the preferred name. Every other assembly (an isotope-labelled one among them) and every assembly with the default keep the serially primed locants of general nomenclature (`1,1':4',1''-terphenyl`), labelled below the preferred name.
+
 What to know before you choose `main`:
 
 - It needs a JDK (`javac`, version 11 or newer), not only a Java runtime, for the build.

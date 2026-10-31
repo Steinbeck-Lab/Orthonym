@@ -40,6 +40,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.assembly import fragment_naming as fn
+from orthonym import opsin_capabilities as caps
 from tests.support.opsin_marks import release_opsin_in_use
 from tests.support.rt_assert import (
     _independent_parse,
@@ -89,12 +90,17 @@ ADDUCT_ROWS = {
 }
 
 
-@pytest.mark.parametrize("smiles", list(ADDUCT_ROWS.values()), ids=list(ADDUCT_ROWS))
-def test_adduct_rows_name_rt_exact(smiles):
+@pytest.mark.parametrize("row_id,smiles", list(ADDUCT_ROWS.items()), ids=list(ADDUCT_ROWS))
+def test_adduct_rows_name_rt_exact(row_id, smiles):
     res = name_best_effort(smiles)
     name = assert_full_rt(res.get("name"), smiles)
     assert EM in name
-    assert res.get("tier") != "pin_verified" and not res.get("is_pin")
+    if row_id == "triphenylene" and caps.composite_assembly_enabled():
+        # (the Blue Book): the terphenyl component has composite locants where the OPSIN in use reads
+        # them, so every component name is a PIN and the adduct is one, as 'pyridin-2-amine—benzene (1/1)' is
+        assert res.get("tier") == "pin_verified" and res.get("is_pin")
+    else:
+        assert res.get("tier") != "pin_verified" and not res.get("is_pin")
 
 
 # Eight components, three of them two-word names at HEAD ('ethyl...propanoate',

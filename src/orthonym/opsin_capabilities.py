@@ -1,9 +1,10 @@
 """What the OPSIN in use can read.
 
-OPSIN 2.9.0 reads neither phane names nor halogen "-uide" anions with substituents
-(``diphenyliodanuide``); OPSIN's main branch reads both. A name of such a form can be checked by a
-round trip only when the OPSIN in use reads it, so a producer of such names asks here before it
-offers one. Nothing in the engine calls this yet.
+OPSIN 2.9.0 reads no phane names, no halogen "-uide" anions with substituents
+(``diphenyliodanuide``) and no ring assembly names with composite locants
+(``1^1,2^1:2^4,3^1-terphenyl``); OPSIN's main branch reads all three. A name of such a form can be
+checked by a round trip only when the OPSIN in use reads it, so a producer of such names asks here
+before it offers one (``phane_enabled``, ``composite_assembly_enabled``).
 
 The release jar (the pinned, checksummed 2.9.0) is known to read neither and is not probed. Any
 other jar -- built from OPSIN's main branch (``ORTHONYM_OPSIN``) or given by ``ORTHONYM_OPSIN_JAR`` --
@@ -22,6 +23,7 @@ from . import jars
 _PROBES = {
     "phane": ("1,4(1,4)-dibenzenacyclohexaphane", "C1Cc2ccc(cc2)CCc2ccc1cc2"),
     "halogen_uide": ("diphenyliodanuide", "[I-](c1ccccc1)c1ccccc1"),
+    "composite_assembly": ("1^1,2^1:2^4,3^1-terphenyl", "c1ccc(cc1)-c1ccc(cc1)-c1ccccc1"),
 }
 _NONE: Dict[str, bool] = {key: False for key in _PROBES}
 _CACHE: Dict[str, Dict[str, bool]] = {}
@@ -86,7 +88,7 @@ def _store(path: str, answer: Dict[str, bool]) -> None:
 
 
 def opsin_capabilities() -> Dict[str, bool]:
-    """``{"phane": bool, "halogen_uide": bool}`` for the OPSIN this process uses."""
+    """``{"phane": bool, "halogen_uide": bool, "composite_assembly": bool}`` for the OPSIN this process uses."""
     from .jvm_bridge import OpsinUnavailable
     try:
         active = jars.active_opsin()
@@ -111,3 +113,9 @@ def opsin_capabilities() -> Dict[str, bool]:
 def phane_enabled() -> bool:
     """True when the OPSIN in use reads phane names."""
     return opsin_capabilities()["phane"]
+
+
+def composite_assembly_enabled() -> bool:
+    """True when the OPSIN in use reads ring assembly names with composite locants. A capability set
+    without the entry (a test that stands in for OPSIN 2.9.0) reads as "cannot"."""
+    return bool(opsin_capabilities().get("composite_assembly", False))

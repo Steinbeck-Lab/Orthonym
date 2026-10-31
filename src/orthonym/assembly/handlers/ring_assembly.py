@@ -47,7 +47,11 @@ def name_ring_assembly(
     if not assembly_info:
         return None
 
-    assembly_name = _name_ring_assembly(features.mol, assembly_info, features)
+    # /: three to six identical cyclic systems take composite locants in the PIN; offered
+    # first where the OPSIN in use reads them (and kept only when it reads the name back), else the primed name.
+    from ...rules.composite_assembly import composite_assembly_name
+    assembly_name = (composite_assembly_name(features.mol, assembly_info)
+                     or _name_ring_assembly(features.mol, assembly_info, features))
     if not assembly_name:
         return None
 

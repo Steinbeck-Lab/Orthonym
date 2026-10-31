@@ -1,9 +1,11 @@
 """Leads L2 (D), item N9c: the spelling residuals of the primed names of three or more components.
 
-The composite-locant PIN producer is NOT built (OPSIN 2.9.0 reads no composite locant, so no independent
-check exists; the label half is closed by ``_multiplied_assembly``, which records the non-PIN rule
- for every primed name of three or more components). What is built here is the spelling of those
-names at the tiers that keep them:
+The composite-locant PIN producer (``rules.composite_assembly``) runs only where the OPSIN in use reads composite
+locants (OPSIN main); OPSIN 2.9.0 reads none, so no independent check exists there and the label half is closed by
+``_multiplied_assembly``, which records the non-PIN rule for every primed name of three or more
+components. The engine tests below expect the composite PIN where the producer runs and the labelled primed name
+otherwise, the Blue Book). What is built here is the spelling of the primed names at the tiers
+that keep them:
 
 * ``### **** UNBRANCHED RING ASSEMBLIES OF THREE THROUGH SIX IDENTICAL CYCLIC SYSTEMS``
   (the Blue Book), ``****`` (:15651): "...placing the appropriate numerical Latin-based
@@ -20,28 +22,35 @@ import pytest
 from rdkit import Chem, RDLogger
 
 from orthonym import Orthonym
+from orthonym import opsin_capabilities as caps
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from orthonym.rules import ring_assemblies as ra
+from tests.support.opsin_marks import needs_composite_opsin, release_capabilities
 from tests.support.rt_assert import assert_full_rt
 
 RDLogger.DisableLog("rdApp.*")
 
 RULE = "P-52.2.7.2"
 
-#: (id, SMILES, the best-effort name before, the name now)
+#: (id, SMILES, the best-effort name before, the primed name now, the composite PIN:,
 ROWS = [
-    ("tercyclopropane", "C1CC1C1CC1C1CC1", "1,1':2',1''-ter(cyclopropane)", "1,1':2',1''-tercyclopropane"),
+    ("tercyclopropane", "C1CC1C1CC1C1CC1", "1,1':2',1''-ter(cyclopropane)", "1,1':2',1''-tercyclopropane",
+     "1^1,2^1:2^2,3^1-tercyclopropane"),
     ("tercyclohexane", "C1CCC(CC1)C1CCC(CC1)C1CCCCC1", "1,1':4',1''-ter(cyclohexane)",
-     "1,1':4',1''-tercyclohexane"),
+     "1,1':4',1''-tercyclohexane", "1^1,2^1:2^4,3^1-tercyclohexane"),
     ("tercyclohexanol", "OC1CCC(CC1)C1CCC(CC1)C1CCCCC1", "[1,1':4',1''-ter(cyclohexan)]-4-ol",
-     "[1,1':4',1''-tercyclohexan]-4-ol"),
-    ("terthiophene", "s1cccc1-c1ccc(s1)-c1cccs1", "2,5':2',2''-terthiophene", "2,2':5',2''-terthiophene"),
-    ("terfuran", "c1cc(oc1)-c1ccc(o1)-c1ccco1", "2,5':2',2''-terfuran", "2,2':5',2''-terfuran"),
+     "[1,1':4',1''-tercyclohexan]-4-ol", "[1^1,2^1:2^4,3^1-tercyclohexan]-1^4-ol"),
+    ("terthiophene", "s1cccc1-c1ccc(s1)-c1cccs1", "2,5':2',2''-terthiophene", "2,2':5',2''-terthiophene",
+     "1^2,2^2:2^5,3^2-terthiophene"),
+    ("terfuran", "c1cc(oc1)-c1ccc(o1)-c1ccco1", "2,5':2',2''-terfuran", "2,2':5',2''-terfuran",
+     "1^2,2^2:2^5,3^2-terfuran"),
     ("quaterfuran", "c1cc(oc1)-c1ccc(o1)-c1ccc(o1)-c1ccco1", "2,5':2',5'':2'',2'''-quaterfuran",
-     "2,2':5',2'':5'',2'''-quaterfuran"),
-    ("terpyridine", "c1ccc(nc1)-c1cccc(n1)-c1ccccn1", "2,2':6',2''-terpyridine", "2,2':6',2''-terpyridine"),
-    ("terphenyl", "c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1''-terphenyl", "1,1':4',1''-terphenyl"),
+     "2,2':5',2'':5'',2'''-quaterfuran", "1^2,2^2:2^5,3^2:3^5,4^2-quaterfuran"),
+    ("terpyridine", "c1ccc(nc1)-c1cccc(n1)-c1ccccn1", "2,2':6',2''-terpyridine", "2,2':6',2''-terpyridine",
+     "1^2,2^2:2^6,3^2-terpyridine"),
+    ("terphenyl", "c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1''-terphenyl", "1,1':4',1''-terphenyl",
+     "1^1,2^1:2^4,3^1-terphenyl"),
 ]
 IDS = [r[0] for r in ROWS]
 
@@ -69,10 +78,16 @@ def test_the_parentheses_of_the_component_stay_for_two_rings_only():
 
 
 # ------------------------------------------------------------------ the names read back
-@pytest.mark.parametrize("_id,smiles,old,new", ROWS, ids=IDS)
-def test_the_new_name_reads_back_to_the_full_inchikey(_id, smiles, old, new):
+@pytest.mark.parametrize("_id,smiles,old,new,composite", ROWS, ids=IDS)
+def test_the_new_name_reads_back_to_the_full_inchikey(_id, smiles, old, new, composite):
     # independent of the engine; OPSIN 2.9.0 also reads the old spelling, so only the book decides
     assert_full_rt(new, smiles)
+
+
+@needs_composite_opsin
+@pytest.mark.parametrize("_id,smiles,old,new,composite", ROWS, ids=IDS)
+def test_the_composite_name_reads_back_to_the_full_inchikey(_id, smiles, old, new, composite):
+    assert_full_rt(composite, smiles)
 
 
 # ------------------------------------------------------------------ the engine
@@ -85,18 +100,37 @@ def namers():
         yield {"pin": Orthonym(), "best-effort": Orthonym(style="pin", **_emit_tier_flags("best-effort"))}
 
 
-@pytest.mark.parametrize("_id,smiles,old,new", ROWS, ids=IDS)
-def test_best_effort_names_the_assembly_as_the_book_spells_it(namers, _id, smiles, old, new):
+@pytest.mark.parametrize("_id,smiles,old,new,composite", ROWS, ids=IDS)
+def test_best_effort_names_the_assembly_as_the_book_spells_it(namers, _id, smiles, old, new, composite):
+    row = namers["best-effort"].name_tiered(smiles)
+    if caps.composite_assembly_enabled():
+        # (:24078): composite locants are the preferred numbering, so the name is the PIN, unlabelled
+        assert (row["name"], row["tier"], row["is_pin"]) == (composite, "pin_verified", True), row
+        assert RULE not in [f["rule"] for f in row.get("spelling_failures") or []], row
+    else:
+        assert (row["name"], row["tier"], row["is_pin"]) == (new, "systematic_verified", False), row
+        assert RULE in [f["rule"] for f in row.get("spelling_failures") or []], row
+
+
+@pytest.mark.parametrize("_id,smiles,old,new,composite", ROWS, ids=IDS)
+def test_the_default_tier_still_declines_a_primed_name_of_three_components(namers, _id, smiles, old, new, composite):
+    # the PIN uses composite locants,:24078): the default tier ships it where OPSIN reads them
+    row = namers["pin"].name_tiered(smiles)
+    if caps.composite_assembly_enabled():
+        assert (row["name"], row["tier"]) == (composite, "pin_verified"), row
+    else:
+        assert (row["tier"], row["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), row
+
+
+@pytest.mark.parametrize("_id,smiles,old,new,composite", ROWS, ids=IDS)
+def test_the_primed_name_of_three_components_is_labelled_below_the_pin(namers, monkeypatch, _id, smiles, old, new,
+                                                                       composite):
+    # the engine as it is with OPSIN 2.9.0, whichever OPSIN is in use: the primed name stays, labelled
+    release_capabilities(monkeypatch)
     row = namers["best-effort"].name_tiered(smiles)
     assert (row["name"], row["tier"], row["is_pin"]) == (new, "systematic_verified", False), row
     assert RULE in [f["rule"] for f in row.get("spelling_failures") or []], row
-
-
-@pytest.mark.parametrize("_id,smiles,old,new", ROWS, ids=IDS)
-def test_the_default_tier_still_declines_a_primed_name_of_three_components(namers, _id, smiles, old, new):
-    # the PIN uses composite locants,:24078); the producer is a separate written item
-    row = namers["pin"].name_tiered(smiles)
-    assert (row["tier"], row["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), row
+    assert namers["pin"].name_tiered(smiles)["tier"] == "abstain"
 
 
 @pytest.mark.parametrize("smiles", [r[1] for r in ROWS if r[0] in ("terthiophene", "quaterfuran", "terpyridine")])
