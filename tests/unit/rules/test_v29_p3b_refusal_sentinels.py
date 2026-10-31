@@ -83,16 +83,17 @@ def test_is_refusal_sentinel_reuses_is_failure_name():
 
 @pytest.mark.parametrize("smiles", [
     # the reported case was CCS[Hg]SCC, 'mercury compound (not supported)ylethane'; mercury is admitted since 2026-10-30
-    # ('mercury diethanethiolate', test_bonded_metal_admissions.py), so cadmium and nickel are the witnesses
-    "CCS[Cd]SCC",
-    "CCS[Ni]SCC",
+    # ('mercury diethanethiolate', test_bonded_metal_admissions.py), and so are cadmium and nickel since lane B2
+    # (their rows: the same file), so technetium and plutonium, which no mechanism admits, are the witnesses
+    "CCS[Tc]SCC",
+    "CCS[Pu]SCC",
 ])
 def test_a_refusal_sentinel_is_never_welded_into_a_name(ungated_namer, smiles):
     """The reported defect: a refusal string given a '-yl' ending and consumed as
     a substituent prefix. Every "did I get a non-empty string?" caller read that
     as success.
 
-    The witnesses are the cadmium and nickel thiolates: zinc and mercury are named through their ionic
+    The witnesses are the technetium and plutonium thiolates: zinc, mercury, cadmium and nickel are named through their ionic
     drawing (``test_a_zinc_thiolate_is_named_through_its_ionic_drawing``), so the molecules that
     keep the refusal are those of the metals that are not admitted to the scope table yet
     (``data/metal_scope.py``).
@@ -134,8 +135,8 @@ def test_the_refusal_is_not_replaced_by_a_structure_dropping_name(ungated_namer)
     molecule that no failure predicate can flag, i.e. strictly worse. The
     refusal must survive all the way out.
     """
-    out = ungated_namer.name("CCS[Cd]SCC", on_failure="label")         # the mercury case of the report
-    assert out == "cadmium compound (not supported)"                      # is named since 2026-10-30
+    out = ungated_namer.name("CCS[Tc]SCC", on_failure="label")         # the mercury case of the report
+    assert out == "inorganic compound (not supported)"                    # (mercury is named since 2026-10-30)
     assert out not in ("ethane", "ethylethane", "diethyl sulfide")
 
 

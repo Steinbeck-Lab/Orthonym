@@ -17,7 +17,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 PIN = "CCO"                                  # the strict tier names it: pin_verified
 BELOW_PIN = "OCCNCc1ccccc1"                  # the strict tier declines it; the best-effort name is pin_unverified
 BELOW_PIN_NAME = "2-(benzylamino)ethan-1-ol"
-NO_NAME = "O=[U](=O)=O"                      # no tier names it (UNSUPPORTED_ELEMENT)
+NO_NAME = "O=[Th](=O)=O"                     # no tier names it (UNSUPPORTED_ELEMENT; uranium is named since 2026-10-30)
 NOTE = cli._BELOW_PIN_NOTE
 
 
@@ -104,9 +104,9 @@ def test_confidence_has_no_row_to_go_with_a_provenance_row(capsys, flags):
     assert "--confidence cannot be combined" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("smiles, label", [("N.N.Cl[Ni]Cl", "nickel compound (not supported)"),
+@pytest.mark.parametrize("smiles, label", [("[NH3][Bi]([NH3])(Cl)Cl", "bismuth compound (not supported)"),
                                           ("*CC", "compound with wildcard atoms (not supported)"),
-                                          ("O=[U](=O)=O", "inorganic compound (not supported)")])
+                                          ("O=[Th](=O)=O", "inorganic compound (not supported)")])
 def test_a_structure_with_no_name_keeps_its_decline_text(capsys, smiles, label):
     """The reason line and the ``--on-failure label`` text are those of the default before it was the
     best-effort tier: the element is named, not a generic catalogue text."""

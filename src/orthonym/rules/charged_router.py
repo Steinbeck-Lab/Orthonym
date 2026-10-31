@@ -2763,6 +2763,35 @@ def _declined_route_keeps_producer_record(fn):
     return _wrapped
 
 
+def _parent_hydride_cation_element(mol) -> Optional[str]:
+    """The symbol of the one atom outside the organic allowlist (``ions._has_metal``) of ``mol`` when that atom is a
+    singly charged cation of a metal that ``data/metal_scope.py`` admits to ``PARENT_HYDRIDE_IONS`` (tin, lead) and
+    ``mol`` is one fragment with no other charge; None otherwise. Such a cation is named on the metal's parent hydride
+    by ``group14_centres.emit_group_ylium``, the Blue Book: "stannane, SnH4, and plumbane, PbH4
+    ... by replacing the 'ane' ending... by the suffix 'ylium'"), which keeps its own scope checks."""
+    from ..data.metal_scope import PARENT_HYDRIDE_IONS, has_mechanism
+    from .ions import _ORGANIC_NONMETALS
+    outside = [a for a in mol.GetAtoms() if a.GetSymbol() not in _ORGANIC_NONMETALS]
+    if (len(outside) != 1 or len(Chem.GetMolFrags(mol)) != 1 or outside[0].GetFormalCharge() != 1
+            or not has_mechanism(outside[0].GetSymbol(), PARENT_HYDRIDE_IONS)
+            or any(a.GetFormalCharge() for a in mol.GetAtoms() if a.GetIdx() != outside[0].GetIdx())):
+        return None
+    return outside[0].GetSymbol()
+
+
+def _parent_hydride_cation_name(mol) -> Optional[str]:
+    """The name of a tin or lead cation that the table admits to PARENT_HYDRIDE_IONS (``_parent_hydride_cation_
+    element``), named on the parent hydride of the metal and nowhere else (no other route of ``route_charged`` is built
+    for a metal): the ylium name when it reads back, else '' (declined); None when ``mol`` is no such cation."""
+    symbol = _parent_hydride_cation_element(mol)
+    if symbol is None:
+        return None
+    from .group14_centres import emit_group_ylium
+    centre = next(a.GetIdx() for a in mol.GetAtoms() if a.GetSymbol() == symbol)
+    ylium = emit_group_ylium(mol, centre)
+    return ylium if ylium and _cation_name_rt_ok(ylium, mol) else ''
+
+
 def _group14_metal_radical_element(mol) -> Optional[str]:
     """'Sn' or 'Pb' when ``mol`` is a neutral molecule of one fragment whose only atom
     outside the organic allowlist (``ions._has_metal``) is a single tin or lead atom, and
@@ -3102,8 +3131,8 @@ def route_charged(mol, style: str = 'pin') -> str:
     # all of its radical electrons is the Group-14 mononuclear parent hydride of a radical
     # ('dimethylstannylidene'), named on the path silicon and germanium take below.
     _group14_centre = _group14_metal_radical_element(mol)
-    if _has_metal(mol) and _group14_centre is None:
-        return ''
+    if (_ylium := _parent_hydride_cation_name(mol)) is not None or (_has_metal(mol) and _group14_centre is None):
+        return _ylium or ''
 
     # --- Step 2: multi-fragment (dot-disconnected salt / arbitrary) -> Plan 04.
     if len(Chem.GetMolFrags(mol)) > 1:

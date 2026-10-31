@@ -25,8 +25,8 @@ PINS = [("CCO", "ethanol"), ("CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O", "(2R)-2-[4-(2-me
 #: structures no tier names: the code and the label of the decline, as the default gave them before it was the
 #: best-effort tier (the label names the element)
 UNNAMED = [
-    ("O=[U](=O)=O", "UNSUPPORTED_ELEMENT", "inorganic compound (not supported)"),
-    ("N.N.Cl[Ni]Cl", "UNSUPPORTED_ELEMENT", "nickel compound (not supported)"),   # (platinum: named since 2026-10-30)
+    ("O=[Th](=O)=O", "UNSUPPORTED_ELEMENT", "inorganic compound (not supported)"),   # (uranium: named since 2026-10-30)
+    ("[NH3][Bi]([NH3])(Cl)Cl", "UNSUPPORTED_ELEMENT", "bismuth compound (not supported)"),   # (nickel, platinum: named)
     ("*CC", "WILDCARD_ATOMS", "compound with wildcard atoms (not supported)"),
 ]
 

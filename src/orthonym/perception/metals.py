@@ -332,8 +332,9 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
     by a double bond (the =O of ``O=[Zn]``) as a ligand of its own, and a metal that carries
     hydrogens takes no ligand at all (``[ZnH2]``): the hydrogens are its ligands Compounds
     with at least one metal-carbon single bond: "The presence of hydrogen attached to a metal atom
-    must always be indicated by the prefix 'hydrido'"). Every other metal declines a multiple bond
-    and a drawing without a neighbour, as before.
+    must always be indicated by the prefix 'hydrido'"), and an organic group joined by one double or
+    triple bond from a carbon or a nitrogen atom is a ligand too ('methylidene', 'phenylimino'). Every
+    other metal declines a multiple bond and a drawing without a neighbour, as before.
 
     Returns None if the topology doesn't match σ-bonded (e.g., aromatic
     π-bonded ligand attached to metal). Pure per internal notes.
@@ -384,8 +385,14 @@ def _build_sigma_ligand_groups(mol: "Chem.Mol",
         # Skip if connecting via a non-single bond (aromatic / double / triple)
         # — those are π-bonded, Tier-4 territory. Aryl σ-bonds to metal are
         # single bonds; aromatic-ring atoms inside the ring are aromatic but
-        # the M-C bond itself is single.
-        if neighbor_bond.GetBondTypeAsDouble() > 1.5:
+        # the M-C bond itself is single. A metal admitted to BONDED_NAMES also takes an organic group
+        # joined by one double or triple bond from a carbon or a nitrogen atom (=CH2, =CH-C6H5, #C-CH3,
+        # =N-C6H5): its ligand name is the 'ylidene', 'ylidyne' or 'imino' prefix of
+        # Definitions of terms, "names for substituent groups as defined in Section can also be used
+        # as ligand names"; ``rules.organometallics._multiply_bonded_ligand_name``).
+        multiple = (bonded_names and neighbor_bond.GetBondType() in (Chem.BondType.DOUBLE, Chem.BondType.TRIPLE)
+                    and neighbor_atom.GetSymbol() in ('C', 'N'))
+        if neighbor_bond.GetBondTypeAsDouble() > 1.5 and not multiple:
             return None
 
         # Walk the organic ligand subgraph via BFS, not crossing the central
@@ -912,7 +919,10 @@ def connect_anion_to_organometal_cation_sites(mol: "Chem.Mol") -> Optional[List[
     """
     if mol is None:
         return None
-    metals = [a for a in atoms_of(mol) if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO]
+    # the true metals, and a Group 14 metal that the table admits to CONNECT_ANION (tin, lead: the bonded drawing
+    # is a substituted stannane or plumbane,
+    metals = [a for a in atoms_of(mol) if a.GetSymbol() in _TRUE_METAL_SYMBOLS_FOR_VETO
+              or (a.GetSymbol() in ('Sn', 'Pb') and has_mechanism(a.GetSymbol(), CONNECT_ANION))]
     cations = [a for a in metals if a.GetFormalCharge() > 0]
     if len(cations) != 1 or any(a.GetDegree() for a in metals if a.GetIdx() != cations[0].GetIdx()):
         return None
@@ -949,8 +959,46 @@ def connect_anion_to_organometal_cation_sites(mol: "Chem.Mol") -> Optional[List[
                 or donor.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
                 or any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in donor.GetBonds())):
             return None                             # an anion that is no free anion: the pairing is a choice
+        if not _charge_stays_on_the_donor(mol, fragment, donor.GetIdx()):
+            return None                             # an ambident anion: the drawing does not fix the donor
         sites.append((cation.GetIdx(), donor.GetIdx()))
     return sites if len(sites) == charge else None
+
+
+#: the most resonance structures read of one anion (``_charge_stays_on_the_donor``); a larger anion declines
+_MAX_ANION_RESONANCE_STRUCTURES = 64
+
+
+def _charge_stays_on_the_donor(mol: "Chem.Mol", fragment, donor_idx: int) -> bool:
+    """True when every resonance structure of the anion ``fragment`` (atom indices of ``mol``) that puts its negative
+    charge on an atom other than carbon is the same structure (one canonical SMILES). The pyridin-2-olate anion
+    drawn ``[O-]c1ccccn1`` and ``O=c1cccc[n-]1`` is one anion with one standard InChIKey, and a bond to its oxygen
+    or to its nitrogen gives two constitutional isomers ('...[(pyridin-2-yl)oxy]stannane', '1-(...stannyl)pyridin-
+    2(1H)-one') with one key too: the drawn position of the charge is no structure, so the read-back cannot tell the
+    bonded drawing it would choose. The two structures of a carboxylate are one SMILES, so acetate stays connectable;
+    a structure with the charge on a carbon is no other donor (a carbanion is no donor, see the caller). False when
+    RDKit cannot enumerate the structures within ``_MAX_ANION_RESONANCE_STRUCTURES`` (fail closed)."""
+    try:
+        mapping: List[Tuple[int, ...]] = []
+        frags = Chem.GetMolFrags(mol, asMols=True, sanitizeFrags=True, fragsMolAtomMapping=mapping)
+        frag = frags[next(k for k, m in enumerate(mapping) if donor_idx in m)]
+        supplier = Chem.ResonanceMolSupplier(frag, Chem.ALLOW_CHARGE_SEPARATION,
+                                             _MAX_ANION_RESONANCE_STRUCTURES)
+        count = len(supplier)
+        if count >= _MAX_ANION_RESONANCE_STRUCTURES:
+            return False
+        forms = set()
+        for k in range(count):
+            structure = supplier[k]
+            if structure is None:
+                return False
+            if any(a.GetFormalCharge() < 0 and a.GetSymbol() != 'C' for a in structure.GetAtoms()):
+                copy = Chem.Mol(structure)
+                Chem.SanitizeMol(copy)
+                forms.add(Chem.MolToSmiles(copy))
+        return len(forms) <= 1
+    except Exception:  # noqa: BLE001 -- any RDKit failure declines the connection
+        return False
 
 
 def atom_and_charge_ledger_ok(before: "Chem.Mol", after: "Chem.Mol",

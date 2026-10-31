@@ -228,7 +228,7 @@ def test_the_as_written_name_ships_when_the_rewrite_fails(monkeypatch):
     base = _start_row(AS_WRITTEN, "best-effort")["name"]                # the name at the start commit
     # the call on the rewritten string names nothing: the rewrite hands the engine a string it cannot name
     monkeypatch.setattr(metal_offer, "metal_disconnected_spelling_and_order",
-                        lambda smiles: ("[Hf+4]", (0,)) if smiles == AS_WRITTEN else None)
+                        lambda smiles: ("[Th+4]", (0,)) if smiles == AS_WRITTEN else None)
     row = _row(AS_WRITTEN, "best-effort")
     assert row["name"] == base and row["tier"] == "systematic_verified"
     assert_full_rt(row["name"], AS_WRITTEN)
@@ -259,7 +259,7 @@ def test_equal_tiers_ship_the_rewritten_name():
 def test_a_failing_rewrite_leaves_the_default_tier_label_of_the_drawing_as_written(monkeypatch):
     """Two failures: the drawing as written ships its own label (UNNAMEABLE: zinc is a complete metal)."""
     monkeypatch.setattr(metal_offer, "metal_disconnected_spelling_and_order",
-                        lambda smiles: ("[Hf+4]", (0,)) if smiles == "Cl[Zn]Cl" else None)
+                        lambda smiles: ("[Th+4]", (0,)) if smiles == "Cl[Zn]Cl" else None)
     row = _row("Cl[Zn]Cl", "pin")
     assert row["tier"] == "abstain" and row["limit_code"] == "UNNAMEABLE"
 

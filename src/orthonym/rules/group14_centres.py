@@ -4,7 +4,8 @@ The centre is a mononuclear parent hydride (silane, germane, borane) and every g
 prefix, named by ``rules.centre_ligands`` (the substituent-prefix namer of the substitutive path, with the
 atom-coverage veto) and cited as the groups of a mononuclear hydride are, the Blue Book).
 Tin, lead, aluminium and gallium are metals of ``data/metal_scope.py``: admitting one to a mechanism is an edit
-of that table followed by a panel measurement, and ``route_charged`` hands a metal on before it reaches here.
+of that table followed by a panel measurement, and ``route_charged`` hands a metal on before it reaches here. Tin
+and lead are admitted to ``PARENT_HYDRIDE_IONS`` (2026-10-30): their cations are named here as silicon's are.
 """
 from rdkit import Chem
 
@@ -15,7 +16,10 @@ from rdkit import Chem
 #:41557). The general method of the same section (:41559, "added to the name of the parent hydride, with
 # elision of the final 'e'") gives boron the same ending (boranylium).
 # element -> (name of the cation, standard bonding number,
-_GROUP_YLIUM = {'Si': ('silylium', 4), 'Ge': ('germylium', 4), 'B': ('boranylium', 3)}
+_GROUP_YLIUM = {'Si': ('silylium', 4), 'Ge': ('germylium', 4), 'B': ('boranylium', 3),
+                # the metals of the same paragraph, read only where the table admits them (PARENT_HYDRIDE_IONS)
+                'Sn': ('stannylium', 4), 'Pb': ('plumbylium', 4)}
+_METAL_YLIUM = frozenset({'Sn', 'Pb'})
 
 # "ANIONS FORMED BY ADDITION OF HYDRIDE IONS" (the Blue Book), method (2) (:41094): 'ide' on a
 # parent hydride whose bonding number at the anionic site is higher than the standard one and is expressed by
@@ -41,6 +45,10 @@ def emit_group_ylium(mol, center_idx: int) -> str:
     reads the name back to the full InChIKey. Returns '' on any decline."""
     center = mol.GetAtomWithIdx(center_idx)
     entry = _GROUP_YLIUM.get(center.GetSymbol())
+    if center.GetSymbol() in _METAL_YLIUM:
+        from ..data.metal_scope import PARENT_HYDRIDE_IONS, has_mechanism
+        if not has_mechanism(center.GetSymbol(), PARENT_HYDRIDE_IONS):
+            return ''
     if entry is None or center.GetFormalCharge() != 1 or center.IsInRing() or center.GetNumRadicalElectrons():
         return ''
     suffix, standard = entry

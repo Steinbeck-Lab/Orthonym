@@ -340,6 +340,8 @@ def _code(smiles):
     ("[Zn-].[Be+2]", "beryllium compound (not supported)"),
     ("[Zn-].[Mg+2]", "magnesium compound (not supported)"),
     ("[Li+].[Zn+2].[H-].[H-].[H-]", "lithium compound (not supported)"),
+    ("[Zn+2].[Cu+2]", "copper compound (not supported)"),        # beside a metal that the table admits since 2026-10-30
+    ("CC[Zn]CC.CC[Pb](CC)(CC)CC", "zinc compound (not supported)"),   # lead: admitted to PARENT_HYDRIDE_IONS and more
 ])
 def test_a_failure_for_a_metal_the_engine_names_is_unnameable_not_unsupported(smiles, message):
     """Every metal of the input is admitted to the scope table and one of them is complete (zinc): the engine
@@ -352,15 +354,18 @@ def test_a_failure_for_a_metal_the_engine_names_is_unnameable_not_unsupported(sm
 
 
 @pytest.mark.parametrize("smiles, message", [
-    ("Cl[Cu]Cl", "copper compound (not supported)"),             # a metal that the table does not admit
+    ("Cl[Tc]Cl", "inorganic compound (not supported)"),          # a metal that the table does not admit
+    ("CC[Tc]CC", "inorganic compound (not supported)"),
+    ("Cl[Cu]Cl", "copper compound (not supported)"),             # a metal that the table admits and does not complete
     ("Cl[Fe]Cl", "iron compound (not supported)"),
     ("[Pt+2].[Cl-].[Cl-]", "platinum compound (not supported)"),
     ("CC[Hg]CC", "mercury compound (not supported)"),
     ("CC[Cd]CC", "cadmium compound (not supported)"),
+    ("CC[Sn](CC)CC", "tin compound (not supported)"),            # tin and lead are admitted and not complete
     ("[Na+].[Cl-]", "sodium compound (not supported)"),          # Groups 1 and 2 alone: admitted, not complete
     ("[Mg+2]", "magnesium compound (not supported)"),
-    ("[Zn+2].[Cu+2]", "copper compound (not supported)"),        # zinc beside a metal that is not admitted
-    ("CC[Zn]CC.CC[Pb](CC)(CC)CC", "zinc compound (not supported)"),
+    ("[Zn+2].[Tc+2]", "zinc compound (not supported)"),          # zinc beside a metal that is not admitted
+    ("CC[Zn]CC.CC[Tc]CC", "zinc compound (not supported)"),
     ("[Zn+2].[Ge]", "zinc compound (not supported)"),            # a metalloid is not a metal of the table
     ("[He]", "inorganic compound (not supported)"),
 ])
@@ -395,12 +400,15 @@ def test_the_scope_function_reads_the_table(monkeypatch):
     or Group 2 element alone is not complete."""
     assert has_complete_scope(["Zn"]) and has_complete_scope(["Zn", "Na", "Mg"])
     assert not has_complete_scope([]) and not has_complete_scope(["Na"]) and not has_complete_scope(["Na", "Ca"])
-    assert not has_complete_scope(["Zn", "Cu"]) and not has_complete_scope(["Zn", "Xx"])
+    assert has_complete_scope(["Zn", "Cu"])                        # copper is admitted since 2026-10-30, zinc completes
+    assert not has_complete_scope(["Zn", "Tc"]) and not has_complete_scope(["Zn", "Xx"])
+    assert not has_complete_scope(["Cu"]) and not has_complete_scope(["Sn"])        # admitted, not complete
     assert is_complete_metal("Zn") and not is_complete_metal("Na") and not is_complete_metal("Cu")
-    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Cu", metal_scope.MetalScope(
-        frozenset({metal_scope.ION_SALTS}), frozenset({2}), complete=True))
-    assert has_complete_scope(["Cu"]) and has_complete_scope(["Zn", "Cu"])
-    assert _code("Cl[Cu]Cl") == "UNNAMEABLE"                      # a later phase completes a metal by its entry
+    assert _code("Cl[Bi]Cl") == "UNSUPPORTED_ELEMENT"              # bismuth has a name (errors._METAL_NAMES), no entry
+    monkeypatch.setitem(metal_scope.METAL_SCOPE, "Bi", metal_scope.MetalScope(
+        frozenset({metal_scope.ION_SALTS}), frozenset({3}), complete=True))
+    assert has_complete_scope(["Bi"]) and has_complete_scope(["Zn", "Bi"])
+    assert _code("Cl[Bi]Cl") == "UNNAMEABLE"                      # a later phase completes a metal by its entry
 
 
 @pytest.mark.parametrize("smiles, message", [("[Zn-]", "zinc compound (not supported)"),
@@ -450,13 +458,14 @@ def test_an_organozinc_halide_the_default_tier_does_not_build_is_unnameable_ther
 
 
 @pytest.mark.parametrize("smiles, message", [
-    ("Cl[Fe]Cl", "iron compound (not supported)"),
+    ("Cl[Tc]Cl", "inorganic compound (not supported)"),
     ("CC1=CC(=O)[N-]S(=O)(=O)O1.[K+]", "potassium compound (not supported)"),
-    ("Cl[Cu]Cl", "copper compound (not supported)"),
+    ("[NH3][Bi]([NH3])(Cl)Cl", "bismuth compound (not supported)"),
 ])
 def test_other_metals_keep_their_failure_rows(smiles, message):
-    """Iron, copper and a Group 1 salt that no producer names at the default tier: the label and the text of
-    the start commit (identity rows of the other-metals panel and the 98-row census)."""
+    """Technetium (a metal that no mechanism admits), a Group 1 salt and a bismuth complex that no producer names at
+    the default tier: the label and the text of the start commit (iron and copper are admitted since 2026-10-30, their
+    rows moved: ``declared_moves_bonded_b2.tsv``)."""
     row = _row(smiles, "pin")
     assert row["tier"] == "abstain" and row["limit_code"] == "UNSUPPORTED_ELEMENT", row
     assert _namer("pin").name(smiles, on_failure="label") == message

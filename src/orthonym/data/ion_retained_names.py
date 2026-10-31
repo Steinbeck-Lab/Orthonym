@@ -220,7 +220,7 @@ INORGANIC_CATIONS = {
     '[Na+]': 'sodium',
     '[K+]': 'potassium',
     '[Rb+]': 'rubidium',
-    '[Cs+]': 'cesium',
+    '[Cs+]': 'caesium',                 # SPELLING (the Blue Book): "caesium not cesium"
 
     # Alkaline earth metals (Group 2)
     '[Mg+2]': 'magnesium',

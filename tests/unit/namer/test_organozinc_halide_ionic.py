@@ -34,7 +34,7 @@ from orthonym import Orthonym, OrthonymLimitError
 from orthonym.assembly import metal_offer
 from orthonym.cli import _emit_tier_flags
 from orthonym.perception.metals import atom_and_charge_ledger_ok
-from tests.support.metal_baselines import baseline_path, identity_view, read_rows
+from tests.support.metal_baselines import baseline_path, declared_bonded_metal_moves, identity_view, read_rows
 from tests.support.rt_assert import assert_full_rt
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
@@ -114,8 +114,11 @@ def test_the_connection_is_the_bonded_drawing_with_every_atom_kept():
 
 def test_the_connection_needs_an_admitted_metal_and_an_allowed_valence_and_no_choice():
     connect = metal_offer.metal_connected_spelling_and_order
-    assert connect("C[Cd+].[Cl-]") is None and connect("C[Ni+].[Cl-]") is None       # not admitted
+    assert connect("C[Tc+].[Cl-]") is None and connect("C[Pu+].[Cl-]") is None       # not admitted
     assert connect("C[Hg+].[Cl-]") == ("[CH3][Hg][Cl]", (0, 1, 2))                    # admitted since 2026-10-30
+    assert connect("C[Cd+].[Cl-]") == ("[CH3][Cd][Cl]", (0, 1, 2))                    # and since the second lane
+    assert connect("C[Cu+].[Cl-]") == ("[CH3][Cu][Cl]", (0, 1, 2))
+    assert connect("C[Sn+3].[Cl-].[Cl-].[Cl-]") == ("[CH3][Sn]([Cl])([Cl])[Cl]", (0, 1, 2, 3, 4))   # tin: CONNECT_ANION
     assert connect("C[Mg+].[Br-]") is None                                             # Group 2: ION_SALTS only
     assert connect("C[Zn+2].[Cl-].[Cl-]") is None                                      # [Zn+3] is no valence of zinc
     assert connect("C[Zn+].[Cl-].[Br-]") is None                                       # which anion: a choice
@@ -194,7 +197,7 @@ def test_a_failing_connection_ships_nothing_and_the_drawing_as_written_keeps_its
     assert as_written["name"] == "phenylzinc(1+)—chloride (1/1)" and as_written["tier"] == "systematic_verified"
     assert_full_rt(as_written["name"], smiles)
     monkeypatch.setattr(metal_offer, "metal_connected_spelling_and_order",
-                        lambda s: ("[Hf+4]", (0,)) if s == smiles else None)
+                        lambda s: ("[Th+4]", (0,)) if s == smiles else None)
     row = _row(smiles, "best-effort")
     assert row["name"] == as_written["name"] and row["tier"] == as_written["tier"] and row["is_pin"] is False
 
@@ -269,18 +272,22 @@ def _constructed_other_metal_rows():
     """Cations of metals that the table does not admit to ``CONNECT_ANION``, each with an anion: the
     drawings the connection could reach if it were not bound to the table; and a zinc cation whose
     charge is no valence after the connection."""
-    return ["C[Cd+].[Cl-]", "C[Ni+].[Cl-]", "C[Mg+].[Br-]", "C[Cu+].[Cl-]", "CC[Zn+2].[Cl-].[Cl-]",
-            "C[Sn+3].[Cl-].[Cl-].[Cl-]"]
+    return ["C[Tc+].[Cl-]", "C[Pu+].[Cl-]", "C[Mg+].[Br-]", "C[Th+].[Cl-]", "CC[Zn+2].[Cl-].[Cl-]",
+            "C[Th+3].[Cl-].[Cl-].[Cl-]"]
 
 
 def test_other_metals_are_not_moved(monkeypatch):
     """No row of the other-metals baseline holds a positively charged metal that the connection
-    could reach; the cations of other metals, with an anion, are named as they are named without
-    the connection."""
+    could reach, but the three organotin rows (tin is admitted to ``CONNECT_ANION`` since the second lane, and the
+    rows are declared in ``declared_moves_bonded_b2.tsv``); the cations of other metals, with an anion, are named as
+    they are named without the connection."""
     rows = read_rows(baseline_path("other"))
     assert len(rows) >= 100, len(rows)
-    for row in rows:
-        assert metal_offer.metal_connected_spelling_and_order(row["smiles"]) is None, row["smiles"]
+    declared = declared_bonded_metal_moves()
+    connected = {row["smiles"] for row in rows if metal_offer.metal_connected_spelling_and_order(row["smiles"])}
+    assert connected == {"CCCC[Sn+](CCCC)CCCC.[Cl-]", "[OH-].c1ccccc1[Sn+](c1ccccc1)c1ccccc1",
+                         "CCCCCCCCCCCC(=O)[O-].CCCCCCCCCCCC(=O)[O-].CCCC[Sn+2]CCCC"}, connected
+    assert all((smiles, "best-effort") in declared for smiles in connected)
     namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
     with_offer = [identity_view(namer.name_tiered(s)) for s in _constructed_other_metal_rows()]
     monkeypatch.setattr(metal_offer, "metal_connected_spelling_and_order", lambda smiles: None)

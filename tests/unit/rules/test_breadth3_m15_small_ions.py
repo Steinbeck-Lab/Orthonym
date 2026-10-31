@@ -44,7 +44,8 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CCNC(C)NCC",
     "CCNCNCC",
     "CN(C)CN(C)C",
-    "[Fr+].[NH2-]",
+    # '[Fr+].[NH2-]' left this set on 2026-10-30: the PIN path names it 'francium amide' pin_verified, as
+    # caesium amide and rubidium amide, a carbon-free salt (the contributor guide "Scope": kept pin_verified by the maintainers)
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -255,7 +256,8 @@ def test_mononuclear_anion_neighbours_unchanged(smiles, expected):
     ("[Li+].[Li+].[Li+].[N-3]", "lithium nitride", "pin_verified"),
     ("[Mg+2].[Mg+2].[Mg+2].[N-3].[N-3]", "magnesium nitride", "pin_verified"),
     ("[N-3].[N-3].[Sr+2].[Sr+2].[Sr+2]", "strontium nitride", "pin_verified"),
-    ("[Fr+].[NH2-]", "francium amide", "systematic_verified"),  # trivial_retained
+    # the PIN path names it since francium has its element name (errors._METAL_NAMES, 2026-10-30), as caesium amide
+    ("[Fr+].[NH2-]", "francium amide", "pin_verified"),
 ])
 def test_element_ion_salt_keeps_its_name_at_best_effort(smiles, expected, tier):
     from tests.support.rt_assert import name_best_effort
