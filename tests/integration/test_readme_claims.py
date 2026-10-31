@@ -123,11 +123,15 @@ def test_specimen_xenon_difluoride_declines():
 
 # README "Output tiers" / "Checked.": the default tier's marked exceptions
 def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers():
-    carve = _row("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")  # a name form outside OPSIN's grammar
+    # an inositol (a name form outside OPSIN's grammar) is no PIN:50943, relabel 2026-10-31): the
+    # default tier declines it and the best-effort tier ships it on its exact InChIKey (guide/tiers.md)
+    inositol = "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    assert _row(inositol)["limit_code"] == "NO_VERIFIED_PIN"
+    carve = _row(inositol, "best-effort")
     assert carve["name"] == "scyllo-inositol", carve
     assert carve["verified"] == "unverified", carve
     assert carve["gate_outcome"] == "carveout:inositol", carve
-    assert carve["tier"] != "pin_verified", carve
+    assert carve["tier"] != "pin_verified" and carve["is_pin"] is False, carve
     assert _independent_parse(carve["name"]) is None
     diol = _row("O[C@H]1CC[C@@H](O)CC1")      # stereodescriptors OPSIN cannot parse
     assert diol["name"] == "(1s,4s)-cyclohexane-1,4-diol", diol
@@ -138,8 +142,10 @@ def test_default_tier_exceptions_are_marked_and_not_shipped_at_the_wider_tiers()
     # are asserted by test_p2_labels_public_claims.py::
     # test_coordination_list_name_keeps_the_label_of_its_naming_path.
     for tier in ("valid", "best-effort"):
-        wide = {s: _row(s, tier) for s in ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "O[C@H]1CC[C@@H](O)CC1")}
+        wide = {s: _row(s, tier) for s in (inositol, "O[C@H]1CC[C@@H](O)CC1")}
         for s, row in wide.items():
+            if s == inositol and tier == "best-effort":
+                continue                             # asserted above
             assert row["name"] not in (carve["name"], diol["name"]), row
             if row["name"]:
                 assert row["verified"] == "opsin", row

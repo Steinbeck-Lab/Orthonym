@@ -33,9 +33,10 @@ substituted/deoxy/larger ring never reaches the table.
 
 from typing import Optional
 
+from rdkit import Chem
 from rdkit.Chem import inchi
 
-# Standard-InChIKey -> retained PIN. The shared skeleton block is
+# Standard-InChIKey -> retained name; no PIN,:50943). The shared skeleton block is
 # CDAISMWEOUEBRE; the nine distinct stereo blocks are the nine inositols.
 _INOSITOL_BY_INCHIKEY = {
     # The seven ACHIRAL (meso) inositols — RDKit perceives their stereochemistry
@@ -112,7 +113,7 @@ def is_inositol_skeleton(mol) -> bool:
 
 
 def name_inositol(mol) -> Optional[str]:
-    """Return the retained inositol PIN for a fully-stereodefined
+    """Return the retained inositol name; no PIN, for a fully-stereodefined
     cyclohexanehexol matching one of the seven deterministically-perceived meso
     inositols, else ``None``.
 
@@ -159,3 +160,16 @@ def is_chiral_inositol(mol) -> bool:
     parts = ik.split('-')
     stereo_block = parts[1] if len(parts) >= 2 else 'UHFFFAOYSA'
     return stereo_block != 'UHFFFAOYSA'  # defined stereo + not meso -> chiro
+
+
+def is_inositol_name_of(smiles: Optional[str], name: Optional[str]) -> bool:
+    """True iff ``name`` is the inositol name:func:`name_inositol` gives the structure ``smiles``. OPSIN has
+    no grammar for these names, so the best-effort tier ships one only when the recogniser gives it for this
+    very structure (an exact InChIKey of the seven meso stereoisomers); makes it no PIN."""
+    if name not in INOSITOL_NAMES or not smiles:
+        return False
+    try:
+        mol = Chem.MolFromSmiles(smiles)
+        return mol is not None and name_inositol(mol) == name
+    except Exception:
+        return False

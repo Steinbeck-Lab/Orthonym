@@ -163,7 +163,8 @@ def test_unsanitized_mol_with_double_bond_stereo_only_in_directions_is_declined(
 
 
 def test_keyword_argument_smiles_takes_a_mol():
-    mol = _mol("C[C@H](N)C(=O)O")
+    # a molecule with a stereocentre that every entry point names (L-alanine is no PIN since the relabel)
+    mol = _mol("C[C@H](O)CC")
     name = name_compound(_written(mol))
     assert name_compound(smiles=mol) == name
     assert Orthonym().name(smiles=mol) == name

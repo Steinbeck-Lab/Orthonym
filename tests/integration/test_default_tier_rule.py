@@ -6,7 +6,7 @@ declines." "The label pin_verified means the strict PIN path built the name and
 verified it." "A decline carries a reason". Exceptions (L75): "names derived from the
 natural-product and metal-complex lists... are emitted based solely on their exact
 structural match. At the default tier, ten further name formats absent from OPSIN's
-grammar (e.g., inositols; phanes after a structure check) are emitted without parse-back
+grammar (e.g., phanes after a structure check; inositols at best-effort only) are emitted without parse-back
 validation"; checks (L74): "At the default tier, it compares only the constitutional
 part of the key".
 
@@ -90,8 +90,19 @@ def test_a_name_only_a_breadth_producer_built_is_declined():
     assert_best_effort_gives(smi, "2-[(1,2-dihydropyridazin-4-yl)(methyl)amino]ethan-1-ol")
 
 
+def test_an_inositol_is_declined_at_the_default_tier_and_ships_at_best_effort():
+    # relabel 2026-10-31 (internal notes)::50943 gives no PIN in Chapter,
+    # so the inositol carve-out no longer ships at the default tier (it did: changed asserted value); the
+    # best-effort tier ships the recogniser's name of the very structure (exact InChIKey; OPSIN has no
+    # inositol grammar), below the PIN. Mutation: rules.inositols.is_inositol_name_of returning False
+    # leaves the best-effort tier without a name.
+    smiles = "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    assert_default_tier_declines(smiles)
+    row = name_best_effort(smiles)
+    assert (row["name"], row["is_pin"], row["gate_outcome"]) == ("scyllo-inositol", False, "carveout:inositol"), row
+
+
 @pytest.mark.parametrize("smiles,expected", [
-    ("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O", "scyllo-inositol"),
     # a carve-out only while the active OPSIN reads no phane name; an OPSIN that does ships it through its read-back
     pytest.param("C1Cc2ccc(cc2)CCc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane", marks=release_opsin_only),
     ("CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO", "(4E)-sphing-4-enine"),  # NP list
@@ -187,7 +198,7 @@ EMIT_TIER_HELP = (
     'can build the preferred IUPAC name (PIN), that is when the strict PIN path built the name and '
     'verified it (tier pin_verified); this was the default up to release 1.0.x. The exceptions are names '
     "from the natural-product and metal-complex lists, the name formats absent from OPSIN's grammar "
-    '(inositols; phanes, checked by building their structure), PIN spellings that OPSIN reads back '
+    '(phanes, checked by building their structure), PIN spellings that OPSIN reads back '
     'through a twin spelling of the same structure (ethan(2H)ol, diphenyliodanuide, '
     'methane-SO-thioperoxol) or through their acids (dianhydrides), PINs whose stereodescriptors OPSIN '
     'cannot read, for which the PIN-only tier compares the constitution, and, with --trivial, a retained '

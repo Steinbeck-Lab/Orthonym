@@ -197,8 +197,10 @@ def test_l_proline_zwitterion_keeps_its_retained_name():
     from orthonym import Orthonym
     from tests.support.rt_assert import _independent_parse
     smiles = "O=C([O-])[C@@H]1CCC[NH2+]1"
-    r = Orthonym(style="pin").name_tiered(smiles)
-    assert r["name"] == "L-proline" and r["tier"] == "pin_verified", r
+    #:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes): the name stands at the best-effort tier, labelled below the PIN
+    from orthonym.cli import _emit_tier_flags
+    r = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    assert r["name"] == "L-proline" and r["tier"] == "systematic_verified", r
     assert _key(_independent_parse("L-proline")) == _key(smiles)
 
 

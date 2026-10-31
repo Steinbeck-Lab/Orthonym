@@ -85,8 +85,11 @@ def test_netzero_aa_zwitterion_names_and_roundtrips(smi):
 @pytest.mark.opsin_gate
 def test_leucine_zwitterion_retained_unchanged():
     # D-leucine is a Table-10.4 standard AA -> the retained name (fired before
-    # route_charged); azaniumyl only fires for NON-standard / net-charged.
-    assert G.name("CC(C)C[C@@H]([NH3+])C(=O)[O-]") == "D-leucine"
+    # route_charged); azaniumyl only fires for NON-standard / net-charged.:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes):
+    # the default (PIN) tier declines it, the best-effort tier ships the retained name.
+    from orthonym.cli import _emit_tier_flags
+    be = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
+    assert be.name("CC(C)C[C@@H]([NH3+])C(=O)[O-]") == "D-leucine"
 
 
 # --- 2. single-cation net-0 amino-acid zwitterion -> azaniumyl PIN ----------

@@ -289,9 +289,12 @@ P10_ROUTE_ROWS = [
 
 
 @pytest.mark.parametrize("smiles", P10_ROUTE_ROWS)
-def test_p10_route_label_unchanged(smiles):
+def test_p10_route_name_is_no_pin(smiles):
+    # relabel 2026-10-31:50943, no PIN in Chapter: the carbohydrate route's name is read by the
+    # check, so the default tier declines it (it was pin_verified: changed asserted value)
     from tests.support.pin_tiers import name_default
-    assert name_default(smiles).get("tier") == "pin_verified"
+    row = name_default(smiles)
+    assert (row.get("tier"), row.get("limit_code")) == ("abstain", "NO_VERIFIED_PIN"), row
 
 
 # Review round (F5). (:39151): "Alkyl, aryl, etc. groups and groups derived

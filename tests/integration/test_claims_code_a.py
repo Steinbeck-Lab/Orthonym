@@ -230,11 +230,17 @@ def test_unverified_trivial_name_is_not_labelled_systematic_verified():
 # 4. labels: 'verified' tiers only for a round trip or the identity table
 # ---------------------------------------------------------------------------
 
-def test_grammar_carveout_ships_at_pin_unverified_with_its_gate_string():
-    row = _pin_row("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
+def test_grammar_carveout_ships_at_best_effort_with_its_gate_string():
+    #:50943 (relabel 2026-10-31): an inositol is no PIN, so the PIN tier declines it (it shipped there
+    # pin_unverified: changed asserted value) and the best-effort tier ships it on its exact InChIKey
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
+    smiles = "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
+    assert _pin_row(smiles)["limit_code"] == "NO_VERIFIED_PIN"
+    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert row["name"] == "scyllo-inositol", row
     assert row["gate_outcome"] == "carveout:inositol", row  # gate string unchanged
-    assert row["tier"] == "pin_unverified" and row["is_pin"] is False, row
+    assert row["tier"] == "best_effort" and row["is_pin"] is False, row
     assert row["verified"] == "unverified" and row["opsin"] == "unverified", row
     assert _independent_full_key(row["name"]) == ""  # OPSIN has no grammar for it
 

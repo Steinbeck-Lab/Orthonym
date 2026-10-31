@@ -43,7 +43,7 @@ def test_no_structure_or_no_name_is_not_a_zwitterion_drawing():
 @pytest.mark.parametrize("smiles, name, label", [
     ("[NH3+][C@@H](CS)C(=O)[O-]", "(2R)-2-amino-3-sulfanylpropanoic acid", "systematic_verified"),
     ("NC(=[NH2+])NCC(=O)[O-]", "(carbamimidoylamino)acetic acid", "systematic_verified"),
-    ("C[C@H]([NH3+])C([O-])=O", "L-alanine", "pin_verified"),                # the strict path's own name
+    ("C[C@H]([NH3+])C([O-])=O", "L-alanine", "systematic_verified"),         # the strict path's own name, no PIN
     ("C[N+]1=CC=CC=C1C([O-])=O", "1-methylpyridin-1-ium-2-carboxylate", "pin_verified"),
 ])
 def test_the_label_of_a_zwitterion_drawing_at_the_best_effort_tier(smiles, name, label):
@@ -53,5 +53,6 @@ def test_the_label_of_a_zwitterion_drawing_at_the_best_effort_tier(smiles, name,
 
 @pytest.mark.opsin_gate
 def test_the_pin_tier_is_unchanged():
-    assert name_compound("C[C@H]([NH3+])C([O-])=O", emit_tier="pin") == "L-alanine"
+    #:50943: the retained amino-acid name is no PIN, so the PIN tier declines it
+    assert not name_compound("C[C@H]([NH3+])C([O-])=O", emit_tier="pin")
     assert name_compound("C[N+]1=CC=CC=C1C([O-])=O", emit_tier="pin") == "1-methylpyridin-1-ium-2-carboxylate"
