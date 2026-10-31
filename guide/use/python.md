@@ -22,7 +22,7 @@ Everything the command line does is one import away. The full parameter lists ar
 ```
 
 ```pycon
->>> name_compound("O=[U](=O)=O")
+>>> name_compound("F[Xe]F")
 ''
 ```
 
@@ -39,7 +39,7 @@ A label such as `inorganic compound (not supported)` is a reason, not a name, so
 | `"raise"` | nothing: it raises `OrthonymLimitError` (`raise_on_limit=True` is the same) |
 
 ```pycon
->>> name_compound("O=[U](=O)=O", on_failure="label")
+>>> name_compound("F[Xe]F", on_failure="label")
 'inorganic compound (not supported)'
 ```
 
@@ -47,7 +47,7 @@ The codes (the keys of `orthonym.errors.LIMIT_CATALOG`) are the stable part; the
 
 ```pycon
 >>> from orthonym.errors import is_failure_name
->>> is_failure_name(name_compound("O=[U](=O)=O"))
+>>> is_failure_name(name_compound("F[Xe]F"))
 True
 ```
 
@@ -112,7 +112,7 @@ Each key is explained on [The provenance row](provenance.md).
 
 ```pycon
 >>> from orthonym import classify_limit
->>> classify_limit("O=[U](=O)=O").code
+>>> classify_limit("F[Xe]F").code
 'UNSUPPORTED_ELEMENT'
 >>> classify_limit("CCO") is None
 True
@@ -123,7 +123,7 @@ To get an exception instead of an empty name, pass `on_failure="raise"` (or `rai
 ```pycon
 >>> from orthonym import OrthonymLimitError
 >>> try:
-...     Orthonym().name("O=[U](=O)=O", on_failure="raise")
+...     Orthonym().name("F[Xe]F", on_failure="raise")
 ... except OrthonymLimitError as err:
 ...     print(err.code, "|", err.message)
 UNSUPPORTED_ELEMENT | inorganic compound (not supported)

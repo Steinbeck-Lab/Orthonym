@@ -3,16 +3,15 @@
 When Orthonym cannot name a molecule, it says so, and what it says is not a name. The plain call returns the empty string and logs the reason, a limit code and a label, as one warning on the `orthonym` logger. The command line prints an empty name, and the reason on the error stream:
 
 ```console
-$ orthonym "O=[U](=O)=O"
+$ orthonym "F[Xe]F"
 
-O=[U](=O)=O	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
+F[Xe]F	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
 ```
 
 The first line is the (empty) name on the normal output, the second the reason on the error stream. `--on-failure label` (`on_failure="label"` in Python) prints and returns the label in place of a name, such as `inorganic compound (not supported)`, as earlier versions did; `--on-failure raise` (`on_failure="raise"`) stops with an error. The [provenance row](use/provenance.md) marks the row {tier}`abstain` with a reason code in `limit_code`:
 
 ```console
-$ orthonym "O=[U](=O)=O" --provenance | python -m json.tool
-OPSIN validity gate suppressed unparseable name: 'unknown'
+$ orthonym --emit-tier pin "F[Xe]F" --provenance | python -m json.tool
 {
     "name": "inorganic compound (not supported)",
     "tier": "abstain",
@@ -21,7 +20,7 @@ OPSIN validity gate suppressed unparseable name: 'unknown'
     "opsin": "n/a",
     "gates_passed": [],
     "gate_outcome": "suppressed",
-    "formula": "O3U",
+    "formula": "F2Xe",
     "limit_code": "UNSUPPORTED_ELEMENT",
     "stereo_unexpressed": false,
     "suffix_free_prefix_name": false,
@@ -32,7 +31,7 @@ OPSIN validity gate suppressed unparseable name: 'unknown'
 }
 ```
 
-The first line is a log message on the error stream: the engine withdrew a candidate that OPSIN could not read. The JSON row is on the normal output. `producer` is `null`: no name ships, so no code is named ([Which code built the name](use/provenance.md#which-code-built-the-name)).
+The JSON row is on the normal output. `producer` is `null`: no name ships, so no code is named ([Which code built the name](use/provenance.md#which-code-built-the-name)).
 
 ## The reason codes
 
@@ -68,7 +67,7 @@ Natural-product names are a second case. Where a molecule's preferred name is a 
 At a tier other than `pin`, the provenance row has no label for the name (`null`), and `--on-failure label` prints `(no name — CODE)` for it:
 
 ```console
-$ orthonym --emit-tier best-effort "O=[U](=O)=O" --on-failure label
+$ orthonym --emit-tier best-effort "F[Xe]F" --on-failure label
 (no name — UNSUPPORTED_ELEMENT)
 ```
 
@@ -78,9 +77,9 @@ A molecule that gets no name gets the empty string, and the reason is logged:
 
 ```pycon
 >>> from orthonym import name_compound
->>> name_compound("O=[U](=O)=O")
+>>> name_compound("F[Xe]F")
 ''
->>> name_compound("O=[U](=O)=O", on_failure="label")
+>>> name_compound("F[Xe]F", on_failure="label")
 'inorganic compound (not supported)'
 ```
 
@@ -88,7 +87,7 @@ A molecule that gets no name gets the empty string, and the reason is logged:
 
 ```pycon
 >>> from orthonym.errors import is_failure_name
->>> is_failure_name(name_compound("O=[U](=O)=O"))
+>>> is_failure_name(name_compound("F[Xe]F"))
 True
 >>> is_failure_name(name_compound("CCO"))
 False

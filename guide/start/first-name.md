@@ -83,9 +83,9 @@ Every other field is explained on [The provenance row](../use/provenance.md), `p
 Orthonym says so. The plain call prints an empty name and, on the error stream, the reason (a limit code and a label); `--provenance` gives the reason as a row:
 
 ```console
-$ orthonym "O=[U](=O)=O"
+$ orthonym "F[Xe]F"
 
-O=[U](=O)=O	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
+F[Xe]F	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
 ```
 
 More on [declines](../declines.md).

@@ -197,15 +197,14 @@ BONDED_METAL_VALENCES = {"Al": (3,), "Hg": (1, 2), "Pd": (2,), "Pt": (2, 4), "Ru
                          "V": (3, 4, 5), "W": (4, 6)}
 
 #: the metals of the second panel of the lane (2026-10-30, 38 metals of PubChem's unnamed metal drawings, no wrong
-#: name): every mechanism zinc has, with the charges of their cations. Not complete. Uranium is left out: its
-#: trioxide is the README's specimen of an element the engine does not name.
+#: name), and uranium (2026-10-31): every mechanism zinc has, with the charges of their cations. Not complete.
 MORE_BONDED_METAL_VALENCES = {"Zr": (4,), "Hf": (4,), "Fe": (2, 3), "Co": (2, 3), "Ni": (2,), "Cu": (1, 2),
                               "Mo": (2, 3, 4, 5, 6), "Cr": (2, 3, 6), "Rh": (1, 3), "Re": (1, 3, 5, 7),
                               "Mn": (2, 3), "Ir": (1, 3), "Y": (3,), "Os": (2, 3, 4), "Ag": (1,),
                               "Au": (1, 3), "Cd": (2,), "Ga": (3,), "In": (3,), "Tl": (1, 3), "Nb": (5,),
                               "Ta": (5,), "Sc": (3,), "La": (3,), "Ce": (3, 4), "Sm": (3,), "Eu": (2, 3),
                               "Gd": (3,), "Nd": (3,), "Yb": (2, 3), "Lu": (3,), "Er": (3,), "Dy": (3,), "Tb": (3,),
-                              "Pr": (3,), "Ho": (3,), "Tm": (3,)}
+                              "Pr": (3,), "Ho": (3,), "Tm": (3,), "U": (3, 4, 5, 6)}
 
 #: metals whose ions have a retained name of their own ('copper(II)', 'iron(III)': ``data.ion_retained_names``,
 #: INORGANIC_CATIONS) are not admitted to ``ELEMENT``: its 'copper(2+)' would replace the retained name and its label

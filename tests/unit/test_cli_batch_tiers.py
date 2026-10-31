@@ -27,7 +27,7 @@ pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 WIDE = "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1"
 WIDE_NAME = "8-methyl-8-azabicyclo[3.2.1]octan-3-yl 3-hydroxy-2-phenylpropanoate"
 # No name at any tier (UNSUPPORTED_ELEMENT), so every tier has a decline to report.
-NO_NAME = "O=[U](=O)=O"
+NO_NAME = "F[Xe]F"
 NAMED = "CCO"
 
 PROVENANCE_KEYS = {"name", "tier", "is_pin", "source", "opsin", "gates_passed", "gate_outcome",

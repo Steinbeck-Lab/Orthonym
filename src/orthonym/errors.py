@@ -63,7 +63,7 @@ _METAL_NAMES = {
     'As': 'arsenic', 'Ge': 'germanium',
     # the metals admitted to the scope table on 2026-10-30 (data/metal_scope.py)
     'Fr': 'francium', 'Hf': 'hafnium', 'Nb': 'niobium', 'Pr': 'praseodymium', 'Ra': 'radium',
-    'Ta': 'tantalum',
+    'Ta': 'tantalum', 'U': 'uranium',
     'Sb': 'antimony', 'Te': 'tellurium', 'Yb': 'ytterbium', 'La': 'lanthanum',
     'Ce': 'cerium', 'Nd': 'neodymium', 'Sm': 'samarium', 'Eu': 'europium',
     'Gd': 'gadolinium', 'Tb': 'terbium', 'Dy': 'dysprosium', 'Ho': 'holmium',
@@ -174,7 +174,7 @@ class OrthonymLimitError(Exception):
     --------
     >>> from orthonym import Orthonym, OrthonymLimitError
     >>> try:
-    ... Orthonym.name("O=[U](=O)=O", on_failure="raise")
+    ... Orthonym.name("F[Xe]F", on_failure="raise")
     ... except OrthonymLimitError as err:
     ... print(err.code, "|", err.message)
     UNSUPPORTED_ELEMENT | inorganic compound (not supported)
@@ -286,9 +286,9 @@ def is_failure_name(name: Optional[str]) -> bool:
     --------
     >>> from orthonym import name_compound
     >>> from orthonym.errors import is_failure_name
-    >>> is_failure_name(name_compound("O=[U](=O)=O"))
+    >>> is_failure_name(name_compound("F[Xe]F"))
     True
-    >>> is_failure_name(name_compound("O=[U](=O)=O", on_failure="label"))
+    >>> is_failure_name(name_compound("F[Xe]F", on_failure="label"))
     True
     >>> is_failure_name(name_compound("CCO"))
     False

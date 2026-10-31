@@ -29,7 +29,7 @@ ROOT = Path(__file__).resolve().parents[2]
 # (SMILES, the limit code of a structure that gets no name)
 UNNAMED = [
     ("C[C@H]1CC[C@H](NC(=O)c2ccccc2)CC1", "UNNAMEABLE"),
-    ("O=[U](=O)=O", "UNSUPPORTED_ELEMENT"),
+    ("F[Xe]F", "UNSUPPORTED_ELEMENT"),
     ("*CC", "WILDCARD_ATOMS"),
 ]
 NAMED = "CCO"
@@ -103,9 +103,9 @@ def test_an_unknown_value_raises_value_error(bad):
 
 def test_a_mol_is_named_like_its_smiles():
     from rdkit import Chem
-    mol = Chem.MolFromSmiles("O=[U](=O)=O")
+    mol = Chem.MolFromSmiles("F[Xe]F")
     assert name_compound(mol) == ""
-    assert name_compound(mol, on_failure="label") == _label_of("O=[U](=O)=O")
+    assert name_compound(mol, on_failure="label") == _label_of("F[Xe]F")
     assert Orthonym().name(mol) == ""
 
 
@@ -136,7 +136,7 @@ def test_one_warning_with_the_code_and_the_label(caplog, smiles, code):
 
 def test_the_instance_call_warns_once_too(caplog):
     with caplog.at_level(logging.WARNING, logger="orthonym"):
-        assert Orthonym().name("O=[U](=O)=O") == ""
+        assert Orthonym().name("F[Xe]F") == ""
     assert [r.orthonym_code for r in _unnamed_records(caplog)] == ["UNSUPPORTED_ELEMENT"]
 
 
@@ -144,7 +144,7 @@ def test_the_instance_call_warns_once_too(caplog):
 def test_label_and_raise_log_nothing(caplog, mode):
     with caplog.at_level(logging.WARNING, logger="orthonym"):
         try:
-            name_compound("O=[U](=O)=O", on_failure=mode)
+            name_compound("F[Xe]F", on_failure=mode)
         except OrthonymLimitError:
             pass
     assert not _unnamed_records(caplog)
@@ -158,23 +158,23 @@ def test_a_name_logs_nothing(caplog):
 
 def test_the_confidence_dict_follows_the_mode(caplog):
     with caplog.at_level(logging.WARNING, logger="orthonym"):
-        record = name_compound("O=[U](=O)=O", include_confidence=True)
+        record = name_compound("F[Xe]F", include_confidence=True)
     assert record["name"] == ""
     assert record["limit"]["code"] == "UNSUPPORTED_ELEMENT"     # the shape is unchanged
     assert {"confidence", "handler", "factors"} <= set(record)
     assert [r.orthonym_code for r in _unnamed_records(caplog)] == ["UNSUPPORTED_ELEMENT"]
-    labelled = name_compound("O=[U](=O)=O", include_confidence=True, on_failure="label")
-    assert labelled["name"] == _label_of("O=[U](=O)=O")
+    labelled = name_compound("F[Xe]F", include_confidence=True, on_failure="label")
+    assert labelled["name"] == _label_of("F[Xe]F")
     with pytest.raises(OrthonymLimitError) as err:
-        name_compound("O=[U](=O)=O", include_confidence=True, on_failure="raise")
+        name_compound("F[Xe]F", include_confidence=True, on_failure="raise")
     assert err.value.code == "UNSUPPORTED_ELEMENT"
     assert name_compound(NAMED, include_confidence=True)["name"] == "ethanol"
 
 
 def test_the_tiered_row_is_unchanged():
-    row = Orthonym().name_tiered("O=[U](=O)=O")
+    row = Orthonym().name_tiered("F[Xe]F")
     assert row["tier"] == "abstain" and row["limit_code"] == "UNSUPPORTED_ELEMENT"
-    assert row["name"] == _label_of("O=[U](=O)=O")
+    assert row["name"] == _label_of("F[Xe]F")
 
 
 # a structure that the default tier does not name but a wider tier does (pin_unverified)
@@ -201,15 +201,15 @@ def test_a_call_inside_a_naming_gets_the_label():
     """The engine names parts of a molecule through the public entries and reads what they
     return as a string; whatever the argument says, such a call gets the label."""
     from orthonym.assembly.fragment_naming import enter_name_scope, exit_name_scope
-    label = _label_of("O=[U](=O)=O")
+    label = _label_of("F[Xe]F")
     enter_name_scope()
     try:
-        assert name_compound("O=[U](=O)=O") == label
-        assert name_compound("O=[U](=O)=O", on_failure="empty") == label
-        assert Orthonym().name("O=[U](=O)=O") == label
-        assert name_compound("O=[U](=O)=O", include_confidence=True)["name"] == label
+        assert name_compound("F[Xe]F") == label
+        assert name_compound("F[Xe]F", on_failure="empty") == label
+        assert Orthonym().name("F[Xe]F") == label
+        assert name_compound("F[Xe]F", include_confidence=True)["name"] == label
         with pytest.raises(OrthonymLimitError):                  # "raise" still raises
-            name_compound("O=[U](=O)=O", on_failure="raise")
+            name_compound("F[Xe]F", on_failure="raise")
     finally:
         exit_name_scope()
 
@@ -278,10 +278,10 @@ def _reasons(stderr: str) -> list:
 
 
 def test_cli_single_default_prints_an_empty_line_and_the_reason_on_stderr():
-    code, out, err = _cli("O=[U](=O)=O")
+    code, out, err = _cli("F[Xe]F")
     assert code == 0
     assert out == "\n"
-    assert _reasons(err) == [f"O=[U](=O)=O\tUNSUPPORTED_ELEMENT: {_label_of('O=[U](=O)=O')}"]
+    assert _reasons(err) == [f"F[Xe]F\tUNSUPPORTED_ELEMENT: {_label_of('F[Xe]F')}"]
 
 
 def test_cli_single_label_and_raise():
@@ -305,47 +305,47 @@ def test_cli_confidence_prints_an_empty_name():
 
 
 def test_cli_batch_keeps_one_line_per_input_line(tmp_path):
-    lines = [NAMED, "O=[U](=O)=O", "", "*CC", "c1ccccc1"]
+    lines = [NAMED, "F[Xe]F", "", "*CC", "c1ccccc1"]
     code, out, err = _cli(input_lines=lines, tmp_path=tmp_path)
     assert code == 0
-    assert out.split("\n")[:-1] == [f"{NAMED}\tethanol", "O=[U](=O)=O\t", "", "*CC\t",
+    assert out.split("\n")[:-1] == [f"{NAMED}\tethanol", "F[Xe]F\t", "", "*CC\t",
                                     "c1ccccc1\tbenzene"]
     reasons = _reasons(err)
-    assert sorted(ln.split("\t")[0] for ln in reasons) == ["*CC", "O=[U](=O)=O"]
+    assert sorted(ln.split("\t")[0] for ln in reasons) == ["*CC", "F[Xe]F"]
     assert all(": " in ln.split("\t")[1] for ln in reasons)
 
 
 def test_cli_batch_confidence_columns_stay_aligned(tmp_path):
-    code, out, err = _cli("--confidence", input_lines=[NAMED, "O=[U](=O)=O"], tmp_path=tmp_path)
+    code, out, err = _cli("--confidence", input_lines=[NAMED, "F[Xe]F"], tmp_path=tmp_path)
     rows = [row.split("\t") for row in out.split("\n")[:-1]]
     assert code == 0 and len(rows) == 2 and all(len(row) == 4 for row in rows)
     assert rows[0][:2] == [NAMED, "ethanol"]
-    assert rows[1][:2] == ["O=[U](=O)=O", ""]
+    assert rows[1][:2] == ["F[Xe]F", ""]
     assert len(_reasons(err)) == 1
 
 
 def test_cli_batch_label_mode_prints_the_label_and_no_reason(tmp_path):
-    label = _label_of("O=[U](=O)=O")
-    code, out, err = _cli("--on-failure", "label", input_lines=[NAMED, "O=[U](=O)=O"],
+    label = _label_of("F[Xe]F")
+    code, out, err = _cli("--on-failure", "label", input_lines=[NAMED, "F[Xe]F"],
                           tmp_path=tmp_path)
     assert code == 0 and _reasons(err) == []
-    assert out.split("\n")[:-1] == [f"{NAMED}\tethanol", f"O=[U](=O)=O\t{label}"]
+    assert out.split("\n")[:-1] == [f"{NAMED}\tethanol", f"F[Xe]F\t{label}"]
 
 
 def test_cli_batch_verbose_counts_the_unnamed_lines(tmp_path):
-    code, out, err = _cli("--verbose", input_lines=[NAMED, "O=[U](=O)=O", "*CC"],
+    code, out, err = _cli("--verbose", input_lines=[NAMED, "F[Xe]F", "*CC"],
                           tmp_path=tmp_path)
     assert code == 0
     assert "Processed 3 SMILES, 0 errors, 2 unnamed" in err
 
 
 def test_cli_batch_raise_mode_marks_the_line_and_fails(tmp_path):
-    code, out, err = _cli("--on-failure", "raise", input_lines=[NAMED, "O=[U](=O)=O"],
+    code, out, err = _cli("--on-failure", "raise", input_lines=[NAMED, "F[Xe]F"],
                           tmp_path=tmp_path)
     rows = out.split("\n")[:-1]
     assert code == 1
     assert rows[0] == f"{NAMED}\tethanol"
-    assert rows[1].startswith("O=[U](=O)=O\tERROR: [UNSUPPORTED_ELEMENT] ")
+    assert rows[1].startswith("F[Xe]F\tERROR: [UNSUPPORTED_ELEMENT] ")
 
 
 def test_cli_rejects_an_unknown_value():

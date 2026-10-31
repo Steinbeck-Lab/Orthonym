@@ -75,7 +75,7 @@ emit_tier="pin")`. See [Output tiers](#output-tiers).
 
 <picture>
   <source media="(max-width: 700px)" srcset="assets/readme-specimen-narrow.svg">
-  <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, pin_verified. Uranium trioxide, with --on-failure label, prints inorganic compound (not supported), abstain." width="100%">
+  <img src="assets/readme-specimen.svg" alt="Five commands and what they print. orthonym CCO prints ethanol, tier pin_verified. Ibuprofen prints (2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid, pin_verified. With --emit-tier valid, sphingosine prints (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol, pin_unverified, and retinol prints (2E,4E,6E,8E)-3,7-dimethyl-9-(2,6,6-trimethylcyclohex-1-en-1-yl)nona-2,4,6,8-tetraen-1-ol, pin_verified. Xenon difluoride, with --on-failure label, prints inorganic compound (not supported), abstain." width="100%">
 </picture>
 
 <sub>Real output, generated from the engine. The tier at the right comes from <code>--provenance</code>.</sub>
