@@ -1591,3 +1591,21 @@ def test_the_deprecated_narrow_namer_no_longer_exists():
     assert callable(sp._narrow_walk_name)
 
 
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    # "The numerical prefixes 'bis', 'tris', 'tetrakis', etc." (BB 7104): "(a) compound
+    # or complex (i.e. substituted) prefixes"; the same N-substituents of an amide take 'bis'
+    # (BB 26237 'bis(2-chloroethyl)amine').
+    ("NP(=O)(O)N(CCCl)CCCl", "N,N-bis(2-chloroethyl)phosphorodiamidic acid"),
+    ("NP(=O)(OCc1ccccc1)N(CCCl)CCCl", "benzyl N,N-bis(2-chloroethyl)phosphorodiamidate"),
+    # an unsubstituted prefix keeps the basic multiplier, with the marks its locant needs
+    ("CC(C)N(C(C)C)P(=O)(O)O", "N,N-di(propan-2-yl)phosphoramidic acid"),
+    ("CC(C)(C)N(C(C)(C)C)P(=O)(O)O", "N,N-di-tert-butylphosphoramidic acid"),
+    # (c)/(d) (BB 7104): a simple prefix beginning with 'dec' takes parentheses, 'di(decyl)'
+    ("CCCCCCCCCCN(CCCCCCCCCC)P(=O)(O)O", "N,N-di(decyl)phosphoramidic acid"),
+])
+def test_amido_n_substituents_take_bis_when_substituted(smiles, expected):
+    """The amido N-prefix of the P oxoacids used a private di/tri table and wrote
+    'N,N-di(2-chloroethyl)'; it now goes through ``multiplied_component``."""
+    assert Orthonym().name(smiles) == expected
