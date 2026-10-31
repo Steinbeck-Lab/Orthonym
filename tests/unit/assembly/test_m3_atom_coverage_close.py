@@ -158,11 +158,17 @@ def test_atom_drop_witness_abstains_cleanly_jar_absent(monkeypatch, smiles):
         f"{smiles} jar-absent name {name!r} does not round-trip to the input")
 
 
+# E-AA (2026-10-31): with OPSIN, a free amino acid takes its systematic name, which reads back
+# INTRODUCTION, the Blue Book;:54247; Table 10.4:54202 'aminoacetic acid'); without
+# the jar no read-back is possible and the retained name stays.
+_JAR_PRESENT_NAME = {"NCC(=O)O": "aminoacetic acid"}
+
+
 @pytest.mark.parametrize("smiles,expected", list(_GUARD.items()))
 def test_by_construction_guard_still_emits_jar_present(eng, smiles, expected):
     """The fix voids ONLY atom-drops: ordinary correct names still emit
     (jar-present, the normal operating config)."""
-    assert eng.name(smiles) == expected
+    assert eng.name(smiles) == _JAR_PRESENT_NAME.get(smiles, expected)
 
 
 @pytest.mark.parametrize("smiles,expected", list(_GUARD.items()))

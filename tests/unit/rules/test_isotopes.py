@@ -464,9 +464,13 @@ class TestFixACountSubscriptOmission:
                       general_fallback_unverified=True, allow_aromatic_general=True)
         got = n.name_tiered("[2H]OC(=O)C([2H])([2H])N([2H])[2H]").get("name")
         assert got == "(2H5)glycine", f"got {got!r}"
+        # E-AA (2026-10-31): the unlabelled structure is named 'aminoacetic acid' now, the Blue Book;
+        # Table 10.4:54202), so the acid deuterium takes the O locant of '(O-2H)acetic acid (PIN)',:43806)
+        # and the amino deuterium keeps its count, "even in case of monosubstitution" (:43720).
         res = n.name_tiered("[2H]OC(=O)C([2H])([2H])N[2H]")
-        assert res.get("name") == "2-(2H1)amino(2,2-2H2)ethan(2H1)oic acid", res
-        assert res.get("tier") != "pin_verified" and not res.get("is_pin"), res
+        assert res.get("name") == "2-(2H1)amino(O,2,2-2H3)acetic acid", res
+        from tests.support.rt_assert import name_is_rt_exact
+        assert name_is_rt_exact(res["name"], "[2H]OC(=O)C([2H])([2H])N[2H]"), res
 
 
 class TestIsotopeDescriptorPlacementAndNestedBracket:

@@ -37,12 +37,13 @@ class TestRingAtomLeakageFixed:
         PIN tier (TRIAGE.md 'User decisions'; retained alpha-amino acids,
          the Blue Book identifies no PIN for them), as for 'D-proline'.
         'D-tyrosine' is OPSIN 2.9.0 full-InChIKey exact (the ring is intact: no
-        '2-aminononanoic acid' leak). Mutation: the old leak injected fails."""
+        '2-aminononanoic acid' leak). Mutation: the old leak injected fails.
+        E-AA (2026-10-31): the user's approval of PIN-tier systematic names for amino acids (2026-10-31) replaces decision D-a; the retained name is no PIN INTRODUCTION, the Blue Book) and the systematic name comes first,:54247). """
         from tests.support.rt_assert import assert_full_rt
         smiles = "N[C@H](Cc1ccc(O)cc1)C(=O)O"
         name = name_compound(smiles)
         assert "nonan" not in name, f"Ring atoms leaked into chain: {name}"
-        assert name == "D-tyrosine", name
+        assert name == "(2R)-2-amino-3-(4-hydroxyphenyl)propanoic acid", name
         assert_full_rt(name, smiles)
 
     def test_bromophenylalanine_has_phenyl_not_hexyl(self):
@@ -366,13 +367,13 @@ class TestImprovementTracking:
         """Tyrosine: was '2-aminononanoic acid', now names the right molecule.
 
         2026-09-26 (wp7) change-asserted-value: 'D-tyrosine' by user decision D-a
-        (see test_tyrosine_has_phenyl_not_hexyl); OPSIN 2.9.0 full-InChIKey exact."""
+        (see test_tyrosine_has_phenyl_not_hexyl); OPSIN 2.9.0 full-InChIKey exact. E-AA (2026-10-31): the user's approval of PIN-tier systematic names for amino acids (2026-10-31) replaces decision D-a; the retained name is no PIN INTRODUCTION, the Blue Book) and the systematic name comes first,:54247)."""
         from tests.support.rt_assert import assert_full_rt
         smiles = "N[C@H](Cc1ccc(O)cc1)C(=O)O"
         name = name_compound(smiles)
         old = "2-aminononanoic acid"
         assert name != old, f"Not improved: still {name}"
-        assert name == "D-tyrosine", name
+        assert name == "(2R)-2-amino-3-(4-hydroxyphenyl)propanoic acid", name
         assert_full_rt(name, smiles)
 
     def test_bromophenylalanine_improved(self):

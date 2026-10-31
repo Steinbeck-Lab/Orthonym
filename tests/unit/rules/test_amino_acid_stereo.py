@@ -23,15 +23,16 @@ class TestAminoAcidSystematicStereo:
     def test_alanine_enantiomers_resolve_to_retained_pin(self):
         """The two alanine enantiomers resolve to 'L-alanine' and 'D-alanine'."""
         # CIP-based: [C@@H](N)(C)C(=O)O is the R (D) enantiomer; [C@H](...) is S (L).
-        assert name_compound("[C@@H](N)(C)C(=O)O") == "D-alanine"
-        assert name_compound("[C@H](N)(C)C(=O)O") == "L-alanine"
+        # E-AA: the retained names are no PINs; INTRODUCTION (the Blue Book), 'Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter'; 'Systematic substitutive names' (:54247) and Table 10.4 (:54186) give the systematic name, which the engine builds first since E-AA (2026-10-31).
+        assert name_compound("[C@@H](N)(C)C(=O)O") == "(2R)-2-aminopropanoic acid"
+        assert name_compound("[C@H](N)(C)C(=O)O") == "(2S)-2-aminopropanoic acid"
 
     def test_l_and_d_alanine_different_names(self):
         """L and D alanine produce different (retained) names — stereo not dropped."""
         l_name = name_compound("[C@H](N)(C)C(=O)O")    # alanine (L implicit)
         d_name = name_compound("[C@@H](N)(C)C(=O)O")   # D-alanine
         assert l_name != d_name, f"L and D should differ: {l_name} vs {d_name}"
-        assert "alanine" in l_name and "alanine" in d_name
+        assert "aminopropanoic acid" in l_name and "aminopropanoic acid" in d_name
 
     def test_glycine_no_stereo(self):
         """Glycine (achiral) has no stereo prefix."""
@@ -101,12 +102,13 @@ class TestWSD07RetainedStereo:
     DEFERS to the systematic namer."""
 
     def test_d_alanine(self):
-        assert name_compound("C[C@@H](N)C(=O)O") == "D-alanine"
+        # E-AA: INTRODUCTION (the Blue Book), 'Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter'; 'Systematic substitutive names' (:54247) and Table 10.4 (:54186) give the systematic name, which the engine builds first since E-AA (2026-10-31).
+        assert name_compound("C[C@@H](N)C(=O)O") == "(2R)-2-aminopropanoic acid"
 
     def test_l_alanine_implicit(self):
         # a6cadc255: the L is no longer implicit for a free amino acid,
         # the Blue Book; the omission is licensed for peptides only,.
-        assert name_compound("C[C@H](N)C(=O)O") == "L-alanine"
+        assert name_compound("C[C@H](N)C(=O)O") == "(2S)-2-aminopropanoic acid"
 
     def test_allo_isoleucine_named(self):
         # W8 P3 Task 3.1: the 2-centre allo diastereomers of
@@ -116,7 +118,8 @@ class TestWSD07RetainedStereo:
         # bcd75afe2: 'allo' is FUSED into the name, 'D-alloisoleucine' -- "Use of
         # the prefix 'allo'" (the Blue Book, 'L-alloisoleucine (symbol 'aIle')
         # (2S,3R)-2-amino-3-methylpentanoic acid'), not hyphenated onto the stem.
-        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "D-alloisoleucine"
+        # E-AA: the systematic name of the same section, INTRODUCTION (the Blue Book), 'Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter'; 'Systematic substitutive names' (:54247) and Table 10.4 (:54186) give the systematic name, which the engine builds first since E-AA (2026-10-31).
+        assert name_compound("CC[C@H](C)[C@@H](N)C(=O)O") == "(2R,3S)-2-amino-3-methylpentanoic acid"
 
     def test_nonstandard_aa_keeps_systematic(self):
         # A non-standard AA (-aminobutanoic acid) keeps the systematic name —

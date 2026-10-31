@@ -13,6 +13,7 @@ Peptide guard: molecules with peptide bonds (-C(=O)-NH-) are NOT simple amino
 acids and must NOT be flattened to "2-aminoXXXanoic acid".
 """
 
+import contextvars
 from typing import Optional, Tuple
 
 from rdkit import Chem
@@ -240,6 +241,87 @@ def _has_extra_functional_groups(mol) -> bool:
     return False
 
 
+#: True inside the naming of:func:`systematic_amino_acid_name`: the retained amino-acid names are not offered
+_RETAINED_OFF: contextvars.ContextVar = contextvars.ContextVar("orthonym_retained_amino_acid_names_off", default=False)
+
+
+def retained_amino_acid_names_off() -> bool:
+    """Whether the running naming leaves the retained amino-acid names out (:func:`systematic_amino_acid_name`)."""
+    return _RETAINED_OFF.get()
+
+
+def systematic_amino_acid_name(mol) -> Optional[str]:
+    """The systematic substitutive name of the molecule being named, offered before its retained amino-acid name.
+
+     INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not identified for the compounds in
+    this Chapter", so 'L-alanine', 'glycinate' and 'methyl L-alaninate' are no PINs. "Systematic
+    substitutive names" (:54247): "When not denoted by a retained name, amino acids receive systematic substitutive
+    names constructed by applying the principles, rules and conventions of substitutive nomenclature"; Table 10.4
+    (:54186) prints that name under each retained one ('2-aminopropanoic acid'), and outside Chapter the book
+    gives such names as PINs ('3-aminopropanoic acid (PIN)',:26304).
+
+    Only for the caller's whole molecule (``outermost_name_input``): a peptide residue or a salt component keeps the
+    retained name its producer asks for. The molecule is named once more by a default-tier engine with the retained
+    amino-acid names left out (:func:`retained_amino_acid_names_off`), under the default tier's context
+    (``assembly.default_tier_scope``: a best-effort caller's breadth is off, so both tiers are offered the same
+    name); the name is returned only when it reads as a PIN (the checks below) and OPSIN reads it back to the
+    full InChIKey of ``mol``. Else None, and the caller keeps its retained name, labelled below the PIN by the
+     spelling check (``validation/spelling/checks_natural_products.py``)."""
+    if mol is None or _RETAINED_OFF.get():
+        return None
+    from ..assembly.fragment_naming import outermost_name_input
+    try:
+        smiles = Chem.MolToSmiles(mol)
+        outer = outermost_name_input()
+        outer_mol = Chem.MolFromSmiles(outer) if outer else None
+        if outer_mol is None or Chem.MolToSmiles(outer_mol) != smiles:
+            return None
+    except Exception:
+        return None
+    from ..assembly.nested_memo import cached_nested_call
+    return cached_nested_call("systematic_amino_acid_name", (smiles,), lambda: _systematic_name(mol, smiles))
+
+
+def systematic_or_retained(mol, retained: str, neutral_name: Optional[str] = None) -> str:
+    """``retained``, a name built on a retained amino-acid word ('glycinate', from the neutral name 'glycine'), or
+    the systematic name:func:`systematic_amino_acid_name` offers in its place ('aminoacetate'): INTRODUCTION
+    (the Blue Book) identifies no PIN for the retained word, (:54247). With ``neutral_name``, the
+    offer is made only when that name is a retained amino-acid name."""
+    if neutral_name is not None:
+        from ..data.amino_acids import is_retained_amino_acid_name
+        if not is_retained_amino_acid_name(neutral_name):
+            return retained
+    return systematic_amino_acid_name(mol) or retained
+
+
+def _systematic_name(mol, smiles: str) -> Optional[str]:
+    """The body of:func:`systematic_amino_acid_name` for the caller's whole molecule ``smiles``."""
+    from ..assembly.default_tier_scope import default_tier_scope
+    token = _RETAINED_OFF.set(True)
+    try:
+        from ..errors import is_failure_name
+        from ..namer import Orthonym
+        with default_tier_scope():
+            name = Orthonym(style="pin").name(smiles)
+    except Exception:                       # the offer must never break a naming: the retained name stands
+        return None
+    finally:
+        _RETAINED_OFF.reset(token)
+    if not name or is_failure_name(name):
+        return None
+    # A nested name call does not apply the default tier's emission rule, so the PIN status is read here: no
+    # part the naming recorded as not the PIN, no broken spelling rule (the check among them), and no
+    # molecule whose PIN is multiplicative; 'L-cystine' keeps its name rather than a substitutive one).
+    from ..metrics.provenance import get_provenance, name_carries_non_pin_part
+    from ..validation.coverage_gate import _full_inchikey_roundtrips
+    from ..validation.pin_spelling import check_pin_spelling
+    from .pin_vocabulary import multiplicative_pin_expected
+    if (name_carries_non_pin_part(get_provenance(), name) or check_pin_spelling(mol, name)
+            or multiplicative_pin_expected(mol) or not _full_inchikey_roundtrips(mol, name)):
+        return None
+    return name
+
+
 def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     """
     Generate name for an amino acid.
@@ -286,7 +368,7 @@ def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:
     # behavior (e.g. the prolyl-glutaminyl-cysteine tripeptide must stay a peptide,
     # not a systematic monomer).
     from ..assembly.fragment_naming import is_top_level_naming
-    trivial = get_amino_acid_name(
+    trivial = None if _RETAINED_OFF.get() else get_amino_acid_name(
         canonical_smiles, mol=mol, with_descriptor=is_top_level_naming(),
     )
     if trivial:
@@ -496,6 +578,11 @@ def _name_amino_acid_systematic(mol) -> str:
     # to the general polyfunctional pipeline, which names it correctly.
     backbone_length = _verify_denoted_alkanoic_backbone(mol, aa_atoms)
     if backbone_length is None:
+        return None
+    # The two-carbon acid is 'acetic acid', not 'ethanoic acid': "Acids" (the Blue Book),
+    # 'acetic acid (PIN) (substitution allowed; see ethanoic acid'; Table 10.4 (:54202) prints glycine's
+    # systematic name 'aminoacetic acid'. The general pipeline names it so.
+    if backbone_length < 3:
         return None
 
     # Get stem from the PROVEN backbone length using centralized module

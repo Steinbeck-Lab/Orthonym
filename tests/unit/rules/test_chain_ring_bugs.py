@@ -153,5 +153,7 @@ class TestAminoAcidRingAtomLeakage:
         a6cadc255 ("a free amino acid keeps its L"): "The stereodescriptors
         'D' and 'L'" (the Blue Book); its omission is licensed for peptides only
         ,:54717)."""
+        # E-AA (2026-10-31): the systematic name again, now first because the retained name is no PIN
+        # INTRODUCTION, the Blue Book;:54247); the ring stays a substituent.
         name = name_compound("N[C@@H](Cc1ccc(O)cc1)C(=O)O")
-        assert name == "L-tyrosine", f"Expected retained 'L-tyrosine', got: {name}"
+        assert name == "(2S)-2-amino-3-(4-hydroxyphenyl)propanoic acid", name

@@ -76,14 +76,18 @@ def test_the_name_is_kept_in_the_table_and_denied_as_a_pin(smiles, name):
     assert name.lower() not in PIN_DENY_HC
 
 
-@pytest.mark.parametrize("smiles, name", _ROWS)
+# glycine itself is named by its systematic name since E-AA (test_the_free_amino_acids_take_their_systematic_pin)
+_NAMED_ROWS = [row for row in _ROWS if row[1] != "glycine"]
+
+
+@pytest.mark.parametrize("smiles, name", _NAMED_ROWS)
 def test_the_default_tier_declines_the_name(smiles, name):
     row = name_default(smiles)
     assert (row.get("tier"), row.get("is_pin"), row.get("limit_code")) == (
         "abstain", False, "NO_VERIFIED_PIN"), row
 
 
-@pytest.mark.parametrize("smiles, name", _ROWS)
+@pytest.mark.parametrize("smiles, name", _NAMED_ROWS)
 def test_best_effort_ships_the_name_labelled_systematic_verified(smiles, name):
     row = name_breadth(smiles)
     assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (
@@ -125,9 +129,8 @@ def test_the_glycine_zwitterion_is_declined_at_default_and_labelled_below_pin_at
     # 'pin_verified' -> declined at the default tier and systematic_verified at best-effort; independent
     # check: name_is_rt_exact (OPSIN reads the name back to the input); mutation: with the check removed
     # from pin_spelling.BUILTIN_CHECK_MODULES the default tier ships the name pin_verified again.
-    ("C[C@H](N)C(=O)O", "L-alanine"),
+    # the neutral drawings take their systematic PIN since E-AA (test below); the zwitterions keep the names
     ("C[C@H]([NH3+])C(=O)[O-]", "L-alanine"),
-    ("N[C@@H](CO)C(=O)O", "L-serine"),
     ("[NH3+][C@@H](CO)C(=O)[O-]", "L-serine"),
     ("[NH3+]CCC(=O)[O-]", "beta-alanine"),
 ])
@@ -138,4 +141,18 @@ def test_other_amino_acid_names_are_labelled_below_pin(smiles, name):
     row = name_breadth(smiles)
     assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (
         name, "systematic_verified", False), row
+    assert name_is_rt_exact(name, smiles), name
+
+
+@pytest.mark.parametrize("smiles, name", [
+    # E-AA (2026-10-31): the retained names are no PINs INTRODUCTION, the Blue Book); the engine names
+    # the neutral drawing by the systematic substitutive name first, "Systematic substitutive names"
+    # (:54247), Table 10.4 (:54186, glycine 'aminoacetic acid':54202). Independent check: OPSIN reads it back.
+    ("NCC(=O)O", "aminoacetic acid"),
+    ("C[C@H](N)C(=O)O", "(2S)-2-aminopropanoic acid"),
+    ("N[C@@H](CO)C(=O)O", "(2S)-2-amino-3-hydroxypropanoic acid"),
+])
+def test_the_free_amino_acids_take_their_systematic_pin(smiles, name):
+    for row in (name_default(smiles), name_breadth(smiles)):
+        assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (name, "pin_verified", True), row
     assert name_is_rt_exact(name, smiles), name

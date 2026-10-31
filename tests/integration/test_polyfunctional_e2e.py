@@ -24,7 +24,7 @@ class TestPOLY01_MultipleFunctionalGroups:
         """Acid > amine. Returns glycine (trivial) or 2-aminoacetic acid."""
         result = name_compound("NCC(=O)O")
         # Returns glycine (trivial) or 2-aminoacetic acid (systematic)
-        assert result in ["glycine", "2-aminoacetic acid"]
+        assert result == "aminoacetic acid"  # E-AA::50943; Table 10.4:54202; no locant,:3037
 
     def test_cyano_acid_seniority(self):
         """Acid > nitrile, so nitrile becomes 'cyano' prefix."""
@@ -80,7 +80,7 @@ class TestPhase4SuccessCriteria:
     def test_criterion_4_amino_acid(self):
         """User can input 'NCC(=O)O' and receive 'glycine' or '2-aminoacetic acid'."""
         result = name_compound("NCC(=O)O")
-        assert result in ["glycine", "2-aminoacetic acid"]
+        assert result == "aminoacetic acid"  # E-AA::50943; Table 10.4:54202; no locant,:3037
 
     def test_criterion_5_principal_group(self):
         """Principal group is always highest-seniority when multiple present."""

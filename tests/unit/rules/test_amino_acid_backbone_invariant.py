@@ -85,7 +85,10 @@ def test_distinct_molecules_never_collapse_onto_one_name():
         ("CCCCC(N)C(=O)O", "2-aminohexanoic acid"),        # norleucine
         ("CCCCCC(N)C(=O)O", "2-aminoheptanoic acid"),
         ("CC(N)C(=O)O", "2-aminopropanoic acid"),          # alanine (systematic)
-        ("NCC(=O)O", "2-aminoethanoic acid"),              # glycine (systematic)
+        # glycine: the producer leaves the two-carbon acid to the general pipeline, which says
+        # 'aminoacetic acid' -- "Acids" (the Blue Book), 'acetic acid (PIN)...
+        # ethanoic acid'; Table 10.4 (:54202) 'aminoacetic acid'
+        ("NCC(=O)O", None),
     ],
 )
 def test_producer_still_names_its_own_class(smiles, expected):

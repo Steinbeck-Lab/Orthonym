@@ -123,8 +123,9 @@ class TestDopa:
     at all."""
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("N[C@@H](Cc1ccc(O)c(O)c1)C(=O)O", "L-dopa"),   # (2S)
-        ("N[C@H](Cc1ccc(O)c(O)c1)C(=O)O", "D-dopa"),    # (2R)
+        # E-AA (2026-10-31): the systematic name comes first,:50943,:54247
+        ("N[C@@H](Cc1ccc(O)c(O)c1)C(=O)O", "(2S)-2-amino-3-(3,4-dihydroxyphenyl)propanoic acid"),
+        ("N[C@H](Cc1ccc(O)c(O)c1)C(=O)O", "(2R)-2-amino-3-(3,4-dihydroxyphenyl)propanoic acid"),
     ])
     def test_dopa_carries_its_descriptor(self, smiles, expected):
         assert name_compound(smiles) == expected

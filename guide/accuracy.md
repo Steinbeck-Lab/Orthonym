@@ -28,7 +28,7 @@ Each tier's columns add up to Molecules. Named: the name read back to the input'
 
 The two ChEBI sets are samples of ChEBI structures that have at most 50 heavy atoms, one fragment, carbon, no radicals, no isotopes and no element other than C, H, N, O, P, S, F, Cl, Br and I. The held-out set is a split that no development run had read. The development set is a sample that development runs did read, so it is not an independent test. The drug-like set is 2,000 drug-like PubChem structures.
 
-On the held-out set the default names 1,994 of 2,000 molecules (99.70 %) and declines 5, and the PIN-only tier names 1,062 (53.10 %) and declines 935. The PIN-only tier declines the names built on a semisystematic name of the recommendations' Chapter P-10 (`D-glucose`, `L-alanine`), for which no PIN is identified (P-100); the default returns them.
+On the held-out set the default names 1,994 of 2,000 molecules (99.70 %) and declines 5, and the PIN-only tier names 1,062 (53.10 %) and declines 935. The PIN-only tier declines the names built on a semisystematic name of the recommendations' Chapter P-10 (`D-glucose`, `glycylglutamylalanine`), for which no PIN is identified (P-100); the default returns them.
 
 ## Measured results
 
