@@ -102,3 +102,37 @@ def test_a_locanted_descriptor_at_a_parent_without_positions_is_flagged(name):
 def test_a_descriptor_that_is_the_parents_or_is_in_its_prefix_is_not_flagged(name, expected):
     from orthonym.validation.spelling.checks_placement import descriptor_locant_at_a_parent_without_positions
     assert descriptor_locant_at_a_parent_without_positions(MOL, name) == expected
+
+
+@pytest.mark.parametrize("name", [
+    "N-methyl-1-(pyridin-4-yl)(1Z,2E)-but-2-en-1-imine",
+    "N-[(2S,3R,4E)-1,3-dihydroxyoctadec-4-en-2-yl](9Z)-octadec-9-enamide",
+    "N-(methoxyacetyl)(2S)-2-(2,6-dimethylanilino)propanoic acid",
+    "N-methyl-(2E)-but-2-en-1-imine",                   # after the hyphen of the prefix
+    "N-methyl(1R*,2S*)-2-methylcyclohexan-1-amine",     # relative descriptors
+    "N-methyl(2RS)-butan-2-amine",
+])
+def test_a_descriptor_set_after_a_prefix_is_flagged(name):
+    from orthonym.validation.spelling.checks_placement import descriptor_block_after_a_prefix
+    assert getattr(descriptor_block_after_a_prefix(MOL, name), "rule", None) == "P-91.3", name
+
+
+@pytest.mark.parametrize("name", [
+    "(1Z,2E)-N-methyl-1-(pyridin-4-yl)but-2-en-1-imine",
+    "4-[(2E)-pent-2-en-1-yl]pyridine",                 # at the front of an enclosed prefix
+    "methyl (2E)-but-2-enoate",                         # after the space of an ester word
+    "(Z)-N-hydroxy(4-chlorophenyl)(phenyl)methanimine",
+    "benzene-1,4-diylbis[(2E)-prop-2-enoic acid]",
+    "rel-(1R,2S)-2-methylcyclohexan-1-amine",
+])
+def test_a_descriptor_set_at_a_front_is_not_flagged(name):
+    from orthonym.validation.spelling.checks_placement import descriptor_block_after_a_prefix
+    assert descriptor_block_after_a_prefix(MOL, name) is None
+
+
+def test_a_sulfur_isotope_label_is_not_a_descriptor_set():
+    #: '(34S)' labels the ring sulfur of 3-methyl-2H-thiopyran; the same spelling after a prefix is not
+    # a stereodescriptor when the structure has a 34S atom
+    from orthonym.validation.spelling.checks_placement import descriptor_block_after_a_prefix
+    assert descriptor_block_after_a_prefix(Chem.MolFromSmiles("CC1=CC=C[34S]C1"), "3-methyl(34S)-2H-thiopyran") is None
+    assert descriptor_block_after_a_prefix(Chem.MolFromSmiles("Cc1ncc[34s]1"), "2-methyl(34S)-1,3-thiazole") is None

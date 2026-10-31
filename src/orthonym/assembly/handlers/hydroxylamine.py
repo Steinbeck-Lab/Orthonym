@@ -350,7 +350,8 @@ def _name_no_disub_hydroxylamine(features: Any) -> Optional[NamingResult]:
     # ('methanamine', 'ethanamine', 'aniline',...). Reject only a failure sentinel.
     if not base or "unknown" in base or "not supported" in base:
         return None
-    name = f"N-{alkoxy}{base}"
+    from ..composition_primitives import prefixes_after_front_stereo
+    name = prefixes_after_front_stereo(f"N-{alkoxy}", base)   #: the base's block stays first
 
     from ..candidate_pool import get_current_pool
     from ..composer import _inject_stereo_if_missing

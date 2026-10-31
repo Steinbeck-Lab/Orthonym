@@ -7890,8 +7890,12 @@ def _assemble_imine_name(features: Any, style: str) -> Optional[str]:
             out += text
         else:
             out += f"-{text}"
-    joiner = "-" if base_name[:1].isdigit() else ""
-    return f"{out}{joiner}{base_name}"
+    # (the Blue Book): the parent's stereodescriptors stand at the front of the complete
+    # name, not after the prefixes ('(2E)-N-cyclohexylbut-2-en-1-imine')
+    from ..decomposition.fragment_assembly import split_front_stereo
+    from .composition_primitives import prefixes_after_front_stereo
+    joiner = "-" if split_front_stereo(base_name)[1][:1].isdigit() else ""
+    return prefixes_after_front_stereo(f"{out}{joiner}", base_name)
 
 
 def _assemble_amine_name(features: Any, style: str) -> Optional[str]:

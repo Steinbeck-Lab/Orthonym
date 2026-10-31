@@ -1049,6 +1049,13 @@ def split_front_stereo(name: str) -> Tuple[str, str]:
     return (name[:m.end()], name[m.end():]) if m else ("", name)
 
 
+def n_prefixed(prefix: str, name: str) -> str:
+    """'N-' + ``prefix`` joined to ``name``, after the stereodescriptor block that opens ``name``
+    , see:func:`split_front_stereo`): '(2S)-N-(methoxyacetyl)-2-...', not 'N-(methoxyacetyl)(2S)-2-...'."""
+    front, rest = split_front_stereo(name)
+    return f"{front}N-{_join_components(prefix, rest)}"
+
+
 #: one locant set at the front of a name: '3', '4a,7', "2'", 'N', "N,N'"
 _LOCANT_SET_RE = _re.compile(r"^(?:[0-9]+[a-z]?'*|N'*)(?:,(?:[0-9]+[a-z]?'*|N'*))*$")
 #: a first token that is not an alphanumerically ordered prefix, so none precedes it:
