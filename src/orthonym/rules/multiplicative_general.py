@@ -56,11 +56,17 @@ Blue Book (``the Blue Book``):
   (:31801,:31803).
 
 Scope (everything else declines, so the narrow handlers and the substitutive path
-keep the molecule): neutral (nitro groups aside), no isotopes, no E/Z, monocyclic
-ring systems only, saturated or mancude rings that need no indicated hydrogen,
-unbranched chain parents, at most one principal characteristic group per unit, a
-linker made of rings, unbranched carbon chains, chalcogen atoms or chains, -NH-,
--N< and =N-N=, with no substituents on the linker and no stereocentre in it.
+keep the molecule): neutral (nitro groups aside), no isotopes, monocyclic ring systems
+only, saturated or mancude rings that need no indicated hydrogen, unbranched chain
+parents, at most one principal characteristic group per unit (acid, ester, nitrile,
+aldehyde, sulfonic acid, amide with N-substituents, alcohol, thiol, amine; the ketone of
+a diacyl derivative of a chalcogen trio), a linker made of rings, unbranched carbon
+chains, chalcogen atoms, runs of up to three or an a(ba)n trio ('dithioxanediyl'),
+hetero atoms ('azanediyl', 'phosphanediyl',...), pairs of them ('hydrazine-1,2-diyl',
+'diazenediyl'), and the carbon, hetero-atom and ring substituents these carry
+(``_split_backbone``): the group may be joined to a unit by a double bond
+('azanylylidene'), one E/Z double bond of the central chain is cited; no stereocentre in
+the linker.
 """
 from __future__ import annotations
 
@@ -93,12 +99,18 @@ _VALENCE_WORD = {2: "diyl", 3: "triyl", 4: "tetrayl"}
 # principal characteristic groups this detector expresses as a suffix
 _RING_SUFFIX = {"acid": "carboxylic acid", "nitrile": "carbonitrile", "ol": "ol",
                 "thiol": "thiol", "amine": "amine", "aldehyde": "carbaldehyde",
-                "ester": "carboxylate"}
+                "ester": "carboxylate", "sulfonic": "sulfonic acid",
+                "amide": "carboxamide"}
+# 'benzenesulfonic acid' is retained only unsubstituted and as a whole; a multiplied
+# unit cites the locant ('4,4'-oxydi(benzene-1-sulfonic acid) (PIN)',,
+# the Blue Book), so a sulfonic acid unit has no retained benzene name here
 _RETAINED_BENZENE = {"acid": "benzoic acid", "nitrile": "benzonitrile",
                      "ol": "phenol", "amine": "aniline", "aldehyde": "benzaldehyde",
-                     "ester": "benzoate"}
+                     "ester": "benzoate", "amide": "benzamide"}
 _PG_KIND = {"carboxylic_acid": "acid", "nitrile": "nitrile", "thiol": "thiol",
-            "aldehyde": "aldehyde", "ester": "ester",
+            "aldehyde": "aldehyde", "ester": "ester", "sulfonic_acid": "sulfonic",
+            "primary_amide": "amide", "secondary_amide": "amide",
+            "tertiary_amide": "amide",
             "primary_alcohol": "ol", "secondary_alcohol": "ol",
             "tertiary_alcohol": "ol", "phenol": "ol", "alcohol": "ol",
             "primary_amine": "amine", "secondary_amine": "amine",
@@ -106,6 +118,9 @@ _PG_KIND = {"carboxylic_acid": "acid", "nitrile": "nitrile", "thiol": "thiol",
 # hydride classes read as "no principal characteristic group"
 _HYDRIDE_PG = frozenset({"primary_phosphine", "secondary_phosphine",
                          "tertiary_phosphine"})
+# principal characteristic groups that outrank every class a hydroxy, alkoxy or amino group on a
+# hetero atom of the linker can stand for Seniority order of classes)
+_STRONG_PG = frozenset({"acid", "ester", "amide", "nitrile", "aldehyde", "sulfonic", "ketone"})
 _MAX_HEAVY = 160
 _MAX_SUBSETS = 64
 
@@ -290,9 +305,6 @@ def _scope_ok(mol) -> bool:
                     _is_nitro_n(at.GetNeighbors()[0]):
                 continue
             return False
-    for bd in mol.GetBonds():
-        if bd.GetStereo() != Chem.BondStereo.STEREONONE:
-            return False
     return True
 
 
@@ -302,7 +314,7 @@ def _scope_ok(mol) -> bool:
 
 class _Kernel:
     __slots__ = ("kind", "skel", "order", "pcg", "anchor", "pg", "organyl",
-                 "organyl_o", "elem", "ring_name", "key")
+                 "organyl_o", "elem", "ring_name", "key", "amide_n")
 
     def __init__(self, kind, skel, order, pcg=frozenset(), anchor=None, pg=None,
                  organyl=frozenset(), organyl_o=None, elem=None):
@@ -317,6 +329,7 @@ class _Kernel:
         self.elem = elem            # hydride element
         self.ring_name = None
         self.key = None
+        self.amide_n = None         # the nitrogen of an amide group (its substituents are N-locanted)
 
     @property
     def core(self) -> FrozenSet[int]:
@@ -387,8 +400,36 @@ def _pcg_kernels(mol, pg: str, matches, rings: List[FrozenSet[int]]):
     kernels = []
     for m in matches:
         atoms = [mol.GetAtomWithIdx(i) for i in m]
-        if kind in ("acid", "nitrile", "aldehyde", "ester"):
+        am_atom = None
+        if kind == "sulfonic":
+            # -SO2-OH on a carbon: the sulfur and its three oxygens are the suffix
+            ss = [a for a in atoms if a.GetAtomicNum() == 16]
+            if len(ss) != 1:
+                return None
+            group = {a.GetIdx() for a in atoms}
+            others = [n for n in ss[0].GetNeighbors() if n.GetIdx() not in group]
+            if len(others) != 1 or others[0].GetAtomicNum() != 6:
+                return None
+            nb = others[0]
+            if nb.GetIdx() in ring_of:
+                kernels.append(_Kernel("ring", ring_of[nb.GetIdx()], [], pcg=group,
+                                       anchor=nb.GetIdx(), pg=kind))
+            else:
+                kernels.append(_Kernel("chain", {nb.GetIdx()}, [], pcg=group,
+                                       anchor=nb.GetIdx(), pg=kind))
+        elif kind in ("acid", "nitrile", "aldehyde", "ester", "amide"):
             cs = [a for a in atoms if a.GetAtomicNum() == 6]
+            if kind == "amide":
+                # the match of a secondary or tertiary amide also holds the carbons of the
+                # N-substituents: the acyl carbon is the one double bonded to oxygen
+                cs = [a for a in cs if any(o.GetAtomicNum() == 8 and o.GetIdx() in m
+                                           and _bond_order(mol, a.GetIdx(), o.GetIdx()) == 2.0
+                                           for o in a.GetNeighbors())]
+                am_n = [a for a in atoms if a.GetAtomicNum() == 7]
+                am_o = [a for a in atoms if a.GetAtomicNum() == 8]
+                if len(cs) != 1 or len(am_n) != 1 or len(am_o) != 1 or am_n[0].IsInRing():
+                    return None
+                atoms = [cs[0], am_n[0], am_o[0]]
             if kind == "ester":
                 # (acyl C, =O, -O-, organyl C)
                 acyl = None
@@ -423,6 +464,8 @@ def _pcg_kernels(mol, pg: str, matches, rings: List[FrozenSet[int]]):
                 c = cs[0]
                 group = {a.GetIdx() for a in atoms if a.GetIdx() != c.GetIdx()}
                 organyl, organyl_o = frozenset(), None
+                if kind == "amide":
+                    am_atom = am_n[0].GetIdx()
             if c.IsInRing():
                 return None
             others = [n for n in c.GetNeighbors() if n.GetIdx() not in group]
@@ -438,6 +481,7 @@ def _pcg_kernels(mol, pg: str, matches, rings: List[FrozenSet[int]]):
                 kernels.append(_Kernel("chain", {c.GetIdx()}, [], pcg=group,
                                        anchor=c.GetIdx(), pg=kind, organyl=organyl,
                                        organyl_o=organyl_o))
+            kernels[-1].amide_n = am_atom
         else:
             het = [a for a in atoms if a.GetAtomicNum() != 6]
             cs = [a for a in atoms if a.GetAtomicNum() == 6]
@@ -472,7 +516,8 @@ def _pcg_kernels(mol, pg: str, matches, rings: List[FrozenSet[int]]):
         order = _path_order(mol, chain)
         if order is None:
             return None
-        if k.pg in ("acid", "nitrile", "aldehyde", "ester") and k.anchor not in (order[0], order[-1]):
+        if k.pg in ("acid", "nitrile", "aldehyde", "ester", "sulfonic", "amide") \
+                and k.anchor not in (order[0], order[-1]):
             return None
         for a, b in zip(order, order[1:]):
             if _bond_order(mol, a, b) != 1.0:
@@ -486,6 +531,46 @@ def _pcg_kernels(mol, pg: str, matches, rings: List[FrozenSet[int]]):
             return None
         seen |= k.core
     return kernels
+
+
+def _pseudoketone_kernels(mol, rings) -> Optional[List[_Kernel]]:
+    """The acyl groups of a diacyl derivative of a chalcogen chain, as ketone units.
+
+     "Diacyl derivatives of trioxidane and chalcogen analogues"
+    " Diacyl derivatives of trioxidane and chalcogen analogues" (the Blue Book), (:32358): "Anhydrides derived from peroxy acids and their chalcogen
+    analogues are named substitutively as pseudoketones (see. Multiplicative names
+    are preferred when the conditions for their use are fulfilled (see ": '1,1'-
+    trioxidanediyldi(ethan-1-one) (PIN)', '1,1'-dithioxanediyldi(ethan-1-one) (PIN)',
+    '1,1'-trisulfanediyldi(propan-1-one) (PIN)' (:39393). A unit is an acyl group whose
+    chalcogen neighbour is bonded to chalcogen atoms alone (an ester, thioester or
+    anhydride has its own class and is not met here); the unbranched carbon chain is the
+    parent, the ketone carbon is its position 1."""
+    chalc = (8, 16, 34, 52)
+    out: List[_Kernel] = []
+    acyclic_c = {a.GetIdx() for a in mol.GetAtoms() if a.GetAtomicNum() == 6 and not a.IsInRing()}
+    for at in mol.GetAtoms():
+        if at.GetAtomicNum() != 6 or at.IsInRing() or at.GetDegree() != 3 or at.GetTotalNumHs():
+            continue
+        o_dbl = [n for n in at.GetNeighbors()
+                 if n.GetAtomicNum() == 8 and n.GetDegree() == 1
+                 and _bond_order(mol, at.GetIdx(), n.GetIdx()) == 2.0]
+        xs = [n for n in at.GetNeighbors()
+              if n.GetAtomicNum() in chalc and n.GetIdx() not in {o.GetIdx() for o in o_dbl}]
+        cs = [n for n in at.GetNeighbors() if n.GetAtomicNum() == 6]
+        if len(o_dbl) != 1 or len(xs) != 1 or len(cs) != 1:
+            continue
+        x = xs[0]
+        if x.GetDegree() != 2 or _bond_order(mol, at.GetIdx(), x.GetIdx()) != 1.0 or \
+                any(n.GetAtomicNum() not in chalc for n in x.GetNeighbors() if n.GetIdx() != at.GetIdx()):
+            continue
+        chain = _component_of(mol, at.GetIdx(), (acyclic_c - {at.GetIdx()}) | {at.GetIdx()})
+        order = _path_order(mol, chain)
+        if order is None or at.GetIdx() not in (order[0], order[-1]) or len(order) < 2:
+            return None
+        if any(_bond_order(mol, a, b) != 1.0 for a, b in zip(order, order[1:])):
+            return None
+        out.append(_Kernel("chain", chain, order, pcg={o_dbl[0].GetIdx()}, anchor=at.GetIdx(), pg="ketone"))
+    return out
 
 
 def _hydride_kernels(mol, rings) -> Optional[List[_Kernel]]:
@@ -525,9 +610,19 @@ def _decoration_prefix(mol, comp: Set[int], attach: int, parent: Sequence[int]) 
     from ..errors import is_failure_name
     host = [n.GetIdx() for n in mol.GetAtomWithIdx(attach).GetNeighbors()
             if n.GetIdx() in set(parent)]
-    if len(host) != 1 or _bond_order(mol, attach, host[0]) != 1.0:
+    if len(host) != 1:
         return None
     at = mol.GetAtomWithIdx(attach)
+    if _bond_order(mol, attach, host[0]) == 2.0:
+        # "Ketones"... the prefix 'oxo' for =O on a position that holds no
+        # principal group ('3-oxopropanoic acid'); an aromatic host would need
+        # hydro prefixes or added hydrogen, so it declines
+        if len(comp) == 1 and at.GetAtomicNum() == 8 and at.GetDegree() == 1 \
+                and not mol.GetAtomWithIdx(host[0]).GetIsAromatic():
+            return "oxo"
+        return None
+    if _bond_order(mol, attach, host[0]) != 1.0:
+        return None
     if len(comp) == 1:
         z = at.GetAtomicNum()
         if z in _HALO:
@@ -593,6 +688,12 @@ def _unit_parent(k: _Kernel, num: Dict[int, int]) -> Optional[str]:
     from ..data.chain_names import get_chain_prefix
     n = len(k.order)
     stem = get_chain_prefix(n)
+    if k.pg == "ketone":
+        return None if n == 1 else f"{stem}an-{num[k.anchor]}-one"
+    if k.pg == "sulfonic":
+        return "methanesulfonic acid" if n == 1 else f"{stem}ane-1-sulfonic acid"
+    if k.pg == "amide":
+        return None if n == 1 else ("acetamide" if n == 2 else f"{stem}anamide")
     if k.pg == "acid":
         return None if n == 1 else ("acetic acid" if n == 2 else f"{stem}anoic acid")
     if k.pg == "ester":
@@ -640,13 +741,22 @@ def _name_unit(mol, k: _Kernel, attach: int, decos: List[Tuple[Set[int], int, in
     from ..assembly.composition_primitives import _join_prefix_to_name
     from ..assembly.naming_utils import prefix_citation_sort_key
     entries: List[Tuple[int, str]] = []    # (skeleton atom, prefix)
+    n_entries: List[str] = []              # prefixes on the nitrogen of an amide
     for comp, a, host in decos:
+        if k.amide_n is not None and host == k.amide_n:
+            p = _decoration_prefix(mol, comp, a, [host])
+            if p is None or any(mol.GetAtomWithIdx(x).GetFormalCharge() for x in comp):
+                return None
+            n_entries.append(p)
+            continue
         if host not in k.skel:
             return None
         p = _decoration_prefix(mol, comp, a, sorted(k.skel))
         if p is None:
             return None
         entries.append((host, p))
+    if n_entries and entries:
+        return None     # N-locants and numbered locants in one unit are not ordered here
     nums = _numberings(mol, k)
     if not nums:
         return None
@@ -685,7 +795,17 @@ def _name_unit(mol, k: _Kernel, attach: int, decos: List[Tuple[Set[int], int, in
         parent = _unit_parent(k, num)
         if parent is None:
             continue
-        if mononuclear or decorated_all or one_position:
+        if n_entries:
+            # "Substituted identical parent structures" (the Blue Book): N-locants of an
+            # amide are cited inside the unit: '3,3'-sulfanediylbis(N,N-dimethylpropanamide) (PIN)' (:6227)
+            from ..assembly.composition_primitives import _join_prefixes
+            from ..assembly.naming_utils import format_substituent_prefix
+            nm_groups: Dict[str, int] = {}
+            for p in n_entries:
+                nm_groups[p] = nm_groups.get(p, 0) + 1
+            pre = _join_prefixes([format_substituent_prefix(nm, ["N"] * nm_groups[nm], nm_groups[nm])
+                                  for nm in sorted(nm_groups, key=prefix_citation_sort_key)])
+        elif mononuclear or decorated_all or one_position:
             pre = _render_prefixes([(1, p) for _, p in entries], True) if entries else ""
         else:
             pre = _render_prefixes([(num[h], p) for h, p in entries], False) if entries else ""
@@ -699,7 +819,7 @@ def _name_unit(mol, k: _Kernel, attach: int, decos: List[Tuple[Set[int], int, in
     loc = None if mononuclear else chosen[attach]
     if k.kind == "ring" and k.ring_name == "benzene" and k.pg in _RETAINED_BENZENE:
         loc = chosen[attach]
-    return name, loc, chosen, bool(entries)
+    return name, loc, chosen, bool(entries) or bool(n_entries)
 
 
 # ---------------------------------------------------------------------------
@@ -707,15 +827,19 @@ def _name_unit(mol, k: _Kernel, attach: int, decos: List[Tuple[Set[int], int, in
 # ---------------------------------------------------------------------------
 
 class _Comp:
-    __slots__ = ("kind", "atoms", "order", "name", "ring_name", "assembly")
+    __slots__ = ("kind", "atoms", "order", "name", "ring_name", "assembly", "skel", "subs")
 
     def __init__(self, kind, atoms, order=None, name=None):
-        self.kind = kind      # 'ring' | 'assembly' | 'chain' | 'chalc' | 'NH' | 'N3' | 'NN'
-        self.atoms = frozenset(atoms)
+        # 'ring' | 'assembly' | 'chain' | 'chalc' | 'aba' | 'NH' | 'N3' | 'NN' | 'XX2'
+        # | 'atom' | 'hchain'
+        self.kind = kind
+        self.atoms = frozenset(atoms)   # the skeleton and the branches it carries
+        self.skel = frozenset(atoms)    # the skeleton atoms alone
         self.order = order
         self.name = name
         self.ring_name = None
         self.assembly = None  # the ring assembly of an 'assembly' (detect_ring_assembly)
+        self.subs = []        # (host atom, branch atoms, branch atom bonded to the host)
 
 
 def _assembly_comps(mol, rings) -> Optional[List[_Comp]]:
@@ -749,9 +873,146 @@ def _assembly_comps(mol, rings) -> Optional[List[_Comp]]:
     return comps
 
 
-def _linker_components(mol, link: Set[int], rings) -> Optional[List[_Comp]]:
+def _split_backbone(mol, link: Set[int], terminals: Sequence[int]):
+    """(backbone atoms, branches) of the linker, or None. The backbone is the part
+    of ``link`` that runs between the atoms next to the parent units
+    (``terminals``): every ring system and acyclic atom on a path between two of
+    them. What hangs off it is a branch, a substituent of the multiplicative group
+    , the Blue Book: "Substitution, expressed by prefixes or
+    implied, is allowed on simple multiplicative groups";,:5285:
+    "Substitution on the central substituent group and on successive substituent
+    groups of a concatenated multiplicative substituent group is allowed provided
+    that the sequence of atoms and bonds, starting at the central substituent group,
+    are identical in each of the branches"). A branch is a list of
+    (host atom of the backbone, branch atom bonded to it, branch atoms)."""
+    node_of: Dict[int, Tuple[str, int]] = {}
+    for rs in _ring_systems(mol):
+        if rs <= link:
+            for a in rs:
+                node_of[a] = ("r", min(rs))
+    for a in link:
+        node_of.setdefault(a, ("a", a))
+    members: Dict[Tuple[str, int], Set[int]] = {}
+    for a, nd in node_of.items():
+        members.setdefault(nd, set()).add(a)
+    adj: Dict[Tuple[str, int], Set[Tuple[str, int]]] = {nd: set() for nd in members}
+    for bd in mol.GetBonds():
+        x, y = bd.GetBeginAtomIdx(), bd.GetEndAtomIdx()
+        if x in link and y in link and node_of[x] != node_of[y]:
+            adj[node_of[x]].add(node_of[y])
+            adj[node_of[y]].add(node_of[x])
+    term = {node_of[t] for t in terminals if t in node_of}
+    alive = set(members)
+    changed = True
+    while changed:
+        changed = False
+        for nd in sorted(alive):
+            if nd in term:
+                continue
+            if sum(1 for m in adj[nd] if m in alive) <= 1:
+                alive.discard(nd)
+                changed = True
+    backbone: Set[int] = set()
+    for nd in alive:
+        backbone |= members[nd]
+    branches = []
+    for piece in _components(mol, set(link) - backbone):
+        hooks = [(x, nb.GetIdx()) for x in piece
+                 for nb in mol.GetAtomWithIdx(x).GetNeighbors() if nb.GetIdx() in backbone]
+        if len(hooks) != 1:
+            return None
+        branches.append((hooks[0][1], hooks[0][0], frozenset(piece)))
+    # An unbranched carbon chain that hangs off the atom next to a unit lengthens the chain
+    # of the group: its principal chain holds the free valences and is the longest one
+    # "Substituent prefixes derived from acyclic parent hydrides", the Blue Book,,:15935: 'propane-1,2-diyl', 'butane-1,3-diyl' (:5232), not
+    # '1-methylethane-1,2-diyl'; 'propane-2,2-diyl'); it stays in the backbone. The chain
+    # has two ends: where more chains hang off the atom than it has free ends, the choice
+    # is open and they stay branches.
+    term_set = set(terminals)
+    cand: Dict[int, List] = {}
+    for br in branches:
+        host, b_atom, atoms = br
+        if host not in term_set or mol.GetAtomWithIdx(host).GetAtomicNum() != 6:
+            continue
+        order = _path_order(mol, atoms)
+        if order is not None and b_atom in (order[0], order[-1]) \
+                and mol.GetBondBetweenAtoms(host, b_atom).GetBondTypeAsDouble() == 1.0 \
+                and all(mol.GetAtomWithIdx(x).GetAtomicNum() == 6 and not mol.GetAtomWithIdx(x).IsInRing()
+                        for x in atoms):
+            cand.setdefault(host, []).append(br)
+    extend: Set[int] = set()
+    for host, lst in cand.items():
+        in_backbone = sum(1 for nb in mol.GetAtomWithIdx(host).GetNeighbors()
+                          if nb.GetIdx() in backbone and mol.GetAtomWithIdx(nb.GetIdx()).GetAtomicNum() == 6)
+        if len(lst) <= 2 - in_backbone:
+            extend.update(id(x) for x in lst)
+            for _h, _b, atoms in lst:
+                backbone |= atoms
+    kept = [x for x in branches if id(x) not in extend]
+    return backbone, kept
+
+
+# hetero atoms of a linker that are a parent hydride of their own: stem and standard
+# bonding number; 'azanediyl' for -NH-, the Blue Book)
+_ATOM_HYDRIDES = {7: ("azane", 3)}
+_ATOM_HYDRIDES.update({z: v for z, v in _HYDRIDE_NAMES.items() if z not in (16, 34, 52)})
+# (the Blue Book): two identical heteroatoms double bonded, 'diazene',
+# 'diphosphene',...; the prefix is '<name>diyl'
+_DOUBLE_PAIR = {7: "diazene", 15: "diphosphene", 33: "diarsene", 51: "distibene",
+                83: "dibismuthene"}
+_CHALC_STEM = {8: "oxidane", 16: "sulfane", 34: "selane", 52: "tellane"}
+# (the Blue Book): the 'a' terms of the elements of an a(ba)n hydride
+_A_TERM = {8: "oxa", 16: "thia", 34: "selena", 52: "tellura"}
+_MAX_RUN = 3
+
+
+def _chalcogen_run_name(z: int, n: int) -> Optional[str]:
+    """The prefix for a run of ``n`` identical divalent chalcogen atoms: 'oxy',
+    'peroxy', 'sulfanediyl', 'disulfanediyl', 'trisulfanediyl', 'trioxidanediyl'
+    , the Blue Book;,:7993 for the multiplied hydride)."""
+    from ..assembly.naming_utils import simple_multiplier_word
+    if n > _MAX_RUN:
+        return None
+    if z == 8:
+        if n == 1:
+            return "oxy"
+        if n == 2:
+            return "peroxy"
+        return f"{simple_multiplier_word(n)}oxidanediyl"
+    stem = _CHALC_STEM.get(z)
+    if stem is None:
+        return None
+    if n == 1:
+        return f"{stem}diyl"
+    return f"{simple_multiplier_word(n)}{stem}diyl"
+
+
+def _aba_name(z_end: int, z_mid: int) -> Optional[str]:
+    """The a(ba)n hydride of three alternating atoms, 'dithioxane' (S-O-S), 'diselenoxane',
+    as a divalent prefix: (the Blue Book) "citing successively a
+    multiplying prefix denoting the number of atoms of the terminal element followed by the
+    'a' term for that element, then the 'a' term of the other element in the chain and the
+    ending 'ane'. The terminal letter 'a' of an 'a' term is elided when followed by a
+    vowel"; 'dithioxane (preselected name)' (:8019)."""
+    ea, eb = _A_TERM.get(z_end), _A_TERM.get(z_mid)
+    if ea is None or eb is None:
+        return None
+    first = "di" + ea
+    second = eb
+    word = first + second + "ane"
+    # elide a terminal 'a' of an 'a' term before a vowel
+    if second[0] in "aeiou":
+        word = first[:-1] + second + "ane"
+    if word.endswith("aane"):
+        word = word[:-4] + "ane"
+    return word + "diyl"
+
+
+def _linker_components(mol, link: Set[int], rings, branches=(),
+                       strong_pg: bool = False) -> Optional[List[_Comp]]:
     comps: List[_Comp] = []
     left = set(link)
+    branch_hosts = Counter(h for h, _b, _atoms in branches)
     linked = [rs for rs in rings if rs & left]
     assemblies = _assembly_comps(mol, linked)
     if assemblies is None:
@@ -780,11 +1041,40 @@ def _linker_components(mol, link: Set[int], rings) -> Optional[List[_Comp]]:
             return None
         comps.append(_Comp("chain", comp, order))
     left -= carbons
+    # a(ba)n: three alternating chalcogens, the ends the later element
+    chalc_atoms = {a for a in left if mol.GetAtomWithIdx(a).GetAtomicNum() in _CHALC_STEM}
+    rank = {zz: i for i, zz in enumerate(_ABA_ORDER)}
+    taken: Set[int] = set()
+    for mid in sorted(chalc_atoms):
+        at = mol.GetAtomWithIdx(mid)
+        ends = [n.GetIdx() for n in at.GetNeighbors() if n.GetIdx() in chalc_atoms]
+        if len(ends) != 2 or mid in taken:
+            continue
+        ze = {mol.GetAtomWithIdx(e).GetAtomicNum() for e in ends}
+        zm = at.GetAtomicNum()
+        if len(ze) != 1 or zm in ze or rank[next(iter(ze))] < rank[zm]:
+            continue
+        trio = {mid, *ends}
+        if trio & taken or any(
+                mol.GetAtomWithIdx(x).GetDegree() != 2 or mol.GetAtomWithIdx(x).GetTotalNumHs()
+                for x in trio):
+            return None
+        # nothing else of the alternating chain: the next atom outward is not a chalcogen
+        if any(n.GetIdx() in chalc_atoms and n.GetIdx() not in trio
+               for e in ends for n in mol.GetAtomWithIdx(e).GetNeighbors()):
+            return None
+        name = _aba_name(next(iter(ze)), zm)
+        if name is None:
+            return None
+        c = _Comp("aba", trio, [ends[0], mid, ends[1]], name)
+        comps.append(c)
+        taken |= trio
+    left -= taken
     for z in (8, 16, 34, 52):
         same = {a for a in left if mol.GetAtomWithIdx(a).GetAtomicNum() == z}
         for comp in _components(mol, same):
             order = _path_order(mol, comp)
-            name = _CHALCOGEN_COMPONENT.get((z, len(comp)))
+            name = _chalcogen_run_name(z, len(comp))
             if order is None or name is None:
                 return None
             for a in comp:
@@ -793,36 +1083,88 @@ def _linker_components(mol, link: Set[int], rings) -> Optional[List[_Comp]]:
                     return None
             comps.append(_Comp("chalc", comp, order, name))
         left -= same
-    ns = {a for a in left if mol.GetAtomWithIdx(a).GetAtomicNum() == 7}
-    for comp in _components(mol, ns):
-        if len(comp) == 1:
-            a = next(iter(comp))
-            atom = mol.GetAtomWithIdx(a)
-            if any(bd.GetBondTypeAsDouble() != 1.0 for bd in atom.GetBonds()):
+    hetero = {a for a in left if mol.GetAtomWithIdx(a).GetAtomicNum() in _ATOM_HYDRIDES}
+    for z in sorted({mol.GetAtomWithIdx(a).GetAtomicNum() for a in hetero}):
+        same = {a for a in hetero if mol.GetAtomWithIdx(a).GetAtomicNum() == z}
+        std = _ATOM_HYDRIDES[z][1]
+        for comp in _components(mol, same):
+            atoms_ = [mol.GetAtomWithIdx(a) for a in comp]
+            if any(x.GetFormalCharge() or x.GetNumRadicalElectrons() or x.GetIsotope()
+                   or x.GetTotalValence() != std for x in atoms_):
                 return None
-            if atom.GetDegree() == 2 and atom.GetTotalNumHs() == 1:
-                comps.append(_Comp("NH", comp, [a], "azanediyl"))
-            elif atom.GetDegree() == 3 and atom.GetTotalNumHs() == 0:
-                comps.append(_Comp("N3", comp, [a], "nitrilo"))
-            else:
-                return None
-        elif len(comp) == 2:
-            a, b = sorted(comp)
-            if _bond_order(mol, a, b) != 1.0:
-                return None
-            for x in (a, b):
-                atom = mol.GetAtomWithIdx(x)
-                if atom.GetDegree() != 2 or atom.GetTotalNumHs():
+            if len(comp) == 1:
+                a = next(iter(comp))
+                atom = atoms_[0]
+                # at most one double bond, outward ('azanylylidene', -N=)
+                if any(bd.GetBondTypeAsDouble() not in (1.0, 2.0) for bd in atom.GetBonds()) \
+                        or sum(bd.GetBondTypeAsDouble() == 2.0 for bd in atom.GetBonds()) > 1:
                     return None
-                out = [bd for bd in atom.GetBonds() if bd.GetOtherAtomIdx(x) not in comp]
-                if len(out) != 1 or out[0].GetBondTypeAsDouble() != 2.0:
+                nsub = branch_hosts.get(a, 0)
+                free = atom.GetDegree() - nsub
+                if free < 2:
                     return None
-            comps.append(_Comp("NN", comp, [a, b], "hydrazinediylidene"))
-        else:
-            return None
-    left -= ns
+                if z == 7 and nsub == 0 and atom.GetDegree() == 2 and atom.GetTotalNumHs() == 1 \
+                        and all(bd.GetBondTypeAsDouble() == 1.0 for bd in atom.GetBonds()):
+                    comps.append(_Comp("NH", comp, [a], "azanediyl"))
+                elif z == 7 and nsub == 0 and atom.GetDegree() == 3 \
+                        and all(bd.GetBondTypeAsDouble() == 1.0 for bd in atom.GetBonds()):
+                    comps.append(_Comp("N3", comp, [a], "nitrilo"))
+                else:
+                    comps.append(_Comp("atom", comp, [a]))
+                continue
+            order = _path_order(mol, comp)
+            if order is None:
+                return None
+            inner = [mol.GetBondBetweenAtoms(x, y).GetBondTypeAsDouble()
+                     for x, y in zip(order, order[1:])]
+            if len(comp) == 2 and inner == [2.0]:
+                # -X=X- ('diazenediyl'): each atom single bonded outward, nothing else
+                if z not in _DOUBLE_PAIR or any(
+                        x.GetDegree() != 2 or x.GetTotalNumHs() or branch_hosts.get(x.GetIdx(), 0)
+                        for x in atoms_):
+                    return None
+                comps.append(_Comp("XX2", comp, order, _DOUBLE_PAIR[z] + "diyl"))
+                continue
+            if any(o != 1.0 for o in inner):
+                return None
+            if z == 7 and len(comp) == 2:
+                outs = [[bd for bd in mol.GetAtomWithIdx(x).GetBonds()
+                         if bd.GetOtherAtomIdx(x) not in comp] for x in order]
+                if all(len(o) == 1 and o[0].GetBondTypeAsDouble() == 2.0 for o in outs) and \
+                        all(not mol.GetAtomWithIdx(x).GetTotalNumHs() for x in order):
+                    comps.append(_Comp("NN", comp, order, "hydrazinediylidene"))
+                    continue
+            if len(comp) > 4 or any(bd.GetBondTypeAsDouble() != 1.0
+                                    for x in order for bd in mol.GetAtomWithIdx(x).GetBonds()):
+                return None
+            comps.append(_Comp("hchain", comp, order))
+        left -= same
     if left:
         return None
+    # the branches go to the component of their host atom; rings take none
+    for host, b_atom, atoms in branches:
+        c = next((c for c in comps if host in c.skel), None)
+        if c is None or c.kind in ("ring", "assembly", "chalc", "aba", "XX2", "NN", "NH", "N3"):
+            return None
+        if c.kind in ("atom", "hchain"):
+            if mol.GetBondBetweenAtoms(host, b_atom).GetBondTypeAsDouble() != 1.0:
+                return None
+            # A branch that opens with a heteroatom ('hydroxy', 'methoxy', 'amino') on a hetero
+            # atom is a characteristic group of that atom: an ester or acid of boron, phosphorus
+            #..., a silanol, a stannanol. The perception reports none of them, and each would be
+            # cited as a suffix or class name; 'methyl bis(1-hydroxybutan-2-yl)borinate'),
+            # so the group is a prefix only where a unit holds a principal group that ranks
+            # above them all ('3,3'-(hydroxyazanediyl)dibenzoic acid',.
+            # An amino branch on a nitrogen of the group makes the group a hydrazine ('hydrazine-1,1-diyl',
+            # Hydrazine and derivatives, the Blue Book: the prefixes "are now formed
+            # systematically from hydrazine"), not 'aminoazanediyl'; the book prints no multiplicative name
+            # with it, so it is declined here.
+            first = mol.GetAtomWithIdx(b_atom).GetAtomicNum()
+            host_z = mol.GetAtomWithIdx(host).GetAtomicNum()
+            if first != 6 and not (host_z == 7 and first != 7 and strong_pg):
+                return None
+        c.subs.append((host, b_atom, atoms))
+        c.atoms = c.atoms | atoms
     return comps
 
 
@@ -836,39 +1178,112 @@ def _chain_unsat(mol, order) -> List[Tuple[int, int, float]]:
     return out
 
 
-def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Set[int]]):
-    """Name a carbon-chain component. ``fv``: atom -> number of free valences;
-    ``toward_parent``: atoms whose free valence points to the parent units (a
-    branch component), or None for the central component."""
+def _sub_entries(mol, comp: _Comp, fv: Dict[int, int]) -> Optional[List[Tuple[int, str]]]:
+    """(host atom, prefix name) of each branch the component carries, or None.
+
+    A carbon chain keeps its principal chain through the free valences: a branch of
+    carbon on an atom that holds a free valence would lengthen it ('propane-1,2-diyl',
+    not '1-methylethane-1,2-diyl'), a doubly bonded branch on one is an acyl group;
+    so both decline; a ring on it does not ('1-(4-chlorophenyl)ethene-1,2-diyl')."""
+    out = []
+    for host, b_atom, atoms in comp.subs:
+        if comp.kind == "chain" and fv.get(host, 0):
+            ba = mol.GetAtomWithIdx(b_atom)
+            if (ba.GetAtomicNum() == 6 and not ba.IsInRing()) \
+                    or mol.GetBondBetweenAtoms(host, b_atom).GetBondTypeAsDouble() != 1.0:
+                return None
+        p = _decoration_prefix(mol, set(atoms), b_atom, [host])
+        if p is None:
+            return None
+        out.append((host, p))
+    return out
+
+
+def _hchain_hydride(z: int, n: int) -> Optional[str]:
+    """The homogeneous hydride of ``n`` atoms of element ``z``, the Blue Book):
+    'disilane', 'diphosphane'; 'hydrazine' for two nitrogens (retained, preselected)."""
+    from ..assembly.naming_utils import simple_multiplier_word
+    if z == 7 and n == 2:
+        return "hydrazine"
+    # (the Blue Book): a polynuclear hydride of a Group 13 element states its number of
+    # hydrogen atoms ('diborane(4)',:37109); this spelling has no such number, so it declines
+    if z in (5, 13, 31, 49, 81) and n > 1:
+        return None
+    word = simple_multiplier_word(n)
+    stem = _ATOM_HYDRIDES.get(z, (None,))[0]
+    return None if word is None or stem is None else word + stem
+
+
+def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Set[int]],
+                orders: Sequence[float] = (), stereo: Optional[Dict[Tuple[int, int], str]] = None):
+    """Name a carbon-chain (or homogeneous hetero-chain) component. ``fv``: atom ->
+    number of free valences; ``toward_parent``: atoms whose free valence points to the
+    parent units (a branch component), or None for the central component. The second
+    item of the result tells whether the name holds locants of the free valences;
+    a substituted component is a compound group (bis, tris)."""
     from ..data.chain_names import get_chain_prefix
     order = comp.order
     n = len(order)
     total = sum(fv.values())
+    entries = _sub_entries(mol, comp, fv)
+    if entries is None:
+        return None
+    ylidene = False
     if n == 1:
         a = order[0]
         h = mol.GetAtomWithIdx(a).GetTotalNumHs()
-        word = {2: "methylene", 3: "methanetriyl", 4: "methanetetrayl"}.get(total)
-        if word is None or h + total != 4:
+        if list(orders) == [1.0, 2.0]:
+            word = "methanylylidene"       # (the Blue Book, 'oxybis(azanylylidenemethanylylidene)':5271)
+        elif list(orders) == [2.0, 2.0]:
+            word = "methanediylidene"
+        else:
+            word = {2: "methylene", 3: "methanetriyl", 4: "methanetetrayl"}.get(total)
+        if word is None or h + sum(orders) + len(entries) != 4 \
+                or (any(o != 1.0 for o in orders) and entries):
             return None
+        if any(mol.GetBondBetweenAtoms(host, b).GetBondTypeAsDouble() != 1.0
+               for host, b, _at in comp.subs):
+            return None
+        if entries:
+            pre = _render_prefixes([(1, p) for _, p in entries], True)
+            if pre is None:
+                return None
+            from ..assembly.composition_primitives import _join_prefix_to_name
+            return _join_prefix_to_name(pre, word), False
         return word, False
-    # one double or triple bond at most ('prop-1-ene-1,3-diyl (preferred prefix)',
-    #, the Blue Book); only in the central component
-    unsat = _chain_unsat(mol, order)
-    if any(o not in (2.0, 3.0) for _, _, o in unsat) or len(unsat) > 1:
-        return None
-    if toward_parent is not None and unsat:
-        return None
+    if any(o != 1.0 for o in orders):
+        # two double bonds outward: 'ethane-1,2-diylidene',:5265; ':5275' ethane-1,2-diylidenebis(azanylylideneoxy)); any mix of
+        # a single and a double bond is 'ethan-1-yl-2-ylidene', which is not written here
+        if comp.kind != "chain" or entries or list(orders) != [2.0, 2.0]:
+            return None
+        ylidene = True
+    z = mol.GetAtomWithIdx(order[0]).GetAtomicNum()
+    if comp.kind == "hchain":
+        hydride = _hchain_hydride(z, n)
+        if hydride is None:
+            return None
+        unsat = []
+    else:
+        hydride = None
+        # one double or triple bond at most ('prop-1-ene-1,3-diyl (preferred prefix)',
+        #, the Blue Book); only in the central component
+        unsat = _chain_unsat(mol, order)
+        if any(o not in (2.0, 3.0) for _, _, o in unsat) or len(unsat) > 1:
+            return None
+        if toward_parent is not None and unsat:
+            return None
     cands = []
     for direction in (order, list(reversed(order))):
         num = {a: i + 1 for i, a in enumerate(direction)}
         fvl = sorted(num[a] for a, c in fv.items() for _ in range(c))
+        subl = sorted(num[h] for h, _ in entries)
         if toward_parent is not None:
             par = sorted(num[a] for a in toward_parent for _ in range(fv.get(a, 0)))
-            key = (par, fvl)
+            key = (par, fvl, subl)
         else:
             mult = sorted(min(num[order[i]], num[order[j]]) for i, j, _ in unsat)
             dbl = sorted(min(num[order[i]], num[order[j]]) for i, j, o in unsat if o == 2.0)
-            key = (fvl, mult, dbl)
+            key = (fvl, mult, dbl, subl)
         cands.append((key, num))
     best = min(c[0] for c in cands)
     names = set()
@@ -885,7 +1300,9 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
         stem = get_chain_prefix(n)
         dbl = sorted(min(num[order[i]], num[order[j]]) for i, j, o in unsat if o == 2.0)
         tpl = sorted(min(num[order[i]], num[order[j]]) for i, j, o in unsat if o == 3.0)
-        if not unsat:
+        if hydride is not None:
+            hyd = hydride
+        elif not unsat:
             hyd = f"{stem}ane"
         elif bond_locant_omitted_on_dinuclear_chain(stem, dbl, tpl):
             # (d) (the Blue Book): 'ethene-1,2-diyl' (:16615), the one multiple
@@ -898,10 +1315,31 @@ def _chain_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Se
         word = _VALENCE_WORD.get(total)
         if word is None:
             return None
-        names.add(f"{hyd}-{','.join(map(str, locs))}-{word}")
+        if ylidene:
+            word = word + "idene"
+        body = f"{hyd}-{','.join(map(str, locs))}-{word}"
+        if entries:
+            from ..assembly.composition_primitives import _join_prefix_to_name
+            pre = _render_prefixes([(num[h], p) for h, p in entries], False)
+            if pre is None:
+                return None
+            body = _join_prefix_to_name(pre, body)
+        if stereo:
+            # (the Blue Book): '1,1'-[(1E)-1-(4-chlorophenyl)ethene-1,2-diyl]
+            # dibenzene (PIN)': the descriptor of the double bond leads the name of the group,
+            # cited with the lowest locant of the bond
+            marks = []
+            for i, j, o in unsat:
+                lab = stereo.get((min(order[i], order[j]), max(order[i], order[j])))
+                if lab is not None:
+                    marks.append((min(num[order[i]], num[order[j]]), lab))
+            if len(marks) != len(stereo):
+                return None
+            body = "(" + ",".join(f"{loc}{lab}" for loc, lab in sorted(marks)) + ")-" + body
+        names.add(body)
     if len(names) != 1:
         return None
-    return names.pop(), True
+    return names.pop(), not entries
 
 
 def _ring_comp_name(mol, comp: _Comp, fv: Dict[int, int], toward_parent: Optional[Set[int]]):
@@ -1023,7 +1461,12 @@ def _units_and_linker(mol, units: List[_Kernel], rings, same_key_kernels):
 
 
 def _linker_tree(mol, link: Set[int], units, attach, rings):
-    comps = _linker_components(mol, link, rings)
+    split = _split_backbone(mol, link, [a for _h, a, _o in attach])
+    if split is None:
+        return None
+    backbone, branches = split
+    comps = _linker_components(mol, backbone, rings, branches,
+                               strong_pg=units[0].pg in _STRONG_PG)
     if comps is None:
         return None
     where = {}
@@ -1107,25 +1550,63 @@ def _identical_children(mol, adj, comps, units, edges, where, node, parent) -> b
 
 
 def _fixed_name(c: _Comp) -> Optional[str]:
-    return c.name if c.kind in ("chalc", "NH", "N3", "NN") else None
+    return c.name if c.kind in ("chalc", "aba", "NH", "N3", "NN", "XX2") else None
 
 
-def _name_component(mol, comps, adj, edges, where, node, parent):
+def _atom_comp_name(mol, comp: _Comp, fv: Dict[int, int], orders: Sequence[float]):
+    """A single hetero atom with its free valences as a group: 'phosphanediyl',
+    'phosphanetriyl', the Blue Book '2,2',2''-phosphanetriyltriacetic
+    acid (PIN)'), 'methylazanediyl',:5222: "methylazanediyl (preferred
+    prefix; a compound multiplicative group) (no longer methylimino)"),
+    '(chloromethyl)phosphanediyl' (:5228); one single and one double bond:
+    'azanylylidene',:5200: "the structure -N=, which now is named as the
+    preselected prefix 'azanylylidene'")."""
+    z = mol.GetAtomWithIdx(comp.order[0]).GetAtomicNum()
+    stem = _ATOM_HYDRIDES[z][0]
+    entries = _sub_entries(mol, comp, fv)
+    if entries is None:
+        return None
+    if list(orders) == [1.0, 2.0]:
+        word = stem[:-1] + "ylylidene"
+    elif list(orders) == [2.0, 2.0]:
+        word = stem + "diylidene"
+    elif all(o == 1.0 for o in orders):
+        word = _VALENCE_WORD.get(len(orders))
+        if word is None:
+            return None
+        word = stem + word
+    else:
+        return None
+    if not entries:
+        return word, False
+    pre = _render_prefixes([(1, p) for _, p in entries], True)
+    if pre is None:
+        return None
+    from ..assembly.composition_primitives import _join_prefix_to_name
+    return _join_prefix_to_name(pre, word), False
+
+
+def _name_component(mol, comps, adj, edges, where, node, parent, stereo=None):
     c = comps[node[1]]
     fixed = _fixed_name(c)
     if fixed is not None:
         return fixed, False
     fv: Dict[int, int] = {}
+    orders: List[float] = []
     toward = None if parent is None else set()
     for nx in adj[node]:
         a = _side_atom(where, edges, node, nx)
-        if mol.GetBondBetweenAtoms(*_edge_atoms(edges, node, nx)).GetBondTypeAsDouble() != 1.0:
-            return None
+        orders.append(mol.GetBondBetweenAtoms(*_edge_atoms(edges, node, nx)).GetBondTypeAsDouble())
         fv[a] = fv.get(a, 0) + 1
         if parent is not None and nx != parent:
             toward.add(a)
-    if c.kind == "chain":
-        return _chain_name(mol, c, fv, toward)
+    orders.sort()
+    if c.kind in ("chain", "hchain"):
+        return _chain_name(mol, c, fv, toward, orders, stereo)
+    if c.kind == "atom":
+        return _atom_comp_name(mol, c, fv, orders)
+    if any(o != 1.0 for o in orders):
+        return None
     if c.kind == "ring":
         return _ring_comp_name(mol, c, fv, toward)
     if c.kind == "assembly":
@@ -1148,21 +1629,27 @@ def _assembly_comp_name(mol, comp: _Comp, fv: Dict[int, int], parent):
     return (name, True) if name else None
 
 
-def _multiplying_group(mol, units, comps, edges, adj, where):
+def _multiplying_group(mol, units, comps, edges, adj, where, stereo=None):
     roots = [("c", i) for i in range(len(comps))
              if _identical_children(mol, adj, comps, units, edges, where, ("c", i), None)]
     if len(roots) != 1:
         return None
     root = roots[0]
     kids = [n for n in adj[root]]
-    rn = _name_component(mol, comps, adj, edges, where, root, None)
+    rn = _name_component(mol, comps, adj, edges, where, root, None, stereo)
     if rn is None:
         return None
     root_name, _ = rn
+    # a substituted central group is a compound group: enclosed ('(acetylazanediyl)',
+    # '(2-methylpropane-1,3-diyl)bis(oxy)',, the Blue Book)
+    root_subs = bool(comps[root[1]].subs)
     if all(k[0] == "u" for k in kids):
-        return root_name, len(kids)
+        return root_name, len(kids), root_subs or bool(stereo), comps[root[1]]
     if any(k[0] == "u" for k in kids):
         return None
+    if root_subs or stereo:
+        from ..assembly.naming_utils import apply_enclosing_marks as _enc
+        root_name = _enc(root_name, -1)
     # walk one branch: components in order, the last one carries the units
     branch: List[str] = []
     branch_locants: List[bool] = []
@@ -1203,7 +1690,7 @@ def _multiplying_group(mol, units, comps, edges, adj, where):
             mult = f"{COMPLEX_MULTIPLIERS[k]}({branch[0]})"
     else:
         mult = COMPLEX_MULTIPLIERS[k] + apply_enclosing_marks(_join_components(branch), -1)
-    return root_name + mult, k * units_per_branch
+    return root_name + mult, k * units_per_branch, False, comps[root[1]]
 
 
 # (the Blue Book): the order whose later element terminates an
@@ -1246,8 +1733,11 @@ def _max_heterounits_on_a_chain(mol, excluded: Set[int]) -> int:
 def _aba_chain_in(mol, comps) -> bool:
     """An a(ba)n chain of alternating heteroatoms ending in two atoms of the
     later element is a parent hydride of its own: 'dithioxane'
-    (HS-O-SH), 'diselenoxane'; '-O-S-O-' is not one ('sulfanediylbis(oxy)')."""
-    het = {a for c in comps if c.kind not in ("ring", "assembly") for a in c.atoms
+    (HS-O-SH), 'diselenoxane'; '-O-S-O-' is not one ('sulfanediylbis(oxy)').
+    One that the linker names as a group of its own ('dithioxanediyl', kind 'aba')
+    is not a reason to decline: three heterounits are fewer than the four that
+     asks for."""
+    het = {a for c in comps if c.kind not in ("ring", "assembly", "aba") for a in c.atoms
            if mol.GetAtomWithIdx(a).GetAtomicNum() != 6}
     rank = {zz: i for i, zz in enumerate(_ABA_ORDER)}
     for mid in het:
@@ -1262,6 +1752,52 @@ def _aba_chain_in(mol, comps) -> bool:
     return False
 
 
+def linear_ring_chain_nodes(mol, rings=None) -> int:
+    """The number of nodes of the linear chain of four or more ring systems of
+    ``mol`` (each ring system one node, ring-assembly members separate nodes, every
+    acyclic atom between the two terminal ring systems one node), 0 when the ring
+    systems are fewer than four or do not form one unbranched line.
+
+     "Preferred IUPAC names in phane nomenclature" (the Blue Book),
+    (2): "linear phanes consist of four or more rings or ring systems, two of which
+    must be terminal, and together with acyclic atoms or chains must consist of at
+    least seven nodes (components)" (:23829)."""
+    rings = _ring_systems(mol) if rings is None else rings
+    if len(rings) < 4:
+        return 0
+    ring_of = {}
+    for i, rs in enumerate(rings):
+        for a in rs:
+            ring_of[a] = i
+    nbrs: Dict[int, Set[int]] = {i: set() for i in range(len(rings))}
+    nonring = set(range(mol.GetNumAtoms())) - set(ring_of)
+    for i, rs in enumerate(rings):
+        for a in rs:
+            for nb in mol.GetAtomWithIdx(a).GetNeighbors():
+                j = nb.GetIdx()
+                if j in ring_of and ring_of[j] != i:
+                    nbrs[i].add(ring_of[j])
+                elif j in nonring:
+                    for x in _component_of(mol, j, nonring):
+                        for nb2 in mol.GetAtomWithIdx(x).GetNeighbors():
+                            y = nb2.GetIdx()
+                            if y in ring_of and ring_of[y] != i:
+                                nbrs[i].add(ring_of[y])
+    if not all(len(v) <= 2 for v in nbrs.values()):
+        return 0
+    ends = [i for i, v in nbrs.items() if len(v) == 1]
+    if len(ends) != 2:
+        return 0
+    # the shortest path between the two terminal systems, over every pair of their atoms
+    best = None
+    for a in rings[ends[0]]:
+        for b in rings[ends[1]]:
+            p = Chem.GetShortestPath(mol, a, b)
+            if best is None or len(p) < len(best):
+                best = p
+    return len(rings) + sum(1 for x in best if x in nonring)
+
+
 def _phane_or_replacement(mol, rings, link, comps, pcg_atoms=frozenset()) -> bool:
     """True when a phane name (2)) or a skeletal replacement name
      is the PIN instead."""
@@ -1269,30 +1805,23 @@ def _phane_or_replacement(mol, rings, link, comps, pcg_atoms=frozenset()) -> boo
         return True
     if _aba_chain_in(mol, comps):
         return True
-    # linear phane: four or more ring systems joined in a line
-    if len(rings) >= 4:
-        ring_of = {}
-        for i, rs in enumerate(rings):
-            for a in rs:
-                ring_of[a] = i
-        nbrs: Dict[int, Set[int]] = {i: set() for i in range(len(rings))}
-        nonring = set(range(mol.GetNumAtoms())) - set(ring_of)
-        for i, rs in enumerate(rings):
-            for a in rs:
-                for nb in mol.GetAtomWithIdx(a).GetNeighbors():
-                    j = nb.GetIdx()
-                    if j in ring_of and ring_of[j] != i:
-                        nbrs[i].add(ring_of[j])
-                    elif j in nonring:
-                        reach = _component_of(mol, j, nonring)
-                        for x in reach:
-                            for nb2 in mol.GetAtomWithIdx(x).GetNeighbors():
-                                y = nb2.GetIdx()
-                                if y in ring_of and ring_of[y] != i:
-                                    nbrs[i].add(ring_of[y])
-        if all(len(v) <= 2 for v in nbrs.values()):
-            return True
-    return False
+    # linear phane: four or more ring systems joined in a line, at least seven
+    # nodes in all (2),:23829)
+    if linear_ring_chain_nodes(mol, rings) >= 7:
+        return True
+    return _has_linear_phane_chain(mol)
+
+
+def _has_linear_phane_chain(mol) -> bool:
+    """The reader of (2) (``validation.spelling.linear_phane``) finds a chain of
+    four or more ring systems and at least seven nodes; kept on the molecule, as every
+    unit set of one molecule asks the same question."""
+    if mol.HasProp("_mg_linear_phane"):
+        return bool(mol.GetIntProp("_mg_linear_phane"))
+    from ..validation.spelling.linear_phane import linear_phane_candidate_chains
+    found = bool(linear_phane_candidate_chains(mol))
+    mol.SetIntProp("_mg_linear_phane", int(found))
+    return found
 
 
 def _unit_stereo(mol, units, numberings, primes_order, unit_atoms) -> Optional[str]:
@@ -1372,6 +1901,29 @@ def _organyl_words(mol, units) -> Optional[str]:
     return " ".join(words)
 
 
+def _double_bond_labels(mol) -> Optional[Dict[Tuple[int, int], str]]:
+    """{(begin, end): 'E' | 'Z'} for the double bonds whose configuration is specified, {}
+    when there is none, None when the label cannot be read."""
+    specified = [bd for bd in mol.GetBonds() if bd.GetStereo() != Chem.BondStereo.STEREONONE]
+    if not specified:
+        return {}
+    from ..perception.stereo import assign_stereochemistry, get_double_bond_stereo
+    work = Chem.Mol(mol)
+    try:
+        assign_stereochemistry(work)
+        found = {d["idx"]: d["stereo"] for d in get_double_bond_stereo(work)}
+    except Exception:  # noqa: BLE001
+        return None
+    out = {}
+    for bd in specified:
+        lab = found.get(bd.GetIdx())
+        if lab not in ("E", "Z"):
+            return None
+        a, b = bd.GetBeginAtomIdx(), bd.GetEndAtomIdx()
+        out[(min(a, b), max(a, b))] = lab
+    return out
+
+
 def _try_unit_set(mol, units: List[_Kernel], rings, same_key) -> Optional[str]:
     dec = _units_and_linker(mol, units, rings, same_key)
     if dec is None:
@@ -1407,7 +1959,7 @@ def _try_unit_set(mol, units: List[_Kernel], rings, same_key) -> Optional[str]:
     if units[0].kind == "hydride":
         unit_of = {a: i for i, k in enumerate(units) for a in k.skel}
         for c in comps:
-            if c.kind in ("chalc", "NH", "N3", "NN"):
+            if c.kind in ("chalc", "aba", "NH", "N3", "NN", "XX2", "atom", "hchain"):
                 touched = {unit_of[n.GetIdx()] for a in c.atoms
                            for n in mol.GetAtomWithIdx(a).GetNeighbors()
                            if n.GetIdx() in unit_of}
@@ -1418,10 +1970,16 @@ def _try_unit_set(mol, units: List[_Kernel], rings, same_key) -> Optional[str]:
         pcg_atoms |= k.pcg
     if _phane_or_replacement(mol, rings, link, comps, pcg_atoms):
         return None
-    mg = _multiplying_group(mol, units, comps, edges, adj, where)
+    stereo_labels = _double_bond_labels(mol)
+    if stereo_labels is None:
+        return None
+    mg = _multiplying_group(mol, units, comps, edges, adj, where, stereo_labels or None)
     if mg is None:
         return None
-    group, n_units = mg
+    if stereo_labels and (mg[3].kind != "chain" or not all(
+            a in mg[3].skel and b in mg[3].skel for a, b in stereo_labels)):
+        return None     # the configuration of a double bond outside the central chain is not cited
+    group, n_units, enclose_group, root_comp = mg
     if n_units != len(units):
         return None
     # name every unit; the names and attachment locants must coincide
@@ -1446,7 +2004,7 @@ def _try_unit_set(mol, units: List[_Kernel], rings, same_key) -> Optional[str]:
         return None
     count = len(units)
     from ..assembly.naming_utils import apply_enclosing_marks
-    if "(" in group or "[" in group or "{" in group:
+    if "(" in group or "[" in group or "{" in group or enclose_group:
         gtok = apply_enclosing_marks(group, -1)
     elif any(ch.isdigit() for ch in group):
         gtok = f"({group})"
@@ -1535,6 +2093,24 @@ def _name_general_multiplicative(mol) -> Optional[str]:
         if len(groups) != 1:
             return None
         return _try_unit_set(mol, kernels, rings, kernels)
+    # no principal characteristic group reported: the acyl groups of a diacyl derivative of a
+    # chalcogen chain are ketone units
+    pk = _pseudoketone_kernels(mol, rings)
+    if pk:
+        if len(pk) < 2 or rings:
+            return None
+        for k in pk:
+            k.key = _kernel_key(mol, k)
+        if len({k.key for k in pk}) != 1:
+            return None
+        # three chalcogen atoms between the acyl groups (trioxidane and its analogues); with
+        # two the compound is an anhydride of a peroxy acid, 'acetic peroxyanhydride (PIN)',
+        # 'acetic dithioperoxyanhydride (PIN)', the Blue Book,:32357)
+        if mol.GetNumAtoms() - sum(len(k.core) for k in pk) != 3:
+            return None
+        return _try_unit_set(mol, pk, rings, pk)
+    if pk is None:
+        return None
     # no principal characteristic group: the senior parent hydride;
     # a ring assembly there competes as a parent, which is not decided here
     if assembled:

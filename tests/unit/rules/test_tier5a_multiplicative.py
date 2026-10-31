@@ -149,9 +149,8 @@ def test_tier5a_regression_controls(smiles, expected):
     [
         ("OC(=O)c1ccc(Oc2cccc(C(=O)O)c2)cc1",
          "para/meta mixed attachment: P-15.3.1.1(3) locants differ"),
-        ("CN(CC(=O)O)CC(=O)O",
-         "methylazanediyl (substituted N bridge) — deferred, fail closed"),
-        ("CN(CCO)CCO", "N-methyl diethanolamine — methyl arm has no PCG"),
+        # (the substituted N bridge 'methylazanediyl' is no longer deferred: the general detector
+        # names it, test_tier5a_methylazanediyl_bridge below)
         ("NCCNCCN",
          "N bridge + amine arms: substitutive polyamine parent is the PIN"),
         ("CNCC(=O)O", "sarcosine: methyl arm has no PCG"),
@@ -174,6 +173,23 @@ def test_tier5a_fail_closed(smiles, why):
     assert name_multiplicative(mol) is None, (
         f"expected fail-closed None for {smiles} ({why})"
     )
+
+
+@pytest.mark.parametrize("smiles,expected", [
+    ("CN(CC(=O)O)CC(=O)O", "2,2'-(methylazanediyl)diacetic acid"),
+    ("CN(CCO)CCO", "2,2'-(methylazanediyl)di(ethan-1-ol)"),
+])
+def test_tier5a_methylazanediyl_bridge(smiles, expected):
+    # (the Blue Book): "Substitution, expressed by prefixes or implied, is
+    # allowed on simple multiplicative groups", 'methylazanediyl (preferred prefix; a compound
+    # multiplicative group) (no longer methylimino)' (:5222); (:23178) prefers the
+    # multiplicative name; a compound group is enclosed ('4,4'-(acetylazanediyl)dibenzoic acid',
+    #,:33062). The methyl is a prefix of the group, not an arm: the units are the two
+    # acetic acids (two ethan-1-ols), identical.
+    from tests.support.rt_assert import name_is_rt_exact
+    assert name_multiplicative(Chem.MolFromSmiles(smiles)) == expected
+    assert name_compound(smiles, style="pin") == expected
+    assert name_is_rt_exact(expected, smiles)
 
 
 def test_tetraethylene_glycol_concatenated_bridge():
