@@ -36,7 +36,8 @@ class TestThioetherDrop:
         assert name_compound(smiles) == expected
 
     @pytest.mark.parametrize("smiles,expected", [
-        ("CSCC[C@@H](N)C(=O)O", "D-methionine"),  # catalog C5 methionine (P5) — unaffected (defined stereo)
+        # catalog C5 methionine (P5), defined stereo: the systematic name since E-AA (2026-10-31), INTRODUCTION (the Blue Book) identifies no PIN for the retained name; 'Systematic substitutive names' (:54247), Table 10.4 (:54186)
+        ("CSCC[C@@H](N)C(=O)O", "(2R)-2-amino-4-(methylsulfanyl)butanoic acid"),
         # a phase (C2b, change-asserted-value, was "S-methylcysteine"): the
         # NON_STANDARD flat key bypassed -07's STANDARD-AA stereo guard; bare
         # 'S-methylcysteine' IS config-implying (OPSIN parses it to the DEFINED L
@@ -64,7 +65,8 @@ class TestGlycinateAnion:
     """ (audit F4): the amino group must not be dropped ('acetate')."""
 
     def test_glycinate(self):
-        assert name_compound("[O-]C(=O)CN") == "glycinate"
+        # E-AA (2026-10-31): the systematic anion, INTRODUCTION (the Blue Book) identifies no PIN for the retained name; 'Systematic substitutive names' (:54247), Table 10.4 (:54186) ('aminoacetic acid':54202)
+        assert name_compound("[O-]C(=O)CN") == "aminoacetate"
 
     @pytest.mark.parametrize("smiles,expected", [
         ("[O-]C(=O)CCCC", "pentanoate"),                 # simple chain — unaffected

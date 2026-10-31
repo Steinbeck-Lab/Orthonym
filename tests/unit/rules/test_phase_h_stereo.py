@@ -153,7 +153,8 @@ def test_v18_cysteine_no_malformed_locant():
     # `L-cysteine` -- which is right: the SMILES is specifically the (R)/L-enantiomer,
     # and a bare `cysteine` would under-specify it. There is NO code site to fix here;
     # only this assertion was stale.
-    assert name == "L-cysteine"
+    # E-AA (2026-10-31): the systematic name, INTRODUCTION (the Blue Book), 'Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter'; 'Systematic substitutive names' (:54247) and Table 10.4 (:54186) give the systematic name, which the engine builds first since E-AA (2026-10-31).
+    assert name == "(2R)-2-amino-3-sulfanylpropanoic acid"
     # ★ THIS is the actual V-18 tripwire and it has passed throughout: the retained
     # name must not carry a malformed '(1R)-'/'(1S)-' block. Do not weaken or merge
     # it into the line above -- the defect V-18 guards against is the malformed

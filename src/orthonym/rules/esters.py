@@ -1163,6 +1163,10 @@ def _name_amino_acid_ester(
     54601 shows 'methyl L-alaninate', unlike the bare AA which suppresses
     implicit L). Glycine (achiral) gets no descriptor.
     """
+    # The naming of amino_acids.systematic_amino_acid_name: the systematic ester path names it.
+    from .amino_acids import retained_amino_acid_names_off, systematic_amino_acid_name
+    if retained_amino_acid_names_off():
+        return None
     carbonyl_c = ester_match[0]
 
     # Reconstruct the acid fragment as a standalone carboxylic acid molecule
@@ -1225,7 +1229,9 @@ def _name_amino_acid_ester(
     if not r_prime:
         return None
 
-    return f"{r_prime} {descriptor}{ate_stem}"
+    # (the Blue Book): 'methyl L-alaninate' is no PIN; the systematic ester name of the molecule
+    # ('methyl (2S)-2-aminopropanoate') is offered first, (:54247).
+    return systematic_amino_acid_name(mol) or f"{r_prime} {descriptor}{ate_stem}"
 
 
 def _labels_polyacid_monoester(fn):

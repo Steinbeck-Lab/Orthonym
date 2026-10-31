@@ -52,7 +52,8 @@ class TestAminoAcidFGBailout:
         smiles = "NCC(=O)O"
         result = name_compound(smiles)
         assert result is not None, "Should produce a name"
-        assert result == "glycine", f"Expected 'glycine' but got: {result}"
+        # E-AA (2026-10-31): the systematic name,:50943; Table 10.4:54202 'aminoacetic acid'
+        assert result == "aminoacetic acid", f"got: {result}"
 
     def test_alanine_trivial_name_preserved(self):
         """Alanine naming, non-stereo input, unaffected by bailout logic.

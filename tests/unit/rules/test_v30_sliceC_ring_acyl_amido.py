@@ -22,7 +22,7 @@ from orthonym.assembly.fragment_naming import name_fragment_recursively
 class TestSystematicStyleThreadedThroughFragmentNamer:
     """name_fragment_recursively must honour style='systematic' (was discarded)."""
 
-    def test_default_and_systematic_differ_for_amino_acid(self):
+    def test_default_and_systematic_differ_for_amino_acid(self, monkeypatch):
         # The default (pin) path returns the retained name; systematic bypasses
         # it. Use DEFINED-stereo L-proline here: the Phase-1 stereo-honesty
         # fix now makes the default path DECLINE the retained name for a
@@ -32,6 +32,12 @@ class TestSystematicStyleThreadedThroughFragmentNamer:
         # With defined stereo the default legitimately returns the retained
         # 'L-proline', which differs from the systematic acid -- the actual
         # style-threading contract this test exists to pin.
+        # E-AA (2026-10-31): called on its own, the fragment is the caller's whole molecule and takes the
+        # systematic name first (rules.amino_acids.systematic_amino_acid_name); inside a larger molecule a
+        # fragment keeps the retained name. That offer is switched off here, so the default style reads the
+        # retained route as a fragment does.
+        import orthonym.rules.amino_acids as amino_acids
+        monkeypatch.setattr(amino_acids, "systematic_amino_acid_name", lambda mol: None)
         default = name_fragment_recursively("OC(=O)[C@@H]1CCCN1")
         systematic = name_fragment_recursively("OC(=O)[C@@H]1CCCN1", style="systematic")
         assert default != systematic

@@ -507,7 +507,7 @@ class TestExpandedAminoAcidPipeline:
         note) instead of the bare, implicit-L retained name.
         """
         proteinogenic = [
-            ("NCC(=O)O", "glycine"),
+            ("NCC(=O)O", "aminoacetic acid"),  # E-AA 2026-10-31::50943; Table 10.4:54202
             ("CC(N)C(=O)O", "2-aminopropanoic acid"),
             ("CC(C)C(N)C(=O)O", "2-amino-3-methylbutanoic acid"),
             ("CC(C)CC(N)C(=O)O", "2-amino-4-methylpentanoic acid"),

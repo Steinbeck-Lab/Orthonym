@@ -72,27 +72,27 @@ RAW = Orthonym(_disable_opsin_validity_gate=True)  # gate-off: proves the raw na
 # L-threonine (symbols 'Thr','T') (2S,3R)-2-amino-3-hydroxybutanoic acid
 # L-allothreonine (symbol 'aThr') (2S,3S)-2-amino-3-hydroxybutanoic acid
 # The D rows are unchanged, which is the point: only the L was being lost.
+# E-AA (2026-10-31): the retained names are no PINs; the PIN is the systematic name the
+# section itself prints beside each one (:54324-54330). INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter"; "Systematic substitutive names" (:54247) and Table 10.4 (:54186) give the systematic name, which the engine now builds first (E-AA).
 @pytest.mark.parametrize("smiles,expected", [
     # L-allothreonine = (2S,3S) [CIP-verified]; C-3 epimer of L-Thr (2S,3R).
-    ("C[C@H](O)[C@H](N)C(=O)O", "L-allothreonine"),
+    ("C[C@H](O)[C@H](N)C(=O)O", "(2S,3S)-2-amino-3-hydroxybutanoic acid"),
     # L-alloisoleucine = (2S,3R) [CIP-verified]; C-3 epimer of L-Ile (2S,3S).
-    ("CC[C@@H](C)[C@H](N)C(=O)O", "L-alloisoleucine"),
+    ("CC[C@@H](C)[C@H](N)C(=O)O", "(2S,3R)-2-amino-3-methylpentanoic acid"),
 ])
 def test_allo_amino_acids(smiles, expected):
     assert G.name(smiles) == expected
 
 
 @pytest.mark.parametrize("smiles,expected", [
-    # All 8 stereoisomers of Thr/Ile emit their retained name (OPSIN-RT verified).
-    # These are retained names, NOT PINs: `### ** INTRODUCTION**` (:50943) —
-    # "Preferred IUPAC names (PINs) are not identified for the compounds in this
-    # Chapter."
-    ("C[C@@H](O)[C@H](N)C(=O)O", "L-threonine"),      # L-Thr (2S,3R)
-    ("C[C@H](O)[C@@H](N)C(=O)O", "D-threonine"),       # D-Thr (2R,3S)
-    ("C[C@@H](O)[C@@H](N)C(=O)O", "D-allothreonine"), # D-allo-Thr (2R,3R)
-    ("CC[C@H](C)[C@H](N)C(=O)O", "L-isoleucine"),      # L-Ile (2S,3S)
-    ("CC[C@@H](C)[C@@H](N)C(=O)O", "D-isoleucine"),    # D-Ile (2R,3R)
-    ("CC[C@H](C)[C@@H](N)C(=O)O", "D-alloisoleucine"),# D-allo-Ile (2R,3S)
+    # All stereoisomers of Thr/Ile take their systematic name (OPSIN-RT verified). The
+    # retained names are NOT PINs: INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter"; "Systematic substitutive names" (:54247) and Table 10.4 (:54186) give the systematic name, which the engine now builds first (E-AA).
+    ("C[C@@H](O)[C@H](N)C(=O)O", "(2S,3R)-2-amino-3-hydroxybutanoic acid"),   # L-Thr
+    ("C[C@H](O)[C@@H](N)C(=O)O", "(2R,3S)-2-amino-3-hydroxybutanoic acid"),   # D-Thr
+    ("C[C@@H](O)[C@@H](N)C(=O)O", "(2R,3R)-2-amino-3-hydroxybutanoic acid"),  # D-allo-Thr
+    ("CC[C@H](C)[C@H](N)C(=O)O", "(2S,3S)-2-amino-3-methylpentanoic acid"),   # L-Ile
+    ("CC[C@@H](C)[C@@H](N)C(=O)O", "(2R,3R)-2-amino-3-methylpentanoic acid"), # D-Ile
+    ("CC[C@H](C)[C@@H](N)C(=O)O", "(2R,3S)-2-amino-3-methylpentanoic acid"),  # D-allo-Ile
 ])
 def test_thr_ile_stereoisomers(smiles, expected):
     assert G.name(smiles) == expected
@@ -100,15 +100,15 @@ def test_thr_ile_stereoisomers(smiles, expected):
 
 # --- 3.2 amino-acid esters, BB 54595-54608) --------------------
 @pytest.mark.parametrize("smiles,expected", [
-    # BB 54601 verbatim example. (The parenthetical "unlike the bare AA's implicit L"
-    # was removed in -REGRESSION I12: the bare AA now carries its L too.)
-    ("COC(=O)[C@H](C)N", "methyl L-alaninate"),
+    # BB 54601 prints 'methyl L-alaninate' in Chapter, which identifies no PIN; the
+    # systematic ester name is offered first (E-AA): INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter"; "Systematic substitutive names" (:54247) and Table 10.4 (:54186) give the systematic name, which the engine now builds first (E-AA).
+    ("COC(=O)[C@H](C)N", "methyl (2S)-2-aminopropanoate"),
     # Glycine is achiral -- no descriptor.
-    ("COC(=O)CN", "methyl glycinate"),
+    ("COC(=O)CN", "methyl aminoacetate"),
     # Different R' (ethyl) -- reuses the existing alkyl namer, not hardcoded.
-    ("CCOC(=O)[C@H](C)N", "ethyl L-alaninate"),
-    # D- enantiomer (alpha-R): explicit D-.
-    ("COC(=O)[C@@H](C)N", "methyl D-alaninate"),
+    ("CCOC(=O)[C@H](C)N", "ethyl (2S)-2-aminopropanoate"),
+    # D- enantiomer (alpha-R).
+    ("COC(=O)[C@@H](C)N", "methyl (2R)-2-aminopropanoate"),
 ])
 def test_amino_acid_esters(smiles, expected):
     assert RAW.name(smiles) == expected

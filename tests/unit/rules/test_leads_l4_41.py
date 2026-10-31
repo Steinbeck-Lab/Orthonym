@@ -145,18 +145,17 @@ NEEDS_NAMER_SKIP = pytest.mark.xfail(
     not _namer_skips_own_route_names(), strict=True,
     reason="needs the dispatch-class skip of namer.py (patch L4-41-namer-dispatch-skip)")
 
+# E-AA (2026-10-31): 'homocystine' and 'L-cystine' left this list. They are Chapter names, and
+# INTRODUCTION (the Blue Book) identifies no PIN for them; their PIN is multiplicative,:23178),
+# which is not built yet, so both ship below the PIN at best-effort
+# (tests/unit/rules/test_amino_acid_systematic_pin.py).
 KEEP_PIN_ROWS = [
-    pytest.param("N[C@@H](CCSSCC[C@H](N)C(=O)O)C(=O)O", "homocystine", marks=NEEDS_NAMER_SKIP,
-                 id="homocystine-amino-acid-route"),
     pytest.param("O=C(O)CSCCSCCCSCCSCC(=O)O", "3,6,10,13-tetrathiapentadecanedioic acid",
                  marks=NEEDS_NAMER_SKIP, id="tetrathia-diacid-skeletal-replacement"),
     # (:23348): six ether oxygens in an unbranched chain, none in the principal group (-ol);
     # (:23405): the two -ol groups are suffixes of the 'a' name, as the diacid of:23212
     pytest.param("OCCOCCOCCOCCOCCOCCOCCO", "3,6,9,12,15,18-hexaoxaicosane-1,20-diol",
                  marks=NEEDS_NAMER_SKIP, id="hexaoxa-diol-skeletal-replacement"),
-    # a retained name: the L-cystine PIN is a retained amino-acid name, not a substitutive diacid
-    pytest.param("N[C@@H](CSSC[C@H](N)C(=O)O)C(=O)O", "L-cystine", marks=NEEDS_NAMER_SKIP,
-                 id="cystine-retained-name"),
     pytest.param("O=C(O)OC(=O)O", "dicarbonic acid", id="dicarbonic-acid"),
     pytest.param("O=C(O)NC(=O)O", "2-imidodicarbonic acid", id="imidodicarbonic-acid"),
     pytest.param("OCCCc1ccc(CCCO)cc1", "3,3'-(1,4-phenylene)di(propan-1-ol)", id="multiplicative-diol"),

@@ -29,8 +29,8 @@ from ..data.ion_retained_names import (
 )
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
-from ..errors import UnnameableSubstituentError  # a voided candidate (Task 3)
-from ..errors import is_failure_name
+from ..errors import UnnameableSubstituentError, is_failure_name  # the first: a voided candidate (Task 3)
+from .amino_acids import retained_amino_acid_names_off as _aa_names_off, systematic_or_retained as _aa_offer
 from .ring_cation_hydron import (  # noqa: F401 (also patched by tests as ions.<name>)
     _hydron_site_candidates, _hydron_sites_in, _other_ring_heteroatom_with_hydrogen, _rdkit_flags0_structures,
 )
@@ -1276,7 +1276,7 @@ def name_anion(mol, style: str = 'pin', _depth: int = 0, retained_only: bool = F
                 anion_name = _apply_anionic_substituent_prefixes(mol, anions, anion_name)
                 validated = _validate_anion_name(mol, anion_name)
                 if validated:
-                    return validated
+                    return _aa_offer(mol, validated, neutral_name)  # 'glycinate' -> 'aminoacetate'
                 # The retained word converted but its anion is refused (a
                 # carbohydrate acid: 'D-mannaric acid' -> 'D-mannarate', which the
                 # PIN tier no longer accepts). That is no reason to abstain: the
@@ -5557,7 +5557,7 @@ def _amino_acid_carboxylate(mol, anion_site: Dict) -> str:
     if nmol is None:
         return ''
     from ..data.amino_acids import get_amino_acid_name
-    aa = get_amino_acid_name(neutral_smi, mol=nmol, with_descriptor=True)
+    aa = not _aa_names_off() and get_amino_acid_name(neutral_smi, mol=nmol, with_descriptor=True)
     if not aa:
         return ''
     # retained-name -> anion, preserving any leading D-/L- descriptor.
@@ -5567,9 +5567,9 @@ def _amino_acid_carboxylate(mol, anion_site: Dict) -> str:
             prefix, stem = d, stem[len(d):]
             break
     if stem.endswith('ic acid'):
-        return prefix + stem[:-len('ic acid')] + 'ate'
+        return _aa_offer(mol, prefix + stem[:-len('ic acid')] + 'ate')
     if stem.endswith('e'):
-        return prefix + stem[:-1] + 'ate'
+        return _aa_offer(mol, prefix + stem[:-1] + 'ate')
     return ''
 
 

@@ -259,8 +259,10 @@ def test_defect_c_polyfunctional_prefix_locant_omitted(namer, smiles, expected):
         # an InChIKey), so the stereo-free input takes the systematic
         # name (9292c013d, 6ed78b1e4), and with a single substituted position the
         # locant is omitted like 'chlorobutanedioic acid (PIN)',:2883).
-        ("NCC(=O)O", "glycine"),
-        ("OC(=O)[C@@H](N)CC(=O)O", "L-aspartic acid"),
+        # E-AA (2026-10-31): the systematic names come first, INTRODUCTION (the Blue Book) identifies no PIN for the retained name; 'Systematic substitutive names' (:54247), Table 10.4 (:54186); the
+        # glycine locant is omitted like 'difluoroacetic acid (PIN)',:3037)
+        ("NCC(=O)O", "aminoacetic acid"),
+        ("OC(=O)[C@@H](N)CC(=O)O", "(2S)-2-aminobutanedioic acid"),
         ("OC(=O)C(N)CC(=O)O", "aminobutanedioic acid"),
     ],
 )

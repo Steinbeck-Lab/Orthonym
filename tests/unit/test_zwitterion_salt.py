@@ -97,8 +97,7 @@ class TestZwitterionGuard4:
         azaniumyl zwitterion namer"). The method keeps its historical name so the node id
         is stable.
 
-        The glycine zwitterion still defers ('' -- the retained amino-acid table names it
-        'glycine' before the router). A primary protonated amine on an anion parent is NO
+        The glycine zwitterion is built as well since E-AA (2026-10-31): 'azaniumylacetate'. A primary protonated amine on an anion parent is NO
         LONGER deferred: ``_name_primary_amine_azaniumyl_zwitterion`` builds the ionic name
         -- the carboxylate anion is the parent and each -NH3+ an 'azaniumyl' prefix
          "Anionic and cationic centers on different parent structures",
@@ -112,7 +111,10 @@ class TestZwitterionGuard4:
         reads it back to the input's full InChIKey (an InChIKey) and to the
         same protonation site."""
         from tests.support.rt_assert import name_is_rt_exact
-        assert _rc("[NH3+]CC(=O)[O-]") == ""                 # glycine zwitterion
+        # E-AA (2026-10-31): the glycine zwitterion is built too, now that the neutral acid is named 'aminoacetic
+        # acid': the book's own name, 'azaniumylacetate glycine zwitterion' (the Blue Book)
+        assert _rc("[NH3+]CC(=O)[O-]") == "azaniumylacetate"
+        assert name_is_rt_exact("azaniumylacetate", "[NH3+]CC(=O)[O-]")
         got = _rc("CC(=O)CC([NH3+])C(=O)[O-]")               # 2-amino-4-oxopentanoate
         assert got == "2-azaniumyl-4-oxopentanoate"
         assert name_is_rt_exact(got, "CC(=O)CC([NH3+])C(=O)[O-]")

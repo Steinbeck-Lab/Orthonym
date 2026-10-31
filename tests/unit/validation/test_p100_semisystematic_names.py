@@ -60,3 +60,33 @@ def test_the_inositol_licence_is_the_structure_s_own_name():
     assert is_inositol_name_of(myo, "myo-inositol")
     assert not is_inositol_name_of(myo, "scyllo-inositol")             # another stereoisomer's name
     assert not is_inositol_name_of(Chem.MolToSmiles(Chem.MolFromSmiles("OC1CCCCC1")), "myo-inositol")
+
+
+def test_the_word_list_of_the_check_is_the_words_of_the_amino_acid_tables():
+    # the check keeps a copy of the table words so that it reads no naming code; the copy may not drift
+    from orthonym.data import amino_acids as aa
+    from orthonym.validation.spelling.checks_natural_products import AMINO_ACID_TABLE_WORDS
+    words = set()
+    for table in (aa.STANDARD_AMINO_ACIDS, aa.NON_STANDARD_AMINO_ACIDS, aa.GENERAL_ONLY_AMINO_ACIDS):
+        for value in table.values():
+            if any(ch.isdigit() for ch in value):
+                continue
+            word = aa._RETAINED_NAME_DESCRIPTOR.sub("", value.strip(), count=1).lower()
+            words.add(word.split(" acid")[0] if word.endswith(" acid") else word.split(" ")[0])
+    assert words == AMINO_ACID_TABLE_WORDS
+
+
+@pytest.mark.parametrize("name", [
+    # E-AA (2026-10-31): names of the amino-acid tables and their ion forms, beyond Table 10.4,:50943)
+    "pidolate", "L-alaninium chloride", "lysinium(1+)", "glycinium", "homocystine", "cysteamine", "sodium glutamate",
+])
+def test_a_name_of_the_amino_acid_tables_is_flagged(name):
+    assert getattr(chapter_p10_name_is_no_pin(None, name), "rule", None) == "P-100", name
+
+
+@pytest.mark.parametrize("name", [
+    "aminoacetic acid", "methyl aminoacetate", "2-aminoethane-1-thiol", "2-aminoethane-1-sulfonic acid",
+    "2-(1H-imidazol-5-yl)ethan-1-amine",
+])
+def test_a_systematic_amino_acid_name_is_not_flagged(name):
+    assert chapter_p10_name_is_no_pin(None, name) is None

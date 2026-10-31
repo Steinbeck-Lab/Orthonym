@@ -10,9 +10,10 @@ the neutral acid was 'hydroxyacetic acid' and the thio analogue 'disodium
 sulfidoacetate'. the Blue Book 'HO-CH2-COOH hydroxyacetic acid (PIN)';:2004
 acetic acid is the retained PIN; the other nine are cited at their entries.
 
-The amino acids are the one exception: user decision D-a keeps the semisystematic
-amino-acid names at the PIN tier (the Blue Book identifies no PIN for names,
- :50943), so a stereo-free 'alanine' entry is not re-derived here.
+The amino acids are the one exception: a fragment keeps its retained amino-acid name (a peptide
+residue, a salt component), while the caller's whole molecule takes its systematic name first
+(E-AA, ``rules.amino_acids.systematic_amino_acid_name``; the Blue Book identifies no PIN for
+names,:50943), so an amino-acid entry ('glycine', a stereo-free 'alanine') is not re-derived here.
 """
 import pytest
 
@@ -22,6 +23,7 @@ from orthonym.assembly import fragment_naming
 pytestmark = pytest.mark.unit
 
 _D_A_AMINO_ACIDS = {
+    "NCC(=O)O",
     "CC(N)C(=O)O", "NC(CO)C(=O)O", "NC(CS)C(=O)O", "NC(Cc1ccc(O)cc1)C(=O)O",
     "NC(Cc1c[nH]cn1)C(=O)O", "NC(Cc1c[nH]c2ccccc12)C(=O)O", "NCCCCC(N)C(=O)O",
     "NC(CCC(=O)O)C(=O)O", "NC(CC(=O)O)C(=O)O", "NC(=O)CC(N)C(=O)O", "CSCCC(N)C(=O)O",

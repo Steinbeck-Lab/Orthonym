@@ -486,7 +486,8 @@ CANARY_COMPOUNDS = [
         # to its retained PIN with the configurational descriptor (D-tyrosine,
         # instead of the systematic substitutive name. RT-verified
         # (OPSIN parses 'D-tyrosine' to the input, InChI-L1 match).
-        "D-tyrosine",
+        # E-AA (2026-10-31): the user's approval of PIN-tier systematic names for amino acids (2026-10-31) replaces decision D-a; the retained name is no PIN INTRODUCTION, the Blue Book) and the systematic name comes first,:54247).
+        "(2R)-2-amino-3-(4-hydroxyphenyl)propanoic acid",
     ),
     # --- a phase: Missing Compound Classes (to) ---
     #: Acetals

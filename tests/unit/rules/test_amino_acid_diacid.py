@@ -23,8 +23,9 @@ class TestDicarboxylicAminoAcidBailout:
         atom of the α-amino carboxylic acids is designated by the stereodescriptor
         'D' or 'L'" -- and the Blue Book itself writes 'L-glutamic acid' inside a
         name (:54506)."""
+        # E-AA (2026-10-31): the retained name is no PIN; INTRODUCTION (the Blue Book): 'Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter'; 'Systematic substitutive names' (:54247) and Table 10.4 (:54186) give the systematic name, which the engine now builds first (E-AA).
         result = name_compound("N[C@@H](CC(=O)O)C(=O)O")
-        assert result == "L-aspartic acid", f"Expected 'L-aspartic acid', got: {result}"
+        assert result == "(2S)-2-aminobutanedioic acid", f"got: {result}"
 
     def test_glutamic_acid_stereo(self):
         """-07 (a phase): a stereo-tagged free glutamic acid resolves to the
@@ -32,7 +33,7 @@ class TestDicarboxylicAminoAcidBailout:
         (OPSIN-round-trip-verified;, see `test_aspartic_acid_stereo`),
         not the old systematic 'aminopentanedioic acid' bailout."""
         result = name_compound("N[C@@H](CCC(=O)O)C(=O)O")
-        assert result == "L-glutamic acid", f"Expected 'L-glutamic acid', got: {result}"
+        assert result == "(2S)-2-aminopentanedioic acid", f"got: {result}"
 
     def test_mono_cooh_amino_acid_unchanged(self):
         """Mono-COOH amino acid should NOT bail out -- regression guard.

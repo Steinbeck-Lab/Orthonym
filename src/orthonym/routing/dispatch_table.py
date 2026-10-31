@@ -657,7 +657,15 @@ def _is_retained_name(mol, smiles, canonical_smiles, features=None, *, _style: s
     if _style == "systematic":
         return False
     from orthonym.data import ALL_RETAINED_NAMES
-    return canonical_smiles in ALL_RETAINED_NAMES
+    name = ALL_RETAINED_NAMES.get(canonical_smiles)
+    if name is None:
+        return False
+    from orthonym.rules.amino_acids import retained_amino_acid_names_off
+    if retained_amino_acid_names_off():
+        # the naming of rules.amino_acids.systematic_amino_acid_name: no retained amino-acid name ('glycine')
+        from orthonym.data.amino_acids import is_retained_amino_acid_name
+        return not is_retained_amino_acid_name(name)
+    return True
 
 
 def _is_amino_acid(mol, smiles, canonical_smiles, features=None, *, _style: str = "pin", **kwargs) -> bool:
@@ -1816,6 +1824,15 @@ def _handle_retained_name(mol, smiles, canonical_smiles, features=None, *,
     from orthonym.rules.benzene_unnumbered import retained_benzene_group_is_labelled
     if name and retained_benzene_group_is_labelled(mol, name):      #: 'benzonitrile' numbers no group carbon
         return None
+    if name:
+        # (the Blue Book): the systematic name of a retained amino acid ('aminoacetic acid') is
+        # offered first (rules.amino_acids.systematic_amino_acid_name); the retained name is the fallback.
+        from orthonym.data.amino_acids import is_retained_amino_acid_name
+        if is_retained_amino_acid_name(name):
+            from orthonym.rules.amino_acids import systematic_amino_acid_name
+            offered = systematic_amino_acid_name(mol)
+            if offered:
+                return offered
     if name and name.lower().strip() in PIN_DENY:
         from orthonym.metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(name)
@@ -1824,9 +1841,17 @@ def _handle_retained_name(mol, smiles, canonical_smiles, features=None, *,
 
 def _handle_amino_acid(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
-    """Mirrors namer.py:1091-1094."""
+    """Mirrors namer.py:1091-1094. A retained name of the tables ('L-alanine', 'homocystine') gives way to the
+    systematic name of the molecule when one is offered (``rules.amino_acids.systematic_amino_acid_name``); else it
+    ships, labelled below the PIN by the spelling check: INTRODUCTION (the Blue Book),
+    "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter"."""
     from orthonym.rules.amino_acids import name_amino_acid
-    return name_amino_acid(mol, canonical_smiles)
+    name = name_amino_acid(mol, canonical_smiles)
+    from orthonym.data.amino_acids import is_retained_amino_acid_name
+    if name and is_retained_amino_acid_name(name):
+        from orthonym.rules.amino_acids import systematic_amino_acid_name
+        return systematic_amino_acid_name(mol) or name
+    return name
 
 
 def _handle_skeletal_replacement(mol, smiles, canonical_smiles, features=None, *,

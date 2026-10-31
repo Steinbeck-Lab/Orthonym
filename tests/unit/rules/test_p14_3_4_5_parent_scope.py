@@ -767,7 +767,7 @@ class TestPhaseCTripwires:
         ("Clc1c(Cl)c(Cl)c(Cl)c(Cl)c1Cl", "hexachlorobenzene"),
         ("OC1CCCCC1", "cyclohexanol"),
         ("OC(=O)C1CCCCC1", "cyclohexanecarboxylic acid"),
-        ("[O-]C(=O)CN", "glycinate"),
+        ("[O-]C(=O)CN", "aminoacetate"),  # E-AA 2026-10-31::50943;:54247
         ("CCO", "ethanol"),
         # Blue Book worked examples that were ALREADY correct
         ("C1CCC2CCCCC2C1", "decahydronaphthalene"),
