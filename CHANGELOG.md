@@ -5,6 +5,92 @@ All notable changes to Orthonym are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this
 project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.0](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.9...v1.1.0) (2026-10-31)
+
+
+### Features
+
+* cages with aromatic rings and very large ring systems get names at the default tier ([#113](https://github.com/Steinbeck-Lab/Orthonym/issues/113)) ([9dcb28b](https://github.com/Steinbeck-Lab/Orthonym/commit/9dcb28b6be9d20149c411411b47f8e697ac61e2b))
+* charged molecules get verified names at the default tier ([#120](https://github.com/Steinbeck-Lab/Orthonym/issues/120)) ([ee1e8f3](https://github.com/Steinbeck-Lab/Orthonym/commit/ee1e8f3bccb0f6477efafc66737a23a3c1864ad1))
+* **cli:** --time-limit gives each structure a wall-clock limit ([#112](https://github.com/Steinbeck-Lab/Orthonym/issues/112)) ([3f8c49b](https://github.com/Steinbeck-Lab/Orthonym/commit/3f8c49b09e4cf75cbd19521ac51fb182c577e67e))
+* more charged molecules get verified names at the default tier ([#122](https://github.com/Steinbeck-Lab/Orthonym/issues/122)) ([1f4aaee](https://github.com/Steinbeck-Lab/Orthonym/commit/1f4aaee0978d188cab8367d5b9fa2be34a420434))
+* more preferred names at the PIN tier, with spelling checks that keep false ones out ([#106](https://github.com/Steinbeck-Lab/Orthonym/issues/106)) ([2f28242](https://github.com/Steinbeck-Lab/Orthonym/commit/2f28242d562e13f1d3745090017c9ca10f308a70))
+* more preferred names, and names that were labelled preferred without being so lose that label ([#115](https://github.com/Steinbeck-Lab/Orthonym/issues/115)) ([a2be03e](https://github.com/Steinbeck-Lab/Orthonym/commit/a2be03e2c97c6d8d78ffd8b2a870531e8dbea171))
+* name a chlorine or bromine with a nonstandard bonding number through its iodine drawing ([#135](https://github.com/Steinbeck-Lab/Orthonym/issues/135)) ([7163c93](https://github.com/Steinbeck-Lab/Orthonym/commit/7163c9345f92c769a43e284112dce1cc8d832dd0))
+* name bonded drawings of eight more metals ([#145](https://github.com/Steinbeck-Lab/Orthonym/issues/145)) ([3792bf3](https://github.com/Steinbeck-Lab/Orthonym/commit/3792bf315b90aad612c6a5f5723a3c9ed25c0c89))
+* name charged molecules that no producer named ([#131](https://github.com/Steinbeck-Lab/Orthonym/issues/131)) ([319db37](https://github.com/Steinbeck-Lab/Orthonym/commit/319db3775f04b65644eb3e313930f020b9a77ed9))
+* name isotope labels on positions a retained name does not number ([#130](https://github.com/Steinbeck-Lab/Orthonym/issues/130)) ([83da335](https://github.com/Steinbeck-Lab/Orthonym/commit/83da33537591a66e8d1ba7192fa955405f249908))
+* name more multiplicative PINs (hetero, substituted and double-bonded linkers) ([#147](https://github.com/Steinbeck-Lab/Orthonym/issues/147)) ([22eb544](https://github.com/Steinbeck-Lab/Orthonym/commit/22eb54492d9873b56d825f86f8bbac0e1b086dc3))
+* name substituent stereo at its prefix; bis for substituted amido N-substituents ([#150](https://github.com/Steinbeck-Lab/Orthonym/issues/150)) ([15f75d8](https://github.com/Steinbeck-Lab/Orthonym/commit/15f75d84761e0616467cf0ebd89f6e202fada625))
+* name the drawings of 37 more metals, tin and lead cations and multiply bonded ligands ([#146](https://github.com/Steinbeck-Lab/Orthonym/issues/146)) ([c80937c](https://github.com/Steinbeck-Lab/Orthonym/commit/c80937cc5db03da5d897ebf8533d98b75986726e))
+* name uranium compounds ([#149](https://github.com/Steinbeck-Lab/Orthonym/issues/149)) ([15d5ca0](https://github.com/Steinbeck-Lab/Orthonym/commit/15d5ca0f4d34b377c33b7181fc496a9b20a6eeb5))
+* names for radicals with several radical centres and for radical ions ([#128](https://github.com/Steinbeck-Lab/Orthonym/issues/128)) ([32e4c53](https://github.com/Steinbeck-Lab/Orthonym/commit/32e4c5315ba03656f94dcd74189b20bfbbadced5))
+* names with a count word above fifty ship when their structure is read back from the name text ([#110](https://github.com/Steinbeck-Lab/Orthonym/issues/110)) ([2b4a53e](https://github.com/Steinbeck-Lab/Orthonym/commit/2b4a53e37a9d40b1a4a152bbc2788a0844f05182))
+* nomenclature coverage and correctness updates ([#142](https://github.com/Steinbeck-Lab/Orthonym/issues/142)) ([9a528d0](https://github.com/Steinbeck-Lab/Orthonym/commit/9a528d07faab150292f58114dbf066879d033d8b))
+* nomenclature coverage and correctness updates ([#143](https://github.com/Steinbeck-Lab/Orthonym/issues/143)) ([4c2fd75](https://github.com/Steinbeck-Lab/Orthonym/commit/4c2fd75720a41a06cbe5b730556de7f413f2a208))
+* nomenclature coverage and correctness updates ([#154](https://github.com/Steinbeck-Lab/Orthonym/issues/154)) ([9988477](https://github.com/Steinbeck-Lab/Orthonym/commit/998847754d08b5f3a299e2c531037aa4aa29040f))
+* nomenclature coverage and correctness updates ([#155](https://github.com/Steinbeck-Lab/Orthonym/issues/155)) ([bfeb16a](https://github.com/Steinbeck-Lab/Orthonym/commit/bfeb16a6931979824035063878c500f90768086c))
+* opt in to OPSIN's main branch for every name check ([#84](https://github.com/Steinbeck-Lab/Orthonym/issues/84)) ([81ba930](https://github.com/Steinbeck-Lab/Orthonym/commit/81ba93034d9cf2acf4491cedd1546d3b8019ba26))
+* phane names (cyclophanes and linear phanes) as preferred IUPAC names ([#94](https://github.com/Steinbeck-Lab/Orthonym/issues/94)) ([13e0ed7](https://github.com/Steinbeck-Lab/Orthonym/commit/13e0ed7f058f50b3ce3b869362b1c513898d94c3))
+* phane PINs with stereodescriptors, hydro prefixes and indicated hydrogen, and phanes as substituents ([#97](https://github.com/Steinbeck-Lab/Orthonym/issues/97)) ([205be0a](https://github.com/Steinbeck-Lab/Orthonym/commit/205be0a0bc580086b647ea20a58eda926183d000))
+* polyacenes, polyphenylenes and the other ortho-fused hydrocarbon series of any size; spiro parents and ring assemblies beside ring substituents ([#103](https://github.com/Steinbeck-Lab/Orthonym/issues/103)) ([c3faf9e](https://github.com/Steinbeck-Lab/Orthonym/commit/c3faf9ef94fabf3868fc4710f7ded55c1552fc96))
+* radicals with centres away from the parent get a verified name at the default tier ([#119](https://github.com/Steinbeck-Lab/Orthonym/issues/119)) ([73de4d1](https://github.com/Steinbeck-Lab/Orthonym/commit/73de4d1576eb8481b29e73b767cbc9e13dbb574b))
+* ring systems with an iodine ring atom get names ([#108](https://github.com/Steinbeck-Lab/Orthonym/issues/108)) ([1e47835](https://github.com/Steinbeck-Lab/Orthonym/commit/1e47835331cf9d8e15011f56aaf5322fb6339121))
+* silicon and boron cations and radicals; multiplied acid halides cite every halide ([#104](https://github.com/Steinbeck-Lab/Orthonym/issues/104)) ([d70ad8a](https://github.com/Steinbeck-Lab/Orthonym/commit/d70ad8afca830dad9fdb606fdba536d033bd0019))
+* skeletal replacement names for acyclic chains with four or more heteroatom units ([#132](https://github.com/Steinbeck-Lab/Orthonym/issues/132)) ([41e3285](https://github.com/Steinbeck-Lab/Orthonym/commit/41e3285a08bc4d720c54a9a4c599620fcbd66ed6))
+* the default output tier is best-effort; --emit-tier pin gives the PIN-only tier ([#100](https://github.com/Steinbeck-Lab/Orthonym/issues/100)) ([9f87dc2](https://github.com/Steinbeck-Lab/Orthonym/commit/9f87dc26cacef005f373865b1995f24479e8e49d))
+* the default tier names stereo molecules from their stereo-free name ([#116](https://github.com/Steinbeck-Lab/Orthonym/issues/116)) ([a2a2456](https://github.com/Steinbeck-Lab/Orthonym/commit/a2a245600d196b16e452314b463fc68f99c10137))
+
+
+### Bug Fixes
+
+* a name whose parse adds or loses a hydrogen of a hypervalent halogen is not read back ([#107](https://github.com/Steinbeck-Lab/Orthonym/issues/107)) ([17e3932](https://github.com/Steinbeck-Lab/Orthonym/commit/17e393247b04d6fa7573582c3061d9422f68fd62))
+* a nested JVM reservation in the same process does not wait on its own lock ([#105](https://github.com/Steinbeck-Lab/Orthonym/issues/105)) ([e5b50e1](https://github.com/Steinbeck-Lab/Orthonym/commit/e5b50e1bbd5548bf0b66e665bf8f686052528479))
+* a ring prefix with groups that differ only in their stereodescriptors gets one name under every hash seed ([#125](https://github.com/Steinbeck-Lab/Orthonym/issues/125)) ([efc25e1](https://github.com/Steinbeck-Lab/Orthonym/commit/efc25e1f8707c672b3a1fb336607d411b91e752d))
+* cite the parent's stereodescriptors at the front of the name ([#151](https://github.com/Steinbeck-Lab/Orthonym/issues/151)) ([f2ac493](https://github.com/Steinbeck-Lab/Orthonym/commit/f2ac493c10af642f9bf0727cb373bd0616e95e5f))
+* **cli:** --batch honours --emit-tier and --provenance ([#98](https://github.com/Steinbeck-Lab/Orthonym/issues/98)) ([ec3f0bc](https://github.com/Steinbeck-Lab/Orthonym/commit/ec3f0bcebc952e003b82cad5b0f479de74a341ad))
+* **cli:** --batch refuses the flags it cannot honour; docs show both tiers ([#99](https://github.com/Steinbeck-Lab/Orthonym/issues/99)) ([ec858ba](https://github.com/Steinbeck-Lab/Orthonym/commit/ec858bae3362f8e8c4f3ad2e3b18a2d95bdcfa09))
+* enclosing marks of mononuclear-hydride substituent groups and the order of prefixes whose letters tie ([#89](https://github.com/Steinbeck-Lab/Orthonym/issues/89)) ([d1bcac5](https://github.com/Steinbeck-Lab/Orthonym/commit/d1bcac5bac421874c7faa51c027f7204262256ba))
+* groups that differ only in R/S are cited R first, whatever locant each sits at ([#126](https://github.com/Steinbeck-Lab/Orthonym/issues/126)) ([79940a5](https://github.com/Steinbeck-Lab/Orthonym/commit/79940a5d79febeb7278a2d6af43795ec7b09eae4))
+* isotope names of large molecules no longer time out ([#87](https://github.com/Steinbeck-Lab/Orthonym/issues/87)) ([4ac436f](https://github.com/Steinbeck-Lab/Orthonym/commit/4ac436f2313faf4830f40f5bd12d0902295bd134))
+* large peptides whose substituent names reuse an acid name are named in seconds ([#83](https://github.com/Steinbeck-Lab/Orthonym/issues/83)) ([91790a7](https://github.com/Steinbeck-Lab/Orthonym/commit/91790a75c79e1d343cc1c709b47b10e9ae54b86e))
+* large ring cations no longer hang, and large molecules are named faster ([#82](https://github.com/Steinbeck-Lab/Orthonym/issues/82)) ([6b29958](https://github.com/Steinbeck-Lab/Orthonym/commit/6b29958fe4e8b3a8d7215802bf361af4596ca995))
+* lost names of labelled emitters, atom-order ties and large molecules ([#133](https://github.com/Steinbeck-Lab/Orthonym/issues/133)) ([73f9f65](https://github.com/Steinbeck-Lab/Orthonym/commit/73f9f65ba60bece25ca472f30bc7bc3008d3d4c2))
+* name a radical or onium ion by the hydride of the bonds its atom holds ([#134](https://github.com/Steinbeck-Lab/Orthonym/issues/134)) ([b54b9aa](https://github.com/Steinbeck-Lab/Orthonym/commit/b54b9aa9c269b287e9d05b6dfe144eff982ae976))
+* name slow and hung rows (isotope search, native hangs) ([#148](https://github.com/Steinbeck-Lab/Orthonym/issues/148)) ([ed4d0a4](https://github.com/Steinbeck-Lab/Orthonym/commit/ed4d0a490e54b38d50393ef35b55b47788029f9b))
+* names labelled as the PIN are the Blue Book's PIN for more classes ([#118](https://github.com/Steinbeck-Lab/Orthonym/issues/118)) ([af233c3](https://github.com/Steinbeck-Lab/Orthonym/commit/af233c360d9d65666fa0a258b2afe6da1eadb5fd))
+* no PIN label for the semisystematic names of sugars, amino acids and nucleosides ([#153](https://github.com/Steinbeck-Lab/Orthonym/issues/153)) ([e0d3d23](https://github.com/Steinbeck-Lab/Orthonym/commit/e0d3d23238a3a7193aac4c98fd337522e7aaad3d))
+* nomenclature correctness updates ([#136](https://github.com/Steinbeck-Lab/Orthonym/issues/136)) ([095c41e](https://github.com/Steinbeck-Lab/Orthonym/commit/095c41e304e9b7217a9791bf9bee9fa644a0fec1))
+* nomenclature correctness updates ([#137](https://github.com/Steinbeck-Lab/Orthonym/issues/137)) ([e6f91bb](https://github.com/Steinbeck-Lab/Orthonym/commit/e6f91bb5d4236485389ceb14f78af4c332673671))
+* nomenclature correctness updates ([#140](https://github.com/Steinbeck-Lab/Orthonym/issues/140)) ([670bc2e](https://github.com/Steinbeck-Lab/Orthonym/commit/670bc2e2400796ecebe214393a04b993ba70d84e))
+* one name per molecule whatever the SMILES spelling, and PIN names for oximes ([#95](https://github.com/Steinbeck-Lab/Orthonym/issues/95)) ([827e7c2](https://github.com/Steinbeck-Lab/Orthonym/commit/827e7c23d602b6f9d3d7b94498ad1614576ac473))
+* PIN names for N-substituted imidic, sulfonimidic and hydroxamic acids ([#93](https://github.com/Steinbeck-Lab/Orthonym/issues/93)) ([8100817](https://github.com/Steinbeck-Lab/Orthonym/commit/8100817b0f83ac24c73eb967792ec697660b4ae2))
+* PIN names for senior-atom hydrides, chalcogen acids and imidic esters; false PIN labels removed ([#86](https://github.com/Steinbeck-Lab/Orthonym/issues/86)) ([e8af665](https://github.com/Steinbeck-Lab/Orthonym/commit/e8af6657c0a689af974c2660f5f9b9424f2a686e))
+* PIN names for substituted hydroximic and thiohydroximic acids, with their C=N configuration ([#88](https://github.com/Steinbeck-Lab/Orthonym/issues/88)) ([a961250](https://github.com/Steinbeck-Lab/Orthonym/commit/a9612505cc2f62252a3c80bd2faf073c1ba40355))
+* polyphenylene dendrimers are named in seconds, and --time-limit always ends a run of one structure ([#124](https://github.com/Steinbeck-Lab/Orthonym/issues/124)) ([ccff4c7](https://github.com/Steinbeck-Lab/Orthonym/commit/ccff4c7da8f5c33c0503ca518e081402081f8185)), closes [#121](https://github.com/Steinbeck-Lab/Orthonym/issues/121)
+* preferred names of N-heteroatom amines and of chalcogen acid cyanides; false PIN labels withdrawn ([#101](https://github.com/Steinbeck-Lab/Orthonym/issues/101)) ([2a185dc](https://github.com/Steinbeck-Lab/Orthonym/commit/2a185dc2d66299f729d27b942d733ea3045413f1))
+* preferred prefixes, lowest locants and skeletal replacement names for acyl halides ([#117](https://github.com/Steinbeck-Lab/Orthonym/issues/117)) ([8cc6077](https://github.com/Steinbeck-Lab/Orthonym/commit/8cc6077980a00d52ffa27824b0d7c101592b1114))
+* substituted perylene, benzo[pqr]tetraphene and other polycyclic hydrocarbons get their fusion names ([#109](https://github.com/Steinbeck-Lab/Orthonym/issues/109)) ([9056a83](https://github.com/Steinbeck-Lab/Orthonym/commit/9056a83f34ba4a2f95c6e2dbf98a67d7c5728adf))
+* **tests:** a test that hides the OPSIN jar also clears the engine's function caches ([#78](https://github.com/Steinbeck-Lab/Orthonym/issues/78)) ([5840104](https://github.com/Steinbeck-Lab/Orthonym/commit/5840104f5a7cc780ffc493675c0375680954eef7))
+* the default tier gives the same preferred name as the PIN tier in more cases ([#111](https://github.com/Steinbeck-Lab/Orthonym/issues/111)) ([cee2fb2](https://github.com/Steinbeck-Lab/Orthonym/commit/cee2fb27866625626b74f529d5021abfd25dd207))
+* the parent ring of two rings joined by =CH- follows the seniority criteria in the order the recommendations give ([#92](https://github.com/Steinbeck-Lab/Orthonym/issues/92)) ([b118d9f](https://github.com/Steinbeck-Lab/Orthonym/commit/b118d9f77aa182d682dfb8791d8b73b4d4217774))
+* two-carbon chains cite no locant that cannot vary ([#102](https://github.com/Steinbeck-Lab/Orthonym/issues/102)) ([43859a8](https://github.com/Steinbeck-Lab/Orthonym/commit/43859a8859c37019d2902f914677fedb918d2235))
+* use a jar only from a directory that no other user can write ([#85](https://github.com/Steinbeck-Lab/Orthonym/issues/85)) ([2532f0c](https://github.com/Steinbeck-Lab/Orthonym/commit/2532f0c056a249b0e4f54a1d39848c708f9cd492))
+* von Baeyer cage numbering follows the numbering criteria in full and never the input atom order ([#91](https://github.com/Steinbeck-Lab/Orthonym/issues/91)) ([d37d50a](https://github.com/Steinbeck-Lab/Orthonym/commit/d37d50a463fcb808f0a4da667ee5b7888486f444))
+* when the numbering is a free choice, the R group takes the lower locant ([#127](https://github.com/Steinbeck-Lab/Orthonym/issues/127)) ([c5f2d67](https://github.com/Steinbeck-Lab/Orthonym/commit/c5f2d673fd37f44e2ef2317a77fad2d92f07ed5c))
+
+
+### Performance Improvements
+
+* faster naming of large molecules, with every name unchanged ([#114](https://github.com/Steinbeck-Lab/Orthonym/issues/114)) ([6d9b6ed](https://github.com/Steinbeck-Lab/Orthonym/commit/6d9b6ed52a9da0029c1c1be149dde3fdb4b687c2))
+* main-ring path search on an explicit stack, same names, same budget ([#129](https://github.com/Steinbeck-Lab/Orthonym/issues/129)) ([c6dd97a](https://github.com/Steinbeck-Lab/Orthonym/commit/c6dd97a5fb85e08a07d36e948fd0c50dbb7fe2f1))
+* the main ring of large polycycles is found from sets of paths ([#123](https://github.com/Steinbeck-Lab/Orthonym/issues/123)) ([a1bcfca](https://github.com/Steinbeck-Lab/Orthonym/commit/a1bcfca356a0b259acb40bd385cad92a8a1d5408))
+
+
+### Documentation
+
+* a shorter README with a gallery, and the preprint to cite ([#81](https://github.com/Steinbeck-Lab/Orthonym/issues/81)) ([51c251b](https://github.com/Steinbeck-Lab/Orthonym/commit/51c251bf21d8c28baa5e106061426c73eb1c923a))
+
 ## [1.0.9](https://github.com/Steinbeck-Lab/Orthonym/compare/v1.0.8...v1.0.9) (2026-10-23)
 
 
