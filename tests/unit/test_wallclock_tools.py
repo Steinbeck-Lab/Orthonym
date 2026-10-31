@@ -159,7 +159,10 @@ def _tool_files():
 def _all_problems():
     problems = []
     for path in _tool_files():
-        source = path.read_text(encoding="utf-8", errors="replace")
+        try:
+            source = path.read_text(encoding="utf-8", errors="replace")
+        except FileNotFoundError:   # a file another test made and removed after the listing (a probe), not a tool
+            continue
         if "SIGALRM" not in source and "signal.alarm" not in source \
                 and "setitimer" not in source:
             continue
