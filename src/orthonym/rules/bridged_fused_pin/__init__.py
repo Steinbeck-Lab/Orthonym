@@ -327,7 +327,7 @@ def _prefix_groups(mol, atom_to_locant, exclude: Set[int]) -> List[Tuple[str, Li
     them -- the same naming call ``_partial_sat_substituent_prefix`` makes, used here
     only to rank numberings by (g) (:3307)."""
     from ...assembly.naming_utils import alpha_sort_key
-    from ..polycyclics import exocyclic_substituent_name
+    from ..polycyclics import exocyclic_substituent_name, ring_ylidene_prefix
     ring_set = set(atom_to_locant)
     halo = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
     groups: Dict[str, List[int]] = {}
@@ -338,6 +338,10 @@ def _prefix_groups(mol, atom_to_locant, exclude: Set[int]) -> List[Tuple[str, Li
                 continue
             if n.GetSymbol() in halo and n.GetDegree() == 1:
                 groups.setdefault(halo[n.GetSymbol()], []).append(idx)
+                continue
+            ylidene = ring_ylidene_prefix(mol, j, idx)
+            if ylidene is not None:
+                groups.setdefault(ylidene, []).append(idx)
                 continue
             seen, stack, frag = set(ring_set) | exclude, [j], []
             while stack:
@@ -385,7 +389,7 @@ def _assemble(mol, system: Set[int], parent: BridgedParent, suffix, added=frozen
     omit = not descriptors and _single_prefix_locant_is_omitted(
         mol, system, parent, bool(suffix_text), set(exo))
     sub_prefix = _partial_sat_substituent_prefix(
-        mol, a2l, exclude_atoms=set(exo), omit_locants=omit)
+        mol, a2l, exclude_atoms=set(exo), omit_locants=omit, ylidene_prefixes=True)
     if sub_prefix is None and (_offring_substituent_atoms(mol, a2l) - set(exo)):
         return None
     stem = f"{parent.text(elide=elide)}{suffix_text}"

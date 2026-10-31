@@ -209,13 +209,25 @@ def _descriptor(km, rings, base: fc.Component, parts: Sequence[fc.Component]):
     return best[0], next(iter(best[1]))
 
 
-def rule_name(key_mol) -> Optional[str]:
+def rule_name(key_mol, carbocyclic: bool = False) -> Optional[str]:
     """The name this module's rules give the skeleton ``key_mol`` (an element-aware all-single-bond
-    graph, ``parents._key_of``), before the tables are asked, or None outside the class."""
-    if all(a.GetAtomicNum() == 6 for a in key_mol.GetAtoms()) or not hf._lambda_free(key_mol):
+    graph, ``parents._key_of``), before the tables are asked, or None outside the class.
+
+    ``carbocyclic``: the other half of the class, a skeleton of carbon atoms only. Only the shape
+    ``fusion_names.retained_parent_name`` documents is built (a retained polycyclic hydrocarbon parent
+    and monocyclic hydrocarbon attached components, every one fused to the parent); the heterocyclic
+    skeletons are left to the call without it, and the other carbocycles to ``fusion_names``. The parent
+    is the senior component of the whole skeleton by (b):12163, (c):12234, (g):12317 "the
+    greatest number of rings in a horizontal row" and (j):12418 (``hetero_fusion._senior``). A skeleton
+    with a tetravalent fusion atom (the angular triquinane 'cyclopenta[c]pentalene') is declined: its
+    numbering (OPSIN's, checked only for a periphery walk, ``fc.periphery_numbering_ok``) is not
+    derived by here, and the von Baeyer name stands."""
+    if all(a.GetAtomicNum() == 6 for a in key_mol.GetAtoms()) != carbocyclic or not hf._lambda_free(key_mol):
         return None
     rings = fc.ortho_rings(key_mol)
     if rings is None or not 3 <= len(rings) <= MAX_RINGS:
+        return None
+    if carbocyclic and fc.tetravalent_fusion_atoms(key_mol, rings):
         return None
     # (:23710)
     if sum(1 for r in rings if len(r) >= 5) < 2:
@@ -226,6 +238,8 @@ def rule_name(key_mol) -> Optional[str]:
     texts = set()
     readings = _readings(key_mol, rings, comps)
     for base, parts in readings:
+        if carbocyclic and not (base.kind == "retained" and all(p.kind == "carbo" for p in parts)):
+            return None
         d = _descriptor(key_mol, rings, base, parts)
         if d is None:
             return None

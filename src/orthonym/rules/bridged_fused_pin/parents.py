@@ -326,6 +326,7 @@ def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], .
     if not candidates:
         # (:11903): no retained or Blue Book name -- a two-component carbocyclic
         # fusion name (``fusion_names``), numbered by OPSIN's reading of it
+        from . import fusion_names
         from .fusion_names import opsin_structure, two_component_name
         made = two_component_name(key_mol)
         struct = opsin_structure(made, key_mol.GetNumAtoms()) if made else None
@@ -343,6 +344,13 @@ def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], .
             made = poly_fusion.polycomponent_name(key_mol)
             struct = hetero_fusion.opsin_structure(made, key_mol.GetNumAtoms()) if made else None
             source = "poly_fusion_name+opsin"
+        if made is None:
+            # DT4 F1: a retained polycyclic hydrocarbon parent with monocyclic hydrocarbon attached
+            # components (``fusion_names.retained_parent_name``), numbered the same way
+            from . import hetero_fusion
+            made = fusion_names.retained_parent_name(key_mol)
+            struct = hetero_fusion.opsin_structure(made, key_mol.GetNumAtoms()) if made else None
+            source = "retained_fusion_name+opsin"
         pm = Chem.MolFromSmiles(struct[0]) if struct else None
         iso = _iso(pm, key_mol) if pm is not None else None
         if iso is not None:

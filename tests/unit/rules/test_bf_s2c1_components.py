@@ -86,12 +86,19 @@ def test_attached_component_prefixes(comp, prefix):
     assert fc.prefix_form(comp) == prefix
 
 
-@pytest.mark.parametrize("name", ["1-benzofuran", "2-benzofuran", "1-benzothiophene"])
-def test_benzofuran_and_benzothiophene_prefixes_are_not_certified(name):
-    # the book prints no PIN with '[1]benzofuro' or '[1]benzofurano' (its only such spelling,
-    #:13461, is a rejected name); the producer declines rather than guess
+@pytest.mark.parametrize("name,prefix", [
+    ("1-benzofuran", "[1]benzofuro"), ("2-benzofuran", "[2]benzofuro"),
+    ("1-benzothiophene", "[1]benzothieno"), ("2-benzothiophene", "[2]benzothieno"),
+])
+def test_benzofuran_and_benzothiophene_take_the_retained_contraction(name, prefix):
+    # Decision D1 (DT4 F1, internal notes 'D1 RULING'): '[1]benzofuro' and '[1]benzothieno' are
+    # certified PIN spellings. (:13437) a benzo unit "may be treated as a parent component or an
+    # attached component"; (:12047) 'furo' and 'thieno' are the retained contractions;
+    # (:11907) the heteroatom locants stay in brackets. Before D1 this asserted None (the book prints no
+    # '(PIN)' line after the spelling); tests/unit/rules/test_bf_f1_benzo_prefix.py holds the derivation.
+    # WHAT WOULD MAKE THIS WRONG: a Blue Book PIN that spells the attached benzofuran otherwise.
     comp = fc.Component("benzo", name, frozenset([0, 1]), frozenset(range(9)), ())
-    assert fc.prefix_form(comp) is None
+    assert fc.prefix_form(comp) == prefix
 
 
 def test_hantzsch_widman_numbering_gives_one_to_the_senior_heteroatom():

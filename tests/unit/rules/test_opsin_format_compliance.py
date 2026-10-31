@@ -802,11 +802,23 @@ def test_canary_not_rt_exact_rows_ship_no_wrong_name(smiles):
 #: "Hydroxamic acids", the Blue Book; the substituent on the N is a prefix,,:3436): the raw name is
 #: '2-(4-butoxyphenyl)-N-hydroxyacetamide' (was 'N-hydroxyacetamide', the carrier dropped), OPSIN 2.9.0
 #: full-InChIKey exact and isomeric-SMILES exact (fresh java run outside the engine).
+#: DT4 F1 (2026-10-31, change-asserted-value): canary calls 68 and 440 (DK-NOTEXACT). A ring =O (or =S, =NH) that is
+#: not the principal group is the prefix 'oxo' ('sulfanylidene', 'imino') of the fused parent hydride
+#: "Ketones", the Blue Book, '9,10-dioxo-9,10-dihydroanthracene-2-carboxylic acid (PIN)':29471;
+#::24862), which the fused builder did not spell: the raw names are now '(2S,3aR,3bR,6aS,7aR)-5,6a-
+#: dihydroxy-2,3b,4-trimethyl-6-oxo-2,3,3a,3b,6,6a,7,7a-octahydro-1H-cyclopenta[a]pentalene-2-carboxylic acid'
+#: and '(3aR,5aR,10aR)-3a,5a-dimethyl-6-oxo-1-(propan-2-yl)-2,3,3a,4,5,5a,6,7,10,10a-decahydrocyclohepta[e]indene-
+#: 8-carbaldehyde'; the locants of the second were checked atom by atom against the input, and both are OPSIN
+#: 2.9.0 full-InChIKey exact (``test_canary_not_rt_exact_raw_name_is_fixed`` reads each back with a fresh call
+#: outside the engine on every run; with the ylidene prefixes off, ``test_bf_f1_ylidene_prefixes.py``, they
+#: decline again).
 _NOW_RT_EXACT = frozenset({
     "CCCCOc1ccc(CC(=O)NO)cc1",
     "COC1OC2(OC)CC3CCC(O)C(C)C3(C)C(OC)C2=C1C",
     "C#CCCCCCCCCCCCC(O)CC(CO)OC(C)=O",
     "C#CCCCCCCCCCCCC(CC(O)CO)OC(C)=O",
+    "CC1=C(O)C(=O)[C@]2(O)C[C@H]3C[C@](C)(C(=O)O)C[C@H]3[C@]12C",
+    "CC(C)C1=C2[C@H]3CC=C(C=O)CC(=O)[C@]3(C)CC[C@@]2(C)CC1",
 })
 
 
