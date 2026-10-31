@@ -398,12 +398,18 @@ def test_the_help_describes_the_limit(capsys):
 
 
 @pytest.mark.slow
-def test_a_real_structure_that_takes_more_than_twenty_seconds_gets_no_name_and_the_run_goes_on(capsys, tmp_path):
-    """A 60-heavy-atom macrocycle with a spiro centre and an N=[S-](=O) group, which the engine needs about
-    4.5 s to name (an unloaded process, as the -uide anion of a lambda hydride,; it needed 20.7 s to
-    decline before that anion had a class). The limit is 1 s, so the margin is four-fold."""
-    cage = ("CC1C(C=CC(C2CCC2CN3CC4(CCCC5=C4C=CC(=C5)Cl)COC6=C3C=C(C=C6)C(=O)N=[S-](=O)C1C(=O)N(C)"
-            "OC7=NN(C=C7C(=O)N)C)OC)OC(=O)N(C)C")
+def test_a_real_structure_that_takes_more_than_twenty_seconds_gets_no_name_and_the_run_goes_on(capsys, tmp_path,
+                                                                                               monkeypatch):
+    """A ring of 20 rings (a cycloparaphenylene with bipyridine units) whose main-ring search runs its whole perf
+    budget, 33-52 s (tests/unit/rules/test_l4_aromatic_cages.py), under the engine of OPSIN 2.9.0 whichever OPSIN is
+    in use (``release_capabilities``: an OPSIN that reads phane names names it quickly as a cyclophane). The limit is
+    1 s. The structure used before, a 60-heavy-atom macrocycle, came to need about 1 s and was named within the limit
+    on the CI runner, three nights in a row."""
+    from tests.support.opsin_marks import release_capabilities
+    release_capabilities(monkeypatch)
+    cage = ("C1=CC2=CC=C1C3=CC=C(C=C3)C4=CC=C(C=C4)C5=CC=C(C=C5)C6=CN=C(C=C6)C7=NC=C(C=C7)C8=CC=C(C=C8)C9=CC=C(C=C9)"
+            "C1=CC=C(C=C1)C1=CC=C(C=C1)C1=CC=C(C=C1)C1=CC=C(C=C1)C1=CC=C(C=C1)C1=CN=C(C=C1)C1=NC=C(C=C1)C1=CC=C(C=C1)"
+            "C1=CC=C(C=C1)C1=CC=C2C=C1")
     started = time.monotonic()
     status, out, err = _batch(capsys, tmp_path, [NAMED, cage, NAMED2], "--time-limit", "1")
     elapsed = time.monotonic() - started
@@ -411,4 +417,4 @@ def test_a_real_structure_that_takes_more_than_twenty_seconds_gets_no_name_and_t
     assert out == [f"{NAMED}\tethanol", f"{cage}\t", f"{NAMED2}\tacetic acid"]
     assert f"{cage}\tTIME_LIMIT: no name within the time limit of 1 s" in err
     assert leaked_naming_state() == {}
-    assert elapsed < 15         # the structure did not run its 20 s
+    assert elapsed < 15         # the structure did not run its 33 s
