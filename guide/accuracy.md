@@ -21,8 +21,8 @@ The table gives both for the same molecules. It is Orthonym 1.0.9 with the chang
 | Set | Molecules | Named, default | Named, PIN-only tier | Declined, default | Declined, PIN-only tier | Unreadable, default | Unreadable, PIN-only tier |
 |:--|--:|--:|--:|--:|--:|--:|--:|
 | Held-out ChEBI 2,000 | 2,000 | 1,994 (99.70 %) | 1,062 (53.10 %) | 5 | 935 | 1 | 3 |
-| ChEBI development 2,000 | 2,000 | 1,993 (99.65 %) | 1,043 (52.15 %) | 4 | 953 | 3 | 4 |
-| Drug-like PubChem 2,000 | 2,000 | 1,959 (97.95 %) | 866 (43.30 %) | 41 | 1,121 (+1 timeout) | 0 | 12 |
+| ChEBI development 2,000 | 2,000 | 1,993 (99.65 %) | 1,042 (52.10 %) | 4 | 954 | 3 | 4 |
+| Drug-like PubChem 2,000 | 2,000 | 1,959 (97.95 %) | 865 (43.25 %) | 41 | 1,122 (+1 timeout) | 0 | 12 |
 
 Each tier's columns add up to Molecules. Named: the name read back to the input's full InChIKey; the percentage is of Molecules. Declined: no name, with a reason. A timeout (naming one molecule did not finish within the 60 seconds the harness allows) is also no name and counts as a miss. Unreadable: the engine emitted a name that OPSIN 2.9.0 cannot read, so it does not count as named. These are the documented exceptions of [Output tiers](tiers.md): at the PIN-only tier, for example, a PIN spelling that OPSIN's grammar lacks or a PIN with stereodescriptors OPSIN cannot read; at the default, a name with stereodescriptors OPSIN cannot read for a molecule that has no other name. Wrong structures, a name that reads back to a different molecule: none in any cell.
 
