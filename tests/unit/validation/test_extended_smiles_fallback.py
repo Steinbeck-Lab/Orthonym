@@ -7,6 +7,17 @@ from orthonym.validation import opsin_roundtrip as orr
 from orthonym.assembly import memo
 
 
+@pytest.fixture(autouse=True)
+def _cold_process_cache():
+    """``_extended_smiles`` is a pure function of the name and its answers are kept for the whole process
+    (``memo.pure_cache_or_compute``, lever A8): a name that another test of the worker has asked ('ethanol', 'methane':
+    the isotope search reads the locants of a component name) is answered from the cache, and these tests, which count
+    the calls to OPSIN, would then fail on the order in which the worker ran its tests."""
+    memo.clear_process_cache()
+    yield
+    memo.clear_process_cache()
+
+
 def test_rejected_name_skips_subprocess(monkeypatch):
     calls = []
     monkeypatch.setattr(orr, "opsin_extended_smiles", lambda name, jar_path=None: (jvm_bridge.REJECTED, True))

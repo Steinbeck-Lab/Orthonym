@@ -2203,8 +2203,9 @@ def _specified_stereo_count(mol) -> int:
     directional double bonds). Used to tell a stereo CONFLICT (same count, different
     canonical) from stereo OMISSION (one side under-specifies)."""
     try:
+        # No CIP label: the count needs none, and the labeller raises 'Digraph generation failed' on a large molecule.
         n = len(Chem.FindMolChiralCenters(
-            mol, includeUnassigned=False, useLegacyImplementation=False))
+            mol, includeUnassigned=False, includeCIP=False, useLegacyImplementation=False))
     except TypeError:  # older RDKit signature
         n = len(Chem.FindMolChiralCenters(mol, includeUnassigned=False))
     for b in mol.GetBonds():
@@ -3979,10 +3980,10 @@ def validate_binding_proof(value: str) -> str:
 
 import functools as _functools
 from .perception.charge_shift import (
-    MOBILE_N_CATION as _CHARGE_MOBILE_N,
     accepted_charge_forms as _accepted_charge_forms,
     charge_drawings,
     charge_places as _charge_places,
+    has_mobile_cation as _has_mobile_cation,
     kept_stereo as _kept_stereo,
 )
 from .perception.molcache import atoms_of, bonds_of, inchikey_of
@@ -4077,7 +4078,7 @@ def _charge_forms(smiles: str) -> Optional[Tuple[Tuple[str, Optional[Tuple[int, 
     try:
         mol = Chem.MolFromSmiles(smiles)
         if (mol is None or mol.GetNumHeavyAtoms() > _FORMS_MAX_HEAVY
-                or not mol.HasSubstructMatch(_CHARGE_MOBILE_N)
+                or not _has_mobile_cation(mol)
                 or _has_lone_pair_stereocentre(smiles)):
             return None
         key = Chem.MolToInchiKey(mol)

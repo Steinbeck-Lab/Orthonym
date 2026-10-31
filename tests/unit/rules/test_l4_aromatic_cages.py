@@ -214,14 +214,33 @@ CYCLOPARAPHENYLENE = (
 def test_a_ring_system_the_lifted_ceilings_cannot_analyse_in_time_is_declined_in_time(monkeypatch):
     """The late offer is bounded by the hang budgets, which count the scan for the main bridge in it. The engine is
     the one of OPSIN 2.9.0 whichever OPSIN is in use (``release_capabilities``): with an OPSIN that reads phane names
-    the ring of 20 rings is a cyclophane and no von Baeyer analysis is asked (the next test)."""
-    import time
+    the ring of 20 rings is a cyclophane and no von Baeyer analysis is asked (the next test).
+
+    'In time' is counted in perf-budget units and in trips, not in seconds. The scan for the main bridge was once not
+    charged and the offer ran 1,405 s; charged, the main-ring search of this ring system runs the 12M units of its
+    budget out once (33 s alone, 37-52 s cold, 73 s inside pytest at load: a unit costs 2.7 us here against 1 us on a
+    cage, so a clock bound failed on load alone, ladder item A2). What the bound is about is the work: the units that
+    ``rules.polycyclic.spend_perf_work`` charges in the whole call stay within the budgets of the main path, of its two
+    rescues and of the late offer. A generous wall bound (600 s) keeps an uncharged scan from hanging the suite."""
+    from orthonym.rules import polycyclic
     release_capabilities(monkeypatch)
     assert vbu.ring_system_beyond_ceiling(Chem.MolFromSmiles(CYCLOPARAPHENYLENE))
+    charged = [0]
+    real = polycyclic.spend_perf_work
+
+    def counting(n=1):
+        charged[0] += n
+        return real(n)
+
+    monkeypatch.setattr(polycyclic, "spend_perf_work", counting)
+    trips = fn.hang_budget_trips()
+    import time
     start = time.monotonic()
     with jvm_slots(1, purpose="l4-aromatic-cages"):
         assert name_compound(CYCLOPARAPHENYLENE) == ""
-    assert time.monotonic() - start < 60
+    assert time.monotonic() - start < 600
+    assert fn.hang_budget_trips() > trips, "the budget of the search was never run out: the ring system is searched"
+    assert charged[0] <= 4 * fn._PERF_BUDGET, charged[0]
 
 
 @needs_phane_opsin

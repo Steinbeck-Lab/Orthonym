@@ -74,8 +74,8 @@ def stands_before_a_one_hydrogen_group(original: Chem.Mol, skel: str, off: int) 
     if not _ONE_HYDROGEN_GROUP_WORD.match(skel, off):
         return False
     labelled = [a for a in Chem.AddHs(original).GetAtoms() if a.GetAtomicNum() == 1 and a.GetIsotope()]
-    if len(labelled) != 1:
-        return False
+    if len(labelled) != 1 or not labelled[0].GetDegree():
+        return False        # a labelled hydrogen ion ('[2H+]') is bonded to no carrier: no one-hydrogen group
     carrier = labelled[0].GetNeighbors()[0]
     return (carrier.GetSymbol() == "C" and not carrier.IsInRing()
             and sum(nb.GetAtomicNum() == 1 for nb in carrier.GetNeighbors()) == 1)

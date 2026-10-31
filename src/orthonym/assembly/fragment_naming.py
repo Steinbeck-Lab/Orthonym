@@ -475,6 +475,18 @@ def spend_analysis_call(n: int = 1) -> None:
     _fragment_guard.analysis_budget = ab
 
 
+def main_ring_trips() -> dict:
+    """The main-ring searches of this naming that ran the perf budget out: ``{structure key: the units the search is
+    known to charge at least}`` (``rules.polycyclic._find_main_ring``: the budget it ran out of, and one unit for each
+    bridgehead pair still to come). A search of the same structure that starts with no more than that runs out too, at
+    the same units, so the rescues of the outermost ``name`` do not search again. Emptied when the outermost
+    ``name`` exits."""
+    trips = getattr(_fragment_guard, 'main_ring_trips', None)
+    if trips is None:
+        trips = _fragment_guard.main_ring_trips = {}
+    return trips
+
+
 def disarm_hang_budgets() -> None:
     """Disable both macrocycle-hang budgets for the remainder of this name
     scope. Called at the outermost boundary ONCE the abstain decision is made,
@@ -626,6 +638,7 @@ def exit_name_scope():
         _fragment_guard.unproven_floor = None
         _fragment_guard.cache = None
         _fragment_guard.naming_pass_cap = None
+        _fragment_guard.main_ring_trips = None
     else:
         _fragment_guard.name_call_depth = d
 

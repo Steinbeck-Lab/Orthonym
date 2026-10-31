@@ -44,6 +44,8 @@ from .main_ring_paths import RingGraph, enumerate_paths, longest_bridge, uses_bo
 from . import main_ring_pairs  # the pair searches of the main-ring search (its PAIR_SCAN_MAX_PATHS is read live)
 from .main_ring_pairs import best_disjoint_pair, interior_masks, offered_multiatom_pairs
 from ..assembly.fragment_naming import (  # M2.5 macrocycle-hang budgets
+    PerfBudgetExceeded,
+    main_ring_trips,
     perf_units_headroom,
     spend_analysis_call,
     spend_perf_work,
@@ -1607,12 +1609,28 @@ class VonBaeyerAnalyzer:
         abstention) is unchanged. RWMol and calls outside a scope run the impl directly.
         """
         key = (frozenset(ring_atoms), frozenset(bridgeheads))
-        state = {"hit": True}
+        state = {"hit": True, "tripped": None}
 
         def _fresh():
             state["hit"] = False
             before = getattr(_fragment_guard, "perf_budget", None)
-            ring, bhp, oriented = self._find_main_ring_impl(mol, ring_atoms, bridgeheads, return_candidates=True)
+            # A search that ran the budget out is not stored by the memo, and the PIN-ceiling rescue of the same
+            # naming (``budget_rescue.pin_ceiling_name``) asks the same search again, with a budget a few dozen units
+            # above the first one (the fused-core matcher charged them in the main path only). A search is a
+            # function of the structure; its charges do not depend on the budget; it trips at the first charge that
+            # brings the budget to 0. The first trip says how many units the search charges at least (the budget it
+            # ran out of and one unit for each bridgehead pair still to come), and a later search of the same
+            # structure that starts with no more than that trips too: it is not run.
+            tripped = state["tripped"]
+            if tripped is not None and before is not None and before <= main_ring_trips().get(tripped, 0):
+                spend_perf_work(before)         # the charge that brings the budget to 0 raises, counted as a trip
+            try:
+                ring, bhp, oriented = self._find_main_ring_impl(mol, ring_atoms, bridgeheads, return_candidates=True)
+            except PerfBudgetExceeded as trip:
+                if tripped is not None and before is not None:
+                    reach = before + getattr(trip, "pairs_left", 0)
+                    main_ring_trips()[tripped] = max(reach, main_ring_trips().get(tripped, 0))
+                raise
             after = getattr(_fragment_guard, "perf_budget", None)
             units = (before - after) if (before is not None and after is not None and before > after) else 0
             return (tuple(ring) if ring else ring, bhp, tuple((tuple(r), b) for r, b in oriented), units)
@@ -1662,6 +1680,8 @@ class VonBaeyerAnalyzer:
             return cached_by_key(mol, "polycyclic.main_ring", key, _fresh)
 
         skey = _struct_key()
+        if skey is not None:
+            state["tripped"] = (skey, bool(getattr(self, "_allow_multiatom_bridge", True)))
         if skey is None:
             val = _by_object()
         else:
@@ -1731,11 +1751,20 @@ class VonBaeyerAnalyzer:
         # takes before it raises)
         pairs = _MainRingPairs(mol, ring_atoms, adj_list, spend_perf_work, _rank_key,
                                getattr(self, "_allow_multiatom_bridge", True), perf_units_headroom)
-        for bh1, bh2 in combinations(sorted(bridgeheads), 2):
+        bridgehead_pairs = list(combinations(sorted(bridgeheads), 2))
+        for done, (bh1, bh2) in enumerate(bridgehead_pairs):
             # Common neighbours (potential 1-atom main bridge atoms), and the direct bond
             # (0-atom main bridge): Cases 1-3 of _MainRingPairs
-            pairs.offer(best, bh1, bh2, adj.get(bh1, set()) & adj.get(bh2, set()),
-                        bh2 in adj.get(bh1, set()))
+            try:
+                pairs.offer(best, bh1, bh2, adj.get(bh1, set()) & adj.get(bh2, set()),
+                            bh2 in adj.get(bh1, set()))
+            except PerfBudgetExceeded as trip:
+                # The pairs still to come each charge one unit or more (``main_ring_paths.enumerate_paths``, which
+                # a ring system of ``LEVEL_MIN_RINGS`` rings or more is always searched with): what the search
+                # would have charged is at least the budget it ran out of and one unit for each of them.
+                trip.pairs_left = (len(bridgehead_pairs) - done - 1
+                                   if pairs.graph.rings >= main_ring_paths.LEVEL_MIN_RINGS else 0)
+                raise
 
         best_ring, best_bh_pair = best.ring, best.bh_pair
         # Fallback: use largest ring method (for bicyclo or unusual cases)
