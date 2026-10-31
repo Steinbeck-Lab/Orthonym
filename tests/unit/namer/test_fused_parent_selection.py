@@ -97,17 +97,11 @@ def test_p52_2_8_equal_tiebreak_ring_wins():
 
 
 @pytest.mark.unit
-def test_p31_1_3_4_np_override_preserved():
-    """ NP backbone always ring-parent: morphine is named on its ring system.
-
-    Morphine is a recognized natural-product backbone (morphinan scaffold);
-    detect_natural_product classifies it. The NP override at
-    parent_selection.py:688-700 forces ring-parent regardless of chain
-    length. a phase preserves this override BYTE-IDENTICAL per.
-
-    Source: https://iupac.qmul.ac.uk/BlueBook/P3.html
-    Source: AUTONOM-1990
-    Source: a phase internal notes (NP override byte-identical).
+def test_morphine_is_named_on_its_ring_system():
+    """Morphine is named on its ring system: it has no chain of two or more carbons, so makes the
+    ring system the parent. (This test used to guard a natural-product shortcut in parent selection that
+    made every such ring system the parent; DT4 F2 deleted it, because it only ever overruled,
+    the Blue Book.)
     """
     morphine_smiles = 'CN1CC[C@]23c4c5ccc(O)c4O[C@H]2[C@@H](O)C=C[C@H]3[C@H]1C5'
     name = name_compound(morphine_smiles)
@@ -115,7 +109,7 @@ def test_p31_1_3_4_np_override_preserved():
     # slice S4: the ring parent is the bridged fused system the Blue Book; the
     # PIN is '...-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol')
     assert name == "(4R,4aR,7S,7aR,12bS)-3-methyl-2,3,4,4a,7,7a-hexahydro-1H-4,12-methano[1]benzofuro[3,2-e]isoquinoline-7,9-diol", (
-        f"Expected the ring-parent PIN (P-31.1.3.4 NP override); got {name!r}"
+        f"Expected the ring-parent PIN; got {name!r}"
     )
 
 

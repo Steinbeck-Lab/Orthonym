@@ -487,7 +487,6 @@ def select_parent_unified(
     an out-of-range rank clamps back to ``ranked[0]``. Every returned result
     carries ``parent_pool_size`` so the caller can bound its retry.
     """
-    from ..perception.natural_products import detect_natural_product
     from .parent_selection import (
         SKELETAL_SUFFIX_PGS,
         ParentSelectionResult,
@@ -532,22 +531,11 @@ def select_parent_unified(
             )
         # else fall through: the 1-carbon PCG chain joins the pool below.
 
-    # --- Pre-empt 3: natural-product backbone, legacy:779) ---
-    np_info = detect_natural_product(mol)
-    if np_info is not None and ring_systems:
-        pool = pool_candidates(mol, ring_systems, [], principal_group,
-                               principal_group_atoms)
-        rings_only = [c for c in pool if c.kind == 'ring']
-        best = _sort_pool(mol, rings_only, principal_group,
-                          principal_group_atoms, ring_info)[0]
-        others = [t for t in ring_tuples if t != tuple(sorted(best.atoms))]
-        return ParentSelectionResult(
-            parent_type='ring',
-            parent_atoms=list(best.atoms),
-            substituent_rings=others,
-            reasoning=(f"P-31.1.3.4: {np_info['scaffold_class']} NP backbone"
-                       " - ring is parent"),
-        )
+    # No natural-product pre-empt: a stereoparent keeps a side-chain suffix only because the side chain is part of
+    # the stereoparent, and the natural_product producer builds those names before this runs. Here
+    # decides (the Blue Book): a chain with the principal characteristic group is the parent, the steroid or
+    # alkaloid ring system its substituent. The pre-empt only ever overruled that choice: when the pool ranks a
+    # ring first it picked the same ring.
 
     # --- The unified pool + comparator ---
     pool = pool_candidates(mol, ring_systems, principal_chain,

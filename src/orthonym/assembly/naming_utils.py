@@ -592,6 +592,8 @@ def strip_alphanumerical_noise(text: str) -> str:
     part of alphanumerical order. THE single definition of that exclusion, so the
     ~140 ``alpha_sort_key`` call sites cannot each grow their own -- one already
     had (``rules/ring_substituents.py`` open-coded ``_alpha_sort_key(_strip_stereo(nm))``).
+    A Greek letter this leaves inside a key (the 'α' of a steroid locant '3α', the 'λ' of
+    an inner 'λ4') is left out of the letters tier by:func:`_key_letters`.
 
     What is removed here does not vanish from the ordering: it reappears at
     ``prefix_citation_sort_key`` tier 3 via:func:`cip_descriptor_rank_key`,
@@ -4025,8 +4027,9 @@ _NON_TIER1_LETTERS_RE = re.compile(
 
 
 def _key_letters(text: str) -> str:
-    """The Roman LETTERS of a sort-key text, in order tier 1)."""
-    return ''.join(ch for ch in _NON_TIER1_LETTERS_RE.sub('', text) if ch.isalpha())
+    """The Roman LETTERS of a sort-key text, in order (P-14.5 tier 1). Greek letters are left out (P-14.5,
+    BlueBookV2.md:3446): the 'α' of a steroid locant '3α' sorted after every Roman letter."""
+    return ''.join(ch for ch in _NON_TIER1_LETTERS_RE.sub('', text) if 'a' <= ch.lower() <= 'z')
 
 
 def prefix_roman_and_italic(text: str) -> tuple:

@@ -41,7 +41,8 @@ STAY_DECLINED = [
     ("phospholipid", "CCCCCC/C=C\\CCCCCCCC(=O)OC[C@H](COP(=O)(O)OCCN)OC(=O)CCCCCCCCCCCCCCCC"),
     ("glycoside", "C=C(C)[C@@H]1CC=C(CO[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)CC1"),
     ("boronic acid", "B(/C=C/C[C@H](C)O)(O)O"),
-    ("alkaloid ester (atropine)", "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1"),
+    # atropine left this list with DT4 F2: the first run builds its functional-class ester name on the von Baeyer
+    # ring, a fully systematic name, the Blue Book), not a stereoparent name
     ("Boc-peptide ester",      # peptide-like: the substitutive name is not promoted (DT3 lead decision 1)
      "CCOC(=O)/C=C/[C@H](C[C@@H]1CCNC1=O)NC(=O)[C@H](CC(C)C)NC(=O)[C@@H](NC(=O)[C@H](CO)NC(=O)OC(C)(C)C)C(C)C"),
 ]

@@ -142,6 +142,15 @@ def _is_sulfoxide_type_centre(atom) -> bool:
     return len(nbrs) == 3 and len(oxo) == 1 and len(carbons) == 2
 
 
+def _decomposition_replaces(assembled: str, decomp_name: str) -> str:
+    """``decomp_name``, after dropping the confidence record stored for ``assembled``, the name it replaces: that
+    record's locant map numbers the replaced name, and the stereo backstop would apply it to ``decomp_name``."""
+    from .assembly.coverage_scoring import clear_confidence, retrieve_confidence
+    if retrieve_confidence().get('name') == assembled:
+        clear_confidence()
+    return decomp_name
+
+
 def _final_stereo_check(
     mol,
     name: str,
@@ -9406,8 +9415,8 @@ class Orthonym:
             # _perceive at the chain-orientation site (features.atom_to_locant);
             # it is never recomputed and never passed into compute_confidence
             # (byte-identity Risk 1).
-            if (getattr(features, 'chain_is_parent', False)
-                    and getattr(features, 'atom_to_locant', None)):
+            if (getattr(features, 'chain_is_parent', False)  # a chain that built no name publishes no map
+                    and getattr(features, 'atom_to_locant', None) and name and not is_failure_name(name)):
                 from .assembly.coverage_scoring import (
                     CandidateName,
                     retrieve_confidence,
@@ -9698,7 +9707,7 @@ class Orthonym:
                 from .decomposition import try_decompose
                 decomp_name = _noted("decomposition", try_decompose(mol, style=self.style), mol)
                 if decomp_name and decomp_name != assembled:
-                    return decomp_name
+                    return _decomposition_replaces(assembled, decomp_name)
                 # Decomposition also failed: return the SMILES-based
                 # canonical SMILES as an honest fallback rather than a
                 # garbled pseudo-IUPAC name that could mislead.
@@ -9731,7 +9740,7 @@ class Orthonym:
                         "(%.4f < %.2f), using decomposition fallback",
                         conf_score, _TRUNCATION_CONFIDENCE_THRESHOLD,
                     )
-                    return decomp_name
+                    return _decomposition_replaces(assembled, decomp_name)
 
             #: atom_coverage secondary gate -- catches quality-gate false
             # positives where retained ring names inflate character-based
@@ -9798,7 +9807,7 @@ class Orthonym:
                                 "decomposition fallback",
                                 atom_cov,
                             )
-                            return decomp_name
+                            return _decomposition_replaces(assembled, decomp_name)
 
         # ============================================================
         # W8-P9 Task 9.2: organometallic structure-loss veto (ACCURACY-
@@ -10055,8 +10064,7 @@ class Orthonym:
 
         # Parent selection for ALL cyclic molecules (a phase: no fused-heterocycle bypass).
         # cascade runs whenever a meaningful chain exists; cascade itself
-        # enforces NP override (parent_selection.py:688-700) and
-        # ring-on-tie tiebreaker (parent_selection.py:862-869).
+        # enforces the ring-on-tie tiebreaker (parent_selection.py:862-869).
         # Source: https://iupac.qmul.ac.uk/BlueBook/P4.html
         # Source: https://iupac.qmul.ac.uk/BlueBook/P5.html
         # Source: AUTONOM 1990 (full seniority cascade on ALL structures).

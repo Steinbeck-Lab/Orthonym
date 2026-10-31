@@ -765,8 +765,7 @@ def select_parent(
     ``rules/p44_scorer.select_parent_unified`` for the rule cascade
      PG count -> senior class -> ring>chain
     -> among rings / among chains -> tiebreaks) and
-    the preserved pre-empts (single-carbon PCG chain, natural
-    products, admission).
+    the preserved pre-empts (single-carbon PCG chain, admission).
 
     Args:
         mol: RDKit Mol object
