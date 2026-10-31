@@ -23,8 +23,10 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
+from orthonym import opsin_capabilities as caps
 from orthonym.rules import ring_assemblies as ra
 from orthonym.validation.opsin_roundtrip import _find_opsin_jar
+from tests.support.opsin_marks import composite_or_primed, release_capabilities
 
 pytestmark = pytest.mark.opsin_gate
 
@@ -45,8 +47,10 @@ LOCANT_INITIAL = [
      "[2,2'-bi-1,3-thiazole]-4,4'-dicarboxylic acid"),
     # the assembly is a substituent prefix ('-yl' on the enclosed assembly)
     ("CC(=O)c1csc(n1)-c1nccs1", "1-([2,2'-bi-1,3-thiazol]-4-yl)ethan-1-one"),
-    # three and four components, the same prefix-to-name junction)
-    ("c1csc(n1)-c1csc(n1)-c1nccs1", "2,4':2',2''-ter-1,3-thiazole"),
+    # three and four components, the same prefix-to-name junction;,:24078: the PIN has composite
+    # locants where the OPSIN in use reads them, and the hyphen before the locant-initial component stays)
+    ("c1csc(n1)-c1csc(n1)-c1nccs1",
+     composite_or_primed("2,4':2',2''-ter-1,3-thiazole", "1^2,2^2:2^4,3^2-ter-1,3-thiazole")),
 ]
 
 # Names whose component does not begin with a locant: unchanged.
@@ -63,7 +67,7 @@ CONTROLS = [
     # the Blue Book "the locant set 1,1':2',1'':3'',1''' is lower than 1,1':3',1'':2'',1'''";
     # the book's own '2,2':6',2'':6'',2'''-quaterpyridine':15667): '2,2':5',2''-terthiophene',
     # which OPSIN 2.9.0 reads back to the full InChIKey (leads L2 item N9c; was '2,5':2',2''-')
-    ("s1cccc1-c1ccc(s1)-c1cccs1", "2,2':5',2''-terthiophene"),
+    ("s1cccc1-c1ccc(s1)-c1cccs1", composite_or_primed("2,2':5',2''-terthiophene", "1^2,2^2:2^5,3^2-terthiophene")),
 ]
 
 
@@ -116,16 +120,33 @@ def test_the_writer_puts_a_hyphen_only_before_a_locant():
 # nomenclature, as in the PIN beside '1H,3''H-3,3':3',3''-terindole' (:15669). The writer
 # spells these assemblies with primed locants, so such a name is never labelled a PIN:
 # the default tier declines it and the wider tiers return it below the PIN label.
-PRIMED_THREE_PLUS = [
-    ("s1cccc1-c1ccc(s1)-c1cccs1", "2,2':5',2''-terthiophene"),
-    ("c1csc(n1)-c1csc(n1)-c1nccs1", "2,4':2',2''-ter-1,3-thiazole"),
-    ("c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1''-terphenyl"),
-    ("c1ccc(cc1)-c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1'':4'',1'''-quaterphenyl"),
+#
+# With an OPSIN that reads composite locants the engine names an unbranched assembly of three or more identical rings
+# with them (``rules.composite_assembly``), and that name is the PIN, unlabelled. An assembly that is a substituent
+# prefix keeps the primed locants (no composite prefix is built) and the label.
+# (SMILES, the primed name, the composite PIN or None for a name that keeps its primed locants)
+THREE_PLUS = [
+    ("s1cccc1-c1ccc(s1)-c1cccs1", "2,2':5',2''-terthiophene", "1^2,2^2:2^5,3^2-terthiophene"),
+    ("c1csc(n1)-c1csc(n1)-c1nccs1", "2,4':2',2''-ter-1,3-thiazole", "1^2,2^2:2^4,3^2-ter-1,3-thiazole"),
+    ("c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1''-terphenyl", "1^1,2^1:2^4,3^1-terphenyl"),
+    ("c1ccc(cc1)-c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "1,1':4',1'':4'',1'''-quaterphenyl",
+     "1^1,2^1:2^4,3^1:3^4,4^1-quaterphenyl"),
     # the assembly as the suffix parent and as a substituent prefix
-    ("OC(=O)c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "[1,1':4',1''-terphenyl]-4-carboxylic acid"),
+    ("OC(=O)c1ccc(cc1)-c1ccc(cc1)-c1ccccc1", "[1,1':4',1''-terphenyl]-4-carboxylic acid",
+     "[1^1,2^1:2^4,3^1-terphenyl]-1^4-carboxylic acid"),
     ("OC(=O)CCCc1ccc(cc1)-c1ccc(cc1)-c1ccccc1",
-     "4-([1,1':4',1''-terphenyl]-4-yl)butanoic acid"),
+     "4-([1,1':4',1''-terphenyl]-4-yl)butanoic acid", None),
 ]
+THREE_PLUS_IDS = [row[1] for row in THREE_PLUS]
+
+
+def _expected(primed, composite):
+    """``(name, tier, is_pin)`` the engine gives: the composite PIN where it is built and OPSIN reads it, else the
+    primed name below the PIN."""
+    if composite is not None and caps.composite_assembly_enabled():
+        return composite, "pin_verified", True
+    return primed, "systematic_verified", False
+
 
 # Two-component assemblies: primed locants are the PIN numbering,:15573-15577).
 TWO_COMPONENT_PINS = [
@@ -143,31 +164,52 @@ def default_tier():
     return Orthonym()
 
 
-@pytest.mark.parametrize("smiles,expected", PRIMED_THREE_PLUS,
-                         ids=[name for _, name in PRIMED_THREE_PLUS])
-def test_primed_three_plus_assembly_is_never_a_pin(best_effort, default_tier,
-                                                   smiles, expected):
+@pytest.mark.parametrize("smiles,primed,composite", THREE_PLUS, ids=THREE_PLUS_IDS)
+def test_a_three_plus_assembly_is_a_pin_only_with_composite_locants(best_effort, default_tier,
+                                                                    smiles, primed, composite):
     from orthonym.errors import is_failure_name
+    name, tier, is_pin = _expected(primed, composite)
     wide = best_effort.name_tiered(smiles)
-    assert wide["name"] == expected, wide
+    assert wide["name"] == name, wide
+    assert (wide["tier"], wide["is_pin"]) == (tier, is_pin), wide
+    pin = default_tier.name_tiered(smiles)
+    if is_pin:
+        assert (pin["name"], pin["tier"], pin["is_pin"]) == (name, "pin_verified", True), pin
+    else:
+        assert pin["tier"] != "pin_verified" and not pin["is_pin"], pin
+        assert is_failure_name(pin["name"]), pin
+
+
+@pytest.mark.parametrize("smiles,primed,composite", THREE_PLUS, ids=THREE_PLUS_IDS)
+def test_the_decline_of_a_primed_three_plus_assembly_records_its_rule(best_effort, default_tier,
+                                                                     smiles, primed, composite):
+    # the default tier's decline row, and the row of the name the wider tiers keep, give
+    # as the reason (``spelling_failures``); where the composite PIN is built there is no decline
+    name, _, is_pin = _expected(primed, composite)
+    pin = default_tier.name_tiered(smiles)
+    wide = best_effort.name_tiered(smiles)
+    assert wide["name"] == name, wide
+    if is_pin:
+        assert not pin["spelling_failures"] and not wide["spelling_failures"], (pin, wide)
+        return
+    assert (pin["tier"], pin["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), pin
+    assert "P-52.2.7.2" in [f["rule"] for f in pin["spelling_failures"]], pin
+    assert "P-52.2.7.2" in [f["rule"] for f in wide["spelling_failures"]], wide
+
+
+@pytest.mark.parametrize("smiles,primed,composite", THREE_PLUS, ids=THREE_PLUS_IDS)
+def test_primed_three_plus_assembly_is_never_a_pin(best_effort, default_tier, monkeypatch, smiles, primed, composite):
+    # the engine as it is with OPSIN 2.9.0, whichever OPSIN is in use,:24078): the primed name is
+    # never a PIN, the default tier declines it, and both rows give the rule
+    from orthonym.errors import is_failure_name
+    release_capabilities(monkeypatch)
+    wide = best_effort.name_tiered(smiles)
+    assert wide["name"] == primed, wide
     assert wide["tier"] == "systematic_verified" and not wide["is_pin"], wide
     pin = default_tier.name_tiered(smiles)
     assert pin["tier"] != "pin_verified" and not pin["is_pin"], pin
     assert is_failure_name(pin["name"]), pin
-
-
-@pytest.mark.parametrize("smiles,expected", PRIMED_THREE_PLUS,
-                         ids=[name for _, name in PRIMED_THREE_PLUS])
-def test_the_decline_of_a_primed_three_plus_assembly_records_its_rule(best_effort, default_tier,
-                                                                     smiles, expected):
-    # the default tier's decline row, and the row of the name the wider tiers keep, give
-    # as the reason (``spelling_failures``)
-    pin = default_tier.name_tiered(smiles)
-    assert (pin["tier"], pin["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), pin
-    assert "P-52.2.7.2" in [f["rule"] for f in pin["spelling_failures"]], pin
-    wide = best_effort.name_tiered(smiles)
-    assert wide["name"] == expected, wide
-    assert "P-52.2.7.2" in [f["rule"] for f in wide["spelling_failures"]], wide
+    assert "P-52.2.7.2" in [f["rule"] for f in pin["spelling_failures"] + wide["spelling_failures"]], (pin, wide)
 
 
 @pytest.mark.parametrize("smiles,expected", TWO_COMPONENT_PINS,
@@ -182,9 +224,10 @@ def test_two_component_assembly_keeps_the_pin_label(default_tier, smiles, expect
 def test_the_label_holds_on_a_warm_namer(best_effort):
     """The same namer, the same molecules again after others: the label does not
     depend on what the namer has cached."""
-    for smiles, expected in PRIMED_THREE_PLUS + PRIMED_THREE_PLUS[::-1]:
+    for smiles, primed, composite in THREE_PLUS + THREE_PLUS[::-1]:
+        name, tier, _ = _expected(primed, composite)
         result = best_effort.name_tiered(smiles)
-        assert result["name"] == expected and result["tier"] == "systematic_verified", result
+        assert result["name"] == name and result["tier"] == tier, result
     for smiles, expected in TWO_COMPONENT_PINS:
         result = best_effort.name_tiered(smiles)
         assert result["name"] == expected and result["tier"] == "pin_verified", result

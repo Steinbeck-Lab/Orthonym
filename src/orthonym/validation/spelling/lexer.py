@@ -51,7 +51,9 @@ _ISOTOPE_LOCANT = r"(?:\d+[a-z]?'*|\d+[A-Z][a-z]?|[A-Z][a-z]?\d*'*)"
 _ISOTOPE_GROUP = (r"(?:" + _ISOTOPE_LOCANT + r"(?:\s*,\s*" + _ISOTOPE_LOCANT + r")*\s*-\s*)?"
                   r"(?:\d+\s*(?:H|C|N|O|S|P|F|Cl|Br|I|Se|B)\s*\d*\s*,?\s*)+")
 _ISOTOPE = re.compile(r"^\s*(?:" + _ISOTOPE_GROUP + r")+$")
-_ASSEMBLY = re.compile(r"^\d+'*[a-z]?,\d+'*[a-z]?(?:[:,]\d+'*[a-z]?)*-"
+#: a junction locant of a ring assembly: primed ("2'", "4'a") or composite: '2^4', ring then superscript)
+_ASSEMBLY_LOCANT = r"\d+(?:\^\d+[a-z]?)?'*[a-z]?"
+_ASSEMBLY = re.compile(r"^" + _ASSEMBLY_LOCANT + r"," + _ASSEMBLY_LOCANT + r"(?:[:,]" + _ASSEMBLY_LOCANT + r")*-"
                        r"(?:bi(?!s)|ter|quater|quinque|sexi|septi|octi|novi|deci)")
 
 

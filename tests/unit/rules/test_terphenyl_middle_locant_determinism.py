@@ -12,6 +12,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
+from tests.support.opsin_marks import composite_or_primed
 
 pytestmark = pytest.mark.unit
 
@@ -34,5 +35,7 @@ def test_terphenyl_middle_ring_carboxy_locant_is_deterministic():
     assert len(names) == 1, f"nondeterministic: {names}"
     # lowest-locant rule: the junction adjacent to the substituent is 1',
     # so the carboxy sits at 2' (the two outer phenyls are identical, so
-    # either junction may be numbered 1').
-    assert names == {"[1,1':4',1''-terphenyl]-2'-carboxylic acid"}
+    # either junction may be numbered 1'). With composite locants, the Blue Book, where the OPSIN in
+    # use reads them) the carboxy sits at 2^2, the second ring's position 2.
+    assert names == {composite_or_primed("[1,1':4',1''-terphenyl]-2'-carboxylic acid",
+                                         "[1^1,2^1:2^4,3^1-terphenyl]-2^2-carboxylic acid")}

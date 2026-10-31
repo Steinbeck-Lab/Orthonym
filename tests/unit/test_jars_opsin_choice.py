@@ -176,13 +176,13 @@ def test_release_jar_has_no_phane_grammar(monkeypatch):
     from orthonym import opsin_capabilities as caps
     caps._reset_cache()
     monkeypatch.setattr(caps, "_probe", lambda path: pytest.fail("the release jar is not probed"))
-    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": False}
+    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": False, "composite_assembly": False}
     assert caps.phane_enabled() is False
 
 
 def test_phane_enabled_follows_the_probe(monkeypatch):
     from orthonym import opsin_capabilities as caps
-    monkeypatch.setattr(caps, "opsin_capabilities", lambda: {"phane": True, "halogen_uide": False})
+    monkeypatch.setattr(caps, "opsin_capabilities", lambda: {"phane": True, "halogen_uide": False, "composite_assembly": False})
     assert caps.phane_enabled() is True
 
 
@@ -196,14 +196,14 @@ def test_an_unserved_probe_is_not_cached(monkeypatch):
         calls.append(path)
         if len(calls) == 1:
             raise OpsinUnavailable("in-process OPSIN busy")
-        return {"phane": True, "halogen_uide": True}
+        return {"phane": True, "halogen_uide": True, "composite_assembly": True}
 
     monkeypatch.setattr(caps, "_probe", probe)
     monkeypatch.setattr(jars, "active_opsin", lambda: {"label": "custom", "commit": None, "path": "/x.jar"})
     caps._reset_cache()
-    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": False}
-    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": True}
-    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": True}
+    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": False, "composite_assembly": False}
+    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": True, "composite_assembly": True}
+    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": True, "composite_assembly": True}
     assert calls == ["/x.jar", "/x.jar"]
 
 
@@ -215,13 +215,13 @@ def test_a_built_jar_keeps_its_answer_in_its_sidecar(monkeypatch, tmp_path):
     side.write_text(json.dumps({"commit": SHA}))
     side.chmod(0o644)  # as ensure_jar leaves it
     probes = []
-    monkeypatch.setattr(caps, "_probe", lambda path: probes.append(path) or {"phane": True, "halogen_uide": False})
+    monkeypatch.setattr(caps, "_probe", lambda path: probes.append(path) or {"phane": True, "halogen_uide": False, "composite_assembly": False})
     monkeypatch.setattr(jars, "active_opsin", lambda: {"label": "main", "commit": SHA, "path": str(jar)})
     caps._reset_cache()
-    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": False}
-    assert json.loads(side.read_text()) == {"commit": SHA, "capabilities": {"phane": True, "halogen_uide": False}}
+    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": False, "composite_assembly": False}
+    assert json.loads(side.read_text()) == {"commit": SHA, "capabilities": {"phane": True, "halogen_uide": False, "composite_assembly": False}}
     caps._reset_cache()  # a new process: the sidecar answers, no probe
-    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": False}
+    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": False, "composite_assembly": False}
     assert probes == [str(jar)]
 
 
@@ -231,20 +231,20 @@ def test_a_malformed_sidecar_answer_is_probed_again(monkeypatch, tmp_path):
     jar.write_bytes(b"jar")
     jar.with_suffix(".json").write_text(json.dumps({"commit": SHA, "capabilities": {"phane": "yes"}}))
     jar.with_suffix(".json").chmod(0o644)
-    monkeypatch.setattr(caps, "_probe", lambda path: {"phane": False, "halogen_uide": True})
+    monkeypatch.setattr(caps, "_probe", lambda path: {"phane": False, "halogen_uide": True, "composite_assembly": True})
     monkeypatch.setattr(jars, "active_opsin", lambda: {"label": "main", "commit": SHA, "path": str(jar)})
     caps._reset_cache()
-    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": True}
+    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": True, "composite_assembly": True}
 
 
 def test_a_given_jar_is_probed_and_leaves_no_file(monkeypatch, tmp_path):
     from orthonym import opsin_capabilities as caps
     jar = tmp_path / "own.jar"
     jar.write_bytes(b"jar")
-    monkeypatch.setattr(caps, "_probe", lambda path: {"phane": True, "halogen_uide": True})
+    monkeypatch.setattr(caps, "_probe", lambda path: {"phane": True, "halogen_uide": True, "composite_assembly": True})
     monkeypatch.setattr(jars, "active_opsin", lambda: {"label": "custom", "commit": None, "path": str(jar)})
     caps._reset_cache()
-    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": True}
+    assert caps.opsin_capabilities() == {"phane": True, "halogen_uide": True, "composite_assembly": True}
     assert sorted(p.name for p in tmp_path.iterdir()) == ["own.jar"]
 
 
@@ -255,7 +255,7 @@ def test_no_jar_means_no_capability(monkeypatch):
         raise jars.JarUnavailable("no jar")
     monkeypatch.setattr(jars, "active_opsin", missing)
     caps._reset_cache()
-    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": False}
+    assert caps.opsin_capabilities() == {"phane": False, "halogen_uide": False, "composite_assembly": False}
 
 
 def test_the_probe_reads_the_release_jar_as_unable(tmp_path):
@@ -269,4 +269,4 @@ def test_the_probe_reads_the_release_jar_as_unable(tmp_path):
         r = subprocess.run([sys.executable, "-c",
                             "from orthonym.opsin_capabilities import opsin_capabilities as c; print(c())"],
                            env=env, cwd=tmp_path, capture_output=True, text=True, timeout=300)
-    assert r.stdout.strip() == "{'phane': False, 'halogen_uide': False}", (r.stdout, r.stderr[-500:])
+    assert r.stdout.strip() == "{'phane': False, 'halogen_uide': False, 'composite_assembly': False}", (r.stdout, r.stderr[-500:])

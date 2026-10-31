@@ -43,7 +43,10 @@ from pathlib import Path
 
 import pytest
 from rdkit import Chem
+
+from orthonym import opsin_capabilities as caps
 from tests.support.jars import jar_or_none
+from tests.support.opsin_marks import composite_or_primed
 
 
 # Lazy imports inside test bodies so test collection succeeds even when
@@ -250,27 +253,28 @@ class TestPrimedLocants:
 
     @pytest.mark.unit
     def test_terphenyl_emits_primed_locant_form(self):
-        """: name_compound emits 1,1':4',1''-terphenyl, NOT carat."""
+        """: name_compound emits 1,1':4',1''-terphenyl, NOT carat. With an OPSIN that reads composite locants the
+        name is the PIN with composite locants, the Blue Book), whose superscripts the caret
+        writes (``rules.composite_assembly``)."""
         from orthonym import name_compound
         name = name_compound("c1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
-        assert name is not None
-        assert "terphenyl" in name
-        # Must NOT contain caret notation per
-        assert "^" not in name
+        assert name == composite_or_primed("1,1':4',1''-terphenyl", "1^1,2^1:2^4,3^1-terphenyl")
+        assert ("^" in name) == caps.composite_assembly_enabled()     # a caret only in composite locants
 
     @pytest.mark.unit
     def test_no_carat_in_quaterphenyl_name(self):
         from orthonym import name_compound
         name = name_compound("c1ccc(-c2ccc(-c3ccc(-c4ccccc4)cc3)cc2)cc1")
-        assert name is not None
-        assert "^" not in name
+        assert name == composite_or_primed("1,1':4',1'':4'',1'''-quaterphenyl",
+                                           "1^1,2^1:2^4,3^1:3^4,4^1-quaterphenyl")
+        assert ("^" in name) == caps.composite_assembly_enabled()
 
     @pytest.mark.unit
     def test_terphenyl_para_emits_canonical_blue_book_form(self):
         """ + +: middle ring gets locant 4 (para-attachment)."""
         from orthonym import name_compound
         name = name_compound("c1ccc(-c2ccc(-c3ccccc3)cc2)cc1")
-        assert name == "1,1':4',1''-terphenyl"
+        assert name == composite_or_primed("1,1':4',1''-terphenyl", "1^1,2^1:2^4,3^1-terphenyl")
 
 
 # ============================================================================

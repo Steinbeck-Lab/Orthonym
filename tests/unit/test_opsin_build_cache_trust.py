@@ -258,14 +258,14 @@ def test_the_capability_sidecar_is_written_through_a_new_file_and_only_if_truste
     side.write_text(json.dumps({"commit": SHA}))
     side.chmod(0o644)
     (tmp_path / "opsin-main-abc.json.part").symlink_to(victim)
-    caps._store(str(jar), {"phane": True, "halogen_uide": False})
+    caps._store(str(jar), {"phane": True, "halogen_uide": False, "composite_assembly": False})
     assert victim.read_text() == "precious"
-    assert json.loads(side.read_text())["capabilities"] == {"phane": True, "halogen_uide": False}
-    assert caps._stored(str(jar)) == {"phane": True, "halogen_uide": False}
+    assert json.loads(side.read_text())["capabilities"] == {"phane": True, "halogen_uide": False, "composite_assembly": False}
+    assert caps._stored(str(jar)) == {"phane": True, "halogen_uide": False, "composite_assembly": False}
     side.chmod(0o664)  # group-writable: not read, not rewritten
     assert caps._stored(str(jar)) is None
-    caps._store(str(jar), {"phane": False, "halogen_uide": False})
-    assert json.loads(side.read_text())["capabilities"] == {"phane": True, "halogen_uide": False}
+    caps._store(str(jar), {"phane": False, "halogen_uide": False, "composite_assembly": False})
+    assert json.loads(side.read_text())["capabilities"] == {"phane": True, "halogen_uide": False, "composite_assembly": False}
 
 
 # --- the reviewer's attacks, offline ----------------------------------------------------------------

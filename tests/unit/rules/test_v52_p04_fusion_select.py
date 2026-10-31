@@ -3,6 +3,7 @@ Rows from benchmarks/bb_conformance (def_id in comments). Each already
 round-trips as a von-Baeyer degrade today (RIGHT_MOL_NONPIN); this pins the PIN."""
 import pytest
 from orthonym import name_compound
+from tests.support.opsin_marks import composite_or_primed
 
 # --- Regression guards: these already MATCH and must stay MATCH ---
 @pytest.mark.parametrize("smiles,expected", [
@@ -113,6 +114,10 @@ def test_d5_ternaphthalene_middle_junctions_distinct():
     # symmetric MULTI-ring terminals is a separate assembly-ordering refinement
     # (follow-on) -- _order_systems_along_path picks min(terminals) by index and
     # the downstream compare_locant_sets only reorders SINGLE-ring components.
+    #
+    # With composite locants, the Blue Book, where the OPSIN in use reads them) the junction locants
+    # are chosen over the whole assembly, ring first: 1^2,2^2:2^6,3^2 (the lowest written order of the set), and the
+    # non-numbering is 1^2,2^2:2^2,3^2.
     out = name_compound("c1ccc2cc(-c3ccc4cc(-c5ccc6ccccc6c5)ccc4c3)ccc2c1")
-    assert out == "2,6':2',2''-ternaphthalene"
-    assert out != "2,2':2',2''-ternaphthalene"  # the fixed non-numbering
+    assert out == composite_or_primed("2,6':2',2''-ternaphthalene", "1^2,2^2:2^6,3^2-ternaphthalene")
+    assert out not in ("2,2':2',2''-ternaphthalene", "1^2,2^2:2^2,3^2-ternaphthalene")  # the fixed non-numbering

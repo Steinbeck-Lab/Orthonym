@@ -19,6 +19,7 @@ from orthonym import name_compound
 from orthonym.perception.rings import get_ring_systems
 from orthonym.rules import branched_assembly
 from orthonym.rules.ring_cluster import is_one_ring_cluster
+from tests.support.opsin_marks import composite_or_primed
 
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
@@ -154,14 +155,18 @@ def test_an_unbranched_assembly_with_substituents_on_a_middle_ring_is_numbered_b
     chlorine at 5', fluorine at 6')."""
     smiles = "Fc1c(Cl)cc(-c2ccc(-c3ccccc3)cc2)cc1-c1ccccc1"
     name = name_compound(smiles)
-    assert name == "5'-chloro-6'-fluoro-1,1':3',1'':4'',1'''-quaterphenyl"
+    # (the Blue Book): where OPSIN reads composite locants the PIN has them (junction set
+    # 1^1,2^1:2^3,3^1:3^4,4^1 before the substituents,:16109), else the primed name of general nomenclature
+    assert name == composite_or_primed("5'-chloro-6'-fluoro-1,1':3',1'':4'',1'''-quaterphenyl",
+                                       "2^5-chloro-2^6-fluoro-1^1,2^1:2^3,3^1:3^4,4^1-quaterphenyl")
     assert _read_back_key(name) == Chem.MolToInchiKey(Chem.MolFromSmiles(smiles))
 
 
 def test_an_unbranched_assembly_that_is_named_today_keeps_its_name():
     """``detect_assembly_or_branched`` returns the result of ``detect_ring_assembly`` unchanged when its name is built
     and read back."""
-    assert name_compound("Cc1ccc(cc1)-c1ccc(cc1)-c1ccc(C)cc1") == "4,4''-dimethyl-1,1':4',1''-terphenyl"
+    assert name_compound("Cc1ccc(cc1)-c1ccc(cc1)-c1ccc(C)cc1") == composite_or_primed(
+        "4,4''-dimethyl-1,1':4',1''-terphenyl", "1^4,3^4-dimethyl-1^1,2^1:2^4,3^1-terphenyl")   #,:24078
     assert name_compound("Cc1ccc(cc1)-c1ccccc1") == "4-methyl-1,1'-biphenyl"
 
 
