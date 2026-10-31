@@ -104,6 +104,38 @@ def descriptor_locant_at_a_parent_without_positions(mol, name):
     return PASS if decided else ABSTAIN
 
 
+#: one item of a stereodescriptor set: a locant (numerical, lettered, primed or N) and a descriptor, as
+#: ``decomposition.fragment_assembly._FRONT_STEREO_RE`` reads the block at the front of a name
+_ITEM = r"(?:(?:[0-9]+[a-z]*'*|N'*)?(?:[RSEZrsMP]\*?|RS|SR))"
+#: a set written straight after a letter, a digit or a closing mark, or after the hyphen of a prefix, i.e.
+#: between a prefix and the rest of the name: 'N-methyl(1E,2E)-but-2-en-1-imine'. A set at the front of the
+#: name, after a space (an ester or salt word), after an opening mark (the front of an enclosed prefix) or after
+#: 'rel-' / 'rac-' does not count.
+_BLOCK_AFTER_PREFIX = re.compile(rf"(?<=[a-z0-9\)\]\}}])(-?)\(({_ITEM}(?:,{_ITEM})*)\)-")
+
+
+@register('P-91.3')
+def descriptor_block_after_a_prefix(mol, name):
+    """A stereodescriptor set between a prefix and the part it opens,:44643): the parent's
+    descriptors are "placed at the front of the complete name", a substituent's "at the front of the
+    corresponding prefix", so a set never follows a prefix: '(1E,2E)-N-methylbut-2-en-1-imine', not
+    'N-methyl(1E,2E)-but-2-en-1-imine'. A sulfur isotope label of the structure ('3-methyl(34S)-2H-thiopyran',
+     has the same spelling as a set '(34S)' and is not one."""
+    if P10.search(name):
+        return None
+    sulfur_masses = ({str(a.GetIsotope()) for a in mol.GetAtoms() if a.GetSymbol() == 'S' and a.GetIsotope()}
+                     if mol is not None else set())
+    for m in _BLOCK_AFTER_PREFIX.finditer(name):
+        if m.group(1) and name[:m.start()].endswith(('rel', 'rac')):
+            continue
+        items = m.group(2).split(',')
+        if all(i.endswith('S') and i[:-1] in sulfur_masses for i in items):
+            continue
+        return SpellingFailure('P-91.3', f"descriptor set '({m.group(2)})' after the prefix "
+                                         f"'{show(name[:m.start()][-30:])}': it belongs at the front")
+    return None
+
+
 #: an italic N locant (or a set 'N,N', "N,N'") joined by a hyphen to a prefix that begins with its own
 #: numerical locant and a letter: 'N-2-methoxyethyl', 'N,N-1-phenylethyl'. 'N,2-dimethyl' (a numerical
 #: locant in the set), 'N-1H-indol-3-yl' (an indicated hydrogen) and the isotope descriptor 'N-2H1' do not match.

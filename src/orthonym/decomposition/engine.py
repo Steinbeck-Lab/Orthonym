@@ -2054,7 +2054,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                         _wrap_n_substituent,
                         enclose_if_compound,
                     )
-                    from .fragment_assembly import _acid_to_acyl, _join_components
+                    from .fragment_assembly import _acid_to_acyl, n_prefixed
                     acid_name = fragment_names.get("acid", "")
                     amine_name = fragment_names.get("amine", "")
                     acyl = _acid_to_acyl(acid_name)
@@ -2073,7 +2073,7 @@ def _try_single_bond_decompose(mol, bond: Dict, style: str = "pin") -> Optional[
                         # an existing enclosure, so add the base level first, as
                         # fragment_assembly._assemble_amide does.
                         wrapped_acyl = _wrap_n_substituent(enclose_if_compound(acyl))
-                        sub_name = f"N-{_join_components(wrapped_acyl, amine_name)}"
+                        sub_name = n_prefixed(wrapped_acyl, amine_name)
                         if sub_name and _name_quality_is_acceptable(sub_name, mol):
                             # Decision A: refused (inside _handle_peptide's systematic
                             # attempt) or demoted when the acylated N is not a suffix

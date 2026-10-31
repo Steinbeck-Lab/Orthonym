@@ -830,7 +830,9 @@ def _assemble_ceramide(mol, match, style) -> Optional[str]:
     if descriptors:
         substituent = format_stereodescriptor_string(descriptors) + substituent
 
-    return f"N-[{substituent}]{amide}"
+    # (the Blue Book): the amide's own block ('(9Z)-') stays at the front of the complete name
+    from ..assembly.composition_primitives import prefixes_after_front_stereo
+    return prefixes_after_front_stereo(f"N-[{substituent}]", amide)
 
 
 def name_lipid(mol, style: str = "pin") -> Optional[str]:

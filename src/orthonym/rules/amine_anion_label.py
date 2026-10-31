@@ -76,5 +76,6 @@ def ring_aminide(mol, anion_idx: int, style: str) -> str:
     if not prefix or not parent or ' ' in parent or ',' in parent:
         return ''
     aminide = apply_ion_suffix_to_name((parent[:-1] if parent.endswith('e') else parent) + 'amine', -1)
-    name = f"N-{enclose_if_compound(prefix)}{aminide}" if aminide else ''
+    from ..assembly.composition_primitives import prefixes_after_front_stereo   #: block first
+    name = prefixes_after_front_stereo(f"N-{enclose_if_compound(prefix)}", aminide) if aminide else ''
     return name if name and _full_inchikey_rt_ok(mol, name) else ''

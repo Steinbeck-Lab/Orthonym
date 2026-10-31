@@ -490,11 +490,11 @@ def prefixes_after_front_stereo(prefix_str: str, name: str) -> str:
     '(2S,3R)-' + '4-(3,5-difluorophenyl)-2,3-dimethyl-N-propyl' + 'butan-1-amine', not
     '4-(3,5-difluorophenyl)-2,3-dimethyl-N-propyl(2S,3R)-butan-1-amine'. The prefixes and the name are
     concatenated as they were; only the block moves in front of them."""
-    from ..rules.stereochemistry import _STEREO_PREFIX_RE
-    m = _STEREO_PREFIX_RE.match(name or "")
-    if not prefix_str or m is None:
+    from ..decomposition.fragment_assembly import split_front_stereo
+    front, rest = split_front_stereo(name or "")
+    if not prefix_str or not front:
         return prefix_str + (name or "")
-    return f"{name[:m.end()]}{prefix_str}{name[m.end():]}"
+    return f"{front}{prefix_str}{rest}"
 
 
 # Leading top-level (alpha-carbon) locant run on a formatted prefix, e.g. the
