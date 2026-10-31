@@ -868,9 +868,14 @@ CI_BENCHMARK = [
         "CCC/C=C/C/C=C/C/C=C/CCCCC(=O)O",
         "(6E,9E,12E)-hexadeca-6,9,12-trienoic acid",
     ),
+    # DT4 F1: the oxo fused-ring name is built now (was _declined, a production-state snapshot).
+    # (Specific rules related to indicated hydrogen...): the remaining indicated hydrogen
+    # goes to the lowest nonfusion peripheral atom, 'hydro' prefixes take the saturated positions;
+    # its example "(not 4,5-dihydro-...6H-...; 4H is lower than 6H)". So 6H, not 6,7-dihydro-8H
+    # (OPSIN 2.9.0 reads both to the input's InChIKey).
     pytest.param(
         "CC1=CC2=C(C=O)C(=O)C(C)(O)C(O)C2=CO1",
-        _declined(),
+        _ships("7,8-dihydroxy-3,7-dimethyl-6-oxo-7,8-dihydro-6H-2-benzopyran-5-carbaldehyde"),
         marks=_GATE,
     ),
     pytest.param(

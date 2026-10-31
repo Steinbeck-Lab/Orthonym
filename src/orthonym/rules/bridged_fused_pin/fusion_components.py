@@ -64,6 +64,9 @@ CONTRACTED = {"anthracene": "anthra", "naphthalene": "naphtho", "benzene": "benz
               "phenanthrene": "phenanthro", "furan": "furo", "imidazole": "imidazo",
               "pyridine": "pyrido", "pyrimidine": "pyrimido", "thiophene": "thieno"}
 #: (Table 1.4) numerical terms 3-20 (21 and above: ``chain_names.numerical_term``)
+#: the benzo names whose heteromonocycle has a retained contracted prefix (:12047 'furo', 'thieno'):
+#: '[1]benzofuro', '[2]benzofuro', '[1]benzothieno', '[2]benzothieno' (``prefix_form``, decision D1)
+_BENZO_CONTRACTED = {"benzofuran": "benzofuro", "benzothiophene": "benzothieno"}
 _NUMERAL = {3: "propa", 4: "buta", 5: "penta", 6: "hexa", 7: "hepta", 8: "octa", 9: "nona",
             10: "deca", 11: "undeca", 12: "dodeca", 13: "trideca", 14: "tetradeca",
             15: "pentadeca", 16: "hexadeca", 17: "heptadeca", 18: "octadeca", 19: "nonadeca",
@@ -124,9 +127,28 @@ def prefix_form(comp: Component) -> Optional[str]:
      (:11905) / (:12024) "changing the final letter 'e' into the letter
     'o' or by adding the letter 'o' when no final letter 'e' is present"; (:12000)
     'cyclo...a' for a monocyclic hydrocarbon other than benzene; heteroatom locants in
-    brackets. None for a benzo name on furan or thiophene: the book prints no PIN with
-    '[1]benzofuro' / '[1]benzofurano' (its only such spelling,:13461, is a rejected name), so
-    that prefix is not certified."""
+    brackets.
+
+    A benzo name on furan or thiophene takes the retained contraction of its stem, '[1]benzofuro'
+    and '[1]benzothieno' (decision D1, 2026-10-31). The book prints no line with '(PIN)' after a
+    name that carries it: its one such spelling (:13461, `### **** Retained names are
+    senior to names of benzoheterocycles.`, '10H-furo[3',2':4,5]indeno[2,1-b]pyridine (PIN) (not
+    10H-[1]benzofuro[5',4':3,4]cyclopenta[1,2-b]pyridine; pyridine is senior to furan; indene, as
+    a retained name, must be used)') is rejected for the retained name, not for the prefix. The
+    certification rests on: (:11813, '1-benzofuran (PIN)':11827) the benzo unit is one
+    component; (:13437) it "may be treated as a parent component or an attached
+    component depending on the order of seniority described in "; (:11905,
+    :11907) an attached name ends in 'o' "or by other means described in " (the retained
+    'furo' and 'thieno' of:12047) and keeps the heteroatom locants of the component in square
+    brackets; the PIN precedents '[1]benzopyrano[2,3-c]pyrrole' (:12157) and '[1,2]benzoxazolo[6,5-g]
+    quinoline' (:13449); and the derived parent '[1]benzofuro[3,2-e]isoquinoline'
+    (``derived_parents``). The caller guarantees the four seniority checks: the benzo unit is the
+    attached component, ``hetero_fusion._readings``), no multiparent name exists
+    , ``hetero_fusion._multi``), no retained name is displaced, a benzene that
+    sits in indene, naphthalene or quinoline is never merged, ``hetero_fusion._merged``), and no
+    'dibenzo' name exists:13463, ``hetero_fusion._merged``). The heteroatom locant
+    bracket is mandatory (:11907). The spelling '[1]benzofurano' is not used: OPSIN reads it as
+    '[1]benzofuro', so a read-back cannot tell them apart, and no source prints it."""
     if comp.kind == "carbo":
         size = len(comp.atoms)
         if size == 6:
@@ -136,8 +158,8 @@ def prefix_form(comp: Component) -> Optional[str]:
     loc, stem = split_locants(comp.name)
     if stem in CONTRACTED:
         pre = CONTRACTED[stem]
-    elif comp.kind == "benzo" and (stem.endswith("furan") or stem.endswith("thiophene")):
-        return None
+    elif comp.kind == "benzo" and stem in _BENZO_CONTRACTED:
+        pre = _BENZO_CONTRACTED[stem]
     elif stem.endswith("e"):
         pre = stem[:-1] + "o"
     else:

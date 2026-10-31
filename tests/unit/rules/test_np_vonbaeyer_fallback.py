@@ -136,17 +136,29 @@ def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
     assert r["source"] != "general_engine"
 
 
-def test_converted_row_provenance_is_general_engine(retained="hopane"):
+def test_converted_row_provenance_is_general_engine(retained="yohimban"):
     """The adopted (converted) row DOES carry the general-engine source -- the
-    restore fires only on reject, never on adopt. `hopane` is a converter whose
+    restore fires only on reject, never on adopt. `yohimban` is a converter whose
     systematic name is von Baeyer (general engine); `ursane`'s is the fusion name
     of a carbon-only ortho-fused system, "Five-membered ring
     requirement" (the Blue Book-23710), which the PIN path builds, so its
-    row is `pin_path` (test below)."""
+    row is `pin_path` (test below), as `hopane`'s and `lupane`'s now are
+    (cyclopenta[a]chrysene, DT4 F1; they stood here as von Baeyer converters)."""
     from tests.support.rt_assert import assert_full_rt
     r = _best_effort_namer().name_tiered(_BY_NAME[retained])
     assert r["name"] != retained
     assert r["source"] == "general_engine"
+    assert_full_rt(r["name"], _BY_NAME[retained])
+
+
+@pytest.mark.parametrize("retained", ["hopane", "lupane"])
+def test_converted_cyclopentachrysene_row_is_pin_path_and_round_trips(retained):
+    """`hopane` and `lupane` convert to a cyclopenta[a]chrysene fusion name through the PIN path
+    (``fusion_names.retained_parent_name``, (b):12163: chrysene, four rings, is the
+    parent); the name reads back to the input's full InChIKey."""
+    from tests.support.rt_assert import assert_full_rt
+    r = _best_effort_namer().name_tiered(_BY_NAME[retained])
+    assert r["source"] == "pin_path" and "icosahydro" in r["name"] and "cyclopenta[a]chrysene" in r["name"], r
     assert_full_rt(r["name"], _BY_NAME[retained])
 
 

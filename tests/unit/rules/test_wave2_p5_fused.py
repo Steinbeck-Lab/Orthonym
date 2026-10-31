@@ -270,17 +270,28 @@ class TestP25ThreeComponentOrthoPeri:
         assert name_compound("C=1OC2=C3C(C4=CC=C(C13)O4)=CO2") == \
             "2,3,9-trioxa-5,8-methanocyclopenta[cd]azulene"
 
-    def test_p25_5_header_fails_closed(self, monkeypatch):
-        # header evidence has no OPSIN-2.9-verifiable PIN
-        # (proposed benzo[4,5-b]naphtho[2,3-d]anthracene parses to a DIFFERENT
-        # structure) -> must decline, never emit a guessed name. Assert under the
-        # production gate (the conftest autouse fixture disables it by default).
+    def test_p25_5_header_skeleton_is_named_by_its_retained_parent(self, monkeypatch):
+        # The skeleton of the header evidence has a fusion name of the ordinary class: the parent
+        # component is the senior one, (b) "a component containing the greater number of rings"
+        # (the Blue Book; chrysene and triphenylene have four), (j) "the lower locants for the peripheral
+        # fusion carbon atoms" (:12418; chrysene 4a,4b,6a,10a,10b,12a against triphenylene 4a,4b,8a,8b,12a,12b),
+        # so 'benzo[g]chrysene' with 'benzo' lettered g:11911). The proposed
+        # benzo[4,5-b]naphtho[2,3-d]anthracene parses to a DIFFERENT structure and is not built; the name
+        # that is built reads back to the input's full InChIKey (fresh OPSIN call outside the engine).
+        # Before DT4 F1 (change-asserted-value: the old value was 'declines' because no builder named a
+        # four-ring hydrocarbon parent) this asserted a decline; with the retained-parent builder disabled it
+        # declines again (test_bf_f1_carbocyclic_retained_parent.py, mutation test).
+        # WHAT WOULD MAKE THIS WRONG: a seniority criterion between chrysene and triphenylene that
+        # (a)-(j) ranks the other way.
         import orthonym.namer as _namer
+        from tests.support.rt_assert import name_is_rt_exact
         if not _namer._validity_gate_jar_present():
             pytest.skip("OPSIN jar not present; production gate cannot run")
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False, raising=False)
-        out = name_compound("C1=CC=C2C(=C1)C=CC3=C2C4=CC=CC=C4C5=CC=CC=C35", on_failure="label", emit_tier="pin")
-        assert out in (None, "unknown organic compound")
+        smiles = "C1=CC=C2C(=C1)C=CC3=C2C4=CC=CC=C4C5=CC=CC=C35"
+        out = name_compound(smiles, on_failure="label", emit_tier="pin")
+        assert out == "benzo[g]chrysene"
+        assert name_is_rt_exact(out, smiles)
 
 
 @pytest.mark.unit

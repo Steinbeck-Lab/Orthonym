@@ -36,9 +36,25 @@ monocyclic hydrocarbon.... There is no upper ring-size limit to this criterion."
 preferred IUPAC names only to compounds having at least two rings of at least five or more
 members."
 
-Declined: heteroatoms, three components, four or more rings, peri-fusion (an atom in three
-rings), two equal rings (the polyalenes are table names), a skeleton the tables name, and
-any name OPSIN 2.9.0 cannot read back to the same skeleton."""
+Declined by ``two_component_name``: heteroatoms, three components, four or more rings, peri-fusion
+(an atom in three rings), two equal rings (the polyalenes are table names), a skeleton the tables
+name, and any name OPSIN 2.9.0 cannot read back to the same skeleton.
+
+``retained_parent_name`` is the other class of carbocycle, a retained polycyclic hydrocarbon parent
+(chrysene, phenanthrene, fluorene, tetracene,...) with monocyclic hydrocarbon attached components
+('benzo[a]tetracene (PIN)':13972, 'dibenzo[c,g]phenanthrene':12982, 'cyclopenta[a]chrysene'): the
+reading, the multiplied prefixes and the letters are ``poly_fusion``'s; the parent is the senior
+component of the whole skeleton by (``hetero_fusion._senior``, ``fusion_components.rank_key``), in
+order: (b) "a component containing the greater number of rings" (:12163), (c) the larger ring at the first point
+of difference (:12234), (g) "A component containing the greatest number of rings in a horizontal row when it is
+drawn in the preferred orientation according to " (:12317; 'benzo[pqr]tetraphene (PIN)':12390,
+"tetraphene (3 rings in horizontal row) preferred to chrysene or pyrene (2 rings in horizontal row)"), and (j)
+"A component with the lower locants for the peripheral fusion carbon atoms" (:12418). So a skeleton that holds
+a four-ring retained component takes it before a three-ring one (dibenzo[a,h]anthracene is
+'benzo[k]tetraphene'), and (g) ranks tetraphene over chrysene ('benzo[c]tetraphene', not benzo[b]chrysene) and
+over triphenylene ('benzo[f]tetraphene', not benzo[b]triphenylene). A skeleton the tables name, a member of the
+ series, a heteroring, a tetravalent fusion atom, a second-order attached component and a tie of
+different names are declined."""
 import re
 from functools import lru_cache
 from itertools import combinations
@@ -114,15 +130,43 @@ def two_component_name(key_mol) -> Optional[str]:
     element-aware all-single-bond graph, ``parents._key_of``), or None outside the class of
     the module docstring. A skeleton the parent tables name has a retained, systematic or
     Blue Book name, which (:11903) puts before any fusion name: declined."""
+    if _named_by_the_tables(key_mol):
+        return None
+    return _rule_name(key_mol)
+
+
+def retained_parent_name(key_mol) -> Optional[str]:
+    """The fusion name (no indicated hydrogen) of a carbocyclic skeleton that is a retained
+    polycyclic hydrocarbon with monocyclic hydrocarbon attached components, or None outside the
+    class (see the module docstring); a skeleton the parent tables name is declined, as in
+    ``two_component_name``."""
+    if _named_by_the_tables(key_mol):
+        return None
+    return _retained_rule_name(key_mol)
+
+
+def _retained_rule_name(key_mol) -> Optional[str]:
+    """The name the rules of ``retained_parent_name`` give the skeleton, before the tables are
+    asked (the tests rebuild the book's own names of the class with it)."""
+    from . import poly_fusion
+    return poly_fusion.rule_name(key_mol, carbocyclic=True)
+
+
+def _named_by_the_tables(key_mol) -> bool:
+    """True when a retained or systematic name of / names the skeleton:
+    (:11903) puts those before any fusion name. The tables hold the printed ones; a member of the
+    open series of (hexacene, octahelicene,...; ``hydrocarbon_series``) is named by its
+    own rule, which no table lists."""
     from ...data import get_retained_name
+    from ..hydrocarbon_series import identify_series
     from .parents import _IH, _mancude, _table_index, is_pin_parent_name
     if _table_index().get(Chem.MolToSmiles(key_mol)):
-        return None
+        return True
     std = _mancude(key_mol)
     retained = get_retained_name(Chem.MolToSmiles(std)) if std is not None else None
     if retained and is_pin_parent_name(_IH.sub("", retained)):
-        return None
-    return _rule_name(key_mol)
+        return True
+    return std is not None and identify_series(std) is not None
 
 
 def _rule_name(key_mol) -> Optional[str]:

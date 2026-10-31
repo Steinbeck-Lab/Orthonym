@@ -2256,11 +2256,35 @@ def exocyclic_substituent_name(mol, sub_atoms, attach_idx, ring_atoms) -> Option
     return name_substituent_fragment(mol, sub_atoms, attach_idx, ring_atoms)
 
 
+#: the one-atom ylidene substituents on a ring atom and their prefixes. "Ketones" (the Blue Book):
+#: "The prefix 'oxo'... is used to denote carbonyl groups" when a group of higher seniority takes the suffix
+#: ('9,10-dioxo-9,10-dihydroanthracene-2-carboxylic acid (PIN)',:29471); (:29504)
+#: 'sulfanylidene' for =S ('3-amino-2-sulfanylidene-1,3-thiazolidin-4-one (PIN)',:26312); ****
+#: (:26540) "The prefix 'imino' for =NH is used in presence of characteristic groups having seniority over
+#: imines" ('4-iminonaphthalen-1(4H)-one (PIN)',:24870).
+_YLIDENE_PREFIX = {"O": "oxo", "S": "sulfanylidene", "N": "imino"}
+
+
+def ring_ylidene_prefix(mol, atom_idx: int, ring_idx: int) -> Optional[str]:
+    """'oxo', 'sulfanylidene' or 'imino' when atom ``atom_idx`` is a bare =O, =S or =NH on
+    ring atom ``ring_idx``, else None (a charged, labelled, radical or substituted atom is
+    left to the fragment namer)."""
+    atom = mol.GetAtomWithIdx(atom_idx)
+    prefix = _YLIDENE_PREFIX.get(atom.GetSymbol())
+    bond = mol.GetBondBetweenAtoms(atom_idx, ring_idx)
+    if (prefix is None or bond is None or bond.GetBondType() != Chem.BondType.DOUBLE
+            or atom.GetDegree() != 1 or atom.GetFormalCharge() or atom.GetNumRadicalElectrons()
+            or atom.GetIsotope() or atom.GetTotalNumHs() != (1 if prefix == "imino" else 0)):
+        return None
+    return prefix
+
+
 def _partial_sat_substituent_prefix(
     mol, atom_to_locant: Dict[int, Any],
     exclude_atoms: Optional[Set[int]] = None,
     spelled_out: Optional[Set[int]] = None,
     omit_locants: bool = False,
+    ylidene_prefixes: bool = False,
 ) -> Optional[str]:
     """Build the alphanumerically-sorted detachable-substituent prefix string
     (with trailing hyphen) for EVERY substituent on a partially-saturated fused
@@ -2290,7 +2314,10 @@ def _partial_sat_substituent_prefix(
     exactly one answer to "what does this name already account for".
 
     ``omit_locants``: the caller has established that the one locant of the one prefix is
-    omitted by (the Blue Book, 'chlorocoronene (PIN)':2947)."""
+    omitted by (the Blue Book, 'chlorocoronene (PIN)':2947).
+
+    ``ylidene_prefixes``: a bare =O, =S or =NH on a ring atom takes its prefix
+    (``ring_ylidene_prefix``); off, the fragment namer is asked and declines such an atom."""
     from ..assembly.naming_utils import alpha_sort_key_rs, format_substituent_prefix
 
     exclude = exclude_atoms or set()
@@ -2321,6 +2348,12 @@ def _partial_sat_substituent_prefix(
                 grouped['nitro'].append(atom_to_locant[idx])
                 spelled.update(_nitro)
                 continue
+            if ylidene_prefixes:
+                _ylidene = ring_ylidene_prefix(mol, n.GetIdx(), idx)
+                if _ylidene is not None:
+                    grouped[_ylidene].append(atom_to_locant[idx])
+                    spelled.add(n.GetIdx())
+                    continue
             sub_atoms: List[int] = []
             seen = set(ring_set) | exclude
             stack = [n.GetIdx()]
