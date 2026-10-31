@@ -3,7 +3,9 @@
 User decision 2026-10-20 (PS lane 1 a performance pass): the PIN label of glycine, pentazolidine and the
 nucleoside and nucleotide table names is lowered ("Keep the names but label them below PIN
 (systematic_verified). The default tier would then decline them."). The wider class (sugars,
-steroids, N-acetylneuraminic acid) is not part of the decision.
+steroids, N-acetylneuraminic acid) is not part of the decision. The relabel of 2026-10-31
+(internal notes) extends it to the to names (sugars, all amino
+acids, cyclitols, nucleosides); the list names (steroids) keep their labels.
 
 Blue Book basis, each anchor opened (the Blue Book Blue Book):
 
@@ -117,13 +119,23 @@ def test_the_glycine_zwitterion_is_declined_at_default_and_labelled_below_pin_at
 
 
 @pytest.mark.parametrize("smiles, name", [
-    # the other amino-acid names are not denied: neither drawing moves
+    # relabel (2026-10-31, the user's delegated ruling, internal notes): the
+    # other amino-acid names are no PIN either:50943, the Table 10.4 rows print no '(PIN)'); the
+    # spelling check validation/spelling/checks_natural_products.py lowers them. Changed asserted value:
+    # 'pin_verified' -> declined at the default tier and systematic_verified at best-effort; independent
+    # check: name_is_rt_exact (OPSIN reads the name back to the input); mutation: with the check removed
+    # from pin_spelling.BUILTIN_CHECK_MODULES the default tier ships the name pin_verified again.
     ("C[C@H](N)C(=O)O", "L-alanine"),
     ("C[C@H]([NH3+])C(=O)[O-]", "L-alanine"),
     ("N[C@@H](CO)C(=O)O", "L-serine"),
     ("[NH3+][C@@H](CO)C(=O)[O-]", "L-serine"),
     ("[NH3+]CCC(=O)[O-]", "beta-alanine"),
 ])
-def test_other_amino_acid_names_keep_their_pin_label(smiles, name):
-    for row in (name_default(smiles), name_breadth(smiles)):
-        assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (name, "pin_verified", True), row
+def test_other_amino_acid_names_are_labelled_below_pin(smiles, name):
+    row = name_default(smiles)
+    assert (row.get("tier"), row.get("is_pin"), row.get("limit_code")) == (
+        "abstain", False, "NO_VERIFIED_PIN"), row
+    row = name_breadth(smiles)
+    assert (row.get("name"), row.get("tier"), row.get("is_pin")) == (
+        name, "systematic_verified", False), row
+    assert name_is_rt_exact(name, smiles), name

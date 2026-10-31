@@ -568,7 +568,7 @@ def main(args: List[str] = None) -> int:
             "the name and verified it (tier pin_verified); this was the default up to "
             "release 1.0.x. The exceptions are names from "
             "the natural-product and metal-complex lists, the name formats absent from "
-            "OPSIN's grammar (inositols; phanes, checked by building their structure), PIN "
+            "OPSIN's grammar (phanes, checked by building their structure), PIN "
             "spellings that OPSIN reads back through a twin spelling of the same structure "
             "(ethan(2H)ol, diphenyliodanuide, methane-SO-thioperoxol) or through their acids (dianhydrides), PINs whose "
             "stereodescriptors OPSIN cannot read, for which the PIN-only tier compares the "

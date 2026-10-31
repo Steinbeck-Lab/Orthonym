@@ -147,8 +147,11 @@ def test_l_carnitine_unchanged(namer):
 def test_l_serine_zwitterion_unchanged(namer):
     # Single-anion protonated-amine zwitterion -- the established
     # retained/neutral-form amino-acid path (defer), unaffected by the
-    # new multi-anion branch (len(anions) == 1 here).
-    assert _dt_obj_name(namer, "[NH3+][C@@H](CO)C(=O)[O-]") == "L-serine"
+    # new multi-anion branch (len(anions) == 1 here).:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes): read at the
+    # best-effort tier, where the retained name ships below the PIN.
+    from orthonym.cli import _emit_tier_flags
+    be = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
+    assert be.name("[NH3+][C@@H](CO)C(=O)[O-]") == "L-serine"
 
 
 @pytest.mark.opsin_gate

@@ -193,8 +193,6 @@ T3_ROWS = [
      '5-amino-6-(7-amino-6-methoxy-5,8-dioxo-5,8-dihydroquinolin-2-yl)-4-(2-hydroxy-3-methoxyphenyl)-3-methylpyridine-2-carboxylic acid'),
     ('d1919', 'CC(=O)OC1CC(C)Cc2ccc(C)c(/C=C/C(O)CC(O)CC(=O)O)c21',
      '(6E)-7-[8-(acetyloxy)-2,6-dimethyl-5,6,7,8-tetrahydronaphthalen-1-yl]-3,5-dihydroxyhept-6-enoic acid'),
-    ('d200', 'C[C@@H]1O[C@@H](Oc2cccc3c2C(=O)c2ccc(C[C@@](C)(O)CC(=O)O)c(O)c2C3=O)[C@H](O)[C@H](O)[C@H]1O',
-     '(3R)-3-hydroxy-4-[1-hydroxy-5-(α-L-rhamnopyranosyloxy)-9,10-dioxo-9,10-dihydroanthracen-2-yl]-3-methylbutanoic acid'),
     ('d722', 'CN1C(=O)[C@H](Cc2c[nH]c3cccc([N+](=O)[O-])c23)N(C)C(=O)C1Cc1ccccc1',
      '(6S)-3-benzyl-1,4-dimethyl-6-[(4-nitro-1H-indol-3-yl)methyl]piperazine-2,5-dione'),
     ('d1006', 'CC(C)=CCc1c2c(c(O)c3c1OC(c1ccc4c(c1)C=CC(C)(C)O4)CC3=O)C=CC(C)(C)O2',
@@ -213,6 +211,19 @@ def test_t3_the_default_tier_ships_the_pin(rid, smiles, expected):
     row = _row(smiles)
     assert row["name"] == expected, row
     assert row["tier"] == "pin_verified" and row["is_pin"], row
+    assert_full_rt(row["name"], smiles)
+
+
+def test_t3_a_glycoside_is_declined_at_the_default_tier():
+    # d200 left T3_ROWS relabel 2026-10-31): the 'α-L-rhamnopyranosyloxy' prefix is a name and
+    #:50943 gives no PIN in Chapter, so the default tier declines; the best-effort tier gives the name
+    from orthonym.cli import _emit_tier_flags
+    smiles = 'C[C@@H]1O[C@@H](Oc2cccc3c2C(=O)c2ccc(C[C@@](C)(O)CC(=O)O)c(O)c2C3=O)[C@H](O)[C@H](O)[C@H]1O'
+    name = ('(3R)-3-hydroxy-4-[1-hydroxy-5-(α-L-rhamnopyranosyloxy)-9,10-dioxo-9,10-dihydroanthracen-2-yl]'
+            '-3-methylbutanoic acid')
+    assert _row(smiles)["limit_code"] == "NO_VERIFIED_PIN"
+    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
+    assert (row["name"], row["tier"], row["is_pin"]) == (name, "systematic_verified", False), row
     assert_full_rt(row["name"], smiles)
 
 

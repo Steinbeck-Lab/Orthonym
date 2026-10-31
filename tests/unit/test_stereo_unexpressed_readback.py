@@ -71,7 +71,6 @@ UNSTATED = [
 STATED = [
     ("C/C=C/C=C/C(=O)[O-]", "(2E,4E)-hexa-2,4-dienoate"),
     ("C[C@H](N)C(=O)[O-]", "(2S)-2-aminopropanoate"),
-    ("[NH3+][C@@H](Cc1ccccc1)C(=O)[O-]", "L-phenylalanine"),
     ("CCO", "ethanol"),
 ]
 
@@ -89,6 +88,13 @@ def test_a_pin_name_that_leaves_the_configuration_out_is_flagged(smiles, name, t
 def test_a_name_that_states_every_element_is_not_flagged(smiles, name, tier):
     row = _namer(tier).name_tiered(smiles)
     assert row["name"] == name
+    assert row["stereo_unexpressed"] is False
+
+
+def test_a_retained_amino_acid_name_states_its_centre():
+    #:50943 gives no PIN in Chapter (relabel 2026-10-31, internal notes): the name is read at the best-effort tier only (the PIN tier declines it)
+    row = _namer("best-effort").name_tiered("[NH3+][C@@H](Cc1ccccc1)C(=O)[O-]")
+    assert row["name"] == "L-phenylalanine"
     assert row["stereo_unexpressed"] is False
 
 

@@ -166,8 +166,8 @@ def test_a_name_of_the_exact_match_list_is_not_read_on_a_route_outside_p10(monke
     """'hopane' reaches the label site through the NATURAL_PRODUCT route, so the class
     skip alone keeps its label; with that skip turned off, the list-name clause must still keep
     the checks from reading a name of the exact-match list (user decision 2026-09-30)."""
-    import orthonym.namer as namer_mod
-    monkeypatch.setattr(namer_mod, "_SPELLING_CHECK_SKIPPED_CLASSES", ())
+    from orthonym.validation.spelling import route_scope
+    monkeypatch.setattr(route_scope, "_SPELLING_CHECK_SKIPPED_CLASSES", ())
     row = Orthonym().name_tiered(HOPANE)
     # INTRODUCTION (the Blue Book, sentence:50943): "Preferred IUPAC names (PINs) are not identified fo
     # r the compounds in this Chapter." Lead decision 2026-10-17 (the user delegated it to the Blue Book) replaced the 2026-09-30 (c) label for the exact-match list: systematic_verified, verified 'identity'.
@@ -175,13 +175,16 @@ def test_a_name_of_the_exact_match_list_is_not_read_on_a_route_outside_p10(monke
     assert not row.get("spelling_failures"), row
 
 
-def test_a_name_of_a_p10_route_is_not_read():
-    # 'aspart-4-ol' (the AMINO_ACID route, nomenclature;:50943 gives no PIN in
-    # Chapter: its label is the natural-product decision's, not this check's
+def test_a_name_of_the_amino_acid_route_is_read():
+    # 'aspart-4-ol' (the AMINO_ACID route, nomenclature)::50943 gives no PIN in Chapter
+    #, and since the relabel (2026-10-31, internal notes) the
+    # carbohydrate and amino-acid route names are read like any other. Changed asserted value: the
+    # default tier shipped it pin_verified and now declines it; mutation: with "AMINO_ACID" back in
+    # validation/spelling/route_scope._SPELLING_CHECK_SKIPPED_CLASSES the default tier ships it again.
     smiles = "N[C@@H](CCO)C(=O)O"
     assert check_pin_spelling(Chem.MolFromSmiles(smiles), "aspart-4-ol", strict=True)
-    row = Orthonym().name_tiered(smiles)
-    assert (row["name"], row["tier"]) == ("aspart-4-ol", "pin_verified"), row
+    declined = assert_default_tier_declines(smiles)
+    assert _rules(declined), declined
 
 
 def test_a_substitutive_name_of_the_peptide_route_is_read():

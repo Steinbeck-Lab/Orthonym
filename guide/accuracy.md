@@ -20,15 +20,15 @@ The table gives both for the same molecules. It is Orthonym 1.0.9 with the chang
 
 | Set | Molecules | Named, default | Named, PIN-only tier | Declined, default | Declined, PIN-only tier | Unreadable, default | Unreadable, PIN-only tier |
 |:--|--:|--:|--:|--:|--:|--:|--:|
-| Held-out ChEBI 2,000 | 2,000 | 1,994 (99.70 %) | 1,106 (55.30 %) | 5 | 891 | 1 | 3 |
-| ChEBI development 2,000 | 2,000 | 1,993 (99.65 %) | 1,108 (55.40 %) | 4 | 888 | 3 | 4 |
-| Drug-like PubChem 2,000 | 2,000 | 1,937 (96.85 %) | 860 (43.00 %) | 63 | 1,127 (+1 timeout) | 0 | 12 |
+| Held-out ChEBI 2,000 | 2,000 | 1,994 (99.70 %) | 1,062 (53.10 %) | 5 | 935 | 1 | 3 |
+| ChEBI development 2,000 | 2,000 | 1,993 (99.65 %) | 1,043 (52.15 %) | 4 | 953 | 3 | 4 |
+| Drug-like PubChem 2,000 | 2,000 | 1,959 (97.95 %) | 866 (43.30 %) | 41 | 1,121 (+1 timeout) | 0 | 12 |
 
 Each tier's columns add up to Molecules. Named: the name read back to the input's full InChIKey; the percentage is of Molecules. Declined: no name, with a reason. A timeout (naming one molecule did not finish within the 60 seconds the harness allows) is also no name and counts as a miss. Unreadable: the engine emitted a name that OPSIN 2.9.0 cannot read, so it does not count as named. These are the documented exceptions of [Output tiers](tiers.md): at the PIN-only tier, for example, a PIN spelling that OPSIN's grammar lacks or a PIN with stereodescriptors OPSIN cannot read; at the default, a name with stereodescriptors OPSIN cannot read for a molecule that has no other name. Wrong structures, a name that reads back to a different molecule: none in any cell.
 
 The two ChEBI sets are samples of ChEBI structures that have at most 50 heavy atoms, one fragment, carbon, no radicals, no isotopes and no element other than C, H, N, O, P, S, F, Cl, Br and I. The held-out set is a split that no development run had read. The development set is a sample that development runs did read, so it is not an independent test. The drug-like set is 2,000 drug-like PubChem structures.
 
-On the held-out set the default names 1,994 of 2,000 molecules (99.70 %) and declines 5, and the PIN-only tier names 1,106 (55.30 %) and declines 891.
+On the held-out set the default names 1,994 of 2,000 molecules (99.70 %) and declines 5, and the PIN-only tier names 1,062 (53.10 %) and declines 935. The PIN-only tier declines the names built on a semisystematic name of the recommendations' Chapter P-10 (`D-glucose`, `L-alanine`), for which no PIN is identified (P-100); the default returns them.
 
 ## Measured results
 

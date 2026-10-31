@@ -113,4 +113,4 @@ from orthonym import name_compound
 name_compound("SMILES", emit_tier="pin")
 ```
 
-On 2,000 held-out ChEBI molecules the default names 1,994 (99.70 %) and `--emit-tier pin` names 1,106 (55.30 %); [Accuracy](../accuracy.md#the-two-tiers) has the numbers for both on three sets, and [Output tiers](../tiers.md) says what each tier adds.
+On 2,000 held-out ChEBI molecules the default names 1,994 (99.70 %) and `--emit-tier pin` names 1,062 (53.10 %); [Accuracy](../accuracy.md#the-two-tiers) has the numbers for both on three sets, and [Output tiers](../tiers.md) says what each tier adds.

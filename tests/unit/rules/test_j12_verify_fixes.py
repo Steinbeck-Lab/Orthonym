@@ -160,12 +160,18 @@ def test_names_needing_an_opsin_observation_still_fail_closed(monkeypatch, name,
 
 
 @pytest.mark.opsin_gate
-def test_general_fallback_tier_keeps_suppressing_grammar_gap_names(monkeypatch):
+def test_general_fallback_tier_ships_only_the_structure_s_own_inositol(monkeypatch):
+    # relabel 2026-10-31 (internal notes): the general tiers ship an inositol on
+    # the exact InChIKey of the very structure (rules.inositols.is_inositol_name_of), whatever OPSIN answers
+    # (it has no inositol grammar); before, they suppressed it (changed asserted value). Another inositol's
+    # name for the structure is still suppressed.
     from orthonym.namer import _descriptive_fallback
+    scyllo = "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"
     for status in ("rejected", "unavailable"):
-        out, _ = _gate(monkeypatch, status, "scyllo-inositol", "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O",
-                       general_fallback_tier=True)
-        assert out == _descriptive_fallback("O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O"), (status, out)
+        out, _ = _gate(monkeypatch, status, "scyllo-inositol", scyllo, general_fallback_tier=True)
+        assert out == "scyllo-inositol", (status, out)
+        out, _ = _gate(monkeypatch, status, "myo-inositol", scyllo, general_fallback_tier=True)
+        assert out == _descriptive_fallback(scyllo), (status, out)
 
 
 # ---------------------------------------------------------------------------

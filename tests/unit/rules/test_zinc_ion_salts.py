@@ -25,6 +25,7 @@ import csv
 import pytest
 from rdkit import Chem
 
+from orthonym.validation.spelling.checks_natural_products import chapter_p10_name_is_no_pin
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.rules.metal_labels import is_carbanion_salt_of_group_3_12_metal
@@ -380,6 +381,15 @@ def test_other_metals_are_not_moved():            # reads the baseline fixture (
             continue
         now = namers[row["tier_req"]].name_tiered(row["smiles"])
         key = (row["smiles"], row["tier_req"])
+        p10_name = respelled[key][1] if key in respelled else row["name"]
+        if chapter_p10_name_is_no_pin(None, p10_name or ""):
+            # relabel 2026-10-31: a salt of a Chapter anion ('copper diglycinate', is no
+            # PIN:50943): the PIN tier declines it, the best-effort tier ships it below the PIN
+            if row["tier_req"] == "pin":
+                assert (now["tier"], now["limit_code"]) == ("abstain", "NO_VERIFIED_PIN"), key
+            else:
+                assert (now["name"], now["tier"], now["is_pin"]) == (p10_name, "systematic_verified", False), key
+            continue
         if key in respelled:
             assert respelled[key][0] == row["name"], key
             assert identity_view(now) == (respelled[key][1],) + tuple(identity_view(row))[1:], (key, identity_view(now))

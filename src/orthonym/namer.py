@@ -41,6 +41,7 @@ from .gate_retry import gate_candidate, name_with_forced_locants
 from .metrics.producer_trail import carried as _carried, noted as _noted, suspended as _suspended
 from .rules.charged_fallback import late_charged_name as _late_charged_name
 from .validation.opsin_ambiguity import reject_ambiguous, restore_withdrawn, withdrawn_name
+from .rules.inositols import is_inositol_name_of   # no OPSIN grammar; exact InChIKey
 from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
                                         twin_outcome_holds, wider_tier_ctx)
 from .validation.halido_twin import HAPTO_DESCRIPTOR
@@ -688,13 +689,7 @@ _LABEL_RANK = {"pin_verified": 4, "pin_unverified": 3, "systematic_verified": 2,
 _DEFAULT_TIER_POLICY_OFF = contextvars.ContextVar("orthonym_default_tier_policy_off",
                                                   default=False)
 
-#: dispatch classes whose names follow Chapter nomenclature (carbohydrates, natural
-#: products and stereoparents, lipids, amino acids): "Preferred IUPAC names (PINs) are
-#: not identified for the compounds in this Chapter" (the Blue Book), and their
-#: labels are the natural-product decision's (pin-class plan Task 32), so the spelling
-#: checks of the PIN do not read them (``Orthonym._tier_row_and_pin_form``). The PEPTIDE
-#: route is read: the names it emits for these inputs are substitutive names.
-_SPELLING_CHECK_SKIPPED_CLASSES = ("CARBOHYDRATE_LOOKUP", "NATURAL_PRODUCT", "LIPID", "AMINO_ACID")
+from .validation.spelling.route_scope import pin_spelling_rows as _pin_spelling_rows  # routes
 
 # (a phase): the constitutional self-consistency gate. After the
 # parseability gate confirms OPSIN ACCEPTS a name, re-perceive it: if OPSIN parses
@@ -2713,8 +2708,8 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     # configuration and keeps its own policy.
     if _validity_gate_status(name) == "unavailable":
         _gap_slug = _grammar_gap_carveout(name, smiles)
-        if _gap_slug is not None and (not general_fallback_tier
-                                      or _gap_slug == "np_stereoparent"):
+        if _gap_slug is not None and (not general_fallback_tier or _gap_slug == "np_stereoparent"
+                                      or is_inositol_name_of(smiles, name)):
             return _ship_grammar_gap_carveout(name, _gap_slug)
         if stats is not None:
             stats["opsin_unavailable_suppressed"] = (
@@ -2760,7 +2755,8 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         except Exception:
             _np_exact_hit = False
         # A halogen -uide name (no OPSIN grammar at any tier) ships on its twin read-back (validation.uide_twin).
-        if not (_np_exact_hit or twin_gate_ships(name, smiles, True)):
+        # The inositol of the very structure (exact InChIKey of a meso stereoisomer) ships the same way.
+        if not (_np_exact_hit or is_inositol_name_of(smiles, name) or twin_gate_ships(name, smiles, True)):
             _record_unparseable_general_fallback(name, smiles)
             _suppressed_to = _descriptive_fallback(smiles)
             _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
@@ -6110,7 +6106,7 @@ class Orthonym:
                 and not self._disable_opsin_validity_gate
                 and not _DISABLE_VALIDITY_GATE
                 and _validity_gate_jar_present()
-                and not _is_exact_match_list_name(smiles, name)):
+                and not (_is_exact_match_list_name(smiles, name) or (self._general_fallback_unverified and is_inositol_name_of(smiles, name)))):
             if _shipped_name_round_trip(name, smiles) == "verified":
                 opsin = "verified"
                 gate_outcome = _pv.GATE_OUTCOME_FULL_KEY_VERIFIED
@@ -6239,20 +6235,15 @@ class Orthonym:
         # above (systematic_verified, best_effort without a verified round trip, is_pin
         # False); the name is unchanged, and the row records the failures. The exact-match
         # list names keep the label of their path (user decision 2026-09-30) and are not
-        # read; nor are the names of the routes (``_SPELLING_CHECK_SKIPPED_CLASSES``),
-        # whose labels are the natural-product decision's. A name lowered by a
+        # read; the routes are read as ``_pin_spelling_rows`` says. A name lowered by a
         # label-only record that names its rule starts with that rule
         # (``_label_rule_failures``); the checks below never read such a name.
         spelling_failures = list(_label_rule_failures) if tier != ABSTAIN else []
         if ((tier == PIN_VERIFIED or (tier == PIN_UNVERIFIED and _unavailable_demoted))
                 and name and not is_failure_name(name)
-                and not _is_np_list and not _is_coord_list
-                and getattr(getattr(self, "_last_dispatch_class", None), "name", None)
-                not in _SPELLING_CHECK_SKIPPED_CLASSES):
-            from .validation.pin_spelling import check_pin_spelling
-            _checked = [
-                {"rule": f.rule, "detail": f.detail}
-                for f in check_pin_spelling(Chem.MolFromSmiles(smiles), name)]
+                and not _is_np_list and not _is_coord_list):
+            _checked = _pin_spelling_rows(
+                getattr(getattr(self, "_last_dispatch_class", None), "name", None), smiles, name)
             if _checked:
                 tier, is_pin = SYSTEMATIC_VERIFIED, False
                 logger.info("name_tiered lowered %r: %s", name,
@@ -8800,7 +8791,8 @@ class Orthonym:
             if self._general_fallback:
                 if (resolved in (_pv.GATE_OUTCOME_STEREO_RECOMPOSED,
                                  _pv.GATE_OUTCOME_FULL_KEY_VERIFIED)
-                        or uide_twin_outcome(resolved) or is_offered(self, name)):
+                        or uide_twin_outcome(resolved) or is_offered(self, name)
+                        or (self._general_fallback_unverified and is_inositol_name_of(smiles, name))):
                     return name
                 if _shipped_name_round_trip(name, smiles) == "verified":
                     if resolved != _pv.GATE_OUTCOME_SELF01:

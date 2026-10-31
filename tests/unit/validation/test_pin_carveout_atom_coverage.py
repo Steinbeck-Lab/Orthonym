@@ -173,6 +173,10 @@ def test_carveout_baseline_ships_expected_pin(namer, case):
     """Locks the carve-out still fires: the representative ships its exact
     expected PIN, and the gate outcome is the carve-out itself (not some
     other path that happens to produce the same string)."""
+    if case["carveout"] == "inositol":
+        #:50943 (relabel 2026-10-31): the PIN tier declines an inositol; the carve-out ships it at best-effort
+        from orthonym.cli import _emit_tier_flags
+        namer = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
     result = namer.name_tiered(case["bare_smiles"])
     assert result["name"] == case["bare_name"], (
         f"{case['carveout']}: baseline SMILES {case['bare_smiles']!r} no longer "

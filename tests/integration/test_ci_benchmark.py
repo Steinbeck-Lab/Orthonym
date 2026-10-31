@@ -511,7 +511,7 @@ CI_BENCHMARK = [
         "O[C@H](CO)[C@@H](O[C@@H]2O[C@H](CO)[C@H](O)[C@H]"
         "(O[C@H]3O[C@H](CO)[C@H](O)[C@H](O)[C@H]3O)[C@H]2O)"
         "[C@@H]1O",
-        _ships(
+        _declined_at_default(  # relabel 2026-10-31:50943, no PIN in Chapter: was _ships
             "α-D-galactopyranosyl-(1->3)-β-D-galactopyranosyl-(1->4)-2-acetamido-2-deoxy-"
             "β-D-glucopyranosyl-(1->6)-β-D-galactopyranosyl-(1->4)-D-glucopyranose"
         ),
@@ -607,7 +607,8 @@ CI_BENCHMARK = [
         "OC[C@H]1O[C@H](OC[C@H]2O[C@H](OC[C@H]3O[C@H](O)[C@H](O)"
         "[C@@H](O)[C@@H]3O)[C@H](O)[C@@H](O)[C@H]2O)[C@H](O)"
         "[C@@H](O)[C@@H]1O",
-        _ships("α-D-glucopyranosyl-(1->6)-α-D-galactopyranosyl-(1->6)-α-D-glucopyranose"),
+        # relabel 2026-10-31:50943, no PIN in Chapter: was _ships
+        _declined_at_default("α-D-glucopyranosyl-(1->6)-α-D-galactopyranosyl-(1->6)-α-D-glucopyranose"),
         marks=_GATE,
     ),
     pytest.param(
@@ -729,7 +730,7 @@ CI_BENCHMARK = [
         "[C@H](O[C@H]3O[C@H](CO)[C@@H](O)[C@H](O[C@@H]4O[C@H](CO)"
         "[C@H](O)[C@H](O)[C@H]4O)[C@H]3NC(C)=O)[C@H]2O)"
         "[C@@H](CO)O[C@H]1O",
-        _ships(
+        _declined_at_default(  # relabel 2026-10-31:50943, no PIN in Chapter: was _ships
             "β-D-galactopyranosyl-(1->3)-2-acetamido-2-deoxy-α-D-glucopyranosyl-(1->3)-β-"
             "D-galactopyranosyl-(1->4)-2-acetamido-2-deoxy-β-D-glucopyranose"
         ),

@@ -122,13 +122,15 @@ def _run_fresh(mode, *smiles):
 @pytest.mark.slow
 def test_unavailable_opsin_returns_no_unverified_name_from_any_entry_point():
     """With OPSIN unavailable no entry point returns a name for benzene (the trivial
-    last resort 'benzol' used to ship at both tiers), while the documented default-
-    tier grammar carve-out 'scyllo-inositol' still ships at the default tier
-    only. Control: with OPSIN reachable the same process code names benzene."""
+    last resort 'benzol' used to ship at both tiers), while the documented grammar
+    carve-out 'scyllo-inositol' ships at the best-effort tier only: its licence is the
+    exact InChIKey of the structure, not OPSIN, and:50943 gives it no PIN, so the
+    PIN tier declines it (relabel 2026-10-31; it used to ship at the PIN tier only).
+    Control: with OPSIN reachable the same process code names benzene."""
     stubbed = _run_fresh("stub", "c1ccccc1", "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O")
     for key, name in stubbed.items():
         smi, tier, entry = key.split("|")
-        if smi == "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O" and tier == "pin":
+        if smi == "O[C@H]1[C@H](O)[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O" and tier == "best-effort":
             assert name == "scyllo-inositol", (key, name)
             continue
         assert name is None or is_failure_name(name), (key, name)
