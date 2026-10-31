@@ -26,7 +26,8 @@ LABEL_ROWS = [
     "COC(=O)CCc1cc(O)c(C)c(=O)o1",
     "COC(=O)CCCc1c(OC)cc(=O)oc1C",
     "COC(=O)/C=C/c1oc(=O)c(CO)c(OC)c1C=O",
-    "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1",
+    # was the tropane ester 'CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1', which the default tier emits since DT4 F2
+    "COc1ccc(-c2cc3cc(CCCO)ccc3o2)c(O)c1",
     "CC(=O)OCC(O)C#Cc1ccc(-c2cccs2)s1",
 ]
 

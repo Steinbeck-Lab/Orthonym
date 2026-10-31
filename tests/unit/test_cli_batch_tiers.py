@@ -18,14 +18,13 @@ from orthonym import cli
 # The gate is ON: the default-tier decline below is a decision of the OPSIN-checked PIN path.
 pytestmark = [pytest.mark.unit, pytest.mark.opsin_gate]
 
-# The default tier declines this molecule (NO_VERIFIED_PIN) and best-effort names it. Atropine: an alkaloid
-#, "NOMENCLATURE FOR NATURAL PRODUCTS BASED ON PARENT HYDRIDES", the Blue Book), so under
-# (:50943) no PIN is identified and the promotion re-run keeps the decline (assembly/pin_rerun.py; the decline
-# is pinned by tests/unit/assembly/test_pin_rerun.py); the name is the engine's own best-effort name. Before DT3
-# step A the control was a drug-like amide, and after it the benzylamino alcohol of test_default_tier.py
-# was a candidate: both can have a PIN, and a later PIN fix would break the control.
-WIDE = "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1"
-WIDE_NAME = "8-methyl-8-azabicyclo[3.2.1]octan-3-yl 3-hydroxy-2-phenylpropanoate"
+# The default tier declines this molecule (NO_VERIFIED_PIN) and best-effort names it. A glycoside whose name
+# cites a carbohydrate name ('β-D-glucopyranoside'): INTRODUCTION (the Blue Book) "Preferred
+# IUPAC names (PINs) are not identified for the compounds in this Chapter", so the spelling check keeps it
+# below the PIN (validation/spelling/checks_natural_products.py). The control used to be atropine, whose
+# functional-class ester name on the von Baeyer ring is built since DT4 F2 (a systematic name, pin_verified).
+WIDE = "C=C(C)[C@@H]1CC=C(CO[C@@H]2O[C@H](CO)[C@@H](O)[C@H](O)[C@H]2O)CC1"
+WIDE_NAME = "[(4S)-4-(prop-1-en-2-yl)cyclohex-1-en-1-yl]methyl β-D-glucopyranoside"
 # No name at any tier (UNSUPPORTED_ELEMENT), so every tier has a decline to report.
 NO_NAME = "F[Xe]F"
 NAMED = "CCO"

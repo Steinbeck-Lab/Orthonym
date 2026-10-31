@@ -67,11 +67,21 @@ SPIRO_H_SUCCINATE = (
 # 'tetracyclo[8.7.0.0^2,7.0^11,15]', the Blue Book), so the
 # ester oxygen of the steroid 3-position is locant 5.
 CARBOXY_ACYL_WITNESSES = [
-    (CHOLESTERYL_H_SUCCINATE, "5-[(3-carboxypropanoyl)oxy]"),
-    (CHOLESTANYL_H_GLUTARATE, "5-[(4-carboxybutanoyl)oxy]"),
-    (LANOSTERYL_H_SUCCINATE, "5-[(3-carboxypropanoyl)oxy]"),
     (CHOLENIC_ACID_H_SUCCINATE, "5-[(3-carboxypropanoyl)oxy]"),
     (SPIRO_H_SUCCINATE, "4'-[(3-carboxypropanoyl)oxy]"),
+]
+
+# Changed asserted value (DT4 F2, internal notes): these three were witnesses above
+# ('5-[(3-carboxypropanoyl)oxy]' on a von Baeyer ring parent). Parent selection made every steroid
+# ring system the parent; it follows now (the Blue Book), and the free acid is the
+# principal characteristic group. ``### **** Partial esters of polybasic acids and their
+# salts`` (:31935): method (1), "substitutively on the basis of the anion, the free acid group(s) and
+# the ester group(s) being cited as prefixes", "generates preferred IUPAC names"
+# ('5-butoxy-2-methyl-5-oxopentanoic acid (PIN)'). The ester is the '-yloxy... oxo' prefix of the acid.
+HALF_ESTER_ACID_NAMES = [
+    (CHOLESTERYL_H_SUCCINATE, "}oxy)-4-oxobutanoic acid"),
+    (CHOLESTANYL_H_GLUTARATE, "}oxy)-5-oxopentanoic acid"),
+    (LANOSTERYL_H_SUCCINATE, "}oxy)butanoic acid"),
 ]
 
 
@@ -94,24 +104,22 @@ def test_hydrogen_dicarboxylate_ester_is_a_carboxy_acyloxy_prefix(smiles, prefix
     assert "dioyloxy" not in name, name
 
 
-@pytest.mark.parametrize("smiles", [CHOLESTERYL_HMG, LANOSTERYL_HMG])
-def test_stereo_bearing_acyl_keeps_the_floor_spelling(smiles):
-    """A carboxy acyl with a stereocentre is not named from its isolated anion
-    (the site O(-) and the ester O-R rank differently under CIP): the leaf
-    declines and the floor's generic, stereo-complete spelling ships."""
-    # roadmap N5c (name-quality lane L2): the subject is the leaf's decline, so the floor's
-    # spelling is pinned in the mechanical spellings; with the book spellings the chain
-    # carries the ester oxygen as a prefix ('-oxy', the Blue Book) in
-    # place of the hetero-ended 'a' chain (:6465) does not allow (residual R4:
-    # the acyl name of a stereo-bearing carboxy acyl is not built).
-    from orthonym.assembly.book_prefixes import mechanical_forms
-    with mechanical_forms():
-        name = _shipped(smiles)
-    assert "(4S)-4,6-dihydroxy-4-methyl-2-oxo-1,7-dioxahept-6-en-1-yl" in name, name
-    assert "pentanedioyl" not in name, name
+@pytest.mark.parametrize("smiles,tail", HALF_ESTER_ACID_NAMES)
+def test_a_steroid_half_ester_is_named_on_the_acid(smiles, tail):
     name = _shipped(smiles)
-    assert "{[(3S)-3,5-dihydroxy-3-methyl-1,5-dioxopentyl]oxy}" in name, name
-    assert "pentanedioyl" not in name and "dioxahept" not in name, name
+    assert name.endswith(tail) and "oxo" in name, name
+    assert "dioyloxy" not in name, name
+
+
+@pytest.mark.parametrize("smiles", [CHOLESTERYL_HMG, LANOSTERYL_HMG])
+def test_stereo_bearing_acyl_half_ester_is_named_on_the_acid(smiles):
+    """Changed asserted value (DT4 F2): the floor's spelling ('(4S)-4,6-dihydroxy-4-methyl-2-oxo-
+    1,7-dioxahept-6-en-1-yl' on the ring parent) is no longer reached; the acid is the parent
+    , method (1), see HALF_ESTER_ACID_NAMES) and its C-3 carries the stereo."""
+    name = _shipped(smiles)
+    assert name.startswith("(3S)-") and name.endswith("pentanoic acid"), name
+    assert "3-hydroxy-3-methyl" in name and "oxo" in name and "pentanedioyl" not in name, name
+
 
 
 # --- the shared acyloxy helper, opt-in used by the floor --------------------

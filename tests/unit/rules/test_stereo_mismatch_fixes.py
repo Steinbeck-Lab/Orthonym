@@ -57,10 +57,14 @@ class TestSM40:
 
     @pytest.mark.opsin_gate
     def test_name_contains_stereodescriptor_block(self):
-        """The best-effort production name carries a (xR,yS,...) block."""
+        """The best-effort production name carries a (xR,yS,...) block.
+
+        DT4 F2: the acid chain is the parent, the Blue Book) and its own stereocentres are
+        undefined in the input, so the block of the ring centres sits in the ring substituent's brackets
+        ('6-[(5S,9S,11R,12S)-...-14-yl]heptanoic acid'), no longer at the front of the name."""
         name = self._best_effort_name()
-        assert name.startswith("("), f"Name missing stereo block: {name}"
-        assert ")-" in name, f"Name missing stereo block closing: {name}"
+        assert "[(5S,9S,11R,12S)-" in name, f"Name missing stereo block: {name}"
+        assert name.endswith("heptanoic acid"), name
 
     @pytest.mark.opsin_gate
     def test_stereo_locants_are_valid(self):

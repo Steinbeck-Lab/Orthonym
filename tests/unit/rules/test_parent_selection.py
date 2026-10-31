@@ -1952,16 +1952,16 @@ class TestNPBackboneEarlyReturn:
             f"Cholesterol: ring should be parent. Got: {result.reasoning}"
         )
 
-    def test_steroid_with_pg_on_chain_ring_wins(self):
-        """Steroid (cholanic acid) with COOH on chain only -> ring should be parent.
+    def test_steroid_with_pg_on_chain_chain_wins(self):
+        """Steroid (cholanic acid) with COOH on chain only -> the chain is the parent.
 
-        Current: PG on chain only -> chain wins via (a).
-        Correct: NP backbone detected -> ring is ALWAYS parent.
-
-        This is the key test for the NP early-return. After Plan 02, the NP
-        check should override (a) and force ring parent for steroids.
-
-        IUPAC: NP ring systems are always the parent.
+        Changed asserted value (DT4 F2, internal notes): this test asserted the ring, on the
+        strength of ': NP ring systems are always the parent'; ``### **** Retained
+        names.`` (the Blue Book) is about retained names such as styrene and says nothing of the
+        kind. ``### **** SENIORITY ORDER FOR PARENT STRUCTURES``, ``****`` (:18875): "The
+        senior parent structure has the maximum number of substituents corresponding to the principal
+        characteristic group (suffix)": the acid chain. A stereoparent name ('cholan-24-oic acid') comes
+        from the natural-product producer, not from parent selection.
         """
         from orthonym.perception.natural_products import detect_natural_product
 
@@ -1984,7 +1984,6 @@ class TestNPBackboneEarlyReturn:
         chain = find_principal_chain(mol, fg, pg, exclude_atoms=all_ring)
 
         result = select_parent(mol, ring_systems, chain, pg, pa)
-        assert result.parent_type == 'ring', (
-            f"Steroid NP backbone: ring should ALWAYS be parent per P-31.1.3.4. "
-            f"Got: {result.parent_type} -- {result.reasoning}"
+        assert result.parent_type == 'chain', (
+            f"P-44.1.1: the acid chain is the parent. Got: {result.parent_type} -- {result.reasoning}"
         )

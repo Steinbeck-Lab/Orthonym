@@ -76,9 +76,9 @@ def test_cyclic_esters_and_amides_are_not_the_senior_class(smiles, senior):
 
 @pytest.mark.parametrize("smiles,ending", [
     # an anion is senior to every suffix class classes 4-6,:18158-:18168): the
-    # glycinate parent stays
+    # acetate (glycinate) parent stays; spelled as the systematic '(...amido)acetate' since E-AA / DT4 F2
     ("C[C@H](CCC(=O)NCC(=O)[O-])[C@H]1CC[C@H]2[C@@H]3C(=O)C[C@@H]4C[C@H](O)CC[C@]4(C)"
-     "[C@H]3CC[C@]12C", "glycinate"),
+     "[C@H]3CC[C@]12C", "-24-amido)acetate"),
     # primary and secondary alcohols are one class: the N-acyl lactam name stays
     ("CC[C@H](C)C[C@H](C)C[C@H](CO)C[C@@H](C)/C=C(C)/C=C(C)/C=C/C=C/C(=O)N1CCCC(O)C1=O",
      "-3-hydroxypiperidin-2-one"),

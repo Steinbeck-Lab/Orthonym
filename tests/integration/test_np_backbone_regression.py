@@ -1,4 +1,8 @@
-"""a phase: 20 NP-backbone canary tests for override regression.
+"""a phase: 20 NP-backbone canary tests (every natural-product backbone gets a non-empty name).
+
+DT4 F2 (2026-10-31) deleted the natural-product shortcut of parent selection described below: it only ever
+overruled (the Blue Book), and a chain with the principal group is now the parent. The canaries
+still guard that every backbone is named.
 
 Per internal notes: when a phase deletes `_should_bypass_fused_guard`,
 `select_parent` runs for ALL cyclic molecules — including NP backbones that
@@ -182,8 +186,7 @@ def test_np_canary_produces_non_empty_name(name_substring, smiles):
     name = _name(smiles)
     assert name, (
         f"D-18 regression: {name_substring} ({smiles}) produced empty name. "
-        f"P-31.1.3.4 NP override may have regressed "
-        f"(parent_selection.py:594-606)."
+        f"Natural-product naming may have regressed."
     )
 
 

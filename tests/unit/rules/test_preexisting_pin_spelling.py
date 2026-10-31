@@ -27,12 +27,10 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CCCCCCCCCCCCCC/C=C\\OC[C@H](COP(=O)(O)OCC[N+](C)(C)C)O",
-    "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
-    "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1",
-})
+#... whose best-effort name is another one (it reads back exactly). The tropane ester
+# 'CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1' was one; since DT4 F2 the default tier emits its PIN.
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
 
 
 def _declined_pin_row(smiles):
@@ -294,16 +292,18 @@ def test_spelling_features(smiles, present, absent):
     assert name_is_rt_exact(name, smiles), f"{name!r} does not round-trip to {smiles}"
 
 
-def test_ester_cited_as_prefix_is_not_labelled_pin():
+def test_ester_principal_group_is_named_by_functional_class():
     """ (:31663): an ester that is the principal characteristic group is
-    named by functional class nomenclature in a PIN. A ring-cascade name citing it as
-    an acyloxy prefix is valid but not preferred, so it never ships as pin_verified;
-    it still ships (breadth), round-trip exact."""
-    from orthonym import Orthonym
+    named by functional class nomenclature in a PIN.
+
+    Changed asserted value (DT4 F2): the tropane skeleton used to make the ring the parent (a natural-product
+    shortcut in parent selection), and the ring-cascade name cited the ester as an acyloxy prefix, valid but not
+    preferred, so it was not labelled pin_verified. Parent selection follows now and the ester is named
+    by functional class; the von Baeyer name is the ring's PIN (a bridged bicycle, no fusion name)."""
     smiles = "CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1"
     res = _dt_row(smiles)
-    assert res.get("name") and "oxy]" in res["name"], res
-    assert res.get("tier") != "pin_verified", res
+    assert res.get("name") == "8-methyl-8-azabicyclo[3.2.1]octan-3-yl 3-hydroxy-2-phenylpropanoate", res
+    assert res.get("tier") == "pin_verified", res
     assert name_is_rt_exact(res["name"], smiles), res
 
 
