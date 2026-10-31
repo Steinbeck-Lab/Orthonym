@@ -366,10 +366,27 @@ def _keep_hotspots_sigsegv_handler(config) -> None:
     config.pluginmanager.unregister(name="faulthandler")
 
 
+def _worktree_import_guard(root=None):
+    """Stop the run when this tree is a git worktree (``.git`` is a file) and ``orthonym`` imports
+    from elsewhere. The shared ``.venv`` is an editable install of the MAIN tree, so a bare
+    ``pytest`` in a worktree tests main's code (the contributor guide a project rule(c)); the repair is
+    ``PYTHONPATH=<tree>/src``. An orthonym installed into site-packages also counts as elsewhere.
+    Silent in the main tree, in CI and in a published copy (no ``.git`` file there)."""
+    root = Path(root) if root is not None else Path(__file__).resolve().parent.parent
+    if not (root / ".git").is_file():
+        return
+    import orthonym
+    where = Path(orthonym.__file__).resolve()
+    if not where.is_relative_to((root / "src").resolve()):
+        pytest.exit(f"orthonym imports from {where.parent}, not from this worktree's "
+                    f"{root / 'src'}: run with PYTHONPATH={root / 'src'}", returncode=4)
+
+
 # trylast: after the faulthandler plugin's own pytest_configure, which this undoes in part.
 @pytest.hookimpl(trylast=True)
 def pytest_configure(config):
     """Configure custom markers; snapshot the ORTHONYM_* environment; record reloads."""
+    _worktree_import_guard()
     _keep_hotspots_sigsegv_handler(config)
     _ORTHONYM_ENV_BEFORE_COLLECTION.clear()
     _ORTHONYM_ENV_BEFORE_COLLECTION.update(_orthonym_env())
