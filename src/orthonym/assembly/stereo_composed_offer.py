@@ -33,7 +33,8 @@ The name is not the PIN: NAMING OF STEREOISOMERS (the Blue Book), sentence:44643
 IUPAC names, stereodescriptors are placed immediately at the front of the part of the name to which they
 relate", and "They are preceded by a numerical or letter locant to describe the position of the stereogenic
 unit". The composed name cites every descriptor at the front of the complete name, in the locants of the
-stereo-free name, so a descriptor of a substituent can repeat a locant of the parent. A repeated locant does
+stereo-free name (when that name does not read back, this offer, and only this one, has
+``rules/prefix_stereo.py`` place each descriptor at the front of the part it relates to instead), so a descriptor of a substituent can repeat a locant of the parent. A repeated locant does
 not give the position of a stereogenic unit, and the name then rests on the order in which OPSIN reads the
 descriptors: ``(3S,3R,...)`` is read to the input, and ``(3R,3S,...)`` to a diastereomer. A composed name that
 cites a locant more than once is therefore offered only when (1) every descriptor at that locant is the same
@@ -213,7 +214,7 @@ def _verified_composed_name(smiles: str, flat_name: str) -> Optional[str]:
     in_key = _self_consistency_full_key(smiles)
     if not in_key:
         return None
-    composed = carried(flat_name, _try_compose_input_stereo(flat_name, smiles, in_key))
+    composed = carried(flat_name, _try_compose_input_stereo(flat_name, smiles, in_key, place_by_scope=True))
     if not composed or is_failure_name(composed) or not repeated_locants_are_one_structure(composed, smiles):
         return None
     opsin_smiles = _validity_gate_name_to_smiles(composed)

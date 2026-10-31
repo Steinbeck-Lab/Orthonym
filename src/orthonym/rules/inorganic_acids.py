@@ -454,7 +454,7 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     """
     from collections import Counter
 
-    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, multiplier_needs_hyphen
+    from ..assembly.naming_utils import alpha_sort_key, enclose_if_compound, multiplied_component
     from .substituent_purity import organyl_prefix_name
 
     n = mol.GetAtomWithIdx(n_idx)
@@ -486,16 +486,17 @@ def _amido_n_prefix(mol, n_idx: int, p_idx: int) -> Optional[str]:
     #, which is the parentheses rule). Hence the bare
     # N-substituent form, and `N,N-di-tert-butyl` keeps the
     # multiplier's hyphen. ('N-tert-butyl' is not itself a BB example.)
+    # "The numerical prefixes 'bis', 'tris', 'tetrakis', etc."
+    # (the Blue Book): "used to indicate a multiplicity of: (a)
+    # compound or complex (i.e. substituted) prefixes" -- so
+    # `N,N-bis(2-chloroethyl)`, never `N,N-di(2-chloroethyl)`; the shared
+    # ``multiplied_component`` picks the multiplier and the marks.
     for nm in sorted(counts, key=alpha_sort_key):
         c = counts[nm]
         if c not in _MULT:
             return None
         locs = ",".join(["N"] * c)
-        marked = enclose_if_compound(nm)
-        if _MULT[c] and marked == nm and multiplier_needs_hyphen(nm):
-            segs.append(f"{locs}-{_MULT[c]}-{marked}")
-        else:
-            segs.append(f"{locs}-{_MULT[c]}{marked}")
+        segs.append(f"{locs}-{multiplied_component(c, nm, enclose_if_compound(nm))}")
     return "-".join(segs)
 
 

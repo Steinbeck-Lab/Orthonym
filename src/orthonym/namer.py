@@ -1969,7 +1969,7 @@ _STEREO_OMISSION_RECLAIM = os.environ.get(
 
 
 def _try_compose_input_stereo(
-    flat_name: str, smiles: str, in_key: str
+    flat_name: str, smiles: str, in_key: str, place_by_scope: bool = False
 ) -> Optional[str]:
     """ a phase — stereo-OMISSION reclaim on the general-fallback tier.
 
@@ -1998,24 +1998,17 @@ def _try_compose_input_stereo(
         mol = Chem.MolFromSmiles(smiles)
         if mol is None:
             return None
+        from .rules.prefix_stereo import composed_reads_back, place_stereo_by_scope
         from .rules.stereochemistry import inject_stereo_reanchored_rt_gated
         composed = inject_stereo_reanchored_rt_gated(
             flat_name, mol, None, input_smiles=smiles)
-        if not composed or composed == flat_name:
-            return None  # nothing composed (conflict / no OPSIN locant map)
-        composed_smiles = _validity_gate_name_to_smiles(composed)
-        if composed_smiles is None:
-            return None
-        if _self_consistency_full_key(composed_smiles) == in_key:
-            # the key does not place a hydron (validation/protonation_identity.py)
-            from .validation.protonation_identity import protonation_site_verdict
-            if protonation_site_verdict(smiles, composed_smiles, composed) == "mismatch":
-                return None
-            # nor the radical graph (validation/radical_identity.py)
-            from .validation.radical_identity import radical_identity_verdict
-            if radical_identity_verdict(smiles, composed_smiles) == "mismatch":
-                return None
-            return composed  # stereo composed AND full-key-verified == input
+        if not composed or composed == flat_name or not composed_reads_back(composed, smiles, in_key):
+            # every descriptor at the front did not read back: for the last offer only (``place_by_scope``,
+            # assembly/stereo_composed_offer.py), each one at the front of the part it relates to
+            composed = place_stereo_by_scope(flat_name, smiles) if place_by_scope else None
+            if not composed or not composed_reads_back(composed, smiles, in_key):
+                return None  # nothing composed (conflict / no OPSIN locant map)
+        return composed  # stereo composed AND full-key-verified == input
     except Exception as _exc:
         # Fail-closed (0-wrong): any OPSIN/RDKit unavailability -> the caller
         # suppresses. Log it (a review -P2 M3) so a silent self-disable from a
