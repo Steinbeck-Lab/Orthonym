@@ -11356,9 +11356,9 @@ def name_compound(smiles: Union[str, Chem.Mol], style: str = "pin",
     >>> from orthonym import name_compound
     >>> name_compound("CC(C)Cc1ccc(cc1)[C@@H](C)C(=O)O")
     '(2R)-2-[4-(2-methylpropyl)phenyl]propanoic acid'
-    >>> name_compound("O=[U](=O)=O")
+    >>> name_compound("F[Xe]F")
     ''
-    >>> name_compound("O=[U](=O)=O", on_failure="label")
+    >>> name_compound("F[Xe]F", on_failure="label")
     'inorganic compound (not supported)'
     """
     mode = _failure_mode.resolve(on_failure, raise_on_limit)
@@ -11688,7 +11688,7 @@ def classify_limit(smiles: Union[str, Chem.Mol]) -> Optional[OrthonymLimitError]
     Examples
     --------
     >>> from orthonym import classify_limit
-    >>> classify_limit("O=[U](=O)=O").code
+    >>> classify_limit("F[Xe]F").code
     'UNSUPPORTED_ELEMENT'
     >>> classify_limit("CC*").code
     'WILDCARD_ATOMS'

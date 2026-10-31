@@ -142,7 +142,9 @@ def test_the_class_of_the_dispatch_table_names_zinc_before_the_retained_cation_w
     ("[Hg+2]", "mercury(2+)"),       # admitted to ELEMENT since 2026-10-30 (BONDED_METAL_VALENCES)
     ("[Cd+2]", "cadmium(2+)"),       # and since lane B2 (MORE_BONDED_METAL_VALENCES), but not the metals of
     ("[Hf+4]", "hafnium(4+)"),       # RETAINED_ION_METALS (Ag, Au, Co, Cr, Cu, Fe, Mn, Ni): their ion words are retained
-    ("[U]", None),                    # uranium stays out (the README specimen of an element no tier names)
+    ("[U]", "uranium"),               # admitted since 2026-10-31 (MORE_BONDED_METAL_VALENCES)
+    ("[U+4]", "uranium(4+)"),
+    ("[Pu]", None),                   # plutonium: no mechanism admits it
     ("[Fe+2]", None),
     ("[Ni+2]", None),
     ("[Cl-]", None),

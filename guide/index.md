@@ -77,7 +77,7 @@ orthonym --fetch-jars</code></pre>
         <code class="ot-rung-id">abstain</code>
       </div>
       <p class="ot-name ot-name--label ot-rule--abstain">inorganic compound (not supported)</p>
-      <p class="ot-cmd"><code>orthonym --on-failure label "O=[U](=O)=O"</code><span class="ot-cmd-note">uranium trioxide</span></p>
+      <p class="ot-cmd"><code>orthonym --on-failure label "F[Xe]F"</code><span class="ot-cmd-note">xenon difluoride</span></p>
       <p class="ot-rung-say">Declined, with the reason code <code>UNSUPPORTED_ELEMENT</code>. By default the name is empty and the reason goes to the error stream.</p>
     </div>
     <p class="ot-ladder-foot">Every line is the engine's own output. <a href="tiers.html">What the tiers mean</a>.</p>

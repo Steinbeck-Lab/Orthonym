@@ -6,17 +6,17 @@ Put one SMILES per line in a text file. An empty line gets an empty output line,
 $ cat molecules.smi
 CCO
 c1ccccc1
-O=[U](=O)=O
+F[Xe]F
 $ orthonym --batch molecules.smi
 CCO	ethanol
 c1ccccc1	benzene
-O=[U](=O)=O	
+F[Xe]F	
 ```
 
 Each output line is the SMILES, a tab, and the name; the name is empty for a line that gets none, so line N of the output belongs to line N of the input. The reason for each such line, with its limit code, goes to the error stream:
 
 ```console
-O=[U](=O)=O	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
+F[Xe]F	UNSUPPORTED_ELEMENT: inorganic compound (not supported)
 ```
 
 `--on-failure label` writes the label in the name column instead, and `--on-failure raise` gives the line `ERROR:` and the reason and ends the run with status `1` (see [Declines](../declines.md)). Write the lines to a file with `--output`, and add `--verbose` for a count at the end:
@@ -78,15 +78,15 @@ A batch run has the same default as one SMILES: the `best-effort` tier, that is 
 $ cat wide.smi
 CCO
 CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1
-O=[U](=O)=O
+F[Xe]F
 $ orthonym --batch wide.smi
 CCO	ethanol
 CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1	2-{4-[4-(1-benzofuran-2-yl)-1,3-thiazol-2-yl]piperidin-1-yl}-N-(3-fluorophenyl)-2-methylpropanamide
-O=[U](=O)=O	
+F[Xe]F	
 $ orthonym --batch wide.smi --emit-tier pin
 CCO	ethanol
 CC(C)(C(=O)Nc1cccc(F)c1)N1CCC(c2nc(-c3cc4ccccc4o3)cs2)CC1	
-O=[U](=O)=O	
+F[Xe]F	
 ```
 
 A line that gets no name at the tier you chose follows `--on-failure`. The whole file is named with one `Orthonym` instance, as in the Python loop below.

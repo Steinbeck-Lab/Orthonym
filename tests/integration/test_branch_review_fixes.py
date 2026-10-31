@@ -312,7 +312,7 @@ def _count_reruns(monkeypatch):
 
 
 @pytest.mark.parametrize("smiles", [
-    "CC(C)(C)C1=CC=C(C=C1)[U]",   # UNSUPPORTED_ELEMENT: no producer runs
+    "CC(C)(C)C1=CC=C(C=C1)[Xe]",  # UNSUPPORTED_ELEMENT: no producer runs
     "CC(C)CC*",                    # WILDCARD_ATOMS
 ])
 def test_c_a_structural_decline_is_not_named_twice(monkeypatch, smiles):

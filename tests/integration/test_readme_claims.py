@@ -115,8 +115,8 @@ def test_gallery_card(smiles, tier, name, label):
     assert _key(_independent_parse(name)) == _key(smiles)
 
 
-def test_specimen_uranium_trioxide_declines():
-    row = _row("O=[U](=O)=O")
+def test_specimen_xenon_difluoride_declines():
+    row = _row("F[Xe]F")
     assert row["name"] == "inorganic compound (not supported)", row
     assert row["tier"] == "abstain" and row["limit_code"] == "UNSUPPORTED_ELEMENT", row
 

@@ -233,11 +233,12 @@ def test_the_function_follows_the_table(monkeypatch):
 
 
 def test_the_metals_of_the_two_bonded_lanes_have_every_mechanism_of_zinc():
-    """The 45 metals of ``BONDED_METAL_VALENCES`` and ``MORE_BONDED_METAL_VALENCES`` (lanes B1 and B2) are admitted to
-    every mechanism of zinc with the charges listed, and none is complete; the metals whose ions have a retained name
-    ('copper(II)', 'iron(III)') are not admitted to ``ELEMENT``, so that the retained name keeps its label."""
+    """The 46 metals of ``BONDED_METAL_VALENCES`` and ``MORE_BONDED_METAL_VALENCES`` (lanes B1, B2 and
+    uranium) are admitted to every mechanism of zinc with the charges listed, and none is complete; the metals
+    whose ions have a retained name ('copper(II)', 'iron(III)') are not admitted to ``ELEMENT``, so that the
+    retained name keeps its label."""
     from orthonym.data.metal_scope import ALL_MECHANISMS, RETAINED_ION_METALS
-    assert len(BONDED_METALS) == 45 and not set(BONDED_METAL_VALENCES) & set(MORE_BONDED_METAL_VALENCES)
+    assert len(BONDED_METALS) == 46 and not set(BONDED_METAL_VALENCES) & set(MORE_BONDED_METAL_VALENCES)
     assert sorted(RETAINED_ION_METALS) == ["Ag", "Au", "Co", "Cr", "Cu", "Fe", "Mn", "Ni"]
     assert RETAINED_ION_METALS <= set(MORE_BONDED_METAL_VALENCES)
     for symbol in BONDED_METALS:
@@ -286,5 +287,5 @@ def test_zero_valent_metals_are_admitted_to_that_alone():
         assert METAL_SCOPE[symbol] == MetalScope(frozenset({ZERO_VALENT}), frozenset()), symbol
         assert is_named_metal(symbol) is False, symbol
         alone.append(symbol)
-    assert alone == ["U", "Rf", "Ac", "Fm"], alone          # no other lane admitted these (uranium: the README specimen)
+    assert alone == ["Rf", "Ac", "Fm"], alone               # no other lane admitted these
     assert _out("[Tc+2].CC(=O)[O-].CC(=O)[O-]") is True                     # no salt mechanism for technetium

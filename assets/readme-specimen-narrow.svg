@@ -37,7 +37,7 @@
   <g transform="translate(48.0,1020.0) scale(1.556)"><g class=""><defs><radialGradient id="gpinsn3"><stop offset="0" stop-color="#3dff8f" stop-opacity=".88"/><stop offset=".3" stop-color="#3dff8f" stop-opacity=".4"/><stop offset=".64" stop-color="#3dff8f" stop-opacity="0"/></radialGradient></defs><circle class="breath" cx="9" cy="9" r="16" fill="url(#gpinsn3)" opacity="1.0"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="8" stroke-width="1.25"/><circle fill="none" stroke="#2f6b28" cx="9" cy="9" r="5.5" stroke-width="1.25"/><circle cx="9" cy="9" r="3" fill="#2f6b28"/></g></g>
   <text class="mono" x="90" y="1042" font-size="22" fill="#000000">pin_verified</text>
 </g><g class="rise" style="animation-delay:1.55s">
-  <text class="mono" x="48" y="1126.0" font-size="22" fill="#000000" xml:space="preserve"><tspan fill="#666666">$</tspan> orthonym --on-failure label "O=[U](=O)=O"</text>
+  <text class="mono" x="48" y="1126.0" font-size="22" fill="#000000" xml:space="preserve"><tspan fill="#666666">$</tspan> orthonym --on-failure label "F[Xe]F"</text>
   <text class="body" x="48" y="1184" font-size="34" fill="#666666">inorganic compound (not supported)</text>
   <line x1="48" y1="1206" x2="621.6" y2="1206" stroke="#d9d9d9" stroke-width="1.6"/>
   <g transform="translate(48.0,1230.0) scale(1.556)"><g class=""><circle fill="none" stroke="#666666" cx="9" cy="9" r="7" stroke-width="1"/></g></g>

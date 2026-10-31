@@ -100,7 +100,7 @@ SAME_NAME = [
     "CC(C)C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)CO)C(=O)O",
     "CC1(C)[C@@H]2CC[C@@]1(C)C(=O)C2",
     "C[S@@](=O)c1ccccc1", "CN1CCC[C@H]1c1cccnc1",
-    "O=[U](=O)=O", "CC*",
+    "F[Xe]F", "CC*",
     "CCC(N)C(=O)O", "NCCCC(N)C(=O)O", "CSCC(N)C(=O)O",
 ]
 
@@ -120,14 +120,14 @@ def test_name_tiered_row_of_a_mol_is_the_row_of_its_smiles(smiles):
 
 
 @pytest.mark.parametrize("smiles", ["CCO", "C[C@H](N)C(=O)O", "C/C=C/C",
-                                    "CC(=O)[O-].[Na+]", "O=[U](=O)=O", "CC*",
+                                    "CC(=O)[O-].[Na+]", "F[Xe]F", "CC*",
                                     "CC(C)C[C@H](NC(=O)[C@@H](N)Cc1ccccc1)C(=O)O"])
 def test_every_public_call_on_a_mol_gives_the_result_of_its_smiles(smiles):
     _assert_named_as_its_smiles(_mol(smiles))
 
 
 def test_limit_record_of_a_mol_echoes_its_smiles():
-    mol = _mol("O=[U](=O)=O")
+    mol = _mol("F[Xe]F")
     found = classify_limit(mol)
     assert found.code == "UNSUPPORTED_ELEMENT" and found.smiles == _written(mol)
 

@@ -248,7 +248,7 @@ def test_a_limit_that_never_fires_changes_nothing(capsys, tmp_path):
     lines = (["C" * n for n in range(1, 13)] + ["C" * n + "O" for n in range(1, 11)]
              + ["C" * n + "C(=O)O" for n in range(1, 9)] + ["C" * n + "N" for n in range(1, 10)]
              + ["c1ccccc1", "Cc1ccccc1", "c1ccc2ccccc2c1", "C1CCCCC1", "CC(C)(C)c1ccccc1", "O=C=O",
-                "CC(=O)Oc1ccccc1C(=O)O", "C[C@H](N)C(=O)O", "O=[U](=O)=O", "not-a-smiles", ""])
+                "CC(=O)Oc1ccccc1C(=O)O", "C[C@H](N)C(=O)O", "F[Xe]F", "not-a-smiles", ""])
     assert len(lines) == 50
     plain = _batch(capsys, tmp_path, lines)
     limited = _batch(capsys, tmp_path, lines, "--time-limit", "600")
@@ -260,7 +260,7 @@ def test_a_limit_that_never_fires_changes_nothing(capsys, tmp_path):
 @pytest.mark.parametrize("flags", [("--emit-tier", "pin"), ("--provenance",), ("--confidence",),
                                    ("--on-failure", "label")])
 def test_a_limit_that_never_fires_changes_nothing_for_the_other_modes(capsys, tmp_path, flags):
-    lines = [NAMED, NAMED2, "c1ccccc1", "O=[U](=O)=O", "C[C@H](N)C(=O)O", "", "CC(=O)Oc1ccccc1C(=O)O"]
+    lines = [NAMED, NAMED2, "c1ccccc1", "F[Xe]F", "C[C@H](N)C(=O)O", "", "CC(=O)Oc1ccccc1C(=O)O"]
     assert _batch(capsys, tmp_path, lines, "--time-limit", "600", *flags) == _batch(capsys, tmp_path, lines, *flags)
 
 

@@ -38,6 +38,13 @@ ROWS = [
     ("Cl[Ti+](Cl)Br", "bromide—chloride—titanium(4+) (1/2/1)"),
     ("C(C(Cl)Cl)O.O=[V+2]", "2,2-dichloroethan-1-ol—oxovanadium(2+) (1/1)"),
     ("O.O.O[W](=O)(=O)O", "dihydroxydi(oxo)tungsten—water (1/2)"),
+    # uranium, admitted on 2026-10-31 (MORE_BONDED_METAL_VALENCES)
+    ("O=[U](=O)=O", "trioxouranium"),
+    ("F[U](F)(F)(F)(F)F", "uranium(VI) fluoride"),
+    ("F[U](F)(F)(F)F", "uranium(V) fluoride"),
+    ("C[U](C)(C)C", "tetramethyluranium"),
+    ("C=[U+2]=O", "methylidene(oxo)uranium(2+)"),
+    ("[N+](=O)([O-])[O-].[N+](=O)([O-])[O-].O.O.O.O.O=[U+2]=O", "dioxouranium(2+) dinitrate tetrahydrate"),
 ]
 
 
