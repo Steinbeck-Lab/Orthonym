@@ -127,13 +127,15 @@ def test_a_strict_path_pin_verified_by_its_constitution_is_emitted():
 
 
 def test_a_retained_trivial_name_is_emitted_only_with_trivial_fallback():
-    # 'diethylstilbestrol': no Blue Book hit, and the strict path builds no PIN for it.
+    # 'rhapontigenin': no Blue Book hit, and the strict path builds no PIN for it.
     # This was 'bisphenol a' until PIN class program batch 2 (Task 10) named that one
-    # '4,4'-(propane-2,2-diyl)diphenol' at the default tier, the Blue Book).
-    smi = "CC/C(=C(/CC)c1ccc(O)cc1)c1ccc(O)cc1"
+    # '4,4'-(propane-2,2-diyl)diphenol' at the default tier, the Blue Book),
+    # and 'diethylstilbestrol' until its multiplicative name with the (3E) hex-3-ene-3,4-diyl
+    # group was built,:47100).
+    smi = "COc1ccc(C=Cc2cc(O)cc(O)c2)cc1O"
     assert_default_tier_declines(smi)
     row = Orthonym(trivial_fallback=True).name_tiered(smi)
-    assert row["name"] == "diethylstilbestrol" and row["source"] == "trivial_retained", row
+    assert row["name"] == "rhapontigenin" and row["source"] == "trivial_retained", row
     assert_full_rt(row["name"], smi)
 
 

@@ -143,9 +143,12 @@ def test_the_rows_main_names_keep_their_name(smiles, pin):
 
 def test_both_sides_carrying_the_principal_group_is_the_multiplicative_case():
     """'If both R and R' are substituted by the same number of the principal characteristic group, a
-    multiplicative name, using the prefix 'diazenediyl'... is preferred' (the Blue Book): out of
-    scope here, so no substitutive name is offered at the pin tier (as on main)."""
-    assert name_default("OC(=O)c1ccc(N=Nc2ccc(C(=O)O)cc2)cc1")["tier"] != "pin_verified"
+    multiplicative name, using the prefix 'diazenediyl'... is preferred' (the Blue Book): the
+    general multiplicative detector builds it ('4,4'-diazenediyldibenzoic acid (PIN)',:38813), so
+    the substitutive name is never offered at the pin tier."""
+    d = name_default("OC(=O)c1ccc(N=Nc2ccc(C(=O)O)cc2)cc1")
+    assert (d["name"], d["tier"], d["is_pin"]) == ("4,4'-diazenediyldibenzoic acid", "pin_verified", True), d
+    assert name_is_rt_exact(d["name"], "OC(=O)c1ccc(N=Nc2ccc(C(=O)O)cc2)cc1")
 
 
 def test_the_amine_assembler_declines_a_ring_it_gave_no_parent():

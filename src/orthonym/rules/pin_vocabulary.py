@@ -1057,13 +1057,15 @@ def _path_reads_same_both_ways(mol, path) -> bool:
 
 
 def _four_or_more_ring_systems(mol) -> bool:
-    """True when the molecule holds four or more ring systems. "Preferred IUPAC names in
-    phane nomenclature" (the Blue Book), (:23826): "(2) linear phanes consist of
-    four or more rings or ring systems, two of which must be terminal, and together with acyclic
-    atoms or chains must consist of at least seven nodes (components)" (:23829); (:23174)
-    names a phane name rather than a multiplicative one then. The linear-phane check of
-    ``validation.pin_spelling`` owns those molecules and records its own reason, so the two rules
-    of this module make no claim for them."""
+    """True when the molecule holds four or more ring systems that may make a phane name the PIN.
+     "Preferred IUPAC names in phane nomenclature" (the Blue Book),
+    (:23826): "(2) linear phanes consist of four or more rings or ring systems, two of which must
+    be terminal, and together with acyclic atoms or chains must consist of at least seven nodes
+    (components)" (:23829); (:23174) names a phane name rather than a multiplicative one
+    then. The linear-phane check of ``validation.pin_spelling`` owns those molecules and records
+    its own reason, so the two rules of this module make no claim for them. Four ring systems in
+    one line with fewer than seven nodes are no phane (4 benzene rings and 1 oxygen: five nodes);
+    the multiplicative rules judge them."""
     rings = [set(r) for r in mol.GetRingInfo().AtomRings()]
     systems = []
     for r in rings:
@@ -1072,7 +1074,12 @@ def _four_or_more_ring_systems(mol) -> bool:
             systems.remove(x)
             r = r | x
         systems.append(r)
-    return len(systems) >= 4
+    if len(systems) < 4:
+        return False
+    from ..validation.spelling.linear_phane import linear_phane_candidate_chains
+    from .multiplicative_general import linear_ring_chain_nodes
+    nodes = linear_ring_chain_nodes(mol)
+    return not (0 < nodes < 7 and not linear_phane_candidate_chains(mol))
 
 
 def _chain_unit_multiplicative_expected(mol) -> bool:

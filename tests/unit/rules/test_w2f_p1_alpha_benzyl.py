@@ -123,12 +123,16 @@ class TestAlphaBenzylFailClosedAndGuards:
         out = name_compound("Brc1ccc(C([N+](=O)[O-])c2ccccc2)cc1")
         assert out in (UNKNOWN, "1-bromo-4-[nitro(phenyl)methyl]benzene")
 
-    def test_identical_units_gem_dichloro_stays_unknown(self):
-        # THE leak hazard (research F): '[dichloro(phenyl)methyl]benzene'
-        # is RT-valid but non-PIN (PIN = multiplicative
-        # 1,1'-(dichloromethylene)dibenzene, not yet buildable). The
-        # in-builder identical-units decline must keep this refused.
-        assert name_compound("ClC(Cl)(c1ccccc1)c1ccccc1", on_failure="label") == UNKNOWN
+    def test_identical_units_gem_dichloro_is_multiplicative(self):
+        # THE leak hazard (research F): '[dichloro(phenyl)methyl]benzene' is RT-valid but
+        # non-PIN; the PIN is the multiplicative 1,1'-(dichloromethylene)dibenzene. The general
+        # multiplicative detector builds it now (a substituted central group,,
+        # the Blue Book: 'chloromethylene (preferred prefix; a compound multiplicative
+        # group)',:5214), so the in-builder identical-units decline has nothing left to refuse.
+        from tests.support.rt_assert import name_is_rt_exact
+        pin = "1,1'-(dichloromethylene)dibenzene"
+        assert name_compound("ClC(Cl)(c1ccccc1)c1ccccc1", on_failure="label") == pin
+        assert name_is_rt_exact(pin, "ClC(Cl)(c1ccccc1)c1ccccc1")
 
     def test_identical_units_sibling_multiplicative_untouched(self):
         #: identical units -> multiplicative@900 stays senior
@@ -164,7 +168,7 @@ class TestAlphaBenzylFailClosedAndGuards:
 @pytest.mark.unit
 class TestAlphaBenzylDeterminism:
     """Task 9: research C det-probe protocol — evidence, sibling,
-    gem-dichloro (d2 refusal), gem-mixed; 10+ random spellings each,
+    gem-dichloro (multiplicative), gem-mixed; 10+ random spellings each,
     byte-identical. All citation inputs are spelling-invariant strings
     (fixed halo-name map + letters-only key); any spread is a REAL bug."""
 
@@ -172,7 +176,7 @@ class TestAlphaBenzylDeterminism:
         ("Brc1ccc(C(Br)c2ccccc2)cc1",
          "1-bromo-4-[bromo(phenyl)methyl]benzene"),
         ("c1ccccc1C(Br)c1ccccc1", "1,1'-(bromomethylene)dibenzene"),
-        ("ClC(Cl)(c1ccccc1)c1ccccc1", UNKNOWN),
+        ("ClC(Cl)(c1ccccc1)c1ccccc1", "1,1'-(dichloromethylene)dibenzene"),
         ("Brc1ccc(C(F)(Cl)c2ccccc2)cc1",
          "1-bromo-4-[chloro(fluoro)(phenyl)methyl]benzene"),
     ])
