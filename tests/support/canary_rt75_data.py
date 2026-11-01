@@ -17,6 +17,10 @@ a phase additions: 10 compounds from missing compound classes (to)
 a phase additions: 3 compounds from decomposition format fixes (ether/alkoxy)
 a phase additions: 19 compounds from v9.0 canary expansion (coverage-based + anchors)
 a phase additions: 2 compounds newly RT-matching in v10.0 (steroid + epoxycyclohexane)
+ANION 2026-11-01 (ruling R6, RULINGS-ANION.md): the amino-acid zwitterions beta-alanine, L-tyrosine and the threonine
+zwitterion take the name, the cationic prefix on the anionic parent "Zwitterionic amino acids
+are named in two ways", the Blue Book, example:54561 'azaniumylacetate'); the retained names name the neutral
+acids and:50943 gives them no PIN. Each new name read back by OPSIN to the input's full InChIKey.
 NPL 2026-11-01: 17 steroid rows (and the DK-P101CIP known-defect rows) take the systematic names of Chapters
  to: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not identified for the
 compounds in this Chapter",:50943 "a 'systematic name' may be generated in accordance with Rules described in
@@ -1501,7 +1505,7 @@ CANARY_COMPOUNDS = [
     #: zwitterion beta-alanine - RT validated
     (
         "[NH3+]CCC(=O)[O-]",
-        "beta-alanine",
+        "3-azaniumylpropanoate",
     ),
     # --- a phase v12.0 canary expansion (30 newly RT-matching compounds) ---
     (
@@ -2694,7 +2698,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](O)[C@H]([NH3+])C(=O)[O-]",  # acyclic,small
-        "(2S,3S)-2-amino-3-hydroxybutanoic acid",
+        "(2S,3S)-2-azaniumyl-3-hydroxybutanoate",
     ),
     (
         "O=[N+]([O-])c1sccc1-c1ncccn1",  # aromatic,heterocycle,small
@@ -2929,7 +2933,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "[NH3+][C@@H](Cc1ccc(O)cc1)C(=O)[O-]",  # aromatic,small
-        "L-tyrosine",
+        "(2S)-2-azaniumyl-3-(4-hydroxyphenyl)propanoate",
     ),
     (
         "Oc1cc(O)cc(-c2ccccc2)c1",  # aromatic,small; OH is PCG -> -diol suffix on assembly parent

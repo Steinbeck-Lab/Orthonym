@@ -5863,10 +5863,11 @@ def _name_carboxylate_systematic(mol, anion_site: Dict) -> str:
                           or _anion_name_keeps_hydron_sites(mol, oate_name)):
             return oate_name
         if oate_name:
-            from .acid_salt_anions import name_ring_acid_salt_anion
+            from .acid_salt_anions import name_acetate_acid_salt_anion, name_ring_acid_salt_anion
             own_parent = (_anion_on_its_own_parent(mol, anion_site, acid_name)
                           or _anion_as_principal_suffix(mol, anion_site)
-                          or name_ring_acid_salt_anion(mol, anion_site))
+                          or name_ring_acid_salt_anion(mol, anion_site)
+                          or name_acetate_acid_salt_anion(mol, anion_site))
             if own_parent:
                 return own_parent
             # method (2): when every carboxy group of the neutral acid

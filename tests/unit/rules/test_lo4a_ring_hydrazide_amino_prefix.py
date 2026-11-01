@@ -88,7 +88,7 @@ def test_an_n_aryl_prefix_keeps_the_fragment_namer():
     ("CN=C1CCc2ccccc2C1=O", "methylimino"),
     ("NC(=N)NC1CCc2ccccc2C1=O", "carbamimidoylamino"),        #, the Blue Book
     ("CC(=O)NC1CCc2ccccc2C1=O", "acetamido"),
-    ("C[N+](C)(C)C1CCc2ccccc2C1=O", "trimethylazaniumyl"),   # a charged nitrogen keeps the fragment namer
+    ("C[N+](C)(C)C1CCc2ccccc2C1=O", "N,N-dimethylmethanaminiumyl"),  # a charged nitrogen keeps the fragment namer (:42473)
     ("NNC1CCc2ccccc2C1=O", "hydrazinyl"),                     # a nitrogen with a heteroatom neighbour too
 ])
 def test_exocyclic_substituent_name(smiles, expected):

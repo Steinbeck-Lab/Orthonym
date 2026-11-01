@@ -175,10 +175,12 @@ from orthonym import name_compound  # noqa: E402
 class TestSUB01ZwitterionNegativeCanary:
     """Retained / structured zwitterion names."""
 
-    def test_glycine_retained(self):
-        """Glycine retained name allows it; OPSIN-parseable) is preserved
-        FIRST per (amino-acid zwitterions sequenced ahead of GUARD 4)."""
-        assert name_compound("[NH3+]CC(=O)[O-]") == "glycine"
+    def test_glycine_zwitterion_is_azaniumylacetate(self):
+        """ "Zwitterionic amino acids are named in two ways" (the Blue Book, example:54561
+        'azaniumylacetate glycine zwitterion'): the zwitterion is named by prefixing the cationic group to the anionic
+        parent,:42473). The retained 'glycine' names the neutral acid and:50943 gives it no PIN, so
+        it no longer pre-empts the structured name (ruling R6, RULINGS-ANION.md). OPSIN reads the name to the input."""
+        assert name_compound("[NH3+]CC(=O)[O-]") == "azaniumylacetate"
 
     def test_betaine_structured_p74_1_3(self):
         """169.6-04: the hardcoded ``betaine`` literal was DELETED (it is NOT
@@ -186,14 +188,14 @@ class TestSUB01ZwitterionNegativeCanary:
         compound'). route_charged GUARD 4 now produces the structured
         (trimethylazaniumyl)acetate, which round-trips in OPSIN to
         C[N+](C)(C)CC(=O)[O-] (RT=1, a strict improvement over RT=0)."""
-        assert name_compound("C[N+](C)(C)CC(=O)[O-]") == "(trimethylazaniumyl)acetate"
+        assert name_compound("C[N+](C)(C)CC(=O)[O-]") == "(N,N-dimethylmethanaminiumyl)acetate"
 
 
 class TestSUB01Zwitterion:
     """Non-retained zwitterion -> whole-skeleton azaniumyl...oate ."""
 
-    @pytest.mark.xfail(reason="DEFERRED (169.5, honest-fail): charge-stripped '4-aminobutanoic acid' already RT-correct at connectivity (InChI-L1 ignores charge), so the D-03 azaniumyl...oate compositional path is precision-only / zero-RT / high-risk new-logic. Deferred over the higher-value anion fix.", strict=False)
     def test_gaba_zwitterion_whole_skeleton(self):
-        # 4-aminobutanoate zwitterion -> 4-azaniumylbutanoate (both centres).
+        # 4-aminobutanoate zwitterion -> 4-azaniumylbutanoate (both centres): (the Blue Book,
+        # example:54561); the deferred row of 169.5 is built since ruling R6 (RULINGS-ANION.md).
         name = name_compound("[NH3+]CCCC(=O)[O-]")
-        assert "azaniumyl" in name and name.endswith("oate")
+        assert name == "4-azaniumylbutanoate"

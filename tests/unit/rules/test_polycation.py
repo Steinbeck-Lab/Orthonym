@@ -33,7 +33,6 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "C[N+](C)(C)CCCC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -157,7 +156,7 @@ def test_integration_bis_quaternary_ammonium(namer, smi, expected):
 @pytest.mark.parametrize("smi,expected", [
     ("C[N+](C)(C)C", "N,N,N-trimethylmethanaminium"),
     ("C[n+]1ccccc1", "1-methylpyridin-1-ium"),
-    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(trimethylazaniumyl)butanoate"),
+    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)butanoate"),
 ])
 def test_integration_regressions_unchanged(namer, smi, expected):
     assert _dt_obj_name(namer, smi) == expected

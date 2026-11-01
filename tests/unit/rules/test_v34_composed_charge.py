@@ -20,7 +20,8 @@ BE = dict(general_fallback=True, general_fallback_unverified=True, allow_aromati
 
 CONTROLS = [
     ("C[N+](C)(C)CC(=O)[O-]", "(trimethylazaniumyl)acetate"),   # betaine — Z3 prefix already works
-    ("C(C(=O)[O-])[NH3+]", "glycine"),                           # amino-acid retained path pre-empts
+    # (the Blue Book, example:54561): the zwitterion is named azaniumylacetate (ruling R6)
+    ("C(C(=O)[O-])[NH3+]", "azaniumylacetate"),
 ]
 
 

@@ -4174,6 +4174,32 @@ def _italic_prefixes(name: str) -> tuple:
     return tuple(_ITALIC_PREFIX_RE.findall(name.lower())) if name else ()
 
 
+import contextlib as _contextlib
+import contextvars as _contextvars
+
+#: While set, a prefix that begins with 'amino' is ordered as the 'azaniumyl' it will be cited as (see
+#::func:`amino_cited_as_azaniumyl`): the name of the neutral molecule is numbered and ordered for the ion.
+_AMINO_AS_AZANIUMYL = _contextvars.ContextVar("orthonym_amino_as_azaniumyl", default=False)
+_LEADING_AMINO_RE = re.compile(r"^([\d,'\-\s(\[{]*)amino")
+
+
+@_contextlib.contextmanager
+def amino_cited_as_azaniumyl():
+    """Within the block ``alpha_sort_key`` orders a prefix that begins with 'amino' as 'azaniumyl'.
+
+    The zwitterion of an amino acid is named from the neutral molecule's name with its 'amino' group re-cited as
+    'azaniumyl', the Blue Book). The two prefixes stand at different places of the alphabet ('anilino'
+    and 'arsono' lie between them,:3446), so a name built with 'amino' in the order would be misordered
+    after the change, and the lowest-locant tie of would be decided for the wrong prefix. The neutral
+    name is built inside this block: the order and the numbering are those of the ion's name, and only the word is
+    changed afterwards."""
+    token = _AMINO_AS_AZANIUMYL.set(True)
+    try:
+        yield
+    finally:
+        _AMINO_AS_AZANIUMYL.reset(token)
+
+
 def alpha_sort_key(substituent_name: str) -> str:
     """ alphanumerical sort key for a substituent prefix.
 
@@ -4209,6 +4235,8 @@ def alpha_sort_key(substituent_name: str) -> str:
         >>> alpha_sort_key('propan-2-ylidene') < alpha_sort_key('prop-1-en-2-yl')
         True
     """
+    if _AMINO_AS_AZANIUMYL.get():
+        substituent_name = _LEADING_AMINO_RE.sub(r"\1azaniumyl", substituent_name)
     return AlphaKey(_ENCLOSING_MARKS_RE.sub('', _alpha_sort_key_core(substituent_name)),
                     strip_alphanumerical_noise(substituent_name.lower()),
                     _lambda_key(substituent_name), substituent_name)

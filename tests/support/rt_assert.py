@@ -51,6 +51,10 @@ def _independent_parse(name: str, smiles=None):
     from orthonym.validation.read_back_policy import smiles_has_radical_electrons
     if not name:
         return None
+    # OPSIN reads no '-aminiumyl' prefix. The PIN '(N,N-dimethylmethanaminiumyl)acetate' (the Blue Book, is read
+    # as the azane-based spelling of the same group, '(trimethylazaniumyl)acetate': this literal is the test's own, not
+    # the engine's twin rule (``validation.twin_spellings``), so the check stays independent of the code under test.
+    name = name.replace("N,N-dimethylmethanaminiumyl", "trimethylazaniumyl")
     jar = _find_opsin_jar()
     if not jar:
         return None

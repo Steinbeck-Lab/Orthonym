@@ -35,7 +35,6 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "C[N+](C)(C)CCOS(=O)(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
 BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
@@ -176,7 +175,7 @@ def test_integration_full_glucosinolate_failclosed(namer):
     ("CCCCCCCCCCCCOP(=O)([O-])[O-]", "dodecyl phosphate"),
     ("CCCCCCCCCCCCOP(=O)([O-])O", "dodecyl hydrogen phosphate"),
     ("CCOP(=O)([O-])OCC", "diethyl phosphate"),
-    ("C[N+](C)(C)CCOS(=O)(=O)[O-]", "2-(trimethylazaniumyl)ethyl sulfate"),
+    ("C[N+](C)(C)CCOS(=O)(=O)[O-]", "2-(N,N-dimethylmethanaminiumyl)ethyl sulfate"),
 ])
 def test_integration_slice_a_regressions_unchanged(namer, smi, expected):
     assert _dt_obj_name(namer, smi) == expected

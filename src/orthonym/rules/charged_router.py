@@ -69,6 +69,9 @@ from .ions import (
     classify_anion,
     classify_cation,
 )
+from .azaniumyl_zwitterions import fully_ionised_azaniumyl_zwitterion
+from .ester_zwitterions import phosphodiester_zwitterion_name
+from .olate_anions import olate_anion_name, olate_on_nitrogen_must_read_back
 from .ring_position_kinds import one_kind_of_substitutable_position
 
 # =============================================================================
@@ -236,7 +239,7 @@ def classify_charged_pcg(mol, sites) -> Optional[str]:
 #: 'olate' anion lacks, and the neutral suffix that names the group. A hydroxy group's pattern
 #: starts with its chalcogen, so the first atom of a match is the centre of the group.
 _OLATE_GROUPS = {
-    'alkoxide': (('primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'alcohol'), 'ol'),
+    'alkoxide': (('primary_alcohol', 'secondary_alcohol', 'tertiary_alcohol', 'alcohol', 'enol'), 'ol'),
     'phenolate': (('phenol',), 'ol'),
     'thiolate': (('thiol',), 'thiol'),
 }
@@ -709,8 +712,10 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
         else:
             return ''                              # P-O-P bridge / charged owner O -> defer
 
+    if len(ester_oxygens) == 2:
+        return phosphodiester_zwitterion_name(mol, cation_idx, central_idx, ester_oxygens)
     if len(ester_oxygens) != 1:
-        return ''                                  # need exactly one ester owner (no diester)
+        return ''                                  # need exactly one ester owner
     ester_o_idx = ester_oxygens[0]
 
     required_dbl_oxo = 2 if central.GetSymbol() == 'S' else 1
@@ -731,6 +736,8 @@ def _name_ester_anion_zwitterion(mol, cation_idx: int, anion_idx: int) -> str:
         return ''
     if cation_idx not in owner_frag:
         return ''                                  # cation not on the owner arm -> defer
+    if any(mol.GetAtomWithIdx(i).GetFormalCharge() < 0 for i in owner_frag):
+        return ''                                  # an anion on the owner arm ('carboxy' for a carboxylate): its own route
 
     accounted |= owner_frag
     if accounted != set(range(mol.GetNumAtoms())):
@@ -1073,8 +1080,10 @@ def _full_inchikey_rt_ok(mol, name: str) -> bool:
     """
     from ..namer import _validity_gate_name_to_smiles
     from ..validation.read_back_policy import reading_for
+    from ..validation.twin_spellings import opsin_spelling
     with reading_for(mol):      # a radical fragment of a closed-shell input keeps its '-yl' names
-        smi = _validity_gate_name_to_smiles(name)
+        # a PIN spelling OPSIN has no grammar for is read as its twin ('(N,N-dimethylmethanaminiumyl)' as '(trimethylazaniumyl)')
+        smi = _validity_gate_name_to_smiles(name) or _validity_gate_name_to_smiles(opsin_spelling(name))
     if not smi:
         return False
     parsed = Chem.MolFromSmiles(smi)
@@ -1227,8 +1236,12 @@ def _name_primary_amine_azaniumyl_zwitterion(mol, cations, anions, style) -> str
     neutral_smi = Chem.MolToSmiles(neutral, canonical=True)
     if not neutral_smi:
         return ''
+    from ..assembly.naming_utils import amino_cited_as_azaniumyl
+    from .amino_acids import retained_amino_acid_names_left_out
     try:
-        neutral_name = _reenter(neutral_smi, style)
+        # the neutral name is ordered and numbered for the ion's prefix, and is the systematic one ('aminoacetic acid')
+        with amino_cited_as_azaniumyl(), retained_amino_acid_names_left_out():
+            neutral_name = _reenter(neutral_smi, style)
     except (RecursionError, ValueError, RuntimeError):
         return ''
     if not neutral_name or _is_malformed_parent(neutral_name):
@@ -1258,7 +1271,8 @@ def _zwitterion_name(mol, sites, style: str) -> str:
     name = _route_zwitterion(mol, sites, style)
     if name and _full_inchikey_rt_ok(mol, name):
         return name
-    return _zwitterion_azanide_parent(mol, sites, style) or name
+    return (_zwitterion_azanide_parent(mol, sites, style)
+            or fully_ionised_azaniumyl_zwitterion(mol, sites['cations'], sites['anions'], style) or name)
 
 
 def _zwitterion_azanide_parent(mol, sites, style: str) -> str:
@@ -3987,11 +4001,11 @@ def route_charged(mol, style: str = 'pin') -> str:
                         return rederived
         return naive
 
-    ionized = apply_ion_suffix_to_name(
+    ionized = olate_on_nitrogen_must_read_back(mol, apply_ion_suffix_to_name(
         neutral_name, total_charge,
         allowed_suffixes=allowed_suffixes,
         cation_class=cation_class,
-    )
+    ))
     if ionized:
         #: an -iminide name inherits the neutral imine's locants
         # (butan-1-iminide, P,P,P-trimethyl-...); the =N- anion removes the N-H, so
@@ -4052,7 +4066,7 @@ def route_charged(mol, style: str = 'pin') -> str:
                 allowed_suffixes=allowed_suffixes,
                 cation_class=cation_class,
             )
-    return olate_with_senior_neutral_group(mol, sites, neutral_smi, style)
+    return olate_anion_name(mol, sites, neutral_smi, style)
 
 
 def _aminide_alternative(mol, sites, style: str, demote: bool = False) -> str:

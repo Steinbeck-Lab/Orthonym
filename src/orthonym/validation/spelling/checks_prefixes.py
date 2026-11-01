@@ -51,9 +51,10 @@ _ANILINE_N = Chem.MolFromSmarts("[NX3;!R;+0]-[c;R1]1:[c;R1]:[c;R1]:[c;R1]:[c;R1]
 
 #: 'phenylamino', '(X-phenyl)amino', '[X-phenyl]amino' and the '(phenyl)amino' of 'methyl(phenyl)amino':
 #: the amino group cited on a phenyl group, and the phenyl group cited first of two ('(4-chlorophenyl)(methyl)
-#: amino'). 'phenylaminyl', 'phenylaminium' and the like are other words.
-_PHENYLAMINO = re.compile(r"phenyl[)\]}]amino|phenylamino"
-                          r"|phenyl[)\]}][(\[{](?:[^()\[\]{}]|[(\[{][^()\[\]{}]*[)\]}])*[)\]}]amino")
+#: amino'). 'phenylaminyl', 'phenylaminium' and the like are other words, and so is 'methyl(phenyl)aminoxide',
+#: the anion R2N-O(-) of (the Blue Book), whose 'aminoxide' is no amino group.
+_PHENYLAMINO = re.compile(r"phenyl[)\]}]amino(?!xide)|phenylamino(?!xide)"
+                          r"|phenyl[)\]}][(\[{](?:[^()\[\]{}]|[(\[{][^()\[\]{}]*[)\]}])*[)\]}]amino(?!xide)")
 
 
 @register("P-62.2.1.1.1")

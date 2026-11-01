@@ -57,10 +57,10 @@ def test_asymmetric_bis_quaternary_still_fails_closed():
 def test_warm_instance_keeps_the_pin_label():
     # a demoted betaine named first in the same instance must not leak its label
     namer = Orthonym(style="pin")
-    for smiles, is_pin in (("C[N+](C)(C)CC(=O)[O-]", False),
+    for smiles, is_pin in (("CC[N+](C)(C)CC(=O)[O-]", False),
                            ("C[N+](C)(C)CCCCCC[N+](C)(C)C", True),
                            ("OCC[N+](C)(C)CCCCCC[N+](C)(C)CCO", True),
-                           ("C[N+](C)(C)CC(=O)[O-]", False),
+                           ("CC[N+](C)(C)CC(=O)[O-]", False),
                            ("C[N+](C)(C)CCCCCC[N+](C)(C)C", True)):
         row = _row(smiles, namer)
         assert row["is_pin"] is is_pin, (smiles, row["name"], row["tier"])

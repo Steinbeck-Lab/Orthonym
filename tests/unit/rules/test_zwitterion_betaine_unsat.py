@@ -14,12 +14,13 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "C[N+](C)(C)C/C=C/C(=O)[O-]",
-    "C[N+](C)(C)CCC(=O)[O-]",
-    "C[N+](C)(C)CCCC(=O)[O-]",
     "C[N+](C)(C)C[C@H](O)CC(=O)[O-]",
 })
 #... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    # the strict path spells the '-aminiumyl' PIN (glued to the descriptor, so declined), the best-effort tier 'azaniumyl'
+    "C[N+](C)(C)C/C=C/C(=O)[O-]",
+})
 
 
 def _declined_pin_row(smiles):
@@ -106,9 +107,9 @@ def test_parent_has_chain_locants_retained_2_naphthoate():
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
     # the unsaturated betaine (the fix)
-    ("C[N+](C)(C)C/C=C/C(=O)[O-]", "4-(trimethylazaniumyl)(2E)-but-2-enoate"),
+    ("C[N+](C)(C)C/C=C/C(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)(2E)-but-2-enoate"),
     # saturated betaine (regression check)
-    ("C[N+](C)(C)CCC(=O)[O-]", "3-(trimethylazaniumyl)propanoate"),
+    ("C[N+](C)(C)CCC(=O)[O-]", "3-(N,N-dimethylmethanaminiumyl)propanoate"),
 ])
 def test_unsaturated_betaine_integration(namer, smi, expected):
     """Integration tests for unsaturated and saturated betaine zwitterions."""
@@ -118,7 +119,7 @@ def test_unsaturated_betaine_integration(namer, smi, expected):
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smi,expected", [
     # longer saturated betaine (regression)
-    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(trimethylazaniumyl)butanoate"),
+    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)butanoate"),
     # carnitine (regression). Name unchanged; labelled below pin_verified since
     # decision A part 1 (test_decision_a_n_substituted_amino_acids.py).
     ("C[N+](C)(C)C[C@H](O)CC(=O)[O-]", "L-carnitine"),

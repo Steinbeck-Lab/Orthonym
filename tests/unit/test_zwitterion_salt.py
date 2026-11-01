@@ -51,8 +51,15 @@ class TestCationToPrefixProducer:
     substituent_naming.py had ZERO cation-prefix capability before this plan."""
 
     def test_trimethyl_quaternary_ammonium(self):
-        """(CH3)3N+- on an anion parent -> trimethylazaniumyl."""
-        assert _cation_prefix("C[N+](C)(C)CC(=O)[O-]") == "trimethylazaniumyl"
+        """(CH3)3N+- on an anion parent -> N,N-dimethylmethanaminiumyl at the default tier, the Blue Book
+        '(N,N-dimethylmethanaminiumyl)acetate (PIN)'); a wider tier spells the OPSIN-readable 'trimethylazaniumyl'."""
+        assert _cation_prefix("C[N+](C)(C)CC(=O)[O-]") == "N,N-dimethylmethanaminiumyl"
+        from orthonym.metrics.provenance import wider_tier_ctx
+        token = wider_tier_ctx.set(True)
+        try:
+            assert _cation_prefix("C[N+](C)(C)CC(=O)[O-]") == "trimethylazaniumyl"
+        finally:
+            wider_tier_ctx.reset(token)
 
     def test_mixed_n_substituents_alphabetized_multiplied(self):
         """N-ethyl-N,N-dimethyl -> ethyldi(methyl)azaniumyl (alphabetical + di-).
@@ -80,17 +87,17 @@ class TestZwitterionGuard4:
         """THE worked target. Betaine (CH3)3N+-CH2-COO- -> the carboxylate is the
         parent and the quaternary ammonium is the (trimethylazaniumyl)
         prefix. OPSIN round-trips this to C[N+](C)(C)CC(=O)[O-]."""
-        assert _rc("C[N+](C)(C)CC(=O)[O-]") == "(trimethylazaniumyl)acetate"
+        assert _rc("C[N+](C)(C)CC(=O)[O-]") == "(N,N-dimethylmethanaminiumyl)acetate"
 
     def test_betaine_homolog_carries_locant(self):
         """A longer-chain betaine homolog cites the attachment locant (PIN cites
         all locants — the contributor guide pitfall 3). 4-carbon -> 4-(trimethylazaniumyl)
         butanoate (RT-verified)."""
-        assert _rc("C[N+](C)(C)CCCC(=O)[O-]") == "4-(trimethylazaniumyl)butanoate"
+        assert _rc("C[N+](C)(C)CCCC(=O)[O-]") == "4-(N,N-dimethylmethanaminiumyl)butanoate"
 
     def test_betaine_propanoate_homolog(self):
         """3-carbon betaine homolog -> 3-(trimethylazaniumyl)propanoate (RT)."""
-        assert _rc("C[N+](C)(C)CCC(=O)[O-]") == "3-(trimethylazaniumyl)propanoate"
+        assert _rc("C[N+](C)(C)CCC(=O)[O-]") == "3-(N,N-dimethylmethanaminiumyl)propanoate"
 
     def test_protonated_amine_deferred(self):
         """, as amended by 0e7b6437a (2026-08-20, " charged Slice B: PIN-correct

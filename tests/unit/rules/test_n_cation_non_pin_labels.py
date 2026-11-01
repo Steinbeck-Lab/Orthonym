@@ -7,8 +7,11 @@ prefix names are formed by adding the suffixes 'yl', 'ylidene', etc. to the cati
 (:42296), "Method (1) leads to preferred IUPAC names" (:42299) -- hence
 '(*N*,*N*-dimethylmethanaminiumyl)acetate (PIN)':42473) and
 '2-(*N*,*N*-dimethylmethanaminiumyl)propan-2-ide (PIN)':42517). The
-round-trip parser reads none of the '-aminiumyl' forms, so those PINs cannot be
-verified: the engine keeps the verified azanium name and labels it general-tier.
+round-trip parser reads none of the '-aminiumyl' forms. For the one group of the book's own example, a nitrogen with three
+methyl groups, the default tier spells the PIN '(N,N-dimethylmethanaminiumyl)acetate' and verifies it through the twin
+'(trimethylazaniumyl)acetate' (``validation.twin_spellings``, rule ``aminiumyl_azaniumyl``; the maintainers' ruling of
+2026-11-01); every other nitrogen with a carbon group (ethyl, propyl, tert-butyl) has no such rule yet, so the engine keeps
+the verified azanium name and labels it general-tier, as below.
 
 A cation also outranks every neutral class: '6 Cations' before
 '7 Acids',:18169-18170), so '3-(methylazaniumyl)propanoic acid' (an azaniumyl prefix on
@@ -39,15 +42,10 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CC(C)(C)[N+](C)(C)CC(=O)[O-]",
-    "CCCCCCCCCCCCCC/C=C\\OC[C@H](COP(=O)(O)OCC[N+](C)(C)C)O",
     "CCCCCCCCCCCCCCCC(=O)OC[C@H](COP([O-])(=O)OCC[N+](C)(C)C)OC(=O)CCCCCCCCCCCCCCC",
     "CCC[N+](C)(C)CC(=O)[O-]",
     "CC[N+](C)(C)CC(=O)[O-]",
     "CC[N+](CC)(CC)CC(=O)[O-]",
-    "C[N+](C)(C)CC(=O)[O-]",
-    "C[N+](C)(C)CCCC(=O)[O-]",
-    "C[N+](C)(C)CCOS(=O)(=O)[O-]",
-    "C[N+](C)(C)[C-](C)C",
     "C[NH+](C)CCC(=O)O",
     "C[NH2+]CCC(=O)O",
     "[NH3+]CCC(=O)O",
@@ -76,14 +74,8 @@ def _row(smiles, namer=None):
 
 # The verified azanium name ships unchanged, labelled general-tier (never pin_verified).
 @pytest.mark.parametrize("smiles,expected", [
-    ("C[N+](C)(C)CC(=O)[O-]", "(trimethylazaniumyl)acetate"),                 #:42473
     ("CC[N+](CC)(CC)CC(=O)[O-]", "(triethylazaniumyl)acetate"),
-    ("C[N+](C)(C)[C-](C)C", "2-(trimethylazaniumyl)propan-2-ide"),            #:42517
-    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(trimethylazaniumyl)butanoate"),
-    ("C[N+](C)(C)CCOS(=O)(=O)[O-]", "2-(trimethylazaniumyl)ethyl sulfate"),
     (_PC, "[(2R)-2,3-bis(hexadecanoyloxy)propyl] 2-(trimethylazaniumyl)ethyl phosphate"),
-    (_PLASMALOGEN, "(2R)-1-{[(1Z)-hexadec-1-en-1-yl]oxy}-3-({[2-(trimethylazaniumyl)"
-                   "ethoxy]hydroxyphosphoryl}oxy)propan-2-ol"),
     #: the cation is principal; an azaniumyl prefix on a neutral parent is not a PIN.
     # With an oxoacid on the cation the aminium-principal PIN is not built (the charged
     # router's zwitterion step ionizes that acid suffix), so the demoted swap ships.
@@ -96,6 +88,31 @@ def test_unverifiable_pin_form_ships_demoted(smiles, expected):
     assert row["name"] == expected
     assert row["tier"] not in ("pin_verified", "abstain") and not row["is_pin"]
     assert name_is_rt_exact(expected, smiles)
+
+
+# The nitrogen with three methyl groups is the '-aminiumyl' PIN of the book's own example, the Blue Book;
+#,:42517), spelled at the default tier and read through its twin (the maintainers' ruling of 2026-11-01).
+# The twin '(trimethylazaniumyl)...' is what OPSIN reads, and the independent read-back below reads it.
+@pytest.mark.parametrize("smiles,expected", [
+    ("C[N+](C)(C)CC(=O)[O-]", "(N,N-dimethylmethanaminiumyl)acetate"),                 #:42473
+    ("C[N+](C)(C)[C-](C)C", "2-(N,N-dimethylmethanaminiumyl)propan-2-ide"),            #:42517
+    ("C[N+](C)(C)CCCC(=O)[O-]", "4-(N,N-dimethylmethanaminiumyl)butanoate"),
+    ("C[N+](C)(C)CCOS(=O)(=O)[O-]", "2-(N,N-dimethylmethanaminiumyl)ethyl sulfate"),
+])
+def test_the_trimethyl_nitrogen_is_the_aminiumyl_pin_verified_through_its_twin(smiles, expected):
+    row = _row(smiles)
+    assert (row["name"], row["tier"], row["is_pin"], row["opsin"]) == (expected, "pin_verified", True, "verified_twin"), row
+    assert name_is_rt_exact(expected, smiles)
+
+
+def test_the_plasmalogen_choline_is_named_at_best_effort_with_the_azaniumyl_prefix():
+    # the default tier builds no name for it (the choline head of this route is spelled 'trimethylazaniumyl' by
+    # ``rules.lipids`` and recorded as no PIN); the best-effort tier ships the verified azanium name below the PIN
+    from tests.support.rt_assert import name_best_effort
+    row = name_best_effort(_PLASMALOGEN)
+    assert row["name"] == ("(2R)-1-{[(1Z)-hexadec-1-en-1-yl]oxy}-3-({[2-(trimethylazaniumyl)"
+                           "ethoxy]hydroxyphosphoryl}oxy)propan-2-ol"), row
+    assert name_is_rt_exact(row["name"], _PLASMALOGEN)
 
 
 # Controls: nothing here cites a carbon-substituted N+ as azanium(yl).
@@ -170,11 +187,13 @@ def test_multiplicative_fallback_unit_records_its_fragment():
 
 
 def test_label_is_stable_in_one_warm_instance():
-    # memo / cache hits must not lose (or leak) the label across calls
+    # memo / cache hits must not lose (or leak) the label across calls. The glycine zwitterion is the
+    # name 'azaniumylacetate' example, the Blue Book), a PIN, since ruling R6 (RULINGS-ANION.md);
+    # the retained 'glycine' that it used to take names the neutral acid and carried no PIN:50943).
     namer = Orthonym(style="pin")
     seq = [(_PC, False), (_PLASMALOGEN, False), (_PLASMALOGEN, False),
-           ("C[N+](C)(C)CC(=O)[O-]", False), ("C[N+](C)(C)CC(=O)[O-]", False),
-           ("[NH3+]CC(=O)[O-]", False), ("C[N+](C)(C)CCO", True), (_PC, False),
+           ("C[N+](C)(C)CC(=O)[O-]", True), ("C[N+](C)(C)CC(=O)[O-]", True),
+           ("[NH3+]CC(=O)[O-]", True), ("C[N+](C)(C)CCO", True), (_PC, False),
            ("CCO", True)]
     for smiles, is_pin in seq:
         row = _row(smiles, namer)

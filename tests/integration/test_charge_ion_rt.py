@@ -229,44 +229,55 @@ class TestPhospholipidZwitterionNaming:
 # ---------------------------------------------------------------------------
 
 class TestAminoAcidZwitterionNaming:
-    """Test amino acid zwitterions produce correct names."""
+    """Amino acid zwitterions are named by the zwitterion rule, not by the retained acid name.
+
+     "Zwitterionic amino acids are named in two ways" (the Blue Book, example
+    :54561 'azaniumylacetate glycine zwitterion'): the cationic centre is the prefix 'azaniumyl'
+    and the anionic one the suffix 'ate',:42473). The retained names glycine, alanine... name the neutral acid; (:50943) gives
+    no PIN in Chapter for them. Each name below reads back to the input's full InChIKey in
+    OPSIN (stereo included: L is S except cysteine, D is R)."""
 
     def test_glycine_zwitterion(self):
-        """Glycine zwitterion should produce 'glycine'."""
+        """Glycine zwitterion is 'azaniumylacetate', the Blue Book)."""
         result = name_compound('[NH3+]CC([O-])=O')
-        assert result == 'glycine', f"Expected glycine, got: {result}"
+        assert result == 'azaniumylacetate', f"Expected azaniumylacetate, got: {result}"
 
     def test_l_alanine_zwitterion(self):
-        """L-alanine zwitterion should produce 'L-alanine'."""
+        """L-alanine zwitterion: the S enantiomer; method (1) of (the Blue Book,
+        "Zwitterionic amino acids are named in two ways"), the cation prefixed to the anionic parent."""
         result = name_compound('C[C@H]([NH3+])C([O-])=O')
-        assert result == 'L-alanine', f"Expected L-alanine, got: {result}"
+        assert result == '(2S)-2-azaniumylpropanoate', \
+            f"Expected (2S)-2-azaniumylpropanoate, got: {result}"
 
     def test_d_valine_zwitterion(self):
-        """ charged B1: this SMILES is the R (D) enantiomer, not L -- the
-        table used to mislabel it 'L-valine'. VERIFIED via OPSIN: the input's
-        InChIKey (an InChIKey) matches opsin_parse('D-valine'),
-        not opsin_parse('L-valine') (an InChIKey)."""
+        """ charged B1: this SMILES is the R (D) enantiomer, not L. VERIFIED via OPSIN: the
+        input's InChIKey (an InChIKey) matches opsin_parse('D-valine'), and the
+        name below reads back to it."""
         result = name_compound('CC(C)[C@@H]([NH3+])C([O-])=O')
-        assert result == 'D-valine', f"Expected D-valine, got: {result}"
+        assert result == '(2R)-2-azaniumyl-3-methylbutanoate', \
+            f"Expected (2R)-2-azaniumyl-3-methylbutanoate, got: {result}"
 
     def test_d_leucine_zwitterion(self):
-        """ charged B1: this SMILES is the R (D) enantiomer, not L -- the
-        table used to mislabel it 'L-leucine' (the original a trace finding).
-        VERIFIED via OPSIN: the input's InChIKey
-        (an InChIKey) matches opsin_parse('D-leucine')."""
+        """ charged B1: this SMILES is the R (D) enantiomer, not L (the original a trace finding).
+        VERIFIED via OPSIN: the input's InChIKey (an InChIKey) matches
+        opsin_parse('D-leucine'), and the name below reads back to it."""
         result = name_compound('CC(C)C[C@@H]([NH3+])C([O-])=O')
-        assert result == 'D-leucine', f"Expected D-leucine, got: {result}"
+        assert result == '(2R)-2-azaniumyl-4-methylpentanoate', \
+            f"Expected (2R)-2-azaniumyl-4-methylpentanoate, got: {result}"
 
     def test_l_proline_zwitterion(self):
-        """L-proline zwitterion."""
+        """L-proline zwitterion: the ring N is the cationic centre, 'pyrrolidin-1-ium'
+        "General rule for systematically naming cationic centers in parent hydrides",
+        the Blue Book), the carboxylate the suffix of the anionic parent."""
         result = name_compound('O=C([O-])[C@@H]1CCC[NH2+]1')
-        assert result == 'L-proline', f"Expected L-proline, got: {result}"
+        assert result == '(2S)-pyrrolidin-1-ium-2-carboxylate', \
+            f"Expected (2S)-pyrrolidin-1-ium-2-carboxylate, got: {result}"
 
     def test_l_phenylalanine_zwitterion(self):
         """L-phenylalanine zwitterion."""
         result = name_compound('[NH3+][C@@H](Cc1ccccc1)C([O-])=O')
-        assert result == 'L-phenylalanine', \
-            f"Expected L-phenylalanine, got: {result}"
+        assert result == '(2S)-2-azaniumyl-3-phenylpropanoate', \
+            f"Expected (2S)-2-azaniumyl-3-phenylpropanoate, got: {result}"
 
     def test_l_glutamic_acid_zwitterion(self):
         """L-glutamic acid zwitterion (one COOH protonated)."""
@@ -289,16 +300,17 @@ class TestAminoAcidZwitterionNaming:
         # 'azaniumylacetate glycine zwitterion', the Blue Book).
         assert result == '2-azaniumylpropanoate', f"Expected 2-azaniumylpropanoate, got: {result}"
 
-    def test_no_azaniumyl_for_amino_acids(self):
-        """Amino acid zwitterions should NOT produce azaniumyl ionic names."""
+    def test_amino_acid_zwitterions_are_named_with_azaniumyl(self):
+        """An amino acid zwitterion carries the prefix 'azaniumyl',:54561), never the
+        retained acid name, which describes the neutral molecule."""
         for smi in [
             '[NH3+]CC([O-])=O',
             'C[C@H]([NH3+])C([O-])=O',
             'CC(C)[C@@H]([NH3+])C([O-])=O',
         ]:
             result = name_compound(smi)
-            assert 'azaniumyl' not in result.lower(), \
-                f"Should not use ionic form for {smi}: {result}"
+            assert 'azaniumyl' in result.lower(), \
+                f"Expected the zwitterion form for {smi}: {result}"
 
 
 # ===================================================================

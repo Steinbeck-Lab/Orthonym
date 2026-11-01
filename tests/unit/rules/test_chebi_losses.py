@@ -41,6 +41,15 @@ def _be(smiles):
 
 # --------------------------------------------------------------------------
 # A multiplicative acid anions,
+#
+# The oxydiacetate row is the method (1) name since ``acid_salt_anions.name_acetate_acid_salt_anion``.
+# "Acid salts of polybasic organic acids are named in two ways" (the Blue Book): "(1) by substitutive nomenclature in
+# which the free acid is cited as a prefix to the name of the anion" (:31593); "(2) in the same way as the neutral salts,
+# the remaining acid hydrogen atom(s) being indicated by the word 'hydrogen'... inserted as a separate word between the
+# name(s) of the cation(s) and the name of the anion" (:31594); "Method (1) generates preferred IUPAC names, except when the
+# structure of the acid salt is unknown" (:31596). The salt cites no 'hydrogen' beside the 'carboxy' prefix
+# (``salts._ACID_H_IN_WORD_RE``). The old value, method (2) 'sodium hydrogen 2,2'-oxydiacetate', fails the name
+# assertion below; both read back to one key. The EDTA rows keep method (2): their anion has no single-anion parent.
 # --------------------------------------------------------------------------
 
 MULTIPLICATIVE_SALTS = [
@@ -49,7 +58,7 @@ MULTIPLICATIVE_SALTS = [
      "trisodium hydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate"),
     ("O=C([O-])CN(CCN(CC(=O)O)CC(=O)O)CC(=O)[O-].[Na+].[Na+]",
      "disodium dihydrogen 2,2',2'',2'''-(ethane-1,2-diyldinitrilo)tetraacetate"),
-    ("O=C([O-])COCC(=O)O.[Na+]", "sodium hydrogen 2,2'-oxydiacetate"),
+    ("O=C([O-])COCC(=O)O.[Na+]", "sodium (carboxymethoxy)acetate"),
 ]
 
 

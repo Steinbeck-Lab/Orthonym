@@ -52,6 +52,21 @@ def is_carbanion_salt_of_group_3_12_metal(smiles: str, name: Optional[str]) -> b
         return False
 
 
+def is_beta_diketonate_salt_of_group_3_12_metal(smiles: str, name: Optional[str]) -> bool:
+    """True iff ``name`` is the name of an ionic drawing of a Group 3-12 metal with the anion of a beta-diketone
+    ('copper bis(4-oxopent-2-en-2-olate)'): the compound is a coordination compound, the Blue Book) and the
+    Blue Book gives its name no PIN,:39735). The salts of Group 1 and 2 metals and the carve-out metals keep the
+    label of a salt of a hydroxy compound ('sodium propan-2-olate',,:28178): this predicate reads the Group 3-12
+    metals only (``perception.metals.GROUP_3_12_METAL_SYMBOLS``). The maintainers' ruling of 2026-11-01. Label only."""
+    if not smiles or not name:
+        return False
+    try:
+        from ..perception.metals import holds_beta_diketonate_salt_of_group_3_12_metal
+        return holds_beta_diketonate_salt_of_group_3_12_metal(Chem.MolFromSmiles(smiles))
+    except Exception:
+        return False
+
+
 def is_bonded_metal_name_without_pin(smiles: str, name: Optional[str]) -> bool:
     """True iff ``name`` names a drawing in which a metal admitted to ``BONDED_NAMES``
     (``data/metal_scope.py``) is bonded to another atom or carries hydrogen ('oxozinc',
@@ -154,6 +169,7 @@ def is_metal_name_without_pin(smiles: str, name: Optional[str]) -> bool:
     a salt of a metal with a macrocyclic ligand (``is_macrocycle_complex_name_without_pin``).
     The tier row of ``Orthonym._tier_row_and_pin_form`` reads this one predicate. Label only."""
     return (is_carbanion_salt_of_group_3_12_metal(smiles, name)
+            or is_beta_diketonate_salt_of_group_3_12_metal(smiles, name)
             or is_bonded_metal_name_without_pin(smiles, name)
             or is_metal_atom_or_ion_name_without_pin(smiles, name)
             or is_macrocycle_complex_name_without_pin(smiles, name))

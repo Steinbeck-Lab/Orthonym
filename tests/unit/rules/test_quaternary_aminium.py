@@ -80,4 +80,4 @@ class TestQuaternaryAminiumProtect:
         NOTE: the phosphatidylcholine ``2-(trimethylazaniumyl)ethyl`` substituent
         path is gold-row-protected (gold L677, LIPID@250), not unit-tested here.
         """
-        assert Orthonym().name("C[N+](C)(C)CC(=O)[O-]") == "(trimethylazaniumyl)acetate"
+        assert Orthonym().name("C[N+](C)(C)CC(=O)[O-]") == "(N,N-dimethylmethanaminiumyl)acetate"

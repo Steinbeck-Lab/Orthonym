@@ -741,6 +741,26 @@ def _is_cyanide_carbon(atom: "Chem.Atom") -> bool:
             and bond.GetBondType() == Chem.BondType.TRIPLE)
 
 
+#: the enolate of a beta-dicarbonyl compound, the anion of 'acetylacetone': O(-)-C=C-C=O
+_BETA_DIKETONATE = Chem.MolFromSmarts("[O-]-[#6]=[#6]-[#6]=O")
+
+
+def holds_beta_diketonate_salt_of_group_3_12_metal(mol: "Chem.Mol") -> bool:
+    """True iff ``mol`` holds a true metal of Groups 3-12 with no bond to another atom and an anion of the beta-diketonate
+    kind ``O(-)-C=C-C=O`` (the acetylacetonate ligand of a chelate drawn ionic).
+
+     (the Blue Book) puts the compounds of the Group 3-12 metals with their ligands into coordination
+    nomenclature, and (:39735) notes no PIN for them; an enolate of this kind is the chelating ligand of the
+    compound, drawn here as the salt it is written as. A salt of a metal of Group 1 or 2 keeps the label of a salt of a
+    hydroxy compound,:28178). Structure only; the name-dependent exclusions are the caller's. PURE."""
+    if mol is None:
+        return False
+    metals = [a for a in mol.GetAtoms() if a.GetSymbol() in GROUP_3_12_METAL_SYMBOLS]
+    if not metals or any(a.GetDegree() for a in metals):
+        return False
+    return mol.HasSubstructMatch(_BETA_DIKETONATE)
+
+
 def holds_carbanion_salt_of_group_3_12_metal(mol: "Chem.Mol") -> bool:
     """True iff ``mol`` is, structurally, a salt of a carbanion with a Group 3-12 metal cation: it
     holds a true metal of Groups 3-12, has no bond from a true metal to carbon, and a fragment of

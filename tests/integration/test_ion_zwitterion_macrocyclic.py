@@ -93,11 +93,11 @@ class TestZwitterionLiteral:
     def test_betaine(self):
         """169.6-04: the hardcoded 'betaine' literal was DELETED (it is NOT
         OPSIN-parseable -> the validity gate suppressed it to 'unknown organic
-        compound'). route_charged GUARD 4 now emits the structured
-        (trimethylazaniumyl)acetate, which round-trips in OPSIN to
-        C[N+](C)(C)CC(=O)[O-] (RT=1, a strict improvement over RT=0)."""
+        compound'). route_charged GUARD 4 emits the structured name, the aminiumyl
+        PIN '(N,N-dimethylmethanaminiumyl)acetate' (the Blue Book, ruling R5), which reads
+        back through its azaniumyl twin to C[N+](C)(C)CC(=O)[O-]."""
         result = self.namer.name('C[N+](C)(C)CC([O-])=O')
-        assert result == '(trimethylazaniumyl)acetate'
+        assert result == '(N,N-dimethylmethanaminiumyl)acetate'
 
     def test_glycine_zwitterion(self):
         """Glycine zwitterion should get a systematic name."""

@@ -132,7 +132,16 @@ class TestCationSubstituentPrefix:
                    if mol.GetAtomWithIdx(nb.GetIdx()).GetSymbol() == "C"
                    and mol.GetAtomWithIdx(nb.GetIdx()).GetDegree() == 2][0]
         prefix = cation_to_prefix(mol, n_idx, ethyl_c)
-        assert prefix == "trimethylazaniumyl", prefix
+        # (the Blue Book) '(N,N-dimethylmethanaminiumyl)acetate (PIN)': the default tier spells the
+        # '-aminiumyl' PIN of a nitrogen with three methyl groups (its twin, 'trimethylazaniumyl', is what OPSIN reads);
+        # a wider tier keeps the OPSIN-readable spelling
+        assert prefix == "N,N-dimethylmethanaminiumyl", prefix
+        from orthonym.metrics.provenance import wider_tier_ctx
+        token = wider_tier_ctx.set(True)
+        try:
+            assert cation_to_prefix(mol, n_idx, ethyl_c) == "trimethylazaniumyl"
+        finally:
+            wider_tier_ctx.reset(token)
 
     def test_name_substituent_fragment_names_pendant_onium_branch(self):
         """ a phase enabler: the "no nested-substituent
@@ -181,7 +190,8 @@ class TestCationSubstituentPrefix:
                 if nb.GetIdx() not in visited:
                     stack.append(nb.GetIdx())
         result = name_substituent_fragment(mol, frag, o_idx, parent_c)
-        assert result == "2-(trimethylazaniumyl)ethoxy", result
+        # the '-aminiumyl' PIN spelling,:42473), read through its twin '2-(trimethylazaniumyl)ethoxybenzene'
+        assert result == "2-(N,N-dimethylmethanaminiumyl)ethoxy", result
 
     def test_out_of_scope_remote_charge_still_fails_closed(self):
         """A charge shape the new Pass 1d does NOT cover -- a carbocation

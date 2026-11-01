@@ -41,8 +41,13 @@ pytestmark = pytest.mark.usefixtures("np_producer_only")
 DEFAULT_TIER_DECLINES = frozenset({
     "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
 })
-#... whose best-effort name is another one (it reads back exactly)
-BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset()
+#... whose best-effort name is another one (it reads back exactly). The carnitine ester is one since ruling a lever
+# (RULINGS-ANION.md): the strict path spells the cation '(N,N-dimethylmethanaminiumyl)':42296,
+#:42473), which OPSIN 2.9.0 cannot read, and the best-effort tier spells the same atoms '(trimethylazaniumyl)',
+# its twin (validation/twin_spellings.py); both read back to the input's full InChIKey.
+BEST_EFFORT_NAMES_IT_OTHERWISE = frozenset({
+    "CCCCCCCCCCCCCC(O)CC(=O)OC(CC(=O)[O-])C[N+](C)(C)C",
+})
 
 
 def _declined_pin_row(smiles):
