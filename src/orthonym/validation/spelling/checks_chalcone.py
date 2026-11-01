@@ -36,17 +36,22 @@ def _benzene_ring_alone(mol, atom_idx: int):
     return ring
 
 
-def _is_chalcone(mol) -> bool:
+def chalcone_skeleton(mol):
+    """``(ring_a_c, c1, o1, c2, c3, ring_b_c, ring_a, ring_b)`` of an (E)-1,3-diarylprop-2-en-1-one of two benzene
+    rings, each alone in its ring system, with no group of the ketone's class or a senior one outside the chain
+    and the rings (nothing outside them has a double or triple bond to a heteroatom, but the nitro group); else
+    None. ``ring_a`` holds the ring of the benzoyl half, ``ring_b`` that of the styryl half. The producer of the
+    substituted name (``rules.chalcones``) reads the same structure."""
     cores = mol.GetSubstructMatches(_CHALCONE_CORE)
     if len(cores) != 1:
-        return False
+        return None
     ring_a_c, c1, o1, c2, c3, ring_b_c = cores[0]
     bond = mol.GetBondBetweenAtoms(c2, c3)
     if bond.GetStereo() not in (Chem.BondStereo.STEREOE, Chem.BondStereo.STEREOTRANS):
-        return False
+        return None
     ring_a, ring_b = _benzene_ring_alone(mol, ring_a_c), _benzene_ring_alone(mol, ring_b_c)
     if ring_a is None or ring_b is None or set(ring_a) & set(ring_b):
-        return False
+        return None
     core = {c1, o1, c2, c3} | set(ring_a) | set(ring_b)
     nitro = {i for m in mol.GetSubstructMatches(_NITRO) for i in m}
     for b in mol.GetBonds():
@@ -55,8 +60,12 @@ def _is_chalcone(mol) -> bool:
             continue
         a, z = mol.GetAtomWithIdx(i), mol.GetAtomWithIdx(j)
         if a.GetSymbol() != 'C' or z.GetSymbol() != 'C':
-            return False      # a double or triple bond to a heteroatom: a group of the ketone's class or a senior one
-    return True
+            return None      # a double or triple bond to a heteroatom: a group of the ketone's class or a senior one
+    return (ring_a_c, c1, o1, c2, c3, ring_b_c, tuple(ring_a), tuple(ring_b))
+
+
+def _is_chalcone(mol) -> bool:
+    return chalcone_skeleton(mol) is not None
 
 
 @register('P-64.2.1.1')

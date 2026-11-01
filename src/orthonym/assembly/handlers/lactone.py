@@ -42,6 +42,23 @@ def _has_separate_senior_group(mol: Any, lactone_info: dict) -> bool:
     ``_PREFIX_ONLY_PRINCIPAL`` classes (e.g. isocyanide) can never be a suffix,
     so they never displace the lactone.
     """
+    # Atoms of the lactone's own ring motif (ring atoms + the exocyclic
+    # carbonyl chalcogen + the optional carbonate second ring O).
+    lactone_atoms = set(lactone_info["ring_atoms"])
+    lactone_atoms.add(lactone_info["carbonyl_O_idx"])
+    extra_o = lactone_info.get("extra_ring_O_idx")
+    if extra_o is not None:
+        lactone_atoms.add(extra_o)
+    return has_senior_group_outside(mol, lactone_atoms)
+
+
+def has_senior_group_outside(mol: Any, motif_atoms: set, own_atoms: tuple = ()) -> bool:
+    """True when a suffix-capable group senior to the ketone/pseudoketone tier has a match that is not
+    confined to ``motif_atoms`` (the atoms of the cyclic pseudoketone itself: "Cyclic anhydrides,
+    esters and amides are named as pseudoketones", Table 4.1 class 16). Shared by the lactone and the
+    lactam handler. A match that holds every atom of ``own_atoms`` is the pseudoketone seen as an amide:
+    the amide patterns reach past the ring to the substituents of the nitrogen (N-methyl, N-acyl), which
+    are still pseudoketone-tier groups of the lactam, not separate senior groups."""
     from ...perception.functional_groups import detect_functional_groups
     from ...rules.seniority import SENIORITY_ORDER, _PREFIX_ONLY_PRINCIPAL
 
@@ -50,21 +67,13 @@ def _has_separate_senior_group(mol: Any, lactone_info: dict) -> bool:
         g for g in SENIORITY_ORDER[:ketone_rank]
         if g not in _PREFIX_ONLY_PRINCIPAL
     }
-
-    # Atoms of the lactone's own ring motif (ring atoms + the exocyclic
-    # carbonyl chalcogen + the optional carbonate second ring O).
-    lactone_atoms = set(lactone_info["ring_atoms"])
-    lactone_atoms.add(lactone_info["carbonyl_O_idx"])
-    extra_o = lactone_info.get("extra_ring_O_idx")
-    if extra_o is not None:
-        lactone_atoms.add(extra_o)
-
+    lactone_atoms = set(motif_atoms)
     fgs = detect_functional_groups(mol)
     for fg_name, matches in fgs.items():
         if fg_name not in senior_classes:
             continue
         for match in matches:
-            if not set(match).issubset(lactone_atoms):
+            if not set(match).issubset(lactone_atoms) and not (own_atoms and set(own_atoms) <= set(match)):
                 return True
     return False
 

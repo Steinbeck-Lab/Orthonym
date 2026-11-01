@@ -39,8 +39,9 @@ def _best_effort(smiles):
      "5-[(cyclohex-2-en-1-yl)(hydroxy)methyl]-5-methyl-2-oxopyrrolidine"),
     ("OC(c1ccc(Cl)cc1)" + PYRROLIDINONE,
      "5-[(4-chlorophenyl)(hydroxy)methyl]-5-methyl-2-oxopyrrolidine"),
+    # a nitrile is senior to the lactam, a pseudoketone (Table 4.1 classes 14 and 16, the Blue Book-18189)
     ("N#CC(c1ccc(Cl)cc1)" + PYRROLIDINONE,
-     "5-[(4-chlorophenyl)(cyano)methyl]-5-methyl-2-oxopyrrolidine"),
+     "(4-chlorophenyl)(2-methyl-5-oxopyrrolidin-2-yl)acetonitrile"),
     # the second and the third prefix, each enclosed
     ("OC(c1ccccc1)(c1ccc(Cl)cc1)" + PYRROLIDINONE,
      "5-[(4-chlorophenyl)(hydroxy)(phenyl)methyl]-5-methyl-2-oxopyrrolidine"),

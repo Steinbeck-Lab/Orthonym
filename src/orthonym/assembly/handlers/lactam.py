@@ -22,12 +22,28 @@ logger = logging.getLogger(__name__)
 
 
 def _is_lactam(features: Any) -> bool:
-    """Predicate: features.mol contains a monocyclic lactam (SMARTS check)."""
+    """Predicate: features.mol contains a monocyclic lactam (SMARTS check) and no senior group owns the suffix.
+
+    A lactam is a heterocyclic pseudoketone "Cyclic anhydrides, esters and amides are named as
+    pseudoketones; the resulting names are preferred IUPAC names"; "Method (1) generates preferred
+    IUPAC names"), class 16 of Table 4.1, so a SEPARATE acid, ester, acid halide, amide, hydrazide, nitrile or aldehyde is the principal
+    group and the ring C=O is the prefix 'oxo' "In cyclic pseudoketones, the prefix 'oxo' and/or
+    acyl group prefixes are used to denote a carbonyl group"): '5-oxopyrrolidine-2-carboxylic acid', not
+    '5-carboxypyrrolidin-2-one'. The same guard the lactone handler applies: "A lactone, as a
+    pseudoketone, ranks lower in the seniority of classes than an acid or an ester"); dispatch then reaches
+    the general suffix assembler.
+    """
     mol = getattr(features, 'mol', None)
     if mol is None:
         return False
     from ...rules.lactams import is_monocyclic_lactam
-    return is_monocyclic_lactam(mol) is not None
+    info = is_monocyclic_lactam(mol)
+    if info is None:
+        return False
+    from .lactone import has_senior_group_outside
+    return not has_senior_group_outside(
+        mol, set(info["ring_atoms"]) | {info["carbonyl_o_idx"]},
+        (info["carbonyl_idx"], info["carbonyl_o_idx"], info["nitrogen_idx"]))
 
 
 def name_lactam(

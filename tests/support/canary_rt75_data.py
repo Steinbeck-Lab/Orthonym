@@ -1460,7 +1460,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(/C=C/c1ccc(Cl)cc1)c1ccccc1",
-        "(2E)-3-(4-chlorophenyl)-1-phenylprop-2-en-1-one",
+        "4-chlorochalcone",  #:28297; was the systematic name before the chalcone producer
     ),
     (
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
@@ -1930,7 +1930,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(/C=C/c1ccc(O)cc1)c1ccc(O)c(O)c1O",  # aromatic,medium
-        "(2E)-3-(4-hydroxyphenyl)-1-(2,3,4-trihydroxyphenyl)prop-2-en-1-one",
+        "2',3',4,4'-tetrahydroxychalcone",
     ),
     (
         "CNC(=N)N",  # acyclic,small
@@ -2397,7 +2397,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "COc1cc(OC)c(OC)c(OC)c1/C=C/C(=O)c1c(O)c(OC)c(OC)c(OC)c1OC",  # aromatic,large
-        "(2E)-1-(2-hydroxy-3,4,5,6-tetramethoxyphenyl)-3-(2,3,4,6-tetramethoxyphenyl)prop-2-en-1-one",
+        "2'-hydroxy-2,3,3',4,4',5',6,6'-octamethoxychalcone",
     ),
     (
         "O=Cc1cccc(C(=O)O)c1",  # aromatic,polyfunctional,small
@@ -2981,7 +2981,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "O=C(/C=C/c1ccc(O)c(O)c1)c1cc(O)c(O)cc1O",  # aromatic,medium
-        "(2E)-3-(3,4-dihydroxyphenyl)-1-(2,4,5-trihydroxyphenyl)prop-2-en-1-one",
+        "2',3,4,4',5'-pentahydroxychalcone",
     ),
     (
         "[NH3+]C(CC(=O)[O-])c1ccc(O)cc1",  # aromatic,small

@@ -135,6 +135,7 @@ class StoutClass(_StrEnumBase):
     THIOIMIDE = "thioimide"                          # W2E-D3 acyclic N-H thioimide R-C(=S)-NH-C(=S)-R' -> N-(ethanethioyl)ethanethioamide; priority 49.7 — after HYDRO_FUSED_PEROXOL@49.6, before ORGM@50)
     NITRAMIDE_SUBSTITUTED = "nitramide_substituted"  # B3 substitutive nitramide/N-nitro: N-(hydroxymethyl)nitramide / N,N-bis(hydroxymethyl)nitramide / N,N'-dinitromethanediamine; priority 49.75 — after THIOIMIDE@49.7, before CYCLIC_POLYESTER@49.8)
     N_HETERO_AMINE = "n_hetero_amine"  # NAZ N-substitution of amines, carboxamides and sulfonamides by azido, alkoxy/sulfanyl and, on an amide, the nitro/nitroso/halogen groups: N-azido-N-methylmethanamine / N-chloro-N-methylacetamide; priority 98000, tier 1 -- after every class-routed namer, before DECOMPOSITION_PRE_GENERAL; the amides of the acids stay NITRAMIDE_SUBSTITUTED@49.75)
+    CHALCONE = "chalcone"                            # ring-substituted chalcone ('2',4'-dihydroxy-3,3'-dimethoxychalcone'; priority 49.9 -- after CYCLIC_POLYESTER@49.8, before ORGM@50). Predicate-IS-handler: rules.chalcones.name_substituted_chalcone.
     CYCLIC_POLYESTER = "cyclic_polyester"            # W3-P08 lactide / cyclic di-/polyester -> 1,4-dioxane-2,5-dione; priority 49.8 — after THIOIMIDE@49.7, before ORGM@50)
     DIAZENIUM_IDE = "diazenium_ide"                  # the 1,2-dipole R2N(+)=N(-) of a diazene '1-phenyldiazen-1-ium-2-ide'; priority 48.37, after CUMULATIVE_ZWITTERION@48.35 and YLIDE@48.36, whose names are the PIN of the unbroken nitrogen chain,; the species is 'neutral' to the perception of the ions, so no handler of the ions sees it). Predicate-IS-handler: rules.diazenium_ide.emit_diazenium_ide.
     AZINIC_DERIVATIVE = "azinic_derivative"          # Wave-2 completion C ethylideneazinic acid; priority 48.3), and its anion the azinate (rules.azinate)
@@ -2333,6 +2334,19 @@ def _handle_ring_chalcogen_oxide(mol, smiles, canonical_smiles, features=None,
     return name_ring_chalcogen_oxide(mol)
 
 
+def _is_chalcone(mol, smiles, canonical_smiles, features=None, **kwargs) -> bool:
+    """; priority 49.9. A (E)-chalcone with ring substituents of the classes the retained name
+    takes ('2',4'-dihydroxy-3,3'-dimethoxychalcone'); the bare chalcone is the retained table's. PURE graph
+    classifier, fail-closed."""
+    from orthonym.rules.chalcones import name_substituted_chalcone
+    return mol is not None and name_substituted_chalcone(mol) is not None
+
+
+def _handle_chalcone(mol, smiles, canonical_smiles, features=None, **kwargs) -> Optional[str]:
+    from orthonym.rules.chalcones import name_substituted_chalcone
+    return name_substituted_chalcone(mol)
+
+
 def _is_cyclic_polyester(mol, smiles, canonical_smiles, features=None,
                          **kwargs) -> bool:
     """W3-P08; priority 49.8. A saturated monocyclic C/O ring
@@ -2945,6 +2959,17 @@ _register_dispatch(
                 "hypochlorous amide ... + the N-substituent prefixes (P-62.4, P-67.1.2.6.3, "
                 "P-68.5.3), or N,N'-dinitromethanediamine; fail-closed",
 )
+# --- CHALCONE at priority 49.9 (after CYCLIC_POLYESTER@49.8, before ORGANOMETALLIC@50). The
+# (E)-1,3-diarylprop-2-en-1-one of two benzene rings with hydroxy / alkoxy / sulfanyl / amino ring
+# substituents is named on the retained parent, '2',4'-dihydroxy-3,3'-dimethoxychalcone (PIN)').
+# Graph classifier, fail-closed; cascade-continuation on None. ---
+_register_dispatch(
+    class_id=StoutClass.CHALCONE, priority=49.9, tier=1,
+    predicate=_is_chalcone, handler=_handle_chalcone,
+    iupac_section="Blue Book P-64.2.1.1",
+    description="Ring-substituted (E)-chalcone on the retained parent; graph classifier, fail-closed",
+)
+
 # --- W3-P08: CYCLIC_POLYESTER at priority 49.8 (after THIOIMIDE@49.7, before
 # ORGM@50). A lactide / cyclic di-/polyester -- a saturated monocyclic C/O ring
 # with >=2 ester carbonyls -- named as a Hantzsch-Widman heterocycle with the

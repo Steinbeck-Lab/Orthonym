@@ -24,6 +24,7 @@ from typing import Dict, List, Optional, Set, Tuple
 from rdkit import Chem
 
 from ..data.chain_names import multiplying_prefix
+from ..assembly.group14_chalcogen_prefix import ring_group14_chalcogen_substituent
 from ..assembly.naming_utils import (
     alpha_sort_key,
     alpha_sort_key_rs,
@@ -1494,11 +1495,11 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int], principal_g
 
     # Oxygen-based groups
     if symbol == 'O':
-        return _identify_oxygen_group(mol, start_idx, ring_atoms)
+        return ring_group14_chalcogen_substituent(mol, start_idx, ring_atoms) or _identify_oxygen_group(mol, start_idx, ring_atoms)
 
     # Sulfur-based groups (non-suffix fallback)
     if symbol == 'S':
-        return _identify_sulfur_group(mol, start_idx, ring_atoms)
+        return ring_group14_chalcogen_substituent(mol, start_idx, ring_atoms) or _identify_sulfur_group(mol, start_idx, ring_atoms)
 
     # Selanyl / tellanyl ethers R-Se- / R-Te- method (1)); the oxoacid
     # suffixes on Se/Te were recognised above.

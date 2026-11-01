@@ -176,10 +176,43 @@ def test_n_hydroxy_imidic_ester(namer, smiles, expected):
     assert _same(smiles, expected), expected
 
 
+# An N-alkoxy imidic ester. The ester is class 9 of (the Blue Book), senior to the imines
+# (class 20), so the ester names the molecule and the N group is a prefix, as 'N-hydroxy' (: and 'N-sulfanyl'
+# are: 'ethyl N-sulfanylbenzenecarboximidothioate (PIN)',:31999). The old path named these
+# '1-methoxy-1-(methoxyimino)ethane' (changed from "left to the old path"; OPSIN reads each name below back to the input).
+N_ALKOXY = [
+    ("CC(=NOC)OC", "methyl N-methoxyethanimidate"),
+    ("CC(=NOC)OCC", "ethyl N-methoxyethanimidate"),
+    ("CC(=NOCC)OC", "methyl N-ethoxyethanimidate"),
+    ("CC(=NOc1ccccc1)OC", "methyl N-phenoxyethanimidate"),
+    ("CC(=NOCc1ccccc1)OC", "methyl N-(benzyloxy)ethanimidate"),
+    ("COC(=NOC)c1ccccc1", "methyl N-methoxybenzenecarboximidate"),
+    ("COC(=NOC)CC(C)C", "methyl N-methoxy-3-methylbutanimidate"),
+    ("CC(=NOC)SC", "methyl N-methoxyethanimidothioate"),
+    ("C(=NOC)OC", "methyl N-methoxymethanimidate"),
+]
+
+
+@pytest.mark.parametrize("smiles,expected", N_ALKOXY)
+def test_n_alkoxy_imidic_ester(namer, smiles, expected):
+    row = namer.name_tiered(smiles)
+    assert row["name"] == expected, row["name"]
+    assert row["tier"] == "pin_verified" and row["producer"] == "inner:imidic_ester", row
+    assert _same(smiles, expected), expected
+
+
+@pytest.mark.parametrize("smiles", [
+    "C/C(=N\\OC)OC",           # a C=N descriptor would be dropped
+    "CC(=NOC(C)=O)OC",         # the O-acyl group is an ester of its own: the pipeline decides
+])
+def test_n_alkoxy_edges_are_not_claimed(namer, smiles):
+    assert namer.name_tiered(smiles)["producer"] != "inner:imidic_ester"
+
+
 @pytest.mark.parametrize("smiles", [
     "CCC(=NN)SC",              # the S-ester of a hydrazonic acid: the book prints no example, the old path runs
     "ON=C(N)SC",               # N-hydroxy carbamimidothioate: not this handler's stem
-    "CC(=NOC)OC",              # an O-alkyl oxime ether: left to the old path
+    "ON=C(N)OC",               # the O-ester of N-hydroxycarbamimidic acid: the imidate handler's stem
 ])
 def test_n_hydroxy_and_hydrazonothio_edges_are_not_claimed(namer, smiles):
     assert namer.name_tiered(smiles)["producer"] != "inner:imidic_ester"

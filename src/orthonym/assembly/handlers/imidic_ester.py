@@ -23,7 +23,8 @@ carboximidothioate', 'ethyl 4-chlorobenzene-1-carboximidothioate'; ``_stem_from_
 engine has no name for that acid (a heteroaromatic or fused ring), the name of the carboxylic acid with the
 same ring and group position, whose '-carboxylic acid' becomes the suffix of the ester ('methyl pyridine-4-
 carboximidothioate'; ``_stem_from_carboxylic_acid``)
-(R = N gives the S-ester of carbamimidic acid); X = H, a carbon group, NH2 (the O-ester hydrazonate), or
+(R = N gives the S-ester of carbamimidic acid); X = H, a carbon group, an alkoxy group (OR, cited as 'N-methoxy' like the
+'N-sulfanyl' of the book's example), NH2 (the O-ester hydrazonate), or
 OH "Carbohydroximic acids": 'N-hydroxyethanimidic acid (PIN)', so 'methyl
 N-hydroxyethanimidate'). The =NH O-esters and the O-carbamimidates stay with ``imidate`` (priority
 2900). Registered at priority 90, ahead of ``oxime`` (100), ``hydrazone`` (200) and every handler
@@ -93,11 +94,19 @@ def _parts(mol: Any) -> Optional[Dict[str, Any]]:
         x = "N"
     elif len(nx) == 1 and nx[0].GetSymbol() == "O" and nx[0].GetTotalNumHs() == 1 and nx[0].GetDegree() == 1:
         x = "O"                           # N-hydroxy "Carbohydroximic acids")
+    elif (len(nx) == 1 and nx[0].GetSymbol() == "O" and nx[0].GetTotalNumHs() == 0 and nx[0].GetDegree() == 2
+          and nx[0].GetFormalCharge() == 0 and not nx[0].IsInRing()
+          and any(m.GetSymbol() == "C"
+                  and not any(b.GetBondTypeAsDouble() == 2.0 and b.GetOtherAtom(m).GetSymbol() != "C"
+                              for b in m.GetBonds())
+                  for m in nx[0].GetNeighbors() if m.GetIdx() != n)):
+        x = "OC"                          # N-alkoxy: the N group is 'methoxy', cited with the locant N like N-hydroxy
+        # (an O-acyl group, N-O-C(=O)R, is an acyloxy group: the carbon of the alkoxy has no double bond to a heteroatom)
     else:
         return None
     if stem == "N":
         # the S-ester of carbamimidic acid; the amino N must be acyclic; no hydrazonate
-        if y_sym != "S" or x in ("N", "O") or r.IsInRing() or r.GetIsAromatic():
+        if y_sym != "S" or x in ("N", "O", "OC") or r.IsInRing() or r.GetIsAromatic():
             return None
     elif y_sym == "O" and x == "H" and not (
             stem == "C" and r.IsInRing() and not _plain_benzene(mol, r)):
@@ -107,7 +116,7 @@ def _parts(mol: Any) -> Optional[Dict[str, Any]]:
     if stem == "C" and not _stem_ok(mol, r):
         return None
     return {"c": c, "n": n, "y": y, "alkyl": alkyl, "r": None if r is None else r.GetIdx(),
-            "stem": stem, "x": x, "n_sub": nx[0].GetIdx() if x == "C" else None,
+            "stem": stem, "x": x, "n_sub": nx[0].GetIdx() if x in ("C", "OC") else None,
             "y_sym": y_sym}
 
 
@@ -345,7 +354,7 @@ def build_imidic_ester_name(mol: Any) -> Optional[str]:
         return None
     suffix = "hydrazonate" if p["x"] == "N" else ("imidothioate" if p["y_sym"] == "S" else "imidate")
     pieces: "List[Tuple[str, str]]" = []
-    if p["x"] == "C":
+    if p["x"] in ("C", "OC"):
         from ..substituent_enumerator import name_substituent
         frag = _collect_subgraph(mol, p["n_sub"], {n})
         nm = name_substituent(mol, set(frag), p["n_sub"])

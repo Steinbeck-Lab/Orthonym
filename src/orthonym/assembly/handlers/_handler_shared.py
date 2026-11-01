@@ -446,12 +446,13 @@ _P14_3_4_RING_SUFFIX_CLASSES = frozenset({
     'secondary_amine', 'tertiary_amine',
     # (c) (the Blue Book), the same shape with the two-atom chalcogen group of Table 6.1 (:27972)
     'so_thioperoxol', 'os_thioperoxol', 'dithioperoxol',
+    'hydroperoxide',     # -OOH: 'cyclohexaneperoxol', the same two-atom group,:27935)
 })
 
 # The two-atom suffix groups, the Blue Book): the element of the atom bonded to the
 # skeletal atom, then of the terminal one. Their ring is monosubstituted when nothing else hangs on it.
 _TWO_ATOM_RING_SUFFIX_GROUPS = {
-    'so_thioperoxol': ('S', 'O'), 'os_thioperoxol': ('O', 'S'), 'dithioperoxol': ('S', 'S'),
+    'so_thioperoxol': ('S', 'O'), 'os_thioperoxol': ('O', 'S'), 'dithioperoxol': ('S', 'S'), 'hydroperoxide': ('O', 'O'),
 }
 
 

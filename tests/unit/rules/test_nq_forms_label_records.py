@@ -64,7 +64,9 @@ def _name_and_records(monkeypatch, smiles, tier):
 # the rows a deleted pattern alone decided (study-r1, study-audit pv_out.jsonl)
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,form", [
-    ("C[C@@H](O)[C@H](NC(=O)[C@@H]1CC[C@](O)(CN)C(=O)N1)C(=O)O", "(oxo)methyl"),
+    # (the first row of this list, the 6-oxopiperidine-2-carbonyl peptide, is no general spelling any more: a lactam
+    # yields the suffix to a senior acid or amide, (the Blue Book), so it ships the PIN
+    # '...-6-oxopiperidine-2-carboxamido...' that OPSIN reads back, and there is no '(oxo)methyl' to record)
     ("C[N+]1=CC=C(C=C1)CNC(=O)C2=CC3=CC=CC=C3N2CC#CC4=CC=C(C=C4)C(=N)N", "(oxo)methyl"),
     ("C1CS(=O)(=O)CC1N(C(=O)C23CC4CC(C2)CC(C4)C3)NC(=O)C56CC7CC(C5)CC(C7)C6",
      "carbonyl)amino"),

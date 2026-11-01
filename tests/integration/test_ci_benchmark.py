@@ -458,7 +458,7 @@ CI_BENCHMARK = [
     ),
     (
         "O=C(/C=C/c1ccc(Cl)cc1)c1ccccc1",
-        "(2E)-3-(4-chlorophenyl)-1-phenylprop-2-en-1-one",
+        "4-chlorochalcone",  #:28297, halo is a characteristic group lower than ketone
     ),
     pytest.param(
         "CN(C)CCC=C1c2ccccc2COc2ccccc21",

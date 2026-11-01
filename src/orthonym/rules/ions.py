@@ -3388,6 +3388,7 @@ def emit_onium_hydride_parent(mol, center_idx: int) -> str:
         name_ylidyne_substituent,
     )
     from ..perception.chains import classify_substituent
+    from .onium_groups import onium_carbon_group_name
     subs: List[str] = []
     covered = {center_idx}
     for nb in heavy:
@@ -3412,11 +3413,9 @@ def emit_onium_hydride_parent(mol, center_idx: int) -> str:
             sub_name = _acyl_on_chalcogen_prefix(mol, nb.GetIdx(), center_idx)
         else:
             info = classify_substituent(mol, sorted(sub_atoms), {center_idx})
-            sub_name = info.get('name')
-            # classify_substituent's 'alkyl' branch names by carbon count and
-            # silently swallows a heteroatom in the branch -> decline (atom drop).
-            if info.get('type') == 'alkyl' and any(
-                    mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in sub_atoms):
+            # a carbon group is named by the substituent namer, the count-based name is the fallback
+            sub_name = onium_carbon_group_name(mol, sub_atoms, nb, info)
+            if sub_name is False:       # an 'alkyl' group that holds a heteroatom, named by count: an atom drop
                 return ''
         if not sub_name:
             return ''
