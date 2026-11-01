@@ -122,6 +122,12 @@ LIMIT_CATALOG: Dict[str, Dict[str, str]] = {
         'message': 'unknown organic compound',
         'design_note_ref': 'ERR-270/274',
     },
+    # A fullerene cage (perception.fullerene): the engine has no fullerene naming, and the
+    # structure is declined at once, before the ring analyses, at every tier.
+    'FULLERENE': {
+        'message': 'fullerene (not supported)',
+        'design_note_ref': 'P-27.1.1',
+    },
     # G0 fail-closed safety (DD7 S1): a ring system Orthonym recognises as
     # complex (polycomponent-fused, bridged-fused, or aromatic-in-a-von-Baeyer
     # cage) but cannot yet name CORRECTLY. Raised mid-assembly to refuse rather
@@ -161,8 +167,9 @@ class OrthonymLimitError(Exception):
     code: str
         The reason code: ``WILDCARD_ATOMS``, ``UNSUPPORTED_ELEMENT``,
         ``ISOLATED_ATOM``, ``STRUCTURE_TOO_LARGE``, ``UNSUPPORTED_RING_SYSTEM``,
-        ``UNNAMEABLE`` or ``NO_VERIFIED_PIN`` (the default tier built a name but
-        not a verified preferred IUPAC name; a wider tier returns it).
+        ``FULLERENE`` (a fullerene cage, declined at once), ``UNNAMEABLE`` or
+        ``NO_VERIFIED_PIN`` (the default tier built a name but not a verified preferred IUPAC
+        name; a wider tier returns it).
     message: str
         The label that ``on_failure="label"`` returns in place of a name.
     design_note_ref: str or None
@@ -402,7 +409,8 @@ def is_refusal_sentinel(name: Optional[str]) -> bool:
 
 
 def classify_scope_limit(mol: Chem.Mol) -> Optional[OrthonymLimitError]:
-    """Pre-naming structural refusal — ONLY for zero-false-positive classes.
+    """Pre-naming structural refusal — ONLY for zero-false-positive classes
+    (a wildcard atom, a fullerene cage).
 
     The sole provably-safe pre-check is a wildcard (`*`, atomic number 0): no
     definite molecule contains one and the namer would silently drop it
@@ -415,6 +423,18 @@ def classify_scope_limit(mol: Chem.Mol) -> Optional[OrthonymLimitError]:
         return None
     if any(atom.GetAtomicNum() == 0 for atom in mol.GetAtoms()):
         return _make('WILDCARD_ATOMS')
+    # A fullerene cage: refused before any producer runs (it cost 11-18 s to decline).
+    return fullerene_limit(mol)
+
+
+def fullerene_limit(mol: Chem.Mol,
+                     smiles: Optional[str] = None) -> Optional[OrthonymLimitError]:
+    """The FULLERENE limit when ``mol`` holds a fullerene cage, else None. A cheap atom-count
+    prefilter comes first: a cage has at least ``MIN_CAGE_ATOMS`` atoms."""
+    from .perception.fullerene import MIN_CAGE_ATOMS, has_fullerene_cage
+    if mol.GetNumAtoms() >= MIN_CAGE_ATOMS:
+        if has_fullerene_cage(mol):
+            return _make('FULLERENE', smiles=smiles)
     return None
 
 
@@ -435,6 +455,11 @@ def classify_failure_limit(mol: Chem.Mol,
     # Wildcard atoms (atomic number 0) — definite scope violation.
     if any(atom.GetAtomicNum() == 0 for atom in mol.GetAtoms()):
         return _make('WILDCARD_ATOMS', smiles=smiles)
+
+    # A fullerene cage (the decline made at once, before the producers run).
+    cage = fullerene_limit(mol, smiles=smiles)
+    if cage is not None:
+        return cage
 
     # Non-organic elements. Pick the reported metal DETERMINISTICALLY by lowest
     # atomic number — NOT atom-index order. Atom-index order varies with the
