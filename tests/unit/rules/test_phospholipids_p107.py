@@ -40,9 +40,10 @@ def test_sphing_4_enine_smiles_is_2s_3r_4e():
     assert any(b.GetStereo() != Chem.BondStereo.STEREONONE for b in m.GetBonds())
 
 
-def test_sphing_4_enine_is_pin_not_sphingosine():
-    # PIN, replacing the non-BB common name 'sphingosine'.
-    assert RAW.name(SPHING_4_ENINE) == "(4E)-sphing-4-enine"
+def test_sphing_4_enine_takes_its_systematic_name():
+    # NPL 2026-11-01: '(4E)-sphing-4-enine' is a Chapter name, no PIN INTRODUCTION, the Blue Book);
+    # the book prints the systematic name beside it (:55235), which the engine offers first.
+    assert RAW.name(SPHING_4_ENINE) == "(2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol"
 
 
 def test_sphinganine_retained_name_unchanged():

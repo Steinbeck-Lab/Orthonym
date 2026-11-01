@@ -265,8 +265,10 @@ NEWLY_RT_P66 = [
         # euphonic 'a' before the multiplied 'dien',:16497). The old text wrote the
         # acid as '21-hydroxy...21-oxo' with a functional-class ester word. OPSIN 2.9.0
         # full-InChIKey exact.
-        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-3-(acetyloxy)-16,25-"
-        "dihydroxy-4,4,14-trimethylcholesta-8,23-dien-21-oic acid",
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book) "PINs are not identified for the compounds in this
+        # Chapter": the systematic name of Chapters to (:50943); OPSIN 2.9.0 full-InChIKey exact.
+        "(2R,4E)-2-[(3S,5R,10S,13R,14R,16R,17R)-3-(acetyloxy)-16-hydroxy-4,4,10,13,14-pentamethyl-"
+        "2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-hydroxy-6-methylhept-4-enoic acid",
         id="cholest-steroid-acetate-RT",
     ),
 ]

@@ -49,6 +49,7 @@ from orthonym.rules.polycyclic import (
     fusion_nomenclature_applies,
     retained_von_baeyer_parent,
 )
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import name_is_rt_exact
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -68,7 +69,6 @@ DEFAULT_TIER_DECLINES = frozenset({
     "CCCCC/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCCCCCCCC",
     "CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC",
     "CCOCC(COC(C)=O)OC(C)=O",
-    "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",
     "NC12CC3CC(CC(C3)C1)C2",
     "N[C@@H](Cc1ccccc1)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CC(=O)O)C(=O)O",
     "OC(=O)C12C3C4C1C5C2C3C45",
@@ -118,10 +118,9 @@ _DEMOTED = [
     # '(25S)-3-oxo-5α-cholestan-26-oic acid', the Blue Book), kept
     # at the PIN tier by the controller ruling on names; pinned in
     # tests/unit/rules/test_j7_defects_misc.py)
-    # whole-graph R/S on a steroid stereoparent (canary DK-P101CIP)
-    ("C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",
-     "(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17,21-trihydroxy-16-methylpregna-1,4-"
-     "diene-3,20-dione"),
+    # (the whole-graph R/S pregna-1,4-diene row of canary DK-P101CIP left this list, NPL 2026-11-01:
+    # INTRODUCTION, the Blue Book "PINs are not identified for the compounds in this Chapter", so the route
+    # offers the systematic name, a pin_verified row of ``_NPL_SYSTEMATIC`` below)
     #: acyloxy prefixes on an alcohol (canary DK-GLYSUB)
     ("CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC",
      "(2R)-1-(octadecanoyloxy)-2-[(9Z)-octadec-9-enoyloxy]propan-3-ol"),
@@ -155,6 +154,7 @@ def test_known_non_pin_class_ships_demoted(smiles, expected):
 
 
 @pytest.mark.opsin_gate
+@pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: the list name is the fallback; the label is the subject
 def test_carveout_stereoparent_is_labelled_by_its_list_identity():
     # 'germacrane' ships through the np_stereoparent carve-out: OPSIN cannot parse it.
     # It is a name of the natural-product list, matched by the exact structure
@@ -190,8 +190,7 @@ _CONTROLS = [
     ("C12CC3CC(C1)CC(C3)C2", "adamantane"),                       # BB:9885
     ("C12C3C4C1C5C2C3C45", "cubane"),                             # BB:9889
     ("C[C@H](N)C(=O)N[C@@H](C)C(=O)O", "(2S)-2-[(2S)-2-aminopropanamido]propanoic acid"),
-    ("C[C@]12CC[C@H]3[C@@H](CC[C@@H]4C[C@@H](O)CC[C@@]43C)[C@@H]1CC[C@@H]2O",
-     "5β-androstane-3β,17β-diol"),
+    # (the 5β-androstane-3β,17β-diol control moved to ``_NPL_SYSTEMATIC``, NPL 2026-11-01)
     ("CC(=O)OC[C@@H](O)COC(C)=O", "2-hydroxypropane-1,3-diyl diacetate"),
     ("CC(=O)OCC(COC(C)=O)OC(C)=O", "propane-1,2,3-triyl triacetate"),  # BB:31827
     ("CC[C@@H](Cl)c1ccccc1", "[(1R)-1-chloropropyl]benzene"),       # BB:44668
@@ -200,6 +199,27 @@ _CONTROLS = [
     ("CC1(C)CC=C[C@]2(C)OO[C@@H]3C[C@@]12CC[C@H]3O",
      "(3R,4R,6aS,10aS)-7,7,10a-trimethyl-3,4,5,6,8,10a-hexahydro-7H-3,6a-methano-1,2-benzodioxocin-4-ol"),
 ]
+
+
+# NPL 2026-11-01: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not identified for the
+# compounds in this Chapter"; the route offers the systematic name of Chapters to (:50943) first. These two
+# steroid rows were a demoted class and a control with a name; each is now a systematic PIN, pin_verified,
+# read back by OPSIN 2.9.0 to the full InChIKey.
+_NPL_SYSTEMATIC = [
+    ("C[C@]12CC[C@H]3[C@@H](CC[C@@H]4C[C@@H](O)CC[C@@]43C)[C@@H]1CC[C@@H]2O",
+     "(3S,5R,8R,9S,10S,13S,14S,17S)-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthrene-3,17-diol"),
+    ("C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",
+     "(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17-dihydroxy-17-(hydroxyacetyl)-10,13,16-trimethyl-"
+     "6,7,8,9,10,11,12,13,14,15,16,17-dodecahydro-3H-cyclopenta[a]phenanthren-3-one"),
+]
+
+
+@pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,expected", _NPL_SYSTEMATIC)
+def test_steroid_rows_now_systematic_pins(smiles, expected):
+    row = _row(smiles)
+    assert row["name"] == expected and row["tier"] == "pin_verified" and row["is_pin"], row
+    assert name_is_rt_exact(expected, smiles)
 
 
 @pytest.mark.opsin_gate

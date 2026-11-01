@@ -90,3 +90,31 @@ def test_a_name_of_the_amino_acid_tables_is_flagged(name):
 ])
 def test_a_systematic_amino_acid_name_is_not_flagged(name):
     assert chapter_p10_name_is_no_pin(None, name) is None
+
+
+def test_the_stems_of_the_check_are_the_stems_of_the_natural_product_tables():
+    # the check keeps a copy so that it reads no naming code; the copy may not drift (NPL 2026-11-01)
+    from orthonym.data import natural_products as npd
+    from orthonym.validation.spelling.checks_natural_products import NATURAL_PRODUCT_TABLE_WORDS, PARENT_STEMS
+    assert {d["stem"] for d in npd.NATURAL_PRODUCT_SCAFFOLDS.values()} <= set(PARENT_STEMS)
+    words = {n.lower().split(")-", 1)[-1] if n.startswith("(") else n.lower()
+             for n in list(npd.NATURAL_PRODUCT_DERIVATIVES.values()) + list(npd.NAME_EXACT_NP_PARENTS)
+             + [d["name"] for d in npd.NATURAL_PRODUCT_SCAFFOLDS.values()]}
+    assert words == NATURAL_PRODUCT_TABLE_WORDS
+
+
+@pytest.mark.parametrize("name", [
+    # NPL 2026-11-01: names INTRODUCTION, the Blue Book), a stem with an ending or a locant too
+    "5α-cholestan-3β-ol", "androst-4-ene-3,17-dione", "(1R,3s,5S)-trop-6-en-3-ol", "17-methylmorphin-7-ene",
+    "cinchon-9-ene", "abietane", "cholesterol", "lysergic acid", "2-methylbornane",
+])
+def test_a_natural_product_name_is_flagged(name):
+    assert getattr(chapter_p10_name_is_no_pin(None, name), "rule", None) == "P-100", name
+
+
+@pytest.mark.parametrize("name", [
+    "(3S,5S,8R,9S,10S,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]hexadecahydro-1H-cyclopenta[a]phenanthren-3-ol",
+    "1,7,7-trimethylbicyclo[2.2.1]heptane", "tropylium", "estragole", "choline", "cholic acid",
+])
+def test_a_systematic_name_beside_a_natural_product_stem_is_not_flagged(name):
+    assert chapter_p10_name_is_no_pin(None, name) is None, name

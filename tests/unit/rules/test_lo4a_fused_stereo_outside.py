@@ -80,9 +80,13 @@ def test_item_rows_producer_and_tiers():
         assert (b.get("name"), b.get("tier")) == (pin, "pin_verified"), b
 
 
-def test_natural_product_route_still_names_the_steroid_skeleton():
-    d = name_default(CONTROL_ROWS[0][0])
-    assert (d.get("name"), d.get("tier")) == ("cholestane", "pin_verified"), d
+def test_natural_product_route_names_the_steroid_skeleton_systematically():
+    # NPL 2026-11-01 (was: 'cholestane', pin_verified): INTRODUCTION (the Blue Book) "Preferred IUPAC names
+    # (PINs) are not identified for the compounds in this Chapter", so the natural-product route offers the systematic
+    # name of Chapters to (:50943); both tiers ship it as the PIN, OPSIN 2.9.0 reads it back to the full InChIKey.
+    assert_pin_at_both_tiers(
+        CONTROL_ROWS[0][0],
+        "(8R,9S,10S,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]hexadecahydro-1H-cyclopenta[a]phenanthrene")
 
 
 def test_the_builder_names_the_pterin_with_every_descriptor():

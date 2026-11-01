@@ -365,13 +365,6 @@ CANARY_KNOWN_DEFECTS = {
     # '(3S)-6,7-dihydroxy-8-methoxy-3-methyl-1H-2-benzopyran-4(3H)-one' is offered in place of the
     # fused namer's hydro-prefix name, which that namer records as not a PIN, and it is the
     # strict-xfail target the row carried; the fixture holds it now)
-    "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3": (
-        # fix-all merge: the acid is the '-21-oic acid' suffix now (acids rank above esters,
-        #, the acetate an '(acetyloxy)' prefix; OPSIN 2.9.0 full InChIKey
-        # exact. The row keeps its whole-graph R/S block on implied centres (was DK-ACIDPFX).
-        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-3-(acetyloxy)-16,25-dihydroxy-4,4,14-trimethylcholesta-8,23-dien-21-oic acid",
-        "DK-P101CIP", (143, 317),
-    ),
     "CCN(CC)Cc1ccccc1": (
         "N-benzyl-N-ethylethan-1-amine",
         "DK-ETHANAMINE", (149,),
@@ -476,25 +469,9 @@ CANARY_KNOWN_DEFECTS = {
         "(2R,5R,8S)-2,10,10-trimethyltricyclo[6.3.0.0^1,5]undec-6-ene-6-carbaldehyde",
         "DK-VBFUSED", (413,),
     ),
-    "C/C(=C\\CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)C(C)(C)[C@@H]1C[C@H]3O)C(=O)O": (
-        # j7: the acid is the '-26-oic acid' suffix now:52548); the row keeps
-        # its whole-graph R/S block on implied centres (was DK-ACIDPFX).
-        "(3R,5R,7R,10S,13R,14R,17R,20R,24E)-3,7-dihydroxy-4,4,14-trimethylcholesta-8,24-dien-26-oic acid",
-        "DK-P101CIP", (416,),
-    ),
-    "C/C(=C\\[C@@H](O)C[C@@H](C)[C@H]1CC(=O)[C@@]2(C)C3=C(C(=O)C[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1C[C@@H]3O)C(=O)O": (
-        # j7: the acid is the '-26-oic acid' suffix now:52548); the row keeps
-        # its whole-graph R/S block on implied centres (was DK-ACIDPFX).
-        "(3S,5R,7S,10S,13R,14R,17R,20R,23S,24E)-3,7,23-trihydroxy-4,4,14-trimethyl-11,15-dioxocholesta-8,24-dien-26-oic acid",
-        "DK-P101CIP", (417,),
-    ),
     "CC[C@H](C)[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
         "glutaminylglutamylisoleucine",
         "DK-PEP", (419,),
-    ),
-    "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO": (
-        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17,21-trihydroxy-16-methylpregna-1,4-diene-3,20-dione",
-        "DK-P101CIP", (421,),
     ),
     "C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)CN)C(=O)O": (
         "glycylaspartylalanine",
@@ -551,13 +528,6 @@ CANARY_KNOWN_DEFECTS = {
     "N[C@@H](CCC(=O)O)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
         "glutamylcysteinylhistidine",
         "DK-PEP", (501,),
-    ),
-    "CC(=O)OC[C@]12CC[C@H](O)C(C)(C)[C@@H]1CCC1=C2CC[C@]2(C)[C@@H]([C@H](C)[C@H](C/C=C(/C)C(=O)O)OC(C)=O)CC[C@@]12C": (
-        # fix-all merge: the acid is the '-26-oic acid' suffix now (acids rank above esters,
-        #, the acetate an '(acetyloxy)' prefix; OPSIN 2.9.0 full InChIKey
-        # exact. The row keeps its whole-graph R/S block on implied centres (was DK-ACIDPFX).
-        "(3S,5R,10R,13R,14R,17R,20S,22S,24Z)-19,22-bis(acetyloxy)-3-hydroxy-4,4,14-trimethylcholesta-8,24-dien-26-oic acid",
-        "DK-P101CIP", (510,),
     ),
     "C[C@H](CC[C@H](O)C(C)(C)O)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3": (
         "(3S,5R,10S,13R,14R,17R,20R,24S)-4,4,14-trimethylcholest-8-ene-3,24,25-triol",

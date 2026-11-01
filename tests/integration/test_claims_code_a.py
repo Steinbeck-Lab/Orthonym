@@ -33,6 +33,7 @@ from rdkit.Chem import inchi
 from orthonym import Orthonym
 from orthonym import namer
 from orthonym.metrics import provenance as pv
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import _independent_parse
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -114,6 +115,9 @@ def test_wrong_locants_are_recomposed_to_the_round_tripping_name():
     assert row["tier"] == "pin_verified" and row["verified"] == "opsin", row
 
 
+# NPL 2026-11-01: the subject is the gate's repair of the producer's wrong descriptors, so the route's systematic offer
+# is off INTRODUCTION, the Blue Book; with it the nandrolone ester takes a systematic, pin_verified name).
+@pytest.mark.usefixtures("np_producer_only")
 def test_wrong_descriptors_on_a_stereoparent_fall_back_to_its_full_key_name():
     assert _independent_full_key(NANDROLONE_PP_WRONG) == ""
     row = _pin_row(NANDROLONE_PP)
@@ -140,7 +144,8 @@ def test_census_row_with_descriptors_on_ring_oxygens_is_repaired():
 # shipping at the default tier, constitution-only, now one label down.
 CORRECT_CARVEOUT_NAMES = [
     ("O[C@H]1CC[C@@H](O)CC1", "(1s,4s)-cyclohexane-1,4-diol"),
-    ("CN1[C@@H]2CC[C@H]1C[C@H](O)C2", "(1R,3s,5S)-tropan-3-ol"),
+    # ('(1R,3s,5S)-tropan-3-ol' left this list: a Chapter name, no PIN, INTRODUCTION
+    # (the Blue Book), NPL 2026-11-01; tests/unit/assembly/test_default_tier_offer.py pins its best-effort row)
     ("Cl[C@H]1[C@H](Cl)[C@@H](Cl)[C@H](Cl)[C@H](Cl)[C@H]1Cl",
      "(1R,2R,3R,4R,5S,6S)-1,2,3,4,5,6-hexachlorocyclohexane"),
 ]

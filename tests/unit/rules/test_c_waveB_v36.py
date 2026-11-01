@@ -245,6 +245,10 @@ def _name_one(smiles):
 
 if __name__ == "__main__":
     if len(sys.argv) >= 3 and sys.argv[1] == "--reach":
+        # NPL 2026-11-01: the trace asks whether the retained table is reached, so the route's systematic offer is off
+        # INTRODUCTION, the Blue Book: with it the estradiol fragment takes its systematic name)
+        import orthonym.rules.natural_products as _np
+        _np.systematic_name_before_natural_product = lambda mol: None
         print(json.dumps(_reach_one(sys.argv[2])))
     else:
         print(json.dumps(_name_one(sys.argv[1])))

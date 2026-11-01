@@ -137,8 +137,13 @@ _ETHYNYL_XFAIL_REASON = (
 # (NO_VERIFIED_PIN). The subprocess then also prints the strict path's name (the
 # emission rule switched off) and the best-effort name: the strict path's name carries
 # the substring and is the best-effort name, and it is the output compared across seeds.
-_DEFAULT_TIER_DECLINES = {"alpha_estradiol", "deoxyestradiol", "2_methoxyestradiol",
-                          "4_hydroxyestradiol"}
+#
+# NPL 2026-11-01: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not
+# identified for the compounds in this Chapter" -- every steroid name of the producer is below the PIN,
+# so the default tier declines all of them. The subject of this file is the producer's numbering, so
+# the subprocess switches the route's systematic offer off (``tests.support.np_producer``) and the
+# strict path's name is the producer's.
+_DEFAULT_TIER_DECLINES = {row[0] for row in AROMATIC_NP_FIXTURES if row[0] not in _NEEDS_ETHYNYL_DECORATION}
 
 
 def _named_in_subprocess(smi, env, timeout=60):
@@ -147,6 +152,8 @@ def _named_in_subprocess(smi, env, timeout=60):
     import json
     code = (
         "import json\n"
+        "import orthonym.rules.natural_products as _np\n"
+        "_np.systematic_name_before_natural_product = lambda mol: None\n"
         "import orthonym.namer as nm\n"
         "from orthonym import Orthonym, name_compound\n"
         "from orthonym.cli import _emit_tier_flags\n"

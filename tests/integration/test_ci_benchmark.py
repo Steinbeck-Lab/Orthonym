@@ -246,7 +246,11 @@ CI_BENCHMARK = [
         # The old '...chola-7,9-dien-3,24-dione' read C-9=C-10 (OPSIN: no parse).
         # A name:50943: no PIN in Chapter, labelled best_effort;
         # OPSIN full-InChIKey exact.
-        "(10S,13R,14R,15S,17R,20R)-15-hydroxy-4,4,14-trimethyl-3-oxochola-7,9(11)-dien-24-oic acid",
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book) "PINs are not identified for the compounds in this
+        # Chapter", so the PIN tier ships the systematic name of Chapters to (:50943); OPSIN 2.9.0
+        # full-InChIKey exact.
+        "(4R)-4-[(10S,13R,14R,15S,17R)-15-hydroxy-4,4,10,13,14-pentamethyl-3-oxo-2,3,4,5,6,10,12,13,14,15,16,17-"
+        "dodecahydro-1H-cyclopenta[a]phenanthren-17-yl]pentanoic acid",
     ),
     pytest.param(
         "CCCCCCCCCCCCCCCCCCCCCC(=O)OC[C@@H](O)COC(=O)CCCCCCCCC",
@@ -285,7 +289,9 @@ CI_BENCHMARK = [
     pytest.param(
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3"
         "(C)[C@H]2[C@@H]1C",
-        _ships("furostan"),
+        # NPL 2026-11-01: 'furostan' is a parent INTRODUCTION, the Blue Book); no systematic name is
+        # built for it, so the PIN tier declines it and best-effort gives the same name.
+        _declined_at_default("furostan"),
         marks=_GATE,
     ),
     pytest.param(
@@ -816,7 +822,9 @@ CI_BENCHMARK = [
         # j7 (TRIAGE g2 G2-C6): the terminal -COOH is the '-21-oic acid' suffix,
         # the Blue Book), the ketones 'oxo' prefixes; was '6,21-dihydroxy...
         # -3,16,21-trione'. name, labelled best_effort; OPSIN full-InChIKey exact.
-        "(5R,6S,10S,13R,14R,17R,20R)-6-hydroxy-4,4,14-trimethyl-3,16-dioxocholesta-8,24-dien-21-oic acid",
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book); the systematic name (:50943), OPSIN 2.9.0 exact.
+        "(2R)-2-[(5R,6S,10S,13R,14R,17R)-6-hydroxy-4,4,10,13,14-pentamethyl-3,16-dioxo-2,3,4,5,6,7,10,11,12,13,14,15,16,17-"
+        "tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-methylhept-5-enoic acid",
     ),
     (
         # Suite fix j6 (TRIAGE g2 G2-C8): the PIN tier abstained (a branched

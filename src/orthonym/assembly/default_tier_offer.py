@@ -413,14 +413,31 @@ def stereo_layer_row(namer, smiles, held) -> Optional[Dict]:
     try:
         from ..errors import is_failure_name
         from ..metrics import provenance as pv
-        alt = default_tier_engine(namer).name_tiered(smiles)
+        engine = default_tier_engine(namer)
+        alt = engine.name_tiered(smiles)
     except Exception:                       # the offer must never break a naming: the abstention stands
         return None
     name = alt.get("name")
     if (name and not is_failure_name(name) and name in held and alt.get("tier") != "abstain"
             and alt.get("gate_outcome") == pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY):
         return alt
-    return None
+    return _withheld_chapter_p10_row(engine, held)
+
+
+def _withheld_chapter_p10_row(engine, held) -> Optional[Dict]:
+    """The row of a Chapter name the default tier built through its stereo-layer carve-out and declined only for
+    the rule ('(1R,3s,5S)-tropan-3-ol': no PIN is identified for it, INTRODUCTION, the Blue Book),
+    labelled ``best_effort`` as an inositol name is: the constitution read back and the descriptors checked against the
+    CIP labels, the stereo layer unread by OPSIN, and no PIN. Else None."""
+    from ..metrics import provenance as pv
+    withheld = getattr(engine, "_default_tier_withheld", None)
+    if not withheld or withheld[0] not in held:
+        return None
+    name, row = withheld
+    rules = {f.get("rule") for f in row.get("spelling_failures") or ()}
+    if rules != {"P-100"} or row.get("gate_outcome") != pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY:
+        return None
+    return dict(row, name=name, tier="best_effort", is_pin=False)
 
 
 def twin_last_resort_row(namer, smiles, held) -> Optional[Dict]:

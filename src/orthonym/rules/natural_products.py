@@ -20,6 +20,7 @@ Decoration enumeration (steroids):
 - Ester groups -> functional class format: parent-yl acylate (IUPAC
 """
 
+import contextvars
 from collections import defaultdict, deque
 from typing import Dict, List, Optional, Tuple
 
@@ -260,6 +261,27 @@ _NP_AROMATIC_RING_LOCANTS: Dict[str, List[Tuple[int, int, Optional[int]]]] = {
 }
 
 
+#: True inside the naming of:func:`systematic_name_before_natural_product`: no natural-product name is offered
+_NP_NAMES_OFF: contextvars.ContextVar = contextvars.ContextVar("orthonym_natural_product_names_off", default=False)
+
+
+def natural_product_names_off() -> bool:
+    """Whether the running naming leaves the natural-product names out (:func:`systematic_name_before_natural_product`)."""
+    return _NP_NAMES_OFF.get()
+
+
+def systematic_name_before_natural_product(mol) -> Optional[str]:
+    """The systematic PIN of the caller's whole molecule, offered before its natural-product name, or None.
+
+     INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not identified for the compounds in
+    this Chapter"; the parents (steroids, alkaloids, terpenes,...:51409) are in it, so '5α-cholestan-3β-ol'
+    is no PIN (user decision 2026-10-31). A name built by Chapters to alone is the systematic name
+    points to (:50943), on a fusion parent such as cyclopenta[a]phenanthrene,:12493). The molecule is
+    named with the natural-product names left out and taken only as a PIN (``rules/systematic_offer.py``)."""
+    from .systematic_offer import systematic_pin_offer
+    return systematic_pin_offer(mol, _NP_NAMES_OFF, "systematic_name_before_natural_product", stereo_unread_ok=True)
+
+
 def name_natural_product(mol) -> Optional[str]:
     """Name a molecule using natural product recognition.
 
@@ -274,7 +296,7 @@ def name_natural_product(mol) -> Optional[str]:
         Trivial/retained name if the molecule is a recognized natural product,
         otherwise None.
     """
-    if mol is None:
+    if mol is None or _NP_NAMES_OFF.get():
         return None
 
     # Step 1: Get canonical SMILES for exact lookup
@@ -923,7 +945,6 @@ def _collect_np_stereo(mol, numbering: Dict[int, int], scaffold_info: Optional[D
 
     descriptors = collect_stereodescriptors(mol, numbering)
     leading = format_stereodescriptor_string(descriptors) if descriptors else ""
-    _record_if_implied_steroid_centres(descriptors, scaffold_info, leading)
     return leading, {}
 
 
@@ -934,35 +955,7 @@ def _whole_graph_rs_prefix(mol, numbering: Dict[int, int],
 
     descriptors = collect_stereodescriptors(mol, numbering)
     prefix = format_stereodescriptor_string(descriptors) if descriptors else ""
-    _record_if_implied_steroid_centres(descriptors, scaffold_info, prefix)
     return prefix
-
-
-#: "Stereochemical configuration of parent structures" (the Blue Book,
-#::51047): "The name of a fundamental parent structure usually implies the absolute
-#: configuration of all chirality centers [...] the implied configurations shown define the
-#: attached hydrogen atoms and methyl groups at positions '8', '10', and '13' as 'β', and at
-#: positions '9' and '14' as 'α'".
-_STEROID_IMPLIED_CENTRES = frozenset({"8", "9", "10", "13", "14"})
-
-
-def _record_if_implied_steroid_centres(descriptors, scaffold_info, prefix) -> None:
-    """A whole-graph R/S block on a steroid stereoparent cites CIP descriptors for the
-    centres its parent name already implies (C-8, 9, 10, 13, 14;:51047). The
-     form states only the configurations that differ or must be specified, with
-    'α'/'β' ("This method is preferred",:51053) and 'R'/'S' only for the
-    rest:51373). Such a name is valid and round-trip verified, so it
-    still ships; this marks the block as a non-PIN fragment (name-scoped), so a shipped
-    name that carries it is not labelled pin_verified. The name is unchanged."""
-    if (not prefix or not descriptors or not scaffold_info
-            or scaffold_info.get("scaffold_class") != "steroid"):
-        return
-    try:
-        if any(str(d[0]) in _STEROID_IMPLIED_CENTRES for d in descriptors):
-            from ..metrics.provenance import record_non_pin_fragment
-            record_non_pin_fragment(prefix)
-    except Exception:  # a label helper must never break naming
-        pass
 
 
 def _record_if_acid_as_prefixes(name, hydroxyls, ketones) -> None:

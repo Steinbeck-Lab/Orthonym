@@ -26,6 +26,11 @@ from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
     default_tier_rule_applies,
 )
+from tests.support.np_producer import np_producer_only  # noqa: F401
+
+# NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
+# name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
+pytestmark = pytest.mark.usefixtures("np_producer_only")
 
 # Default tier: the paper, Methods, "Tiers" (L73): "The default configuration emits a
 # name only when the pipeline can build the preferred IUPAC name (PIN); otherwise, it

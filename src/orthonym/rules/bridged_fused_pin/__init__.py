@@ -871,10 +871,11 @@ def build_fused_decorated_substituent(mol, attach: int, outside: Set[int]) -> Op
     '(3S,8S,9S,10R,13R,14S,17R)-3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthren-17-yl'.
      (the Blue Book) the free valence; (:23710) the fusion name; (:44643, example:44668) "When they
     relate to substituent groups, they are cited at the front of the corresponding prefix". The descriptors are the
-    whole molecule's CIP labels on the ring locants, so the attachment atom's is the one in context. None when a step
-    declines (the caller keeps its older path): a stereogenic unit on the substituent side outside the ring system
-    (it would need a descriptor inside a nested prefix), a ring system bonded to the parent side more than once, a
-    tautomer-sensitive hydrogen placement, isotope labels pending, a lone-pair centre."""
+    whole molecule's CIP labels on the ring locants, so the attachment atom's is the one in context; a stereogenic unit
+    of a prefix of the system is cited by that prefix's namer at the front of the prefix ('17-[(2R)-6-methylheptan-2-
+    yl]'), and the read-back of the whole name checks it. None when a step declines (the caller keeps its older path):
+    a ring system bonded to the parent side more than once, a tautomer-sensitive hydrogen placement, isotope labels
+    pending, a lone-pair centre."""
     if mol is None or attach is None or not outside:
         return None
     system = next((s for s in selection.ring_systems(mol) if attach in s), None)
@@ -892,14 +893,6 @@ def build_fused_decorated_substituent(mol, attach: int, outside: Set[int]) -> Op
         return None
     # a double bond to the parent side is an '-ylidene' prefix, not '-yl'
     if mol.GetBondBetweenAtoms(*links[0]).GetBondType() != Chem.BondType.SINGLE:
-        return None
-    from rdkit.Chem import FindMolChiralCenters
-    if any(idx in side and idx not in system for idx, _ in FindMolChiralCenters(
-            mol, includeUnassigned=False, useLegacyImplementation=False)):
-        return None
-    if any(b.GetStereo() != Chem.BondStereo.STEREONONE and b.GetBeginAtomIdx() in side
-           and b.GetEndAtomIdx() in side and not (b.GetBeginAtomIdx() in system and b.GetEndAtomIdx() in system)
-           for b in mol.GetBonds()):
         return None
     if _isotope_labels_pending(mol, system) or _lone_pair_centre_in(mol, system):
         return None

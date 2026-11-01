@@ -17,6 +17,10 @@ a phase additions: 10 compounds from missing compound classes (to)
 a phase additions: 3 compounds from decomposition format fixes (ether/alkoxy)
 a phase additions: 19 compounds from v9.0 canary expansion (coverage-based + anchors)
 a phase additions: 2 compounds newly RT-matching in v10.0 (steroid + epoxycyclohexane)
+NPL 2026-11-01: 17 steroid rows (and the DK-P101CIP known-defect rows) take the systematic names of Chapters
+ to: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not identified for the
+compounds in this Chapter",:50943 "a 'systematic name' may be generated in accordance with Rules described in
+Chapters through "; each new name read back by OPSIN 2.9.0 to the input's full InChIKey.
 """
 
 import os
@@ -212,7 +216,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "5β-androstane-3α,17α-diol",  # RB-P101 (controller ruling); was '(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol'
+        "(3R,5R,8R,9S,10S,13S,14S,17R)-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthrene-3,17-diol",  # RB-P101 (controller ruling); was '(3R,5R,8R,9S,10S,13S,14S,17R)-androstan-3,17-diol'
     ),
     (
         "CC(C)C[C@H](N)C(=O)N[C@@H](CO)C(=O)NCC(=O)O",
@@ -798,9 +802,8 @@ CANARY_COMPOUNDS = [
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)"
         "[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)"
         "C(=O)O)[C@@]1(C)CC3",
-        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-"
-        "trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-"
-        "dien-3-yl acetate",
+        "(2R,4E)-2-[(3S,5R,10S,13R,14R,16R,17R)-3-(acetyloxy)-16-hydroxy-4,4,10,13,14-pentamethyl-"
+        "2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-hydroxy-6-methylhept-4-enoic acid",
     ),
     # --- a phase: v7.0 Final Benchmark (15 compounds) ---
     (
@@ -1402,7 +1405,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2C3=CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C",
-        "cholest-7-ene",  # RB-P101 (controller ruling); was '(9R,10S,13R,14R,17R,20R)-cholest-7-ene'
+        "(9R,10S,13R,14R,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-2,3,4,5,6,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthrene",  # RB-P101 (controller ruling); was '(9R,10S,13R,14R,17R,20R)-cholest-7-ene'
     ),
     (
         "O=C(O)C(=O)Cc1cccc(O)c1",
@@ -1599,7 +1602,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3",
-        "(3S,5R,10S,13R,14R,16R,17R,20R,23E)-16,21,25-trihydroxy-4,4,14-trimethyl-21-oxocholest-8,23-dien-3-yl acetate",
+        "(2R,4E)-2-[(3S,5R,10S,13R,14R,16R,17R)-3-(acetyloxy)-16-hydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-hydroxy-6-methylhept-4-enoic acid",
     ),
     (
         "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O",
@@ -2011,11 +2014,11 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C/C(=C\\CC[C@@H](C)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@@H](O)C(C)(C)[C@@H]1C[C@H]3O)C(=O)O",  # fused-ring,large,steroid
-        "(3R,5R,7R,10S,13R,14R,17R,20R,24E)-3,7,27-trihydroxy-4,4,14-trimethylcholesta-8,24-dien-27-one",
+        "(2E,6R)-6-[(3R,5R,7R,10S,13R,14R,17R)-3,7-dihydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-2-methylhept-2-enoic acid",
     ),
     (
         "C/C(=C\\[C@@H](O)C[C@@H](C)[C@H]1CC(=O)[C@@]2(C)C3=C(C(=O)C[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1C[C@@H]3O)C(=O)O",  # fused-ring,polyfunctional,large,steroid
-        "(3S,5R,7S,10S,13R,14R,17R,20R,23S,24E)-3,7,23,27-tetrahydroxy-4,4,14-trimethylcholesta-8,24-dien-11,15,27-trione",
+        "(2E,4S,6R)-6-[(3S,5R,7S,10S,13R,14R,17R)-3,7-dihydroxy-4,4,10,13,14-pentamethyl-11,15-dioxo-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-4-hydroxy-2-methylhept-2-enoic acid",
     ),
     (
         "COc1cc(CCC(=O)c2ccc(O)cc2O)ccc1O",  # aromatic,medium
@@ -2031,7 +2034,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H]1C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(Cl)[C@@H](O)C[C@]2(C)[C@@]1(O)C(=O)CO",  # fused-ring,medium,steroid
-        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17,21-trihydroxy-16-methylpregna-1,4-dien-3,20-dione",
+        "(8S,9R,10S,11S,13S,14S,16S,17R)-9-chloro-11,17-dihydroxy-17-(hydroxyacetyl)-10,13,16-trimethyl-6,7,8,9,10,11,12,13,14,15,16,17-dodecahydro-3H-cyclopenta[a]phenanthren-3-one",
     ),
     (
         "CC1CC(S)C(C)O1",  # heterocycle,small
@@ -2098,7 +2101,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@]12CCC(=O)C(O)=C1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12",  # fused-ring,medium,steroid
-        "4-hydroxyandrost-4-ene-3,17-dione",  # RB-P101 (controller ruling); was '(8R,9S,10R,13S,14S)-4-hydroxyandrost-4-en-3,17-dione'
+        "(8R,9S,10R,13S,14S)-4-hydroxy-10,13-dimethyl-7,8,9,10,11,12,13,14,15,16-decahydro-1H-cyclopenta[a]phenanthrene-3,17(2H,6H)-dione",  # RB-P101 (controller ruling); was '(8R,9S,10R,13S,14S)-4-hydroxyandrost-4-en-3,17-dione'
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@H](CC(=O)O)NC(=O)[C@@H](N)CC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2374,7 +2377,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](CCC(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
-        "3α-hydroxy-5β-cholan-24-oic acid",  # j7 RB-P101713:52548 acid suffix on a terminal segment;:51053 alpha/beta once the cholane map's C-11/C-12 swap is fixed); was '(3R,5R,8R,9S,10S,13R,14S,17R,20R)-3,24-dihydroxycholan-24-one'
+        "(4R)-4-[(3R,5R,8R,9S,10S,13R,14S,17R)-3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthren-17-yl]pentanoic acid",  # j7 RB-P101713:52548 acid suffix on a terminal segment;:51053 alpha/beta once the cholane map's C-11/C-12 swap is fixed); was '(3R,5R,8R,9S,10S,13R,14S,17R,20R)-3,24-dihydroxycholan-24-one'
     ),
     (
         "CCC(O)CCl",  # acyclic,small
@@ -2398,7 +2401,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(=O)OC[C@]12CC[C@H](O)C(C)(C)[C@@H]1CCC1=C2CC[C@]2(C)[C@@H]([C@H](C)[C@H](C/C=C(/C)C(=O)O)OC(C)=O)CC[C@@]12C",  # fused-ring,polyfunctional,large,steroid
-        "(3S,5R,10R,13R,14R,17R,20S,22S,24Z)-3,27-dihydroxy-4,4,14-trimethyl-27-oxocholest-8,24-dien-19,22-diyl diacetate",
+        "(2Z,5S,6S)-5-(acetyloxy)-6-{(3S,5R,10R,13R,14R,17R)-10-[(acetyloxy)methyl]-3-hydroxy-4,4,13,14-tetramethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl}-2-methylhept-2-enoic acid",
     ),
     (
         "C/C=C/CCCCCCCCCCCCCCC(=O)O",  # acyclic,medium
@@ -2434,7 +2437,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](CCCC(C)(C)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
-        "7α,25-dihydroxy-5β-cholestan-3-one",  # RB-P101 (controller ruling); was '(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,25-dihydroxycholestan-3-one'
+        "(5R,7R,8R,9S,10S,13R,14S,17R)-7-hydroxy-17-[(2R)-6-hydroxy-6-methylheptan-2-yl]-10,13-dimethylhexadecahydro-3H-cyclopenta[a]phenanthren-3-one",  # RB-P101 (controller ruling); was '(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,25-dihydroxycholestan-3-one'
     ),
     (
         "CC(C)C[C@H](NC(=O)[C@@H](N)Cc1ccc(O)cc1)C(=O)NCC(=O)O",  # aromatic,polyfunctional,medium
@@ -2466,7 +2469,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C(=O)O)[C@H](O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C",  # fused-ring,large,steroid
-        "(24R)-3α,12α,24-trihydroxy-5β-cholestan-26-oic acid",  # j7 RB-P101713:52548); was '(3R,5R,8R,9S,10S,12S,13R,14S,17R,20R,24R)-3,12,24,27-tetrahydroxycholestan-27-one'
+        "(3R,6R)-6-[(3R,5R,8R,9S,10S,12S,13R,14S,17R)-3,12-dihydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthren-17-yl]-3-hydroxy-2-methylheptanoic acid",  # j7 RB-P101713:52548); was '(3R,5R,8R,9S,10S,12S,13R,14S,17R,20R,24R)-3,12,24,27-tetrahydroxycholestan-27-one'
     ),
     (
         "O=C(O)C=CC(=O)O",  # acyclic,small
@@ -2604,7 +2607,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(C)C(O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
-        "7α,24-dihydroxy-5β-cholestan-3-one",  # RB-P101 (controller ruling); was '(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,24-dihydroxycholestan-3-one'
+        "(5R,7R,8R,9S,10S,13R,14S,17R)-7-hydroxy-17-[(2R)-5-hydroxy-6-methylheptan-2-yl]-10,13-dimethylhexadecahydro-3H-cyclopenta[a]phenanthren-3-one",  # RB-P101 (controller ruling); was '(5R,7R,8R,9S,10S,13R,14S,17R,20R)-7,24-dihydroxycholestan-3-one'
     ),
     (
         "NC(=O)C[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)Cc1cnc[nH]1)C(=O)O",  # aromatic,heterocycle,polyfunctional,medium
@@ -2760,7 +2763,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](CCCC(C)(C)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)CC4=CC(=O)CC[C@]4(C)[C@H]3C[C@H](O)[C@]12C",  # fused-ring,large,steroid
-        "7α,12α,25-trihydroxycholest-4-en-3-one",  # RB-P101 (controller ruling); was '(7R,8R,9S,10R,12S,13R,14S,17R,20R)-7,12,25-trihydroxycholest-4-en-3-one'
+        "(7R,8R,9S,10R,12S,13R,14S,17R)-7,12-dihydroxy-17-[(2R)-6-hydroxy-6-methylheptan-2-yl]-10,13-dimethyl-1,2,6,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-3H-cyclopenta[a]phenanthren-3-one",  # RB-P101 (controller ruling); was '(7R,8R,9S,10R,12S,13R,14S,17R,20R)-7,12,25-trihydroxycholest-4-en-3-one'
     ),
     (
         "CCC12C=C/C(C)=C\\C(C)(O)CCC(OC)C(C)C(O)C(C)C(O)C3OC(=CC3=O)CC(=O)OC(C1)C(C)C(=O)O2",  # heterocycle,fused-ring,polyfunctional,large
@@ -2788,7 +2791,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "C[C@H](CCC[C@H](C)C(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,polyfunctional,medium,steroid
-        "(25S)-3-oxo-5α-cholestan-26-oic acid",  # j7 RB-P101713:52548); was '(5S,8R,9S,10S,13R,14S,17R,20R,25S)-27-hydroxycholestan-3,27-dione'
+        "(2S,6R)-6-[(5S,8R,9S,10S,13R,14S,17R)-10,13-dimethyl-3-oxohexadecahydro-1H-cyclopenta[a]phenanthren-17-yl]-2-methylheptanoic acid",  # j7 RB-P101713:52548); was '(5S,8R,9S,10S,13R,14S,17R,20R,25S)-27-hydroxycholestan-3,27-dione'
     ),
     (
         "Cc1cnc(N)c(C)n1",  # aromatic,heterocycle,small
@@ -2942,7 +2945,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(O)[C@@]1(O)CC[C@H]2[C@@H]3CC=C4CC(O)CC[C@]4(C)[C@H]3C(=O)C[C@@]21C",  # fused-ring,medium,steroid
-        "(8S,9S,10R,13S,14S,17R)-3,17,20-trihydroxypregn-5-en-11-one",
+        "(8S,9S,10R,13S,14S,17R)-3,17-dihydroxy-17-(1-hydroxyethyl)-10,13-dimethyl-1,2,3,4,7,8,9,10,12,13,14,15,16,17-tetradecahydro-11H-cyclopenta[a]phenanthren-11-one",
     ),
     (
         "C[C@H](NC(=O)CN)C(=O)N[C@@H](CO)C(=O)O",  # acyclic,polyfunctional,medium
@@ -2990,7 +2993,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC[C@H]1CC[C@H]2[C@@H]3CCC4CCCC[C@]4(C)[C@H]3CC[C@]12C",  # fused-ring,medium,steroid
-        "pregnane",
+        "(8S,9S,10S,13R,14S,17S)-17-ethyl-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthrene",
     ),
     (
         "CC(C)[C@H](N)C(=O)N[C@@H](CCC(=O)O)C(=O)N[C@@H](CCC(=O)O)C(=O)O",  # acyclic,polyfunctional,medium
@@ -3171,7 +3174,7 @@ CANARY_COMPOUNDS = [
     ),
     (
         "CC(CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)C(=O)O",  # fused-ring,medium,steroid
-        "3β-hydroxy-5β-cholestan-26-oic acid",  # j7 RB-P101713:52548); was '(3S,5R,8R,9S,10S,13R,14S,17R,20R)-3,27-dihydroxycholestan-27-one'
+        "(6R)-6-[(3S,5R,8R,9S,10S,13R,14S,17R)-3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthren-17-yl]-2-methylheptanoic acid",  # j7 RB-P101713:52548); was '(3S,5R,8R,9S,10S,13R,14S,17R,20R)-3,27-dihydroxycholestan-27-one'
     ),
     (
         "C[C@H](NC(=O)[C@@H](N)CCC(=O)O)C(=O)N[C@@H](Cc1c[nH]c2ccccc12)C(=O)O",  # aromatic,heterocycle,fused-ring,polyfunctional,medium

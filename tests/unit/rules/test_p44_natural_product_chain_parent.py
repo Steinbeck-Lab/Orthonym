@@ -18,8 +18,12 @@ from orthonym.assembly.naming_utils import alpha_sort_key
 from orthonym.jvm_budget import jvm_slots
 from orthonym.rules.p44_scorer import select_parent_unified
 from tests.support.rt_assert import name_is_rt_exact
+from tests.support.np_producer import np_producer_only  # noqa: F401
 
-pytestmark = pytest.mark.unit
+# NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
+# name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
+
+pytestmark = [pytest.mark.unit, pytest.mark.usefixtures("np_producer_only")]
 
 
 def _pin(smiles):
@@ -57,9 +61,13 @@ _DIOXOCHOLANOATE = "COC(=O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC(=O)[C@@H]4CC(=O)CC
 def test_a_failed_chain_assembly_leaves_no_locant_map_for_the_stereo_check(monkeypatch):
     # The chain route names nothing here and the decomposition fallback names the ester; the chain's map put a
     # '(4R)-' (the chain's C-4, which the stereoparent name implies) in front of it. The chain route fails only
-    # without the decorated fused '-yl' prefix (DT4 F2b), so that prefix is withheld here.
-    from orthonym.assembly import composer
+    # without the decorated fused '-yl' prefix (DT4 F2b), so that prefix is withheld here. NPL 2026-11-01: the
+    # substituent namer builds that prefix too (``fused_ring_system_prefix``, tier 4.4 of its cascade), so it is
+    # withheld there as well; and the natural-product route's systematic offer is off INTRODUCTION,
+    # the Blue Book), the subject being the producer's ester name.
+    from orthonym.assembly import composer, substituent_enumerator
     monkeypatch.setattr(composer, "_fused_decorated_prefix", lambda *a, **k: None)
+    monkeypatch.setattr(substituent_enumerator, "fused_ring_system_prefix", lambda *a, **k: None)
     row = _pin(_DIOXOCHOLANOATE)
     assert row["name"] == "methyl 3,6-dioxo-5β-cholan-24-oate"
     assert name_is_rt_exact(row["name"], _DIOXOCHOLANOATE)

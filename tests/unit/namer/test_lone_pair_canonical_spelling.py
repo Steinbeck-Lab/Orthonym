@@ -229,7 +229,8 @@ def test_a_string_the_engine_already_labels_as_written_is_kept(smiles):
     (N_RING_P, "(2R,5S)-2-[(propan-2-yl)oxy]-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"),
     (N_RING_P_OTHER, "(2S,5S)-2-[(propan-2-yl)oxy]-3-phenyl-1,3-diaza-2-phosphabicyclo[3.3.0]octane"),
     (AZIRIDINE_FIRST,
-     "methyl (1S,2R)-1-{[5-(8,8-difluoro-7,9-dioxabicyclo[4.3.0]nona-1,3,5-trien-2-yl)-2-fluorophenyl]"
+     # DT4 F2b/NPL 2026-11-01: the decorated fused ring is a fusion '-yl' prefix, not von Baeyer
+     "methyl (1S,2R)-1-{[5-(2,2-difluoro-2H-1,3-benzodioxol-4-yl)-2-fluorophenyl]"
      "methyl}aziridine-2-carboxylate"),
 ])
 def test_rows_that_were_limited_by_rdkits_canonical_smiles_are_named(smiles, name):

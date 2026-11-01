@@ -78,4 +78,8 @@ def test_plain_polycycle_and_steroid_unchanged():
         "decahydronaphthalene"
     assert n.name_tiered(
         "C[C@]12CC[C@H]3[C@@H](CC[C@H]4CC(=O)CC[C@]34C)[C@@H]1CC[C@@H]2O"
-    ).get("name") == "17β-hydroxy-5α-androstan-3-one"
+    ).get("name") == (
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book) "PINs are not identified for the compounds in this
+        # Chapter": the steroid takes the systematic name of Chapters to (:50943), read back by OPSIN 2.9.0 to
+        # the full InChIKey (tests/unit/rules/test_c_waveC_v36.py); the sugar preference does not divert it.
+        "(5S,8R,9S,10S,13S,14S,17S)-17-hydroxy-10,13-dimethylhexadecahydro-3H-cyclopenta[a]phenanthren-3-one")

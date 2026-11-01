@@ -37,6 +37,7 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.errors import is_failure_name
 from orthonym.jvm_flags import java_cmd
 from orthonym.metrics import provenance as pv
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.jars import jar_or_skip
 
 pytestmark = [pytest.mark.integration, pytest.mark.opsin_gate]
@@ -216,6 +217,7 @@ def test_rs_component_is_refused_and_the_salt_name_is_readable_or_absent():
     assert is_failure_name(name) or _jar_full_key(name) == _input_key(TROPISETRON_HCL), name
 
 
+@pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: the list name is the fallback behind the systematic offer, the Blue Book)
 def test_component_list_name_exception():
     """An exact-match list name OPSIN rejects is still accepted as a component."""
     from orthonym.rules.adducts import _name_component

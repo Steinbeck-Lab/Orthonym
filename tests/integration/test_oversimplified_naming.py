@@ -230,7 +230,9 @@ CANARY_SAMPLE = [
     # 'e' is kept before the consonant of '-diol'.
     pytest.param(
         "C[C@]12CC[C@@H](O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)[C@H](O)CC[C@@H]12",
-        "5β-androstane-3α,17α-diol",
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book) "PINs are not identified for the compounds in this
+        # Chapter": the systematic name of Chapters to (:50943), read back by OPSIN 2.9.0 to the full InChIKey.
+        "(3R,5R,8R,9S,10S,13S,14S,17R)-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthrene-3,17-diol",
         id="(3R5R8R9S10S13S14S17R)-androstan-317-diol",
     ),
     # Peptides: the PIN is the substitutive name, method (1) (the Blue Book);

@@ -88,7 +88,14 @@ def test_the_trivial_option_does_not_bring_back_the_trivial_name():
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("tier_flags", [{}, {"general_fallback": True, "general_fallback_unverified": True,
                                               "allow_aromatic_general": True}])
-def test_cholesterol_keeps_its_natural_product_name(tier_flags):
+def test_cholesterol_takes_its_systematic_name(tier_flags):
+    # NPL 2026-11-01 (was: keeps 'cholesterol' at pin_verified): INTRODUCTION (the Blue Book) "Preferred
+    # IUPAC names (PINs) are not identified for the compounds in this Chapter", so the route offers the systematic
+    # name of Chapters to (:50943) before the trivial name; OPSIN 2.9.0 reads it back to the full InChIKey.
+    from tests.support.rt_assert import name_is_rt_exact
     with jvm_slots(1, purpose="bf-s4"):
         row = Orthonym(style="pin", **tier_flags).name_tiered(CHOLESTEROL)
-    assert (row.get("name"), row["tier"]) == ("cholesterol", "pin_verified"), row
+    assert (row.get("name"), row["tier"]) == (
+        "(3S,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-"
+        "2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-3-ol", "pin_verified"), row
+    assert name_is_rt_exact(row["name"], CHOLESTEROL)

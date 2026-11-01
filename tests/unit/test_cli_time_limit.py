@@ -279,7 +279,11 @@ def test_the_start_up_is_paid_before_the_first_limit_begins(monkeypatch, capsys,
     # and it names the small structure of the warm-up with the namer of the run
     seen = []
     real_name = Orthonym.name_tiered
-    monkeypatch.setattr(Orthonym, "name_tiered", lambda self, s: seen.append(s) or real_name(self, s))
+    # the CLI's own calls: a nested naming (the systematic offer of a Chapter name, NPL 2026-11-01) runs inside a
+    # name scope and is not one of them
+    from orthonym.assembly.fragment_naming import name_scope_depth
+    monkeypatch.setattr(Orthonym, "name_tiered",
+                        lambda self, s: (name_scope_depth() == 0 and seen.append(s)) or real_name(self, s))
     _batch(capsys, tmp_path, [NAMED], "--time-limit", "600")
     assert seen == [cli_time_limit.WARM_UP_SMILES, NAMED]
 

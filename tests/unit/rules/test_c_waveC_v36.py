@@ -121,10 +121,13 @@ CANARIES = {
     "C1CCC2(CC1)CCCC2": "spiro[4.5]decane",
     "C1C[C@]2(CCCC2)CC1": "spiro[4.4]nonane",
     "C1C2CC3CC1CC(C2)C3": "adamantane",
+    # NPL 2026-11-01: INTRODUCTION (the Blue Book) "PINs are not identified for the compounds in this
+    # Chapter": these two steroids take the systematic names of Chapters to (:50943), asserted with the
+    # round trip below (OPSIN 2.9.0, full InChIKey).
     "C[C@]12CC[C@H]3[C@@H](CC[C@H]4CC(=O)CC[C@]34C)[C@@H]1CC[C@@H]2O":
-        "17β-hydroxy-5α-androstan-3-one",
+        "(5S,8R,9S,10S,13S,14S,17S)-17-hydroxy-10,13-dimethylhexadecahydro-3H-cyclopenta[a]phenanthren-3-one",
     "O=C1CC[C@]2(C)[C@H]3CC[C@@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C":
-        "(5R,8S,9S,10S,13S,14R)-14-methylandrostane-3,17-dione",
+        "(5R,8S,9S,10S,13S,14R)-10,13,14-trimethyldodecahydro-1H-cyclopenta[a]phenanthrene-3,17(2H,4H)-dione",
 }
 
 

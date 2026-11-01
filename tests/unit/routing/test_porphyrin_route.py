@@ -1,13 +1,9 @@
 """The natural-product route also names substituted free-base porphyrins (rules/porphyrin.py).
 
-LABEL. The default tier ships these names as ``pin_verified``, as it already does for the bare
-``porphyrin`` and for the steroid names. That label is the natural-product route's policy (the user
-decision of 2026-09-30, recorded in the docstring of ``routing/dispatch_table._handle_natural_product``),
-NOT a Blue Book PIN ruling: INTRODUCTION says "Preferred IUPAC names (PINs) are not identified for
-the compounds in this Chapter", and (``porphyrin``, Table 10.1 (d)) is in that chapter. So the
-tests below assert the name, the route's label and the independent OPSIN read-back, and leave ``is_pin``
-unasserted. If the PIN class program relabels natural-product names, the ``tier`` assertion moves with
-the whole route.
+LABEL. NPL 2026-11-01 (user decision 2026-10-31): INTRODUCTION (the Blue Book) says "Preferred IUPAC
+names (PINs) are not identified for the compounds in this Chapter", and (``porphyrin``, Table 10.1 (d))
+is in that chapter. So a porphyrin name is no PIN: the default tier declines it (NO_VERIFIED_PIN) and the
+best-effort tier gives the same name labelled ``systematic_verified`` (``is_pin`` False), read back by OPSIN.
 
 The molecules are constructed from names (tests/fixtures/porphyrin/*.tsv); u1 and u2 are user molecules
 (tests/fixtures/resonance/user_molecules.tsv).
@@ -19,6 +15,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym import Orthonym
+from tests.support.default_tier import assert_default_tier_declines
 from tests.support.pin_tiers import name_breadth, name_default
 from tests.support.resonance_rows import rows as resonance_rows
 from tests.support.rt_assert import name_is_rt_exact
@@ -44,20 +41,22 @@ U2_FREE_BASE = U2.split(".")[0]
 @pytest.mark.parametrize("row_id", ["5,10,15,20-tetraphenylporphyrin", "2,3,7,8,12,13,17,18-octaethylporphyrin",
                                     "2-methyl-5-phenylporphyrin"])
 def test_the_name_and_label_at_both_tiers(row_id):
-    """The name, the route's label (``pin_verified``: route policy, not a PIN ruling) and the independent
-    OPSIN read-back, at the default tier and at best-effort."""
+    """The default tier declines it; best-effort gives the name, ``systematic_verified``, read back by OPSIN."""
     row = SUBSTITUTED[row_id]
-    for result in (name_default(row["smiles"]), name_breadth(row["smiles"])):
-        assert result.get("name") == row["expected_name"], result
-        assert result.get("tier") == "pin_verified", result      # the route's label of D1 and D4
-        assert name_is_rt_exact(result["name"], row["smiles"]), result
+    assert_default_tier_declines(row["smiles"])
+    result = name_breadth(row["smiles"])
+    assert result.get("name") == row["expected_name"], result
+    assert result.get("tier") == "systematic_verified", result      # NPL 2026-11-01:, no PIN for the chapter
+    assert name_is_rt_exact(result["name"], row["smiles"]), result
 
 
 def test_the_bare_parent_is_unchanged():
     """The exact lookup (data/natural_products.py) runs first and keeps its own label."""
-    for result in (name_default(BARE), name_breadth(BARE)):
-        assert (result.get("name"), result.get("tier")) == ("porphyrin", "pin_verified"), result
-    assert name_default(BARE).get("is_pin") is True
+    # NPL 2026-11-01: INTRODUCTION (the Blue Book): no PIN for the parents; the default tier declines.
+    assert_default_tier_declines(BARE)
+    result = name_breadth(BARE)
+    assert (result.get("name"), result.get("tier")) == ("porphyrin", "systematic_verified"), result
+    assert result.get("is_pin") is False
 
 
 def test_the_hook_asks_the_catalogue_before_the_porphyrin_producer():
@@ -123,8 +122,9 @@ def test_the_two_declined_rows_that_change_are_named_exactly(row):
     change = CHANGES[row["id"]]
     default = name_default(row["smiles"])
     if "default" in change:
-        assert (default.get("name"), default.get("tier")) == (change["default"], "pin_verified"), default
-        assert name_is_rt_exact(default["name"], row["smiles"]), default
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book): no PIN for a parent, so the default tier
+        # declines it; best-effort names it, ``systematic_verified``
+        assert_default_tier_declines(row["smiles"])
     else:   # the default tier keeps its output
         assert (default.get("tier"), default.get("limit_code") or "", default.get("name") or "") == (
             row["default_tier"], row["default_limit_code"], row["default_name"]), default
@@ -136,9 +136,11 @@ def test_the_two_declined_rows_that_change_are_named_exactly(row):
 
 def test_u2_free_base_at_both_tiers():
     expected = "2-(azidomethyl)-5,10,15,20-tetraphenylporphyrin"
-    for result in (name_default(U2_FREE_BASE), name_breadth(U2_FREE_BASE)):
-        assert (result.get("name"), result.get("tier")) == (expected, "pin_verified"), result
-        assert name_is_rt_exact(expected, U2_FREE_BASE)
+    # NPL 2026-11-01: INTRODUCTION (the Blue Book): the default tier declines a parent's name.
+    assert_default_tier_declines(U2_FREE_BASE)
+    result = name_breadth(U2_FREE_BASE)
+    assert (result.get("name"), result.get("tier")) == (expected, "systematic_verified"), result
+    assert name_is_rt_exact(expected, U2_FREE_BASE)
 
 
 def test_u2_with_its_free_zinc_ion():
@@ -153,9 +155,11 @@ def test_u2_with_its_free_zinc_ion():
 
 
 def test_u1_default_tier_and_round_trip():
-    default = name_default(U1)
-    name = default.get("name") or ""
-    assert default.get("tier") == "pin_verified", default
+    # NPL 2026-11-01: INTRODUCTION (the Blue Book): the default tier declines; best-effort names it.
+    assert_default_tier_declines(U1)
+    result = name_breadth(U1)
+    name = result.get("name") or ""
+    assert result.get("tier") == "systematic_verified", result
     assert name == "5,10,15,20-tetrakis(3-azidophenyl)porphyrin", name
     assert name_is_rt_exact(name, U1), name
 
@@ -164,8 +168,8 @@ def test_u1_azide_is_azido_at_both_tiers():
     """The aryl azide is the prefix ``azido``; the ylide spelling ``triaz-1,2-dien-2-ium-1-idyl`` cites
     locants of the capped molecule and is not made as a prefix."""
     expected = "5,10,15,20-tetrakis(3-azidophenyl)porphyrin"
-    for result in (name_default(U1), name_breadth(U1)):
-        assert result.get("name") == expected, result
+    assert name_breadth(U1).get("name") == expected
+    assert_default_tier_declines(U1)    # NPL 2026-11-01: INTRODUCTION (the Blue Book)
 
 
 def test_no_new_class_in_the_dispatch_table():

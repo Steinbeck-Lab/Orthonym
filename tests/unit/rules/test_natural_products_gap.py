@@ -14,6 +14,7 @@ from orthonym import name_compound
 from orthonym.data.retained_names import get_retained_name
 from orthonym.data.natural_products import get_scaffold_numbering, get_natural_product_name
 from orthonym.rules.natural_products import name_natural_product
+from tests.support.np_producer import np_producer_only  # noqa: F401
 
 
 # ---------------------------------------------------------------------------
@@ -149,7 +150,13 @@ class TestTropaneNPNaming:
         from orthonym.namer import _pseudoasymmetric_name_verified
         smiles = "CN1[C@@H]2CC[C@H]1C[C@@H](OC(=O)c1c[nH]c3ccccc13)C2"
         name = name_compound(smiles)
-        assert name == "(1R,3r,5S)-tropan-3-yl 1H-indole-3-carboxylate", name
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not
+        # identified for the compounds in this Chapter": 'tropane' is a parent, so the shipped name is the
+        # von Baeyer name of Chapters to (OPSIN 2.9.0 reads its stereo-stripped form back to the input's
+        # InChIKey without stereo; it parses no lowercase 'r').
+        producer_name = "(1R,3r,5S)-tropan-3-yl 1H-indole-3-carboxylate"
+        name_ = "(1R,3r,5S)-8-methyl-8-azabicyclo[3.2.1]octan-3-yl 1H-indole-3-carboxylate"
+        assert name == name_, name
         assert _pseudoasymmetric_name_verified(name, smiles)
         # fix a performance pass (wp6-tests), change-asserted-value (was: the NP producer
         # returns None). 286a491c8 made tropisetron nameable on purpose (the NP
@@ -160,7 +167,7 @@ class TestTropaneNPNaming:
         # decoration dropped) is what the old 'is None' guarded, so the producer may
         # decline, or return exactly the verified complete name.
         np = name_natural_product(Chem.MolFromSmiles(smiles))
-        assert np is None or (np == name and _pseudoasymmetric_name_verified(np, smiles)), np
+        assert np is None or (np == producer_name and _pseudoasymmetric_name_verified(np, smiles)), np
 
     @pytest.mark.integration
     @pytest.mark.xfail(strict=True, reason=(
@@ -221,6 +228,7 @@ class TestErgosteneDerivative:
         assert "ergost" in name.lower(), f"Expected 'ergost' in: {name}"
 
     @pytest.mark.integration
+    @pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: the producer's 'ergost' name INTRODUCTION, the Blue Book)
     def test_ergostene_name_compound(self):
         """name_compound on ergostene SMILES produces name containing 'ergost'."""
         name = name_compound(self.ERGOSTENE_SMILES)
