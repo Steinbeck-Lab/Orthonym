@@ -506,7 +506,6 @@ SMALL_STEREO_PARENT_BASELINE = [
         "CC(=O)[C@@]1(C)C(C)=C[C@H](O)[C@H]2C[C@](C)(O)CC[C@@H]21",
         "naphthalen",
         id="ster04-decalin-ketone",
-marks=_XF_FUSED,
     ),
     pytest.param(
         "CC1=C[C@]2(CC1=O)[C@H](C)CC[C@@H](C(C)(C)O)[C@H]2O",

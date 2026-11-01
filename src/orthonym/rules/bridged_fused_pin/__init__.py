@@ -631,8 +631,9 @@ def _name_options(mol, system: Set[int], options):
     if suffix is None:
         return None
     status, kind, pcg_atoms, exo = suffix
-    sub_atoms = {a for a in system for nb in mol.GetAtomWithIdx(a).GetNeighbors()
-                 if nb.GetIdx() not in system and nb.GetIdx() not in exo}
+    # one entry per prefix bond: (f) (:3301) counts every prefix, so a gem pair cites its locant twice
+    sub_atoms = [a for a in system for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                 if nb.GetIdx() not in system and nb.GetIdx() not in exo]
     scored = []
     for sp, bps, state, nums in options:
         need = _lacking(state, kind, pcg_atoms)
@@ -864,12 +865,61 @@ def build_fused_substituent(mol, attach: int) -> Optional[str]:
     return _substituent_name(mol, system, attach, _fused_options(mol, system))
 
 
-def _substituent_name(mol, system: Set[int], attach: int, options) -> Optional[str]:
+def build_fused_decorated_substituent(mol, attach: int, outside: Set[int]) -> Optional[str]:
+    """The '-yl' prefix of the fused ring system of ``mol`` that holds ``attach``, with its own prefixes and
+    stereodescriptors, when ``outside`` (the parent side, bonded to ``attach`` only) is left out:
+    '(3S,8S,9S,10R,13R,14S,17R)-3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthren-17-yl'.
+     (the Blue Book) the free valence; (:23710) the fusion name; (:44643, example:44668) "When they
+    relate to substituent groups, they are cited at the front of the corresponding prefix". The descriptors are the
+    whole molecule's CIP labels on the ring locants, so the attachment atom's is the one in context. None when a step
+    declines (the caller keeps its older path): a stereogenic unit on the substituent side outside the ring system
+    (it would need a descriptor inside a nested prefix), a ring system bonded to the parent side more than once, a
+    tautomer-sensitive hydrogen placement, isotope labels pending, a lone-pair centre."""
+    if mol is None or attach is None or not outside:
+        return None
+    system = next((s for s in selection.ring_systems(mol) if attach in s), None)
+    if not system or system & set(outside):
+        return None
+    side, stack = set(), list(system)
+    while stack:
+        c = stack.pop()
+        if c in side:
+            continue
+        side.add(c)
+        stack.extend(n.GetIdx() for n in mol.GetAtomWithIdx(c).GetNeighbors() if n.GetIdx() not in outside)
+    links = [(a, n.GetIdx()) for a in side for n in mol.GetAtomWithIdx(a).GetNeighbors() if n.GetIdx() in outside]
+    if len(links) != 1 or links[0][0] != attach:
+        return None
+    # a double bond to the parent side is an '-ylidene' prefix, not '-yl'
+    if mol.GetBondBetweenAtoms(*links[0]).GetBondType() != Chem.BondType.SINGLE:
+        return None
+    from rdkit.Chem import FindMolChiralCenters
+    if any(idx in side and idx not in system for idx, _ in FindMolChiralCenters(
+            mol, includeUnassigned=False, useLegacyImplementation=False)):
+        return None
+    if any(b.GetStereo() != Chem.BondStereo.STEREONONE and b.GetBeginAtomIdx() in side
+           and b.GetEndAtomIdx() in side and not (b.GetBeginAtomIdx() in system and b.GetEndAtomIdx() in system)
+           for b in mol.GetBonds()):
+        return None
+    if _isotope_labels_pending(mol, system) or _lone_pair_centre_in(mol, system):
+        return None
+    name = _substituent_name(mol, system, attach, _fused_options(mol, system), frozenset({links[0][1]}))
+    # (c) (the Blue Book): a substituted prefix is multiplied by 'bis', 'tris'
+    from ...assembly.prefix_derivation import built
+    return built(name, substituted=bool(side - system)) if name else None
+
+
+def _substituent_name(mol, system: Set[int], attach: int, options, exo: FrozenSet[int] = frozenset()) -> Optional[str]:
+    """The '-yl' prefix of ``system`` with the free valence on ``attach``; ``exo`` are the atoms of the parent side
+    (none for a bare system), left out of the prefixes."""
     if not options:
         return None
     if len({(o[0].parent, tuple(sorted(bp.name for bp in o[1]))) for o in options}) != 1:
         return None
-    suffix = ("suffix", "yl", {attach}, set())
+    suffix = ("suffix", "yl", {attach}, set(exo))
+    # the ring atom of each prefix bond, for (f) (:3301; a gem pair twice); none for a bare system
+    sub_atoms = [a for a in system for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                 if nb.GetIdx() not in system and nb.GetIdx() not in exo]
     scored = []
     sensitive = False
     for sp, bps, state, nums in options:
@@ -885,15 +935,17 @@ def _substituent_name(mol, system: Set[int], attach: int, options) -> Optional[s
                    numbering.locant_tuple(a2l[a] for a in ih),
                    numbering.locant_tuple([a2l[attach]]),
                    numbering.locant_tuple(a2l[a] for a in added),
-                   numbering.locant_tuple(a2l[a] for a in hydro_atoms), ())
+                   numbering.locant_tuple(a2l[a] for a in hydro_atoms),
+                   numbering.locant_tuple(a2l[a] for a in sub_atoms))
             scored.append((key, sp, bps, state, nb, ih, hydro_atoms, added, need))
     if not scored:
         return None
-    picked = _choose(mol, system, scored, suffix, set(), "yl", {attach})
+    picked = _choose(mol, system, scored, suffix, set(exo), "yl", {attach})
     if picked is None:
         return None
     name, parent, bps = picked
-    if sensitive and not _same_tautomer_as_radical(mol, name):
+    # the radical read-back compares the whole of ``mol``; a decorated substituent has no such molecule
+    if sensitive and (exo or not _same_tautomer_as_radical(mol, name)):
         return None
     if any(not bp.is_pin_form for bp in bps):
         from ..bridged_fused import _record_general_bridge

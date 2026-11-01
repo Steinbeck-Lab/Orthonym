@@ -9224,6 +9224,55 @@ def _ring_sub_group_stereo_veto(features: Any, frag_atom_sets: List[frozenset]) 
     return False
 
 
+def _fused_decorated_prefix(mol, attach, chain_set) -> Optional[str]:
+    """The enclosed '-yl' prefix of a fused ring system that carries its own substituents (a steroid
+    '[(3S,...)-3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthren-17-yl]'), or None. Offered only
+    where the fused branch of ``_generate_ring_substituent_prefixes`` would void the candidate (DT4 F2b,
+    ``bridged_fused_pin.build_fused_decorated_substituent``); marks as for a decorated monocycle."""
+    if attach is None:
+        return None
+    from ..rules.bridged_fused_pin import build_fused_decorated_substituent
+    from .naming_utils import apply_enclosing_marks
+    from .prefix_derivation import carried
+    name = build_fused_decorated_substituent(mol, attach, set(chain_set))
+    return carried(apply_enclosing_marks(name, -1), like=name) if name else None
+
+
+def _general_tier_fusion_prefix(mol, ring_atoms, frag_atoms, attach, chain_set) -> Optional[str]:
+    """DT4 F2b at the general tiers: the PIN tier's '-yl' fusion prefix of a decorated ring system of two or more
+    rings that the strict call of ``name_ring_system_substituent`` declines, or None. It comes before the general
+    tiers' von Baeyer form of the system, as at the PIN tier, the Blue Book)."""
+    ring_set = set(ring_atoms)
+    rings = [set(r) for r in mol.GetRingInfo().AtomRings() if set(r) <= ring_set]
+    # ortho-fused only (no two rings share more than one bond): a bridged system ('1-azabicyclo[2.2.2]octan-2-yl')
+    # keeps the general tiers' own prefix
+    if len(rings) < 2 or any(len(a & b) > 2 for i, a in enumerate(rings) for b in rings[i + 1:]):
+        return None
+    from ..rules.ring_substituents import name_ring_system_substituent
+    if not _strict_ring_prefix_declines(lambda: name_ring_system_substituent(mol, sorted(frag_atoms), attach)):
+        return None
+    try:
+        return _fused_decorated_prefix(mol, attach, chain_set)
+    except Exception:  # noqa: BLE001 - a builder bug keeps the general tiers' own prefix
+        return None
+
+
+def _strict_ring_prefix_declines(produce) -> bool:
+    """Whether ``produce`` names nothing when it is asked the default tier's way (``default_tier_scope``; with
+    ``best_effort_ctx`` on, ``name_substituent`` also offers the von Baeyer composer). The records of the call are
+    rolled back, as only its answer is used."""
+    from ..metrics import provenance as _pv
+    from .default_tier_scope import default_tier_scope
+    snap = _pv.get_provenance()
+    try:
+        with default_tier_scope():
+            return not produce()
+    except Exception:  # noqa: BLE001 - a producer bug must never crash naming
+        return True
+    finally:
+        _pv.restore_provenance(snap)
+
+
 def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
     """
     Generate prefix fragments for rings that are substituents on a chain parent.
@@ -9401,6 +9450,12 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
 
     # --- End a phase multi-ring detection pass ---
 
+    def _taken(prefix) -> bool:  # a decorated fused system's '-yl' prefix (DT4 F2b), grouped as any ring prefix
+        if prefix:
+            ring_sub_groups[prefix].append(locant)
+            ring_sub_group_atoms[prefix].append(frozenset(ring_atom_set))
+        return bool(prefix)
+
     for ring_atoms in single_ring_groups:
         from ..perception.rings import get_containing_ring_system
         ring_atom_set = set(get_containing_ring_system(features.mol, ring_atoms))
@@ -9518,6 +9573,9 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
                 # straight in -- moved two already-emitting molecules from to
                 # and flipped ``is_pin`` to True on a von Baeyer form whose
                 # ring PIN is the retained name *adamantane*.)
+                if _tier_general and _taken(_general_tier_fusion_prefix(features.mol, ring_atoms, _rc_frag,
+                                                                        _ring_attach_atom, chain_set)):
+                    continue
                 _rc_name = _rc_nrss(
                     features.mol, sorted(_rc_frag), _ring_attach_atom,
                 )
@@ -9589,6 +9647,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # raise the typed void signal so the consumer drops THIS candidate and
         # the molecule goes on to the next one (errors.UnnameableSubstituentError).
         if base_name is None:
+            if _taken(_fused_decorated_prefix(features.mol, _ring_attach_atom, chain_set)):
+                continue
             # Task 0.1: an unnameable ring BRANCH is the root cause of
             # the eventual abstention (the recursive-substituent-namer census bucket).
             from ..metrics.abstention import AbstentionCode, record_abstention
@@ -9605,6 +9665,8 @@ def _generate_ring_substituent_prefixes(features: Any) -> List[NameFragment]:
         # branch -- a decorated saturated ring the PIN route has no producer
         # for; the general tier names both through allow_mancude above).
         if sub_name is None:
+            if _taken(_fused_decorated_prefix(features.mol, _ring_attach_atom, chain_set)):
+                continue
             # Task 0.1: decorated-ring branch the machinery cannot
             # express — same census bucket as the unnameable-ring marker.
             from ..metrics.abstention import AbstentionCode, record_abstention
@@ -9764,6 +9826,10 @@ def _build_substituted_ring_name(
         return base_name
 
     if not all(mol.GetAtomWithIdx(a).GetSymbol() == 'C' for a in ring_atoms):
+        return None
+    # The numbering below is one ring's: a two-ring system of up to 8 atoms (octahydropentalene) passed the size
+    # gate and was numbered as one ring ('4-methyl...' for 5-methyl); it goes to the fused '-yl' prefix (DT4 F2b).
+    if not any(set(r) == set(ring_atoms) for r in mol.GetRingInfo().AtomRings()):
         return None
     ring_size = len(ring_atoms)
     if ring_size != 6:

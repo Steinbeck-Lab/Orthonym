@@ -61,9 +61,12 @@ class TestSM40:
 
         DT4 F2: the acid chain is the parent, the Blue Book) and its own stereocentres are
         undefined in the input, so the block of the ring centres sits in the ring substituent's brackets
-        ('6-[(5S,9S,11R,12S)-...-14-yl]heptanoic acid'), no longer at the front of the name."""
+        ('6-[(5S,9S,11R,12S)-...-14-yl]heptanoic acid'), no longer at the front of the name. DT4 F2b: that
+        ring substituent is the fusion '-yl' prefix, the Blue Book), '6-[(3S,7S,14R,15S)-...
+        cyclopenta[a]phenanthren-17-yl]', the same four centres the input defines."""
         name = self._best_effort_name()
-        assert "[(5S,9S,11R,12S)-" in name, f"Name missing stereo block: {name}"
+        assert "[(3S,7S,14R,15S)-" in name and "cyclopenta[a]phenanthren-17-yl]" in name, (
+            f"Name missing stereo block: {name}")
         assert name.endswith("heptanoic acid"), name
 
     @pytest.mark.opsin_gate

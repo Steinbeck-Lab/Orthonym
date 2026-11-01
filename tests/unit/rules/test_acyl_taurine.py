@@ -137,14 +137,17 @@ def test_integration_regressions_unchanged(namer, smi, expected):
 
 
 @pytest.mark.opsin_gate
-def test_integration_bile_acid_taurine_conjugate_failclosed(namer):
+def test_integration_bile_acid_taurine_conjugate_now_named(namer):
     # A steroid/bile-acid taurine conjugate (cholan-24-amide of taurine,
-    # anion form) needs the steroid ring parent to name correctly -- out
-    # of scope here (SCOPE: only the simple acyl-amino-sulfonate case).
-    # Must fail CLOSED to the sentinel abstention, never emit a wrong
-    # (e.g. atom-dropping) name.
+    # anion form) used to fail closed: the steroid ring system with its own
+    # substituents had no '-yl' prefix. DT4 F2b builds it,;
+    # for the descriptor at the front of the prefix), and the chain
+    # with the principal group is the parent. RT-verified:
+    # an InChIKey on both sides.
     smi = "C[C@H](CCC(=O)NCCS(=O)(=O)[O-])[C@H]1CCC2C1(C)CCC3C2CCC4CC(O)CCC34C"
-    assert _dt_obj_name(namer, smi) == "unknown organic compound"
+    assert _dt_obj_name(namer, smi) == (
+        "2-{(4R)-4-[(17R)-3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]"
+        "phenanthren-17-yl]pentanamido}ethane-1-sulfonate")
 
 
 @pytest.mark.opsin_gate
