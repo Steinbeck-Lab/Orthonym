@@ -139,9 +139,10 @@ def test_kept_row_provenance_is_not_mislabelled_general_engine(retained):
     assert r["source"] != "general_engine"
 
 
-def test_converted_row_provenance_is_general_engine(retained="yohimban"):
+def test_converted_row_provenance_is_general_engine(retained="cevane"):
     """The adopted (converted) row DOES carry the general-engine source -- the
-    restore fires only on reject, never on adopt. `yohimban` is a converter whose
+    restore fires only on reject, never on adopt. `cevane` (was `yohimban`, which the PIN path names since
+    DT4-A: ``test_converted_yohimban_row_is_pin_path_and_round_trips``) is a converter whose
     systematic name is von Baeyer (general engine); `ursane`'s is the fusion name
     of a carbon-only ortho-fused system, "Five-membered ring
     requirement" (the Blue Book-23710), which the PIN path builds, so its
@@ -162,6 +163,16 @@ def test_converted_cyclopentachrysene_row_is_pin_path_and_round_trips(retained):
     from tests.support.rt_assert import assert_full_rt
     r = _best_effort_namer().name_tiered(_BY_NAME[retained])
     assert r["source"] == "pin_path" and "icosahydro" in r["name"] and "cyclopenta[a]chrysene" in r["name"], r
+    assert_full_rt(r["name"], _BY_NAME[retained])
+
+
+def test_converted_yohimban_row_is_pin_path_and_round_trips(retained="yohimban"):
+    """DT4-A: ``yohimban`` converts to an indolo/pyrido/isoquinoline fusion name with a second-order attached
+    component, (the Blue Book) "The locants of second-order attached components are primed";
+    built by ``poly_fusion._tree_name``; the name reads back to the input's full InChIKey."""
+    from tests.support.rt_assert import assert_full_rt
+    r = _best_effort_namer().name_tiered(_BY_NAME[retained])
+    assert r["source"] == "pin_path" and "indolo[2',3':3,4]pyrido[1,2-b]isoquinoline" in r["name"], r
     assert_full_rt(r["name"], _BY_NAME[retained])
 
 

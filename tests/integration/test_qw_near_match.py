@@ -284,8 +284,10 @@ def test_vb_c8_tier_contract():
     not RT-exact (the von Baeyer name of a fusion-nameable system is never the PIN)."""
     from tests.support.rt_assert import assert_tier_contract
     _pin, be = assert_tier_contract(VB_C8_SMILES)
-    assert be == ("(1S,2S,5R,10R,11R,12S,14R,16R,17R)-12,17-dihydroxy-17-(hydroxymethyl)-"
-                  "2,7,7,10-tetramethyl-6,8-dioxapentacyclo[14.3.1.0^1,14.0^2,11.0^5,10]icosane")
+    # DT4-A (2026-11-01): the bridged fused name with a second-order component is built now, so both tiers give it
+    #, the Blue Book; fused > bridged fused > von Baeyer)
+    assert be == ("(4aR,4bR,5S,6aR,8R,9R,11aS,11bS,13aR)-9-(hydroxymethyl)-2,2,4a,11b-tetramethyltetradecahydro-"
+                  "2H,4H-8,11a-methanocyclohepta[5,6]naphtho[2,1-d][1,3]dioxine-5,9-diol")
 
 
 @pytest.mark.parametrize("smiles,expected_name", VB_COUNTING_FIXES)

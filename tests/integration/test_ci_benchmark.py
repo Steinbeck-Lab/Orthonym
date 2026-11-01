@@ -289,9 +289,10 @@ CI_BENCHMARK = [
     pytest.param(
         "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3"
         "(C)[C@H]2[C@@H]1C",
-        # NPL 2026-11-01: 'furostan' is a parent INTRODUCTION, the Blue Book); no systematic name is
-        # built for it, so the PIN tier declines it and best-effort gives the same name.
-        _declined_at_default("furostan"),
+        # NPL 2026-11-01: 'furostan' is a parent INTRODUCTION, the Blue Book); DT4-A builds its
+        # systematic fusion name with a second-order component,:12718), OPSIN-exact
+        _ships("(4aS,4bS,6aS,6bR,7S,9aS,10aS,10bR)-4a,6a,7-trimethyl-8-(3-methylbutyl)octadecahydro-1H-"
+               "naphtho[2',1':4,5]indeno[2,1-b]furan"),
         marks=_GATE,
     ),
     pytest.param(
@@ -418,7 +419,8 @@ CI_BENCHMARK = [
     ),
     pytest.param(
         "O=c1c2c(O)cccc2oc2c3c(cc(O)c12)OC1OCCC31",
-        _declined(),
+        # DT4-A (2026-11-01): second-order fusion components, the Blue Book); OPSIN-exact
+        _ships("6,8-dihydroxy-1,2,3a,12c-tetrahydro-7H-furo[3',2':4,5]furo[2,3-c]xanthen-7-one"),
         marks=_GATE,
     ),
     # L5 (TRIAGE default-tier-pin-or-decline): the old text is unparseable (an 'oxanyloxyl'
