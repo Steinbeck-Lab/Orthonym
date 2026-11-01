@@ -2273,6 +2273,10 @@ def _self_consistency_verdict(input_smiles: str, opsin_smiles: str,
     from .rules.hydroximic_acids import cn_configuration_verdict
     if not ignore_stereo and cn_configuration_verdict(input_smiles, opsin_smiles) == "mismatch":
         return "mismatch"
+    # nor some other double-bond configurations (an amidine C=N): validation/key_blind_double_bonds.py
+    from .validation.key_blind_double_bonds import key_blind_double_bond_verdict
+    if not ignore_stereo and key_blind_double_bond_verdict(input_smiles, opsin_smiles) == "mismatch":
+        return "mismatch"
     ka = _self_consistency_full_key(input_smiles)
     kb = _self_consistency_full_key(opsin_smiles)
     if ka is not None and kb is not None and ka == kb:
@@ -3137,6 +3141,10 @@ def _shipped_name_round_trip(name: str, input_smiles: Optional[str]) -> str:
         # it (validation/protonation_identity.py).
         from .validation.protonation_identity import protonation_site_verdict
         if protonation_site_verdict(input_smiles, opsin_smiles, name) == "mismatch":
+            return "failed"
+        # Nor some double-bond configurations (an amidine C=N): validation/key_blind_double_bonds.py.
+        from .validation.key_blind_double_bonds import key_blind_double_bond_verdict
+        if key_blind_double_bond_verdict(input_smiles, opsin_smiles) == "mismatch":
             return "failed"
     except Exception:
         return "failed"

@@ -389,9 +389,14 @@ def opsin_roundtrip_check(
             result["passed"] = True
             # the InChI drops the hydrogens of a hypervalent halogen (validation/key_blind_hydrogens.py)
             from .key_blind_hydrogens import key_blind_hydrogen_verdict
+            from .key_blind_double_bonds import key_blind_double_bond_verdict
             if key_blind_hydrogen_verdict(smiles, opsin_smiles) == "mismatch":
                 result["passed"] = False
                 result["error"] = "hydrogen_mismatch"
+            # nor some double-bond configurations (an amidine C=N; validation/key_blind_double_bonds.py)
+            elif key_blind_double_bond_verdict(smiles, opsin_smiles) == "mismatch":
+                result["passed"] = False
+                result["error"] = "double_bond_configuration_mismatch"
             # nor does it see the radical graph: 'but-3-en-2-yl' parses to C[CH]C=C, which has the key of [CH2]C=CC
             # (validation/radical_identity.py, which includes the check above)
             elif radical_reading:
@@ -405,6 +410,8 @@ def opsin_roundtrip_check(
     except ImportError:
         result["error"] = "rdkit_not_available"
     except Exception as e:
+        # a check that raises after the key matched decides nothing: fail closed
+        result["passed"] = False
         result["error"] = f"comparison_error: {str(e)}"
 
     return result
