@@ -124,19 +124,6 @@
       "opsin_rt_verified_at": "2026-05-29T07:29:13Z"
     },
     {
-      "canonical_smiles": "c1cc2c3c(cccc3c1)CC2",
-      "retained_pin_name": "acenaphthene",
-      "substitution_type": "type_1",
-      "iupac_p_section": "P-22.1.2",
-      "locant_context": null,
-      "compulsory_prefix_smarts": null,
-      "principal_group_required": null,
-      "locus_override_rule_id": null,
-      "stereo_in_key": false,
-      "notes": "Retained dihydroacenaphthylene PIN",
-      "opsin_rt_verified_at": "2026-05-29T07:29:13Z"
-    },
-    {
       "canonical_smiles": "c1ccc2c(c1)Cc1ccccc1-2",
       "retained_pin_name": "9H-fluorene",
       "substitution_type": "type_1",

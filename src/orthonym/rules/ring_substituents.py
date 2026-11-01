@@ -11,11 +11,11 @@ Examples:
 """
 
 from typing import Dict, List, Optional, Set, Tuple
-
 # Chain length prefixes - delegated to centralized chain_names module
 from ..data.chain_names import get_chain_prefix as _get_chain_prefix
 from ..data.chain_names import multiplying_prefix
 from ..data.multipliers import multiplier_table
+from .hydro_azine_attachment import hydro_azine_bonded_at_nitrogen
 from .ring_cluster import is_one_ring_cluster
 from .ring_ketone_forms import decorated_ketone_fused_name, ketone_core_numbering
 
@@ -3463,7 +3463,7 @@ def get_ring_substituent_name(
                     retained = _fh_entry['name']
             except ImportError:
                 pass
-            if retained:
+            if retained and not hydro_azine_bonded_at_nitrogen(mol, retained, attachment_point):
                 # Convert retained name to substituent form:
                 # naphthalene -> naphthalen-{locant}-yl
                 # anthracene -> anthracen-{locant}-yl

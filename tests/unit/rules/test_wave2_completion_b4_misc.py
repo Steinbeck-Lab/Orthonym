@@ -149,7 +149,7 @@ class TestFusedRingRows:
     @pytest.mark.parametrize("smiles,expected", [
         ("C1CC2CCC1C2", "bicyclo[2.2.1]heptane"),  # R11 (2026-09-25, pre-existing-failures plan, Task 5)::9881, only adamantane/cubane are retained; "bicyclo[2.2.1]heptane (PIN)":2038
         ("C12C3C4C1C5C2C3C45", "cubane"),
-        ("C1Cc2cccc3cccc1c23", "acenaphthene"),
+        ("C1Cc2cccc3cccc1c23", "1,2-dihydroacenaphthylene"),  # no name 'acenaphthene' in the Blue Book; hydro prefixes
     ])
     def test_vb_cages_protected(self, smiles, expected):
         assert name_compound(smiles) == expected

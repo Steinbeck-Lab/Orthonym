@@ -29,7 +29,6 @@ _NAMED_PAH_SYSTEMS = {
     "naphthalene", "anthracene", "phenanthrene", "pyrene",
     "fluorene", "acenaphthylene", "fluoranthene", "chrysene",
     "triphenylene", "coronene", "perylene", "azulene",
-    "acenaphthene",
 }
 
 

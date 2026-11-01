@@ -217,6 +217,13 @@ def test_wrapper_prefix_is_byte_identical(smiles, expected):
     ``str``) for its three PIN callers (polycyclic x2, bicyclo)."""
     mol, numbering, ring_atoms = _vb(smiles)
     got = get_heteroatom_replacement_prefix(mol, numbering, ring_atoms)
+    if build_replacement_prefix(mol, numbering, ring_atoms).preselected_only:
+        # a cage of one noncarbon element: the PIN wrapper refuses its 'a' name. "Heterocyclic
+        # noncarbon von Baeyer and spiro compounds" (the Blue Book): "alternative names for use in general
+        # nomenclature are formed by skeletal replacement ('a') nomenclature"; the preselected name is
+        # 'bicyclo[4.2.1]nonasilane' (:23618), built by ``rules.preselected_cage``.
+        assert got is None
+        return
     assert got == expected
     assert isinstance(got, str)
 
@@ -324,8 +331,8 @@ def test_per_atom_covers_exactly_the_expressed_heteroatoms(smiles, _expected):
 #: hydride; alternative names for use in general nomenclature are formed by skeletal replacement
 #: ('a') nomenclature (see and ", with the printed example
 #: ``bicyclo[4.2.1]nonasilane (preselected name)`` (:9810). So the builder spells the 'a' name
-#: (best-effort, ``systematic_verified``), and the PIN callers refuse it (``preselected_only``): the
-#: default tier declines this cage as it did before the composed word existed.
+#: (best-effort, ``systematic_verified``), and the PIN callers refuse it (``preselected_only``); the
+#: PIN tier gives the preselected name (``rules.preselected_cage``), read back through its twin.
 #:
 #: Machine-confirmed: the hand-written name below is read by OPSIN to this very molecule
 #: (``test_docosasila_name_read_back``), and the pre-fix code fails the first assertions.
@@ -350,15 +357,22 @@ def test_multiplicity_past_twenty_is_a_composed_word():
     assert get_heteroatom_replacement_prefix(mol, numbering, ring_atoms) is None
 
 
-def test_preselected_only_is_the_same_kind_noncarbon_cage_past_twenty():
-    """The flag does not touch a cage with carbon, a mixed-element one, or a 20-atom one (their
-    'a' names are unchanged at the PIN callers)."""
-    for smiles in ("O1CC2CNC1C2", "[SiH2]1[SiH2][SiH]2[SiH2][SiH2][SiH]1[SiH2]2"):
+def test_preselected_only_is_the_same_kind_noncarbon_polycycle_or_a_long_ring():
+    """The flag does not touch a cage with carbon, a mixed-element one, or a monocycle of 20 atoms or fewer
+    (their 'a' names are unchanged at the PIN callers); it holds for a von Baeyer or spiro skeleton of one
+    noncarbon element of any size: "Heterocyclic noncarbon von Baeyer and spiro compounds"
+    (the Blue Book), 'bicyclo[4.2.1]nonasilane (preselected name)' beside 'nonasilabicyclo[4.2.1]nonane'
+    (:23618), and (:23573) for the monocycle."""
+    for smiles in ("O1CC2CNC1C2", "[SiH2]1CC2COC1C2"):
         mol, numbering, ring_atoms = _vb(smiles)
         assert not build_replacement_prefix(mol, numbering, ring_atoms).preselected_only
-    mol, numbering, ring_atoms = _vb('[SiH2]1' + '[SiH2]' * 9 + '[SiH]2' + '[SiH2]' * 7 + '[SiH]1[SiH2]2')
-    assert len(ring_atoms) == 20
-    assert not build_replacement_prefix(mol, numbering, ring_atoms).preselected_only
+    for smiles in ("[SiH2]1[SiH2][SiH]2[SiH2][SiH2][SiH]1[SiH2]2",
+                   '[SiH2]1' + '[SiH2]' * 9 + '[SiH]2' + '[SiH2]' * 7 + '[SiH]1[SiH2]2'):
+        mol, numbering, ring_atoms = _vb(smiles)
+        assert build_replacement_prefix(mol, numbering, ring_atoms).preselected_only
+    ring = Chem.MolFromSmiles("[SiH2]1[SiH2][SiH2][SiH2][SiH2][SiH2]1")
+    atoms = set(range(ring.GetNumAtoms()))
+    assert not build_replacement_prefix(ring, {i: i + 1 for i in atoms}, atoms).preselected_only
 
 
 def test_analyze_cage_universal_names_multiplicity_past_twenty():
@@ -371,14 +385,16 @@ def test_analyze_cage_universal_names_multiplicity_past_twenty():
 
 
 @pytest.mark.opsin_gate
-@pytest.mark.parametrize("smiles", [SILA22, SILA21], ids=["22Si", "21Si"])
-def test_same_kind_noncarbon_cage_past_twenty_is_never_a_pin(smiles):
-    """ (:23614): the default tier declines (no PIN claim, no name), the best-effort
-    tier gives the 'a' name from the general engine with a full read-back."""
+@pytest.mark.parametrize("smiles,preselected", [
+    (SILA22, "bicyclo[10.9.1]docosasilane"), (SILA21, "bicyclo[10.8.1]henicosasilane")], ids=["22Si", "21Si"])
+def test_same_kind_noncarbon_cage_past_twenty_is_named_by_its_preselected_name(smiles, preselected):
+    """ (:23614): the PIN tier gives the preselected name, the best-effort tier gives the 'a' name
+    ('alternative names for use in general nomenclature are formed by skeletal replacement') below the PIN,
+    with a full read-back."""
     from tests.support.default_tier import default_tier_row
     from tests.support.rt_assert import assert_full_rt, name_best_effort
     row = default_tier_row(smiles)
-    assert row["tier"] == "abstain" and row["is_pin"] is False, row
+    assert row["name"] == preselected, row
     be = name_best_effort(smiles)
     assert be["tier"] != "pin_verified" and not be.get("is_pin"), be
     assert_full_rt(be["name"], smiles, what="best-effort: ")

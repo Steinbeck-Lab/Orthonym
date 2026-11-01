@@ -375,7 +375,7 @@ def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
     if (_stem is None or a.GetFormalCharge() != 0
             or a.GetNumRadicalElectrons() != 0):
         return None
-    from .phosphorus import _build_substituent_string
+    from ..assembly.prefix_marks import mononuclear_group_name
     from .substituent_purity import organyl_prefix_name
     prefixes = []
     for b in a.GetBonds():
@@ -397,7 +397,7 @@ def name_arsanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:
             return None
     if not prefixes:
         return _stem                                  # bare -AsH2/-SbH2/-BiH2
-    return f"{_build_substituent_string(prefixes)}{_stem}"
+    return mononuclear_group_name(prefixes, _stem, max_count=4)    # a substituted group: 'bis', (c),:7035
 
 
 def _name_iodane_diester(mol, hub) -> Optional[str]:

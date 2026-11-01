@@ -69,6 +69,23 @@ class ParentCandidate:
     pg_count: int
 
 
+def _ended_by_carbon(mol, chain) -> Tuple[int, ...]:
+    """``chain`` without the O, N or S atoms at its ends.
+
+     (the Blue Book, section "Skeletal replacement ('a') nomenclature in acyclic
+    chains"): "The chain must be terminated by C or one of the following heteroatoms: P, As, Sb, Bi, Si, Ge, Sn, Pb,
+    B, Al, Ga, In, or Tl." The skeletal atoms of the chain search are C, N, O and S, so the end of a replacement
+    chain is a carbon atom, and an O, N or S that ended the longest path (an ether oxygen bonded to a ring) is a
+    substituent of the chain: 13-(cyclohexyloxy)-2,5,8,11-tetraoxatridecane, not
+    1-cyclohexyl-1,4,7,10,13-pentaoxatetradecane."""
+    atoms = list(chain)
+    while atoms and mol.GetAtomWithIdx(atoms[0]).GetAtomicNum() != 6:
+        atoms.pop(0)
+    while atoms and mol.GetAtomWithIdx(atoms[-1]).GetAtomicNum() != 6:
+        atoms.pop()
+    return tuple(atoms)
+
+
 def pool_candidates(mol, ring_systems, principal_chain,
                     principal_group, principal_group_atoms) -> List[ParentCandidate]:
     """Pool ALL admissible ring + chain parent candidates.
@@ -130,8 +147,10 @@ def pool_candidates(mol, ring_systems, principal_chain,
                         mol, sk, principal_group_atoms, principal_group)
                     and _has_bridging_heteroatom(mol, sk)):
                 chains.append(tuple(sk))
-        elif _count_bridging_heteroatoms(mol, sk) >= 4:
-            chains.append(tuple(sk))
+        else:
+            sk = _ended_by_carbon(mol, sk)
+            if len(sk) > len(principal_chain or ()) and _count_bridging_heteroatoms(mol, sk) >= 4:
+                chains.append(sk)
 
     for ch in chains:
         pg_n = _count_pg_on_chain(mol, list(ch), principal_group_atoms or [],

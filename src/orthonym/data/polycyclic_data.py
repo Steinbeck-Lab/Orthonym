@@ -250,18 +250,6 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9],  # 9 is the sp3 carbon
         'num_rings': 3,
     },
-    'acenaphthene': {
-        'canonical_smiles': 'c1cc2c3c(cccc3c1)CC2',  # Has two sp3 carbons
-        'smarts': 'c1cc2c3c(cccc3c1)CC2',
-        'num_atoms': 12,
-        # iupac_numbering is empty ON PURPOSE: partial_saturation reads every row with a numbering as a
-        # mancude parent (_carbocyclic_mancude_parents_by_size, _resolve_oxo_parent), and this row is the
-        # hydro form of acenaphthylene, not one. With OPSIN's numbering filled in, 1,2,4,5-tetrahydro-
-        # acenaphthylene came out as 4,5-dihydroacenaphthene.
-        'iupac_numbering': {},
-        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8],  # Excluding the ethylene bridge
-        'num_rings': 3,
-    },
     'acenaphthylene': {
         'canonical_smiles': 'C1=Cc2cccc3cccc1c23',  # Fully unsaturated
         'smarts': 'C1=Cc2cccc3cccc1c23',

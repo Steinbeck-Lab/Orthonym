@@ -1483,6 +1483,7 @@ def _build_hetero_prefix(
     mol,
     spiro_atoms_set: Set[int],
     ring_atoms: Set[int],
+    pin: bool = True,
 ) -> Optional['ReplacementPrefix']:
     """
     Build the skeletal replacement 'a' prefix for heterospiro compounds.
@@ -1544,7 +1545,9 @@ def _build_hetero_prefix(
     # locant to cite). Refuse before spelling anything -- a ring stem must never
     # count an atom that no morpheme in the name spells.
     totality = build_replacement_prefix(mol, numbering, set(ring_atoms))
-    if totality.unexpressed or totality.preselected_only:
+    # ``pin``: the PIN spiro dispatch refuses the 'a' name of a spiro system of one noncarbon element,
+    # ``ReplacementPrefix.preselected_only``); the general engine still offers it, as a name for general nomenclature.
+    if totality.unexpressed or (pin and totality.preselected_only):
         return None
 
     from ..assembly.naming_utils import get_multiplier_prefix

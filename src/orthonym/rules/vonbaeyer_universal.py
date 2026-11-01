@@ -1293,7 +1293,7 @@ def analyze_spiro_universal(
                 len(totality.unexpressed))
             return None
         hp = _build_hetero_prefix(
-            sub, set(spiro_sub), set(range(sub.GetNumAtoms())))
+            sub, set(spiro_sub), set(range(sub.GetNumAtoms())), pin=False)
         if hp is None:
             return None  # hetero present but prefix underivable -> fail closed
         hetero_prefix = hp.prefix

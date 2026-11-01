@@ -252,7 +252,8 @@ class ReplacementPrefix:
 
     ``preselected_only``
                     True when the skeleton is a homogeneous noncarbon one (every
-                    skeletal atom the same noncarbon element) with more than 20 atoms.
+                    skeletal atom the same noncarbon element) and a von Baeyer or spiro
+                    system (two rings or more), or a monocycle of more than 20 atoms.
                     The 'a' name ``prefix`` gives is then a valid name for general
                     nomenclature and never the preferred one:
                     "Heterocyclic noncarbon von Baeyer and spiro compounds"
@@ -267,8 +268,7 @@ class ReplacementPrefix:
                     nomenclature", e.g. ``bicyclo[4.2.1]nonasilane`` (:9810). That
                     name is not built here, so **a caller that claims a PIN must
                     refuse when this is set**, as it refused before the count past 20
-                    had a spelled word. (The same-kind cages of 20 atoms or fewer keep
-                    the 'a' name at the PIN callers: a separate, recorded lead.)
+                    had a spelled word.
 
     ``per_atom`` indices and ``unexpressed`` are disjoint and together cover
     every non-carbon ring atom.
@@ -277,6 +277,28 @@ class ReplacementPrefix:
     per_atom: Tuple[Tuple[int, str], ...]
     unexpressed: Tuple[int, ...]
     preselected_only: bool = False
+
+
+def _ring_count(mol, ring_atoms: Set[int]) -> int:
+    """Rings of the skeleton ``ring_atoms`` induce: bonds - atoms + components (the cyclomatic number),
+    1 for a monocycle, more for a von Baeyer or spiro system."""
+    bonds = sum(1 for b in mol.GetBonds()
+                if b.GetBeginAtomIdx() in ring_atoms and b.GetEndAtomIdx() in ring_atoms)
+    seen: Set[int] = set()
+    components = 0
+    for start in ring_atoms:
+        if start in seen:
+            continue
+        components += 1
+        stack = [start]
+        seen.add(start)
+        while stack:
+            for nb in mol.GetAtomWithIdx(stack.pop()).GetNeighbors():
+                j = nb.GetIdx()
+                if j in ring_atoms and j not in seen:
+                    seen.add(j)
+                    stack.append(j)
+    return bonds - len(ring_atoms) + components
 
 
 def vb_lambda_for_atom(mol, atom_idx: int) -> Optional[int]:
@@ -427,11 +449,13 @@ def build_replacement_prefix(
         from ..metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment('-'.join(parts))
 
-    # (the Blue Book): a skeleton of one noncarbon element has a
-    # preselected name this module does not build; see ``preselected_only``.
+    # (the Blue Book): a von Baeyer or spiro skeleton of one noncarbon element has a
+    # preselected name this module does not build; see ``preselected_only``. A monocycle of one element
+    # keeps its Hantzsch-Widman or 'a' name up to 20 atoms,:23573).
     homogeneous_noncarbon = (
-        len(by_element) == 1 and not unexpressed and len(ring_atoms) > 20
-        and all(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_atoms))
+        len(by_element) == 1 and not unexpressed
+        and all(mol.GetAtomWithIdx(i).GetSymbol() != 'C' for i in ring_atoms)
+        and (len(ring_atoms) > 20 or _ring_count(mol, ring_atoms) > 1))
 
     # The internal '-' between multiple replacement terms is kept by the join;
     # emit NO trailing '-' (callers concatenate prefix + descriptor directly).

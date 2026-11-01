@@ -1561,7 +1561,10 @@ def get_phosphanyl_prefix(mol, phosphorus_idx: int, exclude_atoms: set = None) -
     lam = nonstandard_bonding_number(mol, phosphorus_idx)
     if lam is not None:
         return f"{prefix}-{LAMBDA}{lam}-phosphanyl"
-    return f"{prefix}phosphanyl"
+    # a group with substituents on it is a substituted group: it takes the multipliers 'bis', 'tris' and the marks
+    # of a compound prefix (c), the Blue Book), as the silyl group does (``mononuclear_group_name``)
+    from ..assembly.prefix_marks import mononuclear_group_name
+    return mononuclear_group_name(sub_names, 'phosphanyl', max_count=4)
 
 
 def name_phosphanyl_substituent(mol, frag_atoms, attach_idx: int) -> Optional[str]:

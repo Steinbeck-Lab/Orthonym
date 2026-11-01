@@ -159,12 +159,15 @@ def test_a_nonstandard_valence_atom_takes_the_lower_locant_before_the_stereodesc
     two lambda3 tellurium atoms of this heptatellura cage are bonded to each other, so they take 1 and 2."""
     from rdkit import Chem
 
-    from orthonym.rules.polycyclic import VonBaeyerAnalyzer, get_heteroatom_replacement_prefix
+    from orthonym.rules.polycyclic import VonBaeyerAnalyzer
+    from orthonym.rules.ring_replacement import build_replacement_prefix
+    # the 'a' prefix of the primitive: the PIN wrapper ``get_heteroatom_replacement_prefix`` refuses a cage of
+    # one noncarbon element, whose preselected name has no prefix, the Blue Book)
     for spelling in spellings("[TeH]1[Te][TeH]2[Te][Te][Te]1[Te]2", 12):
         mol = Chem.MolFromSmiles(spelling)
         ring_atoms = {i for ring in mol.GetRingInfo().AtomRings() for i in ring}
         numbering = VonBaeyerAnalyzer().analyze(mol, ring_atoms).numbering
-        assert get_heteroatom_replacement_prefix(mol, numbering, ring_atoms) == "1λ3,2λ3,3,4,5,6,7-heptatellura", spelling
+        assert build_replacement_prefix(mol, numbering, ring_atoms).prefix == "1λ3,2λ3,3,4,5,6,7-heptatellura", spelling
 
 
 ZWITTERION = ("C1=Cc2nc1c(-c1ccccc1)c1ccc([n-]1)c(-c1ccccc1)c1[nH+]c(c(-c3ccccc3)c3ccc([nH]3)c2-c2ccccc2)C=C1")
