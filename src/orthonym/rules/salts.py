@@ -1250,10 +1250,11 @@ def _with_solvate_suffix(mol, result: str, solvate_suffix: str, hydrogen_prefix:
     adducts and preferred IUPAC names must use the notation for denoting the proportion of components described
     above. In general nomenclature, hydrates may be named by adding the words 'hydrate' to the name preceded by an
     appropriate numerical prefix". The word 'hydrate' is the general-nomenclature form, and (:4667) gives
-    a mixed organic - inorganic adduct no preferred name. A carbon-free compound keeps the label of its naming path
-    (user decision 2026-09-30, ``namer._is_carbon_free_compound``). Label only: the name is unchanged."""
+    a mixed organic - inorganic adduct no preferred name. A carbon-free hydrate is labelled the same way (user decision
+    2026-11-01, which narrows the 2026-09-30 one: a carbon-free salt keeps its label, its hydrate does not).
+    (:37563): "these 'adduct names' are not PINs". Label only: the name is unchanged."""
     name = result + solvate_suffix
-    if solvate_suffix and result and any(a.GetAtomicNum() == 6 for a in mol.GetAtoms()):
+    if solvate_suffix and result:
         from ..metrics.provenance import record_non_pin_label
         record_non_pin_label(name, rule="P-14.8.1",
                              detail="the word 'hydrate' is general nomenclature; a hydrate is an adduct (1/1) in a PIN")

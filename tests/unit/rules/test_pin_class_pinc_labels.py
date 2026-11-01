@@ -18,8 +18,9 @@ controls of the same class that stay PINs.
   peroxy]ethan-1-one; the PIN has the lower alphanumerical order}' (:32368); with two chains of different length the
   longer one is the parent, (:20916), '1-[(acetylsulfanyl)peroxy]propan-1-one (PIN)' (:39499).
 * Halides and pseudohalides of noncarbon oxoacids: (:35706), '(CH3)2N-P(O)(NCO)Cl N,N-dimethylphosphor
-  amidisocyanatidic chloride (PIN)' (:35730); ORGANOMETALLIC COMPOUNDS INVOLVING THE ELEMENTS OF GROUPS 13 THROUGH
-  16 (:39737), 'BrSb(CH=CH2)2 bromodi(ethenyl)stibane (PIN; substitutive name)' (:39747), (:39053);
+  amidisocyanatidic chloride (PIN)' (:35730); an organoantimony acid halide keeps the functional class PIN
+  ('diphenylstibinous isocyanate (PIN)',:35714;:39053) over the lone example (:39747; user
+  decision 2026-11-01);
   'diphenylstibinous isocyanate (PIN)' (:35714).
 * Arsinate and stibinate esters: (:46008) and its examples (:46022) are those of the phosphates, phosphonates and
   related compounds of phosphorus; no rule sentence or example covers an arsenic or antimony acid, so the descriptor
@@ -50,9 +51,8 @@ DECLINED_ROWS = [
     "NC(=O)CCc1ccc(/C=C/C(=O)NC)cc1",          #:21033: the N-methylamide chain has the multiple bond
     #:32368,:39499
     "CCC(=O)OOSC(C)=O",
-    #:35730,:39747
+    #:35730
     "CN(C)P(=O)(Cl)N=C=O",
-    "C=[CH][Sb]([Br])[CH]=C",
     #:46008
     "CO[As@](C)(=O)c1ccccc1",
     #:26632,:26636
@@ -87,6 +87,9 @@ CONTROL_ROWS = [
     ("CN(C)P(=O)(Cl)Cl", "N,N-dimethylphosphoramidic dichloride"),
     ("C[Sb](C)N=C=O", "dimethylstibinous isocyanate"),                      #:35714
     ("ClP(c1ccccc1)c1ccccc1", "diphenylphosphinous chloride"),               #:35712
+    #:35706 over the lone example:39747 (user decision 2026-11-01)
+    ("C=[CH][Sb]([Br])[CH]=C", "diethenylstibinous bromide"),
+    ("Cl[Sb](c1ccccc1)c1ccccc1", "diphenylstibinous chloride"),
     ("C[N+](C)(C)[O-]", "N,N-dimethylmethanamine N-oxide"),                  #:26626
     ("CCSS", "ethanedithioperoxol"),                                         #:27998
     ("SSCC(=O)O", "disulfanylacetic acid"),                                  # the acid is senior: the prefix stands

@@ -506,7 +506,6 @@ def test_e_hydrogen_sulfate_is_two_words(smiles, expected, tier):
     # the Blue Book); not a PIN,:4667).
     ("[Fe+3].[Cl-].[Cl-].[Cl-]", "iron(III) chloride"),
     ("[Hg+2].[Cl-].[Cl-]", "mercury(II) chloride"),
-    ("O.O.[Cu+2].[O-]S(=O)(=O)[O-]", "copper(II) sulfate dihydrate"),
     ("[Na+].[Cl-]", "sodium chloride"),
 ])
 def test_e_a_wholly_inorganic_metal_compound_keeps_the_label_of_its_naming_path(

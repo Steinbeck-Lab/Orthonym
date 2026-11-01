@@ -12,8 +12,8 @@ the input's structure from it) and OPSIN's answer adds nothing. The validity gat
 
 NOT here: the thioperoxol names (no OPSIN grammar either; the default tier ships each through its twin read-back,
 ``validation.thioperoxol_twin``; a general tier ships the name OPSIN reads, and the anion of -S-OH, which has none,
-through its twin), the organometallic additive carve-out (OPSIN parses some '-ido' ligand names, and the class has a
-known atom-drop hole, so a healthy run's on a parsed name is a real check), the stereo-layer carve-out (its
+through its twin), the organometallic additive names (the '-ido' names ship through their 'chloro' twin, and a name
+with an eta, kappa or mu descriptor ships at no tier: no read-back, no PIN by, the stereo-layer carve-out (its
 licence is a parse of the stereo-stripped form) and the polyacid carve-out (reached only after a parse).
 """
 from typing import Optional

@@ -40,15 +40,15 @@ from orthonym.metrics import provenance as pv
 # C[C@@H]1C[C@H]1CO and C/C(=C\C1C=CC=C1)/C(=O)O round-trip with their stereo intact now,
 # so they report a full ``self_consistency_verified``.
 # Replacements, measured with the gate on:
-# C=C.C=C.[Ni] -> 'bis(η²-ethene)nickel', exit `_ORGANOMETALLIC_ADDITIVE_PIN_RE`
-# (formula conserving: Ni + 2 C2H4; OPSIN 2.9.0 cannot parse it, so the
-# carve-out ships it on its construction alone)
+# NP(=O)(O)OP(N)(=O)O -> '1,3-diamidodiphosphoric acid', exit `_POLYACID_PREFIX_DERIVATIVE_PIN_RE`
+# (OPSIN puts both amido groups on one P atom). It replaced
+# C=C.C=C.[Ni] on 2026-11-01, whose eta name no longer ships.
 # O[C@H]1CC[C@@H](O)CC1 -> '(1s,4s)-cyclohexane-1,4-diol', exit BBR-GATE stereo carve-out
 # (the verbatim Blue Book PIN, "Achiral cyclic compounds",
 # the Blue Book 'cis-cyclohexane-1,4-diol'; OPSIN has no r/s grammar)
 # C[C@H]1CC[C@@H](C)CC1 -> '(1s,4s)-1,4-dimethylcyclohexane', the same exit
 T1_LEAKS = {
-    "C=C.C=C.[Ni]": "carveout:organometallic_additive",
+    "NP(=O)(O)OP(N)(=O)O": "carveout:polyacid_prefix_derivative",
     "O[C@H]1CC[C@@H](O)CC1": "self_consistency_constitution_only",
     "C[C@H]1CC[C@@H](C)CC1": "self_consistency_constitution_only",
 }
@@ -112,18 +112,13 @@ def test_stereo_carveout_is_labelled_constitution_only():
 
 @pytest.mark.opsin_gate
 def test_carveout_reports_its_slug():
-    """`C=C.C=C.[Ni]` hits the organometallic-additive carve-out
-    (`_ORGANOMETALLIC_ADDITIVE_PIN_RE`), which returns the name BEFORE
-    `_self_consistency_decision` is called. The name still ships — only the
-    label changes.
-
-    (The former probe `CC=C.C=C.[Ti+2]` declines since d961ed8b9, whose atom-conservation veto
-    stopped the carve-out shipping a name that dropped hydrogens; this one conserves its atoms.
-    The name is the current value: no nickel/ethene example was found in the Blue Book, and OPSIN 2.9.0
-    cannot parse it, which is why the carve-out exists.)"""
-    row = Orthonym().name_tiered("C=C.C=C.[Ni]")
-    assert row["name"] == "bis(η²-ethene)nickel"
-    assert row["gate_outcome"] == "carveout:organometallic_additive"
+    """`NP(=O)(O)OP(N)(=O)O` hits the polyacid prefix-derivative carve-out: OPSIN reads
+    '1,3-diamidodiphosphoric acid' with both amido groups on one P atom, so the name ships on its
+    construction with the carve-out label, never a bare. (The former probe `C=C.C=C.[Ni]` no longer
+    ships its eta name at the PIN tier, user decision 2026-11-01:, the Blue Book.)"""
+    row = Orthonym().name_tiered("NP(=O)(O)OP(N)(=O)O")
+    assert row["name"] == "1,3-diamidodiphosphoric acid"
+    assert row["gate_outcome"] == "carveout:polyacid_prefix_derivative"
     assert row["gate_outcome"].startswith("carveout:")
     assert row["opsin"] == "unverified"
     assert row["gates_passed"] == [] or "self_consistency" not in row["gates_passed"]
@@ -177,16 +172,16 @@ def test_consecutive_molecules_each_report_their_own_gate_branch():
     """
     nm = Orthonym()
 
-    first = nm.name_tiered("C=C.C=C.[Ni]")             # carve-out
+    first = nm.name_tiered("NP(=O)(O)OP(N)(=O)O")      # carve-out
     second = nm.name_tiered("CCO")                     # genuinely verified
-    assert first["gate_outcome"] == "carveout:organometallic_additive"
+    assert first["gate_outcome"] == "carveout:polyacid_prefix_derivative"
     assert second["gate_outcome"] == pv.GATE_OUTCOME_SELF01
     assert "self_consistency" in second["gates_passed"]
 
     third = nm.name_tiered("CCO")
-    fourth = nm.name_tiered("C=C.C=C.[Ni]")
+    fourth = nm.name_tiered("NP(=O)(O)OP(N)(=O)O")
     assert third["gate_outcome"] == pv.GATE_OUTCOME_SELF01
-    assert fourth["gate_outcome"] == "carveout:organometallic_additive"
+    assert fourth["gate_outcome"] == "carveout:polyacid_prefix_derivative"
     assert "self_consistency" not in fourth["gates_passed"]
 
 

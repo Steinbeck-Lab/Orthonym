@@ -5,6 +5,9 @@ NEUTRAL bonded complex and shipped at the default tier (label ``pin_unverified``
 through ``namer._ORGANOMETALLIC_ADDITIVE_PIN_RE``, which bypasses OPSIN), e.g.
 ``[Fe].c1cc[cH-]c1.c1cc[cH-]c1`` (net -2) -> 'bis(eta5-cyclopentadienyl)iron'.
 
+Since 2026-11-01 the gate ships no eta name at any tier (no read-back;, the Blue Book); these tests read
+the raw producer (the validity gate is off under pytest without the opsin_gate mark), whose charge check still matters.
+
 Governing rule: is out of scope for the engine; the rule that applies is core
 principle 2 (never emit a wrong structure). The Blue Book states a charged complex
 with a charge number: 'Compounds with at least one metal-carbon single

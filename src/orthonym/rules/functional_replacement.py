@@ -329,8 +329,7 @@ def build_p_frn_halide_name(acid_stem_word: str,
 _HALIDE_WORDS = frozenset({"bromide", "chloride", "fluoride", "iodide"})
 
 
-def record_halide_name_label(name: Optional[str], symbol: str, has_organyl: bool,
-                             halide_counts: Dict[str, int]) -> Optional[str]:
+def record_halide_name_label(name: Optional[str], halide_counts: Dict[str, int]) -> Optional[str]:
     """``name`` of a mononuclear noncarbon-oxoacid halide / pseudohalide, recorded as not the PIN where the Blue Book
     prints another name for the class.
 
@@ -339,24 +338,20 @@ def record_halide_name_label(name: Optional[str], symbol: str, has_organyl: bool
       is the class word and the pseudohalide is a functional-replacement infix of the acid,
       '(CH3)2N-P(O)(NCO)Cl N,N-dimethylphosphoramidisocyanatidic chloride (PIN)' (:35730), not '...phosphoramidic
       chloride isocyanate'.
-    * A halide of an antimony acid with an organyl on the centre: ORGANOMETALLIC COMPOUNDS INVOLVING THE
-      ELEMENTS OF GROUPS 13 THROUGH 16 (:39737), 'BrSb(CH=CH2)2 bromodi(ethenyl)stibane (PIN; substitutive name)'
-      (:39747), where General methodology (:39053) says "Preferred names of acyclic phosphorus, arsenic, and antimony compounds are
-      functional class names (see ": the book prints the substitutive name for this compound, which this
-      engine does not build for antimony, so the functional class name is no PIN of it. The pseudohalide keeps its
-      name ('diphenylstibinous isocyanate (PIN)',:35714), and so do the arsenic compounds, for which the book
-      prints no substitutive PIN."""
+    * A halide of an antimony acid with an organyl on the centre keeps the functional class PIN (user decision
+      2026-11-01): Acid halides and pseudohalides (:35706) forms the PIN "by adding the class name(s) of a
+      halide or pseudohalide to that of the acid" ('diphenylstibinous isocyanate (PIN)',:35714), and
+      General methodology (:39053) says "Preferred names of acyclic phosphorus, arsenic, and antimony compounds are
+      functional class names (see ". The lone substitutive example 'bromodi(ethenyl)stibane (PIN; substitutive
+      name)' of (:39747) is a valid name below the PIN here."""
     if not name:
         return name
     mixed = any(w in _HALIDE_WORDS for w in halide_counts) and any(w not in _HALIDE_WORDS for w in halide_counts)
-    organometallic_halide = (symbol == "Sb" and has_organyl
-                             and any(w in _HALIDE_WORDS for w in halide_counts))
-    if mixed or organometallic_halide:
+    if mixed:
         from ..metrics.provenance import record_non_pin_label
-        record_non_pin_label(name, rule="P-67.1.2.5.1" if mixed else "P-69.1",
+        record_non_pin_label(name, rule="P-67.1.2.5.1",
                              detail="a halide with a pseudohalide is named on the halide class with the pseudohalide "
-                                    "as an infix" if mixed else
-                                    "the halide of an organoantimony acid is named substitutively (P-69.1)")
+                                    "as an infix")
     return name
 
 

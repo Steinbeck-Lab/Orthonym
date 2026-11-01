@@ -45,7 +45,6 @@ from .validation.opsin_ambiguity import reject_ambiguous, restore_withdrawn, wit
 from .rules.inositols import is_inositol_name_of   # no OPSIN grammar; exact InChIKey
 from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
                                         twin_outcome_holds, wider_tier_ctx)
-from .validation.halido_twin import HAPTO_DESCRIPTOR
 from .validation.fullerene_read_back import fullerene_gate_ships
 from .validation.uide_twin import uide_twin_outcome
 from .validation.stereo_descriptors import (  # noqa: F401 both names are imported FROM this module (tests, spies); callers resolve them here at call time
@@ -776,7 +775,7 @@ def _self01_lookup(name: str) -> Tuple[Optional[bool], bool, str]:
           re-anchor must NOT be attempted at all -- a `carveout:*` outcome (a
           BY-DESIGN OPSIN-unparseable PIN: thioperoxol / inositol /
           np_stereoparent / dianhydride / chalcogen_dianhydride /
-          polyol_polyester / organometallic_additive / phane
+          polyol_polyester / phane
           -- the parse is guaranteed to fail), or `gate_disabled` /
           `unavailable` / `not_run` (no real gate decision exists at all to
           reuse OR to usefully repeat: disabled/unavailable already mean "no
@@ -2731,7 +2730,7 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
         # dropping the retained PIN to the abstention sentinel instead of keeping it.
         # They ship via the ``np_stereoparent`` carve-out below. This is NARROW ON
         # PURPOSE: the other OPSIN-unparseable carve-outs stay best-effort-suppressed
-        # (the ``organometallic_additive`` one has a known atom-drop hole). The stereo-layer
+        # (the eta-hapto names ship at no tier,:39735). The stereo-layer
         # carve-out is withheld here too and offered after every other path
         # (``assembly/default_tier_offer.py``, which says why and how).
         try:
@@ -2777,16 +2776,11 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
     _gap_slug = _grammar_gap_carveout(name, smiles)
     if _gap_slug is not None:
         return _ship_grammar_gap_carveout(name, _gap_slug)
-    # W8-P9 Task 9.1 /.4/.6): additive/coordination organometallic
-    # PIN carve-out -- see _ORGANOMETALLIC_ADDITIVE_PIN_RE docstring above. Not a
-    # grammar-gap class (OPSIN parses some of its names), so it is reached only
-    # after a 'rejected' answer. A name with an eta/kappa/mu descriptor has no
-    # spelling OPSIN reads and keeps the carve-out; the '-ido' names ship through
-    # their 'chloro' twin below (validation.halido_twin).
-    if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name) and HAPTO_DESCRIPTOR.search(name):
-        _record_gate_outcome(
-            _pv.carveout_outcome("organometallic_additive"), name)
-        return name
+    # An additive organometallic name with an eta, kappa or mu descriptor has no spelling OPSIN reads
+    # (dan2097/opsin#350) and no PIN INTRODUCTION, the Blue Book: no PINs "for organometallic
+    # compounds involving the transition elements... except for 'ocene' compounds"), so it ships nowhere
+    # unverified (user decision 2026-11-01); the '-ido' names ship through their 'chloro' twin below
+    # (validation.halido_twin).
     # A PIN spelling OPSIN has no grammar for ships when its twin spelling reads to the input's full key.
     if smiles is not None and twin_gate_ships(name, smiles, general_fallback_tier):
         return name

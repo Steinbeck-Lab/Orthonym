@@ -890,8 +890,7 @@ def name_p_oxoacid_halide_amide(mol) -> Optional[str]:
             build_p_frn_acid_stem_word, enclose_if_compound, _build_substituent_string)
         if stem_word is None:
             return None
-        return record_halide_name_label(build_p_frn_halide_name(stem_word, class_counts), symbol,
-                                        bool(organyl_c), class_counts)
+        return record_halide_name_label(build_p_frn_halide_name(stem_word, class_counts), class_counts)
 
     # ---- amide/hydrazide derivative (no halide; every -OH -> -NH2) --------------
     if amide_n and not amido_n_has_substituent(mol, amide_n, ctr.GetIdx()):

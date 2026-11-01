@@ -94,22 +94,19 @@ def test_a_name_that_cites_another_ligand_is_not_read_back():
 
 
 @pytest.mark.opsin_gate
-def test_a_hapto_name_keeps_the_carve_out():
-    """A name with an eta descriptor has no spelling OPSIN reads and no twin: it ships as the carve-out the
-    metal programs list as read-back-free, the name main gives. This lane guarantees that and no more: the
-    label of such a name (it reads pin_unverified at the default tier today, a non-PIN name by,
-    the Blue Book) is an open question owned by the topic on the metal labels, and is not asserted here."""
+def test_a_hapto_name_ships_nowhere_unverified():
+    """A name with an eta descriptor has no spelling OPSIN reads (dan2097/opsin#350), no twin and no PIN
+    INTRODUCTION, the Blue Book), so it does not ship (user decision 2026-11-01); the adduct name that reads
+    back stands in its place."""
     row = default_tier_row("C=C.C=C.[Ni]")
-    assert row["name"] == "bis(η²-ethene)nickel", row
-    assert row["gate_outcome"] == "carveout:organometallic_additive", row
-    assert twin_of(row["name"]) is None
+    assert row["name"] != "bis(η²-ethene)nickel", row
+    assert not str(row["gate_outcome"]).startswith("carveout:"), row
+    assert twin_of("bis(η²-ethene)nickel") is None
 
 
-def test_the_hapto_pattern_has_one_home():
-    """The gate and the twin read the same descriptor pattern (``validation.halido_twin.HAPTO_DESCRIPTOR``)."""
-    import orthonym.namer as namer
+def test_the_hapto_pattern_reads_every_descriptor():
+    """The twin reads the eta, kappa and mu descriptors (``validation.halido_twin.HAPTO_DESCRIPTOR``)."""
     from orthonym.validation.halido_twin import HAPTO_DESCRIPTOR
-    assert namer.HAPTO_DESCRIPTOR is HAPTO_DESCRIPTOR
     assert all(HAPTO_DESCRIPTOR.search(n) for n in ("bis(η2-ethene)nickel", "(κ2-x)iron", "μ-chlorido"))
 
 
