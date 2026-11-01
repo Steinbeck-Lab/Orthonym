@@ -23,7 +23,8 @@ from ..pin_spelling import SpellingFailure, register
 _P10_NAME = re.compile(
     r"pyranos|furanos|(?<!tell)uron(?:ic|ate)|inositol|osamin"     # not 'benzenetelluronic acid' (Te,
     r"|(?<![a-z])(?:[DL]|[αβ]-[DL])-[a-z]+?(?:ose|itol|ulose|onic acid|onate|aric acid|arate)\b"
-    r"|(?:adenosin|guanosin|cytidin|uridin|thymidin|inosin)"
+    r"|(?:adenosin|guanosin|cytidin|uridin|thymidin|inosin|xanthosin)"
+    r"|(?:adenylyl|guanylyl|cytidylyl|uridylyl|thymidylyl|inosinylyl|xanthylyl)"     #,
     r"|(?:glycin|alanin|valin|leucin|isoleucin|serin|threonin|cystein|methionin|prolin|phenylalanin|tyrosin"
     r"|histidin|lysin|arginin|asparagin|glutamin)(?:e|ate|amide)\b"
     r"|\btryptophan(?:ate|amide)?\b|\b(?:aspart|glutam)(?:ic acid|ate|amide)\b"
