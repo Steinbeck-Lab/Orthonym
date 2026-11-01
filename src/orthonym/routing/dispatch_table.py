@@ -1952,16 +1952,19 @@ def _is_nucleoside(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
     name; bare nucleosides + the retained adenylic/inosinic monophosphates are
     NOT claimed here (they hit RETAINED_NAME first). Fail-closed."""
     from orthonym.rules.nucleosides import name_nucleoside
-    return name_nucleoside(mol) is not None
+    from orthonym.rules.oligonucleotides import name_oligonucleotide
+    return name_nucleoside(mol) is not None or name_oligonucleotide(mol) is not None
 
 
 def _handle_nucleoside(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
     """ a phase — decorated nucleoside/nucleotide name /. INTRODUCTION (the Blue Book)
     identifies no PIN for it, so the systematic name of the molecule is offered first
-    (``rules.nucleosides.systematic_nucleoside_name``); the nucleoside name is the fallback."""
+    (``rules.nucleosides.systematic_nucleoside_name``); the nucleoside name is the fallback. A linear 3'->5' chain
+    of nucleosides has the name of ``rules.oligonucleotides`` (adenylyl-(3'->5')-uridine) in its place."""
     from orthonym.rules.nucleosides import name_nucleoside, systematic_nucleoside_name
-    name = name_nucleoside(mol)
+    from orthonym.rules.oligonucleotides import name_oligonucleotide
+    name = name_nucleoside(mol) or name_oligonucleotide(mol)
     if name is None:
         return None
     return systematic_nucleoside_name(mol) or name
@@ -3172,7 +3175,8 @@ _register_dispatch(
     predicate=_is_nucleoside, handler=_handle_nucleoside,
     iupac_section="Blue Book P-105.2 / P-106 (nucleoside/nucleotide decoration)",
     description="Decorated nucleoside/nucleotide (5'-mono/di/tri-phosphate + O-acyl "
-                "ester); strip-and-recognise; routes to rules.nucleosides.name_nucleoside",
+                "ester) and linear 3'->5' oligonucleotide (P-106.3.4); strip-and-recognise; routes to "
+                "rules.nucleosides.name_nucleoside and rules.oligonucleotides.name_oligonucleotide",
     side_effect_inventory=(),
 )
 

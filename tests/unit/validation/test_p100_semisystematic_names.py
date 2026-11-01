@@ -18,6 +18,10 @@ pytestmark = pytest.mark.unit
     "D-glucose", "β-D-glucopyranose", "4-(β-D-glucopyranosyloxy)benzaldehyde",
     "methyl β-D-glucopyranosiduronic acid", "L-alanine", "myo-inositol",
     "adenosine 5'-(tetrahydrogen triphosphate)", "N-glycylglycine",
+    # K3 2026-11-01: the oligonucleotide names of (:55055) and (:55065); no Blue Book (PIN) name has one
+    "adenylyl-(3'→5')-uridine", "thymidylyl-(3'→5')-thymidine", "inosinylyl-(3'→5')-xanthosine",
+    "2'-deoxy-P-thioguanylyl-(3'→5')-2'-deoxy-P-thiouridylyl-(3'→5')-2'-deoxyguanosine",
+    "xanthylyl-(3'→5')-xanthosine", "xanthosine 3'-(trihydrogen diphosphate)",
 ])
 def test_a_chapter_p10_name_is_flagged(name):
     assert getattr(chapter_p10_name_is_no_pin(None, name), "rule", None) == "P-100", name

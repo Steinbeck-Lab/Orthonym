@@ -242,6 +242,12 @@ def _sugar_configuration_ok(mol: Chem.Mol, core: _Core, sugar: str) -> bool:
     name says, so the name is not built."""
     from ..perception.stereo import assign_stereochemistry
     assign_stereochemistry(mol)
+    return _sugar_labels_ok(mol, core, sugar)
+
+
+def _sugar_labels_ok(mol: Chem.Mol, core: _Core, sugar: str) -> bool:
+    """:func:`_sugar_configuration_ok` for a molecule whose CIP labels are assigned already (a chain of units
+    assigns them once, ``rules/oligonucleotides.py``)."""
     for prime, label in _SUGAR_CIP[sugar].items():
         atom = mol.GetAtomWithIdx(core.idx_for(prime))
         if not atom.HasProp("_CIPCode") or atom.GetProp("_CIPCode") != label:
@@ -313,6 +319,11 @@ def _find_core(mol: Chem.Mol) -> Optional[_Core]:
     nitrogen of an N-heterocycle (the base) and another ring C (C4') bears an
     exocyclic carbon (C5'). Returns ``None`` (fail-closed) on any ambiguity.
     """
+    return next(_iter_cores(mol), None)
+
+
+def _iter_cores(mol: Chem.Mol):
+    """Every furanose core of ``mol`` (:func:`_find_core` takes the first; an oligonucleotide has one per unit)."""
     ri = mol.GetRingInfo()
     for ring in ri.AtomRings():
         if len(ring) != 5:
@@ -366,8 +377,7 @@ def _find_core(mol: Chem.Mol) -> Optional[_Core]:
         core.ring_atoms = ring_set
         core.prime = {anomeric: "1'", c2: "2'", c3: "3'", c4: "4'", c5: "5'"}
         core._idx_for = {v: k for k, v in core.prime.items()}
-        return core
-    return None
+        yield core
 
 
 # ---------------------------------------------------------------------------
