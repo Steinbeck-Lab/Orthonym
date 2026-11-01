@@ -26,7 +26,7 @@ GATED = Orthonym()
 
 # (2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol — verified CIP below.
 SPHING_4_ENINE = "CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO"
-# (2S,3R)-2-aminooctadecane-1,3-diol — sphinganine (retained PIN, unchanged).
+# (2S,3R)-2-aminooctadecane-1,3-diol — sphinganine (a Chapter name, no PIN).
 SPHINGANINE = "CCCCCCCCCCCCCCC[C@@H](O)[C@@H](N)CO"
 
 
@@ -46,9 +46,15 @@ def test_sphing_4_enine_takes_its_systematic_name():
     assert RAW.name(SPHING_4_ENINE) == "(2S,3R,4E)-2-aminooctadec-4-ene-1,3-diol"
 
 
-def test_sphinganine_retained_name_unchanged():
-    # Saturated C18 parent keeps its retained PIN (regression guard).
-    assert RAW.name(SPHINGANINE) == "sphinganine"
+@pytest.mark.opsin_gate
+def test_sphinganine_takes_its_systematic_name():
+    # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'sphinganine'. LIPIDS
+    # (the Blue Book) sits inside Chapter, and INTRODUCTION (:50943) says "Preferred IUPAC names
+    # (PINs) are not identified for the compounds in this Chapter"; (:55227) prefers 'sphinganine' inside
+    # lipid nomenclature and prints the systematic name beside it, which OPSIN 2.9.0 reads back to the full InChIKey.
+    assert RAW.name(SPHINGANINE) == "(2S,3R)-2-aminooctadecane-1,3-diol"
+    row = GATED.name_tiered(SPHINGANINE)
+    assert (row["name"], row["tier"]) == ("(2S,3R)-2-aminooctadecane-1,3-diol", "pin_verified"), row
 
 
 def test_phosphatidylserine_serine_parent_pin():
