@@ -585,9 +585,18 @@ def _rings_removed(removed: FrozenSet[int], adj: Dict[int, Set[int]]) -> int:
     return (lost - inner) - len(removed)
 
 
-#: limit of this lane's fused readings: a ring of eight or more members is left to the
-#: von Baeyer name until the larger-ring fusion parents are certified
-MAX_FUSED_RING_SIZE = 7
+#: Largest ring of a fused reading. The Blue Book sets no upper size: (the Blue Book)
+#: "Monocyclic hydrocarbon prefixes for attached components other than 'benzo'... There is no upper
+#: ring-size limit to this criterion"; (:11984) "Heteromonocycles having more than ten
+#: members... are used as parent components in preferred IUPAC fusion names"; (:23831)
+#: "Mancude systems attached to adjacent atoms of an alicyclic large ring... Fusion names... are
+#: preferred IUPAC names" ('5,6,...,16-dodecahydrobenzo[14]annulene (PIN)'). The component names of
+#: rings of 8 to 20 members (cycloocta... icosa, [n]annulene, oxocine... oxacycloicosine) and the
+#: numbering OPSIN reads from them were certified against the book's own fused PINs and read back
+#: (tests/unit/rules/test_fused_large_ring_pin.py). 30 is this lane's limit, not the book's: a larger ring
+#: (a mancude 'benzo[31]annulene', or the 31-membered ring of:24837) declines until it is certified; the hydro
+#: multiplier table (hydro.py) limits the number of hydro prefixes, not the ring size, and declines on its own
+MAX_FUSED_RING_SIZE = 30
 
 
 def _standard_bonding(mol, system: Set[int]) -> bool:

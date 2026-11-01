@@ -91,8 +91,18 @@ AROMATIC_FUSED_CASES = [
 # unsaturated von Baeyer ring system names are preferred IUPAC names"); was: pin
 # abstains, complete 'tricyclo[7.4.0.0^3,7]trideca-1(13),2,4,7,9,11-hexaene'. OPSIN 2.9.0
 # full-InChIKey exact (test_fusion_named_cages_round_trip).
+#
+# DT4-B (change-asserted-value): benzene fused to an eight- or a nine-membered ring joins them. The
+# ring-size cap of the fused builder is lifted: "Prefixes for attached components"
+# (the Blue Book) "There is no upper ring-size limit to this criterion",
+# "Monocyclic hydrocarbons (annulenes)" (:11968) the [n]annulene parent, 'benzo[8]annulene (PIN)'
+# (:19564);:23831 "Mancude systems attached to adjacent atoms of an alicyclic large
+# ring... Fusion names... are preferred IUPAC names". Was: pin abstains, complete 'bicyclo[...]'
+# polyene. Both names read back to the full InChIKey (test_fusion_named_cages_round_trip).
 FUSION_NAMED_CAGES = {
     "C1=Cc2cc3ccccc3cc2C1": "1H-cyclopenta[b]naphthalene",
+    "C1=CC=CC2=CC=CC=CC=C12": "benzo[8]annulene",
+    "C1=CC=CC=Cc2ccccc2C1": "5H-benzo[9]annulene",
 }
 _ABSTAINING_AROMATIC_FUSED_CASES = [
     case for case in AROMATIC_FUSED_CASES if case[0] not in FUSION_NAMED_CAGES]

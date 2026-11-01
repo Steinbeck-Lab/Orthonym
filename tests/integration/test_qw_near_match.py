@@ -122,8 +122,10 @@ METHOXY_FIXES = [
         # ships labelled best_effort -- see _NON_PIN_ROWS / test_methoxy_fix. The
         # old snapshot was the same non-PIN class plus 'isobutyl' (general only,
         #, '0(1,15)' and 'dien-2,18-dione' (a)). OPSIN full-InChIKey exact.
-        "(9E)-5-hydroxy-4-methoxy-9,13,14-trimethyl-16-(2-methylpropyl)-17-azatricyclo"
-        "[9.7.0.0^1,15]octadeca-9,12-diene-2,18-dione",
+        # DT4-B (2026-11-01): the 11-membered ring fused to the isoindole takes its fusion name,
+        # the Blue Book), not the von Baeyer form; OPSIN full-InChIKey exact
+        "(7E)-12-hydroxy-13-methoxy-4,5,8-trimethyl-3-(2-methylpropyl)-3,3a,4,6a,9,10,11,12,13,14-decahydro-1H-"
+        "cycloundeca[d]isoindole-1,15(2H)-dione",
         id="methoxy-C5-tricyclic",
     ),
     pytest.param(

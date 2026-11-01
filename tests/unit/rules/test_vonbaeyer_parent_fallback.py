@@ -285,9 +285,8 @@ ASSEMBLY_POSITIVES = [
     # '(5S,6R,9S,10S)-2,6,11-trimethyl-7,13-dioxo-8-oxatricyclo[8.3.0.0^5,9]trideca-1,11-diene'
     # (the bicyclo[5.3.0]decane-1,5-diol row left this list: an all-carbon fused system has its
     # fusion name,, the Blue Book; pinned in test_n5b_fused_routing.py)
-    ("CC1CCCC(O)/C=C/C2C(O)CC(O)CC2/C=C/C=C\\C/C=C/C=C\\C(=O)O1",
-     "(2E,11Z,13E,16Z,18E)-4,22,24-trihydroxy-8-methyl-10-oxo-9-oxabicyclo"
-     "[18.4.0]tetracosa-2,11,13,16,18-pentaene"),
+    # (a row with a ring of eight or more members left this list: named by fusion nomenclature, DT4-B, pinned
+    # in test_fused_large_ring_pin.py)
     # The row that stood here, a 2,8-dioxabicyclo[4.3.0]nonane (the (1Z)-3,5-dimethylhept-1-en-1-yl
     # one, 'CCC(C)CC(C)/C=C\[C@@H]1O[C@H]2[C@H](C(=O)O[C@H]2C)[C@H](O)[C@H]1O'), is named by fusion
     # nomenclature at both tiers now and left this list: FUSED_NAMED_ROW below pins it.
@@ -308,9 +307,8 @@ ASSEMBLY_POSITIVES = [
      "4,7-dioxo-5,12-dioxatricyclo[7.4.0.0^2,6]trideca-1(13),8,10-triene"),
     # quick-wins F-Q1: '0^4,9' before '0^10,15',:9685); was '(7R)-7-benzyl-
     # 5-ethyl-3,6,9,17-tetraoxo-8-oxa-2,5,16-triazatricyclo[16.4.0.0^10,15]docosa-...'
-    ("CCN1CC(=O)Nc2ccccc2C(=O)Nc2ccccc2C(=O)O[C@H](Cc2ccccc2)C1=O",
-     "(15R)-15-benzyl-13-ethyl-3,11,14,17-tetraoxo-16-oxa-2,10,13-triazatricyclo"
-     "[16.4.0.0^4,9]docosa-1(22),4,6,8,18,20-hexaene"),
+    # (a row with a ring of eight or more members left this list: named by fusion nomenclature, DT4-B, pinned
+    # in test_fused_large_ring_pin.py)
     # A bridged tetracyclic oxirane/ether cage (4,8,11-trioxatetracyclo[7.4.1.0^3,5.0^6,14]tetradecane),
     # which no fusion builder names at either tree. The compound prefix
     # '[(S)-1,3-bis(acetyloxy)propyl]' is enclosed in brackets, its descriptor and its own

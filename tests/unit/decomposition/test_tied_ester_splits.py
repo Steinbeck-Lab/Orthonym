@@ -33,8 +33,10 @@ ROWS = [
     ("P-44.4.1.9 the free valence at locant 1 and not 11",
      "CCCC(C)O[C@H]1[C@H](C(=C)[C@@H]([C@H]2[C@H]([C@](C[C@@]2(C(=O)[C@H](/C=C/C(C1=O)(C)C)C)OC(=O)C)"
      "(C)OC(=O)C)OC(=O)C)OC(=O)C)OC(=O)C",
-     "(1R,3S,4E,8S,9S,11R,12S,13R,14R)-9,11,13,14-tetrakis(acetyloxy)-3,6,6,14-tetramethyl-10-"
-     "methylidene-2,7-dioxo-8-[(pentan-2-yl)oxy]bicyclo[10.3.0]pentadec-4-en-1-yl acetate"),
+     # DT4-B (2026-11-01): the bicyclic 5/12 system takes its fusion name, the Blue Book), the
+     # free valence still at locant 1; OPSIN full-InChIKey exact
+     "(1R,2R,3aR,5S,6E,10S,11S,13R,13aS)-2,3a,11,13-tetrakis(acetyloxy)-2,5,8,8-tetramethyl-12-methylidene-4,9-"
+     "dioxo-10-[(pentan-2-yl)oxy]-2,3,3a,4,5,8,9,10,11,12,13,13a-dodecahydro-1H-cyclopenta[12]annulen-1-yl acetate"),
 ]
 
 

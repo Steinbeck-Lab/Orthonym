@@ -218,8 +218,23 @@ _CANARY_DEFECT_REASONS = {
         # fixture, because the choice of the bridge excision, the ring numbering and the
         # hydro/indicated-hydrogen spelling of each, were not checked
         # against the Blue Book row by row.
-        "bridged fused name, RT-exact; the PIN status of the bridge selection and numbering is "
+        # DT4-B (2026-11-01, change-asserted-value): canary calls 22/318/325, 23/319/327, 154/320/333 and
+        # 500 were DK-VBFUSED von Baeyer names; a fused ring system with a ring of eight or more members
+        # now has its fusion name "Prefixes for attached components", the Blue Book
+        # "There is no upper ring-size limit to this criterion"; "Heteromonocycles":11984
+        # "Heteromonocycles having more than ten members... are used as parent components in preferred
+        # IUPAC fusion names";:23831 fusion names of rings attached to a large ring are PINs).
+        # Each name is OPSIN 2.9.0 full-InChIKey exact (fresh java run); the component choice and numbering
+        # were not checked against the book row by row, so the rows are change detectors.
+        "fused name, RT-exact; the PIN status of the bridge selection and numbering is "
         "unverified (P-25.4.3.4.2 / P-25.4.3.3), so the row is a change detector, not a fixture"
+    ),
+    "DK-LARGERINGFUSED": (
+        # DT4-B (2026-11-01): fused names with a ring of eight or more members, the Blue Book;
+        #,:23831), plain fusion names with no bridge prefix; OPSIN 2.9.0 full-InChIKey exact. Pinned here
+        # as change detectors: their component choice and numbering were checked against the book's own large-ring
+        # PINs (tests/unit/rules/test_fused_large_ring_pin.py), not row by row; call 22 is a three-component name.
+        "fusion name with a large ring, numbering checked by read-back only"
     ),
     "DK-ETHANAMINE": (
         "'ethan-1-amine' with only N-substituents: P-14.3.4.2 (b) omits the locant "
@@ -326,12 +341,12 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (17,),
     ),
     "C[C@H]1C/C=C\\[C@H]2[C@@H]3O[C@]3(C)[C@@H](C)[C@H]3[C@H](Cc4ccccc4)NC(=O)[C@@]32OC(=O)/C=C\\[C@@](C)(O)C1=O": (
-        "(1R,4Z,6R,8S,10Z,12S,13S,15R,16S,17S,18S)-18-benzyl-6-hydroxy-6,8,15,16-tetramethyl-2,14-dioxa-19-azatetracyclo[10.8.0.0^1,17.0^13,15]icosa-4,10-diene-3,7,20-trione",
-        "DK-VBFUSED", (22, 318, 325),
+        "(1Z,4S,6R,7Z,10aR,13S,13aS,14S,14aR,15aS,15bS)-13-benzyl-6-hydroxy-4,6,14,14a-tetramethyl-13,13a,14,14a,15a,15b-hexahydro-3H-[1]oxacyclododecino[2,3-d]oxireno[2,3-f]isoindole-5,9,11(4H,6H,12H)-trione",
+        "DK-LARGERINGFUSED", (22, 318, 325),
     ),
     "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C": (
-        "(1R,4E,6S,10E,12S,15S,16S,17S)-6-hydroxy-10,14,15-trimethyl-17-(2-methylpropyl)-2-oxa-18-azatricyclo[10.7.0.0^1,16]nonadeca-4,10,13-triene-3,19-dione",
-        "DK-VBFUSED", (23, 319, 327),
+        "(3E,5S,9E,10aS,13S,13aS,14S,16aR)-5-hydroxy-9,12,13-trimethyl-14-(2-methylpropyl)-6,7,8,10a,13,13a,14,15-octahydro-2H-[1]oxacyclododecino[2,3-d]isoindole-2,16(5H)-dione",
+        "DK-LARGERINGFUSED", (23, 319, 327),
     ),
     "C[C@H](NC(=O)[C@@H](N)CC(=O)O)C(=O)N[C@@H](CCCCN)C(=O)O": (
         "aspartylalanyllysine",
@@ -377,8 +392,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-NOTEXACT", (151, 315, 326),
     ),
     "COC1CC(=O)C23C(=O)NC(CC(C)C)C2C(C)C(C)=CC3/C=C(\\C)CCCC1O": (
-        "(9E)-5-hydroxy-4-methoxy-9,13,14-trimethyl-16-(2-methylpropyl)-17-azatricyclo[9.7.0.0^1,15]octadeca-9,12-diene-2,18-dione",
-        "DK-VBFUSED", (154, 320, 333),
+        "(7E)-12-hydroxy-13-methoxy-4,5,8-trimethyl-3-(2-methylpropyl)-3,3a,4,6a,9,10,11,12,13,14-decahydro-1H-cycloundeca[d]isoindole-1,15(2H)-dione",
+        "DK-LARGERINGFUSED", (154, 320, 333),
     ),
     "CC(C)=CCOc1ccc(C2=C(CC(C)C)C(=O)NC2=O)cc1": (
         # fix a performance pass (wp5): the ring now takes the form (was
@@ -522,8 +537,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (495,),
     ),
     "CC1=CCC(=O)CC(=O)[C@@]23C(=O)N[C@@H](CC(C)C)[C@@H]2[C@H](C)C(C)=C[C@@H]3C1": (
-        "(1S,4S,5R,6S,9S)-6,7,11-trimethyl-4-(2-methylpropyl)-3-azatricyclo[7.7.0.0^1,5]hexadeca-7,11-diene-2,14,16-trione",
-        "DK-VBFUSED", (500,),
+        "(3S,3aR,4S,6aS,13aS)-4,5,8-trimethyl-3-(2-methylpropyl)-3,3a,4,6a,7,10-hexahydro-1H-cyclonona[d]isoindole-1,11,13(2H,12H)-trione",
+        "DK-LARGERINGFUSED", (500,),
     ),
     "N[C@@H](CCC(=O)O)C(=O)N[C@@H](CS)C(=O)N[C@@H](Cc1cnc[nH]1)C(=O)O": (
         "glutamylcysteinylhistidine",
@@ -789,6 +804,9 @@ _NOW_RT_EXACT = frozenset({
     "C#CCCCCCCCCCCCC(CC(O)CO)OC(C)=O",
     "CC1=C(O)C(=O)[C@]2(O)C[C@H]3C[C@](C)(C(=O)O)C[C@H]3[C@]12C",
     "CC(C)C1=C2[C@H]3CC=C(C=O)CC(=O)[C@]3(C)CC[C@@]2(C)CC1",
+    # DT4-B: an ortho-fused system with an 11-membered ring is a fusion name now ('...tetradecahydrocycloundeca[e]
+    # indene', the Blue Book "no upper ring-size limit";:23831); OPSIN-exact.
+    "C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12",
 })
 
 
