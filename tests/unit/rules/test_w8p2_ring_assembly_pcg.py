@@ -168,9 +168,11 @@ def test_name_substituent_none_does_not_veto_a_group_another_producer_names():
     attach = match[0]  # the nitrogen carries the bond to the ring
     assert mol.GetAtomWithIdx(attach).GetSymbol() == 'N'
 
-    # Producer A cannot name it...
-    assert RA._name_substituent(mol, list(match), attach) is None
-    #... producer B can, which is exactly why the assembly must not abort.
+    # Producer B names it without asking producer A, which is why the assembly must not abort when A says
+    # None. LEADS2 2026-11-01: A reads the group with the atom that bonds to the ring now
+    # (``name_substituent``) and names the nitro group too ('nitro',: nitro is a prefix only), so the
+    # two agree; the whole-molecule rows below pin the prefix-path builder for every category.
+    assert RA._name_substituent(mol, list(match), attach) == 'nitro'
     assert RA._mixed_ring_assembly_prefix_name(
         mol, list(match), attach, None) == 'nitro'
 

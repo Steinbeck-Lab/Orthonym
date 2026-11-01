@@ -4649,7 +4649,7 @@ def _ring_cation_hydron_site_name(mol, center_idx: int, demoted: str) -> str:
     if demoted:
         candidates.append(demoted)
     for cand in candidates:
-        if _cation_name_rt_ok(cand, mol):
+        if _cation_name_rt_ok(cand, mol) and _cation_name_rt_ok(cand, res):    # the hydron on the atom of ``res``
             return cand
     return ''
 

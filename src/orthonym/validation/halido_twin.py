@@ -38,6 +38,20 @@ def halido_twin(name: str) -> str:
     if not name or HAPTO_DESCRIPTOR.search(name) or _HALIDO.search(name) is None:
         return name
     from ..namer import _ORGANOMETALLIC_ADDITIVE_PIN_RE
-    if _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name) is None:
+    if name not in _BONDED_HALIDO_NAMES and _ORGANOMETALLIC_ADDITIVE_PIN_RE.match(name) is None:
         return name
     return _HALIDO.sub(r"\1o", name)
+
+
+#: the names with a halide ligand word that ``rules.organometallics._assemble_bonded_metal_name`` built for the metals
+#: admitted to ``BONDED_NAMES`` (``data.metal_scope``): the producer owns the spelling and reports the string, so the
+#: twin reads it for every such metal and no list of metal names is kept here (advisor ruling 2026-11-01: 'chlorido' is
+#: the book's ligand word, 'chloro' only the read-back)
+_BONDED_HALIDO_NAMES = set()
+
+
+def note_bonded_halido_name(name: str) -> str:
+    """Record ``name`` as an additive name of a bonded metal with halide ligand words; returns it unchanged."""
+    if _HALIDO.search(name):
+        _BONDED_HALIDO_NAMES.add(name)
+    return name
