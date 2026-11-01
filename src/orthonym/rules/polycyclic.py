@@ -4473,7 +4473,11 @@ def name_polycyclic_complete(mol, features=None):
     # the code that says a wider tier returns a name. A refusal here would end the PIN tier
     # without a name and report UNNAMEABLE for molecules the best-effort tier names.
     from ..metrics.provenance import best_effort_ctx
-    _best_effort = bool(best_effort_ctx.get())
+    from .bridged_fused_pin.fullerene import fullerene_in_scope
+    # a C60 skeleton with at most one addend (``bridged_fused_pin.fullerene``) is named by its fused parent, not
+    # by a von Baeyer descriptor: the delegation runs first, as at the PIN tier (the analysis of a cage of 31
+    # rings costs the whole budget)
+    _best_effort = bool(best_effort_ctx.get()) and not fullerene_in_scope(mol)
     desc = analyzer.analyze(mol, ring_atoms) if _best_effort else None
     _early = _vb_delegations_and_g0(mol, ring_atoms if desc is None else desc.numbering)
     if _early is not None:

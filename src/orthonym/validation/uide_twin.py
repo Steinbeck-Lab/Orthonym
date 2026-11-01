@@ -64,10 +64,14 @@ def uide_twin_outcome(outcome: Optional[str]) -> bool:
       numerical term for it at any tier;
     * a phane name whose structure ``validation.phane_read_back`` builds from the name and finds to be the input's
       (``carveout:phane``, recorded by ``namer.Orthonym._last_resort_list_name`` for such a name only: at a general
-      tier the gate withdraws a phane name)."""
+      tier the gate withdraws a phane name);
+    * a fullerene name whose structure ``validation.fullerene_read_back`` builds from the name and finds to be the
+      input's (``carveout:fullerene``, recorded by the validity gate for a best-effort request: OPSIN reads no
+      fullerene name)."""
     from ..metrics.provenance import GATE_OUTCOME_RECONSTRUCTED_PREFIX, carveout_outcome, twin_outcome
     from .thioperoxol_twin import thioperoxol_twin_outcome
-    return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), carveout_outcome("phane"))
+    return (outcome in (twin_outcome(UIDE_TWIN_RULE), twin_outcome("halido_o"), carveout_outcome("phane"),
+                        carveout_outcome("fullerene"))
             or thioperoxol_twin_outcome(outcome)
             or bool(outcome and outcome.startswith(GATE_OUTCOME_RECONSTRUCTED_PREFIX)))
 

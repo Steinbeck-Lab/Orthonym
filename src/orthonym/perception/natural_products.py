@@ -194,6 +194,11 @@ def _detect_natural_product_impl(mol) -> Optional[Dict]:
     """
     if mol is None:
         return None
+    # A fullerene cage holds no scaffold of the table, and matching the 300 queries against its 31 rings costs seconds
+    # (3.4 s for one C60 adduct); a molecule with a cage is named by the fullerene rules, never as a natural product.
+    from .fullerene import MIN_CAGE_ATOMS, has_fullerene_cage
+    if mol.GetNumAtoms() >= MIN_CAGE_ATOMS and has_fullerene_cage(mol):
+        return None
 
     try:
         from orthonym.data.natural_products import NATURAL_PRODUCT_SCAFFOLDS

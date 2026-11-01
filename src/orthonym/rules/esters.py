@@ -1888,10 +1888,12 @@ def _collect_alkyl_fragment_stereo(mol, alkyl_atoms: List[int],
     if anchor_c is None:
         return []
 
-    # Collect carbon atoms in the alkyl fragment
+    # Collect carbon atoms in the alkyl fragment (a fullerene cage is no chain: its paths are too many to list)
+    from ..perception.fullerene import cage_atoms
+    cage = cage_atoms(mol)
     carbon_atoms = [
         idx for idx in alkyl_atoms
-        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C'
+        if mol.GetAtomWithIdx(idx).GetSymbol() == 'C' and idx not in cage
     ]
 
     if len(carbon_atoms) <= 1:

@@ -1155,7 +1155,9 @@ def _find_longest_chain(mol, start: int, frag_atoms: set) -> list:
     Returns:
         Ordered list of atom indices [start,..., end].
     """
-    carbon_set = {i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C'
+    from ..perception.fullerene import cage_atoms
+    cage = cage_atoms(mol)          # a fullerene cage is no chain: its paths are too many to list
+    carbon_set = {i for i in frag_atoms if mol.GetAtomWithIdx(i).GetSymbol() == 'C' and i not in cage
                   and not any(b.GetBondTypeAsDouble() == 3.0
                               and b.GetOtherAtom(mol.GetAtomWithIdx(i)).GetSymbol() == 'N'
                               for b in mol.GetAtomWithIdx(i).GetBonds())}

@@ -427,15 +427,34 @@ def classify_scope_limit(mol: Chem.Mol) -> Optional[OrthonymLimitError]:
     return fullerene_limit(mol)
 
 
+def is_fullerene(mol: Chem.Mol) -> bool:
+    """True when ``mol`` holds a fullerene cage. A cheap atom-count prefilter comes first: a cage has at least
+    ``MIN_CAGE_ATOMS`` atoms."""
+    from .perception.fullerene import MIN_CAGE_ATOMS, has_fullerene_cage
+    return mol is not None and mol.GetNumAtoms() >= MIN_CAGE_ATOMS and has_fullerene_cage(mol)
+
+
+def fullerene_failure_limit(mol: Chem.Mol,
+                             smiles: Optional[str] = None) -> Optional[OrthonymLimitError]:
+    """The FULLERENE limit when ``mol`` holds a fullerene cage, at every tier, else None: the label of a cage that no
+    producer named."""
+    return _make('FULLERENE', smiles=smiles) if is_fullerene(mol) else None
+
+
 def fullerene_limit(mol: Chem.Mol,
                      smiles: Optional[str] = None) -> Optional[OrthonymLimitError]:
-    """The FULLERENE limit when ``mol`` holds a fullerene cage, else None. A cheap atom-count
-    prefilter comes first: a cage has at least ``MIN_CAGE_ATOMS`` atoms."""
-    from .perception.fullerene import MIN_CAGE_ATOMS, has_fullerene_cage
-    if mol.GetNumAtoms() >= MIN_CAGE_ATOMS:
-        if has_fullerene_cage(mol):
-            return _make('FULLERENE', smiles=smiles)
-    return None
+    """The FULLERENE limit when ``mol`` holds a fullerene cage that this request does not name, else None.
+
+    A C60 skeleton with at most one addend on a [6,6] bond, whose attached ring the fusion producer names
+    (``rules.bridged_fused_pin.fullerene``), is named in a best-effort request, and its name is read back by the
+    engine's own reader (``validation.fullerene_read_back``): it passes. Every other cage, and this one in a PIN, valid
+    or complete request, is declined at once."""
+    if not is_fullerene(mol):
+        return None
+    from .rules.bridged_fused_pin.fullerene import fullerene_in_scope
+    if fullerene_in_scope(mol):
+        return None
+    return _make('FULLERENE', smiles=smiles)
 
 
 def classify_failure_limit(mol: Chem.Mol,
@@ -456,8 +475,9 @@ def classify_failure_limit(mol: Chem.Mol,
     if any(atom.GetAtomicNum() == 0 for atom in mol.GetAtoms()):
         return _make('WILDCARD_ATOMS', smiles=smiles)
 
-    # A fullerene cage (the decline made at once, before the producers run).
-    cage = fullerene_limit(mol, smiles=smiles)
+    # A fullerene cage no producer named (the decline made at once, before the producers run, in every request but
+    # the best-effort one for the C60 skeleton of ``fullerene_limit``).
+    cage = fullerene_failure_limit(mol, smiles=smiles)
     if cage is not None:
         return cage
 

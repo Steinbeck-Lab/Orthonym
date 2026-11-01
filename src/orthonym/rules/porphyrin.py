@@ -83,6 +83,19 @@ def _core_matches(mol) -> list:
         return []
     if sum(1 for atom in mol.GetAtoms() if atom.GetAtomicNum() == 7) < 4:
         return []
+    from ..perception.fullerene import cage_atoms
+    cage = cage_atoms(mol)
+    if cage:
+        # a fullerene cage (60 carbon atoms of three ring bonds each) holds no part of the core, and matching the core
+        # inside it costs seconds a call: the atoms left are matched and the matches mapped back to the molecule
+        keep = [i for i in range(mol.GetNumAtoms()) if i not in cage]
+        rest = Chem.RWMol(mol)
+        for i in sorted(cage, reverse=True):
+            rest.RemoveAtom(i)
+        rest = rest.GetMol()
+        rest.UpdatePropertyCache(strict=False)
+        Chem.FastFindRings(rest)
+        return [tuple(keep[j] for j in match) for match in rest.GetSubstructMatches(_core_query(), uniquify=False)]
     return list(mol.GetSubstructMatches(_core_query(), uniquify=False))
 
 

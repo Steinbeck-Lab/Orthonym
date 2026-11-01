@@ -230,7 +230,8 @@ def find_longest_carbon_chain(
     Returns:
         List of atom indices forming the longest chain
     """
-    exclude = exclude_atoms or set()
+    from .fullerene import cage_atoms
+    exclude = (exclude_atoms or set()) | cage_atoms(mol)      # a cage is no chain (its paths are too many to list)
 
     def dfs(atom_idx: int, visited: Set[int], path: List[int], results: List[List[int]]):
         # Skip excluded atoms
