@@ -25,6 +25,7 @@ input skeleton (verified in ``tests/unit/rules/test_phase14_nucleosides.py``).
 
 from __future__ import annotations
 
+import contextvars
 from typing import Dict, List, Optional, Tuple
 
 from rdkit import Chem
@@ -535,9 +536,41 @@ def _name_base_substituted(mol: Chem.Mol, core: _Core) -> Optional[str]:
     return _assemble_base_substituents(stem, sugar, subs)
 
 
+#: The / retained names of the retained-name table (``data/retained_names.py``): the names the
+#: systematic offer below stands before.
+RETAINED_NUCLEOSIDE_NAMES = frozenset({
+    "adenosine", "guanosine", "inosine", "cytidine", "uridine", "thymidine",
+    "2'-deoxyadenosine", "2'-deoxyguanosine", "2'-deoxycytidine", "2'-deoxyuridine",
+    "2'-adenylic acid", "3'-adenylic acid", "5'-adenylic acid", "5'-inosinic acid",
+})
+
+#: True inside the naming of:func:`systematic_nucleoside_name`: no nucleoside or nucleotide name is offered
+_NUCLEOSIDE_NAMES_OFF: contextvars.ContextVar = contextvars.ContextVar(
+    "orthonym_nucleoside_names_off", default=False)
+
+
+def nucleoside_names_off() -> bool:
+    """Whether the running naming leaves the nucleoside and nucleotide names out (:func:`systematic_nucleoside_name`)."""
+    return _NUCLEOSIDE_NAMES_OFF.get()
+
+
+def systematic_nucleoside_name(mol) -> Optional[str]:
+    """The systematic substitutive name of the molecule being named, offered before its nucleoside or nucleotide name.
+
+     INTRODUCTION (the Blue Book): "Preferred IUPAC names (PINs) are not identified for the compounds in
+    this Chapter", so 'adenosine' and '5'-adenylic acid':54943,:55003) are no PINs; the same
+    paragraph: "When the full structure is known, a 'systematic name' may be generated in accordance with Rules
+    described in Chapters through ". As for the amino acids (``amino_acids.systematic_amino_acid_name``) the
+    molecule is named once more with the nucleoside names left out and taken only as a PIN with its stereodescriptors
+    read back (``rules/systematic_offer.py``). Else None, and the caller keeps its nucleoside name, labelled below the
+    PIN. Only for the caller's whole molecule."""
+    from .systematic_offer import systematic_pin_offer
+    return systematic_pin_offer(mol, _NUCLEOSIDE_NAMES_OFF, "systematic_nucleoside_name")
+
+
 def name_nucleoside(mol: Chem.Mol) -> Optional[str]:
     """Name a decorated nucleoside / nucleotide, or return ``None`` (fail-closed)."""
-    if mol is None or len(Chem.GetMolFrags(mol)) != 1:
+    if mol is None or nucleoside_names_off() or len(Chem.GetMolFrags(mol)) != 1:
         return None
     core = _find_core(mol)
     if core is None or not _sugar_is_plain(mol, core):

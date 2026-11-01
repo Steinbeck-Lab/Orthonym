@@ -666,7 +666,11 @@ def _is_retained_name(mol, smiles, canonical_smiles, features=None, *, _style: s
     if retained_amino_acid_names_off():
         # the naming of rules.amino_acids.systematic_amino_acid_name: no retained amino-acid name ('glycine')
         from orthonym.data.amino_acids import is_retained_amino_acid_name
-        return not is_retained_amino_acid_name(name)
+        if is_retained_amino_acid_name(name):
+            return False
+    from orthonym.rules.nucleosides import RETAINED_NUCLEOSIDE_NAMES, nucleoside_names_off
+    if nucleoside_names_off() and name in RETAINED_NUCLEOSIDE_NAMES:
+        return False    # the naming of rules.nucleosides.systematic_nucleoside_name: no 'adenosine'
     return True
 
 
@@ -1842,6 +1846,14 @@ def _handle_retained_name(mol, smiles, canonical_smiles, features=None, *,
             offered = systematic_amino_acid_name(mol)
             if offered:
                 return offered
+        # INTRODUCTION (:50943): likewise the systematic name of a retained nucleoside or nucleotide
+        # ('adenosine', '5'-adenylic acid') is offered first (rules.nucleosides.systematic_nucleoside_name)
+        from orthonym.rules.nucleosides import RETAINED_NUCLEOSIDE_NAMES
+        if name in RETAINED_NUCLEOSIDE_NAMES:
+            from orthonym.rules.nucleosides import systematic_nucleoside_name
+            offered = systematic_nucleoside_name(mol)
+            if offered:
+                return offered
     if name and name.lower().strip() in PIN_DENY:
         from orthonym.metrics.provenance import record_non_pin_fragment
         record_non_pin_fragment(name)
@@ -1945,9 +1957,14 @@ def _is_nucleoside(mol, smiles, canonical_smiles, features=None, **kwargs) -> bo
 
 def _handle_nucleoside(mol, smiles, canonical_smiles, features=None, *,
                        style: str = "pin", **kwargs) -> Optional[str]:
-    """v23 Phase 14 — decorated nucleoside/nucleotide PIN (P-105.2/P-106)."""
-    from orthonym.rules.nucleosides import name_nucleoside
-    return name_nucleoside(mol)
+    """ a phase — decorated nucleoside/nucleotide name /. INTRODUCTION (the Blue Book)
+    identifies no PIN for it, so the systematic name of the molecule is offered first
+    (``rules.nucleosides.systematic_nucleoside_name``); the nucleoside name is the fallback."""
+    from orthonym.rules.nucleosides import name_nucleoside, systematic_nucleoside_name
+    name = name_nucleoside(mol)
+    if name is None:
+        return None
+    return systematic_nucleoside_name(mol) or name
 
 
 def _handle_decomposition_pre_general(mol, smiles, canonical_smiles, features=None, *,
