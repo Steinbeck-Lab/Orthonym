@@ -802,6 +802,9 @@ RETAINED_NAMES = {
     # All canonical SMILES verified via Chem.CanonSmiles + OPSIN RT 2026-03-16
     "c1ccc2c(c1)c1ccccc1c1ccccc21": "triphenylene",
     "c1cc2ccc3ccc4ccc5ccc6ccc1c1c2c3c4c5c61": "coronene",
+    "c1ccc2c(c1)c1cccc3c4c5ccccc5c5cccc(c2c13)c54": "rubicene",  # retained (the Blue Book)
+    "C1=c2ccccc2=Cc2cccc3cccc1c23": "pleiadene",  # retained (the Blue Book)
+    "c1cc2ccc3cc4ccc5ccc6ccc7cc8ccc1c1c2c3c2c4c5c6c7c2c81": "ovalene",  # retained (the Blue Book)
     "c1ccc2c(c1)-c1cccc3cccc-2c13": "fluoranthene",
 
     # === BENZOIC ACID DERIVATIVES (a phase expansion) ===

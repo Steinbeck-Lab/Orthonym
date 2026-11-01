@@ -96,8 +96,9 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     ``porphyrin`` implies its two N-H on N21 and N23 (the tetrapyrrole recommendations.1 that
      cites). The Blue Book gives such a name no PIN: "Preferred IUPAC names (PINs) are not
     identified for the compounds in this Chapter" INTRODUCTION,:50943; the porphyrin parent
-    belongs to, and "Coordination nomenclature is the primary nomenclature method used to name
-    organometallic compounds containing elements of Groups 3 through 12",:39753). The producer is
+    belongs to, and this sentence covers magnesium as well), and "Coordination nomenclature is the primary
+    nomenclature method used to name organometallic compounds containing elements of Groups 3 through 12",
+    :39753). The producer is
     ``rules.porphyrin.name_porphyrin_dianion``; ``rules.metal_macrocycles`` reads this table, and
     ``rules.salts.name_salt`` and ``rules.adducts.name_adduct`` read that module, at the tiers that
     name ions (the best-effort flags). Without the mechanism the ligand is named by the general
@@ -144,8 +145,8 @@ bonded, dative, an atom or an ion) is attempted by the mechanisms above, so an i
 producer names fails for want of a name and not for want of support of the element. The failure
 label of such an input is ``UNNAMEABLE`` and not ``UNSUPPORTED_ELEMENT``
 (``errors.classify_failure_limit``, through ``has_complete_scope``). The elements of Groups 1 and 2
-are admitted to ``ION_SALTS``, ``CARBANION_SALTS`` and ``ZERO_VALENT`` and are not complete: their failures keep
-their label.
+are admitted to ``ION_SALTS``, ``CARBANION_SALTS`` and ``ZERO_VALENT`` (magnesium also to ``MACROCYCLE`` and
+``DISCONNECT``) and are not complete: their failures keep their label.
 
 The valences are the charges of the cation that a rewrite of the structure may give the metal
 (a heterolytic disconnection of a metal-ligand bond adds one positive charge to the metal; the
@@ -219,6 +220,8 @@ METAL_SCOPE: Dict[str, MetalScope] = {
     # ('potassium(0)'): the lane of 2026-10-30
     **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({1})) for symbol in GROUP_1},
     **{symbol: MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT}), frozenset({2})) for symbol in GROUP_2},
+    # magnesium porphyrins (the chlorophyll core) are named on the porphyrin dianion like zinc's
+    "Mg": MetalScope(frozenset({ION_SALTS, CARBANION_SALTS, ZERO_VALENT, MACROCYCLE, DISCONNECT}), frozenset({2})),
     **{symbol: MetalScope(frozenset({ZERO_VALENT}), frozenset()) for symbol in ZERO_VALENT_METALS},
     **{symbol: MetalScope(ALL_MECHANISMS, frozenset(valences)) for symbol, valences in BONDED_METAL_VALENCES.items()},
     **{symbol: MetalScope(ALL_MECHANISMS - ({ELEMENT} if symbol in RETAINED_ION_METALS else frozenset()),

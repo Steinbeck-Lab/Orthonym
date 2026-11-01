@@ -409,6 +409,39 @@ POLYCYCLIC_DATA: Dict[str, Dict[str, Any]] = {
         'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
         'num_rings': 7,
     },
+    'ovalene': {
+        # retained PAH parent, Table 2.7 entry (1) (OCR'd as a figure before '(2) pyranthrene (PIN)',
+        # the Blue Book; named in the seniority list,:14776; 10 rings, 32 atoms). Numbering: OPSIN
+        # `ovalene -o extendedsmi` ($_AV: 1;2;2a;3;4;4a;5;6;6a;7;7a;8;9;9a;10;11;11a;12;13;13a;14;14a..14k), in the atom
+        # order of this SMILES (the OPSIN SMILES written without canonical reordering).
+        'canonical_smiles': 'c1cc2ccc3ccc4cc5ccc6ccc7ccc8cc1c1c2c3c4c2c5c6c7c8c12',
+        'smarts': 'c1cc2ccc3ccc4cc5ccc6ccc7ccc8cc1c1c2c3c4c2c5c6c7c8c12',
+        'num_atoms': 32,
+        'iupac_numbering': {0: 1, 1: 2, 2: '2a', 3: 3, 4: 4, 5: '4a', 6: 5, 7: 6, 8: '6a', 9: 7, 10: '7a', 11: 8, 12: 9, 13: '9a', 14: 10, 15: 11, 16: '11a', 17: 12, 18: 13, 19: '13a', 20: 14, 21: '14a', 22: '14b', 23: '14c', 24: '14d', 25: '14e', 26: '14f', 27: '14g', 28: '14h', 29: '14i', 30: '14j', 31: '14k'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        'num_rings': 10,
+    },
+    'rubicene': {
+        # retained PAH parent ('(4) rubicene (PIN)', Table 2.7, the Blue Book). Numbering: OPSIN `rubicene -o extendedsmi` ($_AV), in the
+        # atom order of this SMILES (the OPSIN SMILES written without canonical reordering).
+        'canonical_smiles': 'c1ccc2c3ccccc3c3c4cccc5c6ccccc6c(c1c23)c45',
+        'smarts': 'c1ccc2c3ccccc3c3c4cccc5c6ccccc6c(c1c23)c45',
+        'num_atoms': 26,
+        'iupac_numbering': {0: 1, 1: 2, 2: 3, 3: '3a', 4: '3b', 5: 4, 6: 5, 7: 6, 8: 7, 9: '7a', 10: '7b', 11: '7c', 12: 8, 13: 9, 14: 10, 15: '10a', 16: '10b', 17: 11, 18: 12, 19: 13, 20: 14, 21: '14a', 22: '14b', 23: '14c', 24: '14d', 25: '14e'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        'num_rings': 7,
+    },
+    'pleiadene': {
+        # retained PAH parent ('(7) pleiadene (PIN)', Table 2.7, the Blue Book). Numbering: OPSIN `pleiadene -o extendedsmi` ($_AV), in the
+        # atom order of the RDKit canonical SMILES below, mapped from OPSIN's atom order by a substructure match (the
+        # reverse lookup ``_SMILES_TO_NAME`` reads the canonical form).
+        'canonical_smiles': 'C1=c2ccccc2=Cc2cccc3cccc1c23',
+        'smarts': 'C1=c2ccccc2=Cc2cccc3cccc1c23',
+        'num_atoms': 18,
+        'iupac_numbering': {0: 7, 1: '7a', 2: 8, 3: 9, 4: 10, 5: 11, 6: '11a', 7: 12, 8: '12a', 9: 1, 10: 2, 11: 3, 12: '3a', 13: 4, 14: 5, 15: 6, 16: '6a', 17: '12b'},
+        'substituent_positions': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+        'num_rings': 4,
+    },
     'benzo[ghi]perylene': {
         # large peri-fused PAH (6 rings, 22 atoms). AUTHORITATIVE
         # IUPAC numbering derived 2026-07-09 from OPSIN

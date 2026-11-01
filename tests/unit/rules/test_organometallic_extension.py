@@ -61,10 +61,10 @@ _CONTROLS = [
 # Hard tail -- must STAY abstained (0-wrong: never forced to a wrong name).
 # * the bridged bimetallic acetylide (2 Mg, fused rings) is multinuclear ->
 # out of Phase-161 scope (is_multimetal);
-# * MgCl2 (halide-only, no organic sigma-ligand) has no best-effort form here.
+# (MgCl2 drawn with bonds is named through its ionic drawing since magnesium is admitted to that mechanism:
+# 'magnesium dichloride', systematic_verified -- test_the_bonded_magnesium_chloride_is_named_through_its_ions.)
 _HARD_TAIL = [
     "C1#C[Mg]C#CC2OC3C#C[Mg]C#CC=3OC1=2",
-    "Cl[Mg]Cl",
 ]
 
 
@@ -85,6 +85,17 @@ def test_hard_tail_abstains(smiles):
     """The hard tail must abstain -- never forced to a wrong name."""
     out = name_compound(smiles)
     assert errors.is_failure_name(out), f"expected abstention, got {out!r}"
+
+
+@pytest.mark.opsin_gate
+def test_the_bonded_magnesium_chloride_is_named_through_its_ions():
+    """A bonded drawing of a metal admitted to the ionic-drawing mechanism is named through that drawing, with the
+    label below the PIN (the contributor guide scope: a name reached through another drawing is systematic_verified)."""
+    from orthonym import Orthonym
+    from orthonym.cli import _emit_tier_flags
+    assert name_compound("Cl[Mg]Cl") == "magnesium dichloride"
+    row = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered("Cl[Mg]Cl")
+    assert (row["name"], row["tier"], row["is_pin"]) == ("magnesium dichloride", "systematic_verified", False), row
 
 
 @pytest.mark.roundtrip
