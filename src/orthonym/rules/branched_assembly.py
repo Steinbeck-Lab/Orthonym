@@ -61,14 +61,18 @@ _HALOGENS = frozenset({9, 17, 35, 53})
 _RING = 6
 
 
-def detect_assembly_or_branched(mol, ring_systems: List[Set[int]]) -> Optional[Dict]:
-    """``detect_ring_assembly`` of ``ring_systems``, else:func:`detect_branched_ring_assembly`. An unbranched assembly
-    of three or more benzene rings that carries substituents keeps the result of ``detect_ring_assembly`` when its name
-    is built and read back, and gets the numbering of this module otherwise (:func:`_renumbered`)."""
+def detect_assembly_or_branched(mol, ring_systems: List[Set[int]], features=None) -> Optional[Dict]:
+    """``detect_ring_assembly`` of ``ring_systems``, else:func:`detect_branched_ring_assembly`, else (with the
+    ``features`` of the molecule) the two-ring assembly that is the parent of a molecule with other rings on chains
+    (``rules.assembly_ring_branches``). An unbranched assembly of three or more benzene rings that carries
+    substituents keeps the result of ``detect_ring_assembly`` when its name is built and read back, and gets the
+    numbering of this module otherwise (:func:`_renumbered`)."""
     from .ring_assemblies import detect_ring_assembly
     info = detect_ring_assembly(mol, ring_systems)
     if info is None:
-        return detect_branched_ring_assembly(mol, ring_systems)
+        from .assembly_ring_branches import detect_assembly_with_ring_branches
+        return (detect_branched_ring_assembly(mol, ring_systems)
+                or detect_assembly_with_ring_branches(mol, ring_systems, features))
     return _renumbered(mol, ring_systems, info) or info
 
 

@@ -157,10 +157,8 @@ def test_unbuilt_ylidene_ring_declines_at_default(smiles, best_effort):
 
 
 @pytest.mark.parametrize("smiles", [
-    # the second ring is a ring assembly (biphenyl): its parent has no default-tier producer for a
-    # substituent that is a ring, in the saturated case either ('1-cyclohexyl-4-phenylbenzene')
-    "C(=C1CCCCC1)c1ccc(cc1)c1ccccc1",
-    "C(C1CCCCC1)c1ccc(cc1)c1ccccc1",
+    # LEADS2 2026-11-01: the two rows with a biphenyl ('C(=C1CCCCC1)c1ccc(cc1)c1ccccc1' and its saturated
+    # twin) are PINs now, built on the assembly (tests/unit/rules/test_leads2_assembly_ring_branches.py)
     # two benzene rings tie and (alphanumerical order) decides; neither prefix is built at the
     # default tier, so neither name is claimed ('1-benzylidene-2-phenylcyclopentane' was a false PIN)
     "c1ccccc1C=C1CCCC1c1ccccc1",

@@ -2814,6 +2814,17 @@ def _name_substituent(mol, sub_atoms: List[int],
     if _is_carboxyl_substituent(mol, sub_atoms, attachment_atom):
         return 'carboxy'
 
+    # The substituent namer reads the fragment with the atom that bonds to the ring: ``name_substituent``,
+    # the one the ring-bearing branch and the alkoxy route above use): '-SC6H13' is 'hexylsulfanyl', '-NHCH3'
+    # 'methylamino', '-SO2CH3' 'methanesulfonyl'. The fallback below names the fragment ALONE, so it cannot tell
+    # which atom bonds to the ring ('-NHCH3' came out as 'aminomethyl', '-OC(=O)CH3' as 'acetyl', '-SC2H5' as
+    # None); it stays the last resort, for a group the substituent namer leaves unnamed.
+    if sub_atoms:
+        from ..assembly.substituent_enumerator import name_substituent
+        token = name_substituent(mol, sub_atoms, attachment_atom)
+        if token and token != 'substituent':
+            return token
+
     # Fallback: use recursive naming via name_fragment_recursively
     # This handles compound substituents (C + heteroatoms) on ring assemblies,
     # such as COOH, CONH2, CHO, etc., that the simple patterns above miss.
@@ -3242,6 +3253,55 @@ def _format_prime(ring_index: int) -> str:
     return "'" * ring_index
 
 
+def _first_cited_key(mol, substituent_list: List[Dict], swap: bool) -> tuple:
+    """The (g) tier of the choice of the unprimed ring of a two-ring assembly: ``(locant, ring)`` of the prefix cited
+    first, the ring read as ``swap`` says; ```` when a group of the molecule is a suffix or has no prefix name.
+
+     (g) (``### **** NUMBERING``, the Blue Book;:3303 "(g) lowest locants for the substituent cited
+    first as a prefix in the name"): when the locant sets tie, the prefix cited first takes the lowest locant, the
+    unprimed one at equal numbers (:3193 "Primed locants are placed immediately after the corresponding unprimed
+    locants in a set arranged in ascending order"): '4-bromo-4'-chloro-1,1'-biphenyl'. A group that is a suffix
+     (c)) is placed by the suffix builders, so the tier reads prefix-only substituents."""
+    if (not substituent_list or not all(s.get('name') for s in substituent_list)
+            or any(_ring_assembly_pcg_suffix(mol, s['sub_atoms'], s['sub_atoms'][0]) for s in substituent_list)):
+        return ()
+    from ..assembly.naming_utils import alpha_sort_key
+    first = min((s['name'] for s in substituent_list), key=alpha_sort_key)
+    return min(((s['locant'], (1 - s['system_idx']) if swap else s['system_idx'])
+                for s in substituent_list if s['name'] == first), default=())
+
+
+def _pcg_left_as_prefix(features) -> bool:
+    """True when the molecule has a principal characteristic group that the suffix and mixed builders of
+    ``name_ring_assembly`` did not express: the prefix-only name would cite it as a prefix.
+
+     (``### **** SENIORITY ORDER FOR PARENT STRUCTURES``, the Blue Book): "The senior parent
+    structure has the maximum number of substituents corresponding to the principal characteristic group (suffix)".
+    An amide, a thiol, a ketone, an N-substituted amine or an ester cited as a prefix is no PIN spelling of it
+    ('4-carbamoyl-1,1'-biphenyl' for the PIN '[1,1'-biphenyl]-4-carboxamide'): the name is declined, and the other
+    producers name the molecule. ``features`` is None when the caller names a part with no principal group."""
+    return features is not None and bool(getattr(features, 'principal_group', None))
+
+
+def _labelled_below_pin_if_pcg_prefix(text: str, features, assembly_info: Dict) -> Optional[str]:
+    """``text`` unchanged; when it cites a principal characteristic group as a prefix (:func:`_pcg_left_as_prefix`)
+    it is recorded as a non-PIN part (``record_non_pin_label``, rule: the name still describes the molecule,
+    so it ships below the PIN instead of being withdrawn ('4-carbamoyl-1,1'-biphenyl', PIN
+    '[1,1'-biphenyl]-4-carboxamide'). Only an assembly of three or more components keeps it: its primed name is
+    already the recorded non-PIN fallback of (composite locants, which the active OPSIN may not read).
+    A two-component assembly is declined, so that a parent that carries the group as a suffix names the molecule
+    ('2-hydroxy-4-[5-(thiophen-2-yl)thiophen-2-yl]but-3-yn-1-yl acetate'); so is any ``pcg_prefix_declines``
+    request (``rules.assembly_ring_branches``, where the single-ring name stands)."""
+    if _pcg_left_as_prefix(features):
+        if assembly_info.get('pcg_prefix_declines') or (assembly_info.get('count') or 0) < 3:
+            return None
+        from ..metrics.provenance import record_non_pin_label
+        record_non_pin_label(
+            text, rule="P-44.1.1",
+            detail=f"ring assembly name '{text}' cites a principal characteristic group as a prefix")
+    return text
+
+
 def name_ring_assembly(
     mol, assembly_info: Dict, features: Any
 ) -> Optional[str]:
@@ -3268,7 +3328,7 @@ def name_ring_assembly(
     """
     # /: a hydro-modified assembly of two identical skeletons was named, and
     # certified, when it was detected (``detect_hydro_ring_assembly``).
-    if assembly_info.get('hydro') or assembly_info.get('branched') and assembly_info.get('name'):
+    if assembly_info.get('hydro') or (assembly_info.get('branched') or assembly_info.get('ring_branches')) and assembly_info.get('name'):
         return assembly_info.get('name')
 
     #: skeletal-replacement ring assembly (mixed/single-heteroatom
@@ -3422,7 +3482,7 @@ def name_ring_assembly(
             for s in substituent_list:
                 eff_sys = (1 - s['system_idx']) if swap else s['system_idx']
                 sub_key.append((s['locant'], eff_sys))
-            return (sorted(conn_key), sorted(ih_key), sorted(sub_key))
+            return (sorted(conn_key), sorted(ih_key), sorted(sub_key), _first_cited_key(mol, substituent_list, swap))
 
         if _combined_key(True) < _combined_key(False):
             ring_systems = [ring_systems[1], ring_systems[0]]
@@ -3764,7 +3824,7 @@ def name_ring_assembly(
 
     sub_prefix = "-".join(prefix_parts)
 
-    return f"{sub_prefix}-{base_name}"
+    return _labelled_below_pin_if_pcg_prefix(f"{sub_prefix}-{base_name}", features, assembly_info)
 
 
 def name_ring_assembly_prefix(

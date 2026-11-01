@@ -58,7 +58,11 @@ Mechanisms (each is a constant below; a task that builds a mechanism adds its co
     terms). The terminal ligands are the prefixes of ``TERMINAL_LIGAND_PREFIXES`` in
     ``data/organometallics.py`` (hydrido, hydroxy, sulfanyl, amino, oxo, sulfanylidene); a charge is
     the closing charge number of the complex, as in 'pentaammine(ethyl)osmium(1+)'. The
-    producer is ``rules.organometallics._assemble_bonded_metal_name``. The Blue Book gives no PIN for
+    producer is ``rules.organometallics._assemble_bonded_metal_name``. A halide beside a multiply bonded ligand is
+    cited with the book's ligand word ('dichlorido(methylidene)titanium',: an anion name ending in 'ide' ends
+    in 'ido' as a ligand; the active OPSIN reads it through its 'chloro' twin, ``validation.halido_twin``), and a
+    multiplied halide, hydrido, oxo, hydroxy or amino ligand takes no enclosing marks ('benzylidenedichloridoruthenium',
+    . The Blue Book gives no PIN for
     such a compound: "Coordination nomenclature is the primary nomenclature method used to name
     organometallic compounds containing elements of Groups 3 through 12", and
     PREFERRED IUPAC NAMES gives the label "PIN" to "the names of compounds whose parent hydride

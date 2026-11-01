@@ -5847,7 +5847,7 @@ def _assemble_heterocycle_name(features: Any, style: str) -> str:
     if parent_name is None:
         parent_name = name_heterocycle(
             features.mol, features.principal_ring,
-            principal_group_atoms=_pcg_flat or None)
+            principal_group_atoms=_pcg_flat or None, substituent_holds_h=True)
     if parent_name is None:
         # A ring heteroatom has no replacement prefix in the governing table, so
         # the parent cannot be spelled. Refuse before decorating it with

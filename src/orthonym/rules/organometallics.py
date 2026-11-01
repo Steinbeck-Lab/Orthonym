@@ -758,7 +758,7 @@ def _halide_ligand_spelling(name: str) -> str:
     return name
 
 
-def _ligand_token(count: int, name: str, first: bool) -> str:
+def _ligand_token(count: int, name: str, first: bool, metal: bool = False) -> str:
     """One multiplied ligand prefix of a parent that takes substituent prefixes: a hydride
     parent (Group 14) or a metal (``_assemble_bonded_metal_name``).
 
@@ -778,11 +778,19 @@ def _ligand_token(count: int, name: str, first: bool) -> str:
     the parentheses" -- 'ethyldi(methyl)phosphane (PIN)',
     'ethyldi(propan-2-yl)silane (PIN)', '*tert*-butyldi(methyl)
     phosphane (PIN)' (:16286)."""
-    from ..assembly.naming_utils import has_structural_hyphen
+    from ..assembly.naming_utils import has_structural_hyphen, multiplied_component
     from ..assembly.prefix_marks import mononuclear_group_token
 
     # a compound ligand (a structural hyphen, an inner mark, a compound R-oxy) takes marks as the first ligand too
     compound = (has_structural_hyphen(name) or '(' in name or _is_complex_ligand_oxy(name))
+    if metal and count > 1 and not compound and name in _BARE_MULTIPLE_LIGANDS:
+        # a metal is no mononuclear parent hydride does not reach it): a multiplied halide, hydrido, oxo,
+        # hydroxy or amino ligand is cited with no marks, 'trichlorido(methanido)titanium', the Blue Book:
+        # 39789), bis/tris only for a compound ligand,:7232); advisor ruling 2026-11-01. An organyl
+        # ligand keeps its marks, as the book keeps them where the bare name would read as another structure
+        # ('(chloromethyl)silane [PIN; the name chloro(methyl)silane would describe ClSiH2CH3]',; OPSIN
+        # reads 'hydroxydimethylzinc(1-)' as hydroxymethyl(methyl)zinc), and 'bis(sulfanyl)' (:7140) keeps its own
+        return multiplied_component(count, name, name)
     return mononuclear_group_token(count, name, first=first, enclosed=compound)
 
 
@@ -806,9 +814,16 @@ def _terminal_ligand_prefix(mol: Any, metal_idx: int, lg: Any) -> Optional[str]:
     return TERMINAL_LIGAND_PREFIXES.get((atom.GetSymbol(), order, atom.GetTotalNumHs()))
 
 
-#: the prefix of a halide ligand beside a multiply bonded one: the substituent prefix that (the Blue Book)
-#: allows as a ligand name; OPSIN reads 'dichloro(methylidene)titanium' and not the 'chlorido' of the inorganic name
-_HALIDE_LIGAND_PREFIXES = {'[F-]': 'fluoro', '[Cl-]': 'chloro', '[Br-]': 'bromo', '[I-]': 'iodo'}
+#: the ligand word of a halide beside a multiply bonded ligand: 'chlorido' is the only book form on a Group 3-12 metal
+#:, the Blue Book: an anion name ending in 'ide' ends in 'ido' as a ligand; every example keeps it,
+#: 'trichlorido(methanido)titanium':39789). The active OPSIN reads no 'chlorido' ligand word ('dichloro(methylidene)
+#: titanium' is what it reads), so the name ships when its 'chloro' twin reads back (``validation.halido_twin``); an
+#: OPSIN that reads the word reads the name itself (advisor ruling 2026-11-01). No PIN: (:39753).
+_HALIDE_LIGAND_PREFIXES = {'[F-]': 'fluorido', '[Cl-]': 'chlorido', '[Br-]': 'bromido', '[I-]': 'iodido'}
+
+#: the ligand words of a metal that a multiplier joins without marks: the halide words, 'hydrido' and the terminal prefixes
+#: that cannot be read as the substituent of another ligand name
+_BARE_MULTIPLE_LIGANDS = frozenset(set(_HALIDE_LIGAND_PREFIXES.values()) | {'hydrido', 'oxo', 'hydroxy', 'amino'})
 
 #: the endings of a substituent prefix of a group joined by a double or a triple bond, 'ylidene',
 #: 'ylidyne', the imino prefixes of
@@ -933,12 +948,13 @@ def _assemble_bonded_metal_name(metal_complex: Any, mol: Any
     if not novel:
         return None
     grouped = _alphabetize_simple_ligands(_group_ligand_counts(names))
-    ligand_prefix = ''.join(_ligand_token(count, name, k == 0)
+    ligand_prefix = ''.join(_ligand_token(count, name, k == 0, metal=True)
                             for k, (count, name) in enumerate(grouped))
     metal_name = info['direct'] + ('' if charge == 0 else f"({abs(charge)}{'+' if charge > 0 else '-'})")
     nodes = [NameTreeNode(parent_stem=name, multiplicative_prefix=_multiplicative_prefix(count) or None,
                           class_id='organometallic_ligand') for count, name in grouped]
-    return (f"{ligand_prefix}{metal_name}", metal_name, nodes)
+    from ..validation.halido_twin import note_bonded_halido_name
+    return (note_bonded_halido_name(f"{ligand_prefix}{metal_name}"), metal_name, nodes)
 
 
 def assemble_organometallic_name(metal_complex: Any, mol: Any,

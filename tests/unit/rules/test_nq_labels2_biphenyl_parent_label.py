@@ -21,12 +21,12 @@ from tests.support.rt_assert import assert_full_rt, name_best_effort
 pytestmark = pytest.mark.opsin_gate
 
 # (smiles, the single-ring name the engine builds and keeps below the PIN)
+# LEADS2 2026-11-01: the benzyloxy, phenoxy and benzyl rows are named on the assembly now
+# (``rules.assembly_ring_branches``, ``test_leads2_assembly_ring_branches.py``); these two still are not: the
+# assembly builders cite no N,N-dimethylamino suffix and no pyridinylmethyl prefix.
 DEMOTED = [
-    ("Oc1ccc(-c2ccccc2)cc1OCc1ccccc1", "2-(benzyloxy)-4-phenylphenol"),                  # the item
     ("CN(C)c1ccc(-c2ccccc2)cc1Cc1ccncc1", "N,N-dimethyl-4-phenyl-2-[(pyridin-4-yl)methyl]aniline"),  # the item
     ("OC(=O)c1ccc(-c2ccccc2)cc1Cc1ccncc1", "4-phenyl-2-[(pyridin-4-yl)methyl]benzoic acid"),
-    ("COc1ccc(-c2ccccc2)cc1OCc1ccccc1", "2-(benzyloxy)-1-methoxy-4-phenylbenzene"),
-    ("c1ccc(Oc2ccccc2-c2ccccc2)cc1", "1-phenoxy-2-phenylbenzene"),     # the Blue Book row 2-phenoxy-1,1'-biphenyl
 ]
 
 

@@ -26,6 +26,7 @@ import re
 from collections import deque
 from typing import Dict, List, Optional, Set, Tuple
 
+from .azole_numbering import indicated_locants, numbering_starts, pyrrole_type_atoms
 from .pyrrole_type import is_pyrrole_type
 from .ring_numbering_ties import ring_numbering_tie_key as _ring_tie_key
 
@@ -435,23 +436,8 @@ def orient_heterocycle_with_substituents(
     # picking the (start, direction) pair that yields the globally minimum
     # tiered (hetero > pg > sub) locant comparison.
     _canon_rank = list(Chem.CanonicalRankAtoms(mol, breakTies=True))
-    sorted_heteroatoms = sorted(
-        heteroatoms,
-        key=lambda x: (
-            get_heteroatom_priority(x[1]),
-            0 if _occupies_indicated_h_position(mol, x[0], ring_set) else 1,
-            _canon_rank[x[0]],
-        )
-    )
-    best_prio = get_heteroatom_priority(sorted_heteroatoms[0][1])
-    best_hcount = (0 if _occupies_indicated_h_position(
-        mol, sorted_heteroatoms[0][0], ring_set) else 1)
-    # Collect all atoms that share the best (priority, h_count) tier
-    start_candidates = [
-        idx for idx, sym in heteroatoms
-        if get_heteroatom_priority(sym) == best_prio
-        and (0 if _occupies_indicated_h_position(mol, idx, ring_set) else 1) == best_hcount
-    ]
+    # (a) fixed numbering, then (b) indicated hydrogen: ``azole_numbering``
+    start_candidates = numbering_starts(mol, ring_set, heteroatoms, mancude_hydrogen)
 
     pg_set = principal_group_atoms or set()
 
@@ -461,9 +447,10 @@ def orient_heterocycle_with_substituents(
         oriented_r = _rotate_ring(ring_list, s_pos, direction)
         loc_map = {atom_idx: pos for pos, atom_idx in enumerate(oriented_r, 1)}
         hetero = sorted(loc_map[idx] for idx, _ in heteroatoms if idx != start_idx)
+        indicated = indicated_locants(mol, ring_set, heteroatoms, loc_map, mancude_hydrogen)
         pg = sorted(loc_map[idx] for idx in pg_set if idx in loc_map)
         sub = sorted(loc_map[idx] for idx in substituent_positions if idx in loc_map)
-        return (hetero, pg, sub), oriented_r
+        return (hetero, indicated, pg, sub), oriented_r
 
     cands = []
     for start_idx in start_candidates:
@@ -2559,7 +2546,7 @@ def _name_lambda_heteromonocycle(mol, oriented, heteroatom_locants, info) -> Opt
     return ih_prefix + _apply_retained_stem(hw)
 
 
-def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[str]:
+def name_heterocycle(mol, ring_atoms, principal_group_atoms=None, substituent_holds_h=False) -> Optional[str]:
     """
     Generate IUPAC name for a heterocyclic ring.
 
@@ -2728,7 +2715,7 @@ def name_heterocycle(mol, ring_atoms, principal_group_atoms=None) -> Optional[st
     # mancude monocyclic parent (2H-1,3-dioxole, 1H-azirine, 2H-/4H-pyran).
     # Returns '' outside its fail-closed scope (aromatic, saturated, hydro
     # forms, multi-indicated-H rings) — the bare-stem status quo.
-    ih = _monocycle_indicated_h_prefix(mol, oriented, info)
+    ih = _monocycle_indicated_h_prefix(mol, oriented, info, substituent_holds_h)
     if ih:
         hw_name = ih + hw_name
 
@@ -2759,7 +2746,7 @@ def _orders_keeping_heteroatom_map(mol, ring_order: List[int], heteroatom_map=No
                 yield order
 
 
-def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
+def _monocycle_indicated_h_prefix(mol, oriented: List[int], info, substituent_holds_h: bool = False) -> str:
     """Indicated-hydrogen prefix ('2H-') for a mancude monocyclic HW parent.
 
      /: after the maximum number of noncumulative
@@ -2787,12 +2774,7 @@ def _monocycle_indicated_h_prefix(mol, oriented: List[int], info) -> str:
         # an indicated hydrogen at that atom -> 1H-phosphole (like 1H-pyrrole;
         # pyrrole itself never reaches here, it is a retained name). Pyridine-
         # type =N- (no H) and >1 such atom fall through to '' (status quo).
-        _PYRROLE_TYPE = frozenset({'N', 'P', 'As', 'Sb'})
-        pyrrole_atoms = [
-            idx for idx in oriented
-            if mol.GetAtomWithIdx(idx).GetSymbol() in _PYRROLE_TYPE
-            and mol.GetAtomWithIdx(idx).GetTotalNumHs() >= 1
-        ]
+        pyrrole_atoms = pyrrole_type_atoms(mol, ring_set, oriented, substituent_holds_h)   # azole_numbering
         if len(pyrrole_atoms) != 1:
             return ""
         target = pyrrole_atoms[0]

@@ -37,7 +37,7 @@ ROWS = [
     ("N.N.N.N.[NH2-].[NH2-].[Ru+2]", "ammonia—azanide—ruthenium(2+) (4/2/1)"),
     ("Cl[Ti+](Cl)Br", "bromide—chloride—titanium(4+) (1/2/1)"),
     ("C(C(Cl)Cl)O.O=[V+2]", "2,2-dichloroethan-1-ol—oxovanadium(2+) (1/1)"),
-    ("O.O.O[W](=O)(=O)O", "dihydroxydi(oxo)tungsten—water (1/2)"),
+    ("O.O.O[W](=O)(=O)O", "dihydroxydioxotungsten—water (1/2)"),
     # uranium, admitted on 2026-10-31 (MORE_BONDED_METAL_VALENCES)
     ("O=[U](=O)=O", "trioxouranium"),
     ("F[U](F)(F)(F)(F)F", "uranium(VI) fluoride"),
@@ -182,25 +182,29 @@ def test_no_declared_move_lowers_a_pin_label():
 def _best_effort_row_checks(smiles, expected):
     """The best-effort name of ``smiles`` is ``expected``, below the PIN, read back to the full key of the drawing
     (a dative drawing against the drawing without its dative bonds); the default tier ships no PIN for it."""
+    from orthonym.validation.halido_twin import halido_twin
     res = name_best_effort(smiles)
-    if not _opsin_reads(expected):
+    read_as = halido_twin(expected)     # a halide ligand word no OPSIN reads is read through its 'chloro' twin (R2)
+    if not _opsin_reads(read_as):
         assert res["name"] is None, res          # no name, never a wrong one (OPSIN 2.9.0 cannot read it)
         return
     assert res["name"] == expected and res["tier"] == "systematic_verified" and not res["is_pin"], res
-    assert name_is_rt_exact(res["name"], smiles_without_dative_bonds(smiles) or smiles), res
+    assert name_is_rt_exact(read_as, smiles_without_dative_bonds(smiles) or smiles), res
     assert _tiered_namer("pin", "pin").name_tiered(smiles)["tier"] != "pin_verified"
 
 
 #: organic groups joined to the metal by a double or a triple bond, and halides beside a multiply bonded ligand: the
 #: ligand prefixes are those of ('methylidene', 'ethylidyne'; 'imino',, cited as ligands in
 #: alphanumerical order before the metal Compounds with at least one metal-carbon single bond); the halide is
-#: 'chloro' (a substituent prefix, and the terminal =O is 'oxo'. The name states the bond order: the
+#: 'chlorido', the Blue Book: an anion name ending in 'ide' ends in 'ido' as a ligand; the active OPSIN
+#: reads the name through its 'chloro' twin; LEADS2 fix round R2, advisor ruling 2026-11-01, changed asserted values: the
+#: rows were 'dichloro(...)') and the terminal =O is 'oxo'. The name states the bond order: the
 #: single-bonded name of the same atoms ('methyl') would read back as another structure
 MULTIPLY_BONDED_ROWS = [
-    ("C=[Ti](Cl)Cl", "dichloro(methylidene)titanium"),
-    ("CC#[W](Cl)(Cl)Cl", "trichloro(ethylidyne)tungsten"),
-    ("Cl[Ti](Cl)=Nc1ccccc1", "dichloro(phenylimino)titanium"),
-    ("O=[V](Cl)Cl", "dichloro(oxo)vanadium"),
+    ("C=[Ti](Cl)Cl", "dichlorido(methylidene)titanium"),
+    ("CC#[W](Cl)(Cl)Cl", "trichlorido(ethylidyne)tungsten"),
+    ("Cl[Ti](Cl)=Nc1ccccc1", "dichlorido(phenylimino)titanium"),
+    ("O=[V](Cl)Cl", "dichlorido(oxo)vanadium"),
     ("C=[Pd]", "methylidenepalladium"),
     ("C=[Zn]", "methylidenezinc"),
 ]
@@ -214,16 +218,43 @@ def test_a_multiply_bonded_ligand_is_named_with_the_order_of_its_bond(smiles, ex
     assert (pin["tier"], pin["is_pin"]) == ("abstain", False) and pin["limit_code"] == "NO_VERIFIED_PIN", pin
 
 
-def test_a_halide_is_cited_as_chloro_only_beside_a_multiply_bonded_ligand():
+def test_a_halide_is_cited_as_chlorido_beside_a_multiply_bonded_ligand_as_in_the_books_example():
     """The ionic drawing of such a complex breaks only the single bonds, so the charge it gives the metal is not the
-    metal's: the halide is cited as a ligand ('chloro') beside a multiply bonded one. A drawing with halides and single
-    bonded groups only is named as before by the branch of the book's own example, 'trichlorido(methyl)titanium'
-     Compounds with at least one metal-carbon single bond: 'trichlorido(methyl)titanium'), and is not renamed
-    'trichloro(methyl)titanium'."""
+    metal's: the halide is cited as a ligand beside a multiply bonded one, with the ligand word of the book's own example,
+    'trichlorido(methyl)titanium' Compounds with at least one metal-carbon single bond), and not as 'chloro'.
+    LEADS2 fix round R2 (advisor ruling 2026-11-01): 'chlorido' is the only book form on a Group 3-12 metal,
+    the Blue Book); no coordination name is a PIN,:39753): the label ceiling is systematic_verified, and
+    the PIN tier declines. The names are read through their 'chloro' twin."""
     plain = name_best_effort("C[Ti](Cl)(Cl)Cl")
     assert (plain["name"], plain["tier"], plain["is_pin"]) == ("trichlorido(methyl)titanium", "systematic_verified",
                                                               False), plain
-    assert name_best_effort("C=[Ti](Cl)Cl")["name"] == "dichloro(methylidene)titanium"
+    multiple = name_best_effort("C=[Ti](Cl)Cl")
+    assert (multiple["name"], multiple["tier"], multiple["is_pin"]) == (
+        "dichlorido(methylidene)titanium", "systematic_verified", False), multiple
+    assert name_is_rt_exact("dichloro(methylidene)titanium", "C=[Ti](Cl)Cl")           # the twin the name is read through
+    assert _tiered_namer("pin", "pin").name_tiered("C=[Ti](Cl)Cl")["tier"] == "abstain"
+
+
+def test_a_multiplied_simple_ligand_of_a_metal_takes_no_enclosing_marks():
+    """ (:39789) 'trichlorido(methanido)titanium'; a metal is no mononuclear parent hydride, so
+    (:7272, 'tert-butyldi(methyl)phosphane') does not reach it: 'benzylidenedichloridoruthenium', not
+    'benzylidenedi(chlorido)ruthenium' (advisor ruling 2026-11-01, R4); bis/tris only for a compound ligand
+    ,:7232). An organyl ligand keeps its marks where the bare name would read as another structure
+    ('(chloromethyl)silane [PIN; the name chloro(methyl)silane would describe ClSiH2CH3]',; OPSIN reads
+    'hydroxydimethylzinc(1-)' as hydroxymethyl(methyl)zinc), and 'bis(sulfanyl)' keeps its own (:7140; the rows of ``test_group12_inorganic_ligands``)."""
+    assert name_best_effort("Cl[Ru](Cl)=Cc1ccccc1")["name"] == "benzylidenedichloridoruthenium"
+    assert name_best_effort("Cl[Mo](Cl)(=O)=O")["name"] == "dichloridodioxomolybdenum"
+    assert name_is_rt_exact("benzylidenedichlororuthenium", "Cl[Ru](Cl)=Cc1ccccc1")
+    assert name_best_effort("[Zn-](O)(C)C")["name"] == "hydroxydi(methyl)zinc(1-)"
+
+
+def test_one_component_twice_has_no_pin_and_the_pin_tier_declines_it():
+    """'oxozinc oxozinc' (R3, advisor ruling 2026-11-01): the book has no form for one component twice,:4667;
+    ,:3765 uses distinct components with ratios): systematic_verified at best, the PIN tier declines."""
+    for smiles in ("O=[Zn].O=[Zn]", "CCO.CCO"):
+        row = name_best_effort(smiles)
+        assert row["tier"] == "systematic_verified" and row["is_pin"] is False, row
+        assert _tiered_namer("pin", "pin").name_tiered(smiles)["tier"] == "abstain"
 
 
 #: the cations of tin and lead on their parent hydrides: PINs ('triphenylsilylium (PIN)',:41557, is the Group 14 example
