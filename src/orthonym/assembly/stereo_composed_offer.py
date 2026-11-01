@@ -156,6 +156,11 @@ def stereo_composed_row(namer, smiles) -> Optional[Dict]:
         flat = stereo_free_smiles(smiles)
         if flat is None:
             return None
+        from rdkit import Chem
+
+        from ..errors import is_fullerene
+        if is_fullerene(Chem.MolFromSmiles(flat)):
+            return None     # no OPSIN reads a fullerene name, so the composed name never reads back: no second naming
         return _composed_row(namer, smiles, flat)
     except Exception:                       # the offer must never break a naming: the abstention stands
         return None

@@ -32,7 +32,7 @@ from .errors import (
     OrthonymLimitError,
     classify_failure_limit,
     classify_scope_limit,
-    fullerene_limit,
+    is_fullerene,
     is_failure_name,
     is_refusal_sentinel,
     no_verified_pin,
@@ -46,6 +46,7 @@ from .rules.inositols import is_inositol_name_of   # no OPSIN grammar; exact InC
 from .validation.twin_spellings import (publish_tier_flags, twin_gate_ships, twin_offer_holds,
                                         twin_outcome_holds, wider_tier_ctx)
 from .validation.halido_twin import HAPTO_DESCRIPTOR
+from .validation.fullerene_read_back import fullerene_gate_ships
 from .validation.uide_twin import uide_twin_outcome
 from .validation.stereo_descriptors import (  # noqa: F401 both names are imported FROM this module (tests, spies); callers resolve them here at call time
     stereo_block_units as _stereo_block_units,
@@ -2459,41 +2460,10 @@ def _self_consistency_decision(name: str, smiles: Optional[str], opsin_smiles: s
 
 
 def _grammar_gap_carveout(name: str, smiles: Optional[str] = None) -> Optional[str]:
-    """The carve-out slug of a construction-verified name whose CLASS OPSIN 2.9.0
-    has no grammar for at all, or None.
-
-    For these classes a healthy OPSIN call can only answer 'rejected' (each
-    docstring above records the verification: no inositol or Table 10.1 stereoparent name,
-    no phane grammar), so the name ships on its construction alone (a phane name when the
-    structure it states is the input's, validation.phane_read_back) and
-    OPSIN's answer adds nothing. The validity gate therefore consults this both
-    after a 'rejected' answer and on 'unavailable': the output of these classes does
-    not depend on whether OPSIN could be reached (TRIAGE j12 finding 1).
-
-    NOT here: the thioperoxol names (no OPSIN grammar either; the default tier ships each through
-    its twin read-back, ``validation.thioperoxol_twin``; a general tier ships the name OPSIN reads,
-    and the anion of -S-OH, which has none, through its twin), the organometallic additive carve-out
-    (OPSIN parses some '-ido' ligand names, and the class has a known atom-drop hole, so a
-    healthy run's on a parsed name is a real check), the stereo-layer carve-out (its
-    licence is a parse of the stereo-stripped form) and the polyacid carve-out (reached only
-    after a parse)."""
-    try:
-        from .rules.inositols import INOSITOL_NAMES
-        if name in INOSITOL_NAMES:
-            return "inositol"
-    except Exception:
-        pass
-    try:
-        from .data.natural_products import NAME_EXACT_NP_PARENTS
-        if name in NAME_EXACT_NP_PARENTS:
-            return "np_stereoparent"
-    except Exception:
-        pass
-    from .validation.phane_read_back import phane_name_shape, phane_read_back
-    if phane_name_shape(name):
-        # OPSIN has no phane grammar; the name ships when the structure it states is the input's
-        return "phane" if phane_read_back(name, smiles) else None
-    return None
+    """The carve-out slug of a construction-verified name whose class OPSIN 2.9.0 has no grammar for, or None
+    (``validation.grammar_gap.grammar_gap_carveout`` holds the classes and the reason each ships)."""
+    from .validation.grammar_gap import grammar_gap_carveout
+    return grammar_gap_carveout(name, smiles)
 
 
 def _ship_grammar_gap_carveout(name: str, slug: str) -> str:
@@ -2767,7 +2737,9 @@ def _final_opsin_validity_gate(name: str, smiles: Optional[str],
             _np_exact_hit = False
         # A halogen -uide name (no OPSIN grammar at any tier) ships on its twin read-back (validation.uide_twin).
         # The inositol of the very structure (exact InChIKey of a meso stereoisomer) ships the same way.
-        if not (_np_exact_hit or is_inositol_name_of(smiles, name) or twin_gate_ships(name, smiles, True)):
+        # A fullerene name (OPSIN reads none) ships on the engine's own reader.
+        if not (_np_exact_hit or is_inositol_name_of(smiles, name) or twin_gate_ships(name, smiles, True)
+                or fullerene_gate_ships(name, smiles)):
             _record_unparseable_general_fallback(name, smiles)
             _suppressed_to = _descriptive_fallback(smiles)
             _record_gate_outcome(_pv.GATE_OUTCOME_SUPPRESSED, _suppressed_to)
@@ -6621,6 +6593,8 @@ class Orthonym:
         floor standing in for a rung candidate that failed its round trip
         (``t4_coverage.last_t4_was_floor_substitute``), so the caller can let a clean-context
         recovery offer the engine's own name first (``_prefer_clean_over_floor_substitute``)."""
+        if is_fullerene(Chem.MolFromSmiles(smiles)):
+            return None   # the engine names no cage (it declines one in seconds): a fullerene has the primary path only
         from .assembly.budget_rescue import recover_beyond_ring_ceiling
         origin: dict = {}
         rec = recover_beyond_ring_ceiling(self, smiles, origin)
@@ -7463,8 +7437,8 @@ class Orthonym:
         # another best-effort rescue, must not re-enter the offer (its own
         # ship-failure hooks can be top-level because is_top_level_naming keys
         # off the fragment `visited` set, not session depth).
-        if self._forced_parent_rank != 0:
-            return None
+        if self._forced_parent_rank != 0 or is_fullerene(Chem.MolFromSmiles(smiles)):
+            return None   # (a fullerene: each retry costs minutes on the cage, and the primary path names it or none does)
         if getattr(_ALT_PARENT_RESCUE, 'active', False):
             return None
         # tier-policy: run at the COMPLETE tier (`_general_fallback`), not
@@ -8021,8 +7995,8 @@ class Orthonym:
         contract that a coverage-audit failure must never change or crash the
         name.
         """
-        if mol is None or fullerene_limit(mol) is not None:
-            return   # no mol, or declined at once (a fullerene cage)
+        if mol is None or is_fullerene(mol):
+            return   # no mol, or a fullerene cage (no alternative offers: they cost minutes on a cage)
         # Require an ACTUAL, LIVE way to verify a brand-new candidate against
         # the primary before ever computing one. Two distinct guards, both
         # measured necessary (a caught regression each):
@@ -8104,7 +8078,7 @@ class Orthonym:
         ``rules.relative_stereo.append_relative_stereo_offer``; this method holds the
         gate: nothing is built with the OPSIN validity gate off or without its jar (no
         candidate could be checked). Best-effort ONLY, like the floor."""
-        if mol is None or fullerene_limit(mol) is not None:
+        if mol is None or is_fullerene(mol):
             return
         if self._disable_opsin_validity_gate or not _validity_gate_jar_present():
             return
@@ -8164,7 +8138,7 @@ class Orthonym:
         if not (name_scope_depth() == 1 and is_top_level_naming()):
             return name
         mol = Chem.MolFromSmiles(smiles)
-        if mol is None or fullerene_limit(mol) is not None or not (
+        if mol is None or is_fullerene(mol) or not (
                 any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
                     for a in mol.GetAtoms())
                 or any(b.GetStereo() != Chem.BondStereo.STEREONONE

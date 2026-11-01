@@ -789,7 +789,11 @@ def _tautomer_sensitive(mol, ih, hydro_atoms) -> bool:
 def _same_tautomer(mol, name: str) -> bool:
     """OPSIN's reading of ``name`` is the input's tautomer: equal fixed-H InChIs
     (``validation.protonation_identity.tautomer_verdict``). False when OPSIN cannot read
-    the name or the verdict is not 'ok'."""
+    the name or the verdict is not 'ok'. A C60 name (``fullerene``) is no name OPSIN reads: the engine's own
+    reader makes the check where the name ships (it compares the fixed-hydrogen key as well)."""
+    from ...data.fullerene_c60 import C60_CORE_TOKEN
+    if C60_CORE_TOKEN in name:
+        return True
     from ...namer import _validity_gate_name_to_smiles
     from ...validation.protonation_identity import tautomer_verdict
     from ...validation.twin_spellings import opsin_spelling
@@ -804,7 +808,11 @@ def _same_tautomer_as_radical(mol, name: str) -> bool:
     hydrogen atom, is the input's tautomer: equal fixed-H InChIs (``validation.protonation_identity.
     tautomer_verdict``), the check ``_same_tautomer`` makes for a whole name. ``mol`` is the ring
     system with the broken bond left as a hydrogen atom, so the capped parse is that hydride.
-    False when OPSIN cannot read the name or the verdict is not 'ok'."""
+    False when OPSIN cannot read the name or the verdict is not 'ok'. A C60 name is read by the engine's own
+    reader where it ships (``_same_tautomer``)."""
+    from ...data.fullerene_c60 import C60_CORE_TOKEN
+    if C60_CORE_TOKEN in name:
+        return True
     from ...jvm_bridge import opsin_stdout
     from ...validation.opsin_roundtrip import _find_opsin_jar
     from ...validation.protonation_identity import tautomer_verdict

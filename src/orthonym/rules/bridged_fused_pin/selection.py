@@ -638,6 +638,13 @@ def fused_split(mol, system: Set[int]) -> Optional[Split]:
     ``_candidate`` with no bridge checks that the ring double bonds of the input are a matching
     of the parent atoms (``Split.n_double``)."""
     system = set(system)
+    if len(system) >= 60:
+        # a C60 skeleton with at most one addend (``fullerene``): not an ortho-fused ring system of
+        # ``fused_rings`` (the cage has more rings than its smallest rings count), a fused parent of its own
+        from .fullerene import fullerene_split
+        cage = fullerene_split(mol, system)
+        if cage is not None:
+            return cage
     if not _standard_bonding(mol, system):
         return None
     unsat = ring_unsaturation(mol, system)

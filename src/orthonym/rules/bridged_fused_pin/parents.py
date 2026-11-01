@@ -382,6 +382,11 @@ def _parent_for_key(key: str) -> Optional[Tuple[str, Tuple[Tuple[int, Locant], .
 
 def fused_parent(mol, residual) -> Optional[FusedParent]:
     """The name and every numbering of the fused parent on ``residual``, or None."""
+    if len(residual) >= 60:
+        from .fullerene import fused_parent as c60_parent        # a C60 skeleton with its addend
+        cage = c60_parent(mol, residual)
+        if cage is not None:
+            return cage
     sk, idx = _skeleton(mol, residual)
     key = Chem.MolToSmiles(sk)
     order = list(sk.GetPropsAsDict(True, True).get("_smilesAtomOutputOrder", ()))
