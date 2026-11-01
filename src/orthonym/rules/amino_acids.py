@@ -262,24 +262,11 @@ def systematic_amino_acid_name(mol) -> Optional[str]:
 
     Only for the caller's whole molecule (``outermost_name_input``): a peptide residue or a salt component keeps the
     retained name its producer asks for. The molecule is named once more by a default-tier engine with the retained
-    amino-acid names left out (:func:`retained_amino_acid_names_off`), under the default tier's context
-    (``assembly.default_tier_scope``: a best-effort caller's breadth is off, so both tiers are offered the same
-    name); the name is returned only when it reads as a PIN (the checks below) and OPSIN reads it back to the
-    full InChIKey of ``mol``. Else None, and the caller keeps its retained name, labelled below the PIN by the
+    amino-acid names left out (:func:`retained_amino_acid_names_off`) and taken only as a PIN
+    (``rules/systematic_offer.py``). Else None, and the caller keeps its retained name, labelled below the PIN by the
      spelling check (``validation/spelling/checks_natural_products.py``)."""
-    if mol is None or _RETAINED_OFF.get():
-        return None
-    from ..assembly.fragment_naming import outermost_name_input
-    try:
-        smiles = Chem.MolToSmiles(mol)
-        outer = outermost_name_input()
-        outer_mol = Chem.MolFromSmiles(outer) if outer else None
-        if outer_mol is None or Chem.MolToSmiles(outer_mol) != smiles:
-            return None
-    except Exception:
-        return None
-    from ..assembly.nested_memo import cached_nested_call
-    return cached_nested_call("systematic_amino_acid_name", (smiles,), lambda: _systematic_name(mol, smiles))
+    from .systematic_offer import systematic_pin_offer
+    return systematic_pin_offer(mol, _RETAINED_OFF, "systematic_amino_acid_name")
 
 
 def systematic_or_retained(mol, retained: str, neutral_name: Optional[str] = None) -> str:
@@ -292,34 +279,6 @@ def systematic_or_retained(mol, retained: str, neutral_name: Optional[str] = Non
         if not is_retained_amino_acid_name(neutral_name):
             return retained
     return systematic_amino_acid_name(mol) or retained
-
-
-def _systematic_name(mol, smiles: str) -> Optional[str]:
-    """The body of:func:`systematic_amino_acid_name` for the caller's whole molecule ``smiles``."""
-    from ..assembly.default_tier_scope import default_tier_scope
-    token = _RETAINED_OFF.set(True)
-    try:
-        from ..errors import is_failure_name
-        from ..namer import Orthonym
-        with default_tier_scope():
-            name = Orthonym(style="pin").name(smiles)
-    except Exception:                       # the offer must never break a naming: the retained name stands
-        return None
-    finally:
-        _RETAINED_OFF.reset(token)
-    if not name or is_failure_name(name):
-        return None
-    # A nested name call does not apply the default tier's emission rule, so the PIN status is read here: no
-    # part the naming recorded as not the PIN, no broken spelling rule (the check among them), and no
-    # molecule whose PIN is multiplicative; 'L-cystine' keeps its name rather than a substitutive one).
-    from ..metrics.provenance import get_provenance, name_carries_non_pin_part
-    from ..validation.coverage_gate import _full_inchikey_roundtrips
-    from ..validation.pin_spelling import check_pin_spelling
-    from .pin_vocabulary import multiplicative_pin_expected
-    if (name_carries_non_pin_part(get_provenance(), name) or check_pin_spelling(mol, name)
-            or multiplicative_pin_expected(mol) or not _full_inchikey_roundtrips(mol, name)):
-        return None
-    return name
 
 
 def name_amino_acid(mol, canonical_smiles: str) -> Optional[str]:

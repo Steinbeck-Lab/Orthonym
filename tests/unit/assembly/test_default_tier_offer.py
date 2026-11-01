@@ -53,12 +53,18 @@ THREE = [
     "C[C@@]1(Cl)CC[C@H](O)CC1",                      # (1s,4s)-4-chloro-4-methylcyclohexan-1-ol
 ]
 
+#: NPL 2026-11-01: '(1R,3s,5S)-tropan-3-ol' is a Chapter name, no PIN INTRODUCTION, the Blue Book;
+#: user decision 2026-10-31): the default tier declines it, and best-effort offers it labelled best_effort
+#: (``default_tier_offer._withheld_chapter_p10_row``); the other five keep the stereo-layer class
+TROPINE = SIX[2]
+STEREO_LAYER = [s for s in SIX if s != TROPINE]
+
 #: the fields of a row the offer must hand over as the default tier gives them
 ROW_FIELDS = ("name", "tier", "is_pin", "source", "opsin", "gates_passed", "gate_outcome", "verified",
               "spelling_failures", "stereo_unexpressed", "limit_code")
 
 
-@pytest.mark.parametrize("smiles", SIX)
+@pytest.mark.parametrize("smiles", STEREO_LAYER)
 def test_best_effort_gives_the_row_the_default_tier_gives(smiles):
     default = default_tier_row(smiles)
     # the premise: the default tier ships it, through the stereo-layer carve-out
@@ -94,7 +100,7 @@ def test_the_row_is_deterministic():
 BE_FLAGS = {k: v for k, v in _emit_tier_flags("best-effort").items() if k != "full_coverage"}
 
 
-@pytest.mark.parametrize("smiles", SIX + THREE)
+@pytest.mark.parametrize("smiles", STEREO_LAYER + THREE)
 def test_the_caller_s_name_call_agrees_with_the_row(smiles):
     """``Orthonym.name`` at best-effort gives the name of the row (the default tier's), in the default mode of
     ``on_failure`` too (the decorator sees the failure before ``on_failure`` turns it into '')."""
@@ -104,7 +110,7 @@ def test_the_caller_s_name_call_agrees_with_the_row(smiles):
     assert engine.name(smiles) == default["name"]
 
 
-@pytest.mark.parametrize("smiles", [SIX[0], SIX[2]])
+@pytest.mark.parametrize("smiles", [SIX[0], SIX[3]])
 def test_every_public_entry_point_agrees(smiles):
     from orthonym import name_compound
     expected = default_tier_row(smiles)["name"]
@@ -115,6 +121,21 @@ def test_every_public_entry_point_agrees(smiles):
     engine = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
     assert engine.name_with_confidence(smiles)["name"] == expected
     assert engine.name_tiered(smiles)["name"] == expected
+
+
+def test_a_chapter_p10_name_the_default_tier_withholds_ships_at_best_effort_below_the_pin():
+    # INTRODUCTION (the Blue Book), NPL 2026-11-01: the default tier declines '(1R,3s,5S)-tropan-3-ol' for the
+    # rule alone; best-effort gives it with the lowest label, its constitution read back and its descriptors checked
+    from orthonym import name_compound
+    default = default_tier_row(TROPINE)
+    assert default["tier"] == "abstain" and default["limit_code"] == "NO_VERIFIED_PIN", default
+    assert {f["rule"] for f in default["spelling_failures"]} == {"P-100"}, default
+    row = name_best_effort(TROPINE)
+    assert (row["name"], row["tier"], row["is_pin"]) == ("(1R,3s,5S)-tropan-3-ol", "best_effort", False), row
+    assert row["gate_outcome"] == pv.GATE_OUTCOME_SELF01_CONSTITUTION_ONLY, row
+    assert name_compound(TROPINE, **BE_FLAGS) == "(1R,3s,5S)-tropan-3-ol"
+    engine = Orthonym(style="pin", **_emit_tier_flags("best-effort"))
+    assert engine.name(TROPINE) == engine.name_tiered(TROPINE)["name"] == "(1R,3s,5S)-tropan-3-ol"
 
 
 def test_the_confidence_record_of_the_offered_name_is_the_default_tier_s():

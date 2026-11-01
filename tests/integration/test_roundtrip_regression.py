@@ -28,6 +28,7 @@ from rdkit import Chem
 
 from orthonym import name_compound
 from tests.support.jars import jar_or_none
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import assert_tier_contract
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -318,7 +319,11 @@ ROUNDTRIP_VERIFIED = [
     # plan ruling R-n). OPSIN RT exact, full InChIKey (TRIAGE.csv; re-checked in Task 7/8).
     (
         "CC(C)C(=O)CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CCC4=CCCC[C@]4(C)[C@H]3CC[C@]12C",
-        "cholest-4-en-24-one",
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book) "PINs are not identified for the compounds in this
+        # Chapter": the route offers the systematic name of Chapters to (:50943); the name below is
+        # read back by OPSIN 2.9.0 to the full InChIKey (this table's round trip asserts it).
+        "(6R)-6-[(8S,9S,10R,13R,14S,17R)-10,13-dimethyl-2,3,6,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-"
+        "cyclopenta[a]phenanthren-17-yl]-2-methylheptan-3-one",
     ),
 ]
 
@@ -586,7 +591,10 @@ class TestPhase22NPEsterRoundTrip:
     differences -- marked xfail if so.
     """
 
+    # NPL 2026-11-01: the subject is the producer's ester spelling, so the route's systematic offer is off
+    # (np_producer_only; INTRODUCTION, the Blue Book)
     @pytest.mark.roundtrip
+    @pytest.mark.usefixtures("np_producer_only")
     @pytest.mark.parametrize(
         "smiles,expected_name",
         PHASE22_NP_ESTER_PARSE,

@@ -24,6 +24,11 @@ import pytest
 from orthonym import name_compound
 from orthonym.errors import is_failure_name
 from orthonym.rules.natural_products import name_natural_product
+from tests.support.np_producer import np_producer_only  # noqa: F401
+
+# NPL 2026-11-01: the subject is the natural-product producer's own name; the route now offers the systematic
+# name first INTRODUCTION, the Blue Book), so the producer is named with that offer off.
+pytestmark = pytest.mark.usefixtures("np_producer_only")
 
 # The a phase witness: a fully-saturated pregnane skeleton with the C-5 ring-fusion
 # stereocentre inverted relative to the natural (5-alpha) reference configuration in

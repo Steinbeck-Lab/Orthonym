@@ -37,6 +37,7 @@ import re
 import pytest
 
 from orthonym import name_compound
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import assert_tier_contract
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -50,7 +51,6 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3",
     "CC(C)C[C@H](N)C(=O)N[C@@H](CC(=O)O)C(=O)N[C@@H](CCCN=C(N)N)C(=O)O",
     "CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1",
     "COC(=O)[C@@H]1CC23CCCN4CC[C@@]5(c6ccccc6N(C)C15CC2)[C@@H]43",
@@ -257,7 +257,7 @@ MEDIUM_STEREO_COMPOUNDS = [
     # j7: the estrane numbering map had C-11/C-12 swapped; with it fixed the
     # alpha/beta form resolves:51053 "This method is
     # preferred"); OPSIN full-InChIKey exact.
-    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', 'estra-1,3,5(10)-triene-3,15α,16α,17β-tetrol'),
+    ('C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O', '(8R,9S,13S,14S,15R,16R,17R)-13-methyl-7,8,9,11,12,13,14,15,16,17-decahydro-6H-cyclopenta[a]phenanthrene-3,15,16,17-tetrol'),  # NPL 2026-11-01: INTRODUCTION (the Blue Book) no PIN for estrane; the systematic name, OPSIN 2.9.0 full-key exact
     ('COc1cc(O)c2c(c1)C(=O)C1=C(C2=O)[C@@H](O)C[C@@](C)(O)C1', '(1S,3S)-1,3,8-trihydroxy-6-methoxy-3-methyl-1,2,3,4-tetrahydroanthracene-9,10-dione'),
     ('C[C@@H]1CC(=O)O[C@@H](C)[C@H](O)/C=C\\C(=O)O[C@@H](C)C/C=C\\C(=O)O1', '(4R,7Z,10S,13Z,15R,16S)-15-hydroxy-4,10,16-trimethyl-1,5,11-trioxacyclohexadeca-7,13-diene-2,6,12-trione'),
     ('CN1CCC2=C[C@H](O)[C@H]3OC(=O)c4cc5c(cc4[C@H]3[C@@H]21)OCO5', None),  # Updated P72: IUPAC citation order
@@ -298,7 +298,7 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('CC(=CCC(O)C(C)[C@H]1CC(=O)[C@@]2(C)C3=C(C(=O)[C@@H](O)[C@]12C)[C@@]1(C)CCC(=O)[C@](C)(CO)[C@@H]1CC3=O)C(=O)O', None),
     ('C=C(CC[C@@H](C(=O)O)[C@H]1[C@H](O)[C@H](O)[C@@]2(C)C3=CC[C@H]4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C)C(C)C', None),
     ('CC(CCCC(C)(O)COS(=O)(=O)O)[C@H]1CC[C@H]2[C@@H]3[C@H](O)C[C@@H]4C[C@H](O)CCC4(C)[C@H]3C[C@H](O)C12C', None),
-    ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(3S,5R,10S,13R,14R,16R,17R,20R,23E)-3-(acetyloxy)-16,25-dihydroxy-4,4,14-trimethylcholesta-8,23-dien-21-oic acid'),
+    ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(2R,4E)-2-[(3S,5R,10S,13R,14R,16R,17R)-3-(acetyloxy)-16-hydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-hydroxy-6-methylhept-4-enoic acid'),
     ('O=C1c2c(O)cc(O)cc2O[C@@H](c2ccc(O)c(O)c2)[C@@H]1O[C@@H]1OC[C@@H](O)[C@H](O)[C@H]1O', '(2S,3S)-2-(3,4-dihydroxyphenyl)-5,7-dihydroxy-3-(β-D-xylopyranosyloxy)-2,3-dihydro-4H-1-benzopyran-4-one'),
     ('CC1=C[C@]2(C)C[C@@H](C)CC[C@@H]2[C@H](C(=O)[C@@H]2C(=O)N3CC[C@@H]4C(=O)O[C@H]2[C@@]43O)[C@@H]1C', None),
     ('CC(=O)O[C@H]1[C@@H](OC(C)=O)C(C)(C)[C@]2(O)CC[C@H]3C(=O)c4ccoc4C[C@@H]3[C@@]2(C)[C@H]1OC(C)=O', None),  # wp7: was 'bis(acetyloxy)ethanone acetate' (OPSIN: a two-component mixture NPMYZOILKOAWDI vs input SJZIFWGVHGVKAH); a phase-05 garbled multi-ester path
@@ -318,7 +318,7 @@ MEDIUM_STEREO_COMPOUNDS = [
     ('O=C1N[C@@H](C[C@@]2(O)c3ccccc3N3C(=O)[C@@H]4CCCCN4[C@@H]32)C(=O)N[C@H]1Cc1ccccc1', None),
     ('CC(C)[C@@H](C)[C@@H](O)[C@H]1CC[C@@H]([C@@]2(C)CCC(=O)[C@@]3(C)CC[C@H](O)C[C@]34C=C[C@@](O)(O4)C2=O)[C@@H]1C', None),
     ('COc1c(Cl)c(C)cc2cc(O)c3c(c12)C(=O)c1cc2c(c(O)c1C3=O)[C@H](C)OC2=O', None),  # Updated P72: IUPAC citation order
-    ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(3S,5R,10S,13R,14R,16R,17R,20R,23E)-3-(acetyloxy)-16,25-dihydroxy-4,4,14-trimethylcholesta-8,23-dien-21-oic acid'),
+    ('CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3', '(2R,4E)-2-[(3S,5R,10S,13R,14R,16R,17R)-3-(acetyloxy)-16-hydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-6-hydroxy-6-methylhept-4-enoic acid'),
     ('C[C@@H]1O[C@@H](OCCCCCCCCCCCCCCCCCCCC[C@@H](O)CC(=O)O)[C@H](O)C[C@H]1O', None),
     ('CC(C)[C@H](CC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C)OS(=O)(=O)[O-]', '(24S)-3β-hydroxycholest-5-en-24-yl sulfate'),
 ]
@@ -372,11 +372,9 @@ _KNOWN_NON_PIN = {
         "von Baeyer name of a system with ortho-fused 5+/6 rings; the (bridged) fusion "
         "name is the PIN (P-52.2.4.1 :23710; large-polycycle Task 6a); shipped at "
         "systematic_verified", None),
-    # m27 == m43 (one SMILES; m43 was m46 before wp7 removed three duplicate rows)
-    "CC(=O)O[C@H]1CC[C@]2(C)C3=C(CC[C@H]2C1(C)C)[C@]1(C)C[C@@H](O)[C@H]([C@@H](C/C=C/C(C)(C)O)C(=O)O)[C@@]1(C)CC3": (
-        "a free COOH written as '21-hydroxy...21-oxo' prefixes with the ester principal; "
-        "acids outrank esters (P-41 :18158, 7a :18172 > 9 :18182; P-65.6.3.2.3 :31696); "
-        "wp5 demotes it", None),
+    # m27 == m43 left this map (NPL 2026-11-01): the acid is now the principal group acids outrank
+    # esters,, the name is '...-yl]-6-hydroxy-6-methylhept-4-enoic acid' on cyclopenta[a]phenanthrene, a
+    # tracked pin_verified row (OPSIN 2.9.0 full-key exact).
 }
 
 # SMILES -> (why the name is not the PIN, the systematic PIN string) for a name of the
@@ -423,18 +421,25 @@ def _assert_demoted(smiles, expected_name):
 
 
 def _assert_list_identity(smiles, expected_name):
-    """A natural-product list name (_LIST_NAME_NOT_THE_PIN): the default and the
-    best-effort tier ship it, labelled systematic_verified by its list identity (verified
-    'identity', gate outcome carveout:np_stereoparent): (the Blue Book) "Preferred IUPAC
-    names (PINs) are not identified for the compounds in this Chapter" (lead decision 2026-10-17). OPSIN cannot read it, so there
-    is no round trip to assert."""
+    """A natural-product list name (_LIST_NAME_NOT_THE_PIN). NPL 2026-11-01: INTRODUCTION
+    (the Blue Book) "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter"; the
+    route offers the systematic name of Chapters to first (:50943), so the default tier gives the
+    systematic name ('(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane'), pin_unverified because OPSIN 2.9.0
+    parses no lowercase pseudoasymmetric descriptor (its stereo-stripped form reads back to the input's
+    constitution); the best-effort tier keeps the list name, labelled systematic_verified by its list identity
+    (verified 'identity', gate outcome carveout:np_stereoparent; OPSIN cannot read it)."""
     from tests.support.rt_assert import name_best_effort
-    for r in (_dt_row(smiles), name_best_effort(smiles)):
-        assert r["name"] == expected_name, (
-            f"LIST-NAME ROW CHANGED: {smiles}: expected {expected_name!r}, got "
-            f"{r['name']!r} -- re-verify (the list entry + the Blue Book)")
-        assert r["tier"] == "systematic_verified" and r["verified"] == "identity", r
-        assert r["gate_outcome"] == "carveout:np_stereoparent", r
+    systematic = _LIST_NAME_NOT_THE_PIN[smiles][1]
+    r = _dt_row(smiles)
+    assert r["name"] == systematic, (
+        f"LIST-NAME ROW CHANGED: {smiles}: expected {systematic!r}, got {r['name']!r}")
+    assert r["tier"] == "pin_unverified" and not r["is_pin"], r
+    r = name_best_effort(smiles)
+    assert r["name"] == expected_name, (
+        f"LIST-NAME ROW CHANGED: {smiles}: expected {expected_name!r}, got "
+        f"{r['name']!r} -- re-verify (the list entry + the Blue Book)")
+    assert r["tier"] == "systematic_verified" and r["verified"] == "identity", r
+    assert r["gate_outcome"] == "carveout:np_stereoparent", r
 
 
 def _params(rows):
@@ -506,6 +511,7 @@ _DERIVED_TARGETS = {
 }
 
 
+@pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: the producer's spelling, the Blue Book)
 @pytest.mark.parametrize("smiles,target", list(_DERIVED_TARGETS.items()))
 def test_steroid_24_28_methylidene_target(smiles, target):
     from tests.support.rt_assert import name_is_rt_exact

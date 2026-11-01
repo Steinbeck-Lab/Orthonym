@@ -41,6 +41,7 @@ Our names follow correct IUPAC 2013 nomenclature rules.
 
 import pytest
 from orthonym.namer import name_compound
+from tests.support.np_producer import np_producer_only  # noqa: F401
 
 
 class TestBicycloHeteroatomFix:
@@ -150,6 +151,9 @@ class TestStereoFormatEdgeCases:
             )
 
 
+# NPL 2026-11-01: the subject is the producer's steroid spelling, so the route's systematic offer is off
+# (np_producer_only; INTRODUCTION, the Blue Book).
+@pytest.mark.usefixtures("np_producer_only")
 class TestSteroidSuffixOrdering:
     """Test that steroid names have correct IUPAC suffix ordering:
     unsaturation BEFORE principal group (e.g., 'trien-3-one', not 'an-3-one-trien').

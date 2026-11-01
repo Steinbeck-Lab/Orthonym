@@ -258,28 +258,29 @@ def test_a_fused_ring_substituent_is_named_on_the_parent_and_labelled_without_a_
                                 "zinc 5-(naphthalen-1-yl)-10,15,20-triphenylporphyrin-21,23-diide")
 
 
-def test_a_decorated_fused_ring_substituent_has_the_porphyrin_name_in_the_best_effort_call_only():
-    """The substituent namer names a bromoanthracenyl group of the ion in the best-effort call (the call that allows a
-    mancude ring system), so the ion has the porphyrin name at that tier; the valid tier keeps the name of the general
-    engine. Both labels are verified systematic names."""
+def test_a_decorated_fused_ring_substituent_has_the_porphyrin_name_at_both_tiers():
+    """The substituent namer names a bromoanthracenyl group of the ion at the best-effort call and, since the fused
+    '-yl' prefix builder runs inside it (NPL 2026-11-01; it cites the side-chain stereo), at the valid tier too: the
+    ion has the porphyrin name at both. Before, the valid tier kept the name of the general engine, so this
+    was a test of "the best-effort call only". Both labels are verified systematic names."""
     smiles = BROMOANTHRACENYL_DIANION + ".[Zn+2]"
-    best_effort = _row(smiles, "best-effort")
-    assert best_effort["name"] == "zinc 5-(8-bromoanthracen-1-yl)-10,15,20-triphenylporphyrin-21,23-diide", best_effort
-    assert best_effort["tier"] == "systematic_verified" and best_effort["is_pin"] is False, best_effort
-    assert_full_rt(best_effort["name"], smiles)
-    valid = _row(smiles, "valid")
-    assert "porphyrin" not in valid["name"], valid
-    assert valid["tier"] == "systematic_verified" and valid["is_pin"] is False, valid
-    assert_full_rt(valid["name"], smiles)
+    for tier in ("best-effort", "valid"):
+        row = _row(smiles, tier)
+        assert row["name"] == "zinc 5-(8-bromoanthracen-1-yl)-10,15,20-triphenylporphyrin-21,23-diide", (tier, row)
+        assert row["tier"] == "systematic_verified" and row["is_pin"] is False, (tier, row)
+        assert_full_rt(row["name"], smiles)
 
 
-def test_the_predicate_is_what_lowers_the_label(monkeypatch):
-    """With the predicate switched off the salt name of the PIN path would carry ``pin_unverified``: it is the
-    predicate that makes the label ``systematic_verified``."""
+def test_the_predicate_is_no_longer_the_only_thing_that_lowers_the_label(monkeypatch):
+    """Before NPL 2026-11-01 the salt name of the PIN path carried ``pin_unverified`` with the predicate switched
+    off: only the predicate made the label ``systematic_verified``. The spelling check now marks
+    'porphyrin' INTRODUCTION, the Blue Book "Preferred IUPAC names (PINs) are not identified for the
+    compounds in this Chapter";, Table 10.1 (d)), so the label stays ``systematic_verified`` without the
+    predicate: two independent reasons lower it. The predicate itself is pinned by ``test_the_label_predicate``."""
     smiles = TPP_DIANION + ".[Zn+2]"
     assert _row(smiles, "best-effort")["tier"] == "systematic_verified"
     monkeypatch.setattr(metal_labels, "is_macrocycle_complex_name_without_pin", lambda smiles, name: False)
-    assert _row(smiles, "best-effort")["tier"] == "pin_unverified"
+    assert _row(smiles, "best-effort")["tier"] == "systematic_verified"
 
 
 @pytest.mark.parametrize("smiles,expected", [
@@ -315,13 +316,17 @@ def test_an_ion_the_producer_declines_keeps_the_general_engine_name_and_has_no_p
         assert_full_rt(row["name"], smiles)
 
 
-def test_the_label_predicate_does_not_read_the_producer():
-    """Outside the best-effort call the producer declines the dianion with the bromoanthracenyl group (the substituent
-    namer needs the call's context), and the label predicate holds all the same."""
+def test_the_label_predicate_does_not_read_the_producer(monkeypatch):
+    """The label predicate holds whether or not the producer names the dianion with the bromoanthracenyl group.
+    NPL 2026-11-01: the fused '-yl' prefix builder now runs inside the substituent namer, so the producer names
+    this dianion outside the best-effort call too (it declined before); the producer is therefore made to decline
+    here, and the predicate, which reads the structure, holds all the same."""
     from orthonym.rules.metal_macrocycles import macrocycle_ion_fragments
     smiles = BROMOANTHRACENYL_DIANION + ".[Zn+2]"
     mol = Chem.MolFromSmiles(smiles)
-    assert macrocycle_component_names(mol) == {}
+    monkeypatch.setattr("orthonym.rules.adducts.macrocycle_component_names", lambda m: {})
+    monkeypatch.setattr("orthonym.rules.metal_macrocycles.macrocycle_component_names", lambda m: {})
+    assert macrocycle_component_names(mol) != {}     # the producer names it now; the predicate does not call it
     assert len(macrocycle_ion_fragments(mol)) == 1
     assert is_macrocycle_complex_name_without_pin(smiles, "a name") is True
 

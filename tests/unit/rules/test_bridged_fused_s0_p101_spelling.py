@@ -11,15 +11,21 @@ fused PIN that needs the 'azanoethano' bridge prefix,:14155 "-NH-CH2-CH2-
 but not the preferred 'azanoethano', so no PIN is built; its
 name is labelled below the PIN,:50943; the user's decision on natural-product names,
 "the default tier declines a natural-product name only where no systematic PIN is built"): the
-best-effort tier keeps it (systematic_verified), the default tier declines it. The tropane name
-(no bridged fused reading) keeps the pin_verified label.
+best-effort tier keeps it (systematic_verified), the default tier declines it. NPL 2026-11-01: the tropane
+name is below the PIN too INTRODUCTION, the Blue Book "Preferred IUPAC names (PINs) are not
+identified for the compounds in this Chapter"; user decision 2026-10-31), and the route offers the systematic name
+of the whole molecule first, so this file names with that offer off (``np_producer_only``): its subject is the
+producer's spelling.
 """
 import pytest
 
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import name_is_rt_exact
+
+pytestmark = pytest.mark.usefixtures("np_producer_only")
 
 #: a 4,5-epoxymorphinan: the strict path builds its bridged fused PIN (slice S4;
 #: the Blue Book), which replaces the name
@@ -55,8 +61,8 @@ def _row(smiles, tier):
         return Orthonym(style="pin", **_emit_tier_flags(tier)).name_tiered(smiles)
 
 
-#: the morphinans without the 4,5-epoxy bridge (no PIN is built): below the PIN
-BELOW_PIN = ROWS + CONTROL_ROWS[:3]
+#: the morphinans without the 4,5-epoxy bridge (no PIN is built) and the tropane diol: below the PIN
+BELOW_PIN = ROWS + CONTROL_ROWS
 
 
 @pytest.mark.opsin_gate
@@ -93,8 +99,11 @@ BARE_PARENT_ROWS = [  # (a) spellings (the Blue Book,:51392,:51396)
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,name", BARE_PARENT_ROWS)
 def test_bare_alkaloid_parent_is_spelled_as_the_parent_table(smiles, name):
-    row = _row(smiles, "pin")
-    assert row.get("name") == name and row["tier"] == "pin_verified", (row.get("name"), row["tier"])
+    # NPL 2026-11-01: INTRODUCTION (the Blue Book): a parent is no PIN; the default tier declines it,
+    # the best-effort tier gives the parent table's spelling labelled systematic_verified.
+    assert _row(smiles, "pin")["tier"] == "abstain"
+    row = _row(smiles, "best-effort")
+    assert row.get("name") == name and row["tier"] == "systematic_verified", (row.get("name"), row["tier"])
     assert name_is_rt_exact(name, smiles)
 
 

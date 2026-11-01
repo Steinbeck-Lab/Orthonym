@@ -630,8 +630,10 @@ def _natural_product_name(mol) -> Optional[str]:
     """The name this route gives: the natural-product catalogue entry, else a substituted free-base
     porphyrin. ``porphyrin`` is a semisystematic parent (Table 10.1 (d)); the bare parent is a
     catalogue entry and runs first, a substituted one is built on it (``rules/porphyrin.py``). Pure."""
-    from orthonym.rules.natural_products import name_natural_product
+    from orthonym.rules.natural_products import name_natural_product, natural_product_names_off
     from orthonym.rules.porphyrin import name_substituted_porphyrin
+    if natural_product_names_off():
+        return None
     return name_natural_product(mol) or name_substituted_porphyrin(mol)
 
 
@@ -1570,6 +1572,13 @@ def _handle_natural_product(mol, smiles, canonical_smiles, features=None, *,
     systematic = _systematic_pin_before_natural_product(mol, canonical_smiles)
     if systematic is not None:
         return systematic
+    # the systematic name of Chapters to is offered next,:50943; user decision 2026-10-31), also for a
+    # list parent, except where its numbering is OPSIN's alone (``_keeps_list_parent_name``)
+    if not _keeps_list_parent_name(mol, canonical_smiles or Chem.MolToSmiles(mol)):
+        from orthonym.rules.natural_products import systematic_name_before_natural_product
+        systematic = systematic_name_before_natural_product(mol)
+        if systematic is not None:
+            return systematic
     name = _natural_product_name(mol)
     if name:
         from orthonym.data.natural_products import NAME_EXACT_NP_PARENTS

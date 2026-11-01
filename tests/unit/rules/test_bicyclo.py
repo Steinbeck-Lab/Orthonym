@@ -431,17 +431,19 @@ class TestRetainedNames:
 
     @pytest.mark.unit
     def test_bornane_e2e_naming(self):
-        """Bornane SMILES should produce 'bornane' end-to-end."""
+        """'bornane' is a parent, no PIN INTRODUCTION, the Blue Book; the table at:2037-2038 sets
+        'bornane' beside 'bicyclo[2.2.1]heptane (PIN)'); NPL 2026-11-01: the systematic name comes first."""
         from orthonym import name_compound
         name = name_compound("CC12CCC(CC1)C2(C)C")
-        assert name == "bornane"
+        assert name == "1,7,7-trimethylbicyclo[2.2.1]heptane"
 
     @pytest.mark.unit
     def test_pinane_e2e_naming(self):
-        """Pinane SMILES should produce 'pinane' end-to-end."""
+        """'pinane' is a parent, no PIN INTRODUCTION, the Blue Book); NPL 2026-11-01: the
+        systematic name comes first."""
         from orthonym import name_compound
         name = name_compound("CC1CCC2CC1C2(C)C")
-        assert name == "pinane"
+        assert name == "2,6,6-trimethylbicyclo[3.1.1]heptane"
 
 
 # ============================================================================

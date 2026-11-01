@@ -89,9 +89,6 @@ def test_guanidine_prefix_name_is_not_the_pin(smiles, non_pin):
 # guanidine-parent name, verified by OPSIN but not certified (the ring prefix is a breadth
 # producer's), so the best-effort tier ships it as pin_unverified and the default tier declines.
 TARGET_ROWS = [
-    ("NC1=Nc2cc(CCN=C(N)N)ccc2CC1",
-     "N-[2-(2-amino-3,4-dihydroquinolin-7-yl)ethyl]guanidine",
-     "7-[2-(diaminomethylideneamino)ethyl]-3,4-dihydroquinolin-2-amine"),
     ("Nc1ccc2cc(CCN=C(N)N)ccc2n1",
      "N-[2-(2-aminoquinolin-6-yl)ethyl]guanidine",
      "6-[2-(diaminomethylideneamino)ethyl]quinolin-2-amine"),
@@ -106,6 +103,16 @@ def test_ring_amidine_amine_beside_guanidine_names_the_guanidine(smiles, parent_
     assert b.get("producer") == "inner:guanidine", b
     assert_not_pin_labelled(smiles, ring_name)
     assert_declined_at_default(smiles)
+
+
+def test_a_dihydroquinolinyl_arm_is_built_by_the_fusion_builder_and_the_guanidine_name_is_the_pin():
+    # the partly hydrogenated ring prefix is now built by the PIN tier's fused '-yl' builder (DT4 F2b, NPL 2026-11-01;
+    #,, so the guanidine-parent name is certified at both tiers
+    smiles = "NC1=Nc2cc(CCN=C(N)N)ccc2CC1"
+    pin = "N-[2-(2-amino-3,4-dihydroquinolin-7-yl)ethyl]guanidine"
+    assert name_is_rt_exact(pin, smiles), pin
+    assert_pin_at_both_tiers(smiles, pin)
+    assert_not_pin_labelled(smiles, "7-[2-(diaminomethylideneamino)ethyl]-3,4-dihydroquinolin-2-amine")
 
 
 def test_ring_name_of_the_guanidine_arm_the_builder_cannot_spell_is_labelled_below_the_pin():

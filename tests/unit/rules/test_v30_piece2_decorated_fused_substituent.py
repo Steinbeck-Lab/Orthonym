@@ -65,13 +65,14 @@ def test_decorated_fused_naphthalene_substituent_now_names():
     assert "6-methoxynaphthalen-2-yl" in got, got
 
 
-def test_fused_producer_is_best_effort_scoped():
-    """PIN byte-identical by construction: with the best-effort flag OFF the
-    fused decorated ring-substituent must still DECLINE (status quo), exactly
-    as it did before Piece 2 — the new capability is opt-in via allow_mancude."""
+def test_the_pin_tier_names_the_fused_substituent_with_the_fusion_builder():
+    """With the best-effort flag OFF the fused decorated ring-substituent used to decline; the PIN
+    tier's own builder (``bridged_fused_pin.build_fused_decorated_substituent``, DT4 F2b;,
+     now names it in the substituent cascade (Tier 4.4), the same names as Piece 2."""
     got_pin = _names_at_every_ring_attachment("COc1ccc2ccccc2c1",
                                               allow_mancude=False)
-    assert not any("methoxynaphthalen" in n for n in got_pin), got_pin
+    assert "6-methoxynaphthalen-2-yl" in got_pin, got_pin
+    assert got_pin <= _names_at_every_ring_attachment("COc1ccc2ccccc2c1"), got_pin
 
 
 def test_generalises_beyond_methoxy_and_to_two_decorations():

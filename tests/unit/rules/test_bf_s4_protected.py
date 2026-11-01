@@ -20,10 +20,17 @@ from orthonym.cli import _emit_tier_flags
 from orthonym.jvm_budget import jvm_slots
 from tests.support.rt_assert import name_is_rt_exact
 
+# NPL 2026-11-01 (these rows kept 'cholesterol' and 'cholesta-4,6-dien-3β-ol' at pin_verified): INTRODUCTION
+# (the Blue Book) "Preferred IUPAC names (PINs) are not identified for the compounds in this Chapter"; the route
+# offers the systematic name of Chapters to first (:50943), so both take it, still pin_verified at both tiers
+# (OPSIN 2.9.0 reads each back to the full InChIKey; ``test_the_systematic_names_read_back``).
 KEEP_BOTH_TIERS = [
-    ("C[C@H](CCCC(C)C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C", "cholesterol"),
+    ("C[C@H](CCCC(C)C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
+     "(3S,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-"
+     "2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-3-ol"),
     ("CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3C=CC4=C[C@@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
-     "cholesta-4,6-dien-3β-ol"),
+     "(3S,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-"
+     "2,3,8,9,10,11,12,13,14,15,16,17-dodecahydro-1H-cyclopenta[a]phenanthren-3-ol"),
 ]
 # the exact-match list parent of (a monocycle): the name is kept at both tiers, below the PIN
 KEEP_LIST_NAME_BOTH_TIERS = [
@@ -54,13 +61,28 @@ def test_natural_products_outside_the_class_keep_name_and_label(smiles, name, ti
 
 
 @pytest.mark.opsin_gate
+@pytest.mark.parametrize("smiles,name", KEEP_BOTH_TIERS)
+def test_the_systematic_names_read_back(smiles, name):
+    assert name_is_rt_exact(name, smiles)
+
+
+@pytest.mark.opsin_gate
 @pytest.mark.parametrize("tier", ["pin", "best-effort"])
 @pytest.mark.parametrize("smiles,name", KEEP_LIST_NAME_BOTH_TIERS)
 def test_an_exact_match_list_name_is_kept_at_both_tiers_below_the_pin(smiles, name, tier):
     """ INTRODUCTION (the Blue Book;:50943): "Preferred IUPAC names (PINs) are not identified for
     the compounds in this Chapter." The name is the list name (verified 'identity'), labelled systematic_verified;
-    mutation: the label assertion fails on the commit before (pin_verified)."""
+    mutation: the label assertion fails on the commit before (pin_verified).
+    NPL 2026-11-01: the default tier now gives the systematic name of Chapters to (:50943),
+    '(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane', pin_unverified (OPSIN 2.9.0 parses no lowercase
+    pseudoasymmetric descriptor; its stereo-stripped form reads back to the constitution); the best-effort tier keeps
+    the list name."""
     row = _row(smiles, tier)
+    if tier == "pin":
+        assert (row.get("name"), row["tier"]) == (
+            "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane", "pin_unverified"), (row.get("name"), row["tier"])
+        assert row["is_pin"] is False, row
+        return
     assert (row.get("name"), row["tier"]) == (name, "systematic_verified"), (row.get("name"), row["tier"])
     assert row["verified"] == "identity" and row["is_pin"] is False, row
 

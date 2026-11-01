@@ -18,6 +18,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.cli import _emit_tier_flags
 from orthonym.data.natural_products import NAME_EXACT_NP_PARENTS, NATURAL_PRODUCT_DERIVATIVES
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.rt_assert import _independent_parse
 
 pytestmark = pytest.mark.opsin_gate
@@ -44,6 +45,10 @@ def test_the_name_is_the_list_entry_of_the_exact_structure(smiles):
     assert _independent_parse(name) is None        # OPSIN reads no list name: the label cannot be an OPSIN verdict
 
 
+# NPL 2026-11-01: the route offers the systematic name of the whole molecule before a list name INTRODUCTION,
+# the Blue Book,:50943), so germacrane and hopane take their systematic names at the default tier. The label
+# of a list name is the subject of the test below, so it names with that offer off: the list name is the fallback.
+@pytest.mark.usefixtures("np_producer_only")
 @pytest.mark.parametrize("smiles", LIST_ROWS)
 def test_the_default_tier_emits_the_list_name_labelled_below_the_pin(smiles):
     row = Orthonym().name_tiered(smiles)
@@ -61,5 +66,12 @@ def test_best_effort_keeps_the_list_name_as_the_last_resort_labelled_below_the_p
 
 
 def test_a_steroid_name_that_is_no_list_entry_keeps_pin_verified():
+    # NPL 2026-11-01: cholesterol is no list entry; the route offers the systematic name of Chapters to
+    # INTRODUCTION, the Blue Book) and it is the PIN: pin_verified (OPSIN 2.9.0 full-key exact).
     row = Orthonym().name_tiered(CHOLESTEROL)
-    assert row["name"] == "cholesterol" and row["tier"] == "pin_verified" and row["is_pin"] is True, row
+    assert row["name"] == ("(3S,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-"
+                           "2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-3-ol"), row
+    assert row["tier"] == "pin_verified" and row["is_pin"] is True, row
+    assert _independent_parse(row["name"], CHOLESTEROL) is not None
+    from tests.support.rt_assert import name_is_rt_exact
+    assert name_is_rt_exact(row["name"], CHOLESTEROL)

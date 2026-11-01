@@ -227,7 +227,8 @@ def test_a_suffix_nitrogen_keeps_its_float():
 @pytest.mark.parametrize("smiles,expected_start", [
     (MERCAPTURATE, MERCAPTURATE_PIN_FORM),
     (GLUCURONIDE, GLUCURONIDE_ACYLAMINO),
-    (TERPENE_CONJUGATE, "(2R)-2-acetamido-3-[({(1S,2R,3R,4S,6S,9S)-3,4,9-trihydroxy-1,7,7-trimethyl-2-"),
+    # NPL 2026-11-01: the ring system is now the fused '-yl' prefix (DT4 F2b;, not the von Baeyer form
+    (TERPENE_CONJUGATE, "(2R)-2-acetamido-3-[({(1R,2R,3S,4aS,7S,8aS)-2,3,7-trihydroxy-5,5,8a-trimethyl-"),
 ], ids=["mercapturate", "acetaminophen-glucuronide", "terpene-conjugate"])
 def test_the_float_is_gone_from_the_breadth_tier(smiles, expected_start):
     res = name_best_effort(smiles)

@@ -111,8 +111,12 @@ def test_verifier_fails_closed_on_mixed_codes():
 
 
 @pytest.mark.opsin_gate
-def test_pin_tier_keeps_the_gold_np_stereoparent_name():
-    assert name_compound(GERMACRANE) == "germacrane"
+def test_the_pin_tier_gives_germacrane_its_systematic_name():
+    # NPL 2026-11-01: 'germacrane' is a parent, no PIN INTRODUCTION, the Blue Book); the PIN tier
+    # offers the systematic name, shipped constitution-only because OPSIN reads no lowercase 4s
+    from orthonym import Orthonym
+    row = Orthonym().name_tiered(GERMACRANE)
+    assert (row["name"], row["tier"]) == (GERMACRANE_SYSTEMATIC, "pin_unverified"), row
 
 
 @pytest.mark.opsin_gate

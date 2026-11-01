@@ -67,7 +67,13 @@ def test_fully_stereo_steroid_glycoside_round_trips():
                   allow_aromatic_general=True)
     name = n.name_tiered(smi).get("name")
     assert name and "unknown" not in name
-    assert "oxan-2-yl)oxy" in name
+    # NPL 2026-11-01 (was: the steroid parent with an '(...oxan-2-yl)oxy' prefix): the fused '-yl' prefix builder now runs
+    # inside the substituent namer;, the Blue Book), so the steroid is the '-yl' prefix of the
+    # sugar parent; the name is clean and reads back to the input's full InChIKey. The '(...oxan-2-yl)oxy'
+    # prefix itself stays under test above (``name_substituent``).
+    assert name == ("2-({(3R,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-"
+                    "2,3,4,7,8,9,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-3-yl}oxy)"
+                    "oxane-3,4,5-triol"), name
     assert _full_rt(smi, name)
 
 

@@ -61,15 +61,22 @@ def _attach_and_outside(smiles):
     return mol, attach, outside
 
 
-def test_a_stereocentre_on_the_substituent_side_outside_the_ring_declines():
-    # the (1R)-1-hydroxyethyl on C-3 would need a descriptor inside a nested prefix; the same branch without the
-    # stereocentre is named, so the decline is the stereo check's (atoms 0-6: the pentanoic acid side)
-    with_stereo = Chem.MolFromSmiles("CC(CCC(=O)O)C1CCC2C1CCC1C2CCC2CC([C@@H](C)O)CCC12")
+def test_a_stereocentre_on_the_substituent_side_outside_the_ring_is_cited_by_its_prefix():
+    # NPL 2026-11-01 (was: the builder declines): the (1R)-1-hydroxyethyl on C-3 is a stereogenic unit of a prefix of
+    # the ring system; its namer cites the descriptor at the front of that prefix, the Blue Book,
+    # "When they relate to substituent groups, they are cited at the front of the corresponding prefix") and the
+    # builder's name is read back with the whole molecule. The same branch without the stereocentre keeps its name
+    # (atoms 0-6: the pentanoic acid side). The whole name reads back by OPSIN 2.9.0 to the input's full InChIKey.
+    with_stereo_smiles = "CC(CCC(=O)O)C1CCC2C1CCC1C2CCC2CC([C@@H](C)O)CCC12"
+    with_stereo = Chem.MolFromSmiles(with_stereo_smiles)
     without = Chem.MolFromSmiles("CC(CCC(=O)O)C1CCC2C1CCC1C2CCC2CC(C(C)O)CCC12")
     outside = set(range(7))
-    assert build_fused_decorated_substituent(with_stereo, 7, outside) is None
+    assert build_fused_decorated_substituent(with_stereo, 7, outside) == (
+        "3-[(1R)-1-hydroxyethyl]hexadecahydro-1H-cyclopenta[a]phenanthren-17-yl")
     assert build_fused_decorated_substituent(without, 7, outside) == (
         "3-(1-hydroxyethyl)hexadecahydro-1H-cyclopenta[a]phenanthren-17-yl")
+    assert name_is_rt_exact("4-{3-[(1R)-1-hydroxyethyl]hexadecahydro-1H-cyclopenta[a]phenanthren-17-yl}pentanoic acid",
+                            with_stereo_smiles)
 
 
 def test_every_prefix_counts_for_p14_4_f():

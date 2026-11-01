@@ -135,9 +135,14 @@ GPI_FAILING_FRAGMENT = (
 # system, which that builder declines, so both PIN rungs decline and the rung names it
 # '1-(5-{[(2S)-butan-2-yl]oxy}-2,15-dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecan-14-yl)
 # ethan-1-one', RT-exact (measured 2026-11-01).
+# NPL 2026-11-01: the builder now cites a stereocentre on the substituent side in the prefix
+# ('3-[(1R)-1-hydroxyethyl]...-17-yl'), so the 3-[(2S)-butan-2-yl]oxy ether is named by both PIN rungs too
+# (RT-exact). The anchor is re-pointed to the 3-azido steroid ketone, which both PIN rungs decline and the T4
+# rung names '1-(5-azido-2,15-dimethyltetracyclo[8.7.0.0^2,7.0^11,15]heptadecan-14-yl)ethan-1-one' (RT-exact,
+# measured 2026-11-01).
 HYDRO_FUSED_FRAGMENT = "C=C(C)C1CC=C2C(C)=CCCC2(C)C1"
 STEROID_PREFIX_FRAGMENT = "CC(=O)C1CCC2C3CCC4CC(O)CCC4(C)C3CCC12C"
-PIN_TIER_FAILING_FRAGMENT = "CC(=O)C1CCC2C3CCC4CC(O[C@@H](C)CC)CCC4(C)C3CCC12C"
+PIN_TIER_FAILING_FRAGMENT = "CC(=O)C1CCC2C3CCC4CC(N=[N+]=[N-])CCC4(C)C3CCC12C"
 
 # 74-heavy-atom lipopeptide (fatty-acyl N-cap + 6 amide-linked residues,
 # non-standard/branched residues). VERIFIED (this session, monkeypatch trace):

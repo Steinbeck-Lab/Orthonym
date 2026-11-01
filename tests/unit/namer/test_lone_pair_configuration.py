@@ -91,10 +91,11 @@ TAUTOMER_NAME = ("N-cyclopropyl-N'-[2-(2,3-dihydro-1,4-benzodioxin-5-yl)ethyl]"
 # N configuration for CDK, the same one for RDKit).
 AZIRIDINE_ROW = "COC(=O)[C@H]1C[N@]1Cc1cc(-c2cccc3c2OC(F)(F)O3)ccc1F"
 AZIRIDINE_FIRST = "[N@@]1(Cc2cc(-c3cccc4c3OC(F)(F)O4)ccc2F)[C@@H](C(OC)=O)C1"
-AZIRIDINE_NAME = ("methyl (1R,2R)-1-{[5-(8,8-difluoro-7,9-dioxabicyclo[4.3.0]"
-                  "nona-1,3,5-trien-2-yl)-2-fluorophenyl]methyl}aziridine-2-carboxylate")
-AZIRIDINE_FIRST_NAME = ("methyl (1S,2R)-1-{[5-(8,8-difluoro-7,9-dioxabicyclo[4.3.0]"
-                        "nona-1,3,5-trien-2-yl)-2-fluorophenyl]methyl}aziridine-2-carboxylate")
+# DT4 F2b/NPL 2026-11-01: the decorated fused ring is a fusion '-yl' prefix, not von Baeyer
+AZIRIDINE_NAME = ("methyl (1R,2R)-1-{[5-(2,2-difluoro-2H-1,3-benzodioxol-4-yl)"
+                  "-2-fluorophenyl]methyl}aziridine-2-carboxylate")
+AZIRIDINE_FIRST_NAME = ("methyl (1S,2R)-1-{[5-(2,2-difluoro-2H-1,3-benzodioxol-4-yl)"
+                        "-2-fluorophenyl]methyl}aziridine-2-carboxylate")
 # A sulfinate ester (PubChem 500k) whose name is built from a nested name of the acid,
 # a SMILES RDKit wrote: only the caller's string is checked.
 SULFINATE_ROW = "CCCCCCC#CCO[S@](=O)c1ccc(C)cc1"

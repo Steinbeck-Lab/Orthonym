@@ -100,9 +100,10 @@ PAIRS = [
     # PB lane S: a tripeptide is named substitutively now method (1); gives no PIN
     # for peptide names), by the general acyclic producer
     ("NCC(=O)N[C@@H](CC(N)=O)C(=O)NCC(=O)O", "best-effort", "inner:general_acyclic"),
-    # the cascade that goes on when the first class's handler returns None
+    # the cascade that goes on when the first class's handler returns None (NPL 2026-11-01: a name is no PIN,
+    # INTRODUCTION, the Blue Book, so the PIN tier declines it and best-effort ships it)
     ("C[C@]12CC[C@H](O[C@@H]3O[C@H](C(=O)O)[C@@H](O)[C@H](O)[C@H]3O)C[C@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)C(=O)CC[C@@H]12",
-     "pin", "outer:natural_product"),
+     "best-effort", "outer:natural_product"),
     ("C/C(=C\\[C@H]1OC(=O)[C@@H](C)[C@@H]1C)[C@H]1CCC2=C3C=CC4=CC(=O)CC[C@]4(C)[C@H]3CC[C@@]21C",
      "best-effort", "outer:natural_product"),
     # the inner handlers

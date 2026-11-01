@@ -7,6 +7,7 @@ import pytest
 from rdkit import Chem
 
 from orthonym.namer import Orthonym
+from tests.support.np_producer import np_namer, np_producer_only  # noqa: F401
 from tests.support.rt_assert import name_is_rt_exact
 from tests.support.default_tier import (  # noqa: E402
     declined_pin_row,
@@ -154,15 +155,18 @@ def test_partial_acid_salt_ez_gate_off(smiles, expected):
 # ---------------------------------------------------------------------------
 
 STEROID_ACID_NAMES = [
-    # (smiles, name, tier at the PIN tier). The last two carry a whole-graph R/S
+    # (smiles, name, tier). NPL 2026-11-01: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs)
+    # are not identified for the compounds in this Chapter", so every steroid name of the producer is
+    # systematic_verified (the best-effort tier gives it; the default tier declines it) and the producer is named
+    # with the route's systematic offer off (``np_producer_only``). The last two carry a whole-graph R/S
     # descriptor block (DK-P101CIP, recorded non-PIN): the PIN path built them and
     # the gate verified them (; name_is_rt_exact below), and the code records
     # them as not the PIN, so systematic_verified -- "a correct systematic name that
     # is not the PIN" (user decision 2026-09-30; Methods, "Tiers").
     ("C[C@H](CCC(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@@H]4C[C@H](O)CC[C@]4(C)[C@H]3CC[C@]12C",
-     "3α-hydroxy-5β-cholan-24-oic acid", "pin_verified"),
+     "3α-hydroxy-5β-cholan-24-oic acid", "systematic_verified"),
     ("C[C@H](CCC[C@H](C)C(=O)O)[C@H]1CC[C@H]2[C@@H]3CC[C@H]4CC(=O)CC[C@]4(C)[C@H]3CC[C@]12C",
-     "(25S)-3-oxo-5α-cholestan-26-oic acid", "pin_verified"),
+     "(25S)-3-oxo-5α-cholestan-26-oic acid", "systematic_verified"),
     ("C[C@H](CCC(=O)O)[C@H]1C[C@H](O)[C@@]2(C)C3=CCC4C(C)(C)C(=O)CC[C@]4(C)C3=CC[C@]12C",
      "(10S,13R,14R,15S,17R,20R)-15-hydroxy-4,4,14-trimethyl-3-oxochola-7,9(11)-dien-24-oic acid",
      "systematic_verified"),
@@ -175,8 +179,8 @@ STEROID_ACID_NAMES = [
 @pytest.mark.opsin_gate
 @pytest.mark.parametrize("smiles,expected,tier", STEROID_ACID_NAMES,
                          ids=[e for _, e, _ in STEROID_ACID_NAMES])
-def test_steroid_terminal_acid_is_the_suffix(smiles, expected, tier):
-    r = _dt_row(smiles)
+def test_steroid_terminal_acid_is_the_suffix(smiles, expected, tier, np_producer_only):
+    r = np_namer().name_tiered(smiles)
     assert r["name"] == expected
     assert r["tier"] == tier
     assert name_is_rt_exact(expected, smiles)
@@ -203,8 +207,9 @@ def test_steroid_numbering_maps_follow_the_skeleton():
     ("C[C@]12CC[C@@H]3c4ccc(O)cc4CC[C@H]3[C@@H]1[C@@H](O)[C@@H](O)[C@@H]2O",
      "estra-1,3,5(10)-triene-3,15α,16α,17β-tetrol"),
 ])
-def test_steroid_compound_locant_and_alpha_beta(smiles, expected):
-    r = _dt_row(smiles)
+def test_steroid_compound_locant_and_alpha_beta(smiles, expected, np_producer_only):
+    # NPL 2026-11-01: the producer's spelling, named with the systematic offer off, the Blue Book)
+    r = np_namer().name_tiered(smiles)
     assert r["name"] == expected
     assert name_is_rt_exact(expected, smiles)
 

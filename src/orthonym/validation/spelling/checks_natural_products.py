@@ -6,9 +6,12 @@ nucleosides and nucleotides (and natural products, lipids). A name that cites on
 semisystematic parents or prefixes ('D-glucose', 'β-D-glucopyranosyloxy', 'L-alanine', 'adenosine', 'myo-inositol')
 names the structure, but no Blue Book rule makes it the PIN, so the name is labelled below the PIN.
 
-Out of scope here: the parents of ``data/natural_products.py`` (steroids, alkaloids, terpenes: the user's
-2026-09-30 ruling keeps their labels) and lipid names. The marks are read from the name alone; none occurs in
-a name the Blue Book gives as a PIN (``tests_local/unit/validation/test_p100_check_precision.py``).
+The names of ``data/natural_products.py`` are marked too (user decision 2026-10-31, which replaces the 2026-09-30
+ruling that kept their labels): the fundamental parent structures (``### ****...`` lists,:51409
+steroids,:51413 terpenes,:51419 miscellaneous) and their stems ('5β-cholan-24-oate', 'androst-4-ene-3,17-dione'),
+and the trivial names of the same tables ('cholesterol', 'lysergic acid', 'alpha-terpineol'), which no rule of the
+book makes a PIN. Out of scope: lipid names. The marks are read from the name alone; none occurs in a name the
+Blue Book gives as a PIN (``tests_local/unit/validation/test_p100_check_precision.py``).
 """
 from __future__ import annotations
 
@@ -64,11 +67,50 @@ def _table_word_pattern(words):
 
 _TABLE_NAME = _table_word_pattern(AMINO_ACID_TABLE_WORDS)
 
+#: The names of the natural-product tables (``data/natural_products.py``: NATURAL_PRODUCT_SCAFFOLDS,
+#: NATURAL_PRODUCT_DERIVATIVES, NAME_EXACT_NP_PARENTS), lower case, a leading E/Z descriptor left out. A copy, as above
+#: (tests/unit/validation/test_p100_semisystematic_names.py keeps it equal to the tables).
+NATURAL_PRODUCT_TABLE_WORDS = frozenset({
+    "1-carbapen-1-em", "21h-biline", "4-terpineol", "abietane", "aconitane", "ajmalan", "alpha-pinene",
+    "alpha-terpinene", "alpha-terpineol", "ambrosane", "androstadienone", "androstane", "androstanediol",
+    "androstenediol", "androstenedione", "androstenol", "androstenone", "aporphine", "aristolane", "aspidospermidine",
+    "atisane", "berbine", "beta-carotene", "beta-terpinene", "beta-terpineol", "beyerane", "bornane", "bufadienolide",
+    "bufanolide", "cadinane", "campestane", "campestanol", "camphor", "cardanolide", "cardenolide", "ceph-2-em",
+    "ceph-3-em", "cepham", "cevane", "cholane", "cholestane", "cholesterol", "cinchonan", "codeine", "codeinone",
+    "conanine", "corrin", "corynan", "corynoxan", "cucurbitane", "dammarane", "delta-terpinene", "diamorphine",
+    "dihydrocodeine", "dihydroheroin", "dihydroisolysergamide", "dihydroisolysergic acid", "dihydroisolysergol",
+    "dihydrolysergamide", "dihydrolysergic acid", "dihydrolysergol", "dihydromorphine", "drimane", "emetan",
+    "eremophilane", "ergoline", "ergosta-7,24(28)-dien-3-ol", "ergostane", "erythrinan", "estrane", "estratetraenol",
+    "eudesmane", "furostan", "galanthan", "gamma-terpinene", "gamma-terpineol", "gammacerane", "germacrane", "gibbane",
+    "gonane", "gorgostane", "grayanotoxane", "guaiane", "hasubanan", "hetisan", "himachalane", "hopane",
+    "hydrocodone", "hydromorphone", "ibogamine", "isolysergamide", "isolysergic acid", "isolysergol", "kaurane",
+    "kopsan", "labdane", "lanostane", "limonene", "lupane", "lycopene", "lycopodane", "lysergamide", "lysergic acid",
+    "lysergol", "menthane", "morphinan", "morphine", "morphinone", "oleanane", "ophiobolane", "oxycodone", "pen-2-em",
+    "penam", "picrasane", "pimarane", "pinane", "podocarpane", "poriferastane", "porphyrin", "pregnane",
+    "progesterone", "prostane", "protostane", "rosane", "sarpagan", "solanidane", "sparteine", "sphing-4-enine",
+    "spirostan", "stigmastane", "strychnidine", "taxane", "thromboxane", "trichothecane", "tropane", "tubulosan",
+    "ursane", "vincane", "yohimban",
+})
+
+#: The stems the parents take before an ending or a locant ('cholest-5-ene', 'androsta-1,4-diene',
+#: '5β-cholan-24-oic acid', 'trop-6-en-3-ol', '17-methylmorphin-7-ene'): the ``stem`` of every scaffold of
+#: NATURAL_PRODUCT_SCAFFOLDS and the four steroid parents of the derivatives table (a test keeps it equal to the table).
+PARENT_STEMS = ("androst", "estr", "pregn", "cholest", "chol", "ergost", "campest", "stigmast", "gon", "morphin",
+                "trop", "cinchon", "aporphin", "ergolin", "aconit", "berbin", "ajmal",
+                "gorgost", "poriferast", "spirost", "furost")
+
+_NP_NAME = re.compile(
+    r"(?:(?:" + "|".join(sorted(PARENT_STEMS, key=len, reverse=True)) + r")(?:a-|an(?:e|-|\b)|-\d)"
+    r"|(?:morphinan|tropan|cinchonan|aporphin|ergolin|aconitan|berbin|ajmalan)(?:e|-|\b)"
+    r"|(?:" + "|".join(re.escape(w) for w in sorted(NATURAL_PRODUCT_TABLE_WORDS, key=len, reverse=True)) + r")"
+    r"(?![a-z]))")
+
 
 @register('P-100')
 def chapter_p10_name_is_no_pin(mol, name):
     """A name that cites a to semisystematic name,:50941): no PIN is identified for it."""
-    m = _P10_NAME.search(name) or _TABLE_NAME.search(name.lower())
+    low = name.lower()
+    m = _P10_NAME.search(name) or _TABLE_NAME.search(low) or _NP_NAME.search(low)
     if m is None:
         return None
     return SpellingFailure('P-100', f"'{m.group(0)}' is a Chapter P-10 semisystematic name: "

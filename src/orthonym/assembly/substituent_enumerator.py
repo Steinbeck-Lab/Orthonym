@@ -47,6 +47,7 @@ from ..perception.molcache import atoms_of, bonds_of  # audit 2026-09-03 (S2): p
 from ..rules.seniority import get_prefix
 from ..errors import CASCADE_REFUSAL
 from .engine_prefix_ordering import engine_orders_with_mancude
+from .fused_ring_prefix import fused_ring_system_prefix
 from .naming_utils import SIMPLE_MULTIPLIERS, get_alkyl_name
 from .n_unit_prefix import n_unit_prefix
 from .substituent_naming import _name_aryl_methyl_ether, name_substituent_fragment
@@ -3262,11 +3263,8 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
     # =O, etc.) where the recursive namer produces garbled results like
     # "ammoniayl" or "unknown organic compoundyl". The descriptive fallback
     # (Tier 5) handles these correctly.
-    _skip_tier4 = False
-    if len(frag_atoms_set) == 1:
-        _single_atom = mol.GetAtomWithIdx(next(iter(frag_atoms_set)))
-        if _single_atom.GetAtomicNum() != 6:
-            _skip_tier4 = True
+    _skip_tier4 = (len(frag_atoms_set) == 1
+                   and mol.GetAtomWithIdx(next(iter(frag_atoms_set))).GetAtomicNum() != 6)
 
     if not _skip_tier4:
         try:
@@ -3277,6 +3275,9 @@ def _name_substituent_cascade(mol, frag_atoms, attach_idx,
                 return result
         except Exception:
             pass
+
+    if (_fused := fused_ring_system_prefix(mol, frag_atoms_set, attach_idx)) is not None:  # Tier 4.4 (DT4 F2b)
+        return _fused
 
     # ---- Tier 4.5 (Composer1 Task 2): recursive decoration composition --
     # Every narrow producer has declined. Under the general-fallback context

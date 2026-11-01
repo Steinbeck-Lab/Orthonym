@@ -25,6 +25,7 @@ import pytest
 
 from orthonym import Orthonym, OrthonymLimitError, classify_limit, name_compound
 from orthonym.errors import is_failure_name
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.default_tier import (
     assert_best_effort_gives,
     assert_default_tier_declines,
@@ -107,6 +108,7 @@ def test_an_inositol_is_declined_at_the_default_tier_and_ships_at_best_effort():
     pytest.param("C1Cc2ccc(cc2)CCc2ccc1cc2", "1,4(1,4)-dibenzenacyclohexaphane", marks=release_opsin_only),
     ("CCCCCCCCCCCCC/C=C/[C@@H](O)[C@@H](N)CO", "(4E)-sphing-4-enine"),  # NP list
 ])
+@pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: the list name is the fallback behind the systematic offer
 def test_the_exact_construction_exceptions_are_emitted(smiles, expected):
     row = Orthonym().name_tiered(smiles)
     assert row["name"] == expected, row
@@ -325,6 +327,7 @@ GERMACRANE = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
 GRAYANOTOXANE_ROW = "C[C@H]1C[C@@]23CC[C@H]4[C@@H](CCC4(C)C)[C@H]([C@@H]2CC[C@@H]1C3)C"
 
 
+@pytest.mark.usefixtures("np_producer_only")   # NPL 2026-11-01: INTRODUCTION (the Blue Book); the list name is the fallback
 def test_a_natural_product_list_name_is_emitted_and_labelled_below_the_pin():
     from orthonym.cli import _emit_tier_flags
     from tests.support.rt_assert import _independent_parse

@@ -5,12 +5,13 @@ from typing import Optional
 from rdkit import Chem
 
 #: Dispatch classes whose names follow Chapter nomenclature: "Preferred IUPAC names (PINs) are not
-#: identified for the compounds in this Chapter" (the Blue Book). The natural-product route keeps the
-#: labels of the natural-product decision (pin-class plan Task 32; user ruling 2026-09-30), so the spelling
-#: checks do not read its names; the lipid route is read by the check only (its sugar parts,;
-#: the carbohydrate, amino-acid and peptide routes are read by every check relabel 2026-10-31).
-_SPELLING_CHECK_SKIPPED_CLASSES = ("NATURAL_PRODUCT",)
-_SPELLING_CHECK_P100_ONLY_CLASSES = ("LIPID",)
+#: identified for the compounds in this Chapter" (the Blue Book). The natural-product route and the lipid
+#: route are read by the check only: a parent ('5α-cholestan-3β-ol') is no PIN (user decision
+#: 2026-10-31, which replaces the 2026-09-30 ruling that kept these labels), while the route's systematic names
+#: ('morphine' as its bridged fused name) are read as before; the lipid route for its sugar parts. The
+#: carbohydrate, amino-acid and peptide routes are read by every check relabel 2026-10-31).
+_SPELLING_CHECK_SKIPPED_CLASSES = ()
+_SPELLING_CHECK_P100_ONLY_CLASSES = ("LIPID", "NATURAL_PRODUCT")
 
 
 def pin_spelling_rows(dispatch_class: Optional[str], smiles: str, name: str) -> list:

@@ -20,6 +20,7 @@ from rdkit import Chem
 from orthonym import Orthonym
 from orthonym.namer import _default_tier_emits
 from orthonym.validation.pin_spelling import check_pin_spelling
+from tests.support.np_producer import np_producer_only  # noqa: F401
 from tests.support.default_tier import (
     assert_best_effort_gives,
     assert_default_tier_declines,
@@ -153,6 +154,10 @@ HOPANE = ("CC(C)[C@H]1CC[C@]2(C)[C@H]3CC[C@@H]4[C@@]5(C)CCCC(C)(C)[C@@H]5CC[C@@]
           "CC[C@@H]12")
 
 
+# NPL 2026-11-01: the route offers the systematic name of Chapters to before a list name INTRODUCTION,
+# the Blue Book,:50943), so 'hopane' is named with the producer-only fixture: the subject is the label path of
+# the list name, which is the fallback.
+@pytest.mark.usefixtures("np_producer_only")
 def test_a_name_of_the_exact_match_list_is_not_read():
     assert check_pin_spelling(Chem.MolFromSmiles(HOPANE), "hopane", strict=True)   # it would fail
     row = Orthonym().name_tiered(HOPANE)
@@ -162,6 +167,7 @@ def test_a_name_of_the_exact_match_list_is_not_read():
     assert not row.get("spelling_failures"), row
 
 
+@pytest.mark.usefixtures("np_producer_only")
 def test_a_name_of_the_exact_match_list_is_not_read_on_a_route_outside_p10(monkeypatch):
     """'hopane' reaches the label site through the NATURAL_PRODUCT route, so the class
     skip alone keeps its label; with that skip turned off, the list-name clause must still keep

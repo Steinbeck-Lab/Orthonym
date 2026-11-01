@@ -212,9 +212,8 @@ def test_the_kept_names_read_back_to_the_full_inchikey(smiles, name):
 @pytest.mark.parametrize("smiles,name", [
     #:23925 the multiplicative PIN (3 rings): the check is silent
     ("c1ccc(Oc2ccc(Oc3ccccc3)cc2)cc1", "1,1'-[1,4-phenylenebis(oxy)]dibenzene"),
-    # a parent (natural-product route): its label is the controller's ruling; the call
-    # site does not read the routes although four pyrroles sit on a 7-node chain
-    ("C1=CC(=CC2=NC(=CC3=NC(=Cc4ccc[nH]4)C=C3)C=C2)N=C1", "21H-biline"),
+    # (the parent '21H-biline' left this list, NPL 2026-11-01: it is no PIN, see
+    # ``test_a_p101_parent_is_not_lowered_by_the_phane_check`` below)
     # four ring systems on a 7-node chain whose substitutive parent cites more amines
     # and holds a ring of the chain: what is left (three ring systems) is no linear phane
     DIAMINE,
@@ -223,6 +222,19 @@ def test_names_the_check_does_not_lower_keep_pin_verified(smiles, name):
     row = _row(smiles, "pin")
     assert (row["name"], row["tier"]) == (name, "pin_verified"), row
     assert not row.get("spelling_failures"), row
+
+
+def test_a_p101_parent_is_not_lowered_by_the_phane_check():
+    """'21H-biline' (natural-product route; four pyrroles sit on a 7-node chain): the phane check does not read it.
+    NPL 2026-11-01: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not identified for
+    the compounds in this Chapter" -- it was pin_verified before; now the default tier declines it and best-effort
+    gives it as systematic_verified (OPSIN 2.9.0 reads it back to the full InChIKey). The only failure is the
+    check's: the phane rule stays silent."""
+    smiles = "C1=CC(=CC2=NC(=CC3=NC(=Cc4ccc[nH]4)C=C3)C=C2)N=C1"
+    assert _row(smiles, "pin")["tier"] == "abstain"
+    row = _row(smiles, "best-effort")
+    assert (row["name"], row["tier"]) == ("21H-biline", "systematic_verified"), row
+    assert _row_rules(row) == ["P-100"], row
 
 
 @release_opsin_only

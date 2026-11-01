@@ -31,7 +31,12 @@ def test_cholest_sulfate():
         "CC(C)CCC[C@@H](C)[C@H]1CC[C@H]2[C@@H]3CC=C4C[C@@H]"
         "(OS(=O)(=O)[O-])CC[C@]4(C)[C@H]3CC[C@]12C"
     )
-    assert name_compound(smiles) == "cholest-5-en-3β-yl sulfate"
+    # NPL 2026-11-01: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not identified
+    # for the compounds in this Chapter": the cholest-5-en-3β-yl name is no PIN, so the name is the one of
+    # Chapters to on cyclopenta[a]phenanthrene (OPSIN 2.9.0 reads it back to the input's full InChIKey).
+    assert name_compound(smiles) == (
+        "(3S,8S,9S,10R,13R,14S,17R)-10,13-dimethyl-17-[(2R)-6-methylheptan-2-yl]-2,3,4,7,8,9,10,11,12,13,14,15,16,17-"
+        "tetradecahydro-1H-cyclopenta[a]phenanthren-3-yl sulfate")
 
 
 def test_androstan_hydroxy_hsulfate():

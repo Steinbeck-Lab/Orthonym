@@ -4256,6 +4256,7 @@ def _budget_scope(fn):
                 _policy = self._default_tier_policy_applies()
                 if _policy:
                     self._default_tier_row = None
+                    self._default_tier_withheld = None
                     from .metrics.provenance import clear_provenance
                     clear_provenance()
             _result = fn(self, *args, **kwargs)
@@ -5835,6 +5836,7 @@ class Orthonym:
         from .validation.stereo_stated import name_states_fewer_stereo
         clear_provenance()
         self._default_tier_row = None
+        self._default_tier_withheld = None
         token = open_trail(smiles)
         try:
             name = self.name(smiles, on_failure="label")
@@ -8326,10 +8328,13 @@ class Orthonym:
         row, pin_form = self._tier_row_and_pin_form(smiles, name, get_provenance())
         if _default_tier_emits(row, pin_form, smiles, self._trivial_fallback):
             self._default_tier_row = (name, row)
+            self._default_tier_withheld = None
             return name
         label, declined = _default_tier_declined_row(
             smiles, row.get("spelling_failures") or ())
         self._default_tier_row = (label, declined)
+        # the name and row the decline withheld, for the best-effort offer (``default_tier_offer.stereo_layer_row``)
+        self._default_tier_withheld = (name, row)
         logger.info("default tier declined %r (tier %s): not a verified PIN",
                     name, row.get("tier"))
         if raise_on_limit:

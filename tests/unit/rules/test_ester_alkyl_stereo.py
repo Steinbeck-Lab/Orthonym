@@ -104,7 +104,11 @@ class TestRingAlcoholEster:
         import orthonym.namer as _namer
         monkeypatch.setattr(_namer, "_DISABLE_VALIDITY_GATE", False)
         name = name_compound("CN1[C@@H]2CC[C@H]1C[C@H](C2)OC(=O)C(CO)c1ccccc1")
-        assert name == "(1R,3r,5S)-tropan-3-yl 3-hydroxy-2-phenylpropanoate", f"got {name!r}"
+        # NPL 2026-11-01: INTRODUCTION (the Blue Book) "Preferred IUPAC names (PINs) are not
+        # identified for the compounds in this Chapter": 'tropane' is a parent, so the name is the von Baeyer
+        # ester of Chapters to (OPSIN 2.9.0 reads its stereo-stripped form back to the input's InChIKey
+        # without stereo; it parses no lowercase 'r').
+        assert name == "(1R,3r,5S)-8-methyl-8-azabicyclo[3.2.1]octan-3-yl 3-hydroxy-2-phenylpropanoate", f"got {name!r}"
 
 
 class TestAcidSideStereoRegression:

@@ -94,19 +94,17 @@ def test_fragment_named_inside_another_name_keeps_the_head_order(monkeypatch):
     assert _pg(smiles) == "primary_amine"
 
 
-def test_declined_offer_keeps_the_next_suffix():
-    """The coumarin lactone: the PIN tier cannot write the ester name (the owner is a ring
-    system), so the ketone stays the principal group and the name keeps its '-one' suffix (it
-    is not demoted to 'oxo'). That substitutive name is correct and OPSIN reads it back, but
-    it names a junior class (Table 4.1: the lactone is class 16, the ester class 9), so it is
-    no PIN: the default tier declines it and the valid tier ships it as a systematic name."""
+def test_the_ring_system_owner_of_the_ester_is_named():
+    """The coumarin lactone: the PIN tier used to be unable to write the ester name (the owner is a
+    decorated fused ring system), so the ketone stayed the principal group. The fused '-yl' prefix of
+    the owner is now built (DT4 F2b, NPL 2026-11-01), so the ester, the senior class (Table 4.1: the
+    ester class 9, the lactone class 16), is the principal group and its functional-class name the PIN."""
     smiles = "CCOP(=O)(OCC)Oc1ccc2c(C)c(Cl)c(=O)oc2c1"
-    name = "3-chloro-7-[(diethoxyphosphoryl)oxy]-4-methyl-2H-1-benzopyran-2-one"
-    assert _pg(smiles) == "ketone"
+    name = "3-chloro-4-methyl-2-oxo-2H-1-benzopyran-7-yl diethyl phosphate"
+    assert _pg(smiles) == "phosphate_triester"
     assert name_is_rt_exact(name, smiles), name
-    assert name_default(smiles).get("tier") != "pin_verified"
-    v = Orthonym(style="pin", **_emit_tier_flags("valid")).name_tiered(smiles)
-    assert (v.get("name"), v.get("tier")) == (name, "systematic_verified"), v
+    row = name_default(smiles)
+    assert (row.get("name"), row.get("tier")) == (name, "pin_verified"), row
 
 
 @pytest.mark.xfail(strict=True, reason=(
