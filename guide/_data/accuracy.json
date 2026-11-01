@@ -10,17 +10,17 @@
     {"set": "PubChem 1,000,000", "molecules": 1000000, "named": 957523, "declined": 42468, "unreadable": 1, "other_layers": 8, "wrong": 0}
   ],
   "tiers": {
-    "source": "Orthonym main after the merges of 2026-10-31 (held-out ChEBI measured at the P-100 build, the development and drug-like sets after the natural-product names (systematic name first)); the evaluation harness at --emit-tier pin (the PIN-only tier) and --emit-tier best-effort (the default), every name read back by OPSIN 2.9.0 and compared by full InChIKey; a declined molecule, a name OPSIN cannot read and a timeout are all misses",
+    "source": "Orthonym main after the merges of 2026-10-31 (held-out ChEBI measured at the P-100 build, the development and drug-like sets after the natural-product names and the higher-order fusion names); the evaluation harness at --emit-tier pin (the PIN-only tier) and --emit-tier best-effort (the default), every name read back by OPSIN 2.9.0 and compared by full InChIKey; a declined molecule, a name OPSIN cannot read and a timeout are all misses",
     "columns": ["Set", "Molecules", "Named, default", "Named, PIN-only tier", "Declined, default", "Declined, PIN-only tier", "Unreadable, default", "Unreadable, PIN-only tier"],
     "rows": [
       {"set": "Held-out ChEBI 2,000", "molecules": 2000,
        "pin": {"named": 1062, "declined": 935, "unreadable": 3, "timed_out": 0},
        "best_effort": {"named": 1994, "declined": 5, "unreadable": 1, "timed_out": 0}, "wrong": 0},
       {"set": "ChEBI development 2,000", "molecules": 2000,
-       "pin": {"named": 1117, "declined": 879, "unreadable": 4, "timed_out": 0},
+       "pin": {"named": 1126, "declined": 870, "unreadable": 4, "timed_out": 0},
        "best_effort": {"named": 1993, "declined": 4, "unreadable": 3, "timed_out": 0}, "wrong": 0},
       {"set": "Drug-like PubChem 2,000", "molecules": 2000,
-       "pin": {"named": 909, "declined": 1078, "unreadable": 12, "timed_out": 1},
+       "pin": {"named": 912, "declined": 1075, "unreadable": 12, "timed_out": 1},
        "best_effort": {"named": 1959, "declined": 41, "unreadable": 0, "timed_out": 0}, "wrong": 0}
     ]
   }

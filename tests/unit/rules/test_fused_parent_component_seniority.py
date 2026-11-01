@@ -80,6 +80,9 @@ PIN_ROWS = [
     # (:13439) a benzoheterocycle as the parent, 'thieno[3,2-f][2,1]
     # benzothiazole (PIN)': O > S, so [1]benzofuran over [1]benzothiophene
     ("c1cc2cc3ccsc3cc2o1", "thieno[3,2-f][1]benzofuran"),
+    ("c1cnc2sc3ccsc3c2c1", "thieno[2',3':4,5]thieno[2,3-b]pyridine"),
+    ("c1cnc2c(c1)sc1sccc12", "thieno[3',2':4,5]thieno[3,2-b]pyridine"),
+    ("c1cnc2oc3ccoc3c2c1", "furo[2',3':4,5]furo[2,3-b]pyridine"),
     # unchanged (commit 2ae3b9820's rows keep their parents under the full key)
     ("c1ccc2c(c1)oc1ncccc12", "[1]benzofuro[2,3-b]pyridine"),
     ("c1ccc2c(c1)[nH]c1ncccc12", "9H-pyrido[2,3-b]indole"),
@@ -100,18 +103,13 @@ def test_fusion_parent_component(smiles, pin):
     assert _same_tautomer(name, smiles), f"{name!r} puts the hydrogen elsewhere"
 
 
-# F11b: the only parent this namer could offer was a fusion-named pair; the PIN
-# ("thieno[2',3':4,5]thieno[2,3-b]pyridine", "furo[2',3':4,5]furo[2,3-b]pyridine")
-# needs primed higher-order locants. None of these may be labelled pin_verified; the
-# best-effort tier still names each one round-trip exact. (The two phenanthroline isomers
-# that stood here left this list: Table 2.8 "Retained names of heterocyclic parent ring
-# components" (the Blue Book) prints "phenanthroline... the PIN is 1,7-phenanthroline;
-# other isomers are: 1,8-; 1,9-; 1,10-; 2,7-; 2,8-; 2,9-; 3,7-; 3,8-; 4,7-" (:11521-11523), and the zero-bridge reading of the bridged fused builder
-# spells them; see PIN_ROWS.)
+# F11b (moved to PIN_ROWS by DT4-A): the PIN of these three needs primed higher-order locants, which
+# ``poly_fusion._tree_name`` now builds. ``### **** Fusion names composed of first- and higher-order
+# attached components`` (the Blue Book): "numerical locants are used instead of letters and the two sets of
+# locants are separated by a colon. The locants of second-order attached components are primed"; the parent is
+# pyridine (a), nitrogen), one location, so (b) offers no first-order-only reading. Each name is
+# read back by OPSIN 2.9.0 to the molecule's full InChIKey by ``test_fusion_parent_component``.
 NOT_PIN_ROWS = [
-    ("c1cnc2sc3ccsc3c2c1", "pyrido[3,2-d]thieno[3,2-b]thiophene"),
-    ("c1cnc2c(c1)sc1sccc12", "pyrido[2,3-d]thieno[2,3-b]thiophene"),
-    ("c1cnc2oc3ccoc3c2c1", "pyrido[3,2-d]furo[3,2-b]furan"),
     # (:13451) "A multiparent name is preferred to a fused ring system,
     # when there is a choice": 'benzo[1,2-b:4,5-c']difuran (PIN) (not furo[3,4-f]
     # [1]benzofuran'; the multiparent name is not built here

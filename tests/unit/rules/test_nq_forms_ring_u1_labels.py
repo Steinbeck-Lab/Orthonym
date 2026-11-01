@@ -29,10 +29,10 @@ LABEL_ROWS = [
     # was the tropane ester 'CN1C2CCC1CC(C2)OC(=O)C(CO)c1ccccc1', which the default tier emits since DT4 F2
     "COc1ccc(-c2cc3cc(CCCO)ccc3o2)c(O)c1",
     "CC(=O)OCC(O)C#Cc1ccc(-c2cccs2)s1",
-    # NPL 2026-11-01: a parent with no systematic name ('furostan', INTRODUCTION, the Blue Book "PINs
-    # are not identified for the compounds in this Chapter"): the default tier declines it, best-effort names it
-    # systematic_verified. It is the declined side of the rule, which the fourth row used to be (the alkaloid).
-    "CC(C)CCC1O[C@H]2C[C@H]3[C@@H]4CCC5CCCC[C@]5(C)[C@H]4CC[C@]3(C)[C@H]2[C@@H]1C",
+    # DT4-A: the furostan row that stood here (NPL 2026-11-01) is named by the default tier now (a fusion name with a
+    # second-order component, the Blue Book); the declined side is a pyran-benzene-pyran
+    # skeleton (a multiparent system,, not built), which the best-effort tier names systematic_verified.
+    "C[C@@H]1CC(=O)C2=C(O1)O[C@]1(C)CC[C@@]3(O)C(C)(C)C=CC(=O)[C@]3(C)[C@H]1C2",
 ]
 
 
