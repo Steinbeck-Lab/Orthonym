@@ -330,6 +330,9 @@ def test_a_flipped_cn_descriptor_does_not_ship(monkeypatch):
     assert res.get("name") != "(1E)-N-methylethanimidothioic acid", res
     import orthonym.rules.hydroximic_acids as hx
     monkeypatch.setattr(hx, "cn_configuration_verdict", lambda *args, **kwargs: "ok")
+    # the key-blind double-bond check reads the same C=N (validation/key_blind_double_bonds.py): off too
+    import orthonym.validation.key_blind_double_bonds as kb
+    monkeypatch.setattr(kb, "key_blind_double_bond_verdict", lambda *args, **kwargs: "n/a")
     assert Orthonym().name_tiered(smiles).get("name") == "(1E)-N-methylethanimidothioic acid"
 
 

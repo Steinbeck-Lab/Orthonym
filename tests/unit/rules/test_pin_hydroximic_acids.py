@@ -469,6 +469,9 @@ def test_a_name_that_states_no_configuration_of_a_configured_cn_does_not_ship(sm
     for res in (name_default(smiles), name_breadth(smiles)):
         assert res.get("tier") != "pin_verified", res
     monkeypatch.setattr(hx, "cn_configuration_verdict", lambda *args, **kwargs: "ok")
+    # the key-blind double-bond check reads the same C=N (validation/key_blind_double_bonds.py): off too
+    import orthonym.validation.key_blind_double_bonds as kb
+    monkeypatch.setattr(kb, "key_blind_double_bond_verdict", lambda *args, **kwargs: "n/a")
     res = name_default(smiles)
     assert res.get("tier") == "pin_verified" and "(E)" not in res["name"] and "(Z)" not in res["name"], res
 
@@ -565,6 +568,9 @@ def test_a_flipped_cn_descriptor_does_not_ship(monkeypatch):
     # and without the verdict the flipped name ships: the key sees nothing (the test can fail)
     import orthonym.rules.hydroximic_acids as hx
     monkeypatch.setattr(hx, "cn_configuration_verdict", lambda *args, **kwargs: "ok")
+    # the key-blind double-bond check reads the same C=N (validation/key_blind_double_bonds.py): off too
+    import orthonym.validation.key_blind_double_bonds as kb
+    monkeypatch.setattr(kb, "key_blind_double_bond_verdict", lambda *args, **kwargs: "n/a")
     assert Orthonym().name_tiered(smiles).get("name") == "(1Z)-N-hydroxyethanimidothioic acid"
 
 
