@@ -2799,12 +2799,13 @@ def _name_substituent(mol, sub_atoms: List[int],
                 for i in other_atoms
             )
             if all_simple and carbon_count > 0:
-                _ALKOXY = {1: 'methoxy', 2: 'ethoxy', 3: 'propoxy',
-                           4: 'butoxy', 5: 'pentyloxy'}
-                if carbon_count in _ALKOXY:
-                    return _ALKOXY[carbon_count]
-                prefix = get_chain_prefix(carbon_count)
-                return f"{prefix}oxy"
+                # The substituent namer reads the chain (branches, multiple bonds) and spells the
+                # prefix: "Retained names" (the Blue Book) contracts only methoxy,
+                # ethoxy, propoxy, butoxy (and phenoxy, tert-butoxy); a longer chain is '{alkyl}oxy',
+                # 'hexyloxy', never 'hexoxy'.
+                from ..assembly.substituent_enumerator import name_substituent
+                token = name_substituent(mol, sub_atoms, attachment_atom)
+                return token if token and token != 'substituent' else None
 
     # Explicit -C(=O)OH recognizer (Wave-2 completion): the recursive
     # fallback below mis-prefixed a carboxyl as 'formyl' (the -OH oxygen was
