@@ -340,8 +340,9 @@ def _nucleoside_stems() -> Tuple[str, ...]:
         from .rules.nucleosides import _NUCLEOSIDE_STEM
         for value in _NUCLEOSIDE_STEM.values():
             if isinstance(value, str) and value:
-                # `2'-deoxyadenosine` contributes the bare `adenosine` too, so a
-                # derivative of either spelling is covered.
+                # the table holds bare stems (`adenosine`); the 2'-deoxy names
+                # (`2'-deoxy-1-methylguanosine`) end in the same stem, which the
+                # unanchored pattern below still matches.
                 stems.add(value.lower())
                 stems.add(value.lower().split('-')[-1])
     except Exception:  # pragma: no cover - table is always importable in-tree
@@ -351,7 +352,7 @@ def _nucleoside_stems() -> Tuple[str, ...]:
     # explicit and separately cited rather than folded into the derived set.
     # `thymidine` is retained by `## **** RETAINED NAMES OF NUCLEOSIDES`
     # (:54943) but is not reachable through `_NUCLEOSIDE_STEM`, which maps
-    # (uracil, deoxy) to `2'-deoxyuridine`; kept so the exemption covers what the
+    # (uracil, deoxy) to the stem `uridine`; kept so the exemption covers what the
     # Blue Book retains rather than only what today's constructor emits.
     stems.update({
         'thymidine',

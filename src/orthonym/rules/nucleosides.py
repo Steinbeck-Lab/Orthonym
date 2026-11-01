@@ -63,14 +63,24 @@ _BASE_SIG = {                                     # {(ring-locant, exo-element)}
     frozenset([(2, "O"), (4, "O")]): "uracil",
     frozenset([(2, "O"), (4, "N")]): "cytosine",
 }
-_NUCLEOSIDE_STEM = {                              # (base, sugar) -> bare nucleoside name
-    ("adenine", "ribo"): "adenosine", ("adenine", "deoxy"): "2'-deoxyadenosine",
-    ("guanine", "ribo"): "guanosine", ("guanine", "deoxy"): "2'-deoxyguanosine",
-    ("hypoxanthine", "ribo"): "inosine", ("hypoxanthine", "deoxy"): "2'-deoxyinosine",
+# (base, sugar) -> retained nucleoside stem. The 2'-deoxy series uses the same stem: '2'-deoxy'
+# is a prefix cited in alphanumerical order with the base prefixes, not part of the stem
+# "Nucleosides having retained names can be fully substituted...", the Blue Book;
+# example `2'-deoxy-1-methylguanosine`,:54967).
+_NUCLEOSIDE_STEM = {
+    ("adenine", "ribo"): "adenosine", ("adenine", "deoxy"): "adenosine",
+    ("guanine", "ribo"): "guanosine", ("guanine", "deoxy"): "guanosine",
+    ("hypoxanthine", "ribo"): "inosine", ("hypoxanthine", "deoxy"): "inosine",
     ("xanthine", "ribo"): "xanthosine",
-    ("uracil", "ribo"): "uridine", ("uracil", "deoxy"): "2'-deoxyuridine",
-    ("cytosine", "ribo"): "cytidine", ("cytosine", "deoxy"): "2'-deoxycytidine",
+    ("uracil", "ribo"): "uridine", ("uracil", "deoxy"): "uridine",
+    ("cytosine", "ribo"): "cytidine", ("cytosine", "deoxy"): "cytidine",
 }
+
+# The configuration every retained nucleoside name states (beta-D-ribofuranosyl,: the CIP
+# labels of the sugar carbons, which the base substituents cannot change (C1' ranks O4' > N > C2'
+# whatever the base carries; C2', C3' and C4' are decided inside the sugar).
+_SUGAR_CIP = {"ribo": {"1'": "R", "2'": "R", "3'": "S", "4'": "R"},
+              "deoxy": {"1'": "R", "3'": "S", "4'": "R"}}
 
 
 def _base_numbering(mol: Chem.Mol, base_n: int) -> Optional[Dict[int, int]]:
@@ -88,6 +98,28 @@ def _base_numbering(mol: Chem.Mol, base_n: int) -> Optional[Dict[int, int]]:
     return None
 
 
+def _alkyl_word(mol: Chem.Mol, frag: set, attach: int) -> Optional[str]:
+    """The straight-chain alkyl prefix of ``frag`` (bonded through ``attach``), or None.
+
+    ``_ALKYL_NAME`` holds unbranched saturated names only, so the fragment must be an
+    unbranched, acyclic chain of saturated, uncharged carbons that starts at ``attach``:
+    a branched (isopropyl), unsaturated (ethynyl) or cyclic group is not what the word says."""
+    word = _ALKYL_NAME.get(len(frag))
+    if word is None:
+        return None
+    for x in frag:
+        atom = mol.GetAtomWithIdx(x)
+        if atom.GetSymbol() != "C" or atom.IsInRing() or atom.GetFormalCharge() \
+                or atom.GetNumRadicalElectrons():
+            return None
+        inner = [nb.GetIdx() for nb in atom.GetNeighbors() if nb.GetIdx() in frag]
+        if len(inner) > 2 or (x == attach and len(frag) > 1 and len(inner) != 1):
+            return None
+        if any(b.GetBondType() != Chem.BondType.SINGLE for b in atom.GetBonds()):
+            return None
+    return word
+
+
 def _frag_from(mol: Chem.Mol, start: int, blocked: set) -> set:
     seen, stack = set(), [start]
     while stack:
@@ -102,7 +134,8 @@ def _frag_from(mol: Chem.Mol, start: int, blocked: set) -> set:
 
 
 def _classify_base(mol: Chem.Mol, core: _Core):
-    """Return (bare_nucleoside_name, [(locant_str, alkyl_word)], strip_atoms) or None.
+    """Return (stem, sugar, [(locant_str, alkyl_word)], strip_atoms) or None; ``sugar`` is
+    'ribo' or 'deoxy' and the stem carries no '2'-deoxy' (``_NUCLEOSIDE_STEM``).
 
     Reads the base TYPE from exocyclic N/O markers (tautomer/charge robust) and the
     sugar type (ribo vs 2'-deoxy) from C2'. Carbon groups on a ring atom or on an
@@ -112,6 +145,13 @@ def _classify_base(mol: Chem.Mol, core: _Core):
     if num is None:
         return None
     base_ring = set(num)
+    # the SMARTS bonds are '~', so a hydrogenated base matches too; a base name states the mancude
+    # ring, so every ring carbon must be aromatic or carry a double bond (ring or exocyclic C=O/C=N)
+    for aidx in base_ring:
+        atom = mol.GetAtomWithIdx(aidx)
+        if atom.GetSymbol() == "C" and not atom.GetIsAromatic() and not any(
+                b.GetBondType() == Chem.BondType.DOUBLE for b in atom.GetBonds()):
+            return None
     sugar_side = _frag_from(mol, core.anomeric, {core.base_n})
     markers: Dict[int, set] = {}
     subs: List[Tuple[str, str]] = []
@@ -127,28 +167,34 @@ def _classify_base(mol: Chem.Mol, core: _Core):
                 markers.setdefault(loc, set()).add(sym)
                 exo_het[b] = f"{sym}{loc}"
             elif sym == "C":
+                if aidx == core.base_n:
+                    return None  # a group on the glycosidic N (a 9-ium) is not a base prefix
                 frag = _frag_from(mol, b, {aidx})
-                if frag & base_ring or frag & sugar_side or \
-                        not all(mol.GetAtomWithIdx(x).GetSymbol() == "C" for x in frag):
+                if frag & base_ring or frag & sugar_side:
                     return None
-                word = _ALKYL_NAME.get(len(frag))
+                word = _alkyl_word(mol, frag, b)
                 if word is None:
                     return None
                 subs.append((str(loc), word))
                 strip |= frag
             else:
                 return None  # exocyclic halogen/other on the base -> out of scope (fail-closed)
-    # substituents on an exocyclic amino N (e.g. N6-methyl on the 6-amino N)
+    # substituents on an exocyclic amino N (e.g. N6-methyl on the 6-amino N); any other group on
+    # an exocyclic N or O (N-hydroxy, a nitro or nitroso N, a second ring) is not expressed: refuse
     for nidx, nloc in exo_het.items():
-        for nb in mol.GetAtomWithIdx(nidx).GetNeighbors():
+        het = mol.GetAtomWithIdx(nidx)
+        if het.GetFormalCharge() or het.GetNumRadicalElectrons():
+            return None
+        for nb in het.GetNeighbors():
             b = nb.GetIdx()
-            if b in base_ring or b in sugar_side or nb.GetSymbol() != "C":
+            if b in base_ring:
                 continue
-            frag = _frag_from(mol, b, {nidx})
-            if frag & base_ring or frag & sugar_side or \
-                    not all(mol.GetAtomWithIdx(x).GetSymbol() == "C" for x in frag):
+            if b in sugar_side or nb.GetSymbol() != "C":
                 return None
-            word = _ALKYL_NAME.get(len(frag))
+            frag = _frag_from(mol, b, {nidx})
+            if frag & base_ring or frag & sugar_side:
+                return None
+            word = _alkyl_word(mol, frag, b)
             if word is None:
                 return None
             subs.append((nloc, word))
@@ -159,27 +205,76 @@ def _classify_base(mol: Chem.Mol, core: _Core):
     c2 = core.idx_for("2'")
     c2_has_o = any(nb.GetSymbol() == "O" and nb.GetIdx() not in core.ring_atoms
                    for nb in mol.GetAtomWithIdx(c2).GetNeighbors())
-    bare = _NUCLEOSIDE_STEM.get((base, "ribo" if c2_has_o else "deoxy"))
-    if bare is None:
+    sugar = "ribo" if c2_has_o else "deoxy"
+    stem = _NUCLEOSIDE_STEM.get((base, sugar))
+    if stem is None:
         return None
-    return bare, subs, strip
+    return stem, sugar, subs, strip
 
 
-def _assemble_base_substituents(bare: str, subs: List[Tuple[str, str]]) -> Optional[str]:
-    """Assemble ``<locant>-<alkyl><nucleoside>``. Single substituent, or
-    several identical-word substituents with a multiplier; mixed words -> None."""
+def _assemble_base_substituents(stem: str, sugar: str,
+                                subs: List[Tuple[str, str]]) -> Optional[str]:
+    """Assemble the base prefixes and, in the 2'-deoxy series, the ``2'-deoxy`` prefix in
+    alphanumerical order in front of the retained stem, the Blue Book:
+    `2'-deoxy-1-methylguanosine`,:54967; order. The base prefixes are one word,
+    single or multiplied; mixed words -> None."""
     if not subs:
         return None
     words = {w for _, w in subs}
-    if len(words) == 1:
-        word = next(iter(words))
-        locs = sorted(subs, key=lambda t: (len(t[0]), t[0]))
-        loc_str = ",".join(l for l, _ in locs)
-        if len(subs) == 1:
-            return f"{loc_str}-{word}{bare}"
-        mult = _PRIME_MULT.get(len(subs))
-        return f"{loc_str}-{mult}{word}{bare}" if mult else None
-    return None  # mixed substituent words -> alphanumeric ordering not built yet
+    if len(words) != 1:
+        return None  # mixed substituent words -> alphanumeric ordering not built yet
+    word = next(iter(words))
+    locs = sorted(subs, key=lambda t: (len(t[0]), t[0]))
+    loc_str = ",".join(l for l, _ in locs)
+    mult = "" if len(subs) == 1 else _PRIME_MULT.get(len(subs))
+    if mult is None:
+        return None
+    prefixes = [(word, f"{loc_str}-{mult}{word}")]       # alphabetised without the multiplier
+    if sugar == "deoxy":
+        prefixes.append(("deoxy", "2'-deoxy"))
+    return "-".join(text for _, text in sorted(prefixes)) + stem
+
+
+def _sugar_configuration_ok(mol: Chem.Mol, core: _Core, sugar: str) -> bool:
+    """Whether every sugar stereocentre is defined with the configuration a retained
+    nucleoside name states (``_SUGAR_CIP``). An undefined or other centre is not what the
+    name says, so the name is not built."""
+    from ..perception.stereo import assign_stereochemistry
+    assign_stereochemistry(mol)
+    for prime, label in _SUGAR_CIP[sugar].items():
+        atom = mol.GetAtomWithIdx(core.idx_for(prime))
+        if not atom.HasProp("_CIPCode") or atom.GetProp("_CIPCode") != label:
+            return False
+    return True
+
+
+def _sugar_is_plain(mol: Chem.Mol, core: _Core) -> bool:
+    """Whether the furanose carries nothing but what the names of this module express: C1'
+    the base, C2' at most one O, C3' and C5' one O each, C4' only C5', every bond to these
+    groups single and no charge on a sugar atom. A 3'-azido, 3'-deoxy, 5'-deoxy, 2'-fluoro,
+    4'-substituted or keto sugar is a different compound and is refused here."""
+    allowed = {"1'": (0, 0), "2'": (0, 1), "3'": (1, 1), "4'": (0, 0), "5'": (1, 1)}
+    c5 = core.idx_for("5'")
+    for prime, (lo, hi) in allowed.items():
+        idx = core.idx_for(prime)
+        atom = mol.GetAtomWithIdx(idx)
+        if atom.GetFormalCharge() or atom.GetNumRadicalElectrons():
+            return False
+        n_o = 0
+        for bond in atom.GetBonds():
+            nb = bond.GetOtherAtom(atom)
+            j = nb.GetIdx()
+            if j in core.ring_atoms or (prime == "1'" and j == core.base_n) \
+                    or (prime == "4'" and j == c5) or (prime == "5'" and j == core.idx_for("4'")):
+                if bond.GetBondType() != Chem.BondType.SINGLE:
+                    return False
+                continue
+            if nb.GetSymbol() != "O" or bond.GetBondType() != Chem.BondType.SINGLE:
+                return False
+            n_o += 1
+        if not lo <= n_o <= hi:
+            return False
+    return True
 
 
 def _canon(smi: str) -> Optional[str]:
@@ -431,10 +526,13 @@ def _name_base_substituted(mol: Chem.Mol, core: _Core) -> Optional[str]:
     res = _classify_base(mol, core)
     if res is None:
         return None
-    bare, subs, _strip_atoms = res
+    stem, sugar, subs, _strip_atoms = res
     if not subs:
         return None  # bare nucleoside -> retained-name path
-    return _assemble_base_substituents(bare, subs)
+    # the stem is not looked up by structure here, so the sugar configuration it states is checked
+    if not _sugar_configuration_ok(mol, core, sugar):
+        return None
+    return _assemble_base_substituents(stem, sugar, subs)
 
 
 def name_nucleoside(mol: Chem.Mol) -> Optional[str]:
@@ -442,7 +540,7 @@ def name_nucleoside(mol: Chem.Mol) -> Optional[str]:
     if mol is None or len(Chem.GetMolFrags(mol)) != 1:
         return None
     core = _find_core(mol)
-    if core is None:
+    if core is None or not _sugar_is_plain(mol, core):
         return None
 
     decorations: Dict[str, tuple] = {}   # prime -> ("phosphate", (to_del,n_oh,n_p)) | ("acyl", word)
