@@ -77,10 +77,18 @@ def test_androstan_3β_sulfate():
         "C[C@]12CC[C@H](O)C[C@@H]1CC[C@@H]1[C@@H]2CC[C@]2(C)"
         "[C@@H](OS(=O)(=O)[O-])CC[C@@H]12"
     )
-    assert (
-        name_compound(smiles)
-        == "3β-hydroxy-5α-androstan-17β-yl sulfate"
-    )
+    # lane DT5 (2026-11-01, change-asserted-value): a hydroxy group of the steroid is the prefix 'hydroxy' of its
+    # fused '-yl' prefix, the Blue Book: in a substituent the free valence is the 'suffix'), which the
+    # fused builder (DT4 F2b) could not build for a bare -OH, so the name of the stereoparent route was shipped
+    # INTRODUCTION:50941 "PINs are not identified for the compounds in this Chapter"). The systematic name is
+    # the name the best-effort tier shipped as pin_unverified; OPSIN 2.9.0 and main read it back to the full InChIKey
+    # (the assertion below); mutation: ``bridged_fused_pin._assemble`` without ``bare_prefixes`` ships the old name.
+    from tests.support.rt_assert import name_is_rt_exact
+    name = name_compound(smiles)
+    assert name == (
+        "(3S,5S,8R,9S,10S,13S,14S,17S)-3-hydroxy-10,13-dimethylhexadecahydro-1H-cyclopenta[a]phenanthren-17-yl sulfate"
+    ), name
+    assert name_is_rt_exact(name, smiles)
 
 
 def test_ergostan_hsulfate():

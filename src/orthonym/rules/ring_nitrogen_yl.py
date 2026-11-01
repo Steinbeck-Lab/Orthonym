@@ -41,6 +41,34 @@ def ring_yl_in_scope(mol, atom_idx: int, fragment_atoms: Iterable[int]) -> bool:
         len(ring) <= MAX_RING_YL_RING for ring in mol.GetRingInfo().AtomRings() if group.issuperset(ring))
 
 
+def ring_yl_branch_in_scope(mol, fragment_atoms: Iterable[int], parent_atoms: Iterable[int]) -> bool:
+    """``ring_yl_in_scope`` for a fragment bonded to the parent through a chain: the fragment holds a ring, every
+    ring system in it is within the bounds, the whole fragment has at most ``MAX_RING_YL_SYSTEM`` atoms, and
+    the parent ring system bears the most principal characteristic groups of the molecule, so no
+    other ring system could be the parent: '2-[(decahydronaphthalen-1-yl)methyl]benzene-1,3-diol'). The size limit
+    of the writers guards against naming a ring as the parent of a molecule whose parent is another ring;
+    the groups tell which ring that is."""
+    fragment = set(fragment_atoms)
+    if len(fragment) > MAX_RING_YL_SYSTEM:
+        return False
+    rings = [r for r in mol.GetRingInfo().AtomRings() if fragment.issuperset(r)]
+    if not rings or not all(len(_ring_group(mol, ring[0])) <= MAX_RING_YL_SYSTEM and len(ring) <= MAX_RING_YL_RING
+                            for ring in rings):
+        return False
+    from ..perception.functional_groups import detect_functional_groups
+    from ..perception.rings import get_ring_systems
+    from .parent_selection import _count_pg_on_ring
+    from .seniority import get_principal_group
+    pg, atoms = get_principal_group(mol, detect_functional_groups(mol))
+    parent = set(parent_atoms)
+    if not pg or not atoms:
+        return False
+    held = _count_pg_on_ring(mol, parent, atoms, pg)
+    return held > 0 and all(
+        _count_pg_on_ring(mol, set(rs), atoms, pg) <= held
+        for rs in get_ring_systems(mol) if not (set(rs) & parent))
+
+
 def _ring_group(mol, atom_idx: int):
     seen = {atom_idx}
     stack = [atom_idx]

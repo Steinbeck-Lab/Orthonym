@@ -64,7 +64,6 @@ from tests.support.default_tier import (  # noqa: E402
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
     "CC(=O)OCC(C)OC(=O)CC",
-    "CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
     "CC12CCC(=O)C=C1C=CC1[C@@H]2CCC2(C)[C@H]1CCC21CCC(=O)O1",
     "CCCCC/C=C\\C/C=C\\CCCCCCCC(=O)O[C@H](COCCCCCCCCCCCCCCCCCC)COC(=O)CCCCCCCCCCCCCCCCCCCCCCC",
     "CCCCCCCC/C=C\\CCCCCCCC(=O)O[C@H](CO)COC(=O)CCCCCCCCCCCCCCCCC",
@@ -93,9 +92,11 @@ def _row(smiles):
 
 
 _DEMOTED = [
-    # von Baeyer names of fusion-nameable systems (canary DK-VBFUSED; TRIAGE rows 89/90)
-    ("CC1(C)C(O)C(O)CC2(C)C1CCC13CC(CCC21)C1(C)OC31",
-     "5,5,9,14-tetramethyl-15-oxapentacyclo[11.3.1.0^1,10.0^4,9.0^14,16]heptadecane-6,7-diol"),
+    # von Baeyer names of fusion-nameable systems (canary DK-VBFUSED; TRIAGE rows 89/90). The epoxy-bridged
+    # diterpene diol of TRIAGE row 89 left this list in lane DT5 (2026-11-01, change-asserted-value): its
+    # bridged fused name is built now and ships pin_verified (tests/unit/rules/test_dt5_ring_ladder.py,
+    # ``BRIDGED_WITH_SMALL_RING``), as (the Blue Book) asks: "No mancude ring, so a phane
+    # name is not allowed; the bridged fused ring name is preferred to the von Baeyer name."
     # wp7 change-asserted-value: (:3448) 'dimethyl' keys at 'methyl', before 'oxo';
     # the primed locants are locants (:3442). Was "...-5,6'-dioxo-9',13'-dimethylspiro[...]".
     # OPSIN 2.9.0 full-InChIKey exact.

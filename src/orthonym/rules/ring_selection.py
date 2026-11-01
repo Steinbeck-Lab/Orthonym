@@ -1387,3 +1387,21 @@ def select_principal_ring_system(
         best_idx = tied[0]
 
     return tuple(sorted(ring_systems[best_idx]))
+
+
+def select_principal_ring_system_with_groups(features) -> Tuple[int, ...]:
+    """``select_principal_ring_system`` of the molecule, then: a ring system with more principal
+    characteristic groups than the senior one is the parent instead (``parent_selection.
+    ring_system_with_most_groups``)."""
+    senior = select_principal_ring_system(features.mol, features.ring_systems)
+    groups = getattr(features, 'principal_group_atoms', None)
+    if senior and groups and len(features.ring_systems) >= 2:
+        from .parent_selection import ring_system_with_most_groups
+        richer = ring_system_with_most_groups(
+            features.mol, features.ring_systems, senior, groups, getattr(features, 'principal_group', None))
+        # a sugar ring is left to the glycoside convention of ``select_principal_ring_system`` (the aglycone is the
+        # parent and the sugar a glycosyloxy prefix,, which this rule does not overrule
+        if richer and not _is_monosaccharide_ring(features.mol, richer):
+            return tuple(sorted(richer))
+    return senior
+

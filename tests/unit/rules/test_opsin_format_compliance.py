@@ -236,6 +236,23 @@ _CANARY_DEFECT_REASONS = {
         # PINs (tests/unit/rules/test_fused_large_ring_pin.py), not row by row; call 22 is a three-component name.
         "fusion name with a large ring, numbering checked by read-back only"
     ),
+    "DK-SMALLRINGFUSED": (
+        # DT5 (2026-11-01, change-asserted-value): canary call 540 was a DK-VBFUSED von Baeyer name; a three-membered
+        # ring is a second-order fusion component now "Fusion names composed of first- and higher-order
+        # attached components", the Blue Book; "Five-membered ring requirement":23706 asks for two rings
+        # of five or more members, the isoindole and the cycloundecene ring), so the row has its fusion name. OPSIN 2.9.0
+        # and main read it back to the full InChIKey (fresh parse outside the engine). The component choice and numbering
+        # were not checked against a book row, so the row is a change detector.
+        "fusion name with a three-membered second-order component, numbering checked by read-back only"
+    ),
+    "DK-STEROIDYL": (
+        # DT5 (2026-11-01, change-asserted-value): canary call 522 was a DK-P101CIP stereoparent name INTRODUCTION,
+        # the Blue Book "PINs are not identified for the compounds in this Chapter"); the heptane-2,3-diol parent
+        # (two hydroxy groups,:18875) now has its steroid '-yl' prefix, whose own hydroxy group is the prefix
+        # 'hydroxy':15800). OPSIN 2.9.0 and main read it back to the full InChIKey; the component choice and numbering
+        # were not checked against a book row, so the row is a change detector.
+        "systematic name with a decorated fused '-yl' prefix, numbering checked by read-back only"
+    ),
     "DK-ETHANAMINE": (
         "'ethan-1-amine' with only N-substituents: P-14.3.4.2 (b) omits the locant "
         "('N,N-diethylethanamine (PIN)' :26235); the old fixture value was right"
@@ -545,8 +562,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (501,),
     ),
     "C[C@H](CC[C@H](O)C(C)(C)O)[C@H]1CC[C@@]2(C)C3=C(CC[C@]12C)[C@@]1(C)CC[C@H](O)C(C)(C)[C@@H]1CC3": (
-        "(3S,5R,10S,13R,14R,17R,20R,24S)-4,4,14-trimethylcholest-8-ene-3,24,25-triol",
-        "DK-P101CIP", (522,),
+        "(3S,6R)-6-[(3S,5R,10S,13R,14R,17R)-3-hydroxy-4,4,10,13,14-pentamethyl-2,3,4,5,6,7,10,11,12,13,14,15,16,17-tetradecahydro-1H-cyclopenta[a]phenanthren-17-yl]-2-methylheptane-2,3-diol",
+        "DK-STEROIDYL", (522,),
     ),
     "CC(C)[C@H](NC(=O)[C@H](CCC(=O)O)NC(=O)[C@@H](N)CCC(N)=O)C(=O)O": (
         "glutaminylglutamylvaline",
@@ -559,8 +576,8 @@ CANARY_KNOWN_DEFECTS = {
         "DK-PEP", (538,),
     ),
     "CC1=CC2/C=C(\\C)CCC3OC3/C=C/C(=O)C23C(=O)NC(CC(C)C)C3C1C": (
-        "(3E,10E)-10,14,15-trimethyl-17-(2-methylpropyl)-6-oxa-18-azatetracyclo[10.7.0.0^1,16.0^5,7]nonadeca-3,10,13-triene-2,19-dione",
-        "DK-VBFUSED", (540,),
+        "(7E,12E)-4,5,8-trimethyl-3-(2-methylpropyl)-3,3a,4,6a,9,10,10a,11a-octahydro-1H-oxireno[2',3':7,8]cycloundeca[1,2-d]isoindole-1,14(2H)-dione",
+        "DK-SMALLRINGFUSED", (540,),
     ),
     "CCC(=O)OCC(=O)[C@@]1(OC(=O)CC)[C@@H](C)C[C@H]2[C@@H]3CCC4=CC(=O)C=C[C@]4(C)[C@@]3(F)[C@@H](O)C[C@@]21C": (
         "(8S,9R,10S,11S,13S,14S,16S,17R)-9-fluoro-11-hydroxy-16-methyl-3,20-dioxopregna-1,4-dien-17,21-diyl dipropanoate",
@@ -803,6 +820,11 @@ _NOW_RT_EXACT = frozenset({
     # DT4-B: an ortho-fused system with an 11-membered ring is a fusion name now ('...tetradecahydrocycloundeca[e]
     # indene', the Blue Book "no upper ring-size limit";:23831); OPSIN-exact.
     "C=C(C)[C@H]1CC[C@]2(C)[C@@H]1CC[C@]1(C)C/C=C(\\C)CC/C=C(\\C)CC[C@H]12",
+    # DT5 (2026-11-01, change-asserted-value): the diarylheptanoid names on its phenol ring now, '4-[(6E)-3-hydroxy-7-
+    # phenylhept-6-en-1-yl]phenol': the ring bearing the most hydroxy groups is the parent, the Blue Book;
+    # one each, so a ring is senior to a chain,:19336), and the writer takes the chain with its ring
+    # (``ring_nitrogen_yl.ring_yl_branch_in_scope``). OPSIN 2.9.0 and main read it back to the full InChIKey.
+    "Oc1ccc(CCC(O)CC/C=C/c2ccccc2)cc1",
 })
 
 

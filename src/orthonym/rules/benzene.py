@@ -44,7 +44,7 @@ from .hydroximic_acids import (
 from .benzene_acid_suffixes import identify_chalcogen_acyl_group as _thioacyl  #: -C(=S)-R prefix
 from .locants import compare_locant_sets as _compare_locant_sets  #
 from .n_branch import acyclic_branch_on_nitrogen, amine_promotion, is_saturated_chain_carbon
-from .ring_nitrogen_yl import n_in_substituent_ring, ring_yl_in_scope
+from .ring_nitrogen_yl import n_in_substituent_ring, ring_yl_branch_in_scope, ring_yl_in_scope
 from ..perception.molcache import atoms_of, inchikey_of
 from ..perception.smarts_cache import compiled as _compiled_smarts
 
@@ -1654,7 +1654,7 @@ def _identify_substituent(mol, start_idx: int, ring_atoms: Set[int], principal_g
 
             if not _is_carbonyl:
                 _MAX_FALLBACK_ATOMS = 10
-                if len(sub_atoms) <= _MAX_FALLBACK_ATOMS or ring_yl_in_scope(mol, start_idx, sub_atoms):
+                if len(sub_atoms) <= _MAX_FALLBACK_ATOMS or ring_yl_in_scope(mol, start_idx, sub_atoms) or ring_yl_branch_in_scope(mol, sub_atoms, ring_atoms):
                     from ..assembly.naming_utils import needs_brackets
                     from ..assembly.substituent_enumerator import name_substituent
                     prefix_name = name_substituent(mol, set(sub_atoms), start_idx)

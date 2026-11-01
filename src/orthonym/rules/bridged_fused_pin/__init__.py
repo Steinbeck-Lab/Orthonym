@@ -130,8 +130,17 @@ def _cyclic_in(mol, system: Set[int], match) -> bool:
 
 
 def _pseudoketone_principal(mol, system: Set[int], groups) -> Optional[str]:
-    """'ketone' when the principal class is a cyclic anhydride, ester or amide of this ring
-    system (a pseudoketone) and nothing senior to a ketone is left; None otherwise."""
+    """The principal class when the first-ranked class is a cyclic anhydride, ester or amide of this ring
+    system (a pseudoketone): 'ketone' when nothing senior to a ketone is left; the senior group
+    (an aldehyde, a nitrile, a nitro-free amide...) when it has a suffix this builder spells, the
+    pseudoketone then being the 'oxo' prefix; None otherwise.
+    Table 4.1 of (the Blue Book, ```` Seniority order for classes) puts "lactones, lactams,
+    anhydrides, imides" in class 16 with the ketones: "16 Ketones..., pseudoketones... See Classes 8, 9, 11
+    and 13, on lactones, lactams, anhydrides, imides"; (:29628) "There is no seniority order
+    difference between ketones and pseudoketones"; (:32112) "A lactone, as a pseudoketone, ranks
+    lower in the seniority of classes than an acid or an ester, but higher than an alcohol, amine, or imine"
+    ('8-oxo-7-oxabicyclo[4.2.0]octane-4,5-dicarboxylic acid (PIN)',:32120). An aldehyde (class 15) or a
+    nitrile (14) therefore takes the suffix and the ring's lactone is cited as 'oxo'."""
     from ..seniority import SENIORITY_ORDER, get_principal_group
     rest = dict(groups)
     for cls in _PSEUDOKETONE_CLASSES:
@@ -142,7 +151,7 @@ def _pseudoketone_principal(mol, system: Set[int], groups) -> Optional[str]:
     if other is not None and other != "ketone" and (
             other not in SENIORITY_ORDER
             or SENIORITY_ORDER.index(other) < SENIORITY_ORDER.index("ketone")):
-        return None
+        return other if other in _SUFFIX_KIND else None
     return "ketone"
 
 
@@ -324,12 +333,14 @@ def _stereo_from_rules_4_and_5(mol, atom_to_locant: Dict[int, Any]) -> bool:
     return False
 
 
-def _prefix_groups(mol, atom_to_locant, exclude: Set[int]) -> List[Tuple[str, List[int]]]:
+def _prefix_groups(mol, atom_to_locant, exclude: Set[int], bare: bool = False,
+                   hydroperoxy: bool = False) -> List[Tuple[str, List[int]]]:
     """The substituent prefix names in citation order with the ring atoms that carry
     them -- the same naming call ``_partial_sat_substituent_prefix`` makes, used here
     only to rank numberings by (g) (:3307)."""
     from ...assembly.naming_utils import alpha_sort_key
-    from ..polycyclics import exocyclic_substituent_name, ring_ylidene_prefix
+    from ..polycyclics import (bare_terminal_prefix, exocyclic_substituent_name, hydroperoxy_atoms,
+                               ring_ylidene_prefix)
     ring_set = set(atom_to_locant)
     halo = {"F": "fluoro", "Cl": "chloro", "Br": "bromo", "I": "iodo"}
     groups: Dict[str, List[int]] = {}
@@ -341,7 +352,8 @@ def _prefix_groups(mol, atom_to_locant, exclude: Set[int]) -> List[Tuple[str, Li
             if n.GetSymbol() in halo and n.GetDegree() == 1:
                 groups.setdefault(halo[n.GetSymbol()], []).append(idx)
                 continue
-            ylidene = ring_ylidene_prefix(mol, j, idx)
+            ylidene = (ring_ylidene_prefix(mol, j, idx) or (bare_terminal_prefix(mol, j, idx) if bare else None)
+                       or ("hydroperoxy" if hydroperoxy and hydroperoxy_atoms(mol, j, idx) else None))
             if ylidene is not None:
                 groups.setdefault(ylidene, []).append(idx)
                 continue
@@ -391,7 +403,8 @@ def _assemble(mol, system: Set[int], parent: BridgedParent, suffix, added=frozen
     omit = not descriptors and _single_prefix_locant_is_omitted(
         mol, system, parent, bool(suffix_text), set(exo))
     sub_prefix = _partial_sat_substituent_prefix(
-        mol, a2l, exclude_atoms=set(exo), omit_locants=omit, ylidene_prefixes=True)
+        mol, a2l, exclude_atoms=set(exo), omit_locants=omit, ylidene_prefixes=True, bare_prefixes=kind == "yl",
+        hydroperoxy_prefixes=status == "suffix")
     if sub_prefix is None and (_offring_substituent_atoms(mol, a2l) - set(exo)):
         return None
     stem = f"{parent.text(elide=elide)}{suffix_text}"
@@ -687,7 +700,7 @@ def _cip_key(descriptors):
     return tuple(out)
 
 
-def _isotope_then_cip(mol, tied, exo):
+def _isotope_then_cip(mol, tied, exo, bare: bool = False, hydroperoxy: bool = False):
     """The numberings of ``tied`` that stand after (i) (:3336), the lowest locants to the isotopically
     modified atoms, and (j) (:3346), the CIP stereodescriptors of the parent and those cited inside its
     prefixes, together, at their locants (``### **** NUMBERING``,:3219). "Isotopic modifications have
@@ -710,7 +723,8 @@ def _isotope_then_cip(mol, tied, exo):
         assign_stereochemistry(mol)
         parent = [(numbering.loc_key(loc), code) for loc, code in collect_stereodescriptors(mol, a2l)]
         return numbering_cip_key(parent, [(numbering.loc_key(a2l[a]), name)
-                                          for name, atoms in _prefix_groups(mol, a2l, set(exo)) for a in atoms])
+                                          for name, atoms in _prefix_groups(mol, a2l, set(exo), bare, hydroperoxy)
+                                          for a in atoms])
 
     best = min(j_key(s) for s in tied)
     return [s for s in tied if j_key(s) == best]
@@ -728,7 +742,7 @@ def _choose(mol, system, scored, suffix, exo, kind, pcg_atoms):
         from ...assembly.naming_utils import alpha_sort_key
 
         def first_cited(s):
-            groups = _prefix_groups(mol, s[4].atom_to_locant, set(exo))
+            groups = _prefix_groups(mol, s[4].atom_to_locant, set(exo), kind == "yl", suffix[0] == "suffix")
             if not groups:
                 return ()
             k0 = alpha_sort_key(groups[0][0])
@@ -736,7 +750,7 @@ def _choose(mol, system, scored, suffix, exo, kind, pcg_atoms):
                                           if alpha_sort_key(name) == k0 for a in atoms)
         g = min(first_cited(s) for s in tied)
         tied = [s for s in tied if first_cited(s) == g]
-        tied = _isotope_then_cip(mol, tied, exo)
+        tied = _isotope_then_cip(mol, tied, exo, kind == "yl", suffix[0] == "suffix")
     results = {}
     for key, sp, bps, state, nb, ih, hydro_atoms, added, need in tied:
         a2l = nb.atom_to_locant

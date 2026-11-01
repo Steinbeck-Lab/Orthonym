@@ -2279,12 +2279,52 @@ def ring_ylidene_prefix(mol, atom_idx: int, ring_idx: int) -> Optional[str]:
     return prefix
 
 
+#: the bare monovalent groups a ring system that is itself a substituent cites as prefixes: no characteristic
+#: group of it is a suffix, the free valence is. "General methodology for naming substituent groups"
+#: (the Blue Book); '(2-hydroxyphenyl)', '2-aminocyclohexyl'. (symbol -> (prefix, hydrogens))
+_BARE_TERMINAL_PREFIX = {"O": ("hydroxy", 1), "S": ("sulfanyl", 1), "N": ("amino", 2)}
+
+
+def bare_terminal_prefix(mol, atom_idx: int, ring_idx: int) -> Optional[str]:
+    """'hydroxy', 'sulfanyl' or 'amino' when atom ``atom_idx`` is a bare -OH, -SH or -NH2 on ring atom
+    ``ring_idx``, else None. The fragment namer withholds these three when the molecule's principal group is of
+    their class (its caller would cite the suffix), which a ring that is a substituent never does."""
+    atom = mol.GetAtomWithIdx(atom_idx)
+    spec = _BARE_TERMINAL_PREFIX.get(atom.GetSymbol())
+    bond = mol.GetBondBetweenAtoms(atom_idx, ring_idx)
+    if (spec is None or bond is None or bond.GetBondType() != Chem.BondType.SINGLE or atom.GetDegree() != 1
+            or atom.GetFormalCharge() or atom.GetNumRadicalElectrons() or atom.GetIsotope()
+            or atom.GetTotalNumHs() != spec[1]):
+        return None
+    return spec[0]
+
+
+def hydroperoxy_atoms(mol, atom_idx: int, ring_idx: int) -> Optional[Set[int]]:
+    """``{atom_idx, other O}`` when atom ``atom_idx`` is the ring-bonded O of a -O-OH group on ring atom ``ring_idx``,
+    else None. ## **** Hydroperoxides (the Blue Book): "The prefix 'hydroperoxy' is formed by concatenation to describe the
+    group -OOH as a substituent in the presence of a characteristic group having priority for citation as a suffix.
+    Method (1) leads to preferred IUPAC names"; the fragment namer's 'dioxidanyl' is no PIN vocabulary. The caller
+    asks only where a group senior to the peroxol (class 18, Table 4.1:18189) takes the suffix."""
+    atom = mol.GetAtomWithIdx(atom_idx)
+    if (atom.GetSymbol() != 'O' or atom.GetDegree() != 2 or atom.GetFormalCharge() or atom.GetIsotope()
+            or atom.GetNumRadicalElectrons()):
+        return None
+    other = [n for n in atom.GetNeighbors() if n.GetIdx() != ring_idx]
+    if (len(other) != 1 or other[0].GetSymbol() != 'O' or other[0].GetDegree() != 1 or other[0].GetFormalCharge()
+            or other[0].GetIsotope() or other[0].GetTotalNumHs() != 1
+            or any(b.GetBondType() != Chem.BondType.SINGLE for b in atom.GetBonds())):
+        return None
+    return {atom_idx, other[0].GetIdx()}
+
+
 def _partial_sat_substituent_prefix(
     mol, atom_to_locant: Dict[int, Any],
     exclude_atoms: Optional[Set[int]] = None,
     spelled_out: Optional[Set[int]] = None,
     omit_locants: bool = False,
     ylidene_prefixes: bool = False,
+    bare_prefixes: bool = False,
+    hydroperoxy_prefixes: bool = False,
 ) -> Optional[str]:
     """Build the alphanumerically-sorted detachable-substituent prefix string
     (with trailing hyphen) for EVERY substituent on a partially-saturated fused
@@ -2317,7 +2357,13 @@ def _partial_sat_substituent_prefix(
     omitted by (the Blue Book, 'chlorocoronene (PIN)':2947).
 
     ``ylidene_prefixes``: a bare =O, =S or =NH on a ring atom takes its prefix
-    (``ring_ylidene_prefix``); off, the fragment namer is asked and declines such an atom."""
+    (``ring_ylidene_prefix``); off, the fragment namer is asked and declines such an atom.
+
+    ``bare_prefixes``: the ring system is a substituent (a '-yl' prefix), so a bare -OH, -SH or -NH2 on it is
+    the prefix 'hydroxy', 'sulfanyl' or 'amino' (``bare_terminal_prefix``).
+
+    ``hydroperoxy_prefixes``: a group senior to the peroxol takes the suffix, so a -OOH on the ring is the prefix
+    'hydroperoxy' (``hydroperoxy_atoms``)."""
     from ..assembly.naming_utils import alpha_sort_key_rs, format_substituent_prefix
 
     exclude = exclude_atoms or set()
@@ -2354,6 +2400,16 @@ def _partial_sat_substituent_prefix(
                     grouped[_ylidene].append(atom_to_locant[idx])
                     spelled.add(n.GetIdx())
                     continue
+            _bare = bare_terminal_prefix(mol, n.GetIdx(), idx) if bare_prefixes else None
+            if _bare is not None:
+                grouped[_bare].append(atom_to_locant[idx])
+                spelled.add(n.GetIdx())
+                continue
+            _hp = hydroperoxy_atoms(mol, n.GetIdx(), idx) if hydroperoxy_prefixes else None
+            if _hp is not None:
+                grouped['hydroperoxy'].append(atom_to_locant[idx])
+                spelled.update(_hp)
+                continue
             sub_atoms: List[int] = []
             seen = set(ring_set) | exclude
             stack = [n.GetIdx()]

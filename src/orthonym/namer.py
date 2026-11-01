@@ -10208,9 +10208,9 @@ class Orthonym:
             # read ONE authoritative value instead of recomputing the identical
             # pure call. Behavior-preserving by construction (same args, same
             # pure function); this only de-duplicates two identical calls into one.
-            from .rules.ring_selection import select_principal_ring_system
+            from .rules.ring_selection import select_principal_ring_system_with_groups
             _principal_ring_system = (
-                select_principal_ring_system(features.mol, features.ring_systems)
+                select_principal_ring_system_with_groups(features)
                 if features.ring_systems else None
             )
             # Carry it on the one authoritative result. `selection` is the same
