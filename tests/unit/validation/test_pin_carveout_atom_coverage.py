@@ -9,8 +9,8 @@ through its twin read-back since the HU topic: ``validation.uide_twin``,
 (``tests/unit/rules/test_dianhydride_names.py``)),
 because the correct PIN for each class is OPSIN-unparseable by construction
 (OPSIN's *generation* grammar has no rule for these suffix/class-word families):
-``inositol``, ``np_stereoparent``, ``polyol_polyester``,
-``organometallic_additive``, ``phane``. Each is commented as "emitted ONLY by a hard-gated /
+``inositol``, ``np_stereoparent``, ``polyol_polyester``, ``phane`` (``organometallic_additive`` was
+removed 2026-11-01: an eta-hapto name ships at no tier). Each is commented as "emitted ONLY by a hard-gated /
 atom-conservation-vetoed" internal producer, i.e. the atom-coverage claim for
 these classes rests entirely on trusting that producer, with no external check
 of any kind — see `internal notes` Gap 2.
@@ -36,8 +36,7 @@ Three honest outcomes for the decorated mutant, all acceptable:
       possible proof, and observed for inositol, dianhydride + np_stereoparent below.
   (b) HONEST ABSTAIN -- the decorated molecule correctly fails closed
       (``errors.is_failure_name`` true: 'unknown...' / '...(not supported)')
-      rather than guessing -- observed for chalcogen_dianhydride,
-      organometallic_additive, phane below.
+      rather than guessing -- observed for chalcogen_dianhydride, phane below.
   (c) SAME-CARVEOUT, ATOM-COMPLETE -- the decorated molecule still matches the
       carve-out's own regex (polyol_polyester below), because
       OPSIN can NEVER round-trip ANY member of this class, decorated or
@@ -138,18 +137,8 @@ CASES = [
         decoration_marker="chloro",
         gate="twin_verified:polyester_acyloxy",
     ),
-    dict(
-        carveout="organometallic_additive",
-        bare_smiles="C=C.C=C.[Ni]",
-        bare_name="bis(\u03b7\u00b2-ethene)nickel",
-        # Since the CO topic the '-ido' names ('trichlorido(methyl)titanium') ship through their 'chloro'
-        # twin (validation.halido_twin; tests/unit/rules/test_halido_twin.py) and the carve-out holds the
-        # names with an eta, kappa or mu descriptor only, for which no spelling OPSIN reads exists.
-        # Replacing one ethene by chloroethene is not an eta-ethene ligand the additive namer names
-        # (observed: "nickel compound (not supported)") -> honest abstain, never the bare name.
-        decorated_smiles="ClC=C.C=C.[Ni]",
-        outcome_kind="abstain",
-    ),
+    # organometallic_additive: removed 2026-11-01 (user decision): an eta, kappa or mu name has no read-back and no
+    # PIN, the Blue Book), so it ships nowhere; 'C=C.C=C.[Ni]' is 'ethene—nickel (2/1)' at the default tier.
     dict(
         carveout="phane",
         bare_smiles="C1Cc2ccc(cc2)CCc2ccc1cc2",

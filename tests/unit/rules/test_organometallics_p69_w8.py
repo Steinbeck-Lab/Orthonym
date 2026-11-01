@@ -25,13 +25,14 @@ def _raw():
 
 @pytest.mark.unit
 class TestTask91EtaCarveOut:
-    """: Tier-4 already generates the correct PIN; the OPSIN-2.9 eta
-    grammar gap must NOT suppress it (carve-out, like inositol/dianhydride)."""
+    """: the raw producer (the validity gate is off under pytest without the opsin_gate mark) builds the
+    eta-hapto names. With the gate on they ship at no tier: OPSIN reads no eta name and (the Blue Book)
+    gives them no PIN (user decision 2026-11-01)."""
 
-    def test_bis_benzene_chromium_ships_gated(self):
+    def test_bis_benzene_chromium_raw_producer(self):
         assert Orthonym().name("[Cr].c1ccccc1.c1ccccc1") == "bis(η⁶-benzene)chromium"
 
-    def test_tricarbonyl_benzene_chromium_ships_gated(self):
+    def test_tricarbonyl_benzene_chromium_raw_producer(self):
         assert (
             Orthonym().name("[Cr].c1ccccc1.[C-]#[O+].[C-]#[O+].[C-]#[O+]")
             == "tricarbonyl(η⁶-benzene)chromium"
@@ -47,7 +48,7 @@ class TestTask91EtaCarveOut:
             == "nickel compound (not supported)"
         )
 
-    def test_cymantrene_systematic_name_ships_gated(self):
+    def test_cymantrene_systematic_name_raw_producer(self):
         # Cymantrene is the NEUTRAL complex: Mn(+1) with Cp(-1) and three CO.
         # The previous input here, "[Mn].c1cc[cH-]c1.3CO", is the ANION (Mn(0)
         # + Cp(-1), net -1) and was asserted to ship the neutral name -- a

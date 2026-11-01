@@ -420,8 +420,8 @@ def select_ligand_naming(ligand_group: Any, hapticity: int,
 
 # (item 4): reference molecular formula for every π-ligand NAME emitted via
 # LIGAND_ETA_DEFAULTS, as (element -> atom count) INCLUDING hydrogens. The
-# additive/η organometallic PINs ship through the hard-gated carve-out that
-# BYPASSES OPSIN (namer._ORGANOMETALLIC_ADDITIVE_PIN_RE), so a lossy
+# additive/η organometallic names have no OPSIN read-back (the PIN tier declines them
+# since 2026-11-01,, but the raw producer still emits them, so a lossy
 # LIGAND_ETA_DEFAULTS row — one whose ligand NAME implies a different atom count
 # than the coordinated FRAGMENT actually has — would silently emit a WRONG
 # constitution with no round-trip net to catch it. Two such rows exist (measured,
@@ -559,9 +559,8 @@ def organometallic_charge_conserved(full_name: str, mol: Any) -> bool:
     complex, so the additive names 'bis(eta5-cyclopentadienyl)iron' /
     'bis(eta6-benzene)chromium' passed every other check and described a different
     species (and the systematic style's default Stock number 'iron(II)' states a metal
-    charge the input does not have). The pin tier ships these names past OPSIN
-    (namer._ORGANOMETALLIC_ADDITIVE_PIN_RE), so this predicate is the only certificate
-    of the charge. The first version read only the closing number and so declined a
+    charge the input does not have). OPSIN reads no eta name, so this predicate is the
+    only certificate of the charge. The first version read only the closing number and so declined a
     correct name whose ligand states the charge, '(4-sulfonatophenyl)mercury chloride'
     for the sulfonate anion.
 

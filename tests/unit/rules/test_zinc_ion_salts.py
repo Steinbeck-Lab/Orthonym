@@ -246,8 +246,10 @@ OCENE_AND_CYMANTRENE = [
      ("ruthenocene", "pin_verified", True), ("ruthenocene", "pin_verified", True)),
     ("Cc1c(C)c(C)[c-](C)c1C.Cc1c(C)c(C)[c-](C)c1C.[Fe+2]",
      ("decamethylferrocene", "pin_verified", True), ("decamethylferrocene", "pin_verified", True)),
+    # cymantrene: the eta-hapto name has no PIN,:39735) and no read-back (dan2097/opsin#350), so the PIN
+    # tier declines it (user decision 2026-11-01); best-effort keeps the adduct name that reads back
     ("[Mn+].c1cc[cH-]c1.[C-]#[O+].[C-]#[O+].[C-]#[O+]",
-     ("tricarbonyl(η⁵-cyclopentadienyl)manganese", "pin_unverified", False),
+     ("manganese compound (not supported)", "abstain", False),
      (f"cyclopenta-2,4-dien-1-ide{EM_DASH}1-oxaeth-1-yn-1-ium-2-ide{EM_DASH}manganese(1+) (1/3/1)",
       "systematic_verified", False)),
 ]
@@ -256,8 +258,8 @@ OCENE_AND_CYMANTRENE = [
 @pytest.mark.parametrize("smiles, default, best_effort", OCENE_AND_CYMANTRENE)
 def test_ionic_ocenes_and_cymantrene_keep_their_start_label_and_tier(smiles, default, best_effort):
     """ (:39735) "except for 'ocene' compounds" and "Ocenes" (:40129; the examples
-    carry "(PIN)",:40133): the ocene names keep PIN status. The eta-hapto name of cymantrene is a
-    target row of the PIN gate and keeps its label. Each holds a Group 3-12 metal, no metal-carbon
+    carry "(PIN)",:40133): the ocene names keep PIN status. The eta-hapto name of cymantrene ships at
+    no tier; user decision 2026-11-01). Each holds a Group 3-12 metal, no metal-carbon
     bond and a carbanion carbon with no positive neighbour, so only clauses (e) and (f) of the
     predicate keep it out of the rule."""
     for tier, expected in (("pin", default), ("best-effort", best_effort)):
@@ -276,7 +278,7 @@ def test_the_predicate_excludes_ocene_and_eta_hapto_names():
     """The function called directly: False for the four molecules with their names and for the
     three ionic ocene rows of the Blue Book with their (PIN) names; True for the salt of a carbanion
     of zinc, so the exclusions are not a blanket False."""
-    for smiles, default, best_effort in OCENE_AND_CYMANTRENE:
+    for smiles, default, best_effort in OCENE_AND_CYMANTRENE[:-1]:
         assert PREDICATE(smiles, default[0]) is False, default[0]
         if default[0] == best_effort[0]:
             assert PREDICATE(smiles, best_effort[0]) is False, best_effort[0]

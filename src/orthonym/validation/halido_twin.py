@@ -18,7 +18,8 @@ The twin is the name with each 'chlorido', 'bromido', 'fluorido', 'iodido' spell
 'fluoro', 'iodo'; 'hydrido' is a word OPSIN reads and stays. It is a rewrite of the tokens of the name, applied
 to the additive names of the transition-metal producer only: a name of the shape of
 ``namer._ORGANOMETALLIC_ADDITIVE_PIN_RE`` without a hapto, kappa or mu descriptor (a name with one has no
-spelling OPSIN reads, and ships as the deliberate eta-hapto carve-out). The standard InChIKey does not see the
+spelling OPSIN reads, and ships at no tier:, the Blue Book, gives it no PIN, user decision 2026-11-01).
+The standard InChIKey does not see the
 bonds of a metal, so the read-back of the twin checks the ligands and their number; the producer certifies
 the bonds (``rules.organometallics._sigma_additive_ligands_certified``).
 
@@ -27,8 +28,8 @@ The twin proves the structure and never the spelling: the producer owns the spel
 import re
 
 _HALIDO = re.compile(r"(chlor|brom|fluor|iod)ido")
-#: a hapto, kappa or mu descriptor: a name with one has no spelling OPSIN reads (the gate keeps it as the deliberate
-#: carve-out ``organometallic_additive``, ``namer._final_opsin_validity_gate``); the one home of the pattern
+#: a hapto, kappa or mu descriptor: a name with one has no spelling OPSIN reads and no twin, so it ships at no tier
+#: (``namer._final_opsin_validity_gate``); the one home of the pattern
 HAPTO_DESCRIPTOR = re.compile(r"[ηκμ]")
 
 

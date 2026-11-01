@@ -66,7 +66,7 @@ GATE_OUTCOME_SELF01_WARN_MISMATCH = "self_consistency_warn_mismatch"
 #: that ships unproven. (It used to be recorded as ``carveout:stereo_omission_reanchor``,
 #: which mislabels a full-key-verified name as ``unverified`` — a review -P2 F3.)
 GATE_OUTCOME_STEREO_RECOMPOSED = "stereo_omission_full_key_recomposed"
-#: prefix for the ten by-design `return name` carve-outs: `carveout:<slug>`.
+#: prefix for the by-design `return name` carve-outs: `carveout:<slug>`.
 GATE_OUTCOME_CARVEOUT_PREFIX = "carveout:"
 #: claims conformance (2026-09-27): at a general tier, ``name_tiered`` checked the
 #: shipped string itself because no verified outcome was recorded for it (an offer
