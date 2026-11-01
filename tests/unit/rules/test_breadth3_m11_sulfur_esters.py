@@ -35,7 +35,6 @@ from tests.support.default_tier import (  # noqa: E402
 # molecules below the test asserts that decline, the strict path's name and label,
 # and the same name at the best-effort tier (tests/support/default_tier.py).
 DEFAULT_TIER_DECLINES = frozenset({
-    "CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O",
     "COc1cccc(OS(=O)(=O)O)c1O",
     "NNC(=O)CCOS(=O)(=O)O",
     "Nc1ccc(OS(=O)(=O)O)cc1",
@@ -133,12 +132,14 @@ def test_chalcogen_ester_acyl_chain(smiles, expected):
 
 
 def test_thioester_dev_set_row():
-    # a dev split / milestone1500 M11 row: named at the PIN tier, labelled below PIN
-    # (it was refused: the diene was dropped)
+    # a dev split / milestone1500 M11 row (it was refused: the diene was dropped). DT3 step C certifies the re-run name as the
+    # PIN (assembly.pin_rerun.rerun_name_certified); a blind Blue Book reading agreed: (the Blue Book)
+    # "Structural specification for esters of thio-... carboxylic acids... is provided by the appropriate italic element
+    # symbol, such as S, O, or SO, prefixed to the name of the organyl group" ('S-ethyl hexanethioate (PIN)',:31989)
     _assert_named(
         "CC(=O)NCCSC(=O)/C=C/CCC[C@H](O)/C=C/CC(C)O",
         "S-(2-acetamidoethyl) (2E,7S,8E)-7,11-dihydroxydodeca-2,8-dienethioate",
-        {"pin_unverified", "pin_verified"})
+        {"pin_verified"})
 
 
 # Review fix (finding 1): the oxoacid-ester prefix is the PIN form only under a parent

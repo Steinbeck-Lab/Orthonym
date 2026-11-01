@@ -8559,7 +8559,8 @@ class Orthonym:
         wrapped = _PIN_PROMOTION_WRAPPED.set(True)
         try:
             from .assembly.fragment_naming import PerfBudgetExceeded
-            from .assembly.pin_rerun import first_run_declined, first_run_state, rerun_class_guard
+            from .assembly.pin_rerun import (first_run_declined, first_run_state, rerun_class_guard,
+                                             rerun_name_certified)
             from .rules.pin_vocabulary import promotion_could_change, promotion_site_probe
             limit_error = None
             with promotion_site_probe() as _sites:
@@ -8636,8 +8637,10 @@ class Orthonym:
                     # for 'ethanethioyl',:30246). The paper's definition
                     # (tier labels): "pin_unverified means a name in PIN form that
                     # only a breadth producer built". So the name ships labelled
-                    # pin_unverified, is_pin False (``name_carries_non_pin_part``).
-                    _pv.record_pin_promotion_rerun()
+                    # pin_unverified, is_pin False (``name_carries_non_pin_part``), unless evidence on every part
+                    # certifies it (``assembly.pin_rerun.rerun_name_certified``, DT3 step C).
+                    if not rerun_name_certified(_mol_mc, second):
+                        _pv.record_pin_promotion_rerun()
                     return second
                 logger.info("PIN promotion re-run name %r is not a verified PIN form; "
                             "first result kept", second)
