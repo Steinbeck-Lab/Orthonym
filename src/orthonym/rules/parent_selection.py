@@ -68,6 +68,13 @@ SKELETAL_SUFFIX_PGS = {
     "so_thioperoxol",
     "os_thioperoxol",
     "dithioperoxol",
+    # "Hydroperoxides" (:27935): the suffix 'peroxol' for -OOH is 'ol' with one more oxygen: it
+    # decorates a skeletal atom ('pyrrolidine-1-peroxol (PIN)':27959, '1,2,3,4-tetrahydronaphthalene-1-peroxol
+    # (PIN)':27948), with no exocyclic-carbon form. The SMARTS leads with the hydroxy oxygen, so
+    # PG_ATTACHMENT_INDICES (seniority.py) points at the carbon. Left out, the CH2 between a ring and the group
+    # was no host of the suffix, the ring was the parent and the CH2 was dropped ('cyclopropane-1-peroxol'
+    # for C1CC1COO).
+    "hydroperoxide",
 }
 
 # /: the suffixes of the sulfonic and sulfinic acids and of their amides name the

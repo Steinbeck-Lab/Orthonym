@@ -63,7 +63,10 @@ def test_heterol_pins_round_trip(smiles, expected):
     ("CCNO", "N-hydroxyethanamine"),
     # ordinary ring-carbon alcohols / peroxols -> unchanged
     ("OC1CCCCC1", "cyclohexanol"),
-    ("OOC1CCCCC1", "cyclohexane-1-peroxol"),
+    # (c) "The locant '1' is omitted... in monosubstituted homogeneous monocyclic rings"
+    # (the Blue Book, 'cyclohexanethiol (PIN)'): the peroxol of a monosubstituted cyclohexane takes no locant
+    # (changed from 'cyclohexane-1-peroxol', which the spelling check of that rule refused at the PIN tier)
+    ("OOC1CCCCC1", "cyclohexaneperoxol"),
 ])
 def test_heterol_canaries_unchanged(smiles, expected):
     from orthonym import Orthonym

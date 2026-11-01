@@ -13,7 +13,8 @@ class TestRingPeroxolFused:
             == "1,2,3,4-tetrahydronaphthalene-1-peroxol"
 
     def test_simple_ring_peroxol_protect(self):
-        assert name_compound("OOC1CCCCC1", style="pin") == "cyclohexane-1-peroxol"
+        # (c) (the Blue Book): no locant '1' on a monosubstituted homogeneous monocyclic ring
+        assert name_compound("OOC1CCCCC1", style="pin") == "cyclohexaneperoxol"
 
     def test_chain_peroxol_protect(self):
         assert name_compound("CC(C)(CC)OO", style="pin") == "2-methylbutane-2-peroxol"

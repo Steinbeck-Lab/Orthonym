@@ -46,9 +46,6 @@ DECLINED_ROWS = [
     "OC(=O)N1CCCc2ccccc21",
     "CC(=O)N1CCc2ccccc2C1",
     "CC(=O)N1CCNc2ccccc21",
-    #:28297
-    "COc1cccc(/C=C/C(=O)c2ccc(O)c(OC)c2O)c1",
-    "O=C(/C=C/c1ccc(Cl)cc1)c1ccc(O)cc1",
     #:21730
     "CNC(=O)CCc1cc(CC(C)C(N)=O)ccc1C",
     "CNC(=O)CCc1ccccc1CC(C)C(N)=O",
@@ -77,6 +74,7 @@ CONTROL_ROWS = [
     ("NC1CCCc2ccccc21", "1,2,3,4-tetrahydronaphthalen-1-amine"),            #:26489, a carbon site
     ("O=C(/C=C/c1ccccc1)c1ccccc1", "chalcone"),                              #:28299
     ("O=C(/C=C\\c1ccccc1)c1ccccc1", "(2Z)-1,3-diphenylprop-2-en-1-one"),     # chalcone is the (E) isomer only
+    ("COc1cccc(/C=C/C(=O)c2ccc(O)c(OC)c2O)c1", "2',4'-dihydroxy-3,3'-dimethoxychalcone"),   #:28303 (PIN)
     ("NC(=O)CCCc1ccccc1CCC(=O)N(C)C", "4-{2-[3-(dimethylamino)-3-oxopropyl]phenyl}butanamide"),   # the longer chain
     ("CC(=O)OOSC(C)=O", "1-[(acetylperoxy)sulfanyl]ethan-1-one"),            #:32368
     ("CN(C)P(=O)(Cl)Cl", "N,N-dimethylphosphoramidic dichloride"),

@@ -37,6 +37,7 @@ from ..perception.stereo import assign_stereochemistry
 from .acyl_prefix import acyl_prefix_text, is_acyl_prefix
 from .chalcogen_acyl_prefix import chalcogen_o_acid_to_acyl, is_chalcogen_o_acid
 from .hetero_chain_prefix import fragment_parent_to_prefix
+from .group14_chalcogen_prefix import UNHANDLED, group14_chalcogen_prefix
 from .capped_name import acyclic_n_parent, carries_capped_locants, chain_stem_ending, terminal_yl_prefix
 from .n_unit_prefix import composed_group, n_unit_prefix, principal_group_in, read_n_group
 from .prefix_derivation import retained_benzyl
@@ -8429,6 +8430,9 @@ def _name_substituent_fragment_uncached(
     if _diaz is not None:
         return _diaz
 
+    _g14_chal = group14_chalcogen_prefix(mol, sub_atoms, attach_idx)  # /.2: (R3Si)oxy
+    if _g14_chal is not UNHANDLED:
+        return _g14_chal
     # Step 0 (Wave-2 C2,: an O-ATTACHED fragment is an R-oxy prefix.
     # The generic Steps 3-5 mis-anchored it ('1-hydroxy-1-methoxymethyl' for
     # -O-CH2-O-CH3, constitution-wrong and -suppressed) — recurse on

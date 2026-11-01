@@ -94,6 +94,8 @@ PG_ATTACHMENT_INDICES: Dict[str, List[int]] = {
     # SMARTS atom order -- reordering the pattern would move every imine locant
     # onto the nitrogen with no test to catch it.
     "imine": [0],
+    #: '[OX2H][OX2][#6]' leads with the hydroxy oxygen; the locant-bearing atom is the carbon (index 2)
+    "hydroperoxide": [2],
 }
 
 # Functional group seniority order (highest priority first)
@@ -1267,12 +1269,44 @@ def get_principal_group(
     return promoted if promoted is not None else head
 
 
+#: The amide classes a ring amide (a lactam) is perceived as; the lactam is a pseudoketone (class 16).
+_RING_AMIDE_CLASSES = ("secondary_amide", "tertiary_amide")
+
+
 def _head_principal_group(
     mol,
     functional_groups: Dict[str, List[tuple]]
 ) -> Tuple[Optional[str], List[tuple]]:
     """The first group of ``SENIORITY_ORDER`` that is present and suffix-capable (the answer
-    before the phosphate esters are offered; see ``get_principal_group``)."""
+    before the phosphate esters are offered; see ``get_principal_group``).
+
+    A ring amide (a lactam) is a pseudoketone, class 16 of Table 4.1 (the Blue Book), and "Cyclic
+    anhydrides, esters and amides are named as pseudoketones" (:29314): a thioamide, a hydrazide, an amidine, a
+    nitrile, an aldehyde or an amide of the chain (classes 11 to 15,:18162-18188) is senior to it. The order of
+    ``SENIORITY_ORDER`` ranks the ring amide among the amides, so those groups were demoted to prefixes
+    ('1-(2-hydrazinyl-2-oxoethyl)pyrrolidin-2-one'). The ring amides step aside, and a group senior to the ketone
+    that remains is the principal group; with none the ring amide keeps its place."""
+    ring = {cls: [m for m in functional_groups.get(cls) or [] if _is_ring_amide(mol, m)]
+            for cls in _RING_AMIDE_CLASSES}
+    if any(ring.values()):
+        rest = {k: ([m for m in v if m not in ring[k]] if k in ring else v) for k, v in functional_groups.items()}
+        group, matches = _first_principal_group(mol, rest)
+        if group is not None and SENIORITY_ORDER.index(group) < SENIORITY_ORDER.index("ketone"):
+            return group, matches
+    return _first_principal_group(mol, functional_groups)
+
+
+def _is_ring_amide(mol, match) -> bool:
+    """An amide match ``(C, O, N,...)`` whose C-N bond is in a ring: a cyclic amide."""
+    bond = mol.GetBondBetweenAtoms(match[0], match[2]) if len(match) > 2 else None
+    return bond is not None and bond.IsInRing()
+
+
+def _first_principal_group(
+    mol,
+    functional_groups: Dict[str, List[tuple]]
+) -> Tuple[Optional[str], List[tuple]]:
+    """The first group of ``SENIORITY_ORDER`` that is present and suffix-capable in ``functional_groups``."""
     for fg_name in SENIORITY_ORDER:
         if fg_name in CN_GROUPS:
             continue                  # ranked by its chalcogen, with the imidic acids (below)

@@ -36,11 +36,11 @@ emitted for the bare (E) parent, and the Blue Book's own worked counter-example
 ``2',4'-dihydroxychalcone-4-carboxamide`` (BB:28305, "(not...)"; already
 listed in ``data/bluebook_not_names.py:171``) is structurally unreachable.
 
-SCOPE (deliberate, documented): substituted chalcones such as the BB's
-``2',4'-dihydroxy-3,3'-dimethoxychalcone (PIN)`` (:28303) are NOT emitted. They
-require primed-locant machinery across two rings plus a ketone-seniority
-adjudication; building that wrong would emit a WRONG name, whereas falling
-through emits the valid systematic name. See TaskL-report.md.
+SCOPE: this table row names the bare (E) parent only. The substituted chalcones of
+the book, ``2',4'-dihydroxy-3,3'-dimethoxychalcone (PIN)`` (:28303), are named by
+``rules.chalcones`` (test_chalcones.py), for the ring substituents rooted at O, S
+or N that the example prints and the classes next to them; the groups the book is
+silent on (a halogen, a hydrocarbyl group, a nitro group) keep the systematic name.
 """
 import pytest
 from rdkit import Chem
@@ -54,7 +54,8 @@ from orthonym.namer import Orthonym
 E_CHALCONE = "O=C(/C=C/c1ccccc1)c1ccccc1"
 Z_ISOMER = r"O=C(/C=C\c1ccccc1)c1ccccc1"
 NO_STEREO = "O=C(C=Cc1ccccc1)c1ccccc1"
-RING_OH = "O=C(/C=C/c1ccc(O)cc1)c1ccccc1"
+RING_OH = "O=C(/C=C/c1ccc(O)cc1)c1ccccc1"   # '4-hydroxychalcone': a group lower than the ketone (rules.chalcones)
+RING_CL = "O=C(/C=C/c1ccc(Cl)cc1)c1ccccc1"   # halo on a ring: 4-chlorochalcone:28297)
 # The Blue Book's own counter-example: a carboxamide OUTRANKS ketone, so the
 # chalcone name is forbidden and the systematic form is the PIN (BB:28305).
 BB_COUNTEREXAMPLE = "O=C(/C=C/c1ccc(cc1)C(N)=O)c1ccc(O)cc1O"
@@ -108,7 +109,6 @@ class TestChalconeEmission:
         [
             (Z_ISOMER, "(2Z)-1,3-diphenylprop-2-en-1-one"),
             (NO_STEREO, "1,3-diphenylprop-2-en-1-one"),
-            (RING_OH, "(2E)-3-(4-hydroxyphenyl)-1-phenylprop-2-en-1-one"),
             (CHAIN_SUBST, "(3E)-4-phenylbut-3-en-2-one"),
             (SATURATED, "1,3-diphenylpropan-1-one"),
         ],
@@ -117,12 +117,18 @@ class TestChalconeEmission:
         """Constraints 1-3: everything outside the bare (E) parent falls through."""
         assert namer.name(smiles) == expected
 
+    def test_a_ring_hydroxy_group_is_the_retained_names(self, namer):
+        """:28297 'ring substitution only by characteristic groups lower than ketone' and:28303's own example:
+        a hydroxy group is such a group, so the name is '4-hydroxychalcone' (changed from the systematic name
+        '(2E)-3-(4-hydroxyphenyl)-1-phenylprop-2-en-1-one', which this test pinned when the class was not built)."""
+        assert namer.name(RING_OH) == "4-hydroxychalcone"
+
     @pytest.mark.parametrize(
         "smiles",
-        [Z_ISOMER, NO_STEREO, RING_OH, BB_COUNTEREXAMPLE, CHAIN_SUBST, SATURATED],
+        [Z_ISOMER, NO_STEREO, BB_COUNTEREXAMPLE, CHAIN_SUBST, SATURATED],
     )
     def test_no_chalcone_token_leaks_into_the_family(self, namer, smiles):
-        """The substitution limit (:28297) — no `...chalcone...` name may appear."""
+        """The substitution limit (:28297) — no `...chalcone...` name for what the retained name does not take."""
         assert "chalcone" not in namer.name(smiles).lower()
 
     def test_bb_counterexample_is_never_the_forbidden_name(self, namer):

@@ -124,7 +124,6 @@ CHAIN_IS_THE_PARENT_ROWS = [
     ("NCCCCNc1ccc(C)cc1", "N-(4-aminobutyl)-4-methylaniline"),
     ("NCc1ccc(NCCN)cc1", "N-(2-aminoethyl)-4-(aminomethyl)aniline"),
     ("CCN(CC)CCNc1ccccc1", "N-[2-(diethylamino)ethyl]aniline"),
-    ("OOCCNc1ccccc1", "N-(2-hydroperoxyethyl)aniline"),                  # PIN: 2-anilinoethane-1-peroxol
     # the same on a heteroring and a fused ring (pin_verified on main as well)
     ("NCCNc1ccncc1", "N-(2-aminoethyl)pyridin-4-amine"),
     ("NCCNc1cccc2ccccc12", "N-(2-aminoethyl)naphthalen-1-amine"),
@@ -139,6 +138,16 @@ def test_a_chain_that_holds_another_amine_or_a_senior_group_is_never_named_as_a_
     # the breadth tier still names the molecule, and it reads back exactly
     b = name_breadth(smiles)
     assert b.get("name") and name_is_rt_exact(b["name"], smiles), b
+
+
+def test_the_hydroperoxy_chain_keeps_the_peroxol_for_the_parent():
+    """The hydroperoxide ranks above the amine,:18162, class 18 before 19), so 2-anilinoethane-1-peroxol is
+    the PIN. The row was in the list above with 'N-(2-hydroperoxyethyl)aniline' as the wrong name, the PIN being
+    unbuilt: the peroxol suffix was no host of a one-carbon-chain hydroperoxide until the hydroperoxide was a
+    skeletal suffix (rules.parent_selection.SKELETAL_SUFFIX_PGS), and the name is now the PIN (OPSIN reads it back)."""
+    res = name_default("OOCCNc1ccccc1")
+    assert (res["name"], res["tier"]) == ("2-anilinoethane-1-peroxol", "pin_verified"), res
+    assert name_is_rt_exact("2-anilinoethane-1-peroxol", "OOCCNc1ccccc1")
 
 
 def test_the_hydroxy_chain_keeps_the_alcohol_for_the_parent():
