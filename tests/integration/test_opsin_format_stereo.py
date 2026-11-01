@@ -658,7 +658,7 @@ class TestStereoFormatGermacrane:
         assert opsin_parse(strip_stereo(name)) is not None, name
 
     @pytest.mark.opsin_gate
-    def test_germacrane_best_effort_emits_the_list_name_opsin_cannot_read(self):
+    def test_germacrane_best_effort_emits_the_systematic_name(self):
         from orthonym import Orthonym
         from orthonym.cli import _emit_tier_flags
         systematic = "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane"
@@ -666,9 +666,7 @@ class TestStereoFormatGermacrane:
         assert opsin_parse("germacrane") is None  # nor is the list name read back
         be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(
             GERMACRANE)
-        assert be["name"] == "germacrane", be
-        # the list name is no PIN: INTRODUCTION (the Blue Book;:50943) "Preferred IUPAC names
-        # (PINs) are not identified for the compounds in this Chapter." (lead decision 2026-10-17);
-        # the name is unchanged and OPSIN still reads neither spelling (the checks above)
-        assert be["tier"] == "systematic_verified" and be["verified"] == "identity", be
+        # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
+        assert be["name"] == systematic, be
+        assert be["tier"] == "pin_unverified", be
         assert be["is_pin"] is False, be

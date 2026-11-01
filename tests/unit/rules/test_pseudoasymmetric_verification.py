@@ -126,7 +126,7 @@ def test_the_pin_tier_gives_germacrane_its_systematic_name():
     "[C@H]1(C)CC[C@@H](C(C)C)CC[C@@H](C)CCC1",
     "C[C@H]1CCC[C@@H](C)CC[C@@H](C(C)C)CC1",
 ])
-def test_best_effort_emits_the_list_name_for_every_spelling(smiles):
+def test_best_effort_emits_the_systematic_name_for_every_spelling(smiles):
     # OPSIN 2.9.0 returns no structure for GERMACRANE_SYSTEMATIC (no lowercase
     # pseudoasymmetric descriptor) and none for 'germacrane'. 'germacrane' is a name of
     # the natural-product list, matched by the exact structure, Table 10.1
@@ -138,6 +138,7 @@ def test_best_effort_emits_the_list_name_for_every_spelling(smiles):
     # systematic name reads back to the input below; mutation: the label assertion fails
     # on the commit before).
     be = Orthonym(style="pin", **_emit_tier_flags("best-effort")).name_tiered(smiles)
-    assert be["name"] == "germacrane", be
-    assert be["tier"] == "systematic_verified" and be["verified"] == "identity" and be["is_pin"] is False, be
+    # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
+    assert be["name"] == GERMACRANE_SYSTEMATIC, be
+    assert be["tier"] == "pin_unverified" and be["is_pin"] is False, be
     assert _pseudoasymmetric_name_verified(GERMACRANE_SYSTEMATIC, smiles)

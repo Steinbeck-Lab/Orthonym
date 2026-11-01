@@ -58,7 +58,17 @@ def test_the_default_tier_emits_the_list_name_labelled_below_the_pin(smiles):
     assert row["verified"] == "identity" and row["source"] == "trivial_retained", row
 
 
-def test_best_effort_keeps_the_list_name_as_the_last_resort_labelled_below_the_pin():
+def test_best_effort_ships_the_systematic_name_the_default_tier_ships():
+    # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
+    row = Orthonym(**_emit_tier_flags("best-effort")).name_tiered("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1")
+    assert (row["name"], row["tier"], row["is_pin"]) == ("(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane", "pin_unverified", False), row
+
+
+def test_best_effort_keeps_the_list_name_as_the_last_resort_labelled_below_the_pin(monkeypatch):
+    # the list name is still the last resort when the default tier ships no systematic name: that question is
+    # switched off here (``assembly.default_tier_offer.list_name_yields``), since every list parent today has one
+    import orthonym.namer as namer_module
+    monkeypatch.setattr(namer_module, "list_name_yields", lambda namer, smiles: False)
     smiles = "CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1"
     row = Orthonym(**_emit_tier_flags("best-effort")).name_tiered(smiles)
     assert row["name"] == "germacrane" and row["gate_outcome"] == "carveout:np_stereoparent", row
