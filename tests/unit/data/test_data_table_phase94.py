@@ -28,6 +28,7 @@ from orthonym.data.sugar_names import (
 )
 from orthonym.data.bicyclo_systems import BICYCLO_RETAINED_NAMES
 from tests.support.jars import jar_or_none
+from tests.support.nucleoside_producer import SYSTEMATIC_FIRST
 
 # ---------------------------------------------------------------------------
 # OPSIN setup
@@ -115,8 +116,10 @@ class TestNucleosideRetainedNames:
     @pytest.mark.parametrize("smiles,expected", NUCLEOSIDE_ENTRIES,
                              ids=[f"{e[1]}-e2e" for e in NUCLEOSIDE_ENTRIES])
     def test_nucleoside_e2e(self, smiles, expected):
-        """name_compound should return the retained name for nucleosides."""
+        """name_compound returns the systematic PIN of a nucleoside when there is one (K2: INTRODUCTION,
+        the Blue Book, identifies no PIN for the retained name), else the retained name."""
         result = name_compound(smiles)
+        expected = SYSTEMATIC_FIRST.get(expected, expected)
         assert result == expected, f"Expected '{expected}', got '{result}'"
 
 

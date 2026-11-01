@@ -76,8 +76,11 @@ def test_the_name_is_kept_in_the_table_and_denied_as_a_pin(smiles, name):
     assert name.lower() not in PIN_DENY_HC
 
 
-# glycine itself is named by its systematic name since E-AA (test_the_free_amino_acids_take_their_systematic_pin)
-_NAMED_ROWS = [row for row in _ROWS if row[1] != "glycine"]
+# glycine itself is named by its systematic name since E-AA (test_the_free_amino_acids_take_their_systematic_pin),
+# and so is every nucleoside with a systematic PIN since K2 (tests/unit/rules/test_nucleoside_systematic_first.py)
+from tests.support.nucleoside_producer import SYSTEMATIC_FIRST  # noqa: E402
+
+_NAMED_ROWS = [row for row in _ROWS if row[1] != "glycine" and row[1] not in SYSTEMATIC_FIRST]
 
 
 @pytest.mark.parametrize("smiles, name", _NAMED_ROWS)
