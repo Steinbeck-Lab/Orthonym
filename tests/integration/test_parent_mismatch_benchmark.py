@@ -191,7 +191,9 @@ EXPECTED_FIXED = [
     ),
     (
         "CC1=C[C@@H]2/C=C(\\C)CCC[C@H](O)/C=C/C(=O)O[C@]23C(=O)N[C@@H](CC(C)C)[C@@H]3[C@@H]1C",
-        "tricyclo",
+        # DT4-B (2026-11-01): a ring of 8+ members fused to the isoindole takes its fusion name,
+        # the Blue Book "Fusion names... are preferred IUPAC names"), not the von Baeyer form
+        "oxacyclododecino[2,3-d]isoindole",
         "Bridged: macrocyclic lactone (canary)",
     ),
 

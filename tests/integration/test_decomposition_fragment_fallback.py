@@ -136,10 +136,8 @@ class TestDepthSafetyNetFallback:
 # them RT-exact (test_j6_breadth tier contract). The len(name)/HA >= 0.7 check
 # has no Blue Book basis and would not tell a right name from a wrong one.
 _J6_PIN_NOT_BUILT = {
-    "COc1cc(O)cc2c1C(=O)O[C@@H](C)CCCCC/C=C/2": (
-        "PIN tier abstains: needs the benzoxacyclododecine lactone (a benzo-"
-        "fused 12-membered macrolide) at the PIN tier -- TODO in TRIAGE.md "
-        "'Suite fix -- j6-breadth'"),
+    # (the benzoxacyclododecine macrolide left this list: DT4-B builds fusion names with a ring of 8+ members,
+    #, the Blue Book;,:23831)
     "CC1OC(Oc2c(C3OC(CO)C(O)C(O)C3O)c(O)c3c(=O)cc(-c4ccc(O)c(O)c4)oc3c2C2OC(CO)"
     "C(O)C(O)C2O)C(O)C(O)C1O": (
         "PIN tier abstains: needs the flavone (4H-1-benzopyran-4-one) PIN with "

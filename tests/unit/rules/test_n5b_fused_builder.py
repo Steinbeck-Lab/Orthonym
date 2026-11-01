@@ -49,6 +49,10 @@ NAMED = [
     ("C1CCC2CCCC3CCCC1C23", "dodecahydro-1H-phenalene"),
     ("OC1CCC2CCCC3CCCC1C23", "dodecahydro-1H-phenalen-1-ol"),
     ("C1CCC2CCCCCC2C1", "decahydro-1H-benzo[7]annulene"),
+    # an eight-membered ring: "Prefixes for attached components" (the Blue Book)
+    # "There is no upper ring-size limit";:23831 (dodecahydrobenzo[14]annulene (PIN)).
+    # Was in DECLINED while a ring of more than seven members was left to the von Baeyer name.
+    ("C1CCCC2CCCCC2CC1", "dodecahydrobenzo[8]annulene"),
 ]
 
 
@@ -83,7 +87,6 @@ DECLINED = [
     "OC1CCC2(CC1)CCCC2",               # spiro
     "C[n+]1ccc2ccccc2c1",              # a ring cation: declined with every ring atom of nonstandard
                                        # bonding or charge, (the Blue Book)
-    "C1CCCC2CCCCC2CC1",                # a ring of ten members: left to the von Baeyer name
     "C1CC[C@H]2CCCC[C@@H]2C1",         # trans-decalin: the junction descriptors are r, s
 ]
 

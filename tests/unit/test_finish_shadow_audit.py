@@ -58,10 +58,10 @@ class TestShadowAuditDoesNotChangeName:
         # after which its verdict comes from and no longer tests the leak.
         nm = Orthonym(general_fallback=True, general_fallback_unverified=True,
                         allow_aromatic_general=True)
-        # '9-azabicyclo[6.3.0]undecan-5-ol': a ring of eight members keeps the von Baeyer name
-        # ('OC1CCC2CCNC2C1' served here until the heterocyclic fusion name,,
-        # the Blue Book, replaced it)
-        nm.name("OC1CCCC2CCNC2CC1")  # a GENERAL-engine winner (e1_spine)
+        # '2-azabicyclo[29.4.0]pentatriacontan-33-ol': a ring above the fusion builder's limit (30, DT4-B) keeps the
+        # von Baeyer name ('OC1CCCC2CCNC2CC1' served here until the large-ring fusion name 'decahydro-1H-
+        # cycloocta[b]pyrrol-7-ol' replaced it,, the Blue Book; 'OC1CCC2CCNC2C1' before that)
+        nm.name("OC1CCC2C(C1)" + "C" * 28 + "N2")  # a GENERAL-engine winner (e1_spine)
         v1 = nm._last_coverage_verdict
         nm.name("CCO")  # a plain retained-name (bare-str) winner
         v2 = nm._last_coverage_verdict
