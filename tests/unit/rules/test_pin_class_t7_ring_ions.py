@@ -80,6 +80,10 @@ CLASS_ROWS = [
     ("[BH2-]1C=CC=C1", "1H-borol-1-uide"),
     ("C[BH-]1C=CC=C1", "1-methyl-1H-borol-1-uide"),
     ("[PH2-]1C=CC=C1", "1H-phosphol-1-uide"),
+    # LEADS2 2026-11-01 (was declined: the parent name lacked its indicated hydrogen, because the methyl stands in the
+    # place of it): (the Blue Book) substitution of the indicated hydrogen; the borole row above is
+    # the book's own pattern (:41122); read back by a fresh OPSIN call in ``assert_pin_at_both_tiers``
+    ("C[PH-]1C=CC=C1", "1-methyl-1H-phosphol-1-uide"),
     ("C[P-]1(C)C=CC=C1", "1,1-dimethyl-1H-phosphol-1-uide"),
     ("[PH2-]1C=Cc2ccccc21", "1H-phosphindol-1-uide"),
     ("C[P-]1(C)C=Cc2ccccc21", "1,1-dimethyl-1H-phosphindol-1-uide"),
@@ -140,7 +144,6 @@ CONTROL_ROWS = [
 
 DECLINED_ROWS = [
     "CO[B-]1(C)C=C(C)c2ccccc21",   # methoxy ligand (see the module docstring)
-    "C[PH-]1C=CC=C1",              # the parent name lacks its indicated hydrogen
     "C1=C[NH2+]C=C[NH2+]1",        # a dication on a hydro-prefixed parent
     "C1C[OH+]CC[NH2+]1",           # two cation classes
     "ClCC[C-]=O",                  # chloro prefix on the carbanion chain

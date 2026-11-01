@@ -125,7 +125,10 @@ def test_one_class_on_both_ends_keeps_its_pin():
 ])
 def test_the_chain_of_a_group_runs_through_its_free_valence(smiles, expected):
     row = _row(smiles, "best-effort")
-    assert row["name"] == expected and row["producer"] == "engine:t4", row["name"]
+    # LEADS2 2026-11-01: the strict path names these rows now (the parent '4H-1,2,4-triazole' keeps its indicated
+    # hydrogen when a substituent stands in its place,, the Blue Book); the name is the one the
+    # floor gave (unchanged), the producer was 'engine:t4'
+    assert row["name"] == expected and row["producer"] in ("engine:t4", "inner:tier_a_ring"), row["name"]
     assert opsin_roundtrip_check(smiles, expected)["passed"], expected
 
 

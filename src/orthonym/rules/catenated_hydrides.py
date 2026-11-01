@@ -62,14 +62,13 @@ def name_catenated_hydride(mol) -> Optional[str]:
         return None
     if len(Chem.GetMolFrags(mol)) != 1:
         return None
-    if mol.GetRingInfo().NumRings() > 0:
-        return None
     for atom in mol.GetAtoms():
         if atom.GetFormalCharge() != 0 or atom.GetNumRadicalElectrons() != 0:
             return None
 
     hub_atoms = []
     bridge_atoms = []
+    organyl_atoms = []
     for atom in mol.GetAtoms():
         sym = atom.GetSymbol()
         if sym == 'H':
@@ -78,8 +77,16 @@ def name_catenated_hydride(mol) -> Optional[str]:
             hub_atoms.append(atom)
         elif sym in _BRIDGE_SUFFIX:
             bridge_atoms.append(atom)
+        elif sym in ('C', 'F', 'Cl', 'Br', 'I'):
+            organyl_atoms.append(atom)   # a group on a hub: read by catenated_hydride_groups
         else:
-            return None  # any carbon / other element -> not this class
+            return None  # any other element -> not this class
+    if organyl_atoms:
+        from .catenated_hydride_groups import name_hub_chain_with_groups
+        return name_hub_chain_with_groups(
+            mol, hub_atoms, bridge_atoms, _HUB_STEM, _BRIDGE_SUFFIX, _parent_name)
+    if mol.GetRingInfo().NumRings() > 0:
+        return None                      # a bare ring of hub and bridge atoms is a cyclosiloxane, not this class
 
     # Need >= 2 hub atoms and exactly one fewer bridge (a-b-a-b-...-a).
     if len(hub_atoms) < 2 or len(bridge_atoms) != len(hub_atoms) - 1:
@@ -129,6 +136,11 @@ def name_catenated_hydride(mol) -> Optional[str]:
     if bridge_sym == 'N':
         return _name_nitrogen_bridged_group14(hub_sym, len(hub_atoms))
 
+    return _parent_name(hub_sym, bridge_sym, len(hub_atoms))
+
+
+def _parent_name(hub_sym: str, bridge_sym: str, n_hubs: int) -> str:
+    """The a(ba)n parent hydride name of ``n_hubs`` hub atoms linked by ``bridge_sym`` atoms (disiloxane)."""
     stem = _HUB_STEM[hub_sym]
     suffix = _BRIDGE_SUFFIX[bridge_sym]
     # Linking 'a' when the bridge suffix begins with a consonant (silathiane,
@@ -139,8 +151,7 @@ def name_catenated_hydride(mol) -> Optional[str]:
     # 'diphosphaselenane'): a basic numerical term, never the 'bis' of a
     # multiplied component (c) concerns multiplied components).
     from ..assembly.naming_utils import simple_multiplier_word
-    multiplier = simple_multiplier_word(len(hub_atoms)) or get_multiplier_prefix(
-        len(hub_atoms), base)
+    multiplier = simple_multiplier_word(n_hubs) or get_multiplier_prefix(n_hubs, base)
     return f"{multiplier}{base}"
 
 

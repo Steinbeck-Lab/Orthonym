@@ -289,7 +289,29 @@ def _is_nitro_n(atom) -> bool:
     return len(os_) == 2 and atom.GetDegree() == 3
 
 
+def _is_azinium_n(atom) -> bool:
+    """The substituted nitrogen of a six-membered mancude ring that is a cation centre: the pyridinium of
+    '4,4'-(ethane-1,2-diyl)bis(1-methylpyridin-1-ium) (PIN)'. Three bonds (two in the ring, one outside it) and no
+    hydrogen: the group on the nitrogen stands in the place of the hydrogen of 'pyridin-1-ium'."""
+    return (atom.GetAtomicNum() == 7 and atom.GetFormalCharge() == 1 and atom.GetIsAromatic()
+            and atom.IsInRingSize(6) and atom.GetDegree() == 3 and atom.GetTotalNumHs() == 0)
+
+
 def _scope_ok(mol) -> bool:
+    """The charges the detector reads: the nitro group, and the 'ium' centre of an N-substituted azinium ring unit
+    , ``## **** Assemblies derived from parent cations``, the Blue Book: "Cationic
+    compounds with cationic centers derived from the same parent hydride, but located in different parts of a
+    structure, are named, if possible, according to the principles of multiplicative nomenclature (see, using
+    the multiplying prefixes 'bis-', 'tris-', etc.",:42113; example:42130 '4,4'-(ethane-1,2-diyl)bis(1-methylpyridin-
+    1-ium) (PIN)'). The unit's parent is named from the ring with its charge (``_ring_parent_name``, 'pyridin-1-ium'),
+    the group on the nitrogen is a prefix of the unit like any other, and two units are identical only when their
+    charged atoms are (``_fragment_key``). Any other charge declines.
+
+    A cation ranks above every suffix group, ``## **** SENIORITY ORDER FOR CLASSES``,
+    the Blue Book: class 6 cations, before acids, alcohols, amines), so the azinium rings are the parents and a
+    suffix group on the molecule would be a prefix of them, which the units of this detector do not cite: a molecule
+    with an azinium atom and a principal characteristic group declines ('4,4'-methylenebis[1-(2-hydroxyethyl)pyridin-1-
+    ium]' is not built; the detector read the alcohol as the parent)."""
     if mol.GetNumHeavyAtoms() > _MAX_HEAVY or mol.GetNumHeavyAtoms() < 3:
         return False
     if len(Chem.GetMolFrags(mol)) != 1:
@@ -299,13 +321,20 @@ def _scope_ok(mol) -> bool:
             return False
         q = at.GetFormalCharge()
         if q:
-            if q == 1 and _is_nitro_n(at):
+            if q == 1 and (_is_nitro_n(at) or _is_azinium_n(at)):
                 continue
             if q == -1 and at.GetAtomicNum() == 8 and at.GetDegree() == 1 and \
                     _is_nitro_n(at.GetNeighbors()[0]):
                 continue
             return False
-    return True
+    return not (any(_is_azinium_n(at) for at in mol.GetAtoms()) and _has_principal_group(mol))
+
+
+def _has_principal_group(mol) -> bool:
+    """True when the molecule has a principal characteristic group (the groups of ``_PG_KIND`` and the rest)."""
+    from ..perception.functional_groups import detect_functional_groups
+    from .seniority import get_principal_group
+    return bool(get_principal_group(mol, detect_functional_groups(mol))[0])
 
 
 # ---------------------------------------------------------------------------

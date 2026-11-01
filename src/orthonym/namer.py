@@ -10185,7 +10185,7 @@ class Orthonym:
             # have 2+ separate ring systems that would otherwise be misrouted
             if len(features.ring_systems) >= 2:
                 from .rules.branched_assembly import detect_assembly_or_branched
-                assembly_info = detect_assembly_or_branched(features.mol, features.ring_systems)
+                assembly_info = detect_assembly_or_branched(features.mol, features.ring_systems, features)
                 if not assembly_info and not features.chain_is_parent:
                     # / (the Blue Book,:24153): two ring systems of
                     # one skeleton that differ in hydrogenation are a ring assembly named with
