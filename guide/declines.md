@@ -40,6 +40,7 @@ The JSON row is on the normal output. `producer` is `null`: no name ships, so no
 | `UNSUPPORTED_ELEMENT` | `inorganic compound (not supported)`, or `<metal> compound (not supported)` | an element outside the ones the rules cover, or a compound of a metal that is not admitted to the naming mechanisms and that no general producer names ([Metal compounds](tiers.md#metal-compounds)) |
 | `WILDCARD_ATOMS` | `compound with wildcard atoms (not supported)` | the structure has a `*` atom |
 | `STRUCTURE_TOO_LARGE` | `unknown organic compound` | an unnamed structure with more than 125 heavy atoms: a label given after the attempt, since the engine sets no size limit and attempts every input |
+| `FULLERENE` | `fullerene (not supported)` | a closed fullerene cage of 60 or more atoms (C60, C70 and their adducts), declined at once at every tier |
 | `ISOLATED_ATOM` | `unknown organic compound` | a single heavy atom |
 | `UNSUPPORTED_RING_SYSTEM` | `unknown organic compound` | a ring system the engine recognises but cannot name correctly yet (with `raise_on_limit=True`) |
 | `UNNAMEABLE` | `unknown organic compound` | an organic structure no candidate name passed the checks for |

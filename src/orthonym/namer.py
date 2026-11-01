@@ -32,6 +32,7 @@ from .errors import (
     OrthonymLimitError,
     classify_failure_limit,
     classify_scope_limit,
+    fullerene_limit,
     is_failure_name,
     is_refusal_sentinel,
     no_verified_pin,
@@ -5193,7 +5194,7 @@ class Orthonym:
             #...) -- both spellings are checked, so the filter has no false
             # negative, and skips the extra RDKit parse on the common
             # (non-wildcard) path.
-            if '*' in smiles or '#0' in smiles:
+            if '*' in smiles or '#0' in smiles or len(smiles) >= 60:
                 _probe = Chem.MolFromSmiles(smiles)
                 if _probe is not None:
                     _scope = classify_scope_limit(_probe)
@@ -8019,8 +8020,8 @@ class Orthonym:
         contract that a coverage-audit failure must never change or crash the
         name.
         """
-        if mol is None:
-            return
+        if mol is None or fullerene_limit(mol) is not None:
+            return   # no mol, or declined at once (a fullerene cage)
         # Require an ACTUAL, LIVE way to verify a brand-new candidate against
         # the primary before ever computing one. Two distinct guards, both
         # measured necessary (a caught regression each):
@@ -8102,7 +8103,7 @@ class Orthonym:
         ``rules.relative_stereo.append_relative_stereo_offer``; this method holds the
         gate: nothing is built with the OPSIN validity gate off or without its jar (no
         candidate could be checked). Best-effort ONLY, like the floor."""
-        if mol is None:
+        if mol is None or fullerene_limit(mol) is not None:
             return
         if self._disable_opsin_validity_gate or not _validity_gate_jar_present():
             return
@@ -8162,7 +8163,7 @@ class Orthonym:
         if not (name_scope_depth() == 1 and is_top_level_naming()):
             return name
         mol = Chem.MolFromSmiles(smiles)
-        if mol is None or not (
+        if mol is None or fullerene_limit(mol) is not None or not (
                 any(a.GetChiralTag() != Chem.ChiralType.CHI_UNSPECIFIED
                     for a in mol.GetAtoms())
                 or any(b.GetStereo() != Chem.BondStereo.STEREONONE
