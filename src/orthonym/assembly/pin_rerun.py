@@ -21,7 +21,8 @@ This module holds the three pieces of that path that do not belong in ``namer.py
   (the Blue Book, sentence:50943): preferred IUPAC names are not identified for the compounds of
   Chapter (carbohydrates, natural products, lipids, amino acids and peptides), so a sugar-ring molecule, a
   natural-product scaffold, a lipid backbone or a peptide-like molecule keeps the first run's result; and a name that breaks a spelling rule of the PIN
-  (``validation.pin_spelling``) is no PIN.
+  (``validation.pin_spelling``) is no PIN;
+*:func:`rerun_name_certified` -- the certificate that lets a kept re-run name keep the PIN label (DT3 step C).
 """
 from __future__ import annotations
 
@@ -96,9 +97,123 @@ def rerun_class_guard(mol, name: str) -> Optional[str]:
         from ..rules.peptides import peptide_like
         if peptide_like(mol):
             return "peptide-like (P-103)"
+        if _prostane_like(mol):
+            return "prostane skeleton (P-101)"
+        if _carotenoid_like(mol):
+            return "carotenoid polyene (P-101)"
         failures = check_pin_spelling(mol, name)
     except Exception as exc:  # noqa: BLE001 - a guard that cannot read the molecule lets nothing through
         return f"the guard could not read the molecule ({type(exc).__name__})"
     if failures:
         return f"{failures[0].rule} {failures[0].detail}"
     return None
+
+
+def _acyclic_carbon_chain_length(mol, start: int, ring: set) -> int:
+    """The number of carbons on the longest path of acyclic carbons that starts at ``start`` and leaves ``ring``."""
+    best = 0
+    stack = [(start, frozenset([start]))]
+    while stack:
+        atom, seen = stack.pop()
+        best = max(best, len(seen))
+        for nb in mol.GetAtomWithIdx(atom).GetNeighbors():
+            j = nb.GetIdx()
+            if j not in seen and j not in ring and nb.GetSymbol() == "C" and not nb.IsInRing():
+                stack.append((j, seen | {j}))
+    return best
+
+
+def _prostane_like(mol) -> bool:
+    """True when a five-membered carbon ring holds, on two neighbouring ring atoms, an acyclic carbon chain of seven
+    carbons and one of at least five: the skeleton of 'prostane', a fundamental parent of
+    ('prostane (fundamental parent structure)', the Blue Book; the C1-C7 chain at C8, C13-C20 at C12). A guard
+    only, so a wider net keeps a name below the PIN and never makes one."""
+    for ring in mol.GetRingInfo().AtomRings():
+        if len(ring) != 5 or any(mol.GetAtomWithIdx(i).GetSymbol() != "C" for i in ring):
+            continue
+        ring_set = set(ring)
+        lengths = {}
+        for i in ring:
+            for nb in mol.GetAtomWithIdx(i).GetNeighbors():
+                if nb.GetIdx() not in ring_set and nb.GetSymbol() == "C" and not nb.IsInRing():
+                    lengths[i] = max(lengths.get(i, 0), _acyclic_carbon_chain_length(mol, nb.GetIdx(), ring_set))
+        for k in range(5):
+            a, b = ring[k], ring[(k + 1) % 5]
+            pair = sorted((lengths.get(a, 0), lengths.get(b, 0)))
+            if (pair[1] == 7 and pair[0] >= 5) or (pair[0] == 7 and pair[1] >= 7):
+                return True
+    return False
+
+
+def _carotenoid_like(mol) -> bool:
+    """True when an acyclic run of conjugated carbon-carbon double bonds holds at least four of them and at least two
+    methyl branches: the polyene of the carotenes and retinoids, fundamental parents of ('β,β-carotene
+    (fundamental parent structure)', the Blue Book). A guard only, as for ``_prostane_like``."""
+    double = [b for b in mol.GetBonds()
+              if b.GetBondType() == Chem.BondType.DOUBLE and not b.IsInRing()
+              and b.GetBeginAtom().GetSymbol() == "C" and b.GetEndAtom().GetSymbol() == "C"]
+    if len(double) < 4:
+        return False
+    atoms = {a for b in double for a in (b.GetBeginAtomIdx(), b.GetEndAtomIdx())}
+    # group the double bonds into conjugated runs: two double bonds are conjugated when a single bond joins them
+    parent = {b.GetIdx(): b.GetIdx() for b in double}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    by_atom = {}
+    for b in double:
+        for a in (b.GetBeginAtomIdx(), b.GetEndAtomIdx()):
+            by_atom[a] = b.GetIdx()
+    for b in mol.GetBonds():
+        if b.GetBondType() != Chem.BondType.SINGLE:
+            continue
+        i, j = b.GetBeginAtomIdx(), b.GetEndAtomIdx()
+        if i in by_atom and j in by_atom:
+            parent[find(by_atom[i])] = find(by_atom[j])
+    runs = {}
+    for b in double:
+        runs.setdefault(find(b.GetIdx()), []).append(b)
+    for run in runs.values():
+        if len(run) < 4:
+            continue
+        run_atoms = {a for b in run for a in (b.GetBeginAtomIdx(), b.GetEndAtomIdx())}
+        # a methyl branch sits on a polyene atom with three heavy neighbours; a chain-end methyl is no branch
+        methyls = sum(1 for a in run_atoms if mol.GetAtomWithIdx(a).GetDegree() >= 3
+                      for nb in mol.GetAtomWithIdx(a).GetNeighbors()
+                      if nb.GetSymbol() == "C" and nb.GetDegree() == 1 and nb.GetIdx() not in atoms)
+        if methyls >= 2:
+            return True
+    return False
+
+
+def rerun_name_certified(mol, name: str) -> bool:
+    """True iff the kept re-run name ``name`` of ``mol`` is certified as the PIN by evidence on every part (DT3 step C).
+
+    A kept re-run name carries pieces a breadth producer built, so it is labelled ``pin_unverified`` unless the
+    evidence decides each of its parts: no class of:func:`rerun_class_guard` "INTRODUCTION",
+    the Blue Book), no spelling check that fails or abstains (``validation.pin_spelling.pin_spelling_report``),
+    and a reader that models every parent-bearing unit of the name and no Chapter mark
+    (``validation.spelling.coverage.NameCoverage.full``). The caller has already required the OPSIN read-back to the
+    full key, the PIN path, no recorded non-PIN part and no multiplicative candidate. Any doubt gives False: the name
+    keeps ``pin_unverified``. A check that returns no verdict (UNDECIDED) does not block: the certificate is the class
+    guard, no failing or abstaining check, and full coverage, not a PASS from every check."""
+    if mol is None or not name:
+        return False
+    # the blind panel of step C found one non-PIN among the certified names, an exocyclic double bond whose E/Z
+    # descriptor sat inside the ylidene prefix instead of at the front with the parent locant
+    # "Specification by stereodescriptors 'E' and 'Z'", the Blue Book-48281); by the plan's stop rule the class
+    # of that row, a name with an ylidene prefix, is not certified
+    if "ylidene" in name:
+        return False
+    try:
+        if rerun_class_guard(mol, name) is not None:
+            return False
+        from ..validation.pin_spelling import ABSTAIN, FAIL, pin_spelling_report
+        report = pin_spelling_report(mol, name)
+        return (report.coverage is not None and report.coverage.full
+                and report.count(FAIL) == 0 and report.count(ABSTAIN) == 0)
+    except Exception:
+        return False
