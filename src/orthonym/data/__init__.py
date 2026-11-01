@@ -315,9 +315,6 @@ _OPSIN_IMPORT_PIN_EVIDENCE = frozenset({
     # retained as PINs in prose (:41017,:41640)
     "ethoxide", "butoxide", "tert-butoxide", "phenoxide", "aminoxide",
     "ethoxylium", "propoxylium", "butoxylium", "phenoxylium", "aminoxylium",
-    # (:55227) "The retained name 'sphinganine' is preferred to the
-    # systematic name (2S,3R)-2-aminooctadecane-1,3-diol"
-    "sphinganine",
     # Table 10.1 fundamental stereoparents (:51383,:51409), kept at the PIN tier
     # by the controller ruling on stereoparent names (plan 'Controller
     # rulings';:50943 identifies no PIN for the chapter)
