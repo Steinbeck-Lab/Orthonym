@@ -80,7 +80,7 @@ _name_with_tree_capture: "contextvars.ContextVar[Optional[Dict[str, Any]]]" = (
 from .assembly.composer import assemble_name
 from .assembly.spelling_offer import name_tiered_with_offer as _name_tiered_with_offer
 from .tiers import is_wider, tier_label_of
-from .assembly.default_tier_offer import default_tier_engine, default_tier_name_scope, is_offered
+from .assembly.default_tier_offer import default_tier_engine, default_tier_name_scope, is_offered, list_name_yields
 from .assembly.offer_pool import (
     ABSTAIN,
     BEST_EFFORT,
@@ -7881,7 +7881,7 @@ class Orthonym:
             if (self._general_fallback and is_failure_name(name) and _np_top()
                     and _np_depth() == 1):
                 _np_name = _np_exact_list_name(smiles)
-                if _np_name is not None:
+                if _np_name is not None and not list_name_yields(self, smiles):
                     from .metrics import provenance as _np_pv
                     _np_pv.record_source("trivial_retained")
                     _record_gate_outcome(

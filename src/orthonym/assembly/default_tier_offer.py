@@ -472,6 +472,20 @@ def twin_last_resort_row(namer, smiles, held) -> Optional[Dict]:
     return None
 
 
+def list_name_yields(namer, smiles) -> bool:
+    """Whether the exact-match natural-product list name ('germacrane') gives way at a general tier: the default
+    tier ships, through its stereo-layer carve-out, a name the gate withdrew for ``smiles`` (:func:`stereo_layer_row`),
+    and the offer below gives that row when no name ships. A name of the PIN path, its stereo layer checked against
+    the CIP labels, outranks a list name OPSIN cannot read: INTRODUCTION (the Blue Book) identifies no PIN
+    for the list name, and the user decision of 2026-10-31 offers the systematic name first (advisor ruling
+    2026-11-01, internal notes). The list name stays the last resort when no such row exists."""
+    try:
+        held = held_names()
+        return bool(held) and stereo_layer_row(namer, smiles, held) is not None
+    except Exception:                       # the list name stands when the question cannot be answered
+        return False
+
+
 def offer_default_tier_row(namer, smiles: str, row: Dict) -> Dict:
     """``row``, or the row ``default_tier_row_for`` offers when ``row`` is an abstention: the default tier's
     row when the default tier ships, through its stereo-layer carve-out, a name the best-effort gate withdrew,

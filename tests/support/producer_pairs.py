@@ -138,9 +138,10 @@ PAIRS = [
     # the late recovery of the general engine names the components of a multi-component input and joins them
     ("C1CCC(C1)NN.[Cl-]", "best-effort", "multifragment"),
     ("CCOC(=O)C.C/C=C/C=C/C(=O)[O-]", "best-effort", "multifragment"),
-    # the exact-match list of natural-product parents, the last resort before a decline (germacrane is
-    # named by outer:natural_product at the default tier)
-    ("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1", "best-effort", "table:np_parent"),
+    # germacrane: the systematic name the default tier ships comes first at best-effort too (2026-11-01, advisor
+    # ruling, internal notes:50943), so the list name 'table:np_parent' is no longer the natural
+    # producer of any list parent; the last resort itself is pinned by test_table_np_parent_exact_list_name
+    ("CC(C)[C@@H]1CC[C@H](C)CCC[C@H](C)CC1", "best-effort", "outer:natural_product"),
     # no organic positive: the list of metal-complex names, taken by name at its exit
     (COB_I, "pin", "table:coordination"),
     (COB_II, "pin", "table:coordination"),

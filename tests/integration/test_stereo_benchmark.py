@@ -434,12 +434,12 @@ def _assert_list_identity(smiles, expected_name):
     assert r["name"] == systematic, (
         f"LIST-NAME ROW CHANGED: {smiles}: expected {systematic!r}, got {r['name']!r}")
     assert r["tier"] == "pin_unverified" and not r["is_pin"], r
+    # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
     r = name_best_effort(smiles)
-    assert r["name"] == expected_name, (
-        f"LIST-NAME ROW CHANGED: {smiles}: expected {expected_name!r}, got "
+    assert r["name"] == systematic, (
+        f"LIST-NAME ROW CHANGED: {smiles}: expected {systematic!r}, got "
         f"{r['name']!r} -- re-verify (the list entry + the Blue Book)")
-    assert r["tier"] == "systematic_verified" and r["verified"] == "identity", r
-    assert r["gate_outcome"] == "carveout:np_stereoparent", r
+    assert r["tier"] == "pin_unverified" and not r["is_pin"], r
 
 
 def _params(rows):

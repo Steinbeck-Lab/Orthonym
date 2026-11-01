@@ -78,7 +78,8 @@ def test_an_exact_match_list_name_is_kept_at_both_tiers_below_the_pin(smiles, na
     pseudoasymmetric descriptor; its stereo-stripped form reads back to the constitution); the best-effort tier keeps
     the list name."""
     row = _row(smiles, tier)
-    if tier == "pin":
+    # 2026-11-01 (changed asserted value; advisor ruling, internal notes): was 'germacrane' at best-effort. The default tier ships the systematic name through its stereo-layer carve-out, and a name of the PIN path outranks a list name OPSIN cannot read INTRODUCTION, the Blue Book; user decision 2026-10-31, systematic name first). A name still ships at every tier (user decision 2026-09-30).
+    if tier in ("pin", "best-effort"):
         assert (row.get("name"), row["tier"]) == (
             "(1R,4s,7S)-1,7-dimethyl-4-(propan-2-yl)cyclodecane", "pin_unverified"), (row.get("name"), row["tier"])
         assert row["is_pin"] is False, row
